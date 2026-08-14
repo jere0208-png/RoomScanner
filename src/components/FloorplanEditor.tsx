@@ -150,10 +150,10 @@ export function FloorplanEditor({
 
           {/* Poignées de coin, uniquement en mode édition */}
           {editable &&
-            corners.map((c) => (
+            corners.map((pt) => (
               <CornerHandle
-                key={`${c.wallId}-${c.end}`}
-                corner={c}
+                key={`${pt.wallId}-${pt.end}`}
+                corner={pt}
                 mapping={mapping}
               />
             ))}

@@ -1,5 +1,12 @@
-import React, { useEffect } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import {
+  Animated,
+  Easing,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import { RoomScan } from 'react-native-room-scan';
 import {
@@ -87,6 +94,47 @@ export function HomeScreen() {
     RoomScan.isSupported().then(setSupported);
   }, [setSupported]);
 
+  // Arrivée : le logo projette une onde qui révèle le contenu en fondu.
+  const wave = useRef(new Animated.Value(0)).current;
+  const reveal = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(wave, {
+        toValue: 1,
+        duration: 600,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+      Animated.timing(reveal, {
+        toValue: 1,
+        duration: 700,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [wave, reveal]);
+
+  // Fondu en cascade : chaque bloc apparaît juste après le précédent.
+  const fadeIn = (i: number) => {
+    const range = [i * 0.1, Math.min(i * 0.1 + 0.45, 1)];
+    return {
+      opacity: reveal.interpolate({
+        inputRange: range,
+        outputRange: [0, 1],
+        extrapolate: 'clamp' as const,
+      }),
+      transform: [
+        {
+          translateY: reveal.interpolate({
+            inputRange: range,
+            outputRange: [10, 0],
+            extrapolate: 'clamp' as const,
+          }),
+        },
+      ],
+    };
+  };
+
   return (
     <View style={styles.container}>
       <TouchableOpacity
@@ -99,23 +147,42 @@ export function HomeScreen() {
       </TouchableOpacity>
 
       <View style={styles.hero}>
-        <LogoMark />
-        <Text style={styles.title}>
-          Echo<Text style={styles.titleAccent}>Plan</Text>
-        </Text>
-        <Text style={styles.subtitle}>
-          Votre appartement en 3D et en plan coté,{'\n'}en quelques minutes.
-        </Text>
-
-        {supported === true && (
-          <View style={styles.statusChip}>
-            <View style={styles.statusDot} />
-            <Text style={styles.statusText}>LiDAR détecté — prêt à scanner</Text>
-          </View>
-        )}
+        <View style={styles.logoWrap}>
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.waveRing,
+              {
+                opacity: wave.interpolate({
+                  inputRange: [0, 0.15, 1],
+                  outputRange: [0, 0.45, 0],
+                }),
+                transform: [
+                  {
+                    scale: wave.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.7, 7],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          />
+          <LogoMark />
+        </View>
+        <Animated.View style={fadeIn(0)}>
+          <Text style={styles.title}>
+            Echo<Text style={styles.titleAccent}>Plan</Text>
+          </Text>
+        </Animated.View>
+        <Animated.View style={fadeIn(1)}>
+          <Text style={styles.subtitle}>
+            Votre appartement en 3D et en plan coté,{'\n'}en quelques minutes.
+          </Text>
+        </Animated.View>
       </View>
 
-      <View style={styles.stepsCard}>
+      <Animated.View style={[styles.stepsCard, fadeIn(2)]}>
         {STEPS.map((s, i) => (
           <View key={s.n} style={[styles.stepRow, i > 0 && styles.stepRowBorder]}>
             <View style={styles.stepBadge}>
@@ -127,7 +194,7 @@ export function HomeScreen() {
             </View>
           </View>
         ))}
-      </View>
+      </Animated.View>
 
       {supported === false && (
         <View style={styles.warning}>
@@ -143,31 +210,35 @@ export function HomeScreen() {
         </View>
       )}
 
-      <TouchableOpacity
-        activeOpacity={0.85}
-        style={[styles.cta, supported !== true && styles.ctaDisabled]}
-        disabled={supported !== true}
-        onPress={start}>
-        <Text style={styles.ctaText}>
-          {supported === null ? 'Vérification…' : 'Commencer le scan'}
-        </Text>
-      </TouchableOpacity>
+      <Animated.View style={[styles.ctaWrap, fadeIn(3)]}>
+        <TouchableOpacity
+          activeOpacity={0.85}
+          style={[styles.cta, supported !== true && styles.ctaDisabled]}
+          disabled={supported !== true}
+          onPress={start}>
+          <Text style={styles.ctaText}>
+            {supported === null ? 'Vérification…' : 'Commencer le scan'}
+          </Text>
+        </TouchableOpacity>
+      </Animated.View>
 
       {saves.length > 0 && (
-        <TouchableOpacity
-          style={styles.libraryButton}
-          onPress={() => setScreen('library')}>
-          <Text style={styles.libraryText}>Mes scans</Text>
-          <View style={styles.libraryBadge}>
-            <Text style={styles.libraryBadgeText}>{saves.length}</Text>
-          </View>
-        </TouchableOpacity>
+        <Animated.View style={fadeIn(4)}>
+          <TouchableOpacity
+            style={styles.libraryButton}
+            onPress={() => setScreen('library')}>
+            <Text style={styles.libraryText}>Mes scans</Text>
+            <View style={styles.libraryBadge}>
+              <Text style={styles.libraryBadgeText}>{saves.length}</Text>
+            </View>
+          </TouchableOpacity>
+        </Animated.View>
       )}
 
-      <Text style={styles.hint}>
+      <Animated.Text style={[styles.hint, fadeIn(5)]}>
         Allumez les lumières et dégagez le centre de la pièce pour un meilleur
         résultat.
-      </Text>
+      </Animated.Text>
     </View>
   );
 }
@@ -209,25 +280,15 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     textAlign: 'center',
     marginTop: 8,
   },
-  statusChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: c.surface,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: c.line,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    marginTop: 18,
+  logoWrap: { alignItems: 'center', justifyContent: 'center' },
+  waveRing: {
+    position: 'absolute',
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+    borderWidth: 2,
+    borderColor: c.blue,
   },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: c.green,
-    marginRight: 8,
-  },
-  statusText: { color: c.inkSoft, fontSize: 13, fontWeight: '600' },
   stepsCard: {
     backgroundColor: c.surface,
     borderRadius: radius.lg,
@@ -257,8 +318,8 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     marginTop: 20,
   },
   warningText: { color: '#A33A3E', fontSize: 13, lineHeight: 18 },
+  ctaWrap: { marginTop: 'auto' },
   cta: {
-    marginTop: 'auto',
     backgroundColor: c.blue,
     borderRadius: radius.md + 2,
     paddingVertical: 17,

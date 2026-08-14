@@ -169,8 +169,8 @@ export function Iso3DView() {
 
     // Meubles : boîtes grises-bleutées.
     for (const obj of objects.map(toFootprint)) {
-      const c = Math.cos(obj.yaw);
-      const s = Math.sin(obj.yaw);
+      const cosY = Math.cos(obj.yaw);
+      const sinY = Math.sin(obj.yaw);
       const hw = obj.width / 2;
       const hd = obj.depth / 2;
       const corners = [
@@ -179,8 +179,8 @@ export function Iso3DView() {
         [hw, hd],
         [-hw, hd],
       ].map(([lx, lz]) => ({
-        x: obj.cx + lx * c - lz * s,
-        z: obj.cz + lx * s + lz * c,
+        x: obj.cx + lx * cosY - lz * sinY,
+        z: obj.cz + lx * sinY + lz * cosY,
       }));
       const yBase = Math.max(0, obj.yCenter - obj.height / 2 - floorY);
       const yTop = yBase + obj.height;
@@ -207,16 +207,16 @@ export function Iso3DView() {
     if (all.length === 0) {
       return { center: { x: 0, y: 0, z: 0 }, radius3d: 1 };
     }
-    const c = {
+    const ctr = {
       x: all.reduce((s, p) => s + p.x, 0) / all.length,
       y: all.reduce((s, p) => s + p.y, 0) / all.length,
       z: all.reduce((s, p) => s + p.z, 0) / all.length,
     };
     const r = Math.max(
       0.5,
-      ...all.map((p) => Math.hypot(p.x - c.x, p.y - c.y, p.z - c.z)),
+      ...all.map((p) => Math.hypot(p.x - ctr.x, p.y - ctr.y, p.z - ctr.z)),
     );
-    return { center: c, radius3d: r };
+    return { center: ctr, radius3d: r };
   }, [faces]);
 
   const rendered = useMemo(() => {
