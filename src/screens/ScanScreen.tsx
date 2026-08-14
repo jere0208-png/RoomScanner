@@ -24,7 +24,7 @@ export function ScanScreen() {
   const windowCount = useScanStore((s) => s.windowCount);
   const paused = useScanStore((s) => s.paused);
   const processing = useScanStore((s) => s.processing);
-  const { pause, resume, stop } = useRoomScan();
+  const { pause, resume, stop, cancel } = useRoomScan();
 
   const stats: [string, number][] = [
     ['Murs', wallCount],
@@ -37,6 +37,10 @@ export function ScanScreen() {
     <View style={styles.container}>
       {/* La vue AR native se rend elle-même à 60 FPS ; l'UI RN flotte au-dessus. */}
       <RoomScanView style={StyleSheet.absoluteFill} />
+
+      <TouchableOpacity style={styles.cancelButton} onPress={cancel}>
+        <Text style={styles.cancelIcon}>✕</Text>
+      </TouchableOpacity>
 
       <View style={styles.topHud} pointerEvents="none">
         <View style={styles.statsPill}>
@@ -88,11 +92,24 @@ export function ScanScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
+  cancelButton: {
+    position: 'absolute',
+    top: 58,
+    left: 20,
+    zIndex: 2,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.scanPillSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelIcon: { color: colors.scanInk, fontSize: 16, fontWeight: '700' },
   topHud: {
     position: 'absolute',
     top: 58,
-    left: 0,
-    right: 0,
+    left: 56,
+    right: 56,
     alignItems: 'center',
   },
   statsPill: {

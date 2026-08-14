@@ -60,5 +60,10 @@ export function useRoomScan() {
         store.setError(e?.message ?? 'Échec du traitement du scan');
       }
     },
+    /** Abandonne le scan en cours sans post-traitement ni sauvegarde. */
+    cancel: () => {
+      RoomScan.pause();
+      useScanStore.getState().reset();
+    },
   };
 }

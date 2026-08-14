@@ -34,6 +34,8 @@ export function HomeScreen() {
   const supported = useScanStore((s) => s.supported);
   const setSupported = useScanStore((s) => s.setSupported);
   const error = useScanStore((s) => s.error);
+  const saves = useScanStore((s) => s.saves);
+  const setScreen = useScanStore((s) => s.setScreen);
   const { start } = useRoomScan();
 
   useEffect(() => {
@@ -94,6 +96,17 @@ export function HomeScreen() {
           {supported === null ? 'Vérification…' : 'Commencer le scan'}
         </Text>
       </TouchableOpacity>
+
+      {saves.length > 0 && (
+        <TouchableOpacity
+          style={styles.libraryButton}
+          onPress={() => setScreen('library')}>
+          <Text style={styles.libraryText}>Mes scans</Text>
+          <View style={styles.libraryBadge}>
+            <Text style={styles.libraryBadgeText}>{saves.length}</Text>
+          </View>
+        </TouchableOpacity>
+      )}
 
       <Text style={styles.hint}>
         Allumez les lumières et dégagez le centre de la pièce pour un meilleur
@@ -188,6 +201,26 @@ const styles = StyleSheet.create({
   },
   ctaDisabled: { backgroundColor: colors.lineStrong, shadowOpacity: 0 },
   ctaText: { color: '#FFFFFF', fontSize: 17, fontWeight: '700' },
+  libraryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.lineStrong,
+    borderRadius: radius.md + 2,
+    paddingVertical: 14,
+    marginTop: 10,
+  },
+  libraryText: { color: colors.ink, fontSize: 15.5, fontWeight: '600' },
+  libraryBadge: {
+    backgroundColor: colors.blueSoft,
+    borderRadius: radius.pill,
+    paddingHorizontal: 9,
+    paddingVertical: 2,
+    marginLeft: 9,
+  },
+  libraryBadgeText: { color: colors.blue, fontSize: 13, fontWeight: '800' },
   hint: {
     color: colors.inkFaint,
     fontSize: 12,

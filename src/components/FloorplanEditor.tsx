@@ -21,28 +21,38 @@ import {
 import { useScanStore } from '../store/scanStore';
 
 interface Props {
+  /** Cotes visibles le long des murs. */
+  showMeasures: boolean;
+  /** Mode édition : sélection des murs + poignées de coin. */
+  editable: boolean;
   selectedWallId: string | null;
   onSelectWall: (id: string | null) => void;
 }
 
 /**
  * Plan 2D vu de dessus, dérivé du store (source de vérité paramétrique).
- * Les coins se déplacent au doigt ; les murs soudés au même coin suivent.
+ * En lecture : plan épuré, cotes discrètes. En édition : murs sélectionnables
+ * et coins déplaçables (les murs soudés au même coin suivent).
  */
-export function FloorplanEditor({ selectedWallId, onSelectWall }: Props) {
+export function FloorplanEditor({
+  showMeasures,
+  editable,
+  selectedWallId,
+  onSelectWall,
+}: Props) {
   const walls = useScanStore((s) => s.walls);
   const openings = useScanStore((s) => s.openings);
   const objects = useScanStore((s) => s.objects);
-  const modelPath = useScanStore((s) => s.modelPath);
+  const currentSaveId = useScanStore((s) => s.currentSaveId);
   const [layout, setLayout] = useState({ w: 0, h: 0 });
 
-  // Cadrage figé sur le résultat du scan (pas sur les éditions),
+  // Cadrage figé sur le scan chargé (pas sur les éditions),
   // sinon le plan "respire" pendant qu'on déplace un coin.
   const mapping = useMemo(() => {
     if (layout.w === 0 || layout.h === 0) return null;
     return makeMapping(bounds(walls), layout.w, layout.h);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [modelPath, layout.w, layout.h]);
+  }, [currentSaveId, layout.w, layout.h]);
 
   // Coins uniques (les extrémités soudées partagent les mêmes coordonnées).
   const corners = useMemo(() => {
@@ -106,9 +116,12 @@ export function FloorplanEditor({ selectedWallId, onSelectWall }: Props) {
                 key={w.id}
                 wall={w}
                 mapping={mapping}
-                selected={w.id === selectedWallId}
-                onPress={() =>
-                  onSelectWall(w.id === selectedWallId ? null : w.id)
+                showMeasure={showMeasures}
+                selected={editable && w.id === selectedWallId}
+                onPress={
+                  editable
+                    ? () => onSelectWall(w.id === selectedWallId ? null : w.id)
+                    : undefined
                 }
               />
             ))}
@@ -133,14 +146,15 @@ export function FloorplanEditor({ selectedWallId, onSelectWall }: Props) {
             })}
           </Svg>
 
-          {/* Poignées de coin (Views absolues : PanResponder simple et fiable) */}
-          {corners.map((c) => (
-            <CornerHandle
-              key={`${c.wallId}-${c.end}`}
-              corner={c}
-              mapping={mapping}
-            />
-          ))}
+          {/* Poignées de coin, uniquement en mode édition */}
+          {editable &&
+            corners.map((c) => (
+              <CornerHandle
+                key={`${c.wallId}-${c.end}`}
+                corner={c}
+                mapping={mapping}
+              />
+            ))}
         </>
       )}
     </View>
@@ -150,24 +164,30 @@ export function FloorplanEditor({ selectedWallId, onSelectWall }: Props) {
 function WallLine({
   wall,
   mapping,
+  showMeasure,
   selected,
   onPress,
 }: {
   wall: WallSeg;
   mapping: Mapping;
+  showMeasure: boolean;
   selected: boolean;
-  onPress: () => void;
+  onPress?: () => void;
 }) {
   const a = mapping.toPx(wall.a);
   const b = mapping.toPx(wall.b);
-  const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-  const label = `${segLength(wall).toFixed(2)} m`;
-  // Décale la cote perpendiculairement au mur pour ne pas la poser dessus.
   const dx = b.x - a.x;
   const dy = b.y - a.y;
   const norm = Math.hypot(dx, dy) || 1;
-  const off = { x: (-dy / norm) * 18, y: (dx / norm) * 18 };
-  const chipW = label.length * 6.6 + 12;
+
+  // Cote : petit texte posé le long du mur, sans cadre, jamais à l'envers.
+  let angle = (Math.atan2(dy, dx) * 180) / Math.PI;
+  if (angle > 90) angle -= 180;
+  if (angle < -90) angle += 180;
+  let n = { x: -dy / norm, y: dx / norm };
+  if (n.y > 0) n = { x: -n.x, y: -n.y }; // toujours du côté "haut" écran
+  const mid = { x: (a.x + b.x) / 2 + n.x * 11, y: (a.y + b.y) / 2 + n.y * 11 };
+  const label = `${segLength(wall).toFixed(2).replace('.', ',')} m`;
 
   return (
     <G onPress={onPress}>
@@ -182,25 +202,18 @@ function WallLine({
         strokeWidth={selected ? 8 : 6}
         strokeLinecap="round"
       />
-      <Rect
-        x={mid.x + off.x - chipW / 2}
-        y={mid.y + off.y - 10}
-        width={chipW}
-        height={20}
-        rx={10}
-        fill={selected ? colors.blue : colors.surface}
-        stroke={selected ? 'none' : colors.line}
-        strokeWidth={1}
-      />
-      <SvgText
-        x={mid.x + off.x}
-        y={mid.y + off.y + 4}
-        fill={selected ? '#FFFFFF' : colors.inkSoft}
-        fontSize={11}
-        fontWeight="600"
-        textAnchor="middle">
-        {label}
-      </SvgText>
+      {showMeasure && (
+        <SvgText
+          x={mid.x}
+          y={mid.y + 3}
+          fill={selected ? colors.blue : colors.inkSoft}
+          fontSize={selected ? 11 : 10}
+          fontWeight="600"
+          textAnchor="middle"
+          transform={`rotate(${angle}, ${mid.x}, ${mid.y})`}>
+          {label}
+        </SvgText>
+      )}
     </G>
   );
 }
