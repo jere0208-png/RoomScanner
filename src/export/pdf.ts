@@ -23,7 +23,6 @@ const WALL_T = 0.14;
 const INK = '#141922';
 const GREY = '#5A6472';
 const GREY_LIGHT = '#98A1AE';
-const BLUE = '#1F5BFF';
 const AMBER = '#B97F26';
 const SKY = '#2E93BD';
 
