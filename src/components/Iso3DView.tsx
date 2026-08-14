@@ -106,17 +106,34 @@ export function Iso3DView() {
       { x: p.x, y: yTop, z: p.z },
     ];
 
+    // Aux coins partagés, chaque mur est prolongé d'une demi-épaisseur :
+    // les boîtes se rejoignent et l'angle extérieur se termine en pointe.
+    const cornerKey = (p: { x: number; z: number }) =>
+      `${p.x.toFixed(3)}:${p.z.toFixed(3)}`;
+    const cornerCount = new Map<string, number>();
+    for (const w of walls) {
+      for (const p of [w.a, w.b]) {
+        cornerCount.set(cornerKey(p), (cornerCount.get(cornerKey(p)) ?? 0) + 1);
+      }
+    }
+
     // Murs épais : boîte (2 longs pans, 2 chants, 1 dessus).
     for (const w of walls) {
       const dx = w.b.x - w.a.x;
       const dz = w.b.z - w.a.z;
       const len = Math.hypot(dx, dz) || 1;
+      const ux = dx / len;
+      const uz = dz / len;
+      const extA = (cornerCount.get(cornerKey(w.a)) ?? 0) > 1 ? WALL_T / 2 : 0;
+      const extB = (cornerCount.get(cornerKey(w.b)) ?? 0) > 1 ? WALL_T / 2 : 0;
+      const pa = { x: w.a.x - ux * extA, z: w.a.z - uz * extA };
+      const pb = { x: w.b.x + ux * extB, z: w.b.z + uz * extB };
       const nx = (-dz / len) * (WALL_T / 2);
       const nz = (dx / len) * (WALL_T / 2);
-      const a1 = { x: w.a.x + nx, z: w.a.z + nz };
-      const a2 = { x: w.a.x - nx, z: w.a.z - nz };
-      const b1 = { x: w.b.x + nx, z: w.b.z + nz };
-      const b2 = { x: w.b.x - nx, z: w.b.z - nz };
+      const a1 = { x: pa.x + nx, z: pa.z + nz };
+      const a2 = { x: pa.x - nx, z: pa.z - nz };
+      const b1 = { x: pb.x + nx, z: pb.z + nz };
+      const b2 = { x: pb.x - nx, z: pb.z - nz };
 
       const sides: [typeof a1, typeof a1][] = [
         [a1, b1],

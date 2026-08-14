@@ -22,6 +22,9 @@ export interface SavedScan {
 }
 
 const STORAGE_KEY = 'roomscanner.saves.v1';
+const THEME_KEY = 'roomscanner.themePref.v1';
+
+export type ThemePref = 'auto' | 'light' | 'dark';
 
 let persistTimer: ReturnType<typeof setTimeout> | null = null;
 function persistSoon(saves: SavedScan[]) {
@@ -64,6 +67,10 @@ interface ScanState {
 
   // Bibliothèque persistée
   saves: SavedScan[];
+
+  // Apparence : Auto suit le réglage du téléphone.
+  themePref: ThemePref;
+  setThemePref: (p: ThemePref) => void;
 
   setScreen: (s: Screen) => void;
   setSupported: (v: boolean) => void;
@@ -125,6 +132,12 @@ export const useScanStore = create<ScanState>((set, get) => {
     openings: [],
     objects: [],
     saves: [],
+    themePref: 'auto',
+
+    setThemePref: (themePref) => {
+      set({ themePref });
+      AsyncStorage.setItem(THEME_KEY, themePref).catch(() => {});
+    },
 
     setScreen: (screen) => set({ screen }),
     setSupported: (supported) => set({ supported }),
@@ -259,12 +272,16 @@ export const useScanStore = create<ScanState>((set, get) => {
 
     loadSaves: async () => {
       try {
+        const pref = await AsyncStorage.getItem(THEME_KEY);
+        if (pref === 'auto' || pref === 'light' || pref === 'dark') {
+          set({ themePref: pref });
+        }
         const raw = await AsyncStorage.getItem(STORAGE_KEY);
         if (!raw) return;
         const saves = JSON.parse(raw) as SavedScan[];
         if (Array.isArray(saves)) set({ saves });
       } catch {
-        // Bibliothèque illisible : on repart de la liste en mémoire.
+        // Stockage illisible : on repart des valeurs en mémoire.
       }
     },
 

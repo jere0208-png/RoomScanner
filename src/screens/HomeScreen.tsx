@@ -9,7 +9,7 @@ import {
   useTheme,
   type Palette,
 } from '../theme';
-import { useScanStore } from '../store/scanStore';
+import { useScanStore, type ThemePref } from '../store/scanStore';
 import { useRoomScan } from '../native/useRoomScan';
 
 /**
@@ -23,9 +23,10 @@ function LogoMark({ size = 76 }: { size?: number }) {
       <Rect x={0} y={0} width={76} height={76} rx={20} fill={c.blue} />
       {/* Point d'émission */}
       <Circle cx={25} cy={51} r={4.5} fill="#FFFFFF" />
-      {/* Deux ondes d'écho */}
+      {/* Deux ondes d'écho, balayage symétrique autour de la diagonale :
+          le radar vise exactement l'angle des murs. */}
       <Path
-        d="M27.9 40.4 A11 11 0 0 1 36 52"
+        d="M25.96 40.04 A11 11 0 0 1 35.96 50.04"
         stroke="#FFFFFF"
         strokeWidth={4.5}
         strokeLinecap="round"
@@ -33,7 +34,7 @@ function LogoMark({ size = 76 }: { size?: number }) {
         opacity={0.55}
       />
       <Path
-        d="M29.9 32.7 A19 19 0 0 1 43.9 52.7"
+        d="M26.66 32.07 A19 19 0 0 1 43.93 49.34"
         stroke="#FFFFFF"
         strokeWidth={4.5}
         strokeLinecap="round"
@@ -65,9 +66,22 @@ export function HomeScreen() {
   const error = useScanStore((s) => s.error);
   const saves = useScanStore((s) => s.saves);
   const setScreen = useScanStore((s) => s.setScreen);
+  const themePref = useScanStore((s) => s.themePref);
+  const setThemePref = useScanStore((s) => s.setThemePref);
   const { start } = useRoomScan();
   const c = useTheme();
   const styles = getStyles(c);
+
+  const THEME_LABELS: Record<ThemePref, string> = {
+    auto: 'Auto',
+    light: 'Clair',
+    dark: 'Sombre',
+  };
+  const NEXT_THEME: Record<ThemePref, ThemePref> = {
+    auto: 'dark',
+    dark: 'light',
+    light: 'auto',
+  };
 
   useEffect(() => {
     RoomScan.isSupported().then(setSupported);
@@ -75,6 +89,15 @@ export function HomeScreen() {
 
   return (
     <View style={styles.container}>
+      <TouchableOpacity
+        style={styles.themePill}
+        onPress={() => setThemePref(NEXT_THEME[themePref])}>
+        <Text style={styles.themePillText}>
+          {themePref === 'dark' ? '☾' : themePref === 'light' ? '☀' : '◐'}{' '}
+          {THEME_LABELS[themePref]}
+        </Text>
+      </TouchableOpacity>
+
       <View style={styles.hero}>
         <LogoMark />
         <Text style={styles.title}>
@@ -158,6 +181,19 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     paddingBottom: 40,
   },
   hero: { alignItems: 'center' },
+  themePill: {
+    position: 'absolute',
+    top: 56,
+    right: 24,
+    backgroundColor: c.surface,
+    borderWidth: 1,
+    borderColor: c.line,
+    borderRadius: radius.pill,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    zIndex: 2,
+  },
+  themePillText: { color: c.inkSoft, fontSize: 12.5, fontWeight: '700' },
   title: {
     color: c.ink,
     fontSize: 32,

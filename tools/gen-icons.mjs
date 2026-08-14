@@ -69,9 +69,10 @@ const cov = (d, aa) => Math.max(0, Math.min(1, 0.5 - d / aa));
 // agrandi de 28 % autour de son centre pour l'icône.
 const ZOOM = 1.28, CX = 39, CY = 37;
 const DOT = { x: 25, y: 51, r: 4.5 };
+// Balayage symétrique autour de la diagonale (-45°) : le radar vise l'angle.
 const ARCS = [
-  { r: 11, w: 4.5, a0: -75, a1: 5, o: 0.55 },
-  { r: 19, w: 4.5, a0: -75, a1: 5, o: 0.8 },
+  { r: 11, w: 4.5, a0: -85, a1: -5, o: 0.55 },
+  { r: 19, w: 4.5, a0: -85, a1: -5, o: 0.8 },
 ];
 const CORNER = { pts: [[25, 23], [53, 23], [53, 51]], w: 5 };
 
