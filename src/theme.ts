@@ -4,7 +4,6 @@
  * Deux palettes (claire et sombre), suivies automatiquement
  * selon le réglage d'apparence du téléphone.
  */
-import { useColorScheme } from 'react-native';
 import { useScanStore } from './store/scanStore';
 
 export interface Palette {
@@ -70,15 +69,10 @@ export const dark: Palette = {
   scanPillSoft: 'rgba(12,14,20,0.55)',
 };
 
-/**
- * Palette du moment : préférence de l'app (Auto / Clair / Sombre),
- * et en Auto, le réglage clair/sombre du téléphone.
- */
+/** Palette du moment : clair par défaut, sombre sur bascule manuelle. */
 export function useTheme(): Palette {
   const pref = useScanStore((s) => s.themePref);
-  const system = useColorScheme();
-  const scheme = pref === 'auto' ? system : pref;
-  return scheme === 'dark' ? dark : light;
+  return pref === 'dark' ? dark : light;
 }
 
 /**

@@ -16,7 +16,7 @@ import {
   useTheme,
   type Palette,
 } from '../theme';
-import { useScanStore, type ThemePref } from '../store/scanStore';
+import { useScanStore } from '../store/scanStore';
 import { useRoomScan } from '../native/useRoomScan';
 
 /**
@@ -79,17 +79,6 @@ export function HomeScreen() {
   const c = useTheme();
   const styles = getStyles(c);
 
-  const THEME_LABELS: Record<ThemePref, string> = {
-    auto: 'Auto',
-    light: 'Clair',
-    dark: 'Sombre',
-  };
-  const NEXT_THEME: Record<ThemePref, ThemePref> = {
-    auto: 'dark',
-    dark: 'light',
-    light: 'auto',
-  };
-
   useEffect(() => {
     RoomScan.isSupported().then(setSupported);
   }, [setSupported]);
@@ -138,12 +127,9 @@ export function HomeScreen() {
   return (
     <View style={styles.container}>
       <TouchableOpacity
-        style={styles.themePill}
-        onPress={() => setThemePref(NEXT_THEME[themePref])}>
-        <Text style={styles.themePillText}>
-          {themePref === 'dark' ? '☾' : themePref === 'light' ? '☀' : '◐'}{' '}
-          {THEME_LABELS[themePref]}
-        </Text>
+        style={styles.themeButton}
+        onPress={() => setThemePref(themePref === 'dark' ? 'light' : 'dark')}>
+        <Text style={styles.themeIcon}>{themePref === 'dark' ? '☀' : '☾'}</Text>
       </TouchableOpacity>
 
       <View style={styles.hero}>
@@ -252,19 +238,21 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     paddingBottom: 40,
   },
   hero: { alignItems: 'center' },
-  themePill: {
+  themeButton: {
     position: 'absolute',
-    top: 56,
-    right: 24,
+    top: 54,
+    right: 22,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     backgroundColor: c.surface,
     borderWidth: 1,
     borderColor: c.line,
-    borderRadius: radius.pill,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
     zIndex: 2,
   },
-  themePillText: { color: c.inkSoft, fontSize: 12.5, fontWeight: '700' },
+  themeIcon: { color: c.inkSoft, fontSize: 21 },
   title: {
     color: c.ink,
     fontSize: 32,

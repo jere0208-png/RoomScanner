@@ -9,6 +9,7 @@ import {
   weldCorners,
   type WallSeg,
 } from '../src/geometry/floorplan';
+import { buildScanPdf, toBase64 } from '../src/export/pdf';
 
 const seg = (
   id: string,
@@ -121,5 +122,41 @@ describe('closedLoop + loopAreaM2', () => {
 
   it('renvoie null quand un coin porte trois murs', () => {
     expect(closedLoop([...rect, seg('x', { x: 0, z: 0 }, { x: -2, z: 0 })])).toBeNull();
+  });
+});
+
+describe('buildScanPdf', () => {
+  const latin1String = (bytes: Uint8Array): string => {
+    let s = '';
+    for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+    return s;
+  };
+  const rect = [
+    seg('n', { x: 0, z: 0 }, { x: 4, z: 0 }),
+    seg('e', { x: 4, z: 0 }, { x: 4, z: 3 }),
+    seg('s', { x: 4, z: 3 }, { x: 0, z: 3 }),
+    seg('w', { x: 0, z: 3 }, { x: 0, z: 0 }),
+  ];
+  const scan = { name: 'Salon test', walls: rect, openings: [], objects: [] };
+
+  it('produit un PDF valide à une page (plan seul)', () => {
+    const s = latin1String(buildScanPdf(scan, false));
+    expect(s.startsWith('%PDF-1.4')).toBe(true);
+    expect(s).toContain('/Count 1');
+    expect(s.endsWith('%%EOF')).toBe(true);
+    expect(s).toContain('Salon test');
+    expect(s).toContain('4,00 m'); // cote d'un mur
+    expect(s).toContain('EchoPlan'); // cartouche
+  });
+
+  it('ajoute la feuille des vues 3D quand demandé', () => {
+    const s = latin1String(buildScanPdf(scan, true));
+    expect(s).toContain('/Count 2');
+    expect(s).toContain('Vues 3D');
+  });
+
+  it('encode le base64 correctement', () => {
+    expect(toBase64(new Uint8Array([72, 101, 108, 108, 111]))).toBe('SGVsbG8=');
+    expect(toBase64(new Uint8Array([77, 97]))).toBe('TWE=');
   });
 });

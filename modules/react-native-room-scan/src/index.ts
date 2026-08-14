@@ -82,4 +82,12 @@ export const RoomScan = {
       NativeModules.RoomScanPreview?.presentUSDZ(path);
     }
   },
+
+  /** iOS : écrit le PDF (base64) en fichier temporaire et ouvre le partage. */
+  sharePDF: (base64: string, filename: string): Promise<boolean> => {
+    if (!NativeModules.RoomScanExport) {
+      return Promise.reject(new Error('Export PDF disponible sur iOS uniquement'));
+    }
+    return NativeModules.RoomScanExport.sharePDF(base64, filename);
+  },
 };

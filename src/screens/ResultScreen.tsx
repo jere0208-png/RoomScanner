@@ -1,16 +1,19 @@
 import React, { useState } from 'react';
 import {
+  Alert,
   Keyboard,
   Modal,
   Platform,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { RoomScan } from 'react-native-room-scan';
+import { buildScanPdf, pdfFilename, toBase64 } from '../export/pdf';
 import {
   radius,
   shadowCard,
@@ -45,6 +48,22 @@ export function ResultScreen() {
   const [lengthInput, setLengthInput] = useState('');
   const [renaming, setRenaming] = useState(false);
   const [nameInput, setNameInput] = useState('');
+  const [exporting, setExporting] = useState(false);
+  const [include3D, setInclude3D] = useState(true);
+
+  const openings = useScanStore((s) => s.openings);
+  const doExport = async () => {
+    setExporting(false);
+    try {
+      const bytes = buildScanPdf(
+        { name: scanName, walls, openings, objects },
+        include3D,
+      );
+      await RoomScan.sharePDF(toBase64(bytes), pdfFilename(scanName));
+    } catch (e: any) {
+      Alert.alert('Export impossible', e?.message ?? 'Erreur inconnue');
+    }
+  };
 
   const selectedWall = walls.find((w) => w.id === selectedWallId) ?? null;
   const perimeter = walls.reduce((s, w) => s + segLength(w), 0);
@@ -104,7 +123,9 @@ export function ResultScreen() {
           <Text style={styles.title} numberOfLines={1}>
             {scanName}
           </Text>
-          <Text style={styles.titleEditIcon}>✎</Text>
+          <View style={styles.editBadge}>
+            <Text style={styles.editBadgeIcon}>✎</Text>
+          </View>
         </TouchableOpacity>
       </View>
 
@@ -210,18 +231,51 @@ export function ResultScreen() {
         </ScrollView>
       )}
 
+      {Platform.OS === 'ios' && (
+        <TouchableOpacity
+          style={styles.exportButton}
+          onPress={() => setExporting(true)}>
+          <Text style={styles.primaryText}>Exporter en PDF</Text>
+        </TouchableOpacity>
+      )}
       <View style={styles.actions}>
         {Platform.OS === 'ios' && modelPath && (
           <TouchableOpacity
-            style={styles.primaryButton}
+            style={styles.secondaryButton}
             onPress={() => RoomScan.viewModel(modelPath)}>
-            <Text style={styles.primaryText}>Modèle AR</Text>
+            <Text style={styles.secondaryText}>Modèle AR</Text>
           </TouchableOpacity>
         )}
         <TouchableOpacity style={styles.secondaryButton} onPress={reset}>
           <Text style={styles.secondaryText}>Nouveau scan</Text>
         </TouchableOpacity>
       </View>
+
+      {/* ---------- Export PDF ---------- */}
+      <Modal visible={exporting} transparent animationType="fade">
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Exporter en PDF</Text>
+            <Text style={styles.modalSubtitle}>
+              Plan d'ensemble coté, prêt à partager ou imprimer.
+            </Text>
+            <View style={styles.switchRow}>
+              <Text style={styles.switchLabel}>Inclure des vues 3D</Text>
+              <Switch value={include3D} onValueChange={setInclude3D} />
+            </View>
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.modalGhost}
+                onPress={() => setExporting(false)}>
+                <Text style={styles.modalGhostText}>Annuler</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalPrimary} onPress={doExport}>
+                <Text style={styles.modalPrimaryText}>Exporter</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* ---------- Renommage ---------- */}
       <Modal visible={renaming} transparent animationType="fade">
@@ -334,7 +388,16 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     letterSpacing: -0.3,
     flexShrink: 1,
   },
-  titleEditIcon: { color: c.inkFaint, fontSize: 15, marginLeft: 8 },
+  editBadge: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: c.blueSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 10,
+  },
+  editBadgeIcon: { color: c.blue, fontSize: 17, fontWeight: '700' },
   metricsRow: {
     flexDirection: 'row',
     backgroundColor: c.surface,
@@ -435,7 +498,32 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   },
   objectName: { color: c.ink, fontSize: 13, fontWeight: '700' },
   objectDims: { color: c.inkFaint, fontSize: 11.5 },
-  actions: { flexDirection: 'row', gap: 10, paddingBottom: 28, paddingTop: 4 },
+  exportButton: {
+    backgroundColor: c.blue,
+    borderRadius: radius.md,
+    paddingVertical: 15,
+    alignItems: 'center',
+    marginTop: 4,
+    shadowColor: c.blue,
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+  },
+  switchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: c.bg,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: c.line,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    marginTop: 4,
+  },
+  switchLabel: { color: c.ink, fontSize: 14.5, fontWeight: '600' },
+  actions: { flexDirection: 'row', gap: 10, paddingBottom: 28, paddingTop: 10 },
   primaryButton: {
     flex: 1,
     backgroundColor: c.blue,
