@@ -62,7 +62,8 @@ export function Iso3DView() {
       },
       onPanResponderMove: (_e, g) => {
         const next = {
-          theta: grabRef.current.theta + g.dx * 0.45,
+          // Glisser à droite « pousse » la face avant vers la droite.
+          theta: grabRef.current.theta - g.dx * 0.45,
           tilt: clamp(grabRef.current.tilt - g.dy * 0.3, 15, 80),
         };
         anglesRef.current = next;
