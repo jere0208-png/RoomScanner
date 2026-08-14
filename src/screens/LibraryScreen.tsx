@@ -74,7 +74,7 @@ export function LibraryScreen() {
               styles.trashText,
               armedId === item.id && styles.trashTextArmed,
             ]}>
-            {armedId === item.id ? 'Supprimer ?' : '✕'}
+            {armedId === item.id ? 'Supprimer' : '✕'}
           </Text>
         </TouchableOpacity>
       </TouchableOpacity>

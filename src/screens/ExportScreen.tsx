@@ -284,7 +284,7 @@ export function ExportScreen() {
                     h: e.nativeEvent.layout.height,
                   };
                 }}>
-                <Iso3DView value={v1} onChange={setV1} hideHint />
+                <Iso3DView value={v1} onChange={setV1} />
               </View>
               <View
                 style={[styles.view3d, styles.view3dLast]}
@@ -294,7 +294,7 @@ export function ExportScreen() {
                     h: e.nativeEvent.layout.height,
                   };
                 }}>
-                <Iso3DView value={v2} onChange={setV2} hideHint />
+                <Iso3DView value={v2} onChange={setV2} />
               </View>
             </View>
           </>

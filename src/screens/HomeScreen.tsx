@@ -246,7 +246,8 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     paddingTop: 84,
     paddingBottom: 40,
   },
-  hero: { alignItems: 'center' },
+  // zIndex/elevation : l'onde d'arrivée pulse AU-DESSUS des cartes suivantes.
+  hero: { alignItems: 'center', zIndex: 20, elevation: 20 },
   themeButton: {
     position: 'absolute',
     top: 54,

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { PanResponder, StyleSheet, Text, View } from 'react-native';
+import { PanResponder, StyleSheet, View } from 'react-native';
 import Svg, { Polygon, Text as SvgText } from 'react-native-svg';
 import { themedStyles, useTheme, type Palette } from '../theme';
 import {
@@ -77,8 +77,6 @@ interface Props {
   /** Mode contrôlé (aperçu d'export) : état de caméra fourni par le parent. */
   value?: View3DParams;
   onChange?: (v: View3DParams) => void;
-  /** Cache la pastille d'aide (pour les petits encarts d'aperçu). */
-  hideHint?: boolean;
   /** Cotes sur les arêtes (arêtes en noir). */
   showMeasures?: boolean;
 }
@@ -88,7 +86,7 @@ interface Props {
  * que le plan 2D : murs épais extrudés, portes/fenêtres, meubles.
  * Un doigt : tourner/incliner. Deux doigts : pincer pour zoomer, déplacer.
  */
-export function Iso3DView({ value, onChange, hideHint, showMeasures }: Props) {
+export function Iso3DView({ value, onChange, showMeasures }: Props) {
   const walls = useScanStore((s) => s.walls);
   const openings = useScanStore((s) => s.openings);
   const allObjects = useScanStore((s) => s.objects);
@@ -592,13 +590,6 @@ export function Iso3DView({ value, onChange, hideHint, showMeasures }: Props) {
           </Svg>
         </View>
       )}
-      {!hideHint && (
-        <View style={styles.hintPill} pointerEvents="none">
-          <Text style={styles.hintText}>
-            1 doigt : tourner · 2 doigts : zoomer, pivoter, déplacer
-          </Text>
-        </View>
-      )}
     </View>
   );
 }
@@ -610,14 +601,4 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     borderRadius: 20,
     overflow: 'hidden',
   },
-  hintPill: {
-    position: 'absolute',
-    bottom: 12,
-    alignSelf: 'center',
-    backgroundColor: c.surfaceSunken,
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-  },
-  hintText: { color: c.inkFaint, fontSize: 11, fontWeight: '600' },
 }));

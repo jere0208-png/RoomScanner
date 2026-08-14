@@ -243,27 +243,8 @@ export function ResultScreen() {
           </View>
         )}
 
-        {/* Modifications non enregistrées : bouton de sauvegarde flottant */}
-        {dirty && (
-          <TouchableOpacity style={styles.saveFab} onPress={commitCurrent}>
-            <Svg width={22} height={22} viewBox="0 0 24 24">
-              <Path
-                d="M12 3 v11 M7 9.5 l5 5 5 -5 M5 20 h14"
-                stroke="#FFFFFF"
-                strokeWidth={2.4}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                fill="none"
-              />
-            </Svg>
-          </TouchableOpacity>
-        )}
-      </View>
-
-      {/* Hauteur FIXE : le canevas ne doit jamais se redimensionner
-          quand la barre d'édition remplace le texte d'aide. */}
-      <View style={styles.bottomZone}>
-        {tab === '2d' && editMode && selectedWall ? (
+        {/* Barre d'édition en surimpression : le plan ne se redimensionne pas */}
+        {tab === '2d' && editMode && selectedWall && (
           <View style={styles.editBar}>
             <Text style={styles.editLabel}>
               Longueur du mur · {fr(selectedWall.height, 2)} m sous plafond
@@ -283,16 +264,25 @@ export function ResultScreen() {
               </TouchableOpacity>
             </View>
           </View>
-        ) : (
-          <Text style={styles.hint}>
-            {tab === '3d'
-              ? 'Un doigt : tourner. Deux doigts : zoomer, pivoter, déplacer. Tapez un mur pour le cadrer.'
-              : editMode
-              ? 'Touchez un mur pour saisir sa longueur, tirez un coin bleu pour déformer le plan.'
-              : 'Activez « Modifier » pour ajuster les murs, ou ouvrez la vue 3D.'}
-          </Text>
+        )}
+
+        {/* Modifications non enregistrées : bouton de sauvegarde flottant */}
+        {dirty && (
+          <TouchableOpacity style={styles.saveFab} onPress={commitCurrent}>
+            <Svg width={22} height={22} viewBox="0 0 24 24">
+              <Path
+                d="M12 3 v11 M7 9.5 l5 5 5 -5 M5 20 h14"
+                stroke="#FFFFFF"
+                strokeWidth={2.4}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                fill="none"
+              />
+            </Svg>
+          </TouchableOpacity>
         )}
       </View>
+
 
       {objects.length > 0 && showFurniture && tab === '2d' && !editMode && (
         <ScrollView
@@ -582,7 +572,8 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     right: 0,
     bottom: 0,
     alignItems: 'center',
-    zIndex: 10,
+    zIndex: 50,
+    elevation: 50,
   },
   transitionRing: {
     position: 'absolute',
@@ -617,20 +608,17 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 5,
   },
-  bottomZone: { height: 100, justifyContent: 'center' },
-  hint: {
-    color: c.inkFaint,
-    fontSize: 12.5,
-    textAlign: 'center',
-    lineHeight: 17,
-    paddingHorizontal: 8,
-  },
   editBar: {
+    position: 'absolute',
+    bottom: 10,
+    left: 10,
+    right: 68,
     backgroundColor: c.surface,
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: c.line,
     padding: 13,
+    ...shadowCard,
   },
   editLabel: { color: c.inkSoft, fontSize: 13, marginBottom: 8, fontWeight: '600' },
   editRow: { flexDirection: 'row', alignItems: 'center' },
