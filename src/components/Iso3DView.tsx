@@ -103,7 +103,11 @@ export function Iso3DView({ value, onChange, hideHint }: Props) {
     d0: 1,
     mx0: 0,
     my0: 0,
+    a0: 0,
   });
+
+  const touchAngle = (t: { pageX: number; pageY: number }[]) =>
+    Math.atan2(t[1].pageY - t[0].pageY, t[1].pageX - t[0].pageX);
 
   // Créé UNE seule fois : un responder recréé en plein geste perd le suivi.
   const pan = useRef(
@@ -124,6 +128,7 @@ export function Iso3DView({ value, onChange, hideHint }: Props) {
               : 1,
           mx0: t.length >= 2 ? (t[0].pageX + t[1].pageX) / 2 : 0,
           my0: t.length >= 2 ? (t[0].pageY + t[1].pageY) / 2 : 0,
+          a0: t.length >= 2 ? touchAngle(t) : 0,
         };
       },
       onPanResponderMove: (e, g) => {
@@ -142,6 +147,7 @@ export function Iso3DView({ value, onChange, hideHint }: Props) {
                 : 1,
             mx0: t.length >= 2 ? (t[0].pageX + t[1].pageX) / 2 : 0,
             my0: t.length >= 2 ? (t[0].pageY + t[1].pageY) / 2 : 0,
+            a0: t.length >= 2 ? touchAngle(t) : 0,
           };
         }
         const base = baseRef.current;
@@ -149,8 +155,11 @@ export function Iso3DView({ value, onChange, hideHint }: Props) {
           const d = Math.max(8, Math.hypot(t[0].pageX - t[1].pageX, t[0].pageY - t[1].pageY));
           const mx = (t[0].pageX + t[1].pageX) / 2;
           const my = (t[0].pageY + t[1].pageY) / 2;
+          // Torsion des deux doigts : le modèle pivote en suivant les doigts.
+          let twist = ((touchAngle(t) - base.a0) * 180) / Math.PI;
+          twist = ((twist + 540) % 360) - 180;
           update({
-            theta: base.v.theta,
+            theta: base.v.theta + twist,
             tilt: base.v.tilt,
             zoom: clamp(base.v.zoom * (d / base.d0), 0.4, 4),
             ox: base.v.ox + (mx - base.mx0),
@@ -396,7 +405,7 @@ export function Iso3DView({ value, onChange, hideHint }: Props) {
       {!hideHint && (
         <View style={styles.hintPill} pointerEvents="none">
           <Text style={styles.hintText}>
-            1 doigt : tourner · 2 doigts : zoomer, déplacer
+            1 doigt : tourner · 2 doigts : zoomer, pivoter, déplacer
           </Text>
         </View>
       )}
