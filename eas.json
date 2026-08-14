@@ -1,0 +1,19 @@
+{
+  "cli": {
+    "appVersionSource": "local"
+  },
+  "build": {
+    "adhoc": {
+      "distribution": "internal",
+      "ios": {
+        "simulator": false
+      }
+    },
+    "production": {
+      "autoIncrement": true
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

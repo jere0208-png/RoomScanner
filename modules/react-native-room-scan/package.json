@@ -1,0 +1,11 @@
+{
+  "name": "react-native-room-scan",
+  "version": "0.1.0",
+  "description": "Scan de pièce 3D (RoomPlan sur iOS, ARCore sur Android) pour React Native",
+  "main": "src/index.ts",
+  "license": "MIT",
+  "peerDependencies": {
+    "react": "*",
+    "react-native": "*"
+  }
+}
