@@ -7,6 +7,8 @@ export interface WallSeg {
   a: { x: number; z: number };
   b: { x: number; z: number };
   height: number;
+  /** Hauteur du centre de la surface (m, repère monde) — sert à la vue 3D. */
+  yCenter: number;
 }
 
 /** Empreinte au sol d'un objet (rectangle orienté). */
@@ -17,6 +19,8 @@ export interface ObjectFootprint {
   cz: number;
   width: number;
   depth: number;
+  height: number;
+  yCenter: number;
   /** Rotation autour de Y, en radians. */
   yaw: number;
 }
@@ -34,6 +38,7 @@ export function toSegment(s: SurfaceData): WallSeg {
       a: { x: s.ax!, z: s.az! },
       b: { x: s.bx!, z: s.bz! },
       height: s.height,
+      yCenter: s.height / 2,
     };
   }
   const m = s.transform!;
@@ -46,6 +51,7 @@ export function toSegment(s: SurfaceData): WallSeg {
     a: { x: pos.x - dir.x * h, z: pos.z - dir.z * h },
     b: { x: pos.x + dir.x * h, z: pos.z + dir.z * h },
     height: s.height,
+    yCenter: m[13],
   };
 }
 
@@ -58,8 +64,58 @@ export function toFootprint(o: ObjectData): ObjectFootprint {
     cz: m[14],
     width: o.width,
     depth: o.depth,
+    height: o.height,
+    yCenter: m[13],
     yaw: Math.atan2(m[2], m[0]),
   };
+}
+
+/**
+ * Si les murs forment une boucle fermée (chaque coin relie exactement
+ * deux murs), renvoie les coins ordonnés le long de la boucle — sinon null.
+ * Sert au calcul de surface et au sol de la vue 3D.
+ */
+export function closedLoop(walls: WallSeg[]): { x: number; z: number }[] | null {
+  if (walls.length < 3) return null;
+  const key = (p: { x: number; z: number }) => `${p.x.toFixed(3)}:${p.z.toFixed(3)}`;
+  const adj = new Map<string, { wallId: string; to: { x: number; z: number } }[]>();
+  for (const w of walls) {
+    for (const [from, to] of [
+      [w.a, w.b],
+      [w.b, w.a],
+    ] as const) {
+      const k = key(from);
+      if (!adj.has(k)) adj.set(k, []);
+      adj.get(k)!.push({ wallId: w.id, to });
+    }
+  }
+  for (const [, edges] of adj) {
+    if (edges.length !== 2) return null;
+  }
+  const start = walls[0].a;
+  const used = new Set<string>();
+  const pts: { x: number; z: number }[] = [];
+  let cur = start;
+  for (let i = 0; i < walls.length; i++) {
+    pts.push(cur);
+    const next = adj.get(key(cur))!.find((e) => !used.has(e.wallId));
+    if (!next) return null;
+    used.add(next.wallId);
+    cur = next.to;
+  }
+  if (key(cur) !== key(start) || used.size !== walls.length) return null;
+  return pts;
+}
+
+/** Aire (m²) d'un polygone par la formule du lacet. */
+export function loopAreaM2(pts: { x: number; z: number }[]): number {
+  let sum = 0;
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i];
+    const q = pts[(i + 1) % pts.length];
+    sum += p.x * q.z - q.x * p.z;
+  }
+  return Math.abs(sum) / 2;
 }
 
 export function segLength(w: WallSeg): number {

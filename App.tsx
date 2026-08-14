@@ -10,7 +10,10 @@ export default function App() {
 
   return (
     <>
-      <StatusBar barStyle="light-content" backgroundColor="#0e1116" />
+      <StatusBar
+        barStyle={screen === 'scan' ? 'light-content' : 'dark-content'}
+        backgroundColor={screen === 'scan' ? '#000000' : '#F6F7F9'}
+      />
       {screen === 'home' && <HomeScreen />}
       {screen === 'scan' && <ScanScreen />}
       {screen === 'result' && <ResultScreen />}

@@ -22,6 +22,7 @@ interface ScanState {
   wallCount: number;
   objectCount: number;
   doorCount: number;
+  windowCount: number;
 
   // Après le scan — SOURCE DE VÉRITÉ paramétrique :
   // le plan 2D et toute vue 3D se dérivent de `walls`, jamais du maillage.
@@ -55,6 +56,7 @@ export const useScanStore = create<ScanState>((set, get) => ({
   wallCount: 0,
   objectCount: 0,
   doorCount: 0,
+  windowCount: 0,
   modelPath: null,
   walls: [],
   openings: [],
@@ -73,6 +75,7 @@ export const useScanStore = create<ScanState>((set, get) => ({
       wallCount: u.wallCount,
       objectCount: u.objectCount,
       doorCount: u.doorCount,
+      windowCount: u.windowCount,
     }),
 
   finalize: (r) => {
@@ -136,6 +139,7 @@ export const useScanStore = create<ScanState>((set, get) => ({
       wallCount: 0,
       objectCount: 0,
       doorCount: 0,
+      windowCount: 0,
       modelPath: null,
       walls: [],
       openings: [],

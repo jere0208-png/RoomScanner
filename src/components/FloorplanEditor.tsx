@@ -1,6 +1,15 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { PanResponder, StyleSheet, View } from 'react-native';
-import Svg, { G, Line, Rect, Text as SvgText } from 'react-native-svg';
+import Svg, {
+  Circle,
+  Defs,
+  G,
+  Line,
+  Pattern,
+  Rect,
+  Text as SvgText,
+} from 'react-native-svg';
+import { colors } from '../theme';
 import {
   bounds,
   makeMapping,
@@ -60,6 +69,13 @@ export function FloorplanEditor({ selectedWallId, onSelectWall }: Props) {
       {mapping && (
         <>
           <Svg width={layout.w} height={layout.h}>
+            <Defs>
+              <Pattern id="grid" width={22} height={22} patternUnits="userSpaceOnUse">
+                <Circle cx={1.2} cy={1.2} r={1.2} fill={colors.line} />
+              </Pattern>
+            </Defs>
+            <Rect x={0} y={0} width={layout.w} height={layout.h} fill="url(#grid)" />
+
             {/* Objets (empreintes au sol) */}
             {objects.map((o) => {
               const f = toFootprint(o);
@@ -75,8 +91,8 @@ export function FloorplanEditor({ selectedWallId, onSelectWall }: Props) {
                     y={-d / 2}
                     width={w}
                     height={d}
-                    fill="#2a3444"
-                    stroke="#3d4a5f"
+                    fill={colors.blueSoft}
+                    stroke={colors.lineStrong}
                     strokeWidth={1}
                     rx={3}
                   />
@@ -101,7 +117,7 @@ export function FloorplanEditor({ selectedWallId, onSelectWall }: Props) {
             {openings.map((o) => {
               const a = mapping.toPx(o.a);
               const b = mapping.toPx(o.b);
-              const color = o.type === 'door' ? '#e8b04b' : '#5bc8f5';
+              const color = o.type === 'door' ? colors.amber : colors.sky;
               return (
                 <Line
                   key={o.id}
@@ -145,34 +161,45 @@ function WallLine({
   const a = mapping.toPx(wall.a);
   const b = mapping.toPx(wall.b);
   const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-  const len = segLength(wall);
+  const label = `${segLength(wall).toFixed(2)} m`;
   // Décale la cote perpendiculairement au mur pour ne pas la poser dessus.
   const dx = b.x - a.x;
   const dy = b.y - a.y;
   const norm = Math.hypot(dx, dy) || 1;
-  const off = { x: (-dy / norm) * 14, y: (dx / norm) * 14 };
+  const off = { x: (-dy / norm) * 18, y: (dx / norm) * 18 };
+  const chipW = label.length * 6.6 + 12;
 
   return (
     <G onPress={onPress}>
       {/* Zone de toucher élargie, invisible */}
-      <Line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="transparent" strokeWidth={28} />
+      <Line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="transparent" strokeWidth={30} />
       <Line
         x1={a.x}
         y1={a.y}
         x2={b.x}
         y2={b.y}
-        stroke={selected ? '#2f6df6' : '#e6edf5'}
+        stroke={selected ? colors.blue : colors.ink}
         strokeWidth={selected ? 8 : 6}
         strokeLinecap="round"
       />
+      <Rect
+        x={mid.x + off.x - chipW / 2}
+        y={mid.y + off.y - 10}
+        width={chipW}
+        height={20}
+        rx={10}
+        fill={selected ? colors.blue : colors.surface}
+        stroke={selected ? 'none' : colors.line}
+        strokeWidth={1}
+      />
       <SvgText
         x={mid.x + off.x}
-        y={mid.y + off.y}
-        fill={selected ? '#7ea6ff' : '#9aa4b2'}
-        fontSize={12}
+        y={mid.y + off.y + 4}
+        fill={selected ? '#FFFFFF' : colors.inkSoft}
+        fontSize={11}
         fontWeight="600"
         textAnchor="middle">
-        {len.toFixed(2)} m
+        {label}
       </SvgText>
     </G>
   );
@@ -214,7 +241,12 @@ function CornerHandle({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#151a21', borderRadius: 16, overflow: 'hidden' },
+  container: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
   handle: {
     position: 'absolute',
     width: 32,
@@ -223,11 +255,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   handleDot: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: '#2f6df6',
-    borderWidth: 2,
-    borderColor: '#fff',
+    width: 15,
+    height: 15,
+    borderRadius: 8,
+    backgroundColor: colors.blue,
+    borderWidth: 2.5,
+    borderColor: '#FFFFFF',
+    shadowColor: '#0B0D12',
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 3,
   },
 });
