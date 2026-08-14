@@ -41,6 +41,32 @@ function escText(s: string): string {
   return latin1(s).replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
 }
 
+/** Tronque une chaîne pour tenir dans maxW points (Helvetica ≈ 0,52 em/signe). */
+function fitText(s: string, size: number, maxW: number): string {
+  const perChar = size * 0.52;
+  const max = Math.max(1, Math.floor(maxW / perChar));
+  return s.length <= max ? s : `${s.slice(0, max - 1)}…`;
+}
+
+/** Paramètres de cadrage validés dans l'aperçu (fractions de demi-boîte). */
+export interface PlanViewParams {
+  zoom: number;
+  fx: number;
+  fy: number;
+}
+export interface View3DParams {
+  theta: number;
+  tilt: number;
+  zoom: number;
+  fx: number;
+  fy: number;
+}
+export interface PdfOptions {
+  plan?: PlanViewParams;
+  views?: [View3DParams, View3DParams];
+  colorOpenings?: boolean;
+}
+
 function bytesOf(s: string): Uint8Array {
   const b = new Uint8Array(s.length);
   for (let i = 0; i < s.length; i++) b[i] = s.charCodeAt(i) & 0xff;
@@ -258,27 +284,31 @@ function drawSheetChrome(
   // Cadre de feuille
   d.rect(FRAME.x, FRAME.y, FRAME.w, FRAME.h, null, INK, 1.2);
 
-  // Cartouche
+  // Cartouche — chaque texte est tronqué à la largeur de sa colonne.
   const ty = FRAME.y;
   d.line(FRAME.x, ty + TITLE_H, FRAME.x + FRAME.w, ty + TITLE_H, 1.2, INK);
-  const cols = [FRAME.x + 150, FRAME.x + 335, FRAME.x + 435];
+  const cols = [FRAME.x + 148, FRAME.x + 318, FRAME.x + 408];
+  const colEnd = [cols[1], cols[2], FRAME.x + FRAME.w];
+  const width = (i: number) => colEnd[i] - cols[i] - 22;
   for (const cx of cols) {
     d.line(cx, ty, cx, ty + TITLE_H, 0.8, INK);
   }
 
   // Bloc marque
   drawLogo(d, FRAME.x + 12, ty + 14, 38);
-  d.text('EchoPlan', FRAME.x + 58, ty + 36, 14, INK, { bold: true, align: 'left' });
+  d.text('EchoPlan', FRAME.x + 58, ty + 36, 13, INK, { bold: true, align: 'left' });
   d.text('Scan 3D & plans', FRAME.x + 58, ty + 22, 7.5, GREY, { align: 'left' });
 
   // Bloc projet
   d.text('PROJET', cols[0] + 12, ty + 50, 6.5, GREY_LIGHT, { align: 'left' });
-  d.text(info.project.slice(0, 34), cols[0] + 12, ty + 37, 11, INK, {
+  d.text(fitText(info.project, 10.5, width(0)), cols[0] + 12, ty + 37, 10.5, INK, {
     bold: true,
     align: 'left',
   });
   d.text('FICHIER', cols[0] + 12, ty + 24, 6.5, GREY_LIGHT, { align: 'left' });
-  d.text(info.filename.slice(0, 40), cols[0] + 12, ty + 12, 8.5, GREY, { align: 'left' });
+  d.text(fitText(info.filename, 8, width(0)), cols[0] + 12, ty + 12, 8, GREY, {
+    align: 'left',
+  });
 
   // Bloc date / échelle
   const now = new Date();
@@ -288,16 +318,20 @@ function drawSheetChrome(
     `${two(now.getDate())}/${two(now.getMonth() + 1)}/${now.getFullYear()}`,
     cols[1] + 12,
     ty + 38,
-    10,
+    9.5,
     INK,
     { align: 'left' },
   );
   d.text('ÉCHELLE', cols[1] + 12, ty + 24, 6.5, GREY_LIGHT, { align: 'left' });
-  d.text(info.scaleLabel ?? '—', cols[1] + 12, ty + 12, 10, INK, { align: 'left' });
+  d.text(fitText(info.scaleLabel ?? '—', 9.5, width(1)), cols[1] + 12, ty + 12, 9.5, INK, {
+    align: 'left',
+  });
 
   // Bloc feuille
   d.text('DOCUMENT', cols[2] + 12, ty + 50, 6.5, GREY_LIGHT, { align: 'left' });
-  d.text(info.sheetTitle, cols[2] + 12, ty + 38, 9.5, INK, { align: 'left' });
+  d.text(fitText(info.sheetTitle, 8.5, width(2)), cols[2] + 12, ty + 38, 8.5, INK, {
+    align: 'left',
+  });
   d.text('FEUILLE', cols[2] + 12, ty + 24, 6.5, GREY_LIGHT, { align: 'left' });
   d.text(info.sheet, cols[2] + 12, ty + 12, 10, INK, { bold: true, align: 'left' });
 }
@@ -367,7 +401,12 @@ function thickWallRect(w: WallSeg, counts: Map<string, number>) {
   };
 }
 
-function buildFaces(walls: WallSeg[], openings: WallSeg[], objects: ObjectData[]) {
+function buildFaces(
+  walls: WallSeg[],
+  openings: WallSeg[],
+  objects: ObjectData[],
+  colorOpenings = false,
+) {
   const floorY =
     walls.length > 0 ? Math.min(...walls.map((w) => w.yCenter - w.height / 2)) : 0;
   const faces: Face[] = [];
@@ -423,7 +462,11 @@ function buildFaces(walls: WallSeg[], openings: WallSeg[], objects: ObjectData[]
     const yb = Math.max(0, o.yCenter - o.height / 2 - floorY);
     faces.push({
       pts: vquad(o.a, o.b, yb, yb + o.height),
-      fill: o.type === 'door' ? '#E8A13B' : '#3EB8E5',
+      fill: colorOpenings
+        ? o.type === 'door'
+          ? '#E8A13B'
+          : '#3EB8E5'
+        : '#B9C2CE',
       stroke: null,
       bias: 0.12,
     });
@@ -468,10 +511,12 @@ function draw3DView(
   openings: WallSeg[],
   objects: ObjectData[],
   box: { x: number; y: number; w: number; h: number },
-  thetaDeg: number,
-  tiltDeg: number,
+  view: View3DParams,
+  colorOpenings = false,
 ) {
-  const faces = buildFaces(walls, openings, objects);
+  const thetaDeg = view.theta;
+  const tiltDeg = view.tilt;
+  const faces = buildFaces(walls, openings, objects, colorOpenings);
   const all = faces.flatMap((f) => f.pts);
   if (all.length === 0) return;
   const ctr = {
@@ -488,9 +533,9 @@ function draw3DView(
   const st = Math.sin(rad(thetaDeg));
   const cp = Math.cos(rad(tiltDeg));
   const sp = Math.sin(rad(tiltDeg));
-  const scale = (Math.min(box.w, box.h) * 0.46) / r3;
-  const cx = box.x + box.w / 2;
-  const cy = box.y + box.h / 2;
+  const scale = ((Math.min(box.w, box.h) * 0.46) / r3) * view.zoom;
+  const cx = box.x + box.w / 2 + view.fx * (box.w / 2);
+  const cy = box.y + box.h / 2 - view.fy * (box.h / 2);
 
   const project = (p: P3) => {
     const x = p.x - ctr.x;
@@ -550,6 +595,8 @@ function planPage(
   openings: WallSeg[],
   objects: ObjectData[],
   sheet: string,
+  planView?: PlanViewParams,
+  colorOpenings = false,
 ): string {
   const d = new Draw();
   const loop = closedLoop(walls);
@@ -576,20 +623,24 @@ function planPage(
   }
   let scaleLabel: string | null = null;
   if (isFinite(minX)) {
-    const scale = Math.min(
+    const fit = Math.min(
       box.w / Math.max(maxX - minX, 0.5),
       box.h / Math.max(maxZ - minZ, 0.5),
     );
+    // Cadrage validé dans l'aperçu : zoom et décalage du plan.
+    const scale = fit * (planView?.zoom ?? 1);
     // 1 m = scale pt = scale × 0,3528 mm → ratio réel arrondi à l'usage.
     const ratio = 1000 / (scale * 0.352778);
     const nice = [20, 25, 50, 75, 100, 125, 150, 200].find((v) => v >= ratio) ?? 250;
     scaleLabel = `~ 1:${nice}`;
 
-    const ox = box.x + (box.w - (maxX - minX) * scale) / 2;
-    const oy = box.y + (box.h - (maxZ - minZ) * scale) / 2;
+    const cxw = (minX + maxX) / 2;
+    const czw = (minZ + maxZ) / 2;
+    const bcx = box.x + box.w / 2 + (planView?.fx ?? 0) * (box.w / 2);
+    const bcy = box.y + box.h / 2 - (planView?.fy ?? 0) * (box.h / 2);
     const px = (p: { x: number; z: number }): Pt => ({
-      x: ox + (p.x - minX) * scale,
-      y: oy + (maxZ - p.z) * scale,
+      x: bcx + (p.x - cxw) * scale,
+      y: bcy + (czw - p.z) * scale,
     });
 
     const centroid = loop
@@ -657,7 +708,8 @@ function planPage(
       if (o.type === 'door') {
         // Battant + arc d'ouverture (charnière en A)
         const leafEnd = { x: o.a.x + inx * len, z: o.a.z + inz * len };
-        d.line(px(o.a).x, px(o.a).y, px(leafEnd).x, px(leafEnd).y, 1.4, AMBER);
+        d.line(px(o.a).x, px(o.a).y, px(leafEnd).x, px(leafEnd).y, 1.4,
+               colorOpenings ? AMBER : GREY);
         const arc: Pt[] = [];
         const a0 = Math.atan2(dz, dx);
         const a1 = Math.atan2(inz, inx);
@@ -670,7 +722,7 @@ function planPage(
         // Fenêtre / ouverture : double trait dans la trouée
         const wx = (-dz / len) * (WALL_T / 4);
         const wz = (dx / len) * (WALL_T / 4);
-        const color = o.type === 'window' ? SKY : GREY;
+        const color = colorOpenings && o.type === 'window' ? SKY : GREY;
         d.line(px({ x: o.a.x + wx, z: o.a.z + wz }).x, px({ x: o.a.x + wx, z: o.a.z + wz }).y,
                px({ x: o.b.x + wx, z: o.b.z + wz }).x, px({ x: o.b.x + wx, z: o.b.z + wz }).y, 1, color);
         d.line(px({ x: o.a.x - wx, z: o.a.z - wz }).x, px({ x: o.a.x - wx, z: o.a.z - wz }).y,
@@ -741,6 +793,11 @@ function planPage(
   return d.stream();
 }
 
+const DEFAULT_PDF_VIEWS: [View3DParams, View3DParams] = [
+  { theta: -32, tilt: 58, zoom: 1, fx: 0, fy: 0 },
+  { theta: 148, tilt: 42, zoom: 1, fx: 0, fy: 0 },
+];
+
 function threeDPage(
   name: string,
   filename: string,
@@ -748,15 +805,19 @@ function threeDPage(
   openings: WallSeg[],
   objects: ObjectData[],
   sheet: string,
+  views: [View3DParams, View3DParams] = DEFAULT_PDF_VIEWS,
+  colorOpenings = false,
 ): string {
   const d = new Draw();
   const top = FRAME.y + FRAME.h;
-  d.text('Perspective nord-ouest', FRAME.x + 20, top - 30, 10, GREY, { align: 'left' });
+  d.text('Vue 1', FRAME.x + 20, top - 30, 10, GREY, { align: 'left' });
   draw3DView(d, walls, openings, objects,
-    { x: FRAME.x + 30, y: FRAME.y + TITLE_H + 375, w: FRAME.w - 60, h: 290 }, -32, 58);
-  d.text('Perspective sud-est', FRAME.x + 20, FRAME.y + TITLE_H + 350, 10, GREY, { align: 'left' });
+    { x: FRAME.x + 30, y: FRAME.y + TITLE_H + 375, w: FRAME.w - 60, h: 290 },
+    views[0], colorOpenings);
+  d.text('Vue 2', FRAME.x + 20, FRAME.y + TITLE_H + 350, 10, GREY, { align: 'left' });
   draw3DView(d, walls, openings, objects,
-    { x: FRAME.x + 30, y: FRAME.y + TITLE_H + 30, w: FRAME.w - 60, h: 290 }, 148, 42);
+    { x: FRAME.x + 30, y: FRAME.y + TITLE_H + 30, w: FRAME.w - 60, h: 290 },
+    views[1], colorOpenings);
 
   drawSheetChrome(d, {
     project: name,
@@ -785,15 +846,25 @@ export function pdfFilename(name: string): string {
   return `${clean || 'echoplan'}.pdf`;
 }
 
-export function buildScanPdf(scan: ScanForPdf, include3D: boolean): Uint8Array {
+export function buildScanPdf(
+  scan: ScanForPdf,
+  include3D: boolean,
+  opts: PdfOptions = {},
+): Uint8Array {
   const filename = pdfFilename(scan.name);
   const total = include3D ? 2 : 1;
   const pages = [
-    planPage(scan.name, filename, scan.walls, scan.openings, scan.objects, `1 / ${total}`),
+    planPage(
+      scan.name, filename, scan.walls, scan.openings, scan.objects,
+      `1 / ${total}`, opts.plan, opts.colorOpenings ?? false,
+    ),
   ];
   if (include3D) {
     pages.push(
-      threeDPage(scan.name, filename, scan.walls, scan.openings, scan.objects, `2 / ${total}`),
+      threeDPage(
+        scan.name, filename, scan.walls, scan.openings, scan.objects,
+        `2 / ${total}`, opts.views, opts.colorOpenings ?? false,
+      ),
     );
   }
   return buildDocument(pages);

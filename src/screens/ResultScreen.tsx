@@ -6,15 +6,14 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
 import { captureRef } from 'react-native-view-shot';
 import { RoomScan } from 'react-native-room-scan';
-import { buildScanPdf, pdfFilename, toBase64 } from '../export/pdf';
 import {
   radius,
   shadowCard,
@@ -38,6 +37,8 @@ export function ResultScreen() {
   const setWallLength = useScanStore((s) => s.setWallLength);
   const renameCurrent = useScanStore((s) => s.renameCurrent);
   const saveAsCopy = useScanStore((s) => s.saveAsCopy);
+  const dirty = useScanStore((s) => s.dirty);
+  const commitCurrent = useScanStore((s) => s.commitCurrent);
   const setScreen = useScanStore((s) => s.setScreen);
   const reset = useScanStore((s) => s.reset);
   const styles = getStyles(useTheme());
@@ -49,10 +50,7 @@ export function ResultScreen() {
   const [lengthInput, setLengthInput] = useState('');
   const [renaming, setRenaming] = useState(false);
   const [nameInput, setNameInput] = useState('');
-  const [exporting, setExporting] = useState(false);
-  const [include3D, setInclude3D] = useState(true);
 
-  const openings = useScanStore((s) => s.openings);
   const canvasRef = useRef<View>(null);
 
   /** Capture la vue affichée (2D ou 3D) en PNG et ouvre le partage. */
@@ -75,19 +73,6 @@ export function ResultScreen() {
       await RoomScan.shareFile(modelPath);
     } catch (e: any) {
       Alert.alert('Partage impossible', e?.message ?? 'Erreur inconnue');
-    }
-  };
-
-  const doExport = async () => {
-    setExporting(false);
-    try {
-      const bytes = buildScanPdf(
-        { name: scanName, walls, openings, objects },
-        include3D,
-      );
-      await RoomScan.sharePDF(toBase64(bytes), pdfFilename(scanName));
-    } catch (e: any) {
-      Alert.alert('Export impossible', e?.message ?? 'Erreur inconnue');
     }
   };
 
@@ -218,6 +203,22 @@ export function ResultScreen() {
             </View>
           )
         )}
+
+        {/* Modifications non enregistrées : bouton de sauvegarde flottant */}
+        {dirty && (
+          <TouchableOpacity style={styles.saveFab} onPress={commitCurrent}>
+            <Svg width={22} height={22} viewBox="0 0 24 24">
+              <Path
+                d="M12 3 v11 M7 9.5 l5 5 5 -5 M5 20 h14"
+                stroke="#FFFFFF"
+                strokeWidth={2.4}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                fill="none"
+              />
+            </Svg>
+          </TouchableOpacity>
+        )}
       </View>
 
       {tab === '2d' && editMode && selectedWall ? (
@@ -269,7 +270,7 @@ export function ResultScreen() {
       {Platform.OS === 'ios' && (
         <TouchableOpacity
           style={styles.exportButton}
-          onPress={() => setExporting(true)}>
+          onPress={() => setScreen('export')}>
           <Text style={styles.primaryText}>Exporter en PDF</Text>
         </TouchableOpacity>
       )}
@@ -286,31 +287,6 @@ export function ResultScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* ---------- Export PDF ---------- */}
-      <Modal visible={exporting} transparent animationType="fade">
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Exporter en PDF</Text>
-            <Text style={styles.modalSubtitle}>
-              Plan d'ensemble coté, prêt à partager ou imprimer.
-            </Text>
-            <View style={styles.switchRow}>
-              <Text style={styles.switchLabel}>Inclure des vues 3D</Text>
-              <Switch value={include3D} onValueChange={setInclude3D} />
-            </View>
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={styles.modalGhost}
-                onPress={() => setExporting(false)}>
-                <Text style={styles.modalGhostText}>Annuler</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.modalPrimary} onPress={doExport}>
-                <Text style={styles.modalPrimaryText}>Exporter</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
 
       {/* ---------- Renommage ---------- */}
       <Modal visible={renaming} transparent animationType="fade">
@@ -318,7 +294,8 @@ export function ResultScreen() {
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>Nom du scan</Text>
             <Text style={styles.modalSubtitle}>
-              Vos modifications s'enregistrent automatiquement dans ce scan.
+              Les modifications du plan s'enregistrent avec le bouton en bas à
+              droite du plan.
             </Text>
             <TextInput
               style={styles.modalInput}
@@ -483,6 +460,22 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   toolPillActive: { backgroundColor: c.blue, borderColor: c.blue },
   toolPillText: { color: c.inkSoft, fontSize: 12.5, fontWeight: '700' },
   toolPillTextActive: { color: '#FFFFFF' },
+  saveFab: {
+    position: 'absolute',
+    bottom: 12,
+    right: 12,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: c.blue,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: c.blue,
+    shadowOpacity: 0.45,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 5,
+  },
   hint: {
     color: c.inkFaint,
     fontSize: 12.5,

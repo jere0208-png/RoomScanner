@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { PanResponder, StyleSheet, Text, View } from 'react-native';
 import Svg, { Polygon } from 'react-native-svg';
 import { themedStyles, useTheme, type Palette } from '../theme';
@@ -22,6 +22,23 @@ interface Face {
   isFloor?: boolean;
 }
 
+/** Paramètres de caméra de la vue 3D (contrôlables de l'extérieur). */
+export interface View3DParams {
+  theta: number;
+  tilt: number;
+  zoom: number;
+  ox: number;
+  oy: number;
+}
+
+export const DEFAULT_VIEW3D: View3DParams = {
+  theta: -32,
+  tilt: 58,
+  zoom: 1,
+  ox: 0,
+  oy: 0,
+};
+
 /** Épaisseur donnée aux murs dans la vue 3D (m). */
 const WALL_T = 0.14;
 
@@ -36,77 +53,118 @@ function mix(a: string, b: string, t: number): string {
   return `#${c.map((v) => v.toString(16).padStart(2, '0')).join('')}`;
 }
 
+interface Props {
+  /** Mode contrôlé (aperçu d'export) : état de caméra fourni par le parent. */
+  value?: View3DParams;
+  onChange?: (v: View3DParams) => void;
+  /** Cache la pastille d'aide (pour les petits encarts d'aperçu). */
+  hideHint?: boolean;
+}
+
 /**
  * Vue 3D axonométrique du scan, dérivée des mêmes données paramétriques
  * que le plan 2D : murs épais extrudés, portes/fenêtres, meubles.
- * Un doigt : horizontal pour tourner, vertical pour incliner.
+ * Un doigt : tourner/incliner. Deux doigts : pincer pour zoomer, déplacer.
  */
-export function Iso3DView() {
+export function Iso3DView({ value, onChange, hideHint }: Props) {
   const walls = useScanStore((s) => s.walls);
   const openings = useScanStore((s) => s.openings);
   const objects = useScanStore((s) => s.objects);
+  const colorOpenings = useScanStore((s) => s.showOpeningColors);
   const c = useTheme();
   const styles = getStyles(c);
 
   const [layout, setLayout] = useState({ w: 0, h: 0 });
-  const [angles, setAngles] = useState({ theta: -32, tilt: 58 });
-  const [offset, setOffset] = useState({ x: 0, y: 0 });
-  const anglesRef = useRef(angles);
-  const offsetRef = useRef(offset);
-  const grabRef = useRef({
-    theta: -32,
-    tilt: 58,
-    ox: 0,
-    oy: 0,
+  const [inner, setInner] = useState<View3DParams>(DEFAULT_VIEW3D);
+  const view = value ?? inner;
+  const viewRef = useRef(view);
+  const changeRef = useRef<Props['onChange']>(undefined);
+  useEffect(() => {
+    viewRef.current = view;
+  }, [view]);
+  useEffect(() => {
+    changeRef.current = onChange;
+  }, [onChange]);
+
+  const update = (v: View3DParams) => {
+    viewRef.current = v;
+    if (changeRef.current) {
+      changeRef.current(v);
+    } else {
+      setInner(v);
+    }
+  };
+
+  const baseRef = useRef({
+    v: DEFAULT_VIEW3D,
+    mode: 'rotate' as 'rotate' | 'pinch',
     dx0: 0,
     dy0: 0,
-    mode: 'rotate' as 'rotate' | 'pan',
+    d0: 1,
+    mx0: 0,
+    my0: 0,
   });
 
   // Créé UNE seule fois : un responder recréé en plein geste perd le suivi.
-  // Un doigt : rotation/inclinaison. Deux doigts : déplacement du modèle.
   const pan = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: (_e, g) =>
         Math.abs(g.dx) + Math.abs(g.dy) > 4,
-      onPanResponderGrant: (e) => {
-        grabRef.current = {
-          ...anglesRef.current,
-          ox: offsetRef.current.x,
-          oy: offsetRef.current.y,
-          dx0: 0,
-          dy0: 0,
-          mode: e.nativeEvent.touches.length >= 2 ? 'pan' : 'rotate',
+      onPanResponderGrant: (e, g) => {
+        const t = e.nativeEvent.touches;
+        baseRef.current = {
+          v: viewRef.current,
+          mode: t.length >= 2 ? 'pinch' : 'rotate',
+          dx0: g.dx,
+          dy0: g.dy,
+          d0:
+            t.length >= 2
+              ? Math.max(8, Math.hypot(t[0].pageX - t[1].pageX, t[0].pageY - t[1].pageY))
+              : 1,
+          mx0: t.length >= 2 ? (t[0].pageX + t[1].pageX) / 2 : 0,
+          my0: t.length >= 2 ? (t[0].pageY + t[1].pageY) / 2 : 0,
         };
       },
       onPanResponderMove: (e, g) => {
-        const mode = e.nativeEvent.touches.length >= 2 ? 'pan' : 'rotate';
-        if (mode !== grabRef.current.mode) {
+        const t = e.nativeEvent.touches;
+        const mode = t.length >= 2 ? 'pinch' : 'rotate';
+        if (mode !== baseRef.current.mode) {
           // Le nombre de doigts a changé en plein geste : on repart d'ici.
-          grabRef.current = {
-            ...anglesRef.current,
-            ox: offsetRef.current.x,
-            oy: offsetRef.current.y,
+          baseRef.current = {
+            v: viewRef.current,
+            mode,
             dx0: g.dx,
             dy0: g.dy,
-            mode,
+            d0:
+              t.length >= 2
+                ? Math.max(8, Math.hypot(t[0].pageX - t[1].pageX, t[0].pageY - t[1].pageY))
+                : 1,
+            mx0: t.length >= 2 ? (t[0].pageX + t[1].pageX) / 2 : 0,
+            my0: t.length >= 2 ? (t[0].pageY + t[1].pageY) / 2 : 0,
           };
         }
-        const ddx = g.dx - grabRef.current.dx0;
-        const ddy = g.dy - grabRef.current.dy0;
-        if (mode === 'pan') {
-          const next = { x: grabRef.current.ox + ddx, y: grabRef.current.oy + ddy };
-          offsetRef.current = next;
-          setOffset(next);
+        const base = baseRef.current;
+        if (mode === 'pinch' && t.length >= 2) {
+          const d = Math.max(8, Math.hypot(t[0].pageX - t[1].pageX, t[0].pageY - t[1].pageY));
+          const mx = (t[0].pageX + t[1].pageX) / 2;
+          const my = (t[0].pageY + t[1].pageY) / 2;
+          update({
+            theta: base.v.theta,
+            tilt: base.v.tilt,
+            zoom: clamp(base.v.zoom * (d / base.d0), 0.4, 4),
+            ox: base.v.ox + (mx - base.mx0),
+            oy: base.v.oy + (my - base.my0),
+          });
         } else {
-          const next = {
+          const ddx = g.dx - base.dx0;
+          const ddy = g.dy - base.dy0;
+          update({
+            ...base.v,
             // Glisser à droite « pousse » la face avant vers la droite.
-            theta: grabRef.current.theta - ddx * 0.45,
-            tilt: clamp(grabRef.current.tilt - ddy * 0.3, 15, 80),
-          };
-          anglesRef.current = next;
-          setAngles(next);
+            theta: base.v.theta - ddx * 0.45,
+            tilt: clamp(base.v.tilt - ddy * 0.3, 15, 80),
+          });
         }
       },
     }),
@@ -199,7 +257,11 @@ export function Iso3DView() {
       const yBase = Math.max(0, o.yCenter - o.height / 2 - floorY);
       list.push({
         pts: vquad(o.a, o.b, yBase, yBase + o.height),
-        fill: o.type === 'door' ? c.amber : c.sky,
+        fill: colorOpenings
+          ? o.type === 'door'
+            ? c.amber
+            : c.sky
+          : '#B9C2CE',
         stroke: 'none',
         bias: 0.12,
       });
@@ -237,7 +299,7 @@ export function Iso3DView() {
     }
 
     return list;
-  }, [walls, openings, objects, floorY, c]);
+  }, [walls, openings, objects, floorY, c, colorOpenings]);
 
   // Centre et rayon englobants en 3D : l'échelle reste stable en rotation.
   const { center, radius3d } = useMemo(() => {
@@ -259,11 +321,11 @@ export function Iso3DView() {
 
   const rendered = useMemo(() => {
     if (layout.w === 0 || layout.h === 0) return null;
-    const ct = Math.cos(rad(angles.theta));
-    const st = Math.sin(rad(angles.theta));
-    const cp = Math.cos(rad(angles.tilt));
-    const sp = Math.sin(rad(angles.tilt));
-    const scale = (Math.min(layout.w, layout.h) * 0.44) / radius3d;
+    const ct = Math.cos(rad(view.theta));
+    const st = Math.sin(rad(view.theta));
+    const cp = Math.cos(rad(view.tilt));
+    const sp = Math.sin(rad(view.tilt));
+    const scale = ((Math.min(layout.w, layout.h) * 0.44) / radius3d) * view.zoom;
 
     const project = (p: P3) => {
       const x = p.x - center.x;
@@ -272,8 +334,8 @@ export function Iso3DView() {
       const rx = x * ct - z * st;
       const rz = x * st + z * ct;
       return {
-        sx: layout.w / 2 + offset.x + rx * scale,
-        sy: layout.h / 2 + offset.y + (rz * cp - y * sp) * scale,
+        sx: layout.w / 2 + view.ox + rx * scale,
+        sy: layout.h / 2 + view.oy + (rz * cp - y * sp) * scale,
         depth: rz * sp + y * cp,
       };
     };
@@ -302,7 +364,7 @@ export function Iso3DView() {
 
     polys.sort((p, q) => p.depth - q.depth);
     return polys;
-  }, [faces, layout, angles, offset, center, radius3d]);
+  }, [faces, layout, view, center, radius3d]);
 
   return (
     <View
@@ -314,7 +376,7 @@ export function Iso3DView() {
         })
       }
       {...pan.panHandlers}>
-      {/* pointerEvents="none" : le SVG ne doit pas voler les gestes de rotation. */}
+      {/* pointerEvents="none" : le SVG ne doit pas voler les gestes. */}
       {rendered && (
         <View pointerEvents="none">
           <Svg width={layout.w} height={layout.h}>
@@ -331,9 +393,13 @@ export function Iso3DView() {
           </Svg>
         </View>
       )}
-      <View style={styles.hintPill} pointerEvents="none">
-        <Text style={styles.hintText}>1 doigt : tourner · 2 doigts : déplacer</Text>
-      </View>
+      {!hideHint && (
+        <View style={styles.hintPill} pointerEvents="none">
+          <Text style={styles.hintText}>
+            1 doigt : tourner · 2 doigts : zoomer, déplacer
+          </Text>
+        </View>
+      )}
     </View>
   );
 }

@@ -65,9 +65,10 @@ const distSeg = (px, py, ax, ay, bx, by) => {
 // couverture 0..1 ; `aa` = largeur d'un pixel en unités glyphe (anticrénelage)
 const cov = (d, aa) => Math.max(0, Math.min(1, 0.5 - d / aa));
 
-// Glyphe dans le repère 76×76 du logo (mêmes tracés que l'app),
-// agrandi de 28 % autour de son centre pour l'icône.
-const ZOOM = 1.28, CX = 39, CY = 37;
+// Glyphe dans le repère 76×76 du logo (mêmes tracés que l'app).
+// Boîte du glyphe (traits compris) : x 22,5–55,5 · y 20,5–53,5 → centre (39, 37).
+// On le recentre sur (38, 38) et on l'agrandit : marges égales sur les 4 côtés.
+const ZOOM = 1.45, CX = 39, CY = 37;
 // Centre d'émission des ondes (le point n'est plus dessiné).
 const DOT = { x: 25, y: 51 };
 // Balayage symétrique autour de la diagonale (-45°) : le radar vise l'angle.
@@ -79,8 +80,9 @@ const CORNER = { pts: [[25, 23], [53, 23], [53, 51]], w: 5 };
 
 function glyphAlpha(gx, gy, aa) {
   // dé-zoom : on échantillonne le glyphe d'origine
-  const x = (gx - CX) / ZOOM + CX;
-  const y = (gy - CY) / ZOOM + CY;
+  // dé-zoom autour du centre de l'icône (38,38), recalé sur le centre du glyphe
+  const x = (gx - 38) / ZOOM + CX;
+  const y = (gy - 38) / ZOOM + CY;
   let a = 0;
   for (const arc of ARCS) {
     const dx = x - DOT.x, dy = y - DOT.y;

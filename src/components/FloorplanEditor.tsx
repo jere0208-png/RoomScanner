@@ -44,6 +44,7 @@ export function FloorplanEditor({
   const openings = useScanStore((s) => s.openings);
   const objects = useScanStore((s) => s.objects);
   const currentSaveId = useScanStore((s) => s.currentSaveId);
+  const colorOpenings = useScanStore((s) => s.showOpeningColors);
   const c = useTheme();
   const styles = getStyles(c);
   const [layout, setLayout] = useState({ w: 0, h: 0 });
@@ -132,7 +133,11 @@ export function FloorplanEditor({
             {openings.map((o) => {
               const a = mapping.toPx(o.a);
               const b = mapping.toPx(o.b);
-              const color = o.type === 'door' ? c.amber : c.sky;
+              const color = colorOpenings
+                ? o.type === 'door'
+                  ? c.amber
+                  : c.sky
+                : c.inkFaint;
               return (
                 <Line
                   key={o.id}

@@ -5,6 +5,7 @@ import { HomeScreen } from './src/screens/HomeScreen';
 import { ScanScreen } from './src/screens/ScanScreen';
 import { ResultScreen } from './src/screens/ResultScreen';
 import { LibraryScreen } from './src/screens/LibraryScreen';
+import { ExportScreen } from './src/screens/ExportScreen';
 import { useScanStore } from './src/store/scanStore';
 
 export default function App() {
@@ -27,6 +28,7 @@ export default function App() {
       {screen === 'scan' && <ScanScreen />}
       {screen === 'result' && <ResultScreen />}
       {screen === 'library' && <LibraryScreen />}
+      {screen === 'export' && <ExportScreen />}
     </>
   );
 }
