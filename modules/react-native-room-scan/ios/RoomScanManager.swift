@@ -15,6 +15,9 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
   private var stopResolver: RCTPromiseResolveBlock?
   private var stopRejecter: RCTPromiseRejectBlock?
   private var lastLiveEmit = Date.distantPast
+  // startRoomScan() est appelé côté JS AVANT que la vue AR soit montée :
+  // on mémorise la demande et on lance la session à la création de la vue.
+  private var pendingStart = false
 
   override init() { super.init() }
 
@@ -29,6 +32,10 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
     view.delegate = self
     view.captureSession.delegate = self
     captureView = view
+    if pendingStart {
+      pendingStart = false
+      view.captureSession.run(configuration: configuration)
+    }
     return view
   }
 
@@ -36,7 +43,13 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
 
   func start() {
     DispatchQueue.main.async {
-      self.captureView?.captureSession.run(configuration: self.configuration)
+      // Une vue d'un scan précédent peut encore traîner, détachée de l'écran :
+      // ne relancer la session que sur une vue réellement affichée.
+      if let view = self.captureView, view.window != nil {
+        view.captureSession.run(configuration: self.configuration)
+      } else {
+        self.pendingStart = true
+      }
     }
   }
 
