@@ -7,7 +7,7 @@ import {
   View,
 } from 'react-native';
 import { RoomScanView } from 'react-native-room-scan';
-import { colors } from '../theme';
+import { themedStyles, useTheme, type Palette } from '../theme';
 import { useScanStore } from '../store/scanStore';
 import { useRoomScan } from '../native/useRoomScan';
 
@@ -25,6 +25,7 @@ export function ScanScreen() {
   const paused = useScanStore((s) => s.paused);
   const processing = useScanStore((s) => s.processing);
   const { pause, resume, stop, cancel } = useRoomScan();
+  const styles = getStyles(useTheme());
 
   const stats: [string, number][] = [
     ['Murs', wallCount],
@@ -90,7 +91,7 @@ export function ScanScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
   cancelButton: {
     position: 'absolute',
@@ -100,11 +101,11 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: colors.scanPillSoft,
+    backgroundColor: c.scanPillSoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  cancelIcon: { color: colors.scanInk, fontSize: 16, fontWeight: '700' },
+  cancelIcon: { color: c.scanInk, fontSize: 16, fontWeight: '700' },
   topHud: {
     position: 'absolute',
     top: 58,
@@ -114,14 +115,14 @@ const styles = StyleSheet.create({
   },
   statsPill: {
     flexDirection: 'row',
-    backgroundColor: colors.scanPill,
+    backgroundColor: c.scanPill,
     borderRadius: 18,
     paddingVertical: 9,
     paddingHorizontal: 6,
   },
   stat: { alignItems: 'center', paddingHorizontal: 16 },
   statBorder: { borderLeftWidth: 1, borderLeftColor: 'rgba(255,255,255,0.14)' },
-  statValue: { color: colors.scanInk, fontSize: 17, fontWeight: '800' },
+  statValue: { color: c.scanInk, fontSize: 17, fontWeight: '800' },
   statLabel: {
     color: 'rgba(244,246,250,0.62)',
     fontSize: 10,
@@ -133,7 +134,7 @@ const styles = StyleSheet.create({
   instructionPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.scanPillSoft,
+    backgroundColor: c.scanPillSoft,
     borderRadius: 999,
     paddingHorizontal: 16,
     paddingVertical: 8,
@@ -144,10 +145,10 @@ const styles = StyleSheet.create({
     width: 7,
     height: 7,
     borderRadius: 4,
-    backgroundColor: colors.blue,
+    backgroundColor: c.blue,
     marginRight: 8,
   },
-  instructionText: { color: colors.scanInk, fontSize: 14, fontWeight: '600' },
+  instructionText: { color: c.scanInk, fontSize: 14, fontWeight: '600' },
   bottomHud: {
     position: 'absolute',
     bottom: 46,
@@ -161,17 +162,17 @@ const styles = StyleSheet.create({
     width: 54,
     height: 54,
     borderRadius: 27,
-    backgroundColor: colors.scanPill,
+    backgroundColor: c.scanPill,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  pauseIcon: { color: colors.scanInk, fontSize: 16, fontWeight: '700' },
+  pauseIcon: { color: c.scanInk, fontSize: 16, fontWeight: '700' },
   stopButton: {
-    backgroundColor: colors.blue,
+    backgroundColor: c.blue,
     borderRadius: 27,
     paddingHorizontal: 26,
     paddingVertical: 16,
-    shadowColor: colors.blue,
+    shadowColor: c.blue,
     shadowOpacity: 0.5,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 4 },
@@ -201,4 +202,4 @@ const styles = StyleSheet.create({
     marginTop: 6,
     textAlign: 'center',
   },
-});
+}));

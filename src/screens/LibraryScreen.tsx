@@ -6,7 +6,13 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { colors, radius, shadowCard } from '../theme';
+import {
+  radius,
+  shadowCard,
+  themedStyles,
+  useTheme,
+  type Palette,
+} from '../theme';
 import { closedLoop, loopAreaM2 } from '../geometry/floorplan';
 import { useScanStore, type SavedScan } from '../store/scanStore';
 
@@ -23,6 +29,7 @@ export function LibraryScreen() {
   const setScreen = useScanStore((s) => s.setScreen);
   const openSave = useScanStore((s) => s.openSave);
   const deleteSave = useScanStore((s) => s.deleteSave);
+  const styles = getStyles(useTheme());
 
   // Suppression en deux temps : premier appui = confirmation, second = suppression.
   const [armedId, setArmedId] = useState<string | null>(null);
@@ -109,10 +116,10 @@ export function LibraryScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.bg,
+    backgroundColor: c.bg,
     paddingTop: 58,
     paddingHorizontal: 18,
   },
@@ -121,20 +128,20 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: colors.surface,
+    backgroundColor: c.surface,
     borderWidth: 1,
-    borderColor: colors.line,
+    borderColor: c.line,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
   },
-  backChevron: { color: colors.ink, fontSize: 24, fontWeight: '600', marginTop: -3 },
-  title: { color: colors.ink, fontSize: 24, fontWeight: '800', letterSpacing: -0.4 },
+  backChevron: { color: c.ink, fontSize: 24, fontWeight: '600', marginTop: -3 },
+  title: { color: c.ink, fontSize: 24, fontWeight: '800', letterSpacing: -0.4 },
   count: {
-    color: colors.blue,
+    color: c.blue,
     fontSize: 14,
     fontWeight: '800',
-    backgroundColor: colors.blueSoft,
+    backgroundColor: c.blueSoft,
     borderRadius: radius.pill,
     paddingHorizontal: 10,
     paddingVertical: 3,
@@ -145,32 +152,32 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surface,
+    backgroundColor: c.surface,
     borderRadius: radius.md + 2,
     padding: 15,
     marginBottom: 10,
     ...shadowCard,
   },
   rowTexts: { flex: 1, marginRight: 10 },
-  rowName: { color: colors.ink, fontSize: 16, fontWeight: '700' },
-  rowSub: { color: colors.inkFaint, fontSize: 12, marginTop: 2 },
-  rowDetails: { color: colors.inkSoft, fontSize: 13, marginTop: 5, fontWeight: '600' },
+  rowName: { color: c.ink, fontSize: 16, fontWeight: '700' },
+  rowSub: { color: c.inkFaint, fontSize: 12, marginTop: 2 },
+  rowDetails: { color: c.inkSoft, fontSize: 13, marginTop: 5, fontWeight: '600' },
   trash: {
     minWidth: 34,
     height: 34,
     borderRadius: 17,
-    backgroundColor: colors.surfaceSunken,
+    backgroundColor: c.surfaceSunken,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 10,
   },
-  trashArmed: { backgroundColor: colors.danger },
-  trashText: { color: colors.inkSoft, fontSize: 13, fontWeight: '700' },
+  trashArmed: { backgroundColor: c.danger },
+  trashText: { color: c.inkSoft, fontSize: 13, fontWeight: '700' },
   trashTextArmed: { color: '#FFFFFF', fontSize: 12 },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
-  emptyTitle: { color: colors.ink, fontSize: 19, fontWeight: '800' },
+  emptyTitle: { color: c.ink, fontSize: 19, fontWeight: '800' },
   emptyText: {
-    color: colors.inkSoft,
+    color: c.inkSoft,
     fontSize: 14,
     lineHeight: 20,
     textAlign: 'center',
@@ -178,11 +185,11 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   primaryButton: {
-    backgroundColor: colors.blue,
+    backgroundColor: c.blue,
     borderRadius: radius.md,
     paddingVertical: 14,
     paddingHorizontal: 28,
     alignItems: 'center',
   },
   primaryText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
-});
+}));

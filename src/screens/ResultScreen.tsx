@@ -11,7 +11,13 @@ import {
   View,
 } from 'react-native';
 import { RoomScan } from 'react-native-room-scan';
-import { colors, radius, shadowCard } from '../theme';
+import {
+  radius,
+  shadowCard,
+  themedStyles,
+  useTheme,
+  type Palette,
+} from '../theme';
 import { FloorplanEditor } from '../components/FloorplanEditor';
 import { Iso3DView } from '../components/Iso3DView';
 import { closedLoop, loopAreaM2, segLength } from '../geometry/floorplan';
@@ -30,6 +36,7 @@ export function ResultScreen() {
   const saveAsCopy = useScanStore((s) => s.saveAsCopy);
   const setScreen = useScanStore((s) => s.setScreen);
   const reset = useScanStore((s) => s.reset);
+  const styles = getStyles(useTheme());
 
   const [tab, setTab] = useState<Tab>('2d');
   const [showMeasures, setShowMeasures] = useState(true);
@@ -277,6 +284,7 @@ function ToolPill({
   active: boolean;
   onPress: () => void;
 }) {
+  const styles = getStyles(useTheme());
   return (
     <TouchableOpacity
       style={[styles.toolPill, active && styles.toolPillActive]}
@@ -288,17 +296,17 @@ function ToolPill({
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.bg,
+    backgroundColor: c.bg,
     paddingTop: 58,
     paddingHorizontal: 18,
   },
   emptyContainer: { alignItems: 'center', justifyContent: 'center', padding: 32 },
-  emptyTitle: { color: colors.ink, fontSize: 22, fontWeight: '800' },
+  emptyTitle: { color: c.ink, fontSize: 22, fontWeight: '800' },
   emptyText: {
-    color: colors.inkSoft,
+    color: c.inkSoft,
     fontSize: 14,
     lineHeight: 20,
     textAlign: 'center',
@@ -310,41 +318,41 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: colors.surface,
+    backgroundColor: c.surface,
     borderWidth: 1,
-    borderColor: colors.line,
+    borderColor: c.line,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
   },
-  backChevron: { color: colors.ink, fontSize: 24, fontWeight: '600', marginTop: -3 },
+  backChevron: { color: c.ink, fontSize: 24, fontWeight: '600', marginTop: -3 },
   titleWrap: { flexDirection: 'row', alignItems: 'center', flex: 1 },
   title: {
-    color: colors.ink,
+    color: c.ink,
     fontSize: 21,
     fontWeight: '800',
     letterSpacing: -0.3,
     flexShrink: 1,
   },
-  titleEditIcon: { color: colors.inkFaint, fontSize: 15, marginLeft: 8 },
+  titleEditIcon: { color: c.inkFaint, fontSize: 15, marginLeft: 8 },
   metricsRow: {
     flexDirection: 'row',
-    backgroundColor: colors.surface,
+    backgroundColor: c.surface,
     borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: colors.line,
+    borderColor: c.line,
     alignSelf: 'flex-start',
     marginTop: 12,
     marginBottom: 12,
     paddingVertical: 8,
   },
   metric: { paddingHorizontal: 15, alignItems: 'center' },
-  metricBorder: { borderLeftWidth: 1, borderLeftColor: colors.line },
-  metricValue: { color: colors.ink, fontSize: 16, fontWeight: '800' },
-  metricLabel: { color: colors.inkFaint, fontSize: 11, marginTop: 1 },
+  metricBorder: { borderLeftWidth: 1, borderLeftColor: c.line },
+  metricValue: { color: c.ink, fontSize: 16, fontWeight: '800' },
+  metricLabel: { color: c.inkFaint, fontSize: 11, marginTop: 1 },
   segment: {
     flexDirection: 'row',
-    backgroundColor: colors.surfaceSunken,
+    backgroundColor: c.surfaceSunken,
     borderRadius: radius.md,
     padding: 3,
     marginBottom: 12,
@@ -355,9 +363,9 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     alignItems: 'center',
   },
-  segmentItemActive: { backgroundColor: colors.surface, ...shadowCard },
-  segmentText: { color: colors.inkSoft, fontSize: 14, fontWeight: '600' },
-  segmentTextActive: { color: colors.blue, fontWeight: '700' },
+  segmentItemActive: { backgroundColor: c.surface, ...shadowCard },
+  segmentText: { color: c.inkSoft, fontSize: 14, fontWeight: '600' },
+  segmentTextActive: { color: c.blue, fontWeight: '700' },
   canvas: { flex: 1, ...shadowCard, borderRadius: radius.lg },
   planTools: {
     position: 'absolute',
@@ -367,36 +375,36 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   toolPill: {
-    backgroundColor: colors.surface,
+    backgroundColor: c.surface,
     borderWidth: 1,
-    borderColor: colors.line,
+    borderColor: c.line,
     borderRadius: radius.pill,
     paddingHorizontal: 13,
     paddingVertical: 7,
   },
-  toolPillActive: { backgroundColor: colors.blue, borderColor: colors.blue },
-  toolPillText: { color: colors.inkSoft, fontSize: 12.5, fontWeight: '700' },
+  toolPillActive: { backgroundColor: c.blue, borderColor: c.blue },
+  toolPillText: { color: c.inkSoft, fontSize: 12.5, fontWeight: '700' },
   toolPillTextActive: { color: '#FFFFFF' },
   hint: {
-    color: colors.inkFaint,
+    color: c.inkFaint,
     fontSize: 12.5,
     textAlign: 'center',
     marginVertical: 12,
     lineHeight: 17,
   },
   editBar: {
-    backgroundColor: colors.surface,
+    backgroundColor: c.surface,
     borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: colors.line,
+    borderColor: c.line,
     padding: 13,
     marginVertical: 10,
   },
-  editLabel: { color: colors.inkSoft, fontSize: 13, marginBottom: 8, fontWeight: '600' },
+  editLabel: { color: c.inkSoft, fontSize: 13, marginBottom: 8, fontWeight: '600' },
   editRow: { flexDirection: 'row', alignItems: 'center' },
   input: {
-    backgroundColor: colors.bg,
-    color: colors.ink,
+    backgroundColor: c.bg,
+    color: c.ink,
     borderRadius: radius.sm,
     paddingHorizontal: 14,
     paddingVertical: 9,
@@ -404,11 +412,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     minWidth: 90,
     borderWidth: 1,
-    borderColor: colors.lineStrong,
+    borderColor: c.lineStrong,
   },
-  unit: { color: colors.inkSoft, fontSize: 15, marginHorizontal: 10 },
+  unit: { color: c.inkSoft, fontSize: 15, marginHorizontal: 10 },
   applyButton: {
-    backgroundColor: colors.blue,
+    backgroundColor: c.blue,
     borderRadius: radius.sm,
     paddingHorizontal: 18,
     paddingVertical: 11,
@@ -417,20 +425,20 @@ const styles = StyleSheet.create({
   applyText: { color: '#FFFFFF', fontWeight: '700', fontSize: 14 },
   objectList: { maxHeight: 58, marginBottom: 6, flexGrow: 0 },
   objectChip: {
-    backgroundColor: colors.surface,
+    backgroundColor: c.surface,
     borderRadius: radius.sm,
     borderWidth: 1,
-    borderColor: colors.line,
+    borderColor: c.line,
     paddingHorizontal: 13,
     paddingVertical: 7,
     marginRight: 8,
   },
-  objectName: { color: colors.ink, fontSize: 13, fontWeight: '700' },
-  objectDims: { color: colors.inkFaint, fontSize: 11.5 },
+  objectName: { color: c.ink, fontSize: 13, fontWeight: '700' },
+  objectDims: { color: c.inkFaint, fontSize: 11.5 },
   actions: { flexDirection: 'row', gap: 10, paddingBottom: 28, paddingTop: 4 },
   primaryButton: {
     flex: 1,
-    backgroundColor: colors.blue,
+    backgroundColor: c.blue,
     borderRadius: radius.md,
     paddingVertical: 15,
     alignItems: 'center',
@@ -438,14 +446,14 @@ const styles = StyleSheet.create({
   primaryText: { color: '#FFFFFF', fontSize: 15.5, fontWeight: '700' },
   secondaryButton: {
     flex: 1,
-    backgroundColor: colors.surface,
+    backgroundColor: c.surface,
     borderWidth: 1,
-    borderColor: colors.lineStrong,
+    borderColor: c.lineStrong,
     borderRadius: radius.md,
     paddingVertical: 15,
     alignItems: 'center',
   },
-  secondaryText: { color: colors.ink, fontSize: 15.5, fontWeight: '600' },
+  secondaryText: { color: c.ink, fontSize: 15.5, fontWeight: '600' },
   modalBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(11,13,18,0.45)',
@@ -454,28 +462,28 @@ const styles = StyleSheet.create({
     padding: 28,
   },
   modalCard: {
-    backgroundColor: colors.surface,
+    backgroundColor: c.surface,
     borderRadius: radius.lg,
     padding: 20,
     width: '100%',
     ...shadowCard,
   },
-  modalTitle: { color: colors.ink, fontSize: 17, fontWeight: '800' },
+  modalTitle: { color: c.ink, fontSize: 17, fontWeight: '800' },
   modalSubtitle: {
-    color: colors.inkFaint,
+    color: c.inkFaint,
     fontSize: 12.5,
     lineHeight: 17,
     marginTop: 4,
     marginBottom: 12,
   },
   modalCopy: { alignItems: 'center', paddingTop: 14 },
-  modalCopyText: { color: colors.blue, fontSize: 14, fontWeight: '700' },
+  modalCopyText: { color: c.blue, fontSize: 14, fontWeight: '700' },
   modalInput: {
-    backgroundColor: colors.bg,
-    color: colors.ink,
+    backgroundColor: c.bg,
+    color: c.ink,
     borderRadius: radius.sm,
     borderWidth: 1,
-    borderColor: colors.lineStrong,
+    borderColor: c.lineStrong,
     paddingHorizontal: 14,
     paddingVertical: 11,
     fontSize: 16,
@@ -487,15 +495,15 @@ const styles = StyleSheet.create({
     borderRadius: radius.sm,
     paddingVertical: 12,
     alignItems: 'center',
-    backgroundColor: colors.surfaceSunken,
+    backgroundColor: c.surfaceSunken,
   },
-  modalGhostText: { color: colors.inkSoft, fontWeight: '600', fontSize: 14.5 },
+  modalGhostText: { color: c.inkSoft, fontWeight: '600', fontSize: 14.5 },
   modalPrimary: {
     flex: 1,
     borderRadius: radius.sm,
     paddingVertical: 12,
     alignItems: 'center',
-    backgroundColor: colors.blue,
+    backgroundColor: c.blue,
   },
   modalPrimaryText: { color: '#FFFFFF', fontWeight: '700', fontSize: 14.5 },
-});
+}));

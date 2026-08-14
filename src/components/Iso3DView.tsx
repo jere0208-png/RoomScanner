@@ -1,7 +1,7 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { PanResponder, StyleSheet, Text, View } from 'react-native';
 import Svg, { Polygon } from 'react-native-svg';
-import { colors } from '../theme';
+import { themedStyles, useTheme, type Palette } from '../theme';
 import { closedLoop, toFootprint } from '../geometry/floorplan';
 import { useScanStore } from '../store/scanStore';
 
@@ -45,6 +45,8 @@ export function Iso3DView() {
   const walls = useScanStore((s) => s.walls);
   const openings = useScanStore((s) => s.openings);
   const objects = useScanStore((s) => s.objects);
+  const c = useTheme();
+  const styles = getStyles(c);
 
   const [layout, setLayout] = useState({ w: 0, h: 0 });
   const [angles, setAngles] = useState({ theta: -32, tilt: 58 });
@@ -86,8 +88,8 @@ export function Iso3DView() {
     if (loop) {
       list.push({
         pts: loop.map((p) => ({ x: p.x, y: 0, z: p.z })),
-        fill: colors.surfaceSunken,
-        stroke: colors.lineStrong,
+        fill: c.surfaceSunken,
+        stroke: c.lineStrong,
         isFloor: true,
       });
     }
@@ -142,7 +144,7 @@ export function Iso3DView() {
       const yBase = Math.max(0, o.yCenter - o.height / 2 - floorY);
       list.push({
         pts: vquad(o.a, o.b, yBase, yBase + o.height),
-        fill: o.type === 'door' ? colors.amber : colors.sky,
+        fill: o.type === 'door' ? c.amber : c.sky,
         stroke: 'none',
         bias: 0.12,
       });
@@ -180,7 +182,7 @@ export function Iso3DView() {
     }
 
     return list;
-  }, [walls, openings, objects, floorY]);
+  }, [walls, openings, objects, floorY, c]);
 
   // Centre et rayon englobants en 3D : l'échelle reste stable en rotation.
   const { center, radius3d } = useMemo(() => {
@@ -281,10 +283,10 @@ export function Iso3DView() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.surface,
+    backgroundColor: c.surface,
     borderRadius: 20,
     overflow: 'hidden',
   },
@@ -292,10 +294,10 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 12,
     alignSelf: 'center',
-    backgroundColor: colors.surfaceSunken,
+    backgroundColor: c.surfaceSunken,
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 5,
   },
-  hintText: { color: colors.inkFaint, fontSize: 11, fontWeight: '600' },
-});
+  hintText: { color: c.inkFaint, fontSize: 11, fontWeight: '600' },
+}));

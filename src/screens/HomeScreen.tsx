@@ -2,7 +2,13 @@ import React, { useEffect } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import { RoomScan } from 'react-native-room-scan';
-import { colors, radius, shadowCard } from '../theme';
+import {
+  radius,
+  shadowCard,
+  themedStyles,
+  useTheme,
+  type Palette,
+} from '../theme';
 import { useScanStore } from '../store/scanStore';
 import { useRoomScan } from '../native/useRoomScan';
 
@@ -11,9 +17,10 @@ import { useRoomScan } from '../native/useRoomScan';
  * et la troisième onde se cristallise en angle de murs (le plan).
  */
 function LogoMark({ size = 76 }: { size?: number }) {
+  const c = useTheme();
   return (
     <Svg width={size} height={size} viewBox="0 0 76 76">
-      <Rect x={0} y={0} width={76} height={76} rx={20} fill={colors.blue} />
+      <Rect x={0} y={0} width={76} height={76} rx={20} fill={c.blue} />
       {/* Point d'émission */}
       <Circle cx={25} cy={51} r={4.5} fill="#FFFFFF" />
       {/* Deux ondes d'écho */}
@@ -59,6 +66,8 @@ export function HomeScreen() {
   const saves = useScanStore((s) => s.saves);
   const setScreen = useScanStore((s) => s.setScreen);
   const { start } = useRoomScan();
+  const c = useTheme();
+  const styles = getStyles(c);
 
   useEffect(() => {
     RoomScan.isSupported().then(setSupported);
@@ -140,25 +149,25 @@ export function HomeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.bg,
+    backgroundColor: c.bg,
     paddingHorizontal: 24,
     paddingTop: 84,
     paddingBottom: 40,
   },
   hero: { alignItems: 'center' },
   title: {
-    color: colors.ink,
+    color: c.ink,
     fontSize: 32,
     fontWeight: '800',
     letterSpacing: -0.5,
     marginTop: 18,
   },
-  titleAccent: { color: colors.blue },
+  titleAccent: { color: c.blue },
   subtitle: {
-    color: colors.inkSoft,
+    color: c.inkSoft,
     fontSize: 15,
     lineHeight: 21,
     textAlign: 'center',
@@ -167,10 +176,10 @@ const styles = StyleSheet.create({
   statusChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surface,
+    backgroundColor: c.surface,
     borderRadius: radius.pill,
     borderWidth: 1,
-    borderColor: colors.line,
+    borderColor: c.line,
     paddingHorizontal: 14,
     paddingVertical: 7,
     marginTop: 18,
@@ -179,32 +188,32 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: colors.green,
+    backgroundColor: c.green,
     marginRight: 8,
   },
-  statusText: { color: colors.inkSoft, fontSize: 13, fontWeight: '600' },
+  statusText: { color: c.inkSoft, fontSize: 13, fontWeight: '600' },
   stepsCard: {
-    backgroundColor: colors.surface,
+    backgroundColor: c.surface,
     borderRadius: radius.lg,
     marginTop: 32,
     paddingHorizontal: 18,
     ...shadowCard,
   },
   stepRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 15 },
-  stepRowBorder: { borderTopWidth: 1, borderTopColor: colors.line },
+  stepRowBorder: { borderTopWidth: 1, borderTopColor: c.line },
   stepBadge: {
     width: 30,
     height: 30,
     borderRadius: 15,
-    backgroundColor: colors.blueSoft,
+    backgroundColor: c.blueSoft,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 14,
   },
-  stepBadgeText: { color: colors.blue, fontSize: 14, fontWeight: '800' },
+  stepBadgeText: { color: c.blue, fontSize: 14, fontWeight: '800' },
   stepTexts: { flex: 1 },
-  stepTitle: { color: colors.ink, fontSize: 15, fontWeight: '700' },
-  stepText: { color: colors.inkFaint, fontSize: 13, marginTop: 1 },
+  stepTitle: { color: c.ink, fontSize: 15, fontWeight: '700' },
+  stepText: { color: c.inkFaint, fontSize: 13, marginTop: 1 },
   warning: {
     backgroundColor: '#FCEEEE',
     borderRadius: radius.md,
@@ -214,43 +223,43 @@ const styles = StyleSheet.create({
   warningText: { color: '#A33A3E', fontSize: 13, lineHeight: 18 },
   cta: {
     marginTop: 'auto',
-    backgroundColor: colors.blue,
+    backgroundColor: c.blue,
     borderRadius: radius.md + 2,
     paddingVertical: 17,
     alignItems: 'center',
-    shadowColor: colors.blue,
+    shadowColor: c.blue,
     shadowOpacity: 0.35,
     shadowRadius: 14,
     shadowOffset: { width: 0, height: 6 },
     elevation: 5,
   },
-  ctaDisabled: { backgroundColor: colors.lineStrong, shadowOpacity: 0 },
+  ctaDisabled: { backgroundColor: c.lineStrong, shadowOpacity: 0 },
   ctaText: { color: '#FFFFFF', fontSize: 17, fontWeight: '700' },
   libraryButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.surface,
+    backgroundColor: c.surface,
     borderWidth: 1,
-    borderColor: colors.lineStrong,
+    borderColor: c.lineStrong,
     borderRadius: radius.md + 2,
     paddingVertical: 14,
     marginTop: 10,
   },
-  libraryText: { color: colors.ink, fontSize: 15.5, fontWeight: '600' },
+  libraryText: { color: c.ink, fontSize: 15.5, fontWeight: '600' },
   libraryBadge: {
-    backgroundColor: colors.blueSoft,
+    backgroundColor: c.blueSoft,
     borderRadius: radius.pill,
     paddingHorizontal: 9,
     paddingVertical: 2,
     marginLeft: 9,
   },
-  libraryBadgeText: { color: colors.blue, fontSize: 13, fontWeight: '800' },
+  libraryBadgeText: { color: c.blue, fontSize: 13, fontWeight: '800' },
   hint: {
-    color: colors.inkFaint,
+    color: c.inkFaint,
     fontSize: 12,
     textAlign: 'center',
     marginTop: 14,
     lineHeight: 17,
   },
-});
+}));

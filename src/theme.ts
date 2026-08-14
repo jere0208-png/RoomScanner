@@ -1,38 +1,94 @@
 /**
- * Système de design RoomScanner.
+ * Système de design EchoPlan.
  * Blanc / gris / noir + un seul bleu saturé comme signature.
+ * Deux palettes (claire et sombre), suivies automatiquement
+ * selon le réglage d'apparence du téléphone.
  */
-export const colors = {
-  // Fonds
+import { useColorScheme } from 'react-native';
+
+export interface Palette {
+  bg: string;
+  surface: string;
+  surfaceSunken: string;
+  ink: string;
+  inkSoft: string;
+  inkFaint: string;
+  line: string;
+  lineStrong: string;
+  blue: string;
+  blueDark: string;
+  blueSoft: string;
+  danger: string;
+  green: string;
+  amber: string;
+  sky: string;
+  scanInk: string;
+  scanPill: string;
+  scanPillSoft: string;
+}
+
+export const light: Palette = {
   bg: '#F6F7F9',
   surface: '#FFFFFF',
   surfaceSunken: '#EFF1F5',
-
-  // Texte
   ink: '#0B0D12',
   inkSoft: '#5A6472',
   inkFaint: '#98A1AE',
-
-  // Traits
   line: '#E7EAF0',
   lineStrong: '#D6DBE3',
-
-  // Signature
   blue: '#1F5BFF',
   blueDark: '#0E3FD8',
   blueSoft: '#EBF0FF',
-
-  // Sémantique (avec parcimonie)
   danger: '#E5484D',
   green: '#1DB954',
-  amber: '#E8A13B', // portes
-  sky: '#3EB8E5', // fenêtres
-
-  // Écran de scan (sombre)
+  amber: '#E8A13B',
+  sky: '#3EB8E5',
   scanInk: '#F4F6FA',
   scanPill: 'rgba(12,14,20,0.72)',
   scanPillSoft: 'rgba(12,14,20,0.55)',
 };
+
+export const dark: Palette = {
+  bg: '#0D1015',
+  surface: '#151A21',
+  surfaceSunken: '#1D2530',
+  ink: '#F2F5F9',
+  inkSoft: '#A6B0BD',
+  inkFaint: '#67717F',
+  line: '#242C37',
+  lineStrong: '#35404E',
+  blue: '#3D77FF',
+  blueDark: '#2A5CE8',
+  blueSoft: '#17264A',
+  danger: '#F0575C',
+  green: '#2BC963',
+  amber: '#EFAF52',
+  sky: '#54C4EE',
+  scanInk: '#F4F6FA',
+  scanPill: 'rgba(12,14,20,0.72)',
+  scanPillSoft: 'rgba(12,14,20,0.55)',
+};
+
+/** Palette du moment, pilotée par le réglage clair/sombre du système. */
+export function useTheme(): Palette {
+  return useColorScheme() === 'dark' ? dark : light;
+}
+
+/**
+ * Fabrique de styles thémés : `const getStyles = themedStyles((c) => StyleSheet.create({...}))`
+ * puis `const styles = getStyles(useTheme())`. Mémoïsé par palette (il n'y en a que deux).
+ */
+export function themedStyles<T>(factory: (c: Palette) => T): (c: Palette) => T {
+  const cache = new Map<Palette, T>();
+  return (c) => {
+    let s = cache.get(c);
+    if (!s) {
+      s = factory(c);
+      cache.set(c, s);
+    }
+    return s;
+  };
+}
 
 export const radius = {
   sm: 10,

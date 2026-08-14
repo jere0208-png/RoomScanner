@@ -9,7 +9,7 @@ import Svg, {
   Rect,
   Text as SvgText,
 } from 'react-native-svg';
-import { colors } from '../theme';
+import { themedStyles, useTheme, type Palette } from '../theme';
 import {
   bounds,
   makeMapping,
@@ -44,6 +44,8 @@ export function FloorplanEditor({
   const openings = useScanStore((s) => s.openings);
   const objects = useScanStore((s) => s.objects);
   const currentSaveId = useScanStore((s) => s.currentSaveId);
+  const c = useTheme();
+  const styles = getStyles(c);
   const [layout, setLayout] = useState({ w: 0, h: 0 });
 
   // Cadrage figé sur le scan chargé (pas sur les éditions),
@@ -81,7 +83,7 @@ export function FloorplanEditor({
           <Svg width={layout.w} height={layout.h}>
             <Defs>
               <Pattern id="grid" width={22} height={22} patternUnits="userSpaceOnUse">
-                <Circle cx={1.2} cy={1.2} r={1.2} fill={colors.line} />
+                <Circle cx={1.2} cy={1.2} r={1.2} fill={c.line} />
               </Pattern>
             </Defs>
             <Rect x={0} y={0} width={layout.w} height={layout.h} fill="url(#grid)" />
@@ -89,20 +91,20 @@ export function FloorplanEditor({
             {/* Objets (empreintes au sol) */}
             {objects.map((o) => {
               const f = toFootprint(o);
-              const c = mapping.toPx({ x: f.cx, z: f.cz });
+              const ctr = mapping.toPx({ x: f.cx, z: f.cz });
               const w = f.width * mapping.scale;
               const d = f.depth * mapping.scale;
               return (
                 <G
                   key={f.id}
-                  transform={`translate(${c.x}, ${c.y}) rotate(${(f.yaw * 180) / Math.PI})`}>
+                  transform={`translate(${ctr.x}, ${ctr.y}) rotate(${(f.yaw * 180) / Math.PI})`}>
                   <Rect
                     x={-w / 2}
                     y={-d / 2}
                     width={w}
                     height={d}
-                    fill={colors.blueSoft}
-                    stroke={colors.lineStrong}
+                    fill={c.blueSoft}
+                    stroke={c.lineStrong}
                     strokeWidth={1}
                     rx={3}
                   />
@@ -130,7 +132,7 @@ export function FloorplanEditor({
             {openings.map((o) => {
               const a = mapping.toPx(o.a);
               const b = mapping.toPx(o.b);
-              const color = o.type === 'door' ? colors.amber : colors.sky;
+              const color = o.type === 'door' ? c.amber : c.sky;
               return (
                 <Line
                   key={o.id}
@@ -174,6 +176,7 @@ function WallLine({
   selected: boolean;
   onPress?: () => void;
 }) {
+  const c = useTheme();
   const a = mapping.toPx(wall.a);
   const b = mapping.toPx(wall.b);
   const dx = b.x - a.x;
@@ -198,7 +201,7 @@ function WallLine({
         y1={a.y}
         x2={b.x}
         y2={b.y}
-        stroke={selected ? colors.blue : colors.ink}
+        stroke={selected ? c.blue : c.ink}
         strokeWidth={selected ? 8 : 6}
         strokeLinecap="round"
       />
@@ -206,7 +209,7 @@ function WallLine({
         <SvgText
           x={mid.x}
           y={mid.y + 3}
-          fill={selected ? colors.blue : colors.inkSoft}
+          fill={selected ? c.blue : c.inkSoft}
           fontSize={selected ? 11 : 10}
           fontWeight="600"
           textAnchor="middle"
@@ -225,6 +228,7 @@ function CornerHandle({
   corner: { x: number; z: number; wallId: string; end: 'a' | 'b' };
   mapping: Mapping;
 }) {
+  const styles = getStyles(useTheme());
   const startRef = useRef({ x: corner.x, z: corner.z });
   const pan = useMemo(
     () =>
@@ -253,10 +257,10 @@ function CornerHandle({
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.surface,
+    backgroundColor: c.surface,
     borderRadius: 20,
     overflow: 'hidden',
   },
@@ -271,7 +275,7 @@ const styles = StyleSheet.create({
     width: 15,
     height: 15,
     borderRadius: 8,
-    backgroundColor: colors.blue,
+    backgroundColor: c.blue,
     borderWidth: 2.5,
     borderColor: '#FFFFFF',
     shadowColor: '#0B0D12',
@@ -280,4 +284,4 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     elevation: 3,
   },
-});
+}));
