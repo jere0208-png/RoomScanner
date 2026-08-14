@@ -1,6 +1,8 @@
 import React, { useRef, useState } from 'react';
 import {
   Alert,
+  Animated,
+  Easing,
   Keyboard,
   Modal,
   Platform,
@@ -56,6 +58,24 @@ export function ResultScreen() {
   const [nameInput, setNameInput] = useState('');
 
   const canvasRef = useRef<View>(null);
+
+  // Départ vers l'export : ondes qui se propagent puis fondu vers l'aperçu.
+  const [transiting, setTransiting] = useState(false);
+  const waveAnim = useRef(new Animated.Value(0)).current;
+  const goExport = () => {
+    if (transiting) return;
+    setTransiting(true);
+    waveAnim.setValue(0);
+    Animated.timing(waveAnim, {
+      toValue: 1,
+      duration: 460,
+      easing: Easing.out(Easing.quad),
+      useNativeDriver: true,
+    }).start(() => {
+      setScreen('export');
+      setTransiting(false);
+    });
+  };
 
   /** Capture la vue affichée (2D ou 3D) en PNG et ouvre le partage. */
   const shareImage = async () => {
@@ -293,7 +313,7 @@ export function ResultScreen() {
       {Platform.OS === 'ios' && (
         <TouchableOpacity
           style={styles.exportButton}
-          onPress={() => setScreen('export')}>
+          onPress={goExport}>
           <Text style={styles.primaryText}>Exporter en PDF</Text>
         </TouchableOpacity>
       )}
@@ -310,6 +330,48 @@ export function ResultScreen() {
         </TouchableOpacity>
       </View>
 
+
+      {/* Transition vers l'export : ondes EchoPlan sur toute la page */}
+      {transiting && (
+        <View style={styles.transition} pointerEvents="auto">
+          {[0, 0.12, 0.24].map((delay, i) => (
+            <Animated.View
+              key={i}
+              style={[
+                styles.transitionRing,
+                {
+                  opacity: waveAnim.interpolate({
+                    inputRange: [delay, Math.min(delay + 0.3, 1), 1],
+                    outputRange: [0.55, 0.3, 0],
+                    extrapolate: 'clamp',
+                  }),
+                  transform: [
+                    {
+                      scale: waveAnim.interpolate({
+                        inputRange: [delay, 1],
+                        outputRange: [0.3, 14],
+                        extrapolate: 'clamp',
+                      }),
+                    },
+                  ],
+                },
+              ]}
+            />
+          ))}
+          <Animated.View
+            style={[
+              styles.transitionFill,
+              {
+                opacity: waveAnim.interpolate({
+                  inputRange: [0.55, 1],
+                  outputRange: [0, 1],
+                  extrapolate: 'clamp',
+                }),
+              },
+            ]}
+          />
+        </View>
+      )}
 
       {/* ---------- Renommage ---------- */}
       <Modal visible={renaming} transparent animationType="fade">
@@ -483,6 +545,32 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   toolPillActive: { backgroundColor: c.blue, borderColor: c.blue },
   toolPillText: { color: c.inkSoft, fontSize: 12.5, fontWeight: '700' },
   toolPillTextActive: { color: '#FFFFFF' },
+  transition: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  transitionRing: {
+    position: 'absolute',
+    bottom: 60,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    borderWidth: 2.5,
+    borderColor: c.blue,
+  },
+  transitionFill: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: c.bg,
+  },
   saveFab: {
     position: 'absolute',
     bottom: 12,

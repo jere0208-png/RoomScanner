@@ -1,6 +1,8 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Alert,
+  Animated,
+  Easing,
   PanResponder,
   ScrollView,
   StyleSheet,
@@ -207,8 +209,32 @@ export function ExportScreen() {
     }
   };
 
+  // Arrivée en fondu rapide, dans la continuité de l'onde de transition.
+  const fade = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(fade, {
+      toValue: 1,
+      duration: 240,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [fade]);
+
   return (
     <View style={styles.container}>
+      <Animated.View
+        style={{
+          flex: 1,
+          opacity: fade,
+          transform: [
+            {
+              translateY: fade.interpolate({
+                inputRange: [0, 1],
+                outputRange: [8, 0],
+              }),
+            },
+          ],
+        }}>
       <View style={styles.headerRow}>
         <TouchableOpacity style={styles.roundButton} onPress={() => setScreen('result')}>
           <Text style={styles.backChevron}>‹</Text>
@@ -284,6 +310,7 @@ export function ExportScreen() {
       <TouchableOpacity style={styles.exportButton} onPress={doExport}>
         <Text style={styles.exportText}>Exporter le PDF</Text>
       </TouchableOpacity>
+      </Animated.View>
     </View>
   );
 }

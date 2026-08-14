@@ -504,15 +504,19 @@ export function Iso3DView({ value, onChange, hideHint, showMeasures }: Props) {
     if (!best) return;
     const w = best.wall;
 
-    // Face au mur, vu depuis l'intérieur de la scène.
+    // Face au mur, du CÔTÉ où l'on regarde : on choisit l'orientation qui
+    // demande la plus petite rotation depuis le point de vue actuel — la
+    // face touchée vient vers la caméra, jamais celle de derrière.
     const phi = (Math.atan2(w.b.z - w.a.z, w.b.x - w.a.x) * 180) / Math.PI;
     const midw = { x: (w.a.x + w.b.x) / 2, z: (w.a.z + w.b.z) / 2 };
-    const pick = [-phi, -phi + 180].find((theta) => {
-      const s = Math.sin(rad(theta));
-      const co = Math.cos(rad(theta));
-      return (midw.x - center.x) * s + (midw.z - center.z) * co < 0;
-    });
-    const thetaN = pick ?? -phi;
+    const norm180 = (a: number) => ((a + 540) % 360) - 180;
+    const cand = [-phi, -phi + 180].reduce((bestC, c2) =>
+      Math.abs(norm180(c2 - v.theta)) < Math.abs(norm180(bestC - v.theta))
+        ? c2
+        : bestC,
+    );
+    // Continuité : on applique le delta au theta courant (pas de saut à 360°).
+    const thetaN = v.theta + norm180(cand - v.theta);
     const tiltN = 30;
     const span = Math.max(segLength(w), w.height * 1.4);
     const zoomN = clamp((0.85 * Math.min(layout.w, layout.h)) / (span * baseScale), 1, 4);
