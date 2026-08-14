@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import Svg, { Circle, Path, Rect } from 'react-native-svg';
+import Svg, { Path, Rect } from 'react-native-svg';
 import { RoomScan } from 'react-native-room-scan';
 import {
   radius,
@@ -20,38 +20,47 @@ import { useScanStore } from '../store/scanStore';
 import { useRoomScan } from '../native/useRoomScan';
 
 /**
- * Le logo raconte le produit : un point de scan émet deux ondes (l'écho),
- * et la troisième onde se cristallise en angle de murs (le plan).
+ * Le logo raconte le produit : des ondes d'écho, de plus en plus nettes,
+ * dont la dernière se cristallise en angle de murs (le plan).
+ * Fond blanc, glyphe noir — dans les deux thèmes.
  */
 function LogoMark({ size = 76 }: { size?: number }) {
   const c = useTheme();
+  const ink = '#0B0D12';
   return (
     <Svg width={size} height={size} viewBox="0 0 76 76">
-      <Rect x={0} y={0} width={76} height={76} rx={20} fill={c.blue} />
-      {/* Point d'émission */}
-      <Circle cx={25} cy={51} r={4.5} fill="#FFFFFF" />
+      <Rect
+        x={0.5}
+        y={0.5}
+        width={75}
+        height={75}
+        rx={20}
+        fill="#FFFFFF"
+        stroke={c.line}
+        strokeWidth={1}
+      />
       {/* Deux ondes d'écho, balayage symétrique autour de la diagonale :
           le radar vise exactement l'angle des murs. */}
       <Path
         d="M25.96 40.04 A11 11 0 0 1 35.96 50.04"
-        stroke="#FFFFFF"
+        stroke={ink}
         strokeWidth={4.5}
         strokeLinecap="round"
         fill="none"
-        opacity={0.55}
+        opacity={0.3}
       />
       <Path
         d="M26.66 32.07 A19 19 0 0 1 43.93 49.34"
-        stroke="#FFFFFF"
+        stroke={ink}
         strokeWidth={4.5}
         strokeLinecap="round"
         fill="none"
-        opacity={0.8}
+        opacity={0.6}
       />
-      {/* La troisième onde devient un angle de murs : le plan */}
+      {/* La dernière onde devient un angle de murs : le plan */}
       <Path
         d="M25 23 H53 V51"
-        stroke="#FFFFFF"
+        stroke={ink}
         strokeWidth={5}
         strokeLinecap="round"
         strokeLinejoin="round"

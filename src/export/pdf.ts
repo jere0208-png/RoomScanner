@@ -212,16 +212,16 @@ class Draw {
 
 // ------------------------------------------------ logo vectoriel EchoPlan
 
-/** Le logo de l'app, redessiné en vectoriel PDF (repère 76 → size). */
+/** Le logo de l'app, redessiné en vectoriel PDF (repère 76 → size) :
+ *  fond blanc, glyphe noir, ondes en gris croissant vers l'angle. */
 function drawLogo(d: Draw, x: number, y: number, size: number) {
   const k = size / 76;
   const X = (gx: number) => x + gx * k;
   const Y = (gy: number) => y + (76 - gy) * k; // repère glyphe (y bas) → PDF (y haut)
-  d.rect(x, y, size, size, BLUE, null);
-  d.circle(X(25), Y(51), 4.5 * k, '#FFFFFF');
+  d.rect(x, y, size, size, '#FFFFFF', '#D6DBE3', 0.8);
   for (const arc of [
-    { r: 11, o: '#B8CBFF' },
-    { r: 19, o: '#DCE6FF' },
+    { r: 11, o: '#B7BABF' }, // ≈ noir à 30 %
+    { r: 19, o: '#6D7178' }, // ≈ noir à 60 %
   ]) {
     const pts: Pt[] = [];
     for (let i = 0; i <= 12; i++) {
@@ -237,7 +237,7 @@ function drawLogo(d: Draw, x: number, y: number, size: number) {
       { x: X(53), y: Y(51) },
     ],
     5 * k,
-    '#FFFFFF',
+    '#0B0D12',
   );
 }
 

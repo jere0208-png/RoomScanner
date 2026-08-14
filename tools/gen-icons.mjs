@@ -68,11 +68,12 @@ const cov = (d, aa) => Math.max(0, Math.min(1, 0.5 - d / aa));
 // Glyphe dans le repère 76×76 du logo (mêmes tracés que l'app),
 // agrandi de 28 % autour de son centre pour l'icône.
 const ZOOM = 1.28, CX = 39, CY = 37;
-const DOT = { x: 25, y: 51, r: 4.5 };
+// Centre d'émission des ondes (le point n'est plus dessiné).
+const DOT = { x: 25, y: 51 };
 // Balayage symétrique autour de la diagonale (-45°) : le radar vise l'angle.
 const ARCS = [
-  { r: 11, w: 4.5, a0: -85, a1: -5, o: 0.55 },
-  { r: 19, w: 4.5, a0: -85, a1: -5, o: 0.8 },
+  { r: 11, w: 4.5, a0: -85, a1: -5, o: 0.3 },
+  { r: 19, w: 4.5, a0: -85, a1: -5, o: 0.6 },
 ];
 const CORNER = { pts: [[25, 23], [53, 23], [53, 51]], w: 5 };
 
@@ -81,7 +82,6 @@ function glyphAlpha(gx, gy, aa) {
   const x = (gx - CX) / ZOOM + CX;
   const y = (gy - CY) / ZOOM + CY;
   let a = 0;
-  a = Math.max(a, cov(Math.hypot(x - DOT.x, y - DOT.y) - DOT.r, aa));
   for (const arc of ARCS) {
     const dx = x - DOT.x, dy = y - DOT.y;
     const ang = (Math.atan2(dy, dx) * 180) / Math.PI;
@@ -105,9 +105,10 @@ function glyphAlpha(gx, gy, aa) {
   return a;
 }
 
-// Fond : léger dégradé vertical autour du bleu signature #1F5BFF.
-const TOP = [0x2a, 0x66, 0xff];
-const BOT = [0x14, 0x44, 0xd6];
+// Fond blanc (léger dégradé vers gris très clair), glyphe noir.
+const TOP = [0xff, 0xff, 0xff];
+const BOT = [0xf1, 0xf3, 0xf6];
+const INK = [0x0b, 0x0d, 0x12];
 
 /**
  * mask : 'none'  → plein cadre opaque (iOS, le système arrondit lui-même)
@@ -140,9 +141,9 @@ function render(size, mask) {
         let cg_ = TOP[1] + (BOT[1] - TOP[1]) * t;
         let cb_ = TOP[2] + (BOT[2] - TOP[2]) * t;
         const w = glyphAlpha(gx, gy, Math.max(S, 0.08));
-        cr_ = cr_ + (255 - cr_) * w;
-        cg_ = cg_ + (255 - cg_) * w;
-        cb_ = cb_ + (255 - cb_) * w;
+        cr_ = cr_ + (INK[0] - cr_) * w;
+        cg_ = cg_ + (INK[1] - cg_) * w;
+        cb_ = cb_ + (INK[2] - cb_) * w;
         r += cr_ * shape;
         g += cg_ * shape;
         b += cb_ * shape;
