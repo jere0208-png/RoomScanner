@@ -215,7 +215,7 @@ export function ResultScreen() {
               active={showMeasures}
               onPress={() => setShowMeasures((v) => !v)}
             />
-            <ToolPill label="Modifier" active={editMode} onPress={toggleEdit} />
+            <ToolPill icon="edit" active={editMode} onPress={toggleEdit} />
             <ToolPill
               label="Meubles"
               active={showFurniture}
@@ -428,21 +428,50 @@ export function ResultScreen() {
 
 function ToolPill({
   label,
+  icon,
   active,
   onPress,
 }: {
-  label: string;
+  label?: string;
+  icon?: 'edit';
   active: boolean;
   onPress: () => void;
 }) {
-  const styles = getStyles(useTheme());
+  const c = useTheme();
+  const styles = getStyles(c);
+  const stroke = active ? '#FFFFFF' : c.inkSoft;
   return (
     <TouchableOpacity
-      style={[styles.toolPill, active && styles.toolPillActive]}
+      style={[
+        styles.toolPill,
+        icon ? styles.toolPillIcon : null,
+        active && styles.toolPillActive,
+      ]}
       onPress={onPress}>
-      <Text style={[styles.toolPillText, active && styles.toolPillTextActive]}>
-        {label}
-      </Text>
+      {icon === 'edit' ? (
+        <Svg width={16} height={16} viewBox="0 0 24 24">
+          {/* Carré ouvert où entre le crayon */}
+          <Path
+            d="M11 4 H6 a2 2 0 0 0 -2 2 v12 a2 2 0 0 0 2 2 h12 a2 2 0 0 0 2 -2 v-5"
+            stroke={stroke}
+            strokeWidth={2.2}
+            strokeLinecap="round"
+            fill="none"
+          />
+          {/* Crayon en diagonale */}
+          <Path
+            d="M18.3 2.7 l3 3 L11.2 15.8 l-4.1 1.1 1.1 -4.1 z"
+            stroke={stroke}
+            strokeWidth={2.2}
+            strokeLinejoin="round"
+            fill="none"
+          />
+        </Svg>
+      ) : (
+        <Text style={[styles.toolPillText, active && styles.toolPillTextActive]}>
+          {label}
+        </Text>
+      )}
     </TouchableOpacity>
   );
 }
@@ -545,6 +574,7 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   toolPillActive: { backgroundColor: c.blue, borderColor: c.blue },
   toolPillText: { color: c.inkSoft, fontSize: 12.5, fontWeight: '700' },
   toolPillTextActive: { color: '#FFFFFF' },
+  toolPillIcon: { paddingHorizontal: 10, paddingVertical: 6 },
   transition: {
     position: 'absolute',
     top: 0,
