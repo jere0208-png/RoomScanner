@@ -1,25 +1,47 @@
 import React, { useEffect } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import Svg, { Path, Rect } from 'react-native-svg';
+import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import { RoomScan } from 'react-native-room-scan';
 import { colors, radius, shadowCard } from '../theme';
 import { useScanStore } from '../store/scanStore';
 import { useRoomScan } from '../native/useRoomScan';
 
+/**
+ * Le logo raconte le produit : un point de scan émet deux ondes (l'écho),
+ * et la troisième onde se cristallise en angle de murs (le plan).
+ */
 function LogoMark({ size = 76 }: { size?: number }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 76 76">
       <Rect x={0} y={0} width={76} height={76} rx={20} fill={colors.blue} />
-      {/* Plan de pièce stylisé, avec une ouverture de porte */}
+      {/* Point d'émission */}
+      <Circle cx={25} cy={51} r={4.5} fill="#FFFFFF" />
+      {/* Deux ondes d'écho */}
       <Path
-        d="M22 24 H54 V54 H22 V40"
+        d="M27.9 40.4 A11 11 0 0 1 36 52"
+        stroke="#FFFFFF"
+        strokeWidth={4.5}
+        strokeLinecap="round"
+        fill="none"
+        opacity={0.55}
+      />
+      <Path
+        d="M29.9 32.7 A19 19 0 0 1 43.9 52.7"
+        stroke="#FFFFFF"
+        strokeWidth={4.5}
+        strokeLinecap="round"
+        fill="none"
+        opacity={0.8}
+      />
+      {/* La troisième onde devient un angle de murs : le plan */}
+      <Path
+        d="M25 23 H53 V51"
         stroke="#FFFFFF"
         strokeWidth={5}
         strokeLinecap="round"
         strokeLinejoin="round"
         fill="none"
       />
-      <Path d="M22 33 V24" stroke="#FFFFFF" strokeWidth={5} strokeLinecap="round" />
     </Svg>
   );
 }
@@ -46,7 +68,9 @@ export function HomeScreen() {
     <View style={styles.container}>
       <View style={styles.hero}>
         <LogoMark />
-        <Text style={styles.title}>RoomScanner</Text>
+        <Text style={styles.title}>
+          Echo<Text style={styles.titleAccent}>Plan</Text>
+        </Text>
         <Text style={styles.subtitle}>
           Votre appartement en 3D et en plan coté,{'\n'}en quelques minutes.
         </Text>
@@ -132,6 +156,7 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
     marginTop: 18,
   },
+  titleAccent: { color: colors.blue },
   subtitle: {
     color: colors.inkSoft,
     fontSize: 15,
