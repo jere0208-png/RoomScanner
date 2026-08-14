@@ -26,6 +26,25 @@ class RoomScanExport: NSObject {
       return
     }
 
+    presentShareSheet(url: url, resolve: resolve, reject: reject)
+  }
+
+  /// Partage un fichier local existant (image, .usdz…) via la feuille iOS.
+  @objc func shareFile(_ path: String,
+                       resolve: @escaping RCTPromiseResolveBlock,
+                       reject: @escaping RCTPromiseRejectBlock) {
+    let clean = path.hasPrefix("file://") ? String(path.dropFirst(7)) : path
+    let url = URL(fileURLWithPath: clean)
+    guard FileManager.default.fileExists(atPath: url.path) else {
+      reject("NOT_FOUND", "Fichier introuvable : \(clean)", nil)
+      return
+    }
+    presentShareSheet(url: url, resolve: resolve, reject: reject)
+  }
+
+  private func presentShareSheet(url: URL,
+                                 resolve: @escaping RCTPromiseResolveBlock,
+                                 reject: @escaping RCTPromiseRejectBlock) {
     DispatchQueue.main.async {
       guard let root = UIApplication.shared.connectedScenes
         .compactMap({ ($0 as? UIWindowScene)?.keyWindow })

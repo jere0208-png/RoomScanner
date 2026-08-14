@@ -22,6 +22,9 @@ RCT_EXTERN_METHOD(sharePDF:(NSString *)base64
                   filename:(NSString *)filename
                   resolve:(RCTPromiseResolveBlock)resolve
                   reject:(RCTPromiseRejectBlock)reject)
+RCT_EXTERN_METHOD(shareFile:(NSString *)path
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
 @end
 
 @interface RCT_EXTERN_MODULE(RoomScanViewManager, RCTViewManager)

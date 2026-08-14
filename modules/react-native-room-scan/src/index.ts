@@ -90,4 +90,12 @@ export const RoomScan = {
     }
     return NativeModules.RoomScanExport.sharePDF(base64, filename);
   },
+
+  /** iOS : partage un fichier local (image, .usdz…) via la feuille de partage. */
+  shareFile: (path: string): Promise<boolean> => {
+    if (!NativeModules.RoomScanExport) {
+      return Promise.reject(new Error('Partage disponible sur iOS uniquement'));
+    }
+    return NativeModules.RoomScanExport.shareFile(path);
+  },
 };

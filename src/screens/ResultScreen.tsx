@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   Alert,
   Keyboard,
@@ -12,6 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { captureRef } from 'react-native-view-shot';
 import { RoomScan } from 'react-native-room-scan';
 import { buildScanPdf, pdfFilename, toBase64 } from '../export/pdf';
 import {
@@ -52,6 +53,31 @@ export function ResultScreen() {
   const [include3D, setInclude3D] = useState(true);
 
   const openings = useScanStore((s) => s.openings);
+  const canvasRef = useRef<View>(null);
+
+  /** Capture la vue affichée (2D ou 3D) en PNG et ouvre le partage. */
+  const shareImage = async () => {
+    try {
+      const uri = await captureRef(canvasRef, {
+        format: 'png',
+        quality: 1,
+        result: 'tmpfile',
+      });
+      await RoomScan.shareFile(uri);
+    } catch (e: any) {
+      Alert.alert('Capture impossible', e?.message ?? 'Erreur inconnue');
+    }
+  };
+
+  const shareModel = async () => {
+    if (!modelPath) return;
+    try {
+      await RoomScan.shareFile(modelPath);
+    } catch (e: any) {
+      Alert.alert('Partage impossible', e?.message ?? 'Erreur inconnue');
+    }
+  };
+
   const doExport = async () => {
     setExporting(false);
     try {
@@ -157,7 +183,7 @@ export function ResultScreen() {
         ))}
       </View>
 
-      <View style={styles.canvas}>
+      <View style={styles.canvas} ref={canvasRef} collapsable={false}>
         {tab === '2d' ? (
           <FloorplanEditor
             showMeasures={showMeasures}
@@ -173,7 +199,7 @@ export function ResultScreen() {
           <Iso3DView />
         )}
 
-        {tab === '2d' && (
+        {tab === '2d' ? (
           <View style={styles.planTools}>
             <ToolPill
               label="Cotes"
@@ -182,6 +208,15 @@ export function ResultScreen() {
             />
             <ToolPill label="Modifier" active={editMode} onPress={toggleEdit} />
           </View>
+        ) : (
+          Platform.OS === 'ios' && (
+            <View style={styles.planTools}>
+              <ToolPill label="Image" active={false} onPress={shareImage} />
+              {modelPath && (
+                <ToolPill label="Fichier 3D" active={false} onPress={shareModel} />
+              )}
+            </View>
+          )
         )}
       </View>
 

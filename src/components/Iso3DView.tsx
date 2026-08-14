@@ -50,26 +50,64 @@ export function Iso3DView() {
 
   const [layout, setLayout] = useState({ w: 0, h: 0 });
   const [angles, setAngles] = useState({ theta: -32, tilt: 58 });
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
   const anglesRef = useRef(angles);
-  const grabRef = useRef(angles);
+  const offsetRef = useRef(offset);
+  const grabRef = useRef({
+    theta: -32,
+    tilt: 58,
+    ox: 0,
+    oy: 0,
+    dx0: 0,
+    dy0: 0,
+    mode: 'rotate' as 'rotate' | 'pan',
+  });
 
   // Créé UNE seule fois : un responder recréé en plein geste perd le suivi.
+  // Un doigt : rotation/inclinaison. Deux doigts : déplacement du modèle.
   const pan = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: (_e, g) =>
         Math.abs(g.dx) + Math.abs(g.dy) > 4,
-      onPanResponderGrant: () => {
-        grabRef.current = anglesRef.current;
-      },
-      onPanResponderMove: (_e, g) => {
-        const next = {
-          // Glisser à droite « pousse » la face avant vers la droite.
-          theta: grabRef.current.theta - g.dx * 0.45,
-          tilt: clamp(grabRef.current.tilt - g.dy * 0.3, 15, 80),
+      onPanResponderGrant: (e) => {
+        grabRef.current = {
+          ...anglesRef.current,
+          ox: offsetRef.current.x,
+          oy: offsetRef.current.y,
+          dx0: 0,
+          dy0: 0,
+          mode: e.nativeEvent.touches.length >= 2 ? 'pan' : 'rotate',
         };
-        anglesRef.current = next;
-        setAngles(next);
+      },
+      onPanResponderMove: (e, g) => {
+        const mode = e.nativeEvent.touches.length >= 2 ? 'pan' : 'rotate';
+        if (mode !== grabRef.current.mode) {
+          // Le nombre de doigts a changé en plein geste : on repart d'ici.
+          grabRef.current = {
+            ...anglesRef.current,
+            ox: offsetRef.current.x,
+            oy: offsetRef.current.y,
+            dx0: g.dx,
+            dy0: g.dy,
+            mode,
+          };
+        }
+        const ddx = g.dx - grabRef.current.dx0;
+        const ddy = g.dy - grabRef.current.dy0;
+        if (mode === 'pan') {
+          const next = { x: grabRef.current.ox + ddx, y: grabRef.current.oy + ddy };
+          offsetRef.current = next;
+          setOffset(next);
+        } else {
+          const next = {
+            // Glisser à droite « pousse » la face avant vers la droite.
+            theta: grabRef.current.theta - ddx * 0.45,
+            tilt: clamp(grabRef.current.tilt - ddy * 0.3, 15, 80),
+          };
+          anglesRef.current = next;
+          setAngles(next);
+        }
       },
     }),
   ).current;
@@ -234,8 +272,8 @@ export function Iso3DView() {
       const rx = x * ct - z * st;
       const rz = x * st + z * ct;
       return {
-        sx: layout.w / 2 + rx * scale,
-        sy: layout.h / 2 + (rz * cp - y * sp) * scale,
+        sx: layout.w / 2 + offset.x + rx * scale,
+        sy: layout.h / 2 + offset.y + (rz * cp - y * sp) * scale,
         depth: rz * sp + y * cp,
       };
     };
@@ -264,7 +302,7 @@ export function Iso3DView() {
 
     polys.sort((p, q) => p.depth - q.depth);
     return polys;
-  }, [faces, layout, angles, center, radius3d]);
+  }, [faces, layout, angles, offset, center, radius3d]);
 
   return (
     <View
@@ -294,7 +332,7 @@ export function Iso3DView() {
         </View>
       )}
       <View style={styles.hintPill} pointerEvents="none">
-        <Text style={styles.hintText}>Un doigt : tourner · incliner</Text>
+        <Text style={styles.hintText}>1 doigt : tourner · 2 doigts : déplacer</Text>
       </View>
     </View>
   );
