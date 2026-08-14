@@ -14,6 +14,7 @@ import {
   toFootprint,
   type WallSeg,
 } from '../geometry/floorplan';
+import { furnKind, furnitureStrokes } from '../geometry/furniture';
 
 const PAGE_W = 595;
 const PAGE_H = 842;
@@ -665,21 +666,24 @@ function planPage(
       d.poly(loop.map(px), '#F5F7FA', null);
     }
 
-    // Meubles (trait fin, style mobilier)
+    // Meubles : contour + symbole d'architecte (lit, canapé, TV…)
     for (const o of objects.map(toFootprint)) {
       const cosY = Math.cos(o.yaw);
       const sinY = Math.sin(o.yaw);
       const hw = o.width / 2;
       const hd = o.depth / 2;
+      const loc = (lx: number, lz: number) =>
+        px({ x: o.cx + lx * cosY - lz * sinY, z: o.cz + lx * sinY + lz * cosY });
       const pts = [
         [-hw, -hd],
         [hw, -hd],
         [hw, hd],
         [-hw, hd],
-      ].map(([lx, lz]) =>
-        px({ x: o.cx + lx * cosY - lz * sinY, z: o.cz + lx * sinY + lz * cosY }),
-      );
+      ].map(([lx, lz]) => loc(lx, lz));
       d.poly(pts, '#FFFFFF', '#9FACBF', 0.8);
+      for (const line of furnitureStrokes(furnKind(o.category), o.width, o.depth)) {
+        d.path(line.map((p) => loc(p.x, p.y)), 0.7, '#9FACBF');
+      }
     }
 
     // Murs pochés (noir plein, coins prolongés)

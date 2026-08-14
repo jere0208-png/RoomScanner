@@ -17,6 +17,7 @@ import {
   toFootprint,
   type WallSeg,
 } from '../geometry/floorplan';
+import { furnKind, furnitureStrokes } from '../geometry/furniture';
 
 interface EffMapping {
   scale: number;
@@ -213,6 +214,23 @@ export function FloorplanEditor({
                     strokeWidth={1}
                     rx={3}
                   />
+                  {/* Symbole de mobilier (lit, canapé, TV…) */}
+                  {furnitureStrokes(furnKind(f.category), w, d).map((line, li) => (
+                    <G key={`s${li}`}>
+                      {line.slice(1).map((p, pi) => (
+                        <Line
+                          key={pi}
+                          x1={line[pi].x}
+                          y1={line[pi].y}
+                          x2={p.x}
+                          y2={p.y}
+                          stroke={c.inkSoft}
+                          strokeWidth={1.2}
+                          strokeLinecap="round"
+                        />
+                      ))}
+                    </G>
+                  ))}
                 </G>
               );
             })}

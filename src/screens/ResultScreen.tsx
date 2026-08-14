@@ -24,6 +24,7 @@ import {
 import { FloorplanEditor } from '../components/FloorplanEditor';
 import { Iso3DView } from '../components/Iso3DView';
 import { closedLoop, loopAreaM2, segLength } from '../geometry/floorplan';
+import { frCategory } from '../geometry/furniture';
 import { useScanStore } from '../store/scanStore';
 
 type Tab = '2d' | '3d';
@@ -268,7 +269,7 @@ export function ResultScreen() {
           showsHorizontalScrollIndicator={false}>
           {objects.map((o) => (
             <View key={o.id} style={styles.objectChip}>
-              <Text style={styles.objectName}>{o.category}</Text>
+              <Text style={styles.objectName}>{frCategory(o.category)}</Text>
               <Text style={styles.objectDims}>
                 {fr(o.width, 2)} × {fr(o.depth, 2)} × {fr(o.height, 2)} m
               </Text>
