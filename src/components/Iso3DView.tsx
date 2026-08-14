@@ -93,7 +93,10 @@ export function Iso3DView({ value, onChange, hideHint, showMeasures }: Props) {
   const openings = useScanStore((s) => s.openings);
   const allObjects = useScanStore((s) => s.objects);
   const showFurniture = useScanStore((s) => s.showFurniture);
-  const objects = showFurniture ? allObjects : [];
+  const objects = useMemo(
+    () => (showFurniture ? allObjects : []),
+    [showFurniture, allObjects],
+  );
   const colorOpenings = useScanStore((s) => s.showOpeningColors);
   const c = useTheme();
   const styles = getStyles(c);
