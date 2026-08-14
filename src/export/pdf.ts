@@ -246,8 +246,8 @@ function drawLogo(d: Draw, x: number, y: number, size: number) {
   const Y = (gy: number) => y + (76 - gy) * k; // repère glyphe (y bas) → PDF (y haut)
   d.rect(x, y, size, size, '#FFFFFF', '#D6DBE3', 0.8);
   for (const arc of [
-    { r: 11, o: '#B7BABF' }, // ≈ noir à 30 %
-    { r: 19, o: '#6D7178' }, // ≈ noir à 60 %
+    { r: 11, o: '#4A4E55' }, // ≈ noir à 70 %
+    { r: 19, o: '#23262B' }, // ≈ noir à 90 %
   ]) {
     const pts: Pt[] = [];
     for (let i = 0; i <= 12; i++) {

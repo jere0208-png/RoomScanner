@@ -47,7 +47,7 @@ function LogoMark({ size = 76 }: { size?: number }) {
         strokeWidth={4.5}
         strokeLinecap="round"
         fill="none"
-        opacity={0.3}
+        opacity={0.7}
       />
       <Path
         d="M26.66 32.07 A19 19 0 0 1 43.93 49.34"
@@ -55,7 +55,7 @@ function LogoMark({ size = 76 }: { size?: number }) {
         strokeWidth={4.5}
         strokeLinecap="round"
         fill="none"
-        opacity={0.6}
+        opacity={0.9}
       />
       {/* La dernière onde devient un angle de murs : le plan */}
       <Path

@@ -73,8 +73,8 @@ const ZOOM = 1.45, CX = 39, CY = 37;
 const DOT = { x: 25, y: 51 };
 // Balayage symétrique autour de la diagonale (-45°) : le radar vise l'angle.
 const ARCS = [
-  { r: 11, w: 4.5, a0: -85, a1: -5, o: 0.3 },
-  { r: 19, w: 4.5, a0: -85, a1: -5, o: 0.6 },
+  { r: 11, w: 4.5, a0: -85, a1: -5, o: 0.7 },
+  { r: 19, w: 4.5, a0: -85, a1: -5, o: 0.9 },
 ];
 const CORNER = { pts: [[25, 23], [53, 23], [53, 51]], w: 5 };
 
