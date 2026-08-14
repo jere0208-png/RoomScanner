@@ -77,6 +77,7 @@ interface ScanState {
   moveWallPoint: (id: string, end: 'a' | 'b', p: { x: number; z: number }) => void;
   setWallLength: (id: string, length: number) => void;
   renameCurrent: (name: string) => void;
+  saveAsCopy: (name: string) => void;
   loadSaves: () => Promise<void>;
   openSave: (id: string) => void;
   deleteSave: (id: string) => void;
@@ -232,6 +233,28 @@ export const useScanStore = create<ScanState>((set, get) => {
       if (!clean) return;
       set({ scanName: clean });
       syncCurrent();
+    },
+
+    /** Enregistre l'état courant comme NOUVELLE entrée de bibliothèque
+     *  (l'original reste tel quel) et bascule dessus. */
+    saveAsCopy: (name) => {
+      const st = get();
+      if (st.walls.length === 0) return;
+      const now = Date.now();
+      const clean = name.trim() || `${st.scanName} (copie)`;
+      const save: SavedScan = {
+        id: `${now}-${Math.random().toString(36).slice(2, 8)}`,
+        name: clean,
+        createdAt: now,
+        updatedAt: now,
+        modelPath: st.modelPath,
+        walls: st.walls,
+        openings: st.openings,
+        objects: st.objects,
+      };
+      const saves = [save, ...st.saves];
+      set({ saves, currentSaveId: save.id, scanName: clean });
+      persistSoon(saves);
     },
 
     loadSaves: async () => {

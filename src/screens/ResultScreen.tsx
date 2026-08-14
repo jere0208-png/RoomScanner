@@ -27,6 +27,7 @@ export function ResultScreen() {
   const scanName = useScanStore((s) => s.scanName);
   const setWallLength = useScanStore((s) => s.setWallLength);
   const renameCurrent = useScanStore((s) => s.renameCurrent);
+  const saveAsCopy = useScanStore((s) => s.saveAsCopy);
   const setScreen = useScanStore((s) => s.setScreen);
   const reset = useScanStore((s) => s.reset);
 
@@ -220,6 +221,9 @@ export function ResultScreen() {
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>Nom du scan</Text>
+            <Text style={styles.modalSubtitle}>
+              Vos modifications s'enregistrent automatiquement dans ce scan.
+            </Text>
             <TextInput
               style={styles.modalInput}
               value={nameInput}
@@ -244,9 +248,19 @@ export function ResultScreen() {
                   renameCurrent(nameInput);
                   setRenaming(false);
                 }}>
-                <Text style={styles.modalPrimaryText}>Enregistrer</Text>
+                <Text style={styles.modalPrimaryText}>Renommer</Text>
               </TouchableOpacity>
             </View>
+            <TouchableOpacity
+              style={styles.modalCopy}
+              onPress={() => {
+                saveAsCopy(nameInput);
+                setRenaming(false);
+              }}>
+              <Text style={styles.modalCopyText}>
+                Enregistrer comme nouvelle copie
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -446,7 +460,16 @@ const styles = StyleSheet.create({
     width: '100%',
     ...shadowCard,
   },
-  modalTitle: { color: colors.ink, fontSize: 17, fontWeight: '800', marginBottom: 12 },
+  modalTitle: { color: colors.ink, fontSize: 17, fontWeight: '800' },
+  modalSubtitle: {
+    color: colors.inkFaint,
+    fontSize: 12.5,
+    lineHeight: 17,
+    marginTop: 4,
+    marginBottom: 12,
+  },
+  modalCopy: { alignItems: 'center', paddingTop: 14 },
+  modalCopyText: { color: colors.blue, fontSize: 14, fontWeight: '700' },
   modalInput: {
     backgroundColor: colors.bg,
     color: colors.ink,
