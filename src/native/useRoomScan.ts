@@ -33,13 +33,22 @@ export function useRoomScan() {
     return () => subs.forEach((s) => s.remove());
   }, []);
 
+  /** Démarre réellement la session (caméra déjà accordée). */
+  const begin = async () => {
+    store.setError(null);
+    await RoomScan.start();
+    store.setScanning(true);
+    store.setPaused(false);
+    store.setScreen('scan');
+  };
+
   return {
+    begin,
+    /** Point d'entrée : passe par la page caméra si l'accès n'est pas accordé. */
     start: async () => {
-      store.setError(null);
-      await RoomScan.start();
-      store.setScanning(true);
-      store.setPaused(false);
-      store.setScreen('scan');
+      const status = await RoomScan.cameraStatus();
+      if (status === 'granted') return begin();
+      store.setScreen('camera');
     },
     pause: () => {
       RoomScan.pause();

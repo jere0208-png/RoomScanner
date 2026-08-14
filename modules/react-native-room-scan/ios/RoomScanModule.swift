@@ -1,11 +1,28 @@
 import Foundation
 import RoomPlan
+import AVFoundation
 import React
 
 @objc(RoomScanModule)
 class RoomScanModule: NSObject {
 
   @objc static func requiresMainQueueSetup() -> Bool { false }
+
+  @objc func cameraStatus(_ resolve: RCTPromiseResolveBlock,
+                          reject: RCTPromiseRejectBlock) {
+    switch AVCaptureDevice.authorizationStatus(for: .video) {
+    case .authorized: resolve("granted")
+    case .notDetermined: resolve("undetermined")
+    default: resolve("denied")
+    }
+  }
+
+  @objc func requestCamera(_ resolve: @escaping RCTPromiseResolveBlock,
+                           reject: @escaping RCTPromiseRejectBlock) {
+    AVCaptureDevice.requestAccess(for: .video) { granted in
+      resolve(granted)
+    }
+  }
 
   @objc func isSupported(_ resolve: RCTPromiseResolveBlock,
                          reject: RCTPromiseRejectBlock) {

@@ -15,9 +15,14 @@ import {
   makeMapping,
   segLength,
   toFootprint,
-  type Mapping,
   type WallSeg,
 } from '../geometry/floorplan';
+
+interface EffMapping {
+  scale: number;
+  toPx: (p: { x: number; z: number }) => { x: number; y: number };
+  deltaToMeters: (dx: number, dy: number) => { x: number; z: number };
+}
 import { useScanStore } from '../store/scanStore';
 
 interface Props {
@@ -49,13 +54,111 @@ export function FloorplanEditor({
   const styles = getStyles(c);
   const [layout, setLayout] = useState({ w: 0, h: 0 });
 
+  // Navigation du plan : zoom (pincer), déplacement (glisser), rotation (torsion).
+  const [view, setView] = useState({ zoom: 1, ox: 0, oy: 0, rot: 0 });
+  const viewRef = useRef(view);
+  viewRef.current = view;
+  const navBase = useRef({
+    v: { zoom: 1, ox: 0, oy: 0, rot: 0 },
+    mode: 'pan' as 'pan' | 'pinch',
+    dx0: 0,
+    dy0: 0,
+    d0: 1,
+    mx0: 0,
+    my0: 0,
+    a0: 0,
+  });
+  const touchAngle = (t: { pageX: number; pageY: number }[]) =>
+    Math.atan2(t[1].pageY - t[0].pageY, t[1].pageX - t[0].pageX);
+  const snapshot = (e: any, g: any) => {
+    const t = e.nativeEvent.touches;
+    navBase.current = {
+      v: viewRef.current,
+      mode: t.length >= 2 ? 'pinch' : 'pan',
+      dx0: g.dx,
+      dy0: g.dy,
+      d0:
+        t.length >= 2
+          ? Math.max(8, Math.hypot(t[0].pageX - t[1].pageX, t[0].pageY - t[1].pageY))
+          : 1,
+      mx0: t.length >= 2 ? (t[0].pageX + t[1].pageX) / 2 : 0,
+      my0: t.length >= 2 ? (t[0].pageY + t[1].pageY) / 2 : 0,
+      a0: t.length >= 2 ? touchAngle(t) : 0,
+    };
+  };
+  const nav = useRef(
+    PanResponder.create({
+      // Ne prend la main QUE sur un mouvement : les taps (sélection de mur)
+      // et les poignées de coin gardent la priorité.
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_e, g) => Math.abs(g.dx) + Math.abs(g.dy) > 6,
+      onPanResponderGrant: snapshot,
+      onPanResponderMove: (e, g) => {
+        const t = e.nativeEvent.touches;
+        const mode = t.length >= 2 ? 'pinch' : 'pan';
+        if (mode !== navBase.current.mode) snapshot(e, g);
+        const base = navBase.current;
+        if (mode === 'pinch' && t.length >= 2) {
+          const d = Math.max(
+            8,
+            Math.hypot(t[0].pageX - t[1].pageX, t[0].pageY - t[1].pageY),
+          );
+          const mx = (t[0].pageX + t[1].pageX) / 2;
+          const my = (t[0].pageY + t[1].pageY) / 2;
+          let twist = touchAngle(t) - base.a0;
+          if (twist > Math.PI) twist -= 2 * Math.PI;
+          if (twist < -Math.PI) twist += 2 * Math.PI;
+          setView({
+            zoom: Math.min(6, Math.max(0.4, base.v.zoom * (d / base.d0))),
+            ox: base.v.ox + (mx - base.mx0),
+            oy: base.v.oy + (my - base.my0),
+            rot: base.v.rot + twist,
+          });
+        } else {
+          setView({
+            ...base.v,
+            ox: base.v.ox + (g.dx - base.dx0),
+            oy: base.v.oy + (g.dy - base.dy0),
+          });
+        }
+      },
+    }),
+  ).current;
+
   // Cadrage figé sur le scan chargé (pas sur les éditions),
   // sinon le plan "respire" pendant qu'on déplace un coin.
-  const mapping = useMemo(() => {
+  const baseMapping = useMemo(() => {
     if (layout.w === 0 || layout.h === 0) return null;
     return makeMapping(bounds(walls), layout.w, layout.h);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentSaveId, layout.w, layout.h]);
+
+  // Cadrage composite : ajustement au canevas + navigation utilisateur.
+  const mapping = useMemo(() => {
+    if (!baseMapping) return null;
+    const cx = layout.w / 2;
+    const cy = layout.h / 2;
+    const cos = Math.cos(view.rot);
+    const sin = Math.sin(view.rot);
+    const scale = baseMapping.scale * view.zoom;
+    return {
+      scale,
+      toPx: (p: { x: number; z: number }) => {
+        const b = baseMapping.toPx(p);
+        const dx = (b.x - cx) * view.zoom;
+        const dy = (b.y - cy) * view.zoom;
+        return {
+          x: cx + dx * cos - dy * sin + view.ox,
+          y: cy + dx * sin + dy * cos + view.oy,
+        };
+      },
+      /** Déplacement écran → déplacement monde (m), rotation/zoom déduits. */
+      deltaToMeters: (dx: number, dy: number) => ({
+        x: (dx * cos + dy * sin) / scale,
+        z: (-dx * sin + dy * cos) / scale,
+      }),
+    };
+  }, [baseMapping, view, layout]);
 
   // Coins uniques (les extrémités soudées partagent les mêmes coordonnées).
   const corners = useMemo(() => {
@@ -78,7 +181,8 @@ export function FloorplanEditor({
           w: e.nativeEvent.layout.width,
           h: e.nativeEvent.layout.height,
         })
-      }>
+      }
+      {...nav.panHandlers}>
       {mapping && (
         <>
           <Svg width={layout.w} height={layout.h}>
@@ -98,7 +202,7 @@ export function FloorplanEditor({
               return (
                 <G
                   key={f.id}
-                  transform={`translate(${ctr.x}, ${ctr.y}) rotate(${(f.yaw * 180) / Math.PI})`}>
+                  transform={`translate(${ctr.x}, ${ctr.y}) rotate(${((f.yaw + view.rot) * 180) / Math.PI})`}>
                   <Rect
                     x={-w / 2}
                     y={-d / 2}
@@ -176,7 +280,7 @@ function WallLine({
   onPress,
 }: {
   wall: WallSeg;
-  mapping: Mapping;
+  mapping: EffMapping;
   showMeasure: boolean;
   selected: boolean;
   onPress?: () => void;
@@ -207,7 +311,7 @@ function WallLine({
         x2={b.x}
         y2={b.y}
         stroke={selected ? c.blue : c.ink}
-        strokeWidth={selected ? 8 : 6}
+        strokeWidth={6}
         strokeLinecap="round"
       />
       {showMeasure && (
@@ -215,7 +319,7 @@ function WallLine({
           x={mid.x}
           y={mid.y + 3}
           fill={selected ? c.blue : c.inkSoft}
-          fontSize={selected ? 11 : 10}
+          fontSize={10}
           fontWeight="600"
           textAnchor="middle"
           transform={`rotate(${angle}, ${mid.x}, ${mid.y})`}>
@@ -231,7 +335,7 @@ function CornerHandle({
   mapping,
 }: {
   corner: { x: number; z: number; wallId: string; end: 'a' | 'b' };
-  mapping: Mapping;
+  mapping: EffMapping;
 }) {
   const styles = getStyles(useTheme());
   const startRef = useRef({ x: corner.x, z: corner.z });
@@ -243,9 +347,10 @@ function CornerHandle({
           startRef.current = { x: corner.x, z: corner.z };
         },
         onPanResponderMove: (_e, g) => {
+          const d = mapping.deltaToMeters(g.dx, g.dy);
           useScanStore.getState().moveWallPoint(corner.wallId, corner.end, {
-            x: startRef.current.x + g.dx / mapping.scale,
-            z: startRef.current.z + g.dy / mapping.scale,
+            x: startRef.current.x + d.x,
+            z: startRef.current.z + d.z,
           });
         },
       }),

@@ -364,25 +364,35 @@ const mixHex = (a: string, b: string, t: number): string => {
 const cornerKey = (p: { x: number; z: number }) =>
   `${p.x.toFixed(3)}:${p.z.toFixed(3)}`;
 
-function cornerCounts(walls: WallSeg[]): Map<string, number> {
-  const m = new Map<string, number>();
+function cornerCounts(walls: WallSeg[]): Map<string, string[]> {
+  const m = new Map<string, string[]>();
   for (const w of walls) {
     for (const p of [w.a, w.b]) {
-      m.set(cornerKey(p), (m.get(cornerKey(p)) ?? 0) + 1);
+      const k = cornerKey(p);
+      const l = m.get(k) ?? [];
+      l.push(w.id);
+      m.set(k, l);
     }
   }
+  for (const l of m.values()) l.sort();
   return m;
 }
 
-/** Rectangle épais d'un mur au sol, coins partagés prolongés (T/2). */
-function thickWallRect(w: WallSeg, counts: Map<string, number>) {
+/** Rectangle épais d'un mur au sol. Aux coins partagés, UN mur traverse
+ *  (prolongé de T/2), l'autre s'arrête contre lui : angle net. */
+function thickWallRect(w: WallSeg, counts: Map<string, string[]>) {
   const dx = w.b.x - w.a.x;
   const dz = w.b.z - w.a.z;
   const len = Math.hypot(dx, dz) || 1;
   const ux = dx / len;
   const uz = dz / len;
-  const extA = (counts.get(cornerKey(w.a)) ?? 0) > 1 ? WALL_T / 2 : 0;
-  const extB = (counts.get(cornerKey(w.b)) ?? 0) > 1 ? WALL_T / 2 : 0;
+  const extFor = (k: string) => {
+    const l = counts.get(k) ?? [];
+    if (l.length < 2) return 0;
+    return l[0] === w.id ? WALL_T / 2 : -WALL_T / 2;
+  };
+  const extA = extFor(cornerKey(w.a));
+  const extB = extFor(cornerKey(w.b));
   const pa = { x: w.a.x - ux * extA, z: w.a.z - uz * extA };
   const pb = { x: w.b.x + ux * extB, z: w.b.z + uz * extB };
   const nx = (-dz / len) * (WALL_T / 2);

@@ -8,7 +8,7 @@ import {
   type WallSeg,
 } from '../geometry/floorplan';
 
-export type Screen = 'home' | 'scan' | 'result' | 'library' | 'export';
+export type Screen = 'home' | 'scan' | 'result' | 'library' | 'export' | 'camera';
 
 export interface SavedScan {
   id: string;

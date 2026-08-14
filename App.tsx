@@ -6,6 +6,7 @@ import { ScanScreen } from './src/screens/ScanScreen';
 import { ResultScreen } from './src/screens/ResultScreen';
 import { LibraryScreen } from './src/screens/LibraryScreen';
 import { ExportScreen } from './src/screens/ExportScreen';
+import { CameraScreen } from './src/screens/CameraScreen';
 import { useScanStore } from './src/store/scanStore';
 
 export default function App() {
@@ -29,6 +30,7 @@ export default function App() {
       {screen === 'result' && <ResultScreen />}
       {screen === 'library' && <LibraryScreen />}
       {screen === 'export' && <ExportScreen />}
+      {screen === 'camera' && <CameraScreen />}
     </>
   );
 }

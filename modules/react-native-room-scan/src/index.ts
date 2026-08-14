@@ -70,6 +70,17 @@ export const RoomScan = {
 
   start: (): Promise<void> => RoomScanModule.startRoomScan(),
 
+  /** Autorisation caméra : 'granted' | 'denied' | 'undetermined'. */
+  cameraStatus: (): Promise<'granted' | 'denied' | 'undetermined'> =>
+    RoomScanModule?.cameraStatus
+      ? RoomScanModule.cameraStatus()
+      : Promise.resolve('granted'),
+
+  requestCamera: (): Promise<boolean> =>
+    RoomScanModule?.requestCamera
+      ? RoomScanModule.requestCamera()
+      : Promise.resolve(true),
+
   /** Arrête, post-traite et exporte. Compte quelques secondes sur iOS. */
   stop: (): Promise<ScanResult> => RoomScanModule.stopRoomScan(),
 

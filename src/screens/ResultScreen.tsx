@@ -45,6 +45,7 @@ export function ResultScreen() {
 
   const [tab, setTab] = useState<Tab>('2d');
   const [showMeasures, setShowMeasures] = useState(true);
+  const [show3DMeasures, setShow3DMeasures] = useState(true);
   const [editMode, setEditMode] = useState(false);
   const [selectedWallId, setSelectedWallId] = useState<string | null>(null);
   const [lengthInput, setLengthInput] = useState('');
@@ -181,7 +182,7 @@ export function ResultScreen() {
             }}
           />
         ) : (
-          <Iso3DView />
+          <Iso3DView showMeasures={show3DMeasures} />
         )}
 
         {tab === '2d' ? (
@@ -194,14 +195,19 @@ export function ResultScreen() {
             <ToolPill label="Modifier" active={editMode} onPress={toggleEdit} />
           </View>
         ) : (
-          Platform.OS === 'ios' && (
-            <View style={styles.planTools}>
+          <View style={styles.planTools}>
+            <ToolPill
+              label="Cotes"
+              active={show3DMeasures}
+              onPress={() => setShow3DMeasures((v) => !v)}
+            />
+            {Platform.OS === 'ios' && (
               <ToolPill label="Image" active={false} onPress={shareImage} />
-              {modelPath && (
-                <ToolPill label="Fichier 3D" active={false} onPress={shareModel} />
-              )}
-            </View>
-          )
+            )}
+            {Platform.OS === 'ios' && modelPath && (
+              <ToolPill label="Fichier 3D" active={false} onPress={shareModel} />
+            )}
+          </View>
         )}
 
         {/* Modifications non enregistrées : bouton de sauvegarde flottant */}
@@ -221,35 +227,39 @@ export function ResultScreen() {
         )}
       </View>
 
-      {tab === '2d' && editMode && selectedWall ? (
-        <View style={styles.editBar}>
-          <Text style={styles.editLabel}>
-            Longueur du mur · {fr(selectedWall.height, 2)} m sous plafond
-          </Text>
-          <View style={styles.editRow}>
-            <TextInput
-              style={styles.input}
-              value={lengthInput}
-              onChangeText={setLengthInput}
-              keyboardType="decimal-pad"
-              returnKeyType="done"
-              onSubmitEditing={applyLength}
-            />
-            <Text style={styles.unit}>m</Text>
-            <TouchableOpacity style={styles.applyButton} onPress={applyLength}>
-              <Text style={styles.applyText}>Appliquer</Text>
-            </TouchableOpacity>
+      {/* Hauteur FIXE : le canevas ne doit jamais se redimensionner
+          quand la barre d'édition remplace le texte d'aide. */}
+      <View style={styles.bottomZone}>
+        {tab === '2d' && editMode && selectedWall ? (
+          <View style={styles.editBar}>
+            <Text style={styles.editLabel}>
+              Longueur du mur · {fr(selectedWall.height, 2)} m sous plafond
+            </Text>
+            <View style={styles.editRow}>
+              <TextInput
+                style={styles.input}
+                value={lengthInput}
+                onChangeText={setLengthInput}
+                keyboardType="decimal-pad"
+                returnKeyType="done"
+                onSubmitEditing={applyLength}
+              />
+              <Text style={styles.unit}>m</Text>
+              <TouchableOpacity style={styles.applyButton} onPress={applyLength}>
+                <Text style={styles.applyText}>Appliquer</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
-      ) : (
-        <Text style={styles.hint}>
-          {tab === '3d'
-            ? 'Un doigt pour tourner et incliner — la 3D suit vos modifications du plan.'
-            : editMode
-            ? 'Touchez un mur pour saisir sa longueur, tirez un coin bleu pour déformer le plan.'
-            : 'Activez « Modifier » pour ajuster les murs, ou ouvrez la vue 3D.'}
-        </Text>
-      )}
+        ) : (
+          <Text style={styles.hint}>
+            {tab === '3d'
+              ? 'Un doigt : tourner. Deux doigts : zoomer, pivoter, déplacer. Tapez un mur pour le cadrer.'
+              : editMode
+              ? 'Touchez un mur pour saisir sa longueur, tirez un coin bleu pour déformer le plan.'
+              : 'Activez « Modifier » pour ajuster les murs, ou ouvrez la vue 3D.'}
+          </Text>
+        )}
+      </View>
 
       {objects.length > 0 && tab === '2d' && !editMode && (
         <ScrollView
@@ -476,12 +486,13 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 5,
   },
+  bottomZone: { height: 100, justifyContent: 'center' },
   hint: {
     color: c.inkFaint,
     fontSize: 12.5,
     textAlign: 'center',
-    marginVertical: 12,
     lineHeight: 17,
+    paddingHorizontal: 8,
   },
   editBar: {
     backgroundColor: c.surface,
@@ -489,7 +500,6 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     borderWidth: 1,
     borderColor: c.line,
     padding: 13,
-    marginVertical: 10,
   },
   editLabel: { color: c.inkSoft, fontSize: 13, marginBottom: 8, fontWeight: '600' },
   editRow: { flexDirection: 'row', alignItems: 'center' },

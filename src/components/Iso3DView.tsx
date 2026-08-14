@@ -1,8 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { PanResponder, StyleSheet, Text, View } from 'react-native';
-import Svg, { Polygon } from 'react-native-svg';
+import Svg, { Polygon, Text as SvgText } from 'react-native-svg';
 import { themedStyles, useTheme, type Palette } from '../theme';
-import { closedLoop, toFootprint } from '../geometry/floorplan';
+import {
+  closedLoop,
+  segLength,
+  toFootprint,
+  type WallSeg,
+} from '../geometry/floorplan';
 import { useScanStore } from '../store/scanStore';
 
 interface P3 {
@@ -45,6 +50,21 @@ const WALL_T = 0.14;
 const rad = (d: number) => (d * Math.PI) / 180;
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
+function pointInPoly(x: number, y: number, pts: { sx: number; sy: number }[]) {
+  let inside = false;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const a = pts[i];
+    const b = pts[j];
+    if (
+      (a.sy > y) !== (b.sy > y) &&
+      x < ((b.sx - a.sx) * (y - a.sy)) / (b.sy - a.sy) + a.sx
+    ) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
 /** Mélange linéaire de deux couleurs hex. */
 function mix(a: string, b: string, t: number): string {
   const pa = [1, 3, 5].map((i) => parseInt(a.slice(i, i + 2), 16));
@@ -59,6 +79,8 @@ interface Props {
   onChange?: (v: View3DParams) => void;
   /** Cache la pastille d'aide (pour les petits encarts d'aperçu). */
   hideHint?: boolean;
+  /** Cotes sur les arêtes (arêtes en noir). */
+  showMeasures?: boolean;
 }
 
 /**
@@ -66,7 +88,7 @@ interface Props {
  * que le plan 2D : murs épais extrudés, portes/fenêtres, meubles.
  * Un doigt : tourner/incliner. Deux doigts : pincer pour zoomer, déplacer.
  */
-export function Iso3DView({ value, onChange, hideHint }: Props) {
+export function Iso3DView({ value, onChange, hideHint, showMeasures }: Props) {
   const walls = useScanStore((s) => s.walls);
   const openings = useScanStore((s) => s.openings);
   const objects = useScanStore((s) => s.objects);
@@ -108,6 +130,7 @@ export function Iso3DView({ value, onChange, hideHint }: Props) {
 
   const touchAngle = (t: { pageX: number; pageY: number }[]) =>
     Math.atan2(t[1].pageY - t[0].pageY, t[1].pageX - t[0].pageX);
+  const tapRef = useRef({ x: 0, y: 0 });
 
   // Créé UNE seule fois : un responder recréé en plein geste perd le suivi.
   const pan = useRef(
@@ -117,6 +140,7 @@ export function Iso3DView({ value, onChange, hideHint }: Props) {
         Math.abs(g.dx) + Math.abs(g.dy) > 4,
       onPanResponderGrant: (e, g) => {
         const t = e.nativeEvent.touches;
+        tapRef.current = { x: e.nativeEvent.locationX, y: e.nativeEvent.locationY };
         baseRef.current = {
           v: viewRef.current,
           mode: t.length >= 2 ? 'pinch' : 'rotate',
@@ -176,6 +200,12 @@ export function Iso3DView({ value, onChange, hideHint }: Props) {
           });
         }
       },
+      onPanResponderRelease: (_e, g) => {
+        // Tap simple (sans glisser) : cadrer la vue sur le mur touché.
+        if (baseRef.current.mode === 'rotate' && Math.abs(g.dx) + Math.abs(g.dy) < 6) {
+          focusRef.current?.(tapRef.current.x, tapRef.current.y);
+        }
+      },
     }),
   ).current;
 
@@ -211,16 +241,26 @@ export function Iso3DView({ value, onChange, hideHint }: Props) {
       { x: p.x, y: yTop, z: p.z },
     ];
 
-    // Aux coins partagés, chaque mur est prolongé d'une demi-épaisseur :
-    // les boîtes se rejoignent et l'angle extérieur se termine en pointe.
+    // Assemblage des coins : UN seul mur traverse l'angle (prolongé d'une
+    // demi-épaisseur), l'autre s'arrête contre lui — angle net, sans
+    // interpénétration visible des boîtes.
     const cornerKey = (p: { x: number; z: number }) =>
       `${p.x.toFixed(3)}:${p.z.toFixed(3)}`;
-    const cornerCount = new Map<string, number>();
+    const cornerIds = new Map<string, string[]>();
     for (const w of walls) {
       for (const p of [w.a, w.b]) {
-        cornerCount.set(cornerKey(p), (cornerCount.get(cornerKey(p)) ?? 0) + 1);
+        const k = cornerKey(p);
+        const l = cornerIds.get(k) ?? [];
+        l.push(w.id);
+        cornerIds.set(k, l);
       }
     }
+    for (const l of cornerIds.values()) l.sort();
+    const extFor = (k: string, id: string) => {
+      const l = cornerIds.get(k) ?? [];
+      if (l.length < 2) return 0;
+      return l[0] === id ? WALL_T / 2 : -WALL_T / 2;
+    };
 
     // Murs épais : boîte (2 longs pans, 2 chants, 1 dessus).
     for (const w of walls) {
@@ -229,8 +269,8 @@ export function Iso3DView({ value, onChange, hideHint }: Props) {
       const len = Math.hypot(dx, dz) || 1;
       const ux = dx / len;
       const uz = dz / len;
-      const extA = (cornerCount.get(cornerKey(w.a)) ?? 0) > 1 ? WALL_T / 2 : 0;
-      const extB = (cornerCount.get(cornerKey(w.b)) ?? 0) > 1 ? WALL_T / 2 : 0;
+      const extA = extFor(cornerKey(w.a), w.id);
+      const extB = extFor(cornerKey(w.b), w.id);
       const pa = { x: w.a.x - ux * extA, z: w.a.z - uz * extA };
       const pb = { x: w.b.x + ux * extB, z: w.b.z + uz * extB };
       const nx = (-dz / len) * (WALL_T / 2);
@@ -368,12 +408,127 @@ export function Iso3DView({ value, onChange, hideHint }: Props) {
         fill = mix('#BFC9D8', '#FCFDFF', facingCam);
       }
 
-      return { proj, depth, fill, stroke: face.stroke };
+      // Mode cotes : toutes les arêtes en noir.
+      const stroke =
+        showMeasures && !face.isFloor && face.stroke !== 'none'
+          ? '#0B0D12'
+          : face.stroke;
+      return { proj, depth, fill, stroke };
     });
 
     polys.sort((p, q) => p.depth - q.depth);
-    return polys;
-  }, [faces, layout, view, center, radius3d]);
+
+    // Cotes portées sur les arêtes : longueur de chaque mur (arête haute),
+    // hauteur une fois par valeur distincte (arête verticale).
+    const labels: { x: number; y: number; angle: number; text: string }[] = [];
+    if (showMeasures) {
+      const edgeLabel = (
+        p0: { sx: number; sy: number },
+        p1: { sx: number; sy: number },
+        text: string,
+      ) => {
+        const dx = p1.sx - p0.sx;
+        const dy = p1.sy - p0.sy;
+        const norm = Math.hypot(dx, dy) || 1;
+        let angle = (Math.atan2(dy, dx) * 180) / Math.PI;
+        if (angle > 90) angle -= 180;
+        if (angle < -90) angle += 180;
+        let n = { x: -dy / norm, y: dx / norm };
+        if (n.y > 0) n = { x: -n.x, y: -n.y };
+        labels.push({
+          x: (p0.sx + p1.sx) / 2 + n.x * 9,
+          y: (p0.sy + p1.sy) / 2 + n.y * 9,
+          angle,
+          text,
+        });
+      };
+      const seenHeights = new Set<string>();
+      for (const w of walls) {
+        const pA = project({ x: w.a.x, y: w.height, z: w.a.z });
+        const pB = project({ x: w.b.x, y: w.height, z: w.b.z });
+        edgeLabel(pA, pB, `${segLength(w).toFixed(2).replace('.', ',')} m`);
+        const hKey = w.height.toFixed(2);
+        if (!seenHeights.has(hKey)) {
+          seenHeights.add(hKey);
+          const p0 = project({ x: w.a.x, y: 0, z: w.a.z });
+          edgeLabel(p0, pA, `${hKey.replace('.', ',')} m`);
+        }
+      }
+    }
+
+    return { polys, labels };
+  }, [faces, layout, view, center, radius3d, showMeasures, walls]);
+
+  // Tap sur un mur : oriente la caméra face au mur, zoome pour le voir entier.
+  const focusRef = useRef<((tx: number, ty: number) => void) | null>(null);
+  focusRef.current = (tx, ty) => {
+    if (layout.w === 0 || walls.length === 0) return;
+    const v = viewRef.current;
+    const ct = Math.cos(rad(v.theta));
+    const st = Math.sin(rad(v.theta));
+    const cp = Math.cos(rad(v.tilt));
+    const sp = Math.sin(rad(v.tilt));
+    const baseScale = (Math.min(layout.w, layout.h) * 0.44) / radius3d;
+    const scale = baseScale * v.zoom;
+    const project = (p: P3) => {
+      const x = p.x - center.x;
+      const y = p.y - center.y;
+      const z = p.z - center.z;
+      const rx = x * ct - z * st;
+      const rz = x * st + z * ct;
+      return {
+        sx: layout.w / 2 + v.ox + rx * scale,
+        sy: layout.h / 2 + v.oy + (rz * cp - y * sp) * scale,
+        depth: rz * sp + y * cp,
+      };
+    };
+
+    let best: { wall: WallSeg; depth: number } | null = null;
+    for (const w of walls) {
+      const quad = [
+        project({ x: w.a.x, y: 0, z: w.a.z }),
+        project({ x: w.b.x, y: 0, z: w.b.z }),
+        project({ x: w.b.x, y: w.height, z: w.b.z }),
+        project({ x: w.a.x, y: w.height, z: w.a.z }),
+      ];
+      if (pointInPoly(tx, ty, quad)) {
+        const depth = quad.reduce((s, p) => s + p.depth, 0) / 4;
+        if (!best || depth > best.depth) best = { wall: w, depth };
+      }
+    }
+    if (!best) return;
+    const w = best.wall;
+
+    // Face au mur, vu depuis l'intérieur de la scène.
+    const phi = (Math.atan2(w.b.z - w.a.z, w.b.x - w.a.x) * 180) / Math.PI;
+    const midw = { x: (w.a.x + w.b.x) / 2, z: (w.a.z + w.b.z) / 2 };
+    const pick = [-phi, -phi + 180].find((theta) => {
+      const s = Math.sin(rad(theta));
+      const co = Math.cos(rad(theta));
+      return (midw.x - center.x) * s + (midw.z - center.z) * co < 0;
+    });
+    const thetaN = pick ?? -phi;
+    const tiltN = 30;
+    const span = Math.max(segLength(w), w.height * 1.4);
+    const zoomN = clamp((0.85 * Math.min(layout.w, layout.h)) / (span * baseScale), 1, 4);
+    const scaleN = baseScale * zoomN;
+    const ct2 = Math.cos(rad(thetaN));
+    const st2 = Math.sin(rad(thetaN));
+    const cp2 = Math.cos(rad(tiltN));
+    const sp2 = Math.sin(rad(tiltN));
+    const x = midw.x - center.x;
+    const yy = w.height / 2 - center.y;
+    const z = midw.z - center.z;
+    const rx = x * ct2 - z * st2;
+    const rz = x * st2 + z * ct2;
+    update({
+      theta: thetaN,
+      tilt: tiltN,
+      zoom: zoomN,
+      ox: -rx * scaleN,
+      oy: -(rz * cp2 - yy * sp2) * scaleN,
+    });
+  };
 
   return (
     <View
@@ -389,7 +544,7 @@ export function Iso3DView({ value, onChange, hideHint }: Props) {
       {rendered && (
         <View pointerEvents="none">
           <Svg width={layout.w} height={layout.h}>
-            {rendered.map((p, i) => (
+            {rendered.polys.map((p, i) => (
               <Polygon
                 key={i}
                 points={p.proj.map((q) => `${q.sx},${q.sy}`).join(' ')}
@@ -398,6 +553,32 @@ export function Iso3DView({ value, onChange, hideHint }: Props) {
                 strokeWidth={1}
                 strokeLinejoin="round"
               />
+            ))}
+            {rendered.labels.map((l, i) => (
+              <React.Fragment key={`l${i}`}>
+                <SvgText
+                  x={l.x}
+                  y={l.y}
+                  fontSize={10}
+                  fontWeight="700"
+                  fill="none"
+                  stroke="#FFFFFF"
+                  strokeWidth={3}
+                  textAnchor="middle"
+                  transform={`rotate(${l.angle}, ${l.x}, ${l.y})`}>
+                  {l.text}
+                </SvgText>
+                <SvgText
+                  x={l.x}
+                  y={l.y}
+                  fontSize={10}
+                  fontWeight="700"
+                  fill="#0B0D12"
+                  textAnchor="middle"
+                  transform={`rotate(${l.angle}, ${l.x}, ${l.y})`}>
+                  {l.text}
+                </SvgText>
+              </React.Fragment>
             ))}
           </Svg>
         </View>
