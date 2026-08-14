@@ -91,7 +91,9 @@ interface Props {
 export function Iso3DView({ value, onChange, hideHint, showMeasures }: Props) {
   const walls = useScanStore((s) => s.walls);
   const openings = useScanStore((s) => s.openings);
-  const objects = useScanStore((s) => s.objects);
+  const allObjects = useScanStore((s) => s.objects);
+  const showFurniture = useScanStore((s) => s.showFurniture);
+  const objects = showFurniture ? allObjects : [];
   const colorOpenings = useScanStore((s) => s.showOpeningColors);
   const c = useTheme();
   const styles = getStyles(c);

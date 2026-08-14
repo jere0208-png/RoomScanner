@@ -24,6 +24,7 @@ export interface SavedScan {
 const STORAGE_KEY = 'roomscanner.saves.v1';
 const THEME_KEY = 'roomscanner.themePref.v1';
 const COLORS_KEY = 'roomscanner.openingColors.v1';
+const FURNITURE_KEY = 'roomscanner.showFurniture.v1';
 
 export type ThemePref = 'light' | 'dark';
 
@@ -78,6 +79,10 @@ interface ScanState {
   // Couleur des portes/fenêtres (2D, 3D, PDF). Décoché par défaut.
   showOpeningColors: boolean;
   setShowOpeningColors: (v: boolean) => void;
+
+  // Meubles visibles (sinon : murs et sols seuls). Activé par défaut.
+  showFurniture: boolean;
+  setShowFurniture: (v: boolean) => void;
 
   setScreen: (s: Screen) => void;
   setSupported: (v: boolean) => void;
@@ -153,6 +158,12 @@ export const useScanStore = create<ScanState>((set, get) => {
     setShowOpeningColors: (showOpeningColors) => {
       set({ showOpeningColors });
       AsyncStorage.setItem(COLORS_KEY, showOpeningColors ? '1' : '0').catch(() => {});
+    },
+
+    showFurniture: true,
+    setShowFurniture: (showFurniture) => {
+      set({ showFurniture });
+      AsyncStorage.setItem(FURNITURE_KEY, showFurniture ? '1' : '0').catch(() => {});
     },
 
     setScreen: (screen) => set({ screen }),
@@ -311,6 +322,10 @@ export const useScanStore = create<ScanState>((set, get) => {
         const colors = await AsyncStorage.getItem(COLORS_KEY);
         if (colors === '1' || colors === '0') {
           set({ showOpeningColors: colors === '1' });
+        }
+        const furn = await AsyncStorage.getItem(FURNITURE_KEY);
+        if (furn === '1' || furn === '0') {
+          set({ showFurniture: furn === '1' });
         }
         const raw = await AsyncStorage.getItem(STORAGE_KEY);
         if (!raw) return;

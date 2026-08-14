@@ -40,6 +40,8 @@ export function ResultScreen() {
   const saveAsCopy = useScanStore((s) => s.saveAsCopy);
   const dirty = useScanStore((s) => s.dirty);
   const commitCurrent = useScanStore((s) => s.commitCurrent);
+  const showFurniture = useScanStore((s) => s.showFurniture);
+  const setShowFurniture = useScanStore((s) => s.setShowFurniture);
   const setScreen = useScanStore((s) => s.setScreen);
   const reset = useScanStore((s) => s.reset);
   const styles = getStyles(useTheme());
@@ -194,6 +196,11 @@ export function ResultScreen() {
               onPress={() => setShowMeasures((v) => !v)}
             />
             <ToolPill label="Modifier" active={editMode} onPress={toggleEdit} />
+            <ToolPill
+              label="Meubles"
+              active={showFurniture}
+              onPress={() => setShowFurniture(!showFurniture)}
+            />
           </View>
         ) : (
           <View style={styles.planTools}>
@@ -201,6 +208,11 @@ export function ResultScreen() {
               label="Cotes"
               active={show3DMeasures}
               onPress={() => setShow3DMeasures((v) => !v)}
+            />
+            <ToolPill
+              label="Meubles"
+              active={showFurniture}
+              onPress={() => setShowFurniture(!showFurniture)}
             />
             {Platform.OS === 'ios' && (
               <ToolPill label="Image" active={false} onPress={shareImage} />
@@ -262,7 +274,7 @@ export function ResultScreen() {
         )}
       </View>
 
-      {objects.length > 0 && tab === '2d' && !editMode && (
+      {objects.length > 0 && showFurniture && tab === '2d' && !editMode && (
         <ScrollView
           style={styles.objectList}
           horizontal

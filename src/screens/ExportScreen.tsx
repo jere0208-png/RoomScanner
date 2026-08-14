@@ -160,6 +160,8 @@ export function ExportScreen() {
   const objects = useScanStore((s) => s.objects);
   const showOpeningColors = useScanStore((s) => s.showOpeningColors);
   const setShowOpeningColors = useScanStore((s) => s.setShowOpeningColors);
+  const showFurniture = useScanStore((s) => s.showFurniture);
+  const setShowFurniture = useScanStore((s) => s.setShowFurniture);
   const c = useTheme();
   const styles = getStyles(c);
 
@@ -187,7 +189,7 @@ export function ExportScreen() {
         fy: v.oy / (b.h / 2),
       });
       const bytes = buildScanPdf(
-        { name: scanName, walls, openings, objects },
+        { name: scanName, walls, openings, objects: showFurniture ? objects : [] },
         include3D,
         {
           plan: {
@@ -227,6 +229,10 @@ export function ExportScreen() {
             Afficher la couleur des portes et fenêtres
           </Text>
           <Switch value={showOpeningColors} onValueChange={setShowOpeningColors} />
+        </View>
+        <View style={styles.switchRow}>
+          <Text style={styles.switchLabel}>Inclure les meubles</Text>
+          <Switch value={showFurniture} onValueChange={setShowFurniture} />
         </View>
 
         <Text style={styles.sheetLabel}>Feuille 1 · Plan d'ensemble</Text>

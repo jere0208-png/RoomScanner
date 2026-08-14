@@ -48,7 +48,9 @@ export function FloorplanEditor({
 }: Props) {
   const walls = useScanStore((s) => s.walls);
   const openings = useScanStore((s) => s.openings);
-  const objects = useScanStore((s) => s.objects);
+  const allObjects = useScanStore((s) => s.objects);
+  const showFurniture = useScanStore((s) => s.showFurniture);
+  const objects = showFurniture ? allObjects : [];
   const currentSaveId = useScanStore((s) => s.currentSaveId);
   const colorOpenings = useScanStore((s) => s.showOpeningColors);
   const c = useTheme();
