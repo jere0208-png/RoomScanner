@@ -488,15 +488,17 @@ export function Iso3DView({ value, onChange, showMeasures }: Props) {
       return { proj, depth, fill, stroke };
     });
 
-    polys.sort((p, q) => p.depth - q.depth);
+    // Cotes insérées DANS le tri de profondeur : un mur proche recouvre
+    // les cotes des éléments situés derrière lui (fini les fuites).
+    type Item =
+      | { kind: 'poly'; depth: number; proj: typeof polys[0]['proj']; fill: string; stroke: string }
+      | { kind: 'label'; depth: number; x: number; y: number; angle: number; text: string };
+    const items: Item[] = polys.map((p) => ({ kind: 'poly' as const, ...p }));
 
-    // Cotes portées sur les arêtes : longueur de chaque mur (arête haute),
-    // hauteur une fois par valeur distincte (arête verticale).
-    const labels: { x: number; y: number; angle: number; text: string }[] = [];
     if (showMeasures && !interacting) {
       const edgeLabel = (
-        p0: { sx: number; sy: number },
-        p1: { sx: number; sy: number },
+        p0: { sx: number; sy: number; depth: number },
+        p1: { sx: number; sy: number; depth: number },
         text: string,
       ) => {
         const dx = p1.sx - p0.sx;
@@ -509,7 +511,9 @@ export function Iso3DView({ value, onChange, showMeasures }: Props) {
         if (angle < -90) angle += 180;
         let n = { x: -dy / norm, y: dx / norm };
         if (n.y > 0) n = { x: -n.x, y: -n.y };
-        labels.push({
+        items.push({
+          kind: 'label',
+          depth: (p0.depth + p1.depth) / 2 + 0.03,
           x: (p0.sx + p1.sx) / 2 + n.x * 9,
           y: (p0.sy + p1.sy) / 2 + n.y * 9,
           angle,
@@ -530,7 +534,8 @@ export function Iso3DView({ value, onChange, showMeasures }: Props) {
       }
     }
 
-    return { polys, labels };
+    items.sort((p, q) => p.depth - q.depth);
+    return items;
   }, [faces, layout, view, center, radius3d, showMeasures, walls, interacting]);
 
   // Tap sur un mur : oriente la caméra face au mur, zoome pour le voir entier.
@@ -622,42 +627,43 @@ export function Iso3DView({ value, onChange, showMeasures }: Props) {
       {rendered && (
         <View pointerEvents="none">
           <Svg width={layout.w} height={layout.h}>
-            {rendered.polys.map((p, i) => (
-              <Polygon
-                key={i}
-                points={p.proj.map((q) => `${q.sx},${q.sy}`).join(' ')}
-                fill={p.fill}
-                stroke={p.stroke}
-                strokeWidth={1}
-                strokeLinejoin="round"
-              />
-            ))}
-            {rendered.labels.map((l, i) => (
-              <React.Fragment key={`l${i}`}>
-                <SvgText
-                  x={l.x}
-                  y={l.y}
-                  fontSize={10}
-                  fontWeight="700"
-                  fill="none"
-                  stroke="#FFFFFF"
-                  strokeWidth={3}
-                  textAnchor="middle"
-                  transform={`rotate(${l.angle}, ${l.x}, ${l.y})`}>
-                  {l.text}
-                </SvgText>
-                <SvgText
-                  x={l.x}
-                  y={l.y}
-                  fontSize={10}
-                  fontWeight="700"
-                  fill="#0B0D12"
-                  textAnchor="middle"
-                  transform={`rotate(${l.angle}, ${l.x}, ${l.y})`}>
-                  {l.text}
-                </SvgText>
-              </React.Fragment>
-            ))}
+            {rendered.map((item, i) =>
+              item.kind === 'poly' ? (
+                <Polygon
+                  key={i}
+                  points={item.proj.map((q) => `${q.sx},${q.sy}`).join(' ')}
+                  fill={item.fill}
+                  stroke={item.stroke}
+                  strokeWidth={1}
+                  strokeLinejoin="round"
+                />
+              ) : (
+                <React.Fragment key={i}>
+                  <SvgText
+                    x={item.x}
+                    y={item.y}
+                    fontSize={10}
+                    fontWeight="700"
+                    fill="none"
+                    stroke="#FFFFFF"
+                    strokeWidth={3}
+                    textAnchor="middle"
+                    transform={`rotate(${item.angle}, ${item.x}, ${item.y})`}>
+                    {item.text}
+                  </SvgText>
+                  <SvgText
+                    x={item.x}
+                    y={item.y}
+                    fontSize={10}
+                    fontWeight="700"
+                    fill="#0B0D12"
+                    textAnchor="middle"
+                    transform={`rotate(${item.angle}, ${item.x}, ${item.y})`}>
+                    {item.text}
+                  </SvgText>
+                </React.Fragment>
+              ),
+            )}
           </Svg>
         </View>
       )}

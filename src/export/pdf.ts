@@ -640,19 +640,32 @@ function draw3DView(
     }
     return { pts, depth, fill, stroke: f.stroke };
   });
-  polys.sort((p, q) => p.depth - q.depth);
-  for (const p of polys) {
-    d.poly(p.pts, p.fill, p.stroke, 0.7);
-  }
-
-  // Cotes portées au milieu de l'arête haute de chaque mur.
+  // Cotes insérées dans le tri de profondeur : un mur proche les recouvre.
+  type Item =
+    | { kind: 'poly'; depth: number; pts: Pt[]; fill: string | null; stroke: string | null }
+    | { kind: 'label'; depth: number; x: number; y: number; text: string };
+  const items: Item[] = polys.map((p) => ({ kind: 'poly' as const, ...p }));
   for (const w of walls) {
     const mid = project({
       x: (w.a.x + w.b.x) / 2,
       y: w.height,
       z: (w.a.z + w.b.z) / 2,
     });
-    d.text(`${segLength(w).toFixed(2).replace('.', ',')} m`, mid.x, mid.y + 5, 8, '#2A3340');
+    items.push({
+      kind: 'label',
+      depth: mid.depth + 0.03,
+      x: mid.x,
+      y: mid.y + 5,
+      text: `${segLength(w).toFixed(2).replace('.', ',')} m`,
+    });
+  }
+  items.sort((p, q) => p.depth - q.depth);
+  for (const item of items) {
+    if (item.kind === 'poly') {
+      d.poly(item.pts, item.fill, item.stroke, 0.7);
+    } else {
+      d.text(item.text, item.x, item.y, 8, '#2A3340');
+    }
   }
 }
 

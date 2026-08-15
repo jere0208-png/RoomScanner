@@ -10,6 +10,7 @@ RCT_EXTERN_METHOD(pauseRoomScan)
 RCT_EXTERN_METHOD(resumeRoomScan)
 RCT_EXTERN_METHOD(cameraStatus:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
 RCT_EXTERN_METHOD(requestCamera:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
+RCT_EXTERN_METHOD(setTorch:(BOOL)on resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
 @end
 
 @interface RCT_EXTERN_MODULE(RoomScanEvents, RCTEventEmitter)

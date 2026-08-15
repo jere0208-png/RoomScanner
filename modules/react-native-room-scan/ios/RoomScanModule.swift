@@ -24,6 +24,24 @@ class RoomScanModule: NSObject {
     }
   }
 
+  /// Torche pendant le scan (fonctionne pendant une session ARKit).
+  @objc func setTorch(_ on: Bool,
+                      resolve: RCTPromiseResolveBlock,
+                      reject: RCTPromiseRejectBlock) {
+    guard let device = AVCaptureDevice.default(for: .video), device.hasTorch else {
+      resolve(false)
+      return
+    }
+    do {
+      try device.lockForConfiguration()
+      device.torchMode = on ? .on : .off
+      device.unlockForConfiguration()
+      resolve(true)
+    } catch {
+      resolve(false)
+    }
+  }
+
   @objc func isSupported(_ resolve: RCTPromiseResolveBlock,
                          reject: RCTPromiseRejectBlock) {
     if #available(iOS 16.0, *) {

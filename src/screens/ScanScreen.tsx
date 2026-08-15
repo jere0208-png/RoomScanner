@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   StyleSheet,
@@ -6,7 +6,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { RoomScanView } from 'react-native-room-scan';
+import Svg, { Path } from 'react-native-svg';
+import { RoomScan, RoomScanView } from 'react-native-room-scan';
 import { themedStyles, useTheme, type Palette } from '../theme';
 import { useScanStore } from '../store/scanStore';
 import { useRoomScan } from '../native/useRoomScan';
@@ -17,7 +18,6 @@ import { useRoomScan } from '../native/useRoomScan';
  * haut, commandes dans les coins inférieurs.
  */
 export function ScanScreen() {
-  const instruction = useScanStore((s) => s.instruction);
   const wallCount = useScanStore((s) => s.wallCount);
   const objectCount = useScanStore((s) => s.objectCount);
   const doorCount = useScanStore((s) => s.doorCount);
@@ -26,6 +26,19 @@ export function ScanScreen() {
   const processing = useScanStore((s) => s.processing);
   const { pause, resume, stop, cancel } = useRoomScan();
   const styles = getStyles(useTheme());
+
+  // Torche : éteinte en quittant l'écran.
+  const [torch, setTorch] = useState(false);
+  useEffect(() => {
+    return () => {
+      RoomScan.setTorch(false).catch(() => {});
+    };
+  }, []);
+  const toggleTorch = () => {
+    const next = !torch;
+    setTorch(next);
+    RoomScan.setTorch(next).catch(() => {});
+  };
 
   const stats: [string, number][] = [
     ['Murs', wallCount],
@@ -43,6 +56,22 @@ export function ScanScreen() {
         <Text style={styles.cancelIcon}>✕</Text>
       </TouchableOpacity>
 
+      {/* Torche : rond façon bouton de thème, avec un éclair. */}
+      <TouchableOpacity
+        style={[styles.torchButton, torch && styles.torchButtonOn]}
+        onPress={toggleTorch}>
+        <Svg width={18} height={18} viewBox="0 0 24 24">
+          <Path
+            d="M13 2 L5 13.5 h5 L8 22 l8.5 -11.5 h-5 z"
+            stroke={torch ? '#0B0D12' : '#F4F6FA'}
+            strokeWidth={2}
+            strokeLinejoin="round"
+            fill={torch ? '#0B0D12' : 'none'}
+          />
+        </Svg>
+      </TouchableOpacity>
+
+      {/* RoomPlan affiche déjà ses propres instructions : pas de doublon. */}
       <View style={styles.topHud} pointerEvents="none">
         <View style={styles.statsPill}>
           {stats.map(([label, n], i) => (
@@ -52,12 +81,6 @@ export function ScanScreen() {
             </View>
           ))}
         </View>
-        {instruction !== '' && !paused && (
-          <View style={styles.instructionPill}>
-            <View style={styles.instructionDot} />
-            <Text style={styles.instructionText}>{instruction}</Text>
-          </View>
-        )}
         {paused && (
           <View style={[styles.instructionPill, styles.pausedPill]}>
             <Text style={styles.instructionText}>Scan en pause</Text>
@@ -106,6 +129,19 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     justifyContent: 'center',
   },
   cancelIcon: { color: c.scanInk, fontSize: 16, fontWeight: '700' },
+  torchButton: {
+    position: 'absolute',
+    top: 58,
+    right: 20,
+    zIndex: 2,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: c.scanPillSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  torchButtonOn: { backgroundColor: '#F4F6FA' },
   topHud: {
     position: 'absolute',
     top: 58,

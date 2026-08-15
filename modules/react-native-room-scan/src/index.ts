@@ -81,6 +81,10 @@ export const RoomScan = {
       ? RoomScanModule.requestCamera()
       : Promise.resolve(true),
 
+  /** Torche pendant le scan (false si l'appareil n'en a pas). */
+  setTorch: (on: boolean): Promise<boolean> =>
+    RoomScanModule?.setTorch ? RoomScanModule.setTorch(on) : Promise.resolve(false),
+
   /** Arrête, post-traite et exporte. Compte quelques secondes sur iOS. */
   stop: (): Promise<ScanResult> => RoomScanModule.stopRoomScan(),
 
