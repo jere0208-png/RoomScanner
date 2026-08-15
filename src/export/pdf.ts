@@ -8,10 +8,12 @@
  */
 import type { ObjectData } from 'react-native-room-scan';
 import {
+  clampFootprint,
   closedLoop,
   loopAreaM2,
   segLength,
   toFootprint,
+  wallsCentroid,
   type WallSeg,
 } from '../geometry/floorplan';
 import { frCategory, furnKind, furnitureStrokes } from '../geometry/furniture';
@@ -541,7 +543,10 @@ function buildFaces(
     });
   }
 
-  for (const obj of objects.map(toFootprint)) {
+  const interior = wallsCentroid(walls);
+  for (const obj of objects.map((o) =>
+    clampFootprint(toFootprint(o), walls, interior),
+  )) {
     const cosY = Math.cos(obj.yaw);
     const sinY = Math.sin(obj.yaw);
     const hw = obj.width / 2;
@@ -723,8 +728,10 @@ function planPage(
       d.poly(loop.map(px), '#F5F7FA', null);
     }
 
-    // Meubles : contour + symbole d'architecte (lit, canapé, TV…)
-    for (const o of objects.map(toFootprint)) {
+    // Meubles : contour + symbole d'architecte, recalés devant les murs.
+    for (const o of objects.map((ob) =>
+      clampFootprint(toFootprint(ob), walls, centroid),
+    )) {
       const cosY = Math.cos(o.yaw);
       const sinY = Math.sin(o.yaw);
       const hw = o.width / 2;

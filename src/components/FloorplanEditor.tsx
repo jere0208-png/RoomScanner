@@ -12,9 +12,11 @@ import Svg, {
 import { themedStyles, useTheme, type Palette } from '../theme';
 import {
   bounds,
+  clampFootprint,
   makeMapping,
   segLength,
   toFootprint,
+  wallsCentroid,
   type WallSeg,
 } from '../geometry/floorplan';
 import { frCategory, furnKind, furnitureStrokes } from '../geometry/furniture';
@@ -198,7 +200,7 @@ export function FloorplanEditor({
 
             {/* Objets (empreintes au sol) */}
             {objects.map((o) => {
-              const f = toFootprint(o);
+              const f = clampFootprint(toFootprint(o), walls, wallsCentroid(walls));
               const ctr = mapping.toPx({ x: f.cx, z: f.cz });
               const w = f.width * mapping.scale;
               const d = f.depth * mapping.scale;

@@ -122,6 +122,70 @@ export function segLength(w: WallSeg): number {
   return Math.hypot(w.b.x - w.a.x, w.b.z - w.a.z);
 }
 
+/** Barycentre des extrémités de murs : « l'intérieur » de la pièce. */
+export function wallsCentroid(walls: WallSeg[]): { x: number; z: number } {
+  if (walls.length === 0) return { x: 0, z: 0 };
+  let x = 0;
+  let z = 0;
+  for (const w of walls) {
+    x += w.a.x + w.b.x;
+    z += w.a.z + w.b.z;
+  }
+  return { x: x / (walls.length * 2), z: z / (walls.length * 2) };
+}
+
+/**
+ * Recale un meuble DEVANT les murs : tout coin de son empreinte qui pénètre
+ * l'épaisseur d'un mur (ou passe derrière) pousse le meuble vers l'intérieur
+ * de la pièce. Utilisé par le plan 2D, la vue 3D et le PDF.
+ */
+export function clampFootprint(
+  f: ObjectFootprint,
+  walls: WallSeg[],
+  interior: { x: number; z: number },
+  wallT = 0.14,
+  margin = 0.02,
+): ObjectFootprint {
+  let cx = f.cx;
+  let cz = f.cz;
+  const cos = Math.cos(f.yaw);
+  const sin = Math.sin(f.yaw);
+  const localCorners: [number, number][] = [
+    [-f.width / 2, -f.depth / 2],
+    [f.width / 2, -f.depth / 2],
+    [f.width / 2, f.depth / 2],
+    [-f.width / 2, f.depth / 2],
+  ];
+  for (const w of walls) {
+    const dx = w.b.x - w.a.x;
+    const dz = w.b.z - w.a.z;
+    const len = Math.hypot(dx, dz) || 1;
+    // Ne considérer que les murs que le meuble longe réellement.
+    const t = ((cx - w.a.x) * dx + (cz - w.a.z) * dz) / (len * len);
+    if (t < -0.1 || t > 1.1) continue;
+    let nx = -dz / len;
+    let nz = dx / len;
+    if (nx * (interior.x - w.a.x) + nz * (interior.z - w.a.z) < 0) {
+      nx = -nx;
+      nz = -nz;
+    }
+    let shift = 0;
+    for (const [lx, lz] of localCorners) {
+      const px = cx + lx * cos - lz * sin;
+      const pz = cz + lx * sin + lz * cos;
+      const d = (px - w.a.x) * nx + (pz - w.a.z) * nz;
+      const need = wallT / 2 + margin - d;
+      if (need > shift) shift = need;
+    }
+    // shift énorme = objet d'une autre zone : ne pas le téléporter.
+    if (shift > 0 && shift < 1) {
+      cx += nx * shift;
+      cz += nz * shift;
+    }
+  }
+  return { ...f, cx, cz };
+}
+
 /**
  * Soudure des coins : les extrémités distantes de moins de `tol` mètres
  * sont ramenées sur un point commun (moyenne du cluster). Rend le plan

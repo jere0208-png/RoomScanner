@@ -3,9 +3,11 @@ import { PanResponder, StyleSheet, View } from 'react-native';
 import Svg, { Polygon, Text as SvgText } from 'react-native-svg';
 import { themedStyles, useTheme, type Palette } from '../theme';
 import {
+  clampFootprint,
   closedLoop,
   segLength,
   toFootprint,
+  wallsCentroid,
   type WallSeg,
 } from '../geometry/floorplan';
 import { useScanStore } from '../store/scanStore';
@@ -134,6 +136,9 @@ export function Iso3DView({ value, onChange, showMeasures }: Props) {
   const touchAngle = (t: { pageX: number; pageY: number }[]) =>
     Math.atan2(t[1].pageY - t[0].pageY, t[1].pageX - t[0].pageX);
   const tapRef = useRef({ x: 0, y: 0 });
+  // Pendant un geste, les cotes sont masquées : c'est leur recalcul à
+  // chaque frame qui faisait ramer les mouvements.
+  const [interacting, setInteracting] = useState(false);
 
   // Créé UNE seule fois : un responder recréé en plein geste perd le suivi.
   const pan = useRef(
@@ -143,6 +148,7 @@ export function Iso3DView({ value, onChange, showMeasures }: Props) {
         Math.abs(g.dx) + Math.abs(g.dy) > 4,
       onPanResponderGrant: (e, g) => {
         const t = e.nativeEvent.touches;
+        setInteracting(true);
         tapRef.current = { x: e.nativeEvent.locationX, y: e.nativeEvent.locationY };
         baseRef.current = {
           v: viewRef.current,
@@ -204,11 +210,13 @@ export function Iso3DView({ value, onChange, showMeasures }: Props) {
         }
       },
       onPanResponderRelease: (_e, g) => {
+        setInteracting(false);
         // Tap simple (sans glisser) : cadrer la vue sur le mur touché.
         if (baseRef.current.mode === 'rotate' && Math.abs(g.dx) + Math.abs(g.dy) < 6) {
           focusRef.current?.(tapRef.current.x, tapRef.current.y);
         }
       },
+      onPanResponderTerminate: () => setInteracting(false),
     }),
   ).current;
 
@@ -378,8 +386,11 @@ export function Iso3DView({ value, onChange, showMeasures }: Props) {
       });
     }
 
-    // Meubles : boîtes grises-bleutées.
-    for (const obj of objects.map(toFootprint)) {
+    // Meubles : boîtes grises-bleutées, recalées devant les murs.
+    const interior = wallsCentroid(walls);
+    for (const obj of objects.map((o) =>
+      clampFootprint(toFootprint(o), walls, interior),
+    )) {
       const cosY = Math.cos(obj.yaw);
       const sinY = Math.sin(obj.yaw);
       const hw = obj.width / 2;
@@ -482,7 +493,7 @@ export function Iso3DView({ value, onChange, showMeasures }: Props) {
     // Cotes portées sur les arêtes : longueur de chaque mur (arête haute),
     // hauteur une fois par valeur distincte (arête verticale).
     const labels: { x: number; y: number; angle: number; text: string }[] = [];
-    if (showMeasures) {
+    if (showMeasures && !interacting) {
       const edgeLabel = (
         p0: { sx: number; sy: number },
         p1: { sx: number; sy: number },
@@ -491,6 +502,8 @@ export function Iso3DView({ value, onChange, showMeasures }: Props) {
         const dx = p1.sx - p0.sx;
         const dy = p1.sy - p0.sy;
         const norm = Math.hypot(dx, dy) || 1;
+        // Arête trop courte à l'écran : la cote chevaucherait ses voisines.
+        if (norm < 46) return;
         let angle = (Math.atan2(dy, dx) * 180) / Math.PI;
         if (angle > 90) angle -= 180;
         if (angle < -90) angle += 180;
@@ -518,7 +531,7 @@ export function Iso3DView({ value, onChange, showMeasures }: Props) {
     }
 
     return { polys, labels };
-  }, [faces, layout, view, center, radius3d, showMeasures, walls]);
+  }, [faces, layout, view, center, radius3d, showMeasures, walls, interacting]);
 
   // Tap sur un mur : oriente la caméra face au mur, zoome pour le voir entier.
   const focusRef = useRef<((tx: number, ty: number) => void) | null>(null);
