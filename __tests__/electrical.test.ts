@@ -20,14 +20,19 @@ import {
 } from '../src/geometry/floorplan';
 import {
   FIXTURES,
+  FIXTURE_KINDS,
+  FIXTURE_SYMBOL,
+  FIXTURE_TAG,
   faceX,
   facePoint,
   fixtureDims,
   fromFaceX,
   interiorSide,
   newFixture,
+  stackRanks,
   wallFace,
   type Fixture,
+  type FixtureKind,
 } from '../src/geometry/electrical';
 import { buildScene, isHiddenFace, type ScenePalette } from '../src/geometry/scene3d';
 import { useScanStore } from '../src/store/scanStore';
@@ -259,6 +264,47 @@ describe('rendu 3D de l’appareillage', () => {
       fixtures: [{ ...prise, wallId: 'mur-disparu' }],
     });
     expect(perdu.faces.length).toBe(nu.faces.length);
+  });
+});
+
+describe('symboles de plan', () => {
+  it('chaque type a son dessin, et deux types voisins ne se confondent pas', () => {
+    for (const kind of FIXTURE_KINDS) {
+      const sym = FIXTURE_SYMBOL[kind];
+      expect(sym.length).toBeGreaterThan(0);
+      for (const seg of sym) expect(seg.d).toMatch(/^M/);
+    }
+    // Une prise n'est pas un interrupteur : le dessin doit différer, sinon
+    // la mention à côté serait le seul moyen de les distinguer.
+    const trace = (k: FixtureKind) =>
+      FIXTURE_SYMBOL[k].map((x) => x.d).join('|');
+    expect(trace('prise')).not.toBe(trace('inter'));
+    expect(trace('prise')).not.toBe(trace('prise2'));
+    expect(trace('inter')).not.toBe(trace('va'));
+    // Les prises 20 et 32 A partagent le socle : c'est l'intensité écrite
+    // à côté qui les sépare, comme sur un vrai plan.
+    expect(trace('prise20')).toBe(trace('prise'));
+    expect(FIXTURE_TAG.prise20).toBeTruthy();
+    expect(FIXTURE_TAG.prise32).toBeTruthy();
+  });
+
+  it('deux appareils au même point du mur s’échelonnent', () => {
+    // Une prise à 25 cm et un interrupteur à 1,10 m tombent au MÊME point
+    // vu de dessus : sans échelonnement, on n'en voyait qu'un.
+    const ranks = stackRanks([
+      { id: 'a', wallId: 'n', side: 1, x: 1.2 },
+      { id: 'b', wallId: 'n', side: 1, x: 1.22 },
+      { id: 'c', wallId: 'n', side: 1, x: 2.5 },
+      { id: 'd', wallId: 'n', side: -1, x: 1.2 },
+      { id: 'e', wallId: 'e', side: 1, x: 1.2 },
+    ]);
+    expect(ranks.get('a')).toBe(0);
+    expect(ranks.get('b')).toBe(1);
+    // Loin sur le même mur, sur l'autre face, ou sur un autre mur : chacun
+    // garde sa place, rien ne s'échelonne sans raison.
+    expect(ranks.get('c')).toBe(0);
+    expect(ranks.get('d')).toBe(0);
+    expect(ranks.get('e')).toBe(0);
   });
 });
 

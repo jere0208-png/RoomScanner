@@ -2,7 +2,9 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { PanResponder, StyleSheet, View } from 'react-native';
 import Svg, {
   Circle,
+  G,
   Line,
+  Path,
   Polygon,
   Rect,
   Text as SvgText,
@@ -12,6 +14,7 @@ import {
   pointOnSeg,
   roomOf,
   segLength,
+  wallQuads,
   type Pt,
   type WallSeg,
 } from '../geometry/floorplan';
@@ -31,6 +34,15 @@ import {
   type ScenePalette,
 } from '../geometry/scene3d';
 import { floorsOf, useScanStore } from '../store/scanStore';
+import {
+  FIXTURES,
+  FIXTURE_SYMBOL,
+  FIXTURE_TAG,
+  faceX,
+  facePoint,
+  wallFace,
+  type SymbolStroke,
+} from '../geometry/electrical';
 
 /** Paramètres de caméra de la vue 3D (contrôlables de l'extérieur). */
 export interface View3DParams {
@@ -376,6 +388,18 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
           dashed: boolean;
         }
       | { kind: 'dot'; depth: number; x: number; y: number; color: string }
+      | {
+          kind: 'elec';
+          depth: number;
+          x: number;
+          y: number;
+          color: string;
+          symbol: SymbolStroke[];
+          tag?: string;
+          /** Cotes lues sur la face, affichées une fois zoomé dessus. */
+          haut?: string;
+          bord?: string;
+        }
       | { kind: 'label'; depth: number; x: number; y: number; angle: number; text: string }
       | {
           kind: 'area';
@@ -416,6 +440,41 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
           area: `${room.surface.exact ? '' : '≈ '}${room.surface.area
             .toFixed(1)
             .replace('.', ',')} m²`,
+        });
+      }
+    }
+
+    // ------------------------------------------- appareillage électrique
+    // Le volume posé sur le mur fait 8 cm : à l'échelle d'un logement
+    // entier, c'est deux pixels. On pose donc au-dessus un repère de taille
+    // FIXE — le même symbole que sur le plan — pour qu'un appareil se voie
+    // quel que soit le zoom. Et quand on s'approche vraiment, ses cotes
+    // s'affichent : c'est là qu'on vient les lire.
+    if (!interacting) {
+      const quads = wallQuads(keptWalls);
+      const byId = new Map(keptWalls.map((w) => [w.id, w]));
+      for (const f of fixtures) {
+        const w = byId.get(f.wallId);
+        if (!w) continue;
+        const face = wallFace(w, quads.get(w.id), f.side);
+        // Face qui tourne le dos à la caméra : l'appareil est derrière le
+        // mur, on ne le montre pas (même test que `isHiddenFace`).
+        if (face.nx * st * sp + face.nz * ct * sp <= 0) continue;
+        const spec = FIXTURES[f.kind];
+        const x = faceX(face, f.along);
+        const p = facePoint(face, x, spec.depth + 0.01);
+        const q = project({ x: p.x, y: f.height, z: p.z });
+        const proche = scale > 90;
+        items.push({
+          kind: 'elec',
+          depth: q.depth + 0.05,
+          x: q.sx,
+          y: q.sy,
+          color: spec.color,
+          symbol: FIXTURE_SYMBOL[f.kind] ?? [],
+          tag: FIXTURE_TAG[f.kind],
+          haut: proche ? `${Math.round(f.height * 100)}` : undefined,
+          bord: proche ? `${Math.round(x * 100)}` : undefined,
         });
       }
     }
@@ -464,6 +523,8 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
   }, [
     scene,
     faces,
+    fixtures,
+    keptWalls,
     roomNames,
     layout,
     view,
@@ -593,6 +654,56 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
                 )
               ) : item.kind === 'dot' ? (
                 <Circle key={i} cx={item.x} cy={item.y} r={1.1} fill={item.color} />
+              ) : item.kind === 'elec' ? (
+                <G key={i}>
+                  <Circle cx={item.x} cy={item.y} r={11} fill={c.surface} opacity={0.94} />
+                  <G transform={`translate(${item.x}, ${item.y})`}>
+                    {item.symbol.map((seg, si) => (
+                      <Path
+                        key={si}
+                        d={seg.d}
+                        stroke={item.color}
+                        strokeWidth={1.6}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        fill={seg.fill ? item.color : 'none'}
+                      />
+                    ))}
+                  </G>
+                  {item.tag && (
+                    <SvgText
+                      x={item.x + 12}
+                      y={item.y - 8}
+                      fill={item.color}
+                      fontSize={8}
+                      fontWeight="800">
+                      {item.tag}
+                    </SvgText>
+                  )}
+                  {item.haut && (
+                    <>
+                      <Rect
+                        x={item.x - 26}
+                        y={item.y + 13}
+                        width={52}
+                        height={15}
+                        rx={4}
+                        fill={c.surface}
+                        stroke={item.color}
+                        strokeWidth={0.8}
+                      />
+                      <SvgText
+                        x={item.x}
+                        y={item.y + 23.5}
+                        fill={c.ink}
+                        fontSize={9}
+                        fontWeight="800"
+                        textAnchor="middle">
+                        {`↕${item.haut} ↔${item.bord}`}
+                      </SvgText>
+                    </>
+                  )}
+                </G>
               ) : item.kind === 'area' ? (
                 (() => {
                   // Cartouche identique à celui du plan 2D : cadre, nom

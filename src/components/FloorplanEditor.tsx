@@ -11,6 +11,7 @@ import Svg, {
   Defs,
   G,
   Line,
+  Path,
   Pattern,
   Polygon,
   Rect,
@@ -40,8 +41,11 @@ import type { ObjectData } from 'react-native-room-scan';
 import { mixHex } from '../geometry/appearance';
 import {
   FIXTURES,
+  FIXTURE_SYMBOL,
+  FIXTURE_TAG,
   faceX,
   facePoint,
+  stackRanks,
   wallFace,
 } from '../geometry/electrical';
 import { frCategory, furnKind, furnitureStrokes } from '../geometry/furniture';
@@ -340,6 +344,10 @@ export function FloorplanEditor({
 
   // Corps des murs : onglets calculés une fois pour tout le rendu.
   const quads = useMemo(() => wallQuads(walls), [walls]);
+  const wallById = useMemo(
+    () => new Map(walls.map((w) => [w.id, w])),
+    [walls],
+  );
   // Pièces du plan : chacune a son contour, son centre et sa teinte de sol.
   const parts = useMemo(() => roomParts(walls, rooms), [walls, rooms]);
   const roomById = useMemo(() => new Map(rooms.map((r) => [r.id, r])), [rooms]);
@@ -401,6 +409,24 @@ export function FloorplanEditor({
       {mapping && (
         <>
           <Svg width={layout.w} height={layout.h}>
+            {/* Toucher le vide désélectionne. Posé tout au fond du dessin :
+                murs, meubles et cartouches gardent la priorité, et seul ce
+                qui n'appartient à rien tombe ici. `transparent` et non
+                `none` — une surface sans couleur n'est pas touchable. */}
+            {editable && (
+              <Rect
+                x={0}
+                y={0}
+                width={layout.w}
+                height={layout.h}
+                fill="transparent"
+                onPress={() => {
+                  onSelectWall(null);
+                  onSelectRoom?.(null);
+                }}
+              />
+            )}
+
             {/* Surface au sol : aplat + semis de points, pour la distinguer
                 d'un coup d'œil des murs pochés en noir. */}
             {showSurfaces && dots && (
@@ -511,6 +537,7 @@ export function FloorplanEditor({
                 height={layout.h}
                 fill={c.surface}
                 opacity={0.72}
+                pointerEvents="none"
               />
             )}
 
@@ -553,53 +580,83 @@ export function FloorplanEditor({
                 juste devant la face qui porte l'appareil — c'est la
                 convention d'un plan d'électricien, et c'est aussi le seul
                 moyen de distinguer les deux faces d'une même cloison. */}
-            {fixtures.map((f) => {
-              const w = walls.find((x) => x.id === f.wallId);
-              if (!w) return null;
-              const face = wallFace(w, quads.get(w.id), f.side);
-              const spec = FIXTURES[f.kind];
-              const x = faceX(face, f.along);
-              const anchor = mapping.toPx(facePoint(face, x, 0.02));
-              const p = mapping.toPx(facePoint(face, x, 0.17));
-              return (
-                <G
-                  key={f.id}
-                  onPress={
-                    onSelectFixture
-                      ? () => onSelectFixture(f.id, f.wallId)
-                      : undefined
-                  }>
-                  <Line
-                    x1={anchor.x}
-                    y1={anchor.y}
-                    x2={p.x}
-                    y2={p.y}
-                    stroke={spec.color}
-                    strokeWidth={1.2}
-                  />
-                  {/* Cible tactile élargie : le symbole fait 16 px, le
-                      doigt en demande le double. */}
-                  <Circle cx={p.x} cy={p.y} r={17} fill="transparent" />
-                  <Circle
-                    cx={p.x}
-                    cy={p.y}
-                    r={8}
-                    fill={c.surface}
-                    stroke={spec.color}
-                    strokeWidth={2}
-                  />
-                  <SvgText
-                    x={p.x}
-                    y={p.y + 3}
-                    fill={spec.color}
-                    fontSize={7.5}
-                    fontWeight="800"
-                    textAnchor="middle">
-                    {spec.short}
-                  </SvgText>
-                </G>
+            {(() => {
+              const placed = fixtures
+                .map((f) => {
+                  const w = wallById.get(f.wallId);
+                  if (!w) return null;
+                  const face = wallFace(w, quads.get(w.id), f.side);
+                  return { f, face, x: faceX(face, f.along) };
+                })
+                .filter((p): p is NonNullable<typeof p> => !!p);
+              const ranks = stackRanks(
+                placed.map((p) => ({
+                  id: p.f.id,
+                  wallId: p.f.wallId,
+                  side: p.f.side,
+                  x: p.x,
+                })),
               );
-            })}
+              return placed.map(({ f, face, x }) => {
+                const spec = FIXTURES[f.kind];
+                const symbol = FIXTURE_SYMBOL[f.kind] ?? [];
+                const tag = FIXTURE_TAG[f.kind];
+                // Échelonnement : le deuxième appareil du même point se pose
+                // plus loin du mur, sur le même filet.
+                const out = 0.2 + (ranks.get(f.id) ?? 0) * 0.24;
+                const anchor = mapping.toPx(facePoint(face, x, 0.02));
+                const p = mapping.toPx(facePoint(face, x, out));
+                // Le symbole regarde SA face : sa tige rejoint le mur. Le
+                // plan pouvant être tourné, l'angle se prend à l'écran.
+                const dir =
+                  (Math.atan2(-face.nz, -face.nx) + view.rot) * (180 / Math.PI) - 90;
+                return (
+                  <G
+                    key={f.id}
+                    onPress={
+                      onSelectFixture
+                        ? () => onSelectFixture(f.id, f.wallId)
+                        : undefined
+                    }>
+                    <Line
+                      x1={anchor.x}
+                      y1={anchor.y}
+                      x2={p.x}
+                      y2={p.y}
+                      stroke={spec.color}
+                      strokeWidth={1.2}
+                    />
+                    {/* Cible tactile élargie : le symbole fait 20 px, le
+                        doigt en demande le double. */}
+                    <Circle cx={p.x} cy={p.y} r={18} fill="transparent" />
+                    <Circle cx={p.x} cy={p.y} r={11} fill={c.surface} />
+                    <G transform={`translate(${p.x}, ${p.y}) rotate(${dir})`}>
+                      {symbol.map((seg, si) => (
+                        <Path
+                          key={si}
+                          d={seg.d}
+                          stroke={spec.color}
+                          strokeWidth={1.6}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          fill={seg.fill ? spec.color : 'none'}
+                        />
+                      ))}
+                    </G>
+                    {tag && (
+                      <SvgText
+                        x={p.x + 12}
+                        y={p.y - 8}
+                        fill={spec.color}
+                        fontSize={8}
+                        fontWeight="800">
+                        {tag}
+                      </SvgText>
+                    )}
+                  </G>
+                );
+              });
+            })()}
 
             {/* Cotes de détail : retour de mur, baie, retour de mur. Elles
                 n'apparaissent qu'une fois le plan assez zoomé pour les lire. */}

@@ -32,7 +32,7 @@ import Svg, {
   Text as SvgText,
 } from 'react-native-svg';
 import { radius, shadowCard, themedStyles, useTheme, type Palette } from '../theme';
-import { roomOf, wallQuads } from '../geometry/floorplan';
+import { roomOf, wallQuadsOf } from '../geometry/floorplan';
 import { assignOpenings } from '../geometry/scene3d';
 import {
   FIXTURES,
@@ -96,7 +96,7 @@ export function WallElevation({
   // attendu quand on met une prise dos à dos.
   const side = selected?.side ?? (wall ? interiorSide(wall, walls, rooms) : 1);
   const face = useMemo(
-    () => (wall ? wallFace(wall, wallQuads(walls).get(wall.id), side) : null),
+    () => (wall ? wallFace(wall, wallQuadsOf(walls).get(wall.id), side) : null),
     [wall, walls, side],
   );
 

@@ -23,7 +23,7 @@ import {
   splitAtJunctions,
   straightenWalls,
   toSegment,
-  wallQuads,
+  wallQuadsOf,
   weldCorners,
   type Pt,
   type WallSeg,
@@ -674,7 +674,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         id,
         kind,
         wall,
-        wallQuads(st.walls).get(wallId),
+        wallQuadsOf(st.walls).get(wallId),
         interiorSide(wall, st.walls, st.rooms),
       );
       set({ fixtures: [...st.fixtures, f], dirty: true });
@@ -688,7 +688,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       if (!f || !wall) return;
       // Un appareil ne peut pas sortir de son mur : ses cotes sont bornées à
       // la face, demi-plaque comprise, et à la hauteur sous plafond.
-      const face = wallFace(wall, wallQuads(st.walls).get(wall.id), f.side);
+      const face = wallFace(wall, wallQuadsOf(st.walls).get(wall.id), f.side);
       const spec = FIXTURES[f.kind];
       const hw = Math.min(spec.w / 2, face.len / 2);
       const hh = Math.min(spec.h / 2, wall.height / 2);

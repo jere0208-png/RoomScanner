@@ -425,6 +425,126 @@ export function fixtureDims(
   return { left: x, right: face.len - x, height: f.height };
 }
 
+
+/**
+ * Symboles de plan.
+ *
+ * Un rond de couleur avec deux lettres dedans n'est pas un plan
+ * d'électricité : personne du métier ne le lit. Les symboles ci-dessous
+ * suivent les conventions habituelles des schémas d'installation — celles de
+ * la série NF EN 60617, à laquelle renvoient les plans NF C 15-100 : le socle
+ * de prise est un demi-cercle barré de son diamètre avec une tige vers le
+ * mur, l'interrupteur un point posé au mur avec sa manette, le point
+ * lumineux un cercle croisé. Ce sont des symboles dessinés à la main d'après
+ * ces conventions, pas une reproduction certifiée de la norme.
+ *
+ * Repère local : centré sur (0, 0), rayon utile 11, **+y vers le mur**. Le
+ * plan tourne ensuite le symbole pour qu'il regarde sa face.
+ */
+export interface SymbolStroke {
+  d: string;
+  /** Tracé plein (le point d'un interrupteur, par exemple). */
+  fill?: boolean;
+}
+
+const SOCLE: SymbolStroke[] = [
+  { d: 'M-8 2 H8' },
+  { d: 'M-8 2 A8 8 0 0 1 8 2' },
+  { d: 'M0 2 V10' },
+];
+
+const POINT_MUR: SymbolStroke = {
+  d: 'M0 8 m-2.4 0 a2.4 2.4 0 1 0 4.8 0 a2.4 2.4 0 1 0 -4.8 0',
+  fill: true,
+};
+
+const MANETTE: SymbolStroke[] = [
+  POINT_MUR,
+  { d: 'M0 8 L6 -4' },
+  { d: 'M2.6 -5.6 L9.6 -2.2' },
+];
+
+export const FIXTURE_SYMBOL: Record<FixtureKind, SymbolStroke[]> = {
+  prise: SOCLE,
+  prise2: [...SOCLE, { d: 'M-4.5 2 A4.5 4.5 0 0 1 4.5 2' }],
+  prise20: SOCLE,
+  prise32: SOCLE,
+  inter: MANETTE,
+  va: [...MANETTE, { d: 'M1.2 -8.4 L8.2 -5' }],
+  poussoir: [POINT_MUR, { d: 'M0 8 V-4' }, { d: 'M-5 -4 H5' }],
+  variateur: [
+    ...MANETTE,
+    { d: 'M-9 -1 L-2.5 -6.5' },
+    { d: 'M-9 -1 l3.4 0.5' },
+    { d: 'M-9 -1 l0.5 -3.4' },
+  ],
+  rj45: SOCLE,
+  tv: SOCLE,
+  applique: [
+    { d: 'M-6 -2 a6 6 0 1 0 12 0 a6 6 0 1 0 -12 0' },
+    { d: 'M-4.2 -6.2 L4.2 2.2' },
+    { d: 'M4.2 -6.2 L-4.2 2.2' },
+    { d: 'M0 4 V9' },
+    { d: 'M-7 9.5 H7' },
+  ],
+  tableau: [
+    { d: 'M-9 -7 H9 V7 H-9 Z' },
+    { d: 'M-4 7 L2 -7' },
+    { d: 'M1 7 L7 -7' },
+  ],
+  thermostat: [
+    { d: 'M-6 0 a6 6 0 1 0 12 0 a6 6 0 1 0 -12 0' },
+    { d: 'M-4 0 H4' },
+  ],
+  sortieCable: [
+    { d: 'M0 4 m-3 0 a3 3 0 1 0 6 0 a3 3 0 1 0 -6 0', fill: true },
+    { d: 'M0 1 V-8' },
+    { d: 'M-4 -8 H4' },
+  ],
+  boite: [
+    { d: 'M-6 0 a6 6 0 1 0 12 0 a6 6 0 1 0 -12 0' },
+    { d: 'M0 -6 V-10' },
+    { d: 'M0 6 V10' },
+    { d: 'M-6 0 H-10' },
+    { d: 'M6 0 H10' },
+  ],
+};
+
+/**
+ * Mention portée à côté du symbole quand le dessin seul ne suffit pas : le
+ * socle d'une prise 20 A est le même que celui d'une 16 A, seule
+ * l'intensité change, et un plan l'écrit.
+ */
+export const FIXTURE_TAG: Partial<Record<FixtureKind, string>> = {
+  prise20: '20A',
+  prise32: '32A',
+  rj45: 'RJ',
+  tv: 'TV',
+};
+
+/**
+ * Rang d'empilement des appareils qui tombent au même point du plan.
+ *
+ * Vu de dessus, une prise à 25 cm et un interrupteur à 1,10 m sur le même
+ * point de mur se superposent EXACTEMENT : on n'en voyait qu'un, et le plan
+ * mentait. Ils s'échelonnent donc le long de leur filet de rappel, du mur
+ * vers l'intérieur de la pièce, dans l'ordre où ils ont été posés.
+ */
+export function stackRanks(
+  items: { id: string; wallId: string; side: 1 | -1; x: number }[],
+): Map<string, number> {
+  const seen = new Map<string, number>();
+  const out = new Map<string, number>();
+  for (const it of items) {
+    // Seau de 12 cm : deux appareils plus proches que ça se gêneraient.
+    const key = `${it.wallId}|${it.side}|${Math.round(it.x / 0.12)}`;
+    const n = seen.get(key) ?? 0;
+    seen.set(key, n + 1);
+    out.set(it.id, n);
+  }
+  return out;
+}
+
 /** Nombre d'appareils par pièce et par type, pour le récapitulatif. */
 export function countByKind(fixtures: Fixture[]): [FixtureKind, number][] {
   const n = new Map<FixtureKind, number>();

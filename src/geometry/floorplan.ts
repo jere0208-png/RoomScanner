@@ -377,6 +377,26 @@ export function wallQuads(walls: WallSeg[], t = WALL_T): Map<string, WallQuad> {
 }
 
 /** Contour fermé d'un corps de mur, dans l'ordre de tracé. */
+/**
+ * `wallQuads` mémoïsé sur l'IDENTITÉ du tableau de murs.
+ *
+ * Glisser une prise redemande les onglets à chaque image, et le store n'a
+ * pas de `useMemo`. Les listes de murs étant remplacées et jamais modifiées
+ * en place, comparer les références suffit — et une seule entrée suffit
+ * aussi : on travaille toujours sur le plan courant.
+ */
+let quadMemo: { walls: WallSeg[]; t: number; map: Map<string, WallQuad> } | null =
+  null;
+export function wallQuadsOf(
+  walls: WallSeg[],
+  t = WALL_T,
+): Map<string, WallQuad> {
+  if (quadMemo && quadMemo.walls === walls && quadMemo.t === t) return quadMemo.map;
+  const map = wallQuads(walls, t);
+  quadMemo = { walls, t, map };
+  return map;
+}
+
 export function quadPoints(q: WallQuad): Pt[] {
   return [q.a1, q.b1, q.b2, q.a2];
 }

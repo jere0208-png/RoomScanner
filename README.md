@@ -152,6 +152,15 @@ Les intitulés, eux, ont gagné en contraste : titres plus grands et resserrés
 (`letterSpacing` négatif), légendes plus petites en capitales espacées. Un
 titre serré se lit comme un titre ; espacé, comme une étiquette.
 
+### Sortir d'une sélection
+
+Toucher le vide désélectionne. La surface qui reçoit cet appui est posée tout
+au fond du dessin : murs, meubles et cartouches gardent la priorité, et seul
+ce qui n'appartient à rien tombe dessus. Elle est peinte en `transparent` et
+non en `none` — une surface sans couleur n'est pas touchable en SVG. Le voile
+d'estompage, lui, laisse passer les appuis (`pointerEvents="none"`) : sans
+ça, il aurait avalé le geste qu'il est censé inviter à faire.
+
 ### Diagnostic du plan
 
 L'app sait tout corriger — supprimer un mur, en ajouter un, redresser,
@@ -313,6 +322,32 @@ Deux appareils dos à dos figurent d'ailleurs sur la planche de référence : le
 cas où deux volumes distants de 14 cm doivent se masquer proprement est
 exactement celui qui casse.
 
+**Les symboles sont ceux d'un plan d'électricité**, pas des pastilles à
+initiales : socle de prise en demi-cercle barré de son diamètre avec sa tige
+vers le mur, interrupteur en point posé au mur avec sa manette, point lumineux
+en cercle croisé, tableau en rectangle hachuré. Ils suivent les conventions
+habituelles des schémas d'installation — celles de la série NF EN 60617, à
+laquelle renvoient les plans NF C 15-100. Ce sont des tracés faits d'après ces
+conventions, pas une reproduction certifiée. Deux socles identiques se
+distinguent par la mention portée à côté (20 A, 32 A, RJ, TV), comme sur un
+vrai plan. Chaque symbole est tourné pour regarder SA face : sa tige rejoint
+le mur, ce qui reste vrai quand on fait pivoter le plan.
+
+**Deux appareils au même point s'échelonnent.** Vu de dessus, une prise à
+25 cm et un interrupteur à 1,10 m tombent EXACTEMENT l'un sur l'autre : on
+n'en voyait qu'un, et le plan mentait. `stackRanks()` les range par seau de
+12 cm et les décale le long de leur filet de rappel, du mur vers l'intérieur
+de la pièce, dans l'ordre où ils ont été posés.
+
+**En 3D, un repère de taille fixe.** Le volume posé sur le mur fait 8 cm : à
+l'échelle d'un logement entier, c'est deux pixels — l'appareil existait mais
+ne se voyait pas. Le même symbole est donc posé par-dessus, à taille
+constante quel que soit le zoom, et masqué dès que sa face tourne le dos à la
+caméra. **En s'approchant** (au-delà de 90 px par mètre), il déplie ses deux
+cotes : hauteur d'axe et distance au bord gauche de la face. C'est là qu'on
+vient les lire, et nulle part ailleurs — les afficher en permanence noierait
+le modèle.
+
 **Limite** : tout s'accroche à un mur. Les points de plafond — DCL, spots,
 détecteur de fumée — n'ont pas de support dans ce modèle et ne sont pas
 proposés.
@@ -323,6 +358,12 @@ Toutes se ferment **en touchant à côté** — le voile sombre est l'échappato
 attendue sur mobile ; sans elle, on cherche le bouton « Fermer ». Le contenu
 absorbe l'appui pour ne pas se refermer sous les doigts, et le bouton retour
 d'Android ferme lui aussi (`onRequestClose`).
+
+Du coup, **plus de bouton de sortie sous le dernier choix** dans les fenêtres
+qui ne font que proposer une liste. Il faisait doublon avec le voile, et posé
+sous une liste il se lisait comme un choix de plus — un bouton pâle et bas,
+dont on ne savait pas s'il validait ou annulait. Les fenêtres qui portent une
+vraie alternative (renommer / annuler) gardent la leur.
 
 ### La barre d'outils
 
@@ -335,10 +376,16 @@ cèdent la place aux outils (diagnostic, appareillage, annuler, ⋮) et les
 réglages d'affichage restent tels qu'on les avait laissés. La vue 3D, qui ne
 s'édite pas, ne porte que des calques.
 
-Le **⋮** ne garde donc que des outils : tracer un mur, redresser, redétecter
-les pièces, revenir à la dernière sauvegarde. Chaque entrée porte son
-intitulé et une ligne d'explication, ce qu'une pastille seule ne peut pas
-dire.
+**Le bouton d'édition ne défile pas.** C'est le seul qu'on cherche toujours,
+et c'est lui qui commande le contenu de la barre : il reste à demeure en haut
+à droite, aligné sur la rangée, et les outils défilent derrière lui.
+
+**Le tiroir ⋮ a disparu.** Ranger un outil derrière deux appuis, c'est le
+rendre introuvable ; en édition, tracer un mur, redresser, redétecter et
+revenir à la sauvegarde sont désormais des pastilles comme les autres. La
+dernière ne paraît que s'il y a quelque chose à abandonner, et demande
+confirmation — sans la ligne d'explication qu'elle avait dans le tiroir, une
+pastille seule ne peut pas prévenir qu'elle jette le travail en cours.
 
 **Les pastilles rentrent dans le bouton d'édition et en ressortent.** C'est
 lui qui commande le changement : autant qu'on le voie. Chacune file vers lui
@@ -577,7 +624,7 @@ passe inaperçu jusqu'à la CI. C'est arrivé une fois.
 ## Vérifications faites sur cette machine (Windows)
 
 - `npx tsc --noEmit` et `npx eslint src App.tsx` : aucun diagnostic.
-- `npx jest` : 150/150 tests verts (conversion matrice iOS→segment, extrémités
+- `npx jest` : 152/152 tests verts (conversion matrice iOS→segment, extrémités
   Android, soudure des coins et jonctions en T, onglets des murs, surface au
   sol, semis de points, lecture des textures, snap angulaire, projection
   mètres↔pixels, génération du PDF ; **multi-pièces** : découpe par pièce,
@@ -607,7 +654,8 @@ passe inaperçu jusqu'à la CI. C'est arrivé une fois.
   devant le nu sans y entrer, gabarit et hauteur, faces arrière masquées,
   appareil orphelin qui ne dessine rien, bornage des cotes au mur,
   retournement sans glissement, mur supprimé qui emporte son appareillage,
-  annulation, scans d'avant l'électricité).
+  annulation, scans d'avant l'électricité, symboles distincts par type et
+  échelonnement des appareils superposés).
 - **Non vérifié ici** : la compilation Swift/Kotlin (impossible sans Mac /
   SDK Android). Les points d'attente connus sont notés ci-dessous.
 

@@ -118,7 +118,6 @@ export function ResultScreen() {
   const [checking, setChecking] = useState(false);
   // Choix du format d'export : plan PDF, modèle 3D, ou image de la vue.
   const [exporting, setExporting] = useState(false);
-  const [showMore, setShowMore] = useState(false);
   // Tracé d'un mur : on attend un premier appui (de préférence sur une
   // extrémité existante), puis un second qui pose l'autre bout.
   const [drawing, setDrawing] = useState(false);
@@ -538,7 +537,7 @@ export function ResultScreen() {
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            style={styles.planToolsScroll}
+            style={[styles.planToolsScroll, styles.planToolsRoom]}
             contentContainerStyle={styles.planTools}>
             {/* Deux barres, jamais mélangées.
                 En lecture, on ne fait que REGARDER : la barre ne porte que
@@ -567,14 +566,62 @@ export function ResultScreen() {
                   canUndo && (
                     <ToolPill key="undo" icon="undo" active={false} onPress={undo} />
                   ),
-                  // Les outils qu'on emploie rarement se rangent ici : la
-                  // barre doit rester lisible d'un coup d'œil.
                   <ToolPill
-                    key="more"
-                    icon="more"
-                    active={showMore}
-                    onPress={() => setShowMore(true)}
+                    key="addWall"
+                    icon="addWall"
+                    active={!!drawing}
+                    onPress={() => {
+                      setDrawing(true);
+                      setDraftFrom(null);
+                      setSelectedWallId(null);
+                      setSelectedObjectId(null);
+                      setSelectedRoomId(null);
+                    }}
                   />,
+                  <ToolPill
+                    key="square"
+                    icon="square"
+                    active={false}
+                    onPress={straightenPlan}
+                  />,
+                  <ToolPill
+                    key="rooms"
+                    icon="rooms"
+                    active={false}
+                    onPress={() => {
+                      redetectRooms();
+                      setSelectedRoomId(null);
+                    }}
+                  />,
+                  // Abandonner ses retouches ne s'annule pas : sous forme de
+                  // pastille, sans la ligne d'explication qu'avait le tiroir,
+                  // il faut le demander. Et la pastille ne paraît que s'il y
+                  // a quelque chose à abandonner.
+                  dirty && (
+                    <ToolPill
+                      key="reset"
+                      icon="reset"
+                      active={false}
+                      onPress={() =>
+                        Alert.alert(
+                          'Revenir à la dernière sauvegarde ?',
+                          'Toutes les retouches non enregistrées seront perdues.',
+                          [
+                            { text: 'Annuler', style: 'cancel' },
+                            {
+                              text: 'Revenir',
+                              style: 'destructive',
+                              onPress: () => {
+                                revertCurrent();
+                                setSelectedWallId(null);
+                                setSelectedObjectId(null);
+                              },
+                            },
+                          ],
+                        )
+                      }
+                    />
+                  ),
                 ]
               : [
                   <ToolPill
@@ -615,7 +662,6 @@ export function ResultScreen() {
                   {el}
                 </PillSlot>
               ))}
-            <ToolPill icon="edit" active={editMode} onPress={toggleEdit} />
           </ScrollView>
         ) : (
           <ScrollView
@@ -655,6 +701,16 @@ export function ResultScreen() {
               />
             )}
           </ScrollView>
+        )}
+
+        {/* Le bouton d'édition ne défile pas avec les autres : c'est le
+            seul qu'on cherche toujours, et il commande le contenu de la
+            barre. Il reste donc à demeure, en haut à droite, aligné sur la
+            rangée — les outils défilent DERRIÈRE lui, jamais dessous. */}
+        {tab === '2d' && (
+          <View style={styles.editAnchor}>
+            <ToolPill icon="edit" active={editMode} onPress={toggleEdit} />
+          </View>
         )}
 
         {/* Côtes du meuble sélectionné, en surimpression */}
@@ -940,93 +996,6 @@ export function ResultScreen() {
         </View>
       )}
 
-      {/* ---------- Outils secondaires ---------- */}
-      <Modal
-        visible={showMore}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowMore(false)}>
-        <Pressable style={styles.modalBackdrop} onPress={() => setShowMore(false)}>
-          <Pressable style={styles.modalCard} onPress={() => {}}>
-            <Text style={styles.modalTitle}>Outils</Text>
-            <Text style={styles.modalSubtitle}>
-              Ce qu'on n'emploie pas à chaque fois. Ce qui s'affiche ou non
-              se règle dans la barre, hors édition.
-            </Text>
-            {(
-              [
-                ...(editMode
-                  ? ([
-                      [
-                        'Tracer un mur',
-                        'Partir d’une extrémité et tirer jusqu’où finir.',
-                        drawing,
-                        () => {
-                          setShowMore(false);
-                          setDrawing(true);
-                          setDraftFrom(null);
-                          setSelectedWallId(null);
-                          setSelectedObjectId(null);
-                          setSelectedRoomId(null);
-                        },
-                      ],
-                      [
-                        'Redresser le plan',
-                        'Remet les murs d’équerre sur la trame du logement.',
-                        false,
-                        () => {
-                          setShowMore(false);
-                          straightenPlan();
-                        },
-                      ],
-                      [
-                        'Redétecter les pièces',
-                        'Relit le graphe des murs après vos retouches.',
-                        false,
-                        () => {
-                          setShowMore(false);
-                          redetectRooms();
-                          setSelectedRoomId(null);
-                        },
-                      ],
-                    ] as [string, string, boolean, () => void][])
-                  : []),
-                [
-                  'Revenir à la dernière sauvegarde',
-                  'Abandonne toutes les retouches non enregistrées.',
-                  false,
-                  () => {
-                    setShowMore(false);
-                    revertCurrent();
-                    setSelectedWallId(null);
-                    setSelectedObjectId(null);
-                  },
-                ],
-              ] as [string, string, boolean, () => void][]
-            ).map(([titre, detail, actif, action]) => (
-              <TouchableOpacity
-                key={titre}
-                style={[styles.exportChoice, actif && styles.exportChoiceOn]}
-                onPress={action}>
-                <Text
-                  style={[
-                    styles.exportChoiceTitle,
-                    actif && styles.exportChoiceTitleOn,
-                  ]}>
-                  {titre}
-                </Text>
-                <Text style={styles.exportChoiceDetail}>{detail}</Text>
-              </TouchableOpacity>
-            ))}
-            <TouchableOpacity
-              style={styles.modalGhost}
-              onPress={() => setShowMore(false)}>
-              <Text style={styles.modalGhostText}>Fermer</Text>
-            </TouchableOpacity>
-          </Pressable>
-        </Pressable>
-      </Modal>
-
       {/* ---------- Choix du format d'export ---------- */}
       <Modal
         visible={exporting}
@@ -1075,11 +1044,6 @@ export function ResultScreen() {
                 <Text style={styles.exportChoiceDetail}>{detail}</Text>
               </TouchableOpacity>
             ))}
-            <TouchableOpacity
-              style={styles.modalGhost}
-              onPress={() => setExporting(false)}>
-              <Text style={styles.modalGhostText}>Annuler</Text>
-            </TouchableOpacity>
           </Pressable>
         </Pressable>
       </Modal>
@@ -1119,11 +1083,6 @@ export function ResultScreen() {
                 </TouchableOpacity>
               ))}
             </ScrollView>
-            <TouchableOpacity
-              style={styles.modalGhost}
-              onPress={() => setChecking(false)}>
-              <Text style={styles.modalGhostText}>Fermer</Text>
-            </TouchableOpacity>
           </Pressable>
         </Pressable>
       </Modal>
@@ -1248,11 +1207,6 @@ export function ResultScreen() {
                       </View>
                     ))}
                   </ScrollView>
-                  <TouchableOpacity
-                    style={styles.modalGhost}
-                    onPress={() => setElecOpen(false)}>
-                    <Text style={styles.modalGhostText}>Annuler</Text>
-                  </TouchableOpacity>
                 </View>
               )}
             </Pressable>
@@ -1332,8 +1286,7 @@ type ToolIcon =
   | 'undo'
   | 'square'
   | 'check'
-  | 'plus'
-  | 'more';
+  | 'plus';
 
 /** Tracés 24×24 des icônes d'outils (trait simple, lisible en 18 px). */
 const TOOL_PATHS: Record<ToolIcon, { d: string; fill?: boolean }[]> = {
@@ -1377,12 +1330,6 @@ const TOOL_PATHS: Record<ToolIcon, { d: string; fill?: boolean }[]> = {
   ],
   // Le « + » de l'appareillage electrique.
   plus: [{ d: 'M12 5 v14' }, { d: 'M5 12 h14' }],
-  // Trois points : le tiroir des outils secondaires.
-  more: [
-    { d: 'M12 5.2 h0.01' },
-    { d: 'M12 12 h0.01' },
-    { d: 'M12 18.8 h0.01' },
-  ],
   // Loupe : ce que le plan a d'incertain.
   check: [
     { d: 'M11 3.5 a7.5 7.5 0 1 0 0 15 a7.5 7.5 0 1 0 0 -15 z' },
@@ -1482,7 +1429,7 @@ function Segment({ tab, onChange }: { tab: Tab; onChange: (t: Tab) => void }) {
 }
 
 /** Pas d'une pastille : sa largeur plus l'écart qui la suit. */
-const PILL_PITCH = 42;
+const PILL_PITCH = 44;
 
 /**
  * Créneau d'une pastille dans la barre.
@@ -1686,8 +1633,11 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     top: 10,
     left: 10,
     right: 10,
-    maxHeight: 40,
+    maxHeight: 42,
   },
+  // De la place pour le bouton d'édition, qui ne défile pas.
+  planToolsRoom: { right: 58 },
+  editAnchor: { position: 'absolute', top: 10, right: 10, zIndex: 4 },
   planTools: {
     flexDirection: 'row',
     alignItems: 'center',
