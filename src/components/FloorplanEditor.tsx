@@ -110,6 +110,29 @@ interface EffMapping {
 import { useScanStore } from '../store/scanStore';
 
 /**
+ * Distance d'un point à un mur, dans une direction donnée.
+ *
+ * Sert aux cotes de dégagement d'un meuble : on part du milieu de chacun de
+ * ses côtés, perpendiculairement, et on regarde ce qu'on rencontre. Rien
+ * dans cette direction : pas de cote, plutôt qu'une cote fausse.
+ */
+function castToWall(from: Pt, dir: Pt, walls: WallSeg[]): number | null {
+  let best = Infinity;
+  for (const w of walls) {
+    const ex = w.b.x - w.a.x;
+    const ez = w.b.z - w.a.z;
+    const den = dir.x * ez - dir.z * ex;
+    if (Math.abs(den) < 1e-9) continue;
+    const t = ((w.a.x - from.x) * ez - (w.a.z - from.z) * ex) / den;
+    const u = ((w.a.x - from.x) * dir.z - (w.a.z - from.z) * dir.x) / den;
+    if (t > 1e-3 && u >= -1e-6 && u <= 1 + 1e-6 && t < best) best = t;
+  }
+  // Jusqu'au NU du mur, pas jusqu'à son axe : c'est la cote qu'on relève
+  // sur place, mètre contre la plinthe.
+  return isFinite(best) ? Math.max(0, best - WALL_T / 2) : null;
+}
+
+/**
  * Empreinte d'un meuble, recalée contre les murs de SA pièce seulement :
  * la cloison de la pièce voisine ne doit pas le repousser.
  */
@@ -729,6 +752,95 @@ export function FloorplanEditor({
                 })}
               </G>
             )}
+
+            {/* Dégagements du meuble sélectionné : ce qui le sépare des
+                murs, sur ses quatre côtés. Les cotes LONGENT le meuble —
+                elles partent du milieu de chaque côté, perpendiculairement,
+                et tournent avec lui puisqu'elles sont calculées dans le
+                monde, pas à l'écran. */}
+            {selectedObjectId &&
+              (() => {
+                const o = allObjects.find((x) => x.id === selectedObjectId);
+                if (!o) return null;
+                const f = footprintOf(o, partOf);
+                const murs = partOf.get(roomOf(o))?.walls ?? walls;
+                const cos = Math.cos(f.yaw);
+                const sin = Math.sin(f.yaw);
+                // Les quatre normales sortantes, dans le repère du meuble.
+                const cotes = [
+                  { d: { x: cos, z: sin }, demi: f.width / 2 },
+                  { d: { x: -cos, z: -sin }, demi: f.width / 2 },
+                  { d: { x: -sin, z: cos }, demi: f.depth / 2 },
+                  { d: { x: sin, z: -cos }, demi: f.depth / 2 },
+                ];
+                return (
+                  <G>
+                    {cotes.map(({ d, demi }, ci) => {
+                      const from = {
+                        x: f.cx + d.x * demi,
+                        z: f.cz + d.z * demi,
+                      };
+                      const gap = castToWall(from, d, murs);
+                      // Ni collé, ni à l'autre bout du logement : au-delà de
+                      // 4 m, ce n'est plus un dégagement, c'est du vide.
+                      if (gap === null || gap < 0.02 || gap > 4) return null;
+                      const to = {
+                        x: from.x + d.x * gap,
+                        z: from.z + d.z * gap,
+                      };
+                      const A = mapping.toPx(from);
+                      const B = mapping.toPx(to);
+                      const len = Math.hypot(B.x - A.x, B.y - A.y);
+                      if (len < 18) return null;
+                      let angle =
+                        (Math.atan2(B.y - A.y, B.x - A.x) * 180) / Math.PI;
+                      if (angle > 90) angle -= 180;
+                      if (angle < -90) angle += 180;
+                      const mx = (A.x + B.x) / 2;
+                      const my = (A.y + B.y) / 2;
+                      const texte =
+                        gap < 1
+                          ? `${Math.round(gap * 100)}`
+                          : gap.toFixed(2).replace('.', ',');
+                      return (
+                        <G key={ci}>
+                          <Line
+                            x1={A.x}
+                            y1={A.y}
+                            x2={B.x}
+                            y2={B.y}
+                            stroke={c.blue}
+                            strokeWidth={1}
+                            strokeDasharray="3 3"
+                          />
+                          <Circle cx={A.x} cy={A.y} r={2} fill={c.blue} />
+                          <Circle cx={B.x} cy={B.y} r={2} fill={c.blue} />
+                          <Rect
+                            x={mx - (texte.length * 3.6 + 7)}
+                            y={my - 8}
+                            width={texte.length * 7.2 + 14}
+                            height={16}
+                            rx={5}
+                            fill={c.surface}
+                            opacity={0.94}
+                            transform={`rotate(${angle}, ${mx}, ${my})`}
+                          />
+                          <SvgText
+                            x={mx}
+                            y={my + 3.5}
+                            fill={c.blue}
+                            fontSize={10}
+                            fontWeight="800"
+                            textAnchor="middle"
+                            transform={`rotate(${angle}, ${mx}, ${my})`}>
+                            {texte}
+                          </SvgText>
+                        </G>
+                      );
+                    })}
+                  </G>
+                );
+              })()}
 
             {/* Cotes de détail : retour de mur, baie, retour de mur. Elles
                 n'apparaissent qu'une fois le plan assez zoomé pour les lire. */}
