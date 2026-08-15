@@ -77,7 +77,8 @@ export function ResultScreen() {
   const styles = getStyles(useTheme());
 
   const [tab, setTab] = useState<Tab>('2d');
-  const [showMeasures, setShowMeasures] = useState(true);
+  // Cotes du plan 2D masquées par défaut : la pastille « Cotes » les active.
+  const [showMeasures, setShowMeasures] = useState(false);
   const [show3DMeasures, setShow3DMeasures] = useState(true);
   const [editMode, setEditMode] = useState(false);
   const [selectedWallId, setSelectedWallId] = useState<string | null>(null);
