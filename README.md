@@ -127,6 +127,24 @@ la pièce et bornées au cadre : jamais sur le mur, jamais hors de l'écran. La
 barre du bas, qui débordait dès que le clavier montait, a disparu ; seule la
 saisie de la cote subsiste, en haut du plan.
 
+### Redresser le plan
+
+Un scan LiDAR ne donne jamais un angle droit exact : on récolte des coins à
+89,2° et des cotes comme 3,93 m. Le logement a pourtant été bâti d'équerre.
+`straightenWalls()` le remet d'aplomb **sur sa propre trame** — pas sur les
+axes de l'écran, qui n'ont aucun sens ici : l'origine du repère dépend de
+l'endroit où le scan a commencé.
+
+On ne redresse pas les murs un par un : cela ouvrirait les coins. **On aligne
+les nœuds.** Après avoir trouvé la trame dominante (moyenne des directions
+pondérée par les longueurs, de période 90° — un mur et son perpendiculaire
+votent donc pour la même trame), tout mur assez proche de l'horizontale de
+cette trame impose à ses deux extrémités la même ordonnée ; tout mur proche
+de la verticale, la même abscisse. Chaque groupe de coordonnées liées prend
+sa moyenne. Les coins restent soudés au point près, la boucle reste fermée,
+la surface bouge de moins de 1 %, et un pan coupé franc — au-delà de 8° —
+n'est pas touché.
+
 ### Retoucher les murs, et annuler
 
 Ajouter un mur (posé au centre du plan, à déplacer par ses poignées),
@@ -370,7 +388,7 @@ passe inaperçu jusqu'à la CI. C'est arrivé une fois.
 ## Vérifications faites sur cette machine (Windows)
 
 - `npx tsc --noEmit` et `npx eslint src App.tsx` : aucun diagnostic.
-- `npx jest` : 110/110 tests verts (conversion matrice iOS→segment, extrémités
+- `npx jest` : 116/116 tests verts (conversion matrice iOS→segment, extrémités
   Android, soudure des coins et jonctions en T, onglets des murs, surface au
   sol, semis de points, lecture des textures, snap angulaire, projection
   mètres↔pixels, génération du PDF ; **multi-pièces** : découpe par pièce,

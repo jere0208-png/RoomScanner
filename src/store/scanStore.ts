@@ -19,6 +19,7 @@ import {
   segLength,
   snapAngle,
   splitAtJunctions,
+  straightenWalls,
   toSegment,
   weldCorners,
   type Pt,
@@ -249,6 +250,8 @@ interface ScanState {
   splitRoom: (roomId: string) => void;
   /** Relit le graphe des murs et refait la liste des pièces. */
   redetectRooms: () => void;
+  /** Redresse le plan sur sa propre trame : les angles redeviennent droits. */
+  straightenPlan: () => void;
   /** Hauteur sous plafond d'une pièce (applique à tous ses murs). */
   setRoomHeight: (roomId: string, height: number) => void;
   /** Retire un mur du plan (et les ouvertures qu'il portait). */
@@ -513,6 +516,15 @@ export const useScanStore = create<ScanState>((set, get) => {
         yCenter: h / 2,
       };
       set({ walls: [...st.walls, wall], dirty: true });
+      get().redetectRooms();
+    },
+
+    straightenPlan: () => {
+      const st = get();
+      // Même clé que la redétection qui suit : les deux ne comptent que pour
+      // une annulation, l'utilisateur n'a fait qu'un geste.
+      pushHistory('redetect');
+      set({ walls: straightenWalls(st.walls), dirty: true });
       get().redetectRooms();
     },
 

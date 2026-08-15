@@ -813,6 +813,147 @@ export function weldCorners(walls: WallSeg[], tol = 0.15): WallSeg[] {
   return out;
 }
 
+// ------------------------------------------------- redressement du plan
+
+/** Direction dominante du plan, en radians dans [0, π/2). */
+function dominantAngle(walls: WallSeg[]): number {
+  let sx = 0;
+  let sy = 0;
+  for (const w of walls) {
+    const len = segLength(w);
+    if (len < 0.2) continue;
+    const a = Math.atan2(w.b.z - w.a.z, w.b.x - w.a.x);
+    // Période de 90° : on quadruple l'angle pour en faire un tour complet,
+    // on moyenne les vecteurs, puis on revient. Un mur et son perpendiculaire
+    // votent ainsi pour la MÊME trame.
+    sx += len * Math.cos(4 * a);
+    sy += len * Math.sin(4 * a);
+  }
+  if (sx === 0 && sy === 0) return 0;
+  let t = Math.atan2(sy, sx) / 4;
+  const q = Math.PI / 2;
+  while (t < 0) t += q;
+  while (t >= q) t -= q;
+  return t;
+}
+
+/** Union-find minimal sur des clés de nœud. */
+function makeUnion() {
+  const parent = new Map<string, string>();
+  const find = (k: string): string => {
+    let r = parent.get(k) ?? k;
+    if (r !== k) {
+      r = find(r);
+      parent.set(k, r);
+    }
+    return r;
+  };
+  return {
+    find,
+    union: (a: string, b: string) => {
+      const ra = find(a);
+      const rb = find(b);
+      if (ra !== rb) parent.set(ra, rb);
+    },
+  };
+}
+
+/**
+ * Redresse le plan sur sa propre trame.
+ *
+ * Un scan LiDAR ne donne jamais un angle droit exact : on récolte des coins à
+ * 89,2° et des cotes comme 3,93 m. Le plan a pourtant été bâti d'équerre, et
+ * c'est ce qu'attend l'œil — comme le devis qui en découlera.
+ *
+ * On ne touche PAS aux murs un par un : les redresser séparément ouvrirait
+ * les coins. On aligne les NŒUDS. Après avoir trouvé la trame dominante du
+ * logement (moyenne des directions, pondérée par les longueurs, de période
+ * 90°), tout mur assez proche de l'horizontale de cette trame impose à ses
+ * deux extrémités la même ordonnée ; tout mur proche de la verticale, la même
+ * abscisse. Chaque groupe de coordonnées ainsi liées prend sa moyenne. Les
+ * coins restent donc exactement soudés, la boucle reste fermée, et les murs
+ * franchement obliques — un pan coupé, une baie en biais — ne bougent pas.
+ */
+export function straightenWalls(
+  walls: WallSeg[],
+  toleranceDeg = 8,
+): WallSeg[] {
+  if (walls.length === 0) return walls;
+  const theta = dominantAngle(walls);
+  const cos = Math.cos(-theta);
+  const sin = Math.sin(-theta);
+  const fwd = (p: Pt): Pt => ({
+    x: p.x * cos - p.z * sin,
+    z: p.x * sin + p.z * cos,
+  });
+  const back = (p: Pt): Pt => ({
+    x: p.x * cos + p.z * sin,
+    z: -p.x * sin + p.z * cos,
+  });
+
+  // Coordonnées de chaque nœud, dans la trame du logement.
+  const nodes = new Map<string, Pt>();
+  const keyOf = (p: Pt) => nodeKey(p);
+  for (const w of walls) {
+    for (const end of ['a', 'b'] as const) {
+      nodes.set(keyOf(w[end]), fwd(w[end]));
+    }
+  }
+
+  const ux = makeUnion();
+  const uz = makeUnion();
+  const tol = (toleranceDeg * Math.PI) / 180;
+  for (const w of walls) {
+    const ka = keyOf(w.a);
+    const kb = keyOf(w.b);
+    const A = nodes.get(ka)!;
+    const B = nodes.get(kb)!;
+    const dx = B.x - A.x;
+    const dz = B.z - A.z;
+    if (Math.hypot(dx, dz) < 1e-6) continue;
+    const ang = Math.atan2(dz, dx);
+    const nearAxis = (target: number) => {
+      const d = Math.abs(((ang - target + Math.PI) % Math.PI) - 0);
+      return Math.min(d, Math.PI - d) < tol;
+    };
+    if (nearAxis(0)) uz.union(ka, kb); // horizontal : même z
+    else if (nearAxis(Math.PI / 2)) ux.union(ka, kb); // vertical : même x
+  }
+
+  // Chaque groupe de coordonnées liées prend sa moyenne.
+  const avg = (
+    u: ReturnType<typeof makeUnion>,
+    pick: (p: Pt) => number,
+  ): Map<string, number> => {
+    const sums = new Map<string, { s: number; n: number }>();
+    for (const [k, p] of nodes) {
+      const r = u.find(k);
+      const cur = sums.get(r) ?? { s: 0, n: 0 };
+      cur.s += pick(p);
+      cur.n += 1;
+      sums.set(r, cur);
+    }
+    const out = new Map<string, number>();
+    for (const [k] of nodes) {
+      const r = sums.get(u.find(k))!;
+      out.set(k, r.s / r.n);
+    }
+    return out;
+  };
+  const xs = avg(ux, (p) => p.x);
+  const zs = avg(uz, (p) => p.z);
+
+  const moved = new Map<string, Pt>();
+  for (const [k] of nodes) {
+    moved.set(k, back({ x: xs.get(k)!, z: zs.get(k)! }));
+  }
+  return walls.map((w) => ({
+    ...w,
+    a: moved.get(keyOf(w.a)) ?? w.a,
+    b: moved.get(keyOf(w.b)) ?? w.b,
+  }));
+}
+
 // --------------------------------------- découpe aux jonctions en T
 
 /** Portion [u0, u1] d'une grille de couleurs, colonnes ré-échantillonnées. */

@@ -15,6 +15,7 @@ import {
   segLength,
   snapAngle,
   splitAtJunctions,
+  straightenWalls,
   toFootprint,
   toSegment,
   totalArea,
@@ -601,6 +602,86 @@ describe('detectRooms', () => {
     ]);
     expect(found).toHaveLength(2);
     expect(found.map((r) => Math.round(r.area))).toEqual([12, 9]);
+  });
+});
+
+describe('straightenWalls', () => {
+  /** Plus grand écart à l'équerre ENTRE les murs — la propriété qui compte. */
+  const equerrage = (ws: WallSeg[]) => {
+    const d0 = Math.atan2(ws[0].b.z - ws[0].a.z, ws[0].b.x - ws[0].a.x);
+    return Math.max(
+      ...ws.map((w) => {
+        const d =
+          ((Math.atan2(w.b.z - w.a.z, w.b.x - w.a.x) - d0) * 180) / Math.PI;
+        const m = ((d % 90) + 90) % 90;
+        return Math.min(m, 90 - m);
+      }),
+    );
+  };
+  /** Rectangle « scanné » : coins de travers, comme le LiDAR les rend. */
+  const bancal = weldCorners([
+    seg('n', { x: 0, z: 0 }, { x: 4.03, z: -0.14 }),
+    seg('e', { x: 4.03, z: -0.14 }, { x: 4.2, z: 2.96 }),
+    seg('s', { x: 4.2, z: 2.96 }, { x: 0.06, z: 3.05 }),
+    seg('w', { x: 0.06, z: 3.05 }, { x: 0, z: 0 }),
+  ]);
+
+  it('remet les murs d’équerre entre eux', () => {
+    expect(equerrage(bancal)).toBeGreaterThan(1);
+    expect(equerrage(straightenWalls(bancal))).toBeLessThan(0.01);
+  });
+
+  it('ne rouvre aucun coin : la boucle reste fermée', () => {
+    // Redresser les murs UN PAR UN ouvrirait les angles ; on aligne les
+    // nœuds, donc les extrémités soudées le restent.
+    const droit = straightenWalls(bancal);
+    expect(closedLoop(droit)).not.toBeNull();
+    expect(roomSurface(droit)?.exact).toBe(true);
+  });
+
+  it('conserve la surface à quelques pour cent près', () => {
+    const avant = roomSurface(bancal)!.area;
+    const apres = roomSurface(straightenWalls(bancal))!.area;
+    expect(Math.abs(apres - avant) / avant).toBeLessThan(0.03);
+  });
+
+  it('trouve la trame du logement, même sur un plan de biais', () => {
+    const t = (30 * Math.PI) / 180;
+    const c = Math.cos(t);
+    const s2 = Math.sin(t);
+    const tourne = weldCorners(
+      bancal.map((w) => ({
+        ...w,
+        a: { x: w.a.x * c - w.a.z * s2, z: w.a.x * s2 + w.a.z * c },
+        b: { x: w.b.x * c - w.b.z * s2, z: w.b.x * s2 + w.b.z * c },
+      })),
+    );
+    expect(equerrage(straightenWalls(tourne))).toBeLessThan(0.01);
+  });
+
+  it('laisse un pan coupé en biais', () => {
+    const avecPan = weldCorners([
+      seg('n', { x: 0, z: 0 }, { x: 4, z: 0 }),
+      seg('pan', { x: 4, z: 0 }, { x: 5.5, z: 1.5 }),
+      seg('e', { x: 5.5, z: 1.5 }, { x: 5.5, z: 3 }),
+      seg('s', { x: 5.5, z: 3 }, { x: 0, z: 3 }),
+      seg('w', { x: 0, z: 3 }, { x: 0, z: 0 }),
+    ]);
+    const pan = straightenWalls(avecPan).find((w) => w.id === 'pan')!;
+    const a = Math.abs(
+      (Math.atan2(pan.b.z - pan.a.z, pan.b.x - pan.a.x) * 180) / Math.PI,
+    );
+    expect(a).toBeGreaterThan(30);
+    expect(a).toBeLessThan(60);
+  });
+
+  it('ne touche pas à un plan déjà droit', () => {
+    const parfait = weldCorners(room('p', 0, 0, 4, 3));
+    const idem = straightenWalls(parfait);
+    for (let i = 0; i < parfait.length; i++) {
+      expect(idem[i].a.x).toBeCloseTo(parfait[i].a.x, 9);
+      expect(idem[i].a.z).toBeCloseTo(parfait[i].a.z, 9);
+    }
   });
 });
 

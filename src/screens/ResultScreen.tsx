@@ -74,6 +74,7 @@ export function ResultScreen() {
   const mergeRooms = useScanStore((s) => s.mergeRooms);
   const splitRoom = useScanStore((s) => s.splitRoom);
   const redetectRooms = useScanStore((s) => s.redetectRooms);
+  const straightenPlan = useScanStore((s) => s.straightenPlan);
   const removeWall = useScanStore((s) => s.removeWall);
   const addWall = useScanStore((s) => s.addWall);
   const undo = useScanStore((s) => s.undo);
@@ -436,6 +437,9 @@ export function ResultScreen() {
                   setSelectedRoomId(null);
                 }}
               />
+            )}
+            {editMode && (
+              <ToolPill icon="square" active={false} onPress={straightenPlan} />
             )}
             {editMode && (
               <ToolPill icon="addWall" active={false} onPress={addWall} />
@@ -877,7 +881,8 @@ type ToolIcon =
   | 'top'
   | 'rooms'
   | 'addWall'
-  | 'undo';
+  | 'undo'
+  | 'square';
 
 /** Tracés 24×24 des icônes d'outils (trait simple, lisible en 18 px). */
 const TOOL_PATHS: Record<ToolIcon, { d: string; fill?: boolean }[]> = {
@@ -918,6 +923,12 @@ const TOOL_PATHS: Record<ToolIcon, { d: string; fill?: boolean }[]> = {
   model: [
     { d: 'M12 3.2 l7.8 4.4 v8.8 L12 20.8 l-7.8 -4.4 V7.6 z' },
     { d: 'M12 12 l7.8 -4.4 M12 12 L4.2 7.6 M12 12 v8.8' },
+  ],
+  // Équerre de dessinateur : le geste de remettre le plan d'aplomb.
+  square: [
+    { d: 'M4 4.5 v15 h15' },
+    { d: 'M4 19.5 L19 4.5' },
+    { d: 'M8.5 15 h3 v3' },
   ],
   addWall: [
     { d: 'M3.5 15 h17' },
