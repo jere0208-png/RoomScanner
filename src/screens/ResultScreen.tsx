@@ -25,6 +25,7 @@ import {
   type Palette,
 } from '../theme';
 import { FloorplanEditor } from '../components/FloorplanEditor';
+import { LogoMark } from '../components/LogoMark';
 import { Iso3DView } from '../components/Iso3DView';
 import { closedLoop, loopAreaM2, segLength } from '../geometry/floorplan';
 import { frCategory } from '../geometry/furniture';
@@ -80,16 +81,22 @@ export function ResultScreen() {
     });
   };
 
-  /** Capture la vue affichée (2D ou 3D) en PNG et ouvre le partage. */
+  /** Capture la vue affichée (2D ou 3D) en PNG — avec watermark EchoPlan —
+   *  et ouvre le partage. Le watermark n'apparaît que sur l'image. */
+  const [capturing, setCapturing] = useState(false);
   const shareImage = async () => {
     try {
+      setCapturing(true);
+      await new Promise<void>((r) => setTimeout(() => r(), 60)); // rendu du watermark
       const uri = await captureRef(canvasRef, {
         format: 'png',
         quality: 1,
         result: 'tmpfile',
       });
+      setCapturing(false);
       await RoomScan.shareFile(uri);
     } catch (e: any) {
+      setCapturing(false);
       Alert.alert('Capture impossible', e?.message ?? 'Erreur inconnue');
     }
   };
@@ -266,6 +273,16 @@ export function ResultScreen() {
                 <Text style={styles.applyText}>Appliquer</Text>
               </TouchableOpacity>
             </View>
+          </View>
+        )}
+
+        {/* Watermark EchoPlan, visible uniquement sur les images générées */}
+        {capturing && (
+          <View style={styles.watermark} pointerEvents="none">
+            <LogoMark size={22} />
+            <Text style={styles.watermarkText}>
+              Echo<Text style={styles.watermarkAccent}>Plan</Text>
+            </Text>
           </View>
         )}
 
@@ -595,6 +612,20 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     bottom: 0,
     backgroundColor: c.bg,
   },
+  watermark: {
+    position: 'absolute',
+    bottom: 10,
+    right: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.88)',
+    borderRadius: 9,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    gap: 6,
+  },
+  watermarkText: { color: '#0B0D12', fontSize: 13, fontWeight: '800' },
+  watermarkAccent: { color: c.blue },
   saveFab: {
     position: 'absolute',
     bottom: 12,
