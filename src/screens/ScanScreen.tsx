@@ -94,7 +94,33 @@ export function ScanScreen() {
         <TouchableOpacity
           style={styles.pauseButton}
           onPress={paused ? resume : pause}>
-          <Text style={styles.pauseIcon}>{paused ? '▶' : '❙❙'}</Text>
+          {/* Icône dessinée : même hauteur (18) que l'éclair et la croix. */}
+          <Svg width={18} height={18} viewBox="0 0 24 24">
+            {paused ? (
+              <Path
+                d="M8 4.5 L19.5 12 L8 19.5 z"
+                fill="#F4F6FA"
+                stroke="#F4F6FA"
+                strokeWidth={2}
+                strokeLinejoin="round"
+              />
+            ) : (
+              <>
+                <Path
+                  d="M8.5 5 v14"
+                  stroke="#F4F6FA"
+                  strokeWidth={4}
+                  strokeLinecap="round"
+                />
+                <Path
+                  d="M15.5 5 v14"
+                  stroke="#F4F6FA"
+                  strokeWidth={4}
+                  strokeLinecap="round"
+                />
+              </>
+            )}
+          </Svg>
         </TouchableOpacity>
         <TouchableOpacity style={styles.stopButton} onPress={stop}>
           <Text style={styles.stopText}>Terminer</Text>
@@ -145,23 +171,23 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   topHud: {
     position: 'absolute',
     top: 58,
-    left: 56,
-    right: 56,
+    left: 66,
+    right: 66,
     alignItems: 'center',
   },
   statsPill: {
     flexDirection: 'row',
     backgroundColor: c.scanPill,
-    borderRadius: 18,
-    paddingVertical: 9,
-    paddingHorizontal: 6,
+    borderRadius: 16,
+    paddingVertical: 7,
+    paddingHorizontal: 2,
   },
-  stat: { alignItems: 'center', paddingHorizontal: 16 },
+  stat: { alignItems: 'center', paddingHorizontal: 9 },
   statBorder: { borderLeftWidth: 1, borderLeftColor: 'rgba(255,255,255,0.14)' },
-  statValue: { color: c.scanInk, fontSize: 17, fontWeight: '800' },
+  statValue: { color: c.scanInk, fontSize: 15, fontWeight: '800' },
   statLabel: {
     color: 'rgba(244,246,250,0.62)',
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.4,
