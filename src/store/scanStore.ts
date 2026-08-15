@@ -11,7 +11,10 @@ import {
   detectRooms,
   mergeColinear,
   pointOnSeg,
+  roomExtent,
+  roomHeight,
   roomOf,
+  roomParts,
   segLength,
   snapAngle,
   splitAtJunctions,
@@ -85,6 +88,31 @@ function nameRooms(kinds: (RoomKind | null)[]): string[] {
     taken.push(name);
     return name;
   });
+}
+
+/**
+ * Premier point où un rayon parti de `from` rencontre le contour d'une pièce.
+ * Sert à poser une cloison qui touche pile les murs, des deux côtés.
+ */
+function castToOutline(
+  from: { x: number; z: number },
+  dir: { x: number; z: number },
+  poly: { x: number; z: number }[],
+): { x: number; z: number } | null {
+  let best = Infinity;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const p = poly[j];
+    const q = poly[i];
+    const ex = q.x - p.x;
+    const ez = q.z - p.z;
+    const den = dir.x * ez - dir.z * ex;
+    if (Math.abs(den) < 1e-9) continue;
+    const t = ((p.x - from.x) * ez - (p.z - from.z) * ex) / den;
+    const u = ((p.x - from.x) * dir.z - (p.z - from.z) * dir.x) / den;
+    if (t > 1e-4 && u >= -1e-6 && u <= 1 + 1e-6 && t < best) best = t;
+  }
+  if (!isFinite(best)) return null;
+  return { x: from.x + dir.x * best, z: from.z + dir.z * best };
 }
 
 /** Mur le plus proche d'une ouverture, et à quelle distance. */
@@ -171,6 +199,14 @@ interface ScanState {
   setRoomName: (roomId: string, name: string) => void;
   /** Retire une pièce du scan (sa géométrie part avec elle). */
   removeRoom: (roomId: string) => void;
+  /** Réunit deux pièces en une : la cloison qui les sépare cesse de les séparer. */
+  mergeRooms: (a: string, b: string) => void;
+  /** Pose une cloison en travers d'une pièce, puis redétecte : elle se scinde. */
+  splitRoom: (roomId: string) => void;
+  /** Relit le graphe des murs et refait la liste des pièces. */
+  redetectRooms: () => void;
+  /** Hauteur sous plafond d'une pièce (applique à tous ses murs). */
+  setRoomHeight: (roomId: string, height: number) => void;
   /** D'où vient l'écran résultat : le bouton retour y renvoie. */
   resultOrigin: 'scan' | 'library';
   walls: WallSeg[];
@@ -335,6 +371,118 @@ export const useScanStore = create<ScanState>((set, get) => {
           return dist < 0.6;
         }),
         objects: st.objects.filter((o) => roomOf(o) !== roomId),
+        dirty: true,
+      });
+    },
+
+    mergeRooms: (aId, bId) => {
+      const st = get();
+      const a = st.rooms.find((r) => r.id === aId);
+      const b = st.rooms.find((r) => r.id === bId);
+      if (!a || !b || aId === bId) return;
+      // La cloison commune cesse de border : elle devient intérieure à la
+      // pièce réunie, et le contour se referme sur l'enveloppe des deux.
+      const inA = new Set(a.wallIds ?? []);
+      const inB = new Set(b.wallIds ?? []);
+      const wallIds = [...new Set([...inA, ...inB])].filter(
+        (id) => !(inA.has(id) && inB.has(id)),
+      );
+      set({
+        rooms: st.rooms
+          .filter((r) => r.id !== bId)
+          .map((r) => (r.id === aId ? { ...r, wallIds } : r)),
+        objects: st.objects.map((o) =>
+          roomOf(o) === bId ? { ...o, roomId: aId } : o,
+        ),
+        dirty: true,
+      });
+    },
+
+    splitRoom: (roomId) => {
+      const st = get();
+      const part = roomParts(st.walls, st.rooms).find((p) => p.roomId === roomId);
+      if (!part?.surface) return;
+      // Cloison posée en travers, perpendiculaire au grand axe et passant par
+      // le point le plus au large. Ses deux bouts s'arrêtent EXACTEMENT sur
+      // le contour : sans ça rien ne se soude, aucun nœud n'apparaît et la
+      // redétection ne voit pas la coupure. On la déplace ensuite au doigt.
+      const { angle } = roomExtent(part.surface.pts);
+      const dir = { x: -Math.sin(angle), z: Math.cos(angle) };
+      const a = castToOutline(part.labelAt, dir, part.surface.pts);
+      const b = castToOutline(
+        part.labelAt,
+        { x: -dir.x, z: -dir.z },
+        part.surface.pts,
+      );
+      if (!a || !b) return;
+      const h = roomHeight(part.walls) || 2.5;
+      const wall: WallSeg = {
+        id: `cl-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        type: 'wall',
+        a,
+        b,
+        height: h,
+        yCenter: h / 2,
+      };
+      set({ walls: [...st.walls, wall], dirty: true });
+      get().redetectRooms();
+    },
+
+    redetectRooms: () => {
+      const st = get();
+      const olds = roomParts(st.walls, st.rooms);
+      // Le graphe a pu changer (cloison ajoutée, coin déplacé) : on le
+      // renettoie avant d'y rechercher les faces.
+      const walls = mergeColinear(splitAtJunctions(weldCorners(st.walls)));
+      const shapes = detectRooms(walls);
+      if (shapes.length === 0) return;
+      const floor = st.rooms[0]?.floor ?? null;
+      const objects = st.objects.map((o) => {
+        const p = { x: o.transform[12], z: o.transform[14] };
+        const hit = shapes.findIndex((s) => pointInPolygon(p, s.outline));
+        return { ...o, roomId: `room-${(hit >= 0 ? hit : 0) + 1}` };
+      });
+      const kinds = shapes.map((_, i) =>
+        deduceRoomKind(
+          objects
+            .filter((o) => o.roomId === `room-${i + 1}`)
+            .map((o) => o.category),
+        ),
+      );
+      const auto = nameRooms(kinds);
+      // Les noms donnés à la main survivent : on rattache chaque nouvelle
+      // pièce à l'ancienne dont le point de cartouche tombe dedans.
+      const rooms: RoomEntry[] = shapes.map((s, i) => {
+        const previous = olds.find((p) => pointInPolygon(p.labelAt, s.outline));
+        const kept = previous
+          ? st.rooms.find((r) => r.id === previous.roomId)
+          : undefined;
+        return {
+          id: `room-${i + 1}`,
+          name: kept?.name || auto[i],
+          wallIds: s.wallIds,
+          kind: kinds[i] ?? undefined,
+          floor,
+        };
+      });
+      // Deux pièces peuvent hériter du même nom : on renumérote les doublons.
+      const seen = new Map<string, number>();
+      for (const r of rooms) {
+        const n = (seen.get(r.name) ?? 0) + 1;
+        seen.set(r.name, n);
+        if (n > 1) r.name = `${r.name} ${n}`;
+      }
+      set({ walls, rooms, objects, dirty: true });
+    },
+
+    setRoomHeight: (roomId, height) => {
+      if (!(height > 1) || height > 6) return;
+      const st = get();
+      const ids = new Set(st.rooms.find((r) => r.id === roomId)?.wallIds ?? []);
+      set({
+        walls: st.walls.map((w) =>
+          ids.has(w.id) ? { ...w, height, yCenter: height / 2 } : w,
+        ),
         dirty: true,
       });
     },

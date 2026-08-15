@@ -81,6 +81,37 @@ outre dessinés PAR-DESSUS le reste : ce sont des annotations, un mur ne doit
 pas les trancher. Ce même point sert aussi à décider de quel côté d'un mur
 se trouve « l'intérieur » quand on recale un meuble.
 
+### Retoucher ce que la détection a trouvé
+
+La détection est bonne, pas infaillible : une porte grande ouverte réunit deux
+pièces, un placard en invente une. Quatre gestes la rattrapent, tous depuis la
+barre qui s'ouvre en touchant le sol d'une pièce en mode édition.
+
+- **Nommer** ouvre une liste (Séjour, Cuisine, Chambre, Couloir…) plutôt qu'un
+  clavier ; les homonymes se numérotent tout seuls. « Autre… » reste possible.
+- **Hauteur** fixe la hauteur sous plafond de la pièce — RoomPlan la donne mais
+  se trompe sous une poutre, et c'est elle qui commande tout le métré mural.
+- **Fusionner** réunit deux pièces : les murs communs cessent de border, le
+  contour se referme sur l'enveloppe des deux. La cloison reste dessinée.
+- **Scinder** pose une cloison en travers, perpendiculaire au grand axe. Ses
+  deux bouts s'arrêtent EXACTEMENT sur le contour (rayon lancé depuis le point
+  au large) : sans ça rien ne se soude, aucun nœud n'apparaît et la
+  redétection ne verrait pas la coupure. On la déplace ensuite au doigt.
+
+L'outil « pièces » de la barre du plan relance la détection sur le graphe
+courant, en **gardant les noms donnés à la main** : chaque nouvelle pièce
+hérite du nom de l'ancienne dont le point de cartouche tombe dedans.
+
+### Métré
+
+Le PDF porte une feuille de métré, une ligne par pièce : cotes hors-tout,
+surface au sol, périmètre, hauteur, et **surface murale nette** (périmètre ×
+hauteur, portes et fenêtres déduites) — le chiffre qu'attend un peintre. Les
+cotes hors-tout viennent de `roomExtent()`, le plus petit rectangle contenant
+la pièce, cherché en tournant avec chaque côté du contour : une pièce scannée
+de biais est cotée dans SES axes, pas dans ceux de l'écran. Elles s'affichent
+aussi sur le plan 2D quand la règle est active.
+
 En mode édition, **le cartouche est le bouton de renommage** : on touche le
 nom là où il s'affiche, sur le plan 2D. Le même cartouche — cadre, nom
 au-dessus, surface en dessous — est reporté au centre de la pièce sur la vue
@@ -249,7 +280,7 @@ nécessaire que si les fichiers Swift/Kotlin ou les dépendances natives changen
 ## Vérifications faites sur cette machine (Windows)
 
 - `npx tsc --noEmit` et `npx eslint src App.tsx` : aucun diagnostic.
-- `npx jest` : 87/87 tests verts (conversion matrice iOS→segment, extrémités
+- `npx jest` : 94/94 tests verts (conversion matrice iOS→segment, extrémités
   Android, soudure des coins et jonctions en T, onglets des murs, surface au
   sol, semis de points, lecture des textures, snap angulaire, projection
   mètres↔pixels, génération du PDF ; **multi-pièces** : découpe par pièce,
@@ -269,7 +300,10 @@ nécessaire que si les fichiers Swift/Kotlin ou les dépendances natives changen
   et T3 démêlés depuis la topologie brute de RoomPlan ; **cartouche** : pôle
   d'inaccessibilité, pièce en L où le barycentre sort ; **meubles** : volume
   à faces masquées, recalage d'une télé encastrée ; **bout en bout** : un T2
-  brut → deux pièces nommées, meubles répartis, contours exacts).
+  brut → deux pièces nommées, meubles répartis, contours exacts ;
+  **retouches** : fusion de deux pièces, scission par cloison, noms gardés à
+  la redétection, hauteur par pièce et refus des valeurs aberrantes, cotes
+  hors-tout, surface murale nette, feuille de métré activable).
 - **Non vérifié ici** : la compilation Swift/Kotlin (impossible sans Mac /
   SDK Android). Les points d'attente connus sont notés ci-dessous.
 

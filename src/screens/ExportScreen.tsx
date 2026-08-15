@@ -178,6 +178,7 @@ export function ExportScreen() {
   const styles = getStyles(c);
 
   const [include3D, setInclude3D] = useState(true);
+  const [includeMetre, setIncludeMetre] = useState(true);
   const [measures2D, setMeasures2D] = useState(true);
   const [measures3D, setMeasures3D] = useState(true);
   // Toucher un modèle verrouille le défilement (iOS annule sinon le geste
@@ -235,6 +236,7 @@ export function ExportScreen() {
           measures3D,
           surfaces: showSurfaces,
           textures: showTextures,
+          metre: includeMetre,
         },
       );
       await RoomScan.sharePDF(toBase64(bytes), pdfFilename(scanName));
@@ -288,6 +290,10 @@ export function ExportScreen() {
         <View style={styles.switchRow}>
           <Text style={styles.switchLabel}>Inclure des vues 3D</Text>
           <Switch value={include3D} onValueChange={setInclude3D} />
+        </View>
+        <View style={styles.switchRow}>
+          <Text style={styles.switchLabel}>Métré par pièce</Text>
+          <Switch value={includeMetre} onValueChange={setIncludeMetre} />
         </View>
         <View style={styles.switchRow}>
           <Text style={styles.switchLabel}>

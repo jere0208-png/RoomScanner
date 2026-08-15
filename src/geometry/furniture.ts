@@ -150,6 +150,31 @@ export function roomKindLabel(kind: RoomKind): string {
   return ROOM_FR[kind];
 }
 
+/**
+ * Noms proposés à la correction, dans l'ordre où on les rencontre dans un
+ * logement. Plus large que ce que le mobilier permet de deviner : un couloir
+ * ou une entrée n'ont pas de meuble caractéristique, mais il faut pouvoir
+ * les nommer d'un geste plutôt qu'au clavier.
+ */
+export const ROOM_NAME_CHOICES: string[] = [
+  'Séjour',
+  'Salon',
+  'Salle à manger',
+  'Cuisine',
+  'Chambre',
+  'Salle de bains',
+  'WC',
+  'Bureau',
+  'Entrée',
+  'Couloir',
+  'Dressing',
+  'Buanderie',
+  'Cellier',
+  'Garage',
+  'Balcon',
+  'Cave',
+];
+
 export function frCategory(category: string): string {
   const kind = furnKind(category);
   return kind === 'other' ? category : FR[kind];

@@ -26,10 +26,20 @@ import {
 } from '../theme';
 import { FloorplanEditor } from '../components/FloorplanEditor';
 import { LogoMark } from '../components/LogoMark';
-import { Iso3DView } from '../components/Iso3DView';
-import { roomParts, segLength, totalArea } from '../geometry/floorplan';
+import {
+  DEFAULT_VIEW3D,
+  Iso3DView,
+  type View3DParams,
+} from '../components/Iso3DView';
+import {
+  roomExtent,
+  roomHeight,
+  roomParts,
+  segLength,
+  totalArea,
+} from '../geometry/floorplan';
 import { hasCapturedColors } from '../geometry/appearance';
-import { frCategory } from '../geometry/furniture';
+import { frCategory, ROOM_NAME_CHOICES } from '../geometry/furniture';
 import { useScanStore } from '../store/scanStore';
 
 type Tab = '2d' | '3d';
@@ -59,6 +69,10 @@ export function ResultScreen() {
   const resizeObject = useScanStore((s) => s.resizeObject);
   const revertCurrent = useScanStore((s) => s.revertCurrent);
   const setRoomName = useScanStore((s) => s.setRoomName);
+  const setRoomHeight = useScanStore((s) => s.setRoomHeight);
+  const mergeRooms = useScanStore((s) => s.mergeRooms);
+  const splitRoom = useScanStore((s) => s.splitRoom);
+  const redetectRooms = useScanStore((s) => s.redetectRooms);
 
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
   const [wInput, setWInput] = useState('');
@@ -79,6 +93,9 @@ export function ResultScreen() {
   const [tab, setTab] = useState<Tab>('2d');
   // Pièce visée par l'outil « nom de pièce » et par la suppression.
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
+  const [naming, setNaming] = useState(false);
+  // Vue 3D : bascule « vue de dessus », comme un plan.
+  const [view3d, setView3d] = useState<View3DParams>(DEFAULT_VIEW3D);
   // Cotes du plan 2D masquées par défaut : la pastille « Cotes » les active.
   const [showMeasures, setShowMeasures] = useState(false);
   const [show3DMeasures, setShow3DMeasures] = useState(true);
@@ -148,34 +165,70 @@ export function ResultScreen() {
     selectedRoomId ?? (rooms.length === 1 ? rooms[0].id : null);
   const targetRoom = rooms.find((r) => r.id === targetRoomId) ?? null;
   const targetPart = parts.find((p) => p.roomId === targetRoomId) ?? null;
+  const targetExtent = targetPart?.surface
+    ? roomExtent(targetPart.surface.pts)
+    : { width: 0, depth: 0, angle: 0 };
   // Le bouton « Couleurs » n'a de sens que si le scan en a relevé.
   const colorsAvailable = hasCapturedColors(
     walls,
     rooms.map((r) => r.floor),
   );
 
-  /** Renomme une pièce précise (appui sur son cartouche dans le plan). */
+  /** Ouvre le choix du nom pour une pièce (appui sur son cartouche). */
   const promptRoomFor = (roomId: string) => {
-    const room = rooms.find((r) => r.id === roomId);
-    if (!room) return;
+    setSelectedRoomId(roomId);
+    setNaming(true);
+  };
+
+  /** Applique un nom choisi dans la liste, en numérotant les homonymes. */
+  const applyRoomName = (name: string) => {
+    if (!targetRoom) return;
+    const clean = name.trim();
+    if (clean) {
+      const same = rooms.filter(
+        (r) =>
+          r.id !== targetRoom.id &&
+          (r.name === clean || r.name.startsWith(`${clean} `)),
+      ).length;
+      setRoomName(targetRoom.id, same === 0 ? clean : `${clean} ${same + 1}`);
+    } else {
+      setRoomName(targetRoom.id, '');
+    }
+    setNaming(false);
+  };
+
+  const promptRoomHeight = () => {
+    if (!targetRoom || !targetPart) return;
     Alert.prompt(
-      'Nom de la pièce',
-      'Il s’affiche sur le plan 2D et au même endroit sur la vue 3D.',
-      (t) => setRoomName(room.id, t ?? ''),
+      'Hauteur sous plafond',
+      'En mètres. Elle sert au volume, aux vues 3D et au métré.',
+      (t) => {
+        const v = parseFloat((t ?? '').replace(',', '.'));
+        if (v > 0) setRoomHeight(targetRoom.id, v);
+      },
       'plain-text',
-      room.name,
+      roomHeight(targetPart.walls).toFixed(2).replace('.', ','),
     );
   };
 
-  const promptRoomName = () => {
-    if (!targetRoom) {
-      Alert.alert(
-        'Quelle pièce ?',
-        'Touchez le cartouche de la pièce sur le plan pour la nommer.',
-      );
-      return;
-    }
-    promptRoomFor(targetRoom.id);
+  /** Réunit la pièce sélectionnée avec une voisine, au choix. */
+  const promptMerge = () => {
+    if (!targetRoom) return;
+    const others = rooms.filter((r) => r.id !== targetRoom.id);
+    Alert.alert(
+      'Fusionner avec…',
+      'Les deux pièces n’en feront plus qu’une ; la cloison reste dessinée.',
+      [
+        ...others.slice(0, 5).map((r) => ({
+          text: r.name || r.id,
+          onPress: () => {
+            mergeRooms(targetRoom.id, r.id);
+            setSelectedRoomId(targetRoom.id);
+          },
+        })),
+        { text: 'Annuler', style: 'cancel' as const },
+      ],
+    );
   };
 
   const applyLength = () => {
@@ -306,7 +359,11 @@ export function ResultScreen() {
             onEditRoomName={promptRoomFor}
           />
         ) : (
-          <Iso3DView showMeasures={show3DMeasures} />
+          <Iso3DView
+            showMeasures={show3DMeasures}
+            value={view3d}
+            onChange={setView3d}
+          />
         )}
 
         {tab === '2d' ? (
@@ -344,9 +401,12 @@ export function ResultScreen() {
             )}
             {editMode && (
               <ToolPill
-                icon="room"
-                active={(targetRoom?.name ?? '') !== ''}
-                onPress={promptRoomName}
+                icon="rooms"
+                active={false}
+                onPress={() => {
+                  redetectRooms();
+                  setSelectedRoomId(null);
+                }}
               />
             )}
             <ToolPill icon="edit" active={editMode} onPress={toggleEdit} />
@@ -357,6 +417,17 @@ export function ResultScreen() {
               icon="ruler"
               active={show3DMeasures}
               onPress={() => setShow3DMeasures((v) => !v)}
+            />
+            <ToolPill
+              icon="top"
+              active={view3d.tilt <= 16}
+              onPress={() =>
+                setView3d(
+                  view3d.tilt <= 16
+                    ? DEFAULT_VIEW3D
+                    : { theta: 0, tilt: 15, zoom: 1, ox: 0, oy: 0 },
+                )
+              }
             />
             <ToolPill
               icon="surface"
@@ -421,14 +492,42 @@ export function ResultScreen() {
                 {targetPart?.surface
                   ? ` · ${targetPart.surface.exact ? '' : '≈ '}${fr(
                       targetPart.surface.area,
-                    )} m² au sol`
+                    )} m² · ${fr(targetExtent.width, 2)} × ${fr(
+                      targetExtent.depth,
+                      2,
+                    )} m`
                   : ''}
               </Text>
-              <View style={styles.editRow}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled">
                 <TouchableOpacity
                   style={styles.applyButton}
-                  onPress={promptRoomName}>
-                  <Text style={styles.applyText}>Renommer</Text>
+                  onPress={() => setNaming(true)}>
+                  <Text style={styles.applyText}>Nommer</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.roomAction}
+                  onPress={promptRoomHeight}>
+                  <Text style={styles.roomActionText}>
+                    Hauteur {fr(roomHeight(targetPart?.walls ?? []), 2)} m
+                  </Text>
+                </TouchableOpacity>
+                {rooms.length > 1 && (
+                  <TouchableOpacity
+                    style={styles.roomAction}
+                    onPress={promptMerge}>
+                    <Text style={styles.roomActionText}>Fusionner</Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity
+                  style={styles.roomAction}
+                  onPress={() => {
+                    splitRoom(selectedRoomId);
+                    setSelectedRoomId(null);
+                  }}>
+                  <Text style={styles.roomActionText}>Scinder</Text>
                 </TouchableOpacity>
                 {rooms.length > 1 && (
                   <TouchableOpacity
@@ -454,7 +553,7 @@ export function ResultScreen() {
                     <Text style={styles.removeRoomText}>Retirer</Text>
                   </TouchableOpacity>
                 )}
-              </View>
+              </ScrollView>
             </View>
           )}
 
@@ -613,6 +712,63 @@ export function ResultScreen() {
         </View>
       )}
 
+      {/* ---------- Nom de la pièce : liste plutôt que clavier ---------- */}
+      <Modal visible={naming} transparent animationType="fade">
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Nom de la pièce</Text>
+            <Text style={styles.modalSubtitle}>
+              Il s'affiche sur le plan 2D, au même endroit sur la vue 3D, et
+              dans le métré du PDF.
+            </Text>
+            <ScrollView style={styles.nameScroll}>
+              <View style={styles.nameGrid}>
+                {ROOM_NAME_CHOICES.map((choice) => {
+                  const on =
+                    targetRoom?.name === choice ||
+                    (targetRoom?.name ?? '').startsWith(`${choice} `);
+                  return (
+                    <TouchableOpacity
+                      key={choice}
+                      style={[styles.nameChip, on && styles.nameChipOn]}
+                      onPress={() => applyRoomName(choice)}>
+                      <Text
+                        style={[
+                          styles.nameChipText,
+                          on && styles.nameChipTextOn,
+                        ]}>
+                        {choice}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </ScrollView>
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.modalGhost}
+                onPress={() => setNaming(false)}>
+                <Text style={styles.modalGhostText}>Annuler</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalPrimary}
+                onPress={() => {
+                  setNaming(false);
+                  Alert.prompt(
+                    'Autre nom',
+                    'Laissez vide pour retirer le nom.',
+                    (t) => applyRoomName(t ?? ''),
+                    'plain-text',
+                    targetRoom?.name ?? '',
+                  );
+                }}>
+                <Text style={styles.modalPrimaryText}>Autre…</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* ---------- Renommage ---------- */}
       <Modal visible={renaming} transparent animationType="fade">
         <View style={styles.modalBackdrop}>
@@ -675,7 +831,9 @@ type ToolIcon =
   | 'colors'
   | 'room'
   | 'image'
-  | 'model';
+  | 'model'
+  | 'top'
+  | 'rooms';
 
 /** Tracés 24×24 des icônes d'outils (trait simple, lisible en 18 px). */
 const TOOL_PATHS: Record<ToolIcon, { d: string; fill?: boolean }[]> = {
@@ -716,6 +874,16 @@ const TOOL_PATHS: Record<ToolIcon, { d: string; fill?: boolean }[]> = {
   model: [
     { d: 'M12 3.2 l7.8 4.4 v8.8 L12 20.8 l-7.8 -4.4 V7.6 z' },
     { d: 'M12 12 l7.8 -4.4 M12 12 L4.2 7.6 M12 12 v8.8' },
+  ],
+  top: [
+    { d: 'M4.5 5.5 h15 a1 1 0 0 1 1 1 v11 a1 1 0 0 1 -1 1 h-15 a1 1 0 0 1 -1 -1 v-11 a1 1 0 0 1 1 -1 z' },
+    { d: 'M4 11.5 h9' },
+    { d: 'M13 5.5 v13' },
+  ],
+  rooms: [
+    { d: 'M3.5 5.5 h7 v6 h-7 z' },
+    { d: 'M13.5 5.5 h7 v13 h-7 z' },
+    { d: 'M3.5 13.5 h7 v5 h-7 z' },
   ],
   edit: [
     { d: 'M11 4 H6 a2 2 0 0 0 -2 2 v12 a2 2 0 0 0 2 2 h12 a2 2 0 0 0 2 -2 v-5' },
@@ -960,6 +1128,27 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     paddingVertical: 11,
   },
   applyText: { color: '#FFFFFF', fontWeight: '700', fontSize: 14 },
+  roomAction: {
+    backgroundColor: c.surfaceSunken,
+    borderRadius: radius.sm,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    marginLeft: 8,
+  },
+  roomActionText: { color: c.inkSoft, fontWeight: '700', fontSize: 13.5 },
+  nameScroll: { maxHeight: 260 },
+  nameGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
+  nameChip: {
+    backgroundColor: c.surfaceSunken,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: c.line,
+    paddingHorizontal: 13,
+    paddingVertical: 8,
+  },
+  nameChipOn: { backgroundColor: c.blueSoft, borderColor: c.blue },
+  nameChipText: { color: c.ink, fontSize: 14, fontWeight: '600' },
+  nameChipTextOn: { color: c.blue, fontWeight: '800' },
   removeRoomButton: {
     backgroundColor: c.surfaceSunken,
     borderRadius: radius.sm,

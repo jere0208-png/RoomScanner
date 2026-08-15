@@ -10,7 +10,13 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 import type { ObjectData, SurfaceData } from 'react-native-room-scan';
-import { roomParts } from '../src/geometry/floorplan';
+import {
+  roomExtent,
+  roomHeight,
+  roomParts,
+  totalArea,
+  wallAreaM2,
+} from '../src/geometry/floorplan';
 import { useScanStore, type SavedScan } from '../src/store/scanStore';
 
 // Le store diffère l'écriture disque de 600 ms : sans horloge factice, le
@@ -258,6 +264,87 @@ describe('appartement tel que RoomPlan le livre', () => {
       parts[0].labelAt.z - parts[1].labelAt.z,
     );
     expect(d).toBeGreaterThan(2);
+  });
+});
+
+describe('retoucher les pièces à la main', () => {
+  beforeEach(reset);
+
+  const deuxPieces = () =>
+    useScanStore.getState().finalize({
+      modelPath: '/tmp/scan.usdz',
+      surfaces: twoRoomFlat,
+      objects: [objectAt('o1', 'sofa', 2, 1.5), objectAt('o2', 'stove', 6, 1.5)],
+    });
+
+  it('fusionne deux pièces : une seule surface, murs communs mis de côté', () => {
+    deuxPieces();
+    useScanStore.getState().mergeRooms('room-1', 'room-2');
+    const st = useScanStore.getState();
+    expect(st.rooms).toHaveLength(1);
+    const parts = roomParts(st.walls, st.rooms);
+    expect(parts[0].surface?.exact).toBe(true);
+    expect(Math.round(parts[0].surface!.area)).toBe(21);
+    // La cloison n'est plus une bordure, mais elle reste dessinée.
+    expect(st.rooms[0].wallIds).not.toContain('refend');
+    expect(st.walls.some((w) => w.id === 'refend')).toBe(true);
+    // Les meubles de la pièce absorbée suivent.
+    expect(st.objects.every((o) => o.roomId === 'room-1')).toBe(true);
+  });
+
+  it('scinde une pièce en posant une cloison en travers', () => {
+    useScanStore.getState().finalize({
+      modelPath: '/tmp/scan.usdz',
+      surfaces: boxSurfaces('a', 0, 0, 6, 3),
+      objects: [],
+    });
+    expect(useScanStore.getState().rooms).toHaveLength(1);
+    useScanStore.getState().splitRoom('room-1');
+    const st = useScanStore.getState();
+    expect(st.rooms).toHaveLength(2);
+    const parts = roomParts(st.walls, st.rooms);
+    expect(parts.every((p) => p.surface?.exact)).toBe(true);
+    // Les deux moitiés totalisent la pièce d'origine.
+    expect(Math.round(totalArea(parts)!.area)).toBe(18);
+  });
+
+  it('garde les noms donnés à la main lors d’une redétection', () => {
+    deuxPieces();
+    useScanStore.getState().setRoomName('room-1', 'Séjour');
+    useScanStore.getState().redetectRooms();
+    expect(useScanStore.getState().rooms.map((r) => r.name)).toContain('Séjour');
+  });
+
+  it('change la hauteur sous plafond d’une seule pièce', () => {
+    deuxPieces();
+    useScanStore.getState().setRoomHeight('room-2', 2.2);
+    const st = useScanStore.getState();
+    const parts = roomParts(st.walls, st.rooms);
+    expect(roomHeight(parts[1].walls)).toBeCloseTo(2.2);
+    // Le salon garde la sienne (la cloison est partagée, elle suit la cuisine).
+    expect(roomHeight(parts[0].walls)).toBeCloseTo(2.5);
+  });
+
+  it('refuse une hauteur aberrante', () => {
+    deuxPieces();
+    useScanStore.getState().setRoomHeight('room-1', 0.4);
+    useScanStore.getState().setRoomHeight('room-1', 12);
+    const parts = roomParts(
+      useScanStore.getState().walls,
+      useScanStore.getState().rooms,
+    );
+    expect(roomHeight(parts[0].walls)).toBeCloseTo(2.5);
+  });
+
+  it('donne les cotes hors-tout et la surface murale nette', () => {
+    deuxPieces();
+    const st = useScanStore.getState();
+    const parts = roomParts(st.walls, st.rooms);
+    const e = roomExtent(parts[0].surface!.pts);
+    expect(e.width).toBeCloseTo(4);
+    expect(e.depth).toBeCloseTo(3);
+    // Périmètre 14 m × 2,5 m = 35 m², sans ouverture ici.
+    expect(wallAreaM2(parts[0].walls, st.openings)).toBeCloseTo(35);
   });
 });
 

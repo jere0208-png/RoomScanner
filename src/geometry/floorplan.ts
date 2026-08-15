@@ -566,6 +566,86 @@ export function interiorPole(poly: Pt[], precision = 0.05): Pt {
   return best;
 }
 
+/**
+ * Cotes hors-tout d'une pièce : le plus petit rectangle qui la contient.
+ *
+ * On tourne le rectangle avec chaque côté du contour (rotating calipers) et
+ * on garde le plus petit — une pièce scannée de biais ne doit pas être cotée
+ * dans les axes de l'écran, mais dans les siens.
+ */
+export function roomExtent(pts: Pt[]): {
+  width: number;
+  depth: number;
+  angle: number;
+} {
+  if (pts.length < 3) return { width: 0, depth: 0, angle: 0 };
+  let best = { width: Infinity, depth: Infinity, angle: 0, area: Infinity };
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i];
+    const b = pts[(i + 1) % pts.length];
+    const len = Math.hypot(b.x - a.x, b.z - a.z);
+    if (len < 1e-6) continue;
+    const ux = (b.x - a.x) / len;
+    const uz = (b.z - a.z) / len;
+    let minU = Infinity;
+    let maxU = -Infinity;
+    let minV = Infinity;
+    let maxV = -Infinity;
+    for (const p of pts) {
+      const u = p.x * ux + p.z * uz;
+      const v = -p.x * uz + p.z * ux;
+      minU = Math.min(minU, u);
+      maxU = Math.max(maxU, u);
+      minV = Math.min(minV, v);
+      maxV = Math.max(maxV, v);
+    }
+    const w = maxU - minU;
+    const d = maxV - minV;
+    const area = w * d;
+    if (area < best.area) {
+      best = {
+        width: Math.max(w, d),
+        depth: Math.min(w, d),
+        angle: Math.atan2(uz, ux),
+        area,
+      };
+    }
+  }
+  if (!isFinite(best.area)) return { width: 0, depth: 0, angle: 0 };
+  return { width: best.width, depth: best.depth, angle: best.angle };
+}
+
+/** Ouvertures posées sur les murs donnés (porte, fenêtre, baie). */
+export function openingsOn(
+  walls: WallSeg[],
+  openings: WallSeg[],
+  tol = 0.6,
+): WallSeg[] {
+  return openings.filter((o) => {
+    const mid = { x: (o.a.x + o.b.x) / 2, z: (o.a.z + o.b.z) / 2 };
+    return walls.some((w) => pointOnSeg(mid, w.a, w.b).dist <= tol);
+  });
+}
+
+/**
+ * Surface murale d'une pièce, déduction faite des portes et fenêtres.
+ * C'est le chiffre qu'attend un peintre ou un poseur de revêtement.
+ */
+export function wallAreaM2(walls: WallSeg[], openings: WallSeg[]): number {
+  const gross = walls.reduce((s, w) => s + segLength(w) * w.height, 0);
+  const holes = openingsOn(walls, openings).reduce(
+    (s, o) => s + segLength(o) * o.height,
+    0,
+  );
+  return Math.max(0, gross - holes);
+}
+
+/** Hauteur sous plafond de la pièce : la plus courante parmi ses murs. */
+export function roomHeight(walls: WallSeg[]): number {
+  if (walls.length === 0) return 0;
+  return Math.max(...walls.map((w) => w.height));
+}
+
 /** Barycentre des extrémités de murs : « l'intérieur » de la pièce. */
 export function wallsCentroid(walls: WallSeg[]): { x: number; z: number } {
   if (walls.length === 0) return { x: 0, z: 0 };

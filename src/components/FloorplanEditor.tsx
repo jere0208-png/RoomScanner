@@ -22,6 +22,7 @@ import {
   clampFootprint,
   makeMapping,
   quadPoints,
+  roomExtent,
   roomOf,
   roomParts,
   segLength,
@@ -450,9 +451,23 @@ export function FloorplanEditor({
                 .filter((o) => roomOf(o) === part.roomId)
                 .map((o) => footprintOf(o, partOf));
               const placeholder = roomName === '' && !areaText ? 'Nommer' : '';
+              // Cotes hors-tout : ce que cherche un artisan avant tout.
+              const extText =
+                showMeasures && part.surface
+                  ? (() => {
+                      const e = roomExtent(part.surface.pts);
+                      return `${e.width.toFixed(2).replace('.', ',')} × ${e.depth
+                        .toFixed(2)
+                        .replace('.', ',')} m`;
+                    })()
+                  : null;
               const text = roomName !== '' ? roomName : areaText ?? placeholder;
-              const wpx = Math.max(46, text.length * 7 + 18);
-              const hpx = roomName !== '' && areaText ? 38 : 24;
+              const wpx = Math.max(
+                46,
+                Math.max(text.length, extText?.length ?? 0) * 7 + 18,
+              );
+              const hpx =
+                (roomName !== '' && areaText ? 38 : 24) + (extText ? 13 : 0);
               const labelW = wpx / mapping.scale;
               const labelH = hpx / mapping.scale;
               const collides = (pt: Pt) =>
@@ -525,6 +540,17 @@ export function FloorplanEditor({
                       fontWeight="700"
                       textAnchor="middle">
                       {areaText}
+                    </SvgText>
+                  )}
+                  {extText && (
+                    <SvgText
+                      x={p.x}
+                      y={p.y + (roomName !== '' && areaText ? 24 : 16)}
+                      fill={c.inkFaint}
+                      fontSize={9}
+                      fontWeight="600"
+                      textAnchor="middle">
+                      {extText}
                     </SvgText>
                   )}
                   {placeholder !== '' && (

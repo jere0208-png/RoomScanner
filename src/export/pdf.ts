@@ -10,10 +10,13 @@ import type { FloorData, ObjectData } from 'react-native-room-scan';
 import {
   clampFootprint,
   quadPoints,
+  roomExtent,
+  roomHeight,
   roomOf,
   roomParts,
   segLength,
   toFootprint,
+  wallAreaM2,
   wallQuads,
   WALL_T,
   type RoomShape,
@@ -86,6 +89,8 @@ export interface PdfOptions {
   surfaces?: boolean;
   /** Couleurs et textures relevées pendant le scan. */
   textures?: boolean;
+  /** Feuille de métré par pièce (surfaces, périmètres, murs nets). */
+  metre?: boolean;
 }
 
 function bytesOf(s: string): Uint8Array {
@@ -787,6 +792,88 @@ function planPage(
   return d.stream();
 }
 
+/**
+ * Feuille de métré : une ligne par pièce.
+ *
+ * C'est ce qui transforme le plan en document de travail — surface au sol
+ * pour un revêtement, surface murale nette pour de la peinture, cotes
+ * hors-tout pour se repérer. Le total en pied de tableau est celui qu'on
+ * recopie dans un devis.
+ */
+function metrePage(ctx: SheetContext, sheet: string): string {
+  const d = new Draw();
+  const parts = roomParts(ctx.walls, ctx.rooms);
+  const x0 = FRAME.x + 24;
+  const w = FRAME.w - 48;
+  // Colonnes : nom, cotes, sol, périmètre, hauteur, murs nets.
+  const cols = [0, 0.28, 0.46, 0.6, 0.73, 0.85].map((f) => x0 + f * w);
+  const heads = ['Pièce', 'Cotes (m)', 'Sol (m²)', 'Périm. (m)', 'H. (m)', 'Murs (m²)'];
+  let y = FRAME.y + FRAME.h - TITLE_H - 46;
+
+  d.text('Métré par pièce', x0, y + 24, 13, INK, { bold: true, align: 'left' });
+  for (let i = 0; i < heads.length; i++) {
+    d.text(heads[i], cols[i], y, 8.5, GREY, { align: 'left' });
+  }
+  y -= 6;
+  d.line(x0, y, x0 + w, y, 0.8, INK);
+
+  let totalArea2 = 0;
+  let totalWalls = 0;
+  for (const part of parts) {
+    if (y < FRAME.y + 90) break;
+    y -= 20;
+    const name = ctx.roomNames[part.roomId] || part.roomId;
+    const ext = part.surface
+      ? roomExtent(part.surface.pts)
+      : { width: 0, depth: 0 };
+    const perim = part.walls.reduce((s, x) => s + segLength(x), 0);
+    const h = roomHeight(part.walls);
+    const nets = wallAreaM2(part.walls, ctx.openings);
+    totalArea2 += part.surface?.area ?? 0;
+    totalWalls += nets;
+    const cells = [
+      fitText(name, 10, cols[1] - cols[0] - 6),
+      `${frLen(ext.width)} × ${frLen(ext.depth)}`,
+      part.surface ? `${part.surface.exact ? '' : '≈ '}${fr1(part.surface.area)}` : '—',
+      fr1(perim),
+      frLen(h),
+      fr1(nets),
+    ];
+    for (let i = 0; i < cells.length; i++) {
+      d.text(cells[i], cols[i], y, i === 0 ? 10 : 9.5, i === 0 ? INK : '#2A3340', {
+        align: 'left',
+        bold: i === 0,
+      });
+    }
+    d.line(x0, y - 7, x0 + w, y - 7, 0.4, GREY_LIGHT);
+  }
+
+  y -= 26;
+  d.line(x0, y + 12, x0 + w, y + 12, 0.8, INK);
+  d.text('Total', cols[0], y, 10, INK, { align: 'left', bold: true });
+  d.text(fr1(totalArea2), cols[2], y, 10, INK, { align: 'left', bold: true });
+  d.text(fr1(totalWalls), cols[5], y, 10, INK, { align: 'left', bold: true });
+
+  y -= 26;
+  d.text(
+    'Surface murale nette : périmètre × hauteur, portes et fenêtres déduites.',
+    x0,
+    y,
+    8,
+    GREY,
+    { align: 'left' },
+  );
+
+  drawSheetChrome(d, {
+    project: ctx.name,
+    filename: ctx.filename,
+    sheetTitle: 'Métré par pièce',
+    sheet,
+    scaleLabel: null,
+  });
+  return d.stream();
+}
+
 const DEFAULT_PDF_VIEWS: [View3DParams, View3DParams] = [
   { theta: -32, tilt: 58, zoom: 1, fx: 0, fy: 0 },
   { theta: 148, tilt: 42, zoom: 1, fx: 0, fy: 0 },
@@ -857,7 +944,8 @@ export function buildScanPdf(
   opts: PdfOptions = {},
 ): Uint8Array {
   const filename = pdfFilename(scan.name);
-  const total = include3D ? 2 : 1;
+  const withMetre = opts.metre ?? true;
+  const total = 1 + (withMetre ? 1 : 0) + (include3D ? 1 : 0);
   const ctx: SheetContext = {
     name: scan.name,
     filename,
@@ -872,8 +960,13 @@ export function buildScanPdf(
     showTextures: opts.textures ?? false,
   };
   const pages = [planPage(ctx, `1 / ${total}`, opts.plan, opts.measures2D ?? true)];
+  if (withMetre) {
+    pages.push(metrePage(ctx, `${pages.length + 1} / ${total}`));
+  }
   if (include3D) {
-    pages.push(threeDPage(ctx, `2 / ${total}`, opts.views, opts.measures3D ?? true));
+    pages.push(
+      threeDPage(ctx, `${pages.length + 1} / ${total}`, opts.views, opts.measures3D ?? true),
+    );
   }
   return buildDocument(pages);
 }

@@ -980,7 +980,7 @@ describe('buildScanPdf', () => {
   const voisine = inRoom('room-2', room('v', 4.2, 0, 3, 3));
 
   it('produit un PDF valide à une page (plan seul)', () => {
-    const s = latin1String(buildScanPdf(scan, false));
+    const s = latin1String(buildScanPdf(scan, false, { metre: false }));
     expect(s.startsWith('%PDF-1.4')).toBe(true);
     expect(s).toContain('/Count 1');
     expect(s.endsWith('%%EOF')).toBe(true);
@@ -990,15 +990,34 @@ describe('buildScanPdf', () => {
   });
 
   it('ajoute la feuille des vues 3D quand demandé', () => {
-    const s = latin1String(buildScanPdf(scan, true));
+    const s = latin1String(buildScanPdf(scan, true, { metre: false }));
     expect(s).toContain('/Count 2');
     expect(s).toContain('Vues 3D');
+  });
+
+  it('ajoute une feuille de métré, activable', () => {
+    const avec = latin1String(buildScanPdf(scan, false));
+    expect(avec).toContain('/Count 2');
+    expect(avec).toContain('Métré par pièce');
+    // Les colonnes du tableau et le total. Les parenthèses sont échappées
+    // dans le flux PDF : on n'assert que sur les intitulés.
+    expect(avec).toContain('Sol');
+    expect(avec).toContain('Murs');
+    expect(avec).toContain('Total');
+    expect(avec).toContain('Cotes');
+    // 4 × 3 : 12 m² au sol, 14 m de périmètre, 2,5 m sous plafond → 35 m².
+    expect(avec).toContain('12,0');
+    expect(avec).toContain('35,0');
+    const sans = latin1String(buildScanPdf(scan, false, { metre: false }));
+    expect(sans).not.toContain('Métré par pièce');
   });
 
   it('porte la surface au sol, et la retire quand on la décoche', () => {
     expect(latin1String(buildScanPdf(scan, false))).toContain('surface au sol');
     expect(latin1String(buildScanPdf(scan, false))).toContain('12,0 m');
-    const sans = latin1String(buildScanPdf(scan, false, { surfaces: false }));
+    const sans = latin1String(
+      buildScanPdf(scan, false, { surfaces: false, metre: false }),
+    );
     expect(sans).not.toContain('surface au sol');
   });
 
@@ -1029,7 +1048,9 @@ describe('buildScanPdf', () => {
         },
       },
     };
-    const s = latin1String(buildScanPdf(withColors, true, { textures: true }));
+    const s = latin1String(
+      buildScanPdf(withColors, true, { textures: true, metre: false }),
+    );
     expect(s.startsWith('%PDF-1.4')).toBe(true);
     expect(s.endsWith('%%EOF')).toBe(true);
     expect(s).toContain('/Count 2');
