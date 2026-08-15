@@ -515,7 +515,7 @@ export function Iso3DView({ value, onChange, showMeasures }: Props) {
                   fill={item.fill}
                   stroke={item.stroke}
                   strokeWidth={item.dashed ? 1.8 : 1}
-                  strokeDasharray={item.dashed ? '6 4' : undefined}
+                  strokeDasharray={item.dashed ? '6 4' : '0'}
                   strokeLinejoin="round"
                 />
               ) : item.kind === 'dot' ? (

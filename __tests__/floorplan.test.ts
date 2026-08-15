@@ -863,6 +863,62 @@ describe('portes et fenêtres en volumes', () => {
     }
   });
 
+  it('garde un meuble entier et contourné sous tous les angles', () => {
+    const sofa = {
+      id: 'sofa',
+      category: 'sofa',
+      width: 1.8,
+      height: 0.8,
+      depth: 0.9,
+      transform: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 2, 0.4, 2, 1],
+    };
+    const scene = buildScene(rect, [], [sofa], { palette: TEST_PALETTE });
+    const rad = (d: number) => (d * Math.PI) / 180;
+    for (let theta = -180; theta <= 180; theta += 15) {
+      for (const tilt of [15, 30, 58, 80]) {
+        const cam = {
+          ct: Math.cos(rad(theta)),
+          st: Math.sin(rad(theta)),
+          cp: Math.cos(rad(tilt)),
+          sp: Math.sin(rad(tilt)),
+        };
+        const vis = scene.faces.filter((f) => !isHiddenFace(f, cam));
+        const pleines = vis.filter(
+          (f) => f.fill === TEST_PALETTE.object || f.fill === TEST_PALETTE.objectTop,
+        );
+        const traits = vis.filter(
+          (f) => f.fill === null && f.stroke === TEST_PALETTE.objectStroke,
+        );
+        // Jamais un meuble réduit à rien, et jamais une face sans son arête :
+        // c'est ce qui donnait l'impression d'un volume amputé.
+        expect(pleines.length).toBeGreaterThanOrEqual(3);
+        expect(traits.length).toBeGreaterThanOrEqual(pleines.length);
+      }
+    }
+  });
+
+  it('ne met en pointillé QUE les passages', () => {
+    // Le pointillé fuyait sur tout le modèle : les polygones sont retriés à
+    // chaque image et React réutilisait le composant d'un pan pointillé.
+    const sofa = {
+      id: 's',
+      category: 'sofa',
+      width: 1,
+      height: 0.8,
+      depth: 0.6,
+      transform: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 2, 0.4, 2, 1],
+    };
+    const scene = buildScene(rect, [porte], [sofa], { palette: TEST_PALETTE });
+    expect(scene.faces.some((f) => f.dashed)).toBe(false);
+    const ouverte = buildScene(rect, [{ ...porte, open: true }], [sofa], {
+      palette: TEST_PALETTE,
+    });
+    expect(ouverte.faces.filter((f) => f.dashed)).toHaveLength(2);
+    expect(
+      ouverte.faces.filter((f) => f.dashed).every((f) => f.stroke === TEST_PALETTE.passage),
+    ).toBe(true);
+  });
+
   it('rend une baie et une porte ouverte en vide bleu pointillé', () => {
     const baie: WallSeg = { ...porte, id: 'b1', type: 'opening', open: true };
     const scene = buildScene(rect, [baie], [], { palette: TEST_PALETTE });

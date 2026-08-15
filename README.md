@@ -188,7 +188,17 @@ Trois règles de plus, apprises à la dure sur un tri « du peintre » :
    se triait à sa profondeur moyenne et traversait les meubles pourtant plus
    proches. Chaque arête du pourtour est un segment à part, trié à sa propre
    profondeur ; les coupures internes ne sont pas tracées.
-3. **Le cadrage vient de la boîte englobante, pas de la moyenne des sommets.**
+3. **La lumière est décalée de 35° par rapport à la caméra.** Éclairé dans
+   l'axe du regard, deux flancs symétriques par rapport à celui-ci reçoivent
+   la même teinte : l'arête entre eux s'efface et le meuble paraît amputé
+   d'une face. Le décalage rend ce cas rare — et le contour, lui, est
+   toujours tracé, ce qui garantit l'arête même à teinte égale.
+4. **Un `strokeDasharray` conditionnel doit TOUJOURS avoir une valeur.** Les
+   polygones sont retriés en profondeur à chaque image, donc React réutilise
+   le composant d'un pan pour un tout autre : passer `undefined` ne
+   réinitialise pas la propriété native, et le pointillé des passages
+   contaminait le modèle entier. On passe `'0'`, jamais `undefined`.
+5. **Le cadrage vient de la boîte englobante, pas de la moyenne des sommets.**
    La moyenne dépend du découpage : le modèle sautait dès qu'on posait le
    doigt. `sceneFraming()` est partagé par la vue de l'app et le PDF.
 
@@ -288,7 +298,7 @@ nécessaire que si les fichiers Swift/Kotlin ou les dépendances natives changen
 ## Vérifications faites sur cette machine (Windows)
 
 - `npx tsc --noEmit` et `npx eslint src App.tsx` : aucun diagnostic.
-- `npx jest` : 95/95 tests verts (conversion matrice iOS→segment, extrémités
+- `npx jest` : 97/97 tests verts (conversion matrice iOS→segment, extrémités
   Android, soudure des coins et jonctions en T, onglets des murs, surface au
   sol, semis de points, lecture des textures, snap angulaire, projection
   mètres↔pixels, génération du PDF ; **multi-pièces** : découpe par pièce,

@@ -700,9 +700,18 @@ export function clampFootprint(
     const dx = w.b.x - w.a.x;
     const dz = w.b.z - w.a.z;
     const len = Math.hypot(dx, dz) || 1;
-    // Ne considérer que les murs que le meuble longe réellement.
-    const t = ((cx - w.a.x) * dx + (cz - w.a.z) * dz) / (len * len);
-    if (t < -0.1 || t > 1.1) continue;
+    // Ne considérer que les murs que le meuble longe réellement — jugé sur
+    // TOUTE son empreinte, pas sur son seul centre : près d'un angle, le
+    // centre sort de la portée du mur alors qu'un coin le traverse encore.
+    const along = (px: number, pz: number) =>
+      ((px - w.a.x) * dx + (pz - w.a.z) * dz) / (len * len);
+    const ts = [
+      along(cx, cz),
+      ...localCorners.map(([lx, lz]) =>
+        along(cx + lx * cos - lz * sin, cz + lx * sin + lz * cos),
+      ),
+    ];
+    if (Math.max(...ts) < -0.1 || Math.min(...ts) > 1.1) continue;
     const nx = -dz / len;
     const nz = dx / len;
     // Le meuble est ramené du côté de SA pièce, pas du côté où RoomPlan a

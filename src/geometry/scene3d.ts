@@ -110,6 +110,10 @@ export interface SceneOptions {
   coarse?: boolean;
 }
 
+/** Décalage de la lumière par rapport à l'azimut de la caméra (35°). */
+const LIGHT_COS = Math.cos((35 * Math.PI) / 180);
+const LIGHT_SIN = Math.sin((35 * Math.PI) / 180);
+
 /** Découpe des pans : au-delà, le tri « du peintre » devient faux localement. */
 const STEP = 0.6;
 /** Mode « geste » : pans d'un seul tenant, pour tenir 60 images par seconde. */
@@ -258,14 +262,24 @@ export function shadeFill(face: Face3D, ct: number, st: number): string | null {
     nx = -dz / len;
     nz = dx / len;
   }
-  const facing = (nx * st + nz * ct + 1) / 2;
+  // Lumière DÉCALÉE de la caméra (35°). Éclairée dans l'axe du regard, deux
+  // faces symétriques par rapport à celui-ci reçoivent exactement la même
+  // teinte : l'arête entre elles s'efface et le meuble paraît amputé d'un
+  // flanc. Le décalage garantit que deux faces voisines diffèrent toujours.
+  const lx = st * LIGHT_COS + ct * LIGHT_SIN;
+  const lz = ct * LIGHT_COS - st * LIGHT_SIN;
+  const facing = (nx * lx + nz * lz + 1) / 2;
   return face.captured
     ? mixHex(
         mixHex(face.fill, '#3B424E', 0.34),
         mixHex(face.fill, '#FFFFFF', 0.24),
         facing,
       )
-    : mixHex('#BFC9D8', '#FCFDFF', facing);
+    : mixHex(
+        mixHex(face.fill, '#8A94A6', 0.35),
+        mixHex(face.fill, '#FFFFFF', 0.35),
+        facing,
+      );
 }
 
 /** Une pièce telle que la scène l'a rendue : de quoi poser cotes et semis. */
@@ -732,7 +746,9 @@ export function buildScene(
         stroke: pal.objectStroke,
         topStroke: pal.objectStroke,
         captured: !!skin,
-        shade: !!skin,
+        // Toujours ombré : deux flancs du même aplat ne se distinguent que
+        // par leur contour, et un meuble paraît alors amputé d'une face.
+        shade: true,
         // Une télé ou une étagère ne touchent pas le sol : leur dessous se
         // voit depuis le bas de la pièce.
         closeBottom: yb > 1e-3,
