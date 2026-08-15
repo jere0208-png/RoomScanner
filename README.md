@@ -182,11 +182,17 @@ prolongement d'un voisin donne un plan qui paraît droit sans l'être.
 
 ### Retoucher les murs, et annuler
 
-**Tracer un mur** : on touche d'abord une extrémité de mur existante — elles
-s'allument toutes pendant le tracé — puis l'endroit où le finir. Le mur naît
-donc déjà raccroché, et son bout libre se déplace ensuite par sa poignée. Le
-poser au centre du plan « au hasard », comme je l'avais fait d'abord, était
-inutilisable : rien ne l'accrochait à quoi que ce soit.
+**Tracer un mur** : les extrémités existantes s'allument, on part de l'une
+d'elles et **on tire** — le mur suit le doigt, avec sa longueur affichée, et
+se pose au relâcher. Un appui à moins de 26 px d'une extrémité s'y accroche
+exactement. Le graphe est relu dans la foulée : c'est là qu'une pièce se
+scinde ou qu'un contour se referme.
+
+Deux versions ratées avant celle-là. D'abord un mur posé au centre du plan
+« au hasard » : rien ne l'accrochait à quoi que ce soit. Puis un tracé en deux
+appuis, sans aperçu — la conversion appui → coordonnées était pourtant exacte
+au millimètre (vérifié à trois zooms et rotations), mais sans voir ni le point
+pris ni le mur en train de naître, le geste restait aveugle.
 
 Supprimer le mur sélectionné, et **annuler pas à pas**. L'historique
 photographie le plan avant chaque retouche, en regroupant les appels

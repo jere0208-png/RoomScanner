@@ -48,6 +48,35 @@ interface EffMapping {
 import { useScanStore } from '../store/scanStore';
 
 /**
+ * Appui à l'écran → point du monde, accroché à l'extrémité de mur la plus
+ * proche si elle est à portée du doigt (26 px).
+ */
+function pointAt(
+  e: { nativeEvent: { locationX: number; locationY: number } },
+  ref: {
+    map: EffMapping | null;
+    nodes: { x: number; z: number }[];
+  },
+): Pt | null {
+  const map = ref.map;
+  if (!map) return null;
+  const monde = map.toMeters({
+    x: e.nativeEvent.locationX,
+    y: e.nativeEvent.locationY,
+  });
+  let best: Pt | null = null;
+  let bestD = 26 / map.scale;
+  for (const n of ref.nodes) {
+    const d = Math.hypot(n.x - monde.x, n.z - monde.z);
+    if (d < bestD) {
+      bestD = d;
+      best = { x: n.x, z: n.z };
+    }
+  }
+  return best ?? monde;
+}
+
+/**
  * Empreinte d'un meuble, recalée contre les murs de SA pièce seulement :
  * la cloison de la pièce voisine ne doit pas le repousser.
  */
@@ -247,6 +276,44 @@ export function FloorplanEditor({
     };
   }, [baseMapping, view, layout]);
 
+  // Tracé d'un mur : l'autre bout suit le doigt tant qu'on ne relâche pas.
+  const [draftTo, setDraftTo] = useState<Pt | null>(null);
+  const drawRef = useRef({
+    on: false,
+    from: null as Pt | null,
+    map: null as EffMapping | null,
+    nodes: [] as { x: number; z: number }[],
+    pick: undefined as Props['onPickPoint'],
+  });
+  const drawPan = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => drawRef.current.on,
+      onMoveShouldSetPanResponder: () => drawRef.current.on,
+      onPanResponderGrant: (e) => {
+        const p = pointAt(e, drawRef.current);
+        if (!p) return;
+        setDraftTo(p);
+        // Premier appui : il fixe le départ, de préférence sur une extrémité.
+        if (!drawRef.current.from) drawRef.current.pick?.(p, true);
+      },
+      onPanResponderMove: (e) => {
+        const p = pointAt(e, drawRef.current);
+        if (p) setDraftTo(p);
+      },
+      onPanResponderRelease: (e) => {
+        const p = pointAt(e, drawRef.current);
+        const from = drawRef.current.from;
+        setDraftTo(null);
+        // Relâché assez loin du départ : le mur est posé. Sinon on garde le
+        // départ en mémoire, et un second appui suffira.
+        if (p && from && Math.hypot(p.x - from.x, p.z - from.z) > 0.2) {
+          drawRef.current.pick?.(p, false);
+        }
+      },
+      onPanResponderTerminate: () => setDraftTo(null),
+    }),
+  ).current;
+
   // Corps des murs : onglets calculés une fois pour tout le rendu.
   const quads = useMemo(() => wallQuads(walls), [walls]);
   // Pièces du plan : chacune a son contour, son centre et sa teinte de sol.
@@ -288,6 +355,14 @@ export function FloorplanEditor({
     }
     return [...seen.entries()].map(([key, v]) => ({ key, ...v }));
   }, [walls]);
+
+  drawRef.current = {
+    on: !!drawing,
+    from: draftFrom ?? null,
+    map: mapping,
+    nodes: corners,
+    pick: onPickPoint,
+  };
 
   return (
     <View
@@ -489,6 +564,42 @@ export function FloorplanEditor({
                 </G>
               );
             })}
+
+            {/* Mur en cours de tracé : on le voit naître sous le doigt. */}
+            {drawing && draftFrom && draftTo && (
+              <G>
+                {(() => {
+                  const A = mapping.toPx(draftFrom);
+                  const B = mapping.toPx(draftTo);
+                  return (
+                    <>
+                      <Line
+                        x1={A.x}
+                        y1={A.y}
+                        x2={B.x}
+                        y2={B.y}
+                        stroke={c.blue}
+                        strokeWidth={Math.max(4, WALL_T * mapping.scale)}
+                        strokeLinecap="round"
+                        opacity={0.55}
+                      />
+                      <Circle cx={B.x} cy={B.y} r={5} fill={c.blue} />
+                      <SvgText
+                        x={(A.x + B.x) / 2}
+                        y={(A.y + B.y) / 2 - 12}
+                        fill={c.blue}
+                        fontSize={12}
+                        fontWeight="800"
+                        textAnchor="middle">
+                        {`${Math.hypot(draftTo.x - draftFrom.x, draftTo.z - draftFrom.z)
+                          .toFixed(2)
+                          .replace('.', ',')} m`}
+                      </SvgText>
+                    </>
+                  );
+                })()}
+              </G>
+            )}
 
             {/* Cartouche par pièce : nom encadré et surface au sol.
                 Chacun esquive les meubles de sa pièce pour rester lisible. */}
@@ -703,32 +814,11 @@ export function FloorplanEditor({
               );
             })()}
 
-          {/* Tracé d'un mur : on montre où se raccrocher, et on capte
-              l'appui pour le convertir en point du monde. */}
+          {/* Tracé d'un mur : les extrémités existantes s'allument, on part
+              de l'une d'elles et on TIRE — le mur suit le doigt. */}
           {drawing && (
             <>
-              <View
-                style={StyleSheet.absoluteFill}
-                onStartShouldSetResponder={() => true}
-                onResponderRelease={(e) => {
-                  const px = {
-                    x: e.nativeEvent.locationX,
-                    y: e.nativeEvent.locationY,
-                  };
-                  const monde = mapping.toMeters(px);
-                  // Un appui près d'une extrémité s'y accroche exactement.
-                  let best: Pt | null = null;
-                  let bestD = 26 / mapping.scale;
-                  for (const pt of corners) {
-                    const d = Math.hypot(pt.x - monde.x, pt.z - monde.z);
-                    if (d < bestD) {
-                      bestD = d;
-                      best = { x: pt.x, z: pt.z };
-                    }
-                  }
-                  onPickPoint?.(best ?? monde, best !== null);
-                }}
-              />
+              <View style={StyleSheet.absoluteFill} {...drawPan.panHandlers} />
               {corners.map((pt) => {
                 const p = mapping.toPx(pt);
                 const pris =
@@ -741,7 +831,7 @@ export function FloorplanEditor({
                     style={[
                       styles.node,
                       pris && styles.nodeOn,
-                      { left: p.x - 7, top: p.y - 7 },
+                      { left: p.x - 9, top: p.y - 9 },
                     ]}
                   />
                 );
@@ -934,9 +1024,9 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   // Extrémités de murs, montrées pendant le tracé d'un nouveau mur.
   node: {
     position: 'absolute',
-    width: 14,
-    height: 14,
-    borderRadius: 7,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
     backgroundColor: c.surface,
     borderWidth: 2.5,
     borderColor: c.blue,

@@ -409,6 +409,9 @@ export function ResultScreen() {
                 return;
               }
               addWallBetween(draftFrom, p);
+              // Le mur ne veut dire quelque chose qu'une fois le graphe relu :
+              // c'est là qu'une pièce se scinde, ou qu'un contour se referme.
+              redetectRooms();
               setDraftFrom(null);
               setDrawing(false);
             }}
@@ -663,8 +666,8 @@ export function ResultScreen() {
           <View style={styles.wallLengthBar}>
             <Text style={styles.wallLengthLabel}>
               {draftFrom
-                ? 'Touchez où finir le mur — vous pourrez le déplacer ensuite.'
-                : 'Touchez une extrémité de mur pour vous y raccrocher.'}
+                ? 'Tirez jusqu’où finir le mur, puis relâchez.'
+                : 'Partez d’une extrémité bleue et tirez.'}
             </Text>
             <TouchableOpacity
               style={styles.roomAction}
