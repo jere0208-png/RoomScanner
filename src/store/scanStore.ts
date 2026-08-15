@@ -16,8 +16,10 @@ import {
   roomHeight,
   roomOf,
   roomParts,
+  planFrameAngle,
   segLength,
   snapAngle,
+  snapToNeighbours,
   splitAtJunctions,
   straightenWalls,
   toSegment,
@@ -776,7 +778,15 @@ export const useScanStore = create<ScanState>((set, get) => {
       if (!wall) return;
       const old = wall[end];
       const fixed = wall[end === 'a' ? 'b' : 'a'];
-      const snapped = snapAngle(fixed, p);
+      // Le magnétisme se règle sur la trame du LOGEMENT, jamais sur les axes
+      // du repère ARKit — ceux-ci dépendent de l'endroit où le scan a
+      // commencé, et le magnétisme ne se déclenchait alors que par hasard.
+      const frame = planFrameAngle(walls);
+      // D'abord l'alignement sur un mur voisin, puis l'équerre : ainsi un
+      // coin tiré « à peu près » dans le prolongement d'un autre mur s'y
+      // pose vraiment, au lieu d'un plan qui paraît droit sans l'être.
+      const aligned = snapToNeighbours(p, walls, frame, 0.12, old);
+      const snapped = snapAngle(fixed, aligned, 5, frame);
       const room = roomOf(wall);
       set({
         walls: walls.map((w) => {

@@ -822,8 +822,14 @@ export function weldCorners(walls: WallSeg[], tol = 0.15): WallSeg[] {
 
 // ------------------------------------------------- redressement du plan
 
-/** Direction dominante du plan, en radians dans [0, π/2). */
-function dominantAngle(walls: WallSeg[]): number {
+/**
+ * Direction dominante du plan, en radians dans [0, π/2).
+ *
+ * C'est LA référence de tout ce qui s'aligne : le redressement comme le
+ * magnétisme de l'édition. Les axes du repère ARKit, eux, ne veulent rien
+ * dire — ils dépendent de l'endroit où le scan a commencé.
+ */
+export function planFrameAngle(walls: WallSeg[]): number {
   let sx = 0;
   let sy = 0;
   for (const w of walls) {
@@ -886,7 +892,7 @@ export function straightenWalls(
   toleranceDeg = 8,
 ): WallSeg[] {
   if (walls.length === 0) return walls;
-  const theta = dominantAngle(walls);
+  const theta = planFrameAngle(walls);
   const cos = Math.cos(-theta);
   const sin = Math.sin(-theta);
   const fwd = (p: Pt): Pt => ({
@@ -1341,17 +1347,81 @@ export function makeMapping(b: Bounds, viewW: number, viewH: number, margin = 40
 
 export type Mapping = ReturnType<typeof makeMapping>;
 
-/** Snap angulaire : colle le mur à l'horizontale/verticale s'il en est à moins de `deg` degrés. */
-export function snapAngle(fixed: { x: number; z: number }, moving: { x: number; z: number }, deg = 5) {
+/**
+ * Magnétisme angulaire : colle le mur sur la trame du plan.
+ *
+ * `frame` est l'orientation du logement (`planFrameAngle`), pas celle de
+ * l'écran. Sans elle, le magnétisme ne se déclenchait QUE sur les logements
+ * scannés par hasard face à un mur : partout ailleurs, l'utilisateur pouvait
+ * tirer un coin sans jamais rien accrocher, et le redressement se défaisait
+ * au premier glissement.
+ */
+export function snapAngle(
+  fixed: { x: number; z: number },
+  moving: { x: number; z: number },
+  deg = 5,
+  frame = 0,
+) {
   const dx = moving.x - fixed.x;
   const dz = moving.z - fixed.z;
   const len = Math.hypot(dx, dz);
   if (len < 1e-6) return moving;
   const angle = Math.atan2(dz, dx);
   const step = Math.PI / 2;
-  const snapped = Math.round(angle / step) * step;
+  // Multiples de 90° comptés DEPUIS la trame du logement.
+  const snapped = Math.round((angle - frame) / step) * step + frame;
   if (Math.abs(angle - snapped) < (deg * Math.PI) / 180) {
     return { x: fixed.x + len * Math.cos(snapped), z: fixed.z + len * Math.sin(snapped) };
   }
   return moving;
+}
+
+/**
+ * Magnétisme d'alignement : le coin déplacé se cale sur la ligne d'un autre
+ * mur déjà en place.
+ *
+ * C'est ce qui manque le plus quand on redresse un plan à la main — tirer un
+ * coin « à peu près » dans le prolongement d'un mur voisin donne un plan qui
+ * paraît droit et ne l'est pas. On travaille dans la trame du logement : on
+ * cherche un nœud existant dont l'abscisse (ou l'ordonnée) est à moins de
+ * `tol` du point visé, et on s'y aligne. Les deux axes se traitent
+ * séparément, donc un coin peut s'aligner en x sur un mur et en z sur un
+ * autre.
+ */
+export function snapToNeighbours(
+  p: { x: number; z: number },
+  walls: WallSeg[],
+  frame = 0,
+  tol = 0.12,
+  exclude?: { x: number; z: number },
+): { x: number; z: number } {
+  const c = Math.cos(-frame);
+  const sn = Math.sin(-frame);
+  const fwd = (q: Pt): Pt => ({ x: q.x * c - q.z * sn, z: q.x * sn + q.z * c });
+  const back = (q: Pt): Pt => ({ x: q.x * c + q.z * sn, z: -q.x * sn + q.z * c });
+  const target = fwd(p);
+  const skip = exclude ? fwd(exclude) : null;
+  let bestX: number | null = null;
+  let bestZ: number | null = null;
+  let dX = tol;
+  let dZ = tol;
+  for (const w of walls) {
+    for (const end of ['a', 'b'] as const) {
+      const q = fwd(w[end]);
+      // Le coin qu'on déplace ne doit pas s'aligner sur lui-même.
+      if (skip && Math.hypot(q.x - skip.x, q.z - skip.z) < 1e-6) continue;
+      const ex = Math.abs(q.x - target.x);
+      if (ex < dX) {
+        dX = ex;
+        bestX = q.x;
+      }
+      const ez = Math.abs(q.z - target.z);
+      if (ez < dZ) {
+        dZ = ez;
+        bestZ = q.z;
+      }
+    }
+  }
+  if (bestX === null && bestZ === null) return p;
+  return back({ x: bestX ?? target.x, z: bestZ ?? target.z });
 }

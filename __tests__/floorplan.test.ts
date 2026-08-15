@@ -8,12 +8,14 @@ import {
   loopAreaM2,
   makeMapping,
   mergeColinear,
+  planFrameAngle,
   pointOnSeg,
   quadPoints,
   roomParts,
   roomSurface,
   segLength,
   snapAngle,
+  snapToNeighbours,
   splitAtJunctions,
   straightenWalls,
   toFootprint,
@@ -310,16 +312,91 @@ describe('sampleTexture', () => {
   });
 });
 
-describe('snapAngle', () => {
-  it("colle un mur presque horizontal à l'horizontale", () => {
-    const p = snapAngle({ x: 0, z: 0 }, { x: 4, z: 0.1 });
-    expect(p.z).toBeCloseTo(0);
-    expect(Math.hypot(p.x, p.z)).toBeCloseTo(Math.hypot(4, 0.1));
+describe('magnétisme de l’édition', () => {
+  const ecart = (a: Pt, b: Pt, frame: number) => {
+    const d = ((Math.atan2(b.z - a.z, b.x - a.x) - frame) * 180) / Math.PI;
+    const m = ((d % 90) + 90) % 90;
+    return Math.min(m, 90 - m);
+  };
+  /** Le même logement, tourné de `deg` — comme selon l'endroit du scan. */
+  const tourne = (deg: number) => {
+    const t = (deg * Math.PI) / 180;
+    const c = Math.cos(t);
+    const s2 = Math.sin(t);
+    const f = (p: Pt): Pt => ({ x: p.x * c - p.z * s2, z: p.x * s2 + p.z * c });
+    return weldCorners(
+      room('r', 0, 0, 4, 3).map((w) => ({ ...w, a: f(w.a), b: f(w.b) })),
+    );
+  };
+
+  it('colle à l’équerre QUEL QUE SOIT l’angle du scan', () => {
+    // Le magnétisme se réglait sur les axes du repère ARKit : il ne se
+    // déclenchait donc que sur un logement scanné par hasard face à un mur.
+    for (const deg of [0, 17, 30, 67, 89]) {
+      const murs = tourne(deg);
+      const frame = planFrameAngle(murs);
+      const a = murs[0].a;
+      const t = (deg * Math.PI) / 180;
+      const vise = {
+        x: a.x + 4.02 * Math.cos(t) - 0.14 * Math.sin(t),
+        z: a.z + 4.02 * Math.sin(t) + 0.14 * Math.cos(t),
+      };
+      expect(ecart(a, vise, t)).toBeGreaterThan(1);
+      expect(ecart(a, snapAngle(a, vise, 5, frame), t)).toBeLessThan(0.01);
+    }
   });
 
-  it('ne touche pas un mur en diagonale franche', () => {
-    const p = snapAngle({ x: 0, z: 0 }, { x: 3, z: 2 });
-    expect(p).toEqual({ x: 3, z: 2 });
+  it('ne touche pas un mur franchement en diagonale', () => {
+    const a = { x: 0, z: 0 };
+    const vise = { x: 3, z: 2 };
+    expect(snapAngle(a, vise)).toEqual(vise);
+  });
+
+  it('aligne un coin sur la ligne d’un mur voisin', () => {
+    const murs = weldCorners(room('r', 0, 0, 4, 3));
+    // 6 cm à côté de la ligne x = 4 : on s'y pose.
+    expect(snapToNeighbours({ x: 3.94, z: 1.5 }, murs, 0, 0.12).x).toBeCloseTo(4);
+    // 50 cm à côté : on laisse l'utilisateur tranquille.
+    expect(snapToNeighbours({ x: 3.5, z: 1.5 }, murs, 0, 0.12).x).toBeCloseTo(3.5);
+  });
+
+  it('ne laisse pas un coin s’aligner sur lui-même', () => {
+    const murs = weldCorners(room('r', 0, 0, 4, 3));
+    // Sans exclusion, le coin (4, 0) s'attirerait lui-même et rien ne bougerait.
+    const p = snapToNeighbours({ x: 4.05, z: 0.03 }, murs, 0, 0.12, { x: 4, z: 0 });
+    expect(p.x).toBeCloseTo(4);
+    expect(p.z).toBeCloseTo(0);
+  });
+
+  it('le redressement survit à un glissement de coin', () => {
+    // Les deux fonctions se contredisaient : redresser alignait sur la trame
+    // du logement, le magnétisme sur celle du monde.
+    const bancal = weldCorners([
+      seg('n', { x: 0, z: 0 }, { x: 4.03, z: -0.14 }),
+      seg('e', { x: 4.03, z: -0.14 }, { x: 4.2, z: 2.96 }),
+      seg('s', { x: 4.2, z: 2.96 }, { x: 0.06, z: 3.05 }),
+      seg('w', { x: 0.06, z: 3.05 }, { x: 0, z: 0 }),
+    ]);
+    const droit = straightenWalls(bancal);
+    const frame = planFrameAngle(droit);
+    const m = droit[0];
+    const tire = { x: m.b.x + 0.05, z: m.b.z + 0.04 };
+    const pose = snapAngle(
+      m.a,
+      snapToNeighbours(tire, droit, frame, 0.12, m.b),
+      5,
+      frame,
+    );
+    const apres = droit.map((w) => (w.id === m.id ? { ...w, b: pose } : w));
+    const d0 = Math.atan2(apres[0].b.z - apres[0].a.z, apres[0].b.x - apres[0].a.x);
+    const pire = Math.max(
+      ...apres.map((w) => {
+        const d = ((Math.atan2(w.b.z - w.a.z, w.b.x - w.a.x) - d0) * 180) / Math.PI;
+        const mm = ((d % 90) + 90) % 90;
+        return Math.min(mm, 90 - mm);
+      }),
+    );
+    expect(pire).toBeLessThan(0.01);
   });
 });
 

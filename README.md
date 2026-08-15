@@ -165,6 +165,21 @@ sa moyenne. Les coins restent soudés au point près, la boucle reste fermée,
 la surface bouge de moins de 1 %, et un pan coupé franc — au-delà de 8° —
 n'est pas touché.
 
+### Magnétisme de l'édition
+
+Tout ce qui s'aligne se règle sur `planFrameAngle()` — la trame du logement —
+et **jamais sur les axes du repère ARKit**, qui dépendent de l'endroit où le
+scan a commencé. Le magnétisme angulaire s'y référait pourtant : il ne se
+déclenchait donc que sur un logement scanné par hasard face à un mur, et
+ailleurs on pouvait tirer un coin sans jamais rien accrocher. Pire, le
+redressement se défaisait au premier glissement.
+
+S'y ajoute un magnétisme d'ALIGNEMENT : le coin déplacé se cale sur la ligne
+d'un mur déjà en place, à moins de 12 cm, les deux axes étant traités
+séparément — un coin peut donc s'aligner en abscisse sur un mur et en
+ordonnée sur un autre. Sans lui, tirer un coin « à peu près » dans le
+prolongement d'un voisin donne un plan qui paraît droit sans l'être.
+
 ### Retoucher les murs, et annuler
 
 Ajouter un mur (posé au centre du plan, à déplacer par ses poignées),
@@ -408,7 +423,7 @@ passe inaperçu jusqu'à la CI. C'est arrivé une fois.
 ## Vérifications faites sur cette machine (Windows)
 
 - `npx tsc --noEmit` et `npx eslint src App.tsx` : aucun diagnostic.
-- `npx jest` : 122/122 tests verts (conversion matrice iOS→segment, extrémités
+- `npx jest` : 125/125 tests verts (conversion matrice iOS→segment, extrémités
   Android, soudure des coins et jonctions en T, onglets des murs, surface au
   sol, semis de points, lecture des textures, snap angulaire, projection
   mètres↔pixels, génération du PDF ; **multi-pièces** : découpe par pièce,
