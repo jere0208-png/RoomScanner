@@ -6,21 +6,29 @@
  * de vues 3D avec les mesures portées sur les murs.
  * PDF 1.4 non compressé, A4, polices Helvetica (WinAnsi).
  */
-import type { ObjectData } from 'react-native-room-scan';
+import type { FloorData, ObjectData } from 'react-native-room-scan';
 import {
   clampFootprint,
-  closedLoop,
-  loopAreaM2,
+  quadPoints,
+  roomSurface,
   segLength,
   toFootprint,
+  wallQuads,
   wallsCentroid,
+  WALL_T,
   type WallSeg,
 } from '../geometry/floorplan';
+import { dotStep, floorDots, mixHex } from '../geometry/appearance';
+import {
+  buildScene,
+  shadeFill,
+  type P3,
+  type ScenePalette,
+} from '../geometry/scene3d';
 import { frCategory, furnKind, furnitureStrokes } from '../geometry/furniture';
 
 const PAGE_W = 595;
 const PAGE_H = 842;
-const WALL_T = 0.14;
 
 // Couleurs du plan
 const INK = '#141922';
@@ -71,6 +79,10 @@ export interface PdfOptions {
   /** Cotes sur le plan 2D / sur les vues 3D. */
   measures2D?: boolean;
   measures3D?: boolean;
+  /** Surface au sol (fond pointillé + valeur en m²). Activée par défaut. */
+  surfaces?: boolean;
+  /** Couleurs et textures relevées pendant le scan. */
+  textures?: boolean;
 }
 
 function bytesOf(s: string): Uint8Array {
@@ -344,242 +356,21 @@ function drawSheetChrome(
 
 // ----------------------------------------------------------- géométrie 3D
 
-interface P3 {
-  x: number;
-  y: number;
-  z: number;
-}
-interface Face {
-  pts: P3[];
-  fill: string | null;
-  stroke: string | null;
-  shade?: boolean;
-  bias?: number;
-  isFloor?: boolean;
-}
-
-const mixHex = (a: string, b: string, t: number): string => {
-  const cl = Math.max(0, Math.min(1, t));
-  const pa = [1, 3, 5].map((i) => parseInt(a.slice(i, i + 2), 16));
-  const pb = [1, 3, 5].map((i) => parseInt(b.slice(i, i + 2), 16));
-  return `#${pa
-    .map((v, i) => Math.round(v + (pb[i] - v) * cl).toString(16).padStart(2, '0'))
-    .join('')}`;
+/** Palette 3D de la feuille imprimée (encres du plan, pas du thème écran). */
+const PDF_SCENE: ScenePalette = {
+  floor: '#EFF1F5',
+  floorStroke: '#C9D1DC',
+  wall: '#FFFFFF',
+  wallStroke: '#77828F',
+  wallTop: '#F2F5F9',
+  wallTopStroke: '#77828F',
+  opening: '#B9C2CE',
+  door: '#E8A13B',
+  window: '#3EB8E5',
+  object: '#D8E1F2',
+  objectTop: '#E9EEF9',
+  objectStroke: '#9FACBF',
 };
-
-const cornerKey = (p: { x: number; z: number }) =>
-  `${p.x.toFixed(3)}:${p.z.toFixed(3)}`;
-
-function cornerCounts(walls: WallSeg[]): Map<string, string[]> {
-  const m = new Map<string, string[]>();
-  for (const w of walls) {
-    for (const p of [w.a, w.b]) {
-      const k = cornerKey(p);
-      const l = m.get(k) ?? [];
-      l.push(w.id);
-      m.set(k, l);
-    }
-  }
-  for (const l of m.values()) l.sort();
-  return m;
-}
-
-/** Rectangle épais d'un mur au sol. Aux coins partagés, UN mur traverse
- *  (prolongé de T/2), l'autre s'arrête contre lui : angle net. */
-function thickWallRect(w: WallSeg, counts: Map<string, string[]>) {
-  const dx = w.b.x - w.a.x;
-  const dz = w.b.z - w.a.z;
-  const len = Math.hypot(dx, dz) || 1;
-  const ux = dx / len;
-  const uz = dz / len;
-  const extFor = (k: string) => {
-    const l = counts.get(k) ?? [];
-    if (l.length < 2) return 0;
-    return l[0] === w.id ? WALL_T / 2 : -WALL_T / 2;
-  };
-  const extA = extFor(cornerKey(w.a));
-  const extB = extFor(cornerKey(w.b));
-  const pa = { x: w.a.x - ux * extA, z: w.a.z - uz * extA };
-  const pb = { x: w.b.x + ux * extB, z: w.b.z + uz * extB };
-  const nx = (-dz / len) * (WALL_T / 2);
-  const nz = (dx / len) * (WALL_T / 2);
-  return {
-    corners: [
-      { x: pa.x + nx, z: pa.z + nz },
-      { x: pb.x + nx, z: pb.z + nz },
-      { x: pb.x - nx, z: pb.z - nz },
-      { x: pa.x - nx, z: pa.z - nz },
-    ],
-    ux,
-    uz,
-    nx,
-    nz,
-  };
-}
-
-function buildFaces(
-  walls: WallSeg[],
-  openings: WallSeg[],
-  objects: ObjectData[],
-  colorOpenings = false,
-) {
-  const floorY =
-    walls.length > 0 ? Math.min(...walls.map((w) => w.yCenter - w.height / 2)) : 0;
-  const faces: Face[] = [];
-
-  const loop = closedLoop(walls);
-  if (loop) {
-    faces.push({
-      pts: loop.map((p) => ({ x: p.x, y: 0, z: p.z })),
-      fill: '#EFF1F5',
-      stroke: '#C9D1DC',
-      isFloor: true,
-    });
-  }
-
-  const vquad = (
-    p: { x: number; z: number },
-    q: { x: number; z: number },
-    yb: number,
-    yt: number,
-  ): P3[] => [
-    { x: p.x, y: yb, z: p.z },
-    { x: q.x, y: yb, z: q.z },
-    { x: q.x, y: yt, z: q.z },
-    { x: p.x, y: yt, z: p.z },
-  ];
-
-  // Subdivision en bandes de 60 cm : tri de profondeur localement juste
-  // (mêmes règles que la vue 3D de l'app), contours redessinés par-dessus.
-  const STEP = 0.6;
-  const lerp2 = (
-    P: { x: number; z: number },
-    Q: { x: number; z: number },
-    t: number,
-  ) => ({ x: P.x + (Q.x - P.x) * t, z: P.z + (Q.z - P.z) * t });
-  const pushStrips = (
-    p: { x: number; z: number },
-    q: { x: number; z: number },
-    yb: number,
-    yt: number,
-    fill: string,
-    shade?: boolean,
-  ) => {
-    const n = Math.max(1, Math.ceil(Math.hypot(q.x - p.x, q.z - p.z) / STEP));
-    for (let i = 0; i < n; i++) {
-      faces.push({
-        pts: vquad(lerp2(p, q, i / n), lerp2(p, q, (i + 1) / n), yb, yt),
-        fill,
-        stroke: null,
-        shade,
-      });
-    }
-  };
-  const pushTopStrips = (
-    e1a: { x: number; z: number },
-    e1b: { x: number; z: number },
-    e2a: { x: number; z: number },
-    e2b: { x: number; z: number },
-    y: number,
-    fill: string,
-  ) => {
-    const n = Math.max(1, Math.ceil(Math.hypot(e1b.x - e1a.x, e1b.z - e1a.z) / STEP));
-    for (let i = 0; i < n; i++) {
-      const t0 = i / n;
-      const t1 = (i + 1) / n;
-      faces.push({
-        pts: [
-          lerp2(e1a, e1b, t0),
-          lerp2(e1a, e1b, t1),
-          lerp2(e2a, e2b, t1),
-          lerp2(e2a, e2b, t0),
-        ].map((p) => ({ x: p.x, y, z: p.z })),
-        fill,
-        stroke: null,
-      });
-    }
-  };
-  const pushOutline = (pts: P3[], stroke: string) => {
-    faces.push({ pts, fill: null, stroke, bias: 0.001 });
-  };
-
-  const counts = cornerCounts(walls);
-  for (const w of walls) {
-    const { corners } = thickWallRect(w, counts);
-    const [a1, b1, b2, a2] = corners;
-    for (const [p, q] of [
-      [a1, b1],
-      [b2, a2],
-    ] as const) {
-      pushStrips(p, q, 0, w.height, '#FFFFFF', true);
-      pushOutline(vquad(p, q, 0, w.height), '#77828F');
-    }
-    for (const [p, q] of [
-      [a2, a1],
-      [b1, b2],
-    ] as const) {
-      faces.push({
-        pts: vquad(p, q, 0, w.height),
-        fill: '#FFFFFF',
-        stroke: '#77828F',
-        shade: true,
-      });
-    }
-    pushTopStrips(a1, b1, a2, b2, w.height, '#F2F5F9');
-    pushOutline(
-      [a1, b1, b2, a2].map((p) => ({ x: p.x, y: w.height, z: p.z })),
-      '#77828F',
-    );
-  }
-
-  for (const o of openings) {
-    const yb = Math.max(0, o.yCenter - o.height / 2 - floorY);
-    faces.push({
-      pts: vquad(o.a, o.b, yb, yb + o.height),
-      fill: colorOpenings
-        ? o.type === 'door'
-          ? '#E8A13B'
-          : '#3EB8E5'
-        : '#B9C2CE',
-      stroke: null,
-      bias: 0.12,
-    });
-  }
-
-  const interior = wallsCentroid(walls);
-  for (const obj of objects.map((o) =>
-    clampFootprint(toFootprint(o), walls, interior),
-  )) {
-    const cosY = Math.cos(obj.yaw);
-    const sinY = Math.sin(obj.yaw);
-    const hw = obj.width / 2;
-    const hd = obj.depth / 2;
-    const corners = [
-      [-hw, -hd],
-      [hw, -hd],
-      [hw, hd],
-      [-hw, hd],
-    ].map(([lx, lz]) => ({
-      x: obj.cx + lx * cosY - lz * sinY,
-      z: obj.cz + lx * sinY + lz * cosY,
-    }));
-    const yb = Math.max(0, obj.yCenter - obj.height / 2 - floorY);
-    const yt = yb + obj.height;
-    for (let i = 0; i < 4; i++) {
-      const p = corners[i];
-      const q = corners[(i + 1) % 4];
-      pushStrips(p, q, yb, yt, '#D8E1F2');
-      pushOutline(vquad(p, q, yb, yt), '#9FACBF');
-    }
-    pushTopStrips(corners[0], corners[1], corners[3], corners[2], yt, '#E9EEF9');
-    pushOutline(
-      corners.map((p) => ({ x: p.x, y: yt, z: p.z })),
-      '#9FACBF',
-    );
-  }
-
-  return faces;
-}
 
 function draw3DView(
   d: Draw,
@@ -588,12 +379,26 @@ function draw3DView(
   objects: ObjectData[],
   box: { x: number; y: number; w: number; h: number },
   view: View3DParams,
-  colorOpenings = false,
-  showDims = true,
+  opts: {
+    colorOpenings?: boolean;
+    showDims?: boolean;
+    showSurfaces?: boolean;
+    showTextures?: boolean;
+    floor?: FloorData | null;
+  } = {},
 ) {
   const thetaDeg = view.theta;
   const tiltDeg = view.tilt;
-  const faces = buildFaces(walls, openings, objects, colorOpenings);
+  const showDims = opts.showDims ?? true;
+  // Exactement la même scène que la vue 3D de l'app.
+  const scene = buildScene(walls, openings, objects, {
+    palette: PDF_SCENE,
+    colorOpenings: opts.colorOpenings,
+    showSurfaces: opts.showSurfaces,
+    showTextures: opts.showTextures,
+    floor: opts.floor,
+  });
+  const faces = scene.faces;
   const all = faces.flatMap((f) => f.pts);
   if (all.length === 0) return;
   const ctr = {
@@ -632,23 +437,34 @@ function draw3DView(
     const depth = f.isFloor
       ? -Infinity
       : pts.reduce((s, p) => s + p.depth, 0) / pts.length + (f.bias ?? 0);
-    let fill = f.fill;
-    if (f.shade) {
-      const a = f.pts[0];
-      const b = f.pts[1];
-      const dx = b.x - a.x;
-      const dz = b.z - a.z;
-      const len = Math.hypot(dx, dz) || 1;
-      const facing = ((-dz / len) * st + (dx / len) * ct + 1) / 2;
-      fill = mixHex('#BFC9D8', '#FCFDFF', facing);
-    }
-    return { pts, depth, fill, stroke: f.stroke };
+    return { pts, depth, fill: shadeFill(f, ct, st), stroke: f.stroke };
   });
   // Cotes insérées dans le tri de profondeur : un mur proche les recouvre.
   type Item =
     | { kind: 'poly'; depth: number; pts: Pt[]; fill: string | null; stroke: string | null }
-    | { kind: 'label'; depth: number; x: number; y: number; text: string };
+    | { kind: 'dot'; depth: number; x: number; y: number; color: string }
+    | { kind: 'label'; depth: number; x: number; y: number; text: string }
+    | { kind: 'area'; depth: number; x: number; y: number; text: string };
   const items: Item[] = polys.map((p) => ({ kind: 'poly' as const, ...p }));
+
+  // Semis du sol et surface : mêmes repères que sur le plan 2D.
+  if (opts.showSurfaces && scene.surface) {
+    const dotColor = mixHex(scene.floorFill, '#4A5361', 0.55);
+    for (const p of floorDots(scene.surface.pts, dotStep(scale, 13), 600)) {
+      const q = project({ x: p.x, y: 0, z: p.z });
+      items.push({ kind: 'dot', depth: -Infinity, x: q.x, y: q.y, color: dotColor });
+    }
+    const mid = wallsCentroid(walls);
+    const q = project({ x: mid.x, y: 0, z: mid.z });
+    items.push({
+      kind: 'area',
+      depth: -Infinity,
+      x: q.x,
+      y: q.y,
+      text: `${scene.surface.exact ? '' : '≈ '}${fr1(scene.surface.area)} m²`,
+    });
+  }
+
   for (const w of showDims ? walls : []) {
     const mid = project({
       x: (w.a.x + w.b.x) / 2,
@@ -667,6 +483,10 @@ function draw3DView(
   for (const item of items) {
     if (item.kind === 'poly') {
       d.poly(item.pts, item.fill, item.stroke, 0.7);
+    } else if (item.kind === 'dot') {
+      d.circle(item.x, item.y, 0.55, item.color);
+    } else if (item.kind === 'area') {
+      d.text(item.text, item.x, item.y, 9.5, INK, { bold: true });
     } else {
       d.text(item.text, item.x, item.y, 8, '#2A3340');
     }
@@ -678,20 +498,42 @@ function draw3DView(
 const fr1 = (v: number) => v.toFixed(1).replace('.', ',');
 const frLen = (v: number) => v.toFixed(2).replace('.', ',');
 
+/** Ce qui est commun à toutes les feuilles d'un même export. */
+interface SheetContext {
+  name: string;
+  filename: string;
+  walls: WallSeg[];
+  openings: WallSeg[];
+  objects: ObjectData[];
+  floor: FloorData | null;
+  colorOpenings: boolean;
+  showSurfaces: boolean;
+  showTextures: boolean;
+}
+
 function planPage(
-  name: string,
-  filename: string,
-  walls: WallSeg[],
-  openings: WallSeg[],
-  objects: ObjectData[],
+  ctx: SheetContext,
   sheet: string,
   planView?: PlanViewParams,
-  colorOpenings = false,
   showDims = true,
 ): string {
+  const {
+    name,
+    filename,
+    walls,
+    openings,
+    objects,
+    colorOpenings,
+    showSurfaces,
+    showTextures,
+    floor: floorData,
+  } = ctx;
   const d = new Draw();
-  const loop = closedLoop(walls);
-  const area = loop ? loopAreaM2(loop) : null;
+  const surface = roomSurface(walls);
+  const floorFill =
+    showTextures && floorData?.color
+      ? mixHex(floorData.color, '#FFFFFF', 0.42)
+      : '#F5F7FA';
 
   // Zone de dessin (cotes extérieures comprises)
   const box = {
@@ -734,16 +576,22 @@ function planPage(
       y: bcy + (czw - p.z) * scale,
     });
 
-    const centroid = loop
+    const centroid = surface
       ? {
-          x: loop.reduce((s, p) => s + p.x, 0) / loop.length,
-          z: loop.reduce((s, p) => s + p.z, 0) / loop.length,
+          x: surface.pts.reduce((s, p) => s + p.x, 0) / surface.pts.length,
+          z: surface.pts.reduce((s, p) => s + p.z, 0) / surface.pts.length,
         }
       : { x: (minX + maxX) / 2, z: (minZ + maxZ) / 2 };
 
-    // Sol
-    if (loop) {
-      d.poly(loop.map(px), '#F5F7FA', null);
+    // Surface au sol : aplat + semis de points, pour la distinguer d'emblée
+    // des murs pochés en noir.
+    if (surface && showSurfaces) {
+      d.poly(surface.pts.map(px), floorFill, null);
+      const dotColor = mixHex(floorFill, '#3D4551', 0.55);
+      for (const p of floorDots(surface.pts, dotStep(scale, 13), 1500)) {
+        const q = px(p);
+        d.circle(q.x, q.y, 0.55, dotColor);
+      }
     }
 
     // Meubles : contour + symbole d'architecte, recalés devant les murs.
@@ -773,10 +621,11 @@ function planPage(
       }
     }
 
-    // Murs pochés (noir plein, coins prolongés)
-    const counts = cornerCounts(walls);
+    // Murs pochés (noir plein, jonctions d'onglet partagées)
+    const quads = wallQuads(walls);
     for (const w of walls) {
-      d.poly(thickWallRect(w, counts).corners.map(px), INK, null);
+      const q = quads.get(w.id);
+      if (q) d.poly(quadPoints(q).map(px), INK, null);
     }
 
     // Ouvertures : trouée blanche + symbole
@@ -793,7 +642,7 @@ function planPage(
           { x: o.b.x - nx, z: o.b.z - nz },
           { x: o.a.x - nx, z: o.a.z - nz },
         ].map(px),
-        '#FFFFFF',
+        showSurfaces && surface ? floorFill : '#FFFFFF',
         null,
       );
 
@@ -877,9 +726,16 @@ function planPage(
     }
 
     // Surface au centre
-    if (area !== null) {
+    if (surface && showSurfaces) {
       const cp2 = px(centroid);
-      d.text(`${fr1(area)} m²`, cp2.x, cp2.y + 4, 15, INK, { bold: true });
+      d.text(
+        `${surface.exact ? '' : '≈ '}${fr1(surface.area)} m²`,
+        cp2.x,
+        cp2.y + 4,
+        15,
+        INK,
+        { bold: true },
+      );
       d.text('surface au sol', cp2.x, cp2.y - 10, 8, GREY);
     }
   }
@@ -900,30 +756,32 @@ const DEFAULT_PDF_VIEWS: [View3DParams, View3DParams] = [
 ];
 
 function threeDPage(
-  name: string,
-  filename: string,
-  walls: WallSeg[],
-  openings: WallSeg[],
-  objects: ObjectData[],
+  ctx: SheetContext,
   sheet: string,
   views: [View3DParams, View3DParams] = DEFAULT_PDF_VIEWS,
-  colorOpenings = false,
   showDims = true,
 ): string {
   const d = new Draw();
+  const opts = {
+    colorOpenings: ctx.colorOpenings,
+    showSurfaces: ctx.showSurfaces,
+    showTextures: ctx.showTextures,
+    floor: ctx.floor,
+    showDims,
+  };
   const top = FRAME.y + FRAME.h;
   d.text('Vue 1', FRAME.x + 20, top - 30, 10, GREY, { align: 'left' });
-  draw3DView(d, walls, openings, objects,
+  draw3DView(d, ctx.walls, ctx.openings, ctx.objects,
     { x: FRAME.x + 30, y: FRAME.y + TITLE_H + 375, w: FRAME.w - 60, h: 290 },
-    views[0], colorOpenings, showDims);
+    views[0], opts);
   d.text('Vue 2', FRAME.x + 20, FRAME.y + TITLE_H + 350, 10, GREY, { align: 'left' });
-  draw3DView(d, walls, openings, objects,
+  draw3DView(d, ctx.walls, ctx.openings, ctx.objects,
     { x: FRAME.x + 30, y: FRAME.y + TITLE_H + 30, w: FRAME.w - 60, h: 290 },
-    views[1], colorOpenings, showDims);
+    views[1], opts);
 
   drawSheetChrome(d, {
-    project: name,
-    filename,
+    project: ctx.name,
+    filename: ctx.filename,
     sheetTitle: showDims ? 'Vues 3D cotées' : 'Vues 3D',
     sheet,
     scaleLabel: null,
@@ -938,6 +796,8 @@ export interface ScanForPdf {
   walls: WallSeg[];
   openings: WallSeg[];
   objects: ObjectData[];
+  /** Couleurs du sol relevées au scan, si disponibles. */
+  floor?: FloorData | null;
 }
 
 export function pdfFilename(name: string): string {
@@ -955,20 +815,20 @@ export function buildScanPdf(
 ): Uint8Array {
   const filename = pdfFilename(scan.name);
   const total = include3D ? 2 : 1;
-  const pages = [
-    planPage(
-      scan.name, filename, scan.walls, scan.openings, scan.objects,
-      `1 / ${total}`, opts.plan, opts.colorOpenings ?? false,
-      opts.measures2D ?? true,
-    ),
-  ];
+  const ctx: SheetContext = {
+    name: scan.name,
+    filename,
+    walls: scan.walls,
+    openings: scan.openings,
+    objects: scan.objects,
+    floor: scan.floor ?? null,
+    colorOpenings: opts.colorOpenings ?? false,
+    showSurfaces: opts.surfaces ?? true,
+    showTextures: opts.textures ?? false,
+  };
+  const pages = [planPage(ctx, `1 / ${total}`, opts.plan, opts.measures2D ?? true)];
   if (include3D) {
-    pages.push(
-      threeDPage(
-        scan.name, filename, scan.walls, scan.openings, scan.objects,
-        `2 / ${total}`, opts.views, opts.colorOpenings ?? false, opts.measures3D ?? true,
-      ),
-    );
+    pages.push(threeDPage(ctx, `2 / ${total}`, opts.views, opts.measures3D ?? true));
   }
   return buildDocument(pages);
 }

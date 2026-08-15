@@ -28,6 +28,7 @@ object ScanEngine {
   fun reset() {
     walls.clear()
     floorY = 0f
+    ColorSampler.reset()
   }
 
   fun onFrame(context: ReactContext, session: Session, frame: Frame) {
@@ -48,6 +49,9 @@ object ScanEngine {
       if (wall.id !in walls) hasNew = true
       walls[wall.id] = wall
     }
+
+    // Relevé des couleurs de l'environnement, sur les murs déjà connus.
+    ColorSampler.onFrame(frame, walls.values, floorY)
 
     val now = System.currentTimeMillis()
     if (hasNew || now - lastEmit > 500) {
@@ -86,7 +90,8 @@ object ScanEngine {
     )
   }
 
-  fun buildSnapshot(): WritableMap = Arguments.createMap().apply {
+  /** `withColors` : réservé au résultat final, trop lourd en temps réel. */
+  fun buildSnapshot(withColors: Boolean = false): WritableMap = Arguments.createMap().apply {
     putInt("wallCount", walls.size)
     putInt("objectCount", 0)
     putInt("doorCount", 0)
@@ -100,10 +105,14 @@ object ScanEngine {
           putDouble("height", w.height.toDouble())
           putDouble("ax", w.ax.toDouble()); putDouble("az", w.az.toDouble())
           putDouble("bx", w.bx.toDouble()); putDouble("bz", w.bz.toDouble())
+          if (withColors) ColorSampler.applyTo(this, w.id)
         })
       }
     })
   }
+
+  /** Couleurs du sol relevées pendant le scan (null si rien de captable). */
+  fun floorPayload(): WritableMap? = ColorSampler.floorPayload()
 
   /** Export OBJ : un quad par mur, du sol au sommet. */
   fun exportObj(dir: File): File {

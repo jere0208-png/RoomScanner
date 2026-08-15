@@ -1,6 +1,11 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { ObjectData, ScanResult, ScanUpdate } from 'react-native-room-scan';
+import type {
+  FloorData,
+  ObjectData,
+  ScanResult,
+  ScanUpdate,
+} from 'react-native-room-scan';
 import {
   segLength,
   snapAngle,
@@ -21,12 +26,16 @@ export interface SavedScan {
   walls: WallSeg[];
   openings: WallSeg[];
   objects: ObjectData[];
+  /** Couleurs du sol relevées au scan. */
+  floor?: FloorData | null;
 }
 
 const STORAGE_KEY = 'roomscanner.saves.v1';
 const THEME_KEY = 'roomscanner.themePref.v1';
 const COLORS_KEY = 'roomscanner.openingColors.v1';
 const FURNITURE_KEY = 'roomscanner.showFurniture.v1';
+const SURFACES_KEY = 'roomscanner.showSurfaces.v1';
+const TEXTURES_KEY = 'roomscanner.showTextures.v1';
 
 export type ThemePref = 'light' | 'dark';
 
@@ -75,6 +84,8 @@ interface ScanState {
   walls: WallSeg[];
   openings: WallSeg[];
   objects: ObjectData[];
+  /** Couleurs du sol relevées pendant le scan (null si non captées). */
+  floor: FloorData | null;
 
   // Bibliothèque persistée
   saves: SavedScan[];
@@ -90,6 +101,14 @@ interface ScanState {
   // Meubles visibles (sinon : murs et sols seuls). Activé par défaut.
   showFurniture: boolean;
   setShowFurniture: (v: boolean) => void;
+
+  // Surface au sol : fond pointillé + valeur en m². Activée par défaut.
+  showSurfaces: boolean;
+  setShowSurfaces: (v: boolean) => void;
+
+  // Couleurs et textures relevées au scan (2D, 3D, PDF). Décoché par défaut.
+  showTextures: boolean;
+  setShowTextures: (v: boolean) => void;
 
   setScreen: (s: Screen) => void;
   setSupported: (v: boolean) => void;
@@ -133,6 +152,7 @@ export const useScanStore = create<ScanState>((set, get) => {
             walls: st.walls,
             openings: st.openings,
             objects: st.objects,
+            floor: st.floor,
             modelPath: st.modelPath,
             updatedAt: Date.now(),
           }
@@ -163,6 +183,7 @@ export const useScanStore = create<ScanState>((set, get) => {
     walls: [],
     openings: [],
     objects: [],
+    floor: null,
     saves: [],
     themePref: 'light',
     showOpeningColors: false,
@@ -181,6 +202,18 @@ export const useScanStore = create<ScanState>((set, get) => {
     setShowFurniture: (showFurniture) => {
       set({ showFurniture });
       AsyncStorage.setItem(FURNITURE_KEY, showFurniture ? '1' : '0').catch(() => {});
+    },
+
+    showSurfaces: true,
+    setShowSurfaces: (showSurfaces) => {
+      set({ showSurfaces });
+      AsyncStorage.setItem(SURFACES_KEY, showSurfaces ? '1' : '0').catch(() => {});
+    },
+
+    showTextures: false,
+    setShowTextures: (showTextures) => {
+      set({ showTextures });
+      AsyncStorage.setItem(TEXTURES_KEY, showTextures ? '1' : '0').catch(() => {});
     },
 
     setRoomName: (roomName) => set({ roomName, dirty: true }),
@@ -206,6 +239,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       const walls = weldCorners(segments.filter((s) => s.type === 'wall'));
       const openings = segments.filter((s) => s.type !== 'wall');
       const objects = r.objects ?? [];
+      const floor = r.floor ?? null;
 
       if (walls.length === 0) {
         // Rien d'exploitable : on montre l'état vide, sans polluer la bibliothèque.
@@ -216,6 +250,7 @@ export const useScanStore = create<ScanState>((set, get) => {
           walls: [],
           openings: [],
           objects: [],
+          floor: null,
           processing: false,
           scanning: false,
           screen: 'result',
@@ -235,6 +270,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         walls,
         openings,
         objects,
+        floor,
       };
       const saves = [save, ...get().saves];
       set({
@@ -247,6 +283,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         walls,
         openings,
         objects,
+        floor,
         saves,
         processing: false,
         scanning: false,
@@ -369,6 +406,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         walls: save.walls,
         openings: save.openings,
         objects: save.objects,
+        floor: save.floor ?? null,
         roomName: save.roomName ?? '',
         dirty: false,
       });
@@ -391,6 +429,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         walls: st.walls,
         openings: st.openings,
         objects: st.objects,
+        floor: st.floor,
       };
       const saves = [save, ...st.saves];
       set({ saves, currentSaveId: save.id, scanName: clean, dirty: false });
@@ -411,6 +450,14 @@ export const useScanStore = create<ScanState>((set, get) => {
         if (furn === '1' || furn === '0') {
           set({ showFurniture: furn === '1' });
         }
+        const surf = await AsyncStorage.getItem(SURFACES_KEY);
+        if (surf === '1' || surf === '0') {
+          set({ showSurfaces: surf === '1' });
+        }
+        const tex = await AsyncStorage.getItem(TEXTURES_KEY);
+        if (tex === '1' || tex === '0') {
+          set({ showTextures: tex === '1' });
+        }
         const raw = await AsyncStorage.getItem(STORAGE_KEY);
         if (!raw) return;
         const saves = JSON.parse(raw) as SavedScan[];
@@ -430,6 +477,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         walls: save.walls,
         openings: save.openings,
         objects: save.objects,
+        floor: save.floor ?? null,
         roomName: save.roomName ?? '',
         dirty: false,
         resultOrigin: 'library',
@@ -465,6 +513,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         walls: [],
         openings: [],
         objects: [],
+        floor: null,
       }),
   };
 });

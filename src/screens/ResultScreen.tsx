@@ -27,7 +27,8 @@ import {
 import { FloorplanEditor } from '../components/FloorplanEditor';
 import { LogoMark } from '../components/LogoMark';
 import { Iso3DView } from '../components/Iso3DView';
-import { closedLoop, loopAreaM2, segLength } from '../geometry/floorplan';
+import { roomSurface, segLength } from '../geometry/floorplan';
+import { hasCapturedColors } from '../geometry/appearance';
 import { frCategory } from '../geometry/furniture';
 import { useScanStore } from '../store/scanStore';
 
@@ -46,6 +47,11 @@ export function ResultScreen() {
   const commitCurrent = useScanStore((s) => s.commitCurrent);
   const showFurniture = useScanStore((s) => s.showFurniture);
   const setShowFurniture = useScanStore((s) => s.setShowFurniture);
+  const showSurfaces = useScanStore((s) => s.showSurfaces);
+  const setShowSurfaces = useScanStore((s) => s.setShowSurfaces);
+  const showTextures = useScanStore((s) => s.showTextures);
+  const setShowTextures = useScanStore((s) => s.setShowTextures);
+  const floorData = useScanStore((s) => s.floor);
   const addOpening = useScanStore((s) => s.addOpening);
   const resultOrigin = useScanStore((s) => s.resultOrigin);
   const removeObject = useScanStore((s) => s.removeObject);
@@ -132,8 +138,9 @@ export function ResultScreen() {
 
   const selectedWall = walls.find((w) => w.id === selectedWallId) ?? null;
   const perimeter = walls.reduce((s, w) => s + segLength(w), 0);
-  const loop = closedLoop(walls);
-  const area = loop ? loopAreaM2(loop) : null;
+  const surface = roomSurface(walls);
+  // Le bouton « Couleurs » n'a de sens que si le scan en a relevé.
+  const colorsAvailable = hasCapturedColors(walls, floorData);
 
   const applyLength = () => {
     const v = parseFloat(lengthInput.replace(',', '.'));
@@ -168,7 +175,14 @@ export function ResultScreen() {
 
   const metrics = [
     { value: `${walls.length}`, label: 'murs' },
-    ...(area !== null ? [{ value: fr(area), label: 'm²' }] : []),
+    ...(surface
+      ? [
+          {
+            value: `${surface.exact ? '' : '≈ '}${fr(surface.area)}`,
+            label: 'm² au sol',
+          },
+        ]
+      : []),
     { value: fr(perimeter), label: 'm de périmètre' },
     ...(objects.length > 0 ? [{ value: `${objects.length}`, label: 'objets' }] : []),
   ];
@@ -265,10 +279,22 @@ export function ResultScreen() {
               onPress={() => setShowMeasures((v) => !v)}
             />
             <ToolPill
+              label="Surfaces"
+              active={showSurfaces}
+              onPress={() => setShowSurfaces(!showSurfaces)}
+            />
+            <ToolPill
               label="Meubles"
               active={showFurniture}
               onPress={() => setShowFurniture(!showFurniture)}
             />
+            {colorsAvailable && (
+              <ToolPill
+                label="Couleurs"
+                active={showTextures}
+                onPress={() => setShowTextures(!showTextures)}
+              />
+            )}
             {editMode && (
               <ToolPill
                 label="Pièce"
@@ -294,10 +320,22 @@ export function ResultScreen() {
               onPress={() => setShow3DMeasures((v) => !v)}
             />
             <ToolPill
+              label="Sol"
+              active={showSurfaces}
+              onPress={() => setShowSurfaces(!showSurfaces)}
+            />
+            <ToolPill
               label="Meubles"
               active={showFurniture}
               onPress={() => setShowFurniture(!showFurniture)}
             />
+            {colorsAvailable && (
+              <ToolPill
+                label="Couleurs"
+                active={showTextures}
+                onPress={() => setShowTextures(!showTextures)}
+              />
+            )}
             {Platform.OS === 'ios' && (
               <ToolPill label="Image" active={false} onPress={shareImage} />
             )}

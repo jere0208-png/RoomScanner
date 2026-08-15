@@ -22,6 +22,7 @@ import {
 import { FloorplanEditor } from '../components/FloorplanEditor';
 import { DEFAULT_VIEW3D, Iso3DView, type View3DParams } from '../components/Iso3DView';
 import { buildScanPdf, pdfFilename, toBase64 } from '../export/pdf';
+import { hasCapturedColors } from '../geometry/appearance';
 import { useScanStore } from '../store/scanStore';
 
 interface PlanView {
@@ -164,6 +165,12 @@ export function ExportScreen() {
   const setShowOpeningColors = useScanStore((s) => s.setShowOpeningColors);
   const showFurniture = useScanStore((s) => s.showFurniture);
   const setShowFurniture = useScanStore((s) => s.setShowFurniture);
+  const showSurfaces = useScanStore((s) => s.showSurfaces);
+  const setShowSurfaces = useScanStore((s) => s.setShowSurfaces);
+  const showTextures = useScanStore((s) => s.showTextures);
+  const setShowTextures = useScanStore((s) => s.setShowTextures);
+  const floorData = useScanStore((s) => s.floor);
+  const colorsAvailable = hasCapturedColors(walls, floorData);
   const c = useTheme();
   const styles = getStyles(c);
 
@@ -203,7 +210,13 @@ export function ExportScreen() {
         fy: v.oy / (b.h / 2),
       });
       const bytes = buildScanPdf(
-        { name: scanName, walls, openings, objects: showFurniture ? objects : [] },
+        {
+          name: scanName,
+          walls,
+          openings,
+          objects: showFurniture ? objects : [],
+          floor: floorData,
+        },
         include3D,
         {
           plan: {
@@ -215,6 +228,8 @@ export function ExportScreen() {
           colorOpenings: showOpeningColors,
           measures2D,
           measures3D,
+          surfaces: showSurfaces,
+          textures: showTextures,
         },
       );
       await RoomScan.sharePDF(toBase64(bytes), pdfFilename(scanName));
@@ -279,6 +294,20 @@ export function ExportScreen() {
           <Text style={styles.switchLabel}>Inclure les meubles</Text>
           <Switch value={showFurniture} onValueChange={setShowFurniture} />
         </View>
+        <View style={styles.switchRow}>
+          <Text style={styles.switchLabel}>
+            Surface au sol (fond pointillé et m²)
+          </Text>
+          <Switch value={showSurfaces} onValueChange={setShowSurfaces} />
+        </View>
+        {colorsAvailable && (
+          <View style={styles.switchRow}>
+            <Text style={styles.switchLabel}>
+              Couleurs et textures relevées au scan
+            </Text>
+            <Switch value={showTextures} onValueChange={setShowTextures} />
+          </View>
+        )}
         <View style={styles.switchRow}>
           <Text style={styles.switchLabel}>Cotes sur le plan 2D</Text>
           <Switch value={measures2D} onValueChange={setMeasures2D} />

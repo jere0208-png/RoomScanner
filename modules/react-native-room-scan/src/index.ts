@@ -6,6 +6,28 @@ import {
   type ViewProps,
 } from 'react-native';
 
+/**
+ * Grille de couleurs relevée sur une surface pendant le scan.
+ * `texels` est ordonné ligne par ligne : ligne 0 = HAUT du mur,
+ * colonne 0 = extrémité A. Couleurs au format `#RRGGBB`.
+ */
+export interface SurfaceTexture {
+  cols: number;
+  rows: number;
+  texels: string[];
+}
+
+/**
+ * Couleurs du sol : même grille, mais projetée sur l'emprise au sol
+ * indiquée (repère monde, mètres). Ligne 0 = minZ, colonne 0 = minX.
+ */
+export interface FloorTexture extends SurfaceTexture {
+  minX: number;
+  minZ: number;
+  maxX: number;
+  maxZ: number;
+}
+
 /** Surface détectée (mur, porte, fenêtre, ouverture). */
 export interface SurfaceData {
   id: string;
@@ -22,6 +44,10 @@ export interface SurfaceData {
   az?: number;
   bx?: number;
   bz?: number;
+  /** Couleur moyenne relevée par la caméra (#RRGGBB), si captée. */
+  color?: string;
+  /** Détail des couleurs de la face intérieure, si captée. */
+  texture?: SurfaceTexture;
 }
 
 /** Objet détecté (iOS/RoomPlan uniquement). */
@@ -33,6 +59,14 @@ export interface ObjectData {
   depth: number;
   confidence?: string;
   transform: number[];
+  /** Couleur moyenne relevée par la caméra (#RRGGBB), si captée. */
+  color?: string;
+}
+
+/** Relevé colorimétrique du sol de la pièce. */
+export interface FloorData {
+  color: string;
+  texture?: FloorTexture;
 }
 
 export interface ScanUpdate {
@@ -48,6 +82,8 @@ export interface ScanResult {
   modelPath: string;
   surfaces: SurfaceData[];
   objects: ObjectData[];
+  /** Couleurs du sol relevées pendant le scan (iOS avec LiDAR). */
+  floor?: FloorData;
 }
 
 const RoomScanModule = NativeModules.RoomScanModule;

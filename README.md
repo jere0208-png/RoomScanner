@@ -15,20 +15,43 @@ réel, mesures, modèle 3D exporté et plan 2D éditable.
 
 ```
 modules/react-native-room-scan/   Module natif autolinké (package local)
-├── ios/        Swift : RoomScanManager (session RoomPlan), module bridge,
-│               émetteur d'événements, vue RoomCaptureView, QuickLook
-├── android/    Kotlin : ScanEngine (plans→murs), ARSceneView, module bridge
+├── ios/        Swift : RoomScanManager (session RoomPlan), RoomColorSampler
+│               (relevé des couleurs), module bridge, émetteur d'événements,
+│               vue RoomCaptureView, QuickLook
+├── android/    Kotlin : ScanEngine (plans→murs), ColorSampler, ARSceneView,
+│               module bridge
 └── src/        API JS typée (RoomScan, RoomScanView, scanEvents)
 
 src/
 ├── store/scanStore.ts       État global (zustand). SOURCE DE VÉRITÉ = la liste
 │                            de murs paramétrique, pas le maillage exporté.
 ├── geometry/floorplan.ts    3D→2D : segments au sol, soudure des coins,
+│                            onglets des jonctions, surface de la pièce,
 │                            snap angulaire, projection mètres↔pixels
+├── geometry/scene3d.ts      Scène 3D commune à la vue de l'app et au PDF
+├── geometry/appearance.ts   Couleurs relevées au scan + semis du sol
 ├── native/useRoomScan.ts    Abonnement aux événements natifs + commandes
 ├── components/FloorplanEditor.tsx  Plan 2D SVG : coins déplaçables, cotes
 └── screens/                 Home / Scan (HUD sur vue AR) / Résultat (plan éditable)
 ```
+
+### Jonctions de murs
+
+Un mur n'est pas un trait épais posé à côté des autres : `wallQuads()` traite
+chaque nœud du plan, trie les murs qui s'y rejoignent par angle et coupe les
+faces deux à deux (onglet). Les deux murs d'un angle partagent donc le même
+point au sol, en 2D comme en 3D et dans le PDF. Une extrémité libre reçoit un
+about droit ; posée sur le flanc d'un autre mur, elle est prolongée d'une
+demi-épaisseur pour entrer dans son corps (jonction en T).
+
+### Couleurs et textures
+
+Pendant le scan, la session ARKit/ARCore est lue en parallèle (~3 Hz, lecture
+seule) : chaque mur est projeté dans l'image caméra et une petite grille de
+couleurs (6 × 4) y est moyennée, ainsi qu'une carte du sol par cases de 40 cm
+et une couleur par meuble. Sur iOS, la carte de profondeur LiDAR sert à
+écarter les points cachés. Le bouton **Couleurs** applique ces relevés à la
+vue 3D, au plan et au PDF ; il n'apparaît que si le scan en a rapporté.
 
 ## Prérequis pour tester sur iPhone
 
@@ -102,9 +125,11 @@ nécessaire que si les fichiers Swift/Kotlin ou les dépendances natives changen
 
 ## Vérifications faites sur cette machine (Windows)
 
-- `npx tsc --noEmit` : aucun diagnostic.
-- `npx jest` : 6/6 tests verts (conversion matrice iOS→segment, extrémités
-  Android, soudure des coins, snap angulaire, projection mètres↔pixels).
+- `npx tsc --noEmit` et `npx eslint .` : aucun diagnostic.
+- `npx jest` : 29/29 tests verts (conversion matrice iOS→segment, extrémités
+  Android, soudure des coins et jonctions en T, onglets des murs, surface au
+  sol, semis de points, lecture des textures, snap angulaire, projection
+  mètres↔pixels, génération du PDF).
 - **Non vérifié ici** : la compilation Swift/Kotlin (impossible sans Mac /
   SDK Android). Les points d'attente connus sont notés ci-dessous.
 
@@ -118,5 +143,12 @@ nécessaire que si les fichiers Swift/Kotlin ou les dépendances natives changen
   attendu, la pause existe pour ça.
 - Android : la qualité dépend fortement de la texture des murs ; les murs
   blancs uniformes se détectent mal (limite d'ARCore, pas un bug).
+- Les couleurs relevées sortent telles quelles de la caméra, exposition
+  automatique comprise : elles sont fidèles les unes aux autres dans un même
+  scan, mais deux scans d'une même pièce sous des lumières différentes ne
+  donneront pas exactement les mêmes teintes.
+- Android n'a pas de test d'occultation (pas d'équivalent simple de la carte
+  de profondeur LiDAR) : un mur en partie masqué par un meuble récupère un
+  peu de sa couleur. La moyenne sur toute la durée du scan lisse l'essentiel.
 - Multi-pièces : non géré en v1. Le modèle de données (liste de murs par scan)
   est prêt à être étendu en `Scene = Room[]` (RoomPlan `StructureBuilder`, iOS 17).

@@ -41,7 +41,8 @@ class ARScanModule(private val ctx: ReactApplicationContext) : ReactContextBaseJ
       val result = Arguments.createMap().apply {
         putString("modelPath", obj.absolutePath)
         putArray("objects", Arguments.createArray())
-        merge(ScanEngine.buildSnapshot())
+        merge(ScanEngine.buildSnapshot(withColors = true))
+        ScanEngine.floorPayload()?.let { putMap("floor", it) }
       }
       promise.resolve(result)
     } catch (e: Exception) {

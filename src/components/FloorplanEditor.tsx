@@ -12,6 +12,7 @@ import Svg, {
   G,
   Line,
   Pattern,
+  Polygon,
   Rect,
   Text as SvgText,
 } from 'react-native-svg';
@@ -20,11 +21,17 @@ import {
   bounds,
   clampFootprint,
   makeMapping,
+  quadPoints,
+  roomSurface,
   segLength,
   toFootprint,
+  wallQuads,
   wallsCentroid,
+  WALL_T,
+  type WallQuad,
   type WallSeg,
 } from '../geometry/floorplan';
+import { dotStep, mixHex } from '../geometry/appearance';
 import { frCategory, furnKind, furnitureStrokes } from '../geometry/furniture';
 
 interface EffMapping {
@@ -67,6 +74,9 @@ export function FloorplanEditor({
   const currentSaveId = useScanStore((s) => s.currentSaveId);
   const roomName = useScanStore((s) => s.roomName);
   const colorOpenings = useScanStore((s) => s.showOpeningColors);
+  const showSurfaces = useScanStore((s) => s.showSurfaces);
+  const showTextures = useScanStore((s) => s.showTextures);
+  const floorData = useScanStore((s) => s.floor);
   const c = useTheme();
   const styles = getStyles(c);
   const [layout, setLayout] = useState({ w: 0, h: 0 });
@@ -177,6 +187,29 @@ export function FloorplanEditor({
     };
   }, [baseMapping, view, layout]);
 
+  // Corps des murs : onglets calculés une fois pour tout le rendu.
+  const quads = useMemo(() => wallQuads(walls), [walls]);
+  // Surface au sol : contour, aire, et semis de points qui la distingue
+  // immédiatement des murs (pochés en noir).
+  const surface = useMemo(() => roomSurface(walls), [walls]);
+  const floorFill = useMemo(() => {
+    const captured = showTextures && floorData?.color;
+    return captured ? mixHex(captured, '#FFFFFF', 0.42) : c.surfaceSunken;
+  }, [showTextures, floorData, c]);
+  /**
+   * Semis du sol : motif répété, calé sur l'origine du monde. Un vrai nuage
+   * de points suivrait mieux la rotation, mais coûterait un millier de
+   * cercles à redessiner à chaque image de déplacement — ici le pas et le
+   * calage suffisent à faire lire l'échelle, pour un coût nul.
+   */
+  const dots = useMemo(() => {
+    if (!mapping) return null;
+    const size = dotStep(mapping.scale, 16) * mapping.scale;
+    const origin = mapping.toPx({ x: 0, z: 0 });
+    const wrap = (v: number) => ((v % size) + size) % size;
+    return { size, x: wrap(origin.x), y: wrap(origin.y) };
+  }, [mapping]);
+
   // Coins uniques (les extrémités soudées partagent les mêmes coordonnées).
   const corners = useMemo(() => {
     const seen = new Map<string, { x: number; z: number; wallId: string; end: 'a' | 'b' }>();
@@ -203,12 +236,37 @@ export function FloorplanEditor({
       {mapping && (
         <>
           <Svg width={layout.w} height={layout.h}>
-            <Defs>
-              <Pattern id="grid" width={22} height={22} patternUnits="userSpaceOnUse">
-                <Circle cx={1.2} cy={1.2} r={1.2} fill={c.line} />
-              </Pattern>
-            </Defs>
-            <Rect x={0} y={0} width={layout.w} height={layout.h} fill="url(#grid)" />
+            {/* Surface au sol : aplat + semis de points, pour la distinguer
+                d'un coup d'œil des murs pochés en noir. */}
+            {showSurfaces && surface && dots && (
+              <G>
+                <Defs>
+                  <Pattern
+                    id="floorDots"
+                    x={dots.x}
+                    y={dots.y}
+                    width={dots.size}
+                    height={dots.size}
+                    patternUnits="userSpaceOnUse">
+                    <Circle cx={1.1} cy={1.1} r={1.1} fill={c.inkFaint} />
+                  </Pattern>
+                </Defs>
+                {(() => {
+                  const poly = surface.pts
+                    .map((p) => {
+                      const q = mapping.toPx(p);
+                      return `${q.x},${q.y}`;
+                    })
+                    .join(' ');
+                  return (
+                    <>
+                      <Polygon points={poly} fill={floorFill} stroke="none" />
+                      <Polygon points={poly} fill="url(#floorDots)" stroke="none" />
+                    </>
+                  );
+                })()}
+              </G>
+            )}
 
             {/* Objets (empreintes au sol) */}
             {objects.map((o) => {
@@ -264,11 +322,12 @@ export function FloorplanEditor({
               );
             })}
 
-            {/* Murs */}
+            {/* Murs : corps poché aux jonctions d'onglet */}
             {walls.map((w) => (
-              <WallLine
+              <WallBody
                 key={w.id}
                 wall={w}
+                quad={quads.get(w.id)}
                 mapping={mapping}
                 showMeasure={showMeasures}
                 selected={editable && w.id === selectedWallId}
@@ -280,17 +339,67 @@ export function FloorplanEditor({
               />
             ))}
 
-            {/* Nom de la pièce : encadré au centre, esquive les meubles */}
-            {roomName !== '' &&
-              walls.length > 0 &&
+            {/* Portes / fenêtres : trouée dans le mur, puis trait de repérage */}
+            {openings.map((o) => {
+              const dx = o.b.x - o.a.x;
+              const dz = o.b.z - o.a.z;
+              const len = Math.hypot(dx, dz) || 1;
+              // Trouée un peu plus épaisse que le mur : elle le traverse net.
+              const nx = (-dz / len) * (WALL_T / 2 + 0.03);
+              const nz = (dx / len) * (WALL_T / 2 + 0.03);
+              const slot = [
+                { x: o.a.x + nx, z: o.a.z + nz },
+                { x: o.b.x + nx, z: o.b.z + nz },
+                { x: o.b.x - nx, z: o.b.z - nz },
+                { x: o.a.x - nx, z: o.a.z - nz },
+              ].map((p) => mapping.toPx(p));
+              const a = mapping.toPx(o.a);
+              const b = mapping.toPx(o.b);
+              const color = colorOpenings
+                ? o.type === 'door'
+                  ? c.amber
+                  : c.sky
+                : c.inkFaint;
+              return (
+                <G key={o.id}>
+                  <Polygon
+                    points={slot.map((p) => `${p.x},${p.y}`).join(' ')}
+                    fill={showSurfaces ? floorFill : c.surface}
+                    stroke="none"
+                  />
+                  <Line
+                    x1={a.x}
+                    y1={a.y}
+                    x2={b.x}
+                    y2={b.y}
+                    stroke={color}
+                    strokeWidth={3}
+                    strokeLinecap="butt"
+                  />
+                </G>
+              );
+            })}
+
+            {/* Cartouche de pièce : nom encadré et surface au sol.
+                Il esquive les meubles pour rester lisible. */}
+            {walls.length > 0 &&
+              (roomName !== '' || (showSurfaces && surface)) &&
               (() => {
+                const areaText =
+                  showSurfaces && surface
+                    ? `${surface.exact ? '' : '≈ '}${surface.area
+                        .toFixed(1)
+                        .replace('.', ',')} m²`
+                    : null;
                 const ctr = wallsCentroid(walls);
                 const foots = objects.map((o) =>
                   clampFootprint(toFootprint(o), walls, ctr),
                 );
-                const wpx = Math.max(46, roomName.length * 7 + 18);
+                const text = roomName !== '' ? roomName : areaText ?? '';
+                const wpx = Math.max(46, text.length * 7 + 18);
+                const hpx = roomName !== '' && areaText ? 38 : 24;
                 const labelW = wpx / mapping.scale;
-                const labelH = 24 / mapping.scale;
+                const labelH = hpx / mapping.scale;
                 const collides = (pt: { x: number; z: number }) =>
                   foots.some(
                     (f) =>
@@ -318,49 +427,39 @@ export function FloorplanEditor({
                   <G>
                     <Rect
                       x={p.x - wpx / 2}
-                      y={p.y - 12}
+                      y={p.y - hpx / 2}
                       width={wpx}
-                      height={24}
+                      height={hpx}
                       rx={6}
                       fill={c.surface}
                       stroke={c.lineStrong}
                       strokeWidth={1}
                     />
-                    <SvgText
-                      x={p.x}
-                      y={p.y + 4}
-                      fill={c.ink}
-                      fontSize={11}
-                      fontWeight="700"
-                      textAnchor="middle">
-                      {roomName}
-                    </SvgText>
+                    {roomName !== '' && (
+                      <SvgText
+                        x={p.x}
+                        y={p.y + (areaText ? -3 : 4)}
+                        fill={c.ink}
+                        fontSize={11}
+                        fontWeight="700"
+                        textAnchor="middle">
+                        {roomName}
+                      </SvgText>
+                    )}
+                    {areaText && (
+                      <SvgText
+                        x={p.x}
+                        y={p.y + (roomName !== '' ? 12 : 4)}
+                        fill={c.inkSoft}
+                        fontSize={roomName !== '' ? 10 : 11}
+                        fontWeight="700"
+                        textAnchor="middle">
+                        {areaText}
+                      </SvgText>
+                    )}
                   </G>
                 );
               })()}
-
-            {/* Portes / fenêtres / ouvertures */}
-            {openings.map((o) => {
-              const a = mapping.toPx(o.a);
-              const b = mapping.toPx(o.b);
-              const color = colorOpenings
-                ? o.type === 'door'
-                  ? c.amber
-                  : c.sky
-                : c.inkFaint;
-              return (
-                <Line
-                  key={o.id}
-                  x1={a.x}
-                  y1={a.y}
-                  x2={b.x}
-                  y2={b.y}
-                  stroke={color}
-                  strokeWidth={5}
-                  strokeLinecap="round"
-                />
-              );
-            })}
           </Svg>
 
           {/* Meuble sélectionné : poignée de déplacement + bouton supprimer */}
@@ -397,14 +496,21 @@ export function FloorplanEditor({
   );
 }
 
-function WallLine({
+/**
+ * Un mur au plan : corps poché dont les quatre coins viennent des onglets
+ * partagés (`wallQuads`) — deux murs qui se rejoignent forment donc un angle
+ * franc, sans recouvrement ni fente.
+ */
+function WallBody({
   wall,
+  quad,
   mapping,
   showMeasure,
   selected,
   onPress,
 }: {
   wall: WallSeg;
+  quad?: WallQuad;
   mapping: EffMapping;
   showMeasure: boolean;
   selected: boolean;
@@ -416,6 +522,16 @@ function WallLine({
   const dx = b.x - a.x;
   const dy = b.y - a.y;
   const norm = Math.hypot(dx, dy) || 1;
+  // Sous une certaine échelle le poché est plus fin qu'un trait : on garde
+  // alors un trait plein, sinon le mur disparaît quand on dézoome.
+  const bodyPx = WALL_T * mapping.scale;
+  const body =
+    quad && bodyPx >= 2.5
+      ? quadPoints(quad)
+          .map((p) => mapping.toPx(p))
+          .map((p) => `${p.x},${p.y}`)
+          .join(' ')
+      : null;
 
   // Cote : petit texte posé le long du mur, sans cadre, jamais à l'envers.
   let angle = (Math.atan2(dy, dx) * 180) / Math.PI;
@@ -423,22 +539,29 @@ function WallLine({
   if (angle < -90) angle += 180;
   let n = { x: -dy / norm, y: dx / norm };
   if (n.y > 0) n = { x: -n.x, y: -n.y }; // toujours du côté "haut" écran
-  const mid = { x: (a.x + b.x) / 2 + n.x * 11, y: (a.y + b.y) / 2 + n.y * 11 };
+  const mid = {
+    x: (a.x + b.x) / 2 + n.x * (bodyPx / 2 + 9),
+    y: (a.y + b.y) / 2 + n.y * (bodyPx / 2 + 9),
+  };
   const label = `${segLength(wall).toFixed(2).replace('.', ',')} m`;
 
   return (
     <G onPress={onPress}>
       {/* Zone de toucher élargie, invisible */}
       <Line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="transparent" strokeWidth={30} />
-      <Line
-        x1={a.x}
-        y1={a.y}
-        x2={b.x}
-        y2={b.y}
-        stroke={selected ? c.blue : c.ink}
-        strokeWidth={6}
-        strokeLinecap="round"
-      />
+      {body ? (
+        <Polygon points={body} fill={selected ? c.blue : c.ink} stroke="none" />
+      ) : (
+        <Line
+          x1={a.x}
+          y1={a.y}
+          x2={b.x}
+          y2={b.y}
+          stroke={selected ? c.blue : c.ink}
+          strokeWidth={2.5}
+          strokeLinecap="butt"
+        />
+      )}
       {showMeasure && (
         <SvgText
           x={mid.x}

@@ -1,33 +1,16 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { PanResponder, StyleSheet, View } from 'react-native';
-import Svg, { Polygon, Text as SvgText } from 'react-native-svg';
+import Svg, { Circle, Polygon, Text as SvgText } from 'react-native-svg';
 import { themedStyles, useTheme, type Palette } from '../theme';
+import { segLength, wallsCentroid, type WallSeg } from '../geometry/floorplan';
+import { dotStep, floorDots, inkOn, mixHex } from '../geometry/appearance';
 import {
-  clampFootprint,
-  closedLoop,
-  segLength,
-  toFootprint,
-  wallsCentroid,
-  type WallSeg,
-} from '../geometry/floorplan';
+  buildScene,
+  shadeFill,
+  type P3,
+  type ScenePalette,
+} from '../geometry/scene3d';
 import { useScanStore } from '../store/scanStore';
-
-interface P3 {
-  x: number;
-  y: number;
-  z: number;
-}
-
-interface Face {
-  pts: P3[];
-  fill: string;
-  stroke: string;
-  /** 'auto' : ombrage recalculé selon l'orientation à la projection. */
-  shade?: boolean;
-  /** Biais de tri (m) : les ouvertures se dessinent juste devant leur mur. */
-  bias?: number;
-  isFloor?: boolean;
-}
 
 /** Paramètres de caméra de la vue 3D (contrôlables de l'extérieur). */
 export interface View3DParams {
@@ -46,9 +29,6 @@ export const DEFAULT_VIEW3D: View3DParams = {
   oy: 0,
 };
 
-/** Épaisseur donnée aux murs dans la vue 3D (m). */
-const WALL_T = 0.14;
-
 const rad = (d: number) => (d * Math.PI) / 180;
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
@@ -65,14 +45,6 @@ function pointInPoly(x: number, y: number, pts: { sx: number; sy: number }[]) {
     }
   }
   return inside;
-}
-
-/** Mélange linéaire de deux couleurs hex. */
-function mix(a: string, b: string, t: number): string {
-  const pa = [1, 3, 5].map((i) => parseInt(a.slice(i, i + 2), 16));
-  const pb = [1, 3, 5].map((i) => parseInt(b.slice(i, i + 2), 16));
-  const c = pa.map((v, i) => Math.round(v + (pb[i] - v) * clamp(t, 0, 1)));
-  return `#${c.map((v) => v.toString(16).padStart(2, '0')).join('')}`;
 }
 
 interface Props {
@@ -98,6 +70,9 @@ export function Iso3DView({ value, onChange, showMeasures }: Props) {
     [showFurniture, allObjects],
   );
   const colorOpenings = useScanStore((s) => s.showOpeningColors);
+  const showSurfaces = useScanStore((s) => s.showSurfaces);
+  const showTextures = useScanStore((s) => s.showTextures);
+  const floorData = useScanStore((s) => s.floor);
   const c = useTheme();
   const styles = getStyles(c);
 
@@ -220,209 +195,40 @@ export function Iso3DView({ value, onChange, showMeasures }: Props) {
     }),
   ).current;
 
-  // Niveau du sol : base du mur le plus bas (repère monde RoomPlan).
-  const floorY = useMemo(() => {
-    if (walls.length === 0) return 0;
-    return Math.min(...walls.map((w) => w.yCenter - w.height / 2));
-  }, [walls]);
+  // Palette 3D de l'app : neutres du thème + teintes des ouvertures.
+  const palette: ScenePalette = useMemo(
+    () => ({
+      floor: c.surfaceSunken,
+      floorStroke: c.lineStrong,
+      wall: '#FFFFFF',
+      wallStroke: '#8A94A6',
+      wallTop: '#F4F7FB',
+      wallTopStroke: '#94A0B4',
+      opening: '#B9C2CE',
+      door: c.amber,
+      window: c.sky,
+      object: '#D8E1F2',
+      objectTop: '#E9EEF9',
+      objectStroke: '#9FACBF',
+    }),
+    [c],
+  );
 
-  const faces = useMemo(() => {
-    const list: Face[] = [];
+  // Scène partagée avec le PDF : mêmes onglets, mêmes bandes, mêmes couleurs.
+  const scene = useMemo(
+    () =>
+      buildScene(walls, openings, objects, {
+        palette,
+        colorOpenings,
+        showSurfaces,
+        showTextures,
+        floor: floorData,
+      }),
+    [walls, openings, objects, palette, colorOpenings, showSurfaces, showTextures, floorData],
+  );
+  const faces = scene.faces;
+  const surface = scene.surface;
 
-    // Sol : la boucle fermée si elle existe.
-    const loop = closedLoop(walls);
-    if (loop) {
-      list.push({
-        pts: loop.map((p) => ({ x: p.x, y: 0, z: p.z })),
-        fill: c.surfaceSunken,
-        stroke: c.lineStrong,
-        isFloor: true,
-      });
-    }
-
-    const vquad = (
-      p: { x: number; z: number },
-      q: { x: number; z: number },
-      yBase: number,
-      yTop: number,
-    ): P3[] => [
-      { x: p.x, y: yBase, z: p.z },
-      { x: q.x, y: yBase, z: q.z },
-      { x: q.x, y: yTop, z: q.z },
-      { x: p.x, y: yTop, z: p.z },
-    ];
-
-    // Assemblage des coins : UN seul mur traverse l'angle (prolongé d'une
-    // demi-épaisseur), l'autre s'arrête contre lui — angle net, sans
-    // interpénétration visible des boîtes.
-    const cornerKey = (p: { x: number; z: number }) =>
-      `${p.x.toFixed(3)}:${p.z.toFixed(3)}`;
-    const cornerIds = new Map<string, string[]>();
-    for (const w of walls) {
-      for (const p of [w.a, w.b]) {
-        const k = cornerKey(p);
-        const l = cornerIds.get(k) ?? [];
-        l.push(w.id);
-        cornerIds.set(k, l);
-      }
-    }
-    for (const l of cornerIds.values()) l.sort();
-    const extFor = (k: string, id: string) => {
-      const l = cornerIds.get(k) ?? [];
-      if (l.length < 2) return 0;
-      return l[0] === id ? WALL_T / 2 : -WALL_T / 2;
-    };
-
-    // Subdivision en bandes de 60 cm : le tri « du peintre » par profondeur
-    // moyenne devient localement juste — plus de meuble à moitié avalé par
-    // un grand pan de mur. Les contours sont redessinés par-dessus.
-    const STEP = 0.6;
-    const lerp2 = (
-      P: { x: number; z: number },
-      Q: { x: number; z: number },
-      t: number,
-    ) => ({ x: P.x + (Q.x - P.x) * t, z: P.z + (Q.z - P.z) * t });
-    const pushStrips = (
-      p: { x: number; z: number },
-      q: { x: number; z: number },
-      yb: number,
-      yt: number,
-      fill: string,
-      shade?: boolean,
-    ) => {
-      const n = Math.max(1, Math.ceil(Math.hypot(q.x - p.x, q.z - p.z) / STEP));
-      for (let i = 0; i < n; i++) {
-        list.push({
-          pts: vquad(lerp2(p, q, i / n), lerp2(p, q, (i + 1) / n), yb, yt),
-          fill,
-          stroke: 'none',
-          shade,
-        });
-      }
-    };
-    const pushTopStrips = (
-      e1a: { x: number; z: number },
-      e1b: { x: number; z: number },
-      e2a: { x: number; z: number },
-      e2b: { x: number; z: number },
-      y: number,
-      fill: string,
-    ) => {
-      const n = Math.max(1, Math.ceil(Math.hypot(e1b.x - e1a.x, e1b.z - e1a.z) / STEP));
-      for (let i = 0; i < n; i++) {
-        const t0 = i / n;
-        const t1 = (i + 1) / n;
-        list.push({
-          pts: [
-            lerp2(e1a, e1b, t0),
-            lerp2(e1a, e1b, t1),
-            lerp2(e2a, e2b, t1),
-            lerp2(e2a, e2b, t0),
-          ].map((p) => ({ x: p.x, y, z: p.z })),
-          fill,
-          stroke: 'none',
-        });
-      }
-    };
-    const pushOutline = (pts: P3[], stroke: string) => {
-      list.push({ pts, fill: 'none', stroke, bias: 0.001 });
-    };
-
-    // Murs épais : boîte (2 longs pans, 2 chants, 1 dessus).
-    for (const w of walls) {
-      const dx = w.b.x - w.a.x;
-      const dz = w.b.z - w.a.z;
-      const len = Math.hypot(dx, dz) || 1;
-      const ux = dx / len;
-      const uz = dz / len;
-      const extA = extFor(cornerKey(w.a), w.id);
-      const extB = extFor(cornerKey(w.b), w.id);
-      const pa = { x: w.a.x - ux * extA, z: w.a.z - uz * extA };
-      const pb = { x: w.b.x + ux * extB, z: w.b.z + uz * extB };
-      const nx = (-dz / len) * (WALL_T / 2);
-      const nz = (dx / len) * (WALL_T / 2);
-      const a1 = { x: pa.x + nx, z: pa.z + nz };
-      const a2 = { x: pa.x - nx, z: pa.z - nz };
-      const b1 = { x: pb.x + nx, z: pb.z + nz };
-      const b2 = { x: pb.x - nx, z: pb.z - nz };
-
-      for (const [p, q] of [
-        [a1, b1],
-        [b2, a2],
-      ] as const) {
-        pushStrips(p, q, 0, w.height, '#FFFFFF', true);
-        pushOutline(vquad(p, q, 0, w.height), '#8A94A6');
-      }
-      for (const [p, q] of [
-        [a2, a1],
-        [b1, b2],
-      ] as const) {
-        list.push({
-          pts: vquad(p, q, 0, w.height),
-          fill: '#FFFFFF',
-          stroke: '#8A94A6',
-          shade: true,
-        });
-      }
-      pushTopStrips(a1, b1, a2, b2, w.height, '#F4F7FB');
-      pushOutline(
-        [a1, b1, b2, a2].map((p) => ({ x: p.x, y: w.height, z: p.z })),
-        '#94A0B4',
-      );
-    }
-
-    // Portes / fenêtres : posées sur le mur, à leur vraie hauteur.
-    for (const o of openings) {
-      const yBase = Math.max(0, o.yCenter - o.height / 2 - floorY);
-      list.push({
-        pts: vquad(o.a, o.b, yBase, yBase + o.height),
-        fill: colorOpenings
-          ? o.type === 'door'
-            ? c.amber
-            : c.sky
-          : '#B9C2CE',
-        stroke: 'none',
-        bias: 0.12,
-      });
-    }
-
-    // Meubles : boîtes grises-bleutées, recalées devant les murs.
-    const interior = wallsCentroid(walls);
-    for (const obj of objects.map((o) =>
-      clampFootprint(toFootprint(o), walls, interior),
-    )) {
-      const cosY = Math.cos(obj.yaw);
-      const sinY = Math.sin(obj.yaw);
-      const hw = obj.width / 2;
-      const hd = obj.depth / 2;
-      const corners = [
-        [-hw, -hd],
-        [hw, -hd],
-        [hw, hd],
-        [-hw, hd],
-      ].map(([lx, lz]) => ({
-        x: obj.cx + lx * cosY - lz * sinY,
-        z: obj.cz + lx * sinY + lz * cosY,
-      }));
-      const yBase = Math.max(0, obj.yCenter - obj.height / 2 - floorY);
-      const yTop = yBase + obj.height;
-      for (let i = 0; i < 4; i++) {
-        const p = corners[i];
-        const q = corners[(i + 1) % 4];
-        pushStrips(p, q, yBase, yTop, '#D8E1F2');
-        pushOutline(vquad(p, q, yBase, yTop), '#9FACBF');
-      }
-      pushTopStrips(corners[0], corners[1], corners[3], corners[2], yTop, '#E9EEF9');
-      pushOutline(
-        corners.map((p) => ({ x: p.x, y: yTop, z: p.z })),
-        '#9FACBF',
-      );
-    }
-
-    return list;
-  }, [walls, openings, objects, floorY, c, colorOpenings]);
-
-  // Centre et rayon englobants en 3D : l'échelle reste stable en rotation.
   const { center, radius3d } = useMemo(() => {
     const all = faces.flatMap((f) => f.pts);
     if (all.length === 0) {
@@ -467,24 +273,15 @@ export function Iso3DView({ value, onChange, showMeasures }: Props) {
         ? -Infinity
         : proj.reduce((s, p) => s + p.depth, 0) / proj.length + (face.bias ?? 0);
 
-      let fill = face.fill;
-      if (face.shade) {
-        // Lumière liée à la caméra : les pans face à nous sont clairs,
-        // ceux de profil s'assombrissent — le volume se lit immédiatement.
-        const a = face.pts[0];
-        const b = face.pts[1];
-        const dx = b.x - a.x;
-        const dz = b.z - a.z;
-        const len = Math.hypot(dx, dz) || 1;
-        const facingCam = ((-dz / len) * st + (dx / len) * ct + 1) / 2;
-        fill = mix('#BFC9D8', '#FCFDFF', facingCam);
-      }
+      // Lumière liée à la caméra : les pans face à nous sont clairs, ceux de
+      // profil s'assombrissent — le volume se lit immédiatement.
+      const fill = shadeFill(face, ct, st) ?? 'none';
 
       // Mode cotes : toutes les arêtes en noir.
       const stroke =
-        showMeasures && !face.isFloor && face.stroke !== 'none'
+        showMeasures && !face.isFloor && face.stroke
           ? '#0B0D12'
-          : face.stroke;
+          : face.stroke ?? 'none';
       return { proj, depth, fill, stroke };
     });
 
@@ -492,8 +289,33 @@ export function Iso3DView({ value, onChange, showMeasures }: Props) {
     // les cotes des éléments situés derrière lui (fini les fuites).
     type Item =
       | { kind: 'poly'; depth: number; proj: typeof polys[0]['proj']; fill: string; stroke: string }
-      | { kind: 'label'; depth: number; x: number; y: number; angle: number; text: string };
+      | { kind: 'dot'; depth: number; x: number; y: number; color: string }
+      | { kind: 'label'; depth: number; x: number; y: number; angle: number; text: string }
+      | { kind: 'area'; depth: number; x: number; y: number; text: string; color: string };
     const items: Item[] = polys.map((p) => ({ kind: 'poly' as const, ...p }));
+
+    // Semis du sol : même code que le plan 2D, projeté sur le plan y = 0.
+    // C'est ce fond pointillé qui distingue la surface au sol des murs.
+    if (showSurfaces && surface && !interacting) {
+      const base = scene.floorFill;
+      const dotColor = mixHex(base, inkOn(base), 0.42);
+      for (const p of floorDots(surface.pts, dotStep(scale, 22), 350)) {
+        const q = project({ x: p.x, y: 0, z: p.z });
+        items.push({ kind: 'dot', depth: -Infinity, x: q.sx, y: q.sy, color: dotColor });
+      }
+      const ctr = wallsCentroid(walls);
+      const q = project({ x: ctr.x, y: 0, z: ctr.z });
+      items.push({
+        kind: 'area',
+        depth: -Infinity,
+        x: q.sx,
+        y: q.sy,
+        color: inkOn(base),
+        text: `${surface.exact ? '' : '≈ '}${surface.area
+          .toFixed(1)
+          .replace('.', ',')} m²`,
+      });
+    }
 
     if (showMeasures && !interacting) {
       const edgeLabel = (
@@ -536,7 +358,19 @@ export function Iso3DView({ value, onChange, showMeasures }: Props) {
 
     items.sort((p, q) => p.depth - q.depth);
     return items;
-  }, [faces, layout, view, center, radius3d, showMeasures, walls, interacting]);
+  }, [
+    scene,
+    faces,
+    surface,
+    layout,
+    view,
+    center,
+    radius3d,
+    showMeasures,
+    showSurfaces,
+    walls,
+    interacting,
+  ]);
 
   // Tap sur un mur : oriente la caméra face au mur, zoome pour le voir entier.
   const focusRef = useRef<((tx: number, ty: number) => void) | null>(null);
@@ -637,6 +471,19 @@ export function Iso3DView({ value, onChange, showMeasures }: Props) {
                   strokeWidth={1}
                   strokeLinejoin="round"
                 />
+              ) : item.kind === 'dot' ? (
+                <Circle key={i} cx={item.x} cy={item.y} r={1.1} fill={item.color} />
+              ) : item.kind === 'area' ? (
+                <SvgText
+                  key={i}
+                  x={item.x}
+                  y={item.y}
+                  fontSize={12}
+                  fontWeight="800"
+                  fill={item.color}
+                  textAnchor="middle">
+                  {item.text}
+                </SvgText>
               ) : (
                 <React.Fragment key={i}>
                   <SvgText

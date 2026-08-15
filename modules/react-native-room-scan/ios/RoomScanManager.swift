@@ -33,6 +33,8 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
     view.delegate = self
     view.captureSession.delegate = self
     captureView = view
+    // Relevé des couleurs : lecture seule sur la session ARKit de RoomPlan.
+    RoomColorSampler.shared.attach(to: view.captureSession.arSession)
     if pendingStart {
       pendingStart = false
       view.captureSession.run(configuration: configuration)
@@ -42,11 +44,15 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
 
   // MARK: - Commandes du bridge
 
-  func start() {
+  /// `fresh` : nouveau scan (les couleurs relevées repartent de zéro).
+  /// Une reprise après pause conserve ce qui a déjà été relevé.
+  func start(fresh: Bool = true) {
+    if fresh { RoomColorSampler.shared.reset() }
     DispatchQueue.main.async {
       // Une vue d'un scan précédent peut encore traîner, détachée de l'écran :
       // ne relancer la session que sur une vue réellement affichée.
       if let view = self.captureView, view.window != nil {
+        RoomColorSampler.shared.attach(to: view.captureSession.arSession)
         view.captureSession.run(configuration: self.configuration)
       } else {
         self.pendingStart = true
@@ -55,6 +61,7 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
   }
 
   func pause() {
+    RoomColorSampler.shared.detach()
     DispatchQueue.main.async {
       if #available(iOS 17.0, *) {
         // Garde la session ARKit chaude : la reprise relocalise
@@ -66,12 +73,15 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
     }
   }
 
-  func resume() { start() }
+  func resume() { start(fresh: false) }
 
   func stop(resolve: @escaping RCTPromiseResolveBlock,
             reject: @escaping RCTPromiseRejectBlock) {
     stopResolver = resolve
     stopRejecter = reject
+    // La session se fige : continuer à lire `currentFrame` ne ferait que
+    // rejouer la dernière image et fausser les moyennes.
+    RoomColorSampler.shared.detach()
     // Déclenche le post-traitement RoomPlan ; le résultat final
     // arrive dans captureView(didPresent:error:).
     DispatchQueue.main.async {
@@ -103,14 +113,18 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
       // .parametric = murs/portes propres (pas le maillage brut).
       try processedResult.export(to: usdzURL, exportOptions: .parametric)
       // L'USDZ RoomPlan est blanc uniforme : invisible sur le fond blanc
-      // de Quick Look. On teinte murs (gris clair) et meubles (gris-bleu).
+      // de Quick Look. On le teinte, avec les couleurs relevées si on en a.
       Self.tintModel(at: usdzURL)
 
-      let payload: [String: Any] = [
+      var payload: [String: Any] = [
         "modelPath": usdzURL.path,
-        "surfaces": Self.surfacesJSON(processedResult),
-        "objects": Self.objectsJSON(processedResult),
+        "surfaces": Self.surfacesJSON(processedResult, withColors: true),
+        "objects": Self.objectsJSON(processedResult, withColors: true),
       ]
+      if let floor = RoomColorSampler.shared.floorPayload() {
+        payload["floor"] = floor
+      }
+      RoomColorSampler.shared.detach()
       stopResolver?(payload)
     } catch {
       stopRejecter?("EXPORT_FAILED", error.localizedDescription, error)
@@ -121,6 +135,9 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
   // MARK: - RoomCaptureSessionDelegate (temps réel)
 
   func captureSession(_ session: RoomCaptureSession, didUpdate room: CapturedRoom) {
+    // Le releveur de couleurs a besoin de la géométrie la plus fraîche
+    // possible : on la lui passe à chaque mise à jour, sans throttle.
+    RoomColorSampler.shared.update(room: room)
     // Throttle à 2 Hz : le JS n'a besoin que d'un aperçu.
     guard Date().timeIntervalSince(lastLiveEmit) > 0.5 else { return }
     lastLiveEmit = Date()
@@ -149,9 +166,12 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
 
   // MARK: - Sérialisation JSON
 
-  static func surfacesJSON(_ room: CapturedRoom) -> [[String: Any]] {
+  /// `withColors` : seul le résultat final porte les couleurs relevées —
+  /// les inclure dans le flux temps réel coûterait cher pour rien.
+  static func surfacesJSON(_ room: CapturedRoom,
+                           withColors: Bool = false) -> [[String: Any]] {
     func encode(_ s: CapturedRoom.Surface, type: String) -> [String: Any] {
-      [
+      var out: [String: Any] = [
         "id": s.identifier.uuidString,
         "type": type,
         // Pour une surface : x = longueur, y = hauteur (mètres).
@@ -160,6 +180,10 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
         "confidence": String(describing: s.confidence),
         "transform": matrixToArray(s.transform),
       ]
+      if withColors {
+        out.merge(RoomColorSampler.shared.payload(for: s)) { a, _ in a }
+      }
+      return out
     }
     return room.walls.map { encode($0, type: "wall") }
          + room.doors.map { encode($0, type: "door") }
@@ -167,9 +191,10 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
          + room.openings.map { encode($0, type: "opening") }
   }
 
-  static func objectsJSON(_ room: CapturedRoom) -> [[String: Any]] {
+  static func objectsJSON(_ room: CapturedRoom,
+                          withColors: Bool = false) -> [[String: Any]] {
     room.objects.map { obj in
-      [
+      var out: [String: Any] = [
         "id": obj.identifier.uuidString,
         "category": String(describing: obj.category),
         "width": obj.dimensions.x,
@@ -178,17 +203,28 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
         "confidence": String(describing: obj.confidence),
         "transform": matrixToArray(obj.transform),
       ]
+      if withColors, let color = RoomColorSampler.shared.color(for: obj) {
+        out["color"] = color
+      }
+      return out
     }
   }
 
   /// Recolore l'USDZ exporté : sans teinte, tout est blanc sur fond blanc
-  /// dans Quick Look. Non fatal : en cas d'échec, le modèle reste blanc.
+  /// dans Quick Look. Les couleurs relevées pendant le scan sont employées
+  /// quand elles existent. Non fatal : en cas d'échec, le modèle reste blanc.
   static func tintModel(at url: URL) {
     do {
       let scene = try SCNScene(url: url, options: nil)
-      let wallColor = UIColor(red: 0.86, green: 0.88, blue: 0.92, alpha: 1)
+      let sampled = { (c: SIMD3<Float>) in
+        UIColor(red: CGFloat(c.x / 255), green: CGFloat(c.y / 255),
+                blue: CGFloat(c.z / 255), alpha: 1)
+      }
+      let wallColor = RoomColorSampler.shared.averageWallColor().map(sampled)
+        ?? UIColor(red: 0.86, green: 0.88, blue: 0.92, alpha: 1)
       let objectColor = UIColor(red: 0.62, green: 0.68, blue: 0.78, alpha: 1)
-      let floorColor = UIColor(red: 0.78, green: 0.80, blue: 0.84, alpha: 1)
+      let floorColor = RoomColorSampler.shared.averageFloorColor().map(sampled)
+        ?? UIColor(red: 0.78, green: 0.80, blue: 0.84, alpha: 1)
       scene.rootNode.enumerateHierarchy { node, _ in
         guard let geometry = node.geometry else { return }
         let name = (node.name ?? "").lowercased()
