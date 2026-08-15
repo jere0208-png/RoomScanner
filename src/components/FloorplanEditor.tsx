@@ -31,7 +31,7 @@ import {
   type WallQuad,
   type WallSeg,
 } from '../geometry/floorplan';
-import { dotStep, mixHex } from '../geometry/appearance';
+import { mixHex } from '../geometry/appearance';
 import { frCategory, furnKind, furnitureStrokes } from '../geometry/furniture';
 
 interface EffMapping {
@@ -204,10 +204,8 @@ export function FloorplanEditor({
    */
   const dots = useMemo(() => {
     if (!mapping) return null;
-    const size = dotStep(mapping.scale, 16) * mapping.scale;
-    const origin = mapping.toPx({ x: 0, z: 0 });
-    const wrap = (v: number) => ((v % size) + size) % size;
-    return { size, x: wrap(origin.x), y: wrap(origin.y) };
+    // Design d'ÉCRAN : le semis est fixe, il ne bouge ni au zoom ni au pan.
+    return { size: 16, x: 0, y: 0 };
   }, [mapping]);
 
   // Coins uniques (les extrémités soudées partagent les mêmes coordonnées).

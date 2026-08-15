@@ -267,7 +267,11 @@ export function Iso3DView({ value, onChange, showMeasures }: Props) {
       };
     };
 
-    const polys = faces.map((face) => {
+    // Pendant un geste : contours et cotes sautés — la fluidité prime.
+    const activeFaces = interacting
+      ? faces.filter((f) => f.fill !== null && f.fill !== 'none')
+      : faces;
+    const polys = activeFaces.map((face) => {
       const proj = face.pts.map(project);
       const depth = face.isFloor
         ? -Infinity

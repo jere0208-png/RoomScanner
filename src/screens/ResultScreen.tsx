@@ -714,8 +714,11 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   planTools: {
     position: 'absolute',
     top: 10,
+    left: 56,
     right: 10,
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
     gap: 6,
   },
   toolPill: {
