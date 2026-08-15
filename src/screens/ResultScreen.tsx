@@ -135,14 +135,15 @@ export function ResultScreen() {
   const [dInput, setDInput] = useState('');
   const selectedObject = objects.find((o) => o.id === selectedObjectId) ?? null;
   /**
-   * Quitte la fiche d'un meuble. Un meuble provisoire — posé à l'instant,
-   * jamais validé — part avec elle.
+   * Renonce au meuble qu'on vient de poser.
+   *
+   * C'est un geste EXPLICITE — la croix de la fiche —, jamais un effet de
+   * bord d'un appui sur le plan : supprimer ce qu'on tient parce que le
+   * doigt a manqué la poignée de six pixels serait insupportable.
    */
-  const leaveObject = () => {
-    if (draftObject) {
-      removeObject(draftObject);
-      setDraftObject(null);
-    }
+  const cancelObject = () => {
+    if (draftObject) removeObject(draftObject);
+    setDraftObject(null);
     setSelectedObjectId(null);
   };
 
@@ -251,6 +252,19 @@ export function ResultScreen() {
       setScreen('export');
       setTransiting(false);
     });
+  };
+
+  /**
+   * Lance un partage APRÈS la fermeture de la fenêtre.
+   *
+   * iOS ne présente pas deux écrans à la fois : demander la feuille de
+   * partage pendant que la fenêtre modale se referme, et elle ne s'ouvre
+   * jamais — sans la moindre erreur. Rien ne se passait au clic sur
+   * « Image » ou « Liste du matériel », alors que le PDF, lui, marchait :
+   * il passe par un changement d'écran, qui laisse le temps.
+   */
+  const apresFermeture = (action: () => void) => {
+    setTimeout(action, 420);
   };
 
   /** Capture la vue affichée (2D ou 3D) en PNG — avec watermark EchoPlan —
@@ -636,10 +650,7 @@ export function ResultScreen() {
               setDraftObject(null);
               setSelectedObjectId(null);
             }}
-            onSelectObject={(id) => {
-              if (id === null) leaveObject();
-              else setSelectedObjectId(id);
-            }}
+            onSelectObject={(id) => setSelectedObjectId(id)}
             selectedWallId={selectedWallId}
             onSelectWall={(id) => {
               setSelectedObjectId(null);
@@ -867,6 +878,24 @@ export function ResultScreen() {
                       strokeWidth={2}
                       strokeLinecap="round"
                       strokeLinejoin="round"
+                      fill="none"
+                    />
+                  </Svg>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.iconBtn} onPress={cancelObject}>
+                  <Svg width={19} height={19} viewBox="0 0 24 24">
+                    <Path
+                      d="M6.5 6.5 L17.5 17.5"
+                      stroke={teinte.danger}
+                      strokeWidth={2.2}
+                      strokeLinecap="round"
+                      fill="none"
+                    />
+                    <Path
+                      d="M17.5 6.5 L6.5 17.5"
+                      stroke={teinte.danger}
+                      strokeWidth={2.2}
+                      strokeLinecap="round"
                       fill="none"
                     />
                   </Svg>
@@ -1183,7 +1212,7 @@ export function ResultScreen() {
                   'Fichier OBJ du plan retouché, pour Blender ou SketchUp.',
                   () => {
                     setExporting(false);
-                    shareObj();
+                    apresFermeture(shareObj);
                   },
                 ],
                 [
@@ -1192,7 +1221,7 @@ export function ResultScreen() {
                     'conformité. Le document à chiffrer.',
                   () => {
                     setExporting(false);
-                    shareMaterial();
+                    apresFermeture(shareMaterial);
                   },
                 ],
                 [
@@ -1200,7 +1229,7 @@ export function ResultScreen() {
                   'Capture de la vue affichée, avec le filigrane EchoPlan.',
                   () => {
                     setExporting(false);
-                    shareImage();
+                    apresFermeture(shareImage);
                   },
                 ],
               ] as [string, string, () => void][]

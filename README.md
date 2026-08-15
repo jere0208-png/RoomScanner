@@ -601,6 +601,25 @@ La barre de la vue 3D n'a plus de bascule « vue de dessus » : le geste y
 mène déjà — on incline la vue jusqu'à l'aplomb — et le plan 2D est là pour
 ça. Un bouton qui refait ce que la main fait mieux ne gagne pas sa place.
 
+### Le plan exporté
+
+**Il se dessine sur la trame du logement, pas dans le repère du scan.** ARKit
+oriente son monde selon l'endroit où le scan a commencé : un appartement
+scanné de biais sortait de biais sur la feuille, ses cotes en écharpe et
+leurs attaches filant vers les coins. Une rotation de la géométrie avant
+projection remet les murs d'aplomb — c'est ce que fait n'importe quel
+dessinateur avant de coter.
+
+**Les menuiseries sont cotées**, à l'intérieur de la pièce : dehors, la cote
+du mur occupe déjà la place.
+
+**Rien ne peut fuir hors du cadre.** Une cote d'appareil devenue folle — un
+mur recoupé depuis la pose — enverrait son symbole à l'autre bout de la
+feuille : la position est bornée à la face, et ce qui sortirait du cadre
+n'est pas tracé. Un test relit le flux PDF, extrait tous les points de tracé
+et vérifie qu'ils tiennent dans le cadre, sur un logement scanné DE BIAIS —
+le cas qui déborde, s'il doit déborder.
+
 ### Métré
 
 Le PDF porte une feuille de métré, une ligne par pièce : cotes hors-tout,

@@ -36,6 +36,7 @@ import {
   type SymbolStroke,
 } from '../geometry/electrical';
 import type { MaterialList } from '../geometry/nfc15100';
+import { planFrameAngle } from '../geometry/floorplan';
 import {
   buildScene,
   isHiddenFace,
@@ -619,12 +620,29 @@ function planPage(
     w: FRAME.w - 140,
     h: FRAME.h - TITLE_H - 140,
   };
+  /**
+   * Le plan se dessine SUR LA TRAME DU LOGEMENT, pas dans le repère du scan.
+   *
+   * ARKit oriente son monde selon l'endroit où le scan a commencé : un
+   * appartement scanné de biais sortait de biais, ses cotes en écharpe,
+   * leurs attaches filant vers les coins de la feuille. Une rotation de la
+   * géométrie avant projection remet les murs d'aplomb — c'est ce que fait
+   * n'importe quel dessinateur avant de coter.
+   */
+  const trame = planFrameAngle(walls);
+  const cosT = Math.cos(-trame);
+  const sinT = Math.sin(-trame);
+  const R = (p: { x: number; z: number }) => ({
+    x: p.x * cosT - p.z * sinT,
+    z: p.x * sinT + p.z * cosT,
+  });
   let minX = Infinity,
     minZ = Infinity,
     maxX = -Infinity,
     maxZ = -Infinity;
   for (const w of walls) {
-    for (const p of [w.a, w.b]) {
+    for (const p0 of [w.a, w.b]) {
+      const p = R(p0);
       minX = Math.min(minX, p.x);
       maxX = Math.max(maxX, p.x);
       minZ = Math.min(minZ, p.z);
@@ -648,10 +666,19 @@ function planPage(
     const czw = (minZ + maxZ) / 2;
     const bcx = box.x + box.w / 2 + (planView?.fx ?? 0) * (box.w / 2);
     const bcy = box.y + box.h / 2 - (planView?.fy ?? 0) * (box.h / 2);
-    const px = (p: { x: number; z: number }): Pt => ({
-      x: bcx + (p.x - cxw) * scale,
-      y: bcy + (czw - p.z) * scale,
-    });
+    const px = (p0: { x: number; z: number }): Pt => {
+      const p = R(p0);
+      return {
+        x: bcx + (p.x - cxw) * scale,
+        y: bcy + (czw - p.z) * scale,
+      };
+    };
+    /** Dans le cadre de dessin ? Rien ne doit fuir vers les bords. */
+    const dansLeCadre = (q: Pt) =>
+      q.x > box.x - 30 &&
+      q.x < box.x + box.w + 30 &&
+      q.y > box.y - 30 &&
+      q.y < box.y + box.h + 30;
 
     // Surfaces au sol : un aplat et un semis par pièce, pour les distinguer
     // d'emblée des murs pochés en noir.
@@ -807,6 +834,56 @@ function planPage(
       );
     }
 
+    // ---------------------------------------- cotes des menuiseries
+    // Une porte se commande à sa largeur : elle doit figurer sur le plan,
+    // posée le long du mur qui la porte, à l'intérieur pour ne pas se
+    // mêler aux cotes extérieures.
+    if (showDims) {
+      for (const o of openings) {
+        const a = px(o.a);
+        const b = px(o.b);
+        const norm = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+        if (norm < 22) continue;
+        const ux2 = (b.x - a.x) / norm;
+        const uy2 = (b.y - a.y) / norm;
+        let nx2 = -uy2;
+        let ny2 = ux2;
+        const midPt = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+        const cPt = px(centerOf(roomOf(o)));
+        // Vers l'INTÉRIEUR : dehors, la cote du mur occupe déjà la place.
+        if (nx2 * (cPt.x - midPt.x) + ny2 * (cPt.y - midPt.y) < 0) {
+          nx2 = -nx2;
+          ny2 = -ny2;
+        }
+        const off = WALL_T * scale + 12;
+        const A = { x: a.x + nx2 * off, y: a.y + ny2 * off };
+        const B = { x: b.x + nx2 * off, y: b.y + ny2 * off };
+        if (!dansLeCadre(A) || !dansLeCadre(B)) continue;
+        d.line(A.x, A.y, B.x, B.y, 0.7, GREY);
+        for (const P of [A, B]) {
+          d.line(
+            P.x - (ux2 + nx2) * 2.6,
+            P.y - (uy2 + ny2) * 2.6,
+            P.x + (ux2 + nx2) * 2.6,
+            P.y + (uy2 + ny2) * 2.6,
+            0.9,
+            GREY,
+          );
+        }
+        let angle = (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI;
+        if (angle > 90) angle -= 180;
+        if (angle < -90) angle += 180;
+        d.text(
+          frLen(segLength(o)),
+          (A.x + B.x) / 2 + nx2 * 7,
+          (A.y + B.y) / 2 + ny2 * 7 - 2.5,
+          7.5,
+          GREY,
+          { angle },
+        );
+      }
+    }
+
     // ------------------------------------------- appareillage électrique
     // Même convention qu'à l'écran : le symbole se pose DANS la pièce,
     // devant la face qui le porte, relié au mur par un filet. Les appareils
@@ -832,9 +909,14 @@ function planPage(
       );
       for (const { f, face, along } of poses) {
         const spec = FIXTURES[f.kind];
+        // Une cote d'appareil devenue folle — un mur recoupé depuis la pose,
+        // par exemple — enverrait son symbole à l'autre bout de la feuille.
+        // On la borne à la face, et on jette ce qui sortirait du cadre.
+        const x = Math.max(0, Math.min(face.len, along));
         const out = 0.2 + (ranks.get(f.id) ?? 0) * 0.24;
-        const anchor = px(facePoint(face, along, 0.02));
-        const q = px(facePoint(face, along, out));
+        const anchor = px(facePoint(face, x, 0.02));
+        const q = px(facePoint(face, x, out));
+        if (!dansLeCadre(q)) continue;
         d.path([anchor, q], 0.6, spec.color);
         d.circle(q.x, q.y, 6.5, '#FFFFFF');
         drawSymbol(d, FIXTURE_SYMBOL[f.kind] ?? [], q.x, q.y, 0.55, spec.color, 0.9);

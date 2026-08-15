@@ -1087,8 +1087,10 @@ export function FloorplanEditor({
               const sw = Math.abs(Math.sin(ang));
               const w = f.width * mapping.scale;
               const d = f.depth * mapping.scale;
-              const hw = Math.max(26, (w * cw + d * sw) / 2);
-              const hh = Math.max(26, (w * sw + d * cw) / 2);
+              // Marge de 10 px autour de l'emprise : le doigt tombe rarement
+              // pile dessus, et rater la poignée déplaçait le plan.
+              const hw = Math.max(28, (w * cw + d * sw) / 2 + 10);
+              const hh = Math.max(28, (w * sw + d * cw) / 2 + 10);
               return (
                 <>
                   <ObjectDragHandle

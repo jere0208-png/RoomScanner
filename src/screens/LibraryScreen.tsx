@@ -9,7 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import Svg, { Line, Path, Polygon } from 'react-native-svg';
+import Svg, { Line, Path, Polygon, Text as SvgText } from 'react-native-svg';
 import {
   glow,
   radius,
@@ -18,7 +18,13 @@ import {
   useTheme,
   type Palette,
 } from '../theme';
-import { bounds, roomParts, totalArea } from '../geometry/floorplan';
+import { bounds, roomParts, totalArea, WALL_T } from '../geometry/floorplan';
+import {
+  checkElectrical,
+  roomInputsOf,
+  roomsInAlert,
+  wallToRooms,
+} from '../geometry/nfc15100';
 import { useScanStore, type SavedScan, type ScanFolder } from '../store/scanStore';
 
 const two = (n: number) => String(n).padStart(2, '0');
@@ -50,7 +56,8 @@ function detailsOf(item: SavedScan): string {
  * Une demi-seconde suffit à distinguer l'appui long du simple appui.
  */
 const HOLD_MS = 500;
-const THUMB = 54;
+const THUMB_W = 78;
+const THUMB_H = 62;
 
 /**
  * L'aperçu du plan, redessiné à la volée.
@@ -60,22 +67,45 @@ const THUMB = 54;
  * retouché montre son nouveau contour à l'ouverture suivante de la liste.
  */
 function PlanThumb({ scan, c }: { scan: SavedScan; c: Palette }) {
+  const parts = roomParts(scan.walls, scan.rooms);
+  // Les mêmes constats que sur le plan : une pièce en défaut sort en rouge
+  // ici aussi, sinon la vignette raconterait autre chose que le plan.
+  const alertes = (() => {
+    try {
+      const inputs = roomInputsOf(scan.rooms, parts);
+      return roomsInAlert(
+        checkElectrical(inputs, scan.fixtures ?? [], wallToRooms(inputs)),
+      );
+    } catch {
+      return new Set<string>();
+    }
+  })();
+  const roomsOfWall = new Map<string, string[]>();
+  for (const r of scan.rooms) {
+    for (const id of r.wallIds ?? []) {
+      roomsOfWall.set(id, [...(roomsOfWall.get(id) ?? []), r.id]);
+    }
+  }
+  // Le plan ENTIER, vu de dessus, redressé sur sa trame : une vignette de
+  // travers ne ressemble pas au plan qu'on va ouvrir.
   const b = bounds(scan.walls);
   const pad = 5;
   const w = Math.max(0.5, b.maxX - b.minX);
   const h = Math.max(0.5, b.maxZ - b.minZ);
-  const k = Math.min((THUMB - pad * 2) / w, (THUMB - pad * 2) / h);
-  const px = (x: number) => pad + (x - b.minX) * k + (THUMB - pad * 2 - w * k) / 2;
-  const py = (z: number) => pad + (z - b.minZ) * k + (THUMB - pad * 2 - h * k) / 2;
-  const parts = roomParts(scan.walls, scan.rooms);
+  const k = Math.min((THUMB_W - pad * 2) / w, (THUMB_H - pad * 2) / h);
+  const px = (x: number) =>
+    pad + (x - b.minX) * k + (THUMB_W - pad * 2 - w * k) / 2;
+  const py = (z: number) =>
+    pad + (z - b.minZ) * k + (THUMB_H - pad * 2 - h * k) / 2;
+  const epais = Math.max(1.6, WALL_T * k);
   return (
-    <Svg width={THUMB} height={THUMB}>
+    <Svg width={THUMB_W} height={THUMB_H}>
       {parts.map((part) =>
         part.surface ? (
           <Polygon
             key={part.roomId}
             points={part.surface.pts.map((p) => `${px(p.x)},${py(p.z)}`).join(' ')}
-            fill={c.blueSoft}
+            fill={c.surfaceSunken}
           />
         ) : null,
       )}
@@ -86,11 +116,45 @@ function PlanThumb({ scan, c }: { scan: SavedScan; c: Palette }) {
           y1={py(wall.a.z)}
           x2={px(wall.b.x)}
           y2={py(wall.b.z)}
-          stroke={c.ink}
-          strokeWidth={1.8}
-          strokeLinecap="round"
+          stroke={
+            (roomsOfWall.get(wall.id) ?? []).some((id) => alertes.has(id))
+              ? '#8E1B1B'
+              : c.ink
+          }
+          strokeWidth={epais}
+          strokeLinecap="butt"
         />
       ))}
+      {/* Les ouvertures percent le mur : c'est ce qui fait reconnaître un
+          plan d'un coup d'œil. */}
+      {scan.openings.map((o) => (
+        <Line
+          key={o.id}
+          x1={px(o.a.x)}
+          y1={py(o.a.z)}
+          x2={px(o.b.x)}
+          y2={py(o.b.z)}
+          stroke={o.type === 'window' ? c.sky : c.blue}
+          strokeWidth={epais}
+          strokeLinecap="butt"
+        />
+      ))}
+      {parts.map((part) => {
+        const nom = scan.rooms.find((r) => r.id === part.roomId)?.name ?? '';
+        if (!nom || !part.surface) return null;
+        return (
+          <SvgText
+            key={`n${part.roomId}`}
+            x={px(part.labelAt.x)}
+            y={py(part.labelAt.z) + 2}
+            fill={c.inkSoft}
+            fontSize={6}
+            fontWeight="700"
+            textAnchor="middle">
+            {nom.length > 9 ? `${nom.slice(0, 8)}…` : nom}
+          </SvgText>
+        );
+      })}
     </Svg>
   );
 }
@@ -694,8 +758,8 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   rowMain: { flexDirection: 'row', alignItems: 'center', flex: 1 },
   // L'aperçu du plan : un carré sobre, qui laisse le nom en tête d'affiche.
   thumb: {
-    width: THUMB,
-    height: THUMB,
+    width: THUMB_W,
+    height: THUMB_H,
     borderRadius: radius.sm,
     backgroundColor: c.bg,
     marginRight: 12,
