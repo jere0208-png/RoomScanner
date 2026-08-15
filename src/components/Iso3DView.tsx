@@ -537,6 +537,22 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
           opacity,
         });
       };
+      // Les menuiseries : largeur sur le linteau, hauteur sur le tableau.
+      // Ce sont des cotes de détail — elles n'apparaissent qu'en approchant,
+      // sinon elles s'empilent sur celles du mur qui les porte.
+      const solY = keptWalls.length
+        ? Math.min(...keptWalls.map((x) => x.yCenter - x.height / 2))
+        : 0;
+      for (const o of keptOpenings) {
+        const y0 = Math.max(0, o.yCenter - o.height / 2 - solY);
+        const y1 = y0 + o.height;
+        const pa = project({ x: o.a.x, y: y1, z: o.a.z });
+        const pb = project({ x: o.b.x, y: y1, z: o.b.z });
+        edgeLabel(pa, pb, `${segLength(o).toFixed(2).replace('.', ',')} m`, true);
+        const bas = project({ x: o.a.x, y: y0, z: o.a.z });
+        edgeLabel(bas, pa, `${o.height.toFixed(2).replace('.', ',')} m`, true);
+      }
+
       const seenHeights = new Set<string>();
       for (const w of walls) {
         const pA = project({ x: w.a.x, y: w.height, z: w.a.z });
@@ -560,6 +576,7 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
     faces,
     fixtures,
     keptWalls,
+    keptOpenings,
     roomNames,
     layout,
     view,
@@ -693,18 +710,30 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
                 <G key={i}>
                   {item.symbol.length > 0 && (
                     <>
+                      {/* Le repère se pose AU-DESSUS de l'appareil, relié
+                          par un filet — centré dessus, il masquait le petit
+                          volume qu'il est censé désigner : une prise fait
+                          8 cm, la pastille en fait 22 de rayon. */}
+                      <Line
+                        x1={item.x}
+                        y1={item.y - 3}
+                        x2={item.x}
+                        y2={item.y - 18}
+                        stroke={item.color}
+                        strokeWidth={1.1}
+                      />
                       {/* Un cerne de la couleur de l'appareil : le disque
                           blanc seul disparaissait sur un mur blanc. */}
                       <Circle
                         cx={item.x}
-                        cy={item.y}
+                        cy={item.y - 29}
                         r={11}
                         fill={c.surface}
                         stroke={item.color}
                         strokeWidth={1.2}
                         opacity={0.96}
                       />
-                      <G transform={`translate(${item.x}, ${item.y})`}>
+                      <G transform={`translate(${item.x}, ${item.y - 29})`}>
                         {item.symbol.map((seg, si) => (
                           <Path
                             key={si}
@@ -722,7 +751,7 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
                   {item.tag && (
                     <SvgText
                       x={item.x + 12}
-                      y={item.y - 8}
+                      y={item.y - 34}
                       fill={item.color}
                       fontSize={8}
                       fontWeight="800">
@@ -737,17 +766,17 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
                           police système, et « 135 » sans rien pour dire de
                           quoi il s'agit ne veut rien dire. */}
                       <Rect
-                        x={item.x - 30}
-                        y={item.y + 14}
-                        width={60}
-                        height={28}
-                        rx={7}
+                        x={item.x - 41}
+                        y={item.y + 10}
+                        width={82}
+                        height={30}
+                        rx={8}
                         fill="#0B0D12"
-                        opacity={0.88}
+                        opacity={0.9}
                       />
                       <SvgText
-                        x={item.x - 23}
-                        y={item.y + 25}
+                        x={item.x - 33}
+                        y={item.y + 22}
                         fill="#FFFFFF"
                         fontSize={7.5}
                         fontWeight="700"
@@ -755,17 +784,17 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
                         SOL
                       </SvgText>
                       <SvgText
-                        x={item.x + 24}
-                        y={item.y + 25}
+                        x={item.x + 33}
+                        y={item.y + 22}
                         fill="#FFFFFF"
-                        fontSize={10}
+                        fontSize={10.5}
                         fontWeight="800"
                         textAnchor="end">
                         {`${item.haut} cm`}
                       </SvgText>
                       <SvgText
-                        x={item.x - 23}
-                        y={item.y + 37}
+                        x={item.x - 33}
+                        y={item.y + 35}
                         fill="#FFFFFF"
                         fontSize={7.5}
                         fontWeight="700"
@@ -773,10 +802,10 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
                         BORD
                       </SvgText>
                       <SvgText
-                        x={item.x + 24}
-                        y={item.y + 37}
+                        x={item.x + 33}
+                        y={item.y + 35}
                         fill="#FFFFFF"
-                        fontSize={10}
+                        fontSize={10.5}
                         fontWeight="800"
                         textAnchor="end">
                         {`${item.bord} cm`}

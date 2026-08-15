@@ -224,20 +224,15 @@ prévoit toute seule. Ce cas ressort en information, jamais en alerte : crier
 au défaut là où la norme ne dit rien décrédibiliserait tous les autres
 constats.
 
-**Toucher un mur en défaut ouvre l'établi.** Pas un constat sur le plan
-qu'il faudrait ensuite aller traduire en gestes : le mur s'ouvre de face,
-prêt à être corrigé, avec le raccourci qui va bien — « + Poser une prise »
-dans le bandeau d'objectif de la pièce, « + Prise à 110 cm » quand ce sont
-les socles du plan de travail qui manquent, « Remettre à 110 cm » sous
-l'appareil mal posé. Le constat est sous les yeux, la correction est à portée
-du même pouce.
-
-**Le mur rouge propose la correction, il ne se contente pas de la
-constater.** La carte porte le geste qui efface le défaut — « Poser la prise
-manquante », « Poser une prise à 110 cm », « Remettre à 110 cm » — et
-l'applique séance tenante, puis ouvre le mur de face pour qu'on voie le
-résultat. Un défaut qu'on se contente d'afficher laisse chercher tout seul
-quoi en faire.
+**Toucher un mur en défaut ouvre l'établi, et rien d'autre.** Il n'y a plus
+de carte d'explication sur le plan : elle disait le défaut et proposait le
+geste, mais laissait le dessin encombré et le geste à distance de son effet.
+Le mur s'ouvre désormais **de face**, et c'est cette page qui porte tout —
+l'objectif de la pièce (« Chambre — 2 socles sur 3 ») avec son bouton
+« + Poser une prise », les constats restants avec leur règle et leur
+raccourci, et sous l'appareil mal posé son « Remettre à 110 cm ». Le constat
+est sous les yeux, la correction est à portée du même pouce, et le résultat
+s'affiche à l'endroit même où on l'a demandé.
 
 **Ce qui alerte se voit sans ouvrir un menu.** Les murs qui bordent une pièce
 en défaut passent en **rouge foncé** — assez sombre pour rester un mur poché,
@@ -354,6 +349,20 @@ métré par pièce, vues 3D), **modèle 3D** (OBJ du plan retouché) ou **image*
 (capture de la vue affichée, filigranée). Les pastilles « image » et
 « modèle » ont quitté les barres d'outils des plans : elles y faisaient
 double emploi et encombraient une barre déjà chargée.
+
+### Menuiseries : les retailler
+
+Une porte détectée à 78 cm alors qu'elle en fait 83, une fenêtre dont le
+linteau est mal vu : ça se corrige sur le plan. Toucher une menuiserie en
+mode édition la sélectionne — sa cible tactile fait 26 px, une menuiserie
+n'en dessine que 3 — et le bandeau du bas donne ses deux cotes avec de quoi
+les changer. La **largeur se retaille autour de son axe** (elle ne glisse
+pas le long du mur), la **hauteur depuis son allège** : c'est le linteau qui
+monte, une fenêtre ne descend pas vers le sol.
+
+En 3D, ces mêmes cotes apparaissent **au zoom**, sur le linteau et sur le
+tableau, comme toutes les cotes de détail : de loin elles s'empileraient sur
+celles du mur qui les porte.
 
 ### Cotes : deux niveaux de détail
 

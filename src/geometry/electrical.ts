@@ -73,7 +73,15 @@ export interface FixtureSpec {
   /** Largeur et hauteur de la plaque (m). */
   w: number;
   h: number;
-  /** Saillie hors du nu du mur (m). */
+  /**
+   * Saillie hors du nu du mur (m).
+   *
+   * Une plaque d'appareillage saille de 8 à 10 mm dans la vraie vie. À
+   * l'écran, sur un mur vu de biais, cela ne fait rien du tout : on retient
+   * 22 mm, cadre compris. C'est la seule cote de ce fichier qui soit un
+   * compromis d'affichage plutôt qu'une mesure — celles qui comptent, qu'on
+   * lit et qu'on exporte, sont la hauteur d'axe et la distance au bord.
+   */
   depth: number;
   color: string;
   /** Hauteur d'axe usuelle (m). */
@@ -96,7 +104,7 @@ export const FIXTURES: Record<FixtureKind, FixtureSpec> = {
     family: 'Prises',
     w: 0.08,
     h: 0.08,
-    depth: 0.012,
+    depth: 0.022,
     color: C_PRISE,
     std: 0.25,
     note: 'Axe usuel à 25 cm ; 5 cm au-dessus du sol au minimum.',
@@ -107,7 +115,7 @@ export const FIXTURES: Record<FixtureKind, FixtureSpec> = {
     family: 'Prises',
     w: 0.15,
     h: 0.08,
-    depth: 0.012,
+    depth: 0.022,
     color: C_PRISE,
     std: 0.25,
     note: 'Deux socles sous une plaque : compte pour deux prises.',
@@ -118,7 +126,7 @@ export const FIXTURES: Record<FixtureKind, FixtureSpec> = {
     family: 'Prises',
     w: 0.08,
     h: 0.08,
-    depth: 0.012,
+    depth: 0.022,
     color: C_PRISE,
     std: 1.1,
     note: 'Four, lave-linge : circuit dédié. Souvent au-dessus du plan.',
@@ -140,7 +148,7 @@ export const FIXTURES: Record<FixtureKind, FixtureSpec> = {
     family: 'Commandes',
     w: 0.08,
     h: 0.08,
-    depth: 0.012,
+    depth: 0.022,
     color: C_CMD,
     std: 1.1,
     note: 'Manette entre 0,90 m et 1,30 m du sol.',
@@ -151,7 +159,7 @@ export const FIXTURES: Record<FixtureKind, FixtureSpec> = {
     family: 'Commandes',
     w: 0.08,
     h: 0.08,
-    depth: 0.012,
+    depth: 0.022,
     color: C_CMD,
     std: 1.1,
     note: 'Deux points de commande pour un même éclairage.',
@@ -162,7 +170,7 @@ export const FIXTURES: Record<FixtureKind, FixtureSpec> = {
     family: 'Commandes',
     w: 0.08,
     h: 0.08,
-    depth: 0.012,
+    depth: 0.022,
     color: C_CMD,
     std: 1.1,
     note: 'Télérupteur : au-delà de deux points de commande.',
@@ -184,7 +192,7 @@ export const FIXTURES: Record<FixtureKind, FixtureSpec> = {
     family: 'Courants faibles',
     w: 0.08,
     h: 0.08,
-    depth: 0.012,
+    depth: 0.022,
     color: C_FAIBLE,
     std: 0.25,
     note: 'Deux au minimum par pièce principale.',
@@ -195,7 +203,7 @@ export const FIXTURES: Record<FixtureKind, FixtureSpec> = {
     family: 'Courants faibles',
     w: 0.08,
     h: 0.08,
-    depth: 0.012,
+    depth: 0.022,
     color: C_FAIBLE,
     std: 0.25,
     note: 'Souvent doublée d’une prise 16 A et d’un RJ45.',

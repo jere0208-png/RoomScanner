@@ -38,6 +38,7 @@ import {
   type FixtureKind,
 } from '../geometry/electrical';
 import {
+  checkElectrical,
   HEIGHT_RULES,
   requirementFor,
   roomInputsOf,
@@ -149,6 +150,26 @@ export function WallElevation({
       regle: req.regle,
       surPlan: req.surPlan > hauts,
     };
+  }, [rooms, walls, fixtures, wallId]);
+
+  /**
+   * Les autres constats de la pièce — ceux que le bandeau d'objectif et
+   * l'avertissement de hauteur ne disent pas déjà. C'est ici qu'ils doivent
+   * paraître : on a ouvert ce mur PARCE QU'il est en défaut, il serait
+   * absurde de renvoyer ailleurs pour savoir lequel.
+   */
+  const constats = useMemo(() => {
+    const inputs = roomInputsOf(rooms, roomParts(walls, rooms));
+    const w2r = wallToRooms(inputs);
+    const miens = w2r.get(wallId) ?? [];
+    return checkElectrical(inputs, fixtures, w2r).filter(
+      (i) =>
+        i.severity === 'alerte' &&
+        i.code !== 'socles' &&
+        i.code !== 'hauteur' &&
+        !!i.roomId &&
+        miens.includes(i.roomId),
+    );
   }, [rooms, walls, fixtures, wallId]);
 
   // ------------------------------------------------------------- échelle
@@ -615,6 +636,29 @@ export function WallElevation({
           <Text style={styles.guideRule}>{objectif.regle}</Text>
         </View>
       )}
+
+      {constats.map((issue) => (
+        <View key={issue.code + issue.message} style={styles.warn}>
+          <View style={styles.warnHead}>
+            <Text style={styles.warnTitle} numberOfLines={2}>
+              {issue.message}
+            </Text>
+            {issue.fix?.type === 'poser' && (
+              <TouchableOpacity
+                style={styles.warnFix}
+                onPress={() =>
+                  poser(
+                    (issue.fix as { kind: FixtureKind }).kind,
+                    (issue.fix as { height?: number }).height,
+                  )
+                }>
+                <Text style={styles.warnFixText}>{issue.fix.label}</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          <Text style={styles.warnRule}>{issue.regle}</Text>
+        </View>
+      ))}
 
       {hauteurKO && selected && (
         <View style={styles.warn}>

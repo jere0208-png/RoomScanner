@@ -249,7 +249,19 @@ export type ElecFix =
   | { type: 'poser'; kind: FixtureKind; height?: number; label: string }
   | { type: 'hauteur'; fixtureId: string; height: number; label: string };
 
+/** Nature du constat : de quoi on parle, sans lire la phrase. */
+export type ElecCode =
+  | 'socles'
+  | 'surPlan'
+  | 'rj45'
+  | 'hauteur'
+  | 'circuits'
+  | 'cuisson'
+  | 'volumes'
+  | 'tableau';
+
 export interface ElecIssue {
+  code: ElecCode;
   roomId?: string;
   fixtureId?: string;
   severity: 'alerte' | 'info';
@@ -306,6 +318,7 @@ export function checkElectrical(
         roomId: roomOfFixture(f),
         fixtureId: f.id,
         severity: 'alerte',
+        code: 'hauteur',
         message: `${spec.label} posée à ${cm} cm : trop bas`,
         regle: rule.regle,
         fix: remise,
@@ -315,6 +328,7 @@ export function checkElectrical(
         roomId: roomOfFixture(f),
         fixtureId: f.id,
         severity: 'alerte',
+        code: 'hauteur',
         message: `${spec.label} posée à ${cm} cm : trop haut`,
         regle: rule.regle,
         fix: remise,
@@ -334,6 +348,7 @@ export function checkElectrical(
     if (socles < req.socles) {
       const manque = req.socles - socles;
       out.push({
+        code: 'socles',
         roomId: room.id,
         severity: 'alerte',
         message:
@@ -352,6 +367,7 @@ export function checkElectrical(
       out.push({
         roomId: room.id,
         severity: 'alerte',
+        code: 'rj45',
         message: `${label} : aucune prise RJ45`,
         regle: req.regle,
         fix: { type: 'poser', kind: 'rj45', label: 'Poser une prise RJ45' },
@@ -363,6 +379,7 @@ export function checkElectrical(
       ).length;
       if (hauts < req.surPlan) {
         out.push({
+          code: 'surPlan',
           roomId: room.id,
           severity: 'alerte',
           message:
@@ -386,6 +403,7 @@ export function checkElectrical(
     // un circuit de plus. On le dit, sans crier.
     if (socles > MAX_SOCLES) {
       out.push({
+        code: 'circuits',
         roomId: room.id,
         severity: 'info',
         message:
@@ -404,6 +422,7 @@ export function checkElectrical(
       out.push({
         roomId: room.id,
         severity: 'alerte',
+        code: 'cuisson',
         message: `${label} : socle 32 A hors cuisine`,
         regle:
           'Le socle 32 A alimente la plaque de cuisson, sur un circuit ' +
@@ -414,6 +433,7 @@ export function checkElectrical(
       out.push({
         roomId: room.id,
         severity: 'info',
+        code: 'volumes',
         message: `${label} : vérifier les volumes`,
         regle:
           'Aucun socle dans les volumes 0, 1 et 2 (baignoire, douche). ' +
@@ -431,6 +451,7 @@ export function checkElectrical(
   const rj45Min = Math.max(2, principales);
   if (principales > 0 && rj45Total < rj45Min) {
     out.push({
+      code: 'rj45',
       severity: 'alerte',
       message: `Logement : ${rj45Total} prise${
         rj45Total > 1 ? 's' : ''
@@ -442,6 +463,7 @@ export function checkElectrical(
   }
   if (fixtures.length > 0 && !fixtures.some((f) => f.kind === 'tableau')) {
     out.push({
+      code: 'tableau',
       severity: 'info',
       message: 'Aucun tableau électrique placé',
       regle:

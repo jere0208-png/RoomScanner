@@ -50,7 +50,6 @@ import { checkPlan } from '../geometry/diagnostics';
 import {
   checkElectrical,
   materialList,
-  type ElecIssue,
   roomInputsOf,
   roomsInAlert,
   wallToRooms,
@@ -111,6 +110,7 @@ export function ResultScreen() {
   const north = useScanStore((s) => s.north);
   const addFixture = useScanStore((s) => s.addFixture);
   const moveFixture = useScanStore((s) => s.moveFixture);
+  const resizeOpening = useScanStore((s) => s.resizeOpening);
 
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
   const [wInput, setWInput] = useState('');
@@ -154,6 +154,7 @@ export function ResultScreen() {
   const [barMode, setBarMode] = useState(false);
   const swap = useRef(new Animated.Value(1)).current;
   const [selectedWallId, setSelectedWallId] = useState<string | null>(null);
+  const [selectedOpeningId, setSelectedOpeningId] = useState<string | null>(null);
   const [renaming, setRenaming] = useState(false);
   const [nameInput, setNameInput] = useState('');
   // Electricite : un seul panneau, qui montre soit le catalogue d'appareils,
@@ -262,6 +263,31 @@ export function ResultScreen() {
     }
   };
 
+  const selectedOpening =
+    openings.find((o) => o.id === selectedOpeningId) ?? null;
+
+  /** Retaille une menuiserie : sa largeur autour de son axe, sa hauteur
+   *  depuis son allège. */
+  const promptOpening = (id: string, quoi: 'largeur' | 'hauteur') => {
+    const o = openings.find((x) => x.id === id);
+    if (!o) return;
+    const actuel = quoi === 'largeur' ? segLength(o) : o.height;
+    Alert.prompt(
+      quoi === 'largeur' ? 'Largeur de la menuiserie' : 'Hauteur de la menuiserie',
+      quoi === 'largeur'
+        ? 'En mètres. Elle se retaille autour de son axe.'
+        : 'En mètres. L’allège ne bouge pas : c’est le linteau qui suit.',
+      (t) => {
+        const v = parseFloat((t ?? '').replace(',', '.'));
+        if (!(v > 0)) return;
+        if (quoi === 'largeur') resizeOpening(id, v, undefined);
+        else resizeOpening(id, undefined, v);
+      },
+      'plain-text',
+      actuel.toFixed(2).replace('.', ','),
+    );
+  };
+
   const selectedWall = walls.find((w) => w.id === selectedWallId) ?? null;
   const perimeter = walls.reduce((s, w) => s + segLength(w), 0);
   const parts = roomParts(walls, rooms);
@@ -298,12 +324,6 @@ export function ResultScreen() {
     })),
   ];
   const alertes = issues.filter((i) => i.severity === 'alerte').length;
-  /** Constats électriques des pièces que borde le mur sélectionné. */
-  const wallIssues = selectedWallId
-    ? elecIssues.filter(
-        (i) => i.roomId && (wallRooms.get(selectedWallId) ?? []).includes(i.roomId),
-      )
-    : [];
 
   /** Amène sous les yeux l'élément visé par un constat. */
   const goToIssue = (issue: Constat) => {
@@ -396,30 +416,6 @@ export function ResultScreen() {
     }
     setElecWallId(wallId);
     setElecSel(id);
-    setElecView('mur');
-    setElecOpen(true);
-  };
-
-  /**
-   * Le geste qui règle le constat, appliqué séance tenante, puis le mur
-   * s'ouvre de face pour qu'on VOIE le résultat. Constater sans proposer
-   * laissait l'utilisateur chercher tout seul quoi faire du rouge.
-   */
-  const applyFix = (issue: ElecIssue) => {
-    const fix = issue.fix;
-    if (!fix) {
-      if (selectedWallId) openWallElevation(selectedWallId);
-      return;
-    }
-    if (fix.type === 'poser') {
-      if (selectedWallId) placeFixture(fix.kind, selectedWallId, fix.height);
-      return;
-    }
-    const cible = fixtures.find((f) => f.id === fix.fixtureId);
-    if (!cible) return;
-    moveFixture(cible.id, cible.along, fix.height);
-    setElecWallId(cible.wallId);
-    setElecSel(cible.id);
     setElecView('mur');
     setElecOpen(true);
   };
@@ -600,6 +596,15 @@ export function ResultScreen() {
               }
             }}
             alertRooms={alertRooms}
+            selectedOpeningId={selectedOpeningId}
+            onSelectOpening={(id) => {
+              setSelectedOpeningId(id);
+              if (id) {
+                setSelectedWallId(null);
+                setSelectedObjectId(null);
+                setSelectedRoomId(null);
+              }
+            }}
             selectedRoomId={selectedRoomId}
             onSelectRoom={(id) => {
               setSelectedObjectId(null);
@@ -863,10 +868,43 @@ export function ResultScreen() {
           </View>
         )}
 
+        {/* La menuiserie sélectionnée : largeur, hauteur, et de quoi les
+            changer. Même bandeau que pour un mur — un seul endroit où
+            regarder quand on a touché quelque chose. */}
+        {tab === '2d' && editMode && selectedOpening && (
+          <View style={styles.wallStrip}>
+            <Text style={styles.wallStripText} numberOfLines={1}>
+              <Text style={styles.wallStripStrong}>
+                {`${fr(segLength(selectedOpening), 2)} × ${fr(
+                  selectedOpening.height,
+                  2,
+                )} m`}
+              </Text>
+              {`  ·  ${
+                selectedOpening.type === 'window'
+                  ? 'fenêtre'
+                  : selectedOpening.type === 'door'
+                  ? 'porte'
+                  : 'baie'
+              }`}
+            </Text>
+            <TouchableOpacity
+              style={styles.wallStripGhost}
+              onPress={() => promptOpening(selectedOpening.id, 'largeur')}>
+              <Text style={styles.wallStripGhostText}>Largeur</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.wallStripAction}
+              onPress={() => promptOpening(selectedOpening.id, 'hauteur')}>
+              <Text style={styles.wallStripActionText}>Hauteur</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* Le mur sélectionné, en une ligne au pied du plan : sa longueur,
             sa hauteur sous plafond, et de quoi les changer. En haut, le
             bandeau mangeait le dessin qu'on est en train de regarder. */}
-        {tab === '2d' && !selectedObject && editMode && selectedWall && (
+        {tab === '2d' && !selectedObject && !selectedOpening && editMode && selectedWall && (
           <View style={styles.wallStrip}>
             <Text style={styles.wallStripText} numberOfLines={1}>
               <Text style={styles.wallStripStrong}>
@@ -879,44 +917,6 @@ export function ResultScreen() {
               onPress={() => promptLength(selectedWall.id)}>
               <Text style={styles.wallStripActionText}>Coter</Text>
             </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Pourquoi ce mur est rouge. On ne montre que la première raison :
-            la liste complète est dans le diagnostic, ici on répond à la
-            question posée par l'appui. */}
-        {tab === '2d' && editMode && selectedWall && wallIssues.length > 0 && (
-          <View style={[styles.elecCard, north !== null && styles.barShift]}>
-            <View style={styles.elecCardHead}>
-              <View style={styles.elecDotAlert} />
-              <Text style={styles.elecCardTitle}>{wallIssues[0].message}</Text>
-            </View>
-            <Text style={styles.elecCardRule}>{wallIssues[0].regle}</Text>
-            <View style={styles.elecCardActions}>
-              <TouchableOpacity
-                style={styles.elecFix}
-                onPress={() => applyFix(wallIssues[0])}>
-                <Text style={styles.elecFixText}>
-                  {wallIssues[0].fix?.label ?? 'Ouvrir le mur'}
-                </Text>
-              </TouchableOpacity>
-              {selectedWallId && (
-                <TouchableOpacity
-                  style={styles.elecSee}
-                  onPress={() => openWallElevation(selectedWallId)}>
-                  <Text style={styles.elecSeeText}>Voir le mur</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-            {wallIssues.length > 1 && (
-              <TouchableOpacity onPress={() => setChecking(true)}>
-                <Text style={styles.elecCardMore}>
-                  {`+ ${wallIssues.length - 1} autre${
-                    wallIssues.length > 2 ? 's' : ''
-                  } constat${wallIssues.length > 2 ? 's' : ''} — tout voir`}
-                </Text>
-              </TouchableOpacity>
-            )}
           </View>
         )}
 
@@ -1802,6 +1802,14 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     paddingVertical: 9,
   },
   wallStripActionText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
+  wallStripGhost: {
+    backgroundColor: c.surfaceSunken,
+    borderRadius: radius.pill,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    marginRight: 6,
+  },
+  wallStripGhostText: { color: c.inkSoft, fontSize: 13, fontWeight: '800' },
   editBar: {
     position: 'absolute',
     bottom: 10,

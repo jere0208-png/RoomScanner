@@ -370,6 +370,12 @@ interface ScanState {
   commitCurrent: () => void;
   /** Ajoute une ouverture manuelle centrée sur un mur (entrée sans porte, baie…). */
   addOpening: (wallId: string) => void;
+  /**
+   * Retaille une ouverture. La largeur se prend autour de son axe, la
+   * hauteur depuis son allège : une fenêtre monte, elle ne descend pas.
+   */
+  resizeOpening: (id: string, width?: number, height?: number) => void;
+  removeOpening: (id: string) => void;
   removeObject: (id: string) => void;
   setObjectCenter: (id: string, x: number, z: number) => void;
   resizeObject: (id: string, width: number, depth: number) => void;
@@ -1001,6 +1007,44 @@ export const useScanStore = create<ScanState>((set, get) => {
         yCenter: base + h / 2,
       };
       set({ openings: [...st.openings, opening], dirty: true });
+    },
+
+    resizeOpening: (id, width, height) => {
+      const st = get();
+      const o = st.openings.find((x) => x.id === id);
+      if (!o) return;
+      pushHistory(`opening:${id}`);
+      const len = Math.hypot(o.b.x - o.a.x, o.b.z - o.a.z) || 1;
+      const ux = (o.b.x - o.a.x) / len;
+      const uz = (o.b.z - o.a.z) / len;
+      const mid = { x: (o.a.x + o.b.x) / 2, z: (o.a.z + o.b.z) / 2 };
+      const l = width !== undefined ? Math.max(0.1, Math.min(6, width)) : len;
+      const h =
+        height !== undefined ? Math.max(0.2, Math.min(3, height)) : o.height;
+      // L'allège ne bouge pas : c'est le linteau qui monte ou descend.
+      const base = o.yCenter - o.height / 2;
+      set({
+        openings: st.openings.map((x) =>
+          x.id === id
+            ? {
+                ...x,
+                a: { x: mid.x - (ux * l) / 2, z: mid.z - (uz * l) / 2 },
+                b: { x: mid.x + (ux * l) / 2, z: mid.z + (uz * l) / 2 },
+                height: h,
+                yCenter: base + h / 2,
+              }
+            : x,
+        ),
+        dirty: true,
+      });
+    },
+
+    removeOpening: (id) => {
+      pushHistory('removeOpening');
+      set({
+        openings: get().openings.filter((o) => o.id !== id),
+        dirty: true,
+      });
     },
 
     removeObject: (id) => {

@@ -142,6 +142,9 @@ interface Props {
    * foncé. C'est le seul signal visible sans ouvrir un menu.
    */
   alertRooms?: Set<string>;
+  /** Ouverture sélectionnée : elle se retaille en largeur et en hauteur. */
+  selectedOpeningId?: string | null;
+  onSelectOpening?: (id: string | null) => void;
   /** Appui sur un symbole d'appareillage : ouvre son mur vu de face. */
   onSelectFixture?: (id: string, wallId: string) => void;
   /** Commande lancée depuis les boutons flottants du mur sélectionné. */
@@ -168,6 +171,8 @@ export function FloorplanEditor({
   onEditRoomName,
   onWallAction,
   onSelectFixture,
+  selectedOpeningId,
+  onSelectOpening,
   alertRooms,
 }: Props) {
   const walls = useScanStore((s) => s.walls);
@@ -774,8 +779,24 @@ export function FloorplanEditor({
                   ? c.amber
                   : c.sky
                 : c.inkFaint;
+              const choisie = o.id === selectedOpeningId;
               return (
-                <G key={o.id}>
+                <G
+                  key={o.id}
+                  onPress={
+                    editable && onSelectOpening
+                      ? () => onSelectOpening(choisie ? null : o.id)
+                      : undefined
+                  }>
+                  {/* Cible tactile : une menuiserie fait 3 px d'épaisseur. */}
+                  <Line
+                    x1={a.x}
+                    y1={a.y}
+                    x2={b.x}
+                    y2={b.y}
+                    stroke="transparent"
+                    strokeWidth={26}
+                  />
                   <Polygon
                     points={slot.map((p) => `${p.x},${p.y}`).join(' ')}
                     fill={showSurfaces ? fillOf(roomOf(o)) : c.surface}
@@ -786,8 +807,8 @@ export function FloorplanEditor({
                     y1={a.y}
                     x2={b.x}
                     y2={b.y}
-                    stroke={color}
-                    strokeWidth={3}
+                    stroke={choisie ? c.blue : color}
+                    strokeWidth={choisie ? 5 : 3}
                     strokeLinecap="butt"
                   />
                 </G>
