@@ -135,13 +135,21 @@ export function FloorplanEditor({
       a0: t.length >= 2 ? touchAngle(t) : 0,
     };
   };
+  // Pendant un déplacement du plan, les cotes sont masquées : leur recalcul
+  // et leur rotation à chaque image faisaient saccader le geste.
+  const [navigating, setNavigating] = useState(false);
   const nav = useRef(
     PanResponder.create({
       // Ne prend la main QUE sur un mouvement : les taps (sélection de mur)
       // et les poignées de coin gardent la priorité.
       onStartShouldSetPanResponder: () => false,
       onMoveShouldSetPanResponder: (_e, g) => Math.abs(g.dx) + Math.abs(g.dy) > 6,
-      onPanResponderGrant: snapshot,
+      onPanResponderGrant: (e, g) => {
+        setNavigating(true);
+        snapshot(e, g);
+      },
+      onPanResponderRelease: () => setNavigating(false),
+      onPanResponderTerminate: () => setNavigating(false),
       onPanResponderMove: (e, g) => {
         const t = e.nativeEvent.touches;
         const mode = t.length >= 2 ? 'pinch' : 'pan';
@@ -371,7 +379,7 @@ export function FloorplanEditor({
                 wall={w}
                 quad={quads.get(w.id)}
                 mapping={mapping}
-                showMeasure={showMeasures}
+                showMeasure={showMeasures && !navigating}
                 selected={editable && w.id === selectedWallId}
                 onPress={
                   editable

@@ -592,6 +592,158 @@ export function weldCorners(walls: WallSeg[], tol = 0.15): WallSeg[] {
   return out;
 }
 
+// ------------------------------------------- fusion des murs colinéaires
+
+/** Direction unitaire d'un mur, de a vers b. */
+function unit(w: WallSeg): Pt {
+  const dx = w.b.x - w.a.x;
+  const dz = w.b.z - w.a.z;
+  const len = Math.hypot(dx, dz) || 1;
+  return { x: dx / len, z: dz / len };
+}
+
+/**
+ * Recompose la grille de couleurs d'un mur fusionné : une colonne tous les
+ * ~50 cm, chacune échantillonnée dans le morceau qu'elle recouvre. Sans ça,
+ * la texture d'un morceau d'1 m serait étirée sur toute la longueur.
+ */
+function mergeTextures(
+  pieces: { wall: WallSeg; from: Pt; to: Pt; len: number }[],
+  total: number,
+): SurfaceTexture | undefined {
+  if (!pieces.some((p) => p.wall.texture)) return undefined;
+  const rows = Math.max(...pieces.map((p) => p.wall.texture?.rows ?? 1));
+  const cols = Math.min(24, Math.max(4, Math.round(total / 0.5)));
+  const texels: string[] = [];
+  for (let r = 0; r < rows; r++) {
+    for (let i = 0; i < cols; i++) {
+      const u = ((i + 0.5) / cols) * total;
+      // Morceau qui porte cette colonne, et position relative dedans.
+      let acc = 0;
+      let piece = pieces[pieces.length - 1];
+      let local = 1;
+      for (const p of pieces) {
+        if (u <= acc + p.len || p === pieces[pieces.length - 1]) {
+          piece = p;
+          local = p.len > 0 ? Math.min(1, Math.max(0, (u - acc) / p.len)) : 0;
+          break;
+        }
+        acc += p.len;
+      }
+      const tex = piece.wall.texture;
+      // `from`/`to` peut être l'inverse du sens propre au morceau : la
+      // colonne 0 de sa grille reste son extrémité A d'origine.
+      const flipped = piece.from !== piece.wall.a;
+      const uu = flipped ? 1 - local : local;
+      const cell = tex
+        ? tex.texels[
+            Math.min(tex.rows - 1, Math.floor(((r + 0.5) / rows) * tex.rows)) *
+              tex.cols +
+              Math.min(tex.cols - 1, Math.floor(uu * tex.cols))
+          ]
+        : undefined;
+      texels.push(cell ?? piece.wall.color ?? '#FFFFFF');
+    }
+  }
+  return { cols, rows, texels };
+}
+
+/**
+ * Fusionne les murs colinéaires bout à bout d'une même pièce.
+ *
+ * RoomPlan livre volontiers un mur droit en deux ou trois morceaux : le plan
+ * hérite d'autant de cotes, la vue 3D montre des raccords là où il n'y a
+ * qu'une surface, et déplacer le « coin » fantôme entre deux morceaux plie un
+ * mur qui devrait rester droit. On ne fusionne qu'à coup sûr : même pièce,
+ * extrémités déjà soudées, directions alignées à `angleDeg` près, hauteurs
+ * comparables, et jamais un nœud qui porte un troisième mur (un vrai T).
+ */
+export function mergeColinear(
+  walls: WallSeg[],
+  angleDeg = 4,
+  heightTol = 0.12,
+): WallSeg[] {
+  const cosMin = Math.cos((angleDeg * Math.PI) / 180);
+  const out: WallSeg[] = [];
+
+  for (const { items } of groupByRoom(walls)) {
+    // Bras par nœud : une fusion demande exactement deux murs qui s'y touchent.
+    const arms = new Map<string, { wall: WallSeg; end: 'a' | 'b' }[]>();
+    for (const w of items) {
+      for (const end of ['a', 'b'] as const) {
+        const k = nodeKey(w[end]);
+        const list = arms.get(k) ?? [];
+        list.push({ wall: w, end });
+        arms.set(k, list);
+      }
+    }
+
+    /** Le mur qui prolonge `w` au nœud `end`, s'il le prolonge vraiment. */
+    const nextAt = (w: WallSeg, end: 'a' | 'b'): WallSeg | null => {
+      const list = arms.get(nodeKey(w[end])) ?? [];
+      if (list.length !== 2) return null;
+      const other = list.find((x) => x.wall.id !== w.id);
+      if (!other) return null;
+      if (Math.abs(other.wall.height - w.height) > heightTol) return null;
+      const u = unit(w);
+      const v = unit(other.wall);
+      // Directions comparées dans le sens du parcours : le mur suivant doit
+      // repartir du nœud dans la même direction qu'on y arrivait.
+      const inbound = end === 'b' ? u : { x: -u.x, z: -u.z };
+      const outbound = other.end === 'a' ? v : { x: -v.x, z: -v.z };
+      const dot = inbound.x * outbound.x + inbound.z * outbound.z;
+      return dot >= cosMin ? other.wall : null;
+    };
+
+    const seen = new Set<string>();
+    for (const start of items) {
+      if (seen.has(start.id)) continue;
+      // Remonter jusqu'au début de la chaîne, sans jamais boucler.
+      let head = start;
+      let headEnd: 'a' | 'b' = 'a';
+      const guard = new Set<string>([start.id]);
+      for (;;) {
+        const prev = nextAt(head, headEnd);
+        if (!prev || guard.has(prev.id)) break;
+        guard.add(prev.id);
+        headEnd = nodeKey(prev.a) === nodeKey(head[headEnd]) ? 'b' : 'a';
+        head = prev;
+      }
+
+      // `head[headEnd]` est l'extrémité libre : c'est de là que part la
+      // chaîne, qu'on déroule maintenant bout à bout jusqu'à l'autre bout.
+      const pieces: { wall: WallSeg; from: Pt; to: Pt; len: number }[] = [];
+      let cur: WallSeg | null = head;
+      let from: Pt = head[headEnd];
+      while (cur && !seen.has(cur.id)) {
+        seen.add(cur.id);
+        const to = nodeKey(cur.a) === nodeKey(from) ? cur.b : cur.a;
+        pieces.push({ wall: cur, from, to, len: segLength(cur) });
+        const end: 'a' | 'b' = nodeKey(cur.b) === nodeKey(to) ? 'b' : 'a';
+        const next: WallSeg | null = nextAt(cur, end);
+        from = to;
+        cur = next;
+      }
+
+      if (pieces.length === 1) {
+        out.push(pieces[0].wall);
+        continue;
+      }
+      // Le plus long morceau donne son identité au mur reconstitué.
+      const main = pieces.reduce((a, b) => (b.len > a.len ? b : a));
+      const total = pieces.reduce((s, p) => s + p.len, 0);
+      out.push({
+        ...main.wall,
+        a: pieces[0].from,
+        b: pieces[pieces.length - 1].to,
+        height: Math.max(...pieces.map((p) => p.wall.height)),
+        texture: mergeTextures(pieces, total),
+      });
+    }
+  }
+  return out;
+}
+
 export interface Bounds {
   minX: number;
   minZ: number;

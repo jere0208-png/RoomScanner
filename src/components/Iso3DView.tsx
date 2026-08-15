@@ -6,6 +6,7 @@ import { segLength, type WallSeg } from '../geometry/floorplan';
 import { dotStep, floorDots, inkOn, mixHex } from '../geometry/appearance';
 import {
   buildScene,
+  sceneFraming,
   shadeFill,
   type P3,
   type ScenePalette,
@@ -228,27 +229,29 @@ export function Iso3DView({ value, onChange, showMeasures }: Props) {
         showSurfaces,
         showTextures,
         floors,
+        // Pendant un geste : mêmes volumes et mêmes contours, mais des pans
+        // d'un seul tenant. C'est le découpage en bandes qui coûtait cher,
+        // pas les contours — les supprimer faisait fondre le modèle en blanc.
+        coarse: interacting,
       }),
-    [walls, openings, objects, palette, colorOpenings, showSurfaces, showTextures, floors],
+    [
+      walls,
+      openings,
+      objects,
+      palette,
+      colorOpenings,
+      showSurfaces,
+      showTextures,
+      floors,
+      interacting,
+    ],
   );
   const faces = scene.faces;
 
-  const { center, radius3d } = useMemo(() => {
-    const all = faces.flatMap((f) => f.pts);
-    if (all.length === 0) {
-      return { center: { x: 0, y: 0, z: 0 }, radius3d: 1 };
-    }
-    const ctr = {
-      x: all.reduce((s, p) => s + p.x, 0) / all.length,
-      y: all.reduce((s, p) => s + p.y, 0) / all.length,
-      z: all.reduce((s, p) => s + p.z, 0) / all.length,
-    };
-    const r = Math.max(
-      0.5,
-      ...all.map((p) => Math.hypot(p.x - ctr.x, p.y - ctr.y, p.z - ctr.z)),
-    );
-    return { center: ctr, radius3d: r };
-  }, [faces]);
+  // Centre pris sur la BOÎTE ENGLOBANTE, jamais sur la moyenne des points :
+  // la moyenne dépend de la finesse du découpage, et le modèle sauterait au
+  // début de chaque geste, quand la scène passe en pans d'un seul tenant.
+  const { center, radius3d } = useMemo(() => sceneFraming(faces), [faces]);
 
   const rendered = useMemo(() => {
     if (layout.w === 0 || layout.h === 0) return null;
@@ -271,11 +274,7 @@ export function Iso3DView({ value, onChange, showMeasures }: Props) {
       };
     };
 
-    // Pendant un geste : contours et cotes sautés — la fluidité prime.
-    const activeFaces = interacting
-      ? faces.filter((f) => f.fill !== null && f.fill !== 'none')
-      : faces;
-    const polys = activeFaces.map((face) => {
+    const polys = faces.map((face) => {
       const proj = face.pts.map(project);
       const depth = face.isFloor
         ? -Infinity
@@ -286,10 +285,13 @@ export function Iso3DView({ value, onChange, showMeasures }: Props) {
       const fill = shadeFill(face, ct, st) ?? 'none';
 
       // Mode cotes : toutes les arêtes en noir.
+      // Un pan sans contour propre est bordé de SA PROPRE couleur : sans ça,
+      // l'anticrénelage laisse une couture blanche entre deux bandes voisines
+      // et le mur paraît fait de morceaux.
       const stroke =
         showMeasures && !face.isFloor && face.stroke
           ? '#0B0D12'
-          : face.stroke ?? 'none';
+          : face.stroke ?? fill;
       return { proj, depth, fill, stroke };
     });
 

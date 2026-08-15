@@ -9,6 +9,7 @@ import type {
 } from 'react-native-room-scan';
 import {
   DEFAULT_ROOM_ID,
+  mergeColinear,
   roomOf,
   segLength,
   snapAngle,
@@ -371,9 +372,12 @@ export const useScanStore = create<ScanState>((set, get) => {
       for (const room of incoming) {
         const id = room.id || `room-${rooms.length + 1}`;
         const segments = (room.surfaces ?? []).map((s) => toSegment(s, id));
-        // La soudure est cloisonnée par pièce : deux cloisons mitoyennes
-        // restent deux murs distincts.
-        walls.push(...weldCorners(segments.filter((s) => s.type === 'wall')));
+        // Souder d'abord (la soudure est cloisonnée par pièce : deux cloisons
+        // mitoyennes restent deux murs distincts), fusionner ensuite les
+        // morceaux alignés que RoomPlan a livrés séparément.
+        walls.push(
+          ...mergeColinear(weldCorners(segments.filter((s) => s.type === 'wall'))),
+        );
         openings.push(...segments.filter((s) => s.type !== 'wall'));
         objects.push(...(room.objects ?? []).map((o) => ({ ...o, roomId: id })));
         rooms.push({

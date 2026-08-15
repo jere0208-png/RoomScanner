@@ -8,7 +8,6 @@
 import type { FloorData, ObjectData, SurfaceTexture } from 'react-native-room-scan';
 import {
   clampFootprint,
-  quadPoints,
   roomOf,
   roomParts,
   toFootprint,
@@ -65,10 +64,19 @@ export interface SceneOptions {
   showTextures?: boolean;
   /** Relevé du sol par pièce, indexé par identifiant de pièce. */
   floors?: Record<string, FloorData | null | undefined>;
+  /**
+   * Rendu allégé pendant un geste : les pans ne sont plus découpés en bandes,
+   * ce qui divise le nombre de polygones par cinq. Le volume reste complet,
+   * contours compris — seule la finesse du tri en profondeur baisse, et le
+   * rendu exact revient dès que le doigt se lève.
+   */
+  coarse?: boolean;
 }
 
 /** Découpe des pans : au-delà, le tri « du peintre » devient faux localement. */
 const STEP = 0.6;
+/** Mode « geste » : pans d'un seul tenant, pour tenir 60 images par seconde. */
+const COARSE_STEP = 1e6;
 /** Nombre maximum de rangées de texels rendues sur un mur. */
 const MAX_TEX_ROWS = 4;
 
@@ -123,6 +131,42 @@ export interface Scene {
   rooms: SceneRoom[];
   /** Niveau du sol dans le repère monde (m). */
   floorY: number;
+}
+
+/**
+ * Cadrage d'une scène : centre et rayon englobants.
+ *
+ * Le centre vient de la BOÎTE englobante, pas de la moyenne des points : la
+ * moyenne dépend du nombre de sommets, donc du découpage en bandes, et le
+ * modèle sauterait au moment où le rendu passe en mode geste. La boîte, elle,
+ * ne dépend que des extrémités — identique dans les deux modes. La vue de
+ * l'app et le PDF partagent ce calcul, donc le même cadrage.
+ */
+export function sceneFraming(faces: Face3D[]): {
+  center: P3;
+  radius3d: number;
+} {
+  let lo = { x: Infinity, y: Infinity, z: Infinity };
+  let hi = { x: -Infinity, y: -Infinity, z: -Infinity };
+  let n = 0;
+  for (const f of faces) {
+    for (const p of f.pts) {
+      n++;
+      lo = { x: Math.min(lo.x, p.x), y: Math.min(lo.y, p.y), z: Math.min(lo.z, p.z) };
+      hi = { x: Math.max(hi.x, p.x), y: Math.max(hi.y, p.y), z: Math.max(hi.z, p.z) };
+    }
+  }
+  if (n === 0) return { center: { x: 0, y: 0, z: 0 }, radius3d: 1 };
+  const center = {
+    x: (lo.x + hi.x) / 2,
+    y: (lo.y + hi.y) / 2,
+    z: (lo.z + hi.z) / 2,
+  };
+  const radius3d = Math.max(
+    0.5,
+    Math.hypot(hi.x - center.x, hi.y - center.y, hi.z - center.z),
+  );
+  return { center, radius3d };
 }
 
 /** Construit la scène complète : sol, murs, ouvertures, meubles. */
@@ -188,10 +232,30 @@ export function buildScene(
     return { roomId: part.roomId, surface, centroid: part.centroid, floorFill };
   });
 
+  const step = opts.coarse ? COARSE_STEP : STEP;
+
+  /**
+   * Arête isolée. Un contour ne peut PAS être un grand polygone posé sur tout
+   * le pan : sa profondeur moyenne le placerait devant un meuble pourtant
+   * plus proche, et on verrait le trait le traverser. Chaque arête est donc
+   * un segment à part, trié à sa propre profondeur.
+   */
+  const pushEdge = (p: P3, q: P3, stroke: string) => {
+    faces.push({ pts: [p, q], fill: null, stroke, bias: 0.004 });
+  };
+
+  /** Contour d'un quadrilatère non découpé : un seul polygone suffit. */
+  const pushOutline = (pts: P3[], stroke: string) => {
+    faces.push({ pts, fill: null, stroke, bias: 0.004 });
+  };
+
   /**
    * Pan vertical découpé en bandes. Avec une texture, chaque bande est en
    * plus découpée en hauteur : la grille de couleurs relevée au scan se
    * retrouve telle quelle sur le mur.
+   *
+   * `outline` fait dessiner le contour du pan SANS ses coupures internes :
+   * les bandes sont un artifice de tri, elles ne doivent pas se voir.
    */
   const pushStrips = (
     p: Pt,
@@ -204,9 +268,10 @@ export function buildScene(
       captured?: boolean;
       tex?: SurfaceTexture;
       flipU?: boolean;
+      outline?: string;
     } = {},
   ) => {
-    const cols = Math.max(1, Math.ceil(Math.hypot(q.x - p.x, q.z - p.z) / STEP));
+    const cols = Math.max(1, Math.ceil(Math.hypot(q.x - p.x, q.z - p.z) / step));
     const rows = o.tex ? Math.min(MAX_TEX_ROWS, Math.max(1, o.tex.rows)) : 1;
     for (let i = 0; i < cols; i++) {
       const s0 = lerp2(p, q, i / cols);
@@ -228,6 +293,20 @@ export function buildScene(
           captured: o.captured || !!o.tex,
         });
       }
+      if (!o.outline) continue;
+      if (cols === 1) {
+        pushOutline(vquad(s0, s1, yb, yt), o.outline);
+        continue;
+      }
+      // Découpé : seules les arêtes du POURTOUR sont tracées.
+      pushEdge({ x: s0.x, y: yt, z: s0.z }, { x: s1.x, y: yt, z: s1.z }, o.outline);
+      pushEdge({ x: s0.x, y: yb, z: s0.z }, { x: s1.x, y: yb, z: s1.z }, o.outline);
+      if (i === 0) {
+        pushEdge({ x: s0.x, y: yb, z: s0.z }, { x: s0.x, y: yt, z: s0.z }, o.outline);
+      }
+      if (i === cols - 1) {
+        pushEdge({ x: s1.x, y: yb, z: s1.z }, { x: s1.x, y: yt, z: s1.z }, o.outline);
+      }
     }
   };
 
@@ -238,26 +317,28 @@ export function buildScene(
     e2b: Pt,
     y: number,
     fill: string,
+    outline?: string,
   ) => {
-    const n = Math.max(1, Math.ceil(Math.hypot(e1b.x - e1a.x, e1b.z - e1a.z) / STEP));
+    const n = Math.max(1, Math.ceil(Math.hypot(e1b.x - e1a.x, e1b.z - e1a.z) / step));
+    const at = (p: Pt): P3 => ({ x: p.x, y, z: p.z });
     for (let i = 0; i < n; i++) {
       const t0 = i / n;
       const t1 = (i + 1) / n;
-      faces.push({
-        pts: [
-          lerp2(e1a, e1b, t0),
-          lerp2(e1a, e1b, t1),
-          lerp2(e2a, e2b, t1),
-          lerp2(e2a, e2b, t0),
-        ].map((p) => ({ x: p.x, y, z: p.z })),
-        fill,
-        stroke: null,
-      });
+      const c1 = lerp2(e1a, e1b, t0);
+      const c2 = lerp2(e1a, e1b, t1);
+      const c3 = lerp2(e2a, e2b, t1);
+      const c4 = lerp2(e2a, e2b, t0);
+      faces.push({ pts: [c1, c2, c3, c4].map(at), fill, stroke: null });
+      if (!outline) continue;
+      if (n === 1) {
+        pushOutline([c1, c2, c3, c4].map(at), outline);
+        continue;
+      }
+      pushEdge(at(c1), at(c2), outline);
+      pushEdge(at(c4), at(c3), outline);
+      if (i === 0) pushEdge(at(c1), at(c4), outline);
+      if (i === n - 1) pushEdge(at(c2), at(c3), outline);
     }
-  };
-
-  const pushOutline = (pts: P3[], stroke: string) => {
-    faces.push({ pts, fill: null, stroke, bias: 0.001 });
   };
 
   // --------------------------------------------------------------- murs
@@ -285,8 +366,8 @@ export function buildScene(
         captured: !!avg,
         tex: inner ? tex : undefined,
         flipU,
+        outline: pal.wallStroke,
       });
-      pushOutline(vquad(p, r, 0, w.height), pal.wallStroke);
     }
     // Chants : trop étroits pour être découpés.
     for (const [p, r] of [
@@ -308,9 +389,6 @@ export function buildScene(
       b2,
       w.height,
       avg ? mixHex(avg, '#FFFFFF', 0.45) : pal.wallTop,
-    );
-    pushOutline(
-      quadPoints(q).map((p) => ({ x: p.x, y: w.height, z: p.z })),
       pal.wallTopStroke,
     );
   }
@@ -363,8 +441,8 @@ export function buildScene(
       pushStrips(p, q, yb, yt, skin ?? pal.object, {
         shade: !!skin,
         captured: !!skin,
+        outline: pal.objectStroke,
       });
-      pushOutline(vquad(p, q, yb, yt), pal.objectStroke);
     }
     pushTopStrips(
       corners[0],
@@ -373,9 +451,6 @@ export function buildScene(
       corners[2],
       yt,
       skin ? mixHex(skin, '#FFFFFF', 0.35) : pal.objectTop,
-    );
-    pushOutline(
-      corners.map((p) => ({ x: p.x, y: yt, z: p.z })),
       pal.objectStroke,
     );
   }

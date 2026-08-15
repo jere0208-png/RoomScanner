@@ -21,6 +21,7 @@ import {
 import { dotStep, floorDots, mixHex } from '../geometry/appearance';
 import {
   buildScene,
+  sceneFraming,
   shadeFill,
   type P3,
   type ScenePalette,
@@ -400,17 +401,9 @@ function draw3DView(
     floors: opts.floors,
   });
   const faces = scene.faces;
-  const all = faces.flatMap((f) => f.pts);
-  if (all.length === 0) return;
-  const ctr = {
-    x: all.reduce((s, p) => s + p.x, 0) / all.length,
-    y: all.reduce((s, p) => s + p.y, 0) / all.length,
-    z: all.reduce((s, p) => s + p.z, 0) / all.length,
-  };
-  const r3 = Math.max(
-    0.5,
-    ...all.map((p) => Math.hypot(p.x - ctr.x, p.y - ctr.y, p.z - ctr.z)),
-  );
+  if (faces.length === 0) return;
+  // Même cadrage que la vue 3D de l'app : boîte englobante, pas moyenne.
+  const { center: ctr, radius3d: r3 } = sceneFraming(faces);
   const rad = (deg: number) => (deg * Math.PI) / 180;
   const ct = Math.cos(rad(thetaDeg));
   const st = Math.sin(rad(thetaDeg));
@@ -438,7 +431,10 @@ function draw3DView(
     const depth = f.isFloor
       ? -Infinity
       : pts.reduce((s, p) => s + p.depth, 0) / pts.length + (f.bias ?? 0);
-    return { pts, depth, fill: shadeFill(f, ct, st), stroke: f.stroke };
+    const fill = shadeFill(f, ct, st);
+    // Pan sans contour propre : bordé de sa propre couleur, sinon la couture
+    // entre deux bandes voisines se voit à l'impression.
+    return { pts, depth, fill, stroke: f.stroke ?? fill };
   });
   // Cotes insérées dans le tri de profondeur : un mur proche les recouvre.
   type Item =

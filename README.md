@@ -72,6 +72,39 @@ Android et iOS 16 restent mono-pièce : leur résultat à plat est remis dans le
 même moule (une pièce implicite `room-1`), et les scans enregistrés avant le
 multi-pièces sont migrés au chargement.
 
+### Un mur d'une seule traite
+
+RoomPlan livre volontiers un mur droit en deux ou trois morceaux. `mergeColinear()`
+les recolle à la fin du scan : même pièce, extrémités déjà soudées, directions
+alignées à 4° près, hauteurs comparables, et jamais au travers d'un nœud qui
+porte un troisième mur (un vrai T). Le plan y gagne une cote au lieu de trois,
+et le « coin » fantôme entre deux morceaux ne peut plus plier un mur droit.
+La grille de couleurs est recomposée, pas étirée : une colonne tous les 50 cm,
+échantillonnée dans le morceau qu'elle recouvre. La fusion a lieu dans
+`finalize()` : **les scans déjà enregistrés gardent leurs murs d'origine**.
+
+### Rendu 3D : ni couture, ni trait fantôme
+
+Trois règles, apprises à la dure sur un tri « du peintre » :
+
+1. **Les bandes ne doivent pas se voir.** Un pan est découpé tous les 60 cm
+   pour que le tri en profondeur reste juste ; l'anticrénelage laissait une
+   couture blanche entre deux bandes voisines et le mur semblait fait de
+   morceaux. Chaque pan est donc bordé de SA PROPRE couleur (`stroke ?? fill`
+   dans les deux rendus), ce qui referme la couture sans rien dessiner.
+2. **Un contour ne peut pas être un grand polygone.** Posé sur tout le pan, il
+   se triait à sa profondeur moyenne et traversait les meubles pourtant plus
+   proches. Chaque arête du pourtour est un segment à part, trié à sa propre
+   profondeur ; les coupures internes ne sont pas tracées.
+3. **Le cadrage vient de la boîte englobante, pas de la moyenne des sommets.**
+   La moyenne dépend du découpage : le modèle sautait dès qu'on posait le
+   doigt. `sceneFraming()` est partagé par la vue de l'app et le PDF.
+
+Pendant un geste, la scène est reconstruite en mode `coarse` : pans d'un seul
+tenant, cinq fois moins de polygones, **contours compris**. Les supprimer
+faisait fondre le modèle en blanc sur blanc le temps du mouvement. Seuls le
+semis du sol et les cotes disparaissent — dans la vue 3D comme sur le plan 2D.
+
 ### Jonctions de murs
 
 Un mur n'est pas un trait épais posé à côté des autres : `wallQuads()` traite
@@ -163,12 +196,15 @@ nécessaire que si les fichiers Swift/Kotlin ou les dépendances natives changen
 ## Vérifications faites sur cette machine (Windows)
 
 - `npx tsc --noEmit` et `npx eslint src App.tsx` : aucun diagnostic.
-- `npx jest` : 46/46 tests verts (conversion matrice iOS→segment, extrémités
+- `npx jest` : 57/57 tests verts (conversion matrice iOS→segment, extrémités
   Android, soudure des coins et jonctions en T, onglets des murs, surface au
   sol, semis de points, lecture des textures, snap angulaire, projection
   mètres↔pixels, génération du PDF ; **multi-pièces** : découpe par pièce,
   non-fusion de deux pièces mitoyennes, surfaces cumulées, sols distincts,
-  mise à plat d'un résultat de scan, migration des scans mono-pièce).
+  mise à plat d'un résultat de scan, migration des scans mono-pièce ;
+  **rendu** : fusion des murs colinéaires — ordre, sens, T, pièces et
+  hauteurs différentes —, recomposition de la grille de couleurs, contours
+  découpés en arêtes, cadrage identique en mode geste).
 - **Non vérifié ici** : la compilation Swift/Kotlin (impossible sans Mac /
   SDK Android). Les points d'attente connus sont notés ci-dessous.
 

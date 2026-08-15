@@ -4,6 +4,7 @@ import {
   groupByRoom,
   loopAreaM2,
   makeMapping,
+  mergeColinear,
   quadPoints,
   roomParts,
   roomSurface,
@@ -18,7 +19,7 @@ import {
   type WallSeg,
 } from '../src/geometry/floorplan';
 import { dotStep, floorDots, sampleTexture } from '../src/geometry/appearance';
-import { buildScene, type ScenePalette } from '../src/geometry/scene3d';
+import { buildScene, sceneFraming, type ScenePalette } from '../src/geometry/scene3d';
 import { buildScanPdf, toBase64 } from '../src/export/pdf';
 
 /** Palette neutre : les tests ne jugent que la géométrie et les relevés. */
@@ -342,6 +343,143 @@ describe('closedLoop + loopAreaM2', () => {
 
   it('renvoie null quand un coin porte trois murs', () => {
     expect(closedLoop([...rect, seg('x', { x: 0, z: 0 }, { x: -2, z: 0 })])).toBeNull();
+  });
+});
+
+describe('mergeColinear', () => {
+  it('recolle en un seul mur les morceaux alignés bout à bout', () => {
+    const merged = mergeColinear([
+      seg('a', { x: 0, z: 0 }, { x: 1.5, z: 0 }),
+      seg('b', { x: 1.5, z: 0 }, { x: 2.7, z: 0 }),
+      seg('c', { x: 2.7, z: 0 }, { x: 4, z: 0 }),
+    ]);
+    expect(merged).toHaveLength(1);
+    expect(segLength(merged[0])).toBeCloseTo(4);
+    expect(merged[0].a.x).toBeCloseTo(0);
+    expect(merged[0].b.x).toBeCloseTo(4);
+  });
+
+  it('recolle quel que soit l’ordre et le sens des segments', () => {
+    const merged = mergeColinear([
+      seg('c', { x: 4, z: 0 }, { x: 2.7, z: 0 }),
+      seg('a', { x: 1.5, z: 0 }, { x: 0, z: 0 }),
+      seg('b', { x: 1.5, z: 0 }, { x: 2.7, z: 0 }),
+    ]);
+    expect(merged).toHaveLength(1);
+    expect(segLength(merged[0])).toBeCloseTo(4);
+  });
+
+  it('ne touche pas à un vrai angle', () => {
+    const merged = mergeColinear([
+      seg('a', { x: 0, z: 0 }, { x: 4, z: 0 }),
+      seg('b', { x: 4, z: 0 }, { x: 4, z: 3 }),
+    ]);
+    expect(merged).toHaveLength(2);
+  });
+
+  it('ne fusionne pas au travers d’une jonction en T', () => {
+    const merged = mergeColinear([
+      seg('a', { x: 0, z: 0 }, { x: 2, z: 0 }),
+      seg('b', { x: 2, z: 0 }, { x: 4, z: 0 }),
+      seg('t', { x: 2, z: 0 }, { x: 2, z: 2 }),
+    ]);
+    expect(merged).toHaveLength(3);
+  });
+
+  it('ne fusionne pas deux murs de pièces différentes', () => {
+    const merged = mergeColinear([
+      seg('a', { x: 0, z: 0 }, { x: 2, z: 0 }),
+      { ...seg('b', { x: 2, z: 0 }, { x: 4, z: 0 }), roomId: 'room-2' },
+    ]);
+    expect(merged).toHaveLength(2);
+  });
+
+  it('ne fusionne pas des murs de hauteurs franchement différentes', () => {
+    const merged = mergeColinear([
+      seg('a', { x: 0, z: 0 }, { x: 2, z: 0 }),
+      { ...seg('b', { x: 2, z: 0 }, { x: 4, z: 0 }), height: 1.1 },
+    ]);
+    expect(merged).toHaveLength(2);
+  });
+
+  it('laisse une boucle fermée intacte et calculable', () => {
+    // Le mur nord est livré en deux morceaux : après fusion, 4 murs et une
+    // boucle toujours fermée.
+    const merged = mergeColinear([
+      seg('n1', { x: 0, z: 0 }, { x: 2, z: 0 }),
+      seg('n2', { x: 2, z: 0 }, { x: 4, z: 0 }),
+      seg('e', { x: 4, z: 0 }, { x: 4, z: 3 }),
+      seg('s', { x: 4, z: 3 }, { x: 0, z: 3 }),
+      seg('w', { x: 0, z: 3 }, { x: 0, z: 0 }),
+    ]);
+    expect(merged).toHaveLength(4);
+    expect(roomSurface(merged)?.exact).toBe(true);
+    expect(roomSurface(merged)?.area).toBeCloseTo(12);
+  });
+
+  it('recompose la grille de couleurs le long du mur reconstitué', () => {
+    const gauche = {
+      ...seg('a', { x: 0, z: 0 }, { x: 2, z: 0 }),
+      color: '#FF0000',
+      texture: { cols: 1, rows: 1, texels: ['#FF0000'] },
+    };
+    const droite = {
+      ...seg('b', { x: 2, z: 0 }, { x: 4, z: 0 }),
+      color: '#0000FF',
+      texture: { cols: 1, rows: 1, texels: ['#0000FF'] },
+    };
+    const merged = mergeColinear([gauche, droite]);
+    expect(merged).toHaveLength(1);
+    const tex = merged[0].texture!;
+    // La première moitié reste rouge, la seconde bleue : pas d'étirement.
+    expect(sampleTexture(tex, 0.1, 0.5)).toBe('#FF0000');
+    expect(sampleTexture(tex, 0.9, 0.5)).toBe('#0000FF');
+  });
+});
+
+describe('contours de la scène 3D', () => {
+  const rect = [
+    seg('n', { x: 0, z: 0 }, { x: 4, z: 0 }),
+    seg('e', { x: 4, z: 0 }, { x: 4, z: 3 }),
+    seg('s', { x: 4, z: 3 }, { x: 0, z: 3 }),
+    seg('w', { x: 0, z: 3 }, { x: 0, z: 0 }),
+  ];
+
+  it('ne pose aucun contour à cheval sur plusieurs bandes', () => {
+    // Un contour d'un seul tenant sur un mur découpé se trierait à une
+    // profondeur moyenne, et traverserait les meubles placés devant.
+    const scene = buildScene(rect, [], [], { palette: TEST_PALETTE });
+    const outlines = scene.faces.filter((f) => f.fill === null);
+    expect(outlines.length).toBeGreaterThan(0);
+    // Les contours d'un pan découpé sont des arêtes : deux points.
+    expect(outlines.every((f) => f.pts.length === 2)).toBe(true);
+  });
+
+  it('garde les contours en mode geste, avec des pans d’un seul tenant', () => {
+    const fine = buildScene(rect, [], [], { palette: TEST_PALETTE });
+    const coarse = buildScene(rect, [], [], { palette: TEST_PALETTE, coarse: true });
+    // Beaucoup moins de polygones…
+    expect(coarse.faces.length).toBeLessThan(fine.faces.length / 2);
+    // …mais toujours des contours : c'est leur disparition qui faisait
+    // fondre le modèle en blanc pendant les gestes.
+    expect(coarse.faces.some((f) => f.fill === null && f.stroke !== null)).toBe(true);
+    // Pans entiers : les contours redeviennent des quadrilatères fermés.
+    expect(
+      coarse.faces.filter((f) => f.fill === null).every((f) => f.pts.length === 4),
+    ).toBe(true);
+  });
+
+  it('cadre à l’identique en mode geste : le modèle ne saute pas', () => {
+    // Le centre venait de la MOYENNE des sommets : moins de bandes, moins de
+    // sommets, centre déplacé — le modèle sursautait au premier doigt posé.
+    const fine = sceneFraming(buildScene(rect, [], [], { palette: TEST_PALETTE }).faces);
+    const coarse = sceneFraming(
+      buildScene(rect, [], [], { palette: TEST_PALETTE, coarse: true }).faces,
+    );
+    expect(coarse.center.x).toBeCloseTo(fine.center.x, 6);
+    expect(coarse.center.y).toBeCloseTo(fine.center.y, 6);
+    expect(coarse.center.z).toBeCloseTo(fine.center.z, 6);
+    expect(coarse.radius3d).toBeCloseTo(fine.radius3d, 6);
   });
 });
 
