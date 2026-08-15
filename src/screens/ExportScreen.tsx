@@ -150,7 +150,9 @@ function PlanPreview({
 }
 
 const planStyles = StyleSheet.create({
-  box: { height: 380, borderRadius: 16, overflow: 'hidden' },
+  // Gouttières invisibles de part et d'autre : on y scrolle la page,
+  // le centre manipule le plan.
+  box: { height: 380, borderRadius: 16, overflow: 'hidden', marginHorizontal: 32 },
   inner: { flex: 1 },
 });
 
@@ -378,7 +380,9 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     padding: 6,
     ...shadowCard,
   },
-  view3d: { height: 210, borderRadius: 14, overflow: 'hidden' },
+  // Gouttières invisibles : les bandes latérales appartiennent au scroll,
+  // seul le centre manipule le modèle.
+  view3d: { height: 210, borderRadius: 14, overflow: 'hidden', marginHorizontal: 32 },
   view3dLast: { marginTop: 6 },
   hint: {
     color: c.inkFaint,
