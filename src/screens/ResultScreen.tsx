@@ -571,17 +571,6 @@ export function ResultScreen() {
               onPress={() => setShow3DMeasures((v) => !v)}
             />
             <ToolPill
-              icon="top"
-              active={view3d.tilt <= 16}
-              onPress={() =>
-                setView3d(
-                  view3d.tilt <= 16
-                    ? DEFAULT_VIEW3D
-                    : { theta: 0, tilt: 15, zoom: 1, ox: 0, oy: 0 },
-                )
-              }
-            />
-            <ToolPill
               icon="furniture"
               active={showFurniture}
               onPress={() => setShowFurniture(!showFurniture)}
@@ -1289,7 +1278,6 @@ type ToolIcon =
   | 'room'
   | 'image'
   | 'model'
-  | 'top'
   | 'rooms'
   | 'addWall'
   | 'undo'
@@ -1368,11 +1356,6 @@ const TOOL_PATHS: Record<ToolIcon, { d: string; fill?: boolean }[]> = {
   undo: [
     { d: 'M4.5 12 a7.5 7.5 0 1 0 2.2 -5.3' },
     { d: 'M4.2 3.8 v4.4 h4.4' },
-  ],
-  top: [
-    { d: 'M4.5 5.5 h15 a1 1 0 0 1 1 1 v11 a1 1 0 0 1 -1 1 h-15 a1 1 0 0 1 -1 -1 v-11 a1 1 0 0 1 1 -1 z' },
-    { d: 'M4 11.5 h9' },
-    { d: 'M13 5.5 v13' },
   ],
   rooms: [
     { d: 'M3.5 5.5 h7 v6 h-7 z' },

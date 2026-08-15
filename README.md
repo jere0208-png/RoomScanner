@@ -302,10 +302,14 @@ d'Android ferme lui aussi (`onRequestClose`).
 ### La barre d'outils
 
 Elle ne garde que ce qu'on touche à chaque fois — diagnostic, cotes, meubles,
-annuler, édition — et range le reste sous **⋮** : surface au sol, couleurs
+appareillage, annuler, édition — et range le reste sous **⋮** : surface au sol, couleurs
 relevées, tracer un mur, redresser, redétecter les pièces, revenir à la
 dernière sauvegarde. Chaque entrée du tiroir porte son intitulé et une ligne
 d'explication, ce qu'une pastille seule ne peut pas dire.
+
+La barre de la vue 3D n'a plus de bascule « vue de dessus » : le geste y
+mène déjà — on incline la vue jusqu'à l'aplomb — et le plan 2D est là pour
+ça. Un bouton qui refait ce que la main fait mieux ne gagne pas sa place.
 
 ### Métré
 
