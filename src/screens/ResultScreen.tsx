@@ -569,7 +569,23 @@ export function ResultScreen() {
               setSelectedRoomId(null);
               setSelectedWallId(id);
               // Un appareil attendait son mur : le voici.
-              if (id && pendingKind) placeFixture(pendingKind, id);
+              if (id && pendingKind) {
+                placeFixture(pendingKind, id);
+                return;
+              }
+              // Un mur en défaut s'ouvre DE FACE, prêt à être corrigé : le
+              // constat sans l'établi obligeait à un détour pour agir.
+              if (
+                id &&
+                elecIssues.some(
+                  (i) =>
+                    i.severity === 'alerte' &&
+                    i.roomId &&
+                    (wallRooms.get(id) ?? []).includes(i.roomId),
+                )
+              ) {
+                openWallElevation(id);
+              }
               const wall = walls.find((w) => w.id === id);
               setLengthInput(wall ? segLength(wall).toFixed(2).replace('.', ',') : '');
             }}

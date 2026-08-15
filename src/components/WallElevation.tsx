@@ -34,6 +34,10 @@ import Svg, {
 import { radius, shadowCard, themedStyles, useTheme, type Palette } from '../theme';
 import { roomOf, roomParts, wallQuadsOf } from '../geometry/floorplan';
 import {
+  FIXTURES as SPECS,
+  type FixtureKind,
+} from '../geometry/electrical';
+import {
   HEIGHT_RULES,
   requirementFor,
   roomInputsOf,
@@ -81,6 +85,7 @@ export function WallElevation({
   const rooms = useScanStore((s) => s.rooms);
   const fixtures = useScanStore((s) => s.fixtures);
   const moveFixture = useScanStore((s) => s.moveFixture);
+  const addFixture = useScanStore((s) => s.addFixture);
   const flipFixture = useScanStore((s) => s.flipFixture);
   const removeFixture = useScanStore((s) => s.removeFixture);
   const c = useTheme();
@@ -129,11 +134,20 @@ export function WallElevation({
         (w2r.get(f.wallId) ?? []).includes(mien.id) &&
         (f.kind === 'prise' || f.kind === 'prise2'),
     ).length;
+    // Cuisine : ce sont les socles du plan de travail qui manquent en
+    // premier, et ceux-là se posent à 1,10 m, pas en plinthe.
+    const hauts = fixtures.filter(
+      (f) =>
+        (w2r.get(f.wallId) ?? []).includes(mien.id) &&
+        (f.kind === 'prise' || f.kind === 'prise2') &&
+        f.height >= 0.9,
+    ).length;
     return {
       nom: mien.name || 'Cette pièce',
       poses,
       exiges: req.socles,
       regle: req.regle,
+      surPlan: req.surPlan > hauts,
     };
   }, [rooms, walls, fixtures, wallId]);
 
@@ -287,6 +301,23 @@ export function WallElevation({
     }
     return null;
   })();
+
+  /**
+   * Poser l'appareil qui manque, sans quitter le mur.
+   *
+   * Le constat est sous les yeux, la correction doit être à portée du même
+   * pouce : renvoyer au catalogue pour choisir une prise dont l'app sait
+   * déjà qu'elle manque serait un détour.
+   */
+  const poser = (kind: FixtureKind, height?: number) => {
+    const id = addFixture(kind, wallId);
+    if (!id) return;
+    if (height !== undefined) {
+      const pose = useScanStore.getState().fixtures.find((f) => f.id === id);
+      if (pose) moveFixture(id, pose.along, height);
+    }
+    onSelect(id);
+  };
 
   /** Applique une cote tapée au clavier (en cm). */
   const applyDraft = () => {
@@ -555,15 +586,17 @@ export function WallElevation({
                 objectif.poses > 1 ? 's' : ''
               } sur ${objectif.exiges}`}
             </Text>
-            <Text
-              style={[
-                styles.guideState,
-                objectif.poses >= objectif.exiges ? styles.guideOk : styles.guideKo,
-              ]}>
-              {objectif.poses >= objectif.exiges
-                ? 'conforme'
-                : `${objectif.exiges - objectif.poses} à poser`}
-            </Text>
+            {objectif.poses >= objectif.exiges ? (
+              <Text style={[styles.guideState, styles.guideOk]}>conforme</Text>
+            ) : (
+              <TouchableOpacity
+                style={styles.guideFix}
+                onPress={() => poser('prise', objectif.surPlan ? 1.1 : undefined)}>
+                <Text style={styles.guideFixText}>
+                  {objectif.surPlan ? '+ Prise à 110 cm' : '+ Poser une prise'}
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
           <View style={styles.guideBar}>
             <View
@@ -583,9 +616,24 @@ export function WallElevation({
         </View>
       )}
 
-      {hauteurKO && (
+      {hauteurKO && selected && (
         <View style={styles.warn}>
-          <Text style={styles.warnTitle}>{`Hauteur ${hauteurKO.sens}`}</Text>
+          <View style={styles.warnHead}>
+            <Text style={styles.warnTitle}>{`Hauteur ${hauteurKO.sens}`}</Text>
+            <TouchableOpacity
+              style={styles.warnFix}
+              onPress={() =>
+                moveFixture(
+                  selected.id,
+                  selected.along,
+                  SPECS[selected.kind].std,
+                )
+              }>
+              <Text style={styles.warnFixText}>
+                {`Remettre à ${cm(SPECS[selected.kind].std)} cm`}
+              </Text>
+            </TouchableOpacity>
+          </View>
           <Text style={styles.warnRule}>{hauteurKO.regle}</Text>
         </View>
       )}
@@ -762,6 +810,13 @@ const getStyles = themedStyles((c: Palette) =>
     guideHead: { flexDirection: 'row', alignItems: 'center' },
     guideTitle: { color: c.ink, fontSize: 12.5, fontWeight: '800', flex: 1 },
     guideState: { fontSize: 11.5, fontWeight: '800' },
+    guideFix: {
+      backgroundColor: c.blue,
+      borderRadius: radius.pill,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+    },
+    guideFixText: { color: '#FFFFFF', fontSize: 11.5, fontWeight: '800' },
     guideOk: { color: c.green },
     guideKo: { color: c.danger },
     guideBar: {
@@ -788,7 +843,15 @@ const getStyles = themedStyles((c: Palette) =>
       paddingHorizontal: 12,
       paddingVertical: 8,
     },
-    warnTitle: { color: c.danger, fontSize: 12.5, fontWeight: '800' },
+    warnHead: { flexDirection: 'row', alignItems: 'center' },
+    warnTitle: { color: c.danger, fontSize: 12.5, fontWeight: '800', flex: 1 },
+    warnFix: {
+      backgroundColor: c.danger,
+      borderRadius: radius.pill,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+    },
+    warnFixText: { color: '#FFFFFF', fontSize: 11.5, fontWeight: '800' },
     warnRule: { color: c.inkSoft, fontSize: 10.5, lineHeight: 14.5, marginTop: 3 },
     fields: { flexDirection: 'row', gap: 8, marginTop: 12 },
     field: { flex: 1 },

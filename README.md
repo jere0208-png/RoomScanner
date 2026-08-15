@@ -217,6 +217,14 @@ prévoit toute seule. Ce cas ressort en information, jamais en alerte : crier
 au défaut là où la norme ne dit rien décrédibiliserait tous les autres
 constats.
 
+**Toucher un mur en défaut ouvre l'établi.** Pas un constat sur le plan
+qu'il faudrait ensuite aller traduire en gestes : le mur s'ouvre de face,
+prêt à être corrigé, avec le raccourci qui va bien — « + Poser une prise »
+dans le bandeau d'objectif de la pièce, « + Prise à 110 cm » quand ce sont
+les socles du plan de travail qui manquent, « Remettre à 110 cm » sous
+l'appareil mal posé. Le constat est sous les yeux, la correction est à portée
+du même pouce.
+
 **Le mur rouge propose la correction, il ne se contente pas de la
 constater.** La carte porte le geste qui efface le défaut — « Poser la prise
 manquante », « Poser une prise à 110 cm », « Remettre à 110 cm » — et
