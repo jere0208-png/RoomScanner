@@ -21,7 +21,21 @@
  * le métier.
  */
 import type { RoomKind } from './furniture';
-import { FIXTURES, type Fixture, type FixtureKind } from './electrical';
+import { pointInPolygon } from './appearance';
+import {
+  faceX,
+  facePoint,
+  wallFace,
+} from './electrical';
+import { wallQuadsOf, type Pt, type WallSeg } from './floorplan';
+import {
+  FIXTURES,
+  postsOf,
+  rjOf,
+  socketsOf,
+  type Fixture,
+  type FixtureKind,
+} from './electrical';
 
 // --------------------------------------------------------------- usages
 
@@ -233,7 +247,8 @@ export const HEIGHT_RULES: Partial<
 /** Un socle est réputé « au-dessus du plan de travail » à partir de 90 cm. */
 const PLAN_TRAVAIL = 0.9;
 
-const SOCLES: FixtureKind[] = ['prise', 'prise2'];
+/** Un appareil porte-t-il au moins un socle 16 A ? */
+const porteSocle = (k: FixtureKind) => socketsOf(k) > 0;
 
 // ------------------------------------------------------------- constats
 
@@ -280,6 +295,39 @@ export interface RoomInput {
   area: number;
   /** Identifiants des murs qui bordent la pièce. */
   wallIds: string[];
+  /** Contour au sol : c'est lui qui dit dans quelle pièce tombe un appareil. */
+  outline?: Pt[];
+}
+
+/**
+ * Dans quelle pièce se trouve chaque appareil.
+ *
+ * Un refend borde DEUX pièces : compter ses appareils pour les deux, c'est
+ * offrir un moyen de tricher — poser cinq prises sur l'autre face d'un mur
+ * mitoyen rendait le séjour conforme alors que tout était chez le voisin.
+ * On regarde donc où l'appareil DONNE : un point pris quinze centimètres
+ * devant sa face, et la pièce qui contient ce point. C'est exactement ce que
+ * montre le symbole sur le plan.
+ */
+export function fixturePlacement(
+  fixtures: Fixture[],
+  walls: WallSeg[],
+  rooms: RoomInput[],
+): Map<string, string> {
+  const quads = wallQuadsOf(walls);
+  const byId = new Map(walls.map((w) => [w.id, w]));
+  const out = new Map<string, string>();
+  for (const f of fixtures) {
+    const w = byId.get(f.wallId);
+    if (!w) continue;
+    const face = wallFace(w, quads.get(w.id), f.side);
+    const p = facePoint(face, faceX(face, f.along), 0.15);
+    const r = rooms.find(
+      (x) => (x.outline?.length ?? 0) >= 3 && pointInPolygon(p, x.outline!),
+    );
+    if (r) out.set(f.id, r.id);
+  }
+  return out;
 }
 
 /**
@@ -296,10 +344,12 @@ export function checkElectrical(
   rooms: RoomInput[],
   fixtures: Fixture[],
   roomOfWall: Map<string, string[]>,
+  /** Pièce de chaque appareil, quand on la connaît (voir `fixturePlacement`). */
+  placement?: Map<string, string>,
 ): ElecIssue[] {
   const out: ElecIssue[] = [];
   const roomOfFixture = (f: Fixture): string | undefined =>
-    roomOfWall.get(f.wallId)?.[0];
+    placement?.get(f.id) ?? roomOfWall.get(f.wallId)?.[0];
 
   // -------------------------------------------------- hauteurs de pose
   for (const f of fixtures) {
@@ -340,9 +390,12 @@ export function checkElectrical(
   for (const room of rooms) {
     const use = roomUse(room.name, room.kind);
     const req = requirementFor(use, room.area);
-    const mine = fixtures.filter((f) => roomOfWall.get(f.wallId)?.includes(room.id));
-    const socles = mine.filter((f) => SOCLES.includes(f.kind)).length;
-    const rj45 = mine.filter((f) => f.kind === 'rj45').length;
+    // Un appareil ne compte QUE pour la pièce où il donne.
+    const mine = fixtures.filter((f) => roomOfFixture(f) === room.id);
+    // Des SOCLES, pas des plaques : un ensemble double en porte un, un
+    // triple en porte deux.
+    const socles = mine.reduce((n, f) => n + socketsOf(f.kind), 0);
+    const rj45 = mine.reduce((n, f) => n + rjOf(f.kind), 0);
     const label = room.name || USE_LABEL[use];
 
     if (socles < req.socles) {
@@ -374,9 +427,10 @@ export function checkElectrical(
       });
     }
     if (req.surPlan > 0) {
-      const hauts = mine.filter(
-        (f) => SOCLES.includes(f.kind) && f.height >= PLAN_TRAVAIL,
-      ).length;
+      const hauts = mine.reduce(
+        (n, f) => n + (f.height >= PLAN_TRAVAIL ? socketsOf(f.kind) : 0),
+        0,
+      );
       if (hauts < req.surPlan) {
         out.push({
           code: 'surPlan',
@@ -429,7 +483,7 @@ export function checkElectrical(
           'dédié en 6 mm². Ailleurs, c’est probablement une erreur de type.',
       });
     }
-    if (use === 'sdb' && mine.some((f) => SOCLES.includes(f.kind))) {
+    if (use === 'sdb' && mine.some((f) => porteSocle(f.kind))) {
       out.push({
         roomId: room.id,
         severity: 'info',
@@ -447,7 +501,7 @@ export function checkElectrical(
   const principales = rooms.filter((r) =>
     PRINCIPALE.includes(roomUse(r.name, r.kind)),
   ).length;
-  const rj45Total = fixtures.filter((f) => f.kind === 'rj45').length;
+  const rj45Total = fixtures.reduce((n, f) => n + rjOf(f.kind), 0);
   const rj45Min = Math.max(2, principales);
   if (principales > 0 && rj45Total < rj45Min) {
     out.push({
@@ -484,7 +538,11 @@ export function checkElectrical(
  */
 export function roomInputsOf(
   rooms: { id: string; name: string; kind?: RoomKind | null; wallIds?: string[] }[],
-  parts: { roomId: string; surface: { area: number } | null; walls: { id: string }[] }[],
+  parts: {
+    roomId: string;
+    surface: { area: number; pts: Pt[] } | null;
+    walls: { id: string }[];
+  }[],
 ): RoomInput[] {
   return rooms.map((r) => {
     const part = parts.find((p) => p.roomId === r.id);
@@ -494,6 +552,7 @@ export function roomInputsOf(
       kind: r.kind ?? null,
       area: part?.surface?.area ?? 0,
       wallIds: r.wallIds ?? part?.walls.map((w) => w.id) ?? [],
+      outline: part?.surface?.pts,
     };
   });
 }
@@ -563,6 +622,33 @@ const chunk = <T,>(list: T[], size: number): T[][] => {
 };
 
 /**
+ * Remplit des circuits à la CHARGE et non au nombre d'appareils : un
+ * ensemble triple pèse deux socles, il ne doit pas voyager en huitième
+ * position d'un circuit déjà plein.
+ */
+function chunkByLoad(
+  list: Fixture[],
+  max: number,
+  poids: (f: Fixture) => number,
+): Fixture[][] {
+  const out: Fixture[][] = [];
+  let lot: Fixture[] = [];
+  let charge = 0;
+  for (const f of list) {
+    const p = Math.max(1, poids(f));
+    if (lot.length > 0 && charge + p > max) {
+      out.push(lot);
+      lot = [];
+      charge = 0;
+    }
+    lot.push(f);
+    charge += p;
+  }
+  if (lot.length > 0) out.push(lot);
+  return out;
+}
+
+/**
  * Répartit l'appareillage en circuits et propose la protection de chacun.
  *
  * Les règles appliquées :
@@ -615,14 +701,14 @@ export function planCircuits(
     });
   }
 
-  const socles = fixtures.filter((f) => SOCLES.includes(f.kind));
+  const socles = fixtures.filter((f) => socketsOf(f.kind) > 0);
   const cuisine = socles.filter(isKitchen);
   const ailleurs = socles.filter((f) => !isKitchen(f));
-  chunk(cuisine, MAX_SOCLES).forEach((lot, i) =>
+  chunkByLoad(cuisine, MAX_SOCLES, (f) => socketsOf(f.kind)).forEach((lot, i) =>
     add({
       label: `Prises cuisine ${i + 1}`,
       nature: 'prises',
-      points: lot.length,
+      points: lot.reduce((n, f) => n + socketsOf(f.kind), 0),
       section: 2.5,
       breaker: 20,
       rooms: roomsOf(lot),
@@ -630,11 +716,11 @@ export function planCircuits(
       note: 'Les prises de cuisine ne partagent pas leur circuit.',
     }),
   );
-  chunk(ailleurs, MAX_SOCLES).forEach((lot, i) =>
+  chunkByLoad(ailleurs, MAX_SOCLES, (f) => socketsOf(f.kind)).forEach((lot, i) =>
     add({
       label: `Prises ${i + 1}`,
       nature: 'prises',
-      points: lot.length,
+      points: lot.reduce((n, f) => n + socketsOf(f.kind), 0),
       section: 2.5,
       breaker: 20,
       rooms: roomsOf(lot),
@@ -669,12 +755,17 @@ export function planCircuits(
     }),
   );
 
-  const vdi = fixtures.filter((f) => f.kind === 'rj45' || f.kind === 'tv');
+  const vdi = fixtures.filter(
+    (f) => postsOf(f.kind).some((k) => k === 'rj45' || k === 'tv'),
+  );
   if (vdi.length > 0) {
     add({
       label: 'Courants faibles',
       nature: 'vdi',
-      points: vdi.length,
+      points: vdi.reduce(
+        (n, f) => n + postsOf(f.kind).filter((k) => k === 'rj45' || k === 'tv').length,
+        0,
+      ),
       section: null,
       breaker: null,
       rooms: roomsOf(vdi),
@@ -772,9 +863,12 @@ export function materialList(
   rooms: RoomInput[],
   fixtures: Fixture[],
   roomOfWall: Map<string, string[]>,
+  placement?: Map<string, string>,
 ): MaterialList {
   const roomById = new Map(rooms.map((r) => [r.id, r]));
   const firstRoom = (f: Fixture) => {
+    const pose = placement?.get(f.id);
+    if (pose) return roomById.get(pose);
     const ids = roomOfWall.get(f.wallId) ?? [];
     return ids.map((id) => roomById.get(id)).find((r) => !!r);
   };
@@ -785,7 +879,7 @@ export function materialList(
   };
 
   const byRoom: RoomMaterial[] = rooms.map((r) => {
-    const mine = fixtures.filter((f) => roomOfWall.get(f.wallId)?.includes(r.id));
+    const mine = fixtures.filter((f) => firstRoom(f)?.id === r.id);
     const counts = new Map<FixtureKind, number>();
     for (const f of mine) counts.set(f.kind, (counts.get(f.kind) ?? 0) + 1);
     return {
@@ -843,6 +937,6 @@ export function materialList(
     circuits,
     differentials,
     board,
-    issues: checkElectrical(rooms, fixtures, roomOfWall),
+    issues: checkElectrical(rooms, fixtures, roomOfWall, placement),
   };
 }

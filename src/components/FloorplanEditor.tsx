@@ -42,8 +42,8 @@ import {
 import type { ObjectData } from 'react-native-room-scan';
 import {
   FIXTURES,
-  FIXTURE_SYMBOL,
   FIXTURE_TAG,
+  assemblySymbol,
   faceX,
   facePoint,
   stackRanks,
@@ -635,7 +635,7 @@ export function FloorplanEditor({
               );
               return placed.map(({ f, face, x }) => {
                 const spec = FIXTURES[f.kind];
-                const symbol = FIXTURE_SYMBOL[f.kind] ?? [];
+                const symbol = assemblySymbol(f.kind);
                 const tag = FIXTURE_TAG[f.kind];
                 // Échelonnement : le deuxième appareil du même point se pose
                 // plus loin du mur, sur le même filet.

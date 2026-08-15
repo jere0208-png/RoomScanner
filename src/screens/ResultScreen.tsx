@@ -55,6 +55,7 @@ import { buildObj, objFilename } from '../export/model3d';
 import { checkPlan } from '../geometry/diagnostics';
 import {
   checkElectrical,
+  fixturePlacement,
   materialList,
   roomInputsOf,
   roomsInAlert,
@@ -311,7 +312,7 @@ export function ResultScreen() {
    */
   const shareMaterial = async () => {
     try {
-      const list = materialList(roomInputs, fixtures, wallRooms);
+      const list = materialList(roomInputs, fixtures, wallRooms, placement);
       const bytes = buildMaterialPdf(scanName, list);
       await RoomScan.sharePDF(toBase64(bytes), materialFilename(scanName));
     } catch (e: any) {
@@ -382,7 +383,8 @@ export function ResultScreen() {
   // se moque de savoir si le défaut est géométrique ou électrique.
   const roomInputs = roomInputsOf(rooms, parts);
   const wallRooms = wallToRooms(roomInputs);
-  const elecIssues = checkElectrical(roomInputs, fixtures, wallRooms);
+  const placement = fixturePlacement(fixtures, walls, roomInputs);
+  const elecIssues = checkElectrical(roomInputs, fixtures, wallRooms, placement);
   const alertRooms = roomsInAlert(elecIssues);
   const issues: Constat[] = [
     ...checkPlan(walls, rooms).map((i, n) => ({

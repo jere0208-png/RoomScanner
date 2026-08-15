@@ -25,8 +25,8 @@ import {
 import { dotStep, floorDots, mixHex } from '../geometry/appearance';
 import {
   FIXTURES,
-  FIXTURE_SYMBOL,
   FIXTURE_TAG,
+  assemblySymbol,
   faceX,
   facePoint,
   stackRanks,
@@ -919,7 +919,7 @@ function planPage(
         if (!dansLeCadre(q)) continue;
         d.path([anchor, q], 0.6, spec.color);
         d.circle(q.x, q.y, 6.5, '#FFFFFF');
-        drawSymbol(d, FIXTURE_SYMBOL[f.kind] ?? [], q.x, q.y, 0.55, spec.color, 0.9);
+        drawSymbol(d, assemblySymbol(f.kind), q.x, q.y, 0.5, spec.color, 0.9);
         const tag = FIXTURE_TAG[f.kind];
         if (tag) d.text(tag, q.x + 13, q.y + 4, 5.5, spec.color, { align: 'left' });
       }
@@ -1225,7 +1225,7 @@ function drawElecLegend(d: Draw, kinds: FixtureKind[], x: number, y: number) {
   kinds.forEach((kind, i) => {
     const cy = y - 26 - i * lineH;
     const spec = FIXTURES[kind];
-    drawSymbol(d, FIXTURE_SYMBOL[kind] ?? [], x + 18, cy - 1, 0.42, spec.color, 0.9);
+    drawSymbol(d, assemblySymbol(kind), x + 18, cy - 1, 0.38, spec.color, 0.9);
     const tag = FIXTURE_TAG[kind];
     d.text(
       fitText(tag ? `${spec.label} (${tag})` : spec.label, 7.5, w - 44),

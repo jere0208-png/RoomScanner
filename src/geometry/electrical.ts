@@ -50,7 +50,15 @@ export type FixtureKind =
   | 'tableau'
   | 'thermostat'
   | 'sortieCable'
-  | 'boite';
+  | 'boite'
+  // Ensembles multipostes : plusieurs fonctions sous une même plaque.
+  | 'prise3'
+  | 'rj2'
+  | 'rjPrise'
+  | 'rjPrise2'
+  | 'tvPrise'
+  | 'inter2'
+  | 'inter3';
 
 /** Un appareil posé sur une face de mur. */
 export interface Fixture {
@@ -67,6 +75,14 @@ export interface Fixture {
 
 export interface FixtureSpec {
   label: string;
+  /**
+   * Fonctions réunies sous la plaque, de gauche à droite. Absent = un seul
+   * poste, de la nature de l'appareil lui-même.
+   *
+   * C'est cette liste qui décide de tout : la largeur de la plaque, les
+   * symboles dessinés, les trous à percer, et le comptage NF C 15-100.
+   */
+  posts?: FixtureKind[];
   /** Sigle porté par le symbole du plan 2D. */
   short: string;
   family: string;
@@ -89,6 +105,30 @@ export interface FixtureSpec {
   /** Ce qu'il faut savoir sur cette hauteur, en une ligne. */
   note: string;
 }
+
+/**
+ * Cotes de pose d'un appareillage encastré, en mètres.
+ *
+ * Ce sont les seules cotes du fichier qui servent à PERCER, et non à
+ * dessiner : elles doivent être justes.
+ *
+ * - **Entraxe 71 mm** entre deux boîtes d'un ensemble multiposte. C'est la
+ *   cote des boîtes et des plaques multipostes du commerce (Batibox et
+ *   équivalents) ; c'est elle qui décide où tombe le second trou.
+ * - **Boîte Ø 67 mm**, percée à la scie cloche de 67 ou 68 mm selon le
+ *   support, profondeur 40 mm en cloison sèche (50 mm pour un point de
+ *   centre ou une boîte à équipement).
+ * - **Plaque 82 mm** de côté pour un poste simple ; une plaque à N postes
+ *   mesure donc `(N − 1) × 71 + 82` mm.
+ */
+export const ENTRAXE = 0.071;
+export const BOITE_D = 0.067;
+export const BOITE_P = 0.04;
+export const PLAQUE = 0.082;
+
+/** Largeur d'une plaque à N postes. */
+export const plaqueLargeur = (n: number) =>
+  Math.max(1, n - 1) * ENTRAXE + PLAQUE - (n > 1 ? 0 : 0);
 
 /** Teintes par famille : le modèle 3D doit se lire sans légende. */
 const C_PRISE = '#F0A202';
@@ -113,8 +153,9 @@ export const FIXTURES: Record<FixtureKind, FixtureSpec> = {
     label: 'Prise double',
     short: 'P2',
     family: 'Prises',
-    w: 0.15,
-    h: 0.08,
+    posts: ['prise', 'prise'],
+    w: ENTRAXE + PLAQUE,
+    h: 0.082,
     depth: 0.022,
     color: C_PRISE,
     std: 0.25,
@@ -263,13 +304,124 @@ export const FIXTURES: Record<FixtureKind, FixtureSpec> = {
     std: 2.3,
     note: 'Doit rester accessible après travaux.',
   },
+  prise3: {
+    label: 'Prise triple',
+    short: 'P3',
+    family: 'Prises',
+    posts: ['prise', 'prise', 'prise'],
+    w: 2 * ENTRAXE + PLAQUE,
+    h: 0.082,
+    depth: 0.022,
+    color: C_PRISE,
+    std: 0.25,
+    note: 'Trois socles sous une plaque : compte pour deux socles au circuit.',
+  },
+  rj2: {
+    label: 'RJ45 double',
+    short: 'RJ2',
+    family: 'Courants faibles',
+    posts: ['rj45', 'rj45'],
+    w: ENTRAXE + PLAQUE,
+    h: 0.082,
+    depth: 0.022,
+    color: C_FAIBLE,
+    std: 0.25,
+    note: 'Deux prises de communication sous une plaque.',
+  },
+  rjPrise: {
+    label: 'RJ45 + prise',
+    short: 'RJ+P',
+    family: 'Courants faibles',
+    posts: ['rj45', 'prise'],
+    w: ENTRAXE + PLAQUE,
+    h: 0.082,
+    depth: 0.022,
+    color: C_FAIBLE,
+    std: 0.25,
+    note: 'Le poste télécom voisine toujours une prise 16 A : box, TV, bureau.',
+  },
+  rjPrise2: {
+    label: 'RJ45 + prise double',
+    short: 'RJ+2P',
+    family: 'Courants faibles',
+    posts: ['rj45', 'prise', 'prise'],
+    w: 2 * ENTRAXE + PLAQUE,
+    h: 0.082,
+    depth: 0.022,
+    color: C_FAIBLE,
+    std: 0.25,
+    note: 'L’ensemble d’un coin bureau ou d’un meuble TV.',
+  },
+  tvPrise: {
+    label: 'TV + prise',
+    short: 'TV+P',
+    family: 'Courants faibles',
+    posts: ['tv', 'prise'],
+    w: ENTRAXE + PLAQUE,
+    h: 0.082,
+    depth: 0.022,
+    color: C_FAIBLE,
+    std: 0.25,
+    note: 'Derrière un téléviseur, à la hauteur de son support.',
+  },
+  inter2: {
+    label: 'Double interrupteur',
+    short: 'I2',
+    family: 'Commandes',
+    posts: ['inter', 'inter'],
+    w: ENTRAXE + PLAQUE,
+    h: 0.082,
+    depth: 0.022,
+    color: C_CMD,
+    std: 1.1,
+    note: 'Deux commandes sous une plaque : deux circuits d’éclairage.',
+  },
+  inter3: {
+    label: 'Triple interrupteur',
+    short: 'I3',
+    family: 'Commandes',
+    posts: ['inter', 'inter', 'inter'],
+    w: 2 * ENTRAXE + PLAQUE,
+    h: 0.082,
+    depth: 0.022,
+    color: C_CMD,
+    std: 1.1,
+    note: 'Trois commandes sous une plaque.',
+  },
 };
+
+/** Fonctions réunies sous la plaque, de gauche à droite. */
+export function postsOf(kind: FixtureKind): FixtureKind[] {
+  return FIXTURES[kind]?.posts ?? [kind];
+}
+
+/**
+ * Où percer, en mètres depuis le bord GAUCHE de la plaque.
+ *
+ * Les boîtes sont à l'entraxe, centrées sur la plaque : c'est ce que
+ * l'électricien trace au crayon avant de sortir la scie cloche.
+ */
+export function boxOffsets(kind: FixtureKind): number[] {
+  const n = postsOf(kind).length;
+  const large = FIXTURES[kind].w;
+  const premier = (large - (n - 1) * ENTRAXE) / 2;
+  return Array.from({ length: n }, (_, i) => premier + i * ENTRAXE);
+}
 
 /** Le catalogue, rangé par famille : l'ordre du sélecteur. */
 export const FIXTURE_FAMILIES: { name: string; kinds: FixtureKind[] }[] = [
-  { name: 'Prises', kinds: ['prise', 'prise2', 'prise20', 'prise32'] },
-  { name: 'Commandes', kinds: ['inter', 'va', 'poussoir', 'variateur'] },
-  { name: 'Courants faibles', kinds: ['rj45', 'tv'] },
+  {
+    name: 'Prises',
+    kinds: ['prise', 'prise2', 'prise3', 'prise20', 'prise32'],
+  },
+  {
+    name: 'Commandes',
+    kinds: ['inter', 'inter2', 'inter3', 'va', 'poussoir', 'variateur'],
+  },
+  {
+    name: 'Courants faibles',
+    kinds: ['rj45', 'rj2', 'rjPrise', 'rjPrise2', 'tv', 'tvPrise'],
+  },
   { name: 'Éclairage', kinds: ['applique'] },
   { name: 'Divers', kinds: ['tableau', 'thermostat', 'sortieCable', 'boite'] },
 ];
@@ -472,6 +624,57 @@ const MANETTE: SymbolStroke[] = [
   { d: 'M2.6 -5.6 L9.6 -2.2' },
 ];
 
+/**
+ * Symbole d'un ensemble : celui de chaque poste, décalé à l'entraxe.
+ *
+ * On ne dessine pas une « prise double » : on dessine deux prises côte à
+ * côte, comme sur le mur. Le repère des symboles couvrant ±11 pour 82 mm de
+ * plaque, l'entraxe y vaut 71/82 × 22.
+ */
+export function assemblySymbol(kind: FixtureKind): SymbolStroke[] {
+  const posts = postsOf(kind);
+  if (posts.length < 2) return FIXTURE_SYMBOL[kind] ?? [];
+  const pas = (ENTRAXE / PLAQUE) * SYMBOL_SPAN;
+  const debut = -((posts.length - 1) * pas) / 2;
+  const out: SymbolStroke[] = [];
+  posts.forEach((post, i) => {
+    const dx = debut + i * pas;
+    for (const seg of FIXTURE_SYMBOL[post] ?? []) {
+      // Décale le tracé : chaque nombre pair d'une commande est une abscisse.
+      out.push({ ...seg, d: shiftPath(seg.d, dx) });
+    }
+  });
+  return out;
+}
+
+/** Décale les abscisses d'un chemin. Les arcs gardent leurs rayons. */
+function shiftPath(d: string, dx: number): string {
+  const toks = d.match(/[MmHVLAaZz]|-?\d*\.?\d+/g) ?? [];
+  let out = '';
+  let i = 0;
+  const n = () => toks[i++];
+  while (i < toks.length) {
+    const cmd = n();
+    const dec = (v: string) => (parseFloat(v) + dx).toFixed(2);
+    if (cmd === 'M' || cmd === 'L') out += `${cmd}${dec(n())} ${n()} `;
+    else if (cmd === 'H') out += `H${dec(n())} `;
+    else if (cmd === 'V') out += `V${n()} `;
+    else if (cmd === 'm' || cmd === 'a' || cmd === 'A') {
+      // Relatifs (ou arcs) : seule la première commande absolue porte le
+      // décalage, le reste suit tout seul.
+      const args: string[] = [];
+      while (i < toks.length && /^-?[\d.]+$/.test(toks[i])) args.push(n());
+      if (cmd === 'A') {
+        args[5] = (parseFloat(args[5]) + dx).toFixed(2);
+      }
+      out += `${cmd}${args.join(' ')} `;
+    } else {
+      out += `${cmd} `;
+    }
+  }
+  return out.trim();
+}
+
 export const FIXTURE_SYMBOL: Record<FixtureKind, SymbolStroke[]> = {
   prise: SOCLE,
   prise2: [...SOCLE, { d: 'M-4.5 2 A4.5 4.5 0 0 1 4.5 2' }],
@@ -516,6 +719,15 @@ export const FIXTURE_SYMBOL: Record<FixtureKind, SymbolStroke[]> = {
     { d: 'M-6 0 H-10' },
     { d: 'M6 0 H10' },
   ],
+  // Les ensembles reprennent le symbole de leurs postes : la table ne porte
+  // que le premier, `assemblySymbol()` compose le reste.
+  prise3: SOCLE,
+  rj2: SOCLE,
+  rjPrise: SOCLE,
+  rjPrise2: SOCLE,
+  tvPrise: SOCLE,
+  inter2: MANETTE,
+  inter3: MANETTE,
 };
 
 /**
@@ -614,7 +826,11 @@ export const FIXTURE_TAG: Partial<Record<FixtureKind, string>> = {
   prise20: '20A',
   prise32: '32A',
   rj45: 'RJ',
+  rj2: 'RJ',
+  rjPrise: 'RJ',
+  rjPrise2: 'RJ',
   tv: 'TV',
+  tvPrise: 'TV',
 };
 
 /**
@@ -638,6 +854,25 @@ export function stackRanks(
     out.set(it.id, n);
   }
   return out;
+}
+
+/**
+ * Nombre de socles 16 A au sens de la norme.
+ *
+ * « Un socle double compte pour un socle, un socle triple pour deux. » La
+ * règle surprend, mais c'est celle qui plafonne les circuits — et elle vaut
+ * aussi bien pour l'équipement minimal d'une pièce que pour la charge d'un
+ * circuit. Compter les trous donnerait des circuits sous-chargés et des
+ * pièces réputées équipées qui ne le sont pas.
+ */
+export function socketsOf(kind: FixtureKind): number {
+  const n = postsOf(kind).filter((k) => k === 'prise').length;
+  return n <= 1 ? n : Math.ceil(n / 2);
+}
+
+/** Nombre de prises de communication portées par l'appareil. */
+export function rjOf(kind: FixtureKind): number {
+  return postsOf(kind).filter((k) => k === 'rj45').length;
 }
 
 /** Nombre d'appareils par pièce et par type, pour le récapitulatif. */

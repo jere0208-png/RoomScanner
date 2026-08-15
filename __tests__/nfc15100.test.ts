@@ -20,6 +20,16 @@ import {
   type RoomInput,
 } from '../src/geometry/nfc15100';
 import { buildMaterialPdf, buildScanPdf } from '../src/export/pdf';
+import {
+  ENTRAXE,
+  boxOffsets,
+  postsOf,
+  rjOf,
+  socketsOf,
+} from '../src/geometry/electrical';
+import { fixturePlacement } from '../src/geometry/nfc15100';
+import { interiorSide, wallFace } from '../src/geometry/electrical';
+import { roomParts, wallQuadsOf } from '../src/geometry/floorplan';
 import type { Fixture, FixtureKind } from '../src/geometry/electrical';
 import type { WallSeg } from '../src/geometry/floorplan';
 
@@ -267,8 +277,8 @@ describe('rattachement des pièces', () => {
         { id: 'r2', name: 'Cuisine', wallIds: ['s', 'refend'] },
       ],
       [
-        { roomId: 'r1', surface: { area: 20 }, walls: [] },
-        { roomId: 'r2', surface: { area: 9 }, walls: [] },
+        { roomId: 'r1', surface: { area: 20, pts: [] }, walls: [] },
+        { roomId: 'r2', surface: { area: 9, pts: [] }, walls: [] },
       ],
     );
     expect(inputs[0].area).toBe(20);
@@ -330,5 +340,101 @@ describe('légende du plan exporté', () => {
       ),
     );
     expect(s).not.toContain('APPAREILLAGE');
+  });
+});
+
+describe('ensembles multipostes', () => {
+  it('comptent des SOCLES, pas des trous', () => {
+    // « Un socle double compte pour un socle, un triple pour deux. »
+    expect(socketsOf('prise')).toBe(1);
+    expect(socketsOf('prise2')).toBe(1);
+    expect(socketsOf('prise3')).toBe(2);
+    // Un ensemble mixte ne compte que ses socles 16 A.
+    expect(socketsOf('rjPrise')).toBe(1);
+    expect(socketsOf('rjPrise2')).toBe(1);
+    expect(rjOf('rjPrise2')).toBe(1);
+    expect(rjOf('rj2')).toBe(2);
+    expect(postsOf('inter3')).toHaveLength(3);
+  });
+
+  it('percent à l’entraxe de 71 mm', () => {
+    const deux = boxOffsets('prise2');
+    expect(deux).toHaveLength(2);
+    expect(deux[1] - deux[0]).toBeCloseTo(ENTRAXE, 6);
+    const trois = boxOffsets('inter3');
+    expect(trois[2] - trois[0]).toBeCloseTo(2 * ENTRAXE, 6);
+    // Les boîtes sont centrées sur la plaque.
+    const large = 2 * ENTRAXE + 0.082;
+    expect(trois[0] + trois[2]).toBeCloseTo(large, 6);
+  });
+
+  it('une chambre est équipée par trois prises doubles', () => {
+    const rooms = [room('r1', 'Chambre', 11)];
+    const trois = [fx('prise2'), fx('prise2'), fx('prise2')];
+    const issues = checkElectrical(rooms, trois, wallToRooms(rooms));
+    expect(issues.some((i) => i.message.includes('socle'))).toBe(false);
+  });
+});
+
+describe('un mur mitoyen ne compte que pour la pièce où l’appareil donne', () => {
+  // Deux pièces de 3 × 4 séparées par un refend en x = 3.
+  const mur = (id: string, ax: number, az: number, bx: number, bz: number) => ({
+    id,
+    type: 'wall' as const,
+    a: { x: ax, z: az },
+    b: { x: bx, z: bz },
+    height: 2.5,
+    yCenter: 1.25,
+  });
+  const walls = [
+    mur('n1', 0, 0, 3, 0),
+    mur('refend', 3, 0, 3, 4),
+    mur('s1', 3, 4, 0, 4),
+    mur('w1', 0, 4, 0, 0),
+    mur('n2', 3, 0, 6, 0),
+    mur('e2', 6, 0, 6, 4),
+    mur('s2', 6, 4, 3, 4),
+  ];
+  const rooms = [
+    { id: 'r1', name: 'Séjour', wallIds: ['n1', 'refend', 's1', 'w1'] },
+    { id: 'r2', name: 'Chambre', wallIds: ['n2', 'e2', 's2', 'refend'] },
+  ];
+  const inputs = roomInputsOf(rooms, roomParts(walls, rooms));
+  const refend = walls.find((w) => w.id === 'refend')!;
+  const cote = interiorSide(refend, walls, rooms);
+  const face = wallFace(refend, wallQuadsOf(walls).get('refend'), cote);
+
+  it('range chaque prise du côté où elle donne', () => {
+    const devant = { ...fx('prise', 'refend'), along: 2, side: cote };
+    const derriere = {
+      ...fx('prise', 'refend'),
+      along: 2,
+      side: (cote > 0 ? -1 : 1) as 1 | -1,
+    };
+    const pose = fixturePlacement([devant, derriere], walls, inputs);
+    expect(pose.get(devant.id)).toBeTruthy();
+    expect(pose.get(derriere.id)).toBeTruthy();
+    // Les deux ne peuvent pas être dans la même pièce : c'était le bug.
+    expect(pose.get(devant.id)).not.toBe(pose.get(derriere.id));
+    expect(face.len).toBeGreaterThan(3);
+  });
+
+  it('cinq prises posées de l’autre côté ne rendent pas le séjour conforme', () => {
+    const autreFace = (cote > 0 ? -1 : 1) as 1 | -1;
+    const triche = Array.from({ length: 5 }, (_, i) => ({
+      ...fx('prise', 'refend'),
+      along: 0.5 + i * 0.6,
+      side: autreFace,
+    }));
+    const pose = fixturePlacement(triche, walls, inputs);
+    const issues = checkElectrical(
+      inputs,
+      triche,
+      wallToRooms(inputs),
+      pose,
+    );
+    const alertes = issues.filter((i) => i.severity === 'alerte');
+    // La pièce qui n'a rien reçu réclame toujours ses socles.
+    expect(alertes.some((i) => i.message.includes('socle'))).toBe(true);
   });
 });

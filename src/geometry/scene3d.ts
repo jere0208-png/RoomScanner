@@ -23,7 +23,7 @@ import {
 import { floorColorAt, mixHex, pointInPolygon, sampleTexture } from './appearance';
 import {
   FIXTURES,
-  FIXTURE_SYMBOL,
+  assemblySymbol,
   faceX,
   symbolPolylines,
   wallFace,
@@ -793,10 +793,12 @@ export function buildScene(
     // « voici une prise », il dit « voici une annotation ». Et comme il
     // fait partie du volume, il tourne, s'incline et disparaît avec lui.
     const trait = mixHex(spec.color, '#000000', 0.55);
-    const k = Math.min(spec.w, spec.h) / SYMBOL_SPAN;
+    // L'échelle se prend sur la HAUTEUR : la largeur d'un ensemble croît
+    // avec ses postes, ses symboles ne doivent pas grossir avec elle.
+    const k = spec.h / SYMBOL_SPAN;
     const yMid = yb + spec.h / 2;
     const nrm = { x: face.nx, y: 0, z: face.nz };
-    for (const ligne of symbolPolylines(FIXTURE_SYMBOL[f.kind] ?? [])) {
+    for (const ligne of symbolPolylines(assemblySymbol(f.kind))) {
       const pts3 = ligne.pts.map((pt) => {
         const sol = at(pt.x * k, spec.depth + 0.0015);
         return { x: sol.x, y: yMid - pt.y * k, z: sol.z };

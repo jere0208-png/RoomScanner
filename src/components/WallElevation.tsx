@@ -34,11 +34,17 @@ import Svg, {
 import { radius, shadowCard, themedStyles, useTheme, type Palette } from '../theme';
 import { roomOf, roomParts, wallQuadsOf } from '../geometry/floorplan';
 import {
+  BOITE_D,
+  ENTRAXE,
+  socketsOf,
   FIXTURES as SPECS,
+  boxOffsets,
+  postsOf,
   type FixtureKind,
 } from '../geometry/electrical';
 import {
   checkElectrical,
+  fixturePlacement,
   HEIGHT_RULES,
   requirementFor,
   roomInputsOf,
@@ -130,19 +136,16 @@ export function WallElevation({
     if (!mien) return null;
     const req = requirementFor(roomUse(mien.name, mien.kind), mien.area);
     if (req.socles === 0) return null;
-    const poses = fixtures.filter(
-      (f) =>
-        (w2r.get(f.wallId) ?? []).includes(mien.id) &&
-        (f.kind === 'prise' || f.kind === 'prise2'),
-    ).length;
+    const pose = fixturePlacement(fixtures, walls, inputs);
+    const socles = (f: (typeof fixtures)[number]) =>
+      pose.get(f.id) === mien.id ? socketsOf(f.kind) : 0;
+    const poses = fixtures.reduce((n, f) => n + socles(f), 0);
     // Cuisine : ce sont les socles du plan de travail qui manquent en
     // premier, et ceux-là se posent à 1,10 m, pas en plinthe.
-    const hauts = fixtures.filter(
-      (f) =>
-        (w2r.get(f.wallId) ?? []).includes(mien.id) &&
-        (f.kind === 'prise' || f.kind === 'prise2') &&
-        f.height >= 0.9,
-    ).length;
+    const hauts = fixtures.reduce(
+      (n, f) => n + (f.height >= 0.9 ? socles(f) : 0),
+      0,
+    );
     return {
       nom: mien.name || 'Cette pièce',
       poses,
@@ -162,7 +165,12 @@ export function WallElevation({
     const inputs = roomInputsOf(rooms, roomParts(walls, rooms));
     const w2r = wallToRooms(inputs);
     const miens = w2r.get(wallId) ?? [];
-    return checkElectrical(inputs, fixtures, w2r).filter(
+    return checkElectrical(
+      inputs,
+      fixtures,
+      w2r,
+      fixturePlacement(fixtures, walls, inputs),
+    ).filter(
       (i) =>
         i.severity === 'alerte' &&
         i.code !== 'socles' &&
@@ -599,23 +607,39 @@ export function WallElevation({
         )}
       </View>
 
+{/* L'objectif de la pièce, en une ligne : son nom, où on en est, et le
+          geste. Le pavé précédent portait un titre sur deux lignes et un gros
+          bouton bleu qui le chevauchait — beaucoup de bruit pour dire
+          « il en manque quatre ». */}
       {objectif && (
         <View style={styles.guide}>
           <View style={styles.guideHead}>
-            <Text style={styles.guideTitle}>
-              {`${objectif.nom} — ${objectif.poses} socle${
-                objectif.poses > 1 ? 's' : ''
-              } sur ${objectif.exiges}`}
+            <Text style={styles.guideTitle} numberOfLines={1}>
+              {objectif.nom}
             </Text>
-            {objectif.poses >= objectif.exiges ? (
-              <Text style={[styles.guideState, styles.guideOk]}>conforme</Text>
-            ) : (
+            <Text
+              style={[
+                styles.guideState,
+                objectif.poses >= objectif.exiges ? styles.guideOk : styles.guideKo,
+              ]}>
+              {`${objectif.poses}/${objectif.exiges}`}
+            </Text>
+            {objectif.poses < objectif.exiges && (
               <TouchableOpacity
                 style={styles.guideFix}
                 onPress={() => poser('prise', objectif.surPlan ? 1.1 : undefined)}>
-                <Text style={styles.guideFixText}>
-                  {objectif.surPlan ? '+ Prise à 110 cm' : '+ Poser une prise'}
-                </Text>
+                <Svg width={17} height={17} viewBox="0 0 24 24">
+                  {['M12 5 v14', 'M5 12 h14'].map((d) => (
+                    <Path
+                      key={d}
+                      d={d}
+                      stroke="#FFFFFF"
+                      strokeWidth={2.6}
+                      strokeLinecap="round"
+                      fill="none"
+                    />
+                  ))}
+                </Svg>
               </TouchableOpacity>
             )}
           </View>
@@ -633,7 +657,9 @@ export function WallElevation({
               ]}
             />
           </View>
-          <Text style={styles.guideRule}>{objectif.regle}</Text>
+          <Text style={styles.guideRule} numberOfLines={2}>
+            {objectif.regle}
+          </Text>
         </View>
       )}
 
@@ -679,6 +705,33 @@ export function WallElevation({
             </TouchableOpacity>
           </View>
           <Text style={styles.warnRule}>{hauteurKO.regle}</Text>
+        </View>
+      )}
+
+{/* Un ensemble multiposte ne se pose pas au jugé : voici où percer,
+          depuis le bord gauche du mur. C'est la seule chose que
+          l'électricien ait à reporter sur son tracé. */}
+      {selected && postsOf(selected.kind).length > 1 && face && (
+        <View style={styles.percage}>
+          <Text style={styles.percageTitle}>
+            {`${postsOf(selected.kind).length} postes · entraxe ${Math.round(
+              ENTRAXE * 1000,
+            )} mm · boîte Ø ${Math.round(BOITE_D * 1000)}`}
+          </Text>
+          <Text style={styles.percageVals}>
+            {boxOffsets(selected.kind)
+              .map(
+                (o) =>
+                  `${Math.round(
+                    (faceX(face, selected.along) -
+                      FIXTURES[selected.kind].w / 2 +
+                      o) *
+                      100,
+                  )}`,
+              )
+              .join('  ·  ')}
+            <Text style={styles.percageUnit}>{'  cm du bord'}</Text>
+          </Text>
         </View>
       )}
 
@@ -890,35 +943,39 @@ const getStyles = themedStyles((c: Palette) =>
       marginTop: 10,
       backgroundColor: c.surfaceSunken,
       borderRadius: radius.sm,
-      paddingHorizontal: 12,
-      paddingVertical: 9,
+      paddingLeft: 12,
+      paddingRight: 8,
+      paddingVertical: 8,
     },
-    guideHead: { flexDirection: 'row', alignItems: 'center' },
-    guideTitle: { color: c.ink, fontSize: 12.5, fontWeight: '800', flex: 1 },
-    guideState: { fontSize: 11.5, fontWeight: '800' },
+    guideHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    guideTitle: { color: c.ink, fontSize: 12.5, fontWeight: '700', flex: 1 },
+    guideState: { fontSize: 13, fontWeight: '800', letterSpacing: -0.3 },
     guideFix: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
       backgroundColor: c.blue,
-      borderRadius: radius.pill,
-      paddingHorizontal: 12,
-      paddingVertical: 6,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
-    guideFixText: { color: '#FFFFFF', fontSize: 11.5, fontWeight: '800' },
     guideOk: { color: c.green },
     guideKo: { color: c.danger },
     guideBar: {
-      height: 5,
-      borderRadius: 3,
+      height: 3,
+      borderRadius: 2,
       backgroundColor: c.line,
-      marginTop: 7,
+      marginTop: 8,
+      marginRight: 4,
       overflow: 'hidden',
     },
-    guideFill: { height: 5, borderRadius: 3, backgroundColor: c.danger },
+    guideFill: { height: 3, borderRadius: 2, backgroundColor: c.danger },
     guideFillOk: { backgroundColor: c.green },
     guideRule: {
       color: c.inkFaint,
-      fontSize: 10.5,
-      lineHeight: 14.5,
-      marginTop: 7,
+      fontSize: 10,
+      lineHeight: 13.5,
+      marginTop: 6,
+      marginRight: 4,
     },
     warn: {
       marginTop: 8,
@@ -939,6 +996,27 @@ const getStyles = themedStyles((c: Palette) =>
     },
     warnFixText: { color: '#FFFFFF', fontSize: 11.5, fontWeight: '800' },
     warnRule: { color: c.inkSoft, fontSize: 10.5, lineHeight: 14.5, marginTop: 3 },
+    percage: {
+      marginTop: 8,
+      backgroundColor: c.blueSoft,
+      borderRadius: radius.sm,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+    },
+    percageTitle: {
+      color: c.blue,
+      fontSize: 10,
+      fontWeight: '800',
+      textTransform: 'uppercase',
+      letterSpacing: 0.4,
+    },
+    percageVals: {
+      color: c.ink,
+      fontSize: 15,
+      fontWeight: '800',
+      marginTop: 2,
+    },
+    percageUnit: { color: c.inkFaint, fontSize: 10.5, fontWeight: '700' },
     fields: { flexDirection: 'row', gap: 8, marginTop: 12 },
     field: { flex: 1 },
     fieldLabel: {

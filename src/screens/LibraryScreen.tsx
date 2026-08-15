@@ -21,6 +21,7 @@ import {
 import { bounds, roomParts, totalArea, WALL_T } from '../geometry/floorplan';
 import {
   checkElectrical,
+  fixturePlacement,
   roomInputsOf,
   roomsInAlert,
   wallToRooms,
@@ -73,8 +74,14 @@ function PlanThumb({ scan, c }: { scan: SavedScan; c: Palette }) {
   const alertes = (() => {
     try {
       const inputs = roomInputsOf(scan.rooms, parts);
+      const fx = scan.fixtures ?? [];
       return roomsInAlert(
-        checkElectrical(inputs, scan.fixtures ?? [], wallToRooms(inputs)),
+        checkElectrical(
+          inputs,
+          fx,
+          wallToRooms(inputs),
+          fixturePlacement(fx, scan.walls, inputs),
+        ),
       );
     } catch {
       return new Set<string>();
