@@ -650,6 +650,76 @@ export function openingsOn(
   });
 }
 
+/** Un tronçon coté le long d'un mur : retour de mur, porte, fenêtre, baie. */
+export interface WallRun {
+  kind: 'mur' | 'door' | 'window' | 'opening';
+  /** Fractions de la longueur du mur, de a vers b. */
+  t0: number;
+  t1: number;
+  /** Longueur du tronçon, en mètres. */
+  length: number;
+}
+
+/**
+ * Découpe un mur en tronçons cotés : retour de mur, baie, retour de mur.
+ *
+ * C'est ainsi qu'un plan d'architecte cote un mur percé — on n'écrit pas
+ * seulement « 3,93 m », on écrit « 1,50 · 0,90 · 1,60 » pour qu'un menuisier
+ * sache où tomber. Les tronçons de moins de 5 cm sont ignorés : ce sont des
+ * résidus de détection, pas des retours de mur. Un mur plein ne renvoie
+ * rien — sa cote globale suffit.
+ */
+export function wallRuns(
+  wall: WallSeg,
+  openings: WallSeg[],
+  tol = 0.6,
+): WallRun[] {
+  const L = segLength(wall);
+  if (L < 1e-6) return [];
+  const dx = wall.b.x - wall.a.x;
+  const dz = wall.b.z - wall.a.z;
+  const len2 = dx * dx + dz * dz;
+  const along = (p: Pt) =>
+    ((p.x - wall.a.x) * dx + (p.z - wall.a.z) * dz) / len2;
+
+  const holes: { t0: number; t1: number; kind: WallRun['kind'] }[] = [];
+  for (const o of openings) {
+    const mid = { x: (o.a.x + o.b.x) / 2, z: (o.a.z + o.b.z) / 2 };
+    if (pointOnSeg(mid, wall.a, wall.b).dist > tol) continue;
+    const ol = segLength(o) || 1;
+    // Parallèle au mur, sinon c'est l'ouverture d'un mur voisin.
+    const dot =
+      ((o.b.x - o.a.x) * dx + (o.b.z - o.a.z) * dz) / (ol * Math.sqrt(len2));
+    if (Math.abs(dot) < 0.9) continue;
+    const ta = along(o.a);
+    const tb = along(o.b);
+    const t0 = Math.max(0, Math.min(ta, tb));
+    const t1 = Math.min(1, Math.max(ta, tb));
+    if (t1 - t0 < 1e-3) continue;
+    // Un mur ne perce pas un mur : seules les menuiseries comptent.
+    if (o.type === 'wall') continue;
+    holes.push({ t0, t1, kind: o.type });
+  }
+  holes.sort((a, b) => a.t0 - b.t0);
+
+  const runs: WallRun[] = [];
+  const push = (t0: number, t1: number, kind: WallRun['kind']) => {
+    const l = (t1 - t0) * L;
+    if (l > 0.05) runs.push({ kind, t0, t1, length: l });
+  };
+  let cursor = 0;
+  for (const h of holes) {
+    const t0 = Math.max(cursor, h.t0);
+    const t1 = Math.max(t0, h.t1);
+    if (t1 - t0 < 1e-4) continue;
+    push(cursor, t0, 'mur');
+    push(t0, t1, h.kind);
+    cursor = t1;
+  }
+  push(cursor, 1, 'mur');
+  return runs.length > 1 ? runs : [];
+}
+
 /**
  * Surface murale d'une pièce, déduction faite des portes et fenêtres.
  * C'est le chiffre qu'attend un peintre ou un poseur de revêtement.

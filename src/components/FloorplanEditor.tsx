@@ -28,6 +28,7 @@ import {
   segLength,
   toFootprint,
   wallQuads,
+  wallRuns,
   WALL_T,
   type ObjectFootprint,
   type Pt,
@@ -314,6 +315,19 @@ export function FloorplanEditor({
     }),
   ).current;
 
+  /**
+   * Niveau de détail des cotes, de 0 à 1, piloté par le zoom.
+   *
+   * Coter chaque retour de mur en même temps que la longueur totale
+   * surchargerait le plan. On les échange donc : en dessous de 55 px/m, seule
+   * la cote globale du mur s'affiche ; au-delà de 95 px/m, seuls les
+   * tronçons. Entre les deux, les unes s'effacent pendant que les autres
+   * apparaissent.
+   */
+  const detail = mapping
+    ? Math.min(1, Math.max(0, (mapping.scale - 55) / 40))
+    : 0;
+
   // Corps des murs : onglets calculés une fois pour tout le rendu.
   const quads = useMemo(() => wallQuads(walls), [walls]);
   // Pièces du plan : chacune a son contour, son centre et sa teinte de sol.
@@ -498,6 +512,7 @@ export function FloorplanEditor({
                 quad={quads.get(w.id)}
                 mapping={mapping}
                 showMeasure={showMeasures && !navigating}
+                measureOpacity={1 - detail}
                 selected={editable && w.id === selectedWallId}
                 onPress={
                   editable
@@ -523,6 +538,44 @@ export function FloorplanEditor({
                   />
                 );
               })()}
+
+            {/* Cotes de détail : retour de mur, baie, retour de mur. Elles
+                n'apparaissent qu'une fois le plan assez zoomé pour les lire. */}
+            {showMeasures && !navigating && detail > 0.02 &&
+              walls.map((w) =>
+                wallRuns(w, openings).map((run, ri) => {
+                  const A = mapping.toPx(w.a);
+                  const B = mapping.toPx(w.b);
+                  const dx = B.x - A.x;
+                  const dy = B.y - A.y;
+                  const norm = Math.hypot(dx, dy) || 1;
+                  let n = { x: -dy / norm, y: dx / norm };
+                  if (n.y > 0) n = { x: -n.x, y: -n.y };
+                  const t = (run.t0 + run.t1) / 2;
+                  const off = WALL_T * mapping.scale + 9;
+                  const px = A.x + dx * t + n.x * off;
+                  const py = A.y + dy * t + n.y * off;
+                  let angle = (Math.atan2(dy, dx) * 180) / Math.PI;
+                  if (angle > 90) angle -= 180;
+                  if (angle < -90) angle += 180;
+                  // Une cote plus courte que son texte serait illisible.
+                  if ((run.t1 - run.t0) * norm < 26) return null;
+                  return (
+                    <SvgText
+                      key={`run-${w.id}-${ri}`}
+                      x={px}
+                      y={py + 3}
+                      fill={run.kind === 'mur' ? c.inkSoft : c.blue}
+                      fontSize={9.5}
+                      fontWeight="700"
+                      opacity={detail}
+                      textAnchor="middle"
+                      transform={`rotate(${angle}, ${px}, ${py})`}>
+                      {run.length.toFixed(2).replace('.', ',')}
+                    </SvgText>
+                  );
+                }),
+              )}
 
             {/* Portes / fenêtres : trouée dans le mur, puis trait de repérage */}
             {openings.map((o) => {
@@ -860,6 +913,7 @@ function WallBody({
   quad,
   mapping,
   showMeasure,
+  measureOpacity = 1,
   selected,
   onPress,
 }: {
@@ -867,6 +921,8 @@ function WallBody({
   quad?: WallQuad;
   mapping: EffMapping;
   showMeasure: boolean;
+  /** Les cotes globales s'effacent quand les cotes de détail arrivent. */
+  measureOpacity?: number;
   selected: boolean;
   onPress?: () => void;
 }) {
@@ -916,8 +972,9 @@ function WallBody({
           strokeLinecap="butt"
         />
       )}
-      {showMeasure && (
+      {showMeasure && measureOpacity > 0.02 && (
         <SvgText
+          opacity={measureOpacity}
           x={mid.x}
           y={mid.y + 3}
           fill={selected ? c.blue : c.inkSoft}

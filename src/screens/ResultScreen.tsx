@@ -106,6 +106,7 @@ export function ResultScreen() {
   const [checking, setChecking] = useState(false);
   // Choix du format d'export : plan PDF, modèle 3D, ou image de la vue.
   const [exporting, setExporting] = useState(false);
+  const [showMore, setShowMore] = useState(false);
   // Tracé d'un mur : on attend un premier appui (de préférence sur une
   // extrémité existante), puis un second qui pose l'autre bout.
   const [drawing, setDrawing] = useState(false);
@@ -462,51 +463,16 @@ export function ResultScreen() {
               onPress={() => setShowMeasures((v) => !v)}
             />
             <ToolPill
-              icon="surface"
-              active={showSurfaces}
-              onPress={() => setShowSurfaces(!showSurfaces)}
-            />
-            <ToolPill
               icon="furniture"
               active={showFurniture}
               onPress={() => setShowFurniture(!showFurniture)}
             />
-            {colorsAvailable && (
-              <ToolPill
-                icon="colors"
-                active={showTextures}
-                onPress={() => setShowTextures(!showTextures)}
-              />
-            )}
-            {editMode && (
-              <ToolPill
-                icon="rooms"
-                active={false}
-                onPress={() => {
-                  redetectRooms();
-                  setSelectedRoomId(null);
-                }}
-              />
-            )}
-            {editMode && (
-              <ToolPill icon="square" active={false} onPress={straightenPlan} />
-            )}
-            {editMode && (
-              <ToolPill
-                icon="addWall"
-                active={drawing}
-                onPress={() => {
-                  setDrawing((d) => !d);
-                  setDraftFrom(null);
-                  setSelectedWallId(null);
-                  setSelectedObjectId(null);
-                  setSelectedRoomId(null);
-                }}
-              />
-            )}
             {canUndo && (
               <ToolPill icon="undo" active={false} onPress={undo} />
             )}
+            {/* Les outils qu'on emploie rarement se rangent ici : la barre
+                doit rester lisible d'un coup d'œil. */}
+            <ToolPill icon="more" active={showMore} onPress={() => setShowMore(true)} />
             <ToolPill icon="edit" active={editMode} onPress={toggleEdit} />
           </ScrollView>
         ) : (
@@ -532,22 +498,15 @@ export function ResultScreen() {
               }
             />
             <ToolPill
-              icon="surface"
-              active={showSurfaces}
-              onPress={() => setShowSurfaces(!showSurfaces)}
-            />
-            <ToolPill
               icon="furniture"
               active={showFurniture}
               onPress={() => setShowFurniture(!showFurniture)}
             />
-            {colorsAvailable && (
-              <ToolPill
-                icon="colors"
-                active={showTextures}
-                onPress={() => setShowTextures(!showTextures)}
-              />
-            )}
+            <ToolPill
+              icon="more"
+              active={showMore}
+              onPress={() => setShowMore(true)}
+            />
             {rooms.length > 1 && (
               <ToolPill
                 icon="rooms"
@@ -830,6 +789,104 @@ export function ResultScreen() {
         </View>
       )}
 
+      {/* ---------- Outils secondaires ---------- */}
+      <Modal visible={showMore} transparent animationType="fade">
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Outils</Text>
+            <Text style={styles.modalSubtitle}>
+              Ce qu'on n'emploie pas à chaque fois.
+            </Text>
+            {(
+              [
+                [
+                  'Surface au sol',
+                  'Fond pointillé et valeur en m².',
+                  showSurfaces,
+                  () => setShowSurfaces(!showSurfaces),
+                ],
+                ...(colorsAvailable
+                  ? ([
+                      [
+                        'Couleurs relevées',
+                        'Teintes des murs et du sol captées pendant le scan.',
+                        showTextures,
+                        () => setShowTextures(!showTextures),
+                      ],
+                    ] as [string, string, boolean, () => void][])
+                  : []),
+                ...(editMode
+                  ? ([
+                      [
+                        'Tracer un mur',
+                        'Partir d’une extrémité et tirer jusqu’où finir.',
+                        drawing,
+                        () => {
+                          setShowMore(false);
+                          setDrawing(true);
+                          setDraftFrom(null);
+                          setSelectedWallId(null);
+                          setSelectedObjectId(null);
+                          setSelectedRoomId(null);
+                        },
+                      ],
+                      [
+                        'Redresser le plan',
+                        'Remet les murs d’équerre sur la trame du logement.',
+                        false,
+                        () => {
+                          setShowMore(false);
+                          straightenPlan();
+                        },
+                      ],
+                      [
+                        'Redétecter les pièces',
+                        'Relit le graphe des murs après vos retouches.',
+                        false,
+                        () => {
+                          setShowMore(false);
+                          redetectRooms();
+                          setSelectedRoomId(null);
+                        },
+                      ],
+                    ] as [string, string, boolean, () => void][])
+                  : []),
+                [
+                  'Revenir à la dernière sauvegarde',
+                  'Abandonne toutes les retouches non enregistrées.',
+                  false,
+                  () => {
+                    setShowMore(false);
+                    revertCurrent();
+                    setSelectedWallId(null);
+                    setSelectedObjectId(null);
+                  },
+                ],
+              ] as [string, string, boolean, () => void][]
+            ).map(([titre, detail, actif, action]) => (
+              <TouchableOpacity
+                key={titre}
+                style={[styles.exportChoice, actif && styles.exportChoiceOn]}
+                onPress={action}>
+                <Text
+                  style={[
+                    styles.exportChoiceTitle,
+                    actif && styles.exportChoiceTitleOn,
+                  ]}>
+                  {titre}
+                </Text>
+                <Text style={styles.exportChoiceDetail}>{detail}</Text>
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity
+              style={styles.modalGhost}
+              onPress={() => setShowMore(false)}>
+              <Text style={styles.modalGhostText}>Fermer</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       {/* ---------- Choix du format d'export ---------- */}
       <Modal visible={exporting} transparent animationType="fade">
         <View style={styles.modalBackdrop}>
@@ -1048,7 +1105,8 @@ type ToolIcon =
   | 'addWall'
   | 'undo'
   | 'square'
-  | 'check';
+  | 'check'
+  | 'more';
 
 /** Tracés 24×24 des icônes d'outils (trait simple, lisible en 18 px). */
 const TOOL_PATHS: Record<ToolIcon, { d: string; fill?: boolean }[]> = {
@@ -1089,6 +1147,12 @@ const TOOL_PATHS: Record<ToolIcon, { d: string; fill?: boolean }[]> = {
   model: [
     { d: 'M12 3.2 l7.8 4.4 v8.8 L12 20.8 l-7.8 -4.4 V7.6 z' },
     { d: 'M12 12 l7.8 -4.4 M12 12 L4.2 7.6 M12 12 v8.8' },
+  ],
+  // Trois points : le tiroir des outils secondaires.
+  more: [
+    { d: 'M12 5.2 h0.01' },
+    { d: 'M12 12 h0.01' },
+    { d: 'M12 18.8 h0.01' },
   ],
   // Loupe : ce que le plan a d'incertain.
   check: [
@@ -1405,7 +1469,9 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     paddingVertical: 13,
     marginTop: 8,
   },
+  exportChoiceOn: { backgroundColor: c.blueSoft },
   exportChoiceTitle: { color: c.ink, fontSize: 15.5, fontWeight: '700' },
+  exportChoiceTitleOn: { color: c.blue },
   exportChoiceDetail: {
     color: c.inkFaint,
     fontSize: 12.5,

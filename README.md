@@ -219,6 +219,29 @@ métré par pièce, vues 3D), **modèle 3D** (OBJ du plan retouché) ou **image*
 « modèle » ont quitté les barres d'outils des plans : elles y faisaient
 double emploi et encombraient une barre déjà chargée.
 
+### Cotes : deux niveaux de détail
+
+Un plan d'architecte ne cote pas seulement « 3,93 m » : il écrit
+« 1,50 · 0,90 · 1,60 » pour qu'un menuisier sache où tomber. `wallRuns()`
+découpe donc chaque mur percé en tronçons — retour de mur, baie, retour de
+mur — en ignorant les résidus de moins de 5 cm et les ouvertures d'un mur
+voisin (test de parallélisme, sinon une porte perpendiculaire viendrait
+couper le mauvais mur).
+
+Tout afficher en même temps noierait le plan. Les deux niveaux **s'échangent
+avec le zoom** : sous 55 px/m, seule la cote globale du mur ; au-delà de
+95 px/m, seuls les tronçons ; entre les deux, les unes s'effacent pendant que
+les autres apparaissent. Une cote plus courte que son propre texte n'est pas
+tracée.
+
+### La barre d'outils
+
+Elle ne garde que ce qu'on touche à chaque fois — diagnostic, cotes, meubles,
+annuler, édition — et range le reste sous **⋮** : surface au sol, couleurs
+relevées, tracer un mur, redresser, redétecter les pièces, revenir à la
+dernière sauvegarde. Chaque entrée du tiroir porte son intitulé et une ligne
+d'explication, ce qu'une pastille seule ne peut pas dire.
+
 ### Métré
 
 Le PDF porte une feuille de métré, une ligne par pièce : cotes hors-tout,

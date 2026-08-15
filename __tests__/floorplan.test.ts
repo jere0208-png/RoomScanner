@@ -22,6 +22,7 @@ import {
   toSegment,
   totalArea,
   wallQuads,
+  wallRuns,
   weldCorners,
   WALL_T,
   type Pt,
@@ -680,6 +681,54 @@ describe('detectRooms', () => {
     ]);
     expect(found).toHaveLength(2);
     expect(found.map((r) => Math.round(r.area))).toEqual([12, 9]);
+  });
+});
+
+describe('cotes de détail', () => {
+  const mur = seg('n', { x: 0, z: 0 }, { x: 4, z: 0 });
+  const porte: WallSeg = {
+    id: 'p',
+    type: 'door',
+    a: { x: 1.5, z: 0 },
+    b: { x: 2.4, z: 0 },
+    height: 2.05,
+    yCenter: 1.025,
+  };
+
+  it('cote les retours de mur de part et d’autre d’une porte', () => {
+    const runs = wallRuns(mur, [porte]);
+    expect(runs.map((r) => r.kind)).toEqual(['mur', 'door', 'mur']);
+    expect(runs.map((r) => r.length.toFixed(2))).toEqual(['1.50', '0.90', '1.60']);
+    // La chaîne de cotes doit refermer la longueur du mur, sans quoi elle
+    // serait fausse aux yeux d'un artisan.
+    expect(runs.reduce((s2, r) => s2 + r.length, 0)).toBeCloseTo(segLength(mur));
+  });
+
+  it('enchaîne plusieurs percements dans l’ordre', () => {
+    const fen: WallSeg = { ...porte, id: 'f', type: 'window', a: { x: 3, z: 0 }, b: { x: 3.6, z: 0 } };
+    expect(wallRuns(mur, [porte, fen]).map((r) => r.kind)).toEqual([
+      'mur',
+      'door',
+      'mur',
+      'window',
+      'mur',
+    ]);
+  });
+
+  it('n’invente pas de retour quand la baie part du coin', () => {
+    const auRas: WallSeg = { ...porte, a: { x: 0, z: 0 }, b: { x: 0.9, z: 0 } };
+    expect(wallRuns(mur, [auRas])[0].kind).toBe('door');
+  });
+
+  it('ne détaille pas un mur plein', () => {
+    expect(wallRuns(mur, [])).toHaveLength(0);
+  });
+
+  it('ignore l’ouverture d’un mur perpendiculaire ou éloigné', () => {
+    const perp: WallSeg = { ...porte, a: { x: 2, z: 0.02 }, b: { x: 2, z: 1.5 } };
+    const ailleurs: WallSeg = { ...porte, a: { x: 1.5, z: 3 }, b: { x: 2.4, z: 3 } };
+    expect(wallRuns(mur, [perp])).toHaveLength(0);
+    expect(wallRuns(mur, [ailleurs])).toHaveLength(0);
   });
 });
 
