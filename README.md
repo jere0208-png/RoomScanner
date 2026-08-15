@@ -122,10 +122,17 @@ le diff apparaît dans la pull request. Quand le changement est voulu :
 
 Toucher un mur en mode édition **estompe tout le reste du plan** et redessine
 ce mur par-dessus le voile. Ses commandes — coter, ajouter une ouverture,
-supprimer — viennent se poser **à côté de lui**, décalées vers l'intérieur de
-la pièce et bornées au cadre : jamais sur le mur, jamais hors de l'écran. La
-barre du bas, qui débordait dès que le clavier montait, a disparu ; seule la
-saisie de la cote subsiste, en haut du plan.
+électricité, supprimer — viennent se poser **à côté de lui**, décalées vers
+l'intérieur de la pièce et bornées au cadre : jamais sur le mur, jamais hors
+de l'écran.
+
+Ce qu'il mesure tient en **une ligne au pied du plan** : « 3,93 m · 2,50 m
+sous plafond », et un bouton « Coter ». Le champ de saisie posé à demeure
+coûtait une barre entière — étiquette, saisie, unité, bouton d'application —
+pour un geste qu'on fait rarement, et il mangeait le dessin qu'on est
+justement en train de regarder. La question se pose maintenant à l'écran, le
+temps d'y répondre. Au passage, plus de clavier qui remonte par-dessus la
+barre : c'est ce défaut-là qui l'avait déjà fait déménager une fois.
 
 ### Langage visuel
 

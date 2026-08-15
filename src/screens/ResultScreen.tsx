@@ -154,7 +154,6 @@ export function ResultScreen() {
   const [barMode, setBarMode] = useState(false);
   const swap = useRef(new Animated.Value(1)).current;
   const [selectedWallId, setSelectedWallId] = useState<string | null>(null);
-  const [lengthInput, setLengthInput] = useState('');
   const [renaming, setRenaming] = useState(false);
   const [nameInput, setNameInput] = useState('');
   // Electricite : un seul panneau, qui montre soit le catalogue d'appareils,
@@ -190,7 +189,6 @@ export function ResultScreen() {
   }, [editMode, barMode, swap]);
 
   const canvasRef = useRef<View>(null);
-  const lengthRef = useRef<TextInput>(null);
 
   // Départ vers l'export : ondes qui traversent toute la page puis fondu.
   const { width: winW, height: winH } = useWindowDimensions();
@@ -316,8 +314,6 @@ export function ResultScreen() {
     if (issue.wallId) {
       setSelectedRoomId(null);
       setSelectedWallId(issue.wallId);
-      const wall = walls.find((w) => w.id === issue.wallId);
-      setLengthInput(wall ? segLength(wall).toFixed(2).replace('.', ',') : '');
     } else if (issue.roomId) {
       setSelectedWallId(null);
       setSelectedRoomId(issue.roomId);
@@ -466,12 +462,28 @@ export function ResultScreen() {
     setElecOpen(true);
   };
 
-  const applyLength = () => {
-    const v = parseFloat(lengthInput.replace(',', '.'));
-    if (selectedWallId && v > 0) {
-      setWallLength(selectedWallId, v);
-    }
-    Keyboard.dismiss();
+  /**
+   * Demande la longueur du mur.
+   *
+   * Un champ posé à demeure sur le plan coûtait une barre entière —
+   * étiquette, saisie, unité, bouton — pour un geste qu'on fait rarement.
+   * La question se pose maintenant à l'écran, le temps de répondre, et le
+   * plan reste dégagé. Au passage, plus de clavier qui remonte par-dessus
+   * la barre : c'était le défaut qui l'avait déjà fait déménager une fois.
+   */
+  const promptLength = (wallId: string) => {
+    const w = walls.find((x) => x.id === wallId);
+    if (!w) return;
+    Alert.prompt(
+      'Longueur du mur',
+      'En mètres. L’extrémité opposée se déplace, les murs soudés suivent.',
+      (t) => {
+        const v = parseFloat((t ?? '').replace(',', '.'));
+        if (v > 0) setWallLength(wallId, v);
+      },
+      'plain-text',
+      segLength(w).toFixed(2).replace('.', ','),
+    );
   };
 
   const toggleEdit = () => {
@@ -586,8 +598,6 @@ export function ResultScreen() {
               ) {
                 openWallElevation(id);
               }
-              const wall = walls.find((w) => w.id === id);
-              setLengthInput(wall ? segLength(wall).toFixed(2).replace('.', ',') : '');
             }}
             alertRooms={alertRooms}
             selectedRoomId={selectedRoomId}
@@ -610,7 +620,7 @@ export function ResultScreen() {
                 removeWall(wallId);
                 setSelectedWallId(null);
               } else {
-                lengthRef.current?.focus();
+                promptLength(wallId);
               }
             }}
           />
@@ -853,27 +863,21 @@ export function ResultScreen() {
           </View>
         )}
 
-        {/* Cote du mur sélectionné : un champ compact, posé en haut du
-            plan pour ne jamais sortir de l'écran ni couvrir le mur. */}
+        {/* Le mur sélectionné, en une ligne au pied du plan : sa longueur,
+            sa hauteur sous plafond, et de quoi les changer. En haut, le
+            bandeau mangeait le dessin qu'on est en train de regarder. */}
         {tab === '2d' && !selectedObject && editMode && selectedWall && (
-          <View style={[styles.wallLengthBar, north !== null && styles.barShift,
-              editMode && canUndo && styles.barShiftRight,
-            ]}>
-            <Text style={styles.wallLengthLabel}>
-              {fr(selectedWall.height, 2)} m sous plafond
+          <View style={styles.wallStrip}>
+            <Text style={styles.wallStripText} numberOfLines={1}>
+              <Text style={styles.wallStripStrong}>
+                {fr(segLength(selectedWall), 2)} m
+              </Text>
+              {`  ·  ${fr(selectedWall.height, 2)} m sous plafond`}
             </Text>
-            <TextInput
-              ref={lengthRef}
-              style={styles.input}
-              value={lengthInput}
-              onChangeText={setLengthInput}
-              keyboardType="decimal-pad"
-              returnKeyType="done"
-              onSubmitEditing={applyLength}
-            />
-            <Text style={styles.unit}>m</Text>
-            <TouchableOpacity style={styles.applyButton} onPress={applyLength}>
-              <Text style={styles.applyText}>Appliquer</Text>
+            <TouchableOpacity
+              style={styles.wallStripAction}
+              onPress={() => promptLength(selectedWall.id)}>
+              <Text style={styles.wallStripActionText}>Coter</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -1756,8 +1760,7 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     ...glow(c.blue),
     shadowOpacity: 0.42,
   },
-  // Cote du mur : barre compacte EN HAUT du plan. En bas, elle sortait de
-  // l'écran dès que le clavier montait, et couvrait le mur qu'on modifiait.
+  // Bandeau d'attente (pose d'un appareil) : en haut, il ne gêne rien.
   wallLengthBar: {
     position: 'absolute',
     top: 10,
@@ -1768,13 +1771,37 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     gap: 8,
     backgroundColor: c.surface,
     borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: c.line,
     paddingHorizontal: 10,
     paddingVertical: 8,
     ...shadowCard,
   },
   wallLengthLabel: { color: c.inkFaint, fontSize: 12, fontWeight: '600', flex: 1 },
+  // Le mur sélectionné : une seule ligne, au pied du plan, à côté du bouton
+  // d'enregistrement. Elle dit l'essentiel et ne mange pas le dessin.
+  wallStrip: {
+    position: 'absolute',
+    bottom: 12,
+    left: 12,
+    right: 70,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: c.surface,
+    borderRadius: radius.pill,
+    paddingLeft: 16,
+    paddingRight: 6,
+    paddingVertical: 6,
+    ...shadowCard,
+    shadowOpacity: 0.12,
+  },
+  wallStripText: { color: c.inkSoft, fontSize: 13, flex: 1 },
+  wallStripStrong: { color: c.ink, fontWeight: '800', fontSize: 14 },
+  wallStripAction: {
+    backgroundColor: c.blue,
+    borderRadius: radius.pill,
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+  },
+  wallStripActionText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
   editBar: {
     position: 'absolute',
     bottom: 10,
