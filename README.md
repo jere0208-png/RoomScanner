@@ -477,9 +477,11 @@ s'édite pas, ne porte que des calques.
 plus qu'à glisser vers le bas. Une rangée horizontale finissait par défiler,
 donc par cacher la moitié des outils ; une colonne les montre tous.
 
-En édition, dans l'ordre : **annuler** (seulement s'il y a quelque chose à
-annuler), **+** pour l'appareillage, le diagnostic, l'équerre. En lecture :
-cotes, meubles, surface au sol.
+**Annuler ne descend pas avec les outils** : c'est le geste qu'on cherche
+dans l'urgence, il se tient **à gauche du bouton d'édition, sur sa ligne**,
+et n'apparaît que s'il y a quelque chose à annuler. La colonne, elle, porte
+en édition : **+** pour l'appareillage, le diagnostic, l'équerre ; et en
+lecture : cotes, meubles, surface au sol.
 
 **Les pastilles rentrent dans le bouton d'édition et en ressortent.** C'est
 lui qui commande le changement : autant qu'on le voie. Chacune remonte vers
@@ -671,27 +673,37 @@ plan ; il ne reste que sur la vue 3D, où une surface se lit vraiment.
 
 ### Dossiers de la bibliothèque
 
-Les dossiers viennent **en tête** de « Mes scans » : c'est le rangement, il
-précède ce qui est rangé. Un dossier s'ouvre d'un appui, se renomme par son
-crayon, et sa suppression ne supprime rien — les scans qu'il contenait
-reviennent à la racine.
+Les dossiers viennent **en tête** de « Mes scans », en **grandes icônes** avec
+leur nom dessous : c'est le rangement, il précède ce qui est rangé — et une
+icône se vise bien mieux qu'une ligne quand on lui amène quelque chose. Un
+appui ouvre le dossier, un appui long propose de le renommer ou de le
+supprimer. Le supprimer ne supprime rien : les scans reviennent à la racine.
 
-**On y dépose un scan en le tenant une seconde**, puis en l'amenant sur le
-dossier : la ligne se décolle, s'agrandit, et le dossier survolé s'allume.
-Trois détails sans lesquels le geste rate :
+**On y dépose un scan en le tenant une demi-seconde**, puis en l'amenant sur
+l'icône. Une seconde, c'était trop long — le doigt croit que rien ne se passe
+et repart. Le geste se raconte tout seul : le scan **rétrécit et pâlit**,
+fantôme de ce qu'on déplace, pendant que les dossiers **grossissent** pour
+dire qu'on peut lâcher là ; celui qu'on survole grossit encore.
+
+Quatre détails sans lesquels ça rate :
 
 - **la liste cesse de défiler** pendant qu'on tient le scan — déplacement et
   défilement sont le même mouvement du doigt, il faut trancher ;
-- **les cadres des dossiers sont mesurés à l'écran à l'instant où le scan se
+- **les cadres des icônes sont mesurés à l'écran à l'instant où le scan se
   décolle**, ni avant (la liste a pu défiler) ni après (il faut savoir
-  survoler dès le premier pixel) ;
+  survoler dès le premier pixel) — et élargis de 12 px, parce que viser une
+  icône au doigt n'est pas viser un pixel ;
 - **le bandeau d'aide flotte** au lieu de pousser la liste : apparaissant
-  pile après la mesure, s'il décalait les rangées, le scan tomberait à côté.
+  pile après la mesure, s'il décalait les rangées, le scan tomberait à côté ;
+- **la rangée est un composant à part entière** et non une fonction définie
+  dans le rendu : définie dedans, React en voyait un type neuf à chaque
+  changement d'état et démontait la ligne — le doigt perdait en plein geste
+  celle qu'il tenait.
 
-La rangée est un composant à part entière et non une fonction définie dans le
-rendu : définie dedans, React en voyait un type neuf à chaque changement
-d'état et démontait la ligne — le doigt perdait en plein geste celle qu'il
-tenait.
+Chaque scan montre **l'aperçu de son plan** à côté de son nom. Ce n'est pas
+une capture d'écran : le plan est une liste de murs, on le retrace en
+quelques traits dans 54 px. Rien à stocker, rien à invalider — un scan
+retouché montre son nouveau contour à l'ouverture suivante de la liste.
 
 ## Prérequis pour tester sur iPhone
 

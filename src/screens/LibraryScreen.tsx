@@ -9,7 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { Line, Path, Polygon } from 'react-native-svg';
 import {
   glow,
   radius,
@@ -18,8 +18,8 @@ import {
   useTheme,
   type Palette,
 } from '../theme';
-import { roomParts, totalArea } from '../geometry/floorplan';
-import { useScanStore, type SavedScan } from '../store/scanStore';
+import { bounds, roomParts, totalArea } from '../geometry/floorplan';
+import { useScanStore, type SavedScan, type ScanFolder } from '../store/scanStore';
 
 const two = (n: number) => String(n).padStart(2, '0');
 function formatDate(ts: number): string {
@@ -43,18 +43,146 @@ function detailsOf(item: SavedScan): string {
   ].join(' · ');
 }
 
-/** Appui long au bout duquel un scan se décolle de la liste. */
-const HOLD_MS = 1000;
+/**
+ * Appui long au bout duquel un scan se décolle.
+ *
+ * Une seconde, c'était long : le doigt croit que rien ne se passe et repart.
+ * Une demi-seconde suffit à distinguer l'appui long du simple appui.
+ */
+const HOLD_MS = 500;
+const THUMB = 54;
 
+/**
+ * L'aperçu du plan, redessiné à la volée.
+ *
+ * Pas une capture d'écran : le plan est une liste de murs, on le retrace en
+ * quelques traits dans 54 px. Rien à stocker, rien à invalider — un scan
+ * retouché montre son nouveau contour à l'ouverture suivante de la liste.
+ */
+function PlanThumb({ scan, c }: { scan: SavedScan; c: Palette }) {
+  const b = bounds(scan.walls);
+  const pad = 5;
+  const w = Math.max(0.5, b.maxX - b.minX);
+  const h = Math.max(0.5, b.maxZ - b.minZ);
+  const k = Math.min((THUMB - pad * 2) / w, (THUMB - pad * 2) / h);
+  const px = (x: number) => pad + (x - b.minX) * k + (THUMB - pad * 2 - w * k) / 2;
+  const py = (z: number) => pad + (z - b.minZ) * k + (THUMB - pad * 2 - h * k) / 2;
+  const parts = roomParts(scan.walls, scan.rooms);
+  return (
+    <Svg width={THUMB} height={THUMB}>
+      {parts.map((part) =>
+        part.surface ? (
+          <Polygon
+            key={part.roomId}
+            points={part.surface.pts.map((p) => `${px(p.x)},${py(p.z)}`).join(' ')}
+            fill={c.blueSoft}
+          />
+        ) : null,
+      )}
+      {scan.walls.map((wall) => (
+        <Line
+          key={wall.id}
+          x1={px(wall.a.x)}
+          y1={py(wall.a.z)}
+          x2={px(wall.b.x)}
+          y2={py(wall.b.z)}
+          stroke={c.ink}
+          strokeWidth={1.8}
+          strokeLinecap="round"
+        />
+      ))}
+    </Svg>
+  );
+}
+
+/** Le dossier, dessiné : rabat au fond, façade par-dessus. */
+function FolderGlyph({ back, front }: { back: string; front: string }) {
+  return (
+    <Svg width={72} height={58} viewBox="0 0 72 58">
+      <Path
+        d="M3 12 a7 7 0 0 1 7 -7 h15.5 a5 5 0 0 1 3.9 1.9 l4.2 5.3 h31.4 a7 7 0 0 1 7 7 v31.8 a7 7 0 0 1 -7 7 H10 a7 7 0 0 1 -7 -7 z"
+        fill={back}
+      />
+      <Path
+        d="M3 22 h66 v26.9 a7 7 0 0 1 -7 7 H10 a7 7 0 0 1 -7 -7 z"
+        fill={front}
+      />
+    </Svg>
+  );
+}
+
+interface TileProps {
+  folder: ScanFolder;
+  count: number;
+  over: boolean;
+  lift: Animated.Value;
+  styles: ReturnType<typeof getStyles>;
+  palette: Palette;
+  onOpen: () => void;
+  onLong: () => void;
+  bind: (node: View | null) => void;
+}
+
+/**
+ * Une tuile de dossier.
+ *
+ * Elle grossit dès qu'un scan est décollé, et davantage encore quand le
+ * doigt la survole : c'est le seul moyen de faire comprendre, sans une
+ * ligne de texte, qu'on peut lâcher là.
+ */
+function FolderTile({
+  folder,
+  count,
+  over,
+  lift,
+  styles,
+  palette,
+  onOpen,
+  onLong,
+  bind,
+}: TileProps) {
+  const scale = lift.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, over ? 1.26 : 1.12],
+  });
+  return (
+    <Animated.View style={[styles.tile, { transform: [{ scale }] }]}>
+      <View ref={bind} collapsable={false}>
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={onOpen}
+          onLongPress={onLong}
+          style={styles.tileTouch}>
+          <View style={styles.tileGlyph}>
+            <FolderGlyph
+              back={over ? palette.blue : palette.blueDark}
+              front={over ? palette.sky : palette.blue}
+            />
+            {count > 0 && (
+              <View style={styles.tileBadge}>
+                <Text style={styles.tileBadgeText}>{count}</Text>
+              </View>
+            )}
+          </View>
+          <Text style={styles.tileName} numberOfLines={2}>
+            {folder.name}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </Animated.View>
+  );
+}
 
 interface RowProps {
   item: SavedScan;
-  dedans?: boolean;
   pris: boolean;
   arme: boolean;
   fige: boolean;
+  dedans?: boolean;
   shift: Animated.Value;
+  lift: Animated.Value;
   styles: ReturnType<typeof getStyles>;
+  palette: Palette;
   onOpen: () => void;
   onTrash: () => void;
   onOut: () => void;
@@ -65,45 +193,61 @@ interface RowProps {
 /**
  * Une ligne de scan.
  *
- * Composant à part entière, et pas une fonction interne au rendu : défini
+ * Composant à part entière, et pas une fonction interne au rendu : définie
  * dedans, React en voyait un type neuf à chaque changement d'état et
  * démontait la ligne — le doigt perdait en plein geste celle qu'il tenait.
+ *
+ * Décollée, elle RÉTRÉCIT et s'efface : elle devient le fantôme de ce qu'on
+ * déplace, et laisse toute la place aux dossiers qui, eux, grossissent.
  */
 function ScanRow({
   item,
-  dedans,
   pris,
   arme,
   fige,
+  dedans,
   shift,
+  lift,
   styles,
+  palette,
   onOpen,
   onTrash,
   onOut,
   onHold,
   onRelease,
 }: RowProps) {
+  const anim = pris
+    ? {
+        opacity: lift.interpolate({ inputRange: [0, 1], outputRange: [1, 0.55] }),
+        transform: [
+          { translateY: shift },
+          {
+            scale: lift.interpolate({ inputRange: [0, 1], outputRange: [1, 0.88] }),
+          },
+        ],
+      }
+    : null;
   return (
     <Animated.View
-      style={[
-        styles.row,
-        dedans && styles.rowNested,
-        pris && styles.rowDragging,
-        pris && { transform: [{ translateY: shift }, { scale: 1.03 }] },
-      ]}
+      style={[styles.row, pris && styles.rowGhost, anim]}
       onTouchStart={onHold}
       onTouchEnd={() => onRelease(true)}
       onTouchCancel={() => onRelease(false)}>
       <TouchableOpacity
-        style={styles.rowTexts}
+        style={styles.rowMain}
         activeOpacity={0.75}
         disabled={fige}
         onPress={onOpen}>
-        <Text style={styles.rowName} numberOfLines={1}>
-          {item.name}
-        </Text>
-        <Text style={styles.rowSub}>{formatDate(item.updatedAt)}</Text>
-        <Text style={styles.rowDetails}>{detailsOf(item)}</Text>
+        <View style={styles.thumb}>
+          <PlanThumb scan={item} c={palette} />
+        </View>
+        <View style={styles.rowTexts}>
+          <Text style={styles.rowName} numberOfLines={1}>
+            {item.name}
+          </Text>
+          <Text style={styles.rowSub}>{formatDate(item.updatedAt)}</Text>
+          <Text style={styles.rowDetails}>{detailsOf(item)}</Text>
+        </View>
       </TouchableOpacity>
       {dedans && !pris && (
         <TouchableOpacity style={styles.outButton} onPress={onOut}>
@@ -133,7 +277,8 @@ export function LibraryScreen() {
   const renameFolder = useScanStore((s) => s.renameFolder);
   const removeFolder = useScanStore((s) => s.removeFolder);
   const moveToFolder = useScanStore((s) => s.moveToFolder);
-  const styles = getStyles(useTheme());
+  const palette = useTheme();
+  const styles = getStyles(palette);
 
   // Suppression en deux temps : premier appui = confirmation, second = suppression.
   const [armedId, setArmedId] = useState<string | null>(null);
@@ -149,7 +294,8 @@ export function LibraryScreen() {
     disarmTimer.current = setTimeout(() => setArmedId(null), 3000);
   };
 
-  const [open, setOpen] = useState<Record<string, boolean>>({});
+  // Dossier ouvert : on n'affiche plus que son contenu.
+  const [inside, setInside] = useState<string | null>(null);
   const byFolder = useMemo(() => {
     const m = new Map<string, SavedScan[]>();
     for (const s of saves) {
@@ -160,13 +306,16 @@ export function LibraryScreen() {
     }
     return m;
   }, [saves]);
-  const racine = byFolder.get('') ?? [];
+  const dossierOuvert = folders.find((f) => f.id === inside) ?? null;
+  const liste = dossierOuvert
+    ? byFolder.get(dossierOuvert.id) ?? []
+    : byFolder.get('') ?? [];
 
   // ------------------------------------------------------- glisser-déposer
   //
-  // Le doigt tient le scan une seconde, il se décolle, et la liste cesse de
-  // défiler tant qu'on le tient : sans ça, le geste de déplacement et celui
-  // de défilement se disputent le même mouvement vertical.
+  // Le doigt tient le scan une demi-seconde, il se décolle, et la liste
+  // cesse de défiler tant qu'on le tient : sans ça, le geste de déplacement
+  // et celui de défilement se disputent le même mouvement vertical.
   //
   // Les cadres des dossiers sont mesurés À L'ÉCRAN au moment où le scan se
   // décolle. Les mesurer plus tôt ne servirait à rien (la liste peut avoir
@@ -177,15 +326,26 @@ export function LibraryScreen() {
   const dragRef = useRef<string | null>(null);
   const overRef = useRef<string | null>(null);
   const shift = useRef(new Animated.Value(0)).current;
+  const lift = useRef(new Animated.Value(0)).current;
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const zones = useRef<{ id: string; top: number; bottom: number }[]>([]);
-  const folderRefs = useRef(new Map<string, View | null>());
+  const zones = useRef<
+    { id: string; top: number; bottom: number; left: number; right: number }[]
+  >([]);
+  const tileRefs = useRef(new Map<string, View | null>());
 
   const mesurer = () => {
     zones.current = [];
-    folderRefs.current.forEach((node, id) => {
-      node?.measureInWindow((_x, y, _w, h) => {
-        zones.current.push({ id, top: y, bottom: y + h });
+    tileRefs.current.forEach((node, id) => {
+      node?.measureInWindow((x, y, w, h) => {
+        // Cible élargie de 12 px : viser une icône au doigt, ce n'est pas
+        // viser un pixel.
+        zones.current.push({
+          id,
+          top: y - 12,
+          bottom: y + h + 12,
+          left: x - 12,
+          right: x + w + 12,
+        });
       });
     });
   };
@@ -204,6 +364,11 @@ export function LibraryScreen() {
     setDragId(null);
     setOver(null);
     shift.setValue(0);
+    Animated.timing(lift, {
+      toValue: 0,
+      duration: 160,
+      useNativeDriver: true,
+    }).start();
     if (deposer && scan && cible) moveToFolder(scan, cible);
   };
 
@@ -216,8 +381,11 @@ export function LibraryScreen() {
       onPanResponderMove: (e, g) => {
         if (!dragRef.current) return;
         shift.setValue(g.dy);
+        const x = e.nativeEvent.pageX;
         const y = e.nativeEvent.pageY;
-        const zone = zones.current.find((z) => y >= z.top && y <= z.bottom);
+        const zone = zones.current.find(
+          (z) => y >= z.top && y <= z.bottom && x >= z.left && x <= z.right,
+        );
         const id = zone?.id ?? null;
         if (id !== overRef.current) {
           overRef.current = id;
@@ -229,13 +397,22 @@ export function LibraryScreen() {
     }),
   ).current;
 
-  /** Le doigt se pose : au bout d'une seconde, le scan se décolle. */
+  /** Le doigt se pose : au bout d'une demi-seconde, le scan se décolle. */
   const beginHold = (id: string) => {
     stopHold();
+    // Rien à viser : pas de dossier, ou on est déjà dedans.
+    if (dossierOuvert || folders.length === 0) return;
     holdTimer.current = setTimeout(() => {
       mesurer();
       dragRef.current = id;
       setDragId(id);
+      Animated.spring(lift, {
+        toValue: 1,
+        damping: 15,
+        stiffness: 220,
+        mass: 0.7,
+        useNativeDriver: true,
+      }).start();
     }, HOLD_MS);
   };
 
@@ -245,38 +422,69 @@ export function LibraryScreen() {
     if (dragRef.current) endDrag(deposer);
   };
 
-  const promptFolderName = (id: string, actuel: string) =>
-    Alert.prompt(
-      'Nom du dossier',
-      'Il n’est utilisé que pour ranger : rien n’est déplacé sur le disque.',
-      (t) => renameFolder(id, t ?? ''),
-      'plain-text',
-      actuel,
-    );
+  const folderMenu = (f: ScanFolder) =>
+    Alert.alert(f.name, 'Que voulez-vous en faire ?', [
+      {
+        text: 'Renommer',
+        onPress: () =>
+          Alert.prompt(
+            'Nom du dossier',
+            'Il ne sert qu’au rangement : aucun fichier n’est déplacé.',
+            (t) => renameFolder(f.id, t ?? ''),
+            'plain-text',
+            f.name,
+          ),
+      },
+      {
+        text: 'Supprimer le dossier',
+        style: 'destructive',
+        onPress: () =>
+          Alert.alert(
+            'Supprimer ce dossier ?',
+            'Les scans qu’il contient reviennent à la racine, rien n’est perdu.',
+            [
+              { text: 'Annuler', style: 'cancel' },
+              {
+                text: 'Supprimer',
+                style: 'destructive',
+                onPress: () => {
+                  removeFolder(f.id);
+                  if (inside === f.id) setInside(null);
+                },
+              },
+            ],
+          ),
+      },
+      { text: 'Annuler', style: 'cancel' },
+    ]);
+
+  const vide = saves.length === 0 && folders.length === 0;
 
   return (
     <View style={styles.container} {...pan.panHandlers}>
       <View style={styles.headerRow}>
-        <TouchableOpacity style={styles.backButton} onPress={() => setScreen('home')}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => (dossierOuvert ? setInside(null) : setScreen('home'))}>
           <Text style={styles.backChevron}>‹</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>Mes scans</Text>
+        <Text style={styles.title} numberOfLines={1}>
+          {dossierOuvert ? dossierOuvert.name : 'Mes scans'}
+        </Text>
         <View style={styles.countPill}>
-          <Text style={styles.countText}>{saves.length}</Text>
+          <Text style={styles.countText}>{liste.length}</Text>
         </View>
       </View>
 
       {dragId !== null && (
         <View style={styles.dragHint}>
           <Text style={styles.dragHintText}>
-            {over
-              ? 'Relâchez pour ranger dans ce dossier'
-              : 'Amenez le scan sur un dossier'}
+            {over ? 'Relâchez pour ranger ici' : 'Amenez le scan sur un dossier'}
           </Text>
         </View>
       )}
 
-      {saves.length === 0 && folders.length === 0 ? (
+      {vide ? (
         <View style={styles.empty}>
           <Text style={styles.emptyTitle}>Aucun scan enregistré</Text>
           <Text style={styles.emptyText}>
@@ -295,93 +503,50 @@ export function LibraryScreen() {
           // Pendant qu'on tient un scan, la liste ne défile pas : les deux
           // gestes sont le même mouvement du doigt.
           scrollEnabled={dragId === null}>
-          {/* Les dossiers d'abord : c'est le rangement, il vient en tête. */}
-          {folders.map((f) => {
-            const dedans = byFolder.get(f.id) ?? [];
-            const ouvert = !!open[f.id];
-            return (
-              <View key={f.id}>
-                <View
-                  ref={(node) => {
-                    folderRefs.current.set(f.id, node);
+          {/* Les dossiers d'abord, en grandes icônes : c'est le rangement,
+              il précède ce qui est rangé, et une icône se vise bien mieux
+              qu'une ligne quand on lui amène quelque chose. */}
+          {!dossierOuvert && folders.length > 0 && (
+            <View style={styles.grid}>
+              {folders.map((f) => (
+                <FolderTile
+                  key={f.id}
+                  folder={f}
+                  count={(byFolder.get(f.id) ?? []).length}
+                  over={over === f.id}
+                  lift={lift}
+                  styles={styles}
+                  palette={palette}
+                  onOpen={() => setInside(f.id)}
+                  onLong={() => folderMenu(f)}
+                  bind={(node) => {
+                    tileRefs.current.set(f.id, node);
                   }}
-                  collapsable={false}
-                  style={[
-                    styles.folder,
-                    over === f.id && styles.folderOver,
-                  ]}>
-                  <TouchableOpacity
-                    style={styles.folderMain}
-                    activeOpacity={0.75}
-                    onPress={() => setOpen((o) => ({ ...o, [f.id]: !ouvert }))}>
-                    <Text style={styles.folderChevron}>{ouvert ? '⌄' : '›'}</Text>
-                    <View style={styles.rowTexts}>
-                      <Text style={styles.folderName} numberOfLines={1}>
-                        {f.name}
-                      </Text>
-                      <Text style={styles.folderSub}>
-                        {dedans.length === 0
-                          ? 'vide — amenez-y un scan'
-                          : `${dedans.length} scan${dedans.length > 1 ? 's' : ''}`}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.folderAction}
-                    onPress={() => promptFolderName(f.id, f.name)}>
-                    <Text style={styles.folderActionText}>✎</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.folderAction}
-                    onPress={() =>
-                      Alert.alert(
-                        'Supprimer ce dossier ?',
-                        'Les scans qu’il contient reviennent à la racine, ' +
-                          'rien n’est perdu.',
-                        [
-                          { text: 'Annuler', style: 'cancel' },
-                          {
-                            text: 'Supprimer',
-                            style: 'destructive',
-                            onPress: () => removeFolder(f.id),
-                          },
-                        ],
-                      )
-                    }>
-                    <Text style={styles.folderActionText}>✕</Text>
-                  </TouchableOpacity>
-                </View>
-                {ouvert &&
-                  dedans.map((s) => (
-                    <ScanRow
-                      key={s.id}
-                      item={s}
-                      dedans
-                      pris={dragId === s.id}
-                      arme={armedId === s.id}
-                      fige={dragId !== null}
-                      shift={shift}
-                      styles={styles}
-                      onOpen={() => openSave(s.id)}
-                      onTrash={() => onTrash(s.id)}
-                      onOut={() => moveToFolder(s.id, null)}
-                      onHold={() => beginHold(s.id)}
-                      onRelease={releaseRow}
-                    />
-                  ))}
-              </View>
-            );
-          })}
+                />
+              ))}
+            </View>
+          )}
 
-          {racine.map((s) => (
+          {liste.length === 0 && (
+            <Text style={styles.emptyFolder}>
+              {dossierOuvert
+                ? 'Ce dossier est vide. Revenez en arrière et amenez-y un scan.'
+                : 'Tous vos scans sont rangés dans des dossiers.'}
+            </Text>
+          )}
+
+          {liste.map((s) => (
             <ScanRow
               key={s.id}
               item={s}
+              dedans={!!dossierOuvert}
               pris={dragId === s.id}
               arme={armedId === s.id}
               fige={dragId !== null}
               shift={shift}
+              lift={lift}
               styles={styles}
+              palette={palette}
               onOpen={() => openSave(s.id)}
               onTrash={() => onTrash(s.id)}
               onOut={() => moveToFolder(s.id, null)}
@@ -393,28 +558,26 @@ export function LibraryScreen() {
       )}
 
       {/* Créer un dossier : bouton flottant en bas à droite, là où le pouce
-          tombe naturellement. Dans l'en-tête, il était à l'opposé de la
-          main et se confondait avec le compteur. */}
-      <TouchableOpacity
-        style={styles.fab}
-        activeOpacity={0.85}
-        onPress={() => {
-          const id = addFolder();
-          setOpen((o) => ({ ...o, [id]: true }));
-        }}>
-        <Svg width={26} height={26} viewBox="0 0 24 24">
-          {['M12 5 v14', 'M5 12 h14'].map((d) => (
-            <Path
-              key={d}
-              d={d}
-              stroke="#FFFFFF"
-              strokeWidth={2.6}
-              strokeLinecap="round"
-              fill="none"
-            />
-          ))}
-        </Svg>
-      </TouchableOpacity>
+          tombe naturellement. */}
+      {!dossierOuvert && (
+        <TouchableOpacity
+          style={styles.fab}
+          activeOpacity={0.85}
+          onPress={() => addFolder()}>
+          <Svg width={26} height={26} viewBox="0 0 24 24">
+            {['M12 5 v14', 'M5 12 h14'].map((d) => (
+              <Path
+                key={d}
+                d={d}
+                stroke="#FFFFFF"
+                strokeWidth={2.6}
+                strokeLinecap="round"
+                fill="none"
+              />
+            ))}
+          </Svg>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -440,7 +603,15 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     marginRight: 12,
   },
   backChevron: { color: c.ink, fontSize: 24, fontWeight: '600', marginTop: -3 },
-  title: { color: c.ink, fontSize: 24, fontWeight: '800', letterSpacing: -0.4 },
+  title: {
+    color: c.ink,
+    fontSize: 24,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+    flexShrink: 1,
+  },
+  // Cadre de hauteur fixe qui centre son chiffre : un Text à rembourrage
+  // retombe plus bas que le titre, sa boîte incluant l'interligne.
   countPill: {
     minWidth: 26,
     height: 24,
@@ -452,88 +623,88 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     justifyContent: 'center',
   },
   countText: { color: c.blue, fontSize: 13.5, fontWeight: '800' },
-  fab: {
-    position: 'absolute',
-    right: 18,
-    bottom: 34,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: c.blue,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...glow(c.blue),
-    shadowOpacity: 0.4,
-  },
   dragHint: {
     position: 'absolute',
     top: 104,
     left: 18,
     right: 18,
     zIndex: 20,
-    backgroundColor: c.blueSoft,
-    borderRadius: radius.md,
-    paddingVertical: 9,
-    paddingHorizontal: 14,
+    backgroundColor: c.blue,
+    borderRadius: radius.pill,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
     alignItems: 'center',
+    ...glow(c.blue),
   },
-  dragHintText: { color: c.blue, fontSize: 13, fontWeight: '700' },
+  dragHintText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
   list: { paddingBottom: 104 },
-  folder: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  grid: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 14 },
+  tile: { width: '33.33%', alignItems: 'center', marginBottom: 16 },
+  tileTouch: { alignItems: 'center', width: 96 },
+  tileGlyph: { alignItems: 'center', justifyContent: 'center' },
+  tileBadge: {
+    position: 'absolute',
+    top: -2,
+    right: 4,
+    minWidth: 22,
+    height: 22,
+    borderRadius: 11,
+    paddingHorizontal: 6,
     backgroundColor: c.surface,
-    borderRadius: radius.md,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    marginBottom: 10,
-    borderWidth: 1.5,
-    borderColor: 'transparent',
-    ...shadowCard,
-  },
-  // Survol : le dossier s'allume, on sait où le scan va tomber.
-  folderOver: { borderColor: c.blue, backgroundColor: c.blueSoft },
-  folderMain: { flexDirection: 'row', alignItems: 'center', flex: 1 },
-  folderChevron: {
-    color: c.inkFaint,
-    fontSize: 18,
-    fontWeight: '800',
-    width: 20,
-  },
-  folderName: { color: c.ink, fontSize: 16, fontWeight: '800' },
-  folderSub: { color: c.inkFaint, fontSize: 12, marginTop: 2 },
-  folderAction: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: c.surfaceSunken,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: 8,
+    ...shadowCard,
+    shadowOpacity: 0.14,
+    shadowRadius: 6,
   },
-  folderActionText: { color: c.inkSoft, fontSize: 14, fontWeight: '700' },
+  tileBadgeText: { color: c.ink, fontSize: 11.5, fontWeight: '800' },
+  tileName: {
+    color: c.ink,
+    fontSize: 12.5,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginTop: 6,
+    lineHeight: 16,
+  },
+  emptyFolder: {
+    color: c.inkFaint,
+    fontSize: 13.5,
+    lineHeight: 19,
+    textAlign: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 24,
+  },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: c.surface,
     borderRadius: radius.md + 2,
-    padding: 15,
+    padding: 12,
     marginBottom: 10,
     ...shadowCard,
   },
-  rowNested: { marginLeft: 22 },
-  // Le scan pris en main : soulevé, teinté, il ne fait plus partie de la liste.
-  rowDragging: {
-    ...glow(c.blue),
+  // Le scan décollé : plus petit, plus pâle, cerné de bleu. Un fantôme de
+  // ce qu'on déplace — la place est aux dossiers, qui grossissent.
+  rowGhost: {
     borderWidth: 1.5,
     borderColor: c.blue,
     zIndex: 10,
     elevation: 10,
   },
+  rowMain: { flexDirection: 'row', alignItems: 'center', flex: 1 },
+  // L'aperçu du plan : un carré sobre, qui laisse le nom en tête d'affiche.
+  thumb: {
+    width: THUMB,
+    height: THUMB,
+    borderRadius: radius.sm,
+    backgroundColor: c.bg,
+    marginRight: 12,
+    overflow: 'hidden',
+  },
   rowTexts: { flex: 1, marginRight: 10 },
   rowName: { color: c.ink, fontSize: 16, fontWeight: '700' },
   rowSub: { color: c.inkFaint, fontSize: 12, marginTop: 2 },
-  rowDetails: { color: c.inkSoft, fontSize: 13, marginTop: 5, fontWeight: '600' },
+  rowDetails: { color: c.inkSoft, fontSize: 13, marginTop: 4, fontWeight: '600' },
   outButton: {
     backgroundColor: c.surfaceSunken,
     borderRadius: radius.pill,
@@ -554,6 +725,19 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   trashArmed: { backgroundColor: c.danger },
   trashText: { color: c.inkSoft, fontSize: 13, fontWeight: '700' },
   trashTextArmed: { color: '#FFFFFF', fontSize: 12 },
+  fab: {
+    position: 'absolute',
+    right: 18,
+    bottom: 34,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: c.blue,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...glow(c.blue),
+    shadowOpacity: 0.4,
+  },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
   emptyTitle: { color: c.ink, fontSize: 19, fontWeight: '800' },
   emptyText: {

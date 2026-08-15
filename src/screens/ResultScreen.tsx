@@ -619,13 +619,6 @@ export function ResultScreen() {
                 qu'on le voie. */}
             {(barMode
               ? [
-                  // Revenir en arrière vient en premier : c'est le geste
-                  // qu'on cherche dans l'urgence, juste sous le pouce qui
-                  // vient de quitter le bouton d'édition. Il ne paraît que
-                  // s'il y a quelque chose à annuler.
-                  canUndo && (
-                    <ToolPill key="undo" icon="undo" active={false} onPress={undo} />
-                  ),
                   <ToolPill
                     key="plus"
                     icon="plus"
@@ -717,6 +710,12 @@ export function ResultScreen() {
             rangée — les outils défilent DERRIÈRE lui, jamais dessous. */}
         {tab === '2d' && (
           <View style={styles.editAnchor}>
+            {/* Revenir en arrière ne descend pas avec les outils : c'est le
+                geste qu'on cherche dans l'urgence, et il se tient à côté du
+                bouton qui commande l'édition, sur sa ligne. */}
+            {editMode && canUndo && (
+              <ToolPill icon="undo" active={false} onPress={undo} />
+            )}
             <ToolPill icon="edit" active={editMode} onPress={toggleEdit} />
           </View>
         )}
@@ -824,7 +823,9 @@ export function ResultScreen() {
           )}
 
         {tab === '2d' && pendingKind && (
-          <View style={[styles.wallLengthBar, north !== null && styles.barShift]}>
+          <View style={[styles.wallLengthBar, north !== null && styles.barShift,
+              editMode && canUndo && styles.barShiftRight,
+            ]}>
             <Text style={styles.wallLengthLabel}>
               {FIXTURES[pendingKind].label} · touchez le mur qui le reçoit
             </Text>
@@ -839,7 +840,9 @@ export function ResultScreen() {
         {/* Cote du mur sélectionné : un champ compact, posé en haut du
             plan pour ne jamais sortir de l'écran ni couvrir le mur. */}
         {tab === '2d' && !selectedObject && editMode && selectedWall && (
-          <View style={[styles.wallLengthBar, north !== null && styles.barShift]}>
+          <View style={[styles.wallLengthBar, north !== null && styles.barShift,
+              editMode && canUndo && styles.barShiftRight,
+            ]}>
             <Text style={styles.wallLengthLabel}>
               {fr(selectedWall.height, 2)} m sous plafond
             </Text>
@@ -1662,7 +1665,15 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     alignItems: 'flex-end',
     gap: 6,
   },
-  editAnchor: { position: 'absolute', top: 10, right: 10, zIndex: 4 },
+  editAnchor: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    zIndex: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   toolPill: {
     width: 38,
     height: 38,
@@ -1964,6 +1975,8 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   // La rose des vents occupe le coin haut-gauche : les bandeaux se
   // décalent pour ne pas la couvrir.
   barShift: { left: 62 },
+  // Deux pastilles ancrées au lieu d'une : le bandeau recule d'autant.
+  barShiftRight: { right: 102 },
   elecCardActions: { flexDirection: 'row', gap: 8, marginTop: 10 },
   elecFix: {
     backgroundColor: c.blue,
