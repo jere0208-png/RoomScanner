@@ -360,6 +360,13 @@ Après la première installation, `npx react-native start` + ouverture de l'app
 suffit pour itérer sur le JS/TS. Une recompilation native (EAS ou Mac) n'est
 nécessaire que si les fichiers Swift/Kotlin ou les dépendances natives changent.
 
+## Chaîne de livraison
+
+`npx tsc --noEmit && npx eslint src App.tsx __tests__ && npx jest` — puis
+commit, push, et GitHub Actions. **Ne jamais écrire `npx jest | tail`** : le
+code de sortie devient celui de `tail`, donc toujours zéro, et un test rouge
+passe inaperçu jusqu'à la CI. C'est arrivé une fois.
+
 ## Vérifications faites sur cette machine (Windows)
 
 - `npx tsc --noEmit` et `npx eslint src App.tsx` : aucun diagnostic.

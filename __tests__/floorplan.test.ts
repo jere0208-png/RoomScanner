@@ -904,15 +904,28 @@ describe('portes et fenêtres en volumes', () => {
     // donc à l'arrêt, et ne revenait que pendant un geste — où un pan non
     // découpé porte un contour d'un seul tenant, centré comme lui.
     const scene = buildScene(rect, [], [], { palette: TEST_PALETTE });
-    const aretes = scene.faces.filter((f) => f.fill === null);
+    const traits = scene.faces.filter((f) => f.fill === null);
+    // Une ARÊTE isolée (deux points) doit porter son point de tri. Un
+    // contour d'un seul tenant, lui, a déjà les quatre coins de son pan :
+    // sa profondeur moyenne est celle du pan, il n'a rien à emprunter.
+    const aretes = traits.filter((f) => f.pts.length === 2);
     expect(aretes.length).toBeGreaterThan(20);
     expect(aretes.every((f) => f.depthAt !== undefined)).toBe(true);
-    // Et le point de tri est bien DANS le pan, pas sur son bord.
+    expect(
+      traits.filter((f) => f.pts.length === 4).every((f) => f.depthAt === undefined),
+    ).toBe(true);
+    // Le point de tri est à MI-HAUTEUR du pan, donc franchement au-dessus
+    // de l'arête basse d'un mur : c'est tout l'objet de la correction.
+    // (Les arêtes d'un dessus de mur, elles, sont bien à la hauteur du pan.)
+    const decalees = aretes.filter(
+      (a) => Math.abs(a.depthAt!.y - a.pts[0].y) > 0.5,
+    );
+    expect(decalees.length).toBeGreaterThan(10);
+    // Et jamais hors du pan : le point de tri reste dans sa boîte.
     for (const a of aretes) {
-      const ys = a.pts.map((p) => p.y);
       const at = a.depthAt!;
-      expect(at.y).toBeGreaterThanOrEqual(Math.min(...ys) - 1e-6);
-      expect(at.y).toBeLessThanOrEqual(Math.max(...ys) + 1e-6);
+      expect(at.y).toBeGreaterThanOrEqual(-1e-6);
+      expect(at.y).toBeLessThanOrEqual(height + 1e-6);
     }
   });
 
