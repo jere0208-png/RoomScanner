@@ -266,7 +266,7 @@ export function ResultScreen() {
         {tab === '2d' ? (
           <View style={styles.planTools}>
             <ToolPill
-              label="↻"
+              icon="reset"
               active={false}
               onPress={() => {
                 revertCurrent();
@@ -275,30 +275,30 @@ export function ResultScreen() {
               }}
             />
             <ToolPill
-              label="Cotes"
+              icon="ruler"
               active={showMeasures}
               onPress={() => setShowMeasures((v) => !v)}
             />
             <ToolPill
-              label="Surfaces"
+              icon="surface"
               active={showSurfaces}
               onPress={() => setShowSurfaces(!showSurfaces)}
             />
             <ToolPill
-              label="Meubles"
+              icon="furniture"
               active={showFurniture}
               onPress={() => setShowFurniture(!showFurniture)}
             />
             {colorsAvailable && (
               <ToolPill
-                label="Couleurs"
+                icon="colors"
                 active={showTextures}
                 onPress={() => setShowTextures(!showTextures)}
               />
             )}
             {editMode && (
               <ToolPill
-                label="Pièce"
+                icon="room"
                 active={roomName !== ''}
                 onPress={() =>
                   Alert.prompt(
@@ -316,32 +316,32 @@ export function ResultScreen() {
         ) : (
           <View style={styles.planTools}>
             <ToolPill
-              label="Cotes"
+              icon="ruler"
               active={show3DMeasures}
               onPress={() => setShow3DMeasures((v) => !v)}
             />
             <ToolPill
-              label="Sol"
+              icon="surface"
               active={showSurfaces}
               onPress={() => setShowSurfaces(!showSurfaces)}
             />
             <ToolPill
-              label="Meubles"
+              icon="furniture"
               active={showFurniture}
               onPress={() => setShowFurniture(!showFurniture)}
             />
             {colorsAvailable && (
               <ToolPill
-                label="Couleurs"
+                icon="colors"
                 active={showTextures}
                 onPress={() => setShowTextures(!showTextures)}
               />
             )}
             {Platform.OS === 'ios' && (
-              <ToolPill label="Image" active={false} onPress={shareImage} />
+              <ToolPill icon="image" active={false} onPress={shareImage} />
             )}
             {Platform.OS === 'ios' && modelPath && (
-              <ToolPill label="Fichier 3D" active={false} onPress={shareModel} />
+              <ToolPill icon="model" active={false} onPress={shareModel} />
             )}
           </View>
         )}
@@ -582,52 +582,93 @@ export function ResultScreen() {
   );
 }
 
+type ToolIcon =
+  | 'edit'
+  | 'reset'
+  | 'ruler'
+  | 'surface'
+  | 'furniture'
+  | 'colors'
+  | 'room'
+  | 'image'
+  | 'model';
+
+/** Tracés 24×24 des icônes d'outils (trait simple, lisible en 18 px). */
+const TOOL_PATHS: Record<ToolIcon, { d: string; fill?: boolean }[]> = {
+  reset: [
+    { d: 'M19.5 12 a7.5 7.5 0 1 1 -2.2 -5.3' },
+    { d: 'M19.8 3.8 v4.4 h-4.4' },
+  ],
+  ruler: [
+    { d: 'M3.5 9 h17 a1.5 1.5 0 0 1 1.5 1.5 v3 a1.5 1.5 0 0 1 -1.5 1.5 h-17 a1.5 1.5 0 0 1 -1.5 -1.5 v-3 a1.5 1.5 0 0 1 1.5 -1.5 z' },
+    { d: 'M7.5 9 v3' },
+    { d: 'M11.5 9 v3' },
+    { d: 'M15.5 9 v3' },
+  ],
+  surface: [
+    { d: 'M5 5 h14 a1.5 1.5 0 0 1 1.5 1.5 v11 a1.5 1.5 0 0 1 -1.5 1.5 h-14 a1.5 1.5 0 0 1 -1.5 -1.5 v-11 A1.5 1.5 0 0 1 5 5 z' },
+    { d: 'M9 10 h0.01' },
+    { d: 'M15 10 h0.01' },
+    { d: 'M12 14 h0.01' },
+  ],
+  furniture: [
+    { d: 'M6.5 10 V8 a2.5 2.5 0 0 1 2.5 -2.5 h6 A2.5 2.5 0 0 1 17.5 8 v2' },
+    { d: 'M4.5 10.5 h15 v5 h-15 z' },
+    { d: 'M6.5 15.5 v2.5' },
+    { d: 'M17.5 15.5 v2.5' },
+  ],
+  colors: [
+    { d: 'M12 3.5 C15 7.5 17.5 10 17.5 13 a5.5 5.5 0 1 1 -11 0 C6.5 10 9 7.5 12 3.5 z' },
+  ],
+  room: [
+    { d: 'M4.5 5 h8.5 a2 2 0 0 1 1.4 0.6 l5.4 5.4 a1.4 1.4 0 0 1 0 2 l-5.4 5.4 a2 2 0 0 1 -1.4 0.6 h-8.5 z' },
+    { d: 'M8.5 9.5 h0.01' },
+  ],
+  image: [
+    { d: 'M4.5 5.5 h15 a1.5 1.5 0 0 1 1.5 1.5 v10 a1.5 1.5 0 0 1 -1.5 1.5 h-15 A1.5 1.5 0 0 1 3 17 V7 a1.5 1.5 0 0 1 1.5 -1.5 z' },
+    { d: 'M9 10 h0.01' },
+    { d: 'M5.5 16.5 l4.5 -4.5 3 3 3 -3 3 3' },
+  ],
+  model: [
+    { d: 'M12 3.2 l7.8 4.4 v8.8 L12 20.8 l-7.8 -4.4 V7.6 z' },
+    { d: 'M12 12 l7.8 -4.4 M12 12 L4.2 7.6 M12 12 v8.8' },
+  ],
+  edit: [
+    { d: 'M11 4 H6 a2 2 0 0 0 -2 2 v12 a2 2 0 0 0 2 2 h12 a2 2 0 0 0 2 -2 v-5' },
+    { d: 'M18.3 2.7 l3 3 L11.2 15.8 l-4.1 1.1 1.1 -4.1 z' },
+  ],
+};
+
 function ToolPill({
-  label,
   icon,
   active,
   onPress,
 }: {
-  label?: string;
-  icon?: 'edit';
+  icon: ToolIcon;
   active: boolean;
   onPress: () => void;
 }) {
   const c = useTheme();
   const styles = getStyles(c);
-  const stroke = active ? '#FFFFFF' : c.inkSoft;
+  // Icône noire sur fond blanc ; blanche sur bleu quand l'outil est actif.
+  const stroke = active ? '#FFFFFF' : c.ink;
   return (
     <TouchableOpacity
-      style={[
-        styles.toolPill,
-        icon ? styles.toolPillIcon : null,
-        active && styles.toolPillActive,
-      ]}
+      style={[styles.toolPill, active && styles.toolPillActive]}
       onPress={onPress}>
-      {icon === 'edit' ? (
-        <Svg width={16} height={16} viewBox="0 0 24 24">
-          {/* Carré ouvert où entre le crayon */}
+      <Svg width={18} height={18} viewBox="0 0 24 24">
+        {TOOL_PATHS[icon].map((seg, i) => (
           <Path
-            d="M11 4 H6 a2 2 0 0 0 -2 2 v12 a2 2 0 0 0 2 2 h12 a2 2 0 0 0 2 -2 v-5"
+            key={i}
+            d={seg.d}
             stroke={stroke}
-            strokeWidth={2.2}
+            strokeWidth={2.1}
             strokeLinecap="round"
-            fill="none"
-          />
-          {/* Crayon en diagonale */}
-          <Path
-            d="M18.3 2.7 l3 3 L11.2 15.8 l-4.1 1.1 1.1 -4.1 z"
-            stroke={stroke}
-            strokeWidth={2.2}
             strokeLinejoin="round"
             fill="none"
           />
-        </Svg>
-      ) : (
-        <Text style={[styles.toolPillText, active && styles.toolPillTextActive]}>
-          {label}
-        </Text>
-      )}
+        ))}
+      </Svg>
     </TouchableOpacity>
   );
 }
@@ -723,17 +764,16 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     gap: 6,
   },
   toolPill: {
+    width: 36,
+    height: 36,
+    borderRadius: 11,
     backgroundColor: c.surface,
     borderWidth: 1,
     borderColor: c.line,
-    borderRadius: radius.pill,
-    paddingHorizontal: 13,
-    paddingVertical: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   toolPillActive: { backgroundColor: c.blue, borderColor: c.blue },
-  toolPillText: { color: c.inkSoft, fontSize: 12.5, fontWeight: '700' },
-  toolPillTextActive: { color: '#FFFFFF' },
-  toolPillIcon: { paddingHorizontal: 10, paddingVertical: 6 },
   transition: {
     position: 'absolute',
     top: 0,
