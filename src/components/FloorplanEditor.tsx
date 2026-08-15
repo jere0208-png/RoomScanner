@@ -29,6 +29,7 @@ import {
   segLength,
   toFootprint,
   northScreenAngle,
+  planFrameAngle,
   wallQuads,
   wallRuns,
   WALL_T,
@@ -142,6 +143,8 @@ interface Props {
    * foncé. C'est le seul signal visible sans ouvrir un menu.
    */
   alertRooms?: Set<string>;
+  /** Appui sur le vide : `null` retire aussi la sélection d'un meuble. */
+  onSelectObject?: (id: string | null) => void;
   /** Ouverture sélectionnée : elle se retaille en largeur et en hauteur. */
   selectedOpeningId?: string | null;
   onSelectOpening?: (id: string | null) => void;
@@ -173,6 +176,7 @@ export function FloorplanEditor({
   onSelectFixture,
   selectedOpeningId,
   onSelectOpening,
+  onSelectObject,
   alertRooms,
 }: Props) {
   const walls = useScanStore((s) => s.walls);
@@ -341,6 +345,10 @@ export function FloorplanEditor({
 
   // Corps des murs : onglets calculés une fois pour tout le rendu.
   const quads = useMemo(() => wallQuads(walls), [walls]);
+  // La trame du logement : c'est SUR ELLE que les angles s'aimantent, et
+  // jamais sur les axes de l'écran — un scan commencé de biais donnerait
+  // sinon des meubles de biais avec des murs droits.
+  const frame = useMemo(() => planFrameAngle(walls), [walls]);
   const wallById = useMemo(
     () => new Map(walls.map((w) => [w.id, w])),
     [walls],
@@ -422,6 +430,8 @@ export function FloorplanEditor({
                 onPress={() => {
                   onSelectWall(null);
                   onSelectRoom?.(null);
+                  onSelectOpening?.(null);
+                  onSelectObject?.(null);
                 }}
               />
             )}
@@ -842,13 +852,41 @@ export function FloorplanEditor({
                         .replace('.', ',')} m`;
                     })()
                   : null;
-              const text = roomName !== '' ? roomName : areaText ?? placeholder;
+              // Le cartouche se compose LIGNE PAR LIGNE, et sa hauteur se
+              // déduit d'elles : à hauteur fixe, la dernière ligne finissait
+              // collée au bord pendant que le titre gardait son air. Une
+              // boîte qui n'a pas la même marge en haut et en bas se voit,
+              // même quand on ne saurait pas dire pourquoi.
+              const lignes: {
+                t: string;
+                size: number;
+                fill: string;
+                bold: boolean;
+              }[] = [];
+              if (roomName !== '') {
+                lignes.push({ t: roomName, size: 11, fill: selectedRoomId === part.roomId && editable ? c.blue : c.ink, bold: true });
+              }
+              if (areaText) {
+                lignes.push({
+                  t: areaText,
+                  size: roomName !== '' ? 10 : 11,
+                  fill: roomName !== '' ? c.inkSoft : c.ink,
+                  bold: roomName === '',
+                });
+              }
+              if (extText) {
+                lignes.push({ t: extText, size: 9, fill: c.inkFaint, bold: false });
+              }
+              if (placeholder !== '' && lignes.length === 0) {
+                lignes.push({ t: placeholder, size: 11, fill: c.inkFaint, bold: true });
+              }
+              const PAD = 9;
+              const LH = 14;
+              const hpx = PAD * 2 + lignes.length * LH;
               const wpx = Math.max(
-                46,
-                Math.max(text.length, extText?.length ?? 0) * 7 + 18,
+                50,
+                Math.max(...lignes.map((l) => l.t.length * (l.size * 0.62))) + 26,
               );
-              const hpx =
-                (roomName !== '' && areaText ? 38 : 24) + (extText ? 13 : 0);
               const labelW = wpx / mapping.scale;
               const labelH = hpx / mapping.scale;
               const collides = (pt: Pt) =>
@@ -901,67 +939,66 @@ export function FloorplanEditor({
                     stroke={selected ? c.blue : c.lineStrong}
                     strokeWidth={selected ? 2 : 1}
                   />
-                  {roomName !== '' && (
+                  {lignes.map((l, li) => (
                     <SvgText
+                      key={li}
                       x={p.x}
-                      y={p.y + (areaText ? -3 : 4)}
-                      fill={selected ? c.blue : c.ink}
-                      fontSize={11}
-                      fontWeight="700"
+                      y={p.y - hpx / 2 + PAD + li * LH + LH / 2 + l.size * 0.35}
+                      fill={l.fill}
+                      fontSize={l.size}
+                      fontWeight={l.bold ? '700' : '600'}
                       textAnchor="middle">
-                      {roomName}
+                      {l.t}
                     </SvgText>
-                  )}
-                  {areaText && (
-                    <SvgText
-                      x={p.x}
-                      y={p.y + (roomName !== '' ? 12 : 4)}
-                      fill={c.inkSoft}
-                      fontSize={roomName !== '' ? 10 : 11}
-                      fontWeight="700"
-                      textAnchor="middle">
-                      {areaText}
-                    </SvgText>
-                  )}
-                  {extText && (
-                    <SvgText
-                      x={p.x}
-                      y={p.y + (roomName !== '' && areaText ? 24 : 16)}
-                      fill={c.inkFaint}
-                      fontSize={9}
-                      fontWeight="600"
-                      textAnchor="middle">
-                      {extText}
-                    </SvgText>
-                  )}
-                  {placeholder !== '' && (
-                    <SvgText
-                      x={p.x}
-                      y={p.y + 4}
-                      fill={c.inkFaint}
-                      fontSize={11}
-                      fontWeight="700"
-                      textAnchor="middle">
-                      {placeholder}
-                    </SvgText>
-                  )}
+                  ))}
                 </G>
               );
             })}
           </Svg>
 
           {/* Meuble sélectionné : poignée de déplacement + bouton supprimer */}
+          {/* Le meuble sélectionné : toute son emprise se glisse, sa croix
+              et sa poignée de rotation flottent HORS de lui.
+
+              Une poignée de 44 px au centre ne suffisait pas : dès qu'on
+              posait le doigt à côté du centre — c'est-à-dire presque
+              partout sur un lit —, c'était le plan qui se déplaçait. */}
           {selectedObjectId &&
             (() => {
               const o = allObjects.find((x) => x.id === selectedObjectId);
               if (!o) return null;
               const f = footprintOf(o, partOf);
               const p = mapping.toPx({ x: f.cx, z: f.cz });
+              // Boîte écran du rectangle tourné : c'est elle qu'on empoigne.
+              const ang = f.yaw + view.rot;
+              const cw = Math.abs(Math.cos(ang));
+              const sw = Math.abs(Math.sin(ang));
+              const w = f.width * mapping.scale;
+              const d = f.depth * mapping.scale;
+              const hw = Math.max(26, (w * cw + d * sw) / 2);
+              const hh = Math.max(26, (w * sw + d * cw) / 2);
               return (
                 <>
-                  <ObjectDragHandle objectId={o.id} center={p} mapping={mapping} raw={o} />
+                  <ObjectDragHandle
+                    objectId={o.id}
+                    center={p}
+                    half={{ x: hw, y: hh }}
+                    mapping={mapping}
+                    raw={o}
+                  />
+                  <RotateHandle
+                    objectId={o.id}
+                    center={p}
+                    at={{ x: p.x - hw - 16, y: p.y - hh - 16 }}
+                    raw={o}
+                    viewRot={view.rot}
+                    frame={frame}
+                  />
                   <TouchableOpacity
-                    style={[styles.objDelete, { left: p.x + 20, top: p.y - 44 }]}
+                    style={[
+                      styles.objDelete,
+                      { left: p.x + hw + 2, top: p.y - hh - 30 },
+                    ]}
                     onPress={() => onDeleteObject?.(o.id)}>
                     <Text style={styles.objDeleteText}>✕</Text>
                   </TouchableOpacity>
@@ -1139,11 +1176,14 @@ function WallBody({
 function ObjectDragHandle({
   objectId,
   center,
+  half,
   mapping,
   raw,
 }: {
   objectId: string;
   center: { x: number; y: number };
+  /** Demi-largeur et demi-hauteur de l'emprise à l'écran. */
+  half: { x: number; y: number };
   mapping: EffMapping;
   raw: { transform: number[] };
 }) {
@@ -1168,8 +1208,115 @@ function ObjectDragHandle({
   return (
     <View
       {...pan.panHandlers}
-      style={[styles.objDrag, { left: center.x - 22, top: center.y - 22 }]}
+      style={[
+        styles.objDrag,
+        {
+          left: center.x - half.x,
+          top: center.y - half.y,
+          width: half.x * 2,
+          height: half.y * 2,
+        },
+      ]}
     />
+  );
+}
+
+/**
+ * La poignée de rotation : un demi-cercle fléché posé à un coin du meuble.
+ *
+ * On la tire, le meuble suit l'angle du doigt autour de son centre, et la
+ * valeur s'affiche le temps du geste — sans elle, on tourne à l'aveugle et
+ * on ne retrouve jamais l'aplomb. Elle s'arrête d'elle-même tous les 15°,
+ * à 4° près : c'est ce qui permet de revenir à l'équerre du premier coup.
+ */
+function RotateHandle({
+  objectId,
+  center,
+  at,
+  raw,
+  viewRot,
+  frame,
+}: {
+  objectId: string;
+  center: { x: number; y: number };
+  at: { x: number; y: number };
+  raw: { transform: number[] };
+  viewRot: number;
+  /** Trame du logement : l'aimant s'y réfère. */
+  frame: number;
+}) {
+  const c = useTheme();
+  const styles = getStyles(c);
+  const [angle, setAngle] = useState<number | null>(null);
+  const base = useRef({ yaw: 0, touche: 0 });
+  const pan = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onPanResponderGrant: () => {
+          base.current = {
+            yaw: Math.atan2(raw.transform[2], raw.transform[0]),
+            // Angle écran du point de départ de la poignée, autour du centre.
+            touche: Math.atan2(at.y - center.y, at.x - center.x),
+          };
+          setAngle(Math.round(((base.current.yaw * 180) / Math.PI) % 360));
+        },
+        onPanResponderMove: (_e, g) => {
+          const a = Math.atan2(
+            at.y + g.dy - center.y,
+            at.x + g.dx - center.x,
+          );
+          let yaw = base.current.yaw + (a - base.current.touche);
+          // Aimant à deux forces, référé à la TRAME du logement :
+          // les quarts de tour tirent de loin (8°) parce que c'est là que
+          // tombent 99 % des meubles ; les seizièmes, de tout près (3°),
+          // pour un meuble volontairement de biais.
+          const rel = yaw - frame;
+          const quart = Math.round(rel / (Math.PI / 2)) * (Math.PI / 2);
+          const seizieme = Math.round(rel / (Math.PI / 12)) * (Math.PI / 12);
+          if (Math.abs(rel - quart) < (8 * Math.PI) / 180) {
+            yaw = frame + quart;
+          } else if (Math.abs(rel - seizieme) < (3 * Math.PI) / 180) {
+            yaw = frame + seizieme;
+          }
+          useScanStore.getState().setObjectYaw(objectId, yaw);
+          const deg = Math.round(((yaw - viewRot) * 180) / Math.PI);
+          setAngle(((deg % 360) + 360) % 360);
+        },
+        onPanResponderRelease: () => setAngle(null),
+        onPanResponderTerminate: () => setAngle(null),
+      }),
+    [objectId, at.x, at.y, center.x, center.y, raw, viewRot, frame],
+  );
+  return (
+    <>
+      <View
+        {...pan.panHandlers}
+        style={[styles.rotHandle, { left: at.x - 17, top: at.y - 17 }]}>
+        <Svg width={19} height={19} viewBox="0 0 24 24">
+          <Path
+            d="M4.5 12 a7.5 7.5 0 1 1 3 6"
+            stroke={c.blue}
+            strokeWidth={2.2}
+            strokeLinecap="round"
+            fill="none"
+          />
+          <Path
+            d="M3.2 8.2 l1.6 4.2 4.2 -1.6"
+            stroke={c.blue}
+            strokeWidth={2.2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            fill="none"
+          />
+        </Svg>
+      </View>
+      {angle !== null && (
+        <View style={[styles.rotBadge, { left: at.x - 24, top: at.y - 46 }]}>
+          <Text style={styles.rotBadgeText}>{`${angle}°`}</Text>
+        </View>
+      )}
+    </>
   );
 }
 
@@ -1224,7 +1371,27 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  objDrag: { position: 'absolute', width: 44, height: 44 },
+  objDrag: { position: 'absolute' },
+  rotHandle: {
+    position: 'absolute',
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: c.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...shadowCard,
+    shadowOpacity: 0.16,
+  },
+  rotBadge: {
+    position: 'absolute',
+    minWidth: 48,
+    borderRadius: radius.pill,
+    backgroundColor: c.blue,
+    paddingVertical: 4,
+    alignItems: 'center',
+  },
+  rotBadgeText: { color: '#FFFFFF', fontSize: 12, fontWeight: '800' },
   // Commandes du mur sélectionné : posées à côté de lui, jamais dessus.
   wallActions: {
     position: 'absolute',
@@ -1251,11 +1418,14 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     marginTop: 3,
     opacity: 0.45,
   },
+  // Hors de l'emprise et en retrait : une croix rouge posée SUR le meuble
+  // se lit comme une partie de lui, et se touche par accident.
   objDelete: {
     position: 'absolute',
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    opacity: 0.75,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: c.danger,
     alignItems: 'center',
     justifyContent: 'center',

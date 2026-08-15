@@ -390,6 +390,8 @@ interface ScanState {
   addObject: (item: CatalogItem, x: number, z: number) => string;
   /** Fait pivoter un meuble d'un quart de tour. */
   rotateObject: (id: string, quarts?: number) => void;
+  /** Oriente un meuble à l'angle donné (radians). */
+  setObjectYaw: (id: string, yaw: number) => void;
   removeObject: (id: string) => void;
   setObjectCenter: (id: string, x: number, z: number) => void;
   resizeObject: (id: string, width: number, depth: number) => void;
@@ -1091,6 +1093,24 @@ export const useScanStore = create<ScanState>((set, get) => {
           const yaw = Math.atan2(t[2], t[0]) + (Math.PI / 2) * quarts;
           const cos = Math.cos(yaw);
           const sin = Math.sin(yaw);
+          t[0] = cos;
+          t[2] = sin;
+          t[8] = -sin;
+          t[10] = cos;
+          return { ...o, transform: t };
+        }),
+        dirty: true,
+      });
+    },
+
+    setObjectYaw: (id, yaw) => {
+      pushHistory(`yaw:${id}`);
+      const cos = Math.cos(yaw);
+      const sin = Math.sin(yaw);
+      set({
+        objects: get().objects.map((o) => {
+          if (o.id !== id) return o;
+          const t = [...o.transform];
           t[0] = cos;
           t[2] = sin;
           t[8] = -sin;

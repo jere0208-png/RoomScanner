@@ -17,7 +17,6 @@
 import React, { useMemo, useRef, useState } from 'react';
 import {
   PanResponder,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -28,6 +27,7 @@ import Svg, {
   Circle,
   G,
   Line,
+  Path,
   Rect,
   Text as SvgText,
 } from 'react-native-svg';
@@ -688,41 +688,83 @@ export function WallElevation({
         {field('h', 'Hauteur', selected?.height ?? 0)}
       </View>
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-        contentContainerStyle={styles.actions}>
-        <TouchableOpacity style={styles.primary} onPress={onAddRequest}>
-          <Text style={styles.primaryText}>+ Appareil</Text>
-        </TouchableOpacity>
-        {selected && spec && (
-          <>
-            <TouchableOpacity
-              style={styles.action}
-              onPress={() =>
-                moveFixture(selected.id, selected.along, spec.std)
-              }>
-              <Text style={styles.actionText}>
-                Hauteur usuelle {cm(spec.std)} cm
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.action}
-              onPress={() => flipFixture(selected.id)}>
-              <Text style={styles.actionText}>Autre face</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.action}
-              onPress={() => {
+      {/* Quatre colonnes de même largeur, rien à faire défiler : la
+          suppression était au bout d'une rangée qui débordait, il fallait
+          la chercher en glissant. Chaque geste a son icône et son mot en
+          tout petit dessous. */}
+      <View style={styles.actions}>
+        {(
+          [
+            {
+              key: 'add',
+              label: 'Ajouter',
+              on: true,
+              tint: c.blue,
+              paths: ['M12 5 v14', 'M5 12 h14'],
+              press: onAddRequest,
+            },
+            {
+              key: 'std',
+              label: spec ? `${cm(spec.std)} cm` : 'Hauteur',
+              on: !!selected,
+              tint: c.ink,
+              // Double flèche verticale : la hauteur normalisée.
+              paths: ['M12 4 v16', 'M8.5 7.5 L12 4 l3.5 3.5', 'M8.5 16.5 L12 20 l3.5 -3.5'],
+              press: () =>
+                selected && spec && moveFixture(selected.id, selected.along, spec.std),
+            },
+            {
+              key: 'flip',
+              label: 'Autre face',
+              on: !!selected,
+              tint: c.ink,
+              // Deux flèches opposées : on passe de l'autre côté du mur.
+              paths: ['M4 9 h16', 'M16.5 5.5 L20 9 l-3.5 3.5', 'M20 15 H4', 'M7.5 11.5 L4 15 l3.5 3.5'],
+              press: () => selected && flipFixture(selected.id),
+            },
+            {
+              key: 'del',
+              label: 'Retirer',
+              on: !!selected,
+              tint: c.danger,
+              paths: ['M5 7 h14', 'M9.5 7 V4.5 h5 V7', 'M6.5 7 l1 13 h9 l1 -13'],
+              press: () => {
+                if (!selected) return;
                 removeFixture(selected.id);
                 onSelect(null);
-              }}>
-              <Text style={styles.dangerText}>Supprimer</Text>
-            </TouchableOpacity>
-          </>
-        )}
-      </ScrollView>
+              },
+            },
+          ] as const
+        ).map((b) => (
+          <TouchableOpacity
+            key={b.key}
+            style={[styles.action, b.key === 'add' && styles.actionAdd]}
+            disabled={!b.on}
+            onPress={b.press}>
+            <Svg width={21} height={21} viewBox="0 0 24 24" opacity={b.on ? 1 : 0.3}>
+              {b.paths.map((d) => (
+                <Path
+                  key={d}
+                  d={d}
+                  stroke={b.key === 'add' ? '#FFFFFF' : b.tint}
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  fill="none"
+                />
+              ))}
+            </Svg>
+            <Text
+              style={[
+                styles.actionText,
+                b.key === 'add' && styles.actionTextAdd,
+                !b.on && styles.actionOff,
+              ]}>
+              {b.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
     </View>
   );
 }
@@ -922,22 +964,30 @@ const getStyles = themedStyles((c: Palette) =>
       paddingVertical: 9,
     },
     fieldUnit: { color: c.inkFaint, fontSize: 12, fontWeight: '600' },
-    actions: { flexDirection: 'row', gap: 8, paddingVertical: 12 },
-    primary: {
-      backgroundColor: c.blue,
-      borderRadius: radius.sm,
-      paddingHorizontal: 16,
-      paddingVertical: 11,
+    actions: {
+      flexDirection: 'row',
+      gap: 8,
+      paddingTop: 12,
+      paddingBottom: 4,
     },
-    primaryText: { color: '#FFFFFF', fontWeight: '700', fontSize: 13.5 },
     action: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
       backgroundColor: c.surfaceSunken,
       borderRadius: radius.sm,
-      paddingHorizontal: 14,
-      paddingVertical: 11,
+      paddingVertical: 9,
     },
-    actionText: { color: c.inkSoft, fontWeight: '700', fontSize: 13.5 },
-    dangerText: { color: c.danger, fontWeight: '700', fontSize: 13.5 },
+    actionAdd: { backgroundColor: c.blue },
+    actionText: {
+      color: c.inkSoft,
+      fontWeight: '700',
+      fontSize: 9.5,
+      marginTop: 3,
+      opacity: 0.75,
+    },
+    actionTextAdd: { color: '#FFFFFF', opacity: 0.9 },
+    actionOff: { opacity: 0.35 },
     ghost: {
       marginTop: 12,
       borderRadius: radius.sm,

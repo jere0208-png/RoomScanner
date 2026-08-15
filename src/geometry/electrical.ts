@@ -519,6 +519,93 @@ export const FIXTURE_SYMBOL: Record<FixtureKind, SymbolStroke[]> = {
 };
 
 /**
+ * Le symbole, aplati en polylignes.
+ *
+ * Les tracés sont écrits en données de chemin SVG parce que c'est ce que
+ * consomme le plan 2D. Le PDF et la 3D, eux, ne parlent pas SVG : ils ont
+ * besoin de listes de points. Cette fonction fait la traduction, une fois
+ * pour toutes — deux jeux de dessins finiraient par diverger.
+ *
+ * Le sous-ensemble employé se limite à `M m H V L A a Z`, et **tous les arcs
+ * sont des demi-cercles dont la corde est le diamètre** : c'est ainsi que les
+ * symboles ci-dessus sont écrits (deux demi-arcs pour un cercle, un seul pour
+ * le socle de prise). Le centre est donc le milieu de la corde, et l'arc se
+ * réduit à douze segments — pas besoin de la paramétrisation générale des
+ * arcs SVG, qui serait une source de bogues pour rien.
+ *
+ * Repère de sortie : celui des symboles — x vers la droite, **y vers le
+ * bas**, rayon utile 11.
+ */
+export function symbolPolylines(
+  paths: SymbolStroke[],
+): { pts: { x: number; y: number }[]; fill?: boolean }[] {
+  const out: { pts: { x: number; y: number }[]; fill?: boolean }[] = [];
+  for (const seg of paths) {
+    const toks = seg.d.match(/[MmHVLAaZz]|-?\d*\.?\d+/g) ?? [];
+    let i = 0;
+    let x = 0;
+    let y = 0;
+    let pts: { x: number; y: number }[] = [];
+    const flush = () => {
+      if (pts.length >= 2) out.push({ pts, fill: seg.fill });
+      pts = [];
+    };
+    const num = () => parseFloat(toks[i++]);
+    while (i < toks.length) {
+      const cmd = toks[i++];
+      if (cmd === 'M') {
+        flush();
+        x = num();
+        y = num();
+        pts.push({ x, y });
+      } else if (cmd === 'm') {
+        x += num();
+        y += num();
+        if (pts.length === 0) pts.push({ x, y });
+      } else if (cmd === 'H') {
+        x = num();
+        pts.push({ x, y });
+      } else if (cmd === 'V') {
+        y = num();
+        pts.push({ x, y });
+      } else if (cmd === 'L') {
+        x = num();
+        y = num();
+        pts.push({ x, y });
+      } else if (cmd === 'A' || cmd === 'a') {
+        const r = num();
+        num();
+        num();
+        num();
+        const sweep = num();
+        const ex = cmd === 'A' ? num() : x + num();
+        const ey = cmd === 'A' ? num() : y + num();
+        const mx = (x + ex) / 2;
+        const my = (y + ey) / 2;
+        const a0 = Math.atan2(y - my, x - mx);
+        const a1 = Math.atan2(ey - my, ex - mx);
+        let span = a1 - a0;
+        if (sweep === 1 && span < 0) span += Math.PI * 2;
+        if (sweep === 0 && span > 0) span -= Math.PI * 2;
+        for (let t = 1; t <= 12; t++) {
+          const a = a0 + (span * t) / 12;
+          pts.push({ x: mx + r * Math.cos(a), y: my + r * Math.sin(a) });
+        }
+        x = ex;
+        y = ey;
+      } else if (cmd === 'Z' || cmd === 'z') {
+        if (pts.length >= 2) pts.push(pts[0]);
+      }
+    }
+    flush();
+  }
+  return out;
+}
+
+/** Demi-largeur du repère des symboles : ils tiennent tous dans ±11. */
+export const SYMBOL_SPAN = 22;
+
+/**
  * Mention portée à côté du symbole quand le dessin seul ne suffit pas : le
  * socle d'une prise 20 A est le même que celui d'une 16 A, seule
  * l'intensité change, et un plan l'écrit.

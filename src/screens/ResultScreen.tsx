@@ -81,6 +81,16 @@ interface Constat {
 }
 const fr = (n: number, d = 1) => n.toFixed(d).replace('.', ',');
 
+/** Recherche sans accent ni casse : « evier » doit trouver « Évier ». */
+const sansAccent = (s: string) =>
+  s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+function matchItem(item: CatalogItem, quete: string): boolean {
+  const q = sansAccent(quete.trim());
+  if (!q) return true;
+  return sansAccent(`${item.label} ${item.category}`).includes(q);
+}
+
 export function ResultScreen() {
   const walls = useScanStore((s) => s.walls);
   const objects = useScanStore((s) => s.objects);
@@ -124,17 +134,32 @@ export function ResultScreen() {
   const [wInput, setWInput] = useState('');
   const [dInput, setDInput] = useState('');
   const selectedObject = objects.find((o) => o.id === selectedObjectId) ?? null;
+  /**
+   * Quitte la fiche d'un meuble. Un meuble provisoire — posé à l'instant,
+   * jamais validé — part avec elle.
+   */
+  const leaveObject = () => {
+    if (draftObject) {
+      removeObject(draftObject);
+      setDraftObject(null);
+    }
+    setSelectedObjectId(null);
+  };
+
   const applyObjectDims = () => {
     const wv = parseFloat(wInput.replace(',', '.'));
     const dv = parseFloat(dInput.replace(',', '.'));
     if (selectedObjectId && wv > 0 && dv > 0) {
       resizeObject(selectedObjectId, wv, dv);
     }
+    // Valider, c'est adopter le meuble : il cesse d'être provisoire.
+    setDraftObject(null);
     Keyboard.dismiss();
   };
   const setScreen = useScanStore((s) => s.setScreen);
   const reset = useScanStore((s) => s.reset);
-  const styles = getStyles(useTheme());
+  const teinte = useTheme();
+  const styles = getStyles(teinte);
 
   const [tab, setTab] = useState<Tab>('2d');
   // Pièce visée par l'outil « nom de pièce » et par la suppression.
@@ -176,6 +201,13 @@ export function ResultScreen() {
   const [pendingKind, setPendingKind] = useState<FixtureKind | null>(null);
   // Catalogue de mobilier : ouvert par le « + » posé à côté du calque meubles.
   const [catalogue, setCatalogue] = useState(false);
+  const [quete, setQuete] = useState('');
+  /**
+   * Meuble tout juste posé, pas encore validé. Quitter sa fiche sans la
+   * valider le retire : un meuble qu'on a posé pour voir ne doit pas rester
+   * planté au milieu de la pièce.
+   */
+  const [draftObject, setDraftObject] = useState<string | null>(null);
 
   // Le diagnostic et la pose d'un appareil passent aussi en édition sans
   // toucher au bouton : l'animation est déclenchée par l'écart entre les
@@ -284,6 +316,8 @@ export function ResultScreen() {
       .sort((a, b) => (b.surface?.area ?? 0) - (a.surface?.area ?? 0))[0];
     const at = cible?.labelAt ?? { x: 0, z: 0 };
     const id = addObject(item, at.x, at.z);
+    setDraftObject(id);
+    setQuete('');
     setCatalogue(false);
     setShowFurniture(true);
     setSelectedWallId(null);
@@ -599,7 +633,12 @@ export function ResultScreen() {
             selectedObjectId={selectedObjectId}
             onDeleteObject={(id) => {
               removeObject(id);
+              setDraftObject(null);
               setSelectedObjectId(null);
+            }}
+            onSelectObject={(id) => {
+              if (id === null) leaveObject();
+              else setSelectedObjectId(id);
             }}
             selectedWallId={selectedWallId}
             onSelectWall={(id) => {
@@ -708,23 +747,20 @@ export function ResultScreen() {
                     active={showMeasures}
                     onPress={() => setShowMeasures((v) => !v)}
                   />,
-                  <ToolPill
-                    key="furniture"
-                    icon="furniture"
-                    active={showFurniture}
-                    onPress={() => setShowFurniture(!showFurniture)}
-                  />,
-                  // Le catalogue s'ouvre depuis le calque qu'il alimente :
-                  // il n'apparaît que si les meubles sont affichés, sinon on
-                  // poserait un meuble qu'on ne verrait pas.
-                  showFurniture && (
+                  // Le catalogue s'ouvre depuis le calque qu'il alimente,
+                  // et le « + » se pose À GAUCHE de lui, sur sa ligne : une
+                  // onde bleue en sort tant qu'on ne l'a pas touché, pour
+                  // dire que c'est par là qu'on ajoute un meuble.
+                  <View key="furniture" style={styles.pillRow}>
+                    {showFurniture && (
+                      <PulsePlus onPress={() => setCatalogue(true)} />
+                    )}
                     <ToolPill
-                      key="addObj"
-                      icon="plus"
-                      active={catalogue}
-                      onPress={() => setCatalogue(true)}
+                      icon="furniture"
+                      active={showFurniture}
+                      onPress={() => setShowFurniture(!showFurniture)}
                     />
-                  ),
+                  </View>,
                   <ToolPill
                     key="surface"
                     icon="surface"
@@ -795,33 +831,59 @@ export function ResultScreen() {
         {/* Côtes du meuble sélectionné, en surimpression */}
         {tab === '2d' && selectedObject && (
           <View style={styles.editBar}>
-            <Text style={styles.editLabel}>
+            <Text style={styles.editLabel} numberOfLines={1}>
               {frCategory(selectedObject.category)} · glissez-le, il se colle
-              aux murs
             </Text>
             <View style={styles.editRow}>
               <TextInput
-                style={styles.input}
+                style={styles.inputSmall}
                 value={wInput}
                 onChangeText={setWInput}
                 keyboardType="decimal-pad"
               />
               <Text style={styles.unit}>×</Text>
               <TextInput
-                style={styles.input}
+                style={styles.inputSmall}
                 value={dInput}
                 onChangeText={setDInput}
                 keyboardType="decimal-pad"
               />
               <Text style={styles.unit}>m</Text>
-              <TouchableOpacity
-                style={styles.roomAction}
-                onPress={() => rotateObject(selectedObject.id)}>
-                <Text style={styles.roomActionText}>Pivoter</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.applyButton} onPress={applyObjectDims}>
-                <Text style={styles.applyText}>Appliquer</Text>
-              </TouchableOpacity>
+              <View style={styles.editIcons}>
+                <TouchableOpacity
+                  style={styles.iconBtn}
+                  onPress={() => rotateObject(selectedObject.id)}>
+                  <Svg width={19} height={19} viewBox="0 0 24 24">
+                    <Path
+                      d="M19.5 12 a7.5 7.5 0 1 1 -2.2 -5.3"
+                      stroke={teinte.ink}
+                      strokeWidth={2}
+                      strokeLinecap="round"
+                      fill="none"
+                    />
+                    <Path
+                      d="M19.8 3.8 v4.4 h-4.4"
+                      stroke={teinte.ink}
+                      strokeWidth={2}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      fill="none"
+                    />
+                  </Svg>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.iconBtnOk} onPress={applyObjectDims}>
+                  <Svg width={19} height={19} viewBox="0 0 24 24">
+                    <Path
+                      d="M5 12.5 L10 17.5 L19 6.5"
+                      stroke="#FFFFFF"
+                      strokeWidth={2.4}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      fill="none"
+                    />
+                  </Svg>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         )}
@@ -1266,17 +1328,27 @@ export function ResultScreen() {
           onPress={() => setCatalogue(false)}>
           <Pressable style={styles.modalCard} onPress={() => {}}>
             <Text style={styles.modalTitle}>Ajouter un meuble</Text>
-            <Text style={styles.modalSubtitle}>
-              Aux dimensions usuelles du commerce, à retailler ensuite. Il se
-              pose au milieu de la plus grande pièce, puis se glisse — et se
-              colle aux murs tout seul.
-            </Text>
-            <ScrollView style={styles.catScroll}>
-              {CATALOGUE.map((famille) => (
+            {/* Une recherche plutôt qu'un mode d'emploi : à trente entrées,
+                on sait ce qu'on cherche, et le faire défiler prend plus de
+                temps que de le taper. */}
+            <TextInput
+              style={styles.catSearch}
+              value={quete}
+              onChangeText={setQuete}
+              placeholder="Rechercher un meuble…"
+              placeholderTextColor={teinte.inkFaint}
+              autoCorrect={false}
+              clearButtonMode="while-editing"
+            />
+            <ScrollView style={styles.catScroll} keyboardShouldPersistTaps="handled">
+              {CATALOGUE.map((famille) => {
+                const trouves = famille.items.filter((i) => matchItem(i, quete));
+                if (trouves.length === 0) return null;
+                return (
                 <View key={famille.name}>
                   <Text style={styles.elecFamily}>{famille.name}</Text>
                   <View style={styles.catGrid}>
-                    {famille.items.map((item) => (
+                    {trouves.map((item) => (
                       <TouchableOpacity
                         key={item.key}
                         style={styles.catCard}
@@ -1293,7 +1365,8 @@ export function ResultScreen() {
                     ))}
                   </View>
                 </View>
-              ))}
+                );
+              })}
             </ScrollView>
           </Pressable>
         </Pressable>
@@ -1615,6 +1688,77 @@ function FurnitureThumb({ item }: { item: CatalogItem }) {
   );
 }
 
+/**
+ * Le « + » du mobilier, avec son onde.
+ *
+ * Une pastille de plus dans une colonne de pastilles ne se remarque pas.
+ * Deux anneaux bleus en sortent donc en boucle, contenus par le bord arrondi
+ * du bouton — l'œil est attiré par ce qui bouge, et c'est le seul endroit de
+ * l'écran qui bouge tout seul. Rien d'autre ne signale qu'on peut ajouter un
+ * meuble.
+ */
+function PulsePlus({ onPress }: { onPress: () => void }) {
+  const c = useTheme();
+  const styles = getStyles(c);
+  const onde = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const boucle = Animated.loop(
+      Animated.timing(onde, {
+        toValue: 1,
+        duration: 1900,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+    );
+    boucle.start();
+    return () => boucle.stop();
+  }, [onde]);
+  return (
+    <TouchableOpacity
+      style={[styles.toolPill, styles.pulsePill]}
+      activeOpacity={0.8}
+      onPress={onPress}>
+      {[0, 0.35].map((retard, i) => (
+        <Animated.View
+          key={i}
+          pointerEvents="none"
+          style={[
+            styles.pulseRing,
+            {
+              opacity: onde.interpolate({
+                inputRange: [retard, Math.min(retard + 0.45, 1), 1],
+                outputRange: [0.45, 0.12, 0],
+                extrapolate: 'clamp',
+              }),
+              transform: [
+                {
+                  scale: onde.interpolate({
+                    inputRange: [retard, 1],
+                    outputRange: [0.35, 1],
+                    extrapolate: 'clamp',
+                  }),
+                },
+              ],
+            },
+          ]}
+        />
+      ))}
+      <Svg width={22} height={22} viewBox="0 0 24 24">
+        {['M12 5 v14', 'M5 12 h14'].map((d) => (
+          <Path
+            key={d}
+            d={d}
+            stroke={c.blue}
+            strokeWidth={2.2}
+            strokeLinecap="round"
+            fill="none"
+          />
+        ))}
+      </Svg>
+    </TouchableOpacity>
+  );
+}
+
 /** Pas d'une pastille : sa largeur plus l'écart qui la suit. */
 const PILL_PITCH = 44;
 
@@ -1845,6 +1989,18 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     shadowRadius: 10,
   },
   toolPillActive: { backgroundColor: c.blue, ...glow(c.blue) },
+  pillRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  // L'onde reste DANS le bouton : elle attire l'œil sans déborder sur le
+  // plan, qui doit rester lisible.
+  pulsePill: { overflow: 'hidden' },
+  pulseRing: {
+    position: 'absolute',
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    borderWidth: 6,
+    borderColor: c.blue,
+  },
   transition: {
     position: 'absolute',
     top: 0,
@@ -1975,7 +2131,39 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     borderWidth: 1,
     borderColor: c.lineStrong,
   },
-  unit: { color: c.inkSoft, fontSize: 15, marginHorizontal: 10 },
+  unit: { color: c.inkSoft, fontSize: 15, marginHorizontal: 8 },
+  // Champs resserrés : la fiche tient sur une ligne, boutons compris, sans
+  // passer sous le bouton d'enregistrement.
+  inputSmall: {
+    backgroundColor: c.bg,
+    color: c.ink,
+    borderRadius: radius.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    fontSize: 15.5,
+    fontWeight: '700',
+    minWidth: 58,
+    textAlign: 'center',
+    borderWidth: 1,
+    borderColor: c.lineStrong,
+  },
+  editIcons: { flexDirection: 'row', gap: 8, marginLeft: 'auto' },
+  iconBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: radius.sm,
+    backgroundColor: c.surfaceSunken,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconBtnOk: {
+    width: 38,
+    height: 38,
+    borderRadius: radius.sm,
+    backgroundColor: c.blue,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   openingButton: {
     backgroundColor: c.surfaceSunken,
     borderRadius: radius.sm,
@@ -2193,7 +2381,20 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     marginBottom: 6,
   },
   elecGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  catScroll: { maxHeight: 400 },
+  catSearch: {
+    backgroundColor: c.bg,
+    color: c.ink,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: c.lineStrong,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    fontSize: 15,
+    fontWeight: '600',
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  catScroll: { maxHeight: 380 },
   catGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   catCard: {
     width: 92,

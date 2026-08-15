@@ -4,7 +4,6 @@ import Svg, {
   Circle,
   G,
   Line,
-  Path,
   Polygon,
   Rect,
   Text as SvgText,
@@ -36,12 +35,9 @@ import {
 import { floorsOf, useScanStore } from '../store/scanStore';
 import {
   FIXTURES,
-  FIXTURE_SYMBOL,
-  FIXTURE_TAG,
   faceX,
   facePoint,
   wallFace,
-  type SymbolStroke,
 } from '../geometry/electrical';
 
 /** Paramètres de caméra de la vue 3D (contrôlables de l'extérieur). */
@@ -394,8 +390,6 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
           x: number;
           y: number;
           color: string;
-          symbol: SymbolStroke[];
-          tag?: string;
           /** Cotes lues sur la face, affichées une fois zoomé dessus. */
           haut?: string;
           bord?: string;
@@ -474,7 +468,6 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
         // Un appareil qui se voit déjà n'a pas besoin d'un pictogramme
         // par-dessus : le tableau fait 55 cm, son symbole lui masquait la
         // façade. Le repère ne sert qu'à ce qui est trop petit pour être vu.
-        const grand = spec.w * scale > 30;
         items.push({
           kind: 'elec',
           // AU-DESSUS de la géométrie, comme les cartouches de pièce.
@@ -489,8 +482,9 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
           x: q.sx,
           y: q.sy,
           color: spec.color,
-          symbol: grand ? [] : FIXTURE_SYMBOL[f.kind] ?? [],
-          tag: grand ? undefined : FIXTURE_TAG[f.kind],
+          // Le symbole n'est plus une pastille posée par-dessus : il est
+          // gravé sur la façade de la plaque, dans la scène elle-même. Ne
+          // restent ici que les cotes, qui sont une annotation, elles.
           haut: scale > 90 ? `${Math.round(f.height * 100)}` : undefined,
           bord: scale > 90 ? `${Math.round(x * 100)}` : undefined,
         });
@@ -708,56 +702,6 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
                 <Circle key={i} cx={item.x} cy={item.y} r={1.1} fill={item.color} />
               ) : item.kind === 'elec' ? (
                 <G key={i}>
-                  {item.symbol.length > 0 && (
-                    <>
-                      {/* Le repère se pose AU-DESSUS de l'appareil, relié
-                          par un filet — centré dessus, il masquait le petit
-                          volume qu'il est censé désigner : une prise fait
-                          8 cm, la pastille en fait 22 de rayon. */}
-                      <Line
-                        x1={item.x}
-                        y1={item.y - 3}
-                        x2={item.x}
-                        y2={item.y - 18}
-                        stroke={item.color}
-                        strokeWidth={1.1}
-                      />
-                      {/* Un cerne de la couleur de l'appareil : le disque
-                          blanc seul disparaissait sur un mur blanc. */}
-                      <Circle
-                        cx={item.x}
-                        cy={item.y - 29}
-                        r={11}
-                        fill={c.surface}
-                        stroke={item.color}
-                        strokeWidth={1.2}
-                        opacity={0.96}
-                      />
-                      <G transform={`translate(${item.x}, ${item.y - 29})`}>
-                        {item.symbol.map((seg, si) => (
-                          <Path
-                            key={si}
-                            d={seg.d}
-                            stroke={item.color}
-                            strokeWidth={1.6}
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            fill={seg.fill ? item.color : 'none'}
-                          />
-                        ))}
-                      </G>
-                    </>
-                  )}
-                  {item.tag && (
-                    <SvgText
-                      x={item.x + 12}
-                      y={item.y - 34}
-                      fill={item.color}
-                      fontSize={8}
-                      fontWeight="800">
-                      {item.tag}
-                    </SvgText>
-                  )}
                   {item.haut && (
                     <>
                       {/* Étiquette de cotes : une pastille sombre, deux
@@ -767,7 +711,7 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
                           quoi il s'agit ne veut rien dire. */}
                       <Rect
                         x={item.x - 41}
-                        y={item.y + 10}
+                        y={item.y + 8}
                         width={82}
                         height={30}
                         rx={8}
@@ -776,7 +720,7 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
                       />
                       <SvgText
                         x={item.x - 33}
-                        y={item.y + 22}
+                        y={item.y + 20}
                         fill="#FFFFFF"
                         fontSize={7.5}
                         fontWeight="700"
@@ -785,7 +729,7 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
                       </SvgText>
                       <SvgText
                         x={item.x + 33}
-                        y={item.y + 22}
+                        y={item.y + 20}
                         fill="#FFFFFF"
                         fontSize={10.5}
                         fontWeight="800"
@@ -794,7 +738,7 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
                       </SvgText>
                       <SvgText
                         x={item.x - 33}
-                        y={item.y + 35}
+                        y={item.y + 33}
                         fill="#FFFFFF"
                         fontSize={7.5}
                         fontWeight="700"
@@ -803,7 +747,7 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
                       </SvgText>
                       <SvgText
                         x={item.x + 33}
-                        y={item.y + 35}
+                        y={item.y + 33}
                         fill="#FFFFFF"
                         fontSize={10.5}
                         fontWeight="800"
