@@ -10,11 +10,11 @@ import type { FloorData, ObjectData } from 'react-native-room-scan';
 import {
   clampFootprint,
   quadPoints,
-  roomSurface,
+  roomOf,
+  roomParts,
   segLength,
   toFootprint,
   wallQuads,
-  wallsCentroid,
   WALL_T,
   type WallSeg,
 } from '../geometry/floorplan';
@@ -384,7 +384,8 @@ function draw3DView(
     showDims?: boolean;
     showSurfaces?: boolean;
     showTextures?: boolean;
-    floor?: FloorData | null;
+    floors?: Record<string, FloorData | null | undefined>;
+    roomNames?: Record<string, string>;
   } = {},
 ) {
   const thetaDeg = view.theta;
@@ -396,7 +397,7 @@ function draw3DView(
     colorOpenings: opts.colorOpenings,
     showSurfaces: opts.showSurfaces,
     showTextures: opts.showTextures,
-    floor: opts.floor,
+    floors: opts.floors,
   });
   const faces = scene.faces;
   const all = faces.flatMap((f) => f.pts);
@@ -447,22 +448,28 @@ function draw3DView(
     | { kind: 'area'; depth: number; x: number; y: number; text: string };
   const items: Item[] = polys.map((p) => ({ kind: 'poly' as const, ...p }));
 
-  // Semis du sol et surface : mêmes repères que sur le plan 2D.
-  if (opts.showSurfaces && scene.surface) {
-    const dotColor = mixHex(scene.floorFill, '#4A5361', 0.55);
-    for (const p of floorDots(scene.surface.pts, dotStep(scale, 13), 600)) {
-      const q = project({ x: p.x, y: 0, z: p.z });
-      items.push({ kind: 'dot', depth: -Infinity, x: q.x, y: q.y, color: dotColor });
+  // Semis du sol et surface : mêmes repères que sur le plan 2D, pièce
+  // par pièce — chaque sol garde sa teinte et porte son propre libellé.
+  if (opts.showSurfaces) {
+    const budget = Math.max(150, Math.round(600 / Math.max(1, scene.rooms.length)));
+    for (const room of scene.rooms) {
+      if (!room.surface) continue;
+      const dotColor = mixHex(room.floorFill, '#4A5361', 0.55);
+      for (const p of floorDots(room.surface.pts, dotStep(scale, 13), budget)) {
+        const q = project({ x: p.x, y: 0, z: p.z });
+        items.push({ kind: 'dot', depth: -Infinity, x: q.x, y: q.y, color: dotColor });
+      }
+      const q = project({ x: room.centroid.x, y: 0, z: room.centroid.z });
+      const name = opts.roomNames?.[room.roomId] ?? '';
+      const area = `${room.surface.exact ? '' : '≈ '}${fr1(room.surface.area)} m²`;
+      items.push({
+        kind: 'area',
+        depth: -Infinity,
+        x: q.x,
+        y: q.y,
+        text: name ? `${name} · ${area}` : area,
+      });
     }
-    const mid = wallsCentroid(walls);
-    const q = project({ x: mid.x, y: 0, z: mid.z });
-    items.push({
-      kind: 'area',
-      depth: -Infinity,
-      x: q.x,
-      y: q.y,
-      text: `${scene.surface.exact ? '' : '≈ '}${fr1(scene.surface.area)} m²`,
-    });
   }
 
   for (const w of showDims ? walls : []) {
@@ -505,7 +512,10 @@ interface SheetContext {
   walls: WallSeg[];
   openings: WallSeg[];
   objects: ObjectData[];
-  floor: FloorData | null;
+  /** Relevé du sol par pièce. */
+  floors: Record<string, FloorData | null | undefined>;
+  /** Nom donné à chaque pièce (vide = pièce non nommée). */
+  roomNames: Record<string, string>;
   colorOpenings: boolean;
   showSurfaces: boolean;
   showTextures: boolean;
@@ -526,14 +536,20 @@ function planPage(
     colorOpenings,
     showSurfaces,
     showTextures,
-    floor: floorData,
+    floors,
+    roomNames,
   } = ctx;
   const d = new Draw();
-  const surface = roomSurface(walls);
-  const floorFill =
-    showTextures && floorData?.color
-      ? mixHex(floorData.color, '#FFFFFF', 0.42)
-      : '#F5F7FA';
+  // Une entrée par pièce : contour, centre, teinte de sol. Tout ce qui suit
+  // (meubles, ouvertures, cotes, cartouches) se règle sur la pièce concernée.
+  const parts = roomParts(walls);
+  const fillOf = (roomId: string) => {
+    const captured = showTextures ? floors[roomId]?.color : undefined;
+    return captured ? mixHex(captured, '#FFFFFF', 0.42) : '#F5F7FA';
+  };
+  const partOf = new Map(parts.map((p) => [p.roomId, p]));
+  const centerOf = (roomId: string) =>
+    partOf.get(roomId)?.centroid ?? { x: 0, z: 0 };
 
   // Zone de dessin (cotes extérieures comprises)
   const box = {
@@ -576,27 +592,30 @@ function planPage(
       y: bcy + (czw - p.z) * scale,
     });
 
-    const centroid = surface
-      ? {
-          x: surface.pts.reduce((s, p) => s + p.x, 0) / surface.pts.length,
-          z: surface.pts.reduce((s, p) => s + p.z, 0) / surface.pts.length,
+    // Surfaces au sol : un aplat et un semis par pièce, pour les distinguer
+    // d'emblée des murs pochés en noir.
+    if (showSurfaces) {
+      const budget = Math.max(300, Math.round(1500 / Math.max(1, parts.length)));
+      for (const part of parts) {
+        if (!part.surface) continue;
+        const fill = fillOf(part.roomId);
+        d.poly(part.surface.pts.map(px), fill, null);
+        const dotColor = mixHex(fill, '#3D4551', 0.55);
+        for (const p of floorDots(part.surface.pts, dotStep(scale, 13), budget)) {
+          const q = px(p);
+          d.circle(q.x, q.y, 0.55, dotColor);
         }
-      : { x: (minX + maxX) / 2, z: (minZ + maxZ) / 2 };
-
-    // Surface au sol : aplat + semis de points, pour la distinguer d'emblée
-    // des murs pochés en noir.
-    if (surface && showSurfaces) {
-      d.poly(surface.pts.map(px), floorFill, null);
-      const dotColor = mixHex(floorFill, '#3D4551', 0.55);
-      for (const p of floorDots(surface.pts, dotStep(scale, 13), 1500)) {
-        const q = px(p);
-        d.circle(q.x, q.y, 0.55, dotColor);
       }
     }
 
-    // Meubles : contour + symbole d'architecte, recalés devant les murs.
+    // Meubles : contour + symbole d'architecte, recalés devant les murs
+    // de LEUR pièce.
     for (const o of objects.map((ob) =>
-      clampFootprint(toFootprint(ob), walls, centroid),
+      clampFootprint(
+        toFootprint(ob),
+        partOf.get(roomOf(ob))?.walls ?? walls,
+        centerOf(roomOf(ob)),
+      ),
     )) {
       const cosY = Math.cos(o.yaw);
       const sinY = Math.sin(o.yaw);
@@ -630,6 +649,8 @@ function planPage(
 
     // Ouvertures : trouée blanche + symbole
     for (const o of openings) {
+      const room = roomOf(o);
+      const centroid = centerOf(room);
       const dx = o.b.x - o.a.x;
       const dz = o.b.z - o.a.z;
       const len = Math.hypot(dx, dz) || 1;
@@ -642,7 +663,7 @@ function planPage(
           { x: o.b.x - nx, z: o.b.z - nz },
           { x: o.a.x - nx, z: o.a.z - nz },
         ].map(px),
-        showSurfaces && surface ? floorFill : '#FFFFFF',
+        showSurfaces && partOf.get(room)?.surface ? fillOf(room) : '#FFFFFF',
         null,
       );
 
@@ -691,9 +712,9 @@ function planPage(
       const uy2 = dy2 / norm;
       let nx2 = -uy2;
       let ny2 = ux2;
-      // vers l'extérieur : à l'opposé du centre de la pièce
+      // vers l'extérieur : à l'opposé du centre de SA pièce
       const midPt = px({ x: (w.a.x + w.b.x) / 2, z: (w.a.z + w.b.z) / 2 });
-      const cPt = px(centroid);
+      const cPt = px(centerOf(roomOf(w)));
       if (nx2 * (cPt.x - midPt.x) + ny2 * (cPt.y - midPt.y) > 0) {
         nx2 = -nx2;
         ny2 = -ny2;
@@ -725,18 +746,24 @@ function planPage(
       );
     }
 
-    // Surface au centre
-    if (surface && showSurfaces) {
-      const cp2 = px(centroid);
-      d.text(
-        `${surface.exact ? '' : '≈ '}${fr1(surface.area)} m²`,
-        cp2.x,
-        cp2.y + 4,
-        15,
-        INK,
-        { bold: true },
-      );
-      d.text('surface au sol', cp2.x, cp2.y - 10, 8, GREY);
+    // Cartouche au centre de chaque pièce : son nom, sa surface. Le texte
+    // rétrécit à mesure que les pièces se multiplient et se resserrent.
+    if (showSurfaces) {
+      const big = parts.length === 1;
+      for (const part of parts) {
+        if (!part.surface) continue;
+        const cp2 = px(part.centroid);
+        const label = roomNames[part.roomId] ?? '';
+        const area = `${part.surface.exact ? '' : '≈ '}${fr1(part.surface.area)} m²`;
+        // Nom au-dessus, surface en dessous (l'axe y du PDF monte).
+        if (label) {
+          d.text(label, cp2.x, cp2.y + 3, big ? 14 : 10.5, INK, { bold: true });
+          d.text(area, cp2.x, cp2.y - 9, big ? 11 : 9, GREY);
+        } else {
+          d.text(area, cp2.x, cp2.y + 4, big ? 15 : 11, INK, { bold: true });
+          d.text('surface au sol', cp2.x, cp2.y - 10, 8, GREY);
+        }
+      }
     }
   }
 
@@ -766,7 +793,8 @@ function threeDPage(
     colorOpenings: ctx.colorOpenings,
     showSurfaces: ctx.showSurfaces,
     showTextures: ctx.showTextures,
-    floor: ctx.floor,
+    floors: ctx.floors,
+    roomNames: ctx.roomNames,
     showDims,
   };
   const top = FRAME.y + FRAME.h;
@@ -796,8 +824,10 @@ export interface ScanForPdf {
   walls: WallSeg[];
   openings: WallSeg[];
   objects: ObjectData[];
-  /** Couleurs du sol relevées au scan, si disponibles. */
-  floor?: FloorData | null;
+  /** Couleurs du sol relevées au scan, par pièce. */
+  floors?: Record<string, FloorData | null | undefined>;
+  /** Nom donné à chaque pièce, par identifiant de pièce. */
+  roomNames?: Record<string, string>;
 }
 
 export function pdfFilename(name: string): string {
@@ -821,7 +851,8 @@ export function buildScanPdf(
     walls: scan.walls,
     openings: scan.openings,
     objects: scan.objects,
-    floor: scan.floor ?? null,
+    floors: scan.floors ?? {},
+    roomNames: scan.roomNames ?? {},
     colorOpenings: opts.colorOpenings ?? false,
     showSurfaces: opts.surfaces ?? true,
     showTextures: opts.textures ?? false,

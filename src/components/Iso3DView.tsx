@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { PanResponder, StyleSheet, View } from 'react-native';
 import Svg, { Circle, Polygon, Text as SvgText } from 'react-native-svg';
 import { themedStyles, useTheme, type Palette } from '../theme';
-import { segLength, wallsCentroid, type WallSeg } from '../geometry/floorplan';
+import { segLength, type WallSeg } from '../geometry/floorplan';
 import { dotStep, floorDots, inkOn, mixHex } from '../geometry/appearance';
 import {
   buildScene,
@@ -10,7 +10,7 @@ import {
   type P3,
   type ScenePalette,
 } from '../geometry/scene3d';
-import { useScanStore } from '../store/scanStore';
+import { floorsOf, useScanStore } from '../store/scanStore';
 
 /** Paramètres de caméra de la vue 3D (contrôlables de l'extérieur). */
 export interface View3DParams {
@@ -72,7 +72,12 @@ export function Iso3DView({ value, onChange, showMeasures }: Props) {
   const colorOpenings = useScanStore((s) => s.showOpeningColors);
   const showSurfaces = useScanStore((s) => s.showSurfaces);
   const showTextures = useScanStore((s) => s.showTextures);
-  const floorData = useScanStore((s) => s.floor);
+  const rooms = useScanStore((s) => s.rooms);
+  const floors = useMemo(() => floorsOf(rooms), [rooms]);
+  const roomNames = useMemo(
+    () => new Map(rooms.map((r) => [r.id, r.name])),
+    [rooms],
+  );
   const c = useTheme();
   const styles = getStyles(c);
 
@@ -222,12 +227,11 @@ export function Iso3DView({ value, onChange, showMeasures }: Props) {
         colorOpenings,
         showSurfaces,
         showTextures,
-        floor: floorData,
+        floors,
       }),
-    [walls, openings, objects, palette, colorOpenings, showSurfaces, showTextures, floorData],
+    [walls, openings, objects, palette, colorOpenings, showSurfaces, showTextures, floors],
   );
   const faces = scene.faces;
-  const surface = scene.surface;
 
   const { center, radius3d } = useMemo(() => {
     const all = faces.flatMap((f) => f.pts);
@@ -300,25 +304,32 @@ export function Iso3DView({ value, onChange, showMeasures }: Props) {
 
     // Semis du sol : même code que le plan 2D, projeté sur le plan y = 0.
     // C'est ce fond pointillé qui distingue la surface au sol des murs.
-    if (showSurfaces && surface && !interacting) {
-      const base = scene.floorFill;
-      const dotColor = mixHex(base, inkOn(base), 0.42);
-      for (const p of floorDots(surface.pts, dotStep(scale, 22), 350)) {
-        const q = project({ x: p.x, y: 0, z: p.z });
-        items.push({ kind: 'dot', depth: -Infinity, x: q.sx, y: q.sy, color: dotColor });
-      }
-      const ctr = wallsCentroid(walls);
-      const q = project({ x: ctr.x, y: 0, z: ctr.z });
-      items.push({
-        kind: 'area',
-        depth: -Infinity,
-        x: q.sx,
-        y: q.sy,
-        color: inkOn(base),
-        text: `${surface.exact ? '' : '≈ '}${surface.area
+    if (showSurfaces && !interacting) {
+      // Une pièce = un semis et une étiquette. Le budget de points est
+      // partagé : dix pièces ne doivent pas coûter dix fois plus cher.
+      const budget = Math.max(80, Math.round(350 / Math.max(1, scene.rooms.length)));
+      for (const room of scene.rooms) {
+        if (!room.surface) continue;
+        const base = room.floorFill;
+        const dotColor = mixHex(base, inkOn(base), 0.42);
+        for (const p of floorDots(room.surface.pts, dotStep(scale, 22), budget)) {
+          const q = project({ x: p.x, y: 0, z: p.z });
+          items.push({ kind: 'dot', depth: -Infinity, x: q.sx, y: q.sy, color: dotColor });
+        }
+        const q = project({ x: room.centroid.x, y: 0, z: room.centroid.z });
+        const name = roomNames.get(room.roomId) ?? '';
+        const area = `${room.surface.exact ? '' : '≈ '}${room.surface.area
           .toFixed(1)
-          .replace('.', ',')} m²`,
-      });
+          .replace('.', ',')} m²`;
+        items.push({
+          kind: 'area',
+          depth: -Infinity,
+          x: q.sx,
+          y: q.sy,
+          color: inkOn(base),
+          text: name ? `${name} · ${area}` : area,
+        });
+      }
     }
 
     if (showMeasures && !interacting) {
@@ -365,7 +376,7 @@ export function Iso3DView({ value, onChange, showMeasures }: Props) {
   }, [
     scene,
     faces,
-    surface,
+    roomNames,
     layout,
     view,
     center,

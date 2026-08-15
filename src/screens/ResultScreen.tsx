@@ -27,7 +27,7 @@ import {
 import { FloorplanEditor } from '../components/FloorplanEditor';
 import { LogoMark } from '../components/LogoMark';
 import { Iso3DView } from '../components/Iso3DView';
-import { roomSurface, segLength } from '../geometry/floorplan';
+import { roomParts, segLength, totalArea } from '../geometry/floorplan';
 import { hasCapturedColors } from '../geometry/appearance';
 import { frCategory } from '../geometry/furniture';
 import { useScanStore } from '../store/scanStore';
@@ -51,13 +51,13 @@ export function ResultScreen() {
   const setShowSurfaces = useScanStore((s) => s.setShowSurfaces);
   const showTextures = useScanStore((s) => s.showTextures);
   const setShowTextures = useScanStore((s) => s.setShowTextures);
-  const floorData = useScanStore((s) => s.floor);
+  const rooms = useScanStore((s) => s.rooms);
+  const removeRoom = useScanStore((s) => s.removeRoom);
   const addOpening = useScanStore((s) => s.addOpening);
   const resultOrigin = useScanStore((s) => s.resultOrigin);
   const removeObject = useScanStore((s) => s.removeObject);
   const resizeObject = useScanStore((s) => s.resizeObject);
   const revertCurrent = useScanStore((s) => s.revertCurrent);
-  const roomName = useScanStore((s) => s.roomName);
   const setRoomName = useScanStore((s) => s.setRoomName);
 
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
@@ -77,6 +77,8 @@ export function ResultScreen() {
   const styles = getStyles(useTheme());
 
   const [tab, setTab] = useState<Tab>('2d');
+  // Pièce visée par l'outil « nom de pièce » et par la suppression.
+  const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   // Cotes du plan 2D masquées par défaut : la pastille « Cotes » les active.
   const [showMeasures, setShowMeasures] = useState(false);
   const [show3DMeasures, setShow3DMeasures] = useState(true);
@@ -139,9 +141,35 @@ export function ResultScreen() {
 
   const selectedWall = walls.find((w) => w.id === selectedWallId) ?? null;
   const perimeter = walls.reduce((s, w) => s + segLength(w), 0);
-  const surface = roomSurface(walls);
+  const parts = roomParts(walls);
+  const surface = totalArea(parts);
+  // Une seule pièce : l'outil de nommage n'a pas besoin de sélection.
+  const targetRoomId =
+    selectedRoomId ?? (rooms.length === 1 ? rooms[0].id : null);
+  const targetRoom = rooms.find((r) => r.id === targetRoomId) ?? null;
+  const targetPart = parts.find((p) => p.roomId === targetRoomId) ?? null;
   // Le bouton « Couleurs » n'a de sens que si le scan en a relevé.
-  const colorsAvailable = hasCapturedColors(walls, floorData);
+  const colorsAvailable = hasCapturedColors(
+    walls,
+    rooms.map((r) => r.floor),
+  );
+
+  const promptRoomName = () => {
+    if (!targetRoom) {
+      Alert.alert(
+        'Quelle pièce ?',
+        'Touchez le sol de la pièce à nommer, puis réessayez.',
+      );
+      return;
+    }
+    Alert.prompt(
+      'Nom de la pièce',
+      'Laissez vide pour retirer le nom du cartouche.',
+      (t) => setRoomName(targetRoom.id, t ?? ''),
+      'plain-text',
+      targetRoom.name,
+    );
+  };
 
   const applyLength = () => {
     const v = parseFloat(lengthInput.replace(',', '.'));
@@ -175,6 +203,9 @@ export function ResultScreen() {
   }
 
   const metrics = [
+    ...(rooms.length > 1
+      ? [{ value: `${rooms.length}`, label: 'pièces' }]
+      : []),
     { value: `${walls.length}`, label: 'murs' },
     ...(surface
       ? [
@@ -254,9 +285,16 @@ export function ResultScreen() {
             selectedWallId={selectedWallId}
             onSelectWall={(id) => {
               setSelectedObjectId(null);
+              setSelectedRoomId(null);
               setSelectedWallId(id);
               const wall = walls.find((w) => w.id === id);
               setLengthInput(wall ? segLength(wall).toFixed(2).replace('.', ',') : '');
+            }}
+            selectedRoomId={selectedRoomId}
+            onSelectRoom={(id) => {
+              setSelectedObjectId(null);
+              setSelectedWallId(null);
+              setSelectedRoomId(id);
             }}
           />
         ) : (
@@ -299,16 +337,8 @@ export function ResultScreen() {
             {editMode && (
               <ToolPill
                 icon="room"
-                active={roomName !== ''}
-                onPress={() =>
-                  Alert.prompt(
-                    'Nom de la pièce',
-                    'Laissez vide pour retirer l’encadré.',
-                    (t) => setRoomName((t ?? '').trim()),
-                    'plain-text',
-                    roomName,
-                  )
-                }
+                active={(targetRoom?.name ?? '') !== ''}
+                onPress={promptRoomName}
               />
             )}
             <ToolPill icon="edit" active={editMode} onPress={toggleEdit} />
@@ -373,6 +403,52 @@ export function ResultScreen() {
             </View>
           </View>
         )}
+
+        {/* Pièce sélectionnée : la nommer, ou la retirer du scan */}
+        {tab === '2d' && editMode && !selectedObject && !selectedWall &&
+          selectedRoomId && targetRoom && (
+            <View style={styles.editBar}>
+              <Text style={styles.editLabel}>
+                {targetRoom.name || 'Pièce sans nom'}
+                {targetPart?.surface
+                  ? ` · ${targetPart.surface.exact ? '' : '≈ '}${fr(
+                      targetPart.surface.area,
+                    )} m² au sol`
+                  : ''}
+              </Text>
+              <View style={styles.editRow}>
+                <TouchableOpacity
+                  style={styles.applyButton}
+                  onPress={promptRoomName}>
+                  <Text style={styles.applyText}>Renommer</Text>
+                </TouchableOpacity>
+                {rooms.length > 1 && (
+                  <TouchableOpacity
+                    style={styles.removeRoomButton}
+                    onPress={() =>
+                      Alert.alert(
+                        'Retirer cette pièce ?',
+                        'Ses murs, ouvertures et meubles quittent le plan. ' +
+                          'Rien n’est enregistré tant que vous ne validez pas.',
+                        [
+                          { text: 'Annuler', style: 'cancel' },
+                          {
+                            text: 'Retirer',
+                            style: 'destructive',
+                            onPress: () => {
+                              removeRoom(selectedRoomId);
+                              setSelectedRoomId(null);
+                            },
+                          },
+                        ],
+                      )
+                    }>
+                    <Text style={styles.removeRoomText}>Retirer</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          )}
 
         {/* Barre d'édition en surimpression : le plan ne se redimensionne pas */}
         {tab === '2d' && !selectedObject && editMode && selectedWall && (
@@ -874,6 +950,14 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     paddingVertical: 11,
   },
   applyText: { color: '#FFFFFF', fontWeight: '700', fontSize: 14 },
+  removeRoomButton: {
+    backgroundColor: c.surfaceSunken,
+    borderRadius: radius.sm,
+    paddingHorizontal: 16,
+    paddingVertical: 11,
+    marginLeft: 10,
+  },
+  removeRoomText: { color: c.danger, fontWeight: '700', fontSize: 14 },
   objectList: { maxHeight: 58, marginTop: 10, marginBottom: 6, flexGrow: 0 },
   objectChipSelected: { borderColor: c.blue, borderWidth: 1.5 },
   objectChip: {

@@ -272,27 +272,56 @@ final class RoomColorSampler {
 
   func color(for o: CapturedRoom.Object) -> String? {
     queue.sync { () -> String? in
-      guard let mean = objects[o.identifier]?.mean else { return nil }
-      return Self.hex(mean)
+      if let mean = objects[o.identifier]?.mean { return Self.hex(mean) }
+      // Même renumérotation qu'au post-traitement des murs : on rattache le
+      // relevé au meuble le plus proche, à défaut d'identifiant commun.
+      let m = o.transform
+      let center = SIMD3(m.columns.3.x, m.columns.3.y, m.columns.3.z)
+      var best: (SIMD3<Float>, Float)?
+      for acc in objects.values {
+        guard let mean = acc.mean else { continue }
+        let d = distance(acc.center, center)
+        guard d < 0.4 else { continue }
+        if best == nil || d < best!.1 { best = (mean, d) }
+      }
+      return best.map { Self.hex($0.0) }
     }
   }
 
-  /// Carte de couleurs du sol, recadrée sur les cases réellement relevées.
-  func floorPayload() -> [String: Any]? {
+  /**
+   Carte de couleurs du sol, recadrée sur les cases réellement relevées.
+
+   `within` limite la carte à une emprise donnée (mètres, repère monde) :
+   en multi-pièces, chaque pièce reçoit ainsi sa propre grille au lieu de
+   se partager une carte à l'échelle de l'appartement.
+   */
+  func floorPayload(
+    within box: (minX: Float, maxX: Float, minZ: Float, maxZ: Float)? = nil
+  ) -> [String: Any]? {
     queue.sync { () -> [String: Any]? in
       guard !floorTiles.isEmpty else { return nil }
+      let cell = Self.floorCell
+      // Marge d'une case : les murs bordent la pièce, leur pied compte.
+      let keep: (Int, Int) -> Bool = { i, j in
+        guard let b = box else { return true }
+        let x = (Float(i) + 0.5) * cell
+        let z = (Float(j) + 0.5) * cell
+        return x >= b.minX - cell && x <= b.maxX + cell
+            && z >= b.minZ - cell && z <= b.maxZ + cell
+      }
       var i0 = Int.max, i1 = Int.min, j0 = Int.max, j1 = Int.min
       var total = SIMD3<Float>(repeating: 0)
       var n = 0
       for (key, value) in floorTiles {
         let i = Int(key >> 32)
         let j = Int(Int32(bitPattern: UInt32(truncatingIfNeeded: key)))
+        guard keep(i, j) else { continue }
         i0 = min(i0, i); i1 = max(i1, i)
         j0 = min(j0, j); j1 = max(j1, j)
         total += value.0
         n += value.1
       }
-      guard n > 0 else { return nil }
+      guard n > 0, i0 <= i1, j0 <= j1 else { return nil }
       let mean = total / Float(n)
       let cols = i1 - i0 + 1
       let rows = j1 - j0 + 1
@@ -311,7 +340,6 @@ final class RoomColorSampler {
           }
         }
       }
-      let cell = Self.floorCell
       return [
         "color": Self.hex(mean),
         "texture": [

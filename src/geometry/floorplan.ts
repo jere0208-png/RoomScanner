@@ -9,6 +9,12 @@ export interface Pt {
   z: number;
 }
 
+/**
+ * Pièce d'appartenance par défaut : les scans d'avant le multi-pièces, et
+ * tout élément dont la pièce n'a pas été renseignée, tombent ici.
+ */
+export const DEFAULT_ROOM_ID = 'room-1';
+
 /** Segment de mur au sol, en mètres (repère monde, plan XZ). */
 export interface WallSeg {
   id: string;
@@ -22,6 +28,34 @@ export interface WallSeg {
   color?: string;
   /** Grille de couleurs relevée sur la face intérieure, si captée. */
   texture?: SurfaceTexture;
+  /** Pièce à laquelle ce mur appartient (scan multi-pièces). */
+  roomId?: string;
+}
+
+/** Pièce d'un élément, valeur par défaut comprise. */
+export const roomOf = (item: { roomId?: string }): string =>
+  item.roomId ?? DEFAULT_ROOM_ID;
+
+/**
+ * Répartit des éléments par pièce, en conservant l'ordre d'apparition des
+ * pièces. Toute la géométrie (soudure, boucles, surfaces, sols) se calcule
+ * pièce par pièce : deux pièces mitoyennes ont chacune leur mur, et rien ne
+ * doit les fusionner.
+ */
+export function groupByRoom<T extends { roomId?: string }>(
+  items: T[],
+): { roomId: string; items: T[] }[] {
+  const order: string[] = [];
+  const map = new Map<string, T[]>();
+  for (const item of items) {
+    const key = roomOf(item);
+    if (!map.has(key)) {
+      map.set(key, []);
+      order.push(key);
+    }
+    map.get(key)!.push(item);
+  }
+  return order.map((roomId) => ({ roomId, items: map.get(roomId)! }));
 }
 
 /** Empreinte au sol d'un objet (rectangle orienté). */
@@ -45,8 +79,8 @@ export interface ObjectFootprint {
  * iOS livre une matrice 4x4 colonne-major : colonne 0 = direction du mur,
  * colonne 3 = position. Android livre directement ax/az/bx/bz.
  */
-export function toSegment(s: SurfaceData): WallSeg {
-  const skin = { color: s.color, texture: s.texture };
+export function toSegment(s: SurfaceData, roomId?: string): WallSeg {
+  const skin = { color: s.color, texture: s.texture, roomId };
   if (s.ax !== undefined) {
     return {
       id: s.id,
@@ -161,6 +195,8 @@ export interface WallQuad {
 interface Arm {
   wallId: string;
   end: 'a' | 'b';
+  /** Position du nœud (m). */
+  p: Pt;
   /** Direction unitaire du mur EN PARTANT du nœud. */
   dir: Pt;
   angle: number;
@@ -204,6 +240,10 @@ function pointOnSeg(p: Pt, a: Pt, b: Pt): { dist: number; t: number } {
 export function wallQuads(walls: WallSeg[], t = WALL_T): Map<string, WallQuad> {
   const half = t / 2;
   const arms = new Map<string, Arm[]>();
+  // Deux pièces mitoyennes ont chacune leur mur : leurs bouts ne se
+  // prolongent pas l'un dans l'autre, seuls les murs d'une même pièce
+  // forment des jonctions.
+  const roomById = new Map(walls.map((w) => [w.id, roomOf(w)]));
 
   for (const w of walls) {
     const dx = w.b.x - w.a.x;
@@ -213,9 +253,17 @@ export function wallQuads(walls: WallSeg[], t = WALL_T): Map<string, WallQuad> {
     const u = { x: dx / len, z: dz / len };
     for (const end of ['a', 'b'] as const) {
       const dir = end === 'a' ? u : { x: -u.x, z: -u.z };
-      const k = nodeKey(w[end]);
+      // Nœud identifié PAR PIÈCE : deux pièces qui se touchent au même point
+      // gardent chacune son angle, elles ne s'assemblent pas en onglet.
+      const k = `${roomOf(w)}|${nodeKey(w[end])}`;
       const list = arms.get(k) ?? [];
-      list.push({ wallId: w.id, end, dir, angle: Math.atan2(dir.z, dir.x) });
+      list.push({
+        wallId: w.id,
+        end,
+        p: w[end],
+        dir,
+        angle: Math.atan2(dir.z, dir.x),
+      });
       arms.set(k, list);
     }
   }
@@ -236,15 +284,15 @@ export function wallQuads(walls: WallSeg[], t = WALL_T): Map<string, WallQuad> {
     out.set(id, q);
   };
 
-  for (const [k, list] of arms) {
-    const [xs, zs] = k.split(':');
-    const P: Pt = { x: parseFloat(xs), z: parseFloat(zs) };
+  for (const [, list] of arms) {
+    const P: Pt = list[0].p;
 
     // Extrémité libre : about droit, prolongé si elle bute sur un autre mur.
     if (list.length === 1) {
       const arm = list[0];
+      const armRoom = roomById.get(arm.wallId);
       const tee = walls.some((v) => {
-        if (v.id === arm.wallId) return false;
+        if (v.id === arm.wallId || roomOf(v) !== armRoom) return false;
         const { dist, t: pos } = pointOnSeg(P, v.a, v.b);
         return dist < t && pos > 0.02 && pos < 0.98;
       });
@@ -329,6 +377,40 @@ export function roomSurface(walls: WallSeg[]): RoomSurface | null {
   const chain = longestChain(walls);
   if (chain.length < 3) return null;
   return { pts: chain, area: loopAreaM2(chain), exact: false };
+}
+
+/** Une pièce du plan : ses murs, son contour au sol, son centre. */
+export interface RoomPart {
+  roomId: string;
+  walls: WallSeg[];
+  surface: RoomSurface | null;
+  centroid: Pt;
+}
+
+/**
+ * Découpe le plan en pièces. C'est LE point d'entrée du rendu multi-pièces :
+ * plan 2D, vue 3D et PDF itèrent tous là-dessus, ce qui garantit que les
+ * trois montrent les mêmes contours et les mêmes surfaces.
+ */
+export function roomParts(walls: WallSeg[]): RoomPart[] {
+  return groupByRoom(walls).map(({ roomId, items }) => ({
+    roomId,
+    walls: items,
+    surface: roomSurface(items),
+    centroid: wallsCentroid(items),
+  }));
+}
+
+/** Aire cumulée des pièces ; `exact` tombe dès qu'un contour est reconstitué. */
+export function totalArea(
+  parts: RoomPart[],
+): { area: number; exact: boolean } | null {
+  const known = parts.filter((p) => p.surface);
+  if (known.length === 0) return null;
+  return {
+    area: known.reduce((s, p) => s + p.surface!.area, 0),
+    exact: known.every((p) => p.surface!.exact),
+  };
 }
 
 /** Plus longue suite de murs bout à bout (les coins sont déjà soudés). */
@@ -442,6 +524,11 @@ export function clampFootprint(
  * (jonction en T). Le plan devient réellement connexe : les onglets de
  * `wallQuads` ont alors de vrais nœuds à traiter.
  *
+ * La soudure s'arrête AUX LIMITES DE LA PIÈCE : deux pièces voisines ont
+ * chacune son mur, souvent à quelques centimètres l'un de l'autre. Les
+ * confondre refermerait les deux contours l'un sur l'autre et ferait
+ * disparaître les surfaces au sol.
+ *
  * Ne modifie pas les murs reçus : renvoie de nouveaux segments.
  */
 export function weldCorners(walls: WallSeg[], tol = 0.15): WallSeg[] {
@@ -456,9 +543,11 @@ export function weldCorners(walls: WallSeg[], tol = 0.15): WallSeg[] {
   for (let i = 0; i < points.length; i++) {
     if (assigned.has(i)) continue;
     const pi = points[i].wall[points[i].end];
+    const room = roomOf(points[i].wall);
     const cluster = [i];
     for (let j = i + 1; j < points.length; j++) {
       if (assigned.has(j)) continue;
+      if (roomOf(points[j].wall) !== room) continue;
       const pj = points[j].wall[points[j].end];
       if (Math.hypot(pi.x - pj.x, pi.z - pj.z) < tol) cluster.push(j);
     }
@@ -483,9 +572,10 @@ export function weldCorners(walls: WallSeg[], tol = 0.15): WallSeg[] {
     if (welded.has(i)) continue;
     const { wall, end } = points[i];
     const p = wall[end];
+    const room = roomOf(wall);
     let best: { d: number; q: Pt } | null = null;
     for (const v of out) {
-      if (v.id === wall.id) continue;
+      if (v.id === wall.id || roomOf(v) !== room) continue;
       const dx = v.b.x - v.a.x;
       const dz = v.b.z - v.a.z;
       const len2 = dx * dx + dz * dz;

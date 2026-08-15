@@ -1,13 +1,16 @@
 import {
   bounds,
   closedLoop,
+  groupByRoom,
   loopAreaM2,
   makeMapping,
   quadPoints,
+  roomParts,
   roomSurface,
   segLength,
   snapAngle,
   toSegment,
+  totalArea,
   wallQuads,
   weldCorners,
   WALL_T,
@@ -15,13 +18,48 @@ import {
   type WallSeg,
 } from '../src/geometry/floorplan';
 import { dotStep, floorDots, sampleTexture } from '../src/geometry/appearance';
+import { buildScene, type ScenePalette } from '../src/geometry/scene3d';
 import { buildScanPdf, toBase64 } from '../src/export/pdf';
+
+/** Palette neutre : les tests ne jugent que la géométrie et les relevés. */
+const TEST_PALETTE: ScenePalette = {
+  floor: '#EEEEEE',
+  floorStroke: '#CCCCCC',
+  wall: '#FFFFFF',
+  wallStroke: '#888888',
+  wallTop: '#F2F2F2',
+  wallTopStroke: '#888888',
+  opening: '#BBBBBB',
+  door: '#E8A13B',
+  window: '#3EB8E5',
+  object: '#DDDDDD',
+  objectTop: '#EEEEEE',
+  objectStroke: '#999999',
+};
 
 const seg = (
   id: string,
   a: { x: number; z: number },
   b: { x: number; z: number },
 ): WallSeg => ({ id, type: 'wall', a, b, height: 2.5, yCenter: 1.25 });
+
+/** Rattache des murs à une pièce donnée (les murs sans `roomId` sont room-1). */
+const inRoom = (roomId: string, walls: WallSeg[]): WallSeg[] =>
+  walls.map((w) => ({ ...w, roomId }));
+
+/** Rectangle de murs fermé, coin haut-gauche en (x, z). */
+const room = (
+  prefix: string,
+  x: number,
+  z: number,
+  w: number,
+  h: number,
+): WallSeg[] => [
+  seg(`${prefix}n`, { x, z }, { x: x + w, z }),
+  seg(`${prefix}e`, { x: x + w, z }, { x: x + w, z: z + h }),
+  seg(`${prefix}s`, { x: x + w, z: z + h }, { x, z: z + h }),
+  seg(`${prefix}w`, { x, z: z + h }, { x, z }),
+];
 
 describe('toSegment', () => {
   it('convertit une matrice iOS (colonne-major) en segment au sol', () => {
@@ -307,6 +345,79 @@ describe('closedLoop + loopAreaM2', () => {
   });
 });
 
+describe('multi-pièces', () => {
+  // Deux pièces mitoyennes : salon 4 × 3, chambre 3 × 3, cloisons distantes
+  // de 8 cm — soit MOINS que la tolérance de soudure, exprès.
+  const salon = room('s', 0, 0, 4, 3);
+  const chambre = inRoom('room-2', room('c', 4.08, 0, 3, 3));
+  const plan = [...salon, ...chambre];
+
+  it('range les murs par pièce, dans l’ordre d’apparition', () => {
+    const groups = groupByRoom(plan);
+    expect(groups.map((g) => g.roomId)).toEqual(['room-1', 'room-2']);
+    expect(groups[0].items).toHaveLength(4);
+    expect(groups[1].items).toHaveLength(4);
+  });
+
+  it('ne soude jamais deux pièces entre elles', () => {
+    const welded = weldCorners(plan);
+    const salonEst = welded.find((w) => w.id === 'se')!;
+    const chambreOuest = welded.find((w) => w.id === 'cw')!;
+    // Les deux cloisons restent où elles étaient : 4 et 4,08.
+    expect(salonEst.a.x).toBeCloseTo(4);
+    expect(chambreOuest.a.x).toBeCloseTo(4.08);
+  });
+
+  it('garde un contour fermé et une surface par pièce', () => {
+    const parts = roomParts(weldCorners(plan));
+    expect(parts).toHaveLength(2);
+    expect(parts[0].surface?.exact).toBe(true);
+    expect(parts[0].surface?.area).toBeCloseTo(12);
+    expect(parts[1].surface?.exact).toBe(true);
+    expect(parts[1].surface?.area).toBeCloseTo(9);
+  });
+
+  it('cumule les surfaces des pièces', () => {
+    const total = totalArea(roomParts(weldCorners(plan)));
+    expect(total?.area).toBeCloseTo(21);
+    expect(total?.exact).toBe(true);
+  });
+
+  it('signale une surface approchée dès qu’une pièce est ouverte', () => {
+    const ouverte = [...salon, ...inRoom('room-2', chambre.slice(0, 3))];
+    const total = totalArea(roomParts(ouverte));
+    expect(total?.exact).toBe(false);
+  });
+
+  it('ne prolonge pas un mur dans la cloison de la pièce voisine', () => {
+    // Cloison du salon (room-1) butant en x = 4. Contre le mur est du salon,
+    // c'est une jonction en T ; contre celui de la chambre (room-2, à 8 cm
+    // seulement), ce doit rester un about droit.
+    const cloison = seg('t', { x: 2, z: 1.5 }, { x: 4, z: 1.5 });
+    const withTee = wallQuads([...salon, cloison]).get('t')!;
+    const acrossRooms = wallQuads([...chambre, cloison]).get('t')!;
+    // Même pièce : le bout entre dans le corps du mur (x > 4).
+    expect(Math.max(withTee.b1.x, withTee.b2.x)).toBeGreaterThan(4);
+    // Pièce voisine : la cloison s'arrête net.
+    expect(Math.max(acrossRooms.b1.x, acrossRooms.b2.x)).toBeCloseTo(4);
+  });
+
+  it('donne au sol de chaque pièce sa propre couleur relevée', () => {
+    const scene = buildScene(weldCorners(plan), [], [], {
+      palette: TEST_PALETTE,
+      showSurfaces: true,
+      showTextures: true,
+      floors: {
+        'room-1': { color: '#8A6E4B' },
+        'room-2': { color: '#4B6E8A' },
+      },
+    });
+    expect(scene.rooms.map((r) => r.floorFill)).toEqual(['#8A6E4B', '#4B6E8A']);
+    // Deux sols distincts dans la scène, pas un seul.
+    expect(scene.faces.filter((f) => f.isFloor)).toHaveLength(2);
+  });
+});
+
 describe('buildScanPdf', () => {
   const latin1String = (bytes: Uint8Array): string => {
     let s = '';
@@ -320,6 +431,8 @@ describe('buildScanPdf', () => {
     seg('w', { x: 0, z: 3 }, { x: 0, z: 0 }),
   ];
   const scan = { name: 'Salon test', walls: rect, openings: [], objects: [] };
+  // Pièce mitoyenne 3 × 3, sa cloison à 20 cm de celle du salon.
+  const voisine = inRoom('room-2', room('v', 4.2, 0, 3, 3));
 
   it('produit un PDF valide à une page (plan seul)', () => {
     const s = latin1String(buildScanPdf(scan, false));
@@ -356,16 +469,18 @@ describe('buildScanPdf', () => {
           texels: ['#C8B79A', '#BFAF93', '#B7A78C', '#D0C0A4'],
         },
       })),
-      floor: {
-        color: '#8A6E4B',
-        texture: {
-          cols: 2,
-          rows: 2,
-          texels: ['#8A6E4B', '#7E6444', '#93764F', '#876A48'],
-          minX: 0,
-          maxX: 4,
-          minZ: 0,
-          maxZ: 3,
+      floors: {
+        'room-1': {
+          color: '#8A6E4B',
+          texture: {
+            cols: 2,
+            rows: 2,
+            texels: ['#8A6E4B', '#7E6444', '#93764F', '#876A48'],
+            minX: 0,
+            maxX: 4,
+            minZ: 0,
+            maxZ: 3,
+          },
         },
       },
     };
@@ -378,5 +493,25 @@ describe('buildScanPdf', () => {
   it('encode le base64 correctement', () => {
     expect(toBase64(new Uint8Array([72, 101, 108, 108, 111]))).toBe('SGVsbG8=');
     expect(toBase64(new Uint8Array([77, 97]))).toBe('TWE=');
+  });
+
+  it('nomme chaque pièce sur le plan multi-pièces', () => {
+    const s = latin1String(
+      buildScanPdf(
+        {
+          name: 'T2',
+          walls: [...rect, ...voisine],
+          openings: [],
+          objects: [],
+          roomNames: { 'room-1': 'Salon', 'room-2': 'Chambre' },
+        },
+        false,
+      ),
+    );
+    expect(s).toContain('Salon');
+    expect(s).toContain('Chambre');
+    // Deux surfaces distinctes, pas une seule agrégée.
+    expect(s).toContain('12,0 m');
+    expect(s).toContain('9,0 m');
   });
 });

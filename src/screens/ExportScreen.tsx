@@ -23,7 +23,7 @@ import { FloorplanEditor } from '../components/FloorplanEditor';
 import { DEFAULT_VIEW3D, Iso3DView, type View3DParams } from '../components/Iso3DView';
 import { buildScanPdf, pdfFilename, toBase64 } from '../export/pdf';
 import { hasCapturedColors } from '../geometry/appearance';
-import { useScanStore } from '../store/scanStore';
+import { floorsOf, useScanStore } from '../store/scanStore';
 
 interface PlanView {
   zoom: number;
@@ -169,8 +169,11 @@ export function ExportScreen() {
   const setShowSurfaces = useScanStore((s) => s.setShowSurfaces);
   const showTextures = useScanStore((s) => s.showTextures);
   const setShowTextures = useScanStore((s) => s.setShowTextures);
-  const floorData = useScanStore((s) => s.floor);
-  const colorsAvailable = hasCapturedColors(walls, floorData);
+  const rooms = useScanStore((s) => s.rooms);
+  const colorsAvailable = hasCapturedColors(
+    walls,
+    rooms.map((r) => r.floor),
+  );
   const c = useTheme();
   const styles = getStyles(c);
 
@@ -215,7 +218,8 @@ export function ExportScreen() {
           walls,
           openings,
           objects: showFurniture ? objects : [],
-          floor: floorData,
+          floors: floorsOf(rooms),
+          roomNames: Object.fromEntries(rooms.map((r) => [r.id, r.name])),
         },
         include3D,
         {

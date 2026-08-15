@@ -69,12 +69,12 @@ export function floorColorAt(floor: FloorData | null | undefined, p: Pt): string
   return valid(floor.color) ? floor.color : undefined;
 }
 
-/** Vrai si le scan porte au moins une couleur exploitable. */
+/** Vrai si le scan porte au moins une couleur exploitable (toutes pièces). */
 export function hasCapturedColors(
   walls: WallSeg[],
-  floor: FloorData | null | undefined,
+  floors: (FloorData | null | undefined)[],
 ): boolean {
-  return walls.some((w) => valid(w.color)) || valid(floor?.color);
+  return walls.some((w) => valid(w.color)) || floors.some((f) => valid(f?.color));
 }
 
 // ------------------------------------------------------- semis du sol

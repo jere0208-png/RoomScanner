@@ -22,15 +22,19 @@ import {
   clampFootprint,
   makeMapping,
   quadPoints,
-  roomSurface,
+  roomOf,
+  roomParts,
   segLength,
   toFootprint,
   wallQuads,
-  wallsCentroid,
   WALL_T,
+  type ObjectFootprint,
+  type Pt,
+  type RoomPart,
   type WallQuad,
   type WallSeg,
 } from '../geometry/floorplan';
+import type { ObjectData } from 'react-native-room-scan';
 import { mixHex } from '../geometry/appearance';
 import { frCategory, furnKind, furnitureStrokes } from '../geometry/furniture';
 
@@ -40,6 +44,19 @@ interface EffMapping {
   deltaToMeters: (dx: number, dy: number) => { x: number; z: number };
 }
 import { useScanStore } from '../store/scanStore';
+
+/**
+ * Empreinte d'un meuble, recalée contre les murs de SA pièce seulement :
+ * la cloison de la pièce voisine ne doit pas le repousser.
+ */
+function footprintOf(
+  o: ObjectData,
+  partOf: Map<string, RoomPart>,
+): ObjectFootprint {
+  const part = partOf.get(roomOf(o));
+  if (!part) return toFootprint(o);
+  return clampFootprint(toFootprint(o), part.walls, part.centroid);
+}
 
 interface Props {
   /** Cotes visibles le long des murs. */
@@ -51,6 +68,10 @@ interface Props {
   /** Meuble sélectionné : surligné, déplaçable, supprimable. */
   selectedObjectId?: string | null;
   onDeleteObject?: (id: string) => void;
+  /** Pièce sélectionnée : son cartouche est mis en avant. */
+  selectedRoomId?: string | null;
+  /** Appui sur le sol d'une pièce (mode édition) : la sélectionne. */
+  onSelectRoom?: (id: string | null) => void;
 }
 
 /**
@@ -65,6 +86,8 @@ export function FloorplanEditor({
   onSelectWall,
   selectedObjectId,
   onDeleteObject,
+  selectedRoomId,
+  onSelectRoom,
 }: Props) {
   const walls = useScanStore((s) => s.walls);
   const openings = useScanStore((s) => s.openings);
@@ -72,11 +95,10 @@ export function FloorplanEditor({
   const showFurniture = useScanStore((s) => s.showFurniture);
   const objects = showFurniture ? allObjects : [];
   const currentSaveId = useScanStore((s) => s.currentSaveId);
-  const roomName = useScanStore((s) => s.roomName);
+  const rooms = useScanStore((s) => s.rooms);
   const colorOpenings = useScanStore((s) => s.showOpeningColors);
   const showSurfaces = useScanStore((s) => s.showSurfaces);
   const showTextures = useScanStore((s) => s.showTextures);
-  const floorData = useScanStore((s) => s.floor);
   const c = useTheme();
   const styles = getStyles(c);
   const [layout, setLayout] = useState({ w: 0, h: 0 });
@@ -189,13 +211,19 @@ export function FloorplanEditor({
 
   // Corps des murs : onglets calculés une fois pour tout le rendu.
   const quads = useMemo(() => wallQuads(walls), [walls]);
-  // Surface au sol : contour, aire, et semis de points qui la distingue
-  // immédiatement des murs (pochés en noir).
-  const surface = useMemo(() => roomSurface(walls), [walls]);
-  const floorFill = useMemo(() => {
-    const captured = showTextures && floorData?.color;
-    return captured ? mixHex(captured, '#FFFFFF', 0.42) : c.surfaceSunken;
-  }, [showTextures, floorData, c]);
+  // Pièces du plan : chacune a son contour, son centre et sa teinte de sol.
+  const parts = useMemo(() => roomParts(walls), [walls]);
+  const roomById = useMemo(() => new Map(rooms.map((r) => [r.id, r])), [rooms]);
+  const fillOf = useMemo(() => {
+    return (roomId: string) => {
+      const captured = showTextures ? roomById.get(roomId)?.floor?.color : undefined;
+      return captured ? mixHex(captured, '#FFFFFF', 0.42) : c.surfaceSunken;
+    };
+  }, [showTextures, roomById, c]);
+  const partOf = useMemo(
+    () => new Map(parts.map((p) => [p.roomId, p])),
+    [parts],
+  );
   /**
    * Semis du sol : motif répété, calé sur l'origine du monde. Un vrai nuage
    * de points suivrait mieux la rotation, mais coûterait un millier de
@@ -209,16 +237,18 @@ export function FloorplanEditor({
   }, [mapping]);
 
   // Coins uniques (les extrémités soudées partagent les mêmes coordonnées).
+  // La clé porte la pièce : deux pièces qui se touchent gardent chacune sa
+  // poignée, sinon déplacer un coin en emporterait deux.
   const corners = useMemo(() => {
     const seen = new Map<string, { x: number; z: number; wallId: string; end: 'a' | 'b' }>();
     for (const w of walls) {
       for (const end of ['a', 'b'] as const) {
         const p = w[end];
-        const key = `${p.x.toFixed(3)}:${p.z.toFixed(3)}`;
+        const key = `${roomOf(w)}|${p.x.toFixed(3)}:${p.z.toFixed(3)}`;
         if (!seen.has(key)) seen.set(key, { x: p.x, z: p.z, wallId: w.id, end });
       }
     }
-    return [...seen.values()];
+    return [...seen.entries()].map(([key, v]) => ({ key, ...v }));
   }, [walls]);
 
   return (
@@ -236,7 +266,7 @@ export function FloorplanEditor({
           <Svg width={layout.w} height={layout.h}>
             {/* Surface au sol : aplat + semis de points, pour la distinguer
                 d'un coup d'œil des murs pochés en noir. */}
-            {showSurfaces && surface && dots && (
+            {showSurfaces && dots && (
               <G>
                 <Defs>
                   <Pattern
@@ -249,26 +279,40 @@ export function FloorplanEditor({
                     <Circle cx={1.1} cy={1.1} r={1.1} fill={c.inkFaint} />
                   </Pattern>
                 </Defs>
-                {(() => {
-                  const poly = surface.pts
+                {parts.map((part) => {
+                  if (!part.surface) return null;
+                  const poly = part.surface.pts
                     .map((p) => {
                       const q = mapping.toPx(p);
                       return `${q.x},${q.y}`;
                     })
                     .join(' ');
                   return (
-                    <>
-                      <Polygon points={poly} fill={floorFill} stroke="none" />
+                    <G
+                      key={part.roomId}
+                      onPress={
+                        editable && onSelectRoom
+                          ? () =>
+                              onSelectRoom(
+                                part.roomId === selectedRoomId ? null : part.roomId,
+                              )
+                          : undefined
+                      }>
+                      <Polygon
+                        points={poly}
+                        fill={fillOf(part.roomId)}
+                        stroke="none"
+                      />
                       <Polygon points={poly} fill="url(#floorDots)" stroke="none" />
-                    </>
+                    </G>
                   );
-                })()}
+                })}
               </G>
             )}
 
             {/* Objets (empreintes au sol) */}
             {objects.map((o) => {
-              const f = clampFootprint(toFootprint(o), walls, wallsCentroid(walls));
+              const f = footprintOf(o, partOf);
               const ctr = mapping.toPx({ x: f.cx, z: f.cz });
               const w = f.width * mapping.scale;
               const d = f.depth * mapping.scale;
@@ -362,7 +406,7 @@ export function FloorplanEditor({
                 <G key={o.id}>
                   <Polygon
                     points={slot.map((p) => `${p.x},${p.y}`).join(' ')}
-                    fill={showSurfaces ? floorFill : c.surface}
+                    fill={showSurfaces ? fillOf(roomOf(o)) : c.surface}
                     stroke="none"
                   />
                   <Line
@@ -378,86 +422,93 @@ export function FloorplanEditor({
               );
             })}
 
-            {/* Cartouche de pièce : nom encadré et surface au sol.
-                Il esquive les meubles pour rester lisible. */}
-            {walls.length > 0 &&
-              (roomName !== '' || (showSurfaces && surface)) &&
-              (() => {
-                const areaText =
-                  showSurfaces && surface
-                    ? `${surface.exact ? '' : '≈ '}${surface.area
-                        .toFixed(1)
-                        .replace('.', ',')} m²`
-                    : null;
-                const ctr = wallsCentroid(walls);
-                const foots = objects.map((o) =>
-                  clampFootprint(toFootprint(o), walls, ctr),
+            {/* Cartouche par pièce : nom encadré et surface au sol.
+                Chacun esquive les meubles de sa pièce pour rester lisible. */}
+            {parts.map((part) => {
+              const roomName = roomById.get(part.roomId)?.name ?? '';
+              const areaText =
+                showSurfaces && part.surface
+                  ? `${part.surface.exact ? '' : '≈ '}${part.surface.area
+                      .toFixed(1)
+                      .replace('.', ',')} m²`
+                  : null;
+              if (roomName === '' && !areaText) return null;
+              const foots = objects
+                .filter((o) => roomOf(o) === part.roomId)
+                .map((o) => footprintOf(o, partOf));
+              const text = roomName !== '' ? roomName : areaText ?? '';
+              const wpx = Math.max(46, text.length * 7 + 18);
+              const hpx = roomName !== '' && areaText ? 38 : 24;
+              const labelW = wpx / mapping.scale;
+              const labelH = hpx / mapping.scale;
+              const collides = (pt: Pt) =>
+                foots.some(
+                  (f) =>
+                    Math.abs(pt.x - f.cx) < (f.width + labelW) / 2 &&
+                    Math.abs(pt.z - f.cz) < (f.depth + labelH) / 2,
                 );
-                const text = roomName !== '' ? roomName : areaText ?? '';
-                const wpx = Math.max(46, text.length * 7 + 18);
-                const hpx = roomName !== '' && areaText ? 38 : 24;
-                const labelW = wpx / mapping.scale;
-                const labelH = hpx / mapping.scale;
-                const collides = (pt: { x: number; z: number }) =>
-                  foots.some(
-                    (f) =>
-                      Math.abs(pt.x - f.cx) < (f.width + labelW) / 2 &&
-                      Math.abs(pt.z - f.cz) < (f.depth + labelH) / 2,
-                  );
-                let pos = ctr;
-                for (const [ox, oz] of [
-                  [0, 0],
-                  [0, 0.5],
-                  [0, -0.5],
-                  [0.7, 0],
-                  [-0.7, 0],
-                  [0, 1],
-                  [0, -1],
-                ]) {
-                  const cand = { x: ctr.x + ox, z: ctr.z + oz };
-                  if (!collides(cand)) {
-                    pos = cand;
-                    break;
-                  }
+              const ctr = part.centroid;
+              let pos = ctr;
+              for (const [ox, oz] of [
+                [0, 0],
+                [0, 0.5],
+                [0, -0.5],
+                [0.7, 0],
+                [-0.7, 0],
+                [0, 1],
+                [0, -1],
+              ]) {
+                const cand = { x: ctr.x + ox, z: ctr.z + oz };
+                if (!collides(cand)) {
+                  pos = cand;
+                  break;
                 }
-                const p = mapping.toPx(pos);
-                return (
-                  <G>
-                    <Rect
-                      x={p.x - wpx / 2}
-                      y={p.y - hpx / 2}
-                      width={wpx}
-                      height={hpx}
-                      rx={6}
-                      fill={c.surface}
-                      stroke={c.lineStrong}
-                      strokeWidth={1}
-                    />
-                    {roomName !== '' && (
-                      <SvgText
-                        x={p.x}
-                        y={p.y + (areaText ? -3 : 4)}
-                        fill={c.ink}
-                        fontSize={11}
-                        fontWeight="700"
-                        textAnchor="middle">
-                        {roomName}
-                      </SvgText>
-                    )}
-                    {areaText && (
-                      <SvgText
-                        x={p.x}
-                        y={p.y + (roomName !== '' ? 12 : 4)}
-                        fill={c.inkSoft}
-                        fontSize={roomName !== '' ? 10 : 11}
-                        fontWeight="700"
-                        textAnchor="middle">
-                        {areaText}
-                      </SvgText>
-                    )}
-                  </G>
-                );
-              })()}
+              }
+              const p = mapping.toPx(pos);
+              const selected = editable && part.roomId === selectedRoomId;
+              return (
+                <G
+                  key={`label-${part.roomId}`}
+                  onPress={
+                    editable && onSelectRoom
+                      ? () => onSelectRoom(selected ? null : part.roomId)
+                      : undefined
+                  }>
+                  <Rect
+                    x={p.x - wpx / 2}
+                    y={p.y - hpx / 2}
+                    width={wpx}
+                    height={hpx}
+                    rx={6}
+                    fill={c.surface}
+                    stroke={selected ? c.blue : c.lineStrong}
+                    strokeWidth={selected ? 2 : 1}
+                  />
+                  {roomName !== '' && (
+                    <SvgText
+                      x={p.x}
+                      y={p.y + (areaText ? -3 : 4)}
+                      fill={selected ? c.blue : c.ink}
+                      fontSize={11}
+                      fontWeight="700"
+                      textAnchor="middle">
+                      {roomName}
+                    </SvgText>
+                  )}
+                  {areaText && (
+                    <SvgText
+                      x={p.x}
+                      y={p.y + (roomName !== '' ? 12 : 4)}
+                      fill={c.inkSoft}
+                      fontSize={roomName !== '' ? 10 : 11}
+                      fontWeight="700"
+                      textAnchor="middle">
+                      {areaText}
+                    </SvgText>
+                  )}
+                </G>
+              );
+            })}
           </Svg>
 
           {/* Meuble sélectionné : poignée de déplacement + bouton supprimer */}
@@ -465,7 +516,7 @@ export function FloorplanEditor({
             (() => {
               const o = allObjects.find((x) => x.id === selectedObjectId);
               if (!o) return null;
-              const f = clampFootprint(toFootprint(o), walls, wallsCentroid(walls));
+              const f = footprintOf(o, partOf);
               const p = mapping.toPx({ x: f.cx, z: f.cz });
               return (
                 <>
@@ -482,11 +533,7 @@ export function FloorplanEditor({
           {/* Poignées de coin, uniquement en mode édition */}
           {editable &&
             corners.map((pt) => (
-              <CornerHandle
-                key={`${pt.wallId}-${pt.end}`}
-                corner={pt}
-                mapping={mapping}
-              />
+              <CornerHandle key={pt.key} corner={pt} mapping={mapping} />
             ))}
         </>
       )}

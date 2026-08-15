@@ -9,7 +9,8 @@ import type { FloorData, ObjectData, SurfaceTexture } from 'react-native-room-sc
 import {
   clampFootprint,
   quadPoints,
-  roomSurface,
+  roomOf,
+  roomParts,
   toFootprint,
   wallQuads,
   wallsCentroid,
@@ -62,7 +63,8 @@ export interface SceneOptions {
   showSurfaces?: boolean;
   /** Couleurs et textures relevées pendant le scan. */
   showTextures?: boolean;
-  floor?: FloorData | null;
+  /** Relevé du sol par pièce, indexé par identifiant de pièce. */
+  floors?: Record<string, FloorData | null | undefined>;
 }
 
 /** Découpe des pans : au-delà, le tri « du peintre » devient faux localement. */
@@ -104,12 +106,21 @@ export function shadeFill(face: Face3D, ct: number, st: number): string | null {
     : mixHex('#BFC9D8', '#FCFDFF', facing);
 }
 
-export interface Scene {
-  faces: Face3D[];
+/** Une pièce telle que la scène l'a rendue : de quoi poser cotes et semis. */
+export interface SceneRoom {
+  roomId: string;
   /** Contour et aire du sol, si la pièce en a un. */
   surface: RoomSurface | null;
+  /** Centre de la pièce (pose du cartouche). */
+  centroid: Pt;
   /** Couleur de fond du sol effectivement employée. */
   floorFill: string;
+}
+
+export interface Scene {
+  faces: Face3D[];
+  /** Une entrée par pièce du scan. */
+  rooms: SceneRoom[];
   /** Niveau du sol dans le repère monde (m). */
   floorY: number;
 }
@@ -123,51 +134,59 @@ export function buildScene(
 ): Scene {
   const { palette: pal } = opts;
   const faces: Face3D[] = [];
-  const interior = wallsCentroid(walls);
+  const parts = roomParts(walls);
+  // Les nœuds de `wallQuads` sont déjà cloisonnés par pièce : un seul appel
+  // suffit, deux pièces mitoyennes n'y forment pas d'onglet commun.
   const quads = wallQuads(walls);
-  const surface = roomSurface(walls);
+  const interiorOf = new Map(parts.map((p) => [p.roomId, p.centroid]));
+  const wallsOf = new Map(parts.map((p) => [p.roomId, p.walls]));
+  const fallbackInterior = wallsCentroid(walls);
   const floorY =
     walls.length > 0 ? Math.min(...walls.map((w) => w.yCenter - w.height / 2)) : 0;
-  const floorFill =
-    (opts.showTextures ? opts.floor?.color : undefined) ?? pal.floor;
 
-  // ---------------------------------------------------------------- sol
-  if (surface && opts.showSurfaces) {
-    faces.push({
-      pts: surface.pts.map((p) => ({ x: p.x, y: 0, z: p.z })),
-      fill: floorFill,
-      stroke: pal.floorStroke,
-      isFloor: true,
-    });
-    // Détail des couleurs relevées : seules les cases entièrement dans la
-    // pièce sont peintes, le pourtour garde la couleur moyenne.
-    const ftex = opts.showTextures ? opts.floor?.texture : undefined;
-    if (ftex && ftex.cols > 0 && ftex.rows > 0) {
-      const cw = (ftex.maxX - ftex.minX) / ftex.cols;
-      const ch = (ftex.maxZ - ftex.minZ) / ftex.rows;
-      for (let r = 0; r < ftex.rows; r++) {
-        for (let i = 0; i < ftex.cols; i++) {
-          const x0 = ftex.minX + i * cw;
-          const z0 = ftex.minZ + r * ch;
-          const cell: Pt[] = [
-            { x: x0, z: z0 },
-            { x: x0 + cw, z: z0 },
-            { x: x0 + cw, z: z0 + ch },
-            { x: x0, z: z0 + ch },
-          ];
-          if (!cell.every((p) => pointInPolygon(p, surface.pts))) continue;
-          const col = floorColorAt(opts.floor, { x: x0 + cw / 2, z: z0 + ch / 2 });
-          if (!col) continue;
-          faces.push({
-            pts: cell.map((p) => ({ x: p.x, y: 0, z: p.z })),
-            fill: col,
-            stroke: null,
-            isFloor: true,
-          });
+  // --------------------------------------------------------------- sols
+  // Un sol par pièce : sa couleur moyenne, puis le détail des cases
+  // entièrement contenues dans SON contour.
+  const rooms: SceneRoom[] = parts.map((part) => {
+    const floor = opts.floors?.[part.roomId] ?? null;
+    const floorFill = (opts.showTextures ? floor?.color : undefined) ?? pal.floor;
+    const surface = part.surface;
+    if (surface && opts.showSurfaces) {
+      faces.push({
+        pts: surface.pts.map((p) => ({ x: p.x, y: 0, z: p.z })),
+        fill: floorFill,
+        stroke: pal.floorStroke,
+        isFloor: true,
+      });
+      const ftex = opts.showTextures ? floor?.texture : undefined;
+      if (ftex && ftex.cols > 0 && ftex.rows > 0) {
+        const cw = (ftex.maxX - ftex.minX) / ftex.cols;
+        const ch = (ftex.maxZ - ftex.minZ) / ftex.rows;
+        for (let r = 0; r < ftex.rows; r++) {
+          for (let i = 0; i < ftex.cols; i++) {
+            const x0 = ftex.minX + i * cw;
+            const z0 = ftex.minZ + r * ch;
+            const cell: Pt[] = [
+              { x: x0, z: z0 },
+              { x: x0 + cw, z: z0 },
+              { x: x0 + cw, z: z0 + ch },
+              { x: x0, z: z0 + ch },
+            ];
+            if (!cell.every((p) => pointInPolygon(p, surface.pts))) continue;
+            const col = floorColorAt(floor, { x: x0 + cw / 2, z: z0 + ch / 2 });
+            if (!col) continue;
+            faces.push({
+              pts: cell.map((p) => ({ x: p.x, y: 0, z: p.z })),
+              fill: col,
+              stroke: null,
+              isFloor: true,
+            });
+          }
         }
       }
     }
-  }
+    return { roomId: part.roomId, surface, centroid: part.centroid, floorFill };
+  });
 
   /**
    * Pan vertical découpé en bandes. Avec une texture, chaque bande est en
@@ -246,7 +265,9 @@ export function buildScene(
     const q = quads.get(w.id);
     if (!q) continue;
     const { a1, b1, b2, a2 } = q;
-    // Seule la face tournée vers la pièce a été vue par la caméra.
+    // Seule la face tournée vers la pièce a été vue par la caméra — et c'est
+    // le centre de SA pièce qui dit de quel côté elle regarde.
+    const interior = interiorOf.get(roomOf(w)) ?? fallbackInterior;
     const mid = { x: (w.a.x + w.b.x) / 2, z: (w.a.z + w.b.z) / 2 };
     const len = Math.hypot(w.b.x - w.a.x, w.b.z - w.a.z) || 1;
     const nrm = { x: -(w.b.z - w.a.z) / len, z: (w.b.x - w.a.x) / len };
@@ -311,8 +332,14 @@ export function buildScene(
   }
 
   // ------------------------------------------------------------ meubles
+  // Un meuble n'est recalé que contre les murs de SA pièce : sinon la
+  // cloison d'à côté le repousserait au milieu du salon.
   for (const obj of objects.map((o) =>
-    clampFootprint(toFootprint(o), walls, interior),
+    clampFootprint(
+      toFootprint(o),
+      wallsOf.get(roomOf(o)) ?? walls,
+      interiorOf.get(roomOf(o)) ?? fallbackInterior,
+    ),
   )) {
     const cosY = Math.cos(obj.yaw);
     const sinY = Math.sin(obj.yaw);
@@ -353,5 +380,5 @@ export function buildScene(
     );
   }
 
-  return { faces, surface, floorFill, floorY };
+  return { faces, rooms, floorY };
 }

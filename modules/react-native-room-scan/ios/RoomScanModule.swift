@@ -70,6 +70,40 @@ class RoomScanModule: NSObject {
     RoomScanManager.shared.stop(resolve: resolve, reject: reject)
   }
 
+  /// L'enchaînement de pièces demande RoomBuilder + StructureBuilder (iOS 17).
+  @objc func canMultiRoom(_ resolve: RCTPromiseResolveBlock,
+                          reject: RCTPromiseRejectBlock) {
+    if #available(iOS 17.0, *), RoomCaptureSession.isSupported {
+      resolve(true)
+    } else {
+      resolve(false)
+    }
+  }
+
+  @objc func finishRoom(_ resolve: @escaping RCTPromiseResolveBlock,
+                        reject: @escaping RCTPromiseRejectBlock) {
+    guard #available(iOS 17.0, *) else {
+      reject("UNSUPPORTED", "Le multi-pièces demande iOS 17", nil)
+      return
+    }
+    RoomScanManager.shared.finishRoom(resolve: resolve, reject: reject)
+  }
+
+  @objc func nextRoom(_ resolve: RCTPromiseResolveBlock,
+                      reject: RCTPromiseRejectBlock) {
+    if #available(iOS 16.0, *) { RoomScanManager.shared.nextRoom() }
+    resolve(nil)
+  }
+
+  @objc func finishScan(_ resolve: @escaping RCTPromiseResolveBlock,
+                        reject: @escaping RCTPromiseRejectBlock) {
+    guard #available(iOS 17.0, *) else {
+      reject("UNSUPPORTED", "Le multi-pièces demande iOS 17", nil)
+      return
+    }
+    RoomScanManager.shared.finishScan(resolve: resolve, reject: reject)
+  }
+
   @objc func pauseRoomScan() {
     if #available(iOS 16.0, *) { RoomScanManager.shared.pause() }
   }

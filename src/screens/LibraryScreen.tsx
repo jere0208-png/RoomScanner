@@ -13,7 +13,7 @@ import {
   useTheme,
   type Palette,
 } from '../theme';
-import { closedLoop, loopAreaM2 } from '../geometry/floorplan';
+import { roomParts, totalArea } from '../geometry/floorplan';
 import { useScanStore, type SavedScan } from '../store/scanStore';
 
 const two = (n: number) => String(n).padStart(2, '0');
@@ -46,11 +46,15 @@ export function LibraryScreen() {
   };
 
   const renderItem = ({ item }: { item: SavedScan }) => {
-    const loop = closedLoop(item.walls);
-    const area = loop ? loopAreaM2(loop) : null;
+    // Surface = somme des pièces ; un contour non refermé ne compte pas.
+    const parts = roomParts(item.walls);
+    const total = totalArea(parts);
     const details = [
+      ...(parts.length > 1 ? [`${parts.length} pièces`] : []),
       `${item.walls.length} murs`,
-      ...(area !== null ? [`${area.toFixed(1).replace('.', ',')} m²`] : []),
+      ...(total
+        ? [`${total.exact ? '' : '≈ '}${total.area.toFixed(1).replace('.', ',')} m²`]
+        : []),
       ...(item.objects.length > 0 ? [`${item.objects.length} objets`] : []),
     ].join(' · ');
 

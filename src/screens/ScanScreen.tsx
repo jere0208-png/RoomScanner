@@ -24,7 +24,10 @@ export function ScanScreen() {
   const windowCount = useScanStore((s) => s.windowCount);
   const paused = useScanStore((s) => s.paused);
   const processing = useScanStore((s) => s.processing);
-  const { pause, resume, stop, cancel } = useRoomScan();
+  const multiRoom = useScanStore((s) => s.multiRoomAvailable);
+  const finishedRooms = useScanStore((s) => s.finishedRooms);
+  const closingRoom = useScanStore((s) => s.closingRoom);
+  const { pause, resume, stop, nextRoom, cancel } = useRoomScan();
   const styles = getStyles(useTheme());
 
   // Torche : éteinte en quittant l'écran.
@@ -81,6 +84,14 @@ export function ScanScreen() {
             </View>
           ))}
         </View>
+        {multiRoom && finishedRooms > 0 && (
+          <View style={[styles.instructionPill, styles.roomPill]}>
+            <Text style={styles.instructionText}>
+              Pièce {finishedRooms + 1} · {finishedRooms} enregistrée
+              {finishedRooms > 1 ? 's' : ''}
+            </Text>
+          </View>
+        )}
         {paused && (
           <View style={[styles.instructionPill, styles.pausedPill]}>
             <Text style={styles.instructionText}>Scan en pause</Text>
@@ -122,10 +133,31 @@ export function ScanScreen() {
             )}
           </Svg>
         </TouchableOpacity>
+        {multiRoom && (
+          <TouchableOpacity
+            style={styles.nextRoomButton}
+            onPress={nextRoom}
+            disabled={closingRoom}>
+            <Text style={styles.nextRoomText}>Pièce suivante</Text>
+          </TouchableOpacity>
+        )}
         <TouchableOpacity style={styles.stopButton} onPress={stop}>
           <Text style={styles.stopText}>Terminer</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Transition entre deux pièces : ne pas couper la caméra, c'est elle
+          qui garde le repère commun aux pièces. */}
+      {closingRoom && (
+        <View style={styles.processing}>
+          <ActivityIndicator size="large" color="#FFFFFF" />
+          <Text style={styles.processingTitle}>Pièce enregistrée…</Text>
+          <Text style={styles.processingText}>
+            Gardez l'app ouverte et marchez jusqu'à la pièce suivante :
+            c'est le suivi de la caméra qui aligne les pièces entre elles.
+          </Text>
+        </View>
+      )}
 
       {processing && (
         <View style={styles.processing}>
@@ -203,6 +235,7 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     marginTop: 10,
   },
   pausedPill: { backgroundColor: 'rgba(232,161,59,0.85)' },
+  roomPill: { backgroundColor: 'rgba(46,147,189,0.85)' },
   instructionDot: {
     width: 7,
     height: 7,
@@ -229,6 +262,15 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     justifyContent: 'center',
   },
   pauseIcon: { color: c.scanInk, fontSize: 16, fontWeight: '700' },
+  nextRoomButton: {
+    backgroundColor: c.scanPill,
+    borderRadius: 27,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    marginLeft: 'auto',
+    marginRight: 10,
+  },
+  nextRoomText: { color: c.scanInk, fontSize: 15, fontWeight: '700' },
   stopButton: {
     backgroundColor: c.blue,
     borderRadius: 27,

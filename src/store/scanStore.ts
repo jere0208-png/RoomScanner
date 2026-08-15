@@ -3,10 +3,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import type {
   FloorData,
   ObjectData,
+  RoomData,
   ScanResult,
   ScanUpdate,
 } from 'react-native-room-scan';
 import {
+  DEFAULT_ROOM_ID,
+  roomOf,
   segLength,
   snapAngle,
   toSegment,
@@ -16,18 +19,77 @@ import {
 
 export type Screen = 'home' | 'scan' | 'result' | 'library' | 'export' | 'camera';
 
+/**
+ * Une pièce du scan. La géométrie reste À PLAT dans `walls`/`openings`/
+ * `objects` — chaque élément porte son `roomId` — parce que tout le rendu
+ * (plan, 3D, PDF) travaille sur des listes de murs. Ici on ne garde que ce
+ * qui est propre à la pièce : son nom et le relevé de son sol.
+ */
+export interface RoomEntry {
+  id: string;
+  /** Nom affiché sur le plan ; vide = pièce non nommée. */
+  name: string;
+  /** Étiquette RoomPlan (`livingRoom`…) qui a servi de nom par défaut. */
+  label?: string;
+  /** Couleurs du sol relevées au scan pour cette pièce. */
+  floor?: FloorData | null;
+}
+
 export interface SavedScan {
   id: string;
   name: string;
   createdAt: number;
   updatedAt: number;
   modelPath: string | null;
-  roomName?: string;
+  rooms: RoomEntry[];
   walls: WallSeg[];
   openings: WallSeg[];
   objects: ObjectData[];
-  /** Couleurs du sol relevées au scan. */
+  /** Scans d'avant le multi-pièces : nom unique de la pièce. */
+  roomName?: string;
+  /** Scans d'avant le multi-pièces : sol unique. */
   floor?: FloorData | null;
+}
+
+/** Étiquettes RoomPlan → nom de pièce en français. */
+const ROOM_LABELS_FR: Record<string, string> = {
+  bathroom: 'Salle de bains',
+  bedroom: 'Chambre',
+  diningRoom: 'Salle à manger',
+  kitchen: 'Cuisine',
+  livingRoom: 'Salon',
+  office: 'Bureau',
+};
+
+/**
+ * Nom par défaut d'une pièce d'après son étiquette RoomPlan. Deux chambres
+ * dans le même scan deviennent « Chambre » et « Chambre 2 ».
+ */
+function defaultRoomName(label: string | undefined, taken: string[]): string {
+  const base = ROOM_LABELS_FR[label ?? ''] ?? '';
+  if (!base) return '';
+  const same = taken.filter((n) => n === base || n.startsWith(`${base} `)).length;
+  return same === 0 ? base : `${base} ${same + 1}`;
+}
+
+/** Relevés de sol indexés par pièce, tels que `buildScene` les attend. */
+export function floorsOf(
+  rooms: RoomEntry[],
+): Record<string, FloorData | null | undefined> {
+  const out: Record<string, FloorData | null | undefined> = {};
+  for (const r of rooms) out[r.id] = r.floor;
+  return out;
+}
+
+/** Scans enregistrés avant le multi-pièces : une seule pièce, implicite. */
+function migrateSave(s: SavedScan): SavedScan {
+  if (Array.isArray(s.rooms) && s.rooms.length > 0) return s;
+  return {
+    ...s,
+    rooms: [
+      { id: DEFAULT_ROOM_ID, name: s.roomName ?? '', floor: s.floor ?? null },
+    ],
+  };
 }
 
 const STORAGE_KEY = 'roomscanner.saves.v1';
@@ -68,6 +130,17 @@ interface ScanState {
   objectCount: number;
   doorCount: number;
   windowCount: number;
+  /** Enchaînement de pièces possible (RoomPlan iOS 17+). */
+  multiRoomAvailable: boolean;
+  setMultiRoomAvailable: (v: boolean) => void;
+  /** Pièces déjà closes pendant le scan en cours. */
+  finishedRooms: number;
+  /** Vrai le temps que RoomPlan post-traite la pièce qu'on vient de clore. */
+  closingRoom: boolean;
+  setClosingRoom: (v: boolean) => void;
+  roomFinished: () => void;
+  /** Remet à zéro les compteurs au démarrage d'un scan. */
+  beginScan: () => void;
 
   // Scan courant — SOURCE DE VÉRITÉ paramétrique :
   // le plan 2D et la vue 3D se dérivent de `walls`, jamais du maillage.
@@ -76,16 +149,17 @@ interface ScanState {
   currentSaveId: string | null;
   /** Modifications du plan non enregistrées (bouton de sauvegarde visible). */
   dirty: boolean;
-  /** Nom de la pièce, affiché encadré au centre du plan. */
-  roomName: string;
-  setRoomName: (n: string) => void;
+  /** Pièces du scan courant, dans l'ordre de capture. */
+  rooms: RoomEntry[];
+  /** Renomme une pièce ; nom vide = plus de cartouche nommé. */
+  setRoomName: (roomId: string, name: string) => void;
+  /** Retire une pièce du scan (sa géométrie part avec elle). */
+  removeRoom: (roomId: string) => void;
   /** D'où vient l'écran résultat : le bouton retour y renvoie. */
   resultOrigin: 'scan' | 'library';
   walls: WallSeg[];
   openings: WallSeg[];
   objects: ObjectData[];
-  /** Couleurs du sol relevées pendant le scan (null si non captées). */
-  floor: FloorData | null;
 
   // Bibliothèque persistée
   saves: SavedScan[];
@@ -148,11 +222,10 @@ export const useScanStore = create<ScanState>((set, get) => {
         ? {
             ...s,
             name: st.scanName,
-            roomName: st.roomName,
+            rooms: st.rooms,
             walls: st.walls,
             openings: st.openings,
             objects: st.objects,
-            floor: st.floor,
             modelPath: st.modelPath,
             updatedAt: Date.now(),
           }
@@ -174,16 +247,18 @@ export const useScanStore = create<ScanState>((set, get) => {
     objectCount: 0,
     doorCount: 0,
     windowCount: 0,
+    multiRoomAvailable: false,
+    finishedRooms: 0,
+    closingRoom: false,
     modelPath: null,
     scanName: '',
     currentSaveId: null,
     dirty: false,
     resultOrigin: 'scan',
-    roomName: '',
+    rooms: [],
     walls: [],
     openings: [],
     objects: [],
-    floor: null,
     saves: [],
     themePref: 'light',
     showOpeningColors: false,
@@ -216,7 +291,47 @@ export const useScanStore = create<ScanState>((set, get) => {
       AsyncStorage.setItem(TEXTURES_KEY, showTextures ? '1' : '0').catch(() => {});
     },
 
-    setRoomName: (roomName) => set({ roomName, dirty: true }),
+    setRoomName: (roomId, name) =>
+      set({
+        rooms: get().rooms.map((r) =>
+          r.id === roomId ? { ...r, name: name.trim() } : r,
+        ),
+        dirty: true,
+      }),
+
+    removeRoom: (roomId) => {
+      const st = get();
+      if (st.rooms.length <= 1) return;
+      set({
+        rooms: st.rooms.filter((r) => r.id !== roomId),
+        walls: st.walls.filter((w) => roomOf(w) !== roomId),
+        openings: st.openings.filter((o) => roomOf(o) !== roomId),
+        objects: st.objects.filter((o) => roomOf(o) !== roomId),
+        dirty: true,
+      });
+    },
+
+    beginScan: () =>
+      set({
+        finishedRooms: 0,
+        closingRoom: false,
+        wallCount: 0,
+        objectCount: 0,
+        doorCount: 0,
+        windowCount: 0,
+      }),
+
+    setMultiRoomAvailable: (multiRoomAvailable) => set({ multiRoomAvailable }),
+    setClosingRoom: (closingRoom) => set({ closingRoom }),
+    roomFinished: () =>
+      set({
+        finishedRooms: get().finishedRooms + 1,
+        closingRoom: false,
+        wallCount: 0,
+        objectCount: 0,
+        doorCount: 0,
+        windowCount: 0,
+      }),
 
     setScreen: (screen) => set({ screen }),
     setSupported: (supported) => set({ supported }),
@@ -235,11 +350,43 @@ export const useScanStore = create<ScanState>((set, get) => {
       }),
 
     finalize: (r) => {
-      const segments = r.surfaces.map(toSegment);
-      const walls = weldCorners(segments.filter((s) => s.type === 'wall'));
-      const openings = segments.filter((s) => s.type !== 'wall');
-      const objects = r.objects ?? [];
-      const floor = r.floor ?? null;
+      // Un scan mono-pièce (Android, iOS 16) se présente comme une liste de
+      // surfaces à plat : on le remet dans le même moule que le multi-pièces.
+      const incoming: RoomData[] =
+        r.rooms && r.rooms.length > 0
+          ? r.rooms
+          : [
+              {
+                id: DEFAULT_ROOM_ID,
+                surfaces: r.surfaces ?? [],
+                objects: r.objects ?? [],
+                floor: r.floor,
+              },
+            ];
+
+      const walls: WallSeg[] = [];
+      const openings: WallSeg[] = [];
+      const objects: ObjectData[] = [];
+      const rooms: RoomEntry[] = [];
+      for (const room of incoming) {
+        const id = room.id || `room-${rooms.length + 1}`;
+        const segments = (room.surfaces ?? []).map((s) => toSegment(s, id));
+        // La soudure est cloisonnée par pièce : deux cloisons mitoyennes
+        // restent deux murs distincts.
+        walls.push(...weldCorners(segments.filter((s) => s.type === 'wall')));
+        openings.push(...segments.filter((s) => s.type !== 'wall'));
+        objects.push(...(room.objects ?? []).map((o) => ({ ...o, roomId: id })));
+        rooms.push({
+          id,
+          name: defaultRoomName(room.label, rooms.map((x) => x.name)),
+          label: room.label,
+          floor: room.floor ?? null,
+        });
+      }
+      // Une pièce sans un seul mur ne se dessine pas : elle n'existe pas.
+      const kept = rooms.filter((room) =>
+        walls.some((w) => roomOf(w) === room.id),
+      );
 
       if (walls.length === 0) {
         // Rien d'exploitable : on montre l'état vide, sans polluer la bibliothèque.
@@ -247,10 +394,10 @@ export const useScanStore = create<ScanState>((set, get) => {
           modelPath: r.modelPath ?? null,
           scanName: 'Scan vide',
           currentSaveId: null,
+          rooms: [],
           walls: [],
           openings: [],
           objects: [],
-          floor: null,
           processing: false,
           scanning: false,
           screen: 'result',
@@ -266,11 +413,10 @@ export const useScanStore = create<ScanState>((set, get) => {
         createdAt: now.getTime(),
         updatedAt: now.getTime(),
         modelPath: r.modelPath ?? null,
-        roomName: '',
+        rooms: kept,
         walls,
         openings,
         objects,
-        floor,
       };
       const saves = [save, ...get().saves];
       set({
@@ -279,11 +425,10 @@ export const useScanStore = create<ScanState>((set, get) => {
         currentSaveId: save.id,
         dirty: false,
         resultOrigin: 'scan',
-        roomName: '',
+        rooms: kept,
         walls,
         openings,
         objects,
-        floor,
         saves,
         processing: false,
         scanning: false,
@@ -303,8 +448,12 @@ export const useScanStore = create<ScanState>((set, get) => {
       const old = wall[end];
       const fixed = wall[end === 'a' ? 'b' : 'a'];
       const snapped = snapAngle(fixed, p);
+      const room = roomOf(wall);
       set({
         walls: walls.map((w) => {
+          // Seuls les murs de la MÊME pièce suivent le coin : la cloison
+          // d'en face garde la sienne, même si les deux se touchent.
+          if (roomOf(w) !== room) return w;
           const move = (pt: { x: number; z: number }) =>
             Math.hypot(pt.x - old.x, pt.z - old.z) < 1e-4 ? snapped : pt;
           return { ...w, a: move(w.a), b: move(w.b) };
@@ -365,6 +514,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       const opening: WallSeg = {
         id: `op-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         type: 'opening',
+        roomId: roomOf(wall),
         a: { x: mid.x - (ux * len) / 2, z: mid.z - (uz * len) / 2 },
         b: { x: mid.x + (ux * len) / 2, z: mid.z + (uz * len) / 2 },
         height: h,
@@ -402,12 +552,12 @@ export const useScanStore = create<ScanState>((set, get) => {
       const st = get();
       const save = st.saves.find((s) => s.id === st.currentSaveId);
       if (!save) return;
+      const migrated = migrateSave(save);
       set({
-        walls: save.walls,
-        openings: save.openings,
-        objects: save.objects,
-        floor: save.floor ?? null,
-        roomName: save.roomName ?? '',
+        walls: migrated.walls,
+        openings: migrated.openings,
+        objects: migrated.objects,
+        rooms: migrated.rooms,
         dirty: false,
       });
     },
@@ -425,11 +575,10 @@ export const useScanStore = create<ScanState>((set, get) => {
         createdAt: now,
         updatedAt: now,
         modelPath: st.modelPath,
-        roomName: st.roomName,
+        rooms: st.rooms,
         walls: st.walls,
         openings: st.openings,
         objects: st.objects,
-        floor: st.floor,
       };
       const saves = [save, ...st.saves];
       set({ saves, currentSaveId: save.id, scanName: clean, dirty: false });
@@ -461,24 +610,24 @@ export const useScanStore = create<ScanState>((set, get) => {
         const raw = await AsyncStorage.getItem(STORAGE_KEY);
         if (!raw) return;
         const saves = JSON.parse(raw) as SavedScan[];
-        if (Array.isArray(saves)) set({ saves });
+        if (Array.isArray(saves)) set({ saves: saves.map(migrateSave) });
       } catch {
         // Stockage illisible : on repart des valeurs en mémoire.
       }
     },
 
     openSave: (id) => {
-      const save = get().saves.find((s) => s.id === id);
-      if (!save) return;
+      const found = get().saves.find((s) => s.id === id);
+      if (!found) return;
+      const save = migrateSave(found);
       set({
         modelPath: save.modelPath,
         scanName: save.name,
         currentSaveId: save.id,
+        rooms: save.rooms,
         walls: save.walls,
         openings: save.openings,
         objects: save.objects,
-        floor: save.floor ?? null,
-        roomName: save.roomName ?? '',
         dirty: false,
         resultOrigin: 'library',
         screen: 'result',
@@ -506,14 +655,16 @@ export const useScanStore = create<ScanState>((set, get) => {
         objectCount: 0,
         doorCount: 0,
         windowCount: 0,
+        finishedRooms: 0,
+        closingRoom: false,
         modelPath: null,
         scanName: '',
         currentSaveId: null,
         dirty: false,
+        rooms: [],
         walls: [],
         openings: [],
         objects: [],
-        floor: null,
       }),
   };
 });
