@@ -91,10 +91,15 @@ export function themedStyles<T>(factory: (c: Palette) => T): (c: Palette) => T {
   };
 }
 
+/**
+ * Rayons. Ils ont tous grandi d'un cran : un rayon serré sur une grande
+ * surface est la signature d'une interface d'il y a dix ans, et l'écart
+ * entre un champ (12) et une carte (22) est ce qui donne la hiérarchie.
+ */
 export const radius = {
-  sm: 10,
-  md: 14,
-  lg: 20,
+  sm: 12,
+  md: 16,
+  lg: 22,
   pill: 999,
 };
 
@@ -106,10 +111,36 @@ export const spacing = {
   xl: 36,
 };
 
+/**
+ * Deux ombres, pas une.
+ *
+ * `shadowCard` pose une surface sur le fond : large, très diffuse, presque
+ * invisible — c'est elle qui remplace les liserés, qu'on empile trop vite
+ * jusqu'à quadriller l'écran. `shadowLift` soulève ce qui appelle le doigt
+ * (bouton principal, bouton flottant) : plus courte, plus dense, et teintée
+ * de la couleur du bouton pour que la lumière ait l'air de venir de lui.
+ */
 export const shadowCard = {
   shadowColor: '#0B0D12',
-  shadowOpacity: 0.06,
-  shadowRadius: 14,
-  shadowOffset: { width: 0, height: 4 },
+  shadowOpacity: 0.07,
+  shadowRadius: 18,
+  shadowOffset: { width: 0, height: 6 },
   elevation: 3,
 };
+
+export const shadowLift = {
+  shadowColor: '#0B0D12',
+  shadowOpacity: 0.14,
+  shadowRadius: 12,
+  shadowOffset: { width: 0, height: 5 },
+  elevation: 6,
+};
+
+/** Ombre colorée d'un élément d'action : la teinte du bouton lui-même. */
+export const glow = (color: string) => ({
+  shadowColor: color,
+  shadowOpacity: 0.32,
+  shadowRadius: 14,
+  shadowOffset: { width: 0, height: 6 },
+  elevation: 6,
+});

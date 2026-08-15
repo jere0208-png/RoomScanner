@@ -20,8 +20,10 @@ import Svg, { Path } from 'react-native-svg';
 import { captureRef } from 'react-native-view-shot';
 import { RoomScan } from 'react-native-room-scan';
 import {
+  glow,
   radius,
   shadowCard,
+  shadowLift,
   themedStyles,
   useTheme,
   type Palette,
@@ -463,24 +465,7 @@ export function ResultScreen() {
         ))}
       </View>
 
-      <View style={styles.segment}>
-        {(
-          [
-            ['2d', 'Plan 2D'],
-            ['3d', 'Vue 3D'],
-          ] as [Tab, string][]
-        ).map(([key, label]) => (
-          <TouchableOpacity
-            key={key}
-            style={[styles.segmentItem, tab === key && styles.segmentItemActive]}
-            onPress={() => setTab(key)}>
-            <Text
-              style={[styles.segmentText, tab === key && styles.segmentTextActive]}>
-              {label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+      <Segment tab={tab} onChange={setTab} />
 
       <View style={styles.canvas} ref={canvasRef} collapsable={false}>
         {tab === '2d' ? (
@@ -1432,6 +1417,70 @@ const TOOL_PATHS: Record<ToolIcon, { d: string; fill?: boolean }[]> = {
   ],
 };
 
+/**
+ * Interrupteur de vue, à pouce glissant.
+ *
+ * Le pavé actif sautait d'un onglet à l'autre : rien ne reliait les deux
+ * états, et c'est exactement ce qui date une interface. Il glisse désormais,
+ * sur un ressort — le mouvement dit d'où l'on vient.
+ */
+function Segment({ tab, onChange }: { tab: Tab; onChange: (t: Tab) => void }) {
+  const styles = getStyles(useTheme());
+  const [w, setW] = useState(0);
+  const x = useRef(new Animated.Value(tab === '2d' ? 0 : 1)).current;
+  useEffect(() => {
+    Animated.spring(x, {
+      toValue: tab === '2d' ? 0 : 1,
+      damping: 17,
+      stiffness: 230,
+      mass: 0.75,
+      useNativeDriver: true,
+    }).start();
+  }, [tab, x]);
+  const half = Math.max(0, (w - 8) / 2);
+  return (
+    <View
+      style={styles.segment}
+      onLayout={(e) => setW(e.nativeEvent.layout.width)}>
+      {w > 0 && (
+        <Animated.View
+          style={[
+            styles.segmentThumb,
+            {
+              width: half,
+              transform: [
+                {
+                  translateX: x.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0, half],
+                  }),
+                },
+              ],
+            },
+          ]}
+        />
+      )}
+      {(
+        [
+          ['2d', 'Plan 2D'],
+          ['3d', 'Vue 3D'],
+        ] as [Tab, string][]
+      ).map(([key, label]) => (
+        <TouchableOpacity
+          key={key}
+          activeOpacity={0.7}
+          style={styles.segmentItem}
+          onPress={() => onChange(key)}>
+          <Text
+            style={[styles.segmentText, tab === key && styles.segmentTextActive]}>
+            {label}
+          </Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
+}
+
 /** Pas d'une pastille : sa largeur plus l'écart qui la suit. */
 const PILL_PITCH = 42;
 
@@ -1545,19 +1594,21 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     height: 38,
     borderRadius: 19,
     backgroundColor: c.surface,
-    borderWidth: 1,
-    borderColor: c.line,
     alignItems: 'center',
     justifyContent: 'center',
+    ...shadowCard,
+    shadowOpacity: 0.07,
+    shadowRadius: 8,
     marginRight: 12,
   },
   backChevron: { color: c.ink, fontSize: 24, fontWeight: '600', marginTop: -3 },
   titleWrap: { flexDirection: 'row', alignItems: 'center', flex: 1 },
   title: {
     color: c.ink,
-    fontSize: 21,
+    fontSize: 24,
     fontWeight: '800',
-    letterSpacing: -0.3,
+    // Un titre serré se lit comme un titre ; espacé, comme une étiquette.
+    letterSpacing: -0.6,
     flexShrink: 1,
   },
   editBadge: {
@@ -1570,37 +1621,63 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     marginLeft: 10,
   },
   editBadgeIcon: { color: c.blue, fontSize: 17, fontWeight: '700' },
+  // Plus de liseré ni de séparateurs : c'est l'ombre qui pose la barre, et
+  // l'écart entre le chiffre et son intitulé qui sépare les colonnes.
   metricsRow: {
     flexDirection: 'row',
     backgroundColor: c.surface,
     borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: c.line,
     alignSelf: 'flex-start',
-    marginTop: 8,
-    marginBottom: 8,
-    paddingVertical: 8,
+    marginTop: 10,
+    marginBottom: 10,
+    paddingVertical: 10,
+    ...shadowCard,
   },
-  metric: { paddingHorizontal: 15, alignItems: 'center' },
-  metricBorder: { borderLeftWidth: 1, borderLeftColor: c.line },
-  metricValue: { color: c.ink, fontSize: 16, fontWeight: '800' },
-  metricLabel: { color: c.inkFaint, fontSize: 11, marginTop: 1 },
+  metric: { paddingHorizontal: 16, alignItems: 'center' },
+  metricBorder: {},
+  metricValue: {
+    color: c.ink,
+    fontSize: 18,
+    fontWeight: '800',
+    letterSpacing: -0.4,
+  },
+  metricLabel: {
+    color: c.inkFaint,
+    fontSize: 9.5,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.7,
+    marginTop: 2,
+  },
   segment: {
     flexDirection: 'row',
     backgroundColor: c.surfaceSunken,
-    borderRadius: radius.md,
-    padding: 3,
-    marginBottom: 8,
+    borderRadius: radius.pill,
+    padding: 4,
+    marginBottom: 10,
+  },
+  segmentThumb: {
+    position: 'absolute',
+    left: 4,
+    top: 4,
+    bottom: 4,
+    borderRadius: radius.pill,
+    backgroundColor: c.surface,
+    ...shadowLift,
+    shadowOpacity: 0.1,
   },
   segmentItem: {
     flex: 1,
-    borderRadius: radius.md - 3,
-    paddingVertical: 9,
+    paddingVertical: 10,
     alignItems: 'center',
   },
-  segmentItemActive: { backgroundColor: c.surface, ...shadowCard },
-  segmentText: { color: c.inkSoft, fontSize: 14, fontWeight: '600' },
-  segmentTextActive: { color: c.blue, fontWeight: '700' },
+  segmentText: {
+    color: c.inkSoft,
+    fontSize: 14.5,
+    fontWeight: '700',
+    letterSpacing: -0.2,
+  },
+  segmentTextActive: { color: c.blue },
   canvas: { flex: 1, ...shadowCard, borderRadius: radius.lg },
   // Jusqu'à neuf pastilles : la barre défile plutôt que de se replier sur
   // deux rangs et de manger le plan.
@@ -1618,16 +1695,17 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     paddingHorizontal: 2,
   },
   toolPill: {
-    width: 36,
-    height: 36,
-    borderRadius: 11,
+    width: 38,
+    height: 38,
+    borderRadius: 14,
     backgroundColor: c.surface,
-    borderWidth: 1,
-    borderColor: c.line,
     alignItems: 'center',
     justifyContent: 'center',
+    ...shadowCard,
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
   },
-  toolPillActive: { backgroundColor: c.blue, borderColor: c.blue },
+  toolPillActive: { backgroundColor: c.blue, ...glow(c.blue) },
   transition: {
     position: 'absolute',
     top: 0,
@@ -1673,17 +1751,14 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     position: 'absolute',
     bottom: 12,
     right: 12,
-    width: 46,
-    height: 46,
-    borderRadius: 23,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     backgroundColor: c.blue,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: c.blue,
-    shadowOpacity: 0.45,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 5,
+    ...glow(c.blue),
+    shadowOpacity: 0.42,
   },
   // Cote du mur : barre compacte EN HAUT du plan. En bas, elle sortait de
   // l'écran dès que le clavier montait, et couvrait le mur qu'on modifiait.
@@ -1827,15 +1902,11 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   objectDims: { color: c.inkFaint, fontSize: 11.5 },
   exportButton: {
     backgroundColor: c.blue,
-    borderRadius: radius.md,
-    paddingVertical: 15,
+    borderRadius: radius.pill,
+    paddingVertical: 16,
     alignItems: 'center',
     marginTop: 14,
-    shadowColor: c.blue,
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
+    ...glow(c.blue),
   },
   switchRow: {
     flexDirection: 'row',
@@ -1854,19 +1925,20 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   primaryButton: {
     flex: 1,
     backgroundColor: c.blue,
-    borderRadius: radius.md,
+    borderRadius: radius.pill,
     paddingVertical: 15,
     alignItems: 'center',
+    ...glow(c.blue),
   },
   primaryText: { color: '#FFFFFF', fontSize: 15.5, fontWeight: '700' },
   secondaryButton: {
     flex: 1,
     backgroundColor: c.surface,
-    borderWidth: 1,
-    borderColor: c.lineStrong,
-    borderRadius: radius.md,
+    borderRadius: radius.pill,
     paddingVertical: 15,
     alignItems: 'center',
+    ...shadowCard,
+    shadowOpacity: 0.05,
   },
   secondaryText: { color: c.ink, fontSize: 15.5, fontWeight: '600' },
   modalBackdrop: {

@@ -127,6 +127,31 @@ la pièce et bornées au cadre : jamais sur le mur, jamais hors de l'écran. La
 barre du bas, qui débordait dès que le clavier montait, a disparu ; seule la
 saisie de la cote subsiste, en haut du plan.
 
+### Langage visuel
+
+Trois règles, appliquées partout plutôt que décidées écran par écran.
+
+**L'ombre remplace le liseré.** Un trait de 1 px autour de chaque carte finit
+par quadriller l'écran ; deux ombres suffisent à dire la même chose. Une très
+diffuse (`shadowCard`) pose une surface sur le fond, une plus dense et
+teintée de la couleur du bouton (`glow`) soulève ce qui appelle le doigt. Les
+séparateurs de la barre de compteurs ont disparu avec : l'écart entre le
+chiffre et son intitulé sépare déjà les colonnes.
+
+**Les rayons ont grandi d'un cran** (12 / 16 / 22, et la pilule pour tout ce
+qui se touche). Un rayon serré sur une grande surface est la signature d'une
+interface d'il y a dix ans, et l'écart entre un champ et une carte est ce qui
+donne la hiérarchie.
+
+**Rien ne saute d'un état à l'autre.** L'interrupteur Plan 2D / Vue 3D fait
+glisser son pouce sur un ressort au lieu de repeindre l'onglet actif, et les
+pastilles d'outils entrent et sortent du bouton d'édition. Un changement
+d'état sans trajet oblige l'œil à retrouver ce qui a bougé.
+
+Les intitulés, eux, ont gagné en contraste : titres plus grands et resserrés
+(`letterSpacing` négatif), légendes plus petites en capitales espacées. Un
+titre serré se lit comme un titre ; espacé, comme une étiquette.
+
 ### Diagnostic du plan
 
 L'app sait tout corriger — supprimer un mur, en ajouter un, redresser,
@@ -301,11 +326,29 @@ d'Android ferme lui aussi (`onRequestClose`).
 
 ### La barre d'outils
 
-Elle ne garde que ce qu'on touche à chaque fois — diagnostic, cotes, meubles,
-appareillage, annuler, édition — et range le reste sous **⋮** : surface au sol, couleurs
-relevées, tracer un mur, redresser, redétecter les pièces, revenir à la
-dernière sauvegarde. Chaque entrée du tiroir porte son intitulé et une ligne
-d'explication, ce qu'une pastille seule ne peut pas dire.
+**Deux barres, jamais mélangées.** Elle répondait à deux questions à la fois
+— que montrer, et que modifier — et on cherchait la bonne pastille au milieu
+des autres. Désormais le mode tranche : en **lecture** on ne fait que
+regarder, la barre ne porte donc que ce qui s'affiche ou non (cotes, meubles,
+surface au sol, couleurs relevées) ; en **édition** on travaille, les calques
+cèdent la place aux outils (diagnostic, appareillage, annuler, ⋮) et les
+réglages d'affichage restent tels qu'on les avait laissés. La vue 3D, qui ne
+s'édite pas, ne porte que des calques.
+
+Le **⋮** ne garde donc que des outils : tracer un mur, redresser, redétecter
+les pièces, revenir à la dernière sauvegarde. Chaque entrée porte son
+intitulé et une ligne d'explication, ce qu'une pastille seule ne peut pas
+dire.
+
+**Les pastilles rentrent dans le bouton d'édition et en ressortent.** C'est
+lui qui commande le changement : autant qu'on le voie. Chacune file vers lui
+en rapetissant, d'autant plus loin qu'elle en est éloignée, et les rangs se
+succèdent — puis le nouveau jeu en jaillit dans l'ordre inverse, avec un
+léger dépassement. L'état affiché par la barre RETARDE donc sur le mode : le
+plan, lui, bascule tout de suite. Et l'animation se déclenche sur l'écart
+entre les deux états, jamais sur l'appui — sinon le diagnostic et la pose
+d'un appareil, qui passent aussi en édition sans toucher au bouton,
+l'oublieraient.
 
 La barre de la vue 3D n'a plus de bascule « vue de dessus » : le geste y
 mène déjà — on incline la vue jusqu'à l'aplomb — et le plan 2D est là pour

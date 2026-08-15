@@ -7,6 +7,7 @@ import {
   View,
 } from 'react-native';
 import {
+  glow,
   radius,
   shadowCard,
   themedStyles,
@@ -133,10 +134,11 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     height: 38,
     borderRadius: 19,
     backgroundColor: c.surface,
-    borderWidth: 1,
-    borderColor: c.line,
     alignItems: 'center',
     justifyContent: 'center',
+    ...shadowCard,
+    shadowOpacity: 0.07,
+    shadowRadius: 8,
     marginRight: 12,
   },
   backChevron: { color: c.ink, fontSize: 24, fontWeight: '600', marginTop: -3 },
@@ -190,10 +192,11 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   },
   primaryButton: {
     backgroundColor: c.blue,
-    borderRadius: radius.md,
-    paddingVertical: 14,
-    paddingHorizontal: 28,
+    borderRadius: radius.pill,
+    paddingVertical: 15,
+    paddingHorizontal: 30,
     alignItems: 'center',
+    ...glow(c.blue),
   },
   primaryText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
 }));
