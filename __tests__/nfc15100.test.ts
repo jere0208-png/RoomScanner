@@ -19,8 +19,9 @@ import {
   wallToRooms,
   type RoomInput,
 } from '../src/geometry/nfc15100';
-import { buildMaterialPdf } from '../src/export/pdf';
+import { buildMaterialPdf, buildScanPdf } from '../src/export/pdf';
 import type { Fixture, FixtureKind } from '../src/geometry/electrical';
+import type { WallSeg } from '../src/geometry/floorplan';
 
 let n = 0;
 const fx = (kind: FixtureKind, wallId = 'w1', height = 0.25): Fixture => ({
@@ -274,5 +275,60 @@ describe('rattachement des pièces', () => {
     const map = wallToRooms(inputs);
     expect(map.get('refend')).toEqual(['r1', 'r2']);
     expect(map.get('n')).toEqual(['r1']);
+  });
+});
+
+describe('légende du plan exporté', () => {
+  const mur = (id: string, ax: number, az: number, bx: number, bz: number): WallSeg => ({
+    id,
+    type: 'wall',
+    a: { x: ax, z: az },
+    b: { x: bx, z: bz },
+    height: 2.5,
+    yCenter: 1.25,
+  });
+  const carre = [
+    mur('n', 0, 0, 4, 0),
+    mur('e', 4, 0, 4, 4),
+    mur('s', 4, 4, 0, 4),
+    mur('w', 0, 4, 0, 0),
+  ];
+  const latin1 = (bytes: Uint8Array) => {
+    let out = '';
+    for (let i = 0; i < bytes.length; i++) out += String.fromCharCode(bytes[i]);
+    return out;
+  };
+
+  it('ne liste que les appareils réellement posés', () => {
+    const s = latin1(
+      buildScanPdf(
+        {
+          name: 'Test',
+          walls: carre,
+          openings: [],
+          objects: [],
+          fixtures: [fx('prise', 'n'), fx('rj45', 'e')],
+        },
+        false,
+        { metre: false },
+      ),
+    );
+    expect(s).toContain('APPAREILLAGE');
+    expect(s).toContain('Prise 16 A');
+    expect(s).toContain('Prise RJ45');
+    // Rien d'autre : une légende qui liste tout le catalogue n'apprend rien.
+    expect(s).not.toContain('Interrupteur');
+    expect(s).not.toContain('Tableau');
+  });
+
+  it('sans appareil, aucune légende', () => {
+    const s = latin1(
+      buildScanPdf(
+        { name: 'Test', walls: carre, openings: [], objects: [], fixtures: [] },
+        false,
+        { metre: false },
+      ),
+    );
+    expect(s).not.toContain('APPAREILLAGE');
   });
 });

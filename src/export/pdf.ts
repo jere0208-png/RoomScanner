@@ -23,7 +23,18 @@ import {
   type WallSeg,
 } from '../geometry/floorplan';
 import { dotStep, floorDots, mixHex } from '../geometry/appearance';
-import type { Fixture } from '../geometry/electrical';
+import {
+  FIXTURES,
+  FIXTURE_SYMBOL,
+  FIXTURE_TAG,
+  faceX,
+  facePoint,
+  stackRanks,
+  wallFace,
+  type Fixture,
+  type FixtureKind,
+  type SymbolStroke,
+} from '../geometry/electrical';
 import type { MaterialList } from '../geometry/nfc15100';
 import {
   buildScene,
@@ -796,6 +807,45 @@ function planPage(
       );
     }
 
+    // ------------------------------------------- appareillage électrique
+    // Même convention qu'à l'écran : le symbole se pose DANS la pièce,
+    // devant la face qui le porte, relié au mur par un filet. Les appareils
+    // qui tombent au même point s'échelonnent le long de ce filet.
+    if (ctx.fixtures && ctx.fixtures.length > 0) {
+      const murQuads = wallQuads(walls);
+      const byId = new Map(walls.map((w) => [w.id, w]));
+      const poses = ctx.fixtures
+        .map((f) => {
+          const w = byId.get(f.wallId);
+          if (!w) return null;
+          const face = wallFace(w, murQuads.get(w.id), f.side);
+          return { f, face, along: faceX(face, f.along) };
+        })
+        .filter((v): v is NonNullable<typeof v> => !!v);
+      const ranks = stackRanks(
+        poses.map((v) => ({
+          id: v.f.id,
+          wallId: v.f.wallId,
+          side: v.f.side,
+          x: v.along,
+        })),
+      );
+      for (const { f, face, along } of poses) {
+        const spec = FIXTURES[f.kind];
+        const out = 0.2 + (ranks.get(f.id) ?? 0) * 0.24;
+        const anchor = px(facePoint(face, along, 0.02));
+        const q = px(facePoint(face, along, out));
+        d.path([anchor, q], 0.6, spec.color);
+        d.circle(q.x, q.y, 6.5, '#FFFFFF');
+        drawSymbol(d, FIXTURE_SYMBOL[f.kind] ?? [], q.x, q.y, 0.55, spec.color, 0.9);
+        const tag = FIXTURE_TAG[f.kind];
+        if (tag) d.text(tag, q.x + 13, q.y + 4, 5.5, spec.color, { align: 'left' });
+      }
+      // La légende, au pied de la feuille, à gauche du cartouche.
+      const presents = [...new Set(ctx.fixtures.map((f) => f.kind))];
+      drawElecLegend(d, presents, FRAME.x + 16, FRAME.y + TITLE_H + 26 + presents.length * 15);
+    }
+
     // Cartouche au centre de chaque pièce : son nom, sa surface. Le texte
     // rétrécit à mesure que les pièces se multiplient et se resserrent.
     if (showSurfaces) {
@@ -968,6 +1018,143 @@ export interface ScanForPdf {
   fixtures?: Fixture[];
 }
 
+
+// -------------------------------------- symboles électriques, en vectoriel
+
+/**
+ * Trace un symbole d'appareillage dans le PDF.
+ *
+ * Les symboles sont écrits une seule fois, en données de chemin SVG, et
+ * servent au plan de l'app comme à ce PDF : deux jeux de dessins finiraient
+ * par diverger. Il faut donc les relire ici — le générateur PDF ne parle pas
+ * SVG.
+ *
+ * Le sous-ensemble employé se limite à `M m H V L A a Z`, et **tous les arcs
+ * sont des demi-cercles dont la corde est le diamètre** (c'est ainsi que les
+ * symboles sont écrits : deux demi-arcs pour un cercle, un seul pour le
+ * socle de prise). Le centre est donc le milieu de la corde, et l'arc se
+ * réduit à un échantillonnage de douze segments — pas besoin de la
+ * paramétrisation générale des arcs SVG, qui serait une source de bogues
+ * pour rien.
+ */
+function drawSymbol(
+  d: Draw,
+  paths: SymbolStroke[],
+  cx: number,
+  cy: number,
+  k: number,
+  color: string,
+  width = 1.1,
+) {
+  // Repère du symbole : x vers la droite, y vers le BAS (comme en SVG) —
+  // le PDF ayant son y vers le haut, on inverse ici.
+  const P = (x: number, y: number): Pt => ({ x: cx + x * k, y: cy - y * k });
+  for (const seg of paths) {
+    const toks = seg.d.match(/[MmHVLAaZz]|-?\d*\.?\d+/g) ?? [];
+    let i = 0;
+    let x = 0;
+    let y = 0;
+    let pts: Pt[] = [];
+    const flush = () => {
+      if (pts.length >= 2) {
+        if (seg.fill) d.poly(pts, color, color, width);
+        else d.path(pts, width, color);
+      }
+      pts = [];
+    };
+    const num = () => parseFloat(toks[i++]);
+    while (i < toks.length) {
+      const cmd = toks[i++];
+      switch (cmd) {
+        case 'M':
+          flush();
+          x = num();
+          y = num();
+          pts.push(P(x, y));
+          break;
+        case 'm':
+          x += num();
+          y += num();
+          if (pts.length === 0) pts.push(P(x, y));
+          break;
+        case 'H':
+          x = num();
+          pts.push(P(x, y));
+          break;
+        case 'V':
+          y = num();
+          pts.push(P(x, y));
+          break;
+        case 'L':
+          x = num();
+          y = num();
+          pts.push(P(x, y));
+          break;
+        case 'A':
+        case 'a': {
+          const r = num();
+          num(); // ry, toujours égal à rx dans nos symboles
+          num(); // rotation
+          num(); // grand arc
+          const sweep = num();
+          const ex = cmd === 'A' ? num() : x + num();
+          const ey = cmd === 'A' ? num() : y + num();
+          // Demi-cercle : le centre est le milieu de la corde.
+          const mx = (x + ex) / 2;
+          const my = (y + ey) / 2;
+          const a0 = Math.atan2(y - my, x - mx);
+          const a1 = Math.atan2(ey - my, ex - mx);
+          let span = a1 - a0;
+          // Le sens du balayage est celui de l'écran (y vers le bas).
+          if (sweep === 1 && span < 0) span += Math.PI * 2;
+          if (sweep === 0 && span > 0) span -= Math.PI * 2;
+          for (let t = 1; t <= 12; t++) {
+            const a = a0 + (span * t) / 12;
+            pts.push(P(mx + r * Math.cos(a), my + r * Math.sin(a)));
+          }
+          x = ex;
+          y = ey;
+          break;
+        }
+        case 'Z':
+        case 'z':
+          if (pts.length >= 2) pts.push(pts[0]);
+          break;
+        default:
+          break;
+      }
+    }
+    flush();
+  }
+}
+
+/**
+ * La légende des symboles — **seulement ceux qui figurent sur le plan**.
+ * Une légende qui liste tout un catalogue n'apprend rien ; celle-ci se lit
+ * en trois secondes parce qu'elle ne parle que de ce qu'on a sous les yeux.
+ */
+function drawElecLegend(d: Draw, kinds: FixtureKind[], x: number, y: number) {
+  if (kinds.length === 0) return;
+  const lineH = 15;
+  const w = 132;
+  const h = 22 + kinds.length * lineH;
+  d.rect(x, y - h, w, h, '#FFFFFF', '#D6DBE3', 0.8);
+  d.text('APPAREILLAGE', x + 10, y - 14, 6.5, GREY_LIGHT, { align: 'left' });
+  kinds.forEach((kind, i) => {
+    const cy = y - 26 - i * lineH;
+    const spec = FIXTURES[kind];
+    drawSymbol(d, FIXTURE_SYMBOL[kind] ?? [], x + 18, cy - 1, 0.42, spec.color, 0.9);
+    const tag = FIXTURE_TAG[kind];
+    d.text(
+      fitText(tag ? `${spec.label} (${tag})` : spec.label, 7.5, w - 44),
+      x + 32,
+      cy - 3,
+      7.5,
+      INK,
+      { align: 'left' },
+    );
+  });
+}
 
 // ------------------------------------------ feuille « liste du matériel »
 

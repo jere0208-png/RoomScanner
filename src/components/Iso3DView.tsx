@@ -456,9 +456,7 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
     // ------------------------------------------- appareillage électrique
     // Le volume posé sur le mur fait 8 cm : à l'échelle d'un logement
     // entier, c'est deux pixels. On pose donc au-dessus un repère de taille
-    // FIXE — le même symbole que sur le plan — pour qu'un appareil se voie
-    // quel que soit le zoom. Et quand on s'approche vraiment, ses cotes
-    // s'affichent : c'est là qu'on vient les lire.
+    // FIXE pour qu'un appareil se voie quel que soit le zoom.
     if (!interacting) {
       const quads = wallQuads(keptWalls);
       const byId = new Map(keptWalls.map((w) => [w.id, w]));
@@ -473,17 +471,28 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
         const x = faceX(face, f.along);
         const p = facePoint(face, x, spec.depth + 0.01);
         const q = project({ x: p.x, y: f.height, z: p.z });
-        const proche = scale > 90;
+        // Un appareil qui se voit déjà n'a pas besoin d'un pictogramme
+        // par-dessus : le tableau fait 55 cm, son symbole lui masquait la
+        // façade. Le repère ne sert qu'à ce qui est trop petit pour être vu.
+        const grand = spec.w * scale > 30;
         items.push({
           kind: 'elec',
-          depth: q.depth + 0.05,
+          // AU-DESSUS de la géométrie, comme les cartouches de pièce.
+          //
+          // Trié à sa profondeur, un repère bas — une prise à 20 cm —
+          // passait AVANT le pan de mur qui le porte, et le mur le
+          // repeignait aussitôt : on ne voyait plus que sa cote, qui
+          // dépassait sous le mur. Un repère est une annotation, pas un
+          // volume ; il se lit par-dessus, et c'est le masquage des faces
+          // arrière qui l'empêche de traverser une cloison.
+          depth: 1e6,
           x: q.sx,
           y: q.sy,
           color: spec.color,
-          symbol: FIXTURE_SYMBOL[f.kind] ?? [],
-          tag: FIXTURE_TAG[f.kind],
-          haut: proche ? `${Math.round(f.height * 100)}` : undefined,
-          bord: proche ? `${Math.round(x * 100)}` : undefined,
+          symbol: grand ? [] : FIXTURE_SYMBOL[f.kind] ?? [],
+          tag: grand ? undefined : FIXTURE_TAG[f.kind],
+          haut: scale > 90 ? `${Math.round(f.height * 100)}` : undefined,
+          bord: scale > 90 ? `${Math.round(x * 100)}` : undefined,
         });
       }
     }
@@ -682,20 +691,34 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
                 <Circle key={i} cx={item.x} cy={item.y} r={1.1} fill={item.color} />
               ) : item.kind === 'elec' ? (
                 <G key={i}>
-                  <Circle cx={item.x} cy={item.y} r={11} fill={c.surface} opacity={0.94} />
-                  <G transform={`translate(${item.x}, ${item.y})`}>
-                    {item.symbol.map((seg, si) => (
-                      <Path
-                        key={si}
-                        d={seg.d}
+                  {item.symbol.length > 0 && (
+                    <>
+                      {/* Un cerne de la couleur de l'appareil : le disque
+                          blanc seul disparaissait sur un mur blanc. */}
+                      <Circle
+                        cx={item.x}
+                        cy={item.y}
+                        r={11}
+                        fill={c.surface}
                         stroke={item.color}
-                        strokeWidth={1.6}
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        fill={seg.fill ? item.color : 'none'}
+                        strokeWidth={1.2}
+                        opacity={0.96}
                       />
-                    ))}
-                  </G>
+                      <G transform={`translate(${item.x}, ${item.y})`}>
+                        {item.symbol.map((seg, si) => (
+                          <Path
+                            key={si}
+                            d={seg.d}
+                            stroke={item.color}
+                            strokeWidth={1.6}
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            fill={seg.fill ? item.color : 'none'}
+                          />
+                        ))}
+                      </G>
+                    </>
+                  )}
                   {item.tag && (
                     <SvgText
                       x={item.x + 12}
@@ -708,24 +731,55 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
                   )}
                   {item.haut && (
                     <>
+                      {/* Étiquette de cotes : une pastille sombre, deux
+                          lignes « intitulé + valeur ». Les flèches ⇕ ⇔ de
+                          la première version sortaient en gros glyphes de
+                          police système, et « 135 » sans rien pour dire de
+                          quoi il s'agit ne veut rien dire. */}
                       <Rect
-                        x={item.x - 26}
-                        y={item.y + 13}
-                        width={52}
-                        height={15}
-                        rx={4}
-                        fill={c.surface}
-                        stroke={item.color}
-                        strokeWidth={0.8}
+                        x={item.x - 30}
+                        y={item.y + 14}
+                        width={60}
+                        height={28}
+                        rx={7}
+                        fill="#0B0D12"
+                        opacity={0.88}
                       />
                       <SvgText
-                        x={item.x}
-                        y={item.y + 23.5}
-                        fill={c.ink}
-                        fontSize={9}
+                        x={item.x - 23}
+                        y={item.y + 25}
+                        fill="#FFFFFF"
+                        fontSize={7.5}
+                        fontWeight="700"
+                        opacity={0.55}>
+                        SOL
+                      </SvgText>
+                      <SvgText
+                        x={item.x + 24}
+                        y={item.y + 25}
+                        fill="#FFFFFF"
+                        fontSize={10}
                         fontWeight="800"
-                        textAnchor="middle">
-                        {`↕${item.haut} ↔${item.bord}`}
+                        textAnchor="end">
+                        {`${item.haut} cm`}
+                      </SvgText>
+                      <SvgText
+                        x={item.x - 23}
+                        y={item.y + 37}
+                        fill="#FFFFFF"
+                        fontSize={7.5}
+                        fontWeight="700"
+                        opacity={0.55}>
+                        BORD
+                      </SvgText>
+                      <SvgText
+                        x={item.x + 24}
+                        y={item.y + 37}
+                        fill="#FFFFFF"
+                        fontSize={10}
+                        fontWeight="800"
+                        textAnchor="end">
+                        {`${item.bord} cm`}
                       </SvgText>
                     </>
                   )}

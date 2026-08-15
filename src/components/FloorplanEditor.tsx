@@ -320,6 +320,20 @@ export function FloorplanEditor({
     ? Math.min(1, Math.max(0, (mapping.scale - 55) / 40))
     : 0;
 
+  /**
+   * Niveau de détail de l'appareillage, de 0 à 1.
+   *
+   * Un symbole de plan fait 22 px, quel que soit le zoom : de loin, trois
+   * prises sur le même pan se chevauchent en une bouillie. En dessous de
+   * 60 px/m, il ne reste donc qu'un POINT de la couleur de l'appareil — on
+   * voit qu'il y a quelque chose, et combien —, et le symbole ne revient
+   * qu'au-delà de 100 px/m, quand il a la place de se lire. Entre les deux,
+   * l'un s'efface pendant que l'autre paraît.
+   */
+  const elecLod = mapping
+    ? Math.min(1, Math.max(0, (mapping.scale - 60) / 40))
+    : 0;
+
   // Corps des murs : onglets calculés une fois pour tout le rendu.
   const quads = useMemo(() => wallQuads(walls), [walls]);
   const wallById = useMemo(
@@ -587,7 +601,7 @@ export function FloorplanEditor({
                 const tag = FIXTURE_TAG[f.kind];
                 // Échelonnement : le deuxième appareil du même point se pose
                 // plus loin du mur, sur le même filet.
-                const out = 0.2 + (ranks.get(f.id) ?? 0) * 0.24;
+                const out = 0.14 + (ranks.get(f.id) ?? 0) * (0.1 + 0.14 * elecLod);
                 const anchor = mapping.toPx(facePoint(face, x, 0.02));
                 const p = mapping.toPx(facePoint(face, x, out));
                 // Le symbole regarde SA face : sa tige rejoint le mur. Le
@@ -602,40 +616,53 @@ export function FloorplanEditor({
                         ? () => onSelectFixture(f.id, f.wallId)
                         : undefined
                     }>
-                    <Line
-                      x1={anchor.x}
-                      y1={anchor.y}
-                      x2={p.x}
-                      y2={p.y}
-                      stroke={spec.color}
-                      strokeWidth={1.2}
-                    />
-                    {/* Cible tactile élargie : le symbole fait 20 px, le
+                    {/* Cible tactile élargie : le symbole fait 22 px, le
                         doigt en demande le double. */}
                     <Circle cx={p.x} cy={p.y} r={18} fill="transparent" />
-                    <Circle cx={p.x} cy={p.y} r={11} fill={c.surface} />
-                    <G transform={`translate(${p.x}, ${p.y}) rotate(${dir})`}>
-                      {symbol.map((seg, si) => (
-                        <Path
-                          key={si}
-                          d={seg.d}
-                          stroke={spec.color}
-                          strokeWidth={1.6}
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          fill={seg.fill ? spec.color : 'none'}
-                        />
-                      ))}
-                    </G>
-                    {tag && (
-                      <SvgText
-                        x={p.x + 12}
-                        y={p.y - 8}
+                    {elecLod < 0.98 && (
+                      <Circle
+                        cx={p.x}
+                        cy={p.y}
+                        r={4}
                         fill={spec.color}
-                        fontSize={8}
-                        fontWeight="800">
-                        {tag}
-                      </SvgText>
+                        opacity={1 - elecLod}
+                      />
+                    )}
+                    {elecLod > 0.02 && (
+                      <G opacity={elecLod}>
+                        <Line
+                          x1={anchor.x}
+                          y1={anchor.y}
+                          x2={p.x}
+                          y2={p.y}
+                          stroke={spec.color}
+                          strokeWidth={1.2}
+                        />
+                        <Circle cx={p.x} cy={p.y} r={11} fill={c.surface} />
+                        <G transform={`translate(${p.x}, ${p.y}) rotate(${dir})`}>
+                          {symbol.map((seg, si) => (
+                            <Path
+                              key={si}
+                              d={seg.d}
+                              stroke={spec.color}
+                              strokeWidth={1.6}
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              fill={seg.fill ? spec.color : 'none'}
+                            />
+                          ))}
+                        </G>
+                        {tag && (
+                          <SvgText
+                            x={p.x + 12}
+                            y={p.y - 8}
+                            fill={spec.color}
+                            fontSize={8}
+                            fontWeight="800">
+                            {tag}
+                          </SvgText>
+                        )}
+                      </G>
                     )}
                   </G>
                 );

@@ -450,14 +450,38 @@ n'en voyait qu'un, et le plan mentait. `stackRanks()` les range par seau de
 12 cm et les décale le long de leur filet de rappel, du mur vers l'intérieur
 de la pièce, dans l'ordre où ils ont été posés.
 
+**Sur le plan dézoomé, un point de couleur.** Un symbole fait 22 px quel que
+soit le zoom : de loin, trois prises sur le même pan se chevauchent en une
+bouillie. En dessous de 60 px/m il ne reste donc qu'un point de la couleur de
+l'appareil — on voit qu'il y a quelque chose, et combien — et le symbole ne
+revient qu'au-delà de 100 px/m, quand il a la place de se lire. Entre les
+deux, l'un s'efface pendant que l'autre paraît.
+
+**Le plan exporté porte les mêmes symboles et sa légende** — uniquement les
+types réellement posés : une légende qui liste tout un catalogue n'apprend
+rien. Les symboles sont écrits UNE fois, en données de chemin SVG, et servent
+l'écran comme le PDF ; celui-ci les relit avec un traceur minimal (`M m H V L
+A a Z`), qui traite chaque arc comme un demi-cercle dont la corde est le
+diamètre — c'est ainsi que tous nos symboles sont écrits, et ça évite la
+paramétrisation générale des arcs SVG, source de bogues pour rien.
+
 **En 3D, un repère de taille fixe.** Le volume posé sur le mur fait 8 cm : à
 l'échelle d'un logement entier, c'est deux pixels — l'appareil existait mais
 ne se voyait pas. Le même symbole est donc posé par-dessus, à taille
 constante quel que soit le zoom, et masqué dès que sa face tourne le dos à la
 caméra. **En s'approchant** (au-delà de 90 px par mètre), il déplie ses deux
-cotes : hauteur d'axe et distance au bord gauche de la face. C'est là qu'on
-vient les lire, et nulle part ailleurs — les afficher en permanence noierait
-le modèle.
+cotes dans une pastille sombre à deux lignes — « SOL 135 cm », « BORD 38 cm ».
+La première version montrait « ⇕135 ⇔38 » : les flèches sortaient en gros
+glyphes de police système, et un nombre sans rien pour dire de quoi il s'agit
+ne veut rien dire.
+
+Deux détails appris sur l'appareil. Le repère est trié **au-dessus de toute
+la géométrie**, comme les cartouches de pièce : trié à sa profondeur, un
+repère bas — une prise à 20 cm — passait AVANT le pan de mur qui le porte,
+et le mur le repeignait aussitôt ; on ne voyait plus que sa cote, qui
+dépassait sous le mur. Et un appareil **déjà visible n'en reçoit pas** : le
+tableau fait 55 cm, son pictogramme lui masquait la façade. Le repère ne sert
+qu'à ce qui est trop petit pour se voir.
 
 **Limite** : tout s'accroche à un mur. Les points de plafond — DCL, spots,
 détecteur de fumée — n'ont pas de support dans ce modèle et ne sont pas
