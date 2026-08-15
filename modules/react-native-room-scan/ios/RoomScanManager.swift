@@ -29,9 +29,9 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
   // déjà recalées les unes par rapport aux autres — sans aucun recollement
   // géométrique à faire côté JS.
 
-  /// Données brutes de chaque pièce close, dans l'ordre de capture.
-  private var roomData: [CapturedRoomData] = []
   /// Pièces post-traitées, exprimées dans le repère commun de la session.
+  /// C'est la seule chose qu'on garde : `StructureBuilder` assemble des
+  /// `CapturedRoom`, pas les données brutes dont elles sont tirées.
   private var rooms: [CapturedRoom] = []
   /// Promesse de `finishRoom` en attente du post-traitement de la pièce.
   private var roomResolver: RCTPromiseResolveBlock?
@@ -69,7 +69,6 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
   func start(fresh: Bool = true) {
     if fresh {
       RoomColorSampler.shared.reset()
-      roomData.removeAll()
       rooms.removeAll()
       multiRoom = false
     }
@@ -155,7 +154,6 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
                   reject: @escaping RCTPromiseRejectBlock) {
     RoomColorSampler.shared.detach()
     let captured = rooms
-    let raw = roomData
     guard !captured.isEmpty else {
       reject("NO_ROOM", "Aucune pièce terminée", nil)
       return
@@ -172,7 +170,7 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
       if captured.count > 1 {
         do {
           let structure = try await StructureBuilder(options: [.beautifyObjects])
-            .capturedStructure(from: raw)
+            .capturedStructure(from: captured)
           try structure.export(to: usdzURL, exportOptions: .parametric)
           exported = true
         } catch {
@@ -320,30 +318,30 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
     }
     // Hors multi-pièces (iOS 16), le résultat arrive par captureView(didPresent:).
     guard #available(iOS 17.0, *), multiRoom, roomResolver != nil else { return }
-    let index = roomData.count
-    roomData.append(data)
-    buildRoom(from: data, index: index)
+    buildRoom(from: data)
   }
 
   /// Post-traitement d'une pièce, hors de RoomCaptureView : c'est ce qui
   /// permet de garder la vue en mode capture d'une pièce à l'autre.
   @available(iOS 17.0, *)
-  private func buildRoom(from data: CapturedRoomData, index: Int) {
+  private func buildRoom(from data: CapturedRoomData) {
     Task {
       do {
         let room = try await RoomBuilder(options: [.beautifyObjects])
           .capturedRoom(from: data)
-        DispatchQueue.main.async { self.roomDidProcess(room, index: index) }
+        DispatchQueue.main.async { self.roomDidProcess(room) }
       } catch {
-        DispatchQueue.main.async { self.roomDidFail(error, index: index) }
+        DispatchQueue.main.async { self.roomDidFail(error) }
       }
     }
   }
 
-  private func roomDidProcess(_ room: CapturedRoom, index: Int) {
+  /// Une pièce de plus au compteur. Seules les pièces dont on a réellement
+  /// tiré une géométrie sont retenues : `finishScan` n'assemblera pas de vide.
+  private func roomDidProcess(_ room: CapturedRoom) {
     rooms.append(room)
     roomResolver?([
-      "index": index,
+      "index": rooms.count - 1,
       "wallCount": room.walls.count,
       "objectCount": room.objects.count,
       "doorCount": room.doors.count,
@@ -354,10 +352,7 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
     roomRejecter = nil
   }
 
-  private func roomDidFail(_ error: Error, index: Int) {
-    // La pièce ne compte pas : sinon StructureBuilder assemblerait des
-    // données dont on n'a jamais tiré de géométrie.
-    if roomData.count == index + 1 { roomData.removeLast() }
+  private func roomDidFail(_ error: Error) {
     roomRejecter?("ROOM_PROCESSING_FAILED", error.localizedDescription, error)
     roomResolver = nil
     roomRejecter = nil
