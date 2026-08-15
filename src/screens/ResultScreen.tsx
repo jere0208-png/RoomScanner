@@ -702,7 +702,7 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     borderRadius: radius.md,
     paddingVertical: 15,
     alignItems: 'center',
-    marginTop: 4,
+    marginTop: 14,
     shadowColor: c.blue,
     shadowOpacity: 0.3,
     shadowRadius: 10,
@@ -722,7 +722,7 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     marginTop: 4,
   },
   switchLabel: { color: c.ink, fontSize: 14.5, fontWeight: '600' },
-  actions: { flexDirection: 'row', gap: 10, paddingBottom: 20, paddingTop: 8 },
+  actions: { flexDirection: 'row', gap: 10, paddingBottom: 34, paddingTop: 8 },
   primaryButton: {
     flex: 1,
     backgroundColor: c.blue,
