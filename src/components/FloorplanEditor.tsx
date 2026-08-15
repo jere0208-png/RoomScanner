@@ -17,7 +17,7 @@ import {
   toFootprint,
   type WallSeg,
 } from '../geometry/floorplan';
-import { furnKind, furnitureStrokes } from '../geometry/furniture';
+import { frCategory, furnKind, furnitureStrokes } from '../geometry/furniture';
 
 interface EffMapping {
   scale: number;
@@ -233,6 +233,19 @@ export function FloorplanEditor({
                       ))}
                     </G>
                   ))}
+                  {/* Nom du meuble (horizontal, si la place le permet) */}
+                  {w > 46 && d > 18 && (
+                    <SvgText
+                      transform={`rotate(${(-(f.yaw + view.rot) * 180) / Math.PI})`}
+                      x={0}
+                      y={3}
+                      fill={c.inkSoft}
+                      fontSize={8.5}
+                      fontWeight="600"
+                      textAnchor="middle">
+                      {frCategory(f.category)}
+                    </SvgText>
+                  )}
                 </G>
               );
             })}
@@ -378,12 +391,12 @@ function CornerHandle({
   );
 
   const px = mapping.toPx(corner);
+  // Zone de saisie invisible : le coin se déplace au doigt, sans marqueur.
   return (
     <View
       {...pan.panHandlers}
-      style={[styles.handle, { left: px.x - 16, top: px.y - 16 }]}>
-      <View style={styles.handleDot} />
-    </View>
+      style={[styles.handle, { left: px.x - 16, top: px.y - 16 }]}
+    />
   );
 }
 

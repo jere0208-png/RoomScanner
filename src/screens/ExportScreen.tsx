@@ -233,18 +233,20 @@ export function ExportScreen() {
   return (
     <View style={styles.container}>
       <Animated.View
-        style={{
-          flex: 1,
-          opacity: fade,
-          transform: [
-            {
-              translateY: fade.interpolate({
-                inputRange: [0, 1],
-                outputRange: [8, 0],
-              }),
-            },
-          ],
-        }}>
+        style={[
+          styles.fadeWrap,
+          {
+            opacity: fade,
+            transform: [
+              {
+                translateY: fade.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [8, 0],
+                }),
+              },
+            ],
+          },
+        ]}>
       <View style={styles.headerRow}>
         <TouchableOpacity style={styles.roundButton} onPress={() => setScreen('result')}>
           <Text style={styles.backChevron}>‹</Text>
@@ -383,6 +385,7 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   },
   // Zone centrale du modèle : les gouttières latérales restent au scroll.
   lockWrap: { marginHorizontal: 32 },
+  fadeWrap: { flex: 1 },
   sheetLabel: {
     color: c.inkSoft,
     fontSize: 12.5,

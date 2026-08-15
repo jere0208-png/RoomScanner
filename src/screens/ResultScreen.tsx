@@ -46,6 +46,8 @@ export function ResultScreen() {
   const commitCurrent = useScanStore((s) => s.commitCurrent);
   const showFurniture = useScanStore((s) => s.showFurniture);
   const setShowFurniture = useScanStore((s) => s.setShowFurniture);
+  const addOpening = useScanStore((s) => s.addOpening);
+  const resultOrigin = useScanStore((s) => s.resultOrigin);
   const setScreen = useScanStore((s) => s.setScreen);
   const reset = useScanStore((s) => s.reset);
   const styles = getStyles(useTheme());
@@ -156,7 +158,11 @@ export function ResultScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.headerRow}>
-        <TouchableOpacity style={styles.backButton} onPress={() => setScreen('home')}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() =>
+            setScreen(resultOrigin === 'library' ? 'library' : 'home')
+          }>
           <Text style={styles.backChevron}>‹</Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -269,6 +275,11 @@ export function ResultScreen() {
                 onSubmitEditing={applyLength}
               />
               <Text style={styles.unit}>m</Text>
+              <TouchableOpacity
+                style={styles.openingButton}
+                onPress={() => selectedWallId && addOpening(selectedWallId)}>
+                <Text style={styles.openingText}>+ Ouverture</Text>
+              </TouchableOpacity>
               <TouchableOpacity style={styles.applyButton} onPress={applyLength}>
                 <Text style={styles.applyText}>Appliquer</Text>
               </TouchableOpacity>
@@ -672,17 +683,25 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     paddingVertical: 9,
     fontSize: 17,
     fontWeight: '700',
-    minWidth: 90,
+    minWidth: 70,
     borderWidth: 1,
     borderColor: c.lineStrong,
   },
   unit: { color: c.inkSoft, fontSize: 15, marginHorizontal: 10 },
+  openingButton: {
+    backgroundColor: c.surfaceSunken,
+    borderRadius: radius.sm,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    marginLeft: 'auto',
+    marginRight: 8,
+  },
+  openingText: { color: c.inkSoft, fontWeight: '700', fontSize: 13 },
   applyButton: {
     backgroundColor: c.blue,
     borderRadius: radius.sm,
     paddingHorizontal: 18,
     paddingVertical: 11,
-    marginLeft: 'auto',
   },
   applyText: { color: '#FFFFFF', fontWeight: '700', fontSize: 14 },
   objectList: { maxHeight: 58, marginBottom: 6, flexGrow: 0 },

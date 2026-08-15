@@ -1,5 +1,6 @@
 import Foundation
 import RoomPlan
+import SceneKit
 import simd
 import React
 
@@ -101,6 +102,9 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
       let usdzURL = docs.appendingPathComponent("scan-\(UUID().uuidString).usdz")
       // .parametric = murs/portes propres (pas le maillage brut).
       try processedResult.export(to: usdzURL, exportOptions: .parametric)
+      // L'USDZ RoomPlan est blanc uniforme : invisible sur le fond blanc
+      // de Quick Look. On teinte murs (gris clair) et meubles (gris-bleu).
+      Self.tintModel(at: usdzURL)
 
       let payload: [String: Any] = [
         "modelPath": usdzURL.path,
@@ -174,6 +178,32 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
         "confidence": String(describing: obj.confidence),
         "transform": matrixToArray(obj.transform),
       ]
+    }
+  }
+
+  /// Recolore l'USDZ exporté : sans teinte, tout est blanc sur fond blanc
+  /// dans Quick Look. Non fatal : en cas d'échec, le modèle reste blanc.
+  static func tintModel(at url: URL) {
+    do {
+      let scene = try SCNScene(url: url, options: nil)
+      let wallColor = UIColor(red: 0.86, green: 0.88, blue: 0.92, alpha: 1)
+      let objectColor = UIColor(red: 0.62, green: 0.68, blue: 0.78, alpha: 1)
+      let floorColor = UIColor(red: 0.78, green: 0.80, blue: 0.84, alpha: 1)
+      scene.rootNode.enumerateHierarchy { node, _ in
+        guard let geometry = node.geometry else { return }
+        let name = (node.name ?? "").lowercased()
+        let isStructure = name.contains("wall") || name.contains("door")
+          || name.contains("window") || name.contains("opening")
+        let isFloor = name.contains("floor")
+        for material in geometry.materials {
+          material.diffuse.contents =
+            isFloor ? floorColor : (isStructure ? wallColor : objectColor)
+          material.roughness.contents = 0.7
+        }
+      }
+      try scene.write(to: url, options: nil, delegate: nil, progressHandler: nil)
+    } catch {
+      // Modèle laissé tel quel.
     }
   }
 

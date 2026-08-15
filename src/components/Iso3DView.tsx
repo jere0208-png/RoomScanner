@@ -265,6 +265,61 @@ export function Iso3DView({ value, onChange, showMeasures }: Props) {
       return l[0] === id ? WALL_T / 2 : -WALL_T / 2;
     };
 
+    // Subdivision en bandes de 60 cm : le tri « du peintre » par profondeur
+    // moyenne devient localement juste — plus de meuble à moitié avalé par
+    // un grand pan de mur. Les contours sont redessinés par-dessus.
+    const STEP = 0.6;
+    const lerp2 = (
+      P: { x: number; z: number },
+      Q: { x: number; z: number },
+      t: number,
+    ) => ({ x: P.x + (Q.x - P.x) * t, z: P.z + (Q.z - P.z) * t });
+    const pushStrips = (
+      p: { x: number; z: number },
+      q: { x: number; z: number },
+      yb: number,
+      yt: number,
+      fill: string,
+      shade?: boolean,
+    ) => {
+      const n = Math.max(1, Math.ceil(Math.hypot(q.x - p.x, q.z - p.z) / STEP));
+      for (let i = 0; i < n; i++) {
+        list.push({
+          pts: vquad(lerp2(p, q, i / n), lerp2(p, q, (i + 1) / n), yb, yt),
+          fill,
+          stroke: 'none',
+          shade,
+        });
+      }
+    };
+    const pushTopStrips = (
+      e1a: { x: number; z: number },
+      e1b: { x: number; z: number },
+      e2a: { x: number; z: number },
+      e2b: { x: number; z: number },
+      y: number,
+      fill: string,
+    ) => {
+      const n = Math.max(1, Math.ceil(Math.hypot(e1b.x - e1a.x, e1b.z - e1a.z) / STEP));
+      for (let i = 0; i < n; i++) {
+        const t0 = i / n;
+        const t1 = (i + 1) / n;
+        list.push({
+          pts: [
+            lerp2(e1a, e1b, t0),
+            lerp2(e1a, e1b, t1),
+            lerp2(e2a, e2b, t1),
+            lerp2(e2a, e2b, t0),
+          ].map((p) => ({ x: p.x, y, z: p.z })),
+          fill,
+          stroke: 'none',
+        });
+      }
+    };
+    const pushOutline = (pts: P3[], stroke: string) => {
+      list.push({ pts, fill: 'none', stroke, bias: 0.001 });
+    };
+
     // Murs épais : boîte (2 longs pans, 2 chants, 1 dessus).
     for (const w of walls) {
       const dx = w.b.x - w.a.x;
@@ -283,13 +338,17 @@ export function Iso3DView({ value, onChange, showMeasures }: Props) {
       const b1 = { x: pb.x + nx, z: pb.z + nz };
       const b2 = { x: pb.x - nx, z: pb.z - nz };
 
-      const sides: [typeof a1, typeof a1][] = [
+      for (const [p, q] of [
         [a1, b1],
         [b2, a2],
+      ] as const) {
+        pushStrips(p, q, 0, w.height, '#FFFFFF', true);
+        pushOutline(vquad(p, q, 0, w.height), '#8A94A6');
+      }
+      for (const [p, q] of [
         [a2, a1],
         [b1, b2],
-      ];
-      for (const [p, q] of sides) {
+      ] as const) {
         list.push({
           pts: vquad(p, q, 0, w.height),
           fill: '#FFFFFF',
@@ -297,11 +356,11 @@ export function Iso3DView({ value, onChange, showMeasures }: Props) {
           shade: true,
         });
       }
-      list.push({
-        pts: [a1, b1, b2, a2].map((p) => ({ x: p.x, y: w.height, z: p.z })),
-        fill: '#F4F7FB',
-        stroke: '#94A0B4',
-      });
+      pushTopStrips(a1, b1, a2, b2, w.height, '#F4F7FB');
+      pushOutline(
+        [a1, b1, b2, a2].map((p) => ({ x: p.x, y: w.height, z: p.z })),
+        '#94A0B4',
+      );
     }
 
     // Portes / fenêtres : posées sur le mur, à leur vraie hauteur.
@@ -337,17 +396,16 @@ export function Iso3DView({ value, onChange, showMeasures }: Props) {
       const yBase = Math.max(0, obj.yCenter - obj.height / 2 - floorY);
       const yTop = yBase + obj.height;
       for (let i = 0; i < 4; i++) {
-        list.push({
-          pts: vquad(corners[i], corners[(i + 1) % 4], yBase, yTop),
-          fill: '#D8E1F2',
-          stroke: '#9FACBF',
-        });
+        const p = corners[i];
+        const q = corners[(i + 1) % 4];
+        pushStrips(p, q, yBase, yTop, '#D8E1F2');
+        pushOutline(vquad(p, q, yBase, yTop), '#9FACBF');
       }
-      list.push({
-        pts: corners.map((p) => ({ x: p.x, y: yTop, z: p.z })),
-        fill: '#E9EEF9',
-        stroke: '#9FACBF',
-      });
+      pushTopStrips(corners[0], corners[1], corners[3], corners[2], yTop, '#E9EEF9');
+      pushOutline(
+        corners.map((p) => ({ x: p.x, y: yTop, z: p.z })),
+        '#9FACBF',
+      );
     }
 
     return list;

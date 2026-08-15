@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { ObjectData, ScanResult, ScanUpdate } from 'react-native-room-scan';
 import {
+  segLength,
   snapAngle,
   toSegment,
   weldCorners,
@@ -65,6 +66,8 @@ interface ScanState {
   currentSaveId: string | null;
   /** Modifications du plan non enregistrées (bouton de sauvegarde visible). */
   dirty: boolean;
+  /** D'où vient l'écran résultat : le bouton retour y renvoie. */
+  resultOrigin: 'scan' | 'library';
   walls: WallSeg[];
   openings: WallSeg[];
   objects: ObjectData[];
@@ -99,6 +102,8 @@ interface ScanState {
   saveAsCopy: (name: string) => void;
   /** Enregistre les modifications du plan dans la bibliothèque. */
   commitCurrent: () => void;
+  /** Ajoute une ouverture manuelle centrée sur un mur (entrée sans porte, baie…). */
+  addOpening: (wallId: string) => void;
   loadSaves: () => Promise<void>;
   openSave: (id: string) => void;
   deleteSave: (id: string) => void;
@@ -143,6 +148,7 @@ export const useScanStore = create<ScanState>((set, get) => {
     scanName: '',
     currentSaveId: null,
     dirty: false,
+    resultOrigin: 'scan',
     walls: [],
     openings: [],
     objects: [],
@@ -222,6 +228,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         scanName: save.name,
         currentSaveId: save.id,
         dirty: false,
+        resultOrigin: 'scan',
         walls,
         openings,
         objects,
@@ -291,6 +298,29 @@ export const useScanStore = create<ScanState>((set, get) => {
       set({ dirty: false });
     },
 
+    addOpening: (wallId) => {
+      const st = get();
+      const wall = st.walls.find((w) => w.id === wallId);
+      if (!wall) return;
+      const wallLen = segLength(wall);
+      if (wallLen < 0.4) return;
+      const len = Math.min(1, wallLen * 0.6);
+      const ux = (wall.b.x - wall.a.x) / wallLen;
+      const uz = (wall.b.z - wall.a.z) / wallLen;
+      const mid = { x: (wall.a.x + wall.b.x) / 2, z: (wall.a.z + wall.b.z) / 2 };
+      const h = Math.min(2.05, wall.height * 0.85);
+      const base = wall.yCenter - wall.height / 2;
+      const opening: WallSeg = {
+        id: `op-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        type: 'opening',
+        a: { x: mid.x - (ux * len) / 2, z: mid.z - (uz * len) / 2 },
+        b: { x: mid.x + (ux * len) / 2, z: mid.z + (uz * len) / 2 },
+        height: h,
+        yCenter: base + h / 2,
+      };
+      set({ openings: [...st.openings, opening], dirty: true });
+    },
+
     /** Enregistre l'état courant comme NOUVELLE entrée de bibliothèque
      *  (l'original reste tel quel) et bascule dessus. */
     saveAsCopy: (name) => {
@@ -347,6 +377,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         openings: save.openings,
         objects: save.objects,
         dirty: false,
+        resultOrigin: 'library',
         screen: 'result',
       });
     },

@@ -14,7 +14,7 @@ import {
   toFootprint,
   type WallSeg,
 } from '../geometry/floorplan';
-import { furnKind, furnitureStrokes } from '../geometry/furniture';
+import { frCategory, furnKind, furnitureStrokes } from '../geometry/furniture';
 
 const PAGE_W = 595;
 const PAGE_H = 842;
@@ -346,7 +346,7 @@ interface P3 {
 }
 interface Face {
   pts: P3[];
-  fill: string;
+  fill: string | null;
   stroke: string | null;
   shade?: boolean;
   bias?: number;
@@ -444,17 +444,75 @@ function buildFaces(
     { x: p.x, y: yt, z: p.z },
   ];
 
+  // Subdivision en bandes de 60 cm : tri de profondeur localement juste
+  // (mêmes règles que la vue 3D de l'app), contours redessinés par-dessus.
+  const STEP = 0.6;
+  const lerp2 = (
+    P: { x: number; z: number },
+    Q: { x: number; z: number },
+    t: number,
+  ) => ({ x: P.x + (Q.x - P.x) * t, z: P.z + (Q.z - P.z) * t });
+  const pushStrips = (
+    p: { x: number; z: number },
+    q: { x: number; z: number },
+    yb: number,
+    yt: number,
+    fill: string,
+    shade?: boolean,
+  ) => {
+    const n = Math.max(1, Math.ceil(Math.hypot(q.x - p.x, q.z - p.z) / STEP));
+    for (let i = 0; i < n; i++) {
+      faces.push({
+        pts: vquad(lerp2(p, q, i / n), lerp2(p, q, (i + 1) / n), yb, yt),
+        fill,
+        stroke: null,
+        shade,
+      });
+    }
+  };
+  const pushTopStrips = (
+    e1a: { x: number; z: number },
+    e1b: { x: number; z: number },
+    e2a: { x: number; z: number },
+    e2b: { x: number; z: number },
+    y: number,
+    fill: string,
+  ) => {
+    const n = Math.max(1, Math.ceil(Math.hypot(e1b.x - e1a.x, e1b.z - e1a.z) / STEP));
+    for (let i = 0; i < n; i++) {
+      const t0 = i / n;
+      const t1 = (i + 1) / n;
+      faces.push({
+        pts: [
+          lerp2(e1a, e1b, t0),
+          lerp2(e1a, e1b, t1),
+          lerp2(e2a, e2b, t1),
+          lerp2(e2a, e2b, t0),
+        ].map((p) => ({ x: p.x, y, z: p.z })),
+        fill,
+        stroke: null,
+      });
+    }
+  };
+  const pushOutline = (pts: P3[], stroke: string) => {
+    faces.push({ pts, fill: null, stroke, bias: 0.001 });
+  };
+
   const counts = cornerCounts(walls);
   for (const w of walls) {
     const { corners } = thickWallRect(w, counts);
     const [a1, b1, b2, a2] = corners;
-    const sides: [typeof a1, typeof a1][] = [
+    for (const [p, q] of [
       [a1, b1],
       [b2, a2],
+    ] as const) {
+      pushStrips(p, q, 0, w.height, '#FFFFFF', true);
+      pushOutline(vquad(p, q, 0, w.height), '#77828F');
+    }
+    for (const [p, q] of [
       [a2, a1],
       [b1, b2],
-    ];
-    for (const [p, q] of sides) {
+    ] as const) {
       faces.push({
         pts: vquad(p, q, 0, w.height),
         fill: '#FFFFFF',
@@ -462,11 +520,11 @@ function buildFaces(
         shade: true,
       });
     }
-    faces.push({
-      pts: corners.map((p) => ({ x: p.x, y: w.height, z: p.z })),
-      fill: '#F2F5F9',
-      stroke: '#77828F',
-    });
+    pushTopStrips(a1, b1, a2, b2, w.height, '#F2F5F9');
+    pushOutline(
+      [a1, b1, b2, a2].map((p) => ({ x: p.x, y: w.height, z: p.z })),
+      '#77828F',
+    );
   }
 
   for (const o of openings) {
@@ -500,17 +558,16 @@ function buildFaces(
     const yb = Math.max(0, obj.yCenter - obj.height / 2 - floorY);
     const yt = yb + obj.height;
     for (let i = 0; i < 4; i++) {
-      faces.push({
-        pts: vquad(corners[i], corners[(i + 1) % 4], yb, yt),
-        fill: '#D8E1F2',
-        stroke: '#9FACBF',
-      });
+      const p = corners[i];
+      const q = corners[(i + 1) % 4];
+      pushStrips(p, q, yb, yt, '#D8E1F2');
+      pushOutline(vquad(p, q, yb, yt), '#9FACBF');
     }
-    faces.push({
-      pts: corners.map((p) => ({ x: p.x, y: yt, z: p.z })),
-      fill: '#E9EEF9',
-      stroke: '#9FACBF',
-    });
+    pushTopStrips(corners[0], corners[1], corners[3], corners[2], yt, '#E9EEF9');
+    pushOutline(
+      corners.map((p) => ({ x: p.x, y: yt, z: p.z })),
+      '#9FACBF',
+    );
   }
 
   return faces;
@@ -683,6 +740,11 @@ function planPage(
       d.poly(pts, '#FFFFFF', '#9FACBF', 0.8);
       for (const line of furnitureStrokes(furnKind(o.category), o.width, o.depth)) {
         d.path(line.map((p) => loc(p.x, p.y)), 0.7, '#9FACBF');
+      }
+      // Nom du meuble au centre, si la place le permet.
+      if (o.width * scale > 42 && o.depth * scale > 16) {
+        const ctr2 = loc(0, 0);
+        d.text(frCategory(o.category), ctr2.x, ctr2.y - 2.5, 7, GREY);
       }
     }
 
