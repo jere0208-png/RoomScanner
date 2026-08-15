@@ -291,23 +291,28 @@ prolongement d'un voisin donne un plan qui paraît droit sans l'être.
 
 ### Retoucher les murs, et annuler
 
-**Tracer un mur** : les extrémités existantes s'allument, on part de l'une
-d'elles et **on tire** — le mur suit le doigt, avec sa longueur affichée, et
-se pose au relâcher. Un appui à moins de 26 px d'une extrémité s'y accroche
-exactement. Le graphe est relu dans la foulée : c'est là qu'une pièce se
-scinde ou qu'un contour se referme.
+**Annuler pas à pas**, et rien d'autre. L'historique photographie le plan
+avant chaque retouche, en regroupant les appels rapprochés d'un même geste :
+un glissement de coin, qui appelle son action des dizaines de fois par
+seconde, ne compte que pour une annulation. La pile est bornée à 40 entrées
+et repart à zéro dès qu'on change de scan. La pastille n'apparaît que s'il y
+a quelque chose à annuler, et c'est la première de la colonne — c'est le
+geste qu'on cherche dans l'urgence.
 
-Deux versions ratées avant celle-là. D'abord un mur posé au centre du plan
-« au hasard » : rien ne l'accrochait à quoi que ce soit. Puis un tracé en deux
-appuis, sans aperçu — la conversion appui → coordonnées était pourtant exacte
-au millimètre (vérifié à trois zooms et rotations), mais sans voir ni le point
-pris ni le mur en train de naître, le geste restait aveugle.
+Le retour à la dernière sauvegarde a été retiré : deux façons de revenir en
+arrière, dont une qui jette tout d'un coup, c'est une de trop. On revient pas
+à pas, ou pas du tout.
 
-Supprimer le mur sélectionné, et **annuler pas à pas**. L'historique
-photographie le plan avant chaque retouche, en regroupant les appels
-rapprochés d'un même geste : un glissement de coin, qui appelle son action
-des dizaines de fois par seconde, ne compte que pour une annulation. La pile
-est bornée à 40 entrées et repart à zéro dès qu'on change de scan.
+**Le tracé de mur a été retiré aussi**, après essai sur l'appareil. Trois
+versions y sont passées — un mur posé au centre « au hasard », un tracé en
+deux appuis sans aperçu, puis un vrai glisser-déposer avec accrochage aux
+extrémités et longueur affichée. La dernière était juste au millimètre, et
+elle restait pénible : sur un écran de téléphone, viser une extrémité de mur
+au doigt, à la bonne échelle, sans la couvrir de son pouce, demande une
+précision que le geste tactile n'a pas. Mieux vaut pas de fonction qu'une
+fonction qui rate une fois sur trois. Ce qui reste : supprimer un mur,
+déplacer ses coins, et scinder une pièce — trois gestes qui, eux, tombent
+juste.
 
 ### Export du modèle 3D
 
@@ -451,21 +456,19 @@ cèdent la place aux outils (diagnostic, appareillage, annuler, ⋮) et les
 réglages d'affichage restent tels qu'on les avait laissés. La vue 3D, qui ne
 s'édite pas, ne porte que des calques.
 
-**Le bouton d'édition ne défile pas.** C'est le seul qu'on cherche toujours,
-et c'est lui qui commande le contenu de la barre : il reste à demeure en haut
-à droite, aligné sur la rangée, et les outils défilent derrière lui.
+**Le bouton d'édition est ancré en haut à droite**, et les outils descendent
+**dans son axe**, contre le bord droit : la main qui vient de le toucher n'a
+plus qu'à glisser vers le bas. Une rangée horizontale finissait par défiler,
+donc par cacher la moitié des outils ; une colonne les montre tous.
 
-**Le tiroir ⋮ a disparu.** Ranger un outil derrière deux appuis, c'est le
-rendre introuvable ; en édition, tracer un mur, redresser, redétecter et
-revenir à la sauvegarde sont désormais des pastilles comme les autres. La
-dernière ne paraît que s'il y a quelque chose à abandonner, et demande
-confirmation — sans la ligne d'explication qu'elle avait dans le tiroir, une
-pastille seule ne peut pas prévenir qu'elle jette le travail en cours.
+En édition, dans l'ordre : **annuler** (seulement s'il y a quelque chose à
+annuler), **+** pour l'appareillage, le diagnostic, l'équerre. En lecture :
+cotes, meubles, surface au sol.
 
 **Les pastilles rentrent dans le bouton d'édition et en ressortent.** C'est
-lui qui commande le changement : autant qu'on le voie. Chacune file vers lui
-en rapetissant, d'autant plus loin qu'elle en est éloignée, et les rangs se
-succèdent — puis le nouveau jeu en jaillit dans l'ordre inverse, avec un
+lui qui commande le changement : autant qu'on le voie. Chacune remonte vers
+lui en rapetissant, d'autant plus haut qu'elle en est éloignée, et les rangs
+se succèdent — puis le nouveau jeu en redescend dans l'ordre inverse, avec un
 léger dépassement. L'état affiché par la barre RETARDE donc sur le mode : le
 plan, lui, bascule tout de suite. Et l'animation se déclenche sur l'écart
 entre les deux états, jamais sur l'appui — sinon le diagnostic et la pose
@@ -617,7 +620,12 @@ seule) : chaque mur est projeté dans l'image caméra et une petite grille de
 couleurs (6 × 4) y est moyennée, ainsi qu'une carte du sol par cases de 40 cm
 et une couleur par meuble. Sur iOS, la carte de profondeur LiDAR sert à
 écarter les points cachés. Le bouton **Couleurs** applique ces relevés à la
-vue 3D, au plan et au PDF ; il n'apparaît que si le scan en a rapporté.
+vue 3D et au PDF ; il n'apparaît que si le scan en a rapporté.
+
+**Le plan 2D, lui, reste neutre.** Le calque avait été branché dessus aussi,
+et il n'y servait à rien : sous le poché noir des murs et le semis de points
+du sol, une teinte relevée ne se lit pas. Le bouton a quitté la barre du
+plan ; il ne reste que sur la vue 3D, où une surface se lit vraiment.
 
 ## Prérequis pour tester sur iPhone
 

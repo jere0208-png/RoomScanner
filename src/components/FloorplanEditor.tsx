@@ -38,7 +38,6 @@ import {
   type WallSeg,
 } from '../geometry/floorplan';
 import type { ObjectData } from 'react-native-room-scan';
-import { mixHex } from '../geometry/appearance';
 import {
   FIXTURES,
   FIXTURE_SYMBOL,
@@ -57,35 +56,6 @@ interface EffMapping {
   toMeters: (px: { x: number; y: number }) => { x: number; z: number };
 }
 import { useScanStore } from '../store/scanStore';
-
-/**
- * Appui à l'écran → point du monde, accroché à l'extrémité de mur la plus
- * proche si elle est à portée du doigt (26 px).
- */
-function pointAt(
-  e: { nativeEvent: { locationX: number; locationY: number } },
-  ref: {
-    map: EffMapping | null;
-    nodes: { x: number; z: number }[];
-  },
-): Pt | null {
-  const map = ref.map;
-  if (!map) return null;
-  const monde = map.toMeters({
-    x: e.nativeEvent.locationX,
-    y: e.nativeEvent.locationY,
-  });
-  let best: Pt | null = null;
-  let bestD = 26 / map.scale;
-  for (const n of ref.nodes) {
-    const d = Math.hypot(n.x - monde.x, n.z - monde.z);
-    if (d < bestD) {
-      bestD = d;
-      best = { x: n.x, z: n.z };
-    }
-  }
-  return best ?? monde;
-}
 
 /**
  * Empreinte d'un meuble, recalée contre les murs de SA pièce seulement :
@@ -116,14 +86,6 @@ interface Props {
   onSelectRoom?: (id: string | null) => void;
   /** Appui sur le cartouche d'une pièce (mode édition) : la renomme. */
   onEditRoomName?: (id: string) => void;
-  /**
-   * Tracé d'un mur en cours : `depart` est l'extrémité déjà accrochée, ou
-   * `null` tant qu'on attend le premier appui. Le plan montre alors les
-   * extrémités de murs sur lesquelles se raccrocher.
-   */
-  drawing?: boolean;
-  draftFrom?: Pt | null;
-  onPickPoint?: (p: Pt, snappedToNode: boolean) => void;
   /**
    * Pièces en défaut de conformité électrique : leurs murs passent en rouge
    * foncé. C'est le seul signal visible sans ouvrir un menu.
@@ -156,9 +118,6 @@ export function FloorplanEditor({
   onWallAction,
   onSelectFixture,
   alertRooms,
-  drawing,
-  draftFrom,
-  onPickPoint,
 }: Props) {
   const walls = useScanStore((s) => s.walls);
   const openings = useScanStore((s) => s.openings);
@@ -170,7 +129,6 @@ export function FloorplanEditor({
   const fixtures = useScanStore((s) => s.fixtures);
   const colorOpenings = useScanStore((s) => s.showOpeningColors);
   const showSurfaces = useScanStore((s) => s.showSurfaces);
-  const showTextures = useScanStore((s) => s.showTextures);
   const c = useTheme();
   const styles = getStyles(c);
   const [layout, setLayout] = useState({ w: 0, h: 0 });
@@ -297,44 +255,6 @@ export function FloorplanEditor({
     };
   }, [baseMapping, view, layout]);
 
-  // Tracé d'un mur : l'autre bout suit le doigt tant qu'on ne relâche pas.
-  const [draftTo, setDraftTo] = useState<Pt | null>(null);
-  const drawRef = useRef({
-    on: false,
-    from: null as Pt | null,
-    map: null as EffMapping | null,
-    nodes: [] as { x: number; z: number }[],
-    pick: undefined as Props['onPickPoint'],
-  });
-  const drawPan = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => drawRef.current.on,
-      onMoveShouldSetPanResponder: () => drawRef.current.on,
-      onPanResponderGrant: (e) => {
-        const p = pointAt(e, drawRef.current);
-        if (!p) return;
-        setDraftTo(p);
-        // Premier appui : il fixe le départ, de préférence sur une extrémité.
-        if (!drawRef.current.from) drawRef.current.pick?.(p, true);
-      },
-      onPanResponderMove: (e) => {
-        const p = pointAt(e, drawRef.current);
-        if (p) setDraftTo(p);
-      },
-      onPanResponderRelease: (e) => {
-        const p = pointAt(e, drawRef.current);
-        const from = drawRef.current.from;
-        setDraftTo(null);
-        // Relâché assez loin du départ : le mur est posé. Sinon on garde le
-        // départ en mémoire, et un second appui suffira.
-        if (p && from && Math.hypot(p.x - from.x, p.z - from.z) > 0.2) {
-          drawRef.current.pick?.(p, false);
-        }
-      },
-      onPanResponderTerminate: () => setDraftTo(null),
-    }),
-  ).current;
-
   /**
    * Niveau de détail des cotes, de 0 à 1, piloté par le zoom.
    *
@@ -369,12 +289,10 @@ export function FloorplanEditor({
   // Pièces du plan : chacune a son contour, son centre et sa teinte de sol.
   const parts = useMemo(() => roomParts(walls, rooms), [walls, rooms]);
   const roomById = useMemo(() => new Map(rooms.map((r) => [r.id, r])), [rooms]);
-  const fillOf = useMemo(() => {
-    return (roomId: string) => {
-      const captured = showTextures ? roomById.get(roomId)?.floor?.color : undefined;
-      return captured ? mixHex(captured, '#FFFFFF', 0.42) : c.surfaceSunken;
-    };
-  }, [showTextures, roomById, c]);
+  // Le sol garde sa teinte neutre. Les couleurs relevées au scan ne servent
+  // qu'à la vue 3D : sur un plan vu de dessus, sous le poché des murs et le
+  // semis des points, elles ne se lisaient pas.
+  const fillOf = useMemo(() => (_roomId: string) => c.surfaceSunken, [c]);
   const partOf = useMemo(
     () => new Map(parts.map((p) => [p.roomId, p])),
     [parts],
@@ -405,14 +323,6 @@ export function FloorplanEditor({
     }
     return [...seen.entries()].map(([key, v]) => ({ key, ...v }));
   }, [walls]);
-
-  drawRef.current = {
-    on: !!drawing,
-    from: draftFrom ?? null,
-    map: mapping,
-    nodes: corners,
-    pick: onPickPoint,
-  };
 
   return (
     <View
@@ -759,42 +669,6 @@ export function FloorplanEditor({
               );
             })}
 
-            {/* Mur en cours de tracé : on le voit naître sous le doigt. */}
-            {drawing && draftFrom && draftTo && (
-              <G>
-                {(() => {
-                  const A = mapping.toPx(draftFrom);
-                  const B = mapping.toPx(draftTo);
-                  return (
-                    <>
-                      <Line
-                        x1={A.x}
-                        y1={A.y}
-                        x2={B.x}
-                        y2={B.y}
-                        stroke={c.blue}
-                        strokeWidth={Math.max(4, WALL_T * mapping.scale)}
-                        strokeLinecap="round"
-                        opacity={0.55}
-                      />
-                      <Circle cx={B.x} cy={B.y} r={5} fill={c.blue} />
-                      <SvgText
-                        x={(A.x + B.x) / 2}
-                        y={(A.y + B.y) / 2 - 12}
-                        fill={c.blue}
-                        fontSize={12}
-                        fontWeight="800"
-                        textAnchor="middle">
-                        {`${Math.hypot(draftTo.x - draftFrom.x, draftTo.z - draftFrom.z)
-                          .toFixed(2)
-                          .replace('.', ',')} m`}
-                      </SvgText>
-                    </>
-                  );
-                })()}
-              </G>
-            )}
-
             {/* Cartouche par pièce : nom encadré et surface au sol.
                 Chacun esquive les meubles de sa pièce pour rester lisible. */}
             {parts.map((part) => {
@@ -1010,31 +884,6 @@ export function FloorplanEditor({
               );
             })()}
 
-          {/* Tracé d'un mur : les extrémités existantes s'allument, on part
-              de l'une d'elles et on TIRE — le mur suit le doigt. */}
-          {drawing && (
-            <>
-              <View style={StyleSheet.absoluteFill} {...drawPan.panHandlers} />
-              {corners.map((pt) => {
-                const p = mapping.toPx(pt);
-                const pris =
-                  draftFrom &&
-                  Math.hypot(pt.x - draftFrom.x, pt.z - draftFrom.z) < 1e-6;
-                return (
-                  <View
-                    key={`nd-${pt.key}`}
-                    pointerEvents="none"
-                    style={[
-                      styles.node,
-                      pris && styles.nodeOn,
-                      { left: p.x - 9, top: p.y - 9 },
-                    ]}
-                  />
-                );
-              })}
-            </>
-          )}
-
           {/* Poignées de coin, uniquement en mode édition */}
           {editable &&
             corners.map((pt) => (
@@ -1228,17 +1077,6 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     justifyContent: 'center',
   },
   objDrag: { position: 'absolute', width: 44, height: 44 },
-  // Extrémités de murs, montrées pendant le tracé d'un nouveau mur.
-  node: {
-    position: 'absolute',
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: c.surface,
-    borderWidth: 2.5,
-    borderColor: c.blue,
-  },
-  nodeOn: { backgroundColor: c.blue },
   // Commandes du mur sélectionné : posées à côté de lui, jamais dessus.
   wallActions: {
     position: 'absolute',

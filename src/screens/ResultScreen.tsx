@@ -97,15 +97,12 @@ export function ResultScreen() {
   const resultOrigin = useScanStore((s) => s.resultOrigin);
   const removeObject = useScanStore((s) => s.removeObject);
   const resizeObject = useScanStore((s) => s.resizeObject);
-  const revertCurrent = useScanStore((s) => s.revertCurrent);
   const setRoomName = useScanStore((s) => s.setRoomName);
   const setRoomHeight = useScanStore((s) => s.setRoomHeight);
   const mergeRooms = useScanStore((s) => s.mergeRooms);
   const splitRoom = useScanStore((s) => s.splitRoom);
-  const redetectRooms = useScanStore((s) => s.redetectRooms);
   const straightenPlan = useScanStore((s) => s.straightenPlan);
   const removeWall = useScanStore((s) => s.removeWall);
-  const addWallBetween = useScanStore((s) => s.addWallBetween);
   const undo = useScanStore((s) => s.undo);
   const canUndo = useScanStore((s) => s.canUndo);
   const openings = useScanStore((s) => s.openings);
@@ -136,10 +133,6 @@ export function ResultScreen() {
   const [checking, setChecking] = useState(false);
   // Choix du format d'export : plan PDF, modèle 3D, ou image de la vue.
   const [exporting, setExporting] = useState(false);
-  // Tracé d'un mur : on attend un premier appui (de préférence sur une
-  // extrémité existante), puis un second qui pose l'autre bout.
-  const [drawing, setDrawing] = useState(false);
-  const [draftFrom, setDraftFrom] = useState<{ x: number; z: number } | null>(null);
   // Vue 3D : bascule « vue de dessus », comme un plan.
   const [view3d, setView3d] = useState<View3DParams>(DEFAULT_VIEW3D);
   // Coupe : index de la pièce isolée en 3D (-1 = tout le logement).
@@ -555,20 +548,6 @@ export function ResultScreen() {
               setSelectedRoomId(id);
             }}
             onEditRoomName={promptRoomFor}
-            drawing={drawing}
-            draftFrom={draftFrom}
-            onPickPoint={(p) => {
-              if (!draftFrom) {
-                setDraftFrom(p);
-                return;
-              }
-              addWallBetween(draftFrom, p);
-              // Le mur ne veut dire quelque chose qu'une fois le graphe relu :
-              // c'est là qu'une pièce se scinde, ou qu'un contour se referme.
-              redetectRooms();
-              setDraftFrom(null);
-              setDrawing(false);
-            }}
             onSelectFixture={(id, wallId) => {
               setElecWallId(wallId);
               setElecSel(id);
@@ -596,11 +575,7 @@ export function ResultScreen() {
         )}
 
         {tab === '2d' ? (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={[styles.planToolsScroll, styles.planToolsRoom]}
-            contentContainerStyle={styles.planTools}>
+          <View style={styles.planTools}>
             {/* Deux barres, jamais mélangées.
                 En lecture, on ne fait que REGARDER : la barre ne porte que
                 ce qui s'affiche ou non. En édition, on TRAVAILLE : les
@@ -611,6 +586,19 @@ export function ResultScreen() {
                 qu'on le voie. */}
             {(barMode
               ? [
+                  // Revenir en arrière vient en premier : c'est le geste
+                  // qu'on cherche dans l'urgence, juste sous le pouce qui
+                  // vient de quitter le bouton d'édition. Il ne paraît que
+                  // s'il y a quelque chose à annuler.
+                  canUndo && (
+                    <ToolPill key="undo" icon="undo" active={false} onPress={undo} />
+                  ),
+                  <ToolPill
+                    key="plus"
+                    icon="plus"
+                    active={!!pendingKind}
+                    onPress={startFixture}
+                  />,
                   issues.length > 0 && (
                     <ToolPill
                       key="check"
@@ -620,70 +608,11 @@ export function ResultScreen() {
                     />
                   ),
                   <ToolPill
-                    key="plus"
-                    icon="plus"
-                    active={!!pendingKind}
-                    onPress={startFixture}
-                  />,
-                  canUndo && (
-                    <ToolPill key="undo" icon="undo" active={false} onPress={undo} />
-                  ),
-                  <ToolPill
-                    key="addWall"
-                    icon="addWall"
-                    active={!!drawing}
-                    onPress={() => {
-                      setDrawing(true);
-                      setDraftFrom(null);
-                      setSelectedWallId(null);
-                      setSelectedObjectId(null);
-                      setSelectedRoomId(null);
-                    }}
-                  />,
-                  <ToolPill
                     key="square"
                     icon="square"
                     active={false}
                     onPress={straightenPlan}
                   />,
-                  <ToolPill
-                    key="rooms"
-                    icon="rooms"
-                    active={false}
-                    onPress={() => {
-                      redetectRooms();
-                      setSelectedRoomId(null);
-                    }}
-                  />,
-                  // Abandonner ses retouches ne s'annule pas : sous forme de
-                  // pastille, sans la ligne d'explication qu'avait le tiroir,
-                  // il faut le demander. Et la pastille ne paraît que s'il y
-                  // a quelque chose à abandonner.
-                  dirty && (
-                    <ToolPill
-                      key="reset"
-                      icon="reset"
-                      active={false}
-                      onPress={() =>
-                        Alert.alert(
-                          'Revenir à la dernière sauvegarde ?',
-                          'Toutes les retouches non enregistrées seront perdues.',
-                          [
-                            { text: 'Annuler', style: 'cancel' },
-                            {
-                              text: 'Revenir',
-                              style: 'destructive',
-                              onPress: () => {
-                                revertCurrent();
-                                setSelectedWallId(null);
-                                setSelectedObjectId(null);
-                              },
-                            },
-                          ],
-                        )
-                      }
-                    />
-                  ),
                 ]
               : [
                   <ToolPill
@@ -704,33 +633,17 @@ export function ResultScreen() {
                     active={showSurfaces}
                     onPress={() => setShowSurfaces(!showSurfaces)}
                   />,
-                  colorsAvailable && (
-                    <ToolPill
-                      key="colors"
-                      icon="colors"
-                      active={showTextures}
-                      onPress={() => setShowTextures(!showTextures)}
-                    />
-                  ),
                 ]
             )
               .filter((el): el is React.ReactElement => !!el)
-              .map((el, i, all) => (
-                <PillSlot
-                  key={el.key}
-                  index={i}
-                  count={all.length}
-                  anim={swap}>
+              .map((el, i) => (
+                <PillSlot key={el.key} index={i} anim={swap}>
                   {el}
                 </PillSlot>
               ))}
-          </ScrollView>
+          </View>
         ) : (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.planToolsScroll}
-            contentContainerStyle={styles.planTools}>
+          <View style={styles.planTools}>
             <ToolPill
               icon="ruler"
               active={show3DMeasures}
@@ -762,7 +675,7 @@ export function ResultScreen() {
                 }
               />
             )}
-          </ScrollView>
+          </View>
         )}
 
         {/* Le bouton d'édition ne défile pas avec les autres : c'est le
@@ -885,24 +798,6 @@ export function ResultScreen() {
             <TouchableOpacity
               style={styles.roomAction}
               onPress={() => setPendingKind(null)}>
-              <Text style={styles.roomActionText}>Annuler</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {tab === '2d' && drawing && (
-          <View style={styles.wallLengthBar}>
-            <Text style={styles.wallLengthLabel}>
-              {draftFrom
-                ? 'Tirez jusqu’où finir le mur, puis relâchez.'
-                : 'Partez d’une extrémité bleue et tirez.'}
-            </Text>
-            <TouchableOpacity
-              style={styles.roomAction}
-              onPress={() => {
-                setDrawing(false);
-                setDraftFrom(null);
-              }}>
               <Text style={styles.roomActionText}>Annuler</Text>
             </TouchableOpacity>
           </View>
@@ -1366,7 +1261,6 @@ export function ResultScreen() {
 
 type ToolIcon =
   | 'edit'
-  | 'reset'
   | 'ruler'
   | 'surface'
   | 'furniture'
@@ -1375,7 +1269,6 @@ type ToolIcon =
   | 'image'
   | 'model'
   | 'rooms'
-  | 'addWall'
   | 'undo'
   | 'square'
   | 'check'
@@ -1383,10 +1276,6 @@ type ToolIcon =
 
 /** Tracés 24×24 des icônes d'outils (trait simple, lisible en 18 px). */
 const TOOL_PATHS: Record<ToolIcon, { d: string; fill?: boolean }[]> = {
-  reset: [
-    { d: 'M19.5 12 a7.5 7.5 0 1 1 -2.2 -5.3' },
-    { d: 'M19.8 3.8 v4.4 h-4.4' },
-  ],
   ruler: [
     { d: 'M3.5 9 h17 a1.5 1.5 0 0 1 1.5 1.5 v3 a1.5 1.5 0 0 1 -1.5 1.5 h-17 a1.5 1.5 0 0 1 -1.5 -1.5 v-3 a1.5 1.5 0 0 1 1.5 -1.5 z' },
     { d: 'M7.5 9 v3' },
@@ -1435,12 +1324,6 @@ const TOOL_PATHS: Record<ToolIcon, { d: string; fill?: boolean }[]> = {
     { d: 'M4 4.5 v15 h15' },
     { d: 'M4 19.5 L19 4.5' },
     { d: 'M8.5 15 h3 v3' },
-  ],
-  addWall: [
-    { d: 'M3.5 15 h17' },
-    { d: 'M3.5 18.5 h17' },
-    { d: 'M12 3 v8' },
-    { d: 'M8 7 h8' },
   ],
   undo: [
     { d: 'M4.5 12 a7.5 7.5 0 1 0 2.2 -5.3' },
@@ -1525,21 +1408,19 @@ function Segment({ tab, onChange }: { tab: Tab; onChange: (t: Tab) => void }) {
 const PILL_PITCH = 44;
 
 /**
- * Créneau d'une pastille dans la barre.
+ * Créneau d'une pastille dans la colonne.
  *
- * La pastille part de sa place et file vers le bouton d'édition — d'autant
- * plus loin qu'elle en est éloignée — en rapetissant jusqu'à disparaître
- * dedans. Le décalage par rang fait le reste : les pastilles s'y engouffrent
- * l'une après l'autre, et en ressortent dans l'ordre inverse.
+ * La pastille remonte vers le bouton d'édition — d'autant plus haut qu'elle
+ * en est éloignée — en rapetissant jusqu'à disparaître dedans. Le décalage
+ * par rang fait le reste : les pastilles s'y engouffrent l'une après
+ * l'autre, et en ressortent dans l'ordre inverse.
  */
 function PillSlot({
   index,
-  count,
   anim,
   children,
 }: {
   index: number;
-  count: number;
   anim: Animated.Value;
   children: React.ReactNode;
 }) {
@@ -1557,9 +1438,9 @@ function PillSlot({
         opacity: t,
         transform: [
           {
-            translateX: t.interpolate({
+            translateY: t.interpolate({
               inputRange: [0, 1],
-              outputRange: [(count - index) * PILL_PITCH, 0],
+              outputRange: [-(index + 1) * PILL_PITCH, 0],
             }),
           },
           {
@@ -1721,22 +1602,18 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   canvas: { flex: 1, ...shadowCard, borderRadius: radius.lg },
   // Jusqu'à neuf pastilles : la barre défile plutôt que de se replier sur
   // deux rangs et de manger le plan.
-  planToolsScroll: {
-    position: 'absolute',
-    top: 10,
-    left: 10,
-    right: 10,
-    maxHeight: 42,
-  },
-  // De la place pour le bouton d'édition, qui ne défile pas.
-  planToolsRoom: { right: 58 },
-  editAnchor: { position: 'absolute', top: 10, right: 10, zIndex: 4 },
+  // Les outils descendent DANS L'AXE du bouton d'édition, contre le bord
+  // droit : la main qui vient de le toucher n'a plus qu'à glisser vers le
+  // bas. Une rangée horizontale, elle, finissait par défiler — donc par
+  // cacher la moitié des outils.
   planTools: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    position: 'absolute',
+    top: 58,
+    right: 10,
+    alignItems: 'flex-end',
     gap: 6,
-    paddingHorizontal: 2,
   },
+  editAnchor: { position: 'absolute', top: 10, right: 10, zIndex: 4 },
   toolPill: {
     width: 38,
     height: 38,
@@ -1807,9 +1684,9 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   // l'écran dès que le clavier montait, et couvrait le mur qu'on modifiait.
   wallLengthBar: {
     position: 'absolute',
-    top: 56,
+    top: 10,
     left: 10,
-    right: 10,
+    right: 58,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
@@ -2004,9 +1881,9 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   // répond à l'appui sans couvrir le mur qu'on vient de toucher.
   elecCard: {
     position: 'absolute',
-    top: 104,
+    top: 62,
     left: 10,
-    right: 10,
+    right: 58,
     backgroundColor: c.surface,
     borderRadius: radius.md,
     borderLeftWidth: 4,
