@@ -7,7 +7,6 @@ import type {
   ScanUpdate,
 } from 'react-native-room-scan';
 import {
-  bounds,
   DEFAULT_ROOM_ID,
   detectRooms,
   mergeColinear,
@@ -17,6 +16,7 @@ import {
   roomOf,
   roomParts,
   planFrameAngle,
+  reprojectOpenings,
   segLength,
   snapAngle,
   snapToNeighbours,
@@ -258,8 +258,12 @@ interface ScanState {
   setRoomHeight: (roomId: string, height: number) => void;
   /** Retire un mur du plan (et les ouvertures qu'il portait). */
   removeWall: (wallId: string) => void;
-  /** Pose un mur neuf au centre du plan, à déplacer par ses poignées. */
-  addWall: () => void;
+  /**
+   * Trace un mur entre deux points choisis sur le plan. Le premier est
+   * généralement l'extrémité d'un mur existant, pour que le nouveau s'y
+   * raccroche ; le second se déplace ensuite par sa poignée.
+   */
+  addWallBetween: (a: Pt, b: Pt) => void;
   /** Annule la dernière retouche. Vide = plus rien à annuler. */
   undo: () => void;
   canUndo: boolean;
@@ -526,7 +530,14 @@ export const useScanStore = create<ScanState>((set, get) => {
       // Même clé que la redétection qui suit : les deux ne comptent que pour
       // une annulation, l'utilisateur n'a fait qu'un geste.
       pushHistory('redetect');
-      set({ walls: straightenWalls(st.walls), dirty: true });
+      const droits = straightenWalls(st.walls);
+      set({
+        walls: droits,
+        // Les portes et fenêtres suivent leur mur : sans ça elles restaient
+        // sur place, décalées, et le rendu ne les rattachait plus.
+        openings: reprojectOpenings(st.walls, droits, st.openings),
+        dirty: true,
+      });
       get().redetectRooms();
     },
 
@@ -596,14 +607,10 @@ export const useScanStore = create<ScanState>((set, get) => {
       });
     },
 
-    addWall: () => {
+    addWallBetween: (a, b) => {
       const st = get();
+      if (Math.hypot(b.x - a.x, b.z - a.z) < 0.2) return;
       pushHistory('addWall');
-      // Posé au centre du plan, long d'un mètre : on l'attrape aussitôt par
-      // ses poignées de coin pour le mettre où il faut.
-      const b = bounds(st.walls);
-      const cx = (b.minX + b.maxX) / 2;
-      const cz = (b.minZ + b.maxZ) / 2;
       const h = st.walls[0]?.height ?? 2.5;
       set({
         walls: [
@@ -611,8 +618,8 @@ export const useScanStore = create<ScanState>((set, get) => {
           {
             id: `mur-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
             type: 'wall',
-            a: { x: cx - 0.5, z: cz },
-            b: { x: cx + 0.5, z: cz },
+            a,
+            b,
             height: h,
             yCenter: h / 2,
           },

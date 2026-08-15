@@ -182,8 +182,13 @@ prolongement d'un voisin donne un plan qui paraît droit sans l'être.
 
 ### Retoucher les murs, et annuler
 
-Ajouter un mur (posé au centre du plan, à déplacer par ses poignées),
-supprimer le mur sélectionné, et **annuler pas à pas**. L'historique
+**Tracer un mur** : on touche d'abord une extrémité de mur existante — elles
+s'allument toutes pendant le tracé — puis l'endroit où le finir. Le mur naît
+donc déjà raccroché, et son bout libre se déplace ensuite par sa poignée. Le
+poser au centre du plan « au hasard », comme je l'avais fait d'abord, était
+inutilisable : rien ne l'accrochait à quoi que ce soit.
+
+Supprimer le mur sélectionné, et **annuler pas à pas**. L'historique
 photographie le plan avant chaque retouche, en regroupant les appels
 rapprochés d'un même geste : un glissement de coin, qui appelle son action
 des dizaines de fois par seconde, ne compte que pour une annulation. La pile
@@ -199,6 +204,14 @@ exporte. Un seul fichier, lisible par Blender, SketchUp et Rhino, avec les
 demanderaient un `.mtl` séparé, or on ne partage qu'un fichier) ; les groupes
 permettent de les remettre en matière d'un clic. « Modèle AR » ouvre toujours
 le `.usdz` d'origine.
+
+### Exporter
+
+Un seul bouton **Exporter**, puis le choix du format : **plan PDF** (coté,
+métré par pièce, vues 3D), **modèle 3D** (OBJ du plan retouché) ou **image**
+(capture de la vue affichée, filigranée). Les pastilles « image » et
+« modèle » ont quitté les barres d'outils des plans : elles y faisaient
+double emploi et encombraient une barre déjà chargée.
 
 ### Métré
 

@@ -362,7 +362,9 @@ describe('retoucher les murs et annuler', () => {
     deux();
     const n = useScanStore.getState().walls.length;
     expect(useScanStore.getState().canUndo).toBe(false);
-    useScanStore.getState().addWall();
+    useScanStore
+      .getState()
+      .addWallBetween({ x: 1, z: 1 }, { x: 1, z: 2.5 });
     expect(useScanStore.getState().walls).toHaveLength(n + 1);
     expect(useScanStore.getState().canUndo).toBe(true);
     useScanStore.getState().undo();
@@ -409,7 +411,7 @@ describe('retoucher les murs et annuler', () => {
 
   it('repart sans historique quand on ouvre un autre scan', () => {
     deux();
-    useScanStore.getState().addWall();
+    useScanStore.getState().addWallBetween({ x: 1, z: 1 }, { x: 1, z: 2.5 });
     expect(useScanStore.getState().canUndo).toBe(true);
     const id = useScanStore.getState().saves[0].id;
     useScanStore.getState().openSave(id);

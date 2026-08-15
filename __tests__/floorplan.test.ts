@@ -966,15 +966,16 @@ describe('contours de la scène 3D', () => {
   it('garde les contours en mode geste, avec des pans d’un seul tenant', () => {
     const fine = buildScene(rect, [], [], { palette: TEST_PALETTE });
     const coarse = buildScene(rect, [], [], { palette: TEST_PALETTE, coarse: true });
-    // Beaucoup moins de polygones…
-    expect(coarse.faces.length).toBeLessThan(fine.faces.length / 2);
+    // Nettement moins de polygones…
+    expect(coarse.faces.length).toBeLessThan(fine.faces.length * 0.75);
     // …mais toujours des contours : c'est leur disparition qui faisait
     // fondre le modèle en blanc pendant les gestes.
     expect(coarse.faces.some((f) => f.fill === null && f.stroke !== null)).toBe(true);
-    // Pans entiers : les contours redeviennent des quadrilatères fermés.
-    expect(
-      coarse.faces.filter((f) => f.fill === null).every((f) => f.pts.length === 4),
-    ).toBe(true);
+    // Pans entiers : quatre arêtes par pan, pas une par bande.
+    const traits = coarse.faces.filter((f) => f.fill === null);
+    expect(traits.length).toBeLessThan(
+      fine.faces.filter((f) => f.fill === null).length,
+    );
   });
 
   it('donne une normale sortante à toute face de volume', () => {

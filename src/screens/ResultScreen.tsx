@@ -77,7 +77,7 @@ export function ResultScreen() {
   const redetectRooms = useScanStore((s) => s.redetectRooms);
   const straightenPlan = useScanStore((s) => s.straightenPlan);
   const removeWall = useScanStore((s) => s.removeWall);
-  const addWall = useScanStore((s) => s.addWall);
+  const addWallBetween = useScanStore((s) => s.addWallBetween);
   const undo = useScanStore((s) => s.undo);
   const canUndo = useScanStore((s) => s.canUndo);
   const openings = useScanStore((s) => s.openings);
@@ -104,6 +104,12 @@ export function ResultScreen() {
   const [naming, setNaming] = useState(false);
   // Diagnostic du plan : ce dont il faut se méfier après un scan.
   const [checking, setChecking] = useState(false);
+  // Choix du format d'export : plan PDF, modèle 3D, ou image de la vue.
+  const [exporting, setExporting] = useState(false);
+  // Tracé d'un mur : on attend un premier appui (de préférence sur une
+  // extrémité existante), puis un second qui pose l'autre bout.
+  const [drawing, setDrawing] = useState(false);
+  const [draftFrom, setDraftFrom] = useState<{ x: number; z: number } | null>(null);
   // Vue 3D : bascule « vue de dessus », comme un plan.
   const [view3d, setView3d] = useState<View3DParams>(DEFAULT_VIEW3D);
   // Coupe : index de la pièce isolée en 3D (-1 = tout le logement).
@@ -395,6 +401,17 @@ export function ResultScreen() {
               setSelectedRoomId(id);
             }}
             onEditRoomName={promptRoomFor}
+            drawing={drawing}
+            draftFrom={draftFrom}
+            onPickPoint={(p) => {
+              if (!draftFrom) {
+                setDraftFrom(p);
+                return;
+              }
+              addWallBetween(draftFrom, p);
+              setDraftFrom(null);
+              setDrawing(false);
+            }}
             onWallAction={(action, wallId) => {
               if (action === 'ouverture') addOpening(wallId);
               else if (action === 'supprimer') {
@@ -472,7 +489,17 @@ export function ResultScreen() {
               <ToolPill icon="square" active={false} onPress={straightenPlan} />
             )}
             {editMode && (
-              <ToolPill icon="addWall" active={false} onPress={addWall} />
+              <ToolPill
+                icon="addWall"
+                active={drawing}
+                onPress={() => {
+                  setDrawing((d) => !d);
+                  setDraftFrom(null);
+                  setSelectedWallId(null);
+                  setSelectedObjectId(null);
+                  setSelectedRoomId(null);
+                }}
+              />
             )}
             {canUndo && (
               <ToolPill icon="undo" active={false} onPress={undo} />
@@ -518,9 +545,6 @@ export function ResultScreen() {
                 onPress={() => setShowTextures(!showTextures)}
               />
             )}
-            {Platform.OS === 'ios' && (
-              <ToolPill icon="image" active={false} onPress={shareImage} />
-            )}
             {rooms.length > 1 && (
               <ToolPill
                 icon="rooms"
@@ -529,9 +553,6 @@ export function ResultScreen() {
                   setFocusIdx((i) => (i + 2 > rooms.length ? -1 : i + 1))
                 }
               />
-            )}
-            {Platform.OS === 'ios' && (
-              <ToolPill icon="model" active={false} onPress={shareObj} />
             )}
           </ScrollView>
         )}
@@ -638,6 +659,24 @@ export function ResultScreen() {
             </View>
           )}
 
+        {tab === '2d' && drawing && (
+          <View style={styles.wallLengthBar}>
+            <Text style={styles.wallLengthLabel}>
+              {draftFrom
+                ? 'Touchez où finir le mur — vous pourrez le déplacer ensuite.'
+                : 'Touchez une extrémité de mur pour vous y raccrocher.'}
+            </Text>
+            <TouchableOpacity
+              style={styles.roomAction}
+              onPress={() => {
+                setDrawing(false);
+                setDraftFrom(null);
+              }}>
+              <Text style={styles.roomActionText}>Annuler</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* Cote du mur sélectionné : un champ compact, posé en haut du
             plan pour ne jamais sortir de l'écran ni couvrir le mur. */}
         {tab === '2d' && !selectedObject && editMode && selectedWall && (
@@ -720,8 +759,8 @@ export function ResultScreen() {
       {Platform.OS === 'ios' && (
         <TouchableOpacity
           style={styles.exportButton}
-          onPress={goExport}>
-          <Text style={styles.primaryText}>Exporter en PDF</Text>
+          onPress={() => setExporting(true)}>
+          <Text style={styles.primaryText}>Exporter</Text>
         </TouchableOpacity>
       )}
       <View style={styles.actions}>
@@ -787,6 +826,59 @@ export function ResultScreen() {
           />
         </View>
       )}
+
+      {/* ---------- Choix du format d'export ---------- */}
+      <Modal visible={exporting} transparent animationType="fade">
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Exporter</Text>
+            <Text style={styles.modalSubtitle}>
+              Trois formats, selon ce que vous voulez en faire.
+            </Text>
+            {(
+              [
+                [
+                  'Plan PDF',
+                  'Plan coté, métré par pièce, vues 3D. À imprimer ou à envoyer.',
+                  () => {
+                    setExporting(false);
+                    goExport();
+                  },
+                ],
+                [
+                  'Modèle 3D',
+                  'Fichier OBJ du plan retouché, pour Blender ou SketchUp.',
+                  () => {
+                    setExporting(false);
+                    shareObj();
+                  },
+                ],
+                [
+                  'Image',
+                  'Capture de la vue affichée, avec le filigrane EchoPlan.',
+                  () => {
+                    setExporting(false);
+                    shareImage();
+                  },
+                ],
+              ] as [string, string, () => void][]
+            ).map(([titre, detail, action]) => (
+              <TouchableOpacity
+                key={titre}
+                style={styles.exportChoice}
+                onPress={action}>
+                <Text style={styles.exportChoiceTitle}>{titre}</Text>
+                <Text style={styles.exportChoiceDetail}>{detail}</Text>
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity
+              style={styles.modalGhost}
+              onPress={() => setExporting(false)}>
+              <Text style={styles.modalGhostText}>Annuler</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* ---------- Diagnostic du plan ---------- */}
       <Modal visible={checking} transparent animationType="fade">
@@ -1303,6 +1395,20 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     marginLeft: 8,
   },
   roomActionText: { color: c.inkSoft, fontWeight: '700', fontSize: 13.5 },
+  exportChoice: {
+    backgroundColor: c.surfaceSunken,
+    borderRadius: radius.md,
+    paddingHorizontal: 15,
+    paddingVertical: 13,
+    marginTop: 8,
+  },
+  exportChoiceTitle: { color: c.ink, fontSize: 15.5, fontWeight: '700' },
+  exportChoiceDetail: {
+    color: c.inkFaint,
+    fontSize: 12.5,
+    lineHeight: 17,
+    marginTop: 2,
+  },
   issueScroll: { maxHeight: 320, marginTop: 4 },
   issueRow: {
     flexDirection: 'row',

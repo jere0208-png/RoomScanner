@@ -43,6 +43,7 @@ interface EffMapping {
   scale: number;
   toPx: (p: { x: number; z: number }) => { x: number; y: number };
   deltaToMeters: (dx: number, dy: number) => { x: number; z: number };
+  toMeters: (px: { x: number; y: number }) => { x: number; z: number };
 }
 import { useScanStore } from '../store/scanStore';
 
@@ -75,6 +76,14 @@ interface Props {
   onSelectRoom?: (id: string | null) => void;
   /** Appui sur le cartouche d'une pièce (mode édition) : la renomme. */
   onEditRoomName?: (id: string) => void;
+  /**
+   * Tracé d'un mur en cours : `depart` est l'extrémité déjà accrochée, ou
+   * `null` tant qu'on attend le premier appui. Le plan montre alors les
+   * extrémités de murs sur lesquelles se raccrocher.
+   */
+  drawing?: boolean;
+  draftFrom?: Pt | null;
+  onPickPoint?: (p: Pt, snappedToNode: boolean) => void;
   /** Commande lancée depuis les boutons flottants du mur sélectionné. */
   onWallAction?: (
     action: 'longueur' | 'ouverture' | 'supprimer',
@@ -98,6 +107,9 @@ export function FloorplanEditor({
   onSelectRoom,
   onEditRoomName,
   onWallAction,
+  drawing,
+  draftFrom,
+  onPickPoint,
 }: Props) {
   const walls = useScanStore((s) => s.walls);
   const openings = useScanStore((s) => s.openings);
@@ -224,6 +236,14 @@ export function FloorplanEditor({
         x: (dx * cos + dy * sin) / scale,
         z: (-dx * sin + dy * cos) / scale,
       }),
+      /** Point de l'écran → point du monde : sert au tracé d'un mur. */
+      toMeters: (px: { x: number; y: number }) => {
+        const dx = px.x - cx - view.ox;
+        const dy = px.y - cy - view.oy;
+        const ux = (dx * cos + dy * sin) / view.zoom + cx;
+        const uy = (-dx * sin + dy * cos) / view.zoom + cy;
+        return baseMapping.toMeters({ x: ux, y: uy });
+      },
     };
   }, [baseMapping, view, layout]);
 
@@ -683,6 +703,52 @@ export function FloorplanEditor({
               );
             })()}
 
+          {/* Tracé d'un mur : on montre où se raccrocher, et on capte
+              l'appui pour le convertir en point du monde. */}
+          {drawing && (
+            <>
+              <View
+                style={StyleSheet.absoluteFill}
+                onStartShouldSetResponder={() => true}
+                onResponderRelease={(e) => {
+                  const px = {
+                    x: e.nativeEvent.locationX,
+                    y: e.nativeEvent.locationY,
+                  };
+                  const monde = mapping.toMeters(px);
+                  // Un appui près d'une extrémité s'y accroche exactement.
+                  let best: Pt | null = null;
+                  let bestD = 26 / mapping.scale;
+                  for (const pt of corners) {
+                    const d = Math.hypot(pt.x - monde.x, pt.z - monde.z);
+                    if (d < bestD) {
+                      bestD = d;
+                      best = { x: pt.x, z: pt.z };
+                    }
+                  }
+                  onPickPoint?.(best ?? monde, best !== null);
+                }}
+              />
+              {corners.map((pt) => {
+                const p = mapping.toPx(pt);
+                const pris =
+                  draftFrom &&
+                  Math.hypot(pt.x - draftFrom.x, pt.z - draftFrom.z) < 1e-6;
+                return (
+                  <View
+                    key={`nd-${pt.key}`}
+                    pointerEvents="none"
+                    style={[
+                      styles.node,
+                      pris && styles.nodeOn,
+                      { left: p.x - 7, top: p.y - 7 },
+                    ]}
+                  />
+                );
+              })}
+            </>
+          )}
+
           {/* Poignées de coin, uniquement en mode édition */}
           {editable &&
             corners.map((pt) => (
@@ -865,6 +931,17 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     justifyContent: 'center',
   },
   objDrag: { position: 'absolute', width: 44, height: 44 },
+  // Extrémités de murs, montrées pendant le tracé d'un nouveau mur.
+  node: {
+    position: 'absolute',
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: c.surface,
+    borderWidth: 2.5,
+    borderColor: c.blue,
+  },
+  nodeOn: { backgroundColor: c.blue },
   // Commandes du mur sélectionné : posées à côté de lui, jamais dessus.
   wallActions: {
     position: 'absolute',

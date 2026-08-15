@@ -486,14 +486,19 @@ export function buildScene(
     } = {},
   ) => {
     const cols = Math.max(1, Math.ceil(Math.hypot(q.x - p.x, q.z - p.z) / step));
-    // Découpe en HAUTEUR aussi. Sans elle, un pan pleine hauteur se trie sur
-    // une profondeur moyenne dominée par son altitude et non par sa distance :
-    // un meuble ou une porte pouvait alors s'afficher devant un mur pourtant
-    // plus proche. Des morceaux de taille comparable laissent la distance
-    // décider, et l'occultation redevient fiable.
+    // PAS de découpe en hauteur — sauf pour poser une texture.
+    //
+    // Je l'avais ajoutée sur un raisonnement : un pan pleine hauteur se trie
+    // sur une profondeur moyenne dominée par son altitude, donc un meuble
+    // pourrait le traverser. Sur l'appareil, elle a surtout produit des
+    // défauts visibles : deux surfaces voisines découpées sur des grilles
+    // DIFFÉRENTES (un trumeau de 2,5 m et une fenêtre de 1,1 m ne tombent pas
+    // sur les mêmes coupures) s'entrelacent au tri et dessinent un escalier
+    // le long des ouvertures. Le vrai remède au meuble traversant était
+    // ailleurs — c'est `clampFootprint` qui le sort du mur.
     const rows = o.tex
       ? Math.min(MAX_TEX_ROWS, Math.max(1, o.tex.rows))
-      : Math.max(1, Math.ceil((yt - yb) / step));
+      : 1;
     for (let i = 0; i < cols; i++) {
       const s0 = lerp2(p, q, i / cols);
       const s1 = lerp2(p, q, (i + 1) / cols);
@@ -516,27 +521,34 @@ export function buildScene(
           captured: o.captured || !!o.tex,
           normal: o.normal,
         });
-      }
-      if (!o.outline) continue;
-      // Les arêtes portent la normale de LEUR face : un contour ne survit
-      // jamais à la disparition du pan qu'il borde.
-      if (cols === 1) {
-        pushOutline(vquad(s0, s1, yb, yt), o.outline, o.normal);
-        continue;
-      }
-      // Découpé : seules les arêtes du POURTOUR sont tracées.
-      // Toutes les arêtes de la bande se trient AVEC elle, depuis son centre.
-      const mid: P3 = {
-        x: (s0.x + s1.x) / 2,
-        y: (yb + yt) / 2,
-        z: (s0.z + s1.z) / 2,
-      };
-      const E = (a: P3, b: P3) => pushEdge(a, b, o.outline!, o.normal, mid);
-      E({ x: s0.x, y: yt, z: s0.z }, { x: s1.x, y: yt, z: s1.z });
-      E({ x: s0.x, y: yb, z: s0.z }, { x: s1.x, y: yb, z: s1.z });
-      if (i === 0) E({ x: s0.x, y: yb, z: s0.z }, { x: s0.x, y: yt, z: s0.z });
-      if (i === cols - 1) {
-        E({ x: s1.x, y: yb, z: s1.z }, { x: s1.x, y: yt, z: s1.z });
+
+        // Contour du POURTOUR, tuile par tuile.
+        //
+        // Une arête doit se trier avec la TUILE qu'elle borde, pas avec le pan
+        // entier : depuis qu'on découpe aussi en hauteur, les tuiles d'un même
+        // pan s'étalent sur près d'un mètre de profondeur. Une arête calée sur
+        // le milieu du pan passait donc avant les tuiles hautes, qui la
+        // repeignaient en escalier — c'est exactement ce qu'on voyait le long
+        // des fenêtres, et ce qui laissait des bouts d'arêtes en l'air.
+        if (!o.outline) continue;
+        const tuile: P3 = {
+          x: (s0.x + s1.x) / 2,
+          y: (bot + top) / 2,
+          z: (s0.z + s1.z) / 2,
+        };
+        const E = (a: P3, b: P3) => pushEdge(a, b, o.outline!, o.normal, tuile);
+        if (r === 0) {
+          E({ x: s0.x, y: yt, z: s0.z }, { x: s1.x, y: yt, z: s1.z });
+        }
+        if (r === rows - 1) {
+          E({ x: s0.x, y: yb, z: s0.z }, { x: s1.x, y: yb, z: s1.z });
+        }
+        if (i === 0) {
+          E({ x: s0.x, y: bot, z: s0.z }, { x: s0.x, y: top, z: s0.z });
+        }
+        if (i === cols - 1) {
+          E({ x: s1.x, y: bot, z: s1.z }, { x: s1.x, y: top, z: s1.z });
+        }
       }
     }
   };

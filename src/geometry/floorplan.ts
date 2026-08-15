@@ -967,6 +967,47 @@ export function straightenWalls(
   }));
 }
 
+/**
+ * Fait suivre les portes et fenêtres quand leurs murs bougent.
+ *
+ * Une ouverture est une surface indépendante, posée dans le plan de son mur
+ * mais sans lien avec lui : redresser les murs les laissait donc sur place,
+ * décalées, et le rendu ne les rattachait plus. On note où chacune se trouve
+ * LE LONG de son mur d'origine, puis on la repose au même endroit sur le mur
+ * devenu droit — même identifiant, même fraction de longueur.
+ */
+export function reprojectOpenings(
+  oldWalls: WallSeg[],
+  newWalls: WallSeg[],
+  openings: WallSeg[],
+): WallSeg[] {
+  const after = new Map(newWalls.map((w) => [w.id, w]));
+  return openings.map((o) => {
+    const mid = { x: (o.a.x + o.b.x) / 2, z: (o.a.z + o.b.z) / 2 };
+    let host: WallSeg | null = null;
+    let best = 0.6;
+    for (const w of oldWalls) {
+      const d = pointOnSeg(mid, w.a, w.b).dist;
+      if (d < best) {
+        best = d;
+        host = w;
+      }
+    }
+    const moved = host ? after.get(host.id) : undefined;
+    if (!host || !moved) return o;
+    const dx = host.b.x - host.a.x;
+    const dz = host.b.z - host.a.z;
+    const len2 = dx * dx + dz * dz || 1;
+    const along = (p: Pt) =>
+      ((p.x - host!.a.x) * dx + (p.z - host!.a.z) * dz) / len2;
+    const at = (t: number): Pt => ({
+      x: moved.a.x + (moved.b.x - moved.a.x) * t,
+      z: moved.a.z + (moved.b.z - moved.a.z) * t,
+    });
+    return { ...o, a: at(along(o.a)), b: at(along(o.b)) };
+  });
+}
+
 // --------------------------------------- découpe aux jonctions en T
 
 /** Portion [u0, u1] d'une grille de couleurs, colonnes ré-échantillonnées. */
