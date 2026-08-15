@@ -50,6 +50,56 @@ import {
 } from '../geometry/electrical';
 import { frCategory, furnKind, furnitureStrokes } from '../geometry/furniture';
 
+/**
+ * Les commandes du mur, en icônes.
+ *
+ * Quatre mots posés côte à côte, c'était quatre longueurs différentes et une
+ * barre qui s'étirait. Une icône a toujours la même largeur ; le mot passe
+ * dessous, en tout petit et en faible opacité — il est là pour la première
+ * fois qu'on hésite, pas pour les cent suivantes.
+ */
+const WALL_ACTIONS: {
+  action: 'longueur' | 'ouverture' | 'electricite' | 'supprimer';
+  label: string | null;
+  paths: { d: string; fill?: boolean }[];
+}[] = [
+  {
+    action: 'longueur',
+    label: 'Cotes',
+    // Le double-décimètre.
+    paths: [
+      { d: 'M3.5 9 h17 a1.5 1.5 0 0 1 1.5 1.5 v3 a1.5 1.5 0 0 1 -1.5 1.5 h-17 a1.5 1.5 0 0 1 -1.5 -1.5 v-3 a1.5 1.5 0 0 1 1.5 -1.5 z' },
+      { d: 'M7.5 9 v3' },
+      { d: 'M11.5 9 v3' },
+      { d: 'M15.5 9 v3' },
+    ],
+  },
+  {
+    action: 'ouverture',
+    label: 'Ouvrir',
+    // Une baie vue en plan : deux tableaux et le débattement.
+    paths: [
+      { d: 'M2.5 18 h4.5' },
+      { d: 'M17 18 h4.5' },
+      { d: 'M7 18 a5 5 0 0 1 10 0' },
+      { d: 'M7 18 v-4' },
+      { d: 'M17 18 v-4' },
+    ],
+  },
+  {
+    action: 'electricite',
+    label: 'Élec',
+    // L'éclair : le seul symbole que personne n'a besoin qu'on lui explique.
+    paths: [{ d: 'M13.5 2.5 L5.5 13.5 h5 l-1 8 8 -11 h-5 z', fill: true }],
+  },
+  {
+    action: 'supprimer',
+    // Pas de mot : une croix se lit dans toutes les langues.
+    label: null,
+    paths: [{ d: 'M6.5 6.5 L17.5 17.5' }, { d: 'M17.5 6.5 L6.5 17.5' }],
+  },
+];
+
 interface EffMapping {
   scale: number;
   toPx: (p: { x: number; z: number }) => { x: number; y: number };
@@ -897,37 +947,39 @@ export function FloorplanEditor({
               let bx = mid.x + nx * gap;
               let by = mid.y + ny * gap;
               // Et jamais hors du cadre : la barre porte quatre commandes,
-              // il lui faut 115 px de part et d'autre de son centre.
-              bx = Math.min(layout.w - 115, Math.max(115, bx));
-              by = Math.min(layout.h - 40, Math.max(40, by));
+              // il lui faut 118 px de part et d'autre de son centre.
+              bx = Math.min(layout.w - 118, Math.max(118, bx));
+              by = Math.min(layout.h - 46, Math.max(46, by));
               return (
                 <View
-                  style={[styles.wallActions, { left: bx - 111, top: by - 22 }]}
+                  style={[styles.wallActions, { left: bx - 114, top: by - 26 }]}
                   pointerEvents="box-none">
-                  {(
-                    [
-                      ['longueur', 'Coter'],
-                      ['ouverture', '+ Ouv.'],
-                      ['electricite', 'Élec'],
-                      ['supprimer', 'Suppr.'],
-                    ] as const
-                  ).map(([action, label]) => (
-                    <TouchableOpacity
-                      key={action}
-                      style={[
-                        styles.wallAction,
-                        action === 'supprimer' && styles.wallActionDanger,
-                      ]}
-                      onPress={() => onWallAction(action, w.id)}>
-                      <Text
-                        style={[
-                          styles.wallActionText,
-                          action === 'supprimer' && styles.wallActionTextDanger,
-                        ]}>
-                        {label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+                  {WALL_ACTIONS.map(({ action, label, paths }) => {
+                    const teinte = action === 'supprimer' ? c.danger : c.ink;
+                    return (
+                      <TouchableOpacity
+                        key={action}
+                        style={styles.wallAction}
+                        onPress={() => onWallAction(action, w.id)}>
+                        <Svg width={21} height={21} viewBox="0 0 24 24">
+                          {paths.map((seg, i) => (
+                            <Path
+                              key={i}
+                              d={seg.d}
+                              stroke={teinte}
+                              strokeWidth={1.9}
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              fill={seg.fill ? teinte : 'none'}
+                            />
+                          ))}
+                        </Svg>
+                        {label && (
+                          <Text style={styles.wallActionText}>{label}</Text>
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
               );
             })()}
@@ -1129,23 +1181,28 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   wallActions: {
     position: 'absolute',
     flexDirection: 'row',
-    gap: 6,
     backgroundColor: c.surface,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: c.line,
-    padding: 4,
+    borderRadius: radius.md,
+    paddingHorizontal: 4,
+    paddingVertical: 6,
     ...shadowCard,
+    shadowOpacity: 0.14,
   },
+  // Quatre colonnes de même largeur : la barre ne s'étire plus au gré de la
+  // longueur des mots.
   wallAction: {
-    borderRadius: radius.pill,
-    backgroundColor: c.surfaceSunken,
-    paddingHorizontal: 11,
-    paddingVertical: 8,
+    width: 55,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 2,
   },
-  wallActionDanger: { backgroundColor: c.surfaceSunken },
-  wallActionText: { color: c.ink, fontSize: 12.5, fontWeight: '700' },
-  wallActionTextDanger: { color: c.danger },
+  wallActionText: {
+    color: c.ink,
+    fontSize: 9,
+    fontWeight: '700',
+    marginTop: 3,
+    opacity: 0.45,
+  },
   objDelete: {
     position: 'absolute',
     width: 30,
