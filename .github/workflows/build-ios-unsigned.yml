@@ -9,7 +9,31 @@ on:
     branches: [main]
 
 jobs:
+  # Contrôles JS d'abord, sur une machine Linux : rapides, et surtout ils
+  # font tourner le GARDE-FOU VISUEL. La planche de rendu est versionnée dans
+  # assets/rendu-reference/ ; toute modification qui change l'image fait
+  # échouer ce job et apparaît comme un diff d'image dans la pull request.
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npx eslint src App.tsx __tests__
+      - run: npx jest
+      - name: Planche de rendu si elle a changé
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rendu-reference
+          path: assets/rendu-reference/
+
   build:
+    needs: checks
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4

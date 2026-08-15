@@ -102,6 +102,42 @@ L'outil « pièces » de la barre du plan relance la détection sur le graphe
 courant, en **gardant les noms donnés à la main** : chaque nouvelle pièce
 hérite du nom de l'ancienne dont le point de cartouche tombe dedans.
 
+### Garde-fou visuel
+
+Les tests vérifient des nombres ; aucun n'a vu le jour où le pointillé des
+passages s'est mis à contaminer tout le modèle. `assets/rendu-reference/`
+contient donc **quatre SVG versionnés** — quatre angles de l'appartement de
+référence (`src/export/snapshotFixture.ts` : deux pièces, un refend, une porte
+fermée, une porte ouverte, une baie, une fenêtre, trois meubles dont une télé
+plaquée au mur). Le rendu passe par exactement le même chemin que la vue de
+l'app : `buildScene`, `sceneFraming`, masquage des faces arrière, tri du
+peintre, `shadeFill`.
+
+Le job `checks` de la CI les recompare à chaque poussée : **toute modification
+qui change l'image fait échouer le build avant même la compilation iOS**, et
+le diff apparaît dans la pull request. Quand le changement est voulu :
+`npm run snapshots`, puis on relit le diff avant de valider.
+
+### Retoucher les murs, et annuler
+
+Ajouter un mur (posé au centre du plan, à déplacer par ses poignées),
+supprimer le mur sélectionné, et **annuler pas à pas**. L'historique
+photographie le plan avant chaque retouche, en regroupant les appels
+rapprochés d'un même geste : un glissement de coin, qui appelle son action
+des dizaines de fois par seconde, ne compte que pour une annulation. La pile
+est bornée à 40 entrées et repart à zéro dès qu'on change de scan.
+
+### Export du modèle 3D
+
+Le `.usdz` de RoomPlan ignore toutes les retouches — murs déplacés, pièces
+fusionnées, cloisons ajoutées. L'export **OBJ** est donc construit depuis
+`buildScene()`, comme la vue 3D et le PDF : ce qu'on voit est ce qu'on
+exporte. Un seul fichier, lisible par Blender, SketchUp et Rhino, avec les
+éléments groupés par nature. Les couleurs ne survivent pas (elles
+demanderaient un `.mtl` séparé, or on ne partage qu'un fichier) ; les groupes
+permettent de les remettre en matière d'un clic. « Modèle AR » ouvre toujours
+le `.usdz` d'origine.
+
 ### Métré
 
 Le PDF porte une feuille de métré, une ligne par pièce : cotes hors-tout,
@@ -298,7 +334,7 @@ nécessaire que si les fichiers Swift/Kotlin ou les dépendances natives changen
 ## Vérifications faites sur cette machine (Windows)
 
 - `npx tsc --noEmit` et `npx eslint src App.tsx` : aucun diagnostic.
-- `npx jest` : 97/97 tests verts (conversion matrice iOS→segment, extrémités
+- `npx jest` : 109/109 tests verts (conversion matrice iOS→segment, extrémités
   Android, soudure des coins et jonctions en T, onglets des murs, surface au
   sol, semis de points, lecture des textures, snap angulaire, projection
   mètres↔pixels, génération du PDF ; **multi-pièces** : découpe par pièce,

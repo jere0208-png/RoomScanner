@@ -40,6 +40,7 @@ import {
 } from '../geometry/floorplan';
 import { hasCapturedColors } from '../geometry/appearance';
 import { frCategory, ROOM_NAME_CHOICES } from '../geometry/furniture';
+import { buildObj, objFilename } from '../export/model3d';
 import { useScanStore } from '../store/scanStore';
 
 type Tab = '2d' | '3d';
@@ -73,6 +74,11 @@ export function ResultScreen() {
   const mergeRooms = useScanStore((s) => s.mergeRooms);
   const splitRoom = useScanStore((s) => s.splitRoom);
   const redetectRooms = useScanStore((s) => s.redetectRooms);
+  const removeWall = useScanStore((s) => s.removeWall);
+  const addWall = useScanStore((s) => s.addWall);
+  const undo = useScanStore((s) => s.undo);
+  const canUndo = useScanStore((s) => s.canUndo);
+  const openings = useScanStore((s) => s.openings);
 
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
   const [wInput, setWInput] = useState('');
@@ -96,6 +102,8 @@ export function ResultScreen() {
   const [naming, setNaming] = useState(false);
   // Vue 3D : bascule « vue de dessus », comme un plan.
   const [view3d, setView3d] = useState<View3DParams>(DEFAULT_VIEW3D);
+  // Coupe : index de la pièce isolée en 3D (-1 = tout le logement).
+  const [focusIdx, setFocusIdx] = useState(-1);
   // Cotes du plan 2D masquées par défaut : la pastille « Cotes » les active.
   const [showMeasures, setShowMeasures] = useState(false);
   const [show3DMeasures, setShow3DMeasures] = useState(true);
@@ -147,12 +155,17 @@ export function ResultScreen() {
     }
   };
 
-  const shareModel = async () => {
-    if (!modelPath) return;
+  /**
+   * Partage le modèle 3D construit à partir de NOTRE plan — murs déplacés,
+   * pièces fusionnées, cloisons ajoutées comprises. Le `.usdz` de RoomPlan,
+   * lui, ignore toutes les retouches ; il reste accessible par « Modèle AR ».
+   */
+  const shareObj = async () => {
     try {
-      await RoomScan.shareFile(modelPath);
+      const obj = buildObj({ walls, openings, objects, rooms }, scanName);
+      await RoomScan.shareText(obj, objFilename(scanName));
     } catch (e: any) {
-      Alert.alert('Partage impossible', e?.message ?? 'Erreur inconnue');
+      Alert.alert('Export impossible', e?.message ?? 'Erreur inconnue');
     }
   };
 
@@ -363,11 +376,16 @@ export function ResultScreen() {
             showMeasures={show3DMeasures}
             value={view3d}
             onChange={setView3d}
+            focusRoomId={rooms[focusIdx]?.id ?? null}
           />
         )}
 
         {tab === '2d' ? (
-          <View style={styles.planTools}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.planToolsScroll}
+            contentContainerStyle={styles.planTools}>
             <ToolPill
               icon="reset"
               active={false}
@@ -409,10 +427,20 @@ export function ResultScreen() {
                 }}
               />
             )}
+            {editMode && (
+              <ToolPill icon="addWall" active={false} onPress={addWall} />
+            )}
+            {canUndo && (
+              <ToolPill icon="undo" active={false} onPress={undo} />
+            )}
             <ToolPill icon="edit" active={editMode} onPress={toggleEdit} />
-          </View>
+          </ScrollView>
         ) : (
-          <View style={styles.planTools}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.planToolsScroll}
+            contentContainerStyle={styles.planTools}>
             <ToolPill
               icon="ruler"
               active={show3DMeasures}
@@ -449,10 +477,19 @@ export function ResultScreen() {
             {Platform.OS === 'ios' && (
               <ToolPill icon="image" active={false} onPress={shareImage} />
             )}
-            {Platform.OS === 'ios' && modelPath && (
-              <ToolPill icon="model" active={false} onPress={shareModel} />
+            {rooms.length > 1 && (
+              <ToolPill
+                icon="rooms"
+                active={focusIdx >= 0}
+                onPress={() =>
+                  setFocusIdx((i) => (i + 2 > rooms.length ? -1 : i + 1))
+                }
+              />
             )}
-          </View>
+            {Platform.OS === 'ios' && (
+              <ToolPill icon="model" active={false} onPress={shareObj} />
+            )}
+          </ScrollView>
         )}
 
         {/* Côtes du meuble sélectionné, en surimpression */}
@@ -577,6 +614,15 @@ export function ResultScreen() {
                 style={styles.openingButton}
                 onPress={() => selectedWallId && addOpening(selectedWallId)}>
                 <Text style={styles.openingText}>+ Ouverture</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.openingButton}
+                onPress={() => {
+                  if (!selectedWallId) return;
+                  removeWall(selectedWallId);
+                  setSelectedWallId(null);
+                }}>
+                <Text style={styles.removeRoomText}>Supprimer</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.applyButton} onPress={applyLength}>
                 <Text style={styles.applyText}>Appliquer</Text>
@@ -833,7 +879,9 @@ type ToolIcon =
   | 'image'
   | 'model'
   | 'top'
-  | 'rooms';
+  | 'rooms'
+  | 'addWall'
+  | 'undo';
 
 /** Tracés 24×24 des icônes d'outils (trait simple, lisible en 18 px). */
 const TOOL_PATHS: Record<ToolIcon, { d: string; fill?: boolean }[]> = {
@@ -874,6 +922,16 @@ const TOOL_PATHS: Record<ToolIcon, { d: string; fill?: boolean }[]> = {
   model: [
     { d: 'M12 3.2 l7.8 4.4 v8.8 L12 20.8 l-7.8 -4.4 V7.6 z' },
     { d: 'M12 12 l7.8 -4.4 M12 12 L4.2 7.6 M12 12 v8.8' },
+  ],
+  addWall: [
+    { d: 'M3.5 15 h17' },
+    { d: 'M3.5 18.5 h17' },
+    { d: 'M12 3 v8' },
+    { d: 'M8 7 h8' },
+  ],
+  undo: [
+    { d: 'M4.5 12 a7.5 7.5 0 1 0 2.2 -5.3' },
+    { d: 'M4.2 3.8 v4.4 h4.4' },
   ],
   top: [
     { d: 'M4.5 5.5 h15 a1 1 0 0 1 1 1 v11 a1 1 0 0 1 -1 1 h-15 a1 1 0 0 1 -1 -1 v-11 a1 1 0 0 1 1 -1 z' },
@@ -1007,15 +1065,20 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   segmentText: { color: c.inkSoft, fontSize: 14, fontWeight: '600' },
   segmentTextActive: { color: c.blue, fontWeight: '700' },
   canvas: { flex: 1, ...shadowCard, borderRadius: radius.lg },
-  planTools: {
+  // Jusqu'à neuf pastilles : la barre défile plutôt que de se replier sur
+  // deux rangs et de manger le plan.
+  planToolsScroll: {
     position: 'absolute',
     top: 10,
-    left: 56,
+    left: 10,
     right: 10,
+    maxHeight: 40,
+  },
+  planTools: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'flex-end',
+    alignItems: 'center',
     gap: 6,
+    paddingHorizontal: 2,
   },
   toolPill: {
     width: 36,

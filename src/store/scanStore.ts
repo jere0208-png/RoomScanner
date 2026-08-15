@@ -7,6 +7,7 @@ import type {
   ScanUpdate,
 } from 'react-native-room-scan';
 import {
+  bounds,
   DEFAULT_ROOM_ID,
   detectRooms,
   mergeColinear,
@@ -187,6 +188,24 @@ function persistSoon(saves: SavedScan[]) {
   }, 600);
 }
 
+/**
+ * Historique d'annulation : une pile de photos du plan, bornée.
+ *
+ * Les gestes continus (déplacer un coin, glisser un meuble) appellent leur
+ * action des dizaines de fois par seconde : on ne photographie qu'une fois
+ * par geste, en regroupant les appels de même nature rapprochés.
+ */
+interface Snapshot {
+  walls: WallSeg[];
+  openings: WallSeg[];
+  objects: ObjectData[];
+  rooms: RoomEntry[];
+}
+const HISTORY_MAX = 40;
+const history: Snapshot[] = [];
+let lastKey = '';
+let lastAt = 0;
+
 const two = (n: number) => String(n).padStart(2, '0');
 function defaultName(d: Date): string {
   return `Scan du ${two(d.getDate())}/${two(d.getMonth() + 1)} à ${two(
@@ -232,6 +251,13 @@ interface ScanState {
   redetectRooms: () => void;
   /** Hauteur sous plafond d'une pièce (applique à tous ses murs). */
   setRoomHeight: (roomId: string, height: number) => void;
+  /** Retire un mur du plan (et les ouvertures qu'il portait). */
+  removeWall: (wallId: string) => void;
+  /** Pose un mur neuf au centre du plan, à déplacer par ses poignées. */
+  addWall: () => void;
+  /** Annule la dernière retouche. Vide = plus rien à annuler. */
+  undo: () => void;
+  canUndo: boolean;
   /** D'où vient l'écran résultat : le bouton retour y renvoie. */
   resultOrigin: 'scan' | 'library';
   walls: WallSeg[];
@@ -290,6 +316,37 @@ interface ScanState {
 }
 
 export const useScanStore = create<ScanState>((set, get) => {
+  /**
+   * Photographie le plan avant de le modifier. `key` regroupe les appels
+   * rapprochés d'un même geste : un glissement de coin ne doit produire
+   * qu'UNE entrée d'historique, pas une par image.
+   */
+  const pushHistory = (key: string) => {
+    const now = Date.now();
+    if (key === lastKey && now - lastAt < 800) {
+      lastAt = now;
+      return;
+    }
+    lastKey = key;
+    lastAt = now;
+    const st = get();
+    history.push({
+      walls: st.walls,
+      openings: st.openings,
+      objects: st.objects,
+      rooms: st.rooms,
+    });
+    if (history.length > HISTORY_MAX) history.shift();
+    if (!st.canUndo) set({ canUndo: true });
+  };
+
+  /** Repart d'un plan vierge d'historique (nouveau scan, ouverture, revert). */
+  const clearHistory = () => {
+    history.length = 0;
+    lastKey = '';
+    set({ canUndo: false });
+  };
+
   /** Recopie le scan courant dans son entrée de bibliothèque et persiste. */
   const syncCurrent = () => {
     const st = get();
@@ -333,6 +390,7 @@ export const useScanStore = create<ScanState>((set, get) => {
     walls: [],
     openings: [],
     objects: [],
+    canUndo: false,
     saves: [],
     themePref: 'light',
     showOpeningColors: false,
@@ -365,17 +423,20 @@ export const useScanStore = create<ScanState>((set, get) => {
       AsyncStorage.setItem(TEXTURES_KEY, showTextures ? '1' : '0').catch(() => {});
     },
 
-    setRoomName: (roomId, name) =>
+    setRoomName: (roomId, name) => {
+      pushHistory(`roomName:${roomId}`);
       set({
         rooms: get().rooms.map((r) =>
           r.id === roomId ? { ...r, name: name.trim() } : r,
         ),
         dirty: true,
-      }),
+      });
+    },
 
     removeRoom: (roomId) => {
       const st = get();
       if (st.rooms.length <= 1) return;
+      pushHistory('removeRoom');
       const gone = st.rooms.find((r) => r.id === roomId);
       const rooms = st.rooms.filter((r) => r.id !== roomId);
       // Un refend borde deux pièces : il ne part que si plus aucune autre
@@ -402,6 +463,7 @@ export const useScanStore = create<ScanState>((set, get) => {
 
     mergeRooms: (aId, bId) => {
       const st = get();
+      pushHistory('mergeRooms');
       const a = st.rooms.find((r) => r.id === aId);
       const b = st.rooms.find((r) => r.id === bId);
       if (!a || !b || aId === bId) return;
@@ -425,6 +487,7 @@ export const useScanStore = create<ScanState>((set, get) => {
 
     splitRoom: (roomId) => {
       const st = get();
+      pushHistory('splitRoom');
       const part = roomParts(st.walls, st.rooms).find((p) => p.roomId === roomId);
       if (!part?.surface) return;
       // Cloison posée en travers, perpendiculaire au grand axe et passant par
@@ -455,6 +518,7 @@ export const useScanStore = create<ScanState>((set, get) => {
 
     redetectRooms: () => {
       const st = get();
+      pushHistory('redetect');
       const olds = roomParts(st.walls, st.rooms);
       // Le graphe a pu changer (cloison ajoutée, coin déplacé) : on le
       // renettoie avant d'y rechercher les faces.
@@ -502,9 +566,57 @@ export const useScanStore = create<ScanState>((set, get) => {
       set({ walls, rooms, objects, dirty: true });
     },
 
+    removeWall: (wallId) => {
+      const st = get();
+      pushHistory('removeWall');
+      const walls = st.walls.filter((w) => w.id !== wallId);
+      set({
+        walls,
+        rooms: st.rooms.map((r) => ({
+          ...r,
+          wallIds: r.wallIds?.filter((id) => id !== wallId),
+        })),
+        // Une ouverture sans mur d'accueil n'a plus de sens.
+        openings: st.openings.filter((o) => nearestWall(o, walls).dist < 0.6),
+        dirty: true,
+      });
+    },
+
+    addWall: () => {
+      const st = get();
+      pushHistory('addWall');
+      // Posé au centre du plan, long d'un mètre : on l'attrape aussitôt par
+      // ses poignées de coin pour le mettre où il faut.
+      const b = bounds(st.walls);
+      const cx = (b.minX + b.maxX) / 2;
+      const cz = (b.minZ + b.maxZ) / 2;
+      const h = st.walls[0]?.height ?? 2.5;
+      set({
+        walls: [
+          ...st.walls,
+          {
+            id: `mur-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            type: 'wall',
+            a: { x: cx - 0.5, z: cz },
+            b: { x: cx + 0.5, z: cz },
+            height: h,
+            yCenter: h / 2,
+          },
+        ],
+        dirty: true,
+      });
+    },
+
+    undo: () => {
+      const prev = history.pop();
+      if (!prev) return;
+      set({ ...prev, canUndo: history.length > 0, dirty: true });
+    },
+
     setRoomHeight: (roomId, height) => {
       if (!(height > 1) || height > 6) return;
       const st = get();
+      pushHistory('height');
       const ids = new Set(st.rooms.find((r) => r.id === roomId)?.wallIds ?? []);
       set({
         walls: st.walls.map((w) =>
@@ -637,6 +749,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         scanning: false,
         screen: 'result',
       });
+      clearHistory();
       persistSoon(saves);
     },
 
@@ -645,6 +758,7 @@ export const useScanStore = create<ScanState>((set, get) => {
      * (autres murs) suivent, et l'angle snappe à l'horizontale/verticale.
      */
     moveWallPoint: (id, end, p) => {
+      pushHistory(`move:${id}:${end}`);
       const { walls } = get();
       const wall = walls.find((w) => w.id === id);
       if (!wall) return;
@@ -704,6 +818,7 @@ export const useScanStore = create<ScanState>((set, get) => {
 
     addOpening: (wallId) => {
       const st = get();
+      pushHistory('addOpening');
       const wall = st.walls.find((w) => w.id === wallId);
       if (!wall) return;
       const wallLen = segLength(wall);
@@ -726,10 +841,13 @@ export const useScanStore = create<ScanState>((set, get) => {
       set({ openings: [...st.openings, opening], dirty: true });
     },
 
-    removeObject: (id) =>
-      set({ objects: get().objects.filter((o) => o.id !== id), dirty: true }),
+    removeObject: (id) => {
+      pushHistory('removeObject');
+      set({ objects: get().objects.filter((o) => o.id !== id), dirty: true });
+    },
 
-    setObjectCenter: (id, x, z) =>
+    setObjectCenter: (id, x, z) => {
+      pushHistory(`moveObject:${id}`);
       set({
         objects: get().objects.map((o) => {
           if (o.id !== id) return o;
@@ -739,10 +857,12 @@ export const useScanStore = create<ScanState>((set, get) => {
           return { ...o, transform: t };
         }),
         dirty: true,
-      }),
+      });
+    },
 
     resizeObject: (id, width, depth) => {
       if (width <= 0 || depth <= 0) return;
+      pushHistory(`resize:${id}`);
       set({
         objects: get().objects.map((o) =>
           o.id === id ? { ...o, width, depth } : o,
@@ -763,6 +883,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         rooms: migrated.rooms,
         dirty: false,
       });
+      clearHistory();
     },
 
     /** Enregistre l'état courant comme NOUVELLE entrée de bibliothèque
@@ -835,6 +956,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         resultOrigin: 'library',
         screen: 'result',
       });
+      clearHistory();
     },
 
     deleteSave: (id) => {

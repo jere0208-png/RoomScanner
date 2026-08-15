@@ -2,7 +2,19 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { PanResponder, StyleSheet, View } from 'react-native';
 import Svg, { Circle, Polygon, Rect, Text as SvgText } from 'react-native-svg';
 import { themedStyles, useTheme, type Palette } from '../theme';
-import { segLength, type WallSeg } from '../geometry/floorplan';
+import {
+  pointOnSeg,
+  roomOf,
+  segLength,
+  type Pt,
+  type WallSeg,
+} from '../geometry/floorplan';
+
+/** Milieu d'une ouverture, au sol. */
+const midOf = (o: WallSeg): Pt => ({
+  x: (o.a.x + o.b.x) / 2,
+  z: (o.a.z + o.b.z) / 2,
+});
 import { dotStep, floorDots, inkOn, mixHex } from '../geometry/appearance';
 import {
   buildScene,
@@ -55,6 +67,8 @@ interface Props {
   onChange?: (v: View3DParams) => void;
   /** Cotes sur les arêtes (arêtes en noir). */
   showMeasures?: boolean;
+  /** N'afficher qu'une pièce : ses murs, son sol, ses meubles. */
+  focusRoomId?: string | null;
 }
 
 /**
@@ -62,7 +76,7 @@ interface Props {
  * que le plan 2D : murs épais extrudés, portes/fenêtres, meubles.
  * Un doigt : tourner/incliner. Deux doigts : pincer pour zoomer, déplacer.
  */
-export function Iso3DView({ value, onChange, showMeasures }: Props) {
+export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props) {
   const walls = useScanStore((s) => s.walls);
   const openings = useScanStore((s) => s.openings);
   const allObjects = useScanStore((s) => s.objects);
@@ -74,7 +88,28 @@ export function Iso3DView({ value, onChange, showMeasures }: Props) {
   const colorOpenings = useScanStore((s) => s.showOpeningColors);
   const showSurfaces = useScanStore((s) => s.showSurfaces);
   const showTextures = useScanStore((s) => s.showTextures);
-  const rooms = useScanStore((s) => s.rooms);
+  const allRooms = useScanStore((s) => s.rooms);
+  // Coupe : on ne garde que la pièce visée, murs et meubles compris.
+  const rooms = useMemo(
+    () => (focusRoomId ? allRooms.filter((r) => r.id === focusRoomId) : allRooms),
+    [allRooms, focusRoomId],
+  );
+  const keptWalls = useMemo(() => {
+    if (!focusRoomId) return walls;
+    const ids = new Set(rooms[0]?.wallIds ?? []);
+    return walls.filter((w) => ids.has(w.id));
+  }, [walls, rooms, focusRoomId]);
+  const keptOpenings = useMemo(() => {
+    if (!focusRoomId) return openings;
+    return openings.filter((o) =>
+      keptWalls.some((w) => pointOnSeg(midOf(o), w.a, w.b).dist < 0.6),
+    );
+  }, [openings, keptWalls, focusRoomId]);
+  const keptObjects = useMemo(
+    () =>
+      focusRoomId ? objects.filter((o) => roomOf(o) === focusRoomId) : objects,
+    [objects, focusRoomId],
+  );
   const floors = useMemo(() => floorsOf(rooms), [rooms]);
   const roomNames = useMemo(
     () => new Map(rooms.map((r) => [r.id, r.name])),
@@ -225,7 +260,7 @@ export function Iso3DView({ value, onChange, showMeasures }: Props) {
   // Scène partagée avec le PDF : mêmes onglets, mêmes bandes, mêmes couleurs.
   const scene = useMemo(
     () =>
-      buildScene(walls, openings, objects, {
+      buildScene(keptWalls, keptOpenings, keptObjects, {
         palette,
         colorOpenings,
         showSurfaces,
@@ -238,9 +273,9 @@ export function Iso3DView({ value, onChange, showMeasures }: Props) {
         coarse: interacting,
       }),
     [
-      walls,
-      openings,
-      objects,
+      keptWalls,
+      keptOpenings,
+      keptObjects,
       palette,
       colorOpenings,
       showSurfaces,

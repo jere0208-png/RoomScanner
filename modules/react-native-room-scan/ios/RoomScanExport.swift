@@ -29,6 +29,22 @@ class RoomScanExport: NSObject {
     presentShareSheet(url: url, resolve: resolve, reject: reject)
   }
 
+  /// Écrit un texte (OBJ, CSV…) en fichier temporaire et ouvre le partage.
+  @objc func shareText(_ content: String,
+                       filename: String,
+                       resolve: @escaping RCTPromiseResolveBlock,
+                       reject: @escaping RCTPromiseRejectBlock) {
+    let url = FileManager.default.temporaryDirectory
+      .appendingPathComponent(filename)
+    do {
+      try content.write(to: url, atomically: true, encoding: .utf8)
+    } catch {
+      reject("WRITE_FAILED", error.localizedDescription, error)
+      return
+    }
+    presentShareSheet(url: url, resolve: resolve, reject: reject)
+  }
+
   /// Retrouve un fichier même si le chemin absolu date d'une ancienne
   /// installation : l'UUID du conteneur change à chaque réinstallation,
   /// mais les Documents sont migrés — on re-résout par le nom de fichier.

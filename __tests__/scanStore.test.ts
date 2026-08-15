@@ -348,6 +348,75 @@ describe('retoucher les pièces à la main', () => {
   });
 });
 
+describe('retoucher les murs et annuler', () => {
+  beforeEach(reset);
+
+  const deux = () =>
+    useScanStore.getState().finalize({
+      modelPath: '/tmp/scan.usdz',
+      surfaces: twoRoomFlat,
+      objects: [objectAt('o1', 'sofa', 2, 1.5)],
+    });
+
+  it('ajoute un mur, et l’annulation le retire', () => {
+    deux();
+    const n = useScanStore.getState().walls.length;
+    expect(useScanStore.getState().canUndo).toBe(false);
+    useScanStore.getState().addWall();
+    expect(useScanStore.getState().walls).toHaveLength(n + 1);
+    expect(useScanStore.getState().canUndo).toBe(true);
+    useScanStore.getState().undo();
+    expect(useScanStore.getState().walls).toHaveLength(n);
+  });
+
+  it('supprime un mur, ses pièces le lâchent, l’annulation le rend', () => {
+    deux();
+    const id = useScanStore.getState().walls[0].id;
+    useScanStore.getState().removeWall(id);
+    const st = useScanStore.getState();
+    expect(st.walls.some((w) => w.id === id)).toBe(false);
+    expect(st.rooms.every((r) => !r.wallIds?.includes(id))).toBe(true);
+    useScanStore.getState().undo();
+    expect(useScanStore.getState().walls.some((w) => w.id === id)).toBe(true);
+  });
+
+  it('ne compte qu’UNE annulation pour tout un glissement', () => {
+    deux();
+    const id = useScanStore.getState().walls[0].id;
+    const avant = { ...useScanStore.getState().walls[0].a };
+    // Un glissement appelle l'action des dizaines de fois par seconde.
+    for (let i = 0; i < 30; i++) {
+      useScanStore.getState().moveWallPoint(id, 'a', { x: -0.02 * i, z: 0 });
+    }
+    useScanStore.getState().undo();
+    const apres = useScanStore.getState().walls.find((w) => w.id === id)!.a;
+    expect(apres.x).toBeCloseTo(avant.x);
+    expect(apres.z).toBeCloseTo(avant.z);
+  });
+
+  it('annule un renommage et une fusion', () => {
+    deux();
+    useScanStore.getState().setRoomName('room-1', 'Séjour');
+    expect(useScanStore.getState().rooms[0].name).toBe('Séjour');
+    useScanStore.getState().undo();
+    expect(useScanStore.getState().rooms[0].name).not.toBe('Séjour');
+
+    useScanStore.getState().mergeRooms('room-1', 'room-2');
+    expect(useScanStore.getState().rooms).toHaveLength(1);
+    useScanStore.getState().undo();
+    expect(useScanStore.getState().rooms).toHaveLength(2);
+  });
+
+  it('repart sans historique quand on ouvre un autre scan', () => {
+    deux();
+    useScanStore.getState().addWall();
+    expect(useScanStore.getState().canUndo).toBe(true);
+    const id = useScanStore.getState().saves[0].id;
+    useScanStore.getState().openSave(id);
+    expect(useScanStore.getState().canUndo).toBe(false);
+  });
+});
+
 describe('removeRoom', () => {
   beforeEach(reset);
 
