@@ -150,9 +150,7 @@ function PlanPreview({
 }
 
 const planStyles = StyleSheet.create({
-  // Gouttières invisibles de part et d'autre : on y scrolle la page,
-  // le centre manipule le plan.
-  box: { height: 380, borderRadius: 16, overflow: 'hidden', marginHorizontal: 32 },
+  box: { height: 380, borderRadius: 16, overflow: 'hidden' },
   inner: { flex: 1 },
 });
 
@@ -260,8 +258,7 @@ export function ExportScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scroll}
-        scrollEnabled={!scrollLocked}
-        canCancelContentTouches={false}>
+        scrollEnabled={!scrollLocked}>
         <View style={styles.switchRow}>
           <Text style={styles.switchLabel}>Inclure des vues 3D</Text>
           <Switch value={include3D} onValueChange={setInclude3D} />
@@ -279,7 +276,8 @@ export function ExportScreen() {
 
         <Text style={styles.sheetLabel}>Feuille 1 · Plan d'ensemble</Text>
         <View style={styles.sheetCard}>
-          <View {...lockProps}>
+          {/* Le verrou de scroll ne couvre QUE la zone centrale du modèle */}
+          <View {...lockProps} style={styles.lockWrap}>
             <PlanPreview
               value={plan}
               onChange={setPlan}
@@ -383,6 +381,8 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     flexShrink: 1,
     marginRight: 10,
   },
+  // Zone centrale du modèle : les gouttières latérales restent au scroll.
+  lockWrap: { marginHorizontal: 32 },
   sheetLabel: {
     color: c.inkSoft,
     fontSize: 12.5,
