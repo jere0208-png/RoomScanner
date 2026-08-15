@@ -16,6 +16,7 @@ import {
   toFootprint,
   wallQuads,
   WALL_T,
+  type RoomShape,
   type WallSeg,
 } from '../geometry/floorplan';
 import { dotStep, floorDots, mixHex } from '../geometry/appearance';
@@ -388,6 +389,7 @@ function draw3DView(
     showTextures?: boolean;
     floors?: Record<string, FloorData | null | undefined>;
     roomNames?: Record<string, string>;
+    rooms?: RoomShape[];
   } = {},
 ) {
   const thetaDeg = view.theta;
@@ -400,6 +402,7 @@ function draw3DView(
     showSurfaces: opts.showSurfaces,
     showTextures: opts.showTextures,
     floors: opts.floors,
+    rooms: opts.rooms,
   });
   const faces = scene.faces;
   if (faces.length === 0) return;
@@ -518,6 +521,8 @@ interface SheetContext {
   floors: Record<string, FloorData | null | undefined>;
   /** Nom donné à chaque pièce (vide = pièce non nommée). */
   roomNames: Record<string, string>;
+  /** Pièces du scan, avec les murs qui bordent chacune. */
+  rooms?: RoomShape[];
   colorOpenings: boolean;
   showSurfaces: boolean;
   showTextures: boolean;
@@ -544,7 +549,7 @@ function planPage(
   const d = new Draw();
   // Une entrée par pièce : contour, centre, teinte de sol. Tout ce qui suit
   // (meubles, ouvertures, cotes, cartouches) se règle sur la pièce concernée.
-  const parts = roomParts(walls);
+  const parts = roomParts(walls, ctx.rooms);
   const fillOf = (roomId: string) => {
     const captured = showTextures ? floors[roomId]?.color : undefined;
     return captured ? mixHex(captured, '#FFFFFF', 0.42) : '#F5F7FA';
@@ -797,6 +802,7 @@ function threeDPage(
     showTextures: ctx.showTextures,
     floors: ctx.floors,
     roomNames: ctx.roomNames,
+    rooms: ctx.rooms,
     showDims,
   };
   const top = FRAME.y + FRAME.h;
@@ -830,6 +836,8 @@ export interface ScanForPdf {
   floors?: Record<string, FloorData | null | undefined>;
   /** Nom donné à chaque pièce, par identifiant de pièce. */
   roomNames?: Record<string, string>;
+  /** Pièces du scan, avec les murs qui bordent chacune. */
+  rooms?: RoomShape[];
 }
 
 export function pdfFilename(name: string): string {
@@ -855,6 +863,7 @@ export function buildScanPdf(
     objects: scan.objects,
     floors: scan.floors ?? {},
     roomNames: scan.roomNames ?? {},
+    rooms: scan.rooms,
     colorOpenings: opts.colorOpenings ?? false,
     showSurfaces: opts.surfaces ?? true,
     showTextures: opts.textures ?? false,

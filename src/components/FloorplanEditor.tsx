@@ -223,7 +223,7 @@ export function FloorplanEditor({
   // Corps des murs : onglets calculés une fois pour tout le rendu.
   const quads = useMemo(() => wallQuads(walls), [walls]);
   // Pièces du plan : chacune a son contour, son centre et sa teinte de sol.
-  const parts = useMemo(() => roomParts(walls), [walls]);
+  const parts = useMemo(() => roomParts(walls, rooms), [walls, rooms]);
   const roomById = useMemo(() => new Map(rooms.map((r) => [r.id, r])), [rooms]);
   const fillOf = useMemo(() => {
     return (roomId: string) => {

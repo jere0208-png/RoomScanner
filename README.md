@@ -5,7 +5,8 @@ réel, mesures, modèle 3D exporté et plan 2D éditable.
 
 - **iOS** : Apple **RoomPlan** (LiDAR) via un module natif Swift — murs, portes,
   fenêtres et objets paramétriques, export `.usdz`, visionneuse QuickLook.
-  **Multi-pièces** (iOS 17+) : on enchaîne les pièces dans un même scan.
+  On scanne le logement d'une traite : **les pièces sont détectées ensuite**,
+  dans le graphe des murs, puis nommées d'après le mobilier.
 - **Android** : **ARCore** via un module natif Kotlin — détection de plans
   verticaux/horizontaux, export `.obj`. Résultat plus grossier qu'iOS
   (Android n'a pas d'équivalent de RoomPlan).
@@ -36,45 +37,43 @@ src/
 └── screens/                 Home / Scan (HUD sur vue AR) / Résultat (plan éditable)
 ```
 
-### Multi-pièces
+### Les pièces se détectent toutes seules
 
-Un scan peut contenir plusieurs pièces. **« Pièce suivante » clôt la pièce
-courante sans couper la session ARKit** (`stop(pauseARSession: false)`) : le
-repère monde survit, on marche jusqu'à la pièce suivante, on relance une
-capture, et les pièces sortent déjà recalées les unes par rapport aux autres.
-Aucun recollement géométrique n'est fait côté JS — c'est le suivi de la
-caméra qui aligne, donc **il ne faut ni quitter l'app ni masquer l'objectif
-entre deux pièces**.
+**Rien à découper à la main pendant le scan.** On parcourt le logement d'une
+traite, et les pièces sont trouvées après coup, dans la géométrie.
 
-Chaque pièce est post-traitée à part par `RoomBuilder` (iOS 17), hors de
-`RoomCaptureView` : c'est ce qui permet de garder la vue en mode capture d'un
-bout à l'autre (`captureView(shouldPresent:)` renvoie `false` en multi-pièces).
-À la fin, `StructureBuilder` fusionne les données brutes pour le **seul**
-`.usdz` exporté — la géométrie du plan, elle, vient des pièces individuelles.
-Si l'assemblage échoue, le plan reste juste, seul le modèle 3D se réduit à la
-première pièce.
+Un appartement scanné d'un seul tenant est **un graphe de murs** : les pièces
+en sont les faces. `detectRooms()` les énumère par le parcours classique des
+faces d'un graphe planaire — à chaque nœud, on repart par l'arête qui suit
+immédiatement celle par laquelle on est arrivé. Le parcours ferme chaque pièce
+tout seul, et la face extérieure (le tour du logement) sort avec l'orientation
+inverse : c'est à ça qu'on la reconnaît et qu'on la jette. Les murs qui ne
+ferment rien (bout pendant, cloison isolée) ne créent pas de pièce, et les
+boucles de moins de 1,2 m² sont du bruit de scan.
 
-Côté JS, la géométrie reste **à plat** : `walls`, `openings` et `objects` sont
-des listes uniques où chaque élément porte un `roomId`, et `rooms[]` ne
-contient que ce qui est propre à la pièce (nom, relevé du sol). Tout le rendu
-passe par `roomParts()`, qui redécoupe le plan par pièce. Conséquence
-importante : **la soudure des coins, les jonctions en T et les onglets sont
-cloisonnés par pièce**. Deux cloisons mitoyennes distantes de 8 cm restent
-deux murs distincts ; les confondre refermerait les deux contours l'un sur
-l'autre et ferait disparaître les surfaces au sol.
+Conséquence sur le modèle de données : **un refend borde deux pièces**. C'est
+donc la pièce qui liste ses murs (`RoomEntry.wallIds`), et non le mur qui
+désigne sa pièce. `roomParts()` recalcule le contour à partir de cette liste,
+ce qui reste juste quand on déplace un coin à l'édition. Faute de liste
+(scans d'avant la détection), on retombe sur un regroupement par `roomId`.
 
-RoomPlan classe les pièces (`livingRoom`, `kitchen`…) : le nom français est
-posé d'office, avec numérotation des doublons (« Chambre », « Chambre 2 »).
+**Le nom vient du mobilier.** `deduceRoomKind()` fait voter les meubles
+trouvés dans la pièce : un lit ou un réfrigérateur tranchent à eux seuls
+(poids 3), un four et un lave-vaisselle se cumulent, une table ou un évier ne
+font que pencher la balance — un évier se trouve aussi bien dans une cuisine
+que dans une salle de bains. En dessous de 2,5 points, on n'invente rien : la
+pièce prend son rang, « Pièce 1 », « Pièce 2 ». Les homonymes sont numérotés
+(« Chambre », « Chambre 2 »).
+
 En mode édition, **le cartouche est le bouton de renommage** : on touche le
-nom là où il s'affiche, sur le plan 2D. Une pièce encore anonyme affiche
-« Nommer » pour qu'il y ait toujours quelque chose à toucher. Le même
-cartouche — cadre, nom au-dessus, surface en dessous — est reporté au centre
-de la pièce sur la vue 3D. Toucher le sol d'une pièce la sélectionne, ce qui
-permet aussi de la retirer du plan.
+nom là où il s'affiche, sur le plan 2D. Le même cartouche — cadre, nom
+au-dessus, surface en dessous — est reporté au centre de la pièce sur la vue
+3D. Toucher le sol d'une pièce la sélectionne, ce qui permet aussi de la
+retirer du plan ; ses murs partent avec elle, sauf ceux qu'une autre pièce
+borde encore.
 
-Android et iOS 16 restent mono-pièce : leur résultat à plat est remis dans le
-même moule (une pièce implicite `room-1`), et les scans enregistrés avant le
-multi-pièces sont migrés au chargement.
+Les scans enregistrés avant tout ça sont migrés au chargement en une pièce
+implicite `room-1`.
 
 ### Un mur d'une seule traite
 
@@ -226,7 +225,7 @@ nécessaire que si les fichiers Swift/Kotlin ou les dépendances natives changen
 ## Vérifications faites sur cette machine (Windows)
 
 - `npx tsc --noEmit` et `npx eslint src App.tsx` : aucun diagnostic.
-- `npx jest` : 65/65 tests verts (conversion matrice iOS→segment, extrémités
+- `npx jest` : 76/76 tests verts (conversion matrice iOS→segment, extrémités
   Android, soudure des coins et jonctions en T, onglets des murs, surface au
   sol, semis de points, lecture des textures, snap angulaire, projection
   mètres↔pixels, génération du PDF ; **multi-pièces** : découpe par pièce,
@@ -238,7 +237,10 @@ nécessaire que si les fichiers Swift/Kotlin ou les dépendances natives changen
   normales sortantes unitaires, jamais deux faces opposées visibles à la
   fois, rattachement des ouvertures à leur mur, découpe du mur en trumeaux /
   linteau / allège, non-recouvrement des panneaux, porte rendue en bloc sans
-  biais de tri).
+  biais de tri ; **détection** : une pièce, deux pièces séparées par un
+  refend partagé, trois pièces en enfilade, cloison qui ne ferme rien, plan
+  ouvert, boucle-bruit écartée, pièces disjointes ; **nommage** : déduction
+  par le mobilier, numérotation des homonymes et des indécidables).
 - **Non vérifié ici** : la compilation Swift/Kotlin (impossible sans Mac /
   SDK Android). Les points d'attente connus sont notés ci-dessous.
 
@@ -259,15 +261,16 @@ nécessaire que si les fichiers Swift/Kotlin ou les dépendances natives changen
 - Android n'a pas de test d'occultation (pas d'équivalent simple de la carte
   de profondeur LiDAR) : un mur en partie masqué par un meuble récupère un
   peu de sa couleur. La moyenne sur toute la durée du scan lisse l'essentiel.
-- Multi-pièces : le recalage repose entièrement sur la continuité du suivi
-  ARKit. Un long trajet, un couloir sombre ou une porte franchie caméra
-  baissée font dériver le repère : les pièces sortent alors décalées. Le plan
-  2D reste éditable, mais il n'y a pas (encore) de recalage manuel d'une
-  pièce entière.
-- Multi-pièces : les couleurs relevées sont rattachées par identifiant de
-  surface, avec repli sur la position (0,7 m et même orientation). Le sol de
-  chaque pièce est découpé dans la carte monde à partir de l'emprise de ses
-  murs, plus une case de 40 cm de marge.
-- Multi-pièces : deux pièces mitoyennes gardent chacune son mur. C'est
-  volontaire (c'est la réalité d'une cloison vue des deux côtés), mais la
-  surface au sol cumulée exclut donc l'épaisseur de la cloison.
+- Détection des pièces : elle ne voit que ce qui se referme. Une porte
+  ouverte sans huisserie détectée, ou un mur manquant, fusionne deux pièces
+  en une. À l'inverse, un placard fermé compte pour une pièce — on peut le
+  retirer d'un geste depuis le plan.
+- Détection des pièces : elle a lieu UNE fois, à la fin du scan. Déplacer un
+  coin ensuite ne recrée ni ne supprime de pièce ; le contour, lui, suit.
+- Nommage : il ne peut être meilleur que la détection d'objets de RoomPlan.
+  Un bureau, une entrée ou un couloir n'ont pas de mobilier caractéristique
+  et sortiront en « Pièce N ».
+- Le relevé de couleurs du sol est une seule carte monde par scan, plafonnée
+  à 64 × 64 cases de 40 cm (25,6 m de côté). Au-delà, seule la couleur
+  moyenne subsiste. Chaque pièce n'y peint que les cases tombant dans son
+  contour.

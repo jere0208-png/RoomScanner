@@ -141,7 +141,7 @@ export function ResultScreen() {
 
   const selectedWall = walls.find((w) => w.id === selectedWallId) ?? null;
   const perimeter = walls.reduce((s, w) => s + segLength(w), 0);
-  const parts = roomParts(walls);
+  const parts = roomParts(walls, rooms);
   const surface = totalArea(parts);
   // Une seule pièce : l'outil de nommage n'a pas besoin de sélection.
   const targetRoomId =

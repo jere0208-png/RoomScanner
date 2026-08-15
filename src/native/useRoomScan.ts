@@ -33,14 +33,6 @@ export function useRoomScan() {
     return () => subs.forEach((s) => s.remove());
   }, []);
 
-  // L'enchaînement de pièces n'existe qu'à partir d'iOS 17 : on le demande
-  // une fois, le bouton « Pièce suivante » n'apparaît que si c'est possible.
-  useEffect(() => {
-    RoomScan.canMultiRoom()
-      .then((ok) => useScanStore.getState().setMultiRoomAvailable(ok))
-      .catch(() => useScanStore.getState().setMultiRoomAvailable(false));
-  }, []);
-
   /** Démarre réellement la session (caméra déjà accordée). */
   const begin = async () => {
     store.setError(null);
@@ -68,43 +60,15 @@ export function useRoomScan() {
       store.setPaused(false);
     },
     /**
-     * Clôt la pièce courante et enchaîne sur la suivante. La session ARKit
-     * reste vivante : le repère monde est conservé, c'est lui qui recale les
-     * pièces entre elles. Il faut donc MARCHER jusqu'à la pièce suivante
-     * sans couper l'app ni masquer la caméra.
+     * Termine le scan. Il n'y a rien à découper à la main : l'appartement se
+     * scanne d'une traite, et les pièces sont ensuite déduites du graphe des
+     * murs puis nommées d'après le mobilier (`finalize`).
      */
-    nextRoom: async () => {
-      const st = useScanStore.getState();
-      if (st.closingRoom) return;
-      st.setClosingRoom(true);
-      try {
-        await RoomScan.finishRoom();
-        useScanStore.getState().roomFinished();
-        await RoomScan.nextRoom();
-        useScanStore.getState().setPaused(false);
-      } catch (e: any) {
-        useScanStore.getState().setClosingRoom(false);
-        useScanStore
-          .getState()
-          .setError(e?.message ?? 'Échec de l’enregistrement de la pièce');
-      }
-    },
-
     stop: async () => {
-      const multi = useScanStore.getState().multiRoomAvailable;
       store.setProcessing(true);
       try {
         // Le post-traitement RoomPlan prend quelques secondes.
-        let result;
-        if (multi) {
-          // La dernière pièce n'est pas encore close : on la ferme, puis on
-          // assemble. Une pièce vide (bouton pressé sans rien scanner) fait
-          // échouer la clôture — ce n'est pas une raison de perdre les autres.
-          await RoomScan.finishRoom().catch(() => {});
-          result = await RoomScan.finishScan();
-        } else {
-          result = await RoomScan.stop();
-        }
+        const result = await RoomScan.stop();
         useScanStore.getState().finalize(result);
       } catch (e: any) {
         store.setProcessing(false);

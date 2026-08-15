@@ -1,6 +1,7 @@
 import {
   bounds,
   closedLoop,
+  detectRooms,
   groupByRoom,
   loopAreaM2,
   makeMapping,
@@ -351,6 +352,87 @@ describe('closedLoop + loopAreaM2', () => {
 
   it('renvoie null quand un coin porte trois murs', () => {
     expect(closedLoop([...rect, seg('x', { x: 0, z: 0 }, { x: -2, z: 0 })])).toBeNull();
+  });
+});
+
+describe('detectRooms', () => {
+  it('trouve une pièce unique et jette le contour extérieur', () => {
+    const found = detectRooms(room('r', 0, 0, 4, 3));
+    expect(found).toHaveLength(1);
+    expect(found[0].area).toBeCloseTo(12);
+    expect(found[0].wallIds.sort()).toEqual(['re', 'rn', 'rs', 'rw']);
+  });
+
+  it('trouve deux pièces séparées par un refend, partagé entre elles', () => {
+    // Un 7 × 3 coupé en deux par une cloison à x = 4.
+    const walls = [
+      seg('n1', { x: 0, z: 0 }, { x: 4, z: 0 }),
+      seg('n2', { x: 4, z: 0 }, { x: 7, z: 0 }),
+      seg('e', { x: 7, z: 0 }, { x: 7, z: 3 }),
+      seg('s2', { x: 7, z: 3 }, { x: 4, z: 3 }),
+      seg('s1', { x: 4, z: 3 }, { x: 0, z: 3 }),
+      seg('w', { x: 0, z: 3 }, { x: 0, z: 0 }),
+      seg('refend', { x: 4, z: 0 }, { x: 4, z: 3 }),
+    ];
+    const found = detectRooms(walls);
+    expect(found).toHaveLength(2);
+    expect(found.map((r) => Math.round(r.area))).toEqual([12, 9]);
+    // Le refend borde les DEUX pièces.
+    expect(found.every((r) => r.wallIds.includes('refend'))).toBe(true);
+  });
+
+  it('trouve trois pièces dans un plan en peigne', () => {
+    const walls = [
+      seg('n', { x: 0, z: 0 }, { x: 9, z: 0 }),
+      seg('e', { x: 9, z: 0 }, { x: 9, z: 3 }),
+      seg('s', { x: 9, z: 3 }, { x: 0, z: 3 }),
+      seg('w', { x: 0, z: 3 }, { x: 0, z: 0 }),
+      seg('c1', { x: 3, z: 0 }, { x: 3, z: 3 }),
+      seg('c2', { x: 6, z: 0 }, { x: 6, z: 3 }),
+    ];
+    // Les murs extérieurs doivent d'abord être coupés aux cloisons.
+    const cut = [
+      seg('n1', { x: 0, z: 0 }, { x: 3, z: 0 }),
+      seg('n2', { x: 3, z: 0 }, { x: 6, z: 0 }),
+      seg('n3', { x: 6, z: 0 }, { x: 9, z: 0 }),
+      walls[1],
+      seg('s3', { x: 9, z: 3 }, { x: 6, z: 3 }),
+      seg('s2', { x: 6, z: 3 }, { x: 3, z: 3 }),
+      seg('s1', { x: 3, z: 3 }, { x: 0, z: 3 }),
+      walls[3],
+      walls[4],
+      walls[5],
+    ];
+    const found = detectRooms(cut);
+    expect(found).toHaveLength(3);
+    expect(found.map((r) => Math.round(r.area))).toEqual([9, 9, 9]);
+  });
+
+  it('ignore une cloison qui ne ferme rien', () => {
+    const found = detectRooms([
+      ...room('r', 0, 0, 4, 3),
+      seg('pendant', { x: 2, z: 3 }, { x: 2, z: 1.5 }),
+    ]);
+    expect(found).toHaveLength(1);
+    expect(found[0].area).toBeCloseTo(12);
+  });
+
+  it('ne rend rien quand aucun contour ne se referme', () => {
+    expect(detectRooms(room('r', 0, 0, 4, 3).slice(0, 3))).toHaveLength(0);
+  });
+
+  it('écarte les boucles minuscules dues au bruit du scan', () => {
+    const found = detectRooms(room('t', 0, 0, 0.5, 0.5));
+    expect(found).toHaveLength(0);
+  });
+
+  it('gère deux pièces qui ne se touchent pas', () => {
+    const found = detectRooms([
+      ...room('a', 0, 0, 4, 3),
+      ...room('b', 9, 0, 3, 3),
+    ]);
+    expect(found).toHaveLength(2);
+    expect(found.map((r) => Math.round(r.area))).toEqual([12, 9]);
   });
 });
 

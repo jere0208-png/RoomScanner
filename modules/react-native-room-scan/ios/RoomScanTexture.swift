@@ -291,31 +291,19 @@ final class RoomColorSampler {
   /**
    Carte de couleurs du sol, recadrée sur les cases réellement relevées.
 
-   `within` limite la carte à une emprise donnée (mètres, repère monde) :
-   en multi-pièces, chaque pièce reçoit ainsi sa propre grille au lieu de
-   se partager une carte à l'échelle de l'appartement.
+   La carte couvre tout le scan : le rendu ne peint que les cases tombant
+   dans le contour d'une pièce, la découpe se fait donc côté JS.
    */
-  func floorPayload(
-    within box: (minX: Float, maxX: Float, minZ: Float, maxZ: Float)? = nil
-  ) -> [String: Any]? {
+  func floorPayload() -> [String: Any]? {
     queue.sync { () -> [String: Any]? in
       guard !floorTiles.isEmpty else { return nil }
       let cell = Self.floorCell
-      // Marge d'une case : les murs bordent la pièce, leur pied compte.
-      let keep: (Int, Int) -> Bool = { i, j in
-        guard let b = box else { return true }
-        let x = (Float(i) + 0.5) * cell
-        let z = (Float(j) + 0.5) * cell
-        return x >= b.minX - cell && x <= b.maxX + cell
-            && z >= b.minZ - cell && z <= b.maxZ + cell
-      }
       var i0 = Int.max, i1 = Int.min, j0 = Int.max, j1 = Int.min
       var total = SIMD3<Float>(repeating: 0)
       var n = 0
       for (key, value) in floorTiles {
         let i = Int(key >> 32)
         let j = Int(Int32(bitPattern: UInt32(truncatingIfNeeded: key)))
-        guard keep(i, j) else { continue }
         i0 = min(i0, i); i1 = max(i1, i)
         j0 = min(j0, j); j1 = max(j1, j)
         total += value.0

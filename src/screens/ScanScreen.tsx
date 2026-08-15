@@ -24,10 +24,7 @@ export function ScanScreen() {
   const windowCount = useScanStore((s) => s.windowCount);
   const paused = useScanStore((s) => s.paused);
   const processing = useScanStore((s) => s.processing);
-  const multiRoom = useScanStore((s) => s.multiRoomAvailable);
-  const finishedRooms = useScanStore((s) => s.finishedRooms);
-  const closingRoom = useScanStore((s) => s.closingRoom);
-  const { pause, resume, stop, nextRoom, cancel } = useRoomScan();
+  const { pause, resume, stop, cancel } = useRoomScan();
   const styles = getStyles(useTheme());
 
   // Torche : éteinte en quittant l'écran.
@@ -63,7 +60,7 @@ export function ScanScreen() {
       <TouchableOpacity
         style={[styles.torchButton, torch && styles.torchButtonOn]}
         onPress={toggleTorch}>
-        <Svg width={21} height={21} viewBox="0 0 24 24">
+        <Svg width={18} height={18} viewBox="0 0 24 24">
           <Path
             d="M13 2 L5 13.5 h5 L8 22 l8.5 -11.5 h-5 z"
             stroke={torch ? '#0B0D12' : '#F4F6FA'}
@@ -84,14 +81,6 @@ export function ScanScreen() {
             </View>
           ))}
         </View>
-        {multiRoom && finishedRooms > 0 && (
-          <View style={[styles.instructionPill, styles.roomPill]}>
-            <Text style={styles.instructionText}>
-              Pièce {finishedRooms + 1} · {finishedRooms} enregistrée
-              {finishedRooms > 1 ? 's' : ''}
-            </Text>
-          </View>
-        )}
         {paused && (
           <View style={[styles.instructionPill, styles.pausedPill]}>
             <Text style={styles.instructionText}>Scan en pause</Text>
@@ -105,8 +94,8 @@ export function ScanScreen() {
         <TouchableOpacity
           style={styles.pauseButton}
           onPress={paused ? resume : pause}>
-          {/* Icône dessinée : même hauteur (21) que l'éclair et la croix. */}
-          <Svg width={21} height={21} viewBox="0 0 24 24">
+          {/* Icône dessinée : même hauteur (18) que l'éclair et la croix. */}
+          <Svg width={18} height={18} viewBox="0 0 24 24">
             {paused ? (
               <Path
                 d="M8 4.5 L19.5 12 L8 19.5 z"
@@ -133,38 +122,18 @@ export function ScanScreen() {
             )}
           </Svg>
         </TouchableOpacity>
-        {multiRoom && (
-          <TouchableOpacity
-            style={styles.nextRoomButton}
-            onPress={nextRoom}
-            disabled={closingRoom}>
-            <Text style={styles.nextRoomText}>Pièce suivante</Text>
-          </TouchableOpacity>
-        )}
         <TouchableOpacity style={styles.stopButton} onPress={stop}>
           <Text style={styles.stopText}>Terminer</Text>
         </TouchableOpacity>
       </View>
-
-      {/* Transition entre deux pièces : ne pas couper la caméra, c'est elle
-          qui garde le repère commun aux pièces. */}
-      {closingRoom && (
-        <View style={styles.processing}>
-          <ActivityIndicator size="large" color="#FFFFFF" />
-          <Text style={styles.processingTitle}>Pièce enregistrée…</Text>
-          <Text style={styles.processingText}>
-            Gardez l'app ouverte et marchez jusqu'à la pièce suivante :
-            c'est le suivi de la caméra qui aligne les pièces entre elles.
-          </Text>
-        </View>
-      )}
 
       {processing && (
         <View style={styles.processing}>
           <ActivityIndicator size="large" color="#FFFFFF" />
           <Text style={styles.processingTitle}>Assemblage du modèle 3D…</Text>
           <Text style={styles.processingText}>
-            Murs, ouvertures et mesures sont en cours de calcul.
+            Murs et ouvertures sont en cours de calcul, puis les pièces sont
+            reconnues et nommées d'après le mobilier trouvé dedans.
           </Text>
         </View>
       )}
@@ -235,7 +204,6 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     marginTop: 10,
   },
   pausedPill: { backgroundColor: 'rgba(232,161,59,0.85)' },
-  roomPill: { backgroundColor: 'rgba(46,147,189,0.85)' },
   instructionDot: {
     width: 7,
     height: 7,
@@ -262,15 +230,6 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     justifyContent: 'center',
   },
   pauseIcon: { color: c.scanInk, fontSize: 16, fontWeight: '700' },
-  nextRoomButton: {
-    backgroundColor: c.scanPill,
-    borderRadius: 27,
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    marginLeft: 'auto',
-    marginRight: 10,
-  },
-  nextRoomText: { color: c.scanInk, fontSize: 15, fontWeight: '700' },
   stopButton: {
     backgroundColor: c.blue,
     borderRadius: 27,

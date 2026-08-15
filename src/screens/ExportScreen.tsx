@@ -218,6 +218,7 @@ export function ExportScreen() {
           walls,
           openings,
           objects: showFurniture ? objects : [],
+          rooms,
           floors: floorsOf(rooms),
           roomNames: Object.fromEntries(rooms.map((r) => [r.id, r.name])),
         },

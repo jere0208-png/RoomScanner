@@ -56,6 +56,100 @@ const FR: Record<FurnKind, string> = {
   other: 'Objet',
 };
 
+// ------------------------------------------ à quoi sert cette pièce ?
+
+/** Type de pièce déduit du mobilier qui s'y trouve. */
+export type RoomKind =
+  | 'kitchen'
+  | 'bathroom'
+  | 'wc'
+  | 'bedroom'
+  | 'living'
+  | 'dining';
+
+const ROOM_FR: Record<RoomKind, string> = {
+  kitchen: 'Cuisine',
+  bathroom: 'Salle de bains',
+  wc: 'WC',
+  bedroom: 'Chambre',
+  living: 'Salon',
+  dining: 'Salle à manger',
+};
+
+/**
+ * Ce qu'un meuble dit de la pièce où il se trouve, et avec quelle force.
+ *
+ * Un réfrigérateur ou un lit tranchent à eux seuls ; une table ou un évier
+ * ne font que pencher la balance — un évier se trouve aussi bien dans une
+ * cuisine que dans une salle de bains. Les indices se cumulent : four +
+ * lave-vaisselle valent une cuisine, même sans réfrigérateur détecté.
+ */
+function votesFor(category: string): [RoomKind, number][] {
+  const c = category.toLowerCase();
+  if (c.includes('bed')) return [['bedroom', 3]];
+  if (c.includes('bathtub') || c.includes('shower')) return [['bathroom', 3]];
+  if (c.includes('toilet')) {
+    return [
+      ['wc', 3],
+      ['bathroom', 1],
+    ];
+  }
+  if (c.includes('refrigerator') || c.includes('stove')) return [['kitchen', 3]];
+  if (c.includes('oven') || c.includes('dishwasher')) return [['kitchen', 2]];
+  if (c.includes('washer') || c.includes('dryer')) return [['bathroom', 1.5]];
+  if (c.includes('sink')) {
+    return [
+      ['kitchen', 1],
+      ['bathroom', 1],
+    ];
+  }
+  if (c.includes('sofa') || c.includes('couch')) return [['living', 3]];
+  if (c.includes('television') || c === 'tv') return [['living', 2]];
+  if (c.includes('fireplace')) return [['living', 2]];
+  if (c.includes('table')) return [['dining', 1.5]];
+  if (c.includes('chair')) return [['dining', 0.5]];
+  return [];
+}
+
+/** Départage deux types à égalité : le plus caractéristique l'emporte. */
+const PRIORITY: RoomKind[] = [
+  'kitchen',
+  'bathroom',
+  'bedroom',
+  'wc',
+  'living',
+  'dining',
+];
+
+/** Score minimal pour oser nommer : un seul indice faible ne suffit pas. */
+const MIN_SCORE = 2.5;
+
+/**
+ * Déduit le type d'une pièce d'après les meubles qu'elle contient.
+ * `null` quand rien n'est assez net — l'appelant retombe alors sur
+ * « Pièce 1 », « Pièce 2 »…
+ */
+export function deduceRoomKind(categories: string[]): RoomKind | null {
+  const score = new Map<RoomKind, number>();
+  for (const category of categories) {
+    for (const [kind, weight] of votesFor(category)) {
+      score.set(kind, (score.get(kind) ?? 0) + weight);
+    }
+  }
+  let best: RoomKind | null = null;
+  for (const kind of PRIORITY) {
+    const s = score.get(kind) ?? 0;
+    if (s < MIN_SCORE) continue;
+    if (best === null || s > (score.get(best) ?? 0)) best = kind;
+  }
+  return best;
+}
+
+/** Nom français d'un type de pièce. */
+export function roomKindLabel(kind: RoomKind): string {
+  return ROOM_FR[kind];
+}
+
 export function frCategory(category: string): string {
   const kind = furnKind(category);
   return kind === 'other' ? category : FR[kind];

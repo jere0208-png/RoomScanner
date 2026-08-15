@@ -387,12 +387,37 @@ export interface RoomPart {
   centroid: Pt;
 }
 
+/** Ce qu'il faut savoir d'une pièce pour la dessiner : ses murs. */
+export interface RoomShape {
+  id: string;
+  /** Murs qui la bordent. Absent = anciens scans, on retombe sur `roomId`. */
+  wallIds?: string[];
+}
+
 /**
  * Découpe le plan en pièces. C'est LE point d'entrée du rendu multi-pièces :
  * plan 2D, vue 3D et PDF itèrent tous là-dessus, ce qui garantit que les
  * trois montrent les mêmes contours et les mêmes surfaces.
+ *
+ * La liste des murs vient de la pièce, pas l'inverse : un refend borde deux
+ * pièces à la fois, il figure donc dans les deux listes. Faute de liste
+ * (scans d'avant la détection automatique), on regroupe par `roomId`.
  */
-export function roomParts(walls: WallSeg[]): RoomPart[] {
+export function roomParts(walls: WallSeg[], rooms?: RoomShape[]): RoomPart[] {
+  if (rooms && rooms.some((r) => r.wallIds)) {
+    const byId = new Map(walls.map((w) => [w.id, w]));
+    return rooms.map((r) => {
+      const items = (r.wallIds ?? [])
+        .map((id) => byId.get(id))
+        .filter((w): w is WallSeg => !!w);
+      return {
+        roomId: r.id,
+        walls: items,
+        surface: roomSurface(items),
+        centroid: wallsCentroid(items),
+      };
+    });
+  }
   return groupByRoom(walls).map(({ roomId, items }) => ({
     roomId,
     walls: items,
@@ -590,6 +615,118 @@ export function weldCorners(walls: WallSeg[], tol = 0.15): WallSeg[] {
   }
 
   return out;
+}
+
+// ------------------------------------------- détection des pièces
+
+/** Une pièce trouvée dans le graphe des murs. */
+export interface DetectedRoom {
+  /** Contour du sol, dans l'ordre du parcours. */
+  outline: Pt[];
+  /** Murs qui la bordent — un refend est dans DEUX pièces. */
+  wallIds: string[];
+  /** Aire en m². */
+  area: number;
+}
+
+/** Aire signée : le sens de parcours distingue l'intérieur de l'extérieur. */
+function signedArea(pts: Pt[]): number {
+  let sum = 0;
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i];
+    const q = pts[(i + 1) % pts.length];
+    sum += p.x * q.z - q.x * p.z;
+  }
+  return sum / 2;
+}
+
+/**
+ * Découpe le plan en pièces, tout seul.
+ *
+ * Un appartement scanné d'une traite est UN graphe de murs : les pièces en
+ * sont les faces. On les énumère par le parcours classique des faces d'un
+ * graphe planaire — à chaque nœud, on repart par l'arête qui suit
+ * immédiatement, dans le sens horaire, celle par laquelle on est arrivé. Le
+ * parcours ferme naturellement chaque pièce, et la face extérieure (le tour
+ * de l'appartement) sort avec l'orientation inverse : c'est à ça qu'on la
+ * reconnaît et qu'on la jette.
+ *
+ * Un refend appartient donc à deux pièces à la fois — d'où `wallIds` plutôt
+ * qu'un `roomId` posé sur le mur. Les murs qui ne ferment rien (bouts
+ * pendants, cloison isolée) ne créent pas de pièce : le parcours les longe
+ * à l'aller et au retour, leur contribution à l'aire est nulle.
+ */
+export function detectRooms(walls: WallSeg[], minArea = 1.2): DetectedRoom[] {
+  interface HalfEdge {
+    wallId: string;
+    from: Pt;
+    to: Pt;
+    angle: number;
+  }
+  const outgoing = new Map<string, HalfEdge[]>();
+  const edges: HalfEdge[] = [];
+  for (const w of walls) {
+    if (segLength(w) < 1e-6) continue;
+    for (const [from, to] of [
+      [w.a, w.b],
+      [w.b, w.a],
+    ] as const) {
+      const he: HalfEdge = {
+        wallId: w.id,
+        from,
+        to,
+        angle: Math.atan2(to.z - from.z, to.x - from.x),
+      };
+      edges.push(he);
+      const k = nodeKey(from);
+      const list = outgoing.get(k) ?? [];
+      list.push(he);
+      outgoing.set(k, list);
+    }
+  }
+  for (const list of outgoing.values()) list.sort((a, b) => a.angle - b.angle);
+
+  /** Arête suivante de la face : la précédente en angle autour du nœud. */
+  const nextOf = (he: HalfEdge): HalfEdge | null => {
+    const list = outgoing.get(nodeKey(he.to));
+    if (!list || list.length === 0) return null;
+    // On repart de l'inverse de l'arête d'arrivée, puis on tourne d'un cran.
+    const back = he.angle > 0 ? he.angle - Math.PI : he.angle + Math.PI;
+    let idx = list.findIndex(
+      (e) => e.wallId === he.wallId && nodeKey(e.to) === nodeKey(he.from),
+    );
+    if (idx < 0) {
+      // Nœud non partagé au point près : on se rabat sur l'angle.
+      idx = list.findIndex((e) => Math.abs(e.angle - back) < 1e-6);
+      if (idx < 0) return null;
+    }
+    return list[(idx - 1 + list.length) % list.length];
+  };
+
+  const seen = new Set<HalfEdge>();
+  const faces: { pts: Pt[]; wallIds: string[]; area: number }[] = [];
+  for (const start of edges) {
+    if (seen.has(start)) continue;
+    const pts: Pt[] = [];
+    const ids = new Set<string>();
+    let he: HalfEdge | null = start;
+    // Garde-fou : un graphe abîmé ne doit pas boucler indéfiniment.
+    for (let guard = 0; he && !seen.has(he) && guard <= edges.length; guard++) {
+      seen.add(he);
+      pts.push(he.from);
+      ids.add(he.wallId);
+      he = nextOf(he);
+    }
+    if (pts.length < 3) continue;
+    faces.push({ pts, wallIds: [...ids], area: signedArea(pts) });
+  }
+
+  // Les faces intérieures tournent toutes dans le même sens ; le contour
+  // extérieur, lui, sort à l'envers.
+  return faces
+    .filter((f) => f.area > 0 && f.area >= minArea)
+    .map((f) => ({ outline: f.pts, wallIds: f.wallIds, area: f.area }))
+    .sort((a, b) => b.area - a.area);
 }
 
 // ------------------------------------------- fusion des murs colinéaires

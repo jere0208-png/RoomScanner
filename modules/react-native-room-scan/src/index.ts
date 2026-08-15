@@ -80,44 +80,25 @@ export interface ScanUpdate {
 }
 
 /**
- * Une pièce d'un scan multi-pièces. Toutes les pièces d'un même scan sont
- * exprimées dans UN SEUL repère monde : c'est `StructureBuilder` (iOS 17+)
- * qui les recale entre elles à partir des sessions ARKit enchaînées.
+ * Résultat d'un scan : le logement d'un seul tenant.
+ *
+ * Le natif ne cherche PAS à découper en pièces — c'est le JS qui les déduit
+ * du graphe des murs (`detectRooms`) puis les nomme d'après le mobilier.
  */
-export interface RoomData {
-  /** Identifiant stable de la pièce à l'intérieur du scan. */
-  id: string;
-  /** Étiquette RoomPlan (`livingRoom`, `kitchen`…), si RoomPlan en donne une. */
-  label?: string;
-  surfaces: SurfaceData[];
-  objects: ObjectData[];
-  /** Couleurs du sol de CETTE pièce (grille recadrée sur son emprise). */
-  floor?: FloorData;
-}
-
-/**
- * Résultat d'une pièce terminée en cours de scan multi-pièces : de quoi
- * afficher un compte à l'écran, sans post-traitement final.
- */
-export interface RoomSummary {
-  index: number;
-  wallCount: number;
-  objectCount: number;
-  doorCount: number;
-  windowCount: number;
-  label?: string;
-}
-
 export interface ScanResult {
   /** Chemin local du modèle 3D (.usdz sur iOS, .obj sur Android). */
   modelPath: string;
-  /** Pièces du scan (toujours au moins une sur le chemin multi-pièces). */
-  rooms?: RoomData[];
-  /** Chemin mono-pièce (Android, iOS 16) : les surfaces à plat. */
   surfaces?: SurfaceData[];
   objects?: ObjectData[];
   /** Couleurs du sol relevées pendant le scan (iOS avec LiDAR). */
   floor?: FloorData;
+  /** Compat : anciens résultats déjà découpés en pièces. */
+  rooms?: {
+    id: string;
+    surfaces?: SurfaceData[];
+    objects?: ObjectData[];
+    floor?: FloorData;
+  }[];
 }
 
 const RoomScanModule = NativeModules.RoomScanModule;
@@ -160,28 +141,6 @@ export const RoomScan = {
 
   pause: (): void => RoomScanModule.pauseRoomScan(),
   resume: (): void => RoomScanModule.resumeRoomScan(),
-
-  /**
-   * Enchaînement de plusieurs pièces dans un même scan. Demande
-   * `StructureBuilder` (iOS 17+) : ailleurs, un scan = une pièce.
-   */
-  canMultiRoom: (): Promise<boolean> =>
-    RoomScanModule?.canMultiRoom
-      ? RoomScanModule.canMultiRoom()
-      : Promise.resolve(false),
-
-  /**
-   * Clôt la pièce courante SANS couper la session ARKit : le repère monde
-   * survit, c'est lui qui recalera la pièce suivante sur celle-ci.
-   * Marcher jusqu'à la pièce suivante avant d'appeler `nextRoom`.
-   */
-  finishRoom: (): Promise<RoomSummary> => RoomScanModule.finishRoom(),
-
-  /** Relance la capture pour une nouvelle pièce, dans le même repère. */
-  nextRoom: (): Promise<void> => RoomScanModule.nextRoom(),
-
-  /** Assemble toutes les pièces closes, exporte le modèle et rend le tout. */
-  finishScan: (): Promise<ScanResult> => RoomScanModule.finishScan(),
 
   /** iOS : ouvre le .usdz dans QuickLook (visionneuse 3D + AR native).
    *  Rejette si le fichier du modèle n'existe plus. */

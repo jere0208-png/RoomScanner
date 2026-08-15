@@ -3,13 +3,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import type {
   FloorData,
   ObjectData,
-  RoomData,
   ScanResult,
   ScanUpdate,
 } from 'react-native-room-scan';
 import {
   DEFAULT_ROOM_ID,
+  detectRooms,
   mergeColinear,
+  pointOnSeg,
   roomOf,
   segLength,
   snapAngle,
@@ -17,6 +18,12 @@ import {
   weldCorners,
   type WallSeg,
 } from '../geometry/floorplan';
+import { pointInPolygon } from '../geometry/appearance';
+import {
+  deduceRoomKind,
+  roomKindLabel,
+  type RoomKind,
+} from '../geometry/furniture';
 
 export type Screen = 'home' | 'scan' | 'result' | 'library' | 'export' | 'camera';
 
@@ -30,9 +37,15 @@ export interface RoomEntry {
   id: string;
   /** Nom affiché sur le plan ; vide = pièce non nommée. */
   name: string;
-  /** Étiquette RoomPlan (`livingRoom`…) qui a servi de nom par défaut. */
-  label?: string;
-  /** Couleurs du sol relevées au scan pour cette pièce. */
+  /**
+   * Murs qui bordent la pièce. C'est la pièce qui liste ses murs, et non
+   * l'inverse : un refend borde deux pièces, il figure dans les deux listes.
+   * Absent sur les scans d'avant la détection automatique.
+   */
+  wallIds?: string[];
+  /** Type déduit du mobilier (`kitchen`, `bedroom`…), si déduction il y a. */
+  kind?: RoomKind;
+  /** Couleurs du sol relevées au scan. */
   floor?: FloorData | null;
 }
 
@@ -52,25 +65,35 @@ export interface SavedScan {
   floor?: FloorData | null;
 }
 
-/** Étiquettes RoomPlan → nom de pièce en français. */
-const ROOM_LABELS_FR: Record<string, string> = {
-  bathroom: 'Salle de bains',
-  bedroom: 'Chambre',
-  diningRoom: 'Salle à manger',
-  kitchen: 'Cuisine',
-  livingRoom: 'Salon',
-  office: 'Bureau',
-};
-
 /**
- * Nom par défaut d'une pièce d'après son étiquette RoomPlan. Deux chambres
- * dans le même scan deviennent « Chambre » et « Chambre 2 ».
+ * Nomme les pièces d'un scan.
+ *
+ * Le type vient du mobilier (`deduceRoomKind`) ; deux chambres dans le même
+ * appartement deviennent « Chambre » et « Chambre 2 ». Quand rien n'est assez
+ * net pour trancher, la pièce prend son rang : « Pièce 3 ».
  */
-function defaultRoomName(label: string | undefined, taken: string[]): string {
-  const base = ROOM_LABELS_FR[label ?? ''] ?? '';
-  if (!base) return '';
-  const same = taken.filter((n) => n === base || n.startsWith(`${base} `)).length;
-  return same === 0 ? base : `${base} ${same + 1}`;
+function nameRooms(kinds: (RoomKind | null)[]): string[] {
+  const taken: string[] = [];
+  return kinds.map((kind, i) => {
+    if (!kind) return `Pièce ${i + 1}`;
+    const base = roomKindLabel(kind);
+    const same = taken.filter(
+      (n) => n === base || n.startsWith(`${base} `),
+    ).length;
+    const name = same === 0 ? base : `${base} ${same + 1}`;
+    taken.push(name);
+    return name;
+  });
+}
+
+/** Mur le plus proche d'une ouverture, et à quelle distance. */
+function nearestWall(o: WallSeg, walls: WallSeg[]): { dist: number } {
+  const mid = { x: (o.a.x + o.b.x) / 2, z: (o.a.z + o.b.z) / 2 };
+  let dist = Infinity;
+  for (const w of walls) {
+    dist = Math.min(dist, pointOnSeg(mid, w.a, w.b).dist);
+  }
+  return { dist };
 }
 
 /** Relevés de sol indexés par pièce, tels que `buildScene` les attend. */
@@ -131,15 +154,6 @@ interface ScanState {
   objectCount: number;
   doorCount: number;
   windowCount: number;
-  /** Enchaînement de pièces possible (RoomPlan iOS 17+). */
-  multiRoomAvailable: boolean;
-  setMultiRoomAvailable: (v: boolean) => void;
-  /** Pièces déjà closes pendant le scan en cours. */
-  finishedRooms: number;
-  /** Vrai le temps que RoomPlan post-traite la pièce qu'on vient de clore. */
-  closingRoom: boolean;
-  setClosingRoom: (v: boolean) => void;
-  roomFinished: () => void;
   /** Remet à zéro les compteurs au démarrage d'un scan. */
   beginScan: () => void;
 
@@ -248,9 +262,6 @@ export const useScanStore = create<ScanState>((set, get) => {
     objectCount: 0,
     doorCount: 0,
     windowCount: 0,
-    multiRoomAvailable: false,
-    finishedRooms: 0,
-    closingRoom: false,
     modelPath: null,
     scanName: '',
     currentSaveId: null,
@@ -303,10 +314,25 @@ export const useScanStore = create<ScanState>((set, get) => {
     removeRoom: (roomId) => {
       const st = get();
       if (st.rooms.length <= 1) return;
+      const gone = st.rooms.find((r) => r.id === roomId);
+      const rooms = st.rooms.filter((r) => r.id !== roomId);
+      // Un refend borde deux pièces : il ne part que si plus aucune autre
+      // pièce ne s'appuie dessus.
+      const stillUsed = new Set(rooms.flatMap((r) => r.wallIds ?? []));
+      const doomed = new Set(
+        gone?.wallIds
+          ? gone.wallIds.filter((id) => !stillUsed.has(id))
+          : st.walls.filter((w) => roomOf(w) === roomId).map((w) => w.id),
+      );
+      const walls = st.walls.filter((w) => !doomed.has(w.id));
       set({
-        rooms: st.rooms.filter((r) => r.id !== roomId),
-        walls: st.walls.filter((w) => roomOf(w) !== roomId),
-        openings: st.openings.filter((o) => roomOf(o) !== roomId),
+        rooms,
+        walls,
+        // Les ouvertures des murs supprimés s'en vont avec eux.
+        openings: st.openings.filter((o) => {
+          const { dist } = nearestWall(o, walls);
+          return dist < 0.6;
+        }),
         objects: st.objects.filter((o) => roomOf(o) !== roomId),
         dirty: true,
       });
@@ -314,20 +340,6 @@ export const useScanStore = create<ScanState>((set, get) => {
 
     beginScan: () =>
       set({
-        finishedRooms: 0,
-        closingRoom: false,
-        wallCount: 0,
-        objectCount: 0,
-        doorCount: 0,
-        windowCount: 0,
-      }),
-
-    setMultiRoomAvailable: (multiRoomAvailable) => set({ multiRoomAvailable }),
-    setClosingRoom: (closingRoom) => set({ closingRoom }),
-    roomFinished: () =>
-      set({
-        finishedRooms: get().finishedRooms + 1,
-        closingRoom: false,
         wallCount: 0,
         objectCount: 0,
         doorCount: 0,
@@ -351,46 +363,55 @@ export const useScanStore = create<ScanState>((set, get) => {
       }),
 
     finalize: (r) => {
-      // Un scan mono-pièce (Android, iOS 16) se présente comme une liste de
-      // surfaces à plat : on le remet dans le même moule que le multi-pièces.
-      const incoming: RoomData[] =
-        r.rooms && r.rooms.length > 0
-          ? r.rooms
-          : [
-              {
-                id: DEFAULT_ROOM_ID,
-                surfaces: r.surfaces ?? [],
-                objects: r.objects ?? [],
-                floor: r.floor,
-              },
-            ];
+      // Le scan est d'un seul tenant : une liste de surfaces, une liste de
+      // meubles. Les pièces, on les trouve nous-mêmes.
+      const surfaces = r.rooms?.length
+        ? r.rooms.flatMap((x) => x.surfaces ?? [])
+        : r.surfaces ?? [];
+      const incomingObjects = r.rooms?.length
+        ? r.rooms.flatMap((x) => x.objects ?? [])
+        : r.objects ?? [];
+      const floor = r.floor ?? r.rooms?.[0]?.floor ?? null;
 
-      const walls: WallSeg[] = [];
-      const openings: WallSeg[] = [];
-      const objects: ObjectData[] = [];
-      const rooms: RoomEntry[] = [];
-      for (const room of incoming) {
-        const id = room.id || `room-${rooms.length + 1}`;
-        const segments = (room.surfaces ?? []).map((s) => toSegment(s, id));
-        // Souder d'abord (la soudure est cloisonnée par pièce : deux cloisons
-        // mitoyennes restent deux murs distincts), fusionner ensuite les
-        // morceaux alignés que RoomPlan a livrés séparément.
-        walls.push(
-          ...mergeColinear(weldCorners(segments.filter((s) => s.type === 'wall'))),
-        );
-        openings.push(...segments.filter((s) => s.type !== 'wall'));
-        objects.push(...(room.objects ?? []).map((o) => ({ ...o, roomId: id })));
-        rooms.push({
-          id,
-          name: defaultRoomName(room.label, rooms.map((x) => x.name)),
-          label: room.label,
-          floor: room.floor ?? null,
-        });
-      }
-      // Une pièce sans un seul mur ne se dessine pas : elle n'existe pas.
-      const kept = rooms.filter((room) =>
-        walls.some((w) => roomOf(w) === room.id),
+      const segments = surfaces.map((s) => toSegment(s));
+      // Souder les coins, recoller les murs livrés en morceaux, PUIS chercher
+      // les pièces : le graphe doit être propre avant d'y chercher des faces.
+      const walls = mergeColinear(
+        weldCorners(segments.filter((s) => s.type === 'wall')),
       );
+      const openings = segments.filter((s) => s.type !== 'wall');
+
+      // Détection automatique : les pièces sont les faces du graphe des murs.
+      // Si rien ne se referme (scan trop partiel), tout tient en une pièce.
+      const detected = detectRooms(walls);
+      const shapes =
+        detected.length > 0
+          ? detected
+          : [{ outline: [], wallIds: walls.map((w) => w.id), area: 0 }];
+
+      // Chaque meuble revient à la pièce qui le contient.
+      const objects: ObjectData[] = incomingObjects.map((o) => {
+        const p = { x: o.transform[12], z: o.transform[14] };
+        const hit = shapes.findIndex(
+          (s) => s.outline.length >= 3 && pointInPolygon(p, s.outline),
+        );
+        return { ...o, roomId: `room-${(hit >= 0 ? hit : 0) + 1}` };
+      });
+
+      const kinds = shapes.map((_, i) => {
+        const id = `room-${i + 1}`;
+        return deduceRoomKind(
+          objects.filter((o) => o.roomId === id).map((o) => o.category),
+        );
+      });
+      const names = nameRooms(kinds);
+      const kept: RoomEntry[] = shapes.map((s, i) => ({
+        id: `room-${i + 1}`,
+        name: names[i],
+        wallIds: s.wallIds,
+        kind: kinds[i] ?? undefined,
+        floor,
+      }));
 
       if (walls.length === 0) {
         // Rien d'exploitable : on montre l'état vide, sans polluer la bibliothèque.
@@ -659,8 +680,6 @@ export const useScanStore = create<ScanState>((set, get) => {
         objectCount: 0,
         doorCount: 0,
         windowCount: 0,
-        finishedRooms: 0,
-        closingRoom: false,
         modelPath: null,
         scanName: '',
         currentSaveId: null,

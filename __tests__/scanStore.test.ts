@@ -1,7 +1,7 @@
 /**
- * Le store multi-pièces : mise à plat d'un résultat de scan, rattachement de
- * chaque élément à sa pièce, et reprise des scans enregistrés avant que le
- * multi-pièces existe.
+ * Le store : mise à plat d'un résultat de scan, DÉTECTION AUTOMATIQUE des
+ * pièces dans le graphe des murs, nommage d'après le mobilier, et reprise des
+ * scans enregistrés avant tout ça.
  */
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn(async () => null),
@@ -9,11 +9,16 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   removeItem: jest.fn(async () => undefined),
 }));
 
-import type { ObjectData, ScanResult, SurfaceData } from 'react-native-room-scan';
-import { roomOf } from '../src/geometry/floorplan';
-import { floorsOf, useScanStore, type SavedScan } from '../src/store/scanStore';
+import type { ObjectData, SurfaceData } from 'react-native-room-scan';
+import { roomParts } from '../src/geometry/floorplan';
+import { useScanStore, type SavedScan } from '../src/store/scanStore';
 
-/** Surface iOS : matrice colonne-major, mur le long de X. */
+// Le store diffère l'écriture disque de 600 ms : sans horloge factice, le
+// minuteur survit à la fin des tests et Jest tue son worker de force.
+beforeAll(() => jest.useFakeTimers());
+afterAll(() => jest.useRealTimers());
+
+/** Surface iOS : matrice colonne-major, mur le long de X (ou de Z). */
 const surface = (
   id: string,
   cx: number,
@@ -30,6 +35,18 @@ const surface = (
     : [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, cx, 1.25, cz, 1],
 });
 
+/** Mur droit entre deux points, exprimé comme RoomPlan le livre. */
+const wallBetween = (
+  id: string,
+  ax: number,
+  az: number,
+  bx: number,
+  bz: number,
+): SurfaceData => {
+  const len = Math.hypot(bx - ax, bz - az);
+  return surface(id, (ax + bx) / 2, (az + bz) / 2, len, Math.abs(bz - az) > 1e-9);
+};
+
 /** Les quatre murs d'une pièce rectangulaire, coin haut-gauche en (x, z). */
 const boxSurfaces = (p: string, x: number, z: number, w: number, h: number) => [
   surface(`${p}n`, x + w / 2, z, w),
@@ -38,19 +55,19 @@ const boxSurfaces = (p: string, x: number, z: number, w: number, h: number) => [
   surface(`${p}e`, x + w, z + h / 2, h, true),
 ];
 
-const objectAt = (id: string, x: number, z: number): ObjectData => ({
+const objectAt = (
+  id: string,
+  category: string,
+  x: number,
+  z: number,
+): ObjectData => ({
   id,
-  category: 'sofa',
-  width: 1.8,
+  category,
+  width: 0.8,
   height: 0.8,
-  depth: 0.9,
+  depth: 0.8,
   transform: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, 0.4, z, 1],
 });
-
-// Le store diffère l'écriture disque de 600 ms : sans horloge factice, le
-// minuteur survit à la fin des tests et Jest tue son worker de force.
-beforeAll(() => jest.useFakeTimers());
-afterAll(() => jest.useRealTimers());
 
 const reset = () =>
   useScanStore.setState({
@@ -64,92 +81,128 @@ const reset = () =>
     dirty: false,
   });
 
-describe('finalize', () => {
+/** Un 7 × 3 coupé en deux par un refend à x = 4 : 12 m² puis 9 m². */
+const twoRoomFlat = [
+  wallBetween('n1', 0, 0, 4, 0),
+  wallBetween('n2', 4, 0, 7, 0),
+  wallBetween('e', 7, 0, 7, 3),
+  wallBetween('s2', 7, 3, 4, 3),
+  wallBetween('s1', 4, 3, 0, 3),
+  wallBetween('w', 0, 3, 0, 0),
+  wallBetween('refend', 4, 0, 4, 3),
+];
+
+describe('détection automatique des pièces', () => {
   beforeEach(reset);
 
-  it('accepte un résultat mono-pièce à plat (Android, iOS 16)', () => {
-    const result: ScanResult = {
-      modelPath: '/tmp/scan.obj',
-      surfaces: boxSurfaces('a', 0, 0, 4, 3),
-      objects: [objectAt('o1', 2, 1.5)],
-    };
-    useScanStore.getState().finalize(result);
-    const st = useScanStore.getState();
-    expect(st.rooms).toHaveLength(1);
-    expect(st.rooms[0].id).toBe('room-1');
-    expect(st.walls).toHaveLength(4);
-    expect(st.walls.every((w) => roomOf(w) === 'room-1')).toBe(true);
-    expect(st.objects[0].roomId).toBe('room-1');
-    // Un scan terminé se sauvegarde tout seul.
-    expect(st.saves).toHaveLength(1);
-    expect(st.saves[0].rooms).toHaveLength(1);
-  });
-
-  it('estampille chaque mur, ouverture et meuble de sa pièce', () => {
+  it('trouve une pièce dans un scan tout simple', () => {
     useScanStore.getState().finalize({
       modelPath: '/tmp/scan.usdz',
-      rooms: [
-        {
-          id: 'room-1',
-          label: 'livingRoom',
-          surfaces: [
-            ...boxSurfaces('a', 0, 0, 4, 3),
-            { ...surface('d1', 2, 0, 0.9), type: 'door' },
-          ],
-          objects: [objectAt('o1', 2, 1.5)],
-          floor: { color: '#8A6E4B' },
-        },
-        {
-          id: 'room-2',
-          label: 'bedroom',
-          surfaces: boxSurfaces('b', 4.2, 0, 3, 3),
-          objects: [objectAt('o2', 5.5, 1.5)],
-          floor: { color: '#4B6E8A' },
-        },
-      ],
+      surfaces: boxSurfaces('a', 0, 0, 4, 3),
+      objects: [],
     });
     const st = useScanStore.getState();
-    expect(st.rooms.map((r) => r.id)).toEqual(['room-1', 'room-2']);
-    expect(st.walls.filter((w) => roomOf(w) === 'room-1')).toHaveLength(4);
-    expect(st.walls.filter((w) => roomOf(w) === 'room-2')).toHaveLength(4);
-    expect(st.openings).toHaveLength(1);
-    expect(roomOf(st.openings[0])).toBe('room-1');
-    expect(st.objects.map((o) => o.roomId)).toEqual(['room-1', 'room-2']);
-    // Chaque pièce garde SON relevé de sol.
-    expect(floorsOf(st.rooms)['room-2']?.color).toBe('#4B6E8A');
+    expect(st.rooms).toHaveLength(1);
+    expect(st.walls).toHaveLength(4);
+    // Aucun meuble : rien à déduire, la pièce prend son rang.
+    expect(st.rooms[0].name).toBe('Pièce 1');
+    expect(st.rooms[0].wallIds).toHaveLength(4);
   });
 
-  it('traduit les étiquettes RoomPlan, et numérote les doublons', () => {
+  it('trouve DEUX pièces séparées par un refend, sans rien demander', () => {
     useScanStore.getState().finalize({
       modelPath: '/tmp/scan.usdz',
-      rooms: [
-        { id: 'room-1', label: 'livingRoom', surfaces: boxSurfaces('a', 0, 0, 4, 3), objects: [] },
-        { id: 'room-2', label: 'bedroom', surfaces: boxSurfaces('b', 5, 0, 3, 3), objects: [] },
-        { id: 'room-3', label: 'bedroom', surfaces: boxSurfaces('c', 9, 0, 3, 3), objects: [] },
-        { id: 'room-4', label: 'unidentified', surfaces: boxSurfaces('d', 13, 0, 2, 2), objects: [] },
+      surfaces: twoRoomFlat,
+      objects: [],
+    });
+    const st = useScanStore.getState();
+    expect(st.rooms).toHaveLength(2);
+    const parts = roomParts(st.walls, st.rooms);
+    expect(parts.map((p) => Math.round(p.surface!.area))).toEqual([12, 9]);
+    // Le refend borde les deux pièces : il est dans les deux listes.
+    expect(st.rooms.every((r) => r.wallIds?.includes('refend'))).toBe(true);
+  });
+
+  it('nomme chaque pièce d’après les meubles qui s’y trouvent', () => {
+    useScanStore.getState().finalize({
+      modelPath: '/tmp/scan.usdz',
+      surfaces: twoRoomFlat,
+      objects: [
+        objectAt('o1', 'sofa', 2, 1.5),
+        objectAt('o2', 'television', 1, 0.3),
+        objectAt('o3', 'refrigerator', 5.5, 1.5),
+        objectAt('o4', 'stove', 6, 0.5),
       ],
     });
     expect(useScanStore.getState().rooms.map((r) => r.name)).toEqual([
       'Salon',
-      'Chambre',
-      'Chambre 2',
-      '',
+      'Cuisine',
     ]);
   });
 
-  it('écarte une pièce dont RoomPlan n’a tiré aucun mur', () => {
+  it('rattache chaque meuble à la pièce qui le contient', () => {
     useScanStore.getState().finalize({
       modelPath: '/tmp/scan.usdz',
-      rooms: [
-        { id: 'room-1', surfaces: boxSurfaces('a', 0, 0, 4, 3), objects: [] },
-        { id: 'room-2', surfaces: [], objects: [] },
-      ],
+      surfaces: twoRoomFlat,
+      objects: [objectAt('o1', 'sofa', 2, 1.5), objectAt('o2', 'stove', 6, 1.5)],
     });
-    expect(useScanStore.getState().rooms.map((r) => r.id)).toEqual(['room-1']);
+    const st = useScanStore.getState();
+    expect(st.objects.map((o) => o.roomId)).toEqual(['room-1', 'room-2']);
+  });
+
+  it('numérote les pièces que le mobilier ne permet pas de deviner', () => {
+    useScanStore.getState().finalize({
+      modelPath: '/tmp/scan.usdz',
+      surfaces: twoRoomFlat,
+      // Un rangement ne dit rien de la pièce ; un lit, si.
+      objects: [objectAt('o1', 'storage', 2, 1.5), objectAt('o2', 'bed', 6, 1.5)],
+    });
+    expect(useScanStore.getState().rooms.map((r) => r.name)).toEqual([
+      'Pièce 1',
+      'Chambre',
+    ]);
+  });
+
+  it('numérote les homonymes : deux chambres, pas deux fois le même nom', () => {
+    useScanStore.getState().finalize({
+      modelPath: '/tmp/scan.usdz',
+      surfaces: twoRoomFlat,
+      objects: [objectAt('o1', 'bed', 2, 1.5), objectAt('o2', 'bed', 6, 1.5)],
+    });
+    expect(useScanStore.getState().rooms.map((r) => r.name)).toEqual([
+      'Chambre',
+      'Chambre 2',
+    ]);
+  });
+
+  it('retombe sur une pièce unique quand rien ne se referme', () => {
+    useScanStore.getState().finalize({
+      modelPath: '/tmp/scan.usdz',
+      surfaces: boxSurfaces('a', 0, 0, 4, 3).slice(0, 3),
+      objects: [objectAt('o1', 'bathtub', 2, 1.5)],
+    });
+    const st = useScanStore.getState();
+    expect(st.rooms).toHaveLength(1);
+    expect(st.rooms[0].wallIds).toHaveLength(3);
+    // Le mobilier parle même sans contour fermé.
+    expect(st.rooms[0].name).toBe('Salle de bains');
+  });
+
+  it('accepte un résultat mono-pièce à plat et l’enregistre', () => {
+    useScanStore.getState().finalize({
+      modelPath: '/tmp/scan.obj',
+      surfaces: boxSurfaces('a', 0, 0, 4, 3),
+      objects: [objectAt('o1', 'toilet', 2, 1.5)],
+    });
+    const st = useScanStore.getState();
+    expect(st.rooms[0].name).toBe('WC');
+    // Un scan terminé se sauvegarde tout seul.
+    expect(st.saves).toHaveLength(1);
+    expect(st.saves[0].rooms[0].wallIds).toHaveLength(4);
   });
 
   it('montre l’état vide sans rien enregistrer quand rien n’est détecté', () => {
-    useScanStore.getState().finalize({ modelPath: '/tmp/vide.usdz', rooms: [] });
+    useScanStore.getState().finalize({ modelPath: '/tmp/vide.usdz', surfaces: [] });
     const st = useScanStore.getState();
     expect(st.walls).toHaveLength(0);
     expect(st.saves).toHaveLength(0);
@@ -160,18 +213,19 @@ describe('finalize', () => {
 describe('removeRoom', () => {
   beforeEach(reset);
 
-  it('emporte la géométrie de la pièce retirée, et elle seule', () => {
+  it('garde le refend tant que la pièce voisine s’appuie dessus', () => {
     useScanStore.getState().finalize({
       modelPath: '/tmp/scan.usdz',
-      rooms: [
-        { id: 'room-1', surfaces: boxSurfaces('a', 0, 0, 4, 3), objects: [objectAt('o1', 2, 1.5)] },
-        { id: 'room-2', surfaces: boxSurfaces('b', 5, 0, 3, 3), objects: [objectAt('o2', 6.5, 1.5)] },
-      ],
+      surfaces: twoRoomFlat,
+      objects: [objectAt('o1', 'sofa', 2, 1.5), objectAt('o2', 'stove', 6, 1.5)],
     });
     useScanStore.getState().removeRoom('room-2');
     const st = useScanStore.getState();
     expect(st.rooms.map((r) => r.id)).toEqual(['room-1']);
-    expect(st.walls).toHaveLength(4);
+    // Le refend reste : il borde encore le salon.
+    expect(st.walls.some((w) => w.id === 'refend')).toBe(true);
+    // Les murs qui n'appartenaient qu'à la cuisine sont partis.
+    expect(st.walls.some((w) => w.id === 'n2')).toBe(false);
     expect(st.objects.map((o) => o.id)).toEqual(['o1']);
     expect(st.dirty).toBe(true);
   });
@@ -179,14 +233,15 @@ describe('removeRoom', () => {
   it('refuse de retirer la dernière pièce', () => {
     useScanStore.getState().finalize({
       modelPath: '/tmp/scan.usdz',
-      rooms: [{ id: 'room-1', surfaces: boxSurfaces('a', 0, 0, 4, 3), objects: [] }],
+      surfaces: boxSurfaces('a', 0, 0, 4, 3),
+      objects: [],
     });
     useScanStore.getState().removeRoom('room-1');
     expect(useScanStore.getState().rooms).toHaveLength(1);
   });
 });
 
-describe('scans enregistrés avant le multi-pièces', () => {
+describe('scans enregistrés avant la détection automatique', () => {
   beforeEach(reset);
 
   it('se rouvrent avec une pièce implicite, nom et sol conservés', () => {
@@ -211,9 +266,9 @@ describe('scans enregistrés avant le multi-pièces', () => {
     expect(st.rooms).toHaveLength(1);
     expect(st.rooms[0].name).toBe('Salon');
     expect(st.rooms[0].floor?.color).toBe('#8A6E4B');
-    // Les murs sans `roomId` retombent sur la pièce par défaut : le contour
-    // et le sol se retrouvent bien.
-    expect(st.rooms[0].id).toBe(roomOf(st.walls[0]));
+    // Pas de wallIds : le découpage retombe sur le regroupement par roomId.
+    expect(st.rooms[0].wallIds).toBeUndefined();
+    expect(roomParts(st.walls, st.rooms)).toHaveLength(1);
   });
 });
 
@@ -223,14 +278,12 @@ describe('setRoomName', () => {
   it('ne renomme que la pièce visée et marque le plan modifié', () => {
     useScanStore.getState().finalize({
       modelPath: '/tmp/scan.usdz',
-      rooms: [
-        { id: 'room-1', surfaces: boxSurfaces('a', 0, 0, 4, 3), objects: [] },
-        { id: 'room-2', surfaces: boxSurfaces('b', 5, 0, 3, 3), objects: [] },
-      ],
+      surfaces: twoRoomFlat,
+      objects: [],
     });
     useScanStore.getState().setRoomName('room-2', '  Cuisine  ');
     const st = useScanStore.getState();
-    expect(st.rooms.map((r) => r.name)).toEqual(['', 'Cuisine']);
+    expect(st.rooms.map((r) => r.name)).toEqual(['Pièce 1', 'Cuisine']);
     expect(st.dirty).toBe(true);
   });
 });

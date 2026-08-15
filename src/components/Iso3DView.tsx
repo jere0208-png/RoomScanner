@@ -230,6 +230,7 @@ export function Iso3DView({ value, onChange, showMeasures }: Props) {
         showSurfaces,
         showTextures,
         floors,
+        rooms,
         // Pendant un geste : mêmes volumes et mêmes contours, mais des pans
         // d'un seul tenant. C'est le découpage en bandes qui coûtait cher,
         // pas les contours — les supprimer faisait fondre le modèle en blanc.
@@ -244,6 +245,7 @@ export function Iso3DView({ value, onChange, showMeasures }: Props) {
       showSurfaces,
       showTextures,
       floors,
+      rooms,
       interacting,
     ],
   );

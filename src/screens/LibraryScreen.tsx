@@ -47,7 +47,7 @@ export function LibraryScreen() {
 
   const renderItem = ({ item }: { item: SavedScan }) => {
     // Surface = somme des pièces ; un contour non refermé ne compte pas.
-    const parts = roomParts(item.walls);
+    const parts = roomParts(item.walls, item.rooms);
     const total = totalArea(parts);
     const details = [
       ...(parts.length > 1 ? [`${parts.length} pièces`] : []),

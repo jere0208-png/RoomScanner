@@ -15,6 +15,7 @@ import {
   wallQuads,
   wallsCentroid,
   WALL_T,
+  type RoomShape,
   type Pt,
   type RoomSurface,
   type WallSeg,
@@ -94,6 +95,8 @@ export interface SceneOptions {
   showTextures?: boolean;
   /** Relevé du sol par pièce, indexé par identifiant de pièce. */
   floors?: Record<string, FloorData | null | undefined>;
+  /** Pièces du scan, avec les murs qui bordent chacune. */
+  rooms?: RoomShape[];
   /**
    * Rendu allégé pendant un geste : les pans ne sont plus découpés en bandes,
    * ce qui divise le nombre de polygones par cinq. Le volume reste complet,
@@ -325,7 +328,7 @@ export function buildScene(
 ): Scene {
   const { palette: pal } = opts;
   const faces: Face3D[] = [];
-  const parts = roomParts(walls);
+  const parts = roomParts(walls, opts.rooms);
   // Les nœuds de `wallQuads` sont déjà cloisonnés par pièce : un seul appel
   // suffit, deux pièces mitoyennes n'y forment pas d'onglet commun.
   const quads = wallQuads(walls);
