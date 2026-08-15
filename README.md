@@ -42,8 +42,17 @@ src/
 **Rien à découper à la main pendant le scan.** On parcourt le logement d'une
 traite, et les pièces sont trouvées après coup, dans la géométrie.
 
-Un appartement scanné d'un seul tenant est **un graphe de murs** : les pièces
-en sont les faces. `detectRooms()` les énumère par le parcours classique des
+**Avant de chercher les pièces, il faut couper les murs.** RoomPlan livre
+l'enveloppe d'un seul tenant, et la cloison qui sépare deux pièces vient
+s'appuyer au milieu d'un mur sans le couper. Tant que ce point de contact
+n'est pas un nœud du graphe, aucun cycle ne passe par la cloison et
+l'appartement entier ressort comme une pièce unique. `splitAtJunctions()`
+coupe donc chaque mur là où un autre vient buter contre son flanc (à plus de
+20 cm des bouts, sinon c'est un coin). C'est la condition sans laquelle toute
+la détection est inutile en vrai.
+
+Un appartement scanné d'un seul tenant est ensuite **un graphe de murs** :
+les pièces en sont les faces. `detectRooms()` les énumère par le parcours classique des
 faces d'un graphe planaire — à chaque nœud, on repart par l'arête qui suit
 immédiatement celle par laquelle on est arrivé. Le parcours ferme chaque pièce
 tout seul, et la face extérieure (le tour du logement) sort avec l'orientation
@@ -64,6 +73,13 @@ font que pencher la balance — un évier se trouve aussi bien dans une cuisine
 que dans une salle de bains. En dessous de 2,5 points, on n'invente rien : la
 pièce prend son rang, « Pièce 1 », « Pièce 2 ». Les homonymes sont numérotés
 (« Chambre », « Chambre 2 »).
+
+**Le cartouche se pose au large.** `interiorPole()` cherche le point de la
+pièce qui maximise la distance au mur le plus proche — pas le barycentre, qui
+tombe dans le mur dès que la pièce est en L. Le nom et la surface sont en
+outre dessinés PAR-DESSUS le reste : ce sont des annotations, un mur ne doit
+pas les trancher. Ce même point sert aussi à décider de quel côté d'un mur
+se trouve « l'intérieur » quand on recale un meuble.
 
 En mode édition, **le cartouche est le bouton de renommage** : on touche le
 nom là où il s'affiche, sur le plan 2D. Le même cartouche — cadre, nom
@@ -100,6 +116,14 @@ profondeur les entrelaçait. Résultat : des rayures verticales sur tous les
 murs, visibles à l'arrêt et absentes pendant les gestes (où un pan = une seule
 bande). Aucun réglage de biais ne pouvait corriger ça — il fallait supprimer
 la question.
+
+**Un meuble aussi est un volume.** Ses quatre flancs portaient des normales
+tournées vers l'intérieur et n'étaient pas masqués : ils se disputaient
+l'ordre d'affichage et clignotaient au fil de la rotation. Et une télé
+plaquée contre un mur ressortait à cheval dessus, donc visible depuis la
+pièce d'à côté — `clampFootprint()` la ramène désormais du côté de SA pièce
+(et non du côté où RoomPlan a cru voir son centre), en acceptant un
+déplacement jusqu'à la profondeur du meuble.
 
 **Une porte ou une fenêtre est un bloc, et le mur ne se construit pas
 dessus.** `assignOpenings()` rattache chaque ouverture au mur qui la porte
@@ -225,7 +249,7 @@ nécessaire que si les fichiers Swift/Kotlin ou les dépendances natives changen
 ## Vérifications faites sur cette machine (Windows)
 
 - `npx tsc --noEmit` et `npx eslint src App.tsx` : aucun diagnostic.
-- `npx jest` : 76/76 tests verts (conversion matrice iOS→segment, extrémités
+- `npx jest` : 87/87 tests verts (conversion matrice iOS→segment, extrémités
   Android, soudure des coins et jonctions en T, onglets des murs, surface au
   sol, semis de points, lecture des textures, snap angulaire, projection
   mètres↔pixels, génération du PDF ; **multi-pièces** : découpe par pièce,
@@ -240,7 +264,12 @@ nécessaire que si les fichiers Swift/Kotlin ou les dépendances natives changen
   biais de tri ; **détection** : une pièce, deux pièces séparées par un
   refend partagé, trois pièces en enfilade, cloison qui ne ferme rien, plan
   ouvert, boucle-bruit écartée, pièces disjointes ; **nommage** : déduction
-  par le mobilier, numérotation des homonymes et des indécidables).
+  par le mobilier, numérotation des homonymes et des indécidables ;
+  **jonctions** : découpe du mur porteur, coin épargné, texture recoupée, T2
+  et T3 démêlés depuis la topologie brute de RoomPlan ; **cartouche** : pôle
+  d'inaccessibilité, pièce en L où le barycentre sort ; **meubles** : volume
+  à faces masquées, recalage d'une télé encastrée ; **bout en bout** : un T2
+  brut → deux pièces nommées, meubles répartis, contours exacts).
 - **Non vérifié ici** : la compilation Swift/Kotlin (impossible sans Mac /
   SDK Android). Les points d'attente connus sont notés ci-dessous.
 

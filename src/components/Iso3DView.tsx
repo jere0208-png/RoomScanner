@@ -337,10 +337,12 @@ export function Iso3DView({ value, onChange, showMeasures }: Props) {
         }
         // Même cartouche qu'en 2D, au même endroit : le nom donné sur le
         // plan se retrouve au centre de la pièce sur le modèle.
-        const q = project({ x: room.centroid.x, y: 0, z: room.centroid.z });
+        // Posé au large de la pièce, et par-dessus tout le reste : c'est
+        // une annotation, pas un volume — un mur ne doit pas la trancher.
+        const q = project({ x: room.labelAt.x, y: 0, z: room.labelAt.z });
         items.push({
           kind: 'area',
-          depth: -Infinity,
+          depth: Infinity,
           x: q.sx,
           y: q.sy,
           name: roomNames.get(room.roomId) ?? '',

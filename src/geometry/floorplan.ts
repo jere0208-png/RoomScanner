@@ -385,6 +385,21 @@ export interface RoomPart {
   walls: WallSeg[];
   surface: RoomSurface | null;
   centroid: Pt;
+  /** Où poser le cartouche : au large, jamais dans un mur ni contre lui. */
+  labelAt: Pt;
+}
+
+/** Complète une pièce : contour, centre, et point de pose du cartouche. */
+function makePart(roomId: string, items: WallSeg[]): RoomPart {
+  const surface = roomSurface(items);
+  const centroid = wallsCentroid(items);
+  return {
+    roomId,
+    walls: items,
+    surface,
+    centroid,
+    labelAt: surface ? interiorPole(surface.pts) : centroid,
+  };
 }
 
 /** Ce qu'il faut savoir d'une pièce pour la dessiner : ses murs. */
@@ -406,24 +421,16 @@ export interface RoomShape {
 export function roomParts(walls: WallSeg[], rooms?: RoomShape[]): RoomPart[] {
   if (rooms && rooms.some((r) => r.wallIds)) {
     const byId = new Map(walls.map((w) => [w.id, w]));
-    return rooms.map((r) => {
-      const items = (r.wallIds ?? [])
-        .map((id) => byId.get(id))
-        .filter((w): w is WallSeg => !!w);
-      return {
-        roomId: r.id,
-        walls: items,
-        surface: roomSurface(items),
-        centroid: wallsCentroid(items),
-      };
-    });
+    return rooms.map((r) =>
+      makePart(
+        r.id,
+        (r.wallIds ?? [])
+          .map((id) => byId.get(id))
+          .filter((w): w is WallSeg => !!w),
+      ),
+    );
   }
-  return groupByRoom(walls).map(({ roomId, items }) => ({
-    roomId,
-    walls: items,
-    surface: roomSurface(items),
-    centroid: wallsCentroid(items),
-  }));
+  return groupByRoom(walls).map(({ roomId, items }) => makePart(roomId, items));
 }
 
 /** Aire cumulée des pièces ; `exact` tombe dès qu'un contour est reconstitué. */
@@ -474,6 +481,91 @@ function longestChain(walls: WallSeg[]): Pt[] {
   return best;
 }
 
+/** Distance d'un point au bord d'un polygone, négative à l'extérieur. */
+function signedDistToEdge(p: Pt, poly: Pt[]): number {
+  let best = Infinity;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    best = Math.min(best, pointOnSeg(p, poly[j], poly[i]).dist);
+  }
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const a = poly[i];
+    const b = poly[j];
+    if (
+      a.z > p.z !== b.z > p.z &&
+      p.x < ((b.x - a.x) * (p.z - a.z)) / (b.z - a.z) + a.x
+    ) {
+      inside = !inside;
+    }
+  }
+  return inside ? best : -best;
+}
+
+/**
+ * Point le plus « au large » d'une pièce : celui qui maximise la distance au
+ * mur le plus proche.
+ *
+ * Le barycentre ne convient pas — dans une pièce en L il tombe volontiers
+ * dans le mur, ou juste contre. C'est pourtant là qu'on pose le nom de la
+ * pièce et sa surface. On balaye donc une grille, puis on affine autour du
+ * meilleur point tant que le pas dépasse la précision demandée.
+ */
+export function interiorPole(poly: Pt[], precision = 0.05): Pt {
+  if (poly.length < 3) {
+    return poly[0] ?? { x: 0, z: 0 };
+  }
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minZ = Infinity;
+  let maxZ = -Infinity;
+  for (const p of poly) {
+    minX = Math.min(minX, p.x);
+    maxX = Math.max(maxX, p.x);
+    minZ = Math.min(minZ, p.z);
+    maxZ = Math.max(maxZ, p.z);
+  }
+  const w = maxX - minX;
+  const h = maxZ - minZ;
+  let best = { x: minX + w / 2, z: minZ + h / 2 };
+  let bestD = signedDistToEdge(best, poly);
+  const N = 12;
+  for (let i = 0; i <= N; i++) {
+    for (let j = 0; j <= N; j++) {
+      const p = { x: minX + (w * i) / N, z: minZ + (h * j) / N };
+      const d = signedDistToEdge(p, poly);
+      if (d > bestD) {
+        bestD = d;
+        best = p;
+      }
+    }
+  }
+  // Affinage : on descend le pas tant qu'il reste au-dessus de la précision.
+  let step = Math.max(w, h) / N;
+  while (step > precision) {
+    let moved = false;
+    for (const [dx, dz] of [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+      [1, 1],
+      [1, -1],
+      [-1, 1],
+      [-1, -1],
+    ]) {
+      const p = { x: best.x + dx * step, z: best.z + dz * step };
+      const d = signedDistToEdge(p, poly);
+      if (d > bestD) {
+        bestD = d;
+        best = p;
+        moved = true;
+      }
+    }
+    if (!moved) step /= 2;
+  }
+  return best;
+}
+
 /** Barycentre des extrémités de murs : « l'intérieur » de la pièce. */
 export function wallsCentroid(walls: WallSeg[]): { x: number; z: number } {
   if (walls.length === 0) return { x: 0, z: 0 };
@@ -517,13 +609,11 @@ export function clampFootprint(
     if (t < -0.1 || t > 1.1) continue;
     const nx = -dz / len;
     const nz = dx / len;
-    // Le meuble reste de SON côté du mur (jamais poussé à travers) :
-    // le côté est celui de son centre — au pire tie-break vers l'intérieur.
-    const dCenter = (cx - w.a.x) * nx + (cz - w.a.z) * nz;
+    // Le meuble est ramené du côté de SA pièce, pas du côté où RoomPlan a
+    // cru voir son centre : une télé posée à plat contre un mur ressort
+    // volontiers à cheval dessus, et se voyait alors depuis l'autre pièce.
     const side =
-      Math.abs(dCenter) > 1e-6
-        ? Math.sign(dCenter)
-        : Math.sign((interior.x - w.a.x) * nx + (interior.z - w.a.z) * nz) || 1;
+      Math.sign((interior.x - w.a.x) * nx + (interior.z - w.a.z) * nz) || 1;
     let minCorner = Infinity;
     for (const [lx, lz] of localCorners) {
       const px = cx + lx * cos - lz * sin;
@@ -532,9 +622,10 @@ export function clampFootprint(
       if (d < minCorner) minCorner = d;
     }
     const need = wallT / 2 + margin - minCorner;
-    // Petite pénétration = frottement de détection : on écarte le meuble.
-    // Grosse valeur = il vit ailleurs : on ne le téléporte pas.
-    if (need > 0 && need < 0.3) {
+    // On accepte de déplacer jusqu'à la profondeur du meuble : de quoi
+    // dégager une télé ou une étagère entièrement enfoncée dans la cloison.
+    // Au-delà, le meuble vit ailleurs — on ne le téléporte pas.
+    if (need > 0 && need < Math.max(0.3, f.depth + wallT)) {
       cx += nx * side * need;
       cz += nz * side * need;
     }
@@ -614,6 +705,87 @@ export function weldCorners(walls: WallSeg[], tol = 0.15): WallSeg[] {
     if (best) wall[end] = best.q;
   }
 
+  return out;
+}
+
+// --------------------------------------- découpe aux jonctions en T
+
+/** Portion [u0, u1] d'une grille de couleurs, colonnes ré-échantillonnées. */
+function sliceTexture(
+  tex: SurfaceTexture | undefined,
+  u0: number,
+  u1: number,
+): SurfaceTexture | undefined {
+  if (!tex || tex.cols < 1 || tex.rows < 1) return undefined;
+  const cols = Math.max(1, Math.round(tex.cols * (u1 - u0)));
+  const texels: string[] = [];
+  for (let r = 0; r < tex.rows; r++) {
+    for (let i = 0; i < cols; i++) {
+      const u = u0 + (u1 - u0) * ((i + 0.5) / cols);
+      const c = Math.min(tex.cols - 1, Math.max(0, Math.floor(u * tex.cols)));
+      texels.push(tex.texels[r * tex.cols + c]);
+    }
+  }
+  return { cols, rows: tex.rows, texels };
+}
+
+/**
+ * Coupe chaque mur là où un autre vient buter contre son flanc.
+ *
+ * C'est la condition SANS LAQUELLE la détection des pièces ne trouve rien
+ * de réel : RoomPlan livre le mur d'enveloppe d'un seul tenant, et la cloison
+ * qui sépare deux pièces vient s'y appuyer en son milieu. Tant que ce mur
+ * n'est pas coupé au point de contact, ce point n'est pas un nœud du graphe,
+ * aucun cycle ne passe par la cloison, et l'appartement entier ressort comme
+ * une pièce unique.
+ *
+ * Le premier morceau garde l'identifiant d'origine : les ouvertures et les
+ * sélections en cours continuent de le désigner.
+ */
+export function splitAtJunctions(walls: WallSeg[], tol = 0.08): WallSeg[] {
+  const out: WallSeg[] = [];
+  for (const w of walls) {
+    const len = segLength(w);
+    if (len < 1e-6) {
+      out.push(w);
+      continue;
+    }
+    const cuts: number[] = [];
+    for (const v of walls) {
+      if (v.id === w.id) continue;
+      for (const end of ['a', 'b'] as const) {
+        const { dist, t } = pointOnSeg(v[end], w.a, w.b);
+        if (dist > tol || t <= 0 || t >= 1) continue;
+        // Trop près d'un bout : c'est un coin, pas un T — rien à couper.
+        if (t * len < 0.2 || (1 - t) * len < 0.2) continue;
+        cuts.push(t);
+      }
+    }
+    if (cuts.length === 0) {
+      out.push(w);
+      continue;
+    }
+    cuts.sort((a, b) => a - b);
+    const uniq = cuts.filter((t, i) => i === 0 || t - cuts[i - 1] > 0.02);
+    let prev = 0;
+    let n = 0;
+    for (const t of [...uniq, 1]) {
+      if (t - prev < 1e-6) continue;
+      const at = (u: number): Pt => ({
+        x: w.a.x + (w.b.x - w.a.x) * u,
+        z: w.a.z + (w.b.z - w.a.z) * u,
+      });
+      out.push({
+        ...w,
+        id: n === 0 ? w.id : `${w.id}#${n}`,
+        a: at(prev),
+        b: at(t),
+        texture: sliceTexture(w.texture, prev, t),
+      });
+      prev = t;
+      n++;
+    }
+  }
   return out;
 }
 

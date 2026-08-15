@@ -55,7 +55,7 @@ function footprintOf(
 ): ObjectFootprint {
   const part = partOf.get(roomOf(o));
   if (!part) return toFootprint(o);
-  return clampFootprint(toFootprint(o), part.walls, part.centroid);
+  return clampFootprint(toFootprint(o), part.walls, part.labelAt);
 }
 
 interface Props {
@@ -461,16 +461,18 @@ export function FloorplanEditor({
                     Math.abs(pt.x - f.cx) < (f.width + labelW) / 2 &&
                     Math.abs(pt.z - f.cz) < (f.depth + labelH) / 2,
                 );
-              const ctr = part.centroid;
+              // Point le plus au large de la pièce : jamais dans un mur ni
+              // collé à un. On s'en écarte juste assez pour éviter un meuble.
+              const ctr = part.labelAt;
               let pos = ctr;
               for (const [ox, oz] of [
                 [0, 0],
-                [0, 0.5],
-                [0, -0.5],
-                [0.7, 0],
-                [-0.7, 0],
-                [0, 1],
-                [0, -1],
+                [0, 0.4],
+                [0, -0.4],
+                [0.5, 0],
+                [-0.5, 0],
+                [0, 0.8],
+                [0, -0.8],
               ]) {
                 const cand = { x: ctr.x + ox, z: ctr.z + oz };
                 if (!collides(cand)) {

@@ -464,12 +464,13 @@ function draw3DView(
         const q = project({ x: p.x, y: 0, z: p.z });
         items.push({ kind: 'dot', depth: -Infinity, x: q.x, y: q.y, color: dotColor });
       }
-      const q = project({ x: room.centroid.x, y: 0, z: room.centroid.z });
+      const q = project({ x: room.labelAt.x, y: 0, z: room.labelAt.z });
       const name = opts.roomNames?.[room.roomId] ?? '';
       const area = `${room.surface.exact ? '' : '≈ '}${fr1(room.surface.area)} m²`;
+      // Au large, et par-dessus les murs : c'est une annotation.
       items.push({
         kind: 'area',
-        depth: -Infinity,
+        depth: Infinity,
         x: q.x,
         y: q.y,
         text: name ? `${name} · ${area}` : area,
@@ -555,8 +556,10 @@ function planPage(
     return captured ? mixHex(captured, '#FFFFFF', 0.42) : '#F5F7FA';
   };
   const partOf = new Map(parts.map((p) => [p.roomId, p]));
+  // Le « dedans » d'une pièce : le point au large, pas le barycentre des
+  // extrémités de murs — celui-ci sort de la pièce dès qu'elle est en L.
   const centerOf = (roomId: string) =>
-    partOf.get(roomId)?.centroid ?? { x: 0, z: 0 };
+    partOf.get(roomId)?.labelAt ?? { x: 0, z: 0 };
 
   // Zone de dessin (cotes extérieures comprises)
   const box = {
@@ -759,7 +762,7 @@ function planPage(
       const big = parts.length === 1;
       for (const part of parts) {
         if (!part.surface) continue;
-        const cp2 = px(part.centroid);
+        const cp2 = px(part.labelAt);
         const label = roomNames[part.roomId] ?? '';
         const area = `${part.surface.exact ? '' : '≈ '}${fr1(part.surface.area)} m²`;
         // Nom au-dessus, surface en dessous (l'axe y du PDF monte).

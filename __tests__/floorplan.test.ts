@@ -1,16 +1,21 @@
 import {
   bounds,
+  clampFootprint,
   closedLoop,
   detectRooms,
+  interiorPole,
   groupByRoom,
   loopAreaM2,
   makeMapping,
   mergeColinear,
+  pointOnSeg,
   quadPoints,
   roomParts,
   roomSurface,
   segLength,
   snapAngle,
+  splitAtJunctions,
+  toFootprint,
   toSegment,
   totalArea,
   wallQuads,
@@ -19,7 +24,12 @@ import {
   type Pt,
   type WallSeg,
 } from '../src/geometry/floorplan';
-import { dotStep, floorDots, sampleTexture } from '../src/geometry/appearance';
+import {
+  dotStep,
+  floorDots,
+  pointInPolygon,
+  sampleTexture,
+} from '../src/geometry/appearance';
 import {
   assignOpenings,
   buildScene,
@@ -352,6 +362,163 @@ describe('closedLoop + loopAreaM2', () => {
 
   it('renvoie null quand un coin porte trois murs', () => {
     expect(closedLoop([...rect, seg('x', { x: 0, z: 0 }, { x: -2, z: 0 })])).toBeNull();
+  });
+});
+
+describe('pose du cartouche', () => {
+  it('place le nom au large, loin de tout mur', () => {
+    const p = interiorPole([
+      { x: 0, z: 0 },
+      { x: 4, z: 0 },
+      { x: 4, z: 4 },
+      { x: 0, z: 4 },
+    ]);
+    expect(p.x).toBeCloseTo(2, 1);
+    expect(p.z).toBeCloseTo(2, 1);
+  });
+
+  it('sort du mur dans une pièce en L, là où le barycentre tombe dedans', () => {
+    // L : le barycentre du contour tombe dans le renfoncement, donc dans
+    // le mur — c'est exactement ce qui coupait le cartouche en deux.
+    const L = [
+      { x: 0, z: 0 },
+      { x: 6, z: 0 },
+      { x: 6, z: 2 },
+      { x: 2, z: 2 },
+      { x: 2, z: 6 },
+      { x: 0, z: 6 },
+    ];
+    const p = interiorPole(L);
+    expect(pointInPolygon(p, L)).toBe(true);
+    // Et vraiment au large : au moins 80 cm de tout bord.
+    const dist = Math.min(
+      ...L.map((_, i) => {
+        const a = L[i];
+        const b = L[(i + 1) % L.length];
+        return pointOnSeg(p, a, b).dist;
+      }),
+    );
+    expect(dist).toBeGreaterThan(0.8);
+  });
+
+  it('donne à chaque pièce son propre point de pose', () => {
+    const parts = roomParts([
+      ...room('a', 0, 0, 4, 3),
+      ...inRoom('room-2', room('b', 9, 0, 3, 3)),
+    ]);
+    expect(parts).toHaveLength(2);
+    expect(parts[0].labelAt.x).toBeCloseTo(2, 1);
+    expect(parts[1].labelAt.x).toBeCloseTo(10.5, 1);
+  });
+});
+
+describe('meubles', () => {
+  const height = 2.5;
+  const box = [
+    { ...seg('n', { x: 0, z: 0 }, { x: 4, z: 0 }), height },
+    { ...seg('e', { x: 4, z: 0 }, { x: 4, z: 3 }), height },
+    { ...seg('s', { x: 4, z: 3 }, { x: 0, z: 3 }), height },
+    { ...seg('w', { x: 0, z: 3 }, { x: 0, z: 0 }), height },
+  ];
+  /** Télé plaquée sur le mur nord, centre DERRIÈRE le nu du mur. */
+  const tv = {
+    id: 'tv',
+    category: 'television',
+    width: 1.2,
+    height: 0.7,
+    depth: 0.08,
+    transform: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 2, 1.3, -0.02, 1],
+  };
+
+  it('ramène un meuble à cheval sur un mur du côté de sa pièce', () => {
+    const f = clampFootprint(toFootprint(tv), box, { x: 2, z: 1.5 });
+    // Aucun coin ne doit plus dépasser dans le mur (nu à z = 0,07).
+    expect(f.cz - tv.depth / 2).toBeGreaterThan(WALL_T / 2);
+  });
+
+  it('rend chaque meuble comme un volume, faces arrière masquées', () => {
+    const scene = buildScene(box, [], [tv], { palette: TEST_PALETTE });
+    const faces = scene.faces.filter((f) => f.fill === TEST_PALETTE.object);
+    expect(faces.length).toBeGreaterThan(0);
+    // Toutes les faces d'un meuble portent leur normale : c'est ce qui
+    // empêche les flancs de clignoter au fil de la rotation.
+    expect(faces.every((f) => f.normal !== undefined)).toBe(true);
+    const rad = (d: number) => (d * Math.PI) / 180;
+    for (const theta of [-180, -90, -32, 0, 45, 90, 180]) {
+      const cam = {
+        ct: Math.cos(rad(theta)),
+        st: Math.sin(rad(theta)),
+        cp: Math.cos(rad(58)),
+        sp: Math.sin(rad(58)),
+      };
+      const shown = faces.filter((f) => !isHiddenFace(f, cam));
+      // Jamais deux flancs opposés en même temps, jamais aucun.
+      expect(shown.length).toBeGreaterThan(0);
+      expect(shown.length).toBeLessThan(faces.length);
+    }
+  });
+});
+
+describe('splitAtJunctions', () => {
+  it('coupe le mur porteur là où une cloison vient buter', () => {
+    const cut = splitAtJunctions([
+      seg('n', { x: 0, z: 0 }, { x: 7, z: 0 }),
+      seg('refend', { x: 4, z: 0 }, { x: 4, z: 3 }),
+    ]);
+    expect(cut).toHaveLength(3);
+    const pieces = cut.filter((w) => w.id.startsWith('n'));
+    expect(pieces.map((w) => Math.round(segLength(w)))).toEqual([4, 3]);
+  });
+
+  it('ne coupe pas à un simple coin', () => {
+    const cut = splitAtJunctions([
+      seg('n', { x: 0, z: 0 }, { x: 4, z: 0 }),
+      seg('e', { x: 4, z: 0 }, { x: 4, z: 3 }),
+    ]);
+    expect(cut).toHaveLength(2);
+  });
+
+  it('trouve les pièces d’un appartement tel que RoomPlan le livre', () => {
+    // Enveloppe d'un seul tenant, cloison qui bute au milieu : sans découpe,
+    // aucun cycle ne passe par elle et tout ressort en une pièce unique.
+    const brut = [
+      seg('n', { x: 0, z: 0 }, { x: 7, z: 0 }),
+      seg('e', { x: 7, z: 0 }, { x: 7, z: 3 }),
+      seg('s', { x: 7, z: 3 }, { x: 0, z: 3 }),
+      seg('w', { x: 0, z: 3 }, { x: 0, z: 0 }),
+      seg('refend', { x: 4, z: 0.05 }, { x: 4, z: 2.95 }),
+    ];
+    expect(detectRooms(mergeColinear(weldCorners(brut)))).toHaveLength(1);
+    const propre = mergeColinear(splitAtJunctions(weldCorners(brut)));
+    const found = detectRooms(propre);
+    expect(found).toHaveLength(2);
+    expect(found.map((r) => Math.round(r.area))).toEqual([12, 9]);
+  });
+
+  it('démêle un T3 : séjour et deux chambres', () => {
+    const brut = [
+      seg('N', { x: 0, z: 0 }, { x: 9, z: 0 }),
+      seg('E', { x: 9, z: 0 }, { x: 9, z: 4 }),
+      seg('S', { x: 9, z: 4 }, { x: 0, z: 4 }),
+      seg('W', { x: 0, z: 4 }, { x: 0, z: 0 }),
+      seg('c1', { x: 5, z: 0.03 }, { x: 5, z: 4 }),
+      seg('c2', { x: 5, z: 2 }, { x: 9, z: 2 }),
+    ];
+    const found = detectRooms(mergeColinear(splitAtJunctions(weldCorners(brut))));
+    expect(found.map((r) => Math.round(r.area))).toEqual([20, 8, 8]);
+  });
+
+  it('recoupe la grille de couleurs avec le mur', () => {
+    const n = {
+      ...seg('n', { x: 0, z: 0 }, { x: 8, z: 0 }),
+      texture: { cols: 8, rows: 1, texels: ['#000000', '#111111', '#222222', '#333333', '#444444', '#555555', '#666666', '#777777'] },
+    };
+    const cut = splitAtJunctions([n, seg('r', { x: 4, z: 0 }, { x: 4, z: 3 })]);
+    const [left, right] = cut.filter((w) => w.id.startsWith('n'));
+    expect(left.texture!.cols).toBe(4);
+    expect(right.texture!.cols).toBe(4);
+    expect(left.texture!.texels[0]).toBe('#000000');
+    expect(right.texture!.texels[3]).toBe('#777777');
   });
 });
 

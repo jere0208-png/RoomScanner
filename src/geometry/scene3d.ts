@@ -269,8 +269,10 @@ export interface SceneRoom {
   roomId: string;
   /** Contour et aire du sol, si la pièce en a un. */
   surface: RoomSurface | null;
-  /** Centre de la pièce (pose du cartouche). */
+  /** Centre de la pièce. */
   centroid: Pt;
+  /** Où poser le cartouche : au large, jamais dans un mur. */
+  labelAt: Pt;
   /** Couleur de fond du sol effectivement employée. */
   floorFill: string;
 }
@@ -332,7 +334,7 @@ export function buildScene(
   // Les nœuds de `wallQuads` sont déjà cloisonnés par pièce : un seul appel
   // suffit, deux pièces mitoyennes n'y forment pas d'onglet commun.
   const quads = wallQuads(walls);
-  const interiorOf = new Map(parts.map((p) => [p.roomId, p.centroid]));
+  const interiorOf = new Map(parts.map((p) => [p.roomId, p.labelAt]));
   const wallsOf = new Map(parts.map((p) => [p.roomId, p.walls]));
   const fallbackInterior = wallsCentroid(walls);
   const floorY =
@@ -379,7 +381,13 @@ export function buildScene(
         }
       }
     }
-    return { roomId: part.roomId, surface, centroid: part.centroid, floorFill };
+    return {
+      roomId: part.roomId,
+      surface,
+      centroid: part.centroid,
+      labelAt: part.labelAt,
+      floorFill,
+    };
   });
 
   const step = opts.coarse ? COARSE_STEP : STEP;
@@ -529,6 +537,8 @@ export function buildScene(
       shrink?: number;
       /** Dessous fermé : un linteau se regarde par en dessous. */
       closeBottom?: boolean;
+      /** Ombrage selon l'orientation (les meubles restent en aplat). */
+      shade?: boolean;
     },
   ) => {
     if (t1 - t0 < 1e-4 || yt - yb < 1e-4) return;
@@ -541,7 +551,7 @@ export function buildScene(
 
     const face = (p: Pt, r: Pt, tex?: SurfaceTexture, uFrom = 0, uTo = 1) =>
       pushStrips(p, r, yb, yt, o.fill, {
-        shade: true,
+        shade: o.shade ?? true,
         captured: o.captured,
         tex,
         uFrom,
@@ -677,23 +687,30 @@ export function buildScene(
     const yb = Math.max(0, obj.yCenter - obj.height / 2 - floorY);
     const yt = yb + obj.height;
     const skin = opts.showTextures ? obj.color : undefined;
-    for (let i = 0; i < 4; i++) {
-      const p = corners[i];
-      const q = corners[(i + 1) % 4];
-      pushStrips(p, q, yb, yt, skin ?? pal.object, {
-        shade: !!skin,
-        captured: !!skin,
-        outline: pal.objectStroke,
-      });
-    }
-    pushTopStrips(
-      corners[0],
-      corners[1],
-      corners[3],
-      corners[2],
+    // Un meuble est un VOLUME, comme un mur : ses faces portent leur normale
+    // sortante et celles qui tournent le dos ne sont pas dessinées. Sans ça,
+    // les quatre flancs se disputaient l'ordre d'affichage et l'un ou l'autre
+    // clignotait au fil de la rotation.
+    //
+    // L'ordre des coins est celui qui donne des normales SORTANTES avec la
+    // convention de `pushWallBlock` : c3→c2 borde le côté +n.
+    pushWallBlock(
+      { a1: corners[3], b1: corners[2], b2: corners[1], a2: corners[0] },
+      0,
+      1,
+      yb,
       yt,
-      skin ? mixHex(skin, '#FFFFFF', 0.35) : pal.objectTop,
-      pal.objectStroke,
+      {
+        fill: skin ?? pal.object,
+        top: skin ? mixHex(skin, '#FFFFFF', 0.35) : pal.objectTop,
+        stroke: pal.objectStroke,
+        topStroke: pal.objectStroke,
+        captured: !!skin,
+        shade: !!skin,
+        // Une télé ou une étagère ne touchent pas le sol : leur dessous se
+        // voit depuis le bas de la pièce.
+        closeBottom: yb > 1e-3,
+      },
     );
   }
 

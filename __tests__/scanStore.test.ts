@@ -210,6 +210,57 @@ describe('détection automatique des pièces', () => {
   });
 });
 
+describe('appartement tel que RoomPlan le livre', () => {
+  beforeEach(reset);
+
+  /**
+   * Le cas qui compte : l'enveloppe arrive d'un SEUL tenant et la cloison
+   * vient buter au milieu, sans couper personne. Sans découpe aux jonctions,
+   * aucun cycle ne passe par la cloison et tout ressort en une pièce.
+   */
+  const brut = [
+    wallBetween('n', 0, 0, 7, 0),
+    wallBetween('e', 7, 0, 7, 3),
+    wallBetween('s', 7, 3, 0, 3),
+    wallBetween('w', 0, 3, 0, 0),
+    wallBetween('refend', 4, 0.05, 4, 2.95),
+  ];
+
+  it('démêle un T2 de bout en bout : pièces, noms, meubles, ouverture', () => {
+    useScanStore.getState().finalize({
+      modelPath: '/tmp/scan.usdz',
+      surfaces: [
+        ...brut,
+        { ...wallBetween('p1', 4, 1, 4, 1.9), type: 'door', height: 2.05 },
+      ],
+      objects: [
+        objectAt('o1', 'sofa', 2, 1.5),
+        objectAt('o2', 'television', 2, 0.3),
+        objectAt('o3', 'refrigerator', 5.5, 1.5),
+        objectAt('o4', 'stove', 6, 0.4),
+      ],
+    });
+    const st = useScanStore.getState();
+    expect(st.rooms.map((r) => r.name)).toEqual(['Salon', 'Cuisine']);
+    expect(st.openings).toHaveLength(1);
+    expect(st.objects.map((o) => o.roomId)).toEqual([
+      'room-1',
+      'room-1',
+      'room-2',
+      'room-2',
+    ]);
+    const parts = roomParts(st.walls, st.rooms);
+    expect(parts.every((p) => p.surface?.exact)).toBe(true);
+    expect(parts.map((p) => Math.round(p.surface!.area))).toEqual([12, 9]);
+    // Les cartouches se posent au large, chacun chez soi.
+    const d = Math.hypot(
+      parts[0].labelAt.x - parts[1].labelAt.x,
+      parts[0].labelAt.z - parts[1].labelAt.z,
+    );
+    expect(d).toBeGreaterThan(2);
+  });
+});
+
 describe('removeRoom', () => {
   beforeEach(reset);
 

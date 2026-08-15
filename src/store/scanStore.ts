@@ -14,6 +14,7 @@ import {
   roomOf,
   segLength,
   snapAngle,
+  splitAtJunctions,
   toSegment,
   weldCorners,
   type WallSeg,
@@ -374,10 +375,12 @@ export const useScanStore = create<ScanState>((set, get) => {
       const floor = r.floor ?? r.rooms?.[0]?.floor ?? null;
 
       const segments = surfaces.map((s) => toSegment(s));
-      // Souder les coins, recoller les murs livrés en morceaux, PUIS chercher
-      // les pièces : le graphe doit être propre avant d'y chercher des faces.
+      // Souder les coins, COUPER les murs là où une cloison vient buter
+      // (sans ça aucun cycle ne passe par elle et tout l'appartement ressort
+      // en une seule pièce), recoller les morceaux alignés, PUIS chercher les
+      // pièces : le graphe doit être propre avant d'y chercher des faces.
       const walls = mergeColinear(
-        weldCorners(segments.filter((s) => s.type === 'wall')),
+        splitAtJunctions(weldCorners(segments.filter((s) => s.type === 'wall'))),
       );
       const openings = segments.filter((s) => s.type !== 'wall');
 
