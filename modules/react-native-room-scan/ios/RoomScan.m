@@ -16,7 +16,9 @@ RCT_EXTERN_METHOD(requestCamera:(RCTPromiseResolveBlock)resolve reject:(RCTPromi
 @end
 
 @interface RCT_EXTERN_MODULE(RoomScanPreview, NSObject)
-RCT_EXTERN_METHOD(presentUSDZ:(NSString *)path)
+RCT_EXTERN_METHOD(presentUSDZ:(NSString *)path
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
 @end
 
 @interface RCT_EXTERN_MODULE(RoomScanExport, NSObject)

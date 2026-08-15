@@ -87,11 +87,13 @@ export const RoomScan = {
   pause: (): void => RoomScanModule.pauseRoomScan(),
   resume: (): void => RoomScanModule.resumeRoomScan(),
 
-  /** iOS : ouvre le .usdz dans QuickLook (visionneuse 3D + AR native). */
-  viewModel: (path: string): void => {
-    if (Platform.OS === 'ios') {
-      NativeModules.RoomScanPreview?.presentUSDZ(path);
+  /** iOS : ouvre le .usdz dans QuickLook (visionneuse 3D + AR native).
+   *  Rejette si le fichier du modèle n'existe plus. */
+  viewModel: (path: string): Promise<boolean> => {
+    if (Platform.OS === 'ios' && NativeModules.RoomScanPreview) {
+      return NativeModules.RoomScanPreview.presentUSDZ(path);
     }
+    return Promise.resolve(false);
   },
 
   /** iOS : écrit le PDF (base64) en fichier temporaire et ouvre le partage. */

@@ -331,7 +331,15 @@ export function ResultScreen() {
         {Platform.OS === 'ios' && modelPath && (
           <TouchableOpacity
             style={styles.secondaryButton}
-            onPress={() => RoomScan.viewModel(modelPath)}>
+            onPress={() =>
+              RoomScan.viewModel(modelPath).catch(() =>
+                Alert.alert(
+                  'Modèle 3D indisponible',
+                  'Le fichier de ce scan a été supprimé (désinstallation de ' +
+                    "l'app). Le plan et la vue 3D restent disponibles.",
+                ),
+              )
+            }>
             <Text style={styles.secondaryText}>Modèle AR</Text>
           </TouchableOpacity>
         )}

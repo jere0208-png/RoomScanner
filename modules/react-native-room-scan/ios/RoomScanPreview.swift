@@ -11,18 +11,29 @@ class RoomScanPreview: NSObject, QLPreviewControllerDataSource {
 
   @objc static func requiresMainQueueSetup() -> Bool { false }
 
-  @objc func presentUSDZ(_ path: String) {
+  @objc func presentUSDZ(_ path: String,
+                         resolve: @escaping RCTPromiseResolveBlock,
+                         reject: @escaping RCTPromiseRejectBlock) {
+    // Re-résout le fichier si le chemin date d'une ancienne installation.
+    guard let url = RoomScanExport.resolveFile(path) else {
+      reject("NOT_FOUND", "Modèle 3D introuvable : \(path)", nil)
+      return
+    }
     DispatchQueue.main.async {
-      self.fileURL = URL(fileURLWithPath: path)
+      self.fileURL = url
       let controller = QLPreviewController()
       controller.dataSource = self
 
       guard let root = UIApplication.shared.connectedScenes
         .compactMap({ ($0 as? UIWindowScene)?.keyWindow })
-        .first?.rootViewController else { return }
+        .first?.rootViewController else {
+        reject("NO_VIEW", "Aucune vue pour présenter le modèle", nil)
+        return
+      }
       var top = root
       while let presented = top.presentedViewController { top = presented }
       top.present(controller, animated: true)
+      resolve(true)
     }
   }
 

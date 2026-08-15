@@ -29,14 +29,24 @@ class RoomScanExport: NSObject {
     presentShareSheet(url: url, resolve: resolve, reject: reject)
   }
 
+  /// Retrouve un fichier même si le chemin absolu date d'une ancienne
+  /// installation : l'UUID du conteneur change à chaque réinstallation,
+  /// mais les Documents sont migrés — on re-résout par le nom de fichier.
+  static func resolveFile(_ path: String) -> URL? {
+    let clean = path.hasPrefix("file://") ? String(path.dropFirst(7)) : path
+    let url = URL(fileURLWithPath: clean)
+    if FileManager.default.fileExists(atPath: url.path) { return url }
+    let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+    let candidate = docs.appendingPathComponent(url.lastPathComponent)
+    return FileManager.default.fileExists(atPath: candidate.path) ? candidate : nil
+  }
+
   /// Partage un fichier local existant (image, .usdz…) via la feuille iOS.
   @objc func shareFile(_ path: String,
                        resolve: @escaping RCTPromiseResolveBlock,
                        reject: @escaping RCTPromiseRejectBlock) {
-    let clean = path.hasPrefix("file://") ? String(path.dropFirst(7)) : path
-    let url = URL(fileURLWithPath: clean)
-    guard FileManager.default.fileExists(atPath: url.path) else {
-      reject("NOT_FOUND", "Fichier introuvable : \(clean)", nil)
+    guard let url = RoomScanExport.resolveFile(path) else {
+      reject("NOT_FOUND", "Fichier introuvable : \(path)", nil)
       return
     }
     presentShareSheet(url: url, resolve: resolve, reject: reject)
