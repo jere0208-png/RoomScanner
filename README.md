@@ -350,6 +350,62 @@ métré par pièce, vues 3D), **modèle 3D** (OBJ du plan retouché) ou **image*
 « modèle » ont quitté les barres d'outils des plans : elles y faisaient
 double emploi et encombraient une barre déjà chargée.
 
+### Poser des meubles
+
+RoomPlan ne reconnaît que ce qui était là au moment du scan — or un logement
+vide se scanne très bien, et c'est même le cas courant avant travaux. Le
+**catalogue** comble ce trou : le « + » qui paraît à côté du calque meubles
+ouvre une trentaine d'entrées aux dimensions usuelles du commerce, rangées
+par pièce — lits 90/140/160, meubles bas et hauts de cuisine, four, plaque,
+réfrigérateur, lave-vaisselle, baignoire, douche, WC, bureau, armoire…
+
+**Le « + » se signale tout seul.** Une pastille de plus dans une colonne de
+pastilles ne se remarque pas : celle-ci, posée à GAUCHE du calque meubles,
+laisse échapper deux anneaux bleus en boucle, contenus par son bord arrondi.
+L'œil va vers ce qui bouge, et c'est le seul endroit de l'écran qui bouge
+tout seul.
+
+**On choisit une forme, pas un mot.** Chaque vignette dessine le symbole du
+meuble vu de dessus, à l'échelle de sa propre emprise — exactement celui
+qu'on retrouvera sur le plan. Le nom vient dessous, les cotes en plus petit
+encore. Et une **recherche** plutôt qu'un mode d'emploi : à trente entrées on
+sait ce qu'on cherche, sans accent ni casse — « evier » trouve « Évier ».
+
+Un meuble posé porte une **catégorie RoomPlan** (`bed`, `refrigerator`,
+`sink`…) et non un type maison : pour tout le reste de l'app — symbole 2D,
+nom français, volume 3D, export — c'est un meuble comme un autre.
+
+**Il est provisoire tant qu'on ne l'a pas validé.** Quitter sa fiche sans le
+✓ le retire : on en essaie un pour voir, il ne doit pas rester planté au
+milieu de la pièce.
+
+**Toute son emprise se glisse**, et pas seulement un carré de 44 px en son
+centre : sur un lit, poser le doigt à côté du centre déplaçait le PLAN. La
+poignée épouse la boîte écran du meuble, coins tournés compris. Sa croix de
+suppression et sa poignée de rotation flottent HORS de lui, à faible
+opacité — posées dessus, elles se lisaient comme une partie du meuble et se
+touchaient par accident.
+
+**La rotation se tire.** Un demi-cercle fléché à un coin : on le tire, le
+meuble suit l'angle du doigt, et la valeur s'affiche le temps du geste —
+sans elle, on tourne à l'aveugle et on ne retrouve jamais l'aplomb. L'aimant
+a deux forces, référées à la TRAME du logement et jamais aux axes de
+l'écran : les quarts de tour tirent de loin (8°), parce que c'est là que
+tombent presque tous les meubles ; les seizièmes de tour, de tout près (3°),
+pour un meuble volontairement de biais.
+
+**Les murs attirent.** Dès que le dos d'un meuble passe à moins de 30 cm d'un
+mur, il s'y colle et s'aligne dessus, dos au nu, face à la pièce. Au-delà, il
+reste exactement là où le doigt l'a laissé — l'aimant aide, il ne décide pas.
+
+**Les dégagements se cotent tout seuls.** Un meuble sélectionné montre ce qui
+le sépare des murs sur ses quatre côtés : la cote part du milieu de chaque
+côté, perpendiculairement, et s'arrête au NU du mur — pas à son axe, parce
+que c'est la cote qu'on relève sur place, mètre contre la plinthe. Les traits
+longent le meuble et tournent avec lui, étant calculés dans le monde et non à
+l'écran. Rien dans une direction, ou plus de 4 m : pas de cote, plutôt qu'une
+cote qui ne veut rien dire.
+
 ### Menuiseries : les retailler
 
 Une porte détectée à 78 cm alors qu'elle en fait 83, une fenêtre dont le
