@@ -163,24 +163,28 @@ export function clampFootprint(
     // Ne considérer que les murs que le meuble longe réellement.
     const t = ((cx - w.a.x) * dx + (cz - w.a.z) * dz) / (len * len);
     if (t < -0.1 || t > 1.1) continue;
-    let nx = -dz / len;
-    let nz = dx / len;
-    if (nx * (interior.x - w.a.x) + nz * (interior.z - w.a.z) < 0) {
-      nx = -nx;
-      nz = -nz;
-    }
-    let shift = 0;
+    const nx = -dz / len;
+    const nz = dx / len;
+    // Le meuble reste de SON côté du mur (jamais poussé à travers) :
+    // le côté est celui de son centre — au pire tie-break vers l'intérieur.
+    const dCenter = (cx - w.a.x) * nx + (cz - w.a.z) * nz;
+    const side =
+      Math.abs(dCenter) > 1e-6
+        ? Math.sign(dCenter)
+        : Math.sign((interior.x - w.a.x) * nx + (interior.z - w.a.z) * nz) || 1;
+    let minCorner = Infinity;
     for (const [lx, lz] of localCorners) {
       const px = cx + lx * cos - lz * sin;
       const pz = cz + lx * sin + lz * cos;
-      const d = (px - w.a.x) * nx + (pz - w.a.z) * nz;
-      const need = wallT / 2 + margin - d;
-      if (need > shift) shift = need;
+      const d = side * ((px - w.a.x) * nx + (pz - w.a.z) * nz);
+      if (d < minCorner) minCorner = d;
     }
-    // shift énorme = objet d'une autre zone : ne pas le téléporter.
-    if (shift > 0 && shift < 1) {
-      cx += nx * shift;
-      cz += nz * shift;
+    const need = wallT / 2 + margin - minCorner;
+    // Petite pénétration = frottement de détection : on écarte le meuble.
+    // Grosse valeur = il vit ailleurs : on ne le téléporte pas.
+    if (need > 0 && need < 0.3) {
+      cx += nx * side * need;
+      cz += nz * side * need;
     }
   }
   return { ...f, cx, cz };

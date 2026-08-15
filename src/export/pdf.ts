@@ -68,6 +68,9 @@ export interface PdfOptions {
   plan?: PlanViewParams;
   views?: [View3DParams, View3DParams];
   colorOpenings?: boolean;
+  /** Cotes sur le plan 2D / sur les vues 3D. */
+  measures2D?: boolean;
+  measures3D?: boolean;
 }
 
 function bytesOf(s: string): Uint8Array {
@@ -586,6 +589,7 @@ function draw3DView(
   box: { x: number; y: number; w: number; h: number },
   view: View3DParams,
   colorOpenings = false,
+  showDims = true,
 ) {
   const thetaDeg = view.theta;
   const tiltDeg = view.tilt;
@@ -645,7 +649,7 @@ function draw3DView(
     | { kind: 'poly'; depth: number; pts: Pt[]; fill: string | null; stroke: string | null }
     | { kind: 'label'; depth: number; x: number; y: number; text: string };
   const items: Item[] = polys.map((p) => ({ kind: 'poly' as const, ...p }));
-  for (const w of walls) {
+  for (const w of showDims ? walls : []) {
     const mid = project({
       x: (w.a.x + w.b.x) / 2,
       y: w.height,
@@ -683,6 +687,7 @@ function planPage(
   sheet: string,
   planView?: PlanViewParams,
   colorOpenings = false,
+  showDims = true,
 ): string {
   const d = new Draw();
   const loop = closedLoop(walls);
@@ -827,7 +832,7 @@ function planPage(
     }
 
     // Lignes de cote extérieures (attaches + tirets à 45°)
-    for (const w of walls) {
+    for (const w of showDims ? walls : []) {
       const a = px(w.a);
       const b = px(w.b);
       const dx2 = b.x - a.x;
@@ -903,22 +908,23 @@ function threeDPage(
   sheet: string,
   views: [View3DParams, View3DParams] = DEFAULT_PDF_VIEWS,
   colorOpenings = false,
+  showDims = true,
 ): string {
   const d = new Draw();
   const top = FRAME.y + FRAME.h;
   d.text('Vue 1', FRAME.x + 20, top - 30, 10, GREY, { align: 'left' });
   draw3DView(d, walls, openings, objects,
     { x: FRAME.x + 30, y: FRAME.y + TITLE_H + 375, w: FRAME.w - 60, h: 290 },
-    views[0], colorOpenings);
+    views[0], colorOpenings, showDims);
   d.text('Vue 2', FRAME.x + 20, FRAME.y + TITLE_H + 350, 10, GREY, { align: 'left' });
   draw3DView(d, walls, openings, objects,
     { x: FRAME.x + 30, y: FRAME.y + TITLE_H + 30, w: FRAME.w - 60, h: 290 },
-    views[1], colorOpenings);
+    views[1], colorOpenings, showDims);
 
   drawSheetChrome(d, {
     project: name,
     filename,
-    sheetTitle: 'Vues 3D cotées',
+    sheetTitle: showDims ? 'Vues 3D cotées' : 'Vues 3D',
     sheet,
     scaleLabel: null,
   });
@@ -953,13 +959,13 @@ export function buildScanPdf(
     planPage(
       scan.name, filename, scan.walls, scan.openings, scan.objects,
       `1 / ${total}`, opts.plan, opts.colorOpenings ?? false,
-    ),
+    , opts.measures2D ?? true),
   ];
   if (include3D) {
     pages.push(
       threeDPage(
         scan.name, filename, scan.walls, scan.openings, scan.objects,
-        `2 / ${total}`, opts.views, opts.colorOpenings ?? false,
+        `2 / ${total}`, opts.views, opts.colorOpenings ?? false, opts.measures3D ?? true,
       ),
     );
   }
