@@ -46,7 +46,15 @@ import {
 import { hasCapturedColors } from '../geometry/appearance';
 import { frCategory, ROOM_NAME_CHOICES } from '../geometry/furniture';
 import { buildObj, objFilename } from '../export/model3d';
-import { checkPlan, type PlanIssue } from '../geometry/diagnostics';
+import { checkPlan } from '../geometry/diagnostics';
+import {
+  checkElectrical,
+  materialList,
+  roomInputsOf,
+  roomsInAlert,
+  wallToRooms,
+} from '../geometry/nfc15100';
+import { buildMaterialPdf, materialFilename, toBase64 } from '../export/pdf';
 import {
   FIXTURES,
   FIXTURE_FAMILIES,
@@ -55,6 +63,16 @@ import {
 import { useScanStore } from '../store/scanStore';
 
 type Tab = '2d' | '3d';
+
+/** Un constat du diagnostic, d'où qu'il vienne — géométrie ou électricité. */
+interface Constat {
+  key: string;
+  message: string;
+  hint: string;
+  severity: string;
+  wallId?: string;
+  roomId?: string;
+}
 const fr = (n: number, d = 1) => n.toFixed(d).replace('.', ',');
 
 export function ResultScreen() {
@@ -235,6 +253,21 @@ export function ResultScreen() {
     }
   };
 
+  /**
+   * La liste du matériel : ce qu'on envoie à un client ou à un fournisseur.
+   * Elle sort du même relevé que le plan — pièces, appareils, circuits — et
+   * n'a donc rien à ressaisir.
+   */
+  const shareMaterial = async () => {
+    try {
+      const list = materialList(roomInputs, fixtures, wallRooms);
+      const bytes = buildMaterialPdf(scanName, list);
+      await RoomScan.sharePDF(toBase64(bytes), materialFilename(scanName));
+    } catch (e: any) {
+      Alert.alert('Export impossible', e?.message ?? 'Erreur inconnue');
+    }
+  };
+
   const selectedWall = walls.find((w) => w.id === selectedWallId) ?? null;
   const perimeter = walls.reduce((s, w) => s + segLength(w), 0);
   const parts = roomParts(walls, rooms);
@@ -247,11 +280,39 @@ export function ResultScreen() {
   const targetExtent = targetPart?.surface
     ? roomExtent(targetPart.surface.pts)
     : { width: 0, depth: 0, angle: 0 };
-  const issues = checkPlan(walls, rooms);
+  // Deux familles de constats, une seule liste : celui qui regarde son plan
+  // se moque de savoir si le défaut est géométrique ou électrique.
+  const roomInputs = roomInputsOf(rooms, parts);
+  const wallRooms = wallToRooms(roomInputs);
+  const elecIssues = checkElectrical(roomInputs, fixtures, wallRooms);
+  const alertRooms = roomsInAlert(elecIssues);
+  const issues: Constat[] = [
+    ...checkPlan(walls, rooms).map((i, n) => ({
+      key: `p${n}`,
+      message: i.message,
+      hint: i.hint,
+      severity: i.severity as string,
+      wallId: i.wallId,
+      roomId: i.roomId,
+    })),
+    ...elecIssues.map((i, n) => ({
+      key: `e${n}`,
+      message: i.message,
+      hint: i.regle,
+      severity: i.severity as string,
+      roomId: i.roomId,
+    })),
+  ];
   const alertes = issues.filter((i) => i.severity === 'alerte').length;
+  /** Constats électriques des pièces que borde le mur sélectionné. */
+  const wallIssues = selectedWallId
+    ? elecIssues.filter(
+        (i) => i.roomId && (wallRooms.get(selectedWallId) ?? []).includes(i.roomId),
+      )
+    : [];
 
   /** Amène sous les yeux l'élément visé par un constat. */
-  const goToIssue = (issue: PlanIssue) => {
+  const goToIssue = (issue: Constat) => {
     setChecking(false);
     setTab('2d');
     setEditMode(true);
@@ -486,6 +547,7 @@ export function ResultScreen() {
               const wall = walls.find((w) => w.id === id);
               setLengthInput(wall ? segLength(wall).toFixed(2).replace('.', ',') : '');
             }}
+            alertRooms={alertRooms}
             selectedRoomId={selectedRoomId}
             onSelectRoom={(id) => {
               setSelectedObjectId(null);
@@ -869,6 +931,28 @@ export function ResultScreen() {
           </View>
         )}
 
+        {/* Pourquoi ce mur est rouge. On ne montre que la première raison :
+            la liste complète est dans le diagnostic, ici on répond à la
+            question posée par l'appui. */}
+        {tab === '2d' && editMode && selectedWall && wallIssues.length > 0 && (
+          <View style={styles.elecCard}>
+            <View style={styles.elecCardHead}>
+              <View style={styles.elecDotAlert} />
+              <Text style={styles.elecCardTitle}>{wallIssues[0].message}</Text>
+            </View>
+            <Text style={styles.elecCardRule}>{wallIssues[0].regle}</Text>
+            {wallIssues.length > 1 && (
+              <TouchableOpacity onPress={() => setChecking(true)}>
+                <Text style={styles.elecCardMore}>
+                  {`+ ${wallIssues.length - 1} autre${
+                    wallIssues.length > 2 ? 's' : ''
+                  } constat${wallIssues.length > 2 ? 's' : ''} — tout voir`}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+
         {/* Watermark EchoPlan, visible uniquement sur les images générées */}
         {capturing && (
           <View style={styles.watermark} pointerEvents="none">
@@ -1027,6 +1111,15 @@ export function ResultScreen() {
                   },
                 ],
                 [
+                  'Liste du matériel',
+                  'Appareillage par pièce, circuits et disjoncteurs, ' +
+                    'conformité. Le document à chiffrer.',
+                  () => {
+                    setExporting(false);
+                    shareMaterial();
+                  },
+                ],
+                [
                   'Image',
                   'Capture de la vue affichée, avec le filigrane EchoPlan.',
                   () => {
@@ -1065,9 +1158,9 @@ export function ResultScreen() {
               Touchez une ligne pour aller voir l'élément concerné sur le plan.
             </Text>
             <ScrollView style={styles.issueScroll}>
-              {issues.map((issue, i) => (
+              {issues.map((issue) => (
                 <TouchableOpacity
-                  key={`${issue.kind}-${issue.wallId ?? issue.roomId ?? i}`}
+                  key={issue.key}
                   style={styles.issueRow}
                   onPress={() => goToIssue(issue)}>
                   <View
@@ -1907,6 +2000,41 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   },
   modalTitle: { color: c.ink, fontSize: 17, fontWeight: '800' },
   elecWrap: { width: '100%' },
+  // Carte d'explication du mur rouge : posée sous la barre de cote, elle
+  // répond à l'appui sans couvrir le mur qu'on vient de toucher.
+  elecCard: {
+    position: 'absolute',
+    top: 104,
+    left: 10,
+    right: 10,
+    backgroundColor: c.surface,
+    borderRadius: radius.md,
+    borderLeftWidth: 4,
+    borderLeftColor: c.danger,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    ...shadowCard,
+  },
+  elecCardHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  elecDotAlert: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: c.danger,
+  },
+  elecCardTitle: { color: c.ink, fontSize: 13.5, fontWeight: '800', flex: 1 },
+  elecCardRule: {
+    color: c.inkSoft,
+    fontSize: 11.5,
+    lineHeight: 16,
+    marginTop: 5,
+  },
+  elecCardMore: {
+    color: c.blue,
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: 7,
+  },
   elecScroll: { maxHeight: 340 },
   elecFamily: {
     color: c.inkFaint,

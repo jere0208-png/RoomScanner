@@ -124,6 +124,11 @@ interface Props {
   drawing?: boolean;
   draftFrom?: Pt | null;
   onPickPoint?: (p: Pt, snappedToNode: boolean) => void;
+  /**
+   * Pièces en défaut de conformité électrique : leurs murs passent en rouge
+   * foncé. C'est le seul signal visible sans ouvrir un menu.
+   */
+  alertRooms?: Set<string>;
   /** Appui sur un symbole d'appareillage : ouvre son mur vu de face. */
   onSelectFixture?: (id: string, wallId: string) => void;
   /** Commande lancée depuis les boutons flottants du mur sélectionné. */
@@ -150,6 +155,7 @@ export function FloorplanEditor({
   onEditRoomName,
   onWallAction,
   onSelectFixture,
+  alertRooms,
   drawing,
   draftFrom,
   onPickPoint,
@@ -348,6 +354,18 @@ export function FloorplanEditor({
     () => new Map(walls.map((w) => [w.id, w])),
     [walls],
   );
+  // Quel mur borde quelle pièce : un refend en borde deux.
+  const roomsOfWall = useMemo(() => {
+    const m = new Map<string, string[]>();
+    for (const r of rooms) {
+      for (const id of r.wallIds ?? []) {
+        const list = m.get(id) ?? [];
+        list.push(r.id);
+        m.set(id, list);
+      }
+    }
+    return m;
+  }, [rooms]);
   // Pièces du plan : chacune a son contour, son centre et sa teinte de sol.
   const parts = useMemo(() => roomParts(walls, rooms), [walls, rooms]);
   const roomById = useMemo(() => new Map(rooms.map((r) => [r.id, r])), [rooms]);
@@ -550,6 +568,10 @@ export function FloorplanEditor({
                 mapping={mapping}
                 showMeasure={showMeasures && !navigating}
                 measureOpacity={1 - detail}
+                alert={
+                  !!alertRooms?.size &&
+                  (roomsOfWall.get(w.id) ?? []).some((id) => alertRooms.has(id))
+                }
                 selected={editable && w.id === selectedWallId}
                 onPress={
                   editable
@@ -1036,6 +1058,7 @@ function WallBody({
   showMeasure,
   measureOpacity = 1,
   selected,
+  alert,
   onPress,
 }: {
   wall: WallSeg;
@@ -1045,6 +1068,8 @@ function WallBody({
   /** Les cotes globales s'effacent quand les cotes de détail arrivent. */
   measureOpacity?: number;
   selected: boolean;
+  /** Le mur borde une pièce en défaut de conformité électrique. */
+  alert?: boolean;
   onPress?: () => void;
 }) {
   const c = useTheme();
@@ -1075,20 +1100,24 @@ function WallBody({
     y: (a.y + b.y) / 2 + n.y * (bodyPx / 2 + 9),
   };
   const label = `${segLength(wall).toFixed(2).replace('.', ',')} m`;
+  // Rouge foncé : assez sombre pour rester un mur poché, assez rouge pour
+  // qu'on ne le confonde pas avec les autres. La sélection reste bleue —
+  // c'est un état, pas un défaut.
+  const teinte = selected ? c.blue : alert ? '#8E1B1B' : c.ink;
 
   return (
     <G onPress={onPress}>
       {/* Zone de toucher élargie, invisible */}
       <Line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="transparent" strokeWidth={30} />
       {body ? (
-        <Polygon points={body} fill={selected ? c.blue : c.ink} stroke="none" />
+        <Polygon points={body} fill={teinte} stroke="none" />
       ) : (
         <Line
           x1={a.x}
           y1={a.y}
           x2={b.x}
           y2={b.y}
-          stroke={selected ? c.blue : c.ink}
+          stroke={teinte}
           strokeWidth={2.5}
           strokeLinecap="butt"
         />

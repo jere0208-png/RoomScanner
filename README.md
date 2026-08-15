@@ -181,6 +181,81 @@ qui rendent le plan faux — passent devant les simples vérifications. La
 pastille ne s'affiche que s'il y a quelque chose à dire, et devient rouge s'il
 y a une alerte.
 
+### Conformité NF C 15-100
+
+L'app compte, compare, et prévient. Elle **ne délivre aucune attestation** —
+et trois familles d'exigences lui échappent complètement : les **volumes de
+la salle d'eau** (0, 1, 2), qui se mesurent depuis la baignoire ou le
+receveur ; les **points d'éclairage en plafond**, qui n'ont pas de support
+dans le modèle ; la **puissance réellement raccordée**, qui décide de la
+section. Le dernier mot reste à l'électricien : on lui épargne le comptage,
+pas le métier.
+
+Ce qui est vérifié, avec le chiffre de la norme :
+
+| Pièce | Socles 16 A | Communication |
+| --- | --- | --- |
+| Séjour | 1 par tranche de 4 m², **5 au minimum** | 1 RJ45 |
+| Chambre, bureau | **3** | 1 RJ45 |
+| Cuisine ≥ 4 m² | **6**, dont **4** au-dessus du plan de travail | — |
+| Cuisine < 4 m² | 3 | — |
+| Salle d'eau | 1, hors volumes | — |
+| Circulation > 4 m² | 1 | — |
+| WC | aucun | — |
+
+S'y ajoutent les **hauteurs de pose** : socle 16 A entre 5 cm et 1,30 m,
+socle 32 A à 12 cm au minimum, organe de commande entre 0,90 m et 1,30 m,
+tableau entre 0,90 m et 1,80 m. Un socle de cuisine est réputé « au-dessus du
+plan de travail » à partir de 90 cm d'axe — c'est ainsi que les quatre du
+plan se comptent tout seuls.
+
+**Un point de vocabulaire, parce qu'il change le verdict.** La norme ne fixe
+AUCUN maximum de socles par pièce. Ce qui est plafonné, c'est le nombre de
+points par **circuit** : huit socles sur un 20 A. Poser dix prises dans une
+cuisine n'est donc pas une faute — il faut un deuxième circuit, et l'app le
+prévoit toute seule. Ce cas ressort en information, jamais en alerte : crier
+au défaut là où la norme ne dit rien décrédibiliserait tous les autres
+constats.
+
+**Ce qui alerte se voit sans ouvrir un menu.** Les murs qui bordent une pièce
+en défaut passent en **rouge foncé** — assez sombre pour rester un mur poché,
+assez rouge pour qu'on ne le confonde pas ; la sélection, elle, reste bleue,
+parce que c'est un état et non un défaut. Toucher le mur affiche la raison
+(« Chambre : 2 socles sur 3 exigés — il en manque 1 ») et la règle en une
+phrase. Rien n'est bloqué : on continue de poser, l'alerte suit.
+
+Pendant la pose, la vue face au mur porte **l'objectif de la pièce** : un
+titre (« Chambre — 2 socles sur 3 »), une barre qui se remplit et devient
+verte, la règle en dessous. Et si l'appareil qu'on tient sort de sa plage de
+hauteur, la règle correspondante s'affiche en rouge sous les cotes, là où on
+est en train de la violer.
+
+Les constats électriques rejoignent ceux de la géométrie dans **le même
+diagnostic** : celui qui regarde son plan se moque de savoir si le défaut est
+géométrique ou électrique.
+
+### Liste du matériel
+
+**Exporter → Liste du matériel.** Un PDF au cartouche EchoPlan qui sort du
+même relevé que le plan — rien à ressaisir.
+
+- **L'appareillage pièce par pièce**, compté par type.
+- **Le tableau** : un circuit par ligne, avec ses points, sa section et son
+  disjoncteur. Le découpage est automatique — un circuit dédié par socle
+  32 A (cuisson, 6 mm²) et par socle 20 A (four, lave-linge…), les socles
+  16 A par paquets de huit en 2,5 mm² sous 20 A avec **la cuisine à part**,
+  l'éclairage par paquets de huit en 1,5 mm² sous 16 A, et les courants
+  faibles hors tableau, au coffret de communication.
+- **La protection différentielle** 30 mA, huit circuits au maximum par
+  appareil, dont au moins un **type A** : les courants de défaut de la
+  cuisson et du lave-linge peuvent comporter une composante continue qu'un
+  type AC ne détecte pas.
+- **Les fournitures de tableau** et un ordre de grandeur de câble.
+- **Les constats de conformité**, chacun avec sa règle.
+
+La dernière ligne du document rappelle ce qu'il est : une aide au chiffrage,
+pas une attestation.
+
 ### Redresser le plan
 
 Un scan LiDAR ne donne jamais un angle droit exact : on récolte des coins à
@@ -624,7 +699,7 @@ passe inaperçu jusqu'à la CI. C'est arrivé une fois.
 ## Vérifications faites sur cette machine (Windows)
 
 - `npx tsc --noEmit` et `npx eslint src App.tsx` : aucun diagnostic.
-- `npx jest` : 152/152 tests verts (conversion matrice iOS→segment, extrémités
+- `npx jest` : 171/171 tests verts (conversion matrice iOS→segment, extrémités
   Android, soudure des coins et jonctions en T, onglets des murs, surface au
   sol, semis de points, lecture des textures, snap angulaire, projection
   mètres↔pixels, génération du PDF ; **multi-pièces** : découpe par pièce,
@@ -655,7 +730,13 @@ passe inaperçu jusqu'à la CI. C'est arrivé une fois.
   appareil orphelin qui ne dessine rien, bornage des cotes au mur,
   retournement sans glissement, mur supprimé qui emporte son appareillage,
   annulation, scans d'avant l'électricité, symboles distincts par type et
-  échelonnement des appareils superposés).
+  échelonnement des appareils superposés ; **NF C 15-100** : usage d'une
+  pièce lu dans son nom, exigences par pièce et par surface, chambre
+  sous-équipée, hauteurs de pose interdites, socles du plan de travail
+  comptés à leur hauteur, socle 32 A hors cuisine, minimum de prises de
+  communication, huit socles par circuit, cuisine séparée, circuits dédiés,
+  différentiel de type A sur la cuisson, disjoncteurs déduits des circuits,
+  PDF de la liste du matériel).
 - **Non vérifié ici** : la compilation Swift/Kotlin (impossible sans Mac /
   SDK Android). Les points d'attente connus sont notés ci-dessous.
 

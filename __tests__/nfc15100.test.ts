@@ -1,0 +1,278 @@
+/**
+ * Conformité NF C 15-100 et découpage en circuits.
+ *
+ * Les nombres testés ici sont ceux de la norme, pas des choix d'interface :
+ * cinq socles au séjour, trois par chambre, six en cuisine dont quatre
+ * au-dessus du plan de travail, huit socles au maximum par circuit 20 A.
+ * S'ils bougent un jour, il faut que ce soit délibéré.
+ */
+import {
+  MAX_SOCLES,
+  checkElectrical,
+  materialList,
+  planCircuits,
+  planDifferentials,
+  requirementFor,
+  roomInputsOf,
+  roomUse,
+  roomsInAlert,
+  wallToRooms,
+  type RoomInput,
+} from '../src/geometry/nfc15100';
+import { buildMaterialPdf } from '../src/export/pdf';
+import type { Fixture, FixtureKind } from '../src/geometry/electrical';
+
+let n = 0;
+const fx = (kind: FixtureKind, wallId = 'w1', height = 0.25): Fixture => ({
+  id: `f${++n}`,
+  kind,
+  wallId,
+  along: 1,
+  height,
+  side: 1,
+});
+
+const room = (
+  id: string,
+  name: string,
+  area: number,
+  wallIds: string[] = ['w1'],
+): RoomInput => ({ id, name, kind: null, area, wallIds });
+
+describe('usage d’une pièce', () => {
+  it('se lit d’abord dans le nom donné à la main', () => {
+    expect(roomUse('Séjour')).toBe('sejour');
+    expect(roomUse('Salle à manger')).toBe('sejour');
+    expect(roomUse('Chambre 2')).toBe('chambre');
+    expect(roomUse('Cuisine')).toBe('cuisine');
+    expect(roomUse('Salle de bains')).toBe('sdb');
+    expect(roomUse('WC')).toBe('wc');
+    expect(roomUse('Couloir')).toBe('circulation');
+    // Sans nom parlant, on retombe sur ce que le mobilier avait déduit.
+    expect(roomUse('Pièce 3', 'kitchen')).toBe('cuisine');
+    expect(roomUse('Pièce 3')).toBe('autre');
+  });
+});
+
+describe('exigences par pièce', () => {
+  it('le séjour compte un socle par tranche de 4 m², cinq au minimum', () => {
+    expect(requirementFor('sejour', 12).socles).toBe(5);
+    expect(requirementFor('sejour', 20).socles).toBe(5);
+    expect(requirementFor('sejour', 28).socles).toBe(7);
+    expect(requirementFor('sejour', 40).socles).toBe(10);
+  });
+
+  it('chambre trois socles, cuisine six dont quatre en hauteur', () => {
+    expect(requirementFor('chambre', 11).socles).toBe(3);
+    expect(requirementFor('chambre', 11).rj45).toBe(1);
+    const cuisine = requirementFor('cuisine', 9);
+    expect(cuisine.socles).toBe(6);
+    expect(cuisine.surPlan).toBe(4);
+    // Sous 4 m², la cuisine retombe à trois socles.
+    expect(requirementFor('cuisine', 3).socles).toBe(3);
+  });
+
+  it('les WC n’exigent rien, une circulation exiguë non plus', () => {
+    expect(requirementFor('wc', 2).socles).toBe(0);
+    expect(requirementFor('circulation', 3).socles).toBe(0);
+    expect(requirementFor('circulation', 6).socles).toBe(1);
+  });
+});
+
+describe('constats', () => {
+  const w2r = (rooms: RoomInput[]) => wallToRooms(rooms);
+
+  it('signale une chambre sous-équipée, et dit combien il manque', () => {
+    const rooms = [room('r1', 'Chambre', 11)];
+    const issues = checkElectrical(rooms, [fx('prise'), fx('prise')], w2r(rooms));
+    const manque = issues.find((i) => i.message.includes('socle'));
+    expect(manque?.severity).toBe('alerte');
+    expect(manque?.message).toContain('2 socles sur 3');
+    expect(manque?.message).toContain('il en manque 1');
+    expect(manque?.regle).toContain('trois socles');
+    expect(roomsInAlert(issues).has('r1')).toBe(true);
+  });
+
+  it('ne crie pas quand il y a BEAUCOUP de prises : ce n’est pas une faute', () => {
+    // La norme ne plafonne pas les socles d'une pièce, elle plafonne les
+    // points d'un circuit. Dix prises, c'est un circuit de plus, pas un
+    // défaut — le constat existe, mais en information.
+    const rooms = [room('r1', 'Cuisine', 12)];
+    const fixtures = Array.from({ length: 10 }, () => fx('prise', 'w1', 1.1));
+    const issues = checkElectrical(rooms, fixtures, w2r(rooms));
+    const trop = issues.find((i) => i.message.includes('circuits'));
+    expect(trop?.severity).toBe('info');
+    expect(trop?.message).toContain('2 circuits');
+    // Et la pièce n'est donc PAS en alerte pour cette raison.
+    expect(issues.filter((i) => i.severity === 'alerte')).toHaveLength(0);
+  });
+
+  it('relève une hauteur de pose interdite', () => {
+    const rooms = [room('r1', 'Chambre', 11)];
+    const bas = checkElectrical(rooms, [fx('inter', 'w1', 0.3)], w2r(rooms));
+    const ko = bas.find((i) => i.message.includes('trop bas'));
+    expect(ko?.severity).toBe('alerte');
+    expect(ko?.regle).toContain('0,90 m');
+    // À 1,10 m, plus rien à dire sur la hauteur.
+    const ok = checkElectrical(rooms, [fx('inter', 'w1', 1.1)], w2r(rooms));
+    expect(ok.some((i) => i.message.includes('trop'))).toBe(false);
+  });
+
+  it('compte les socles du plan de travail à leur hauteur', () => {
+    const rooms = [room('r1', 'Cuisine', 10)];
+    // Six socles, mais tous en plinthe : les quatre du plan manquent.
+    const bas = Array.from({ length: 6 }, () => fx('prise', 'w1', 0.25));
+    const issues = checkElectrical(rooms, bas, w2r(rooms));
+    expect(issues.some((i) => i.message.includes('plan de travail'))).toBe(true);
+    const hauts = [
+      ...Array.from({ length: 4 }, () => fx('prise', 'w1', 1.1)),
+      ...Array.from({ length: 2 }, () => fx('prise', 'w1', 0.25)),
+    ];
+    const ok = checkElectrical(rooms, hauts, w2r(rooms));
+    expect(ok.some((i) => i.message.includes('plan de travail'))).toBe(false);
+  });
+
+  it('doute d’un socle 32 A hors cuisine', () => {
+    const rooms = [room('r1', 'Chambre', 11)];
+    const issues = checkElectrical(rooms, [fx('prise32', 'w1', 0.25)], w2r(rooms));
+    expect(
+      issues.some((i) => i.severity === 'alerte' && i.message.includes('32 A')),
+    ).toBe(true);
+  });
+
+  it('exige au moins deux prises de communication dans le logement', () => {
+    const rooms = [room('r1', 'Séjour', 24), room('r2', 'Chambre', 11, ['w2'])];
+    const issues = checkElectrical(rooms, [], wallToRooms(rooms));
+    expect(issues.some((i) => i.message.includes('RJ45 sur 2'))).toBe(true);
+  });
+});
+
+describe('circuits', () => {
+  const nom = () => 'Séjour';
+  const pasCuisine = () => false;
+
+  it('huit socles par circuit, pas un de plus', () => {
+    const socles = Array.from({ length: MAX_SOCLES + 1 }, () => fx('prise'));
+    const circuits = planCircuits(socles, nom, pasCuisine);
+    expect(circuits).toHaveLength(2);
+    expect(circuits[0].points).toBe(MAX_SOCLES);
+    expect(circuits[1].points).toBe(1);
+    expect(circuits[0].breaker).toBe(20);
+    expect(circuits[0].section).toBe(2.5);
+  });
+
+  it('la cuisine ne partage pas ses circuits', () => {
+    const list = [fx('prise', 'wc1'), fx('prise', 'ws1')];
+    const circuits = planCircuits(
+      list,
+      (f) => (f.wallId === 'wc1' ? 'Cuisine' : 'Séjour'),
+      (f) => f.wallId === 'wc1',
+    );
+    expect(circuits).toHaveLength(2);
+    expect(circuits.some((c) => c.label.includes('cuisine'))).toBe(true);
+  });
+
+  it('un circuit dédié par cuisson et par spécialisé', () => {
+    const circuits = planCircuits(
+      [fx('prise32'), fx('prise20'), fx('prise20')],
+      nom,
+      pasCuisine,
+    );
+    const cuisson = circuits.find((c) => c.nature === 'cuisson');
+    expect(cuisson?.breaker).toBe(32);
+    expect(cuisson?.section).toBe(6);
+    expect(circuits.filter((c) => c.nature === 'specialise')).toHaveLength(2);
+    expect(circuits.every((c) => c.points === 1)).toBe(true);
+  });
+
+  it('l’éclairage est en 1,5 mm² sous 16 A, les courants faibles hors tableau', () => {
+    const circuits = planCircuits(
+      [fx('applique', 'w1', 1.9), fx('rj45'), fx('tv')],
+      nom,
+      pasCuisine,
+    );
+    const lum = circuits.find((c) => c.nature === 'eclairage');
+    expect(lum?.section).toBe(1.5);
+    expect(lum?.breaker).toBe(16);
+    const vdi = circuits.find((c) => c.nature === 'vdi');
+    expect(vdi?.breaker).toBeNull();
+    expect(vdi?.points).toBe(2);
+  });
+
+  it('un différentiel de type A porte la cuisson', () => {
+    const circuits = planCircuits([fx('prise32'), fx('prise')], nom, pasCuisine);
+    const diffs = planDifferentials(circuits);
+    const typeA = diffs.find((d) => d.type === 'A');
+    expect(typeA).toBeTruthy();
+    expect(typeA?.circuits.some((l) => l.startsWith('Cuisson'))).toBe(true);
+    // Les courants faibles ne passent pas derrière un différentiel.
+    const vdi = planDifferentials(
+      planCircuits([fx('rj45')], nom, pasCuisine),
+    );
+    expect(vdi.every((d) => d.circuits.length === 0)).toBe(true);
+  });
+});
+
+describe('liste du matériel', () => {
+  const rooms = [room('r1', 'Cuisine', 10, ['w1']), room('r2', 'Séjour', 24, ['w2'])];
+  const fixtures = [
+    ...Array.from({ length: 6 }, () => fx('prise', 'w1', 1.1)),
+    fx('prise32', 'w1', 0.25),
+    fx('prise20', 'w1', 1.1),
+    ...Array.from({ length: 5 }, () => fx('prise', 'w2', 0.25)),
+    fx('rj45', 'w2'),
+  ];
+  const list = materialList(rooms, fixtures, wallToRooms(rooms));
+
+  it('compte l’appareillage pièce par pièce', () => {
+    const cuisine = list.rooms.find((r) => r.room === 'Cuisine');
+    expect(cuisine?.rows.find((x) => x.label === 'Prise 16 A')?.quantity).toBe(6);
+    expect(cuisine?.rows.find((x) => x.label === 'Prise 32 A')?.quantity).toBe(1);
+  });
+
+  it('prévoit un disjoncteur par circuit, au bon calibre', () => {
+    const d32 = list.board.find((b) => b.label === 'Disjoncteur 32 A');
+    expect(d32?.quantity).toBe(1);
+    const d20 = list.board.find((b) => b.label === 'Disjoncteur 20 A');
+    // Prises cuisine (1) + prises séjour (1) + spécialisé (1) = trois 20 A.
+    expect(d20?.quantity).toBe(3);
+    expect(
+      list.board.some((b) => b.label.includes('type A')),
+    ).toBe(true);
+    expect(
+      list.board.some((b) => b.label === 'Coffret de communication'),
+    ).toBe(true);
+  });
+
+  it('sort un PDF valide, avec ses sections', () => {
+    const bytes = buildMaterialPdf('Appartement test', list);
+    let s = '';
+    for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+    expect(s.startsWith('%PDF-1.4')).toBe(true);
+    expect(s.endsWith('%%EOF')).toBe(true);
+    expect(s).toContain('Liste du mat');
+    expect(s).toContain('Tableau ');
+    expect(s).toContain('Conformit');
+    expect(s).toContain('EchoPlan');
+    expect(s).toContain('Disjoncteur 32 A');
+  });
+});
+
+describe('rattachement des pièces', () => {
+  it('un refend borde deux pièces', () => {
+    const inputs = roomInputsOf(
+      [
+        { id: 'r1', name: 'Séjour', wallIds: ['n', 'refend'] },
+        { id: 'r2', name: 'Cuisine', wallIds: ['s', 'refend'] },
+      ],
+      [
+        { roomId: 'r1', surface: { area: 20 }, walls: [] },
+        { roomId: 'r2', surface: { area: 9 }, walls: [] },
+      ],
+    );
+    expect(inputs[0].area).toBe(20);
+    const map = wallToRooms(inputs);
+    expect(map.get('refend')).toEqual(['r1', 'r2']);
+    expect(map.get('n')).toEqual(['r1']);
+  });
+});

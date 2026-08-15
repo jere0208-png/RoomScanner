@@ -24,6 +24,7 @@ import {
 } from '../geometry/floorplan';
 import { dotStep, floorDots, mixHex } from '../geometry/appearance';
 import type { Fixture } from '../geometry/electrical';
+import type { MaterialList } from '../geometry/nfc15100';
 import {
   buildScene,
   isHiddenFace,
@@ -965,6 +966,218 @@ export interface ScanForPdf {
   rooms?: RoomShape[];
   /** Appareillage électrique posé sur les murs. */
   fixtures?: Fixture[];
+}
+
+
+// ------------------------------------------ feuille « liste du matériel »
+
+/** Découpe un texte en lignes qui tiennent dans `maxW` points. */
+function wrapText(str: string, size: number, maxW: number): string[] {
+  const perChar = size * 0.52;
+  const max = Math.max(8, Math.floor(maxW / perChar));
+  const out: string[] = [];
+  let line = '';
+  for (const word of str.split(' ')) {
+    if (line.length + word.length + 1 > max) {
+      if (line) out.push(line);
+      line = word;
+    } else {
+      line = line ? `${line} ${word}` : word;
+    }
+  }
+  if (line) out.push(line);
+  return out;
+}
+
+/**
+ * La liste du matériel, prête à chiffrer.
+ *
+ * Une feuille par section, qui déborde sur autant de pages que nécessaire :
+ * l'appareillage pièce par pièce, le tableau (un disjoncteur par circuit,
+ * les différentiels), puis les constats de conformité. C'est le document
+ * qu'on envoie à un client ou à un fournisseur — il porte donc le cartouche
+ * et le logo comme les autres feuilles.
+ */
+export function buildMaterialPdf(name: string, list: MaterialList): Uint8Array {
+  const x0 = FRAME.x + 24;
+  const w = FRAME.w - 48;
+  const TOP = FRAME.y + FRAME.h - TITLE_H - 40;
+  const BOTTOM = FRAME.y + 54;
+
+  const pages: Draw[] = [];
+  let d = new Draw();
+  pages.push(d);
+  let y = TOP;
+  const need = (h: number) => {
+    if (y - h < BOTTOM) {
+      d = new Draw();
+      pages.push(d);
+      y = TOP;
+    }
+  };
+  const titre = (t: string) => {
+    need(46);
+    y -= 6;
+    d.text(t, x0, y, 13, INK, { bold: true, align: 'left' });
+    y -= 8;
+    d.line(x0, y, x0 + w, y, 1, INK);
+    y -= 16;
+  };
+  const ligne = (
+    gauche: string,
+    droite: string,
+    o: { bold?: boolean; grey?: boolean; indent?: number } = {},
+  ) => {
+    need(16);
+    const col = o.grey ? GREY : INK;
+    d.text(fitText(gauche, 10, w - 80 - (o.indent ?? 0)), x0 + (o.indent ?? 0), y, 10, col, {
+      align: 'left',
+      bold: o.bold,
+    });
+    if (droite) {
+      d.text(droite, x0 + w - 60, y, 10, col, { align: 'left', bold: o.bold });
+    }
+    y -= 15;
+  };
+  const note = (t: string) => {
+    for (const l of wrapText(t, 8.5, w)) {
+      need(12);
+      d.text(l, x0, y, 8.5, GREY, { align: 'left' });
+      y -= 11;
+    }
+  };
+
+  // ------------------------------------------------------------ en-tête
+  const appareils = list.rooms.reduce(
+    (n, r) => n + r.rows.reduce((m, x) => m + x.quantity, 0),
+    0,
+  );
+  d.text('Liste du matériel', x0, y, 19, INK, { bold: true, align: 'left' });
+  y -= 20;
+  d.text(
+    `${appareils} appareil${appareils > 1 ? 's' : ''} · ` +
+      `${list.circuits.length} circuit${list.circuits.length > 1 ? 's' : ''} · ` +
+      `${list.rooms.length} pièce${list.rooms.length > 1 ? 's' : ''}`,
+    x0,
+    y,
+    10,
+    GREY,
+    { align: 'left' },
+  );
+  y -= 22;
+
+  // ------------------------------------------------ appareillage par pièce
+  titre('Appareillage par pièce');
+  for (const room of list.rooms) {
+    if (room.rows.length === 0) continue;
+    need(30);
+    d.text(room.room, x0, y, 11, INK, { bold: true, align: 'left' });
+    d.text(
+      `${room.use} · ${room.area.toFixed(1).replace('.', ',')} m²`,
+      x0 + w - 130,
+      y,
+      9,
+      GREY,
+      { align: 'left' },
+    );
+    y -= 15;
+    for (const row of room.rows) {
+      ligne(row.label, `${row.quantity}`, { indent: 14 });
+    }
+    y -= 6;
+  }
+  if (appareils === 0) {
+    note('Aucun appareil posé pour l’instant.');
+  }
+
+  // ------------------------------------------------------------- tableau
+  titre('Tableau électrique');
+  ligne('Circuit', 'Protection', { bold: true, grey: true });
+  for (const c of list.circuits) {
+    const protection =
+      c.breaker === null
+        ? 'coffret com.'
+        : `${c.breaker} A · ${c.section} mm²`;
+    ligne(
+      `${c.label} — ${c.points} point${c.points > 1 ? 's' : ''}` +
+        (c.rooms.length ? ` (${c.rooms.join(', ')})` : ''),
+      protection,
+    );
+    if (c.note) note(`   ${c.note}`);
+  }
+  if (list.circuits.length === 0) note('Aucun circuit : rien à protéger.');
+
+  if (list.differentials.length > 0) {
+    y -= 8;
+    ligne('Protection différentielle 30 mA', '', { bold: true });
+    for (const diff of list.differentials) {
+      ligne(
+        `${diff.label} — ${diff.rating} A type ${diff.type}` +
+          (diff.circuits.length ? ` : ${diff.circuits.join(', ')}` : ''),
+        '',
+        { indent: 14 },
+      );
+    }
+    note(
+      'Un différentiel de type A au minimum : les courants de défaut de la ' +
+        'cuisson et du lave-linge peuvent comporter une composante continue ' +
+        'qu’un type AC ne détecte pas.',
+    );
+  }
+
+  // -------------------------------------------------------- fournitures
+  if (list.board.length > 0) {
+    titre('Fournitures de tableau');
+    for (const row of list.board) {
+      ligne(row.label, row.quantity > 1 ? `${row.quantity}` : '1');
+    }
+  }
+
+  // -------------------------------------------------------- conformité
+  titre('Conformité');
+  const alertes = list.issues.filter((i) => i.severity === 'alerte');
+  if (alertes.length === 0) {
+    ligne('Aucun écart relevé sur ce qui est vérifiable.', '');
+  }
+  for (const issue of list.issues) {
+    need(30);
+    d.circle(x0 + 3, y + 3, 2.6, issue.severity === 'alerte' ? '#C0392B' : '#98A1AE');
+    d.text(fitText(issue.message, 10, w - 30), x0 + 14, y, 10, INK, {
+      align: 'left',
+      bold: issue.severity === 'alerte',
+    });
+    y -= 13;
+    for (const l of wrapText(issue.regle, 8.5, w - 14)) {
+      need(11);
+      d.text(l, x0 + 14, y, 8.5, GREY, { align: 'left' });
+      y -= 10;
+    }
+    y -= 6;
+  }
+
+  y -= 10;
+  note(
+    'Document d’aide au chiffrage établi d’après les exigences usuelles de ' +
+      'la NF C 15-100. Il ne vaut pas attestation de conformité : les ' +
+      'volumes de la salle d’eau, les points d’éclairage en plafond et la ' +
+      'puissance réellement raccordée ne sont pas vérifiés par l’application.',
+  );
+
+  const filename = pdfFilename(`${name} - materiel`);
+  pages.forEach((p, i) =>
+    drawSheetChrome(p, {
+      project: name,
+      filename,
+      sheetTitle: 'Liste du matériel',
+      sheet: `${i + 1} / ${pages.length}`,
+      scaleLabel: null,
+    }),
+  );
+  return buildDocument(pages.map((p) => p.stream()));
+}
+
+export function materialFilename(name: string): string {
+  return pdfFilename(`${name} - materiel`);
 }
 
 export function pdfFilename(name: string): string {

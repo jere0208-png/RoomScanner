@@ -32,7 +32,14 @@ import Svg, {
   Text as SvgText,
 } from 'react-native-svg';
 import { radius, shadowCard, themedStyles, useTheme, type Palette } from '../theme';
-import { roomOf, wallQuadsOf } from '../geometry/floorplan';
+import { roomOf, roomParts, wallQuadsOf } from '../geometry/floorplan';
+import {
+  HEIGHT_RULES,
+  requirementFor,
+  roomInputsOf,
+  roomUse,
+  wallToRooms,
+} from '../geometry/nfc15100';
 import { assignOpenings } from '../geometry/scene3d';
 import {
   FIXTURES,
@@ -105,6 +112,30 @@ export function WallElevation({
     const floorY = Math.min(...walls.map((w) => w.yCenter - w.height / 2));
     return assignOpenings(walls, openings, floorY).get(wall.id) ?? [];
   }, [wall, walls, openings]);
+
+  // ------------------------------------------------- guide de conformité
+  // Poser une prise sans savoir combien la pièce en exige, c'est compter
+  // dans sa tête. L'app le fait : elle annonce l'objectif, montre où on en
+  // est, et rappelle la règle en une ligne.
+  const objectif = useMemo(() => {
+    const inputs = roomInputsOf(rooms, roomParts(walls, rooms));
+    const w2r = wallToRooms(inputs);
+    const mien = inputs.find((r) => (w2r.get(wallId) ?? []).includes(r.id));
+    if (!mien) return null;
+    const req = requirementFor(roomUse(mien.name, mien.kind), mien.area);
+    if (req.socles === 0) return null;
+    const poses = fixtures.filter(
+      (f) =>
+        (w2r.get(f.wallId) ?? []).includes(mien.id) &&
+        (f.kind === 'prise' || f.kind === 'prise2'),
+    ).length;
+    return {
+      nom: mien.name || 'Cette pièce',
+      poses,
+      exiges: req.socles,
+      regle: req.regle,
+    };
+  }, [rooms, walls, fixtures, wallId]);
 
   // ------------------------------------------------------------- échelle
   const H = wall?.height ?? 2.5;
@@ -241,6 +272,21 @@ export function WallElevation({
   const selX = selected ? faceX(face, selected.along) : 0;
   const roomName =
     rooms.find((r) => r.id === roomOf(wall))?.name ?? '';
+
+  // La règle de hauteur de l'appareil qu'on tient : c'est ici, et nulle
+  // part ailleurs, qu'elle sert.
+  const hauteurKO = (() => {
+    if (!selected) return null;
+    const r = HEIGHT_RULES[selected.kind];
+    if (!r) return null;
+    if (r.min !== undefined && selected.height < r.min - 1e-6) {
+      return { sens: 'trop bas', regle: r.regle };
+    }
+    if (r.max !== undefined && selected.height > r.max + 1e-6) {
+      return { sens: 'trop haut', regle: r.regle };
+    }
+    return null;
+  })();
 
   /** Applique une cote tapée au clavier (en cm). */
   const applyDraft = () => {
@@ -501,6 +547,49 @@ export function WallElevation({
         )}
       </View>
 
+      {objectif && (
+        <View style={styles.guide}>
+          <View style={styles.guideHead}>
+            <Text style={styles.guideTitle}>
+              {`${objectif.nom} — ${objectif.poses} socle${
+                objectif.poses > 1 ? 's' : ''
+              } sur ${objectif.exiges}`}
+            </Text>
+            <Text
+              style={[
+                styles.guideState,
+                objectif.poses >= objectif.exiges ? styles.guideOk : styles.guideKo,
+              ]}>
+              {objectif.poses >= objectif.exiges
+                ? 'conforme'
+                : `${objectif.exiges - objectif.poses} à poser`}
+            </Text>
+          </View>
+          <View style={styles.guideBar}>
+            <View
+              style={[
+                styles.guideFill,
+                objectif.poses >= objectif.exiges && styles.guideFillOk,
+                {
+                  width: `${Math.min(
+                    100,
+                    (objectif.poses / objectif.exiges) * 100,
+                  )}%`,
+                },
+              ]}
+            />
+          </View>
+          <Text style={styles.guideRule}>{objectif.regle}</Text>
+        </View>
+      )}
+
+      {hauteurKO && (
+        <View style={styles.warn}>
+          <Text style={styles.warnTitle}>{`Hauteur ${hauteurKO.sens}`}</Text>
+          <Text style={styles.warnRule}>{hauteurKO.regle}</Text>
+        </View>
+      )}
+
       <View style={styles.fields}>
         {field('g', 'Gauche', selX)}
         {field('d', 'Droite', face.len - selX)}
@@ -663,6 +752,44 @@ const getStyles = themedStyles((c: Palette) =>
       borderColor: c.line,
       overflow: 'hidden',
     },
+    guide: {
+      marginTop: 10,
+      backgroundColor: c.surfaceSunken,
+      borderRadius: radius.sm,
+      paddingHorizontal: 12,
+      paddingVertical: 9,
+    },
+    guideHead: { flexDirection: 'row', alignItems: 'center' },
+    guideTitle: { color: c.ink, fontSize: 12.5, fontWeight: '800', flex: 1 },
+    guideState: { fontSize: 11.5, fontWeight: '800' },
+    guideOk: { color: c.green },
+    guideKo: { color: c.danger },
+    guideBar: {
+      height: 5,
+      borderRadius: 3,
+      backgroundColor: c.line,
+      marginTop: 7,
+      overflow: 'hidden',
+    },
+    guideFill: { height: 5, borderRadius: 3, backgroundColor: c.danger },
+    guideFillOk: { backgroundColor: c.green },
+    guideRule: {
+      color: c.inkFaint,
+      fontSize: 10.5,
+      lineHeight: 14.5,
+      marginTop: 7,
+    },
+    warn: {
+      marginTop: 8,
+      backgroundColor: c.surfaceSunken,
+      borderLeftWidth: 3,
+      borderLeftColor: c.danger,
+      borderRadius: radius.sm,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+    },
+    warnTitle: { color: c.danger, fontSize: 12.5, fontWeight: '800' },
+    warnRule: { color: c.inkSoft, fontSize: 10.5, lineHeight: 14.5, marginTop: 3 },
     fields: { flexDirection: 'row', gap: 8, marginTop: 12 },
     field: { flex: 1 },
     fieldLabel: {
