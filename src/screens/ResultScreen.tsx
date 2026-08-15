@@ -154,21 +154,28 @@ export function ResultScreen() {
     rooms.map((r) => r.floor),
   );
 
+  /** Renomme une pièce précise (appui sur son cartouche dans le plan). */
+  const promptRoomFor = (roomId: string) => {
+    const room = rooms.find((r) => r.id === roomId);
+    if (!room) return;
+    Alert.prompt(
+      'Nom de la pièce',
+      'Il s’affiche sur le plan 2D et au même endroit sur la vue 3D.',
+      (t) => setRoomName(room.id, t ?? ''),
+      'plain-text',
+      room.name,
+    );
+  };
+
   const promptRoomName = () => {
     if (!targetRoom) {
       Alert.alert(
         'Quelle pièce ?',
-        'Touchez le sol de la pièce à nommer, puis réessayez.',
+        'Touchez le cartouche de la pièce sur le plan pour la nommer.',
       );
       return;
     }
-    Alert.prompt(
-      'Nom de la pièce',
-      'Laissez vide pour retirer le nom du cartouche.',
-      (t) => setRoomName(targetRoom.id, t ?? ''),
-      'plain-text',
-      targetRoom.name,
-    );
+    promptRoomFor(targetRoom.id);
   };
 
   const applyLength = () => {
@@ -296,6 +303,7 @@ export function ResultScreen() {
               setSelectedWallId(null);
               setSelectedRoomId(id);
             }}
+            onEditRoomName={promptRoomFor}
           />
         ) : (
           <Iso3DView showMeasures={show3DMeasures} />
@@ -732,13 +740,15 @@ function ToolPill({
     <TouchableOpacity
       style={[styles.toolPill, active && styles.toolPillActive]}
       onPress={onPress}>
-      <Svg width={18} height={18} viewBox="0 0 24 24">
+      {/* La pastille garde ses 36 px : seul le tracé grossit, pour se lire
+          d'un coup d'œil sans élargir la barre d'outils. */}
+      <Svg width={22} height={22} viewBox="0 0 24 24">
         {TOOL_PATHS[icon].map((seg, i) => (
           <Path
             key={i}
             d={seg.d}
             stroke={stroke}
-            strokeWidth={2.1}
+            strokeWidth={2}
             strokeLinecap="round"
             strokeLinejoin="round"
             fill="none"

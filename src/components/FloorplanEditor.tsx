@@ -72,6 +72,8 @@ interface Props {
   selectedRoomId?: string | null;
   /** Appui sur le sol d'une pièce (mode édition) : la sélectionne. */
   onSelectRoom?: (id: string | null) => void;
+  /** Appui sur le cartouche d'une pièce (mode édition) : la renomme. */
+  onEditRoomName?: (id: string) => void;
 }
 
 /**
@@ -88,6 +90,7 @@ export function FloorplanEditor({
   onDeleteObject,
   selectedRoomId,
   onSelectRoom,
+  onEditRoomName,
 }: Props) {
   const walls = useScanStore((s) => s.walls);
   const openings = useScanStore((s) => s.openings);
@@ -440,11 +443,14 @@ export function FloorplanEditor({
                       .toFixed(1)
                       .replace('.', ',')} m²`
                   : null;
-              if (roomName === '' && !areaText) return null;
+              // En édition, la pièce a toujours son cartouche : c'est par lui
+              // qu'on la nomme, même quand elle n'a encore ni nom ni surface.
+              if (roomName === '' && !areaText && !editable) return null;
               const foots = objects
                 .filter((o) => roomOf(o) === part.roomId)
                 .map((o) => footprintOf(o, partOf));
-              const text = roomName !== '' ? roomName : areaText ?? '';
+              const placeholder = roomName === '' && !areaText ? 'Nommer' : '';
+              const text = roomName !== '' ? roomName : areaText ?? placeholder;
               const wpx = Math.max(46, text.length * 7 + 18);
               const hpx = roomName !== '' && areaText ? 38 : 24;
               const labelW = wpx / mapping.scale;
@@ -477,9 +483,14 @@ export function FloorplanEditor({
               return (
                 <G
                   key={`label-${part.roomId}`}
+                  // En édition, le cartouche EST le bouton de renommage :
+                  // on touche le nom là où il s'affiche.
                   onPress={
-                    editable && onSelectRoom
-                      ? () => onSelectRoom(selected ? null : part.roomId)
+                    editable
+                      ? () => {
+                          onSelectRoom?.(part.roomId);
+                          onEditRoomName?.(part.roomId);
+                        }
                       : undefined
                   }>
                   <Rect
@@ -512,6 +523,17 @@ export function FloorplanEditor({
                       fontWeight="700"
                       textAnchor="middle">
                       {areaText}
+                    </SvgText>
+                  )}
+                  {placeholder !== '' && (
+                    <SvgText
+                      x={p.x}
+                      y={p.y + 4}
+                      fill={c.inkFaint}
+                      fontSize={11}
+                      fontWeight="700"
+                      textAnchor="middle">
+                      {placeholder}
                     </SvgText>
                   )}
                 </G>

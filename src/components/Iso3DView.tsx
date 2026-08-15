@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { PanResponder, StyleSheet, View } from 'react-native';
-import Svg, { Circle, Polygon, Text as SvgText } from 'react-native-svg';
+import Svg, { Circle, Polygon, Rect, Text as SvgText } from 'react-native-svg';
 import { themedStyles, useTheme, type Palette } from '../theme';
 import { segLength, type WallSeg } from '../geometry/floorplan';
 import { dotStep, floorDots, inkOn, mixHex } from '../geometry/appearance';
 import {
   buildScene,
+  isHiddenFace,
   sceneFraming,
   shadeFill,
   type P3,
@@ -274,7 +275,13 @@ export function Iso3DView({ value, onChange, showMeasures }: Props) {
       };
     };
 
-    const polys = faces.map((face) => {
+    // Faces de volume qui tournent le dos à la caméra : jetées avant même
+    // d'être projetées. Un mur ne peut donc plus montrer ses deux faces à la
+    // fois, et aucun tri en profondeur n'a à les départager.
+    const cam = { ct, st, cp, sp };
+    const polys = faces
+      .filter((face) => !isHiddenFace(face, cam))
+      .map((face) => {
       const proj = face.pts.map(project);
       const depth = face.isFloor
         ? -Infinity
@@ -293,7 +300,7 @@ export function Iso3DView({ value, onChange, showMeasures }: Props) {
           ? '#0B0D12'
           : face.stroke ?? fill;
       return { proj, depth, fill, stroke };
-    });
+      });
 
     // Cotes insérées DANS le tri de profondeur : un mur proche recouvre
     // les cotes des éléments situés derrière lui (fini les fuites).
@@ -301,7 +308,15 @@ export function Iso3DView({ value, onChange, showMeasures }: Props) {
       | { kind: 'poly'; depth: number; proj: typeof polys[0]['proj']; fill: string; stroke: string }
       | { kind: 'dot'; depth: number; x: number; y: number; color: string }
       | { kind: 'label'; depth: number; x: number; y: number; angle: number; text: string }
-      | { kind: 'area'; depth: number; x: number; y: number; text: string; color: string };
+      | {
+          kind: 'area';
+          depth: number;
+          x: number;
+          y: number;
+          /** Nom de la pièce, tel qu'il est posé sur le plan 2D. */
+          name: string;
+          area: string;
+        };
     const items: Item[] = polys.map((p) => ({ kind: 'poly' as const, ...p }));
 
     // Semis du sol : même code que le plan 2D, projeté sur le plan y = 0.
@@ -318,18 +333,18 @@ export function Iso3DView({ value, onChange, showMeasures }: Props) {
           const q = project({ x: p.x, y: 0, z: p.z });
           items.push({ kind: 'dot', depth: -Infinity, x: q.sx, y: q.sy, color: dotColor });
         }
+        // Même cartouche qu'en 2D, au même endroit : le nom donné sur le
+        // plan se retrouve au centre de la pièce sur le modèle.
         const q = project({ x: room.centroid.x, y: 0, z: room.centroid.z });
-        const name = roomNames.get(room.roomId) ?? '';
-        const area = `${room.surface.exact ? '' : '≈ '}${room.surface.area
-          .toFixed(1)
-          .replace('.', ',')} m²`;
         items.push({
           kind: 'area',
           depth: -Infinity,
           x: q.sx,
           y: q.sy,
-          color: inkOn(base),
-          text: name ? `${name} · ${area}` : area,
+          name: roomNames.get(room.roomId) ?? '',
+          area: `${room.surface.exact ? '' : '≈ '}${room.surface.area
+            .toFixed(1)
+            .replace('.', ',')} m²`,
         });
       }
     }
@@ -491,16 +506,47 @@ export function Iso3DView({ value, onChange, showMeasures }: Props) {
               ) : item.kind === 'dot' ? (
                 <Circle key={i} cx={item.x} cy={item.y} r={1.1} fill={item.color} />
               ) : item.kind === 'area' ? (
-                <SvgText
-                  key={i}
-                  x={item.x}
-                  y={item.y}
-                  fontSize={12}
-                  fontWeight="800"
-                  fill={item.color}
-                  textAnchor="middle">
-                  {item.text}
-                </SvgText>
+                (() => {
+                  // Cartouche identique à celui du plan 2D : cadre, nom
+                  // au-dessus, surface en dessous.
+                  const label = item.name || item.area;
+                  const wpx = Math.max(46, label.length * 7 + 18);
+                  const hpx = item.name ? 38 : 24;
+                  return (
+                    <React.Fragment key={i}>
+                      <Rect
+                        x={item.x - wpx / 2}
+                        y={item.y - hpx / 2}
+                        width={wpx}
+                        height={hpx}
+                        rx={6}
+                        fill={c.surface}
+                        stroke={c.lineStrong}
+                        strokeWidth={1}
+                      />
+                      {item.name !== '' && (
+                        <SvgText
+                          x={item.x}
+                          y={item.y - 3}
+                          fontSize={11}
+                          fontWeight="700"
+                          fill={c.ink}
+                          textAnchor="middle">
+                          {item.name}
+                        </SvgText>
+                      )}
+                      <SvgText
+                        x={item.x}
+                        y={item.y + (item.name !== '' ? 12 : 4)}
+                        fontSize={item.name !== '' ? 10 : 11}
+                        fontWeight="700"
+                        fill={c.inkSoft}
+                        textAnchor="middle">
+                        {item.area}
+                      </SvgText>
+                    </React.Fragment>
+                  );
+                })()
               ) : (
                 <React.Fragment key={i}>
                   <SvgText

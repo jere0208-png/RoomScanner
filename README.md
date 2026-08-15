@@ -65,8 +65,12 @@ l'autre et ferait disparaître les surfaces au sol.
 
 RoomPlan classe les pièces (`livingRoom`, `kitchen`…) : le nom français est
 posé d'office, avec numérotation des doublons (« Chambre », « Chambre 2 »).
-En mode édition, toucher le sol d'une pièce la sélectionne — on la renomme ou
-on la retire du plan.
+En mode édition, **le cartouche est le bouton de renommage** : on touche le
+nom là où il s'affiche, sur le plan 2D. Une pièce encore anonyme affiche
+« Nommer » pour qu'il y ait toujours quelque chose à toucher. Le même
+cartouche — cadre, nom au-dessus, surface en dessous — est reporté au centre
+de la pièce sur la vue 3D. Toucher le sol d'une pièce la sélectionne, ce qui
+permet aussi de la retirer du plan.
 
 Android et iOS 16 restent mono-pièce : leur résultat à plat est remis dans le
 même moule (une pièce implicite `room-1`), et les scans enregistrés avant le
@@ -83,9 +87,35 @@ La grille de couleurs est recomposée, pas étirée : une colonne tous les 50 cm
 échantillonnée dans le morceau qu'elle recouvre. La fusion a lieu dans
 `finalize()` : **les scans déjà enregistrés gardent leurs murs d'origine**.
 
+### Des volumes, pas des plans posés les uns sur les autres
+
+C'est la règle qui rend le rendu 3D fiable, et elle a coûté deux itérations.
+
+**Tout est un solide fermé, et une face qui tourne le dos à la caméra n'est
+pas dessinée du tout.** Chaque face porte sa normale sortante (`Face3D.normal`)
+et `isHiddenFace()` la jette avant même la projection. Sans ça, les deux faces
+d'un mur — distantes de 14 cm — se disputaient l'affichage : découpées
+séparément en bandes de 60 cm, depuis des extrémités opposées et de longueurs
+différentes à cause des onglets, leurs bandes ne s'alignaient pas et le tri en
+profondeur les entrelaçait. Résultat : des rayures verticales sur tous les
+murs, visibles à l'arrêt et absentes pendant les gestes (où un pan = une seule
+bande). Aucun réglage de biais ne pouvait corriger ça — il fallait supprimer
+la question.
+
+**Une porte ou une fenêtre est un bloc, et le mur ne se construit pas
+dessus.** `assignOpenings()` rattache chaque ouverture au mur qui la porte
+(parallèle à 25° près, à moins de 60 cm, même pièce), puis `wallPanels()`
+découpe le mur autour : trumeau à gauche, trumeau à droite, linteau au-dessus,
+allège en dessous. Le bloc de menuiserie remplit le vide, en retrait de 22 %
+dans l'épaisseur pour que le tableau du mur se voie autour. Avant, l'ouverture
+était un plan sans épaisseur poussé de 12 cm devant le mur par un biais de
+tri : selon l'angle elle passait devant, derrière, ou se faisait couper en
+triangle. Plus aucun biais, plus aucun recouvrement, donc plus aucune couleur
+qui en mange une autre.
+
 ### Rendu 3D : ni couture, ni trait fantôme
 
-Trois règles, apprises à la dure sur un tri « du peintre » :
+Trois règles de plus, apprises à la dure sur un tri « du peintre » :
 
 1. **Les bandes ne doivent pas se voir.** Un pan est découpé tous les 60 cm
    pour que le tri en profondeur reste juste ; l'anticrénelage laissait une
@@ -196,7 +226,7 @@ nécessaire que si les fichiers Swift/Kotlin ou les dépendances natives changen
 ## Vérifications faites sur cette machine (Windows)
 
 - `npx tsc --noEmit` et `npx eslint src App.tsx` : aucun diagnostic.
-- `npx jest` : 57/57 tests verts (conversion matrice iOS→segment, extrémités
+- `npx jest` : 65/65 tests verts (conversion matrice iOS→segment, extrémités
   Android, soudure des coins et jonctions en T, onglets des murs, surface au
   sol, semis de points, lecture des textures, snap angulaire, projection
   mètres↔pixels, génération du PDF ; **multi-pièces** : découpe par pièce,
@@ -204,7 +234,11 @@ nécessaire que si les fichiers Swift/Kotlin ou les dépendances natives changen
   mise à plat d'un résultat de scan, migration des scans mono-pièce ;
   **rendu** : fusion des murs colinéaires — ordre, sens, T, pièces et
   hauteurs différentes —, recomposition de la grille de couleurs, contours
-  découpés en arêtes, cadrage identique en mode geste).
+  découpés en arêtes, cadrage identique en mode geste ; **volumes** :
+  normales sortantes unitaires, jamais deux faces opposées visibles à la
+  fois, rattachement des ouvertures à leur mur, découpe du mur en trumeaux /
+  linteau / allège, non-recouvrement des panneaux, porte rendue en bloc sans
+  biais de tri).
 - **Non vérifié ici** : la compilation Swift/Kotlin (impossible sans Mac /
   SDK Android). Les points d'attente connus sont notés ci-dessous.
 

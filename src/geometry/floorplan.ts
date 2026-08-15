@@ -211,7 +211,7 @@ function lineCross(p1: Pt, d1: Pt, p2: Pt, d2: Pt): Pt | null {
 }
 
 /** Distance d'un point à un segment, et position relative le long du segment. */
-function pointOnSeg(p: Pt, a: Pt, b: Pt): { dist: number; t: number } {
+export function pointOnSeg(p: Pt, a: Pt, b: Pt): { dist: number; t: number } {
   const dx = b.x - a.x;
   const dz = b.z - a.z;
   const len2 = dx * dx + dz * dz;

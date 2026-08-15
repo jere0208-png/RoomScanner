@@ -8,11 +8,13 @@
 import type { FloorData, ObjectData, SurfaceTexture } from 'react-native-room-scan';
 import {
   clampFootprint,
+  pointOnSeg,
   roomOf,
   roomParts,
   toFootprint,
   wallQuads,
   wallsCentroid,
+  WALL_T,
   type Pt,
   type RoomSurface,
   type WallSeg,
@@ -33,9 +35,37 @@ export interface Face3D {
   shade?: boolean;
   /** La teinte vient du scan : l'ombrage doit conserver sa couleur. */
   captured?: boolean;
-  /** Biais de tri (m) : les ouvertures passent juste devant leur mur. */
+  /** Biais de tri (m), pour départager deux faces à la même profondeur. */
   bias?: number;
   isFloor?: boolean;
+  /**
+   * Normale sortante d'une face de VOLUME. Sa présence dit que la face
+   * appartient à un solide fermé : quand elle tourne le dos à la caméra, on
+   * ne la dessine pas du tout. C'est ce qui empêche définitivement les deux
+   * faces d'un même mur — distantes de 14 cm — de se disputer l'affichage.
+   */
+  normal?: P3;
+}
+
+/** Orientation de la caméra, telle que les deux rendus la calculent. */
+export interface CameraTrig {
+  /** cos/sin de l'azimut. */
+  ct: number;
+  st: number;
+  /** cos/sin de l'inclinaison. */
+  cp: number;
+  sp: number;
+}
+
+/**
+ * Face d'un solide qui tourne le dos à la caméra : à jeter avant même de la
+ * projeter. La profondeur croît vers la caméra (`rz * sp + y * cp`), donc son
+ * gradient `(st·sp, cp, ct·sp)` est la direction de l'observateur.
+ */
+export function isHiddenFace(face: Face3D, cam: CameraTrig): boolean {
+  const n = face.normal;
+  if (!n) return false;
+  return n.x * cam.st * cam.sp + n.y * cam.cp + n.z * cam.ct * cam.sp <= 0;
 }
 
 /** Couleurs neutres du rendu (l'app suit son thème, le PDF le sien). */
@@ -85,6 +115,114 @@ const lerp2 = (P: Pt, Q: Pt, t: number): Pt => ({
   z: P.z + (Q.z - P.z) * t,
 });
 
+/** Normale sortante d'un pan p→q, avec la convention de `vquad`. */
+const outwardOf = (p: Pt, q: Pt): P3 => {
+  const dx = q.x - p.x;
+  const dz = q.z - p.z;
+  const len = Math.hypot(dx, dz) || 1;
+  return { x: -dz / len, y: 0, z: dx / len };
+};
+
+/** Ouverture rattachée à un mur, en fraction de longueur et en hauteur. */
+export interface WallHole {
+  seg: WallSeg;
+  t0: number;
+  t1: number;
+  y0: number;
+  y1: number;
+}
+
+/**
+ * Rattache chaque porte/fenêtre au mur qui la porte.
+ *
+ * RoomPlan livre les ouvertures comme des surfaces indépendantes, posées dans
+ * le plan de leur mur mais sans lien avec lui. Sans ce rattachement, on ne
+ * peut que les poser PAR-DESSUS le mur — et c'est exactement ce qui les
+ * faisait passer devant ou derrière selon l'angle de vue.
+ *
+ * La clé `used:<id>` marque les ouvertures effectivement rattachées.
+ */
+export function assignOpenings(
+  walls: WallSeg[],
+  openings: WallSeg[],
+  floorY: number,
+): Map<string, WallHole[]> {
+  const out = new Map<string, WallHole[]>();
+  for (const o of openings) {
+    const od = { x: o.b.x - o.a.x, z: o.b.z - o.a.z };
+    const ol = Math.hypot(od.x, od.z) || 1;
+    const ou = { x: od.x / ol, z: od.z / ol };
+    const mid = { x: (o.a.x + o.b.x) / 2, z: (o.a.z + o.b.z) / 2 };
+
+    let best: { wall: WallSeg; dist: number } | null = null;
+    for (const w of walls) {
+      if (roomOf(w) !== roomOf(o)) continue;
+      const wd = { x: w.b.x - w.a.x, z: w.b.z - w.a.z };
+      const wl = Math.hypot(wd.x, wd.z) || 1;
+      // Parallèle à moins de ~25°, et posée à même le mur.
+      if (Math.abs((wd.x * ou.x + wd.z * ou.z) / wl) < 0.9) continue;
+      const { dist } = pointOnSeg(mid, w.a, w.b);
+      if (dist > 0.6) continue;
+      if (!best || dist < best.dist) best = { wall: w, dist };
+    }
+    if (!best) continue;
+
+    const w = best.wall;
+    const wd = { x: w.b.x - w.a.x, z: w.b.z - w.a.z };
+    const wl2 = wd.x * wd.x + wd.z * wd.z || 1;
+    const along = (p: Pt) =>
+      ((p.x - w.a.x) * wd.x + (p.z - w.a.z) * wd.z) / wl2;
+    const ta = along(o.a);
+    const tb = along(o.b);
+    const t0 = Math.max(0, Math.min(ta, tb));
+    const t1 = Math.min(1, Math.max(ta, tb));
+    if (t1 - t0 < 1e-3) continue;
+    const y0 = Math.max(0, o.yCenter - o.height / 2 - floorY);
+    const y1 = Math.min(w.height, y0 + o.height);
+    if (y1 - y0 < 1e-3) continue;
+
+    const list = out.get(w.id) ?? [];
+    list.push({ seg: o, t0, t1, y0, y1 });
+    out.set(w.id, list);
+    out.set(`used:${o.id}`, []);
+  }
+  return out;
+}
+
+/** Un morceau plein de mur : trumeau, linteau ou allège. */
+export interface WallPanel {
+  t0: number;
+  t1: number;
+  y0: number;
+  y1: number;
+}
+
+/**
+ * Découpe un mur autour de ses ouvertures. Le mur ne se construit JAMAIS
+ * dans le vide laissé par une porte : à gauche et à droite un trumeau pleine
+ * hauteur, au-dessus un linteau, en dessous une allège s'il y en a une.
+ * Deux ouvertures qui se chevauchent sont fusionnées plutôt que superposées.
+ */
+export function wallPanels(holes: WallHole[], height: number): WallPanel[] {
+  if (holes.length === 0) return [{ t0: 0, t1: 1, y0: 0, y1: height }];
+  const sorted = [...holes].sort((a, b) => a.t0 - b.t0);
+  const out: WallPanel[] = [];
+  let cursor = 0;
+  for (const hole of sorted) {
+    const t0 = Math.max(cursor, hole.t0);
+    const t1 = Math.max(t0, Math.min(1, hole.t1));
+    if (t1 - t0 < 1e-4) continue;
+    if (t0 - cursor > 1e-4) out.push({ t0: cursor, t1: t0, y0: 0, y1: height });
+    if (hole.y0 > 1e-3) out.push({ t0, t1, y0: 0, y1: hole.y0 });
+    if (hole.y1 < height - 1e-3) {
+      out.push({ t0, t1, y0: hole.y1, y1: height });
+    }
+    cursor = t1;
+  }
+  if (cursor < 1 - 1e-4) out.push({ t0: cursor, t1: 1, y0: 0, y1: height });
+  return out;
+}
+
 const vquad = (p: Pt, q: Pt, yb: number, yt: number): P3[] => [
   { x: p.x, y: yb, z: p.z },
   { x: q.x, y: yb, z: q.z },
@@ -99,12 +237,21 @@ const vquad = (p: Pt, q: Pt, yb: number, yt: number): P3[] => [
  */
 export function shadeFill(face: Face3D, ct: number, st: number): string | null {
   if (!face.shade || !face.fill) return face.fill;
-  const a = face.pts[0];
-  const b = face.pts[1];
-  const dx = b.x - a.x;
-  const dz = b.z - a.z;
-  const len = Math.hypot(dx, dz) || 1;
-  const facing = ((-dz / len) * st + (dx / len) * ct + 1) / 2;
+  let nx: number;
+  let nz: number;
+  if (face.normal) {
+    nx = face.normal.x;
+    nz = face.normal.z;
+  } else {
+    const a = face.pts[0];
+    const b = face.pts[1];
+    const dx = b.x - a.x;
+    const dz = b.z - a.z;
+    const len = Math.hypot(dx, dz) || 1;
+    nx = -dz / len;
+    nz = dx / len;
+  }
+  const facing = (nx * st + nz * ct + 1) / 2;
   return face.captured
     ? mixHex(
         mixHex(face.fill, '#3B424E', 0.34),
@@ -240,13 +387,13 @@ export function buildScene(
    * plus proche, et on verrait le trait le traverser. Chaque arête est donc
    * un segment à part, trié à sa propre profondeur.
    */
-  const pushEdge = (p: P3, q: P3, stroke: string) => {
-    faces.push({ pts: [p, q], fill: null, stroke, bias: 0.004 });
+  const pushEdge = (p: P3, q: P3, stroke: string, normal?: P3) => {
+    faces.push({ pts: [p, q], fill: null, stroke, bias: 0.004, normal });
   };
 
   /** Contour d'un quadrilatère non découpé : un seul polygone suffit. */
-  const pushOutline = (pts: P3[], stroke: string) => {
-    faces.push({ pts, fill: null, stroke, bias: 0.004 });
+  const pushOutline = (pts: P3[], stroke: string, normal?: P3) => {
+    faces.push({ pts, fill: null, stroke, bias: 0.004, normal });
   };
 
   /**
@@ -267,8 +414,11 @@ export function buildScene(
       shade?: boolean;
       captured?: boolean;
       tex?: SurfaceTexture;
-      flipU?: boolean;
+      /** Position dans la texture aux extrémités p et q (0 = extrémité A). */
+      uFrom?: number;
+      uTo?: number;
       outline?: string;
+      normal?: P3;
     } = {},
   ) => {
     const cols = Math.max(1, Math.ceil(Math.hypot(q.x - p.x, q.z - p.z) / step));
@@ -281,8 +431,10 @@ export function buildScene(
         const bot = yt - ((yt - yb) * (r + 1)) / rows;
         let paint = fill;
         if (o.tex) {
-          const u = (i + 0.5) / cols;
-          const s = sampleTexture(o.tex, o.flipU ? 1 - u : u, (r + 0.5) / rows);
+          const uf = o.uFrom ?? 0;
+          const ut = o.uTo ?? 1;
+          const u = uf + (ut - uf) * ((i + 0.5) / cols);
+          const s = sampleTexture(o.tex, u, (r + 0.5) / rows);
           if (s) paint = s;
         }
         faces.push({
@@ -291,21 +443,23 @@ export function buildScene(
           stroke: null,
           shade: o.shade,
           captured: o.captured || !!o.tex,
+          normal: o.normal,
         });
       }
       if (!o.outline) continue;
+      // Les arêtes portent la normale de LEUR face : un contour ne survit
+      // jamais à la disparition du pan qu'il borde.
       if (cols === 1) {
-        pushOutline(vquad(s0, s1, yb, yt), o.outline);
+        pushOutline(vquad(s0, s1, yb, yt), o.outline, o.normal);
         continue;
       }
       // Découpé : seules les arêtes du POURTOUR sont tracées.
-      pushEdge({ x: s0.x, y: yt, z: s0.z }, { x: s1.x, y: yt, z: s1.z }, o.outline);
-      pushEdge({ x: s0.x, y: yb, z: s0.z }, { x: s1.x, y: yb, z: s1.z }, o.outline);
-      if (i === 0) {
-        pushEdge({ x: s0.x, y: yb, z: s0.z }, { x: s0.x, y: yt, z: s0.z }, o.outline);
-      }
+      const E = (a: P3, b: P3) => pushEdge(a, b, o.outline!, o.normal);
+      E({ x: s0.x, y: yt, z: s0.z }, { x: s1.x, y: yt, z: s1.z });
+      E({ x: s0.x, y: yb, z: s0.z }, { x: s1.x, y: yb, z: s1.z });
+      if (i === 0) E({ x: s0.x, y: yb, z: s0.z }, { x: s0.x, y: yt, z: s0.z });
       if (i === cols - 1) {
-        pushEdge({ x: s1.x, y: yb, z: s1.z }, { x: s1.x, y: yt, z: s1.z }, o.outline);
+        E({ x: s1.x, y: yb, z: s1.z }, { x: s1.x, y: yt, z: s1.z });
       }
     }
   };
@@ -318,9 +472,12 @@ export function buildScene(
     y: number,
     fill: string,
     outline?: string,
+    /** +1 = dessus d'un volume, −1 = dessous (linteau vu d'en dessous). */
+    facing: 1 | -1 = 1,
   ) => {
     const n = Math.max(1, Math.ceil(Math.hypot(e1b.x - e1a.x, e1b.z - e1a.z) / step));
     const at = (p: Pt): P3 => ({ x: p.x, y, z: p.z });
+    const normal: P3 = { x: 0, y: facing, z: 0 };
     for (let i = 0; i < n; i++) {
       const t0 = i / n;
       const t1 = (i + 1) / n;
@@ -328,24 +485,88 @@ export function buildScene(
       const c2 = lerp2(e1a, e1b, t1);
       const c3 = lerp2(e2a, e2b, t1);
       const c4 = lerp2(e2a, e2b, t0);
-      faces.push({ pts: [c1, c2, c3, c4].map(at), fill, stroke: null });
+      faces.push({ pts: [c1, c2, c3, c4].map(at), fill, stroke: null, normal });
       if (!outline) continue;
       if (n === 1) {
-        pushOutline([c1, c2, c3, c4].map(at), outline);
+        pushOutline([c1, c2, c3, c4].map(at), outline, normal);
         continue;
       }
-      pushEdge(at(c1), at(c2), outline);
-      pushEdge(at(c4), at(c3), outline);
-      if (i === 0) pushEdge(at(c1), at(c4), outline);
-      if (i === n - 1) pushEdge(at(c2), at(c3), outline);
+      pushEdge(at(c1), at(c2), outline, normal);
+      pushEdge(at(c4), at(c3), outline, normal);
+      if (i === 0) pushEdge(at(c1), at(c4), outline, normal);
+      if (i === n - 1) pushEdge(at(c2), at(c3), outline, normal);
+    }
+  };
+
+  /**
+   * Un VOLUME découpé dans l'épaisseur d'un mur, entre deux abscisses le long
+   * de celui-ci. `t0`/`t1` sont des fractions de la longueur du mur, `shrink`
+   * un retrait sur l'épaisseur (la porte est en retrait dans son tableau).
+   *
+   * Les quatre faces verticales, le dessus et le dessous portent chacun leur
+   * normale sortante : le rendu jette celles qui tournent le dos. Deux faces
+   * d'un même volume ne peuvent donc plus jamais se disputer l'affichage,
+   * quel que soit l'angle de vue — c'est ce qui faisait clignoter les murs.
+   */
+  const pushWallBlock = (
+    q: { a1: Pt; b1: Pt; b2: Pt; a2: Pt },
+    t0: number,
+    t1: number,
+    yb: number,
+    yt: number,
+    o: {
+      fill: string;
+      top: string;
+      stroke: string;
+      topStroke: string;
+      captured?: boolean;
+      /** Texture appliquée à la face +n (`plus`) ou −n. */
+      tex?: SurfaceTexture;
+      texOnPlus?: boolean;
+      shrink?: number;
+      /** Dessous fermé : un linteau se regarde par en dessous. */
+      closeBottom?: boolean;
+    },
+  ) => {
+    if (t1 - t0 < 1e-4 || yt - yb < 1e-4) return;
+    const s = o.shrink ?? 0;
+    // p1/q1 longent la face +n, p2/q2 la face −n.
+    const p1 = lerp2(lerp2(q.a1, q.b1, t0), lerp2(q.a2, q.b2, t0), s);
+    const r1 = lerp2(lerp2(q.a1, q.b1, t1), lerp2(q.a2, q.b2, t1), s);
+    const p2 = lerp2(lerp2(q.a2, q.b2, t0), lerp2(q.a1, q.b1, t0), s);
+    const r2 = lerp2(lerp2(q.a2, q.b2, t1), lerp2(q.a1, q.b1, t1), s);
+
+    const face = (p: Pt, r: Pt, tex?: SurfaceTexture, uFrom = 0, uTo = 1) =>
+      pushStrips(p, r, yb, yt, o.fill, {
+        shade: true,
+        captured: o.captured,
+        tex,
+        uFrom,
+        uTo,
+        outline: o.stroke,
+        normal: outwardOf(p, r),
+      });
+
+    face(p1, r1, o.texOnPlus ? o.tex : undefined, t0, t1);
+    face(r2, p2, o.texOnPlus ? undefined : o.tex, t1, t0);
+    // Tableaux (chants) : trop étroits pour mériter un découpage.
+    face(p2, p1);
+    face(r1, r2);
+    pushTopStrips(p1, r1, p2, r2, yt, o.top, o.topStroke);
+    if (o.closeBottom) {
+      pushTopStrips(r1, p1, r2, p2, yb, o.top, o.topStroke, -1);
     }
   };
 
   // --------------------------------------------------------------- murs
+  // Chaque ouverture est rattachée à son mur, puis le mur est bâti AUTOUR
+  // d'elle : trumeaux de part et d'autre, linteau au-dessus, allège en
+  // dessous. Plus rien ne se superpose, donc plus une seule couleur qui en
+  // recouvre une autre selon l'angle.
+  const holes = assignOpenings(walls, openings, floorY);
   for (const w of walls) {
     const q = quads.get(w.id);
     if (!q) continue;
-    const { a1, b1, b2, a2 } = q;
     // Seule la face tournée vers la pièce a été vue par la caméra — et c'est
     // le centre de SA pièce qui dit de quel côté elle regarde.
     const interior = interiorOf.get(roomOf(w)) ?? fallbackInterior;
@@ -356,56 +577,74 @@ export function buildScene(
       (interior.x - mid.x) * nrm.x + (interior.z - mid.z) * nrm.z > 0;
     const tex = opts.showTextures ? w.texture : undefined;
     const avg = opts.showTextures ? w.color : undefined;
+    const skin = {
+      fill: avg ?? pal.wall,
+      top: avg ? mixHex(avg, '#FFFFFF', 0.45) : pal.wallTop,
+      stroke: pal.wallStroke,
+      topStroke: pal.wallTopStroke,
+      captured: !!avg,
+      tex,
+      texOnPlus: plusIsInner,
+    };
 
-    for (const [p, r, inner, flipU] of [
-      [a1, b1, plusIsInner, false],
-      [b2, a2, !plusIsInner, true],
-    ] as [Pt, Pt, boolean, boolean][]) {
-      pushStrips(p, r, 0, w.height, avg ?? pal.wall, {
-        shade: true,
-        captured: !!avg,
-        tex: inner ? tex : undefined,
-        flipU,
-        outline: pal.wallStroke,
+    const mine = holes.get(w.id) ?? [];
+    for (const panel of wallPanels(mine, w.height)) {
+      pushWallBlock(q, panel.t0, panel.t1, panel.y0, panel.y1, {
+        ...skin,
+        closeBottom: panel.y0 > 1e-3,
       });
     }
-    // Chants : trop étroits pour être découpés.
-    for (const [p, r] of [
-      [a2, a1],
-      [b1, b2],
-    ] as const) {
-      faces.push({
-        pts: vquad(p, r, 0, w.height),
-        fill: avg ?? pal.wall,
-        stroke: pal.wallStroke,
-        shade: true,
-        captured: !!avg,
-      });
-    }
-    pushTopStrips(
-      a1,
-      b1,
-      a2,
-      b2,
-      w.height,
-      avg ? mixHex(avg, '#FFFFFF', 0.45) : pal.wallTop,
-      pal.wallTopStroke,
-    );
-  }
 
-  // -------------------------------------------------- portes / fenêtres
-  for (const o of openings) {
-    const yb = Math.max(0, o.yCenter - o.height / 2 - floorY);
-    const captured = opts.showTextures ? o.color : undefined;
-    faces.push({
-      pts: vquad(o.a, o.b, yb, yb + o.height),
-      fill: opts.colorOpenings
-        ? o.type === 'door'
+    // ---------------------------------------- portes / fenêtres du mur
+    for (const hole of mine) {
+      const captured = opts.showTextures ? hole.seg.color : undefined;
+      const paint = opts.colorOpenings
+        ? hole.seg.type === 'door'
           ? pal.door
           : pal.window
-        : captured ?? pal.opening,
-      stroke: null,
-      bias: 0.12,
+        : captured ?? pal.opening;
+      pushWallBlock(q, hole.t0, hole.t1, hole.y0, hole.y1, {
+        fill: paint,
+        top: mixHex(paint, '#FFFFFF', 0.3),
+        stroke: pal.wallStroke,
+        topStroke: pal.wallStroke,
+        captured: !!captured,
+        // En retrait dans l'épaisseur : le tableau du mur reste visible
+        // autour, et le bloc se lit comme une menuiserie posée dedans.
+        shrink: 0.22,
+        closeBottom: true,
+      });
+    }
+  }
+
+  // ------------------------- ouvertures sans mur d'accueil identifiable
+  // Rare (mur supprimé à l'édition) : le bloc est posé sur sa propre emprise.
+  for (const o of openings) {
+    if (holes.has(`used:${o.id}`)) continue;
+    const yb = Math.max(0, o.yCenter - o.height / 2 - floorY);
+    const captured = opts.showTextures ? o.color : undefined;
+    const paint = opts.colorOpenings
+      ? o.type === 'door'
+        ? pal.door
+        : pal.window
+      : captured ?? pal.opening;
+    const dx = o.b.x - o.a.x;
+    const dz = o.b.z - o.a.z;
+    const l = Math.hypot(dx, dz) || 1;
+    const h = { x: (-dz / l) * (WALL_T / 2), z: (dx / l) * (WALL_T / 2) };
+    const box = {
+      a1: { x: o.a.x + h.x, z: o.a.z + h.z },
+      b1: { x: o.b.x + h.x, z: o.b.z + h.z },
+      b2: { x: o.b.x - h.x, z: o.b.z - h.z },
+      a2: { x: o.a.x - h.x, z: o.a.z - h.z },
+    };
+    pushWallBlock(box, 0, 1, yb, yb + o.height, {
+      fill: paint,
+      top: mixHex(paint, '#FFFFFF', 0.3),
+      stroke: pal.wallStroke,
+      topStroke: pal.wallStroke,
+      captured: !!captured,
+      closeBottom: true,
     });
   }
 

@@ -63,7 +63,7 @@ export function ScanScreen() {
       <TouchableOpacity
         style={[styles.torchButton, torch && styles.torchButtonOn]}
         onPress={toggleTorch}>
-        <Svg width={18} height={18} viewBox="0 0 24 24">
+        <Svg width={21} height={21} viewBox="0 0 24 24">
           <Path
             d="M13 2 L5 13.5 h5 L8 22 l8.5 -11.5 h-5 z"
             stroke={torch ? '#0B0D12' : '#F4F6FA'}
@@ -105,8 +105,8 @@ export function ScanScreen() {
         <TouchableOpacity
           style={styles.pauseButton}
           onPress={paused ? resume : pause}>
-          {/* Icône dessinée : même hauteur (18) que l'éclair et la croix. */}
-          <Svg width={18} height={18} viewBox="0 0 24 24">
+          {/* Icône dessinée : même hauteur (21) que l'éclair et la croix. */}
+          <Svg width={21} height={21} viewBox="0 0 24 24">
             {paused ? (
               <Path
                 d="M8 4.5 L19.5 12 L8 19.5 z"

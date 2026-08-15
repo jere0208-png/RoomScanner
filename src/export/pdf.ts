@@ -21,6 +21,7 @@ import {
 import { dotStep, floorDots, mixHex } from '../geometry/appearance';
 import {
   buildScene,
+  isHiddenFace,
   sceneFraming,
   shadeFill,
   type P3,
@@ -426,16 +427,21 @@ function draw3DView(
     };
   };
 
-  const polys = faces.map((f) => {
-    const pts = f.pts.map(project);
-    const depth = f.isFloor
-      ? -Infinity
-      : pts.reduce((s, p) => s + p.depth, 0) / pts.length + (f.bias ?? 0);
-    const fill = shadeFill(f, ct, st);
-    // Pan sans contour propre : bordé de sa propre couleur, sinon la couture
-    // entre deux bandes voisines se voit à l'impression.
-    return { pts, depth, fill, stroke: f.stroke ?? fill };
-  });
+  // Même masquage des faces arrière que dans la vue de l'app : le PDF doit
+  // montrer exactement le même volume.
+  const cam = { ct, st, cp, sp };
+  const polys = faces
+    .filter((f) => !isHiddenFace(f, cam))
+    .map((f) => {
+      const pts = f.pts.map(project);
+      const depth = f.isFloor
+        ? -Infinity
+        : pts.reduce((s, p) => s + p.depth, 0) / pts.length + (f.bias ?? 0);
+      const fill = shadeFill(f, ct, st);
+      // Pan sans contour propre : bordé de sa propre couleur, sinon la couture
+      // entre deux bandes voisines se voit à l'impression.
+      return { pts, depth, fill, stroke: f.stroke ?? fill };
+    });
   // Cotes insérées dans le tri de profondeur : un mur proche les recouvre.
   type Item =
     | { kind: 'poly'; depth: number; pts: Pt[]; fill: string | null; stroke: string | null }

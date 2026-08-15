@@ -19,7 +19,15 @@ import {
   type WallSeg,
 } from '../src/geometry/floorplan';
 import { dotStep, floorDots, sampleTexture } from '../src/geometry/appearance';
-import { buildScene, sceneFraming, type ScenePalette } from '../src/geometry/scene3d';
+import {
+  assignOpenings,
+  buildScene,
+  isHiddenFace,
+  sceneFraming,
+  wallPanels,
+  type ScenePalette,
+  type WallHole,
+} from '../src/geometry/scene3d';
 import { buildScanPdf, toBase64 } from '../src/export/pdf';
 
 /** Palette neutre : les tests ne jugent que la géométrie et les relevés. */
@@ -445,14 +453,28 @@ describe('contours de la scène 3D', () => {
     seg('w', { x: 0, z: 3 }, { x: 0, z: 0 }),
   ];
 
+  /** Plus grande étendue horizontale d'une face (m). */
+  const span = (f: { pts: { x: number; z: number }[] }) => {
+    let max = 0;
+    for (const p of f.pts) {
+      for (const q of f.pts) {
+        max = Math.max(max, Math.hypot(p.x - q.x, p.z - q.z));
+      }
+    }
+    return max;
+  };
+
   it('ne pose aucun contour à cheval sur plusieurs bandes', () => {
     // Un contour d'un seul tenant sur un mur découpé se trierait à une
-    // profondeur moyenne, et traverserait les meubles placés devant.
+    // profondeur moyenne, et traverserait les meubles placés devant. Aucun
+    // contour ne doit donc dépasser une bande (60 cm) — en diagonale, plus
+    // l'épaisseur du mur pour le dessus des murs.
     const scene = buildScene(rect, [], [], { palette: TEST_PALETTE });
     const outlines = scene.faces.filter((f) => f.fill === null);
     expect(outlines.length).toBeGreaterThan(0);
-    // Les contours d'un pan découpé sont des arêtes : deux points.
-    expect(outlines.every((f) => f.pts.length === 2)).toBe(true);
+    expect(Math.max(...outlines.map(span))).toBeLessThan(0.6 + WALL_T + 0.02);
+    // Un mur de 4 m : un contour d'un seul tenant ferait cinq fois ça.
+    expect(Math.max(...outlines.map(span))).toBeLessThan(1);
   });
 
   it('garde les contours en mode geste, avec des pans d’un seul tenant', () => {
@@ -467,6 +489,142 @@ describe('contours de la scène 3D', () => {
     expect(
       coarse.faces.filter((f) => f.fill === null).every((f) => f.pts.length === 4),
     ).toBe(true);
+  });
+
+  it('donne une normale sortante à toute face de volume', () => {
+    // Sans normale, impossible de masquer la face arrière : les deux faces
+    // d'un mur, distantes de 14 cm, se disputaient l'affichage bande par
+    // bande — d'où les rayures verticales sur les murs.
+    const scene = buildScene(rect, [], [], { palette: TEST_PALETTE });
+    const solid = scene.faces.filter((f) => !f.isFloor);
+    expect(solid.length).toBeGreaterThan(0);
+    expect(solid.every((f) => f.normal !== undefined)).toBe(true);
+    // Normales unitaires.
+    for (const f of solid) {
+      const n = f.normal!;
+      expect(Math.hypot(n.x, n.y, n.z)).toBeCloseTo(1, 6);
+    }
+  });
+
+  it('ne montre jamais les deux faces d’un mur en même temps', () => {
+    const scene = buildScene(rect, [], [], { palette: TEST_PALETTE });
+    // Vue par défaut de l'app.
+    const rad = (d: number) => (d * Math.PI) / 180;
+    const cam = {
+      ct: Math.cos(rad(-32)),
+      st: Math.sin(rad(-32)),
+      cp: Math.cos(rad(58)),
+      sp: Math.sin(rad(58)),
+    };
+    const visible = scene.faces.filter((f) => !isHiddenFace(f, cam));
+    // Une face et son opposée ont des normales opposées : au plus une des
+    // deux survit, quelle que soit l'orientation.
+    for (const f of visible) {
+      const n = f.normal;
+      if (!n) continue;
+      const opposite = { ...f, normal: { x: -n.x, y: -n.y, z: -n.z } };
+      expect(isHiddenFace(opposite, cam)).toBe(true);
+    }
+    expect(visible.length).toBeLessThan(scene.faces.length);
+  });
+});
+
+describe('portes et fenêtres en volumes', () => {
+  const height = 2.5;
+  const rect = [
+    { ...seg('n', { x: 0, z: 0 }, { x: 4, z: 0 }), height },
+    { ...seg('e', { x: 4, z: 0 }, { x: 4, z: 3 }), height },
+    { ...seg('s', { x: 4, z: 3 }, { x: 0, z: 3 }), height },
+    { ...seg('w', { x: 0, z: 3 }, { x: 0, z: 0 }), height },
+  ];
+  /** Porte de 1 m au milieu du mur nord, du sol à 2,05 m. */
+  const porte: WallSeg = {
+    id: 'd1',
+    type: 'door',
+    a: { x: 1.5, z: 0 },
+    b: { x: 2.5, z: 0 },
+    height: 2.05,
+    yCenter: 1.025,
+  };
+  /** Fenêtre de 1,2 m sur le mur est, allège à 0,9 m. */
+  const fenetre: WallSeg = {
+    id: 'w1',
+    type: 'window',
+    a: { x: 4, z: 1 },
+    b: { x: 4, z: 2.2 },
+    height: 1.1,
+    yCenter: 1.45,
+  };
+
+  it('rattache chaque ouverture au mur qui la porte', () => {
+    const holes = assignOpenings(rect, [porte, fenetre], 0);
+    expect(holes.get('n')).toHaveLength(1);
+    expect(holes.get('e')).toHaveLength(1);
+    const d = holes.get('n')![0];
+    expect(d.t0).toBeCloseTo(1.5 / 4);
+    expect(d.t1).toBeCloseTo(2.5 / 4);
+    expect(d.y0).toBeCloseTo(0);
+    expect(d.y1).toBeCloseTo(2.05);
+  });
+
+  it('n’attrape pas une ouverture d’un mur perpendiculaire ou lointain', () => {
+    const ailleurs: WallSeg = { ...porte, id: 'x', a: { x: 1.5, z: 9 }, b: { x: 2.5, z: 9 } };
+    expect(assignOpenings(rect, [ailleurs], 0).size).toBe(0);
+  });
+
+  it('bâtit le mur AUTOUR de la porte, jamais dedans', () => {
+    const holes = assignOpenings(rect, [porte], 0);
+    const panels = wallPanels(holes.get('n')!, height);
+    // Trumeau gauche, linteau au-dessus de la porte, trumeau droit.
+    expect(panels).toHaveLength(3);
+    expect(panels[0]).toMatchObject({ t0: 0, y0: 0, y1: height });
+    expect(panels[1].y0).toBeCloseTo(2.05);
+    expect(panels[1].y1).toBeCloseTo(height);
+    expect(panels[2].t1).toBe(1);
+    // Aucun morceau plein ne recouvre le vide de la porte.
+    const dans = panels.filter(
+      (p) => p.t0 < 0.6 && p.t1 > 0.4 && p.y0 < 2 && p.y1 > 0.1,
+    );
+    expect(dans).toHaveLength(0);
+  });
+
+  it('ajoute une allège sous une fenêtre', () => {
+    const holes = assignOpenings(rect, [fenetre], 0);
+    const panels = wallPanels(holes.get('e')!, height);
+    // Deux trumeaux, une allège, un linteau.
+    expect(panels).toHaveLength(4);
+    expect(panels.some((p) => p.y0 === 0 && Math.abs(p.y1 - 0.9) < 1e-6)).toBe(true);
+  });
+
+  it('fusionne deux ouvertures qui se chevauchent au lieu de les empiler', () => {
+    const a: WallHole = { seg: porte, t0: 0.2, t1: 0.5, y0: 0, y1: 2 };
+    const b: WallHole = { seg: porte, t0: 0.4, t1: 0.7, y0: 0, y1: 2 };
+    const panels = wallPanels([a, b], height);
+    // Aucun panneau ne doit se superposer à un autre.
+    for (let i = 0; i < panels.length; i++) {
+      for (let j = i + 1; j < panels.length; j++) {
+        const p = panels[i];
+        const q = panels[j];
+        const overlap =
+          Math.min(p.t1, q.t1) - Math.max(p.t0, q.t0) > 1e-6 &&
+          Math.min(p.y1, q.y1) - Math.max(p.y0, q.y0) > 1e-6;
+        expect(overlap).toBe(false);
+      }
+    }
+  });
+
+  it('rend la porte comme un bloc, sans plan flottant devant le mur', () => {
+    const scene = buildScene(rect, [porte], [], {
+      palette: TEST_PALETTE,
+      colorOpenings: true,
+    });
+    const portes = scene.faces.filter((f) => f.fill === TEST_PALETTE.door);
+    // Un bloc, donc plusieurs faces orientées différemment — pas un seul plan.
+    expect(portes.length).toBeGreaterThan(3);
+    expect(portes.every((f) => f.normal !== undefined)).toBe(true);
+    // Plus aucun biais de tri : c'est lui qui faisait passer la porte devant
+    // ou derrière le mur selon l'angle.
+    expect(portes.every((f) => (f.bias ?? 0) < 0.01)).toBe(true);
   });
 
   it('cadre à l’identique en mode geste : le modèle ne saute pas', () => {
