@@ -35,6 +35,12 @@ export interface WallSeg {
    * Elle ne se dessine pas comme un panneau mais comme un vide.
    */
   open?: boolean;
+  /**
+   * Confiance de RoomPlan dans cette détection (`low`, `medium`, `high`).
+   * C'est lui qui sait le mieux de quoi il doute : le diagnostic du plan
+   * s'en sert pour désigner les murs à vérifier.
+   */
+  confidence?: string;
 }
 
 /** Pièce d'un élément, valeur par défaut comprise. */
@@ -96,6 +102,7 @@ export function toSegment(s: SurfaceData, roomId?: string): WallSeg {
     texture: s.texture,
     roomId,
     open: isOpenPassage(s) || undefined,
+    confidence: s.confidence,
   };
   if (s.ax !== undefined) {
     return {

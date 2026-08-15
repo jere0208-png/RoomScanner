@@ -41,6 +41,7 @@ import {
   type WallHole,
 } from '../src/geometry/scene3d';
 import { buildScanPdf, toBase64 } from '../src/export/pdf';
+import { checkPlan } from '../src/geometry/diagnostics';
 
 /** Palette neutre : les tests ne jugent que la géométrie et les relevés. */
 const TEST_PALETTE: ScenePalette = {
@@ -602,6 +603,83 @@ describe('detectRooms', () => {
     ]);
     expect(found).toHaveLength(2);
     expect(found.map((r) => Math.round(r.area))).toEqual([12, 9]);
+  });
+});
+
+describe('diagnostic du plan', () => {
+  const carre = [
+    seg('n', { x: 0, z: 0 }, { x: 4, z: 0 }),
+    seg('e', { x: 4, z: 0 }, { x: 4, z: 3 }),
+    seg('s', { x: 4, z: 3 }, { x: 0, z: 3 }),
+    seg('w', { x: 0, z: 3 }, { x: 0, z: 0 }),
+  ];
+  const rooms = [
+    { id: 'room-1', name: 'Salon', wallIds: carre.map((w) => w.id) },
+  ];
+
+  it('ne trouve rien à redire sur un plan sain', () => {
+    expect(checkPlan(carre, rooms)).toHaveLength(0);
+  });
+
+  it('reprend la confiance que RoomPlan accorde à ses murs', () => {
+    // C'est lui qui sait le mieux de quoi il doute — et on jetait l'info.
+    const doute = [...carre.slice(0, 3), { ...carre[3], confidence: 'low' }];
+    const issues = checkPlan(doute, rooms);
+    const i = issues.find((x) => x.kind === 'confiance');
+    expect(i).toBeDefined();
+    expect(i!.wallId).toBe('w');
+    expect(i!.severity).toBe('alerte');
+  });
+
+  it('signale un contour qui ne se referme pas, en nommant la pièce', () => {
+    const ouvert = carre.slice(0, 3);
+    const i = checkPlan(ouvert, [
+      { id: 'room-1', name: 'Salon', wallIds: ouvert.map((w) => w.id) },
+    ]).find((x) => x.kind === 'contour');
+    expect(i?.severity).toBe('alerte');
+    expect(i?.message).toContain('Salon');
+  });
+
+  it('distingue deux murs superposés de deux murs bout à bout', () => {
+    const double = [...carre, seg('bis', { x: 0.3, z: 0.06 }, { x: 3.6, z: 0.06 })];
+    expect(checkPlan(double, rooms).some((i) => i.kind === 'doublon')).toBe(true);
+
+    // Bout à bout, c'est un mur coupé — surtout pas un doublon.
+    const suite = [
+      seg('a', { x: 0, z: 0 }, { x: 2, z: 0 }),
+      seg('b', { x: 2, z: 0 }, { x: 4, z: 0 }),
+      ...carre.slice(1),
+    ];
+    expect(
+      checkPlan(suite, [{ id: 'room-1', wallIds: suite.map((w) => w.id) }]).some(
+        (i) => i.kind === 'doublon',
+      ),
+    ).toBe(false);
+  });
+
+  it('signale un éclat de mur et une hauteur aberrante', () => {
+    const sale = [
+      ...carre.slice(0, 3),
+      { ...carre[3], height: 4.2 },
+      seg('mini', { x: 1, z: 1 }, { x: 1.12, z: 1 }),
+    ];
+    const kinds = checkPlan(sale, rooms).map((i) => i.kind);
+    expect(kinds).toContain('murCourt');
+    expect(kinds).toContain('hauteur');
+  });
+
+  it('met les alertes en tête et propose un geste à chaque fois', () => {
+    const sale = [
+      ...carre.slice(0, 3),
+      { ...carre[3], confidence: 'low' },
+      seg('mini', { x: 1, z: 1 }, { x: 1.12, z: 1 }),
+    ];
+    const issues = checkPlan(sale, rooms);
+    expect(issues.length).toBeGreaterThan(1);
+    expect(issues[0].severity).toBe('alerte');
+    expect(issues.every((i) => i.hint.length > 10)).toBe(true);
+    // Chaque constat désigne un élément : sans ça, on ne saurait où aller.
+    expect(issues.every((i) => i.wallId || i.roomId)).toBe(true);
   });
 });
 

@@ -127,6 +127,26 @@ la pièce et bornées au cadre : jamais sur le mur, jamais hors de l'écran. La
 barre du bas, qui débordait dès que le clavier montait, a disparu ; seule la
 saisie de la cote subsiste, en haut du plan.
 
+### Diagnostic du plan
+
+L'app sait tout corriger — supprimer un mur, en ajouter un, redresser,
+fusionner ou scinder une pièce. Elle ne disait pas OÙ regarder : à charge de
+l'utilisateur de repérer lui-même le mur douteux dans un plan qui, de loin,
+paraît propre.
+
+`checkPlan()` rassemble ce qu'on peut affirmer sans se tromper. D'abord ce que
+**RoomPlan signale lui-même** : chaque surface arrive avec une `confidence`,
+que `toSegment` jetait jusqu'ici. Puis ce que la géométrie trahit : un contour
+qui ne se referme pas, deux murs posés l'un sur l'autre (distingués de deux
+murs bout à bout, qui sont un mur coupé), un éclat de moins de 25 cm, une
+hauteur qui détonne de plus de 40 cm, une « pièce » de moins de 1,5 m².
+
+Chaque constat porte **le geste qui le règle** et **désigne son élément** : un
+appui l'amène sous les yeux, sélectionné, en mode édition. Les alertes — celles
+qui rendent le plan faux — passent devant les simples vérifications. La
+pastille ne s'affiche que s'il y a quelque chose à dire, et devient rouge s'il
+y a une alerte.
+
 ### Redresser le plan
 
 Un scan LiDAR ne donne jamais un angle droit exact : on récolte des coins à
@@ -388,7 +408,7 @@ passe inaperçu jusqu'à la CI. C'est arrivé une fois.
 ## Vérifications faites sur cette machine (Windows)
 
 - `npx tsc --noEmit` et `npx eslint src App.tsx` : aucun diagnostic.
-- `npx jest` : 116/116 tests verts (conversion matrice iOS→segment, extrémités
+- `npx jest` : 122/122 tests verts (conversion matrice iOS→segment, extrémités
   Android, soudure des coins et jonctions en T, onglets des murs, surface au
   sol, semis de points, lecture des textures, snap angulaire, projection
   mètres↔pixels, génération du PDF ; **multi-pièces** : découpe par pièce,

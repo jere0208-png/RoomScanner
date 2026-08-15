@@ -41,6 +41,7 @@ import {
 import { hasCapturedColors } from '../geometry/appearance';
 import { frCategory, ROOM_NAME_CHOICES } from '../geometry/furniture';
 import { buildObj, objFilename } from '../export/model3d';
+import { checkPlan, type PlanIssue } from '../geometry/diagnostics';
 import { useScanStore } from '../store/scanStore';
 
 type Tab = '2d' | '3d';
@@ -101,6 +102,8 @@ export function ResultScreen() {
   // Pièce visée par l'outil « nom de pièce » et par la suppression.
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [naming, setNaming] = useState(false);
+  // Diagnostic du plan : ce dont il faut se méfier après un scan.
+  const [checking, setChecking] = useState(false);
   // Vue 3D : bascule « vue de dessus », comme un plan.
   const [view3d, setView3d] = useState<View3DParams>(DEFAULT_VIEW3D);
   // Coupe : index de la pièce isolée en 3D (-1 = tout le logement).
@@ -183,6 +186,26 @@ export function ResultScreen() {
   const targetExtent = targetPart?.surface
     ? roomExtent(targetPart.surface.pts)
     : { width: 0, depth: 0, angle: 0 };
+  const issues = checkPlan(walls, rooms);
+  const alertes = issues.filter((i) => i.severity === 'alerte').length;
+
+  /** Amène sous les yeux l'élément visé par un constat. */
+  const goToIssue = (issue: PlanIssue) => {
+    setChecking(false);
+    setTab('2d');
+    setEditMode(true);
+    setSelectedObjectId(null);
+    if (issue.wallId) {
+      setSelectedRoomId(null);
+      setSelectedWallId(issue.wallId);
+      const wall = walls.find((w) => w.id === issue.wallId);
+      setLengthInput(wall ? segLength(wall).toFixed(2).replace('.', ',') : '');
+    } else if (issue.roomId) {
+      setSelectedWallId(null);
+      setSelectedRoomId(issue.roomId);
+    }
+  };
+
   // Le bouton « Couleurs » n'a de sens que si le scan en a relevé.
   const colorsAvailable = hasCapturedColors(
     walls,
@@ -397,6 +420,13 @@ export function ResultScreen() {
             showsHorizontalScrollIndicator={false}
             style={styles.planToolsScroll}
             contentContainerStyle={styles.planTools}>
+            {issues.length > 0 && (
+              <ToolPill
+                icon="check"
+                active={alertes > 0}
+                onPress={() => setChecking(true)}
+              />
+            )}
             <ToolPill
               icon="reset"
               active={false}
@@ -758,6 +788,46 @@ export function ResultScreen() {
         </View>
       )}
 
+      {/* ---------- Diagnostic du plan ---------- */}
+      <Modal visible={checking} transparent animationType="fade">
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>
+              {alertes > 0
+                ? `${alertes} point${alertes > 1 ? 's' : ''} à corriger`
+                : 'Rien de bloquant'}
+            </Text>
+            <Text style={styles.modalSubtitle}>
+              Touchez une ligne pour aller voir l'élément concerné sur le plan.
+            </Text>
+            <ScrollView style={styles.issueScroll}>
+              {issues.map((issue, i) => (
+                <TouchableOpacity
+                  key={`${issue.kind}-${issue.wallId ?? issue.roomId ?? i}`}
+                  style={styles.issueRow}
+                  onPress={() => goToIssue(issue)}>
+                  <View
+                    style={[
+                      styles.issueDot,
+                      issue.severity === 'alerte' && styles.issueDotAlert,
+                    ]}
+                  />
+                  <View style={styles.issueTexts}>
+                    <Text style={styles.issueMessage}>{issue.message}</Text>
+                    <Text style={styles.issueHint}>{issue.hint}</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity
+              style={styles.modalGhost}
+              onPress={() => setChecking(false)}>
+              <Text style={styles.modalGhostText}>Fermer</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       {/* ---------- Nom de la pièce : liste plutôt que clavier ---------- */}
       <Modal visible={naming} transparent animationType="fade">
         <View style={styles.modalBackdrop}>
@@ -882,7 +952,8 @@ type ToolIcon =
   | 'rooms'
   | 'addWall'
   | 'undo'
-  | 'square';
+  | 'square'
+  | 'check';
 
 /** Tracés 24×24 des icônes d'outils (trait simple, lisible en 18 px). */
 const TOOL_PATHS: Record<ToolIcon, { d: string; fill?: boolean }[]> = {
@@ -923,6 +994,13 @@ const TOOL_PATHS: Record<ToolIcon, { d: string; fill?: boolean }[]> = {
   model: [
     { d: 'M12 3.2 l7.8 4.4 v8.8 L12 20.8 l-7.8 -4.4 V7.6 z' },
     { d: 'M12 12 l7.8 -4.4 M12 12 L4.2 7.6 M12 12 v8.8' },
+  ],
+  // Loupe : ce que le plan a d'incertain.
+  check: [
+    { d: 'M11 3.5 a7.5 7.5 0 1 0 0 15 a7.5 7.5 0 1 0 0 -15 z' },
+    { d: 'M16.5 16.5 L21 21' },
+    { d: 'M11 7.5 v4' },
+    { d: 'M11 14.5 h0.01' },
   ],
   // Équerre de dessinateur : le geste de remettre le plan d'aplomb.
   square: [
@@ -1225,6 +1303,26 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     marginLeft: 8,
   },
   roomActionText: { color: c.inkSoft, fontWeight: '700', fontSize: 13.5 },
+  issueScroll: { maxHeight: 320, marginTop: 4 },
+  issueRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingVertical: 11,
+    borderBottomWidth: 1,
+    borderBottomColor: c.line,
+  },
+  issueDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginTop: 5,
+    marginRight: 11,
+    backgroundColor: c.inkFaint,
+  },
+  issueDotAlert: { backgroundColor: c.danger },
+  issueTexts: { flex: 1 },
+  issueMessage: { color: c.ink, fontSize: 14.5, fontWeight: '600' },
+  issueHint: { color: c.inkFaint, fontSize: 12.5, marginTop: 2, lineHeight: 17 },
   nameScroll: { maxHeight: 260 },
   nameGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
   nameChip: {
