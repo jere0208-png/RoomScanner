@@ -50,6 +50,7 @@ import { checkPlan } from '../geometry/diagnostics';
 import {
   checkElectrical,
   materialList,
+  type ElecIssue,
   roomInputsOf,
   roomsInAlert,
   wallToRooms,
@@ -108,6 +109,7 @@ export function ResultScreen() {
   const openings = useScanStore((s) => s.openings);
   const fixtures = useScanStore((s) => s.fixtures);
   const addFixture = useScanStore((s) => s.addFixture);
+  const moveFixture = useScanStore((s) => s.moveFixture);
 
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
   const [wInput, setWInput] = useState('');
@@ -385,12 +387,42 @@ export function ResultScreen() {
   };
 
   /** Pose l'appareil sur ce mur et ouvre aussitot le mur vu de face. */
-  const placeFixture = (kind: FixtureKind, wallId: string) => {
+  const placeFixture = (kind: FixtureKind, wallId: string, height?: number) => {
     const id = addFixture(kind, wallId);
     setPendingKind(null);
     if (!id) return;
+    // Une prise de plan de travail arrive directement à sa hauteur : la
+    // corriger juste après, à la main, serait un geste de trop.
+    if (height !== undefined) {
+      const pose = useScanStore.getState().fixtures.find((f) => f.id === id);
+      if (pose) moveFixture(id, pose.along, height);
+    }
     setElecWallId(wallId);
     setElecSel(id);
+    setElecView('mur');
+    setElecOpen(true);
+  };
+
+  /**
+   * Le geste qui règle le constat, appliqué séance tenante, puis le mur
+   * s'ouvre de face pour qu'on VOIE le résultat. Constater sans proposer
+   * laissait l'utilisateur chercher tout seul quoi faire du rouge.
+   */
+  const applyFix = (issue: ElecIssue) => {
+    const fix = issue.fix;
+    if (!fix) {
+      if (selectedWallId) openWallElevation(selectedWallId);
+      return;
+    }
+    if (fix.type === 'poser') {
+      if (selectedWallId) placeFixture(fix.kind, selectedWallId, fix.height);
+      return;
+    }
+    const cible = fixtures.find((f) => f.id === fix.fixtureId);
+    if (!cible) return;
+    moveFixture(cible.id, cible.along, fix.height);
+    setElecWallId(cible.wallId);
+    setElecSel(cible.id);
     setElecView('mur');
     setElecOpen(true);
   };
@@ -836,6 +868,22 @@ export function ResultScreen() {
               <Text style={styles.elecCardTitle}>{wallIssues[0].message}</Text>
             </View>
             <Text style={styles.elecCardRule}>{wallIssues[0].regle}</Text>
+            <View style={styles.elecCardActions}>
+              <TouchableOpacity
+                style={styles.elecFix}
+                onPress={() => applyFix(wallIssues[0])}>
+                <Text style={styles.elecFixText}>
+                  {wallIssues[0].fix?.label ?? 'Ouvrir le mur'}
+                </Text>
+              </TouchableOpacity>
+              {selectedWallId && (
+                <TouchableOpacity
+                  style={styles.elecSee}
+                  onPress={() => openWallElevation(selectedWallId)}>
+                  <Text style={styles.elecSeeText}>Voir le mur</Text>
+                </TouchableOpacity>
+              )}
+            </View>
             {wallIssues.length > 1 && (
               <TouchableOpacity onPress={() => setChecking(true)}>
                 <Text style={styles.elecCardMore}>
@@ -1910,8 +1958,23 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     color: c.blue,
     fontSize: 12,
     fontWeight: '700',
-    marginTop: 7,
+    marginTop: 9,
   },
+  elecCardActions: { flexDirection: 'row', gap: 8, marginTop: 10 },
+  elecFix: {
+    backgroundColor: c.blue,
+    borderRadius: radius.sm,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+  },
+  elecFixText: { color: '#FFFFFF', fontSize: 12.5, fontWeight: '800' },
+  elecSee: {
+    backgroundColor: c.surfaceSunken,
+    borderRadius: radius.sm,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+  },
+  elecSeeText: { color: c.inkSoft, fontSize: 12.5, fontWeight: '700' },
   elecScroll: { maxHeight: 340 },
   elecFamily: {
     color: c.inkFaint,

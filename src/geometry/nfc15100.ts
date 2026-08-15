@@ -237,6 +237,18 @@ const SOCLES: FixtureKind[] = ['prise', 'prise2'];
 
 // ------------------------------------------------------------- constats
 
+/**
+ * Le geste qui règle le constat.
+ *
+ * Un défaut qu'on se contente d'afficher laisse l'utilisateur chercher tout
+ * seul où et comment le corriger. Chaque constat porte donc, quand elle
+ * existe, l'action qui l'efface — poser l'appareil qui manque, ou remettre
+ * à sa hauteur celui qui est mal posé.
+ */
+export type ElecFix =
+  | { type: 'poser'; kind: FixtureKind; height?: number; label: string }
+  | { type: 'hauteur'; fixtureId: string; height: number; label: string };
+
 export interface ElecIssue {
   roomId?: string;
   fixtureId?: string;
@@ -245,6 +257,8 @@ export interface ElecIssue {
   message: string;
   /** La règle, en une ou deux phrases. */
   regle: string;
+  /** Comment le régler, s'il y a un geste évident. */
+  fix?: ElecFix;
 }
 
 export interface RoomInput {
@@ -281,6 +295,12 @@ export function checkElectrical(
     if (!rule) continue;
     const spec = FIXTURES[f.kind];
     const cm = Math.round(f.height * 100);
+    const remise: ElecFix = {
+      type: 'hauteur',
+      fixtureId: f.id,
+      height: spec.std,
+      label: `Remettre à ${Math.round(spec.std * 100)} cm`,
+    };
     if (rule.min !== undefined && f.height < rule.min - 1e-6) {
       out.push({
         roomId: roomOfFixture(f),
@@ -288,6 +308,7 @@ export function checkElectrical(
         severity: 'alerte',
         message: `${spec.label} posée à ${cm} cm : trop bas`,
         regle: rule.regle,
+        fix: remise,
       });
     } else if (rule.max !== undefined && f.height > rule.max + 1e-6) {
       out.push({
@@ -296,6 +317,7 @@ export function checkElectrical(
         severity: 'alerte',
         message: `${spec.label} posée à ${cm} cm : trop haut`,
         regle: rule.regle,
+        fix: remise,
       });
     }
   }
@@ -319,6 +341,11 @@ export function checkElectrical(
           `${req.socles} exigé${req.socles > 1 ? 's' : ''} — il en manque ` +
           `${manque}`,
         regle: req.regle,
+        fix: {
+          type: 'poser',
+          kind: 'prise',
+          label: manque > 1 ? 'Poser une prise' : 'Poser la prise manquante',
+        },
       });
     }
     if (rj45 < req.rj45) {
@@ -327,6 +354,7 @@ export function checkElectrical(
         severity: 'alerte',
         message: `${label} : aucune prise RJ45`,
         regle: req.regle,
+        fix: { type: 'poser', kind: 'rj45', label: 'Poser une prise RJ45' },
       });
     }
     if (req.surPlan > 0) {
@@ -344,6 +372,12 @@ export function checkElectrical(
             'Quatre des six socles de la cuisine se posent au-dessus du ' +
             'plan de travail. L’app les reconnaît à leur hauteur d’axe, ' +
             'à partir de 90 cm.',
+          fix: {
+            type: 'poser',
+            kind: 'prise',
+            height: 1.1,
+            label: 'Poser une prise à 110 cm',
+          },
         });
       }
     }

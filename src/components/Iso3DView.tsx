@@ -400,7 +400,16 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
           haut?: string;
           bord?: string;
         }
-      | { kind: 'label'; depth: number; x: number; y: number; angle: number; text: string }
+      | {
+          kind: 'label';
+          depth: number;
+          x: number;
+          y: number;
+          angle: number;
+          text: string;
+          /** Les cotes de détail apparaissent en fondu, avec le zoom. */
+          opacity: number;
+        }
       | {
           kind: 'area';
           depth: number;
@@ -480,16 +489,30 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
     }
 
     if (showMeasures && !interacting) {
+      /**
+       * Niveau de détail, de 0 à 1, piloté par le zoom — la même idée qu'au
+       * plan 2D. De loin, on ne garde que les grandes cotes : une vue
+       * criblée de nombres ne se lit pas. En s'approchant, les petites
+       * arêtes et les hauteurs sous plafond de CHAQUE mur apparaissent en
+       * fondu, sans jamais sauter à l'écran.
+       */
+      const detail = Math.max(0, Math.min(1, (scale - 55) / 45));
       const edgeLabel = (
         p0: { sx: number; sy: number; depth: number },
         p1: { sx: number; sy: number; depth: number },
         text: string,
+        /** Cote de détail : elle n'existe qu'une fois assez zoomé. */
+        fine = false,
       ) => {
         const dx = p1.sx - p0.sx;
         const dy = p1.sy - p0.sy;
         const norm = Math.hypot(dx, dy) || 1;
-        // Arête trop courte à l'écran : la cote chevaucherait ses voisines.
-        if (norm < 46) return;
+        // Sous 22 px, le texte serait plus long que l'arête qu'il cote :
+        // aucun zoom ne le rendrait lisible.
+        if (norm < 22) return;
+        const courte = norm < 46;
+        const opacity = fine || courte ? detail : 1;
+        if (opacity < 0.03) return;
         let angle = (Math.atan2(dy, dx) * 180) / Math.PI;
         if (angle > 90) angle -= 180;
         if (angle < -90) angle += 180;
@@ -502,6 +525,7 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
           y: (p0.sy + p1.sy) / 2 + n.y * 9,
           angle,
           text,
+          opacity,
         });
       };
       const seenHeights = new Set<string>();
@@ -509,12 +533,14 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
         const pA = project({ x: w.a.x, y: w.height, z: w.a.z });
         const pB = project({ x: w.b.x, y: w.height, z: w.b.z });
         edgeLabel(pA, pB, `${segLength(w).toFixed(2).replace('.', ',')} m`);
+        // La hauteur sous plafond : une seule de loin — elle est la même
+        // partout —, puis celle de chaque mur quand on s'approche, sur son
+        // arête verticale.
         const hKey = w.height.toFixed(2);
-        if (!seenHeights.has(hKey)) {
-          seenHeights.add(hKey);
-          const p0 = project({ x: w.a.x, y: 0, z: w.a.z });
-          edgeLabel(p0, pA, `${hKey.replace('.', ',')} m`);
-        }
+        const premiere = !seenHeights.has(hKey);
+        seenHeights.add(hKey);
+        const p0 = project({ x: w.a.x, y: 0, z: w.a.z });
+        edgeLabel(p0, pA, `${hKey.replace('.', ',')} m`, !premiere);
       }
     }
 
@@ -747,7 +773,7 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
                   );
                 })()
               ) : (
-                <React.Fragment key={i}>
+                <G key={i} opacity={item.opacity}>
                   <SvgText
                     x={item.x}
                     y={item.y}
@@ -770,7 +796,7 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
                     transform={`rotate(${item.angle}, ${item.x}, ${item.y})`}>
                     {item.text}
                   </SvgText>
-                </React.Fragment>
+                </G>
               ),
             )}
           </Svg>

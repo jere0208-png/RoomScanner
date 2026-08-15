@@ -217,6 +217,13 @@ prévoit toute seule. Ce cas ressort en information, jamais en alerte : crier
 au défaut là où la norme ne dit rien décrédibiliserait tous les autres
 constats.
 
+**Le mur rouge propose la correction, il ne se contente pas de la
+constater.** La carte porte le geste qui efface le défaut — « Poser la prise
+manquante », « Poser une prise à 110 cm », « Remettre à 110 cm » — et
+l'applique séance tenante, puis ouvre le mur de face pour qu'on voie le
+résultat. Un défaut qu'on se contente d'afficher laisse chercher tout seul
+quoi en faire.
+
 **Ce qui alerte se voit sans ouvrir un menu.** Les murs qui bordent une pièce
 en défaut passent en **rouge foncé** — assez sombre pour rester un mur poché,
 assez rouge pour qu'on ne le confonde pas ; la sélection, elle, reste bleue,
@@ -334,6 +341,15 @@ métré par pièce, vues 3D), **modèle 3D** (OBJ du plan retouché) ou **image*
 double emploi et encombraient une barre déjà chargée.
 
 ### Cotes : deux niveaux de détail
+
+**En 3D aussi.** De loin, seules les grandes cotes : une vue criblée de
+nombres ne se lit pas. En s'approchant (au-delà de 55 px par mètre), les
+arêtes trop courtes pour être cotées jusque-là apparaissent en fondu, et la
+hauteur sous plafond, jusqu'alors affichée une seule fois — elle est la même
+partout —, se pose sur l'arête verticale de **chaque** mur. Sous 22 px
+d'arête, rien : le texte serait plus long que ce qu'il cote, aucun zoom n'y
+changerait rien.
+
 
 Un plan d'architecte ne cote pas seulement « 3,93 m » : il écrit
 « 1,50 · 0,90 · 1,60 » pour qu'un menuisier sache où tomber. `wallRuns()`
