@@ -514,7 +514,19 @@ function draw3DView(
   items.sort((p, q) => p.depth - q.depth);
   for (const item of items) {
     if (item.kind === 'poly') {
-      d.poly(item.pts, item.fill, item.stroke, item.dashed ? 1.3 : 0.7, item.dashed);
+      if (item.pts.length === 2 && item.stroke) {
+        // Arête isolée : `poly` refuse deux points, il faut un trait.
+        d.line(
+          item.pts[0].x,
+          item.pts[0].y,
+          item.pts[1].x,
+          item.pts[1].y,
+          item.dashed ? 1.3 : 0.7,
+          item.stroke,
+        );
+      } else {
+        d.poly(item.pts, item.fill, item.stroke, item.dashed ? 1.3 : 0.7, item.dashed);
+      }
     } else if (item.kind === 'dot') {
       d.circle(item.x, item.y, 0.55, item.color);
     } else if (item.kind === 'area') {

@@ -98,19 +98,22 @@ export function renderSceneSvg(
         fill,
         stroke: f.stroke ?? fill,
         dashed: !!f.dashed,
+        count: proj.length,
         points: proj.map((p) => `${n2(p.sx)},${n2(p.sy)}`).join(' '),
       };
     })
     .sort((a, b) => a.depth - b.depth);
 
   const body = polys
-    .map(
-      (p) =>
-        `<polygon points="${p.points}" fill="${p.fill}" stroke="${p.stroke}"` +
-        ` stroke-width="${p.dashed ? 1.8 : 1}"` +
-        ` stroke-dasharray="${p.dashed ? '6 4' : '0'}"` +
-        ' stroke-linejoin="round"/>',
-    )
+    .map((p) => {
+      const common =
+        ` stroke="${p.stroke}" stroke-width="${p.dashed ? 1.8 : 1}"` +
+        ` stroke-dasharray="${p.dashed ? '6 4' : '0'}"`;
+      // Deux points = une arête : un polygone dégénéré ne se dessine pas.
+      return p.count === 2
+        ? `<polyline points="${p.points}" fill="none"${common} stroke-linecap="round"/>`
+        : `<polygon points="${p.points}" fill="${p.fill}"${common} stroke-linejoin="round"/>`;
+    })
     .join('\n');
 
   return (

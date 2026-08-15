@@ -118,6 +118,15 @@ qui change l'image fait échouer le build avant même la compilation iOS**, et
 le diff apparaît dans la pull request. Quand le changement est voulu :
 `npm run snapshots`, puis on relit le diff avant de valider.
 
+### Sélectionner un mur
+
+Toucher un mur en mode édition **estompe tout le reste du plan** et redessine
+ce mur par-dessus le voile. Ses commandes — coter, ajouter une ouverture,
+supprimer — viennent se poser **à côté de lui**, décalées vers l'intérieur de
+la pièce et bornées au cadre : jamais sur le mur, jamais hors de l'écran. La
+barre du bas, qui débordait dès que le clavier montait, a disparu ; seule la
+saisie de la cote subsiste, en haut du plan.
+
 ### Retoucher les murs, et annuler
 
 Ajouter un mur (posé au centre du plan, à déplacer par ses poignées),
@@ -213,28 +222,40 @@ qui en mange une autre.
 
 ### Rendu 3D : ni couture, ni trait fantôme
 
-Trois règles de plus, apprises à la dure sur un tri « du peintre » :
+Sept règles, toutes apprises à la dure sur un tri « du peintre » :
 
 1. **Les bandes ne doivent pas se voir.** Un pan est découpé tous les 60 cm
    pour que le tri en profondeur reste juste ; l'anticrénelage laissait une
    couture blanche entre deux bandes voisines et le mur semblait fait de
    morceaux. Chaque pan est donc bordé de SA PROPRE couleur (`stroke ?? fill`
    dans les deux rendus), ce qui referme la couture sans rien dessiner.
-2. **Un contour ne peut pas être un grand polygone.** Posé sur tout le pan, il
+2. **Une arête isolée se dessine avec une LIGNE, pas un polygone.** Un
+   « polygone » à deux points est dégénéré : ni react-native-svg ni le
+   générateur PDF ne le tracent. Comme les contours d'un pan découpé sont
+   justement des arêtes, tous disparaissaient — sauf pendant un geste, où le
+   mode `coarse` rend le contour sous forme de quadrilatère. D'où le symptôme
+   déroutant : on ne voyait les arêtes qu'en gardant le doigt appuyé. Les
+   trois rendus traitent maintenant `pts.length === 2` à part.
+3. **Les pans sont découpés en hauteur autant qu'en largeur.** Le tri du
+   peintre compare des profondeurs MOYENNES : un pan pleine hauteur a une
+   moyenne dominée par son altitude, pas par sa distance, et un meuble ou une
+   porte pouvait donc s'afficher devant un mur pourtant plus proche. Des
+   morceaux de taille comparable laissent la distance décider.
+4. **Un contour ne peut pas être un grand polygone.** Posé sur tout le pan, il
    se triait à sa profondeur moyenne et traversait les meubles pourtant plus
    proches. Chaque arête du pourtour est un segment à part, trié à sa propre
    profondeur ; les coupures internes ne sont pas tracées.
-3. **La lumière est décalée de 35° par rapport à la caméra.** Éclairé dans
+5. **La lumière est décalée de 35° par rapport à la caméra.** Éclairé dans
    l'axe du regard, deux flancs symétriques par rapport à celui-ci reçoivent
    la même teinte : l'arête entre eux s'efface et le meuble paraît amputé
    d'une face. Le décalage rend ce cas rare — et le contour, lui, est
    toujours tracé, ce qui garantit l'arête même à teinte égale.
-4. **Un `strokeDasharray` conditionnel doit TOUJOURS avoir une valeur.** Les
+6. **Un `strokeDasharray` conditionnel doit TOUJOURS avoir une valeur.** Les
    polygones sont retriés en profondeur à chaque image, donc React réutilise
    le composant d'un pan pour un tout autre : passer `undefined` ne
    réinitialise pas la propriété native, et le pointillé des passages
    contaminait le modèle entier. On passe `'0'`, jamais `undefined`.
-5. **Le cadrage vient de la boîte englobante, pas de la moyenne des sommets.**
+7. **Le cadrage vient de la boîte englobante, pas de la moyenne des sommets.**
    La moyenne dépend du découpage : le modèle sautait dès qu'on posait le
    doigt. `sceneFraming()` est partagé par la vue de l'app et le PDF.
 

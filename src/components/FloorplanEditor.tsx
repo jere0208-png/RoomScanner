@@ -16,7 +16,7 @@ import Svg, {
   Rect,
   Text as SvgText,
 } from 'react-native-svg';
-import { themedStyles, useTheme, type Palette } from '../theme';
+import { radius, shadowCard, themedStyles, useTheme, type Palette } from '../theme';
 import {
   bounds,
   clampFootprint,
@@ -75,6 +75,11 @@ interface Props {
   onSelectRoom?: (id: string | null) => void;
   /** Appui sur le cartouche d'une pièce (mode édition) : la renomme. */
   onEditRoomName?: (id: string) => void;
+  /** Commande lancée depuis les boutons flottants du mur sélectionné. */
+  onWallAction?: (
+    action: 'longueur' | 'ouverture' | 'supprimer',
+    wallId: string,
+  ) => void;
 }
 
 /**
@@ -92,6 +97,7 @@ export function FloorplanEditor({
   selectedRoomId,
   onSelectRoom,
   onEditRoomName,
+  onWallAction,
 }: Props) {
   const walls = useScanStore((s) => s.walls);
   const openings = useScanStore((s) => s.openings);
@@ -376,6 +382,19 @@ export function FloorplanEditor({
               );
             })}
 
+            {/* Voile d'estompage : quand un mur est sélectionné, tout le
+                reste passe en retrait pour qu'on ne lise plus que lui. */}
+            {selectedWallId && (
+              <Rect
+                x={0}
+                y={0}
+                width={layout.w}
+                height={layout.h}
+                fill={c.surface}
+                opacity={0.72}
+              />
+            )}
+
             {/* Murs : corps poché aux jonctions d'onglet */}
             {walls.map((w) => (
               <WallBody
@@ -392,6 +411,23 @@ export function FloorplanEditor({
                 }
               />
             ))}
+
+            {/* Le mur sélectionné repasse au-dessus du voile, bien lisible. */}
+            {selectedWallId &&
+              (() => {
+                const w = walls.find((x) => x.id === selectedWallId);
+                if (!w) return null;
+                return (
+                  <WallBody
+                    wall={w}
+                    quad={quads.get(w.id)}
+                    mapping={mapping}
+                    showMeasure={!navigating}
+                    selected
+                    onPress={editable ? () => onSelectWall(null) : undefined}
+                  />
+                );
+              })()}
 
             {/* Portes / fenêtres : trouée dans le mur, puis trait de repérage */}
             {openings.map((o) => {
@@ -588,6 +624,65 @@ export function FloorplanEditor({
               );
             })()}
 
+          {/* Mur sélectionné : le reste du plan s'estompe, et les commandes
+              viennent se poser À CÔTÉ du mur, jamais dessus. */}
+          {selectedWallId &&
+            (() => {
+              const w = walls.find((x) => x.id === selectedWallId);
+              if (!w || !onWallAction) return null;
+              const a2 = mapping.toPx(w.a);
+              const b2 = mapping.toPx(w.b);
+              const mid = { x: (a2.x + b2.x) / 2, y: (a2.y + b2.y) / 2 };
+              // Décalage perpendiculaire, du côté où il y a de la place.
+              const dx = b2.x - a2.x;
+              const dy = b2.y - a2.y;
+              const len = Math.hypot(dx, dy) || 1;
+              let nx = -dy / len;
+              let ny = dx / len;
+              const ctr = partOf.get(roomOf(w))?.labelAt;
+              const c2 = ctr ? mapping.toPx(ctr) : { x: layout.w / 2, y: layout.h / 2 };
+              // Vers l'intérieur de la pièce : c'est là qu'on a de la place.
+              if (nx * (c2.x - mid.x) + ny * (c2.y - mid.y) < 0) {
+                nx = -nx;
+                ny = -ny;
+              }
+              const gap = 54;
+              let bx = mid.x + nx * gap;
+              let by = mid.y + ny * gap;
+              // Et jamais hors du cadre.
+              bx = Math.min(layout.w - 92, Math.max(92, bx));
+              by = Math.min(layout.h - 40, Math.max(40, by));
+              return (
+                <View
+                  style={[styles.wallActions, { left: bx - 88, top: by - 22 }]}
+                  pointerEvents="box-none">
+                  {(
+                    [
+                      ['longueur', 'Coter'],
+                      ['ouverture', '+ Ouv.'],
+                      ['supprimer', 'Suppr.'],
+                    ] as const
+                  ).map(([action, label]) => (
+                    <TouchableOpacity
+                      key={action}
+                      style={[
+                        styles.wallAction,
+                        action === 'supprimer' && styles.wallActionDanger,
+                      ]}
+                      onPress={() => onWallAction(action, w.id)}>
+                      <Text
+                        style={[
+                          styles.wallActionText,
+                          action === 'supprimer' && styles.wallActionTextDanger,
+                        ]}>
+                        {label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              );
+            })()}
+
           {/* Poignées de coin, uniquement en mode édition */}
           {editable &&
             corners.map((pt) => (
@@ -770,6 +865,27 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     justifyContent: 'center',
   },
   objDrag: { position: 'absolute', width: 44, height: 44 },
+  // Commandes du mur sélectionné : posées à côté de lui, jamais dessus.
+  wallActions: {
+    position: 'absolute',
+    flexDirection: 'row',
+    gap: 6,
+    backgroundColor: c.surface,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: c.line,
+    padding: 4,
+    ...shadowCard,
+  },
+  wallAction: {
+    borderRadius: radius.pill,
+    backgroundColor: c.surfaceSunken,
+    paddingHorizontal: 11,
+    paddingVertical: 8,
+  },
+  wallActionDanger: { backgroundColor: c.surfaceSunken },
+  wallActionText: { color: c.ink, fontSize: 12.5, fontWeight: '700' },
+  wallActionTextDanger: { color: c.danger },
   objDelete: {
     position: 'absolute',
     width: 30,

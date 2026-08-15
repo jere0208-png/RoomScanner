@@ -114,6 +114,7 @@ export function ResultScreen() {
   const [nameInput, setNameInput] = useState('');
 
   const canvasRef = useRef<View>(null);
+  const lengthRef = useRef<TextInput>(null);
 
   // Départ vers l'export : ondes qui traversent toute la page puis fondu.
   const { width: winW, height: winH } = useWindowDimensions();
@@ -370,6 +371,15 @@ export function ResultScreen() {
               setSelectedRoomId(id);
             }}
             onEditRoomName={promptRoomFor}
+            onWallAction={(action, wallId) => {
+              if (action === 'ouverture') addOpening(wallId);
+              else if (action === 'supprimer') {
+                removeWall(wallId);
+                setSelectedWallId(null);
+              } else {
+                lengthRef.current?.focus();
+              }
+            }}
           />
         ) : (
           <Iso3DView
@@ -594,40 +604,26 @@ export function ResultScreen() {
             </View>
           )}
 
-        {/* Barre d'édition en surimpression : le plan ne se redimensionne pas */}
+        {/* Cote du mur sélectionné : un champ compact, posé en haut du
+            plan pour ne jamais sortir de l'écran ni couvrir le mur. */}
         {tab === '2d' && !selectedObject && editMode && selectedWall && (
-          <View style={styles.editBar}>
-            <Text style={styles.editLabel}>
-              Longueur du mur · {fr(selectedWall.height, 2)} m sous plafond
+          <View style={styles.wallLengthBar}>
+            <Text style={styles.wallLengthLabel}>
+              {fr(selectedWall.height, 2)} m sous plafond
             </Text>
-            <View style={styles.editRow}>
-              <TextInput
-                style={styles.input}
-                value={lengthInput}
-                onChangeText={setLengthInput}
-                keyboardType="decimal-pad"
-                returnKeyType="done"
-                onSubmitEditing={applyLength}
-              />
-              <Text style={styles.unit}>m</Text>
-              <TouchableOpacity
-                style={styles.openingButton}
-                onPress={() => selectedWallId && addOpening(selectedWallId)}>
-                <Text style={styles.openingText}>+ Ouverture</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.openingButton}
-                onPress={() => {
-                  if (!selectedWallId) return;
-                  removeWall(selectedWallId);
-                  setSelectedWallId(null);
-                }}>
-                <Text style={styles.removeRoomText}>Supprimer</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.applyButton} onPress={applyLength}>
-                <Text style={styles.applyText}>Appliquer</Text>
-              </TouchableOpacity>
-            </View>
+            <TextInput
+              ref={lengthRef}
+              style={styles.input}
+              value={lengthInput}
+              onChangeText={setLengthInput}
+              keyboardType="decimal-pad"
+              returnKeyType="done"
+              onSubmitEditing={applyLength}
+            />
+            <Text style={styles.unit}>m</Text>
+            <TouchableOpacity style={styles.applyButton} onPress={applyLength}>
+              <Text style={styles.applyText}>Appliquer</Text>
+            </TouchableOpacity>
           </View>
         )}
 
@@ -1148,6 +1144,25 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 5,
   },
+  // Cote du mur : barre compacte EN HAUT du plan. En bas, elle sortait de
+  // l'écran dès que le clavier montait, et couvrait le mur qu'on modifiait.
+  wallLengthBar: {
+    position: 'absolute',
+    top: 56,
+    left: 10,
+    right: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: c.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: c.line,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    ...shadowCard,
+  },
+  wallLengthLabel: { color: c.inkFaint, fontSize: 12, fontWeight: '600', flex: 1 },
   editBar: {
     position: 'absolute',
     bottom: 10,

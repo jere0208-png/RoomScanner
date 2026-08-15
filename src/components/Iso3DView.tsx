@@ -1,6 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { PanResponder, StyleSheet, View } from 'react-native';
-import Svg, { Circle, Polygon, Rect, Text as SvgText } from 'react-native-svg';
+import Svg, {
+  Circle,
+  Line,
+  Polygon,
+  Rect,
+  Text as SvgText,
+} from 'react-native-svg';
 import { themedStyles, useTheme, type Palette } from '../theme';
 import {
   pointOnSeg,
@@ -544,6 +550,21 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
           <Svg width={layout.w} height={layout.h}>
             {rendered.map((item, i) =>
               item.kind === 'poly' ? (
+                // Deux points = une arête : react-native-svg ne dessine pas
+                // un polygone dégénéré, il faut une vraie ligne.
+                item.proj.length === 2 ? (
+                  <Line
+                    key={i}
+                    x1={item.proj[0].sx}
+                    y1={item.proj[0].sy}
+                    x2={item.proj[1].sx}
+                    y2={item.proj[1].sy}
+                    stroke={item.stroke}
+                    strokeWidth={item.dashed ? 1.8 : 1}
+                    strokeDasharray={item.dashed ? '6 4' : '0'}
+                    strokeLinecap="round"
+                  />
+                ) : (
                 <Polygon
                   key={i}
                   points={item.proj.map((q) => `${q.sx},${q.sy}`).join(' ')}
@@ -553,6 +574,7 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
                   strokeDasharray={item.dashed ? '6 4' : '0'}
                   strokeLinejoin="round"
                 />
+                )
               ) : item.kind === 'dot' ? (
                 <Circle key={i} cx={item.x} cy={item.y} r={1.1} fill={item.color} />
               ) : item.kind === 'area' ? (

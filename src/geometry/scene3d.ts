@@ -451,7 +451,14 @@ export function buildScene(
     } = {},
   ) => {
     const cols = Math.max(1, Math.ceil(Math.hypot(q.x - p.x, q.z - p.z) / step));
-    const rows = o.tex ? Math.min(MAX_TEX_ROWS, Math.max(1, o.tex.rows)) : 1;
+    // Découpe en HAUTEUR aussi. Sans elle, un pan pleine hauteur se trie sur
+    // une profondeur moyenne dominée par son altitude et non par sa distance :
+    // un meuble ou une porte pouvait alors s'afficher devant un mur pourtant
+    // plus proche. Des morceaux de taille comparable laissent la distance
+    // décider, et l'occultation redevient fiable.
+    const rows = o.tex
+      ? Math.min(MAX_TEX_ROWS, Math.max(1, o.tex.rows))
+      : Math.max(1, Math.ceil((yt - yb) / step));
     for (let i = 0; i < cols; i++) {
       const s0 = lerp2(p, q, i / cols);
       const s1 = lerp2(p, q, (i + 1) / cols);
