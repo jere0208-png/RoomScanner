@@ -225,12 +225,12 @@ export function ResultScreen() {
               active={showMeasures}
               onPress={() => setShowMeasures((v) => !v)}
             />
-            <ToolPill icon="edit" active={editMode} onPress={toggleEdit} />
             <ToolPill
               label="Meubles"
               active={showFurniture}
               onPress={() => setShowFurniture(!showFurniture)}
             />
+            <ToolPill icon="edit" active={editMode} onPress={toggleEdit} />
           </View>
         ) : (
           <View style={styles.planTools}>

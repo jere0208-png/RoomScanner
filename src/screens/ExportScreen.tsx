@@ -170,6 +170,16 @@ export function ExportScreen() {
   const styles = getStyles(c);
 
   const [include3D, setInclude3D] = useState(true);
+  // Toucher un modèle verrouille le défilement (iOS annule sinon le geste
+  // JS au profit du scroll natif) ; le relâcher le rend au ScrollView.
+  const [scrollLocked, setScrollLocked] = useState(false);
+  const lockProps = {
+    onTouchStart: () => setScrollLocked(true),
+    onTouchEnd: (e: any) => {
+      if (e.nativeEvent.touches.length === 0) setScrollLocked(false);
+    },
+    onTouchCancel: () => setScrollLocked(false),
+  };
   const [plan, setPlan] = useState<PlanView>(DEFAULT_PLAN);
   const [v1, setV1] = useState<View3DParams>(DEFAULT_V1);
   const [v2, setV2] = useState<View3DParams>(DEFAULT_V2);
@@ -247,7 +257,11 @@ export function ExportScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scroll}
+        scrollEnabled={!scrollLocked}
+        canCancelContentTouches={false}>
         <View style={styles.switchRow}>
           <Text style={styles.switchLabel}>Inclure des vues 3D</Text>
           <Switch value={include3D} onValueChange={setInclude3D} />
@@ -265,13 +279,15 @@ export function ExportScreen() {
 
         <Text style={styles.sheetLabel}>Feuille 1 · Plan d'ensemble</Text>
         <View style={styles.sheetCard}>
-          <PlanPreview
-            value={plan}
-            onChange={setPlan}
-            onBox={(b) => {
-              planBox.current = b;
-            }}
-          />
+          <View {...lockProps}>
+            <PlanPreview
+              value={plan}
+              onChange={setPlan}
+              onBox={(b) => {
+                planBox.current = b;
+              }}
+            />
+          </View>
         </View>
 
         {include3D && (
@@ -279,6 +295,7 @@ export function ExportScreen() {
             <Text style={styles.sheetLabel}>Feuille 2 · Vues 3D</Text>
             <View style={styles.sheetCard}>
               <View
+                {...lockProps}
                 style={styles.view3d}
                 onLayout={(e) => {
                   box1.current = {
@@ -289,6 +306,7 @@ export function ExportScreen() {
                 <Iso3DView value={v1} onChange={setV1} />
               </View>
               <View
+                {...lockProps}
                 style={[styles.view3d, styles.view3dLast]}
                 onLayout={(e) => {
                   box2.current = {
