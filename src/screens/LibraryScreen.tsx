@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
 import {
   glow,
   radius,
@@ -260,15 +261,9 @@ export function LibraryScreen() {
           <Text style={styles.backChevron}>‹</Text>
         </TouchableOpacity>
         <Text style={styles.title}>Mes scans</Text>
-        <Text style={styles.count}>{saves.length}</Text>
-        <TouchableOpacity
-          style={styles.newFolder}
-          onPress={() => {
-            const id = addFolder();
-            setOpen((o) => ({ ...o, [id]: true }));
-          }}>
-          <Text style={styles.newFolderText}>+ Dossier</Text>
-        </TouchableOpacity>
+        <View style={styles.countPill}>
+          <Text style={styles.countText}>{saves.length}</Text>
+        </View>
       </View>
 
       {dragId !== null && (
@@ -396,6 +391,30 @@ export function LibraryScreen() {
           ))}
         </ScrollView>
       )}
+
+      {/* Créer un dossier : bouton flottant en bas à droite, là où le pouce
+          tombe naturellement. Dans l'en-tête, il était à l'opposé de la
+          main et se confondait avec le compteur. */}
+      <TouchableOpacity
+        style={styles.fab}
+        activeOpacity={0.85}
+        onPress={() => {
+          const id = addFolder();
+          setOpen((o) => ({ ...o, [id]: true }));
+        }}>
+        <Svg width={26} height={26} viewBox="0 0 24 24">
+          {['M12 5 v14', 'M5 12 h14'].map((d) => (
+            <Path
+              key={d}
+              d={d}
+              stroke="#FFFFFF"
+              strokeWidth={2.6}
+              strokeLinecap="round"
+              fill="none"
+            />
+          ))}
+        </Svg>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -422,27 +441,30 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   },
   backChevron: { color: c.ink, fontSize: 24, fontWeight: '600', marginTop: -3 },
   title: { color: c.ink, fontSize: 24, fontWeight: '800', letterSpacing: -0.4 },
-  count: {
-    color: c.blue,
-    fontSize: 14,
-    fontWeight: '800',
-    backgroundColor: c.blueSoft,
-    borderRadius: radius.pill,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
+  countPill: {
+    minWidth: 26,
+    height: 24,
+    borderRadius: 12,
+    paddingHorizontal: 8,
     marginLeft: 10,
-    overflow: 'hidden',
+    backgroundColor: c.blueSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  newFolder: {
-    marginLeft: 'auto',
-    backgroundColor: c.surface,
-    borderRadius: radius.pill,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    ...shadowCard,
-    shadowOpacity: 0.06,
+  countText: { color: c.blue, fontSize: 13.5, fontWeight: '800' },
+  fab: {
+    position: 'absolute',
+    right: 18,
+    bottom: 34,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: c.blue,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...glow(c.blue),
+    shadowOpacity: 0.4,
   },
-  newFolderText: { color: c.blue, fontSize: 13.5, fontWeight: '800' },
   dragHint: {
     position: 'absolute',
     top: 104,
@@ -456,7 +478,7 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     alignItems: 'center',
   },
   dragHintText: { color: c.blue, fontSize: 13, fontWeight: '700' },
-  list: { paddingBottom: 30 },
+  list: { paddingBottom: 104 },
   folder: {
     flexDirection: 'row',
     alignItems: 'center',
