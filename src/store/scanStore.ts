@@ -10,6 +10,7 @@ import {
   DEFAULT_ROOM_ID,
   detectRooms,
   mergeColinear,
+  perpOf,
   pointOnSeg,
   roomExtent,
   roomHeight,
@@ -25,9 +26,14 @@ import {
   toSegment,
   wallQuadsOf,
   weldCorners,
+  WALL_T,
   type Pt,
   type WallSeg,
 } from '../geometry/floorplan';
+import {
+  catalogTransform,
+  type CatalogItem,
+} from '../geometry/catalogue';
 import {
   FIXTURES,
   faceX,
@@ -376,6 +382,14 @@ interface ScanState {
    */
   resizeOpening: (id: string, width?: number, height?: number) => void;
   removeOpening: (id: string) => void;
+  /**
+   * Pose un meuble du catalogue au point donné. Renvoie son identifiant,
+   * pour le sélectionner aussitôt : un meuble qu'on vient de poser, on va
+   * le déplacer.
+   */
+  addObject: (item: CatalogItem, x: number, z: number) => string;
+  /** Fait pivoter un meuble d'un quart de tour. */
+  rotateObject: (id: string, quarts?: number) => void;
   removeObject: (id: string) => void;
   setObjectCenter: (id: string, x: number, z: number) => void;
   resizeObject: (id: string, width: number, depth: number) => void;
@@ -1047,19 +1061,115 @@ export const useScanStore = create<ScanState>((set, get) => {
       });
     },
 
+    addObject: (item, x, z) => {
+      const st = get();
+      pushHistory('addObject');
+      const id = `mb-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      set({
+        objects: [
+          ...st.objects,
+          {
+            id,
+            category: item.category,
+            width: item.w,
+            depth: item.d,
+            height: item.h,
+            transform: catalogTransform(item, x, z),
+          },
+        ],
+        dirty: true,
+      });
+      return id;
+    },
+
+    rotateObject: (id, quarts = 1) => {
+      pushHistory(`rotate:${id}`);
+      set({
+        objects: get().objects.map((o) => {
+          if (o.id !== id) return o;
+          const t = [...o.transform];
+          const yaw = Math.atan2(t[2], t[0]) + (Math.PI / 2) * quarts;
+          const cos = Math.cos(yaw);
+          const sin = Math.sin(yaw);
+          t[0] = cos;
+          t[2] = sin;
+          t[8] = -sin;
+          t[10] = cos;
+          return { ...o, transform: t };
+        }),
+        dirty: true,
+      });
+    },
+
     removeObject: (id) => {
       pushHistory('removeObject');
       set({ objects: get().objects.filter((o) => o.id !== id), dirty: true });
     },
 
+    /**
+     * Déplace un meuble, avec **attraction des murs**.
+     *
+     * Un meuble se pose presque toujours contre un mur, et le poser au
+     * pixel près au doigt est pénible. Dès que son dos passe à moins de
+     * 30 cm d'un mur, il s'y colle et s'aligne dessus : le dos contre le
+     * nu, la face vers la pièce. Au-delà, il reste exactement où le doigt
+     * l'a laissé — l'aimant aide, il ne décide pas.
+     */
     setObjectCenter: (id, x, z) => {
       pushHistory(`moveObject:${id}`);
+      const st = get();
+      const obj = st.objects.find((o) => o.id === id);
+      if (!obj) return;
+      const parts = roomParts(st.walls, st.rooms);
+      const part =
+        parts.find((p) => pointInPolygon({ x, z }, p.surface?.pts ?? [])) ??
+        parts.find((p) => p.roomId === roomOf(obj));
+      let pose = { x, z, yaw: Math.atan2(obj.transform[2], obj.transform[0]) };
+      const demi = obj.depth / 2 + WALL_T / 2;
+      let best: { d: number; w: WallSeg } | null = null;
+      for (const w of part?.walls ?? st.walls) {
+        const { dist } = pointOnSeg({ x, z }, w.a, w.b);
+        if (dist > demi + 0.3) continue;
+        if (!best || dist < best.d) best = { d: dist, w };
+      }
+      if (best) {
+        const w = best.w;
+        const len = segLength(w) || 1;
+        const u = { x: (w.b.x - w.a.x) / len, z: (w.b.z - w.a.z) / len };
+        let n = perpOf(u);
+        // La normale doit regarder l'intérieur de la pièce : c'est de ce
+        // côté-là que le meuble se pose.
+        const mid = { x: (w.a.x + w.b.x) / 2, z: (w.a.z + w.b.z) / 2 };
+        const dedans = part?.labelAt ?? { x, z };
+        if ((dedans.x - mid.x) * n.x + (dedans.z - mid.z) * n.z < 0) {
+          n = { x: -n.x, z: -n.z };
+        }
+        // Projection sur l'axe du mur, puis recul d'une demi-profondeur.
+        const t = ((x - w.a.x) * u.x + (z - w.a.z) * u.z) / len;
+        const sur = {
+          x: w.a.x + u.x * len * Math.max(0, Math.min(1, t)),
+          z: w.a.z + u.z * len * Math.max(0, Math.min(1, t)),
+        };
+        pose = {
+          x: sur.x + n.x * demi,
+          z: sur.z + n.z * demi,
+          // Dos au mur : l'axe de profondeur du meuble (z local) regarde la
+          // pièce, ce qui donne cet angle-là.
+          yaw: Math.atan2(-n.x, n.z),
+        };
+      }
+      const cos = Math.cos(pose.yaw);
+      const sin = Math.sin(pose.yaw);
       set({
-        objects: get().objects.map((o) => {
+        objects: st.objects.map((o) => {
           if (o.id !== id) return o;
           const t = [...o.transform];
-          t[12] = x;
-          t[14] = z;
+          t[0] = cos;
+          t[2] = sin;
+          t[8] = -sin;
+          t[10] = cos;
+          t[12] = pose.x;
+          t[14] = pose.z;
           return { ...o, transform: t };
         }),
         dirty: true,

@@ -550,3 +550,88 @@ describe('dossiers de la bibliothèque', () => {
     ).toBe(true);
   });
 });
+
+describe('meubles posés à la main', () => {
+  const mur = (id: string, ax: number, az: number, bx: number, bz: number) => ({
+    id,
+    type: 'wall' as const,
+    a: { x: ax, z: az },
+    b: { x: bx, z: bz },
+    height: 2.5,
+    yCenter: 1.25,
+  });
+  // Pièce carrée de 4 m, murs parcourus dans le sens horaire.
+  const CARRE = [
+    mur('n', 0, 0, 4, 0),
+    mur('e', 4, 0, 4, 4),
+    mur('s', 4, 4, 0, 4),
+    mur('w', 0, 4, 0, 0),
+  ];
+  const LIT = {
+    key: 'lit140',
+    label: 'Lit double 140',
+    category: 'bed',
+    w: 1.4,
+    d: 1.9,
+    h: 0.5,
+  };
+
+  beforeEach(() => {
+    useScanStore.setState({
+      walls: CARRE,
+      openings: [],
+      objects: [],
+      fixtures: [],
+      rooms: [{ id: 'room-1', name: 'Chambre', wallIds: CARRE.map((w) => w.id) }],
+      currentSaveId: null,
+      saves: [],
+      canUndo: false,
+      dirty: false,
+    });
+  });
+
+  it('pose le meuble à ses cotes, au point demandé', () => {
+    const id = useScanStore.getState().addObject(LIT, 2, 2);
+    const o = useScanStore.getState().objects.find((x) => x.id === id)!;
+    expect(o.width).toBe(1.4);
+    expect(o.depth).toBe(1.9);
+    expect(o.transform[12]).toBe(2);
+    expect(o.transform[14]).toBe(2);
+    // La hauteur portée par la matrice est celle du CENTRE du meuble.
+    expect(o.transform[13]).toBeCloseTo(0.25, 6);
+  });
+
+  it('se colle au mur dès qu’on l’en approche, et s’aligne dessus', () => {
+    const id = useScanStore.getState().addObject(LIT, 2, 2);
+    // Amené près du mur nord (z = 0) : il doit reculer contre lui.
+    useScanStore.getState().setObjectCenter(id, 2, 1.0);
+    const o = useScanStore.getState().objects.find((x) => x.id === id)!;
+    // Dos au nu du mur : demi-profondeur + demi-épaisseur de mur.
+    expect(o.transform[14]).toBeCloseTo(1.9 / 2 + 0.07, 3);
+    expect(o.transform[12]).toBeCloseTo(2, 6);
+    // Et l'axe de profondeur du meuble regarde la pièce (vers +z).
+    const yaw = Math.atan2(o.transform[2], o.transform[0]);
+    expect(Math.abs(Math.sin(yaw))).toBeCloseTo(0, 6);
+    expect(Math.cos(yaw)).toBeCloseTo(1, 6);
+  });
+
+  it('reste où on le laisse quand il est loin des murs', () => {
+    const id = useScanStore.getState().addObject(LIT, 2, 2);
+    useScanStore.getState().setObjectCenter(id, 2, 2);
+    const o = useScanStore.getState().objects.find((x) => x.id === id)!;
+    expect(o.transform[12]).toBe(2);
+    expect(o.transform[14]).toBe(2);
+  });
+
+  it('pivote par quarts de tour', () => {
+    const id = useScanStore.getState().addObject(LIT, 2, 2);
+    useScanStore.getState().rotateObject(id);
+    const o = useScanStore.getState().objects.find((x) => x.id === id)!;
+    const yaw = Math.atan2(o.transform[2], o.transform[0]);
+    expect(yaw).toBeCloseTo(Math.PI / 2, 6);
+    // Quatre quarts de tour ramènent à l'endroit.
+    for (let i = 0; i < 3; i++) useScanStore.getState().rotateObject(id);
+    const fin = useScanStore.getState().objects.find((x) => x.id === id)!;
+    expect(Math.abs(Math.atan2(fin.transform[2], fin.transform[0]))).toBeCloseTo(0, 6);
+  });
+});

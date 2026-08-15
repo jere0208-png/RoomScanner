@@ -16,7 +16,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { Line as SvgLine, Path, Rect as SvgRect } from 'react-native-svg';
 import { captureRef } from 'react-native-view-shot';
 import { RoomScan } from 'react-native-room-scan';
 import {
@@ -44,7 +44,13 @@ import {
   totalArea,
 } from '../geometry/floorplan';
 import { hasCapturedColors } from '../geometry/appearance';
-import { frCategory, ROOM_NAME_CHOICES } from '../geometry/furniture';
+import {
+  frCategory,
+  furnKind,
+  furnitureStrokes,
+  ROOM_NAME_CHOICES,
+} from '../geometry/furniture';
+import { CATALOGUE, type CatalogItem } from '../geometry/catalogue';
 import { buildObj, objFilename } from '../export/model3d';
 import { checkPlan } from '../geometry/diagnostics';
 import {
@@ -111,6 +117,8 @@ export function ResultScreen() {
   const addFixture = useScanStore((s) => s.addFixture);
   const moveFixture = useScanStore((s) => s.moveFixture);
   const resizeOpening = useScanStore((s) => s.resizeOpening);
+  const addObject = useScanStore((s) => s.addObject);
+  const rotateObject = useScanStore((s) => s.rotateObject);
 
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
   const [wInput, setWInput] = useState('');
@@ -166,6 +174,8 @@ export function ResultScreen() {
   const [elecSel, setElecSel] = useState<string | null>(null);
   // Appareil choisi alors qu'aucun mur n'etait designe : on attend l'appui.
   const [pendingKind, setPendingKind] = useState<FixtureKind | null>(null);
+  // Catalogue de mobilier : ouvert par le « + » posé à côté du calque meubles.
+  const [catalogue, setCatalogue] = useState(false);
 
   // Le diagnostic et la pose d'un appareil passent aussi en édition sans
   // toucher au bouton : l'animation est déclenchée par l'écart entre les
@@ -261,6 +271,26 @@ export function ResultScreen() {
     } catch (e: any) {
       Alert.alert('Export impossible', e?.message ?? 'Erreur inconnue');
     }
+  };
+
+  /**
+   * Pose un meuble du catalogue au centre de la plus grande pièce — c'est
+   * là qu'il a le plus de chances d'être visible — puis le sélectionne :
+   * un meuble qu'on vient de poser, on va le déplacer.
+   */
+  const placeObject = (item: CatalogItem) => {
+    const cible = parts
+      .filter((p) => p.surface)
+      .sort((a, b) => (b.surface?.area ?? 0) - (a.surface?.area ?? 0))[0];
+    const at = cible?.labelAt ?? { x: 0, z: 0 };
+    const id = addObject(item, at.x, at.z);
+    setCatalogue(false);
+    setShowFurniture(true);
+    setSelectedWallId(null);
+    setSelectedOpeningId(null);
+    setSelectedObjectId(id);
+    setWInput(item.w.toFixed(2).replace('.', ','));
+    setDInput(item.d.toFixed(2).replace('.', ','));
   };
 
   const selectedOpening =
@@ -684,6 +714,17 @@ export function ResultScreen() {
                     active={showFurniture}
                     onPress={() => setShowFurniture(!showFurniture)}
                   />,
+                  // Le catalogue s'ouvre depuis le calque qu'il alimente :
+                  // il n'apparaît que si les meubles sont affichés, sinon on
+                  // poserait un meuble qu'on ne verrait pas.
+                  showFurniture && (
+                    <ToolPill
+                      key="addObj"
+                      icon="plus"
+                      active={catalogue}
+                      onPress={() => setCatalogue(true)}
+                    />
+                  ),
                   <ToolPill
                     key="surface"
                     icon="surface"
@@ -755,7 +796,8 @@ export function ResultScreen() {
         {tab === '2d' && selectedObject && (
           <View style={styles.editBar}>
             <Text style={styles.editLabel}>
-              {frCategory(selectedObject.category)} · glissez-le sur le plan
+              {frCategory(selectedObject.category)} · glissez-le, il se colle
+              aux murs
             </Text>
             <View style={styles.editRow}>
               <TextInput
@@ -772,6 +814,11 @@ export function ResultScreen() {
                 keyboardType="decimal-pad"
               />
               <Text style={styles.unit}>m</Text>
+              <TouchableOpacity
+                style={styles.roomAction}
+                onPress={() => rotateObject(selectedObject.id)}>
+                <Text style={styles.roomActionText}>Pivoter</Text>
+              </TouchableOpacity>
               <TouchableOpacity style={styles.applyButton} onPress={applyObjectDims}>
                 <Text style={styles.applyText}>Appliquer</Text>
               </TouchableOpacity>
@@ -1208,6 +1255,50 @@ export function ResultScreen() {
         </Pressable>
       </Modal>
 
+      {/* ---------- Catalogue de mobilier ---------- */}
+      <Modal
+        visible={catalogue}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setCatalogue(false)}>
+        <Pressable
+          style={styles.modalBackdrop}
+          onPress={() => setCatalogue(false)}>
+          <Pressable style={styles.modalCard} onPress={() => {}}>
+            <Text style={styles.modalTitle}>Ajouter un meuble</Text>
+            <Text style={styles.modalSubtitle}>
+              Aux dimensions usuelles du commerce, à retailler ensuite. Il se
+              pose au milieu de la plus grande pièce, puis se glisse — et se
+              colle aux murs tout seul.
+            </Text>
+            <ScrollView style={styles.catScroll}>
+              {CATALOGUE.map((famille) => (
+                <View key={famille.name}>
+                  <Text style={styles.elecFamily}>{famille.name}</Text>
+                  <View style={styles.catGrid}>
+                    {famille.items.map((item) => (
+                      <TouchableOpacity
+                        key={item.key}
+                        style={styles.catCard}
+                        activeOpacity={0.8}
+                        onPress={() => placeObject(item)}>
+                        <FurnitureThumb item={item} />
+                        <Text style={styles.catName} numberOfLines={1}>
+                          {item.label}
+                        </Text>
+                        <Text style={styles.catDims}>
+                          {`${fr(item.w, 2)} × ${fr(item.d, 2)} m`}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              ))}
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
       {/* ---------- Électricité : catalogue, puis le mur vu de face ---------- */}
       <Modal
         visible={elecOpen}
@@ -1473,6 +1564,54 @@ function Segment({ tab, onChange }: { tab: Tab; onChange: (t: Tab) => void }) {
         </TouchableOpacity>
       ))}
     </View>
+  );
+}
+
+/**
+ * La vignette d'un meuble du catalogue : son symbole de plan, vu de dessus,
+ * à l'échelle de sa propre emprise.
+ *
+ * C'est le même tracé que sur le plan — on choisit donc en reconnaissant la
+ * forme qu'on retrouvera, et non en lisant une liste de mots. Le nom passe
+ * dessous, les cotes en plus petit encore.
+ */
+function FurnitureThumb({ item }: { item: CatalogItem }) {
+  const c = useTheme();
+  const W = 74;
+  const H = 52;
+  // Emprise mise à l'échelle de la vignette, marges comprises.
+  const k = Math.min((W - 14) / item.w, (H - 14) / item.d);
+  const w = item.w * k;
+  const d = item.d * k;
+  return (
+    <Svg width={W} height={H}>
+      <SvgRect
+        x={(W - w) / 2}
+        y={(H - d) / 2}
+        width={w}
+        height={d}
+        rx={3}
+        fill={c.blueSoft}
+        stroke={c.blue}
+        strokeWidth={1.2}
+      />
+      {furnitureStrokes(furnKind(item.category), w, d).map((ligne, li) => (
+        <React.Fragment key={li}>
+          {ligne.slice(1).map((pt, pi) => (
+            <SvgLine
+              key={pi}
+              x1={W / 2 + ligne[pi].x}
+              y1={H / 2 + ligne[pi].y}
+              x2={W / 2 + pt.x}
+              y2={H / 2 + pt.y}
+              stroke={c.blue}
+              strokeWidth={1.1}
+              strokeLinecap="round"
+            />
+          ))}
+        </React.Fragment>
+      ))}
+    </Svg>
   );
 }
 
@@ -2054,6 +2193,24 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     marginBottom: 6,
   },
   elecGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  catScroll: { maxHeight: 400 },
+  catGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  catCard: {
+    width: 92,
+    alignItems: 'center',
+    backgroundColor: c.surfaceSunken,
+    borderRadius: radius.md,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+  },
+  catName: {
+    color: c.ink,
+    fontSize: 11.5,
+    fontWeight: '700',
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  catDims: { color: c.inkFaint, fontSize: 9.5, fontWeight: '600', marginTop: 1 },
   elecChip: {
     flexDirection: 'row',
     alignItems: 'center',
