@@ -1,6 +1,7 @@
 import Foundation
 import QuickLook
 import UIKit
+import React
 
 /// Visionneuse 3D native : ouvre le .usdz exporté par RoomPlan dans
 /// QuickLook (rendu Apple, gratuit, avec mode AR intégré).
