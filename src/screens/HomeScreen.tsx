@@ -5,6 +5,7 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import Svg, { Path, Rect } from 'react-native-svg';
@@ -92,15 +93,17 @@ export function HomeScreen() {
     RoomScan.isSupported().then(setSupported);
   }, [setSupported]);
 
-  // Arrivée : le logo projette une onde qui révèle le contenu en fondu.
+  // Arrivée : le logo projette des ondes qui traversent TOUTE la page.
+  const { width: winW, height: winH } = useWindowDimensions();
+  const waveScale = (Math.max(winW, winH) * 2.4) / 76;
   const wave = useRef(new Animated.Value(0)).current;
   const reveal = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     Animated.parallel([
       Animated.timing(wave, {
         toValue: 1,
-        duration: 600,
-        easing: Easing.out(Easing.quad),
+        duration: 750,
+        easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }),
       Animated.timing(reveal, {
@@ -143,26 +146,31 @@ export function HomeScreen() {
 
       <View style={styles.hero}>
         <View style={styles.logoWrap}>
-          <Animated.View
-            pointerEvents="none"
-            style={[
-              styles.waveRing,
-              {
-                opacity: wave.interpolate({
-                  inputRange: [0, 0.15, 1],
-                  outputRange: [0, 0.45, 0],
-                }),
-                transform: [
-                  {
-                    scale: wave.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0.7, 7],
-                    }),
-                  },
-                ],
-              },
-            ]}
-          />
+          {[0, 0.15].map((delay, i) => (
+            <Animated.View
+              key={i}
+              pointerEvents="none"
+              style={[
+                styles.waveRing,
+                {
+                  opacity: wave.interpolate({
+                    inputRange: [delay, Math.min(delay + 0.2, 1), 1],
+                    outputRange: [0, 0.5, 0],
+                    extrapolate: 'clamp',
+                  }),
+                  transform: [
+                    {
+                      scale: wave.interpolate({
+                        inputRange: [delay, 1],
+                        outputRange: [0.6, waveScale],
+                        extrapolate: 'clamp',
+                      }),
+                    },
+                  ],
+                },
+              ]}
+            />
+          ))}
           <LogoMark />
         </View>
         <Animated.View style={fadeIn(0)}>
@@ -284,7 +292,7 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     width: 76,
     height: 76,
     borderRadius: 38,
-    borderWidth: 2,
+    borderWidth: 4,
     borderColor: c.blue,
   },
   stepsCard: {

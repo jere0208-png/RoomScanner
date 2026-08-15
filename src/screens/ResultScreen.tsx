@@ -11,6 +11,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
@@ -59,7 +60,9 @@ export function ResultScreen() {
 
   const canvasRef = useRef<View>(null);
 
-  // Départ vers l'export : ondes qui se propagent puis fondu vers l'aperçu.
+  // Départ vers l'export : ondes qui traversent toute la page puis fondu.
+  const { width: winW, height: winH } = useWindowDimensions();
+  const ringScale = (Math.max(winW, winH) * 2.4) / 120;
   const [transiting, setTransiting] = useState(false);
   const waveAnim = useRef(new Animated.Value(0)).current;
   const goExport = () => {
@@ -68,8 +71,8 @@ export function ResultScreen() {
     waveAnim.setValue(0);
     Animated.timing(waveAnim, {
       toValue: 1,
-      duration: 460,
-      easing: Easing.out(Easing.quad),
+      duration: 580,
+      easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start(() => {
       setScreen('export');
@@ -339,7 +342,7 @@ export function ResultScreen() {
                     {
                       scale: waveAnim.interpolate({
                         inputRange: [delay, 1],
-                        outputRange: [0.3, 14],
+                        outputRange: [0.3, ringScale],
                         extrapolate: 'clamp',
                       }),
                     },
@@ -521,8 +524,8 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     borderWidth: 1,
     borderColor: c.line,
     alignSelf: 'flex-start',
-    marginTop: 12,
-    marginBottom: 12,
+    marginTop: 8,
+    marginBottom: 8,
     paddingVertical: 8,
   },
   metric: { paddingHorizontal: 15, alignItems: 'center' },
@@ -534,7 +537,7 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     backgroundColor: c.surfaceSunken,
     borderRadius: radius.md,
     padding: 3,
-    marginBottom: 12,
+    marginBottom: 8,
   },
   segmentItem: {
     flex: 1,
@@ -581,7 +584,7 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 60,
-    borderWidth: 2.5,
+    borderWidth: 4.5,
     borderColor: c.blue,
   },
   transitionFill: {
@@ -680,7 +683,7 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     marginTop: 4,
   },
   switchLabel: { color: c.ink, fontSize: 14.5, fontWeight: '600' },
-  actions: { flexDirection: 'row', gap: 10, paddingBottom: 28, paddingTop: 10 },
+  actions: { flexDirection: 'row', gap: 10, paddingBottom: 20, paddingTop: 8 },
   primaryButton: {
     flex: 1,
     backgroundColor: c.blue,
