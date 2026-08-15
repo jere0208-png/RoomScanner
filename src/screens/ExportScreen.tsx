@@ -168,6 +168,8 @@ export function ExportScreen() {
   const styles = getStyles(c);
 
   const [include3D, setInclude3D] = useState(true);
+  const [measures2D, setMeasures2D] = useState(true);
+  const [measures3D, setMeasures3D] = useState(true);
   // Toucher un modèle verrouille le défilement (iOS annule sinon le geste
   // JS au profit du scroll natif) ; le relâcher le rend au ScrollView.
   const [scrollLocked, setScrollLocked] = useState(false);
@@ -211,6 +213,8 @@ export function ExportScreen() {
           },
           views: [conv(v1, box1.current), conv(v2, box2.current)],
           colorOpenings: showOpeningColors,
+          measures2D,
+          measures3D,
         },
       );
       await RoomScan.sharePDF(toBase64(bytes), pdfFilename(scanName));
@@ -274,6 +278,14 @@ export function ExportScreen() {
         <View style={styles.switchRow}>
           <Text style={styles.switchLabel}>Inclure les meubles</Text>
           <Switch value={showFurniture} onValueChange={setShowFurniture} />
+        </View>
+        <View style={styles.switchRow}>
+          <Text style={styles.switchLabel}>Cotes sur le plan 2D</Text>
+          <Switch value={measures2D} onValueChange={setMeasures2D} />
+        </View>
+        <View style={styles.switchRow}>
+          <Text style={styles.switchLabel}>Cotes sur les vues 3D</Text>
+          <Switch value={measures3D} onValueChange={setMeasures3D} />
         </View>
 
         <Text style={styles.sheetLabel}>Feuille 1 · Plan d'ensemble</Text>

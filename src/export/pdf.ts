@@ -959,7 +959,8 @@ export function buildScanPdf(
     planPage(
       scan.name, filename, scan.walls, scan.openings, scan.objects,
       `1 / ${total}`, opts.plan, opts.colorOpenings ?? false,
-    , opts.measures2D ?? true),
+      opts.measures2D ?? true,
+    ),
   ];
   if (include3D) {
     pages.push(
