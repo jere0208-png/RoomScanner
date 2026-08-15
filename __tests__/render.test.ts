@@ -14,6 +14,7 @@ import {
   SNAPSHOT_VIEWS,
 } from '../src/export/svgSnapshot';
 import {
+  SNAPSHOT_FIXTURES,
   SNAPSHOT_OBJECTS,
   SNAPSHOT_OPENINGS,
   SNAPSHOT_ROOMS,
@@ -26,6 +27,7 @@ const input = {
   openings: SNAPSHOT_OPENINGS,
   objects: SNAPSHOT_OBJECTS,
   rooms: SNAPSHOT_ROOMS,
+  fixtures: SNAPSHOT_FIXTURES,
 };
 const dir = join(__dirname, '..', 'assets', 'rendu-reference');
 

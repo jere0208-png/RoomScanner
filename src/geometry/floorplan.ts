@@ -201,8 +201,12 @@ export function segLength(w: WallSeg): number {
 // ------------------------------------------------------ jonctions de murs
 
 const nodeKey = (p: Pt) => `${p.x.toFixed(3)}:${p.z.toFixed(3)}`;
-/** Normale « gauche » d'une direction unitaire. */
-const perp = (d: Pt): Pt => ({ x: -d.z, z: d.x });
+/**
+ * Normale « gauche » d'une direction unitaire. C'est elle qui définit le côté
+ * `a1/b1` d'un mur — donc, pour l'appareillage électrique, la face `+1`.
+ */
+export const perpOf = (d: Pt): Pt => ({ x: -d.z, z: d.x });
+const perp = perpOf;
 
 /**
  * Corps d'un mur au sol : quadrilatère à coins d'onglet.

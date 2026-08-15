@@ -15,6 +15,7 @@
  */
 import type { ObjectData } from 'react-native-room-scan';
 import type { RoomShape, WallSeg } from '../geometry/floorplan';
+import type { Fixture } from '../geometry/electrical';
 import { buildScene, type Face3D, type ScenePalette } from './../geometry/scene3d';
 
 /** Palette neutre : l'OBJ ne porte pas les couleurs, seule la forme compte. */
@@ -39,6 +40,7 @@ export interface ModelForExport {
   openings: WallSeg[];
   objects: ObjectData[];
   rooms?: RoomShape[];
+  fixtures?: Fixture[];
 }
 
 /** À quel groupe OBJ appartient une face. */
@@ -59,6 +61,7 @@ export function buildObj(model: ModelForExport, name = 'EchoPlan'): string {
     palette: SHAPE_ONLY,
     showSurfaces: true,
     rooms: model.rooms,
+    fixtures: model.fixtures,
   });
   const lines: string[] = [
     `# ${name} — exporté par EchoPlan`,

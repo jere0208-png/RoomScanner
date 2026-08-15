@@ -23,6 +23,7 @@ import {
   type WallSeg,
 } from '../geometry/floorplan';
 import { dotStep, floorDots, mixHex } from '../geometry/appearance';
+import type { Fixture } from '../geometry/electrical';
 import {
   buildScene,
   isHiddenFace,
@@ -402,6 +403,7 @@ function draw3DView(
     floors?: Record<string, FloorData | null | undefined>;
     roomNames?: Record<string, string>;
     rooms?: RoomShape[];
+    fixtures?: Fixture[];
   } = {},
 ) {
   const thetaDeg = view.theta;
@@ -415,6 +417,7 @@ function draw3DView(
     showTextures: opts.showTextures,
     floors: opts.floors,
     rooms: opts.rooms,
+    fixtures: opts.fixtures,
   });
   const faces = scene.faces;
   if (faces.length === 0) return;
@@ -558,6 +561,8 @@ interface SheetContext {
   roomNames: Record<string, string>;
   /** Pièces du scan, avec les murs qui bordent chacune. */
   rooms?: RoomShape[];
+  /** Appareillage électrique posé sur les murs. */
+  fixtures?: Fixture[];
   colorOpenings: boolean;
   showSurfaces: boolean;
   showTextures: boolean;
@@ -922,6 +927,7 @@ function threeDPage(
     floors: ctx.floors,
     roomNames: ctx.roomNames,
     rooms: ctx.rooms,
+    fixtures: ctx.fixtures,
     showDims,
   };
   const top = FRAME.y + FRAME.h;
@@ -957,6 +963,8 @@ export interface ScanForPdf {
   roomNames?: Record<string, string>;
   /** Pièces du scan, avec les murs qui bordent chacune. */
   rooms?: RoomShape[];
+  /** Appareillage électrique posé sur les murs. */
+  fixtures?: Fixture[];
 }
 
 export function pdfFilename(name: string): string {
@@ -984,6 +992,7 @@ export function buildScanPdf(
     floors: scan.floors ?? {},
     roomNames: scan.roomNames ?? {},
     rooms: scan.rooms,
+    fixtures: scan.fixtures ?? [],
     colorOpenings: opts.colorOpenings ?? false,
     showSurfaces: opts.surfaces ?? true,
     showTextures: opts.textures ?? false,

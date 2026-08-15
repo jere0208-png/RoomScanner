@@ -38,6 +38,12 @@ import {
 } from '../geometry/floorplan';
 import type { ObjectData } from 'react-native-room-scan';
 import { mixHex } from '../geometry/appearance';
+import {
+  FIXTURES,
+  faceX,
+  facePoint,
+  wallFace,
+} from '../geometry/electrical';
 import { frCategory, furnKind, furnitureStrokes } from '../geometry/furniture';
 
 interface EffMapping {
@@ -114,9 +120,11 @@ interface Props {
   drawing?: boolean;
   draftFrom?: Pt | null;
   onPickPoint?: (p: Pt, snappedToNode: boolean) => void;
+  /** Appui sur un symbole d'appareillage : ouvre son mur vu de face. */
+  onSelectFixture?: (id: string, wallId: string) => void;
   /** Commande lancée depuis les boutons flottants du mur sélectionné. */
   onWallAction?: (
-    action: 'longueur' | 'ouverture' | 'supprimer',
+    action: 'longueur' | 'ouverture' | 'electricite' | 'supprimer',
     wallId: string,
   ) => void;
 }
@@ -137,6 +145,7 @@ export function FloorplanEditor({
   onSelectRoom,
   onEditRoomName,
   onWallAction,
+  onSelectFixture,
   drawing,
   draftFrom,
   onPickPoint,
@@ -148,6 +157,7 @@ export function FloorplanEditor({
   const objects = showFurniture ? allObjects : [];
   const currentSaveId = useScanStore((s) => s.currentSaveId);
   const rooms = useScanStore((s) => s.rooms);
+  const fixtures = useScanStore((s) => s.fixtures);
   const colorOpenings = useScanStore((s) => s.showOpeningColors);
   const showSurfaces = useScanStore((s) => s.showSurfaces);
   const showTextures = useScanStore((s) => s.showTextures);
@@ -539,6 +549,58 @@ export function FloorplanEditor({
                 );
               })()}
 
+            {/* Appareillage électrique : le symbole se pose DANS la pièce,
+                juste devant la face qui porte l'appareil — c'est la
+                convention d'un plan d'électricien, et c'est aussi le seul
+                moyen de distinguer les deux faces d'une même cloison. */}
+            {fixtures.map((f) => {
+              const w = walls.find((x) => x.id === f.wallId);
+              if (!w) return null;
+              const face = wallFace(w, quads.get(w.id), f.side);
+              const spec = FIXTURES[f.kind];
+              const x = faceX(face, f.along);
+              const anchor = mapping.toPx(facePoint(face, x, 0.02));
+              const p = mapping.toPx(facePoint(face, x, 0.17));
+              return (
+                <G
+                  key={f.id}
+                  onPress={
+                    onSelectFixture
+                      ? () => onSelectFixture(f.id, f.wallId)
+                      : undefined
+                  }>
+                  <Line
+                    x1={anchor.x}
+                    y1={anchor.y}
+                    x2={p.x}
+                    y2={p.y}
+                    stroke={spec.color}
+                    strokeWidth={1.2}
+                  />
+                  {/* Cible tactile élargie : le symbole fait 16 px, le
+                      doigt en demande le double. */}
+                  <Circle cx={p.x} cy={p.y} r={17} fill="transparent" />
+                  <Circle
+                    cx={p.x}
+                    cy={p.y}
+                    r={8}
+                    fill={c.surface}
+                    stroke={spec.color}
+                    strokeWidth={2}
+                  />
+                  <SvgText
+                    x={p.x}
+                    y={p.y + 3}
+                    fill={spec.color}
+                    fontSize={7.5}
+                    fontWeight="800"
+                    textAnchor="middle">
+                    {spec.short}
+                  </SvgText>
+                </G>
+              );
+            })}
+
             {/* Cotes de détail : retour de mur, baie, retour de mur. Elles
                 n'apparaissent qu'une fois le plan assez zoomé pour les lire. */}
             {showMeasures && !navigating && detail > 0.02 &&
@@ -833,17 +895,19 @@ export function FloorplanEditor({
               const gap = 54;
               let bx = mid.x + nx * gap;
               let by = mid.y + ny * gap;
-              // Et jamais hors du cadre.
-              bx = Math.min(layout.w - 92, Math.max(92, bx));
+              // Et jamais hors du cadre : la barre porte quatre commandes,
+              // il lui faut 115 px de part et d'autre de son centre.
+              bx = Math.min(layout.w - 115, Math.max(115, bx));
               by = Math.min(layout.h - 40, Math.max(40, by));
               return (
                 <View
-                  style={[styles.wallActions, { left: bx - 88, top: by - 22 }]}
+                  style={[styles.wallActions, { left: bx - 111, top: by - 22 }]}
                   pointerEvents="box-none">
                   {(
                     [
                       ['longueur', 'Coter'],
                       ['ouverture', '+ Ouv.'],
+                      ['electricite', 'Élec'],
                       ['supprimer', 'Suppr.'],
                     ] as const
                   ).map(([action, label]) => (

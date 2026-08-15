@@ -116,6 +116,14 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
       focusRoomId ? objects.filter((o) => roomOf(o) === focusRoomId) : objects,
     [objects, focusRoomId],
   );
+  // L'appareillage suit son mur : en coupe sur une pièce, les prises des
+  // autres pièces s'en vont avec les murs qui les portaient.
+  const allFixtures = useScanStore((s) => s.fixtures);
+  const fixtures = useMemo(() => {
+    if (!focusRoomId) return allFixtures;
+    const ids = new Set(keptWalls.map((w) => w.id));
+    return allFixtures.filter((f) => ids.has(f.wallId));
+  }, [allFixtures, keptWalls, focusRoomId]);
   const floors = useMemo(() => floorsOf(rooms), [rooms]);
   const roomNames = useMemo(
     () => new Map(rooms.map((r) => [r.id, r.name])),
@@ -273,6 +281,7 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
         showTextures,
         floors,
         rooms,
+        fixtures,
         // Pendant un geste : mêmes volumes et mêmes contours, mais des pans
         // d'un seul tenant. C'est le découpage en bandes qui coûtait cher,
         // pas les contours — les supprimer faisait fondre le modèle en blanc.
@@ -288,6 +297,7 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
       showTextures,
       floors,
       rooms,
+      fixtures,
       interacting,
     ],
   );

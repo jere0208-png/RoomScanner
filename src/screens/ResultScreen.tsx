@@ -4,6 +4,7 @@ import {
   Animated,
   Easing,
   Keyboard,
+  KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
@@ -26,6 +27,7 @@ import {
   type Palette,
 } from '../theme';
 import { FloorplanEditor } from '../components/FloorplanEditor';
+import { WallElevation } from '../components/WallElevation';
 import { LogoMark } from '../components/LogoMark';
 import {
   DEFAULT_VIEW3D,
@@ -43,6 +45,11 @@ import { hasCapturedColors } from '../geometry/appearance';
 import { frCategory, ROOM_NAME_CHOICES } from '../geometry/furniture';
 import { buildObj, objFilename } from '../export/model3d';
 import { checkPlan, type PlanIssue } from '../geometry/diagnostics';
+import {
+  FIXTURES,
+  FIXTURE_FAMILIES,
+  type FixtureKind,
+} from '../geometry/electrical';
 import { useScanStore } from '../store/scanStore';
 
 type Tab = '2d' | '3d';
@@ -82,6 +89,8 @@ export function ResultScreen() {
   const undo = useScanStore((s) => s.undo);
   const canUndo = useScanStore((s) => s.canUndo);
   const openings = useScanStore((s) => s.openings);
+  const fixtures = useScanStore((s) => s.fixtures);
+  const addFixture = useScanStore((s) => s.addFixture);
 
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
   const [wInput, setWInput] = useState('');
@@ -124,6 +133,15 @@ export function ResultScreen() {
   const [lengthInput, setLengthInput] = useState('');
   const [renaming, setRenaming] = useState(false);
   const [nameInput, setNameInput] = useState('');
+  // Electricite : un seul panneau, qui montre soit le catalogue d'appareils,
+  // soit le mur vu de face. Deux fenetres empilees se marchent dessus sur
+  // iOS — celle-ci change de contenu plutot que d'en ouvrir une seconde.
+  const [elecOpen, setElecOpen] = useState(false);
+  const [elecView, setElecView] = useState<'catalogue' | 'mur'>('catalogue');
+  const [elecWallId, setElecWallId] = useState<string | null>(null);
+  const [elecSel, setElecSel] = useState<string | null>(null);
+  // Appareil choisi alors qu'aucun mur n'etait designe : on attend l'appui.
+  const [pendingKind, setPendingKind] = useState<FixtureKind | null>(null);
 
   const canvasRef = useRef<View>(null);
   const lengthRef = useRef<TextInput>(null);
@@ -175,7 +193,10 @@ export function ResultScreen() {
    */
   const shareObj = async () => {
     try {
-      const obj = buildObj({ walls, openings, objects, rooms }, scanName);
+      const obj = buildObj(
+        { walls, openings, objects, rooms, fixtures },
+        scanName,
+      );
       await RoomScan.shareText(obj, objFilename(scanName));
     } catch (e: any) {
       Alert.alert('Export impossible', e?.message ?? 'Erreur inconnue');
@@ -277,6 +298,55 @@ export function ResultScreen() {
     );
   };
 
+  /** Pose l'appareil sur ce mur et ouvre aussitot le mur vu de face. */
+  const placeFixture = (kind: FixtureKind, wallId: string) => {
+    const id = addFixture(kind, wallId);
+    setPendingKind(null);
+    if (!id) return;
+    setElecWallId(wallId);
+    setElecSel(id);
+    setElecView('mur');
+    setElecOpen(true);
+  };
+
+  /**
+   * Le « + » : le catalogue, puis un mur.
+   *
+   * Le mur visé est celui qu'on a sélectionné SUR LE PLAN 2D, et rien
+   * d'autre : en 3D aucune sélection n'est visible, et un mur retenu d'une
+   * visite précédente ferait atterrir la prise dans une autre pièce sans
+   * qu'on comprenne pourquoi.
+   */
+  const startFixture = () => {
+    setElecWallId(tab === '2d' ? selectedWallId : null);
+    setElecSel(null);
+    setElecView('catalogue');
+    setElecOpen(true);
+  };
+
+  /** Un appareil choisi dans le catalogue. */
+  const chooseKind = (kind: FixtureKind) => {
+    if (elecWallId) {
+      placeFixture(kind, elecWallId);
+      return;
+    }
+    // Aucun mur designe : on ferme et on attend un appui sur le plan.
+    setElecOpen(false);
+    setPendingKind(kind);
+    setTab('2d');
+    setEditMode(true);
+    setSelectedObjectId(null);
+    setSelectedRoomId(null);
+  };
+
+  /** Ouvre un mur vu de face, sans rien y poser. */
+  const openWallElevation = (wallId: string) => {
+    setElecWallId(wallId);
+    setElecSel(fixtures.find((f) => f.wallId === wallId)?.id ?? null);
+    setElecView('mur');
+    setElecOpen(true);
+  };
+
   const applyLength = () => {
     const v = parseFloat(lengthInput.replace(',', '.'));
     if (selectedWallId && v > 0) {
@@ -323,6 +393,9 @@ export function ResultScreen() {
       : []),
     { value: fr(perimeter), label: 'm de périmètre' },
     ...(objects.length > 0 ? [{ value: `${objects.length}`, label: 'objets' }] : []),
+    ...(fixtures.length > 0
+      ? [{ value: `${fixtures.length}`, label: 'élec.' }]
+      : []),
   ];
 
   return (
@@ -393,6 +466,8 @@ export function ResultScreen() {
               setSelectedObjectId(null);
               setSelectedRoomId(null);
               setSelectedWallId(id);
+              // Un appareil attendait son mur : le voici.
+              if (id && pendingKind) placeFixture(pendingKind, id);
               const wall = walls.find((w) => w.id === id);
               setLengthInput(wall ? segLength(wall).toFixed(2).replace('.', ',') : '');
             }}
@@ -417,8 +492,15 @@ export function ResultScreen() {
               setDraftFrom(null);
               setDrawing(false);
             }}
+            onSelectFixture={(id, wallId) => {
+              setElecWallId(wallId);
+              setElecSel(id);
+              setElecView('mur');
+              setElecOpen(true);
+            }}
             onWallAction={(action, wallId) => {
               if (action === 'ouverture') addOpening(wallId);
+              else if (action === 'electricite') openWallElevation(wallId);
               else if (action === 'supprimer') {
                 removeWall(wallId);
                 setSelectedWallId(null);
@@ -468,6 +550,7 @@ export function ResultScreen() {
               active={showFurniture}
               onPress={() => setShowFurniture(!showFurniture)}
             />
+            <ToolPill icon="plus" active={!!pendingKind} onPress={startFixture} />
             {canUndo && (
               <ToolPill icon="undo" active={false} onPress={undo} />
             )}
@@ -503,6 +586,7 @@ export function ResultScreen() {
               active={showFurniture}
               onPress={() => setShowFurniture(!showFurniture)}
             />
+            <ToolPill icon="plus" active={false} onPress={startFixture} />
             <ToolPill
               icon="more"
               active={showMore}
@@ -621,6 +705,19 @@ export function ResultScreen() {
               </ScrollView>
             </View>
           )}
+
+        {tab === '2d' && pendingKind && (
+          <View style={styles.wallLengthBar}>
+            <Text style={styles.wallLengthLabel}>
+              {FIXTURES[pendingKind].label} · touchez le mur qui le reçoit
+            </Text>
+            <TouchableOpacity
+              style={styles.roomAction}
+              onPress={() => setPendingKind(null)}>
+              <Text style={styles.roomActionText}>Annuler</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {tab === '2d' && drawing && (
           <View style={styles.wallLengthBar}>
@@ -1054,6 +1151,77 @@ export function ResultScreen() {
         </Pressable>
       </Modal>
 
+      {/* ---------- Électricité : catalogue, puis le mur vu de face ---------- */}
+      <Modal
+        visible={elecOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setElecOpen(false)}>
+        <Pressable
+          style={styles.modalBackdrop}
+          onPress={() => setElecOpen(false)}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={styles.elecWrap}>
+            <Pressable onPress={() => {}}>
+              {elecView === 'mur' && elecWallId ? (
+                <WallElevation
+                  wallId={elecWallId}
+                  selectedId={elecSel}
+                  onSelect={setElecSel}
+                  onAddRequest={() => setElecView('catalogue')}
+                  onClose={() => setElecOpen(false)}
+                />
+              ) : (
+                <View style={styles.modalCard}>
+                  <Text style={styles.modalTitle}>Ajouter un appareil</Text>
+                  <Text style={styles.modalSubtitle}>
+                    Il se pose à 20 cm du coin bas gauche du mur, puis se
+                    déplace au doigt ou à la cote, face au mur.
+                  </Text>
+                  <ScrollView style={styles.elecScroll}>
+                    {FIXTURE_FAMILIES.map((family) => (
+                      <View key={family.name}>
+                        <Text style={styles.elecFamily}>{family.name}</Text>
+                        <View style={styles.elecGrid}>
+                          {family.kinds.map((kind) => {
+                            const spec = FIXTURES[kind];
+                            return (
+                              <TouchableOpacity
+                                key={kind}
+                                style={styles.elecChip}
+                                onPress={() => chooseKind(kind)}>
+                                <View
+                                  style={[
+                                    styles.elecDot,
+                                    { backgroundColor: spec.color },
+                                  ]}>
+                                  <Text style={styles.elecDotText}>
+                                    {spec.short}
+                                  </Text>
+                                </View>
+                                <Text style={styles.elecChipText}>
+                                  {spec.label}
+                                </Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+                      </View>
+                    ))}
+                  </ScrollView>
+                  <TouchableOpacity
+                    style={styles.modalGhost}
+                    onPress={() => setElecOpen(false)}>
+                    <Text style={styles.modalGhostText}>Annuler</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </Pressable>
+          </KeyboardAvoidingView>
+        </Pressable>
+      </Modal>
+
       {/* ---------- Renommage ---------- */}
       <Modal
         visible={renaming}
@@ -1127,6 +1295,7 @@ type ToolIcon =
   | 'undo'
   | 'square'
   | 'check'
+  | 'plus'
   | 'more';
 
 /** Tracés 24×24 des icônes d'outils (trait simple, lisible en 18 px). */
@@ -1169,6 +1338,8 @@ const TOOL_PATHS: Record<ToolIcon, { d: string; fill?: boolean }[]> = {
     { d: 'M12 3.2 l7.8 4.4 v8.8 L12 20.8 l-7.8 -4.4 V7.6 z' },
     { d: 'M12 12 l7.8 -4.4 M12 12 L4.2 7.6 M12 12 v8.8' },
   ],
+  // Le « + » de l'appareillage electrique.
+  plus: [{ d: 'M12 5 v14' }, { d: 'M5 12 h14' }],
   // Trois points : le tiroir des outils secondaires.
   more: [
     { d: 'M12 5.2 h0.01' },
@@ -1612,6 +1783,37 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     ...shadowCard,
   },
   modalTitle: { color: c.ink, fontSize: 17, fontWeight: '800' },
+  elecWrap: { width: '100%' },
+  elecScroll: { maxHeight: 340 },
+  elecFamily: {
+    color: c.inkFaint,
+    fontSize: 11.5,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginTop: 12,
+    marginBottom: 6,
+  },
+  elecGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  elecChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: c.surfaceSunken,
+    borderRadius: radius.pill,
+    paddingLeft: 6,
+    paddingRight: 14,
+    paddingVertical: 6,
+  },
+  elecDot: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  elecDotText: { color: '#FFFFFF', fontSize: 9.5, fontWeight: '800' },
+  elecChipText: { color: c.ink, fontSize: 13.5, fontWeight: '700' },
   modalSubtitle: {
     color: c.inkFaint,
     fontSize: 12.5,

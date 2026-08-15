@@ -23,10 +23,21 @@ import {
   splitAtJunctions,
   straightenWalls,
   toSegment,
+  wallQuads,
   weldCorners,
   type Pt,
   type WallSeg,
 } from '../geometry/floorplan';
+import {
+  FIXTURES,
+  faceX,
+  fromFaceX,
+  interiorSide,
+  newFixture,
+  wallFace,
+  type Fixture,
+  type FixtureKind,
+} from '../geometry/electrical';
 import { pointInPolygon } from '../geometry/appearance';
 import {
   deduceRoomKind,
@@ -68,6 +79,8 @@ export interface SavedScan {
   walls: WallSeg[];
   openings: WallSeg[];
   objects: ObjectData[];
+  /** Appareillage électrique ajouté à la main. Absent des scans d'avant. */
+  fixtures?: Fixture[];
   /** Scans d'avant le multi-pièces : nom unique de la pièce. */
   roomName?: string;
   /** Scans d'avant le multi-pièces : sol unique. */
@@ -165,9 +178,13 @@ export function floorsOf(
 
 /** Scans enregistrés avant le multi-pièces : une seule pièce, implicite. */
 function migrateSave(s: SavedScan): SavedScan {
-  if (Array.isArray(s.rooms) && s.rooms.length > 0) return s;
+  const fixtures = Array.isArray(s.fixtures) ? s.fixtures : [];
+  if (Array.isArray(s.rooms) && s.rooms.length > 0) {
+    return s.fixtures === fixtures ? s : { ...s, fixtures };
+  }
   return {
     ...s,
+    fixtures,
     rooms: [
       { id: DEFAULT_ROOM_ID, name: s.roomName ?? '', floor: s.floor ?? null },
     ],
@@ -203,6 +220,7 @@ interface Snapshot {
   openings: WallSeg[];
   objects: ObjectData[];
   rooms: RoomEntry[];
+  fixtures: Fixture[];
 }
 const HISTORY_MAX = 40;
 const history: Snapshot[] = [];
@@ -264,6 +282,18 @@ interface ScanState {
    * raccroche ; le second se déplace ensuite par sa poignée.
    */
   addWallBetween: (a: Pt, b: Pt) => void;
+  /** Appareillage électrique posé sur les murs (prises, commandes, RJ45…). */
+  fixtures: Fixture[];
+  /**
+   * Pose un appareil sur un mur, à 20 cm du coin bas gauche de la face qui
+   * regarde la pièce. Renvoie son identifiant, pour l'ouvrir aussitôt.
+   */
+  addFixture: (kind: FixtureKind, wallId: string) => string | null;
+  /** Déplace un appareil sur sa face : cote depuis le bord, hauteur d'axe. */
+  moveFixture: (id: string, along: number, height: number) => void;
+  /** Bascule l'appareil sur l'autre face du mur, sans le déplacer. */
+  flipFixture: (id: string) => void;
+  removeFixture: (id: string) => void;
   /** Annule la dernière retouche. Vide = plus rien à annuler. */
   undo: () => void;
   canUndo: boolean;
@@ -344,6 +374,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       openings: st.openings,
       objects: st.objects,
       rooms: st.rooms,
+      fixtures: st.fixtures,
     });
     if (history.length > HISTORY_MAX) history.shift();
     if (!st.canUndo) set({ canUndo: true });
@@ -369,6 +400,7 @@ export const useScanStore = create<ScanState>((set, get) => {
             walls: st.walls,
             openings: st.openings,
             objects: st.objects,
+            fixtures: st.fixtures,
             modelPath: st.modelPath,
             updatedAt: Date.now(),
           }
@@ -399,6 +431,7 @@ export const useScanStore = create<ScanState>((set, get) => {
     walls: [],
     openings: [],
     objects: [],
+    fixtures: [],
     canUndo: false,
     saves: [],
     themePref: 'light',
@@ -466,6 +499,7 @@ export const useScanStore = create<ScanState>((set, get) => {
           return dist < 0.6;
         }),
         objects: st.objects.filter((o) => roomOf(o) !== roomId),
+        fixtures: st.fixtures.filter((f) => !doomed.has(f.wallId)),
         dirty: true,
       });
     },
@@ -603,6 +637,8 @@ export const useScanStore = create<ScanState>((set, get) => {
         })),
         // Une ouverture sans mur d'accueil n'a plus de sens.
         openings: st.openings.filter((o) => nearestWall(o, walls).dist < 0.6),
+        // Une prise non plus : elle était posée sur la face de ce mur.
+        fixtures: st.fixtures.filter((f) => f.wallId !== wallId),
         dirty: true,
       });
     },
@@ -624,6 +660,68 @@ export const useScanStore = create<ScanState>((set, get) => {
             yCenter: h / 2,
           },
         ],
+        dirty: true,
+      });
+    },
+
+    addFixture: (kind, wallId) => {
+      const st = get();
+      const wall = st.walls.find((w) => w.id === wallId);
+      if (!wall) return null;
+      pushHistory('addFixture');
+      const id = `el-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      const f = newFixture(
+        id,
+        kind,
+        wall,
+        wallQuads(st.walls).get(wallId),
+        interiorSide(wall, st.walls, st.rooms),
+      );
+      set({ fixtures: [...st.fixtures, f], dirty: true });
+      return id;
+    },
+
+    moveFixture: (id, along, height) => {
+      const st = get();
+      const f = st.fixtures.find((x) => x.id === id);
+      const wall = f ? st.walls.find((w) => w.id === f.wallId) : null;
+      if (!f || !wall) return;
+      // Un appareil ne peut pas sortir de son mur : ses cotes sont bornées à
+      // la face, demi-plaque comprise, et à la hauteur sous plafond.
+      const face = wallFace(wall, wallQuads(st.walls).get(wall.id), f.side);
+      const spec = FIXTURES[f.kind];
+      const hw = Math.min(spec.w / 2, face.len / 2);
+      const hh = Math.min(spec.h / 2, wall.height / 2);
+      const x = Math.max(hw, Math.min(face.len - hw, faceX(face, along)));
+      pushHistory(`fixture:${id}`);
+      set({
+        fixtures: st.fixtures.map((o) =>
+          o.id === id
+            ? {
+                ...o,
+                along: fromFaceX(face, x),
+                height: Math.max(hh, Math.min(wall.height - hh, height)),
+              }
+            : o,
+        ),
+        dirty: true,
+      });
+    },
+
+    flipFixture: (id) => {
+      pushHistory(`flip:${id}`);
+      set({
+        fixtures: get().fixtures.map((f) =>
+          f.id === id ? { ...f, side: (f.side > 0 ? -1 : 1) as 1 | -1 } : f,
+        ),
+        dirty: true,
+      });
+    },
+
+    removeFixture: (id) => {
+      pushHistory('removeFixture');
+      set({
+        fixtures: get().fixtures.filter((f) => f.id !== id),
         dirty: true,
       });
     },
@@ -734,6 +832,7 @@ export const useScanStore = create<ScanState>((set, get) => {
           walls: [],
           openings: [],
           objects: [],
+          fixtures: [],
           processing: false,
           scanning: false,
           screen: 'result',
@@ -753,6 +852,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         walls,
         openings,
         objects,
+        fixtures: [],
       };
       const saves = [save, ...get().saves];
       set({
@@ -765,6 +865,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         walls,
         openings,
         objects,
+        fixtures: [],
         saves,
         processing: false,
         scanning: false,
@@ -910,6 +1011,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         openings: migrated.openings,
         objects: migrated.objects,
         rooms: migrated.rooms,
+        fixtures: migrated.fixtures ?? [],
         dirty: false,
       });
       clearHistory();
@@ -932,6 +1034,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         walls: st.walls,
         openings: st.openings,
         objects: st.objects,
+        fixtures: st.fixtures,
       };
       const saves = [save, ...st.saves];
       set({ saves, currentSaveId: save.id, scanName: clean, dirty: false });
@@ -981,6 +1084,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         walls: save.walls,
         openings: save.openings,
         objects: save.objects,
+        fixtures: save.fixtures ?? [],
         dirty: false,
         resultOrigin: 'library',
         screen: 'result',
@@ -1017,6 +1121,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         walls: [],
         openings: [],
         objects: [],
+        fixtures: [],
       }),
   };
 });

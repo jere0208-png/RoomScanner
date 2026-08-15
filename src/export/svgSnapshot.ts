@@ -12,6 +12,7 @@
  */
 import type { ObjectData } from 'react-native-room-scan';
 import type { RoomShape, WallSeg } from '../geometry/floorplan';
+import type { Fixture } from '../geometry/electrical';
 import {
   buildScene,
   isHiddenFace,
@@ -46,6 +47,7 @@ export interface SnapshotInput {
   openings: WallSeg[];
   objects: ObjectData[];
   rooms?: RoomShape[];
+  fixtures?: Fixture[];
   showSurfaces?: boolean;
 }
 
@@ -63,6 +65,7 @@ export function renderSceneSvg(
     palette: SNAPSHOT_PALETTE,
     showSurfaces: input.showSurfaces ?? true,
     rooms: input.rooms,
+    fixtures: input.fixtures,
   });
   const { center, radius3d } = sceneFraming(scene.faces);
   const ct = Math.cos(rad(view.theta));

@@ -7,6 +7,7 @@
  * une fois — ils doivent tous figurer sur la planche.
  */
 import type { ObjectData } from 'react-native-room-scan';
+import type { Fixture } from '../geometry/electrical';
 import {
   detectRooms,
   mergeColinear,
@@ -86,6 +87,30 @@ export const SNAPSHOT_OPENINGS: WallSeg[] = [
   hole('baie', 'opening', 5, 0, 6.2, 0, 2.1, 1.05, true),
   // Fenêtre à l'est, avec allège.
   hole('fenetre', 'window', 7, 1, 7, 2.2, 1.1, 1.45),
+];
+
+/**
+ * Appareillage électrique : une prise et un interrupteur, sur les deux faces
+ * du refend. C'est le cas qui casse — deux petits volumes dos à dos, à 14 cm
+ * l'un de l'autre, dont un seul doit se voir depuis chaque pièce.
+ */
+export const SNAPSHOT_FIXTURES: Fixture[] = [
+  {
+    id: 'prise-sejour',
+    kind: 'prise',
+    wallId: SNAPSHOT_WALLS.find((w) => w.id.startsWith('refend'))?.id ?? 'refend',
+    along: 2.2,
+    height: 0.25,
+    side: 1,
+  },
+  {
+    id: 'inter-cuisine',
+    kind: 'inter',
+    wallId: SNAPSHOT_WALLS.find((w) => w.id.startsWith('refend'))?.id ?? 'refend',
+    along: 2.2,
+    height: 1.1,
+    side: -1,
+  },
 ];
 
 export const SNAPSHOT_OBJECTS: ObjectData[] = [

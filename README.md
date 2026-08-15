@@ -234,6 +234,64 @@ avec le zoom** : sous 55 px/m, seule la cote globale du mur ; au-delà de
 les autres apparaissent. Une cote plus courte que son propre texte n'est pas
 tracée.
 
+### Électricité : poser l'appareillage
+
+Un plan vu de dessus ne dit rien d'une hauteur, et une vue 3D en perspective
+ne se cote pas. Or un électricien ne travaille qu'avec ça : une distance
+depuis un coin, une hauteur depuis le sol. D'où un troisième point de vue —
+**face au mur, bien à plat**, un seul mur à la fois, à l'échelle, avec ses
+portes et ses fenêtres.
+
+Le « **+** » de la barre d'outils ouvre le catalogue : prises 16/20/32 A et
+prise double, interrupteur, va-et-vient, bouton poussoir, variateur, RJ45,
+TV, applique, tableau, thermostat, sortie de câble, boîte de dérivation.
+Chaque type porte sa **hauteur usuelle**, rappelée sous son nom quand on le
+sélectionne — un bouton la lui applique d'un appui. L'appareil, lui, arrive
+toujours **à 20 cm du coin bas gauche** : un point de départ prévisible vaut
+mieux qu'un placement malin qu'on ne comprend pas.
+
+On le déplace ensuite au doigt, ou à la cote : trois champs en centimètres —
+depuis la gauche, depuis la droite, depuis le sol — qui se répondent. Le
+doigt étant imprécis, le geste **s'accroche** à la hauteur usuelle du type
+posé, à l'alignement d'un appareil déjà en place et au milieu du mur ; le
+repère vert s'affiche tant qu'on y est collé. Un appui sur le symbole d'un
+appareil, sur le plan 2D, rouvre son mur de face.
+
+**La face du mur est le vrai repère, et c'est ce qui fait toute la
+géométrie.** Une cloison a deux faces, et de l'autre côté la gauche et la
+droite s'échangent. `wallFace()` renvoie donc la face demandée avec son bord
+gauche **tel qu'on le voit en se plaçant devant** — un test le vérifie en
+projetant les deux bords exactement comme le fait la vue 3D, faute de quoi
+une prise sur deux se poserait à l'autre bout du mur.
+
+Deux conséquences, contre-intuitives mais justes :
+
+- **Les deux faces d'un mur n'ont pas la même longueur.** L'onglet des coins
+  raccourcit celle de l'intérieur d'une épaisseur de mur et rallonge celle de
+  l'extérieur d'autant. C'est bien ce qu'on veut : la cote part du coin fini
+  que l'électricien a sous les yeux, pas de l'axe théorique.
+- **La position est stockée le long du SEGMENT de mur, jamais depuis le bord
+  de la face.** Retourner un appareil sur l'autre face ne doit pas le faire
+  sauter à l'autre bout ; et la face, elle, change de longueur dès qu'un mur
+  voisin bouge. Un test vérifie qu'après retournement le point n'a traversé
+  que l'épaisseur du mur, sans glisser le long de celui-ci.
+
+En 3D, une prise est un **volume** posé à 1 mm devant le nu, avec ses
+normales sortantes comme le reste du modèle : elle disparaît d'elle-même
+quand on passe derrière son mur, et la coupe sur une pièce emporte les
+appareils des autres. Sur le plan 2D, le symbole se pose **dans la pièce**,
+relié au mur par un filet — la convention d'un plan d'électricien, et le seul
+moyen de distinguer les deux faces d'une même cloison. Le PDF et l'OBJ les
+reprennent, puisque tout passe par `buildScene()`.
+
+Deux appareils dos à dos figurent d'ailleurs sur la planche de référence : le
+cas où deux volumes distants de 14 cm doivent se masquer proprement est
+exactement celui qui casse.
+
+**Limite** : tout s'accroche à un mur. Les points de plafond — DCL, spots,
+détecteur de fumée — n'ont pas de support dans ce modèle et ne sont pas
+proposés.
+
 ### Les fenêtres
 
 Toutes se ferment **en touchant à côté** — le voile sombre est l'échappatoire
@@ -472,7 +530,7 @@ passe inaperçu jusqu'à la CI. C'est arrivé une fois.
 ## Vérifications faites sur cette machine (Windows)
 
 - `npx tsc --noEmit` et `npx eslint src App.tsx` : aucun diagnostic.
-- `npx jest` : 125/125 tests verts (conversion matrice iOS→segment, extrémités
+- `npx jest` : 150/150 tests verts (conversion matrice iOS→segment, extrémités
   Android, soudure des coins et jonctions en T, onglets des murs, surface au
   sol, semis de points, lecture des textures, snap angulaire, projection
   mètres↔pixels, génération du PDF ; **multi-pièces** : découpe par pièce,
@@ -495,7 +553,14 @@ passe inaperçu jusqu'à la CI. C'est arrivé une fois.
   brut → deux pièces nommées, meubles répartis, contours exacts ;
   **retouches** : fusion de deux pièces, scission par cloison, noms gardés à
   la redétection, hauteur par pièce et refus des valeurs aberrantes, cotes
-  hors-tout, surface murale nette, feuille de métré activable).
+  hors-tout, surface murale nette, feuille de métré activable ;
+  **électricité** : repère des deux faces d'un mur, longueurs différentes
+  par l'onglet, gauche/droite vérifiées contre la projection réelle de la
+  vue 3D, pose à 20/20, appareil large qui ne déborde pas, volume posé
+  devant le nu sans y entrer, gabarit et hauteur, faces arrière masquées,
+  appareil orphelin qui ne dessine rien, bornage des cotes au mur,
+  retournement sans glissement, mur supprimé qui emporte son appareillage,
+  annulation, scans d'avant l'électricité).
 - **Non vérifié ici** : la compilation Swift/Kotlin (impossible sans Mac /
   SDK Android). Les points d'attente connus sont notés ci-dessous.
 

@@ -21,6 +21,12 @@ import {
   type WallSeg,
 } from './floorplan';
 import { floorColorAt, mixHex, pointInPolygon, sampleTexture } from './appearance';
+import {
+  FIXTURES,
+  faceX,
+  wallFace,
+  type Fixture,
+} from './electrical';
 
 export interface P3 {
   x: number;
@@ -113,6 +119,8 @@ export interface SceneOptions {
   floors?: Record<string, FloorData | null | undefined>;
   /** Pièces du scan, avec les murs qui bordent chacune. */
   rooms?: RoomShape[];
+  /** Appareillage électrique posé sur les faces de murs. */
+  fixtures?: Fixture[];
   /**
    * Rendu allégé pendant un geste : les pans ne sont plus découpés en bandes,
    * ce qui divise le nombre de polygones par cinq. Le volume reste complet,
@@ -733,6 +741,48 @@ export function buildScene(
         closeBottom: true,
       });
     }
+  }
+
+  // ------------------------------------------- appareillage électrique
+  // Une prise est un petit VOLUME plaqué sur la face du mur, pas une
+  // pastille peinte dessus : elle porte ses normales sortantes comme le
+  // reste du modèle, donc elle disparaît d'elle-même dès qu'on passe
+  // derrière son mur, et rien ne peut la faire flotter au travers.
+  const wallById = new Map(walls.map((w) => [w.id, w]));
+  for (const f of opts.fixtures ?? []) {
+    const w = wallById.get(f.wallId);
+    if (!w) continue;
+    const face = wallFace(w, quads.get(w.id), f.side);
+    const spec = FIXTURES[f.kind];
+    const x = faceX(face, f.along);
+    const hw = spec.w / 2;
+    const yb = Math.max(0, f.height - spec.h / 2);
+    // Le dos de la plaque est posé à 1 mm devant le nu : collé pile dessus,
+    // les deux faces se disputeraient le même plan.
+    const at = (dx: number, out: number): Pt => ({
+      x: face.A.x + face.ux * (x + dx) + face.nx * out,
+      z: face.A.z + face.uz * (x + dx) + face.nz * out,
+    });
+    pushWallBlock(
+      {
+        a1: at(-hw, spec.depth),
+        b1: at(hw, spec.depth),
+        b2: at(hw, 0.001),
+        a2: at(-hw, 0.001),
+      },
+      0,
+      1,
+      yb,
+      yb + spec.h,
+      {
+        fill: spec.color,
+        top: mixHex(spec.color, '#FFFFFF', 0.3),
+        stroke: mixHex(spec.color, '#000000', 0.4),
+        topStroke: mixHex(spec.color, '#000000', 0.4),
+        shade: true,
+        closeBottom: true,
+      },
+    );
   }
 
   // ------------------------- ouvertures sans mur d'accueil identifiable

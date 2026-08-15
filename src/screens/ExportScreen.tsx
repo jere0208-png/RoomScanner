@@ -161,6 +161,7 @@ export function ExportScreen() {
   const walls = useScanStore((s) => s.walls);
   const openings = useScanStore((s) => s.openings);
   const objects = useScanStore((s) => s.objects);
+  const fixtures = useScanStore((s) => s.fixtures);
   const showOpeningColors = useScanStore((s) => s.showOpeningColors);
   const setShowOpeningColors = useScanStore((s) => s.setShowOpeningColors);
   const showFurniture = useScanStore((s) => s.showFurniture);
@@ -220,6 +221,7 @@ export function ExportScreen() {
           openings,
           objects: showFurniture ? objects : [],
           rooms,
+          fixtures,
           floors: floorsOf(rooms),
           roomNames: Object.fromEntries(rooms.map((r) => [r.id, r.name])),
         },
