@@ -89,9 +89,13 @@ export function renderSceneSvg(
     .filter((f) => !isHiddenFace(f, cam))
     .map((f) => {
       const proj = f.pts.map(project);
+      // Une arête se trie avec le pan qu'elle borde (`depthAt`), pas sur sa
+      // propre position : sinon l'arête basse d'un mur passe avant lui.
       const depth = f.isFloor
         ? -Infinity
-        : proj.reduce((s, p) => s + p.depth, 0) / proj.length + (f.bias ?? 0);
+        : (f.depthAt ? project(f.depthAt).depth
+                     : proj.reduce((s, p) => s + p.depth, 0) / proj.length) +
+          (f.bias ?? 0);
       const fill = shadeFill(f, ct, st) ?? 'none';
       return {
         depth,

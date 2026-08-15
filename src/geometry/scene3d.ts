@@ -42,6 +42,18 @@ export interface Face3D {
   /** Trait pointillé : réservé aux passages, qui sont des vides. */
   dashed?: boolean;
   /**
+   * Point dont la profondeur classe la face, à la place de son propre centre.
+   *
+   * Une ARÊTE doit se trier avec le pan qu'elle borde, pas pour elle-même :
+   * l'arête basse d'un mur est à y = 0 alors que le pan a son centre à
+   * mi-hauteur. Comme la profondeur croît avec l'altitude, l'arête basse
+   * passait AVANT son propre pan, qui la repeignait aussitôt. C'est ce qui
+   * effaçait le silhouettage — et pourquoi il réapparaissait pendant un
+   * geste, où un pan non découpé porte un contour d'un seul tenant, centré
+   * comme lui.
+   */
+  depthAt?: P3;
+  /**
    * Normale sortante d'une face de VOLUME. Sa présence dit que la face
    * appartient à un solide fermé : quand elle tourne le dos à la caméra, on
    * ne la dessine pas du tout. C'est ce qui empêche définitivement les deux
@@ -416,13 +428,36 @@ export function buildScene(
    * plus proche, et on verrait le trait le traverser. Chaque arête est donc
    * un segment à part, trié à sa propre profondeur.
    */
-  const pushEdge = (p: P3, q: P3, stroke: string, normal?: P3) => {
-    faces.push({ pts: [p, q], fill: null, stroke, bias: 0.004, normal });
+  /**
+   * Biais de tri des arêtes, en mètres.
+   *
+   * Il valait 4 mm — dérisoire à côté d'une épaisseur de mur de 14 cm : la
+   * moindre face voisine, dessinée après, effaçait le trait. Le silhouettage
+   * disparaissait alors sur fond blanc, sauf pendant un geste où un pan n'est
+   * pas découpé et son contour redevient un quadrilatère plus large.
+   *
+   * 5 cm : une arête l'emporte sur tout ce qui la frôle (faces coplanaires,
+   * bandes voisines, menuiserie en retrait de 22 %), mais reste masquée par
+   * une géométrie franchement plus proche — un mur devant en cache toujours
+   * un autre.
+   */
+  const EDGE_BIAS = 0.02;
+
+  /** `at` = centre du pan bordé : c'est lui qui donne sa place à l'arête. */
+  const pushEdge = (p: P3, q: P3, stroke: string, normal?: P3, at?: P3) => {
+    faces.push({
+      pts: [p, q],
+      fill: null,
+      stroke,
+      bias: EDGE_BIAS,
+      normal,
+      depthAt: at,
+    });
   };
 
   /** Contour d'un quadrilatère non découpé : un seul polygone suffit. */
   const pushOutline = (pts: P3[], stroke: string, normal?: P3) => {
-    faces.push({ pts, fill: null, stroke, bias: 0.004, normal });
+    faces.push({ pts, fill: null, stroke, bias: EDGE_BIAS, normal });
   };
 
   /**
@@ -490,7 +525,13 @@ export function buildScene(
         continue;
       }
       // Découpé : seules les arêtes du POURTOUR sont tracées.
-      const E = (a: P3, b: P3) => pushEdge(a, b, o.outline!, o.normal);
+      // Toutes les arêtes de la bande se trient AVEC elle, depuis son centre.
+      const mid: P3 = {
+        x: (s0.x + s1.x) / 2,
+        y: (yb + yt) / 2,
+        z: (s0.z + s1.z) / 2,
+      };
+      const E = (a: P3, b: P3) => pushEdge(a, b, o.outline!, o.normal, mid);
       E({ x: s0.x, y: yt, z: s0.z }, { x: s1.x, y: yt, z: s1.z });
       E({ x: s0.x, y: yb, z: s0.z }, { x: s1.x, y: yb, z: s1.z });
       if (i === 0) E({ x: s0.x, y: yb, z: s0.z }, { x: s0.x, y: yt, z: s0.z });
@@ -527,10 +568,15 @@ export function buildScene(
         pushOutline([c1, c2, c3, c4].map(at), outline, normal);
         continue;
       }
-      pushEdge(at(c1), at(c2), outline, normal);
-      pushEdge(at(c4), at(c3), outline, normal);
-      if (i === 0) pushEdge(at(c1), at(c4), outline, normal);
-      if (i === n - 1) pushEdge(at(c2), at(c3), outline, normal);
+      const mid: P3 = {
+        x: (c1.x + c2.x + c3.x + c4.x) / 4,
+        y,
+        z: (c1.z + c2.z + c3.z + c4.z) / 4,
+      };
+      pushEdge(at(c1), at(c2), outline, normal, mid);
+      pushEdge(at(c4), at(c3), outline, normal, mid);
+      if (i === 0) pushEdge(at(c1), at(c4), outline, normal, mid);
+      if (i === n - 1) pushEdge(at(c2), at(c3), outline, normal, mid);
     }
   };
 

@@ -327,9 +327,15 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
       .filter((face) => !isHiddenFace(face, cam))
       .map((face) => {
       const proj = face.pts.map(project);
+      // Une arête se trie avec le pan qu'elle borde (`depthAt`), pas sur sa
+      // propre position : sinon l'arête basse d'un mur passe avant lui et le
+      // pan la repeint — c'est ce qui effaçait le silhouettage.
       const depth = face.isFloor
         ? -Infinity
-        : proj.reduce((s, p) => s + p.depth, 0) / proj.length + (face.bias ?? 0);
+        : (face.depthAt
+            ? project(face.depthAt).depth
+            : proj.reduce((s, p) => s + p.depth, 0) / proj.length) +
+          (face.bias ?? 0);
 
       // Lumière liée à la caméra : les pans face à nous sont clairs, ceux de
       // profil s'assombrissent — le volume se lit immédiatement.

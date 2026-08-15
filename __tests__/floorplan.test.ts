@@ -897,6 +897,25 @@ describe('portes et fenêtres en volumes', () => {
     }
   });
 
+  it('trie chaque arête AVEC le pan qu’elle borde, jamais avant lui', () => {
+    // L'arête basse d'un mur est à y = 0 alors que son pan est centré à
+    // mi-hauteur ; la profondeur croissant avec l'altitude, elle passait
+    // AVANT son propre pan, qui la repeignait. Le silhouettage disparaissait
+    // donc à l'arrêt, et ne revenait que pendant un geste — où un pan non
+    // découpé porte un contour d'un seul tenant, centré comme lui.
+    const scene = buildScene(rect, [], [], { palette: TEST_PALETTE });
+    const aretes = scene.faces.filter((f) => f.fill === null);
+    expect(aretes.length).toBeGreaterThan(20);
+    expect(aretes.every((f) => f.depthAt !== undefined)).toBe(true);
+    // Et le point de tri est bien DANS le pan, pas sur son bord.
+    for (const a of aretes) {
+      const ys = a.pts.map((p) => p.y);
+      const at = a.depthAt!;
+      expect(at.y).toBeGreaterThanOrEqual(Math.min(...ys) - 1e-6);
+      expect(at.y).toBeLessThanOrEqual(Math.max(...ys) + 1e-6);
+    }
+  });
+
   it('ne met en pointillé QUE les passages', () => {
     // Le pointillé fuyait sur tout le modèle : les polygones sont retriés à
     // chaque image et React réutilisait le composant d'un pan pointillé.

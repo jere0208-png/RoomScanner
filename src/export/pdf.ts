@@ -449,9 +449,12 @@ function draw3DView(
     .filter((f) => !isHiddenFace(f, cam))
     .map((f) => {
       const pts = f.pts.map(project);
+      // Une arête se trie avec le pan qu'elle borde (`depthAt`).
       const depth = f.isFloor
         ? -Infinity
-        : pts.reduce((s, p) => s + p.depth, 0) / pts.length + (f.bias ?? 0);
+        : (f.depthAt ? project(f.depthAt).depth
+                     : pts.reduce((s, p) => s + p.depth, 0) / pts.length) +
+          (f.bias ?? 0);
       const fill = shadeFill(f, ct, st);
       // Pan sans contour propre : bordé de sa propre couleur, sinon la couture
       // entre deux bandes voisines se voit à l'impression.
