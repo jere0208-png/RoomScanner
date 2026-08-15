@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Alert,
   Animated,
@@ -129,6 +129,15 @@ export function ResultScreen() {
   const [showMeasures, setShowMeasures] = useState(false);
   const [show3DMeasures, setShow3DMeasures] = useState(true);
   const [editMode, setEditMode] = useState(false);
+  /**
+   * Jeu de pastilles affiché. Il RETARDE sur `editMode` : les anciennes
+   * pastilles rentrent d'abord dans le bouton d'édition, les nouvelles en
+   * ressortent ensuite. Passer par un état séparé plutôt que par `editMode`
+   * lui-même permet au plan de basculer tout de suite — c'est la barre, et
+   * elle seule, qui prend le temps de l'animation.
+   */
+  const [barMode, setBarMode] = useState(false);
+  const swap = useRef(new Animated.Value(1)).current;
   const [selectedWallId, setSelectedWallId] = useState<string | null>(null);
   const [lengthInput, setLengthInput] = useState('');
   const [renaming, setRenaming] = useState(false);
@@ -142,6 +151,28 @@ export function ResultScreen() {
   const [elecSel, setElecSel] = useState<string | null>(null);
   // Appareil choisi alors qu'aucun mur n'etait designe : on attend l'appui.
   const [pendingKind, setPendingKind] = useState<FixtureKind | null>(null);
+
+  // Le diagnostic et la pose d'un appareil passent aussi en édition sans
+  // toucher au bouton : l'animation est déclenchée par l'écart entre les
+  // deux états, jamais par le geste, sinon la moitié des cas l'oublierait.
+  useEffect(() => {
+    if (editMode === barMode) return;
+    Animated.timing(swap, {
+      toValue: 0,
+      duration: 130,
+      easing: Easing.in(Easing.cubic),
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      if (!finished) return;
+      setBarMode(editMode);
+      Animated.timing(swap, {
+        toValue: 1,
+        duration: 260,
+        easing: Easing.out(Easing.back(1.6)),
+        useNativeDriver: true,
+      }).start();
+    });
+  }, [editMode, barMode, swap]);
 
   const canvasRef = useRef<View>(null);
   const lengthRef = useRef<TextInput>(null);
@@ -524,39 +555,81 @@ export function ResultScreen() {
             showsHorizontalScrollIndicator={false}
             style={styles.planToolsScroll}
             contentContainerStyle={styles.planTools}>
-            {issues.length > 0 && (
-              <ToolPill
-                icon="check"
-                active={alertes > 0}
-                onPress={() => setChecking(true)}
-              />
-            )}
-            <ToolPill
-              icon="reset"
-              active={false}
-              onPress={() => {
-                revertCurrent();
-                setSelectedWallId(null);
-                setSelectedObjectId(null);
-              }}
-            />
-            <ToolPill
-              icon="ruler"
-              active={showMeasures}
-              onPress={() => setShowMeasures((v) => !v)}
-            />
-            <ToolPill
-              icon="furniture"
-              active={showFurniture}
-              onPress={() => setShowFurniture(!showFurniture)}
-            />
-            <ToolPill icon="plus" active={!!pendingKind} onPress={startFixture} />
-            {canUndo && (
-              <ToolPill icon="undo" active={false} onPress={undo} />
-            )}
-            {/* Les outils qu'on emploie rarement se rangent ici : la barre
-                doit rester lisible d'un coup d'œil. */}
-            <ToolPill icon="more" active={showMore} onPress={() => setShowMore(true)} />
+            {/* Deux barres, jamais mélangées.
+                En lecture, on ne fait que REGARDER : la barre ne porte que
+                ce qui s'affiche ou non. En édition, on TRAVAILLE : les
+                calques cèdent la place aux outils, et les cotes ou les
+                meubles restent tels qu'on les avait laissés.
+                Les pastilles rentrent dans le bouton d'édition et en
+                ressortent : c'est lui qui commande le changement, autant
+                qu'on le voie. */}
+            {(barMode
+              ? [
+                  issues.length > 0 && (
+                    <ToolPill
+                      key="check"
+                      icon="check"
+                      active={alertes > 0}
+                      onPress={() => setChecking(true)}
+                    />
+                  ),
+                  <ToolPill
+                    key="plus"
+                    icon="plus"
+                    active={!!pendingKind}
+                    onPress={startFixture}
+                  />,
+                  canUndo && (
+                    <ToolPill key="undo" icon="undo" active={false} onPress={undo} />
+                  ),
+                  // Les outils qu'on emploie rarement se rangent ici : la
+                  // barre doit rester lisible d'un coup d'œil.
+                  <ToolPill
+                    key="more"
+                    icon="more"
+                    active={showMore}
+                    onPress={() => setShowMore(true)}
+                  />,
+                ]
+              : [
+                  <ToolPill
+                    key="ruler"
+                    icon="ruler"
+                    active={showMeasures}
+                    onPress={() => setShowMeasures((v) => !v)}
+                  />,
+                  <ToolPill
+                    key="furniture"
+                    icon="furniture"
+                    active={showFurniture}
+                    onPress={() => setShowFurniture(!showFurniture)}
+                  />,
+                  <ToolPill
+                    key="surface"
+                    icon="surface"
+                    active={showSurfaces}
+                    onPress={() => setShowSurfaces(!showSurfaces)}
+                  />,
+                  colorsAvailable && (
+                    <ToolPill
+                      key="colors"
+                      icon="colors"
+                      active={showTextures}
+                      onPress={() => setShowTextures(!showTextures)}
+                    />
+                  ),
+                ]
+            )
+              .filter((el): el is React.ReactElement => !!el)
+              .map((el, i, all) => (
+                <PillSlot
+                  key={el.key}
+                  index={i}
+                  count={all.length}
+                  anim={swap}>
+                  {el}
+                </PillSlot>
+              ))}
             <ToolPill icon="edit" active={editMode} onPress={toggleEdit} />
           </ScrollView>
         ) : (
@@ -575,12 +648,18 @@ export function ResultScreen() {
               active={showFurniture}
               onPress={() => setShowFurniture(!showFurniture)}
             />
-            <ToolPill icon="plus" active={false} onPress={startFixture} />
             <ToolPill
-              icon="more"
-              active={showMore}
-              onPress={() => setShowMore(true)}
+              icon="surface"
+              active={showSurfaces}
+              onPress={() => setShowSurfaces(!showSurfaces)}
             />
+            {colorsAvailable && (
+              <ToolPill
+                icon="colors"
+                active={showTextures}
+                onPress={() => setShowTextures(!showTextures)}
+              />
+            )}
             {rooms.length > 1 && (
               <ToolPill
                 icon="rooms"
@@ -886,26 +965,11 @@ export function ResultScreen() {
           <Pressable style={styles.modalCard} onPress={() => {}}>
             <Text style={styles.modalTitle}>Outils</Text>
             <Text style={styles.modalSubtitle}>
-              Ce qu'on n'emploie pas à chaque fois.
+              Ce qu'on n'emploie pas à chaque fois. Ce qui s'affiche ou non
+              se règle dans la barre, hors édition.
             </Text>
             {(
               [
-                [
-                  'Surface au sol',
-                  'Fond pointillé et valeur en m².',
-                  showSurfaces,
-                  () => setShowSurfaces(!showSurfaces),
-                ],
-                ...(colorsAvailable
-                  ? ([
-                      [
-                        'Couleurs relevées',
-                        'Teintes des murs et du sol captées pendant le scan.',
-                        showTextures,
-                        () => setShowTextures(!showTextures),
-                      ],
-                    ] as [string, string, boolean, () => void][])
-                  : []),
                 ...(editMode
                   ? ([
                       [
@@ -1367,6 +1431,60 @@ const TOOL_PATHS: Record<ToolIcon, { d: string; fill?: boolean }[]> = {
     { d: 'M18.3 2.7 l3 3 L11.2 15.8 l-4.1 1.1 1.1 -4.1 z' },
   ],
 };
+
+/** Pas d'une pastille : sa largeur plus l'écart qui la suit. */
+const PILL_PITCH = 42;
+
+/**
+ * Créneau d'une pastille dans la barre.
+ *
+ * La pastille part de sa place et file vers le bouton d'édition — d'autant
+ * plus loin qu'elle en est éloignée — en rapetissant jusqu'à disparaître
+ * dedans. Le décalage par rang fait le reste : les pastilles s'y engouffrent
+ * l'une après l'autre, et en ressortent dans l'ordre inverse.
+ */
+function PillSlot({
+  index,
+  count,
+  anim,
+  children,
+}: {
+  index: number;
+  count: number;
+  anim: Animated.Value;
+  children: React.ReactNode;
+}) {
+  // Le rang n'entre en scène qu'après les précédents, sans jamais dépasser
+  // la moitié de la course : à huit pastilles, la dernière partirait sinon
+  // quand l'animation est déjà finie.
+  const t = anim.interpolate({
+    inputRange: [Math.min(0.45, index * 0.08), 1],
+    outputRange: [0, 1],
+    extrapolate: 'clamp',
+  });
+  return (
+    <Animated.View
+      style={{
+        opacity: t,
+        transform: [
+          {
+            translateX: t.interpolate({
+              inputRange: [0, 1],
+              outputRange: [(count - index) * PILL_PITCH, 0],
+            }),
+          },
+          {
+            scale: t.interpolate({
+              inputRange: [0, 1],
+              outputRange: [0.2, 1],
+            }),
+          },
+        ],
+      }}>
+      {children}
+    </Animated.View>
+  );
+}
 
 function ToolPill({
   icon,
