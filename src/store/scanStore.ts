@@ -17,6 +17,7 @@ export interface SavedScan {
   createdAt: number;
   updatedAt: number;
   modelPath: string | null;
+  roomName?: string;
   walls: WallSeg[];
   openings: WallSeg[];
   objects: ObjectData[];
@@ -66,6 +67,9 @@ interface ScanState {
   currentSaveId: string | null;
   /** Modifications du plan non enregistrées (bouton de sauvegarde visible). */
   dirty: boolean;
+  /** Nom de la pièce, affiché encadré au centre du plan. */
+  roomName: string;
+  setRoomName: (n: string) => void;
   /** D'où vient l'écran résultat : le bouton retour y renvoie. */
   resultOrigin: 'scan' | 'library';
   walls: WallSeg[];
@@ -104,6 +108,11 @@ interface ScanState {
   commitCurrent: () => void;
   /** Ajoute une ouverture manuelle centrée sur un mur (entrée sans porte, baie…). */
   addOpening: (wallId: string) => void;
+  removeObject: (id: string) => void;
+  setObjectCenter: (id: string, x: number, z: number) => void;
+  resizeObject: (id: string, width: number, depth: number) => void;
+  /** Abandonne les modifications : recharge la dernière sauvegarde. */
+  revertCurrent: () => void;
   loadSaves: () => Promise<void>;
   openSave: (id: string) => void;
   deleteSave: (id: string) => void;
@@ -120,6 +129,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         ? {
             ...s,
             name: st.scanName,
+            roomName: st.roomName,
             walls: st.walls,
             openings: st.openings,
             objects: st.objects,
@@ -149,6 +159,7 @@ export const useScanStore = create<ScanState>((set, get) => {
     currentSaveId: null,
     dirty: false,
     resultOrigin: 'scan',
+    roomName: '',
     walls: [],
     openings: [],
     objects: [],
@@ -171,6 +182,8 @@ export const useScanStore = create<ScanState>((set, get) => {
       set({ showFurniture });
       AsyncStorage.setItem(FURNITURE_KEY, showFurniture ? '1' : '0').catch(() => {});
     },
+
+    setRoomName: (roomName) => set({ roomName, dirty: true }),
 
     setScreen: (screen) => set({ screen }),
     setSupported: (supported) => set({ supported }),
@@ -218,6 +231,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         createdAt: now.getTime(),
         updatedAt: now.getTime(),
         modelPath: r.modelPath ?? null,
+        roomName: '',
         walls,
         openings,
         objects,
@@ -229,6 +243,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         currentSaveId: save.id,
         dirty: false,
         resultOrigin: 'scan',
+        roomName: '',
         walls,
         openings,
         objects,
@@ -321,6 +336,44 @@ export const useScanStore = create<ScanState>((set, get) => {
       set({ openings: [...st.openings, opening], dirty: true });
     },
 
+    removeObject: (id) =>
+      set({ objects: get().objects.filter((o) => o.id !== id), dirty: true }),
+
+    setObjectCenter: (id, x, z) =>
+      set({
+        objects: get().objects.map((o) => {
+          if (o.id !== id) return o;
+          const t = [...o.transform];
+          t[12] = x;
+          t[14] = z;
+          return { ...o, transform: t };
+        }),
+        dirty: true,
+      }),
+
+    resizeObject: (id, width, depth) => {
+      if (width <= 0 || depth <= 0) return;
+      set({
+        objects: get().objects.map((o) =>
+          o.id === id ? { ...o, width, depth } : o,
+        ),
+        dirty: true,
+      });
+    },
+
+    revertCurrent: () => {
+      const st = get();
+      const save = st.saves.find((s) => s.id === st.currentSaveId);
+      if (!save) return;
+      set({
+        walls: save.walls,
+        openings: save.openings,
+        objects: save.objects,
+        roomName: save.roomName ?? '',
+        dirty: false,
+      });
+    },
+
     /** Enregistre l'état courant comme NOUVELLE entrée de bibliothèque
      *  (l'original reste tel quel) et bascule dessus. */
     saveAsCopy: (name) => {
@@ -334,6 +387,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         createdAt: now,
         updatedAt: now,
         modelPath: st.modelPath,
+        roomName: st.roomName,
         walls: st.walls,
         openings: st.openings,
         objects: st.objects,
@@ -376,6 +430,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         walls: save.walls,
         openings: save.openings,
         objects: save.objects,
+        roomName: save.roomName ?? '',
         dirty: false,
         resultOrigin: 'library',
         screen: 'result',

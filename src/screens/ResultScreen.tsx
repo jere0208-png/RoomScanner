@@ -48,6 +48,24 @@ export function ResultScreen() {
   const setShowFurniture = useScanStore((s) => s.setShowFurniture);
   const addOpening = useScanStore((s) => s.addOpening);
   const resultOrigin = useScanStore((s) => s.resultOrigin);
+  const removeObject = useScanStore((s) => s.removeObject);
+  const resizeObject = useScanStore((s) => s.resizeObject);
+  const revertCurrent = useScanStore((s) => s.revertCurrent);
+  const roomName = useScanStore((s) => s.roomName);
+  const setRoomName = useScanStore((s) => s.setRoomName);
+
+  const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
+  const [wInput, setWInput] = useState('');
+  const [dInput, setDInput] = useState('');
+  const selectedObject = objects.find((o) => o.id === selectedObjectId) ?? null;
+  const applyObjectDims = () => {
+    const wv = parseFloat(wInput.replace(',', '.'));
+    const dv = parseFloat(dInput.replace(',', '.'));
+    if (selectedObjectId && wv > 0 && dv > 0) {
+      resizeObject(selectedObjectId, wv, dv);
+    }
+    Keyboard.dismiss();
+  };
   const setScreen = useScanStore((s) => s.setScreen);
   const reset = useScanStore((s) => s.reset);
   const styles = getStyles(useTheme());
@@ -213,8 +231,14 @@ export function ResultScreen() {
           <FloorplanEditor
             showMeasures={showMeasures}
             editable={editMode}
+            selectedObjectId={selectedObjectId}
+            onDeleteObject={(id) => {
+              removeObject(id);
+              setSelectedObjectId(null);
+            }}
             selectedWallId={selectedWallId}
             onSelectWall={(id) => {
+              setSelectedObjectId(null);
               setSelectedWallId(id);
               const wall = walls.find((w) => w.id === id);
               setLengthInput(wall ? segLength(wall).toFixed(2).replace('.', ',') : '');
@@ -227,6 +251,15 @@ export function ResultScreen() {
         {tab === '2d' ? (
           <View style={styles.planTools}>
             <ToolPill
+              label="↻"
+              active={false}
+              onPress={() => {
+                revertCurrent();
+                setSelectedWallId(null);
+                setSelectedObjectId(null);
+              }}
+            />
+            <ToolPill
               label="Cotes"
               active={showMeasures}
               onPress={() => setShowMeasures((v) => !v)}
@@ -236,6 +269,21 @@ export function ResultScreen() {
               active={showFurniture}
               onPress={() => setShowFurniture(!showFurniture)}
             />
+            {editMode && (
+              <ToolPill
+                label="Pièce"
+                active={roomName !== ''}
+                onPress={() =>
+                  Alert.prompt(
+                    'Nom de la pièce',
+                    'Laissez vide pour retirer l’encadré.',
+                    (t) => setRoomName((t ?? '').trim()),
+                    'plain-text',
+                    roomName,
+                  )
+                }
+              />
+            )}
             <ToolPill icon="edit" active={editMode} onPress={toggleEdit} />
           </View>
         ) : (
@@ -259,8 +307,36 @@ export function ResultScreen() {
           </View>
         )}
 
+        {/* Côtes du meuble sélectionné, en surimpression */}
+        {tab === '2d' && selectedObject && (
+          <View style={styles.editBar}>
+            <Text style={styles.editLabel}>
+              {frCategory(selectedObject.category)} · glissez-le sur le plan
+            </Text>
+            <View style={styles.editRow}>
+              <TextInput
+                style={styles.input}
+                value={wInput}
+                onChangeText={setWInput}
+                keyboardType="decimal-pad"
+              />
+              <Text style={styles.unit}>×</Text>
+              <TextInput
+                style={styles.input}
+                value={dInput}
+                onChangeText={setDInput}
+                keyboardType="decimal-pad"
+              />
+              <Text style={styles.unit}>m</Text>
+              <TouchableOpacity style={styles.applyButton} onPress={applyObjectDims}>
+                <Text style={styles.applyText}>Appliquer</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
         {/* Barre d'édition en surimpression : le plan ne se redimensionne pas */}
-        {tab === '2d' && editMode && selectedWall && (
+        {tab === '2d' && !selectedObject && editMode && selectedWall && (
           <View style={styles.editBar}>
             <Text style={styles.editLabel}>
               Longueur du mur · {fr(selectedWall.height, 2)} m sous plafond
@@ -321,12 +397,24 @@ export function ResultScreen() {
           horizontal
           showsHorizontalScrollIndicator={false}>
           {objects.map((o) => (
-            <View key={o.id} style={styles.objectChip}>
+            <TouchableOpacity
+              key={o.id}
+              style={[
+                styles.objectChip,
+                o.id === selectedObjectId && styles.objectChipSelected,
+              ]}
+              onPress={() => {
+                const next = o.id === selectedObjectId ? null : o.id;
+                setSelectedObjectId(next);
+                setSelectedWallId(null);
+                setWInput(o.width.toFixed(2).replace('.', ','));
+                setDInput(o.depth.toFixed(2).replace('.', ','));
+              }}>
               <Text style={styles.objectName}>{frCategory(o.category)}</Text>
               <Text style={styles.objectDims}>
                 {fr(o.width, 2)} × {fr(o.depth, 2)} × {fr(o.height, 2)} m
               </Text>
-            </View>
+            </TouchableOpacity>
           ))}
         </ScrollView>
       )}
@@ -704,7 +792,8 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     paddingVertical: 11,
   },
   applyText: { color: '#FFFFFF', fontWeight: '700', fontSize: 14 },
-  objectList: { maxHeight: 58, marginBottom: 6, flexGrow: 0 },
+  objectList: { maxHeight: 58, marginTop: 10, marginBottom: 6, flexGrow: 0 },
+  objectChipSelected: { borderColor: c.blue, borderWidth: 1.5 },
   objectChip: {
     backgroundColor: c.surface,
     borderRadius: radius.sm,

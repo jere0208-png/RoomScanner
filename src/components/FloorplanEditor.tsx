@@ -1,5 +1,11 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { PanResponder, StyleSheet, View } from 'react-native';
+import {
+  PanResponder,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import Svg, {
   Circle,
   Defs,
@@ -35,6 +41,9 @@ interface Props {
   editable: boolean;
   selectedWallId: string | null;
   onSelectWall: (id: string | null) => void;
+  /** Meuble sélectionné : surligné, déplaçable, supprimable. */
+  selectedObjectId?: string | null;
+  onDeleteObject?: (id: string) => void;
 }
 
 /**
@@ -47,6 +56,8 @@ export function FloorplanEditor({
   editable,
   selectedWallId,
   onSelectWall,
+  selectedObjectId,
+  onDeleteObject,
 }: Props) {
   const walls = useScanStore((s) => s.walls);
   const openings = useScanStore((s) => s.openings);
@@ -54,6 +65,7 @@ export function FloorplanEditor({
   const showFurniture = useScanStore((s) => s.showFurniture);
   const objects = showFurniture ? allObjects : [];
   const currentSaveId = useScanStore((s) => s.currentSaveId);
+  const roomName = useScanStore((s) => s.roomName);
   const colorOpenings = useScanStore((s) => s.showOpeningColors);
   const c = useTheme();
   const styles = getStyles(c);
@@ -214,8 +226,8 @@ export function FloorplanEditor({
                     width={w}
                     height={d}
                     fill={c.blueSoft}
-                    stroke={c.lineStrong}
-                    strokeWidth={1}
+                    stroke={o.id === selectedObjectId ? c.blue : c.lineStrong}
+                    strokeWidth={o.id === selectedObjectId ? 2.5 : 1}
                     rx={3}
                   />
                   {/* Symbole de mobilier (lit, canapé, TV…) */}
@@ -268,6 +280,65 @@ export function FloorplanEditor({
               />
             ))}
 
+            {/* Nom de la pièce : encadré au centre, esquive les meubles */}
+            {roomName !== '' &&
+              walls.length > 0 &&
+              (() => {
+                const ctr = wallsCentroid(walls);
+                const foots = objects.map((o) =>
+                  clampFootprint(toFootprint(o), walls, ctr),
+                );
+                const wpx = Math.max(46, roomName.length * 7 + 18);
+                const labelW = wpx / mapping.scale;
+                const labelH = 24 / mapping.scale;
+                const collides = (pt: { x: number; z: number }) =>
+                  foots.some(
+                    (f) =>
+                      Math.abs(pt.x - f.cx) < (f.width + labelW) / 2 &&
+                      Math.abs(pt.z - f.cz) < (f.depth + labelH) / 2,
+                  );
+                let pos = ctr;
+                for (const [ox, oz] of [
+                  [0, 0],
+                  [0, 0.5],
+                  [0, -0.5],
+                  [0.7, 0],
+                  [-0.7, 0],
+                  [0, 1],
+                  [0, -1],
+                ]) {
+                  const cand = { x: ctr.x + ox, z: ctr.z + oz };
+                  if (!collides(cand)) {
+                    pos = cand;
+                    break;
+                  }
+                }
+                const p = mapping.toPx(pos);
+                return (
+                  <G>
+                    <Rect
+                      x={p.x - wpx / 2}
+                      y={p.y - 12}
+                      width={wpx}
+                      height={24}
+                      rx={6}
+                      fill={c.surface}
+                      stroke={c.lineStrong}
+                      strokeWidth={1}
+                    />
+                    <SvgText
+                      x={p.x}
+                      y={p.y + 4}
+                      fill={c.ink}
+                      fontSize={11}
+                      fontWeight="700"
+                      textAnchor="middle">
+                      {roomName}
+                    </SvgText>
+                  </G>
+                );
+              })()}
+
             {/* Portes / fenêtres / ouvertures */}
             {openings.map((o) => {
               const a = mapping.toPx(o.a);
@@ -291,6 +362,25 @@ export function FloorplanEditor({
               );
             })}
           </Svg>
+
+          {/* Meuble sélectionné : poignée de déplacement + bouton supprimer */}
+          {selectedObjectId &&
+            (() => {
+              const o = allObjects.find((x) => x.id === selectedObjectId);
+              if (!o) return null;
+              const f = clampFootprint(toFootprint(o), walls, wallsCentroid(walls));
+              const p = mapping.toPx({ x: f.cx, z: f.cz });
+              return (
+                <>
+                  <ObjectDragHandle objectId={o.id} center={p} mapping={mapping} raw={o} />
+                  <TouchableOpacity
+                    style={[styles.objDelete, { left: p.x + 20, top: p.y - 44 }]}
+                    onPress={() => onDeleteObject?.(o.id)}>
+                    <Text style={styles.objDeleteText}>✕</Text>
+                  </TouchableOpacity>
+                </>
+              );
+            })()}
 
           {/* Poignées de coin, uniquement en mode édition */}
           {editable &&
@@ -365,6 +455,43 @@ function WallLine({
   );
 }
 
+function ObjectDragHandle({
+  objectId,
+  center,
+  mapping,
+  raw,
+}: {
+  objectId: string;
+  center: { x: number; y: number };
+  mapping: EffMapping;
+  raw: { transform: number[] };
+}) {
+  const styles = getStyles(useTheme());
+  const startRef = useRef({ x: raw.transform[12], z: raw.transform[14] });
+  const pan = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onPanResponderGrant: () => {
+          startRef.current = { x: raw.transform[12], z: raw.transform[14] };
+        },
+        onPanResponderMove: (_e, g) => {
+          const d = mapping.deltaToMeters(g.dx, g.dy);
+          useScanStore
+            .getState()
+            .setObjectCenter(objectId, startRef.current.x + d.x, startRef.current.z + d.z);
+        },
+      }),
+    [objectId, mapping, raw],
+  );
+  return (
+    <View
+      {...pan.panHandlers}
+      style={[styles.objDrag, { left: center.x - 22, top: center.y - 22 }]}
+    />
+  );
+}
+
 function CornerHandle({
   corner,
   mapping,
@@ -416,6 +543,22 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  objDrag: { position: 'absolute', width: 44, height: 44 },
+  objDelete: {
+    position: 'absolute',
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: c.danger,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#0B0D12',
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 4,
+  },
+  objDeleteText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
   handleDot: {
     width: 15,
     height: 15,
