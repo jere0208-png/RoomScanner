@@ -192,9 +192,15 @@ class Draw {
     );
   }
 
-  poly(pts: Pt[], fillHex: string | null, strokeHex: string | null, sw = 0.8) {
+  poly(
+    pts: Pt[],
+    fillHex: string | null,
+    strokeHex: string | null,
+    sw = 0.8,
+    dashed = false,
+  ) {
     if (pts.length < 3) return;
-    let op = '';
+    let op = dashed ? '[4 3] 0 d ' : '[] 0 d ';
     if (fillHex) {
       const [r, g, b] = hexRgb(fillHex);
       op += `${n2(r)} ${n2(g)} ${n2(b)} rg `;
@@ -375,6 +381,7 @@ const PDF_SCENE: ScenePalette = {
   opening: '#B9C2CE',
   door: '#E8A13B',
   window: '#3EB8E5',
+  passage: '#2F6BFF',
   object: '#D8E1F2',
   objectTop: '#E9EEF9',
   objectStroke: '#9FACBF',
@@ -448,11 +455,18 @@ function draw3DView(
       const fill = shadeFill(f, ct, st);
       // Pan sans contour propre : bordé de sa propre couleur, sinon la couture
       // entre deux bandes voisines se voit à l'impression.
-      return { pts, depth, fill, stroke: f.stroke ?? fill };
+      return { pts, depth, fill, stroke: f.stroke ?? fill, dashed: !!f.dashed };
     });
   // Cotes insérées dans le tri de profondeur : un mur proche les recouvre.
   type Item =
-    | { kind: 'poly'; depth: number; pts: Pt[]; fill: string | null; stroke: string | null }
+    | {
+        kind: 'poly';
+        depth: number;
+        pts: Pt[];
+        fill: string | null;
+        stroke: string | null;
+        dashed?: boolean;
+      }
     | { kind: 'dot'; depth: number; x: number; y: number; color: string }
     | { kind: 'label'; depth: number; x: number; y: number; text: string }
     | { kind: 'area'; depth: number; x: number; y: number; text: string };
@@ -500,7 +514,7 @@ function draw3DView(
   items.sort((p, q) => p.depth - q.depth);
   for (const item of items) {
     if (item.kind === 'poly') {
-      d.poly(item.pts, item.fill, item.stroke, 0.7);
+      d.poly(item.pts, item.fill, item.stroke, item.dashed ? 1.3 : 0.7, item.dashed);
     } else if (item.kind === 'dot') {
       d.circle(item.x, item.y, 0.55, item.color);
     } else if (item.kind === 'area') {

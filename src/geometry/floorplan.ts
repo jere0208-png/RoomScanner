@@ -30,6 +30,11 @@ export interface WallSeg {
   texture?: SurfaceTexture;
   /** Pièce à laquelle ce mur appartient (scan multi-pièces). */
   roomId?: string;
+  /**
+   * Ouverture qu'on TRAVERSE : baie sans porte, ou porte détectée ouverte.
+   * Elle ne se dessine pas comme un panneau mais comme un vide.
+   */
+  open?: boolean;
 }
 
 /** Pièce d'un élément, valeur par défaut comprise. */
@@ -79,8 +84,19 @@ export interface ObjectFootprint {
  * iOS livre une matrice 4x4 colonne-major : colonne 0 = direction du mur,
  * colonne 3 = position. Android livre directement ax/az/bx/bz.
  */
+/** Vrai si RoomPlan a vu la porte ouverte, ou si c'est une baie libre. */
+function isOpenPassage(s: SurfaceData): boolean {
+  if (s.type === 'opening') return true;
+  return s.type === 'door' && /isOpen:\s*true/.test(s.category ?? '');
+}
+
 export function toSegment(s: SurfaceData, roomId?: string): WallSeg {
-  const skin = { color: s.color, texture: s.texture, roomId };
+  const skin = {
+    color: s.color,
+    texture: s.texture,
+    roomId,
+    open: isOpenPassage(s) || undefined,
+  };
   if (s.ax !== undefined) {
     return {
       id: s.id,
@@ -705,7 +721,7 @@ export function clampFootprint(
     // On accepte de déplacer jusqu'à la profondeur du meuble : de quoi
     // dégager une télé ou une étagère entièrement enfoncée dans la cloison.
     // Au-delà, le meuble vit ailleurs — on ne le téléporte pas.
-    if (need > 0 && need < Math.max(0.3, f.depth + wallT)) {
+    if (need > 0 && need < Math.max(0.8, f.depth + wallT)) {
       cx += nx * side * need;
       cz += nz * side * need;
     }

@@ -156,7 +156,15 @@ pièce d'à côté — `clampFootprint()` la ramène désormais du côté de SA 
 (et non du côté où RoomPlan a cru voir son centre), en acceptant un
 déplacement jusqu'à la profondeur du meuble.
 
-**Une porte ou une fenêtre est un bloc, et le mur ne se construit pas
+**Une baie ou une porte OUVERTE est un vide, pas un bloc.** RoomPlan classe
+ses portes en `door(isOpen:)` : on transmet la catégorie brute et le JS en
+tire `WallSeg.open`. Un passage ouvert n'est alors pas rempli — on trace le
+pourtour du vide en **bleu pointillé** sur les deux faces du mur, et on
+traverse. Le mur reste découpé autour (trumeaux, linteau), donc le tableau se
+voit. Le mode cotes, qui noircit toutes les arêtes, épargne ce bleu : c'est
+lui qui distingue un passage d'une menuiserie.
+
+**Une porte fermée ou une fenêtre est un bloc, et le mur ne se construit pas
 dessus.** `assignOpenings()` rattache chaque ouverture au mur qui la porte
 (parallèle à 25° près, à moins de 60 cm, même pièce), puis `wallPanels()`
 découpe le mur autour : trumeau à gauche, trumeau à droite, linteau au-dessus,
@@ -280,7 +288,7 @@ nécessaire que si les fichiers Swift/Kotlin ou les dépendances natives changen
 ## Vérifications faites sur cette machine (Windows)
 
 - `npx tsc --noEmit` et `npx eslint src App.tsx` : aucun diagnostic.
-- `npx jest` : 94/94 tests verts (conversion matrice iOS→segment, extrémités
+- `npx jest` : 95/95 tests verts (conversion matrice iOS→segment, extrémités
   Android, soudure des coins et jonctions en T, onglets des murs, surface au
   sol, semis de points, lecture des textures, snap angulaire, projection
   mètres↔pixels, génération du PDF ; **multi-pièces** : découpe par pièce,

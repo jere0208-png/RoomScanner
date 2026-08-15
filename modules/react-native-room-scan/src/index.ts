@@ -37,6 +37,8 @@ export interface SurfaceData {
   /** Hauteur en mètres. */
   height: number;
   confidence?: string;
+  /** Catégorie RoomPlan brute, ex. `door(isOpen: true)`. */
+  category?: string;
   /** iOS uniquement : matrice 4x4 colonne-major (16 floats). */
   transform?: number[];
   /** Android uniquement : extrémités au sol, en mètres. */

@@ -39,6 +39,8 @@ export interface Face3D {
   /** Biais de tri (m), pour départager deux faces à la même profondeur. */
   bias?: number;
   isFloor?: boolean;
+  /** Trait pointillé : réservé aux passages, qui sont des vides. */
+  dashed?: boolean;
   /**
    * Normale sortante d'une face de VOLUME. Sa présence dit que la face
    * appartient à un solide fermé : quand elle tourne le dos à la caméra, on
@@ -80,6 +82,8 @@ export interface ScenePalette {
   opening: string;
   door: string;
   window: string;
+  /** Baie libre ou porte ouverte : un vide, tracé en pointillé. */
+  passage: string;
   object: string;
   objectTop: string;
   objectStroke: string;
@@ -610,6 +614,28 @@ export function buildScene(
 
     // ---------------------------------------- portes / fenêtres du mur
     for (const hole of mine) {
+      // Une baie libre ou une porte ouverte, ça se TRAVERSE : pas de panneau,
+      // juste le pourtour du vide, en pointillé, sur les deux faces du mur.
+      if (hole.seg.open) {
+        const p1 = lerp2(q.a1, q.b1, hole.t0);
+        const r1 = lerp2(q.a1, q.b1, hole.t1);
+        const p2 = lerp2(q.a2, q.b2, hole.t0);
+        const r2 = lerp2(q.a2, q.b2, hole.t1);
+        for (const [p, r] of [
+          [p1, r1],
+          [r2, p2],
+        ] as [Pt, Pt][]) {
+          faces.push({
+            pts: vquad(p, r, hole.y0, hole.y1),
+            fill: null,
+            stroke: pal.passage,
+            dashed: true,
+            bias: 0.006,
+            normal: outwardOf(p, r),
+          });
+        }
+        continue;
+      }
       const captured = opts.showTextures ? hole.seg.color : undefined;
       const paint = opts.colorOpenings
         ? hole.seg.type === 'door'

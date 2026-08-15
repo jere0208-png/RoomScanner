@@ -52,6 +52,7 @@ const TEST_PALETTE: ScenePalette = {
   opening: '#BBBBBB',
   door: '#E8A13B',
   window: '#3EB8E5',
+  passage: '#2F6BFF',
   object: '#DDDDDD',
   objectTop: '#EEEEEE',
   objectStroke: '#999999',
@@ -860,6 +861,21 @@ describe('portes et fenêtres en volumes', () => {
         expect(overlap).toBe(false);
       }
     }
+  });
+
+  it('rend une baie et une porte ouverte en vide bleu pointillé', () => {
+    const baie: WallSeg = { ...porte, id: 'b1', type: 'opening', open: true };
+    const scene = buildScene(rect, [baie], [], { palette: TEST_PALETTE });
+    const dashed = scene.faces.filter((f) => f.dashed);
+    // Une face par côté du mur : on traverse, on ne pose pas de panneau.
+    expect(dashed).toHaveLength(2);
+    expect(dashed.every((f) => f.fill === null)).toBe(true);
+    expect(dashed.every((f) => f.stroke === TEST_PALETTE.passage)).toBe(true);
+    // Aucun bloc de menuiserie n'a été posé dans le vide.
+    expect(scene.faces.some((f) => f.fill === TEST_PALETTE.opening)).toBe(false);
+    // Le mur reste découpé autour : trumeaux et linteau sont bien là.
+    const holes = assignOpenings(rect, [baie], 0);
+    expect(wallPanels(holes.get('n')!, height)).toHaveLength(3);
   });
 
   it('rend la porte comme un bloc, sans plan flottant devant le mur', () => {

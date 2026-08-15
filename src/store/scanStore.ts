@@ -20,6 +20,7 @@ import {
   splitAtJunctions,
   toSegment,
   weldCorners,
+  type Pt,
   type WallSeg,
 } from '../geometry/floorplan';
 import { pointInPolygon } from '../geometry/appearance';
@@ -113,6 +114,30 @@ function castToOutline(
   }
   if (!isFinite(best)) return null;
   return { x: from.x + dir.x * best, z: from.z + dir.z * best };
+}
+
+/**
+ * Pièce à laquelle rattacher un point. Un meuble plaqué contre un mur — une
+ * télé, une étagère — a souvent son centre HORS du contour : on prend alors
+ * la pièce la plus proche, et non la première venue.
+ */
+function roomIndexAt(p: { x: number; z: number }, outlines: Pt[][]): number {
+  const inside = outlines.findIndex(
+    (o) => o.length >= 3 && pointInPolygon(p, o),
+  );
+  if (inside >= 0) return inside;
+  let best = 0;
+  let bestD = Infinity;
+  outlines.forEach((o, i) => {
+    for (let a = 0, b = o.length - 1; a < o.length; b = a++) {
+      const d = pointOnSeg(p, o[b], o[a]).dist;
+      if (d < bestD) {
+        bestD = d;
+        best = i;
+      }
+    }
+  });
+  return best;
 }
 
 /** Mur le plus proche d'une ouverture, et à quelle distance. */
@@ -437,11 +462,13 @@ export const useScanStore = create<ScanState>((set, get) => {
       const shapes = detectRooms(walls);
       if (shapes.length === 0) return;
       const floor = st.rooms[0]?.floor ?? null;
-      const objects = st.objects.map((o) => {
-        const p = { x: o.transform[12], z: o.transform[14] };
-        const hit = shapes.findIndex((s) => pointInPolygon(p, s.outline));
-        return { ...o, roomId: `room-${(hit >= 0 ? hit : 0) + 1}` };
-      });
+      const objects = st.objects.map((o) => ({
+        ...o,
+        roomId: `room-${roomIndexAt(
+          { x: o.transform[12], z: o.transform[14] },
+          shapes.map((s) => s.outline),
+        ) + 1}`,
+      }));
       const kinds = shapes.map((_, i) =>
         deduceRoomKind(
           objects
@@ -541,13 +568,13 @@ export const useScanStore = create<ScanState>((set, get) => {
           : [{ outline: [], wallIds: walls.map((w) => w.id), area: 0 }];
 
       // Chaque meuble revient à la pièce qui le contient.
-      const objects: ObjectData[] = incomingObjects.map((o) => {
-        const p = { x: o.transform[12], z: o.transform[14] };
-        const hit = shapes.findIndex(
-          (s) => s.outline.length >= 3 && pointInPolygon(p, s.outline),
-        );
-        return { ...o, roomId: `room-${(hit >= 0 ? hit : 0) + 1}` };
-      });
+      const objects: ObjectData[] = incomingObjects.map((o) => ({
+        ...o,
+        roomId: `room-${roomIndexAt(
+          { x: o.transform[12], z: o.transform[14] },
+          shapes.map((s) => s.outline),
+        ) + 1}`,
+      }));
 
       const kinds = shapes.map((_, i) => {
         const id = `room-${i + 1}`;

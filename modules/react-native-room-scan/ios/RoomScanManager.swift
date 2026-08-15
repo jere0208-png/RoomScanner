@@ -178,6 +178,8 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
         "length": s.dimensions.x,
         "height": s.dimensions.y,
         "confidence": String(describing: s.confidence),
+        // `door(isOpen: true)` : c'est ce qui distingue une porte ouverte.
+        "category": String(describing: s.category),
         "transform": matrixToArray(s.transform),
       ]
       if withColors {

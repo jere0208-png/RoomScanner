@@ -214,6 +214,7 @@ export function Iso3DView({ value, onChange, showMeasures }: Props) {
       opening: '#B9C2CE',
       door: c.amber,
       window: c.sky,
+      passage: c.blue,
       object: '#D8E1F2',
       objectTop: '#E9EEF9',
       objectStroke: '#9FACBF',
@@ -297,17 +298,26 @@ export function Iso3DView({ value, onChange, showMeasures }: Props) {
       // Un pan sans contour propre est bordé de SA PROPRE couleur : sans ça,
       // l'anticrénelage laisse une couture blanche entre deux bandes voisines
       // et le mur paraît fait de morceaux.
+      // Mode cotes : arêtes en noir — SAUF les passages, dont le bleu
+      // pointillé est justement ce qui les distingue d'un panneau.
       const stroke =
-        showMeasures && !face.isFloor && face.stroke
+        showMeasures && !face.isFloor && !face.dashed && face.stroke
           ? '#0B0D12'
           : face.stroke ?? fill;
-      return { proj, depth, fill, stroke };
+      return { proj, depth, fill, stroke, dashed: !!face.dashed };
       });
 
     // Cotes insérées DANS le tri de profondeur : un mur proche recouvre
     // les cotes des éléments situés derrière lui (fini les fuites).
     type Item =
-      | { kind: 'poly'; depth: number; proj: typeof polys[0]['proj']; fill: string; stroke: string }
+      | {
+          kind: 'poly';
+          depth: number;
+          proj: typeof polys[0]['proj'];
+          fill: string;
+          stroke: string;
+          dashed: boolean;
+        }
       | { kind: 'dot'; depth: number; x: number; y: number; color: string }
       | { kind: 'label'; depth: number; x: number; y: number; angle: number; text: string }
       | {
@@ -504,7 +514,8 @@ export function Iso3DView({ value, onChange, showMeasures }: Props) {
                   points={item.proj.map((q) => `${q.sx},${q.sy}`).join(' ')}
                   fill={item.fill}
                   stroke={item.stroke}
-                  strokeWidth={1}
+                  strokeWidth={item.dashed ? 1.8 : 1}
+                  strokeDasharray={item.dashed ? '6 4' : undefined}
                   strokeLinejoin="round"
                 />
               ) : item.kind === 'dot' ? (
