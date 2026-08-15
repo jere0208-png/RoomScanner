@@ -6,6 +6,7 @@ import {
   Keyboard,
   Modal,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -790,9 +791,13 @@ export function ResultScreen() {
       )}
 
       {/* ---------- Outils secondaires ---------- */}
-      <Modal visible={showMore} transparent animationType="fade">
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
+      <Modal
+        visible={showMore}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowMore(false)}>
+        <Pressable style={styles.modalBackdrop} onPress={() => setShowMore(false)}>
+          <Pressable style={styles.modalCard} onPress={() => {}}>
             <Text style={styles.modalTitle}>Outils</Text>
             <Text style={styles.modalSubtitle}>
               Ce qu'on n'emploie pas à chaque fois.
@@ -883,14 +888,18 @@ export function ResultScreen() {
               onPress={() => setShowMore(false)}>
               <Text style={styles.modalGhostText}>Fermer</Text>
             </TouchableOpacity>
-          </View>
-        </View>
+          </Pressable>
+        </Pressable>
       </Modal>
 
       {/* ---------- Choix du format d'export ---------- */}
-      <Modal visible={exporting} transparent animationType="fade">
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
+      <Modal
+        visible={exporting}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setExporting(false)}>
+        <Pressable style={styles.modalBackdrop} onPress={() => setExporting(false)}>
+          <Pressable style={styles.modalCard} onPress={() => {}}>
             <Text style={styles.modalTitle}>Exporter</Text>
             <Text style={styles.modalSubtitle}>
               Trois formats, selon ce que vous voulez en faire.
@@ -936,14 +945,18 @@ export function ResultScreen() {
               onPress={() => setExporting(false)}>
               <Text style={styles.modalGhostText}>Annuler</Text>
             </TouchableOpacity>
-          </View>
-        </View>
+          </Pressable>
+        </Pressable>
       </Modal>
 
       {/* ---------- Diagnostic du plan ---------- */}
-      <Modal visible={checking} transparent animationType="fade">
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
+      <Modal
+        visible={checking}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setChecking(false)}>
+        <Pressable style={styles.modalBackdrop} onPress={() => setChecking(false)}>
+          <Pressable style={styles.modalCard} onPress={() => {}}>
             <Text style={styles.modalTitle}>
               {alertes > 0
                 ? `${alertes} point${alertes > 1 ? 's' : ''} à corriger`
@@ -976,14 +989,18 @@ export function ResultScreen() {
               onPress={() => setChecking(false)}>
               <Text style={styles.modalGhostText}>Fermer</Text>
             </TouchableOpacity>
-          </View>
-        </View>
+          </Pressable>
+        </Pressable>
       </Modal>
 
       {/* ---------- Nom de la pièce : liste plutôt que clavier ---------- */}
-      <Modal visible={naming} transparent animationType="fade">
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
+      <Modal
+        visible={naming}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setNaming(false)}>
+        <Pressable style={styles.modalBackdrop} onPress={() => setNaming(false)}>
+          <Pressable style={styles.modalCard} onPress={() => {}}>
             <Text style={styles.modalTitle}>Nom de la pièce</Text>
             <Text style={styles.modalSubtitle}>
               Il s'affiche sur le plan 2D, au même endroit sur la vue 3D, et
@@ -1033,14 +1050,18 @@ export function ResultScreen() {
                 <Text style={styles.modalPrimaryText}>Autre…</Text>
               </TouchableOpacity>
             </View>
-          </View>
-        </View>
+          </Pressable>
+        </Pressable>
       </Modal>
 
       {/* ---------- Renommage ---------- */}
-      <Modal visible={renaming} transparent animationType="fade">
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
+      <Modal
+        visible={renaming}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setRenaming(false)}>
+        <Pressable style={styles.modalBackdrop} onPress={() => setRenaming(false)}>
+          <Pressable style={styles.modalCard} onPress={() => {}}>
             <Text style={styles.modalTitle}>Nom du scan</Text>
             <Text style={styles.modalSubtitle}>
               Les modifications du plan s'enregistrent avec le bouton en bas à
@@ -1083,8 +1104,8 @@ export function ResultScreen() {
                 Enregistrer comme nouvelle copie
               </Text>
             </TouchableOpacity>
-          </View>
-        </View>
+          </Pressable>
+        </Pressable>
       </Modal>
     </View>
   );

@@ -234,6 +234,13 @@ avec le zoom** : sous 55 px/m, seule la cote globale du mur ; au-delà de
 les autres apparaissent. Une cote plus courte que son propre texte n'est pas
 tracée.
 
+### Les fenêtres
+
+Toutes se ferment **en touchant à côté** — le voile sombre est l'échappatoire
+attendue sur mobile ; sans elle, on cherche le bouton « Fermer ». Le contenu
+absorbe l'appui pour ne pas se refermer sous les doigts, et le bouton retour
+d'Android ferme lui aussi (`onRequestClose`).
+
 ### La barre d'outils
 
 Elle ne garde que ce qu'on touche à chaque fois — diagnostic, cotes, meubles,
