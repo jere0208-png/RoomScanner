@@ -554,6 +554,27 @@ proposés.
 
 ### Les fenêtres
 
+**Elles sont à nous.** `Alert.alert` et `Alert.prompt` sont ceux d'iOS :
+police système, boutons bleus empilés, coins de 2019 — au milieu d'une app
+qui a sa typographie, ses rayons et son bleu, ils faisaient tache. Et sur
+Android, `Alert.prompt` n'existe même pas.
+
+Deux composants couvrent tout : une **feuille de choix** (titre, phrase, et
+des lignes portant chacune son icône, parce qu'une liste de mots se lit plus
+lentement) et une **feuille de saisie** (une valeur, son unité, deux
+boutons).
+
+**Ce sont des feuilles du bas, et ce n'est pas une mode :** c'est le seul
+endroit de l'écran que le clavier ne peut pas recouvrir, puisque la feuille
+monte avec lui. Une boîte centrée avec un champ de saisie finit toujours par
+se faire manger la moitié. On voit donc toujours ce qu'on tape.
+
+Un détail appris à la dure : une action de feuille attend **180 ms** avant de
+s'exécuter. iOS ne présente pas deux écrans à la fois, et une action qui en
+ouvre un autre — renommer, qui appelle la saisie — tombait dans le vide.
+
+
+
 Toutes se ferment **en touchant à côté** — le voile sombre est l'échappatoire
 attendue sur mobile ; sans elle, on cherche le bouton « Fermer ». Le contenu
 absorbe l'appui pour ne pas se refermer sous les doigts, et le bouton retour

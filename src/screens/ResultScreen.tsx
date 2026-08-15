@@ -68,6 +68,12 @@ import {
   type FixtureKind,
 } from '../geometry/electrical';
 import { useScanStore } from '../store/scanStore';
+import {
+  ActionSheet,
+  PromptSheet,
+  type ActionData,
+  type PromptData,
+} from '../components/Sheet';
 
 type Tab = '2d' | '3d';
 
@@ -201,6 +207,9 @@ export function ResultScreen() {
   const [elecSel, setElecSel] = useState<string | null>(null);
   // Appareil choisi alors qu'aucun mur n'etait designe : on attend l'appui.
   const [pendingKind, setPendingKind] = useState<FixtureKind | null>(null);
+  // Nos fenêtres : une pour les choix, une pour les valeurs à saisir.
+  const [menu, setMenu] = useState<ActionData | null>(null);
+  const [prompt, setPrompt] = useState<PromptData | null>(null);
   // Catalogue de mobilier : ouvert par le « + » posé à côté du calque meubles.
   const [catalogue, setCatalogue] = useState(false);
   const [quete, setQuete] = useState('');
@@ -351,20 +360,22 @@ export function ResultScreen() {
     const o = openings.find((x) => x.id === id);
     if (!o) return;
     const actuel = quoi === 'largeur' ? segLength(o) : o.height;
-    Alert.prompt(
-      quoi === 'largeur' ? 'Largeur de la menuiserie' : 'Hauteur de la menuiserie',
-      quoi === 'largeur'
-        ? 'En mètres. Elle se retaille autour de son axe.'
-        : 'En mètres. L’allège ne bouge pas : c’est le linteau qui suit.',
-      (t) => {
-        const v = parseFloat((t ?? '').replace(',', '.'));
+    setPrompt({
+      title: quoi === 'largeur' ? 'Largeur de la menuiserie' : 'Hauteur de la menuiserie',
+      subtitle:
+        quoi === 'largeur'
+          ? 'Elle se retaille autour de son axe.'
+          : 'L’allège ne bouge pas : c’est le linteau qui suit.',
+      value: actuel.toFixed(2).replace('.', ','),
+      unit: 'm',
+      numeric: true,
+      onSubmit: (t) => {
+        const v = parseFloat(t.replace(',', '.'));
         if (!(v > 0)) return;
         if (quoi === 'largeur') resizeOpening(id, v, undefined);
         else resizeOpening(id, undefined, v);
       },
-      'plain-text',
-      actuel.toFixed(2).replace('.', ','),
-    );
+    });
   };
 
   const selectedWall = walls.find((w) => w.id === selectedWallId) ?? null;
@@ -451,36 +462,38 @@ export function ResultScreen() {
 
   const promptRoomHeight = () => {
     if (!targetRoom || !targetPart) return;
-    Alert.prompt(
-      'Hauteur sous plafond',
-      'En mètres. Elle sert au volume, aux vues 3D et au métré.',
-      (t) => {
-        const v = parseFloat((t ?? '').replace(',', '.'));
+    setPrompt({
+      title: 'Hauteur sous plafond',
+      subtitle: 'Elle sert au volume, aux vues 3D et au métré.',
+      value: roomHeight(targetPart.walls).toFixed(2).replace('.', ','),
+      unit: 'm',
+      numeric: true,
+      onSubmit: (t) => {
+        const v = parseFloat(t.replace(',', '.'));
         if (v > 0) setRoomHeight(targetRoom.id, v);
       },
-      'plain-text',
-      roomHeight(targetPart.walls).toFixed(2).replace('.', ','),
-    );
+    });
   };
 
   /** Réunit la pièce sélectionnée avec une voisine, au choix. */
   const promptMerge = () => {
     if (!targetRoom) return;
-    const others = rooms.filter((r) => r.id !== targetRoom.id);
-    Alert.alert(
-      'Fusionner avec…',
-      'Les deux pièces n’en feront plus qu’une ; la cloison reste dessinée.',
-      [
-        ...others.slice(0, 5).map((r) => ({
-          text: r.name || r.id,
+    setMenu({
+      title: 'Fusionner avec…',
+      subtitle:
+        'Les deux pièces n’en feront plus qu’une ; la cloison reste dessinée.',
+      actions: rooms
+        .filter((r) => r.id !== targetRoom.id)
+        .slice(0, 6)
+        .map((r) => ({
+          label: r.name || r.id,
+          icon: 'fusionner' as const,
           onPress: () => {
             mergeRooms(targetRoom.id, r.id);
             setSelectedRoomId(targetRoom.id);
           },
         })),
-        { text: 'Annuler', style: 'cancel' as const },
-      ],
-    );
+    });
   };
 
   /** Pose l'appareil sur ce mur et ouvre aussitot le mur vu de face. */
@@ -550,16 +563,17 @@ export function ResultScreen() {
   const promptLength = (wallId: string) => {
     const w = walls.find((x) => x.id === wallId);
     if (!w) return;
-    Alert.prompt(
-      'Longueur du mur',
-      'En mètres. L’extrémité opposée se déplace, les murs soudés suivent.',
-      (t) => {
-        const v = parseFloat((t ?? '').replace(',', '.'));
+    setPrompt({
+      title: 'Longueur du mur',
+      subtitle: 'L’extrémité opposée se déplace, les murs soudés suivent.',
+      value: segLength(w).toFixed(2).replace('.', ','),
+      unit: 'm',
+      numeric: true,
+      onSubmit: (t) => {
+        const v = parseFloat(t.replace(',', '.'));
         if (v > 0) setWallLength(wallId, v);
       },
-      'plain-text',
-      segLength(w).toFixed(2).replace('.', ','),
-    );
+    });
   };
 
   const toggleEdit = () => {
@@ -969,22 +983,23 @@ export function ResultScreen() {
                   <TouchableOpacity
                     style={styles.removeRoomButton}
                     onPress={() =>
-                      Alert.alert(
-                        'Retirer cette pièce ?',
-                        'Ses murs, ouvertures et meubles quittent le plan. ' +
+                      setMenu({
+                        title: 'Retirer cette pièce ?',
+                        subtitle:
+                          'Ses murs, ouvertures et meubles quittent le plan. ' +
                           'Rien n’est enregistré tant que vous ne validez pas.',
-                        [
-                          { text: 'Annuler', style: 'cancel' },
+                        actions: [
                           {
-                            text: 'Retirer',
-                            style: 'destructive',
+                            label: 'Retirer la pièce',
+                            icon: 'supprimer',
+                            danger: true,
                             onPress: () => {
                               removeRoom(selectedRoomId);
                               setSelectedRoomId(null);
                             },
                           },
                         ],
-                      )
+                      })
                     }>
                     <Text style={styles.removeRoomText}>Retirer</Text>
                   </TouchableOpacity>
@@ -1333,13 +1348,12 @@ export function ResultScreen() {
                 style={styles.modalPrimary}
                 onPress={() => {
                   setNaming(false);
-                  Alert.prompt(
-                    'Autre nom',
-                    'Laissez vide pour retirer le nom.',
-                    (t) => applyRoomName(t ?? ''),
-                    'plain-text',
-                    targetRoom?.name ?? '',
-                  );
+                  setPrompt({
+                    title: 'Autre nom',
+                    subtitle: 'Laissez vide pour retirer le nom.',
+                    value: targetRoom?.name ?? '',
+                    onSubmit: (t) => applyRoomName(t),
+                  });
                 }}>
                 <Text style={styles.modalPrimaryText}>Autre…</Text>
               </TouchableOpacity>
@@ -1347,6 +1361,9 @@ export function ResultScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      <ActionSheet data={menu} onClose={() => setMenu(null)} />
+      <PromptSheet data={prompt} onClose={() => setPrompt(null)} />
 
       {/* ---------- Catalogue de mobilier ---------- */}
       <Modal

@@ -394,8 +394,8 @@ export function checkElectrical(
     const mine = fixtures.filter((f) => roomOfFixture(f) === room.id);
     // Des SOCLES, pas des plaques : un ensemble double en porte un, un
     // triple en porte deux.
-    const socles = mine.reduce((n, f) => n + socketsOf(f.kind), 0);
-    const rj45 = mine.reduce((n, f) => n + rjOf(f.kind), 0);
+    const socles = mine.reduce((somme, f) => somme + socketsOf(f.kind), 0);
+    const rj45 = mine.reduce((somme, f) => somme + rjOf(f.kind), 0);
     const label = room.name || USE_LABEL[use];
 
     if (socles < req.socles) {
@@ -428,7 +428,7 @@ export function checkElectrical(
     }
     if (req.surPlan > 0) {
       const hauts = mine.reduce(
-        (n, f) => n + (f.height >= PLAN_TRAVAIL ? socketsOf(f.kind) : 0),
+        (somme, f) => somme + (f.height >= PLAN_TRAVAIL ? socketsOf(f.kind) : 0),
         0,
       );
       if (hauts < req.surPlan) {
@@ -501,7 +501,7 @@ export function checkElectrical(
   const principales = rooms.filter((r) =>
     PRINCIPALE.includes(roomUse(r.name, r.kind)),
   ).length;
-  const rj45Total = fixtures.reduce((n, f) => n + rjOf(f.kind), 0);
+  const rj45Total = fixtures.reduce((somme, f) => somme + rjOf(f.kind), 0);
   const rj45Min = Math.max(2, principales);
   if (principales > 0 && rj45Total < rj45Min) {
     out.push({
@@ -708,7 +708,7 @@ export function planCircuits(
     add({
       label: `Prises cuisine ${i + 1}`,
       nature: 'prises',
-      points: lot.reduce((n, f) => n + socketsOf(f.kind), 0),
+      points: lot.reduce((somme, f) => somme + socketsOf(f.kind), 0),
       section: 2.5,
       breaker: 20,
       rooms: roomsOf(lot),
@@ -720,7 +720,7 @@ export function planCircuits(
     add({
       label: `Prises ${i + 1}`,
       nature: 'prises',
-      points: lot.reduce((n, f) => n + socketsOf(f.kind), 0),
+      points: lot.reduce((somme, f) => somme + socketsOf(f.kind), 0),
       section: 2.5,
       breaker: 20,
       rooms: roomsOf(lot),
@@ -763,7 +763,8 @@ export function planCircuits(
       label: 'Courants faibles',
       nature: 'vdi',
       points: vdi.reduce(
-        (n, f) => n + postsOf(f.kind).filter((k) => k === 'rj45' || k === 'tv').length,
+        (somme, f) =>
+          somme + postsOf(f.kind).filter((k) => k === 'rj45' || k === 'tv').length,
         0,
       ),
       section: null,

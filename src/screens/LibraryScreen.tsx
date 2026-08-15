@@ -1,6 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
 import {
-  Alert,
   Animated,
   PanResponder,
   ScrollView,
@@ -27,6 +26,12 @@ import {
   wallToRooms,
 } from '../geometry/nfc15100';
 import { useScanStore, type SavedScan, type ScanFolder } from '../store/scanStore';
+import {
+  ActionSheet,
+  PromptSheet,
+  type ActionData,
+  type PromptData,
+} from '../components/Sheet';
 
 const two = (n: number) => String(n).padStart(2, '0');
 function formatDate(ts: number): string {
@@ -493,41 +498,41 @@ export function LibraryScreen() {
     if (dragRef.current) endDrag(deposer);
   };
 
+  // Nos fenêtres, pas celles du système : même typographie, mêmes rayons,
+  // même bleu — et une icône par choix, qui se lit plus vite qu'un mot.
+  const [menu, setMenu] = useState<ActionData | null>(null);
+  const [prompt, setPrompt] = useState<PromptData | null>(null);
+
   const folderMenu = (f: ScanFolder) =>
-    Alert.alert(f.name, 'Que voulez-vous en faire ?', [
-      {
-        text: 'Renommer',
-        onPress: () =>
-          Alert.prompt(
-            'Nom du dossier',
-            'Il ne sert qu’au rangement : aucun fichier n’est déplacé.',
-            (t) => renameFolder(f.id, t ?? ''),
-            'plain-text',
-            f.name,
-          ),
-      },
-      {
-        text: 'Supprimer le dossier',
-        style: 'destructive',
-        onPress: () =>
-          Alert.alert(
-            'Supprimer ce dossier ?',
-            'Les scans qu’il contient reviennent à la racine, rien n’est perdu.',
-            [
-              { text: 'Annuler', style: 'cancel' },
-              {
-                text: 'Supprimer',
-                style: 'destructive',
-                onPress: () => {
-                  removeFolder(f.id);
-                  if (inside === f.id) setInside(null);
-                },
-              },
-            ],
-          ),
-      },
-      { text: 'Annuler', style: 'cancel' },
-    ]);
+    setMenu({
+      title: f.name,
+      subtitle: `${(byFolder.get(f.id) ?? []).length} scan${
+        (byFolder.get(f.id) ?? []).length > 1 ? 's' : ''
+      } rangés ici.`,
+      actions: [
+        {
+          label: 'Renommer',
+          icon: 'renommer',
+          onPress: () =>
+            setPrompt({
+              title: 'Nom du dossier',
+              subtitle: 'Il ne sert qu’au rangement : aucun fichier n’est déplacé.',
+              value: f.name,
+              onSubmit: (t) => renameFolder(f.id, t),
+            }),
+        },
+        {
+          label: 'Supprimer le dossier',
+          hint: 'Les scans qu’il contient reviennent à la racine.',
+          icon: 'supprimer',
+          danger: true,
+          onPress: () => {
+            removeFolder(f.id);
+            if (inside === f.id) setInside(null);
+          },
+        },
+      ],
+    });
 
   const vide = saves.length === 0 && folders.length === 0;
 
@@ -630,6 +635,9 @@ export function LibraryScreen() {
 
       {/* Créer un dossier : bouton flottant en bas à droite, là où le pouce
           tombe naturellement. */}
+      <ActionSheet data={menu} onClose={() => setMenu(null)} />
+      <PromptSheet data={prompt} onClose={() => setPrompt(null)} />
+
       {!dossierOuvert && (
         <TouchableOpacity
           style={styles.fab}
