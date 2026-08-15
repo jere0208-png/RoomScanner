@@ -28,6 +28,7 @@ import {
   roomParts,
   segLength,
   toFootprint,
+  northScreenAngle,
   wallQuads,
   wallRuns,
   WALL_T,
@@ -127,6 +128,7 @@ export function FloorplanEditor({
   const currentSaveId = useScanStore((s) => s.currentSaveId);
   const rooms = useScanStore((s) => s.rooms);
   const fixtures = useScanStore((s) => s.fixtures);
+  const north = useScanStore((s) => s.north);
   const colorOpenings = useScanStore((s) => s.showOpeningColors);
   const showSurfaces = useScanStore((s) => s.showSurfaces);
   const c = useTheme();
@@ -589,6 +591,52 @@ export function FloorplanEditor({
                 );
               });
             })()}
+
+            {/* Rose des vents. Relevée au magnétomètre pendant le scan, elle
+                tourne avec le plan : le N montre le vrai nord, à toute
+                rotation. Posée dans un coin, hors du dessin — une rose au
+                milieu du plan gênerait la lecture qu'elle est censée aider. */}
+            {north !== null && (
+              <G
+                transform={`translate(32, 32) rotate(${
+                  (northScreenAngle(north, view.rot) * 180) / Math.PI + 90
+                })`}>
+                <Circle
+                  cx={0}
+                  cy={0}
+                  r={21}
+                  fill={c.surface}
+                  fillOpacity={0.92}
+                  stroke={c.line}
+                  strokeWidth={1}
+                />
+                {/* Aiguille : la moitié nord pleine, la moitié sud en creux. */}
+                <Polygon points="0,-16 4.5,0 -4.5,0" fill={c.danger} />
+                <Polygon points="0,16 4.5,0 -4.5,0" fill={c.inkFaint} />
+                {(
+                  [
+                    ['N', 0],
+                    ['E', 90],
+                    ['S', 180],
+                    ['O', 270],
+                  ] as [string, number][]
+                ).map(([lettre, deg]) => {
+                  const a = ((deg - 90) * Math.PI) / 180;
+                  return (
+                    <SvgText
+                      key={lettre}
+                      x={Math.cos(a) * 15.5}
+                      y={Math.sin(a) * 15.5 + 3}
+                      fill={lettre === 'N' ? c.ink : c.inkFaint}
+                      fontSize={lettre === 'N' ? 9.5 : 8}
+                      fontWeight="800"
+                      textAnchor="middle">
+                      {lettre}
+                    </SvgText>
+                  );
+                })}
+              </G>
+            )}
 
             {/* Cotes de détail : retour de mur, baie, retour de mur. Elles
                 n'apparaissent qu'une fois le plan assez zoomé pour les lire. */}

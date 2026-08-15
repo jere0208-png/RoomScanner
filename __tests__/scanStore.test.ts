@@ -496,3 +496,57 @@ describe('setRoomName', () => {
     expect(st.dirty).toBe(true);
   });
 });
+
+describe('dossiers de la bibliothèque', () => {
+  const scan = (id: string): SavedScan => ({
+    id,
+    name: `Scan ${id}`,
+    createdAt: 0,
+    updatedAt: 0,
+    modelPath: null,
+    rooms: [{ id: 'room-1', name: '' }],
+    walls: [],
+    openings: [],
+    objects: [],
+  });
+
+  beforeEach(() => {
+    useScanStore.setState({
+      saves: [scan('a'), scan('b')],
+      folders: [],
+      currentSaveId: null,
+    });
+  });
+
+  it('range un scan, puis l’en ressort', () => {
+    const id = useScanStore.getState().addFolder('Chantier Dupont');
+    useScanStore.getState().moveToFolder('a', id);
+    expect(useScanStore.getState().saves.find((s) => s.id === 'a')?.folderId).toBe(id);
+    expect(useScanStore.getState().saves.find((s) => s.id === 'b')?.folderId).toBeUndefined();
+    useScanStore.getState().moveToFolder('a', null);
+    expect(useScanStore.getState().saves.find((s) => s.id === 'a')?.folderId).toBeUndefined();
+  });
+
+  it('se renomme', () => {
+    const id = useScanStore.getState().addFolder();
+    expect(useScanStore.getState().folders[0].name).toBe('Dossier 1');
+    useScanStore.getState().renameFolder(id, '  Rue des Lilas  ');
+    expect(useScanStore.getState().folders[0].name).toBe('Rue des Lilas');
+    // Un nom vide ne remplace pas l'ancien : on n'efface pas par mégarde.
+    useScanStore.getState().renameFolder(id, '   ');
+    expect(useScanStore.getState().folders[0].name).toBe('Rue des Lilas');
+  });
+
+  it('supprimer le dossier ne supprime pas les scans', () => {
+    const id = useScanStore.getState().addFolder();
+    useScanStore.getState().moveToFolder('a', id);
+    useScanStore.getState().moveToFolder('b', id);
+    useScanStore.getState().removeFolder(id);
+    expect(useScanStore.getState().folders).toHaveLength(0);
+    // Les deux scans sont toujours là, revenus à la racine.
+    expect(useScanStore.getState().saves).toHaveLength(2);
+    expect(
+      useScanStore.getState().saves.every((s) => s.folderId === undefined),
+    ).toBe(true);
+  });
+});

@@ -8,6 +8,7 @@ import {
   loopAreaM2,
   makeMapping,
   mergeColinear,
+  northScreenAngle,
   planFrameAngle,
   pointOnSeg,
   quadPoints,
@@ -1350,6 +1351,29 @@ describe('multi-pièces', () => {
     expect(scene.rooms.map((r) => r.floorFill)).toEqual(['#8A6E4B', '#4B6E8A']);
     // Deux sols distincts dans la scène, pas un seul.
     expect(scene.faces.filter((f) => f.isFloor)).toHaveLength(2);
+  });
+});
+
+describe('rose des vents', () => {
+  const deg = (rad: number) => Math.round((rad * 180) / Math.PI);
+
+  it('sans rotation, un scan commencé face au nord met le N en haut', () => {
+    // 0 = l'axe −Z du monde regarde le nord ; −Z, c'est le haut de l'écran.
+    expect(deg(northScreenAngle(0, 0))).toBe(-90);
+  });
+
+  it('la rose suit la rotation du plan', () => {
+    const quart = Math.PI / 2;
+    expect(deg(northScreenAngle(0, quart))).toBe(0);
+    expect(deg(northScreenAngle(0, -quart))).toBe(-180);
+  });
+
+  it('un scan commencé face à l’est renvoie le nord à gauche', () => {
+    // Si le haut de l'écran est l'est, le nord est à un quart de tour dans
+    // le sens inverse des aiguilles : à gauche.
+    expect(Math.abs(deg(northScreenAngle(90, 0)))).toBe(180);
+    // Et face au sud, le nord repasse en bas.
+    expect(deg(northScreenAngle(180, 0))).toBe(90);
   });
 });
 

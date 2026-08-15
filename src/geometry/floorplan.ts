@@ -397,6 +397,20 @@ export function wallQuadsOf(
   return map;
 }
 
+/**
+ * Où pointe le nord à l'écran, en radians (0 = vers la droite, sens horaire
+ * — la convention des rotations SVG).
+ *
+ * `northOffset` est le cap de l'axe −Z du repère de scan, tel que le
+ * magnétomètre l'a relevé : 0 signifie que le scan a commencé face au nord.
+ * La direction du nord dans le monde est donc (−sin, −cos) en (x, z), et le
+ * plan lui ajoute sa propre rotation.
+ */
+export function northScreenAngle(northOffset: number, viewRot: number): number {
+  const t = (northOffset * Math.PI) / 180;
+  return Math.atan2(-Math.cos(t), -Math.sin(t)) + viewRot;
+}
+
 export function quadPoints(q: WallQuad): Pt[] {
   return [q.a1, q.b1, q.b2, q.a2];
 }

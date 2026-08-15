@@ -629,6 +629,32 @@ point au sol, en 2D comme en 3D et dans le PDF. Une extrémité libre reçoit un
 about droit ; posée sur le flanc d'un autre mur, elle est prolongée d'une
 demi-épaisseur pour entrer dans son corps (jonction en T).
 
+### Le nord
+
+ARKit démarre son monde là où le scan commence : son axe −Z regarde dans la
+direction du téléphone au premier instant, et rien de plus. Deux scans du
+même appartement n'ont donc aucune raison d'être orientés pareil.
+
+Pendant le scan, `RoomScanCompass` relève donc à 2 Hz, **au même instant**,
+le cap du téléphone (`CMDeviceMotion.heading` dans le repère
+`.xMagneticNorthZVertical`, qui ne demande aucune autorisation — le nord
+géographique, lui, exigerait la localisation) et la direction de visée de la
+caméra dans le monde ARKit. Leur différence est le cap de l'axe −Z du monde :
+une seule valeur, constante pour tout le scan.
+
+Elle est moyennée **circulairement** — la moyenne arithmétique de 359° et 1°
+donnerait 180°, soit plein sud pour deux relevés plein nord.
+
+Le plan porte alors une **rose des vents** dans son coin haut-gauche, qui
+tourne avec lui : le N montre le nord réel à toute rotation. Elle n'apparaît
+que si le magnétomètre a donné quelque chose de sûr (au moins quatre relevés
+concordants) — mieux vaut pas de rose qu'une fausse.
+
+Deux réserves : le magnétomètre est perturbé par le métal, et un appartement
+en est plein (huisseries, radiateurs, câblage) ; et c'est le nord
+**magnétique**, qui s'écarte du géographique d'un degré ou deux sous nos
+latitudes — sans conséquence pour orienter un plan.
+
 ### Couleurs et textures
 
 Pendant le scan, la session ARKit/ARCore est lue en parallèle (~3 Hz, lecture
@@ -642,6 +668,30 @@ vue 3D et au PDF ; il n'apparaît que si le scan en a rapporté.
 et il n'y servait à rien : sous le poché noir des murs et le semis de points
 du sol, une teinte relevée ne se lit pas. Le bouton a quitté la barre du
 plan ; il ne reste que sur la vue 3D, où une surface se lit vraiment.
+
+### Dossiers de la bibliothèque
+
+Les dossiers viennent **en tête** de « Mes scans » : c'est le rangement, il
+précède ce qui est rangé. Un dossier s'ouvre d'un appui, se renomme par son
+crayon, et sa suppression ne supprime rien — les scans qu'il contenait
+reviennent à la racine.
+
+**On y dépose un scan en le tenant une seconde**, puis en l'amenant sur le
+dossier : la ligne se décolle, s'agrandit, et le dossier survolé s'allume.
+Trois détails sans lesquels le geste rate :
+
+- **la liste cesse de défiler** pendant qu'on tient le scan — déplacement et
+  défilement sont le même mouvement du doigt, il faut trancher ;
+- **les cadres des dossiers sont mesurés à l'écran à l'instant où le scan se
+  décolle**, ni avant (la liste a pu défiler) ni après (il faut savoir
+  survoler dès le premier pixel) ;
+- **le bandeau d'aide flotte** au lieu de pousser la liste : apparaissant
+  pile après la mesure, s'il décalait les rangées, le scan tomberait à côté.
+
+La rangée est un composant à part entière et non une fonction définie dans le
+rendu : définie dedans, React en voyait un type neuf à chaque changement
+d'état et démontait la ligne — le doigt perdait en plein geste celle qu'il
+tenait.
 
 ## Prérequis pour tester sur iPhone
 
@@ -723,7 +773,7 @@ passe inaperçu jusqu'à la CI. C'est arrivé une fois.
 ## Vérifications faites sur cette machine (Windows)
 
 - `npx tsc --noEmit` et `npx eslint src App.tsx` : aucun diagnostic.
-- `npx jest` : 171/171 tests verts (conversion matrice iOS→segment, extrémités
+- `npx jest` : 177/177 tests verts (conversion matrice iOS→segment, extrémités
   Android, soudure des coins et jonctions en T, onglets des murs, surface au
   sol, semis de points, lecture des textures, snap angulaire, projection
   mètres↔pixels, génération du PDF ; **multi-pièces** : découpe par pièce,

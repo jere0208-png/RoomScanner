@@ -108,6 +108,7 @@ export function ResultScreen() {
   const canUndo = useScanStore((s) => s.canUndo);
   const openings = useScanStore((s) => s.openings);
   const fixtures = useScanStore((s) => s.fixtures);
+  const north = useScanStore((s) => s.north);
   const addFixture = useScanStore((s) => s.addFixture);
   const moveFixture = useScanStore((s) => s.moveFixture);
 
@@ -823,7 +824,7 @@ export function ResultScreen() {
           )}
 
         {tab === '2d' && pendingKind && (
-          <View style={styles.wallLengthBar}>
+          <View style={[styles.wallLengthBar, north !== null && styles.barShift]}>
             <Text style={styles.wallLengthLabel}>
               {FIXTURES[pendingKind].label} · touchez le mur qui le reçoit
             </Text>
@@ -838,7 +839,7 @@ export function ResultScreen() {
         {/* Cote du mur sélectionné : un champ compact, posé en haut du
             plan pour ne jamais sortir de l'écran ni couvrir le mur. */}
         {tab === '2d' && !selectedObject && editMode && selectedWall && (
-          <View style={styles.wallLengthBar}>
+          <View style={[styles.wallLengthBar, north !== null && styles.barShift]}>
             <Text style={styles.wallLengthLabel}>
               {fr(selectedWall.height, 2)} m sous plafond
             </Text>
@@ -862,7 +863,7 @@ export function ResultScreen() {
             la liste complète est dans le diagnostic, ici on répond à la
             question posée par l'appui. */}
         {tab === '2d' && editMode && selectedWall && wallIssues.length > 0 && (
-          <View style={styles.elecCard}>
+          <View style={[styles.elecCard, north !== null && styles.barShift]}>
             <View style={styles.elecCardHead}>
               <View style={styles.elecDotAlert} />
               <Text style={styles.elecCardTitle}>{wallIssues[0].message}</Text>
@@ -1960,6 +1961,9 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     fontWeight: '700',
     marginTop: 9,
   },
+  // La rose des vents occupe le coin haut-gauche : les bandeaux se
+  // décalent pour ne pas la couvrir.
+  barShift: { left: 62 },
   elecCardActions: { flexDirection: 'row', gap: 8, marginTop: 10 },
   elecFix: {
     backgroundColor: c.blue,

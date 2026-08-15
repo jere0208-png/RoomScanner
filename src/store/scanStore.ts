@@ -69,6 +69,13 @@ export interface RoomEntry {
   floor?: FloorData | null;
 }
 
+/** Un dossier de la bibliothèque. Il ne porte qu'un nom : ce sont les scans
+ *  qui désignent le dossier où ils sont rangés. */
+export interface ScanFolder {
+  id: string;
+  name: string;
+}
+
 export interface SavedScan {
   id: string;
   name: string;
@@ -81,6 +88,14 @@ export interface SavedScan {
   objects: ObjectData[];
   /** Appareillage électrique ajouté à la main. Absent des scans d'avant. */
   fixtures?: Fixture[];
+  /** Dossier qui contient ce scan. Absent = à la racine. */
+  folderId?: string;
+  /**
+   * Cap de l'axe −Z du repère de scan, en degrés depuis le nord. Absent
+   * quand le magnétomètre n'a rien donné de sûr — et sur tous les scans
+   * d'avant la boussole.
+   */
+  north?: number;
   /** Scans d'avant le multi-pièces : nom unique de la pièce. */
   roomName?: string;
   /** Scans d'avant le multi-pièces : sol unique. */
@@ -192,6 +207,7 @@ function migrateSave(s: SavedScan): SavedScan {
 }
 
 const STORAGE_KEY = 'roomscanner.saves.v1';
+const FOLDERS_KEY = 'roomscanner.folders.v1';
 const THEME_KEY = 'roomscanner.themePref.v1';
 const COLORS_KEY = 'roomscanner.openingColors.v1';
 const FURNITURE_KEY = 'roomscanner.showFurniture.v1';
@@ -284,6 +300,8 @@ interface ScanState {
   addWallBetween: (a: Pt, b: Pt) => void;
   /** Appareillage électrique posé sur les murs (prises, commandes, RJ45…). */
   fixtures: Fixture[];
+  /** Cap du scan : d'où vient le nord. `null` = boussole muette. */
+  north: number | null;
   /**
    * Pose un appareil sur un mur, à 20 cm du coin bas gauche de la face qui
    * regarde la pièce. Renvoie son identifiant, pour l'ouvrir aussitôt.
@@ -305,6 +323,15 @@ interface ScanState {
 
   // Bibliothèque persistée
   saves: SavedScan[];
+  /** Dossiers de la bibliothèque, dans l'ordre de création. */
+  folders: ScanFolder[];
+  /** Crée un dossier et renvoie son identifiant. */
+  addFolder: (name?: string) => string;
+  renameFolder: (id: string, name: string) => void;
+  /** Supprime le dossier ; les scans qu'il contenait reviennent à la racine. */
+  removeFolder: (id: string) => void;
+  /** Range un scan dans un dossier, ou l'en sort (`null`). */
+  moveToFolder: (scanId: string, folderId: string | null) => void;
 
   // Apparence : clair par défaut, bascule manuelle.
   themePref: ThemePref;
@@ -401,6 +428,7 @@ export const useScanStore = create<ScanState>((set, get) => {
             openings: st.openings,
             objects: st.objects,
             fixtures: st.fixtures,
+            north: st.north ?? undefined,
             modelPath: st.modelPath,
             updatedAt: Date.now(),
           }
@@ -432,8 +460,10 @@ export const useScanStore = create<ScanState>((set, get) => {
     openings: [],
     objects: [],
     fixtures: [],
+    north: null,
     canUndo: false,
     saves: [],
+    folders: [],
     themePref: 'light',
     showOpeningColors: false,
 
@@ -853,6 +883,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         openings,
         objects,
         fixtures: [],
+        north: typeof r.north === 'number' ? r.north : undefined,
       };
       const saves = [save, ...get().saves];
       set({
@@ -866,6 +897,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         openings,
         objects,
         fixtures: [],
+        north: typeof r.north === 'number' ? r.north : null,
         saves,
         processing: false,
         scanning: false,
@@ -1035,9 +1067,51 @@ export const useScanStore = create<ScanState>((set, get) => {
         openings: st.openings,
         objects: st.objects,
         fixtures: st.fixtures,
+        north: st.north ?? undefined,
       };
       const saves = [save, ...st.saves];
       set({ saves, currentSaveId: save.id, scanName: clean, dirty: false });
+      persistSoon(saves);
+    },
+
+    addFolder: (name) => {
+      const id = `dos-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      const folders = [
+        ...get().folders,
+        { id, name: name?.trim() || `Dossier ${get().folders.length + 1}` },
+      ];
+      set({ folders });
+      AsyncStorage.setItem(FOLDERS_KEY, JSON.stringify(folders)).catch(() => {});
+      return id;
+    },
+
+    renameFolder: (id, name) => {
+      const clean = name.trim();
+      if (!clean) return;
+      const folders = get().folders.map((f) =>
+        f.id === id ? { ...f, name: clean } : f,
+      );
+      set({ folders });
+      AsyncStorage.setItem(FOLDERS_KEY, JSON.stringify(folders)).catch(() => {});
+    },
+
+    removeFolder: (id) => {
+      const folders = get().folders.filter((f) => f.id !== id);
+      // Supprimer un dossier ne supprime pas ce qu'il contient : les scans
+      // remontent à la racine, où on les retrouve.
+      const saves = get().saves.map((s) =>
+        s.folderId === id ? { ...s, folderId: undefined } : s,
+      );
+      set({ folders, saves });
+      AsyncStorage.setItem(FOLDERS_KEY, JSON.stringify(folders)).catch(() => {});
+      persistSoon(saves);
+    },
+
+    moveToFolder: (scanId, folderId) => {
+      const saves = get().saves.map((s) =>
+        s.id === scanId ? { ...s, folderId: folderId ?? undefined } : s,
+      );
+      set({ saves });
       persistSoon(saves);
     },
 
@@ -1063,6 +1137,11 @@ export const useScanStore = create<ScanState>((set, get) => {
         if (tex === '1' || tex === '0') {
           set({ showTextures: tex === '1' });
         }
+        const dossiers = await AsyncStorage.getItem(FOLDERS_KEY);
+        if (dossiers) {
+          const parsed = JSON.parse(dossiers) as ScanFolder[];
+          if (Array.isArray(parsed)) set({ folders: parsed });
+        }
         const raw = await AsyncStorage.getItem(STORAGE_KEY);
         if (!raw) return;
         const saves = JSON.parse(raw) as SavedScan[];
@@ -1085,6 +1164,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         openings: save.openings,
         objects: save.objects,
         fixtures: save.fixtures ?? [],
+        north: save.north ?? null,
         dirty: false,
         resultOrigin: 'library',
         screen: 'result',
@@ -1122,6 +1202,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         openings: [],
         objects: [],
         fixtures: [],
+        north: null,
       }),
   };
 });

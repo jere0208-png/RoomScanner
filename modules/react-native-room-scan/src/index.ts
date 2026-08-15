@@ -94,6 +94,11 @@ export interface ScanResult {
   objects?: ObjectData[];
   /** Couleurs du sol relevées pendant le scan (iOS avec LiDAR). */
   floor?: FloorData;
+  /**
+   * Cap de l'axe −Z du repère de scan, en degrés horaires depuis le nord
+   * magnétique. Absent si le magnétomètre n'a rien donné de sûr.
+   */
+  north?: number;
   /** Compat : anciens résultats déjà découpés en pièces. */
   rooms?: {
     id: string;

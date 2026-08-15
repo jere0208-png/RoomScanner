@@ -33,8 +33,10 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
     view.delegate = self
     view.captureSession.delegate = self
     captureView = view
-    // Relevé des couleurs : lecture seule sur la session ARKit de RoomPlan.
+    // Relevé des couleurs ET du cap : lecture seule sur la session ARKit
+    // de RoomPlan, l'un comme l'autre.
     RoomColorSampler.shared.attach(to: view.captureSession.arSession)
+    RoomScanCompass.shared.attach(to: view.captureSession.arSession)
     if pendingStart {
       pendingStart = false
       view.captureSession.run(configuration: configuration)
@@ -47,12 +49,16 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
   /// `fresh` : nouveau scan (les couleurs relevées repartent de zéro).
   /// Une reprise après pause conserve ce qui a déjà été relevé.
   func start(fresh: Bool = true) {
-    if fresh { RoomColorSampler.shared.reset() }
+    if fresh {
+      RoomColorSampler.shared.reset()
+      RoomScanCompass.shared.reset()
+    }
     DispatchQueue.main.async {
       // Une vue d'un scan précédent peut encore traîner, détachée de l'écran :
       // ne relancer la session que sur une vue réellement affichée.
       if let view = self.captureView, view.window != nil {
         RoomColorSampler.shared.attach(to: view.captureSession.arSession)
+        RoomScanCompass.shared.attach(to: view.captureSession.arSession)
         view.captureSession.run(configuration: self.configuration)
       } else {
         self.pendingStart = true
@@ -124,7 +130,13 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
       if let floor = RoomColorSampler.shared.floorPayload() {
         payload["floor"] = floor
       }
+      // Cap du monde ARKit : absent si le magnétomètre n'a rien donné de
+      // sûr — mieux vaut pas de rose des vents qu'une fausse.
+      if let north = RoomScanCompass.shared.northOffset {
+        payload["north"] = north
+      }
       RoomColorSampler.shared.detach()
+      RoomScanCompass.shared.detach()
       stopResolver?(payload)
     } catch {
       stopRejecter?("EXPORT_FAILED", error.localizedDescription, error)
