@@ -78,16 +78,41 @@ class RoomScanExport: NSObject {
         reject("NO_VIEW", "Aucune vue pour présenter le partage", nil)
         return
       }
-      var top = root
-      while let presented = top.presentedViewController { top = presented }
-      let sheet = UIActivityViewController(activityItems: [url],
-                                           applicationActivities: nil)
-      // iPad : la feuille exige un point d'ancrage.
-      sheet.popoverPresentationController?.sourceView = top.view
-      sheet.popoverPresentationController?.sourceRect = CGRect(
-        x: top.view.bounds.midX, y: top.view.bounds.midY, width: 0, height: 0)
-      top.present(sheet, animated: true)
+      Self.presentWhenReady(root: root, url: url, tries: 0)
       resolve(true)
     }
+  }
+
+  /**
+   Présente la feuille de partage, mais pas avant que l'écran soit libre.
+
+   iOS ne présente pas deux contrôleurs à la fois, et une fenêtre en train
+   de se fermer reste en place quelques dixièmes de seconde : présenter
+   dessus **ne fait rien du tout**, sans la moindre erreur ni exception.
+   C'est ce qui rendait « Image », « Modèle 3D » et « Liste du matériel »
+   muets au clic — le partage était demandé pendant que la fenêtre de choix
+   se refermait. Le PDF, lui, marchait : il passe par un changement d'écran.
+
+   On attend donc que plus rien ne soit en cours de fermeture, par pas de
+   100 ms, une seconde au maximum.
+   */
+  private static func presentWhenReady(root: UIViewController, url: URL, tries: Int) {
+    var top = root
+    while let presented = top.presentedViewController, !presented.isBeingDismissed {
+      top = presented
+    }
+    if (top.isBeingDismissed || top.presentedViewController != nil), tries < 10 {
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+        presentWhenReady(root: root, url: url, tries: tries + 1)
+      }
+      return
+    }
+    let sheet = UIActivityViewController(activityItems: [url],
+                                         applicationActivities: nil)
+    // iPad : la feuille exige un point d'ancrage.
+    sheet.popoverPresentationController?.sourceView = top.view
+    sheet.popoverPresentationController?.sourceRect = CGRect(
+      x: top.view.bounds.midX, y: top.view.bounds.midY, width: 0, height: 0)
+    top.present(sheet, animated: true)
   }
 }

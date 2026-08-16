@@ -1152,6 +1152,15 @@ export const useScanStore = create<ScanState>((set, get) => {
         if (dist > demi + 0.3) continue;
         if (!best || dist < best.d) best = { d: dist, w };
       }
+      // L'aimant ne DÉCIDE pas de l'orientation.
+      //
+      // Il collait le meuble au mur et lui imposait son angle à chaque
+      // déplacement. Dans une chambre de 2,44 m, un lit de 1,90 est à moins
+      // de 30 cm d'un mur PARTOUT : il restait donc collé en permanence, et
+      // toute rotation à la main était effacée au premier glissement. On ne
+      // s'aimante plus que si le meuble regarde DÉJÀ à peu près dans le bon
+      // sens — à 30° près. Au-delà, l'utilisateur veut visiblement autre
+      // chose, et on lui laisse la main.
       if (best) {
         const w = best.w;
         const len = segLength(w) || 1;
@@ -1170,13 +1179,18 @@ export const useScanStore = create<ScanState>((set, get) => {
           x: w.a.x + u.x * len * Math.max(0, Math.min(1, t)),
           z: w.a.z + u.z * len * Math.max(0, Math.min(1, t)),
         };
-        pose = {
-          x: sur.x + n.x * demi,
-          z: sur.z + n.z * demi,
-          // Dos au mur : l'axe de profondeur du meuble (z local) regarde la
-          // pièce, ce qui donne cet angle-là.
-          yaw: Math.atan2(-n.x, n.z),
-        };
+        const vise = Math.atan2(-n.x, n.z);
+        let ecart = Math.abs(((pose.yaw - vise + Math.PI) % (2 * Math.PI)) - Math.PI);
+        if (ecart > Math.PI) ecart = 2 * Math.PI - ecart;
+        if (ecart < (30 * Math.PI) / 180) {
+          pose = {
+            x: sur.x + n.x * demi,
+            z: sur.z + n.z * demi,
+            // Dos au mur : l'axe de profondeur du meuble (z local) regarde
+            // la pièce, ce qui donne cet angle-là.
+            yaw: vise,
+          };
+        }
       }
       const cos = Math.cos(pose.yaw);
       const sin = Math.sin(pose.yaw);

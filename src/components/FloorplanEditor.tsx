@@ -166,6 +166,9 @@ interface Props {
    * foncé. C'est le seul signal visible sans ouvrir un menu.
    */
   alertRooms?: Set<string>;
+  /** Cotes du meuble sélectionné : réclamées par sa pastille de mesure. */
+  showObjectDims?: boolean;
+  onToggleObjectDims?: () => void;
   /** Appui sur le vide : `null` retire aussi la sélection d'un meuble. */
   onSelectObject?: (id: string | null) => void;
   /** Ouverture sélectionnée : elle se retaille en largeur et en hauteur. */
@@ -200,6 +203,8 @@ export function FloorplanEditor({
   selectedOpeningId,
   onSelectOpening,
   onSelectObject,
+  showObjectDims,
+  onToggleObjectDims,
   alertRooms,
 }: Props) {
   const walls = useScanStore((s) => s.walls);
@@ -252,12 +257,32 @@ export function FloorplanEditor({
   // Pendant un déplacement du plan, les cotes sont masquées : leur recalcul
   // et leur rotation à chaque image faisaient saccader le geste.
   const [navigating, setNavigating] = useState(false);
+  /** Emprise à l'écran du meuble sélectionné : zone interdite au plan. */
+  const objBox = useRef<{ x: number; y: number; hw: number; hh: number } | null>(
+    null,
+  );
   const nav = useRef(
     PanResponder.create({
       // Ne prend la main QUE sur un mouvement : les taps (sélection de mur)
       // et les poignées de coin gardent la priorité.
       onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (_e, g) => Math.abs(g.dx) + Math.abs(g.dy) > 6,
+      // Un geste qui COMMENCE sur le meuble sélectionné appartient au
+      // meuble, jamais au plan. Sans cette exception, le plan se déplaçait
+      // sous le doigt et le meuble ne bougeait pas d'un pouce.
+      onMoveShouldSetPanResponder: (e, g) => {
+        if (Math.abs(g.dx) + Math.abs(g.dy) <= 6) return false;
+        const b = objBox.current;
+        if (b) {
+          const { locationX: x, locationY: y } = e.nativeEvent;
+          if (
+            Math.abs(x - b.x) < b.hw + 14 &&
+            Math.abs(y - b.y) < b.hh + 14
+          ) {
+            return false;
+          }
+        }
+        return true;
+      },
       onPanResponderGrant: (e, g) => {
         setNavigating(true);
         snapshot(e, g);
@@ -759,6 +784,8 @@ export function FloorplanEditor({
                 et tournent avec lui puisqu'elles sont calculées dans le
                 monde, pas à l'écran. */}
             {selectedObjectId &&
+              showFurniture &&
+              showObjectDims &&
               (() => {
                 const o = allObjects.find((x) => x.id === selectedObjectId);
                 if (!o) return null;
@@ -1076,6 +1103,7 @@ export function FloorplanEditor({
               posait le doigt à côté du centre — c'est-à-dire presque
               partout sur un lit —, c'était le plan qui se déplaçait. */}
           {selectedObjectId &&
+            showFurniture &&
             (() => {
               const o = allObjects.find((x) => x.id === selectedObjectId);
               if (!o) return null;
@@ -1091,6 +1119,12 @@ export function FloorplanEditor({
               // pile dessus, et rater la poignée déplaçait le plan.
               const hw = Math.max(28, (w * cw + d * sw) / 2 + 10);
               const hh = Math.max(28, (w * sw + d * cw) / 2 + 10);
+              objBox.current = { x: p.x, y: p.y, hw, hh };
+              // Les boutons flottants restent DANS le plan, et à gauche de
+              // la colonne d'outils : posés sur elle, on cliquait l'un pour
+              // l'autre.
+              const bx = Math.min(layout.w - 106, Math.max(46, p.x + hw + 2));
+              const by = Math.min(layout.h - 96, Math.max(30, p.y - hh - 30));
               return (
                 <>
                   <ObjectDragHandle
@@ -1109,12 +1143,39 @@ export function FloorplanEditor({
                     frame={frame}
                   />
                   <TouchableOpacity
-                    style={[
-                      styles.objDelete,
-                      { left: p.x + hw + 2, top: p.y - hh - 30 },
-                    ]}
+                    style={[styles.objDelete, { left: bx, top: by }]}
                     onPress={() => onDeleteObject?.(o.id)}>
                     <Text style={styles.objDeleteText}>✕</Text>
+                  </TouchableOpacity>
+                  {/* Les cotes à la demande : le bandeau du bas et les
+                      dégagements ne s'affichent que si on les réclame. Ils
+                      couvraient le plan en permanence pour un réglage qu'on
+                      ne fait qu'une fois. */}
+                  <TouchableOpacity
+                    style={[
+                      styles.objMeasure,
+                      showObjectDims && styles.objMeasureOn,
+                      { left: bx, top: by + 36 },
+                    ]}
+                    onPress={onToggleObjectDims}>
+                    <Svg width={17} height={17} viewBox="0 0 24 24">
+                      {[
+                        'M3.5 9 h17 a1.5 1.5 0 0 1 1.5 1.5 v3 a1.5 1.5 0 0 1 -1.5 1.5 h-17 a1.5 1.5 0 0 1 -1.5 -1.5 v-3 a1.5 1.5 0 0 1 1.5 -1.5 z',
+                        'M7.5 9 v3',
+                        'M11.5 9 v3',
+                        'M15.5 9 v3',
+                      ].map((dd) => (
+                        <Path
+                          key={dd}
+                          d={dd}
+                          stroke={showObjectDims ? '#FFFFFF' : c.ink}
+                          strokeWidth={2}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          fill="none"
+                        />
+                      ))}
+                    </Svg>
                   </TouchableOpacity>
                 </>
               );
@@ -1550,6 +1611,18 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     elevation: 4,
   },
   objDeleteText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
+  objMeasure: {
+    position: 'absolute',
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: c.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...shadowCard,
+    shadowOpacity: 0.16,
+  },
+  objMeasureOn: { backgroundColor: c.blue },
   handleDot: {
     width: 15,
     height: 15,

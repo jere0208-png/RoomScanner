@@ -350,6 +350,20 @@ métré par pièce, vues 3D), **modèle 3D** (OBJ du plan retouché) ou **image*
 « modèle » ont quitté les barres d'outils des plans : elles y faisaient
 double emploi et encombraient une barre déjà chargée.
 
+### Partager : la feuille attend que l'écran soit libre
+
+« Image », « Modèle 3D » et « Liste du matériel » ne faisaient **rien** au
+clic — pas d'erreur, pas d'alerte, rien. iOS ne présente pas deux
+contrôleurs à la fois, et une fenêtre en train de se fermer reste en place
+quelques dixièmes de seconde : présenter la feuille de partage dessus est
+purement ignoré. Le PDF, lui, marchait, parce qu'il passe par un changement
+d'écran qui laisse le temps.
+
+Un délai côté JS ne suffisait pas — la durée de fermeture n'est pas garantie.
+Le natif attend donc que **plus rien ne soit en cours de fermeture**, par pas
+de 100 ms et une seconde au maximum, avant de présenter. Et le JS déclenche
+le partage sur `onDismiss`, quand la fenêtre est vraiment partie.
+
 ### Poser des meubles
 
 RoomPlan ne reconnaît que ce qui était là au moment du scan — or un logement
@@ -397,6 +411,22 @@ pour un meuble volontairement de biais.
 **Les murs attirent.** Dès que le dos d'un meuble passe à moins de 30 cm d'un
 mur, il s'y colle et s'aligne dessus, dos au nu, face à la pièce. Au-delà, il
 reste exactement là où le doigt l'a laissé — l'aimant aide, il ne décide pas.
+
+**Les cotes sont à la demande.** Une pastille de mesure suit le meuble, sous
+sa croix de suppression : elle allume les dégagements et le bandeau des
+dimensions. Ils occupaient l'écran en permanence pour un réglage qu'on ne
+fait qu'une fois.
+
+**L'aimant ne décide pas de l'orientation.** Il collait le meuble au mur ET
+lui imposait son angle à chaque déplacement : dans une chambre de 2,44 m, un
+lit de 1,90 est à moins de 30 cm d'un mur PARTOUT, il restait donc collé en
+permanence et toute rotation à la main était effacée au premier glissement.
+L'aimantation ne joue plus que si le meuble regarde déjà à peu près dans le
+bon sens, à 30° près.
+
+**Un geste qui commence sur le meuble appartient au meuble.** Le plan avait
+beau ne réagir qu'au-delà de six pixels, il volait le glissement : sa zone
+de navigation exclut désormais l'emprise du meuble sélectionné.
 
 **Les dégagements se cotent tout seuls.** Un meuble sélectionné montre ce qui
 le sépare des murs sur ses quatre côtés : la cote part du milieu de chaque

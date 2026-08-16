@@ -212,6 +212,9 @@ export function ResultScreen() {
   const [prompt, setPrompt] = useState<PromptData | null>(null);
   // Catalogue de mobilier : ouvert par le « + » posé à côté du calque meubles.
   const [catalogue, setCatalogue] = useState(false);
+  // Cotes du meuble : à la demande. Le bandeau couvrait le plan en
+  // permanence pour un réglage qu'on ne fait qu'une fois.
+  const [objDims, setObjDims] = useState(false);
   const [quete, setQuete] = useState('');
   /**
    * Meuble tout juste posé, pas encore validé. Quitter sa fiche sans la
@@ -243,6 +246,7 @@ export function ResultScreen() {
   }, [editMode, barMode, swap]);
 
   const canvasRef = useRef<View>(null);
+  const partageEnAttente = useRef<null | (() => void)>(null);
 
   // Départ vers l'export : ondes qui traversent toute la page puis fondu.
   const { width: winW, height: winH } = useWindowDimensions();
@@ -274,7 +278,16 @@ export function ResultScreen() {
    * il passe par un changement d'écran, qui laisse le temps.
    */
   const apresFermeture = (action: () => void) => {
-    setTimeout(action, 420);
+    partageEnAttente.current = action;
+    // Android n'a pas `onDismiss` : on retombe sur un délai.
+    if (Platform.OS !== 'ios') setTimeout(() => lancerPartage(), 350);
+  };
+
+  /** Exécute le partage mis de côté, une fois la fenêtre vraiment fermée. */
+  const lancerPartage = () => {
+    const action = partageEnAttente.current;
+    partageEnAttente.current = null;
+    action?.();
   };
 
   /** Capture la vue affichée (2D ou 3D) en PNG — avec watermark EchoPlan —
@@ -347,6 +360,7 @@ export function ResultScreen() {
     setSelectedWallId(null);
     setSelectedOpeningId(null);
     setSelectedObjectId(id);
+    setObjDims(true);
     setWInput(item.w.toFixed(2).replace('.', ','));
     setDInput(item.d.toFixed(2).replace('.', ','));
   };
@@ -667,6 +681,8 @@ export function ResultScreen() {
               setSelectedObjectId(null);
             }}
             onSelectObject={(id) => setSelectedObjectId(id)}
+            showObjectDims={objDims}
+            onToggleObjectDims={() => setObjDims((v) => !v)}
             selectedWallId={selectedWallId}
             onSelectWall={(id) => {
               setSelectedObjectId(null);
@@ -785,7 +801,16 @@ export function ResultScreen() {
                     <ToolPill
                       icon="furniture"
                       active={showFurniture}
-                      onPress={() => setShowFurniture(!showFurniture)}
+                      onPress={() => {
+                        // Éteindre le calque éteint tout ce qui l'accompagne :
+                        // les poignées d'un meuble invisible restaient à
+                        // l'écran, orphelines.
+                        if (showFurniture) {
+                          setSelectedObjectId(null);
+                          setObjDims(false);
+                        }
+                        setShowFurniture(!showFurniture);
+                      }}
                     />
                   </View>,
                   <ToolPill
@@ -856,7 +881,7 @@ export function ResultScreen() {
         )}
 
         {/* Côtes du meuble sélectionné, en surimpression */}
-        {tab === '2d' && selectedObject && (
+        {tab === '2d' && selectedObject && showFurniture && objDims && (
           <View style={styles.editBar}>
             <Text style={styles.editLabel} numberOfLines={1}>
               {frCategory(selectedObject.category)} · glissez-le, il se colle
@@ -1207,6 +1232,7 @@ export function ResultScreen() {
         visible={exporting}
         transparent
         animationType="fade"
+        onDismiss={lancerPartage}
         onRequestClose={() => setExporting(false)}>
         <Pressable style={styles.modalBackdrop} onPress={() => setExporting(false)}>
           <Pressable style={styles.modalCard} onPress={() => {}}>
@@ -2157,7 +2183,7 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     position: 'absolute',
     bottom: 10,
     left: 10,
-    right: 68,
+    right: 76,
     backgroundColor: c.surface,
     borderRadius: radius.md,
     borderWidth: 1,
