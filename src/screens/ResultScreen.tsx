@@ -102,6 +102,7 @@ import { EnAttente } from '../components/PendingPill';
 import {
   CEILINGS,
   CEILING_KINDS,
+  spreadPoints,
   type CeilingKind,
 } from '../geometry/ceiling';
 import { haptic } from '../ui/haptic';
@@ -299,6 +300,8 @@ export function ResultScreen() {
   const [showCeiling, setShowCeiling] = useState(true);
   /** Appareil de plafond en attente de pose : on touche la pièce qui le reçoit. */
   const [pendingCeiling, setPendingCeiling] = useState<CeilingKind | null>(null);
+  /** Nombre de spots à répartir dans la prochaine pièce touchée. */
+  const [pendingSpots, setPendingSpots] = useState<number | null>(null);
   /**
    * Point de plafond en attente de COMMANDE : on touche l'interrupteur.
    *
@@ -360,7 +363,10 @@ export function ResultScreen() {
   const seulGeste = useCallback(
     (garde?: 'mur' | 'plafond' | 'lien' | 'reglage') => {
       if (garde !== 'mur') setPendingKind(null);
-      if (garde !== 'plafond') setPendingCeiling(null);
+      if (garde !== 'plafond') {
+        setPendingCeiling(null);
+        setPendingSpots(null);
+      }
       if (garde !== 'lien') setPendingLink(null);
       if (garde !== 'reglage') setSelCeiling(null);
     },
@@ -1212,9 +1218,9 @@ export function ResultScreen() {
             ceiling={ceiling}
             showCeiling={showCeiling}
             selectedCeilingId={selCeiling}
-            placing={!!pendingCeiling}
+            placing={!!pendingCeiling || !!pendingSpots}
             onPlaceAt={(at) => {
-              if (!pendingCeiling) return;
+              if (!pendingCeiling && !pendingSpots) return;
               // Dans quelle pièce le doigt s'est-il posé ? Hors de tout
               // contour, on ne pose rien : un appareil de plafond sans
               // pièce n'aurait ni circuit ni métré.
@@ -1227,7 +1233,18 @@ export function ResultScreen() {
                 haptic('alerte');
                 return;
               }
-              addCeiling(pendingCeiling, part.roomId, at);
+              if (pendingSpots) {
+                const pts = spreadPoints(
+                  part.surface?.pts ?? [],
+                  pendingSpots,
+                  trame,
+                );
+                for (const p2 of pts) addCeiling('spot', part.roomId, p2);
+                haptic('succes');
+                setPendingSpots(null);
+                return;
+              }
+              addCeiling(pendingCeiling!, part.roomId, at);
               haptic('succes');
               setPendingCeiling(null);
             }}
@@ -1422,11 +1439,33 @@ export function ResultScreen() {
                         subtitle:
                           'Choisissez l’appareil, puis touchez la pièce qui ' +
                           'le reçoit. Il se pose en son centre.',
-                        actions: CEILING_KINDS.map((k) => ({
-                          label: CEILINGS[k].label,
-                          hint: CEILINGS[k].note,
-                          onPress: () => setPendingCeiling(k),
-                        })),
+                        actions: [
+                          /**
+                           * LA LIGNE DE SPOTS, en un geste.
+                           *
+                           * Quatre spots dans un séjour, c'était quatre
+                           * poses suivies de quatre réglages : un quart
+                           * d'heure pour ce que personne ne fait à la main
+                           * sur un chantier. On les aligne sur la longueur
+                           * de la pièce, à intervalles égaux.
+                           */
+                          ...(rooms.length > 0
+                            ? [
+                                {
+                                  label: 'Ligne de spots',
+                                  hint:
+                                    'Quatre spots alignés sur la longueur ' +
+                                    'de la pièce, à intervalles égaux.',
+                                  onPress: () => setPendingSpots(4),
+                                },
+                              ]
+                            : []),
+                          ...CEILING_KINDS.map((k) => ({
+                            label: CEILINGS[k].label,
+                            hint: CEILINGS[k].note,
+                            onPress: () => setPendingCeiling(k),
+                          })),
+                        ],
                       });
                     }}
                   />,
@@ -1837,18 +1876,21 @@ export function ResultScreen() {
           )}
 
         {vue === '2d' &&
-          (pendingKind || pendingCeiling || pendingLink) &&
+          (pendingKind || pendingCeiling || pendingSpots || pendingLink) &&
           !capturing && (
             <EnAttente
               kind={pendingKind}
               plafond={
+                (pendingSpots ? 'spot' : null) ??
                 pendingCeiling ??
                 (pendingLink
                   ? ceiling.find((x) => x.id === pendingLink)?.kind ?? null
                   : null)
               }
               cible={
-                pendingLink
+                pendingSpots
+                  ? `une pièce — ${pendingSpots} spots`
+                  : pendingLink
                   ? 'l’interrupteur qui l’allume'
                   : pendingCeiling
                   ? 'une pièce'
@@ -1859,6 +1901,7 @@ export function ResultScreen() {
               onCancel={() => {
                 setPendingKind(null);
                 setPendingCeiling(null);
+                setPendingSpots(null);
                 setPendingLink(null);
               }}
             />

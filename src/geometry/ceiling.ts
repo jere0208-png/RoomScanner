@@ -14,7 +14,8 @@
  * huit points lumineux sans dire lequel commande quoi n'est pas un plan de
  * travail, c'est un inventaire.
  */
-import type { Pt } from './floorplan';
+import { interiorPole, type Pt } from './floorplan';
+import { pointInPolygon } from './appearance';
 
 export type CeilingKind =
   | 'dcl'
@@ -292,13 +293,74 @@ export function insetOnRing(ring: Pt[], p: Pt, marge: number): Pt {
     const d = Math.hypot(p.x - q.x, p.z - q.z);
     if (d >= dist) continue;
     dist = d;
-    // La normale rentrante de ce côté : on recule vers le centre.
-    const l = Math.sqrt(l2);
-    const n = { x: -dz / l, z: dx / l };
-    const cx = ring.reduce((t2, r) => t2 + r.x, 0) / ring.length;
-    const cz = ring.reduce((t2, r) => t2 + r.z, 0) / ring.length;
-    const sens = (cx - q.x) * n.x + (cz - q.z) * n.z >= 0 ? 1 : -1;
-    best = { x: q.x + n.x * sens * marge, z: q.z + n.z * sens * marge };
+    /**
+     * On recule vers un point SÛREMENT intérieur, pas vers le barycentre.
+     *
+     * Le barycentre d'une pièce en L tombe dans le vide : la normale
+     * calculée par rapport à lui pointait alors vers l'extérieur, et le
+     * recalage poussait l'appareil hors du mur au lieu de l'y ramener.
+     * Le pôle d'inaccessibilité, lui, est intérieur par construction.
+     */
+    const dedans = interiorPole(ring);
+    const vx = dedans.x - q.x;
+    const vz = dedans.z - q.z;
+    const vl = Math.hypot(vx, vz) || 1;
+    best = { x: q.x + (vx / vl) * marge, z: q.z + (vz / vl) * marge };
   }
   return best;
+}
+
+/**
+ * Répartit N points lumineux dans une pièce, comme on pose une ligne de spots.
+ *
+ * Quatre spots dans un séjour, c'était quatre poses au doigt suivies de
+ * quatre réglages au centimètre — un quart d'heure pour un geste que
+ * personne ne fait à la main sur un vrai chantier. On aligne toujours les
+ * spots sur la plus grande dimension de la pièce, à intervalles égaux, avec
+ * un demi-intervalle aux extrémités : c'est la règle du métier, celle qui
+ * évite deux spots collés au mur et un trou au milieu.
+ *
+ * Le calcul se fait dans la TRAME du logement, jamais dans le repère du
+ * scan : une pièce relevée de biais donnerait sinon une ligne de spots en
+ * écharpe. Et chaque point est ramené dans le contour — une pièce en L a
+ * des recoins où une ligne droite sort du mur.
+ */
+export function spreadPoints(
+  ring: Pt[],
+  count: number,
+  frame: number,
+): Pt[] {
+  if (count < 1 || ring.length < 3) return [];
+  const cos = Math.cos(frame);
+  const sin = Math.sin(frame);
+  const versTrame = (p: Pt): Pt => ({
+    x: p.x * cos + p.z * sin,
+    z: -p.x * sin + p.z * cos,
+  });
+  const versMonde = (p: Pt): Pt => ({
+    x: p.x * cos - p.z * sin,
+    z: p.x * sin + p.z * cos,
+  });
+  const pts = ring.map(versTrame);
+  const x0 = Math.min(...pts.map((p) => p.x));
+  const x1 = Math.max(...pts.map((p) => p.x));
+  const z0 = Math.min(...pts.map((p) => p.z));
+  const z1 = Math.max(...pts.map((p) => p.z));
+  // On s'aligne sur la plus grande dimension : une ligne de spots suit la
+  // longueur d'une pièce, pas sa largeur.
+  const surX = x1 - x0 >= z1 - z0;
+  const long = surX ? x1 - x0 : z1 - z0;
+  const milieu = surX ? (z0 + z1) / 2 : (x0 + x1) / 2;
+  const out: Pt[] = [];
+  for (let i = 0; i < count; i++) {
+    // Demi-intervalle aux bouts : (i + ½) / n, jamais i / (n − 1).
+    const t = (i + 0.5) / count;
+    const le = (surX ? x0 : z0) + long * t;
+    const p = surX ? { x: le, z: milieu } : { x: milieu, z: le };
+    const monde = versMonde(p);
+    out.push(
+      pointInPolygon(monde, ring) ? monde : insetOnRing(ring, monde, 0.25),
+    );
+  }
+  return out;
 }

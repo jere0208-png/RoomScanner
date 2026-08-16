@@ -1473,6 +1473,115 @@ function metrePage(ctx: SheetContext, sheet: string): string {
  * de conducteurs, sa section et sa gaine alignés en colonnes. On en met
  * vingt sans se serrer, et ce qui ne tiendrait pas est ANNONCÉ.
  */
+/**
+ * LES ÉTIQUETTES DU TABLEAU, à découper.
+ *
+ * À la mise en service, il faut étiqueter chaque disjoncteur. On le fait au
+ * feutre sur une bande adhésive, dans un tableau mal éclairé, en relisant
+ * un plan posé par terre — et c'est la dernière tâche du chantier, celle
+ * qu'on bâcle. Six mois plus tard, personne ne sait quel disjoncteur coupe
+ * la chambre.
+ *
+ * Cette feuille les imprime dans l'ORDRE DU TABLEAU, aux dimensions d'un
+ * porte-étiquette de rang modulaire, avec les traits de coupe. On découpe,
+ * on glisse, c'est fini.
+ */
+function labelsPage(
+  ctx: SheetContext,
+  sheet: string,
+  rows: SchemaRow[],
+): string {
+  const d = new Draw();
+  const x0 = FRAME.x + 30;
+  const w = FRAME.w - 60;
+  let y = FRAME.y + FRAME.h - TITLE_H - 46;
+
+  d.text('Étiquettes de tableau', x0, y + 22, 13, INK, {
+    bold: true,
+    align: 'left',
+  });
+  d.text(
+    'Dans l’ordre des modules. À découper sur les traits, à glisser dans ' +
+      'les porte-étiquettes.',
+    x0,
+    y + 8,
+    8,
+    GREY,
+    { align: 'left' },
+  );
+  y -= 18;
+
+  // Un porte-étiquette de rang fait environ 45 mm de large sur 8 de haut.
+  const LARG = (45 / 25.4) * 72;
+  const HAUT = (9 / 25.4) * 72;
+  const COLS = Math.max(1, Math.floor(w / (LARG + 12)));
+  const PAS_X = LARG + 12;
+  const PAS_Y = HAUT + 10;
+  const BAS = FRAME.y + TITLE_H + 40;
+
+  let i = 0;
+  let restants = 0;
+  for (const r of rows) {
+    const col = i % COLS;
+    const rang = Math.floor(i / COLS);
+    const ex = x0 + col * PAS_X;
+    const ey = y - rang * PAS_Y;
+    if (ey - HAUT < BAS) {
+      restants += 1;
+      i += 1;
+      continue;
+    }
+    // Le cadre de coupe : tireté, parce qu'on découpe dessus.
+    d.dashedPath(
+      [
+        { x: ex, y: ey },
+        { x: ex + LARG, y: ey },
+        { x: ex + LARG, y: ey - HAUT },
+        { x: ex, y: ey - HAUT },
+        { x: ex, y: ey },
+      ],
+      0.5,
+      '#B9C2CE',
+      [2, 2],
+    );
+    // Le repère, en gras à gauche : c'est ce qu'on lit en premier.
+    d.text(r.mark, ex + 6, ey - HAUT + 3, 7.5, INK, {
+      align: 'left',
+      bold: true,
+    });
+    // Le libellé, tronqué à la place réelle : une étiquette qui déborde ne
+    // rentre pas dans son porte-étiquette.
+    d.text(fitText(r.label, 7, LARG - 58), ex + 24, ey - HAUT + 3, 7, INK, {
+      align: 'left',
+    });
+    const calibre = r.breaker === null ? 'com.' : `${r.breaker} A`;
+    d.text(calibre, ex + LARG - 5, ey - HAUT + 3, 7, GREY, { align: 'right' });
+    i += 1;
+  }
+
+  if (restants > 0) {
+    const bas = y - Math.ceil(i / COLS) * PAS_Y;
+    d.text(
+      `${restants} étiquette${restants > 1 ? 's' : ''} de plus — la feuille ` +
+        'est pleine.',
+      x0,
+      Math.max(BAS + 4, bas),
+      7.5,
+      GREY,
+      { align: 'left' },
+    );
+  }
+
+  drawSheetChrome(d, {
+    project: ctx.name,
+    filename: ctx.filename,
+    sheetTitle: 'Étiquettes de tableau',
+    sheet,
+    scaleLabel: null,
+  });
+  return d.stream();
+}
+
 function unifilairePage(
   ctx: SheetContext,
   sheet: string,
@@ -2507,7 +2616,7 @@ export function buildScanPdf(
     (withMetre ? 1 : 0) +
     (include3D ? 1 : 0) +
     (withCeiling ? 1 : 0) +
-    (withSchema ? 3 : 0);
+    (withSchema ? 4 : 0);
   const ctx: SheetContext = {
     name: scan.name,
     filename,
@@ -2538,6 +2647,10 @@ export function buildScanPdf(
     );
   }
   if (withSchema && schemas) {
+    // Les étiquettes d'abord : c'est la feuille qu'on détache du dossier.
+    pages.push(
+      labelsPage(ctx, `${pages.length + 1} / ${total}`, schemas.rows),
+    );
     // D'abord l'architecture hors sol — d'où part quoi, sous quelle
     // protection —, puis les deux MÊMES schémas posés sur le plan : c'est
     // là qu'on lit où passe un départ, et c'est la question du chantier.

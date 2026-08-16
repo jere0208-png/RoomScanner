@@ -221,10 +221,26 @@ describe('rien ne sort de la feuille', () => {
     expect(pdf).toContain(trait('#2F6BFF'));
   });
 
-  it('le document compte trois feuilles de plus', () => {
-    // L'unifilaire hors sol, puis les deux schémas posés sur le plan.
+  it('le document compte quatre feuilles de plus', () => {
+    // Les étiquettes à découper, l'unifilaire hors sol, puis les deux
+    // schémas posés sur le plan.
     const feuilles = (src: string) => (src.match(/\/Type \/Page /g) ?? []).length;
-    expect(feuilles(pdf)).toBe(feuilles(sansSchema) + 3);
+    expect(feuilles(pdf)).toBe(feuilles(sansSchema) + 4);
+  });
+
+  /**
+   * Les étiquettes : la feuille qu'on détache du dossier.
+   *
+   * À la mise en service on étiquette au feutre, dans un tableau mal
+   * éclairé, en relisant un plan posé par terre. Six mois plus tard,
+   * personne ne sait quel disjoncteur coupe la chambre.
+   */
+  it('porte les étiquettes du tableau, dans l’ordre des modules', () => {
+    const doc = texte(pdf);
+    expect(doc).toContain('Étiquettes de tableau');
+    // Chaque départ a la sienne, avec son repère et son calibre.
+    for (const r of rows) expect(doc).toContain(r.mark);
+    expect(doc).toContain('découper');
   });
 });
 

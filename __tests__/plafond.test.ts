@@ -21,6 +21,7 @@ import {
   CEILING_KINDS,
   CEILING_SYMBOL,
   lightingLoad,
+  spreadPoints,
   linkAnchor,
   linkCurve,
   type CeilingFixture,
@@ -36,6 +37,7 @@ import {
 } from '../src/geometry/nfc15100';
 import { planRoutes } from '../src/geometry/elecplan';
 import { roomParts } from '../src/geometry/floorplan';
+import { pointInPolygon } from '../src/geometry/appearance';
 
 import type { WallSeg } from '../src/geometry/floorplan';
 import type { Fixture } from '../src/geometry/electrical';
@@ -554,5 +556,87 @@ describe('les contrôles du plafond', () => {
     expect(
       issues.some((i) => i.code === 'daaf' && /mal placé/.test(i.message)),
     ).toBe(true);
+  });
+});
+
+/**
+ * La ligne de spots : quatre poses en un geste.
+ *
+ * Sur un chantier, personne ne place des spots un par un « à peu près ». On
+ * les aligne sur la longueur de la pièce, à intervalles égaux, avec un
+ * demi-intervalle aux extrémités — sans quoi on obtient deux spots collés
+ * aux murs et un trou au milieu.
+ */
+describe('répartir une ligne de spots', () => {
+  /** Une pièce de 6 × 3, d'équerre avec le monde. */
+  const SALLE = [
+    { x: 0, z: 0 },
+    { x: 6, z: 0 },
+    { x: 6, z: 3 },
+    { x: 0, z: 3 },
+  ];
+
+  it('les aligne sur la LONGUEUR, à intervalles égaux', () => {
+    const pts = spreadPoints(SALLE, 4, 0);
+    expect(pts).toHaveLength(4);
+    // Tous sur l'axe médian de la pièce.
+    for (const p of pts) expect(p.z).toBeCloseTo(1.5, 6);
+    // Un demi-intervalle aux bouts : 0,75 / 2,25 / 3,75 / 5,25.
+    expect(pts.map((p) => Math.round(p.x * 100) / 100)).toEqual([
+      0.75, 2.25, 3.75, 5.25,
+    ]);
+  });
+
+  it('suit la longueur même quand la pièce est en travers', () => {
+    const couloir = [
+      { x: 0, z: 0 },
+      { x: 2, z: 0 },
+      { x: 2, z: 8 },
+      { x: 0, z: 8 },
+    ];
+    const pts = spreadPoints(couloir, 3, 0);
+    // Ici c'est z qui est long : les spots s'y répartissent.
+    for (const p of pts) expect(p.x).toBeCloseTo(1, 6);
+    expect(pts.map((p) => Math.round(p.z * 100) / 100)).toEqual([
+      1.33, 4, 6.67,
+    ]);
+  });
+
+  it('et suit la TRAME quand la pièce est relevée de biais', () => {
+    const a = (20 * Math.PI) / 180;
+    const tourne = SALLE.map((p) => ({
+      x: p.x * Math.cos(a) - p.z * Math.sin(a),
+      z: p.x * Math.sin(a) + p.z * Math.cos(a),
+    }));
+    const pts = spreadPoints(tourne, 4, a);
+    // Les quatre points restent alignés : leurs écarts successifs sont
+    // égaux, ce qui ne serait pas le cas sur les axes du monde.
+    const d = [0, 1, 2].map((i) =>
+      Math.hypot(pts[i + 1].x - pts[i].x, pts[i + 1].z - pts[i].z),
+    );
+    expect(d[1]).toBeCloseTo(d[0], 3);
+    expect(d[2]).toBeCloseTo(d[0], 3);
+    expect(d[0]).toBeCloseTo(1.5, 3);
+  });
+
+  it('un seul spot se pose au centre', () => {
+    const [p] = spreadPoints(SALLE, 1, 0);
+    expect(p.x).toBeCloseTo(3, 6);
+    expect(p.z).toBeCloseTo(1.5, 6);
+  });
+
+  it('et rien ne sort du contour', () => {
+    // Une pièce en L : la ligne droite traverserait le vide.
+    const enL = [
+      { x: 0, z: 0 },
+      { x: 6, z: 0 },
+      { x: 6, z: 1.2 },
+      { x: 2, z: 1.2 },
+      { x: 2, z: 4 },
+      { x: 0, z: 4 },
+    ];
+    for (const p of spreadPoints(enL, 5, 0)) {
+      expect(pointInPolygon(p, enL)).toBe(true);
+    }
   });
 });
