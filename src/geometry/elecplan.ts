@@ -22,6 +22,18 @@ export interface ElecPlan {
   parCircuit: Map<string, number>;
   /** Détail par circuit : gaine, câble, nombre de départs. */
   metre: Map<string, { conduit: number; cable: number; runs: number }>;
+  /**
+   * Le métré repose-t-il sur des contours SÛRS ?
+   *
+   * La gaine longe le contour de la pièce desservie. Quand la pièce n'a pas
+   * été relevée en boucle fermée, ce contour est reconstitué : la surface
+   * l'annonce déjà par un « ≈ », la longueur de câble le taisait. Un métré
+   * qu'on croit exact part au devis tel quel — et c'est le genre d'erreur
+   * qui se paie au mètre de câble, pas au centimètre carré.
+   */
+  exact: boolean;
+  /** Les circuits dont le tracé longe un contour reconstitué. */
+  approx: Set<string>;
   /** Tracés au sol, un par appareil desservi. */
   traces: { id: string; path: Pt[] }[];
 }
@@ -65,6 +77,7 @@ export function planRoutes(
     { conduit: number; cable: number; runs: number }
   >();
   const traces: { id: string; path: Pt[] }[] = [];
+  const approx = new Set<string>();
 
   for (const c of circuits) {
     const runs = c.fixtureIds.flatMap((id) => {
@@ -76,8 +89,12 @@ export function planRoutes(
       // de la première pièce du plan — mieux vaut un tracé approché qu'une
       // ligne droite à travers les cloisons.
       const piece = parts.find((p) => p.roomId === placement.get(f.id));
-      const ring = piece?.surface?.pts ?? parts[0]?.surface?.pts ?? [];
+      const surface = piece?.surface ?? parts[0]?.surface;
+      const ring = surface?.pts ?? [];
       if (ring.length < 3) return [];
+      // Contour reconstitué, ou pièce introuvable et contour emprunté à une
+      // autre : dans les deux cas le tracé est approché, et on le dit.
+      if (!surface?.exact || !piece) approx.add(c.id);
       return cableRuns(ring, depart.at, depart.height, [
         { id: f.id, at: pos.at, height: pos.height },
       ]);
@@ -91,5 +108,5 @@ export function planRoutes(
     });
     for (const r of runs) traces.push({ id: r.fixtureId, path: r.path });
   }
-  return { parCircuit, metre, traces };
+  return { parCircuit, metre, traces, exact: approx.size === 0, approx };
 }

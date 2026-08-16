@@ -53,6 +53,8 @@ import {
   wallFace,
 } from '../geometry/electrical';
 import { frCategory, furnKind, furnitureStrokes } from '../geometry/furniture';
+import { markColor } from '../geometry/schema';
+import { CloseCross } from './CloseCross';
 
 /**
  * Les commandes du mur, en icônes.
@@ -1094,7 +1096,13 @@ export function FloorplanEditor({
                   })
                   .join(' ')}
                 fill="none"
-                stroke={c.blue}
+                // La teinte du circuit, celle-là même que porte le schéma du
+                // PDF : on suit un tracé à l'œil avant de lire son repère.
+                stroke={
+                  circuitMarks?.get(r.id)
+                    ? markColor(circuitMarks.get(r.id)!)
+                    : c.blue
+                }
                 strokeWidth={1.6}
                 strokeDasharray="7 4"
                 strokeLinejoin="round"
@@ -1201,7 +1209,9 @@ export function FloorplanEditor({
                           <SvgText
                             x={p.x}
                             y={p.y + 20}
-                            fill={c.ink}
+                            // Même teinte que le tracé et que le schéma du
+                            // PDF : un seul code couleur pour toute l'app.
+                            fill={markColor(circuitMarks.get(f.id)!)}
                             fontSize={8}
                             fontWeight="900"
                             textAnchor="middle">
@@ -1399,7 +1409,7 @@ export function FloorplanEditor({
                   <TouchableOpacity
                     style={[styles.objDelete, { left: bx, top: by }]}
                     onPress={() => onDeleteObject?.(o.id)}>
-                    <Text style={styles.objDeleteText}>✕</Text>
+                    <CloseCross size={17} color="#FFFFFF" weight={3.4} />
                   </TouchableOpacity>
                   {/* Les cotes à la demande : le bandeau du bas et les
                       dégagements ne s'affichent que si on les réclame. Ils
@@ -1966,7 +1976,6 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     elevation: 4,
   },
-  objDeleteText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
   objMeasure: {
     position: 'absolute',
     width: 28,

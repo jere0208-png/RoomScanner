@@ -94,26 +94,17 @@ import {
   type FixtureKind,
 } from '../geometry/electrical';
 import { useScanStore } from '../store/scanStore';
+import { DiagnosticSheet, type Constat } from '../components/DiagnosticSheet';
 import { haptic } from '../ui/haptic';
 import {
   ActionSheet,
   PromptSheet,
-  SheetShell,
   type ActionData,
   type PromptData,
 } from '../components/Sheet';
 
 type Tab = '2d' | '3d';
 
-/** Un constat du diagnostic, d'où qu'il vienne — géométrie ou électricité. */
-interface Constat {
-  key: string;
-  message: string;
-  hint: string;
-  severity: string;
-  wallId?: string;
-  roomId?: string;
-}
 const fr = (n: number, d = 1) => n.toFixed(d).replace('.', ',');
 
 /** Recherche sans accent ni casse : « evier » doit trouver « Évier ». */
@@ -412,7 +403,11 @@ export function ResultScreen() {
         cheminements?.parCircuit,
       );
       // Le tirage et la commande : ce qu'un patron lit avant le reste.
-      const pull = pullSchedule(list.circuits, cheminements?.metre);
+      const pull = pullSchedule(
+        list.circuits,
+        cheminements?.metre,
+        cheminements?.approx,
+      );
       const tirage = { pull, buy: buyingList(pull, fixtures) };
       const bytes = buildMaterialPdf(scanName, list, tirage);
       await RoomScan.sharePDF(toBase64(bytes), materialFilename(scanName));
@@ -654,33 +649,53 @@ export function ResultScreen() {
     return out;
   }, [objects, walls, fixtures, rooms, placement]);
 
-  const elecIssues = checkElectrical(
-    roomInputs,
-    fixtures,
-    wallRooms,
-    placement,
-    volumes,
-    wallWorktops,
+  /**
+   * Les constats, calculés UNE fois par changement de plan.
+   *
+   * Ils étaient recalculés à chaque rendu — donc à chaque image d'un geste
+   * sur la vue 3D, alors que ni les murs ni l'appareillage ne bougent
+   * pendant qu'on tourne autour. `checkElectrical` parcourt tous les
+   * appareils croisés à toutes les pièces, `checkPlan` tous les murs : c'est
+   * exactement le genre de travail qu'un doigt posé sur l'écran ne doit pas
+   * déclencher soixante fois par seconde.
+   */
+  const elecIssues = useMemo(
+    () =>
+      checkElectrical(
+        roomInputs,
+        fixtures,
+        wallRooms,
+        placement,
+        volumes,
+        wallWorktops,
+      ),
+    [roomInputs, fixtures, wallRooms, placement, volumes, wallWorktops],
   );
-  const alertRooms = roomsInAlert(elecIssues);
-  const issues: Constat[] = [
-    ...checkPlan(walls, rooms).map((i, n) => ({
-      key: `p${n}`,
-      message: i.message,
-      hint: i.hint,
-      severity: i.severity as string,
-      wallId: i.wallId,
-      roomId: i.roomId,
-    })),
-    ...elecIssues.map((i, n) => ({
-      key: `e${n}`,
-      message: i.message,
-      hint: i.regle,
-      severity: i.severity as string,
-      roomId: i.roomId,
-    })),
-  ];
-  const alertes = issues.filter((i) => i.severity === 'alerte').length;
+  const alertRooms = useMemo(() => roomsInAlert(elecIssues), [elecIssues]);
+  const issues: Constat[] = useMemo(
+    () => [
+      ...checkPlan(walls, rooms).map((i, n) => ({
+        key: `p${n}`,
+        message: i.message,
+        hint: i.hint,
+        severity: i.severity as string,
+        wallId: i.wallId,
+        roomId: i.roomId,
+      })),
+      ...elecIssues.map((i, n) => ({
+        key: `e${n}`,
+        message: i.message,
+        hint: i.regle,
+        severity: i.severity as string,
+        roomId: i.roomId,
+      })),
+    ],
+    [walls, rooms, elecIssues],
+  );
+  const alertes = useMemo(
+    () => issues.filter((i) => i.severity === 'alerte').length,
+    [issues],
+  );
 
   /** Amène sous les yeux l'élément visé par un constat. */
   const goToIssue = (issue: Constat) => {
@@ -1616,49 +1631,13 @@ export function ResultScreen() {
       </Modal>
 
       {/* ---------- Diagnostic du plan ---------- */}
-      <SheetShell visible={checking} onClose={() => setChecking(false)}>
-        <View style={styles.diagHead}>
-          <View
-            style={[
-              styles.diagBadge,
-              alertes > 0 ? styles.diagBadgeKo : styles.diagBadgeOk,
-            ]}>
-            <Text style={styles.diagBadgeText}>{alertes || '✓'}</Text>
-          </View>
-          <View style={styles.diagTitles}>
-            <Text style={styles.diagTitle}>
-              {alertes > 0
-                ? `${alertes} point${alertes > 1 ? 's' : ''} à corriger`
-                : 'Rien de bloquant'}
-            </Text>
-            <Text style={styles.diagSub}>
-              {issues.length === 0
-                ? 'Le plan ne présente aucune anomalie détectable.'
-                : 'Touchez une ligne pour aller voir l’élément sur le plan.'}
-            </Text>
-          </View>
-        </View>
-        <ScrollView style={styles.diagScroll} showsVerticalScrollIndicator={false}>
-          {issues.map((issue) => (
-            <TouchableOpacity
-              key={issue.key}
-              style={[
-                styles.diagRow,
-                issue.severity === 'alerte' && styles.diagRowKo,
-              ]}
-              activeOpacity={0.75}
-              onPress={() => goToIssue(issue)}>
-              <View style={styles.diagTexts}>
-                <Text style={styles.diagMessage}>{issue.message}</Text>
-                <Text style={styles.diagHint} numberOfLines={2}>
-                  {issue.hint}
-                </Text>
-              </View>
-              <Text style={styles.diagChevron}>›</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </SheetShell>
+      <DiagnosticSheet
+        visible={checking}
+        onClose={() => setChecking(false)}
+        issues={issues}
+        rooms={rooms}
+        onGoToIssue={goToIssue}
+      />
 
       {/* ---------- Nom de la pièce : liste plutôt que clavier ---------- */}
       <Modal
@@ -2895,39 +2874,8 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   modalBackdropPlein: { padding: 12, paddingTop: 56, justifyContent: 'flex-end' },
   // Diagnostic : un état d'abord — combien, et est-ce grave —, puis la
   // liste. L'ancienne fenêtre commençait par une consigne d'usage.
-  diagHead: { flexDirection: 'row', alignItems: 'center', gap: 13 },
-  diagBadge: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  diagBadgeKo: { backgroundColor: c.danger },
-  diagBadgeOk: { backgroundColor: c.green },
-  diagBadgeText: { color: '#FFFFFF', fontSize: 17, fontWeight: '800' },
-  diagTitles: { flex: 1 },
-  diagTitle: { color: c.ink, fontSize: 17.5, fontWeight: '800', letterSpacing: -0.3 },
-  diagSub: { color: c.inkFaint, fontSize: 12, lineHeight: 16, marginTop: 2 },
-  diagScroll: { maxHeight: 380, marginTop: 12 },
-  diagRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: c.surfaceSunken,
-    borderRadius: radius.md,
-    borderLeftWidth: 3,
-    borderLeftColor: c.inkFaint,
-    paddingLeft: 13,
-    paddingRight: 10,
-    paddingVertical: 11,
-    marginBottom: 8,
-  },
-  diagRowKo: { borderLeftColor: c.danger },
-  diagTexts: { flex: 1 },
-  diagMessage: { color: c.ink, fontSize: 14, fontWeight: '700', lineHeight: 19 },
-  diagHint: { color: c.inkFaint, fontSize: 11.5, lineHeight: 15.5, marginTop: 3 },
-  diagChevron: { color: c.inkFaint, fontSize: 22, fontWeight: '600', marginTop: -3 },
+  // Le volet d'une pièce : son nom, le nombre de constats, un chevron qui
+  // pivote. Rien de plus — c'est un séparateur qu'on peut viser du pouce.
   // Carte d'explication du mur rouge : posée sous la barre de cote, elle
   // répond à l'appui sans couvrir le mur qu'on vient de toucher.
   elecCard: {

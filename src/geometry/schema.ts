@@ -201,3 +201,36 @@ export function multiWire(
         : undefined,
   };
 }
+
+/**
+ * La teinte d'un circuit — la MÊME à l'écran et sur le PDF.
+ *
+ * Un repère « C3 » écrit en noir sur le plan et tracé en vert sur le schéma,
+ * c'est deux documents qui parlent du même départ sans se ressembler. Sur le
+ * chantier, on suit la couleur avant de lire le texte : elle doit donc être
+ * décidée UNE fois, ici, et non dans chaque module qui dessine.
+ *
+ * Douze teintes, distinctes entre elles et lisibles sur fond blanc comme sur
+ * un aplat de sol. Au-delà de douze départs on recommence la roue : deux
+ * circuits de même teinte restent distingués par leur repère, et une
+ * installation qui dépasse douze départs a de toute façon son tableau pour
+ * référence.
+ */
+const ROUE = [
+  '#2F6BFF', '#B8352A', '#2E8B57', '#8A5CD1', '#C77A18', '#0F8C9E',
+  '#B5326E', '#5C7A1E', '#3757A8', '#A34D2A', '#6B4FA0', '#127A5E',
+] as const;
+
+export function circuitColor(index: number): string {
+  return ROUE[((index % ROUE.length) + ROUE.length) % ROUE.length];
+}
+
+/**
+ * La teinte d'après le repère (« C3 » → la troisième). Les repères sont
+ * numérotés dans l'ordre du tableau, ce qui suffit à retrouver le rang sans
+ * traîner la liste des circuits jusqu'au composant qui dessine.
+ */
+export function markColor(mark: string): string {
+  const n = parseInt(mark.replace(/^\D+/, ''), 10);
+  return circuitColor(Number.isFinite(n) && n > 0 ? n - 1 : 0);
+}

@@ -237,7 +237,17 @@ function migrateSave(s: SavedScan): SavedScan {
   };
 }
 
+/**
+ * L'ancienne clé : TOUTE la bibliothèque dans une seule chaîne JSON.
+ *
+ * Elle n'est plus écrite, seulement lue une dernière fois pour reprendre les
+ * scans d'avant. On la garde nommée ici : un jour où l'autre quelqu'un se
+ * demandera pourquoi il traîne une clé « v1 » dans le stockage.
+ */
 const STORAGE_KEY = 'roomscanner.saves.v1';
+/** L'ordre des scans. Le contenu, lui, vit une clé par scan. */
+const INDEX_KEY = 'roomscanner.index.v2';
+const scanKey = (id: string) => `roomscanner.scan.v2.${id}`;
 const FOLDERS_KEY = 'roomscanner.folders.v1';
 const THEME_KEY = 'roomscanner.themePref.v1';
 const COLORS_KEY = 'roomscanner.openingColors.v1';
@@ -247,11 +257,99 @@ const TEXTURES_KEY = 'roomscanner.showTextures.v1';
 
 export type ThemePref = 'light' | 'dark';
 
+/**
+ * Ce qui est déjà sur le disque, par scan. Sert à n'écrire QUE ce qui change.
+ */
+const ecrits = new Map<string, string>();
+/** Remis à zéro par l'hydratation, et par les tests qui repartent à neuf. */
+export function resetPersistCache() {
+  ecrits.clear();
+}
+
+/**
+ * Relit la bibliothèque, et reprend au passage celle de l'ancien format.
+ *
+ * L'ancienne clé unique est lue une dernière fois, éclatée en une clé par
+ * scan, puis effacée — mais seulement après que tout a été réécrit. Une
+ * migration qui efface avant d'avoir fini est une migration qui perd des
+ * données le jour où le téléphone s'éteint au mauvais moment.
+ */
+async function loadLibrary(): Promise<SavedScan[] | null> {
+  const index = await AsyncStorage.getItem(INDEX_KEY);
+  if (index) {
+    const ids = JSON.parse(index) as string[];
+    if (!Array.isArray(ids)) return null;
+    const out: SavedScan[] = [];
+    for (const id of ids) {
+      const raw = await AsyncStorage.getItem(scanKey(id));
+      if (!raw) continue;
+      try {
+        out.push(JSON.parse(raw) as SavedScan);
+        ecrits.set(id, raw);
+      } catch {
+        // Un scan corrompu est sauté, les autres restent lisibles — c'est
+        // tout l'intérêt de ne plus tout mettre dans la même chaîne.
+      }
+    }
+    return out;
+  }
+
+  // --------------------------------------------- reprise de l'ancien format
+  const legacy = await AsyncStorage.getItem(STORAGE_KEY);
+  if (!legacy) return null;
+  const saves = JSON.parse(legacy) as SavedScan[];
+  if (!Array.isArray(saves)) return null;
+  for (const s of saves) {
+    const json = JSON.stringify(s);
+    await AsyncStorage.setItem(scanKey(s.id), json);
+    ecrits.set(s.id, json);
+  }
+  await AsyncStorage.setItem(INDEX_KEY, JSON.stringify(saves.map((s) => s.id)));
+  await AsyncStorage.removeItem(STORAGE_KEY);
+  return saves;
+}
+
 let persistTimer: ReturnType<typeof setTimeout> | null = null;
+/**
+ * Enregistrer un scan ne réécrit plus la bibliothèque entière.
+ *
+ * Tout tenait dans une seule clé : renommer un scan de 40 ko en réécrivait
+ * trente autres avec lui, à chaque sauvegarde, soit plusieurs mégaoctets
+ * sérialisés puis écrits sur le disque pour un mot changé. Sur un iPhone
+ * chargé de relevés, ça se sent — et c'est le genre d'écriture qui, coupée
+ * en plein vol, emporte la bibliothèque plutôt qu'un scan.
+ *
+ * Désormais : une clé par scan, plus un index qui donne l'ordre. On compare
+ * au dernier état écrit et on ne touche qu'aux scans réellement modifiés.
+ */
 function persistSoon(saves: SavedScan[]) {
   if (persistTimer) clearTimeout(persistTimer);
   persistTimer = setTimeout(() => {
-    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(saves)).catch(() => {});
+    try {
+      const vus = new Set<string>();
+      for (const s of saves) {
+        vus.add(s.id);
+        const json = JSON.stringify(s);
+        if (ecrits.get(s.id) === json) continue;
+        ecrits.set(s.id, json);
+        AsyncStorage.setItem(scanKey(s.id), json).catch(() => {
+          // Écriture perdue : on oublie ce qu'on croyait avoir écrit, la
+          // prochaine sauvegarde réessaiera.
+          ecrits.delete(s.id);
+        });
+      }
+      for (const id of [...ecrits.keys()]) {
+        if (vus.has(id)) continue;
+        ecrits.delete(id);
+        AsyncStorage.removeItem(scanKey(id)).catch(() => {});
+      }
+      AsyncStorage.setItem(
+        INDEX_KEY,
+        JSON.stringify(saves.map((s) => s.id)),
+      ).catch(() => {});
+    } catch {
+      // Un scan illisible ne doit pas emporter les autres.
+    }
   }, 600);
 }
 
@@ -1667,10 +1765,8 @@ export const useScanStore = create<ScanState>((set, get) => {
           const parsed = JSON.parse(dossiers) as ScanFolder[];
           if (Array.isArray(parsed)) set({ folders: parsed });
         }
-        const raw = await AsyncStorage.getItem(STORAGE_KEY);
-        if (!raw) return;
-        const saves = JSON.parse(raw) as SavedScan[];
-        if (Array.isArray(saves)) set({ saves: saves.map(migrateSave) });
+        const saves = await loadLibrary();
+        if (saves) set({ saves: saves.map(migrateSave) });
       } catch {
         // Stockage illisible : on repart des valeurs en mémoire.
       }

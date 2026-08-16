@@ -451,30 +451,37 @@ const styles = getStyles(c);
                 : []),
             ] as OptionDef[]
           ).map(([icon, label, actif, press]) => (
-            <TouchableOpacity
-              key={icon}
-              style={[styles.option, actif && styles.optionOn]}
-              activeOpacity={0.8}
-              onPress={press}>
-              <Svg width={22} height={22} viewBox="0 0 24 24">
-                {EXPORT_ICONS[icon].map((d) => (
-                  <Path
-                    key={d}
-                    d={d}
-                    stroke={actif ? '#FFFFFF' : c.ink}
-                    strokeWidth={1.9}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    fill="none"
-                  />
-                ))}
-              </Svg>
+            /* Le nom SOUS le bloc, pas dedans : la pastille ne porte que son
+               icône, centrée, et le mot se lit en légende. Un carré qui
+               contient à la fois un dessin et un mot n'a de place ni pour
+               l'un ni pour l'autre — l'icône rétrécissait, le mot se
+               tronquait, et l'état actif se lisait mal sous le texte. */
+            <View key={icon} style={styles.optionCell}>
+              <TouchableOpacity
+                style={[styles.option, actif && styles.optionOn]}
+                activeOpacity={0.8}
+                accessibilityLabel={label}
+                onPress={press}>
+                <Svg width={26} height={26} viewBox="0 0 24 24">
+                  {EXPORT_ICONS[icon].map((d) => (
+                    <Path
+                      key={d}
+                      d={d}
+                      stroke={actif ? '#FFFFFF' : c.ink}
+                      strokeWidth={1.9}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      fill="none"
+                    />
+                  ))}
+                </Svg>
+              </TouchableOpacity>
               <Text
                 style={[styles.optionText, actif && styles.optionTextOn]}
                 numberOfLines={1}>
                 {label}
               </Text>
-            </TouchableOpacity>
+            </View>
           ))}
         </View>
 
@@ -573,28 +580,34 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   grille: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
+    rowGap: 12,
+    columnGap: 6,
     marginBottom: 10,
   },
+  optionCell: { width: '23.5%', alignItems: 'center' },
   option: {
-    width: '23.5%',
-    aspectRatio: 1.15,
+    // Un carré franc : l'icône est au centre géométrique, sans rien pour la
+    // pousser d'un côté.
+    width: '100%',
+    aspectRatio: 1,
     borderRadius: radius.sm,
     backgroundColor: c.surface,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 3,
     ...shadowCard,
     shadowOpacity: 0.05,
     shadowRadius: 8,
   },
   optionOn: { backgroundColor: c.blue },
   optionText: {
-    color: c.inkSoft,
-    fontSize: 9.5,
-    fontWeight: '800',
+    color: c.inkFaint,
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: -0.1,
+    textAlign: 'center',
+    marginTop: 5,
   },
-  optionTextOn: { color: '#FFFFFF' },
+  optionTextOn: { color: c.blue, fontWeight: '800' },
   switchRow: {
     flexDirection: 'row',
     alignItems: 'center',

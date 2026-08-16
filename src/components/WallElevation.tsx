@@ -70,6 +70,7 @@ import {
 import { RoomScan } from 'react-native-room-scan';
 import { useScanStore } from '../store/scanStore';
 import { haptic } from '../ui/haptic';
+import { CloseCross } from './CloseCross';
 
 const PAD_X = 30;
 const PAD_TOP = 26;
@@ -597,7 +598,7 @@ export function WallElevation({
           </Svg>
         </TouchableOpacity>
         <TouchableOpacity style={styles.close} onPress={onClose}>
-          <Text style={styles.closeText}>✕</Text>
+          <CloseCross size={19} color={c.inkSoft} weight={2.9} />
         </TouchableOpacity>
       </View>
 
@@ -1326,7 +1327,6 @@ const getStyles = themedStyles((c: Palette) =>
       alignItems: 'center',
       justifyContent: 'center',
     },
-    closeText: { color: c.inkSoft, fontSize: 15, fontWeight: '700' },
     // Le mur occupe la moitié de l'écran, pas une vignette de 250 px.
     //
     // On place des appareils au doigt, à 5 cm près, sur un dessin qui

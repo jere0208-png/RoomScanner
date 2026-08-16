@@ -11,6 +11,7 @@ import { RoomScan, RoomScanView } from 'react-native-room-scan';
 import { themedStyles, useTheme, type Palette } from '../theme';
 import { useScanStore } from '../store/scanStore';
 import { useRoomScan } from '../native/useRoomScan';
+import { CloseCross } from '../components/CloseCross';
 
 /**
  * Écran de scan. RoomPlan dessine lui-même ses guides ET la miniature 3D
@@ -25,7 +26,8 @@ export function ScanScreen() {
   const paused = useScanStore((s) => s.paused);
   const processing = useScanStore((s) => s.processing);
   const { pause, resume, stop, cancel } = useRoomScan();
-  const styles = getStyles(useTheme());
+  const c = useTheme();
+  const styles = getStyles(c);
 
   // Torche : éteinte en quittant l'écran.
   const [torch, setTorch] = useState(false);
@@ -53,7 +55,7 @@ export function ScanScreen() {
       <RoomScanView style={StyleSheet.absoluteFill} />
 
       <TouchableOpacity style={styles.cancelButton} onPress={cancel}>
-        <Text style={styles.cancelIcon}>✕</Text>
+        <CloseCross size={20} color={c.scanInk} weight={3} />
       </TouchableOpacity>
 
       {/* Torche : rond façon bouton de thème, avec un éclair. */}
@@ -155,7 +157,6 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  cancelIcon: { color: c.scanInk, fontSize: 16, fontWeight: '700' },
   torchButton: {
     position: 'absolute',
     top: 58,

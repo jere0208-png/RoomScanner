@@ -38,6 +38,7 @@ import {
 import type { Differential, MaterialList } from '../geometry/nfc15100';
 import {
   WIRE_COLORS,
+  circuitColor,
   type MultiWireSchema,
   type SchemaRow,
 } from '../geometry/schema';
@@ -863,8 +864,58 @@ function planPage(
       }
     }
 
-    // Lignes de cote extérieures (attaches + tirets à 45°)
-    for (const w of showDims ? walls : []) {
+    /**
+     * Les cotes extérieures — et la place que prend leur valeur.
+     *
+     * Le plan à l'écran saute la valeur d'un mur trop court pour la porter ;
+     * le PDF, lui, les écrivait toutes. Sur un logement aux retours de mur
+     * nombreux, ou simplement à petite échelle, deux valeurs voisines se
+     * chevauchaient — et un chiffre illisible sur un plan coté est pire
+     * qu'un chiffre absent : on ne sait même pas qu'il manque.
+     *
+     * On place donc les valeurs comme un dessinateur : les GRANDES COTES
+     * d'abord (ce sont celles qu'on lit), chacune poussée vers l'extérieur
+     * tant qu'elle rencontre une voisine déjà posée. Trois tentatives, puis
+     * on renonce à la valeur — la ligne de cote et ses tirets restent, la
+     * longueur se retrouve au métré.
+     */
+    const posees: { x: number; y: number; w: number; h: number }[] = [];
+    /** Boîte d'un texte pivoté, à la louche : Helvetica ≈ 0,5 em par signe. */
+    const boite = (txt: string, cx: number, cy: number, size: number, ang: number) => {
+      const l = txt.length * size * 0.5;
+      const r = (Math.abs(ang) * Math.PI) / 180;
+      const w2 = l * Math.cos(r) + size * Math.sin(r);
+      const h2 = l * Math.sin(r) + size * Math.cos(r);
+      return { x: cx - w2 / 2, y: cy - h2 / 2, w: w2, h: h2 };
+    };
+    /**
+     * L'étiquette tient-elle ENTIÈREMENT dans la fenêtre de la feuille ?
+     *
+     * On se règle sur la fenêtre de découpe, pas sur la zone de dessin : le
+     * plan est cadré au plus juste dans celle-ci, et ses cotes extérieures
+     * débordent forcément de quelques dizaines de points. Ce qui compte,
+     * c'est qu'aucun chiffre ne se fasse trancher par le bord.
+     */
+    const dansLaFenetre = (b: { x: number; y: number; w: number; h: number }) =>
+      b.x > FRAME.x + 4 &&
+      b.x + b.w < FRAME.x + FRAME.w - 4 &&
+      b.y > FRAME.y + TITLE_H + 4 &&
+      b.y + b.h < FRAME.y + FRAME.h - 4;
+    const libre = (b: { x: number; y: number; w: number; h: number }) =>
+      posees.every(
+        (o) =>
+          b.x > o.x + o.w + 1.5 ||
+          o.x > b.x + b.w + 1.5 ||
+          b.y > o.y + o.h + 1.5 ||
+          o.y > b.y + b.h + 1.5,
+      );
+
+    // Les plus longues d'abord : à égalité de place, c'est la grande cote
+    // qui doit gagner.
+    const cotes = showDims
+      ? [...walls].sort((u, v) => segLength(v) - segLength(u))
+      : [];
+    for (const w of cotes) {
       const a = px(w.a);
       const b = px(w.b);
       const dx2 = b.x - a.x;
@@ -898,10 +949,25 @@ function planPage(
       let angle = (Math.atan2(dy2, dx2) * 180) / Math.PI;
       if (angle > 90) angle -= 180;
       if (angle < -90) angle += 180;
+      const texte = `${frLen(segLength(w))} m`;
+      const mx = (A.x + B.x) / 2;
+      const my = (A.y + B.y) / 2;
+      let place: { x: number; y: number } | null = null;
+      for (const ecart of [8, 19, 30]) {
+        const q = { x: mx + nx2 * ecart, y: my + ny2 * ecart };
+        const bb = boite(texte, q.x, q.y, 8.5, angle);
+        if (libre(bb) && dansLaFenetre(bb)) {
+          posees.push(bb);
+          place = q;
+          break;
+        }
+      }
+      // Rien de libre : la ligne de cote reste, la valeur cède la place.
+      if (!place) continue;
       d.text(
-        `${frLen(segLength(w))} m`,
-        (A.x + B.x) / 2 + nx2 * 8,
-        (A.y + B.y) / 2 + ny2 * 8 - 3,
+        texte,
+        place.x,
+        place.y - 3,
         8.5,
         INK,
         { angle },
@@ -947,14 +1013,16 @@ function planPage(
         let angle = (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI;
         if (angle > 90) angle -= 180;
         if (angle < -90) angle += 180;
-        d.text(
-          frLen(segLength(o)),
-          (A.x + B.x) / 2 + nx2 * 7,
-          (A.y + B.y) / 2 + ny2 * 7 - 2.5,
-          7.5,
-          GREY,
-          { angle },
-        );
+        // La largeur de porte entre dans le même jeu de places que les cotes
+        // de murs : deux menuiseries voisines ne doivent pas se marcher
+        // dessus, et une porte ne doit pas se poser sur une cote.
+        const txt = frLen(segLength(o));
+        const qx = (A.x + B.x) / 2 + nx2 * 7;
+        const qy = (A.y + B.y) / 2 + ny2 * 7;
+        const bb = boite(txt, qx, qy, 7.5, angle);
+        if (!libre(bb) || !dansLaFenetre(bb)) continue;
+        posees.push(bb);
+        d.text(txt, qx, qy - 2.5, 7.5, GREY, { angle });
       }
     }
 
@@ -1302,16 +1370,6 @@ function unifilairePage(
  * Tout est borné par la fenêtre de découpe du plan (`d.clip`) : rien ne peut
  * sortir du cadre, quel que soit le zoom demandé.
  */
-function circuitColor(i: number): string {
-  // Douze teintes distinctes, réutilisées au-delà : deux circuits de même
-  // couleur restent lisibles s'ils portent des repères différents.
-  const roue = [
-    '#2F6BFF', '#B8352A', '#2E8B57', '#8A5CD1', '#C77A18', '#0F8C9E',
-    '#B5326E', '#5C7A1E', '#3757A8', '#A34D2A', '#6B4FA0', '#127A5E',
-  ];
-  return roue[i % roue.length];
-}
-
 /** Repère rond posé sur un tracé : « C1 » dans une pastille blanche. */
 function markerAt(d: Draw, at: Pt, texte: string, couleur: string) {
   d.circle(at.x, at.y, 7.5, '#FFFFFF');
@@ -1792,13 +1850,17 @@ export function buildMaterialPdf(
     titre('Tirage — gaines et conducteurs');
     ligne('Circuit', 'Gaine · longueur', { bold: true, grey: true });
     for (const r of tirage.pull) {
+      // « ≈ » comme sur les surfaces : la même réserve, écrite pareil.
+      const approche = r.approx && r.conduitLength > 0 ? '≈ ' : '';
       const droite =
         r.conduitLength > 0
-          ? `ICTA Ø${r.conduit} · ${r.conduitLength} m`
+          ? `ICTA Ø${r.conduit} · ${approche}${r.conduitLength} m`
           : `ICTA Ø${r.conduit}`;
       ligne(
         `${r.label} — ${r.runs} départ${r.runs > 1 ? 's' : ''}` +
-          (r.cableLength > 0 ? ` · ${r.cableLength} m de conducteur` : ''),
+          (r.cableLength > 0
+            ? ` · ${approche}${r.cableLength} m de conducteur`
+            : ''),
         droite,
       );
     }
@@ -1806,6 +1868,13 @@ export function buildMaterialPdf(
       '   Remplissage NF C 15-100 : la section des conducteurs ne dépasse ' +
         'pas le tiers de celle du conduit.',
     );
+    if (tirage.pull.some((r) => r.approx && r.conduitLength > 0)) {
+      note(
+        '   Les longueurs marquées « ≈ » longent un contour reconstitué : ' +
+          'la pièce n’a pas été relevée en boucle fermée. Prévoyez une ' +
+          'marge, ou refaites le tour de la pièce.',
+      );
+    }
     if (tirage.pull.every((r) => r.conduitLength === 0)) {
       note('   Posez le tableau sur le plan pour obtenir les longueurs.');
     }

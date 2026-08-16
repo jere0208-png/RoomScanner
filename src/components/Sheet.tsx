@@ -94,17 +94,37 @@ export function SheetShell({
 }) {
   const styles = getStyles(useTheme());
   const monte = useRef(new Animated.Value(0)).current;
+  /**
+   * La feuille survit à sa fermeture, le temps de descendre.
+   *
+   * Le `Modal` était monté sur `visible` : à la fermeture il disparaissait
+   * dans l'image même où l'animation démarrait, et les 140 ms de descente se
+   * jouaient dans le vide. On voyait donc la feuille MONTER en douceur et
+   * DISPARAÎTRE d'un coup — une asymétrie qu'on ne s'explique pas en la
+   * regardant, mais qu'on sent.
+   */
+  const [rendu, setRendu] = useState(visible);
   useEffect(() => {
+    if (visible) setRendu(true);
     Animated.timing(monte, {
       toValue: visible ? 1 : 0,
-      duration: visible ? 220 : 140,
+      duration: visible ? 220 : 160,
       easing: visible ? Easing.out(Easing.cubic) : Easing.in(Easing.cubic),
       useNativeDriver: true,
-    }).start();
+    }).start(({ finished }) => {
+      if (finished && !visible) setRendu(false);
+    });
   }, [visible, monte]);
   return (
-    <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
+    <Modal visible={rendu} transparent animationType="none" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
+        {/* Le voile s'allume et s'éteint avec la feuille. Posé en fond et
+            transparent au doigt : c'est le `Pressable` du dessous qui ferme,
+            sinon l'appui « à côté » ne fonctionnerait plus. */}
+        <Animated.View
+          pointerEvents="none"
+          style={[StyleSheet.absoluteFill, styles.veil, { opacity: monte }]}
+        />
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.avoider}>
@@ -131,6 +151,20 @@ export function SheetShell({
   );
 }
 
+/**
+ * Garde le dernier contenu non vide pendant la descente.
+ *
+ * Nos feuilles s'écrivent `{data && …}` : à la fermeture, `data` retombe à
+ * `null` et le contenu s'évanouissait AVANT la feuille, qui finissait sa
+ * course vide. On rejoue donc le dernier contenu connu tant que la feuille
+ * est encore à l'écran.
+ */
+function useDernier<T>(data: T | null): T | null {
+  const dernier = useRef<T | null>(data);
+  if (data) dernier.current = data;
+  return data ?? dernier.current;
+}
+
 /** Un titre, une phrase, des choix — chacun avec son icône. */
 export function ActionSheet({
   data,
@@ -141,15 +175,16 @@ export function ActionSheet({
 }) {
   const c = useTheme();
   const styles = getStyles(c);
+  const vu = useDernier(data);
   return (
     <SheetShell visible={!!data} onClose={onClose}>
-      {data && (
+      {vu && (
         <>
-          <Text style={styles.title}>{data.title}</Text>
-          {data.subtitle ? (
-            <Text style={styles.subtitle}>{data.subtitle}</Text>
+          <Text style={styles.title}>{vu.title}</Text>
+          {vu.subtitle ? (
+            <Text style={styles.subtitle}>{vu.subtitle}</Text>
           ) : null}
-          {data.actions.map((a) => (
+          {vu.actions.map((a) => (
             <Pressable
               key={a.label}
               style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
@@ -199,6 +234,7 @@ export function PromptSheet({
 }) {
   const c = useTheme();
   const styles = getStyles(c);
+  const vu = useDernier(data);
   const [texte, setTexte] = useState('');
   useEffect(() => {
     setTexte(data?.value ?? '');
@@ -210,11 +246,11 @@ export function PromptSheet({
   };
   return (
     <SheetShell visible={!!data} onClose={onClose}>
-      {data && (
+      {vu && (
         <>
-          <Text style={styles.title}>{data.title}</Text>
-          {data.subtitle ? (
-            <Text style={styles.subtitle}>{data.subtitle}</Text>
+          <Text style={styles.title}>{vu.title}</Text>
+          {vu.subtitle ? (
+            <Text style={styles.subtitle}>{vu.subtitle}</Text>
           ) : null}
           <View style={styles.champRow}>
             <TextInput
@@ -223,19 +259,19 @@ export function PromptSheet({
               onChangeText={setTexte}
               autoFocus
               selectTextOnFocus
-              keyboardType={data.numeric ? 'decimal-pad' : 'default'}
+              keyboardType={vu.numeric ? 'decimal-pad' : 'default'}
               returnKeyType="done"
               onSubmitEditing={valider}
               placeholderTextColor={c.inkFaint}
             />
-            {data.unit ? <Text style={styles.unit}>{data.unit}</Text> : null}
+            {vu.unit ? <Text style={styles.unit}>{vu.unit}</Text> : null}
           </View>
           <View style={styles.actions}>
             <Pressable style={styles.ghost} onPress={onClose}>
               <Text style={styles.ghostText}>Annuler</Text>
             </Pressable>
             <Pressable style={styles.primary} onPress={valider}>
-              <Text style={styles.primaryText}>{data.okLabel ?? 'Valider'}</Text>
+              <Text style={styles.primaryText}>{vu.okLabel ?? 'Valider'}</Text>
             </Pressable>
           </View>
         </>
@@ -246,11 +282,8 @@ export function PromptSheet({
 
 const getStyles = themedStyles((c: Palette) =>
   StyleSheet.create({
-    backdrop: {
-      flex: 1,
-      backgroundColor: 'rgba(11,13,18,0.42)',
-      justifyContent: 'flex-end',
-    },
+    backdrop: { flex: 1, justifyContent: 'flex-end' },
+    veil: { backgroundColor: 'rgba(11,13,18,0.42)' },
     avoider: { width: '100%' },
     sheet: {
       backgroundColor: c.surface,

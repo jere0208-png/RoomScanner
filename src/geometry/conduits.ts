@@ -48,6 +48,12 @@ export interface PullRow {
   conduitLength: number;
   /** Mètres de câble (parcours + mou d'about). */
   cableLength: number;
+  /**
+   * Longueur approchée : la pièce desservie n'a pas été relevée en boucle
+   * fermée, son contour est reconstitué, et la gaine le longe. À chiffrer
+   * avec une marge, ou à re-scanner.
+   */
+  approx: boolean;
   protection: string;
 }
 
@@ -61,10 +67,13 @@ export interface PullRow {
 export function pullSchedule(
   circuits: Circuit[],
   metre?: Map<string, { conduit: number; cable: number; runs: number }>,
+  /** Circuits dont le tracé longe un contour reconstitué (voir `ElecPlan`). */
+  approx?: Set<string>,
 ): PullRow[] {
   return circuits.map((c) => {
     const m = metre?.get(c.id);
     return {
+      approx: !!approx?.has(c.id),
       circuitId: c.id,
       label: c.label,
       section: c.section,

@@ -98,6 +98,7 @@ describe('la liste d’achat', () => {
       runs: 8,
       conduitLength: 60,
       cableLength: 66,
+      approx: false,
       protection: '20 A',
     },
     {
@@ -108,6 +109,7 @@ describe('la liste d’achat', () => {
       runs: 5,
       conduitLength: 45,
       cableLength: 50,
+      approx: false,
       protection: '16 A',
     },
     {
@@ -118,6 +120,7 @@ describe('la liste d’achat', () => {
       runs: 2,
       conduitLength: 24,
       cableLength: 27,
+      approx: false,
       protection: 'coffret com.',
     },
   ];

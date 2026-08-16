@@ -32,6 +32,48 @@ import {
   type ActionData,
   type PromptData,
 } from '../components/Sheet';
+import { CloseCross } from '../components/CloseCross';
+
+/**
+ * Le dessin de l'état vide.
+ *
+ * Un écran vide qui n'affiche que du texte se lit comme une panne. Le même
+ * écran avec un croquis se lit comme une invitation — et celui-ci n'est pas
+ * un décor : c'est un plan au trait, exactement ce que l'app produira, posé
+ * dans les teintes du thème pour ne pas jurer en mode sombre.
+ */
+function EmptyPlanArt({ c }: { c: Palette }) {
+  return (
+    <Svg width={132} height={104} viewBox="0 0 132 104">
+      {/* La feuille */}
+      <Path
+        d="M14 12 h104 a4 4 0 0 1 4 4 v72 a4 4 0 0 1 -4 4 H14 a4 4 0 0 1 -4 -4 V16 a4 4 0 0 1 4 -4 z"
+        fill={c.surfaceSunken}
+        stroke={c.line}
+        strokeWidth={1.5}
+      />
+      {/* Deux pièces et leur cloison, la porte laissée ouverte */}
+      <Path
+        d="M26 28 h80 v48 H26 z M74 28 v20 M74 60 v16"
+        fill="none"
+        stroke={c.lineStrong}
+        strokeWidth={2.4}
+        strokeLinecap="round"
+      />
+      {/* La cote extérieure, tirets compris : la signature du document */}
+      <Line x1={26} y1={86} x2={106} y2={86} stroke={c.inkFaint} strokeWidth={1.2} />
+      <Line x1={26} y1={83} x2={26} y2={89} stroke={c.inkFaint} strokeWidth={1.2} />
+      <Line x1={106} y1={83} x2={106} y2={89} stroke={c.inkFaint} strokeWidth={1.2} />
+      {/* Un appareil posé sur un mur, en bleu : l'app, c'est ça */}
+      <Path d="M46 24 v8" stroke={c.blue} strokeWidth={3} strokeLinecap="round" />
+      <Path
+        d="M46 20 m-4 0 a4 4 0 1 0 8 0 a4 4 0 1 0 -8 0"
+        fill={c.blue}
+        opacity={0.9}
+      />
+    </Svg>
+  );
+}
 
 const two = (n: number) => String(n).padStart(2, '0');
 function formatDate(ts: number): string {
@@ -334,9 +376,11 @@ function ScanRow({
         <TouchableOpacity
           style={[styles.trash, arme && styles.trashArmed]}
           onPress={onTrash}>
-          <Text style={[styles.trashText, arme && styles.trashTextArmed]}>
-            {arme ? 'Supprimer' : '✕'}
-          </Text>
+          {arme ? (
+            <Text style={[styles.trashText, styles.trashTextArmed]}>Supprimer</Text>
+          ) : (
+            <CloseCross size={18} color={palette.inkSoft} weight={2.9} />
+          )}
         </TouchableOpacity>
       )}
     </Animated.View>
@@ -562,6 +606,7 @@ export function LibraryScreen() {
 
       {vide ? (
         <View style={styles.empty}>
+          <EmptyPlanArt c={palette} />
           <Text style={styles.emptyTitle}>Aucun scan enregistré</Text>
           <Text style={styles.emptyText}>
             Chaque scan terminé est sauvegardé automatiquement et apparaîtra ici.
@@ -604,11 +649,14 @@ export function LibraryScreen() {
           )}
 
           {liste.length === 0 && (
-            <Text style={styles.emptyFolder}>
-              {dossierOuvert
-                ? 'Ce dossier est vide. Revenez en arrière et amenez-y un scan.'
-                : 'Tous vos scans sont rangés dans des dossiers.'}
-            </Text>
+            <View style={styles.emptyFolderBox}>
+              <EmptyPlanArt c={palette} />
+              <Text style={styles.emptyFolder}>
+                {dossierOuvert
+                  ? 'Ce dossier est vide. Revenez en arrière et amenez-y un scan.'
+                  : 'Tous vos scans sont rangés dans des dossiers.'}
+              </Text>
+            </View>
           )}
 
           {liste.map((s) => (
@@ -745,13 +793,15 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     marginTop: 6,
     lineHeight: 16,
   },
+  emptyFolderBox: { alignItems: 'center', paddingTop: 22, opacity: 0.85 },
   emptyFolder: {
     color: c.inkFaint,
     fontSize: 13.5,
     lineHeight: 19,
     textAlign: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 24,
+    paddingTop: 12,
+    paddingBottom: 24,
   },
   row: {
     flexDirection: 'row',
@@ -818,7 +868,7 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     shadowOpacity: 0.4,
   },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
-  emptyTitle: { color: c.ink, fontSize: 19, fontWeight: '800' },
+  emptyTitle: { color: c.ink, fontSize: 19, fontWeight: '800', marginTop: 14 },
   emptyText: {
     color: c.inkSoft,
     fontSize: 14,
