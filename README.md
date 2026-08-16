@@ -424,9 +424,18 @@ permanence et toute rotation à la main était effacée au premier glissement.
 L'aimantation ne joue plus que si le meuble regarde déjà à peu près dans le
 bon sens, à 30° près.
 
-**Un geste qui commence sur le meuble appartient au meuble.** Le plan avait
-beau ne réagir qu'au-delà de six pixels, il volait le glissement : sa zone
-de navigation exclut désormais l'emprise du meuble sélectionné.
+**Un geste qui commence sur le meuble appartient au meuble**, et il lui
+reste. C'est le bug qui a résisté à trois corrections, et sa cause est dans
+le système de responders de React Native : `PanResponder` accepte par défaut
+de **rendre** le geste (`onPanResponderTerminationRequest`), et le plan le
+redemande à chaque mouvement au-delà de six pixels. Les premiers pixels
+déplaçaient donc bien le meuble, puis le plan reprenait tout — vu de l'écran,
+« le meuble ne bouge pas, c'est le plan qui glisse ». Les trois poignées
+(déplacement, rotation, coin de mur) refusent désormais de céder la main.
+
+**Et un meuble se sélectionne en le touchant**, tout simplement. Il fallait
+passer par la liste du bas, ce qui n'est venu à l'idée de personne : sans
+sélection, pas de poignée, et le doigt ne déplaçait que le plan.
 
 **Les dégagements se cotent tout seuls.** Un meuble sélectionné montre ce qui
 le sépare des murs sur ses quatre côtés : la cote part du milieu de chaque

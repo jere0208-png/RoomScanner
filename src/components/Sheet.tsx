@@ -77,8 +77,12 @@ export interface PromptData {
   onSubmit: (value: string) => void;
 }
 
-/** La feuille elle-même : voile, glissement du bas, appui à côté pour fermer. */
-function Sheet({
+/**
+ * La feuille elle-même : voile, glissement du bas, appui à côté pour fermer.
+ * Exportée : tout ce qui s'ouvre par-dessus le plan doit avoir cette
+ * carrosserie, sinon chaque écran réinvente la sienne.
+ */
+export function SheetShell({
   visible,
   onClose,
   children,
@@ -137,7 +141,7 @@ export function ActionSheet({
   const c = useTheme();
   const styles = getStyles(c);
   return (
-    <Sheet visible={!!data} onClose={onClose}>
+    <SheetShell visible={!!data} onClose={onClose}>
       {data && (
         <>
           <Text style={styles.title}>{data.title}</Text>
@@ -180,7 +184,7 @@ export function ActionSheet({
           ))}
         </>
       )}
-    </Sheet>
+    </SheetShell>
   );
 }
 
@@ -204,7 +208,7 @@ export function PromptSheet({
     setTimeout(() => data?.onSubmit(v), 150);
   };
   return (
-    <Sheet visible={!!data} onClose={onClose}>
+    <SheetShell visible={!!data} onClose={onClose}>
       {data && (
         <>
           <Text style={styles.title}>{data.title}</Text>
@@ -235,7 +239,7 @@ export function PromptSheet({
           </View>
         </>
       )}
-    </Sheet>
+    </SheetShell>
   );
 }
 

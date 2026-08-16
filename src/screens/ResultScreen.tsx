@@ -71,6 +71,7 @@ import { useScanStore } from '../store/scanStore';
 import {
   ActionSheet,
   PromptSheet,
+  SheetShell,
   type ActionData,
   type PromptData,
 } from '../components/Sheet';
@@ -1290,43 +1291,49 @@ export function ResultScreen() {
       </Modal>
 
       {/* ---------- Diagnostic du plan ---------- */}
-      <Modal
-        visible={checking}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setChecking(false)}>
-        <Pressable style={styles.modalBackdrop} onPress={() => setChecking(false)}>
-          <Pressable style={styles.modalCard} onPress={() => {}}>
-            <Text style={styles.modalTitle}>
+      <SheetShell visible={checking} onClose={() => setChecking(false)}>
+        <View style={styles.diagHead}>
+          <View
+            style={[
+              styles.diagBadge,
+              alertes > 0 ? styles.diagBadgeKo : styles.diagBadgeOk,
+            ]}>
+            <Text style={styles.diagBadgeText}>{alertes || '✓'}</Text>
+          </View>
+          <View style={styles.diagTitles}>
+            <Text style={styles.diagTitle}>
               {alertes > 0
                 ? `${alertes} point${alertes > 1 ? 's' : ''} à corriger`
                 : 'Rien de bloquant'}
             </Text>
-            <Text style={styles.modalSubtitle}>
-              Touchez une ligne pour aller voir l'élément concerné sur le plan.
+            <Text style={styles.diagSub}>
+              {issues.length === 0
+                ? 'Le plan ne présente aucune anomalie détectable.'
+                : 'Touchez une ligne pour aller voir l’élément sur le plan.'}
             </Text>
-            <ScrollView style={styles.issueScroll}>
-              {issues.map((issue) => (
-                <TouchableOpacity
-                  key={issue.key}
-                  style={styles.issueRow}
-                  onPress={() => goToIssue(issue)}>
-                  <View
-                    style={[
-                      styles.issueDot,
-                      issue.severity === 'alerte' && styles.issueDotAlert,
-                    ]}
-                  />
-                  <View style={styles.issueTexts}>
-                    <Text style={styles.issueMessage}>{issue.message}</Text>
-                    <Text style={styles.issueHint}>{issue.hint}</Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </Pressable>
-        </Pressable>
-      </Modal>
+          </View>
+        </View>
+        <ScrollView style={styles.diagScroll} showsVerticalScrollIndicator={false}>
+          {issues.map((issue) => (
+            <TouchableOpacity
+              key={issue.key}
+              style={[
+                styles.diagRow,
+                issue.severity === 'alerte' && styles.diagRowKo,
+              ]}
+              activeOpacity={0.75}
+              onPress={() => goToIssue(issue)}>
+              <View style={styles.diagTexts}>
+                <Text style={styles.diagMessage}>{issue.message}</Text>
+                <Text style={styles.diagHint} numberOfLines={2}>
+                  {issue.hint}
+                </Text>
+              </View>
+              <Text style={styles.diagChevron}>›</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </SheetShell>
 
       {/* ---------- Nom de la pièce : liste plutôt que clavier ---------- */}
       <Modal
@@ -1777,12 +1784,18 @@ function PulsePlus({ onPress }: { onPress: () => void }) {
   const onde = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     const boucle = Animated.loop(
-      Animated.timing(onde, {
-        toValue: 1,
-        duration: 1900,
-        easing: Easing.out(Easing.quad),
-        useNativeDriver: true,
-      }),
+      // Une onde, lente, à peine visible : le repère doit attirer l'œil une
+      // fois, pas clignoter en permanence dans le coin de l'écran.
+      Animated.sequence([
+        Animated.timing(onde, {
+          toValue: 1,
+          duration: 1500,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.delay(1400),
+        Animated.timing(onde, { toValue: 0, duration: 0, useNativeDriver: true }),
+      ]),
     );
     boucle.start();
     return () => boucle.stop();
@@ -1792,31 +1805,26 @@ function PulsePlus({ onPress }: { onPress: () => void }) {
       style={[styles.toolPill, styles.pulsePill]}
       activeOpacity={0.8}
       onPress={onPress}>
-      {[0, 0.35].map((retard, i) => (
-        <Animated.View
-          key={i}
-          pointerEvents="none"
-          style={[
-            styles.pulseRing,
-            {
-              opacity: onde.interpolate({
-                inputRange: [retard, Math.min(retard + 0.45, 1), 1],
-                outputRange: [0.45, 0.12, 0],
-                extrapolate: 'clamp',
-              }),
-              transform: [
-                {
-                  scale: onde.interpolate({
-                    inputRange: [retard, 1],
-                    outputRange: [0.35, 1],
-                    extrapolate: 'clamp',
-                  }),
-                },
-              ],
-            },
-          ]}
-        />
-      ))}
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.pulseRing,
+          {
+            opacity: onde.interpolate({
+              inputRange: [0, 0.5, 1],
+              outputRange: [0.22, 0.09, 0],
+            }),
+            transform: [
+              {
+                scale: onde.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.3, 1],
+                }),
+              },
+            ],
+          },
+        ]}
+      />
       <Svg width={22} height={22} viewBox="0 0 24 24">
         {['M12 5 v14', 'M5 12 h14'].map((d) => (
           <Path
@@ -2072,7 +2080,7 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    borderWidth: 6,
+    borderWidth: 4,
     borderColor: c.blue,
   },
   transition: {
@@ -2389,6 +2397,41 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   },
   modalTitle: { color: c.ink, fontSize: 17, fontWeight: '800' },
   elecWrap: { width: '100%' },
+  // Diagnostic : un état d'abord — combien, et est-ce grave —, puis la
+  // liste. L'ancienne fenêtre commençait par une consigne d'usage.
+  diagHead: { flexDirection: 'row', alignItems: 'center', gap: 13 },
+  diagBadge: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  diagBadgeKo: { backgroundColor: c.danger },
+  diagBadgeOk: { backgroundColor: c.green },
+  diagBadgeText: { color: '#FFFFFF', fontSize: 17, fontWeight: '800' },
+  diagTitles: { flex: 1 },
+  diagTitle: { color: c.ink, fontSize: 17.5, fontWeight: '800', letterSpacing: -0.3 },
+  diagSub: { color: c.inkFaint, fontSize: 12, lineHeight: 16, marginTop: 2 },
+  diagScroll: { maxHeight: 380, marginTop: 12 },
+  diagRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: c.surfaceSunken,
+    borderRadius: radius.md,
+    borderLeftWidth: 3,
+    borderLeftColor: c.inkFaint,
+    paddingLeft: 13,
+    paddingRight: 10,
+    paddingVertical: 11,
+    marginBottom: 8,
+  },
+  diagRowKo: { borderLeftColor: c.danger },
+  diagTexts: { flex: 1 },
+  diagMessage: { color: c.ink, fontSize: 14, fontWeight: '700', lineHeight: 19 },
+  diagHint: { color: c.inkFaint, fontSize: 11.5, lineHeight: 15.5, marginTop: 3 },
+  diagChevron: { color: c.inkFaint, fontSize: 22, fontWeight: '600', marginTop: -3 },
   // Carte d'explication du mur rouge : posée sous la barre de cote, elle
   // répond à l'appui sans couvrir le mur qu'on vient de toucher.
   elecCard: {

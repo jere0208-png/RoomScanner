@@ -539,6 +539,15 @@ export function FloorplanEditor({
               return (
                 <G
                   key={f.id}
+                  // Toucher un meuble le sélectionne : sans ça, ses poignées
+                  // n'apparaissaient jamais et le doigt ne déplaçait que le
+                  // plan. On le choisissait par la liste du bas, ce qui
+                  // n'est venu à l'idée de personne.
+                  onPress={
+                    onSelectObject
+                      ? () => onSelectObject(o.id === selectedObjectId ? null : o.id)
+                      : undefined
+                  }
                   transform={`translate(${ctr.x}, ${ctr.y}) rotate(${((f.yaw + view.rot) * 180) / Math.PI})`}>
                   <Rect
                     x={-w / 2}
@@ -1368,6 +1377,13 @@ function ObjectDragHandle({
     () =>
       PanResponder.create({
         onStartShouldSetPanResponder: () => true,
+        // Le geste ne se rend PAS au plan : `PanResponder` accepte par
+        // défaut de céder la main, et le plan la redemande à chaque
+        // mouvement — les premiers pixels déplaçaient le meuble, puis le
+        // plan reprenait tout.
+        onMoveShouldSetPanResponder: () => true,
+        onPanResponderTerminationRequest: () => false,
+        onShouldBlockNativeResponder: () => true,
         onPanResponderGrant: () => {
           startRef.current = { x: raw.transform[12], z: raw.transform[14] };
         },
@@ -1428,6 +1444,13 @@ function RotateHandle({
     () =>
       PanResponder.create({
         onStartShouldSetPanResponder: () => true,
+        // Le geste ne se rend PAS au plan : `PanResponder` accepte par
+        // défaut de céder la main, et le plan la redemande à chaque
+        // mouvement — les premiers pixels déplaçaient le meuble, puis le
+        // plan reprenait tout.
+        onMoveShouldSetPanResponder: () => true,
+        onPanResponderTerminationRequest: () => false,
+        onShouldBlockNativeResponder: () => true,
         onPanResponderGrant: () => {
           base.current = {
             yaw: Math.atan2(raw.transform[2], raw.transform[0]),
@@ -1508,6 +1531,13 @@ function CornerHandle({
     () =>
       PanResponder.create({
         onStartShouldSetPanResponder: () => true,
+        // Le geste ne se rend PAS au plan : `PanResponder` accepte par
+        // défaut de céder la main, et le plan la redemande à chaque
+        // mouvement — les premiers pixels déplaçaient le meuble, puis le
+        // plan reprenait tout.
+        onMoveShouldSetPanResponder: () => true,
+        onPanResponderTerminationRequest: () => false,
+        onShouldBlockNativeResponder: () => true,
         onPanResponderGrant: () => {
           startRef.current = { x: corner.x, z: corner.z };
         },
