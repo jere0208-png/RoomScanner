@@ -1,3 +1,9 @@
+jest.mock('@react-native-async-storage/async-storage', () => ({
+  getItem: jest.fn(async () => null),
+  setItem: jest.fn(async () => undefined),
+  removeItem: jest.fn(async () => undefined),
+}));
+
 /**
  * Le plafond, et LE TRAIT QUI DIT QUI COMMANDE QUOI.
  *
@@ -22,6 +28,10 @@ import {
 import { buildScanPdf } from '../src/export/pdf';
 import type { WallSeg } from '../src/geometry/floorplan';
 import type { Fixture } from '../src/geometry/electrical';
+import { useScanStore } from '../src/store/scanStore';
+
+beforeAll(() => jest.useFakeTimers());
+afterAll(() => jest.useRealTimers());
 
 const mur = (id: string, ax: number, az: number, bx: number, bz: number): WallSeg => ({
   id,
@@ -157,5 +167,71 @@ describe('la feuille d’implantation', () => {
       expect(parseFloat(m[2])).toBeGreaterThanOrEqual(-1);
       expect(parseFloat(m[2])).toBeLessThanOrEqual(842.89);
     }
+  });
+});
+
+/**
+ * La liaison, dans le store : c'est elle qu'on manipule au doigt.
+ *
+ * Un point lumineux peut être allumé par une commande, par deux — c'est un
+ * va-et-vient — et une même commande peut allumer plusieurs points. Le
+ * modèle doit tenir les trois cas sans rien perdre, et savoir défaire.
+ */
+describe('relier une commande à un point', () => {
+  const poser = () => {
+    useScanStore.setState({
+      walls: W,
+      openings: [],
+      rooms: R,
+      objects: [],
+      fixtures: FX,
+      photos: [],
+      ceiling: [
+        { id: 'p1', kind: 'dcl', roomId: 'r1', at: { x: 2.5, z: 2 } },
+        { id: 'p2', kind: 'spot', roomId: 'r1', at: { x: 4, z: 3 } },
+      ],
+    });
+  };
+
+  it('un interrupteur allume un point', () => {
+    poser();
+    useScanStore.getState().toggleCeilingCommand('p1', 'i1');
+    const cl = useScanStore.getState().ceiling.find((c) => c.id === 'p1')!;
+    expect(cl.commands).toEqual(['i1']);
+  });
+
+  it('deux commandes pour un point : le va-et-vient', () => {
+    poser();
+    useScanStore.getState().toggleCeilingCommand('p1', 'i1');
+    useScanStore.getState().toggleCeilingCommand('p1', 'i2');
+    const cl = useScanStore.getState().ceiling.find((c) => c.id === 'p1')!;
+    expect(cl.commands).toEqual(['i1', 'i2']);
+  });
+
+  it('une commande peut allumer plusieurs points', () => {
+    poser();
+    useScanStore.getState().toggleCeilingCommand('p1', 'i1');
+    useScanStore.getState().toggleCeilingCommand('p2', 'i1');
+    const cl = useScanStore.getState().ceiling;
+    expect(cl[0].commands).toEqual(['i1']);
+    expect(cl[1].commands).toEqual(['i1']);
+  });
+
+  it('le même geste défait le lien', () => {
+    poser();
+    useScanStore.getState().toggleCeilingCommand('p1', 'i1');
+    useScanStore.getState().toggleCeilingCommand('p1', 'i1');
+    const cl = useScanStore.getState().ceiling.find((c) => c.id === 'p1')!;
+    expect(cl.commands).toEqual([]);
+  });
+
+  it('et un retour en arrière rétablit ce qui était lié', () => {
+    poser();
+    useScanStore.getState().toggleCeilingCommand('p1', 'i1');
+    jest.advanceTimersByTime(2000);
+    useScanStore.getState().toggleCeilingCommand('p1', 'i2');
+    useScanStore.getState().undo();
+    const cl = useScanStore.getState().ceiling.find((c) => c.id === 'p1')!;
+    expect(cl.commands).toEqual(['i1']);
   });
 });

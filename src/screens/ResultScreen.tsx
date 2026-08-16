@@ -116,6 +116,22 @@ import {
 
 type Tab = '2d' | '3d';
 
+/**
+ * Ce qui peut COMMANDER un point lumineux.
+ *
+ * Une prise n'allume rien. Le rappeler ici évite de tracer sur le plan un
+ * lien qui n'existe pas dans la réalité — et un plan qui ment est pire
+ * qu'un plan incomplet.
+ */
+const COMMANDES_MURALES: FixtureKind[] = [
+  'inter',
+  'inter2',
+  'inter3',
+  'va',
+  'poussoir',
+  'variateur',
+];
+
 const fr = (n: number, d = 1) => n.toFixed(d).replace('.', ',');
 
 /** Recherche sans accent ni casse : « evier » doit trouver « Évier ». */
@@ -170,6 +186,7 @@ export function ResultScreen() {
   const ceiling = useScanStore((s) => s.ceiling);
   const addCeiling = useScanStore((s) => s.addCeiling);
   const removeCeiling = useScanStore((s) => s.removeCeiling);
+  const toggleCeilingCommand = useScanStore((s) => s.toggleCeilingCommand);
   const moveFixture = useScanStore((s) => s.moveFixture);
   const resizeOpening = useScanStore((s) => s.resizeOpening);
   const addObject = useScanStore((s) => s.addObject);
@@ -282,6 +299,16 @@ export function ResultScreen() {
   const [showCeiling, setShowCeiling] = useState(true);
   /** Appareil de plafond en attente de pose : on touche la pièce qui le reçoit. */
   const [pendingCeiling, setPendingCeiling] = useState<CeilingKind | null>(null);
+  /**
+   * Point de plafond en attente de COMMANDE : on touche l'interrupteur.
+   *
+   * C'est le geste qui manquait pour faire un plan d'électricien. Le trait
+   * pointillé entre un interrupteur et le point qu'il allume ne se devine
+   * pas — aucune règle ne dit que la commande la plus proche est la bonne,
+   * et c'est justement la question qu'on se pose sur le chantier. Il faut
+   * donc que quelqu'un le désigne, une fois.
+   */
+  const [pendingLink, setPendingLink] = useState<string | null>(null);
   /** Repères électriques en 3D : un calque comme les autres. */
   const [showElecTags, setShowElecTags] = useState(true);
   const [editMode, setEditMode] = useState(false);
@@ -1101,13 +1128,41 @@ export function ResultScreen() {
               // il n'a ni cote ni hauteur à régler, seulement une place.
               const cl = ceiling.find((x) => x.id === id);
               if (!cl) return;
+              const spec = CEILINGS[cl.kind];
+              const liees = (cl.commands ?? [])
+                .map((fid) => fixtures.find((f) => f.id === fid))
+                .filter((f): f is Fixture => !!f);
               setMenu({
-                title: CEILINGS[cl.kind].label,
-                subtitle: CEILINGS[cl.kind].note,
+                title: spec.label,
+                subtitle: spec.note,
                 actions: [
+                  // Ce qui n'éclaire pas ne se commande pas : un détecteur
+                  // de fumée n'a pas d'interrupteur, et proposer d'en
+                  // relier un serait une invitation à se tromper.
+                  ...(spec.commandable
+                    ? [
+                        {
+                          label:
+                            liees.length > 0
+                              ? 'Ajouter une commande'
+                              : 'Relier à une commande',
+                          hint:
+                            'Touchez ensuite l’interrupteur qui l’allume. ' +
+                            'Deux commandes pour un point, c’est un ' +
+                            'va-et-vient.',
+                          icon: 'fusionner' as const,
+                          onPress: () => setPendingLink(id),
+                        },
+                      ]
+                    : []),
+                  ...liees.map((f) => ({
+                    label: `Détacher ${FIXTURES[f.kind].label}`,
+                    icon: 'scinder' as const,
+                    onPress: () => toggleCeilingCommand(id, f.id),
+                  })),
                   {
                     label: 'Retirer',
-                    icon: 'supprimer',
+                    icon: 'supprimer' as const,
                     danger: true,
                     onPress: () => removeCeiling(id),
                   },
@@ -1133,6 +1188,38 @@ export function ResultScreen() {
             onEditRoomName={promptRoomFor}
             onPierChange={setPier}
             onSelectFixture={(id, wallId) => {
+              // Une liaison est en cours : cet appareil devient la commande.
+              if (pendingLink) {
+                const f = fixtures.find((x) => x.id === id);
+                if (f && COMMANDES_MURALES.includes(f.kind)) {
+                  toggleCeilingCommand(pendingLink, id);
+                  haptic('succes');
+                  setPendingLink(null);
+                } else {
+                  // Une prise n'allume rien : on le dit, plutôt que de
+                  // tracer un lien qui n'existe pas dans la réalité.
+                  haptic('alerte');
+                  setMenu({
+                    title: 'Ce n’est pas une commande',
+                    subtitle:
+                      'Un point lumineux s’allume par un interrupteur, un ' +
+                      'va-et-vient, un poussoir ou un variateur — pas par ' +
+                      'une prise. Touchez l’un de ceux-là.',
+                    actions: [
+                      {
+                        label: 'Continuer',
+                        onPress: () => {},
+                      },
+                      {
+                        label: 'Abandonner la liaison',
+                        danger: true,
+                        onPress: () => setPendingLink(null),
+                      },
+                    ],
+                  });
+                }
+                return;
+              }
               setElecWallId(wallId);
               setElecSel(id);
               setElecView('mur');
@@ -1559,19 +1646,33 @@ export function ResultScreen() {
             </View>
           )}
 
-        {vue === '2d' && (pendingKind || pendingCeiling) && !capturing && (
-          <EnAttente
-            kind={pendingKind}
-            plafond={pendingCeiling}
-            cible={
-              pendingCeiling ? 'une pièce' : pier ? 'ce retour' : null
-            }
-            onCancel={() => {
-              setPendingKind(null);
-              setPendingCeiling(null);
-            }}
-          />
-        )}
+        {vue === '2d' &&
+          (pendingKind || pendingCeiling || pendingLink) &&
+          !capturing && (
+            <EnAttente
+              kind={pendingKind}
+              plafond={
+                pendingCeiling ??
+                (pendingLink
+                  ? ceiling.find((x) => x.id === pendingLink)?.kind ?? null
+                  : null)
+              }
+              cible={
+                pendingLink
+                  ? 'l’interrupteur qui l’allume'
+                  : pendingCeiling
+                  ? 'une pièce'
+                  : pier
+                  ? 'ce retour'
+                  : null
+              }
+              onCancel={() => {
+                setPendingKind(null);
+                setPendingCeiling(null);
+                setPendingLink(null);
+              }}
+            />
+          )}
 
         {/* La menuiserie sélectionnée : largeur, hauteur, et de quoi les
             changer. Même bandeau que pour un mur — un seul endroit où
