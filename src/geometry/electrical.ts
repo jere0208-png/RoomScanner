@@ -71,6 +71,16 @@ export interface Fixture {
   height: number;
   /** Face du mur : +1 = côté de la normale `perpOf(u)`, −1 = l'autre. */
   side: 1 | -1;
+  /**
+   * Appareils réunis sous une même plaque.
+   *
+   * On ne fusionne PAS deux appareils en un seul : sur le mur, un ensemble
+   * à deux postes, ce sont deux boîtes distinctes à 71 mm d'entraxe, deux
+   * mécanismes, et une plaque commune. Le modèle dit donc la même chose —
+   * chacun garde son identité, son circuit et son symbole, et cet
+   * identifiant partagé dit qu'ils se posent ensemble.
+   */
+  group?: string;
 }
 
 export interface FixtureSpec {
@@ -854,6 +864,57 @@ export function stackRanks(
     out.set(it.id, n);
   }
   return out;
+}
+
+/**
+ * Deux appareils tombent-ils au même endroit du mur ?
+ *
+ * « Au même endroit » ne veut pas dire « au millimètre » : on pose un RJ45
+ * *à peu près* sur la prise, et c'est justement le geste qui doit déclencher
+ * la proposition de les réunir. La tolérance est donc celle d'un poste.
+ */
+export function overlaps(
+  a: { x: number; y: number; kind: FixtureKind },
+  b: { x: number; y: number; kind: FixtureKind },
+): boolean {
+  const dx = Math.abs(a.x - b.x);
+  const dy = Math.abs(a.y - b.y);
+  return (
+    dx < (FIXTURES[a.kind].w + FIXTURES[b.kind].w) / 2 &&
+    dy < (FIXTURES[a.kind].h + FIXTURES[b.kind].h) / 2
+  );
+}
+
+/** Côté où poser le second poste d'un ensemble. */
+export type PlateSide = 'gauche' | 'droite' | 'haut' | 'bas';
+
+export const PLATE_SIDES: { key: PlateSide; label: string; arrow: string }[] = [
+  { key: 'gauche', label: 'Gauche', arrow: 'M15 5 L8 12 l7 7' },
+  { key: 'droite', label: 'Droite', arrow: 'M9 5 L16 12 l-7 7' },
+  { key: 'haut', label: 'Haut', arrow: 'M5 15 L12 8 l7 7' },
+  { key: 'bas', label: 'Bas', arrow: 'M5 9 L12 16 l7 -7' },
+];
+
+/**
+ * Position du second poste, à l'entraxe du premier.
+ *
+ * Le premier ne bouge pas : c'est lui qu'on a placé à la cote, on ne va pas
+ * le déplacer parce qu'un second arrive.
+ */
+export function plateSlot(
+  base: { x: number; y: number },
+  side: PlateSide,
+): { x: number; y: number } {
+  switch (side) {
+    case 'gauche':
+      return { x: base.x - ENTRAXE, y: base.y };
+    case 'droite':
+      return { x: base.x + ENTRAXE, y: base.y };
+    case 'haut':
+      return { x: base.x, y: base.y + ENTRAXE };
+    default:
+      return { x: base.x, y: base.y - ENTRAXE };
+  }
 }
 
 /**

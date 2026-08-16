@@ -886,9 +886,6 @@ export function ResultScreen() {
         {/* Côtes du meuble sélectionné, en surimpression */}
         {tab === '2d' && selectedObject && showFurniture && objDims && (
           <View style={styles.editBar}>
-            <Text style={styles.editLabel} numberOfLines={1}>
-              {frCategory(selectedObject.category)} · glissez-le, il se colle
-            </Text>
             <View style={styles.editRow}>
               <TextInput
                 style={styles.inputSmall}
@@ -2189,17 +2186,20 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     marginRight: 6,
   },
   wallStripGhostText: { color: c.inkSoft, fontSize: 13, fontWeight: '800' },
+  // Une seule ligne, au pied du plan, et LOIN du bouton d'enregistrement :
+  // le bandeau faisait deux étages et son bouton de validation finissait
+  // derrière la pastille bleue.
   editBar: {
     position: 'absolute',
-    bottom: 10,
-    left: 10,
-    right: 76,
+    bottom: 12,
+    left: 12,
+    right: 84,
     backgroundColor: c.surface,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: c.line,
-    padding: 13,
+    borderRadius: radius.pill,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
     ...shadowCard,
+    shadowOpacity: 0.12,
   },
   editLabel: { color: c.inkSoft, fontSize: 13, marginBottom: 8, fontWeight: '600' },
   editRow: { flexDirection: 'row', alignItems: 'center' },
@@ -2222,27 +2222,27 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     backgroundColor: c.bg,
     color: c.ink,
     borderRadius: radius.sm,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    fontSize: 15.5,
+    paddingHorizontal: 6,
+    paddingVertical: 6,
+    fontSize: 14.5,
     fontWeight: '700',
-    minWidth: 58,
+    minWidth: 50,
     textAlign: 'center',
     borderWidth: 1,
     borderColor: c.lineStrong,
   },
-  editIcons: { flexDirection: 'row', gap: 8, marginLeft: 'auto' },
+  editIcons: { flexDirection: 'row', gap: 6, marginLeft: 'auto' },
   iconBtn: {
-    width: 38,
-    height: 38,
+    width: 34,
+    height: 34,
     borderRadius: radius.sm,
     backgroundColor: c.surfaceSunken,
     alignItems: 'center',
     justifyContent: 'center',
   },
   iconBtnOk: {
-    width: 38,
-    height: 38,
+    width: 34,
+    height: 34,
     borderRadius: radius.sm,
     backgroundColor: c.blue,
     alignItems: 'center',

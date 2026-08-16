@@ -317,6 +317,11 @@ interface ScanState {
   moveFixture: (id: string, along: number, height: number) => void;
   /** Bascule l'appareil sur l'autre face du mur, sans le déplacer. */
   flipFixture: (id: string) => void;
+  /**
+   * Réunit deux appareils sous une même plaque : le second se pose à
+   * l'entraxe du premier, du côté demandé. Le premier ne bouge pas.
+   */
+  joinFixtures: (movedId: string, baseId: string, along: number, height: number) => void;
   removeFixture: (id: string) => void;
   /** Annule la dernière retouche. Vide = plus rien à annuler. */
   undo: () => void;
@@ -756,6 +761,22 @@ export const useScanStore = create<ScanState>((set, get) => {
               }
             : o,
         ),
+        dirty: true,
+      });
+    },
+
+    joinFixtures: (movedId, baseId, along, height) => {
+      const st = get();
+      const base = st.fixtures.find((f) => f.id === baseId);
+      if (!base) return;
+      pushHistory('joinFixtures');
+      const group = base.group ?? `pl-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`;
+      set({
+        fixtures: st.fixtures.map((f) => {
+          if (f.id === baseId) return { ...f, group };
+          if (f.id === movedId) return { ...f, along, height, group, side: base.side };
+          return f;
+        }),
         dirty: true,
       });
     },

@@ -36,7 +36,11 @@ import { roomOf, roomParts, wallQuadsOf } from '../geometry/floorplan';
 import {
   BOITE_D,
   ENTRAXE,
+  PLATE_SIDES,
+  overlaps,
+  plateSlot,
   socketsOf,
+  type PlateSide,
   FIXTURES as SPECS,
   boxOffsets,
   postsOf,
@@ -95,12 +99,17 @@ export function WallElevation({
   const addFixture = useScanStore((s) => s.addFixture);
   const flipFixture = useScanStore((s) => s.flipFixture);
   const removeFixture = useScanStore((s) => s.removeFixture);
+  const joinFixtures = useScanStore((s) => s.joinFixtures);
   const c = useTheme();
   const styles = getStyles(c);
 
   const [layout, setLayout] = useState({ w: 0, h: 0 });
   const [guide, setGuide] = useState<{ x?: number; y?: number }>({});
   const [editing, setEditing] = useState<'g' | 'd' | 'h' | null>(null);
+  /** Deux appareils posés au même endroit : on propose de les réunir. */
+  const [fusion, setFusion] = useState<{ moved: string; base: string } | null>(
+    null,
+  );
   const [draft, setDraft] = useState('');
 
   const wall = walls.find((w) => w.id === wallId) ?? null;
@@ -290,8 +299,27 @@ export function WallElevation({
         L.move(d.id, fromFaceX(L.face, x), y);
       },
       onPanResponderRelease: () => {
+        const d = drag.current;
         drag.current = null;
         setGuide({});
+        // Posé SUR un autre appareil : c'est le geste qui demande à les
+        // réunir sous une même plaque. On ne décide pas à sa place — on
+        // demande de quel côté.
+        const L = live.current;
+        if (!d || !L.face) return;
+        const moi = L.mine.find((f) => f.id === d.id);
+        if (!moi) return;
+        const sous = L.mine.find(
+          (f) =>
+            f.id !== moi.id &&
+            f.side === moi.side &&
+            !f.group &&
+            overlaps(
+              { x: faceX(L.face!, moi.along), y: moi.height, kind: moi.kind },
+              { x: faceX(L.face!, f.along), y: f.height, kind: f.kind },
+            ),
+        );
+        if (sous) setFusion({ moved: moi.id, base: sous.id });
       },
       onPanResponderTerminate: () => {
         drag.current = null;
@@ -346,6 +374,45 @@ export function WallElevation({
       if (pose) moveFixture(id, pose.along, height);
     }
     onSelect(id);
+  };
+
+  /**
+   * Côtés où le second poste tient encore : à l'entraxe du premier, sans
+   * sortir du mur ni tomber sur un troisième appareil. Un côté impossible
+   * n'est pas proposé — plutôt que proposé puis refusé.
+   */
+  const cotesPossibles = (): PlateSide[] => {
+    if (!fusion || !face || !wall) return [];
+    const base = mine.find((f) => f.id === fusion.base);
+    const moved = mine.find((f) => f.id === fusion.moved);
+    if (!base || !moved) return [];
+    const gabarit = FIXTURES[moved.kind];
+    const depart = { x: faceX(face, base.along), y: base.height };
+    return PLATE_SIDES.map((s) => s.key).filter((cote) => {
+      const p = plateSlot(depart, cote);
+      if (p.x < gabarit.w / 2 || p.x > face.len - gabarit.w / 2) return false;
+      if (p.y < gabarit.h / 2 || p.y > wall.height - gabarit.h / 2) return false;
+      // Ni sur un troisième appareil déjà posé.
+      return !mine.some(
+        (f) =>
+          f.id !== moved.id &&
+          f.id !== base.id &&
+          f.side === base.side &&
+          overlaps(
+            { x: p.x, y: p.y, kind: moved.kind },
+            { x: faceX(face, f.along), y: f.height, kind: f.kind },
+          ),
+      );
+    });
+  };
+
+  const reunir = (cote: PlateSide) => {
+    if (!fusion || !face) return;
+    const base = mine.find((f) => f.id === fusion.base);
+    if (!base) return;
+    const p = plateSlot({ x: faceX(face, base.along), y: base.height }, cote);
+    joinFixtures(fusion.moved, fusion.base, fromFaceX(face, p.x), p.y);
+    setFusion(null);
   };
 
   /** Applique une cote tapée au clavier (en cm). */
@@ -500,6 +567,36 @@ export function WallElevation({
               );
             })}
 
+            {/* La plaque commune d'un ensemble : un cadre autour des postes
+                réunis. C'est ce qu'on visse, et ça se voit sur le mur. */}
+            {[...new Set(mine.filter((f) => f.group).map((f) => f.group))].map(
+              (g) => {
+                const lot = mine.filter((f) => f.group === g && f.side === side);
+                if (lot.length < 2) return null;
+                const xs = lot.map((f) => faceX(face, f.along));
+                const ys = lot.map((f) => f.height);
+                const larg = Math.max(...lot.map((f) => FIXTURES[f.kind].w));
+                const haut = Math.max(...lot.map((f) => FIXTURES[f.kind].h));
+                const x0 = Math.min(...xs) - larg / 2;
+                const x1 = Math.max(...xs) + larg / 2;
+                const y0 = Math.min(...ys) - haut / 2;
+                const y1 = Math.max(...ys) + haut / 2;
+                return (
+                  <Rect
+                    key={g}
+                    x={px(x0) - 3}
+                    y={py(y1) - 3}
+                    width={(x1 - x0) * scale + 6}
+                    height={(y1 - y0) * scale + 6}
+                    rx={4}
+                    fill="none"
+                    stroke={c.inkFaint}
+                    strokeWidth={1.4}
+                  />
+                );
+              },
+            )}
+
             {/* Repère d'accrochage, le temps du geste. */}
             {guide.x !== undefined && (
               <Line
@@ -611,6 +708,44 @@ export function WallElevation({
           geste. Le pavé précédent portait un titre sur deux lignes et un gros
           bouton bleu qui le chevauchait — beaucoup de bruit pour dire
           « il en manque quatre ». */}
+      {fusion && (
+        <View style={styles.fusion}>
+          <View style={styles.fusionHead}>
+            <Text style={styles.fusionTitle}>Réunir sous une même plaque ?</Text>
+            <TouchableOpacity onPress={() => setFusion(null)}>
+              <Text style={styles.fusionNon}>Non</Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.fusionRule}>
+            {`Le premier ne bouge pas. Le second se pose à ${Math.round(
+              ENTRAXE * 1000,
+            )} mm d'entraxe, du côté choisi.`}
+          </Text>
+          <View style={styles.fusionCotes}>
+            {PLATE_SIDES.filter((s) => cotesPossibles().includes(s.key)).map(
+              (s) => (
+                <TouchableOpacity
+                  key={s.key}
+                  style={styles.fusionCote}
+                  onPress={() => reunir(s.key)}>
+                  <Svg width={18} height={18} viewBox="0 0 24 24">
+                    <Path
+                      d={s.arrow}
+                      stroke={c.blue}
+                      strokeWidth={2.2}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      fill="none"
+                    />
+                  </Svg>
+                  <Text style={styles.fusionCoteText}>{s.label}</Text>
+                </TouchableOpacity>
+              ),
+            )}
+          </View>
+        </View>
+      )}
+
       {objectif && (
         <View style={styles.guide}>
           <View style={styles.guideHead}>
@@ -996,6 +1131,36 @@ const getStyles = themedStyles((c: Palette) =>
     },
     warnFixText: { color: '#FFFFFF', fontSize: 11.5, fontWeight: '800' },
     warnRule: { color: c.inkSoft, fontSize: 10.5, lineHeight: 14.5, marginTop: 3 },
+    fusion: {
+      marginTop: 10,
+      backgroundColor: c.blueSoft,
+      borderRadius: radius.sm,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+    },
+    fusionHead: { flexDirection: 'row', alignItems: 'center' },
+    fusionTitle: { color: c.blue, fontSize: 13, fontWeight: '800', flex: 1 },
+    fusionNon: { color: c.inkFaint, fontSize: 12.5, fontWeight: '700' },
+    fusionRule: {
+      color: c.inkSoft,
+      fontSize: 10.5,
+      lineHeight: 14,
+      marginTop: 2,
+    },
+    fusionCotes: { flexDirection: 'row', gap: 8, marginTop: 9 },
+    fusionCote: {
+      flex: 1,
+      alignItems: 'center',
+      backgroundColor: c.surface,
+      borderRadius: radius.sm,
+      paddingVertical: 8,
+    },
+    fusionCoteText: {
+      color: c.inkSoft,
+      fontSize: 9.5,
+      fontWeight: '700',
+      marginTop: 2,
+    },
     percage: {
       marginTop: 8,
       backgroundColor: c.blueSoft,

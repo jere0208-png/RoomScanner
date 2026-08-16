@@ -390,6 +390,8 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
           x: number;
           y: number;
           color: string;
+          /** Opacité du point de repère : 1 de loin, 0 dès qu'on voit la plaque. */
+          pastille: number;
           /** Cotes lues sur la face, affichées une fois zoomé dessus. */
           haut?: string;
           bord?: string;
@@ -468,8 +470,17 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
         // Un appareil qui se voit déjà n'a pas besoin d'un pictogramme
         // par-dessus : le tableau fait 55 cm, son symbole lui masquait la
         // façade. Le repère ne sert qu'à ce qui est trop petit pour être vu.
+        // Une plaque de 8 cm fait cinq pixels à l'échelle d'un logement :
+        // le volume est bien là — les tests le vérifient au millimètre —
+        // mais l'œil ne le trouve pas. On pose donc un point de sa couleur
+        // TANT QU'IL EST TROP PETIT, et ce point s'efface à mesure que la
+        // plaque devient visible. L'inverse de la pastille d'avant, qui
+        // masquait ce qu'elle désignait.
+        const taille = spec.w * scale;
+        const pastille = Math.max(0, Math.min(1, (16 - taille) / 8));
         items.push({
           kind: 'elec',
+          pastille,
           // AU-DESSUS de la géométrie, comme les cartouches de pièce.
           //
           // Trié à sa profondeur, un repère bas — une prise à 20 cm —
@@ -702,6 +713,24 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
                 <Circle key={i} cx={item.x} cy={item.y} r={1.1} fill={item.color} />
               ) : item.kind === 'elec' ? (
                 <G key={i}>
+                  {item.pastille > 0.02 && (
+                    <>
+                      <Circle
+                        cx={item.x}
+                        cy={item.y}
+                        r={6.5}
+                        fill={c.surface}
+                        opacity={item.pastille * 0.9}
+                      />
+                      <Circle
+                        cx={item.x}
+                        cy={item.y}
+                        r={4}
+                        fill={item.color}
+                        opacity={item.pastille}
+                      />
+                    </>
+                  )}
                   {item.haut && (
                     <>
                       {/* Étiquette de cotes : une pastille sombre, deux
