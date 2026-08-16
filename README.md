@@ -145,6 +145,23 @@ le toucher continue de le sélectionner d'un coup, sinon on aurait compliqué
 le geste courant sans rien apporter. La note ne s'affiche que quand un retour
 est tenu ; rien de sélectionné, rien à l'écran.
 
+### La typo de la marque
+
+Le mot « EchoPlan » n'est plus composé : c'est **l'image de la marque**,
+détourée du fond gris de l'original (`src/assets/echoplan.png`, plus ses
+densités `@2x`/`@3x`). Aucune police système ne sait faire le « O » d'ECHO,
+qui porte les ondes du logo. Le détourage se déduit de la luminance — fond
+au-dessus de 190, typo en dessous de 70, rampe entre les deux pour garder
+l'anticrénelage des courbes —, puis on recadre au plus juste avec une marge
+de quelques pixels. Les pixels transparents restent NOIRS : sinon, un halo
+clair borde les lettres dès qu'on redimensionne.
+
+L'image est **teintée par le thème** (`tintColor: c.ink`), donc elle suit le
+mode sombre. Sur l'écran de lancement iOS, en revanche, le système dessine
+avant que l'app puisse dire quel thème est choisi : le fond y est donc forcé
+en clair (`LaunchScreen.storyboard`), faute de quoi un iPhone en mode sombre
+afficherait du noir sur noir, c'est-à-dire rien.
+
 ### Langage visuel
 
 Trois règles, appliquées partout plutôt que décidées écran par écran.

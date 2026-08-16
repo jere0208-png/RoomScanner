@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import {
   Animated,
   Easing,
+  Image,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -124,9 +125,16 @@ export function HomeScreen() {
           <LogoMark />
         </View>
         <Animated.View style={fadeIn(0)}>
-          <Text style={styles.title}>
-            Echo<Text style={styles.titleAccent}>Plan</Text>
-          </Text>
+          {/* La typo de la marque, détourée, plutôt que deux `Text` empilés :
+              le « O » d'ECHO porte les ondes du logo, ce qu'aucune police
+              système ne sait faire. Teintée par le thème pour rester
+              lisible en sombre. */}
+          <Image
+            source={require('../assets/echoplan.png')}
+            style={styles.wordmark}
+            resizeMode="contain"
+            accessibilityLabel="EchoPlan"
+          />
         </Animated.View>
         <Animated.View style={fadeIn(1)}>
           <Text style={styles.subtitle}>
@@ -221,14 +229,12 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     zIndex: 2,
   },
   themeIcon: { color: c.inkSoft, fontSize: 21 },
-  title: {
-    color: c.ink,
-    fontSize: 36,
-    fontWeight: '800',
-    letterSpacing: -1,
+  wordmark: {
+    width: 244,
+    height: 54,
     marginTop: 18,
+    tintColor: c.ink,
   },
-  titleAccent: { color: c.blue },
   subtitle: {
     color: c.inkSoft,
     fontSize: 15,
