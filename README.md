@@ -879,6 +879,28 @@ quatre plaques superposées, illisibles au plan comme en 3D. S'il n'y a plus de
 place sous une plaque commune, on s'écarte franchement de 40 cm plutôt que de
 superposer.
 
+Attention à ne pas confondre deux mesures qui se ressemblent : « tombe sur un
+autre » compare les PLAQUES (82 mm — deux appareils à 71 mm d'entraxe se
+chevauchent donc, et c'est normal, ils en partagent une), « la place est
+prise » compare les BOÎTES, une par poste. Le premier jet utilisait la même
+fonction pour les deux et rangeait la seconde prise à 142 mm : un trou
+d'entraxe sur deux restait vide.
+
+**Le réglage de l'ensemble se fait ensuite, en une ligne.** L'appareil est
+déjà rangé quand le bandeau s'affiche — on ne pose donc pas une question à
+laquelle l'app a répondu : on propose de changer d'avis. Le côté (les seuls
+possibles sont montrés), puis l'axe, qui a deux lectures légitimes :
+
+- **1re fixe** — la première ne bouge pas, la seconde se pose à 71 mm. C'est
+  le geste de l'électricien qui ajoute une prise à une prise existante.
+- **Centré** — l'ensemble s'axe sur le premier percement, chacune s'écartant
+  de 35,5 mm. C'est ce qu'on veut quand la cote vient d'un plan.
+
+`placeAssembly` écrit les deux positions dans la MÊME retouche : sans ça,
+l'annulation en défait la moitié. `__tests__/assemblage.test.ts` couvre la
+pose, l'entraxe, les quatre côtés, le recentrage, la séparation, le
+changement d'avis répété et le retour en arrière.
+
 Les cotes, en 3D, se lisent comme sur un plan : un filet pointillé jusqu'au
 retour de mur, un autre jusqu'au sol, le nombre posé dessus, et la
 désignation (PC, RJ, VV…) au-dessus de l'appareil. L'étiquette noire d'avant

@@ -14,7 +14,7 @@
  * un appareil déjà posé, milieu du mur — et le repère s'affiche pendant
  * qu'on y est accroché.
  */
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   PanResponder,
   StyleSheet,
@@ -36,6 +36,7 @@ import { roomOf, roomParts, wallQuadsOf } from '../geometry/floorplan';
 import {
   BOITE_D,
   ENTRAXE,
+  PLAQUE,
   PLATE_SIDES,
   overlaps,
   plateSlot,
@@ -99,7 +100,10 @@ export function WallElevation({
   const addFixture = useScanStore((s) => s.addFixture);
   const flipFixture = useScanStore((s) => s.flipFixture);
   const removeFixture = useScanStore((s) => s.removeFixture);
-  const joinFixtures = useScanStore((s) => s.joinFixtures);
+  const placeAssembly = useScanStore((s) => s.placeAssembly);
+  const splitFixture = useScanStore((s) => s.splitFixture);
+  const pendingJoin = useScanStore((s) => s.pendingJoin);
+  const clearPendingJoin = useScanStore((s) => s.clearPendingJoin);
   const c = useTheme();
   const styles = getStyles(c);
 
@@ -107,9 +111,15 @@ export function WallElevation({
   const [guide, setGuide] = useState<{ x?: number; y?: number }>({});
   const [editing, setEditing] = useState<'g' | 'd' | 'h' | null>(null);
   /** Deux appareils posés au même endroit : on propose de les réunir. */
-  const [fusion, setFusion] = useState<{ moved: string; base: string } | null>(
-    null,
-  );
+  const [fusion, setFusion] = useState<{
+    moved: string;
+    base: string;
+    /** Axe du PREMIER appareil au moment où l'ensemble s'est formé. */
+    axe: number;
+    cote: PlateSide;
+    /** true = l'ensemble est centré sur cet axe ; false = le premier y reste. */
+    centre: boolean;
+  } | null>(null);
   const [draft, setDraft] = useState('');
 
   const wall = walls.find((w) => w.id === wallId) ?? null;
@@ -319,7 +329,16 @@ export function WallElevation({
               { x: faceX(L.face!, f.along), y: f.height, kind: f.kind },
             ),
         );
-        if (sous) setFusion({ moved: moi.id, base: sous.id });
+        if (sous) {
+          const xb = faceX(L.face, sous.along);
+          setFusion({
+            moved: moi.id,
+            base: sous.id,
+            axe: xb,
+            cote: faceX(L.face, moi.along) >= xb ? 'droite' : 'gauche',
+            centre: false,
+          });
+        }
       },
       onPanResponderTerminate: () => {
         drag.current = null;
@@ -327,6 +346,35 @@ export function WallElevation({
       },
     }),
   ).current;
+
+  /**
+   * L'appareil qu'on vient de poser est tombé sur un autre : le store les a
+   * rangés côte à côte pour que rien ne se superpose, et nous propose ici de
+   * choisir le côté — ou de recentrer l'ensemble sur l'axe du premier.
+   */
+  useEffect(() => {
+    if (!pendingJoin || !face) return;
+    const base = fixtures.find((f) => f.id === pendingJoin.base);
+    const moved = fixtures.find((f) => f.id === pendingJoin.moved);
+    clearPendingJoin();
+    if (!base || !moved || base.wallId !== wall?.id) return;
+    const xb = faceX(face, base.along);
+    const xm = faceX(face, moved.along);
+    setFusion({
+      moved: moved.id,
+      base: base.id,
+      axe: xb,
+      cote:
+        Math.abs(xm - xb) > 1e-6
+          ? xm > xb
+            ? 'droite'
+            : 'gauche'
+          : moved.height > base.height
+          ? 'haut'
+          : 'bas',
+      centre: false,
+    });
+  }, [pendingJoin, face, fixtures, wall, clearPendingJoin]);
 
   if (!wall || !face) {
     return (
@@ -387,7 +435,7 @@ export function WallElevation({
     const moved = mine.find((f) => f.id === fusion.moved);
     if (!base || !moved) return [];
     const gabarit = FIXTURES[moved.kind];
-    const depart = { x: faceX(face, base.along), y: base.height };
+    const depart = { x: fusion.axe, y: base.height };
     return PLATE_SIDES.map((s) => s.key).filter((cote) => {
       const p = plateSlot(depart, cote);
       if (p.x < gabarit.w / 2 || p.x > face.len - gabarit.w / 2) return false;
@@ -398,6 +446,7 @@ export function WallElevation({
           f.id !== moved.id &&
           f.id !== base.id &&
           f.side === base.side &&
+          !f.group &&
           overlaps(
             { x: p.x, y: p.y, kind: moved.kind },
             { x: faceX(face, f.along), y: f.height, kind: f.kind },
@@ -406,12 +455,42 @@ export function WallElevation({
     });
   };
 
-  const reunir = (cote: PlateSide) => {
+  /**
+   * Pose l'ensemble : côté choisi, et axe de référence.
+   *
+   * Deux façons de comprendre « à droite de la première » : la première ne
+   * bouge pas et la seconde se pose à 71 mm — c'est ce que fait un
+   * électricien qui ajoute une prise à une prise existante —, ou l'ensemble
+   * se CENTRE sur l'axe de la première, chacune s'écartant de 35,5 mm. La
+   * seconde façon garde l'axe du premier percement au milieu de la plaque,
+   * ce qu'on veut quand la cote a été relevée sur un plan.
+   */
+  const appliquer = (cote: PlateSide, centre: boolean) => {
     if (!fusion || !face) return;
     const base = mine.find((f) => f.id === fusion.base);
     if (!base) return;
-    const p = plateSlot({ x: faceX(face, base.along), y: base.height }, cote);
-    joinFixtures(fusion.moved, fusion.base, fromFaceX(face, p.x), p.y);
+    const horiz = cote === 'gauche' || cote === 'droite';
+    const sens = cote === 'gauche' || cote === 'bas' ? -1 : 1;
+    const demi = centre ? ENTRAXE / 2 : 0;
+    const axeY = base.height;
+    const bx = horiz ? fusion.axe - sens * demi : fusion.axe;
+    const by = horiz ? axeY : axeY - sens * demi;
+    const mx = horiz ? bx + sens * ENTRAXE : bx;
+    const my = horiz ? by : by + sens * ENTRAXE;
+    placeAssembly(
+      fusion.base,
+      fusion.moved,
+      { along: fromFaceX(face, bx), height: by },
+      { along: fromFaceX(face, mx), height: my },
+    );
+    setFusion({ ...fusion, cote, centre });
+  };
+
+  /** Défait l'ensemble : le second s'écarte de 40 cm, seul. */
+  const separer = () => {
+    if (!fusion || !face) return;
+    const x = Math.min(face.len - 0.05, fusion.axe + 0.4);
+    splitFixture(fusion.moved, fromFaceX(face, x));
     setFusion(null);
   };
 
@@ -756,43 +835,83 @@ export function WallElevation({
           geste. Le pavé précédent portait un titre sur deux lignes et un gros
           bouton bleu qui le chevauchait — beaucoup de bruit pour dire
           « il en manque quatre ». */}
-      {fusion && (
-        <View style={styles.fusion}>
-          <View style={styles.fusionHead}>
-            <Text style={styles.fusionTitle}>Réunir sous une même plaque ?</Text>
-            <TouchableOpacity onPress={() => setFusion(null)}>
-              <Text style={styles.fusionNon}>Non</Text>
-            </TouchableOpacity>
-          </View>
-          <Text style={styles.fusionRule}>
-            {`Le premier ne bouge pas. Le second se pose à ${Math.round(
-              ENTRAXE * 1000,
-            )} mm d'entraxe, du côté choisi.`}
-          </Text>
-          <View style={styles.fusionCotes}>
-            {PLATE_SIDES.filter((s) => cotesPossibles().includes(s.key)).map(
-              (s) => (
-                <TouchableOpacity
-                  key={s.key}
-                  style={styles.fusionCote}
-                  onPress={() => reunir(s.key)}>
-                  <Svg width={18} height={18} viewBox="0 0 24 24">
-                    <Path
-                      d={s.arrow}
-                      stroke={c.blue}
-                      strokeWidth={2.2}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      fill="none"
-                    />
-                  </Svg>
-                  <Text style={styles.fusionCoteText}>{s.label}</Text>
+      {fusion &&
+        (() => {
+          const lot = mine.filter(
+            (f) => f.id === fusion.base || f.id === fusion.moved,
+          );
+          const n = lot.reduce((t, f) => t + postsOf(f.kind).length, 0);
+          const dispo = cotesPossibles();
+          return (
+            <View style={styles.ens}>
+              <View style={styles.ensHead}>
+                <View style={styles.ensPastille}>
+                  <Text style={styles.ensPastilleText}>{n}</Text>
+                </View>
+                <View style={styles.ensTitres}>
+                  <Text style={styles.ensTitre} numberOfLines={1}>
+                    {`Ensemble ${n} postes`}
+                  </Text>
+                  <Text style={styles.ensSous} numberOfLines={1}>
+                    {`entraxe ${Math.round(ENTRAXE * 1000)} mm · plaque ${Math.round(
+                      ((n - 1) * ENTRAXE + PLAQUE) * 1000,
+                    )} mm`}
+                  </Text>
+                </View>
+                <TouchableOpacity style={styles.ensOk} onPress={() => setFusion(null)}>
+                  <Text style={styles.ensOkText}>OK</Text>
                 </TouchableOpacity>
-              ),
-            )}
-          </View>
-        </View>
-      )}
+              </View>
+
+              <View style={styles.ensLigne}>
+                {PLATE_SIDES.filter((sd) => dispo.includes(sd.key)).map((sd) => {
+                  const actif = fusion.cote === sd.key;
+                  return (
+                    <TouchableOpacity
+                      key={sd.key}
+                      style={[styles.ensCote, actif && styles.ensCoteOn]}
+                      onPress={() => appliquer(sd.key, fusion.centre)}>
+                      <Svg width={16} height={16} viewBox="0 0 24 24">
+                        <Path
+                          d={sd.arrow}
+                          stroke={actif ? '#FFFFFF' : c.ink}
+                          strokeWidth={2.2}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          fill="none"
+                        />
+                      </Svg>
+                    </TouchableOpacity>
+                  );
+                })}
+                <View style={styles.ensSep} />
+                {[
+                  { on: false, label: '1re fixe' },
+                  { on: true, label: 'Centré' },
+                ].map((opt) => (
+                  <TouchableOpacity
+                    key={opt.label}
+                    style={[
+                      styles.ensAxe,
+                      fusion.centre === opt.on && styles.ensAxeOn,
+                    ]}
+                    onPress={() => appliquer(fusion.cote, opt.on)}>
+                    <Text
+                      style={[
+                        styles.ensAxeText,
+                        fusion.centre === opt.on && styles.ensAxeTextOn,
+                      ]}>
+                      {opt.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+                <TouchableOpacity style={styles.ensSplit} onPress={separer}>
+                  <Text style={styles.ensSplitText}>Séparer</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          );
+        })()}
 
       {objectif && (
         <View style={styles.guide}>
@@ -1157,6 +1276,63 @@ const getStyles = themedStyles((c: Palette) =>
     },
     warnFixText: { color: '#FFFFFF', fontSize: 11.5, fontWeight: '800' },
     warnRule: { color: c.inkSoft, fontSize: 10.5, lineHeight: 14.5, marginTop: 3 },
+    // L'ensemble, en UNE ligne de commandes : le côté, l'axe, et de quoi
+    // défaire. L'ancien pavé posait une question à laquelle l'appareil avait
+    // déjà répondu — il était rangé avant même qu'on lise le titre.
+    ens: {
+      marginTop: 10,
+      backgroundColor: c.surfaceSunken,
+      borderRadius: radius.sm,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+    },
+    ensHead: { flexDirection: 'row', alignItems: 'center', gap: 9 },
+    ensPastille: {
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      backgroundColor: c.blue,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    ensPastilleText: { color: '#FFFFFF', fontSize: 11.5, fontWeight: '900' },
+    ensTitres: { flex: 1, minWidth: 0 },
+    ensTitre: { color: c.ink, fontSize: 12.5, fontWeight: '800' },
+    ensSous: { color: c.inkFaint, fontSize: 9.5, fontWeight: '700' },
+    ensOk: {
+      backgroundColor: c.blue,
+      borderRadius: radius.pill,
+      paddingHorizontal: 12,
+      paddingVertical: 4,
+    },
+    ensOkText: { color: '#FFFFFF', fontSize: 11.5, fontWeight: '800' },
+    ensLigne: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      marginTop: 8,
+    },
+    ensCote: {
+      width: 30,
+      height: 26,
+      borderRadius: radius.sm,
+      backgroundColor: c.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    ensCoteOn: { backgroundColor: c.blue },
+    ensSep: { width: 1, height: 18, backgroundColor: c.line, marginHorizontal: 3 },
+    ensAxe: {
+      borderRadius: radius.sm,
+      backgroundColor: c.surface,
+      paddingHorizontal: 8,
+      paddingVertical: 5,
+    },
+    ensAxeOn: { backgroundColor: c.blue },
+    ensAxeText: { color: c.inkSoft, fontSize: 10.5, fontWeight: '800' },
+    ensAxeTextOn: { color: '#FFFFFF' },
+    ensSplit: { marginLeft: 'auto', paddingHorizontal: 4, paddingVertical: 5 },
+    ensSplitText: { color: c.inkFaint, fontSize: 10.5, fontWeight: '800' },
     fusion: {
       marginTop: 10,
       backgroundColor: c.blueSoft,

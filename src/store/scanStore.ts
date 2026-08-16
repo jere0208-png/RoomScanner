@@ -323,6 +323,28 @@ interface ScanState {
    * l'entraxe du premier, du côté demandé. Le premier ne bouge pas.
    */
   joinFixtures: (movedId: string, baseId: string, along: number, height: number) => void;
+  /**
+   * Repose les DEUX appareils d'un ensemble d'un coup.
+   *
+   * Choisir « ensemble centré » déplace aussi le premier : il faut donc
+   * pouvoir écrire les deux positions dans la même retouche, sinon
+   * l'annulation en défait la moitié.
+   */
+  placeAssembly: (
+    baseId: string,
+    movedId: string,
+    base: { along: number; height: number },
+    moved: { along: number; height: number },
+  ) => void;
+  /** Sort un appareil de son ensemble et l'écarte franchement. */
+  splitFixture: (id: string, along: number) => void;
+  /**
+   * Un appareil vient d'être rangé à côté d'un autre, sous une plaque
+   * commune : l'écran de face le propose à l'utilisateur, qui choisit le
+   * côté ou recentre l'ensemble. Consommé une fois lu.
+   */
+  pendingJoin: { moved: string; base: string } | null;
+  clearPendingJoin: () => void;
   removeFixture: (id: string) => void;
   /** Annule la dernière retouche. Vide = plus rien à annuler. */
   undo: () => void;
@@ -487,6 +509,7 @@ export const useScanStore = create<ScanState>((set, get) => {
     modelPath: null,
     scanName: '',
     currentSaveId: null,
+    pendingJoin: null,
     dirty: false,
     resultOrigin: 'scan',
     rooms: [],
@@ -751,16 +774,28 @@ export const useScanStore = create<ScanState>((set, get) => {
       const mine = st.fixtures.filter(
         (o) => o.wallId === wallId && o.side === side,
       );
-      const occupe = (px: number) =>
+      // « Tombe sur un autre » et « la place est prise » ne se mesurent pas
+      // pareil : le premier compare les PLAQUES (82 mm, donc deux appareils
+      // à 71 mm d'entraxe se chevauchent, et c'est normal — ils partagent
+      // une plaque), le second compare les BOÎTES, une par poste.
+      const surUnAutre = (px: number) =>
         mine.find((o) =>
           overlaps(
             { x: px, y: f.height, kind },
             { x: faceX(face, o.along), y: o.height, kind: o.kind },
           ),
         );
+      const placePrise = (px: number) =>
+        mine.some((o) => {
+          const ox = faceX(face, o.along);
+          return (
+            Math.abs(px - ox) < ENTRAXE - 1e-6 &&
+            Math.abs(f.height - o.height) < ENTRAXE - 1e-6
+          );
+        });
       let x = faceX(face, f.along);
       let group: string | undefined;
-      const voisin = occupe(x);
+      const voisin = surUnAutre(x);
       if (voisin) {
         // On cherche la place libre la plus proche, par pas d'entraxe, à
         // droite d'abord — le sens de lecture d'un tableau d'appareillage.
@@ -769,7 +804,7 @@ export const useScanStore = create<ScanState>((set, get) => {
           for (const sens of [1, -1]) {
             const px = x + sens * k * ENTRAXE;
             if (px - spec.w / 2 < 0 || px + spec.w / 2 > face.len) continue;
-            if (occupe(px)) continue;
+            if (placePrise(px)) continue;
             place = px;
             break;
           }
@@ -794,6 +829,9 @@ export const useScanStore = create<ScanState>((set, get) => {
           ),
           pose,
         ],
+        // L'écran de face proposera le côté, ou de recentrer l'ensemble :
+        // on range d'abord pour que rien ne se superpose, on demande ensuite.
+        pendingJoin: group && voisin ? { moved: id, base: voisin.id } : null,
         dirty: true,
       });
       return id;
@@ -821,6 +859,35 @@ export const useScanStore = create<ScanState>((set, get) => {
                 height: Math.max(hh, Math.min(wall.height - hh, height)),
               }
             : o,
+        ),
+        dirty: true,
+      });
+    },
+
+    clearPendingJoin: () => set({ pendingJoin: null }),
+
+    placeAssembly: (baseId, movedId, base, moved) => {
+      const st = get();
+      const b = st.fixtures.find((f) => f.id === baseId);
+      if (!b) return;
+      pushHistory('assemblage');
+      const group =
+        b.group ?? `pl-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`;
+      set({
+        fixtures: st.fixtures.map((f) => {
+          if (f.id === baseId) return { ...f, ...base, group };
+          if (f.id === movedId) return { ...f, ...moved, group, side: b.side };
+          return f;
+        }),
+        dirty: true,
+      });
+    },
+
+    splitFixture: (id, along) => {
+      pushHistory('separer');
+      set({
+        fixtures: get().fixtures.map((f) =>
+          f.id === id ? { ...f, along, group: undefined } : f,
         ),
         dirty: true,
       });
