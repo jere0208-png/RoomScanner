@@ -18,9 +18,9 @@ import {
   View,
 } from 'react-native';
 import Svg, {
-  Circle,
   Line as SvgLine,
   Path,
+  Rect,
   Rect as SvgRect,
 } from 'react-native-svg';
 import { captureRef } from 'react-native-view-shot';
@@ -1012,6 +1012,28 @@ export function ResultScreen() {
                     active={false}
                     onPress={straightenPlan}
                   />,
+                  // Ajouter un meuble EST une modification : sa place est
+                  // ici. L'onde bleue dit que c'est par là qu'on ouvre le
+                  // catalogue, tant qu'on ne l'a pas fait une fois.
+                  <View key="furniture+" style={styles.pillRow}>
+                    <PulsePlus
+                      onPress={() => {
+                        setShowFurniture(true);
+                        setCatalogue(true);
+                      }}
+                    />
+                    <ToolPill
+                      icon="furniture"
+                      active={showFurniture}
+                      onPress={() => {
+                        if (showFurniture) {
+                          setSelectedObjectId(null);
+                          setObjDims(false);
+                        }
+                        setShowFurniture(!showFurniture);
+                      }}
+                    />
+                  </View>,
                 ]
               : [
                   <ToolPill
@@ -1033,14 +1055,12 @@ export function ResultScreen() {
                         />,
                       ]
                     : []),
-                  // Le catalogue s'ouvre depuis le calque qu'il alimente,
-                  // et le « + » se pose À GAUCHE de lui, sur sa ligne : une
-                  // onde bleue en sort tant qu'on ne l'a pas touché, pour
-                  // dire que c'est par là qu'on ajoute un meuble.
+                  // HORS ÉDITION, une pastille ne fait qu'AFFICHER ou
+                  // CACHER. Le « + » du catalogue vivait ici : on pouvait
+                  // donc modifier le plan sans être en édition, et la barre
+                  // mélangeait deux natures de gestes. Il est passé dans la
+                  // barre d'édition, avec les autres outils.
                   <View key="furniture" style={styles.pillRow}>
-                    {showFurniture && (
-                      <PulsePlus onPress={() => setCatalogue(true)} />
-                    )}
                     <ToolPill
                       icon="furniture"
                       active={showFurniture}
@@ -2219,21 +2239,38 @@ function ToolPill({
   const plein = active && !halo;
   // Icône noire sur fond blanc ; blanche sur bleu quand l'outil est actif.
   const stroke = plein ? '#FFFFFF' : active ? c.blue : c.ink;
-  const tour = useRef(new Animated.Value(0)).current;
+  /**
+   * Un contour qui respire, plutôt qu'un point qui tourne.
+   *
+   * L'arc tournant attirait l'œil en permanence et donnait à lire une
+   * progression — comme si quelque chose se chargeait. Or il n'y a rien à
+   * attendre : le bouton dit seulement « vous êtes en train de modifier ».
+   * Un liseré complet qui apparaît et s'efface en fondu le dit sans rien
+   * promettre, et se remarque à la périphérie du regard sans l'accrocher.
+   */
+  const pulse = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     if (!halo || !active) return;
-    tour.setValue(0);
+    pulse.setValue(0);
     const boucle = Animated.loop(
-      Animated.timing(tour, {
-        toValue: 1,
-        duration: 2600,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      }),
+      Animated.sequence([
+        Animated.timing(pulse, {
+          toValue: 1,
+          duration: 900,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulse, {
+          toValue: 0,
+          duration: 900,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ]),
     );
     boucle.start();
     return () => boucle.stop();
-  }, [halo, active, tour]);
+  }, [halo, active, pulse]);
   return (
     <TouchableOpacity
       style={[styles.toolPill, plein && styles.toolPillActive]}
@@ -2241,41 +2278,18 @@ function ToolPill({
       {halo && active && (
         <Animated.View
           pointerEvents="none"
-          style={[
-            styles.toolHalo,
-            {
-              transform: [
-                {
-                  rotate: tour.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: ['0deg', '360deg'],
-                  }),
-                },
-              ],
-            },
-          ]}>
-          {/* Un arc, pas un anneau : c'est son extrémité qui fait la
-              lueur, et le tour complet se lit en deux secondes et demie. */}
-          <Svg width={44} height={44} viewBox="0 0 44 44">
-            <Circle
-              cx={22}
-              cy={22}
-              r={20}
+          style={[styles.toolHalo, { opacity: pulse }]}>
+          {/* Le contour épouse exactement la pastille : un anneau posé
+              dessus, ni plus grand ni décalé. */}
+          <Svg width={40} height={40} viewBox="0 0 40 40">
+            <Rect
+              x={2}
+              y={2}
+              width={36}
+              height={36}
+              rx={12}
               stroke={c.blue}
-              strokeWidth={2.4}
-              strokeLinecap="round"
-              strokeDasharray="30 96"
-              fill="none"
-            />
-            <Circle
-              cx={22}
-              cy={22}
-              r={20}
-              stroke={c.blue}
-              strokeWidth={6}
-              strokeLinecap="round"
-              strokeDasharray="12 114"
-              opacity={0.18}
+              strokeWidth={2.2}
               fill="none"
             />
           </Svg>
@@ -2448,13 +2462,13 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 10,
   },
-  // L'arc déborde la pastille de 4 px : la lueur tourne AUTOUR d'elle.
+  // Le liseré épouse la pastille, à deux pixels près.
   toolHalo: {
     position: 'absolute',
-    width: 44,
-    height: 44,
-    left: -4,
-    top: -4,
+    width: 40,
+    height: 40,
+    left: -2,
+    top: -2,
     alignItems: 'center',
     justifyContent: 'center',
   },

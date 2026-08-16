@@ -6,11 +6,11 @@ import {
   PanResponder,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
 import { RoomScan } from 'react-native-room-scan';
 import {
   glow,
@@ -180,7 +180,29 @@ export function ExportScreen() {
     rooms.map((r) => r.floor),
   );
   const c = useTheme();
-  const styles = getStyles(c);
+  /** Une case de la grille : icône, mot, état, bascule. */
+type OptionDef = [keyof typeof EXPORT_ICONS, string, boolean, () => void];
+
+/**
+ * Icônes des options d'export, tracées en 24×24.
+ *
+ * Un mot sous chacune : l'icône seule se devine mal — « surfaces » et
+ * « couleurs » se ressemblent trop —, et le mot seul reprend la place qu'on
+ * cherchait justement à gagner.
+ */
+const EXPORT_ICONS = {
+  vues3d: ['M12 3 l8 4.5 v9 L12 21 l-8 -4.5 v-9 z', 'M12 12 l8 -4.5', 'M12 12 v9', 'M12 12 L4 7.5'],
+  metre: ['M4 5 h16 v14 H4 z', 'M4 12 h16', 'M12 5 v14'],
+  cotes2d: ['M3 12 h18', 'M6 9 v6', 'M18 9 v6', 'M9 4 h6 v3 H9 z'],
+  cotes3d: ['M4 18 l6 -12 6 6 4 -4', 'M3 21 h18', 'M6 15 v6'],
+  meubles: ['M4 17 v-5 a2 2 0 0 1 2 -2 h12 a2 2 0 0 1 2 2 v5', 'M4 17 h16', 'M6 17 v3', 'M18 17 v3'],
+  surface: ['M4 6 h16 v12 H4 z', 'M8 10 h.01', 'M12 10 h.01', 'M16 10 h.01', 'M8 14 h.01', 'M12 14 h.01', 'M16 14 h.01'],
+  ouvertures: ['M5 4 v16 h9 V4 z', 'M14 20 l5 2 V2 l-5 2', 'M8 12 h.01'],
+  couleurs: ['M12 3 a9 9 0 1 0 0 18 h2 a2 2 0 0 0 0 -4 h-1 a2 2 0 0 1 0 -4 h3 a4 4 0 0 0 0 -8 z', 'M8 9 h.01', 'M12 7 h.01'],
+  gaines: ['M4 20 h9 a3 3 0 0 0 3 -3 V7', 'M13 4 h6 v3 h-6 z', 'M4 17.5 v5'],
+} as const;
+
+const styles = getStyles(c);
 
   const [include3D, setInclude3D] = useState(true);
   const [includeMetre, setIncludeMetre] = useState(true);
@@ -310,54 +332,99 @@ export function ExportScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scroll}
         scrollEnabled={!scrollLocked}>
-        <View style={styles.switchRow}>
-          <Text style={styles.switchLabel}>Inclure des vues 3D</Text>
-          <Switch value={include3D} onValueChange={setInclude3D} />
+        {/* Ce qui entre dans le document : neuf réglages, en une grille
+            d'icônes plutôt qu'en neuf lignes d'interrupteurs. Empilés, ils
+            repoussaient l'aperçu — la seule chose qu'on veuille vraiment
+            voir ici — sous la ligne de flottaison. Actif = pastille bleue,
+            comme partout ailleurs dans l'app. */}
+        <View style={styles.grille}>
+          {(
+            [
+              ['vues3d', 'Vues 3D', include3D, () => setInclude3D(!include3D)],
+              [
+                'metre',
+                'Métré',
+                includeMetre,
+                () => setIncludeMetre(!includeMetre),
+              ],
+              [
+                'cotes2d',
+                'Cotes 2D',
+                measures2D,
+                () => setMeasures2D(!measures2D),
+              ],
+              [
+                'cotes3d',
+                'Cotes 3D',
+                measures3D,
+                () => setMeasures3D(!measures3D),
+              ],
+              [
+                'meubles',
+                'Meubles',
+                showFurniture,
+                () => setShowFurniture(!showFurniture),
+              ],
+              [
+                'surface',
+                'Surfaces',
+                showSurfaces,
+                () => setShowSurfaces(!showSurfaces),
+              ],
+              [
+                'ouvertures',
+                'Ouvertures',
+                showOpeningColors,
+                () => setShowOpeningColors(!showOpeningColors),
+              ],
+              ...(colorsAvailable
+                ? [
+                    [
+                      'couleurs',
+                      'Couleurs',
+                      showTextures,
+                      () => setShowTextures(!showTextures),
+                    ] as OptionDef,
+                  ]
+                : []),
+              ...(cheminements
+                ? [
+                    [
+                      'gaines',
+                      'Gaines',
+                      gaines,
+                      () => setGaines(!gaines),
+                    ] as OptionDef,
+                  ]
+                : []),
+            ] as OptionDef[]
+          ).map(([icon, label, actif, press]) => (
+            <TouchableOpacity
+              key={icon}
+              style={[styles.option, actif && styles.optionOn]}
+              activeOpacity={0.8}
+              onPress={press}>
+              <Svg width={22} height={22} viewBox="0 0 24 24">
+                {EXPORT_ICONS[icon].map((d) => (
+                  <Path
+                    key={d}
+                    d={d}
+                    stroke={actif ? '#FFFFFF' : c.ink}
+                    strokeWidth={1.9}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    fill="none"
+                  />
+                ))}
+              </Svg>
+              <Text
+                style={[styles.optionText, actif && styles.optionTextOn]}
+                numberOfLines={1}>
+                {label}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
-        <View style={styles.switchRow}>
-          <Text style={styles.switchLabel}>Métré par pièce</Text>
-          <Switch value={includeMetre} onValueChange={setIncludeMetre} />
-        </View>
-        <View style={styles.switchRow}>
-          <Text style={styles.switchLabel}>
-            Afficher la couleur des portes et fenêtres
-          </Text>
-          <Switch value={showOpeningColors} onValueChange={setShowOpeningColors} />
-        </View>
-        <View style={styles.switchRow}>
-          <Text style={styles.switchLabel}>Inclure les meubles</Text>
-          <Switch value={showFurniture} onValueChange={setShowFurniture} />
-        </View>
-        <View style={styles.switchRow}>
-          <Text style={styles.switchLabel}>
-            Surface au sol (fond pointillé et m²)
-          </Text>
-          <Switch value={showSurfaces} onValueChange={setShowSurfaces} />
-        </View>
-        {colorsAvailable && (
-          <View style={styles.switchRow}>
-            <Text style={styles.switchLabel}>
-              Couleurs et textures relevées au scan
-            </Text>
-            <Switch value={showTextures} onValueChange={setShowTextures} />
-          </View>
-        )}
-        <View style={styles.switchRow}>
-          <Text style={styles.switchLabel}>Cotes sur le plan 2D</Text>
-          <Switch value={measures2D} onValueChange={setMeasures2D} />
-        </View>
-        <View style={styles.switchRow}>
-          <Text style={styles.switchLabel}>Cotes sur les vues 3D</Text>
-          <Switch value={measures3D} onValueChange={setMeasures3D} />
-        </View>
-        {cheminements && (
-          <View style={styles.switchRow}>
-            <Text style={styles.switchLabel}>
-              Plan des gaines (tracé du tirage)
-            </Text>
-            <Switch value={gaines} onValueChange={setGaines} />
-          </View>
-        )}
 
         <Text style={styles.sheetLabel}>Feuille 1 · Plan d'ensemble</Text>
         <View style={styles.sheetCard}>
@@ -448,6 +515,32 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     marginLeft: 12,
   },
   scroll: { paddingBottom: 16 },
+  // Quatre par ligne : la grille tient en deux rangées, l'aperçu remonte.
+  grille: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 10,
+  },
+  option: {
+    width: '23.5%',
+    aspectRatio: 1.15,
+    borderRadius: radius.sm,
+    backgroundColor: c.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 3,
+    ...shadowCard,
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+  },
+  optionOn: { backgroundColor: c.blue },
+  optionText: {
+    color: c.inkSoft,
+    fontSize: 9.5,
+    fontWeight: '800',
+  },
+  optionTextOn: { color: '#FFFFFF' },
   switchRow: {
     flexDirection: 'row',
     alignItems: 'center',
