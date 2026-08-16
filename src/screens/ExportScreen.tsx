@@ -293,14 +293,26 @@ const styles = getStyles(c);
   /** Ce que le document portera vraiment : la feuille du plafond existe. */
   const avecPlafond = plafond && ceiling.length > 0;
   const [plan, setPlan] = useState<PlanView>(DEFAULT_PLAN);
+  /**
+   * LE CADRAGE DU PLAFOND EST LE SIEN.
+   *
+   * Les deux aperçus partageaient le même état : cadrer la feuille du
+   * plafond déplaçait le plan d'ensemble sous les yeux, et inversement.
+   * Ce sont pourtant deux feuilles séparées du dossier, qu'on ne lit pas
+   * au même moment ni pour la même chose — on serre sur une pièce pour
+   * placer ses spots, on garde le logement entier pour le plan d'ensemble.
+   */
+  const [planCl, setPlanCl] = useState<PlanView>(DEFAULT_PLAN);
   const [v1, setV1] = useState<View3DParams>(DEFAULT_V1);
   const [v2, setV2] = useState<View3DParams>(DEFAULT_V2);
   const planBox = useRef({ w: 1, h: 1 });
+  const planClBox = useRef({ w: 1, h: 1 });
   const box1 = useRef({ w: 1, h: 1 });
   const box2 = useRef({ w: 1, h: 1 });
 
   const reset = () => {
     setPlan(DEFAULT_PLAN);
+    setPlanCl(DEFAULT_PLAN);
     setV1(DEFAULT_V1);
     setV2(DEFAULT_V2);
   };
@@ -341,6 +353,11 @@ const styles = getStyles(c);
           // Le plafond ne s'impose pas : il fait une feuille de plus, et
           // tout le monde n'équipe pas les plafonds.
           ceiling: plafond ? ceiling : undefined,
+          ceilingPlan: {
+            zoom: planCl.zoom,
+            fx: planCl.ox / (planClBox.current.w / 2),
+            fy: planCl.oy / (planClBox.current.h / 2),
+          },
           surfaces: showSurfaces,
           textures: showTextures,
           metre: includeMetre,
@@ -548,10 +565,10 @@ const styles = getStyles(c);
                 <PlanPreview
                   cotes={measures2D}
                   ceiling={ceiling}
-                  value={plan}
-                  onChange={setPlan}
+                  value={planCl}
+                  onChange={setPlanCl}
                   onBox={(b) => {
-                    planBox.current = b;
+                    planClBox.current = b;
                   }}
                 />
               </View>

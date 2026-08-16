@@ -199,6 +199,47 @@ describe('la feuille d’implantation', () => {
     expect(vu).toContain('Va-et-vient');
   });
 
+  /**
+   * CHAQUE FEUILLE A SON CADRAGE.
+   *
+   * Les deux aperçus de l'écran d'export partageaient le même : serrer sur
+   * une pièce pour placer ses spots emportait le plan d'ensemble avec soi.
+   * Ce sont deux feuilles séparées du dossier, on ne les lit ni au même
+   * moment ni pour la même chose.
+   */
+  it('se cadre pour elle seule, sans emporter le plan d’ensemble', () => {
+    const flux = (src: string) => src.match(/stream\n[\s\S]*?endstream/g) ?? [];
+    const bati = (zoomPlafond: number) =>
+      flux(
+        latin1(
+          buildScanPdf(
+            {
+              name: 'Séjour',
+              walls: W,
+              openings: [],
+              objects: [],
+              rooms: R,
+              fixtures: FX,
+            },
+            false,
+            {
+              metre: false,
+              ceiling: PLAFOND,
+              plan: { zoom: 1, fx: 0, fy: 0 },
+              ceilingPlan: { zoom: zoomPlafond, fx: 0, fy: 0 },
+            },
+          ),
+        ),
+      );
+    const a = bati(1);
+    const b = bati(1.8);
+    expect(a).toHaveLength(b.length);
+    // Feuille 1, le plan d'ensemble : rigoureusement identique.
+    expect(a[0]).toBe(b[0]);
+    // Feuille 2, le plafond : c'est elle, et elle seule, qui a bougé.
+    expect(a[1]).not.toBe(b[1]);
+  });
+
   it('et rien ne sort de la feuille', () => {
     const src = doc(PLAFOND);
     const re = /(-?\d+(?:\.\d+)?) (-?\d+(?:\.\d+)?) (m|l) /g;

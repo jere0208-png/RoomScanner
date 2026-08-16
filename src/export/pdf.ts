@@ -199,6 +199,15 @@ export interface PdfOptions {
    */
   ceiling?: CeilingFixture[];
   /**
+   * Le cadrage de CETTE feuille-là.
+   *
+   * Elle reprenait celui du plan d'ensemble, ce qui obligeait à choisir :
+   * ou l'appartement entier sur les deux, ou une pièce serrée sur les
+   * deux. Or on ne les regarde pas pour la même raison. À défaut, elle
+   * garde le cadrage du plan — c'est le comportement d'avant.
+   */
+  ceilingPlan?: PlanViewParams;
+  /**
    * Schémas unifilaire et multifilaire : deux feuilles de plus, tirées des
    * circuits déjà calculés. Absent = pas de schéma, et le dossier garde sa
    * pagination d'avant.
@@ -2723,7 +2732,12 @@ export function buildScanPdf(
   const pages = [planPage(ctx, `1 / ${total}`, opts.plan, opts.measures2D ?? true)];
   if (withCeiling) {
     pages.push(
-      ceilingPage(ctx, `${pages.length + 1} / ${total}`, opts.plan, opts.ceiling!),
+      ceilingPage(
+        ctx,
+        `${pages.length + 1} / ${total}`,
+        opts.ceilingPlan ?? opts.plan,
+        opts.ceiling!,
+      ),
     );
   }
   if (withMetre) {
