@@ -36,7 +36,11 @@ import {
   wallToRooms,
 } from '../src/geometry/nfc15100';
 import { planRoutes } from '../src/geometry/elecplan';
-import { castToWall, roomParts } from '../src/geometry/floorplan';
+import {
+  castToWall,
+  planFrameAngle,
+  roomParts,
+} from '../src/geometry/floorplan';
 import { pointInPolygon } from '../src/geometry/appearance';
 
 import type { WallSeg } from '../src/geometry/floorplan';
@@ -174,6 +178,32 @@ describe('la feuille d’implantation', () => {
 
   it('garde les cotes du plan : un point lumineux se pose au mètre près', () => {
     expect(texte(doc(PLAFOND))).toMatch(/5,00 m/);
+  });
+
+  /**
+   * ET LES COTES DES APPAREILS EUX-MÊMES.
+   *
+   * La feuille portait les cotes des MURS, et on la croyait complète :
+   * elle disait où sont les cloisons, jamais où percer le plafond. Un
+   * point lumineux ne se place pas à l'œil — on tend un mètre depuis deux
+   * murs, et c'est justement ce que l'écran montre en pointillés bleus
+   * quand on le déplace. Ce sont ces valeurs-là, au centimètre près.
+   */
+  it('cote chaque appareil depuis les murs, comme à l’écran', () => {
+    const vu = texte(doc(PLAFOND));
+    const trame = planFrameAngle(W);
+    const cos = Math.cos(trame);
+    const sin = Math.sin(trame);
+    for (const cl of PLAFOND) {
+      for (const axe of [
+        { x: -cos, z: -sin },
+        { x: sin, z: -cos },
+      ]) {
+        const d = castToWall(cl.at, axe, W);
+        expect(d).not.toBeNull();
+        expect(vu).toContain(String(Math.round(d! * 100)));
+      }
+    }
   });
 
   /**

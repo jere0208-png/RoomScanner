@@ -8,6 +8,7 @@
  */
 import type { FloorData, ObjectData } from 'react-native-room-scan';
 import {
+  castToWall,
   clampFootprint,
   quadPoints,
   roomExtent,
@@ -28,7 +29,10 @@ import {
   FIXTURE_TAG,
   assemblySymbol,
   faceX,
+  faceXofT,
   facePoint,
+  interiorSide,
+  masonryRuns,
   stackRanks,
   wallFace,
   type Fixture,
@@ -51,6 +55,8 @@ import {
   type CeilingFixture,
 } from '../geometry/ceiling';
 import { planFrameAngle } from '../geometry/floorplan';
+import { assignOpenings } from '../geometry/scene3d';
+import { wallRuns } from '../geometry/floorplan';
 import {
   faceDepth,
   buildScene,
@@ -208,6 +214,15 @@ export interface PdfOptions {
    */
   ceilingPlan?: PlanViewParams;
   /**
+   * Les élévations : un mur vu de face par feuille.
+   *
+   * C'est le dossier de pose — celui qu'on tient devant le mur, la
+   * perceuse dans l'autre main. Optionnel, parce qu'un logement de douze
+   * murs fait douze feuilles de plus, et qu'un plan pour l'architecte
+   * n'en a que faire.
+   */
+  elevations?: boolean;
+  /**
    * Schémas unifilaire et multifilaire : deux feuilles de plus, tirées des
    * circuits déjà calculés. Absent = pas de schéma, et le dossier garde sa
    * pagination d'avant.
@@ -241,9 +256,107 @@ export function toBase64(bytes: Uint8Array): string {
   return out;
 }
 
+/**
+ * UNE PHOTO DANS LE DOSSIER — le JPEG entre tel quel.
+ *
+ * Un PDF sait porter un JPEG SANS LE TOUCHER : le flux compressé de
+ * l'appareil photo devient le contenu de l'objet image, et le lecteur le
+ * décode lui-même (`/DCTDecode`). On n'a donc ni à décompresser, ni à
+ * réencoder — ce qu'aucune bibliothèque ne ferait ici de toute façon.
+ *
+ * Reste à lire ses DIMENSIONS, que le PDF exige et que le JPEG ne dit
+ * qu'à l'intérieur : dans le marqueur SOF, quelque part après l'en-tête.
+ * On parcourt donc les segments jusqu'à lui.
+ */
+export interface PdfImage {
+  /** Nom de ressource dans la page : Im0, Im1… */
+  name: string;
+  /** Le JPEG, un octet par signe (ce que rend `fromBase64`). */
+  data: string;
+  w: number;
+  h: number;
+  /** 1 = gris, 3 = couleur, 4 = CMJN. */
+  comps: number;
+}
+
+const B64_INV: Record<string, number> = {};
+for (let i = 0; i < 64; i++) {
+  B64_INV['ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'[i]] = i;
+}
+
+/** Base64 → chaîne d'octets. Tolère un préfixe `data:` et les sauts de ligne. */
+export function fromBase64(b64: string): string {
+  const src = b64.slice(b64.indexOf(',') + 1).replace(/[^A-Za-z0-9+/]/g, '');
+  let out = '';
+  for (let i = 0; i < src.length; i += 4) {
+    const a = B64_INV[src[i]] ?? 0;
+    const b = B64_INV[src[i + 1]] ?? 0;
+    const c = B64_INV[src[i + 2]] ?? 0;
+    const d = B64_INV[src[i + 3]] ?? 0;
+    out += String.fromCharCode((a << 2) | (b >> 4));
+    if (i + 2 < src.length) out += String.fromCharCode(((b & 15) << 4) | (c >> 2));
+    if (i + 3 < src.length) out += String.fromCharCode(((c & 3) << 6) | d);
+  }
+  return out;
+}
+
+/**
+ * Les dimensions d'un JPEG, lues dans son marqueur SOF.
+ *
+ * `null` si ce n'est pas un JPEG lisible — auquel cas la photo est
+ * simplement absente de la feuille. Un dossier sans photo se lit ; un
+ * dossier qui refuse de s'exporter, non.
+ */
+export function jpegSize(
+  data: string,
+): { w: number; h: number; comps: number } | null {
+  if (data.charCodeAt(0) !== 0xff || data.charCodeAt(1) !== 0xd8) return null;
+  let i = 2;
+  while (i + 9 < data.length) {
+    if (data.charCodeAt(i) !== 0xff) {
+      i += 1;
+      continue;
+    }
+    const marqueur = data.charCodeAt(i + 1);
+    // Les SOF\* portent la taille ; C4 (Huffman), C8 et CC n'en sont pas.
+    if (
+      marqueur >= 0xc0 &&
+      marqueur <= 0xcf &&
+      marqueur !== 0xc4 &&
+      marqueur !== 0xc8 &&
+      marqueur !== 0xcc
+    ) {
+      return {
+        h: (data.charCodeAt(i + 5) << 8) | data.charCodeAt(i + 6),
+        w: (data.charCodeAt(i + 7) << 8) | data.charCodeAt(i + 8),
+        comps: data.charCodeAt(i + 9),
+      };
+    }
+    if (marqueur === 0xd8 || (marqueur >= 0xd0 && marqueur <= 0xd9)) {
+      i += 2;
+      continue;
+    }
+    const taille = (data.charCodeAt(i + 2) << 8) | data.charCodeAt(i + 3);
+    if (taille < 2) return null;
+    i += 2 + taille;
+  }
+  return null;
+}
+
+/** Prépare une photo pour le document, ou `null` si elle est illisible. */
+export function pdfImage(name: string, base64: string): PdfImage | null {
+  const data = fromBase64(base64);
+  const taille = jpegSize(data);
+  if (!taille || taille.w < 2 || taille.h < 2) return null;
+  return { name, data, ...taille };
+}
+
 // ------------------------------------------------------- document PDF
 
-function buildDocument(pageStreams: string[]): Uint8Array {
+function buildDocument(
+  pageStreams: string[],
+  images: PdfImage[] = [],
+): Uint8Array {
   const objects: string[] = [];
   const add = (body: string) => {
     objects.push(body);
@@ -255,13 +368,31 @@ function buildDocument(pageStreams: string[]): Uint8Array {
   const f2 = add(
     '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>',
   );
+  const COULEUR = ['', '/DeviceGray', '', '/DeviceRGB', '/DeviceCMYK'];
+  const imgIds = images.map((im) =>
+    add(
+      `<< /Type /XObject /Subtype /Image /Width ${im.w} /Height ${im.h} ` +
+        `/ColorSpace ${COULEUR[im.comps] ?? '/DeviceRGB'} /BitsPerComponent 8 ` +
+        `/Filter /DCTDecode /Length ${im.data.length} >>\nstream\n${im.data}\nendstream`,
+    ),
+  );
+  // Toutes les images sont déclarées sur toutes les pages : une ressource
+  // qu'une page n'appelle pas ne coûte rien, et ça évite de tenir une
+  // comptabilité page par page pour rien.
+  const xobj =
+    images.length > 0
+      ? ` /XObject << ${images
+          .map((im, i) => `/${im.name} ${imgIds[i]} 0 R`)
+          .join(' ')} >>`
+      : '';
   const contentIds = pageStreams.map((s) =>
     add(`<< /Length ${s.length} >>\nstream\n${s}\nendstream`),
   );
   const pageIds = contentIds.map((cid) =>
     add(
       `<< /Type /Page /Parent @P 0 R /MediaBox [0 0 ${PAGE_W} ${PAGE_H}] ` +
-        `/Resources << /Font << /F1 ${f1} 0 R /F2 ${f2} 0 R >> >> /Contents ${cid} 0 R >>`,
+        `/Resources << /Font << /F1 ${f1} 0 R /F2 ${f2} 0 R >>${xobj} >> ` +
+        `/Contents ${cid} 0 R >>`,
     ),
   );
   const pagesId = add(
@@ -429,6 +560,20 @@ class Draw {
     this.ops.push(
       `BT /${opts.bold ? 'F2' : 'F1'} ${n2(size)} Tf ${n2(r)} ${n2(g)} ${n2(b)} rg ` +
         `${n2(cos)} ${n2(sin)} ${n2(-sin)} ${n2(cos)} ${n2(tx)} ${n2(ty)} Tm (${s}) Tj ET`,
+    );
+  }
+
+  /**
+   * Une image, posée dans un rectangle.
+   *
+   * Le repère d'une image PDF est le carré unité : c'est la matrice qui
+   * lui donne sa taille et sa place. D'où le `cm` — largeur, hauteur,
+   * puis coin bas gauche — encadré d'un `q`/`Q` pour ne pas contaminer
+   * ce qui suit.
+   */
+  image(name: string, x: number, y: number, w: number, h: number) {
+    this.ops.push(
+      `q ${n2(w)} 0 0 ${n2(h)} ${n2(x)} ${n2(y)} cm /${name} Do Q`,
     );
   }
 
@@ -2067,6 +2212,62 @@ function ceilingPage(
       }
     }
 
+    /**
+     * LES COTES DE CHAQUE APPAREIL — sans elles, la feuille ne se pose pas.
+     *
+     * Le plan portait les cotes des MURS, et on croyait la feuille
+     * complète : elle disait où sont les cloisons, jamais où percer le
+     * plafond. Or un point lumineux ne se place pas à l'œil — on tend un
+     * mètre depuis deux murs qui se coupent, et c'est exactement ce qu'on
+     * lit à l'écran en déplaçant l'appareil, en pointillés bleus.
+     *
+     * Les deux cotes partent donc d'équerre AVEC LA TRAME du logement, et
+     * non avec les axes du monde : ARKit oriente son repère selon
+     * l'endroit où le relevé a commencé, et un scan de biais est le cas
+     * normal. Ce sont les mêmes valeurs qu'à l'écran, au centimètre près.
+     */
+    const trame = planFrameAngle(ctx.walls);
+    const cos = Math.cos(trame);
+    const sin = Math.sin(trame);
+    const AXES = [
+      { x: -cos, z: -sin },
+      { x: sin, z: -cos },
+    ];
+    // Les étiquettes déjà posées : deux nombres l'un sur l'autre ne se
+    // lisent ni l'un ni l'autre, et une cote illisible ne vaut rien.
+    const prises: { x: number; y: number }[] = [];
+    const libre = (p: { x: number; y: number }) =>
+      prises.every((q) => Math.abs(q.x - p.x) > 22 || Math.abs(q.y - p.y) > 11);
+    for (const cl of ceiling) {
+      for (const axe of AXES) {
+        const dist = castToWall(cl.at, axe, ctx.walls);
+        if (dist === null || dist < 0.02) continue;
+        const bout = {
+          x: cl.at.x + axe.x * dist,
+          z: cl.at.z + axe.z * dist,
+        };
+        const a = px(cl.at);
+        const b = px(bout);
+        d.dashedPath([a, b], 0.6, SKY, [2, 3]);
+        // Le repère au pied de la cote : on voit sur quel mur elle bute.
+        const nx = (b.y - a.y) / (Math.hypot(b.x - a.x, b.y - a.y) || 1);
+        const ny = -(b.x - a.x) / (Math.hypot(b.x - a.x, b.y - a.y) || 1);
+        d.line(b.x - nx * 3, b.y - ny * 3, b.x + nx * 3, b.y + ny * 3, 0.8, SKY);
+        // L'étiquette glisse vers le mur tant qu'elle en gêne une autre.
+        let t = 0.5;
+        let p = { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+        for (let n = 0; n < 4 && !libre(p); n++) {
+          t += 0.16;
+          p = { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+        }
+        prises.push(p);
+        d.rect(p.x - 11, p.y - 5, 22, 10, '#FFFFFF', null);
+        d.text(`${Math.round(dist * 100)}`, p.x, p.y - 2.5, 6.5, SKY, {
+          bold: true,
+        });
+      }
+    }
+
     // Puis les appareils, à leur diamètre réel, jamais plus petits que
     // lisibles : un spot de 9 cm ferait deux points à l'échelle 1:100.
     for (const cl of ceiling) {
@@ -2142,6 +2343,313 @@ function ceilingPage(
   });
 }
 
+/**
+ * L'ÉLÉVATION D'UN MUR — la feuille qu'on tient devant le mur.
+ *
+ * Le plan vu de dessus dit où sont les cloisons, jamais à quelle hauteur
+ * percer. C'est pourtant la seule question du compagnon qui a la
+ * perceuse en main, et jusqu'ici la réponse ne vivait QUE dans l'app :
+ * face au mur, à l'écran, dans un téléphone qu'on ne sort pas les mains
+ * pleines de plâtre. Ces feuilles la mettent sur le papier, un mur par
+ * page, avec les trois cotes qui comptent — depuis la gauche, depuis le
+ * sol, la longueur du retour quand le mur est percé — et la photo de
+ * repérage dessous quand elle existe : trois jours plus tard, c'est elle
+ * qui répond à « c'était quel mur, déjà ? ».
+ */
+function elevationPage(
+  ctx: SheetContext,
+  sheet: string,
+  wall: WallSeg,
+  photo: PdfImage | null,
+): string {
+  const d = new Draw();
+  const walls = ctx.walls;
+  const rooms = ctx.rooms ?? [];
+  const side = interiorSide(wall, walls, rooms);
+  const face = wallFace(wall, wallQuads(walls).get(wall.id), side);
+  const H = wall.height;
+  const mine = (ctx.fixtures ?? []).filter((f) => f.wallId === wall.id);
+  const piece = ctx.roomNames[roomOf(wall) ?? ''] ?? '';
+
+  // ------------------------------------------------------------- cadre
+  const hautTitre = FRAME.y + FRAME.h - TITLE_H - 40;
+  d.text(
+    `Élévation — ${piece || 'mur'}`,
+    FRAME.x + 30,
+    hautTitre,
+    13,
+    INK,
+    { bold: true, align: 'left' },
+  );
+  d.text(
+    `Mur de ${face.len.toFixed(2).replace('.', ',')} m sous ` +
+      `${H.toFixed(2).replace('.', ',')} m · ` +
+      `${mine.length} appareil${mine.length > 1 ? 's' : ''} · cotes en cm ` +
+      'depuis le nu du mur et depuis le sol.',
+    FRAME.x + 30,
+    hautTitre - 14,
+    8,
+    GREY,
+    { align: 'left' },
+  );
+
+  // La photo prend le bas de la feuille ; sans elle, le dessin descend.
+  const BAS = FRAME.y + TITLE_H + 34;
+  const hautPhoto = photo ? BAS + 190 : BAS;
+  const zone = {
+    x: FRAME.x + 52,
+    y: hautPhoto + 46,
+    w: FRAME.w - 104,
+    h: hautTitre - 40 - (hautPhoto + 46),
+  };
+  const scale = Math.min(zone.w / face.len, zone.h / H);
+  const x0 = zone.x + (zone.w - face.len * scale) / 2;
+  /**
+   * Le dessin se CENTRE dans sa zone.
+   *
+   * Un mur large est bridé par la largeur de la feuille : à 6 m de long, il
+   * ne fait plus que 18 cm de haut sur le papier. Calé en bas, il laissait
+   * un tiers de page vide au-dessus, et les cotes du bas se retrouvaient
+   * coincées contre le cartouche. Centré, la feuille respire des deux côtés.
+   */
+  const y0 = zone.y + Math.max(0, (zone.h - H * scale) / 2);
+  const px = (x: number) => x0 + x * scale;
+  const py = (y: number) => y0 + y * scale;
+
+  // ------------------------------------------------------------- le mur
+  d.rect(px(0), py(0), face.len * scale, H * scale, '#F4F6F9', INK, 1.2);
+  // Le sol : trait franc et hachures, comme sur la face à l'écran.
+  d.line(px(0) - 12, py(0), px(face.len) + 12, py(0), 2, INK);
+  for (let x = px(0) - 10; x < px(face.len) + 10; x += 9) {
+    d.line(x, py(0) - 6, x + 5, py(0), 0.6, GREY_LIGHT);
+  }
+
+  // Les hauteurs de référence, en filigrane : ce sont les quatre lignes
+  // sur lesquelles une installation se pose.
+  for (const r of HAUTEURS_REF) {
+    if (r.y >= H - 0.05) continue;
+    d.dashedPath(
+      [
+        { x: px(0), y: py(r.y) },
+        { x: px(face.len), y: py(r.y) },
+      ],
+      0.5,
+      '#C7D2E0',
+      [2, 5],
+    );
+    d.text(r.nom, px(face.len) - 3, py(r.y) + 3, 6, GREY_LIGHT, {
+      align: 'right',
+    });
+  }
+
+  // ---------------------------------------------------- baies et retours
+  const solY = Math.min(...walls.map((w) => w.yCenter - w.height / 2));
+  const trous = assignOpenings(walls, ctx.openings, solY).get(wall.id) ?? [];
+  for (const t of trous) {
+    const xa = faceXofT(face, t.t0);
+    const xb = faceXofT(face, t.t1);
+    const gx = Math.min(xa, xb);
+    const larg = Math.abs(xb - xa);
+    d.rect(
+      px(gx),
+      py(t.y0),
+      larg * scale,
+      (t.y1 - t.y0) * scale,
+      '#EAF2FA',
+      SKY,
+      1,
+    );
+    if (larg * scale > 40) {
+      d.text(
+        t.seg.type === 'window' ? 'Fenêtre' : t.seg.open ? 'Passage' : 'Porte',
+        px(gx + larg / 2),
+        py(t.y1) + 5,
+        7,
+        SKY,
+        { bold: true },
+      );
+      d.text(
+        `${Math.round(larg * 100)} × ${Math.round((t.y1 - t.y0) * 100)}`,
+        px(gx + larg / 2),
+        py(t.y0) - 11,
+        6.5,
+        SKY,
+      );
+    }
+  }
+
+  const retours = masonryRuns(
+    wallRuns(wall, ctx.openings),
+    segLength(wall),
+    face,
+  );
+  if (retours.length > 1) {
+    for (const r of retours) {
+      const m = (r.x0 + r.x1) / 2;
+      const yr = py(H) - 14;
+      d.line(px(r.x0) + 1, yr, px(r.x1) - 1, yr, 0.8, GREY);
+      for (const x of [r.x0, r.x1]) d.line(px(x), yr - 3, px(x), yr + 3, 1, GREY);
+      d.dashedPath(
+        [
+          { x: px(m), y: py(0) + 2 },
+          { x: px(m), y: py(H) - 20 },
+        ],
+        0.5,
+        '#C7D2E0',
+        [2, 5],
+      );
+      d.circle(px(m), yr, 8.5, '#FFFFFF');
+      d.text(`${Math.round((r.x1 - r.x0) * 100)}`, px(m), yr - 2.5, 7, GREY, {
+        bold: true,
+      });
+    }
+  }
+
+  // -------------------------------------------------------- la longueur
+  const yCote = py(H) + 22;
+  d.line(px(0), yCote, px(face.len), yCote, 0.8, INK);
+  for (const x of [0, face.len]) {
+    d.line(px(x), yCote - 4, px(x), yCote + 4, 1.2, INK);
+  }
+  d.circle(px(face.len / 2), yCote, 15, '#FFFFFF');
+  d.text(
+    `${face.len.toFixed(2).replace('.', ',')} m`,
+    px(face.len / 2),
+    yCote - 3.5,
+    10,
+    INK,
+    { bold: true },
+  );
+  // La hauteur sous plafond, debout à gauche.
+  d.text(
+    `H ${H.toFixed(2).replace('.', ',')} m`,
+    px(0) - 16,
+    py(H / 2),
+    8,
+    GREY,
+    { angle: 90 },
+  );
+
+  // ------------------------------------------------------- l'appareillage
+  /**
+   * Les cotes du bas, sur DEUX RANGS.
+   *
+   * Deux appareils voisins — une prise et sa commande à quarante
+   * centimètres — écrivent leurs nombres l'un sur l'autre à l'échelle
+   * d'une feuille. On alterne donc les rangs dès qu'ils se touchent :
+   * c'est ce que fait un dessinateur, et ça se lit sans effort.
+   */
+  const poses = mine
+    .filter((f) => f.side === side)
+    .map((f) => ({ f, x: faceX(face, f.along) }))
+    .sort((a, b) => a.x - b.x);
+  let dernier = -Infinity;
+  let rang = 0;
+  for (const { f, x } of poses) {
+    const spec = FIXTURES[f.kind];
+    // Le symbole, sur un disque blanc pour rester lisible sur une baie.
+    d.circle(px(x), py(f.height), 9, '#FFFFFF');
+    drawSymbol(d, assemblySymbol(f.kind), px(x), py(f.height), 0.62, spec.color, 1);
+    const tag = FIXTURE_TAG[f.kind];
+    if (tag) {
+      d.text(tag, px(x) + 12, py(f.height) + 4, 6, spec.color, { align: 'left' });
+    }
+    // Sa hauteur, à gauche du symbole, sur un trait de rappel.
+    d.dashedPath(
+      [
+        { x: px(0) - 8, y: py(f.height) },
+        { x: px(x) - 10, y: py(f.height) },
+      ],
+      0.5,
+      '#B9C2CE',
+      [2, 3],
+    );
+    d.circle(px(0) - 22, py(f.height), 9, '#FFFFFF');
+    d.text(`${Math.round(f.height * 100)}`, px(0) - 22, py(f.height) - 2.5, 7, INK, {
+      bold: true,
+    });
+    // Sa distance au bord gauche, en bas.
+    rang = x * scale - dernier < 46 ? 1 - rang : 0;
+    dernier = x * scale;
+    const yb = py(0) - 16 - rang * 15;
+    d.dashedPath(
+      [
+        { x: px(x), y: py(f.height) - 10 },
+        { x: px(x), y: yb + 6 },
+      ],
+      0.5,
+      '#B9C2CE',
+      [2, 3],
+    );
+    d.line(px(0), yb, px(x), yb, 0.6, GREY);
+    d.line(px(0), yb - 3, px(0), yb + 3, 1, GREY);
+    d.line(px(x), yb - 3, px(x), yb + 3, 1, GREY);
+    d.circle(px(x / 2), yb, 9, '#FFFFFF');
+    d.text(`${Math.round(x * 100)}`, px(x / 2), yb - 2.5, 7, GREY, { bold: true });
+  }
+
+  if (poses.length === 0) {
+    d.text(
+      'Aucun appareil sur ce mur.',
+      px(face.len / 2),
+      py(H / 2),
+      9,
+      GREY_LIGHT,
+    );
+  }
+
+  // ------------------------------------------------------------ la photo
+  if (photo) {
+    const hMax = 150;
+    const wMax = 210;
+    const k = Math.min(wMax / photo.w, hMax / photo.h);
+    const pw = photo.w * k;
+    const ph = photo.h * k;
+    const pxp = FRAME.x + (FRAME.w - pw) / 2;
+    const pyp = BAS + 14;
+    d.rect(pxp - 3, pyp - 3, pw + 6, ph + 6, '#FFFFFF', '#D6DBE3', 0.8);
+    d.image(photo.name, pxp, pyp, pw, ph);
+    d.text(
+      'Photo de repérage',
+      FRAME.x + FRAME.w / 2,
+      pyp + ph + 9,
+      7,
+      GREY_LIGHT,
+    );
+  }
+
+  drawSheetChrome(d, {
+    project: ctx.name,
+    filename: ctx.filename,
+    sheetTitle: `Élévation — ${piece || 'mur'}`,
+    sheet,
+    // Un mètre vaut 2834,6 points à l'échelle 1:1 (72 pt par pouce).
+    scaleLabel: `1:${Math.round(2834.6 / Math.max(scale, 1e-6))}`,
+  });
+  return d.stream();
+}
+
+/** Les hauteurs de référence d'une installation — les mêmes qu'à l'écran. */
+const HAUTEURS_REF = [
+  { y: 0.25, nom: 'plinthe 25' },
+  { y: 1.1, nom: 'commande 110' },
+  { y: 1.35, nom: 'tableau 135' },
+  { y: 2.1, nom: 'applique 210' },
+];
+
+/**
+ * Les murs qui méritent leur feuille, dans l'ordre où on visite le
+ * logement : pièce par pièce, et dans chaque pièce l'ordre du relevé.
+ */
+function elevationWalls(ctx: SheetContext): WallSeg[] {
+  const ordre = new Map((ctx.rooms ?? []).map((r, i) => [r.id, i]));
+  return ctx.walls
+    .filter((w) => w.type === 'wall' && segLength(w) > 0.3)
+    .map((w, i) => ({ w, i, r: ordre.get(roomOf(w) ?? '') ?? 999 }))
+    .sort((a, b) => a.r - b.r || a.i - b.i)
+    .map((e) => e.w);
+}
+
 const DEFAULT_PDF_VIEWS: [View3DParams, View3DParams] = [
   { theta: -32, tilt: 58, zoom: 1, fx: 0, fy: 0 },
   { theta: 148, tilt: 42, zoom: 1, fx: 0, fy: 0 },
@@ -2201,6 +2709,16 @@ export interface ScanForPdf {
   fixtures?: Fixture[];
   /** Cheminement des gaines, du tableau à chaque appareil (repère monde). */
   routes?: { id: string; path: { x: number; z: number }[] }[];
+  /**
+   * Les photos de repérage, une par mur au plus, en JPEG base64.
+   *
+   * L'app les garde en fichiers ; le PDF, lui, ne peut embarquer que des
+   * octets. C'est donc l'écran d'export qui les relit et les réduit avant
+   * de les passer ici — une photo d'appareil pleine résolution pèse
+   * quatre mégaoctets, et un dossier de douze murs deviendrait
+   * impartageable.
+   */
+  photos?: { wallId: string; base64: string }[];
 }
 
 
@@ -2695,6 +3213,27 @@ export function pdfFilename(name: string): string {
   return `${clean || 'echoplan'}.pdf`;
 }
 
+/**
+ * De quoi ordonner les murs avant même d'avoir monté le contexte complet :
+ * la pagination doit être connue dès la première feuille.
+ */
+function ctxTemporaire(scan: ScanForPdf): SheetContext {
+  return {
+    name: scan.name,
+    filename: '',
+    walls: scan.walls,
+    openings: scan.openings,
+    objects: scan.objects,
+    floors: scan.floors ?? {},
+    roomNames: scan.roomNames ?? {},
+    rooms: scan.rooms,
+    fixtures: scan.fixtures ?? [],
+    colorOpenings: false,
+    showSurfaces: false,
+    showTextures: false,
+  };
+}
+
 export function buildScanPdf(
   scan: ScanForPdf,
   include3D: boolean,
@@ -2706,6 +3245,23 @@ export function buildScanPdf(
   const schemas = opts.schemas ?? null;
   const withSchema = !!schemas && schemas.rows.length > 0;
   const withCeiling = (opts.ceiling?.length ?? 0) > 0;
+  const murs = opts.elevations ? elevationWalls(ctxTemporaire(scan)) : [];
+  /**
+   * Les photos, prêtes à être posées : une par mur, la dernière prise.
+   *
+   * Une photo illisible — fichier tronqué, format inattendu — est
+   * simplement laissée de côté : la feuille sort sans elle. Un dossier
+   * qui refuse de s'exporter serait bien pire qu'un dossier sans photo.
+   */
+  const photos = new Map<string, PdfImage>();
+  const images: PdfImage[] = [];
+  (scan.photos ?? []).forEach((p, i) => {
+    if (photos.has(p.wallId)) return;
+    const im = pdfImage(`Im${i}`, p.base64);
+    if (!im) return;
+    photos.set(p.wallId, im);
+    images.push(im);
+  });
   // Trois feuilles : l'unifilaire hors sol, puis les deux schémas sur le
   // plan. Les tracés viennent des mêmes cheminements que le métré.
   const total =
@@ -2713,6 +3269,7 @@ export function buildScanPdf(
     (withMetre ? 1 : 0) +
     (include3D ? 1 : 0) +
     (withCeiling ? 1 : 0) +
+    murs.length +
     (withSchema ? 4 : 0);
   const ctx: SheetContext = {
     name: scan.name,
@@ -2746,6 +3303,18 @@ export function buildScanPdf(
   if (include3D) {
     pages.push(
       threeDPage(ctx, `${pages.length + 1} / ${total}`, opts.views, opts.measures3D ?? true),
+    );
+  }
+  // Les élévations viennent après les plans et avant les schémas : on lit
+  // le logement, puis chaque mur, puis le tableau.
+  for (const w of murs) {
+    pages.push(
+      elevationPage(
+        ctx,
+        `${pages.length + 1} / ${total}`,
+        w,
+        photos.get(w.id) ?? null,
+      ),
     );
   }
   if (withSchema && schemas) {
@@ -2789,5 +3358,5 @@ export function buildScanPdf(
       ),
     );
   }
-  return buildDocument(pages);
+  return buildDocument(pages, images);
 }

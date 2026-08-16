@@ -176,6 +176,18 @@ export const RoomScan = {
     return NativeModules.RoomScanPhoto.takePhoto();
   },
 
+  /**
+   * Relit une photo de repérage, réduite, en JPEG base64 — de quoi la
+   * poser dans un PDF, qui ne sait rien faire d'un chemin de fichier.
+   * `null` si le fichier a disparu ou hors iOS.
+   */
+  readPhoto(path: string, maxSide = 900): Promise<string | null> {
+    if (Platform.OS === 'ios' && NativeModules.RoomScanPhoto?.readPhoto) {
+      return NativeModules.RoomScanPhoto.readPhoto(path, maxSide);
+    }
+    return Promise.resolve(null);
+  },
+
   /** Efface des photos de repérage (chemins rendus par `takePhoto`). */
   deletePhotos(paths: string[]): Promise<number> {
     if (Platform.OS === 'ios' && NativeModules.RoomScanPhoto) {

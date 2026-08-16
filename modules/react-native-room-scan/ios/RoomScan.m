@@ -25,6 +25,10 @@ RCT_EXTERN_METHOD(takePhoto:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRe
 RCT_EXTERN_METHOD(deletePhotos:(NSArray *)paths
                   resolve:(RCTPromiseResolveBlock)resolve
                   reject:(RCTPromiseRejectBlock)reject)
+RCT_EXTERN_METHOD(readPhoto:(NSString *)path
+                  maxSide:(nonnull NSNumber *)maxSide
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
 @end
 
 @interface RCT_EXTERN_MODULE(RoomScanPreview, NSObject)

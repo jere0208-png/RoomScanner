@@ -229,6 +229,15 @@ const EXPORT_ICONS = {
   ouvertures: ['M5 4 v16 h9 V4 z', 'M14 20 l5 2 V2 l-5 2', 'M8 12 h.01'],
   couleurs: ['M12 3 a9 9 0 1 0 0 18 h2 a2 2 0 0 0 0 -4 h-1 a2 2 0 0 1 0 -4 h3 a4 4 0 0 0 0 -8 z', 'M8 9 h.01', 'M12 7 h.01'],
   gaines: ['M4 20 h9 a3 3 0 0 0 3 -3 V7', 'M13 4 h6 v3 h-6 z', 'M4 17.5 v5'],
+  // Élévation : un mur vu de face, sa cote au-dessus, une prise dessus.
+  elevations: [
+    'M4 19 h16',
+    'M5 19 V8 h14 v11',
+    'M4 5.5 h16',
+    'M4 4 v3',
+    'M20 4 v3',
+    'M10.5 13.5 h3 v3 h-3 z',
+  ],
   // Schémas : un peigne de tableau, deux départs sous une barre.
   schema: ['M12 3 v4', 'M4 7 h16', 'M8 7 v4', 'M16 7 v4', 'M6 11 h4 v6 H6 z', 'M14 11 h4 v6 h-4 z'],
 } as const;
@@ -248,6 +257,15 @@ const styles = getStyles(c);
   const ceiling = useScanStore((s) => s.ceiling);
   /** La feuille d'implantation du plafond, avec ses liens de commande. */
   const [plafond, setPlafond] = useState(true);
+  const photos = useScanStore((s) => s.photos);
+  /**
+   * LES ÉLÉVATIONS : un mur vu de face par feuille.
+   *
+   * Décochées par défaut, et ce n'est pas de la prudence : elles font une
+   * feuille PAR MUR. C'est le dossier qu'on emporte sur le chantier, pas
+   * celui qu'on envoie au client.
+   */
+  const [elevations, setElevations] = useState(false);
   const parts = useMemo(() => roomParts(walls, rooms), [walls, rooms]);
   const placement = useMemo(
     () => fixturePlacement(fixtures, walls, roomInputsOf(rooms, parts)),
@@ -319,6 +337,25 @@ const styles = getStyles(c);
 
   const doExport = async () => {
     try {
+      /**
+       * Les photos, relues et réduites AVANT de bâtir le document.
+       *
+       * Une par mur, la dernière prise : deux vignettes de la même
+       * cloison n'apprennent rien de plus, et chacune pèse dans le
+       * fichier qu'on enverra par messagerie. Celle qui ne se relit pas
+       * — fichier effacé hors de l'app — est simplement absente : sa
+       * feuille sort sans elle.
+       */
+      const vignettes: { wallId: string; base64: string }[] = [];
+      if (elevations) {
+        const vues = new Set<string>();
+        for (const ph of [...photos].sort((a, b) => b.at - a.at)) {
+          if (vues.has(ph.wallId)) continue;
+          vues.add(ph.wallId);
+          const b64 = await RoomScan.readPhoto(ph.path, 900);
+          if (b64) vignettes.push({ wallId: ph.wallId, base64: b64 });
+        }
+      }
       const conv = (v: View3DParams, b: { w: number; h: number }) => ({
         theta: v.theta,
         tilt: v.tilt,
@@ -337,6 +374,7 @@ const styles = getStyles(c);
           routes: gaines || schema ? cheminements?.traces : undefined,
           floors: floorsOf(rooms),
           roomNames: Object.fromEntries(rooms.map((r) => [r.id, r.name])),
+          photos: vignettes,
         },
         include3D,
         {
@@ -361,6 +399,7 @@ const styles = getStyles(c);
           surfaces: showSurfaces,
           textures: showTextures,
           metre: includeMetre,
+          elevations,
         },
       );
       await RoomScan.sharePDF(toBase64(bytes), pdfFilename(scanName));
@@ -486,6 +525,12 @@ const styles = getStyles(c);
                     ] as OptionDef,
                   ]
                 : []),
+              [
+                'elevations',
+                'Élévations',
+                elevations,
+                () => setElevations(!elevations),
+              ],
               ...(schemas
                 ? [
                     [

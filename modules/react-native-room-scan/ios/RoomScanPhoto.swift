@@ -42,6 +42,43 @@ class RoomScanPhoto: NSObject {
     resolve(n)
   }
 
+  /**
+   Relit une photo de repérage, réduite, en JPEG base64.
+
+   Le PDF ne sait embarquer que des octets : un chemin de fichier ne lui
+   sert à rien. Et on ne veut pas y verser l'image telle quelle — 1600 px
+   par mur, sur douze murs, feraient un dossier qu'aucune messagerie ne
+   laisse passer. On la ramène donc au format où elle sera imprimée : une
+   vignette sous l'élévation, jamais plus large qu'un tiers de page.
+
+   `nil` si le fichier n'existe plus (photo effacée hors de l'app) : la
+   feuille sortira sans elle, ce qui vaut mieux qu'un export qui échoue.
+   */
+  @objc func readPhoto(_ path: String,
+                       maxSide: NSNumber,
+                       resolve: @escaping RCTPromiseResolveBlock,
+                       reject: @escaping RCTPromiseRejectBlock) {
+    let url = URL(fileURLWithPath: path)
+    // Même garde que pour l'effacement : on ne lit que NOS photos.
+    guard url.deletingLastPathComponent().lastPathComponent == "photos",
+          let image = UIImage(contentsOfFile: path) else {
+      resolve(nil)
+      return
+    }
+    let cote = CGFloat(truncating: maxSide)
+    let echelle = min(1, cote / max(image.size.width, image.size.height))
+    let taille = CGSize(width: image.size.width * echelle,
+                        height: image.size.height * echelle)
+    let rendu = UIGraphicsImageRenderer(size: taille).image { _ in
+      image.draw(in: CGRect(origin: .zero, size: taille))
+    }
+    guard let data = rendu.jpegData(compressionQuality: 0.62) else {
+      resolve(nil)
+      return
+    }
+    resolve(data.base64EncodedString())
+  }
+
   /// Prend une photo et renvoie son chemin, ou `nil` si l'utilisateur annule.
   @objc func takePhoto(_ resolve: @escaping RCTPromiseResolveBlock,
                        reject: @escaping RCTPromiseRejectBlock) {
