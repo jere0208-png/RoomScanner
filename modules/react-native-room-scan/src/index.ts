@@ -188,6 +188,36 @@ export const RoomScan = {
     return Promise.resolve(null);
   },
 
+  /**
+   * LA BOUSSOLE EN DIRECT, pour la couronne cardinale du plan.
+   *
+   * `startHeading` ouvre le magnétomètre, `heading` donne le cap courant
+   * en degrés horaires depuis le nord (`null` si le relèvement n'est pas
+   * sûr — téléphone à plat, capteur pas encore prêt), `stopHeading` le
+   * referme. À l'appelant de fermer : un magnétomètre qui tourne pour un
+   * écran qu'on a quitté ne coûte que de la batterie.
+   */
+  startHeading(): Promise<boolean> {
+    if (Platform.OS === 'ios' && NativeModules.RoomScanHeading) {
+      return NativeModules.RoomScanHeading.start();
+    }
+    return Promise.resolve(false);
+  },
+
+  stopHeading(): Promise<boolean> {
+    if (Platform.OS === 'ios' && NativeModules.RoomScanHeading) {
+      return NativeModules.RoomScanHeading.stop();
+    }
+    return Promise.resolve(false);
+  },
+
+  heading(): Promise<number | null> {
+    if (Platform.OS === 'ios' && NativeModules.RoomScanHeading) {
+      return NativeModules.RoomScanHeading.heading();
+    }
+    return Promise.resolve(null);
+  },
+
   /** Efface des photos de repérage (chemins rendus par `takePhoto`). */
   deletePhotos(paths: string[]): Promise<number> {
     if (Platform.OS === 'ios' && NativeModules.RoomScanPhoto) {

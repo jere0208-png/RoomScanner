@@ -114,6 +114,7 @@ interface EffMapping {
   deltaToMeters: (dx: number, dy: number) => { x: number; z: number };
   toMeters: (px: { x: number; y: number }) => { x: number; z: number };
 }
+import { RoomScan } from 'react-native-room-scan';
 import { useScanStore } from '../store/scanStore';
 import { haptic, releaseHaptic } from '../ui/haptic';
 
@@ -270,6 +271,36 @@ export function FloorplanEditor({
   const rooms = useScanStore((s) => s.rooms);
   const fixtures = useScanStore((s) => s.fixtures);
   const north = useScanStore((s) => s.north);
+  /**
+   * OÙ REGARDE-T-ON, EN CE MOMENT ?
+   *
+   * Le cap du scan dit où est le nord SUR LE PLAN, une fois pour toutes.
+   * Il ne dit pas où est le nord POUR CELUI QUI TIENT LE TÉLÉPHONE, et
+   * c'est pourtant la question qu'on se pose sur place, un pied dans le
+   * couloir : « lequel de ces deux murs est celui du plan ? ».
+   *
+   * On interroge donc le magnétomètre trois fois par seconde — assez pour
+   * suivre un demi-tour, assez peu pour peser — et seulement quand il y a
+   * une couronne à faire tourner. À la fermeture, on referme : un capteur
+   * qui tourne pour personne ne coûte que de la batterie.
+   */
+  const [cap, setCap] = useState<number | null>(null);
+  useEffect(() => {
+    if (north === null) return;
+    let vivant = true;
+    RoomScan.startHeading();
+    const lire = async () => {
+      const v = await RoomScan.heading();
+      if (vivant) setCap(typeof v === 'number' ? v : null);
+    };
+    lire();
+    const t = setInterval(lire, 330);
+    return () => {
+      vivant = false;
+      clearInterval(t);
+      RoomScan.stopHeading();
+    };
+  }, [north]);
   const colorOpenings = useScanStore((s) => s.showOpeningColors);
   const showSurfaces = useScanStore((s) => s.showSurfaces);
   const c = useTheme();
@@ -911,51 +942,97 @@ export function FloorplanEditor({
               );
             })}
 
-            {/* Rose des vents. Relevée au magnétomètre pendant le scan, elle
-                tourne avec le plan : le N montre le vrai nord, à toute
-                rotation. Posée dans un coin, hors du dessin — une rose au
-                milieu du plan gênerait la lecture qu'elle est censée aider. */}
-            {north !== null && (
-              <G
-                transform={`translate(32, 32) rotate(${
-                  (northScreenAngle(north, view.rot) * 180) / Math.PI + 90
-                })`}>
-                <Circle
-                  cx={0}
-                  cy={0}
-                  r={21}
-                  fill={c.surface}
-                  fillOpacity={0.92}
-                  stroke={c.line}
-                  strokeWidth={1}
-                />
-                {/* Aiguille : la moitié nord pleine, la moitié sud en creux. */}
-                <Polygon points="0,-16 4.5,0 -4.5,0" fill={c.danger} />
-                <Polygon points="0,16 4.5,0 -4.5,0" fill={c.inkFaint} />
-                {(
-                  [
-                    ['N', 0],
-                    ['E', 90],
-                    ['S', 180],
-                    ['O', 270],
-                  ] as [string, number][]
-                ).map(([lettre, deg]) => {
-                  const a = ((deg - 90) * Math.PI) / 180;
-                  return (
-                    <SvgText
-                      key={lettre}
-                      x={Math.cos(a) * 15.5}
-                      y={Math.sin(a) * 15.5 + 3}
-                      fill={lettre === 'N' ? c.ink : c.inkFaint}
-                      fontSize={lettre === 'N' ? 9.5 : 8}
-                      fontWeight="800"
-                      textAnchor="middle">
-                      {lettre}
-                    </SvgText>
+            {/*
+              LA COURONNE CARDINALE — tout autour du plan, pas dans un coin.
+
+              La rose tenait dans un rond de 21 points en haut à gauche :
+              lisible à la loupe, et surtout détachée des murs qu'elle
+              devait qualifier. On lit maintenant les quatre lettres AU BORD
+              du cadre, chacune du côté où se trouve réellement son point
+              cardinal : le mur qui touche le N est le mur nord, sans calcul
+              et sans rose à interpréter. C'est le même nom que porteront
+              l'établi et le dossier imprimé — « mur nord » partout.
+
+              Le repère bleu, lui, montre OÙ L'ON REGARDE et tourne quand on
+              se tourne : c'est ce qui remplace un plan qui pivoterait sous
+              les doigts, en laissant le dessin tranquille.
+            */}
+            {north !== null &&
+              layout.w > 0 &&
+              (() => {
+                const a0 = northScreenAngle(north, view.rot);
+                const cx = layout.w / 2;
+                const cy = layout.h / 2;
+                /** Le point du BORD du cadre, dans cette direction. */
+                const bord = (a: number, marge: number) => {
+                  const dx = Math.cos(a);
+                  const dy = Math.sin(a);
+                  const t = Math.min(
+                    Math.abs((cx - marge) / (dx || 1e-6)),
+                    Math.abs((cy - marge) / (dy || 1e-6)),
                   );
-                })}
-              </G>
-            )}
+                  return { x: cx + dx * t, y: cy + dy * t };
+                };
+                return (
+                  <G>
+                    {(
+                      [
+                        ['N', 0],
+                        ['E', 90],
+                        ['S', 180],
+                        ['O', 270],
+                      ] as [string, number][]
+                    ).map(([lettre, deg]) => {
+                      const p = bord(a0 + (deg * Math.PI) / 180, 15);
+                      const nord = lettre === 'N';
+                      return (
+                        <G key={lettre}>
+                          <Circle
+                            cx={p.x}
+                            cy={p.y}
+                            r={11}
+                            fill={c.surface}
+                            fillOpacity={0.88}
+                            stroke={nord ? c.danger : c.line}
+                            strokeWidth={nord ? 1.4 : 1}
+                          />
+                          <SvgText
+                            x={p.x}
+                            y={p.y + 4}
+                            fill={nord ? c.danger : c.inkSoft}
+                            fontSize={nord ? 12 : 11}
+                            fontWeight="900"
+                            textAnchor="middle">
+                            {lettre}
+                          </SvgText>
+                        </G>
+                      );
+                    })}
+                    {cap !== null &&
+                      (() => {
+                        // Le cap se compte depuis le nord dans le sens des
+                        // aiguilles : la même convention que la couronne.
+                        const a = a0 + (cap * Math.PI) / 180;
+                        const p = bord(a, 30);
+                        const q = bord(a, 46);
+                        return (
+                          <G>
+                            <Line
+                              x1={q.x}
+                              y1={q.y}
+                              x2={p.x}
+                              y2={p.y}
+                              stroke={c.blue}
+                              strokeWidth={2.4}
+                              strokeLinecap="round"
+                            />
+                            <Circle cx={p.x} cy={p.y} r={3.4} fill={c.blue} />
+                          </G>
+                        );
+                      })()}
+                  </G>
+                );
+              })()}
 
             {/* Dégagements du meuble sélectionné : ce qui le sépare des
                 murs, sur ses quatre côtés. Les cotes LONGENT le meuble —

@@ -31,6 +31,12 @@ RCT_EXTERN_METHOD(readPhoto:(NSString *)path
                   reject:(RCTPromiseRejectBlock)reject)
 @end
 
+@interface RCT_EXTERN_MODULE(RoomScanHeading, NSObject)
+RCT_EXTERN_METHOD(start:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
+RCT_EXTERN_METHOD(stop:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
+RCT_EXTERN_METHOD(heading:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
+@end
+
 @interface RCT_EXTERN_MODULE(RoomScanPreview, NSObject)
 RCT_EXTERN_METHOD(presentUSDZ:(NSString *)path
                   resolve:(RCTPromiseResolveBlock)resolve

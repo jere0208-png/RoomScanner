@@ -680,6 +680,10 @@ export function WallElevation({
             répond mieux qu'une note. */}
         <TouchableOpacity
           style={styles.photo}
+          // La cible déborde le dessin : 36 points se voient bien, 44 se
+          // touchent bien. iOS distingue les deux, et c'est ce qui évite
+          // d'ouvrir la caméra en visant la croix.
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
           onPress={async () => {
             const chemin = await RoomScan.takePhoto();
             if (chemin) {
@@ -722,7 +726,10 @@ export function WallElevation({
             />
           </Svg>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.close} onPress={onClose}>
+        <TouchableOpacity
+          style={styles.close}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          onPress={onClose}>
           <CloseCross size={19} color={c.inkSoft} weight={2.9} />
         </TouchableOpacity>
       </View>
@@ -1244,15 +1251,32 @@ export function WallElevation({
                 </TouchableOpacity>
               </View>
 
-              <View style={styles.ensLigne}>
+              {/*
+                DEUX SÉLECTEURS ET UN BOUTON — à la taille du pouce.
+
+                Tout tenait sur une seule ligne : quatre flèches de 30 × 26
+                points, deux étiquettes de dix points et un « Séparer » sans
+                fond, tassés bord à bord. Apple demande 44 points de côté
+                pour une cible tactile, et ce n'est pas un caprice : en
+                dessous, un doigt sur deux tombe à côté — ici, sur la
+                flèche voisine, qui déplace la prise du mauvais côté.
+
+                On reprend donc la grammaire d'iOS : un sélecteur segmenté
+                par question (de quel côté ? quel axe ?), chacun sur toute
+                la largeur, et l'action destructive isolée en bas, en
+                rouge, comme partout ailleurs dans le système.
+              */}
+              <Text style={styles.ensLabel}>CÔTÉ DU SECOND POSTE</Text>
+              <View style={styles.ensSeg}>
                 {PLATE_SIDES.filter((sd) => dispo.includes(sd.key)).map((sd) => {
                   const actif = fusion.cote === sd.key;
                   return (
                     <TouchableOpacity
                       key={sd.key}
-                      style={[styles.ensCote, actif && styles.ensCoteOn]}
+                      style={[styles.ensSegItem, actif && styles.ensSegItemOn]}
+                      accessibilityLabel={sd.label}
                       onPress={() => appliquer(sd.key, fusion.centre)}>
-                      <Svg width={16} height={16} viewBox="0 0 24 24">
+                      <Svg width={18} height={18} viewBox="0 0 24 24">
                         <Path
                           d={sd.arrow}
                           stroke={actif ? '#FFFFFF' : c.ink}
@@ -1262,34 +1286,61 @@ export function WallElevation({
                           fill="none"
                         />
                       </Svg>
+                      <Text
+                        style={[
+                          styles.ensSegText,
+                          actif && styles.ensSegTextOn,
+                        ]}>
+                        {sd.label}
+                      </Text>
                     </TouchableOpacity>
                   );
                 })}
-                <View style={styles.ensSep} />
-                {[
-                  { on: false, label: '1re fixe' },
-                  { on: true, label: 'Centré' },
-                ].map((opt) => (
-                  <TouchableOpacity
-                    key={opt.label}
-                    style={[
-                      styles.ensAxe,
-                      fusion.centre === opt.on && styles.ensAxeOn,
-                    ]}
-                    onPress={() => appliquer(fusion.cote, opt.on)}>
-                    <Text
-                      style={[
-                        styles.ensAxeText,
-                        fusion.centre === opt.on && styles.ensAxeTextOn,
-                      ]}>
-                      {opt.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-                <TouchableOpacity style={styles.ensSplit} onPress={separer}>
-                  <Text style={styles.ensSplitText}>Séparer</Text>
-                </TouchableOpacity>
               </View>
+
+              <Text style={styles.ensLabel}>AXE DE RÉFÉRENCE</Text>
+              <View style={styles.ensSeg}>
+                {[
+                  {
+                    on: false,
+                    label: 'Première fixe',
+                    hint: 'la première ne bouge pas',
+                  },
+                  {
+                    on: true,
+                    label: 'Centré',
+                    hint: 'la plaque se centre sur son axe',
+                  },
+                ].map((opt) => {
+                  const actif = fusion.centre === opt.on;
+                  return (
+                    <TouchableOpacity
+                      key={opt.label}
+                      style={[styles.ensSegLarge, actif && styles.ensSegItemOn]}
+                      onPress={() => appliquer(fusion.cote, opt.on)}>
+                      <Text
+                        style={[
+                          styles.ensSegText,
+                          actif && styles.ensSegTextOn,
+                        ]}>
+                        {opt.label}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.ensSegHint,
+                          actif && styles.ensSegHintOn,
+                        ]}
+                        numberOfLines={1}>
+                        {opt.hint}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <TouchableOpacity style={styles.ensSplit} onPress={separer}>
+                <Text style={styles.ensSplitText}>Séparer les appareils</Text>
+              </TouchableOpacity>
             </View>
           );
         })()}
@@ -1310,6 +1361,7 @@ export function WallElevation({
             {objectif.poses < objectif.exiges && (
               <TouchableOpacity
                 style={styles.guideFix}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 onPress={() => poser('prise', objectif.surPlan ? 1.1 : undefined)}>
                 <Svg width={17} height={17} viewBox="0 0 24 24">
                   {['M12 5 v14', 'M5 12 h14'].map((d) => (
@@ -1762,37 +1814,61 @@ const getStyles = themedStyles((c: Palette) =>
     ensOk: {
       backgroundColor: c.blue,
       borderRadius: radius.pill,
-      paddingHorizontal: 12,
-      paddingVertical: 4,
+      paddingHorizontal: 18,
+      // 44 points de haut : la cible tactile minimale d'iOS, pas un
+      // arrondi de mise en page.
+      minHeight: 44,
+      justifyContent: 'center',
     },
-    ensOkText: { color: '#FFFFFF', fontSize: 11.5, fontWeight: '800' },
-    ensLigne: {
+    ensOkText: { color: '#FFFFFF', fontSize: 14, fontWeight: '800' },
+    /** Le titre d'un sélecteur, comme les en-têtes de section d'iOS. */
+    ensLabel: {
+      color: c.inkFaint,
+      fontSize: 10,
+      fontWeight: '800',
+      letterSpacing: 0.6,
+      marginTop: 12,
+      marginBottom: 5,
+    },
+    /** Le rail d'un sélecteur segmenté : fond creux, pastilles dedans. */
+    ensSeg: {
       flexDirection: 'row',
-      alignItems: 'center',
-      gap: 5,
-      marginTop: 8,
+      backgroundColor: c.surface,
+      borderRadius: radius.sm,
+      padding: 3,
+      gap: 3,
     },
-    ensCote: {
-      width: 30,
-      height: 26,
+    ensSegItem: {
+      flex: 1,
+      minHeight: 44,
+      borderRadius: radius.sm - 2,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 2,
+    },
+    ensSegLarge: {
+      flex: 1,
+      minHeight: 46,
+      borderRadius: radius.sm - 2,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 6,
+      gap: 1,
+    },
+    ensSegItemOn: { backgroundColor: c.blue },
+    ensSegText: { color: c.ink, fontSize: 11.5, fontWeight: '800' },
+    ensSegTextOn: { color: '#FFFFFF' },
+    ensSegHint: { color: c.inkFaint, fontSize: 9, fontWeight: '700' },
+    ensSegHintOn: { color: '#FFFFFFCC' },
+    ensSplit: {
+      marginTop: 10,
+      minHeight: 44,
       borderRadius: radius.sm,
       backgroundColor: c.surface,
       alignItems: 'center',
       justifyContent: 'center',
     },
-    ensCoteOn: { backgroundColor: c.blue },
-    ensSep: { width: 1, height: 18, backgroundColor: c.line, marginHorizontal: 3 },
-    ensAxe: {
-      borderRadius: radius.sm,
-      backgroundColor: c.surface,
-      paddingHorizontal: 8,
-      paddingVertical: 5,
-    },
-    ensAxeOn: { backgroundColor: c.blue },
-    ensAxeText: { color: c.inkSoft, fontSize: 10.5, fontWeight: '800' },
-    ensAxeTextOn: { color: '#FFFFFF' },
-    ensSplit: { marginLeft: 'auto', paddingHorizontal: 4, paddingVertical: 5 },
-    ensSplitText: { color: c.inkFaint, fontSize: 10.5, fontWeight: '800' },
+    ensSplitText: { color: c.danger, fontSize: 13, fontWeight: '800' },
     fusion: {
       marginTop: 10,
       backgroundColor: c.blueSoft,
