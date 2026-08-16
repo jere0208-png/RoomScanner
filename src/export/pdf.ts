@@ -24,6 +24,7 @@ import {
   type WallSeg,
 } from '../geometry/floorplan';
 import { dotStep, floorDots, mixHex } from '../geometry/appearance';
+import { wallLabel, type DeviceName } from '../geometry/naming';
 import {
   FIXTURES,
   FIXTURE_TAG,
@@ -41,7 +42,6 @@ import {
 } from '../geometry/electrical';
 import type { Differential, MaterialList } from '../geometry/nfc15100';
 import {
-  WIRE_COLORS,
   circuitColor,
   type MultiWireSchema,
   type SchemaRow,
@@ -198,21 +198,11 @@ export interface PdfOptions {
   /** Feuille de métré par pièce (surfaces, périmètres, murs nets). */
   metre?: boolean;
   /**
-   * Le plafond : une feuille d'implantation de plus, avec les liens de
-   * commande. Absente si rien n'est posé au plafond — une feuille vide
-   * dans un dossier, c'est une feuille qu'on tourne en se demandant si on
-   * a raté quelque chose.
+   * Le plafond, posé SUR le plan d'ensemble : points lumineux, détection,
+   * ventilation, leurs cotes aux murs et le lien de commande de chacun.
+   * Vide = le plan reste celui du sol.
    */
   ceiling?: CeilingFixture[];
-  /**
-   * Le cadrage de CETTE feuille-là.
-   *
-   * Elle reprenait celui du plan d'ensemble, ce qui obligeait à choisir :
-   * ou l'appartement entier sur les deux, ou une pièce serrée sur les
-   * deux. Or on ne les regarde pas pour la même raison. À défaut, elle
-   * garde le cadrage du plan — c'est le comportement d'avant.
-   */
-  ceilingPlan?: PlanViewParams;
   /**
    * Les élévations : un mur vu de face par feuille.
    *
@@ -617,6 +607,16 @@ function drawLogo(d: Draw, x: number, y: number, size: number) {
 
 const FRAME = { x: 30, y: 30, w: PAGE_W - 60, h: PAGE_H - 60 };
 /**
+ * LA LIGNE DE TITRE, EN HAUT DE LA FEUILLE.
+ *
+ * Elle se calculait depuis le BAS du cadre, en retirant la hauteur du
+ * cartouche : le titre se posait donc à quatre-vingt-dix points du bord
+ * supérieur, avec un grand vide au-dessus et le dessin collé dessous. Un
+ * plan d'exécution titre en haut à gauche, à une marge du bord — c'est
+ * là que l'œil va chercher de quoi il s'agit.
+ */
+const TETE = FRAME.y + FRAME.h - 30;
+/**
  * LA MARGE D'UN CADRE DE LÉGENDE — la même sur les quatre côtés.
  *
  * Chaque boîte avait ses propres retraits, ajustés à l'œil : le texte se
@@ -1008,6 +1008,22 @@ interface SheetContext {
   showTextures: boolean;
   /** Cheminement des gaines, en coordonnées MONDE (`Pt` est ici la page). */
   routes?: { id: string; path: { x: number; z: number }[] }[];
+  /**
+   * Le PLAFOND, posé sur le plan d'ensemble.
+   *
+   * Il a eu sa feuille à lui pendant un temps, et c'était une erreur : on
+   * ne pose pas un point lumineux sans regarder où tombent les cloisons et
+   * les meubles, donc on lisait les deux feuilles côte à côte, en
+   * reportant les cotes de l'une sur l'autre. Un plan d'électricien porte
+   * le sol ET le plafond — c'est la même pièce.
+   */
+  ceiling?: CeilingFixture[];
+  /**
+   * Le cap du scan : d'où vient le nord, en degrés horaires sur l'axe −Z.
+   * `null` = boussole muette (scan ancien, appareil sans magnétomètre) : on
+   * ne nomme alors aucun mur, plutôt que d'inventer une orientation.
+   */
+  north?: number | null;
 }
 
 /**
@@ -1067,12 +1083,22 @@ function planPage(
   const centerOf = (roomId: string) =>
     partOf.get(roomId)?.labelAt ?? { x: 0, z: 0 };
 
+  /**
+   * LE BANDEAU DU TITRE EST RÉSERVÉ, pas partagé.
+   *
+   * Le titre s'écrivait par-dessus le dessin : sur un logement haut, le
+   * plan montait jusqu'en tête de feuille et le barrait de ses murs —
+   * « Plan d'implantation » rayé par une cloison. Le dessin s'arrête
+   * donc sous le bandeau, et la fenêtre de découpe avec lui : c'est la
+   * seule façon d'en être sûr, puisque le zoom vient de l'utilisateur.
+   */
+  const BANDEAU = 44;
   // Zone de dessin (cotes extérieures comprises)
   const box = {
     x: FRAME.x + 70,
     y: FRAME.y + TITLE_H + 70,
     w: FRAME.w - 140,
-    h: FRAME.h - TITLE_H - 140,
+    h: FRAME.h - TITLE_H - 140 - BANDEAU,
   };
   /**
    * Le plan se dessine SUR LA TRAME DU LOGEMENT, pas dans le repère du scan.
@@ -1113,7 +1139,7 @@ function planPage(
       FRAME.x + 2,
       FRAME.y + TITLE_H + 2,
       FRAME.w - 4,
-      FRAME.h - TITLE_H - 4,
+      FRAME.h - TITLE_H - 4 - BANDEAU,
     );
     const fit = Math.min(
       box.w / Math.max(maxX - minX, 0.5),
@@ -1469,6 +1495,102 @@ function planPage(
         if (tag) d.text(tag, q.x + 13, q.y + 4, 5.5, spec.color, { align: 'left' });
       }
       /**
+       * LE PLAFOND, SUR LE MÊME PLAN.
+       *
+       * Il a eu sa feuille à lui, et c'était une erreur : on ne place pas
+       * un point lumineux sans voir où tombent les cloisons, les meubles
+       * et les commandes murales qui l'allument. On lisait donc les deux
+       * feuilles côte à côte en reportant les cotes de l'une sur
+       * l'autre. Sol et plafond sont la même pièce : un seul plan.
+       */
+      const plafond = ctx.ceiling ?? [];
+      if (plafond.length > 0) {
+        // Les liens d'abord : ils passent SOUS les symboles, jamais dessus.
+        for (const cl of plafond) {
+          for (const fid of cl.commands ?? []) {
+            const f = (ctx.fixtures ?? []).find((x) => x.id === fid);
+            const w = f ? byId.get(f.wallId) : undefined;
+            if (!f || !w) continue;
+            const face = wallFace(w, murQuads.get(w.id), f.side);
+            const depart = facePoint(face, faceX(face, f.along), 0.16);
+            const arrivee = linkAnchor(
+              { x: depart.x, z: depart.z },
+              cl.at,
+              CEILINGS[cl.kind].d * 0.7,
+            );
+            d.dashedPath(
+              linkCurve({ x: depart.x, z: depart.z }, arrivee).map(px),
+              0.7,
+              GREY,
+              [1.6, 3],
+            );
+          }
+        }
+
+        /**
+         * LES COTES DE CHAQUE APPAREIL — sans elles, on ne pose pas.
+         *
+         * Le plan portait les cotes des MURS, et on le croyait complet :
+         * il disait où sont les cloisons, jamais où percer le plafond. Un
+         * point lumineux ne se place pas à l'œil — on tend un mètre
+         * depuis deux murs, et c'est exactement ce que l'écran montre en
+         * pointillés bleus quand on le déplace. Les deux cotes partent
+         * d'équerre AVEC LA TRAME du logement, comme le dessin lui-même.
+         */
+        const cosP = Math.cos(trame);
+        const sinP = Math.sin(trame);
+        const prises: Pt[] = [];
+        const libreIci = (p: Pt) =>
+          prises.every(
+            (q) => Math.abs(q.x - p.x) > 22 || Math.abs(q.y - p.y) > 11,
+          );
+        for (const cl of plafond) {
+          for (const axe of [
+            { x: -cosP, z: -sinP },
+            { x: sinP, z: -cosP },
+          ]) {
+            const dist = castToWall(cl.at, axe, walls);
+            if (dist === null || dist < 0.02) continue;
+            const a = px(cl.at);
+            const b = px({
+              x: cl.at.x + axe.x * dist,
+              z: cl.at.z + axe.z * dist,
+            });
+            if (!dansLeCadre(a) || !dansLeCadre(b)) continue;
+            d.dashedPath([a, b], 0.6, SKY, [2, 3]);
+            const l = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+            const nx = (b.y - a.y) / l;
+            const ny = -(b.x - a.x) / l;
+            d.line(b.x - nx * 3, b.y - ny * 3, b.x + nx * 3, b.y + ny * 3, 0.8, SKY);
+            // L'étiquette glisse vers le mur tant qu'elle en gêne une autre.
+            let t = 0.5;
+            let p = { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+            for (let n = 0; n < 4 && !libreIci(p); n++) {
+              t += 0.16;
+              p = { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+            }
+            prises.push(p);
+            d.rect(p.x - 11, p.y - 5, 22, 10, '#FFFFFF', null);
+            d.text(`${Math.round(dist * 100)}`, p.x, p.y - 2.5, 6.5, SKY, {
+              bold: true,
+            });
+          }
+        }
+
+        // Puis les appareils, à leur diamètre réel, jamais plus petits
+        // que lisibles : un spot de 9 cm ferait deux points au 1:100.
+        for (const cl of plafond) {
+          const spec = CEILINGS[cl.kind];
+          const q = px(cl.at);
+          if (!dansLeCadre(q)) continue;
+          const r = Math.max(7, Math.min(16, (spec.d / 2) * scale));
+          d.circle(q.x, q.y, r + 2, '#FFFFFF');
+          drawSymbol(d, CEILING_SYMBOL[cl.kind], q.x, q.y, r / 9, spec.color, 1.1);
+          d.text(spec.short, q.x, q.y - r - 8, 6.5, spec.color, { bold: true });
+        }
+      }
+
+      /**
        * La légende se pose dans le coin le plus LIBRE, pas toujours à
        * gauche.
        *
@@ -1481,9 +1603,23 @@ function planPage(
       const presents = extra?.hideLegend
         ? []
         : [...new Set(ctx.fixtures.map((f) => f.kind))];
-      if (presents.length > 0) {
-        const lw = 132;
-        const lh = 22 + presents.length * 15;
+      // Ce que porte le plafond : une colonne de plus dans le MÊME cadre.
+      // Deux boîtes cherchant chacune le coin le plus libre finissent l'une
+      // sur l'autre — on l'a vécu sur la feuille du plafond.
+      const vusPlafond = extra?.hideLegend
+        ? []
+        : [...new Set((ctx.ceiling ?? []).map((c) => c.kind))];
+      if (presents.length > 0 || vusPlafond.length > 0) {
+        const deux = presents.length > 0 && vusPlafond.length > 0;
+        const rangs = Math.max(
+          presents.length > 0 ? presents.length + 1 : 0,
+          vusPlafond.length > 0 ? vusPlafond.length + 2 : 0,
+        );
+        const lw = deux ? 300 : vusPlafond.length > 0 ? 154 : 132;
+        const lh =
+          vusPlafond.length > 0
+            ? rangs * CADRE_LIGNE + CADRE_MARGE * 2
+            : 22 + presents.length * 15;
         const marge = 16;
         const gauche = FRAME.x + marge;
         const droite = FRAME.x + FRAME.w - marge - lw;
@@ -1513,7 +1649,33 @@ function planPage(
         const choisi = coins.reduce((meilleur, coin) =>
           gene(coin.x, coin.y) < gene(meilleur.x, meilleur.y) ? coin : meilleur,
         );
-        drawElecLegend(d, presents, choisi.x, choisi.y);
+        if (vusPlafond.length === 0) {
+          drawElecLegend(d, presents, choisi.x, choisi.y);
+        } else {
+          const colonnes: LegendSection[][] = [];
+          if (presents.length > 0) {
+            colonnes.push([
+              {
+                titre: 'APPAREILLAGE',
+                lignes: presents.map((k) => ({
+                  texte: FIXTURES[k].label,
+                  symbole: { paths: assemblySymbol(k), color: FIXTURES[k].color },
+                })),
+              },
+            ]);
+          }
+          colonnes.push([
+            {
+              titre: 'PLAFOND',
+              lignes: vusPlafond.map((k) => ({
+                texte: CEILINGS[k].label,
+                symbole: { paths: CEILING_SYMBOL[k], color: CEILINGS[k].color },
+              })),
+            },
+            { lignes: [{ couleur: GREY, texte: 'Lien de commande' }] },
+          ]);
+          drawLegendBox(d, choisi.x, choisi.y - lh, lw, colonnes);
+        }
       }
     }
 
@@ -1544,22 +1706,79 @@ function planPage(
     d.restore();
   }
 
-  if (extra) {
-    d.text(extra.title, FRAME.x + 24, FRAME.y + FRAME.h - TITLE_H - 24, 13, INK, {
-      bold: true,
-      align: 'left',
-    });
-    if (extra.sub) {
-      d.text(extra.sub, FRAME.x + 24, FRAME.y + FRAME.h - TITLE_H - 38, 8, GREY, {
-        align: 'left',
-      });
+  /**
+   * Et il y a TOUJOURS un titre.
+   *
+   * La première feuille n'en portait pas : le dossier s'ouvrait sur un
+   * dessin sans nom, et il fallait descendre au cartouche pour savoir ce
+   * qu'on regardait. Toutes les autres en ont un ; celle-là aussi
+   * désormais, et le sous-titre dit ce qu'elle contient vraiment.
+   */
+  const titre = extra?.title ?? 'Plan d\u2019ensemble cot\u00e9';
+  const sous =
+    extra?.sub ??
+    (ctx.ceiling && ctx.ceiling.length > 0
+      ? 'Murs, ouvertures et surfaces, avec l\u2019appareillage et le plafond \u2014 ' +
+        'cotes en m\u00e8tres, cotes d\u2019appareil en centim\u00e8tres.'
+      : 'Murs, ouvertures et surfaces relev\u00e9s au scan \u2014 cotes en m\u00e8tres.');
+  d.text(titre, FRAME.x + 24, TETE, 13, INK, {
+    bold: true,
+    align: 'left',
+  });
+  d.text(sous, FRAME.x + 24, TETE - 14, 8, GREY, {
+    align: 'left',
+  });
+
+  /**
+   * LA ROSE DES VENTS — pour dire DE QUEL MUR on parle.
+   *
+   * « Le mur de gauche » ne veut rien dire une fois la feuille retournée,
+   * et un identifiant de mur encore moins. Le nord, lui, se vérifie sur
+   * place avec n'importe quel téléphone : c'est la seule désignation qui
+   * traverse le chantier. Elle est relevée au magnétomètre pendant le
+   * scan, et tourne avec la trame du plan comme le dessin lui-même.
+   */
+  if (ctx.north !== null && ctx.north !== undefined) {
+    const cx = FRAME.x + FRAME.w - 44;
+    const cy = TETE - 12;
+    // Le plan est redressé sur la trame : le nord tourne d'autant.
+    const a0 = ((ctx.north - (planFrameAngle(walls) * 180) / Math.PI) * Math.PI) / 180;
+    const dir = (deg: number) => {
+      const a = a0 + (deg * Math.PI) / 180;
+      return { x: Math.sin(a), y: Math.cos(a) };
+    };
+    d.circle(cx, cy, 17, '#FFFFFF');
+    d.poly(
+      [
+        { x: cx + dir(0).x * 15, y: cy + dir(0).y * 15 },
+        { x: cx + dir(120).x * 5, y: cy + dir(120).y * 5 },
+        { x: cx + dir(240).x * 5, y: cy + dir(240).y * 5 },
+      ],
+      '#C4453B',
+      null,
+    );
+    for (const [lettre, deg] of [
+      ['N', 0],
+      ['E', 90],
+      ['S', 180],
+      ['O', 270],
+    ] as [string, number][]) {
+      const p = dir(deg);
+      d.text(
+        lettre,
+        cx + p.x * 22,
+        cy + p.y * 22 - 2.5,
+        lettre === 'N' ? 7.5 : 6.5,
+        lettre === 'N' ? INK : GREY_LIGHT,
+        { bold: true },
+      );
     }
   }
 
   drawSheetChrome(d, {
     project: name,
     filename,
-    sheetTitle: extra?.title ?? 'Plan d’ensemble coté',
+    sheetTitle: titre,
     sheet,
     scaleLabel,
   });
@@ -1582,7 +1801,7 @@ function metrePage(ctx: SheetContext, sheet: string): string {
   // Colonnes : nom, cotes, sol, périmètre, hauteur, murs nets.
   const cols = [0, 0.28, 0.46, 0.6, 0.73, 0.85].map((f) => x0 + f * w);
   const heads = ['Pièce', 'Cotes (m)', 'Sol (m²)', 'Périm. (m)', 'H. (m)', 'Murs (m²)'];
-  let y = FRAME.y + FRAME.h - TITLE_H - 46;
+  let y = TETE - 22;
 
   d.text('Métré par pièce', x0, y + 24, 13, INK, { bold: true, align: 'left' });
   for (let i = 0; i < heads.length; i++) {
@@ -1672,113 +1891,21 @@ function metrePage(ctx: SheetContext, sheet: string): string {
  * de conducteurs, sa section et sa gaine alignés en colonnes. On en met
  * vingt sans se serrer, et ce qui ne tiendrait pas est ANNONCÉ.
  */
-/**
- * LES ÉTIQUETTES DU TABLEAU, à découper.
- *
- * À la mise en service, il faut étiqueter chaque disjoncteur. On le fait au
- * feutre sur une bande adhésive, dans un tableau mal éclairé, en relisant
- * un plan posé par terre — et c'est la dernière tâche du chantier, celle
- * qu'on bâcle. Six mois plus tard, personne ne sait quel disjoncteur coupe
- * la chambre.
- *
- * Cette feuille les imprime dans l'ORDRE DU TABLEAU, aux dimensions d'un
- * porte-étiquette de rang modulaire, avec les traits de coupe. On découpe,
- * on glisse, c'est fini.
- */
-function labelsPage(
-  ctx: SheetContext,
-  sheet: string,
-  rows: SchemaRow[],
-): string {
-  const d = new Draw();
-  const x0 = FRAME.x + 30;
-  const w = FRAME.w - 60;
-  let y = FRAME.y + FRAME.h - TITLE_H - 46;
-
-  d.text('Étiquettes de tableau', x0, y + 22, 13, INK, {
-    bold: true,
-    align: 'left',
-  });
-  d.text(
-    'Dans l’ordre des modules. À découper sur les traits, à glisser dans ' +
-      'les porte-étiquettes.',
-    x0,
-    y + 8,
-    8,
-    GREY,
-    { align: 'left' },
+/** Repère rond posé sur un tracé : « C1 » dans une pastille blanche. */
+function markerAt(d: Draw, at: Pt, texte: string, couleur: string) {
+  d.circle(at.x, at.y, 7.5, '#FFFFFF');
+  d.poly(
+    [
+      { x: at.x - 7.5, y: at.y },
+      { x: at.x, y: at.y + 7.5 },
+      { x: at.x + 7.5, y: at.y },
+      { x: at.x, y: at.y - 7.5 },
+    ],
+    null,
+    couleur,
+    0.8,
   );
-  y -= 18;
-
-  // Un porte-étiquette de rang fait environ 45 mm de large sur 8 de haut.
-  const LARG = (45 / 25.4) * 72;
-  const HAUT = (9 / 25.4) * 72;
-  const COLS = Math.max(1, Math.floor(w / (LARG + 12)));
-  const PAS_X = LARG + 12;
-  const PAS_Y = HAUT + 10;
-  const BAS = FRAME.y + TITLE_H + 40;
-
-  let i = 0;
-  let restants = 0;
-  for (const r of rows) {
-    const col = i % COLS;
-    const rang = Math.floor(i / COLS);
-    const ex = x0 + col * PAS_X;
-    const ey = y - rang * PAS_Y;
-    if (ey - HAUT < BAS) {
-      restants += 1;
-      i += 1;
-      continue;
-    }
-    // Le cadre de coupe : tireté, parce qu'on découpe dessus.
-    d.dashedPath(
-      [
-        { x: ex, y: ey },
-        { x: ex + LARG, y: ey },
-        { x: ex + LARG, y: ey - HAUT },
-        { x: ex, y: ey - HAUT },
-        { x: ex, y: ey },
-      ],
-      0.5,
-      '#B9C2CE',
-      [2, 2],
-    );
-    // Le repère, en gras à gauche : c'est ce qu'on lit en premier.
-    d.text(r.mark, ex + 6, ey - HAUT + 3, 7.5, INK, {
-      align: 'left',
-      bold: true,
-    });
-    // Le libellé, tronqué à la place réelle : une étiquette qui déborde ne
-    // rentre pas dans son porte-étiquette.
-    d.text(fitText(r.label, 7, LARG - 58), ex + 24, ey - HAUT + 3, 7, INK, {
-      align: 'left',
-    });
-    const calibre = r.breaker === null ? 'com.' : `${r.breaker} A`;
-    d.text(calibre, ex + LARG - 5, ey - HAUT + 3, 7, GREY, { align: 'right' });
-    i += 1;
-  }
-
-  if (restants > 0) {
-    const bas = y - Math.ceil(i / COLS) * PAS_Y;
-    d.text(
-      `${restants} étiquette${restants > 1 ? 's' : ''} de plus — la feuille ` +
-        'est pleine.',
-      x0,
-      Math.max(BAS + 4, bas),
-      7.5,
-      GREY,
-      { align: 'left' },
-    );
-  }
-
-  drawSheetChrome(d, {
-    project: ctx.name,
-    filename: ctx.filename,
-    sheetTitle: 'Étiquettes de tableau',
-    sheet,
-    scaleLabel: null,
-  });
-  return d.stream();
+  d.text(texte, at.x, at.y - 2.6, 6.5, couleur, { bold: true });
 }
 
 function unifilairePage(
@@ -1786,11 +1913,21 @@ function unifilairePage(
   sheet: string,
   rows: SchemaRow[],
   diffs: Differential[],
+  /**
+   * CE QUE CHAQUE DÉPART DESSERT, NOMMÉ.
+   *
+   * « Prises 1 · C3 » ne se lit qu'avec le plan à côté et un doigt
+   * dessus. Un vrai schéma nomme : « Séjour, mur nord — Prise plinthe 1,
+   * Prise plinthe 2 ». Trois informations, et on trouve l'appareil sans
+   * rien ouvrir d'autre. Vide (pas de boussole, pas de pièces nommées) :
+   * on retombe sur le résumé d'avant.
+   */
+  detail?: Map<string, string>,
 ): string {
   const d = new Draw();
   const x0 = FRAME.x + 30;
   const w = FRAME.w - 60;
-  let y = FRAME.y + FRAME.h - TITLE_H - 46;
+  let y = TETE - 22;
 
   d.text('Schéma unifilaire', x0, y + 22, 13, INK, { bold: true, align: 'left' });
   d.text(
@@ -1881,8 +2018,9 @@ function unifilairePage(
     d.text(fitText(r.label, 8, largeurNom), NOM, cy - 3, 8, INK, {
       align: 'left',
     });
-    if (r.points) {
-      d.text(fitText(r.points, 6.5, largeurNom), NOM, cy - 12, 6.5, GREY_LIGHT, {
+    const dessert = detail?.get(r.mark) || r.points;
+    if (dessert) {
+      d.text(fitText(dessert, 6.5, largeurNom), NOM, cy - 12, 6.5, GREY_LIGHT, {
         align: 'left',
       });
     }
@@ -1977,372 +2115,6 @@ function unifilairePage(
  * Tout est borné par la fenêtre de découpe du plan (`d.clip`) : rien ne peut
  * sortir du cadre, quel que soit le zoom demandé.
  */
-/** Repère rond posé sur un tracé : « C1 » dans une pastille blanche. */
-function markerAt(d: Draw, at: Pt, texte: string, couleur: string) {
-  d.circle(at.x, at.y, 7.5, '#FFFFFF');
-  d.poly(
-    [
-      { x: at.x - 7.5, y: at.y },
-      { x: at.x, y: at.y + 7.5 },
-      { x: at.x + 7.5, y: at.y },
-      { x: at.x, y: at.y - 7.5 },
-    ],
-    null,
-    couleur,
-    0.8,
-  );
-  d.text(texte, at.x, at.y - 2.6, 6.5, couleur, { bold: true });
-}
-
-function schemaPlanPage(
-  ctx: SheetContext,
-  sheet: string,
-  planView: PlanViewParams | undefined,
-  rows: SchemaRow[],
-  routes: { id: string; path: { x: number; z: number }[] }[],
-  fixtureCircuit: Map<string, string>,
-  mode: 'uni' | 'multi',
-  multi: MultiWireSchema[],
-): string {
-  const parMarque = new Map(rows.map((r) => [r.mark, r]));
-  const filsDe = new Map(multi.map((m) => [m.mark, m.wires]));
-
-  const overlay: PlanOverlay = (d, px, scale, box) => {
-    for (const r of routes) {
-      const mark = fixtureCircuit.get(r.id);
-      if (!mark) continue;
-      const idx = rows.findIndex((x) => x.mark === mark);
-      const couleur = circuitColor(idx < 0 ? 0 : idx);
-      const pts = r.path.map(px);
-      if (pts.length < 2) continue;
-
-      if (mode === 'uni') {
-        /**
-         * CHAQUE CIRCUIT SUR SA VOIE, ici aussi.
-         *
-         * Les faisceaux du multifilaire avaient reçu leur écartement, pas
-         * les traits de l'unifilaire : deux départs longeant le même mur se
-         * posaient l'un sur l'autre. On voyait alors un trait rouge faire
-         * le tour de la pièce et frôler des prises qu'il ne dessert pas,
-         * pendant que le bleu qui les alimente disparaissait dessous. Un
-         * professionnel ne peut rien faire d'un plan pareil.
-         */
-        const voie = (idx - (rows.length - 1) / 2) * Math.max(2, scale * 0.03);
-        const ecarte = pts.map((q, i2) => {
-          const prev = pts[Math.max(0, i2 - 1)];
-          const next = pts[Math.min(pts.length - 1, i2 + 1)];
-          const dx2 = next.x - prev.x;
-          const dy2 = next.y - prev.y;
-          const l2 = Math.hypot(dx2, dy2) || 1;
-          return { x: q.x - (dy2 / l2) * voie, y: q.y + (dx2 / l2) * voie };
-        });
-        d.path(ecarte, 1.4, couleur);
-        /**
-         * LE POINT DE RACCORDEMENT.
-         *
-         * Sans lui, le trait PASSE près de l'appareil sans qu'on sache s'il
-         * s'y arrête ou s'il continue vers un autre. Une pastille pleine à
-         * l'arrivée, et la question ne se pose plus : ce trait-là finit
-         * ici, sur cet appareil.
-         */
-        const fin = ecarte[ecarte.length - 1];
-        d.circle(fin.x, fin.y, 2.6, couleur);
-        const a = pts[0];
-        const b = pts[1];
-        const dx = b.x - a.x;
-        const dy = b.y - a.y;
-        const l = Math.hypot(dx, dy) || 1;
-        const m = { x: a.x + (dx / l) * 16, y: a.y + (dy / l) * 16 };
-        const n = { x: -dy / l, y: dx / l };
-        d.line(
-          m.x - n.x * 4 - (dx / l) * 3,
-          m.y - n.y * 4 - (dy / l) * 3,
-          m.x + n.x * 4 + (dx / l) * 3,
-          m.y + n.y * 4 + (dy / l) * 3,
-          0.9,
-          couleur,
-        );
-        const nb = parMarque.get(mark)?.wires ?? 3;
-        d.text(`${nb}`, m.x + n.x * 8, m.y + n.y * 8 - 2, 6, couleur, {
-          bold: true,
-        });
-      } else {
-        // MULTIFILAIRE : un trait par conducteur, décalé de sa voisine, à
-        // sa couleur normalisée. L'écartement suit l'échelle du plan pour
-        // rester lisible sans jamais devenir un ruban.
-        const fils = filsDe.get(mark) ?? [];
-        const pas = Math.max(1.1, Math.min(2.2, scale * 0.02));
-        /**
-         * CHAQUE CIRCUIT SUR SA VOIE.
-         *
-         * Les conducteurs d'un même départ s'écartaient bien les uns des
-         * autres, mais deux départs qui longent le même mur se posaient au
-         * même endroit : six traits par-dessus six autres, et plus personne
-         * ne sait lequel va où. On décale donc le faisceau entier, circuit
-         * par circuit, comme des câbles voisins dans une même goulotte.
-         */
-        const voie =
-          (idx - (rows.length - 1) / 2) * (fils.length + 1.2) * pas;
-        fils.forEach((fil, k) => {
-          const dec = voie + (k - (fils.length - 1) / 2) * pas;
-          const decale = pts.map((q, i) => {
-            const prev = pts[Math.max(0, i - 1)];
-            const next = pts[Math.min(pts.length - 1, i + 1)];
-            const dx2 = next.x - prev.x;
-            const dy2 = next.y - prev.y;
-            const l2 = Math.hypot(dx2, dy2) || 1;
-            return { x: q.x - (dy2 / l2) * dec, y: q.y + (dx2 / l2) * dec };
-          });
-          d.path(decale, 0.7, fil.color);
-        });
-      }
-
-      /**
-       * LE REPÈRE SUR CHAQUE APPAREIL, décalé pour ne rien recouvrir.
-       *
-       * Le plan montre les appareils à la couleur de LEUR TYPE — orange
-       * pour une prise, violet pour une RJ45 — et les circuits à la
-       * couleur du DÉPART. Rien ne reliait les deux : on voyait des prises
-       * orange et un trait bleu sans pouvoir dire lesquelles il alimente.
-       * Le repère, posé sur l'appareil à la teinte de son circuit, fait ce
-       * lien en un coup d'œil.
-       */
-      const bout = pts[pts.length - 1];
-      const avant = pts[Math.max(0, pts.length - 2)];
-      const dxb = bout.x - avant.x;
-      const dyb = bout.y - avant.y;
-      const lb = Math.hypot(dxb, dyb) || 1;
-      markerAt(
-        d,
-        { x: bout.x + (dxb / lb) * 11, y: bout.y + (dyb / lb) * 11 },
-        mark,
-        couleur,
-      );
-    }
-
-    /**
-     * UNE SEULE LÉGENDE, et elle dit tout.
-     *
-     * Il y en avait deux : celle des appareils, qui cherchait le coin le
-     * plus libre, et celle des conducteurs, clouée en bas à gauche. Elles
-     * se retrouvaient l'une sur l'autre — deux cadres blancs superposés,
-     * dont on ne lisait ni l'un ni l'autre. Sur une feuille de schéma, le
-     * dessinateur n'en met qu'une : les départs, puis les couleurs.
-     */
-    // Ce que chaque départ DESSERT : sans ça, la légende nomme des
-    // circuits sans dire ce qu'on trouve au bout.
-    const departs: LegendLine[] = rows.map((r, i) => ({
-      couleur: circuitColor(i),
-      texte:
-        `${r.mark} · ${r.label}${r.breaker === null ? '' : ` · ${r.breaker} A`}` +
-        (r.points ? ` · ${r.points}` : ''),
-    }));
-    const fils: LegendLine[] =
-      mode === 'multi'
-        ? (['phase', 'neutre', 'terre', 'navette', 'retour'] as const).map(
-            (r) => ({
-              couleur: WIRE_COLORS[r].color,
-              texte: WIRE_COLORS[r].label,
-            }),
-          )
-        : [];
-    // Une seule boîte, deux sections, et des marges égales partout.
-    drawLegendBox(d, box.x + 8, box.y + 8, 152, [
-      [
-        { titre: 'DÉPARTS', lignes: departs },
-        ...(fils.length > 0 ? [{ titre: 'CONDUCTEURS', lignes: fils }] : []),
-      ],
-    ]);
-  };
-
-  const titre =
-    mode === 'uni' ? 'Unifilaire sur plan' : 'Multifilaire sur plan';
-  const sous =
-    mode === 'uni'
-      ? 'Un trait par circuit, du tableau à ses appareils. Calibres et ' +
-        'sections selon NF C 15-100.'
-      : 'Un trait par conducteur, à sa couleur normalisée (NF C 15-100).';
-  return planPage(ctx, sheet, planView, false, {
-    title: titre,
-    sub: sous,
-    overlay,
-    hideLegend: true,
-  });
-}
-
-/**
- * LA FEUILLE D'IMPLANTATION — celle qu'on donne à l'équipe.
- *
- * Le plan coté dit où sont les murs, la liste dit ce qu'il faut acheter ;
- * aucun des deux ne dit QUEL INTERRUPTEUR ALLUME QUOI. C'est pourtant la
- * seule question qu'on se pose une fois les gaines tirées, et celle qui
- * coûte une matinée quand personne n'y a répondu par écrit.
- *
- * Cette feuille porte donc les appareils de plafond à leur place, les
- * commandes murales, et le trait pointillé courbe qui va de l'une à
- * l'autre — courbe, pour qu'on ne le confonde ni avec une cote ni avec un
- * cheminement de gaine. Les cotes du plan restent : on pose un point
- * lumineux au mètre près, pas à l'œil.
- */
-function ceilingPage(
-  ctx: SheetContext,
-  sheet: string,
-  planView: PlanViewParams | undefined,
-  ceiling: CeilingFixture[],
-): string {
-  const quads = wallQuads(ctx.walls);
-  const murs = new Map(ctx.walls.map((w) => [w.id, w]));
-
-  const overlay: PlanOverlay = (d, px, scale, box) => {
-    // Les liens d'abord : ils passent SOUS les symboles, jamais dessus.
-    for (const cl of ceiling) {
-      for (const fid of cl.commands ?? []) {
-        const f = (ctx.fixtures ?? []).find((x) => x.id === fid);
-        const w = f ? murs.get(f.wallId) : undefined;
-        if (!f || !w) continue;
-        const face = wallFace(w, quads.get(w.id), f.side);
-        const depart = facePoint(face, faceX(face, f.along), 0.16);
-        const arrivee = linkAnchor(
-          { x: depart.x, z: depart.z },
-          cl.at,
-          CEILINGS[cl.kind].d * 0.7,
-        );
-        const courbe = linkCurve({ x: depart.x, z: depart.z }, arrivee).map(px);
-        d.dashedPath(courbe, 0.7, GREY, [1.6, 3]);
-      }
-    }
-
-    /**
-     * LES COTES DE CHAQUE APPAREIL — sans elles, la feuille ne se pose pas.
-     *
-     * Le plan portait les cotes des MURS, et on croyait la feuille
-     * complète : elle disait où sont les cloisons, jamais où percer le
-     * plafond. Or un point lumineux ne se place pas à l'œil — on tend un
-     * mètre depuis deux murs qui se coupent, et c'est exactement ce qu'on
-     * lit à l'écran en déplaçant l'appareil, en pointillés bleus.
-     *
-     * Les deux cotes partent donc d'équerre AVEC LA TRAME du logement, et
-     * non avec les axes du monde : ARKit oriente son repère selon
-     * l'endroit où le relevé a commencé, et un scan de biais est le cas
-     * normal. Ce sont les mêmes valeurs qu'à l'écran, au centimètre près.
-     */
-    const trame = planFrameAngle(ctx.walls);
-    const cos = Math.cos(trame);
-    const sin = Math.sin(trame);
-    const AXES = [
-      { x: -cos, z: -sin },
-      { x: sin, z: -cos },
-    ];
-    // Les étiquettes déjà posées : deux nombres l'un sur l'autre ne se
-    // lisent ni l'un ni l'autre, et une cote illisible ne vaut rien.
-    const prises: { x: number; y: number }[] = [];
-    const libre = (p: { x: number; y: number }) =>
-      prises.every((q) => Math.abs(q.x - p.x) > 22 || Math.abs(q.y - p.y) > 11);
-    for (const cl of ceiling) {
-      for (const axe of AXES) {
-        const dist = castToWall(cl.at, axe, ctx.walls);
-        if (dist === null || dist < 0.02) continue;
-        const bout = {
-          x: cl.at.x + axe.x * dist,
-          z: cl.at.z + axe.z * dist,
-        };
-        const a = px(cl.at);
-        const b = px(bout);
-        d.dashedPath([a, b], 0.6, SKY, [2, 3]);
-        // Le repère au pied de la cote : on voit sur quel mur elle bute.
-        const nx = (b.y - a.y) / (Math.hypot(b.x - a.x, b.y - a.y) || 1);
-        const ny = -(b.x - a.x) / (Math.hypot(b.x - a.x, b.y - a.y) || 1);
-        d.line(b.x - nx * 3, b.y - ny * 3, b.x + nx * 3, b.y + ny * 3, 0.8, SKY);
-        // L'étiquette glisse vers le mur tant qu'elle en gêne une autre.
-        let t = 0.5;
-        let p = { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
-        for (let n = 0; n < 4 && !libre(p); n++) {
-          t += 0.16;
-          p = { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
-        }
-        prises.push(p);
-        d.rect(p.x - 11, p.y - 5, 22, 10, '#FFFFFF', null);
-        d.text(`${Math.round(dist * 100)}`, p.x, p.y - 2.5, 6.5, SKY, {
-          bold: true,
-        });
-      }
-    }
-
-    // Puis les appareils, à leur diamètre réel, jamais plus petits que
-    // lisibles : un spot de 9 cm ferait deux points à l'échelle 1:100.
-    for (const cl of ceiling) {
-      const spec = CEILINGS[cl.kind];
-      const q = px(cl.at);
-      const r = Math.max(7, Math.min(16, (spec.d / 2) * scale));
-      d.circle(q.x, q.y, r + 2, '#FFFFFF');
-      drawSymbol(d, CEILING_SYMBOL[cl.kind], q.x, q.y, r / 9, spec.color, 1.1);
-      d.text(spec.short, q.x, q.y - r - 8, 6.5, spec.color, { bold: true });
-    }
-
-    /**
-     * LA LÉGENDE, EN UN SEUL CADRE À DEUX COLONNES.
-     *
-     * Cette feuille en portait deux : celle de l'appareillage, que la page
-     * de plan pose dans le coin qu'elle juge le plus libre, et celle du
-     * plafond, clouée en bas à gauche. Elles se recouvraient, et on ne
-     * lisait plus ni l'une ni l'autre. Un plan n'a qu'une légende : on
-     * demande donc à la page de ne pas dessiner la sienne
-     * (`hideLegend`), et on réunit tout ici — les commandes murales à
-     * gauche, ce qu'elles allument à droite. C'est aussi l'ordre dans
-     * lequel on lit le plan.
-     */
-    const vus = [...new Set(ceiling.map((c) => c.kind))];
-    if (vus.length === 0) return;
-    // On ne montre au mur que ce qui commande : sur une feuille de
-    // plafond, une prise de courant n'apprend rien.
-    const commandes = [
-      ...new Set(
-        (ctx.fixtures ?? [])
-          .filter((f) => ceiling.some((c) => (c.commands ?? []).includes(f.id)))
-          .map((f) => f.kind),
-      ),
-    ];
-    const colGauche: LegendSection[] = [
-      {
-        titre: 'COMMANDES',
-        lignes: commandes.map((k) => ({
-          texte: FIXTURES[k].label,
-          symbole: { paths: assemblySymbol(k), color: FIXTURES[k].color },
-        })),
-      },
-    ];
-    const colDroite: LegendSection[] = [
-      {
-        titre: 'PLAFOND',
-        lignes: vus.map((k) => ({
-          texte: CEILINGS[k].label,
-          symbole: { paths: CEILING_SYMBOL[k], color: CEILINGS[k].color },
-        })),
-      },
-      { lignes: [{ couleur: GREY, texte: 'Lien de commande' }] },
-    ];
-    const colonnes =
-      commandes.length > 0 ? [colGauche, colDroite] : [colDroite];
-    drawLegendBox(
-      d,
-      box.x + 8,
-      box.y + 8,
-      colonnes.length > 1 ? 300 : 154,
-      colonnes,
-    );
-  };
-
-  return planPage(ctx, sheet, planView, true, {
-    title: 'Plan d\u2019implantation — plafond',
-    sub:
-      'Points lumineux, détection et ventilation, avec le lien de commande ' +
-      'de chaque appareil. Cotes du plan d’ensemble.',
-    overlay,
-    // La légende de l'appareillage est reprise dans le cadre ci-dessus.
-    hideLegend: true,
-  });
-}
-
 /**
  * L'ÉLÉVATION D'UN MUR — la feuille qu'on tient devant le mur.
  *
@@ -2370,11 +2142,21 @@ function elevationPage(
   const H = wall.height;
   const mine = (ctx.fixtures ?? []).filter((f) => f.wallId === wall.id);
   const piece = ctx.roomNames[roomOf(wall) ?? ''] ?? '';
+  /**
+   * DE QUEL MUR S'AGIT-IL ? Celui du nord, celui de l'est.
+   *
+   * « Élévation — Chambre » sur quatre feuilles d'affilée ne dit pas
+   * laquelle on tient. L'orientation, elle, se vérifie sur place.
+   */
+  const centre = roomParts(ctx.walls, ctx.rooms).find(
+    (p) => p.roomId === roomOf(wall),
+  )?.labelAt;
+  const cardinal = centre ? wallLabel(wall, centre, ctx.north ?? null) : null;
 
   // ------------------------------------------------------------- cadre
-  const hautTitre = FRAME.y + FRAME.h - TITLE_H - 40;
+  const hautTitre = TETE;
   d.text(
-    `Élévation — ${piece || 'mur'}`,
+    `Élévation — ${piece || 'mur'}${cardinal ? `, ${cardinal}` : ''}`,
     FRAME.x + 30,
     hautTitre,
     13,
@@ -2396,11 +2178,14 @@ function elevationPage(
   // La photo prend le bas de la feuille ; sans elle, le dessin descend.
   const BAS = FRAME.y + TITLE_H + 34;
   const hautPhoto = photo ? BAS + 190 : BAS;
+  // Le dessin s'arrête SOUS le sous-titre, cote de longueur comprise : la
+  // cote du haut dépasse le mur de 22 points, et c'est elle qui venait
+  // barrer la ligne « Mur de 2,32 m sous 2,51 m ».
   const zone = {
     x: FRAME.x + 52,
     y: hautPhoto + 46,
     w: FRAME.w - 104,
-    h: hautTitre - 40 - (hautPhoto + 46),
+    h: hautTitre - 62 - (hautPhoto + 46),
   };
   const scale = Math.min(zone.w / face.len, zone.h / H);
   const x0 = zone.x + (zone.w - face.len * scale) / 2;
@@ -2531,61 +2316,113 @@ function elevationPage(
   );
 
   // ------------------------------------------------------- l'appareillage
-  /**
-   * Les cotes du bas, sur DEUX RANGS.
-   *
-   * Deux appareils voisins — une prise et sa commande à quarante
-   * centimètres — écrivent leurs nombres l'un sur l'autre à l'échelle
-   * d'une feuille. On alterne donc les rangs dès qu'ils se touchent :
-   * c'est ce que fait un dessinateur, et ça se lit sans effort.
-   */
   const poses = mine
     .filter((f) => f.side === side)
     .map((f) => ({ f, x: faceX(face, f.along) }))
     .sort((a, b) => a.x - b.x);
-  let dernier = -Infinity;
-  let rang = 0;
+
+  /**
+   * LES DISQUES D'ABORD, LES SYMBOLES ENSUITE.
+   *
+   * Chaque appareil se pose sur un disque blanc pour rester lisible sur une
+   * baie. Dessinés appareil par appareil, le disque du second effaçait le
+   * symbole du premier : une RJ45 à 3 cm d'une prise, et il ne restait
+   * qu'une moitié de dessin. En deux passes, un disque ne peut plus rien
+   * recouvrir d'autre que le mur.
+   */
+  const serre = (x: number, y: number) =>
+    poses.some(
+      (o) =>
+        (o.x !== x || o.f.height !== y) &&
+        Math.hypot((o.x - x) * scale, (o.f.height - y) * scale) < 18,
+    );
+  for (const { f, x } of poses) {
+    d.circle(px(x), py(f.height), serre(x, f.height) ? 6 : 9, '#FFFFFF');
+  }
   for (const { f, x } of poses) {
     const spec = FIXTURES[f.kind];
-    // Le symbole, sur un disque blanc pour rester lisible sur une baie.
-    d.circle(px(x), py(f.height), 9, '#FFFFFF');
     drawSymbol(d, assemblySymbol(f.kind), px(x), py(f.height), 0.62, spec.color, 1);
     const tag = FIXTURE_TAG[f.kind];
-    if (tag) {
+    if (!tag) continue;
+    // Le sigle va à droite s'il y a la place, au-dessus sinon : à droite
+    // d'une prise serrée contre sa voisine, il tombait sur elle.
+    const place = !poses.some(
+      (o) => o.x > x && (o.x - x) * scale < 34 && Math.abs(o.f.height - f.height) * scale < 16,
+    );
+    if (place) {
       d.text(tag, px(x) + 12, py(f.height) + 4, 6, spec.color, { align: 'left' });
+    } else {
+      d.text(tag, px(x), py(f.height) + 14, 6, spec.color);
     }
-    // Sa hauteur, à gauche du symbole, sur un trait de rappel.
+  }
+
+  /**
+   * LES HAUTEURS, à gauche, sur autant de colonnes qu'il faut.
+   *
+   * Deux appareils à 22 et 25 cm écrivaient leurs nombres au même
+   * endroit : on lisait « 25 » par-dessus un « 22 » à moitié effacé.
+   * Quand deux cotes se touchent, la seconde recule d'une colonne.
+   */
+  const parHauteur = [...poses].sort((a, b) => a.f.height - b.f.height);
+  let hPrec = -Infinity;
+  let colonne = 0;
+  for (const { f, x } of parHauteur) {
+    const y = py(f.height);
+    colonne = y - hPrec < 12 ? colonne + 1 : 0;
+    if (colonne > 2) colonne = 0;
+    hPrec = y;
+    const lx = px(0) - 22 - colonne * 26;
     d.dashedPath(
       [
-        { x: px(0) - 8, y: py(f.height) },
-        { x: px(x) - 10, y: py(f.height) },
+        { x: lx + 11, y },
+        { x: px(x) - 10, y },
       ],
       0.5,
       '#B9C2CE',
       [2, 3],
     );
-    d.circle(px(0) - 22, py(f.height), 9, '#FFFFFF');
-    d.text(`${Math.round(f.height * 100)}`, px(0) - 22, py(f.height) - 2.5, 7, INK, {
-      bold: true,
-    });
-    // Sa distance au bord gauche, en bas.
-    rang = x * scale - dernier < 46 ? 1 - rang : 0;
-    dernier = x * scale;
-    const yb = py(0) - 16 - rang * 15;
+    d.circle(lx, y, 9, '#FFFFFF');
+    d.text(`${Math.round(f.height * 100)}`, lx, y - 2.5, 7, INK, { bold: true });
+  }
+
+  /**
+   * LA CHAÎNE DE COTES DU BAS — des segments, pas des rayons.
+   *
+   * Chaque appareil traçait sa distance depuis le bord gauche : quatre
+   * appareils, quatre traits partant du même point, empilés sur deux rangs
+   * et se traversant l'un l'autre — le nombre d'un trait tombait sur le
+   * trait du suivant. Un dessinateur cote AUTREMENT : bord → premier
+   * appareil → suivant → … → bord. C'est aussi ce qu'on fait au mètre, et
+   * plus rien ne se croise.
+   */
+  const yb = py(0) - 20;
+  const bornes = [0, ...poses.map((p) => p.x), face.len];
+  for (const { x } of poses) {
     d.dashedPath(
       [
-        { x: px(x), y: py(f.height) - 10 },
-        { x: px(x), y: yb + 6 },
+        { x: px(x), y: py(0) },
+        { x: px(x), y: yb + 5 },
       ],
       0.5,
       '#B9C2CE',
       [2, 3],
     );
-    d.line(px(0), yb, px(x), yb, 0.6, GREY);
-    d.line(px(0), yb - 3, px(0), yb + 3, 1, GREY);
-    d.line(px(x), yb - 3, px(x), yb + 3, 1, GREY);
-    d.circle(px(x / 2), yb, 9, '#FFFFFF');
-    d.text(`${Math.round(x * 100)}`, px(x / 2), yb - 2.5, 7, GREY, { bold: true });
+  }
+  d.line(px(0), yb, px(face.len), yb, 0.6, GREY);
+  for (const b of bornes) d.line(px(b), yb - 4, px(b), yb + 4, 1, GREY);
+  let etage = 0;
+  for (let i = 0; i < bornes.length - 1; i++) {
+    const larg = bornes[i + 1] - bornes[i];
+    if (larg < 0.02) continue;
+    const m = (bornes[i] + bornes[i + 1]) / 2;
+    // Un segment trop étroit pour son nombre l'écrit un cran plus bas,
+    // avec un trait de rappel : mieux vaut décaler que superposer.
+    const tient = larg * scale > 26;
+    etage = tient ? 0 : etage === 0 ? 1 : 0;
+    const yv = yb - etage * 13;
+    if (!tient) d.line(px(m), yb - 3, px(m), yv + 4, 0.5, '#B9C2CE');
+    d.circle(px(m), yv, 9, '#FFFFFF');
+    d.text(`${Math.round(larg * 100)}`, px(m), yv - 2.5, 7, GREY, { bold: true });
   }
 
   if (poses.length === 0) {
@@ -2621,7 +2458,7 @@ function elevationPage(
   drawSheetChrome(d, {
     project: ctx.name,
     filename: ctx.filename,
-    sheetTitle: `Élévation — ${piece || 'mur'}`,
+    sheetTitle: `Élévation — ${piece || 'mur'}${cardinal ? `, ${cardinal}` : ''}`,
     sheet,
     // Un mètre vaut 2834,6 points à l'échelle 1:1 (72 pt par pouce).
     scaleLabel: `1:${Math.round(2834.6 / Math.max(scale, 1e-6))}`,
@@ -2709,6 +2546,13 @@ export interface ScanForPdf {
   fixtures?: Fixture[];
   /** Cheminement des gaines, du tableau à chaque appareil (repère monde). */
   routes?: { id: string; path: { x: number; z: number }[] }[];
+  /** Cap du scan, pour nommer les murs par leur orientation. */
+  north?: number | null;
+  /**
+   * Le nom de chaque appareil : « Prise plinthe 2 », sa pièce, son mur.
+   * Calculé par l'écran d'export, qui connaît le placement et la boussole.
+   */
+  deviceNames?: Map<string, DeviceName>;
   /**
    * Les photos de repérage, une par mur au plus, en JPEG base64.
    *
@@ -2900,7 +2744,7 @@ export function buildMaterialPdf(
 ): Uint8Array {
   const x0 = FRAME.x + 24;
   const w = FRAME.w - 48;
-  const TOP = FRAME.y + FRAME.h - TITLE_H - 40;
+  const TOP = TETE - 22;
   const BOTTOM = FRAME.y + 54;
 
   const pages: Draw[] = [];
@@ -3217,6 +3061,40 @@ export function pdfFilename(name: string): string {
  * De quoi ordonner les murs avant même d'avoir monté le contexte complet :
  * la pagination doit être connue dès la première feuille.
  */
+/**
+ * Ce que chaque circuit dessert, en clair et nommé.
+ *
+ * Les noms viennent de l'écran d'export, qui seul connaît le placement des
+ * appareils dans les pièces et le cap de la boussole. On les regroupe ici
+ * par circuit — le repère C1, C2… que porte déjà le plan — en gardant
+ * l'ordre du tableau, et groupés par pièce : c'est ainsi qu'on relit un
+ * départ, pièce par pièce.
+ */
+function detailDesDeparts(
+  scan: ScanForPdf,
+  marks: Map<string, string>,
+  rows: SchemaRow[],
+): Map<string, string> {
+  const noms = scan.deviceNames;
+  const out = new Map<string, string>();
+  if (!noms || noms.size === 0) return out;
+  for (const r of rows) {
+    const parPiece = new Map<string, string[]>();
+    for (const f of scan.fixtures ?? []) {
+      if (marks.get(f.id) !== r.mark) continue;
+      const n = noms.get(f.id);
+      if (!n) continue;
+      const ou = [n.piece, n.mur].filter(Boolean).join(', ');
+      parPiece.set(ou, [...(parPiece.get(ou) ?? []), n.nom]);
+    }
+    const morceaux = [...parPiece.entries()].map(([ou, liste]) =>
+      ou ? `${ou} \u2014 ${liste.join(', ')}` : liste.join(', '),
+    );
+    if (morceaux.length > 0) out.set(r.mark, morceaux.join(' \u00b7 '));
+  }
+  return out;
+}
+
 function ctxTemporaire(scan: ScanForPdf): SheetContext {
   return {
     name: scan.name,
@@ -3228,6 +3106,7 @@ function ctxTemporaire(scan: ScanForPdf): SheetContext {
     roomNames: scan.roomNames ?? {},
     rooms: scan.rooms,
     fixtures: scan.fixtures ?? [],
+    north: scan.north ?? null,
     colorOpenings: false,
     showSurfaces: false,
     showTextures: false,
@@ -3244,7 +3123,7 @@ export function buildScanPdf(
   // Les schémas ne s'impriment que s'il y a une installation à montrer.
   const schemas = opts.schemas ?? null;
   const withSchema = !!schemas && schemas.rows.length > 0;
-  const withCeiling = (opts.ceiling?.length ?? 0) > 0;
+
   const murs = opts.elevations ? elevationWalls(ctxTemporaire(scan)) : [];
   /**
    * Les photos, prêtes à être posées : une par mur, la dernière prise.
@@ -3268,9 +3147,8 @@ export function buildScanPdf(
     1 +
     (withMetre ? 1 : 0) +
     (include3D ? 1 : 0) +
-    (withCeiling ? 1 : 0) +
     murs.length +
-    (withSchema ? 4 : 0);
+    (withSchema ? 1 : 0);
   const ctx: SheetContext = {
     name: scan.name,
     filename,
@@ -3282,21 +3160,13 @@ export function buildScanPdf(
     rooms: scan.rooms,
     fixtures: scan.fixtures ?? [],
     routes: scan.routes,
+    ceiling: opts.ceiling ?? [],
+    north: scan.north ?? null,
     colorOpenings: opts.colorOpenings ?? false,
     showSurfaces: opts.surfaces ?? true,
     showTextures: opts.textures ?? false,
   };
   const pages = [planPage(ctx, `1 / ${total}`, opts.plan, opts.measures2D ?? true)];
-  if (withCeiling) {
-    pages.push(
-      ceilingPage(
-        ctx,
-        `${pages.length + 1} / ${total}`,
-        opts.ceilingPlan ?? opts.plan,
-        opts.ceiling!,
-      ),
-    );
-  }
   if (withMetre) {
     pages.push(metrePage(ctx, `${pages.length + 1} / ${total}`));
   }
@@ -3318,43 +3188,23 @@ export function buildScanPdf(
     );
   }
   if (withSchema && schemas) {
-    // Les étiquettes d'abord : c'est la feuille qu'on détache du dossier.
-    pages.push(
-      labelsPage(ctx, `${pages.length + 1} / ${total}`, schemas.rows),
-    );
-    // D'abord l'architecture hors sol — d'où part quoi, sous quelle
-    // protection —, puis les deux MÊMES schémas posés sur le plan : c'est
-    // là qu'on lit où passe un départ, et c'est la question du chantier.
+    /**
+     * LE SCHÉMA UNIFILAIRE, ET LUI SEUL.
+     *
+     * Le dossier portait aussi les deux mêmes schémas POSÉS SUR LE PLAN,
+     * un par mode de tracé. Ils promettaient de montrer où passe chaque
+     * départ et ne montraient qu'un écheveau : sur un logement réel, une
+     * dizaine de circuits se croisent, et aucun d'eux ne se suit à l'œil.
+     * Le cheminement se lit sur le plan des gaines, le tableau sur
+     * l'unifilaire ; les mélanger ne donnait ni l'un ni l'autre.
+     */
     pages.push(
       unifilairePage(
         ctx,
         `${pages.length + 1} / ${total}`,
         schemas.rows,
         schemas.differentials,
-      ),
-    );
-    pages.push(
-      schemaPlanPage(
-        ctx,
-        `${pages.length + 1} / ${total}`,
-        opts.plan,
-        schemas.rows,
-        scan.routes ?? [],
-        schemas.marks,
-        'uni',
-        schemas.multi,
-      ),
-    );
-    pages.push(
-      schemaPlanPage(
-        ctx,
-        `${pages.length + 1} / ${total}`,
-        opts.plan,
-        schemas.rows,
-        scan.routes ?? [],
-        schemas.marks,
-        'multi',
-        schemas.multi,
+        detailDesDeparts(scan, schemas.marks, schemas.rows),
       ),
     );
   }

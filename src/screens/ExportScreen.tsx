@@ -34,6 +34,7 @@ import {
 import { fixtureMarks, multiWire, schemaRows } from '../geometry/schema';
 import { planRoutes } from '../geometry/elecplan';
 import { floorsOf, useScanStore } from '../store/scanStore';
+import { deviceNames } from '../geometry/naming';
 import type { CeilingFixture } from '../geometry/ceiling';
 
 interface PlanView {
@@ -258,6 +259,7 @@ const styles = getStyles(c);
   /** La feuille d'implantation du plafond, avec ses liens de commande. */
   const [plafond, setPlafond] = useState(true);
   const photos = useScanStore((s) => s.photos);
+  const north = useScanStore((s) => s.north);
   /**
    * LES ÉLÉVATIONS : un mur vu de face par feuille.
    *
@@ -274,6 +276,25 @@ const styles = getStyles(c);
   const cheminements = useMemo(
     () => planRoutes(walls, rooms, parts, fixtures, placement, ceiling),
     [walls, rooms, parts, fixtures, placement, ceiling],
+  );
+  /**
+   * Le nom de chaque appareil : « Séjour, mur nord — Prise plinthe 2 ».
+   *
+   * Il se calcule ici, et nulle part ailleurs : c'est le seul endroit qui
+   * connaît à la fois le placement des appareils dans les pièces, les noms
+   * donnés aux pièces et le cap de la boussole.
+   */
+  const noms = useMemo(
+    () =>
+      deviceNames(
+        fixtures,
+        walls,
+        placement,
+        Object.fromEntries(rooms.map((r) => [r.id, r.name])),
+        new Map(parts.map((p) => [p.roomId, p.labelAt])),
+        north,
+      ),
+    [fixtures, walls, placement, rooms, parts, north],
   );
   /** Schémas unifilaire et multifilaire, tirés des mêmes circuits. */
   const [schema, setSchema] = useState(false);
@@ -308,29 +329,17 @@ const styles = getStyles(c);
     },
     onTouchCancel: () => setScrollLocked(false),
   };
-  /** Ce que le document portera vraiment : la feuille du plafond existe. */
+  /** Le plafond se dessine SUR le plan d'ensemble, pas sur une feuille à part. */
   const avecPlafond = plafond && ceiling.length > 0;
   const [plan, setPlan] = useState<PlanView>(DEFAULT_PLAN);
-  /**
-   * LE CADRAGE DU PLAFOND EST LE SIEN.
-   *
-   * Les deux aperçus partageaient le même état : cadrer la feuille du
-   * plafond déplaçait le plan d'ensemble sous les yeux, et inversement.
-   * Ce sont pourtant deux feuilles séparées du dossier, qu'on ne lit pas
-   * au même moment ni pour la même chose — on serre sur une pièce pour
-   * placer ses spots, on garde le logement entier pour le plan d'ensemble.
-   */
-  const [planCl, setPlanCl] = useState<PlanView>(DEFAULT_PLAN);
   const [v1, setV1] = useState<View3DParams>(DEFAULT_V1);
   const [v2, setV2] = useState<View3DParams>(DEFAULT_V2);
   const planBox = useRef({ w: 1, h: 1 });
-  const planClBox = useRef({ w: 1, h: 1 });
   const box1 = useRef({ w: 1, h: 1 });
   const box2 = useRef({ w: 1, h: 1 });
 
   const reset = () => {
     setPlan(DEFAULT_PLAN);
-    setPlanCl(DEFAULT_PLAN);
     setV1(DEFAULT_V1);
     setV2(DEFAULT_V2);
   };
@@ -375,6 +384,8 @@ const styles = getStyles(c);
           floors: floorsOf(rooms),
           roomNames: Object.fromEntries(rooms.map((r) => [r.id, r.name])),
           photos: vignettes,
+          north,
+          deviceNames: noms,
         },
         include3D,
         {
@@ -391,11 +402,6 @@ const styles = getStyles(c);
           // Le plafond ne s'impose pas : il fait une feuille de plus, et
           // tout le monde n'équipe pas les plafonds.
           ceiling: plafond ? ceiling : undefined,
-          ceilingPlan: {
-            zoom: planCl.zoom,
-            fx: planCl.ox / (planClBox.current.w / 2),
-            fy: planCl.oy / (planClBox.current.h / 2),
-          },
           surfaces: showSurfaces,
           textures: showTextures,
           metre: includeMetre,
@@ -586,13 +592,18 @@ const styles = getStyles(c);
           retrouver en quatrième page, et on cherchait la feuille du
           plafond dans un écran qui ne la montrait nulle part.
         */}
-        <Text style={styles.sheetLabel}>Feuille 1 · Plan d'ensemble</Text>
+        <Text style={styles.sheetLabel}>
+          {avecPlafond
+            ? "Feuille 1 · Plan d'ensemble et plafond"
+            : "Feuille 1 · Plan d'ensemble"}
+        </Text>
         <View style={styles.sheetCard}>
           {/* Le verrou de scroll ne couvre QUE la zone centrale du modèle */}
           <View {...lockProps} style={styles.lockWrap}>
             <PlanPreview
               cotes={measures2D}
               routes={gaines || schema ? cheminements?.traces : undefined}
+              ceiling={avecPlafond ? ceiling : undefined}
               value={plan}
               onChange={setPlan}
               onBox={(b) => {
@@ -602,29 +613,10 @@ const styles = getStyles(c);
           </View>
         </View>
 
-        {avecPlafond && (
-          <>
-            <Text style={styles.sheetLabel}>Feuille 2 · Plafond</Text>
-            <View style={styles.sheetCard}>
-              <View {...lockProps} style={styles.lockWrap}>
-                <PlanPreview
-                  cotes={measures2D}
-                  ceiling={ceiling}
-                  value={planCl}
-                  onChange={setPlanCl}
-                  onBox={(b) => {
-                    planClBox.current = b;
-                  }}
-                />
-              </View>
-            </View>
-          </>
-        )}
-
         {include3D && (
           <>
             <Text style={styles.sheetLabel}>
-              {`Feuille ${1 + (avecPlafond ? 1 : 0) + (includeMetre ? 1 : 0) + 1} · Vues 3D`}
+              {`Feuille ${(includeMetre ? 1 : 0) + 2} · Vues 3D`}
             </Text>
             <View style={styles.sheetCard}>
               <View

@@ -83,6 +83,7 @@ import { RoomScan } from 'react-native-room-scan';
 import { useScanStore } from '../store/scanStore';
 import { haptic } from '../ui/haptic';
 import { CloseCross } from './CloseCross';
+import { wallLabel } from '../geometry/naming';
 
 const PAD_X = 30;
 const PAD_TOP = 26;
@@ -149,6 +150,7 @@ export function WallElevation({
   const objects = useScanStore((s) => s.objects);
   const addPhoto = useScanStore((s) => s.addPhoto);
   const wallClip = useScanStore((s) => s.wallClip);
+  const north = useScanStore((s) => s.north);
   const copyWallFixtures = useScanStore((s) => s.copyWallFixtures);
   const pasteWallFixtures = useScanStore((s) => s.pasteWallFixtures);
   const clearPendingJoin = useScanStore((s) => s.clearPendingJoin);
@@ -497,6 +499,20 @@ export function WallElevation({
     : null;
   const roomName =
     rooms.find((r) => r.id === roomOf(wall))?.name ?? '';
+  /**
+   * DE QUEL MUR S'AGIT-IL ? Celui du nord, celui de l'est.
+   *
+   * « Pièce 1 · mur de 3,36 m » ne distingue pas deux murs de même
+   * longueur, et un logement en a toujours deux. L'orientation, elle, se
+   * vérifie sur place — c'est aussi ce que porte désormais le dossier
+   * imprimé, et les deux doivent dire la même chose.
+   */
+  const cardinal = (() => {
+    const centre = roomParts(walls, rooms).find(
+      (p) => p.roomId === roomOf(wall),
+    )?.labelAt;
+    return centre ? wallLabel(wall, centre, north) : null;
+  })();
 
   // La règle de hauteur de l'appareil qu'on tient : c'est ici, et nulle
   // part ailleurs, qu'elle sert.
@@ -652,7 +668,9 @@ export function WallElevation({
           </Text>
           <Text style={styles.subtitle}>
             {roomName ? `${roomName} · ` : ''}
-            {`mur de ${face.len.toFixed(2).replace('.', ',')} m`}
+            {cardinal
+              ? `${cardinal} de ${face.len.toFixed(2).replace('.', ',')} m`
+              : `mur de ${face.len.toFixed(2).replace('.', ',')} m`}
             {monRetour ? ` · retour de ${cm(monRetour.x1 - monRetour.x0)} cm` : ''}
             {spec ? ` · ${spec.note}` : ''}
           </Text>

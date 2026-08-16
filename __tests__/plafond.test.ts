@@ -143,7 +143,15 @@ describe('le bilan par pièce', () => {
   });
 });
 
-describe('la feuille d’implantation', () => {
+/**
+ * LE PLAFOND EST SUR LE PLAN D'ENSEMBLE, pas sur une feuille à part.
+ *
+ * Il a eu la sienne pendant deux versions, et c'était une erreur : on ne
+ * place pas un point lumineux sans voir où tombent les cloisons, les
+ * meubles et les commandes murales qui l'allument. On lisait les deux
+ * feuilles côte à côte en reportant les cotes de l'une sur l'autre.
+ */
+describe('le plafond sur le plan', () => {
   const latin1 = (bytes: Uint8Array) => {
     let s = '';
     for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
@@ -162,18 +170,19 @@ describe('la feuille d’implantation', () => {
       .map((m) => m.slice(1, m.lastIndexOf(')')))
       .join(' | ');
 
-  it('n’existe que si le plafond est équipé', () => {
+  it('n’ajoute aucune feuille : c’est le même plan', () => {
     const pages = (src: string) => (src.match(/\/Type \/Page /g) ?? []).length;
-    expect(pages(doc(PLAFOND))).toBe(pages(doc()) + 1);
-    expect(texte(doc())).not.toContain('implantation');
+    expect(pages(doc(PLAFOND))).toBe(pages(doc()));
+    expect(pages(doc(PLAFOND))).toBe(1);
   });
 
   it('porte les appareils, leur sigle et la légende du lien', () => {
     const vu = texte(doc(PLAFOND));
-    expect(vu).toContain('implantation');
     expect(vu).toContain('DCL');
     expect(vu).toContain('DAAF');
     expect(vu).toContain('Lien de commande');
+    // Et le sous-titre annonce ce que la feuille porte vraiment.
+    expect(vu).toContain('plafond');
   });
 
   it('garde les cotes du plan : un point lumineux se pose au mètre près', () => {
@@ -216,58 +225,14 @@ describe('la feuille d’implantation', () => {
    * titres « APPAREILLAGE » le dit sans ambiguïté : la feuille du plafond
    * ne doit pas en ajouter un.
    */
-  it('ne porte qu’une légende, commandes à gauche et plafond à droite', () => {
+  it('ne porte qu’une légende : appareillage à gauche, plafond à droite', () => {
     const compte = (src: string, mot: string) =>
       texte(src).split(mot).length - 1;
-    expect(compte(doc(PLAFOND), 'APPAREILLAGE')).toBe(
-      compte(doc(), 'APPAREILLAGE'),
-    );
-    const vu = texte(doc(PLAFOND));
-    expect(vu).toContain('COMMANDES');
-    expect(vu).toContain('PLAFOND');
-    // Ce qui commande, et seulement ça : la prise n'a rien à faire là.
-    expect(vu).toContain('Va-et-vient');
-  });
-
-  /**
-   * CHAQUE FEUILLE A SON CADRAGE.
-   *
-   * Les deux aperçus de l'écran d'export partageaient le même : serrer sur
-   * une pièce pour placer ses spots emportait le plan d'ensemble avec soi.
-   * Ce sont deux feuilles séparées du dossier, on ne les lit ni au même
-   * moment ni pour la même chose.
-   */
-  it('se cadre pour elle seule, sans emporter le plan d’ensemble', () => {
-    const flux = (src: string) => src.match(/stream\n[\s\S]*?endstream/g) ?? [];
-    const bati = (zoomPlafond: number) =>
-      flux(
-        latin1(
-          buildScanPdf(
-            {
-              name: 'Séjour',
-              walls: W,
-              openings: [],
-              objects: [],
-              rooms: R,
-              fixtures: FX,
-            },
-            false,
-            {
-              metre: false,
-              ceiling: PLAFOND,
-              plan: { zoom: 1, fx: 0, fy: 0 },
-              ceilingPlan: { zoom: zoomPlafond, fx: 0, fy: 0 },
-            },
-          ),
-        ),
-      );
-    const a = bati(1);
-    const b = bati(1.8);
-    expect(a).toHaveLength(b.length);
-    // Feuille 1, le plan d'ensemble : rigoureusement identique.
-    expect(a[0]).toBe(b[0]);
-    // Feuille 2, le plafond : c'est elle, et elle seule, qui a bougé.
-    expect(a[1]).not.toBe(b[1]);
+    // Un seul cadre, donc un seul titre de chaque : deux boîtes cherchant
+    // chacune le coin le plus libre finissaient l'une sur l'autre.
+    expect(compte(doc(PLAFOND), 'APPAREILLAGE')).toBe(1);
+    expect(compte(doc(PLAFOND), 'PLAFOND')).toBe(1);
+    expect(texte(doc(PLAFOND))).toContain('Va-et-vient');
   });
 
   it('et rien ne sort de la feuille', () => {

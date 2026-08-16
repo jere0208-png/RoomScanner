@@ -14,12 +14,12 @@ import {
   wallToRooms,
 } from '../src/geometry/nfc15100';
 import {
-  WIRE_COLORS,
   fixtureMarks,
   multiWire,
   schemaRows,
 } from '../src/geometry/schema';
 import { roomParts, type WallSeg } from '../src/geometry/floorplan';
+import { deviceNames } from '../src/geometry/naming';
 import { planRoutes } from '../src/geometry/elecplan';
 import type { Fixture } from '../src/geometry/electrical';
 
@@ -80,6 +80,22 @@ const latin1 = (bytes: Uint8Array) => {
 
 const plan = planRoutes(W, R, parts, FX, placement)!;
 
+/**
+ * Les noms d'appareils, comme l'écran d'export les calcule.
+ *
+ * Le cap 0 place le nord dans l'axe −Z du scan : le mur « n », qui est au
+ * nord de la pièce, se nomme donc « mur nord ». C'est exactement ce que
+ * doit lire l'électricien sur son schéma.
+ */
+const noms = deviceNames(
+  FX,
+  W,
+  placement,
+  Object.fromEntries(R.map((r) => [r.id, r.name])),
+  new Map(parts.map((p) => [p.roomId, p.labelAt])),
+  0,
+);
+
 const pdf = latin1(
   buildScanPdf(
     {
@@ -90,6 +106,8 @@ const pdf = latin1(
       rooms: R,
       fixtures: FX,
       routes: plan.traces,
+      north: 0,
+      deviceNames: noms,
     },
     false,
     {
@@ -164,37 +182,25 @@ describe('la feuille unifilaire', () => {
   });
 });
 
-describe('la feuille multifilaire', () => {
+/**
+ * LES SCHÉMAS SUR PLAN N'EXISTENT PLUS — et c'est un progrès.
+ *
+ * Le dossier portait les deux mêmes schémas posés sur le plan, un par mode
+ * de tracé. Ils promettaient de montrer où passe chaque départ et ne
+ * montraient qu'un écheveau : sur un logement réel, une dizaine de circuits
+ * se croisent, et aucun ne se suit à l'œil. Le cheminement se lit sur le
+ * plan des gaines, le tableau sur l'unifilaire.
+ */
+describe('ce que le dossier ne porte plus', () => {
   const doc = texte(pdf);
 
-  it('emploie les couleurs de la norme, et le PDF les écrit vraiment', () => {
-    expect(pdf).toContain(trait(WIRE_COLORS.neutre.color));
-    expect(pdf).toContain(trait(WIRE_COLORS.terre.color));
-    expect(pdf).toContain(trait(WIRE_COLORS.phase.color));
-    expect(doc).toMatch(/bleu/i);
-    expect(doc).toMatch(/vert/i);
+  it('ni unifilaire ni multifilaire posés sur le plan', () => {
+    expect(doc).not.toContain('Unifilaire sur plan');
+    expect(doc).not.toContain('Multifilaire sur plan');
   });
 
-  it('se lit SUR LE PLAN, avec sa légende de couleurs', () => {
-    expect(doc).toContain('Multifilaire sur plan');
-    expect(doc).toMatch(/Phase/);
-    expect(doc).toMatch(/Neutre/);
-    expect(doc).toMatch(/Terre/);
-    // Un circuit d'éclairage compte six conducteurs : c'est ce que le
-    // tracé dessine, six traits parallèles.
-    const eclairage = multi.find((m) => m.label.startsWith('Éclairage'))!;
-    expect(eclairage.wires).toHaveLength(6);
-  });
-
-  it('l’unifilaire sur plan porte les repères de chaque départ', () => {
-    expect(doc).toContain('Unifilaire sur plan');
-    // Les libellés portent des tirets cadratins que l'encodage PDF rend
-    // autrement : on compare sur le repère et sur le calibre, qui sont
-    // justement ce qu'on lit sur le chantier.
-    for (const r of rows) {
-      expect(doc).toContain(`${r.mark} · `);
-      if (r.breaker !== null) expect(doc).toContain(`${r.breaker} A`);
-    }
+  it('ni feuille d’étiquettes de tableau', () => {
+    expect(doc).not.toContain('Étiquettes de tableau');
   });
 });
 
@@ -221,27 +227,11 @@ describe('rien ne sort de la feuille', () => {
     expect(pdf).toContain(trait('#2F6BFF'));
   });
 
-  it('le document compte quatre feuilles de plus', () => {
-    // Les étiquettes à découper, l'unifilaire hors sol, puis les deux
-    // schémas posés sur le plan.
+  it('le document ne compte QU’UNE feuille de plus', () => {
     const feuilles = (src: string) => (src.match(/\/Type \/Page /g) ?? []).length;
-    expect(feuilles(pdf)).toBe(feuilles(sansSchema) + 4);
+    expect(feuilles(pdf)).toBe(feuilles(sansSchema) + 1);
   });
 
-  /**
-   * Les étiquettes : la feuille qu'on détache du dossier.
-   *
-   * À la mise en service on étiquette au feutre, dans un tableau mal
-   * éclairé, en relisant un plan posé par terre. Six mois plus tard,
-   * personne ne sait quel disjoncteur coupe la chambre.
-   */
-  it('porte les étiquettes du tableau, dans l’ordre des modules', () => {
-    const doc = texte(pdf);
-    expect(doc).toContain('Étiquettes de tableau');
-    // Chaque départ a la sienne, avec son repère et son calibre.
-    for (const r of rows) expect(doc).toContain(r.mark);
-    expect(doc).toContain('découper');
-  });
 });
 
 /**
@@ -274,10 +264,17 @@ describe('la lisibilité des feuilles de schéma', () => {
     }
   });
 
-  it('la légende du schéma porte les départs ET les conducteurs', () => {
+  /**
+   * LE SCHÉMA NOMME CE QU'IL DESSERT.
+   *
+   * « Prises 1 · C3 » ne se lit qu'avec le plan à côté et un doigt dessus.
+   * Un vrai schéma dit la pièce, le mur, et le nom de l'appareil.
+   */
+  it('nomme les appareils de chaque départ, avec leur pièce et leur mur', () => {
     const doc = texte(pdf);
-    expect(doc).toContain('DÉPARTS');
-    expect(doc).toContain('CONDUCTEURS');
+    expect(doc).toContain('Prise plinthe 1');
+    expect(doc).toContain('Cuisine');
+    expect(doc).toMatch(/mur (nord|sud|est|ouest)/);
   });
 
   /**
