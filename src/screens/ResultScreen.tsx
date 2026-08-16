@@ -55,6 +55,12 @@ import {
 import { hasCapturedColors } from '../geometry/appearance';
 import { planRoutes } from '../geometry/elecplan';
 import { fixtureMarks } from '../geometry/schema';
+import {
+  volumeAt,
+  volumeVerdict,
+  wetZones,
+  type VolumeVerdict,
+} from '../geometry/volumes';
 import { buyingList, pullSchedule } from '../geometry/conduits';
 import {
   frCategory,
@@ -82,6 +88,7 @@ import {
   FIXTURES,
   FIXTURE_FAMILIES,
   faceX,
+  facePoint,
   wallFace,
   type Fixture,
   type FixtureKind,
@@ -621,11 +628,38 @@ export function ResultScreen() {
     );
   }, [fixtures, rooms, placement]);
 
+  /**
+   * Volumes de salle d'eau : le seul contrôle où une erreur est dangereuse.
+   * Il ne s'active que si une baignoire ou une douche est posée — sans
+   * mobilier, l'app ne peut rien affirmer, et le dire vaut mieux que
+   * rassurer.
+   */
+  const volumes = useMemo(() => {
+    const zones = wetZones(objects);
+    const out = new Map<string, VolumeVerdict>();
+    if (zones.length === 0) return out;
+    const quads = wallQuadsOf(walls);
+    const murs = new Map(walls.map((w) => [w.id, w]));
+    for (const f of fixtures) {
+      const w = murs.get(f.wallId);
+      if (!w) continue;
+      const piece = rooms.find((r) => r.id === placement.get(f.id));
+      if (roomUse(piece?.name ?? '', piece?.kind) !== 'sdb') continue;
+      const face = wallFace(w, quads.get(w.id), f.side);
+      const p = facePoint(face, faceX(face, f.along), 0.05);
+      const v = volumeAt({ x: p.x, z: p.z }, f.height, zones);
+      if (v === null) continue;
+      out.set(f.id, volumeVerdict(f.kind, v));
+    }
+    return out;
+  }, [objects, walls, fixtures, rooms, placement]);
+
   const elecIssues = checkElectrical(
     roomInputs,
     fixtures,
     wallRooms,
     placement,
+    volumes,
     wallWorktops,
   );
   const alertRooms = roomsInAlert(elecIssues);

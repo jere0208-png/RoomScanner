@@ -22,6 +22,7 @@
  */
 import type { RoomKind } from './furniture';
 import { pointInPolygon } from './appearance';
+import type { VolumeVerdict } from './volumes';
 import {
   faceX,
   facePoint,
@@ -466,6 +467,15 @@ export function checkElectrical(
   /** Pièce de chaque appareil, quand on la connaît (voir `fixturePlacement`). */
   placement?: Map<string, string>,
   /**
+   * Volume de salle d'eau de chaque appareil, quand la pièce en a.
+   *
+   * C'est le seul contrôle où une erreur est dangereuse plutôt que
+   * gênante : une prise à 40 cm d'une baignoire ne se remarque pas sur un
+   * plan. L'app le calcule dès qu'une baignoire ou une douche est posée —
+   * et se tait franchement quand il n'y en a pas, plutôt que de rassurer.
+   */
+  volumes?: Map<string, VolumeVerdict>,
+  /**
    * Plans de travail longés par chaque mur, s'ils sont connus
    * (`worktopsOnWall`) : au-dessus d'une crédence, la règle de hauteur
    * n'est pas celle d'un mur nu, et la signaler en défaut reviendrait à
@@ -700,6 +710,41 @@ export function checkElectrical(
       regle:
         'Aucun tableau ni boîte de connexion dans les volumes d’une salle ' +
         'd’eau. Il se place dans un local sec, en dégagement.',
+    });
+  }
+
+  // ----------------------------------------------- volumes de salle d'eau
+  if (volumes && volumes.size > 0) {
+    for (const f of fixtures) {
+      const v = volumes.get(f.id);
+      if (!v) continue;
+      const spec = FIXTURES[f.kind];
+      out.push({
+        code: 'volumes',
+        roomId: roomOfFixture(f),
+        fixtureId: f.id,
+        severity: v.allowed ? 'info' : 'alerte',
+        message: v.allowed
+          ? `${spec.label} en volume ${v.volume} : matériel imposé`
+          : `${spec.label} en volume ${v.volume} : interdit`,
+        regle: v.regle,
+      });
+    }
+  }
+  // Une salle d'eau appelle deux obligations que le plan ne montre pas, et
+  // qu'on ne peut donc que rappeler.
+  for (const r of rooms) {
+    const usage = roomUse(r.name, r.kind);
+    if (usage !== 'sdb') continue;
+    out.push({
+      code: 'volumes',
+      roomId: r.id,
+      severity: 'info',
+      message: `${r.name || 'Salle d’eau'} : liaison équipotentielle`,
+      regle:
+        'Liaison équipotentielle supplémentaire reliant les canalisations ' +
+        'métalliques et les masses, et protection 30 mA sur tous les ' +
+        'circuits de la pièce.',
     });
   }
 

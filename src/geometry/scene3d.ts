@@ -1096,13 +1096,12 @@ export function buildScene(
   // ------------------------------------------------------------ meubles
   // Un meuble n'est recalé que contre les murs de SA pièce : sinon la
   // cloison d'à côté le repousserait au milieu du salon.
-  for (const obj of objects.map((o) =>
-    clampFootprint(
-      toFootprint(o),
-      wallsOf.get(roomOf(o)) ?? walls,
-      interiorOf.get(roomOf(o)) ?? fallbackInterior,
-    ),
-  )) {
+  for (const source of objects) {
+    const obj = clampFootprint(
+      toFootprint(source),
+      wallsOf.get(roomOf(source)) ?? walls,
+      interiorOf.get(roomOf(source)) ?? fallbackInterior,
+    );
     const cosY = Math.cos(obj.yaw);
     const sinY = Math.sin(obj.yaw);
     /**
@@ -1219,6 +1218,58 @@ export function buildScene(
       nappe(0.02, 0.13);
     }
 
+    /**
+     * Un meuble PLAQUÉ contre un mur se trie AVEC lui.
+     *
+     * Même piège que pour l'appareillage, et il ressort sur les objets
+     * plats : un pan de mur se trie sur le centre de sa tuile, donc à
+     * mi-hauteur ; une télé accrochée à 1,35 m se trie plus haut, et le
+     * terme d'altitude de la profondeur la faisait passer DEVANT le mur —
+     * on la voyait depuis la pièce d'à côté. On donne donc à ses faces le
+     * point de tri du mur qu'elle longe, avancé de sa saillie : vu de la
+     * pièce, elle passe juste après le mur ; vu de dos, le mur la couvre.
+     *
+     * Réservé à ce qui est VRAIMENT contre un mur (50 cm de saillie au
+     * plus) : un lit de 1,90 m trié avec le mur de sa tête passerait devant
+     * ce qui se trouve à son pied.
+     */
+    let triMeuble: P3 | undefined;
+    {
+      const murs = wallsOf.get(roomOf(source)) ?? walls;
+      let best = Infinity;
+      for (const w of murs) {
+        const len = Math.hypot(w.b.x - w.a.x, w.b.z - w.a.z);
+        if (len < 1e-6) continue;
+        const u = { x: (w.b.x - w.a.x) / len, z: (w.b.z - w.a.z) / len };
+        const t = ((obj.cx - w.a.x) * u.x + (obj.cz - w.a.z) * u.z) / len;
+        if (t < -0.15 || t > 1.15) continue;
+        const n = { x: -u.z, z: u.x };
+        const d = (obj.cx - w.a.x) * n.x + (obj.cz - w.a.z) * n.z;
+        if (Math.abs(d) > best) continue;
+        // Demi-emprise PERPENDICULAIRE au mur : une télé de 1,20 m de large
+        // et 8 cm d'épaisseur, posée à plat, ne déborde que de 4 cm — la
+        // prendre par sa plus grande dimension l'aurait exclue d'office.
+        const demi =
+          Math.abs(cosY * n.x + sinY * n.z) * (obj.width / 2) +
+          Math.abs(-sinY * n.x + cosY * n.z) * (obj.depth / 2);
+        // Saillie du meuble par rapport au nu : au-delà d'un demi-mètre,
+        // ce n'est plus un objet mural.
+        const saillie = Math.abs(d) + demi - WALL_T / 2;
+        if (saillie > 0.5) continue;
+        best = Math.abs(d);
+        const sens = d >= 0 ? 1 : -1;
+        const mid = 0.5;
+        triMeuble = {
+          x:
+            w.a.x + (w.b.x - w.a.x) * mid + n.x * sens * (Math.abs(d) + 0.002),
+          y: w.height / 2,
+          z:
+            w.a.z + (w.b.z - w.a.z) * mid + n.z * sens * (Math.abs(d) + 0.002),
+        };
+      }
+    }
+    const avantMeuble = faces.length;
+
     // La silhouette du meuble, s'il en a une ; sinon, la boîte pleine.
     // Elle reste montée PENDANT les gestes : voir le lit se changer en
     // caisse dès qu'on tourne la pièce, puis redevenir un lit au relâcher,
@@ -1229,6 +1280,12 @@ export function buildScene(
       poser({ x0: 0, x1: 1, y0: 0, y1: 1, z0: 0, z1: 1, tone: 'body' });
     } else {
       for (const part of morceaux) poser(part);
+    }
+    if (triMeuble) {
+      for (let i = avantMeuble; i < faces.length; i++) {
+        if (faces[i].isFloor) continue;
+        faces[i].depthAt = triMeuble;
+      }
     }
   }
 

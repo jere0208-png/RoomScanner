@@ -111,12 +111,13 @@ export function furnitureParts(category: string): FurnPart[] {
   }
 
   if (c.includes('television') || c === 'tv') {
-    // Une télé fait 10 cm d'épaisseur : la dalle occupe TOUTE la
-    // profondeur, sinon il ne reste qu'un trait d'un centimètre à l'écran.
+    // Une télé se fixe AU MUR : plus de pied ni de socle. Presque toutes le
+    // sont aujourd'hui, et un pied dessiné sous un écran accroché à 1,10 m
+    // ne décrit rien de réel. La dalle occupe toute l'épaisseur — 8 cm — et
+    // la patine murale se devine derrière.
     return [
-      P(0, 1, 0.3, 1, 0.1, 0.9, 'dark'),
-      P(0.44, 0.56, 0.05, 0.32, 0.15, 0.85),
-      P(0.2, 0.8, 0, 0.06, 0, 1, 'dark'),
+      P(0, 1, 0, 1, 0, 0.75, 'dark'),
+      P(0.3, 0.7, 0.28, 0.72, 0.75, 1),
     ];
   }
 

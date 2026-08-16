@@ -149,7 +149,7 @@ describe('le contrôle de conformité, crédence comprise', () => {
   });
 
   const hauteurs = (fixtures: Fixture[], wt = worktops) =>
-    checkElectrical([piece], fixtures, wallRooms, undefined, wt).filter(
+    checkElectrical([piece], fixtures, wallRooms, undefined, undefined, wt).filter(
       (i) => i.code === 'hauteur',
     );
 

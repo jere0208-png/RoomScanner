@@ -1192,6 +1192,45 @@ Une règle en est sortie, qui vaut pour tout le store : **ne jamais importer
 tests d'un coup. Les fonctions natives se cherchent dans `NativeModules`, à
 chaque appel (`src/ui/photos.ts`, `src/ui/haptic.ts`).
 
+### Les volumes de la salle d'eau
+
+Le seul contrôle de l'app où une erreur est DANGEREUSE et non gênante : une
+prise à 40 cm d'une baignoire ne se remarque pas sur un plan, et elle tue.
+`volumes.ts` situe chaque appareil dans le découpage de la norme — volume 0
+(l'intérieur du receveur), volume 1 (son aplomb jusqu'à 2,25 m), volume 2
+(60 cm autour, jusqu'à 2,25 m) — et `volumeVerdict()` dit ce qui y est admis :
+aucun socle en 1 ni en 2 (sauf rasoir sur transformateur), pas de commande en
+volume 1, luminaire TBTS ou IPX4 classe II. Chaque verdict porte SA règle : un
+interdit sans motif ne sert à rien.
+
+Deux choses que ce module ne fait pas, et qu'il vaut mieux savoir : il ignore
+les parois fixes (qui rabattent les volumes) et les indices IP du matériel
+choisi. Il situe un appareil dans un volume ; il ne délivre pas d'attestation.
+**Et sans baignoire ni douche relevée, il se tait** — l'app ne peut rien
+affirmer sur une pièce dont elle ne connaît pas les équipements, et rassurer à
+tort serait pire que se taire. La liaison équipotentielle et le 30 mA, eux,
+sont rappelés dans tous les cas.
+
+### Un meuble contre un mur ne se voit pas de l'autre côté
+
+Même piège que pour l'appareillage, et il ressort sur les objets plats : un
+pan de mur se trie sur le centre de sa tuile, donc à mi-hauteur ; une télé
+accrochée à 1,35 m se trie plus haut, et en vue plongeante le terme
+d'altitude la faisait passer DEVANT le mur — on la voyait depuis la pièce
+d'à côté.
+
+Un meuble dont la saillie ne dépasse pas 50 cm du nu se trie donc AVEC son
+mur, avancé de sa propre saillie : vu de sa pièce il passe juste après le
+mur, vu de dos le mur le couvre. La demi-emprise se mesure
+PERPENDICULAIREMENT au mur — prendre la plus grande dimension d'une télé de
+1,20 m l'aurait exclue d'office. Au-delà de 50 cm, on ne fait rien : un lit
+de 1,90 m trié avec le mur de sa tête passerait devant ce qui se trouve à son
+pied.
+
+Au passage, **la télé se fixe au mur** : plus de pied ni de socle. Presque
+toutes le sont aujourd'hui, et un pied dessiné sous un écran accroché à
+1,10 m ne décrit rien de réel.
+
 ### Jonctions de murs
 
 Un mur n'est pas un trait épais posé à côté des autres : `wallQuads()` traite
