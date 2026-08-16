@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { deletePhotoFiles } from '../ui/photos';
 import type {
   FloorData,
   ObjectData,
@@ -40,6 +41,8 @@ import {
   fromFaceX,
   interiorSide,
   newFixture,
+  reprojectAnchors,
+  reprojectFixtures,
   overlaps,
   wallFace,
   type Fixture,
@@ -711,6 +714,10 @@ export const useScanStore = create<ScanState>((set, get) => {
         // Les portes et fenêtres suivent leur mur : sans ça elles restaient
         // sur place, décalées, et le rendu ne les rattachait plus.
         openings: reprojectOpenings(st.walls, droits, st.openings),
+        // L'appareillage et les photos aussi : ils sont accrochés à un
+        // identifiant de mur, et le redressement le change.
+        fixtures: reprojectFixtures(st.walls, droits, st.fixtures),
+        photos: reprojectAnchors(st.walls, droits, st.photos),
         dirty: true,
       });
       get().redetectRooms();
@@ -725,6 +732,16 @@ export const useScanStore = create<ScanState>((set, get) => {
       const walls = mergeColinear(splitAtJunctions(weldCorners(st.walls)));
       const shapes = detectRooms(walls);
       if (shapes.length === 0) return;
+      /**
+       * Le graphe vient d'être recousu : un mur coupé en deux ne garde son
+       * identifiant que sur le premier morceau, un mur fusionné que celui
+       * du plus long. Tout ce qui s'accroche à un mur doit donc être
+       * reporté sur le nouveau jeu, par sa POSITION — sans quoi une prise
+       * de la seconde moitié d'un mur se dessine hors du mur, et une prise
+       * de mur fusionné disparaît de l'écran, des comptages et du métré.
+       */
+      const fixtures = reprojectFixtures(st.walls, walls, st.fixtures);
+      const photos = reprojectAnchors(st.walls, walls, st.photos);
       const floor = st.rooms[0]?.floor ?? null;
       const objects = st.objects.map((o) => ({
         ...o,
@@ -763,7 +780,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         seen.set(r.name, n);
         if (n > 1) r.name = `${r.name} ${n}`;
       }
-      set({ walls, rooms, objects, dirty: true });
+      set({ walls, rooms, objects, fixtures, photos, dirty: true });
     },
 
     removeWall: (wallId) => {
@@ -1615,6 +1632,11 @@ export const useScanStore = create<ScanState>((set, get) => {
         objects: save.objects,
         fixtures: save.fixtures ?? [],
         photos: save.photos ?? [],
+        // Un relevé de mur appartient au plan où il a été pris : le garder
+        // d'un scan à l'autre permettrait de coller les cotes d'un autre
+        // logement.
+        wallClip: null,
+        pendingJoin: null,
         north: save.north ?? null,
         dirty: false,
         resultOrigin: 'library',
@@ -1624,10 +1646,23 @@ export const useScanStore = create<ScanState>((set, get) => {
     },
 
     deleteSave: (id) => {
-      const saves = get().saves.filter((s) => s.id !== id);
+      const st = get();
+      const parti = st.saves.find((s) => s.id === id);
+      const saves = st.saves.filter((s) => s.id !== id);
+      // Les photos de repérage vivent dans les Documents de l'app : sans
+      // ce ménage, elles s'accumulent pour toujours, sans que personne
+      // puisse les retrouver ni les effacer. On ne touche qu'à celles que
+      // plus aucun scan ne réclame.
+      const gardees = new Set(
+        saves.flatMap((s) => (s.photos ?? []).map((p) => p.path)),
+      );
+      const aEffacer = (parti?.photos ?? [])
+        .map((p) => p.path)
+        .filter((p) => !gardees.has(p));
+      deletePhotoFiles(aEffacer);
       set({
         saves,
-        ...(get().currentSaveId === id ? { currentSaveId: null } : null),
+        ...(st.currentSaveId === id ? { currentSaveId: null } : null),
       });
       persistSoon(saves);
     },

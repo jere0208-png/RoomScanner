@@ -163,11 +163,25 @@ export const RoomScan = {
    * fichier écrit dans Documents. `null` si l'utilisateur annule ou si
    * l'appareil n'a pas de caméra (simulateur).
    */
-  takePhoto(): Promise<string | null> {
-    if (Platform.OS === 'ios' && NativeModules.RoomScanPhoto) {
-      return NativeModules.RoomScanPhoto.takePhoto();
+  async takePhoto(): Promise<string | null> {
+    if (Platform.OS !== 'ios' || !NativeModules.RoomScanPhoto) return null;
+    // La caméra a pu être refusée au scan : sans cette demande, le
+    // sélecteur s'ouvrait sur un écran noir, sans un mot d'explication.
+    const etat = await RoomScan.cameraStatus();
+    if (etat === 'denied') return null;
+    if (etat !== 'granted') {
+      const ok = await RoomScan.requestCamera();
+      if (!ok) return null;
     }
-    return Promise.resolve(null);
+    return NativeModules.RoomScanPhoto.takePhoto();
+  },
+
+  /** Efface des photos de repérage (chemins rendus par `takePhoto`). */
+  deletePhotos(paths: string[]): Promise<number> {
+    if (Platform.OS === 'ios' && NativeModules.RoomScanPhoto) {
+      return NativeModules.RoomScanPhoto.deletePhotos(paths);
+    }
+    return Promise.resolve(0);
   },
 
   /** iOS : écrit le PDF (base64) en fichier temporaire et ouvre le partage. */

@@ -24,6 +24,7 @@
  */
 import {
   perpOf,
+  pointOnSeg,
   roomOf,
   roomParts,
   segLength,
@@ -645,6 +646,95 @@ export function newFixture(
     ),
     side,
   };
+}
+
+/**
+ * Rattache à leur nouveau mur ce qui était accroché aux anciens.
+ *
+ * C'est le défaut le plus coûteux qu'on ait trouvé : « Redresser le plan »,
+ * l'ajout d'une cloison, toute retouche du graphe passent par
+ * `splitAtJunctions` + `mergeColinear`. Un mur coupé en deux ne garde son
+ * identifiant que sur le PREMIER morceau ; un mur fusionné ne garde que
+ * celui du plus long. Les ouvertures étaient reprojetées, l'appareillage
+ * non : une prise posée dans la seconde moitié d'un mur se retrouvait avec
+ * une cote plus longue que son mur — dessinée dans le vide — et une prise
+ * d'un mur fusionné disparaissait de l'écran, des comptages, des circuits
+ * et du métré. Sans alerte, et sans rien à annuler puisque rien ne semblait
+ * s'être passé.
+ *
+ * On reprojette donc par la POSITION : le point du monde où se trouve
+ * l'appareil, reporté sur le mur le plus proche du nouveau jeu. La face est
+ * conservée par sa normale — un appareil ne change pas de côté de cloison
+ * parce qu'on a redressé le plan.
+ */
+export function reprojectFixtures(
+  oldWalls: WallSeg[],
+  newWalls: WallSeg[],
+  fixtures: Fixture[],
+): Fixture[] {
+  if (newWalls.length === 0) return fixtures;
+  const avant = new Map(oldWalls.map((w) => [w.id, w]));
+  return fixtures.map((f) => {
+    const w = avant.get(f.wallId);
+    if (!w) return f;
+    const len = segLength(w) || 1;
+    const u = { x: (w.b.x - w.a.x) / len, z: (w.b.z - w.a.z) / len };
+    const t = Math.min(len, Math.max(0, f.along));
+    const p = { x: w.a.x + u.x * t, z: w.a.z + u.z * t };
+    const n = perpOf(u);
+    const dehors = { x: n.x * f.side, z: n.z * f.side };
+
+    let cible = newWalls[0];
+    let best = Infinity;
+    for (const v of newWalls) {
+      const d = pointOnSeg(p, v.a, v.b).dist;
+      if (d < best) {
+        best = d;
+        cible = v;
+      }
+    }
+    const lenC = segLength(cible) || 1;
+    const uC = { x: (cible.b.x - cible.a.x) / lenC, z: (cible.b.z - cible.a.z) / lenC };
+    const along = Math.min(
+      lenC,
+      Math.max(0, (p.x - cible.a.x) * uC.x + (p.z - cible.a.z) * uC.z),
+    );
+    const nC = perpOf(uC);
+    const meme = dehors.x * nC.x + dehors.z * nC.z;
+    return {
+      ...f,
+      wallId: cible.id,
+      along,
+      // Un mur retourné dans la reconstruction ne doit pas retourner ses
+      // prises : on garde la face qui regarde du même côté.
+      side: Math.abs(meme) < 1e-9 ? f.side : ((meme > 0 ? 1 : -1) as 1 | -1),
+    };
+  });
+}
+
+/**
+ * Même reprojection, pour tout ce qui n'est accroché qu'à une cote : les
+ * photos de repérage, aujourd'hui, et ce qui viendra s'y ajouter.
+ */
+export function reprojectAnchors<T extends { wallId: string; along: number }>(
+  oldWalls: WallSeg[],
+  newWalls: WallSeg[],
+  items: T[],
+): T[] {
+  const faux = items.map((it) => ({
+    id: 'x',
+    kind: 'prise' as FixtureKind,
+    wallId: it.wallId,
+    along: it.along,
+    height: 0,
+    side: 1 as const,
+  }));
+  const remis = reprojectFixtures(oldWalls, newWalls, faux);
+  return items.map((it, i) => ({
+    ...it,
+    wallId: remis[i].wallId,
+    along: remis[i].along,
+  }));
 }
 
 /** Cotes lues sur la face : gauche, droite, hauteur — ce que l'app affiche. */

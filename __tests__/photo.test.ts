@@ -16,6 +16,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   removeItem: jest.fn(async () => undefined),
 }));
 
+import { NativeModules } from 'react-native';
 import { type WallSeg } from '../src/geometry/floorplan';
 import { useScanStore, type SavedScan } from '../src/store/scanStore';
 
@@ -140,5 +141,63 @@ describe('la photo suit le scan', () => {
     useScanStore.getState().undo();
     expect(useScanStore.getState().walls.some((w) => w.id === 'n')).toBe(true);
     expect(useScanStore.getState().photos).toHaveLength(1);
+  });
+});
+
+describe('le ménage des fichiers', () => {
+  it('supprimer un scan efface SES photos, et pas celles des autres', () => {
+    const efface: string[][] = [];
+    (NativeModules as Record<string, unknown>).RoomScanPhoto = {
+      deletePhotos: (paths: string[]) => {
+        efface.push(paths);
+        return Promise.resolve(paths.length);
+      },
+    };
+    neuf();
+    useScanStore.getState().addPhoto('n', 1, '/photos/a.jpg');
+    useScanStore.getState().saveAsCopy('Premier');
+    const premier = useScanStore.getState().saves[0];
+
+    neuf();
+    useScanStore.getState().addPhoto('n', 1, '/photos/b.jpg');
+    useScanStore.setState({ saves: [premier, ...useScanStore.getState().saves] });
+    useScanStore.getState().saveAsCopy('Second');
+
+    useScanStore.getState().deleteSave(premier.id);
+    expect(efface).toHaveLength(1);
+    expect(efface[0]).toEqual(['/photos/a.jpg']);
+    delete (NativeModules as Record<string, unknown>).RoomScanPhoto;
+  });
+
+  it('une image partagée par deux scans n’est pas effacée', () => {
+    const efface: string[][] = [];
+    (NativeModules as Record<string, unknown>).RoomScanPhoto = {
+      deletePhotos: (paths: string[]) => {
+        efface.push(paths);
+        return Promise.resolve(paths.length);
+      },
+    };
+    neuf();
+    useScanStore.getState().addPhoto('n', 1, '/photos/commune.jpg');
+    useScanStore.getState().saveAsCopy('A');
+    const a = useScanStore.getState().saves[0];
+    useScanStore.getState().saveAsCopy('B');
+    useScanStore.getState().deleteSave(a.id);
+    // Le second scan la référence encore : on ne touche à rien.
+    expect(efface).toHaveLength(0);
+    delete (NativeModules as Record<string, unknown>).RoomScanPhoto;
+  });
+
+  it('changer de scan vide le presse-papier de mur', () => {
+    neuf();
+    useScanStore.getState().saveAsCopy('Un');
+    const un = useScanStore.getState().saves[0];
+    useScanStore.setState({
+      wallClip: { from: 'n', items: [{ kind: 'prise', x: 1, height: 0.25 }] },
+    });
+    useScanStore.getState().openSave(un.id);
+    // Un relevé appartient au plan où il a été pris : le coller ailleurs
+    // reporterait les cotes d'un autre logement.
+    expect(useScanStore.getState().wallClip).toBeNull();
   });
 });

@@ -23,6 +23,25 @@ class RoomScanPhoto: NSObject {
   private var resolve: RCTPromiseResolveBlock?
   private var reject: RCTPromiseRejectBlock?
 
+  /// Efface des photos de repérage. Un scan supprimé ne doit pas laisser
+  /// ses images derrière lui : elles s'accumuleraient sans que personne
+  /// puisse jamais les retrouver ni les effacer.
+  @objc func deletePhotos(_ paths: [String],
+                          resolve: @escaping RCTPromiseResolveBlock,
+                          reject: @escaping RCTPromiseRejectBlock) {
+    var n = 0
+    for p in paths {
+      // On ne sort JAMAIS du dossier des photos : un chemin venu du disque
+      // ne doit pas pouvoir désigner autre chose.
+      let url = URL(fileURLWithPath: p)
+      guard url.deletingLastPathComponent().lastPathComponent == "photos" else {
+        continue
+      }
+      if (try? FileManager.default.removeItem(at: url)) != nil { n += 1 }
+    }
+    resolve(n)
+  }
+
   /// Prend une photo et renvoie son chemin, ou `nil` si l'utilisateur annule.
   @objc func takePhoto(_ resolve: @escaping RCTPromiseResolveBlock,
                        reject: @escaping RCTPromiseRejectBlock) {

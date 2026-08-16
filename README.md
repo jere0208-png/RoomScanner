@@ -1152,6 +1152,46 @@ Deux corrections de fond au passage :
   gaines, ni tirage : le constat monte en alerte avec un bouton qui le pose.
   Deux tableaux, ou un tableau en salle d'eau, sont signalés aussi.
 
+### Ce qui est accroché à un mur doit survivre au recousage
+
+Le défaut le plus coûteux qu'on ait trouvé, et le plus silencieux.
+« Redresser le plan », ajouter une cloison, déplacer un coin : tout passe par
+`splitAtJunctions` + `mergeColinear`, et là les identifiants changent — un mur
+coupé en deux ne garde le sien que sur le PREMIER morceau, un mur fusionné que
+celui du plus long.
+
+Les ouvertures étaient reprojetées depuis longtemps. L'appareillage, non. Une
+prise posée dans la seconde moitié d'un mur de 6 m se retrouvait avec une cote
+de 4,50 m sur un mur devenu long de 3 : dessinée dans le vide. Une prise d'un
+mur fusionné disparaissait de l'écran, des comptages, des circuits et du
+métré — sans alerte, et sans rien à annuler puisque rien ne semblait s'être
+passé.
+
+`reprojectFixtures()` reporte donc chaque appareil par sa POSITION sur le
+nouveau jeu de murs, en conservant sa face par sa normale : un appareil ne
+change pas de côté de cloison parce qu'on a redressé le plan. Les photos
+suivent le même chemin (`reprojectAnchors`).
+`__tests__/reprojection.test.ts` rejoue les deux cas, découpe et fusion, et
+vérifie qu'aucune prise ne sort de son mur.
+
+### Trois fuites, fermées
+
+- **Les photos d'un scan supprimé** restaient dans les Documents pour
+  toujours, sans que personne puisse les retrouver. Elles sont effacées avec
+  le scan — sauf celles qu'un autre scan référence encore, et jamais rien
+  hors du dossier `photos`.
+- **L'appareil photo** s'ouvrait sur un écran noir si la caméra avait été
+  refusée au scan : `takePhoto` demande maintenant l'autorisation, et renonce
+  proprement si elle est refusée.
+- **Le presse-papier de mur** survivait au changement de scan : on pouvait
+  coller sur un plan les cotes d'un autre logement. Il se vide à l'ouverture.
+
+Une règle en est sortie, qui vaut pour tout le store : **ne jamais importer
+`react-native-room-scan` depuis le store**. Le module construit un
+`NativeEventEmitter` au chargement ; l'import faisait tomber six suites de
+tests d'un coup. Les fonctions natives se cherchent dans `NativeModules`, à
+chaque appel (`src/ui/photos.ts`, `src/ui/haptic.ts`).
+
 ### Jonctions de murs
 
 Un mur n'est pas un trait épais posé à côté des autres : `wallQuads()` traite

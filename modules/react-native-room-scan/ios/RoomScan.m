@@ -22,6 +22,9 @@ RCT_EXTERN_METHOD(tap:(NSString *)kind)
 
 @interface RCT_EXTERN_MODULE(RoomScanPhoto, NSObject)
 RCT_EXTERN_METHOD(takePhoto:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
+RCT_EXTERN_METHOD(deletePhotos:(NSArray *)paths
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
 @end
 
 @interface RCT_EXTERN_MODULE(RoomScanPreview, NSObject)
