@@ -1146,7 +1146,10 @@ export function FloorplanEditor({
                   <RotateHandle
                     objectId={o.id}
                     center={p}
-                    at={{ x: p.x - hw - 16, y: p.y - hh - 16 }}
+                    at={{
+                      x: Math.min(layout.w - 130, Math.max(24, p.x - hw - 16)),
+                      y: Math.min(layout.h - 60, Math.max(24, p.y - hh - 16)),
+                    }}
                     raw={o}
                     viewRot={view.rot}
                     frame={frame}

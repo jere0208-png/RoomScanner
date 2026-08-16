@@ -361,7 +361,9 @@ export function ResultScreen() {
     setSelectedWallId(null);
     setSelectedOpeningId(null);
     setSelectedObjectId(id);
-    setObjDims(true);
+    // Les cotes restent CACHÉES : on vient de poser un meuble, on veut le
+    // placer, pas le redimensionner. La pastille de mesure les appellera.
+    setObjDims(false);
     setWInput(item.w.toFixed(2).replace('.', ','));
     setDInput(item.d.toFixed(2).replace('.', ','));
   };
