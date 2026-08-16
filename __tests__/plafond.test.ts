@@ -36,7 +36,7 @@ import {
   wallToRooms,
 } from '../src/geometry/nfc15100';
 import { planRoutes } from '../src/geometry/elecplan';
-import { roomParts } from '../src/geometry/floorplan';
+import { castToWall, roomParts } from '../src/geometry/floorplan';
 import { pointInPolygon } from '../src/geometry/appearance';
 
 import type { WallSeg } from '../src/geometry/floorplan';
@@ -638,5 +638,47 @@ describe('répartir une ligne de spots', () => {
     for (const p of spreadPoints(enL, 5, 0)) {
       expect(pointInPolygon(p, enL)).toBe(true);
     }
+  });
+});
+
+/**
+ * Le bandeau de réglage dit LA MÊME CHOSE que le plan.
+ *
+ * Il affichait des coordonnées comptées depuis le coin de l'emprise de la
+ * pièce, pendant que les pointillés du plan montraient les distances aux
+ * murs. Deux quantités différentes côte à côte : le bandeau contredisait le
+ * dessin, et on ne savait plus laquelle croire.
+ *
+ * La règle, désormais : ce qu'on lit dans le bandeau est ce que mesure le
+ * plan — la distance au nu du mur, dans la trame du logement. On la vérifie
+ * ici en la parcourant à l'envers : poser l'appareil à N centimètres d'un
+ * mur doit donner exactement N.
+ */
+describe('les cotes du bandeau', () => {
+  const AXES = (frame: number) => ({
+    gauche: { x: -Math.cos(frame), z: -Math.sin(frame) },
+    haut: { x: Math.sin(frame), z: -Math.cos(frame) },
+  });
+
+  it('la distance lue est celle du mur, pas celle d’un coin', () => {
+    // Pièce 5 × 4 d'équerre ; un point à 1,20 m du mur de gauche.
+    const at = { x: 1.2, z: 2 };
+    const gap = castToWall(at, AXES(0).gauche, W);
+    // Le mur de gauche est en x = 0, son nu à 7 cm : 1,13 m.
+    expect(gap).not.toBeNull();
+    expect(gap!).toBeCloseTo(1.2 - 0.07, 2);
+  });
+
+  it('et déplacer de d change la distance de d, exactement', () => {
+    const at = { x: 1.2, z: 2 };
+    const avant = castToWall(at, AXES(0).gauche, W)!;
+    const bouge = { x: at.x + 0.5, z: at.z };
+    const apres = castToWall(bouge, AXES(0).gauche, W)!;
+    expect(apres - avant).toBeCloseTo(0.5, 6);
+  });
+
+  it('les deux axes du bandeau sont perpendiculaires entre eux', () => {
+    const a = AXES(0.37);
+    expect(a.gauche.x * a.haut.x + a.gauche.z * a.haut.z).toBeCloseTo(0, 9);
   });
 });

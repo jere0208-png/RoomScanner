@@ -1687,3 +1687,26 @@ export function snapToNeighbours(
   if (bestX === null && bestZ === null) return p;
   return back({ x: bestX ?? target.x, z: bestZ ?? target.z });
 }
+
+/**
+ * Distance d'un point à un mur, dans une direction donnée.
+ *
+ * Sert aux cotes de dégagement d'un meuble : on part du milieu de chacun de
+ * ses côtés, perpendiculairement, et on regarde ce qu'on rencontre. Rien
+ * dans cette direction : pas de cote, plutôt qu'une cote fausse.
+ */
+export function castToWall(from: Pt, dir: Pt, walls: WallSeg[]): number | null {
+  let best = Infinity;
+  for (const w of walls) {
+    const ex = w.b.x - w.a.x;
+    const ez = w.b.z - w.a.z;
+    const den = dir.x * ez - dir.z * ex;
+    if (Math.abs(den) < 1e-9) continue;
+    const t = ((w.a.x - from.x) * ez - (w.a.z - from.z) * ex) / den;
+    const u = ((w.a.x - from.x) * dir.z - (w.a.z - from.z) * dir.x) / den;
+    if (t > 1e-3 && u >= -1e-6 && u <= 1 + 1e-6 && t < best) best = t;
+  }
+  // Jusqu'au NU du mur, pas jusqu'à son axe : c'est la cote qu'on relève
+  // sur place, mètre contre la plinthe.
+  return isFinite(best) ? Math.max(0, best - WALL_T / 2) : null;
+}

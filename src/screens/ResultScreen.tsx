@@ -42,6 +42,7 @@ import {
   type View3DParams,
 } from '../components/Iso3DView';
 import {
+  castToWall,
   fitsInRoom,
   planFrameAngle,
   roomOf,
@@ -325,25 +326,6 @@ export function ResultScreen() {
    * qui redresse le plan et qui oriente les traits de dégagement.
    */
   const trame = useMemo(() => planFrameAngle(walls), [walls]);
-  /** Un point du monde, exprimé dans la trame. */
-  const dansLaTrame = (p: { x: number; z: number }) => ({
-    x: p.x * Math.cos(trame) + p.z * Math.sin(trame),
-    z: -p.x * Math.sin(trame) + p.z * Math.cos(trame),
-  });
-  /** L'inverse : de la trame vers le monde. */
-  const versLeMonde = (p: { x: number; z: number }) => ({
-    x: p.x * Math.cos(trame) - p.z * Math.sin(trame),
-    z: p.x * Math.sin(trame) + p.z * Math.cos(trame),
-  });
-  const origineDe = (roomId: string) => {
-    const part = parts.find((p2) => p2.roomId === roomId);
-    const pts = (part?.surface?.pts ?? []).map(dansLaTrame);
-    if (pts.length === 0) return { x: 0, z: 0 };
-    return {
-      x: Math.min(...pts.map((q) => q.x)),
-      z: Math.min(...pts.map((q) => q.z)),
-    };
-  };
   /** Appareil de plafond en cours de réglage : le plan se dégage pour lui. */
   const [selCeiling, setSelCeiling] = useState<string | null>(null);
 
@@ -372,25 +354,6 @@ export function ResultScreen() {
     },
     [],
   );
-  const [clX, setClX] = useState('');
-  const [clZ, setClZ] = useState('');
-  /**
-   * Les deux cotes suivent le doigt.
-   *
-   * Elles étaient figées à la sélection : on glissait l'appareil et les
-   * champs continuaient d'afficher la position de départ. Or c'est en
-   * glissant qu'on lit — après, on ne regarde plus.
-   */
-  const clAt = ceiling.find((x) => x.id === selCeiling)?.at;
-  useEffect(() => {
-    const cl = ceiling.find((x) => x.id === selCeiling);
-    if (!cl) return;
-    const o = origineDe(cl.roomId);
-    const t = dansLaTrame(cl.at);
-    setClX(String(Math.round((t.x - o.x) * 100)));
-    setClZ(String(Math.round((t.z - o.z) * 100)));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selCeiling, clAt?.x, clAt?.z]);
   /** Repères électriques en 3D : un calque comme les autres. */
   const [showElecTags, setShowElecTags] = useState(true);
   const [editMode, setEditMode] = useState(false);
@@ -1260,10 +1223,6 @@ export function ResultScreen() {
                 setSelCeiling(id);
                 setSelectedObjectId(null);
                 setSelectedWallId(null);
-                const o = origineDe(cl.roomId);
-                const t = dansLaTrame(cl.at);
-                setClX(String(Math.round((t.x - o.x) * 100)));
-                setClZ(String(Math.round((t.z - o.z) * 100)));
                 return;
               }
               const spec = CEILINGS[cl.kind];
@@ -1454,9 +1413,31 @@ export function ResultScreen() {
                                 {
                                   label: 'Ligne de spots',
                                   hint:
-                                    'Quatre spots alignés sur la longueur ' +
-                                    'de la pièce, à intervalles égaux.',
-                                  onPress: () => setPendingSpots(4),
+                                    'Alignés sur la longueur de la pièce, ' +
+                                    'à intervalles égaux.',
+                                  onPress: () =>
+                                    setMenu({
+                                      title: 'Combien de spots ?',
+                                      subtitle:
+                                        'Ils se répartiront sur la longueur ' +
+                                        'de la pièce, avec un demi-écart aux ' +
+                                        'extrémités — la règle du métier.',
+                                      actions: [2, 3, 4, 5, 6, 8].map((n) => ({
+                                        label: `${n} spots`,
+                                        hint:
+                                          n <= 3
+                                            ? 'Petite pièce, ou une simple ' +
+                                              'ligne d’appoint.'
+                                            : n >= 6
+                                            ? 'Grande pièce, ou éclairage ' +
+                                              'général sans plafonnier.'
+                                            : undefined,
+                                        onPress: () => {
+                                          seulGeste('plafond');
+                                          setPendingSpots(n);
+                                        },
+                                      })),
+                                    }),
                                 },
                               ]
                             : []),
@@ -1725,39 +1706,106 @@ export function ResultScreen() {
           </View>
         )}
 
-        {/* L'appareil de plafond en réglage : ses deux cotes, au centimètre.
-            Mêmes gestes que pour un meuble — on lit, on corrige, on valide. */}
+        {/*
+          L'APPAREIL DE PLAFOND EN RÉGLAGE : ses distances aux murs.
+
+          Trois choses étaient fausses dans la première version, et toutes
+          les trois pour la même raison — j'avais recopié le bandeau des
+          meubles sans me demander ce qu'on lit vraiment sur un plafond.
+
+          1. Les valeurs étaient comptées depuis le coin de l'emprise de la
+             pièce, alors que les pointillés du plan montrent les distances
+             AUX MURS. Deux quantités différentes affichées côte à côte :
+             le bandeau contredisait le dessin.
+          2. La saisie se faisait dans le bandeau, en bas de l'écran — que
+             le clavier recouvre entièrement. On ne voyait plus ni le champ,
+             ni le plan, ni la validation.
+          3. Les deux flèches étaient des caractères : l'une passait en
+             icône, l'autre en émoji couleur selon la police du système.
+
+          Désormais : deux distances aux murs, exactement celles des
+          pointillés, dans des pastilles qu'on touche pour ouvrir la
+          feuille de saisie — celle qui monte AVEC le clavier.
+        */}
         {vue === '2d' && selCeiling && !capturing && (() => {
           const cl = ceiling.find((x) => x.id === selCeiling);
           if (!cl) return null;
-          const o = origineDe(cl.roomId);
-          const appliquer = () => {
-            const vx = parseFloat(clX.replace(',', '.'));
-            const vz = parseFloat(clZ.replace(',', '.'));
-            if (!isFinite(vx) || !isFinite(vz)) return;
-            moveCeiling(
-              cl.id,
-              versLeMonde({ x: o.x + vx / 100, z: o.z + vz / 100 }),
-            );
+          const part = parts.find((p2) => p2.roomId === cl.roomId);
+          const murs = part?.walls ?? walls;
+          const cos = Math.cos(trame);
+          const sin = Math.sin(trame);
+          /** Les quatre directions d'équerre, comme sur le plan. */
+          const AXES = {
+            gauche: { x: -cos, z: -sin },
+            droite: { x: cos, z: sin },
+            haut: { x: sin, z: -cos },
+            bas: { x: -sin, z: cos },
+          } as const;
+          const ecart = (k: keyof typeof AXES) =>
+            castToWall(cl.at, AXES[k], murs);
+          const cm = (v: number | null) =>
+            v === null ? '—' : String(Math.round(v * 100));
+
+          /** Déplace l'appareil pour obtenir CETTE distance à CE mur. */
+          const poser = (k: keyof typeof AXES, valeurCm: string) => {
+            const v = parseFloat(valeurCm.replace(',', '.'));
+            const actuel = ecart(k);
+            if (!isFinite(v) || v < 0 || actuel === null) return;
+            const d = v / 100 - actuel;
+            moveCeiling(cl.id, {
+              x: cl.at.x + AXES[k].x * d,
+              z: cl.at.z + AXES[k].z * d,
+            });
             haptic('succes');
           };
+
+          const champ = (
+            k: keyof typeof AXES,
+            titre: string,
+            fleche: 'gauche' | 'haut',
+          ) => (
+            <TouchableOpacity
+              style={styles.clChamp}
+              onPress={() => {
+                const actuel = ecart(k);
+                if (actuel === null) return;
+                setPrompt({
+                  title: titre,
+                  subtitle:
+                    'Distance entre l’appareil et le nu du mur, en ' +
+                    'centimètres. C’est la cote que porte le plan.',
+                  value: String(Math.round(actuel * 100)),
+                  unit: 'cm',
+                  numeric: true,
+                  okLabel: 'Placer',
+                  onSubmit: (t) => poser(k, t),
+                });
+              }}>
+              <Svg width={15} height={15} viewBox="0 0 24 24">
+                {(fleche === 'gauche'
+                  ? ['M3 12 h18', 'M8 7 L3 12 l5 5', 'M16 7 l5 5 -5 5']
+                  : ['M12 3 v18', 'M7 8 L12 3 l5 5', 'M7 16 l5 5 5 -5']
+                ).map((d2) => (
+                  <Path
+                    key={d2}
+                    d={d2}
+                    stroke={teinte.inkSoft}
+                    strokeWidth={2}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    fill="none"
+                  />
+                ))}
+              </Svg>
+              <Text style={styles.clValeur}>{cm(ecart(k))}</Text>
+            </TouchableOpacity>
+          );
+
           return (
             <View style={styles.editBar}>
               <View style={styles.editRow}>
-                <Text style={styles.unit}>↔</Text>
-                <TextInput
-                  style={styles.inputSmall}
-                  value={clX}
-                  onChangeText={setClX}
-                  keyboardType="decimal-pad"
-                />
-                <Text style={styles.unit}>↕</Text>
-                <TextInput
-                  style={styles.inputSmall}
-                  value={clZ}
-                  onChangeText={setClZ}
-                  keyboardType="decimal-pad"
-                />
+                {champ('gauche', 'Distance au mur de gauche', 'gauche')}
+                {champ('haut', 'Distance au mur du haut', 'haut')}
                 <Text style={styles.unit}>cm</Text>
                 <View style={styles.editIcons}>
                   <TouchableOpacity
@@ -1779,10 +1827,7 @@ export function ResultScreen() {
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.iconBtnOk}
-                    onPress={() => {
-                      appliquer();
-                      setSelCeiling(null);
-                    }}>
+                    onPress={() => setSelCeiling(null)}>
                     <Svg width={19} height={19} viewBox="0 0 24 24">
                       <Path
                         d="M5 12.5 L10 17.5 L19 6.5"
@@ -3194,6 +3239,24 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   unit: { color: c.inkSoft, fontSize: 15, marginHorizontal: 8 },
   // Champs resserrés : la fiche tient sur une ligne, boutons compris, sans
   // passer sous le bouton d'enregistrement.
+  /**
+   * Une distance au mur, dans le bandeau du plafond.
+   *
+   * C'est une pastille qu'on TOUCHE, pas un champ qu'on remplit sur place :
+   * le bandeau est en bas de l'écran, et le clavier le recouvre en entier.
+   * L'appui ouvre la feuille de saisie, qui monte avec le clavier.
+   */
+  clChamp: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: c.surfaceSunken,
+    borderRadius: radius.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginRight: 8,
+  },
+  clValeur: { color: c.ink, fontSize: 16, fontWeight: '800', minWidth: 30 },
   inputSmall: {
     backgroundColor: c.bg,
     color: c.ink,

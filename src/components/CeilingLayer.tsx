@@ -19,8 +19,8 @@ import {
   wallFace,
   type Fixture,
 } from '../geometry/electrical';
-import type { Pt, RoomPart, WallSeg } from '../geometry/floorplan';
-import { castToWall } from './FloorplanEditor';
+import { castToWall, type Pt, type RoomPart, type WallSeg } from '../geometry/floorplan';
+
 import {
   CEILINGS,
   CEILING_SYMBOL,
