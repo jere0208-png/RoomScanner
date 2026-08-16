@@ -2067,9 +2067,18 @@ const TOOL_PATHS: Record<ToolIcon, { d: string; fill?: boolean }[]> = {
     { d: 'M13.5 5.5 h7 v13 h-7 z' },
     { d: 'M3.5 13.5 h7 v5 h-7 z' },
   ],
+  /**
+   * Le crayon, recentré dans son cadre.
+   *
+   * Son tracé occupait x 4→21,3 et y 2,7→20 : le centre de l'encre
+   * tombait à (12,65 ; 11,35) quand celui de la boîte est à (12 ; 12). La
+   * pointe du crayon dépassant en haut à droite, l'icône paraissait
+   * poussée dans ce coin — d'autant plus visible que la pastille porte un
+   * contour, qui donne l'œil un repère. Décalée de (−0,65 ; +0,65).
+   */
   edit: [
-    { d: 'M11 4 H6 a2 2 0 0 0 -2 2 v12 a2 2 0 0 0 2 2 h12 a2 2 0 0 0 2 -2 v-5' },
-    { d: 'M18.3 2.7 l3 3 L11.2 15.8 l-4.1 1.1 1.1 -4.1 z' },
+    { d: 'M10.35 4.65 H5.35 a2 2 0 0 0 -2 2 v12 a2 2 0 0 0 2 2 h12 a2 2 0 0 0 2 -2 v-5' },
+    { d: 'M17.65 3.35 l3 3 L10.55 16.45 l-4.1 1.1 1.1 -4.1 z' },
   ],
 };
 
@@ -2185,8 +2194,31 @@ function FurnitureThumb({ item }: { item: CatalogItem }) {
   );
 }
 
-/** Pas d'une pastille : sa hauteur, son mot, et l'écart qui la suit. */
-const PILL_PITCH = 58;
+/**
+ * La géométrie de la colonne d'outils, en un seul endroit.
+ *
+ * Elle était éparpillée : la hauteur de la pastille dans un style, le
+ * `top` de la colonne dans un autre, le pas de l'animation dans une
+ * constante à part. Le jour où les pastilles ont reçu leur mot, la cellule
+ * a grandi de quinze points sans que rien d'autre bouge — le titre
+ * « Édition » est venu buter contre la pastille du dessous, et l'écart
+ * n'était plus le même entre la rangée d'ancrage et la colonne qu'à
+ * l'intérieur de la colonne.
+ *
+ * Tout se déduit maintenant de ces quatre nombres.
+ */
+const PILL_SIZE = 38;
+/** Hauteur du mot : imposée, pour que le calcul ne dépende pas des réglages
+ *  de police du téléphone. */
+const PILL_LABEL_H = 12;
+const PILL_LABEL_GAP = 3;
+/** Le même écart partout : entre deux pastilles, et sous l'ancrage. */
+const PILL_GAP = 12;
+const PILL_CELL_H = PILL_SIZE + PILL_LABEL_GAP + PILL_LABEL_H;
+/** Pas d'une pastille : sa cellule, et l'écart qui la suit. */
+const PILL_PITCH = PILL_CELL_H + PILL_GAP;
+/** Où la rangée d'ancrage se pose, et donc où la colonne commence. */
+const ANCHOR_TOP = 10;
 
 /**
  * Créneau d'une pastille dans la colonne.
@@ -2257,12 +2289,12 @@ function ToolPill({
   active: boolean;
   onPress: () => void;
   /**
-   * Actif = une lueur qui TOURNE autour, pastille laissée blanche.
+   * Actif = un contour bleu, pastille laissée blanche.
    *
    * Réservé au bouton d'édition. Rempli de bleu comme les autres, il
    * disait « calque affiché » alors qu'il dit « vous êtes en train de
-   * modifier » — un état, pas un réglage. Quelque chose qui bouge le dit
-   * mieux qu'une couleur, et c'est le seul point de l'écran qui bouge.
+   * modifier » — un état, pas un réglage. Le contour distingue les deux
+   * sans emprunter la couleur des calques.
    */
   halo?: boolean;
 }) {
@@ -2272,37 +2304,14 @@ function ToolPill({
   // Icône noire sur fond blanc ; blanche sur bleu quand l'outil est actif.
   const stroke = plein ? '#FFFFFF' : active ? c.blue : c.ink;
   /**
-   * Un contour qui respire, plutôt qu'un point qui tourne.
+   * Actif = un contour, POSÉ. Il ne respire plus.
    *
-   * L'arc tournant attirait l'œil en permanence et donnait à lire une
-   * progression — comme si quelque chose se chargeait. Or il n'y a rien à
-   * attendre : le bouton dit seulement « vous êtes en train de modifier ».
-   * Un liseré complet qui apparaît et s'efface en fondu le dit sans rien
-   * promettre, et se remarque à la périphérie du regard sans l'accrocher.
+   * Il est passé par un arc tournant, puis par un liséré en fondu. Les deux
+   * attiraient l'œil en permanence : quelque chose qui bouge dans un coin
+   * de l'écran se lit comme une attente, et il n'y a rien à attendre — le
+   * bouton dit seulement « vous êtes en train de modifier ». Un contour
+   * franc le dit une fois, et se tait.
    */
-  const pulse = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    if (!halo || !active) return;
-    pulse.setValue(0);
-    const boucle = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulse, {
-          toValue: 1,
-          duration: 900,
-          easing: Easing.inOut(Easing.quad),
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulse, {
-          toValue: 0,
-          duration: 900,
-          easing: Easing.inOut(Easing.quad),
-          useNativeDriver: true,
-        }),
-      ]),
-    );
-    boucle.start();
-    return () => boucle.stop();
-  }, [halo, active, pulse]);
   return (
     <View style={styles.toolCell}>
       <TouchableOpacity
@@ -2310,9 +2319,7 @@ function ToolPill({
         accessibilityLabel={label}
         onPress={onPress}>
         {halo && active && (
-          <Animated.View
-            pointerEvents="none"
-            style={[styles.toolHalo, { opacity: pulse }]}>
+          <View pointerEvents="none" style={styles.toolHalo}>
             {/* Le contour épouse exactement la pastille : un anneau posé
                 dessus, ni plus grand ni décalé. */}
             <Svg width={40} height={40} viewBox="0 0 40 40">
@@ -2327,7 +2334,7 @@ function ToolPill({
                 fill="none"
               />
             </Svg>
-          </Animated.View>
+          </View>
         )}
         {/* La pastille garde ses 36 px : seul le tracé grossit, pour se
             lire d'un coup d'œil sans élargir la barre d'outils. */}
@@ -2489,21 +2496,24 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   // cacher la moitié des outils.
   planTools: {
     position: 'absolute',
-    top: 58,
+    // Juste sous la rangée d'ancrage, du même écart qu'entre deux pastilles.
+    top: ANCHOR_TOP + PILL_CELL_H + PILL_GAP,
     // La cellule fait 58 de large pour son mot, la pastille 38 : on recule
     // de la moitié de la différence pour que les pastilles restent sur
     // l'axe qu'elles occupaient.
     right: -1,
     alignItems: 'flex-end',
-    gap: 6,
+    gap: PILL_GAP,
   },
   editAnchor: {
     position: 'absolute',
-    top: 10,
+    top: ANCHOR_TOP,
     right: -1,
     zIndex: 4,
     flexDirection: 'row',
-    alignItems: 'center',
+    // En haut, pas au centre : les cellules de la rangée doivent partager
+    // la ligne des pastilles, même quand l'une porte un mot plus long.
+    alignItems: 'flex-start',
     gap: 6,
   },
   /**
@@ -2513,19 +2523,20 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
    * CENTRÉE sur elle : les colonnes du plan 2D et de la 3D, et la rangée du
    * bouton d'édition, gardent ainsi le même axe qu'avant.
    */
-  toolCell: { width: 58, alignItems: 'center' },
+  toolCell: { width: 58, alignItems: 'center', height: PILL_CELL_H },
   toolLabel: {
     color: c.inkFaint,
     fontSize: 9.5,
+    lineHeight: PILL_LABEL_H,
     fontWeight: '700',
     letterSpacing: -0.1,
-    marginTop: 3,
+    marginTop: PILL_LABEL_GAP,
     textAlign: 'center',
   },
   toolLabelActive: { color: c.blue },
   toolPill: {
-    width: 38,
-    height: 38,
+    width: PILL_SIZE,
+    height: PILL_SIZE,
     borderRadius: 14,
     backgroundColor: c.surface,
     alignItems: 'center',
@@ -2535,12 +2546,15 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     shadowRadius: 10,
   },
   // Le liseré épouse la pastille, à deux pixels près.
+  // Le liséré fait 40 sur une pastille de 38 : il déborde d'UN point de
+  // chaque côté. À −2 il était décalé d'un pixel en haut à gauche — peu de
+  // chose, sauf que l'œil compare un contour à la forme qu'il entoure.
   toolHalo: {
     position: 'absolute',
     width: 40,
     height: 40,
-    left: -2,
-    top: -2,
+    left: -1,
+    top: -1,
     alignItems: 'center',
     justifyContent: 'center',
   },
