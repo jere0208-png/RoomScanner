@@ -634,7 +634,12 @@ dessinateur avant de coter.
 **Les menuiseries sont cotées**, à l'intérieur de la pièce : dehors, la cote
 du mur occupe déjà la place.
 
-**Rien ne peut fuir hors du cadre.** Une cote d'appareil devenue folle — un
+**Rien ne peut fuir hors du cadre.** Le zoom du plan vient de l'aperçu
+d'export : rien ne borne son échelle, et un plan agrandi sortait de sa zone
+pour aller barrer le cartouche — c'est ce que montrait le PDF envoyé, dont
+les murs eux-mêmes filaient au-delà du cadre. Une **fenêtre de découpe** PDF
+contient désormais tout le dessin, quelle que soit l'échelle. C'est la seule
+façon sûre : borner chaque tracé un par un, c'est en oublier un. Une cote d'appareil devenue folle — un
 mur recoupé depuis la pose — enverrait son symbole à l'autre bout de la
 feuille : la position est bornée à la face, et ce qui sortirait du cadre
 n'est pas tracé. Un test relit le flux PDF, extrait tous les points de tracé

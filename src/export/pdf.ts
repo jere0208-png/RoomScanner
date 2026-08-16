@@ -244,6 +244,24 @@ class Draw {
     );
   }
 
+  /**
+   * Fenêtre de découpe : tout ce qui suit est rogné à ce rectangle, jusqu'au
+   * `restore()`. C'est la seule façon sûre de contenir un dessin dont
+   * l'échelle vient de l'utilisateur — un plan zoomé dans l'aperçu d'export
+   * débordait de sa zone et allait barrer le cartouche.
+   */
+  save() {
+    this.ops.push('q');
+  }
+
+  restore() {
+    this.ops.push('Q');
+  }
+
+  clip(x: number, y: number, w: number, h: number) {
+    this.ops.push(`${n2(x)} ${n2(y)} ${n2(w)} ${n2(h)} re W n`);
+  }
+
   circle(cx: number, cy: number, r: number, fill: string) {
     const pts: Pt[] = [];
     for (let i = 0; i < 20; i++) {
@@ -651,6 +669,16 @@ function planPage(
   }
   let scaleLabel: string | null = null;
   if (isFinite(minX)) {
+    // Rien du plan ne peut sortir de la feuille : le zoom choisi dans
+    // l'aperçu s'applique tel quel, et un plan agrandi allait jusqu'à
+    // traverser le cartouche.
+    d.save();
+    d.clip(
+      FRAME.x + 2,
+      FRAME.y + TITLE_H + 2,
+      FRAME.w - 4,
+      FRAME.h - TITLE_H - 4,
+    );
     const fit = Math.min(
       box.w / Math.max(maxX - minX, 0.5),
       box.h / Math.max(maxZ - minZ, 0.5),
@@ -947,6 +975,8 @@ function planPage(
         }
       }
     }
+
+    d.restore();
   }
 
   drawSheetChrome(d, {

@@ -71,8 +71,8 @@ function points(pdf: string): { x: number; y: number }[] {
   return out;
 }
 
-describe('le plan PDF tient dans sa feuille', () => {
-  const pdf = latin1(
+const pdfDe = (opts: object) =>
+  latin1(
     buildScanPdf(
       {
         name: 'Biais',
@@ -82,9 +82,12 @@ describe('le plan PDF tient dans sa feuille', () => {
         fixtures: prises,
       },
       false,
-      { metre: false },
+      { metre: false, ...opts },
     ),
   );
+
+describe('le plan PDF tient dans sa feuille', () => {
+  const pdf = pdfDe({});
 
   it('produit bien un document', () => {
     expect(pdf.startsWith('%PDF-1.4')).toBe(true);
@@ -107,5 +110,20 @@ describe('le plan PDF tient dans sa feuille', () => {
   it('les ouvertures sont cotées', () => {
     // 0,90 m de porte : la cote doit figurer sur le plan.
     expect(pdf).toContain('0,90');
+  });
+
+  it('un plan ZOOMÉ est rogné, jamais laissé libre', () => {
+    // Le zoom vient de l'aperçu d'export : rien ne borne l'échelle, et le
+    // plan agrandi allait traverser le cartouche. Une fenêtre de découpe le
+    // contient — c'est elle qu'on vérifie, les coordonnées d'un tracé rogné
+    // sortant forcément du cadre.
+    const zoome = pdfDe({ plan: { zoom: 2.6, fx: 0.35, fy: -0.3 } });
+    const clip = /(-?[\d.]+) (-?[\d.]+) (-?[\d.]+) (-?[\d.]+) re W n/.exec(zoome);
+    expect(clip).not.toBeNull();
+    const [x, y, w, h] = clip!.slice(1).map(parseFloat);
+    expect(x).toBeGreaterThanOrEqual(30);
+    expect(y).toBeGreaterThanOrEqual(30);
+    expect(x + w).toBeLessThanOrEqual(PAGE_W - 30);
+    expect(y + h).toBeLessThanOrEqual(PAGE_H - 30);
   });
 });
