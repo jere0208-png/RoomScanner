@@ -21,6 +21,7 @@
  * Les courants faibles (RJ45, coaxial) passent en ICTA 25 : on y tire
  * rarement une seule paire, et une gaine trop juste se paie au tirage.
  */
+import { CEILINGS, type CeilingFixture } from './ceiling';
 import { FIXTURES, postsOf, type Fixture } from './electrical';
 import type { Circuit } from './nfc15100';
 
@@ -115,6 +116,7 @@ export const BUY_FAMILIES = [
   'Conduits et conducteurs',
   'Encastrement et finition',
   'Appareillage',
+  'Plafond',
 ] as const;
 
 /** Écrit une section à la française : 2,5 et non 2.5. */
@@ -132,7 +134,20 @@ const COURONNE = 100;
  * double, ce sont deux boîtes à 71 mm d'entraxe — et les plaques par
  * ensemble, ce qui n'est pas la même chose et se confond tout le temps.
  */
-export function buyingList(rows: PullRow[], fixtures: Fixture[]): BuyRow[] {
+export function buyingList(
+  rows: PullRow[],
+  fixtures: Fixture[],
+  /**
+   * Ce qui est posé AU PLAFOND.
+   *
+   * On le dessinait sur le plan et personne ne l'achetait : huit spots
+   * figuraient au dossier sans jamais apparaître sur un bordereau. Chaque
+   * point lumineux emporte en outre sa boîte — une DCL pour un point de
+   * centre, une boîte de dérivation pour une applique — qu'on oublie
+   * encore plus facilement que le luminaire lui-même.
+   */
+  ceiling: CeilingFixture[] = [],
+): BuyRow[] {
   const out: BuyRow[] = [];
 
   const parConduit = new Map<ConduitD, number>();
@@ -216,6 +231,44 @@ export function buyingList(rows: PullRow[], fixtures: Fixture[]): BuyRow[] {
       label: FIXTURES[k as keyof typeof FIXTURES].label,
       spec: 'Mécanisme à encastrer, entraxe 60 mm, griffes ou vis',
       quantity: q,
+      unit: 'u',
+    });
+  }
+
+  // ------------------------------------------------------------- plafond
+  const parPlafond = new Map<string, number>();
+  for (const cl of ceiling) {
+    parPlafond.set(cl.kind, (parPlafond.get(cl.kind) ?? 0) + 1);
+  }
+  for (const [k, q] of parPlafond) {
+    const spec = CEILINGS[k as keyof typeof CEILINGS];
+    out.push({
+      family: 'Plafond',
+      label: spec.label,
+      spec: spec.note,
+      quantity: q,
+      unit: 'u',
+    });
+  }
+  // Les boîtes : une par point lumineux, et pas la même selon le point.
+  const dcl = (parPlafond.get('dcl') ?? 0) + (parPlafond.get('ventilateur') ?? 0);
+  if (dcl > 0) {
+    out.push({
+      family: 'Plafond',
+      label: 'Boîte de centre DCL',
+      spec: 'Avec fiche et douille, crochet pour luminaire suspendu',
+      quantity: dcl,
+      unit: 'u',
+      note: 'une par point de centre',
+    });
+  }
+  const derivation = parPlafond.get('applique') ?? 0;
+  if (derivation > 0) {
+    out.push({
+      family: 'Plafond',
+      label: 'Boîte de dérivation Ø 80 mm',
+      spec: 'Pour applique : la DCL ne convient qu\u2019au point de centre',
+      quantity: derivation,
       unit: 'u',
     });
   }

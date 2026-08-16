@@ -1,0 +1,2551 @@
+{
+ "type": "View",
+ "props": {
+  "style": {
+   "flex": 1,
+   "backgroundColor": "#FFFFFF",
+   "borderRadius": 20,
+   "overflow": "hidden"
+  },
+  "onLayout": "[fn]",
+  "onStartShouldSetResponder": "[fn]",
+  "onMoveShouldSetResponder": "[fn]",
+  "onStartShouldSetResponderCapture": "[fn]",
+  "onMoveShouldSetResponderCapture": "[fn]",
+  "onResponderGrant": "[fn]",
+  "onResponderReject": "[fn]",
+  "onResponderRelease": "[fn]",
+  "onResponderStart": "[fn]",
+  "onResponderMove": "[fn]",
+  "onResponderEnd": "[fn]",
+  "onResponderTerminate": "[fn]",
+  "onResponderTerminationRequest": "[fn]"
+ },
+ "children": [
+  {
+   "type": "RNSVGSvgView",
+   "props": {
+    "width": 360,
+    "height": 520,
+    "focusable": false,
+    "style": [
+     {
+      "backgroundColor": "transparent",
+      "borderWidth": 0
+     },
+     {
+      "width": 360,
+      "height": 520,
+      "flex": 0
+     }
+    ],
+    "bbWidth": 360,
+    "bbHeight": 520
+   },
+   "children": [
+    {
+     "type": "RNSVGGroup",
+     "props": {
+      "fill": {
+       "type": 0,
+       "payload": 4278190080
+      }
+     },
+     "children": [
+      {
+       "type": "RNSVGRect",
+       "props": {
+        "onResponderMove": "[fn]",
+        "onResponderGrant": "[fn]",
+        "onResponderRelease": "[fn]",
+        "onResponderTerminate": "[fn]",
+        "onStartShouldSetResponder": "[fn]",
+        "onResponderTerminationRequest": "[fn]",
+        "responsible": true,
+        "fill": {
+         "type": 0,
+         "payload": 0
+        },
+        "propList": [
+         "fill"
+        ],
+        "x": 0,
+        "y": 0,
+        "width": 360,
+        "height": 520
+       },
+       "children": null
+      },
+      {
+       "type": "RNSVGGroup",
+       "props": {
+        "fill": {
+         "type": 0,
+         "payload": 4278190080
+        }
+       },
+       "children": [
+        {
+         "type": "RNSVGDefs",
+         "props": {},
+         "children": [
+          {
+           "type": "RNSVGPattern",
+           "props": {
+            "x": 0,
+            "y": 0,
+            "width": 16,
+            "height": 16,
+            "name": "floorDots",
+            "matrix": [
+             1,
+             0,
+             0,
+             1,
+             0,
+             0
+            ],
+            "patternTransform": [
+             1,
+             0,
+             0,
+             1,
+             0,
+             0
+            ],
+            "patternUnits": 1,
+            "patternContentUnits": 1
+           },
+           "children": [
+            {
+             "type": "RNSVGCircle",
+             "props": {
+              "fill": {
+               "type": 0,
+               "payload": 4288192942
+              },
+              "propList": [
+               "fill"
+              ],
+              "cx": 1.1,
+              "cy": 1.1,
+              "r": 1.1
+             },
+             "children": null
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "type": "RNSVGGroup",
+         "props": {
+          "fill": {
+           "type": 0,
+           "payload": 4278190080
+          }
+         },
+         "children": [
+          {
+           "type": "RNSVGPath",
+           "props": {
+            "fill": {
+             "type": 0,
+             "payload": 4293915125
+            },
+            "stroke": null,
+            "propList": [
+             "fill",
+             "stroke"
+            ],
+            "d": "M63.37722357294943 177.73597754957197 210.0188101026926 208.90560898017122 320 232.28283255312064 296.62277642705055 342.264022450428 186.6415865297432 318.88679887747855 40 287.71716744687933z"
+           },
+           "children": null
+          },
+          {
+           "type": "RNSVGPath",
+           "props": {
+            "fill": {
+             "type": 1,
+             "brushRef": "floorDots"
+            },
+            "stroke": null,
+            "propList": [
+             "fill",
+             "stroke"
+            ],
+            "d": "M63.37722357294943 177.73597754957197 210.0188101026926 208.90560898017122 320 232.28283255312064 296.62277642705055 342.264022450428 186.6415865297432 318.88679887747855 40 287.71716744687933z"
+           },
+           "children": null
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "RNSVGGroup",
+       "props": {
+        "onResponderMove": "[fn]",
+        "onResponderGrant": "[fn]",
+        "onResponderRelease": "[fn]",
+        "onResponderTerminate": "[fn]",
+        "onStartShouldSetResponder": "[fn]",
+        "onResponderTerminationRequest": "[fn]",
+        "responsible": true,
+        "fill": {
+         "type": 0,
+         "payload": 4278190080
+        }
+       },
+       "children": [
+        {
+         "type": "RNSVGLine",
+         "props": {
+          "fill": {
+           "type": 0,
+           "payload": 4278190080
+          },
+          "stroke": {
+           "type": 0,
+           "payload": 0
+          },
+          "strokeWidth": 30,
+          "propList": [
+           "stroke",
+           "strokeWidth"
+          ],
+          "x1": 63.377,
+          "y1": 177.736,
+          "x2": 210.019,
+          "y2": 208.906
+         },
+         "children": null
+        },
+        {
+         "type": "RNSVGPath",
+         "props": {
+          "fill": {
+           "type": 0,
+           "payload": 4278914322
+          },
+          "stroke": null,
+          "propList": [
+           "fill",
+           "stroke"
+          ],
+          "d": "M65.39798278718445 180.84767386387796 206.90711378838665 210.92636819440622 210.5642786527281 206.3393812159007 61.35646435871442 174.62428123526598z"
+         },
+         "children": null
+        },
+        {
+         "type": "RNSVGText",
+         "props": {
+          "fill": {
+           "type": 0,
+           "payload": 4284114034
+          },
+          "propList": [
+           "fill"
+          ],
+          "matrix": [
+           0.978,
+           0.208,
+           -0.208,
+           0.978,
+           40.87,
+           -24.947
+          ],
+          "opacity": 1,
+          "content": null,
+          "font": {
+           "fontWeight": "600",
+           "fontSize": 10,
+           "textAnchor": "middle"
+          },
+          "x": [
+           139.115
+          ],
+          "y": [
+           184.951
+          ],
+          "dx": [],
+          "dy": [],
+          "rotate": []
+         },
+         "children": [
+          {
+           "type": "RNSVGTSpan",
+           "props": {
+            "fill": {
+             "type": 0,
+             "payload": 4278190080
+            },
+            "content": "4,00 m",
+            "font": {},
+            "x": [],
+            "y": [],
+            "dx": [],
+            "dy": [],
+            "rotate": []
+           },
+           "children": null
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "RNSVGGroup",
+       "props": {
+        "onResponderMove": "[fn]",
+        "onResponderGrant": "[fn]",
+        "onResponderRelease": "[fn]",
+        "onResponderTerminate": "[fn]",
+        "onStartShouldSetResponder": "[fn]",
+        "onResponderTerminationRequest": "[fn]",
+        "responsible": true,
+        "fill": {
+         "type": 0,
+         "payload": 4278190080
+        }
+       },
+       "children": [
+        {
+         "type": "RNSVGLine",
+         "props": {
+          "fill": {
+           "type": 0,
+           "payload": 4278190080
+          },
+          "stroke": {
+           "type": 0,
+           "payload": 0
+          },
+          "strokeWidth": 30,
+          "propList": [
+           "stroke",
+           "strokeWidth"
+          ],
+          "x1": 210.019,
+          "y1": 208.906,
+          "x2": 320,
+          "y2": 232.283
+         },
+         "children": null
+        },
+        {
+         "type": "RNSVGPath",
+         "props": {
+          "fill": {
+           "type": 0,
+           "payload": 4278914322
+          },
+          "stroke": null,
+          "propList": [
+           "fill",
+           "stroke"
+          ],
+          "d": "M212.03956931692767 212.0173052944772 316.888303685694 234.30359176735567 323.111696314306 230.2620733388856 210.5642786527281 206.3393812159007z"
+         },
+         "children": null
+        },
+        {
+         "type": "RNSVGText",
+         "props": {
+          "fill": {
+           "type": 0,
+           "payload": 4284114034
+          },
+          "propList": [
+           "fill"
+          ],
+          "matrix": [
+           0.978,
+           0.208,
+           -0.208,
+           0.978,
+           49.344,
+           -51.029
+          ],
+          "opacity": 1,
+          "content": null,
+          "font": {
+           "fontWeight": "600",
+           "fontSize": 10,
+           "textAnchor": "middle"
+          },
+          "x": [
+           267.426
+          ],
+          "y": [
+           212.225
+          ],
+          "dx": [],
+          "dy": [],
+          "rotate": []
+         },
+         "children": [
+          {
+           "type": "RNSVGTSpan",
+           "props": {
+            "fill": {
+             "type": 0,
+             "payload": 4278190080
+            },
+            "content": "3,00 m",
+            "font": {},
+            "x": [],
+            "y": [],
+            "dx": [],
+            "dy": [],
+            "rotate": []
+           },
+           "children": null
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "RNSVGGroup",
+       "props": {
+        "onResponderMove": "[fn]",
+        "onResponderGrant": "[fn]",
+        "onResponderRelease": "[fn]",
+        "onResponderTerminate": "[fn]",
+        "onStartShouldSetResponder": "[fn]",
+        "onResponderTerminationRequest": "[fn]",
+        "responsible": true,
+        "fill": {
+         "type": 0,
+         "payload": 4278190080
+        }
+       },
+       "children": [
+        {
+         "type": "RNSVGLine",
+         "props": {
+          "fill": {
+           "type": 0,
+           "payload": 4278190080
+          },
+          "stroke": {
+           "type": 0,
+           "payload": 0
+          },
+          "strokeWidth": 30,
+          "propList": [
+           "stroke",
+           "strokeWidth"
+          ],
+          "x1": 320,
+          "y1": 232.283,
+          "x2": 296.623,
+          "y2": 342.264
+         },
+         "children": null
+        },
+        {
+         "type": "RNSVGPath",
+         "props": {
+          "fill": {
+           "type": 0,
+           "payload": 4278914322
+          },
+          "stroke": null,
+          "propList": [
+           "fill",
+           "stroke"
+          ],
+          "d": "M316.888303685694 234.30359176735567 294.60201721281555 339.15232613612204 298.6435356412856 345.3757187647341 323.111696314306 230.2620733388856z"
+         },
+         "children": null
+        },
+        {
+         "type": "RNSVGText",
+         "props": {
+          "fill": {
+           "type": 0,
+           "payload": 4284114034
+          },
+          "propList": [
+           "fill"
+          ],
+          "matrix": [
+           0.208,
+           -0.978,
+           0.978,
+           0.208,
+           -43.428,
+           516.085
+          ],
+          "opacity": 1,
+          "content": null,
+          "font": {
+           "fontWeight": "600",
+           "fontSize": 10,
+           "textAnchor": "middle"
+          },
+          "x": [
+           296.942
+          ],
+          "y": [
+           287.857
+          ],
+          "dx": [],
+          "dy": [],
+          "rotate": []
+         },
+         "children": [
+          {
+           "type": "RNSVGTSpan",
+           "props": {
+            "fill": {
+             "type": 0,
+             "payload": 4278190080
+            },
+            "content": "3,00 m",
+            "font": {},
+            "x": [],
+            "y": [],
+            "dx": [],
+            "dy": [],
+            "rotate": []
+           },
+           "children": null
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "RNSVGGroup",
+       "props": {
+        "onResponderMove": "[fn]",
+        "onResponderGrant": "[fn]",
+        "onResponderRelease": "[fn]",
+        "onResponderTerminate": "[fn]",
+        "onStartShouldSetResponder": "[fn]",
+        "onResponderTerminationRequest": "[fn]",
+        "responsible": true,
+        "fill": {
+         "type": 0,
+         "payload": 4278190080
+        }
+       },
+       "children": [
+        {
+         "type": "RNSVGLine",
+         "props": {
+          "fill": {
+           "type": 0,
+           "payload": 4278190080
+          },
+          "stroke": {
+           "type": 0,
+           "payload": 0
+          },
+          "strokeWidth": 30,
+          "propList": [
+           "stroke",
+           "strokeWidth"
+          ],
+          "x1": 296.623,
+          "y1": 342.264,
+          "x2": 186.642,
+          "y2": 318.887
+         },
+         "children": null
+        },
+        {
+         "type": "RNSVGPath",
+         "props": {
+          "fill": {
+           "type": 0,
+           "payload": 4278914322
+          },
+          "stroke": null,
+          "propList": [
+           "fill",
+           "stroke"
+          ],
+          "d": "M294.60201721281555 339.15232613612204 189.75328284404918 316.86603966324355 186.09611797970769 321.4530266417491 298.6435356412856 345.3757187647341z"
+         },
+         "children": null
+        },
+        {
+         "type": "RNSVGText",
+         "props": {
+          "fill": {
+           "type": 0,
+           "payload": 4284114034
+          },
+          "propList": [
+           "fill"
+          ],
+          "matrix": [
+           0.978,
+           0.208,
+           -0.208,
+           0.978,
+           71.7,
+           -43.765
+          ],
+          "opacity": 1,
+          "content": null,
+          "font": {
+           "fontWeight": "600",
+           "fontSize": 10,
+           "textAnchor": "middle"
+          },
+          "x": [
+           244.049
+          ],
+          "y": [
+           322.206
+          ],
+          "dx": [],
+          "dy": [],
+          "rotate": []
+         },
+         "children": [
+          {
+           "type": "RNSVGTSpan",
+           "props": {
+            "fill": {
+             "type": 0,
+             "payload": 4278190080
+            },
+            "content": "3,00 m",
+            "font": {},
+            "x": [],
+            "y": [],
+            "dx": [],
+            "dy": [],
+            "rotate": []
+           },
+           "children": null
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "RNSVGGroup",
+       "props": {
+        "onResponderMove": "[fn]",
+        "onResponderGrant": "[fn]",
+        "onResponderRelease": "[fn]",
+        "onResponderTerminate": "[fn]",
+        "onStartShouldSetResponder": "[fn]",
+        "onResponderTerminationRequest": "[fn]",
+        "responsible": true,
+        "fill": {
+         "type": 0,
+         "payload": 4278190080
+        }
+       },
+       "children": [
+        {
+         "type": "RNSVGLine",
+         "props": {
+          "fill": {
+           "type": 0,
+           "payload": 4278190080
+          },
+          "stroke": {
+           "type": 0,
+           "payload": 0
+          },
+          "strokeWidth": 30,
+          "propList": [
+           "stroke",
+           "strokeWidth"
+          ],
+          "x1": 186.642,
+          "y1": 318.887,
+          "x2": 40,
+          "y2": 287.717
+         },
+         "children": null
+        },
+        {
+         "type": "RNSVGPath",
+         "props": {
+          "fill": {
+           "type": 0,
+           "payload": 4278914322
+          },
+          "stroke": null,
+          "propList": [
+           "fill",
+           "stroke"
+          ],
+          "d": "M184.62082731550817 315.7751025631726 43.11169631430599 285.69640823264433 36.88830368569401 289.7379266611144 186.09611797970769 321.4530266417491z"
+         },
+         "children": null
+        },
+        {
+         "type": "RNSVGText",
+         "props": {
+          "fill": {
+           "type": 0,
+           "payload": 4284114034
+          },
+          "propList": [
+           "fill"
+          ],
+          "matrix": [
+           0.978,
+           0.208,
+           -0.208,
+           0.978,
+           63.225,
+           -17.684
+          ],
+          "opacity": 1,
+          "content": null,
+          "font": {
+           "fontWeight": "600",
+           "fontSize": 10,
+           "textAnchor": "middle"
+          },
+          "x": [
+           115.737
+          ],
+          "y": [
+           294.932
+          ],
+          "dx": [],
+          "dy": [],
+          "rotate": []
+         },
+         "children": [
+          {
+           "type": "RNSVGTSpan",
+           "props": {
+            "fill": {
+             "type": 0,
+             "payload": 4278190080
+            },
+            "content": "4,00 m",
+            "font": {},
+            "x": [],
+            "y": [],
+            "dx": [],
+            "dy": [],
+            "rotate": []
+           },
+           "children": null
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "RNSVGGroup",
+       "props": {
+        "onResponderMove": "[fn]",
+        "onResponderGrant": "[fn]",
+        "onResponderRelease": "[fn]",
+        "onResponderTerminate": "[fn]",
+        "onStartShouldSetResponder": "[fn]",
+        "onResponderTerminationRequest": "[fn]",
+        "responsible": true,
+        "fill": {
+         "type": 0,
+         "payload": 4278190080
+        }
+       },
+       "children": [
+        {
+         "type": "RNSVGLine",
+         "props": {
+          "fill": {
+           "type": 0,
+           "payload": 4278190080
+          },
+          "stroke": {
+           "type": 0,
+           "payload": 0
+          },
+          "strokeWidth": 30,
+          "propList": [
+           "stroke",
+           "strokeWidth"
+          ],
+          "x1": 40,
+          "y1": 287.717,
+          "x2": 63.377,
+          "y2": 177.736
+         },
+         "children": null
+        },
+        {
+         "type": "RNSVGPath",
+         "props": {
+          "fill": {
+           "type": 0,
+           "payload": 4278914322
+          },
+          "stroke": null,
+          "propList": [
+           "fill",
+           "stroke"
+          ],
+          "d": "M43.11169631430599 285.69640823264433 65.39798278718445 180.84767386387796 61.35646435871442 174.62428123526598 36.88830368569401 289.7379266611144z"
+         },
+         "children": null
+        },
+        {
+         "type": "RNSVGText",
+         "props": {
+          "fill": {
+           "type": 0,
+           "payload": 4284114034
+          },
+          "propList": [
+           "fill"
+          ],
+          "matrix": [
+           0.208,
+           -0.978,
+           0.978,
+           0.208,
+           -193.341,
+           221.864
+          ],
+          "opacity": 1,
+          "content": null,
+          "font": {
+           "fontWeight": "600",
+           "fontSize": 10,
+           "textAnchor": "middle"
+          },
+          "x": [
+           40.319
+          ],
+          "y": [
+           233.31
+          ],
+          "dx": [],
+          "dy": [],
+          "rotate": []
+         },
+         "children": [
+          {
+           "type": "RNSVGTSpan",
+           "props": {
+            "fill": {
+             "type": 0,
+             "payload": 4278190080
+            },
+            "content": "3,00 m",
+            "font": {},
+            "x": [],
+            "y": [],
+            "dx": [],
+            "dy": [],
+            "rotate": []
+           },
+           "children": null
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "RNSVGGroup",
+       "props": {
+        "onResponderMove": "[fn]",
+        "onResponderGrant": "[fn]",
+        "onResponderRelease": "[fn]",
+        "onResponderTerminate": "[fn]",
+        "onStartShouldSetResponder": "[fn]",
+        "onResponderTerminationRequest": "[fn]",
+        "responsible": true,
+        "fill": {
+         "type": 0,
+         "payload": 4278190080
+        }
+       },
+       "children": [
+        {
+         "type": "RNSVGLine",
+         "props": {
+          "fill": {
+           "type": 0,
+           "payload": 4278190080
+          },
+          "stroke": {
+           "type": 0,
+           "payload": 0
+          },
+          "strokeWidth": 30,
+          "propList": [
+           "stroke",
+           "strokeWidth"
+          ],
+          "x1": 210.019,
+          "y1": 208.906,
+          "x2": 186.642,
+          "y2": 318.887
+         },
+         "children": null
+        },
+        {
+         "type": "RNSVGPath",
+         "props": {
+          "fill": {
+           "type": 0,
+           "payload": 4278914322
+          },
+          "stroke": null,
+          "propList": [
+           "fill",
+           "stroke"
+          ],
+          "d": "M206.90711378838665 210.92636819440622 184.62082731550817 315.7751025631726 189.75328284404918 316.86603966324355 212.03956931692767 212.0173052944772z"
+         },
+         "children": null
+        },
+        {
+         "type": "RNSVGText",
+         "props": {
+          "fill": {
+           "type": 0,
+           "payload": 4284114034
+          },
+          "propList": [
+           "fill"
+          ],
+          "matrix": [
+           0.208,
+           -0.978,
+           0.978,
+           0.208,
+           -107.676,
+           389.99
+          ],
+          "opacity": 1,
+          "content": null,
+          "font": {
+           "fontWeight": "600",
+           "fontSize": 10,
+           "textAnchor": "middle"
+          },
+          "x": [
+           186.961
+          ],
+          "y": [
+           264.48
+          ],
+          "dx": [],
+          "dy": [],
+          "rotate": []
+         },
+         "children": [
+          {
+           "type": "RNSVGTSpan",
+           "props": {
+            "fill": {
+             "type": 0,
+             "payload": 4278190080
+            },
+            "content": "3,00 m",
+            "font": {},
+            "x": [],
+            "y": [],
+            "dx": [],
+            "dy": [],
+            "rotate": []
+           },
+           "children": null
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "RNSVGPath",
+       "props": {
+        "onResponderMove": "[fn]",
+        "onResponderGrant": "[fn]",
+        "onResponderRelease": "[fn]",
+        "onResponderTerminate": "[fn]",
+        "onStartShouldSetResponder": "[fn]",
+        "onResponderTerminationRequest": "[fn]",
+        "responsible": true,
+        "fill": {
+         "type": 0,
+         "payload": 0
+        },
+        "stroke": {
+         "type": 0,
+         "payload": 0
+        },
+        "strokeWidth": 6,
+        "propList": [
+         "fill",
+         "stroke",
+         "strokeWidth"
+        ],
+        "d": "M212.03956931692767 212.0173052944772 246.98914743984977 219.44606745210336 248.08008453992073 214.31361192356235 210.5642786527281 206.3393812159007z"
+       },
+       "children": null
+      },
+      {
+       "type": "RNSVGPath",
+       "props": {
+        "onResponderMove": "[fn]",
+        "onResponderGrant": "[fn]",
+        "onResponderRelease": "[fn]",
+        "onResponderTerminate": "[fn]",
+        "onStartShouldSetResponder": "[fn]",
+        "onResponderTerminationRequest": "[fn]",
+        "responsible": true,
+        "fill": {
+         "type": 0,
+         "payload": 0
+        },
+        "stroke": {
+         "type": 0,
+         "payload": 0
+        },
+        "strokeWidth": 6,
+        "propList": [
+         "fill",
+         "stroke",
+         "strokeWidth"
+        ],
+        "d": "M288.92864118735633 228.36058204125476 316.888303685694 234.30359176735567 323.111696314306 230.2620733388856 293.09905160455196 223.8826887727563z"
+       },
+       "children": null
+      },
+      {
+       "type": "RNSVGPath",
+       "props": {
+        "onResponderMove": "[fn]",
+        "onResponderGrant": "[fn]",
+        "onResponderRelease": "[fn]",
+        "onResponderTerminate": "[fn]",
+        "onStartShouldSetResponder": "[fn]",
+        "onResponderTerminationRequest": "[fn]",
+        "responsible": true,
+        "fill": {
+         "type": 0,
+         "payload": 0
+        },
+        "stroke": {
+         "type": 0,
+         "payload": 0
+        },
+        "strokeWidth": 6,
+        "propList": [
+         "fill",
+         "stroke",
+         "strokeWidth"
+        ],
+        "d": "M316.888303685694 234.30359176735567 309.45954152806786 269.2531698902778 314.9556427566325 268.63328848083506 323.111696314306 230.2620733388856z"
+       },
+       "children": null
+      },
+      {
+       "type": "RNSVGPath",
+       "props": {
+        "onResponderMove": "[fn]",
+        "onResponderGrant": "[fn]",
+        "onResponderRelease": "[fn]",
+        "onResponderTerminate": "[fn]",
+        "onStartShouldSetResponder": "[fn]",
+        "onResponderTerminationRequest": "[fn]",
+        "responsible": true,
+        "fill": {
+         "type": 0,
+         "payload": 0
+        },
+        "stroke": {
+         "type": 0,
+         "payload": 0
+        },
+        "strokeWidth": 6,
+        "propList": [
+         "fill",
+         "stroke",
+         "strokeWidth"
+        ],
+        "d": "M300.54502693891646 311.19266363778434 294.60201721281555 339.15232613612204 298.6435356412856 345.3757187647341 305.16837848742443 314.6787466511745z"
+       },
+       "children": null
+      },
+      {
+       "type": "RNSVGPath",
+       "props": {
+        "onResponderMove": "[fn]",
+        "onResponderGrant": "[fn]",
+        "onResponderRelease": "[fn]",
+        "onResponderTerminate": "[fn]",
+        "onStartShouldSetResponder": "[fn]",
+        "onResponderTerminationRequest": "[fn]",
+        "responsible": true,
+        "fill": {
+         "type": 0,
+         "payload": 0
+        },
+        "stroke": {
+         "type": 0,
+         "payload": 0
+        },
+        "strokeWidth": 6,
+        "propList": [
+         "fill",
+         "stroke",
+         "strokeWidth"
+        ],
+        "d": "M43.11169631430599 285.69640823264433 51.283334687694776 247.25187229743 45.85996259913483 247.52959000496998 36.88830368569401 289.7379266611144z"
+       },
+       "children": null
+      },
+      {
+       "type": "RNSVGPath",
+       "props": {
+        "onResponderMove": "[fn]",
+        "onResponderGrant": "[fn]",
+        "onResponderRelease": "[fn]",
+        "onResponderTerminate": "[fn]",
+        "onStartShouldSetResponder": "[fn]",
+        "onResponderTerminationRequest": "[fn]",
+        "responsible": true,
+        "fill": {
+         "type": 0,
+         "payload": 0
+        },
+        "stroke": {
+         "type": 0,
+         "payload": 0
+        },
+        "strokeWidth": 6,
+        "propList": [
+         "fill",
+         "stroke",
+         "strokeWidth"
+        ],
+        "d": "M57.96922062955829 215.7972519868001 65.39798278718445 180.84767386387796 61.35646435871442 174.62428123526598 53.200410801040945 212.99549637721543z"
+       },
+       "children": null
+      },
+      {
+       "type": "RNSVGPath",
+       "props": {
+        "onResponderMove": "[fn]",
+        "onResponderGrant": "[fn]",
+        "onResponderRelease": "[fn]",
+        "onResponderTerminate": "[fn]",
+        "onStartShouldSetResponder": "[fn]",
+        "onResponderTerminationRequest": "[fn]",
+        "responsible": true,
+        "fill": {
+         "type": 0,
+         "payload": 0
+        },
+        "stroke": {
+         "type": 0,
+         "payload": 0
+        },
+        "strokeWidth": 6,
+        "propList": [
+         "fill",
+         "stroke",
+         "strokeWidth"
+        ],
+        "d": "M206.90711378838665 210.92636819440622 199.47835163076047 245.87594631732836 204.6108071593015 246.96688341739934 212.03956931692767 212.0173052944772z"
+       },
+       "children": null
+      },
+      {
+       "type": "RNSVGPath",
+       "props": {
+        "onResponderMove": "[fn]",
+        "onResponderGrant": "[fn]",
+        "onResponderRelease": "[fn]",
+        "onResponderTerminate": "[fn]",
+        "onStartShouldSetResponder": "[fn]",
+        "onResponderTerminationRequest": "[fn]",
+        "responsible": true,
+        "fill": {
+         "type": 0,
+         "payload": 0
+        },
+        "stroke": {
+         "type": 0,
+         "payload": 0
+        },
+        "strokeWidth": 6,
+        "propList": [
+         "fill",
+         "stroke",
+         "strokeWidth"
+        ],
+        "d": "M192.79246568889693 277.33056662795826 184.62082731550817 315.7751025631726 189.75328284404918 316.86603966324355 197.92492121743794 278.4215037280292z"
+       },
+       "children": null
+      },
+      {
+       "type": "RNSVGGroup",
+       "props": {
+        "fill": {
+         "type": 0,
+         "payload": 4278190080
+        }
+       },
+       "children": [
+        {
+         "type": "RNSVGLine",
+         "props": {
+          "fill": {
+           "type": 0,
+           "payload": 4278190080
+          },
+          "stroke": {
+           "type": 0,
+           "payload": 0
+          },
+          "strokeWidth": 26,
+          "propList": [
+           "stroke",
+           "strokeWidth"
+          ],
+          "x1": 55.585,
+          "y1": 214.396,
+          "x2": 48.572,
+          "y2": 247.391
+         },
+         "children": null
+        },
+        {
+         "type": "RNSVGPath",
+         "props": {
+          "fill": {
+           "type": 0,
+           "payload": 4293915125
+          },
+          "stroke": null,
+          "propList": [
+           "fill",
+           "stroke"
+          ],
+          "d": "M51.918776052056046 213.6171333962428 44.90560898017122 246.611490365435 52.237688306658384 248.16997193696494 59.25085537854321 215.17561496777273z"
+         },
+         "children": null
+        },
+        {
+         "type": "RNSVGLine",
+         "props": {
+          "fill": {
+           "type": 0,
+           "payload": 4278190080
+          },
+          "stroke": {
+           "type": 0,
+           "payload": 4293435707
+          },
+          "strokeWidth": 3,
+          "strokeLinecap": 0,
+          "propList": [
+           "stroke",
+           "strokeWidth",
+           "strokeLinecap"
+          ],
+          "x1": 55.585,
+          "y1": 214.396,
+          "x2": 48.572,
+          "y2": 247.391
+         },
+         "children": null
+        }
+       ]
+      },
+      {
+       "type": "RNSVGGroup",
+       "props": {
+        "fill": {
+         "type": 0,
+         "payload": 4278190080
+        }
+       },
+       "children": [
+        {
+         "type": "RNSVGLine",
+         "props": {
+          "fill": {
+           "type": 0,
+           "payload": 4278190080
+          },
+          "stroke": {
+           "type": 0,
+           "payload": 0
+          },
+          "strokeWidth": 26,
+          "propList": [
+           "stroke",
+           "strokeWidth"
+          ],
+          "x1": 202.226,
+          "y1": 245.566,
+          "x2": 195.213,
+          "y2": 278.56
+         },
+         "children": null
+        },
+        {
+         "type": "RNSVGPath",
+         "props": {
+          "fill": {
+           "type": 0,
+           "payload": 4293915125
+          },
+          "stroke": null,
+          "propList": [
+           "fill",
+           "stroke"
+          ],
+          "d": "M198.5603625817992 244.78676482684202 191.5471955099144 277.7811217960342 198.87927483640158 279.3396033675642 205.8924419082864 246.34524639837198z"
+         },
+         "children": null
+        },
+        {
+         "type": "RNSVGLine",
+         "props": {
+          "fill": {
+           "type": 0,
+           "payload": 4278190080
+          },
+          "stroke": {
+           "type": 0,
+           "payload": 4293435707
+          },
+          "strokeWidth": 3,
+          "strokeLinecap": 0,
+          "propList": [
+           "stroke",
+           "strokeWidth",
+           "strokeLinecap"
+          ],
+          "x1": 202.226,
+          "y1": 245.566,
+          "x2": 195.213,
+          "y2": 278.56
+         },
+         "children": null
+        }
+       ]
+      },
+      {
+       "type": "RNSVGGroup",
+       "props": {
+        "fill": {
+         "type": 0,
+         "payload": 4278190080
+        }
+       },
+       "children": [
+        {
+         "type": "RNSVGLine",
+         "props": {
+          "fill": {
+           "type": 0,
+           "payload": 4278190080
+          },
+          "stroke": {
+           "type": 0,
+           "payload": 0
+          },
+          "strokeWidth": 26,
+          "propList": [
+           "stroke",
+           "strokeWidth"
+          ],
+          "x1": 246.679,
+          "y1": 216.698,
+          "x2": 290.672,
+          "y2": 226.049
+         },
+         "children": null
+        },
+        {
+         "type": "RNSVGPath",
+         "props": {
+          "fill": {
+           "type": 0,
+           "payload": 4293915125
+          },
+          "stroke": null,
+          "propList": [
+           "fill",
+           "stroke"
+          ],
+          "d": "M245.89996594936343 220.3640565010646 289.8924419082864 229.71494593024437 291.45092347981637 222.3828666037572 247.4584475208934 213.03197717457743z"
+         },
+         "children": null
+        },
+        {
+         "type": "RNSVGLine",
+         "props": {
+          "fill": {
+           "type": 0,
+           "payload": 4278190080
+          },
+          "stroke": {
+           "type": 0,
+           "payload": 4282300645
+          },
+          "strokeWidth": 3,
+          "strokeLinecap": 0,
+          "propList": [
+           "stroke",
+           "strokeWidth",
+           "strokeLinecap"
+          ],
+          "x1": 246.679,
+          "y1": 216.698,
+          "x2": 290.672,
+          "y2": 226.049
+         },
+         "children": null
+        }
+       ]
+      },
+      {
+       "type": "RNSVGGroup",
+       "props": {
+        "fill": {
+         "type": 0,
+         "payload": 4278190080
+        }
+       },
+       "children": [
+        {
+         "type": "RNSVGLine",
+         "props": {
+          "fill": {
+           "type": 0,
+           "payload": 4278190080
+          },
+          "stroke": {
+           "type": 0,
+           "payload": 0
+          },
+          "strokeWidth": 26,
+          "propList": [
+           "stroke",
+           "strokeWidth"
+          ],
+          "x1": 312.208,
+          "y1": 268.943,
+          "x2": 302.857,
+          "y2": 312.936
+         },
+         "children": null
+        },
+        {
+         "type": "RNSVGPath",
+         "props": {
+          "fill": {
+           "type": 0,
+           "payload": 4293915125
+          },
+          "stroke": null,
+          "propList": [
+           "fill",
+           "stroke"
+          ],
+          "d": "M308.5415524791066 268.1639883997915 299.19066304992685 312.1564643587144 306.522742376414 313.71494593024437 315.8736318055938 269.7224699713214z"
+         },
+         "children": null
+        },
+        {
+         "type": "RNSVGLine",
+         "props": {
+          "fill": {
+           "type": 0,
+           "payload": 4278190080
+          },
+          "stroke": {
+           "type": 0,
+           "payload": 4282300645
+          },
+          "strokeWidth": 3,
+          "strokeLinecap": 0,
+          "propList": [
+           "stroke",
+           "strokeWidth",
+           "strokeLinecap"
+          ],
+          "x1": 312.208,
+          "y1": 268.943,
+          "x2": 302.857,
+          "y2": 312.936
+         },
+         "children": null
+        }
+       ]
+      },
+      {
+       "type": "RNSVGGroup",
+       "props": {
+        "fill": {
+         "type": 0,
+         "payload": 4278190080
+        }
+       },
+       "children": [
+        {
+         "type": "RNSVGCircle",
+         "props": {
+          "fill": {
+           "type": 0,
+           "payload": 0
+          },
+          "propList": [
+           "fill"
+          ],
+          "cx": 123.344,
+          "cy": 230.207,
+          "r": 15
+         },
+         "children": null
+        },
+        {
+         "type": "RNSVGCircle",
+         "props": {
+          "fill": {
+           "type": 0,
+           "payload": 4293652735
+          },
+          "stroke": {
+           "type": 0,
+           "payload": 4280245247
+          },
+          "strokeWidth": 1.6,
+          "propList": [
+           "fill",
+           "stroke",
+           "strokeWidth"
+          ],
+          "cx": 123.344,
+          "cy": 230.207,
+          "r": 14
+         },
+         "children": null
+        },
+        {
+         "type": "RNSVGGroup",
+         "props": {
+          "fill": {
+           "type": 0,
+           "payload": 4278190080
+          },
+          "matrix": [
+           1,
+           0,
+           0,
+           1,
+           123.344,
+           230.207
+          ]
+         },
+         "children": [
+          {
+           "type": "RNSVGPath",
+           "props": {
+            "fill": null,
+            "stroke": {
+             "type": 0,
+             "payload": 4292911930
+            },
+            "strokeWidth": 1.5,
+            "strokeLinecap": 1,
+            "strokeLinejoin": 1,
+            "propList": [
+             "fill",
+             "stroke",
+             "strokeWidth",
+             "strokeLinecap",
+             "strokeLinejoin"
+            ],
+            "d": "M-8 -8 L8 8"
+           },
+           "children": null
+          },
+          {
+           "type": "RNSVGPath",
+           "props": {
+            "fill": null,
+            "stroke": {
+             "type": 0,
+             "payload": 4292911930
+            },
+            "strokeWidth": 1.5,
+            "strokeLinecap": 1,
+            "strokeLinejoin": 1,
+            "propList": [
+             "fill",
+             "stroke",
+             "strokeWidth",
+             "strokeLinecap",
+             "strokeLinejoin"
+            ],
+            "d": "M8 -8 L-8 8"
+           },
+           "children": null
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "RNSVGGroup",
+       "props": {
+        "fill": {
+         "type": 0,
+         "payload": 4278190080
+        }
+       },
+       "children": [
+        {
+         "type": "RNSVGCircle",
+         "props": {
+          "fill": {
+           "type": 0,
+           "payload": 0
+          },
+          "propList": [
+           "fill"
+          ],
+          "cx": 160.824,
+          "cy": 207.72,
+          "r": 15
+         },
+         "children": null
+        },
+        {
+         "type": "RNSVGGroup",
+         "props": {
+          "fill": {
+           "type": 0,
+           "payload": 4278190080
+          },
+          "matrix": [
+           1,
+           0,
+           0,
+           1,
+           160.824,
+           207.72
+          ]
+         },
+         "children": [
+          {
+           "type": "RNSVGPath",
+           "props": {
+            "fill": null,
+            "stroke": {
+             "type": 0,
+             "payload": 4293613399
+            },
+            "strokeWidth": 1.5,
+            "strokeLinecap": 1,
+            "strokeLinejoin": 1,
+            "propList": [
+             "fill",
+             "stroke",
+             "strokeWidth",
+             "strokeLinecap",
+             "strokeLinejoin"
+            ],
+            "d": "M-8 0 a8 8 0 1 0 16 0 a8 8 0 1 0 -16 0"
+           },
+           "children": null
+          },
+          {
+           "type": "RNSVGPath",
+           "props": {
+            "fill": {
+             "type": 0,
+             "payload": 4293613399
+            },
+            "stroke": {
+             "type": 0,
+             "payload": 4293613399
+            },
+            "strokeWidth": 1.5,
+            "strokeLinecap": 1,
+            "strokeLinejoin": 1,
+            "propList": [
+             "fill",
+             "stroke",
+             "strokeWidth",
+             "strokeLinecap",
+             "strokeLinejoin"
+            ],
+            "d": "M-3.5 0 a3.5 3.5 0 1 0 7 0 a3.5 3.5 0 1 0 -7 0"
+           },
+           "children": null
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "RNSVGPath",
+       "props": {
+        "fill": null,
+        "stroke": {
+         "type": 0,
+         "payload": 4284114034
+        },
+        "strokeWidth": 1.1,
+        "strokeDasharray": [
+         "1.5",
+         "3.5"
+        ],
+        "strokeLinecap": 1,
+        "propList": [
+         "fill",
+         "stroke",
+         "strokeWidth",
+         "strokeDasharray",
+         "strokeLinecap"
+        ],
+        "d": "M201.30740404132325 291.3507353787894 196.59650450196648 284.7575145762122 191.62968630467725 278.49061122206103 186.40694944945542 272.5500253163357 180.9282939363011 266.9357568590362 175.1937197652142 261.6478058501626 169.2032269361949 256.686172289715 162.95681544924304 252.05085617769322 156.45448530435863 247.74185751409738 149.69623650154173 243.75917629892743 142.6820690407923 240.10281253218335 135.41198292211038 236.7727662138652 127.8859781454959 233.76903734397294"
+       },
+       "children": null
+      },
+      {
+       "type": "RNSVGGroup",
+       "props": {
+        "fill": {
+         "type": 0,
+         "payload": 4278190080
+        }
+       },
+       "children": [
+        {
+         "type": "RNSVGGroup",
+         "props": {
+          "fill": {
+           "type": 0,
+           "payload": 4278190080
+          }
+         },
+         "children": [
+          {
+           "type": "RNSVGLine",
+           "props": {
+            "fill": {
+             "type": 0,
+             "payload": 4278190080
+            },
+            "stroke": {
+             "type": 0,
+             "payload": 4280245247
+            },
+            "strokeWidth": 1,
+            "strokeDasharray": [
+             "3",
+             "3"
+            ],
+            "propList": [
+             "stroke",
+             "strokeWidth",
+             "strokeDasharray"
+            ],
+            "x1": 123.344,
+            "y1": 230.207,
+            "x2": 199.374,
+            "y2": 246.368
+           },
+           "children": null
+          },
+          {
+           "type": "RNSVGCircle",
+           "props": {
+            "fill": {
+             "type": 0,
+             "payload": 4280245247
+            },
+            "propList": [
+             "fill"
+            ],
+            "cx": 199.374,
+            "cy": 246.368,
+            "r": 2
+           },
+           "children": null
+          },
+          {
+           "type": "RNSVGRect",
+           "props": {
+            "fill": {
+             "type": 0,
+             "payload": 4294967295
+            },
+            "propList": [
+             "fill"
+            ],
+            "opacity": 0.94,
+            "x": 139.959,
+            "y": 230.287,
+            "width": 42.8,
+            "height": 16,
+            "rx": 5
+           },
+           "children": null
+          },
+          {
+           "type": "RNSVGText",
+           "props": {
+            "fill": {
+             "type": 0,
+             "payload": 4280245247
+            },
+            "propList": [
+             "fill"
+            ],
+            "matrix": [
+             0.978,
+             0.208,
+             -0.208,
+             0.978,
+             53.069,
+             -28.341
+            ],
+            "content": null,
+            "font": {
+             "fontWeight": "800",
+             "fontSize": 10,
+             "textAnchor": "middle"
+            },
+            "x": [
+             161.359
+            ],
+            "y": [
+             242.287
+            ],
+            "dx": [],
+            "dy": [],
+            "rotate": []
+           },
+           "children": [
+            {
+             "type": "RNSVGTSpan",
+             "props": {
+              "fill": {
+               "type": 0,
+               "payload": 4278190080
+              },
+              "content": "2,07",
+              "font": {},
+              "x": [],
+              "y": [],
+              "dx": [],
+              "dy": [],
+              "rotate": []
+             },
+             "children": null
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "type": "RNSVGGroup",
+         "props": {
+          "fill": {
+           "type": 0,
+           "payload": 4278190080
+          }
+         },
+         "children": [
+          {
+           "type": "RNSVGLine",
+           "props": {
+            "fill": {
+             "type": 0,
+             "payload": 4278190080
+            },
+            "stroke": {
+             "type": 0,
+             "payload": 4280245247
+            },
+            "strokeWidth": 1,
+            "strokeDasharray": [
+             "3",
+             "3"
+            ],
+            "propList": [
+             "stroke",
+             "strokeWidth",
+             "strokeDasharray"
+            ],
+            "x1": 123.344,
+            "y1": 230.207,
+            "x2": 57.865,
+            "y2": 216.289
+           },
+           "children": null
+          },
+          {
+           "type": "RNSVGCircle",
+           "props": {
+            "fill": {
+             "type": 0,
+             "payload": 4280245247
+            },
+            "propList": [
+             "fill"
+            ],
+            "cx": 57.865,
+            "cy": 216.289,
+            "r": 2
+           },
+           "children": null
+          },
+          {
+           "type": "RNSVGRect",
+           "props": {
+            "fill": {
+             "type": 0,
+             "payload": 4294967295
+            },
+            "propList": [
+             "fill"
+            ],
+            "opacity": 0.94,
+            "x": 69.204,
+            "y": 215.248,
+            "width": 42.8,
+            "height": 16,
+            "rx": 5
+           },
+           "children": null
+          },
+          {
+           "type": "RNSVGText",
+           "props": {
+            "fill": {
+             "type": 0,
+             "payload": 4280245247
+            },
+            "propList": [
+             "fill"
+            ],
+            "matrix": [
+             0.978,
+             0.208,
+             -0.208,
+             0.978,
+             48.396,
+             -13.959
+            ],
+            "content": null,
+            "font": {
+             "fontWeight": "800",
+             "fontSize": 10,
+             "textAnchor": "middle"
+            },
+            "x": [
+             90.604
+            ],
+            "y": [
+             227.248
+            ],
+            "dx": [],
+            "dy": [],
+            "rotate": []
+           },
+           "children": [
+            {
+             "type": "RNSVGTSpan",
+             "props": {
+              "fill": {
+               "type": 0,
+               "payload": 4278190080
+              },
+              "content": "1,79",
+              "font": {},
+              "x": [],
+              "y": [],
+              "dx": [],
+              "dy": [],
+              "rotate": []
+             },
+             "children": null
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "type": "RNSVGGroup",
+         "props": {
+          "fill": {
+           "type": 0,
+           "payload": 4278190080
+          }
+         },
+         "children": [
+          {
+           "type": "RNSVGLine",
+           "props": {
+            "fill": {
+             "type": 0,
+             "payload": 4278190080
+            },
+            "stroke": {
+             "type": 0,
+             "payload": 4280245247
+            },
+            "strokeWidth": 1,
+            "strokeDasharray": [
+             "3",
+             "3"
+            ],
+            "propList": [
+             "stroke",
+             "strokeWidth",
+             "strokeDasharray"
+            ],
+            "x1": 123.344,
+            "y1": 230.207,
+            "x2": 108.591,
+            "y2": 299.615
+           },
+           "children": null
+          },
+          {
+           "type": "RNSVGCircle",
+           "props": {
+            "fill": {
+             "type": 0,
+             "payload": 4280245247
+            },
+            "propList": [
+             "fill"
+            ],
+            "cx": 108.591,
+            "cy": 299.615,
+            "r": 2
+           },
+           "children": null
+          },
+          {
+           "type": "RNSVGRect",
+           "props": {
+            "fill": {
+             "type": 0,
+             "payload": 4294967295
+            },
+            "propList": [
+             "fill"
+            ],
+            "opacity": 0.94,
+            "x": 94.568,
+            "y": 256.911,
+            "width": 42.8,
+            "height": 16,
+            "rx": 5
+           },
+           "children": null
+          },
+          {
+           "type": "RNSVGText",
+           "props": {
+            "fill": {
+             "type": 0,
+             "payload": 4280245247
+            },
+            "propList": [
+             "fill"
+            ],
+            "matrix": [
+             0.208,
+             -0.978,
+             0.978,
+             0.208,
+             -167.265,
+             323.266
+            ],
+            "content": null,
+            "font": {
+             "fontWeight": "800",
+             "fontSize": 10,
+             "textAnchor": "middle"
+            },
+            "x": [
+             115.968
+            ],
+            "y": [
+             268.911
+            ],
+            "dx": [],
+            "dy": [],
+            "rotate": []
+           },
+           "children": [
+            {
+             "type": "RNSVGTSpan",
+             "props": {
+              "fill": {
+               "type": 0,
+               "payload": 4278190080
+              },
+              "content": "1,89",
+              "font": {},
+              "x": [],
+              "y": [],
+              "dx": [],
+              "dy": [],
+              "rotate": []
+             },
+             "children": null
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "type": "RNSVGGroup",
+         "props": {
+          "fill": {
+           "type": 0,
+           "payload": 4278190080
+          }
+         },
+         "children": [
+          {
+           "type": "RNSVGLine",
+           "props": {
+            "fill": {
+             "type": 0,
+             "payload": 4278190080
+            },
+            "stroke": {
+             "type": 0,
+             "payload": 4280245247
+            },
+            "strokeWidth": 1,
+            "strokeDasharray": [
+             "3",
+             "3"
+            ],
+            "propList": [
+             "stroke",
+             "strokeWidth",
+             "strokeDasharray"
+            ],
+            "x1": 123.344,
+            "y1": 230.207,
+            "x2": 130.878,
+            "y2": 194.766
+           },
+           "children": null
+          },
+          {
+           "type": "RNSVGCircle",
+           "props": {
+            "fill": {
+             "type": 0,
+             "payload": 4280245247
+            },
+            "propList": [
+             "fill"
+            ],
+            "cx": 130.878,
+            "cy": 194.766,
+            "r": 2
+           },
+           "children": null
+          },
+          {
+           "type": "RNSVGRect",
+           "props": {
+            "fill": {
+             "type": 0,
+             "payload": 4294967295
+            },
+            "propList": [
+             "fill"
+            ],
+            "opacity": 0.94,
+            "x": 112.911,
+            "y": 204.486,
+            "width": 28.4,
+            "height": 16,
+            "rx": 5
+           },
+           "children": null
+          },
+          {
+           "type": "RNSVGText",
+           "props": {
+            "fill": {
+             "type": 0,
+             "payload": 4280245247
+            },
+            "propList": [
+             "fill"
+            ],
+            "matrix": [
+             0.208,
+             -0.978,
+             0.978,
+             0.208,
+             -107.16,
+             292.641
+            ],
+            "content": null,
+            "font": {
+             "fontWeight": "800",
+             "fontSize": 10,
+             "textAnchor": "middle"
+            },
+            "x": [
+             127.111
+            ],
+            "y": [
+             216.486
+            ],
+            "dx": [],
+            "dy": [],
+            "rotate": []
+           },
+           "children": [
+            {
+             "type": "RNSVGTSpan",
+             "props": {
+              "fill": {
+               "type": 0,
+               "payload": 4278190080
+              },
+              "content": "97",
+              "font": {},
+              "x": [],
+              "y": [],
+              "dx": [],
+              "dy": [],
+              "rotate": []
+             },
+             "children": null
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "RNSVGGroup",
+       "props": {
+        "fill": {
+         "type": 0,
+         "payload": 4278190080
+        }
+       },
+       "children": [
+        {
+         "type": "RNSVGCircle",
+         "props": {
+          "fill": {
+           "type": 0,
+           "payload": 0
+          },
+          "propList": [
+           "fill"
+          ],
+          "cx": 185.177,
+          "cy": 287.922,
+          "r": 18
+         },
+         "children": null
+        },
+        {
+         "type": "RNSVGCircle",
+         "props": {
+          "fill": {
+           "type": 0,
+           "payload": 4293960194
+          },
+          "propList": [
+           "fill"
+          ],
+          "opacity": 1,
+          "cx": 185.177,
+          "cy": 287.922,
+          "r": 4
+         },
+         "children": null
+        }
+       ]
+      },
+      {
+       "type": "RNSVGGroup",
+       "props": {
+        "fill": {
+         "type": 0,
+         "payload": 4278190080
+        }
+       },
+       "children": [
+        {
+         "type": "RNSVGCircle",
+         "props": {
+          "fill": {
+           "type": 0,
+           "payload": 0
+          },
+          "propList": [
+           "fill"
+          ],
+          "cx": 200.574,
+          "cy": 291.195,
+          "r": 18
+         },
+         "children": null
+        },
+        {
+         "type": "RNSVGCircle",
+         "props": {
+          "fill": {
+           "type": 0,
+           "payload": 4281179355
+          },
+          "propList": [
+           "fill"
+          ],
+          "opacity": 1,
+          "cx": 200.574,
+          "cy": 291.195,
+          "r": 4
+         },
+         "children": null
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "View",
+   "props": {
+    "style": {
+     "position": "absolute",
+     "left": 104.344,
+     "top": 211.207,
+     "width": 38,
+     "height": 38
+    },
+    "onStartShouldSetResponder": "[fn]",
+    "onMoveShouldSetResponder": "[fn]",
+    "onStartShouldSetResponderCapture": "[fn]",
+    "onMoveShouldSetResponderCapture": "[fn]",
+    "onResponderGrant": "[fn]",
+    "onResponderReject": "[fn]",
+    "onResponderRelease": "[fn]",
+    "onResponderStart": "[fn]",
+    "onResponderMove": "[fn]",
+    "onResponderEnd": "[fn]",
+    "onResponderTerminate": "[fn]",
+    "onResponderTerminationRequest": "[fn]"
+   },
+   "children": null
+  },
+  {
+   "type": "View",
+   "props": {
+    "onStartShouldSetResponder": "[fn]",
+    "onMoveShouldSetResponder": "[fn]",
+    "onStartShouldSetResponderCapture": "[fn]",
+    "onMoveShouldSetResponderCapture": "[fn]",
+    "onResponderGrant": "[fn]",
+    "onResponderReject": "[fn]",
+    "onResponderRelease": "[fn]",
+    "onResponderStart": "[fn]",
+    "onResponderMove": "[fn]",
+    "onResponderEnd": "[fn]",
+    "onResponderTerminate": "[fn]",
+    "onResponderTerminationRequest": "[fn]",
+    "style": [
+     {
+      "position": "absolute",
+      "width": 32,
+      "height": 32,
+      "alignItems": "center",
+      "justifyContent": "center"
+     },
+     {
+      "left": 47.377,
+      "top": 161.736
+     }
+    ]
+   },
+   "children": null
+  },
+  {
+   "type": "View",
+   "props": {
+    "onStartShouldSetResponder": "[fn]",
+    "onMoveShouldSetResponder": "[fn]",
+    "onStartShouldSetResponderCapture": "[fn]",
+    "onMoveShouldSetResponderCapture": "[fn]",
+    "onResponderGrant": "[fn]",
+    "onResponderReject": "[fn]",
+    "onResponderRelease": "[fn]",
+    "onResponderStart": "[fn]",
+    "onResponderMove": "[fn]",
+    "onResponderEnd": "[fn]",
+    "onResponderTerminate": "[fn]",
+    "onResponderTerminationRequest": "[fn]",
+    "style": [
+     {
+      "position": "absolute",
+      "width": 32,
+      "height": 32,
+      "alignItems": "center",
+      "justifyContent": "center"
+     },
+     {
+      "left": 194.019,
+      "top": 192.906
+     }
+    ]
+   },
+   "children": null
+  },
+  {
+   "type": "View",
+   "props": {
+    "onStartShouldSetResponder": "[fn]",
+    "onMoveShouldSetResponder": "[fn]",
+    "onStartShouldSetResponderCapture": "[fn]",
+    "onMoveShouldSetResponderCapture": "[fn]",
+    "onResponderGrant": "[fn]",
+    "onResponderReject": "[fn]",
+    "onResponderRelease": "[fn]",
+    "onResponderStart": "[fn]",
+    "onResponderMove": "[fn]",
+    "onResponderEnd": "[fn]",
+    "onResponderTerminate": "[fn]",
+    "onResponderTerminationRequest": "[fn]",
+    "style": [
+     {
+      "position": "absolute",
+      "width": 32,
+      "height": 32,
+      "alignItems": "center",
+      "justifyContent": "center"
+     },
+     {
+      "left": 304,
+      "top": 216.283
+     }
+    ]
+   },
+   "children": null
+  },
+  {
+   "type": "View",
+   "props": {
+    "onStartShouldSetResponder": "[fn]",
+    "onMoveShouldSetResponder": "[fn]",
+    "onStartShouldSetResponderCapture": "[fn]",
+    "onMoveShouldSetResponderCapture": "[fn]",
+    "onResponderGrant": "[fn]",
+    "onResponderReject": "[fn]",
+    "onResponderRelease": "[fn]",
+    "onResponderStart": "[fn]",
+    "onResponderMove": "[fn]",
+    "onResponderEnd": "[fn]",
+    "onResponderTerminate": "[fn]",
+    "onResponderTerminationRequest": "[fn]",
+    "style": [
+     {
+      "position": "absolute",
+      "width": 32,
+      "height": 32,
+      "alignItems": "center",
+      "justifyContent": "center"
+     },
+     {
+      "left": 280.623,
+      "top": 326.264
+     }
+    ]
+   },
+   "children": null
+  },
+  {
+   "type": "View",
+   "props": {
+    "onStartShouldSetResponder": "[fn]",
+    "onMoveShouldSetResponder": "[fn]",
+    "onStartShouldSetResponderCapture": "[fn]",
+    "onMoveShouldSetResponderCapture": "[fn]",
+    "onResponderGrant": "[fn]",
+    "onResponderReject": "[fn]",
+    "onResponderRelease": "[fn]",
+    "onResponderStart": "[fn]",
+    "onResponderMove": "[fn]",
+    "onResponderEnd": "[fn]",
+    "onResponderTerminate": "[fn]",
+    "onResponderTerminationRequest": "[fn]",
+    "style": [
+     {
+      "position": "absolute",
+      "width": 32,
+      "height": 32,
+      "alignItems": "center",
+      "justifyContent": "center"
+     },
+     {
+      "left": 170.642,
+      "top": 302.887
+     }
+    ]
+   },
+   "children": null
+  },
+  {
+   "type": "View",
+   "props": {
+    "onStartShouldSetResponder": "[fn]",
+    "onMoveShouldSetResponder": "[fn]",
+    "onStartShouldSetResponderCapture": "[fn]",
+    "onMoveShouldSetResponderCapture": "[fn]",
+    "onResponderGrant": "[fn]",
+    "onResponderReject": "[fn]",
+    "onResponderRelease": "[fn]",
+    "onResponderStart": "[fn]",
+    "onResponderMove": "[fn]",
+    "onResponderEnd": "[fn]",
+    "onResponderTerminate": "[fn]",
+    "onResponderTerminationRequest": "[fn]",
+    "style": [
+     {
+      "position": "absolute",
+      "width": 32,
+      "height": 32,
+      "alignItems": "center",
+      "justifyContent": "center"
+     },
+     {
+      "left": 24,
+      "top": 271.717
+     }
+    ]
+   },
+   "children": null
+  }
+ ]
+}

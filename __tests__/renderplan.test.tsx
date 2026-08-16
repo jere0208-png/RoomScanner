@@ -34,6 +34,7 @@ import {
   SNAPSHOT_WALLS,
 } from '../src/export/snapshotFixture';
 import type { CeilingFixture } from '../src/geometry/ceiling';
+import type { Pt } from '../src/geometry/floorplan';
 
 const dir = join(__dirname, '..', 'assets', 'rendu-reference');
 
@@ -53,10 +54,36 @@ const PLAFOND: CeilingFixture[] = [
  * Monte l'éditeur et lui donne une taille : sans `onLayout`, il ne dessine
  * rien du tout — il ne connaît pas encore son échelle.
  */
-function rendu(editable: boolean) {
+/**
+ * Le même appartement, TOURNÉ de douze degrés.
+ *
+ * L'appartement de référence est d'équerre avec le repère du scan, ce qui
+ * cache une famille entière de défauts : tout ce qui se calcule sur les axes
+ * du monde y donne le même résultat que sur ceux du logement. Or ARKit
+ * oriente son repère selon l'endroit où le relevé a commencé — un scan de
+ * biais est le cas NORMAL, pas l'exception. La planche du plafond se fait
+ * donc sur un plan tourné : c'est elle qui vérifie que les cotes de
+ * dégagement partent bien perpendiculairement aux murs.
+ */
+const A = (12 * Math.PI) / 180;
+const tourner = <T extends { a: Pt; b: Pt }>(w: T): T => ({
+  ...w,
+  a: {
+    x: w.a.x * Math.cos(A) - w.a.z * Math.sin(A),
+    z: w.a.x * Math.sin(A) + w.a.z * Math.cos(A),
+  },
+  b: {
+    x: w.b.x * Math.cos(A) - w.b.z * Math.sin(A),
+    z: w.b.x * Math.sin(A) + w.b.z * Math.cos(A),
+  },
+});
+
+function rendu(editable: boolean, regle?: string, biais = false) {
+  const murs = biais ? SNAPSHOT_WALLS.map(tourner) : SNAPSHOT_WALLS;
+  const baies = biais ? SNAPSHOT_OPENINGS.map(tourner) : SNAPSHOT_OPENINGS;
   useScanStore.setState({
-    walls: SNAPSHOT_WALLS,
-    openings: SNAPSHOT_OPENINGS,
+    walls: murs,
+    openings: baies,
     objects: SNAPSHOT_OBJECTS,
     rooms: SNAPSHOT_ROOMS.map((r, i) => ({
       id: r.id,
@@ -80,6 +107,7 @@ function rendu(editable: boolean) {
         onSelectWall={() => {}}
         ceiling={PLAFOND}
         showCeiling
+        selectedCeilingId={regle ?? null}
       />,
     );
   });
@@ -107,12 +135,17 @@ const serialise = (tree: TestRenderer.ReactTestRenderer) =>
   );
 
 describe('planche de rendu du plan 2D', () => {
-  for (const [nom, editable] of [
-    ['plan-lecture', false],
-    ['plan-edition', true],
+  for (const [nom, editable, regle] of [
+    ['plan-lecture', false, undefined],
+    ['plan-edition', true, undefined],
+    // Un appareil de plafond en réglage : c'est la seule planche qui porte
+    // ses cotes de dégagement, et donc la seule qui vérifie qu'elles
+    // partent bien d'équerre avec les murs.
+    ['plan-plafond', true, 'pl1'],
   ] as const) {
     it(`${nom} n'a pas changé`, () => {
-      const actual = serialise(rendu(editable));
+      // La planche du plafond se fait de biais : voir plus haut.
+      const actual = serialise(rendu(editable, regle, nom === 'plan-plafond'));
       if (process.env.UPDATE_SNAPSHOTS) {
         mkdirSync(dir, { recursive: true });
         writeFileSync(join(dir, `${nom}.json`), actual, 'utf8');

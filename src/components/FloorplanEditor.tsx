@@ -1165,6 +1165,7 @@ export function FloorplanEditor({
               quads={quads}
               partOf={partOf}
               mapping={mapping}
+              frame={frame}
               c={c}
             />
 

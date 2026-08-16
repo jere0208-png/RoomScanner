@@ -26,6 +26,7 @@ import {
   type CeilingFixture,
 } from '../src/geometry/ceiling';
 import { buildScanPdf } from '../src/export/pdf';
+import { buyingList } from '../src/geometry/conduits';
 import type { WallSeg } from '../src/geometry/floorplan';
 import type { Fixture } from '../src/geometry/electrical';
 import { useScanStore } from '../src/store/scanStore';
@@ -340,5 +341,59 @@ describe('les murs arrêtent l’appareil', () => {
     const at = poser({ x: 1.4, z: 2.6 });
     expect(at.x).toBeCloseTo(1.4, 6);
     expect(at.z).toBeCloseTo(2.6, 6);
+  });
+});
+
+/**
+ * Le plafond entre dans le matériel — sinon personne ne l'achète.
+ *
+ * Huit spots figuraient au plan, et le bordereau n'en portait aucun. Chaque
+ * point lumineux emporte en outre SA BOÎTE — une DCL pour un point de
+ * centre, une boîte de dérivation pour une applique — qu'on oublie encore
+ * plus facilement que le luminaire.
+ */
+describe('le plafond au bordereau', () => {
+  const rows = [
+    {
+      circuitId: 'c1',
+      label: 'Éclairage',
+      section: 1.5,
+      conduit: 16 as const,
+      runs: 2,
+      conduitLength: 20,
+      cableLength: 24,
+      approx: false,
+      protection: '16 A',
+    },
+  ];
+  const plafond: CeilingFixture[] = [
+    { id: 'a', kind: 'spot', roomId: 'r1', at: { x: 1, z: 1 } },
+    { id: 'b', kind: 'spot', roomId: 'r1', at: { x: 2, z: 1 } },
+    { id: 'c', kind: 'dcl', roomId: 'r1', at: { x: 3, z: 1 } },
+    { id: 'd', kind: 'applique', roomId: 'r1', at: { x: 4, z: 1 } },
+    { id: 'e', kind: 'daaf', roomId: 'r1', at: { x: 1, z: 3 } },
+  ];
+
+  it('compte chaque appareil, dans son rayon', () => {
+    const list = buyingList(rows, [], plafond);
+    const spots = list.find((r) => r.label === CEILINGS.spot.label)!;
+    expect(spots.quantity).toBe(2);
+    expect(spots.family).toBe('Plafond');
+    expect(list.find((r) => r.label === CEILINGS.daaf.label)!.quantity).toBe(1);
+  });
+
+  it('n’oublie pas les boîtes, et pas la même selon le point', () => {
+    const list = buyingList(rows, [], plafond);
+    const dcl = list.find((r) => r.label.includes('Boîte de centre DCL'))!;
+    expect(dcl.quantity).toBe(1);
+    const der = list.find((r) => r.label.includes('dérivation'))!;
+    expect(der.quantity).toBe(1);
+    // Un spot ne demande ni l'une ni l'autre : il s'encastre.
+    expect(dcl.quantity + der.quantity).toBe(2);
+  });
+
+  it('sans plafond, le bordereau ne change pas', () => {
+    const list = buyingList(rows, []);
+    expect(list.some((r) => r.family === 'Plafond')).toBe(false);
   });
 });

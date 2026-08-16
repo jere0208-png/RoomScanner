@@ -43,6 +43,7 @@ import {
 } from '../components/Iso3DView';
 import {
   fitsInRoom,
+  planFrameAngle,
   roomOf,
   wallQuadsOf,
   roomExtent,
@@ -309,15 +310,31 @@ export function ResultScreen() {
    */
   const [pendingLink, setPendingLink] = useState<string | null>(null);
   /**
-   * L'origine des cotes d'une pièce : le coin de son emprise.
+   * L'origine des cotes d'une pièce, DANS LA TRAME DU LOGEMENT.
    *
-   * Un point lumineux ne se cote pas « en x = 3,42 » — ça ne veut rien dire
-   * sur un chantier. Il se cote depuis DEUX MURS, et le coin de la pièce
-   * est le repère que tout le monde prend.
+   * Un point lumineux ne se cote pas « en x = 3,42 » : ça ne veut rien dire
+   * sur un chantier. Il se cote depuis deux murs — et depuis des murs
+   * PERPENDICULAIRES, pas depuis les axes du scan.
+   *
+   * ARKit oriente son repère selon l'endroit où le relevé a commencé : un
+   * logement scanné de biais donnait des cotes en écharpe, qui ne
+   * correspondaient à aucun mur. On travaille donc dans la trame, la même
+   * qui redresse le plan et qui oriente les traits de dégagement.
    */
+  const trame = useMemo(() => planFrameAngle(walls), [walls]);
+  /** Un point du monde, exprimé dans la trame. */
+  const dansLaTrame = (p: { x: number; z: number }) => ({
+    x: p.x * Math.cos(trame) + p.z * Math.sin(trame),
+    z: -p.x * Math.sin(trame) + p.z * Math.cos(trame),
+  });
+  /** L'inverse : de la trame vers le monde. */
+  const versLeMonde = (p: { x: number; z: number }) => ({
+    x: p.x * Math.cos(trame) - p.z * Math.sin(trame),
+    z: p.x * Math.sin(trame) + p.z * Math.cos(trame),
+  });
   const origineDe = (roomId: string) => {
     const part = parts.find((p2) => p2.roomId === roomId);
-    const pts = part?.surface?.pts ?? [];
+    const pts = (part?.surface?.pts ?? []).map(dansLaTrame);
     if (pts.length === 0) return { x: 0, z: 0 };
     return {
       x: Math.min(...pts.map((q) => q.x)),
@@ -363,8 +380,9 @@ export function ResultScreen() {
     const cl = ceiling.find((x) => x.id === selCeiling);
     if (!cl) return;
     const o = origineDe(cl.roomId);
-    setClX(String(Math.round((cl.at.x - o.x) * 100)));
-    setClZ(String(Math.round((cl.at.z - o.z) * 100)));
+    const t = dansLaTrame(cl.at);
+    setClX(String(Math.round((t.x - o.x) * 100)));
+    setClZ(String(Math.round((t.z - o.z) * 100)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selCeiling, clAt?.x, clAt?.z]);
   /** Repères électriques en 3D : un calque comme les autres. */
@@ -525,6 +543,7 @@ export function ResultScreen() {
         wallRooms,
         placement,
         cheminements?.parCircuit,
+        ceiling,
       );
       // Le tirage et la commande : ce qu'un patron lit avant le reste.
       const pull = pullSchedule(
@@ -532,7 +551,7 @@ export function ResultScreen() {
         cheminements?.metre,
         cheminements?.approx,
       );
-      const tirage = { pull, buy: buyingList(pull, fixtures) };
+      const tirage = { pull, buy: buyingList(pull, fixtures, ceiling) };
       const bytes = buildMaterialPdf(scanName, list, tirage);
       await RoomScan.sharePDF(toBase64(bytes), materialFilename(scanName));
     } catch (e: any) {
@@ -1215,8 +1234,9 @@ export function ResultScreen() {
                 setSelectedObjectId(null);
                 setSelectedWallId(null);
                 const o = origineDe(cl.roomId);
-                setClX(String(Math.round((cl.at.x - o.x) * 100)));
-                setClZ(String(Math.round((cl.at.z - o.z) * 100)));
+                const t = dansLaTrame(cl.at);
+                setClX(String(Math.round((t.x - o.x) * 100)));
+                setClZ(String(Math.round((t.z - o.z) * 100)));
                 return;
               }
               const spec = CEILINGS[cl.kind];
@@ -1666,7 +1686,10 @@ export function ResultScreen() {
             const vx = parseFloat(clX.replace(',', '.'));
             const vz = parseFloat(clZ.replace(',', '.'));
             if (!isFinite(vx) || !isFinite(vz)) return;
-            moveCeiling(cl.id, { x: o.x + vx / 100, z: o.z + vz / 100 });
+            moveCeiling(
+              cl.id,
+              versLeMonde({ x: o.x + vx / 100, z: o.z + vz / 100 }),
+            );
             haptic('succes');
           };
           return (

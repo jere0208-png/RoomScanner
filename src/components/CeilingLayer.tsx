@@ -44,6 +44,7 @@ export function CeilingLayer({
   quads,
   partOf,
   mapping,
+  frame,
   c,
 }: {
   ceiling?: CeilingFixture[];
@@ -56,6 +57,8 @@ export function CeilingLayer({
   quads: Map<string, { a1: Pt; b1: Pt; a2: Pt; b2: Pt } | undefined>;
   partOf: Map<string, RoomPart>;
   mapping: Mapping;
+  /** Angle de la trame du logement : les cotes s'y alignent. */
+  frame: number;
   c: Palette;
 }) {
   return (
@@ -158,11 +161,23 @@ export function CeilingLayer({
           );
           if (!cl) return null;
           const murs = partOf.get(cl.roomId)?.walls ?? walls;
+          /**
+           * D'ÉQUERRE AVEC LES MURS, pas avec le monde.
+           *
+           * Les quatre rayons partaient le long des axes x et z du repère
+           * de scan. Or ARKit oriente ce repère selon l'endroit où le scan
+           * a commencé : un logement relevé de biais donnait des cotes en
+           * écharpe, qui traversaient la pièce et annonçaient trois mètres
+           * dix jusqu'à un coin. On les lance donc sur la TRAME du
+           * logement — les mêmes axes que ceux du plan redressé.
+           */
+          const cos = Math.cos(frame);
+          const sin = Math.sin(frame);
           const sens = [
-            { x: 1, z: 0 },
-            { x: -1, z: 0 },
-            { x: 0, z: 1 },
-            { x: 0, z: -1 },
+            { x: cos, z: sin },
+            { x: -cos, z: -sin },
+            { x: -sin, z: cos },
+            { x: sin, z: -cos },
           ];
           return (
             <G>

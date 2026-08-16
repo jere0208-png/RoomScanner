@@ -21,6 +21,11 @@
  * le métier.
  */
 import type { RoomKind } from './furniture';
+import {
+  CEILINGS,
+  type CeilingFixture,
+  type CeilingKind,
+} from './ceiling';
 import { pointInPolygon } from './appearance';
 import type { VolumeVerdict } from './volumes';
 import {
@@ -1154,6 +1159,15 @@ export function materialList(
   placement?: Map<string, string>,
   /** Métré de câble par circuit, calculé sur le plan (`cableRuns`). */
   cable?: Map<string, number>,
+  /**
+   * Ce qui est posé AU PLAFOND.
+   *
+   * Sans lui, la liste du matériel ignorait les points lumineux, les
+   * détecteurs et les bouches de VMC : on les dessinait sur le plan, et
+   * personne ne les commandait. Un dossier qui montre huit spots et n'en
+   * fait acheter aucun est pire qu'un dossier qui n'en parle pas.
+   */
+  ceiling?: CeilingFixture[],
 ): MaterialList {
   const roomById = new Map(rooms.map((r) => [r.id, r]));
   const firstRoom = (f: Fixture) => {
@@ -1172,14 +1186,27 @@ export function materialList(
     const mine = fixtures.filter((f) => firstRoom(f)?.id === r.id);
     const counts = new Map<FixtureKind, number>();
     for (const f of mine) counts.set(f.kind, (counts.get(f.kind) ?? 0) + 1);
+    // Le plafond compte comme le reste : c'est du matériel à poser dans
+    // cette pièce, et à acheter avec.
+    const auPlafond = new Map<CeilingKind, number>();
+    for (const cl of ceiling ?? []) {
+      if (cl.roomId !== r.id) continue;
+      auPlafond.set(cl.kind, (auPlafond.get(cl.kind) ?? 0) + 1);
+    }
     return {
       room: r.name || USE_LABEL[roomUse(r.name, r.kind)],
       use: USE_LABEL[roomUse(r.name, r.kind)],
       area: r.area,
-      rows: [...counts.entries()].map(([kind, quantity]) => ({
-        label: FIXTURES[kind].label,
-        quantity,
-      })),
+      rows: [
+        ...[...counts.entries()].map(([kind, quantity]) => ({
+          label: FIXTURES[kind].label,
+          quantity,
+        })),
+        ...[...auPlafond.entries()].map(([kind, quantity]) => ({
+          label: CEILINGS[kind].label,
+          quantity,
+        })),
+      ],
     };
   });
 
