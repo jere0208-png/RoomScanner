@@ -651,10 +651,23 @@ export const useScanStore = create<ScanState>((set, get) => {
     if (!st.canUndo) set({ canUndo: true });
   };
 
+  /**
+   * La profondeur d'historique au moment du dernier enregistrement.
+   *
+   * C'est elle qui dit si le plan a VRAIMENT changé. `dirty` était posé à
+   * vrai par chaque retouche et jamais repris : en annulant jusqu'à
+   * revenir à l'état enregistré, le bouton de sauvegarde restait affiché,
+   * proposant d'enregistrer ce qui l'était déjà. Comparer la profondeur
+   * répond exactement à la question — et sans effacer l'historique, donc
+   * sans priver d'annulation ce qui a été fait avant la sauvegarde.
+   */
+  let savedDepth = 0;
+
   /** Repart d'un plan vierge d'historique (nouveau scan, ouverture, revert). */
   const clearHistory = () => {
     history.length = 0;
     lastKey = '';
+    savedDepth = 0;
     set({ canUndo: false });
   };
 
@@ -1353,7 +1366,13 @@ export const useScanStore = create<ScanState>((set, get) => {
     undo: () => {
       const prev = history.pop();
       if (!prev) return;
-      set({ ...prev, canUndo: history.length > 0, dirty: true });
+      set({
+        ...prev,
+        canUndo: history.length > 0,
+        // Revenu à l'état enregistré : il n'y a plus rien à enregistrer, et
+        // le bouton de sauvegarde n'a plus lieu d'être.
+        dirty: history.length !== savedDepth,
+      });
     },
 
     setRoomHeight: (roomId, height) => {
@@ -1572,6 +1591,7 @@ export const useScanStore = create<ScanState>((set, get) => {
 
     commitCurrent: () => {
       syncCurrent();
+      savedDepth = history.length;
       set({ dirty: false });
     },
 

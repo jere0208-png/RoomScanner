@@ -141,3 +141,59 @@ describe('les scans de l’ancien format', () => {
     expect(saves[0].name).toBe('Lisible');
   });
 });
+
+/**
+ * Le bouton de sauvegarde ne survit pas à l'annulation de tout.
+ *
+ * `dirty` était posé à vrai par chaque retouche et jamais repris : en
+ * annulant jusqu'à revenir à l'état enregistré, le bouton restait affiché
+ * et proposait d'enregistrer ce qui l'était déjà. On finit par appuyer —
+ * et on crée une révision identique à la précédente.
+ */
+describe('l’état « modifié »', () => {
+  const planer = () => {
+    useScanStore.setState({
+      walls: [
+        {
+          id: 'n',
+          type: 'wall',
+          a: { x: 0, z: 0 },
+          b: { x: 4, z: 0 },
+          height: 2.5,
+          yCenter: 1.25,
+          roomId: 'r1',
+        },
+      ],
+      openings: [],
+      objects: [],
+      rooms: [{ id: 'r1', name: 'Pièce', wallIds: ['n'] }],
+      fixtures: [],
+      photos: [],
+      ceiling: [],
+      dirty: false,
+      currentSaveId: null,
+    });
+  };
+
+  /**
+   * Un seul scénario, deux vérifications : l'historique regroupe les
+   * retouches de MÊME NATURE rapprochées, et deux tests voisins qui
+   * commencent par le même geste se retrouveraient à en partager une.
+   */
+  it('suit l’état réel du plan, retouche par retouche', () => {
+    planer();
+    const st = () => useScanStore.getState();
+
+    st().addOpening('n');
+    st().addFixture('prise', 'n');
+    expect(st().dirty).toBe(true);
+
+    // Il reste l'ouverture : le plan diffère toujours de l'enregistré.
+    st().undo();
+    expect(st().dirty).toBe(true);
+
+    // Plus rien : le bouton de sauvegarde n'a plus lieu d'être.
+    st().undo();
+    expect(st().dirty).toBe(false);
+  });
+});

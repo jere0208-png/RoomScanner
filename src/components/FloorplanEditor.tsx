@@ -214,6 +214,19 @@ interface Props {
   showCeiling?: boolean;
   onSelectCeiling?: (id: string) => void;
   /**
+   * Pose en cours : le prochain appui donne un POINT, et rien d'autre.
+   *
+   * Sans cette étape, l'appui était intercepté par ce qui se trouvait
+   * dessous — un cartouche de pièce demandait à renommer, un mur se
+   * sélectionnait, et le plafond ne recevait rien. Un calque de capture,
+   * posé par-dessus tout le dessin, rend le geste indépendant de ce qui
+   * traîne en dessous. Et l'appareil se pose là où le doigt s'est posé,
+   * pas au centre de la pièce : quatre spots ne se posent pas au même
+   * endroit.
+   */
+  placing?: boolean;
+  onPlaceAt?: (at: Pt) => void;
+  /**
    * Le retour de mur choisi, ou `null`.
    *
    * L'écran en a besoin pour y poser un appareil : choisir un retour puis
@@ -254,6 +267,8 @@ export function FloorplanEditor({
   ceiling,
   showCeiling,
   onSelectCeiling,
+  placing,
+  onPlaceAt,
   onPierChange,
   selectedOpeningId,
   onSelectOpening,
@@ -788,7 +803,11 @@ export function FloorplanEditor({
                       points={pts}
                       fill="transparent"
                       stroke="transparent"
-                      strokeWidth={18}
+                      // 18 px de halo débordaient de NEUF pixels dans la
+                      // pièce : un meuble plaqué contre le mur tombait
+                      // dedans, et c'est le mur qui se sélectionnait. Le
+                      // retour se vise sur sa maçonnerie, pas au large.
+                      strokeWidth={6}
                       onPress={() => {
                         onSelectWall(null);
                         onSelectOpening?.(null);
@@ -1581,6 +1600,23 @@ export function FloorplanEditor({
                 </G>
               );
             })}
+            {/* Le calque de capture : au-dessus de TOUT, et seulement
+                pendant une pose. */}
+            {placing && (
+              <Rect
+                x={0}
+                y={0}
+                width={layout.w}
+                height={layout.h}
+                fill="transparent"
+                onPress={(e) => {
+                  const { locationX, locationY } = e.nativeEvent;
+                  onPlaceAt?.(
+                    mapping.toMeters({ x: locationX, y: locationY }),
+                  );
+                }}
+              />
+            )}
           </Svg>
 
           {/* Meuble sélectionné : poignée de déplacement + bouton supprimer */}

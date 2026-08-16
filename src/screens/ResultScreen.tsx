@@ -52,7 +52,7 @@ import {
   totalArea,
   type RoomPart,
 } from '../geometry/floorplan';
-import { hasCapturedColors } from '../geometry/appearance';
+import { hasCapturedColors, pointInPolygon } from '../geometry/appearance';
 import { planRoutes } from '../geometry/elecplan';
 import { fixtureMarks } from '../geometry/schema';
 import {
@@ -1123,6 +1123,25 @@ export function ResultScreen() {
             selectedRoomId={selectedRoomId}
             ceiling={ceiling}
             showCeiling={showCeiling}
+            placing={!!pendingCeiling}
+            onPlaceAt={(at) => {
+              if (!pendingCeiling) return;
+              // Dans quelle pièce le doigt s'est-il posé ? Hors de tout
+              // contour, on ne pose rien : un appareil de plafond sans
+              // pièce n'aurait ni circuit ni métré.
+              const part = parts.find(
+                (p2) =>
+                  (p2.surface?.pts.length ?? 0) >= 3 &&
+                  pointInPolygon(at, p2.surface!.pts),
+              );
+              if (!part) {
+                haptic('alerte');
+                return;
+              }
+              addCeiling(pendingCeiling, part.roomId, at);
+              haptic('succes');
+              setPendingCeiling(null);
+            }}
             onSelectCeiling={(id) => {
               // Un appui sur un appareil de plafond propose de le retirer :
               // il n'a ni cote ni hauteur à régler, seulement une place.
@@ -1170,17 +1189,6 @@ export function ResultScreen() {
               });
             }}
             onSelectRoom={(id) => {
-              // Un appareil de plafond en attente ? La pièce touchée le
-              // reçoit, en son centre — là où se pose un point lumineux.
-              if (pendingCeiling && id) {
-                const part = parts.find((p) => p.roomId === id);
-                if (part) {
-                  addCeiling(pendingCeiling, id, part.labelAt);
-                  haptic('succes');
-                  setPendingCeiling(null);
-                  return;
-                }
-              }
               setSelectedObjectId(null);
               setSelectedWallId(null);
               setSelectedRoomId(id);

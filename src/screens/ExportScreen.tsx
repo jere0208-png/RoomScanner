@@ -479,7 +479,7 @@ const styles = getStyles(c);
                 activeOpacity={0.8}
                 accessibilityLabel={label}
                 onPress={press}>
-                <Svg width={29} height={29} viewBox="0 0 24 24">
+                <Svg width={26} height={26} viewBox="0 0 24 24">
                   {EXPORT_ICONS[icon].map((d) => (
                     <Path
                       key={d}
@@ -597,7 +597,7 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   grille: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    rowGap: 12,
+    rowGap: 8,
     columnGap: 6,
     marginBottom: 10,
   },
@@ -610,7 +610,9 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     // plus. La hauteur est fixe et courte, l'icône y gagne trois points —
     // ce qu'on doit reconnaître, c'est le dessin, pas la surface bleue.
     width: '100%',
-    height: 58,
+    // Neuf options remplissaient l'écran avant même l'aperçu du plan.
+    // À 46 px, les trois rangées tiennent dans ce que prenaient deux.
+    height: 46,
     borderRadius: radius.sm,
     backgroundColor: c.surface,
     alignItems: 'center',
@@ -622,11 +624,11 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   optionOn: { backgroundColor: c.blue },
   optionText: {
     color: c.inkFaint,
-    fontSize: 10,
+    fontSize: 9.5,
     fontWeight: '700',
     letterSpacing: -0.1,
     textAlign: 'center',
-    marginTop: 5,
+    marginTop: 3,
   },
   optionTextOn: { color: c.blue, fontWeight: '800' },
   switchRow: {

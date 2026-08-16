@@ -462,6 +462,64 @@ function drawLogo(d: Draw, x: number, y: number, size: number) {
 // --------------------------------------------------- cadre et cartouche
 
 const FRAME = { x: 30, y: 30, w: PAGE_W - 60, h: PAGE_H - 60 };
+/**
+ * LA MARGE D'UN CADRE DE LÉGENDE — la même sur les quatre côtés.
+ *
+ * Chaque boîte avait ses propres retraits, ajustés à l'œil : le texte se
+ * retrouvait collé en bas d'un cadre et flottant dans un autre, et il
+ * suffisait d'ajouter une ligne pour que tout se décale. Un seul nombre,
+ * appliqué partout, et la question ne se pose plus — y compris pour les
+ * cadres qu'on ajoutera demain.
+ */
+const CADRE_MARGE = 10;
+/** Hauteur d'une ligne de légende, texte compris. */
+const CADRE_LIGNE = 12;
+/** Largeur du trait de couleur qui précède un libellé, et son écart. */
+const CADRE_PUCE = 18;
+
+/**
+ * Dessine un cadre de légende : titre(s), lignes colorées, marges égales.
+ *
+ * Le cadre se dimensionne SUR SON CONTENU. On lui donne des sections, il
+ * rend sa hauteur — personne n'a plus à compter les lignes à la main.
+ */
+function drawLegendBox(
+  d: Draw,
+  x: number,
+  y: number,
+  larg: number,
+  sections: { titre?: string; lignes: [string, string][] }[],
+): number {
+  let rangs = 0;
+  for (const sec of sections) {
+    if (sec.titre) rangs += 1;
+    rangs += sec.lignes.length;
+  }
+  const haut = rangs * CADRE_LIGNE + CADRE_MARGE * 2;
+  d.rect(x, y, larg, haut, '#FFFFFFEE', '#D8DEE7', 0.6);
+  // On écrit du HAUT vers le bas : la première ligne à une marge du bord.
+  let base = y + haut - CADRE_MARGE - CADRE_LIGNE + 3.5;
+  const tx = x + CADRE_MARGE;
+  for (const sec of sections) {
+    if (sec.titre) {
+      d.text(sec.titre, tx, base, 6, GREY_LIGHT, { align: 'left' });
+      base -= CADRE_LIGNE;
+    }
+    for (const [couleur, texte] of sec.lignes) {
+      d.line(tx, base + 2.5, tx + CADRE_PUCE - 4, base + 2.5, 2, couleur);
+      d.text(
+        fitText(texte, 7, larg - CADRE_MARGE * 2 - CADRE_PUCE),
+        tx + CADRE_PUCE,
+        base,
+        7,
+        INK,
+        { align: 'left' },
+      );
+      base -= CADRE_LIGNE;
+    }
+  }
+  return haut;
+}
 const TITLE_H = 66;
 
 function drawSheetChrome(
@@ -1441,7 +1499,6 @@ function unifilairePage(
   const BUS = x0 + 26; // la barre verticale
   const DISJ = x0 + 74; // le disjoncteur
   const NOM = x0 + 132; // repère et libellé
-  const FIL = x0 + w - 128; // conducteurs
   const CABLE = x0 + w; // section et gaine, calés à droite
   const PAS = 27; // hauteur d'une ligne de départ
 
@@ -1493,18 +1550,31 @@ function unifilairePage(
     d.text(r.breaker === null ? 'com.' : `${r.breaker} A`, DISJ, cy - 3, 7.5, INK, {
       bold: true,
     });
-    d.line(DISJ + 16, cy, FIL - 16, cy, 0.9, INK);
+    /**
+     * LE TRAIT S'ARRÊTE AVANT LE TEXTE.
+     *
+     * Il allait d'un bout à l'autre de la ligne et passait DERRIÈRE le
+     * libellé : « Prises 1 » sortait barré, comme raturé. Un trait qui
+     * traverse un mot le rend illisible et, pire, lui donne l'air annulé.
+     * Le départ se lit donc : dérivation, disjoncteur, nombre de
+     * conducteurs, repère — puis le texte, seul, sur fond blanc.
+     */
+    const finTrait = NOM - 24;
+    d.line(DISJ + 16, cy, finTrait, cy, 0.9, INK);
     // La barre oblique et le nombre de conducteurs : la convention de
     // l'unifilaire, qui dit en un signe ce que le multifilaire détaille.
-    d.line(FIL - 20, cy - 5, FIL - 12, cy + 5, 0.9, INK);
-    d.text(`${r.wires}`, FIL - 8, cy + 2, 7, GREY, { align: 'left' });
+    const oblique = DISJ + 34;
+    d.line(oblique - 4, cy - 5, oblique + 4, cy + 5, 0.9, INK);
+    d.text(`${r.wires}`, oblique + 7, cy + 2, 7, GREY, { align: 'left' });
     // Le repère, à sa teinte de circuit : la même que sur le plan.
     markerAt(d, { x: NOM - 14, y: cy }, r.mark, teinte);
-    d.text(fitText(r.label, 8, FIL - NOM - 34), NOM, cy - 3, 8, INK, {
+    // Le libellé dispose de toute la place jusqu'à la colonne de droite.
+    const largeurNom = CABLE - NOM - 96;
+    d.text(fitText(r.label, 8, largeurNom), NOM, cy - 3, 8, INK, {
       align: 'left',
     });
     if (r.points) {
-      d.text(fitText(r.points, 6.5, FIL - NOM - 34), NOM, cy - 12, 6.5, GREY_LIGHT, {
+      d.text(fitText(r.points, 6.5, largeurNom), NOM, cy - 12, 6.5, GREY_LIGHT, {
         align: 'left',
       });
     }
@@ -1639,9 +1709,36 @@ function schemaPlanPage(
       if (pts.length < 2) continue;
 
       if (mode === 'uni') {
-        // UN trait par circuit : c'est la définition de l'unifilaire. La
-        // barre oblique et le nombre de conducteurs se posent au départ.
-        d.path(pts, 1.4, couleur);
+        /**
+         * CHAQUE CIRCUIT SUR SA VOIE, ici aussi.
+         *
+         * Les faisceaux du multifilaire avaient reçu leur écartement, pas
+         * les traits de l'unifilaire : deux départs longeant le même mur se
+         * posaient l'un sur l'autre. On voyait alors un trait rouge faire
+         * le tour de la pièce et frôler des prises qu'il ne dessert pas,
+         * pendant que le bleu qui les alimente disparaissait dessous. Un
+         * professionnel ne peut rien faire d'un plan pareil.
+         */
+        const voie = (idx - (rows.length - 1) / 2) * Math.max(2, scale * 0.03);
+        const ecarte = pts.map((q, i2) => {
+          const prev = pts[Math.max(0, i2 - 1)];
+          const next = pts[Math.min(pts.length - 1, i2 + 1)];
+          const dx2 = next.x - prev.x;
+          const dy2 = next.y - prev.y;
+          const l2 = Math.hypot(dx2, dy2) || 1;
+          return { x: q.x - (dy2 / l2) * voie, y: q.y + (dx2 / l2) * voie };
+        });
+        d.path(ecarte, 1.4, couleur);
+        /**
+         * LE POINT DE RACCORDEMENT.
+         *
+         * Sans lui, le trait PASSE près de l'appareil sans qu'on sache s'il
+         * s'y arrête ou s'il continue vers un autre. Une pastille pleine à
+         * l'arrivée, et la question ne se pose plus : ce trait-là finit
+         * ici, sur cet appareil.
+         */
+        const fin = ecarte[ecarte.length - 1];
+        d.circle(fin.x, fin.y, 2.6, couleur);
         const a = pts[0];
         const b = pts[1];
         const dx = b.x - a.x;
@@ -1692,8 +1789,27 @@ function schemaPlanPage(
         });
       }
 
-      // Le repère, posé au bout du tracé — là où l'appareil se trouve.
-      markerAt(d, pts[pts.length - 1], mark, couleur);
+      /**
+       * LE REPÈRE SUR CHAQUE APPAREIL, décalé pour ne rien recouvrir.
+       *
+       * Le plan montre les appareils à la couleur de LEUR TYPE — orange
+       * pour une prise, violet pour une RJ45 — et les circuits à la
+       * couleur du DÉPART. Rien ne reliait les deux : on voyait des prises
+       * orange et un trait bleu sans pouvoir dire lesquelles il alimente.
+       * Le repère, posé sur l'appareil à la teinte de son circuit, fait ce
+       * lien en un coup d'œil.
+       */
+      const bout = pts[pts.length - 1];
+      const avant = pts[Math.max(0, pts.length - 2)];
+      const dxb = bout.x - avant.x;
+      const dyb = bout.y - avant.y;
+      const lb = Math.hypot(dxb, dyb) || 1;
+      markerAt(
+        d,
+        { x: bout.x + (dxb / lb) * 11, y: bout.y + (dyb / lb) * 11 },
+        mark,
+        couleur,
+      );
     }
 
     /**
@@ -1705,9 +1821,12 @@ function schemaPlanPage(
      * dont on ne lisait ni l'un ni l'autre. Sur une feuille de schéma, le
      * dessinateur n'en met qu'une : les départs, puis les couleurs.
      */
+    // Ce que chaque départ DESSERT : sans ça, la légende nomme des
+    // circuits sans dire ce qu'on trouve au bout.
     const departs: [string, string][] = rows.map((r, i) => [
       circuitColor(i),
-      `${r.mark} · ${r.label}${r.breaker === null ? '' : ` · ${r.breaker} A`}`,
+      `${r.mark} · ${r.label}${r.breaker === null ? '' : ` · ${r.breaker} A`}` +
+        (r.points ? ` · ${r.points}` : ''),
     ]);
     const fils: [string, string][] =
       mode === 'multi'
@@ -1715,34 +1834,13 @@ function schemaPlanPage(
             (r) => [WIRE_COLORS[r].color, WIRE_COLORS[r].label],
           )
         : [];
-    const LIGNE = 11;
-    const larg = 148;
-    const haut =
-      14 +
-      departs.length * LIGNE +
-      (fils.length > 0 ? 12 + fils.length * LIGNE : 0);
-    const lx = box.x + 8;
-    let ly = box.y + 6 + haut - 14;
-    d.rect(lx - 4, box.y + 6, larg, haut, '#FFFFFFEE', '#D8DEE7', 0.6);
-    d.text('DÉPARTS', lx + 2, ly + 3, 6, GREY_LIGHT, { align: 'left' });
-    for (const [couleur, texte] of departs) {
-      ly -= LIGNE;
-      d.line(lx + 2, ly + 2.5, lx + 16, ly + 2.5, 2, couleur);
-      d.text(fitText(texte, 6.5, larg - 30), lx + 20, ly, 6.5, INK, {
-        align: 'left',
-      });
-    }
-    if (fils.length > 0) {
-      ly -= 12;
-      d.text('CONDUCTEURS', lx + 2, ly + 3, 6, GREY_LIGHT, { align: 'left' });
-      for (const [couleur, texte] of fils) {
-        ly -= LIGNE;
-        d.line(lx + 2, ly + 2.5, lx + 16, ly + 2.5, 2, couleur);
-        d.text(fitText(texte, 6.5, larg - 30), lx + 20, ly, 6.5, INK, {
-          align: 'left',
-        });
-      }
-    }
+    // Une seule boîte, deux sections, et des marges égales partout.
+    drawLegendBox(d, box.x + 8, box.y + 8, 152, [
+      { titre: 'DÉPARTS', lignes: departs },
+      ...(fils.length > 0
+        ? [{ titre: 'CONDUCTEURS', lignes: fils }]
+        : []),
+    ]);
   };
 
   const titre =
@@ -1813,37 +1911,19 @@ function ceilingPage(
       d.text(spec.short, q.x, q.y - r - 8, 6.5, spec.color, { bold: true });
     }
 
-    // La légende : les familles présentes, et le trait de commande.
+    // La légende : les familles présentes, et le trait de commande. Même
+    // cadre que les autres feuilles, donc mêmes marges.
     const vus = [...new Set(ceiling.map((c) => c.kind))];
     if (vus.length === 0) return;
-    const LIGNE = 13;
-    const haut = 22 + (vus.length + 1) * LIGNE;
-    const larg = 150;
-    const lx = box.x + 8;
-    let ly = box.y + 6 + haut - 16;
-    d.rect(lx - 4, box.y + 6, larg, haut, '#FFFFFFEE', '#D8DEE7', 0.6);
-    d.text('PLAFOND', lx + 2, ly + 3, 6, GREY_LIGHT, { align: 'left' });
-    for (const k of vus) {
-      ly -= LIGNE;
-      const spec = CEILINGS[k];
-      drawSymbol(d, CEILING_SYMBOL[k], lx + 10, ly + 3, 0.6, spec.color, 1);
-      d.text(fitText(spec.label, 7, larg - 34), lx + 24, ly, 7, INK, {
-        align: 'left',
-      });
-    }
-    ly -= LIGNE;
-    d.dashedPath(
-      [
-        { x: lx + 3, y: ly + 3 },
-        { x: lx + 8, y: ly + 7 },
-        { x: lx + 14, y: ly + 3 },
-        { x: lx + 18, y: ly + 3 },
-      ],
-      0.7,
-      GREY,
-      [1.6, 3],
-    );
-    d.text('Lien de commande', lx + 24, ly, 7, INK, { align: 'left' });
+    drawLegendBox(d, box.x + 8, box.y + 8, 154, [
+      {
+        titre: 'PLAFOND',
+        lignes: vus.map(
+          (k) => [CEILINGS[k].color, CEILINGS[k].label] as [string, string],
+        ),
+      },
+      { lignes: [[GREY, 'Lien de commande']] },
+    ]);
   };
 
   return planPage(ctx, sheet, planView, true, {
