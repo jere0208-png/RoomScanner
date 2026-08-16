@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   PanResponder,
   StyleSheet,
@@ -37,6 +37,7 @@ import {
   type Pt,
   type RoomPart,
   type WallQuad,
+  type WallRun,
   type WallSeg,
 } from '../geometry/floorplan';
 import type { ObjectData } from 'react-native-room-scan';
@@ -391,8 +392,76 @@ export function FloorplanEditor({
     ? Math.min(1, Math.max(0, (mapping.scale - 60) / 40))
     : 0;
 
+  /**
+   * Retour de mur sélectionné : `{ mur, index du tronçon }`.
+   *
+   * Un mur percé d'une baie n'est pas un objet unique sur le chantier : il
+   * est fait de retours — les bouts de maçonnerie entre l'angle et la
+   * menuiserie — et c'est SUR EUX qu'on prend une cote ou qu'on décide de
+   * poser une prise. Un appui bref choisit donc le retour touché, et lui
+   * seul ; l'appui long garde l'ancien geste et prend le mur entier,
+   * ouvertures comprises.
+   */
+  const [pier, setPier] = useState<{ wallId: string; i: number } | null>(null);
+  useEffect(() => {
+    // Le mur entier l'emporte : les deux sélections ne coexistent pas.
+    if (selectedWallId || !editable) setPier(null);
+  }, [selectedWallId, editable]);
+
   // Corps des murs : onglets calculés une fois pour tout le rendu.
   const quads = useMemo(() => wallQuads(walls), [walls]);
+
+  /**
+   * Les retours de chaque mur percé. Un mur plein n'en a pas : le toucher
+   * doit continuer à prendre le mur, sans quoi on aurait rendu l'ouverture
+   * du panneau plus difficile sans rien apporter.
+   */
+  const retours = useMemo(() => {
+    const m = new Map<string, WallRun[]>();
+    for (const w of walls) {
+      const runs = wallRuns(w, openings);
+      if (!runs.some((r) => r.kind !== 'mur')) continue;
+      m.set(
+        w.id,
+        runs.filter((r) => r.kind === 'mur'),
+      );
+    }
+    return m;
+  }, [walls, openings]);
+
+  /** Le quadrilatère d'un tronçon de mur, découpé dans l'onglet du mur. */
+  const runQuad = (w: WallSeg, run: WallRun): Pt[] => {
+    const q = quads.get(w.id);
+    const lp = (a: Pt, b: Pt, t: number) => ({
+      x: a.x + (b.x - a.x) * t,
+      z: a.z + (b.z - a.z) * t,
+    });
+    if (q) {
+      return [
+        lp(q.a1, q.b1, run.t0),
+        lp(q.a1, q.b1, run.t1),
+        lp(q.a2, q.b2, run.t1),
+        lp(q.a2, q.b2, run.t0),
+      ];
+    }
+    const dx = w.b.x - w.a.x;
+    const dz = w.b.z - w.a.z;
+    const l = Math.hypot(dx, dz) || 1;
+    const nx = (-dz / l) * (WALL_T / 2);
+    const nz = (dx / l) * (WALL_T / 2);
+    const at = (t: number) => ({ x: w.a.x + dx * t, z: w.a.z + dz * t });
+    const p0 = at(run.t0);
+    const p1 = at(run.t1);
+    return [
+      { x: p0.x + nx, z: p0.z + nz },
+      { x: p1.x + nx, z: p1.z + nz },
+      { x: p1.x - nx, z: p1.z - nz },
+      { x: p0.x - nx, z: p0.z - nz },
+    ];
+  };
+
+  const pierRun =
+    pier != null ? (retours.get(pier.wallId) ?? [])[pier.i] ?? null : null;
   // La trame du logement : c'est SUR ELLE que les angles s'aimantent, et
   // jamais sur les axes de l'écran — un scan commencé de biais donnerait
   // sinon des meubles de biais avec des murs droits.
@@ -476,6 +545,7 @@ export function FloorplanEditor({
                 height={layout.h}
                 fill="transparent"
                 onPress={() => {
+                  setPier(null);
                   onSelectWall(null);
                   onSelectRoom?.(null);
                   onSelectOpening?.(null);
@@ -628,6 +698,82 @@ export function FloorplanEditor({
                 }
               />
             ))}
+
+            {/* Les retours d'un mur percé, chacun touchable pour lui-même.
+                Une zone invisible par tronçon : c'est le dessin qui répond
+                « lequel », plutôt qu'un calcul de coordonnées sur un plan
+                qu'on peut avoir tourné et zoomé. */}
+            {editable &&
+              walls.map((w) =>
+                (retours.get(w.id) ?? []).map((run, ri) => {
+                  const pts = runQuad(w, run)
+                    .map((p) => mapping.toPx(p))
+                    .map((p) => `${p.x},${p.y}`)
+                    .join(' ');
+                  return (
+                    <Polygon
+                      key={`pier-hit-${w.id}-${ri}`}
+                      points={pts}
+                      fill="transparent"
+                      stroke="transparent"
+                      strokeWidth={18}
+                      onPress={() => {
+                        onSelectWall(null);
+                        onSelectOpening?.(null);
+                        onSelectObject?.(null);
+                        setPier({ wallId: w.id, i: ri });
+                      }}
+                      delayLongPress={900}
+                      onLongPress={() => {
+                        setPier(null);
+                        onSelectWall(w.id);
+                      }}
+                    />
+                  );
+                }),
+              )}
+
+            {/* Le retour choisi : lui seul se colore, pour qu'on voie bien
+                que la sélection s'arrête au bout de la maçonnerie. */}
+            {pierRun &&
+              (() => {
+                const w = walls.find((x) => x.id === pier?.wallId);
+                if (!w) return null;
+                const pxs = runQuad(w, pierRun).map((p) => mapping.toPx(p));
+                const A = mapping.toPx(w.a);
+                const B = mapping.toPx(w.b);
+                const dx = B.x - A.x;
+                const dy = B.y - A.y;
+                const norm = Math.hypot(dx, dy) || 1;
+                let n = { x: -dy / norm, y: dx / norm };
+                if (n.y > 0) n = { x: -n.x, y: -n.y };
+                const t = (pierRun.t0 + pierRun.t1) / 2;
+                const off = WALL_T * mapping.scale + 10;
+                const lx = A.x + dx * t + n.x * off;
+                const ly = A.y + dy * t + n.y * off;
+                let angle = (Math.atan2(dy, dx) * 180) / Math.PI;
+                if (angle > 90) angle -= 180;
+                if (angle < -90) angle += 180;
+                return (
+                  <G>
+                    <Polygon
+                      points={pxs.map((p) => `${p.x},${p.y}`).join(' ')}
+                      fill={c.blue}
+                      stroke="none"
+                    />
+                    <SvgText
+                      x={lx}
+                      y={ly + 3}
+                      fill={c.blue}
+                      fontSize={10}
+                      fontWeight="800"
+                      textAnchor="middle"
+                      transform={`rotate(${angle}, ${lx}, ${ly})`}>
+                      {`${pierRun.length.toFixed(2).replace('.', ',')} m`}
+                    </SvgText>
+                  </G>
+                );
+              })()}
 
             {/* Le mur sélectionné repasse au-dessus du voile, bien lisible. */}
             {selectedWallId &&
@@ -1256,6 +1402,20 @@ export function FloorplanEditor({
               );
             })()}
 
+          {/* La marche à suivre, seulement quand un retour est pris : une
+              ligne au coin du plan, qui dit ce qu'on tient et comment
+              prendre le mur entier. Rien de sélectionné, rien d'affiché. */}
+          {pierRun && (
+            <View style={styles.pierNote} pointerEvents="none">
+              <Text style={styles.pierNoteTitle}>
+                {`Retour de mur · ${(pierRun.length * 100).toFixed(0)} cm`}
+              </Text>
+              <Text style={styles.pierNoteHint}>
+                Appui long : tout le mur, ouvertures comprises
+              </Text>
+            </View>
+          )}
+
           {/* Poignées de coin, uniquement en mode édition */}
           {editable &&
             corners.map((pt) => (
@@ -1580,6 +1740,23 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     justifyContent: 'center',
   },
   objDrag: { position: 'absolute' },
+  pierNote: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    maxWidth: 210,
+    backgroundColor: c.blueSoft,
+    borderRadius: radius.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  pierNoteTitle: { color: c.blue, fontSize: 12, fontWeight: '800' },
+  pierNoteHint: {
+    color: c.inkSoft,
+    fontSize: 10,
+    fontWeight: '600',
+    marginTop: 1,
+  },
   rotHandle: {
     position: 'absolute',
     width: 34,

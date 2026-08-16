@@ -411,6 +411,72 @@ export function northScreenAngle(northOffset: number, viewRot: number): number {
   return Math.atan2(-Math.cos(t), -Math.sin(t)) + viewRot;
 }
 
+/**
+ * Repousse un meuble hors des murs, sans jamais l'attirer.
+ *
+ * L'aimant précédent décidait à la place de l'utilisateur : il collait le
+ * meuble ET lui imposait son angle, ce qui, dans une pièce étroite, revenait
+ * à l'y clouer. On ne fait plus que l'empêcher d'ENTRER dans un mur : il
+ * glisse librement, s'arrête pile contre le nu, et peut donc se poser à
+ * touche-touche — ce qu'un aimant ne permet jamais avec précision.
+ *
+ * Le calcul : pour chaque mur de la pièce, la demi-emprise du meuble
+ * PROJETÉE sur la normale du mur donne la distance minimale entre son centre
+ * et le nu. En dessous, on le repousse d'autant. Deux passes suffisent pour
+ * les coins, où deux murs poussent en même temps.
+ */
+export function pushOutOfWalls(
+  centre: Pt,
+  box: { width: number; depth: number; yaw: number },
+  walls: WallSeg[],
+  inside: Pt,
+): Pt {
+  const cos = Math.cos(box.yaw);
+  const sin = Math.sin(box.yaw);
+  let p = { ...centre };
+  for (let passe = 0; passe < 2; passe++) {
+    for (const w of walls) {
+      const len = segLength(w);
+      if (len < 1e-6) continue;
+      const u = { x: (w.b.x - w.a.x) / len, z: (w.b.z - w.a.z) / len };
+      let n = perpOf(u);
+      const mid = { x: (w.a.x + w.b.x) / 2, z: (w.a.z + w.b.z) / 2 };
+      if ((inside.x - mid.x) * n.x + (inside.z - mid.z) * n.z < 0) {
+        n = { x: -n.x, z: -n.z };
+      }
+      // Demi-emprise dans la direction du mur : la boîte est tournée, ce
+      // sont ses deux demi-côtés projetés qui comptent.
+      const demi =
+        Math.abs((cos * n.x + sin * n.z) * (box.width / 2)) +
+        Math.abs((-sin * n.x + cos * n.z) * (box.depth / 2));
+      const mini = demi + WALL_T / 2;
+      // Distance signée du centre au nu, comptée vers l'intérieur.
+      const d = (p.x - w.a.x) * n.x + (p.z - w.a.z) * n.z;
+      // Hors du segment : ce mur ne barre pas la route ici.
+      const t = ((p.x - w.a.x) * u.x + (p.z - w.a.z) * u.z) / len;
+      if (t < -0.15 || t > 1.15) continue;
+      if (d < mini) {
+        p = { x: p.x + n.x * (mini - d), z: p.z + n.z * (mini - d) };
+      }
+    }
+  }
+  return p;
+}
+
+/** Un meuble tient-il dans une pièce, quel que soit son angle ? */
+export function fitsInRoom(
+  box: { width: number; depth: number },
+  outline: Pt[],
+): boolean {
+  if (outline.length < 3) return true;
+  const e = roomExtent(outline);
+  const petit = Math.min(box.width, box.depth);
+  const grand = Math.max(box.width, box.depth);
+  const dispoPetit = Math.min(e.width, e.depth) - WALL_T;
+  const dispoGrand = Math.max(e.width, e.depth) - WALL_T;
+  return petit <= dispoPetit && grand <= dispoGrand;
+}
+
 export function quadPoints(q: WallQuad): Pt[] {
   return [q.a1, q.b1, q.b2, q.a2];
 }

@@ -20,7 +20,12 @@ import {
   type Fixture,
 } from '../src/geometry/electrical';
 import { wallQuads, type WallSeg } from '../src/geometry/floorplan';
-import { buildScene, type ScenePalette } from '../src/geometry/scene3d';
+import {
+  buildScene,
+  isHiddenFace,
+  type Face3D,
+  type ScenePalette,
+} from '../src/geometry/scene3d';
 import { mixHex } from '../src/geometry/appearance';
 
 const wall = (id: string, ax: number, az: number, bx: number, bz: number): WallSeg => ({
@@ -136,6 +141,73 @@ describe('tout l’appareillage se voit en 3D, à ses cotes', () => {
       });
     }
   }
+
+  /**
+   * Le test qui manquait : un volume peut exister ET rester invisible.
+   *
+   * Les pans de mur se trient sur le milieu de leur tuile, donc à
+   * mi-hauteur ; une prise se triait sur son propre centre, à 25 cm du sol.
+   * Le terme d'altitude de la profondeur la mettait un mètre DERRIÈRE le mur
+   * qui la porte, et le mur la repeignait : à l'écran, plus un seul appareil,
+   * seulement ses cotes. On vérifie donc l'ORDRE de peinture, sous six angles
+   * de caméra, aux deux hauteurs qui comptent — prise basse et interrupteur.
+   */
+  describe('l’appareil se peint DEVANT son mur, jamais dessous', () => {
+    const rad = (d: number) => (d * Math.PI) / 180;
+    for (const kind of FIXTURE_KINDS) {
+      const spec = FIXTURES[kind];
+      it(`${spec.label} : visible sous tous les angles`, () => {
+        for (const h of [0.25, 1.2]) {
+          const f: Fixture = { id: 'x', kind, wallId: 'n', along: 2, height: h, side };
+          const scene = buildScene(BOX, [], [], { palette: PAL, fixtures: [f] });
+          const x0 = faceX(face, 2) - spec.w / 2;
+          const x1 = faceX(face, 2) + spec.w / 2;
+          const along = (p: { x: number; z: number }) =>
+            (p.x - face.A.x) * face.ux + (p.z - face.A.z) * face.uz;
+          const out = (p: { x: number; z: number }) =>
+            (p.x - face.A.x) * face.nx + (p.z - face.A.z) * face.nz;
+          let vueAuMoinsUneFois = false;
+          for (const theta of [15, 75, 135, 195, 255, 315]) {
+            const cam = {
+              ct: Math.cos(rad(theta)),
+              st: Math.sin(rad(theta)),
+              cp: Math.cos(rad(35)),
+              sp: Math.sin(rad(35)),
+            };
+            const prof = (p: { x: number; y: number; z: number }) =>
+              (p.x * cam.st + p.z * cam.ct) * cam.sp + p.y * cam.cp;
+            const dep = (x: Face3D) =>
+              (x.depthAt
+                ? prof(x.depthAt)
+                : x.pts.reduce((s2, p) => s2 + prof(p), 0) / x.pts.length) +
+              (x.bias ?? 0);
+            const vus = scene.faces.filter((x) => !isHiddenFace(x, cam));
+            // La façade de la plaque : celle qui regarde la pièce.
+            const facade = vus.filter(
+              (x) =>
+                x.fill === spec.color &&
+                !!x.normal &&
+                x.normal.x * face.nx + x.normal.z * face.nz > 0.9,
+            );
+            if (!facade.length) continue; // vue de dos : normal qu'on ne la voie pas
+            vueAuMoinsUneFois = true;
+            const dPlaque = Math.min(...facade.map(dep));
+            // Les tuiles du mur qui la recouvrent : même face, même portion.
+            const dessous = vus.filter(
+              (x) =>
+                x.fill === PAL.wall &&
+                x.pts.every((p) => Math.abs(out(p)) < 0.01) &&
+                Math.max(...x.pts.map(along)) > x0 &&
+                Math.min(...x.pts.map(along)) < x1,
+            );
+            const pire = Math.max(-Infinity, ...dessous.map(dep));
+            expect(pire).toBeLessThan(dPlaque);
+          }
+          expect(vueAuMoinsUneFois).toBe(true);
+        }
+      });
+    }
+  });
 
   it('deux appareils sous une même plaque restent deux volumes', () => {
     // Un ensemble monté à la main : deux boîtes à l'entraxe, deux

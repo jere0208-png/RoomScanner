@@ -760,6 +760,7 @@ export function buildScene(
     const x = faceX(face, f.along);
     const hw = spec.w / 2;
     const yb = Math.max(0, f.height - spec.h / 2);
+    const avant = faces.length;
     // Le dos de la plaque est posé à 1 mm devant le nu : collé pile dessus,
     // les deux faces se disputeraient le même plan.
     const at = (dx: number, out: number): Pt => ({
@@ -792,6 +793,32 @@ export function buildScene(
     // pictogramme qui plane à côté de l'objet qu'il désigne ne dit pas
     // « voici une prise », il dit « voici une annotation ». Et comme il
     // fait partie du volume, il tourne, s'incline et disparaît avec lui.
+    // ---- Le tri en profondeur : une prise se range AVEC son mur.
+    //
+    // C'est ce qui manquait, et pourquoi on ne voyait aucun appareil sur le
+    // modèle : un pan de mur se trie sur le milieu de sa tuile, donc à
+    // MI-HAUTEUR (1,25 m), tandis qu'une prise se triait sur son propre
+    // centre — 25 cm du sol. Le terme d'altitude de la profondeur mettait
+    // donc systématiquement la prise un mètre DERRIÈRE le mur qui la porte,
+    // et le mur la repeignait. Seules les hauteurs d'interrupteur, vers
+    // 1,20 m, s'en sortaient parfois : d'où « on ne voit que les cotes ».
+    //
+    // On donne donc à chaque face de l'appareil un point de tri pris à la
+    // hauteur du pan, à son propre point du mur, avancé d'un cheveu. Le
+    // biais rattrape la largeur d'une tuile : sans lui, un appareil posé
+    // dans la moitié arrière de SA tuile repasserait derrière elle.
+    const refY = w.height / 2;
+    const rangeAvecLeMur = (from: number) => {
+      for (let i = from; i < faces.length; i++) {
+        const f2 = faces[i];
+        const cx = f2.pts.reduce((s2, p) => s2 + p.x, 0) / f2.pts.length;
+        const cz = f2.pts.reduce((s2, p) => s2 + p.z, 0) / f2.pts.length;
+        f2.depthAt = { x: cx, y: refY, z: cz };
+        f2.bias = (f2.bias ?? 0) + step / 2 + 0.004;
+      }
+    };
+    rangeAvecLeMur(avant);
+
     const trait = mixHex(spec.color, '#000000', 0.55);
     // L'échelle se prend sur la HAUTEUR : la largeur d'un ensemble croît
     // avec ses postes, ses symboles ne doivent pas grossir avec elle.
@@ -808,9 +835,14 @@ export function buildScene(
         pts: pts3,
         fill: null,
         stroke: trait,
-        bias: EDGE_BIAS,
+        // Le symbole se trie comme la plaque, un cran devant elle.
+        bias: EDGE_BIAS + step / 2 + 0.006,
         normal: nrm,
-        depthAt: { x: at(0, spec.depth).x, y: yMid, z: at(0, spec.depth).z },
+        depthAt: {
+          x: at(0, spec.depth).x,
+          y: w.height / 2,
+          z: at(0, spec.depth).z,
+        },
       });
     }
   }

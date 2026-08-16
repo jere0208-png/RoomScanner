@@ -50,6 +50,7 @@ const ICONS: Record<string, string[]> = {
     'M15.5 9 v3',
   ],
   sortir: ['M14 4 h5 v16 h-5', 'M4 12 h10', 'M10.5 8.5 L14 12 l-3.5 3.5'],
+  piece: ['M4 5 h16 v14 h-16 z', 'M4 12 h6 v7'],
 };
 
 export interface SheetAction {

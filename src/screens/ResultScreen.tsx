@@ -37,11 +37,13 @@ import {
   type View3DParams,
 } from '../components/Iso3DView';
 import {
+  fitsInRoom,
   roomExtent,
   roomHeight,
   roomParts,
   segLength,
   totalArea,
+  type RoomPart,
 } from '../geometry/floorplan';
 import { hasCapturedColors } from '../geometry/appearance';
 import {
@@ -344,14 +346,10 @@ export function ResultScreen() {
   };
 
   /**
-   * Pose un meuble du catalogue au centre de la plus grande pièce — c'est
-   * là qu'il a le plus de chances d'être visible — puis le sélectionne :
-   * un meuble qu'on vient de poser, on va le déplacer.
+   * Pose un meuble au centre de la pièce demandée, puis le sélectionne : un
+   * meuble qu'on vient de poser, on va le déplacer.
    */
-  const placeObject = (item: CatalogItem) => {
-    const cible = parts
-      .filter((p) => p.surface)
-      .sort((a, b) => (b.surface?.area ?? 0) - (a.surface?.area ?? 0))[0];
+  const poserDans = (item: CatalogItem, cible: RoomPart | null) => {
     const at = cible?.labelAt ?? { x: 0, z: 0 };
     const id = addObject(item, at.x, at.z);
     setDraftObject(id);
@@ -366,6 +364,64 @@ export function ResultScreen() {
     setObjDims(false);
     setWInput(item.w.toFixed(2).replace('.', ','));
     setDInput(item.d.toFixed(2).replace('.', ','));
+  };
+
+  /**
+   * Choisit la pièce avant de poser.
+   *
+   * Deux garde-fous, parce qu'un meuble posé au petit bonheur est un meuble
+   * qu'il faut ensuite rattraper au doigt : on refuse ce qui ne RENTRE pas
+   * (un lit de 2 m dans un dégagement de 1,20 ne se place pas, il se
+   * coince), et quand le scan compte plusieurs pièces on demande laquelle
+   * plutôt que de parier sur la plus grande.
+   */
+  const placeObject = (item: CatalogItem) => {
+    const salles = parts.filter((p) => p.surface);
+    const boite = { width: item.w, depth: item.d };
+    const possibles = salles.filter((p) => fitsInRoom(boite, p.surface!.pts));
+
+    if (salles.length > 0 && possibles.length === 0) {
+      const plus = salles
+        .map((p) => roomExtent(p.surface!.pts))
+        .sort((a, b) => b.width * b.depth - a.width * a.depth)[0];
+      setCatalogue(false);
+      setMenu({
+        title: `${item.label} : trop grand`,
+        subtitle: `Il lui faut ${fr(Math.min(item.w, item.d), 2)} × ${fr(
+          Math.max(item.w, item.d),
+          2,
+        )} m de libre. La plus grande pièce du scan n'offre que ${fr(
+          Math.min(plus.width, plus.depth),
+          2,
+        )} × ${fr(Math.max(plus.width, plus.depth), 2)} m.`,
+        actions: [
+          {
+            label: 'Revenir au catalogue',
+            hint: 'Choisir un meuble à la bonne taille',
+            icon: 'sortir',
+            onPress: () => setCatalogue(true),
+          },
+        ],
+      });
+      return;
+    }
+
+    if (possibles.length > 1) {
+      setCatalogue(false);
+      setMenu({
+        title: `Où poser ${item.label.toLowerCase()} ?`,
+        subtitle: 'Le meuble se pose au centre de la pièce choisie.',
+        actions: possibles.map((p) => ({
+          label: rooms.find((r) => r.id === p.roomId)?.name ?? 'Pièce',
+          hint: `${fr(p.surface?.area ?? 0, 1)} m² au sol`,
+          icon: 'piece' as const,
+          onPress: () => poserDans(item, p),
+        })),
+      });
+      return;
+    }
+
+    poserDans(item, possibles[0] ?? salles[0] ?? null);
   };
 
   const selectedOpening =

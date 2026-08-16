@@ -10,8 +10,8 @@ import {
   DEFAULT_ROOM_ID,
   detectRooms,
   mergeColinear,
-  perpOf,
   pointOnSeg,
+  pushOutOfWalls,
   roomExtent,
   roomHeight,
   roomOf,
@@ -26,7 +26,6 @@ import {
   toSegment,
   wallQuadsOf,
   weldCorners,
-  WALL_T,
   type Pt,
   type WallSeg,
 } from '../geometry/floorplan';
@@ -1148,13 +1147,14 @@ export const useScanStore = create<ScanState>((set, get) => {
     },
 
     /**
-     * Déplace un meuble, avec **attraction des murs**.
+     * Déplace un meuble. Les murs l'ARRÊTENT, ils ne l'attirent pas.
      *
-     * Un meuble se pose presque toujours contre un mur, et le poser au
-     * pixel près au doigt est pénible. Dès que son dos passe à moins de
-     * 30 cm d'un mur, il s'y colle et s'aligne dessus : le dos contre le
-     * nu, la face vers la pièce. Au-delà, il reste exactement où le doigt
-     * l'a laissé — l'aimant aide, il ne décide pas.
+     * L'aimant d'avant collait le meuble au mur et lui imposait son angle à
+     * chaque déplacement : dans une chambre de 2,44 m, un lit de 1,90 est à
+     * portée d'aimant partout — il restait donc collé, toute rotation était
+     * effacée, et le meuble semblait revenir à sa place tout seul. Une
+     * simple collision fait mieux et sans surprise : on pousse jusqu'au mur,
+     * ça s'arrête pile contre le nu.
      */
     setObjectCenter: (id, x, z) => {
       pushHistory(`moveObject:${id}`);
@@ -1165,64 +1165,19 @@ export const useScanStore = create<ScanState>((set, get) => {
       const part =
         parts.find((p) => pointInPolygon({ x, z }, p.surface?.pts ?? [])) ??
         parts.find((p) => p.roomId === roomOf(obj));
-      let pose = { x, z, yaw: Math.atan2(obj.transform[2], obj.transform[0]) };
-      const demi = obj.depth / 2 + WALL_T / 2;
-      let best: { d: number; w: WallSeg } | null = null;
-      for (const w of part?.walls ?? st.walls) {
-        const { dist } = pointOnSeg({ x, z }, w.a, w.b);
-        if (dist > demi + 0.3) continue;
-        if (!best || dist < best.d) best = { d: dist, w };
-      }
-      // L'aimant ne DÉCIDE pas de l'orientation.
-      //
-      // Il collait le meuble au mur et lui imposait son angle à chaque
-      // déplacement. Dans une chambre de 2,44 m, un lit de 1,90 est à moins
-      // de 30 cm d'un mur PARTOUT : il restait donc collé en permanence, et
-      // toute rotation à la main était effacée au premier glissement. On ne
-      // s'aimante plus que si le meuble regarde DÉJÀ à peu près dans le bon
-      // sens — à 30° près. Au-delà, l'utilisateur veut visiblement autre
-      // chose, et on lui laisse la main.
-      if (best) {
-        const w = best.w;
-        const len = segLength(w) || 1;
-        const u = { x: (w.b.x - w.a.x) / len, z: (w.b.z - w.a.z) / len };
-        let n = perpOf(u);
-        // La normale doit regarder l'intérieur de la pièce : c'est de ce
-        // côté-là que le meuble se pose.
-        const mid = { x: (w.a.x + w.b.x) / 2, z: (w.a.z + w.b.z) / 2 };
-        const dedans = part?.labelAt ?? { x, z };
-        if ((dedans.x - mid.x) * n.x + (dedans.z - mid.z) * n.z < 0) {
-          n = { x: -n.x, z: -n.z };
-        }
-        // Projection sur l'axe du mur, puis recul d'une demi-profondeur.
-        const t = ((x - w.a.x) * u.x + (z - w.a.z) * u.z) / len;
-        const sur = {
-          x: w.a.x + u.x * len * Math.max(0, Math.min(1, t)),
-          z: w.a.z + u.z * len * Math.max(0, Math.min(1, t)),
-        };
-        const vise = Math.atan2(-n.x, n.z);
-        let ecart = Math.abs(((pose.yaw - vise + Math.PI) % (2 * Math.PI)) - Math.PI);
-        if (ecart > Math.PI) ecart = 2 * Math.PI - ecart;
-        if (ecart < (30 * Math.PI) / 180) {
-          pose = {
-            x: sur.x + n.x * demi,
-            z: sur.z + n.z * demi,
-            // Dos au mur : l'axe de profondeur du meuble (z local) regarde
-            // la pièce, ce qui donne cet angle-là.
-            yaw: vise,
-          };
-        }
-      }
-      const cos = Math.cos(pose.yaw);
-      const sin = Math.sin(pose.yaw);
+      const yaw = Math.atan2(obj.transform[2], obj.transform[0]);
+      const pose = part
+        ? pushOutOfWalls(
+            { x, z },
+            { width: obj.width, depth: obj.depth, yaw },
+            part.walls,
+            part.labelAt,
+          )
+        : { x, z };
       set({
         objects: st.objects.map((o) => {
           if (o.id !== id) return o;
           const t = [...o.transform];
-          t[0] = cos;
-          t[2] = sin;
-          t[8] = -sin;
-          t[10] = cos;
           t[12] = pose.x;
           t[14] = pose.z;
           return { ...o, transform: t };

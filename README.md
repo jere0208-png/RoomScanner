@@ -134,6 +134,17 @@ justement en train de regarder. La question se pose maintenant à l'écran, le
 temps d'y répondre. Au passage, plus de clavier qui remonte par-dessus la
 barre : c'est ce défaut-là qui l'avait déjà fait déménager une fois.
 
+**Un mur percé se touche par morceaux.** Sur le chantier, un mur avec une
+baie n'est pas un objet : ce sont deux *retours* de maçonnerie et un vide
+entre eux, et c'est le retour qu'on mesure, qu'on perce, sur lequel on décide
+où passe la prise. Un appui bref sur un retour ne prend donc que lui — il se
+colore, sa longueur s'inscrit à côté, et une note au coin du plan rappelle la
+suite : **appui long (0,9 s) pour prendre le mur entier**, ouvertures
+comprises, avec son voile et ses commandes. Un mur plein n'a pas de retour :
+le toucher continue de le sélectionner d'un coup, sinon on aurait compliqué
+le geste courant sans rien apporter. La note ne s'affiche que quand un retour
+est tenu ; rien de sélectionné, rien à l'écran.
+
 ### Langage visuel
 
 Trois règles, appliquées partout plutôt que décidées écran par écran.
@@ -372,6 +383,21 @@ vide se scanne très bien, et c'est même le cas courant avant travaux. Le
 ouvre une trentaine d'entrées aux dimensions usuelles du commerce, rangées
 par pièce — lits 90/140/160, meubles bas et hauts de cuisine, four, plaque,
 réfrigérateur, lave-vaisselle, baignoire, douche, WC, bureau, armoire…
+
+**Le meuble se heurte aux murs, il n'y est plus attiré.** L'aimant collait
+le meuble au nu ET lui imposait l'angle du mur à chaque déplacement : dans
+une chambre de 2,44 m, un lit de 1,90 est à portée d'aimant partout, il
+restait donc collé, toute rotation était effacée au premier glissement, et le
+meuble paraissait revenir tout seul à sa place. À la place, `pushOutOfWalls()`
+ne fait que l'empêcher d'ENTRER dans un mur : on pousse, ça s'arrête pile
+contre le nu, et on obtient le contact franc qu'un aimant ne donne jamais.
+
+**Ce qui ne rentre pas ne se pose pas.** `fitsInRoom()` compare l'emprise du
+meuble à celle de la pièce, dans les deux sens : un lit de 2 m ne s'ajoute
+pas à un dégagement de 1,20 m, et on le dit avec les deux cotes en main
+plutôt que de laisser l'utilisateur découvrir un meuble coincé dans un
+angle. Et quand le scan compte plusieurs pièces, on **demande laquelle**
+avant de poser, au lieu de parier sur la plus grande.
 
 **Le « + » se signale tout seul.** Une pastille de plus dans une colonne de
 pastilles ne se remarque pas : celle-ci, posée à GAUCHE du calque meubles,
@@ -809,6 +835,25 @@ Pendant un geste, la scène est reconstruite en mode `coarse` : pans d'un seul
 tenant, cinq fois moins de polygones, **contours compris**. Les supprimer
 faisait fondre le modèle en blanc sur blanc le temps du mouvement. Seuls le
 semis du sol et les cotes disparaissent — dans la vue 3D comme sur le plan 2D.
+
+### Un appareil se trie AVEC son mur
+
+Le piège coûte cher parce qu'il ne ressemble pas à un bug de géométrie : les
+volumes des prises étaient bien construits, à leurs cotes, devant le nu — et
+pourtant l'écran n'en montrait aucun, seulement leurs cotes flottantes. La
+cause est dans le TRI en profondeur. Un pan de mur se trie sur le centre de
+sa tuile, donc à mi-hauteur — 1,25 m ; une prise se triait sur son propre
+centre, à 25 cm du sol. Le terme d'altitude de la profondeur
+(`rz · sp + y · cp`) mettait donc la prise près d'un mètre DERRIÈRE le mur
+qui la porte, et le mur la repeignait aussitôt.
+
+Chaque face d'appareil reçoit donc un `depthAt` pris **à la hauteur du pan**,
+à son propre point du mur, plus un biais d'une demi-tuile — sans ce biais, un
+appareil posé dans la moitié arrière de sa propre tuile repasserait derrière
+elle. `__tests__/appareillage3d.test.ts` vérifie l'ORDRE de peinture pour les
+22 types, sous six azimuts et aux deux hauteurs qui comptent (prise basse,
+interrupteur) : un volume peut exister et rester invisible, un test qui se
+contente de le trouver dans la scène ne prouve rien.
 
 ### Jonctions de murs
 
