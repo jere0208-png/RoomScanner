@@ -702,6 +702,54 @@ export function WallElevation({
             )}
           </Svg>
         )}
+
+        {/* L'alerte de hauteur se pose SUR le dessin, au-dessus de
+            l'appareil qu'elle concerne — jamais dans le flux du panneau.
+            En bandeau, elle poussait tout le reste vers le bas : le schéma
+            changeait de taille selon qu'une prise était trop basse ou non,
+            et le regard perdait le mur qu'il suivait. Ici, elle désigne ce
+            dont elle parle, et rien ne bouge. */}
+        {hauteurKO && selected && face && (
+          <View
+            style={[
+              styles.alerte,
+              {
+                left: Math.max(
+                  6,
+                  Math.min(
+                    layout.w - 190,
+                    px(faceX(face, selected.along)) - 92,
+                  ),
+                ),
+                top: Math.max(4, py(selected.height) - 46),
+              },
+            ]}
+            pointerEvents="box-none">
+            <View style={styles.alerteRow}>
+              <Text style={styles.alerteTitre} numberOfLines={1}>
+                {`Trop ${hauteurKO.sens === 'trop bas' ? 'bas' : 'haut'}`}
+              </Text>
+              <TouchableOpacity
+                style={styles.alerteFix}
+                onPress={() =>
+                  moveFixture(
+                    selected.id,
+                    selected.along,
+                    SPECS[selected.kind].std,
+                  )
+                }>
+                <Text style={styles.alerteFixText}>
+                  {`${cm(SPECS[selected.kind].std)} cm`}
+                </Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.alerteRegle} numberOfLines={2}>
+              {hauteurKO.regle}
+            </Text>
+            {/* La pointe qui vise l'appareil. */}
+            <View style={styles.alertePointe} />
+          </View>
+        )}
       </View>
 
 {/* L'objectif de la pièce, en une ligne : son nom, où on en est, et le
@@ -820,28 +868,6 @@ export function WallElevation({
           <Text style={styles.warnRule}>{issue.regle}</Text>
         </View>
       ))}
-
-      {hauteurKO && selected && (
-        <View style={styles.warn}>
-          <View style={styles.warnHead}>
-            <Text style={styles.warnTitle}>{`Hauteur ${hauteurKO.sens}`}</Text>
-            <TouchableOpacity
-              style={styles.warnFix}
-              onPress={() =>
-                moveFixture(
-                  selected.id,
-                  selected.along,
-                  SPECS[selected.kind].std,
-                )
-              }>
-              <Text style={styles.warnFixText}>
-                {`Remettre à ${cm(SPECS[selected.kind].std)} cm`}
-              </Text>
-            </TouchableOpacity>
-          </View>
-          <Text style={styles.warnRule}>{hauteurKO.regle}</Text>
-        </View>
-      )}
 
 {/* Un ensemble multiposte ne se pose pas au jugé : voici où percer,
           depuis le bord gauche du mur. C'est la seule chose que
@@ -1160,6 +1186,49 @@ const getStyles = themedStyles((c: Palette) =>
       fontSize: 9.5,
       fontWeight: '700',
       marginTop: 2,
+    },
+    // Une bulle, pas un bandeau : posée en absolu sur le dessin, elle ne
+    // prend aucune place dans la mise en page.
+    alerte: {
+      position: 'absolute',
+      width: 184,
+      backgroundColor: c.surface,
+      borderRadius: radius.sm,
+      paddingHorizontal: 9,
+      paddingVertical: 7,
+      borderLeftWidth: 3,
+      borderLeftColor: c.danger,
+      ...shadowCard,
+      shadowOpacity: 0.16,
+    },
+    alerteRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    alerteTitre: {
+      color: c.danger,
+      fontSize: 12.5,
+      fontWeight: '800',
+      flex: 1,
+    },
+    alerteFix: {
+      backgroundColor: c.danger,
+      borderRadius: radius.pill,
+      paddingHorizontal: 9,
+      paddingVertical: 3,
+    },
+    alerteFixText: { color: '#FFFFFF', fontSize: 11, fontWeight: '800' },
+    alerteRegle: {
+      color: c.inkSoft,
+      fontSize: 9.5,
+      lineHeight: 12.5,
+      marginTop: 2,
+    },
+    alertePointe: {
+      position: 'absolute',
+      bottom: -5,
+      left: 88,
+      width: 10,
+      height: 10,
+      backgroundColor: c.surface,
+      transform: [{ rotate: '45deg' }],
     },
     percage: {
       marginTop: 8,
