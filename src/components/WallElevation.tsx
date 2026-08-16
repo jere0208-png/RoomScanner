@@ -118,6 +118,8 @@ export function WallElevation({
   const [layout, setLayout] = useState({ w: 0, h: 0 });
   const [guide, setGuide] = useState<{ x?: number; y?: number }>({});
   const [editing, setEditing] = useState<'g' | 'd' | 'h' | null>(null);
+  /** Pas du réglage fin : le centimètre, ou les cinq centimètres. */
+  const [pas, setPas] = useState(0.01);
   /** Deux appareils posés au même endroit : on propose de les réunir. */
   const [fusion, setFusion] = useState<{
     moved: string;
@@ -269,9 +271,11 @@ export function WallElevation({
         if (!L.face || L.scale <= 0) return;
         const tx = e.nativeEvent.locationX;
         const ty = e.nativeEvent.locationY;
-        // L'appareil le plus proche du doigt, à portée de pouce.
+        // L'appareil le plus proche du doigt, à portée de POUCE : 44 px,
+        // la cible minimale d'iOS. À 34 on ratait une prise sur trois, et
+        // on désélectionnait au lieu de saisir.
         let best: Fixture | null = null;
-        let bd = 34;
+        let bd = 44;
         for (const f of L.mine) {
           const d = Math.hypot(
             L.px(faceX(L.face, f.along)) - tx,
@@ -1055,6 +1059,50 @@ export function WallElevation({
         </View>
       )}
 
+      {/* Le pavé de réglage fin : le doigt cache toujours l'appareil qu'il
+          déplace, et un pouce ne vise pas au centimètre. Quatre flèches et
+          un pas règlent la cote sans rien masquer — et déplacent l'ENSEMBLE
+          quand l'appareil en fait partie. */}
+      {selected && (
+        <View style={styles.pave}>
+          <TouchableOpacity
+            style={styles.pavePas}
+            onPress={() => setPas(pas === 0.01 ? 0.05 : 0.01)}>
+            <Text style={styles.pavePasText}>{`${Math.round(pas * 100)} cm`}</Text>
+          </TouchableOpacity>
+          {(
+            [
+              ['gauche', -1, 0, 'M15 5 L8 12 l7 7'],
+              ['droite', 1, 0, 'M9 5 L16 12 l-7 7'],
+              ['haut', 0, 1, 'M5 15 L12 8 l7 7'],
+              ['bas', 0, -1, 'M5 9 L12 16 l7 -7'],
+            ] as const
+          ).map(([cle, dx, dy, fleche]) => (
+            <TouchableOpacity
+              key={cle}
+              style={styles.paveBtn}
+              onPress={() =>
+                moveFixture(
+                  selected.id,
+                  fromFaceX(face, faceX(face, selected.along) + dx * pas),
+                  selected.height + dy * pas,
+                )
+              }>
+              <Svg width={20} height={20} viewBox="0 0 24 24">
+                <Path
+                  d={fleche}
+                  stroke={c.ink}
+                  strokeWidth={2.2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  fill="none"
+                />
+              </Svg>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+
       <View style={styles.fields}>
         {field('g', 'Gauche', selX)}
         {field('d', 'Droite', face.len - selX)}
@@ -1256,6 +1304,9 @@ const getStyles = themedStyles((c: Palette) =>
       borderRadius: radius.lg,
       padding: 14,
       width: '100%',
+      // La feuille monte jusqu'en haut : c'est un établi, pas une
+      // notification.
+      flex: 1,
       ...shadowCard,
     },
     header: { flexDirection: 'row', alignItems: 'flex-start' },
@@ -1276,8 +1327,15 @@ const getStyles = themedStyles((c: Palette) =>
       justifyContent: 'center',
     },
     closeText: { color: c.inkSoft, fontSize: 15, fontWeight: '700' },
+    // Le mur occupe la moitié de l'écran, pas une vignette de 250 px.
+    //
+    // On place des appareils au doigt, à 5 cm près, sur un dessin qui
+    // faisait 250 px de haut : le pouce couvrait le tiers du mur. La feuille
+    // prend maintenant toute la hauteur disponible, et le dessin ce qui
+    // reste une fois les commandes posées.
     canvas: {
-      height: 250,
+      flex: 1,
+      minHeight: 300,
       marginTop: 10,
       backgroundColor: c.bg,
       borderRadius: radius.md,
@@ -1450,6 +1508,28 @@ const getStyles = themedStyles((c: Palette) =>
       color: c.inkSoft,
       fontSize: 11.5,
       fontWeight: '800',
+    },
+    // Un pavé de flèches larges : 44 px, la cible minimale d'un pouce.
+    pave: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      marginTop: 10,
+    },
+    pavePas: {
+      backgroundColor: c.blue,
+      borderRadius: radius.sm,
+      paddingHorizontal: 12,
+      paddingVertical: 11,
+    },
+    pavePasText: { color: '#FFFFFF', fontSize: 12, fontWeight: '800' },
+    paveBtn: {
+      flex: 1,
+      height: 44,
+      borderRadius: radius.sm,
+      backgroundColor: c.surfaceSunken,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     photo: {
       width: 34,

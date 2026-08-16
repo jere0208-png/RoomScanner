@@ -1231,6 +1231,29 @@ Au passage, **la télé se fixe au mur** : plus de pied ni de socle. Presque
 toutes le sont aujourd'hui, et un pied dessiné sous un écran accroché à
 1,10 m ne décrit rien de réel.
 
+### L'établi électrique, et le bloc qui se déplace d'un tenant
+
+Deux défauts que l'usage au doigt révèle seul.
+
+**La fenêtre était une vignette.** On y place des appareils à cinq
+centimètres près sur un dessin de 250 px de haut : le pouce couvrait le tiers
+du mur. Elle prend maintenant tout l'écran — c'est un établi, pas une
+notification —, le dessin occupe ce qui reste une fois les commandes posées,
+et la cible de saisie passe de 34 à **44 px**, le minimum d'iOS ; en dessous
+on ratait une prise sur trois, et on désélectionnait au lieu de saisir.
+
+**Le doigt cache ce qu'il déplace.** Un pavé de quatre flèches règle la cote
+sans rien masquer, au centimètre ou par pas de cinq — c'est le geste qu'on
+fait vraiment quand on veut « 5 cm plus à gauche ».
+
+**Un ensemble se déplace D'UN BLOC.** Deux prises sous une même plaque, ce
+n'est plus deux appareils : c'est une plaque de 153 mm avec deux mécanismes.
+En déplacer un seul cassait l'entraxe — l'ensemble n'existait que tant qu'on
+n'y touchait pas. Tout le lot suit donc le même vecteur, et c'est le BLOC
+qu'on borne au mur, pas chaque poste : sans quoi le premier arrivé au bord
+écrase les autres contre lui. Retirer un poste d'une paire défait la plaque
+et rend l'appareil restant libre ; d'un trio, il reste un ensemble de deux.
+
 ### Jonctions de murs
 
 Un mur n'est pas un trait épais posé à côté des autres : `wallQuads()` traite

@@ -312,3 +312,92 @@ describe('ce que le modèle 3D en montre', () => {
     expect(centres[1] - centres[0]).toBeCloseTo(ENTRAXE, 3);
   });
 });
+
+describe('un ensemble se déplace d’un bloc', () => {
+  const face = faceDuMur();
+  const cotes = () =>
+    useScanStore
+      .getState()
+      .fixtures.map((f) => ({
+        id: f.id,
+        x: faceX(face, f.along),
+        y: f.height,
+      }))
+      .sort((a, b) => a.x - b.x);
+
+  const paire = () => {
+    neuf();
+    const a = useScanStore.getState().addFixture('prise', 'n')!;
+    const b = useScanStore.getState().addFixture('prise', 'n')!;
+    return { a, b };
+  };
+
+  it('déplacer un poste emporte l’autre, à l’entraxe', () => {
+    const { a } = paire();
+    const avant = cotes();
+    const ecart = avant[1].x - avant[0].x;
+    useScanStore.getState().moveFixture(a, fromFaceX(face, 2.5), 1.1);
+    const apres = cotes();
+    expect(apres[1].x - apres[0].x).toBeCloseTo(ecart, 6);
+    expect(apres[0].y).toBeCloseTo(1.1, 6);
+    expect(apres[1].y).toBeCloseTo(1.1, 6);
+    // Et le poste saisi est bien allé où on le demandait.
+    const saisi = useScanStore.getState().fixtures.find((f) => f.id === a)!;
+    expect(faceX(face, saisi.along)).toBeCloseTo(2.5, 6);
+  });
+
+  it('poussé au bord, le BLOC s’arrête — pas le poste saisi tout seul', () => {
+    const { a } = paire();
+    useScanStore.getState().moveFixture(a, fromFaceX(face, 99), 1.1);
+    const apres = cotes();
+    const spec = FIXTURES.prise;
+    // Le dernier poste touche le bord, et l'entraxe est intact.
+    expect(apres[1].x + spec.w / 2).toBeCloseTo(face.len, 6);
+    expect(apres[1].x - apres[0].x).toBeCloseTo(ENTRAXE, 6);
+  });
+
+  it('et dans l’autre sens, contre le coin de départ', () => {
+    const { b } = paire();
+    useScanStore.getState().moveFixture(b, fromFaceX(face, -5), 0.25);
+    const apres = cotes();
+    expect(apres[0].x - FIXTURES.prise.w / 2).toBeCloseTo(0, 6);
+    expect(apres[1].x - apres[0].x).toBeCloseTo(ENTRAXE, 6);
+  });
+
+  it('en hauteur aussi, le bloc reste sous le plafond', () => {
+    const { a } = paire();
+    useScanStore.getState().moveFixture(a, fromFaceX(face, 2), 9);
+    for (const f of useScanStore.getState().fixtures) {
+      expect(f.height + FIXTURES[f.kind].h / 2).toBeLessThanOrEqual(2.5 + 1e-9);
+    }
+  });
+
+  it('retirer un poste défait la plaque : le dernier redevient libre', () => {
+    const { a } = paire();
+    useScanStore.getState().removeFixture(a);
+    const restant = useScanStore.getState().fixtures;
+    expect(restant).toHaveLength(1);
+    expect(restant[0].group).toBeUndefined();
+  });
+
+  it('à trois postes, en retirer un laisse un ensemble de deux', () => {
+    neuf();
+    const a = useScanStore.getState().addFixture('prise', 'n')!;
+    useScanStore.getState().addFixture('prise', 'n');
+    useScanStore.getState().addFixture('prise', 'n');
+    useScanStore.getState().removeFixture(a);
+    const restant = useScanStore.getState().fixtures;
+    expect(restant).toHaveLength(2);
+    expect(restant[0].group).toBeTruthy();
+    expect(restant[1].group).toBe(restant[0].group);
+  });
+
+  it('un appareil seul se déplace toujours seul', () => {
+    neuf();
+    const a = useScanStore.getState().addFixture('prise', 'n')!;
+    useScanStore.getState().moveFixture(a, fromFaceX(face, 1.4), 0.9);
+    const f = useScanStore.getState().fixtures[0];
+    expect(faceX(face, f.along)).toBeCloseTo(1.4, 6);
+    expect(f.height).toBeCloseTo(0.9, 6);
+  });
+});

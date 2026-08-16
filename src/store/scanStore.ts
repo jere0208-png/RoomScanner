@@ -913,21 +913,60 @@ export const useScanStore = create<ScanState>((set, get) => {
       const f = st.fixtures.find((x) => x.id === id);
       const wall = f ? st.walls.find((w) => w.id === f.wallId) : null;
       if (!f || !wall) return;
-      // Un appareil ne peut pas sortir de son mur : ses cotes sont bornées à
-      // la face, demi-plaque comprise, et à la hauteur sous plafond.
       const face = wallFace(wall, wallQuadsOf(st.walls).get(wall.id), f.side);
-      const spec = FIXTURES[f.kind];
-      const hw = Math.min(spec.w / 2, face.len / 2);
-      const hh = Math.min(spec.h / 2, wall.height / 2);
-      const x = Math.max(hw, Math.min(face.len - hw, faceX(face, along)));
-      pushHistory(`fixture:${id}`);
+
+      /**
+       * Un ensemble se déplace D'UN BLOC.
+       *
+       * Deux prises sous une même plaque, ce n'est plus deux appareils :
+       * c'est une plaque de 153 mm avec deux mécanismes. En déplacer un
+       * seul cassait l'entraxe — l'ensemble n'existait que tant qu'on n'y
+       * touchait pas. On déplace donc tout le lot du même vecteur, et on
+       * borne le BLOC au mur, pas chaque poste séparément : sans quoi le
+       * premier arrivé au bord écrase les autres contre lui.
+       */
+      const lot =
+        f.group
+          ? st.fixtures.filter(
+              (o) => o.group === f.group && o.wallId === f.wallId && o.side === f.side,
+            )
+          : [f];
+
+      // Emprise du bloc, mesurée sur la face.
+      let x0 = Infinity;
+      let x1 = -Infinity;
+      let y0 = Infinity;
+      let y1 = -Infinity;
+      for (const o of lot) {
+        const sp = FIXTURES[o.kind];
+        const cx = faceX(face, o.along);
+        x0 = Math.min(x0, cx - sp.w / 2);
+        x1 = Math.max(x1, cx + sp.w / 2);
+        y0 = Math.min(y0, o.height - sp.h / 2);
+        y1 = Math.max(y1, o.height + sp.h / 2);
+      }
+      const largeur = x1 - x0;
+      const hauteur = y1 - y0;
+
+      // Le vecteur demandé, puis ce que le mur en laisse passer.
+      const vise = { x: faceX(face, along), y: height };
+      let dx = vise.x - faceX(face, f.along);
+      let dy = vise.y - f.height;
+      dx = Math.min(face.len - x1, Math.max(-x0, dx));
+      dy = Math.min(wall.height - y1, Math.max(-y0, dy));
+      // Un bloc plus large que son mur : on le colle au bord, sans pousser.
+      if (largeur > face.len) dx = -x0;
+      if (hauteur > wall.height) dy = -y0;
+
+      pushHistory(`fixture:${f.group ?? id}`);
+      const ids = new Set(lot.map((o) => o.id));
       set({
         fixtures: st.fixtures.map((o) =>
-          o.id === id
+          ids.has(o.id)
             ? {
                 ...o,
-                along: fromFaceX(face, x),
-                height: Math.max(hh, Math.min(wall.height - hh, height)),
+                along: fromFaceX(face, faceX(face, o.along) + dx),
+                height: o.height + dy,
               }
             : o,
         ),
@@ -1070,6 +1109,25 @@ export const useScanStore = create<ScanState>((set, get) => {
     },
 
     removeFixture: (id) => {
+      // Un ensemble réduit à un poste n'est plus un ensemble : sa plaque
+      // redevient simple, et l'appareil restant redevient libre.
+      {
+        const st0 = get();
+        const parti = st0.fixtures.find((f) => f.id === id);
+        if (parti?.group) {
+          const restants = st0.fixtures.filter(
+            (f) => f.group === parti.group && f.id !== id,
+          );
+          if (restants.length === 1) {
+            const seul = restants[0].id;
+            set({
+              fixtures: st0.fixtures.map((f) =>
+                f.id === seul ? { ...f, group: undefined } : f,
+              ),
+            });
+          }
+        }
+      }
       pushHistory('removeFixture');
       set({
         fixtures: get().fixtures.filter((f) => f.id !== id),
