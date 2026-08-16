@@ -196,6 +196,125 @@ export function requirementFor(use: RoomUse, area: number): RoomRequirement {
 // ------------------------------------------------------- hauteurs de pose
 
 /** Plage de hauteur d'axe admise, quand la norme en fixe une. */
+/**
+ * Un plan de travail devant un mur : sur quelle portion, et à quelle
+ * hauteur.
+ *
+ * La règle des 1,30 m dit « hors plan de travail » — et c'est justement
+ * au-dessus d'un plan de travail qu'on pose le plus de prises. Sans en
+ * tenir compte, l'app signalait en défaut la totalité d'une crédence de
+ * cuisine, ce qui revient à ne rien signaler du tout : on n'écoute plus un
+ * garde-fou qui se trompe à chaque fois.
+ */
+export interface Worktop {
+  /** Portion du mur couverte, en abscisse de face (m). */
+  from: number;
+  to: number;
+  /** Altitude du dessus, en mètres depuis le sol. */
+  height: number;
+}
+
+/** Meubles qui portent un plan de travail (dessus entre 80 cm et 1 m). */
+const PORTE_PLAN = /counter|countertop|sink|stove|cooktop|oven|dishwasher|washer/i;
+/** En cuisine, un caisson bas fait plan de travail lui aussi. */
+const CAISSON = /storage|cabinet|refrigerator/i;
+
+/**
+ * Les plans de travail que ce mur longe.
+ *
+ * Un meuble compte s'il est ASSEZ PRÈS du mur (75 cm : la profondeur d'un
+ * caisson plus un jeu), si son dessus est à hauteur de plan (80 cm à 1 m),
+ * et il ne couvre que la portion du mur qu'il longe réellement.
+ */
+export function worktopsOnWall(
+  face: { A: Pt; ux: number; uz: number; nx: number; nz: number; len: number },
+  objects: {
+    category?: string;
+    width: number;
+    depth: number;
+    height: number;
+    transform: number[];
+  }[],
+  cuisine: boolean,
+  floorY = 0,
+): Worktop[] {
+  const out: Worktop[] = [];
+  for (const o of objects) {
+    const cat = o.category ?? '';
+    if (!PORTE_PLAN.test(cat) && !(cuisine && CAISSON.test(cat))) continue;
+    const cx = o.transform[12];
+    const cz = o.transform[14];
+    const haut = o.transform[13] + (o.height ?? 0) / 2 - floorY;
+    if (haut < 0.8 || haut > 1.02) continue;
+    const yaw = Math.atan2(o.transform[2], o.transform[0]);
+    const cos = Math.cos(yaw);
+    const sin = Math.sin(yaw);
+    // Emprise du meuble projetée sur la face : abscisse et éloignement.
+    let x0 = Infinity;
+    let x1 = -Infinity;
+    let loin = Infinity;
+    let pres = Infinity;
+    for (const [sx, sz] of [
+      [-1, -1],
+      [1, -1],
+      [1, 1],
+      [-1, 1],
+    ]) {
+      const lx = (sx * o.width) / 2;
+      const lz = (sz * o.depth) / 2;
+      const px = cx + lx * cos - lz * sin;
+      const pz = cz + lx * sin + lz * cos;
+      const dx = px - face.A.x;
+      const dz = pz - face.A.z;
+      const le = dx * face.ux + dz * face.uz;
+      const de = dx * face.nx + dz * face.nz;
+      x0 = Math.min(x0, le);
+      x1 = Math.max(x1, le);
+      pres = Math.min(pres, de);
+      loin = Math.min(loin, Math.abs(de));
+    }
+    // Devant la face, et à portée : un meuble de l'autre pièce ne compte pas.
+    if (pres < -0.1 || loin > 0.75) continue;
+    const a = Math.max(0, x0);
+    const b = Math.min(face.len, x1);
+    if (b - a < 0.15) continue;
+    out.push({ from: a, to: b, height: haut });
+  }
+  return out;
+}
+
+/**
+ * La règle de hauteur qui s'applique VRAIMENT à cet endroit du mur.
+ *
+ * Au-dessus d'un plan de travail, un socle ne se pose ni derrière le meuble
+ * ni au plafond : 8 cm au-dessus du plan au minimum — de quoi passer la
+ * main —, 40 cm au-dessus au maximum, ce qui laisse la crédence libre.
+ */
+export function heightRuleAt(
+  kind: FixtureKind,
+  x: number,
+  worktops: Worktop[],
+): { min?: number; max?: number; regle: string } | null {
+  const base = HEIGHT_RULES[kind];
+  if (!base) return null;
+  const plan = worktops.find((w) => x >= w.from - 0.05 && x <= w.to + 0.05);
+  if (!plan) return base;
+  // Seuls les appareils qu'on pose sur une crédence sont concernés.
+  if (!/^(prise|prise2|prise3|prise20|rj45|rj2|inter|va|tv)$/.test(kind)) {
+    return base;
+  }
+  const min = plan.height + 0.08;
+  return {
+    min,
+    max: Math.max(min + 0.05, plan.height + 0.4),
+    regle: `Au-dessus d'un plan de travail à ${Math.round(
+      plan.height * 100,
+    )} cm : axe entre ${Math.round(min * 100)} et ${Math.round(
+      (plan.height + 0.4) * 100,
+    )} cm du sol.`,
+  };
+}
+
 export const HEIGHT_RULES: Partial<
   Record<FixtureKind, { min?: number; max?: number; regle: string }>
 > = {
@@ -346,6 +465,13 @@ export function checkElectrical(
   roomOfWall: Map<string, string[]>,
   /** Pièce de chaque appareil, quand on la connaît (voir `fixturePlacement`). */
   placement?: Map<string, string>,
+  /**
+   * Plans de travail longés par chaque mur, s'ils sont connus
+   * (`worktopsOnWall`) : au-dessus d'une crédence, la règle de hauteur
+   * n'est pas celle d'un mur nu, et la signaler en défaut reviendrait à
+   * crier au loup sur toute une cuisine.
+   */
+  worktops?: Map<string, { x: (f: Fixture) => number; plans: Worktop[] }>,
 ): ElecIssue[] {
   const out: ElecIssue[] = [];
   const roomOfFixture = (f: Fixture): string | undefined =>
@@ -353,15 +479,25 @@ export function checkElectrical(
 
   // -------------------------------------------------- hauteurs de pose
   for (const f of fixtures) {
-    const rule = HEIGHT_RULES[f.kind];
+    const surLeMur = worktops?.get(f.wallId);
+    const rule = surLeMur
+      ? heightRuleAt(f.kind, surLeMur.x(f), surLeMur.plans)
+      : HEIGHT_RULES[f.kind];
     if (!rule) continue;
     const spec = FIXTURES[f.kind];
     const cm = Math.round(f.height * 100);
+    // La cote proposée doit être valide LÀ OÙ L'APPAREIL EST : au-dessus
+    // d'un plan de travail, « remettre à 25 cm » remettrait la prise
+    // derrière le meuble.
+    const cible = Math.min(
+      rule.max ?? spec.std,
+      Math.max(rule.min ?? spec.std, spec.std),
+    );
     const remise: ElecFix = {
       type: 'hauteur',
       fixtureId: f.id,
-      height: spec.std,
-      label: `Remettre à ${Math.round(spec.std * 100)} cm`,
+      height: cible,
+      label: `Remettre à ${Math.round(cible * 100)} cm`,
     };
     if (rule.min !== undefined && f.height < rule.min - 1e-6) {
       out.push({

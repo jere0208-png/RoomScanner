@@ -26,6 +26,7 @@ const midOf = (o: WallSeg): Pt => ({
 import { dotStep, floorDots, inkOn, mixHex } from '../geometry/appearance';
 import {
   buildScene,
+  cutawayOpacity,
   isHiddenFace,
   sceneFraming,
   shadeFill,
@@ -383,6 +384,10 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
       // Lumière liée à la caméra : les pans face à nous sont clairs, ceux de
       // profil s'assombrissent — le volume se lit immédiatement.
       const fill = shadeFill(face, ct, st) ?? 'none';
+      // Écorché : un mur qui nous fait face s'efface pour laisser voir la
+      // pièce. Il garde son arête, donc sa présence.
+      const voile =
+        face.cutaway && face.normal ? cutawayOpacity(face.normal, cam) : 1;
 
       // Mode cotes : toutes les arêtes en noir.
       // Un pan sans contour propre est bordé de SA PROPRE couleur : sans ça,
@@ -394,7 +399,7 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
         showMeasures && !face.isFloor && !face.dashed && face.stroke
           ? '#0B0D12'
           : face.stroke ?? fill;
-      return { proj, depth, fill, stroke, dashed: !!face.dashed };
+      return { proj, depth, fill, stroke, voile, dashed: !!face.dashed };
       });
 
     // Cotes insérées DANS le tri de profondeur : un mur proche recouvre
@@ -406,6 +411,8 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
           proj: typeof polys[0]['proj'];
           fill: string;
           stroke: string;
+          /** Écorché : 1 = plein, 0,15 = mur effacé pour voir la pièce. */
+          voile: number;
           dashed: boolean;
         }
       | { kind: 'dot'; depth: number; x: number; y: number; color: string }
@@ -765,6 +772,7 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
                     strokeWidth={item.dashed ? 1.8 : 1}
                     strokeDasharray={item.dashed ? '6 4' : '0'}
                     strokeLinecap="round"
+                    opacity={item.voile}
                   />
                 ) : (
                 <Polygon
@@ -775,6 +783,10 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
                   strokeWidth={item.dashed ? 1.8 : 1}
                   strokeDasharray={item.dashed ? '6 4' : '0'}
                   strokeLinejoin="round"
+                  // L'aplat s'efface, l'arête reste : un mur estompé doit
+                  // continuer à dire où il passe.
+                  fillOpacity={item.voile}
+                  strokeOpacity={0.25 + 0.75 * item.voile}
                 />
                 )
               ) : item.kind === 'dot' ? (

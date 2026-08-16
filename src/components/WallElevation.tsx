@@ -50,7 +50,8 @@ import {
 import {
   checkElectrical,
   fixturePlacement,
-  HEIGHT_RULES,
+  heightRuleAt,
+  worktopsOnWall,
   requirementFor,
   roomInputsOf,
   roomUse,
@@ -103,6 +104,10 @@ export function WallElevation({
   const placeAssembly = useScanStore((s) => s.placeAssembly);
   const splitFixture = useScanStore((s) => s.splitFixture);
   const pendingJoin = useScanStore((s) => s.pendingJoin);
+  const objects = useScanStore((s) => s.objects);
+  const wallClip = useScanStore((s) => s.wallClip);
+  const copyWallFixtures = useScanStore((s) => s.copyWallFixtures);
+  const pasteWallFixtures = useScanStore((s) => s.pasteWallFixtures);
   const clearPendingJoin = useScanStore((s) => s.clearPendingJoin);
   const c = useTheme();
   const styles = getStyles(c);
@@ -376,6 +381,17 @@ export function WallElevation({
     });
   }, [pendingJoin, face, fixtures, wall, clearPendingJoin]);
 
+  /** Les plans de travail que ce mur longe : ils changent la règle. */
+  const plansDeTravail = useMemo(() => {
+    if (!face || !wall) return [];
+    const piece = rooms.find((r) => r.id === roomOf(wall));
+    return worktopsOnWall(
+      face,
+      objects,
+      roomUse(piece?.name ?? '', piece?.kind) === 'cuisine',
+    );
+  }, [face, wall, rooms, objects]);
+
   if (!wall || !face) {
     return (
       <View style={styles.sheet}>
@@ -395,8 +411,12 @@ export function WallElevation({
   // La règle de hauteur de l'appareil qu'on tient : c'est ici, et nulle
   // part ailleurs, qu'elle sert.
   const hauteurKO = (() => {
-    if (!selected) return null;
-    const r = HEIGHT_RULES[selected.kind];
+    if (!selected || !face) return null;
+    const r = heightRuleAt(
+      selected.kind,
+      faceX(face, selected.along),
+      plansDeTravail,
+    );
     if (!r) return null;
     if (r.min !== undefined && selected.height < r.min - 1e-6) {
       return { sens: 'trop bas', regle: r.regle };
@@ -1054,6 +1074,32 @@ export function WallElevation({
               // Deux flèches opposées : on passe de l'autre côté du mur.
               paths: ['M4 9 h16', 'M16.5 5.5 L20 9 l-3.5 3.5', 'M20 15 H4', 'M7.5 11.5 L4 15 l3.5 3.5'],
               press: () => selected && flipFixture(selected.id),
+            },
+            {
+              // Relever un mur, puis le reporter sur un autre : dans un
+              // couloir ou une chambre symétrique, c'est trois fois le même
+              // équipement à la même cote du coin, et trois occasions de se
+              // tromper d'un centimètre.
+              key: 'clip',
+              label:
+                wallClip && wallClip.from !== wallId
+                  ? `Coller ${wallClip.items.length}`
+                  : mine.length > 0
+                  ? 'Relever'
+                  : 'Relever',
+              on: wallClip ? wallClip.from !== wallId : mine.length > 0,
+              tint: c.blue,
+              paths:
+                wallClip && wallClip.from !== wallId
+                  ? ['M9 4 h6 v3 H9 z', 'M6 7 h12 v13 H6 z', 'M9.5 13.5 l2 2 4 -4']
+                  : ['M9 4 h6 v3 H9 z', 'M6 7 h12 v13 H6 z'],
+              press: () => {
+                if (wallClip && wallClip.from !== wallId) {
+                  pasteWallFixtures(wallId);
+                } else {
+                  copyWallFixtures(wallId);
+                }
+              },
             },
             {
               key: 'del',

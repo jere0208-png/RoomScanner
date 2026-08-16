@@ -121,7 +121,12 @@ describe('dans la scène, la silhouette remplace la boîte', () => {
   it('et il ne sort pas de son emprise', () => {
     const nu = buildScene(PIECE, [], [], { palette: PAL });
     const avec = scene('bed');
-    const ajoutees = avec.faces.slice(nu.faces.length);
+    // L'ombre portée déborde volontairement l'emprise : elle n'est pas le
+    // meuble, elle est sa trace au sol. On la met de côté ici, elle a son
+    // propre test.
+    const ajoutees = avec.faces
+      .slice(nu.faces.length)
+      .filter((f) => !f.isFloor);
     expect(ajoutees.length).toBeGreaterThan(0);
     for (const f of ajoutees) {
       for (const p of f.pts) {
@@ -133,6 +138,60 @@ describe('dans la scène, la silhouette remplace la boîte', () => {
         expect(p.y).toBeLessThanOrEqual(0.5 * 1.6 + 1e-6);
       }
     }
+  });
+
+  it('un meuble posé au sol porte son ombre, et elle le déborde', () => {
+    const nu = buildScene(PIECE, [], [], { palette: PAL });
+    const avec = buildScene(PIECE, [], [objet('bed', 1.4, 1.9, 0.5)], {
+      palette: PAL,
+    });
+    const ombres = avec.faces
+      .slice(nu.faces.length)
+      .filter((f) => f.isFloor);
+    // Deux nappes concentriques, au ras du sol.
+    expect(ombres).toHaveLength(2);
+    for (const o of ombres) {
+      expect(o.pts.every((p) => p.y === 0)).toBe(true);
+      expect(o.stroke).toBeNull();
+    }
+    const large = ombres[0].pts.map((p) => p.x);
+    const serre = ombres[1].pts.map((p) => p.x);
+    const etale = (v: number[]) => Math.max(...v) - Math.min(...v);
+    // La plus large déborde le meuble ; la plus serrée le suit de près.
+    expect(etale(large)).toBeGreaterThan(1.4);
+    expect(etale(large)).toBeGreaterThan(etale(serre));
+    expect(etale(serre)).toBeLessThan(1.5);
+    // Elles s'assombrissent vers le centre, sinon la trace paraît plate.
+    expect(ombres[1].fill).not.toBe(ombres[0].fill);
+  });
+
+  it('ce qui ne touche pas le sol n’a pas d’ombre', () => {
+    const nu = buildScene(PIECE, [], [], { palette: PAL });
+    // Une télé accrochée à 1,20 m : une ombre à ses pieds désignerait un
+    // objet qui n'est pas là.
+    const murale = {
+      id: 'tv',
+      category: 'television',
+      width: 1.1,
+      depth: 0.1,
+      height: 0.65,
+      transform: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 3, 1.2, 2.5, 1],
+    };
+    const avec = buildScene(PIECE, [], [murale], { palette: PAL });
+    expect(
+      avec.faces.slice(nu.faces.length).filter((f) => f.isFloor),
+    ).toHaveLength(0);
+  });
+
+  it('sans sol affiché, pas d’ombre non plus', () => {
+    const nu = buildScene(PIECE, [], [], { palette: PAL, showSurfaces: false });
+    const avec = buildScene(PIECE, [], [objet('bed', 1.4, 1.9, 0.5)], {
+      palette: PAL,
+      showSurfaces: false,
+    });
+    expect(
+      avec.faces.slice(nu.faces.length).filter((f) => f.isFloor),
+    ).toHaveLength(0);
   });
 
   it('la silhouette RESTE pendant un geste', () => {

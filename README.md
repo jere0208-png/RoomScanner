@@ -983,6 +983,50 @@ sur le sol réel, et le rendu rattrape en plus tout ce qui plane à moins de
 45 cm sans raison : rien de cette liste ne se suspend, et une télé murale, elle,
 est bien plus haut.
 
+### L'écorché, et l'ombre au sol
+
+Deux détails de rendu qui changent la lecture du modèle.
+
+**L'écorché.** Un mur qui nous fait face cache exactement ce qu'on veut
+regarder. Il s'efface donc à mesure qu'il nous fait face — plein vu de champ,
+15 % vu de plein fouet, avec un lissage cubique pour qu'aucun degré de
+rotation ne fasse sauter le dessin. Son arête reste, elle, à 25 % d'opacité
+minimum : un mur effacé doit continuer à dire où il passe. Seule l'app le
+fait ; les exports gardent les murs opaques, un plan qu'on imprime ne se lit
+pas en transparence.
+
+**L'ombre.** Un meuble sans ombre ne pose pas, il flotte — même quand sa
+géométrie est juste au millimètre. C'est le contact avec le sol que l'œil
+cherche. Deux nappes concentriques suffisent à le donner, la plus large à
+peine teintée ; on ne calcule aucune lumière, on décalque l'emprise décalée
+de 5 cm. Rien pour ce qui ne touche pas le sol : une ombre au pied d'une télé
+murale désignerait un objet qui n'est pas là.
+
+### Le plan de travail change la règle
+
+« Axe à 1,30 m du sol au maximum, HORS PLAN DE TRAVAIL » — et c'est justement
+au-dessus d'une crédence qu'on pose le plus de prises. Sans en tenir compte,
+l'app signalait en défaut toute une cuisine, ce qui revient à ne rien
+signaler : on n'écoute plus un garde-fou qui se trompe à chaque fois.
+
+`worktopsOnWall()` reconnaît un plan de travail à trois signes : un meuble qui
+en porte un (évier, plaque, lave-vaisselle, ou n'importe quel caisson bas SI
+la pièce est une cuisine), assez près du mur (75 cm), dessus entre 80 cm et
+1 m. Il ne couvre que la portion du mur qu'il longe réellement.
+`heightRuleAt()` applique alors 8 cm au-dessus du plan comme minimum, 40 cm
+comme maximum — et la correction proposée vise cette fourchette, sinon
+« remettre à 25 cm » remettrait la prise derrière le meuble.
+
+### Relever un mur, le reporter sur un autre
+
+Dans un couloir, une chambre symétrique, une enfilade de bureaux, c'est trois
+fois le même équipement à la même cote du coin. Le relevé (`copyWallFixtures`)
+garde les cotes DEPUIS LE DÉBUT DE LA FACE — celles qu'on lit à l'écran — et
+le report (`pasteWallFixtures`) ne pose que ce qui tient : un appareil à
+4,50 m du coin ne se colle pas sur un mur de 3 m, un tableau de 55 cm ne
+déborde pas. Les ensembles restent des ensembles, avec un identifiant NEUF :
+deux murs, deux plaques.
+
 ### Jonctions de murs
 
 Un mur n'est pas un trait épais posé à côté des autres : `wallQuads()` traite

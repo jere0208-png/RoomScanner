@@ -2,6 +2,10 @@
 <rect width="420" height="340" fill="#FFFFFF"/>
 <polygon points="217.76,185.79 267.74,214.34 164.76,222.13 114.78,193.58" fill="#EEF1F6" stroke="#C9D1DC" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
 <polygon points="267.74,214.34 305.22,235.75 202.24,243.54 164.76,222.13" fill="#EEF1F6" stroke="#C9D1DC" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
+<polygon points="172.31,197.8 197.04,211.93 159.97,214.73 135.24,200.6" fill="#dee1e6" stroke="#dee1e6" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
+<polygon points="170.78,198.48 193.77,211.61 161.5,214.05 138.51,200.92" fill="#d0d3d8" stroke="#d0d3d8" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
+<polygon points="289.07,228.97 300.07,235.25 269.86,237.53 258.87,231.25" fill="#dee1e6" stroke="#dee1e6" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
+<polygon points="287.54,229.65 296.79,234.93 271.39,236.85 262.14,231.57" fill="#d0d3d8" stroke="#d0d3d8" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
 <polygon points="216.23,186.47 219.29,185.11 219.29,95.78 216.23,97.14" fill="#fcfdfd" stroke="#fcfdfd" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
 <polyline points="216.23,97.14 219.29,95.78" fill="none" stroke="#8A94A6" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polyline points="216.23,186.47 219.29,185.11" fill="none" stroke="#8A94A6" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>

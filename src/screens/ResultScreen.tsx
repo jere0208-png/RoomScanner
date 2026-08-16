@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Animated,
@@ -43,6 +43,8 @@ import {
 } from '../components/Iso3DView';
 import {
   fitsInRoom,
+  roomOf,
+  wallQuadsOf,
   roomExtent,
   roomHeight,
   roomParts,
@@ -62,6 +64,9 @@ import { buildObj, objFilename } from '../export/model3d';
 import { checkPlan } from '../geometry/diagnostics';
 import {
   checkElectrical,
+  roomUse,
+  worktopsOnWall,
+  type Worktop,
   fixturePlacement,
   materialList,
   roomInputsOf,
@@ -72,6 +77,9 @@ import { buildMaterialPdf, materialFilename, toBase64 } from '../export/pdf';
 import {
   FIXTURES,
   FIXTURE_FAMILIES,
+  faceX,
+  wallFace,
+  type Fixture,
   type FixtureKind,
 } from '../geometry/electrical';
 import { useScanStore } from '../store/scanStore';
@@ -509,7 +517,34 @@ export function ResultScreen() {
   const roomInputs = roomInputsOf(rooms, parts);
   const wallRooms = wallToRooms(roomInputs);
   const placement = fixturePlacement(fixtures, walls, roomInputs);
-  const elecIssues = checkElectrical(roomInputs, fixtures, wallRooms, placement);
+  /**
+   * Plans de travail par mur : la règle des 1,30 m dit « hors plan de
+   * travail », encore faut-il savoir où il y en a un.
+   */
+  const wallWorktops = useMemo(() => {
+    const quads = wallQuadsOf(walls);
+    const m = new Map<string, { x: (f: Fixture) => number; plans: Worktop[] }>();
+    for (const w of walls) {
+      const piece = rooms.find((r) => r.id === roomOf(w));
+      const cuisine = roomUse(piece?.name ?? '', piece?.kind) === 'cuisine';
+      for (const side of [1, -1] as const) {
+        const face = wallFace(w, quads.get(w.id), side);
+        const plans = worktopsOnWall(face, objects, cuisine);
+        if (plans.length === 0) continue;
+        m.set(w.id, { x: (f: Fixture) => faceX(face, f.along), plans });
+        break;
+      }
+    }
+    return m;
+  }, [walls, rooms, objects]);
+
+  const elecIssues = checkElectrical(
+    roomInputs,
+    fixtures,
+    wallRooms,
+    placement,
+    wallWorktops,
+  );
   const alertRooms = roomsInAlert(elecIssues);
   const issues: Constat[] = [
     ...checkPlan(walls, rooms).map((i, n) => ({

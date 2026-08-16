@@ -51,6 +51,15 @@ export interface Face3D {
   /** Biais de tri (m), pour départager deux faces à la même profondeur. */
   bias?: number;
   isFloor?: boolean;
+  /**
+   * Face extérieure d'un mur : celle qui tourne le dos à sa pièce.
+   *
+   * Le rendu de l'app l'estompe quand elle nous fait face — c'est
+   * l'écorché : on voit DANS la pièce sans avoir à tourner le modèle par
+   * dessus. Les exports, eux, la gardent opaque : un plan qu'on imprime ne
+   * se lit pas en transparence.
+   */
+  cutaway?: boolean;
   /** Trait pointillé : réservé aux passages, qui sont des vides. */
   dashed?: boolean;
   /**
@@ -106,6 +115,24 @@ export function isHiddenFace(face: Face3D, cam: CameraTrig): boolean {
   const n = face.normal;
   if (!n) return false;
   return n.x * cam.st * cam.sp + n.y * cam.cp + n.z * cam.ct * cam.sp <= 0;
+}
+
+/**
+ * Opacité d'une face extérieure de mur, selon l'angle de vue.
+ *
+ * Un mur vu de champ ne cache rien : il reste plein. Plus il nous fait
+ * face, plus il masque la pièce, et plus il s'efface — jusqu'à 15 %, de
+ * quoi garder l'arête qui dit où il est. Le passage est progressif : un
+ * mur qui disparaîtrait d'un coup ferait sauter le dessin à chaque degré
+ * de rotation.
+ */
+export function cutawayOpacity(n: P3, cam: CameraTrig): number {
+  const vers = n.x * cam.st * cam.sp + n.y * cam.cp + n.z * cam.ct * cam.sp;
+  if (vers <= 0.12) return 1;
+  const t = Math.min(1, (vers - 0.12) / 0.45);
+  // Lissage cubique : ni marche, ni rampe linéaire visible.
+  const doux = t * t * (3 - 2 * t);
+  return 1 - 0.85 * doux;
 }
 
 /** Couleurs neutres du rendu (l'app suit son thème, le PDF le sien). */
@@ -517,6 +544,8 @@ export function buildScene(
       uTo?: number;
       outline?: string;
       normal?: P3;
+      /** Le pan appartient à la face extérieure d'un mur. */
+      cutaway?: boolean;
     } = {},
   ) => {
     const cols = Math.max(1, Math.ceil(Math.hypot(q.x - p.x, q.z - p.z) / step));
@@ -554,6 +583,7 @@ export function buildScene(
           shade: o.shade,
           captured: o.captured || !!o.tex,
           normal: o.normal,
+          cutaway: o.cutaway,
         });
 
         // Contour du POURTOUR, tuile par tuile.
@@ -648,6 +678,8 @@ export function buildScene(
       stroke: string;
       topStroke: string;
       captured?: boolean;
+      /** Le bloc est un mur : ses deux faces se distinguent dedans/dehors. */
+      cutaway?: boolean;
       /** Texture appliquée à la face +n (`plus`) ou −n. */
       tex?: SurfaceTexture;
       texOnPlus?: boolean;
@@ -666,7 +698,14 @@ export function buildScene(
     const p2 = lerp2(lerp2(q.a2, q.b2, t0), lerp2(q.a1, q.b1, t0), s);
     const r2 = lerp2(lerp2(q.a2, q.b2, t1), lerp2(q.a1, q.b1, t1), s);
 
-    const face = (p: Pt, r: Pt, tex?: SurfaceTexture, uFrom = 0, uTo = 1) =>
+    const face = (
+      p: Pt,
+      r: Pt,
+      tex?: SurfaceTexture,
+      uFrom = 0,
+      uTo = 1,
+      extra: { cutaway?: boolean } = {},
+    ) =>
       pushStrips(p, r, yb, yt, o.fill, {
         shade: o.shade ?? true,
         captured: o.captured,
@@ -675,10 +714,18 @@ export function buildScene(
         uTo,
         outline: o.stroke,
         normal: outwardOf(p, r),
+        cutaway: extra.cutaway,
       });
 
-    face(p1, r1, o.texOnPlus ? o.tex : undefined, t0, t1);
-    face(r2, p2, o.texOnPlus ? undefined : o.tex, t1, t0);
+    // `texOnPlus` dit déjà quelle face regarde la pièce : l'AUTRE est
+    // l'extérieure, celle que l'écorché estompe.
+    const dehors = o.cutaway;
+    face(p1, r1, o.texOnPlus ? o.tex : undefined, t0, t1, {
+      cutaway: dehors === undefined ? undefined : !o.texOnPlus,
+    });
+    face(r2, p2, o.texOnPlus ? undefined : o.tex, t1, t0, {
+      cutaway: dehors === undefined ? undefined : !!o.texOnPlus,
+    });
     // Tableaux (chants) : trop étroits pour mériter un découpage.
     face(p2, p1);
     face(r1, r2);
@@ -708,6 +755,8 @@ export function buildScene(
     const tex = opts.showTextures ? w.texture : undefined;
     const avg = opts.showTextures ? w.color : undefined;
     const skin = {
+      // Marque les deux faces : `pushWallBlock` saura laquelle est dehors.
+      cutaway: true,
       fill: avg ?? pal.wall,
       top: avg ? mixHex(avg, '#FFFFFF', 0.45) : pal.wallTop,
       stroke: pal.wallStroke,
@@ -1120,6 +1169,47 @@ export function buildScene(
         },
       );
     };
+
+    /**
+     * L'ombre portée : deux nappes sombres sous le meuble.
+     *
+     * Sans elle, un meuble ne POSE pas — il flotte, même quand sa géométrie
+     * est juste au millimètre. C'est le contact avec le sol que l'œil
+     * cherche, et un aplat ne le donne pas. Deux nappes concentriques, la
+     * plus large à peine teintée, suffisent à le suggérer : on ne calcule
+     * aucune lumière, on décalque l'emprise, décalée d'un rien.
+     *
+     * Rien pour ce qui ne touche pas le sol : une ombre au pied d'une télé
+     * accrochée au mur désignerait un objet qui n'est pas là.
+     */
+    if (opts.showSurfaces !== false && yb < 0.3) {
+      const nappe = (marge: number, force: number) => {
+        const pts = [
+          [-1, -1],
+          [1, -1],
+          [1, 1],
+          [-1, 1],
+        ].map(([sx, sz]) => {
+          const lx = sx * (obj.width / 2 + marge);
+          const lz = sz * (obj.depth / 2 + marge);
+          return {
+            x: obj.cx + lx * cosY - lz * sinY + 0.05,
+            y: 0,
+            z: obj.cz + lx * sinY + lz * cosY + 0.05,
+          };
+        });
+        faces.push({
+          pts,
+          fill: mixHex(pal.floor, '#0B0D12', force),
+          stroke: null,
+          // Comme le sol : tout au fond du tri, dans l'ordre où on les
+          // pousse — donc par-dessus le sol, sous tout le reste.
+          isFloor: true,
+        });
+      };
+      nappe(0.09, 0.07);
+      nappe(0.02, 0.13);
+    }
 
     // La silhouette du meuble, s'il en a une ; sinon, la boîte pleine.
     // Elle reste montée PENDANT les gestes : voir le lit se changer en
