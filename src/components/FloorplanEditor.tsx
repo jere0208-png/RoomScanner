@@ -196,6 +196,16 @@ interface Props {
   onSelectOpening?: (id: string | null) => void;
   /** Appui sur un symbole d'appareillage : ouvre son mur vu de face. */
   onSelectFixture?: (id: string, wallId: string) => void;
+  /**
+   * Le retour de mur choisi, ou `null`.
+   *
+   * L'écran en a besoin pour y poser un appareil : choisir un retour puis
+   * demander une prise doit la mettre LÀ, pas au milieu du mur. Sans cette
+   * remontée, la sélection restait un simple surlignage.
+   */
+  onPierChange?: (
+    pier: { wallId: string; t0: number; t1: number } | null,
+  ) => void;
   /** Commande lancée depuis les boutons flottants du mur sélectionné. */
   onWallAction?: (
     action: 'longueur' | 'ouverture' | 'electricite' | 'supprimer',
@@ -224,6 +234,7 @@ export function FloorplanEditor({
   onEditRoomName,
   onWallAction,
   onSelectFixture,
+  onPierChange,
   selectedOpeningId,
   onSelectOpening,
   onSelectObject,
@@ -485,6 +496,16 @@ export function FloorplanEditor({
 
   const pierRun =
     pier != null ? (retours.get(pier.wallId) ?? [])[pier.i] ?? null : null;
+  // Le retour choisi remonte à l'écran, pour qu'on puisse y poser.
+  const signalePier = useRef(onPierChange);
+  signalePier.current = onPierChange;
+  useEffect(() => {
+    signalePier.current?.(
+      pier && pierRun
+        ? { wallId: pier.wallId, t0: pierRun.t0, t1: pierRun.t1 }
+        : null,
+    );
+  }, [pier, pierRun]);
   // La trame du logement : c'est SUR ELLE que les angles s'aimantent, et
   // jamais sur les axes de l'écran — un scan commencé de biais donnerait
   // sinon des meubles de biais avec des murs droits.

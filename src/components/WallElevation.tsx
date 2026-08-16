@@ -29,6 +29,10 @@ import Svg, {
   Line,
   Path,
   Rect,
+  Polygon,
+  Stop,
+  LinearGradient,
+  Defs,
   Text as SvgText,
 } from 'react-native-svg';
 import { radius, shadowCard, themedStyles, useTheme, type Palette } from '../theme';
@@ -74,6 +78,23 @@ import { CloseCross } from './CloseCross';
 
 const PAD_X = 30;
 const PAD_TOP = 26;
+/** Fuite du relief : l'épaisseur du mur, en pixels d'écran. */
+const FUITE = 9;
+/** Hauteur de la ligne de cote au-dessus du plafond. */
+const COTE_H = 26;
+/**
+ * Les hauteurs de référence d'une installation, en mètres.
+ *
+ * Ce ne sont pas des décorations : ce sont les quatre lignes sur lesquelles
+ * tout se pose. Les voir en filigrane fait repérer d'un coup l'appareil qui
+ * n'est aligné avec rien.
+ */
+const HAUTEURS_REF = [
+  { y: 0.25, nom: 'plinthe 25' },
+  { y: 1.1, nom: 'commande 110' },
+  { y: 1.35, nom: 'tableau 135' },
+  { y: 2.1, nom: 'applique 210' },
+];
 const PAD_BOTTOM = 34;
 /** Tolérance d'accrochage, en mètres. */
 const SNAP = 0.03;
@@ -571,7 +592,7 @@ export function WallElevation({
           <Text style={styles.subtitle}>
             {roomName ? `${roomName} · ` : ''}
             {`mur de ${face.len.toFixed(2).replace('.', ',')} m`}
-            {spec ? ` · ${spec.note}` : ' · touchez un appareil pour le coter'}
+            {spec ? ` · ${spec.note}` : ''}
           </Text>
         </View>
         {/* Photo de repérage : trois jours plus tard, la relecture achoppe
@@ -598,14 +619,14 @@ export function WallElevation({
               width={17}
               height={11.5}
               rx={2.6}
-              stroke={c.ink}
+              stroke="#FFFFFF"
               strokeWidth={2.1}
               strokeLinejoin="round"
               fill="none"
             />
             <Path
               d="M9 7.5 L10.4 5 h3.2 L15 7.5"
-              stroke={c.ink}
+              stroke="#FFFFFF"
               strokeWidth={2.1}
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -615,7 +636,7 @@ export function WallElevation({
               cx={12}
               cy={13.25}
               r={3.4}
-              stroke={c.ink}
+              stroke="#FFFFFF"
               strokeWidth={2.1}
               fill="none"
             />
@@ -637,17 +658,91 @@ export function WallElevation({
         {...pan.panHandlers}>
         {scale > 0 && (
           <Svg width={layout.w} height={layout.h}>
+            <Defs>
+              {/* Un mur éclairé par le haut : la lumière vient du plafond,
+                  comme dans une pièce. Rien de spectaculaire — juste de quoi
+                  ne plus lire un rectangle gris. */}
+              <LinearGradient id="mur" x1="0" y1="0" x2="0" y2="1">
+                <Stop offset="0" stopColor={c.surface} />
+                <Stop offset="1" stopColor={c.surfaceSunken} />
+              </LinearGradient>
+            </Defs>
+
+            {/*
+              LÉGER RELIEF : l'épaisseur du mur, vue de trois quarts.
+              Deux bandeaux en fuite — un au plafond, un sur le côté — et le
+              mur cesse d'être un rectangle posé sur du vide : on lit une
+              maçonnerie, avec son épaisseur, et les appareils s'y posent
+              dessus. La face, elle, reste exactement à l'échelle : c'est sur
+              elle qu'on mesure.
+            */}
+            <Polygon
+              points={[
+                `${px(0)},${py(H)}`,
+                `${px(0) + FUITE},${py(H) - FUITE}`,
+                `${px(face.len) + FUITE},${py(H) - FUITE}`,
+                `${px(face.len)},${py(H)}`,
+              ].join(' ')}
+              fill={c.surfaceSunken}
+              stroke={c.line}
+              strokeWidth={1}
+            />
+            <Polygon
+              points={[
+                `${px(face.len)},${py(H)}`,
+                `${px(face.len) + FUITE},${py(H) - FUITE}`,
+                `${px(face.len) + FUITE},${py(0) - FUITE}`,
+                `${px(face.len)},${py(0)}`,
+              ].join(' ')}
+              fill={c.line}
+              opacity={0.5}
+              stroke={c.line}
+              strokeWidth={1}
+            />
+
             {/* Le mur, vu de face : un rectangle à l'échelle. */}
             <Rect
               x={px(0)}
               y={py(H)}
               width={face.len * scale}
               height={H * scale}
-              fill={c.surfaceSunken}
+              fill="url(#mur)"
               stroke={c.lineStrong}
               strokeWidth={1.5}
               rx={2}
             />
+
+            {/*
+              LES HAUTEURS DE RÉFÉRENCE, en filigrane.
+              Poser un appareil, c'est viser une de ces quatre lignes : 25 cm
+              pour une prise de plinthe, 1,10 m pour une commande ou un plan
+              de travail, 1,35 m pour le tableau, 2,10 m pour une applique.
+              Les avoir sous les yeux évite de les chercher, et fait voir
+              d'un coup ce qui n'est pas aligné avec le reste.
+            */}
+            {HAUTEURS_REF.filter((r) => r.y < H - 0.05).map((r) => (
+              <G key={`ref${r.y}`}>
+                <Line
+                  x1={px(0)}
+                  y1={py(r.y)}
+                  x2={px(face.len)}
+                  y2={py(r.y)}
+                  stroke={c.blue}
+                  strokeWidth={0.8}
+                  strokeDasharray="2 6"
+                  opacity={0.35}
+                />
+                <SvgText
+                  x={px(face.len) - 4}
+                  y={py(r.y) - 4}
+                  fill={c.inkFaint}
+                  fontSize={8}
+                  fontWeight="700"
+                  textAnchor="end">
+                  {r.nom}
+                </SvgText>
+              </G>
+            ))}
 
             {/* Sol : trait épais et hachures — le zéro des hauteurs. */}
             <Line
@@ -684,6 +779,63 @@ export function WallElevation({
               strokeWidth={1}
               strokeDasharray="5 4"
             />
+
+            {/*
+              LES COTES DU MUR, dans l'espace laissé libre au-dessus.
+              Le dessin est calé en bas — c'est le sol, il n'y a pas à
+              discuter — et le haut de la zone restait vide. Un plan
+              d'élévation y met justement ses cotes : la longueur au-dessus,
+              la hauteur sous plafond sur le côté. On les lisait jusqu'ici
+              dans une phrase, en petit, sous le titre.
+            */}
+            <G>
+              <Line
+                x1={px(0)}
+                y1={py(H) - COTE_H}
+                x2={px(face.len)}
+                y2={py(H) - COTE_H}
+                stroke={c.inkSoft}
+                strokeWidth={1}
+              />
+              {[0, face.len].map((x) => (
+                <Line
+                  key={`t${x}`}
+                  x1={px(x)}
+                  y1={py(H) - COTE_H - 4}
+                  x2={px(x)}
+                  y2={py(H) - COTE_H + 4}
+                  stroke={c.inkSoft}
+                  strokeWidth={1.4}
+                />
+              ))}
+              <Rect
+                x={px(face.len / 2) - 30}
+                y={py(H) - COTE_H - 9}
+                width={60}
+                height={18}
+                rx={9}
+                fill={c.bg}
+              />
+              <SvgText
+                x={px(face.len / 2)}
+                y={py(H) - COTE_H + 4}
+                fill={c.ink}
+                fontSize={12}
+                fontWeight="800"
+                textAnchor="middle">
+                {`${face.len.toFixed(2).replace('.', ',')} m`}
+              </SvgText>
+              <SvgText
+                x={px(0) - 8}
+                y={py(H / 2)}
+                fill={c.inkFaint}
+                fontSize={10}
+                fontWeight="700"
+                textAnchor="middle"
+                transform={`rotate(-90, ${px(0) - 8}, ${py(H / 2)})`}>
+                {`H ${H.toFixed(2).replace('.', ',')} m`}
+              </SvgText>
+            </G>
 
             {/* Portes et fenêtres : on ne perce pas un mur à leur place. */}
             {holes.map((hole, i) => {
@@ -1555,11 +1707,14 @@ const getStyles = themedStyles((c: Palette) =>
       alignItems: 'center',
       justifyContent: 'center',
     },
+    // Une ACTION, pas un réglage : l'appareil photo prend le bleu de l'app.
+    // En gris sur gris, à côté de la croix de fermeture, on ne le voyait
+    // pas — et une photo de repérage non prise est une photo perdue.
     photo: {
-      width: 34,
-      height: 34,
-      borderRadius: 17,
-      backgroundColor: c.surfaceSunken,
+      width: 36,
+      height: 36,
+      borderRadius: 13,
+      backgroundColor: c.blue,
       alignItems: 'center',
       justifyContent: 'center',
       marginRight: 8,

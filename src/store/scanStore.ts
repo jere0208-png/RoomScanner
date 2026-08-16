@@ -439,7 +439,14 @@ interface ScanState {
    * Pose un appareil sur un mur, à 20 cm du coin bas gauche de la face qui
    * regarde la pièce. Renvoie son identifiant, pour l'ouvrir aussitôt.
    */
-  addFixture: (kind: FixtureKind, wallId: string) => string | null;
+  /**
+   * Pose un appareil sur un mur.
+   *
+   * `at` vise une abscisse précise SUR LA FACE, en mètres : c'est ce que
+   * donne un retour de mur choisi au plan. Sans elle, l'appareil se pose au
+   * milieu, comme avant.
+   */
+  addFixture: (kind: FixtureKind, wallId: string, at?: number) => string | null;
   /** Déplace un appareil sur sa face : cote depuis le bord, hauteur d'axe. */
   moveFixture: (id: string, along: number, height: number) => void;
   /** Bascule l'appareil sur l'autre face du mur, sans le déplacer. */
@@ -923,7 +930,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       });
     },
 
-    addFixture: (kind, wallId) => {
+    addFixture: (kind, wallId, at) => {
       const st = get();
       const wall = st.walls.find((w) => w.id === wallId);
       if (!wall) return null;
@@ -965,7 +972,7 @@ export const useScanStore = create<ScanState>((set, get) => {
             Math.abs(f.height - o.height) < ENTRAXE - 1e-6
           );
         });
-      let x = faceX(face, f.along);
+      let x = at ?? faceX(face, f.along);
       let group: string | undefined;
       const voisin = surUnAutre(x);
       if (voisin) {
@@ -992,6 +999,20 @@ export const useScanStore = create<ScanState>((set, get) => {
           x = Math.min(face.len - spec.w / 2, x + 0.4);
         }
       }
+
+      /**
+       * Et sur de la MAÇONNERIE, comme lors d'un déplacement.
+       *
+       * Un appareil posé au milieu d'un mur percé d'une porte-fenêtre
+       * atterrissait dans la baie : il fallait le rattraper au doigt pour
+       * qu'il tienne sur quelque chose.
+       */
+      const pleins = masonryRuns(
+        wallRuns(wall, st.openings),
+        segLength(wall),
+        face,
+      );
+      if (pleins.length > 1) x = snapToMasonry(pleins, x, spec.w / 2, face.len);
 
       const pose = { ...f, along: fromFaceX(face, x), group };
       set({

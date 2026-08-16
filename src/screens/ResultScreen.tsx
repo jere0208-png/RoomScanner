@@ -87,8 +87,10 @@ import { buildMaterialPdf, materialFilename, toBase64 } from '../export/pdf';
 import {
   FIXTURES,
   FIXTURE_FAMILIES,
+  assemblySymbol,
   faceX,
   facePoint,
+  interiorSide,
   wallFace,
   type Fixture,
   type FixtureKind,
@@ -96,6 +98,7 @@ import {
 import { useScanStore } from '../store/scanStore';
 import { DiagnosticSheet, type Constat } from '../components/DiagnosticSheet';
 import { ExportArt, type ExportArtKind } from '../components/ExportArt';
+import { CloseCross } from '../components/CloseCross';
 import { haptic } from '../ui/haptic';
 import {
   ActionSheet,
@@ -157,7 +160,6 @@ export function ResultScreen() {
   const canUndo = useScanStore((s) => s.canUndo);
   const openings = useScanStore((s) => s.openings);
   const fixtures = useScanStore((s) => s.fixtures);
-  const north = useScanStore((s) => s.north);
   const addFixture = useScanStore((s) => s.addFixture);
   const moveFixture = useScanStore((s) => s.moveFixture);
   const resizeOpening = useScanStore((s) => s.resizeOpening);
@@ -247,6 +249,19 @@ export function ResultScreen() {
   // Cotes du plan 2D masquées par défaut : la pastille « Cotes » les active.
   const [showMeasures, setShowMeasures] = useState(false);
   const [show3DMeasures, setShow3DMeasures] = useState(true);
+  /**
+   * Le retour de mur choisi sur le plan.
+   *
+   * Un mur percé d'une porte est fait de retours — les bouts de maçonnerie
+   * entre l'angle et l'huisserie — et c'est SUR EUX qu'on pose
+   * l'interrupteur d'entrée. En choisir un puis demander un appareil doit
+   * le mettre là, pas au milieu du mur.
+   */
+  const [pier, setPier] = useState<{
+    wallId: string;
+    t0: number;
+    t1: number;
+  } | null>(null);
   /** Repères électriques en 3D : un calque comme les autres. */
   const [showElecTags, setShowElecTags] = useState(true);
   const [editMode, setEditMode] = useState(false);
@@ -783,7 +798,7 @@ export function ResultScreen() {
 
   /** Pose l'appareil sur ce mur et ouvre aussitot le mur vu de face. */
   const placeFixture = (kind: FixtureKind, wallId: string, height?: number) => {
-    const id = addFixture(kind, wallId);
+    const id = addFixture(kind, wallId, cibleDuRetour(wallId));
     setPendingKind(null);
     if (!id) return;
     // Rangé à côté d'un autre, sous une plaque commune : la main le sent,
@@ -809,8 +824,28 @@ export function ResultScreen() {
    * visite précédente ferait atterrir la prise dans une autre pièce sans
    * qu'on comprenne pourquoi.
    */
+  /**
+   * L'abscisse visée sur la face, quand un retour est choisi.
+   *
+   * Les tronçons se comptent en fractions de l'AXE du mur ; la face, elle,
+   * est raccourcie de l'épaisseur du mur à chaque about. Appliquer les
+   * fractions de l'axe à la longueur de la face décalerait le retour de
+   * quelques centimètres — presque une largeur de plaque.
+   */
+  const cibleDuRetour = (wallId: string): number | undefined => {
+    if (!pier || pier.wallId !== wallId) return undefined;
+    const w = walls.find((x) => x.id === wallId);
+    if (!w) return undefined;
+    const L = segLength(w);
+    const side = interiorSide(w, walls, rooms);
+    const face = wallFace(w, wallQuadsOf(walls).get(w.id), side);
+    const marge = (L - face.len) / 2;
+    const milieu = ((pier.t0 + pier.t1) / 2) * L - marge;
+    return Math.min(Math.max(milieu, 0), face.len);
+  };
+
   const startFixture = () => {
-    setElecWallId(tab === '2d' ? selectedWallId : null);
+    setElecWallId(tab === '2d' ? selectedWallId ?? pier?.wallId ?? null : null);
     setElecSel(null);
     setElecView('catalogue');
     setElecOpen(true);
@@ -1045,6 +1080,7 @@ export function ResultScreen() {
               setSelectedRoomId(id);
             }}
             onEditRoomName={promptRoomFor}
+            onPierChange={setPier}
             onSelectFixture={(id, wallId) => {
               setElecWallId(wallId);
               setElecSel(id);
@@ -1438,18 +1474,11 @@ export function ResultScreen() {
           )}
 
         {vue === '2d' && pendingKind && !capturing && (
-          <View style={[styles.wallLengthBar, north !== null && styles.barShift,
-              editMode && canUndo && styles.barShiftRight,
-            ]}>
-            <Text style={styles.wallLengthLabel}>
-              {FIXTURES[pendingKind].label} · touchez le mur qui le reçoit
-            </Text>
-            <TouchableOpacity
-              style={styles.roomAction}
-              onPress={() => setPendingKind(null)}>
-              <Text style={styles.roomActionText}>Annuler</Text>
-            </TouchableOpacity>
-          </View>
+          <EnAttente
+            kind={pendingKind}
+            cible={pier ? 'ce retour' : null}
+            onCancel={() => setPendingKind(null)}
+          />
         )}
 
         {/* La menuiserie sélectionnée : largeur, hauteur, et de quoi les
@@ -2107,6 +2136,109 @@ const TOOL_PATHS: Record<ToolIcon, { d: string; fill?: boolean }[]> = {
  * états, et c'est exactement ce qui date une interface. Il glisse désormais,
  * sur un ressort — le mouvement dit d'où l'on vient.
  */
+/**
+ * « On attend que vous désigniez un mur. »
+ *
+ * C'était un bandeau pleine largeur, avec la phrase entière et un bouton
+ * « Annuler » — qui passait sous les pastilles d'outils, illisible. Or ce
+ * moment ne dure que le temps d'un geste : il n'a pas besoin d'une phrase,
+ * il a besoin de MONTRER ce qu'on tient et de dire qu'on attend.
+ *
+ * Une pastille en bas à gauche, donc : le symbole de l'appareil pris, son
+ * nom, une croix pour reposer. Elle respire lentement — c'est l'attente
+ * elle-même qui se voit, sans un mot de plus.
+ */
+function EnAttente({
+  kind,
+  cible,
+  onCancel,
+}: {
+  kind: FixtureKind;
+  /** Précision quand une cible est déjà désignée (un retour de mur). */
+  cible: string | null;
+  onCancel: () => void;
+}) {
+  const c = useTheme();
+  const styles = getStyles(c);
+  const spec = FIXTURES[kind];
+  const souffle = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const boucle = Animated.loop(
+      Animated.sequence([
+        Animated.timing(souffle, {
+          toValue: 1,
+          duration: 850,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(souffle, {
+          toValue: 0,
+          duration: 850,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    boucle.start();
+    return () => boucle.stop();
+  }, [souffle]);
+  return (
+    <View style={styles.attente} pointerEvents="box-none">
+      {/* L'auréole qui bat : elle dit « en attente » sans écrire le mot. */}
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.attenteOnde,
+          {
+            backgroundColor: spec.color,
+            opacity: souffle.interpolate({
+              inputRange: [0, 1],
+              outputRange: [0.28, 0],
+            }),
+            transform: [
+              {
+                scale: souffle.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [1, 1.5],
+                }),
+              },
+            ],
+          },
+        ]}
+      />
+      <View style={[styles.attenteIcone, { borderColor: spec.color }]}>
+        <Svg width={20} height={20} viewBox="-12 -12 24 24">
+          {assemblySymbol(kind).map((seg, i) => (
+            <Path
+              key={i}
+              d={seg.d}
+              stroke={spec.color}
+              strokeWidth={1.8}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              fill={seg.fill ? spec.color : 'none'}
+            />
+          ))}
+        </Svg>
+      </View>
+      <View style={styles.attenteTextes}>
+        <Text style={styles.attenteNom} numberOfLines={1}>
+          {spec.label}
+        </Text>
+        <Text style={styles.attenteHint} numberOfLines={1}>
+          {cible ? `Touchez ${cible}` : 'Touchez un mur'}
+        </Text>
+      </View>
+      <TouchableOpacity
+        style={styles.attenteClose}
+        onPress={onCancel}
+        accessibilityLabel="Annuler la pose">
+        <CloseCross size={17} color={c.inkSoft} weight={3} />
+      </TouchableOpacity>
+    </View>
+  );
+}
+
 function Segment({ tab, onChange }: { tab: Tab; onChange: (t: Tab) => void }) {
   const styles = getStyles(useTheme());
   const [w, setW] = useState(0);
@@ -2637,6 +2769,56 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   watermarkLogo: { width: 116, height: 26, tintColor: c.ink, opacity: 0.85 },
   watermarkText: { color: '#0B0D12', fontSize: 13, fontWeight: '800' },
   watermarkAccent: { color: c.blue },
+  /**
+   * La pastille d'attente : EN BAS À GAUCHE.
+   *
+   * En haut, elle passait derrière les pastilles d'outils — son texte
+   * disparaissait sous le bouton « Contrôle ». En bas à gauche, elle est
+   * seule, sous le pouce, et loin du bandeau de cotes qui occupe la droite.
+   */
+  attente: {
+    position: 'absolute',
+    left: 10,
+    bottom: 12,
+    zIndex: 5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingLeft: 8,
+    paddingRight: 6,
+    paddingVertical: 7,
+    borderRadius: radius.pill,
+    backgroundColor: c.surface,
+    ...shadowCard,
+    shadowOpacity: 0.16,
+  },
+  attenteOnde: {
+    position: 'absolute',
+    left: 8,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+  },
+  attenteIcone: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    backgroundColor: c.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  attenteTextes: { maxWidth: 138 },
+  attenteNom: { color: c.ink, fontSize: 13.5, fontWeight: '800' },
+  attenteHint: { color: c.inkFaint, fontSize: 11, marginTop: 1 },
+  attenteClose: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: c.surfaceSunken,
+  },
   // Bandeau d'attente (pose d'un appareil) : en haut, il ne gêne rien.
   wallLengthBar: {
     position: 'absolute',
