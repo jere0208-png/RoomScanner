@@ -29,12 +29,50 @@ const input = {
   rooms: SNAPSHOT_ROOMS,
   fixtures: SNAPSHOT_FIXTURES,
 };
+
+/**
+ * LE MÊME APPARTEMENT, TOURNÉ DE DOUZE DEGRÉS.
+ *
+ * L'appartement de référence est d'équerre avec le repère du scan, ce qui
+ * cache une famille entière de défauts : tout ce qui se calcule sur les axes
+ * du monde y donne le même résultat que sur ceux du logement, et un test qui
+ * ne voit pas la différence ne vérifie rien. C'est exactement comme ça que
+ * les cotes du plafond sont parties en écharpe sans qu'aucune planche ne
+ * bronche.
+ *
+ * Or ARKit oriente son repère selon l'endroit où le relevé a commencé : un
+ * scan de biais est le cas NORMAL, pas l'exception. Une planche tournée
+ * suffit à couvrir la famille entière — inutile de tourner les quatre.
+ */
+const A = (12 * Math.PI) / 180;
+const pivot = <T extends { a: { x: number; z: number }; b: { x: number; z: number } }>(
+  w: T,
+): T => ({
+  ...w,
+  a: {
+    x: w.a.x * Math.cos(A) - w.a.z * Math.sin(A),
+    z: w.a.x * Math.sin(A) + w.a.z * Math.cos(A),
+  },
+  b: {
+    x: w.b.x * Math.cos(A) - w.b.z * Math.sin(A),
+    z: w.b.x * Math.sin(A) + w.b.z * Math.cos(A),
+  },
+});
+const inputBiais = {
+  ...input,
+  walls: SNAPSHOT_WALLS.map(pivot),
+  openings: SNAPSHOT_OPENINGS.map(pivot),
+};
 const dir = join(__dirname, '..', 'assets', 'rendu-reference');
 
 describe('planche de rendu de référence', () => {
-  for (const { name, view } of SNAPSHOT_VIEWS) {
+  for (const { name, view } of [
+    ...SNAPSHOT_VIEWS,
+    // La planche de biais : celle qui voit ce que les quatre autres ratent.
+    { name: 'biais', view: SNAPSHOT_VIEWS[0].view },
+  ]) {
     it(`${name} n'a pas changé`, () => {
-      const actual = renderSceneSvg(input, view);
+      const actual = renderSceneSvg(name === 'biais' ? inputBiais : input, view);
       // `npm run snapshots` réécrit la planche au lieu de la comparer.
       if (process.env.UPDATE_SNAPSHOTS) {
         mkdirSync(dir, { recursive: true });
