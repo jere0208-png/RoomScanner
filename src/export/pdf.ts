@@ -36,6 +36,7 @@ import {
   type SymbolStroke,
 } from '../geometry/electrical';
 import type { MaterialList } from '../geometry/nfc15100';
+import type { BuyRow, PullRow } from '../geometry/conduits';
 import { planFrameAngle } from '../geometry/floorplan';
 import {
   buildScene,
@@ -203,6 +204,17 @@ class Draw {
       `${n2(r)} ${n2(g)} ${n2(b)} RG ${n2(w)} w 1 J 1 j ` +
         pts.map((p, i) => `${n2(p.x)} ${n2(p.y)} ${i === 0 ? 'm' : 'l'}`).join(' ') +
         ' S',
+    );
+  }
+
+  /** Ligne brisée en tireté : le cheminement d'une gaine. */
+  dashedPath(pts: Pt[], w: number, hex: string, dash: [number, number]) {
+    if (pts.length < 2) return;
+    const [r, g, b] = hexRgb(hex);
+    this.ops.push(
+      `q [${dash[0]} ${dash[1]}] 0 d ${n2(r)} ${n2(g)} ${n2(b)} RG ${n2(w)} w 1 J 1 j ` +
+        pts.map((p, i) => `${n2(p.x)} ${n2(p.y)} ${i === 0 ? 'm' : 'l'}`).join(' ') +
+        ' S Q',
     );
   }
 
@@ -599,6 +611,8 @@ interface SheetContext {
   colorOpenings: boolean;
   showSurfaces: boolean;
   showTextures: boolean;
+  /** Cheminement des gaines, en coordonnées MONDE (`Pt` est ici la page). */
+  routes?: { id: string; path: { x: number; z: number }[] }[];
 }
 
 function planPage(
@@ -914,6 +928,20 @@ function planPage(
       }
     }
 
+    // ------------------------------------------------- plan des gaines
+    // Le cheminement passe SOUS les symboles : c'est un tracé de chantier,
+    // pas une annotation. En tireté fin, il se lit sans manger le plan, et
+    // il se superpose au métré du tableau de tirage — même source, mêmes
+    // longueurs.
+    if (ctx.routes && ctx.routes.length > 0) {
+      for (const r of ctx.routes) {
+        if (r.path.length < 2) continue;
+        // Un tireté fin : lisible sans manger le plan, et distinct du trait
+        // plein des murs comme du pointillé des passages.
+        d.dashedPath(r.path.map(px), 0.7, '#2F6BFF', [4, 3]);
+      }
+    }
+
     // ------------------------------------------- appareillage électrique
     // Même convention qu'à l'écran : le symbole se pose DANS la pièce,
     // devant la face qui le porte, relié au mur par un filet. Les appareils
@@ -1130,6 +1158,8 @@ export interface ScanForPdf {
   rooms?: RoomShape[];
   /** Appareillage électrique posé sur les murs. */
   fixtures?: Fixture[];
+  /** Cheminement des gaines, du tableau à chaque appareil (repère monde). */
+  routes?: { id: string; path: { x: number; z: number }[] }[];
 }
 
 
@@ -1299,7 +1329,16 @@ function wrapText(str: string, size: number, maxW: number): string[] {
  * qu'on envoie à un client ou à un fournisseur — il porte donc le cartouche
  * et le logo comme les autres feuilles.
  */
-export function buildMaterialPdf(name: string, list: MaterialList): Uint8Array {
+export function buildMaterialPdf(
+  name: string,
+  list: MaterialList,
+  /**
+   * Ce que lit le patron avant tout le reste : ce qu'il faut tirer, et ce
+   * qu'il faut acheter. Optionnel — sans plan des gaines, la liste garde sa
+   * forme d'avant.
+   */
+  tirage?: { pull: PullRow[]; buy: BuyRow[] },
+): Uint8Array {
   const x0 = FRAME.x + 24;
   const w = FRAME.w - 48;
   const TOP = FRAME.y + FRAME.h - TITLE_H - 40;
@@ -1411,6 +1450,43 @@ export function buildMaterialPdf(name: string, list: MaterialList): Uint8Array {
   }
   if (list.circuits.length === 0) note('Aucun circuit : rien à protéger.');
 
+  // ------------------------------------------------------------- tirage
+  if (tirage && tirage.pull.length > 0) {
+    y -= 8;
+    titre('Tirage — gaines et conducteurs');
+    ligne('Circuit', 'Gaine · longueur', { bold: true, grey: true });
+    for (const r of tirage.pull) {
+      const droite =
+        r.conduitLength > 0
+          ? `ICTA Ø${r.conduit} · ${r.conduitLength} m`
+          : `ICTA Ø${r.conduit}`;
+      ligne(
+        `${r.label} — ${r.runs} départ${r.runs > 1 ? 's' : ''}` +
+          (r.cableLength > 0 ? ` · ${r.cableLength} m de conducteur` : ''),
+        droite,
+      );
+    }
+    note(
+      '   Remplissage NF C 15-100 : la section des conducteurs ne dépasse ' +
+        'pas le tiers de celle du conduit.',
+    );
+    if (tirage.pull.every((r) => r.conduitLength === 0)) {
+      note('   Posez le tableau sur le plan pour obtenir les longueurs.');
+    }
+  }
+
+  // -------------------------------------------------------- à commander
+  if (tirage && tirage.buy.length > 0) {
+    y -= 8;
+    titre('À commander');
+    for (const r of tirage.buy) {
+      ligne(
+        r.label + (r.note ? ` — ${r.note}` : ''),
+        `${r.quantity} ${r.unit}`,
+      );
+    }
+  }
+
   if (list.differentials.length > 0) {
     y -= 8;
     ligne('Protection différentielle 30 mA', '', { bold: true });
@@ -1510,6 +1586,7 @@ export function buildScanPdf(
     roomNames: scan.roomNames ?? {},
     rooms: scan.rooms,
     fixtures: scan.fixtures ?? [],
+    routes: scan.routes,
     colorOpenings: opts.colorOpenings ?? false,
     showSurfaces: opts.surfaces ?? true,
     showTextures: opts.textures ?? false,

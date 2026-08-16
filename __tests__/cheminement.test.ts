@@ -164,6 +164,12 @@ describe('le métré d’un circuit', () => {
     expect(runs[0].path[0]).toEqual(dehors);
   });
 
+  it('la gaine se compte sans le mou : on tire du fil en plus, pas du tube', () => {
+    const runs = cableRuns(PIECE, tableau, 1.3, [devices[0]]);
+    expect(runs[0].length - runs[0].conduit).toBeCloseTo(MOU, 6);
+    expect(runs[0].conduit).toBeGreaterThan(0);
+  });
+
   it('sans appareil, le circuit ne coûte rien', () => {
     expect(circuitLength(cableRuns(PIECE, tableau, 1.3, []))).toBe(0);
   });

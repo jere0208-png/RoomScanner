@@ -1041,7 +1041,15 @@ export function buildScene(
       // celle du milieu de l'appareil — sinon un flanc de tableau se
       // retrouvait trié avec une tuile voisine, et repassait devant le dos
       // du mur quand on regardait la cloison de l'autre côté.
-      if (devant && refs.length > 1) {
+      // Toute face qui S'ÉTEND sur plusieurs tuiles se compare à toutes :
+      // le dessus d'un tableau de 55 cm en couvre deux, et la tuile qu'on
+      // n'aurait pas prise repassait devant — c'est le liseré blanc qui
+      // mordait le coin de l'appareil.
+      const xs = fa.pts.map(
+        (q) => (q.x - face.A.x) * face.ux + (q.z - face.A.z) * face.uz,
+      );
+      const large = Math.max(...xs) - Math.min(...xs) > tw * 0.5;
+      if ((devant || large) && refs.length > 1) {
         fa.depthRefs = refs;
       } else {
         const cxf =

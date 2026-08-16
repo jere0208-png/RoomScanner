@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Animated,
@@ -24,6 +24,9 @@ import { FloorplanEditor } from '../components/FloorplanEditor';
 import { DEFAULT_VIEW3D, Iso3DView, type View3DParams } from '../components/Iso3DView';
 import { buildScanPdf, pdfFilename, toBase64 } from '../export/pdf';
 import { hasCapturedColors } from '../geometry/appearance';
+import { roomParts } from '../geometry/floorplan';
+import { fixturePlacement, roomInputsOf } from '../geometry/nfc15100';
+import { planRoutes } from '../geometry/elecplan';
 import { floorsOf, useScanStore } from '../store/scanStore';
 
 interface PlanView {
@@ -182,6 +185,22 @@ export function ExportScreen() {
   const [include3D, setInclude3D] = useState(true);
   const [includeMetre, setIncludeMetre] = useState(true);
   const [measures2D, setMeasures2D] = useState(true);
+  /**
+   * Plan des gaines : le tracé du tableau à chaque appareil, celui-là même
+   * dont le devis donne les longueurs. Décoché par défaut — un plan
+   * d'architecte n'a pas à porter le tirage —, mais à un interrupteur près
+   * quand c'est l'électricien qui imprime.
+   */
+  const [gaines, setGaines] = useState(false);
+  const parts = useMemo(() => roomParts(walls, rooms), [walls, rooms]);
+  const placement = useMemo(
+    () => fixturePlacement(fixtures, walls, roomInputsOf(rooms, parts)),
+    [fixtures, walls, rooms, parts],
+  );
+  const cheminements = useMemo(
+    () => planRoutes(walls, rooms, parts, fixtures, placement),
+    [walls, rooms, parts, fixtures, placement],
+  );
   const [measures3D, setMeasures3D] = useState(true);
   // Toucher un modèle verrouille le défilement (iOS annule sinon le geste
   // JS au profit du scroll natif) ; le relâcher le rend au ScrollView.
@@ -223,6 +242,7 @@ export function ExportScreen() {
           objects: showFurniture ? objects : [],
           rooms,
           fixtures,
+          routes: gaines ? cheminements?.traces : undefined,
           floors: floorsOf(rooms),
           roomNames: Object.fromEntries(rooms.map((r) => [r.id, r.name])),
         },
@@ -330,6 +350,14 @@ export function ExportScreen() {
           <Text style={styles.switchLabel}>Cotes sur les vues 3D</Text>
           <Switch value={measures3D} onValueChange={setMeasures3D} />
         </View>
+        {cheminements && (
+          <View style={styles.switchRow}>
+            <Text style={styles.switchLabel}>
+              Plan des gaines (tracé du tirage)
+            </Text>
+            <Switch value={gaines} onValueChange={setGaines} />
+          </View>
+        )}
 
         <Text style={styles.sheetLabel}>Feuille 1 · Plan d'ensemble</Text>
         <View style={styles.sheetCard}>

@@ -870,18 +870,36 @@ export function planCircuits(
     }),
   );
 
+  /**
+   * Éclairage : les points lumineux ET leurs commandes.
+   *
+   * La norme compte les POINTS (huit au maximum par circuit) ; un
+   * interrupteur n'en est pas un. Mais il est bien câblé sur ce circuit-là,
+   * et il faut donc lui tirer du fil : le laisser hors de tout circuit, ce
+   * que faisait la première version, revenait à ne jamais compter le câble
+   * des commandes — et à ne dessiner aucune gaine jusqu'à elles.
+   */
+  const commandes = fixtures.filter((f) =>
+    ['inter', 'inter2', 'inter3', 'va', 'poussoir', 'variateur'].includes(f.kind),
+  );
   const lumieres = fixtures.filter((f) => f.kind === 'applique');
-  chunk(lumieres, MAX_LUMIERE).forEach((lot, i) =>
+  const surEclairage = [...lumieres, ...commandes];
+  chunk(surEclairage, MAX_LUMIERE).forEach((lot, i) => {
+    const points = lot.filter((f) => f.kind === 'applique').length;
     add({
       label: `Éclairage ${i + 1}`,
       nature: 'eclairage',
-      points: lot.length,
+      points,
       section: 1.5,
       breaker: 16,
       rooms: roomsOf(lot),
       fixtureIds: lot.map((f) => f.id),
-    }),
-  );
+      note:
+        points === 0
+          ? 'Commandes seules : les points lumineux ne sont pas encore posés.'
+          : undefined,
+    });
+  });
 
   const sorties = fixtures.filter((f) => f.kind === 'sortieCable');
   chunk(sorties, MAX_SOCLES).forEach((lot, i) =>

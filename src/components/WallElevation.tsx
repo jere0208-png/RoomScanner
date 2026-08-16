@@ -835,45 +835,39 @@ export function WallElevation({
             et le regard perdait le mur qu'il suivait. Ici, elle désigne ce
             dont elle parle, et rien ne bouge. */}
         {hauteurKO && selected && face && (
-          <View
-            style={[
-              styles.alerte,
-              {
-                left: Math.max(
-                  6,
-                  Math.min(
-                    layout.w - 190,
-                    px(faceX(face, selected.along)) - 92,
-                  ),
-                ),
-                top: Math.max(4, py(selected.height) - 46),
-              },
-            ]}
-            pointerEvents="box-none">
-            <View style={styles.alerteRow}>
-              <Text style={styles.alerteTitre} numberOfLines={1}>
-                {`Trop ${hauteurKO.sens === 'trop bas' ? 'bas' : 'haut'}`}
-              </Text>
+          (() => {
+            // Ni cadre, ni fond : rien ne doit masquer l'appareil dont on
+            // parle. Le mot suffit, en rouge, avec un liseré clair derrière
+            // les lettres pour qu'il tienne sur n'importe quel fond. On le
+            // pose AU-DESSUS de l'appareil, et en dessous quand il n'y a
+            // plus de place — près du plafond, il sortait du cadre.
+            const xc = px(faceX(face, selected.along));
+            const yTete = py(selected.height + SPECS[selected.kind].h / 2);
+            const dessus = yTete > 34;
+            return (
               <TouchableOpacity
-                style={styles.alerteFix}
+                style={[
+                  styles.alerte,
+                  {
+                    left: Math.max(4, Math.min(layout.w - 204, xc - 100)),
+                    top: dessus
+                      ? yTete - 30
+                      : py(selected.height - SPECS[selected.kind].h / 2) + 8,
+                  },
+                ]}
+                activeOpacity={0.7}
                 onPress={() =>
-                  moveFixture(
-                    selected.id,
-                    selected.along,
-                    SPECS[selected.kind].std,
-                  )
+                  moveFixture(selected.id, selected.along, SPECS[selected.kind].std)
                 }>
-                <Text style={styles.alerteFixText}>
-                  {`${cm(SPECS[selected.kind].std)} cm`}
+                <Text style={styles.alerteTexte} numberOfLines={1}>
+                  {`Trop ${hauteurKO.sens === 'trop bas' ? 'bas' : 'haut'}`}
+                  <Text style={styles.alerteFixe}>
+                    {`  ·  remettre à ${cm(SPECS[selected.kind].std)} cm`}
+                  </Text>
                 </Text>
               </TouchableOpacity>
-            </View>
-            <Text style={styles.alerteRegle} numberOfLines={2}>
-              {hauteurKO.regle}
-            </Text>
-            {/* La pointe qui vise l'appareil. */}
-            <View style={styles.alertePointe} />
-          </View>
+            );
+          })()
         )}
       </View>
 
@@ -1435,48 +1429,27 @@ const getStyles = themedStyles((c: Palette) =>
       fontWeight: '700',
       marginTop: 2,
     },
-    // Une bulle, pas un bandeau : posée en absolu sur le dessin, elle ne
-    // prend aucune place dans la mise en page.
+    // Un texte, pas une bulle : un cadre posé sur le dessin cache
+    // justement l'appareil dont il parle. Le liseré clair derrière les
+    // lettres suffit à les détacher du fond.
     alerte: {
       position: 'absolute',
-      width: 184,
-      backgroundColor: c.surface,
-      borderRadius: radius.sm,
-      paddingHorizontal: 9,
-      paddingVertical: 7,
-      borderLeftWidth: 3,
-      borderLeftColor: c.danger,
-      ...shadowCard,
-      shadowOpacity: 0.16,
+      width: 200,
+      alignItems: 'center',
     },
-    alerteRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    alerteTitre: {
+    alerteTexte: {
       color: c.danger,
       fontSize: 12.5,
-      fontWeight: '800',
-      flex: 1,
+      fontWeight: '900',
+      textAlign: 'center',
+      textShadowColor: c.surface,
+      textShadowOffset: { width: 0, height: 0 },
+      textShadowRadius: 4,
     },
-    alerteFix: {
-      backgroundColor: c.danger,
-      borderRadius: radius.pill,
-      paddingHorizontal: 9,
-      paddingVertical: 3,
-    },
-    alerteFixText: { color: '#FFFFFF', fontSize: 11, fontWeight: '800' },
-    alerteRegle: {
+    alerteFixe: {
       color: c.inkSoft,
-      fontSize: 9.5,
-      lineHeight: 12.5,
-      marginTop: 2,
-    },
-    alertePointe: {
-      position: 'absolute',
-      bottom: -5,
-      left: 88,
-      width: 10,
-      height: 10,
-      backgroundColor: c.surface,
-      transform: [{ rotate: '45deg' }],
+      fontSize: 11.5,
+      fontWeight: '800',
     },
     photo: {
       width: 34,

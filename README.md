@@ -1077,6 +1077,36 @@ traînerait à chaque écriture. Le fichier vit dans les Documents de l'app : il
 ne survit pas à une réinstallation, comme le `.usdz`, et un mur supprimé
 laisse sa photo orpheline plutôt que de la détruire.
 
+### Le document que lit un patron électricien
+
+La liste du matériel porte désormais deux sections de plus, dans l'ordre où
+on les lit sur un chantier :
+
+**Tirage** — une ligne par circuit : nombre de départs, mètres de conducteur,
+diamètre et longueur de gaine. Les diamètres suivent la règle de remplissage
+de la NF C 15-100 (la section des conducteurs ne dépasse pas le tiers de
+celle du conduit) : 1,5 mm² → ICTA 16, 2,5 → 20, 4-6 → 25, 10 → 32, et les
+courants faibles en 25 — on n'y tire jamais une seule paire, et une gaine
+trop juste se paie au tirage.
+
+**À commander** — gaines par diamètre et conducteurs par section, en mètres
+ET en couronnes de 100 m : le premier chiffre sert à vérifier, le second à
+commander. Puis les boîtes d'encastrement, comptées PAR POSTE (une plaque
+double, ce sont deux boîtes à 71 mm d'entraxe), les plaques par ensemble avec
+leur largeur, et les mécanismes par type. Trois conducteurs par mètre de
+parcours : c'est l'erreur classique du métré au doigt mouillé.
+
+Le **plan des gaines** est un interrupteur de l'écran d'export : le tracé du
+tirage se superpose au plan, en tireté fin. Décoché par défaut — un plan
+d'architecte n'a pas à porter le tirage — et proposé seulement si un tableau
+est posé. Écran et document tirent leurs longueurs de la MÊME fonction
+(`planRoutes`), sinon l'un dirait une chose et l'autre une autre.
+
+Au passage, un défaut de modèle corrigé : les **interrupteurs n'étaient
+portés par aucun circuit**. La norme compte les points lumineux, pas les
+commandes — mais une commande est bien câblée sur le circuit d'éclairage, et
+l'ignorer revenait à ne jamais compter son câble ni dessiner sa gaine.
+
 ### Jonctions de murs
 
 Un mur n'est pas un trait épais posé à côté des autres : `wallQuads()` traite

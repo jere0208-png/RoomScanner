@@ -106,6 +106,7 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
   const colorOpenings = useScanStore((s) => s.showOpeningColors);
   const showSurfaces = useScanStore((s) => s.showSurfaces);
   const showTextures = useScanStore((s) => s.showTextures);
+  const solidWalls = useScanStore((s) => s.solidWalls);
   const allRooms = useScanStore((s) => s.rooms);
   // Coupe : on ne garde que la pièce visée, murs et meubles compris.
   const rooms = useMemo(
@@ -387,7 +388,9 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
       // Écorché : un mur qui nous fait face s'efface pour laisser voir la
       // pièce. Il garde son arête, donc sa présence.
       const voile =
-        face.cutaway && face.normal ? cutawayOpacity(face.normal, cam) : 1;
+        !solidWalls && face.cutaway && face.normal
+          ? cutawayOpacity(face.normal, cam)
+          : 1;
 
       // Mode cotes : toutes les arêtes en noir.
       // Un pan sans contour propre est bordé de SA PROPRE couleur : sans ça,
@@ -664,6 +667,7 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
     radius3d,
     showMeasures,
     showSurfaces,
+    solidWalls,
     walls,
     interacting,
   ]);

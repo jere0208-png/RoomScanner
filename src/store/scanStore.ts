@@ -424,6 +424,15 @@ interface ScanState {
 
   // Couleurs et textures relevées au scan (2D, 3D, PDF). Décoché par défaut.
   showTextures: boolean;
+  /**
+   * Murs pleins en 3D, ou écorché.
+   *
+   * L'écorché efface le mur qui nous fait face pour montrer la pièce ; c'est
+   * le bon réglage neuf fois sur dix, mais pas quand on veut juger un volume
+   * bâti ou montrer une façade. Le choix reste donc à l'utilisateur.
+   */
+  solidWalls: boolean;
+  toggleSolidWalls: () => void;
   setShowTextures: (v: boolean) => void;
 
   setScreen: (s: Screen) => void;
@@ -590,6 +599,8 @@ export const useScanStore = create<ScanState>((set, get) => {
     },
 
     showTextures: false,
+    solidWalls: false,
+    toggleSolidWalls: () => set({ solidWalls: !get().solidWalls }),
     setShowTextures: (showTextures) => {
       set({ showTextures });
       AsyncStorage.setItem(TEXTURES_KEY, showTextures ? '1' : '0').catch(() => {});

@@ -31,6 +31,11 @@ export interface CableRun {
   path: Pt[];
   /** Longueur développée : parcours au sol + descente + remontée + mou. */
   length: number;
+  /**
+   * Longueur de GAINE : le parcours physique, sans le mou d'about. On tire
+   * du fil en plus, pas du conduit.
+   */
+  conduit: number;
 }
 
 /** Distance entre deux points du plan. */
@@ -134,10 +139,12 @@ export function cableRuns(
     const { path, length } = ringPath(ring, panel, d.at);
     const descente = Math.abs(panelHeight - HAUTEUR_GAINE);
     const remontee = Math.abs(d.height - HAUTEUR_GAINE);
+    const parcours = traverse + length + descente + remontee;
     return {
       fixtureId: d.id,
       path: traverse > 1e-6 ? [panel, ...path] : path,
-      length: traverse + length + descente + remontee + MOU,
+      length: parcours + MOU,
+      conduit: parcours,
     };
   });
 }

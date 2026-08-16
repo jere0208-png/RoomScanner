@@ -50,11 +50,11 @@ import {
   roomParts,
   segLength,
   totalArea,
-  type Pt,
   type RoomPart,
 } from '../geometry/floorplan';
 import { hasCapturedColors } from '../geometry/appearance';
-import { cableRuns, circuitLength } from '../geometry/routing';
+import { planRoutes } from '../geometry/elecplan';
+import { buyingList, pullSchedule } from '../geometry/conduits';
 import {
   frCategory,
   furnKind,
@@ -66,7 +66,6 @@ import { buildObj, objFilename } from '../export/model3d';
 import { checkPlan } from '../geometry/diagnostics';
 import {
   checkElectrical,
-  planCircuits,
   roomUse,
   worktopsOnWall,
   type Worktop,
@@ -81,7 +80,6 @@ import {
   FIXTURES,
   FIXTURE_FAMILIES,
   faceX,
-  facePoint,
   wallFace,
   type Fixture,
   type FixtureKind,
@@ -138,6 +136,8 @@ export function ResultScreen() {
   const showSurfaces = useScanStore((s) => s.showSurfaces);
   const setShowSurfaces = useScanStore((s) => s.setShowSurfaces);
   const showTextures = useScanStore((s) => s.showTextures);
+  const solidWalls = useScanStore((s) => s.solidWalls);
+  const toggleSolidWalls = useScanStore((s) => s.toggleSolidWalls);
   const setShowTextures = useScanStore((s) => s.setShowTextures);
   const rooms = useScanStore((s) => s.rooms);
   const removeRoom = useScanStore((s) => s.removeRoom);
@@ -402,7 +402,10 @@ export function ResultScreen() {
         placement,
         cheminements?.parCircuit,
       );
-      const bytes = buildMaterialPdf(scanName, list);
+      // Le tirage et la commande : ce qu'un patron lit avant le reste.
+      const pull = pullSchedule(list.circuits, cheminements?.metre);
+      const tirage = { pull, buy: buyingList(pull, fixtures) };
+      const bytes = buildMaterialPdf(scanName, list, tirage);
       await RoomScan.sharePDF(toBase64(bytes), materialFilename(scanName));
     } catch (e: any) {
       Alert.alert('Export impossible', e?.message ?? 'Erreur inconnue');
@@ -588,56 +591,13 @@ export function ResultScreen() {
   }, [walls, rooms, objects]);
 
   /**
-   * Cheminement des gaines et métré, quand un tableau est posé.
-   *
-   * Sans tableau, on ne sait pas d'où part le câble : on ne devine pas, on
-   * s'abstient, et le devis garde son estimation forfaitaire.
+   * Cheminement des gaines et métré : même source que l'export, pour que le
+   * document et l'écran ne racontent jamais deux choses.
    */
-  const cheminements = useMemo(() => {
-    const tableau = fixtures.find((f) => f.kind === 'tableau');
-    if (!tableau) return null;
-    const quads = wallQuadsOf(walls);
-    const murs = new Map(walls.map((w) => [w.id, w]));
-    const posDe = (f: Fixture) => {
-      const w = murs.get(f.wallId);
-      if (!w) return null;
-      const fa = wallFace(w, quads.get(w.id), f.side);
-      const p = facePoint(fa, faceX(fa, f.along), 0.02);
-      return { at: { x: p.x, z: p.z }, height: f.height };
-    };
-    const depart = posDe(tableau);
-    if (!depart) return null;
-
-    const circuits = planCircuits(
-      fixtures,
-      (f) => rooms.find((r) => r.id === placement.get(f.id))?.name ?? '',
-      (f) =>
-        roomUse(
-          rooms.find((r) => r.id === placement.get(f.id))?.name ?? '',
-          rooms.find((r) => r.id === placement.get(f.id))?.kind,
-        ) === 'cuisine',
-    );
-    const parCircuit = new Map<string, number>();
-    const traces: { id: string; path: Pt[] }[] = [];
-    for (const c of circuits) {
-      const runs = c.fixtureIds.flatMap((id) => {
-        const f = fixtures.find((x) => x.id === id);
-        if (!f || f.id === tableau.id) return [];
-        const pos = posDe(f);
-        if (!pos) return [];
-        const piece = parts.find((p) => p.roomId === placement.get(f.id));
-        const ring = piece?.surface?.pts ?? parts[0]?.surface?.pts ?? [];
-        if (ring.length < 3) return [];
-        return cableRuns(ring, depart.at, depart.height, [
-          { id: f.id, at: pos.at, height: pos.height },
-        ]);
-      });
-      if (runs.length === 0) continue;
-      parCircuit.set(c.id, circuitLength(runs));
-      for (const r of runs) traces.push({ id: r.fixtureId, path: r.path });
-    }
-    return { parCircuit, traces };
-  }, [fixtures, walls, rooms, parts, placement]);
+  const cheminements = useMemo(
+    () => planRoutes(walls, rooms, parts, fixtures, placement),
+    [walls, rooms, parts, fixtures, placement],
+  );
 
   const elecIssues = checkElectrical(
     roomInputs,
@@ -1127,6 +1087,14 @@ export function ResultScreen() {
               icon="surface"
               active={showSurfaces}
               onPress={() => setShowSurfaces(!showSurfaces)}
+            />
+            {/* Murs pleins ou écorché : l'écorché montre la pièce, les murs
+                pleins montrent le bâti. Ni l'un ni l'autre n'a toujours
+                raison — c'est un réglage, pas une trouvaille. */}
+            <ToolPill
+              icon="murs"
+              active={solidWalls}
+              onPress={toggleSolidWalls}
             />
             {colorsAvailable && (
               <ToolPill
@@ -1908,10 +1876,19 @@ type ToolIcon =
   | 'square'
   | 'check'
   | 'gaines'
+  | 'murs'
   | 'plus';
 
 /** Tracés 24×24 des icônes d'outils (trait simple, lisible en 18 px). */
 const TOOL_PATHS: Record<ToolIcon, { d: string; fill?: boolean }[]> = {
+  // Murs pleins : un pan hachuré, comme un mur poché sur un plan.
+  murs: [
+    { d: 'M4 6 h16 v12 H4 z' },
+    { d: 'M4 12 h16' },
+    { d: 'M12 6 v6' },
+    { d: 'M8 12 v6' },
+    { d: 'M16 12 v6' },
+  ],
   // Cheminement : un câble qui longe deux murs et remonte.
   gaines: [
     { d: 'M4 20 h9 a3 3 0 0 0 3 -3 V7' },
