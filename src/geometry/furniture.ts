@@ -175,6 +175,54 @@ export const ROOM_NAME_CHOICES: string[] = [
   'Cave',
 ];
 
+/**
+ * Le rayon qui part de `p` vers l'œil traverse-t-il ce meuble ?
+ *
+ * Sur un plan 3D, un appareil posé derrière un rangement disparaît
+ * purement et simplement : rien ne dit qu'il existe, et l'électricien qui
+ * fait le tour du modèle compte une prise de moins. Il faut donc savoir,
+ * image par image, ce que chaque meuble masque.
+ *
+ * Test des tranches dans le repère du meuble : on ramène le rayon dans ses
+ * axes, et on regarde s'il coupe la boîte.
+ */
+export function hiddenByBox(
+  p: { x: number; y: number; z: number },
+  dir: { x: number; y: number; z: number },
+  box: {
+    cx: number;
+    cz: number;
+    y0: number;
+    y1: number;
+    width: number;
+    depth: number;
+    yaw: number;
+  },
+): boolean {
+  const cos = Math.cos(-box.yaw);
+  const sin = Math.sin(-box.yaw);
+  const rx = (p.x - box.cx) * cos - (p.z - box.cz) * sin;
+  const rz = (p.x - box.cx) * sin + (p.z - box.cz) * cos;
+  const dx = dir.x * cos - dir.z * sin;
+  const dz = dir.x * sin + dir.z * cos;
+  let t0 = 0.001;
+  let t1 = Infinity;
+  const tranche = (o: number, d: number, demi: number) => {
+    if (Math.abs(d) < 1e-9) return Math.abs(o) <= demi;
+    const a = (-demi - o) / d;
+    const b = (demi - o) / d;
+    t0 = Math.max(t0, Math.min(a, b));
+    t1 = Math.min(t1, Math.max(a, b));
+    return true;
+  };
+  if (!tranche(rx, dx, box.width / 2)) return false;
+  if (!tranche(rz, dz, box.depth / 2)) return false;
+  // La hauteur, dans le repère du monde : un meuble n'est pas incliné.
+  const cy = (box.y0 + box.y1) / 2;
+  if (!tranche(p.y - cy, dir.y, (box.y1 - box.y0) / 2)) return false;
+  return t1 >= t0;
+}
+
 export function frCategory(category: string): string {
   const kind = furnKind(category);
   return kind === 'other' ? category : FR[kind];

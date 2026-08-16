@@ -178,7 +178,56 @@ function fuites(faces: Face3D[], cible: Face3D[]): string[] {
         for (const m of vus) {
           if (m.fill !== PAL.wall && m.fill !== PAL.wallTop) continue;
           if (!traverse(m, c, dir)) continue;
-          if (depOf(m, P, cam) < d) {
+          if (depOf(m, P, cam) < d) out.push(`θ=${theta} φ=${phi}`);
+        }
+      }
+    }
+  }
+  return [...new Set(out)];
+}
+
+/**
+ * Le symptème INVERSE : un pan de mur situé DERRIÈRE l'objet le recouvre.
+ *
+ * `fuites` cherche ce qui se voit à travers un mur. Il faut aussi chercher
+ * ce qu'un mur efface alors qu'il est derrière : c'est le même désordre de
+ * tri, vu de l'autre bout, et c'est lui qui tranchait un meuble d'angle en
+ * deux.
+ */
+function masques(faces: Face3D[], cible: Face3D[]): string[] {
+  const out: string[] = [];
+  for (const theta of ANGLES) {
+    for (const phi of PHIS) {
+      const cam = camAt(theta, phi);
+      const P = prof(cam);
+      const dir = versOeil(cam);
+      const dos = { x: -dir.x, y: -dir.y, z: -dir.z };
+      const vus = faces.filter((f) => !isHiddenFace(f, cam));
+      for (const f of cible) {
+        if (isHiddenFace(f, cam)) continue;
+        const c = centroide(f.pts);
+        const d = depOf(f, P, cam);
+        /**
+         * Une face déjà couverte par un mur ne nous intéresse pas.
+         *
+         * Regardé depuis l'extérieur, un meuble est légitimement masqué par
+         * la façade : peu importe alors comment il se trie avec les murs du
+         * fond, personne ne le voit. Ne compter que ce qui est VISIBLE, sans
+         * quoi le test réclamerait un ordre parfait entre des faces que rien
+         * n'affiche.
+         */
+        const dejaCache = vus.some(
+          (m) =>
+            (m.fill === PAL.wall || m.fill === PAL.wallTop) &&
+            traverse(m, c, dir) &&
+            depOf(m, P, cam) > d,
+        );
+        if (dejaCache) continue;
+        for (const m of vus) {
+          if (m.fill !== PAL.wall && m.fill !== PAL.wallTop) continue;
+          // Le mur est DERRIÈRE : le rayon qui s'éloigne de l'œil le trouve.
+          if (!traverse(m, c, dos)) continue;
+          if (depOf(m, P, cam) > d) {
             out.push(`θ=${theta} φ=${phi}`);
           }
         }
@@ -216,5 +265,45 @@ describe('un appareil ne traverse aucune cloison', () => {
       (f) => !!f.fill && (f.depthRefs || f.depthAt) && f.fill !== PAL.wall,
     );
     expect(fuites(sc.faces, appareil)).toEqual([]);
+  });
+});
+
+/**
+ * Un meuble d'angle ne se fait pas manger par le mur d'à côté.
+ *
+ * Un meuble plaqué contre un mur emprunte le point de tri de CE mur, pour
+ * passer juste après lui vu de la pièce et rester derrière lui vu de dos.
+ * Le point retenu était le MILIEU DU MUR, quelle que soit la place du
+ * meuble : un rangement posé dans un coin se triait donc jusqu'à 1,75 m de
+ * l'endroit où il se trouve. Vu en biais, cet écart dépasse largement la
+ * largeur de la pièce — et le mur perpendiculaire, dessiné après, tranchait
+ * le meuble en deux.
+ */
+describe('un meuble d’angle', () => {
+  /** Un rangement de 1,00 × 0,45, contre le mur nord, collé au coin est. */
+  const RANGEMENT = {
+    id: 'r',
+    category: 'storage',
+    width: 1,
+    depth: 0.45,
+    height: 0.9,
+    roomId: 'r1',
+    transform: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 2.9, 0.45, 0.36, 1],
+  };
+
+  it('reste entier sous tous les angles', () => {
+    const sc = buildScene(W, [], [RANGEMENT], {
+      palette: PAL,
+      rooms: R,
+      fixtures: [],
+      showSurfaces: false,
+    });
+    const meuble = sc.faces.filter(
+      (f) => f.fill === PAL.object || f.fill === PAL.objectTop,
+    );
+    expect(meuble.length).toBeGreaterThan(0);
+    expect(fuites(sc.faces, meuble)).toEqual([]);
+    // Et aucun mur situé derrière lui ne vient le repeindre.
+    expect(masques(sc.faces, meuble)).toEqual([]);
   });
 });

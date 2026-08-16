@@ -48,6 +48,14 @@ export interface Face3D {
   shade?: boolean;
   /** La teinte vient du scan : l'ombrage doit conserver sa couleur. */
   captured?: boolean;
+  /**
+   * Le meuble dont cette face fait partie.
+   *
+   * Sert à l'effacer d'un bloc quand il cache un appareil électrique : sans
+   * cette étiquette, il faudrait le retrouver à la géométrie, meuble par
+   * meuble, à chaque image.
+   */
+  ownerId?: string;
   /** Biais de tri (m), pour départager deux faces à la même profondeur. */
   bias?: number;
   isFloor?: boolean;
@@ -1303,7 +1311,54 @@ export function buildScene(
      * plus) : un lit de 1,90 m trié avec le mur de sa tête passerait devant
      * ce qui se trouve à son pied.
      */
-    let triMeuble: P3 | undefined;
+    /**
+     * OÙ se trie un meuble : à SA PLACE AU SOL, à hauteur de mur.
+     *
+     * Le tri en profondeur de cette scène comporte un terme d'ALTITUDE :
+     * à position au sol égale, ce qui est haut passe devant ce qui est bas.
+     * C'est nécessaire pour que le dessus d'un mur se pose sur son pan, et
+     * c'est justement ce terme qui dérange partout ailleurs : un pan de mur
+     * se trie à mi-hauteur, soit 1,25 m, là où un rangement de 90 cm se trie
+     * à 45. L'écart d'altitude — 80 cm — pesait plus lourd que l'écart de
+     * position, et le mur, dessiné après, tranchait le meuble en deux. C'est
+     * ce qu'on voyait dans les angles de pièce.
+     *
+     * On donne donc à chaque meuble le point de tri d'un mur imaginaire posé
+     * à sa place : ses coordonnées au sol, l'altitude commune. Le terme
+     * d'altitude disparaît de la comparaison, et il ne reste que ce qui
+     * compte — qui est devant qui.
+     *
+     * Ce qui était réservé aux meubles « vraiment contre un mur » (moins
+     * d'un demi-mètre de saillie) vaut maintenant pour tous : le seuil ne
+     * protégeait de rien, et il laissait dehors les rangements de 45 cm,
+     * dont la saillie atteint 51 — un centimètre de trop pour être bien
+     * dessinés.
+     */
+    const hauteurTri =
+      (wallsOf.get(roomOf(source)) ?? walls).reduce(
+        (h, w) => Math.max(h, w.height),
+        0,
+      ) || 2.5;
+    /**
+     * Et sur TOUTE SON EMPRISE quand il est ADOSSÉ à un mur.
+     *
+     * Un rangement d'un mètre vu en biais déborde de vingt-cinq centimètres
+     * de part et d'autre de son centre : le pan de mur qui longe son bout le
+     * plus proche se trouvait alors devant le point de tri et derrière le
+     * meuble, et il le repeignait — le meuble d'angle tranché en deux.
+     *
+     * On lui donne donc ce qu'on donne déjà à une plaque électrique : une
+     * série de points répartis le long du mur qu'il touche, avancés de sa
+     * saillie, plus le CÔTÉ vers lequel il regarde. Vu de la pièce, le tri
+     * retient le point le plus proche et le meuble passe après tout ce qu'il
+     * masque ; vu de dos, il retient le plus lointain et le mur le couvre.
+     *
+     * Prendre le seul point le plus proche, sans ce côté, ferait passer le
+     * meuble devant les cloisons situées entre lui et l'œil : les deux
+     * réglages ne valent que pris ensemble.
+     */
+    let triRefs: P3[] = [{ x: obj.cx, y: hauteurTri / 2, z: obj.cz }];
+    let triCote: P3 | undefined;
     {
       const murs = wallsOf.get(roomOf(source)) ?? walls;
       let best = Infinity;
@@ -1317,27 +1372,36 @@ export function buildScene(
         const d = (obj.cx - w.a.x) * n.x + (obj.cz - w.a.z) * n.z;
         if (Math.abs(d) > best) continue;
         // Demi-emprise PERPENDICULAIRE au mur : une télé de 1,20 m de large
-        // et 8 cm d'épaisseur, posée à plat, ne déborde que de 4 cm — la
-        // prendre par sa plus grande dimension l'aurait exclue d'office.
+        // et 8 cm d'épaisseur, posée à plat, ne déborde que de 4 cm.
         const demi =
           Math.abs(cosY * n.x + sinY * n.z) * (obj.width / 2) +
           Math.abs(-sinY * n.x + cosY * n.z) * (obj.depth / 2);
-        // Saillie du meuble par rapport au nu : au-delà d'un demi-mètre,
-        // ce n'est plus un objet mural.
-        const saillie = Math.abs(d) + demi - WALL_T / 2;
-        if (saillie > 0.5) continue;
+        // Le meuble TOUCHE-T-IL ce mur ? On compare le jeu entre son dos et
+        // le nu de la maçonnerie, pas sa profondeur : un rangement de 45 cm
+        // est adossé comme une télé de 8, et l'ancien seuil de saillie le
+        // laissait dehors pour un centimètre.
+        const jeu = Math.abs(d) - demi - WALL_T / 2;
+        if (jeu > 0.12) continue;
         best = Math.abs(d);
         const sens = d >= 0 ? 1 : -1;
-        const mid = 0.5;
-        triMeuble = {
-          x:
-            w.a.x + (w.b.x - w.a.x) * mid + n.x * sens * (Math.abs(d) + 0.002),
-          y: w.height / 2,
-          z:
-            w.a.z + (w.b.z - w.a.z) * mid + n.z * sens * (Math.abs(d) + 0.002),
-        };
+        // Demi-emprise LE LONG du mur : de quoi couvrir toute sa largeur.
+        const long =
+          Math.abs(cosY * u.x + sinY * u.z) * (obj.width / 2) +
+          Math.abs(-sinY * u.x + cosY * u.z) * (obj.depth / 2);
+        const saillie = Math.abs(d) + demi;
+        const N = 5;
+        triRefs = Array.from({ length: N }, (_, k) => {
+          const e = -long + (2 * long * k) / (N - 1);
+          return {
+            x: obj.cx + u.x * e + n.x * sens * (saillie - Math.abs(d)),
+            y: hauteurTri / 2,
+            z: obj.cz + u.z * e + n.z * sens * (saillie - Math.abs(d)),
+          };
+        });
+        triCote = { x: n.x * sens, y: 0, z: n.z * sens };
       }
     }
+
     const avantMeuble = faces.length;
 
     // La silhouette du meuble, s'il en a une ; sinon, la boîte pleine.
@@ -1351,11 +1415,11 @@ export function buildScene(
     } else {
       for (const part of morceaux) poser(part);
     }
-    if (triMeuble) {
-      for (let i = avantMeuble; i < faces.length; i++) {
-        if (faces[i].isFloor) continue;
-        faces[i].depthAt = triMeuble;
-      }
+    for (let i = avantMeuble; i < faces.length; i++) {
+      faces[i].ownerId = obj.id;
+      if (faces[i].isFloor) continue;
+      faces[i].depthRefs = triRefs;
+      faces[i].depthFacing = triCote;
     }
   }
 

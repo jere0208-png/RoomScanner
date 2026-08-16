@@ -34,6 +34,7 @@ import {
   type P3,
   type ScenePalette,
 } from '../geometry/scene3d';
+import { hiddenByBox } from '../geometry/furniture';
 import { floorsOf, useScanStore } from '../store/scanStore';
 import {
   FIXTURES,
@@ -105,6 +106,14 @@ interface Props {
  * que le plan 2D : murs épais extrudés, portes/fenêtres, meubles.
  * Un doigt : tourner/incliner. Deux doigts : pincer pour zoomer, déplacer.
  */
+/**
+ * À partir de cette échelle, un meuble qui cache un appareil s'efface.
+ *
+ * 110 px/m, c'est le moment où l'on regarde UN mur plutôt qu'un logement :
+ * on cherche alors où tombe la prise, pas à quoi ressemble la pièce.
+ */
+const ZOOM_FONDU = 110;
+
 export function Iso3DView({
   value,
   onChange,
@@ -412,7 +421,15 @@ export function Iso3DView({
         showMeasures && !face.isFloor && !face.dashed && face.stroke
           ? '#0B0D12'
           : face.stroke ?? fill;
-      return { proj, depth, fill, stroke, voile, dashed: !!face.dashed };
+      return {
+        proj,
+        depth,
+        fill,
+        stroke,
+        voile,
+        dashed: !!face.dashed,
+        owner: face.ownerId,
+      };
       });
 
     // Cotes insérées DANS le tri de profondeur : un mur proche recouvre
@@ -420,6 +437,8 @@ export function Iso3DView({
     type Item =
       | {
           kind: 'poly';
+          /** Le meuble dont ce pan fait partie, s'il en vient d'un. */
+          owner?: string;
           depth: number;
           proj: typeof polys[0]['proj'];
           fill: string;
@@ -448,6 +467,14 @@ export function Iso3DView({
           /** Cotes lues sur la face, affichées une fois zoomé dessus. */
           haut?: string;
           bord?: string;
+          /**
+           * Un meuble le cache.
+           *
+           * De loin, on n'en montre qu'un point de sa couleur : il ne s'agit
+           * pas de lire l'appareil, mais de savoir qu'il y en a un. De près,
+           * le meuble s'efface et le repère revient en entier.
+           */
+          derriere?: boolean;
         }
       | {
           kind: 'label';
@@ -469,6 +496,13 @@ export function Iso3DView({
           area: string;
         };
     const items: Item[] = polys.map((p) => ({ kind: 'poly' as const, ...p }));
+    /**
+     * Les meubles à effacer : ceux qui cachent un appareil, une fois zoomé.
+     *
+     * Rempli par la passe électrique plus bas, appliqué à la toute fin :
+     * on ne sait qu'un meuble gêne qu'après avoir cherché ce qu'il cache.
+     */
+    const fondus = new Set<string>();
 
     // Semis du sol : même code que le plan 2D, projeté sur le plan y = 0.
     // C'est ce fond pointillé qui distingue la surface au sol des murs.
@@ -520,6 +554,32 @@ export function Iso3DView({
         else lots.set(cle, [f]);
       }
 
+      /**
+       * Les boîtes des meubles, dans le repère du monde.
+       *
+       * Un appareil posé derrière un rangement disparaît purement et
+       * simplement du modèle : rien ne dit qu'il existe, et l'électricien
+       * qui fait le tour compte une prise de moins. On regarde donc, image
+       * par image, ce que chaque meuble intercepte.
+       */
+      const solY = Math.min(
+        ...keptWalls.map((w2) => w2.yCenter - w2.height / 2),
+      );
+      const boites = keptObjects.map((o) => {
+        const bas = o.transform[13] - o.height / 2 - solY;
+        return {
+          id: o.id,
+          cx: o.transform[12],
+          cz: o.transform[14],
+          y0: bas,
+          y1: bas + o.height,
+          width: o.width,
+          depth: o.depth,
+          yaw: Math.atan2(o.transform[8], o.transform[10]),
+        };
+      });
+      const versOeil = { x: st * sp, y: cp, z: ct * sp };
+
       for (const lot of lots.values()) {
         const w = byId.get(lot[0].wallId);
         if (!w) continue;
@@ -546,6 +606,11 @@ export function Iso3DView({
           lot.reduce((t, f) => t + f.height, 0) / lot.length;
         const p = facePoint(face, x, saillie + 0.01);
         const q = project({ x: p.x, y: hauteur, z: p.z });
+        const cachePar = boites.filter((b) =>
+          hiddenByBox({ x: p.x, y: hauteur, z: p.z }, versOeil, b),
+        );
+        // De près, ces meubles-là s'effacent pour laisser voir l'appareil.
+        if (scale >= ZOOM_FONDU) for (const b of cachePar) fondus.add(b.id);
 
         // Tant que la plaque est trop petite pour se voir, un point de sa
         // couleur en tient lieu ; il s'efface à mesure qu'elle grandit.
@@ -581,7 +646,12 @@ export function Iso3DView({
               : undefined,
           // La désignation en toutes lettres, POSÉE SUR l'appareil. Le
           // symbole gravé se réduisait à trois traits gris : un mot se lit.
-          nom: scale > 70 ? assemblyTag(postes) : undefined,
+          // Caché et vu de loin : pas de mot, juste le point de couleur.
+          nom:
+            scale > 70 && (cachePar.length === 0 || scale >= ZOOM_FONDU)
+              ? assemblyTag(postes)
+              : undefined,
+          derriere: cachePar.length > 0 && scale < ZOOM_FONDU,
           bx: qb.sx,
           by: qb.sy,
           sx: qs.sx,
@@ -662,6 +732,20 @@ export function Iso3DView({
       }
     }
 
+    /**
+     * Les meubles qui cachent un appareil s'effacent, une fois zoomé.
+     *
+     * Pas de disparition : un fantôme à 22 %, qui garde sa silhouette et
+     * son arête. On doit comprendre que la prise est DERRIÈRE le rangement,
+     * pas croire que le rangement n'existe pas.
+     */
+    if (fondus.size > 0) {
+      for (const it of items) {
+        if (it.kind !== 'poly' || !it.owner) continue;
+        if (fondus.has(it.owner)) it.voile = Math.min(it.voile, 0.22);
+      }
+    }
+
     items.sort((p, q) => p.depth - q.depth);
     return items;
   }, [
@@ -677,6 +761,7 @@ export function Iso3DView({
     radius3d,
     showMeasures,
     showElecTags,
+    keptObjects,
     showSurfaces,
     solidWalls,
     walls,
@@ -808,7 +893,41 @@ export function Iso3DView({
                 <Circle key={i} cx={item.x} cy={item.y} r={1.1} fill={item.color} />
               ) : item.kind === 'elec' ? (
                 <G key={i}>
-                  {item.pastille > 0.02 && (
+                  {/* DERRIÈRE UN MEUBLE : un point de sa couleur, cerné de
+                      blanc, et rien d'autre. On ne cherche pas à lire
+                      l'appareil — le meuble est devant — mais à savoir
+                      qu'il y en a un, sans quoi on en compte un de moins en
+                      faisant le tour du modèle. En zoomant, le meuble
+                      s'efface et le repère revient en entier. */}
+                  {item.derriere && (
+                    <>
+                      <Circle
+                        cx={item.x}
+                        cy={item.y}
+                        r={5.2}
+                        fill={c.surface}
+                        opacity={0.92}
+                      />
+                      <Circle
+                        cx={item.x}
+                        cy={item.y}
+                        r={3.4}
+                        fill={item.color}
+                        opacity={0.55}
+                      />
+                      <Circle
+                        cx={item.x}
+                        cy={item.y}
+                        r={5.2}
+                        stroke={item.color}
+                        strokeWidth={1}
+                        strokeDasharray="2.2 2"
+                        fill="none"
+                        opacity={0.75}
+                      />
+                    </>
+                  )}
+                  {!item.derriere && item.pastille > 0.02 && (
                     <>
                       <Circle
                         cx={item.x}
