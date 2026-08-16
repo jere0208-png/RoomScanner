@@ -75,18 +75,50 @@ export interface Face3D {
    */
   depthAt?: P3;
   /**
-   * Plusieurs points de tri, dont on retient LE PLUS PROCHE de la caméra.
+   * Plusieurs points de tri : les tuiles de mur que la face RECOUVRE.
    *
    * Une façade d'appareil large — un tableau électrique fait 55 cm —
    * recouvre deux tuiles de mur, et le tri ne peut pas se contenter d'une
    * seule : celle qu'on n'aurait pas prise passerait après, et repeindrait
-   * la moitié du tableau. On donne donc les tuiles RECOUVERTES, avancées
-   * d'un millimètre ; le maximum, calculé à la projection, tombe
-   * exactement sur la bonne, quel que soit l'angle. Réservé aux faces
-   * tournées vers la pièce : vues de dos elles sont écartées, et rien ne
-   * peut donc traverser un mur par ce chemin.
+   * la moitié du tableau.
+   *
+   * Laquelle retenir dépend du CÔTÉ d'où l'on regarde, et c'est tout le
+   * piège — voir `depthFacing`.
    */
   depthRefs?: P3[];
+  /**
+   * De quel côté la face regarde : la normale sortante de SON mur.
+   *
+   * Le tri retenait toujours la tuile la plus PROCHE (`Math.max`). Vu de la
+   * pièce, c'est juste : l'appareil doit passer devant chacune des tuiles
+   * qu'il recouvre. Vu de l'autre côté de la cloison, c'est exactement
+   * l'inverse — le tableau se triait sur la tuile la plus proche de l'œil,
+   * alors que le pan qui le masque est à l'autre bout de son emprise. Sur
+   * une pièce de 3,50 m regardée en biais, l'écart entre les deux bouts
+   * d'un tableau de 55 cm dépasse largement l'épaisseur du mur : le
+   * rectangle rouge flottait sur la maçonnerie.
+   *
+   * On garde donc la tuile la plus proche quand la face nous fait face, et
+   * la plus LOINTAINE quand elle nous tourne le dos : dans ce cas, tout ce
+   * qui la couvre passe après elle.
+   */
+  depthFacing?: P3;
+  /**
+   * Le côté de mur auquel la face APPARTIENT. Elle disparaît avec lui.
+   *
+   * Le tri par tuile ne peut pas résoudre ce cas, et c'est démontrable : un
+   * appareil se trie sur la tuile qu'il occupe, mais le regard qui le
+   * traverse ressort par une tuile VOISINE, plus proche de l'œil dès qu'on
+   * est en biais. Sur une pièce de 3,50 m, un pas de tuile représente
+   * jusqu'à dix centimètres de profondeur quand l'épaisseur du mur n'en
+   * offre que six : le flanc du tableau repassait devant la maçonnerie, et
+   * on voyait un rectangle rouge sur un mur plein.
+   *
+   * Aucun réglage de profondeur ne rattrape ça. Ce qui est posé sur la face
+   * cachée d'un mur ne doit pas être dessiné du tout — c'est la règle du
+   * bâtiment, pas une astuce de rendu.
+   */
+  facing?: P3;
   /**
    * Normale sortante d'une face de VOLUME. Sa présence dit que la face
    * appartient à un solide fermé : quand elle tourne le dos à la caméra, on
@@ -111,10 +143,44 @@ export interface CameraTrig {
  * projeter. La profondeur croît vers la caméra (`rz * sp + y * cp`), donc son
  * gradient `(st·sp, cp, ct·sp)` est la direction de l'observateur.
  */
+/**
+ * La profondeur de tri d'une face — la même pour la vue 3D, le PDF et les
+ * planches de référence.
+ *
+ * Elle était recopiée dans les trois : six lignes identiques, qu'il fallait
+ * penser à corriger trois fois. Une divergence entre elles ne se voit pas à
+ * la lecture, seulement à l'impression — le genre d'écart qu'on découvre
+ * sur un plan déjà remis au client.
+ */
+export function faceDepth(
+  face: Face3D,
+  project: (p: P3) => { depth: number },
+  cam: CameraTrig,
+): number {
+  // Le sol passe avant tout : il ne peut rien masquer.
+  if (face.isFloor) return -Infinity;
+  const bias = face.bias ?? 0;
+  if (face.depthRefs && face.depthRefs.length > 0) {
+    const ds = face.depthRefs.map((r) => project(r).depth);
+    const n = face.depthFacing;
+    const vers = n ? n.x * cam.st * cam.sp + n.y * cam.cp + n.z * cam.ct * cam.sp : 1;
+    return (vers >= 0 ? Math.max(...ds) : Math.min(...ds)) + bias;
+  }
+  if (face.depthAt) return project(face.depthAt).depth + bias;
+  return (
+    face.pts.reduce((s, p) => s + project(p).depth, 0) / face.pts.length + bias
+  );
+}
+
 export function isHiddenFace(face: Face3D, cam: CameraTrig): boolean {
+  const vers = (v: P3) =>
+    v.x * cam.st * cam.sp + v.y * cam.cp + v.z * cam.ct * cam.sp;
+  // Posé sur la face cachée d'un mur : le mur le masque, quoi qu'en dise le
+  // tri en profondeur.
+  if (face.facing && vers(face.facing) <= 0) return true;
   const n = face.normal;
   if (!n) return false;
-  return n.x * cam.st * cam.sp + n.y * cam.cp + n.z * cam.ct * cam.sp <= 0;
+  return vers(n) <= 0;
 }
 
 /**
@@ -1034,6 +1100,9 @@ export function buildScene(
     }
     for (let i = avant; i < faces.length; i++) {
       const fa = faces[i];
+      // L'appareil appartient à une FACE de mur : il n'existe que pour qui
+      // regarde ce côté-là.
+      fa.facing = { x: face.nx, y: 0, z: face.nz };
       const nf = fa.normal;
       const devant = !!nf && nf.x * face.nx + nf.z * face.nz > 0.9;
       // La façade se compare à TOUTES les tuiles qu'elle recouvre. Les
@@ -1051,6 +1120,7 @@ export function buildScene(
       const large = Math.max(...xs) - Math.min(...xs) > tw * 0.5;
       if ((devant || large) && refs.length > 1) {
         fa.depthRefs = refs;
+        fa.depthFacing = { x: face.nx, y: 0, z: face.nz };
       } else {
         const cxf =
           fa.pts.reduce(

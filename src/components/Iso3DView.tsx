@@ -25,6 +25,7 @@ const midOf = (o: WallSeg): Pt => ({
 });
 import { dotStep, floorDots, inkOn, mixHex } from '../geometry/appearance';
 import {
+  faceDepth,
   buildScene,
   cutawayOpacity,
   isHiddenFace,
@@ -85,6 +86,16 @@ interface Props {
   onChange?: (v: View3DParams) => void;
   /** Cotes sur les arêtes (arêtes en noir). */
   showMeasures?: boolean;
+  /**
+   * Les repères électriques : la désignation posée sur chaque appareil, sa
+   * hauteur et sa cote au bord.
+   *
+   * Ils sont indispensables pour poser, et encombrants pour montrer. Une
+   * pièce équipée en porte une dizaine ; dès qu'on veut regarder le volume,
+   * le lever de plan ou une couleur de mur, ils couvrent la moitié de la
+   * scène. Comme tous les autres calques, ils s'éteignent.
+   */
+  showElecTags?: boolean;
   /** N'afficher qu'une pièce : ses murs, son sol, ses meubles. */
   focusRoomId?: string | null;
 }
@@ -94,7 +105,13 @@ interface Props {
  * que le plan 2D : murs épais extrudés, portes/fenêtres, meubles.
  * Un doigt : tourner/incliner. Deux doigts : pincer pour zoomer, déplacer.
  */
-export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props) {
+export function Iso3DView({
+  value,
+  onChange,
+  showMeasures,
+  showElecTags = true,
+  focusRoomId,
+}: Props) {
   const walls = useScanStore((s) => s.walls);
   const openings = useScanStore((s) => s.openings);
   const allObjects = useScanStore((s) => s.objects);
@@ -373,14 +390,7 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
       // Une arête se trie avec le pan qu'elle borde (`depthAt`), pas sur sa
       // propre position : sinon l'arête basse d'un mur passe avant lui et le
       // pan la repeint — c'est ce qui effaçait le silhouettage.
-      const depth = face.isFloor
-        ? -Infinity
-        : (face.depthRefs
-            ? Math.max(...face.depthRefs.map((r) => project(r).depth))
-            : face.depthAt
-            ? project(face.depthAt).depth
-            : proj.reduce((s, p) => s + p.depth, 0) / proj.length) +
-          (face.bias ?? 0);
+      const depth = faceDepth(face, project, cam);
 
       // Lumière liée à la caméra : les pans face à nous sont clairs, ceux de
       // profil s'assombrissent — le volume se lit immédiatement.
@@ -496,7 +506,7 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
     // Le volume posé sur le mur fait 8 cm : à l'échelle d'un logement
     // entier, c'est deux pixels. On pose donc au-dessus un repère de taille
     // FIXE pour qu'un appareil se voie quel que soit le zoom.
-    if (!interacting) {
+    if (!interacting && showElecTags) {
       const quads = wallQuads(keptWalls);
       const byId = new Map(keptWalls.map((w) => [w.id, w]));
 
@@ -666,6 +676,7 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
     center,
     radius3d,
     showMeasures,
+    showElecTags,
     showSurfaces,
     solidWalls,
     walls,

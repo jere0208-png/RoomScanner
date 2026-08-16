@@ -807,8 +807,28 @@ const MANETTE: SymbolStroke[] = [
  * plaque, l'entraxe y vaut 71/82 × 22.
  */
 export function assemblySymbol(kind: FixtureKind): SymbolStroke[] {
-  const posts = postsOf(kind);
-  if (posts.length < 2) return FIXTURE_SYMBOL[kind] ?? [];
+  return postsSymbol(postsOf(kind), kind);
+}
+
+/**
+ * Le symbole d'un ensemble, à partir de SES POSTES.
+ *
+ * Deux prises réunies à la main forment une double prise : sur le mur, c'est
+ * une plaque de 153 mm avec deux mécanismes, exactement comme une « prise
+ * double » du catalogue. Le plan, lui, dessinait le symbole de chaque
+ * appareil à sa propre place — deux socles distants de 71 mm, soit deux
+ * pixels à l'échelle d'un logement : on ne voyait qu'un socle, et rien ne
+ * disait qu'ils étaient liés.
+ *
+ * On compose donc un symbole unique pour tout l'ensemble, comme le fait déjà
+ * la vue 3D pour la plaque et comme le dit déjà la désignation.
+ */
+export function postsSymbol(
+  posts: FixtureKind[],
+  fallback?: FixtureKind,
+): SymbolStroke[] {
+  if (posts.length === 0) return fallback ? FIXTURE_SYMBOL[fallback] ?? [] : [];
+  if (posts.length < 2) return FIXTURE_SYMBOL[posts[0]] ?? [];
   const pas = (ENTRAXE / PLAQUE) * SYMBOL_SPAN;
   const debut = -((posts.length - 1) * pas) / 2;
   const out: SymbolStroke[] = [];
@@ -1106,4 +1126,84 @@ export function countByKind(fixtures: Fixture[]): [FixtureKind, number][] {
   const n = new Map<FixtureKind, number>();
   for (const f of fixtures) n.set(f.kind, (n.get(f.kind) ?? 0) + 1);
   return FIXTURE_KINDS.filter((k) => n.has(k)).map((k) => [k, n.get(k) ?? 0]);
+}
+
+
+/**
+ * Un tronçon de maçonnerie, en mètres depuis le début de la face.
+ *
+ * C'est la forme dont l'appareillage a besoin : `wallRuns` raisonne en
+ * fractions de l'axe du mur, la pose d'une prise en mètres sur la face.
+ */
+export interface Masonry {
+  x0: number;
+  x1: number;
+}
+
+/**
+ * Les retours de mur d'une face, dans son propre repère.
+ *
+ * Un mur percé d'une baie n'est pas une surface continue : c'est un retour,
+ * un trou, un retour. Les fractions de `wallRuns` portent sur l'AXE du mur ;
+ * la face, elle, est raccourcie de l'épaisseur du mur à chaque about quand
+ * elle est en tableau. On convertit donc, plutôt que d'appliquer des
+ * fractions d'axe à une longueur de face — l'erreur ferait glisser chaque
+ * retour de quelques centimètres, soit exactement l'ordre de grandeur d'une
+ * plaque.
+ */
+export function masonryRuns(
+  runs: { kind: string; t0: number; t1: number }[],
+  wallLength: number,
+  face: { len: number },
+): Masonry[] {
+  if (wallLength < 1e-6) return [{ x0: 0, x1: face.len }];
+  const pleins = runs.filter((r) => r.kind === 'mur');
+  if (pleins.length === 0) return [{ x0: 0, x1: face.len }];
+  // Le décalage entre l'axe et la face : la face commence à `marge` sur
+  // l'axe, et se termine à `wallLength - marge`.
+  const marge = (wallLength - face.len) / 2;
+  const out: Masonry[] = [];
+  for (const r of pleins) {
+    const x0 = Math.max(0, r.t0 * wallLength - marge);
+    const x1 = Math.min(face.len, r.t1 * wallLength - marge);
+    if (x1 - x0 > 0.01) out.push({ x0, x1 });
+  }
+  return out.length > 0 ? out : [{ x0: 0, x1: face.len }];
+}
+
+/**
+ * Ramène un appareil sur la MAÇONNERIE la plus proche.
+ *
+ * Rien n'empêche de poser une prise au milieu d'une porte-fenêtre : le
+ * mur vu de face montre bien la baie, mais le doigt la traverse sans
+ * résistance, et l'appareil part au métré comme s'il tenait sur du vide.
+ * Or c'est PRÉCISÉMENT sur les retours — les trente centimètres de mur
+ * entre l'angle et l'huisserie — qu'on pose l'interrupteur d'entrée.
+ *
+ * On choisit donc le retour qui peut accueillir l'appareil ENTIER et dont
+ * on est le plus proche, puis on y borne la position. Un retour trop étroit
+ * pour la plaque est écarté : mieux vaut la poser à côté que déborder sur
+ * l'huisserie.
+ */
+export function snapToMasonry(
+  runs: Masonry[],
+  x: number,
+  halfWidth: number,
+  faceLen: number,
+): number {
+  const utiles = runs.filter((r) => r.x1 - r.x0 >= halfWidth * 2);
+  if (utiles.length === 0) {
+    // Aucun retour assez large : on garde la face entière, en la bornant.
+    return Math.min(Math.max(x, halfWidth), Math.max(halfWidth, faceLen - halfWidth));
+  }
+  let best = utiles[0];
+  let dist = Infinity;
+  for (const r of utiles) {
+    const d = x < r.x0 ? r.x0 - x : x > r.x1 ? x - r.x1 : 0;
+    if (d < dist) {
+      dist = d;
+      best = r;
+    }
+  }
+  return Math.min(Math.max(x, best.x0 + halfWidth), best.x1 - halfWidth);
 }

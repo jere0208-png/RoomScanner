@@ -462,7 +462,7 @@ const styles = getStyles(c);
                 activeOpacity={0.8}
                 accessibilityLabel={label}
                 onPress={press}>
-                <Svg width={26} height={26} viewBox="0 0 24 24">
+                <Svg width={29} height={29} viewBox="0 0 24 24">
                   {EXPORT_ICONS[icon].map((d) => (
                     <Path
                       key={d}
@@ -586,10 +586,14 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   },
   optionCell: { width: '23.5%', alignItems: 'center' },
   option: {
-    // Un carré franc : l'icône est au centre géométrique, sans rien pour la
-    // pousser d'un côté.
+    // Une tuile BASSE, et une icône plus grande dedans.
+    //
+    // Le carré parfait donnait des pavés de 85 px de haut : neuf options
+    // occupaient tout l'écran avant même l'aperçu du plan, qu'on ne voyait
+    // plus. La hauteur est fixe et courte, l'icône y gagne trois points —
+    // ce qu'on doit reconnaître, c'est le dessin, pas la surface bleue.
     width: '100%',
-    aspectRatio: 1,
+    height: 58,
     borderRadius: radius.sm,
     backgroundColor: c.surface,
     alignItems: 'center',

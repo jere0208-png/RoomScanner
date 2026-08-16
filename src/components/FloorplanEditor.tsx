@@ -44,8 +44,9 @@ import {
 import type { ObjectData } from 'react-native-room-scan';
 import {
   FIXTURES,
-  FIXTURE_TAG,
-  assemblySymbol,
+  assemblyTag,
+  postsOf,
+  postsSymbol,
   faceX,
   facePoint,
   interiorSide,
@@ -1127,18 +1128,49 @@ export function FloorplanEditor({
                   return { f, face, x: faceX(face, f.along) };
                 })
                 .filter((p): p is NonNullable<typeof p> => !!p);
+              /**
+               * Un ENSEMBLE se dessine une fois, avec tous ses postes.
+               *
+               * Deux prises liées à la main forment une double prise : sur le
+               * mur, c'est une plaque de 153 mm à deux mécanismes. Le plan,
+               * lui, dessinait le symbole de chaque appareil à sa propre
+               * place — deux socles distants de 71 mm, soit deux pixels à
+               * l'échelle d'un logement. On n'en voyait qu'un, et rien ne
+               * disait qu'ils étaient liés.
+               */
+              const lots = new Map<string, typeof placed>();
+              for (const it of placed) {
+                const cle = it.f.group
+                  ? `g:${it.f.group}:${it.f.wallId}:${it.f.side}`
+                  : `s:${it.f.id}`;
+                const l = lots.get(cle);
+                if (l) l.push(it);
+                else lots.set(cle, [it]);
+              }
+              const unites = [...lots.values()].map((membres) => {
+                const tri = [...membres].sort((a2, b2) => a2.x - b2.x);
+                const xs = tri.map((m) => m.x);
+                return {
+                  f: tri[0].f,
+                  face: tri[0].face,
+                  // Le symbole se pose au MILIEU de l'ensemble, comme sa
+                  // plaque : c'est ce qu'on voit sur le mur.
+                  x: (Math.min(...xs) + Math.max(...xs)) / 2,
+                  postes: tri.flatMap((m) => postsOf(m.f.kind)),
+                };
+              });
               const ranks = stackRanks(
-                placed.map((p) => ({
+                unites.map((p) => ({
                   id: p.f.id,
                   wallId: p.f.wallId,
                   side: p.f.side,
                   x: p.x,
                 })),
               );
-              return placed.map(({ f, face, x }) => {
+              return unites.map(({ f, face, x, postes }) => {
                 const spec = FIXTURES[f.kind];
-                const symbol = assemblySymbol(f.kind);
-                const tag = FIXTURE_TAG[f.kind];
+                const symbol = postsSymbol(postes, f.kind);
+                const tag = assemblyTag(postes);
                 // Échelonnement : le deuxième appareil du même point se pose
                 // plus loin du mur, sur le même filet.
                 const out = 0.14 + (ranks.get(f.id) ?? 0) * (0.1 + 0.14 * elecLod);

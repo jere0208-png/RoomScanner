@@ -716,7 +716,10 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     paddingTop: 58,
     paddingHorizontal: 18,
   },
-  headerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
+  // Le titre respire, et la pastille de comptage d'un dossier a la place
+  // de dépasser : posée à −2 du haut de son icône, elle passait sous le
+  // bloc du titre et se faisait trancher.
+  headerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 26 },
   backButton: {
     width: 38,
     height: 38,
@@ -764,9 +767,9 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     ...glow(c.blue),
   },
   dragHintText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
-  list: { paddingBottom: 104 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 14 },
-  tile: { width: '33.33%', alignItems: 'center', marginBottom: 16 },
+  list: { paddingTop: 6, paddingBottom: 104 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 4, marginBottom: 20 },
+  tile: { width: '33.33%', alignItems: 'center', marginBottom: 18 },
   tileTouch: { alignItems: 'center', width: 96 },
   tileGlyph: { alignItems: 'center', justifyContent: 'center' },
   tileBadge: {

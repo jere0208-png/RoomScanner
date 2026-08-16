@@ -100,6 +100,7 @@ import { haptic } from '../ui/haptic';
 import {
   ActionSheet,
   PromptSheet,
+  SheetShell,
   type ActionData,
   type PromptData,
 } from '../components/Sheet';
@@ -246,6 +247,8 @@ export function ResultScreen() {
   // Cotes du plan 2D masquées par défaut : la pastille « Cotes » les active.
   const [showMeasures, setShowMeasures] = useState(false);
   const [show3DMeasures, setShow3DMeasures] = useState(true);
+  /** Repères électriques en 3D : un calque comme les autres. */
+  const [showElecTags, setShowElecTags] = useState(true);
   const [editMode, setEditMode] = useState(false);
   /**
    * Jeu de pastilles affiché. Il RETARDE sur `editMode` : les anciennes
@@ -1062,6 +1065,7 @@ export function ResultScreen() {
         ) : (
           <Iso3DView
             showMeasures={show3DMeasures}
+            showElecTags={showElecTags}
             value={view3d}
             onChange={setView3d}
             focusRoomId={rooms[focusIdx]?.id ?? null}
@@ -1204,6 +1208,17 @@ export function ResultScreen() {
               active={solidWalls}
               onPress={toggleSolidWalls}
             />
+            {/* Les repères électriques : indispensables pour poser,
+                encombrants pour montrer. Une pièce équipée en porte une
+                dizaine, et ils couvrent alors la moitié de la scène. */}
+            {fixtures.length > 0 && (
+              <ToolPill
+                icon="plus"
+                label="Repères"
+                active={showElecTags}
+                onPress={() => setShowElecTags((v) => !v)}
+              />
+            )}
             {colorsAvailable && (
               <ToolPill
                 icon="colors"
@@ -1234,6 +1249,19 @@ export function ResultScreen() {
             {/* Revenir en arrière ne descend pas avec les outils : c'est le
                 geste qu'on cherche dans l'urgence, et il se tient à côté du
                 bouton qui commande l'édition, sur sa ligne. */}
+            {/* Modifications non enregistrées : la sauvegarde se tient AVEC
+                les autres commandes, à gauche de l'édition. Elle flottait
+                seule en bas à droite du plan, loin du seul endroit qu'on
+                regarde quand on modifie — et elle forçait la barre de cotes
+                à se raccourcir pour lui laisser la place. */}
+            {dirty && (
+              <ToolPill
+                icon="save"
+                label="Enregistrer"
+                active
+                onPress={commitCurrent}
+              />
+            )}
             {editMode && canUndo && (
               <ToolPill icon="undo" label="Annuler" active={false} onPress={undo} />
             )}
@@ -1487,21 +1515,6 @@ export function ResultScreen() {
           </View>
         )}
 
-        {/* Modifications non enregistrées : bouton de sauvegarde flottant */}
-        {dirty && !capturing && (
-          <TouchableOpacity style={styles.saveFab} onPress={commitCurrent}>
-            <Svg width={22} height={22} viewBox="0 0 24 24">
-              <Path
-                d="M12 3 v11 M7 9.5 l5 5 5 -5 M5 20 h14"
-                stroke="#FFFFFF"
-                strokeWidth={2.4}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                fill="none"
-              />
-            </Svg>
-          </TouchableOpacity>
-        )}
       </Animated.View>
 
 
@@ -1919,14 +1932,14 @@ export function ResultScreen() {
         </Pressable>
       </Modal>
 
-      {/* ---------- Renommage ---------- */}
-      <Modal
-        visible={renaming}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setRenaming(false)}>
-        <Pressable style={styles.modalBackdrop} onPress={() => setRenaming(false)}>
-          <Pressable style={styles.modalCard} onPress={() => {}}>
+      {/* ---------- Renommage ----------
+          EN FEUILLE DU BAS, pas en boîte centrée.
+          Une boîte au milieu de l'écran avec un champ de saisie finit
+          toujours par se faire manger la moitié : le clavier iOS occupe le
+          bas de l'écran, et recouvrait ici le champ lui-même, « Annuler »,
+          « Renommer » et la copie. La feuille, elle, monte avec lui. */}
+      <SheetShell visible={renaming} onClose={() => setRenaming(false)}>
+          <View>
             <Text style={styles.modalTitle}>Nom du scan</Text>
             <Text style={styles.modalSubtitle}>
               Les modifications du plan s'enregistrent avec le bouton en bas à
@@ -1969,14 +1982,14 @@ export function ResultScreen() {
                 Enregistrer comme nouvelle copie
               </Text>
             </TouchableOpacity>
-          </Pressable>
-        </Pressable>
-      </Modal>
+          </View>
+      </SheetShell>
     </View>
   );
 }
 
 type ToolIcon =
+  | 'save'
   | 'edit'
   | 'ruler'
   | 'surface'
@@ -2076,6 +2089,11 @@ const TOOL_PATHS: Record<ToolIcon, { d: string; fill?: boolean }[]> = {
    * poussée dans ce coin — d'autant plus visible que la pastille porte un
    * contour, qui donne l'œil un repère. Décalée de (−0,65 ; +0,65).
    */
+  save: [
+    { d: 'M12 3.5 v10.5' },
+    { d: 'M7.4 9.6 L12 14.2 l4.6 -4.6' },
+    { d: 'M5 19.5 h14' },
+  ],
   edit: [
     { d: 'M10.35 4.65 H5.35 a2 2 0 0 0 -2 2 v12 a2 2 0 0 0 2 2 h12 a2 2 0 0 0 2 -2 v-5' },
     { d: 'M17.65 3.35 l3 3 L10.55 16.45 l-4.1 1.1 1.1 -4.1 z' },
@@ -2619,19 +2637,6 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   watermarkLogo: { width: 116, height: 26, tintColor: c.ink, opacity: 0.85 },
   watermarkText: { color: '#0B0D12', fontSize: 13, fontWeight: '800' },
   watermarkAccent: { color: c.blue },
-  saveFab: {
-    position: 'absolute',
-    bottom: 12,
-    right: 12,
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: c.blue,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...glow(c.blue),
-    shadowOpacity: 0.42,
-  },
   // Bandeau d'attente (pose d'un appareil) : en haut, il ne gêne rien.
   wallLengthBar: {
     position: 'absolute',
@@ -2689,7 +2694,11 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     position: 'absolute',
     bottom: 12,
     left: 12,
-    right: 84,
+    // Toute la largeur : les 84 points réservés au bouton de sauvegarde
+    // n'ont plus lieu d'être, et c'était eux qui poussaient la validation
+    // HORS du bandeau blanc — un bouton bleu flottant à côté de sa barre,
+    // sans rien pour dire qu'il lui appartenait.
+    right: 12,
     backgroundColor: c.surface,
     borderRadius: radius.pill,
     paddingHorizontal: 10,
@@ -2698,7 +2707,7 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     shadowOpacity: 0.12,
   },
   editLabel: { color: c.inkSoft, fontSize: 13, marginBottom: 8, fontWeight: '600' },
-  editRow: { flexDirection: 'row', alignItems: 'center' },
+  editRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'nowrap' },
   input: {
     backgroundColor: c.bg,
     color: c.ink,
@@ -2727,7 +2736,9 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     borderWidth: 1,
     borderColor: c.lineStrong,
   },
-  editIcons: { flexDirection: 'row', gap: 6, marginLeft: 'auto' },
+  // `flexShrink: 0` : les trois boutons gardent leur taille, ce sont les
+  // champs qui cèdent si la place manque — jamais l'inverse.
+  editIcons: { flexDirection: 'row', gap: 6, marginLeft: 'auto', flexShrink: 0 },
   iconBtn: {
     width: 34,
     height: 34,

@@ -45,6 +45,7 @@ import {
 import type { BuyRow, PullRow } from '../geometry/conduits';
 import { planFrameAngle } from '../geometry/floorplan';
 import {
+  faceDepth,
   buildScene,
   isHiddenFace,
   sceneFraming,
@@ -597,14 +598,10 @@ function draw3DView(
     .filter((f) => !isHiddenFace(f, cam))
     .map((f) => {
       const pts = f.pts.map(project);
-      // Une arête se trie avec le pan qu'elle borde (`depthAt`).
-      const depth = f.isFloor
-        ? -Infinity
-        : (f.depthRefs
-            ? Math.max(...f.depthRefs.map((r) => project(r).depth))
-            : f.depthAt ? project(f.depthAt).depth
-                     : pts.reduce((s, p) => s + p.depth, 0) / pts.length) +
-          (f.bias ?? 0);
+      // Une arête se trie avec le pan qu'elle borde (`depthAt`), et une
+      // façade large avec les tuiles qu'elle recouvre : la règle est écrite
+      // une fois, dans `scene3d`.
+      const depth = faceDepth(f, project, cam);
       const fill = shadeFill(f, ct, st);
       // Pan sans contour propre : bordé de sa propre couleur, sinon la couture
       // entre deux bandes voisines se voit à l'impression.

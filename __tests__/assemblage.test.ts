@@ -17,6 +17,8 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 import {
+  assemblySymbol,
+  postsSymbol,
   ENTRAXE,
   FIXTURES,
   PLAQUE,
@@ -399,5 +401,45 @@ describe('un ensemble se déplace d’un bloc', () => {
     const f = useScanStore.getState().fixtures[0];
     expect(faceX(face, f.along)).toBeCloseTo(1.4, 6);
     expect(f.height).toBeCloseTo(0.9, 6);
+  });
+});
+
+/**
+ * Un ensemble se DESSINE comme un ensemble, pas comme deux appareils.
+ *
+ * Sur le mur, deux prises liées forment une plaque de 153 mm à deux
+ * mécanismes — exactement une prise double du catalogue. Le plan dessinait
+ * pourtant le symbole de chacune à sa propre place : deux socles distants de
+ * 71 mm, soit deux pixels à l'échelle d'un logement. On n'en voyait qu'un, et
+ * rien ne disait qu'ils étaient liés.
+ */
+describe('le symbole d’un ensemble', () => {
+  it('porte autant de socles que l’ensemble a de postes', () => {
+    const seul = postsSymbol(['prise']);
+    const double = postsSymbol(['prise', 'prise']);
+    const triple = postsSymbol(['prise', 'prise', 'prise']);
+    expect(double.length).toBe(seul.length * 2);
+    expect(triple.length).toBe(seul.length * 3);
+  });
+
+  it('deux prises liées donnent le MÊME tracé qu’une prise double', () => {
+    const compose = postsSymbol(['prise', 'prise']);
+    const catalogue = assemblySymbol('prise2');
+    expect(compose.map((s) => s.d)).toEqual(catalogue.map((s) => s.d));
+  });
+
+  it('un ensemble mixte garde le symbole propre à chaque poste', () => {
+    const mixte = postsSymbol(['prise', 'rj45']);
+    const prise = postsSymbol(['prise']);
+    const rj = postsSymbol(['rj45']);
+    expect(mixte).toHaveLength(prise.length + rj.length);
+    // Et il est CENTRÉ : les deux postes s'écartent de part et d'autre.
+    const xs = mixte.map((s) => parseFloat(s.d.match(/-?\d+(\.\d+)?/)![0]));
+    expect(Math.min(...xs)).toBeLessThan(0);
+    expect(Math.max(...xs)).toBeGreaterThan(0);
+  });
+
+  it('sans poste connu, on retombe sur le symbole de l’appareil', () => {
+    expect(postsSymbol([], 'tableau')).toEqual(assemblySymbol('tableau'));
   });
 });

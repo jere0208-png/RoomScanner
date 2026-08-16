@@ -26,6 +26,7 @@ import {
   straightenWalls,
   toSegment,
   wallQuadsOf,
+  wallRuns,
   weldCorners,
   type Pt,
   type WallSeg,
@@ -39,6 +40,8 @@ import {
   ENTRAXE,
   faceX,
   fromFaceX,
+  masonryRuns,
+  snapToMasonry,
   interiorSide,
   newFixture,
   reprojectAnchors,
@@ -1055,6 +1058,29 @@ export const useScanStore = create<ScanState>((set, get) => {
       // Un bloc plus large que son mur : on le colle au bord, sans pousser.
       if (largeur > face.len) dx = -x0;
       if (hauteur > wall.height) dy = -y0;
+
+      /**
+       * ET SUR DE LA MAÇONNERIE, pas dans une baie.
+       *
+       * Le mur vu de face montre bien ses ouvertures, mais le doigt les
+       * traversait sans résistance : on posait une prise au milieu d'une
+       * porte-fenêtre, et elle partait au métré comme si elle tenait sur
+       * du vide. Or les RETOURS — les trente centimètres de mur entre
+       * l'angle et l'huisserie — sont justement là où se pose
+       * l'interrupteur d'entrée : ce sont des emplacements à viser, pas des
+       * zones à éviter. Le bloc se recale donc sur le retour le plus proche
+       * capable de l'accueillir en entier.
+       */
+      const pleins = masonryRuns(
+        wallRuns(wall, st.openings),
+        segLength(wall),
+        face,
+      );
+      if (pleins.length > 1) {
+        const centre = (x0 + x1) / 2 + dx;
+        const cale = snapToMasonry(pleins, centre, largeur / 2, face.len);
+        dx += cale - centre;
+      }
 
       pushHistory(`fixture:${f.group ?? id}`);
       const ids = new Set(lot.map((o) => o.id));

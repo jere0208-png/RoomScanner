@@ -586,15 +586,39 @@ export function WallElevation({
               haptic('succes');
             }
           }}>
-          <Svg width={19} height={19} viewBox="0 0 24 24">
-            <Path
-              d="M4 8 h3.5 l1.5 -2 h6 l1.5 2 H20 v11 H4 z"
+          {/* L'appareil photo, redessiné comme la croix : trait franc,
+              angles arrondis, et surtout CENTRÉ. L'ancien tracé montait à
+              y=6 pour son viseur et descendait à 19 : son encre pesait un
+              demi-point trop bas dans la boîte, ce qui suffit à faire
+              paraître une icône « posée de travers » dans un rond. */}
+          <Svg width={20} height={20} viewBox="0 0 24 24">
+            <Rect
+              x={3.5}
+              y={7.5}
+              width={17}
+              height={11.5}
+              rx={2.6}
               stroke={c.ink}
-              strokeWidth={1.9}
+              strokeWidth={2.1}
               strokeLinejoin="round"
               fill="none"
             />
-            <Circle cx={12} cy={13.5} r={3.4} stroke={c.ink} strokeWidth={1.9} fill="none" />
+            <Path
+              d="M9 7.5 L10.4 5 h3.2 L15 7.5"
+              stroke={c.ink}
+              strokeWidth={2.1}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              fill="none"
+            />
+            <Circle
+              cx={12}
+              cy={13.25}
+              r={3.4}
+              stroke={c.ink}
+              strokeWidth={2.1}
+              fill="none"
+            />
           </Svg>
         </TouchableOpacity>
         <TouchableOpacity style={styles.close} onPress={onClose}>
