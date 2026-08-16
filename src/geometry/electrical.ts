@@ -438,6 +438,57 @@ export const FIXTURE_FAMILIES: { name: string; kinds: FixtureKind[] }[] = [
 
 export const FIXTURE_KINDS = FIXTURE_FAMILIES.flatMap((f) => f.kinds);
 
+/**
+ * Désignation posée SUR l'appareil en 3D.
+ *
+ * Le symbole gravé faisait joli et ne se lisait pas : à l'échelle d'un
+ * logement, une plaque fait dix pixels, et le pictogramme qu'on y grave se
+ * réduit à trois traits gris. Un mot se lit. Les symboles restent où ils
+ * disent quelque chose : le plan 2D et la légende du PDF.
+ */
+const TAG_BASE: Partial<Record<FixtureKind, string>> = {
+  prise: 'PC',
+  prise20: 'PC 20A',
+  prise32: 'PC 32A',
+  inter: 'INT',
+  va: 'VV',
+  poussoir: 'BP',
+  variateur: 'VAR',
+  rj45: 'RJ',
+  tv: 'TV',
+  applique: 'LUM',
+  tableau: 'TABLEAU',
+  thermostat: 'THERMO',
+  sortieCable: 'SORTIE',
+  boite: 'DÉRIV',
+};
+
+const MULTIPLE = ['', '', 'DOUBLE ', 'TRIPLE ', 'QUADRUPLE '];
+
+/**
+ * Le mot d'un ensemble, quel qu'il soit : « PC », « DOUBLE PC »,
+ * « RJ + PC »… Les postes identiques qui se suivent se comptent, le reste
+ * s'énumère — un ensemble monté à la main se nomme donc exactement comme
+ * l'appareil multiposte équivalent du catalogue.
+ */
+export function assemblyTag(kinds: FixtureKind[]): string {
+  const lots: { kind: FixtureKind; n: number }[] = [];
+  for (const k of kinds) {
+    const last = lots[lots.length - 1];
+    if (last && last.kind === k) last.n += 1;
+    else lots.push({ kind: k, n: 1 });
+  }
+  return lots
+    .map(({ kind, n }) => {
+      const mot = TAG_BASE[kind] ?? FIXTURES[kind].short;
+      return n > 1 ? `${MULTIPLE[Math.min(n, 4)]}${mot}` : mot;
+    })
+    .join(' + ');
+}
+
+/** La désignation d'un type du catalogue, postes déployés. */
+export const fixtureTag = (kind: FixtureKind) => assemblyTag(postsOf(kind));
+
 /** Retrait initial, aux deux cotes : 20 cm du coin bas. */
 export const FIXTURE_MARGIN = 0.2;
 

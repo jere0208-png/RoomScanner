@@ -35,9 +35,12 @@ import {
 import { floorsOf, useScanStore } from '../store/scanStore';
 import {
   FIXTURES,
+  assemblyTag,
   faceX,
   facePoint,
+  postsOf,
   wallFace,
+  type FixtureKind,
 } from '../geometry/electrical';
 
 /** Paramètres de caméra de la vue 3D (contrôlables de l'extérieur). */
@@ -486,35 +489,55 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
     if (!interacting) {
       const quads = wallQuads(keptWalls);
       const byId = new Map(keptWalls.map((w) => [w.id, w]));
+
+      // Un ensemble se désigne UNE fois : deux prises sous une même plaque
+      // ne portent pas deux étiquettes, ni deux jeux de cotes.
+      const lots = new Map<string, typeof fixtures>();
       for (const f of fixtures) {
-        const w = byId.get(f.wallId);
+        const cle = f.group ? `g:${f.group}:${f.wallId}:${f.side}` : `s:${f.id}`;
+        const l = lots.get(cle);
+        if (l) l.push(f);
+        else lots.set(cle, [f]);
+      }
+
+      for (const lot of lots.values()) {
+        const w = byId.get(lot[0].wallId);
         if (!w) continue;
-        const face = wallFace(w, quads.get(w.id), f.side);
+        const face = wallFace(w, quads.get(w.id), lot[0].side);
         // Face qui tourne le dos à la caméra : l'appareil est derrière le
         // mur, on ne le montre pas (même test que `isHiddenFace`).
         if (face.nx * st * sp + face.nz * ct * sp <= 0) continue;
-        const spec = FIXTURES[f.kind];
-        const x = faceX(face, f.along);
-        const p = facePoint(face, x, spec.depth + 0.01);
-        const q = project({ x: p.x, y: f.height, z: p.z });
-        // Un appareil qui se voit déjà n'a pas besoin d'un pictogramme
-        // par-dessus : le tableau fait 55 cm, son symbole lui masquait la
-        // façade. Le repère ne sert qu'à ce qui est trop petit pour être vu.
-        // Une plaque de 8 cm fait cinq pixels à l'échelle d'un logement :
-        // le volume est bien là — les tests le vérifient au millimètre —
-        // mais l'œil ne le trouve pas. On pose donc un point de sa couleur
-        // TANT QU'IL EST TROP PETIT, et ce point s'efface à mesure que la
-        // plaque devient visible. L'inverse de la pastille d'avant, qui
-        // masquait ce qu'elle désignait.
-        const taille = spec.w * scale;
+
+        // L'emprise de la plaque commune, et les postes qu'elle porte.
+        const postes: FixtureKind[] = [];
+        let x0 = Infinity;
+        let x1 = -Infinity;
+        let saillie = 0;
+        for (const f of lot) {
+          const sp2 = FIXTURES[f.kind];
+          const cx = faceX(face, f.along);
+          x0 = Math.min(x0, cx - sp2.w / 2);
+          x1 = Math.max(x1, cx + sp2.w / 2);
+          saillie = Math.max(saillie, sp2.depth);
+          postes.push(...postsOf(f.kind));
+        }
+        const x = (x0 + x1) / 2;
+        const hauteur =
+          lot.reduce((t, f) => t + f.height, 0) / lot.length;
+        const p = facePoint(face, x, saillie + 0.01);
+        const q = project({ x: p.x, y: hauteur, z: p.z });
+
+        // Tant que la plaque est trop petite pour se voir, un point de sa
+        // couleur en tient lieu ; il s'efface à mesure qu'elle grandit.
+        const taille = (x1 - x0) * scale;
         const pastille = Math.max(0, Math.min(1, (16 - taille) / 8));
+
         // Les deux cotes se lisent comme sur un plan : un filet pointillé
         // jusqu'au bord du mur, un autre jusqu'au sol, et le nombre posé
-        // dessus. L'étiquette noire d'avant disait la même chose en trois
-        // fois plus de place, et deux appareils voisins la superposaient.
+        // dessus.
         const versBord = x <= face.len / 2 ? 0 : face.len;
-        const pb = facePoint(face, versBord, spec.depth + 0.01);
-        const qb = project({ x: pb.x, y: f.height, z: pb.z });
+        const pb = facePoint(face, versBord, saillie + 0.01);
+        const qb = project({ x: pb.x, y: hauteur, z: pb.z });
         const qs = project({ x: p.x, y: 0, z: p.z });
         items.push({
           kind: 'elec',
@@ -530,16 +553,15 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
           depth: 1e6,
           x: q.sx,
           y: q.sy,
-          color: spec.color,
-          // Le symbole n'est plus une pastille posée par-dessus : il est
-          // gravé sur la façade de la plaque, dans la scène elle-même. Ne
-          // restent ici que les cotes, qui sont une annotation, elles.
-          haut: scale > 90 ? `${Math.round(f.height * 100)}` : undefined,
+          color: FIXTURES[lot[0].kind].color,
+          haut: scale > 90 ? `${Math.round(hauteur * 100)}` : undefined,
           bord:
             scale > 90
               ? `${Math.round(Math.abs(x - versBord) * 100)}`
               : undefined,
-          nom: scale > 90 ? spec.short : undefined,
+          // La désignation en toutes lettres, POSÉE SUR l'appareil. Le
+          // symbole gravé se réduisait à trois traits gris : un mot se lit.
+          nom: scale > 70 ? assemblyTag(postes) : undefined,
           bx: qb.sx,
           by: qb.sy,
           sx: qs.sx,
@@ -819,17 +841,34 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
                         fontWeight="800">
                         {item.haut}
                       </SvgText>
-                      {/* La désignation, au-dessus de l'appareil. */}
+                      {/* La désignation, AU CENTRE de l'appareil. Deux
+                          passes : un liseré clair dessous, le texte
+                          par-dessus — sans quoi « PC » disparaît sur un
+                          mécanisme ambre. */}
                       {item.nom && (
-                        <SvgText
-                          x={item.x}
-                          y={item.y - 11}
-                          fill={c.ink}
-                          fontSize={9.5}
-                          fontWeight="800"
-                          textAnchor="middle">
-                          {item.nom}
-                        </SvgText>
+                        <>
+                          <SvgText
+                            x={item.x}
+                            y={item.y + 3}
+                            fill="none"
+                            stroke={c.surface}
+                            strokeWidth={2.6}
+                            strokeLinejoin="round"
+                            fontSize={9}
+                            fontWeight="800"
+                            textAnchor="middle">
+                            {item.nom}
+                          </SvgText>
+                          <SvgText
+                            x={item.x}
+                            y={item.y + 3}
+                            fill={c.ink}
+                            fontSize={9}
+                            fontWeight="800"
+                            textAnchor="middle">
+                            {item.nom}
+                          </SvgText>
+                        </>
                       )}
                     </>
                   )}

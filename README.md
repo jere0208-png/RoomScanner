@@ -901,6 +901,15 @@ l'annulation en défait la moitié. `__tests__/assemblage.test.ts` couvre la
 pose, l'entraxe, les quatre côtés, le recentrage, la séparation, le
 changement d'avis répété et le retour en arrière.
 
+**En 3D, l'appareil porte son nom, pas son symbole.** Le pictogramme gravé se
+réduisait à trois traits gris : à l'échelle d'un logement, une plaque fait dix
+pixels. On écrit donc dessus, en toutes lettres — « PC », « DOUBLE PC »,
+« RJ + PC » —, avec un liseré clair sous le texte pour qu'il tienne sur un
+mécanisme ambre. Les symboles restent là où ils se lisent : le plan 2D et la
+légende du PDF. Un ensemble monté à la main se nomme exactement comme
+l'appareil multiposte équivalent du catalogue (`assemblyTag`), sinon le même
+montage porterait deux noms selon la façon dont on l'a créé.
+
 Les cotes, en 3D, se lisent comme sur un plan : un filet pointillé jusqu'au
 retour de mur, un autre jusqu'au sol, le nombre posé dessus, et la
 désignation (PC, RJ, VV…) au-dessus de l'appareil. L'étiquette noire d'avant

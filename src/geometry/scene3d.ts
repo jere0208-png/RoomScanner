@@ -25,14 +25,11 @@ import { furnitureParts, type FurnPart } from './furniture3d';
 import {
   FIXTURES,
   PLAQUE,
-  assemblySymbol,
   boxOffsets,
   faceX,
   facePoint,
   postsOf,
-  symbolPolylines,
   wallFace,
-  SYMBOL_SPAN,
   type Fixture,
   type FixtureKind,
 } from './electrical';
@@ -801,39 +798,12 @@ export function buildScene(
     if (!w) continue;
     const face = wallFace(w, quads.get(w.id), lot[0].side);
     const avant = faces.length;
-    const nrm = { x: face.nx, y: 0, z: face.nz };
 
     /** Un point de la face : `dx` le long du mur, `out` en saillie. */
     const at = (fx: number, out: number): Pt => ({
       x: face.A.x + face.ux * fx + face.nx * out,
       z: face.A.z + face.uz * fx + face.nz * out,
     });
-
-    /** Grave un symbole sur une façade, à l'échelle donnée. */
-    const graver = (
-      cx: number,
-      cy: number,
-      taille: number,
-      out: number,
-      kind: FixtureKind,
-      trait: string,
-    ) => {
-      const k = taille / SYMBOL_SPAN;
-      for (const ligne of symbolPolylines(assemblySymbol(kind))) {
-        const pts3 = ligne.pts.map((pt) => {
-          const sol = at(cx + pt.x * k, out);
-          return { x: sol.x, y: cy - pt.y * k, z: sol.z };
-        });
-        if (pts3.length < 2) continue;
-        faces.push({
-          pts: pts3,
-          fill: null,
-          stroke: trait,
-          bias: EDGE_BIAS,
-          normal: nrm,
-        });
-      }
-    };
 
     /** Un volume plaqué sur le mur : de `out0` à `out1` en saillie. */
     const poser = (
@@ -922,14 +892,6 @@ export function buildScene(
           col,
           mixHex(col, '#000000', 0.4),
         );
-        graver(
-          q.x,
-          q.y,
-          MECANISME * 0.82,
-          Math.max(PLAQUE_EP + 0.004, sp.depth) + 0.0015,
-          q.kind,
-          mixHex(col, '#000000', 0.55),
-        );
       }
     } else {
       const f = lot[0];
@@ -948,14 +910,6 @@ export function buildScene(
         sp.depth,
         sp.color,
         mixHex(sp.color, '#000000', 0.4),
-      );
-      graver(
-        cx,
-        f.height,
-        sp.h,
-        sp.depth + 0.0015,
-        f.kind,
-        mixHex(sp.color, '#000000', 0.55),
       );
     }
 

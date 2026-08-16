@@ -440,9 +440,6 @@
 <polyline points="236.62,209.35 236.62,207.96" fill="none" stroke="#906101" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polyline points="237.06,209.21 237.06,207.81" fill="none" stroke="#906101" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polygon points="235.75,207.22 236.62,207.96 237.06,207.81 236.19,207.07" fill="none" stroke="#906101" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
-<polyline points="235.88,208.18 236.4,208.62" fill="none" stroke="#6c4901" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
-<polygon points="235.88,208.18 235.89,208.08 235.92,208 235.96,207.95 236.01,207.93 236.08,207.94 236.14,207.99 236.21,208.06 236.27,208.15 236.33,208.27 236.37,208.39 236.39,208.51 236.4,208.62" fill="none" stroke="#6c4901" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
-<polyline points="236.14,208.4 236.14,208.82" fill="none" stroke="#6c4901" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polygon points="343.94,119.57 326.22,125.44 331.96,126.73 350.98,120.43" fill="#F4F7FB" stroke="#F4F7FB" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
 <polyline points="343.94,119.57 326.22,125.44" fill="none" stroke="#94A0B4" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polyline points="350.98,120.43 331.96,126.73" fill="none" stroke="#94A0B4" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>

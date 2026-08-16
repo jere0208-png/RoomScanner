@@ -18,6 +18,7 @@ import {
   FIXTURE_KINDS,
   PLAQUE,
   faceX,
+  fixtureTag,
   interiorSide,
   postsOf,
   wallFace,
@@ -150,19 +151,16 @@ describe('l’appareillage, à ses cotes réelles', () => {
       });
     }
 
-    it(`${spec.label} : son symbole est gravé sur la façade`, () => {
+    it(`${spec.label} : aucun symbole gravé — c'est un mot qui le nomme`, () => {
+      // Le pictogramme gravé se réduisait à trois traits gris à l'échelle
+      // d'un logement. La désignation est désormais écrite par-dessus, dans
+      // la couche d'annotation ; les symboles restent au plan 2D et à la
+      // légende du PDF, où ils se lisent.
       const grave = mixHex(FIXTURES[postsOf(kind)[0]].color, '#000000', 0.55);
-      const traits = scene.faces.filter(
-        (x) => x.fill === null && x.stroke === grave,
-      );
-      expect(traits.length).toBeGreaterThan(0);
-      const e = etendue(traits);
-      const m = etendue(meca);
-      expect(e.x0).toBeGreaterThan(m.x0 - 1e-6);
-      expect(e.x1).toBeLessThan(m.x1 + 1e-6);
-      for (const p of traits.flatMap((x) => x.pts)) {
-        expect(out(p)).toBeGreaterThan(m.n1 - 1e-9);
-      }
+      expect(
+        scene.faces.filter((x) => x.fill === null && x.stroke === grave),
+      ).toHaveLength(0);
+      expect(fixtureTag(kind)).toBeTruthy();
     });
   }
 
