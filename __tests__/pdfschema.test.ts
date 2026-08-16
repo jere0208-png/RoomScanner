@@ -225,3 +225,51 @@ describe('rien ne sort de la feuille', () => {
     expect(feuilles(pdf)).toBe(feuilles(sansSchema) + 3);
   });
 });
+
+/**
+ * Une feuille de schéma se LIT. C'est tout ce qu'on lui demande.
+ *
+ * Deux défauts la rendaient illisible, et tous deux venaient d'un excès de
+ * zèle : deux légendes cherchant chacune sa place finissaient l'une sur
+ * l'autre, et les conducteurs de plusieurs départs se posaient tous sur le
+ * même trait de mur — six fils par-dessus six autres.
+ */
+describe('la lisibilité des feuilles de schéma', () => {
+  /** Les cadres blancs de légende posés sur la feuille. */
+  const cadres = (src: string) =>
+    [...src.matchAll(/([\d.]+) ([\d.]+) ([\d.]+) ([\d.]+) re f/g)].map((m) =>
+      m.slice(1).map(parseFloat),
+    );
+
+  it('une seule légende par feuille : elles ne peuvent plus se recouvrir', () => {
+    // Deux cadres de légende superposés produisaient deux rectangles
+    // blancs se chevauchant. On vérifie qu'aucune paire ne se recouvre.
+    const boites = cadres(pdf).filter(([, , w, h]) => w > 90 && h > 30);
+    for (let i = 0; i < boites.length; i++) {
+      for (let j = i + 1; j < boites.length; j++) {
+        const [ax, ay, aw, ah] = boites[i];
+        const [bx, by, bw, bh] = boites[j];
+        const ox = Math.min(ax + aw, bx + bw) - Math.max(ax, bx);
+        const oy = Math.min(ay + ah, by + bh) - Math.max(ay, by);
+        expect(ox > 2 && oy > 2).toBe(false);
+      }
+    }
+  });
+
+  it('la légende du schéma porte les départs ET les conducteurs', () => {
+    const doc = texte(pdf);
+    expect(doc).toContain('DÉPARTS');
+    expect(doc).toContain('CONDUCTEURS');
+  });
+
+  /**
+   * L'écartement des faisceaux ne se teste pas ici, et il faut le dire.
+   *
+   * Le plan est dessiné sur TROIS feuilles — le plan, l'unifilaire, le
+   * multifilaire — si bien qu'un même point de départ apparaît trois fois
+   * dans le flux. Compter les doublons mesurerait donc la pagination, pas
+   * l'écartement des circuits. Le décalage par voie se voit à l'œil sur la
+   * feuille ; le prétendre vérifié par un compte de coordonnées serait un
+   * test qui rassure sans rien garantir.
+   */
+});

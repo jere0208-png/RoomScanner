@@ -574,7 +574,23 @@ function draw3DView(
   const st = Math.sin(rad(thetaDeg));
   const cp = Math.cos(rad(tiltDeg));
   const sp = Math.sin(rad(tiltDeg));
-  const scale = ((Math.min(box.w, box.h) * 0.46) / r3) * view.zoom;
+  /**
+   * LE ZOOM DE L'ÉCRAN, MAIS BORNÉ — et surtout, la case est un cadre.
+   *
+   * À l'écran, la vue 3D vit dans un cadre qui la ROGNE : on zoome, le
+   * modèle grandit, et ce qui dépasse disparaît derrière le bord. Le PDF
+   * reprenait le même zoom sans le même rognage : un modèle agrandi
+   * trois fois s'étalait sur toute la feuille, traversait la case voisine
+   * et recouvrait le cartouche. C'est ce qu'on voyait — des murs coupés
+   * par le bord du papier et deux vues emmêlées.
+   *
+   * Deux garde-fous, tous deux nécessaires : le zoom est ramené dans des
+   * limites raisonnables, et le dessin est BORNÉ à sa case. La seconde
+   * suffirait à sauver la feuille ; la première évite qu'on n'imprime,
+   * en toute rigueur, un bout de mur pris de trop près.
+   */
+  const zoom = Math.min(2.2, Math.max(0.5, view.zoom || 1));
+  const scale = ((Math.min(box.w, box.h) * 0.46) / r3) * zoom;
   const cx = box.x + box.w / 2 + view.fx * (box.w / 2);
   const cy = box.y + box.h / 2 - view.fy * (box.h / 2);
 
@@ -590,6 +606,10 @@ function draw3DView(
       depth: rz * sp + y * cp,
     };
   };
+
+  // Le cadre de la case : rien n'en sort, quel que soit le zoom.
+  d.save();
+  d.clip(box.x, box.y, box.w, box.h);
 
   // Même masquage des faces arrière que dans la vue de l'app : le PDF doit
   // montrer exactement le même volume.
@@ -685,6 +705,11 @@ function draw3DView(
       d.text(item.text, item.x, item.y, 8, '#2A3340');
     }
   }
+  d.restore();
+
+  // Le liseré de la case : il dit où s'arrête la vue, et rend lisible un
+  // modèle qui touche le bord.
+  d.rect(box.x, box.y, box.w, box.h, null, '#E3E7EE', 0.8);
 }
 
 // -------------------------------------------------------------- pages
@@ -731,7 +756,19 @@ function planPage(
   sheet: string,
   planView?: PlanViewParams,
   showDims = true,
-  extra?: { title: string; sub?: string; overlay?: PlanOverlay },
+  extra?: {
+    title: string;
+    sub?: string;
+    overlay?: PlanOverlay;
+    /**
+     * Tait la légende d'appareillage.
+     *
+     * Sur une feuille de schéma, la surcouche en dessine une qui dit tout —
+     * appareils ET conducteurs. Deux boîtes cherchant chacune le coin le
+     * plus libre finissaient l'une sur l'autre, et c'était illisible.
+     */
+    hideLegend?: boolean;
+  },
 ): string {
   const {
     name,
@@ -1170,7 +1207,9 @@ function planPage(
        * expliquer. On mesure donc l'emprise du plan sur la page, et on
        * choisit le coin qu'il recouvre le moins.
        */
-      const presents = [...new Set(ctx.fixtures.map((f) => f.kind))];
+      const presents = extra?.hideLegend
+        ? []
+        : [...new Set(ctx.fixtures.map((f) => f.kind))];
       if (presents.length > 0) {
         const lw = 132;
         const lh = 22 + presents.length * 15;
@@ -1561,8 +1600,19 @@ function schemaPlanPage(
         // rester lisible sans jamais devenir un ruban.
         const fils = filsDe.get(mark) ?? [];
         const pas = Math.max(1.1, Math.min(2.2, scale * 0.02));
+        /**
+         * CHAQUE CIRCUIT SUR SA VOIE.
+         *
+         * Les conducteurs d'un même départ s'écartaient bien les uns des
+         * autres, mais deux départs qui longent le même mur se posaient au
+         * même endroit : six traits par-dessus six autres, et plus personne
+         * ne sait lequel va où. On décale donc le faisceau entier, circuit
+         * par circuit, comme des câbles voisins dans une même goulotte.
+         */
+        const voie =
+          (idx - (rows.length - 1) / 2) * (fils.length + 1.2) * pas;
         fils.forEach((fil, k) => {
-          const dec = (k - (fils.length - 1) / 2) * pas;
+          const dec = voie + (k - (fils.length - 1) / 2) * pas;
           const decale = pts.map((q, i) => {
             const prev = pts[Math.max(0, i - 1)];
             const next = pts[Math.min(pts.length - 1, i + 1)];
@@ -1579,28 +1629,52 @@ function schemaPlanPage(
       markerAt(d, pts[pts.length - 1], mark, couleur);
     }
 
-    // La légende, DANS le cadre du plan : des couleurs sans leur nom ne se
-    // lisent pas, et une légende hors cadre se ferait rogner.
-    const lignes: [string, string][] =
+    /**
+     * UNE SEULE LÉGENDE, et elle dit tout.
+     *
+     * Il y en avait deux : celle des appareils, qui cherchait le coin le
+     * plus libre, et celle des conducteurs, clouée en bas à gauche. Elles
+     * se retrouvaient l'une sur l'autre — deux cadres blancs superposés,
+     * dont on ne lisait ni l'un ni l'autre. Sur une feuille de schéma, le
+     * dessinateur n'en met qu'une : les départs, puis les couleurs.
+     */
+    const departs: [string, string][] = rows.map((r, i) => [
+      circuitColor(i),
+      `${r.mark} · ${r.label}${r.breaker === null ? '' : ` · ${r.breaker} A`}`,
+    ]);
+    const fils: [string, string][] =
       mode === 'multi'
         ? (['phase', 'neutre', 'terre', 'navette', 'retour'] as const).map(
             (r) => [WIRE_COLORS[r].color, WIRE_COLORS[r].label],
           )
-        : rows.map((r, i) => [
-            circuitColor(i),
-            `${r.mark} · ${r.label}${
-              r.breaker === null ? '' : ` · ${r.breaker} A`
-            }`,
-          ]);
-    const larg = mode === 'multi' ? 108 : 132;
-    const haut = lignes.length * 11 + 10;
+        : [];
+    const LIGNE = 11;
+    const larg = 148;
+    const haut =
+      14 +
+      departs.length * LIGNE +
+      (fils.length > 0 ? 12 + fils.length * LIGNE : 0);
     const lx = box.x + 8;
-    let ly = box.y + haut;
+    let ly = box.y + 6 + haut - 14;
     d.rect(lx - 4, box.y + 6, larg, haut, '#FFFFFFEE', '#D8DEE7', 0.6);
-    for (const [couleur, texte] of lignes) {
-      ly -= 11;
+    d.text('DÉPARTS', lx + 2, ly + 3, 6, GREY_LIGHT, { align: 'left' });
+    for (const [couleur, texte] of departs) {
+      ly -= LIGNE;
       d.line(lx + 2, ly + 2.5, lx + 16, ly + 2.5, 2, couleur);
-      d.text(texte, lx + 20, ly, 6.5, INK, { align: 'left' });
+      d.text(fitText(texte, 6.5, larg - 30), lx + 20, ly, 6.5, INK, {
+        align: 'left',
+      });
+    }
+    if (fils.length > 0) {
+      ly -= 12;
+      d.text('CONDUCTEURS', lx + 2, ly + 3, 6, GREY_LIGHT, { align: 'left' });
+      for (const [couleur, texte] of fils) {
+        ly -= LIGNE;
+        d.line(lx + 2, ly + 2.5, lx + 16, ly + 2.5, 2, couleur);
+        d.text(fitText(texte, 6.5, larg - 30), lx + 20, ly, 6.5, INK, {
+          align: 'left',
+        });
+      }
     }
   };
 
@@ -1615,6 +1689,7 @@ function schemaPlanPage(
     title: titre,
     sub: sous,
     overlay,
+    hideLegend: true,
   });
 }
 

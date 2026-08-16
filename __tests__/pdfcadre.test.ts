@@ -71,7 +71,7 @@ function points(pdf: string): { x: number; y: number }[] {
   return out;
 }
 
-const pdfDe = (opts: object) =>
+const pdfDe = (opts: object, avec3D = false) =>
   latin1(
     buildScanPdf(
       {
@@ -81,7 +81,7 @@ const pdfDe = (opts: object) =>
         objects: [],
         fixtures: prises,
       },
-      false,
+      avec3D,
       { metre: false, ...opts },
     ),
   );
@@ -125,5 +125,61 @@ describe('le plan PDF tient dans sa feuille', () => {
     expect(y).toBeGreaterThanOrEqual(30);
     expect(x + w).toBeLessThanOrEqual(PAGE_W - 30);
     expect(y + h).toBeLessThanOrEqual(PAGE_H - 30);
+  });
+
+  /**
+   * Et la VUE 3D aussi — c'est elle qui débordait vraiment.
+   *
+   * À l'écran, la 3D vit dans un cadre qui la rogne : on zoome, le modèle
+   * grandit, ce qui dépasse disparaît derrière le bord. Le PDF reprenait le
+   * zoom sans le rognage — un modèle agrandi trois fois s'étalait sur toute
+   * la feuille, traversait la seconde vue et recouvrait le cartouche.
+   */
+  it('une vue 3D zoomée reste dans sa case', () => {
+    const zoome = pdfDe(
+      {
+        views: [
+          { theta: -32, tilt: 58, zoom: 3.4, fx: 0.4, fy: -0.35 },
+          { theta: 148, tilt: 42, zoom: 3.4, fx: -0.4, fy: 0.35 },
+        ],
+      },
+      true,
+    );
+    const clips = [
+      ...zoome.matchAll(/(-?[\d.]+) (-?[\d.]+) (-?[\d.]+) (-?[\d.]+) re W n/g),
+    ].map((m) => m.slice(1).map(parseFloat));
+    // Deux vues par feuille : deux fenêtres de découpe au minimum.
+    expect(clips.length).toBeGreaterThanOrEqual(2);
+    for (const [x, y, w, h] of clips) {
+      expect(x).toBeGreaterThanOrEqual(30);
+      expect(y).toBeGreaterThanOrEqual(30);
+      expect(x + w).toBeLessThanOrEqual(PAGE_W - 30);
+      expect(y + h).toBeLessThanOrEqual(PAGE_H - 30);
+    }
+  });
+
+  it('et le zoom lui-même est borné : on n’imprime pas un bout de mur', () => {
+    // Deux documents, l'un demandé à 3,4×, l'autre à la borne : même dessin.
+    const fou = pdfDe(
+      {
+        views: [
+          { theta: -32, tilt: 58, zoom: 9, fx: 0, fy: 0 },
+          { theta: 148, tilt: 42, zoom: 9, fx: 0, fy: 0 },
+        ],
+      },
+      true,
+    );
+    const borne = pdfDe(
+      {
+        views: [
+          { theta: -32, tilt: 58, zoom: 2.2, fx: 0, fy: 0 },
+          { theta: 148, tilt: 42, zoom: 2.2, fx: 0, fy: 0 },
+        ],
+      },
+      true,
+    );
+    const traces = (src: string) =>
+      (src.match(/-?[\d.]+ -?[\d.]+ [ml] /g) ?? []).join('|');
+    expect(traces(fou)).toBe(traces(borne));
   });
 });
