@@ -1,9 +1,10 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { deletePhotoFiles } from '../ui/photos';
-import type {
-  CeilingFixture,
-  CeilingKind,
+import {
+  insetOnRing,
+  type CeilingFixture,
+  type CeilingKind,
 } from '../geometry/ceiling';
 import type {
   FloorData,
@@ -21,6 +22,7 @@ import {
   roomHeight,
   roomOf,
   roomParts,
+  WALL_T,
   planFrameAngle,
   reprojectOpenings,
   segLength,
@@ -1185,9 +1187,30 @@ export const useScanStore = create<ScanState>((set, get) => {
     },
 
     moveCeiling: (id, at) => {
+      const st = get();
+      const cl = st.ceiling.find((c) => c.id === id);
+      if (!cl) return;
+      /**
+       * LES MURS L'ARRÊTENT, comme un meuble.
+       *
+       * Un point lumineux posé hors de sa pièce n'existe pas : il n'a ni
+       * circuit, ni métré, ni sens sur le chantier. Le doigt dépasse
+       * pourtant tout le temps — on vise le coin, on sort d'un
+       * centimètre. Le contour de la pièce ramène donc la position sur
+       * son bord le plus proche, légèrement en retrait pour que le
+       * symbole ne chevauche pas la maçonnerie.
+       */
+      const part = roomParts(st.walls, st.rooms).find(
+        (p) => p.roomId === cl.roomId,
+      );
+      const ring = part?.surface?.pts ?? [];
+      const pose =
+        ring.length >= 3 && !pointInPolygon(at, ring)
+          ? insetOnRing(ring, at, WALL_T / 2 + 0.03)
+          : at;
       pushHistory(`ceiling:${id}`);
       set({
-        ceiling: get().ceiling.map((c) => (c.id === id ? { ...c, at } : c)),
+        ceiling: st.ceiling.map((c) => (c.id === id ? { ...c, at: pose } : c)),
         dirty: true,
       });
     },

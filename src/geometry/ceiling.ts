@@ -263,3 +263,42 @@ export function lightingLoad(
   }
   return out;
 }
+
+
+/**
+ * Ramène un point SUR le contour d'une pièce, légèrement en retrait.
+ *
+ * Le doigt dépasse tout le temps : on vise le coin d'une pièce et on sort
+ * d'un centimètre. Plutôt que de refuser le geste — l'appareil resterait
+ * bloqué loin de là où on le veut —, on le pose au point du bord le plus
+ * proche, reculé de `marge` vers l'intérieur pour que son symbole ne
+ * chevauche pas la maçonnerie.
+ */
+export function insetOnRing(ring: Pt[], p: Pt, marge: number): Pt {
+  let best: Pt = p;
+  let dist = Infinity;
+  for (let i = 0; i < ring.length; i++) {
+    const a = ring[i];
+    const b = ring[(i + 1) % ring.length];
+    const dx = b.x - a.x;
+    const dz = b.z - a.z;
+    const l2 = dx * dx + dz * dz;
+    if (l2 < 1e-12) continue;
+    const t = Math.max(
+      0,
+      Math.min(1, ((p.x - a.x) * dx + (p.z - a.z) * dz) / l2),
+    );
+    const q = { x: a.x + dx * t, z: a.z + dz * t };
+    const d = Math.hypot(p.x - q.x, p.z - q.z);
+    if (d >= dist) continue;
+    dist = d;
+    // La normale rentrante de ce côté : on recule vers le centre.
+    const l = Math.sqrt(l2);
+    const n = { x: -dz / l, z: dx / l };
+    const cx = ring.reduce((t2, r) => t2 + r.x, 0) / ring.length;
+    const cz = ring.reduce((t2, r) => t2 + r.z, 0) / ring.length;
+    const sens = (cx - q.x) * n.x + (cz - q.z) * n.z >= 0 ? 1 : -1;
+    best = { x: q.x + n.x * sens * marge, z: q.z + n.z * sens * marge };
+  }
+  return best;
+}

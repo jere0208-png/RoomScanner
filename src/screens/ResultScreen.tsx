@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Animated,
@@ -87,7 +87,6 @@ import { buildMaterialPdf, materialFilename, toBase64 } from '../export/pdf';
 import {
   FIXTURES,
   FIXTURE_FAMILIES,
-  assemblySymbol,
   faceX,
   facePoint,
   interiorSide,
@@ -98,11 +97,10 @@ import {
 import { useScanStore } from '../store/scanStore';
 import { DiagnosticSheet, type Constat } from '../components/DiagnosticSheet';
 import { ExportArt, type ExportArtKind } from '../components/ExportArt';
-import { CloseCross } from '../components/CloseCross';
+import { EnAttente } from '../components/PendingPill';
 import {
   CEILINGS,
   CEILING_KINDS,
-  CEILING_SYMBOL,
   type CeilingKind,
 } from '../geometry/ceiling';
 import { haptic } from '../ui/haptic';
@@ -328,8 +326,47 @@ export function ResultScreen() {
   };
   /** Appareil de plafond en cours de réglage : le plan se dégage pour lui. */
   const [selCeiling, setSelCeiling] = useState<string | null>(null);
+
+  /**
+   * UN SEUL GESTE EN ATTENTE À LA FOIS.
+   *
+   * Chaque mode d'attente — poser un appareil mural, poser au plafond,
+   * relier une commande, régler un point — vivait dans son coin. On
+   * choisissait un spot, puis on demandait un meuble : le spot restait en
+   * attente, invisible, et c'est LUI qui recevait l'appui suivant. Le
+   * meuble n'apparaissait jamais, sans qu'on comprenne pourquoi.
+   *
+   * Commencer un geste annule donc les autres. C'est la règle que l'on
+   * attend d'un outil : ce qu'on vient de demander l'emporte sur ce qu'on
+   * avait demandé avant et laissé en plan.
+   */
+  const seulGeste = useCallback(
+    (garde?: 'mur' | 'plafond' | 'lien' | 'reglage') => {
+      if (garde !== 'mur') setPendingKind(null);
+      if (garde !== 'plafond') setPendingCeiling(null);
+      if (garde !== 'lien') setPendingLink(null);
+      if (garde !== 'reglage') setSelCeiling(null);
+    },
+    [],
+  );
   const [clX, setClX] = useState('');
   const [clZ, setClZ] = useState('');
+  /**
+   * Les deux cotes suivent le doigt.
+   *
+   * Elles étaient figées à la sélection : on glissait l'appareil et les
+   * champs continuaient d'afficher la position de départ. Or c'est en
+   * glissant qu'on lit — après, on ne regarde plus.
+   */
+  const clAt = ceiling.find((x) => x.id === selCeiling)?.at;
+  useEffect(() => {
+    const cl = ceiling.find((x) => x.id === selCeiling);
+    if (!cl) return;
+    const o = origineDe(cl.roomId);
+    setClX(String(Math.round((cl.at.x - o.x) * 100)));
+    setClZ(String(Math.round((cl.at.z - o.z) * 100)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selCeiling, clAt?.x, clAt?.z]);
   /** Repères électriques en 3D : un calque comme les autres. */
   const [showElecTags, setShowElecTags] = useState(true);
   const [editMode, setEditMode] = useState(false);
@@ -913,6 +950,7 @@ export function ResultScreen() {
   };
 
   const startFixture = () => {
+    seulGeste('mur');
     setElecWallId(tab === '2d' ? selectedWallId ?? pier?.wallId ?? null : null);
     setElecSel(null);
     setElecView('catalogue');
@@ -968,6 +1006,8 @@ export function ResultScreen() {
   };
 
   const toggleEdit = () => {
+    // Sortir d'un mode, c'est abandonner ce qu'on y avait commencé.
+    seulGeste();
     setEditMode((e) => {
       if (e) setSelectedWallId(null);
       return !e;
@@ -1172,6 +1212,7 @@ export function ResultScreen() {
               // D'abord le réglage : c'est ce qu'on vient faire neuf fois
               // sur dix. Le menu s'ouvre par un appui long.
               if (selCeiling !== id) {
+                seulGeste('reglage');
                 setSelCeiling(id);
                 setSelectedObjectId(null);
                 setSelectedWallId(null);
@@ -1203,7 +1244,10 @@ export function ResultScreen() {
                             'Deux commandes pour un point, c’est un ' +
                             'va-et-vient.',
                           icon: 'fusionner' as const,
-                          onPress: () => setPendingLink(id),
+                          onPress: () => {
+                            seulGeste('lien');
+                            setPendingLink(id);
+                          },
                         },
                       ]
                     : []),
@@ -1330,6 +1374,7 @@ export function ResultScreen() {
                     label="Ajouter"
                     active={false}
                     onPress={() => {
+                      seulGeste();
                       setShowFurniture(true);
                       setCatalogue(true);
                     }}
@@ -1342,6 +1387,7 @@ export function ResultScreen() {
                     label="Plafond"
                     active={!!pendingCeiling}
                     onPress={() => {
+                      seulGeste('plafond');
                       setShowCeiling(true);
                       setMenu({
                         title: 'Équiper le plafond',
@@ -2450,113 +2496,6 @@ const TOOL_PATHS: Record<ToolIcon, { d: string; fill?: boolean }[]> = {
  * états, et c'est exactement ce qui date une interface. Il glisse désormais,
  * sur un ressort — le mouvement dit d'où l'on vient.
  */
-/**
- * « On attend que vous désigniez un mur. »
- *
- * C'était un bandeau pleine largeur, avec la phrase entière et un bouton
- * « Annuler » — qui passait sous les pastilles d'outils, illisible. Or ce
- * moment ne dure que le temps d'un geste : il n'a pas besoin d'une phrase,
- * il a besoin de MONTRER ce qu'on tient et de dire qu'on attend.
- *
- * Une pastille en bas à gauche, donc : le symbole de l'appareil pris, son
- * nom, une croix pour reposer. Elle respire lentement — c'est l'attente
- * elle-même qui se voit, sans un mot de plus.
- */
-function EnAttente({
-  kind,
-  plafond,
-  cible,
-  onCancel,
-}: {
-  kind: FixtureKind | null;
-  /** Appareil de plafond en attente : on touche la pièce, pas le mur. */
-  plafond?: CeilingKind | null;
-  /** Précision quand une cible est déjà désignée (un retour de mur). */
-  cible: string | null;
-  onCancel: () => void;
-}) {
-  const c = useTheme();
-  const styles = getStyles(c);
-  // Mur ou plafond : deux catalogues, un seul bandeau d'attente.
-  const spec = plafond ? CEILINGS[plafond] : FIXTURES[kind!];
-  const trace = plafond ? CEILING_SYMBOL[plafond] : assemblySymbol(kind!);
-  const souffle = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    const boucle = Animated.loop(
-      Animated.sequence([
-        Animated.timing(souffle, {
-          toValue: 1,
-          duration: 850,
-          easing: Easing.inOut(Easing.quad),
-          useNativeDriver: true,
-        }),
-        Animated.timing(souffle, {
-          toValue: 0,
-          duration: 850,
-          easing: Easing.inOut(Easing.quad),
-          useNativeDriver: true,
-        }),
-      ]),
-    );
-    boucle.start();
-    return () => boucle.stop();
-  }, [souffle]);
-  return (
-    <View style={styles.attente} pointerEvents="box-none">
-      {/* L'auréole qui bat : elle dit « en attente » sans écrire le mot. */}
-      <Animated.View
-        pointerEvents="none"
-        style={[
-          styles.attenteOnde,
-          {
-            backgroundColor: spec.color,
-            opacity: souffle.interpolate({
-              inputRange: [0, 1],
-              outputRange: [0.28, 0],
-            }),
-            transform: [
-              {
-                scale: souffle.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [1, 1.5],
-                }),
-              },
-            ],
-          },
-        ]}
-      />
-      <View style={[styles.attenteIcone, { borderColor: spec.color }]}>
-        <Svg width={20} height={20} viewBox="-12 -12 24 24">
-          {trace.map((seg, i) => (
-            <Path
-              key={i}
-              d={seg.d}
-              stroke={spec.color}
-              strokeWidth={1.8}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              fill={seg.fill ? spec.color : 'none'}
-            />
-          ))}
-        </Svg>
-      </View>
-      <View style={styles.attenteTextes}>
-        <Text style={styles.attenteNom} numberOfLines={1}>
-          {spec.label}
-        </Text>
-        <Text style={styles.attenteHint} numberOfLines={1}>
-          {cible ? `Touchez ${cible}` : 'Touchez un mur'}
-        </Text>
-      </View>
-      <TouchableOpacity
-        style={styles.attenteClose}
-        onPress={onCancel}
-        accessibilityLabel="Annuler la pose">
-        <CloseCross size={17} color={c.inkSoft} weight={3} />
-      </TouchableOpacity>
-    </View>
-  );
-}
 
 function Segment({ tab, onChange }: { tab: Tab; onChange: (t: Tab) => void }) {
   const styles = getStyles(useTheme());
@@ -3095,49 +3034,6 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
    * disparaissait sous le bouton « Contrôle ». En bas à gauche, elle est
    * seule, sous le pouce, et loin du bandeau de cotes qui occupe la droite.
    */
-  attente: {
-    position: 'absolute',
-    left: 10,
-    bottom: 12,
-    zIndex: 5,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingLeft: 8,
-    paddingRight: 6,
-    paddingVertical: 7,
-    borderRadius: radius.pill,
-    backgroundColor: c.surface,
-    ...shadowCard,
-    shadowOpacity: 0.16,
-  },
-  attenteOnde: {
-    position: 'absolute',
-    left: 8,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-  },
-  attenteIcone: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    backgroundColor: c.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  attenteTextes: { maxWidth: 138 },
-  attenteNom: { color: c.ink, fontSize: 13.5, fontWeight: '800' },
-  attenteHint: { color: c.inkFaint, fontSize: 11, marginTop: 1 },
-  attenteClose: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: c.surfaceSunken,
-  },
   // Bandeau d'attente (pose d'un appareil) : en haut, il ne gêne rien.
   wallLengthBar: {
     position: 'absolute',

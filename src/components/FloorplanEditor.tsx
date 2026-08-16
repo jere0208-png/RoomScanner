@@ -1245,6 +1245,87 @@ export function FloorplanEditor({
                 }),
               )}
 
+            {/*
+              LES DÉGAGEMENTS DE L'APPAREIL DE PLAFOND CHOISI.
+              Quatre cotes, vers les quatre murs qui l'entourent, en direct
+              pendant qu'on le déplace. Sans elles, on déplace à vue et on
+              lit le résultat après coup dans un champ — alors que la
+              question qu'on se pose en glissant est exactement « à combien
+              du mur ? ».
+            */}
+            {selectedCeilingId &&
+              (() => {
+                const cl = (ceiling ?? []).find(
+                  (x) => x.id === selectedCeilingId,
+                );
+                if (!cl) return null;
+                const murs = partOf.get(cl.roomId)?.walls ?? walls;
+                const sens = [
+                  { x: 1, z: 0 },
+                  { x: -1, z: 0 },
+                  { x: 0, z: 1 },
+                  { x: 0, z: -1 },
+                ];
+                return (
+                  <G>
+                    {sens.map((d, ci) => {
+                      const gap = castToWall(cl.at, d, murs);
+                      if (gap === null || gap < 0.02 || gap > 12) return null;
+                      const to = {
+                        x: cl.at.x + d.x * gap,
+                        z: cl.at.z + d.z * gap,
+                      };
+                      const A = mapping.toPx(cl.at);
+                      const B = mapping.toPx(to);
+                      if (Math.hypot(B.x - A.x, B.y - A.y) < 22) return null;
+                      let angle =
+                        (Math.atan2(B.y - A.y, B.x - A.x) * 180) / Math.PI;
+                      if (angle > 90) angle -= 180;
+                      if (angle < -90) angle += 180;
+                      const mx = (A.x + B.x) / 2;
+                      const my = (A.y + B.y) / 2;
+                      const texte =
+                        gap < 1
+                          ? `${Math.round(gap * 100)}`
+                          : gap.toFixed(2).replace('.', ',');
+                      return (
+                        <G key={`clcote-${ci}`}>
+                          <Line
+                            x1={A.x}
+                            y1={A.y}
+                            x2={B.x}
+                            y2={B.y}
+                            stroke={c.blue}
+                            strokeWidth={1}
+                            strokeDasharray="3 3"
+                          />
+                          <Circle cx={B.x} cy={B.y} r={2} fill={c.blue} />
+                          <Rect
+                            x={mx - (texte.length * 3.6 + 7)}
+                            y={my - 8}
+                            width={texte.length * 7.2 + 14}
+                            height={16}
+                            rx={5}
+                            fill={c.surface}
+                            opacity={0.94}
+                          />
+                          <SvgText
+                            x={mx}
+                            y={my + 4}
+                            fill={c.blue}
+                            fontSize={10}
+                            fontWeight="800"
+                            textAnchor="middle"
+                            transform={`rotate(${angle}, ${mx}, ${my})`}>
+                            {texte}
+                          </SvgText>
+                        </G>
+                      );
+                    })}
+                  </G>
+                );
+              })()}
+
             {/* Les gaines : un filet tireté qui longe les murs, du tableau
                 à chaque appareil. Il passe SOUS les symboles — c'est un
                 cheminement, pas une annotation — et son tracé est celui du
@@ -1549,12 +1630,16 @@ export function FloorplanEditor({
               if (placeholder !== '' && lignes.length === 0) {
                 lignes.push({ t: placeholder, size: 11, fill: c.inkFaint, bold: true });
               }
-              const PAD = 9;
+              // Le cartouche SERRE son texte, et son fond laisse voir le
+              // plan. Opaque et large, il masquait le sol qu'il annote — et
+              // c'est justement là, au centre de la pièce, que se pose un
+              // point lumineux.
+              const PAD = 5;
               const LH = 14;
               const hpx = PAD * 2 + lignes.length * LH;
               const wpx = Math.max(
                 50,
-                Math.max(...lignes.map((l) => l.t.length * (l.size * 0.62))) + 26,
+                Math.max(...lignes.map((l) => l.t.length * (l.size * 0.62))) + 14,
               );
               const labelW = wpx / mapping.scale;
               const labelH = hpx / mapping.scale;
@@ -1605,8 +1690,9 @@ export function FloorplanEditor({
                     y={p.y - hpx / 2}
                     width={wpx}
                     height={hpx}
-                    rx={6}
+                    rx={5}
                     fill={c.surface}
+                    fillOpacity={0.55}
                     stroke={selected ? c.blue : c.lineStrong}
                     strokeWidth={selected ? 2 : 1}
                   />

@@ -299,3 +299,46 @@ describe('déplacer un appareil de plafond', () => {
     expect(useScanStore.getState().ceiling[0].at.x).toBeCloseTo(2.5, 6);
   });
 });
+
+/**
+ * Les murs arrêtent un appareil de plafond, comme ils arrêtent un meuble.
+ *
+ * J'avais choisi l'inverse — un point lumineux n'a pas d'emprise au sol, il
+ * peut se coller à une cloison. À l'usage, c'est faux : le doigt dépasse
+ * tout le temps, on vise un coin et on sort de la pièce. Un appareil hors
+ * de sa pièce n'a ni circuit, ni métré, ni sens sur le chantier.
+ */
+describe('les murs arrêtent l’appareil', () => {
+  const poser = (at: { x: number; z: number }) => {
+    useScanStore.setState({
+      walls: W,
+      openings: [],
+      rooms: R,
+      objects: [],
+      fixtures: FX,
+      photos: [],
+      ceiling: [{ id: 'p1', kind: 'spot', roomId: 'r1', at: { x: 2.5, z: 2 } }],
+    });
+    useScanStore.getState().moveCeiling('p1', at);
+    return useScanStore.getState().ceiling[0].at;
+  };
+
+  it('un point visé hors de la pièce revient sur son bord', () => {
+    // La pièce fait 5 × 4 : viser à 9 m, c'est viser dehors.
+    const at = poser({ x: 9, z: 2 });
+    expect(at.x).toBeLessThan(5);
+    expect(at.x).toBeGreaterThan(4.5);
+  });
+
+  it('et il ne chevauche pas la maçonnerie', () => {
+    const at = poser({ x: -3, z: 2 });
+    // Rentré d'au moins la demi-épaisseur du mur.
+    expect(at.x).toBeGreaterThan(0.09);
+  });
+
+  it('à l’intérieur, rien ne le déplace', () => {
+    const at = poser({ x: 1.4, z: 2.6 });
+    expect(at.x).toBeCloseTo(1.4, 6);
+    expect(at.z).toBeCloseTo(2.6, 6);
+  });
+});
