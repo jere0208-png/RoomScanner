@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   Alert,
   Animated,
+  Image,
   Easing,
   Keyboard,
   KeyboardAvoidingView,
@@ -16,7 +17,12 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import Svg, { Line as SvgLine, Path, Rect as SvgRect } from 'react-native-svg';
+import Svg, {
+  Circle,
+  Line as SvgLine,
+  Path,
+  Rect as SvgRect,
+} from 'react-native-svg';
 import { captureRef } from 'react-native-view-shot';
 import { RoomScan } from 'react-native-room-scan';
 import {
@@ -30,7 +36,6 @@ import {
 } from '../theme';
 import { FloorplanEditor } from '../components/FloorplanEditor';
 import { WallElevation } from '../components/WallElevation';
-import { LogoMark } from '../components/LogoMark';
 import {
   DEFAULT_VIEW3D,
   Iso3DView,
@@ -106,6 +111,8 @@ export function ResultScreen() {
   const objects = useScanStore((s) => s.objects);
   const modelPath = useScanStore((s) => s.modelPath);
   const scanName = useScanStore((s) => s.scanName);
+  const saves = useScanStore((s) => s.saves);
+  const currentSaveId = useScanStore((s) => s.currentSaveId);
   const setWallLength = useScanStore((s) => s.setWallLength);
   const renameCurrent = useScanStore((s) => s.renameCurrent);
   const saveAsCopy = useScanStore((s) => s.saveAsCopy);
@@ -424,6 +431,40 @@ export function ResultScreen() {
     poserDans(item, possibles[0] ?? salles[0] ?? null);
   };
 
+  /**
+   * « Dernière MAJ » : la date d'enregistrement du scan ouvert.
+   *
+   * Tant qu'il reste des modifications en attente, on le dit plutôt que
+   * d'afficher une date périmée — c'est l'information utile à ce
+   * moment-là. Aujourd'hui et hier se nomment, au-delà on date.
+   */
+  const majTexte = (() => {
+    if (dirty) return 'Modifications non enregistrées';
+    const save = saves.find((s) => s.id === currentSaveId);
+    if (!save) return null;
+    const d = new Date(save.updatedAt);
+    const heure = `${String(d.getHours()).padStart(2, '0')}h${String(
+      d.getMinutes(),
+    ).padStart(2, '0')}`;
+    const jour = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    const now = new Date();
+    const aujourdhui = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+    ).getTime();
+    const ecart = Math.round((aujourdhui - jour) / 86400000);
+    const quand =
+      ecart <= 0
+        ? `aujourd'hui à ${heure}`
+        : ecart === 1
+        ? `hier à ${heure}`
+        : `le ${String(d.getDate()).padStart(2, '0')}/${String(
+            d.getMonth() + 1,
+          ).padStart(2, '0')} à ${heure}`;
+    return `Dernière MAJ : ${quand}`;
+  })();
+
   const selectedOpening =
     openings.find((o) => o.id === selectedOpeningId) ?? null;
 
@@ -708,9 +749,19 @@ export function ResultScreen() {
             setNameInput(scanName);
             setRenaming(true);
           }}>
-          <Text style={styles.title} numberOfLines={1}>
-            {scanName}
-          </Text>
+          <View style={styles.titleCol}>
+            <Text style={styles.title} numberOfLines={1}>
+              {scanName}
+            </Text>
+            {/* Quand ce plan a-t-il été enregistré pour la dernière fois ?
+                La question se pose à chaque ouverture d'un scan repris, et
+                la réponse tenait jusqu'ici dans la seule liste des scans. */}
+            {majTexte && (
+              <Text style={styles.titleSub} numberOfLines={1}>
+                {majTexte}
+              </Text>
+            )}
+          </View>
           <View style={styles.editBadge}>
             <Text style={styles.editBadgeIcon}>✎</Text>
           </View>
@@ -809,7 +860,9 @@ export function ResultScreen() {
           />
         )}
 
-        {tab === '2d' ? (
+        {/* Toute la quincaillerie s'efface pendant une capture : une image
+            qu'on envoie ne doit montrer QUE le plan et le logo. */}
+        {capturing ? null : tab === '2d' ? (
           <View style={styles.planTools}>
             {/* Deux barres, jamais mélangées.
                 En lecture, on ne fait que REGARDER : la barre ne porte que
@@ -927,7 +980,7 @@ export function ResultScreen() {
             seul qu'on cherche toujours, et il commande le contenu de la
             barre. Il reste donc à demeure, en haut à droite, aligné sur la
             rangée — les outils défilent DERRIÈRE lui, jamais dessous. */}
-        {tab === '2d' && (
+        {tab === '2d' && !capturing && (
           <View style={styles.editAnchor}>
             {/* Revenir en arrière ne descend pas avec les outils : c'est le
                 geste qu'on cherche dans l'urgence, et il se tient à côté du
@@ -935,12 +988,12 @@ export function ResultScreen() {
             {editMode && canUndo && (
               <ToolPill icon="undo" active={false} onPress={undo} />
             )}
-            <ToolPill icon="edit" active={editMode} onPress={toggleEdit} />
+            <ToolPill icon="edit" active={editMode} halo onPress={toggleEdit} />
           </View>
         )}
 
         {/* Côtes du meuble sélectionné, en surimpression */}
-        {tab === '2d' && selectedObject && showFurniture && objDims && (
+        {tab === '2d' && selectedObject && showFurniture && objDims && !capturing && (
           <View style={styles.editBar}>
             <View style={styles.editRow}>
               <TextInput
@@ -1015,7 +1068,7 @@ export function ResultScreen() {
         )}
 
         {/* Pièce sélectionnée : la nommer, ou la retirer du scan */}
-        {tab === '2d' && editMode && !selectedObject && !selectedWall &&
+        {tab === '2d' && editMode && !capturing && !selectedObject && !selectedWall &&
           selectedRoomId && targetRoom && (
             <View style={styles.editBar}>
               <Text style={styles.editLabel}>
@@ -1089,7 +1142,7 @@ export function ResultScreen() {
             </View>
           )}
 
-        {tab === '2d' && pendingKind && (
+        {tab === '2d' && pendingKind && !capturing && (
           <View style={[styles.wallLengthBar, north !== null && styles.barShift,
               editMode && canUndo && styles.barShiftRight,
             ]}>
@@ -1107,7 +1160,7 @@ export function ResultScreen() {
         {/* La menuiserie sélectionnée : largeur, hauteur, et de quoi les
             changer. Même bandeau que pour un mur — un seul endroit où
             regarder quand on a touché quelque chose. */}
-        {tab === '2d' && editMode && selectedOpening && (
+        {tab === '2d' && editMode && selectedOpening && !capturing && (
           <View style={styles.wallStrip}>
             <Text style={styles.wallStripText} numberOfLines={1}>
               <Text style={styles.wallStripStrong}>
@@ -1140,7 +1193,7 @@ export function ResultScreen() {
         {/* Le mur sélectionné, en une ligne au pied du plan : sa longueur,
             sa hauteur sous plafond, et de quoi les changer. En haut, le
             bandeau mangeait le dessin qu'on est en train de regarder. */}
-        {tab === '2d' && !selectedObject && !selectedOpening && editMode && selectedWall && (
+        {tab === '2d' && !selectedObject && !selectedOpening && editMode && selectedWall && !capturing && (
           <View style={styles.wallStrip}>
             <Text style={styles.wallStripText} numberOfLines={1}>
               <Text style={styles.wallStripStrong}>
@@ -1159,15 +1212,16 @@ export function ResultScreen() {
         {/* Watermark EchoPlan, visible uniquement sur les images générées */}
         {capturing && (
           <View style={styles.watermark} pointerEvents="none">
-            <LogoMark size={22} />
-            <Text style={styles.watermarkText}>
-              Echo<Text style={styles.watermarkAccent}>Plan</Text>
-            </Text>
+            <Image
+              source={require('../assets/echoplan.png')}
+              style={styles.watermarkLogo}
+              resizeMode="contain"
+            />
           </View>
         )}
 
         {/* Modifications non enregistrées : bouton de sauvegarde flottant */}
-        {dirty && (
+        {dirty && !capturing && (
           <TouchableOpacity style={styles.saveFab} onPress={commitCurrent}>
             <Svg width={22} height={22} viewBox="0 0 24 24">
               <Path
@@ -1952,19 +2006,88 @@ function ToolPill({
   icon,
   active,
   onPress,
+  halo,
 }: {
   icon: ToolIcon;
   active: boolean;
   onPress: () => void;
+  /**
+   * Actif = une lueur qui TOURNE autour, pastille laissée blanche.
+   *
+   * Réservé au bouton d'édition. Rempli de bleu comme les autres, il
+   * disait « calque affiché » alors qu'il dit « vous êtes en train de
+   * modifier » — un état, pas un réglage. Quelque chose qui bouge le dit
+   * mieux qu'une couleur, et c'est le seul point de l'écran qui bouge.
+   */
+  halo?: boolean;
 }) {
   const c = useTheme();
   const styles = getStyles(c);
+  const plein = active && !halo;
   // Icône noire sur fond blanc ; blanche sur bleu quand l'outil est actif.
-  const stroke = active ? '#FFFFFF' : c.ink;
+  const stroke = plein ? '#FFFFFF' : active ? c.blue : c.ink;
+  const tour = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!halo || !active) return;
+    tour.setValue(0);
+    const boucle = Animated.loop(
+      Animated.timing(tour, {
+        toValue: 1,
+        duration: 2600,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }),
+    );
+    boucle.start();
+    return () => boucle.stop();
+  }, [halo, active, tour]);
   return (
     <TouchableOpacity
-      style={[styles.toolPill, active && styles.toolPillActive]}
+      style={[styles.toolPill, plein && styles.toolPillActive]}
       onPress={onPress}>
+      {halo && active && (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.toolHalo,
+            {
+              transform: [
+                {
+                  rotate: tour.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: ['0deg', '360deg'],
+                  }),
+                },
+              ],
+            },
+          ]}>
+          {/* Un arc, pas un anneau : c'est son extrémité qui fait la
+              lueur, et le tour complet se lit en deux secondes et demie. */}
+          <Svg width={44} height={44} viewBox="0 0 44 44">
+            <Circle
+              cx={22}
+              cy={22}
+              r={20}
+              stroke={c.blue}
+              strokeWidth={2.4}
+              strokeLinecap="round"
+              strokeDasharray="30 96"
+              fill="none"
+            />
+            <Circle
+              cx={22}
+              cy={22}
+              r={20}
+              stroke={c.blue}
+              strokeWidth={6}
+              strokeLinecap="round"
+              strokeDasharray="12 114"
+              opacity={0.18}
+              fill="none"
+            />
+          </Svg>
+        </Animated.View>
+      )}
       {/* La pastille garde ses 36 px : seul le tracé grossit, pour se lire
           d'un coup d'œil sans élargir la barre d'outils. */}
       <Svg width={22} height={22} viewBox="0 0 24 24">
@@ -2023,6 +2146,13 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     // Un titre serré se lit comme un titre ; espacé, comme une étiquette.
     letterSpacing: -0.6,
     flexShrink: 1,
+  },
+  titleCol: { flex: 1, minWidth: 0 },
+  titleSub: {
+    color: c.inkFaint,
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 1,
   },
   editBadge: {
     width: 34,
@@ -2125,6 +2255,16 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 10,
   },
+  // L'arc déborde la pastille de 4 px : la lueur tourne AUTOUR d'elle.
+  toolHalo: {
+    position: 'absolute',
+    width: 44,
+    height: 44,
+    left: -4,
+    top: -4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   toolPillActive: { backgroundColor: c.blue, ...glow(c.blue) },
   pillRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   // L'onde reste DANS le bouton : elle attire l'œil sans déborder sur le
@@ -2177,6 +2317,7 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     paddingVertical: 5,
     gap: 6,
   },
+  watermarkLogo: { width: 116, height: 26, tintColor: c.ink, opacity: 0.85 },
   watermarkText: { color: '#0B0D12', fontSize: 13, fontWeight: '800' },
   watermarkAccent: { color: c.blue },
   saveFab: {

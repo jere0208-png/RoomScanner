@@ -486,7 +486,9 @@ function draw3DView(
       // Une arête se trie avec le pan qu'elle borde (`depthAt`).
       const depth = f.isFloor
         ? -Infinity
-        : (f.depthAt ? project(f.depthAt).depth
+        : (f.depthRefs
+            ? Math.max(...f.depthRefs.map((r) => project(r).depth))
+            : f.depthAt ? project(f.depthAt).depth
                      : pts.reduce((s, p) => s + p.depth, 0) / pts.length) +
           (f.bias ?? 0);
       const fill = shadeFill(f, ct, st);

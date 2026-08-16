@@ -174,7 +174,7 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
 
   const touchAngle = (t: { pageX: number; pageY: number }[]) =>
     Math.atan2(t[1].pageY - t[0].pageY, t[1].pageX - t[0].pageX);
-  const tapRef = useRef({ x: 0, y: 0 });
+  const tapRef = useRef({ x: 0, y: 0, multi: false, t0: 0 });
   // Pendant un geste, les cotes sont masquées : c'est leur recalcul à
   // chaque frame qui faisait ramer les mouvements.
   const [interacting, setInteracting] = useState(false);
@@ -188,7 +188,12 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
       onPanResponderGrant: (e, g) => {
         const t = e.nativeEvent.touches;
         setInteracting(true);
-        tapRef.current = { x: e.nativeEvent.locationX, y: e.nativeEvent.locationY };
+        tapRef.current = {
+          x: e.nativeEvent.locationX,
+          y: e.nativeEvent.locationY,
+          multi: t.length >= 2,
+          t0: Date.now(),
+        };
         baseRef.current = {
           v: viewRef.current,
           mode: t.length >= 2 ? 'pinch' : 'rotate',
@@ -206,6 +211,9 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
       onPanResponderMove: (e, g) => {
         const t = e.nativeEvent.touches;
         const mode = t.length >= 2 ? 'pinch' : 'rotate';
+        // Un second doigt, meme une fraction de seconde, ote au geste tout
+        // droit a etre lu comme un tap au relachement.
+        if (t.length >= 2) tapRef.current.multi = true;
         if (mode !== baseRef.current.mode) {
           // Le nombre de doigts a changé en plein geste : on repart d'ici.
           baseRef.current = {
@@ -251,8 +259,20 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
       onPanResponderRelease: (_e, g) => {
         setInteracting(false);
         // Tap simple (sans glisser) : cadrer la vue sur le mur touché.
-        if (baseRef.current.mode === 'rotate' && Math.abs(g.dx) + Math.abs(g.dy) < 6) {
-          focusRef.current?.(tapRef.current.x, tapRef.current.y);
+        //
+        // « Sans glisser » ne suffisait pas : un pincement court laisse un
+        // `dx` de centroïde minuscule, donc la vue se recadrait toute seule
+        // au relâchement, comme si on avait tapé un mur. Un geste à deux
+        // doigts n'est JAMAIS un tap — on s'en souvient pour toute la durée
+        // du geste —, et un tap ne dure pas une seconde.
+        const geste = tapRef.current;
+        if (
+          !geste.multi &&
+          baseRef.current.mode === 'rotate' &&
+          Math.abs(g.dx) + Math.abs(g.dy) < 6 &&
+          Date.now() - geste.t0 < 500
+        ) {
+          focusRef.current?.(geste.x, geste.y);
         }
       },
       onPanResponderTerminate: () => setInteracting(false),
@@ -350,7 +370,9 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
       // pan la repeint — c'est ce qui effaçait le silhouettage.
       const depth = face.isFloor
         ? -Infinity
-        : (face.depthAt
+        : (face.depthRefs
+            ? Math.max(...face.depthRefs.map((r) => project(r).depth))
+            : face.depthAt
             ? project(face.depthAt).depth
             : proj.reduce((s, p) => s + p.depth, 0) / proj.length) +
           (face.bias ?? 0);
@@ -386,6 +408,8 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
       | { kind: 'dot'; depth: number; x: number; y: number; color: string }
       | {
           kind: 'elec';
+          /** Décalage vertical appliqué pour ne pas en recouvrir une autre. */
+          dy?: number;
           depth: number;
           x: number;
           y: number;
@@ -499,6 +523,31 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
           haut: scale > 90 ? `${Math.round(f.height * 100)}` : undefined,
           bord: scale > 90 ? `${Math.round(x * 100)}` : undefined,
         });
+      }
+    }
+
+    // Deux appareils voisins, deux étiquettes au même endroit : la seconde
+    // masquait la première, et on lisait « 25 cm » à moitié sous « 20 cm ».
+    // On les empile donc, du haut vers le bas, en ne déplaçant que ce qui se
+    // recouvre vraiment — un trait fin rattache celles qui ont dû descendre.
+    {
+      const etiq = items.filter(
+        (i): i is Extract<typeof i, { kind: 'elec' }> =>
+          i.kind === 'elec' && !!i.haut,
+      );
+      etiq.sort((a, b) => a.y - b.y);
+      const pris: { x: number; y: number }[] = [];
+      for (const e of etiq) {
+        let y = e.y;
+        for (let garde = 0; garde < 40; garde++) {
+          const gene = pris.find(
+            (p) => Math.abs(p.x - e.x) < 104 && Math.abs(p.y - y) < 21,
+          );
+          if (!gene) break;
+          y = gene.y + 21;
+        }
+        e.dy = y - e.y;
+        pris.push({ x: e.x, y });
       }
     }
 
@@ -733,55 +782,40 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
                   )}
                   {item.haut && (
                     <>
-                      {/* Étiquette de cotes : une pastille sombre, deux
-                          lignes « intitulé + valeur ». Les flèches ⇕ ⇔ de
-                          la première version sortaient en gros glyphes de
-                          police système, et « 135 » sans rien pour dire de
-                          quoi il s'agit ne veut rien dire. */}
+                      {/* Étiquette de cotes : UNE ligne, pas un bloc.
+                          À deux lignes elle faisait 30 px de haut et deux
+                          appareils voisins se recouvraient. Elle dit la même
+                          chose sur 18 px, et `dy` la fait descendre quand la
+                          place est déjà prise — le filet rappelle alors à
+                          quel appareil elle appartient. */}
+                      {(item.dy ?? 0) > 2 && (
+                        <Line
+                          x1={item.x}
+                          y1={item.y + 6}
+                          x2={item.x}
+                          y2={item.y + (item.dy ?? 0) + 8}
+                          stroke="#0B0D12"
+                          strokeWidth={1}
+                          opacity={0.35}
+                        />
+                      )}
                       <Rect
-                        x={item.x - 41}
-                        y={item.y + 8}
-                        width={82}
-                        height={30}
-                        rx={8}
+                        x={item.x - 52}
+                        y={item.y + (item.dy ?? 0) + 8}
+                        width={104}
+                        height={18}
+                        rx={9}
                         fill="#0B0D12"
                         opacity={0.9}
                       />
                       <SvgText
-                        x={item.x - 33}
-                        y={item.y + 20}
+                        x={item.x}
+                        y={item.y + (item.dy ?? 0) + 20.5}
                         fill="#FFFFFF"
-                        fontSize={7.5}
-                        fontWeight="700"
-                        opacity={0.55}>
-                        SOL
-                      </SvgText>
-                      <SvgText
-                        x={item.x + 33}
-                        y={item.y + 20}
-                        fill="#FFFFFF"
-                        fontSize={10.5}
+                        fontSize={9}
                         fontWeight="800"
-                        textAnchor="end">
-                        {`${item.haut} cm`}
-                      </SvgText>
-                      <SvgText
-                        x={item.x - 33}
-                        y={item.y + 33}
-                        fill="#FFFFFF"
-                        fontSize={7.5}
-                        fontWeight="700"
-                        opacity={0.55}>
-                        BORD
-                      </SvgText>
-                      <SvgText
-                        x={item.x + 33}
-                        y={item.y + 33}
-                        fill="#FFFFFF"
-                        fontSize={10.5}
-                        fontWeight="800"
-                        textAnchor="end">
-                        {`${item.bord} cm`}
+                        textAnchor="middle">
+                        {`SOL ${item.haut} · BORD ${item.bord} cm`}
                       </SvgText>
                     </>
                   )}

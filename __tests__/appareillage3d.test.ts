@@ -177,7 +177,9 @@ describe('tout l’appareillage se voit en 3D, à ses cotes', () => {
             const prof = (p: { x: number; y: number; z: number }) =>
               (p.x * cam.st + p.z * cam.ct) * cam.sp + p.y * cam.cp;
             const dep = (x: Face3D) =>
-              (x.depthAt
+              (x.depthRefs
+                ? Math.max(...x.depthRefs.map(prof))
+                : x.depthAt
                 ? prof(x.depthAt)
                 : x.pts.reduce((s2, p) => s2 + prof(p), 0) / x.pts.length) +
               (x.bias ?? 0);
@@ -205,6 +207,79 @@ describe('tout l’appareillage se voit en 3D, à ses cotes', () => {
           }
           expect(vueAuMoinsUneFois).toBe(true);
         }
+      });
+    }
+  });
+
+  /**
+   * Le revers du remède. Une première correction avançait l'appareil d'un
+   * biais constant pour qu'il passe devant sa tuile : il passait alors aussi
+   * devant le mur VU DE DOS, et on voyait les prises au travers des
+   * cloisons. Le tri se fait donc sur la tuile réelle, avancée d'un
+   * millimètre — un millimètre qui compte NÉGATIVEMENT dès qu'on regarde
+   * l'autre face. C'est ce signe que ce test surveille.
+   */
+  describe('vu de dos, le mur recouvre l’appareil', () => {
+    const rad = (d: number) => (d * Math.PI) / 180;
+    for (const kind of FIXTURE_KINDS) {
+      const spec = FIXTURES[kind];
+      it(`${spec.label} : invisible à travers la cloison`, () => {
+        const f: Fixture = { id: 'x', kind, wallId: 'n', along: 2, height: 1.2, side };
+        const scene = buildScene(BOX, [], [], { palette: PAL, fixtures: [f] });
+        const out = (p: { x: number; z: number }) =>
+          (p.x - face.A.x) * face.nx + (p.z - face.A.z) * face.nz;
+        const along = (p: { x: number; z: number }) =>
+          (p.x - face.A.x) * face.ux + (p.z - face.A.z) * face.uz;
+        const x0 = faceX(face, 2) - spec.w / 2;
+        const x1 = faceX(face, 2) + spec.w / 2;
+        let vuDeDos = false;
+        for (const theta of [15, 75, 135, 195, 255, 315]) {
+          const cam = {
+            ct: Math.cos(rad(theta)),
+            st: Math.sin(rad(theta)),
+            cp: Math.cos(rad(35)),
+            sp: Math.sin(rad(35)),
+          };
+          // On ne garde que les angles où la face porteuse tourne le dos.
+          if (face.nx * cam.st * cam.sp + face.nz * cam.ct * cam.sp > 0) continue;
+          vuDeDos = true;
+          const prof = (p: { x: number; y: number; z: number }) =>
+            (p.x * cam.st + p.z * cam.ct) * cam.sp + p.y * cam.cp;
+          const dep = (x: Face3D) =>
+            (x.depthRefs
+              ? Math.max(...x.depthRefs.map(prof))
+              : x.depthAt
+              ? prof(x.depthAt)
+              : x.pts.reduce((s2, p) => s2 + prof(p), 0) / x.pts.length) +
+            (x.bias ?? 0);
+          const vus = scene.faces.filter((x) => !isHiddenFace(x, cam));
+          const appareil = vus.filter((x) => x.fill === spec.color);
+          if (!appareil.length) continue; // entièrement écarté : parfait
+          // Le dos du mur : les tuiles de la face opposée.
+          const dos = vus.filter(
+            (x) => x.fill === PAL.wall && x.pts.every((p) => out(p) < -0.13),
+          );
+          expect(
+            dos.filter(
+              (x) =>
+                Math.max(...x.pts.map(along)) > x0 &&
+                Math.min(...x.pts.map(along)) < x1,
+            ).length,
+          ).toBeGreaterThan(0);
+          // Chaque morceau d'appareil se compare aux tuiles qui le couvrent
+          // VRAIMENT : une tuile de l'autre bout du mur ne le cache pas.
+          for (const a2 of appareil) {
+            const ax0 = Math.min(...a2.pts.map(along));
+            const ax1 = Math.max(...a2.pts.map(along));
+            const dessus = dos.filter(
+              (x) =>
+                Math.max(...x.pts.map(along)) > ax0 + 1e-6 &&
+                Math.min(...x.pts.map(along)) < ax1 - 1e-6,
+            );
+            for (const d of dessus) expect(dep(a2)).toBeLessThan(dep(d));
+          }
+        }
+        expect(vuDeDos).toBe(true);
       });
     }
   });

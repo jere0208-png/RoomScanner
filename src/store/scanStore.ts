@@ -1087,6 +1087,14 @@ export const useScanStore = create<ScanState>((set, get) => {
       const st = get();
       pushHistory('addObject');
       const id = `mb-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      // Le meuble RETIENT sa pièce dès la pose. Sans ça, il n'appartenait à
+      // rien : c'est le point visé qui décidait, à chaque image, des murs
+      // qui devaient l'arrêter — et dès que le doigt sortait de la pièce,
+      // plus aucun mur ne le retenait. Il traversait donc la cloison au
+      // moment précis où on cherchait à l'y plaquer.
+      const accueil = roomParts(st.walls, st.rooms).find((p) =>
+        pointInPolygon({ x, z }, p.surface?.pts ?? []),
+      );
       set({
         objects: [
           ...st.objects,
@@ -1096,6 +1104,7 @@ export const useScanStore = create<ScanState>((set, get) => {
             width: item.w,
             depth: item.d,
             height: item.h,
+            roomId: accueil?.roomId,
             transform: catalogTransform(item, x, z),
           },
         ],
@@ -1162,7 +1171,14 @@ export const useScanStore = create<ScanState>((set, get) => {
       const obj = st.objects.find((o) => o.id === id);
       if (!obj) return;
       const parts = roomParts(st.walls, st.rooms);
+      // La pièce du meuble est celle où IL EST, pas celle que le doigt
+      // survole : pousser un lit contre un mur, c'est justement viser
+      // au-delà du mur. On garde donc, dans l'ordre : sa pièce déclarée,
+      // celle qui contient son centre actuel, celle du point visé.
+      const ici = { x: obj.transform[12], z: obj.transform[14] };
       const part =
+        parts.find((p) => p.roomId === obj.roomId) ??
+        parts.find((p) => pointInPolygon(ici, p.surface?.pts ?? [])) ??
         parts.find((p) => pointInPolygon({ x, z }, p.surface?.pts ?? [])) ??
         parts.find((p) => p.roomId === roomOf(obj));
       const yaw = Math.atan2(obj.transform[2], obj.transform[0]);
@@ -1172,6 +1188,7 @@ export const useScanStore = create<ScanState>((set, get) => {
             { width: obj.width, depth: obj.depth, yaw },
             part.walls,
             part.labelAt,
+            part.surface?.pts,
           )
         : { x, z };
       set({

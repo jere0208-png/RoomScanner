@@ -409,6 +409,16 @@ meuble paraissait revenir tout seul à sa place. À la place, `pushOutOfWalls()`
 ne fait que l'empêcher d'ENTRER dans un mur : on pousse, ça s'arrête pile
 contre le nu, et on obtient le contact franc qu'un aimant ne donne jamais.
 
+**Le meuble appartient à une pièce, et c'est elle qui l'arrête.** Il retient
+son `roomId` dès la pose. Sans ça, c'était le point VISÉ qui décidait, à
+chaque image, des murs censés l'arrêter — et pousser un lit contre un mur,
+c'est justement viser au-delà du mur : plus aucun mur ne le retenait, il
+traversait la cloison au moment précis où on cherchait à l'y plaquer. Pour la
+même raison, un point visé hors de la pièce est d'abord **ramené sur le
+contour** avant la poussée : un mur ne repousse que ce qui se trouve en face
+de lui, et visé loin dans un angle, le meuble n'était en face d'aucun des
+deux.
+
 **Ce qui ne rentre pas ne se pose pas.** `fitsInRoom()` compare l'emprise du
 meuble à celle de la pièce, dans les deux sens : un lit de 2 m ne s'ajoute
 pas à un dégagement de 1,20 m, et on le dit avec les deux cotes en main
@@ -864,13 +874,53 @@ centre, à 25 cm du sol. Le terme d'altitude de la profondeur
 (`rz · sp + y · cp`) mettait donc la prise près d'un mètre DERRIÈRE le mur
 qui la porte, et le mur la repeignait aussitôt.
 
-Chaque face d'appareil reçoit donc un `depthAt` pris **à la hauteur du pan**,
-à son propre point du mur, plus un biais d'une demi-tuile — sans ce biais, un
-appareil posé dans la moitié arrière de sa propre tuile repasserait derrière
-elle. `__tests__/appareillage3d.test.ts` vérifie l'ORDRE de peinture pour les
-22 types, sous six azimuts et aux deux hauteurs qui comptent (prise basse,
-interrupteur) : un volume peut exister et rester invisible, un test qui se
+Le premier remède — même hauteur, plus un biais d'une demi-tuile — a guéri ça
+et provoqué l'inverse : **un biais est une avance constante**, qui faisait
+aussi passer l'appareil devant le mur vu de dos. On voyait les prises au
+travers des cloisons.
+
+Le bon repère n'a rien d'approximatif : chaque face se trie sur le centre de
+**sa** tuile de mur, avancé d'un millimètre vers la pièce. Vu de face, ce
+millimètre compte positivement et l'appareil passe juste après sa tuile ; vu
+de dos, il compte négativement et le mur le recouvre. Trois précisions que le
+cas général cache :
+
+- une **façade large** (le tableau fait 55 cm) recouvre deux tuiles : elle
+  reçoit `depthRefs`, la liste des tuiles recouvertes, et le rendu retient la
+  plus proche de la caméra — exact à tout angle, là où un biais ne l'est
+  jamais ;
+- un **flanc** tient dans une seule tuile : c'est la sienne qu'on lui donne,
+  pas celle du milieu de l'appareil ;
+- le **dos** de la plaque est supprimé. Il est plaqué au nu du mur : on ne
+  peut le voir qu'en se tenant dans la maçonnerie, et large comme il est, il
+  traversait la cloison. Quatre faces de moins par appareil, au passage.
+
+`__tests__/appareillage3d.test.ts` vérifie l'ORDRE de peinture pour les 22
+types, sous six azimuts, aux deux hauteurs qui comptent (prise basse,
+interrupteur) — et l'inverse : **vu de dos, le mur doit recouvrir
+l'appareil**. Un volume peut exister et rester invisible ; un test qui se
 contente de le trouver dans la scène ne prouve rien.
+
+### Les meubles ont une silhouette
+
+Une boîte grise ne dit pas si on regarde un lit ou un frigo. `furniture3d.ts`
+découpe donc chaque meuble en quelques volumes — sommier, matelas, oreillers
+et dosseret pour un lit ; assise, dossier et accoudoirs pour un canapé ;
+plateau et quatre pieds pour une table ; cuve ouverte pour une baignoire.
+Les cotes sont **normalisées** (0 à 1 sur chaque axe), donc valables à toute
+taille, et le repère local est celui de l'emprise : `x` la largeur, `y` la
+hauteur depuis le sol, `z` la profondeur, l'avant en `z = 0`.
+
+Deux libertés assumées. La **tête de lit monte à 1,6 fois** la hauteur du
+meuble : au catalogue, la hauteur d'un lit est celle du couchage — 55 cm — et
+un dosseret de 55 cm ne se voit pas ; à 1,6 on retrouve les 90 cm d'un vrai
+dosseret. Un **robinet** dépasse de même son plan de travail. Ce qu'on ne
+sait pas nommer — un escalier, un objet non identifié — reste une boîte : mieux
+vaut ça qu'une silhouette inventée.
+
+Pendant un geste (`coarse`), on retombe sur la boîte pleine : une silhouette
+coûte cinq fois plus de faces à trier, et le plan doit rester fluide sous le
+doigt.
 
 ### Jonctions de murs
 
@@ -880,6 +930,23 @@ faces deux à deux (onglet). Les deux murs d'un angle partagent donc le même
 point au sol, en 2D comme en 3D et dans le PDF. Une extrémité libre reçoit un
 about droit ; posée sur le flanc d'un autre mur, elle est prolongée d'une
 demi-épaisseur pour entrer dans son corps (jonction en T).
+
+### Un geste ne se refabrique pas en cours de route
+
+La panne la plus coûteuse de tout le mobilier, et invisible à la lecture. Le
+meuble bouge → le store le recrée → la prop `raw` est un objet neuf → le
+`useMemo` qui fabriquait le `PanResponder` se ré-exécutait. Or l'état d'un
+responder — le `dx` cumulé depuis l'appui — vit DANS l'instance : la nouvelle
+n'a jamais reçu l'appui, son `dx` repart de zéro, et le meuble retourne à sa
+position de départ. À l'usage : « impossible de le bouger », « il revient tout
+seul ».
+
+Règle, pour les deux poignées (déplacement et rotation) : le responder se crée
+**une fois** (`[objectId]` en dépendance), et tout ce qui change à chaque
+image — le meuble, le cadrage, l'angle de vue — passe par une **référence**
+mise à jour au rendu. `__tests__/poignees.test.tsx` monte la poignée, la
+re-rend vingt fois avec des positions différentes et vérifie que les
+gestionnaires gardent la même identité.
 
 ### Le nord
 

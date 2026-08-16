@@ -96,7 +96,9 @@ export function renderSceneSvg(
       // propre position : sinon l'arête basse d'un mur passe avant lui.
       const depth = f.isFloor
         ? -Infinity
-        : (f.depthAt ? project(f.depthAt).depth
+        : (f.depthRefs
+            ? Math.max(...f.depthRefs.map((r) => project(r).depth))
+            : f.depthAt ? project(f.depthAt).depth
                      : proj.reduce((s, p) => s + p.depth, 0) / proj.length) +
           (f.bias ?? 0);
       const fill = shadeFill(f, ct, st) ?? 'none';

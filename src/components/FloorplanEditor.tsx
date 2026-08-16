@@ -792,100 +792,6 @@ export function FloorplanEditor({
                 );
               })()}
 
-            {/* Appareillage électrique : le symbole se pose DANS la pièce,
-                juste devant la face qui porte l'appareil — c'est la
-                convention d'un plan d'électricien, et c'est aussi le seul
-                moyen de distinguer les deux faces d'une même cloison. */}
-            {(() => {
-              const placed = fixtures
-                .map((f) => {
-                  const w = wallById.get(f.wallId);
-                  if (!w) return null;
-                  const face = wallFace(w, quads.get(w.id), f.side);
-                  return { f, face, x: faceX(face, f.along) };
-                })
-                .filter((p): p is NonNullable<typeof p> => !!p);
-              const ranks = stackRanks(
-                placed.map((p) => ({
-                  id: p.f.id,
-                  wallId: p.f.wallId,
-                  side: p.f.side,
-                  x: p.x,
-                })),
-              );
-              return placed.map(({ f, face, x }) => {
-                const spec = FIXTURES[f.kind];
-                const symbol = assemblySymbol(f.kind);
-                const tag = FIXTURE_TAG[f.kind];
-                // Échelonnement : le deuxième appareil du même point se pose
-                // plus loin du mur, sur le même filet.
-                const out = 0.14 + (ranks.get(f.id) ?? 0) * (0.1 + 0.14 * elecLod);
-                const anchor = mapping.toPx(facePoint(face, x, 0.02));
-                const p = mapping.toPx(facePoint(face, x, out));
-                // Le symbole regarde SA face : sa tige rejoint le mur. Le
-                // plan pouvant être tourné, l'angle se prend à l'écran.
-                const dir =
-                  (Math.atan2(-face.nz, -face.nx) + view.rot) * (180 / Math.PI) - 90;
-                return (
-                  <G
-                    key={f.id}
-                    onPress={
-                      onSelectFixture
-                        ? () => onSelectFixture(f.id, f.wallId)
-                        : undefined
-                    }>
-                    {/* Cible tactile élargie : le symbole fait 22 px, le
-                        doigt en demande le double. */}
-                    <Circle cx={p.x} cy={p.y} r={18} fill="transparent" />
-                    {elecLod < 0.98 && (
-                      <Circle
-                        cx={p.x}
-                        cy={p.y}
-                        r={4}
-                        fill={spec.color}
-                        opacity={1 - elecLod}
-                      />
-                    )}
-                    {elecLod > 0.02 && (
-                      <G opacity={elecLod}>
-                        <Line
-                          x1={anchor.x}
-                          y1={anchor.y}
-                          x2={p.x}
-                          y2={p.y}
-                          stroke={spec.color}
-                          strokeWidth={1.2}
-                        />
-                        <Circle cx={p.x} cy={p.y} r={11} fill={c.surface} />
-                        <G transform={`translate(${p.x}, ${p.y}) rotate(${dir})`}>
-                          {symbol.map((seg, si) => (
-                            <Path
-                              key={si}
-                              d={seg.d}
-                              stroke={spec.color}
-                              strokeWidth={1.6}
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              fill={seg.fill ? spec.color : 'none'}
-                            />
-                          ))}
-                        </G>
-                        {tag && (
-                          <SvgText
-                            x={p.x + 12}
-                            y={p.y - 8}
-                            fill={spec.color}
-                            fontSize={8}
-                            fontWeight="800">
-                            {tag}
-                          </SvgText>
-                        )}
-                      </G>
-                    )}
-                  </G>
-                );
-              });
-            })()}
 
             {/* Rose des vents. Relevée au magnétomètre pendant le scan, elle
                 tourne avec le plan : le N montre le vrai nord, à toute
@@ -1118,6 +1024,104 @@ export function FloorplanEditor({
                 </G>
               );
             })}
+
+            {/* L'appareillage se dessine APRÈS les menuiseries : la
+                trouée d'une baie est un aplat opaque, et posée
+                par-dessus elle effaçait les prises du mur — on croyait
+                les avoir perdues en créant l'ouverture. Le symbole se pose
+                DANS la pièce, juste devant la face qui porte l'appareil :
+                c'est la convention d'un plan d'électricien, et le seul moyen
+                de distinguer les deux faces d'une même cloison. */}
+            {(() => {
+              const placed = fixtures
+                .map((f) => {
+                  const w = wallById.get(f.wallId);
+                  if (!w) return null;
+                  const face = wallFace(w, quads.get(w.id), f.side);
+                  return { f, face, x: faceX(face, f.along) };
+                })
+                .filter((p): p is NonNullable<typeof p> => !!p);
+              const ranks = stackRanks(
+                placed.map((p) => ({
+                  id: p.f.id,
+                  wallId: p.f.wallId,
+                  side: p.f.side,
+                  x: p.x,
+                })),
+              );
+              return placed.map(({ f, face, x }) => {
+                const spec = FIXTURES[f.kind];
+                const symbol = assemblySymbol(f.kind);
+                const tag = FIXTURE_TAG[f.kind];
+                // Échelonnement : le deuxième appareil du même point se pose
+                // plus loin du mur, sur le même filet.
+                const out = 0.14 + (ranks.get(f.id) ?? 0) * (0.1 + 0.14 * elecLod);
+                const anchor = mapping.toPx(facePoint(face, x, 0.02));
+                const p = mapping.toPx(facePoint(face, x, out));
+                // Le symbole regarde SA face : sa tige rejoint le mur. Le
+                // plan pouvant être tourné, l'angle se prend à l'écran.
+                const dir =
+                  (Math.atan2(-face.nz, -face.nx) + view.rot) * (180 / Math.PI) - 90;
+                return (
+                  <G
+                    key={f.id}
+                    onPress={
+                      onSelectFixture
+                        ? () => onSelectFixture(f.id, f.wallId)
+                        : undefined
+                    }>
+                    {/* Cible tactile élargie : le symbole fait 22 px, le
+                        doigt en demande le double. */}
+                    <Circle cx={p.x} cy={p.y} r={18} fill="transparent" />
+                    {elecLod < 0.98 && (
+                      <Circle
+                        cx={p.x}
+                        cy={p.y}
+                        r={4}
+                        fill={spec.color}
+                        opacity={1 - elecLod}
+                      />
+                    )}
+                    {elecLod > 0.02 && (
+                      <G opacity={elecLod}>
+                        <Line
+                          x1={anchor.x}
+                          y1={anchor.y}
+                          x2={p.x}
+                          y2={p.y}
+                          stroke={spec.color}
+                          strokeWidth={1.2}
+                        />
+                        <Circle cx={p.x} cy={p.y} r={11} fill={c.surface} />
+                        <G transform={`translate(${p.x}, ${p.y}) rotate(${dir})`}>
+                          {symbol.map((seg, si) => (
+                            <Path
+                              key={si}
+                              d={seg.d}
+                              stroke={spec.color}
+                              strokeWidth={1.6}
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              fill={seg.fill ? spec.color : 'none'}
+                            />
+                          ))}
+                        </G>
+                        {tag && (
+                          <SvgText
+                            x={p.x + 12}
+                            y={p.y - 8}
+                            fill={spec.color}
+                            fontSize={8}
+                            fontWeight="800">
+                            {tag}
+                          </SvgText>
+                        )}
+                      </G>
+                    )}
+                  </G>
+                );
+              });
+            })()}
 
             {/* Cartouche par pièce : nom encadré et surface au sol.
                 Chacun esquive les meubles de sa pièce pour rester lisible. */}
@@ -1520,7 +1524,9 @@ function WallBody({
   );
 }
 
-function ObjectDragHandle({
+// Exportées pour les tests : c'est la STABILITÉ de leur responder qu'on
+// vérifie, et elle ne se voit que de l'extérieur.
+export function ObjectDragHandle({
   objectId,
   center,
   half,
@@ -1536,6 +1542,21 @@ function ObjectDragHandle({
 }) {
   const styles = getStyles(useTheme());
   const startRef = useRef({ x: raw.transform[12], z: raw.transform[14] });
+  /**
+   * Ce qui change à chaque frame passe par une RÉFÉRENCE, jamais par les
+   * dépendances du geste.
+   *
+   * C'est la panne du glissement, et elle est vicieuse : `raw` est un objet
+   * neuf à chaque déplacement (le store recrée le meuble), donc le `useMemo`
+   * refabriquait un `PanResponder` À CHAQUE MOUVEMENT. Or l'état d'un
+   * responder — le `dx` cumulé depuis l'appui — vit DANS l'instance : la
+   * nouvelle n'a jamais reçu l'appui, son `dx` repart de zéro, et le meuble
+   * retourne à sa position de départ. D'où « impossible de le bouger » et
+   * « il revient tout seul ». Le responder est maintenant créé une fois pour
+   * la vie de la poignée.
+   */
+  const live = useRef({ mapping, raw });
+  live.current = { mapping, raw };
   const pan = useMemo(
     () =>
       PanResponder.create({
@@ -1548,16 +1569,17 @@ function ObjectDragHandle({
         onPanResponderTerminationRequest: () => false,
         onShouldBlockNativeResponder: () => true,
         onPanResponderGrant: () => {
-          startRef.current = { x: raw.transform[12], z: raw.transform[14] };
+          const t = live.current.raw.transform;
+          startRef.current = { x: t[12], z: t[14] };
         },
         onPanResponderMove: (_e, g) => {
-          const d = mapping.deltaToMeters(g.dx, g.dy);
+          const d = live.current.mapping.deltaToMeters(g.dx, g.dy);
           useScanStore
             .getState()
             .setObjectCenter(objectId, startRef.current.x + d.x, startRef.current.z + d.z);
         },
       }),
-    [objectId, mapping, raw],
+    [objectId],
   );
   return (
     <View
@@ -1583,7 +1605,7 @@ function ObjectDragHandle({
  * on ne retrouve jamais l'aplomb. Elle s'arrête d'elle-même tous les 15°,
  * à 4° près : c'est ce qui permet de revenir à l'équerre du premier coup.
  */
-function RotateHandle({
+export function RotateHandle({
   objectId,
   center,
   at,
@@ -1603,6 +1625,12 @@ function RotateHandle({
   const styles = getStyles(c);
   const [angle, setAngle] = useState<number | null>(null);
   const base = useRef({ yaw: 0, touche: 0 });
+  // Même règle que pour le déplacement : la poignée suit le meuble, donc
+  // `at`, `center` et `raw` changent à chaque frame. Les mettre dans les
+  // dépendances recréait le responder en plein geste et la rotation
+  // repartait de zéro.
+  const live = useRef({ at, center, raw, viewRot, frame });
+  live.current = { at, center, raw, viewRot, frame };
   const pan = useMemo(
     () =>
       PanResponder.create({
@@ -1615,39 +1643,42 @@ function RotateHandle({
         onPanResponderTerminationRequest: () => false,
         onShouldBlockNativeResponder: () => true,
         onPanResponderGrant: () => {
+          const L = live.current;
           base.current = {
-            yaw: Math.atan2(raw.transform[2], raw.transform[0]),
+            yaw: Math.atan2(L.raw.transform[2], L.raw.transform[0]),
             // Angle écran du point de départ de la poignée, autour du centre.
-            touche: Math.atan2(at.y - center.y, at.x - center.x),
+            touche: Math.atan2(L.at.y - L.center.y, L.at.x - L.center.x),
           };
           setAngle(Math.round(((base.current.yaw * 180) / Math.PI) % 360));
         },
         onPanResponderMove: (_e, g) => {
+          const L = live.current;
+          const { at: at0, center: c0, viewRot: vr, frame: fr } = L;
           const a = Math.atan2(
-            at.y + g.dy - center.y,
-            at.x + g.dx - center.x,
+            at0.y + g.dy - c0.y,
+            at0.x + g.dx - c0.x,
           );
           let yaw = base.current.yaw + (a - base.current.touche);
           // Aimant à deux forces, référé à la TRAME du logement :
           // les quarts de tour tirent de loin (8°) parce que c'est là que
           // tombent 99 % des meubles ; les seizièmes, de tout près (3°),
           // pour un meuble volontairement de biais.
-          const rel = yaw - frame;
+          const rel = yaw - fr;
           const quart = Math.round(rel / (Math.PI / 2)) * (Math.PI / 2);
           const seizieme = Math.round(rel / (Math.PI / 12)) * (Math.PI / 12);
           if (Math.abs(rel - quart) < (8 * Math.PI) / 180) {
-            yaw = frame + quart;
+            yaw = fr + quart;
           } else if (Math.abs(rel - seizieme) < (3 * Math.PI) / 180) {
-            yaw = frame + seizieme;
+            yaw = fr + seizieme;
           }
           useScanStore.getState().setObjectYaw(objectId, yaw);
-          const deg = Math.round(((yaw - viewRot) * 180) / Math.PI);
+          const deg = Math.round(((yaw - vr) * 180) / Math.PI);
           setAngle(((deg % 360) + 360) % 360);
         },
         onPanResponderRelease: () => setAngle(null),
         onPanResponderTerminate: () => setAngle(null),
       }),
-    [objectId, at.x, at.y, center.x, center.y, raw, viewRot, frame],
+    [objectId],
   );
   return (
     <>

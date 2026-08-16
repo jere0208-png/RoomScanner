@@ -430,10 +430,20 @@ export function pushOutOfWalls(
   box: { width: number; depth: number; yaw: number },
   walls: WallSeg[],
   inside: Pt,
+  outline?: Pt[],
 ): Pt {
   const cos = Math.cos(box.yaw);
   const sin = Math.sin(box.yaw);
   let p = { ...centre };
+  // Le doigt part TOUJOURS au-delà du mur quand on plaque un meuble contre
+  // lui. Or un mur ne repousse que ce qui se trouve en face de lui : visé
+  // loin dans un angle, le meuble n'était plus en face d'aucun des deux, et
+  // il s'échappait par le coin. On ramène donc d'abord le point visé sur le
+  // contour de la pièce ; la poussée qui suit part alors d'un point que les
+  // murs voient, et le meuble se range dans l'angle au lieu de le traverser.
+  if (outline && outline.length >= 3 && !insidePoly(p, outline)) {
+    p = nearestOnRing(p, outline);
+  }
   for (let passe = 0; passe < 2; passe++) {
     for (const w of walls) {
       const len = segLength(w);
@@ -461,6 +471,43 @@ export function pushOutOfWalls(
     }
   }
   return p;
+}
+
+/** Point du contour le plus proche : la sortie de secours d'un point égaré. */
+function nearestOnRing(p: Pt, ring: Pt[]): Pt {
+  let best = ring[0];
+  let d2 = Infinity;
+  for (let i = 0; i < ring.length; i++) {
+    const a = ring[i];
+    const b = ring[(i + 1) % ring.length];
+    const ex = b.x - a.x;
+    const ez = b.z - a.z;
+    const l2 = ex * ex + ez * ez || 1e-9;
+    const t = Math.min(1, Math.max(0, ((p.x - a.x) * ex + (p.z - a.z) * ez) / l2));
+    const q = { x: a.x + ex * t, z: a.z + ez * t };
+    const dd = (q.x - p.x) ** 2 + (q.z - p.z) ** 2;
+    if (dd < d2) {
+      d2 = dd;
+      best = q;
+    }
+  }
+  return best;
+}
+
+/** Point dans un polygone (lancer de rayon), sans dépendre d'`appearance`. */
+function insidePoly(p: Pt, ring: Pt[]): boolean {
+  let dans = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const a = ring[i];
+    const b = ring[j];
+    if (
+      a.z > p.z !== b.z > p.z &&
+      p.x < ((b.x - a.x) * (p.z - a.z)) / (b.z - a.z) + a.x
+    ) {
+      dans = !dans;
+    }
+  }
+  return dans;
 }
 
 /** Un meuble tient-il dans une pièce, quel que soit son angle ? */

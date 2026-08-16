@@ -21,10 +21,12 @@ import {
   type WallSeg,
 } from './floorplan';
 import { floorColorAt, mixHex, pointInPolygon, sampleTexture } from './appearance';
+import { furnitureParts, type FurnPart } from './furniture3d';
 import {
   FIXTURES,
   assemblySymbol,
   faceX,
+  facePoint,
   symbolPolylines,
   wallFace,
   SYMBOL_SPAN,
@@ -62,6 +64,19 @@ export interface Face3D {
    * comme lui.
    */
   depthAt?: P3;
+  /**
+   * Plusieurs points de tri, dont on retient LE PLUS PROCHE de la caméra.
+   *
+   * Une façade d'appareil large — un tableau électrique fait 55 cm —
+   * recouvre deux tuiles de mur, et le tri ne peut pas se contenter d'une
+   * seule : celle qu'on n'aurait pas prise passerait après, et repeindrait
+   * la moitié du tableau. On donne donc les tuiles RECOUVERTES, avancées
+   * d'un millimètre ; le maximum, calculé à la projection, tombe
+   * exactement sur la bonne, quel que soit l'angle. Réservé aux faces
+   * tournées vers la pièce : vues de dos elles sont écartées, et rien ne
+   * peut donc traverser un mur par ce chemin.
+   */
+  depthRefs?: P3[];
   /**
    * Normale sortante d'une face de VOLUME. Sa présence dit que la face
    * appartient à un solide fermé : quand elle tourne le dos à la caméra, on
@@ -793,31 +808,101 @@ export function buildScene(
     // pictogramme qui plane à côté de l'objet qu'il désigne ne dit pas
     // « voici une prise », il dit « voici une annotation ». Et comme il
     // fait partie du volume, il tourne, s'incline et disparaît avec lui.
-    // ---- Le tri en profondeur : une prise se range AVEC son mur.
+    // ---- Le tri en profondeur : un appareil se range AVEC SA TUILE.
     //
-    // C'est ce qui manquait, et pourquoi on ne voyait aucun appareil sur le
-    // modèle : un pan de mur se trie sur le milieu de sa tuile, donc à
-    // MI-HAUTEUR (1,25 m), tandis qu'une prise se triait sur son propre
-    // centre — 25 cm du sol. Le terme d'altitude de la profondeur mettait
-    // donc systématiquement la prise un mètre DERRIÈRE le mur qui la porte,
-    // et le mur la repeignait. Seules les hauteurs d'interrupteur, vers
-    // 1,20 m, s'en sortaient parfois : d'où « on ne voit que les cotes ».
+    // Deux erreurs successives, et la seconde vaut d'être écrite. Un pan de
+    // mur se découpe en tuiles et chacune se trie sur SON centre, donc à
+    // mi-hauteur du pan ; une prise se triait sur son propre centre, à
+    // 25 cm du sol. Le terme d'altitude de la profondeur la mettait un
+    // mètre DERRIÈRE le mur qui la porte, et le mur la repeignait : à
+    // l'écran, plus un seul appareil, seulement ses cotes.
     //
-    // On donne donc à chaque face de l'appareil un point de tri pris à la
-    // hauteur du pan, à son propre point du mur, avancé d'un cheveu. Le
-    // biais rattrape la largeur d'une tuile : sans lui, un appareil posé
-    // dans la moitié arrière de SA tuile repasserait derrière elle.
-    const refY = w.height / 2;
-    const rangeAvecLeMur = (from: number) => {
-      for (let i = from; i < faces.length; i++) {
-        const f2 = faces[i];
-        const cx = f2.pts.reduce((s2, p) => s2 + p.x, 0) / f2.pts.length;
-        const cz = f2.pts.reduce((s2, p) => s2 + p.z, 0) / f2.pts.length;
-        f2.depthAt = { x: cx, y: refY, z: cz };
-        f2.bias = (f2.bias ?? 0) + step / 2 + 0.004;
-      }
+    // Le premier remède — même hauteur, plus un biais d'une demi-tuile — a
+    // guéri ça et provoqué l'inverse : un biais est une avance CONSTANTE,
+    // qui faisait aussi passer l'appareil devant le mur vu de dos. On voyait
+    // les prises au travers des cloisons.
+    //
+    // Le bon repère n'a rien d'approximatif : c'est le centre exact de la
+    // tuile qui porte l'appareil, avancé d'un millimètre vers la pièce. Vu
+    // de face, ce millimètre compte positivement et l'appareil passe juste
+    // après sa tuile ; vu de dos, il compte négativement et le mur le
+    // recouvre. Aucun biais, donc aucun cas où l'un l'emporte à tort.
+    const texMur = opts.showTextures ? w.texture : undefined;
+    const rows = texMur
+      ? Math.min(MAX_TEX_ROWS, Math.max(1, texMur.rows))
+      : 1;
+    // Le paramètre du quadrilatère, ramené à l'abscisse de CETTE face.
+    const xOf = (t: number) => (f.side > 0 ? t : 1 - t) * face.len;
+    let xa = 0;
+    let xb = face.len;
+    let ya = 0;
+    let yz = w.height;
+    for (const panel of wallPanels(holes.get(w.id) ?? [], w.height)) {
+      const e0 = xOf(panel.t0);
+      const e1 = xOf(panel.t1);
+      const lo = Math.min(e0, e1);
+      const hi = Math.max(e0, e1);
+      if (x < lo - 1e-6 || x > hi + 1e-6) continue;
+      if (f.height < panel.y0 - 1e-6 || f.height > panel.y1 + 1e-6) continue;
+      xa = lo;
+      xb = hi;
+      ya = panel.y0;
+      yz = panel.y1;
+      break;
+    }
+    const largeurPan = Math.max(1e-6, xb - xa);
+    const cols = Math.max(1, Math.ceil(largeurPan / step));
+    const tw = largeurPan / cols;
+    const ci = Math.min(cols - 1, Math.max(0, Math.floor((x - xa) / tw)));
+    const hautPan = Math.max(1e-6, yz - ya);
+    const rh = hautPan / rows;
+    const ri = Math.min(rows - 1, Math.max(0, Math.floor((f.height - ya) / rh)));
+    const yTuile = ya + (ri + 0.5) * rh;
+    const ancre = facePoint(face, xa + (ci + 0.5) * tw, spec.depth + 0.001);
+    const triAt = { x: ancre.x, y: yTuile, z: ancre.z };
+    // Toutes les tuiles que la plaque recouvre, pas seulement la sienne.
+    const c0 = Math.min(cols - 1, Math.max(0, Math.floor((x - hw - xa) / tw)));
+    const c1 = Math.min(cols - 1, Math.max(0, Math.floor((x + hw - xa) / tw)));
+    /** Le point de tri de la tuile qui contient cette abscisse de face. */
+    const tuileDe = (xf: number): P3 => {
+      const k = Math.min(cols - 1, Math.max(0, Math.floor((xf - xa) / tw)));
+      const a2 = facePoint(face, xa + (k + 0.5) * tw, spec.depth + 0.001);
+      return { x: a2.x, y: yTuile, z: a2.z };
     };
-    rangeAvecLeMur(avant);
+    const refs: P3[] = [];
+    for (let k = c0; k <= c1; k++) {
+      const a2 = facePoint(face, xa + (k + 0.5) * tw, spec.depth + 0.001);
+      refs.push({ x: a2.x, y: yTuile, z: a2.z });
+    }
+    // Le DOS de la plaque n'existe pour personne : il est plaqué au nu du
+    // mur, à un millimètre. On ne peut le voir qu'en se plaçant DANS la
+    // maçonnerie — c'est-à-dire jamais —, et comme il est large il se triait
+    // mal vu de l'autre côté de la cloison : il traversait. On le retire,
+    // et quatre faces de moins par appareil, c'est autant de gagné.
+    for (let i = faces.length - 1; i >= avant; i--) {
+      const nf = faces[i].normal;
+      if (nf && nf.x * face.nx + nf.z * face.nz < -0.9) faces.splice(i, 1);
+    }
+    for (let i = avant; i < faces.length; i++) {
+      const fa = faces[i];
+      const nf = fa.normal;
+      const devant = !!nf && nf.x * face.nx + nf.z * face.nz > 0.9;
+      // La façade se compare à TOUTES les tuiles qu'elle recouvre. Les
+      // flancs, eux, tiennent chacun dans UNE tuile : on prend la leur, pas
+      // celle du milieu de l'appareil — sinon un flanc de tableau se
+      // retrouvait trié avec une tuile voisine, et repassait devant le dos
+      // du mur quand on regardait la cloison de l'autre côté.
+      if (devant && refs.length > 1) {
+        fa.depthRefs = refs;
+      } else {
+        const cxf =
+          fa.pts.reduce(
+            (s2, p) => s2 + (p.x - face.A.x) * face.ux + (p.z - face.A.z) * face.uz,
+            0,
+          ) / fa.pts.length;
+        fa.depthAt = tuileDe(cxf);
+      }
+    }
 
     const trait = mixHex(spec.color, '#000000', 0.55);
     // L'échelle se prend sur la HAUTEUR : la largeur d'un ensemble croît
@@ -836,13 +921,10 @@ export function buildScene(
         fill: null,
         stroke: trait,
         // Le symbole se trie comme la plaque, un cran devant elle.
-        bias: EDGE_BIAS + step / 2 + 0.006,
+        bias: EDGE_BIAS,
         normal: nrm,
-        depthAt: {
-          x: at(0, spec.depth).x,
-          y: w.height / 2,
-          z: at(0, spec.depth).z,
-        },
+        depthAt: refs.length > 1 ? undefined : triAt,
+        depthRefs: refs.length > 1 ? refs : undefined,
       });
     }
   }
@@ -890,20 +972,13 @@ export function buildScene(
   )) {
     const cosY = Math.cos(obj.yaw);
     const sinY = Math.sin(obj.yaw);
-    const hw = obj.width / 2;
-    const hd = obj.depth / 2;
-    const corners = [
-      [-hw, -hd],
-      [hw, -hd],
-      [hw, hd],
-      [-hw, hd],
-    ].map(([lx, lz]) => ({
-      x: obj.cx + lx * cosY - lz * sinY,
-      z: obj.cz + lx * sinY + lz * cosY,
-    }));
     const yb = Math.max(0, obj.yCenter - obj.height / 2 - floorY);
-    const yt = yb + obj.height;
     const skin = opts.showTextures ? obj.color : undefined;
+    const teintes = {
+      body: skin ?? pal.object,
+      soft: mixHex(skin ?? pal.object, '#FFFFFF', 0.45),
+      dark: mixHex(skin ?? pal.object, '#0B0D12', 0.42),
+    };
     // Un meuble est un VOLUME, comme un mur : ses faces portent leur normale
     // sortante et celles qui tournent le dos ne sont pas dessinées. Sans ça,
     // les quatre flancs se disputaient l'ordre d'affichage et l'un ou l'autre
@@ -911,26 +986,62 @@ export function buildScene(
     //
     // L'ordre des coins est celui qui donne des normales SORTANTES avec la
     // convention de `pushWallBlock` : c3→c2 borde le côté +n.
-    pushWallBlock(
-      { a1: corners[3], b1: corners[2], b2: corners[1], a2: corners[0] },
-      0,
-      1,
-      yb,
-      yt,
-      {
-        fill: skin ?? pal.object,
-        top: skin ? mixHex(skin, '#FFFFFF', 0.35) : pal.objectTop,
-        stroke: pal.objectStroke,
-        topStroke: pal.objectStroke,
-        captured: !!skin,
-        // Toujours ombré : deux flancs du même aplat ne se distinguent que
-        // par leur contour, et un meuble paraît alors amputé d'une face.
-        shade: true,
-        // Une télé ou une étagère ne touchent pas le sol : leur dessous se
-        // voit depuis le bas de la pièce.
-        closeBottom: yb > 1e-3,
-      },
-    );
+    /**
+     * Une pièce du meuble, posée dans son repère.
+     *
+     * `pushWallBlock` attend un quadrilatère au sol et deux altitudes : on
+     * lui donne l'emprise de la pièce, tournée comme le meuble. L'ordre des
+     * coins est celui qui donne des normales SORTANTES — c3→c2 borde le
+     * côté +n —, sans quoi les quatre flancs se disputent l'affichage.
+     */
+    const poser = (part: FurnPart) => {
+      const bloc = [
+        [part.x0, part.z0],
+        [part.x1, part.z0],
+        [part.x1, part.z1],
+        [part.x0, part.z1],
+      ].map(([ux, uz]) => {
+        const lx = (ux - 0.5) * obj.width;
+        const lz = (uz - 0.5) * obj.depth;
+        return {
+          x: obj.cx + lx * cosY - lz * sinY,
+          z: obj.cz + lx * sinY + lz * cosY,
+        };
+      });
+      const fond = yb + part.y0 * obj.height;
+      const haut = yb + part.y1 * obj.height;
+      if (haut - fond < 1e-4) return;
+      const fill = teintes[part.tone];
+      pushWallBlock(
+        { a1: bloc[3], b1: bloc[2], b2: bloc[1], a2: bloc[0] },
+        0,
+        1,
+        fond,
+        haut,
+        {
+          fill,
+          top: mixHex(fill, '#FFFFFF', 0.3),
+          stroke: pal.objectStroke,
+          topStroke: pal.objectStroke,
+          captured: !!skin,
+          // Toujours ombré : deux flancs du même aplat ne se distinguent
+          // que par leur contour, et un meuble paraît alors amputé d'une
+          // face.
+          shade: true,
+          // Une télé ou une étagère ne touchent pas le sol : leur dessous se
+          // voit depuis le bas de la pièce.
+          closeBottom: fond > 1e-3,
+        },
+      );
+    };
+
+    // La silhouette du meuble, s'il en a une ; sinon, la boîte pleine.
+    const morceaux = opts.coarse ? [] : furnitureParts(obj.category ?? '');
+    if (morceaux.length === 0) {
+      poser({ x0: 0, x1: 1, y0: 0, y1: 1, z0: 0, z1: 1, tone: 'body' });
+    } else {
+      for (const part of morceaux) poser(part);
+    }
   }
 
   return { faces, rooms, floorY };
