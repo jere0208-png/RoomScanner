@@ -35,7 +35,12 @@ import {
   type FixtureKind,
   type SymbolStroke,
 } from '../geometry/electrical';
-import type { MaterialList } from '../geometry/nfc15100';
+import type { Differential, MaterialList } from '../geometry/nfc15100';
+import {
+  WIRE_COLORS,
+  type MultiWireSchema,
+  type SchemaRow,
+} from '../geometry/schema';
 import type { BuyRow, PullRow } from '../geometry/conduits';
 import { planFrameAngle } from '../geometry/floorplan';
 import {
@@ -106,6 +111,16 @@ export interface PdfOptions {
   textures?: boolean;
   /** Feuille de métré par pièce (surfaces, périmètres, murs nets). */
   metre?: boolean;
+  /**
+   * Schémas unifilaire et multifilaire : deux feuilles de plus, tirées des
+   * circuits déjà calculés. Absent = pas de schéma, et le dossier garde sa
+   * pagination d'avant.
+   */
+  schemas?: {
+    rows: SchemaRow[];
+    differentials: Differential[];
+    multi: MultiWireSchema[];
+  } | null;
 }
 
 function bytesOf(s: string): Uint8Array {
@@ -1101,6 +1116,244 @@ function metrePage(ctx: SheetContext, sheet: string): string {
   return d.stream();
 }
 
+/**
+ * Schéma unifilaire : l'architecture de l'installation.
+ *
+ * Ce que lit un contrôleur ou un confrère avant tout le reste — d'où part
+ * quoi, sous quelle protection, avec quelle section. On ne réinvente aucun
+ * circuit : ce sont exactement ceux de la liste du matériel, mis en forme.
+ * Un document qui contredirait la liste ne servirait à rien.
+ */
+function unifilairePage(
+  ctx: SheetContext,
+  sheet: string,
+  rows: SchemaRow[],
+  diffs: Differential[],
+): string {
+  const d = new Draw();
+  const x0 = FRAME.x + 30;
+  const w = FRAME.w - 60;
+  let y = FRAME.y + FRAME.h - TITLE_H - 46;
+
+  d.text('Schéma unifilaire', x0, y + 22, 13, INK, { bold: true, align: 'left' });
+  d.text(
+    'Origine, protections, départs. Sections et calibres selon NF C 15-100.',
+    x0,
+    y + 8,
+    8,
+    GREY,
+    { align: 'left' },
+  );
+  y -= 14;
+
+  // ---------------------------------------------------------- l'origine
+  const cx = x0 + 34;
+  d.rect(cx - 26, y - 20, 52, 20, '#FFFFFF', INK, 1);
+  d.text('AGCP', cx, y - 8, 8, INK, { bold: true });
+  d.text('500 mA S', cx, y - 17, 6.5, GREY);
+  d.text('Disjoncteur de branchement', cx + 40, y - 12, 7.5, GREY, {
+    align: 'left',
+  });
+  y -= 20;
+  d.line(cx, y, cx, y - 16, 1, INK);
+  y -= 16;
+
+  // Le peigne horizontal : tous les différentiels y pendent.
+  const parDiff = new Map<string, SchemaRow[]>();
+  const libres: SchemaRow[] = [];
+  for (const r of rows) {
+    if (!r.under) libres.push(r);
+    else parDiff.set(r.under, [...(parDiff.get(r.under) ?? []), r]);
+  }
+
+  const dessineDepart = (r: SchemaRow, bx: number, by: number) => {
+    // Le disjoncteur : un rectangle, sa valeur, et le trait qui descend.
+    d.line(bx, by, bx, by - 12, 0.9, INK);
+    d.rect(bx - 13, by - 30, 26, 18, '#FFFFFF', INK, 0.9);
+    d.text(r.breaker === null ? 'com.' : `${r.breaker} A`, bx, by - 24, 7.5, INK, {
+      bold: true,
+    });
+    d.line(bx, by - 30, bx, by - 44, 0.9, INK);
+    // La barre oblique et le nombre de conducteurs : la convention de
+    // l'unifilaire, qui dit en un signe ce que le multifilaire détaille.
+    d.line(bx - 4, by - 40, bx + 4, by - 34, 0.9, INK);
+    d.text(`${r.wires}`, bx + 8, by - 39, 7, GREY, { align: 'left' });
+    d.text(r.mark, bx, by - 52, 8, INK, { bold: true });
+    const detail =
+      r.section === null
+        ? `ICTA Ø${r.conduit}`
+        : `${r.section} mm² · ICTA Ø${r.conduit}`;
+    d.text(detail, bx, by - 61, 6.5, GREY);
+  };
+
+  const blocs: { titre: string; sous: string; rows: SchemaRow[] }[] = [];
+  diffs.forEach((diff, i) => {
+    const list = parDiff.get(`ID${i + 1}`) ?? [];
+    if (list.length === 0) return;
+    blocs.push({
+      titre: `ID${i + 1}`,
+      sous: `${diff.rating} A · 30 mA · type ${diff.type}`,
+      rows: list,
+    });
+  });
+  if (libres.length > 0) {
+    blocs.push({
+      titre: 'GTL',
+      sous: 'coffret de communication',
+      rows: libres,
+    });
+  }
+
+  for (const bloc of blocs) {
+    if (y < FRAME.y + 130) break;
+    // Le différentiel, puis son peigne.
+    d.rect(cx - 26, y - 20, 52, 20, '#FFFFFF', INK, 1);
+    d.text(bloc.titre, cx, y - 8, 8, INK, { bold: true });
+    d.text(bloc.sous, cx + 40, y - 12, 7.5, GREY, { align: 'left' });
+    y -= 20;
+    const nb = bloc.rows.length;
+    const largeur = Math.min(w - 60, Math.max(60, nb * 62));
+    const gauche = x0 + 30;
+    d.line(cx, y, cx, y - 14, 1, INK);
+    y -= 14;
+    d.line(gauche, y, gauche + largeur, y, 1, INK);
+    bloc.rows.forEach((r, i) => {
+      const bx = gauche + (nb === 1 ? largeur / 2 : (i * largeur) / (nb - 1));
+      dessineDepart(r, bx, y);
+      // Le nom du circuit, à la verticale sous le repère.
+      d.text(r.label, bx, y - 71, 6.5, GREY);
+    });
+    y -= 92;
+  }
+
+  // -------------------------------------------------------- le tableau
+  if (y > FRAME.y + 110) {
+    y -= 4;
+    d.line(x0, y, x0 + w, y, 0.6, GREY_LIGHT);
+    y -= 14;
+    d.text('Départs', x0, y, 8.5, GREY, { align: 'left' });
+    d.text('Protection · section · gaine', x0 + w, y, 8.5, GREY, {
+      align: 'left',
+    });
+    y -= 12;
+    for (const r of rows) {
+      if (y < FRAME.y + 70) break;
+      d.text(`${r.mark} — ${r.label}`, x0, y, 8, INK, { align: 'left' });
+      d.text(r.points, x0 + 150, y, 7.5, GREY, { align: 'left' });
+      const droite =
+        r.breaker === null
+          ? `coffret com. · ICTA Ø${r.conduit}`
+          : `${r.breaker} A · ${r.section} mm² · ICTA Ø${r.conduit}`;
+      d.text(droite, x0 + w - 4, y, 7.5, INK, { align: 'left' });
+      y -= 12;
+    }
+  }
+
+  drawSheetChrome(d, {
+    project: ctx.name,
+    filename: ctx.filename,
+    sheetTitle: 'Schéma unifilaire',
+    sheet,
+    scaleLabel: null,
+  });
+  return d.stream();
+}
+
+/**
+ * Schéma multifilaire : le câblage, conducteur par conducteur.
+ *
+ * Les couleurs sont normatives — bleu pour le neutre, vert/jaune pour la
+ * terre, et ces deux-là ne servent à rien d'autre. Un schéma qui les
+ * emploierait à tort serait faux avant d'être lu, c'est pourquoi elles ne
+ * sont pas choisies ici mais reprises de `WIRE_COLORS`.
+ */
+function multifilairePage(
+  ctx: SheetContext,
+  sheet: string,
+  schemas: MultiWireSchema[],
+): string {
+  const d = new Draw();
+  const x0 = FRAME.x + 30;
+  const w = FRAME.w - 60;
+  let y = FRAME.y + FRAME.h - TITLE_H - 46;
+
+  d.text('Schéma multifilaire', x0, y + 22, 13, INK, { bold: true, align: 'left' });
+  d.text(
+    'Un conducteur par trait, à sa couleur normalisée (NF C 15-100).',
+    x0,
+    y + 8,
+    8,
+    GREY,
+    { align: 'left' },
+  );
+  y -= 16;
+
+  // La légende des couleurs, une fois pour toute la feuille.
+  let lx = x0;
+  for (const role of ['phase', 'neutre', 'terre', 'navette', 'retour'] as const) {
+    const { color, label } = WIRE_COLORS[role];
+    d.line(lx, y, lx + 14, y, 2, color);
+    d.text(label, lx + 18, y - 3, 6.5, GREY, { align: 'left' });
+    lx += 104;
+  }
+  y -= 18;
+
+  for (const sch of schemas) {
+    const haut = 34 + sch.wires.length * 9;
+    if (y - haut < FRAME.y + 80) break;
+    d.line(x0, y, x0 + w, y, 0.6, GREY_LIGHT);
+    y -= 14;
+    d.text(`${sch.mark} — ${sch.label}`, x0, y, 9, INK, {
+      bold: true,
+      align: 'left',
+    });
+    y -= 12;
+
+    // Le disjoncteur à gauche, les appareils à droite, les fils entre.
+    const gx = x0 + 6;
+    const dx = x0 + w - 6;
+    d.rect(gx, y - sch.wires.length * 9 - 4, 22, sch.wires.length * 9 + 8, '#FFFFFF', INK, 0.9);
+    d.text(sch.mark, gx + 11, y - sch.wires.length * 9 / 2 - 2, 7, INK, {
+      bold: true,
+    });
+
+    sch.wires.forEach((fil, i) => {
+      const fy = y - i * 9 - 6;
+      d.line(gx + 22, fy, dx - 90, fy, 1.6, fil.color);
+      d.text(
+        fil.section > 0 ? `${fil.role} ${fil.section}` : fil.role,
+        dx - 86,
+        fy - 2.5,
+        6.5,
+        fil.color,
+        { align: 'left' },
+      );
+    });
+
+    // Ce que dessert le circuit, en boîtes alignées à droite.
+    const cy = y - (sch.wires.length * 9) / 2 - 2;
+    const noms = sch.devices.slice(0, 4).map((x) => x.label);
+    if (sch.devices.length > 4) noms.push(`+${sch.devices.length - 4}`);
+    d.text(noms.join(' · ') || '—', dx, cy, 7, INK, { align: 'left' });
+
+    y -= sch.wires.length * 9 + 10;
+    if (sch.note) {
+      d.text(sch.note, x0 + 6, y, 6.5, GREY, { align: 'left' });
+      y -= 12;
+    }
+    y -= 6;
+  }
+
+  drawSheetChrome(d, {
+    project: ctx.name,
+    filename: ctx.filename,
+    sheetTitle: 'Schéma multifilaire',
+    sheet,
+    scaleLabel: null,
+  });
+  return d.stream();
+}
+
 const DEFAULT_PDF_VIEWS: [View3DParams, View3DParams] = [
   { theta: -32, tilt: 58, zoom: 1, fx: 0, fy: 0 },
   { theta: 148, tilt: 42, zoom: 1, fx: 0, fy: 0 },
@@ -1575,7 +1828,11 @@ export function buildScanPdf(
 ): Uint8Array {
   const filename = pdfFilename(scan.name);
   const withMetre = opts.metre ?? true;
-  const total = 1 + (withMetre ? 1 : 0) + (include3D ? 1 : 0);
+  // Les schémas ne s'impriment que s'il y a une installation à montrer.
+  const schemas = opts.schemas ?? null;
+  const withSchema = !!schemas && schemas.rows.length > 0;
+  const total =
+    1 + (withMetre ? 1 : 0) + (include3D ? 1 : 0) + (withSchema ? 2 : 0);
   const ctx: SheetContext = {
     name: scan.name,
     filename,
@@ -1598,6 +1855,19 @@ export function buildScanPdf(
   if (include3D) {
     pages.push(
       threeDPage(ctx, `${pages.length + 1} / ${total}`, opts.views, opts.measures3D ?? true),
+    );
+  }
+  if (withSchema && schemas) {
+    pages.push(
+      unifilairePage(
+        ctx,
+        `${pages.length + 1} / ${total}`,
+        schemas.rows,
+        schemas.differentials,
+      ),
+    );
+    pages.push(
+      multifilairePage(ctx, `${pages.length + 1} / ${total}`, schemas.multi),
     );
   }
   return buildDocument(pages);

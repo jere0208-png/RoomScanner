@@ -1107,6 +1107,51 @@ portés par aucun circuit**. La norme compte les points lumineux, pas les
 commandes — mais une commande est bien câblée sur le circuit d'éclairage, et
 l'ignorer revenait à ne jamais compter son câble ni dessiner sa gaine.
 
+### Schémas unifilaire et multifilaire
+
+Tout dossier électrique en porte deux, et l'app peut les déduire du relevé
+puisqu'elle connaît déjà les circuits — ce sont EXACTEMENT ceux de la liste
+du matériel, mis en forme. Un schéma qui contredirait la liste ne servirait
+à rien.
+
+**L'unifilaire** montre l'architecture : disjoncteur de branchement, peigne,
+un différentiel par groupe, un départ par circuit avec son calibre, sa
+section, sa gaine et le nombre de conducteurs marqué d'une barre oblique — la
+convention qui dit en un signe ce que le multifilaire détaille.
+
+**Le multifilaire** montre le câblage : un trait par conducteur, à sa
+couleur. Les couleurs sont **normatives**, pas décoratives : bleu clair pour
+le neutre et vert/jaune pour la terre sont RÉSERVÉS, et un schéma qui les
+emploierait à tort serait faux avant d'être lu. Elles vivent donc dans une
+seule table (`WIRE_COLORS`), et un test vérifie qu'aucun autre rôle ne les
+reprend. Un circuit d'éclairage compte six fils (phase, neutre, terre, retour
+de lampe, deux navettes), un circuit de prises trois, et les courants faibles
+ne se colorient pas comme du 230 V.
+
+Faute de pouvoir regarder le PDF depuis la machine de développement,
+`__tests__/pdfschema.test.ts` le relit : repères présents, protections
+rattachées, couleurs réellement écrites dans le flux, et **rien qui sorte de
+la feuille**.
+
+### Le repère de circuit, du plan au tableau
+
+Chaque appareil porte son repère (C1, C2…) sur le plan 2D quand le calque
+« gaines » est allumé, et ce sont les mêmes sur l'unifilaire et dans le
+tableau de tirage. C'est ce qu'on donne à celui qui tire.
+
+Deux corrections de fond au passage :
+
+- **Deux pièces homonymes ne se confondent plus.** Le regroupement se faisait
+  sur le NOM : dans un T4 avec deux « Chambre » non renommées, le tableau
+  était faux. On dédoublonne sur l'identité et on numérote les homonymes à
+  l'affichage.
+- **Un appareil arrive à SA hauteur normalisée**, pas à 20 cm du sol. Tout
+  arrivait à 20 : une prise y est chez elle, un interrupteur non, et un
+  tableau électrique s'annonçait « trop bas » à la seconde où on le posait.
+- **Le tableau est réclamé.** Sans lui, ni métré de câble, ni plan des
+  gaines, ni tirage : le constat monte en alerte avec un bouton qui le pose.
+  Deux tableaux, ou un tableau en salle d'eau, sont signalés aussi.
+
 ### Jonctions de murs
 
 Un mur n'est pas un trait épais posé à côté des autres : `wallQuads()` traite

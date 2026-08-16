@@ -161,6 +161,11 @@ interface Props {
    * sans tableau posé, l'écran n'en fournit pas, et rien ne se dessine.
    */
   cableRoutes?: { id: string; path: Pt[] }[];
+  /**
+   * Repère de circuit par appareil (C1, C2…) : ce qu'on donne à celui qui
+   * tire les gaines. Absent = pas de repérage, le plan reste nu.
+   */
+  circuitMarks?: Map<string, string>;
   /** Photos de repérage punaisées sur les murs. */
   photos?: { id: string; wallId: string; along: number }[];
   onSelectPhoto?: (id: string) => void;
@@ -206,6 +211,7 @@ export function FloorplanEditor({
   selectedWallId,
   onSelectWall,
   cableRoutes,
+  circuitMarks,
   photos,
   onSelectPhoto,
   selectedObjectId,
@@ -1186,6 +1192,20 @@ export function FloorplanEditor({
                             fontSize={8}
                             fontWeight="800">
                             {tag}
+                          </SvgText>
+                        )}
+                        {/* Le repère de circuit : c'est LUI qu'on lit sur le
+                            chantier pour savoir quoi tirer où. Posé sous
+                            l'appareil pour ne pas se mêler à son sigle. */}
+                        {circuitMarks?.get(f.id) && (
+                          <SvgText
+                            x={p.x}
+                            y={p.y + 20}
+                            fill={c.ink}
+                            fontSize={8}
+                            fontWeight="900"
+                            textAnchor="middle">
+                            {circuitMarks.get(f.id)}
                           </SvgText>
                         )}
                       </G>

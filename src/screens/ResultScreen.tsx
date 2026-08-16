@@ -54,6 +54,7 @@ import {
 } from '../geometry/floorplan';
 import { hasCapturedColors } from '../geometry/appearance';
 import { planRoutes } from '../geometry/elecplan';
+import { fixtureMarks } from '../geometry/schema';
 import { buyingList, pullSchedule } from '../geometry/conduits';
 import {
   frCategory,
@@ -66,6 +67,7 @@ import { buildObj, objFilename } from '../export/model3d';
 import { checkPlan } from '../geometry/diagnostics';
 import {
   checkElectrical,
+  planCircuits,
   roomUse,
   worktopsOnWall,
   type Worktop,
@@ -599,6 +601,26 @@ export function ResultScreen() {
     [walls, rooms, parts, fixtures, placement],
   );
 
+  /**
+   * Repère de circuit par appareil (C1, C2…).
+   *
+   * C'est ce qu'on lit sur le chantier : le plan dit quoi tirer où, et le
+   * schéma unifilaire porte les mêmes repères. Ils se calculent sans
+   * tableau posé — un circuit existe dès qu'il y a des appareils.
+   */
+  const marks = useMemo(() => {
+    const pieceDe = (f: Fixture) =>
+      rooms.find((r) => r.id === placement.get(f.id));
+    return fixtureMarks(
+      planCircuits(
+        fixtures,
+        (f) => pieceDe(f)?.name ?? '',
+        (f) => roomUse(pieceDe(f)?.name ?? '', pieceDe(f)?.kind) === 'cuisine',
+        (f) => pieceDe(f)?.id,
+      ),
+    );
+  }, [fixtures, rooms, placement]);
+
   const elecIssues = checkElectrical(
     roomInputs,
     fixtures,
@@ -898,6 +920,7 @@ export function ResultScreen() {
         {vue === '2d' ? (
           <FloorplanEditor
             cableRoutes={showRoutes ? cheminements?.traces : undefined}
+            circuitMarks={showRoutes ? marks : undefined}
             photos={photos}
             onSelectPhoto={setPhotoVue}
             showMeasures={showMeasures}

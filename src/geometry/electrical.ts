@@ -632,7 +632,17 @@ export function newFixture(
     kind,
     wallId: wall.id,
     along: fromFaceX(face, x),
-    height: FIXTURE_MARGIN,
+    // À SA hauteur normalisée, pas à 20 cm du sol.
+    //
+    // Tout arrivait à 20 cm : une prise y est chez elle, un interrupteur
+    // non, et un tableau électrique y est carrément hors norme — il
+    // s'annonçait « trop bas » à la seconde où on le posait. On pose donc
+    // chaque appareil là où il se pose vraiment, quitte à le déplacer
+    // ensuite.
+    height: Math.min(
+      Math.max(spec.std, spec.h / 2),
+      Math.max(spec.h / 2, wall.height - spec.h / 2),
+    ),
     side,
   };
 }

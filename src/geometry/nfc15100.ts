@@ -651,14 +651,55 @@ export function checkElectrical(
         'jamais moins de deux dans le logement.',
     });
   }
-  if (fixtures.length > 0 && !fixtures.some((f) => f.kind === 'tableau')) {
+  /**
+   * Le tableau n'est pas un appareil de plus : c'est l'ORIGINE.
+   *
+   * Sans lui, pas de métré de câble, pas de plan des gaines, pas de tableau
+   * de tirage — la moitié du document manque, et l'app ne le disait qu'en
+   * passant. Le constat monte donc en alerte dès qu'il y a de quoi tirer un
+   * circuit, et il propose de le poser.
+   */
+  const tableaux = fixtures.filter((f) => f.kind === 'tableau');
+  if (fixtures.length > 0 && tableaux.length === 0) {
     out.push({
       code: 'tableau',
-      severity: 'info',
-      message: 'Aucun tableau électrique placé',
+      severity: 'alerte',
+      message: 'Aucun tableau électrique : rien à raccorder',
       regle:
-        'Le tableau se place dans la gaine technique du logement (GTL), ' +
-        'ses manettes entre 0,90 m et 1,80 m du sol.',
+        'Le tableau se place dans la gaine technique du logement (GTL), ses ' +
+        'manettes entre 0,90 m et 1,80 m du sol. Sans lui, ni métré de ' +
+        'câble ni plan des gaines.',
+      fix: { type: 'poser', kind: 'tableau', label: 'Poser le tableau' },
+    });
+  }
+  // Deux tableaux dans un logement, c'est une erreur de saisie neuf fois
+  // sur dix — et une installation à revoir la dixième.
+  if (tableaux.length > 1) {
+    out.push({
+      code: 'tableau',
+      severity: 'alerte',
+      message: `${tableaux.length} tableaux placés`,
+      regle:
+        'Un logement n’a qu’un tableau de répartition. Un second coffret ' +
+        'est un tableau divisionnaire : il se raccorde en aval, pas en tête.',
+    });
+  }
+  // En salle d'eau, c'est interdit — et c'est le genre d'erreur qui passe
+  // inaperçue sur un plan tant que personne ne regarde la pièce.
+  for (const t of tableaux) {
+    const piece = rooms.find((r) => r.id === roomOfFixture(t));
+    if (!piece) continue;
+    const usage = roomUse(piece.name, piece.kind);
+    if (usage !== 'sdb' && usage !== 'wc') continue;
+    out.push({
+      code: 'tableau',
+      roomId: piece.id,
+      fixtureId: t.id,
+      severity: 'alerte',
+      message: `Tableau en ${USE_LABEL[usage].toLowerCase()} : interdit`,
+      regle:
+        'Aucun tableau ni boîte de connexion dans les volumes d’une salle ' +
+        'd’eau. Il se place dans un local sec, en dégagement.',
     });
   }
 
@@ -809,6 +850,16 @@ export function planCircuits(
   fixtures: Fixture[],
   roomNameOf: (f: Fixture) => string,
   isKitchen: (f: Fixture) => boolean,
+  /**
+   * Identifiant de la pièce, quand on l'a.
+   *
+   * Sans lui, deux « Chambre » d'un T4 ne comptent que pour une : le
+   * regroupement se faisait sur le NOM, et un plan avec deux pièces
+   * homonymes — le cas courant tant qu'on ne les a pas renommées —
+   * produisait un tableau faux. On dédoublonne donc sur l'identité, et on
+   * numérote les homonymes à l'affichage.
+   */
+  roomIdOf?: (f: Fixture) => string | undefined,
 ): Circuit[] {
   const out: Circuit[] = [];
   let n = 0;
@@ -816,28 +867,59 @@ export function planCircuits(
     n += 1;
     out.push({ ...c, id: `c${n}` });
   };
-  const roomsOf = (list: Fixture[]) => [...new Set(list.map(roomNameOf))];
+  // Deux pièces homonymes reçoivent un numéro, dans l'ordre où elles
+  // apparaissent : « Chambre », « Chambre 2 ».
+  const suffixe = new Map<string, string>();
+  if (roomIdOf) {
+    const vus = new Map<string, string[]>();
+    for (const f of fixtures) {
+      const id = roomIdOf(f);
+      if (!id) continue;
+      const nom = roomNameOf(f);
+      const liste = vus.get(nom) ?? [];
+      if (!liste.includes(id)) liste.push(id);
+      vus.set(nom, liste);
+    }
+    for (const [nom, ids] of vus) {
+      ids.forEach((id, i) => suffixe.set(id, i === 0 ? nom : `${nom} ${i + 1}`));
+    }
+  }
+  const nomDe = (f: Fixture) => {
+    const id = roomIdOf?.(f);
+    return (id && suffixe.get(id)) || roomNameOf(f);
+  };
+  const roomsOf = (list: Fixture[]) => {
+    const out2: string[] = [];
+    const vus = new Set<string>();
+    for (const f of list) {
+      const cle = roomIdOf?.(f) ?? roomNameOf(f);
+      if (vus.has(cle)) continue;
+      vus.add(cle);
+      out2.push(nomDe(f));
+    }
+    return out2;
+  };
 
   for (const f of fixtures.filter((x) => x.kind === 'prise32')) {
     add({
-      label: `Cuisson — ${roomNameOf(f)}`,
+      label: `Cuisson — ${nomDe(f)}`,
       nature: 'cuisson',
       points: 1,
       section: 6,
       breaker: 32,
-      rooms: [roomNameOf(f)],
+      rooms: [nomDe(f)],
       fixtureIds: [f.id],
       note: 'Circuit dédié à la plaque de cuisson.',
     });
   }
   for (const f of fixtures.filter((x) => x.kind === 'prise20')) {
     add({
-      label: `Spécialisé 20 A — ${roomNameOf(f)}`,
+      label: `Spécialisé 20 A — ${nomDe(f)}`,
       nature: 'specialise',
       points: 1,
       section: 2.5,
       breaker: 20,
-      rooms: [roomNameOf(f)],
+      rooms: [nomDe(f)],
       fixtureIds: [f.id],
       note: 'Circuit dédié : four, lave-linge, lave-vaisselle ou sèche-linge.',
     });
@@ -1056,7 +1138,7 @@ export function materialList(
     };
   });
 
-  const circuits = planCircuits(fixtures, nameOf, isKitchen);
+  const circuits = planCircuits(fixtures, nameOf, isKitchen, (f) => firstRoom(f)?.id);
   const differentials = planDifferentials(circuits);
 
   const breakers = new Map<number, number>();

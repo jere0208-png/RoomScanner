@@ -56,6 +56,7 @@ export function planRoutes(
     fixtures,
     (f) => pieceDe(f)?.name ?? '',
     (f) => roomUse(pieceDe(f)?.name ?? '', pieceDe(f)?.kind) === 'cuisine',
+    (f) => pieceDe(f)?.id,
   );
 
   const parCircuit = new Map<string, number>();

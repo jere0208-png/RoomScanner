@@ -34,6 +34,7 @@ import {
   type Fixture,
   type FixtureKind,
 } from '../src/geometry/electrical';
+import { HEIGHT_RULES } from '../src/geometry/nfc15100';
 import { buildScene, isHiddenFace, type ScenePalette } from '../src/geometry/scene3d';
 import { useScanStore } from '../src/store/scanStore';
 
@@ -154,15 +155,28 @@ describe('repère de la face de mur', () => {
 describe('pose d’un appareil', () => {
   const q = wallQuads(BOX);
 
-  it('arrive à 20 cm du coin bas gauche, quelle que soit la face', () => {
+  it('arrive à 20 cm du coin, À SA hauteur normalisée', () => {
     for (const side of [1, -1] as const) {
       const f = newFixture('f1', 'prise', BOX[0], q.get('n'), side);
       const face = wallFace(BOX[0], q.get('n'), side);
       expect(faceX(face, f.along)).toBeCloseTo(0.2, 6);
-      expect(f.height).toBeCloseTo(0.2, 6);
+      // 25 cm : la cote usuelle d'un socle, pas les 20 cm de la marge.
+      expect(f.height).toBeCloseTo(FIXTURES.prise.std, 6);
       const dims = fixtureDims(face, f);
       expect(dims.left).toBeCloseTo(0.2, 6);
       expect(dims.left + dims.right).toBeCloseTo(face.len, 6);
+    }
+  });
+
+  it('chaque type arrive là où il se pose vraiment', () => {
+    // C'est le défaut qu'on corrige : tout arrivait à 20 cm, et un tableau
+    // électrique s'annonçait « trop bas » à la seconde où on le posait.
+    for (const kind of ['prise', 'inter', 'tableau', 'applique'] as const) {
+      const f = newFixture('x', kind, BOX[0], q.get('n'), 1);
+      expect(f.height).toBeCloseTo(FIXTURES[kind].std, 6);
+      const regle = HEIGHT_RULES[kind];
+      if (regle?.min !== undefined) expect(f.height).toBeGreaterThanOrEqual(regle.min);
+      if (regle?.max !== undefined) expect(f.height).toBeLessThanOrEqual(regle.max);
     }
   });
 
@@ -325,13 +339,13 @@ describe('le store et l’appareillage', () => {
     });
   });
 
-  it('pose l’appareil à 20/20 sur la face de la pièce', () => {
+  it('pose l’appareil à 20 cm du coin, à sa hauteur normalisée', () => {
     const id = useScanStore.getState().addFixture('prise', 'n');
     expect(id).toBeTruthy();
     const f = useScanStore.getState().fixtures[0];
     const face = wallFace(BOX[0], wallQuads(BOX).get('n'), f.side);
     expect(faceX(face, f.along)).toBeCloseTo(0.2, 6);
-    expect(f.height).toBeCloseTo(0.2, 6);
+    expect(f.height).toBeCloseTo(FIXTURES.prise.std, 6);
     expect(f.side).toBe(interiorSide(BOX[0], BOX));
   });
 

@@ -25,7 +25,13 @@ import { DEFAULT_VIEW3D, Iso3DView, type View3DParams } from '../components/Iso3
 import { buildScanPdf, pdfFilename, toBase64 } from '../export/pdf';
 import { hasCapturedColors } from '../geometry/appearance';
 import { roomParts } from '../geometry/floorplan';
-import { fixturePlacement, roomInputsOf } from '../geometry/nfc15100';
+import {
+  fixturePlacement,
+  materialList,
+  roomInputsOf,
+  wallToRooms,
+} from '../geometry/nfc15100';
+import { multiWire, schemaRows } from '../geometry/schema';
 import { planRoutes } from '../geometry/elecplan';
 import { floorsOf, useScanStore } from '../store/scanStore';
 
@@ -200,6 +206,8 @@ const EXPORT_ICONS = {
   ouvertures: ['M5 4 v16 h9 V4 z', 'M14 20 l5 2 V2 l-5 2', 'M8 12 h.01'],
   couleurs: ['M12 3 a9 9 0 1 0 0 18 h2 a2 2 0 0 0 0 -4 h-1 a2 2 0 0 1 0 -4 h3 a4 4 0 0 0 0 -8 z', 'M8 9 h.01', 'M12 7 h.01'],
   gaines: ['M4 20 h9 a3 3 0 0 0 3 -3 V7', 'M13 4 h6 v3 h-6 z', 'M4 17.5 v5'],
+  // Schémas : un peigne de tableau, deux départs sous une barre.
+  schema: ['M12 3 v4', 'M4 7 h16', 'M8 7 v4', 'M16 7 v4', 'M6 11 h4 v6 H6 z', 'M14 11 h4 v6 h-4 z'],
 } as const;
 
 const styles = getStyles(c);
@@ -223,6 +231,24 @@ const styles = getStyles(c);
     () => planRoutes(walls, rooms, parts, fixtures, placement),
     [walls, rooms, parts, fixtures, placement],
   );
+  /** Schémas unifilaire et multifilaire, tirés des mêmes circuits. */
+  const [schema, setSchema] = useState(false);
+  const schemas = useMemo(() => {
+    if (fixtures.length === 0) return null;
+    const list = materialList(
+      roomInputsOf(rooms, parts),
+      fixtures,
+      wallToRooms(roomInputsOf(rooms, parts)),
+      placement,
+      cheminements?.parCircuit,
+    );
+    const rows = schemaRows(list.circuits, list.differentials, fixtures);
+    return {
+      rows,
+      differentials: list.differentials,
+      multi: list.circuits.map((circ, i) => multiWire(circ, fixtures, `C${i + 1}`)),
+    };
+  }, [rooms, parts, fixtures, placement, cheminements]);
   const [measures3D, setMeasures3D] = useState(true);
   // Toucher un modèle verrouille le défilement (iOS annule sinon le geste
   // JS au profit du scroll natif) ; le relâcher le rend au ScrollView.
@@ -279,6 +305,7 @@ const styles = getStyles(c);
           colorOpenings: showOpeningColors,
           measures2D,
           measures3D,
+          schemas: schema ? schemas : null,
           surfaces: showSurfaces,
           textures: showTextures,
           metre: includeMetre,
@@ -394,6 +421,16 @@ const styles = getStyles(c);
                       'Gaines',
                       gaines,
                       () => setGaines(!gaines),
+                    ] as OptionDef,
+                  ]
+                : []),
+              ...(schemas
+                ? [
+                    [
+                      'schema',
+                      'Schémas',
+                      schema,
+                      () => setSchema(!schema),
                     ] as OptionDef,
                   ]
                 : []),

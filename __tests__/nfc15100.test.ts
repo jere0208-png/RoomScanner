@@ -114,8 +114,11 @@ describe('constats', () => {
     const trop = issues.find((i) => i.message.includes('circuits'));
     expect(trop?.severity).toBe('info');
     expect(trop?.message).toContain('2 circuits');
-    // Et la pièce n'est donc PAS en alerte pour cette raison.
-    expect(issues.filter((i) => i.severity === 'alerte')).toHaveLength(0);
+    // Et la pièce n'est donc PAS en alerte pour cette raison. La seule
+    // alerte restante est l'absence de tableau, qui n'a rien à voir.
+    expect(
+      issues.filter((i) => i.severity === 'alerte' && i.code !== 'tableau'),
+    ).toHaveLength(0);
   });
 
   it('relève une hauteur de pose interdite', () => {
