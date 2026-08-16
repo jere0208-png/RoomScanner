@@ -149,7 +149,9 @@ describe('la feuille unifilaire', () => {
   it('donne calibre, section et gaine de chaque départ', () => {
     const prises = rows.find((r) => r.label.startsWith('Prises'))!;
     expect(doc).toContain(`${prises.breaker} A`);
-    expect(doc).toContain(`${prises.section} mm²`);
+    // À la française : le schéma écrit « 2,5 mm² », comme le bordereau du
+    // fournisseur. Un document qui mélange les deux notations se relit mal.
+    expect(doc).toContain(`${String(prises.section).replace('.', ',')} mm²`);
     expect(doc).toContain(`ICTA Ø${prises.conduit}`);
   });
 
@@ -272,4 +274,70 @@ describe('la lisibilité des feuilles de schéma', () => {
    * feuille ; le prétendre vérifié par un compte de coordonnées serait un
    * test qui rassure sans rien garantir.
    */
+});
+
+/**
+ * Le schéma unifilaire tient debout quel que soit le nombre de départs.
+ *
+ * Il était dessiné en peigne : les départs s'alignaient horizontalement sous
+ * leur différentiel. C'est la forme des manuels, et elle ne tient que pour
+ * trois ou quatre circuits — au-delà, la largeur de la feuille étant fixe,
+ * les libellés se touchaient, et les différentiels qui ne rentraient plus
+ * étaient ABANDONNÉS en cours de page, sans que rien ne le dise.
+ */
+describe('l’unifilaire, à toutes les tailles d’installation', () => {
+  /** Une installation d'appartement complet : douze départs. */
+  const gros = Array.from({ length: 12 }, (_, i) => ({
+    mark: `C${i + 1}`,
+    circuitId: `c${i}`,
+    label: `Circuit ${i + 1}`,
+    breaker: 16,
+    section: 1.5,
+    conduit: 16 as const,
+    wires: 3,
+    points: '4 points',
+    under: `ID${(i % 2) + 1}`,
+  }));
+  const deuxDiffs = [
+    { label: 'ID1', rating: 40, type: 'A' as const, circuits: [] as string[] },
+    { label: 'ID2', rating: 40, type: 'AC' as const, circuits: [] as string[] },
+  ];
+
+  const doc = (r: typeof gros, dd: typeof deuxDiffs) =>
+    texte(
+      latin1(
+        buildScanPdf(
+          { name: 'Grand', walls: W, openings: [], objects: [], rooms: R, fixtures: FX },
+          false,
+          {
+            metre: false,
+            schemas: { rows: r, differentials: dd, multi: [], marks: new Map() },
+          },
+        ),
+      ),
+    );
+
+  it('douze départs se lisent tous, chacun sur sa ligne', () => {
+    const vu = doc(gros, deuxDiffs);
+    for (const r of gros) expect(vu).toContain(r.mark);
+  });
+
+  it('les deux différentiels sont dessinés, pas seulement le premier', () => {
+    const vu = doc(gros, deuxDiffs);
+    expect(vu).toContain('ID1');
+    expect(vu).toContain('ID2');
+  });
+
+  it('et si un départ ne tenait pas, la feuille le DIRAIT', () => {
+    // Quarante départs ne tiennent pas sur une page : le schéma en dessine
+    // ce qu'il peut et annonce le reste, au lieu de l'escamoter.
+    const enorme = Array.from({ length: 40 }, (_, i) => ({
+      ...gros[0],
+      mark: `D${i + 1}`,
+      circuitId: `d${i}`,
+      label: `Départ ${i + 1}`,
+    }));
+    const vu = doc(enorme, deuxDiffs);
+    expect(vu).toMatch(/départs? de plus/);
+  });
 });

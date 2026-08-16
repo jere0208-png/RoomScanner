@@ -1385,6 +1385,22 @@ function metrePage(ctx: SheetContext, sheet: string): string {
  * circuit : ce sont exactement ceux de la liste du matériel, mis en forme.
  * Un document qui contredirait la liste ne servirait à rien.
  */
+/**
+ * Le schéma unifilaire — EN COLONNE, une ligne par départ.
+ *
+ * Il était dessiné en peigne : les départs s'alignaient horizontalement
+ * sous leur différentiel. C'est la forme qu'on voit dans les manuels, et
+ * elle ne tient que pour trois ou quatre circuits. Au-delà, la largeur de
+ * la feuille est fixe : les départs se resserrent, les libellés se touchent,
+ * et les différentiels qui ne rentraient plus étaient purement abandonnés
+ * en cours de page — sans que rien ne le dise.
+ *
+ * Un tableau réel se lit de haut en bas, dans l'ordre des modules. Le
+ * schéma suit donc cet ordre : une barre verticale, les différentiels
+ * dessus, et chaque départ sur SA ligne, avec son disjoncteur, son nombre
+ * de conducteurs, sa section et sa gaine alignés en colonnes. On en met
+ * vingt sans se serrer, et ce qui ne tiendrait pas est ANNONCÉ.
+ */
 function unifilairePage(
   ctx: SheetContext,
   sheet: string,
@@ -1405,54 +1421,43 @@ function unifilairePage(
     GREY,
     { align: 'left' },
   );
-  y -= 14;
+  y -= 10;
+
+  // Les colonnes du schéma, fixées une fois : tout s'y aligne.
+  const BUS = x0 + 26; // la barre verticale
+  const DISJ = x0 + 74; // le disjoncteur
+  const NOM = x0 + 132; // repère et libellé
+  const FIL = x0 + w - 128; // conducteurs
+  const CABLE = x0 + w; // section et gaine, calés à droite
+  const PAS = 27; // hauteur d'une ligne de départ
 
   // ---------------------------------------------------------- l'origine
-  const cx = x0 + 34;
-  d.rect(cx - 26, y - 20, 52, 20, '#FFFFFF', INK, 1);
-  d.text('AGCP', cx, y - 8, 8, INK, { bold: true });
-  d.text('500 mA S', cx, y - 17, 6.5, GREY);
-  d.text('Disjoncteur de branchement', cx + 40, y - 12, 7.5, GREY, {
-    align: 'left',
-  });
-  y -= 20;
-  d.line(cx, y, cx, y - 16, 1, INK);
-  y -= 16;
+  d.rect(BUS - 30, y - 26, 60, 24, '#FFFFFF', INK, 1.2);
+  d.text('AGCP', BUS, y - 12, 8.5, INK, { bold: true });
+  d.text('500 mA S', BUS, y - 21, 6.5, GREY);
+  d.text(
+    'Disjoncteur de branchement — origine de l’installation',
+    BUS + 42,
+    y - 16,
+    7.5,
+    GREY,
+    { align: 'left' },
+  );
+  y -= 26;
 
-  // Le peigne horizontal : tous les différentiels y pendent.
+  // Les départs, rangés sous leur différentiel.
   const parDiff = new Map<string, SchemaRow[]>();
   const libres: SchemaRow[] = [];
   for (const r of rows) {
     if (!r.under) libres.push(r);
     else parDiff.set(r.under, [...(parDiff.get(r.under) ?? []), r]);
   }
-
-  const dessineDepart = (r: SchemaRow, bx: number, by: number) => {
-    // Le disjoncteur : un rectangle, sa valeur, et le trait qui descend.
-    d.line(bx, by, bx, by - 12, 0.9, INK);
-    d.rect(bx - 13, by - 30, 26, 18, '#FFFFFF', INK, 0.9);
-    d.text(r.breaker === null ? 'com.' : `${r.breaker} A`, bx, by - 24, 7.5, INK, {
-      bold: true,
-    });
-    d.line(bx, by - 30, bx, by - 44, 0.9, INK);
-    // La barre oblique et le nombre de conducteurs : la convention de
-    // l'unifilaire, qui dit en un signe ce que le multifilaire détaille.
-    d.line(bx - 4, by - 40, bx + 4, by - 34, 0.9, INK);
-    d.text(`${r.wires}`, bx + 8, by - 39, 7, GREY, { align: 'left' });
-    d.text(r.mark, bx, by - 52, 8, INK, { bold: true });
-    const detail =
-      r.section === null
-        ? `ICTA Ø${r.conduit}`
-        : `${r.section} mm² · ICTA Ø${r.conduit}`;
-    d.text(detail, bx, by - 61, 6.5, GREY);
-  };
-
   const blocs: { titre: string; sous: string; rows: SchemaRow[] }[] = [];
-  diffs.forEach((diff, i) => {
-    const list = parDiff.get(`ID${i + 1}`) ?? [];
+  diffs.forEach((diff, i2) => {
+    const list = parDiff.get(`ID${i2 + 1}`) ?? [];
     if (list.length === 0) return;
     blocs.push({
-      titre: `ID${i + 1}`,
+      titre: `ID${i2 + 1}`,
       sous: `${diff.rating} A · 30 mA · type ${diff.type}`,
       rows: list,
     });
@@ -1460,54 +1465,102 @@ function unifilairePage(
   if (libres.length > 0) {
     blocs.push({
       titre: 'GTL',
-      sous: 'coffret de communication',
+      sous: 'coffret de communication, sans disjoncteur',
       rows: libres,
     });
   }
 
-  for (const bloc of blocs) {
-    if (y < FRAME.y + 130) break;
-    // Le différentiel, puis son peigne.
-    d.rect(cx - 26, y - 20, 52, 20, '#FFFFFF', INK, 1);
-    d.text(bloc.titre, cx, y - 8, 8, INK, { bold: true });
-    d.text(bloc.sous, cx + 40, y - 12, 7.5, GREY, { align: 'left' });
-    y -= 20;
-    const nb = bloc.rows.length;
-    const largeur = Math.min(w - 60, Math.max(60, nb * 62));
-    const gauche = x0 + 30;
-    d.line(cx, y, cx, y - 14, 1, INK);
-    y -= 14;
-    d.line(gauche, y, gauche + largeur, y, 1, INK);
-    bloc.rows.forEach((r, i) => {
-      const bx = gauche + (nb === 1 ? largeur / 2 : (i * largeur) / (nb - 1));
-      dessineDepart(r, bx, y);
-      // Le nom du circuit, à la verticale sous le repère.
-      d.text(r.label, bx, y - 71, 6.5, GREY);
+  /** Une ligne de départ, avec tout ce qui se lit dessus. */
+  const ligneDepart = (r: SchemaRow, cy: number, teinte: string) => {
+    // La dérivation depuis la barre.
+    d.line(BUS, cy, DISJ - 16, cy, 0.9, INK);
+    // Le disjoncteur : un module, sa valeur.
+    d.rect(DISJ - 16, cy - 9, 32, 18, '#FFFFFF', INK, 0.9);
+    d.text(r.breaker === null ? 'com.' : `${r.breaker} A`, DISJ, cy - 3, 7.5, INK, {
+      bold: true,
     });
-    y -= 92;
-  }
-
-  // -------------------------------------------------------- le tableau
-  if (y > FRAME.y + 110) {
-    y -= 4;
-    d.line(x0, y, x0 + w, y, 0.6, GREY_LIGHT);
-    y -= 14;
-    d.text('Départs', x0, y, 8.5, GREY, { align: 'left' });
-    d.text('Protection · section · gaine', x0 + w, y, 8.5, GREY, {
+    d.line(DISJ + 16, cy, FIL - 16, cy, 0.9, INK);
+    // La barre oblique et le nombre de conducteurs : la convention de
+    // l'unifilaire, qui dit en un signe ce que le multifilaire détaille.
+    d.line(FIL - 20, cy - 5, FIL - 12, cy + 5, 0.9, INK);
+    d.text(`${r.wires}`, FIL - 8, cy + 2, 7, GREY, { align: 'left' });
+    // Le repère, à sa teinte de circuit : la même que sur le plan.
+    markerAt(d, { x: NOM - 14, y: cy }, r.mark, teinte);
+    d.text(fitText(r.label, 8, FIL - NOM - 34), NOM, cy - 3, 8, INK, {
       align: 'left',
     });
-    y -= 12;
-    for (const r of rows) {
-      if (y < FRAME.y + 70) break;
-      d.text(`${r.mark} — ${r.label}`, x0, y, 8, INK, { align: 'left' });
-      d.text(r.points, x0 + 150, y, 7.5, GREY, { align: 'left' });
-      const droite =
-        r.breaker === null
-          ? `coffret com. · ICTA Ø${r.conduit}`
-          : `${r.breaker} A · ${r.section} mm² · ICTA Ø${r.conduit}`;
-      d.text(droite, x0 + w - 4, y, 7.5, INK, { align: 'left' });
-      y -= 12;
+    if (r.points) {
+      d.text(fitText(r.points, 6.5, FIL - NOM - 34), NOM, cy - 12, 6.5, GREY_LIGHT, {
+        align: 'left',
+      });
     }
+    const droite =
+      r.section === null
+        ? `ICTA Ø${r.conduit}`
+        : `${String(r.section).replace('.', ',')} mm² · ICTA Ø${r.conduit}`;
+    d.text(droite, CABLE, cy - 3, 7.5, INK, { align: 'right' });
+  };
+
+  const BAS = FRAME.y + TITLE_H + 30;
+  let restants = 0;
+  let indexGlobal = 0;
+
+  for (const bloc of blocs) {
+    // Un bloc s'annonce, et ses départs suivent. On ne commence pas un
+    // différentiel qu'on ne pourrait pas honorer d'au moins une ligne.
+    if (y - 34 - PAS < BAS) {
+      restants += bloc.rows.length;
+      continue;
+    }
+    y -= 16;
+    d.line(BUS, y + 16, BUS, y, 1.2, INK);
+    d.rect(BUS - 30, y - 20, 60, 20, '#F3F6FB', INK, 1);
+    d.text(bloc.titre, BUS, y - 8, 8, INK, { bold: true });
+    d.text(bloc.sous, BUS + 42, y - 12, 7.5, GREY, { align: 'left' });
+    y -= 20;
+
+    const debut = y;
+    for (const r of bloc.rows) {
+      if (y - PAS < BAS) {
+        restants += 1;
+        indexGlobal += 1;
+        continue;
+      }
+      y -= PAS;
+      ligneDepart(r, y + PAS / 2 - 2, circuitColor(indexGlobal));
+      indexGlobal += 1;
+    }
+    // La barre qui porte les dérivations de ce différentiel.
+    d.line(BUS, debut, BUS, y + 4, 1.2, INK);
+    y -= 8;
+  }
+
+  if (restants > 0) {
+    y -= 6;
+    d.text(
+      `${restants} départ${restants > 1 ? 's' : ''} de plus — voir la liste du ` +
+        'matériel, où le tableau est donné en entier.',
+      x0,
+      y,
+      7.5,
+      GREY,
+      { align: 'left' },
+    );
+    y -= 12;
+  }
+
+  // Le rappel de lecture, en pied : un schéma se lit avec sa convention.
+  if (y > BAS + 24) {
+    d.line(x0, BAS + 16, x0 + w, BAS + 16, 0.6, GREY_LIGHT);
+    d.text(
+      'La barre oblique et son chiffre donnent le nombre de conducteurs du ' +
+        'départ. Repères identiques à ceux du plan.',
+      x0,
+      BAS + 4,
+      7,
+      GREY_LIGHT,
+      { align: 'left' },
+    );
   }
 
   drawSheetChrome(d, {
