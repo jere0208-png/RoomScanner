@@ -27,6 +27,16 @@ import {
 } from '../src/geometry/ceiling';
 import { buildScanPdf } from '../src/export/pdf';
 import { buyingList } from '../src/geometry/conduits';
+import {
+  checkElectrical,
+  fixturePlacement,
+  materialList,
+  roomInputsOf,
+  wallToRooms,
+} from '../src/geometry/nfc15100';
+import { planRoutes } from '../src/geometry/elecplan';
+import { roomParts } from '../src/geometry/floorplan';
+
 import type { WallSeg } from '../src/geometry/floorplan';
 import type { Fixture } from '../src/geometry/electrical';
 import { useScanStore } from '../src/store/scanStore';
@@ -55,6 +65,12 @@ const FX: Fixture[] = [
   { id: 'i1', kind: 'inter', wallId: 'n', along: 0.4, height: 1.1, side: 1 },
   { id: 'i2', kind: 'va', wallId: 's', along: 0.4, height: 1.1, side: 1 },
 ];
+/** Un tableau en plus : sans lui, aucun cheminement n'est calculé. */
+const FX2: Fixture[] = [
+  ...FX,
+  { id: 't', kind: 'tableau', wallId: 'w', along: 1, height: 1.35, side: 1 },
+];
+
 const PLAFOND: CeilingFixture[] = [
   { id: 'p1', kind: 'dcl', roomId: 'r1', at: { x: 2.5, z: 2 }, commands: ['i1', 'i2'] },
   { id: 'p2', kind: 'daaf', roomId: 'r1', at: { x: 1, z: 1 } },
@@ -395,5 +411,148 @@ describe('le plafond au bordereau', () => {
   it('sans plafond, le bordereau ne change pas', () => {
     const list = buyingList(rows, []);
     expect(list.some((r) => r.family === 'Plafond')).toBe(false);
+  });
+});
+
+/**
+ * Le plafond entre dans les CIRCUITS — sinon le dossier se contredit.
+ *
+ * On posait huit spots, le bordereau les comptait, et le tableau annonçait
+ * « 0 point ». Le métré de gaine ne montait jamais au plafond, et les
+ * schémas les ignoraient : trois feuilles qui décrivaient trois
+ * installations différentes.
+ */
+describe('le plafond dans les circuits', () => {
+  const inputs = roomInputsOf(R, roomParts(W, R));
+  const w2r = wallToRooms(inputs);
+
+  it('les points de plafond comptent dans le circuit d’éclairage', () => {
+    const spots: CeilingFixture[] = Array.from({ length: 3 }, (_, i) => ({
+      id: `s${i}`,
+      kind: 'spot' as const,
+      roomId: 'r1',
+      at: { x: 1 + i, z: 2 },
+    }));
+    const list = materialList(inputs, FX, w2r, undefined, undefined, spots);
+    const ecl = list.circuits.find((c) => c.nature === 'eclairage')!;
+    expect(ecl.points).toBe(3);
+    expect(ecl.ceilingIds).toHaveLength(3);
+  });
+
+  it('ce qui n’éclaire pas ne compte pas comme point', () => {
+    const mix: CeilingFixture[] = [
+      { id: 'a', kind: 'dcl', roomId: 'r1', at: { x: 1, z: 2 } },
+      { id: 'b', kind: 'daaf', roomId: 'r1', at: { x: 2, z: 2 } },
+      { id: 'c', kind: 'vmc', roomId: 'r1', at: { x: 3, z: 2 } },
+    ];
+    const list = materialList(inputs, FX, w2r, undefined, undefined, mix);
+    expect(list.circuits.find((c) => c.nature === 'eclairage')!.points).toBe(1);
+  });
+
+  it('au-delà de huit points, un second circuit', () => {
+    const dix: CeilingFixture[] = Array.from({ length: 10 }, (_, i) => ({
+      id: `s${i}`,
+      kind: 'spot' as const,
+      roomId: 'r1',
+      at: { x: 1, z: 1 },
+    }));
+    const list = materialList(inputs, FX, w2r, undefined, undefined, dix);
+    const ecl = list.circuits.filter((c) => c.nature === 'eclairage');
+    expect(ecl.length).toBe(2);
+    expect(ecl.reduce((n, c) => n + c.points, 0)).toBe(10);
+  });
+});
+
+/**
+ * Et la gaine MONTE jusqu'à eux.
+ *
+ * Sans les deux derniers segments — la montée le long du mur et la traversée
+ * du plafond — un circuit de six spots ne comptait que le tour de la pièce.
+ */
+describe('le cheminement jusqu’au plafond', () => {
+  const parts = roomParts(W, R);
+  const inputs = roomInputsOf(R, parts);
+  const placement = fixturePlacement(FX2, W, inputs);
+
+  it('le métré d’un circuit d’éclairage grandit avec ses points', () => {
+    const sans = planRoutes(W, R, parts, FX2, placement, [])!;
+    const avec = planRoutes(W, R, parts, FX2, placement, [
+      { id: 'p', kind: 'dcl', roomId: 'r1', at: { x: 2.5, z: 2 } },
+    ])!;
+    const total = (p: typeof sans) =>
+      [...p.metre.values()].reduce((n, m) => n + m.cable, 0);
+    // La montée (2,5 − 0,3 m) et la traversée s'ajoutent : au moins deux
+    // mètres de plus, et sûrement pas moins.
+    expect(total(avec)).toBeGreaterThan(total(sans) + 2);
+  });
+
+  it('et son tracé va jusqu’au point, pas jusqu’au mur', () => {
+    const plan = planRoutes(W, R, parts, FX2, placement, [
+      { id: 'p', kind: 'dcl', roomId: 'r1', at: { x: 2.5, z: 2 } },
+    ])!;
+    const trace = plan.traces.find((t) => t.id === 'p')!;
+    const bout = trace.path[trace.path.length - 1];
+    expect(bout.x).toBeCloseTo(2.5, 6);
+    expect(bout.z).toBeCloseTo(2, 6);
+  });
+});
+
+/**
+ * Les contrôles du plafond, et leur réserve.
+ *
+ * Ils ne parlent QUE si le plafond a commencé à être équipé : sans cela,
+ * tout scan d'avant cette fonction sortirait avec une alerte par pièce, pour
+ * une information que personne n'a saisie. Même règle que pour les volumes
+ * de salle d'eau — se taire vaut mieux que crier au loup.
+ */
+describe('les contrôles du plafond', () => {
+  const inputs = roomInputsOf(R, roomParts(W, R));
+  const w2r = wallToRooms(inputs);
+  const check = (ceiling: CeilingFixture[]) =>
+    checkElectrical(inputs, FX, w2r, undefined, undefined, undefined, ceiling);
+
+  it('se taisent tant que rien n’est posé au plafond', () => {
+    const codes = check([]).map((i) => i.code);
+    expect(codes).not.toContain('eclairage');
+    expect(codes).not.toContain('daaf');
+  });
+
+  it('signalent une pièce sans point lumineux', () => {
+    // Un détecteur ailleurs suffit à « ouvrir » les contrôles.
+    const issues = check([
+      { id: 'd', kind: 'daaf', roomId: 'autre', at: { x: 1, z: 1 } },
+    ]);
+    expect(issues.some((i) => i.code === 'eclairage')).toBe(true);
+  });
+
+  it('réclament un détecteur de fumée dans le logement', () => {
+    const issues = check([
+      { id: 'p', kind: 'dcl', roomId: 'r1', at: { x: 2, z: 2 } },
+    ]);
+    const daaf = issues.find((i) => i.code === 'daaf')!;
+    expect(daaf.severity).toBe('alerte');
+    expect(daaf.message).toMatch(/détecteur de fumée/);
+  });
+
+  it('et refusent un détecteur en cuisine', () => {
+    const cuisine = roomInputsOf(
+      [{ id: 'r1', name: 'Cuisine', wallIds: W.map((w) => w.id) }],
+      roomParts(W, [{ id: 'r1', wallIds: W.map((w) => w.id) }]),
+    );
+    const issues = checkElectrical(
+      cuisine,
+      FX,
+      wallToRooms(cuisine),
+      undefined,
+      undefined,
+      undefined,
+      [
+        { id: 'p', kind: 'dcl', roomId: 'r1', at: { x: 2, z: 2 } },
+        { id: 'd', kind: 'daaf', roomId: 'r1', at: { x: 1, z: 1 } },
+      ],
+    );
+    expect(
+      issues.some((i) => i.code === 'daaf' && /mal placé/.test(i.message)),
+    ).toBe(true);
   });
 });

@@ -244,8 +244,8 @@ const styles = getStyles(c);
     [fixtures, walls, rooms, parts],
   );
   const cheminements = useMemo(
-    () => planRoutes(walls, rooms, parts, fixtures, placement),
-    [walls, rooms, parts, fixtures, placement],
+    () => planRoutes(walls, rooms, parts, fixtures, placement, ceiling),
+    [walls, rooms, parts, fixtures, placement, ceiling],
   );
   /** Schémas unifilaire et multifilaire, tirés des mêmes circuits. */
   const [schema, setSchema] = useState(false);
@@ -257,6 +257,7 @@ const styles = getStyles(c);
       wallToRooms(roomInputsOf(rooms, parts)),
       placement,
       cheminements?.parCircuit,
+      ceiling,
     );
     const rows = schemaRows(list.circuits, list.differentials, fixtures);
     return {
@@ -267,7 +268,7 @@ const styles = getStyles(c);
       // départ il dépend, et c'est ce repère qui s'écrit sur le tracé.
       marks: fixtureMarks(list.circuits),
     };
-  }, [rooms, parts, fixtures, placement, cheminements]);
+  }, [rooms, parts, fixtures, placement, cheminements, ceiling]);
   const [measures3D, setMeasures3D] = useState(true);
   // Toucher un modèle verrouille le défilement (iOS annule sinon le geste
   // JS au profit du scroll natif) ; le relâcher le rend au ScrollView.

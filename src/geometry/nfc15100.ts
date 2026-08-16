@@ -7,15 +7,18 @@
  * l'appareillage en circuits et proposer la protection de chacun.
  *
  * Ce qu'il ne fait pas, et qu'il faut dire clairement : il ne délivre aucune
- * attestation. Trois familles d'exigences lui échappent complètement —
+ * attestation. Deux familles d'exigences lui échappent —
  *
  * - **les volumes de la salle d'eau** (0, 1, 2), qui se mesurent par rapport
- *   à la baignoire ou au receveur : l'app ne sait pas où ils sont ;
- * - **les points d'éclairage en plafond**, qui n'ont pas de support dans le
- *   modèle (tout s'accroche à un mur) — aucun minimum d'éclairage n'est donc
- *   vérifié ;
+ *   à la baignoire ou au receveur : l'app ne les vérifie que si le mobilier
+ *   a été relevé ;
  * - **la puissance réellement raccordée** (chauffage, cumulus), qui décide
  *   de la section et du calibre.
+ *
+ * L'éclairage, lui, est désormais vérifié — mais SEULEMENT quand le plafond
+ * a commencé à être équipé. Avant cela, l'app n'a aucune information sur
+ * lui, et une alerte par pièce ne dirait rien d'autre que « vous n'avez
+ * rien saisi ».
  *
  * Le dernier mot reste à l'électricien. L'app lui épargne le comptage, pas
  * le métier.
@@ -398,7 +401,9 @@ export type ElecCode =
   | 'circuits'
   | 'cuisson'
   | 'volumes'
-  | 'tableau';
+  | 'tableau'
+  | 'eclairage'
+  | 'daaf';
 
 export interface ElecIssue {
   code: ElecCode;
@@ -487,6 +492,8 @@ export function checkElectrical(
    * crier au loup sur toute une cuisine.
    */
   worktops?: Map<string, { x: (f: Fixture) => number; plans: Worktop[] }>,
+  /** Ce qui est posé au plafond : points lumineux, détection, ventilation. */
+  ceiling: CeilingFixture[] = [],
 ): ElecIssue[] {
   const out: ElecIssue[] = [];
   const roomOfFixture = (f: Fixture): string | undefined =>
@@ -753,6 +760,101 @@ export function checkElectrical(
     });
   }
 
+  /**
+   * UN POINT LUMINEUX PAR PIÈCE — mais seulement si on parle du plafond.
+   *
+   * La norme exige un point d'éclairage commandé dans chaque pièce
+   * principale, et un détecteur de fumée par logement. L'app le vérifie
+   * désormais... à une condition : que le plafond ait COMMENCÉ à être
+   * équipé.
+   *
+   * Sans cette réserve, tout scan d'avant cette fonction sortirait avec une
+   * alerte par pièce et une de plus pour le détecteur — pour une
+   * information que personne n'a saisie. C'est la même règle que pour les
+   * volumes de salle d'eau : sans mobilier, l'app ne peut rien affirmer, et
+   * se taire vaut mieux que crier au loup.
+   */
+  for (const room of ceiling.length > 0 ? rooms : []) {
+    const use = roomUse(room.name, room.kind);
+    if (use === 'autre') continue;
+    const label = room.name || USE_LABEL[use];
+    const points = ceiling.filter(
+      (cl) => cl.roomId === room.id && CEILINGS[cl.kind].watts > 0,
+    );
+    const appliques = fixtures.filter(
+      (f) => f.kind === 'applique' && roomOfFixture(f) === room.id,
+    );
+    if (points.length + appliques.length === 0) {
+      out.push({
+        code: 'eclairage',
+        roomId: room.id,
+        severity: 'alerte',
+        message: `${label} : aucun point lumineux`,
+        regle:
+          'Un point d’éclairage commandé au minimum par pièce, en plafond ' +
+          'ou en applique. Une pièce sans éclairage fixe n’est pas ' +
+          'réceptionnable.',
+      });
+      continue;
+    }
+    // Un point posé mais que rien n'allume : la moitié du travail.
+    const commandes = fixtures.filter(
+      (f) =>
+        roomOfFixture(f) === room.id &&
+        ['inter', 'inter2', 'inter3', 'va', 'poussoir', 'variateur'].includes(
+          f.kind,
+        ),
+    );
+    const relies = points.some((p) => (p.commands ?? []).length > 0);
+    if (points.length > 0 && !relies && commandes.length === 0) {
+      out.push({
+        code: 'eclairage',
+        roomId: room.id,
+        severity: 'info',
+        message: `${label} : point lumineux sans commande`,
+        regle:
+          'Un point d’éclairage se commande depuis l’accès de la pièce. ' +
+          'Posez un interrupteur, puis reliez-le au point.',
+      });
+    }
+  }
+
+  /**
+   * LE DÉTECTEUR DE FUMÉE.
+   *
+   * Obligatoire, un par logement au minimum, dans la circulation qui
+   * dessert les chambres — et jamais en cuisine ni en salle d'eau, où les
+   * vapeurs le déclenchent pour rien. Un détecteur qu'on débranche parce
+   * qu'il hurle en faisant cuire des pâtes ne protège plus personne.
+   */
+  const daaf = ceiling.filter((cl) => cl.kind === 'daaf');
+  if (ceiling.length > 0 && daaf.length === 0) {
+    out.push({
+      code: 'daaf',
+      severity: 'alerte',
+      message: 'Aucun détecteur de fumée dans le logement',
+      regle:
+        'Un DAAF au minimum par logement, dans la circulation qui dessert ' +
+        'les chambres. Obligation du propriétaire depuis 2015.',
+    });
+  }
+  for (const d of daaf) {
+    const room = rooms.find((r) => r.id === d.roomId);
+    if (!room) continue;
+    const use = roomUse(room.name, room.kind);
+    if (use !== 'cuisine' && use !== 'sdb') continue;
+    out.push({
+      code: 'daaf',
+      roomId: room.id,
+      severity: 'alerte',
+      message: `${room.name || USE_LABEL[use]} : détecteur de fumée mal placé`,
+      regle:
+        'Jamais en cuisine ni en salle d’eau : la vapeur et les fumées de ' +
+        'cuisson le déclenchent, et un détecteur débranché ne protège plus ' +
+        'personne.',
+    });
+  }
+
   // Les alertes d'abord : c'est ce qui rend l'installation non conforme.
   return out.sort((a, b) =>
     a.severity === b.severity ? 0 : a.severity === 'alerte' ? -1 : 1,
@@ -839,6 +941,17 @@ export interface Circuit {
   breaker: number | null;
   rooms: string[];
   fixtureIds: string[];
+  /**
+   * Les appareils de PLAFOND portés par ce circuit.
+   *
+   * Un point lumineux n'est pas un appareil mural : il n'a ni face, ni
+   * hauteur, ni abscisse le long d'un mur. Il appartient pourtant à un
+   * circuit d'éclairage, il compte dans ses huit points, et il faut lui
+   * tirer du fil. Sans cette liste, on posait huit spots au plafond et le
+   * tableau annonçait « 0 point » — le dossier se contredisait d'une
+   * feuille à l'autre.
+   */
+  ceilingIds?: string[];
   note?: string;
   /**
    * Métré de câble (m), quand la géométrie est connue : c'est la seule
@@ -910,6 +1023,8 @@ export function planCircuits(
    * numérote les homonymes à l'affichage.
    */
   roomIdOf?: (f: Fixture) => string | undefined,
+  /** Les appareils de plafond, avec la pièce qui les porte. */
+  ceiling: CeilingFixture[] = [],
 ): Circuit[] {
   const out: Circuit[] = [];
   let n = 0;
@@ -1015,23 +1130,57 @@ export function planCircuits(
     ['inter', 'inter2', 'inter3', 'va', 'poussoir', 'variateur'].includes(f.kind),
   );
   const lumieres = fixtures.filter((f) => f.kind === 'applique');
+  /**
+   * LES POINTS DU PLAFOND COMPTENT AUSSI.
+   *
+   * La norme limite un circuit d'éclairage à huit POINTS. Un point de
+   * centre, un spot, une applique de plafond en sont ; un détecteur de
+   * fumée ou une bouche de VMC, non — le premier a sa propre pile, la
+   * seconde ne consomme rien.
+   */
+  const plafonniers = ceiling.filter((c) => CEILINGS[c.kind].watts > 0);
   const surEclairage = [...lumieres, ...commandes];
-  chunk(surEclairage, MAX_LUMIERE).forEach((lot, i) => {
-    const points = lot.filter((f) => f.kind === 'applique').length;
-    add({
-      label: `Éclairage ${i + 1}`,
-      nature: 'eclairage',
-      points,
-      section: 1.5,
-      breaker: 16,
-      rooms: roomsOf(lot),
-      fixtureIds: lot.map((f) => f.id),
-      note:
-        points === 0
-          ? 'Commandes seules : les points lumineux ne sont pas encore posés.'
-          : undefined,
-    });
-  });
+  // On répartit sur le nombre de points, plafond compris : douze spots et
+  // deux appliques font deux circuits, pas un.
+  const totalPoints = lumieres.length + plafonniers.length;
+  const nbCircuits = Math.max(
+    1,
+    Math.ceil(totalPoints / MAX_LUMIERE) || (commandes.length > 0 ? 1 : 0),
+  );
+  if (surEclairage.length > 0 || plafonniers.length > 0) {
+    const lotsMuraux = chunk(surEclairage, Math.ceil(surEclairage.length / nbCircuits) || 1);
+    const lotsPlafond = chunk(
+      plafonniers,
+      Math.ceil(plafonniers.length / nbCircuits) || 1,
+    );
+    for (let i = 0; i < nbCircuits; i++) {
+      const lot = lotsMuraux[i] ?? [];
+      const hauts = lotsPlafond[i] ?? [];
+      if (lot.length === 0 && hauts.length === 0) continue;
+      const points =
+        lot.filter((f) => f.kind === 'applique').length + hauts.length;
+      // Les pièces desservies : celles des commandes ET celles du plafond.
+      const pieces = [...roomsOf(lot)];
+      for (const h of hauts) {
+        const nom = suffixe.get(h.roomId);
+        if (nom && !pieces.includes(nom)) pieces.push(nom);
+      }
+      add({
+        label: `Éclairage ${i + 1}`,
+        nature: 'eclairage',
+        points,
+        section: 1.5,
+        breaker: 16,
+        rooms: pieces,
+        fixtureIds: lot.map((f) => f.id),
+        ceilingIds: hauts.map((h) => h.id),
+        note:
+          points === 0
+            ? 'Commandes seules : les points lumineux ne sont pas encore posés.'
+            : undefined,
+      });
+    }
+  }
 
   const sorties = fixtures.filter((f) => f.kind === 'sortieCable');
   chunk(sorties, MAX_SOCLES).forEach((lot, i) =>
@@ -1210,7 +1359,13 @@ export function materialList(
     };
   });
 
-  const circuits = planCircuits(fixtures, nameOf, isKitchen, (f) => firstRoom(f)?.id);
+  const circuits = planCircuits(
+    fixtures,
+    nameOf,
+    isKitchen,
+    (f) => firstRoom(f)?.id,
+    ceiling,
+  );
   const differentials = planDifferentials(circuits);
 
   const breakers = new Map<number, number>();

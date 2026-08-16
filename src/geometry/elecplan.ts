@@ -15,7 +15,13 @@ import {
 import { wallQuadsOf, type Pt, type RoomPart, type WallSeg } from './floorplan';
 import { planCircuits, roomUse } from './nfc15100';
 import type { RoomKind } from './furniture';
-import { cableRuns, circuitLength } from './routing';
+import {
+  HAUTEUR_GAINE,
+  cableRuns,
+  circuitLength,
+  projectOnRing,
+} from './routing';
+import type { CeilingFixture } from './ceiling';
 
 export interface ElecPlan {
   /** Métré total par circuit, en mètres de câble, arrondi. */
@@ -48,6 +54,8 @@ export function planRoutes(
   parts: RoomPart[],
   fixtures: Fixture[],
   placement: Map<string, string>,
+  /** Les appareils de plafond : eux aussi demandent du fil. */
+  ceiling: CeilingFixture[] = [],
 ): ElecPlan | null {
   const tableau = fixtures.find((f) => f.kind === 'tableau');
   if (!tableau) return null;
@@ -69,7 +77,15 @@ export function planRoutes(
     (f) => pieceDe(f)?.name ?? '',
     (f) => roomUse(pieceDe(f)?.name ?? '', pieceDe(f)?.kind) === 'cuisine',
     (f) => pieceDe(f)?.id,
+    ceiling,
   );
+  const plafondParId = new Map(ceiling.map((c) => [c.id, c]));
+  /** Hauteur sous plafond de la pièce, pour la montée du fil. */
+  const hauteurDe = (roomId: string) =>
+    (parts.find((p) => p.roomId === roomId)?.walls ?? walls).reduce(
+      (h, w) => Math.max(h, w.height),
+      0,
+    ) || 2.5;
 
   const parCircuit = new Map<string, number>();
   const metre = new Map<
@@ -99,6 +115,39 @@ export function planRoutes(
         { id: f.id, at: pos.at, height: pos.height },
       ]);
     });
+    /**
+     * LE FIL MONTE AU PLAFOND.
+     *
+     * Un point lumineux n'est pas sur un mur : la gaine longe le contour
+     * comme pour un appareil mural, puis MONTE le long du mur le plus
+     * proche du point, et traverse le plafond jusqu'à lui. Sans ces deux
+     * derniers segments, un circuit de six spots ne comptait que le tour
+     * de la pièce — et le métré sous-estimait tous les éclairages.
+     */
+    for (const id of c.ceilingIds ?? []) {
+      const cl = plafondParId.get(id);
+      if (!cl) continue;
+      const piece = parts.find((p) => p.roomId === cl.roomId);
+      const ring = piece?.surface?.pts ?? parts[0]?.surface?.pts ?? [];
+      if (ring.length < 3) continue;
+      if (!piece?.surface?.exact || !piece) approx.add(c.id);
+      // Le point du contour le plus proche : c'est par là que le fil monte.
+      const pied = projectOnRing(ring, cl.at).at;
+      const [run] = cableRuns(ring, depart.at, depart.height, [
+        { id: cl.id, at: pied, height: HAUTEUR_GAINE },
+      ]);
+      if (!run) continue;
+      const montee = hauteurDe(cl.roomId) - HAUTEUR_GAINE;
+      const traversee = Math.hypot(cl.at.x - pied.x, cl.at.z - pied.z);
+      runs.push({
+        ...run,
+        // Le parcours physique gagne la montée et la traversée ; le câble
+        // aussi, avec son mou déjà compté par `cableRuns`.
+        conduit: run.conduit + montee + traversee,
+        length: run.length + montee + traversee,
+        path: [...run.path, cl.at],
+      });
+    }
     if (runs.length === 0) continue;
     parCircuit.set(c.id, circuitLength(runs));
     metre.set(c.id, {

@@ -742,8 +742,8 @@ export function ResultScreen() {
    * document et l'écran ne racontent jamais deux choses.
    */
   const cheminements = useMemo(
-    () => planRoutes(walls, rooms, parts, fixtures, placement),
-    [walls, rooms, parts, fixtures, placement],
+    () => planRoutes(walls, rooms, parts, fixtures, placement, ceiling),
+    [walls, rooms, parts, fixtures, placement, ceiling],
   );
 
   /**
@@ -762,9 +762,10 @@ export function ResultScreen() {
         (f) => pieceDe(f)?.name ?? '',
         (f) => roomUse(pieceDe(f)?.name ?? '', pieceDe(f)?.kind) === 'cuisine',
         (f) => pieceDe(f)?.id,
+        ceiling,
       ),
     );
-  }, [fixtures, rooms, placement]);
+  }, [fixtures, rooms, placement, ceiling]);
 
   /**
    * Volumes de salle d'eau : le seul contrôle où une erreur est dangereuse.
@@ -811,8 +812,17 @@ export function ResultScreen() {
         placement,
         volumes,
         wallWorktops,
+        ceiling,
       ),
-    [roomInputs, fixtures, wallRooms, placement, volumes, wallWorktops],
+    [
+      roomInputs,
+      fixtures,
+      wallRooms,
+      placement,
+      volumes,
+      wallWorktops,
+      ceiling,
+    ],
   );
   const alertRooms = useMemo(() => roomsInAlert(elecIssues), [elecIssues]);
   const issues: Constat[] = useMemo(
