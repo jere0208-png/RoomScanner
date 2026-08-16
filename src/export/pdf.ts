@@ -120,6 +120,8 @@ export interface PdfOptions {
     rows: SchemaRow[];
     differentials: Differential[];
     multi: MultiWireSchema[];
+    /** Repère de circuit par appareil : ce qui relie le plan au tableau. */
+    marks: Map<string, string>;
   } | null;
 }
 
@@ -630,11 +632,24 @@ interface SheetContext {
   routes?: { id: string; path: { x: number; z: number }[] }[];
 }
 
+/**
+ * Ce qu'on dessine PAR-DESSUS le plan, une fois murs, meubles et appareils
+ * en place : le tracé d'un schéma, par exemple. La fonction reçoit de quoi
+ * passer du monde à la page, et l'échelle en points par mètre.
+ */
+type PlanOverlay = (
+  d: Draw,
+  px: (p: { x: number; z: number }) => Pt,
+  scale: number,
+  box: { x: number; y: number; w: number; h: number },
+) => void;
+
 function planPage(
   ctx: SheetContext,
   sheet: string,
   planView?: PlanViewParams,
   showDims = true,
+  extra?: { title: string; sub?: string; overlay?: PlanOverlay },
 ): string {
   const {
     name,
@@ -1021,13 +1036,29 @@ function planPage(
       }
     }
 
+    // La surcouche vient EN DERNIER, dans la même fenêtre de découpe : un
+    // schéma se lit par-dessus le plan, jamais dessous.
+    if (extra?.overlay) extra.overlay(d, px, scale, box);
+
     d.restore();
+  }
+
+  if (extra) {
+    d.text(extra.title, FRAME.x + 24, FRAME.y + FRAME.h - TITLE_H - 24, 13, INK, {
+      bold: true,
+      align: 'left',
+    });
+    if (extra.sub) {
+      d.text(extra.sub, FRAME.x + 24, FRAME.y + FRAME.h - TITLE_H - 38, 8, GREY, {
+        align: 'left',
+      });
+    }
   }
 
   drawSheetChrome(d, {
     project: name,
     filename,
-    sheetTitle: 'Plan d’ensemble coté',
+    sheetTitle: extra?.title ?? 'Plan d’ensemble coté',
     sheet,
     scaleLabel,
   });
@@ -1260,98 +1291,150 @@ function unifilairePage(
 }
 
 /**
- * Schéma multifilaire : le câblage, conducteur par conducteur.
+ * Les deux schémas se lisent SUR LE PLAN.
  *
- * Les couleurs sont normatives — bleu pour le neutre, vert/jaune pour la
- * terre, et ces deux-là ne servent à rien d'autre. Un schéma qui les
- * emploierait à tort serait faux avant d'être lu, c'est pourquoi elles ne
- * sont pas choisies ici mais reprises de `WIRE_COLORS`.
+ * Un unifilaire hors sol dit d'où part quoi ; il ne dit pas où ça passe. Sur
+ * le chantier, la question est toujours la même — « ce départ, il va où ? » —
+ * et la réponse se lit sur le plan de la pièce, pas sur un peigne abstrait.
+ * On dessine donc les circuits À LEUR PLACE : le tracé depuis le tableau,
+ * repéré C1, C2…, et le cartouche de départs en pied de feuille.
+ *
+ * Tout est borné par la fenêtre de découpe du plan (`d.clip`) : rien ne peut
+ * sortir du cadre, quel que soit le zoom demandé.
  */
-function multifilairePage(
+function circuitColor(i: number): string {
+  // Douze teintes distinctes, réutilisées au-delà : deux circuits de même
+  // couleur restent lisibles s'ils portent des repères différents.
+  const roue = [
+    '#2F6BFF', '#B8352A', '#2E8B57', '#8A5CD1', '#C77A18', '#0F8C9E',
+    '#B5326E', '#5C7A1E', '#3757A8', '#A34D2A', '#6B4FA0', '#127A5E',
+  ];
+  return roue[i % roue.length];
+}
+
+/** Repère rond posé sur un tracé : « C1 » dans une pastille blanche. */
+function markerAt(d: Draw, at: Pt, texte: string, couleur: string) {
+  d.circle(at.x, at.y, 7.5, '#FFFFFF');
+  d.poly(
+    [
+      { x: at.x - 7.5, y: at.y },
+      { x: at.x, y: at.y + 7.5 },
+      { x: at.x + 7.5, y: at.y },
+      { x: at.x, y: at.y - 7.5 },
+    ],
+    null,
+    couleur,
+    0.8,
+  );
+  d.text(texte, at.x, at.y - 2.6, 6.5, couleur, { bold: true });
+}
+
+function schemaPlanPage(
   ctx: SheetContext,
   sheet: string,
-  schemas: MultiWireSchema[],
+  planView: PlanViewParams | undefined,
+  rows: SchemaRow[],
+  routes: { id: string; path: { x: number; z: number }[] }[],
+  fixtureCircuit: Map<string, string>,
+  mode: 'uni' | 'multi',
+  multi: MultiWireSchema[],
 ): string {
-  const d = new Draw();
-  const x0 = FRAME.x + 30;
-  const w = FRAME.w - 60;
-  let y = FRAME.y + FRAME.h - TITLE_H - 46;
+  const parMarque = new Map(rows.map((r) => [r.mark, r]));
+  const filsDe = new Map(multi.map((m) => [m.mark, m.wires]));
 
-  d.text('Schéma multifilaire', x0, y + 22, 13, INK, { bold: true, align: 'left' });
-  d.text(
-    'Un conducteur par trait, à sa couleur normalisée (NF C 15-100).',
-    x0,
-    y + 8,
-    8,
-    GREY,
-    { align: 'left' },
-  );
-  y -= 16;
+  const overlay: PlanOverlay = (d, px, scale, box) => {
+    for (const r of routes) {
+      const mark = fixtureCircuit.get(r.id);
+      if (!mark) continue;
+      const idx = rows.findIndex((x) => x.mark === mark);
+      const couleur = circuitColor(idx < 0 ? 0 : idx);
+      const pts = r.path.map(px);
+      if (pts.length < 2) continue;
 
-  // La légende des couleurs, une fois pour toute la feuille.
-  let lx = x0;
-  for (const role of ['phase', 'neutre', 'terre', 'navette', 'retour'] as const) {
-    const { color, label } = WIRE_COLORS[role];
-    d.line(lx, y, lx + 14, y, 2, color);
-    d.text(label, lx + 18, y - 3, 6.5, GREY, { align: 'left' });
-    lx += 104;
-  }
-  y -= 18;
+      if (mode === 'uni') {
+        // UN trait par circuit : c'est la définition de l'unifilaire. La
+        // barre oblique et le nombre de conducteurs se posent au départ.
+        d.path(pts, 1.4, couleur);
+        const a = pts[0];
+        const b = pts[1];
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const l = Math.hypot(dx, dy) || 1;
+        const m = { x: a.x + (dx / l) * 16, y: a.y + (dy / l) * 16 };
+        const n = { x: -dy / l, y: dx / l };
+        d.line(
+          m.x - n.x * 4 - (dx / l) * 3,
+          m.y - n.y * 4 - (dy / l) * 3,
+          m.x + n.x * 4 + (dx / l) * 3,
+          m.y + n.y * 4 + (dy / l) * 3,
+          0.9,
+          couleur,
+        );
+        const nb = parMarque.get(mark)?.wires ?? 3;
+        d.text(`${nb}`, m.x + n.x * 8, m.y + n.y * 8 - 2, 6, couleur, {
+          bold: true,
+        });
+      } else {
+        // MULTIFILAIRE : un trait par conducteur, décalé de sa voisine, à
+        // sa couleur normalisée. L'écartement suit l'échelle du plan pour
+        // rester lisible sans jamais devenir un ruban.
+        const fils = filsDe.get(mark) ?? [];
+        const pas = Math.max(1.1, Math.min(2.2, scale * 0.02));
+        fils.forEach((fil, k) => {
+          const dec = (k - (fils.length - 1) / 2) * pas;
+          const decale = pts.map((q, i) => {
+            const prev = pts[Math.max(0, i - 1)];
+            const next = pts[Math.min(pts.length - 1, i + 1)];
+            const dx2 = next.x - prev.x;
+            const dy2 = next.y - prev.y;
+            const l2 = Math.hypot(dx2, dy2) || 1;
+            return { x: q.x - (dy2 / l2) * dec, y: q.y + (dx2 / l2) * dec };
+          });
+          d.path(decale, 0.7, fil.color);
+        });
+      }
 
-  for (const sch of schemas) {
-    const haut = 34 + sch.wires.length * 9;
-    if (y - haut < FRAME.y + 80) break;
-    d.line(x0, y, x0 + w, y, 0.6, GREY_LIGHT);
-    y -= 14;
-    d.text(`${sch.mark} — ${sch.label}`, x0, y, 9, INK, {
-      bold: true,
-      align: 'left',
-    });
-    y -= 12;
-
-    // Le disjoncteur à gauche, les appareils à droite, les fils entre.
-    const gx = x0 + 6;
-    const dx = x0 + w - 6;
-    d.rect(gx, y - sch.wires.length * 9 - 4, 22, sch.wires.length * 9 + 8, '#FFFFFF', INK, 0.9);
-    d.text(sch.mark, gx + 11, y - sch.wires.length * 9 / 2 - 2, 7, INK, {
-      bold: true,
-    });
-
-    sch.wires.forEach((fil, i) => {
-      const fy = y - i * 9 - 6;
-      d.line(gx + 22, fy, dx - 90, fy, 1.6, fil.color);
-      d.text(
-        fil.section > 0 ? `${fil.role} ${fil.section}` : fil.role,
-        dx - 86,
-        fy - 2.5,
-        6.5,
-        fil.color,
-        { align: 'left' },
-      );
-    });
-
-    // Ce que dessert le circuit, en boîtes alignées à droite.
-    const cy = y - (sch.wires.length * 9) / 2 - 2;
-    const noms = sch.devices.slice(0, 4).map((x) => x.label);
-    if (sch.devices.length > 4) noms.push(`+${sch.devices.length - 4}`);
-    d.text(noms.join(' · ') || '—', dx, cy, 7, INK, { align: 'left' });
-
-    y -= sch.wires.length * 9 + 10;
-    if (sch.note) {
-      d.text(sch.note, x0 + 6, y, 6.5, GREY, { align: 'left' });
-      y -= 12;
+      // Le repère, posé au bout du tracé — là où l'appareil se trouve.
+      markerAt(d, pts[pts.length - 1], mark, couleur);
     }
-    y -= 6;
-  }
 
-  drawSheetChrome(d, {
-    project: ctx.name,
-    filename: ctx.filename,
-    sheetTitle: 'Schéma multifilaire',
-    sheet,
-    scaleLabel: null,
+    // La légende, DANS le cadre du plan : des couleurs sans leur nom ne se
+    // lisent pas, et une légende hors cadre se ferait rogner.
+    const lignes: [string, string][] =
+      mode === 'multi'
+        ? (['phase', 'neutre', 'terre', 'navette', 'retour'] as const).map(
+            (r) => [WIRE_COLORS[r].color, WIRE_COLORS[r].label],
+          )
+        : rows.map((r, i) => [
+            circuitColor(i),
+            `${r.mark} · ${r.label}${
+              r.breaker === null ? '' : ` · ${r.breaker} A`
+            }`,
+          ]);
+    const larg = mode === 'multi' ? 108 : 132;
+    const haut = lignes.length * 11 + 10;
+    const lx = box.x + 8;
+    let ly = box.y + haut;
+    d.rect(lx - 4, box.y + 6, larg, haut, '#FFFFFFEE', '#D8DEE7', 0.6);
+    for (const [couleur, texte] of lignes) {
+      ly -= 11;
+      d.line(lx + 2, ly + 2.5, lx + 16, ly + 2.5, 2, couleur);
+      d.text(texte, lx + 20, ly, 6.5, INK, { align: 'left' });
+    }
+  };
+
+  const titre =
+    mode === 'uni' ? 'Unifilaire sur plan' : 'Multifilaire sur plan';
+  const sous =
+    mode === 'uni'
+      ? 'Un trait par circuit, du tableau à ses appareils. Calibres et ' +
+        'sections selon NF C 15-100.'
+      : 'Un trait par conducteur, à sa couleur normalisée (NF C 15-100).';
+  return planPage(ctx, sheet, planView, false, {
+    title: titre,
+    sub: sous,
+    overlay,
   });
-  return d.stream();
 }
 
 const DEFAULT_PDF_VIEWS: [View3DParams, View3DParams] = [
@@ -1831,8 +1914,10 @@ export function buildScanPdf(
   // Les schémas ne s'impriment que s'il y a une installation à montrer.
   const schemas = opts.schemas ?? null;
   const withSchema = !!schemas && schemas.rows.length > 0;
+  // Trois feuilles : l'unifilaire hors sol, puis les deux schémas sur le
+  // plan. Les tracés viennent des mêmes cheminements que le métré.
   const total =
-    1 + (withMetre ? 1 : 0) + (include3D ? 1 : 0) + (withSchema ? 2 : 0);
+    1 + (withMetre ? 1 : 0) + (include3D ? 1 : 0) + (withSchema ? 3 : 0);
   const ctx: SheetContext = {
     name: scan.name,
     filename,
@@ -1858,6 +1943,9 @@ export function buildScanPdf(
     );
   }
   if (withSchema && schemas) {
+    // D'abord l'architecture hors sol — d'où part quoi, sous quelle
+    // protection —, puis les deux MÊMES schémas posés sur le plan : c'est
+    // là qu'on lit où passe un départ, et c'est la question du chantier.
     pages.push(
       unifilairePage(
         ctx,
@@ -1867,7 +1955,28 @@ export function buildScanPdf(
       ),
     );
     pages.push(
-      multifilairePage(ctx, `${pages.length + 1} / ${total}`, schemas.multi),
+      schemaPlanPage(
+        ctx,
+        `${pages.length + 1} / ${total}`,
+        opts.plan,
+        schemas.rows,
+        scan.routes ?? [],
+        schemas.marks,
+        'uni',
+        schemas.multi,
+      ),
+    );
+    pages.push(
+      schemaPlanPage(
+        ctx,
+        `${pages.length + 1} / ${total}`,
+        opts.plan,
+        schemas.rows,
+        scan.routes ?? [],
+        schemas.marks,
+        'multi',
+        schemas.multi,
+      ),
     );
   }
   return buildDocument(pages);

@@ -28,6 +28,7 @@ import {
   roomOf,
   roomParts,
   segLength,
+  wallQuads,
   wallsCentroid,
   WALL_T,
   type Pt,
@@ -674,6 +675,9 @@ export function reprojectFixtures(
 ): Fixture[] {
   if (newWalls.length === 0) return fixtures;
   const avant = new Map(oldWalls.map((w) => [w.id, w]));
+  // Les onglets du nouveau jeu : la face d'un mur est PLUS COURTE que son
+  // axe, et c'est sur la face que l'appareil se pose.
+  const quads = wallQuads(newWalls);
   return fixtures.map((f) => {
     const w = avant.get(f.wallId);
     if (!w) return f;
@@ -695,19 +699,29 @@ export function reprojectFixtures(
     }
     const lenC = segLength(cible) || 1;
     const uC = { x: (cible.b.x - cible.a.x) / lenC, z: (cible.b.z - cible.a.z) / lenC };
-    const along = Math.min(
-      lenC,
-      Math.max(0, (p.x - cible.a.x) * uC.x + (p.z - cible.a.z) * uC.z),
-    );
     const nC = perpOf(uC);
     const meme = dehors.x * nC.x + dehors.z * nC.z;
+    const cote: 1 | -1 =
+      Math.abs(meme) < 1e-9 ? f.side : meme > 0 ? 1 : -1;
+    // On borne sur la FACE, à la demi-largeur de l'appareil : un tableau de
+    // 55 cm recalé sur l'extrémité laissait la moitié de sa plaque dans le
+    // vide, au-delà du coin. Et c'est bien la face qui compte — l'onglet la
+    // raccourcit de l'épaisseur du mur. Plus court que l'appareil, le mur le
+    // reçoit centré : c'est faux, mais c'est visible, donc corrigeable.
+    const face = wallFace(cible, quads.get(cible.id), cote);
+    const demi = Math.min(FIXTURES[f.kind].w / 2, face.len / 2);
+    const brut = (p.x - cible.a.x) * uC.x + (p.z - cible.a.z) * uC.z;
+    const x = Math.min(
+      face.len - demi,
+      Math.max(demi, faceX(face, brut)),
+    );
     return {
       ...f,
       wallId: cible.id,
-      along,
+      along: fromFaceX(face, x),
       // Un mur retourné dans la reconstruction ne doit pas retourner ses
       // prises : on garde la face qui regarde du même côté.
-      side: Math.abs(meme) < 1e-9 ? f.side : ((meme > 0 ? 1 : -1) as 1 | -1),
+      side: cote,
     };
   });
 }

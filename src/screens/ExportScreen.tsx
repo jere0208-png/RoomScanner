@@ -31,7 +31,7 @@ import {
   roomInputsOf,
   wallToRooms,
 } from '../geometry/nfc15100';
-import { multiWire, schemaRows } from '../geometry/schema';
+import { fixtureMarks, multiWire, schemaRows } from '../geometry/schema';
 import { planRoutes } from '../geometry/elecplan';
 import { floorsOf, useScanStore } from '../store/scanStore';
 
@@ -54,10 +54,21 @@ function PlanPreview({
   value,
   onChange,
   onBox,
+  cotes,
+  routes,
 }: {
   value: PlanView;
   onChange: (v: PlanView) => void;
   onBox: (b: { w: number; h: number }) => void;
+  /**
+   * Ce que le document portera vraiment.
+   *
+   * L'aperçu montrait TOUJOURS les cotes, quel que soit l'interrupteur : on
+   * décochait « cotes sur le plan 2D » et rien ne changeait sous les yeux —
+   * on ne pouvait donc vérifier son réglage qu'en ouvrant le PDF.
+   */
+  cotes: boolean;
+  routes?: { id: string; path: { x: number; z: number }[] }[];
 }) {
   const valueRef = useRef(value);
   valueRef.current = value;
@@ -149,7 +160,8 @@ function PlanPreview({
           },
         ]}>
         <FloorplanEditor
-          showMeasures
+          showMeasures={cotes}
+          cableRoutes={routes}
           editable={false}
           selectedWallId={null}
           onSelectWall={() => {}}
@@ -247,6 +259,9 @@ const styles = getStyles(c);
       rows,
       differentials: list.differentials,
       multi: list.circuits.map((circ, i) => multiWire(circ, fixtures, `C${i + 1}`)),
+      // Le lien entre le plan et le tableau : chaque appareil sait de quel
+      // départ il dépend, et c'est ce repère qui s'écrit sur le tracé.
+      marks: fixtureMarks(list.circuits),
     };
   }, [rooms, parts, fixtures, placement, cheminements]);
   const [measures3D, setMeasures3D] = useState(true);
@@ -290,7 +305,7 @@ const styles = getStyles(c);
           objects: showFurniture ? objects : [],
           rooms,
           fixtures,
-          routes: gaines ? cheminements?.traces : undefined,
+          routes: gaines || schema ? cheminements?.traces : undefined,
           floors: floorsOf(rooms),
           roomNames: Object.fromEntries(rooms.map((r) => [r.id, r.name])),
         },
@@ -468,6 +483,8 @@ const styles = getStyles(c);
           {/* Le verrou de scroll ne couvre QUE la zone centrale du modèle */}
           <View {...lockProps} style={styles.lockWrap}>
             <PlanPreview
+              cotes={measures2D}
+              routes={gaines || schema ? cheminements?.traces : undefined}
               value={plan}
               onChange={setPlan}
               onBox={(b) => {
@@ -490,7 +507,7 @@ const styles = getStyles(c);
                     h: e.nativeEvent.layout.height,
                   };
                 }}>
-                <Iso3DView value={v1} onChange={setV1} />
+                <Iso3DView value={v1} onChange={setV1} showMeasures={measures3D} />
               </View>
               <View
                 {...lockProps}
@@ -501,7 +518,7 @@ const styles = getStyles(c);
                     h: e.nativeEvent.layout.height,
                   };
                 }}>
-                <Iso3DView value={v2} onChange={setV2} />
+                <Iso3DView value={v2} onChange={setV2} showMeasures={measures3D} />
               </View>
             </View>
           </>

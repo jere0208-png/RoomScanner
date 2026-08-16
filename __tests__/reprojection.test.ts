@@ -19,6 +19,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 import {
+  FIXTURES,
   faceX,
   interiorSide,
   reprojectAnchors,
@@ -198,5 +199,38 @@ describe('dans le store, bout en bout', () => {
       const w = st.walls.find((x) => x.id === f.wallId)!;
       expect(f.side).toBe(interiorSide(w, st.walls, st.rooms));
     }
+  });
+});
+
+describe('un appareil large ne déborde jamais du mur d’arrivée', () => {
+  it('le tableau recalé en bout de mur garde sa plaque sur la maçonnerie', () => {
+    // Un tableau de 55 cm posé près du refend : après recousage, il ne doit
+    // pas se retrouver à cheval sur le coin, la moitié dans le vide.
+    const neufs = mergeColinear(splitAtJunctions(weldCorners(AVEC_REFEND)));
+    const tableau: Fixture = {
+      id: 't',
+      kind: 'tableau',
+      wallId: 'n',
+      along: 2.95,
+      height: 1.35,
+      side: 1,
+    };
+    const [remis] = reprojectFixtures(AVEC_REFEND, neufs, [tableau]);
+    const w = neufs.find((x) => x.id === remis.wallId)!;
+    const face = wallFace(w, wallQuads(neufs).get(w.id), remis.side);
+    const x = faceX(face, remis.along);
+    const demi = FIXTURES.tableau.w / 2;
+    expect(x - demi).toBeGreaterThanOrEqual(-1e-6);
+    expect(x + demi).toBeLessThanOrEqual(face.len + 1e-6);
+  });
+
+  it('sur un mur plus court que lui, il se centre', () => {
+    const court: WallSeg[] = [mur('c', 0, 0, 0.4, 0)];
+    const [remis] = reprojectFixtures(
+      [mur('c', 0, 0, 2, 0)],
+      court,
+      [{ id: 't', kind: 'tableau', wallId: 'c', along: 1.8, height: 1.35, side: 1 }],
+    );
+    expect(remis.along).toBeCloseTo(0.2, 6);
   });
 });

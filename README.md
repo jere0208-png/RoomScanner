@@ -1254,6 +1254,32 @@ qu'on borne au mur, pas chaque poste : sans quoi le premier arrivé au bord
 écrase les autres contre lui. Retirer un poste d'une paire défait la plaque
 et rend l'appareil restant libre ; d'un trio, il reste un ensemble de deux.
 
+### Les schémas se lisent SUR LE PLAN
+
+Un unifilaire hors sol dit d'où part quoi ; il ne dit pas où ça passe. Sur le
+chantier, la question est toujours la même — « ce départ, il va où ? » — et la
+réponse se lit sur le plan de la pièce, pas sur un peigne abstrait. Le dossier
+porte donc trois feuilles : l'unifilaire hors sol, puis les deux schémas posés
+sur le plan.
+
+- **Unifilaire sur plan** : un trait par circuit, du tableau à ses appareils,
+  barré du nombre de conducteurs au départ — la convention de l'unifilaire.
+  Chaque circuit a sa teinte, son repère (C1, C2…) posé au bout du tracé, et
+  la légende en donne le calibre.
+- **Multifilaire sur plan** : un trait par conducteur, décalé de ses voisins,
+  à sa couleur normalisée. L'écartement suit l'échelle du plan pour rester
+  lisible sans devenir un ruban.
+
+Les deux passent par `planPage()` avec une SURCOUCHE : mêmes murs, mêmes
+meubles, mêmes symboles que le plan d'ensemble, et le schéma par-dessus.
+Tout est tracé dans la fenêtre de découpe du plan (`d.clip`), légende
+comprise — **rien ne peut sortir du cadre**, quel que soit le zoom demandé.
+
+Et l'aperçu d'export montre enfin ce que le document portera : cotes 2D,
+cotes 3D et tracé des gaines suivent leurs interrupteurs. On décochait
+« cotes sur le plan 2D » et rien ne changeait sous les yeux — il fallait
+ouvrir le PDF pour vérifier son réglage.
+
 ### Jonctions de murs
 
 Un mur n'est pas un trait épais posé à côté des autres : `wallQuads()` traite

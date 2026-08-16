@@ -13,8 +13,14 @@ import {
   roomInputsOf,
   wallToRooms,
 } from '../src/geometry/nfc15100';
-import { WIRE_COLORS, multiWire, schemaRows } from '../src/geometry/schema';
+import {
+  WIRE_COLORS,
+  fixtureMarks,
+  multiWire,
+  schemaRows,
+} from '../src/geometry/schema';
 import { roomParts, type WallSeg } from '../src/geometry/floorplan';
+import { planRoutes } from '../src/geometry/elecplan';
 import type { Fixture } from '../src/geometry/electrical';
 
 const PAGE_W = 595.28;
@@ -72,11 +78,29 @@ const latin1 = (bytes: Uint8Array) => {
   return s;
 };
 
+const plan = planRoutes(W, R, parts, FX, placement)!;
+
 const pdf = latin1(
   buildScanPdf(
-    { name: 'Cuisine', walls: W, openings: [], objects: [], rooms: R, fixtures: FX },
+    {
+      name: 'Cuisine',
+      walls: W,
+      openings: [],
+      objects: [],
+      rooms: R,
+      fixtures: FX,
+      routes: plan.traces,
+    },
     false,
-    { metre: false, schemas: { rows, differentials: list.differentials, multi } },
+    {
+      metre: false,
+      schemas: {
+        rows,
+        differentials: list.differentials,
+        multi,
+        marks: fixtureMarks(list.circuits),
+      },
+    },
   ),
 );
 
@@ -95,7 +119,9 @@ const texte = (src: string) =>
 
 /** La couleur telle que le PDF l'écrit : « r g b RG ». */
 const trait = (hex: string) => {
-  const v = (i: number) => (parseInt(hex.slice(i, i + 2), 16) / 255).toFixed(2);
+  // Le PDF écrit les nombres au plus court : « 1 », pas « 1.00 ».
+  const v = (i: number) =>
+    String(Math.round((parseInt(hex.slice(i, i + 2), 16) / 255) * 100) / 100);
   return `${v(1)} ${v(3)} ${v(5)} RG`;
 };
 
@@ -147,17 +173,26 @@ describe('la feuille multifilaire', () => {
     expect(doc).toMatch(/vert/i);
   });
 
-  it('montre un conducteur par trait, avec sa section', () => {
+  it('se lit SUR LE PLAN, avec sa légende de couleurs', () => {
+    expect(doc).toContain('Multifilaire sur plan');
+    expect(doc).toMatch(/Phase/);
+    expect(doc).toMatch(/Neutre/);
+    expect(doc).toMatch(/Terre/);
+    // Un circuit d'éclairage compte six conducteurs : c'est ce que le
+    // tracé dessine, six traits parallèles.
     const eclairage = multi.find((m) => m.label.startsWith('Éclairage'))!;
-    // Phase, neutre, terre, retour de lampe, deux navettes.
     expect(eclairage.wires).toHaveLength(6);
-    expect(doc).toContain('neutre 1.5');
-    expect(doc).toContain('terre 2.5');
   });
 
-  it('avertit là où le câblage se joue : va-et-vient, courants faibles', () => {
-    expect(doc).toMatch(/va-et-vient/i);
-    expect(doc).toMatch(/même gaine/i);
+  it('l’unifilaire sur plan porte les repères de chaque départ', () => {
+    expect(doc).toContain('Unifilaire sur plan');
+    // Les libellés portent des tirets cadratins que l'encodage PDF rend
+    // autrement : on compare sur le repère et sur le calibre, qui sont
+    // justement ce qu'on lit sur le chantier.
+    for (const r of rows) {
+      expect(doc).toContain(`${r.mark} · `);
+      if (r.breaker !== null) expect(doc).toContain(`${r.breaker} A`);
+    }
   });
 });
 
@@ -178,8 +213,15 @@ describe('rien ne sort de la feuille', () => {
     expect(n).toBeGreaterThan(200);
   });
 
-  it('le document compte bien deux feuilles de plus', () => {
-    const feuilles = (src: string) => (src.match(/\/Type \/Page\b/g) ?? []).length;
-    expect(feuilles(pdf)).toBe(feuilles(sansSchema) + 2);
+  it('les tracés de circuit sont bien dessinés, pas seulement listés', () => {
+    expect(plan.traces.length).toBeGreaterThan(3);
+    // Chaque circuit a sa teinte : on retrouve le bleu du premier départ.
+    expect(pdf).toContain(trait('#2F6BFF'));
+  });
+
+  it('le document compte trois feuilles de plus', () => {
+    // L'unifilaire hors sol, puis les deux schémas posés sur le plan.
+    const feuilles = (src: string) => (src.match(/\/Type \/Page /g) ?? []).length;
+    expect(feuilles(pdf)).toBe(feuilles(sansSchema) + 3);
   });
 });
