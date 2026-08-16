@@ -782,11 +782,39 @@ export interface SymbolStroke {
   fill?: boolean;
 }
 
+/**
+ * LE SOCLE DE PRISE — le demi-cercle sur sa tige.
+ *
+ * C'est le symbole de la prise de courant sur un plan français : un
+ * demi-disque appuyé sur son diamètre, prolongé d'une tige qui rejoint le
+ * mur. Tout le reste du jeu s'en déduit par ajout d'un signe distinctif, et
+ * jamais par changement de forme — c'est ce qui permet de lire un plan sans
+ * revenir à la légende à chaque symbole.
+ */
 const SOCLE: SymbolStroke[] = [
   { d: 'M-8 2 H8' },
   { d: 'M-8 2 A8 8 0 0 1 8 2' },
   { d: 'M0 2 V10' },
 ];
+
+/**
+ * La barre du socle SPÉCIALISÉ : un trait en travers du diamètre.
+ *
+ * Une prise 20 A de lave-linge et une prise 16 A de séjour se dessinaient
+ * exactement pareil — seul le sigle écrit à côté les distinguait, et il
+ * disparaît dès qu'on dézoome. La convention marque le circuit spécialisé
+ * d'un trait : on le voit sans lire.
+ */
+const BARRE_SPECIALISE: SymbolStroke = { d: 'M-4.5 -2.5 H4.5' };
+
+/**
+ * La prise de COMMUNICATION : le socle, barré d'un trait vertical.
+ *
+ * Une RJ45 se dessinait comme une prise de courant. Sur un plan où les deux
+ * voisinent — c'est le cas de tous les séjours — rien ne les distinguait
+ * que la couleur, qui disparaît à l'impression en noir et blanc.
+ */
+const TRAIT_VDI: SymbolStroke = { d: 'M0 2 V-5' };
 
 const POINT_MUR: SymbolStroke = {
   d: 'M0 8 m-2.4 0 a2.4 2.4 0 1 0 4.8 0 a2.4 2.4 0 1 0 -4.8 0',
@@ -872,9 +900,28 @@ function shiftPath(d: string, dx: number): string {
 
 export const FIXTURE_SYMBOL: Record<FixtureKind, SymbolStroke[]> = {
   prise: SOCLE,
-  prise2: [...SOCLE, { d: 'M-4.5 2 A4.5 4.5 0 0 1 4.5 2' }],
-  prise20: SOCLE,
-  prise32: SOCLE,
+  /**
+   * La prise DOUBLE : deux demi-disques sur une même tige.
+   *
+   * Elle était dessinée comme un arc de plus à l'intérieur du premier, ce
+   * qui n'est la convention de personne — ça se lisait comme une prise
+   * simple mal imprimée. Deux socles côte à côte, c'est ce que l'œil
+   * attend.
+   */
+  prise2: [
+    { d: 'M-9 2 H9' },
+    { d: 'M-9 2 A4.5 4.5 0 0 1 0 2' },
+    { d: 'M0 2 A4.5 4.5 0 0 1 9 2' },
+    { d: 'M0 2 V10' },
+  ],
+  prise20: [...SOCLE, BARRE_SPECIALISE],
+  // La 32 A porte DEUX barres : c'est le plus gros calibre du logement, et
+  // la confondre avec un 20 A se paie en section de câble.
+  prise32: [
+    ...SOCLE,
+    BARRE_SPECIALISE,
+    { d: 'M-4.5 -5 H4.5' },
+  ],
   inter: MANETTE,
   va: [...MANETTE, { d: 'M1.2 -8.4 L8.2 -5' }],
   poussoir: [POINT_MUR, { d: 'M0 8 V-4' }, { d: 'M-5 -4 H5' }],
@@ -884,8 +931,13 @@ export const FIXTURE_SYMBOL: Record<FixtureKind, SymbolStroke[]> = {
     { d: 'M-9 -1 l3.4 0.5' },
     { d: 'M-9 -1 l0.5 -3.4' },
   ],
-  rj45: SOCLE,
-  tv: SOCLE,
+  rj45: [...SOCLE, TRAIT_VDI],
+  // La TV : le socle de communication, avec l'antenne au-dessus.
+  tv: [
+    ...SOCLE,
+    TRAIT_VDI,
+    { d: 'M-3.5 -5 L0 -8 L3.5 -5' },
+  ],
   applique: [
     { d: 'M-6 -2 a6 6 0 1 0 12 0 a6 6 0 1 0 -12 0' },
     { d: 'M-4.2 -6.2 L4.2 2.2' },
@@ -917,7 +969,7 @@ export const FIXTURE_SYMBOL: Record<FixtureKind, SymbolStroke[]> = {
   // Les ensembles reprennent le symbole de leurs postes : la table ne porte
   // que le premier, `assemblySymbol()` compose le reste.
   prise3: SOCLE,
-  rj2: SOCLE,
+  rj2: [...SOCLE, TRAIT_VDI],
   rjPrise: SOCLE,
   rjPrise2: SOCLE,
   tvPrise: SOCLE,

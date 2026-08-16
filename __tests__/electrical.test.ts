@@ -297,11 +297,34 @@ describe('symboles de plan', () => {
     expect(trace('prise')).not.toBe(trace('inter'));
     expect(trace('prise')).not.toBe(trace('prise2'));
     expect(trace('inter')).not.toBe(trace('va'));
-    // Les prises 20 et 32 A partagent le socle : c'est l'intensité écrite
-    // à côté qui les sépare, comme sur un vrai plan.
-    expect(trace('prise20')).toBe(trace('prise'));
+    /**
+     * CHAQUE CALIBRE SE VOIT, sans lire le sigle.
+     *
+     * Les trois prises partageaient exactement le même dessin : seule
+     * l'intensité écrite à côté les séparait, et ce texte disparaît dès
+     * qu'on dézoome ou qu'on imprime petit. Une 20 A de lave-linge
+     * confondue avec une 16 A de séjour, c'est une section de câble fausse.
+     * La convention marque le circuit spécialisé d'une barre — deux pour
+     * la 32 A, le plus gros calibre du logement.
+     */
+    expect(trace('prise20')).not.toBe(trace('prise'));
+    expect(trace('prise32')).not.toBe(trace('prise20'));
+    // Mais tous gardent le socle : on reconnaît une prise au premier coup
+    // d'œil, et son calibre au second.
+    for (const k of ['prise20', 'prise32'] as const) {
+      expect(trace(k).startsWith(trace('prise'))).toBe(true);
+    }
     expect(FIXTURE_TAG.prise20).toBeTruthy();
     expect(FIXTURE_TAG.prise32).toBeTruthy();
+
+    /**
+     * Et une prise de COMMUNICATION n'est pas une prise de courant.
+     *
+     * Elles se dessinaient pareil ; sur un plan en noir et blanc — celui
+     * qu'on imprime pour le chantier — plus rien ne les distinguait.
+     */
+    expect(trace('rj45')).not.toBe(trace('prise'));
+    expect(trace('tv')).not.toBe(trace('rj45'));
   });
 
   it('deux appareils au même point du mur s’échelonnent', () => {

@@ -113,8 +113,17 @@ function rendu(editable: boolean, regle?: string, biais = false) {
   });
   act(() => {
     const conteneur = tree.root.findAllByType(View)[0];
+    /**
+     * Une planche LARGE, et c'est indispensable.
+     *
+     * À 360 px pour sept mètres, l'échelle tombe à 45 px/m : sous ce zoom,
+     * l'appareillage n'est plus qu'un point de couleur, et les symboles ne
+     * sont pas dessinés du tout. La référence ne couvrait donc aucun d'eux
+     * — on a pu les redessiner sans qu'elle bronche. Il faut passer le
+     * seuil de détail pour qu'ils entrent dans la planche.
+     */
     conteneur.props.onLayout?.({
-      nativeEvent: { layout: { width: 360, height: 520 } },
+      nativeEvent: { layout: { width: 900, height: 620 } },
     });
   });
   return tree;

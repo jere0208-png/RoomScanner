@@ -111,6 +111,31 @@ export const SNAPSHOT_FIXTURES: Fixture[] = [
     height: 1.1,
     side: -1,
   },
+  /**
+   * UN DE CHAQUE FAMILLE DE SYMBOLE.
+   *
+   * Le jeu ne portait qu'une prise et un interrupteur : tout le reste du
+   * catalogue — prise double, spécialisées 20 et 32 A, communication —
+   * n'était couvert par aucune planche. On a pu redessiner leurs symboles
+   * sans qu'une seule référence bouge, ce qui revient à ne pas les avoir
+   * vérifiés du tout. Ils figurent donc ici, sur le mur nord.
+   */
+  ...(
+    [
+      ['pc2', 'prise2', 1.0],
+      ['pc20', 'prise20', 1.6],
+      ['pc32', 'prise32', 2.2],
+      ['rj', 'rj45', 2.8],
+      ['tv-prise', 'tv', 3.4],
+    ] as const
+  ).map(([id, kind, along]) => ({
+    id,
+    kind,
+    wallId: SNAPSHOT_WALLS.find((w) => w.id === 'n')?.id ?? 'n',
+    along,
+    height: 0.25,
+    side: 1 as const,
+  })),
 ];
 
 export const SNAPSHOT_OBJECTS: ObjectData[] = [
