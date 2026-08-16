@@ -309,8 +309,17 @@ export function WallElevation({
           }
         }
         if (!best) {
+          /**
+           * L'APPUI À VIDE NE DÉSÉLECTIONNE PLUS.
+           *
+           * Il lâchait l'appareil tenu : le titre repassait à « Face au
+           * mur », le bandeau de cotes disparaissait, et toute la fenêtre
+           * se réorganisait sous les doigts. Or on touche le mur pour
+           * viser, pas pour abandonner — et on rate la prise une fois sur
+           * trois. On garde donc la sélection : elle change en touchant un
+           * AUTRE appareil, et se termine en fermant la fenêtre.
+           */
           drag.current = null;
-          L.select(null);
           return;
         }
         drag.current = {

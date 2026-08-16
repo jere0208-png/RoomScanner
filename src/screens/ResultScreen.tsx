@@ -1157,19 +1157,17 @@ export function ResultScreen() {
                 placeFixture(pendingKind, id);
                 return;
               }
-              // Un mur en défaut s'ouvre DE FACE, prêt à être corrigé : le
-              // constat sans l'établi obligeait à un détour pour agir.
-              if (
-                id &&
-                elecIssues.some(
-                  (i) =>
-                    i.severity === 'alerte' &&
-                    i.roomId &&
-                    (wallRooms.get(id) ?? []).includes(i.roomId),
-                )
-              ) {
-                openWallElevation(id);
-              }
+              /**
+               * TOUCHER UN MUR NE FAIT QUE LE CHOISIR.
+               *
+               * Un mur d'une pièce en défaut ouvrait directement l'établi
+               * électrique — l'idée était d'épargner un détour à qui vient
+               * corriger un constat. À l'usage, c'est l'inverse : on touche
+               * un mur pour le coter, pour y percer, pour le supprimer, et
+               * on se retrouve dans une fenêtre plein écran qu'on n'a pas
+               * demandée. Le menu de choix s'affiche à côté du mur, et
+               * l'établi s'ouvre par son bouton — comme les trois autres.
+               */
             }}
             alertRooms={alertRooms}
             selectedOpeningId={selectedOpeningId}

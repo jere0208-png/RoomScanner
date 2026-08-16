@@ -108,8 +108,10 @@ const WALL_ACTIONS: {
   },
   {
     action: 'supprimer',
-    // Pas de mot : une croix se lit dans toutes les langues.
-    label: null,
+    // Une croix se lit dans toutes les langues, mais pas dans une rangée
+    // où ses trois voisines portent un mot : c'est la seule sans titre, et
+    // c'est justement celle qui efface un mur. On la nomme.
+    label: 'Supprimer',
     paths: [{ d: 'M6.5 6.5 L17.5 17.5' }, { d: 'M17.5 6.5 L6.5 17.5' }],
   },
 ];
@@ -1837,14 +1839,39 @@ export function FloorplanEditor({
               );
             })()}
 
-          {/* Mur sélectionné : le reste du plan s'estompe, et les commandes
-              viennent se poser À CÔTÉ du mur, jamais dessus. */}
-          {selectedWallId &&
+          {/*
+            Mur ou RETOUR sélectionné : les commandes viennent se poser À
+            CÔTÉ de lui, jamais dessus.
+
+            Un retour n'ouvrait aucun menu : il se surlignait, affichait sa
+            note, et c'était tout. On ne pouvait donc rien y poser — alors
+            que le retour est justement l'endroit où l'on met l'interrupteur
+            d'entrée. Il reçoit maintenant le même menu que le mur entier,
+            centré sur SA portion de maçonnerie.
+          */}
+          {(selectedWallId || pierRun) &&
             (() => {
-              const w = walls.find((x) => x.id === selectedWallId);
+              const w = walls.find(
+                (x) => x.id === (selectedWallId ?? pier?.wallId),
+              );
               if (!w || !onWallAction) return null;
-              const a2 = mapping.toPx(w.a);
-              const b2 = mapping.toPx(w.b);
+              // Sur un retour, le menu se centre sur le tronçon, pas sur le
+              // mur : c'est le bout de maçonnerie qu'on vise.
+              const bornes =
+                !selectedWallId && pierRun
+                  ? {
+                      a: {
+                        x: w.a.x + (w.b.x - w.a.x) * pierRun.t0,
+                        z: w.a.z + (w.b.z - w.a.z) * pierRun.t0,
+                      },
+                      b: {
+                        x: w.a.x + (w.b.x - w.a.x) * pierRun.t1,
+                        z: w.a.z + (w.b.z - w.a.z) * pierRun.t1,
+                      },
+                    }
+                  : { a: w.a, b: w.b };
+              const a2 = mapping.toPx(bornes.a);
+              const b2 = mapping.toPx(bornes.b);
               const mid = { x: (a2.x + b2.x) / 2, y: (a2.y + b2.y) / 2 };
               // Décalage perpendiculaire, du côté où il y a de la place.
               const dx = b2.x - a2.x;
@@ -2354,11 +2381,30 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     justifyContent: 'center',
   },
   objDrag: { position: 'absolute' },
+  /**
+   * LES VOIES DU PLAN — où chaque bloc flottant a le droit de se poser.
+   *
+   * Tout ce qui flotte au-dessus du dessin était placé à vue, chacun dans
+   * son coin, sans que personne ne tienne la liste. Il a suffi que la
+   * rangée d'outils reçoive ses titres pour qu'elle s'élargisse et vienne
+   * couvrir la note du retour de mur, illisible dessous.
+   *
+   * Quatre voies, et une seule chose par voie :
+   *
+   * - EN HAUT À DROITE : la rangée d'ancrage (contrôle, édition, annuler,
+   *   enregistrer). Elle grandit avec le nombre de boutons — rien d'autre
+   *   ne doit compter sur cette bande.
+   * - À DROITE : la colonne des calques.
+   * - EN BAS À GAUCHE : ce qui explique l'état courant (attente de pose,
+   *   note du retour de mur). Un seul à la fois.
+   * - EN BAS, PLEINE LARGEUR : les barres de cotes.
+   */
   pierNote: {
     position: 'absolute',
-    top: 10,
+    // En bas à gauche : en haut, la rangée d'outils la recouvrait.
+    bottom: 12,
     left: 10,
-    maxWidth: 210,
+    maxWidth: 230,
     backgroundColor: c.blueSoft,
     borderRadius: radius.sm,
     paddingHorizontal: 10,
