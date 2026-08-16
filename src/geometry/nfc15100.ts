@@ -749,6 +749,12 @@ export interface Circuit {
   rooms: string[];
   fixtureIds: string[];
   note?: string;
+  /**
+   * Métré de câble (m), quand la géométrie est connue : c'est la seule
+   * ligne du devis qu'on ne pouvait pas déduire du relevé, et celle qu'un
+   * électricien estime encore au pas dans le couloir.
+   */
+  cable?: number;
 }
 
 const chunk = <T,>(list: T[], size: number): T[][] => {
@@ -1001,6 +1007,8 @@ export function materialList(
   fixtures: Fixture[],
   roomOfWall: Map<string, string[]>,
   placement?: Map<string, string>,
+  /** Métré de câble par circuit, calculé sur le plan (`cableRuns`). */
+  cable?: Map<string, number>,
 ): MaterialList {
   const roomById = new Map(rooms.map((r) => [r.id, r]));
   const firstRoom = (f: Fixture) => {
@@ -1058,20 +1066,31 @@ export function materialList(
   if (circuits.some((c) => c.nature === 'vdi')) {
     board.push({ label: 'Coffret de communication', quantity: 1 });
   }
-  const metres = circuits.reduce(
-    (s, c) => s + (c.section === null ? 0 : c.points * 12),
-    0,
-  );
+  // Le métré rejoint son circuit : le PDF n'a plus qu'à le lire.
+  const avecCable = cable
+    ? circuits.map((c) => ({ ...c, cable: cable.get(c.id) }))
+    : circuits;
+
+  // Le total de câble : mesuré SUR LE PLAN quand on connaît la géométrie,
+  // estimé à 12 m par point sinon. La nuance est dite au lecteur — un devis
+  // ne se signe pas sur un forfait qu'on aurait pris pour un métré.
+  const mesure = avecCable.reduce((t, c) => t + (c.cable ?? 0), 0);
+  const metres = mesure > 0
+    ? Math.ceil(mesure)
+    : circuits.reduce((t, c) => t + (c.section === null ? 0 : c.points * 12), 0);
   if (metres > 0) {
     board.push({
-      label: `Câble — environ ${metres} m au total (12 m par point, à ajuster)`,
+      label:
+        mesure > 0
+          ? `Câble — ${metres} m au total, mesurés sur le plan (hors chutes)`
+          : `Câble — environ ${metres} m au total (12 m par point, à ajuster)`,
       quantity: 1,
     });
   }
 
   return {
     rooms: byRoom,
-    circuits,
+    circuits: avecCable,
     differentials,
     board,
     issues: checkElectrical(rooms, fixtures, roomOfWall, placement),

@@ -50,9 +50,11 @@ import {
   roomParts,
   segLength,
   totalArea,
+  type Pt,
   type RoomPart,
 } from '../geometry/floorplan';
 import { hasCapturedColors } from '../geometry/appearance';
+import { cableRuns, circuitLength } from '../geometry/routing';
 import {
   frCategory,
   furnKind,
@@ -64,6 +66,7 @@ import { buildObj, objFilename } from '../export/model3d';
 import { checkPlan } from '../geometry/diagnostics';
 import {
   checkElectrical,
+  planCircuits,
   roomUse,
   worktopsOnWall,
   type Worktop,
@@ -78,11 +81,13 @@ import {
   FIXTURES,
   FIXTURE_FAMILIES,
   faceX,
+  facePoint,
   wallFace,
   type Fixture,
   type FixtureKind,
 } from '../geometry/electrical';
 import { useScanStore } from '../store/scanStore';
+import { haptic } from '../ui/haptic';
 import {
   ActionSheet,
   PromptSheet,
@@ -120,6 +125,8 @@ export function ResultScreen() {
   const modelPath = useScanStore((s) => s.modelPath);
   const scanName = useScanStore((s) => s.scanName);
   const saves = useScanStore((s) => s.saves);
+  const photos = useScanStore((s) => s.photos);
+  const removePhoto = useScanStore((s) => s.removePhoto);
   const currentSaveId = useScanStore((s) => s.currentSaveId);
   const setWallLength = useScanStore((s) => s.setWallLength);
   const renameCurrent = useScanStore((s) => s.renameCurrent);
@@ -188,6 +195,42 @@ export function ResultScreen() {
   const styles = getStyles(teinte);
 
   const [tab, setTab] = useState<Tab>('2d');
+  /** Calque des cheminements de gaines (métré à l'appui). */
+  const [showRoutes, setShowRoutes] = useState(false);
+  /** Photo de repérage ouverte en grand. */
+  const [photoVue, setPhotoVue] = useState<string | null>(null);
+  /**
+   * Le passage du plan à la 3D : un basculement, pas une coupure.
+   *
+   * Sec, on perd le repère de ce qu'on regardait — le dessin change de
+   * nature en une image. La vue sortante s'enfonce et s'efface, la nouvelle
+   * revient de l'avant : 260 ms en tout, assez pour lier les deux, trop peu
+   * pour attendre.
+   */
+  const bascule = useRef(new Animated.Value(1)).current;
+  const [vue, setVue] = useState<Tab>('2d');
+  useEffect(() => {
+    if (vue === tab) return;
+    let vivant = true;
+    Animated.timing(bascule, {
+      toValue: 0,
+      duration: 110,
+      easing: Easing.in(Easing.quad),
+      useNativeDriver: true,
+    }).start(() => {
+      if (!vivant) return;
+      setVue(tab);
+      Animated.timing(bascule, {
+        toValue: 1,
+        duration: 170,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
+    });
+    return () => {
+      vivant = false;
+    };
+  }, [tab, vue, bascule]);
   // Pièce visée par l'outil « nom de pièce » et par la suppression.
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [naming, setNaming] = useState(false);
@@ -352,7 +395,13 @@ export function ResultScreen() {
    */
   const shareMaterial = async () => {
     try {
-      const list = materialList(roomInputs, fixtures, wallRooms, placement);
+      const list = materialList(
+        roomInputs,
+        fixtures,
+        wallRooms,
+        placement,
+        cheminements?.parCircuit,
+      );
       const bytes = buildMaterialPdf(scanName, list);
       await RoomScan.sharePDF(toBase64(bytes), materialFilename(scanName));
     } catch (e: any) {
@@ -538,6 +587,58 @@ export function ResultScreen() {
     return m;
   }, [walls, rooms, objects]);
 
+  /**
+   * Cheminement des gaines et métré, quand un tableau est posé.
+   *
+   * Sans tableau, on ne sait pas d'où part le câble : on ne devine pas, on
+   * s'abstient, et le devis garde son estimation forfaitaire.
+   */
+  const cheminements = useMemo(() => {
+    const tableau = fixtures.find((f) => f.kind === 'tableau');
+    if (!tableau) return null;
+    const quads = wallQuadsOf(walls);
+    const murs = new Map(walls.map((w) => [w.id, w]));
+    const posDe = (f: Fixture) => {
+      const w = murs.get(f.wallId);
+      if (!w) return null;
+      const fa = wallFace(w, quads.get(w.id), f.side);
+      const p = facePoint(fa, faceX(fa, f.along), 0.02);
+      return { at: { x: p.x, z: p.z }, height: f.height };
+    };
+    const depart = posDe(tableau);
+    if (!depart) return null;
+
+    const circuits = planCircuits(
+      fixtures,
+      (f) => rooms.find((r) => r.id === placement.get(f.id))?.name ?? '',
+      (f) =>
+        roomUse(
+          rooms.find((r) => r.id === placement.get(f.id))?.name ?? '',
+          rooms.find((r) => r.id === placement.get(f.id))?.kind,
+        ) === 'cuisine',
+    );
+    const parCircuit = new Map<string, number>();
+    const traces: { id: string; path: Pt[] }[] = [];
+    for (const c of circuits) {
+      const runs = c.fixtureIds.flatMap((id) => {
+        const f = fixtures.find((x) => x.id === id);
+        if (!f || f.id === tableau.id) return [];
+        const pos = posDe(f);
+        if (!pos) return [];
+        const piece = parts.find((p) => p.roomId === placement.get(f.id));
+        const ring = piece?.surface?.pts ?? parts[0]?.surface?.pts ?? [];
+        if (ring.length < 3) return [];
+        return cableRuns(ring, depart.at, depart.height, [
+          { id: f.id, at: pos.at, height: pos.height },
+        ]);
+      });
+      if (runs.length === 0) continue;
+      parCircuit.set(c.id, circuitLength(runs));
+      for (const r of runs) traces.push({ id: r.fixtureId, path: r.path });
+    }
+    return { parCircuit, traces };
+  }, [fixtures, walls, rooms, parts, placement]);
+
   const elecIssues = checkElectrical(
     roomInputs,
     fixtures,
@@ -650,6 +751,9 @@ export function ResultScreen() {
     const id = addFixture(kind, wallId);
     setPendingKind(null);
     if (!id) return;
+    // Rangé à côté d'un autre, sous une plaque commune : la main le sent,
+    // et l'œil ira lire le bandeau qui propose de changer de côté.
+    if (useScanStore.getState().pendingJoin) haptic('accroche');
     // Une prise de plan de travail arrive directement à sa hauteur : la
     // corriger juste après, à la main, serait un geste de trop.
     if (height !== undefined) {
@@ -814,9 +918,28 @@ export function ResultScreen() {
 
       <Segment tab={tab} onChange={setTab} />
 
-      <View style={styles.canvas} ref={canvasRef} collapsable={false}>
-        {tab === '2d' ? (
+      <Animated.View
+        style={[
+          styles.canvas,
+          {
+            opacity: bascule,
+            transform: [
+              {
+                scale: bascule.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.965, 1],
+                }),
+              },
+            ],
+          },
+        ]}
+        ref={canvasRef}
+        collapsable={false}>
+        {vue === '2d' ? (
           <FloorplanEditor
+            cableRoutes={showRoutes ? cheminements?.traces : undefined}
+            photos={photos}
+            onSelectPhoto={setPhotoVue}
             showMeasures={showMeasures}
             editable={editMode}
             selectedObjectId={selectedObjectId}
@@ -897,7 +1020,7 @@ export function ResultScreen() {
 
         {/* Toute la quincaillerie s'efface pendant une capture : une image
             qu'on envoie ne doit montrer QUE le plan et le logo. */}
-        {capturing ? null : tab === '2d' ? (
+        {capturing ? null : vue === '2d' ? (
           <View style={styles.planTools}>
             {/* Deux barres, jamais mélangées.
                 En lecture, on ne fait que REGARDER : la barre ne porte que
@@ -937,6 +1060,19 @@ export function ResultScreen() {
                     active={showMeasures}
                     onPress={() => setShowMeasures((v) => !v)}
                   />,
+                  // Le calque des gaines ne s'offre que s'il a quelque chose
+                  // à montrer : sans tableau posé, on ne sait pas d'où part
+                  // le câble, et une pastille qui n'allume rien est un piège.
+                  ...(cheminements
+                    ? [
+                        <ToolPill
+                          key="gaines"
+                          icon="gaines"
+                          active={showRoutes}
+                          onPress={() => setShowRoutes((v) => !v)}
+                        />,
+                      ]
+                    : []),
                   // Le catalogue s'ouvre depuis le calque qu'il alimente,
                   // et le « + » se pose À GAUCHE de lui, sur sa ligne : une
                   // onde bleue en sort tant qu'on ne l'a pas touché, pour
@@ -1015,7 +1151,7 @@ export function ResultScreen() {
             seul qu'on cherche toujours, et il commande le contenu de la
             barre. Il reste donc à demeure, en haut à droite, aligné sur la
             rangée — les outils défilent DERRIÈRE lui, jamais dessous. */}
-        {tab === '2d' && !capturing && (
+        {vue === '2d' && !capturing && (
           <View style={styles.editAnchor}>
             {/* Revenir en arrière ne descend pas avec les outils : c'est le
                 geste qu'on cherche dans l'urgence, et il se tient à côté du
@@ -1028,7 +1164,7 @@ export function ResultScreen() {
         )}
 
         {/* Côtes du meuble sélectionné, en surimpression */}
-        {tab === '2d' && selectedObject && showFurniture && objDims && !capturing && (
+        {vue === '2d' && selectedObject && showFurniture && objDims && !capturing && (
           <View style={styles.editBar}>
             <View style={styles.editRow}>
               <TextInput
@@ -1103,7 +1239,7 @@ export function ResultScreen() {
         )}
 
         {/* Pièce sélectionnée : la nommer, ou la retirer du scan */}
-        {tab === '2d' && editMode && !capturing && !selectedObject && !selectedWall &&
+        {vue === '2d' && editMode && !capturing && !selectedObject && !selectedWall &&
           selectedRoomId && targetRoom && (
             <View style={styles.editBar}>
               <Text style={styles.editLabel}>
@@ -1177,7 +1313,7 @@ export function ResultScreen() {
             </View>
           )}
 
-        {tab === '2d' && pendingKind && !capturing && (
+        {vue === '2d' && pendingKind && !capturing && (
           <View style={[styles.wallLengthBar, north !== null && styles.barShift,
               editMode && canUndo && styles.barShiftRight,
             ]}>
@@ -1195,7 +1331,7 @@ export function ResultScreen() {
         {/* La menuiserie sélectionnée : largeur, hauteur, et de quoi les
             changer. Même bandeau que pour un mur — un seul endroit où
             regarder quand on a touché quelque chose. */}
-        {tab === '2d' && editMode && selectedOpening && !capturing && (
+        {vue === '2d' && editMode && selectedOpening && !capturing && (
           <View style={styles.wallStrip}>
             <Text style={styles.wallStripText} numberOfLines={1}>
               <Text style={styles.wallStripStrong}>
@@ -1228,7 +1364,7 @@ export function ResultScreen() {
         {/* Le mur sélectionné, en une ligne au pied du plan : sa longueur,
             sa hauteur sous plafond, et de quoi les changer. En haut, le
             bandeau mangeait le dessin qu'on est en train de regarder. */}
-        {tab === '2d' && !selectedObject && !selectedOpening && editMode && selectedWall && !capturing && (
+        {vue === '2d' && !selectedObject && !selectedOpening && editMode && selectedWall && !capturing && (
           <View style={styles.wallStrip}>
             <Text style={styles.wallStripText} numberOfLines={1}>
               <Text style={styles.wallStripStrong}>
@@ -1270,10 +1406,10 @@ export function ResultScreen() {
             </Svg>
           </TouchableOpacity>
         )}
-      </View>
+      </Animated.View>
 
 
-      {objects.length > 0 && showFurniture && tab === '2d' && !editMode && (
+      {objects.length > 0 && showFurniture && vue === '2d' && !editMode && (
         <ScrollView
           style={styles.objectList}
           horizontal
@@ -1542,6 +1678,44 @@ export function ResultScreen() {
       <ActionSheet data={menu} onClose={() => setMenu(null)} />
       <PromptSheet data={prompt} onClose={() => setPrompt(null)} />
 
+      {/* ---------- Photo de repérage, en grand ---------- */}
+      <Modal
+        visible={!!photoVue}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPhotoVue(null)}>
+        <Pressable style={styles.photoFond} onPress={() => setPhotoVue(null)}>
+          {(() => {
+            const ph = photos.find((p) => p.id === photoVue);
+            if (!ph) return null;
+            const mur = walls.find((w) => w.id === ph.wallId);
+            return (
+              <>
+                <Image
+                  source={{ uri: `file://${ph.path}` }}
+                  style={styles.photoPleine}
+                  resizeMode="contain"
+                />
+                <View style={styles.photoBarre}>
+                  <Text style={styles.photoLegende} numberOfLines={1}>
+                    {mur
+                      ? `Mur de ${fr(segLength(mur), 2)} m`
+                      : 'Mur supprimé'}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => {
+                      removePhoto(ph.id);
+                      setPhotoVue(null);
+                    }}>
+                    <Text style={styles.photoSuppr}>Supprimer</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            );
+          })()}
+        </Pressable>
+      </Modal>
+
       {/* ---------- Catalogue de mobilier ---------- */}
       <Modal
         visible={catalogue}
@@ -1733,10 +1907,17 @@ type ToolIcon =
   | 'undo'
   | 'square'
   | 'check'
+  | 'gaines'
   | 'plus';
 
 /** Tracés 24×24 des icônes d'outils (trait simple, lisible en 18 px). */
 const TOOL_PATHS: Record<ToolIcon, { d: string; fill?: boolean }[]> = {
+  // Cheminement : un câble qui longe deux murs et remonte.
+  gaines: [
+    { d: 'M4 20 h9 a3 3 0 0 0 3 -3 V7' },
+    { d: 'M13 4 h6 v3 h-6 z' },
+    { d: 'M4 17.5 v5' },
+  ],
   ruler: [
     { d: 'M3.5 9 h17 a1.5 1.5 0 0 1 1.5 1.5 v3 a1.5 1.5 0 0 1 -1.5 1.5 h-17 a1.5 1.5 0 0 1 -1.5 -1.5 v-3 a1.5 1.5 0 0 1 1.5 -1.5 z' },
     { d: 'M7.5 9 v3' },
@@ -2352,6 +2533,24 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     paddingVertical: 5,
     gap: 6,
   },
+  photoFond: {
+    flex: 1,
+    backgroundColor: 'rgba(8,10,14,0.94)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  photoPleine: { width: '100%', height: '78%' },
+  photoBarre: {
+    position: 'absolute',
+    bottom: 40,
+    left: 20,
+    right: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  photoLegende: { color: '#FFFFFF', fontSize: 13, fontWeight: '700', flex: 1 },
+  photoSuppr: { color: '#FF6B6B', fontSize: 13, fontWeight: '800' },
   watermarkLogo: { width: 116, height: 26, tintColor: c.ink, opacity: 0.85 },
   watermarkText: { color: '#0B0D12', fontSize: 13, fontWeight: '800' },
   watermarkAccent: { color: c.blue },

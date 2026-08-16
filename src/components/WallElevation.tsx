@@ -67,7 +67,9 @@ import {
   wallFace,
   type Fixture,
 } from '../geometry/electrical';
+import { RoomScan } from 'react-native-room-scan';
 import { useScanStore } from '../store/scanStore';
+import { haptic } from '../ui/haptic';
 
 const PAD_X = 30;
 const PAD_TOP = 26;
@@ -105,6 +107,7 @@ export function WallElevation({
   const splitFixture = useScanStore((s) => s.splitFixture);
   const pendingJoin = useScanStore((s) => s.pendingJoin);
   const objects = useScanStore((s) => s.objects);
+  const addPhoto = useScanStore((s) => s.addPhoto);
   const wallClip = useScanStore((s) => s.wallClip);
   const copyWallFixtures = useScanStore((s) => s.copyWallFixtures);
   const pasteWallFixtures = useScanStore((s) => s.pasteWallFixtures);
@@ -566,6 +569,29 @@ export function WallElevation({
             {spec ? ` · ${spec.note}` : ' · touchez un appareil pour le coter'}
           </Text>
         </View>
+        {/* Photo de repérage : trois jours plus tard, la relecture achoppe
+            toujours sur « c'était quoi, ce mur ? ». Une photo punaisée y
+            répond mieux qu'une note. */}
+        <TouchableOpacity
+          style={styles.photo}
+          onPress={async () => {
+            const chemin = await RoomScan.takePhoto();
+            if (chemin) {
+              addPhoto(wallId, fromFaceX(face, face.len / 2), chemin);
+              haptic('succes');
+            }
+          }}>
+          <Svg width={19} height={19} viewBox="0 0 24 24">
+            <Path
+              d="M4 8 h3.5 l1.5 -2 h6 l1.5 2 H20 v11 H4 z"
+              stroke={c.ink}
+              strokeWidth={1.9}
+              strokeLinejoin="round"
+              fill="none"
+            />
+            <Circle cx={12} cy={13.5} r={3.4} stroke={c.ink} strokeWidth={1.9} fill="none" />
+          </Svg>
+        </TouchableOpacity>
         <TouchableOpacity style={styles.close} onPress={onClose}>
           <Text style={styles.closeText}>✕</Text>
         </TouchableOpacity>
@@ -1451,6 +1477,15 @@ const getStyles = themedStyles((c: Palette) =>
       height: 10,
       backgroundColor: c.surface,
       transform: [{ rotate: '45deg' }],
+    },
+    photo: {
+      width: 34,
+      height: 34,
+      borderRadius: 17,
+      backgroundColor: c.surfaceSunken,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 8,
     },
     percage: {
       marginTop: 8,

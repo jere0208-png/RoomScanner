@@ -158,6 +158,18 @@ export const RoomScan = {
     return Promise.resolve(false);
   },
 
+  /**
+   * Photo de repérage : l'appareil photo du système, puis le chemin du
+   * fichier écrit dans Documents. `null` si l'utilisateur annule ou si
+   * l'appareil n'a pas de caméra (simulateur).
+   */
+  takePhoto(): Promise<string | null> {
+    if (Platform.OS === 'ios' && NativeModules.RoomScanPhoto) {
+      return NativeModules.RoomScanPhoto.takePhoto();
+    }
+    return Promise.resolve(null);
+  },
+
   /** iOS : écrit le PDF (base64) en fichier temporaire et ouvre le partage. */
   sharePDF: (base64: string, filename: string): Promise<boolean> => {
     if (!NativeModules.RoomScanExport) {

@@ -16,6 +16,14 @@ RCT_EXTERN_METHOD(setTorch:(BOOL)on resolve:(RCTPromiseResolveBlock)resolve reje
 @interface RCT_EXTERN_MODULE(RoomScanEvents, RCTEventEmitter)
 @end
 
+@interface RCT_EXTERN_MODULE(RoomScanHaptics, NSObject)
+RCT_EXTERN_METHOD(tap:(NSString *)kind)
+@end
+
+@interface RCT_EXTERN_MODULE(RoomScanPhoto, NSObject)
+RCT_EXTERN_METHOD(takePhoto:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
+@end
+
 @interface RCT_EXTERN_MODULE(RoomScanPreview, NSObject)
 RCT_EXTERN_METHOD(presentUSDZ:(NSString *)path
                   resolve:(RCTPromiseResolveBlock)resolve

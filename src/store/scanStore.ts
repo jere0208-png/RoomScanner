@@ -83,6 +83,25 @@ export interface ScanFolder {
   name: string;
 }
 
+/**
+ * Photo de repérage, punaisée sur un mur.
+ *
+ * Un relevé se fait vite ; sa relecture, trois jours plus tard, achoppe
+ * toujours sur la même question — « c'était quoi, ce mur ? ». Le chemin
+ * pointe un fichier des Documents de l'app : il ne survit PAS à une
+ * réinstallation, comme le `.usdz` du scan, et l'app doit donc supporter
+ * qu'il ait disparu.
+ */
+export interface ScanPhoto {
+  id: string;
+  wallId: string;
+  /** Cote sur le mur (m depuis A), pour la punaise du plan. */
+  along: number;
+  path: string;
+  /** Horodatage de la prise de vue. */
+  at: number;
+}
+
 export interface SavedScan {
   id: string;
   name: string;
@@ -95,6 +114,8 @@ export interface SavedScan {
   objects: ObjectData[];
   /** Appareillage électrique ajouté à la main. Absent des scans d'avant. */
   fixtures?: Fixture[];
+  /** Photos de repérage. Absentes des scans d'avant. */
+  photos?: ScanPhoto[];
   /** Dossier qui contient ce scan. Absent = à la racine. */
   folderId?: string;
   /**
@@ -244,6 +265,7 @@ interface Snapshot {
   objects: ObjectData[];
   rooms: RoomEntry[];
   fixtures: Fixture[];
+  photos: ScanPhoto[];
 }
 const HISTORY_MAX = 40;
 const history: Snapshot[] = [];
@@ -338,6 +360,11 @@ interface ScanState {
   ) => void;
   /** Sort un appareil de son ensemble et l'écarte franchement. */
   splitFixture: (id: string, along: number) => void;
+  /** Photos de repérage du scan courant. */
+  photos: ScanPhoto[];
+  /** Punaise une photo sur un mur, à la cote donnée. */
+  addPhoto: (wallId: string, along: number, path: string) => string;
+  removePhoto: (id: string) => void;
   /**
    * Presse-papier d'appareillage : le relevé d'un mur, cotes comprises.
    *
@@ -470,6 +497,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       objects: st.objects,
       rooms: st.rooms,
       fixtures: st.fixtures,
+      photos: st.photos,
     });
     if (history.length > HISTORY_MAX) history.shift();
     if (!st.canUndo) set({ canUndo: true });
@@ -496,6 +524,7 @@ export const useScanStore = create<ScanState>((set, get) => {
             openings: st.openings,
             objects: st.objects,
             fixtures: st.fixtures,
+            photos: st.photos,
             north: st.north ?? undefined,
             modelPath: st.modelPath,
             updatedAt: Date.now(),
@@ -523,6 +552,7 @@ export const useScanStore = create<ScanState>((set, get) => {
     currentSaveId: null,
     pendingJoin: null,
     wallClip: null,
+    photos: [],
     dirty: false,
     resultOrigin: 'scan',
     rooms: [],
@@ -879,6 +909,21 @@ export const useScanStore = create<ScanState>((set, get) => {
 
     clearPendingJoin: () => set({ pendingJoin: null }),
 
+    addPhoto: (wallId, along, path) => {
+      pushHistory('photo');
+      const id = `ph-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`;
+      set({
+        photos: [...get().photos, { id, wallId, along, path, at: Date.now() }],
+        dirty: true,
+      });
+      return id;
+    },
+
+    removePhoto: (id) => {
+      pushHistory('photo');
+      set({ photos: get().photos.filter((p) => p.id !== id), dirty: true });
+    },
+
     copyWallFixtures: (wallId) => {
       const st = get();
       const wall = st.walls.find((w) => w.id === wallId);
@@ -1111,6 +1156,7 @@ export const useScanStore = create<ScanState>((set, get) => {
           openings: [],
           objects: [],
           fixtures: [],
+          photos: [],
           processing: false,
           scanning: false,
           screen: 'result',
@@ -1131,6 +1177,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         openings,
         objects,
         fixtures: [],
+        photos: [],
         north: typeof r.north === 'number' ? r.north : undefined,
       };
       const saves = [save, ...get().saves];
@@ -1145,6 +1192,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         openings,
         objects,
         fixtures: [],
+        photos: [],
         north: typeof r.north === 'number' ? r.north : null,
         saves,
         processing: false,
@@ -1457,6 +1505,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         openings: st.openings,
         objects: st.objects,
         fixtures: st.fixtures,
+        photos: st.photos,
         north: st.north ?? undefined,
       };
       const saves = [save, ...st.saves];
@@ -1554,6 +1603,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         openings: save.openings,
         objects: save.objects,
         fixtures: save.fixtures ?? [],
+        photos: save.photos ?? [],
         north: save.north ?? null,
         dirty: false,
         resultOrigin: 'library',
@@ -1592,6 +1642,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         openings: [],
         objects: [],
         fixtures: [],
+        photos: [],
         north: null,
       }),
   };

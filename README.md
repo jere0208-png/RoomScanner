@@ -1027,6 +1027,56 @@ le report (`pasteWallFixtures`) ne pose que ce qui tient : un appareil à
 déborde pas. Les ensembles restent des ensembles, avec un identifiant NEUF :
 deux murs, deux plaques.
 
+### Cheminement des gaines, et métré
+
+Le plan sait où sont les appareils et où est le tableau : il peut donc dire
+par où passe la gaine et combien de mètres acheter. C'est la seule ligne du
+devis qu'on ne pouvait pas déduire du relevé, et celle qu'un électricien
+estime encore au pas dans le couloir.
+
+Le modèle est volontairement simple, et il le dit : la gaine longe le contour
+de la pièce à hauteur de plinthe (15 cm), tourne aux angles, remonte à
+l'appareil. `ringPath()` compare les deux sens de contournement et garde le
+plus court — jamais la diagonale à travers la pièce, jamais le tour complet
+quand un quart suffit. La longueur ajoute la descente du tableau, la remontée
+à l'appareil, 60 cm de mou d'about, et la traversée en ligne droite quand le
+tableau est dans une autre pièce.
+
+Le calque « gaines » ne s'offre que si un tableau est posé : sans lui, on ne
+sait pas d'où part le câble, et une pastille qui n'allume rien est un piège.
+Le devis distingue les deux cas — « mesurés sur le plan » ou « environ, 12 m
+par point » : on ne signe pas un chiffrage sur un forfait qu'on aurait pris
+pour un métré.
+
+### La main sait avant l'œil
+
+Trois moments méritent une secousse : la **butée** (le meuble touche le mur),
+l'**accroche** (l'appareil s'est rangé à l'entraxe, l'angle est tombé pile sur
+le quart de tour) et l'**avis** (une photo est prise, une pose sort de la
+norme). Deux règles sans lesquelles l'utilisateur coupe l'haptique dans les
+réglages du téléphone — et perd donc aussi ce qui était utile : jamais deux
+secousses de même nature à moins de 120 ms, et un état MAINTENU n'en produit
+qu'une (un glissement contre un mur en produirait soixante par seconde).
+
+Le module natif se cherche à chaque appel, jamais au chargement : sur
+appareil, l'ordre d'enregistrement des modules n'est pas garanti, et un
+`undefined` capturé une fois pour toutes couperait l'haptique pour de bon.
+
+### Photo de repérage
+
+Un relevé se fait vite ; sa relecture, trois jours plus tard, achoppe toujours
+sur « c'était quoi, ce mur ? ». Le bouton photo de l'écran de face punaise une
+image SUR le mur, à sa cote : elle suit le plan, part avec la sauvegarde, et
+se rouvre en grand d'un toucher sur sa punaise.
+
+Côté natif, `UIImagePickerController` plutôt qu'une session AVCapture maison :
+c'est l'appareil photo du système, avec sa mise au point et son autorisation
+déjà accordée pour le scan. L'image est ramenée à 1600 px de côté avant
+écriture — un plan n'a pas besoin de douze mégapixels, et la sauvegarde les
+traînerait à chaque écriture. Le fichier vit dans les Documents de l'app : il
+ne survit pas à une réinstallation, comme le `.usdz`, et un mur supprimé
+laisse sa photo orpheline plutôt que de la détruire.
+
 ### Jonctions de murs
 
 Un mur n'est pas un trait épais posé à côté des autres : `wallQuads()` traite

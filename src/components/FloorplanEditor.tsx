@@ -14,6 +14,7 @@ import Svg, {
   Path,
   Pattern,
   Polygon,
+  Polyline,
   Rect,
   Text as SvgText,
 } from 'react-native-svg';
@@ -47,6 +48,7 @@ import {
   assemblySymbol,
   faceX,
   facePoint,
+  interiorSide,
   stackRanks,
   wallFace,
 } from '../geometry/electrical';
@@ -109,6 +111,7 @@ interface EffMapping {
   toMeters: (px: { x: number; y: number }) => { x: number; z: number };
 }
 import { useScanStore } from '../store/scanStore';
+import { haptic, releaseHaptic } from '../ui/haptic';
 
 /**
  * Distance d'un point à un mur, dans une direction donnée.
@@ -153,6 +156,14 @@ interface Props {
   editable: boolean;
   selectedWallId: string | null;
   onSelectWall: (id: string | null) => void;
+  /**
+   * Cheminement des gaines, du tableau à chaque appareil. Calque optionnel :
+   * sans tableau posé, l'écran n'en fournit pas, et rien ne se dessine.
+   */
+  cableRoutes?: { id: string; path: Pt[] }[];
+  /** Photos de repérage punaisées sur les murs. */
+  photos?: { id: string; wallId: string; along: number }[];
+  onSelectPhoto?: (id: string) => void;
   /** Meuble sélectionné : surligné, déplaçable, supprimable. */
   selectedObjectId?: string | null;
   onDeleteObject?: (id: string) => void;
@@ -194,6 +205,9 @@ export function FloorplanEditor({
   editable,
   selectedWallId,
   onSelectWall,
+  cableRoutes,
+  photos,
+  onSelectPhoto,
   selectedObjectId,
   onDeleteObject,
   selectedRoomId,
@@ -793,6 +807,41 @@ export function FloorplanEditor({
               })()}
 
 
+            {/* Les punaises de photo : posées sur le mur, tournées vers la
+                pièce. Une vignette serait illisible à cette échelle et
+                cacherait le plan ; le repère dit qu'il y a une photo, le
+                toucher l'ouvre. */}
+            {photos?.map((ph) => {
+              const w = wallById.get(ph.wallId);
+              if (!w) return null;
+              const face = wallFace(w, quads.get(w.id), interiorSide(w, walls));
+              const p = facePoint(face, faceX(face, ph.along), 0.14);
+              const q = mapping.toPx(p);
+              return (
+                <G key={`photo-${ph.id}`} onPress={() => onSelectPhoto?.(ph.id)}>
+                  <Circle cx={q.x} cy={q.y} r={11} fill="transparent" />
+                  <Rect
+                    x={q.x - 8}
+                    y={q.y - 7}
+                    width={16}
+                    height={14}
+                    rx={3}
+                    fill={c.surface}
+                    stroke={c.ink}
+                    strokeWidth={1.3}
+                  />
+                  <Circle
+                    cx={q.x}
+                    cy={q.y}
+                    r={3.2}
+                    fill="none"
+                    stroke={c.ink}
+                    strokeWidth={1.3}
+                  />
+                </G>
+              );
+            })}
+
             {/* Rose des vents. Relevée au magnétomètre pendant le scan, elle
                 tourne avec le plan : le N montre le vrai nord, à toute
                 rotation. Posée dans un coin, hors du dessin — une rose au
@@ -1024,6 +1073,29 @@ export function FloorplanEditor({
                 </G>
               );
             })}
+
+            {/* Les gaines : un filet tireté qui longe les murs, du tableau
+                à chaque appareil. Il passe SOUS les symboles — c'est un
+                cheminement, pas une annotation — et son tracé est celui du
+                métré porté au devis, pas une illustration. */}
+            {cableRoutes?.map((r) => (
+              <Polyline
+                key={`gaine-${r.id}`}
+                points={r.path
+                  .map((p) => {
+                    const q = mapping.toPx(p);
+                    return `${q.x},${q.y}`;
+                  })
+                  .join(' ')}
+                fill="none"
+                stroke={c.blue}
+                strokeWidth={1.6}
+                strokeDasharray="7 4"
+                strokeLinejoin="round"
+                strokeLinecap="round"
+                opacity={0.75}
+              />
+            ))}
 
             {/* L'appareillage se dessine APRÈS les menuiseries : la
                 trouée d'une baie est un aplat opaque, et posée
@@ -1574,10 +1646,27 @@ export function ObjectDragHandle({
         },
         onPanResponderMove: (_e, g) => {
           const d = live.current.mapping.deltaToMeters(g.dx, g.dy);
-          useScanStore
+          const vise = {
+            x: startRef.current.x + d.x,
+            z: startRef.current.z + d.z,
+          };
+          useScanStore.getState().setObjectCenter(objectId, vise.x, vise.z);
+          // Le doigt demande, les murs disposent : si la position obtenue
+          // n'est pas celle visée, c'est qu'on bute. La main doit le sentir,
+          // parce que l'œil, lui, est caché par le doigt.
+          const apres = useScanStore
             .getState()
-            .setObjectCenter(objectId, startRef.current.x + d.x, startRef.current.z + d.z);
+            .objects.find((o) => o.id === objectId);
+          if (!apres) return;
+          const ecart = Math.hypot(
+            apres.transform[12] - vise.x,
+            apres.transform[14] - vise.z,
+          );
+          if (ecart > 0.01) haptic('butee', true);
+          else releaseHaptic('butee');
         },
+        onPanResponderRelease: () => releaseHaptic('butee'),
+        onPanResponderTerminate: () => releaseHaptic('butee'),
       }),
     [objectId],
   );
@@ -1668,8 +1757,14 @@ export function RotateHandle({
           const seizieme = Math.round(rel / (Math.PI / 12)) * (Math.PI / 12);
           if (Math.abs(rel - quart) < (8 * Math.PI) / 180) {
             yaw = fr + quart;
+            // Pile sur l'équerre : un petit cran sous le doigt le dit mieux
+            // qu'un chiffre qu'on ne regarde pas.
+            haptic('accroche', true);
           } else if (Math.abs(rel - seizieme) < (3 * Math.PI) / 180) {
             yaw = fr + seizieme;
+            haptic('accroche', true);
+          } else {
+            releaseHaptic('accroche');
           }
           useScanStore.getState().setObjectYaw(objectId, yaw);
           const deg = Math.round(((yaw - vr) * 180) / Math.PI);

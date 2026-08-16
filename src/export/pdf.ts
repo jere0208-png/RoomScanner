@@ -1401,7 +1401,10 @@ export function buildMaterialPdf(name: string, list: MaterialList): Uint8Array {
         : `${c.breaker} A · ${c.section} mm²`;
     ligne(
       `${c.label} — ${c.points} point${c.points > 1 ? 's' : ''}` +
-        (c.rooms.length ? ` (${c.rooms.join(', ')})` : ''),
+        (c.rooms.length ? ` (${c.rooms.join(', ')})` : '') +
+        // Le métré, à même la ligne du circuit : c'est là qu'on le cherche
+        // au moment de chiffrer.
+        (c.cable ? ` · ${c.cable} m de câble` : ''),
       protection,
     );
     if (c.note) note(`   ${c.note}`);
