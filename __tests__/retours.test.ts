@@ -19,6 +19,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 import {
   FIXTURES,
   faceX,
+  masonryAxes,
   masonryRuns,
   snapToMasonry,
   wallFace,
@@ -90,6 +91,51 @@ describe('les retours d’un mur percé', () => {
     const runs = masonryRuns(wallRuns(W[0], []), segLength(W[0]), face());
     expect(runs).toHaveLength(1);
     expect(runs[0].x1 - runs[0].x0).toBeCloseTo(face().len, 6);
+  });
+});
+
+/**
+ * L'AXE DU RETOUR : ce sur quoi le doigt s'accroche.
+ *
+ * Le mur avait son milieu, le retour n'avait rien — on centrait un
+ * interrupteur dans un tableau de porte à l'œil, alors que c'est
+ * exactement là qu'un décalage de deux centimètres se voit.
+ */
+describe('les axes d’accroche des retours', () => {
+  it('un axe par retour, au milieu de sa maçonnerie', () => {
+    const axes = masonryAxes(
+      [
+        { x0: 0, x1: 2.4 },
+        { x0: 3.3, x1: 5.86 },
+      ],
+      0.082,
+    );
+    expect(axes).toHaveLength(2);
+    expect(axes[0]).toBeCloseTo(1.2, 6);
+    expect(axes[1]).toBeCloseTo(4.58, 6);
+  });
+
+  it('mais aucun sur un retour trop étroit pour la plaque', () => {
+    // 6 cm ne portent pas une plaque de 8,2 : proposer leur milieu
+    // accrocherait sur une position que le recalage déferait aussitôt.
+    const axes = masonryAxes(
+      [
+        { x0: 0, x1: 0.06 },
+        { x0: 1, x1: 2 },
+      ],
+      0.082,
+    );
+    expect(axes).toEqual([1.5]);
+  });
+
+  it('et l’axe tombe bien sur de la maçonnerie, pas dans la baie', () => {
+    const runs = masonryRuns(wallRuns(W[0], [PORTE]), segLength(W[0]), face());
+    for (const axe of masonryAxes(runs, FIXTURES.inter.w)) {
+      // Un axe proposé est une position que le recalage garde telle quelle.
+      expect(
+        snapToMasonry(runs, axe, FIXTURES.inter.w / 2, face().len),
+      ).toBeCloseTo(axe, 6);
+    }
   });
 });
 

@@ -368,6 +368,30 @@ export function ResultScreen() {
   const swap = useRef(new Animated.Value(1)).current;
   const [selectedWallId, setSelectedWallId] = useState<string | null>(null);
   const [selectedOpeningId, setSelectedOpeningId] = useState<string | null>(null);
+  /**
+   * UN SEUL OBJET SÉLECTIONNÉ À LA FOIS.
+   *
+   * Chaque appui posait sa propre sélection et oubliait d'éteindre les
+   * autres : on touchait un mur en gardant un meuble pris, et deux
+   * bandeaux se disputaient le bas de l'écran — celui du meuble et celui
+   * du mur. Le pire cas était silencieux : un appareil de plafond restait
+   * en réglage sous un mur sélectionné, et les flèches déplaçaient le
+   * point lumineux qu'on ne regardait plus.
+   *
+   * La règle est celle d'un plan papier : ce qu'on désigne remplace ce
+   * qu'on désignait. `seuleSelection('mur')` éteint tout sauf le mur ;
+   * sans argument, elle éteint tout — c'est l'appui dans le vide.
+   */
+  const seuleSelection = useCallback(
+    (garde?: 'mur' | 'meuble' | 'piece' | 'ouverture' | 'plafond') => {
+      if (garde !== 'mur') setSelectedWallId(null);
+      if (garde !== 'meuble') setSelectedObjectId(null);
+      if (garde !== 'piece') setSelectedRoomId(null);
+      if (garde !== 'ouverture') setSelectedOpeningId(null);
+      if (garde !== 'plafond') setSelCeiling(null);
+    },
+    [],
+  );
   const [renaming, setRenaming] = useState(false);
   const [nameInput, setNameInput] = useState('');
   // Electricite : un seul panneau, qui montre soit le catalogue d'appareils,
@@ -1142,13 +1166,15 @@ export function ResultScreen() {
               setDraftObject(null);
               setSelectedObjectId(null);
             }}
-            onSelectObject={(id) => setSelectedObjectId(id)}
+            onSelectObject={(id) => {
+              seuleSelection('meuble');
+              setSelectedObjectId(id);
+            }}
             showObjectDims={objDims}
             onToggleObjectDims={() => setObjDims((v) => !v)}
             selectedWallId={selectedWallId}
             onSelectWall={(id) => {
-              setSelectedObjectId(null);
-              setSelectedRoomId(null);
+              seuleSelection('mur');
               setSelectedWallId(id);
               // Un appareil attendait son mur : le voici.
               if (id && pendingKind) {
@@ -1170,12 +1196,8 @@ export function ResultScreen() {
             alertRooms={alertRooms}
             selectedOpeningId={selectedOpeningId}
             onSelectOpening={(id) => {
+              if (id) seuleSelection('ouverture');
               setSelectedOpeningId(id);
-              if (id) {
-                setSelectedWallId(null);
-                setSelectedObjectId(null);
-                setSelectedRoomId(null);
-              }
             }}
             selectedRoomId={selectedRoomId}
             ceiling={ceiling}
@@ -1212,6 +1234,12 @@ export function ResultScreen() {
               setPendingCeiling(null);
             }}
             onSelectCeiling={(id) => {
+              // Appui dans le vide : on lâche, comme pour un meuble.
+              if (id === null) {
+                setSelCeiling(null);
+                setPendingLink(null);
+                return;
+              }
               // Un appui sur un appareil de plafond propose de le retirer :
               // il n'a ni cote ni hauteur à régler, seulement une place.
               const cl = ceiling.find((x) => x.id === id);
@@ -1220,9 +1248,8 @@ export function ResultScreen() {
               // sur dix. Le menu s'ouvre par un appui long.
               if (selCeiling !== id) {
                 seulGeste('reglage');
+                seuleSelection('plafond');
                 setSelCeiling(id);
-                setSelectedObjectId(null);
-                setSelectedWallId(null);
                 return;
               }
               const spec = CEILINGS[cl.kind];
@@ -1270,8 +1297,7 @@ export function ResultScreen() {
               });
             }}
             onSelectRoom={(id) => {
-              setSelectedObjectId(null);
-              setSelectedWallId(null);
+              seuleSelection('piece');
               setSelectedRoomId(id);
             }}
             onEditRoomName={promptRoomFor}
@@ -1808,6 +1834,32 @@ export function ResultScreen() {
                 {champ('haut', 'Distance au mur du haut', 'haut')}
                 <Text style={styles.unit}>cm</Text>
                 <View style={styles.editIcons}>
+                  {/* RELIER, à portée de pouce.
+                      La liaison vivait au fond d'un menu qu'il fallait
+                      ouvrir en touchant l'appareil une seconde fois — et
+                      cette seconde fois n'arrivait jamais jusqu'au dessin,
+                      la poignée de glissement l'avalant. Trois appuis pour
+                      un geste qu'on répète à chaque point lumineux. */}
+                  {CEILINGS[cl.kind].commandable && (
+                    <TouchableOpacity
+                      style={styles.iconBtn}
+                      accessibilityLabel="Relier à une commande"
+                      onPress={() => {
+                        seulGeste('lien');
+                        setPendingLink(cl.id);
+                      }}>
+                      <Svg width={19} height={19} viewBox="0 0 24 24">
+                        <Path
+                          d="M9.5 14.5 L14.5 9.5 M8 12 L5.5 14.5 a3.5 3.5 0 0 0 5 5 L13 17 M16 12 l2.5 -2.5 a3.5 3.5 0 0 0 -5 -5 L11 7"
+                          stroke={teinte.blue}
+                          strokeWidth={2}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          fill="none"
+                        />
+                      </Svg>
+                    </TouchableOpacity>
+                  )}
                   <TouchableOpacity
                     style={styles.iconBtn}
                     onPress={() => {
@@ -2382,6 +2434,7 @@ export function ResultScreen() {
               {elecView === 'mur' && elecWallId ? (
                 <WallElevation
                   wallId={elecWallId}
+                  focusX={cibleDuRetour(elecWallId)}
                   selectedId={elecSel}
                   onSelect={setElecSel}
                   onAddRequest={() => setElecView('catalogue')}

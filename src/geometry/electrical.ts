@@ -1224,6 +1224,25 @@ export function masonryRuns(
 }
 
 /**
+ * LES AXES DES RETOURS — ce sur quoi le doigt s'accroche.
+ *
+ * Un mur a son milieu ; un retour de mur n'avait rien. On glissait un
+ * interrupteur sur les trente centimètres entre l'angle et l'huisserie en
+ * visant à l'œil, alors que c'est justement là que la pose se centre : un
+ * appareil décalé de deux centimètres dans un tableau de porte se voit
+ * depuis le couloir.
+ *
+ * Un retour qui ne peut pas recevoir la plaque ENTIÈRE n'offre pas son
+ * axe : s'y accrocher mènerait à une position que `snapToMasonry`
+ * défferait aussitôt — le doigt collerait à un repère fantôme.
+ */
+export function masonryAxes(runs: Masonry[], width: number): number[] {
+  return runs
+    .filter((r) => r.x1 - r.x0 >= width)
+    .map((r) => (r.x0 + r.x1) / 2);
+}
+
+/**
  * Ramène un appareil sur la MAÇONNERIE la plus proche.
  *
  * Rien n'empêche de poser une prise au milieu d'une porte-fenêtre : le

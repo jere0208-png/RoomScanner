@@ -34,6 +34,7 @@ import {
 import { fixtureMarks, multiWire, schemaRows } from '../geometry/schema';
 import { planRoutes } from '../geometry/elecplan';
 import { floorsOf, useScanStore } from '../store/scanStore';
+import type { CeilingFixture } from '../geometry/ceiling';
 
 interface PlanView {
   zoom: number;
@@ -56,6 +57,7 @@ function PlanPreview({
   onBox,
   cotes,
   routes,
+  ceiling,
 }: {
   value: PlanView;
   onChange: (v: PlanView) => void;
@@ -69,6 +71,12 @@ function PlanPreview({
    */
   cotes: boolean;
   routes?: { id: string; path: { x: number; z: number }[] }[];
+  /**
+   * Les appareils de plafond, quand c'est la feuille du plafond qu'on
+   * cadre. Un aperçu qui ne montre pas ce que la feuille portera ne sert
+   * à rien — et laisse croire que la feuille n'existe pas.
+   */
+  ceiling?: CeilingFixture[];
 }) {
   const valueRef = useRef(value);
   valueRef.current = value;
@@ -162,6 +170,8 @@ function PlanPreview({
         <FloorplanEditor
           showMeasures={cotes}
           cableRoutes={routes}
+          ceiling={ceiling}
+          showCeiling={!!ceiling}
           editable={false}
           selectedWallId={null}
           onSelectWall={() => {}}
@@ -280,6 +290,8 @@ const styles = getStyles(c);
     },
     onTouchCancel: () => setScrollLocked(false),
   };
+  /** Ce que le document portera vraiment : la feuille du plafond existe. */
+  const avecPlafond = plafond && ceiling.length > 0;
   const [plan, setPlan] = useState<PlanView>(DEFAULT_PLAN);
   const [v1, setV1] = useState<View3DParams>(DEFAULT_V1);
   const [v2, setV2] = useState<View3DParams>(DEFAULT_V2);
@@ -503,6 +515,15 @@ const styles = getStyles(c);
           ))}
         </View>
 
+        {/*
+          LES NUMÉROS DE FEUILLE SUIVENT LE DOCUMENT.
+
+          Ils étaient écrits en dur — « Feuille 1 », « Feuille 2 · Vues
+          3D » — alors que le PDF insère le plafond en deuxième et le
+          métré en troisième. On cadrait donc la « feuille 2 » pour la
+          retrouver en quatrième page, et on cherchait la feuille du
+          plafond dans un écran qui ne la montrait nulle part.
+        */}
         <Text style={styles.sheetLabel}>Feuille 1 · Plan d'ensemble</Text>
         <View style={styles.sheetCard}>
           {/* Le verrou de scroll ne couvre QUE la zone centrale du modèle */}
@@ -519,9 +540,30 @@ const styles = getStyles(c);
           </View>
         </View>
 
+        {avecPlafond && (
+          <>
+            <Text style={styles.sheetLabel}>Feuille 2 · Plafond</Text>
+            <View style={styles.sheetCard}>
+              <View {...lockProps} style={styles.lockWrap}>
+                <PlanPreview
+                  cotes={measures2D}
+                  ceiling={ceiling}
+                  value={plan}
+                  onChange={setPlan}
+                  onBox={(b) => {
+                    planBox.current = b;
+                  }}
+                />
+              </View>
+            </View>
+          </>
+        )}
+
         {include3D && (
           <>
-            <Text style={styles.sheetLabel}>Feuille 2 · Vues 3D</Text>
+            <Text style={styles.sheetLabel}>
+              {`Feuille ${1 + (avecPlafond ? 1 : 0) + (includeMetre ? 1 : 0) + 1} · Vues 3D`}
+            </Text>
             <View style={styles.sheetCard}>
               <View
                 {...lockProps}

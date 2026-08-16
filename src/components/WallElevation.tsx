@@ -36,7 +36,13 @@ import Svg, {
   Text as SvgText,
 } from 'react-native-svg';
 import { radius, shadowCard, themedStyles, useTheme, type Palette } from '../theme';
-import { roomOf, roomParts, wallQuadsOf } from '../geometry/floorplan';
+import {
+  roomOf,
+  roomParts,
+  segLength,
+  wallQuadsOf,
+  wallRuns,
+} from '../geometry/floorplan';
 import {
   BOITE_D,
   ENTRAXE,
@@ -48,6 +54,8 @@ import {
   type PlateSide,
   FIXTURES as SPECS,
   boxOffsets,
+  masonryAxes,
+  masonryRuns,
   postsOf,
   type FixtureKind,
 } from '../geometry/electrical';
@@ -103,6 +111,15 @@ const cm = (m: number) => Math.round(m * 100);
 
 interface Props {
   wallId: string;
+  /**
+   * L'abscisse du RETOUR choisi sur le plan, sur la face, en mètres.
+   *
+   * On choisit un tableau de porte sur le plan, on demande « Élec », et
+   * le mur entier s'ouvre : plus rien ne dit lequel des trois morceaux de
+   * maçonnerie on visait. Le retour qui contient ce point se dessine
+   * donc en bleu, cote comprise.
+   */
+  focusX?: number | null;
   selectedId: string | null;
   onSelect: (id: string | null) => void;
   /** Ouvre le catalogue pour poser un appareil de plus sur ce mur. */
@@ -112,6 +129,7 @@ interface Props {
 
 export function WallElevation({
   wallId,
+  focusX,
   selectedId,
   onSelect,
   onAddRequest,
@@ -169,6 +187,24 @@ export function WallElevation({
     () => (wall ? wallFace(wall, wallQuadsOf(walls).get(wall.id), side) : null),
     [wall, walls, side],
   );
+
+  /**
+   * LES RETOURS DE MAÇONNERIE DE CETTE FACE.
+   *
+   * Un mur percé n'est pas une surface : c'est un retour, un trou, un
+   * retour. Et c'est précisément sur ces trente centimètres entre
+   * l'angle et l'huisserie qu'on pose l'interrupteur d'entrée — donc
+   * là qu'il faut une cote et un axe, comme le mur entier a sa longueur
+   * et son milieu. Le store recalait déjà l'appareil sur la maçonnerie
+   * (`snapToMasonry`), mais en silence : rien ne montrait ni la largeur
+   * du retour, ni son milieu, et on posait à l'œil en croyant viser.
+   */
+  const retours = useMemo(() => {
+    if (!wall || !face) return [];
+    const runs = masonryRuns(wallRuns(wall, openings), segLength(wall), face);
+    // Un seul plein = le mur entier : il a déjà sa cote et son milieu.
+    return runs.length > 1 ? runs : [];
+  }, [wall, face, openings]);
 
   const holes = useMemo(() => {
     if (!wall || walls.length === 0) return [];
@@ -255,6 +291,7 @@ export function WallElevation({
     px,
     py,
     selectedId,
+    retours,
     move: moveFixture,
     select: onSelect,
   });
@@ -266,6 +303,7 @@ export function WallElevation({
     px,
     py,
     selectedId,
+    retours,
     move: moveFixture,
     select: onSelect,
   };
@@ -339,8 +377,12 @@ export function WallElevation({
         // Repères : hauteur usuelle du type posé, alignement avec les autres
         // appareils du mur, milieu du mur.
         const others = L.mine.filter((f) => f.id !== d.id);
+        // L'axe de chaque retour assez large pour recevoir la plaque
+        // entière : la règle est écrite une seule fois, dans la géométrie.
+        const axes = masonryAxes(L.retours, spec.w);
         const sx = snapTo(x, [
           ...others.map((f) => faceX(L.face!, f.along)),
+          ...axes,
           L.face.len / 2,
         ]);
         const sy = snapTo(y, [spec.std, ...others.map((f) => f.height)]);
@@ -443,6 +485,16 @@ export function WallElevation({
 
   const spec = selected ? FIXTURES[selected.kind] : null;
   const selX = selected ? faceX(face, selected.along) : 0;
+  /**
+   * Le retour QUI PORTE l'appareil tenu.
+   *
+   * « Mur de 3,36 m » ne renseigne pas qui pose sur un tableau de porte :
+   * la seule longueur qui compte alors, c'est celle du morceau de
+   * maçonnerie sous la main.
+   */
+  const monRetour = selected
+    ? retours.find((r) => selX >= r.x0 - 1e-6 && selX <= r.x1 + 1e-6) ?? null
+    : null;
   const roomName =
     rooms.find((r) => r.id === roomOf(wall))?.name ?? '';
 
@@ -601,6 +653,7 @@ export function WallElevation({
           <Text style={styles.subtitle}>
             {roomName ? `${roomName} · ` : ''}
             {`mur de ${face.len.toFixed(2).replace('.', ',')} m`}
+            {monRetour ? ` · retour de ${cm(monRetour.x1 - monRetour.x0)} cm` : ''}
             {spec ? ` · ${spec.note}` : ''}
           </Text>
         </View>
@@ -878,6 +931,86 @@ export function WallElevation({
                         : 'Porte'}
                     </SvgText>
                   )}
+                </G>
+              );
+            })}
+
+            {/*
+              LES RETOURS : leur cote, et leur axe.
+
+              Le mur porte sa longueur au-dessus et son milieu en
+              accroche ; un retour n'avait ni l'une ni l'autre. On les lui
+              donne, dans la même écriture : la cote sous le plafond, en
+              centimètres puisque c'est ainsi qu'on la relit au mètre, et
+              l'axe en filigrane, sur lequel l'appareil s'accroche quand
+              on passe dessus. La cote se dessine APRÈS les baies pour
+              rester lisible par-dessus le bleu d'une porte-fenêtre.
+            */}
+            {retours.map((r, i) => {
+              const larg = r.x1 - r.x0;
+              const milieu = (r.x0 + r.x1) / 2;
+              // Celui qu'on a désigné sur le plan, ou à défaut celui qui
+              // porte l'appareil tenu : c'est le même besoin — savoir sur
+              // quel morceau de mur on travaille.
+              const vise =
+                (focusX != null && focusX >= r.x0 && focusX <= r.x1) ||
+                (!!monRetour && monRetour.x0 === r.x0 && monRetour.x1 === r.x1);
+              const teinte = vise ? c.blue : c.inkFaint;
+              const yc = py(H) + 15;
+              // Un retour étroit ne peut pas porter son nombre entre ses
+              // deux traits : on écrit alors la cote au-dessus, et on
+              // garde les traits pour dire où elle s'applique.
+              const large = larg * scale > 40;
+              return (
+                <G key={`ret${i}`}>
+                  {larg >= 0.06 && (
+                    <Line
+                      x1={px(milieu)}
+                      y1={py(H) - 2}
+                      x2={px(milieu)}
+                      y2={py(0) + 2}
+                      stroke={c.blue}
+                      strokeWidth={vise ? 1 : 0.8}
+                      strokeDasharray="2 6"
+                      opacity={vise ? 0.75 : 0.35}
+                    />
+                  )}
+                  <Line
+                    x1={px(r.x0) + 1}
+                    y1={yc}
+                    x2={px(r.x1) - 1}
+                    y2={yc}
+                    stroke={teinte}
+                    strokeWidth={1}
+                  />
+                  {[r.x0, r.x1].map((x) => (
+                    <Line
+                      key={`t${i}-${x}`}
+                      x1={px(x)}
+                      y1={yc - 4}
+                      x2={px(x)}
+                      y2={yc + 4}
+                      stroke={teinte}
+                      strokeWidth={1.2}
+                    />
+                  ))}
+                  <Rect
+                    x={px(milieu) - 17}
+                    y={(large ? yc : yc - 13) - 7}
+                    width={34}
+                    height={14}
+                    rx={7}
+                    fill={c.surface}
+                  />
+                  <SvgText
+                    x={px(milieu)}
+                    y={(large ? yc : yc - 13) + 4}
+                    fill={vise ? c.blue : c.inkSoft}
+                    fontSize={9}
+                    fontWeight={vise ? '800' : '700'}
+                    textAnchor="middle">
+                    {`${cm(larg)}`}
+                  </SvgText>
                 </G>
               );
             })}

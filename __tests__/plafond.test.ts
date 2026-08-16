@@ -176,6 +176,29 @@ describe('la feuille d’implantation', () => {
     expect(texte(doc(PLAFOND))).toMatch(/5,00 m/);
   });
 
+  /**
+   * UNE seule légende, en deux colonnes.
+   *
+   * La feuille en portait deux : celle de l'appareillage, que la page de
+   * plan pose dans le coin qu'elle croit le plus libre, et celle du
+   * plafond, clouée en bas à gauche. Elles se retrouvaient l'une sur
+   * l'autre, et on ne lisait plus ni l'une ni l'autre. Le compte des
+   * titres « APPAREILLAGE » le dit sans ambiguïté : la feuille du plafond
+   * ne doit pas en ajouter un.
+   */
+  it('ne porte qu’une légende, commandes à gauche et plafond à droite', () => {
+    const compte = (src: string, mot: string) =>
+      texte(src).split(mot).length - 1;
+    expect(compte(doc(PLAFOND), 'APPAREILLAGE')).toBe(
+      compte(doc(), 'APPAREILLAGE'),
+    );
+    const vu = texte(doc(PLAFOND));
+    expect(vu).toContain('COMMANDES');
+    expect(vu).toContain('PLAFOND');
+    // Ce qui commande, et seulement ça : la prise n'a rien à faire là.
+    expect(vu).toContain('Va-et-vient');
+  });
+
   it('et rien ne sort de la feuille', () => {
     const src = doc(PLAFOND);
     const re = /(-?\d+(?:\.\d+)?) (-?\d+(?:\.\d+)?) (m|l) /g;

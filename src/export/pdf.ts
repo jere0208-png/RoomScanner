@@ -483,41 +483,86 @@ const CADRE_PUCE = 18;
  * Le cadre se dimensionne SUR SON CONTENU. On lui donne des sections, il
  * rend sa hauteur — personne n'a plus à compter les lignes à la main.
  */
+/** Une ligne de légende : sa vignette à gauche, son libellé à droite. */
+interface LegendLine {
+  texte: string;
+  /** Un trait de couleur — pour un circuit, un conducteur, un lien. */
+  couleur?: string;
+  /** Ou un symbole dessiné — pour un appareil. */
+  symbole?: { paths: SymbolStroke[]; color: string };
+}
+
+interface LegendSection {
+  titre?: string;
+  lignes: LegendLine[];
+}
+
+/**
+ * Un cadre de légende, à UNE OU DEUX COLONNES.
+ *
+ * La feuille du plafond en portait deux, côte à côte et se recouvrant :
+ * celle des appareils muraux, qui cherche le coin le plus libre, et celle du
+ * plafond, posée à gauche. Deux cadres blancs l'un sur l'autre, dont on ne
+ * lisait ni l'un ni l'autre. Un plan n'a qu'une légende — avec deux
+ * colonnes s'il le faut.
+ */
 function drawLegendBox(
   d: Draw,
   x: number,
   y: number,
   larg: number,
-  sections: { titre?: string; lignes: [string, string][] }[],
+  colonnes: LegendSection[][],
 ): number {
-  let rangs = 0;
-  for (const sec of sections) {
-    if (sec.titre) rangs += 1;
-    rangs += sec.lignes.length;
-  }
+  const rangsDe = (sections: LegendSection[]) =>
+    sections.reduce(
+      (n, sec) => n + (sec.titre ? 1 : 0) + sec.lignes.length,
+      0,
+    );
+  const rangs = Math.max(...colonnes.map(rangsDe));
   const haut = rangs * CADRE_LIGNE + CADRE_MARGE * 2;
   d.rect(x, y, larg, haut, '#FFFFFFEE', '#D8DEE7', 0.6);
-  // On écrit du HAUT vers le bas : la première ligne à une marge du bord.
-  let base = y + haut - CADRE_MARGE - CADRE_LIGNE + 3.5;
-  const tx = x + CADRE_MARGE;
-  for (const sec of sections) {
-    if (sec.titre) {
-      d.text(sec.titre, tx, base, 6, GREY_LIGHT, { align: 'left' });
-      base -= CADRE_LIGNE;
+  const largCol = (larg - CADRE_MARGE * (colonnes.length + 1)) / colonnes.length;
+  colonnes.forEach((sections, ci) => {
+    const tx = x + CADRE_MARGE + ci * (largCol + CADRE_MARGE);
+    let base = y + haut - CADRE_MARGE - CADRE_LIGNE + 3.5;
+    for (const sec of sections) {
+      if (sec.titre) {
+        d.text(sec.titre, tx, base, 6, GREY_LIGHT, { align: 'left' });
+        base -= CADRE_LIGNE;
+      }
+      for (const ligne of sec.lignes) {
+        if (ligne.symbole) {
+          drawSymbol(
+            d,
+            ligne.symbole.paths,
+            tx + 7,
+            base + 2.5,
+            0.42,
+            ligne.symbole.color,
+            0.9,
+          );
+        } else if (ligne.couleur) {
+          d.line(
+            tx,
+            base + 2.5,
+            tx + CADRE_PUCE - 4,
+            base + 2.5,
+            2,
+            ligne.couleur,
+          );
+        }
+        d.text(
+          fitText(ligne.texte, 7, largCol - CADRE_PUCE),
+          tx + CADRE_PUCE,
+          base,
+          7,
+          INK,
+          { align: 'left' },
+        );
+        base -= CADRE_LIGNE;
+      }
     }
-    for (const [couleur, texte] of sec.lignes) {
-      d.line(tx, base + 2.5, tx + CADRE_PUCE - 4, base + 2.5, 2, couleur);
-      d.text(
-        fitText(texte, 7, larg - CADRE_MARGE * 2 - CADRE_PUCE),
-        tx + CADRE_PUCE,
-        base,
-        7,
-        INK,
-        { align: 'left' },
-      );
-      base -= CADRE_LIGNE;
-    }
-  }
+  });
   return haut;
 }
 const TITLE_H = 66;
@@ -1932,23 +1977,27 @@ function schemaPlanPage(
      */
     // Ce que chaque départ DESSERT : sans ça, la légende nomme des
     // circuits sans dire ce qu'on trouve au bout.
-    const departs: [string, string][] = rows.map((r, i) => [
-      circuitColor(i),
-      `${r.mark} · ${r.label}${r.breaker === null ? '' : ` · ${r.breaker} A`}` +
+    const departs: LegendLine[] = rows.map((r, i) => ({
+      couleur: circuitColor(i),
+      texte:
+        `${r.mark} · ${r.label}${r.breaker === null ? '' : ` · ${r.breaker} A`}` +
         (r.points ? ` · ${r.points}` : ''),
-    ]);
-    const fils: [string, string][] =
+    }));
+    const fils: LegendLine[] =
       mode === 'multi'
         ? (['phase', 'neutre', 'terre', 'navette', 'retour'] as const).map(
-            (r) => [WIRE_COLORS[r].color, WIRE_COLORS[r].label],
+            (r) => ({
+              couleur: WIRE_COLORS[r].color,
+              texte: WIRE_COLORS[r].label,
+            }),
           )
         : [];
     // Une seule boîte, deux sections, et des marges égales partout.
     drawLegendBox(d, box.x + 8, box.y + 8, 152, [
-      { titre: 'DÉPARTS', lignes: departs },
-      ...(fils.length > 0
-        ? [{ titre: 'CONDUCTEURS', lignes: fils }]
-        : []),
+      [
+        { titre: 'DÉPARTS', lignes: departs },
+        ...(fils.length > 0 ? [{ titre: 'CONDUCTEURS', lignes: fils }] : []),
+      ],
     ]);
   };
 
@@ -2020,19 +2069,57 @@ function ceilingPage(
       d.text(spec.short, q.x, q.y - r - 8, 6.5, spec.color, { bold: true });
     }
 
-    // La légende : les familles présentes, et le trait de commande. Même
-    // cadre que les autres feuilles, donc mêmes marges.
+    /**
+     * LA LÉGENDE, EN UN SEUL CADRE À DEUX COLONNES.
+     *
+     * Cette feuille en portait deux : celle de l'appareillage, que la page
+     * de plan pose dans le coin qu'elle juge le plus libre, et celle du
+     * plafond, clouée en bas à gauche. Elles se recouvraient, et on ne
+     * lisait plus ni l'une ni l'autre. Un plan n'a qu'une légende : on
+     * demande donc à la page de ne pas dessiner la sienne
+     * (`hideLegend`), et on réunit tout ici — les commandes murales à
+     * gauche, ce qu'elles allument à droite. C'est aussi l'ordre dans
+     * lequel on lit le plan.
+     */
     const vus = [...new Set(ceiling.map((c) => c.kind))];
     if (vus.length === 0) return;
-    drawLegendBox(d, box.x + 8, box.y + 8, 154, [
+    // On ne montre au mur que ce qui commande : sur une feuille de
+    // plafond, une prise de courant n'apprend rien.
+    const commandes = [
+      ...new Set(
+        (ctx.fixtures ?? [])
+          .filter((f) => ceiling.some((c) => (c.commands ?? []).includes(f.id)))
+          .map((f) => f.kind),
+      ),
+    ];
+    const colGauche: LegendSection[] = [
+      {
+        titre: 'COMMANDES',
+        lignes: commandes.map((k) => ({
+          texte: FIXTURES[k].label,
+          symbole: { paths: assemblySymbol(k), color: FIXTURES[k].color },
+        })),
+      },
+    ];
+    const colDroite: LegendSection[] = [
       {
         titre: 'PLAFOND',
-        lignes: vus.map(
-          (k) => [CEILINGS[k].color, CEILINGS[k].label] as [string, string],
-        ),
+        lignes: vus.map((k) => ({
+          texte: CEILINGS[k].label,
+          symbole: { paths: CEILING_SYMBOL[k], color: CEILINGS[k].color },
+        })),
       },
-      { lignes: [[GREY, 'Lien de commande']] },
-    ]);
+      { lignes: [{ couleur: GREY, texte: 'Lien de commande' }] },
+    ];
+    const colonnes =
+      commandes.length > 0 ? [colGauche, colDroite] : [colDroite];
+    drawLegendBox(
+      d,
+      box.x + 8,
+      box.y + 8,
+      colonnes.length > 1 ? 300 : 154,
+      colonnes,
+    );
   };
 
   return planPage(ctx, sheet, planView, true, {
@@ -2041,7 +2128,8 @@ function ceilingPage(
       'Points lumineux, détection et ventilation, avec le lien de commande ' +
       'de chaque appareil. Cotes du plan d’ensemble.',
     overlay,
-    hideLegend: false,
+    // La légende de l'appareillage est reprise dans le cadre ci-dessus.
+    hideLegend: true,
   });
 }
 

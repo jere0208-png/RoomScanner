@@ -184,7 +184,8 @@ interface Props {
    */
   ceiling?: CeilingFixture[];
   showCeiling?: boolean;
-  onSelectCeiling?: (id: string) => void;
+  /** `null` = plus rien de sélectionné au plafond (appui dans le vide). */
+  onSelectCeiling?: (id: string | null) => void;
   /**
    * Pose en cours : le prochain appui donne un POINT, et rien d'autre.
    *
@@ -607,7 +608,14 @@ export function FloorplanEditor({
               passait. Or « appuyer à côté », c'est le geste universel pour
               désélectionner ; il ne dépend pas d'un mode.
             */}
-            {(editable || selectedObjectId) && (
+{/*
+              ET IL RÉPOND POUR TOUT CE QUI SE SÉLECTIONNE.
+              Il ne se montait que pour un meuble ; un appareil de plafond
+              en réglage, lui, ne se lâchait qu'en le retouchant. Deux
+              gestes contraires pour la même intention — c'est le genre
+              d'incohérence qu'on n'explique pas à un compagnon.
+            */}
+            {(editable || selectedObjectId || selectedCeilingId) && (
               <Rect
                 x={0}
                 y={0}
@@ -620,6 +628,7 @@ export function FloorplanEditor({
                   onSelectRoom?.(null);
                   onSelectOpening?.(null);
                   onSelectObject?.(null);
+                  onSelectCeiling?.(null);
                 }}
               />
             )}
@@ -1360,6 +1369,7 @@ export function FloorplanEditor({
                   rayon={Math.max(9, Math.min(15, mapping.scale * 0.14))}
                   mapping={mapping}
                   at={cl.at}
+                  onTap={() => onSelectCeiling?.(cl.id)}
                 />
               );
             })()}
@@ -1679,17 +1689,30 @@ export function CeilingDragHandle({
   rayon,
   mapping,
   at,
+  onTap,
 }: {
   id: string;
   center: { x: number; y: number };
   rayon: number;
   mapping: EffMapping;
   at: Pt;
+  /**
+   * Un APPUI, par opposition à un glissement.
+   *
+   * La poignée couvre l'appareil : une fois celui-ci choisi, plus aucun
+   * appui ne redescendait jusqu'au dessin, et le menu — celui qui porte
+   * « Relier à une commande » — devenait inatteignable. On distinguait un
+   * geste de l'autre nulle part : tout était traité comme un déplacement,
+   * même de zéro pixel.
+   */
+  onTap?: () => void;
 }) {
   const styles = getStyles(useTheme());
   const startRef = useRef(at);
   const live = useRef({ mapping, at });
   live.current = { mapping, at };
+  const tapRef = useRef(onTap);
+  tapRef.current = onTap;
   const pan = useMemo(
     () =>
       PanResponder.create({
@@ -1708,7 +1731,12 @@ export function CeilingDragHandle({
             z: startRef.current.z + d.z,
           });
         },
-        onPanResponderRelease: () => releaseHaptic('accroche'),
+        onPanResponderRelease: (_e, g) => {
+          releaseHaptic('accroche');
+          // Moins de six pixels parcourus : le doigt n'a pas glissé, il a
+          // touché. Six, c'est le tremblement d'une main qui vise.
+          if (Math.hypot(g.dx, g.dy) < 6) tapRef.current?.();
+        },
         onPanResponderTerminate: () => releaseHaptic('accroche'),
       }),
     [id],
