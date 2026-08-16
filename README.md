@@ -1415,7 +1415,19 @@ Le workflow [.github/workflows/build-ios-unsigned.yml](.github/workflows/build-i
 compile une version **non signée** sur les Mac gratuits de GitHub Actions :
 
 1. Pousser le projet sur un dépôt GitHub → onglet **Actions** → télécharger
-   l'artefact `RoomScanner-unsigned-ipa`.
+   l'artefact `RoomScanner-unsigned-ipa`. En ligne de commande, tout se fait
+   d'un bloc : `bash tools/ship.sh "Message de commit"`.
+
+   > **Ne jamais télécharger « le dernier run ».** GitHub met quelques
+   > secondes à créer le run d'un push : `gh run list -L 1` lancé juste
+   > après rend celui d'AVANT, déjà terminé. `gh run watch` rend alors la
+   > main aussitôt, `gh run download` sans identifiant prend l'artefact le
+   > plus récent, et on dépose le build du commit précédent en annonçant le
+   > nouveau. Le symptôme est trompeur au possible : l'app paraît ignorer
+   > les dernières corrections, alors que le code est juste. Le signe qui ne
+   > trompe pas est la TAILLE de l'IPA, identique à l'octet près d'une
+   > livraison à l'autre. `tools/ship.sh` retrouve le run par son commit et
+   > attend qu'il existe.
 2. Sur le PC, installer **Sideloadly** (ou **AltStore**) + les pilotes Apple
    (iTunes). iPhone branché en USB, glisser l'IPA, entrer son identifiant
    Apple (gratuit) → l'app s'installe.
