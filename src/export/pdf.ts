@@ -67,9 +67,80 @@ const SKY = '#2E93BD';
 // ------------------------------------------------------------ encodage
 
 /** Ramène une chaîne en Latin-1 (les autres signes → '?'). */
+/**
+ * Les signes typographiques que WinAnsi loge entre 0x80 et 0x9F.
+ *
+ * C'est LA case oubliée de l'encodage. Le document déclare bien ses polices
+ * en `/WinAnsiEncoding`, mais l'écriture, elle, se contentait du Latin-1 :
+ * tout ce qui dépassait 0xFF devenait un point d'interrogation. Or l'app
+ * écrit en français typographié — apostrophes courbes, tirets cadratins,
+ * points de suspension, et jusqu'au « ≈ » des cotes approchées. Des noms
+ * comme « Éclairage — retour lampe » sortaient donc troués : « Éclairage ?
+ * retour lampe ».
+ *
+ * WinAnsi les loge tous, simplement pas là où Unicode les met.
+ */
+const WIN_ANSI: Record<string, number> = {
+  '\u20AC': 0x80, // €
+  '\u201A': 0x82,
+  '\u0192': 0x83,
+  '\u201E': 0x84,
+  '\u2026': 0x85, // …
+  '\u2020': 0x86,
+  '\u2021': 0x87,
+  '\u02C6': 0x88,
+  '\u2030': 0x89, // ‰
+  '\u0160': 0x8a,
+  '\u2039': 0x8b,
+  '\u0152': 0x8c, // Œ
+  '\u017D': 0x8e,
+  '\u2018': 0x91,
+  '\u2019': 0x92, // ’
+  '\u201C': 0x93,
+  '\u201D': 0x94,
+  '\u2022': 0x95, // •
+  '\u2013': 0x96, // –
+  '\u2014': 0x97, // —
+  '\u02DC': 0x98,
+  '\u2122': 0x99,
+  '\u0161': 0x9a,
+  '\u203A': 0x9b,
+  '\u0153': 0x9c, // œ
+  '\u017E': 0x9e,
+  '\u0178': 0x9f,
+};
+
+/**
+ * Ce qu'aucun encodage 8 bits ne sait écrire, et son équivalent lisible.
+ *
+ * Mieux vaut un « ~ » qu'un « ? » : le premier dit « environ », le second
+ * dit « l'application a un bug ».
+ */
+const REMPLACE: Record<string, string> = {
+  '\u2248': '~', // ≈
+  '\u2260': '<>',
+  '\u2264': '<=',
+  '\u2265': '>=',
+  '\u00A0': ' ',
+  '\u202F': ' ', // espace fine insécable
+  '\u2212': '-',
+  '\u2192': '->',
+};
+
+/** Une chaîne telle que le PDF l'écrira : un octet WinAnsi par signe. */
 function latin1(s: string): string {
   let out = '';
   for (const ch of s) {
+    const win = WIN_ANSI[ch];
+    if (win !== undefined) {
+      out += String.fromCharCode(win);
+      continue;
+    }
+    const alt = REMPLACE[ch];
+    if (alt !== undefined) {
+      out += alt;
+      continue;
+    }
     out += ch.codePointAt(0)! <= 0xff ? ch : '?';
   }
   return out;
@@ -308,14 +379,27 @@ class Draw {
     y: number,
     size: number,
     hex: string,
-    opts: { bold?: boolean; angle?: number; align?: 'center' | 'left' } = {},
+    opts: {
+      bold?: boolean;
+      angle?: number;
+      /**
+       * `right` cale la FIN du texte sur (x, y).
+       *
+       * Sans lui, une colonne de valeurs se posait à gauche d'un x fixe et
+       * grandissait vers la droite : « 1 couronne de 100 m » sortait du
+       * cadre de la feuille, tranchée par le bord.
+       */
+      align?: 'center' | 'left' | 'right';
+    } = {},
   ) {
     const s = escText(str);
     const [r, g, b] = hexRgb(hex);
     const a = ((opts.angle ?? 0) * Math.PI) / 180;
     const cos = Math.cos(a);
     const sin = Math.sin(a);
-    const w = opts.align === 'left' ? 0 : latin1(str).length * size * 0.5;
+    const large = latin1(str).length * size * 0.5;
+    const w =
+      opts.align === 'left' ? 0 : opts.align === 'right' ? large * 2 : large;
     const tx = x - (w / 2) * cos;
     const ty = y - (w / 2) * sin;
     this.ops.push(
@@ -1079,9 +1163,51 @@ function planPage(
         const tag = FIXTURE_TAG[f.kind];
         if (tag) d.text(tag, q.x + 13, q.y + 4, 5.5, spec.color, { align: 'left' });
       }
-      // La légende, au pied de la feuille, à gauche du cartouche.
+      /**
+       * La légende se pose dans le coin le plus LIBRE, pas toujours à
+       * gauche.
+       *
+       * Elle était clouée en bas à gauche. Sur un logement en L, ou dès
+       * qu'on décalait le cadrage dans l'aperçu, elle se posait en plein
+       * milieu des pièces — masquant les murs qu'elle était censée
+       * expliquer. On mesure donc l'emprise du plan sur la page, et on
+       * choisit le coin qu'il recouvre le moins.
+       */
       const presents = [...new Set(ctx.fixtures.map((f) => f.kind))];
-      drawElecLegend(d, presents, FRAME.x + 16, FRAME.y + TITLE_H + 26 + presents.length * 15);
+      if (presents.length > 0) {
+        const lw = 132;
+        const lh = 22 + presents.length * 15;
+        const marge = 16;
+        const gauche = FRAME.x + marge;
+        const droite = FRAME.x + FRAME.w - marge - lw;
+        const bas = FRAME.y + TITLE_H + marge + lh;
+        const haut = FRAME.y + FRAME.h - TITLE_H - marge;
+        // L'emprise du plan sur la feuille, coins compris.
+        const c1 = px({ x: minX, z: minZ });
+        const c2 = px({ x: maxX, z: maxZ });
+        const plan = {
+          x0: Math.min(c1.x, c2.x),
+          x1: Math.max(c1.x, c2.x),
+          y0: Math.min(c1.y, c2.y),
+          y1: Math.max(c1.y, c2.y),
+        };
+        /** Surface du plan qu'un emplacement viendrait couvrir. */
+        const gene = (lx: number, ly: number) => {
+          const ox = Math.min(plan.x1, lx + lw) - Math.max(plan.x0, lx);
+          const oy = Math.min(plan.y1, ly) - Math.max(plan.y0, ly - lh);
+          return Math.max(0, ox) * Math.max(0, oy);
+        };
+        const coins = [
+          { x: gauche, y: bas },
+          { x: droite, y: bas },
+          { x: droite, y: haut },
+          { x: gauche, y: haut },
+        ];
+        const choisi = coins.reduce((meilleur, coin) =>
+          gene(coin.x, coin.y) < gene(meilleur.x, meilleur.y) ? coin : meilleur,
+        );
+        drawElecLegend(d, presents, choisi.x, choisi.y);
+      }
     }
 
     // Cartouche au centre de chaque pièce : son nom, sa surface. Le texte
@@ -1757,6 +1883,15 @@ export function buildMaterialPdf(
     d.line(x0, y, x0 + w, y, 1, INK);
     y -= 16;
   };
+  /**
+   * Une ligne à deux colonnes : la désignation, et sa valeur.
+   *
+   * La valeur était posée à gauche d'un x fixe et s'étendait vers la
+   * droite : dès qu'elle dépassait soixante points — « 1 couronne de
+   * 100 m » — elle sortait du cadre. Elle se cale désormais sur le bord
+   * DROIT de la colonne, et la désignation se tronque à ce qui reste.
+   */
+  const COL_VAL = 118;
   const ligne = (
     gauche: string,
     droite: string,
@@ -1764,12 +1899,16 @@ export function buildMaterialPdf(
   ) => {
     need(16);
     const col = o.grey ? GREY : INK;
-    d.text(fitText(gauche, 10, w - 80 - (o.indent ?? 0)), x0 + (o.indent ?? 0), y, 10, col, {
+    const dispo = w - COL_VAL - 10 - (o.indent ?? 0);
+    d.text(fitText(gauche, 10, dispo), x0 + (o.indent ?? 0), y, 10, col, {
       align: 'left',
       bold: o.bold,
     });
     if (droite) {
-      d.text(droite, x0 + w - 60, y, 10, col, { align: 'left', bold: o.bold });
+      d.text(fitText(droite, 10, COL_VAL), x0 + w, y, 10, col, {
+        align: 'right',
+        bold: o.bold,
+      });
     }
     y -= 15;
   };
@@ -1808,11 +1947,11 @@ export function buildMaterialPdf(
     d.text(room.room, x0, y, 11, INK, { bold: true, align: 'left' });
     d.text(
       `${room.use} · ${room.area.toFixed(1).replace('.', ',')} m²`,
-      x0 + w - 130,
+      x0 + w,
       y,
       9,
       GREY,
-      { align: 'left' },
+      { align: 'right' },
     );
     y -= 15;
     for (const row of room.rows) {
@@ -1831,7 +1970,7 @@ export function buildMaterialPdf(
     const protection =
       c.breaker === null
         ? 'coffret com.'
-        : `${c.breaker} A · ${c.section} mm²`;
+        : `${c.breaker} A · ${String(c.section).replace('.', ',')} mm²`;
     ligne(
       `${c.label} — ${c.points} point${c.points > 1 ? 's' : ''}` +
         (c.rooms.length ? ` (${c.rooms.join(', ')})` : '') +
@@ -1881,15 +2020,77 @@ export function buildMaterialPdf(
   }
 
   // -------------------------------------------------------- à commander
+  //
+  // C'EST LA PAGE QU'ON TEND AU COMPTOIR. Elle était une suite de phrases
+  // — « Plaque 1 poste — 82 mm de large ... 5 plaques » — où la
+  // désignation, la précision et l'unité se mélangeaient sur une seule
+  // ligne, et où la quantité débordait de la feuille. Un fournisseur lit
+  // un bordereau : un rayon, une désignation, une quantité, une unité.
+  // C'est exactement ce qu'on lui donne maintenant.
   if (tirage && tirage.buy.length > 0) {
     y -= 8;
     titre('À commander');
+    const COL_U = 62; // l'unité, calée à droite
+    const COL_Q = 34; // la quantité, juste avant
+    const xU = x0 + w;
+    const xQ = xU - COL_U;
+    const largeurDesignation = w - COL_U - COL_Q - 12;
+
+    need(20);
+    d.text('Désignation', x0, y, 8, GREY_LIGHT, { align: 'left', bold: true });
+    d.text('Qté', xQ, y, 8, GREY_LIGHT, { align: 'right', bold: true });
+    d.text('Unité', xU, y, 8, GREY_LIGHT, { align: 'right', bold: true });
+    y -= 6;
+    d.line(x0, y, x0 + w, y, 0.6, '#D6DBE3');
+    y -= 12;
+
+    let famille = '';
+    let bande = 0;
     for (const r of tirage.buy) {
-      ligne(
-        r.label + (r.note ? ` — ${r.note}` : ''),
-        `${r.quantity} ${r.unit}`,
-      );
+      if (r.family !== famille) {
+        famille = r.family;
+        bande = 0;
+        need(30);
+        y -= 4;
+        // Le rayon, en bandeau : on parcourt le magasin dans cet ordre.
+        d.rect(x0, y - 4, w, 15, '#EEF2F8', null);
+        d.text(famille.toUpperCase(), x0 + 7, y, 7.5, INK, {
+          align: 'left',
+          bold: true,
+        });
+        y -= 19;
+      }
+      const hauteur = r.spec || r.note ? 24 : 15;
+      need(hauteur + 2);
+      // Une bande sur deux, très pâle : l'œil suit la ligne jusqu'à sa
+      // quantité sans avoir à poser le doigt sur la feuille.
+      if (bande % 2 === 1) {
+        d.rect(x0, y - hauteur + 11, w, hauteur, '#FAFBFD', null);
+      }
+      bande += 1;
+      d.text(fitText(r.label, 10, largeurDesignation), x0 + 3, y, 10, INK, {
+        align: 'left',
+      });
+      d.text(`${r.quantity}`, xQ, y, 10, INK, { align: 'right', bold: true });
+      d.text(fitText(r.unit, 9, COL_U - 6), xU - 3, y, 9, GREY, {
+        align: 'right',
+      });
+      y -= 12;
+      const dessous = [r.spec, r.note].filter(Boolean).join(' · ');
+      if (dessous) {
+        d.text(fitText(dessous, 8, largeurDesignation), x0 + 3, y, 8, GREY_LIGHT, {
+          align: 'left',
+        });
+        y -= 12;
+      }
+      y -= 3;
     }
+    y -= 4;
+    note(
+      '   Quantités établies sur le relevé, chutes non comprises. Les ' +
+        'longueurs de conduit et de conducteur sont mesurées sur le plan, ' +
+        'pas estimées au mètre carré.',
+    );
   }
 
   if (list.differentials.length > 0) {

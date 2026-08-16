@@ -95,6 +95,7 @@ import {
 } from '../geometry/electrical';
 import { useScanStore } from '../store/scanStore';
 import { DiagnosticSheet, type Constat } from '../components/DiagnosticSheet';
+import { ExportArt, type ExportArtKind } from '../components/ExportArt';
 import { haptic } from '../ui/haptic';
 import {
   ActionSheet,
@@ -892,12 +893,14 @@ export function ResultScreen() {
       ? [
           {
             value: `${surface.exact ? '' : '≈ '}${fr(surface.area)}`,
-            label: 'm² au sol',
+            label: 'm² sol',
           },
         ]
       : []),
-    { value: fr(perimeter), label: 'm de périmètre' },
-    ...(objects.length > 0 ? [{ value: `${objects.length}`, label: 'objets' }] : []),
+    { value: fr(perimeter), label: 'm périm.' },
+    ...(objects.length > 0
+      ? [{ value: `${objects.length}`, label: 'meubles' }]
+      : []),
     ...(fixtures.length > 0
       ? [{ value: `${fixtures.length}`, label: 'élec.' }]
       : []),
@@ -938,11 +941,26 @@ export function ResultScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* Le bandeau tient TOUJOURS dans l'écran.
+          Les cellules étaient dimensionnées par leur contenu, le cadre
+          calé à gauche : à six mesures — pièces, murs, surface, périmètre,
+          meubles, appareillage — il sortait par la droite du téléphone, et
+          les derniers chiffres n'existaient plus pour personne. Elles se
+          partagent désormais la largeur à parts égales, et le chiffre se
+          réduit plutôt que de déborder. */}
       <View style={styles.metricsRow}>
         {metrics.map((m, i) => (
           <View key={m.label} style={[styles.metric, i > 0 && styles.metricBorder]}>
-            <Text style={styles.metricValue}>{m.value}</Text>
-            <Text style={styles.metricLabel}>{m.label}</Text>
+            <Text
+              style={styles.metricValue}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.65}>
+              {m.value}
+            </Text>
+            <Text style={styles.metricLabel} numberOfLines={1}>
+              {m.label}
+            </Text>
           </View>
         ))}
       </View>
@@ -1067,50 +1085,42 @@ export function ResultScreen() {
                   <ToolPill
                     key="plus"
                     icon="plus"
+                    label="Appareil"
                     active={!!pendingKind}
                     onPress={startFixture}
                   />,
-                  issues.length > 0 && (
-                    <ToolPill
-                      key="check"
-                      icon="check"
-                      active={alertes > 0}
-                      onPress={() => setChecking(true)}
-                    />
-                  ),
                   <ToolPill
                     key="square"
                     icon="square"
+                    label="Redresser"
                     active={false}
                     onPress={straightenPlan}
                   />,
-                  // Ajouter un meuble EST une modification : sa place est
-                  // ici. L'onde bleue dit que c'est par là qu'on ouvre le
-                  // catalogue, tant qu'on ne l'a pas fait une fois.
-                  <View key="furniture+" style={styles.pillRow}>
-                    <PulsePlus
-                      onPress={() => {
-                        setShowFurniture(true);
-                        setCatalogue(true);
-                      }}
-                    />
-                    <ToolPill
-                      icon="furniture"
-                      active={showFurniture}
-                      onPress={() => {
-                        if (showFurniture) {
-                          setSelectedObjectId(null);
-                          setObjDims(false);
-                        }
-                        setShowFurniture(!showFurniture);
-                      }}
-                    />
-                  </View>,
+                  // En édition, la pastille des meubles OUVRE LE CATALOGUE.
+                  //
+                  // Elle portait un « + » à côté d'elle, et restait par
+                  // ailleurs un interrupteur d'affichage : deux boutons pour
+                  // un meme sujet, dont l'un modifiait le plan et l'autre
+                  // non. Or on n’entre pas en édition pour cacher les
+                  // meubles — on y entre pour en poser. Afficher ou cacher
+                  // redevient ce que c’est, un calque, et se règle hors
+                  // édition.
+                  <ToolPill
+                    key="furniture"
+                    icon="furniture"
+                    label="Ajouter"
+                    active={false}
+                    onPress={() => {
+                      setShowFurniture(true);
+                      setCatalogue(true);
+                    }}
+                  />,
                 ]
               : [
                   <ToolPill
                     key="ruler"
                     icon="ruler"
+                    label="Cotes"
                     active={showMeasures}
                     onPress={() => setShowMeasures((v) => !v)}
                   />,
@@ -1122,6 +1132,7 @@ export function ResultScreen() {
                         <ToolPill
                           key="gaines"
                           icon="gaines"
+                          label="Gaines"
                           active={showRoutes}
                           onPress={() => setShowRoutes((v) => !v)}
                         />,
@@ -1132,25 +1143,26 @@ export function ResultScreen() {
                   // donc modifier le plan sans être en édition, et la barre
                   // mélangeait deux natures de gestes. Il est passé dans la
                   // barre d'édition, avec les autres outils.
-                  <View key="furniture" style={styles.pillRow}>
-                    <ToolPill
-                      icon="furniture"
-                      active={showFurniture}
-                      onPress={() => {
+                  <ToolPill
+                    key="furniture"
+                    icon="furniture"
+                    label="Meubles"
+                    active={showFurniture}
+                    onPress={() => {
                         // Éteindre le calque éteint tout ce qui l'accompagne :
                         // les poignées d'un meuble invisible restaient à
                         // l'écran, orphelines.
-                        if (showFurniture) {
-                          setSelectedObjectId(null);
-                          setObjDims(false);
-                        }
-                        setShowFurniture(!showFurniture);
-                      }}
-                    />
-                  </View>,
+                      if (showFurniture) {
+                        setSelectedObjectId(null);
+                        setObjDims(false);
+                      }
+                      setShowFurniture(!showFurniture);
+                    }}
+                  />,
                   <ToolPill
                     key="surface"
                     icon="surface"
+                    label="Surfaces"
                     active={showSurfaces}
                     onPress={() => setShowSurfaces(!showSurfaces)}
                   />,
@@ -1167,16 +1179,19 @@ export function ResultScreen() {
           <View style={styles.planTools}>
             <ToolPill
               icon="ruler"
+              label="Cotes"
               active={show3DMeasures}
               onPress={() => setShow3DMeasures((v) => !v)}
             />
             <ToolPill
               icon="furniture"
+              label="Meubles"
               active={showFurniture}
               onPress={() => setShowFurniture(!showFurniture)}
             />
             <ToolPill
               icon="surface"
+              label="Surfaces"
               active={showSurfaces}
               onPress={() => setShowSurfaces(!showSurfaces)}
             />
@@ -1185,12 +1200,14 @@ export function ResultScreen() {
                 raison — c'est un réglage, pas une trouvaille. */}
             <ToolPill
               icon="murs"
+              label="Murs"
               active={solidWalls}
               onPress={toggleSolidWalls}
             />
             {colorsAvailable && (
               <ToolPill
                 icon="colors"
+                label="Couleurs"
                 active={showTextures}
                 onPress={() => setShowTextures(!showTextures)}
               />
@@ -1198,6 +1215,7 @@ export function ResultScreen() {
             {rooms.length > 1 && (
               <ToolPill
                 icon="rooms"
+                label="Pièces"
                 active={focusIdx >= 0}
                 onPress={() =>
                   setFocusIdx((i) => (i + 2 > rooms.length ? -1 : i + 1))
@@ -1217,9 +1235,27 @@ export function ResultScreen() {
                 geste qu'on cherche dans l'urgence, et il se tient à côté du
                 bouton qui commande l'édition, sur sa ligne. */}
             {editMode && canUndo && (
-              <ToolPill icon="undo" active={false} onPress={undo} />
+              <ToolPill icon="undo" label="Annuler" active={false} onPress={undo} />
             )}
-            <ToolPill icon="edit" active={editMode} halo onPress={toggleEdit} />
+            {/* Le contrôle de conformité ne défile plus avec les calques :
+                c’est un verdict sur le plan, pas un réglage d’affichage, et
+                on le cherche en édition comme en lecture. Il se tient donc
+                contre le bouton d’édition, à sa gauche. */}
+            {issues.length > 0 && (
+              <ToolPill
+                icon="check"
+                label="Contrôle"
+                active={alertes > 0}
+                onPress={() => setChecking(true)}
+              />
+            )}
+            <ToolPill
+              icon="edit"
+              label="Édition"
+              active={editMode}
+              halo
+              onPress={toggleEdit}
+            />
           </View>
         )}
 
@@ -1584,6 +1620,7 @@ export function ResultScreen() {
             {(
               [
                 [
+                  'pdf',
                   'Plan PDF',
                   'Plan coté, métré par pièce, vues 3D. À imprimer ou à envoyer.',
                   () => {
@@ -1592,6 +1629,7 @@ export function ResultScreen() {
                   },
                 ],
                 [
+                  'obj',
                   'Modèle 3D',
                   'Fichier OBJ du plan retouché, pour Blender ou SketchUp.',
                   () => {
@@ -1600,6 +1638,7 @@ export function ResultScreen() {
                   },
                 ],
                 [
+                  'materiel',
                   'Liste du matériel',
                   'Appareillage par pièce, circuits et disjoncteurs, ' +
                     'conformité. Le document à chiffrer.',
@@ -1609,6 +1648,7 @@ export function ResultScreen() {
                   },
                 ],
                 [
+                  'image',
                   'Image',
                   'Capture de la vue affichée, avec le filigrane EchoPlan.',
                   () => {
@@ -1616,14 +1656,21 @@ export function ResultScreen() {
                     apresFermeture(shareImage);
                   },
                 ],
-              ] as [string, string, () => void][]
-            ).map(([titre, detail, action]) => (
+              ] as [ExportArtKind, string, string, () => void][]
+            ).map(([art, titre, detail, action]) => (
               <TouchableOpacity
                 key={titre}
                 style={styles.exportChoice}
+                activeOpacity={0.8}
                 onPress={action}>
-                <Text style={styles.exportChoiceTitle}>{titre}</Text>
-                <Text style={styles.exportChoiceDetail}>{detail}</Text>
+                {/* La vignette dit CE QU'ON OBTIENT : une feuille cotée, un
+                    volume, un bordereau, une capture. On la reconnaît sans
+                    lire — quatre lignes de texte, non. */}
+                <ExportArt kind={art} c={teinte} />
+                <View style={styles.exportChoiceTexts}>
+                  <Text style={styles.exportChoiceTitle}>{titre}</Text>
+                  <Text style={styles.exportChoiceDetail}>{detail}</Text>
+                </View>
               </TouchableOpacity>
             ))}
           </Pressable>
@@ -2138,80 +2185,8 @@ function FurnitureThumb({ item }: { item: CatalogItem }) {
   );
 }
 
-/**
- * Le « + » du mobilier, avec son onde.
- *
- * Une pastille de plus dans une colonne de pastilles ne se remarque pas.
- * Deux anneaux bleus en sortent donc en boucle, contenus par le bord arrondi
- * du bouton — l'œil est attiré par ce qui bouge, et c'est le seul endroit de
- * l'écran qui bouge tout seul. Rien d'autre ne signale qu'on peut ajouter un
- * meuble.
- */
-function PulsePlus({ onPress }: { onPress: () => void }) {
-  const c = useTheme();
-  const styles = getStyles(c);
-  const onde = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    const boucle = Animated.loop(
-      // Une onde, lente, à peine visible : le repère doit attirer l'œil une
-      // fois, pas clignoter en permanence dans le coin de l'écran.
-      Animated.sequence([
-        Animated.timing(onde, {
-          toValue: 1,
-          duration: 1500,
-          easing: Easing.out(Easing.quad),
-          useNativeDriver: true,
-        }),
-        Animated.delay(1400),
-        Animated.timing(onde, { toValue: 0, duration: 0, useNativeDriver: true }),
-      ]),
-    );
-    boucle.start();
-    return () => boucle.stop();
-  }, [onde]);
-  return (
-    <TouchableOpacity
-      style={[styles.toolPill, styles.pulsePill]}
-      activeOpacity={0.8}
-      onPress={onPress}>
-      <Animated.View
-        pointerEvents="none"
-        style={[
-          styles.pulseRing,
-          {
-            opacity: onde.interpolate({
-              inputRange: [0, 0.5, 1],
-              outputRange: [0.22, 0.09, 0],
-            }),
-            transform: [
-              {
-                scale: onde.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0.3, 1],
-                }),
-              },
-            ],
-          },
-        ]}
-      />
-      <Svg width={22} height={22} viewBox="0 0 24 24">
-        {['M12 5 v14', 'M5 12 h14'].map((d) => (
-          <Path
-            key={d}
-            d={d}
-            stroke={c.blue}
-            strokeWidth={2.2}
-            strokeLinecap="round"
-            fill="none"
-          />
-        ))}
-      </Svg>
-    </TouchableOpacity>
-  );
-}
-
-/** Pas d'une pastille : sa largeur plus l'écart qui la suit. */
-const PILL_PITCH = 44;
+/** Pas d'une pastille : sa hauteur, son mot, et l'écart qui la suit. */
+const PILL_PITCH = 58;
 
 /**
  * Créneau d'une pastille dans la colonne.
@@ -2264,11 +2239,21 @@ function PillSlot({
 
 function ToolPill({
   icon,
+  label,
   active,
   onPress,
   halo,
 }: {
   icon: ToolIcon;
+  /**
+   * Le mot sous la pastille.
+   *
+   * Une colonne de pictogrammes se devine, elle ne se lit pas : « murs
+   * pleins » et « surfaces » ne se distinguent qu'en les essayant, et on ne
+   * retient pas l'essai d'une fois sur l'autre. Le mot est discret — dix
+   * pixels, gris — mais il enlève toute hésitation.
+   */
+  label?: string;
   active: boolean;
   onPress: () => void;
   /**
@@ -2319,45 +2304,55 @@ function ToolPill({
     return () => boucle.stop();
   }, [halo, active, pulse]);
   return (
-    <TouchableOpacity
-      style={[styles.toolPill, plein && styles.toolPillActive]}
-      onPress={onPress}>
-      {halo && active && (
-        <Animated.View
-          pointerEvents="none"
-          style={[styles.toolHalo, { opacity: pulse }]}>
-          {/* Le contour épouse exactement la pastille : un anneau posé
-              dessus, ni plus grand ni décalé. */}
-          <Svg width={40} height={40} viewBox="0 0 40 40">
-            <Rect
-              x={2}
-              y={2}
-              width={36}
-              height={36}
-              rx={12}
-              stroke={c.blue}
-              strokeWidth={2.2}
+    <View style={styles.toolCell}>
+      <TouchableOpacity
+        style={[styles.toolPill, plein && styles.toolPillActive]}
+        accessibilityLabel={label}
+        onPress={onPress}>
+        {halo && active && (
+          <Animated.View
+            pointerEvents="none"
+            style={[styles.toolHalo, { opacity: pulse }]}>
+            {/* Le contour épouse exactement la pastille : un anneau posé
+                dessus, ni plus grand ni décalé. */}
+            <Svg width={40} height={40} viewBox="0 0 40 40">
+              <Rect
+                x={2}
+                y={2}
+                width={36}
+                height={36}
+                rx={12}
+                stroke={c.blue}
+                strokeWidth={2.2}
+                fill="none"
+              />
+            </Svg>
+          </Animated.View>
+        )}
+        {/* La pastille garde ses 36 px : seul le tracé grossit, pour se
+            lire d'un coup d'œil sans élargir la barre d'outils. */}
+        <Svg width={22} height={22} viewBox="0 0 24 24">
+          {TOOL_PATHS[icon].map((seg, i) => (
+            <Path
+              key={i}
+              d={seg.d}
+              stroke={stroke}
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
               fill="none"
             />
-          </Svg>
-        </Animated.View>
-      )}
-      {/* La pastille garde ses 36 px : seul le tracé grossit, pour se lire
-          d'un coup d'œil sans élargir la barre d'outils. */}
-      <Svg width={22} height={22} viewBox="0 0 24 24">
-        {TOOL_PATHS[icon].map((seg, i) => (
-          <Path
-            key={i}
-            d={seg.d}
-            stroke={stroke}
-            strokeWidth={2}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            fill="none"
-          />
-        ))}
-      </Svg>
-    </TouchableOpacity>
+          ))}
+        </Svg>
+      </TouchableOpacity>
+      {label ? (
+        <Text
+          style={[styles.toolLabel, active && styles.toolLabelActive]}
+          numberOfLines={1}>
+          {label}
+        </Text>
+      ) : null}
+    </View>
   );
 }
 
@@ -2424,26 +2419,36 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     flexDirection: 'row',
     backgroundColor: c.surface,
     borderRadius: radius.md,
-    alignSelf: 'flex-start',
+    // Pleine largeur : c'est ce qui borne le cadre. Les cellules se
+    // répartissent l'espace au lieu de le réclamer.
+    alignSelf: 'stretch',
     marginTop: 10,
     marginBottom: 10,
     paddingVertical: 10,
+    paddingHorizontal: 4,
     ...shadowCard,
   },
-  metric: { paddingHorizontal: 16, alignItems: 'center' },
-  metricBorder: {},
+  metric: {
+    flex: 1,
+    // Sans cela, une cellule refuse de rétrécir sous la largeur de son
+    // texte, et la rangée repart en débordement.
+    minWidth: 0,
+    paddingHorizontal: 3,
+    alignItems: 'center',
+  },
+  metricBorder: { borderLeftWidth: 1, borderLeftColor: c.line },
   metricValue: {
     color: c.ink,
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '800',
     letterSpacing: -0.4,
   },
   metricLabel: {
     color: c.inkFaint,
-    fontSize: 9.5,
+    fontSize: 8.5,
     fontWeight: '700',
     textTransform: 'uppercase',
-    letterSpacing: 0.7,
+    letterSpacing: 0.2,
     marginTop: 2,
   },
   segment: {
@@ -2485,19 +2490,39 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   planTools: {
     position: 'absolute',
     top: 58,
-    right: 10,
+    // La cellule fait 58 de large pour son mot, la pastille 38 : on recule
+    // de la moitié de la différence pour que les pastilles restent sur
+    // l'axe qu'elles occupaient.
+    right: -1,
     alignItems: 'flex-end',
     gap: 6,
   },
   editAnchor: {
     position: 'absolute',
     top: 10,
-    right: 10,
+    right: -1,
     zIndex: 4,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
   },
+  /**
+   * La cellule d'un outil : la pastille, et son mot dessous.
+   *
+   * Elle est plus large que la pastille pour loger le mot, mais reste
+   * CENTRÉE sur elle : les colonnes du plan 2D et de la 3D, et la rangée du
+   * bouton d'édition, gardent ainsi le même axe qu'avant.
+   */
+  toolCell: { width: 58, alignItems: 'center' },
+  toolLabel: {
+    color: c.inkFaint,
+    fontSize: 9.5,
+    fontWeight: '700',
+    letterSpacing: -0.1,
+    marginTop: 3,
+    textAlign: 'center',
+  },
+  toolLabelActive: { color: c.blue },
   toolPill: {
     width: 38,
     height: 38,
@@ -2520,18 +2545,6 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     justifyContent: 'center',
   },
   toolPillActive: { backgroundColor: c.blue, ...glow(c.blue) },
-  pillRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  // L'onde reste DANS le bouton : elle attire l'œil sans déborder sur le
-  // plan, qui doit rester lisible.
-  pulsePill: { overflow: 'hidden' },
-  pulseRing: {
-    position: 'absolute',
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    borderWidth: 4,
-    borderColor: c.blue,
-  },
   transition: {
     position: 'absolute',
     top: 0,
@@ -2742,12 +2755,16 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   },
   roomActionText: { color: c.inkSoft, fontWeight: '700', fontSize: 13.5 },
   exportChoice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 13,
     backgroundColor: c.surfaceSunken,
     borderRadius: radius.md,
-    paddingHorizontal: 15,
-    paddingVertical: 13,
+    paddingHorizontal: 13,
+    paddingVertical: 12,
     marginTop: 8,
   },
+  exportChoiceTexts: { flex: 1 },
   exportChoiceOn: { backgroundColor: c.blueSoft },
   exportChoiceTitle: { color: c.ink, fontSize: 15.5, fontWeight: '700' },
   exportChoiceTitleOn: { color: c.blue },

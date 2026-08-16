@@ -76,11 +76,43 @@ describe('les couleurs sont celles de la norme', () => {
     expect(w.every((x) => x.section === 2.5)).toBe(true);
   });
 
-  it('un circuit d’éclairage ajoute le retour de lampe et deux navettes', () => {
-    const w = wiresOf(LUM);
+  /**
+   * Le compte des conducteurs d'un circuit d'éclairage suit CE QUI EST POSÉ.
+   *
+   * Il était forfaitaire : six fils pour tout circuit d'éclairage — phase,
+   * neutre, terre, retour de lampe, deux navettes. C'est le câblage d'un
+   * va-et-vient, pas celui d'un éclairage en général. Le schéma annonçait
+   * donc un retour de lampe sans point lumineux au plan, et deux navettes
+   * pour un simple interrupteur : quatre mètres de fil fantômes par départ,
+   * reportés au métré puis à la commande.
+   */
+  it('un va-et-vient : retour de lampe ET deux navettes', () => {
+    // LUM porte une applique, un interrupteur et un va-et-vient.
+    const w = wiresOf(LUM, FIXTURES);
     expect(w.filter((x) => x.role === 'navette')).toHaveLength(2);
     expect(w.some((x) => x.role === 'retour')).toBe(true);
     expect(w.every((x) => x.section === 1.5)).toBe(true);
+  });
+
+  it('un simple interrupteur : le retour, mais AUCUNE navette', () => {
+    const simple = circuit('c4', 'Éclairage 2', 'eclairage', 1.5, 16, ['l', 'i']);
+    const w = wiresOf(simple, FIXTURES);
+    expect(w.some((x) => x.role === 'retour')).toBe(true);
+    expect(w.filter((x) => x.role === 'navette')).toHaveLength(0);
+    expect(w).toHaveLength(4);
+  });
+
+  it('aucun point lumineux posé : aucun retour de lampe', () => {
+    const sansPoint = circuit('c5', 'Éclairage 3', 'eclairage', 1.5, 16, ['i']);
+    const w = wiresOf(sansPoint, FIXTURES);
+    expect(w.some((x) => x.role === 'retour')).toBe(false);
+    expect(w.map((x) => x.role)).toEqual(['phase', 'neutre', 'terre']);
+  });
+
+  it('sans la liste des appareils, on ne suppose pas de va-et-vient', () => {
+    const w = wiresOf(LUM);
+    expect(w.some((x) => x.role === 'retour')).toBe(true);
+    expect(w.filter((x) => x.role === 'navette')).toHaveLength(0);
   });
 
   it('les courants faibles ne se colorient pas comme du 230 V', () => {

@@ -148,7 +148,8 @@ describe('la liste d’achat', () => {
 
   it('compte TROIS conducteurs par mètre de parcours', () => {
     const list = buyingList(rows, []);
-    const c25 = list.find((r) => r.label.includes('2.5 mm²'))!;
+    // À la française : le fournisseur lit « 2,5 mm² », pas « 2.5 ».
+    const c25 = list.find((r) => r.label.includes('2,5 mm²'))!;
     // 66 m de parcours → 198 m de fil → deux couronnes.
     expect(c25.note).toContain('198');
     expect(c25.quantity).toBe(2);
@@ -169,17 +170,30 @@ describe('la liste d’achat', () => {
     ];
     const list = buyingList([], fixtures);
     const boites = list.find((r) => r.label.includes('encastrement'))!;
+    // Le rayon où la chercher au magasin, pas seulement son nom.
+    expect(boites.family).toBe('Encastrement et finition');
     // 1 (simple) + 2 (ensemble) + 3 (prise triple) = 6 postes.
     expect(boites.quantity).toBe(6);
 
-    const p1 = list.find((r) => r.label === 'Plaque 1 poste')!;
-    const p2 = list.find((r) => r.label === 'Plaque 2 postes')!;
-    const p3 = list.find((r) => r.label === 'Plaque 3 postes')!;
+    const p1 = list.find((r) => r.label === 'Plaque de finition 1 poste')!;
+    const p2 = list.find((r) => r.label === 'Plaque de finition 2 postes')!;
+    const p3 = list.find((r) => r.label === 'Plaque de finition 3 postes')!;
     expect(p1.quantity).toBe(1);
     expect(p2.quantity).toBe(1);
     expect(p3.quantity).toBe(1);
-    expect(p2.note).toContain('153 mm');
-    expect(p3.note).toContain('224 mm');
+    /**
+     * La LARGEUR d'une plaque ne se commande pas.
+     *
+     * On l'écrivait en note : « Plaque 1 poste — 82 mm de large ». Un
+     * fournisseur ne cherche pas une plaque de 82 mm, il cherche une plaque
+     * un poste : la cote découle du nombre de postes, l'écrire ajoute un
+     * chiffre à vérifier sans rien apporter. L'entraxe, lui, se vérifie —
+     * et seulement à partir de deux postes.
+     */
+    expect(p1.spec).toBeUndefined();
+    expect(p2.spec).toContain('71 mm');
+    expect(p3.spec).toContain('71 mm');
+    expect(JSON.stringify(list)).not.toContain('82 mm');
   });
 
   it('compte les mécanismes poste par poste, pas appareil par appareil', () => {

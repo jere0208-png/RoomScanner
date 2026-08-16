@@ -87,14 +87,38 @@ export function pullSchedule(
   });
 }
 
+/**
+ * Une ligne de commande, telle qu'un fournisseur la lit.
+ *
+ * Le libellé seul ne suffit pas au comptoir : « Plaque 1 poste » ne dit pas
+ * de quelle gamme, « Gaine Ø20 » ne dit pas la norme. On sépare donc ce qui
+ * DÉSIGNE (le libellé), ce qui SPÉCIFIE (la norme, la matière, la
+ * profondeur) et ce qui EXPLIQUE d'où vient la quantité (la note). Chaque
+ * ligne porte enfin son rayon, pour que le bordereau se lise dans l'ordre
+ * où l'on remplit le chariot.
+ */
 export interface BuyRow {
+  /** Rayon : « Conduits et câbles », « Encastrement », « Appareillage ». */
+  family: string;
   label: string;
-  /** Quantité, dans l'unité du libellé (m, couronnes, pièces). */
+  /** Ce qui précise l'article : norme, matière, dimensions utiles. */
+  spec?: string;
   quantity: number;
+  /** Unité courte, celle des bordereaux : « u », « cour. 100 m ». */
   unit: string;
-  /** Précision utile au comptoir. */
+  /** D'où sort la quantité : le chiffrage doit être vérifiable. */
   note?: string;
 }
+
+/** Les rayons, dans l'ordre où on les parcourt. */
+export const BUY_FAMILIES = [
+  'Conduits et conducteurs',
+  'Encastrement et finition',
+  'Appareillage',
+] as const;
+
+/** Écrit une section à la française : 2,5 et non 2.5. */
+const frSection = (v: number) => String(v).replace('.', ',');
 
 /** Longueur d'une couronne du commerce, en mètres. */
 const COURONNE = 100;
@@ -123,10 +147,12 @@ export function buyingList(rows: PullRow[], fixtures: Fixture[]): BuyRow[] {
   for (const [d, m] of [...parConduit.entries()].sort((a, b) => a[0] - b[0])) {
     if (m <= 0) continue;
     out.push({
-      label: `Gaine ICTA Ø${d}`,
+      family: 'Conduits et conducteurs',
+      label: `Conduit ICTA Ø${d} mm`,
+      spec: 'Gaine annelée souple avec tire-fil, NF EN 61386',
       quantity: Math.ceil(m / COURONNE),
-      unit: `couronne${Math.ceil(m / COURONNE) > 1 ? 's' : ''} de 100 m`,
-      note: `${m} m mesurés sur le plan`,
+      unit: 'cour. 100 m',
+      note: `${m} m relevés sur le plan`,
     });
   }
 
@@ -135,10 +161,12 @@ export function buyingList(rows: PullRow[], fixtures: Fixture[]): BuyRow[] {
     // Trois conducteurs par départ : phase, neutre, terre.
     const brins = m * 3;
     out.push({
-      label: `Conducteur H07V-U ${s} mm²`,
+      family: 'Conduits et conducteurs',
+      label: `Conducteur H07V-U ${frSection(s)} mm²`,
+      spec: 'Rigide cuivre 450/750 V — rouge, bleu, vert-jaune',
       quantity: Math.ceil(brins / COURONNE),
-      unit: `couronne${Math.ceil(brins / COURONNE) > 1 ? 's' : ''} de 100 m`,
-      note: `${m} m de parcours, 3 conducteurs, soit ${brins} m`,
+      unit: 'cour. 100 m',
+      note: `${m} m de parcours × 3 conducteurs = ${brins} m`,
     });
   }
 
@@ -151,23 +179,26 @@ export function buyingList(rows: PullRow[], fixtures: Fixture[]): BuyRow[] {
   const postes = [...parEnsemble.values()].reduce((t, n) => t + n, 0);
   if (postes > 0) {
     out.push({
-      label: 'Boîte d’encastrement Ø67',
+      family: 'Encastrement et finition',
+      label: 'Boîte d’encastrement Ø 67 mm',
+      spec: 'Profondeur 40 mm, à sceller ou pour cloison sèche',
       quantity: postes,
-      unit: `boîte${postes > 1 ? 's' : ''}`,
-      note: 'une par poste, entraxe 71 mm pour les ensembles',
+      unit: 'u',
+      note: 'une boîte par poste',
     });
   }
   const plaques = new Map<number, number>();
   for (const n of parEnsemble.values()) plaques.set(n, (plaques.get(n) ?? 0) + 1);
   for (const [n, q] of [...plaques.entries()].sort((a, b) => a[0] - b[0])) {
     out.push({
-      label: `Plaque ${n} poste${n > 1 ? 's' : ''}`,
+      family: 'Encastrement et finition',
+      label: `Plaque de finition ${n} poste${n > 1 ? 's' : ''}`,
+      // La largeur d'une plaque ne se commande pas : elle découle du nombre
+      // de postes. Ce qui se vérifie, en revanche, c'est l'entraxe — et
+      // seulement à partir de deux postes.
+      spec: n > 1 ? 'Entraxe 71 mm, horizontale ou verticale' : undefined,
       quantity: q,
-      unit: `plaque${q > 1 ? 's' : ''}`,
-      note:
-        n > 1
-          ? `${Math.round((n - 1) * 71 + 82)} mm de large`
-          : '82 mm de large',
+      unit: 'u',
     });
   }
 
@@ -181,11 +212,20 @@ export function buyingList(rows: PullRow[], fixtures: Fixture[]): BuyRow[] {
   }
   for (const [k, q] of parType) {
     out.push({
+      family: 'Appareillage',
       label: FIXTURES[k as keyof typeof FIXTURES].label,
+      spec: 'Mécanisme à encastrer, entraxe 60 mm, griffes ou vis',
       quantity: q,
-      unit: q > 1 ? 'pièces' : 'pièce',
+      unit: 'u',
     });
   }
+
+  // Rangé par rayon : on ne fait pas trois fois le tour du magasin.
+  const rang = (f: string) => {
+    const i = (BUY_FAMILIES as readonly string[]).indexOf(f);
+    return i < 0 ? BUY_FAMILIES.length : i;
+  };
+  out.sort((a, b) => rang(a.family) - rang(b.family));
 
   return out;
 }

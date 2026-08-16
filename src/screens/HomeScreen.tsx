@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { RoomScan } from 'react-native-room-scan';
+import Svg, { Path, Rect } from 'react-native-svg';
 import {
   glow,
   radius,
@@ -22,10 +23,97 @@ import { LogoMark } from '../components/LogoMark';
 import { useScanStore } from '../store/scanStore';
 import { useRoomScan } from '../native/useRoomScan';
 
-const STEPS = [
-  { n: '1', title: 'Scannez', text: 'Filmez la pièce, les murs se détectent seuls' },
-  { n: '2', title: 'Ajustez', text: 'Corrigez le plan 2D, vérifiez les mesures' },
-  { n: '3', title: 'Explorez', text: 'Vue 3D interactive et modèle AR' },
+/**
+ * Les trois étapes, et leur dessin.
+ *
+ * Elles portaient un numéro dans une pastille — 1, 2, 3 — ce qui dit
+ * l'ordre mais rien du geste. Un téléphone qui balaye une pièce, un plan
+ * qu'on retouche, un volume qu'on tourne : on comprend l'app avant d'avoir
+ * lu la première ligne, et le numéro reste, en petit, pour l'ordre.
+ */
+const STEPS: {
+  n: string;
+  title: string;
+  text: string;
+  art: (c: Palette) => React.ReactNode;
+}[] = [
+  {
+    n: '1',
+    title: 'Scannez',
+    text: 'Filmez la pièce, les murs se détectent seuls',
+    // Un téléphone, et les ondes qui en sortent.
+    art: (c) => (
+      <>
+        <Rect
+          x={7}
+          y={4}
+          width={11}
+          height={18}
+          rx={2.2}
+          fill="none"
+          stroke={c.blue}
+          strokeWidth={1.7}
+        />
+        <Path
+          d="M21 8.5 a6 6 0 0 1 0 9 M24.5 5 a10 10 0 0 1 0 16"
+          fill="none"
+          stroke={c.blue}
+          strokeWidth={1.6}
+          strokeLinecap="round"
+          opacity={0.75}
+        />
+      </>
+    ),
+  },
+  {
+    n: '2',
+    title: 'Ajustez',
+    text: 'Corrigez le plan 2D, vérifiez les mesures',
+    // Un plan et sa cote : ce qu'on retouche.
+    art: (c) => (
+      <>
+        <Path
+          d="M5 6 h18 v11 H5 z M15 6 v6"
+          fill="none"
+          stroke={c.blue}
+          strokeWidth={1.7}
+          strokeLinejoin="round"
+        />
+        <Path
+          d="M5 21 h18 M5 19.5 v3 M23 19.5 v3"
+          fill="none"
+          stroke={c.blue}
+          strokeWidth={1.3}
+          opacity={0.7}
+        />
+      </>
+    ),
+  },
+  {
+    n: '3',
+    title: 'Explorez',
+    text: 'Vue 3D interactive et modèle AR',
+    // Un volume en isométrie : le modèle qu'on tourne.
+    art: (c) => (
+      <>
+        <Path
+          d="M14 3 L24 8.5 v11 L14 25 L4 19.5 v-11 z"
+          fill="none"
+          stroke={c.blue}
+          strokeWidth={1.7}
+          strokeLinejoin="round"
+        />
+        <Path
+          d="M4 8.5 L14 14 L24 8.5 M14 14 v11"
+          fill="none"
+          stroke={c.blue}
+          strokeWidth={1.4}
+          strokeLinejoin="round"
+          opacity={0.65}
+        />
+      </>
+    ),
+  },
 ];
 
 export function HomeScreen() {
@@ -147,10 +235,15 @@ export function HomeScreen() {
         {STEPS.map((s, i) => (
           <View key={s.n} style={[styles.stepRow, i > 0 && styles.stepRowBorder]}>
             <View style={styles.stepBadge}>
-              <Text style={styles.stepBadgeText}>{s.n}</Text>
+              <Svg width={28} height={28} viewBox="0 0 28 28">
+                {s.art(c)}
+              </Svg>
             </View>
             <View style={styles.stepTexts}>
-              <Text style={styles.stepTitle}>{s.title}</Text>
+              <Text style={styles.stepTitle}>
+                <Text style={styles.stepNum}>{s.n}. </Text>
+                {s.title}
+              </Text>
               <Text style={styles.stepText}>{s.text}</Text>
             </View>
           </View>
@@ -261,15 +354,15 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   stepRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 15 },
   stepRowBorder: { borderTopWidth: 1, borderTopColor: c.line },
   stepBadge: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 40,
+    height: 40,
+    borderRadius: 13,
     backgroundColor: c.blueSoft,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 14,
   },
-  stepBadgeText: { color: c.blue, fontSize: 14, fontWeight: '800' },
+  stepNum: { color: c.inkFaint, fontWeight: '700' },
   stepTexts: { flex: 1 },
   stepTitle: { color: c.ink, fontSize: 15, fontWeight: '700' },
   stepText: { color: c.inkFaint, fontSize: 13, marginTop: 1 },

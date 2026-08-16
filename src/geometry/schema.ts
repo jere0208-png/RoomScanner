@@ -57,7 +57,37 @@ export const WIRE_COLORS: Record<WireRole, { color: string; label: string }> = {
  * va-et-vient ajoute deux navettes. Un circuit de communication n'a ni
  * phase ni terre : ce sont des paires, on ne les colorie pas comme du 230 V.
  */
-export function wiresOf(circuit: Circuit): Wire[] {
+/** Les appareils qui COMMANDENT : eux seuls appellent un retour de lampe. */
+const COMMANDES: FixtureKind[] = [
+  'inter',
+  'inter2',
+  'inter3',
+  'va',
+  'poussoir',
+  'variateur',
+];
+/** Les POINTS LUMINEUX : sans l'un d'eux, il n'y a rien à retourner. */
+const LUMIERES: FixtureKind[] = ['applique', 'boite', 'sortieCable'];
+
+/**
+ * Les conducteurs d'un circuit — ceux qu'on tire VRAIMENT.
+ *
+ * Tout circuit d'éclairage recevait six fils : phase, neutre, terre, retour
+ * de lampe et deux navettes. C'est le câblage d'un va-et-vient, pas celui
+ * d'un circuit d'éclairage en général. Le schéma annonçait donc un retour
+ * de lampe là où le plan ne porte aucun point lumineux, et deux navettes
+ * pour un simple interrupteur — quatre mètres de fil imaginaires par
+ * départ, reportés au métré puis à la commande.
+ *
+ * On compte donc ce qui est POSÉ :
+ *
+ * - le retour de lampe suppose une commande ET un point lumineux ;
+ * - les navettes supposent DEUX commandes (ou un va-et-vient déclaré).
+ *
+ * Sans la liste des appareils, on s'en tient au câblage le plus courant —
+ * une commande, un point — plutôt que d'inventer un va-et-vient.
+ */
+export function wiresOf(circuit: Circuit, fixtures?: Fixture[]): Wire[] {
   const section = circuit.section ?? 0;
   if (circuit.section === null) {
     return [
@@ -70,12 +100,31 @@ export function wiresOf(circuit: Circuit): Wire[] {
     { role: 'terre', ...WIRE_COLORS.terre, section },
   ];
   if (circuit.nature !== 'eclairage') return base;
-  return [
-    ...base,
-    { role: 'retour', ...WIRE_COLORS.retour, section },
-    { role: 'navette', ...WIRE_COLORS.navette, section },
-    { role: 'navette', ...WIRE_COLORS.navette, section },
-  ];
+
+  const poses = fixtures
+    ? circuit.fixtureIds
+        .map((id) => fixtures.find((f) => f.id === id))
+        .filter((f): f is Fixture => !!f)
+    : null;
+  const commandes = poses
+    ? poses.filter((f) => COMMANDES.includes(f.kind)).length
+    : 1;
+  const lumieres = poses
+    ? poses.filter((f) => LUMIERES.includes(f.kind)).length
+    : 1;
+  const vaEtVient = poses
+    ? commandes >= 2 || poses.some((f) => f.kind === 'va')
+    : false;
+
+  const out = [...base];
+  if (commandes >= 1 && lumieres >= 1) {
+    out.push({ role: 'retour', ...WIRE_COLORS.retour, section });
+  }
+  if (vaEtVient) {
+    out.push({ role: 'navette', ...WIRE_COLORS.navette, section });
+    out.push({ role: 'navette', ...WIRE_COLORS.navette, section });
+  }
+  return out;
 }
 
 export interface SchemaRow {
@@ -151,7 +200,7 @@ export function schemaRows(
     breaker: c.breaker,
     section: c.section,
     conduit: conduitFor(c.section),
-    wires: wiresOf(c).length,
+    wires: wiresOf(c, fixtures).length,
     points: pointsOf(c, fixtures),
     under: protecteur.get(c.label),
   }));
@@ -189,12 +238,16 @@ export function multiWire(
   return {
     mark,
     label: circuit.label,
-    wires: wiresOf(circuit),
+    wires: wiresOf(circuit, fixtures),
     devices,
     note:
       circuit.nature === 'eclairage' && commandes > 1
         ? 'Deux commandes ou plus : va-et-vient, deux navettes entre les ' +
           'boîtiers, retour de lampe au point lumineux.'
+        : circuit.nature === 'eclairage' &&
+          !devices.some((d) => LUMIERES.includes(d.kind))
+        ? 'Aucun point lumineux posé sur ce circuit : pas de retour de ' +
+          'lampe. Ajoutez le point sur le plan pour l’obtenir.'
         : circuit.section === null
         ? 'Courants faibles : paires torsadées, jamais dans la même gaine ' +
           'que la puissance.'

@@ -133,11 +133,19 @@ describe('la liste du matériel, version chantier', () => {
     expect(doc).toContain('départ');
   });
 
-  it('porte la commande : couronnes, boîtes, plaques', () => {
+  it('porte la commande, en bordereau : rayon, désignation, quantité, unité', () => {
     expect(doc).toContain('commander');
-    expect(doc).toMatch(/couronne/);
+    // Les trois colonnes d'un bordereau, et les rayons qui les regroupent.
+    expect(doc).toContain('Désignation');
+    expect(doc).toContain('Qté');
+    expect(doc).toContain('Unité');
+    expect(doc).toContain('CONDUITS ET CONDUCTEURS');
+    expect(doc).toContain('ENCASTREMENT ET FINITION');
+    expect(doc).toMatch(/cour\. 100 m/);
     expect(doc).toMatch(/encastrement/);
-    expect(doc).toMatch(/Plaque 1 poste/);
+    expect(doc).toMatch(/Plaque de finition 1 poste/);
+    // Et plus une seule largeur de plaque : elle ne se commande pas.
+    expect(doc).not.toContain('82 mm');
   });
 
   it('rappelle la règle de remplissage — un chiffre sans sa règle ne vaut rien', () => {
