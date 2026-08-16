@@ -55,6 +55,13 @@ import {
 } from '../geometry/electrical';
 import { frCategory, furnKind, furnitureStrokes } from '../geometry/furniture';
 import { markColor } from '../geometry/schema';
+import {
+  CEILINGS,
+  CEILING_SYMBOL,
+  linkAnchor,
+  linkCurve,
+  type CeilingFixture,
+} from '../geometry/ceiling';
 import { CloseCross } from './CloseCross';
 
 /**
@@ -197,6 +204,16 @@ interface Props {
   /** Appui sur un symbole d'appareillage : ouvre son mur vu de face. */
   onSelectFixture?: (id: string, wallId: string) => void;
   /**
+   * Le PLAFOND : points lumineux, détecteurs, caméras, bouches de VMC.
+   *
+   * C'est le calque qui manquait pour faire un vrai plan d'électricien. Il
+   * s'affiche ou se cache : superposé au sol et à son mobilier, il devient
+   * vite illisible, et on ne le regarde pas en même temps que le reste.
+   */
+  ceiling?: CeilingFixture[];
+  showCeiling?: boolean;
+  onSelectCeiling?: (id: string) => void;
+  /**
    * Le retour de mur choisi, ou `null`.
    *
    * L'écran en a besoin pour y poser un appareil : choisir un retour puis
@@ -234,6 +251,9 @@ export function FloorplanEditor({
   onEditRoomName,
   onWallAction,
   onSelectFixture,
+  ceiling,
+  showCeiling,
+  onSelectCeiling,
   onPierChange,
   selectedOpeningId,
   onSelectOpening,
@@ -581,7 +601,15 @@ export function FloorplanEditor({
                 murs, meubles et cartouches gardent la priorité, et seul ce
                 qui n'appartient à rien tombe ici. `transparent` et non
                 `none` — une surface sans couleur n'est pas touchable. */}
-            {editable && (
+            {/*
+              Le fond répond MÊME HORS ÉDITION.
+              Un meuble se sélectionne aussi en lecture — par sa vignette,
+              ou en le touchant — et il fallait alors retoucher le meuble
+              lui-même pour le lâcher : n'importe où ailleurs, rien ne se
+              passait. Or « appuyer à côté », c'est le geste universel pour
+              désélectionner ; il ne dépend pas d'un mode.
+            */}
+            {(editable || selectedObjectId) && (
               <Rect
                 x={0}
                 y={0}
@@ -1104,6 +1132,78 @@ export function FloorplanEditor({
               );
             })}
 
+            {/*
+              LE PLAFOND, et surtout LES LIENS DE COMMANDE.
+              Un plan qui montre six interrupteurs et huit points lumineux
+              sans dire lequel allume quoi n'est pas un plan de travail,
+              c'est un inventaire. Le trait pointillé courbe — jamais droit,
+              pour ne pas le confondre avec une cote ou une gaine — va de la
+              commande au point qu'elle allume.
+            */}
+            {showCeiling &&
+              (ceiling ?? []).map((cl) => {
+                const spec = CEILINGS[cl.kind];
+                const q = mapping.toPx(cl.at);
+                const r = Math.max(9, Math.min(15, mapping.scale * 0.14));
+                return (
+                  <G
+                    key={`cl-${cl.id}`}
+                    onPress={
+                      onSelectCeiling ? () => onSelectCeiling(cl.id) : undefined
+                    }>
+                    <Circle cx={q.x} cy={q.y} r={r + 6} fill="transparent" />
+                    <G transform={`translate(${q.x}, ${q.y}) scale(${r / 9})`}>
+                      {CEILING_SYMBOL[cl.kind].map((seg, si) => (
+                        <Path
+                          key={si}
+                          d={seg.d}
+                          stroke={spec.color}
+                          strokeWidth={1.5}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          fill={seg.fill ? spec.color : 'none'}
+                        />
+                      ))}
+                    </G>
+                  </G>
+                );
+              })}
+            {showCeiling &&
+              (ceiling ?? []).flatMap((cl) =>
+                (cl.commands ?? []).map((fid) => {
+                  const f = fixtures?.find((x) => x.id === fid);
+                  if (!f) return null;
+                  const w = wallById.get(f.wallId);
+                  if (!w) return null;
+                  const fa = wallFace(w, quads.get(w.id), f.side);
+                  const depart = facePoint(fa, faceX(fa, f.along), 0.16);
+                  const rayon = Math.max(0.1, CEILINGS[cl.kind].d * 0.7);
+                  const arrivee = linkAnchor(
+                    { x: depart.x, z: depart.z },
+                    cl.at,
+                    rayon,
+                  );
+                  const courbe = linkCurve(
+                    { x: depart.x, z: depart.z },
+                    arrivee,
+                  ).map((pt) => {
+                    const g = mapping.toPx(pt);
+                    return `${g.x},${g.y}`;
+                  });
+                  return (
+                    <Polyline
+                      key={`lien-${cl.id}-${fid}`}
+                      points={courbe.join(' ')}
+                      fill="none"
+                      stroke={c.inkSoft}
+                      strokeWidth={1.1}
+                      strokeDasharray="1.5 3.5"
+                      strokeLinecap="round"
+                    />
+                  );
+                }),
+              )}
+
             {/* Les gaines : un filet tireté qui longe les murs, du tableau
                 à chaque appareil. Il passe SOUS les symboles — c'est un
                 cheminement, pas une annotation — et son tracé est celui du
@@ -1188,6 +1288,64 @@ export function FloorplanEditor({
                   x: p.x,
                 })),
               );
+              /**
+               * LA TAILLE DU SYMBOLE SUIT LE ZOOM.
+               *
+               * Elle était fixe : à l'échelle d'un logement, onze pixels de
+               * pastille par appareil couvraient les murs qu'ils sont
+               * censés décrire ; en zoomant sur un mur, la même pastille
+               * devenait minuscule au milieu du dessin. Elle se cale
+               * désormais sur l'échelle, entre deux bornes — assez petite
+               * pour laisser voir le plan, assez grande pour se viser.
+               */
+              const rayon = Math.max(
+                7,
+                Math.min(13, 7 + (mapping.scale - 60) * 0.07),
+              );
+              const taillePolice = Math.max(6.5, Math.min(9, rayon * 0.72));
+
+              /**
+               * OÙ poser le sigle : la première place libre.
+               *
+               * Il était posé en haut à droite, toujours. Deux appareils
+               * voisins — une double prise et une RJ45 à vingt centimètres —
+               * écrivaient donc leurs sigles au même endroit, l'un sur
+               * l'autre. On essaie les quatre coins, puis on renonce : un
+               * sigle illisible vaut moins que pas de sigle du tout, le
+               * symbole suffit à dire qu'il y a quelque chose.
+               */
+              const posesTag: { x: number; y: number; w: number; h: number }[] =
+                [];
+              const placeTag = (
+                cx: number,
+                cy: number,
+                texte: string,
+              ): { x: number; y: number } | null => {
+                const w2 = texte.length * taillePolice * 0.58;
+                const h2 = taillePolice;
+                const coins: [number, number][] = [
+                  [rayon + 3, -rayon + 1],
+                  [-rayon - 3 - w2, -rayon + 1],
+                  [-w2 / 2, -rayon - h2 - 1],
+                  [-w2 / 2, rayon + h2 + 3],
+                ];
+                for (const [dx, dy] of coins) {
+                  const b = { x: cx + dx, y: cy + dy - h2, w: w2, h: h2 };
+                  const libre = posesTag.every(
+                    (o) =>
+                      b.x > o.x + o.w + 1 ||
+                      o.x > b.x + b.w + 1 ||
+                      b.y > o.y + o.h + 1 ||
+                      o.y > b.y + b.h + 1,
+                  );
+                  if (libre) {
+                    posesTag.push(b);
+                    return { x: b.x, y: cy + dy };
+                  }
+                }
+                return null;
+              };
+
               return unites.map(({ f, face, x, postes }) => {
                 const spec = FIXTURES[f.kind];
                 const symbol = postsSymbol(postes, f.kind);
@@ -1211,7 +1369,12 @@ export function FloorplanEditor({
                     }>
                     {/* Cible tactile élargie : le symbole fait 22 px, le
                         doigt en demande le double. */}
-                    <Circle cx={p.x} cy={p.y} r={18} fill="transparent" />
+                    <Circle
+                      cx={p.x}
+                      cy={p.y}
+                      r={Math.max(18, rayon + 8)}
+                      fill="transparent"
+                    />
                     {elecLod < 0.98 && (
                       <Circle
                         cx={p.x}
@@ -1231,8 +1394,12 @@ export function FloorplanEditor({
                           stroke={spec.color}
                           strokeWidth={1.2}
                         />
-                        <Circle cx={p.x} cy={p.y} r={11} fill={c.surface} />
-                        <G transform={`translate(${p.x}, ${p.y}) rotate(${dir})`}>
+                        <Circle cx={p.x} cy={p.y} r={rayon} fill={c.surface} />
+                        <G
+                          transform={
+                            `translate(${p.x}, ${p.y}) ` +
+                            `rotate(${dir}) scale(${rayon / 11})`
+                          }>
                           {symbol.map((seg, si) => (
                             <Path
                               key={si}
@@ -1245,16 +1412,21 @@ export function FloorplanEditor({
                             />
                           ))}
                         </G>
-                        {tag && (
-                          <SvgText
-                            x={p.x + 12}
-                            y={p.y - 8}
-                            fill={spec.color}
-                            fontSize={8}
-                            fontWeight="800">
-                            {tag}
-                          </SvgText>
-                        )}
+                        {(() => {
+                          if (!tag) return null;
+                          const pose = placeTag(p.x, p.y, tag);
+                          if (!pose) return null;
+                          return (
+                            <SvgText
+                              x={pose.x}
+                              y={pose.y}
+                              fill={spec.color}
+                              fontSize={taillePolice}
+                              fontWeight="800">
+                              {tag}
+                            </SvgText>
+                          );
+                        })()}
                         {/* Le repère de circuit : c'est LUI qu'on lit sur le
                             chantier pour savoir quoi tirer où. Posé sous
                             l'appareil pour ne pas se mêler à son sigle. */}
@@ -1377,6 +1549,8 @@ export function FloorplanEditor({
                   onPress={
                     editable
                       ? () => {
+                          // Toucher le sol, c'est quitter le meuble.
+                          onSelectObject?.(null);
                           onSelectRoom?.(part.roomId);
                           onEditRoomName?.(part.roomId);
                         }

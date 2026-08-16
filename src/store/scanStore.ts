@@ -2,6 +2,10 @@ import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { deletePhotoFiles } from '../ui/photos';
 import type {
+  CeilingFixture,
+  CeilingKind,
+} from '../geometry/ceiling';
+import type {
   FloorData,
   ObjectData,
   ScanResult,
@@ -122,6 +126,8 @@ export interface SavedScan {
   fixtures?: Fixture[];
   /** Photos de repérage. Absentes des scans d'avant. */
   photos?: ScanPhoto[];
+  /** Appareils de plafond — points lumineux, détecteurs, VMC. */
+  ceiling?: CeilingFixture[];
   /** Dossier qui contient ce scan. Absent = à la racine. */
   folderId?: string;
   /**
@@ -370,6 +376,7 @@ interface Snapshot {
   rooms: RoomEntry[];
   fixtures: Fixture[];
   photos: ScanPhoto[];
+  ceiling: CeilingFixture[];
 }
 const HISTORY_MAX = 40;
 const history: Snapshot[] = [];
@@ -472,6 +479,26 @@ interface ScanState {
   /** Sort un appareil de son ensemble et l'écarte franchement. */
   splitFixture: (id: string, along: number) => void;
   /** Photos de repérage du scan courant. */
+  /**
+   * Le PLAFOND : points lumineux, détecteurs, caméras, bouches de VMC.
+   *
+   * Une liste à part de l'appareillage mural, parce que ce n'est pas le
+   * même objet : un appareil de plafond se repère à deux coordonnées dans
+   * la pièce, pas sur une face de mur à une hauteur.
+   */
+  ceiling: CeilingFixture[];
+  /** Pose un appareil au plafond, dans la pièce dont on donne le contour. */
+  addCeiling: (kind: CeilingKind, roomId: string, at: Pt) => string;
+  moveCeiling: (id: string, at: Pt) => void;
+  removeCeiling: (id: string) => void;
+  /**
+   * Relie une commande murale à un point de plafond, ou défait le lien.
+   *
+   * C'est LE trait du plan d'électricien : celui qui dit quel interrupteur
+   * allume quoi. Sans lui, un plan montre six commandes et huit points sans
+   * jamais dire lequel va avec lequel.
+   */
+  toggleCeilingCommand: (ceilingId: string, fixtureId: string) => void;
   photos: ScanPhoto[];
   /** Punaise une photo sur un mur, à la cote donnée. */
   addPhoto: (wallId: string, along: number, path: string) => string;
@@ -618,6 +645,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       rooms: st.rooms,
       fixtures: st.fixtures,
       photos: st.photos,
+      ceiling: st.ceiling,
     });
     if (history.length > HISTORY_MAX) history.shift();
     if (!st.canUndo) set({ canUndo: true });
@@ -645,6 +673,7 @@ export const useScanStore = create<ScanState>((set, get) => {
             objects: st.objects,
             fixtures: st.fixtures,
             photos: st.photos,
+            ceiling: st.ceiling,
             north: st.north ?? undefined,
             modelPath: st.modelPath,
             updatedAt: Date.now(),
@@ -673,6 +702,7 @@ export const useScanStore = create<ScanState>((set, get) => {
     pendingJoin: null,
     wallClip: null,
     photos: [],
+    ceiling: [],
     dirty: false,
     resultOrigin: 'scan',
     rooms: [],
@@ -1129,6 +1159,46 @@ export const useScanStore = create<ScanState>((set, get) => {
         dirty: true,
       });
       return id;
+    },
+
+    addCeiling: (kind, roomId, at) => {
+      pushHistory('addCeiling');
+      const id = `pl-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      set({
+        ceiling: [...get().ceiling, { id, kind, roomId, at }],
+        dirty: true,
+      });
+      return id;
+    },
+
+    moveCeiling: (id, at) => {
+      pushHistory(`ceiling:${id}`);
+      set({
+        ceiling: get().ceiling.map((c) => (c.id === id ? { ...c, at } : c)),
+        dirty: true,
+      });
+    },
+
+    removeCeiling: (id) => {
+      pushHistory('removeCeiling');
+      set({ ceiling: get().ceiling.filter((c) => c.id !== id), dirty: true });
+    },
+
+    toggleCeilingCommand: (ceilingId, fixtureId) => {
+      pushHistory('ceilingCommand');
+      set({
+        ceiling: get().ceiling.map((c) => {
+          if (c.id !== ceilingId) return c;
+          const cur = c.commands ?? [];
+          return {
+            ...c,
+            commands: cur.includes(fixtureId)
+              ? cur.filter((x) => x !== fixtureId)
+              : [...cur, fixtureId],
+          };
+        }),
+        dirty: true,
+      });
     },
 
     removePhoto: (id) => {
@@ -1737,6 +1807,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         objects: st.objects,
         fixtures: st.fixtures,
         photos: st.photos,
+        ceiling: st.ceiling,
         north: st.north ?? undefined,
       };
       const saves = [save, ...st.saves];
@@ -1833,6 +1904,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         objects: save.objects,
         fixtures: save.fixtures ?? [],
         photos: save.photos ?? [],
+        ceiling: save.ceiling ?? [],
         // Un relevé de mur appartient au plan où il a été pris : le garder
         // d'un scan à l'autre permettrait de coller les cotes d'un autre
         // logement.

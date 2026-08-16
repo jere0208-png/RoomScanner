@@ -43,6 +43,13 @@ import {
   type SchemaRow,
 } from '../geometry/schema';
 import type { BuyRow, PullRow } from '../geometry/conduits';
+import {
+  CEILINGS,
+  CEILING_SYMBOL,
+  linkAnchor,
+  linkCurve,
+  type CeilingFixture,
+} from '../geometry/ceiling';
 import { planFrameAngle } from '../geometry/floorplan';
 import {
   faceDepth,
@@ -184,6 +191,13 @@ export interface PdfOptions {
   textures?: boolean;
   /** Feuille de métré par pièce (surfaces, périmètres, murs nets). */
   metre?: boolean;
+  /**
+   * Le plafond : une feuille d'implantation de plus, avec les liens de
+   * commande. Absente si rien n'est posé au plafond — une feuille vide
+   * dans un dossier, c'est une feuille qu'on tourne en se demandant si on
+   * a raté quelque chose.
+   */
+  ceiling?: CeilingFixture[];
   /**
    * Schémas unifilaire et multifilaire : deux feuilles de plus, tirées des
    * circuits déjà calculés. Absent = pas de schéma, et le dossier garde sa
@@ -1746,6 +1760,102 @@ function schemaPlanPage(
   });
 }
 
+/**
+ * LA FEUILLE D'IMPLANTATION — celle qu'on donne à l'équipe.
+ *
+ * Le plan coté dit où sont les murs, la liste dit ce qu'il faut acheter ;
+ * aucun des deux ne dit QUEL INTERRUPTEUR ALLUME QUOI. C'est pourtant la
+ * seule question qu'on se pose une fois les gaines tirées, et celle qui
+ * coûte une matinée quand personne n'y a répondu par écrit.
+ *
+ * Cette feuille porte donc les appareils de plafond à leur place, les
+ * commandes murales, et le trait pointillé courbe qui va de l'une à
+ * l'autre — courbe, pour qu'on ne le confonde ni avec une cote ni avec un
+ * cheminement de gaine. Les cotes du plan restent : on pose un point
+ * lumineux au mètre près, pas à l'œil.
+ */
+function ceilingPage(
+  ctx: SheetContext,
+  sheet: string,
+  planView: PlanViewParams | undefined,
+  ceiling: CeilingFixture[],
+): string {
+  const quads = wallQuads(ctx.walls);
+  const murs = new Map(ctx.walls.map((w) => [w.id, w]));
+
+  const overlay: PlanOverlay = (d, px, scale, box) => {
+    // Les liens d'abord : ils passent SOUS les symboles, jamais dessus.
+    for (const cl of ceiling) {
+      for (const fid of cl.commands ?? []) {
+        const f = (ctx.fixtures ?? []).find((x) => x.id === fid);
+        const w = f ? murs.get(f.wallId) : undefined;
+        if (!f || !w) continue;
+        const face = wallFace(w, quads.get(w.id), f.side);
+        const depart = facePoint(face, faceX(face, f.along), 0.16);
+        const arrivee = linkAnchor(
+          { x: depart.x, z: depart.z },
+          cl.at,
+          CEILINGS[cl.kind].d * 0.7,
+        );
+        const courbe = linkCurve({ x: depart.x, z: depart.z }, arrivee).map(px);
+        d.dashedPath(courbe, 0.7, GREY, [1.6, 3]);
+      }
+    }
+
+    // Puis les appareils, à leur diamètre réel, jamais plus petits que
+    // lisibles : un spot de 9 cm ferait deux points à l'échelle 1:100.
+    for (const cl of ceiling) {
+      const spec = CEILINGS[cl.kind];
+      const q = px(cl.at);
+      const r = Math.max(7, Math.min(16, (spec.d / 2) * scale));
+      d.circle(q.x, q.y, r + 2, '#FFFFFF');
+      drawSymbol(d, CEILING_SYMBOL[cl.kind], q.x, q.y, r / 9, spec.color, 1.1);
+      d.text(spec.short, q.x, q.y - r - 8, 6.5, spec.color, { bold: true });
+    }
+
+    // La légende : les familles présentes, et le trait de commande.
+    const vus = [...new Set(ceiling.map((c) => c.kind))];
+    if (vus.length === 0) return;
+    const LIGNE = 13;
+    const haut = 22 + (vus.length + 1) * LIGNE;
+    const larg = 150;
+    const lx = box.x + 8;
+    let ly = box.y + 6 + haut - 16;
+    d.rect(lx - 4, box.y + 6, larg, haut, '#FFFFFFEE', '#D8DEE7', 0.6);
+    d.text('PLAFOND', lx + 2, ly + 3, 6, GREY_LIGHT, { align: 'left' });
+    for (const k of vus) {
+      ly -= LIGNE;
+      const spec = CEILINGS[k];
+      drawSymbol(d, CEILING_SYMBOL[k], lx + 10, ly + 3, 0.6, spec.color, 1);
+      d.text(fitText(spec.label, 7, larg - 34), lx + 24, ly, 7, INK, {
+        align: 'left',
+      });
+    }
+    ly -= LIGNE;
+    d.dashedPath(
+      [
+        { x: lx + 3, y: ly + 3 },
+        { x: lx + 8, y: ly + 7 },
+        { x: lx + 14, y: ly + 3 },
+        { x: lx + 18, y: ly + 3 },
+      ],
+      0.7,
+      GREY,
+      [1.6, 3],
+    );
+    d.text('Lien de commande', lx + 24, ly, 7, INK, { align: 'left' });
+  };
+
+  return planPage(ctx, sheet, planView, true, {
+    title: 'Plan d\u2019implantation — plafond',
+    sub:
+      'Points lumineux, détection et ventilation, avec le lien de commande ' +
+      'de chaque appareil. Cotes du plan d’ensemble.',
+    overlay,
+    hideLegend: false,
+  });
+}
+
 const DEFAULT_PDF_VIEWS: [View3DParams, View3DParams] = [
   { theta: -32, tilt: 58, zoom: 1, fx: 0, fy: 0 },
   { theta: 148, tilt: 42, zoom: 1, fx: 0, fy: 0 },
@@ -2309,10 +2419,15 @@ export function buildScanPdf(
   // Les schémas ne s'impriment que s'il y a une installation à montrer.
   const schemas = opts.schemas ?? null;
   const withSchema = !!schemas && schemas.rows.length > 0;
+  const withCeiling = (opts.ceiling?.length ?? 0) > 0;
   // Trois feuilles : l'unifilaire hors sol, puis les deux schémas sur le
   // plan. Les tracés viennent des mêmes cheminements que le métré.
   const total =
-    1 + (withMetre ? 1 : 0) + (include3D ? 1 : 0) + (withSchema ? 3 : 0);
+    1 +
+    (withMetre ? 1 : 0) +
+    (include3D ? 1 : 0) +
+    (withCeiling ? 1 : 0) +
+    (withSchema ? 3 : 0);
   const ctx: SheetContext = {
     name: scan.name,
     filename,
@@ -2329,6 +2444,11 @@ export function buildScanPdf(
     showTextures: opts.textures ?? false,
   };
   const pages = [planPage(ctx, `1 / ${total}`, opts.plan, opts.measures2D ?? true)];
+  if (withCeiling) {
+    pages.push(
+      ceilingPage(ctx, `${pages.length + 1} / ${total}`, opts.plan, opts.ceiling!),
+    );
+  }
   if (withMetre) {
     pages.push(metrePage(ctx, `${pages.length + 1} / ${total}`));
   }

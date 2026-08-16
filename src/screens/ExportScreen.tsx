@@ -211,6 +211,7 @@ type OptionDef = [keyof typeof EXPORT_ICONS, string, boolean, () => void];
 const EXPORT_ICONS = {
   vues3d: ['M12 3 l8 4.5 v9 L12 21 l-8 -4.5 v-9 z', 'M12 12 l8 -4.5', 'M12 12 v9', 'M12 12 L4 7.5'],
   metre: ['M4 5 h16 v14 H4 z', 'M4 12 h16', 'M12 5 v14'],
+  plafond: ['M3.5 6 h17', 'M12 6 v3.5', 'M7.5 15 a4.5 4.5 0 0 1 9 0 z', 'M6 18.5 h12'],
   cotes2d: ['M3 12 h18', 'M6 9 v6', 'M18 9 v6', 'M9 4 h6 v3 H9 z'],
   cotes3d: ['M4 18 l6 -12 6 6 4 -4', 'M3 21 h18', 'M6 15 v6'],
   meubles: ['M4 17 v-5 a2 2 0 0 1 2 -2 h12 a2 2 0 0 1 2 2 v5', 'M4 17 h16', 'M6 17 v3', 'M18 17 v3'],
@@ -234,6 +235,9 @@ const styles = getStyles(c);
    * quand c'est l'électricien qui imprime.
    */
   const [gaines, setGaines] = useState(false);
+  const ceiling = useScanStore((s) => s.ceiling);
+  /** La feuille d'implantation du plafond, avec ses liens de commande. */
+  const [plafond, setPlafond] = useState(true);
   const parts = useMemo(() => roomParts(walls, rooms), [walls, rooms]);
   const placement = useMemo(
     () => fixturePlacement(fixtures, walls, roomInputsOf(rooms, parts)),
@@ -321,6 +325,9 @@ const styles = getStyles(c);
           measures2D,
           measures3D,
           schemas: schema ? schemas : null,
+          // Le plafond ne s'impose pas : il fait une feuille de plus, et
+          // tout le monde n'équipe pas les plafonds.
+          ceiling: plafond ? ceiling : undefined,
           surfaces: showSurfaces,
           textures: showTextures,
           metre: includeMetre,
@@ -436,6 +443,16 @@ const styles = getStyles(c);
                       'Gaines',
                       gaines,
                       () => setGaines(!gaines),
+                    ] as OptionDef,
+                  ]
+                : []),
+              ...(ceiling.length > 0
+                ? [
+                    [
+                      'plafond',
+                      'Plafond',
+                      plafond,
+                      () => setPlafond(!plafond),
                     ] as OptionDef,
                   ]
                 : []),

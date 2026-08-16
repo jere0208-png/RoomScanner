@@ -99,6 +99,12 @@ import { useScanStore } from '../store/scanStore';
 import { DiagnosticSheet, type Constat } from '../components/DiagnosticSheet';
 import { ExportArt, type ExportArtKind } from '../components/ExportArt';
 import { CloseCross } from '../components/CloseCross';
+import {
+  CEILINGS,
+  CEILING_KINDS,
+  CEILING_SYMBOL,
+  type CeilingKind,
+} from '../geometry/ceiling';
 import { haptic } from '../ui/haptic';
 import {
   ActionSheet,
@@ -161,6 +167,9 @@ export function ResultScreen() {
   const openings = useScanStore((s) => s.openings);
   const fixtures = useScanStore((s) => s.fixtures);
   const addFixture = useScanStore((s) => s.addFixture);
+  const ceiling = useScanStore((s) => s.ceiling);
+  const addCeiling = useScanStore((s) => s.addCeiling);
+  const removeCeiling = useScanStore((s) => s.removeCeiling);
   const moveFixture = useScanStore((s) => s.moveFixture);
   const resizeOpening = useScanStore((s) => s.resizeOpening);
   const addObject = useScanStore((s) => s.addObject);
@@ -262,6 +271,17 @@ export function ResultScreen() {
     t0: number;
     t1: number;
   } | null>(null);
+  /**
+   * Le calque PLAFOND : points lumineux, détecteurs, caméras, VMC.
+   *
+   * Affiché par-dessus le sol et son mobilier, il devient vite illisible —
+   * on ne regarde pas les deux en même temps. Il s'éteint donc, comme les
+   * autres calques, et c'est le premier réflexe quand on veut revoir le
+   * plan de sol.
+   */
+  const [showCeiling, setShowCeiling] = useState(true);
+  /** Appareil de plafond en attente de pose : on touche la pièce qui le reçoit. */
+  const [pendingCeiling, setPendingCeiling] = useState<CeilingKind | null>(null);
   /** Repères électriques en 3D : un calque comme les autres. */
   const [showElecTags, setShowElecTags] = useState(true);
   const [editMode, setEditMode] = useState(false);
@@ -1074,7 +1094,38 @@ export function ResultScreen() {
               }
             }}
             selectedRoomId={selectedRoomId}
+            ceiling={ceiling}
+            showCeiling={showCeiling}
+            onSelectCeiling={(id) => {
+              // Un appui sur un appareil de plafond propose de le retirer :
+              // il n'a ni cote ni hauteur à régler, seulement une place.
+              const cl = ceiling.find((x) => x.id === id);
+              if (!cl) return;
+              setMenu({
+                title: CEILINGS[cl.kind].label,
+                subtitle: CEILINGS[cl.kind].note,
+                actions: [
+                  {
+                    label: 'Retirer',
+                    icon: 'supprimer',
+                    danger: true,
+                    onPress: () => removeCeiling(id),
+                  },
+                ],
+              });
+            }}
             onSelectRoom={(id) => {
+              // Un appareil de plafond en attente ? La pièce touchée le
+              // reçoit, en son centre — là où se pose un point lumineux.
+              if (pendingCeiling && id) {
+                const part = parts.find((p) => p.roomId === id);
+                if (part) {
+                  addCeiling(pendingCeiling, id, part.labelAt);
+                  haptic('succes');
+                  setPendingCeiling(null);
+                  return;
+                }
+              }
               setSelectedObjectId(null);
               setSelectedWallId(null);
               setSelectedRoomId(id);
@@ -1155,6 +1206,28 @@ export function ResultScreen() {
                       setCatalogue(true);
                     }}
                   />,
+                  // Le plafond s'équipe comme les murs : on choisit
+                  // l'appareil, puis on touche la pièce qui le reçoit.
+                  <ToolPill
+                    key="plafond"
+                    icon="plafond"
+                    label="Plafond"
+                    active={!!pendingCeiling}
+                    onPress={() => {
+                      setShowCeiling(true);
+                      setMenu({
+                        title: 'Équiper le plafond',
+                        subtitle:
+                          'Choisissez l’appareil, puis touchez la pièce qui ' +
+                          'le reçoit. Il se pose en son centre.',
+                        actions: CEILING_KINDS.map((k) => ({
+                          label: CEILINGS[k].label,
+                          hint: CEILINGS[k].note,
+                          onPress: () => setPendingCeiling(k),
+                        })),
+                      });
+                    }}
+                  />,
                 ]
               : [
                   <ToolPill
@@ -1206,6 +1279,19 @@ export function ResultScreen() {
                     active={showSurfaces}
                     onPress={() => setShowSurfaces(!showSurfaces)}
                   />,
+                  // Le plafond se cache pour revoir le sol : superposés,
+                  // les deux calques deviennent illisibles.
+                  ...(ceiling.length > 0
+                    ? [
+                        <ToolPill
+                          key="plafond"
+                          icon="plafond"
+                          label="Plafond"
+                          active={showCeiling}
+                          onPress={() => setShowCeiling((v) => !v)}
+                        />,
+                      ]
+                    : []),
                 ]
             )
               .filter((el): el is React.ReactElement => !!el)
@@ -1473,11 +1559,17 @@ export function ResultScreen() {
             </View>
           )}
 
-        {vue === '2d' && pendingKind && !capturing && (
+        {vue === '2d' && (pendingKind || pendingCeiling) && !capturing && (
           <EnAttente
             kind={pendingKind}
-            cible={pier ? 'ce retour' : null}
-            onCancel={() => setPendingKind(null)}
+            plafond={pendingCeiling}
+            cible={
+              pendingCeiling ? 'une pièce' : pier ? 'ce retour' : null
+            }
+            onCancel={() => {
+              setPendingKind(null);
+              setPendingCeiling(null);
+            }}
           />
         )}
 
@@ -2018,6 +2110,7 @@ export function ResultScreen() {
 }
 
 type ToolIcon =
+  | 'plafond'
   | 'save'
   | 'edit'
   | 'ruler'
@@ -2118,6 +2211,13 @@ const TOOL_PATHS: Record<ToolIcon, { d: string; fill?: boolean }[]> = {
    * poussée dans ce coin — d'autant plus visible que la pastille porte un
    * contour, qui donne l'œil un repère. Décalée de (−0,65 ; +0,65).
    */
+  // Un plafond vu en coupe : la dalle, et le point lumineux dessous.
+  plafond: [
+    { d: 'M3.5 6 h17' },
+    { d: 'M12 6 v3.5' },
+    { d: 'M7.5 15 a4.5 4.5 0 0 1 9 0 z' },
+    { d: 'M6 18.5 h12' },
+  ],
   save: [
     { d: 'M12 3.5 v10.5' },
     { d: 'M7.4 9.6 L12 14.2 l4.6 -4.6' },
@@ -2150,17 +2250,22 @@ const TOOL_PATHS: Record<ToolIcon, { d: string; fill?: boolean }[]> = {
  */
 function EnAttente({
   kind,
+  plafond,
   cible,
   onCancel,
 }: {
-  kind: FixtureKind;
+  kind: FixtureKind | null;
+  /** Appareil de plafond en attente : on touche la pièce, pas le mur. */
+  plafond?: CeilingKind | null;
   /** Précision quand une cible est déjà désignée (un retour de mur). */
   cible: string | null;
   onCancel: () => void;
 }) {
   const c = useTheme();
   const styles = getStyles(c);
-  const spec = FIXTURES[kind];
+  // Mur ou plafond : deux catalogues, un seul bandeau d'attente.
+  const spec = plafond ? CEILINGS[plafond] : FIXTURES[kind!];
+  const trace = plafond ? CEILING_SYMBOL[plafond] : assemblySymbol(kind!);
   const souffle = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     const boucle = Animated.loop(
@@ -2208,7 +2313,7 @@ function EnAttente({
       />
       <View style={[styles.attenteIcone, { borderColor: spec.color }]}>
         <Svg width={20} height={20} viewBox="-12 -12 24 24">
-          {assemblySymbol(kind).map((seg, i) => (
+          {trace.map((seg, i) => (
             <Path
               key={i}
               d={seg.d}
