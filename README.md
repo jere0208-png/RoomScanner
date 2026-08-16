@@ -863,6 +863,28 @@ tenant, cinq fois moins de polygones, **contours compris**. Les supprimer
 faisait fondre le modèle en blanc sur blanc le temps du mouvement. Seuls le
 semis du sol et les cotes disparaissent — dans la vue 3D comme sur le plan 2D.
 
+### Une plaque, des mécanismes
+
+Un ensemble multiposte, ce n'est pas plusieurs plaques : c'est **une** plaque
+et **plusieurs mécanismes**. Le modèle 3D le dit maintenant avec les cotes du
+commerce : plaque de 82 mm pour un poste, 153 pour deux, 224 pour trois ;
+mécanismes de 45 mm en saillie de 8 mm, à 71 mm d'entraxe. Deux prises réunies
+à la main donnent exactement le même volume qu'une prise double du catalogue —
+`__tests__/appareillage3d.test.ts` compare les deux au millimètre.
+
+Et **un appareil posé sur un autre ne s'empile plus** : `addFixture` cherche la
+place libre la plus proche par pas d'entraxe, à droite d'abord, et réunit les
+deux sous une même plaque. Quatre prises ajoutées de suite donnaient jusque-là
+quatre plaques superposées, illisibles au plan comme en 3D. S'il n'y a plus de
+place sous une plaque commune, on s'écarte franchement de 40 cm plutôt que de
+superposer.
+
+Les cotes, en 3D, se lisent comme sur un plan : un filet pointillé jusqu'au
+retour de mur, un autre jusqu'au sol, le nombre posé dessus, et la
+désignation (PC, RJ, VV…) au-dessus de l'appareil. L'étiquette noire d'avant
+disait la même chose en trois fois plus de place, et deux appareils voisins la
+superposaient.
+
 ### Un appareil se trie AVEC son mur
 
 Le piège coûte cher parce qu'il ne ressemble pas à un bug de géométrie : les
@@ -918,9 +940,17 @@ dosseret. Un **robinet** dépasse de même son plan de travail. Ce qu'on ne
 sait pas nommer — un escalier, un objet non identifié — reste une boîte : mieux
 vaut ça qu'une silhouette inventée.
 
-Pendant un geste (`coarse`), on retombe sur la boîte pleine : une silhouette
-coûte cinq fois plus de faces à trier, et le plan doit rester fluide sous le
-doigt.
+La silhouette **reste montée pendant les gestes**. Voir le lit se changer en
+caisse dès qu'on tourne la pièce, puis redevenir un lit au relâcher, est pire
+que tout ; le mode allégé découpe moins finement les pans, mais il ne touche
+plus au mobilier.
+
+**Un meuble pose par terre.** Le catalogue plaçait le meuble en supposant le
+sol à l'altitude zéro, or le sol d'un scan est là où ARKit l'a trouvé —
+souvent un demi-mètre plus bas. Le lit flottait en l'air. Il se pose désormais
+sur le sol réel, et le rendu rattrape en plus tout ce qui plane à moins de
+45 cm sans raison : rien de cette liste ne se suspend, et une télé murale, elle,
+est bien plus haut.
 
 ### Jonctions de murs
 

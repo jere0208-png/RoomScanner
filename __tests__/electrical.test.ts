@@ -214,9 +214,11 @@ describe('rendu 3D de l’appareillage', () => {
   });
 
   it('tient dans son gabarit, à la bonne hauteur', () => {
+    // `mine` ne retient que le MÉCANISME — 45 mm, la pièce colorée. La
+    // plaque de 82 qui l'entoure a son propre test, dans appareillage3d.
     const ys = mine.flatMap((f) => f.pts.map((p) => p.y));
-    expect(Math.min(...ys)).toBeCloseTo(prise.height - spec.h / 2, 3);
-    expect(Math.max(...ys)).toBeCloseTo(prise.height + spec.h / 2, 3);
+    expect(Math.min(...ys)).toBeCloseTo(prise.height - 0.045 / 2, 3);
+    expect(Math.max(...ys)).toBeCloseTo(prise.height + 0.045 / 2, 3);
   });
 
   it('porte des normales unitaires, et jamais deux opposées visibles', () => {

@@ -135,18 +135,14 @@ describe('dans la scène, la silhouette remplace la boîte', () => {
     }
   });
 
-  it('pendant un geste, on retombe sur la boîte : le tri doit rester rapide', () => {
-    const rapide = buildScene(PIECE, [], [objet('bed', 1.4, 1.9, 0.5)], {
-      palette: PAL,
-      coarse: true,
-    });
-    const nu = buildScene(PIECE, [], [], { palette: PAL, coarse: true });
-    // Une boîte : six faces pleines et leurs contours, pas davantage —
-    // à comparer à la cinquantaine que coûte la silhouette complète.
-    const plein = buildScene(PIECE, [], [objet('bed', 1.4, 1.9, 0.5)], {
-      palette: PAL,
-    }).faces.length - buildScene(PIECE, [], [], { palette: PAL }).faces.length;
-    expect(rapide.faces.length - nu.faces.length).toBeLessThanOrEqual(24);
-    expect(plein).toBeGreaterThan(2 * (rapide.faces.length - nu.faces.length));
-  });
-});
+  it('la silhouette RESTE pendant un geste', () => {
+    // Voir le lit se changer en caisse dès qu'on tourne la pièce, puis
+    // redevenir un lit au relâcher, est pire que tout : le mode allégé
+    // découpe moins finement, mais il ne touche plus au MOBILIER.
+    const compte = (cat: string, coarse: boolean) =>
+      buildScene(PIECE, [], [objet(cat, 1.4, 1.9, 0.5)], { palette: PAL, coarse })
+        .faces.length -
+      buildScene(PIECE, [], [], { palette: PAL, coarse }).faces.length;
+    expect(compte('bed', true)).toBeGreaterThan(compte('stairs', true) + 8);
+    expect(compte('bed', false)).toBeGreaterThan(compte('stairs', false) + 8);
+  });});

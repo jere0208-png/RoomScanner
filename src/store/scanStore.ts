@@ -35,10 +35,12 @@ import {
 } from '../geometry/catalogue';
 import {
   FIXTURES,
+  ENTRAXE,
   faceX,
   fromFaceX,
   interiorSide,
   newFixture,
+  overlaps,
   wallFace,
   type Fixture,
   type FixtureKind,
@@ -407,6 +409,12 @@ interface ScanState {
   reset: () => void;
 }
 
+/** Altitude du sol : le pied du mur le plus bas. */
+const solDe = (walls: WallSeg[]) =>
+  walls.length > 0
+    ? Math.min(...walls.map((w) => w.yCenter - w.height / 2))
+    : 0;
+
 export const useScanStore = create<ScanState>((set, get) => {
   /**
    * Photographie le plan avant de le modifier. `key` regroupe les appels
@@ -726,14 +734,68 @@ export const useScanStore = create<ScanState>((set, get) => {
       if (!wall) return null;
       pushHistory('addFixture');
       const id = `el-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-      const f = newFixture(
-        id,
-        kind,
-        wall,
-        wallQuadsOf(st.walls).get(wallId),
-        interiorSide(wall, st.walls, st.rooms),
+      const side = interiorSide(wall, st.walls, st.rooms);
+      const quad = wallQuadsOf(st.walls).get(wallId);
+      const f = newFixture(id, kind, wall, quad, side);
+
+      /**
+       * Un appareil posé là où il y en a déjà un ne s'EMPILE pas : il se
+       * range à côté, à 71 mm d'entraxe, et les deux passent sous la même
+       * plaque. C'est ce que fait l'électricien, et c'est ce qu'attend
+       * quiconque pose une deuxième prise au même endroit — quatre prises
+       * ajoutées de suite donnaient jusqu'ici quatre plaques superposées,
+       * illisibles au plan comme en 3D.
+       */
+      const face = wallFace(wall, quad, side);
+      const spec = FIXTURES[kind];
+      const mine = st.fixtures.filter(
+        (o) => o.wallId === wallId && o.side === side,
       );
-      set({ fixtures: [...st.fixtures, f], dirty: true });
+      const occupe = (px: number) =>
+        mine.find((o) =>
+          overlaps(
+            { x: px, y: f.height, kind },
+            { x: faceX(face, o.along), y: o.height, kind: o.kind },
+          ),
+        );
+      let x = faceX(face, f.along);
+      let group: string | undefined;
+      const voisin = occupe(x);
+      if (voisin) {
+        // On cherche la place libre la plus proche, par pas d'entraxe, à
+        // droite d'abord — le sens de lecture d'un tableau d'appareillage.
+        let place: number | null = null;
+        for (let k = 1; k <= 6 && place === null; k++) {
+          for (const sens of [1, -1]) {
+            const px = x + sens * k * ENTRAXE;
+            if (px - spec.w / 2 < 0 || px + spec.w / 2 > face.len) continue;
+            if (occupe(px)) continue;
+            place = px;
+            break;
+          }
+        }
+        if (place !== null) {
+          x = place;
+          group =
+            voisin.group ??
+            `pl-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`;
+        } else {
+          // Plus de place sous une plaque commune : on s'écarte franchement
+          // plutôt que de superposer.
+          x = Math.min(face.len - spec.w / 2, x + 0.4);
+        }
+      }
+
+      const pose = { ...f, along: fromFaceX(face, x), group };
+      set({
+        fixtures: [
+          ...st.fixtures.map((o) =>
+            group && voisin && o.id === voisin.id ? { ...o, group } : o,
+          ),
+          pose,
+        ],
+        dirty: true,
+      });
       return id;
     },
 
@@ -1105,7 +1167,10 @@ export const useScanStore = create<ScanState>((set, get) => {
             depth: item.d,
             height: item.h,
             roomId: accueil?.roomId,
-            transform: catalogTransform(item, x, z),
+            // Sur LE sol du scan, pas sur l'altitude zéro : ARKit place le
+            // plancher où il l'a trouvé, souvent un demi-mètre plus bas, et
+            // le meuble se retrouvait sinon suspendu en l'air.
+            transform: catalogTransform(item, x, z, solDe(st.walls)),
           },
         ],
         dirty: true,

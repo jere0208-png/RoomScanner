@@ -150,7 +150,7 @@ const C_DIVERS = '#EB5757';
 export const FIXTURES: Record<FixtureKind, FixtureSpec> = {
   prise: {
     label: 'Prise 16 A',
-    short: 'P',
+    short: 'PC',
     family: 'Prises',
     w: 0.08,
     h: 0.08,
@@ -161,7 +161,7 @@ export const FIXTURES: Record<FixtureKind, FixtureSpec> = {
   },
   prise2: {
     label: 'Prise double',
-    short: 'P2',
+    short: 'PC2',
     family: 'Prises',
     posts: ['prise', 'prise'],
     w: ENTRAXE + PLAQUE,
@@ -316,7 +316,7 @@ export const FIXTURES: Record<FixtureKind, FixtureSpec> = {
   },
   prise3: {
     label: 'Prise triple',
-    short: 'P3',
+    short: 'PC3',
     family: 'Prises',
     posts: ['prise', 'prise', 'prise'],
     w: 2 * ENTRAXE + PLAQUE,

@@ -24,13 +24,17 @@ import { floorColorAt, mixHex, pointInPolygon, sampleTexture } from './appearanc
 import { furnitureParts, type FurnPart } from './furniture3d';
 import {
   FIXTURES,
+  PLAQUE,
   assemblySymbol,
+  boxOffsets,
   faceX,
   facePoint,
+  postsOf,
   symbolPolylines,
   wallFace,
   SYMBOL_SPAN,
   type Fixture,
+  type FixtureKind,
 } from './electrical';
 
 export interface P3 {
@@ -158,6 +162,13 @@ const STEP = 0.6;
 const COARSE_STEP = 1e6;
 /** Nombre maximum de rangées de texels rendues sur un mur. */
 const MAX_TEX_ROWS = 4;
+/** Ce qui se pose forcément par terre : rien de tout ça ne se suspend. */
+const POSE_AU_SOL =
+  /bed|sofa|couch|table|desk|chair|stool|refrigerator|fridge|stove|oven|dishwasher|washer|dryer|toilet|bathtub|shower|storage|cabinet|wardrobe|plant/i;
+
+/** Épaisseur d'une plaque d'appareillage (8 mm), et côté d'un mécanisme. */
+const PLAQUE_EP = 0.008;
+const MECANISME = 0.045;
 
 const lerp2 = (P: Pt, Q: Pt, t: number): Pt => ({
   x: P.x + (Q.x - P.x) * t,
@@ -767,47 +778,187 @@ export function buildScene(
   // reste du modèle, donc elle disparaît d'elle-même dès qu'on passe
   // derrière son mur, et rien ne peut la faire flotter au travers.
   const wallById = new Map(walls.map((w) => [w.id, w]));
-  for (const f of opts.fixtures ?? []) {
-    const w = wallById.get(f.wallId);
-    if (!w) continue;
-    const face = wallFace(w, quads.get(w.id), f.side);
-    const spec = FIXTURES[f.kind];
-    const x = faceX(face, f.along);
-    const hw = spec.w / 2;
-    const yb = Math.max(0, f.height - spec.h / 2);
-    const avant = faces.length;
-    // Le dos de la plaque est posé à 1 mm devant le nu : collé pile dessus,
-    // les deux faces se disputeraient le même plan.
-    const at = (dx: number, out: number): Pt => ({
-      x: face.A.x + face.ux * (x + dx) + face.nx * out,
-      z: face.A.z + face.uz * (x + dx) + face.nz * out,
-    });
-    pushWallBlock(
-      {
-        a1: at(-hw, spec.depth),
-        b1: at(hw, spec.depth),
-        b2: at(hw, 0.001),
-        a2: at(-hw, 0.001),
-      },
-      0,
-      1,
-      yb,
-      yb + spec.h,
-      {
-        fill: spec.color,
-        top: mixHex(spec.color, '#FFFFFF', 0.3),
-        stroke: mixHex(spec.color, '#000000', 0.4),
-        topStroke: mixHex(spec.color, '#000000', 0.4),
-        shade: true,
-        closeBottom: true,
-      },
-    );
 
-    // Le symbole est GRAVÉ sur la façade de la plaque, à un millimètre
-    // devant elle. Il n'y a plus de pastille flottante au-dessus : un
-    // pictogramme qui plane à côté de l'objet qu'il désigne ne dit pas
-    // « voici une prise », il dit « voici une annotation ». Et comme il
-    // fait partie du volume, il tourne, s'incline et disparaît avec lui.
+  /**
+   * Les appareils réunis se dessinent ENSEMBLE.
+   *
+   * Deux prises côte à côte, ce ne sont pas deux plaques qui se chevauchent :
+   * c'est UNE plaque de 151 mm et deux mécanismes de 45 mm à 71 mm
+   * d'entraxe. C'est ce que voit l'électricien sur le mur, et ce que le
+   * modèle doit montrer — sans quoi une double prise ressemble à une prise
+   * posée de travers sur une autre.
+   */
+  const lots = new Map<string, Fixture[]>();
+  for (const f of opts.fixtures ?? []) {
+    const cle = f.group ? `g:${f.group}:${f.wallId}:${f.side}` : `s:${f.id}`;
+    const l = lots.get(cle);
+    if (l) l.push(f);
+    else lots.set(cle, [f]);
+  }
+
+  for (const lot of lots.values()) {
+    const w = wallById.get(lot[0].wallId);
+    if (!w) continue;
+    const face = wallFace(w, quads.get(w.id), lot[0].side);
+    const avant = faces.length;
+    const nrm = { x: face.nx, y: 0, z: face.nz };
+
+    /** Un point de la face : `dx` le long du mur, `out` en saillie. */
+    const at = (fx: number, out: number): Pt => ({
+      x: face.A.x + face.ux * fx + face.nx * out,
+      z: face.A.z + face.uz * fx + face.nz * out,
+    });
+
+    /** Grave un symbole sur une façade, à l'échelle donnée. */
+    const graver = (
+      cx: number,
+      cy: number,
+      taille: number,
+      out: number,
+      kind: FixtureKind,
+      trait: string,
+    ) => {
+      const k = taille / SYMBOL_SPAN;
+      for (const ligne of symbolPolylines(assemblySymbol(kind))) {
+        const pts3 = ligne.pts.map((pt) => {
+          const sol = at(cx + pt.x * k, out);
+          return { x: sol.x, y: cy - pt.y * k, z: sol.z };
+        });
+        if (pts3.length < 2) continue;
+        faces.push({
+          pts: pts3,
+          fill: null,
+          stroke: trait,
+          bias: EDGE_BIAS,
+          normal: nrm,
+        });
+      }
+    };
+
+    /** Un volume plaqué sur le mur : de `out0` à `out1` en saillie. */
+    const poser = (
+      cx: number,
+      largeur: number,
+      cy: number,
+      hauteur: number,
+      out0: number,
+      out1: number,
+      fill: string,
+      stroke: string,
+    ) => {
+      const hx = largeur / 2;
+      pushWallBlock(
+        {
+          a1: at(cx - hx, out1),
+          b1: at(cx + hx, out1),
+          b2: at(cx + hx, out0),
+          a2: at(cx - hx, out0),
+        },
+        0,
+        1,
+        Math.max(0, cy - hauteur / 2),
+        Math.max(0, cy - hauteur / 2) + hauteur,
+        {
+          fill,
+          top: mixHex(fill, '#FFFFFF', 0.3),
+          stroke,
+          topStroke: stroke,
+          shade: true,
+          closeBottom: true,
+        },
+      );
+    };
+
+    // Les postes réels : une boîte d'encastrement par mécanisme, à
+    // l'entraxe, qu'ils viennent d'un appareil multiposte du catalogue ou de
+    // deux appareils réunis à la main.
+    const postes: { x: number; y: number; kind: FixtureKind }[] = [];
+    for (const f of lot) {
+      const sp = FIXTURES[f.kind];
+      const gauche = faceX(face, f.along) - sp.w / 2;
+      const kinds = postsOf(f.kind);
+      const offs = boxOffsets(f.kind);
+      kinds.forEach((k, i) =>
+        postes.push({ x: gauche + offs[i], y: f.height, kind: k }),
+      );
+    }
+
+    // Un appareil hors gabarit — tableau, applique, thermostat large — n'est
+    // pas de l'appareillage encastré : il garde son volume propre.
+    const encastre = lot.every((f) => FIXTURES[f.kind].h <= 0.12);
+    let x0: number;
+    let x1: number;
+    let y0: number;
+    let y1: number;
+
+    if (encastre) {
+      x0 = Math.min(...postes.map((q) => q.x)) - PLAQUE / 2;
+      x1 = Math.max(...postes.map((q) => q.x)) + PLAQUE / 2;
+      y0 = Math.min(...postes.map((q) => q.y)) - PLAQUE / 2;
+      y1 = Math.max(...postes.map((q) => q.y)) + PLAQUE / 2;
+      // La plaque : blanche, comme sur le mur, et fine (8 mm).
+      const blanc = mixHex(pal.object, '#FFFFFF', 0.72);
+      poser(
+        (x0 + x1) / 2,
+        x1 - x0,
+        (y0 + y1) / 2,
+        y1 - y0,
+        0.001,
+        PLAQUE_EP,
+        blanc,
+        pal.objectStroke,
+      );
+      // Puis un mécanisme par poste, en saillie de la plaque.
+      for (const q of postes) {
+        const sp = FIXTURES[q.kind];
+        const col = sp.color;
+        poser(
+          q.x,
+          MECANISME,
+          q.y,
+          MECANISME,
+          PLAQUE_EP,
+          Math.max(PLAQUE_EP + 0.004, sp.depth),
+          col,
+          mixHex(col, '#000000', 0.4),
+        );
+        graver(
+          q.x,
+          q.y,
+          MECANISME * 0.82,
+          Math.max(PLAQUE_EP + 0.004, sp.depth) + 0.0015,
+          q.kind,
+          mixHex(col, '#000000', 0.55),
+        );
+      }
+    } else {
+      const f = lot[0];
+      const sp = FIXTURES[f.kind];
+      const cx = faceX(face, f.along);
+      x0 = cx - sp.w / 2;
+      x1 = cx + sp.w / 2;
+      y0 = f.height - sp.h / 2;
+      y1 = f.height + sp.h / 2;
+      poser(
+        cx,
+        sp.w,
+        f.height,
+        sp.h,
+        0.001,
+        sp.depth,
+        sp.color,
+        mixHex(sp.color, '#000000', 0.4),
+      );
+      graver(
+        cx,
+        f.height,
+        sp.h,
+        sp.depth + 0.0015,
+        f.kind,
+        mixHex(sp.color, '#000000', 0.55),
+      );
+    }
+
     // ---- Le tri en profondeur : un appareil se range AVEC SA TUILE.
     //
     // Deux erreurs successives, et la seconde vaut d'être écrite. Un pan de
@@ -827,12 +978,12 @@ export function buildScene(
     // de face, ce millimètre compte positivement et l'appareil passe juste
     // après sa tuile ; vu de dos, il compte négativement et le mur le
     // recouvre. Aucun biais, donc aucun cas où l'un l'emporte à tort.
+    const xm = (x0 + x1) / 2;
+    const ym = (y0 + y1) / 2;
+    const saillie = 0.001 + PLAQUE_EP;
     const texMur = opts.showTextures ? w.texture : undefined;
-    const rows = texMur
-      ? Math.min(MAX_TEX_ROWS, Math.max(1, texMur.rows))
-      : 1;
-    // Le paramètre du quadrilatère, ramené à l'abscisse de CETTE face.
-    const xOf = (t: number) => (f.side > 0 ? t : 1 - t) * face.len;
+    const rows = texMur ? Math.min(MAX_TEX_ROWS, Math.max(1, texMur.rows)) : 1;
+    const xOf = (t: number) => (lot[0].side > 0 ? t : 1 - t) * face.len;
     let xa = 0;
     let xb = face.len;
     let ya = 0;
@@ -842,8 +993,8 @@ export function buildScene(
       const e1 = xOf(panel.t1);
       const lo = Math.min(e0, e1);
       const hi = Math.max(e0, e1);
-      if (x < lo - 1e-6 || x > hi + 1e-6) continue;
-      if (f.height < panel.y0 - 1e-6 || f.height > panel.y1 + 1e-6) continue;
+      if (xm < lo - 1e-6 || xm > hi + 1e-6) continue;
+      if (ym < panel.y0 - 1e-6 || ym > panel.y1 + 1e-6) continue;
       xa = lo;
       xb = hi;
       ya = panel.y0;
@@ -853,32 +1004,27 @@ export function buildScene(
     const largeurPan = Math.max(1e-6, xb - xa);
     const cols = Math.max(1, Math.ceil(largeurPan / step));
     const tw = largeurPan / cols;
-    const ci = Math.min(cols - 1, Math.max(0, Math.floor((x - xa) / tw)));
     const hautPan = Math.max(1e-6, yz - ya);
     const rh = hautPan / rows;
-    const ri = Math.min(rows - 1, Math.max(0, Math.floor((f.height - ya) / rh)));
+    const ri = Math.min(rows - 1, Math.max(0, Math.floor((ym - ya) / rh)));
     const yTuile = ya + (ri + 0.5) * rh;
-    const ancre = facePoint(face, xa + (ci + 0.5) * tw, spec.depth + 0.001);
-    const triAt = { x: ancre.x, y: yTuile, z: ancre.z };
-    // Toutes les tuiles que la plaque recouvre, pas seulement la sienne.
-    const c0 = Math.min(cols - 1, Math.max(0, Math.floor((x - hw - xa) / tw)));
-    const c1 = Math.min(cols - 1, Math.max(0, Math.floor((x + hw - xa) / tw)));
     /** Le point de tri de la tuile qui contient cette abscisse de face. */
     const tuileDe = (xf: number): P3 => {
       const k = Math.min(cols - 1, Math.max(0, Math.floor((xf - xa) / tw)));
-      const a2 = facePoint(face, xa + (k + 0.5) * tw, spec.depth + 0.001);
+      const a2 = facePoint(face, xa + (k + 0.5) * tw, saillie);
       return { x: a2.x, y: yTuile, z: a2.z };
     };
+    const c0 = Math.min(cols - 1, Math.max(0, Math.floor((x0 - xa) / tw)));
+    const c1 = Math.min(cols - 1, Math.max(0, Math.floor((x1 - xa) / tw)));
     const refs: P3[] = [];
     for (let k = c0; k <= c1; k++) {
-      const a2 = facePoint(face, xa + (k + 0.5) * tw, spec.depth + 0.001);
+      const a2 = facePoint(face, xa + (k + 0.5) * tw, saillie);
       refs.push({ x: a2.x, y: yTuile, z: a2.z });
     }
-    // Le DOS de la plaque n'existe pour personne : il est plaqué au nu du
+    // Le DOS d'une plaque n'existe pour personne : il est plaqué au nu du
     // mur, à un millimètre. On ne peut le voir qu'en se plaçant DANS la
-    // maçonnerie — c'est-à-dire jamais —, et comme il est large il se triait
-    // mal vu de l'autre côté de la cloison : il traversait. On le retire,
-    // et quatre faces de moins par appareil, c'est autant de gagné.
+    // maçonnerie — c'est-à-dire jamais —, et large comme il est, il se
+    // triait mal vu de l'autre côté de la cloison : il traversait.
     for (let i = faces.length - 1; i >= avant; i--) {
       const nf = faces[i].normal;
       if (nf && nf.x * face.nx + nf.z * face.nz < -0.9) faces.splice(i, 1);
@@ -897,35 +1043,11 @@ export function buildScene(
       } else {
         const cxf =
           fa.pts.reduce(
-            (s2, p) => s2 + (p.x - face.A.x) * face.ux + (p.z - face.A.z) * face.uz,
+            (s2, q) => s2 + (q.x - face.A.x) * face.ux + (q.z - face.A.z) * face.uz,
             0,
           ) / fa.pts.length;
         fa.depthAt = tuileDe(cxf);
       }
-    }
-
-    const trait = mixHex(spec.color, '#000000', 0.55);
-    // L'échelle se prend sur la HAUTEUR : la largeur d'un ensemble croît
-    // avec ses postes, ses symboles ne doivent pas grossir avec elle.
-    const k = spec.h / SYMBOL_SPAN;
-    const yMid = yb + spec.h / 2;
-    const nrm = { x: face.nx, y: 0, z: face.nz };
-    for (const ligne of symbolPolylines(assemblySymbol(f.kind))) {
-      const pts3 = ligne.pts.map((pt) => {
-        const sol = at(pt.x * k, spec.depth + 0.0015);
-        return { x: sol.x, y: yMid - pt.y * k, z: sol.z };
-      });
-      if (pts3.length < 2) continue;
-      faces.push({
-        pts: pts3,
-        fill: null,
-        stroke: trait,
-        // Le symbole se trie comme la plaque, un cran devant elle.
-        bias: EDGE_BIAS,
-        normal: nrm,
-        depthAt: refs.length > 1 ? undefined : triAt,
-        depthRefs: refs.length > 1 ? refs : undefined,
-      });
     }
   }
 
@@ -972,7 +1094,17 @@ export function buildScene(
   )) {
     const cosY = Math.cos(obj.yaw);
     const sinY = Math.sin(obj.yaw);
-    const yb = Math.max(0, obj.yCenter - obj.height / 2 - floorY);
+    /**
+     * Un meuble POSE PAR TERRE.
+     *
+     * Le catalogue place le meuble en supposant le sol à l'altitude zéro,
+     * or le sol d'un scan est où ARKit l'a trouvé — souvent 50 cm plus bas.
+     * Le lit flottait donc en l'air. On rattrape ici tout ce qui plane à
+     * moins de 45 cm sans raison : aucun meuble de cette liste ne se
+     * suspend, et une télé murale, elle, est bien plus haut.
+     */
+    let yb = Math.max(0, obj.yCenter - obj.height / 2 - floorY);
+    if (yb > 0 && yb < 0.45 && POSE_AU_SOL.test(obj.category ?? '')) yb = 0;
     const skin = opts.showTextures ? obj.color : undefined;
     const teintes = {
       body: skin ?? pal.object,
@@ -1036,7 +1168,11 @@ export function buildScene(
     };
 
     // La silhouette du meuble, s'il en a une ; sinon, la boîte pleine.
-    const morceaux = opts.coarse ? [] : furnitureParts(obj.category ?? '');
+    // Elle reste montée PENDANT les gestes : voir le lit se changer en
+    // caisse dès qu'on tourne la pièce, puis redevenir un lit au relâcher,
+    // c'est pire que tout — et une douzaine de faces de plus par meuble ne
+    // se sent pas.
+    const morceaux = furnitureParts(obj.category ?? '');
     if (morceaux.length === 0) {
       poser({ x0: 0, x1: 1, y0: 0, y1: 1, z0: 0, z1: 1, tone: 'body' });
     } else {

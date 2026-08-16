@@ -125,11 +125,16 @@ export function catalogItem(key: string): CatalogItem | undefined {
  * CENTRE du meuble — un meuble suspendu (meuble haut, télévision) est donc
  * posé à `base + h / 2`.
  */
-export function catalogTransform(item: CatalogItem, x: number, z: number): number[] {
+export function catalogTransform(
+  item: CatalogItem,
+  x: number,
+  z: number,
+  sol = 0,
+): number[] {
   return [
     1, 0, 0, 0,
     0, 1, 0, 0,
     0, 0, 1, 0,
-    x, (item.base ?? 0) + item.h / 2, z, 1,
+    x, sol + (item.base ?? 0) + item.h / 2, z, 1,
   ];
 }

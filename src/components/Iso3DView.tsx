@@ -408,8 +408,14 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
       | { kind: 'dot'; depth: number; x: number; y: number; color: string }
       | {
           kind: 'elec';
-          /** Décalage vertical appliqué pour ne pas en recouvrir une autre. */
-          dy?: number;
+          /** Bout de la ligne de cote vers le bord du mur. */
+          bx?: number;
+          by?: number;
+          /** Bout de la ligne de cote vers le sol. */
+          sx?: number;
+          sy?: number;
+          /** Désignation courte, posée au-dessus de l'appareil. */
+          nom?: string;
           depth: number;
           x: number;
           y: number;
@@ -502,6 +508,14 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
         // masquait ce qu'elle désignait.
         const taille = spec.w * scale;
         const pastille = Math.max(0, Math.min(1, (16 - taille) / 8));
+        // Les deux cotes se lisent comme sur un plan : un filet pointillé
+        // jusqu'au bord du mur, un autre jusqu'au sol, et le nombre posé
+        // dessus. L'étiquette noire d'avant disait la même chose en trois
+        // fois plus de place, et deux appareils voisins la superposaient.
+        const versBord = x <= face.len / 2 ? 0 : face.len;
+        const pb = facePoint(face, versBord, spec.depth + 0.01);
+        const qb = project({ x: pb.x, y: f.height, z: pb.z });
+        const qs = project({ x: p.x, y: 0, z: p.z });
         items.push({
           kind: 'elec',
           pastille,
@@ -521,33 +535,16 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
           // gravé sur la façade de la plaque, dans la scène elle-même. Ne
           // restent ici que les cotes, qui sont une annotation, elles.
           haut: scale > 90 ? `${Math.round(f.height * 100)}` : undefined,
-          bord: scale > 90 ? `${Math.round(x * 100)}` : undefined,
+          bord:
+            scale > 90
+              ? `${Math.round(Math.abs(x - versBord) * 100)}`
+              : undefined,
+          nom: scale > 90 ? spec.short : undefined,
+          bx: qb.sx,
+          by: qb.sy,
+          sx: qs.sx,
+          sy: qs.sy,
         });
-      }
-    }
-
-    // Deux appareils voisins, deux étiquettes au même endroit : la seconde
-    // masquait la première, et on lisait « 25 cm » à moitié sous « 20 cm ».
-    // On les empile donc, du haut vers le bas, en ne déplaçant que ce qui se
-    // recouvre vraiment — un trait fin rattache celles qui ont dû descendre.
-    {
-      const etiq = items.filter(
-        (i): i is Extract<typeof i, { kind: 'elec' }> =>
-          i.kind === 'elec' && !!i.haut,
-      );
-      etiq.sort((a, b) => a.y - b.y);
-      const pris: { x: number; y: number }[] = [];
-      for (const e of etiq) {
-        let y = e.y;
-        for (let garde = 0; garde < 40; garde++) {
-          const gene = pris.find(
-            (p) => Math.abs(p.x - e.x) < 104 && Math.abs(p.y - y) < 21,
-          );
-          if (!gene) break;
-          y = gene.y + 21;
-        }
-        e.dy = y - e.y;
-        pris.push({ x: e.x, y });
       }
     }
 
@@ -782,41 +779,58 @@ export function Iso3DView({ value, onChange, showMeasures, focusRoomId }: Props)
                   )}
                   {item.haut && (
                     <>
-                      {/* Étiquette de cotes : UNE ligne, pas un bloc.
-                          À deux lignes elle faisait 30 px de haut et deux
-                          appareils voisins se recouvraient. Elle dit la même
-                          chose sur 18 px, et `dy` la fait descendre quand la
-                          place est déjà prise — le filet rappelle alors à
-                          quel appareil elle appartient. */}
-                      {(item.dy ?? 0) > 2 && (
-                        <Line
-                          x1={item.x}
-                          y1={item.y + 6}
-                          x2={item.x}
-                          y2={item.y + (item.dy ?? 0) + 8}
-                          stroke="#0B0D12"
-                          strokeWidth={1}
-                          opacity={0.35}
-                        />
-                      )}
-                      <Rect
-                        x={item.x - 52}
-                        y={item.y + (item.dy ?? 0) + 8}
-                        width={104}
-                        height={18}
-                        rx={9}
-                        fill="#0B0D12"
-                        opacity={0.9}
+                      {/* Cote du bord : filet pointillé jusqu'au retour de
+                          mur, nombre posé dessus. */}
+                      <Line
+                        x1={item.x}
+                        y1={item.y}
+                        x2={item.bx ?? item.x}
+                        y2={item.by ?? item.y}
+                        stroke={c.ink}
+                        strokeWidth={1}
+                        strokeDasharray="2 3"
+                        opacity={0.5}
                       />
                       <SvgText
-                        x={item.x}
-                        y={item.y + (item.dy ?? 0) + 20.5}
-                        fill="#FFFFFF"
-                        fontSize={9}
+                        x={((item.bx ?? item.x) + item.x) / 2}
+                        y={((item.by ?? item.y) + item.y) / 2 - 4}
+                        fill={c.ink}
+                        fontSize={9.5}
                         fontWeight="800"
                         textAnchor="middle">
-                        {`SOL ${item.haut} · BORD ${item.bord} cm`}
+                        {item.bord}
                       </SvgText>
+                      {/* Cote du sol : même filet, à l'aplomb. */}
+                      <Line
+                        x1={item.x}
+                        y1={item.y}
+                        x2={item.sx ?? item.x}
+                        y2={item.sy ?? item.y}
+                        stroke={c.ink}
+                        strokeWidth={1}
+                        strokeDasharray="2 3"
+                        opacity={0.5}
+                      />
+                      <SvgText
+                        x={((item.sx ?? item.x) + item.x) / 2 + 7}
+                        y={((item.sy ?? item.y) + item.y) / 2 + 3}
+                        fill={c.ink}
+                        fontSize={9.5}
+                        fontWeight="800">
+                        {item.haut}
+                      </SvgText>
+                      {/* La désignation, au-dessus de l'appareil. */}
+                      {item.nom && (
+                        <SvgText
+                          x={item.x}
+                          y={item.y - 11}
+                          fill={c.ink}
+                          fontSize={9.5}
+                          fontWeight="800"
+                          textAnchor="middle">
+                          {item.nom}
+                        </SvgText>
+                      )}
                     </>
                   )}
                 </G>

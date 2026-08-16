@@ -1,21 +1,25 @@
 /**
- * Chaque appareil doit se voir en 3D, à ses cotes.
+ * Chaque appareil doit se voir en 3D, à ses cotes RÉELLES.
  *
- * Un test par type du catalogue, ensembles multipostes compris : le volume
- * existe, il mesure ce qu'annonce sa fiche, il est posé devant le nu du mur,
- * et son symbole est gravé dessus — à l'entraxe quand il y a plusieurs
- * postes. C'est le genre de vérification qu'on ne fait pas à l'œil sur
- * quinze types.
+ * Ce que le modèle doit montrer, c'est ce que l'électricien voit sur le mur :
+ * une plaque blanche — 82 mm pour un poste, 153 pour deux, 224 pour trois —
+ * et, en saillie dessus, un mécanisme de 45 mm par poste, à 71 mm d'entraxe.
+ * Deux prises réunies à la main donnent exactement la même chose qu'une prise
+ * double du catalogue : c'est ce qui distingue un ensemble de deux plaques
+ * posées l'une sur l'autre.
+ *
+ * On vérifie aussi l'ORDRE DE PEINTURE, dans les deux sens. Un volume peut
+ * exister et rester invisible (le mur le repeint), ou se voir alors qu'il
+ * devrait être caché (il traverse la cloison) : les deux sont arrivés.
  */
 import {
   ENTRAXE,
   FIXTURES,
   FIXTURE_KINDS,
-  assemblySymbol,
+  PLAQUE,
   faceX,
   interiorSide,
   postsOf,
-  symbolPolylines,
   wallFace,
   type Fixture,
 } from '../src/geometry/electrical';
@@ -63,249 +67,248 @@ const PAL: ScenePalette = {
 
 const side = interiorSide(BOX[0], BOX);
 const face = wallFace(BOX[0], wallQuads(BOX).get('n'), side);
+/** Couleur de la plaque : le neutre du décor éclairci. */
+const BLANC = mixHex(PAL.object, '#FFFFFF', 0.72);
+const MECANISME = 0.045;
 
-describe('tout l’appareillage se voit en 3D, à ses cotes', () => {
+const along = (p: { x: number; z: number }) =>
+  (p.x - face.A.x) * face.ux + (p.z - face.A.z) * face.uz;
+const out = (p: { x: number; z: number }) =>
+  (p.x - face.A.x) * face.nx + (p.z - face.A.z) * face.nz;
+
+/** Étendue d'un jeu de faces, dans le repère de la face du mur. */
+const etendue = (fs: Face3D[]) => {
+  const pts = fs.flatMap((f) => f.pts);
+  const xs = pts.map(along);
+  const ys = pts.map((p) => p.y);
+  const ns = pts.map(out);
+  return {
+    x0: Math.min(...xs),
+    x1: Math.max(...xs),
+    y0: Math.min(...ys),
+    y1: Math.max(...ys),
+    n0: Math.min(...ns),
+    n1: Math.max(...ns),
+    cx: (Math.min(...xs) + Math.max(...xs)) / 2,
+    cy: (Math.min(...ys) + Math.max(...ys)) / 2,
+  };
+};
+
+const scener = (fixtures: Fixture[]) =>
+  buildScene(BOX, [], [], { palette: PAL, fixtures });
+
+describe('l’appareillage, à ses cotes réelles', () => {
   for (const kind of FIXTURE_KINDS) {
     const spec = FIXTURES[kind];
-    const f: Fixture = {
-      id: 'x',
-      kind,
-      wallId: 'n',
-      along: 2,
-      height: 1.2,
-      side,
-    };
-    const scene = buildScene(BOX, [], [], { palette: PAL, fixtures: [f] });
+    const n = postsOf(kind).length;
+    const encastre = spec.h <= 0.12;
+    const f: Fixture = { id: 'x', kind, wallId: 'n', along: 2, height: 1.2, side };
+    const scene = scener([f]);
     const nu = buildScene(BOX, [], [], { palette: PAL });
-    // La plaque : ses flancs portent la couleur de l'appareil.
-    const plaque = scene.faces.filter((x) => x.fill === spec.color);
-    // Le symbole gravé : des traits, dans la teinte foncée de l'appareil.
-    const grave = mixHex(spec.color, '#000000', 0.55);
-    const traits = scene.faces.filter(
-      (x) => x.fill === null && x.stroke === grave,
-    );
-    const along = (p: { x: number; z: number }) =>
-      (p.x - face.A.x) * face.ux + (p.z - face.A.z) * face.uz;
-    const out = (p: { x: number; z: number }) =>
-      (p.x - face.A.x) * face.nx + (p.z - face.A.z) * face.nz;
+    // Un ensemble mixte (RJ + prise) porte DEUX couleurs de mécanisme : on
+    // les prend toutes, sinon on ne mesure qu'un poste sur deux.
+    const teintes = new Set(postsOf(kind).map((k) => FIXTURES[k].color));
+    const meca = scene.faces.filter((x) => !!x.fill && teintes.has(x.fill));
+    const plaque = scene.faces.filter((x) => x.fill === BLANC);
 
     it(`${spec.label} : un volume s’ajoute au modèle`, () => {
       expect(scene.faces.length).toBeGreaterThan(nu.faces.length);
-      expect(plaque.length).toBeGreaterThan(0);
+      expect(meca.length).toBeGreaterThan(0);
     });
 
-    it(`${spec.label} : ${Math.round(spec.w * 1000)} × ${Math.round(
-      spec.h * 1000,
-    )} mm, ${Math.round(spec.depth * 1000)} de saillie`, () => {
-      const pts = plaque.flatMap((x) => x.pts);
-      const xs = pts.map(along);
-      const ys = pts.map((p) => p.y);
-      const ns = pts.map(out);
-      expect(Math.max(...xs) - Math.min(...xs)).toBeCloseTo(spec.w, 3);
-      expect(Math.max(...ys) - Math.min(...ys)).toBeCloseTo(spec.h, 3);
-      // Devant le nu, jamais dedans, et à la saillie annoncée.
-      expect(Math.min(...ns)).toBeGreaterThanOrEqual(faceX(face, 0) * 0 - 1e-9);
-      expect(Math.max(...ns)).toBeCloseTo(spec.depth, 3);
-      // Centrée sur la cote demandée.
-      const centre = (Math.max(...xs) + Math.min(...xs)) / 2;
-      expect(centre).toBeCloseTo(faceX(face, 2), 3);
-      const milieu = (Math.max(...ys) + Math.min(...ys)) / 2;
-      expect(milieu).toBeCloseTo(1.2, 3);
-    });
+    if (encastre) {
+      it(`${spec.label} : plaque de ${Math.round(
+        ((n - 1) * ENTRAXE + PLAQUE) * 1000,
+      )} × ${Math.round(PLAQUE * 1000)} mm`, () => {
+        const e = etendue(plaque);
+        expect(e.x1 - e.x0).toBeCloseTo((n - 1) * ENTRAXE + PLAQUE, 3);
+        expect(e.y1 - e.y0).toBeCloseTo(PLAQUE, 3);
+        // Posée sur le nu, 8 mm d'épaisseur, centrée sur la cote demandée.
+        expect(e.n1).toBeCloseTo(0.008, 3);
+        expect(e.cx).toBeCloseTo(faceX(face, 2), 3);
+        expect(e.cy).toBeCloseTo(1.2, 3);
+      });
+
+      it(`${spec.label} : ${n} mécanisme(s) de 45 mm en saillie`, () => {
+        const e = etendue(meca);
+        expect(e.y1 - e.y0).toBeCloseTo(MECANISME, 3);
+        expect(e.x1 - e.x0).toBeCloseTo((n - 1) * ENTRAXE + MECANISME, 3);
+        // En saillie DE LA PLAQUE, jamais dedans.
+        expect(e.n0).toBeGreaterThanOrEqual(0.008 - 1e-9);
+        expect(e.n1).toBeCloseTo(Math.max(0.012, spec.depth), 3);
+      });
+    } else {
+      it(`${spec.label} : ${Math.round(spec.w * 1000)} × ${Math.round(
+        spec.h * 1000,
+      )} mm, ${Math.round(spec.depth * 1000)} de saillie`, () => {
+        const e = etendue(meca);
+        expect(e.x1 - e.x0).toBeCloseTo(spec.w, 3);
+        expect(e.y1 - e.y0).toBeCloseTo(spec.h, 3);
+        expect(e.n1).toBeCloseTo(spec.depth, 3);
+        expect(e.cx).toBeCloseTo(faceX(face, 2), 3);
+        expect(e.cy).toBeCloseTo(1.2, 3);
+      });
+    }
 
     it(`${spec.label} : son symbole est gravé sur la façade`, () => {
+      const grave = mixHex(FIXTURES[postsOf(kind)[0]].color, '#000000', 0.55);
+      const traits = scene.faces.filter(
+        (x) => x.fill === null && x.stroke === grave,
+      );
       expect(traits.length).toBeGreaterThan(0);
-      const pts = traits.flatMap((x) => x.pts);
-      // Le tracé reste DANS la plaque, et devant elle.
-      const xs = pts.map(along);
-      const centre = faceX(face, 2);
-      expect(Math.min(...xs)).toBeGreaterThan(centre - spec.w / 2 - 1e-6);
-      expect(Math.max(...xs)).toBeLessThan(centre + spec.w / 2 + 1e-6);
-      for (const p of pts) expect(out(p)).toBeGreaterThan(spec.depth);
+      const e = etendue(traits);
+      const m = etendue(meca);
+      expect(e.x0).toBeGreaterThan(m.x0 - 1e-6);
+      expect(e.x1).toBeLessThan(m.x1 + 1e-6);
+      for (const p of traits.flatMap((x) => x.pts)) {
+        expect(out(p)).toBeGreaterThan(m.n1 - 1e-9);
+      }
     });
-
-    const n = postsOf(kind).length;
-    if (n > 1) {
-      it(`${spec.label} : ${n} postes à ${Math.round(
-        ENTRAXE * 1000,
-      )} mm d’entraxe`, () => {
-        // L'écartement des symboles, mesuré sur le tracé lui-même : c'est
-        // l'entraxe des boîtes, ramené à l'échelle du symbole.
-        const lignes = symbolPolylines(assemblySymbol(kind));
-        const xs = lignes.flatMap((l) => l.pts.map((p) => p.x));
-        const etendue = Math.max(...xs) - Math.min(...xs);
-        // Repère du symbole : 22 unités pour 82 mm de plaque.
-        const enMetres = (etendue / 22) * 0.082;
-        expect(enMetres).toBeGreaterThan((n - 1) * ENTRAXE * 0.9);
-        expect(enMetres).toBeLessThan((n - 1) * ENTRAXE + 0.082);
-      });
-    }
   }
 
-  /**
-   * Le test qui manquait : un volume peut exister ET rester invisible.
-   *
-   * Les pans de mur se trient sur le milieu de leur tuile, donc à
-   * mi-hauteur ; une prise se triait sur son propre centre, à 25 cm du sol.
-   * Le terme d'altitude de la profondeur la mettait un mètre DERRIÈRE le mur
-   * qui la porte, et le mur la repeignait : à l'écran, plus un seul appareil,
-   * seulement ses cotes. On vérifie donc l'ORDRE de peinture, sous six angles
-   * de caméra, aux deux hauteurs qui comptent — prise basse et interrupteur.
-   */
-  describe('l’appareil se peint DEVANT son mur, jamais dessous', () => {
-    const rad = (d: number) => (d * Math.PI) / 180;
-    for (const kind of FIXTURE_KINDS) {
-      const spec = FIXTURES[kind];
-      it(`${spec.label} : visible sous tous les angles`, () => {
-        for (const h of [0.25, 1.2]) {
-          const f: Fixture = { id: 'x', kind, wallId: 'n', along: 2, height: h, side };
-          const scene = buildScene(BOX, [], [], { palette: PAL, fixtures: [f] });
-          const x0 = faceX(face, 2) - spec.w / 2;
-          const x1 = faceX(face, 2) + spec.w / 2;
-          const along = (p: { x: number; z: number }) =>
-            (p.x - face.A.x) * face.ux + (p.z - face.A.z) * face.uz;
-          const out = (p: { x: number; z: number }) =>
-            (p.x - face.A.x) * face.nx + (p.z - face.A.z) * face.nz;
-          let vueAuMoinsUneFois = false;
-          for (const theta of [15, 75, 135, 195, 255, 315]) {
-            const cam = {
-              ct: Math.cos(rad(theta)),
-              st: Math.sin(rad(theta)),
-              cp: Math.cos(rad(35)),
-              sp: Math.sin(rad(35)),
-            };
-            const prof = (p: { x: number; y: number; z: number }) =>
-              (p.x * cam.st + p.z * cam.ct) * cam.sp + p.y * cam.cp;
-            const dep = (x: Face3D) =>
-              (x.depthRefs
-                ? Math.max(...x.depthRefs.map(prof))
-                : x.depthAt
-                ? prof(x.depthAt)
-                : x.pts.reduce((s2, p) => s2 + prof(p), 0) / x.pts.length) +
-              (x.bias ?? 0);
-            const vus = scene.faces.filter((x) => !isHiddenFace(x, cam));
-            // La façade de la plaque : celle qui regarde la pièce.
-            const facade = vus.filter(
-              (x) =>
-                x.fill === spec.color &&
-                !!x.normal &&
-                x.normal.x * face.nx + x.normal.z * face.nz > 0.9,
-            );
-            if (!facade.length) continue; // vue de dos : normal qu'on ne la voie pas
-            vueAuMoinsUneFois = true;
-            const dPlaque = Math.min(...facade.map(dep));
-            // Les tuiles du mur qui la recouvrent : même face, même portion.
-            const dessous = vus.filter(
-              (x) =>
-                x.fill === PAL.wall &&
-                x.pts.every((p) => Math.abs(out(p)) < 0.01) &&
-                Math.max(...x.pts.map(along)) > x0 &&
-                Math.min(...x.pts.map(along)) < x1,
-            );
-            const pire = Math.max(-Infinity, ...dessous.map(dep));
-            expect(pire).toBeLessThan(dPlaque);
-          }
-          expect(vueAuMoinsUneFois).toBe(true);
-        }
-      });
-    }
-  });
-
-  /**
-   * Le revers du remède. Une première correction avançait l'appareil d'un
-   * biais constant pour qu'il passe devant sa tuile : il passait alors aussi
-   * devant le mur VU DE DOS, et on voyait les prises au travers des
-   * cloisons. Le tri se fait donc sur la tuile réelle, avancée d'un
-   * millimètre — un millimètre qui compte NÉGATIVEMENT dès qu'on regarde
-   * l'autre face. C'est ce signe que ce test surveille.
-   */
-  describe('vu de dos, le mur recouvre l’appareil', () => {
-    const rad = (d: number) => (d * Math.PI) / 180;
-    for (const kind of FIXTURE_KINDS) {
-      const spec = FIXTURES[kind];
-      it(`${spec.label} : invisible à travers la cloison`, () => {
-        const f: Fixture = { id: 'x', kind, wallId: 'n', along: 2, height: 1.2, side };
-        const scene = buildScene(BOX, [], [], { palette: PAL, fixtures: [f] });
-        const out = (p: { x: number; z: number }) =>
-          (p.x - face.A.x) * face.nx + (p.z - face.A.z) * face.nz;
-        const along = (p: { x: number; z: number }) =>
-          (p.x - face.A.x) * face.ux + (p.z - face.A.z) * face.uz;
-        const x0 = faceX(face, 2) - spec.w / 2;
-        const x1 = faceX(face, 2) + spec.w / 2;
-        let vuDeDos = false;
-        for (const theta of [15, 75, 135, 195, 255, 315]) {
-          const cam = {
-            ct: Math.cos(rad(theta)),
-            st: Math.sin(rad(theta)),
-            cp: Math.cos(rad(35)),
-            sp: Math.sin(rad(35)),
-          };
-          // On ne garde que les angles où la face porteuse tourne le dos.
-          if (face.nx * cam.st * cam.sp + face.nz * cam.ct * cam.sp > 0) continue;
-          vuDeDos = true;
-          const prof = (p: { x: number; y: number; z: number }) =>
-            (p.x * cam.st + p.z * cam.ct) * cam.sp + p.y * cam.cp;
-          const dep = (x: Face3D) =>
-            (x.depthRefs
-              ? Math.max(...x.depthRefs.map(prof))
-              : x.depthAt
-              ? prof(x.depthAt)
-              : x.pts.reduce((s2, p) => s2 + prof(p), 0) / x.pts.length) +
-            (x.bias ?? 0);
-          const vus = scene.faces.filter((x) => !isHiddenFace(x, cam));
-          const appareil = vus.filter((x) => x.fill === spec.color);
-          if (!appareil.length) continue; // entièrement écarté : parfait
-          // Le dos du mur : les tuiles de la face opposée.
-          const dos = vus.filter(
-            (x) => x.fill === PAL.wall && x.pts.every((p) => out(p) < -0.13),
-          );
-          expect(
-            dos.filter(
-              (x) =>
-                Math.max(...x.pts.map(along)) > x0 &&
-                Math.min(...x.pts.map(along)) < x1,
-            ).length,
-          ).toBeGreaterThan(0);
-          // Chaque morceau d'appareil se compare aux tuiles qui le couvrent
-          // VRAIMENT : une tuile de l'autre bout du mur ne le cache pas.
-          for (const a2 of appareil) {
-            const ax0 = Math.min(...a2.pts.map(along));
-            const ax1 = Math.max(...a2.pts.map(along));
-            const dessus = dos.filter(
-              (x) =>
-                Math.max(...x.pts.map(along)) > ax0 + 1e-6 &&
-                Math.min(...x.pts.map(along)) < ax1 - 1e-6,
-            );
-            for (const d of dessus) expect(dep(a2)).toBeLessThan(dep(d));
-          }
-        }
-        expect(vuDeDos).toBe(true);
-      });
-    }
-  });
-
-  it('deux appareils sous une même plaque restent deux volumes', () => {
-    // Un ensemble monté à la main : deux boîtes à l'entraxe, deux
-    // mécanismes. Le modèle doit en montrer deux, pas un bloc unique.
-    const prise: Fixture = { id: 'a', kind: 'prise', wallId: 'n', along: 2, height: 0.25, side, group: 'g1' };
-    const rj: Fixture = {
+  it('deux prises réunies = une prise double, au millimètre', () => {
+    const a: Fixture = { id: 'a', kind: 'prise', wallId: 'n', along: 2, height: 0.25, side, group: 'g1' };
+    const b: Fixture = {
       id: 'b',
-      kind: 'rj45',
+      kind: 'prise',
       wallId: 'n',
       along: 2 + ENTRAXE * (face.s1 >= face.s0 ? 1 : -1),
       height: 0.25,
       side,
       group: 'g1',
     };
-    const scene = buildScene(BOX, [], [], { palette: PAL, fixtures: [prise, rj] });
-    const along = (p: { x: number; z: number }) =>
-      (p.x - face.A.x) * face.ux + (p.z - face.A.z) * face.uz;
-    const centres = ['prise', 'rj45'].map((k) => {
-      const col = FIXTURES[k as 'prise'].color;
-      const pts = scene.faces.filter((x) => x.fill === col).flatMap((x) => x.pts);
-      const xs = pts.map(along);
-      return (Math.max(...xs) + Math.min(...xs)) / 2;
-    });
-    expect(Math.abs(centres[0] - centres[1])).toBeCloseTo(ENTRAXE, 3);
+    const ensemble = scener([a, b]);
+    const double = scener([
+      { id: 'd', kind: 'prise2', wallId: 'n', along: 2 + ENTRAXE / 2, height: 0.25, side },
+    ]);
+
+    const pl1 = etendue(ensemble.faces.filter((x) => x.fill === BLANC));
+    const pl2 = etendue(double.faces.filter((x) => x.fill === BLANC));
+    // Même plaque : 153 mm, au même endroit.
+    expect(pl1.x1 - pl1.x0).toBeCloseTo(ENTRAXE + PLAQUE, 3);
+    expect(pl1.x1 - pl1.x0).toBeCloseTo(pl2.x1 - pl2.x0, 3);
+    expect(pl1.cx).toBeCloseTo(pl2.cx, 3);
+
+    // Et deux mécanismes distincts, à 71 mm d'entraxe.
+    const col = FIXTURES.prise.color;
+    for (const sc of [ensemble, double]) {
+      // Une seule face par mécanisme : sa FAÇADE. Prendre tous les flancs
+      // reviendrait à mesurer l'étendue de l'ensemble, pas l'entraxe.
+      const xs = sc.faces
+        .filter(
+          (x) =>
+            x.fill === col &&
+            !!x.normal &&
+            x.normal.x * face.nx + x.normal.z * face.nz > 0.9,
+        )
+        .map((x) => x.pts.map(along))
+        .map((v) => (Math.min(...v) + Math.max(...v)) / 2)
+        .sort((a2, b2) => a2 - b2);
+      expect(xs).toHaveLength(2);
+      expect(xs[1] - xs[0]).toBeCloseTo(ENTRAXE, 3);
+    }
   });
+
+  it('une seule plaque pour un ensemble, pas une par appareil', () => {
+    const a: Fixture = { id: 'a', kind: 'prise', wallId: 'n', along: 2, height: 0.25, side, group: 'g' };
+    const b: Fixture = { id: 'b', kind: 'rj45', wallId: 'n', along: 2.071, height: 0.25, side, group: 'g' };
+    const sc = scener([a, b]);
+    const e = etendue(sc.faces.filter((x) => x.fill === BLANC));
+    expect(e.x1 - e.x0).toBeCloseTo(ENTRAXE + PLAQUE, 3);
+    // Les deux mécanismes gardent LEUR couleur : on lit ce qui est posé.
+    expect(sc.faces.some((x) => x.fill === FIXTURES.prise.color)).toBe(true);
+    expect(sc.faces.some((x) => x.fill === FIXTURES.rj45.color)).toBe(true);
+  });
+});
+
+describe('l’ordre de peinture, dans les deux sens', () => {
+  const rad = (d: number) => (d * Math.PI) / 180;
+  const ANGLES = [15, 75, 135, 195, 255, 315];
+  const camAt = (theta: number) => ({
+    ct: Math.cos(rad(theta)),
+    st: Math.sin(rad(theta)),
+    cp: Math.cos(rad(35)),
+    sp: Math.sin(rad(35)),
+  });
+  const profAt =
+    (cam: ReturnType<typeof camAt>) =>
+    (p: { x: number; y: number; z: number }) =>
+      (p.x * cam.st + p.z * cam.ct) * cam.sp + p.y * cam.cp;
+  const depAt =
+    (prof: (p: { x: number; y: number; z: number }) => number) => (x: Face3D) =>
+      (x.depthRefs
+        ? Math.max(...x.depthRefs.map(prof))
+        : x.depthAt
+        ? prof(x.depthAt)
+        : x.pts.reduce((s, p) => s + prof(p), 0) / x.pts.length) + (x.bias ?? 0);
+
+  for (const kind of FIXTURE_KINDS) {
+    const spec = FIXTURES[kind];
+
+    it(`${spec.label} : visible de face, sous tous les angles`, () => {
+      for (const h of [0.25, 1.2]) {
+        const scene = scener([
+          { id: 'x', kind, wallId: 'n', along: 2, height: h, side },
+        ]);
+        const e = etendue(
+          scene.faces.filter((x) => x.fill === spec.color || x.fill === BLANC),
+        );
+        let vue = false;
+        for (const theta of ANGLES) {
+          const cam = camAt(theta);
+          const dep = depAt(profAt(cam));
+          const vus = scene.faces.filter((x) => !isHiddenFace(x, cam));
+          const facade = vus.filter(
+            (x) =>
+              (x.fill === spec.color || x.fill === BLANC) &&
+              !!x.normal &&
+              x.normal.x * face.nx + x.normal.z * face.nz > 0.9,
+          );
+          if (!facade.length) continue;
+          vue = true;
+          const dPlaque = Math.min(...facade.map(dep));
+          const dessous = vus.filter(
+            (x) =>
+              x.fill === PAL.wall &&
+              x.pts.every((p) => Math.abs(out(p)) < 0.01) &&
+              Math.max(...x.pts.map(along)) > e.x0 &&
+              Math.min(...x.pts.map(along)) < e.x1,
+          );
+          expect(Math.max(-Infinity, ...dessous.map(dep))).toBeLessThan(dPlaque);
+        }
+        expect(vue).toBe(true);
+      }
+    });
+
+    it(`${spec.label} : invisible à travers la cloison`, () => {
+      const scene = scener([
+        { id: 'x', kind, wallId: 'n', along: 2, height: 1.2, side },
+      ]);
+      let vuDeDos = false;
+      for (const theta of ANGLES) {
+        const cam = camAt(theta);
+        if (face.nx * cam.st * cam.sp + face.nz * cam.ct * cam.sp > 0) continue;
+        vuDeDos = true;
+        const dep = depAt(profAt(cam));
+        const vus = scene.faces.filter((x) => !isHiddenFace(x, cam));
+        const appareil = vus.filter(
+          (x) => x.fill === spec.color || x.fill === BLANC,
+        );
+        const dos = vus.filter(
+          (x) => x.fill === PAL.wall && x.pts.every((p) => out(p) < -0.13),
+        );
+        for (const a of appareil) {
+          const ax0 = Math.min(...a.pts.map(along));
+          const ax1 = Math.max(...a.pts.map(along));
+          const dessus = dos.filter(
+            (x) =>
+              Math.max(...x.pts.map(along)) > ax0 + 1e-6 &&
+              Math.min(...x.pts.map(along)) < ax1 - 1e-6,
+          );
+          for (const d of dessus) expect(dep(a)).toBeLessThan(dep(d));
+        }
+      }
+      expect(vuDeDos).toBe(true);
+    });
+  }
 });
