@@ -43,25 +43,16 @@ import {
 } from '../geometry/floorplan';
 import type { ObjectData } from 'react-native-room-scan';
 import {
-  FIXTURES,
-  assemblyTag,
-  postsOf,
-  postsSymbol,
   faceX,
   facePoint,
   interiorSide,
-  stackRanks,
   wallFace,
 } from '../geometry/electrical';
 import { frCategory, furnKind, furnitureStrokes } from '../geometry/furniture';
 import { markColor } from '../geometry/schema';
-import {
-  CEILINGS,
-  CEILING_SYMBOL,
-  linkAnchor,
-  linkCurve,
-  type CeilingFixture,
-} from '../geometry/ceiling';
+import { CeilingLayer } from './CeilingLayer';
+import { FixtureLayer } from './FixtureLayer';
+import type { CeilingFixture } from '../geometry/ceiling';
 import { CloseCross } from './CloseCross';
 
 /**
@@ -132,7 +123,7 @@ import { haptic, releaseHaptic } from '../ui/haptic';
  * ses côtés, perpendiculairement, et on regarde ce qu'on rencontre. Rien
  * dans cette direction : pas de cote, plutôt qu'une cote fausse.
  */
-function castToWall(from: Pt, dir: Pt, walls: WallSeg[]): number | null {
+export function castToWall(from: Pt, dir: Pt, walls: WallSeg[]): number | null {
   let best = Infinity;
   for (const w of walls) {
     const ex = w.b.x - w.a.x;
@@ -1164,169 +1155,18 @@ export function FloorplanEditor({
               );
             })}
 
-            {/*
-              LE PLAFOND, et surtout LES LIENS DE COMMANDE.
-              Un plan qui montre six interrupteurs et huit points lumineux
-              sans dire lequel allume quoi n'est pas un plan de travail,
-              c'est un inventaire. Le trait pointillé courbe — jamais droit,
-              pour ne pas le confondre avec une cote ou une gaine — va de la
-              commande au point qu'elle allume.
-            */}
-            {showCeiling &&
-              (ceiling ?? []).map((cl) => {
-                const spec = CEILINGS[cl.kind];
-                const q = mapping.toPx(cl.at);
-                const r = Math.max(9, Math.min(15, mapping.scale * 0.14));
-                const choisi = cl.id === selectedCeilingId;
-                return (
-                  <G
-                    key={`cl-${cl.id}`}
-                    onPress={
-                      onSelectCeiling ? () => onSelectCeiling(cl.id) : undefined
-                    }>
-                    <Circle cx={q.x} cy={q.y} r={r + 6} fill="transparent" />
-                    {choisi && (
-                      <Circle
-                        cx={q.x}
-                        cy={q.y}
-                        r={r + 5}
-                        fill={c.blueSoft}
-                        stroke={c.blue}
-                        strokeWidth={1.6}
-                      />
-                    )}
-                    <G transform={`translate(${q.x}, ${q.y}) scale(${r / 9})`}>
-                      {CEILING_SYMBOL[cl.kind].map((seg, si) => (
-                        <Path
-                          key={si}
-                          d={seg.d}
-                          stroke={spec.color}
-                          strokeWidth={1.5}
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          fill={seg.fill ? spec.color : 'none'}
-                        />
-                      ))}
-                    </G>
-                  </G>
-                );
-              })}
-            {showCeiling &&
-              (ceiling ?? []).flatMap((cl) =>
-                (cl.commands ?? []).map((fid) => {
-                  const f = fixtures?.find((x) => x.id === fid);
-                  if (!f) return null;
-                  const w = wallById.get(f.wallId);
-                  if (!w) return null;
-                  const fa = wallFace(w, quads.get(w.id), f.side);
-                  const depart = facePoint(fa, faceX(fa, f.along), 0.16);
-                  const rayon = Math.max(0.1, CEILINGS[cl.kind].d * 0.7);
-                  const arrivee = linkAnchor(
-                    { x: depart.x, z: depart.z },
-                    cl.at,
-                    rayon,
-                  );
-                  const courbe = linkCurve(
-                    { x: depart.x, z: depart.z },
-                    arrivee,
-                  ).map((pt) => {
-                    const g = mapping.toPx(pt);
-                    return `${g.x},${g.y}`;
-                  });
-                  return (
-                    <Polyline
-                      key={`lien-${cl.id}-${fid}`}
-                      points={courbe.join(' ')}
-                      fill="none"
-                      stroke={c.inkSoft}
-                      strokeWidth={1.1}
-                      strokeDasharray="1.5 3.5"
-                      strokeLinecap="round"
-                    />
-                  );
-                }),
-              )}
-
-            {/*
-              LES DÉGAGEMENTS DE L'APPAREIL DE PLAFOND CHOISI.
-              Quatre cotes, vers les quatre murs qui l'entourent, en direct
-              pendant qu'on le déplace. Sans elles, on déplace à vue et on
-              lit le résultat après coup dans un champ — alors que la
-              question qu'on se pose en glissant est exactement « à combien
-              du mur ? ».
-            */}
-            {selectedCeilingId &&
-              (() => {
-                const cl = (ceiling ?? []).find(
-                  (x) => x.id === selectedCeilingId,
-                );
-                if (!cl) return null;
-                const murs = partOf.get(cl.roomId)?.walls ?? walls;
-                const sens = [
-                  { x: 1, z: 0 },
-                  { x: -1, z: 0 },
-                  { x: 0, z: 1 },
-                  { x: 0, z: -1 },
-                ];
-                return (
-                  <G>
-                    {sens.map((d, ci) => {
-                      const gap = castToWall(cl.at, d, murs);
-                      if (gap === null || gap < 0.02 || gap > 12) return null;
-                      const to = {
-                        x: cl.at.x + d.x * gap,
-                        z: cl.at.z + d.z * gap,
-                      };
-                      const A = mapping.toPx(cl.at);
-                      const B = mapping.toPx(to);
-                      if (Math.hypot(B.x - A.x, B.y - A.y) < 22) return null;
-                      let angle =
-                        (Math.atan2(B.y - A.y, B.x - A.x) * 180) / Math.PI;
-                      if (angle > 90) angle -= 180;
-                      if (angle < -90) angle += 180;
-                      const mx = (A.x + B.x) / 2;
-                      const my = (A.y + B.y) / 2;
-                      const texte =
-                        gap < 1
-                          ? `${Math.round(gap * 100)}`
-                          : gap.toFixed(2).replace('.', ',');
-                      return (
-                        <G key={`clcote-${ci}`}>
-                          <Line
-                            x1={A.x}
-                            y1={A.y}
-                            x2={B.x}
-                            y2={B.y}
-                            stroke={c.blue}
-                            strokeWidth={1}
-                            strokeDasharray="3 3"
-                          />
-                          <Circle cx={B.x} cy={B.y} r={2} fill={c.blue} />
-                          <Rect
-                            x={mx - (texte.length * 3.6 + 7)}
-                            y={my - 8}
-                            width={texte.length * 7.2 + 14}
-                            height={16}
-                            rx={5}
-                            fill={c.surface}
-                            opacity={0.94}
-                          />
-                          <SvgText
-                            x={mx}
-                            y={my + 4}
-                            fill={c.blue}
-                            fontSize={10}
-                            fontWeight="800"
-                            textAnchor="middle"
-                            transform={`rotate(${angle}, ${mx}, ${my})`}>
-                            {texte}
-                          </SvgText>
-                        </G>
-                      );
-                    })}
-                  </G>
-                );
-              })()}
+            <CeilingLayer
+              ceiling={ceiling}
+              showCeiling={showCeiling}
+              selectedCeilingId={selectedCeilingId}
+              onSelectCeiling={onSelectCeiling}
+              fixtures={fixtures}
+              walls={walls}
+              quads={quads}
+              partOf={partOf}
+              mapping={mapping}
+              c={c}
+            />
 
             {/* Les gaines : un filet tireté qui longe les murs, du tableau
                 à chaque appareil. Il passe SOUS les symboles — c'est un
@@ -1356,223 +1196,17 @@ export function FloorplanEditor({
                 opacity={0.75}
               />
             ))}
-
-            {/* L'appareillage se dessine APRÈS les menuiseries : la
-                trouée d'une baie est un aplat opaque, et posée
-                par-dessus elle effaçait les prises du mur — on croyait
-                les avoir perdues en créant l'ouverture. Le symbole se pose
-                DANS la pièce, juste devant la face qui porte l'appareil :
-                c'est la convention d'un plan d'électricien, et le seul moyen
-                de distinguer les deux faces d'une même cloison. */}
-            {(() => {
-              const placed = fixtures
-                .map((f) => {
-                  const w = wallById.get(f.wallId);
-                  if (!w) return null;
-                  const face = wallFace(w, quads.get(w.id), f.side);
-                  return { f, face, x: faceX(face, f.along) };
-                })
-                .filter((p): p is NonNullable<typeof p> => !!p);
-              /**
-               * Un ENSEMBLE se dessine une fois, avec tous ses postes.
-               *
-               * Deux prises liées à la main forment une double prise : sur le
-               * mur, c'est une plaque de 153 mm à deux mécanismes. Le plan,
-               * lui, dessinait le symbole de chaque appareil à sa propre
-               * place — deux socles distants de 71 mm, soit deux pixels à
-               * l'échelle d'un logement. On n'en voyait qu'un, et rien ne
-               * disait qu'ils étaient liés.
-               */
-              const lots = new Map<string, typeof placed>();
-              for (const it of placed) {
-                const cle = it.f.group
-                  ? `g:${it.f.group}:${it.f.wallId}:${it.f.side}`
-                  : `s:${it.f.id}`;
-                const l = lots.get(cle);
-                if (l) l.push(it);
-                else lots.set(cle, [it]);
-              }
-              const unites = [...lots.values()].map((membres) => {
-                const tri = [...membres].sort((a2, b2) => a2.x - b2.x);
-                const xs = tri.map((m) => m.x);
-                return {
-                  f: tri[0].f,
-                  face: tri[0].face,
-                  // Le symbole se pose au MILIEU de l'ensemble, comme sa
-                  // plaque : c'est ce qu'on voit sur le mur.
-                  x: (Math.min(...xs) + Math.max(...xs)) / 2,
-                  postes: tri.flatMap((m) => postsOf(m.f.kind)),
-                };
-              });
-              const ranks = stackRanks(
-                unites.map((p) => ({
-                  id: p.f.id,
-                  wallId: p.f.wallId,
-                  side: p.f.side,
-                  x: p.x,
-                })),
-              );
-              /**
-               * LA TAILLE DU SYMBOLE SUIT LE ZOOM.
-               *
-               * Elle était fixe : à l'échelle d'un logement, onze pixels de
-               * pastille par appareil couvraient les murs qu'ils sont
-               * censés décrire ; en zoomant sur un mur, la même pastille
-               * devenait minuscule au milieu du dessin. Elle se cale
-               * désormais sur l'échelle, entre deux bornes — assez petite
-               * pour laisser voir le plan, assez grande pour se viser.
-               */
-              const rayon = Math.max(
-                7,
-                Math.min(13, 7 + (mapping.scale - 60) * 0.07),
-              );
-              const taillePolice = Math.max(6.5, Math.min(9, rayon * 0.72));
-
-              /**
-               * OÙ poser le sigle : la première place libre.
-               *
-               * Il était posé en haut à droite, toujours. Deux appareils
-               * voisins — une double prise et une RJ45 à vingt centimètres —
-               * écrivaient donc leurs sigles au même endroit, l'un sur
-               * l'autre. On essaie les quatre coins, puis on renonce : un
-               * sigle illisible vaut moins que pas de sigle du tout, le
-               * symbole suffit à dire qu'il y a quelque chose.
-               */
-              const posesTag: { x: number; y: number; w: number; h: number }[] =
-                [];
-              const placeTag = (
-                cx: number,
-                cy: number,
-                texte: string,
-              ): { x: number; y: number } | null => {
-                const w2 = texte.length * taillePolice * 0.58;
-                const h2 = taillePolice;
-                const coins: [number, number][] = [
-                  [rayon + 3, -rayon + 1],
-                  [-rayon - 3 - w2, -rayon + 1],
-                  [-w2 / 2, -rayon - h2 - 1],
-                  [-w2 / 2, rayon + h2 + 3],
-                ];
-                for (const [dx, dy] of coins) {
-                  const b = { x: cx + dx, y: cy + dy - h2, w: w2, h: h2 };
-                  const libre = posesTag.every(
-                    (o) =>
-                      b.x > o.x + o.w + 1 ||
-                      o.x > b.x + b.w + 1 ||
-                      b.y > o.y + o.h + 1 ||
-                      o.y > b.y + b.h + 1,
-                  );
-                  if (libre) {
-                    posesTag.push(b);
-                    return { x: b.x, y: cy + dy };
-                  }
-                }
-                return null;
-              };
-
-              return unites.map(({ f, face, x, postes }) => {
-                const spec = FIXTURES[f.kind];
-                const symbol = postsSymbol(postes, f.kind);
-                const tag = assemblyTag(postes);
-                // Échelonnement : le deuxième appareil du même point se pose
-                // plus loin du mur, sur le même filet.
-                const out = 0.14 + (ranks.get(f.id) ?? 0) * (0.1 + 0.14 * elecLod);
-                const anchor = mapping.toPx(facePoint(face, x, 0.02));
-                const p = mapping.toPx(facePoint(face, x, out));
-                // Le symbole regarde SA face : sa tige rejoint le mur. Le
-                // plan pouvant être tourné, l'angle se prend à l'écran.
-                const dir =
-                  (Math.atan2(-face.nz, -face.nx) + view.rot) * (180 / Math.PI) - 90;
-                return (
-                  <G
-                    key={f.id}
-                    onPress={
-                      onSelectFixture
-                        ? () => onSelectFixture(f.id, f.wallId)
-                        : undefined
-                    }>
-                    {/* Cible tactile élargie : le symbole fait 22 px, le
-                        doigt en demande le double. */}
-                    <Circle
-                      cx={p.x}
-                      cy={p.y}
-                      r={Math.max(18, rayon + 8)}
-                      fill="transparent"
-                    />
-                    {elecLod < 0.98 && (
-                      <Circle
-                        cx={p.x}
-                        cy={p.y}
-                        r={4}
-                        fill={spec.color}
-                        opacity={1 - elecLod}
-                      />
-                    )}
-                    {elecLod > 0.02 && (
-                      <G opacity={elecLod}>
-                        <Line
-                          x1={anchor.x}
-                          y1={anchor.y}
-                          x2={p.x}
-                          y2={p.y}
-                          stroke={spec.color}
-                          strokeWidth={1.2}
-                        />
-                        <Circle cx={p.x} cy={p.y} r={rayon} fill={c.surface} />
-                        <G
-                          transform={
-                            `translate(${p.x}, ${p.y}) ` +
-                            `rotate(${dir}) scale(${rayon / 11})`
-                          }>
-                          {symbol.map((seg, si) => (
-                            <Path
-                              key={si}
-                              d={seg.d}
-                              stroke={spec.color}
-                              strokeWidth={1.6}
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              fill={seg.fill ? spec.color : 'none'}
-                            />
-                          ))}
-                        </G>
-                        {(() => {
-                          if (!tag) return null;
-                          const pose = placeTag(p.x, p.y, tag);
-                          if (!pose) return null;
-                          return (
-                            <SvgText
-                              x={pose.x}
-                              y={pose.y}
-                              fill={spec.color}
-                              fontSize={taillePolice}
-                              fontWeight="800">
-                              {tag}
-                            </SvgText>
-                          );
-                        })()}
-                        {/* Le repère de circuit : c'est LUI qu'on lit sur le
-                            chantier pour savoir quoi tirer où. Posé sous
-                            l'appareil pour ne pas se mêler à son sigle. */}
-                        {circuitMarks?.get(f.id) && (
-                          <SvgText
-                            x={p.x}
-                            y={p.y + 20}
-                            // Même teinte que le tracé et que le schéma du
-                            // PDF : un seul code couleur pour toute l'app.
-                            fill={markColor(circuitMarks.get(f.id)!)}
-                            fontSize={8}
-                            fontWeight="900"
-                            textAnchor="middle">
-                            {circuitMarks.get(f.id)}
-                          </SvgText>
-                        )}
-                      </G>
-                    )}
-                  </G>
-                );
-              });
-            })()}
+            <FixtureLayer
+              fixtures={fixtures}
+              circuitMarks={circuitMarks}
+              walls={walls}
+              quads={quads}
+              mapping={mapping}
+              viewRot={view.rot}
+              elecLod={elecLod}
+              onSelectFixture={onSelectFixture}
+              c={c}
+            />
 
             {/* Cartouche par pièce : nom encadré et surface au sol.
                 Chacun esquive les meubles de sa pièce pour rester lisible.
