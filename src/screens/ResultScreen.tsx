@@ -186,6 +186,7 @@ export function ResultScreen() {
   const ceiling = useScanStore((s) => s.ceiling);
   const addCeiling = useScanStore((s) => s.addCeiling);
   const removeCeiling = useScanStore((s) => s.removeCeiling);
+  const moveCeiling = useScanStore((s) => s.moveCeiling);
   const toggleCeilingCommand = useScanStore((s) => s.toggleCeilingCommand);
   const moveFixture = useScanStore((s) => s.moveFixture);
   const resizeOpening = useScanStore((s) => s.resizeOpening);
@@ -309,6 +310,26 @@ export function ResultScreen() {
    * donc que quelqu'un le désigne, une fois.
    */
   const [pendingLink, setPendingLink] = useState<string | null>(null);
+  /**
+   * L'origine des cotes d'une pièce : le coin de son emprise.
+   *
+   * Un point lumineux ne se cote pas « en x = 3,42 » — ça ne veut rien dire
+   * sur un chantier. Il se cote depuis DEUX MURS, et le coin de la pièce
+   * est le repère que tout le monde prend.
+   */
+  const origineDe = (roomId: string) => {
+    const part = parts.find((p2) => p2.roomId === roomId);
+    const pts = part?.surface?.pts ?? [];
+    if (pts.length === 0) return { x: 0, z: 0 };
+    return {
+      x: Math.min(...pts.map((q) => q.x)),
+      z: Math.min(...pts.map((q) => q.z)),
+    };
+  };
+  /** Appareil de plafond en cours de réglage : le plan se dégage pour lui. */
+  const [selCeiling, setSelCeiling] = useState<string | null>(null);
+  const [clX, setClX] = useState('');
+  const [clZ, setClZ] = useState('');
   /** Repères électriques en 3D : un calque comme les autres. */
   const [showElecTags, setShowElecTags] = useState(true);
   const [editMode, setEditMode] = useState(false);
@@ -1123,6 +1144,7 @@ export function ResultScreen() {
             selectedRoomId={selectedRoomId}
             ceiling={ceiling}
             showCeiling={showCeiling}
+            selectedCeilingId={selCeiling}
             placing={!!pendingCeiling}
             onPlaceAt={(at) => {
               if (!pendingCeiling) return;
@@ -1147,6 +1169,17 @@ export function ResultScreen() {
               // il n'a ni cote ni hauteur à régler, seulement une place.
               const cl = ceiling.find((x) => x.id === id);
               if (!cl) return;
+              // D'abord le réglage : c'est ce qu'on vient faire neuf fois
+              // sur dix. Le menu s'ouvre par un appui long.
+              if (selCeiling !== id) {
+                setSelCeiling(id);
+                setSelectedObjectId(null);
+                setSelectedWallId(null);
+                const o = origineDe(cl.roomId);
+                setClX(String(Math.round((cl.at.x - o.x) * 100)));
+                setClZ(String(Math.round((cl.at.z - o.z) * 100)));
+                return;
+              }
               const spec = CEILINGS[cl.kind];
               const liees = (cl.commands ?? [])
                 .map((fid) => fixtures.find((f) => f.id === fid))
@@ -1578,6 +1611,78 @@ export function ResultScreen() {
             </View>
           </View>
         )}
+
+        {/* L'appareil de plafond en réglage : ses deux cotes, au centimètre.
+            Mêmes gestes que pour un meuble — on lit, on corrige, on valide. */}
+        {vue === '2d' && selCeiling && !capturing && (() => {
+          const cl = ceiling.find((x) => x.id === selCeiling);
+          if (!cl) return null;
+          const o = origineDe(cl.roomId);
+          const appliquer = () => {
+            const vx = parseFloat(clX.replace(',', '.'));
+            const vz = parseFloat(clZ.replace(',', '.'));
+            if (!isFinite(vx) || !isFinite(vz)) return;
+            moveCeiling(cl.id, { x: o.x + vx / 100, z: o.z + vz / 100 });
+            haptic('succes');
+          };
+          return (
+            <View style={styles.editBar}>
+              <View style={styles.editRow}>
+                <Text style={styles.unit}>↔</Text>
+                <TextInput
+                  style={styles.inputSmall}
+                  value={clX}
+                  onChangeText={setClX}
+                  keyboardType="decimal-pad"
+                />
+                <Text style={styles.unit}>↕</Text>
+                <TextInput
+                  style={styles.inputSmall}
+                  value={clZ}
+                  onChangeText={setClZ}
+                  keyboardType="decimal-pad"
+                />
+                <Text style={styles.unit}>cm</Text>
+                <View style={styles.editIcons}>
+                  <TouchableOpacity
+                    style={styles.iconBtn}
+                    onPress={() => {
+                      removeCeiling(cl.id);
+                      setSelCeiling(null);
+                    }}>
+                    <Svg width={19} height={19} viewBox="0 0 24 24">
+                      <Path
+                        d="M5 7 h14 M9.5 7 V4.5 h5 V7 M6.5 7 l1 13 h9 l1 -13"
+                        stroke={teinte.danger}
+                        strokeWidth={2}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        fill="none"
+                      />
+                    </Svg>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.iconBtnOk}
+                    onPress={() => {
+                      appliquer();
+                      setSelCeiling(null);
+                    }}>
+                    <Svg width={19} height={19} viewBox="0 0 24 24">
+                      <Path
+                        d="M5 12.5 L10 17.5 L19 6.5"
+                        stroke="#FFFFFF"
+                        strokeWidth={2.4}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        fill="none"
+                      />
+                    </Svg>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          );
+        })()}
 
         {/* Pièce sélectionnée : la nommer, ou la retirer du scan */}
         {vue === '2d' && editMode && !capturing && !selectedObject && !selectedWall &&

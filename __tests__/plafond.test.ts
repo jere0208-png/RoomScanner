@@ -235,3 +235,67 @@ describe('relier une commande à un point', () => {
     expect(cl.commands).toEqual(['i1']);
   });
 });
+
+/**
+ * Déplacer un appareil de plafond, au doigt puis au centimètre.
+ *
+ * Il se posait au centre de la pièce et n'en bougeait plus : pour quatre
+ * spots, c'est quatre appareils empilés au même endroit. Le déplacement
+ * doit donc être libre — un point lumineux n'a pas d'emprise au sol qui
+ * buterait sur les murs, il se pose où l'on veut, y compris contre une
+ * cloison quand c'est une applique.
+ */
+describe('déplacer un appareil de plafond', () => {
+  it('le pose exactement où on le demande', () => {
+    useScanStore.setState({
+      walls: W,
+      openings: [],
+      rooms: R,
+      objects: [],
+      fixtures: FX,
+      photos: [],
+      ceiling: [{ id: 'p1', kind: 'spot', roomId: 'r1', at: { x: 2.5, z: 2 } }],
+    });
+    useScanStore.getState().moveCeiling('p1', { x: 1.2, z: 0.8 });
+    const cl = useScanStore.getState().ceiling[0];
+    expect(cl.at.x).toBeCloseTo(1.2, 6);
+    expect(cl.at.z).toBeCloseTo(0.8, 6);
+  });
+
+  it('sans rien perdre de ses liens de commande', () => {
+    useScanStore.setState({
+      walls: W,
+      openings: [],
+      rooms: R,
+      objects: [],
+      fixtures: FX,
+      photos: [],
+      ceiling: [
+        {
+          id: 'p1',
+          kind: 'dcl',
+          roomId: 'r1',
+          at: { x: 2.5, z: 2 },
+          commands: ['i1'],
+        },
+      ],
+    });
+    useScanStore.getState().moveCeiling('p1', { x: 3, z: 1 });
+    expect(useScanStore.getState().ceiling[0].commands).toEqual(['i1']);
+  });
+
+  it('et le déplacement s’annule', () => {
+    useScanStore.setState({
+      walls: W,
+      openings: [],
+      rooms: R,
+      objects: [],
+      fixtures: FX,
+      photos: [],
+      ceiling: [{ id: 'p1', kind: 'spot', roomId: 'r1', at: { x: 2.5, z: 2 } }],
+    });
+    useScanStore.getState().moveCeiling('p1', { x: 1, z: 1 });
+    useScanStore.getState().undo();
+    expect(useScanStore.getState().ceiling[0].at.x).toBeCloseTo(2.5, 6);
+  });
+});

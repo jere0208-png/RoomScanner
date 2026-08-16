@@ -227,6 +227,14 @@ interface Props {
   placing?: boolean;
   onPlaceAt?: (at: Pt) => void;
   /**
+   * L'appareil de plafond en cours de réglage.
+   *
+   * Tant qu'on le déplace, le plan se DÉGAGE : meubles et cartouches de
+   * pièce s'effacent. Un point lumineux se pose par rapport aux murs, et
+   * c'est justement ce qu'un canapé dessiné par-dessus empêche de voir.
+   */
+  selectedCeilingId?: string | null;
+  /**
    * Le retour de mur choisi, ou `null`.
    *
    * L'écran en a besoin pour y poser un appareil : choisir un retour puis
@@ -269,6 +277,7 @@ export function FloorplanEditor({
   onSelectCeiling,
   placing,
   onPlaceAt,
+  selectedCeilingId,
   onPierChange,
   selectedOpeningId,
   onSelectOpening,
@@ -281,7 +290,9 @@ export function FloorplanEditor({
   const openings = useScanStore((s) => s.openings);
   const allObjects = useScanStore((s) => s.objects);
   const showFurniture = useScanStore((s) => s.showFurniture);
-  const objects = showFurniture ? allObjects : [];
+  // Un appareil de plafond en réglage : le sol s'efface pour qu'on voie
+  // où il tombe par rapport aux murs.
+  const objects = showFurniture && !selectedCeilingId ? allObjects : [];
   const currentSaveId = useScanStore((s) => s.currentSaveId);
   const rooms = useScanStore((s) => s.rooms);
   const fixtures = useScanStore((s) => s.fixtures);
@@ -1164,6 +1175,7 @@ export function FloorplanEditor({
                 const spec = CEILINGS[cl.kind];
                 const q = mapping.toPx(cl.at);
                 const r = Math.max(9, Math.min(15, mapping.scale * 0.14));
+                const choisi = cl.id === selectedCeilingId;
                 return (
                   <G
                     key={`cl-${cl.id}`}
@@ -1171,6 +1183,16 @@ export function FloorplanEditor({
                       onSelectCeiling ? () => onSelectCeiling(cl.id) : undefined
                     }>
                     <Circle cx={q.x} cy={q.y} r={r + 6} fill="transparent" />
+                    {choisi && (
+                      <Circle
+                        cx={q.x}
+                        cy={q.y}
+                        r={r + 5}
+                        fill={c.blueSoft}
+                        stroke={c.blue}
+                        strokeWidth={1.6}
+                      />
+                    )}
                     <G transform={`translate(${q.x}, ${q.y}) scale(${r / 9})`}>
                       {CEILING_SYMBOL[cl.kind].map((seg, si) => (
                         <Path
@@ -1470,8 +1492,11 @@ export function FloorplanEditor({
             })()}
 
             {/* Cartouche par pièce : nom encadré et surface au sol.
-                Chacun esquive les meubles de sa pièce pour rester lisible. */}
-            {parts.map((part) => {
+                Chacun esquive les meubles de sa pièce pour rester lisible.
+                Il s'efface pendant qu'on règle un appareil de plafond : le
+                cartouche tombe au CENTRE de la pièce, c'est-à-dire là où se
+                pose un point lumineux. */}
+            {(selectedCeilingId ? [] : parts).map((part) => {
               const roomName = roomById.get(part.roomId)?.name ?? '';
               const areaText =
                 showSurfaces && part.surface
@@ -1618,6 +1643,24 @@ export function FloorplanEditor({
               />
             )}
           </Svg>
+
+          {/* La poignée de l'appareil de plafond choisi : hors du SVG, comme
+              celle d'un meuble — un PanResponder ne vit pas dans un tracé. */}
+          {selectedCeilingId &&
+            (() => {
+              const cl = (ceiling ?? []).find((x) => x.id === selectedCeilingId);
+              if (!cl) return null;
+              const q = mapping.toPx(cl.at);
+              return (
+                <CeilingDragHandle
+                  id={cl.id}
+                  center={q}
+                  rayon={Math.max(9, Math.min(15, mapping.scale * 0.14))}
+                  mapping={mapping}
+                  at={cl.at}
+                />
+              );
+            })()}
 
           {/* Meuble sélectionné : poignée de déplacement + bouton supprimer */}
           {/* Le meuble sélectionné : toute son emprise se glisse, sa croix
@@ -1891,6 +1934,72 @@ function WallBody({
 
 // Exportées pour les tests : c'est la STABILITÉ de leur responder qu'on
 // vérifie, et elle ne se voit que de l'extérieur.
+/**
+ * La poignée d'un appareil de PLAFOND.
+ *
+ * Même principe que celle d'un meuble, et même piège évité : le geste vit
+ * dans une référence, jamais dans les dépendances d'un `useMemo`, sinon le
+ * `PanResponder` se refabrique à chaque image et perd le déplacement cumulé
+ * depuis l'appui.
+ *
+ * Différence avec un meuble : un point lumineux n'a pas d'emprise au sol
+ * qui buterait sur les murs. Il se pose où l'on veut dans la pièce, y
+ * compris contre une cloison — une applique, justement, s'y colle.
+ */
+export function CeilingDragHandle({
+  id,
+  center,
+  rayon,
+  mapping,
+  at,
+}: {
+  id: string;
+  center: { x: number; y: number };
+  rayon: number;
+  mapping: EffMapping;
+  at: Pt;
+}) {
+  const styles = getStyles(useTheme());
+  const startRef = useRef(at);
+  const live = useRef({ mapping, at });
+  live.current = { mapping, at };
+  const pan = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        onPanResponderTerminationRequest: () => false,
+        onShouldBlockNativeResponder: () => true,
+        onPanResponderGrant: () => {
+          startRef.current = live.current.at;
+          haptic('accroche');
+        },
+        onPanResponderMove: (_e, g) => {
+          const d = live.current.mapping.deltaToMeters(g.dx, g.dy);
+          useScanStore.getState().moveCeiling(id, {
+            x: startRef.current.x + d.x,
+            z: startRef.current.z + d.z,
+          });
+        },
+        onPanResponderRelease: () => releaseHaptic('accroche'),
+        onPanResponderTerminate: () => releaseHaptic('accroche'),
+      }),
+    [id],
+  );
+  return (
+    <View
+      style={{
+        ...styles.dragZone,
+        left: center.x - rayon - 10,
+        top: center.y - rayon - 10,
+        width: (rayon + 10) * 2,
+        height: (rayon + 10) * 2,
+      }}
+      {...pan.panHandlers}
+    />
+  );
+}
+
 export function ObjectDragHandle({
   objectId,
   center,
@@ -2224,6 +2333,8 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   },
   // Hors de l'emprise et en retrait : une croix rouge posée SUR le meuble
   // se lit comme une partie de lui, et se touche par accident.
+  /** Zone de saisie d'une poignée : posée sur le dessin, sans décor. */
+  dragZone: { position: 'absolute' as const },
   objDelete: {
     position: 'absolute',
     opacity: 0.75,
