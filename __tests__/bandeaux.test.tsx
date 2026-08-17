@@ -23,7 +23,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 import React from 'react';
-import { Text, TouchableOpacity, View } from 'react-native';
+import { Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Circle, Text as SvgText } from 'react-native-svg';
 import TestRenderer, { act } from 'react-test-renderer';
 import { ResultScreen } from '../src/screens/ResultScreen';
@@ -207,6 +207,50 @@ describe('l’écran des résultats', () => {
     const vu = textes(tree);
     expect(vu).toContain('Élec');
     expect(vu).toContain('Supprimer');
+  });
+
+  /**
+   * LE BANDEAU DU MEUBLE.
+   *
+   * On touche le meuble, puis sa pastille de cotes : le bandeau donne sa
+   * largeur et sa profondeur. Elles se saisissaient dans deux champs posés
+   * au bas de l'écran — c'est-à-dire là où le clavier vient se mettre.
+   */
+  it('ouvre le bandeau du meuble, avec ses cotes', () => {
+    const tree = monter();
+    /** Un meuble : un groupe touchable qui porte son emprise arrondie. */
+    const meuble = tree.root
+      .findAll((n) => typeof n.props?.onPress === 'function')
+      .find((n) => n.findAll((x) => x.props?.rx === 3).length > 0);
+    expect(meuble).toBeDefined();
+    act(() => meuble!.props.onPress());
+    const cotes = bouton(tree, 'Cotes du meuble');
+    expect(cotes).toBeDefined();
+    act(() => cotes!.props.onPress());
+
+    // Les deux cotes du meuble, en mètres, telles que le scan les donne.
+    const o = SNAPSHOT_OBJECTS[0];
+    const vu = textes(tree);
+    expect(vu).toContain(o.width.toFixed(2).replace('.', ','));
+    expect(vu).toContain(o.depth.toFixed(2).replace('.', ','));
+  });
+
+  /**
+   * AUCUNE SAISIE NE SE FAIT SOUS LE CLAVIER.
+   *
+   * Les bandeaux vivent en bas de l'écran, où le clavier se pose : un champ
+   * qui s'y trouve est un champ qu'on ne voit pas pendant qu'on tape. La
+   * saisie passe donc par la feuille, qui monte AVEC le clavier — et le
+   * bandeau ne porte plus que des pastilles qu'on touche.
+   */
+  it('ne pose aucun champ de saisie dans les bandeaux', () => {
+    const tree = monter();
+    const meuble = tree.root
+      .findAll((n) => typeof n.props?.onPress === 'function')
+      .find((n) => n.findAll((x) => x.props?.rx === 3).length > 0);
+    act(() => meuble!.props.onPress());
+    act(() => bouton(tree, 'Cotes du meuble')!.props.onPress());
+    expect(tree.root.findAllByType(TextInput)).toHaveLength(0);
   });
 
   /**

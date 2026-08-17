@@ -4,7 +4,6 @@ import {
   Animated,
   Image,
   Easing,
-  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -17,11 +16,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import Svg, {
-  Line as SvgLine,
-  Path,
-  Rect as SvgRect,
-} from 'react-native-svg';
+import Svg, { Line as SvgLine, Rect as SvgRect } from 'react-native-svg';
 import { captureRef } from 'react-native-view-shot';
 import { RoomScan } from 'react-native-room-scan';
 import {
@@ -38,6 +33,7 @@ import { WallElevation } from '../components/WallElevation';
 import { SidePill } from '../components/SidePill';
 import { CeilingIcon } from '../components/CeilingIcon';
 import { CeilingBar } from '../components/CeilingBar';
+import { ObjectBar } from '../components/ObjectBar';
 import {
   ANCHOR_TOP,
   PILL_CELL_H,
@@ -205,8 +201,6 @@ export function ResultScreen() {
   const rotateObject = useScanStore((s) => s.rotateObject);
 
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
-  const [wInput, setWInput] = useState('');
-  const [dInput, setDInput] = useState('');
   const selectedObject = objects.find((o) => o.id === selectedObjectId) ?? null;
   /**
    * Renonce au meuble qu'on vient de poser.
@@ -221,15 +215,15 @@ export function ResultScreen() {
     setSelectedObjectId(null);
   };
 
+  /**
+   * Valider, c'est ADOPTER le meuble : il cesse d'être provisoire.
+   *
+   * Les cotes, elles, sont déjà posées — chacune part vers le magasin
+   * quand on la valide dans sa feuille. Il n'y a donc plus rien à lire ici
+   * au moment de fermer, et plus de clavier à congédier.
+   */
   const applyObjectDims = () => {
-    const wv = parseFloat(wInput.replace(',', '.'));
-    const dv = parseFloat(dInput.replace(',', '.'));
-    if (selectedObjectId && wv > 0 && dv > 0) {
-      resizeObject(selectedObjectId, wv, dv);
-    }
-    // Valider, c'est adopter le meuble : il cesse d'être provisoire.
     setDraftObject(null);
-    Keyboard.dismiss();
   };
   const setScreen = useScanStore((s) => s.setScreen);
   const reset = useScanStore((s) => s.reset);
@@ -589,8 +583,6 @@ export function ResultScreen() {
     // Les cotes restent CACHÉES : on vient de poser un meuble, on veut le
     // placer, pas le redimensionner. La pastille de mesure les appellera.
     setObjDims(false);
-    setWInput(item.w.toFixed(2).replace('.', ','));
-    setDInput(item.d.toFixed(2).replace('.', ','));
   };
 
   /**
@@ -1737,100 +1729,32 @@ export function ResultScreen() {
         )}
 
         {/* Côtes du meuble sélectionné, en surimpression */}
+        {/*
+          LE BANDEAU DU MEUBLE vit dans son propre fichier, lui aussi — et
+          il a perdu ses champs de saisie au passage.
+
+          Largeur et profondeur se tapaient dans deux champs posés au bas
+          de l'écran, c'est-à-dire là où le clavier vient se mettre : on
+          tapait à l'aveugle, sans voir ni le champ ni le meuble. Ce sont
+          maintenant deux pastilles qu'on touche, comme au plafond, et la
+          feuille de saisie monte AVEC le clavier.
+        */}
         {vue === '2d' && selectedObject && showFurniture && objDims && !capturing && (
-          <View style={styles.editBar}>
-            <View style={styles.editRow}>
-              <TextInput
-                style={styles.inputSmall}
-                value={wInput}
-                onChangeText={setWInput}
-                keyboardType="decimal-pad"
-              />
-              <Text style={styles.unit}>×</Text>
-              <TextInput
-                style={styles.inputSmall}
-                value={dInput}
-                onChangeText={setDInput}
-                keyboardType="decimal-pad"
-              />
-              <Text style={styles.unit}>m</Text>
-              <View style={styles.editIcons}>
-                <TouchableOpacity
-                  style={styles.iconBtn}
-                  onPress={() => rotateObject(selectedObject.id)}>
-                  <Svg width={19} height={19} viewBox="0 0 24 24">
-                    <Path
-                      d="M19.5 12 a7.5 7.5 0 1 1 -2.2 -5.3"
-                      stroke={teinte.ink}
-                      strokeWidth={2}
-                      strokeLinecap="round"
-                      fill="none"
-                    />
-                    <Path
-                      d="M19.8 3.8 v4.4 h-4.4"
-                      stroke={teinte.ink}
-                      strokeWidth={2}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      fill="none"
-                    />
-                  </Svg>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.iconBtn} onPress={cancelObject}>
-                  <Svg width={19} height={19} viewBox="0 0 24 24">
-                    <Path
-                      d="M6.5 6.5 L17.5 17.5"
-                      stroke={teinte.danger}
-                      strokeWidth={2.2}
-                      strokeLinecap="round"
-                      fill="none"
-                    />
-                    <Path
-                      d="M17.5 6.5 L6.5 17.5"
-                      stroke={teinte.danger}
-                      strokeWidth={2.2}
-                      strokeLinecap="round"
-                      fill="none"
-                    />
-                  </Svg>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.iconBtnOk} onPress={applyObjectDims}>
-                  <Svg width={19} height={19} viewBox="0 0 24 24">
-                    <Path
-                      d="M5 12.5 L10 17.5 L19 6.5"
-                      stroke="#FFFFFF"
-                      strokeWidth={2.4}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      fill="none"
-                    />
-                  </Svg>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
+          <ObjectBar
+            object={selectedObject}
+            styles={styles}
+            palette={teinte}
+            onPrompt={setPrompt}
+            onResize={(w, d) => {
+              resizeObject(selectedObject.id, w, d);
+              setDraftObject(null);
+            }}
+            onRotate={() => rotateObject(selectedObject.id)}
+            onCancel={cancelObject}
+            onDone={applyObjectDims}
+          />
         )}
 
-        {/*
-          L'APPAREIL DE PLAFOND EN RÉGLAGE : ses distances aux murs.
-
-          Trois choses étaient fausses dans la première version, et toutes
-          les trois pour la même raison — j'avais recopié le bandeau des
-          meubles sans me demander ce qu'on lit vraiment sur un plafond.
-
-          1. Les valeurs étaient comptées depuis le coin de l'emprise de la
-             pièce, alors que les pointillés du plan montrent les distances
-             AUX MURS. Deux quantités différentes affichées côte à côte :
-             le bandeau contredisait le dessin.
-          2. La saisie se faisait dans le bandeau, en bas de l'écran — que
-             le clavier recouvre entièrement. On ne voyait plus ni le champ,
-             ni le plan, ni la validation.
-          3. Les deux flèches étaient des caractères : l'une passait en
-             icône, l'autre en émoji couleur selon la police du système.
-
-          Désormais : deux distances aux murs, exactement celles des
-          pointillés, dans des pastilles qu'on touche pour ouvrir la
-          feuille de saisie — celle qui monte AVEC le clavier.
         {/*
           LE BANDEAU DU PLAFOND vit dans son propre fichier.
 
@@ -2058,8 +1982,6 @@ export function ResultScreen() {
                 const next = o.id === selectedObjectId ? null : o.id;
                 setSelectedObjectId(next);
                 setSelectedWallId(null);
-                setWInput(o.width.toFixed(2).replace('.', ','));
-                setDInput(o.depth.toFixed(2).replace('.', ','));
               }}>
               <Text style={styles.objectName}>{frCategory(o.category)}</Text>
               <Text style={styles.objectDims}>

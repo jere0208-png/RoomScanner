@@ -1444,6 +1444,8 @@ export function FloorplanEditor({
                   />
                   <TouchableOpacity
                     style={[styles.objDelete, { left: bx, top: by }]}
+                    accessibilityLabel="Retirer le meuble"
+                    hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                     onPress={() => onDeleteObject?.(o.id)}>
                     <CloseCross size={17} color="#FFFFFF" weight={3.4} />
                   </TouchableOpacity>
@@ -1457,6 +1459,8 @@ export function FloorplanEditor({
                       showObjectDims && styles.objMeasureOn,
                       { left: bx, top: by + 36 },
                     ]}
+                    accessibilityLabel="Cotes du meuble"
+                    hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                     onPress={onToggleObjectDims}>
                     <Svg width={17} height={17} viewBox="0 0 24 24">
                       {[
