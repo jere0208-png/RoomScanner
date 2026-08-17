@@ -40,6 +40,7 @@ export function FixtureLayer({
   mapping,
   viewRot,
   elecLod,
+  navigating,
   onSelectFixture,
   c,
 }: {
@@ -52,6 +53,17 @@ export function FixtureLayer({
   viewRot: number;
   /** Niveau de détail, de 0 (un point) à 1 (le symbole entier). */
   elecLod: number;
+  /**
+   * LE PLAN GLISSE SOUS LE DOIGT : on allège.
+   *
+   * Un appareil dessiné en grand, c'est un filet, un disque, quatre tracés
+   * de symbole et parfois une étiquette — sept nœuds. Vingt appareils
+   * pendant un déplacement, c'est cent quarante nœuds à repeindre à chaque
+   * image, pour un dessin qui file. On retombe donc sur ce que la vue fait
+   * déjà de loin : un POINT de la couleur de l'appareil — on voit qu'il y
+   * a quelque chose et combien — et le symbole revient au relâcher.
+   */
+  navigating?: boolean;
   onSelectFixture?: (id: string, wallId: string) => void;
   c: Palette;
 }) {
@@ -177,7 +189,8 @@ export function FixtureLayer({
           const tag = assemblyTag(postes);
           // Échelonnement : le deuxième appareil du même point se pose
           // plus loin du mur, sur le même filet.
-          const out = 0.14 + (ranks.get(f.id) ?? 0) * (0.1 + 0.14 * elecLod);
+          const lod = navigating ? 0 : elecLod;
+          const out = 0.14 + (ranks.get(f.id) ?? 0) * (0.1 + 0.14 * lod);
           const anchor = mapping.toPx(facePoint(face, x, 0.02));
           const p = mapping.toPx(facePoint(face, x, out));
           // Le symbole regarde SA face : sa tige rejoint le mur. Le
@@ -200,17 +213,17 @@ export function FixtureLayer({
                 r={Math.max(18, rayon + 8)}
                 fill="transparent"
               />
-              {elecLod < 0.98 && (
+              {lod < 0.98 && (
                 <Circle
                   cx={p.x}
                   cy={p.y}
                   r={4}
                   fill={spec.color}
-                  opacity={1 - elecLod}
+                  opacity={1 - lod}
                 />
               )}
-              {elecLod > 0.02 && (
-                <G opacity={elecLod}>
+              {lod > 0.02 && (
+                <G opacity={lod}>
                   <Line
                     x1={anchor.x}
                     y1={anchor.y}

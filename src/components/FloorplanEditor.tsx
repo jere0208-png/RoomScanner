@@ -758,25 +758,40 @@ export function FloorplanEditor({
                     strokeWidth={o.id === selectedObjectId ? 2.5 : 1}
                     rx={3}
                   />
-                  {/* Symbole de mobilier (lit, canapé, TV…) */}
-                  {furnitureStrokes(furnKind(f.category), w, d).map((line, li) => (
-                    <G key={`s${li}`}>
-                      {line.slice(1).map((p, pi) => (
-                        <Line
-                          key={pi}
-                          x1={line[pi].x}
-                          y1={line[pi].y}
-                          x2={p.x}
-                          y2={p.y}
-                          stroke={c.inkSoft}
-                          strokeWidth={1.2}
-                          strokeLinecap="round"
-                        />
-                      ))}
-                    </G>
-                  ))}
+                  {/*
+                    UN TRAIT PAR POLYLIGNE, pas un nœud par segment.
+
+                    Le symbole d'un lit ou d'un canapé, c'est trois ou quatre
+                    lignes brisées. Elles étaient dessinées segment par
+                    segment, chacun dans sa balise, groupés dans une balise
+                    de plus : une quinzaine de nœuds par meuble, quand un
+                    seul tracé par ligne suffit. Sur un logement meublé, ça
+                    se compte en centaines — et chaque nœud se repaie à
+                    chaque image quand le plan glisse sous le doigt.
+
+                    Pendant le geste, le symbole s'efface même tout à fait :
+                    on déplace un plan pour VOIR OÙ L'ON VA, la silhouette du
+                    meuble suffit, et le détail revient au relâcher.
+                  */}
+                  {!navigating &&
+                    furnitureStrokes(furnKind(f.category), w, d).map((line, li) => (
+                      <Path
+                        key={`s${li}`}
+                        d={line
+                          .map(
+                            (p, pi) =>
+                              `${pi === 0 ? 'M' : 'L'}${p.x.toFixed(1)} ${p.y.toFixed(1)}`,
+                          )
+                          .join(' ')}
+                        stroke={c.inkSoft}
+                        strokeWidth={1.2}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        fill="none"
+                      />
+                    ))}
                   {/* Nom du meuble (horizontal, si la place le permet) */}
-                  {w > 46 && d > 18 && (
+                  {!navigating && w > 46 && d > 18 && (
                     <SvgText
                       transform={`rotate(${(-(f.yaw + view.rot) * 180) / Math.PI})`}
                       x={0}
@@ -1216,6 +1231,7 @@ export function FloorplanEditor({
               mapping={mapping}
               viewRot={view.rot}
               elecLod={elecLod}
+              navigating={navigating}
               onSelectFixture={onSelectFixture}
               c={c}
             />
