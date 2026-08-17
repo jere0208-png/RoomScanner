@@ -30,8 +30,15 @@ final class RoomColorSampler {
   private static let wallRows = 4
   /// Côté d'une case du sol, en mètres.
   private static let floorCell: Float = 0.4
-  /// Cadence de lecture des images (Hz). Au-delà on paie sans rien gagner.
-  private static let rate = 3.0
+  /**
+   Cadence de lecture des images (Hz).
+
+   Trois fois par seconde, un mur traversé en marchant ne recevait que
+   quelques relevés par case — trop peu pour que la médiane fasse son
+   office. Cinq, c'est encore imperceptible sur la capture RoomPlan (on ne
+   fait que LIRE `currentFrame`) et ça double presque la matière.
+   */
+  private static let rate = 5.0
 
   // MARK: - Accumulateurs
 
@@ -381,11 +388,22 @@ final class RoomColorSampler {
     return best?.0
   }
 
+  /**
+   Lumière linéaire → `#RRGGBB`.
+
+   Les couleurs s'accumulent en LINÉAIRE et se rendent en sRGB. Moyenner
+   des valeurs déjà encodées en gamma — ce qu'on faisait — tire tout vers
+   le gris : deux relevés d'un même mur, l'un à l'ombre l'autre au jour,
+   donnaient une teinte plus terne que les deux. C'est la même raison qui
+   fait qu'on ne mixe pas des sons en décibels.
+   */
   static func hex(_ c: SIMD3<Float>) -> String {
-    let r = Int(max(0, min(255, c.x.rounded())))
-    let g = Int(max(0, min(255, c.y.rounded())))
-    let b = Int(max(0, min(255, c.z.rounded())))
-    return String(format: "#%02X%02X%02X", r, g, b)
+    func srgb(_ v: Float) -> Int {
+      let l = max(0, min(1, v))
+      let e = l <= 0.0031308 ? l * 12.92 : 1.055 * pow(l, 1 / 2.4) - 0.055
+      return Int((e * 255).rounded())
+    }
+    return String(format: "#%02X%02X%02X", srgb(c.x), srgb(c.y), srgb(c.z))
   }
 }
 
@@ -466,7 +484,8 @@ private struct FrameImage {
     let ix = Int(u.rounded())
     let iy = Int(v.rounded())
     // Marge de bord : les pixels extrêmes sont les plus déformés.
-    guard ix >= 8, iy >= 8, ix < width - 8, iy < height - 8 else { return nil }
+    // La marge couvre la tache lue : deux pixels de part et d'autre.
+    guard ix >= 10, iy >= 10, ix < width - 10, iy < height - 10 else { return nil }
 
     if let d = depth {
       let dw = CVPixelBufferGetWidth(d)
@@ -481,7 +500,35 @@ private struct FrameImage {
       if measured > 0.05 && measured < z - 0.25 { return nil }
     }
 
-    return yuv(x: ix, y: iy)
+    /**
+     UNE TACHE DE NEUF PIXELS, ET SA MÉDIANE.
+
+     On lisait UN pixel. À main levée, sur une image compressée, ce pixel
+     tombe une fois sur trois dans un grain de bruit, un reflet spéculaire
+     ou le joint sombre entre deux lés de papier peint — et la case entière
+     héritait de cette couleur-là. La médiane d'une petite tache écarte
+     ces accidents par construction : il faudrait que la moitié des pixels
+     soient faux pour la tromper.
+     */
+    var lus: [SIMD3<Float>] = []
+    lus.reserveCapacity(9)
+    for dy in -2...2 where dy % 2 == 0 {
+      for dx in -2...2 where dx % 2 == 0 {
+        lus.append(yuv(x: ix + dx, y: iy + dy))
+      }
+    }
+    let lum = lus.map { 0.2126 * $0.x + 0.7152 * $0.y + 0.0722 * $0.z }
+    let ordre = lum.enumerated().sorted { $0.element < $1.element }
+    return lineaire(lus[ordre[ordre.count / 2].offset])
+  }
+
+  /// sRGB 0…255 → lumière linéaire 0…1 : c'est ainsi qu'on moyenne.
+  private func lineaire(_ c: SIMD3<Float>) -> SIMD3<Float> {
+    func lin(_ v: Float) -> Float {
+      let e = max(0, min(1, v / 255))
+      return e <= 0.04045 ? e / 12.92 : pow((e + 0.055) / 1.055, 2.4)
+    }
+    return SIMD3(lin(c.x), lin(c.y), lin(c.z))
   }
 
   /// Conversion Y'CbCr (BT.601) → RGB 0…255.

@@ -299,11 +299,66 @@ describe('sampleTexture', () => {
     texels: ['#111111', '#222222', '#333333', '#444444'],
   };
 
-  it('lit la bonne case (ligne 0 = haut, colonne 0 = extrémité A)', () => {
-    expect(sampleTexture(tex, 0.1, 0.1)).toBe('#111111');
-    expect(sampleTexture(tex, 0.9, 0.1)).toBe('#222222');
-    expect(sampleTexture(tex, 0.1, 0.9)).toBe('#333333');
-    expect(sampleTexture(tex, 0.9, 0.9)).toBe('#444444');
+  /** La distance entre deux couleurs, canal par canal. */
+  const ecartCouleur = (a: string, b: string) =>
+    Math.max(
+      ...[1, 3, 5].map((i) =>
+        Math.abs(parseInt(a.slice(i, i + 2), 16) - parseInt(b.slice(i, i + 2), 16)),
+      ),
+    );
+
+  it('rend chaque coin à SA case (ligne 0 = haut, colonne 0 = extrémité A)', () => {
+    /**
+     * L'échantillonnage est bilinéaire : un coin ne rend plus exactement sa
+     * case, il rend un mélange dominé par elle. C'est le prix — et
+     * l'objet — du changement : une grille de six cases par quatre étalée
+     * sur trois mètres donnait sinon des carrés de cinquante centimètres,
+     * francs comme un carrelage. On vérifie donc l'ORDRE : chaque coin
+     * reste plus proche de sa case que des autres.
+     */
+    const coins: [number, number, string][] = [
+      [0.02, 0.02, '#111111'],
+      [0.98, 0.02, '#222222'],
+      [0.02, 0.98, '#333333'],
+      [0.98, 0.98, '#444444'],
+    ];
+    for (const [u, v, attendu] of coins) {
+      const vu = sampleTexture(tex, u, v)!;
+      for (const autre of tex.texels) {
+        if (autre === attendu) continue;
+        expect(ecartCouleur(vu, attendu)).toBeLessThan(ecartCouleur(vu, autre));
+      }
+    }
+  });
+
+  it('et le milieu mélange, au lieu de sauter d’une case à l’autre', () => {
+    const gauche = sampleTexture(tex, 0.45, 0.5)!;
+    const droite = sampleTexture(tex, 0.55, 0.5)!;
+    // Deux points à dix centièmes l'un de l'autre, de part et d'autre de
+    // la frontière : la marche était de dix-sept niveaux, elle est douce.
+    expect(ecartCouleur(gauche, droite)).toBeLessThan(12);
+  });
+
+  /**
+   * UNE CASE ABERRANTE NE PASSE PLUS.
+   *
+   * Un reflet, une ombre portée, une main qui traverse le champ : la case
+   * sort d'une teinte franchement différente de ses voisines, et on voyait
+   * un damier aléatoire là où il n'y a qu'un mur uni.
+   */
+  it('écarte une case aberrante au profit de ses voisines', () => {
+    const uni = {
+      cols: 3,
+      rows: 3,
+      texels: [
+        '#C8C8C8', '#C8C8C8', '#C8C8C8',
+        '#C8C8C8', '#101010', '#C8C8C8',
+        '#C8C8C8', '#C8C8C8', '#C8C8C8',
+      ],
+    };
+    const centre = sampleTexture(uni, 0.5, 0.5)!;
+    // La case noire est remplacée par la médiane de son voisinage : gris.
+    expect(ecartCouleur(centre, '#C8C8C8')).toBeLessThan(20);
   });
 
   it('ignore une grille vide ou une couleur invalide', () => {
@@ -976,8 +1031,13 @@ describe('mergeColinear', () => {
     expect(merged).toHaveLength(1);
     const tex = merged[0].texture!;
     // La première moitié reste rouge, la seconde bleue : pas d'étirement.
-    expect(sampleTexture(tex, 0.1, 0.5)).toBe('#FF0000');
-    expect(sampleTexture(tex, 0.9, 0.5)).toBe('#0000FF');
+    // (À l'échantillonnage bilinéaire, « rouge » veut dire « dominé par le
+    // rouge » : au bord, la case voisine pèse un peu.)
+    const rouge = sampleTexture(tex, 0.02, 0.5)!;
+    const bleu = sampleTexture(tex, 0.98, 0.5)!;
+    const canal = (c: string, i: number) => parseInt(c.slice(i, i + 2), 16);
+    expect(canal(rouge, 1)).toBeGreaterThan(canal(rouge, 5));
+    expect(canal(bleu, 5)).toBeGreaterThan(canal(bleu, 1));
   });
 });
 
