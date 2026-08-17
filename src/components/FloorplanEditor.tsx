@@ -55,6 +55,7 @@ import { CeilingLayer } from './CeilingLayer';
 import { FixtureLayer } from './FixtureLayer';
 import type { CeilingFixture } from '../geometry/ceiling';
 import { CloseCross } from './CloseCross';
+import { CardinalRing, NorthBadge } from './CardinalRing';
 
 /**
  * Les commandes du mur, en icônes.
@@ -185,6 +186,13 @@ interface Props {
    */
   ceiling?: CeilingFixture[];
   showCeiling?: boolean;
+  /**
+   * Les points cardinaux autour du plan.
+   *
+   * On les cache comme un calque : sur un plan serré, quatre pastilles au
+   * bord prennent la place des cotes qu'on est venu lire.
+   */
+  showNorth?: boolean;
   /** `null` = plus rien de sélectionné au plafond (appui dans le vide). */
   onSelectCeiling?: (id: string | null) => void;
   /**
@@ -248,6 +256,7 @@ export function FloorplanEditor({
   onSelectFixture,
   ceiling,
   showCeiling,
+  showNorth = true,
   onSelectCeiling,
   placing,
   onPlaceAt,
@@ -271,41 +280,14 @@ export function FloorplanEditor({
   const rooms = useScanStore((s) => s.rooms);
   const fixtures = useScanStore((s) => s.fixtures);
   const north = useScanStore((s) => s.north);
-  /**
-   * OÙ REGARDE-T-ON, EN CE MOMENT ?
-   *
-   * Le cap du scan dit où est le nord SUR LE PLAN, une fois pour toutes.
-   * Il ne dit pas où est le nord POUR CELUI QUI TIENT LE TÉLÉPHONE, et
-   * c'est pourtant la question qu'on se pose sur place, un pied dans le
-   * couloir : « lequel de ces deux murs est celui du plan ? ».
-   *
-   * On interroge donc le magnétomètre trois fois par seconde — assez pour
-   * suivre un demi-tour, assez peu pour peser — et seulement quand il y a
-   * une couronne à faire tourner. À la fermeture, on referme : un capteur
-   * qui tourne pour personne ne coûte que de la batterie.
-   */
-  const [cap, setCap] = useState<number | null>(null);
-  useEffect(() => {
-    if (north === null) return;
-    let vivant = true;
-    RoomScan.startHeading();
-    const lire = async () => {
-      const v = await RoomScan.heading();
-      if (vivant) setCap(typeof v === 'number' ? v : null);
-    };
-    lire();
-    const t = setInterval(lire, 330);
-    return () => {
-      vivant = false;
-      clearInterval(t);
-      RoomScan.stopHeading();
-    };
-  }, [north]);
   const colorOpenings = useScanStore((s) => s.showOpeningColors);
   const showSurfaces = useScanStore((s) => s.showSurfaces);
   const c = useTheme();
   const styles = getStyles(c);
   const [layout, setLayout] = useState({ w: 0, h: 0 });
+  const setNorth = useScanStore((s) => s.setNorth);
+  /** La consigne d'orientation est affichée : le prochain appui valide. */
+  const [invite, setInvite] = useState(false);
 
   // Navigation du plan : zoom (pincer), déplacement (glisser), rotation (torsion).
   const [view, setView] = useState({ zoom: 1, ox: 0, oy: 0, rot: 0 });
@@ -624,6 +606,39 @@ export function FloorplanEditor({
         })
       }
       {...nav.panHandlers}>
+      {/*
+        SANS CAP, ON PROPOSE DE L'ORIENTER — sans refaire le scan.
+
+        Les relevés d'avant la boussole, et ceux où le magnétomètre s'est
+        tu, n'ont pas d'orientation : on ne peut ni dessiner la couronne, ni
+        l'inventer. Plutôt qu'un vide inexplicable, deux appuis suffisent :
+        on se place face au HAUT du plan — la direction du haut de l'écran,
+        que le dessin montre sans ambiguïté — et le cap du téléphone donne
+        le reste. Le nord de l'écran est à la rotation du plan près : c'est
+        toute la formule.
+      */}
+      {showNorth && north === null && layout.w > 0 && (
+        <NorthBadge
+          x={10}
+          y={10}
+          invite={invite}
+          onPress={async () => {
+            if (!invite) {
+              setInvite(true);
+              return;
+            }
+            setInvite(false);
+            const cap = await RoomScan.heading();
+            if (cap === null) {
+              haptic('alerte');
+              return;
+            }
+            const rot = (viewRef.current.rot * 180) / Math.PI;
+            setNorth(((cap - rot) % 360 + 360) % 360);
+            haptic('succes');
+          }}
+        />
+      )}
       {mapping && (
         <>
           <Svg width={layout.w} height={layout.h}>
@@ -943,96 +958,22 @@ export function FloorplanEditor({
             })}
 
             {/*
-              LA COURONNE CARDINALE — tout autour du plan, pas dans un coin.
+              LES POINTS CARDINAUX, tout autour du plan.
 
-              La rose tenait dans un rond de 21 points en haut à gauche :
-              lisible à la loupe, et surtout détachée des murs qu'elle
-              devait qualifier. On lit maintenant les quatre lettres AU BORD
-              du cadre, chacune du côté où se trouve réellement son point
-              cardinal : le mur qui touche le N est le mur nord, sans calcul
-              et sans rose à interpréter. C'est le même nom que porteront
-              l'établi et le dossier imprimé — « mur nord » partout.
-
-              Le repère bleu, lui, montre OÙ L'ON REGARDE et tourne quand on
-              se tourne : c'est ce qui remplace un plan qui pivoterait sous
-              les doigts, en laissant le dessin tranquille.
+              Le mur qui touche le N est le mur nord : c'est le nom que
+              porteront aussi l'établi et le dossier imprimé. Le calcul de
+              l'angle appartient à la vue — ici la rotation du plan —, le
+              dessin est commun avec la 3D.
             */}
-            {north !== null &&
-              layout.w > 0 &&
-              (() => {
-                const a0 = northScreenAngle(north, view.rot);
-                const cx = layout.w / 2;
-                const cy = layout.h / 2;
-                /** Le point du BORD du cadre, dans cette direction. */
-                const bord = (a: number, marge: number) => {
-                  const dx = Math.cos(a);
-                  const dy = Math.sin(a);
-                  const t = Math.min(
-                    Math.abs((cx - marge) / (dx || 1e-6)),
-                    Math.abs((cy - marge) / (dy || 1e-6)),
-                  );
-                  return { x: cx + dx * t, y: cy + dy * t };
-                };
-                return (
-                  <G>
-                    {(
-                      [
-                        ['N', 0],
-                        ['E', 90],
-                        ['S', 180],
-                        ['O', 270],
-                      ] as [string, number][]
-                    ).map(([lettre, deg]) => {
-                      const p = bord(a0 + (deg * Math.PI) / 180, 15);
-                      const nord = lettre === 'N';
-                      return (
-                        <G key={lettre}>
-                          <Circle
-                            cx={p.x}
-                            cy={p.y}
-                            r={11}
-                            fill={c.surface}
-                            fillOpacity={0.88}
-                            stroke={nord ? c.danger : c.line}
-                            strokeWidth={nord ? 1.4 : 1}
-                          />
-                          <SvgText
-                            x={p.x}
-                            y={p.y + 4}
-                            fill={nord ? c.danger : c.inkSoft}
-                            fontSize={nord ? 12 : 11}
-                            fontWeight="900"
-                            textAnchor="middle">
-                            {lettre}
-                          </SvgText>
-                        </G>
-                      );
-                    })}
-                    {cap !== null &&
-                      (() => {
-                        // Le cap se compte depuis le nord dans le sens des
-                        // aiguilles : la même convention que la couronne.
-                        const a = a0 + (cap * Math.PI) / 180;
-                        const p = bord(a, 30);
-                        const q = bord(a, 46);
-                        return (
-                          <G>
-                            <Line
-                              x1={q.x}
-                              y1={q.y}
-                              x2={p.x}
-                              y2={p.y}
-                              stroke={c.blue}
-                              strokeWidth={2.4}
-                              strokeLinecap="round"
-                            />
-                            <Circle cx={p.x} cy={p.y} r={3.4} fill={c.blue} />
-                          </G>
-                        );
-                      })()}
-                  </G>
-                );
-              })()}
+            {showNorth && north !== null && (
+              <CardinalRing
+                w={layout.w}
+                h={layout.h}
+                angleOf={(deg) =>
+                  northScreenAngle(north, view.rot) + (deg * Math.PI) / 180
+                }
+              />
+            )}
 
             {/* Dégagements du meuble sélectionné : ce qui le sépare des
                 murs, sur ses quatre côtés. Les cotes LONGENT le meuble —

@@ -36,6 +36,8 @@ import {
 } from '../theme';
 import { FloorplanEditor } from '../components/FloorplanEditor';
 import { WallElevation } from '../components/WallElevation';
+import { SidePill } from '../components/SidePill';
+import { CeilingIcon } from '../components/CeilingIcon';
 import {
   DEFAULT_VIEW3D,
   Iso3DView,
@@ -1438,9 +1440,7 @@ export function ResultScreen() {
                             ? [
                                 {
                                   label: 'Ligne de spots',
-                                  hint:
-                                    'Alignés sur la longueur de la pièce, ' +
-                                    'à intervalles égaux.',
+                                  node: <CeilingIcon kind="spots" />,
                                   onPress: () =>
                                     setMenu({
                                       title: 'Combien de spots ?',
@@ -1467,9 +1467,21 @@ export function ResultScreen() {
                                 },
                               ]
                             : []),
+                          /*
+                            LE CATALOGUE SE LIT D'UN COUP D'ŒIL.
+
+                            Chaque appareil portait sa règle en trois lignes
+                            grises : la liste faisait deux écrans, et il
+                            fallait dérouler pour trouver un spot. Un
+                            électricien sait ce qu'est un détecteur de
+                            fumée ; ce qu'il veut, c'est le toucher. Les
+                            règles n'ont pas disparu pour autant — elles
+                            restent là où elles servent : le contrôle de
+                            conformité et le dossier imprimé.
+                          */
                           ...CEILING_KINDS.map((k) => ({
                             label: CEILINGS[k].label,
-                            hint: CEILINGS[k].note,
+                            node: <CeilingIcon kind={k} />,
                             onPress: () => setPendingCeiling(k),
                           })),
                         ],
@@ -1550,7 +1562,16 @@ export function ResultScreen() {
               ))}
           </View>
         ) : (
-          <View style={styles.planTools}>
+          /*
+            EN 3D, LA COLONNE COMMENCE EN HAUT.
+
+            Elle partageait le décalage du plan 2D, où elle passe SOUS la
+            rangée du bouton d'édition. Mais la 3D n'a pas de bouton
+            d'édition : la colonne descendait donc d'une cellule pour
+            laisser la place à une rangée qui n'existe pas, et la
+            dernière pastille se retrouvait à mi-hauteur du modèle.
+          */
+          <View style={[styles.planTools, styles.planToolsHaut]}>
             <ToolPill
               icon="ruler"
               label="Cotes"
@@ -1624,29 +1645,29 @@ export function ResultScreen() {
                 seule en bas à droite du plan, loin du seul endroit qu'on
                 regarde quand on modifie — et elle forçait la barre de cotes
                 à se raccourcir pour lui laisser la place. */}
-            {dirty && (
+            <SidePill visible={dirty} index={2}>
               <ToolPill
                 icon="save"
                 label="Enregistrer"
                 active
                 onPress={commitCurrent}
               />
-            )}
-            {editMode && canUndo && (
+            </SidePill>
+            <SidePill visible={editMode && canUndo} index={1}>
               <ToolPill icon="undo" label="Annuler" active={false} onPress={undo} />
-            )}
+            </SidePill>
             {/* Le contrôle de conformité ne défile plus avec les calques :
                 c’est un verdict sur le plan, pas un réglage d’affichage, et
                 on le cherche en édition comme en lecture. Il se tient donc
                 contre le bouton d’édition, à sa gauche. */}
-            {issues.length > 0 && (
+            <SidePill visible={issues.length > 0} index={0}>
               <ToolPill
                 icon="check"
                 label="Contrôle"
                 active={alertes > 0}
                 onPress={() => setChecking(true)}
               />
-            )}
+            </SidePill>
             <ToolPill
               icon="edit"
               label="Édition"
@@ -3085,6 +3106,8 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     alignItems: 'flex-end',
     gap: PILL_GAP,
   },
+  /** Sans rangée au-dessus, la colonne prend sa place. */
+  planToolsHaut: { top: ANCHOR_TOP },
   editAnchor: {
     position: 'absolute',
     top: ANCHOR_TOP,

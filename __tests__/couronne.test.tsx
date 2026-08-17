@@ -8,9 +8,8 @@
  * cardinal, et le mur qui touche le N est le mur nord — c'est le nom que
  * portent aussi l'établi et le dossier imprimé.
  *
- * Le repère bleu, lui, dit où l'on regarde EN CE MOMENT, et tourne quand on
- * se tourne. On vérifie les deux : la place des lettres, et le fait que le
- * repère suive le cap sans emporter le reste.
+ * On vérifie la place des lettres — et qu'elles se taisent quand le relevé
+ * n'a pas de cap, plutôt que d'en inventer un.
  */
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn(async () => null),
@@ -18,7 +17,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   removeItem: jest.fn(async () => undefined),
 }));
 
-/** Un cap qu'on pilote depuis le test : `mock` en préfixe, sinon Jest refuse. */
+/** Le cap que rendra la boussole, piloté depuis le test. */
 const mockCap = { valeur: null as number | null };
 jest.mock('react-native-room-scan', () => ({
   RoomScan: {
@@ -32,7 +31,7 @@ jest.mock('react-native-room-scan', () => ({
 
 import React from 'react';
 import { View } from 'react-native';
-import { Circle, Line, Text as SvgText } from 'react-native-svg';
+import { Text as SvgText } from 'react-native-svg';
 import TestRenderer, { act } from 'react-test-renderer';
 import { FloorplanEditor } from '../src/components/FloorplanEditor';
 import { useScanStore } from '../src/store/scanStore';
@@ -162,37 +161,5 @@ describe('les quatre lettres autour du plan', () => {
    */
   it('et disparaissent quand le scan n’a pas de cap', () => {
     expect(lettres(rendu(null)).size).toBe(0);
-  });
-});
-
-describe('le repère « où je regarde »', () => {
-  /** Le trait bleu du cap : le seul segment à bout rond de cette longueur. */
-  const repere = (tree: TestRenderer.ReactTestRenderer) =>
-    tree.root
-      .findAllByType(Line)
-      .filter((n) => n.props.strokeLinecap === 'round' && n.props.strokeWidth === 2.4);
-
-  it('n’apparaît que si le magnétomètre répond', () => {
-    expect(repere(rendu(0))).toHaveLength(0);
-  });
-
-  it('et se pose du côté où l’on regarde', async () => {
-    mockCap.valeur = 90; // plein est
-    const tree = rendu(0);
-    // Le cap arrive par une promesse : avancer l'horloge ne suffit pas, il
-    // faut aussi laisser les microtâches se vider.
-    await act(async () => {
-      jest.advanceTimersByTime(400);
-    });
-    const traits = repere(tree);
-    expect(traits).toHaveLength(1);
-    // Plein est, plan orienté nord en haut : le repère est à droite.
-    expect(traits[0].props.x2).toBeGreaterThan(TAILLE.width / 2);
-    expect(Math.abs(traits[0].props.y2 - TAILLE.height / 2)).toBeLessThan(3);
-    // Et sa pastille est au bout du trait, pas ailleurs.
-    const pastille = tree.root
-      .findAllByType(Circle)
-      .find((n) => n.props.r === 3.4)!;
-    expect(pastille.props.cx).toBeCloseTo(traits[0].props.x2, 3);
   });
 });

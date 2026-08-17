@@ -107,3 +107,76 @@ describe('le contenu de la feuille', () => {
     expect(modalOf(tree).props.visible).toBe(false);
   });
 });
+
+/**
+ * UNE FEUILLE N'EN OUVRE UNE AUTRE QU'APRÈS ÊTRE PARTIE.
+ *
+ * iOS ne présente qu'une fenêtre modale à la fois. En ouvrir une seconde
+ * pendant que la première se retire ne fait rien du tout : la seconde
+ * n'apparaît jamais. Le symptôme est déroutant — on touche « Largeur » dans
+ * un menu, le clavier monte (le champ a bien pris le focus) et il n'y a
+ * aucun champ à l'écran. L'action attendait derrière un délai de 180 ms
+ * réglé à l'œil sur l'animation de descente ; elle attend maintenant le
+ * démontage réel.
+ */
+describe('l’enchaînement de deux feuilles', () => {
+  it('ne lance l’action qu’une fois la fenêtre retirée', () => {
+    const fait: string[] = [];
+    let visible = true;
+    const rendre = (tree?: TestRenderer.ReactTestRenderer) => {
+      const el = (
+        <ActionSheet
+          data={
+            visible
+              ? {
+                  title: 'Menuiserie',
+                  actions: [
+                    { label: 'Largeur', onPress: () => fait.push('largeur') },
+                  ],
+                }
+              : null
+          }
+          onClose={() => {
+            visible = false;
+          }}
+        />
+      );
+      if (tree) {
+        act(() => tree.update(el));
+        return tree;
+      }
+      let t!: TestRenderer.ReactTestRenderer;
+      act(() => {
+        t = TestRenderer.create(el);
+      });
+      return t;
+    };
+    const tree = rendre();
+    /**
+     * On remonte depuis le MOT jusqu'au premier parent qui répond au doigt.
+     *
+     * Chercher le `Pressable` par son type ne donne rien ici : le banc
+     * d'essai de React Native le remplace par un autre composant, et le
+     * symbole importé ne correspond plus à ce qui est rendu.
+     */
+    const mot = tree.root
+      .findAllByType(Text)
+      .find((t) => t.props.children === 'Largeur')!;
+    let ligne: TestRenderer.ReactTestInstance | null = mot;
+    while (ligne && typeof ligne.props?.onPress !== 'function') {
+      ligne = ligne.parent;
+    }
+    act(() => ligne!.props.onPress());
+    // Rien n'est parti : la feuille est encore là, en train de descendre.
+    expect(fait).toEqual([]);
+    expect(modalOf(tree).props.visible).toBe(true);
+
+    // Le parent retire la donnée, la descente se joue, la fenêtre part.
+    rendre(tree);
+    act(() => {
+      jest.advanceTimersByTime(400);
+    });
+    expect(modalOf(tree).props.visible).toBe(false);
+    expect(fait).toEqual(['largeur']);
+  });
+});

@@ -25,6 +25,126 @@
   {
    "type": "RNSVGSvgView",
    "props": {
+    "width": 54,
+    "height": 44,
+    "onPress": "[fn]",
+    "focusable": false,
+    "style": [
+     {
+      "backgroundColor": "transparent",
+      "borderWidth": 0
+     },
+     [
+      {
+       "position": "absolute"
+      },
+      {
+       "left": 10,
+       "top": 10
+      }
+     ],
+     {
+      "width": 54,
+      "height": 44,
+      "flex": 0
+     }
+    ],
+    "bbWidth": 54,
+    "bbHeight": 44,
+    "onResponderMove": "[fn]",
+    "onResponderGrant": "[fn]",
+    "onResponderRelease": "[fn]",
+    "onResponderTerminate": "[fn]",
+    "onStartShouldSetResponder": "[fn]",
+    "onResponderTerminationRequest": "[fn]",
+    "responsible": true
+   },
+   "children": [
+    {
+     "type": "RNSVGGroup",
+     "props": {
+      "fill": {
+       "type": 0,
+       "payload": 4278190080
+      }
+     },
+     "children": [
+      {
+       "type": "RNSVGCircle",
+       "props": {
+        "fill": {
+         "type": 0,
+         "payload": 4294967295
+        },
+        "stroke": {
+         "type": 0,
+         "payload": 4293389040
+        },
+        "strokeWidth": 1,
+        "propList": [
+         "fill",
+         "stroke",
+         "strokeWidth"
+        ],
+        "cx": 22,
+        "cy": 22,
+        "r": 17
+       },
+       "children": null
+      },
+      {
+       "type": "RNSVGText",
+       "props": {
+        "fill": {
+         "type": 0,
+         "payload": 4288192942
+        },
+        "propList": [
+         "fill"
+        ],
+        "content": null,
+        "font": {
+         "fontWeight": "900",
+         "fontSize": 13,
+         "textAnchor": "middle"
+        },
+        "x": [
+         22
+        ],
+        "y": [
+         26
+        ],
+        "dx": [],
+        "dy": [],
+        "rotate": []
+       },
+       "children": [
+        {
+         "type": "RNSVGTSpan",
+         "props": {
+          "fill": {
+           "type": 0,
+           "payload": 4278190080
+          },
+          "content": "N?",
+          "font": {},
+          "x": [],
+          "y": [],
+          "dx": [],
+          "dy": [],
+          "rotate": []
+         },
+         "children": null
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "RNSVGSvgView",
+   "props": {
     "width": 900,
     "height": 620,
     "focusable": false,

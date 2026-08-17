@@ -524,6 +524,15 @@ interface ScanState {
    */
   pendingJoin: { moved: string; base: string } | null;
   clearPendingJoin: () => void;
+  /**
+   * Oriente le plan à la main, quand le scan n'a pas de cap.
+   *
+   * Les relevés d'avant la boussole n'en ont pas, et refaire le scan d'un
+   * appartement pour une aiguille serait absurde. La valeur suit la même
+   * convention que celle du magnétomètre : cap de l'axe −Z du repère de
+   * scan, en degrés horaires depuis le nord.
+   */
+  setNorth: (deg: number | null) => void;
   removeFixture: (id: string) => void;
   /** Annule la dernière retouche. Vide = plus rien à annuler. */
   undo: () => void;
@@ -1166,6 +1175,11 @@ export const useScanStore = create<ScanState>((set, get) => {
 
     clearPendingJoin: () => set({ pendingJoin: null }),
 
+    setNorth: (deg) => {
+      pushHistory('north');
+      set({ north: deg, dirty: true });
+    },
+
     addPhoto: (wallId, along, path) => {
       pushHistory('photo');
       const id = `ph-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`;
@@ -1500,6 +1514,7 @@ export const useScanStore = create<ScanState>((set, get) => {
           objects: [],
           fixtures: [],
           photos: [],
+          ceiling: [],
           processing: false,
           scanning: false,
           screen: 'result',
@@ -1521,6 +1536,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         objects,
         fixtures: [],
         photos: [],
+        ceiling: [],
         north: typeof r.north === 'number' ? r.north : undefined,
       };
       const saves = [save, ...get().saves];
@@ -1536,6 +1552,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         objects,
         fixtures: [],
         photos: [],
+        ceiling: [],
         north: typeof r.north === 'number' ? r.north : null,
         saves,
         processing: false,
@@ -2005,6 +2022,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         objects: [],
         fixtures: [],
         photos: [],
+        ceiling: [],
         north: null,
       }),
   };

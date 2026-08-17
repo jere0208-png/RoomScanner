@@ -57,6 +57,15 @@ export interface SheetAction {
   label: string;
   hint?: string;
   icon?: keyof typeof ICONS;
+  /**
+   * Une icône toute faite, quand le jeu maison n'en a pas.
+   *
+   * Les huit dessins de ce fichier couvrent les gestes de l'app —
+   * renommer, fusionner, supprimer. Ils ne couvriront jamais un
+   * détecteur de fumée ni une bouche de VMC : plutôt que d'en dessiner
+   * un de plus à chaque appareil, l'appelant passe le sien.
+   */
+  node?: React.ReactNode;
   danger?: boolean;
   onPress: () => void;
 }
@@ -86,10 +95,22 @@ export interface PromptData {
 export function SheetShell({
   visible,
   onClose,
+  onClosed,
   children,
 }: {
   visible: boolean;
   onClose: () => void;
+  /**
+   * Appelé quand la feuille est VRAIMENT partie, fenêtre native comprise.
+   *
+   * iOS ne présente qu'une fenêtre modale à la fois : en ouvrir une
+   * seconde pendant que la première se retire ne fait rien du tout — la
+   * seconde n'apparaît jamais. Le symptôme est déroutant : on touche
+   * « Largeur » dans un menu, le clavier monte (le champ a bien pris le
+   * focus) et il n'y a aucun champ à l'écran. D'où ce signal : ce qui doit
+   * s'ouvrir ensuite attend ici, et pas derrière un délai deviné.
+   */
+  onClosed?: () => void;
   children: React.ReactNode;
 }) {
   const styles = getStyles(useTheme());
@@ -115,6 +136,18 @@ export function SheetShell({
       if (finished && !visible) setRendu(false);
     });
   }, [visible, monte]);
+  // Le démontage de la fenêtre native se fait au rendu suivant : on prévient
+  // à ce moment-là, pas à la fin de l'animation.
+  const partie = useRef(true);
+  useEffect(() => {
+    if (rendu) {
+      partie.current = false;
+      return;
+    }
+    if (partie.current) return;
+    partie.current = true;
+    onClosed?.();
+  }, [rendu, onClosed]);
   return (
     <Modal visible={rendu} transparent animationType="none" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
@@ -176,8 +209,25 @@ export function ActionSheet({
   const c = useTheme();
   const styles = getStyles(c);
   const vu = useDernier(data);
+  /**
+   * L'action attend que la feuille soit PARTIE.
+   *
+   * Elle partait derrière un délai de 180 ms, calé à l'œil sur
+   * l'animation de descente. C'était trop court dès que l'action ouvrait
+   * une autre feuille : la fenêtre native de la première n'était pas
+   * encore retirée, iOS refusait la seconde, et on se retrouvait avec un
+   * clavier ouvert devant un écran sans champ.
+   */
+  const attente = useRef<null | (() => void)>(null);
   return (
-    <SheetShell visible={!!data} onClose={onClose}>
+    <SheetShell
+      visible={!!data}
+      onClose={onClose}
+      onClosed={() => {
+        const suite = attente.current;
+        attente.current = null;
+        suite?.();
+      }}>
       {vu && (
         <>
           <Text style={styles.title}>{vu.title}</Text>
@@ -189,12 +239,10 @@ export function ActionSheet({
               key={a.label}
               style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
               onPress={() => {
+                attente.current = a.onPress;
                 onClose();
-                // Laisse la feuille se refermer : iOS ne présente pas deux
-                // écrans à la fois, et une action qui en ouvre un autre
-                // tomberait dans le vide.
-                setTimeout(a.onPress, 180);
               }}>
+              {a.node}
               {a.icon && (
                 <Svg width={20} height={20} viewBox="0 0 24 24">
                   {ICONS[a.icon].map((d) => (
@@ -239,13 +287,22 @@ export function PromptSheet({
   useEffect(() => {
     setTexte(data?.value ?? '');
   }, [data]);
+  const attente = useRef<null | (() => void)>(null);
   const valider = () => {
     const v = texte;
+    const suite = data?.onSubmit;
+    attente.current = suite ? () => suite(v) : null;
     onClose();
-    setTimeout(() => data?.onSubmit(v), 150);
   };
   return (
-    <SheetShell visible={!!data} onClose={onClose}>
+    <SheetShell
+      visible={!!data}
+      onClose={onClose}
+      onClosed={() => {
+        const suite = attente.current;
+        attente.current = null;
+        suite?.();
+      }}>
       {vu && (
         <>
           <Text style={styles.title}>{vu.title}</Text>
@@ -316,8 +373,11 @@ const getStyles = themedStyles((c: Palette) =>
       backgroundColor: c.surfaceSunken,
       borderRadius: radius.md,
       paddingHorizontal: 15,
-      paddingVertical: 13,
-      marginTop: 8,
+      // Une ligne sans description n'a pas besoin de treize points de
+      // marge : à neuf appareils de plafond, on déroulait deux écrans
+      // pour choisir un spot.
+      paddingVertical: 11,
+      marginTop: 7,
     },
     rowPressed: { opacity: 0.6 },
     rowTexts: { flex: 1 },
