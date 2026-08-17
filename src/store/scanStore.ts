@@ -133,6 +133,16 @@ export interface SavedScan {
   /** Dossier qui contient ce scan. Absent = à la racine. */
   folderId?: string;
   /**
+   * À QUI EST CE RELEVÉ : le client, et l'adresse du chantier.
+   *
+   * Un scan ne s'appelait que « Scan du 17/08 à 11h54 ». À trente relevés,
+   * plus personne ne sait lequel est le T3 de la rue Pasteur — et le
+   * dossier remis au client ne portait que le nom du fichier, là où un
+   * devis porte toujours le nom de celui qui le reçoit.
+   */
+  client?: string;
+  address?: string;
+  /**
    * Cap de l'axe −Z du repère de scan, en degrés depuis le nord. Absent
    * quand le magnétomètre n'a rien donné de sûr — et sur tous les scans
    * d'avant la boussole.
@@ -413,6 +423,9 @@ interface ScanState {
   // le plan 2D et la vue 3D se dérivent de `walls`, jamais du maillage.
   modelPath: string | null;
   scanName: string;
+  /** Client et adresse du chantier courant (vides = non renseignés). */
+  client: string;
+  address: string;
   currentSaveId: string | null;
   /** Modifications du plan non enregistrées (bouton de sauvegarde visible). */
   dirty: boolean;
@@ -533,6 +546,12 @@ interface ScanState {
    * scan, en degrés horaires depuis le nord.
    */
   setNorth: (deg: number | null) => void;
+  /** Renseigne le client et l'adresse du chantier courant. */
+  setClientInfo: (client: string, address: string) => void;
+  /** Renomme une entrée de la bibliothèque sans l'ouvrir. */
+  renameSave: (id: string, name: string) => void;
+  /** Copie une entrée : même plan, autre nom, autre vie. */
+  duplicateSave: (id: string) => void;
   /**
    * Remet l'appareillage tel qu'il était — pour abandonner ce qu'on vient
    * de poser sur un mur sans toucher au reste du plan.
@@ -696,6 +715,8 @@ export const useScanStore = create<ScanState>((set, get) => {
         ? {
             ...s,
             name: st.scanName,
+            client: st.client || undefined,
+            address: st.address || undefined,
             rooms: st.rooms,
             walls: st.walls,
             openings: st.openings,
@@ -727,6 +748,8 @@ export const useScanStore = create<ScanState>((set, get) => {
     windowCount: 0,
     modelPath: null,
     scanName: '',
+    client: '',
+    address: '',
     currentSaveId: null,
     pendingJoin: null,
     wallClip: null,
@@ -1185,6 +1208,51 @@ export const useScanStore = create<ScanState>((set, get) => {
       set({ north: deg, dirty: true });
     },
 
+    setClientInfo: (client, address) => {
+      set({ client: client.trim(), address: address.trim(), dirty: true });
+    },
+
+    renameSave: (id, name) => {
+      const clean = name.trim();
+      if (!clean) return;
+      const st = get();
+      const saves = st.saves.map((x) =>
+        x.id === id ? { ...x, name: clean, updatedAt: Date.now() } : x,
+      );
+      set({
+        saves,
+        // Le scan ouvert est le même : son en-tête doit suivre.
+        scanName: st.currentSaveId === id ? clean : st.scanName,
+      });
+      persistSoon(saves);
+    },
+
+    /**
+     * DUPLIQUER : chiffrer deux variantes de la même installation.
+     *
+     * On copie l'entrée telle quelle, sans l'ouvrir — les photos restent
+     * partagées avec l'original, ce sont des fichiers sur le disque et
+     * personne ne veut les voir doubler de poids à chaque copie.
+     */
+    duplicateSave: (id) => {
+      const st = get();
+      const source = st.saves.find((x) => x.id === id);
+      if (!source) return;
+      const now = Date.now();
+      const copie: SavedScan = {
+        ...source,
+        id: `${now}-${Math.random().toString(36).slice(2, 8)}`,
+        name: `${source.name} (copie)`,
+        createdAt: now,
+        updatedAt: now,
+      };
+      const i = st.saves.findIndex((x) => x.id === id);
+      const saves = [...st.saves];
+      saves.splice(i + 1, 0, copie);
+      set({ saves });
+      persistSoon(saves);
+    },
+
     restoreFixtures: (list) => {
       pushHistory('restore');
       set({ fixtures: list, dirty: true });
@@ -1553,6 +1621,8 @@ export const useScanStore = create<ScanState>((set, get) => {
       set({
         modelPath: save.modelPath,
         scanName: save.name,
+        client: '',
+        address: '',
         currentSaveId: save.id,
         dirty: false,
         resultOrigin: 'scan',
@@ -1879,6 +1949,8 @@ export const useScanStore = create<ScanState>((set, get) => {
         photos: st.photos,
         ceiling: st.ceiling,
         north: st.north ?? undefined,
+        client: st.client || undefined,
+        address: st.address || undefined,
       };
       const saves = [save, ...st.saves];
       set({ saves, currentSaveId: save.id, scanName: clean, dirty: false });
@@ -1967,6 +2039,8 @@ export const useScanStore = create<ScanState>((set, get) => {
       set({
         modelPath: save.modelPath,
         scanName: save.name,
+        client: save.client ?? '',
+        address: save.address ?? '',
         currentSaveId: save.id,
         rooms: save.rooms,
         walls: save.walls,

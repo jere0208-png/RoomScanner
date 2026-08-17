@@ -441,3 +441,70 @@ describe('un mur mitoyen ne compte que pour la pièce où l’appareil donne', (
     expect(alertes.some((i) => i.message.includes('socle'))).toBe(true);
   });
 });
+
+/**
+ * LE CARTOUCHE DIT À QUI EST LE DOSSIER.
+ *
+ * Il portait le nom du fichier — que le lecteur a déjà sous les yeux,
+ * puisqu'il l'a ouvert. Un plan d'exécution porte le nom du client et
+ * l'adresse du chantier : c'est ce qu'on cherche sur une pile de plans, et
+ * ce qui distingue deux T3 identiques de la même rue.
+ */
+describe('le client dans le cartouche', () => {
+  /** Une pièce carrée : le cartouche ne dépend pas de la géométrie. */
+  const mur = (
+    id: string,
+    ax: number,
+    az: number,
+    bx: number,
+    bz: number,
+  ): WallSeg => ({
+    id,
+    type: 'wall',
+    a: { x: ax, z: az },
+    b: { x: bx, z: bz },
+    height: 2.5,
+    yCenter: 1.25,
+    roomId: 'r1',
+  });
+  const piece = [
+    mur('n', 0, 0, 4, 0),
+    mur('e', 4, 0, 4, 4),
+    mur('s', 4, 4, 0, 4),
+    mur('w', 0, 4, 0, 0),
+  ];
+  const latin1 = (bytes: Uint8Array) => {
+    let s = '';
+    for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+    return s;
+  };
+  const doc = (client?: string, address?: string) =>
+    latin1(
+      buildScanPdf(
+        {
+          name: 'Chantier',
+          walls: piece,
+          openings: [],
+          objects: [],
+          fixtures: [],
+          client,
+          address,
+        },
+        false,
+        { metre: false },
+      ),
+    );
+
+  it('écrit le client et le chantier quand ils sont renseignés', () => {
+    const src = doc('Mme Dupont', '12 rue Pasteur');
+    expect(src).toContain('CLIENT');
+    expect(src).toContain('Mme Dupont');
+    expect(src).toContain('12 rue Pasteur');
+  });
+
+  it('et garde le nom du fichier quand ils ne le sont pas', () => {
+    const src = doc();
+    expect(src).toContain('FICHIER');
+    expect(src).not.toContain('CLIENT');
+  });
+});

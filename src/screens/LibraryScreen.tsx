@@ -5,6 +5,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -302,6 +303,8 @@ interface RowProps {
   styles: ReturnType<typeof getStyles>;
   palette: Palette;
   onOpen: () => void;
+  /** Appui long : renommer, dupliquer, supprimer. */
+  onMenu: () => void;
   onTrash: () => void;
   onOut: () => void;
   onHold: () => void;
@@ -329,6 +332,7 @@ function ScanRow({
   styles,
   palette,
   onOpen,
+  onMenu,
   onTrash,
   onOut,
   onHold,
@@ -355,6 +359,10 @@ function ScanRow({
         style={styles.rowMain}
         activeOpacity={0.75}
         disabled={fige}
+        // Un appui long ouvre ce qu'on peut FAIRE du relévé — c'est le
+        // geste d'iOS, et il laisse l'appui simple à l'ouverture.
+        onLongPress={onMenu}
+        delayLongPress={420}
         onPress={onOpen}>
         <View style={styles.thumb}>
           <PlanThumb scan={item} c={palette} />
@@ -363,6 +371,12 @@ function ScanRow({
           <Text style={styles.rowName} numberOfLines={1}>
             {item.name}
           </Text>
+          {/* Le client passe AVANT la date : c'est ce qu'on cherche. */}
+          {item.client || item.address ? (
+            <Text style={styles.rowClient} numberOfLines={1}>
+              {[item.client, item.address].filter(Boolean).join(' · ')}
+            </Text>
+          ) : null}
           <Text style={styles.rowSub}>{formatDate(item.updatedAt)}</Text>
           <Text style={styles.rowDetails}>{detailsOf(item)}</Text>
         </View>
@@ -397,6 +411,8 @@ export function LibraryScreen() {
   const renameFolder = useScanStore((s) => s.renameFolder);
   const removeFolder = useScanStore((s) => s.removeFolder);
   const moveToFolder = useScanStore((s) => s.moveToFolder);
+  const renameSave = useScanStore((s) => s.renameSave);
+  const duplicateSave = useScanStore((s) => s.duplicateSave);
   const palette = useTheme();
   const styles = getStyles(palette);
 
@@ -414,6 +430,18 @@ export function LibraryScreen() {
     disarmTimer.current = setTimeout(() => setArmedId(null), 3000);
   };
 
+  /**
+   * CHERCHER ET TRIER — à trente relevés, faire défiler ne suffit plus.
+   *
+   * On tape trois lettres du nom, du client ou de l'adresse ; la recherche
+   * balaie les trois, parce que personne ne se souvient sous lequel il a
+   * rangé son chantier. Et le tri par nom sert dès qu'on nomme ses
+   * relevés — par date, un dossier repris hier remonte en tête et on ne
+   * le retrouve plus où on l'avait laissé.
+   */
+  const [quete, setQuete] = useState('');
+  const [tri, setTri] = useState<'date' | 'nom'>('date');
+
   // Dossier ouvert : on n'affiche plus que son contenu.
   const [inside, setInside] = useState<string | null>(null);
   const byFolder = useMemo(() => {
@@ -427,9 +455,29 @@ export function LibraryScreen() {
     return m;
   }, [saves]);
   const dossierOuvert = folders.find((f) => f.id === inside) ?? null;
-  const liste = dossierOuvert
-    ? byFolder.get(dossierOuvert.id) ?? []
-    : byFolder.get('') ?? [];
+  const liste = useMemo(() => {
+    const brute = dossierOuvert
+      ? byFolder.get(dossierOuvert.id) ?? []
+      : byFolder.get('') ?? [];
+    const q = quete.trim().toLowerCase();
+    // Une recherche cherche PARTOUT : dans un dossier ouvert comme à la
+    // racine, elle porte sur toute la bibliothèque — sinon il faudrait
+    // savoir d'avance où chercher, ce qui est précisément le problème.
+    const base = q ? saves : brute;
+    const filtre = q
+      ? base.filter((x) =>
+          [x.name, x.client ?? '', x.address ?? '']
+            .join(' ')
+            .toLowerCase()
+            .includes(q),
+        )
+      : base;
+    return [...filtre].sort((a, b) =>
+      tri === 'nom'
+        ? a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' })
+        : b.updatedAt - a.updatedAt,
+    );
+  }, [byFolder, dossierOuvert, saves, quete, tri]);
 
   // ------------------------------------------------------- glisser-déposer
   //
@@ -578,6 +626,38 @@ export function LibraryScreen() {
       ],
     });
 
+  /** Ce qu'on peut faire d'un relevé, sans l'ouvrir. */
+  const scanMenu = (item: SavedScan) =>
+    setMenu({
+      title: item.name,
+      subtitle: [item.client, item.address].filter(Boolean).join(' · ') ||
+        undefined,
+      actions: [
+        {
+          label: 'Renommer',
+          icon: 'renommer',
+          onPress: () =>
+            setPrompt({
+              title: 'Nom du relevé',
+              value: item.name,
+              onSubmit: (t) => renameSave(item.id, t),
+            }),
+        },
+        {
+          label: 'Dupliquer',
+          hint: 'Pour chiffrer deux variantes du même logement.',
+          icon: 'scinder',
+          onPress: () => duplicateSave(item.id),
+        },
+        {
+          label: 'Supprimer',
+          icon: 'supprimer',
+          danger: true,
+          onPress: () => deleteSave(item.id),
+        },
+      ],
+    });
+
   const vide = saves.length === 0 && folders.length === 0;
 
   return (
@@ -595,6 +675,38 @@ export function LibraryScreen() {
           <Text style={styles.countText}>{liste.length}</Text>
         </View>
       </View>
+
+      {!vide && (
+        <View style={styles.chercheRow}>
+          <View style={styles.champ}>
+            <Svg width={16} height={16} viewBox="0 0 24 24">
+              <Path
+                d="M11 4 a7 7 0 1 0 0 14 a7 7 0 0 0 0 -14 M16.5 16.5 L21 21"
+                stroke={palette.inkFaint}
+                strokeWidth={2}
+                strokeLinecap="round"
+                fill="none"
+              />
+            </Svg>
+            <TextInput
+              style={styles.champInput}
+              value={quete}
+              onChangeText={setQuete}
+              placeholder="Nom, client, adresse…"
+              placeholderTextColor={palette.inkFaint}
+              autoCorrect={false}
+              clearButtonMode="while-editing"
+            />
+          </View>
+          <TouchableOpacity
+            style={styles.triBtn}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityLabel={tri === 'date' ? 'Trier par nom' : 'Trier par date'}
+            onPress={() => setTri(tri === 'date' ? 'nom' : 'date')}>
+            <Text style={styles.triText}>{tri === 'date' ? 'Récents' : 'A → Z'}</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {dragId !== null && (
         <View style={styles.dragHint}>
@@ -672,6 +784,7 @@ export function LibraryScreen() {
               styles={styles}
               palette={palette}
               onOpen={() => openSave(s.id)}
+              onMenu={() => scanMenu(s)}
               onTrash={() => onTrash(s.id)}
               onOut={() => moveToFolder(s.id, null)}
               onHold={() => beginHold(s.id)}
@@ -719,7 +832,28 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   // Le titre respire, et la pastille de comptage d'un dossier a la place
   // de dépasser : posée à −2 du haut de son icône, elle passait sous le
   // bloc du titre et se faisait trancher.
-  headerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 26 },
+  headerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
+  chercheRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 },
+  champ: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    minHeight: 44,
+    paddingHorizontal: 14,
+    borderRadius: radius.pill,
+    backgroundColor: c.surface,
+  },
+  champInput: { flex: 1, color: c.ink, fontSize: 15, paddingVertical: 0 },
+  triBtn: {
+    minHeight: 44,
+    paddingHorizontal: 14,
+    borderRadius: radius.pill,
+    backgroundColor: c.surface,
+    justifyContent: 'center',
+  },
+  triText: { color: c.blue, fontSize: 13.5, fontWeight: '800' },
+  rowClient: { color: c.blue, fontSize: 12, fontWeight: '700', marginTop: 1 },
   backButton: {
     width: 38,
     height: 38,

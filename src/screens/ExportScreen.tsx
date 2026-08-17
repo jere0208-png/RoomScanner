@@ -36,6 +36,7 @@ import { planRoutes } from '../geometry/elecplan';
 import { floorsOf, useScanStore } from '../store/scanStore';
 import { deviceNames } from '../geometry/naming';
 import { ClientTour } from '../components/ClientTour';
+import { PromptSheet, type PromptData } from '../components/Sheet';
 import { PlayCircle } from 'lucide-react-native';
 import type { CeilingFixture } from '../geometry/ceiling';
 
@@ -262,6 +263,10 @@ const styles = getStyles(c);
   const [plafond, setPlafond] = useState(true);
   const photos = useScanStore((s) => s.photos);
   const north = useScanStore((s) => s.north);
+  const client = useScanStore((s) => s.client);
+  const address = useScanStore((s) => s.address);
+  const setClientInfo = useScanStore((s) => s.setClientInfo);
+  const [prompt, setPrompt] = useState<PromptData | null>(null);
   /**
    * LES ÉLÉVATIONS : un mur vu de face par feuille.
    *
@@ -390,6 +395,8 @@ const styles = getStyles(c);
           photos: vignettes,
           north,
           deviceNames: noms,
+          client,
+          address,
         },
         include3D,
         {
@@ -460,6 +467,44 @@ const styles = getStyles(c);
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scroll}
         scrollEnabled={!scrollLocked}>
+        {/*
+          À QUI EST CE DOSSIER.
+
+          Le cartouche ne portait que le nom du fichier. Un devis, un plan
+          d'exécution, un dossier de réception portent toujours le nom de
+          celui qui le reçoit et l'adresse du chantier — c'est ce qu'on
+          cherche en premier sur une pile de plans, et ce qui distingue
+          deux T3 identiques rue Pasteur.
+        */}
+        <View style={styles.dossier}>
+          {(
+            [
+              ['Client', client, 'Nom du client', (t: string) => setClientInfo(t, address)],
+              ['Chantier', address, 'Adresse du chantier', (t: string) => setClientInfo(client, t)],
+            ] as [string, string, string, (t: string) => void][]
+          ).map(([titre, valeur, invite, poser]) => (
+            <TouchableOpacity
+              key={titre}
+              style={styles.dossierCase}
+              onPress={() =>
+                setPrompt({
+                  title: invite,
+                  subtitle: 'Il paraît dans le cartouche de chaque feuille.',
+                  value: valeur,
+                  okLabel: 'Enregistrer',
+                  onSubmit: poser,
+                })
+              }>
+              <Text style={styles.dossierTitre}>{titre.toUpperCase()}</Text>
+              <Text
+                style={[styles.dossierValeur, !valeur && styles.dossierVide]}
+                numberOfLines={1}>
+                {valeur || 'Non renseigné'}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
         {/* Ce qui entre dans le document : neuf réglages, en une grille
             d'icônes plutôt qu'en neuf lignes d'interrupteurs. Empilés, ils
             repoussaient l'aperçu — la seule chose qu'on veuille vraiment
@@ -677,6 +722,7 @@ const styles = getStyles(c);
         </TouchableOpacity>
       </View>
       <ClientTour visible={visite} onClose={() => setVisite(false)} />
+      <PromptSheet data={prompt} onClose={() => setPrompt(null)} />
       </Animated.View>
     </View>
   );
@@ -773,6 +819,25 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   // Zone centrale du modèle : les gouttières latérales restent au scroll.
   lockWrap: { marginHorizontal: 32 },
   fadeWrap: { flex: 1 },
+  /** Le bloc « à qui est ce dossier », en tête de l'écran. */
+  dossier: { flexDirection: 'row', gap: 10, marginBottom: 14 },
+  dossierCase: {
+    flex: 1,
+    minHeight: 56,
+    justifyContent: 'center',
+    backgroundColor: c.surface,
+    borderRadius: radius.md,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  dossierTitre: {
+    color: c.inkFaint,
+    fontSize: 9.5,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+  },
+  dossierValeur: { color: c.ink, fontSize: 14.5, fontWeight: '700', marginTop: 3 },
+  dossierVide: { color: c.inkFaint, fontWeight: '600' },
   sheetLabel: {
     color: c.inkSoft,
     fontSize: 12.5,

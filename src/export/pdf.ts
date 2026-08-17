@@ -729,6 +729,9 @@ function drawSheetChrome(
     sheetTitle: string;
     sheet: string;
     scaleLabel: string | null;
+    /** À qui est le dossier : à défaut, on retombe sur le nom du fichier. */
+    client?: string;
+    address?: string;
   },
 ) {
   // Cadre de feuille
@@ -755,8 +758,20 @@ function drawSheetChrome(
     bold: true,
     align: 'left',
   });
-  d.text('FICHIER', cols[0] + 12, ty + 24, 6.5, GREY_LIGHT, { align: 'left' });
-  d.text(fitText(info.filename, 8, width(0)), cols[0] + 12, ty + 12, 8, GREY, {
+  /**
+   * LA SECONDE LIGNE DIT À QUI EST LE DOSSIER.
+   *
+   * Elle portait le nom du fichier — que le lecteur a déjà sous les yeux,
+   * puisqu'il l'a ouvert. Un plan d'exécution porte le nom du client et
+   * l'adresse du chantier : c'est ce qu'on cherche sur une pile de plans,
+   * et ce qui distingue deux T3 identiques de la même rue. Sans client
+   * renseigné, on garde le fichier plutôt qu'une ligne vide.
+   */
+  const aQui = [info.client, info.address].filter(Boolean).join(' · ');
+  d.text(aQui ? 'CLIENT' : 'FICHIER', cols[0] + 12, ty + 24, 6.5, GREY_LIGHT, {
+    align: 'left',
+  });
+  d.text(fitText(aQui || info.filename, 8, width(0)), cols[0] + 12, ty + 12, 8, GREY, {
     align: 'left',
   });
 
@@ -992,6 +1007,9 @@ const frLen = (v: number) => v.toFixed(2).replace('.', ',');
 interface SheetContext {
   name: string;
   filename: string;
+  /** Client et chantier, pour le cartouche. */
+  client?: string;
+  address?: string;
   walls: WallSeg[];
   openings: WallSeg[];
   objects: ObjectData[];
@@ -1778,6 +1796,8 @@ function planPage(
   drawSheetChrome(d, {
     project: name,
     filename,
+    client: ctx.client,
+    address: ctx.address,
     sheetTitle: titre,
     sheet,
     scaleLabel,
@@ -1860,6 +1880,8 @@ function metrePage(ctx: SheetContext, sheet: string): string {
   drawSheetChrome(d, {
     project: ctx.name,
     filename: ctx.filename,
+    client: ctx.client,
+    address: ctx.address,
     sheetTitle: 'Métré par pièce',
     sheet,
     scaleLabel: null,
@@ -2096,6 +2118,8 @@ function unifilairePage(
   drawSheetChrome(d, {
     project: ctx.name,
     filename: ctx.filename,
+    client: ctx.client,
+    address: ctx.address,
     sheetTitle: 'Schéma unifilaire',
     sheet,
     scaleLabel: null,
@@ -2458,6 +2482,8 @@ function elevationPage(
   drawSheetChrome(d, {
     project: ctx.name,
     filename: ctx.filename,
+    client: ctx.client,
+    address: ctx.address,
     sheetTitle: `Élévation — ${piece || 'mur'}${cardinal ? `, ${cardinal}` : ''}`,
     sheet,
     // Un mètre vaut 2834,6 points à l'échelle 1:1 (72 pt par pouce).
@@ -2522,6 +2548,8 @@ function threeDPage(
   drawSheetChrome(d, {
     project: ctx.name,
     filename: ctx.filename,
+    client: ctx.client,
+    address: ctx.address,
     sheetTitle: showDims ? 'Vues 3D cotées' : 'Vues 3D',
     sheet,
     scaleLabel: null,
@@ -2548,6 +2576,9 @@ export interface ScanForPdf {
   routes?: { id: string; path: { x: number; z: number }[] }[];
   /** Cap du scan, pour nommer les murs par leur orientation. */
   north?: number | null;
+  /** À qui est ce dossier : le client, et l'adresse du chantier. */
+  client?: string;
+  address?: string;
   /**
    * Le nom de chaque appareil : « Prise plinthe 2 », sa pièce, son mur.
    * Calculé par l'écran d'export, qui connaît le placement et la boussole.
@@ -3152,6 +3183,8 @@ export function buildScanPdf(
   const ctx: SheetContext = {
     name: scan.name,
     filename,
+    client: scan.client,
+    address: scan.address,
     walls: scan.walls,
     openings: scan.openings,
     objects: scan.objects,
