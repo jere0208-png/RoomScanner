@@ -38,6 +38,7 @@ export function CeilingLayer({
   ceiling,
   showCeiling,
   selectedCeilingId,
+  selectedCeilingRow,
   onSelectCeiling,
   fixtures,
   walls,
@@ -50,6 +51,13 @@ export function CeilingLayer({
   ceiling?: CeilingFixture[];
   showCeiling?: boolean;
   selectedCeilingId?: string | null;
+  /**
+   * La LIGNE tenue en main : tous ses spots se surlignent ensemble.
+   *
+   * Sans ça, prendre une ligne ne se voyait pas — le bandeau parlait de
+   * quatre spots pendant que le dessin n'en montrait aucun de choisi.
+   */
+  selectedCeilingRow?: string | null;
   onSelectCeiling?: (id: string) => void;
   fixtures?: Fixture[];
   walls: WallSeg[];
@@ -76,7 +84,9 @@ export function CeilingLayer({
           const spec = CEILINGS[cl.kind];
           const q = mapping.toPx(cl.at);
           const r = Math.max(9, Math.min(15, mapping.scale * 0.14));
-          const choisi = cl.id === selectedCeilingId;
+          const choisi =
+            cl.id === selectedCeilingId ||
+            (!!selectedCeilingRow && cl.row === selectedCeilingRow);
           return (
             <G
               key={`cl-${cl.id}`}

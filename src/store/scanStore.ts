@@ -5,6 +5,7 @@ import {
   insetOnRing,
   type CeilingFixture,
   type CeilingKind,
+  type SpotAxis,
 } from '../geometry/ceiling';
 import type {
   FloorData,
@@ -503,9 +504,19 @@ interface ScanState {
    */
   ceiling: CeilingFixture[];
   /** Pose un appareil au plafond, dans la pièce dont on donne le contour. */
-  addCeiling: (kind: CeilingKind, roomId: string, at: Pt) => string;
+  addCeiling: (
+    kind: CeilingKind,
+    roomId: string,
+    at: Pt,
+    /** La ligne à laquelle il appartient, quand on pose en série. */
+    ligne?: { row: string; axe: SpotAxis },
+  ) => string;
   moveCeiling: (id: string, at: Pt) => void;
   removeCeiling: (id: string) => void;
+  /** Repose toute une ligne de spots : nouvelles places, nouvel axe. */
+  setCeilingRow: (row: string, pts: Pt[], axe: SpotAxis) => void;
+  /** Retire la ligne entière, d'un seul repentir. */
+  removeCeilingRow: (row: string) => void;
   /**
    * Relie une commande murale à un point de plafond, ou défait le lien.
    *
@@ -1268,14 +1279,50 @@ export const useScanStore = create<ScanState>((set, get) => {
       return id;
     },
 
-    addCeiling: (kind, roomId, at) => {
+    addCeiling: (kind, roomId, at, ligne) => {
       pushHistory('addCeiling');
       const id = `pl-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
       set({
-        ceiling: [...get().ceiling, { id, kind, roomId, at }],
+        ceiling: [
+          ...get().ceiling,
+          { id, kind, roomId, at, ...(ligne ? { row: ligne.row, axe: ligne.axe } : {}) },
+        ],
         dirty: true,
       });
       return id;
+    },
+
+    /**
+     * REPOSER UNE LIGNE, d'un seul geste et d'un seul repentir.
+     *
+     * Retourner une ligne de six spots, c'était six déplacements au
+     * centimètre — et six lignes dans l'historique, donc six annulations
+     * pour revenir en arrière. Les spots gardent leur ordre : le premier
+     * de la liste reçoit la première place, et les liens de commande
+     * déjà tirés vers un interrupteur suivent leur point.
+     */
+    setCeilingRow: (row, pts, axe) => {
+      const st = get();
+      const dansLaLigne = st.ceiling.filter((c) => c.row === row);
+      if (dansLaLigne.length === 0 || pts.length === 0) return;
+      pushHistory(`ceilingRow:${row}`);
+      let k = 0;
+      set({
+        ceiling: st.ceiling.map((c) =>
+          c.row === row
+            ? { ...c, at: pts[Math.min(k++, pts.length - 1)], axe }
+            : c,
+        ),
+        dirty: true,
+      });
+    },
+
+    removeCeilingRow: (row) => {
+      pushHistory('removeCeilingRow');
+      set({
+        ceiling: get().ceiling.filter((c) => c.row !== row),
+        dirty: true,
+      });
     },
 
     moveCeiling: (id, at) => {

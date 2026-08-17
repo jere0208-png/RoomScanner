@@ -34,8 +34,22 @@ export function StripBar({
 }) {
   return (
     <View style={styles.wallStrip}>
+      {/*
+        LA COTE NE SE TRONQUE JAMAIS.
+
+        Les deux textes vivaient dans une seule ligne, et c'est la LIGNE
+        entière qui était rognée : « 1,38 × 2,04 m · porte » n'entrant pas,
+        on lisait « 1,38 × 2,... ». Le seul chiffre qu'on venait chercher
+        était le premier sacrifié — un bandeau de cotes qui cache la cote.
+
+        Ils sont donc séparés : la valeur garde toute sa place
+        (`flexShrink: 0`), et c'est la précision en gris, dont on se passe,
+        qui s'efface en premier quand la largeur manque.
+      */}
+      <Text style={styles.wallStripStrong} numberOfLines={1}>
+        {strong}
+      </Text>
       <Text style={styles.wallStripText} numberOfLines={1}>
-        <Text style={styles.wallStripStrong}>{strong}</Text>
         {`  ·  ${note}`}
       </Text>
       {actions.map((a) => (

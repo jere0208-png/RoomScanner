@@ -24,7 +24,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 
 import React from 'react';
 import { Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { Circle, Text as SvgText } from 'react-native-svg';
+import { Circle, Path, Text as SvgText } from 'react-native-svg';
 import TestRenderer, { act } from 'react-test-renderer';
 import { ResultScreen } from '../src/screens/ResultScreen';
 import { useScanStore } from '../src/store/scanStore';
@@ -53,6 +53,16 @@ const PLAFOND: CeilingFixture[] = [
   },
 ];
 
+/** Et une LIGNE de trois spots, posée d'un geste, dans la même pièce. */
+const LIGNE: CeilingFixture[] = [0, 1, 2].map((i) => ({
+  id: `sp${i}`,
+  kind: 'spot' as const,
+  roomId: SNAPSHOT_ROOMS[0].id,
+  at: { x: 1.2 + i * 0.7, z: 2.4 },
+  row: 'ln-test',
+  axe: 'longueur' as const,
+}));
+
 let arbre: TestRenderer.ReactTestRenderer | null = null;
 afterEach(() => {
   act(() => arbre?.unmount());
@@ -74,7 +84,7 @@ function monter() {
         floor: null,
       })),
       fixtures: SNAPSHOT_FIXTURES,
-      ceiling: PLAFOND,
+      ceiling: [...PLAFOND, ...LIGNE],
       photos: [],
       showFurniture: true,
       showSurfaces: true,
@@ -169,6 +179,49 @@ describe('l’écran des résultats', () => {
    * Il s'ouvre en touchant l'appareil sur le plan, et porte ses distances
    * aux murs — les mêmes que les pointillés du dessin, en centimètres.
    */
+  /**
+   * UNE LIGNE SE PREND ENTIÈRE, PUIS SPOT PAR SPOT.
+   *
+   * Toucher un spot d'une ligne de quatre pour n'en attraper qu'un seul,
+   * c'était condamner l'utilisateur à quatre réglages là où il voulait
+   * retourner la ligne. Le premier appui la prend donc tout entière — le
+   * bandeau annonce le nombre de spots et propose les deux axes — et un
+   * second appui sur le même spot l'en détache pour le réglage fin.
+   */
+  it('prend la LIGNE au premier appui, le spot au second', () => {
+    const tree = monter();
+    // Un SPOT, reconnu à son symbole : le disque cerné de quatre rayons.
+    // Chercher « un groupe touchable » ne suffit pas — l'appareillage mural
+    // en pose aussi, et le banc attrapait une prise TV.
+    const RAYON = 'M-5 0 a5 5 0 1 0 10 0 a5 5 0 1 0 -10 0';
+    const spots = () =>
+      tree.root
+        .findAll((n) => typeof n.props?.onPress === 'function')
+        .filter((n) =>
+          n.findAllByType(Path).some((p) => p.props.d === RAYON),
+        );
+    const spot = spots()[0];
+    expect(spot).toBeDefined();
+    act(() => spot.props.onPress());
+    let vu = textes(tree);
+    expect(vu).toContain('3 spots');
+    expect(vu).toContain('sur la longueur');
+    expect(bouton(tree, 'Largeur')).toBeDefined();
+    expect(bouton(tree, 'Longueur')).toBeDefined();
+
+    // Retourner la ligne : le bandeau le dit aussitôt.
+    act(() => bouton(tree, 'Largeur')?.props.onPress());
+    expect(textes(tree)).toContain('sur la largeur');
+
+    // Second appui sur le même spot : il sort de sa ligne.
+    const encore = spots()[0];
+    act(() => encore.props.onPress());
+    vu = textes(tree);
+    expect(vu).not.toContain('3 spots');
+    // Le bandeau d'un appareil seul parle de sa place, en centimètres.
+    expect(bouton(tree, 'Retirer')).toBeDefined();
+  });
+
   it('ouvre le bandeau du plafond quand on touche l’appareil', () => {
     const tree = monter();
     // Le calque de plafond enveloppe chaque appareil dans un groupe

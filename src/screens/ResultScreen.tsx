@@ -113,6 +113,7 @@ import {
   CEILING_KINDS,
   spreadPoints,
   type CeilingKind,
+  type SpotAxis,
 } from '../geometry/ceiling';
 import { haptic } from '../ui/haptic';
 import {
@@ -196,6 +197,8 @@ export function ResultScreen() {
   const addCeiling = useScanStore((s) => s.addCeiling);
   const removeCeiling = useScanStore((s) => s.removeCeiling);
   const moveCeiling = useScanStore((s) => s.moveCeiling);
+  const setCeilingRow = useScanStore((s) => s.setCeilingRow);
+  const removeCeilingRow = useScanStore((s) => s.removeCeilingRow);
   const toggleCeilingCommand = useScanStore((s) => s.toggleCeilingCommand);
   const moveFixture = useScanStore((s) => s.moveFixture);
   const resizeOpening = useScanStore((s) => s.resizeOpening);
@@ -307,6 +310,15 @@ export function ResultScreen() {
   const [showCeiling, setShowCeiling] = useState(true);
   /** Appareil de plafond en attente de pose : on touche la pièce qui le reçoit. */
   const [pendingCeiling, setPendingCeiling] = useState<CeilingKind | null>(null);
+  /**
+   * LA LIGNE de spots tenue en main, s'il y en a une.
+   *
+   * On touche un spot d'une ligne : c'est LA LIGNE qu'on attrape — c'est
+   * elle qu'on veut retourner ou retirer neuf fois sur dix. Un second
+   * appui sur le même spot le détache de sa ligne et le rend seul, pour
+   * le réglage au centimètre. Deux niveaux, un seul geste à apprendre.
+   */
+  const [selRow, setSelRow] = useState<string | null>(null);
   /** Nombre de spots à répartir dans la prochaine pièce touchée. */
   const [pendingSpots, setPendingSpots] = useState<number | null>(null);
   /**
@@ -407,7 +419,10 @@ export function ResultScreen() {
       if (garde !== 'meuble') setSelectedObjectId(null);
       if (garde !== 'piece') setSelectedRoomId(null);
       if (garde !== 'ouverture') setSelectedOpeningId(null);
-      if (garde !== 'plafond') setSelCeiling(null);
+      if (garde !== 'plafond') {
+        setSelCeiling(null);
+        setSelRow(null);
+      }
     },
     [],
   );
@@ -1222,6 +1237,7 @@ export function ResultScreen() {
             showCeiling={showCeiling}
             showNorth={showNorth}
             selectedCeilingId={selCeiling}
+            selectedCeilingRow={selRow}
             placing={!!pendingCeiling || !!pendingSpots}
             onPlaceAt={(at) => {
               if (!pendingCeiling && !pendingSpots) return;
@@ -1242,10 +1258,21 @@ export function ResultScreen() {
                   part.surface?.pts ?? [],
                   pendingSpots,
                   trame,
+                  'longueur',
                 );
-                for (const p2 of pts) addCeiling('spot', part.roomId, p2);
+                // Les spots posés ensemble forment une LIGNE, et la ligne
+                // est aussitôt tenue en main : son bandeau propose de la
+                // retourner sur la largeur, ce qui est justement la
+                // question qu'on se pose en la voyant apparaître.
+                const row = `ln-${Date.now().toString(36)}`;
+                for (const p2 of pts) {
+                  addCeiling('spot', part.roomId, p2, { row, axe: 'longueur' });
+                }
                 haptic('succes');
                 setPendingSpots(null);
+                seuleSelection('plafond');
+                setSelCeiling(null);
+                setSelRow(row);
                 return;
               }
               addCeiling(pendingCeiling!, part.roomId, at);
@@ -1256,6 +1283,7 @@ export function ResultScreen() {
               // Appui dans le vide : on lâche, comme pour un meuble.
               if (id === null) {
                 setSelCeiling(null);
+                setSelRow(null);
                 setPendingLink(null);
                 return;
               }
@@ -1265,9 +1293,28 @@ export function ResultScreen() {
               if (!cl) return;
               // D'abord le réglage : c'est ce qu'on vient faire neuf fois
               // sur dix. Le menu s'ouvre par un appui long.
+              // LA LIGNE D'ABORD, LE SPOT ENSUITE.
+              //
+              // Un spot posé en série appartient à une ligne : le premier
+              // appui la prend tout entière. On la retourne, on la retire,
+              // on la voit surlignée d'un bout à l'autre. Un second appui
+              // sur le même spot l'en sort et le donne seul.
+              if (cl.row && selRow !== cl.row && selCeiling !== id) {
+                seulGeste('reglage');
+                seuleSelection('plafond');
+                setSelCeiling(null);
+                setSelRow(cl.row);
+                return;
+              }
+              if (cl.row && selRow === cl.row) {
+                setSelRow(null);
+                setSelCeiling(id);
+                return;
+              }
               if (selCeiling !== id) {
                 seulGeste('reglage');
                 seuleSelection('plafond');
+                setSelRow(null);
                 setSelCeiling(id);
                 return;
               }
@@ -1452,8 +1499,9 @@ export function ResultScreen() {
                            * Quatre spots dans un séjour, c'était quatre
                            * poses suivies de quatre réglages : un quart
                            * d'heure pour ce que personne ne fait à la main
-                           * sur un chantier. On les aligne sur la longueur
-                           * de la pièce, à intervalles égaux.
+                           * sur un chantier. Ils se répartissent par
+                           * zones, à intervalles égaux, et la ligne se
+                           * retourne ensuite d'un appui.
                            */
                           ...(rooms.length > 0
                             ? [
@@ -1464,9 +1512,11 @@ export function ResultScreen() {
                                     setMenu({
                                       title: 'Combien de spots ?',
                                       subtitle:
-                                        'Ils se répartiront sur la longueur ' +
-                                        'de la pièce, avec un demi-écart aux ' +
-                                        'extrémités — la règle du métier.',
+                                        'Ils se répartissent par zones — le ' +
+                                        'retour d’une pièce en L reçoit les ' +
+                                        'siens — avec un demi-écart aux ' +
+                                        'extrémités. Longueur ou largeur se ' +
+                                        'choisit ensuite, sur le plan.',
                                       actions: [2, 3, 4, 5, 6, 8].map((n) => ({
                                         label: `${n} spots`,
                                         hint:
@@ -1794,6 +1844,66 @@ export function ResultScreen() {
                 setSelCeiling(null);
               }}
               onDone={() => setSelCeiling(null)}
+            />
+          );
+        })()}
+
+        {/*
+          LE BANDEAU DE LA LIGNE DE SPOTS.
+
+          Une ligne se règle par ce qu'elle EST — un nombre de spots et un
+          sens — pas par la position de chacun. Le sens se choisit ici,
+          après la pose, en voyant le résultat : « sur la longueur » pour un
+          séjour, « sur la largeur » pour une cuisine éclairée en travers.
+          Poser d'abord, régler ensuite — personne ne sait répondre à la
+          question avant d'avoir vu la ligne sur le plan.
+        */}
+        {vue === '2d' && selRow && !capturing && (() => {
+          const ligne = ceiling.filter((x) => x.row === selRow);
+          if (ligne.length === 0) return null;
+          const part = parts.find((p2) => p2.roomId === ligne[0].roomId);
+          const axe = ligne[0].axe ?? 'longueur';
+          /** Retend la ligne sur l'autre axe, sans changer son nombre. */
+          const tendre = (vers: SpotAxis) => {
+            const pts = spreadPoints(
+              part?.surface?.pts ?? [],
+              ligne.length,
+              trame,
+              vers,
+            );
+            if (pts.length === 0) return;
+            setCeilingRow(selRow, pts, vers);
+            haptic('succes');
+          };
+          return (
+            <StripBar
+              styles={styles}
+              strong={`${ligne.length} spots`}
+              note={
+                `${rooms.find((r) => r.id === ligne[0].roomId)?.name ?? 'Pièce'} · ` +
+                (axe === 'longueur' ? 'sur la longueur' : 'sur la largeur')
+              }
+              actions={[
+                {
+                  label: 'Longueur',
+                  ghost: axe !== 'longueur',
+                  onPress: () => tendre('longueur'),
+                },
+                {
+                  label: 'Largeur',
+                  ghost: axe !== 'largeur',
+                  onPress: () => tendre('largeur'),
+                },
+                {
+                  label: 'Retirer',
+                  ghost: true,
+                  onPress: () => {
+                    removeCeilingRow(selRow);
+                    setSelRow(null);
+                    haptic('succes');
+                  },
+                },
+              ]}
             />
           );
         })()}
@@ -2784,7 +2894,10 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     position: 'absolute',
     bottom: 12,
     left: 12,
-    right: 70,
+    // La colonne d'outils descend du HAUT du plan : sous elle, la largeur
+    // est libre. On lui laissait pourtant soixante-dix points de marge —
+    // un cinquième de l'écran perdu, pendant que la cote était tronquée.
+    right: 12,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: c.surface,
@@ -2792,24 +2905,34 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     paddingLeft: 16,
     paddingRight: 6,
     paddingVertical: 6,
+    // Les boutons à droite, la cote à gauche : entre les deux, du vide
+    // plutôt qu'un texte écrasé contre eux.
+    justifyContent: 'space-between',
     ...shadowCard,
     shadowOpacity: 0.12,
   },
-  wallStripText: { color: c.inkSoft, fontSize: 13, flex: 1 },
-  wallStripStrong: { color: c.ink, fontWeight: '800', fontSize: 14 },
+  // La précision en gris cède la place la première ; la cote, jamais.
+  wallStripText: { color: c.inkSoft, fontSize: 13, flexShrink: 1 },
+  wallStripStrong: {
+    color: c.ink,
+    fontWeight: '800',
+    fontSize: 14,
+    flexShrink: 0,
+  },
   wallStripAction: {
     backgroundColor: c.blue,
     borderRadius: radius.pill,
-    paddingHorizontal: 16,
+    paddingHorizontal: 13,
     paddingVertical: 9,
+    marginLeft: 6,
   },
   wallStripActionText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
   wallStripGhost: {
     backgroundColor: c.surfaceSunken,
     borderRadius: radius.pill,
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     paddingVertical: 9,
-    marginRight: 6,
+    marginLeft: 6,
   },
   wallStripGhostText: { color: c.inkSoft, fontSize: 13, fontWeight: '800' },
   // Une seule ligne, au pied du plan, et LOIN du bouton d'enregistrement :

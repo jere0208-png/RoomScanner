@@ -216,6 +216,8 @@ interface Props {
    * c'est justement ce qu'un canapé dessiné par-dessus empêche de voir.
    */
   selectedCeilingId?: string | null;
+  /** La ligne de spots tenue en main : elle se surligne d'un bout à l'autre. */
+  selectedCeilingRow?: string | null;
   /**
    * Le retour de mur choisi, ou `null`.
    *
@@ -261,6 +263,7 @@ export function FloorplanEditor({
   placing,
   onPlaceAt,
   selectedCeilingId,
+  selectedCeilingRow,
   onPierChange,
   selectedOpeningId,
   onSelectOpening,
@@ -275,7 +278,8 @@ export function FloorplanEditor({
   const showFurniture = useScanStore((s) => s.showFurniture);
   // Un appareil de plafond en réglage : le sol s'efface pour qu'on voie
   // où il tombe par rapport aux murs.
-  const objects = showFurniture && !selectedCeilingId ? allObjects : [];
+  const objects =
+    showFurniture && !selectedCeilingId && !selectedCeilingRow ? allObjects : [];
   const currentSaveId = useScanStore((s) => s.currentSaveId);
   const rooms = useScanStore((s) => s.rooms);
   const fixtures = useScanStore((s) => s.fixtures);
@@ -1165,6 +1169,7 @@ export function FloorplanEditor({
               ceiling={ceiling}
               showCeiling={showCeiling}
               selectedCeilingId={selectedCeilingId}
+              selectedCeilingRow={selectedCeilingRow}
               onSelectCeiling={onSelectCeiling}
               fixtures={fixtures}
               walls={walls}

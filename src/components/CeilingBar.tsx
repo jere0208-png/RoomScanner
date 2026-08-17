@@ -145,8 +145,14 @@ export function CeilingBar({
                       </Svg>
                     </TouchableOpacity>
                   )}
+                  {/* Deux boutons en pictogramme, et rien pour les nommer :
+                      VoiceOver annonçait « bouton », deux fois, à côté de
+                      la corbeille et de la validation. Toutes les autres
+                      barres de l'app portent leur étiquette ; celles-ci
+                      l'avaient perdue en chemin. */}
                   <TouchableOpacity
                     style={styles.iconBtn}
+                    accessibilityLabel="Retirer"
                     onPress={onRemove}>
                     <Svg width={19} height={19} viewBox="0 0 24 24">
                       <Path
@@ -161,6 +167,7 @@ export function CeilingBar({
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.iconBtnOk}
+                    accessibilityLabel="Terminer"
                     onPress={onDone}>
                     <Svg width={19} height={19} viewBox="0 0 24 24">
                       <Path

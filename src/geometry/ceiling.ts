@@ -160,6 +160,29 @@ export interface CeilingFixture {
    * qu'un plan d'implantation dit de plus qu'un inventaire.
    */
   commands?: string[];
+  /**
+   * LA LIGNE à laquelle il appartient, quand il a été posé en série.
+   *
+   * Quatre spots posés d'un geste, ce n'est pas quatre appareils
+   * indépendants : c'est une ligne, qu'on déplace, qu'on retourne et
+   * qu'on supprime d'un bloc. Sans ce lien, retourner une ligne de six
+   * demandait six réglages au centimètre — exactement ce que la pose en
+   * série était censée épargner.
+   */
+  row?: string;
+  /** L'axe sur lequel la ligne a été tendue : longueur ou largeur. */
+  axe?: SpotAxis;
+}
+
+/** Le sens d'une ligne de spots, par rapport à la pièce. */
+export type SpotAxis = 'longueur' | 'largeur';
+
+/** Un pavé rectangulaire de la pièce, mesuré DANS LA TRAME. */
+export interface Zone {
+  x0: number;
+  x1: number;
+  z0: number;
+  z1: number;
 }
 
 /** Le symbole d'un appareil de plafond, dans un carré de 24 centré. */
@@ -311,24 +334,189 @@ export function insetOnRing(ring: Pt[], p: Pt, marge: number): Pt {
 }
 
 /**
+ * LES ZONES RECTANGULAIRES D'UNE PIÈCE.
+ *
+ * Une pièce n'est presque jamais un rectangle : il y a l'entrée, le
+ * dégagement derrière la porte, le renfoncement de la cheminée. Poser une
+ * ligne de spots sur l'emprise TOTALE revient à la faire passer dans le
+ * vide — et le point qui tombe dehors est ramené contre le mur le plus
+ * proche : le fameux spot collé à la cloison de la petite partie.
+ *
+ * On découpe donc la pièce en pavés : on cherche le plus grand rectangle
+ * inscrit, on le retire, on recommence. Deux ou trois passées suffisent à
+ * séparer « le grand séjour » de « son retour », et chacun reçoit ensuite
+ * sa part de spots.
+ *
+ * Le calcul passe par une grille de douze centimètres, ÉRODÉE de trente :
+ * on ne cherche pas la surface au sol, on cherche où un spot peut se poser
+ * sans être à dix centimètres d'un mur. C'est aussi ce qui élimine les
+ * échardes des murs en biais, qu'un découpage par bandes verticales
+ * transformerait en dizaines de fausses zones.
+ */
+export function roomZones(ring: Pt[], frame: number, max = 3): Zone[] {
+  if (ring.length < 3 || max < 1) return [];
+  const cos = Math.cos(frame);
+  const sin = Math.sin(frame);
+  const pts = ring.map((p) => ({
+    x: p.x * cos + p.z * sin,
+    z: -p.x * sin + p.z * cos,
+  }));
+  const x0 = Math.min(...pts.map((p) => p.x));
+  const x1 = Math.max(...pts.map((p) => p.x));
+  const z0 = Math.min(...pts.map((p) => p.z));
+  const z1 = Math.max(...pts.map((p) => p.z));
+  const PAS = 0.12;
+  /** Recul minimal devant un mur : un spot ne s'y colle pas. */
+  const MARGE = 0.3;
+  const nx = Math.min(220, Math.max(1, Math.ceil((x1 - x0) / PAS)));
+  const nz = Math.min(220, Math.max(1, Math.ceil((z1 - z0) / PAS)));
+  if (nx < 2 || nz < 2) return [];
+  const cx = (i: number) => x0 + ((i + 0.5) * (x1 - x0)) / nx;
+  const cz = (j: number) => z0 + ((j + 0.5) * (z1 - z0)) / nz;
+  let libre = new Uint8Array(nx * nz);
+  for (let j = 0; j < nz; j++) {
+    for (let i = 0; i < nx; i++) {
+      libre[j * nx + i] = pointInPolygon({ x: cx(i), z: cz(j) }, pts) ? 1 : 0;
+    }
+  }
+  // Érosion : on ôte les cases trop près d'un bord, MARGE en cases.
+  const k = Math.max(1, Math.round(MARGE / PAS));
+  for (let pas = 0; pas < k; pas++) {
+    const suivant = new Uint8Array(nx * nz);
+    for (let j = 0; j < nz; j++) {
+      for (let i = 0; i < nx; i++) {
+        if (!libre[j * nx + i]) continue;
+        const bord =
+          i === 0 ||
+          j === 0 ||
+          i === nx - 1 ||
+          j === nz - 1 ||
+          !libre[j * nx + i - 1] ||
+          !libre[j * nx + i + 1] ||
+          !libre[(j - 1) * nx + i] ||
+          !libre[(j + 1) * nx + i];
+        suivant[j * nx + i] = bord ? 0 : 1;
+      }
+    }
+    libre = suivant;
+  }
+
+  const zones: Zone[] = [];
+  for (let n = 0; n < max; n++) {
+    const r = plusGrandPave(libre, nx, nz);
+    if (!r) break;
+    const larg = ((r.i1 - r.i0 + 1) * (x1 - x0)) / nx;
+    const haut = ((r.j1 - r.j0 + 1) * (z1 - z0)) / nz;
+    // Une écharde n'est pas une zone : ni surface, ni largeur utile.
+    if (larg * haut < 1 || Math.min(larg, haut) < 0.5) break;
+    /**
+     * LA ZONE EST RENDUE À SA VRAIE TAILLE.
+     *
+     * L'érosion sert à TROUVER les pavés, pas à les mesurer : garder le
+     * rectangle érodé reviendrait à comprimer la ligne de trente
+     * centimètres à chaque bout, et le demi-intervalle du métier — quatre
+     * spots dans six mètres, donc à 0,75 m des murs — deviendrait un
+     * espacement bâtard qu'aucun électricien ne reconnaît. On la redonne
+     * donc à sa dimension, bornée par l'emprise de la pièce ; c'est
+     * ensuite le demi-intervalle qui écarte les spots des murs.
+     */
+    // On redonne EXACTEMENT ce que l'érosion a pris : k cases de chaque
+    // côté. À un demi-centimètre près, la zone d'une pièce rectangulaire
+    // redevient la pièce, et la ligne retrouve ses cotes rondes.
+    const rendreX = (k * (x1 - x0)) / nx;
+    const rendreZ = (k * (z1 - z0)) / nz;
+    zones.push({
+      x0: Math.max(x0, x0 + (r.i0 * (x1 - x0)) / nx - rendreX),
+      x1: Math.min(x1, x0 + ((r.i1 + 1) * (x1 - x0)) / nx + rendreX),
+      z0: Math.max(z0, z0 + (r.j0 * (z1 - z0)) / nz - rendreZ),
+      z1: Math.min(z1, z0 + ((r.j1 + 1) * (z1 - z0)) / nz + rendreZ),
+    });
+    for (let j = r.j0; j <= r.j1; j++) {
+      for (let i = r.i0; i <= r.i1; i++) libre[j * nx + i] = 0;
+    }
+  }
+  return zones;
+}
+
+/** Le plus grand rectangle plein d'une grille booléenne, en cases. */
+function plusGrandPave(
+  libre: Uint8Array,
+  nx: number,
+  nz: number,
+): { i0: number; i1: number; j0: number; j1: number } | null {
+  const haut = new Int32Array(nx);
+  let best: { i0: number; i1: number; j0: number; j1: number } | null = null;
+  let bestAire = 0;
+  for (let j = 0; j < nz; j++) {
+    for (let i = 0; i < nx; i++) haut[i] = libre[j * nx + i] ? haut[i] + 1 : 0;
+    // Le plus grand rectangle sous un histogramme, à la pile.
+    const pile: number[] = [];
+    for (let i = 0; i <= nx; i++) {
+      const h = i === nx ? 0 : haut[i];
+      while (pile.length > 0 && haut[pile[pile.length - 1]] >= h) {
+        const t = pile.pop() as number;
+        const hauteur = haut[t];
+        const gauche = pile.length > 0 ? pile[pile.length - 1] + 1 : 0;
+        const aire = hauteur * (i - gauche);
+        if (hauteur > 0 && aire > bestAire) {
+          bestAire = aire;
+          best = { i0: gauche, i1: i - 1, j0: j - hauteur + 1, j1: j };
+        }
+      }
+      pile.push(i);
+    }
+  }
+  return best;
+}
+
+/** Répartit `total` unités au prorata des poids, sans en perdre. */
+function repartir(total: number, poids: number[]): number[] {
+  const somme = poids.reduce((a, b) => a + b, 0);
+  if (somme <= 0) return poids.map(() => 0);
+  const brut = poids.map((p) => (total * p) / somme);
+  const part = brut.map((v) => Math.floor(v));
+  let reste = total - part.reduce((a, b) => a + b, 0);
+  const ordre = brut
+    .map((v, i) => ({ i, r: v - Math.floor(v) }))
+    .sort((a, b) => b.r - a.r);
+  for (const o of ordre) {
+    if (reste <= 0) break;
+    part[o.i] += 1;
+    reste -= 1;
+  }
+  return part;
+}
+
+/**
  * Répartit N points lumineux dans une pièce, comme on pose une ligne de spots.
  *
  * Quatre spots dans un séjour, c'était quatre poses au doigt suivies de
  * quatre réglages au centimètre — un quart d'heure pour un geste que
- * personne ne fait à la main sur un vrai chantier. On aligne toujours les
- * spots sur la plus grande dimension de la pièce, à intervalles égaux, avec
- * un demi-intervalle aux extrémités : c'est la règle du métier, celle qui
- * évite deux spots collés au mur et un trou au milieu.
+ * personne ne fait à la main sur un vrai chantier. On les aligne à
+ * intervalles égaux, avec un demi-intervalle aux extrémités : c'est la
+ * règle du métier, celle qui évite deux spots collés au mur et un trou au
+ * milieu.
+ *
+ * DEUX CHOSES ONT CHANGÉ depuis la première version, et les deux venaient
+ * du même défaut : la pièce était traitée comme son rectangle englobant.
+ *
+ *   — On pose maintenant par ZONES (`roomZones`) : le retour d'une pièce
+ *     en L reçoit SA part de spots, centrée chez lui, au lieu de voir
+ *     passer une ligne venue d'ailleurs dont le dernier point finissait
+ *     rabattu contre sa cloison.
+ *   — L'axe se CHOISIT : sur la longueur (par défaut, la règle) ou sur la
+ *     largeur. Une cuisine se éclaire en travers, un couloir en long, et
+ *     personne d'autre que l'électricien ne peut trancher.
  *
  * Le calcul se fait dans la TRAME du logement, jamais dans le repère du
  * scan : une pièce relevée de biais donnerait sinon une ligne de spots en
- * écharpe. Et chaque point est ramené dans le contour — une pièce en L a
- * des recoins où une ligne droite sort du mur.
+ * écharpe.
  */
 export function spreadPoints(
   ring: Pt[],
   count: number,
   frame: number,
+  axe: SpotAxis = 'longueur',
 ): Pt[] {
   if (count < 1 || ring.length < 3) return [];
   const cos = Math.cos(frame);
@@ -346,21 +534,38 @@ export function spreadPoints(
   const x1 = Math.max(...pts.map((p) => p.x));
   const z0 = Math.min(...pts.map((p) => p.z));
   const z1 = Math.max(...pts.map((p) => p.z));
-  // On s'aligne sur la plus grande dimension : une ligne de spots suit la
-  // longueur d'une pièce, pas sa largeur.
-  const surX = x1 - x0 >= z1 - z0;
-  const long = surX ? x1 - x0 : z1 - z0;
-  const milieu = surX ? (z0 + z1) / 2 : (x0 + x1) / 2;
+  // La longueur de la PIÈCE, pas celle d'une zone : c'est d'elle que parle
+  // l'électricien quand il dit « sur la longueur ».
+  const longueurSurX = x1 - x0 >= z1 - z0;
+  const surX = axe === 'longueur' ? longueurSurX : !longueurSurX;
+  // Une zone par spot au plus : inutile de découper plus fin qu'on ne pose.
+  const zones = roomZones(ring, frame, Math.min(3, count));
+  const cibles: Zone[] = zones.length > 0 ? zones : [{ x0, x1, z0, z1 }];
+  const parts = repartir(
+    count,
+    cibles.map((z) => (z.x1 - z.x0) * (z.z1 - z.z0)),
+  );
   const out: Pt[] = [];
-  for (let i = 0; i < count; i++) {
-    // Demi-intervalle aux bouts : (i + ½) / n, jamais i / (n − 1).
-    const t = (i + 0.5) / count;
-    const le = (surX ? x0 : z0) + long * t;
-    const p = surX ? { x: le, z: milieu } : { x: milieu, z: le };
-    const monde = versMonde(p);
-    out.push(
-      pointInPolygon(monde, ring) ? monde : insetOnRing(ring, monde, 0.25),
-    );
-  }
-  return out;
+  cibles.forEach((z, k) => {
+    const n = parts[k];
+    if (n < 1) return;
+    const d0 = surX ? z.x0 : z.z0;
+    const d1 = surX ? z.x1 : z.z1;
+    const milieu = surX ? (z.z0 + z.z1) / 2 : (z.x0 + z.x1) / 2;
+    for (let i = 0; i < n; i++) {
+      // Demi-intervalle aux bouts : (i + ½) / n, jamais i / (n − 1).
+      const le = d0 + (d1 - d0) * ((i + 0.5) / n);
+      const p = surX ? { x: le, z: milieu } : { x: milieu, z: le };
+      const monde = versMonde(p);
+      out.push(
+        pointInPolygon(monde, ring) ? monde : insetOnRing(ring, monde, 0.25),
+      );
+    }
+  });
+  // Un ordre lisible : la ligne se numérote de bout en bout.
+  return out.sort((a, b) => {
+    const ta = versTrame(a);
+    const tb = versTrame(b);
+    return surX ? ta.x - tb.x || ta.z - tb.z : ta.z - tb.z || ta.x - tb.x;
+  });
 }
