@@ -620,6 +620,24 @@ export function buildScene(
       normal?: P3;
       /** Le pan appartient à la face extérieure d'un mur. */
       cutaway?: boolean;
+      /**
+       * ALTITUDE DE TRI : un mur se classe COMME UN PLAN, pas morceau par
+       * morceau.
+       *
+       * La vue peint du plus lointain au plus proche, et la profondeur
+       * mêle l'éloignement à l'altitude : plus un point est haut, plus il
+       * est près de l'œil. Un mur percé d'une fenêtre est découpé en
+       * panneaux — celui sous l'allège a son centre à cinquante
+       * centimètres, celui du linteau à deux mètres vingt : plus d'un
+       * mètre de profondeur d'écart entre deux morceaux du MÊME plan.
+       * Tout ce qui se glissait entre les deux — une armoire derrière le
+       * mur — passait devant l'un et derrière l'autre : le meuble
+       * traversait la cloison.
+       *
+       * En classant chaque morceau à la mi-hauteur du mur, le mur
+       * redevient une seule surface : rien ne peut plus s'y intercaler.
+       */
+      depthY?: number;
     } = {},
   ) => {
     const cols = Math.max(1, Math.ceil(Math.hypot(q.x - p.x, q.z - p.z) / step));
@@ -658,6 +676,14 @@ export function buildScene(
           captured: o.captured || !!o.tex,
           normal: o.normal,
           cutaway: o.cutaway,
+          depthAt:
+            o.depthY === undefined
+              ? undefined
+              : {
+                  x: (s0.x + s1.x) / 2,
+                  y: o.depthY,
+                  z: (s0.z + s1.z) / 2,
+                },
         });
 
         // Contour du POURTOUR, tuile par tuile.
@@ -762,6 +788,8 @@ export function buildScene(
       closeBottom?: boolean;
       /** Ombrage selon l'orientation (les meubles restent en aplat). */
       shade?: boolean;
+      /** Altitude de tri commune à tout le mur (voir `pushStrips`). */
+      depthY?: number;
       /**
        * Seulement les deux grandes faces — ni chants, ni dessus, ni dessous.
        *
@@ -799,6 +827,7 @@ export function buildScene(
         outline: o.stroke,
         normal: outwardOf(p, r),
         cutaway: extra.cutaway,
+        depthY: o.depthY,
       });
 
     // `texOnPlus` dit déjà quelle face regarde la pièce : l'AUTRE est
@@ -856,6 +885,9 @@ export function buildScene(
       pushWallBlock(q, panel.t0, panel.t1, panel.y0, panel.y1, {
         ...skin,
         closeBottom: panel.y0 > 1e-3,
+        // Tous les morceaux d'un mur se classent à sa mi-hauteur : le mur
+        // est un plan, pas une collection de tuiles.
+        depthY: w.height / 2,
       });
     }
 
@@ -916,6 +948,8 @@ export function buildScene(
         // qui apparaîssait sur le côté d'une fenêtre selon l'angle.
         shrink: 0.06,
         facesSeules: true,
+        // La menuiserie appartient au plan du mur : elle s'y classe avec lui.
+        depthY: w.height / 2,
       });
     }
   }
