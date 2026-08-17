@@ -16,9 +16,11 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 import {
+  faceIntoRoom,
   fitsInRoom,
   pushOutOfWalls,
   WALL_T,
+  type ObjectFootprint,
   type WallSeg,
 } from '../src/geometry/floorplan';
 import { useScanStore } from '../src/store/scanStore';
@@ -191,5 +193,71 @@ describe('la poussée hors des murs, prise isolément', () => {
       dedans,
     );
     expect(p.z).toBeCloseTo(0.5 + WALL_T / 2, 3);
+  });
+});
+
+/**
+ * L'AVANT D'UN MEUBLE NE REGARDE PAS LE MUR.
+ *
+ * Une commode contre une cloison ouvre ses tiroirs vers la pièce, un lit
+ * pose sa tête contre le mur, un canapé y adosse son dossier. Le relevé, lui,
+ * ne le sait pas : ARKit rend une boîte et un angle, et cet angle vaut aussi
+ * bien θ que θ + 180° — rien dans un nuage de points ne distingue l'avant de
+ * l'arrière d'un caisson. Une fois sur deux, le meuble sortait dos à la pièce.
+ */
+describe('l’orientation d’un meuble contre un mur', () => {
+  /** Un mur nord (z = 0), la pièce s'étendant vers les z positifs. */
+  const MUR: WallSeg = {
+    id: 'n',
+    type: 'wall',
+    a: { x: 0, z: 0 },
+    b: { x: 5, z: 0 },
+    height: 2.5,
+    yCenter: 1.25,
+    roomId: 'r1',
+  };
+  const commode = (yaw: number): ObjectFootprint => ({
+    id: 'o1',
+    category: 'storage',
+    cx: 2,
+    cz: 0.32,
+    width: 1,
+    depth: 0.5,
+    height: 0.9,
+    yCenter: 0.45,
+    yaw,
+  });
+  /** L'avant du meuble dans le monde : son côté −z local. */
+  const avant = (f: ObjectFootprint) => ({
+    x: Math.sin(f.yaw),
+    z: -Math.cos(f.yaw),
+  });
+
+  it('se retourne quand il ouvre ses tiroirs dans le mur', () => {
+    // yaw = 0 : l'avant regarde −z, c'est-à-dire le mur. Demi-tour.
+    const corrige = faceIntoRoom(commode(0), [MUR]);
+    expect(avant(corrige).z).toBeGreaterThan(0.9);
+  });
+
+  it('ne touche à rien quand il regarde déjà la pièce', () => {
+    const bon = commode(Math.PI);
+    expect(faceIntoRoom(bon, [MUR]).yaw).toBe(bon.yaw);
+  });
+
+  it('ne corrige QUE par demi-tour : les cotes ne bougent pas', () => {
+    const f = commode(0);
+    const corrige = faceIntoRoom(f, [MUR]);
+    // Un quart de tour échangerait largeur et profondeur — le meuble ne
+    // coïnciderait plus avec ce qui a été mesuré.
+    expect(corrige.width).toBe(f.width);
+    expect(corrige.depth).toBe(f.depth);
+    expect(Math.abs(Math.sin(corrige.yaw - f.yaw))).toBeLessThan(1e-9);
+  });
+
+  it('et laisse tranquille un meuble au milieu de la pièce', () => {
+    // À deux mètres du mur, une chaise regarde où elle veut : lui imposer
+    // un sens serait inventer une information qu'on n'a pas.
+    const libre = { ...commode(0), cz: 2 };
+    expect(faceIntoRoom(libre, [MUR]).yaw).toBe(0);
   });
 });

@@ -963,7 +963,63 @@ export function clampFootprint(
       cz += nz * side * need;
     }
   }
-  return { ...f, cx, cz };
+  return faceIntoRoom({ ...f, cx, cz }, walls);
+}
+
+/**
+ * L'AVANT D'UN MEUBLE NE REGARDE PAS LE MUR.
+ *
+ * Une commode contre une cloison ouvre ses tiroirs vers la pièce, un lit
+ * pose sa tête contre le mur, un canapé y adosse son dossier. C'est vrai
+ * partout, sans exception — personne n'ouvre un tiroir dans du plâtre.
+ *
+ * Le relèvement, lui, ne le sait pas : ARKit rend une boîte et un angle,
+ * et cet angle vaut aussi bien θ que θ + 180° — rien dans un nuage de
+ * points ne distingue l'avant de l'arrière d'un caisson. Une fois sur
+ * deux, le meuble sortait donc dos à la pièce.
+ *
+ * On ne corrige QUE par demi-tour : un quart de tour échangerait largeur et
+ * profondeur, et le meuble ne coïnciderait plus avec ce qui a été mesuré.
+ * Et seulement pour un meuble RÉELLEMENT contre un mur : au milieu d'une
+ * pièce, une chaise regarde où elle veut, et lui imposer un sens serait
+ * inventer une information qu'on n'a pas.
+ */
+export function faceIntoRoom(
+  f: ObjectFootprint,
+  walls: WallSeg[],
+  wallT = WALL_T,
+): ObjectFootprint {
+  // L'avant du meuble est son côté −z local (`furnitureParts` y pose les
+  // portes et les tiroirs) : dans le monde, (sin θ, −cos θ).
+  const front = { x: Math.sin(f.yaw), z: -Math.cos(f.yaw) };
+  let plusProche: { d: number; vers: { x: number; z: number } } | null = null;
+  for (const w of walls) {
+    const dx = w.b.x - w.a.x;
+    const dz = w.b.z - w.a.z;
+    const len2 = dx * dx + dz * dz;
+    if (len2 < 1e-9) continue;
+    // Le point du mur le plus proche du centre, borné au segment.
+    const t = Math.max(
+      0,
+      Math.min(1, ((f.cx - w.a.x) * dx + (f.cz - w.a.z) * dz) / len2),
+    );
+    const px = w.a.x + dx * t;
+    const pz = w.a.z + dz * t;
+    const vx = f.cx - px;
+    const vz = f.cz - pz;
+    const d = Math.hypot(vx, vz);
+    // Contre le mur = son dos y touche presque : la demi-profondeur, plus
+    // la demi-épaisseur du mur, plus dix centimètres de jeu.
+    if (d > f.depth / 2 + wallT / 2 + 0.1) continue;
+    if (!plusProche || d < plusProche.d) {
+      plusProche = { d, vers: { x: vx / (d || 1), z: vz / (d || 1) } };
+    }
+  }
+  if (!plusProche) return f;
+  // L'avant regarde-t-il le mur ? Alors demi-tour.
+  const versLaPiece = plusProche.vers;
+  const scalaire = front.x * versLaPiece.x + front.z * versLaPiece.z;
+  return scalaire < -0.15 ? { ...f, yaw: f.yaw + Math.PI } : f;
 }
 
 /**

@@ -878,15 +878,28 @@ export function buildScene(
           ? pal.door
           : pal.window
         : captured ?? pal.opening;
+      /**
+       * UNE MENUISERIE N'EST PAS UN CAISSON.
+       *
+       * Elle était bâtie comme un bloc de mur : ses six faces cernées du
+       * même trait gris que la maçonnerie, et enfoncée de 22 % dans
+       * l'épaisseur. À l'écran, ça donnait un halo d'arêtes autour de
+       * chaque fenêtre — le dormant, le tableau, le linteau, chacun son
+       * trait — et, sous un angle rasant, on voyait le JOUR entre le
+       * vitrage et le nu du mur : le mur paraissait percé de part en part.
+       *
+       * Le vitrage remplit donc l'épaisseur (plus de retrait, donc plus de
+       * jour), et ne porte plus de contour propre : c'est son aplat qui la
+       * dessine, comme une vitre. Le mur, lui, garde les siens — ce sont
+       * eux qui donnent la baie.
+       */
       pushWallBlock(q, hole.t0, hole.t1, hole.y0, hole.y1, {
         fill: paint,
         top: mixHex(paint, '#FFFFFF', 0.3),
-        stroke: pal.wallStroke,
-        topStroke: pal.wallStroke,
+        stroke: paint,
+        topStroke: mixHex(paint, '#FFFFFF', 0.3),
         captured: !!captured,
-        // En retrait dans l'épaisseur : le tableau du mur reste visible
-        // autour, et le bloc se lit comme une menuiserie posée dedans.
-        shrink: 0.22,
+        shrink: 0,
         closeBottom: true,
       });
     }

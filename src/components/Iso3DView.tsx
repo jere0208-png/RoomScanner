@@ -614,8 +614,19 @@ export function Iso3DView({
         const cachePar = boites.filter((b) =>
           hiddenByBox({ x: p.x, y: hauteur, z: p.z }, versOeil, b),
         );
-        // De près, ces meubles-là s'effacent pour laisser voir l'appareil.
-        if (scale >= ZOOM_FONDU) for (const b of cachePar) fondus.add(b.id);
+        /**
+         * LE MEUBLE NE S'EFFACE QUE SI LES MURS S'EFFACENT AUSSI.
+         *
+         * Le fondu répondait à un vrai besoin — voir la prise derrière le
+         * rangement — mais il s'appliquait dans les DEUX modes. Murs
+         * pleins, on se retrouvait avec un lit fantôme flottant dans une
+         * pièce fermée : le modèle disait à la fois « ce mur est opaque »
+         * et « ce meuble est transparent », deux affirmations qui ne
+         * tiennent pas ensemble. En mode plein, on ne fond plus rien.
+         */
+        if (!solidWalls && scale >= ZOOM_FONDU) {
+          for (const b of cachePar) fondus.add(b.id);
+        }
 
         // Tant que la plaque est trop petite pour se voir, un point de sa
         // couleur en tient lieu ; il s'efface à mesure qu'elle grandit.
@@ -644,9 +655,21 @@ export function Iso3DView({
           x: q.sx,
           y: q.sy,
           color: FIXTURES[lot[0].kind].color,
-          haut: scale > 90 ? `${Math.round(hauteur * 100)}` : undefined,
+          /**
+           * LES COTES D'UN APPAREIL SONT DES COTES.
+           *
+           * Elles s'affichaient en zoomant, quel que soit l'état du bouton
+           * « Cotes » : on l'éteignait pour regarder le volume, les cotes
+           * des murs disparaîbssaient, et celles des prises restaient —
+           * avec leurs filets pointillés jusqu'au sol. Un calque qui
+           * n'éteint que la moitié de ce qu'il nomme n'est pas un calque.
+           */
+          haut:
+            showMeasures && scale > 90
+              ? `${Math.round(hauteur * 100)}`
+              : undefined,
           bord:
-            scale > 90
+            showMeasures && scale > 90
               ? `${Math.round(Math.abs(x - versBord) * 100)}`
               : undefined,
           // La désignation en toutes lettres, POSÉE SUR l'appareil. Le
