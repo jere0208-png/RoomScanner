@@ -60,6 +60,12 @@ interface Etape {
   vue: View3DParams;
   /** Tour d'horizon pendant l'étape, en degrés (0 = caméra fixe). */
   balayage: number;
+  /**
+   * L'étape présente UN MUR : on trace alors les cotes des appareils, et
+   * on pose leur désignation. Le reste du temps, la scène reste nue — un
+   * client ne lit pas dix nombres sur un volume qui tourne.
+   */
+  mur?: boolean;
   /** Durée, en millisecondes. */
   duree: number;
 }
@@ -171,15 +177,25 @@ export function ClientTour({
             .map((f) => noms.get(f.id)?.nom ?? FIXTURES[f.kind].label)
             .join(' · '),
           roomId: room.id,
+          mur: true,
+          /**
+           * PRESQUE DE FACE, ET LENTEMENT.
+           *
+           * De face pile, un mur devient un rectangle plat : on ne voit
+           * plus ni son épaisseur ni la profondeur de la pièce, et
+           * l'image paraît figée. Quelques degrés de biais suffisent à
+           * garder le volume, et un balayage lent — dix degrés sur six
+           * secondes — fait vivre l'image sans qu'on ait à suivre.
+           */
           vue: {
-            theta: azimutFaceAuMur(w, centre),
-            tilt: 34,
-            zoom: 1.5,
+            theta: azimutFaceAuMur(w, centre) - 5,
+            tilt: 26,
+            zoom: 1.55,
             ox: 0,
             oy: 0,
           },
-          balayage: 26,
-          duree: 4200,
+          balayage: 10,
+          duree: 6200,
         });
       }
     }
@@ -211,6 +227,8 @@ export function ClientTour({
     oy: 0,
   });
   const [avance, setAvance] = useState(0);
+  /** Avancement du tracé des cotes, ou `null` hors des étapes de mur. */
+  const [cotes, setCotes] = useState<number | null>(null);
 
   const etape = etapes[Math.min(index, etapes.length - 1)];
   const depart = useRef<View3DParams>(vue);
@@ -251,10 +269,11 @@ export function ClientTour({
       if (!vivant) return;
       const passe = Date.now() - t0;
       const t = Math.min(1, passe / etape.duree);
-      // Deux temps : on rejoint la caméra de l'étape sur le premier tiers,
-      // puis on balaie doucement — arriver ET tourner en même temps donne
-      // un mouvement mou, qui ne montre rien.
-      const arrivee = lissage(Math.min(1, t / 0.34));
+      // Deux temps : on rejoint la caméra de l'étape, puis on balaie
+      // doucement — arriver ET tourner en même temps donne un mouvement
+      // mou, qui ne montre rien. Devant un mur, l'arrivée prend son temps :
+      // c'est le moment où le client comprend ce qu'il regarde.
+      const arrivee = lissage(Math.min(1, t / (etape.mur ? 0.45 : 0.34)));
       const d = depart.current;
       const a = etape.vue;
       const balaye = etape.balayage * Math.max(0, (t - 0.2) / 0.8);
@@ -265,6 +284,23 @@ export function ClientTour({
         ox: 0,
         oy: 0,
       });
+      /**
+       * LES COTES SE TRACENT, PUIS S'EFFACENT.
+       *
+       * Elles montent après l'arrivée de la caméra — sinon elles
+       * s'étirent pendant que l'image tourne, et rien ne se lit —, tiennent
+       * le temps qu'on les lise, et se rétractent avant le mur suivant. Un
+       * client retient un geste : le mètre qu'on déroule, puis qu'on range.
+       */
+      setCotes(
+        !etape.mur
+          ? null
+          : t < 0.5
+          ? Math.max(0, (t - 0.42) / 0.08)
+          : t < 0.86
+          ? 1
+          : Math.max(0, 1 - (t - 0.86) / 0.1),
+      );
       setAvance(t);
       debut.current = passe;
       if (t >= 1) {
@@ -291,11 +327,21 @@ export function ClientTour({
   return (
     <Modal visible={visible} animationType="fade" onRequestClose={onClose}>
       <View style={styles.plein}>
+        {/*
+          LES AUTRES MURS S'EFFACENT.
+
+          Une pièce isolée reste une boîte fermée : la cloison qui se
+          trouve entre la caméra et le mur présenté cachait précisément ce
+          qu'on venait montrer. L'écorché les rend transparentes — elles
+          gardent leur arête, donc la pièce garde sa forme.
+        */}
         <Iso3DView
           value={vue}
           showMeasures={false}
-          showElecTags={false}
+          showElecTags={!!etape.mur}
           showNorth={false}
+          cutaway
+          elecCotes={cotes}
           focusRoomId={etape.roomId}
         />
 

@@ -102,6 +102,24 @@ interface Props {
   focusRoomId?: string | null;
   /** Les points cardinaux autour de la vue, comme sur le plan. */
   showNorth?: boolean;
+  /**
+   * Force l'écorché, quel que soit le réglage de l'utilisateur.
+   *
+   * Pendant la présentation, on ne demande pas au client d'aller cocher
+   * « murs pleins » : montrer un mur équipé en gardant opaque la cloison
+   * qui se trouve devant, c'est ne rien montrer du tout.
+   */
+  cutaway?: boolean;
+  /**
+   * LES COTES QUI SE TRACENT, de 0 à 1.
+   *
+   * `null` = le comportement ordinaire (elles suivent le bouton « Cotes »
+   * et le zoom). Un nombre = la présentation les pilote : le filet part de
+   * l'appareil et s'étire jusqu'à son mur à mesure que la valeur monte,
+   * puis se rétracte. C'est le geste du mètre qu'on déroule — il se
+   * comprend sans légende, et c'est ce qu'on veut devant un client.
+   */
+  elecCotes?: number | null;
 }
 
 /**
@@ -124,6 +142,8 @@ export function Iso3DView({
   showElecTags = true,
   focusRoomId,
   showNorth = true,
+  cutaway,
+  elecCotes = null,
 }: Props) {
   const walls = useScanStore((s) => s.walls);
   const openings = useScanStore((s) => s.openings);
@@ -137,7 +157,9 @@ export function Iso3DView({
   const colorOpenings = useScanStore((s) => s.showOpeningColors);
   const showSurfaces = useScanStore((s) => s.showSurfaces);
   const showTextures = useScanStore((s) => s.showTextures);
-  const solidWalls = useScanStore((s) => s.solidWalls);
+  const solidWallsReglage = useScanStore((s) => s.solidWalls);
+  // La présentation impose l'écorché ; ailleurs, c'est le réglage qui décide.
+  const solidWalls = cutaway === undefined ? solidWallsReglage : !cutaway;
   const allRooms = useScanStore((s) => s.rooms);
   // Coupe : on ne garde que la pièce visée, murs et meubles compris.
   const rooms = useMemo(
@@ -456,6 +478,8 @@ export function Iso3DView({
       | {
           kind: 'elec';
           /** Bout de la ligne de cote vers le bord du mur. */
+          /** Avancement du tracé des cotes, de 0 à 1. */
+          trace?: number;
           bx?: number;
           by?: number;
           /** Bout de la ligne de cote vers le sol. */
@@ -664,14 +688,17 @@ export function Iso3DView({
            * avec leurs filets pointillés jusqu'au sol. Un calque qui
            * n'éteint que la moitié de ce qu'il nomme n'est pas un calque.
            */
+          // La présentation décide seule quand les cotes paraissent ; sinon
+          // c'est le bouton « Cotes », et le zoom.
           haut:
-            showMeasures && scale > 90
+            (elecCotes === null ? showMeasures && scale > 90 : elecCotes > 0.02)
               ? `${Math.round(hauteur * 100)}`
               : undefined,
           bord:
-            showMeasures && scale > 90
+            (elecCotes === null ? showMeasures && scale > 90 : elecCotes > 0.02)
               ? `${Math.round(Math.abs(x - versBord) * 100)}`
               : undefined,
+          trace: elecCotes === null ? 1 : Math.max(0, Math.min(1, elecCotes)),
           // La désignation en toutes lettres, POSÉE SUR l'appareil. Le
           // symbole gravé se réduisait à trois traits gris : un mot se lit.
           // Caché et vu de loin : pas de mot, juste le point de couleur.
@@ -780,6 +807,7 @@ export function Iso3DView({
     scene,
     faces,
     fixtures,
+    elecCotes,
     keptWalls,
     keptOpenings,
     roomNames,
@@ -977,44 +1005,51 @@ export function Iso3DView({
                     <>
                       {/* Cote du bord : filet pointillé jusqu'au retour de
                           mur, nombre posé dessus. */}
+                      {/* Le filet s'étire de l'appareil vers le mur : c'est
+                          le mètre qu'on déroule. À l'arrêt (`trace` = 1) il
+                          est entier, comme avant. */}
                       <Line
                         x1={item.x}
                         y1={item.y}
-                        x2={item.bx ?? item.x}
-                        y2={item.by ?? item.y}
+                        x2={item.x + ((item.bx ?? item.x) - item.x) * (item.trace ?? 1)}
+                        y2={item.y + ((item.by ?? item.y) - item.y) * (item.trace ?? 1)}
                         stroke={c.ink}
                         strokeWidth={1}
                         strokeDasharray="2 3"
-                        opacity={0.5}
+                        opacity={0.5 * (item.trace ?? 1)}
                       />
-                      <SvgText
-                        x={((item.bx ?? item.x) + item.x) / 2}
-                        y={((item.by ?? item.y) + item.y) / 2 - 4}
-                        fill={c.ink}
-                        fontSize={9.5}
-                        fontWeight="800"
-                        textAnchor="middle">
-                        {item.bord}
-                      </SvgText>
+                      {(item.trace ?? 1) > 0.85 && (
+                        <SvgText
+                          x={((item.bx ?? item.x) + item.x) / 2}
+                          y={((item.by ?? item.y) + item.y) / 2 - 4}
+                          fill={c.ink}
+                          fontSize={9.5}
+                          fontWeight="800"
+                          textAnchor="middle">
+                          {item.bord}
+                        </SvgText>
+                      )}
                       {/* Cote du sol : même filet, à l'aplomb. */}
                       <Line
                         x1={item.x}
                         y1={item.y}
-                        x2={item.sx ?? item.x}
-                        y2={item.sy ?? item.y}
+                        x2={item.x + ((item.sx ?? item.x) - item.x) * (item.trace ?? 1)}
+                        y2={item.y + ((item.sy ?? item.y) - item.y) * (item.trace ?? 1)}
                         stroke={c.ink}
                         strokeWidth={1}
                         strokeDasharray="2 3"
-                        opacity={0.5}
+                        opacity={0.5 * (item.trace ?? 1)}
                       />
-                      <SvgText
-                        x={((item.sx ?? item.x) + item.x) / 2 + 7}
-                        y={((item.sy ?? item.y) + item.y) / 2 + 3}
-                        fill={c.ink}
-                        fontSize={9.5}
-                        fontWeight="800">
-                        {item.haut}
-                      </SvgText>
+                      {(item.trace ?? 1) > 0.85 && (
+                        <SvgText
+                          x={((item.sx ?? item.x) + item.x) / 2 + 7}
+                          y={((item.sy ?? item.y) + item.y) / 2 + 3}
+                          fill={c.ink}
+                          fontSize={9.5}
+                          fontWeight="800">
+                          {item.haut}
+                        </SvgText>
+                      )}
                       {/* La désignation, AU CENTRE de l'appareil. Deux
                           passes : un liseré clair dessous, le texte
                           par-dessus — sans quoi « PC » disparaît sur un
