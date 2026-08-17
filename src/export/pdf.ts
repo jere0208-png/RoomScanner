@@ -50,6 +50,7 @@ import type { BuyRow, PullRow } from '../geometry/conduits';
 import {
   CEILINGS,
   CEILING_SYMBOL,
+  lightingLoad,
   linkAnchor,
   linkCurve,
   type CeilingFixture,
@@ -1818,9 +1819,30 @@ function metrePage(ctx: SheetContext, sheet: string): string {
   const parts = roomParts(ctx.walls, ctx.rooms);
   const x0 = FRAME.x + 24;
   const w = FRAME.w - 48;
-  // Colonnes : nom, cotes, sol, périmètre, hauteur, murs nets.
-  const cols = [0, 0.28, 0.46, 0.6, 0.73, 0.85].map((f) => x0 + f * w);
-  const heads = ['Pièce', 'Cotes (m)', 'Sol (m²)', 'Périm. (m)', 'H. (m)', 'Murs (m²)'];
+  /**
+   * UNE COLONNE POUR L'ÉCLAIRAGE.
+   *
+   * Le bilan par pièce — combien de points lumineux, quelle puissance —
+   * était calculé depuis des semaines et n'allait nulle part. C'est
+   * pourtant ce qu'on additionne pour dimensionner un départ d'éclairage :
+   * la norme borne le NOMBRE de points par circuit, le chiffrage borne la
+   * puissance. La colonne reste vide tant qu'aucun plafond n'est équipé.
+   */
+  const eclairage = lightingLoad(ctx.ceiling ?? []);
+  const avecEclairage = (ctx.ceiling?.length ?? 0) > 0;
+  // Colonnes : nom, cotes, sol, périmètre, hauteur, murs nets, éclairage.
+  const cols = avecEclairage
+    ? [0, 0.26, 0.42, 0.55, 0.66, 0.76, 0.88].map((f) => x0 + f * w)
+    : [0, 0.28, 0.46, 0.6, 0.73, 0.85].map((f) => x0 + f * w);
+  const heads = [
+    'Pièce',
+    'Cotes (m)',
+    'Sol (m²)',
+    'Périm. (m)',
+    'H. (m)',
+    'Murs (m²)',
+    ...(avecEclairage ? ['Éclairage'] : []),
+  ];
   let y = TETE - 22;
 
   d.text('Métré par pièce', x0, y + 24, 13, INK, { bold: true, align: 'left' });
@@ -1832,6 +1854,8 @@ function metrePage(ctx: SheetContext, sheet: string): string {
 
   let totalArea2 = 0;
   let totalWalls = 0;
+  let totalPoints = 0;
+  let totalWatts = 0;
   for (const part of parts) {
     if (y < FRAME.y + 90) break;
     y -= 20;
@@ -1844,6 +1868,9 @@ function metrePage(ctx: SheetContext, sheet: string): string {
     const nets = wallAreaM2(part.walls, ctx.openings);
     totalArea2 += part.surface?.area ?? 0;
     totalWalls += nets;
+    totalPoints += eclairage.get(part.roomId)?.points ?? 0;
+    totalWatts += eclairage.get(part.roomId)?.watts ?? 0;
+    const lum = eclairage.get(part.roomId);
     const cells = [
       fitText(name, 10, cols[1] - cols[0] - 6),
       `${frLen(ext.width)} × ${frLen(ext.depth)}`,
@@ -1851,6 +1878,9 @@ function metrePage(ctx: SheetContext, sheet: string): string {
       fr1(perim),
       frLen(h),
       fr1(nets),
+      ...(avecEclairage
+        ? [lum && lum.points > 0 ? `${lum.points} pts · ${lum.watts} W` : '—']
+        : []),
     ];
     for (let i = 0; i < cells.length; i++) {
       d.text(cells[i], cols[i], y, i === 0 ? 10 : 9.5, i === 0 ? INK : '#2A3340', {
@@ -1866,6 +1896,12 @@ function metrePage(ctx: SheetContext, sheet: string): string {
   d.text('Total', cols[0], y, 10, INK, { align: 'left', bold: true });
   d.text(fr1(totalArea2), cols[2], y, 10, INK, { align: 'left', bold: true });
   d.text(fr1(totalWalls), cols[5], y, 10, INK, { align: 'left', bold: true });
+  if (avecEclairage && totalPoints > 0) {
+    d.text(`${totalPoints} pts · ${totalWatts} W`, cols[6], y, 10, INK, {
+      align: 'left',
+      bold: true,
+    });
+  }
 
   y -= 26;
   d.text(

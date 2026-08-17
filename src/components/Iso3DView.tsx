@@ -102,6 +102,8 @@ interface Props {
   focusRoomId?: string | null;
   /** Les points cardinaux autour de la vue, comme sur le plan. */
   showNorth?: boolean;
+  /** Le calque du plafond, comme sur le plan 2D. */
+  showCeiling?: boolean;
   /**
    * Force l'écorché, quel que soit le réglage de l'utilisateur.
    *
@@ -142,6 +144,7 @@ export function Iso3DView({
   showElecTags = true,
   focusRoomId,
   showNorth = true,
+  showCeiling = true,
   cutaway,
   elecCotes = null,
 }: Props) {
@@ -154,6 +157,7 @@ export function Iso3DView({
     [showFurniture, allObjects],
   );
   const north = useScanStore((s) => s.north);
+  const ceiling = useScanStore((s) => s.ceiling);
   const colorOpenings = useScanStore((s) => s.showOpeningColors);
   const showSurfaces = useScanStore((s) => s.showSurfaces);
   const showTextures = useScanStore((s) => s.showTextures);
@@ -368,6 +372,9 @@ export function Iso3DView({
         floors,
         rooms,
         fixtures,
+        // Le plafond suit son propre calque, comme sur le plan : superposé
+        // au mobilier, il ne se lit plus.
+        ceiling: showCeiling ? ceiling : [],
         // Pendant un geste : mêmes volumes et mêmes contours, mais des pans
         // d'un seul tenant. C'est le découpage en bandes qui coûtait cher,
         // pas les contours — les supprimer faisait fondre le modèle en blanc.
@@ -383,6 +390,8 @@ export function Iso3DView({
       showTextures,
       floors,
       rooms,
+      ceiling,
+      showCeiling,
       fixtures,
       interacting,
     ],

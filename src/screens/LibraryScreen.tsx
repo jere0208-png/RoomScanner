@@ -389,6 +389,7 @@ function ScanRow({
       {!pris && (
         <TouchableOpacity
           style={[styles.trash, arme && styles.trashArmed]}
+          hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
           onPress={onTrash}>
           {arme ? (
             <Text style={[styles.trashText, styles.trashTextArmed]}>Supprimer</Text>
@@ -665,6 +666,7 @@ export function LibraryScreen() {
       <View style={styles.headerRow}>
         <TouchableOpacity
           style={styles.backButton}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           onPress={() => (dossierOuvert ? setInside(null) : setScreen('home'))}>
           <Text style={styles.backChevron}>‹</Text>
         </TouchableOpacity>

@@ -27,6 +27,7 @@ import {
   type CeilingFixture,
 } from '../src/geometry/ceiling';
 import { buildScanPdf } from '../src/export/pdf';
+import { buildScene } from '../src/geometry/scene3d';
 import { buyingList } from '../src/geometry/conduits';
 import {
   checkElectrical,
@@ -739,5 +740,104 @@ describe('les cotes du bandeau', () => {
   it('les deux axes du bandeau sont perpendiculaires entre eux', () => {
     const a = AXES(0.37);
     expect(a.gauche.x * a.haut.x + a.gauche.z * a.haut.z).toBeCloseTo(0, 9);
+  });
+});
+
+/**
+ * LE PLAFOND EXISTE AUSSI EN 3D.
+ *
+ * Le plan le portait, le dossier imprimé aussi, la vue 3D non : on équipait
+ * un plafond, on basculait en 3D pour montrer à un client, et tout avait
+ * disparu. Un appareil de plafond est une pastille épaisse, à son diamètre
+ * réel, posée à la hauteur du plafond de SA pièce — un logement n'a pas
+ * partout la même hauteur sous plafond.
+ */
+describe('le plafond dans la scène 3D', () => {
+  const PAL = {
+    floor: '#EEEEEE',
+    floorStroke: '#CCCCCC',
+    wall: '#FFFFFF',
+    wallStroke: '#888888',
+    wallTop: '#F4F4F4',
+    wallTopStroke: '#949494',
+    opening: '#B9C2CE',
+    door: '#E8A13B',
+    window: '#3EB8E5',
+    passage: '#2F6BFF',
+    object: '#D8E1F2',
+    objectTop: '#E9EEF9',
+    objectStroke: '#9FACBF',
+  };
+
+  it('pose chaque appareil au plafond de sa pièce', () => {
+    const faces = buildScene(W, [], [], {
+      palette: PAL,
+      ceiling: PLAFOND,
+    }).faces.filter((f) => f.ownerId?.startsWith('cl-'));
+    expect(faces.length).toBeGreaterThan(0);
+    // Les murs font 2,50 m : rien ne pend au milieu de la pièce.
+    for (const f of faces) {
+      for (const p of f.pts) {
+        expect(p.y).toBeGreaterThan(2.4);
+        expect(p.y).toBeLessThanOrEqual(2.5);
+      }
+    }
+  });
+
+  it('à son diamètre réel, et à sa teinte de famille', () => {
+    const faces = buildScene(W, [], [], {
+      palette: PAL,
+      ceiling: [PLAFOND[1]],
+    }).faces.filter((f) => f.ownerId === `cl-${PLAFOND[1].id}`);
+    const xs = faces.flatMap((f) => f.pts.map((p) => p.x));
+    const largeur = Math.max(...xs) - Math.min(...xs);
+    expect(largeur).toBeCloseTo(CEILINGS.daaf.d, 1);
+    expect(faces.some((f) => f.fill === CEILINGS.daaf.color)).toBe(true);
+  });
+
+  it('et rien du tout quand le calque est éteint', () => {
+    const faces = buildScene(W, [], [], { palette: PAL, ceiling: [] }).faces;
+    expect(faces.some((f) => f.ownerId?.startsWith('cl-'))).toBe(false);
+  });
+});
+
+/**
+ * LE BILAN D'ÉCLAIRAGE VA QUELQUE PART.
+ *
+ * Il était calculé depuis des semaines et n'allait nulle part. C'est
+ * pourtant ce qu'on additionne pour dimensionner un départ : la norme borne
+ * le NOMBRE de points par circuit, le chiffrage borne la puissance.
+ */
+describe('l’éclairage sur la feuille de métré', () => {
+  const latin1 = (bytes: Uint8Array) => {
+    let s = '';
+    for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+    return s;
+  };
+  const texte = (src: string) =>
+    (src.match(/\(((?:[^()\\]|\\.)*)\) Tj/g) ?? [])
+      .map((m) => m.slice(1, m.lastIndexOf(')')))
+      .join(' | ');
+  const doc = (ceiling?: CeilingFixture[]) =>
+    texte(
+      latin1(
+        buildScanPdf(
+          { name: 'Séjour', walls: W, openings: [], objects: [], rooms: R, fixtures: FX },
+          false,
+          { metre: true, ceiling },
+        ),
+      ),
+    );
+
+  it('compte les points et leur puissance, par pièce et au total', () => {
+    const vu = doc(PLAFOND);
+    expect(vu).toContain('Éclairage');
+    // DCL + spot : deux points, et la somme de leurs puissances.
+    const total = CEILINGS.dcl.watts + CEILINGS.spot.watts;
+    expect(vu).toContain(`2 pts · ${total} W`);
+  });
+
+  it('et la colonne n’existe pas quand aucun plafond n’est équipé', () => {
+    expect(doc()).not.toContain('Éclairage');
   });
 });

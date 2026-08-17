@@ -1093,6 +1093,7 @@ export function ResultScreen() {
       <View style={styles.headerRow}>
         <TouchableOpacity
           style={styles.backButton}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           onPress={() =>
             setScreen(resultOrigin === 'library' ? 'library' : 'home')
           }>
@@ -1371,6 +1372,7 @@ export function ResultScreen() {
             showMeasures={show3DMeasures}
             showElecTags={showElecTags}
             showNorth={showNorth}
+            showCeiling={showCeiling}
             value={view3d}
             onChange={setView3d}
             focusRoomId={rooms[focusIdx]?.id ?? null}
@@ -1631,6 +1633,15 @@ export function ResultScreen() {
               active={showNorth}
               onPress={() => setShowNorth((v) => !v)}
             />
+            {/* Le plafond existe aussi en 3D : même calque, même bouton. */}
+            {ceiling.length > 0 && (
+              <ToolPill
+                icon="plafond"
+                label="Plafond"
+                active={showCeiling}
+                onPress={() => setShowCeiling((v) => !v)}
+              />
+            )}
             {/* Murs pleins ou écorché : l'écorché montre la pièce, les murs
                 pleins montrent le bâti. Ni l'un ni l'autre n'a toujours
                 raison — c'est un réglage, pas une trouvaille. */}
@@ -2986,6 +2997,15 @@ function ToolPill({
       <TouchableOpacity
         style={[styles.toolPill, plein && styles.toolPillActive]}
         accessibilityLabel={label}
+        /**
+         * 38 POINTS DESSINÉS, 44 SOUS LE DOIGT.
+         *
+         * Les pastilles se touchent en colonne, à douze points d'écart :
+         * viser la bonne demande de la précision, et un doigt n'en a pas.
+         * Le débord ne change rien au dessin — il ne fait qu'élargir la
+         * cible, comme le fait iOS partout.
+         */
+        hitSlop={{ top: 4, bottom: 4, left: 6, right: 6 }}
         onPress={onPress}>
         {halo && active && (
           <View pointerEvents="none" style={styles.toolHalo}>

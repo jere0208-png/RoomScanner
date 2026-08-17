@@ -22,6 +22,7 @@ import {
 } from './floorplan';
 import { floorColorAt, mixHex, pointInPolygon, sampleTexture } from './appearance';
 import { furnitureParts, type FurnPart } from './furniture3d';
+import { CEILINGS, type CeilingFixture } from './ceiling';
 import {
   FIXTURES,
   PLAQUE,
@@ -241,6 +242,15 @@ export interface SceneOptions {
   rooms?: RoomShape[];
   /** Appareillage électrique posé sur les faces de murs. */
   fixtures?: Fixture[];
+  /**
+   * LE PLAFOND : points lumineux, détection, ventilation.
+   *
+   * Le plan le portait, le dossier imprimé aussi, la 3D non : on équipait
+   * un plafond, on basculait en 3D pour montrer à un client, et tout avait
+   * disparu. Ils se posent à la hauteur du plafond de LEUR pièce — un
+   * logement n'a pas partout la même hauteur sous plafond.
+   */
+  ceiling?: CeilingFixture[];
   /**
    * Rendu allégé pendant un geste : les pans ne sont plus découpés en bandes,
    * ce qui divise le nombre de polygones par cinq. Le volume reste complet,
@@ -1231,6 +1241,62 @@ export function buildScene(
       captured: !!captured,
       closeBottom: true,
     });
+  }
+
+  // ----------------------------------------------------------- plafond
+  //
+  // Un appareil de plafond est une PASTILLE ÉPAISSE, à son diamètre réel :
+  // un spot de 9 cm reste un spot de 9 cm. Elle porte sa teinte de famille
+  // — lumière, sécurité, ventilation —, la même que sur le plan et dans
+  // le dossier, et son dessus est peint comme son dessous : dans une
+  // maquette ouverte, on la regarde par au-dessus.
+  for (const cl of opts.ceiling ?? []) {
+    const spec = CEILINGS[cl.kind];
+    const mursDeLaPiece = walls.filter((w) => roomOf(w) === cl.roomId);
+    const haut = (mursDeLaPiece.length > 0 ? mursDeLaPiece : walls).reduce(
+      (m, w) => Math.max(m, w.height),
+      0,
+    );
+    if (!(haut > 0.5)) continue;
+    const r = Math.max(0.05, spec.d / 2);
+    const y1 = haut - 0.01;
+    const y0 = y1 - 0.06;
+    const cotes = 10;
+    const bord = (i: number): Pt => ({
+      x: cl.at.x + r * Math.cos((i / cotes) * Math.PI * 2),
+      z: cl.at.z + r * Math.sin((i / cotes) * Math.PI * 2),
+    });
+    const dessus = Array.from({ length: cotes }, (_, i) => bord(i));
+    const centre: P3 = { x: cl.at.x, y: (y0 + y1) / 2, z: cl.at.z };
+    for (let i = 0; i < cotes; i++) {
+      const p = dessus[i];
+      const q = dessus[(i + 1) % cotes];
+      faces.push({
+        pts: vquad(p, q, y0, y1),
+        fill: spec.color,
+        stroke: null,
+        shade: true,
+        normal: outwardOf(p, q),
+        ownerId: `cl-${cl.id}`,
+        depthAt: centre,
+      });
+    }
+    // Dessus et dessous : le même disque, deux normales opposées.
+    for (const [y, sens] of [
+      [y1, 1],
+      [y0, -1],
+    ] as [number, number][]) {
+      const pts = dessus.map((p) => ({ x: p.x, y, z: p.z }));
+      faces.push({
+        pts: sens > 0 ? pts : [...pts].reverse(),
+        fill: sens > 0 ? mixHex(spec.color, '#FFFFFF', 0.25) : spec.color,
+        stroke: null,
+        shade: false,
+        normal: { x: 0, y: sens, z: 0 },
+        ownerId: `cl-${cl.id}`,
+        depthAt: centre,
+      });
+    }
   }
 
   // ------------------------------------------------------------ meubles

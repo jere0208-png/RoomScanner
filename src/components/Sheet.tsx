@@ -20,6 +20,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
+  useWindowDimensions,
   Easing,
   KeyboardAvoidingView,
   Modal,
@@ -114,6 +115,18 @@ export function SheetShell({
   children: React.ReactNode;
 }) {
   const styles = getStyles(useTheme());
+  /**
+   * SUR TABLETTE, UNE FEUILLE NE TRAVERSE PAS L'ÉCRAN.
+   *
+   * Étirée sur mille pixels, elle laisse son titre à gauche, son bouton à
+   * droite, et un désert au milieu : l'œil fait l'aller-retour pour lire
+   * trois mots. iOS la centre et la borne — c'est ce que fait toute
+   * l'interface du système dès qu'un iPad dépasse la largeur d'un
+   * téléphone. Au-delà, elle devient une carte posée, coins arrondis des
+   * quatre côtés.
+   */
+  const { width: largeur } = useWindowDimensions();
+  const carte = largeur > 620;
   const monte = useRef(new Animated.Value(0)).current;
   /**
    * La feuille survit à sa fermeture, le temps de descendre.
@@ -173,7 +186,9 @@ export function SheetShell({
                 },
               ],
             }}>
-            <Pressable style={styles.sheet} onPress={() => {}}>
+            <Pressable
+              style={[styles.sheet, carte && styles.sheetCarte]}
+              onPress={() => {}}>
               <View style={styles.grip} />
               {children}
             </Pressable>
@@ -350,6 +365,14 @@ const getStyles = themedStyles((c: Palette) =>
       paddingTop: 10,
       paddingBottom: 34,
       ...shadowCard,
+    },
+    /** Tablette : une carte centrée, bornée à la largeur d'un téléphone. */
+    sheetCarte: {
+      width: 560,
+      alignSelf: 'center',
+      borderRadius: 26,
+      marginBottom: 26,
+      paddingBottom: 22,
     },
     grip: {
       alignSelf: 'center',
