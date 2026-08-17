@@ -277,6 +277,16 @@ const styles = getStyles(c);
   const [elevations, setElevations] = useState(false);
   /** La visite guidée, plein écran : ce qu'on montre au client. */
   const [visite, setVisite] = useState(false);
+  /**
+   * Le cadrage de la vignette : de trois quarts, et un peu de recul.
+   *
+   * C'est une image, pas une vue à régler : elle garde son angle, celui
+   * où l'on reconnaît un logement d'un coup d'œil.
+   */
+  const [vignette] = useState<View3DParams>({
+    ...DEFAULT_VIEW3D,
+    zoom: DEFAULT_VIEW3D.zoom * 0.82,
+  });
   const parts = useMemo(() => roomParts(walls, rooms), [walls, rooms]);
   const placement = useMemo(
     () => fixturePlacement(fixtures, walls, roomInputsOf(rooms, parts)),
@@ -674,7 +684,32 @@ const styles = getStyles(c);
           style={styles.visiteButton}
           accessibilityLabel="Présentation animée"
           onPress={() => setVisite(true)}>
-          <PlayCircle size={20} color={c.blue} strokeWidth={2.2} />
+          {/*
+            UNE VIGNETTE, comme chaque feuille a son aperçu.
+
+            Un pictogramme dit « ça se lance » ; il ne dit pas CE QUI se
+            lance. Les feuilles du dossier, elles, se choisissent sur leur
+            image — on reconnaît son plan avant de lire son titre. La
+            présentation montre le logement en volume : elle porte donc le
+            logement en volume, en petit, à côté de son nom.
+
+            La vignette ne se touche pas : le doigt qui s'y pose lance la
+            présentation comme partout ailleurs sur la rangée, au lieu de
+            faire tourner un modèle de soixante-douze pixels.
+          */}
+          <View style={styles.visiteVignette} pointerEvents="none">
+            <Iso3DView
+              value={vignette}
+              onChange={() => {}}
+              showMeasures={false}
+              showElecTags={false}
+              showNorth={false}
+              showCeiling={false}
+            />
+            <View style={styles.visitePastille}>
+              <PlayCircle size={17} color="#FFFFFF" strokeWidth={2.4} />
+            </View>
+          </View>
           <View style={styles.visiteTextes}>
             <Text style={styles.visiteText}>Présentation animée</Text>
             <Text style={styles.visiteSous}>
@@ -879,6 +914,24 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     marginTop: 12,
   },
   /** La visite : une ligne posée sous l'aperçu, pas un second bouton d'acte. */
+  visiteVignette: {
+    width: 72,
+    height: 72,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+    backgroundColor: c.surfaceSunken,
+  },
+  visitePastille: {
+    position: 'absolute',
+    right: 4,
+    bottom: 4,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(20,24,32,0.55)',
+  },
   visiteButton: {
     flexDirection: 'row',
     alignItems: 'center',

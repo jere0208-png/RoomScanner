@@ -43,9 +43,7 @@ import {
   PillSlot,
   ToolPill,
 } from '../components/ToolPill';
-import { Compass, PlayCircle } from 'lucide-react-native';
-import { ClientTour } from '../components/ClientTour';
-import { WalkView } from '../components/WalkView';
+import { Compass } from 'lucide-react-native';
 import {
   DEFAULT_VIEW3D,
   Iso3DView,
@@ -385,10 +383,6 @@ export function ResultScreen() {
    * dossier imprimé, lui, porte toujours sa rose des vents.
    */
   const [showNorth, setShowNorth] = useState(false);
-  /** La visite guidée, plein écran : ce qu'on montre au client. */
-  const [visite, setVisite] = useState(false);
-  /** La visite INTÉRIEURE : on entre dans le modèle et on y marche. */
-  const [visiteInterieure, setVisiteInterieure] = useState(false);
   const [editMode, setEditMode] = useState(false);
   /**
    * Jeu de pastilles affiché. Il RETARDE sur `editMode` : les anciennes
@@ -2106,61 +2100,22 @@ export function ResultScreen() {
         </TouchableOpacity>
       )}
       {/*
-        LA PRÉSENTATION SE LANCE D'ICI, pas du fond de l'écran d'export.
+        LA PRÉSENTATION N'EST PLUS ICI — elle vit sous l'aperçu, dans
+        l'écran d'export.
 
-        Je l'avais posée à côté du bouton du PDF, par symétrie : deux
-        sorties, deux publics. Mais on n'entre pas dans l'écran d'export
-        pour montrer un plan à quelqu'un — on y entre pour régler un
-        document. Montrer, ça se fait depuis le plan, la tablette déjà
-        tournée vers le client.
+        Elle a fait les deux voyages : d'abord au pied de l'écran d'export
+        à côté du bouton PDF, puis ici, sur l'écran du scan. Ni l'un ni
+        l'autre. Sa place est sous l'IMAGE qu'elle anime : on regarde
+        l'aperçu du logement, et le bouton qui le fait tourner est juste
+        dessous. Cet écran-ci sert à relever et à corriger, pas à montrer.
       */}
       <View style={styles.actions}>
-        <TouchableOpacity
-          style={styles.secondaryButton}
-          onPress={() => setVisite(true)}>
-          <PlayCircle size={16} color={teinte.blue} strokeWidth={2.2} />
-          <Text
-            style={[styles.secondaryText, styles.secondaryTextBlue]}
-            numberOfLines={1}>
-            Présentation
-          </Text>
-        </TouchableOpacity>
-        {/*
-          « MODÈLE AR » EST DEVENU « VISITE ».
-          
-          Le bouton ouvrait le .usdz du scan dans la visionneuse d'Apple :
-          la maquette se posait sur une table, en réalité augmentée, avec
-          l'image de la caméra derrière — et sans aucune des retouches
-          faites depuis (murs déplacés, cloisons ajoutées, appareillage,
-          gaines). Pour préparer une pose, c'est l'inverse de ce qu'il
-          faut : on veut se tenir DANS le logement, celui qu'on a corrigé,
-          et ne voir que lui.
-        */}
-        {walls.length > 0 && (
-          <TouchableOpacity
-            style={styles.secondaryButton}
-            accessibilityLabel="Visite"
-            onPress={() => setVisiteInterieure(true)}>
-            <Text style={styles.secondaryText} numberOfLines={1}>
-              Visite
-            </Text>
-          </TouchableOpacity>
-        )}
         <TouchableOpacity style={styles.secondaryButton} onPress={reset}>
           <Text style={styles.secondaryText} numberOfLines={1}>
             Nouveau scan
           </Text>
         </TouchableOpacity>
       </View>
-      <ClientTour visible={visite} onClose={() => setVisite(false)} />
-      {/* On entre dans le modèle : mêmes murs, mêmes appareils, mêmes
-          gaines que sur le plan — vus d'en dedans, à hauteur d'œil. */}
-      <WalkView
-        visible={visiteInterieure}
-        onClose={() => setVisiteInterieure(false)}
-        cableRoutes={cheminements?.traces}
-        routeHeights={hauteursDesservies}
-      />
 
 
       {/* Transition vers l'export : ondes EchoPlan sur toute la page */}
