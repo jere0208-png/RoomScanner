@@ -54,13 +54,17 @@ export function ScanScreen() {
       {/* La vue AR native se rend elle-même à 60 FPS ; l'UI RN flotte au-dessus. */}
       <RoomScanView style={StyleSheet.absoluteFill} />
 
-      <TouchableOpacity style={styles.cancelButton} onPress={cancel}>
+      <TouchableOpacity
+        style={styles.cancelButton}
+        accessibilityLabel="Arrêter le scan"
+        onPress={cancel}>
         <CloseCross size={20} color={c.scanInk} weight={3} />
       </TouchableOpacity>
 
       {/* Torche : rond façon bouton de thème, avec un éclair. */}
       <TouchableOpacity
         style={[styles.torchButton, torch && styles.torchButtonOn]}
+        accessibilityLabel={torch ? 'Éteindre la torche' : 'Allumer la torche'}
         onPress={toggleTorch}>
         <Svg width={18} height={18} viewBox="0 0 24 24">
           <Path
@@ -95,6 +99,7 @@ export function ScanScreen() {
       <View style={styles.bottomHud} pointerEvents="box-none">
         <TouchableOpacity
           style={styles.pauseButton}
+          accessibilityLabel={paused ? 'Reprendre le scan' : 'Mettre en pause'}
           onPress={paused ? resume : pause}>
           {/* Icône dessinée : même hauteur (18) que l'éclair et la croix. */}
           <Svg width={18} height={18} viewBox="0 0 24 24">

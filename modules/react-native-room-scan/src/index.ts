@@ -149,15 +149,6 @@ export const RoomScan = {
   pause: (): void => RoomScanModule.pauseRoomScan(),
   resume: (): void => RoomScanModule.resumeRoomScan(),
 
-  /** iOS : ouvre le .usdz dans QuickLook (visionneuse 3D + AR native).
-   *  Rejette si le fichier du modèle n'existe plus. */
-  viewModel: (path: string): Promise<boolean> => {
-    if (Platform.OS === 'ios' && NativeModules.RoomScanPreview) {
-      return NativeModules.RoomScanPreview.presentUSDZ(path);
-    }
-    return Promise.resolve(false);
-  },
-
   /**
    * Photo de repérage : l'appareil photo du système, puis le chemin du
    * fichier écrit dans Documents. `null` si l'utilisateur annule ou si

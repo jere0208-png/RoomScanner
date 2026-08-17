@@ -805,6 +805,7 @@ export function LibraryScreen() {
         <TouchableOpacity
           style={styles.fab}
           activeOpacity={0.85}
+          accessibilityLabel="Nouveau dossier"
           onPress={() => addFolder()}>
           <Svg width={26} height={26} viewBox="0 0 24 24">
             {['M12 5 v14', 'M5 12 h14'].map((d) => (

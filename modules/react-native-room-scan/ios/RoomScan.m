@@ -37,12 +37,6 @@ RCT_EXTERN_METHOD(stop:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectB
 RCT_EXTERN_METHOD(heading:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
 @end
 
-@interface RCT_EXTERN_MODULE(RoomScanPreview, NSObject)
-RCT_EXTERN_METHOD(presentUSDZ:(NSString *)path
-                  resolve:(RCTPromiseResolveBlock)resolve
-                  reject:(RCTPromiseRejectBlock)reject)
-@end
-
 @interface RCT_EXTERN_MODULE(RoomScanExport, NSObject)
 RCT_EXTERN_METHOD(sharePDF:(NSString *)base64
                   filename:(NSString *)filename

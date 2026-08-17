@@ -888,6 +888,7 @@ export function WallElevation({
             répond mieux qu'une note. */}
         <TouchableOpacity
           style={styles.photo}
+          accessibilityLabel="Photo de repérage"
           // La cible déborde le dessin : 36 points se voient bien, 44 se
           // touchent bien. iOS distingue les deux, et c'est ce qui évite
           // d'ouvrir la caméra en visant la croix.
@@ -1653,6 +1654,7 @@ export function WallElevation({
           <TouchableOpacity
             style={styles.bilanHead}
             activeOpacity={0.7}
+            accessibilityLabel={regleOuverte ? 'Masquer la règle' : 'Voir la règle'}
             onPress={() => setRegleOuverte((v) => !v)}>
             {objectif && (
               <View style={styles.bilanJauge}>
@@ -1897,6 +1899,9 @@ export function WallElevation({
             key={b.key}
             style={[styles.action, b.key === 'add' && styles.actionAdd]}
             disabled={!b.on}
+            // Le mot est dessous, en légende : c'est l'étiquette qui nomme
+            // le bouton pour qui se fait lire l'écran.
+            accessibilityLabel={b.label}
             onPress={b.press}>
             <Svg width={21} height={21} viewBox="0 0 24 24" opacity={b.on ? 1 : 0.3}>
               {b.paths.map((d) => (

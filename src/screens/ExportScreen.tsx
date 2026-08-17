@@ -406,10 +406,12 @@ const styles = getStyles(c);
           floors: floorsOf(rooms),
           roomNames: Object.fromEntries(rooms.map((r) => [r.id, r.name])),
           photos: vignettes,
-          // Éteint, le dossier ne porte ni rose des vents ni lettres : le
-          // nom des murs y perd sa boussole, et c'est le choix de celui qui
-          // remet le document.
-          north: cardinaux ? north : null,
+          north,
+          // Éteinte, la rose des vents ne se dessine pas — mais les murs
+          // gardent leur nom : « Élévation — Chambre, mur nord » et
+          // « Prise plinthe 1 · mur nord » viennent du même relevé, et un
+          // dossier qui les perd ne désigne plus rien.
+          compass: cardinaux,
           deviceNames: noms,
           client,
           address,
@@ -474,7 +476,10 @@ const styles = getStyles(c);
           <Text style={styles.backChevron}>‹</Text>
         </TouchableOpacity>
         <Text style={styles.title}>Aperçu du PDF</Text>
-        <TouchableOpacity style={[styles.roundButton, styles.resetButton]} onPress={reset}>
+        <TouchableOpacity
+          style={[styles.roundButton, styles.resetButton]}
+          accessibilityLabel="Remettre les cadrages à zéro"
+          onPress={reset}>
           <Text style={styles.resetIcon}>↻</Text>
         </TouchableOpacity>
       </View>

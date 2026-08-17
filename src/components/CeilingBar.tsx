@@ -80,6 +80,7 @@ export function CeilingBar({
           ) => (
             <TouchableOpacity
               style={styles.clChamp}
+              accessibilityLabel={titre}
               onPress={() => {
                 const actuel = ecart(k);
                 if (actuel === null) return;

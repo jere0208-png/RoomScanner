@@ -260,17 +260,6 @@ export interface SceneOptions {
    * l'appareil — de quoi lire un cheminement sans le déduire.
    */
   routes?: { id: string; path: Pt[] }[];
-  /**
-   * LE PLAFOND PLEIN — seulement pour la visite intérieure.
-   *
-   * Vue de dessus, une pièce coiffée n'est plus une pièce : on ne voit que
-   * des dalles. Vue de l'INTÉRIEUR, une pièce sans plafond n'en est pas
-   * une non plus — on lève les yeux et on voit le vide. Le modèle porte
-   * donc la dalle haute à la demande, et elle ne gêne personne : sa normale
-   * pointe vers le bas, elle disparaît donc d'elle-même dès qu'on regarde
-   * la maquette de dessus.
-   */
-  ceilingSlab?: boolean;
   /** Hauteur de l'appareil desservi par chaque gaine, pour la remontée. */
   routeHeights?: Record<string, number>;
   /**
@@ -551,20 +540,6 @@ export function buildScene(
         stroke: pal.floorStroke,
         isFloor: true,
       });
-      if (opts.ceilingSlab) {
-        // La hauteur de CETTE pièce : un logement n'a pas partout la même.
-        const h =
-          part.walls.reduce((m, w) => Math.max(m, w.height), 0) || 2.5;
-        faces.push({
-          // Sens inversé : vue de dessous, la dalle doit se présenter de face.
-          pts: [...surface.pts]
-            .reverse()
-            .map((p) => ({ x: p.x, y: h, z: p.z })),
-          fill: mixHex(pal.wall, '#000000', 0.06),
-          stroke: pal.wallTopStroke,
-          normal: { x: 0, y: -1, z: 0 },
-        });
-      }
       const ftex = opts.showTextures ? floor?.texture : undefined;
       if (ftex && ftex.cols > 0 && ftex.rows > 0) {
         const cw = (ftex.maxX - ftex.minX) / ftex.cols;

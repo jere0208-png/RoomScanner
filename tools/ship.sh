@@ -52,12 +52,25 @@ done
 echo "   run $RUN"
 
 echo "── Build"
-"$GH" run watch "$RUN" --exit-status > /dev/null
+# `run watch` ne suffit pas : quand le run est DÉJÀ terminé au moment où on
+# l'attache — un échec de compilation tombe en une minute — il rend la main
+# avec un code zéro, quoi qu'il se soit passé. La chaîne annonçait alors une
+# livraison réussie, sans IPA, et il fallait s'en apercevoir tout seul.
+# On relit donc la CONCLUSION du run, et on montre ce qui a brûlé.
+"$GH" run watch "$RUN" --exit-status > /dev/null || true
+ETAT=$("$GH" run view "$RUN" --json conclusion -q .conclusion)
+if [ "$ETAT" != "success" ]; then
+  echo "ÉCHEC DU BUILD ($ETAT) — run $RUN"
+  "$GH" run view "$RUN" --log-failed 2>/dev/null | tail -60 || true
+  exit 1
+fi
 
 echo "── Dépôt"
 # `gh` refuse d'écraser : sans ce ménage, le téléchargement échoue et l'IPA
 # de la livraison précédente reste sur le Bureau, à passer pour la nouvelle.
 rm -f "$IPA"
 "$GH" run download "$RUN" -n RoomScanner-unsigned-ipa -D "$BUREAU"
+# Et l'IPA doit être là, non vide : un téléchargement muet vaut un échec.
+[ -s "$IPA" ] || { echo "Aucun IPA déposé pour $SHA."; exit 1; }
 ls -l "$IPA"
 echo "IPA DEPOSE — commit $SHA"

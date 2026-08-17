@@ -1554,6 +1554,7 @@ export function FloorplanEditor({
                       <TouchableOpacity
                         key={action}
                         style={styles.wallAction}
+                        accessibilityLabel={label ?? action}
                         onPress={() => onWallAction(action, w.id)}>
                         <Svg width={21} height={21} viewBox="0 0 24 24">
                           {paths.map((seg, i) => (
