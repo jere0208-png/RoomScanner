@@ -244,6 +244,11 @@ export function ClientTour({
    * l'horloge ne part qu'ensuite.
    */
   const [pret, setPret] = useState(false);
+  /** Les pièces traversées par la présentation, sans doublon. */
+  const pieces = useMemo(
+    () => [...new Set(etapes.map((e) => e.roomId ?? null))],
+    [etapes],
+  );
   /** Avancement du tracé des cotes, ou `null` hors des étapes de mur. */
   const [cotes, setCotes] = useState<number | null>(null);
 
@@ -440,6 +445,11 @@ export function ClientTour({
              rend en pans d'un seul tenant. La découpe en bandes ne se voit
              pas sur une image qui tourne — les saccades, si. */
           light
+          /* Et toutes les pièces qu'on va montrer sont bâties D'AVANCE,
+             derrière le rideau : sans ça, chaque changement de pièce refait
+             le modèle en plein mouvement — un à-coup par étape, toujours au
+             même endroit. */
+          prebuildRooms={pieces}
         />
 
         {/*

@@ -564,3 +564,151 @@ describe('le banc d’épreuve du plan', () => {
     expect(perim).toBeCloseTo(16, 6);
   });
 });
+
+/**
+ * LE MÊME BANC, MAIS AVEC LE LOGEMENT ÉQUIPÉ.
+ *
+ * Les épreuves ci-dessus promènent des murs et des meubles. Or ce qu'on
+ * regarde vraiment sur ce modèle, ce sont les APPAREILS : une prise à
+ * 25 cm, un interrupteur à 1,10 m, six spots au plafond, et la gaine qui
+ * les relie. Ce sont eux qui portent les cotes, eux qu'on cherche des yeux,
+ * et eux dont le tri en profondeur décide s'ils se voient ou pas.
+ *
+ * On rejoue donc les mêmes invariants sur un logement ÉQUIPÉ, sous les
+ * mêmes 144 angles : rien d'invalide, rien d'invisible, et jamais un
+ * appareil peint par-dessus le mur qui devrait le cacher.
+ */
+describe('le banc d’épreuve du logement équipé', () => {
+  const octets = (bytes: Uint8Array) => {
+    let t = '';
+    for (let i = 0; i < bytes.length; i++) t += String.fromCharCode(bytes[i]);
+    return t;
+  };
+
+  /** Deux appareils par mur, plus le tableau : une pose ordinaire. */
+  const equiper = (walls: WallSeg[]) =>
+    walls.flatMap((w, i) => {
+      const len = segLength(w);
+      return [
+        {
+          id: `fx${i}a`,
+          kind: 'prise' as const,
+          wallId: w.id,
+          along: Math.min(len - 0.2, 0.6),
+          height: 0.25,
+          side: 1 as const,
+        },
+        {
+          id: `fx${i}b`,
+          kind: (i % 3 === 0 ? 'inter' : 'rj45') as 'inter' | 'rj45',
+          wallId: w.id,
+          along: Math.max(0.2, len - 0.6),
+          height: i % 3 === 0 ? 1.1 : 0.25,
+          side: 1 as const,
+        },
+      ];
+    });
+
+  /** Trois points lumineux, et une gaine qui traverse la pièce. */
+  const plafonner = (logement: (typeof LOGEMENTS)[number]) => {
+    const parts = roomParts(logement.walls, [{ id: 'r1' }]);
+    const ring = parts[0]?.surface?.pts ?? [];
+    if (ring.length < 3) return { ceiling: [], routes: [] };
+    const c = {
+      x: ring.reduce((s, p) => s + p.x, 0) / ring.length,
+      z: ring.reduce((s, p) => s + p.z, 0) / ring.length,
+    };
+    return {
+      ceiling: [{ id: 'cl1', kind: 'dcl' as const, roomId: 'r1', at: c }],
+      routes: [{ id: 'fx0a', path: [ring[0], c] }],
+    };
+  };
+
+  it('ne produit aucune coordonnée invalide, appareils compris', () => {
+    for (const logement of LOGEMENTS) {
+      const { ceiling, routes } = plafonner(logement);
+      const { faces } = buildScene(logement.walls, [], logement.objects, {
+        palette: PAL,
+        showSurfaces: true,
+        rooms: [{ id: 'r1' }],
+        fixtures: equiper(logement.walls),
+        ceiling,
+        routes,
+        routeHeights: { fx0a: 0.25 },
+      });
+      for (const f of faces) {
+        for (const p of f.pts) {
+          expect(
+            `${logement.nom} : ${Number.isFinite(p.x) && Number.isFinite(p.y) && Number.isFinite(p.z)}`,
+          ).toBe(`${logement.nom} : true`);
+        }
+      }
+    }
+  });
+
+  /**
+   * UN APPAREIL NE TRAVERSE PAS SON MUR.
+   *
+   * C'est le défaut le plus coûteux de cette vue : une prise du mur d'en
+   * face qui se dessine par-dessus la cloison qu'on regarde. On voit alors
+   * six prises sur un mur qui n'en porte que trois, et on perce à côté.
+   */
+  it('ne montre jamais un appareil au travers d’un mur', () => {
+    for (const logement of LOGEMENTS) {
+      const { faces } = buildScene(logement.walls, [], logement.objects, {
+        palette: PAL,
+        showSurfaces: true,
+        rooms: [{ id: 'r1' }],
+        fixtures: equiper(logement.walls),
+      });
+      const centre = sceneFraming(faces).center;
+      for (const cam of ANGLES) {
+        const project = projecteur(cam, centre, 40);
+        const vues = faces.filter((f) => !isHiddenFace(f, cam));
+        const appareils = vues.filter((f) => f.ownerId?.startsWith('fx'));
+        for (const a of appareils) {
+          const da = faceDepth(a, project, cam);
+          const devant = vues.filter(
+            (w) =>
+              !w.ownerId &&
+              !w.isFloor &&
+              w.fill !== null &&
+              recouvre(w, a, project) &&
+              plusProche(w, a, project),
+          );
+          for (const w of devant) {
+            expect(da).toBeLessThanOrEqual(faceDepth(w, project, cam) + 1e-6);
+          }
+        }
+      }
+    }
+  });
+
+  it('et le dossier d’un logement équipé tient dans ses pages', () => {
+    for (const logement of LOGEMENTS) {
+      const { ceiling } = plafonner(logement);
+      const bytes = buildScanPdf(
+        {
+          name: logement.nom,
+          walls: logement.walls,
+          openings: [],
+          objects: logement.objects,
+          rooms: [{ id: 'r1' }],
+          roomNames: { r1: 'Séjour' },
+          fixtures: equiper(logement.walls),
+          north: 40,
+        },
+        true,
+        { metre: true, elevations: true, ceiling },
+      );
+      const src = octets(bytes);
+      expect(src.startsWith('%PDF-1.4')).toBe(true);
+      expect(src).not.toContain('NaN');
+      for (const p of hors(src)) {
+        expect(`${logement.nom} · ${p.op} (${p.x.toFixed(0)}, ${p.y.toFixed(0)})`).toBe(
+          `${logement.nom} · dans la page`,
+        );
+      }
+    }
+  });
+});

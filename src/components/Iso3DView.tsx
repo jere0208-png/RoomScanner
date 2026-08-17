@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PanResponder, StyleSheet, View } from 'react-native';
 import Svg, {
   Circle,
@@ -32,6 +32,7 @@ import {
   sceneFraming,
   shadeFill,
   type P3,
+  type Scene,
   type ScenePalette,
 } from '../geometry/scene3d';
 import { hiddenByBox } from '../geometry/furniture';
@@ -143,6 +144,18 @@ interface Props {
    * voit pas ; les saccades, si.
    */
   light?: boolean;
+  /**
+   * LES PIÈCES À BÂTIR D'AVANCE.
+   *
+   * La présentation change de pièce à chaque étape, et chaque changement
+   * refait le modèle : murs extrudés, mobilier, appareillage. Cent
+   * millisecondes de calcul, pile au moment où la caméra part — un à-coup
+   * par étape, toujours au même endroit, celui qu'on remarque.
+   *
+   * Avec cette liste, les modèles sont bâtis pendant le rideau de
+   * préparation et rangés : les étapes n'ont plus qu'à les reprendre.
+   */
+  prebuildRooms?: (string | null)[];
 }
 
 /**
@@ -171,6 +184,7 @@ export function Iso3DView({
   cutaway,
   elecCotes = null,
   light = false,
+  prebuildRooms,
 }: Props) {
   const walls = useScanStore((s) => s.walls);
   const openings = useScanStore((s) => s.openings);
@@ -385,27 +399,143 @@ export function Iso3DView({
     [c],
   );
 
-  // Scène partagée avec le PDF : mêmes onglets, mêmes bandes, mêmes couleurs.
-  const scene = useMemo(
-    () =>
-      buildScene(keptWalls, keptOpenings, keptObjects, {
+  /**
+   * LE MODÈLE DÉJÀ BÂTI SE RETROUVE, il ne se refait pas.
+   *
+   * Une pièce revue — la présentation qui repasse, un aller-retour entre
+   * deux étapes — coûtait un modèle entier à chaque fois. On les range
+   * par pièce, et on les jette dès que le plan bouge : le magasin est
+   * remis à zéro par la même dépendance qui rebattrait les cartes.
+   */
+  const magasin = useRef(new Map<string, Scene>());
+  /**
+   * Le vidage saute le PREMIER passage.
+   *
+   * Un effet se joue après le rendu : au montage, il jetait le modèle que
+   * ce rendu venait de bâtir, et le préchargement le refaisait derrière.
+   * Trois constructions là où deux suffisent — c'est l'épreuve qui les a
+   * comptées.
+   */
+  const premier = useRef(true);
+  useEffect(() => {
+    if (premier.current) {
+      premier.current = false;
+      return;
+    }
+    magasin.current.clear();
+  }, [
+    walls,
+    openings,
+    objects,
+    allFixtures,
+    ceiling,
+    palette,
+    showSurfaces,
+    showTextures,
+    colorOpenings,
+    showCeiling,
+    cableRoutes,
+    routeHeights,
+    light,
+  ]);
+
+  /** Les entrées d'une pièce : le même filtrage que pour la pièce montrée. */
+  const entreesDe = useCallback(
+    (focus: string | null) => {
+      const rs = focus ? allRooms.filter((r) => r.id === focus) : allRooms;
+      const ids = new Set(rs[0]?.wallIds ?? []);
+      const ws = focus ? walls.filter((w) => ids.has(w.id)) : walls;
+      const os = focus
+        ? openings.filter((o) =>
+            ws.some((w) => pointOnSeg(midOf(o), w.a, w.b).dist < 0.6),
+          )
+        : openings;
+      const murs = new Set(ws.map((w) => w.id));
+      return {
+        rooms: rs,
+        walls: ws,
+        openings: os,
+        objects: focus ? objects.filter((o) => roomOf(o) === focus) : objects,
+        fixtures: focus
+          ? allFixtures.filter((f) => murs.has(f.wallId))
+          : allFixtures,
+      };
+    },
+    [allRooms, walls, openings, objects, allFixtures],
+  );
+
+  /** Bâtir la scène d'une pièce, ou la reprendre au magasin. */
+  const batir = useCallback(
+    (focus: string | null): Scene => {
+      const cle = focus ?? '—';
+      const deja = magasin.current.get(cle);
+      if (deja) return deja;
+      const e = entreesDe(focus);
+      const faite = buildScene(e.walls, e.openings, e.objects, {
         palette,
         colorOpenings,
         showSurfaces,
         showTextures,
-        floors,
-        rooms,
-        fixtures,
-        // Le plafond suit son propre calque, comme sur le plan : superposé
-        // au mobilier, il ne se lit plus.
+        floors: floorsOf(e.rooms),
+        rooms: e.rooms,
+        fixtures: e.fixtures,
         ceiling: showCeiling ? ceiling : [],
         routes: cableRoutes,
         routeHeights,
-        // Pendant un geste : mêmes volumes et mêmes contours, mais des pans
-        // d'un seul tenant. C'est le découpage en bandes qui coûtait cher,
-        // pas les contours — les supprimer faisait fondre le modèle en blanc.
-        coarse: interacting || light,
-      }),
+        coarse: true,
+      });
+      magasin.current.set(cle, faite);
+      return faite;
+    },
+    [
+      entreesDe,
+      palette,
+      colorOpenings,
+      showSurfaces,
+      showTextures,
+      ceiling,
+      showCeiling,
+      cableRoutes,
+      routeHeights,
+    ],
+  );
+
+  /**
+   * On bâtit d'avance, une fois, ce que la présentation va montrer.
+   *
+   * Le calcul est lourd et volontairement SYNCHRONE : il tombe derrière le
+   * rideau de préparation, là où il ne se voit pas. Le geler ailleurs
+   * serait impardonnable ; ici, c'est exactement le moment prévu pour ça.
+   */
+  useEffect(() => {
+    if (!prebuildRooms || prebuildRooms.length === 0) return;
+    for (const id of prebuildRooms) batir(id);
+  }, [prebuildRooms, batir]);
+
+  // Scène partagée avec le PDF : mêmes onglets, mêmes bandes, mêmes couleurs.
+  const scene = useMemo(
+    () =>
+      light
+        ? batir(focusRoomId ?? null)
+        : buildScene(keptWalls, keptOpenings, keptObjects, {
+            palette,
+            colorOpenings,
+            showSurfaces,
+            showTextures,
+            floors,
+            rooms,
+            fixtures,
+            // Le plafond suit son propre calque, comme sur le plan :
+            // superposé au mobilier, il ne se lit plus.
+            ceiling: showCeiling ? ceiling : [],
+            routes: cableRoutes,
+            routeHeights,
+            // Pendant un geste : mêmes volumes et mêmes contours, mais des
+            // pans d'un seul tenant. C'est le découpage en bandes qui
+            // coûtait cher, pas les contours — les supprimer faisait fondre
+            // le modèle en blanc.
+            coarse: interacting,
+          }),
     [
       keptWalls,
       keptOpenings,
@@ -423,6 +553,8 @@ export function Iso3DView({
       showCeiling,
       fixtures,
       interacting,
+      batir,
+      focusRoomId,
     ],
   );
   const faces = scene.faces;
