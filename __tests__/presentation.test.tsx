@@ -1,14 +1,14 @@
 /**
  * OÙ SE LANCE LA PRÉSENTATION — et où elle ne se lance PAS.
  *
- * Ce bouton a fait trois voyages : au pied de l'écran d'export à côté du
- * bouton PDF, puis sur l'écran du scan, puis enfin sous l'aperçu du plan,
- * dans l'écran d'export — sa place, demandée deux fois. Un réglage
- * d'ergonomie qu'on redemande est un réglage qu'un test doit tenir, sinon
- * il repart au premier remaniement.
+ * Ce bouton a cherché sa place quatre fois : au pied de l'écran d'export à
+ * côté du bouton PDF, sur l'écran du scan, sous l'aperçu du plan, et enfin
+ * LÀ OÙ IL FALLAIT — dans le menu qui s'ouvre sur « Exporter », avec le
+ * PDF, le modèle 3D et le bordereau.
  *
- * On vérifie donc les deux moitiés de la consigne : présent sous l'image
- * dans l'export, absent de l'écran du scan.
+ * Le malentendu était le même à chaque fois : on la rangeait dans le
+ * RÉGLAGE D'UN DOCUMENT alors que c'est une SORTIE. Un réglage d'ergonomie
+ * qu'on redemande est un réglage qu'un test doit tenir.
  */
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn(async () => null),
@@ -22,6 +22,7 @@ import TestRenderer, { act } from 'react-test-renderer';
 import { ExportScreen } from '../src/screens/ExportScreen';
 import { ResultScreen } from '../src/screens/ResultScreen';
 import { Iso3DView } from '../src/components/Iso3DView';
+import { ExportArt } from '../src/components/ExportArt';
 import { ClientTour } from '../src/components/ClientTour';
 import { useScanStore } from '../src/store/scanStore';
 import {
@@ -58,6 +59,8 @@ function monter(quoi: 'export' | 'scan') {
       fixtures: SNAPSHOT_FIXTURES,
       ceiling: [],
       photos: [],
+      // Un cap relevé : sans lui, l'option « Nord » n'aurait rien à allumer.
+      north: 0,
     });
     tree =
       quoi === 'export'
@@ -88,46 +91,57 @@ const textes = (tree: TestRenderer.ReactTestRenderer) =>
     .join(' | ');
 
 describe('la présentation animée', () => {
-  it('se lance depuis l’écran d’export, sous l’aperçu', () => {
-    const tree = monter('export');
-    const bouton = tree.root
+  it('se choisit sur le bouton « Exporter », avec les autres sorties', () => {
+    const tree = monter('scan');
+    const exporter = tree.root
       .findAllByType(TouchableOpacity)
-      .find((n) => n.props.accessibilityLabel === 'Présentation animée');
-    expect(bouton).toBeDefined();
-    expect(textes(tree)).toContain('Présentation animée');
+      .find((n) =>
+        n.findAllByType(Text).some((t) => t.props.children === 'Exporter'),
+      );
+    expect(exporter).toBeDefined();
+    act(() => exporter!.props.onPress());
+    const vu = textes(tree);
+    expect(vu).toContain('Présentation animée');
+    // Elle voisine avec les autres sorties, elle ne les remplace pas.
+    expect(vu).toContain('Plan PDF');
+    expect(vu).toContain('Modèle 3D');
   });
 
   /**
-   * ET ELLE PORTE SON IMAGE, comme chaque feuille du dossier.
+   * ET ELLE PORTE SON DESSIN, comme chaque sortie du menu.
    *
-   * Un pictogramme dit « ça se lance » ; il ne dit pas ce qui se lance.
-   * La vignette montre le logement en volume — ce que la présentation
-   * anime — et se reconnaît avant qu'on ait lu le titre.
+   * Les quatre autres vignettes disent un fichier — une feuille, un
+   * volume, un bordereau, une capture. Celle-ci dit un moment : le
+   * logement qui tourne devant le client.
    */
-  it('porte une vignette du logement, et non un simple pictogramme', () => {
-    const tree = monter('export');
-    const bouton = tree.root
+  it('porte sa vignette dans le menu', () => {
+    const tree = monter('scan');
+    const exporter = tree.root
       .findAllByType(TouchableOpacity)
-      .find((n) => n.props.accessibilityLabel === 'Présentation animée');
-    expect(bouton!.findAllByType(Iso3DView).length).toBe(1);
-    // La vignette ne se manipule pas : le doigt lance la présentation.
-    const cadre = bouton!
-      .findAllByType(View)
-      .find((n) => n.props.pointerEvents === 'none');
-    expect(cadre).toBeDefined();
-    expect(cadre!.findAllByType(Iso3DView).length).toBe(1);
+      .find((n) =>
+        n.findAllByType(Text).some((t) => t.props.children === 'Exporter'),
+      );
+    act(() => exporter!.props.onPress());
+    const ligne = tree.root
+      .findAllByType(TouchableOpacity)
+      .find((n) =>
+        n
+          .findAllByType(Text)
+          .some((t) => t.props.children === 'Présentation animée'),
+      );
+    expect(ligne).toBeDefined();
+    expect(ligne!.findAllByType(ExportArt)).toHaveLength(1);
+    expect(ligne!.findByType(ExportArt).props.kind).toBe('presentation');
   });
 
-  it('ne s’affiche plus sur l’écran du scan', () => {
-    const tree = monter('scan');
-    expect(textes(tree)).not.toContain('Présentation');
+  it('ne s’affiche plus dans l’écran d’export du PDF', () => {
+    const tree = monter('export');
+    expect(textes(tree)).not.toContain('Présentation animée');
     expect(
       tree.root
         .findAllByType(TouchableOpacity)
-        .some((n) => n.props.accessibilityLabel === 'Présentation'),
+        .some((n) => n.props.accessibilityLabel === 'Présentation animée'),
     ).toBe(false);
-    // Le pied de page garde ce qui relève du scan.
-    expect(textes(tree)).toContain('Nouveau scan');
   });
 
   /**
@@ -142,6 +156,33 @@ describe('la présentation animée', () => {
     const vu = textes(tree);
     expect(vu).not.toContain('Visite');
     expect(vu).not.toContain('Modèle AR');
+  });
+});
+
+/**
+ * LES POINTS CARDINAUX SUR LE DOSSIER — À LA DEMANDE.
+ *
+ * Ils désignent un mur sans ambiguïté, et tous les dossiers n'en ont pas
+ * besoin. Comme sur le plan de l'app, ils partent ÉTEINTS : quatre lettres
+ * autour de chaque vue chargent la feuille quand personne ne les lit.
+ */
+describe('le nord dans le dossier', () => {
+  it('s’offre en option, éteinte au départ', () => {
+    const tree = monter('export');
+    const bouton = tree.root
+      .findAllByType(TouchableOpacity)
+      // Le mot est en légende SOUS la pastille : c'est l'étiquette
+      // d'accessibilité qui nomme le bouton.
+      .find((n) => n.props.accessibilityLabel === 'Nord');
+    expect(bouton).toBeDefined();
+    // Éteinte : les vues 3D de l'aperçu ne portent pas la couronne.
+    for (const v of tree.root.findAllByType(Iso3DView)) {
+      expect(v.props.showNorth).toBe(false);
+    }
+    act(() => bouton!.props.onPress());
+    const apres = tree.root.findAllByType(Iso3DView);
+    expect(apres.length).toBeGreaterThan(0);
+    for (const v of apres) expect(v.props.showNorth).toBe(true);
   });
 });
 

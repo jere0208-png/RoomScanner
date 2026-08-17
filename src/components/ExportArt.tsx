@@ -16,7 +16,12 @@ import React from 'react';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import type { Palette } from '../theme';
 
-export type ExportArtKind = 'pdf' | 'obj' | 'materiel' | 'image';
+export type ExportArtKind =
+  | 'pdf'
+  | 'obj'
+  | 'materiel'
+  | 'image'
+  | 'presentation';
 
 const T = 44;
 
@@ -36,6 +41,7 @@ const TEINTE = (kind: ExportArtKind, c: Palette): string =>
     obj: '#EAF6F2',
     materiel: '#FDF1E4',
     image: '#F2ECFB',
+    presentation: '#E9F3FF',
   }[kind]);
 
 const DESSINS: Record<ExportArtKind, (c: Palette) => React.ReactNode> = {
@@ -114,6 +120,43 @@ const DESSINS: Record<ExportArtKind, (c: Palette) => React.ReactNode> = {
           opacity={y === 17 ? 1 : 0.55}
         />
       ))}
+    </>
+  ),
+
+  /**
+   * Un logement en volume et un bouton de lecture : ce qu'on MONTRE.
+   *
+   * Les quatre autres vignettes disent un FICHIER — une feuille, un
+   * volume, un bordereau, une capture. Celle-ci dit un moment : le
+   * logement tourne devant le client. D'où le triangle, qui ne se
+   * confond avec rien d'autre dans ce menu.
+   */
+  presentation: () => (
+    <>
+      <Path
+        d="M22 8 L34 15 L22 22 L10 15 Z"
+        fill="#FFFFFF"
+        stroke="#2F6FF0"
+        strokeWidth={1.6}
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M10 15 v8 l12 7 v-8 Z"
+        fill="#2F6FF0"
+        opacity={0.16}
+        stroke="#2F6FF0"
+        strokeWidth={1.5}
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M34 15 v8 l-12 7"
+        fill="none"
+        stroke="#2F6FF0"
+        strokeWidth={1.5}
+        strokeLinejoin="round"
+      />
+      <Circle cx={30} cy={30} r={7} fill="#2F6FF0" />
+      <Path d="M28 26.6 L33 30 L28 33.4 Z" fill="#FFFFFF" />
     </>
   ),
 

@@ -35,9 +35,7 @@ import { fixtureMarks, multiWire, schemaRows } from '../geometry/schema';
 import { planRoutes } from '../geometry/elecplan';
 import { floorsOf, useScanStore } from '../store/scanStore';
 import { deviceNames } from '../geometry/naming';
-import { ClientTour } from '../components/ClientTour';
 import { PromptSheet, type PromptData } from '../components/Sheet';
-import { PlayCircle } from 'lucide-react-native';
 import type { CeilingFixture } from '../geometry/ceiling';
 
 interface PlanView {
@@ -244,6 +242,12 @@ const EXPORT_ICONS = {
   ],
   // Schémas : un peigne de tableau, deux départs sous une barre.
   schema: ['M12 3 v4', 'M4 7 h16', 'M8 7 v4', 'M16 7 v4', 'M6 11 h4 v6 H6 z', 'M14 11 h4 v6 h-4 z'],
+  /** La rose des vents : un cercle, une aiguille, quatre branches. */
+  nord: [
+    'M12 3 a9 9 0 1 0 0 18 a9 9 0 1 0 0 -18',
+    'M12 6.5 L14.6 13 L12 11.6 L9.4 13 Z',
+    'M12 15 v2.5',
+  ],
 } as const;
 
 const styles = getStyles(c);
@@ -275,18 +279,17 @@ const styles = getStyles(c);
    * celui qu'on envoie au client.
    */
   const [elevations, setElevations] = useState(false);
-  /** La visite guidée, plein écran : ce qu'on montre au client. */
-  const [visite, setVisite] = useState(false);
   /**
-   * Le cadrage de la vignette : de trois quarts, et un peu de recul.
+   * LES POINTS CARDINAUX SUR LE DOCUMENT — ÉTEINTS PAR DÉFAUT.
    *
-   * C'est une image, pas une vue à régler : elle garde son angle, celui
-   * où l'on reconnaît un logement d'un coup d'œil.
+   * Ils désignent un mur sans ambiguïté : « la prise du mur nord » se
+   * vérifie sur place avec n'importe quel téléphone. Mais tous les
+   * dossiers n'en ont pas besoin, et quatre lettres autour de chaque vue
+   * chargent la feuille pour rien quand personne ne les lit. Comme sur le
+   * plan de l'app, on les allume à la demande.
    */
-  const [vignette] = useState<View3DParams>({
-    ...DEFAULT_VIEW3D,
-    zoom: DEFAULT_VIEW3D.zoom * 0.82,
-  });
+  const [cardinaux, setCardinaux] = useState(false);
+
   const parts = useMemo(() => roomParts(walls, rooms), [walls, rooms]);
   const placement = useMemo(
     () => fixturePlacement(fixtures, walls, roomInputsOf(rooms, parts)),
@@ -403,7 +406,10 @@ const styles = getStyles(c);
           floors: floorsOf(rooms),
           roomNames: Object.fromEntries(rooms.map((r) => [r.id, r.name])),
           photos: vignettes,
-          north,
+          // Éteint, le dossier ne porte ni rose des vents ni lettres : le
+          // nom des murs y perd sa boussole, et c'est le choix de celui qui
+          // remet le document.
+          north: cardinaux ? north : null,
           deviceNames: noms,
           client,
           address,
@@ -596,6 +602,18 @@ const styles = getStyles(c);
                 elevations,
                 () => setElevations(!elevations),
               ],
+              // Le nord ne s'offre que si le scan en porte un : sans cap
+              // relevé, l'option n'allumerait rien.
+              ...(north !== null && north !== undefined
+                ? [
+                    [
+                      'nord',
+                      'Nord',
+                      cardinaux,
+                      () => setCardinaux(!cardinaux),
+                    ] as OptionDef,
+                  ]
+                : []),
               ...(schemas
                 ? [
                     [
@@ -673,52 +691,15 @@ const styles = getStyles(c);
         </View>
 
         {/*
-          LA PRÉSENTATION SE LANCE SOUS L'IMAGE QU'ELLE ANIME.
+          LA PRÉSENTATION N'EST PLUS ICI.
 
-          Elle était posée en pied de page, à côté du bouton du PDF : deux
-          sorties côte à côte, dont une qui n'a rien à voir avec un
-          document. Ici, elle suit immédiatement l'aperçu — on voit le
-          logement, et juste dessous le bouton qui le fait tourner.
+          Elle a occupé trois places avant celle-ci — pied de page, écran du
+          scan, sous l'aperçu — et le malentendu était le même à chaque
+          fois : on la rangeait dans le RÉGLAGE D'UN DOCUMENT alors que
+          c'est une SORTIE. Elle se choisit donc sur le bouton
+          « Exporter », avec le PDF, le modèle 3D et le bordereau. Cet
+          écran-ci ne sert qu'à composer une feuille.
         */}
-        <Text style={styles.sheetLabel}>À montrer au client</Text>
-        <TouchableOpacity
-          style={styles.visiteButton}
-          accessibilityLabel="Présentation animée"
-          onPress={() => setVisite(true)}>
-          {/*
-            UNE VIGNETTE, comme chaque feuille a son aperçu.
-
-            Un pictogramme dit « ça se lance » ; il ne dit pas CE QUI se
-            lance. Les feuilles du dossier, elles, se choisissent sur leur
-            image — on reconnaît son plan avant de lire son titre. La
-            présentation montre le logement en volume : elle porte donc le
-            logement en volume, en petit, à côté de son nom.
-
-            La vignette ne se touche pas : le doigt qui s'y pose lance la
-            présentation comme partout ailleurs sur la rangée, au lieu de
-            faire tourner un modèle de soixante-douze pixels.
-          */}
-          <View style={styles.visiteVignette} pointerEvents="none">
-            <Iso3DView
-              value={vignette}
-              onChange={() => {}}
-              showMeasures={false}
-              showElecTags={false}
-              showNorth={false}
-              showCeiling={false}
-            />
-            <View style={styles.visitePastille}>
-              <PlayCircle size={17} color="#FFFFFF" strokeWidth={2.4} />
-            </View>
-          </View>
-          <View style={styles.visiteTextes}>
-            <Text style={styles.visiteText}>Présentation animée</Text>
-            <Text style={styles.visiteSous}>
-              Le logement se présente tout seul, pièce par pièce.
-            </Text>
-          </View>
-          <Text style={styles.visiteChevron}>›</Text>
-        </TouchableOpacity>
 
         {include3D && (
           <>
@@ -735,7 +716,12 @@ const styles = getStyles(c);
                     h: e.nativeEvent.layout.height,
                   };
                 }}>
-                <Iso3DView value={v1} onChange={setV1} showMeasures={measures3D} />
+                <Iso3DView
+                  value={v1}
+                  onChange={setV1}
+                  showMeasures={measures3D}
+                  showNorth={cardinaux}
+                />
               </View>
               <View
                 {...lockProps}
@@ -746,7 +732,12 @@ const styles = getStyles(c);
                     h: e.nativeEvent.layout.height,
                   };
                 }}>
-                <Iso3DView value={v2} onChange={setV2} showMeasures={measures3D} />
+                <Iso3DView
+                  value={v2}
+                  onChange={setV2}
+                  showMeasures={measures3D}
+                  showNorth={cardinaux}
+                />
               </View>
             </View>
           </>
@@ -759,19 +750,12 @@ const styles = getStyles(c);
         </Text>
       </ScrollView>
 
-      {/*
-        DEUX SORTIES, DEUX PUBLICS.
-
-        Le PDF part chez le fournisseur et sur le chantier ; il ne se montre
-        pas à un client dans son salon. La visite guidée, elle, joue le
-        relevé toute seule — le logement tourne, la caméra s'arrête sur
-        chaque pièce puis face à chaque mur équipé, et un carton annonce ce
-        qu'on regarde. On lance, et on laisse regarder.
-      */}
+      {/* Cet écran compose UNE feuille et la sort. La présentation, elle,
+          se choisit sur le bouton « Exporter » du plan, avec les autres
+          sorties. */}
       <TouchableOpacity style={styles.exportButton} onPress={doExport}>
         <Text style={styles.exportText}>Exporter le PDF</Text>
       </TouchableOpacity>
-      <ClientTour visible={visite} onClose={() => setVisite(false)} />
       <PromptSheet data={prompt} onClose={() => setPrompt(null)} />
       </Animated.View>
     </View>
@@ -914,49 +898,6 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     textAlign: 'center',
     marginTop: 12,
   },
-  /** La visite : une ligne posée sous l'aperçu, pas un second bouton d'acte. */
-  visiteVignette: {
-    width: 72,
-    height: 72,
-    borderRadius: radius.sm,
-    overflow: 'hidden',
-    backgroundColor: c.surfaceSunken,
-  },
-  visitePastille: {
-    position: 'absolute',
-    right: 4,
-    bottom: 4,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(20,24,32,0.55)',
-  },
-  /**
-   * ELLE NE SE CONFOND PLUS AVEC UNE LIGNE DE RÉGLAGE.
-   *
-   * Posée en blanc sur fond gris, sous l'aperçu, elle passait pour un
-   * intitulé de plus — on la cherchait sans la voir. Elle porte donc son
-   * propre titre (« À montrer au client », comme les feuilles portent le
-   * leur), un fond bleuté et un cadre : c'est une SORTIE, pas un réglage.
-   */
-  visiteButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    padding: 10,
-    paddingRight: 16,
-    borderRadius: radius.md,
-    backgroundColor: c.blueSoft,
-    borderWidth: 1,
-    borderColor: c.blue,
-    marginTop: 2,
-  },
-  visiteTextes: { flex: 1, minWidth: 0 },
-  visiteText: { color: c.blue, fontSize: 15, fontWeight: '800' },
-  visiteSous: { color: c.inkFaint, fontSize: 11.5, marginTop: 1 },
-  visiteChevron: { color: c.inkFaint, fontSize: 22, fontWeight: '600' },
   exportButton: {
     backgroundColor: c.blue,
     marginBottom: 28,

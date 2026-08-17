@@ -106,6 +106,7 @@ import {
 import { useScanStore } from '../store/scanStore';
 import { DiagnosticSheet, type Constat } from '../components/DiagnosticSheet';
 import { ExportArt, type ExportArtKind } from '../components/ExportArt';
+import { ClientTour } from '../components/ClientTour';
 import { EnAttente } from '../components/PendingPill';
 import {
   CEILINGS,
@@ -277,6 +278,8 @@ export function ResultScreen() {
   const [checking, setChecking] = useState(false);
   // Choix du format d'export : plan PDF, modèle 3D, ou image de la vue.
   const [exporting, setExporting] = useState(false);
+  /** La présentation guidée, plein écran : ce qu'on montre au client. */
+  const [visite, setVisite] = useState(false);
   // Vue 3D : bascule « vue de dessus », comme un plan.
   const [view3d, setView3d] = useState<View3DParams>(DEFAULT_VIEW3D);
   // Coupe : index de la pièce isolée en 3D (-1 = tout le logement).
@@ -2099,16 +2102,6 @@ export function ResultScreen() {
           <Text style={styles.primaryText}>Exporter</Text>
         </TouchableOpacity>
       )}
-      {/*
-        LA PRÉSENTATION N'EST PLUS ICI — elle vit sous l'aperçu, dans
-        l'écran d'export.
-
-        Elle a fait les deux voyages : d'abord au pied de l'écran d'export
-        à côté du bouton PDF, puis ici, sur l'écran du scan. Ni l'un ni
-        l'autre. Sa place est sous l'IMAGE qu'elle anime : on regarde
-        l'aperçu du logement, et le bouton qui le fait tourner est juste
-        dessous. Cet écran-ci sert à relever et à corriger, pas à montrer.
-      */}
       <View style={styles.actions}>
         <TouchableOpacity style={styles.secondaryButton} onPress={reset}>
           <Text style={styles.secondaryText} numberOfLines={1}>
@@ -2171,10 +2164,31 @@ export function ResultScreen() {
           <Pressable style={styles.modalCard} onPress={() => {}}>
             <Text style={styles.modalTitle}>Exporter</Text>
             <Text style={styles.modalSubtitle}>
-              Trois formats, selon ce que vous voulez en faire.
+              Un document à remettre, ou une présentation à montrer.
             </Text>
             {(
               [
+                /*
+                  LA PRÉSENTATION SE CHOISIT ICI, avec les autres sorties.
+
+                  Elle a longtemps cherché sa place : au pied de l'écran
+                  d'export, puis sur l'écran du scan, puis sous l'aperçu du
+                  plan. À chaque fois le même malentendu — on la rangeait
+                  dans le réglage d'un DOCUMENT, alors que c'est une SORTIE,
+                  au même titre qu'un PDF ou un modèle 3D. Elle est donc
+                  dans le menu qui les propose, et en premier : c'est celle
+                  qu'on lance devant quelqu'un.
+                */
+                [
+                  'presentation',
+                  'Présentation animée',
+                  'Le logement se présente tout seul, pièce par pièce. ' +
+                    'À montrer au client, sur place.',
+                  () => {
+                    setExporting(false);
+                    apresFermeture(() => setVisite(true));
+                  },
+                ],
                 [
                   'pdf',
                   'Plan PDF',
@@ -2232,6 +2246,9 @@ export function ResultScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      {/* La présentation, lancée depuis le menu « Exporter ». */}
+      <ClientTour visible={visite} onClose={() => setVisite(false)} />
 
       {/* ---------- Diagnostic du plan ---------- */}
       <DiagnosticSheet
