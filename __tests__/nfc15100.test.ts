@@ -114,10 +114,17 @@ describe('constats', () => {
     const trop = issues.find((i) => i.message.includes('circuits'));
     expect(trop?.severity).toBe('info');
     expect(trop?.message).toContain('2 circuits');
-    // Et la pièce n'est donc PAS en alerte pour cette raison. La seule
-    // alerte restante est l'absence de tableau, qui n'a rien à voir.
+    // Et la pièce n'est donc PAS en alerte pour cette raison. Restent deux
+    // alertes qui n'ont rien à voir avec le nombre de socles : l'absence
+    // de tableau, et les trois circuits spécialisés d'une cuisine — dix
+    // prises 16 A n'alimentent ni le four ni le lave-vaisselle.
     expect(
-      issues.filter((i) => i.severity === 'alerte' && i.code !== 'tableau'),
+      issues.filter(
+        (i) =>
+          i.severity === 'alerte' &&
+          i.code !== 'tableau' &&
+          i.code !== 'specialises',
+      ),
     ).toHaveLength(0);
   });
 
@@ -506,5 +513,100 @@ describe('le client dans le cartouche', () => {
     const src = doc();
     expect(src).toContain('FICHIER');
     expect(src).not.toContain('CLIENT');
+  });
+});
+
+/**
+ * DEUX CONTRÔLES QUE PERSONNE D'AUTRE NE FAIT.
+ *
+ * Le premier fait recaler au Consuel, le second se voit sur le mur fini.
+ * Aucun scanner de pièce ne les connaît — c'est exactement ce qui sépare
+ * un relevé d'un dossier d'électricien.
+ */
+/** Le mur → pièces des bancs précédents, repris tel quel. */
+const w2r = (rooms: RoomInput[]) => wallToRooms(rooms);
+
+describe('les circuits spécialisés', () => {
+  it('en exige trois dès qu’il y a une cuisine', () => {
+    const rooms = [room('r1', 'Cuisine', 12)];
+    const issues = checkElectrical(
+      rooms,
+      [fx('prise20', 'w1', 1.1)],
+      w2r(rooms),
+    );
+    const manque = issues.find((i) => i.code === 'specialises');
+    expect(manque?.severity).toBe('alerte');
+    expect(manque?.message).toContain('1 circuit spécialisé sur 3');
+    expect(manque?.regle).toContain('lave-linge');
+  });
+
+  it('compte la sortie de câble comme un circuit, et où qu’elle soit', () => {
+    // Le lave-linge est souvent en salle d'eau : c'est un circuit du
+    // LOGEMENT, pas de la cuisine.
+    const rooms = [room('r1', 'Cuisine', 12), room('r2', 'Salle de bain', 5)];
+    const fixtures = [
+      fx('prise20', 'w1', 1.1),
+      fx('prise20', 'w1', 1.1),
+      fx('sortieCable', 'w2', 0.6),
+    ];
+    const issues = checkElectrical(rooms, fixtures, w2r(rooms));
+    expect(issues.some((i) => i.code === 'specialises')).toBe(false);
+  });
+
+  it('se tait quand le logement n’a pas de cuisine', () => {
+    const rooms = [room('r1', 'Chambre', 11)];
+    const issues = checkElectrical(rooms, [], w2r(rooms));
+    expect(issues.some((i) => i.code === 'specialises')).toBe(false);
+  });
+});
+
+describe('l’alignement des appareils', () => {
+  it('relève deux prises presque à la même hauteur, sur le même mur', () => {
+    const rooms = [room('r1', 'Chambre', 11)];
+    const fixtures = [fx('prise', 'w1', 0.25), fx('prise', 'w1', 0.28)];
+    const issues = checkElectrical(rooms, fixtures, w2r(rooms));
+    const ecart = issues.find((i) => i.code === 'alignement');
+    // Un défaut de finition, pas une faute : on le dit sans crier.
+    expect(ecart?.severity).toBe('info');
+    expect(ecart?.message).toContain('25 cm et 28 cm');
+    expect(ecart?.fix?.label).toContain('Aligner à 25 cm');
+  });
+
+  it('mais se tait quand c’est aligné, ou franchement différent', () => {
+    const rooms = [room('r1', 'Chambre', 11)];
+    // Aligné au millimètre.
+    expect(
+      checkElectrical(
+        rooms,
+        [fx('prise', 'w1', 0.25), fx('prise', 'w1', 0.25)],
+        w2r(rooms),
+      ).some((i) => i.code === 'alignement'),
+    ).toBe(false);
+    // Une prise en plinthe et un interrupteur à hauteur de main : voulu.
+    expect(
+      checkElectrical(
+        rooms,
+        [fx('prise', 'w1', 0.25), fx('inter', 'w1', 1.1)],
+        w2r(rooms),
+      ).some((i) => i.code === 'alignement'),
+    ).toBe(false);
+    // Deux prises à 25 et 90 : deux usages différents, pas un défaut.
+    expect(
+      checkElectrical(
+        rooms,
+        [fx('prise', 'w1', 0.25), fx('prise', 'w1', 0.9)],
+        w2r(rooms),
+      ).some((i) => i.code === 'alignement'),
+    ).toBe(false);
+  });
+
+  it('et ne compare pas deux murs différents', () => {
+    const rooms = [room('r1', 'Chambre', 11)];
+    const issues = checkElectrical(
+      rooms,
+      [fx('prise', 'w1', 0.25), fx('prise', 'w2', 0.28)],
+      w2r(rooms),
+    );
+    expect(issues.some((i) => i.code === 'alignement')).toBe(false);
   });
 });

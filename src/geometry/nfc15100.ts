@@ -488,7 +488,9 @@ export type ElecCode =
   | 'volumes'
   | 'tableau'
   | 'eclairage'
-  | 'daaf';
+  | 'daaf'
+  | 'specialises'
+  | 'alignement';
 
 export interface ElecIssue {
   code: ElecCode;
@@ -740,6 +742,104 @@ export function checkElectrical(
           'Ces volumes se mesurent depuis l’appareil sanitaire, que l’app ' +
           'ne connaît pas : la vérification reste manuelle.',
       });
+    }
+  }
+
+  /**
+   * LES TROIS CIRCUITS SPÉCIALISÉS — le point qui fait recaler au Consuel.
+   *
+   * La norme demande, en plus de la cuisson, TROIS circuits dédiés en
+   * 2,5 mm² sous 20 A : lave-linge, lave-vaisselle, four. Chacun part du
+   * tableau et ne dessert qu'un appareil. C'est un oubli classé : on
+   * compte ses prises, on n'oublie pas la plaque, et on livre un logement
+   * où le four et le lave-vaisselle partagent le circuit des prises.
+   *
+   * L'app les reconnaît à leur nature — socle 20 A ou sortie de câble —
+   * où qu'ils soient : le lave-linge est souvent en salle d'eau, pas en
+   * cuisine. Et elle ne dit rien tant qu'aucune cuisine n'est nommée :
+   * sans cuisine, il n'y a pas de logement à recevoir.
+   */
+  const cuisines = rooms.filter((r) => roomUse(r.name, r.kind) === 'cuisine');
+  if (cuisines.length > 0) {
+    const dedies = fixtures.filter(
+      (f) => f.kind === 'prise20' || f.kind === 'sortieCable',
+    ).length;
+    if (dedies < 3) {
+      out.push({
+        code: 'specialises',
+        roomId: cuisines[0].id,
+        severity: 'alerte',
+        message: `Logement : ${dedies} circuit${
+          dedies > 1 ? 's' : ''
+        } spécialisé${dedies > 1 ? 's' : ''} sur 3`,
+        regle:
+          'Trois circuits spécialisés au minimum, en 2,5 mm² sous 20 A : ' +
+          'lave-linge, lave-vaisselle, four. Chacun ne dessert que son ' +
+          'appareil, et s’ajoute au circuit de cuisson en 6 mm². Posez un ' +
+          'socle 20 A ou une sortie de câble pour chacun.',
+        fix: {
+          type: 'poser',
+          kind: 'prise20',
+          label: 'Poser une 20 A',
+        },
+      });
+    }
+  }
+
+  /**
+   * L'ALIGNEMENT — ce qui distingue une pose soignée d'une pose rapide.
+   *
+   * Deux prises sur le même mur à vingt-cinq et vingt-huit centimètres :
+   * la norme s'en moque, le client non. C'est ce qu'on voit en entrant
+   * dans une pièce finie, et ça ne se rattrape plus une fois les boîtes
+   * scellées.
+   *
+   * On ne signale QUE le presque-aligné : de un à douze centimètres
+   * d'écart, entre appareils de même famille, sur le même mur. En dessous
+   * d'un centimètre c'est aligné ; au-delà de douze c'est voulu — une
+   * prise à vingt-cinq et son interrupteur à cent dix ne se comparent pas.
+   */
+  const parMur = new Map<string, Fixture[]>();
+  for (const f of fixtures) {
+    const l = parMur.get(f.wallId) ?? [];
+    l.push(f);
+    parMur.set(f.wallId, l);
+  }
+  for (const lot of parMur.values()) {
+    for (let i = 0; i < lot.length; i++) {
+      for (let j = i + 1; j < lot.length; j++) {
+        const a = lot[i];
+        const b = lot[j];
+        if (FIXTURES[a.kind].family !== FIXTURES[b.kind].family) continue;
+        // Réunis sous une même plaque, ils ne s'alignent pas : ils se
+        // superposent, et c'est le modèle qui les place.
+        if (a.group && a.group === b.group) continue;
+        const ecart = Math.abs(a.height - b.height);
+        if (ecart <= 0.01 || ecart > 0.12) continue;
+        const piece = rooms.find((r) => r.id === roomOfFixture(a));
+        out.push({
+          code: 'alignement',
+          roomId: piece?.id,
+          fixtureId: b.id,
+          severity: 'info',
+          message:
+            `${piece?.name ?? 'Mur'} : ${FIXTURES[a.kind].label} à ` +
+            `${Math.round(a.height * 100)} cm et ` +
+            `${Math.round(b.height * 100)} cm sur le même mur`,
+          regle:
+            'Deux appareils de même nature, sur un même mur, se posent à la ' +
+            'MÊME hauteur d’axe. Trois centimètres d’écart ne se voient pas ' +
+            'sur un plan et se voient sur le mur fini.',
+          fix: {
+            type: 'hauteur',
+            fixtureId: b.id,
+            height: a.height,
+            label: `Aligner à ${Math.round(a.height * 100)} cm`,
+          },
+        });
+        // Un seul constat par mur : la liste se lit, elle ne s'endure pas.
+        break;
+      }
     }
   }
 
