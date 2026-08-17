@@ -317,7 +317,7 @@ final class RoomColorSampler {
       var out: [String: Any] = ["color": Self.hex(mean)]
       let cols = Self.wallCols
       let rows = Self.wallRows
-      if acc.sum.count == cols * rows {
+      if acc.samples.count == cols * rows {
         // Les cases jamais vues reprennent la moyenne : pas de trou noir.
         let texels = (0..<(cols * rows)).map { Self.hex(acc.cell($0) ?? mean) }
         out["texture"] = ["cols": cols, "rows": rows, "texels": texels]
@@ -362,8 +362,10 @@ final class RoomColorSampler {
         let j = Int(Int32(bitPattern: UInt32(truncatingIfNeeded: key)))
         i0 = min(i0, i); i1 = max(i1, i)
         j0 = min(j0, j); j1 = max(j1, j)
-        total += value.0
-        n += value.1
+        for c in value {
+          total += c
+          n += 1
+        }
       }
       guard n > 0, i0 <= i1, j0 <= j1 else { return nil }
       let mean = total / Float(n)
@@ -432,7 +434,7 @@ final class RoomColorSampler {
     let axis = normalize(SIMD3(m.columns.0.x, m.columns.0.y, m.columns.0.z))
     var best: (Accum, Float)?
     for acc in walls.values {
-      guard acc.mean != nil else { continue }
+      guard acc.overall != nil else { continue }
       let d = distance(acc.center, center)
       guard d < 0.7, abs(dot(acc.axis, axis)) > 0.94 else { continue }
       if best == nil || d < best!.1 { best = (acc, d) }
