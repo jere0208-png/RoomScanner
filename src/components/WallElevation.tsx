@@ -170,6 +170,17 @@ export function WallElevation({
    * pas manger l'écran entier.
    */
   const [hauteurCadre, setHauteurCadre] = useState<number | null>(null);
+  /** L'horloge de l'appui maintenu, et celle qui efface le trait d'aide. */
+  const tenir = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const effaceGuide = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Un écran qu'on quitte ne doit pas laisser une horloge derrière lui.
+  useEffect(
+    () => () => {
+      if (tenir.current) clearTimeout(tenir.current);
+      if (effaceGuide.current) clearTimeout(effaceGuide.current);
+    },
+    [],
+  );
   const restoreFixtures = useScanStore((st) => st.restoreFixtures);
   /**
    * L'APPAREILLAGE TEL QU'ON A OUVERT LE MUR.
@@ -686,6 +697,83 @@ export function WallElevation({
     setFusion(null);
   };
 
+  /**
+   * LES TRAITS D'ALIGNEMENT VALENT AUSSI POUR LES FLÈCHES.
+   *
+   * Ils n'apparaissaient qu'au doigt : le glissement s'accroche aux
+   * repères et les montre. Au pavé, on avançait d'un centimètre à la
+   * fois à travers ces mêmes repères sans que rien ne le dise — on
+   * passait DEVANT l'alignement sans le voir, et on s'arrêtait un
+   * centimètre plus loin.
+   *
+   * Ici, pas d'accrochage : la flèche est faite pour viser au centimètre
+   * près, l'aimanter serait lui retirer sa raison d'être. On se contente
+   * de DIRE quand la position tombe juste, à cinq millimètres près.
+   */
+  const montrerAlignement = (id: string, x: number, y: number) => {
+    if (!face) return;
+    const autres = mine.filter((f) => f.id !== id);
+    const pres = (v: number, cibles: number[]) =>
+      cibles.find((t) => Math.abs(v - t) < 0.005);
+    setGuide({
+      x: pres(x, [...autres.map((f) => faceX(face, f.along)), face.len / 2]),
+      y: pres(y, autres.map((f) => f.height)),
+    });
+    // Le trait s'efface tout seul : il dit un instant, il ne s'installe pas.
+    if (effaceGuide.current) clearTimeout(effaceGuide.current);
+    effaceGuide.current = setTimeout(() => setGuide({}), 1200);
+  };
+
+  /**
+   * UN PAS DE FLÈCHE, et le repère qui va avec.
+   *
+   * Un appui = un pas ; un appui MAINTENU = les pas s'enchaînent, de plus
+   * en plus vite. Traverser un mur de trois mètres au centimètre demandait
+   * trois cents appuis — personne ne le faisait, on repartait au doigt et
+   * on perdait la précision qu'on était venu chercher.
+   */
+  const pasFleche = (dx: number, dy: number) => {
+    if (!selected || !face) return;
+    /**
+     * La position se relit DANS LE MAGASIN, à chaque pas.
+     *
+     * L'appui maintenu enchaîne des pas depuis une horloge : sa fermeture
+     * garde l'appareil tel qu'il était au premier pas. En repartant de
+     * cette copie à chaque fois, les cent pas suivants recalculaient tous
+     * la MÊME destination — le doigt restait appuyé et rien ne bougeait
+     * plus.
+     */
+    const vif = useScanStore
+      .getState()
+      .fixtures.find((f) => f.id === selected.id);
+    if (!vif) return;
+    const x = faceX(face, vif.along) + dx * pas;
+    const y = vif.height + dy * pas;
+    moveFixture(vif.id, fromFaceX(face, x), y);
+    montrerAlignement(vif.id, Math.round(x * 100) / 100, Math.round(y * 100) / 100);
+  };
+
+  /**
+   * L'appui maintenu : le premier pas part tout de suite, puis la cadence
+   * s'accélère — 380 ms d'attente pour ne pas déclencher sur un appui
+   * bref, et jusqu'à 40 ms pour parcourir un mur en deux secondes.
+   */
+  const lancerFleche = (dx: number, dy: number) => {
+    pasFleche(dx, dy);
+    let attente = 380;
+    const suivant = () => {
+      tenir.current = setTimeout(() => {
+        pasFleche(dx, dy);
+        attente = Math.max(40, attente * 0.72);
+        suivant();
+      }, attente);
+    };
+    suivant();
+  };
+  const arreterFleche = () => {
+    if (tenir.current) clearTimeout(tenir.current);
+    tenir.current = null;
+  };
   /** Applique une cote tapée au clavier (en cm). */
   const applyDraft = () => {
     const v = parseFloat(draft.replace(',', '.'));
@@ -1652,13 +1740,12 @@ export function WallElevation({
             <TouchableOpacity
               key={cle}
               style={styles.paveBtn}
-              onPress={() =>
-                moveFixture(
-                  selected.id,
-                  fromFaceX(face, faceX(face, selected.along) + dx * pas),
-                  selected.height + dy * pas,
-                )
-              }>
+              accessibilityLabel={cle}
+              // `onPressIn` et non `onPress` : le pas part au contact, et
+              // l'enchaînement s'arrête quand le doigt se lève — y compris
+              // s'il glisse hors du bouton (`onPressOut` couvre les deux).
+              onPressIn={() => lancerFleche(dx, dy)}
+              onPressOut={arreterFleche}>
               <Svg width={20} height={20} viewBox="0 0 24 24">
                 <Path
                   d={fleche}

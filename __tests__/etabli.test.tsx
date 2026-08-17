@@ -255,3 +255,58 @@ describe('quitter l’établi', () => {
     alerte.mockRestore();
   });
 });
+
+/**
+ * LE PAVÉ DE FLÈCHES : un appui maintenu vaut cent appuis.
+ *
+ * Traverser un mur de trois mètres au centimètre demandait trois cents
+ * appuis — personne ne le faisait : on repartait au doigt, et on perdait la
+ * précision qu'on était venu chercher. Et les traits d'alignement, eux,
+ * n'apparaissaient qu'au glissement : au pavé, on passait DEVANT un
+ * alignement sans le voir.
+ */
+describe('les flèches de réglage', () => {
+  const PRISE: Fixture = {
+    id: 'a',
+    kind: 'prise',
+    wallId: 'n',
+    along: 1,
+    height: 0.25,
+    side: 1,
+  };
+  const fleche = (tree: TestRenderer.ReactTestRenderer, sens: string) =>
+    tree.root
+      .findAllByType(TouchableOpacity)
+      .find((n) => n.props.accessibilityLabel === sens)!;
+
+  it('un appui déplace d’un pas', () => {
+    const tree = rendu({ fixtures: [PRISE] });
+    const avant = useScanStore.getState().fixtures[0].along;
+    act(() => fleche(tree, 'droite').props.onPressIn());
+    act(() => fleche(tree, 'droite').props.onPressOut());
+    const apres = useScanStore.getState().fixtures[0].along;
+    expect(Math.abs(apres - avant)).toBeCloseTo(0.01, 3);
+  });
+
+  it('et l’appui maintenu les enchaîne, de plus en plus vite', () => {
+    const tree = rendu({ fixtures: [PRISE] });
+    const avant = useScanStore.getState().fixtures[0].along;
+    act(() => fleche(tree, 'droite').props.onPressIn());
+    // Une seconde de doigt posé : bien plus d'un pas, et la cadence
+    // s'accélère — on ne compte donc pas un nombre exact, on vérifie
+    // qu'on a franchi une distance qu'un seul appui ne donnerait jamais.
+    act(() => {
+      jest.advanceTimersByTime(1000);
+    });
+    act(() => fleche(tree, 'droite').props.onPressOut());
+    const apres = useScanStore.getState().fixtures[0].along;
+    expect(Math.abs(apres - avant)).toBeGreaterThan(0.04);
+
+    // Et le doigt levé arrête tout : rien ne bouge plus.
+    const fige = useScanStore.getState().fixtures[0].along;
+    act(() => {
+      jest.advanceTimersByTime(2000);
+    });
+    expect(useScanStore.getState().fixtures[0].along).toBe(fige);
+  });
+});
