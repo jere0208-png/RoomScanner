@@ -46,3 +46,14 @@ jest.mock('lucide-react-native', () =>
     },
   ),
 );
+
+/**
+ * La capture d'écran : native, elle aussi.
+ *
+ * `react-native-view-shot` est importé par l'écran des résultats — donc par
+ * tout test qui veut le monter. Sous Node il n'a rien à capturer ; ce qu'on
+ * vérifie ici, ce sont les bandeaux de réglage, jamais l'image produite.
+ */
+jest.mock('react-native-view-shot', () => ({
+  captureRef: jest.fn(async () => 'file:///tmp/capture.png'),
+}));
