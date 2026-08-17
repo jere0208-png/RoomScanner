@@ -129,6 +129,31 @@ describe('l’écran des résultats', () => {
     expect(vu).not.toContain('Renommer');
   });
 
+  /**
+   * LA BOUSSOLE SE DEMANDE, ELLE NE S'IMPOSE PAS.
+   *
+   * On ouvre un plan pour lire des cotes. Les quatre lettres au bord du
+   * cadre servent à désigner un mur — un besoin ponctuel, pas permanent —
+   * et elles occupent justement la place où tombent les cotes de rive. Le
+   * calque part donc éteint, et le bouton le rallume en un appui.
+   */
+  it('s’ouvre SANS les points cardinaux, et le bouton les rallume', () => {
+    const tree = monter();
+    const lettres = () =>
+      tree.root
+        .findAllByType(SvgText)
+        .map((n) => n.props.children)
+        .filter((c) => c === 'N' || c === 'E' || c === 'S' || c === 'O');
+    expect(lettres()).toHaveLength(0);
+    const b = bouton(tree, 'Nord');
+    expect(b).toBeDefined();
+    act(() => b?.props.onPress());
+    // Quatre lettres par vue affichée : la couronne est bien là.
+    expect(lettres().length).toBeGreaterThanOrEqual(4);
+    act(() => b?.props.onPress());
+    expect(lettres()).toHaveLength(0);
+  });
+
   it('porte ses calques et son bouton d’édition', () => {
     const tree = monter();
     expect(bouton(tree, 'Édition')).toBeDefined();

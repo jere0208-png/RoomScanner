@@ -363,13 +363,16 @@ export function ResultScreen() {
   /** Repères électriques en 3D : un calque comme les autres. */
   const [showElecTags, setShowElecTags] = useState(true);
   /**
-   * Les points cardinaux : un calque, lui aussi.
+   * Les points cardinaux : un calque, lui aussi — ÉTEINT au départ.
    *
-   * Ils disent de quel mur on parle — et sur un plan serré, quatre
-   * pastilles au bord prennent la place des cotes qu'on est venu lire. Ils
-   * se cachent donc comme les meubles ou les surfaces.
+   * Ils disent de quel mur on parle, et c'est précieux au moment de
+   * désigner un mur dans le dossier. Mais on ouvre un plan pour lire des
+   * cotes, pas une boussole : quatre pastilles au bord du cadre prennent
+   * la place de ce qu'on est venu voir, à chaque ouverture, alors qu'on ne
+   * s'en sert qu'à l'occasion. Le bouton les rallume en un geste, et le
+   * dossier imprimé, lui, porte toujours sa rose des vents.
    */
-  const [showNorth, setShowNorth] = useState(true);
+  const [showNorth, setShowNorth] = useState(false);
   /** La visite guidée, plein écran : ce qu'on montre au client. */
   const [visite, setVisite] = useState(false);
   const [editMode, setEditMode] = useState(false);
