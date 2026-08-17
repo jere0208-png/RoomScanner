@@ -666,7 +666,10 @@ export function checkElectrical(
         code: 'rj45',
         message: `${label} : aucune prise RJ45`,
         regle: req.regle,
-        fix: { type: 'poser', kind: 'rj45', label: 'Poser une prise RJ45' },
+        // Le mot tient dans un bouton de téléphone : « Poser une prise
+        // RJ45 » sortait tronqué en « Poser une prise R… », ce qui ne dit
+        // plus rien du tout. Sur un chantier, on dit « une RJ ».
+        fix: { type: 'poser', kind: 'rj45', label: 'Poser RJ45' },
       });
     }
     if (req.surPlan > 0) {
@@ -690,7 +693,7 @@ export function checkElectrical(
             type: 'poser',
             kind: 'prise',
             height: 1.1,
-            label: 'Poser une prise à 110 cm',
+            label: 'Poser PC 110',
           },
         });
       }
@@ -776,7 +779,7 @@ export function checkElectrical(
         'Le tableau se place dans la gaine technique du logement (GTL), ses ' +
         'manettes entre 0,90 m et 1,80 m du sol. Sans lui, ni métré de ' +
         'câble ni plan des gaines.',
-      fix: { type: 'poser', kind: 'tableau', label: 'Poser le tableau' },
+      fix: { type: 'poser', kind: 'tableau', label: 'Poser tableau' },
     });
   }
   // Deux tableaux dans un logement, c'est une erreur de saisie neuf fois

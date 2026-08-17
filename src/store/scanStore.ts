@@ -533,6 +533,11 @@ interface ScanState {
    * scan, en degrés horaires depuis le nord.
    */
   setNorth: (deg: number | null) => void;
+  /**
+   * Remet l'appareillage tel qu'il était — pour abandonner ce qu'on vient
+   * de poser sur un mur sans toucher au reste du plan.
+   */
+  restoreFixtures: (list: Fixture[]) => void;
   removeFixture: (id: string) => void;
   /** Annule la dernière retouche. Vide = plus rien à annuler. */
   undo: () => void;
@@ -1178,6 +1183,11 @@ export const useScanStore = create<ScanState>((set, get) => {
     setNorth: (deg) => {
       pushHistory('north');
       set({ north: deg, dirty: true });
+    },
+
+    restoreFixtures: (list) => {
+      pushHistory('restore');
+      set({ fixtures: list, dirty: true });
     },
 
     addPhoto: (wallId, along, path) => {

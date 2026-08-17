@@ -16,6 +16,7 @@
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Alert,
   PanResponder,
   StyleSheet,
   Text,
@@ -86,7 +87,7 @@ import { haptic } from '../ui/haptic';
 import { CloseCross } from './CloseCross';
 import { wallLabel } from '../geometry/naming';
 import { frCategory } from '../geometry/furniture';
-import { Sofa } from 'lucide-react-native';
+import { Check, Sofa } from 'lucide-react-native';
 
 const PAD_X = 30;
 const PAD_TOP = 26;
@@ -161,6 +162,28 @@ export function WallElevation({
   const styles = getStyles(c);
 
   const [layout, setLayout] = useState({ w: 0, h: 0 });
+  /**
+   * La hauteur que réclame CE mur, une fois la largeur connue.
+   *
+   * Bornée des deux côtés : un couloir de six mètres ne doit pas se
+   * réduire à un trait, et un placard de quatre-vingts centimètres ne doit
+   * pas manger l'écran entier.
+   */
+  const [hauteurCadre, setHauteurCadre] = useState<number | null>(null);
+  const restoreFixtures = useScanStore((st) => st.restoreFixtures);
+  /**
+   * L'APPAREILLAGE TEL QU'ON A OUVERT LE MUR.
+   *
+   * Tout ce qu'on fait ici part dans le plan à l'instant même — c'est ce
+   * qui permet de voir la cote bouger en glissant le doigt. La croix
+   * n'avait donc rien à fermer : elle laissait tout en place, et rien ne
+   * disait comment revenir en arrière après une pose à côté. On garde
+   * l'état de départ : la croix le remet, le bouton d'enregistrement le
+   * jette.
+   */
+  const depart = useRef<Fixture[] | null>(null);
+  if (depart.current === null) depart.current = fixtures;
+  const modifie = fixtures !== depart.current;
   const [guide, setGuide] = useState<{ x?: number; y?: number }>({});
   const [editing, setEditing] = useState<'g' | 'd' | 'h' | null>(null);
   /** Pas du réglage fin : le centimètre, ou les cinq centimètres. */
@@ -220,6 +243,22 @@ export function WallElevation({
     // Un seul plein = le mur entier : il a déjà sa cote et son milieu.
     return runs.length > 1 ? runs : [];
   }, [wall, face, openings]);
+
+  /**
+   * La hauteur du cadre suit les proportions du mur.
+   *
+   * On la calcule à partir de la largeur mesurée, une fois pour toutes :
+   * la largeur d'une feuille ne dépend pas de sa hauteur, il n'y a donc
+   * pas de boucle à craindre.
+   */
+  useEffect(() => {
+    if (!face || layout.w <= 0 || !wall) return;
+    const utile = Math.max(80, layout.w - 2 * PAD_X);
+    const voulue = (utile * wall.height) / Math.max(0.5, face.len);
+    setHauteurCadre(
+      Math.round(Math.min(430, Math.max(190, voulue + PAD_TOP + PAD_BOTTOM))),
+    );
+  }, [face, wall, layout.w]);
 
   const holes = useMemo(() => {
     if (!wall || walls.length === 0) return [];
@@ -588,9 +627,9 @@ export function WallElevation({
     const moved = mine.find((f) => f.id === fusion.moved);
     if (!base || !moved) return [];
     const gabarit = FIXTURES[moved.kind];
-    const depart = { x: fusion.axe, y: base.height };
+    const axe = { x: fusion.axe, y: base.height };
     return PLATE_SIDES.map((s) => s.key).filter((cote) => {
-      const p = plateSlot(depart, cote);
+      const p = plateSlot(axe, cote);
       if (p.x < gabarit.w / 2 || p.x > face.len - gabarit.w / 2) return false;
       if (p.y < gabarit.h / 2 || p.y > wall.height - gabarit.h / 2) return false;
       // Ni sur un troisième appareil déjà posé.
@@ -753,11 +792,57 @@ export function WallElevation({
             />
           </Svg>
         </TouchableOpacity>
+        {/*
+          DEUX SORTIES, ET ELLES NE FONT PAS LA MÊME CHOSE.
+
+          Tout ce qu'on pose ici part dans le plan à l'instant même — c'est
+          ce qui permet de voir la cote bouger en glissant le doigt. La
+          croix ne fermait donc rien : elle laissait tout en place, et une
+          prise posée à côté restait dans le plan sans qu'on sache comment
+          l'annuler. Elle remet maintenant le mur dans l'état où on l'a
+          ouvert ; le bouton vert garde le travail et referme.
+
+          Elle demande avant, évidemment : abandonner un quart d'heure de
+          pose sur un appui malheureux serait pire que le défaut d'origine.
+          Et sans modification, elle ferme sans rien demander.
+        */}
+        <TouchableOpacity
+          style={styles.valider}
+          onPress={() => {
+            depart.current = null;
+            haptic('succes');
+            onClose();
+          }}>
+          <Check size={19} color="#FFFFFF" strokeWidth={2.8} />
+          <Text style={styles.validerText}>Enregistrer</Text>
+        </TouchableOpacity>
         <TouchableOpacity
           style={styles.close}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          onPress={onClose}>
-          <CloseCross size={19} color={c.inkSoft} weight={2.9} />
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          accessibilityLabel="Fermer sans garder"
+          onPress={() => {
+            if (!modifie) {
+              onClose();
+              return;
+            }
+            Alert.alert(
+              'Abandonner les modifications ?',
+              'Ce mur reviendra dans l’état où vous l’avez ouvert.',
+              [
+                { text: 'Continuer', style: 'cancel' },
+                {
+                  text: 'Abandonner',
+                  style: 'destructive',
+                  onPress: () => {
+                    if (depart.current) restoreFixtures(depart.current);
+                    depart.current = null;
+                    onClose();
+                  },
+                },
+              ],
+            );
+          }}>
+          <CloseCross size={22} color={c.inkSoft} weight={3} />
         </TouchableOpacity>
       </View>
 
@@ -781,7 +866,7 @@ export function WallElevation({
         </TouchableOpacity>
       )}
       <View
-        style={styles.canvas}
+        style={[styles.canvas, hauteurCadre ? { height: hauteurCadre } : null]}
         onLayout={(e) =>
           setLayout({
             w: e.nativeEvent.layout.width,
@@ -1821,10 +1906,24 @@ const getStyles = themedStyles((c: Palette) =>
       lineHeight: 16,
       marginTop: 2,
     },
+    /** L'enregistrement : vert, écrit, et à 44 points sous le doigt. */
+    valider: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      // 44 points : la règle d'iOS, que le banc d'essai vérifie bouton
+      // par bouton sur cet écran.
+      minHeight: 44,
+      paddingHorizontal: 12,
+      borderRadius: radius.pill,
+      backgroundColor: c.green,
+      marginRight: 8,
+    },
+    validerText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
     close: {
-      width: 32,
-      height: 32,
-      borderRadius: 16,
+      width: 38,
+      height: 38,
+      borderRadius: 19,
       backgroundColor: c.surfaceSunken,
       alignItems: 'center',
       justifyContent: 'center',
@@ -1835,9 +1934,17 @@ const getStyles = themedStyles((c: Palette) =>
     // faisait 250 px de haut : le pouce couvrait le tiers du mur. La feuille
     // prend maintenant toute la hauteur disponible, et le dessin ce qui
     // reste une fois les commandes posées.
+    /**
+     * LE CADRE ÉPOUSE LA FORME DU MUR.
+     *
+     * Il prenait toute la hauteur disponible (`flex: 1`, 300 points au
+     * minimum) : un mur de 2,70 m par 2,49 y flottait au milieu d'un grand
+     * vide, en haut comme en bas, et la feuille paraîssait mal remplie
+     * alors qu'elle était pleine — de rien. Sa hauteur se calcule
+     * désormais à partir de la largeur disponible et des proportions du
+     * mur : le dessin remplit son cadre, et la feuille se resserre.
+     */
     canvas: {
-      flex: 1,
-      minHeight: 300,
       marginTop: 10,
       backgroundColor: c.bg,
       borderRadius: radius.md,

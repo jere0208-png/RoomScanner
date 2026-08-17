@@ -17,7 +17,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 import React from 'react';
-import { Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Text, TouchableOpacity, View } from 'react-native';
 import { Text as SvgText } from 'react-native-svg';
 import TestRenderer, { act } from 'react-test-renderer';
 import { WallElevation } from '../src/components/WallElevation';
@@ -191,5 +191,67 @@ describe('le bandeau de conformité', () => {
       )!;
     act(() => cible.props.onPress());
     expect(textes(tree)).toContain('socles 16 A');
+  });
+});
+
+/**
+ * DEUX SORTIES, ET ELLES NE FONT PAS LA MÊME CHOSE.
+ *
+ * Tout ce qu'on pose face au mur part dans le plan à l'instant même — c'est
+ * ce qui permet de voir la cote bouger en glissant le doigt. La croix ne
+ * fermait donc rien : une prise posée à côté restait dans le plan sans
+ * qu'on sache comment l'annuler.
+ */
+describe('quitter l’établi', () => {
+  it('propose d’enregistrer, et une croix pour renoncer', () => {
+    const vu = textes(rendu());
+    expect(vu).toContain('Enregistrer');
+  });
+
+  it('la croix rend le mur tel qu’on l’a ouvert', () => {
+    const avant: Fixture[] = [
+      { id: 'a', kind: 'prise', wallId: 'n', along: 1, height: 0.25, side: 1 },
+    ];
+    const tree = rendu({ fixtures: avant });
+    // On pose un appareil de plus, comme le ferait le catalogue.
+    act(() => {
+      useScanStore.setState({
+        fixtures: [
+          ...avant,
+          { id: 'b', kind: 'inter', wallId: 'n', along: 2, height: 1.1, side: 1 },
+        ],
+      });
+    });
+    expect(useScanStore.getState().fixtures).toHaveLength(2);
+
+    // La croix : un ordre de restauration part vers le magasin.
+    const croix = tree.root
+      .findAllByType(TouchableOpacity)
+      .find((n) => n.props.accessibilityLabel === 'Fermer sans garder')!;
+    expect(croix).toBeDefined();
+    const alerte = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    act(() => croix.props.onPress());
+    // Elle DEMANDE d'abord : abandonner un quart d'heure de pose sur un
+    // appui malheureux serait pire que le défaut d'origine.
+    expect(alerte).toHaveBeenCalled();
+    const boutons = alerte.mock.calls[0][2] as {
+      text: string;
+      onPress?: () => void;
+    }[];
+    const abandon = boutons.find((b) => b.text === 'Abandonner')!;
+    act(() => abandon.onPress?.());
+    expect(useScanStore.getState().fixtures).toHaveLength(1);
+    alerte.mockRestore();
+  });
+
+  it('et ne demande rien quand rien n’a bougé', () => {
+    const tree = rendu();
+    const croix = tree.root
+      .findAllByType(TouchableOpacity)
+      .find((n) => n.props.accessibilityLabel === 'Fermer sans garder')!;
+    const alerte = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    act(() => croix.props.onPress());
+    expect(alerte).not.toHaveBeenCalled();
+    alerte.mockRestore();
   });
 });
