@@ -662,6 +662,28 @@ const styles = getStyles(c);
           </View>
         </View>
 
+        {/*
+          LA PRÉSENTATION SE LANCE SOUS L'IMAGE QU'ELLE ANIME.
+
+          Elle était posée en pied de page, à côté du bouton du PDF : deux
+          sorties côte à côte, dont une qui n'a rien à voir avec un
+          document. Ici, elle suit immédiatement l'aperçu — on voit le
+          logement, et juste dessous le bouton qui le fait tourner.
+        */}
+        <TouchableOpacity
+          style={styles.visiteButton}
+          accessibilityLabel="Présentation animée"
+          onPress={() => setVisite(true)}>
+          <PlayCircle size={20} color={c.blue} strokeWidth={2.2} />
+          <View style={styles.visiteTextes}>
+            <Text style={styles.visiteText}>Présentation animée</Text>
+            <Text style={styles.visiteSous}>
+              Le logement se présente tout seul, pièce par pièce.
+            </Text>
+          </View>
+          <Text style={styles.visiteChevron}>›</Text>
+        </TouchableOpacity>
+
         {include3D && (
           <>
             <Text style={styles.sheetLabel}>
@@ -710,17 +732,9 @@ const styles = getStyles(c);
         chaque pièce puis face à chaque mur équipé, et un carton annonce ce
         qu'on regarde. On lance, et on laisse regarder.
       */}
-      <View style={styles.sorties}>
-        <TouchableOpacity
-          style={styles.visiteButton}
-          onPress={() => setVisite(true)}>
-          <PlayCircle size={19} color={c.blue} strokeWidth={2.2} />
-          <Text style={styles.visiteText}>Présentation</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.exportButton} onPress={doExport}>
-          <Text style={styles.exportText}>Exporter le PDF</Text>
-        </TouchableOpacity>
-      </View>
+      <TouchableOpacity style={styles.exportButton} onPress={doExport}>
+        <Text style={styles.exportText}>Exporter le PDF</Text>
+      </TouchableOpacity>
       <ClientTour visible={visite} onClose={() => setVisite(false)} />
       <PromptSheet data={prompt} onClose={() => setPrompt(null)} />
       </Animated.View>
@@ -864,30 +878,25 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     textAlign: 'center',
     marginTop: 12,
   },
-  sorties: {
-    flexDirection: 'row',
-    gap: 10,
-    alignItems: 'center',
-    marginBottom: 28,
-    marginTop: 6,
-  },
-  /** La visite : une sortie SECONDAIRE, en creux — le PDF reste l'acte. */
+  /** La visite : une ligne posée sous l'aperçu, pas un second bouton d'acte. */
   visiteButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 7,
+    gap: 12,
     paddingHorizontal: 16,
-    minHeight: 52,
-    borderRadius: radius.pill,
+    minHeight: 60,
+    borderRadius: radius.md,
     backgroundColor: c.surface,
-    borderWidth: 1,
-    borderColor: c.line,
+    marginTop: 10,
   },
-  visiteText: { color: c.blue, fontSize: 14.5, fontWeight: '800' },
+  visiteTextes: { flex: 1, minWidth: 0 },
+  visiteText: { color: c.blue, fontSize: 15, fontWeight: '800' },
+  visiteSous: { color: c.inkFaint, fontSize: 11.5, marginTop: 1 },
+  visiteChevron: { color: c.inkFaint, fontSize: 22, fontWeight: '600' },
   exportButton: {
-    flex: 1,
     backgroundColor: c.blue,
+    marginBottom: 28,
+    marginTop: 6,
     borderRadius: radius.pill,
     paddingVertical: 16,
     alignItems: 'center',

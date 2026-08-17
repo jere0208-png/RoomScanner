@@ -4,8 +4,15 @@ import CoreVideo
 import RoomPlan
 import simd
 
-/// Incidence minimale pour retenir un échantillon (cosinus de l'angle de vue).
-private let kMinIncidence: Float = 0.25
+/**
+ Incidence minimale pour retenir un échantillon (cosinus de l'angle de vue).
+
+ À 0,25, on acceptait jusqu'à 75 degrés de biais : un mur vu presque par la
+ tranche, où un demi-degré d'erreur de pose déplace le point visé de vingt
+ centimètres — assez pour lire le sol, le canapé, ou le mur d'à côté. À
+ 0,5, on ne retient que ce qu'on regarde à moins de soixante degrés.
+ */
+private let kMinIncidence: Float = 0.5
 
 /**
  Relevé des couleurs de la pièce pendant le scan.
@@ -42,34 +49,67 @@ final class RoomColorSampler {
 
   // MARK: - Accumulateurs
 
+  /// Combien d'échantillons on garde par case, et le minimum pour trancher.
+  private static let maxSamples = 24
+  private static let minSamples = 4
+
+  /**
+   L'ACCUMULATEUR GARDE LES ÉCHANTILLONS, il ne les moyenne plus.
+
+   Une moyenne se laisse tirer par n'importe quoi : un seul relevé pris sur
+   le canapé qui masque le bas du mur, et la case entière vire au bleu
+   nuit. Une médiane, non — il faudrait que la MOITIÉ des relevés soient
+   faux pour la tromper, et si la moitié d'une case est cachée par un
+   meuble, c'est qu'on n'aurait pas dû la relever du tout.
+
+   C'est le même raisonnement que pour la tache de neuf pixels, appliqué
+   cette fois à la durée : on scanne une pièce en marchant, chaque case
+   est vue sous des angles et des éclairages différents, et parmi ces vues
+   il y en a toujours quelques-unes qui ne montrent pas le mur.
+   */
   private struct Accum {
-    var sum: [SIMD3<Float>]
-    var count: [Int]
+    var samples: [[SIMD3<Float>]]
     /// Repères géométriques : servent à rattacher un relevé à la surface
     /// finale quand RoomPlan a renuméroté ses identifiants au post-traitement.
     var center = SIMD3<Float>(repeating: 0)
     var axis = SIMD3<Float>(repeating: 0)
 
     init(cells: Int) {
-      sum = Array(repeating: SIMD3<Float>(repeating: 0), count: cells)
-      count = Array(repeating: 0, count: cells)
+      samples = Array(repeating: [], count: cells)
     }
 
     mutating func add(_ i: Int, _ c: SIMD3<Float>) {
-      sum[i] += c
-      count[i] += 1
+      // On garde les premiers relevés : au-delà de vingt-quatre, la
+      // médiane ne bouge plus, et la mémoire, elle, continuerait de monter.
+      if samples[i].count < RoomColorSampler.maxSamples { samples[i].append(c) }
     }
 
-    /// Moyenne globale (toutes cases confondues).
-    var mean: SIMD3<Float>? {
-      var s = SIMD3<Float>(repeating: 0)
-      var n = 0
-      for i in 0..<sum.count { s += sum[i]; n += count[i] }
-      return n > 0 ? s / Float(n) : nil
+    /// La médiane d'un lot, canal par canal.
+    static func median(_ lot: [SIMD3<Float>]) -> SIMD3<Float>? {
+      guard !lot.isEmpty else { return nil }
+      let r = lot.map { $0.x }.sorted()
+      let g = lot.map { $0.y }.sorted()
+      let b = lot.map { $0.z }.sorted()
+      let k = lot.count / 2
+      return SIMD3(r[k], g[k], b[k])
     }
 
+    /// La couleur DOMINANTE de la surface : la médiane de tout ce qu'on a vu.
+    var overall: SIMD3<Float>? {
+      Accum.median(samples.flatMap { $0 })
+    }
+
+    /**
+     La couleur d'une case — seulement si on l'a assez vue.
+
+     Sous quatre relevés, on ne tranche pas : la case reprend la couleur
+     dominante de la surface. C'est ce qui fait qu'un mur uni sort UNI,
+     au lieu du damier qu'on obtenait en donnant à chaque case le peu
+     qu'elle avait vu.
+     */
     func cell(_ i: Int) -> SIMD3<Float>? {
-      count[i] > 0 ? sum[i] / Float(count[i]) : nil
+      guard samples[i].count >= RoomColorSampler.minSamples else { return nil }
+      return Accum.median(samples[i])
     }
   }
 
@@ -80,7 +120,15 @@ final class RoomColorSampler {
   private var walls: [UUID: Accum] = [:]
   private var objects: [UUID: Accum] = [:]
   /// Sol : grille monde à pas fixe, la pièce peut grandir en cours de scan.
-  private var floorTiles: [Int64: (SIMD3<Float>, Int)] = [:]
+  /**
+   Le sol, case par case — et lui aussi garde ses échantillons.
+
+   Une case de sol est vue depuis le couloir, depuis la porte, depuis le
+   milieu de la pièce : entre-temps, un pied de table ou une chaise passe
+   dans le champ. La médiane écarte ces vues-là ; la moyenne les mélangeait
+   au parquet.
+   */
+  private var floorTiles: [Int64: [SIMD3<Float>]] = [:]
 
   // MARK: - Cycle de vie
 
@@ -216,8 +264,9 @@ final class RoomColorSampler {
             (Float(i) + 0.5) * cell, p.y, (Float(j) + 0.5) * cell)
           if let c = img.color(at: world, normal: up) {
             let key = (Int64(i) << 32) | Int64(UInt32(bitPattern: Int32(j)))
-            let cur = floorTiles[key] ?? (SIMD3<Float>(repeating: 0), 0)
-            floorTiles[key] = (cur.0 + c, cur.1 + 1)
+            var lot = floorTiles[key] ?? []
+            if lot.count < Self.maxSamples { lot.append(c) }
+            floorTiles[key] = lot
           }
           j += 1
         }
@@ -264,7 +313,7 @@ final class RoomColorSampler {
   func payload(for s: CapturedRoom.Surface) -> [String: Any] {
     queue.sync { () -> [String: Any] in
       guard let acc = match(s) else { return [:] }
-      guard let mean = acc.mean else { return [:] }
+      guard let mean = acc.overall else { return [:] }
       var out: [String: Any] = ["color": Self.hex(mean)]
       let cols = Self.wallCols
       let rows = Self.wallRows
@@ -279,14 +328,14 @@ final class RoomColorSampler {
 
   func color(for o: CapturedRoom.Object) -> String? {
     queue.sync { () -> String? in
-      if let mean = objects[o.identifier]?.mean { return Self.hex(mean) }
+      if let mean = objects[o.identifier]?.overall { return Self.hex(mean) }
       // Même renumérotation qu'au post-traitement des murs : on rattache le
       // relevé au meuble le plus proche, à défaut d'identifiant commun.
       let m = o.transform
       let center = SIMD3(m.columns.3.x, m.columns.3.y, m.columns.3.z)
       var best: (SIMD3<Float>, Float)?
       for acc in objects.values {
-        guard let mean = acc.mean else { continue }
+        guard let mean = acc.overall else { continue }
         let d = distance(acc.center, center)
         guard d < 0.4 else { continue }
         if best == nil || d < best!.1 { best = (mean, d) }
@@ -328,8 +377,11 @@ final class RoomColorSampler {
       for j in j0...j1 {
         for i in i0...i1 {
           let key = (Int64(i) << 32) | Int64(UInt32(bitPattern: Int32(j)))
-          if let v = floorTiles[key], v.1 > 0 {
-            texels.append(Self.hex(v.0 / Float(v.1)))
+          // Sous quatre relevés, la case reprend la teinte dominante du
+          // sol : un parquet uni sort uni, au lieu d'un damier de hasards.
+          if let lot = floorTiles[key], lot.count >= Self.minSamples,
+             let med = Accum.median(lot) {
+            texels.append(Self.hex(med))
           } else {
             texels.append(Self.hex(mean))
           }
@@ -356,7 +408,7 @@ final class RoomColorSampler {
       var s = SIMD3<Float>(repeating: 0)
       var n = 0
       for acc in walls.values {
-        if let m = acc.mean { s += m; n += 1 }
+        if let m = acc.overall { s += m; n += 1 }
       }
       return n > 0 ? s / Float(n) : nil
     }
@@ -366,7 +418,7 @@ final class RoomColorSampler {
     queue.sync { () -> SIMD3<Float>? in
       var s = SIMD3<Float>(repeating: 0)
       var n = 0
-      for v in floorTiles.values { s += v.0; n += v.1 }
+      for lot in floorTiles.values { for c in lot { s += c; n += 1 } }
       return n > 0 ? s / Float(n) : nil
     }
   }
@@ -470,7 +522,9 @@ private struct FrameImage {
   func color(at world: SIMD3<Float>, normal: SIMD3<Float>) -> SIMD3<Float>? {
     let toCam = camPos - world
     let dist = length(toCam)
-    guard dist > 0.2, dist < 8 else { return nil }
+    // Au-delà de cinq mètres, un pixel couvre plusieurs centimètres de mur
+    // et la moindre erreur de pose fait lire autre chose.
+    guard dist > 0.2, dist < 5 else { return nil }
     // Le signe de la normale dépend de la convention RoomPlan : on ne
     // regarde que l'incidence. L'occultation est traitée par la profondeur.
     guard abs(dot(normal, toCam / dist)) > kMinIncidence else { return nil }
@@ -487,18 +541,29 @@ private struct FrameImage {
     // La marge couvre la tache lue : deux pixels de part et d'autre.
     guard ix >= 10, iy >= 10, ix < width - 10, iy < height - 10 else { return nil }
 
-    if let d = depth {
-      let dw = CVPixelBufferGetWidth(d)
-      let dh = CVPixelBufferGetHeight(d)
-      let dx = min(dw - 1, max(0, Int(u / Float(width) * Float(dw))))
-      let dy = min(dh - 1, max(0, Int(v / Float(height) * Float(dh))))
-      let row = CVPixelBufferGetBaseAddress(d)!
-        .advanced(by: dy * CVPixelBufferGetBytesPerRow(d))
-        .assumingMemoryBound(to: Float32.self)
-      let measured = row[dx]
-      // Quelque chose de nettement plus proche : le point est masqué.
-      if measured > 0.05 && measured < z - 0.25 { return nil }
-    }
+    /**
+     LA PROFONDEUR EST OBLIGATOIRE, ET ELLE DOIT TOMBER JUSTE.
+
+     Elle était facultative — pas de carte de profondeur, pas de vérification
+     — et tolérait vingt-cinq centimètres d'écart. Autant dire qu'un canapé
+     devant un mur passait pour le mur : c'est exactement ce qu'on voyait,
+     un damier de beiges et de gris sur une cloison peinte en vert uni.
+
+     Désormais : sans profondeur, pas d'échantillon ; et le point doit se
+     trouver à huit centimètres près de là où la géométrie l'attend. On
+     relève moins de cases — celles qui restent disent la vérité, et une
+     case sans relevé reprend la teinte dominante de sa surface.
+     */
+    guard let d = depth else { return nil }
+    let dw = CVPixelBufferGetWidth(d)
+    let dh = CVPixelBufferGetHeight(d)
+    let dx = min(dw - 1, max(0, Int(u / Float(width) * Float(dw))))
+    let dy = min(dh - 1, max(0, Int(v / Float(height) * Float(dh))))
+    let row = CVPixelBufferGetBaseAddress(d)!
+      .advanced(by: dy * CVPixelBufferGetBytesPerRow(d))
+      .assumingMemoryBound(to: Float32.self)
+    let measured = row[dx]
+    guard measured > 0.05, abs(measured - z) < 0.08 else { return nil }
 
     /**
      UNE TACHE DE NEUF PIXELS, ET SA MÉDIANE.

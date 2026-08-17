@@ -20,10 +20,11 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Animated,
+  Easing,
   Modal,
   Pressable,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -230,6 +231,64 @@ export function ClientTour({
   /** Avancement du tracé des cotes, ou `null` hors des étapes de mur. */
   const [cotes, setCotes] = useState<number | null>(null);
 
+  /**
+   * LE CARTON CHANGE, ET ÇA SE VOIT.
+   *
+   * Le titre se remplaçait d'une image à l'autre : « Mur nord » devenait
+   * « Mur est » sans que rien ne bouge, et on ne savait pas si on avait
+   * changé de mur ou mal lu. Devant un client, ce silence-là coûte cher :
+   * c'est le moment où il faut qu'il comprenne qu'on passe à autre chose.
+   *
+   * Le carton sort donc par la gauche en s'effaçant, et le suivant entre
+   * par la droite — le geste d'une page qu'on tourne. Les trois éléments
+   * ne partent pas ensemble : le titre mène, le sous-titre suit à quarante
+   * millisecondes, le détail à quatre-vingts. C'est ce décalage qui donne
+   * l'impression d'un mouvement vivant plutôt que d'un bloc qui glisse.
+   */
+  const carton = useRef(new Animated.Value(1)).current;
+  const [vu, setVu] = useState<Etape | null>(null);
+  useEffect(() => {
+    const cible = etapes[Math.min(index, etapes.length - 1)];
+    if (!cible) return;
+    if (vu === cible) return;
+    if (!vu) {
+      setVu(cible);
+      return;
+    }
+    Animated.timing(carton, {
+      toValue: 0,
+      duration: 170,
+      easing: Easing.in(Easing.cubic),
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      if (!finished) return;
+      setVu(cible);
+      Animated.timing(carton, {
+        toValue: 1,
+        duration: 320,
+        easing: Easing.out(Easing.back(1.3)),
+        useNativeDriver: true,
+      }).start();
+    });
+  }, [index, etapes, vu, carton]);
+
+  /** Le décalage d'un élément du carton, selon son rang. */
+  const glisse = (rang: number) => ({
+    opacity: carton.interpolate({
+      inputRange: [0, 0.25 + rang * 0.12, 1],
+      outputRange: [0, 0, 1],
+      extrapolate: 'clamp' as const,
+    }),
+    transform: [
+      {
+        translateX: carton.interpolate({
+          inputRange: [0, 1],
+          outputRange: [26 + rang * 10, 0],
+        }),
+      },
+    ],
+  });
+
   const etape = etapes[Math.min(index, etapes.length - 1)];
   const depart = useRef<View3DParams>(vue);
   const debut = useRef(0);
@@ -348,18 +407,18 @@ export function ClientTour({
         {/* Le carton : il monte du bas, il ne clignote pas. Un titre qu'on
             lit sans effort pendant que le modèle tourne derrière. */}
         <View pointerEvents="none" style={styles.carton}>
-          <Text style={styles.titre} numberOfLines={2}>
-            {etape.titre}
-          </Text>
-          {etape.sous ? (
-            <Text style={styles.sous} numberOfLines={1}>
-              {etape.sous}
-            </Text>
+          <Animated.Text style={[styles.titre, glisse(0)]} numberOfLines={2}>
+            {(vu ?? etape).titre}
+          </Animated.Text>
+          {(vu ?? etape).sous ? (
+            <Animated.Text style={[styles.sous, glisse(1)]} numberOfLines={1}>
+              {(vu ?? etape).sous}
+            </Animated.Text>
           ) : null}
-          {etape.detail ? (
-            <Text style={styles.detail} numberOfLines={3}>
-              {etape.detail}
-            </Text>
+          {(vu ?? etape).detail ? (
+            <Animated.Text style={[styles.detail, glisse(2)]} numberOfLines={3}>
+              {(vu ?? etape).detail}
+            </Animated.Text>
           ) : null}
         </View>
 
