@@ -96,11 +96,22 @@ function monter() {
   return tree;
 }
 
-/** Tous les textes visibles, plans compris. */
+/**
+ * Tous les textes visibles, plans compris.
+ *
+ * Un libellé comme « Hauteur 2,50 m » arrive en TROIS morceaux — le mot,
+ * la valeur interpolée, l'unité. Ne garder que les enfants déjà chaînes
+ * reviendrait à ne jamais voir ces libellés-là, et à croire un bandeau
+ * vide alors qu'il est plein.
+ */
 const textes = (tree: TestRenderer.ReactTestRenderer) =>
   [...tree.root.findAllByType(Text), ...tree.root.findAllByType(SvgText)]
-    .map((n) => n.props.children)
-    .filter((x) => typeof x === 'string')
+    .map((n) =>
+      (Array.isArray(n.props.children) ? n.props.children : [n.props.children])
+        .filter((x: unknown) => typeof x === 'string' || typeof x === 'number')
+        .join(''),
+    )
+    .filter((t) => t.length > 0)
     .join(' | ');
 
 /** Le bouton portant cette étiquette d'accessibilité. */
@@ -207,6 +218,9 @@ describe('l’écran des résultats', () => {
     const vu = textes(tree);
     expect(vu).toContain('Élec');
     expect(vu).toContain('Supprimer');
+    // Et le bandeau du bas donne ses cotes, avec de quoi les changer.
+    expect(vu).toContain('sous plafond');
+    expect(vu).toContain('Coter');
   });
 
   /**
@@ -251,6 +265,40 @@ describe('l’écran des résultats', () => {
     act(() => meuble!.props.onPress());
     act(() => bouton(tree, 'Cotes du meuble')!.props.onPress());
     expect(tree.root.findAllByType(TextInput)).toHaveLength(0);
+  });
+
+  /**
+   * LE BANDEAU DE LA PIÈCE.
+   *
+   * On touche le SOL, en édition : la pièce se nomme, sa hauteur sous
+   * plafond se règle, et on peut la retirer du scan. Hors édition, le sol
+   * ne répond pas — on lit un plan sans le modifier par mégarde.
+   */
+  it('ouvre le bandeau de la pièce quand on touche son sol', () => {
+    const tree = monter();
+    /** Le sol : deux polygones superposés, dont un semis de points. */
+    const sol = () =>
+      tree.root
+        .findAll((n) => typeof n.props?.onPress === 'function')
+        .find(
+          (n) =>
+            n.findAll((x) => x.props?.fill === 'url(#floorDots)').length > 0,
+        );
+
+    expect(sol()).toBeUndefined();
+    act(() => bouton(tree, 'Édition')!.props.onPress());
+    act(() => {
+      jest.advanceTimersByTime(500);
+    });
+    const cible = sol();
+    expect(cible).toBeDefined();
+    act(() => cible!.props.onPress());
+
+    const vu = textes(tree);
+    expect(vu).toContain('Nommer');
+    expect(vu).toMatch(/Hauteur \d/);
+    // Le bandeau annonce la pièce qu'il règle, avec sa surface.
+    expect(vu).toMatch(/Pièce \d/);
   });
 
   /**

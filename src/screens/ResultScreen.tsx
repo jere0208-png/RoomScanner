@@ -34,6 +34,8 @@ import { SidePill } from '../components/SidePill';
 import { CeilingIcon } from '../components/CeilingIcon';
 import { CeilingBar } from '../components/CeilingBar';
 import { ObjectBar } from '../components/ObjectBar';
+import { RoomBar } from '../components/RoomBar';
+import { StripBar } from '../components/StripBar';
 import {
   ANCHOR_TOP,
   PILL_CELL_H,
@@ -1793,79 +1795,50 @@ export function ResultScreen() {
           );
         })()}
 
-        {/* Pièce sélectionnée : la nommer, ou la retirer du scan */}
+        {/*
+          LE BANDEAU DE LA PIÈCE vit dans son propre fichier.
+
+          Nommer, régler la hauteur sous plafond, fusionner deux pièces que
+          le scan a séparées, en scinder une qu'il a réunies, la retirer :
+          cinq gestes qui ne regardent que la pièce, et rien du reste de
+          l'écran.
+        */}
         {vue === '2d' && editMode && !capturing && !selectedObject && !selectedWall &&
           selectedRoomId && targetRoom && (
-            <View style={styles.editBar}>
-              <Text style={styles.editLabel}>
-                {targetRoom.name || 'Pièce sans nom'}
-                {targetPart?.surface
-                  ? ` · ${targetPart.surface.exact ? '' : '≈ '}${fr(
-                      targetPart.surface.area,
-                    )} m² · ${fr(targetExtent.width, 2)} × ${fr(
-                      targetExtent.depth,
-                      2,
-                    )} m`
-                  : ''}
-              </Text>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled">
-                <TouchableOpacity
-                  style={styles.applyButton}
-                  onPress={() => setNaming(true)}>
-                  <Text style={styles.applyText}>Nommer</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.roomAction}
-                  onPress={promptRoomHeight}>
-                  <Text style={styles.roomActionText}>
-                    Hauteur {fr(roomHeight(targetPart?.walls ?? []), 2)} m
-                  </Text>
-                </TouchableOpacity>
-                {rooms.length > 1 && (
-                  <TouchableOpacity
-                    style={styles.roomAction}
-                    onPress={promptMerge}>
-                    <Text style={styles.roomActionText}>Fusionner</Text>
-                  </TouchableOpacity>
-                )}
-                <TouchableOpacity
-                  style={styles.roomAction}
-                  onPress={() => {
-                    splitRoom(selectedRoomId);
-                    setSelectedRoomId(null);
-                  }}>
-                  <Text style={styles.roomActionText}>Scinder</Text>
-                </TouchableOpacity>
-                {rooms.length > 1 && (
-                  <TouchableOpacity
-                    style={styles.removeRoomButton}
-                    onPress={() =>
-                      setMenu({
-                        title: 'Retirer cette pièce ?',
-                        subtitle:
-                          'Ses murs, ouvertures et meubles quittent le plan. ' +
-                          'Rien n’est enregistré tant que vous ne validez pas.',
-                        actions: [
-                          {
-                            label: 'Retirer la pièce',
-                            icon: 'supprimer',
-                            danger: true,
-                            onPress: () => {
-                              removeRoom(selectedRoomId);
-                              setSelectedRoomId(null);
-                            },
-                          },
-                        ],
-                      })
-                    }>
-                    <Text style={styles.removeRoomText}>Retirer</Text>
-                  </TouchableOpacity>
-                )}
-              </ScrollView>
-            </View>
+            <RoomBar
+              room={targetRoom}
+              surface={targetPart?.surface ?? null}
+              extent={targetExtent}
+              hauteur={roomHeight(targetPart?.walls ?? [])}
+              voisines={rooms.filter((r) => r.id !== selectedRoomId).length}
+              styles={styles}
+              onName={() => setNaming(true)}
+              onHeight={promptRoomHeight}
+              onMerge={promptMerge}
+              onSplit={() => {
+                splitRoom(selectedRoomId);
+                setSelectedRoomId(null);
+              }}
+              onRemove={() =>
+                setMenu({
+                  title: 'Retirer cette pièce ?',
+                  subtitle:
+                    'Ses murs, ses meubles et son appareillage quittent le ' +
+                    'plan. Le scan d’origine, lui, ne bouge pas.',
+                  actions: [
+                    {
+                      label: 'Retirer la pièce',
+                      icon: 'supprimer',
+                      danger: true,
+                      onPress: () => {
+                        removeRoom(selectedRoomId);
+                        setSelectedRoomId(null);
+                      },
+                    },
+                  ],
+                })
+              }
+            />
           )}
 
         {vue === '2d' &&
@@ -1904,52 +1877,45 @@ export function ResultScreen() {
             changer. Même bandeau que pour un mur — un seul endroit où
             regarder quand on a touché quelque chose. */}
         {vue === '2d' && editMode && selectedOpening && !capturing && (
-          <View style={styles.wallStrip}>
-            <Text style={styles.wallStripText} numberOfLines={1}>
-              <Text style={styles.wallStripStrong}>
-                {`${fr(segLength(selectedOpening), 2)} × ${fr(
-                  selectedOpening.height,
-                  2,
-                )} m`}
-              </Text>
-              {`  ·  ${
-                selectedOpening.type === 'window'
-                  ? 'fenêtre'
-                  : selectedOpening.type === 'door'
-                  ? 'porte'
-                  : 'baie'
-              }`}
-            </Text>
-            <TouchableOpacity
-              style={styles.wallStripGhost}
-              onPress={() => promptOpening(selectedOpening.id, 'largeur')}>
-              <Text style={styles.wallStripGhostText}>Largeur</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.wallStripAction}
-              onPress={() => promptOpening(selectedOpening.id, 'hauteur')}>
-              <Text style={styles.wallStripActionText}>Hauteur</Text>
-            </TouchableOpacity>
-          </View>
+          <StripBar
+            styles={styles}
+            strong={`${fr(segLength(selectedOpening), 2)} × ${fr(
+              selectedOpening.height,
+              2,
+            )} m`}
+            note={
+              selectedOpening.type === 'window'
+                ? 'fenêtre'
+                : selectedOpening.type === 'door'
+                ? 'porte'
+                : 'baie'
+            }
+            actions={[
+              {
+                label: 'Largeur',
+                ghost: true,
+                onPress: () => promptOpening(selectedOpening.id, 'largeur'),
+              },
+              {
+                label: 'Hauteur',
+                onPress: () => promptOpening(selectedOpening.id, 'hauteur'),
+              },
+            ]}
+          />
         )}
 
         {/* Le mur sélectionné, en une ligne au pied du plan : sa longueur,
             sa hauteur sous plafond, et de quoi les changer. En haut, le
             bandeau mangeait le dessin qu'on est en train de regarder. */}
         {vue === '2d' && !selectedObject && !selectedOpening && editMode && selectedWall && !capturing && (
-          <View style={styles.wallStrip}>
-            <Text style={styles.wallStripText} numberOfLines={1}>
-              <Text style={styles.wallStripStrong}>
-                {fr(segLength(selectedWall), 2)} m
-              </Text>
-              {`  ·  ${fr(selectedWall.height, 2)} m sous plafond`}
-            </Text>
-            <TouchableOpacity
-              style={styles.wallStripAction}
-              onPress={() => promptLength(selectedWall.id)}>
-              <Text style={styles.wallStripActionText}>Coter</Text>
-            </TouchableOpacity>
-          </View>
+          <StripBar
+            styles={styles}
+            strong={`${fr(segLength(selectedWall), 2)} m`}
+            note={`${fr(selectedWall.height, 2)} m sous plafond`}
+            actions={[
+              { label: 'Coter', onPress: () => promptLength(selectedWall.id) },
+            ]}
+          />
         )}
 
         {/* Watermark EchoPlan, visible uniquement sur les images générées */}
