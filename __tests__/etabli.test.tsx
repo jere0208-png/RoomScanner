@@ -310,3 +310,69 @@ describe('les flèches de réglage', () => {
     expect(useScanStore.getState().fixtures[0].along).toBe(fige);
   });
 });
+
+/**
+ * L'EN-TÊTE DE L'ÉTABLI — trois sorties, une légende, et rien qui se marche
+ * dessus.
+ *
+ * Le relevé du chantier : « la croix doit être un bloc de la même hauteur
+ * que le Enregistrer », « 1 meuble cache du texte », « en bas trop de marge
+ * de bloc inutile ». Trois défauts de mise en page, tous vérifiables sans
+ * capture d'écran — et donc tenus ici.
+ */
+describe('la mise en page de l’établi', () => {
+  /** Le style aplati d'un nœud, quel que soit son empilement de tableaux. */
+  const style = (n: TestRenderer.ReactTestInstance) => {
+    const plats = Array.isArray(n.props.style) ? n.props.style : [n.props.style];
+    return Object.assign({}, ...plats.filter(Boolean).flat(Infinity));
+  };
+
+  const boutonNommé = (tree: TestRenderer.ReactTestRenderer, label: string) =>
+    tree.root
+      .findAllByType(TouchableOpacity)
+      .find((n) => n.props.accessibilityLabel === label);
+
+  it('donne à la croix le gabarit du bouton d’enregistrement', () => {
+    const tree = rendu();
+    const croix = boutonNommé(tree, 'Fermer sans garder');
+    expect(croix).toBeDefined();
+    const enregistrer = tree.root
+      .findAllByType(TouchableOpacity)
+      .find((n) =>
+        n
+          .findAllByType(Text)
+          .some((t) => t.props.children === 'Enregistrer'),
+      );
+    expect(enregistrer).toBeDefined();
+    const sc = style(croix!);
+    const se = style(enregistrer!);
+    // Même hauteur : deux sorties voisines se ressemblent.
+    expect(`croix ${sc.height} · vert ${se.height}`).toBe(
+      `croix ${se.height} · vert ${se.height}`,
+    );
+    // Et un bloc, pas une pastille : le rayon n'est plus la moitié du côté.
+    expect(sc.borderRadius).toBeLessThan(sc.height / 2);
+    // La règle des 44 points tient toujours.
+    expect(sc.height).toBeGreaterThanOrEqual(44);
+  });
+
+  it('pose la pastille des meubles DANS le flux, sous la légende', () => {
+    const tree = rendu({ objects: [BIBLIO] });
+    const pastille = boutonNommé(tree, 'Meubles devant ce mur');
+    expect(pastille).toBeDefined();
+    const sp = style(pastille!);
+    // Flottante, elle tombait sur la légende du mur et en cachait la
+    // moitié : plus rien ne se superpose.
+    expect(sp.position).toBeUndefined();
+    expect(sp.alignSelf).toBe('flex-start');
+  });
+
+  it('ne réserve plus toute la hauteur de l’écran', () => {
+    const tree = rendu();
+    // La feuille : le premier View, celui qui porte l'ombre et le fond.
+    const feuille = tree.root.findAllByType(View)[0];
+    const sf = style(feuille);
+    expect(sf.flex).toBeUndefined();
+    expect(sf.maxHeight).toBe('100%');
+  });
+});

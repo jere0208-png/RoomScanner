@@ -3176,8 +3176,10 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   },
   modalTitle: { color: c.ink, fontSize: 17, fontWeight: '800' },
   elecWrap: { width: '100%' },
-  elecWrapPlein: { flex: 1 },
-  elecPlein: { flex: 1 },
+  // L'établi ne s'étire plus jusqu'au bas de l'écran : il fait la taille
+  // de ce qu'il porte, et se pose au milieu de la hauteur libre.
+  elecWrapPlein: { flex: 1, justifyContent: 'center' },
+  elecPlein: { width: '100%' },
   // Plein écran, aux marges près : le pouce a besoin de la place.
   modalBackdropPlein: { padding: 12, paddingTop: 56, justifyContent: 'flex-end' },
   // Diagnostic : un état d'abord — combien, et est-ce grave —, puis la

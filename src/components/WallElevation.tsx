@@ -22,6 +22,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import Svg, {
@@ -162,6 +163,8 @@ export function WallElevation({
   const styles = getStyles(c);
 
   const [layout, setLayout] = useState({ w: 0, h: 0 });
+  /** La hauteur de l'écran : c'est elle qui borne le dessin. */
+  const { height: hauteurEcran } = useWindowDimensions();
   /**
    * La hauteur que réclame CE mur, une fois la largeur connue.
    *
@@ -266,10 +269,23 @@ export function WallElevation({
     if (!face || layout.w <= 0 || !wall) return;
     const utile = Math.max(80, layout.w - 2 * PAD_X);
     const voulue = (utile * wall.height) / Math.max(0.5, face.len);
+    /**
+     * ET IL RESTE DANS L'ÉCRAN.
+     *
+     * Le dessin se calculait sur les seules proportions du mur, la feuille
+     * s'étirait pour l'accueillir, et sur un petit téléphone les commandes
+     * du bas — les cotes, « Ajouter », « Retirer » — sortaient par le bas.
+     * On réserve donc la place des commandes (environ 390 points : bandeau
+     * de conformité, pas de réglage, trois champs, cinq boutons) et le
+     * dessin prend ce qui reste.
+     */
+    const reste = hauteurEcran - 390;
     setHauteurCadre(
-      Math.round(Math.min(430, Math.max(190, voulue + PAD_TOP + PAD_BOTTOM))),
+      Math.round(
+        Math.min(430, Math.max(170, reste), Math.max(190, voulue + PAD_TOP + PAD_BOTTOM)),
+      ),
     );
-  }, [face, wall, layout.w]);
+  }, [face, wall, layout.w, hauteurEcran]);
 
   const holes = useMemo(() => {
     if (!wall || walls.length === 0) return [];
@@ -817,18 +833,56 @@ export function WallElevation({
     <View style={styles.sheet}>
       <View style={styles.header}>
         <View style={styles.headerTexts}>
-          <Text style={styles.title}>
+          <Text style={styles.title} numberOfLines={1}>
             {spec ? spec.label : 'Face au mur'}
           </Text>
-          <Text style={styles.subtitle}>
+          {/*
+            DEUX LIGNES, PAS QUATRE.
+
+            La légende empilait la pièce, le mur, sa longueur, le retour et
+            la règle de l'appareil : quatre lignes de gris sous un titre,
+            qui poussaient les boutons et que la pastille des meubles
+            venait recouvrir. On garde ce qui SITUE (la pièce, le mur, sa
+            longueur) ; la règle de l'appareil, elle, est déjà dite par le
+            bandeau de conformité, juste dessous, là où elle sert.
+          */}
+          <Text style={styles.subtitle} numberOfLines={2}>
             {roomName ? `${roomName} · ` : ''}
             {cardinal
               ? `${cardinal} de ${face.len.toFixed(2).replace('.', ',')} m`
               : `mur de ${face.len.toFixed(2).replace('.', ',')} m`}
             {monRetour ? ` · retour de ${cm(monRetour.x1 - monRetour.x0)} cm` : ''}
-            {spec ? ` · ${spec.note}` : ''}
           </Text>
+          {/*
+            LA PASTILLE DES MEUBLES REVIENT DANS LE FLUX.
+
+            Elle flottait par-dessus l'en-tête, à soixante-deux points du
+            haut : sur un titre de deux lignes elle tombait pile sur la
+            légende et en cachait la moitié. Posée sous la légende, elle
+            ne peut plus rien recouvrir, et elle se lit comme ce qu'elle
+            est : un calque à allumer.
+          */}
+          {meublesDuMur.length > 0 && (
+            <TouchableOpacity
+              style={[styles.calque, voirMeubles && styles.calqueOn]}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityLabel="Meubles devant ce mur"
+              onPress={() => setVoirMeubles((v) => !v)}>
+              <Sofa
+                size={15}
+                color={voirMeubles ? '#FFFFFF' : c.inkSoft}
+                strokeWidth={2}
+              />
+              <Text
+                style={[styles.calqueText, voirMeubles && styles.calqueTextOn]}>
+                {`${meublesDuMur.length} meuble${
+                  meublesDuMur.length > 1 ? 's' : ''
+                }`}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
+        <View style={styles.headerActions}>
         {/* Photo de repérage : trois jours plus tard, la relecture achoppe
             toujours sur « c'était quoi, ce mur ? ». Une photo punaisée y
             répond mieux qu'une note. */}
@@ -932,27 +986,8 @@ export function WallElevation({
           }}>
           <CloseCross size={22} color={c.inkSoft} weight={3} />
         </TouchableOpacity>
+        </View>
       </View>
-
-      {meublesDuMur.length > 0 && (
-        <TouchableOpacity
-          style={[styles.calque, voirMeubles && styles.calqueOn]}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          accessibilityLabel="Meubles devant ce mur"
-          onPress={() => setVoirMeubles((v) => !v)}>
-          <Sofa
-            size={16}
-            color={voirMeubles ? '#FFFFFF' : c.inkSoft}
-            strokeWidth={2}
-          />
-          <Text
-            style={[styles.calqueText, voirMeubles && styles.calqueTextOn]}>
-            {`${meublesDuMur.length} meuble${
-              meublesDuMur.length > 1 ? 's' : ''
-            }`}
-          </Text>
-        </TouchableOpacity>
-      )}
       <View
         style={[styles.canvas, hauteurCadre ? { height: hauteurCadre } : null]}
         onLayout={(e) =>
@@ -1974,18 +2009,27 @@ function Dim({
 
 const getStyles = themedStyles((c: Palette) =>
   StyleSheet.create({
+    /**
+     * LA FEUILLE FAIT LA TAILLE DE CE QU'ELLE PORTE.
+     *
+     * Elle prenait toute la hauteur (`flex: 1`) : sous les commandes,
+     * cent cinquante à trois cents points de blanc, tous les jours, sur
+     * chaque mur. Un établi se juge à ce qu'il porte, pas à la place
+     * qu'il occupe — et le dessin, lui, a déjà sa hauteur propre, calculée
+     * sur les proportions du mur.
+     */
     sheet: {
       backgroundColor: c.surface,
       borderRadius: radius.lg,
       padding: 14,
       width: '100%',
-      // La feuille monte jusqu'en haut : c'est un établi, pas une
-      // notification.
-      flex: 1,
+      maxHeight: '100%',
       ...shadowCard,
     },
     header: { flexDirection: 'row', alignItems: 'flex-start' },
-    headerTexts: { flex: 1, paddingRight: 8 },
+    headerTexts: { flex: 1, paddingRight: 10, minWidth: 0 },
+    /** Les trois sorties alignées, à la même hauteur et au même gabarit. */
+    headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     title: { color: c.ink, fontSize: 17, fontWeight: '800' },
     subtitle: {
       color: c.inkFaint,
@@ -2000,17 +2044,24 @@ const getStyles = themedStyles((c: Palette) =>
       gap: 6,
       // 44 points : la règle d'iOS, que le banc d'essai vérifie bouton
       // par bouton sur cet écran.
-      minHeight: 44,
-      paddingHorizontal: 12,
-      borderRadius: radius.pill,
+      height: 44,
+      paddingHorizontal: 14,
+      borderRadius: radius.md,
       backgroundColor: c.green,
-      marginRight: 8,
     },
     validerText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
+    /**
+     * LA CROIX EST UN BLOC, pas une pastille.
+     *
+     * Ronde et six points plus basse que le bouton vert, elle flottait à
+     * côté de lui : deux sorties voisines qui ne se ressemblaient pas,
+     * dont la plus destructrice était la plus petite. Même hauteur, même
+     * rayon, même famille — le vert garde, le gris abandonne.
+     */
     close: {
-      width: 38,
-      height: 38,
-      borderRadius: 19,
+      width: 44,
+      height: 44,
+      borderRadius: radius.md,
       backgroundColor: c.surfaceSunken,
       alignItems: 'center',
       justifyContent: 'center',
@@ -2047,14 +2098,12 @@ const getStyles = themedStyles((c: Palette) =>
      * des meubles devant lui — sinon il n'a rien à montrer.
      */
     calque: {
-      position: 'absolute',
-      top: 62,
-      left: 22,
-      zIndex: 3,
+      alignSelf: 'flex-start',
+      marginTop: 7,
       flexDirection: 'row',
       alignItems: 'center',
       gap: 6,
-      minHeight: 30,
+      height: 30,
       paddingHorizontal: 10,
       borderRadius: radius.pill,
       backgroundColor: c.surfaceSunken,
@@ -2318,13 +2367,12 @@ const getStyles = themedStyles((c: Palette) =>
     // En gris sur gris, à côté de la croix de fermeture, on ne le voyait
     // pas — et une photo de repérage non prise est une photo perdue.
     photo: {
-      width: 36,
-      height: 36,
-      borderRadius: 13,
+      width: 44,
+      height: 44,
+      borderRadius: radius.md,
       backgroundColor: c.blue,
       alignItems: 'center',
       justifyContent: 'center',
-      marginRight: 8,
     },
     percage: {
       marginTop: 8,
