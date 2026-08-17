@@ -324,82 +324,23 @@ describe('le banc d’épreuve de la vue 3D', () => {
   });
 
   /**
-   * TROISIÈME INVARIANT : un meuble derrière un mur reste derrière.
+   * TROISIÈME INVARIANT : L'ORDRE DE PEINTURE — jugé ailleurs, et mieux.
    *
-   * C'est le défaut corrigé ce matin, éprouvé cette fois sous TOUS les
-   * angles et sur tous les logements — pas seulement sur la scène qui
-   * l'avait révélé.
-   */
-  it('garde chaque meuble derrière le mur qui le masque', () => {
-    for (const logement of LOGEMENTS) {
-      if (logement.objects.length === 0) continue;
-      const { faces } = buildScene(logement.walls, [], logement.objects, {
-        palette: PAL,
-        showSurfaces: true,
-      });
-      const centre = sceneFraming(faces).center;
-      for (const cam of ANGLES) {
-        const project = projecteur(cam, centre, 40);
-        const vues = faces.filter((f) => !isHiddenFace(f, cam));
-        const meubles = vues.filter((f) => f.ownerId);
-        for (const m of meubles) {
-          const dm = faceDepth(m, project, cam);
-          // Le mur qui masque ce meuble : celui dont TOUS les points sont
-          // plus proches de l'œil, et qui le recouvre à l'écran.
-          const devant = vues.filter(
-            (w) =>
-              !w.ownerId &&
-              !w.isFloor &&
-              w.fill !== null &&
-              recouvre(w, m, project) &&
-              plusProche(w, m, project),
-          );
-          for (const w of devant) {
-            expect(dm).toBeLessThanOrEqual(faceDepth(w, project, cam) + 1e-6);
-          }
-        }
-      }
-    }
-  });
-  /**
-   * ET L'INVERSE, QUI MANQUAIT : un meuble DEVANT un mur reste devant.
+   * Deux épreuves vivaient ici : « un meuble derrière un mur reste
+   * derrière » et son inverse. Toutes deux comparaient les EXTRÊMES de deux
+   * faces — une face n'était jugée « devant » que si TOUS ses points
+   * l'étaient. Un meuble adossé à un mur ne remplit jamais cette
+   * condition : son dos touche la maçonnerie. La paire était donc écartée
+   * sans être jugée, et c'est précisément le cas qui a été filmé sur le
+   * chantier — un rangement avalé par le mur contre lequel il s'appuie.
    *
-   * Le banc vérifiait qu'un meuble caché par un mur ne passe pas par-dessus
-   * lui. Il ne vérifiait pas l'autre sens — et c'est celui qu'on voyait à
-   * l'écran : le haut d'une armoire mangé par le mur derrière elle, la tête
-   * de lit disparue. Vue de dessus, le couronnement d'un mur est une bande
-   * large : projetée, elle balaie tout ce qui se tient devant.
+   * `recouvrement.test.ts` juge désormais la même chose comme le fait
+   * l'œil : à un POINT de l'écran couvert par les deux faces, celle qui est
+   * devant doit être peinte en dernier. C'est strictement plus fort, et
+   * c'est ce qui a fait tomber le défaut.
    */
-  it('garde chaque meuble DEVANT le mur qu’il cache', () => {
-    for (const logement of LOGEMENTS) {
-      if (logement.objects.length === 0) continue;
-      const { faces } = buildScene(logement.walls, [], logement.objects, {
-        palette: PAL,
-        showSurfaces: true,
-      });
-      const centre = sceneFraming(faces).center;
-      for (const cam of ANGLES) {
-        const project = projecteur(cam, centre, 40);
-        const vues = faces.filter((f) => !isHiddenFace(f, cam));
-        const meubles = vues.filter((f) => f.ownerId && f.fill !== null);
-        for (const m of meubles) {
-          const dm = faceDepth(m, project, cam);
-          // Les murs que ce meuble cache : ceux qu'il recouvre à l'écran et
-          // qui sont ENTIÈREMENT derrière lui.
-          const derriere = vues.filter(
-            (w) =>
-              !w.ownerId &&
-              !w.isFloor &&
-              w.fill !== null &&
-              recouvre(w, m, project) &&
-              plusProche(m, w, project),
-          );
-          for (const w of derriere) {
-            expect(dm).toBeGreaterThanOrEqual(faceDepth(w, project, cam) - 1e-6);
-          }
-        }
-      }
-    }
+  it('laisse l’ordre de peinture à l’épreuve qui le juge au pixel', () => {
+    expect(true).toBe(true);
   });
 });
 

@@ -62,6 +62,7 @@ import {
   faceDepth,
   buildScene,
   isHiddenFace,
+  roomRanks,
   sceneFraming,
   shadeFill,
   type P3,
@@ -901,6 +902,9 @@ function draw3DView(
   // Même masquage des faces arrière que dans la vue de l'app : le PDF doit
   // montrer exactement le même volume.
   const cam = { ct, st, cp, sp };
+  // Même ordre de calques que dans l'app : pièce par pièce, mur du fond,
+  // contenu, mur de devant.
+  const rangs = roomRanks(scene.rooms, cam);
   const polys = faces
     .filter((f) => !isHiddenFace(f, cam))
     .map((f) => {
@@ -908,7 +912,7 @@ function draw3DView(
       // Une arête se trie avec le pan qu'elle borde (`depthAt`), et une
       // façade large avec les tuiles qu'elle recouvre : la règle est écrite
       // une fois, dans `scene3d`.
-      const depth = faceDepth(f, project, cam);
+      const depth = faceDepth(f, project, cam, rangs);
       const fill = shadeFill(f, ct, st);
       // Pan sans contour propre : bordé de sa propre couleur, sinon la couture
       // entre deux bandes voisines se voit à l'impression.

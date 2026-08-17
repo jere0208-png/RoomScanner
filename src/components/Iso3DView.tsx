@@ -31,6 +31,7 @@ import {
   isHiddenFace,
   sceneFraming,
   shadeFill,
+  roomRanks,
   type P3,
   type Scene,
   type ScenePalette,
@@ -581,6 +582,10 @@ export function Iso3DView({
     // d'être projetées. Un mur ne peut donc plus montrer ses deux faces à la
     // fois, et aucun tri en profondeur n'a à les départager.
     const cam = { ct, st, cp, sp };
+    // Le rang des pièces pour CETTE caméra : de la plus lointaine à la plus
+    // proche. C'est lui qui empêche le mobilier de la pièce voisine de se
+    // voir au travers de la cloison mitoyenne.
+    const rangs = roomRanks(scene.rooms, cam);
     const polys = faces
       .filter((face) => !isHiddenFace(face, cam))
       .map((face) => {
@@ -588,7 +593,9 @@ export function Iso3DView({
       // Une arête se trie avec le pan qu'elle borde (`depthAt`), pas sur sa
       // propre position : sinon l'arête basse d'un mur passe avant lui et le
       // pan la repeint — c'est ce qui effaçait le silhouettage.
-      const depth = faceDepth(face, project, cam);
+      // Le rang de la pièce entre dans le tri : deux pièces ne se
+      // traversent pas, et leurs contenus se peignent l'un après l'autre.
+      const depth = faceDepth(face, project, cam, rangs);
 
       // Lumière liée à la caméra : les pans face à nous sont clairs, ceux de
       // profil s'assombrissent — le volume se lit immédiatement.

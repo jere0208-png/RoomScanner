@@ -109,6 +109,22 @@ const scene = () =>
 /** Les faces d'un mur : celles qui n'appartiennent ni au sol ni à un meuble. */
 const estMur = (f: Face3D) => !f.isFloor && !f.ownerId && f.fill !== null;
 
+/**
+ * LES FACES DU MUR NORD, reconnues à leur CÔTÉ PIÈCE.
+ *
+ * Les repérer à « tous leurs points en z ≈ 0 » attrapait aussi les onglets
+ * des murs est et ouest, qui touchent le coin. Ces murs-là sont vus par la
+ * tranche depuis le nord : leur côté est indécidable, ils tombaient dans
+ * l'autre couche, et l'épreuve mesurait un mur qu'elle croyait être le bon.
+ * La normale vers la pièce, elle, ne trompe pas : le mur nord est le seul
+ * qui regarde vers les z croissants.
+ */
+const duMurNord = (f: Face3D) =>
+  estMur(f) &&
+  !!f.roomSide &&
+  f.roomSide.z > 0.9 &&
+  f.pts.every((p) => Math.abs(p.z) < 0.2);
+
 describe('l’ordre de peinture entre un meuble et le mur qui le cache', () => {
   it('reconnaît la scène de piège', () => {
     const faces = scene().faces;
@@ -127,10 +143,7 @@ describe('l’ordre de peinture entre un meuble et le mur qui le cache', () => {
   it('l’armoire se peint AVANT le mur qui la masque', () => {
     const faces = scene().faces.filter((f) => !f.isFloor);
     const meuble = faces.filter((f) => f.ownerId === 'o1');
-    // Les panneaux du mur nord : ceux dont tous les points sont en z ≈ 0.
-    const murNord = faces.filter(
-      (f) => estMur(f) && f.pts.every((p) => Math.abs(p.z) < 0.2),
-    );
+    const murNord = faces.filter(duMurNord);
     expect(meuble.length).toBeGreaterThan(0);
     expect(murNord.length).toBeGreaterThan(0);
 
@@ -154,8 +167,7 @@ describe('l’ordre de peinture entre un meuble et le mur qui le cache', () => {
     const murNord = scene()
       .faces.filter(
         (f) =>
-          estMur(f) &&
-          f.pts.every((p) => Math.abs(p.z) < 0.2) &&
+          duMurNord(f) &&
           Math.max(...f.pts.map((p) => p.y)) -
             Math.min(...f.pts.map((p) => p.y)) >
             0.1,
@@ -192,13 +204,13 @@ describe('l’ordre de peinture entre un meuble et le mur qui le cache', () => {
     const meuble = faces.filter((f) => f.ownerId === 'o2');
     const murNord = faces.filter(
       (f) =>
-        estMur(f) &&
-        f.pts.every((p) => Math.abs(p.z) < 0.2) &&
+        duMurNord(f) &&
         Math.max(...f.pts.map((p) => p.y)) -
           Math.min(...f.pts.map((p) => p.y)) >
           0.1,
     );
     expect(meuble.length).toBeGreaterThan(0);
+    expect(murNord.length).toBeGreaterThan(0);
     const dMeuble = Math.max(...meuble.map((f) => faceDepth(f, project, CAM)));
     const dMur = Math.min(...murNord.map((f) => faceDepth(f, project, CAM)));
     expect(dMeuble).toBeLessThan(dMur);

@@ -72,6 +72,27 @@ export interface Face3D {
   /** Trait pointillé : réservé aux passages, qui sont des vides. */
   dashed?: boolean;
   /**
+   * LA PIÈCE À LAQUELLE CETTE FACE APPARTIENT, et de quel côté elle regarde.
+   *
+   * Le tri du peintre range les faces sur UN nombre : leur profondeur. Deux
+   * surfaces qui se croisent à l'écran n'ont pourtant pas d'ordre unique —
+   * un mur de trois mètres passe devant un lit à un bout et derrière à
+   * l'autre. Aucun nombre ne dit les deux, et c'est ce qui faisait
+   * disparaître un meuble sous un mur en tournant le modèle.
+   *
+   * On ajoute donc au tri ce que la géométrie sait de façon SÛRE : une
+   * pièce est une boîte, et pour un œil donné il n'y a que trois couches —
+   * les murs qu'on voit PAR L'INTÉRIEUR (ils sont derrière tout le
+   * contenu), le contenu lui-même, et les murs qu'on voit PAR L'EXTÉRIEUR
+   * (ils sont devant tout). C'est vrai sous tous les angles, sans exception
+   * ni réglage.
+   *
+   * `roomSide` est la normale du mur tournée vers sa pièce : c'est elle qui
+   * dit, pour une caméra donnée, de quel côté on se trouve.
+   */
+  roomId?: string;
+  roomSide?: P3;
+  /**
    * Point dont la profondeur classe la face, à la place de son propre centre.
    *
    * Une ARÊTE doit se trier avec le pan qu'elle borde, pas pour elle-même :
@@ -161,23 +182,70 @@ export interface CameraTrig {
  * la lecture, seulement à l'impression — le genre d'écart qu'on découvre
  * sur un plan déjà remis au client.
  */
+/** Écart entre deux couches : plus grand que toute profondeur réelle. */
+const COUCHE = 1e4;
+/** Écart entre deux pièces : plus grand que trois couches. */
+const PIECE = 1e6;
+
+/**
+ * OÙ SE RANGE CETTE FACE, avant même de regarder sa profondeur.
+ *
+ * Trois couches par pièce, dans cet ordre : les murs vus de l'intérieur
+ * (derrière tout), le contenu — mobilier, appareillage, gaines —, puis les
+ * murs vus de l'extérieur (devant tout). Et les pièces entre elles se
+ * rangent de la plus lointaine à la plus proche : sans quoi le mobilier de
+ * la chambre voisine se verrait au travers de la cloison mitoyenne.
+ */
+function couche(face: Face3D, cam: CameraTrig): number {
+  if (!face.roomSide) return COUCHE;
+  const vers =
+    face.roomSide.x * cam.st * cam.sp +
+    face.roomSide.y * cam.cp +
+    face.roomSide.z * cam.ct * cam.sp;
+  // On voit le côté pièce : le mur est AU FOND, derrière son contenu.
+  return vers > 0 ? 0 : 2 * COUCHE;
+}
+
 export function faceDepth(
   face: Face3D,
   project: (p: P3) => { depth: number },
   cam: CameraTrig,
+  /** Rang de chaque pièce, de la plus lointaine (0) à la plus proche. */
+  rangs?: Map<string, number>,
 ): number {
   // Le sol passe avant tout : il ne peut rien masquer.
   if (face.isFloor) return -Infinity;
+  const rang = rangs && face.roomId ? (rangs.get(face.roomId) ?? 0) : 0;
+  const calage = rang * PIECE + couche(face, cam);
   const bias = face.bias ?? 0;
   if (face.depthRefs && face.depthRefs.length > 0) {
     const ds = face.depthRefs.map((r) => project(r).depth);
     const n = face.depthFacing;
     const vers = n ? n.x * cam.st * cam.sp + n.y * cam.cp + n.z * cam.ct * cam.sp : 1;
-    return (vers >= 0 ? Math.max(...ds) : Math.min(...ds)) + bias;
+    return calage + (vers >= 0 ? Math.max(...ds) : Math.min(...ds)) + bias;
   }
-  if (face.depthAt) return project(face.depthAt).depth + bias;
+  if (face.depthAt) return calage + project(face.depthAt).depth + bias;
   return (
-    face.pts.reduce((s, p) => s + project(p).depth, 0) / face.pts.length + bias
+    calage +
+    face.pts.reduce((s, p) => s + project(p).depth, 0) / face.pts.length +
+    bias
+  );
+}
+
+/**
+ * Le rang de chaque pièce pour cette caméra : la plus lointaine d'abord.
+ *
+ * Deux pièces ne se traversent pas : leurs contenus se peignent l'un après
+ * l'autre, dans l'ordre où l'œil les rencontre. Le centre suffit à les
+ * ordonner — elles ne s'interpénètrent pas.
+ */
+export function roomRanks(rooms: SceneRoom[], cam: CameraTrig): Map<string, number> {
+  const cle = (r: SceneRoom) =>
+    (r.centroid.x * cam.st + r.centroid.z * cam.ct) * cam.sp;
+  return new Map(
+    [...rooms]
+      .sort((a, b) => cle(a) - cle(b))
+      .map((r, i) => [r.roomId, i] as [string, number]),
   );
 }
 
@@ -901,6 +969,20 @@ export function buildScene(
       texOnPlus: plusIsInner,
     };
 
+    /**
+     * La normale du mur tournée VERS SA PIÈCE.
+     *
+     * C'est elle qui dira au tri, pour une caméra donnée, si l'on regarde
+     * ce mur du dedans (il est alors au fond, derrière le mobilier) ou du
+     * dehors (il est devant tout).
+     */
+    const versLaPiece: P3 = {
+      x: plusIsInner ? nrm.x : -nrm.x,
+      y: 0,
+      z: plusIsInner ? nrm.z : -nrm.z,
+    };
+    const avantMur = faces.length;
+
     const mine = holes.get(w.id) ?? [];
     for (const panel of wallPanels(mine, w.height)) {
       pushWallBlock(q, panel.t0, panel.t1, panel.y0, panel.y1, {
@@ -972,6 +1054,13 @@ export function buildScene(
         // La menuiserie appartient au plan du mur : elle s'y classe avec lui.
         depthY: w.height / 2,
       });
+    }
+
+    // Tout ce que ce mur vient de poser — pans, chants, couronnement,
+    // menuiseries — appartient à sa pièce et regarde du même côté.
+    for (let i = avantMur; i < faces.length; i++) {
+      faces[i].roomId = roomOf(w);
+      faces[i].roomSide = versLaPiece;
     }
   }
 
@@ -1303,6 +1392,16 @@ export function buildScene(
       // L'appareil appartient à une FACE de mur : il n'existe que pour qui
       // regarde ce côté-là.
       fa.facing = { x: face.nx, y: 0, z: face.nz };
+      /*
+        ET IL SE PEINT AVEC LE CONTENU DE LA PIÈCE QU'IL DESSERT.
+
+        Un appareil est posé SUR un mur, mais il se voit depuis la pièce :
+        il appartient donc à la couche du contenu, entre le mur du fond et
+        le mur de devant. Sans ça, une prise se rangeait avec la maçonnerie
+        et le mobilier lui passait dessus.
+      */
+      fa.roomId = roomOf(w);
+      fa.roomSide = undefined;
       const nf = fa.normal;
       const devant = !!nf && nf.x * face.nx + nf.z * face.nz > 0.9;
       // La façade se compare à TOUTES les tuiles qu'elle recouvre. Les
@@ -1398,6 +1497,7 @@ export function buildScene(
         shade: true,
         normal: outwardOf(p, q),
         ownerId: `cl-${cl.id}`,
+        roomId: cl.roomId,
         depthAt: centre,
       });
     }
@@ -1414,10 +1514,19 @@ export function buildScene(
         shade: false,
         normal: { x: 0, y: sens, z: 0 },
         ownerId: `cl-${cl.id}`,
+        roomId: cl.roomId,
         depthAt: centre,
       });
     }
   }
+
+  /** La pièce dont le contour contient ce point, s'il y en a une. */
+  const pieceDuPoint = (p: Pt): string | undefined =>
+    parts.find(
+      (part) =>
+        (part.surface?.pts.length ?? 0) >= 3 &&
+        pointInPolygon(p, part.surface!.pts),
+    )?.roomId;
 
   // ------------------------------------------------------------ meubles
   // Un meuble n'est recalé que contre les murs de SA pièce : sinon la
@@ -1679,6 +1788,16 @@ export function buildScene(
     for (let i = avantMeuble; i < faces.length; i++) {
       const f = faces[i];
       f.ownerId = obj.id;
+      /*
+        LA PIÈCE D'UN MEUBLE SE LIT SUR LE PLAN, pas sur son étiquette.
+
+        Le scanner ne dit pas toujours à quelle pièce appartient un meuble :
+        `roomOf` retombe alors sur une pièce par défaut, qui n'est celle
+        d'aucun mur. Le meuble se rangeait donc dans une couche à lui, et
+        les murs des vraies pièces lui passaient dessus. On cherche donc le
+        contour qui le CONTIENT ; l'étiquette ne sert que de recours.
+      */
+      f.roomId = pieceDuPoint({ x: obj.cx, z: obj.cz }) ?? roomOf(source);
       if (f.isFloor) continue;
       f.depthFacing = triCote;
       if (!adosse) {
