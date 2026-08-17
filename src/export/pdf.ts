@@ -1057,6 +1057,34 @@ type PlanOverlay = (
   box: { x: number; y: number; w: number; h: number },
 ) => void;
 
+/**
+ * OÙ POINTE UN CAP SUR LA FEUILLE.
+ *
+ * Trois repères se superposent ici, et il suffit d'en retourner un pour
+ * imprimer une boussole qui ment : le monde du scan (où le nord se trouve
+ * à « moins north » degrés de l'axe −Z, comme dans la vue 3D), la TRAME
+ * (le plan est redressé avant projection), et la page (dont l'axe Y monte,
+ * alors que le Z du monde descend sur le dessin).
+ *
+ * Le signe du nord était pris à l'envers : la rose imprimée était le
+ * MIROIR de la réalité dès que le scan n'avait pas démarré plein nord —
+ * est et ouest échangés — alors que les murs, sur la même feuille,
+ * portaient les bons noms (« mur nord », « mur est ») : la feuille se
+ * contredisait elle-même. Si l'erreur a tenu si longtemps, c'est qu'à
+ * nord = 0 les deux calculs tombent juste ensemble.
+ *
+ * Le banc d'épreuve vérifie désormais l'accord entre l'aiguille et le nom
+ * du mur, sur des dizaines de caps et de trames.
+ */
+export function northPageDir(
+  bearing: number,
+  north: number,
+  trame: number,
+): { x: number; y: number } {
+  const a = ((bearing - north) * Math.PI) / 180 - trame;
+  return { x: Math.sin(a), y: Math.cos(a) };
+}
+
 function planPage(
   ctx: SheetContext,
   sheet: string,
@@ -1760,12 +1788,8 @@ function planPage(
   if (ctx.north !== null && ctx.north !== undefined) {
     const cx = FRAME.x + FRAME.w - 44;
     const cy = TETE - 12;
-    // Le plan est redressé sur la trame : le nord tourne d'autant.
-    const a0 = ((ctx.north - (planFrameAngle(walls) * 180) / Math.PI) * Math.PI) / 180;
-    const dir = (deg: number) => {
-      const a = a0 + (deg * Math.PI) / 180;
-      return { x: Math.sin(a), y: Math.cos(a) };
-    };
+    const nord = ctx.north;
+    const dir = (deg: number) => northPageDir(deg, nord, planFrameAngle(walls));
     d.circle(cx, cy, 17, '#FFFFFF');
     d.poly(
       [

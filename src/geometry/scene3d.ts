@@ -1468,25 +1468,33 @@ export function buildScene(
         0,
       ) || 2.5;
     /**
-     * Et sur TOUTE SON EMPRISE quand il est ADOSSÉ à un mur.
+     * Et CHAQUE MORCEAU SUR PLACE quand il est ADOSSÉ à un mur.
      *
      * Un rangement d'un mètre vu en biais déborde de vingt-cinq centimètres
      * de part et d'autre de son centre : le pan de mur qui longe son bout le
-     * plus proche se trouvait alors devant le point de tri et derrière le
-     * meuble, et il le repeignait — le meuble d'angle tranché en deux.
+     * plus proche se trouvait devant le point de tri et derrière le meuble,
+     * et il le repeignait — le meuble d'angle tranché en deux. On avait
+     * donc donné au meuble entier la profondeur de son bout le PLUS PROCHE.
      *
-     * On lui donne donc ce qu'on donne déjà à une plaque électrique : une
-     * série de points répartis le long du mur qu'il touche, avancés de sa
-     * saillie, plus le CÔTÉ vers lequel il regarde. Vu de la pièce, le tri
-     * retient le point le plus proche et le meuble passe après tout ce qu'il
-     * masque ; vu de dos, il retient le plus lointain et le mur le couvre.
+     * Le banc d'épreuve a montré le revers : un meuble de deux mètres vu en
+     * enfilade se triait alors tout entier comme son bout le plus proche,
+     * quatre-vingts centimètres devant sa vraie place — et son arête haute
+     * passait par-dessus le couronnement du mur qui aurait dû la masquer.
+     * Un bout de trait au-dessus du mur, sur vingt configurations.
      *
-     * Prendre le seul point le plus proche, sans ce côté, ferait passer le
-     * meuble devant les cloisons situées entre lui et l'œil : les deux
-     * réglages ne valent que pris ensemble.
+     * On garde donc l'idée — se trier sur le PLAN DU MEUBLE, avancé de sa
+     * saillie devant le nu du mur — mais chaque morceau s'y projette À SA
+     * PROPRE ABSCISSE. Le meuble bat son mur partout où il le couvre
+     * (il est devant, de toute sa saillie), et nulle part ailleurs. Le côté
+     * n'a plus à être dit : vu de dos, le plan avancé est naturellement
+     * derrière la maçonnerie, et le mur le couvre.
      */
     let triRefs: P3[] = [{ x: obj.cx, y: hauteurTri / 2, z: obj.cz }];
     let triCote: P3 | undefined;
+    /** Le mur auquel il est adossé : de quoi projeter chaque morceau. */
+    let adosse:
+      | { ax: number; az: number; ux: number; uz: number; ox: number; oz: number }
+      | undefined;
     {
       const murs = wallsOf.get(roomOf(source)) ?? walls;
       let best = Infinity;
@@ -1512,21 +1520,26 @@ export function buildScene(
         if (jeu > 0.12) continue;
         best = Math.abs(d);
         const sens = d >= 0 ? 1 : -1;
-        // Demi-emprise LE LONG du mur : de quoi couvrir toute sa largeur.
-        const long =
-          Math.abs(cosY * u.x + sinY * u.z) * (obj.width / 2) +
-          Math.abs(-sinY * u.x + cosY * u.z) * (obj.depth / 2);
         const saillie = Math.abs(d) + demi;
-        const N = 5;
-        triRefs = Array.from({ length: N }, (_, k) => {
-          const e = -long + (2 * long * k) / (N - 1);
-          return {
-            x: obj.cx + u.x * e + n.x * sens * (saillie - Math.abs(d)),
+        // Le plan de tri du meuble : le nu du mur, avancé de sa saillie.
+        // Chaque morceau s'y projettera à son abscisse — plus besoin de
+        // mesurer son emprise le long du mur, sa propre position suffit.
+        adosse = {
+          ax: w.a.x,
+          az: w.a.z,
+          ux: u.x,
+          uz: u.z,
+          ox: n.x * sens * saillie,
+          oz: n.z * sens * saillie,
+        };
+        triRefs = [
+          {
+            x: w.a.x + u.x * (t * len) + n.x * sens * saillie,
             y: hauteurTri / 2,
-            z: obj.cz + u.z * e + n.z * sens * (saillie - Math.abs(d)),
-          };
-        });
-        triCote = { x: n.x * sens, y: 0, z: n.z * sens };
+            z: w.a.z + u.z * (t * len) + n.z * sens * saillie,
+          },
+        ];
+        triCote = undefined;
       }
     }
 
@@ -1544,12 +1557,64 @@ export function buildScene(
       for (const part of morceaux) poser(part);
     }
     for (let i = avantMeuble; i < faces.length; i++) {
-      faces[i].ownerId = obj.id;
-      if (faces[i].isFloor) continue;
-      faces[i].depthRefs = triRefs;
-      faces[i].depthFacing = triCote;
+      const f = faces[i];
+      f.ownerId = obj.id;
+      if (f.isFloor) continue;
+      f.depthFacing = triCote;
+      if (!adosse) {
+        f.depthRefs = triRefs;
+        continue;
+      }
+      // Le milieu du morceau, ramené sur le plan avancé du meuble.
+      let cx = 0;
+      let cz = 0;
+      for (const p of f.pts) {
+        cx += p.x;
+        cz += p.z;
+      }
+      cx /= f.pts.length;
+      cz /= f.pts.length;
+      const e = (cx - adosse.ax) * adosse.ux + (cz - adosse.az) * adosse.uz;
+      f.depthRefs = undefined;
+      f.depthAt = {
+        x: adosse.ax + adosse.ux * e + adosse.ox,
+        y: hauteurTri / 2,
+        z: adosse.az + adosse.uz * e + adosse.oz,
+      };
     }
   }
 
-  return { faces, rooms, floorY };
+  return { faces: faces.filter(nonDegenere), rooms, floorY };
+}
+
+/**
+ * UNE FACE D'AIRE NULLE N'EST PAS INVISIBLE : ELLE DESSINE UN TRAIT.
+ *
+ * Un chant de mur dont les deux nus se rejoignent — ça arrive à l'about
+ * d'un mur biais, où l'onglet réduit l'épaisseur à rien — sort du
+ * constructeur comme un quadrilatère plat. Son aplat ne couvre aucun
+ * pixel, mais son CONTOUR, lui, trace une barre verticale en plein milieu
+ * du dessin, et le tri en profondeur la place où il veut. C'est une de ces
+ * « arêtes fantômes » qu'on voyait traîner sur le modèle.
+ *
+ * Le banc d'épreuve la trouve toute seule : elle passait devant un meuble
+ * qu'elle aurait dû laisser voir.
+ *
+ * Le seuil est large — un centimètre carré — et sans danger : le plus
+ * petit élément du modèle, un mécanisme de prise, en fait vingt.
+ */
+function nonDegenere(f: Face3D): boolean {
+  // Un trait (deux points) n'a pas d'aire : ce n'est pas une face.
+  if (f.pts.length < 3) return true;
+  let nx = 0;
+  let ny = 0;
+  let nz = 0;
+  for (let i = 0; i < f.pts.length; i++) {
+    const a = f.pts[i];
+    const b = f.pts[(i + 1) % f.pts.length];
+    nx += (a.y - b.y) * (a.z + b.z);
+    ny += (a.z - b.z) * (a.x + b.x);
+    nz += (a.x - b.x) * (a.y + b.y);
+  }
+  return Math.hypot(nx, ny, nz) / 2 > 1e-4;
 }
