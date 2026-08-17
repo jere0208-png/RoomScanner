@@ -38,6 +38,7 @@ import { FloorplanEditor } from '../components/FloorplanEditor';
 import { WallElevation } from '../components/WallElevation';
 import { SidePill } from '../components/SidePill';
 import { CeilingIcon } from '../components/CeilingIcon';
+import { Compass } from 'lucide-react-native';
 import {
   DEFAULT_VIEW3D,
   Iso3DView,
@@ -358,6 +359,14 @@ export function ResultScreen() {
   );
   /** Repères électriques en 3D : un calque comme les autres. */
   const [showElecTags, setShowElecTags] = useState(true);
+  /**
+   * Les points cardinaux : un calque, lui aussi.
+   *
+   * Ils disent de quel mur on parle — et sur un plan serré, quatre
+   * pastilles au bord prennent la place des cotes qu'on est venu lire. Ils
+   * se cachent donc comme les meubles ou les surfaces.
+   */
+  const [showNorth, setShowNorth] = useState(true);
   const [editMode, setEditMode] = useState(false);
   /**
    * Jeu de pastilles affiché. Il RETARDE sur `editMode` : les anciennes
@@ -1204,6 +1213,7 @@ export function ResultScreen() {
             selectedRoomId={selectedRoomId}
             ceiling={ceiling}
             showCeiling={showCeiling}
+            showNorth={showNorth}
             selectedCeilingId={selCeiling}
             placing={!!pendingCeiling || !!pendingSpots}
             onPlaceAt={(at) => {
@@ -1357,6 +1367,7 @@ export function ResultScreen() {
           <Iso3DView
             showMeasures={show3DMeasures}
             showElecTags={showElecTags}
+            showNorth={showNorth}
             value={view3d}
             onChange={setView3d}
             focusRoomId={rooms[focusIdx]?.id ?? null}
@@ -1539,6 +1550,20 @@ export function ResultScreen() {
                     active={showSurfaces}
                     onPress={() => setShowSurfaces(!showSurfaces)}
                   />,
+                  <ToolPill
+                    key="nord"
+                    icon="square"
+                    label="Nord"
+                    node={
+                      <Compass
+                        size={22}
+                        color={showNorth ? '#FFFFFF' : teinte.ink}
+                        strokeWidth={2}
+                      />
+                    }
+                    active={showNorth}
+                    onPress={() => setShowNorth((v) => !v)}
+                  />,
                   // Le plafond se cache pour revoir le sol : superposés,
                   // les deux calques deviennent illisibles.
                   ...(ceiling.length > 0
@@ -1589,6 +1614,19 @@ export function ResultScreen() {
               label="Surfaces"
               active={showSurfaces}
               onPress={() => setShowSurfaces(!showSurfaces)}
+            />
+            <ToolPill
+              icon="square"
+              label="Nord"
+              node={
+                <Compass
+                  size={22}
+                  color={showNorth ? '#FFFFFF' : teinte.ink}
+                  strokeWidth={2}
+                />
+              }
+              active={showNorth}
+              onPress={() => setShowNorth((v) => !v)}
             />
             {/* Murs pleins ou écorché : l'écorché montre la pièce, les murs
                 pleins montrent le bâti. Ni l'un ni l'autre n'a toujours
@@ -2875,6 +2913,7 @@ function ToolPill({
   label,
   active,
   onPress,
+  node,
   halo,
 }: {
   icon: ToolIcon;
@@ -2889,6 +2928,8 @@ function ToolPill({
   label?: string;
   active: boolean;
   onPress: () => void;
+  /** Une icône toute faite, quand le jeu maison n'en a pas. */
+  node?: React.ReactNode;
   /**
    * Actif = un contour bleu, pastille laissée blanche.
    *
@@ -2939,6 +2980,9 @@ function ToolPill({
         )}
         {/* La pastille garde ses 36 px : seul le tracé grossit, pour se
             lire d'un coup d'œil sans élargir la barre d'outils. */}
+        {/* Une icône de bibliothèque l'emporte sur le jeu maison : celui-ci
+            couvre les gestes de l'app, pas tout le vocabulaire du métier. */}
+        {node ?? (
         <Svg width={22} height={22} viewBox="0 0 24 24">
           {TOOL_PATHS[icon].map((seg, i) => (
             <Path
@@ -2952,6 +2996,7 @@ function ToolPill({
             />
           ))}
         </Svg>
+        )}
       </TouchableOpacity>
       {label ? (
         <Text

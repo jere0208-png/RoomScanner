@@ -34,6 +34,7 @@ import { View } from 'react-native';
 import { Text as SvgText } from 'react-native-svg';
 import TestRenderer, { act } from 'react-test-renderer';
 import { FloorplanEditor } from '../src/components/FloorplanEditor';
+import { Iso3DView } from '../src/components/Iso3DView';
 import { useScanStore } from '../src/store/scanStore';
 
 import type { WallSeg } from '../src/geometry/floorplan';
@@ -161,5 +162,58 @@ describe('les quatre lettres autour du plan', () => {
    */
   it('et disparaissent quand le scan n’a pas de cap', () => {
     expect(lettres(rendu(null)).size).toBe(0);
+  });
+});
+
+/**
+ * ET LA MÊME COURONNE EN 3D.
+ *
+ * C'est là qu'on tourne autour du logement jusqu'à ne plus savoir quel mur
+ * on regarde — le plan, lui, garde toujours le même sens. L'angle se calcule
+ * autrement : la caméra tourne et s'incline, donc une direction du monde
+ * s'aplatit à l'écran. Le dessin, lui, est le même.
+ */
+describe('la vue 3D', () => {
+  const rendu3d = (north: number | null, theta: number) => {
+    let tree!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      useScanStore.setState({
+        walls: W,
+        openings: [],
+        objects: [],
+        rooms: [{ id: 'r1', name: 'Séjour', floor: null }],
+        fixtures: [],
+        photos: [],
+        north,
+      });
+      tree = TestRenderer.create(
+        <Iso3DView value={{ theta, tilt: 58, zoom: 1, ox: 0, oy: 0 }} />,
+      );
+    });
+    act(() => {
+      const zone = tree.root
+        .findAllByType(View)
+        .find((n) => typeof n.props.onLayout === 'function')!;
+      zone.props.onLayout({ nativeEvent: { layout: TAILLE } });
+    });
+    precedent = tree;
+    return tree;
+  };
+
+  it('porte les quatre lettres, elle aussi', () => {
+    expect(lettres(rendu3d(0, 0)).size).toBe(4);
+  });
+
+  it('et elles suivent la rotation de la caméra', () => {
+    const droit = lettres(rendu3d(0, 0));
+    const tourne = lettres(rendu3d(0, 90));
+    const N1 = droit.get('N')!;
+    const N2 = tourne.get('N')!;
+    // Un quart de tour de caméra déplace le nord d'un bord à l'autre.
+    expect(Math.hypot(N1.x - N2.x, N1.y - N2.y)).toBeGreaterThan(50);
+  });
+
+  it('et se taisent sans cap, comme sur le plan', () => {
+    expect(lettres(rendu3d(null, 0)).size).toBe(0);
   });
 });

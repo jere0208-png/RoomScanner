@@ -36,6 +36,7 @@ import {
 } from '../geometry/scene3d';
 import { hiddenByBox } from '../geometry/furniture';
 import { floorsOf, useScanStore } from '../store/scanStore';
+import { CardinalRing } from './CardinalRing';
 import {
   FIXTURES,
   assemblyTag,
@@ -99,6 +100,8 @@ interface Props {
   showElecTags?: boolean;
   /** N'afficher qu'une pièce : ses murs, son sol, ses meubles. */
   focusRoomId?: string | null;
+  /** Les points cardinaux autour de la vue, comme sur le plan. */
+  showNorth?: boolean;
 }
 
 /**
@@ -120,6 +123,7 @@ export function Iso3DView({
   showMeasures,
   showElecTags = true,
   focusRoomId,
+  showNorth = true,
 }: Props) {
   const walls = useScanStore((s) => s.walls);
   const openings = useScanStore((s) => s.openings);
@@ -129,6 +133,7 @@ export function Iso3DView({
     () => (showFurniture ? allObjects : []),
     [showFurniture, allObjects],
   );
+  const north = useScanStore((s) => s.north);
   const colorOpenings = useScanStore((s) => s.showOpeningColors);
   const showSurfaces = useScanStore((s) => s.showSurfaces);
   const showTextures = useScanStore((s) => s.showTextures);
@@ -1087,6 +1092,32 @@ export function Iso3DView({
                   </SvgText>
                 </G>
               ),
+            )}
+            {/*
+              LES POINTS CARDINAUX, ici aussi.
+
+              Le plan les portait, pas la 3D — et c'est pourtant là qu'on
+              tourne autour du logement jusqu'à ne plus savoir quel mur on
+              regarde. L'angle se calcule autrement : la caméra tourne et
+              s'incline, donc une direction du monde s'aplatit à l'écran.
+              Le dessin, lui, est le même que sur le plan.
+            */}
+            {showNorth && north !== null && (
+              <CardinalRing
+                w={layout.w}
+                h={layout.h}
+                angleOf={(bearing) => {
+                  // La direction du monde pour ce cap, dans le repère du
+                  // scan : le nord y est à −`north` degrés de l'axe −Z.
+                  const b = ((bearing - north) * Math.PI) / 180;
+                  const dx = Math.sin(b);
+                  const dz = -Math.cos(b);
+                  const ct = Math.cos(rad(view.theta));
+                  const st = Math.sin(rad(view.theta));
+                  const cp = Math.cos(rad(view.tilt));
+                  return Math.atan2((dx * st + dz * ct) * cp, dx * ct - dz * st);
+                }}
+              />
             )}
           </Svg>
         </View>
