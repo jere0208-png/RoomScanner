@@ -1,0 +1,425 @@
+/**
+ * LA PRÉSENTATION CLIENT — le relevé qui se raconte tout seul.
+ *
+ * Montrer un plan à un client, c'est aujourd'hui lui tendre le téléphone et
+ * tourner le modèle du doigt en commentant : « là c'est la chambre, la prise
+ * est sur ce mur… ». Ça marche, et ça ne se délègue pas — l'électricien doit
+ * être là, le doigt sur l'écran, et il montre toujours la même chose deux
+ * fois par visite.
+ *
+ * Cette visite guidée joue la même chose sans lui : le logement tourne, la
+ * caméra s'arrête sur chaque pièce puis se place FACE à chaque mur équipé,
+ * et un carton annonce ce qu'on regarde — « Mur nord · Chambre », les
+ * appareils qui s'y trouvent, nommés comme sur le dossier. On la lance et on
+ * laisse le client regarder.
+ *
+ * Ce n'est pas un fichier vidéo, et il faut le dire franchement : produire
+ * un .mp4 demanderait d'encoder les images une par une côté natif. En
+ * attendant, l'enregistrement d'écran d'iOS capture cette visite en un
+ * geste, et le résultat s'envoie comme n'importe quelle vidéo.
+ */
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { Pause, Play, X } from 'lucide-react-native';
+import { Iso3DView, type View3DParams } from './Iso3DView';
+import {
+  radius,
+  shadowCard,
+  themedStyles,
+  useTheme,
+  type Palette,
+} from '../theme';
+import {
+  roomParts,
+  segLength,
+  type Pt,
+  type WallSeg,
+} from '../geometry/floorplan';
+import { FIXTURES } from '../geometry/electrical';
+import { deviceNames, wallCardinal } from '../geometry/naming';
+import { fixturePlacement, roomInputsOf } from '../geometry/nfc15100';
+import { useScanStore } from '../store/scanStore';
+
+/** Un moment de la visite : une caméra d'arrivée, un carton, une durée. */
+interface Etape {
+  /** Ce qu'on annonce, en haut. */
+  titre: string;
+  sous?: string;
+  /** Le détail, en bas — les appareils du mur, par exemple. */
+  detail?: string;
+  /** Pièce isolée pendant l'étape, ou `null` pour le logement entier. */
+  roomId: string | null;
+  /** Caméra visée. Le mouvement s'y rend en douceur depuis la précédente. */
+  vue: View3DParams;
+  /** Tour d'horizon pendant l'étape, en degrés (0 = caméra fixe). */
+  balayage: number;
+  /** Durée, en millisecondes. */
+  duree: number;
+}
+
+const lissage = (t: number) =>
+  t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+
+const fr1 = (v: number) => v.toFixed(1).replace('.', ',');
+
+/**
+ * L'AZIMUT QUI MET UN MUR DE FACE.
+ *
+ * La vue projette un point du monde en tournant le plan de `theta` : la
+ * profondeur y suit la direction (sin θ, cos θ). Regarder un mur de face,
+ * c'est donc aligner cette direction sur sa normale — celle qui va du
+ * centre de la pièce vers le mur, puisque la caméra se tient dans la pièce.
+ */
+function azimutFaceAuMur(wall: WallSeg, centre: Pt): number {
+  const milieu = {
+    x: (wall.a.x + wall.b.x) / 2,
+    z: (wall.a.z + wall.b.z) / 2,
+  };
+  const dx = milieu.x - centre.x;
+  const dz = milieu.z - centre.z;
+  return (Math.atan2(dx, dz) * 180) / Math.PI;
+}
+
+export function ClientTour({
+  visible,
+  onClose,
+}: {
+  visible: boolean;
+  onClose: () => void;
+}) {
+  const c = useTheme();
+  const styles = getStyles(c);
+  const walls = useScanStore((s) => s.walls);
+  const rooms = useScanStore((s) => s.rooms);
+  const fixtures = useScanStore((s) => s.fixtures);
+  const ceiling = useScanStore((s) => s.ceiling);
+  const north = useScanStore((s) => s.north);
+  const scanName = useScanStore((s) => s.scanName);
+
+  /**
+   * LE SCÉNARIO, tiré du plan lui-même.
+   *
+   * Rien n'est écrit à la main : les pièces viennent du relevé, les murs de
+   * leur géométrie, les noms d'appareils du même calcul que le dossier
+   * imprimé. Un plan modifié change donc la visite, sans qu'on y touche.
+   */
+  const etapes = useMemo<Etape[]>(() => {
+    const parts = roomParts(walls, rooms);
+    const centres = new Map(parts.map((p) => [p.roomId, p.labelAt]));
+    const placement = fixturePlacement(fixtures, walls, roomInputsOf(rooms, parts));
+    const noms = deviceNames(
+      fixtures,
+      walls,
+      placement,
+      Object.fromEntries(rooms.map((r) => [r.id, r.name])),
+      centres,
+      north,
+    );
+    const surface = parts.reduce((t, p) => t + (p.surface?.area ?? 0), 0);
+    const out: Etape[] = [];
+
+    // 1. Le logement entier, qui tourne : on prend la mesure du volume.
+    out.push({
+      titre: scanName || 'Le logement',
+      sous: `${rooms.length} pièce${rooms.length > 1 ? 's' : ''} · ${fr1(
+        surface,
+      )} m² · ${fixtures.length} appareil${fixtures.length > 1 ? 's' : ''}`,
+      roomId: null,
+      vue: { theta: -32, tilt: 56, zoom: 1, ox: 0, oy: 0 },
+      balayage: 300,
+      duree: 7000,
+    });
+
+    for (const room of rooms) {
+      const part = parts.find((p) => p.roomId === room.id);
+      const centre = centres.get(room.id);
+      if (!part || !centre) continue;
+      const murs = part.walls
+        .map((w) => walls.find((x) => x.id === w.id))
+        .filter((w): w is WallSeg => !!w && segLength(w) > 0.4);
+
+      // 2. La pièce, isolée et vue en tournant : on la reconnaît.
+      out.push({
+        titre: room.name || 'Pièce',
+        sous: part.surface
+          ? `${fr1(part.surface.area)} m² · ${murs.length} murs`
+          : undefined,
+        roomId: room.id,
+        vue: { theta: -32, tilt: 52, zoom: 1.15, ox: 0, oy: 0 },
+        balayage: 200,
+        duree: 5200,
+      });
+
+      // 3. Chaque mur ÉQUIPÉ, vu de face, avec ses appareils nommés.
+      for (const w of murs) {
+        const dessus = fixtures.filter((f) => f.wallId === w.id);
+        if (dessus.length === 0) continue;
+        const aire = wallCardinal(w, centre, north);
+        out.push({
+          titre: aire
+            ? `Mur ${aire} · ${room.name || 'pièce'}`
+            : `Mur de ${fr1(segLength(w))} m · ${room.name || 'pièce'}`,
+          sous: `${dessus.length} appareil${dessus.length > 1 ? 's' : ''}`,
+          detail: dessus
+            .map((f) => noms.get(f.id)?.nom ?? FIXTURES[f.kind].label)
+            .join(' · '),
+          roomId: room.id,
+          vue: {
+            theta: azimutFaceAuMur(w, centre),
+            tilt: 34,
+            zoom: 1.5,
+            ox: 0,
+            oy: 0,
+          },
+          balayage: 26,
+          duree: 4200,
+        });
+      }
+    }
+
+    // 4. Le mot de la fin : ce qu'il y a dans le devis, en trois chiffres.
+    out.push({
+      titre: 'Installation complète',
+      sous: `${fixtures.length} appareil${fixtures.length > 1 ? 's' : ''}${
+        ceiling.length > 0
+          ? ` · ${ceiling.length} au plafond`
+          : ''
+      } · ${fr1(surface)} m²`,
+      detail: 'Plans, schémas et liste du matériel dans le dossier PDF.',
+      roomId: null,
+      vue: { theta: 148, tilt: 62, zoom: 0.95, ox: 0, oy: 0 },
+      balayage: 120,
+      duree: 6000,
+    });
+    return out;
+  }, [walls, rooms, fixtures, ceiling, north, scanName]);
+
+  const [index, setIndex] = useState(0);
+  const [joue, setJoue] = useState(true);
+  const [vue, setVue] = useState<View3DParams>(etapes[0]?.vue ?? {
+    theta: -32,
+    tilt: 56,
+    zoom: 1,
+    ox: 0,
+    oy: 0,
+  });
+  const [avance, setAvance] = useState(0);
+
+  const etape = etapes[Math.min(index, etapes.length - 1)];
+  const depart = useRef<View3DParams>(vue);
+  const debut = useRef(0);
+  const boucle = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /** Remet la visite à son début — à l'ouverture, et à la fin. */
+  const rembobiner = useCallback(() => {
+    setIndex(0);
+    setAvance(0);
+    depart.current = etapes[0]?.vue ?? vue;
+    setVue(etapes[0]?.vue ?? vue);
+    debut.current = 0;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [etapes]);
+
+  useEffect(() => {
+    if (visible) {
+      rembobiner();
+      setJoue(true);
+    }
+  }, [visible, rembobiner]);
+
+  /**
+   * LE MOUVEMENT — une horloge, pas une animation native.
+   *
+   * Ce qu'on anime n'est pas un style mais les paramètres d'une caméra que
+   * la vue 3D reprojette : ça passe forcément par JavaScript. On tient donc
+   * notre propre horloge, à trente images par seconde — assez pour que le
+   * mouvement soit fluide, assez peu pour que le rendu d'un logement entier
+   * suive sans saccader.
+   */
+  useEffect(() => {
+    if (!visible || !joue || !etape) return;
+    let vivant = true;
+    const t0 = Date.now() - debut.current;
+    const tick = () => {
+      if (!vivant) return;
+      const passe = Date.now() - t0;
+      const t = Math.min(1, passe / etape.duree);
+      // Deux temps : on rejoint la caméra de l'étape sur le premier tiers,
+      // puis on balaie doucement — arriver ET tourner en même temps donne
+      // un mouvement mou, qui ne montre rien.
+      const arrivee = lissage(Math.min(1, t / 0.34));
+      const d = depart.current;
+      const a = etape.vue;
+      const balaye = etape.balayage * Math.max(0, (t - 0.2) / 0.8);
+      setVue({
+        theta: d.theta + (a.theta - d.theta) * arrivee + balaye,
+        tilt: d.tilt + (a.tilt - d.tilt) * arrivee,
+        zoom: d.zoom + (a.zoom - d.zoom) * arrivee,
+        ox: 0,
+        oy: 0,
+      });
+      setAvance(t);
+      debut.current = passe;
+      if (t >= 1) {
+        depart.current = {
+          ...a,
+          theta: a.theta + etape.balayage,
+        };
+        debut.current = 0;
+        if (index + 1 < etapes.length) setIndex(index + 1);
+        else setJoue(false);
+        return;
+      }
+      boucle.current = setTimeout(tick, 33);
+    };
+    tick();
+    return () => {
+      vivant = false;
+      if (boucle.current) clearTimeout(boucle.current);
+    };
+  }, [visible, joue, etape, index, etapes.length]);
+
+  if (!etape) return null;
+
+  return (
+    <Modal visible={visible} animationType="fade" onRequestClose={onClose}>
+      <View style={styles.plein}>
+        <Iso3DView
+          value={vue}
+          showMeasures={false}
+          showElecTags={false}
+          showNorth={false}
+          focusRoomId={etape.roomId}
+        />
+
+        {/* Le carton : il monte du bas, il ne clignote pas. Un titre qu'on
+            lit sans effort pendant que le modèle tourne derrière. */}
+        <View pointerEvents="none" style={styles.carton}>
+          <Text style={styles.titre} numberOfLines={2}>
+            {etape.titre}
+          </Text>
+          {etape.sous ? (
+            <Text style={styles.sous} numberOfLines={1}>
+              {etape.sous}
+            </Text>
+          ) : null}
+          {etape.detail ? (
+            <Text style={styles.detail} numberOfLines={3}>
+              {etape.detail}
+            </Text>
+          ) : null}
+        </View>
+
+        {/* La barre d'avancement : une graduation par étape, remplie au fur
+            et à mesure. On sait toujours où on en est, et combien il reste. */}
+        <View pointerEvents="none" style={styles.rail}>
+          {etapes.map((_, i) => (
+            <View key={i} style={styles.railCase}>
+              <View
+                style={[
+                  styles.railFill,
+                  {
+                    width: `${
+                      i < index ? 100 : i === index ? avance * 100 : 0
+                    }%`,
+                  },
+                ]}
+              />
+            </View>
+          ))}
+        </View>
+
+        <View style={styles.commandes}>
+          <TouchableOpacity
+            style={styles.rond}
+            accessibilityLabel={joue ? 'Pause' : 'Reprendre'}
+            onPress={() => {
+              if (!joue && index === etapes.length - 1 && avance >= 1) {
+                rembobiner();
+              }
+              setJoue((v) => !v);
+            }}>
+            {joue ? (
+              <Pause size={20} color="#FFFFFF" strokeWidth={2.4} />
+            ) : (
+              <Play size={20} color="#FFFFFF" strokeWidth={2.4} />
+            )}
+          </TouchableOpacity>
+          <Pressable
+            style={styles.rond}
+            accessibilityLabel="Fermer la présentation"
+            onPress={onClose}>
+            <X size={20} color="#FFFFFF" strokeWidth={2.6} />
+          </Pressable>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+const getStyles = themedStyles((c: Palette) =>
+  StyleSheet.create({
+    plein: { flex: 1, backgroundColor: c.bg, paddingTop: 40 },
+    carton: {
+      position: 'absolute',
+      left: 20,
+      right: 20,
+      bottom: 108,
+      backgroundColor: c.surface,
+      borderRadius: radius.md,
+      paddingHorizontal: 18,
+      paddingVertical: 14,
+      ...shadowCard,
+      shadowOpacity: 0.12,
+      shadowRadius: 18,
+    },
+    titre: { color: c.ink, fontSize: 22, fontWeight: '900', letterSpacing: -0.4 },
+    sous: { color: c.blue, fontSize: 13.5, fontWeight: '800', marginTop: 3 },
+    detail: {
+      color: c.inkSoft,
+      fontSize: 12.5,
+      lineHeight: 17,
+      marginTop: 7,
+    },
+    rail: {
+      position: 'absolute',
+      top: 52,
+      left: 20,
+      right: 20,
+      flexDirection: 'row',
+      gap: 4,
+    },
+    railCase: {
+      flex: 1,
+      height: 3,
+      borderRadius: 2,
+      backgroundColor: c.line,
+      overflow: 'hidden',
+    },
+    railFill: { height: 3, backgroundColor: c.blue, borderRadius: 2 },
+    commandes: {
+      position: 'absolute',
+      right: 20,
+      bottom: 44,
+      flexDirection: 'row',
+      gap: 10,
+    },
+    rond: {
+      width: 46,
+      height: 46,
+      borderRadius: 23,
+      backgroundColor: c.ink,
+      alignItems: 'center',
+      justifyContent: 'center',
+      ...shadowCard,
+      shadowOpacity: 0.16,
+    },
+  }),
+);

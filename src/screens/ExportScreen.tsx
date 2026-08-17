@@ -35,6 +35,8 @@ import { fixtureMarks, multiWire, schemaRows } from '../geometry/schema';
 import { planRoutes } from '../geometry/elecplan';
 import { floorsOf, useScanStore } from '../store/scanStore';
 import { deviceNames } from '../geometry/naming';
+import { ClientTour } from '../components/ClientTour';
+import { PlayCircle } from 'lucide-react-native';
 import type { CeilingFixture } from '../geometry/ceiling';
 
 interface PlanView {
@@ -268,6 +270,8 @@ const styles = getStyles(c);
    * celui qu'on envoie au client.
    */
   const [elevations, setElevations] = useState(false);
+  /** La visite guidée, plein écran : ce qu'on montre au client. */
+  const [visite, setVisite] = useState(false);
   const parts = useMemo(() => roomParts(walls, rooms), [walls, rooms]);
   const placement = useMemo(
     () => fixturePlacement(fixtures, walls, roomInputsOf(rooms, parts)),
@@ -652,9 +656,27 @@ const styles = getStyles(c);
         </Text>
       </ScrollView>
 
-      <TouchableOpacity style={styles.exportButton} onPress={doExport}>
-        <Text style={styles.exportText}>Exporter le PDF</Text>
-      </TouchableOpacity>
+      {/*
+        DEUX SORTIES, DEUX PUBLICS.
+
+        Le PDF part chez le fournisseur et sur le chantier ; il ne se montre
+        pas à un client dans son salon. La visite guidée, elle, joue le
+        relevé toute seule — le logement tourne, la caméra s'arrête sur
+        chaque pièce puis face à chaque mur équipé, et un carton annonce ce
+        qu'on regarde. On lance, et on laisse regarder.
+      */}
+      <View style={styles.sorties}>
+        <TouchableOpacity
+          style={styles.visiteButton}
+          onPress={() => setVisite(true)}>
+          <PlayCircle size={19} color={c.blue} strokeWidth={2.2} />
+          <Text style={styles.visiteText}>Présentation</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.exportButton} onPress={doExport}>
+          <Text style={styles.exportText}>Exporter le PDF</Text>
+        </TouchableOpacity>
+      </View>
+      <ClientTour visible={visite} onClose={() => setVisite(false)} />
       </Animated.View>
     </View>
   );
@@ -777,13 +799,33 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     textAlign: 'center',
     marginTop: 12,
   },
+  sorties: {
+    flexDirection: 'row',
+    gap: 10,
+    alignItems: 'center',
+    marginBottom: 28,
+    marginTop: 6,
+  },
+  /** La visite : une sortie SECONDAIRE, en creux — le PDF reste l'acte. */
+  visiteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    paddingHorizontal: 16,
+    minHeight: 52,
+    borderRadius: radius.pill,
+    backgroundColor: c.surface,
+    borderWidth: 1,
+    borderColor: c.line,
+  },
+  visiteText: { color: c.blue, fontSize: 14.5, fontWeight: '800' },
   exportButton: {
+    flex: 1,
     backgroundColor: c.blue,
     borderRadius: radius.pill,
     paddingVertical: 16,
     alignItems: 'center',
-    marginBottom: 28,
-    marginTop: 6,
     ...glow(c.blue),
   },
   exportText: { color: '#FFFFFF', fontSize: 15.5, fontWeight: '700' },
