@@ -140,3 +140,70 @@ describe('qui porte le voile, dans la scène', () => {
     }
   });
 });
+
+/**
+ * UNE MENUISERIE N'A PAS DE FLANCS À ELLE.
+ *
+ * Elle était bâtie comme un bloc de mur : ses six faces, dont deux chants
+ * peints à la couleur du vitrage. Or ces chants tombent EXACTEMENT sur le
+ * tableau du mur, que les panneaux voisins dessinent déjà en maçonnerie.
+ * Deux surfaces au même endroit, et c'est le tri en profondeur qui décide
+ * laquelle gagne : selon l'angle, on voyait l'épaisseur du mur peinte en
+ * bleu vitrage.
+ */
+describe('les faces d’une ouverture', () => {
+  const MURS: WallSeg[] = [
+    mur('n', 0, 0, 4, 0),
+    mur('e', 4, 0, 4, 3),
+    mur('s', 4, 3, 0, 3),
+    mur('w', 0, 3, 0, 0),
+  ];
+  const FENETRE: WallSeg = {
+    id: 'f1',
+    type: 'window',
+    a: { x: 1.4, z: 0 },
+    b: { x: 2.6, z: 0 },
+    height: 1.15,
+    yCenter: 1.5,
+    roomId: 'r1',
+  };
+
+  it('sont DEUX : une par face du mur, et pas un chant de plus', () => {
+    const faces = buildScene(MURS, [FENETRE], [], {
+      palette: PAL,
+      colorOpenings: true,
+    }).faces;
+    const vitrage = faces.filter((f) => f.fill === PAL.window);
+    expect(vitrage.length).toBeGreaterThan(0);
+    /**
+     * Le vitrage ne regarde que dans DEUX directions : vers la pièce et
+     * vers l'extérieur. Une troisième normale signifierait un chant —
+     * c'est-à-dire une surface posée exactement sur le tableau du mur,
+     * que les panneaux voisins dessinent déjà en maçonnerie. Deux
+     * surfaces au même endroit, et c'est le tri qui décide laquelle
+     * gagne : selon l'angle, l'épaisseur du mur sortait en bleu.
+     */
+    const normales = new Set(
+      vitrage
+        .filter((f) => f.normal)
+        .map((f) => `${Math.round(f.normal!.x * 50)}:${Math.round(f.normal!.z * 50)}`),
+    );
+    expect(normales.size).toBe(2);
+  });
+
+  it('et le tableau reste de la maçonnerie', () => {
+    const faces = buildScene(MURS, [FENETRE], [], {
+      palette: PAL,
+      colorOpenings: true,
+    }).faces;
+    // Les chants du mur nord (normales le long du mur, donc ±x) existent
+    // toujours : ce sont eux qui bordent la baie.
+    const chants = faces.filter(
+      (f) =>
+        f.fill === PAL.wall &&
+        f.normal &&
+        Math.abs(f.normal.x) > 0.9,
+    );
+    expect(chants.length).toBeGreaterThan(0);
+  });
+});

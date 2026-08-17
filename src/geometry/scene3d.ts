@@ -762,6 +762,16 @@ export function buildScene(
       closeBottom?: boolean;
       /** Ombrage selon l'orientation (les meubles restent en aplat). */
       shade?: boolean;
+      /**
+       * Seulement les deux grandes faces — ni chants, ni dessus, ni dessous.
+       *
+       * Une menuiserie n'a pas de flancs à elle : ses flancs, c'est le
+       * TABLEAU DU MUR, que les panneaux voisins dessinent déjà en
+       * maçonnerie. Les dessiner aussi, c'est poser deux surfaces au même
+       * endroit — et laisser le tri décider laquelle gagne. On voyait donc
+       * l'épaisseur du mur peinte en bleu vitrage, selon l'angle.
+       */
+      facesSeules?: boolean;
     },
   ) => {
     if (t1 - t0 < 1e-4 || yt - yb < 1e-4) return;
@@ -800,6 +810,7 @@ export function buildScene(
     face(r2, p2, o.texOnPlus ? undefined : o.tex, t1, t0, {
       cutaway: dehors === undefined ? undefined : !!o.texOnPlus,
     });
+    if (o.facesSeules) return;
     // Tableaux (chants) : trop étroits pour mériter un découpage.
     face(p2, p1);
     face(r1, r2);
@@ -899,8 +910,12 @@ export function buildScene(
         stroke: paint,
         topStroke: mixHex(paint, '#FFFFFF', 0.3),
         captured: !!captured,
-        shrink: 0,
-        closeBottom: true,
+        // Légèrement en retrait, mais SANS flancs : le tableau du mur est
+        // dessiné par les panneaux voisins, en maçonnerie. Deux surfaces au
+        // même endroit se disputaient l'affichage — d'où l'épaisseur bleue
+        // qui apparaîssait sur le côté d'une fenêtre selon l'angle.
+        shrink: 0.06,
+        facesSeules: true,
       });
     }
   }
