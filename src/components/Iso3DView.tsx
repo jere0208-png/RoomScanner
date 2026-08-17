@@ -163,14 +163,6 @@ interface Props {
  * que le plan 2D : murs épais extrudés, portes/fenêtres, meubles.
  * Un doigt : tourner/incliner. Deux doigts : pincer pour zoomer, déplacer.
  */
-/**
- * À partir de cette échelle, un meuble qui cache un appareil s'efface.
- *
- * 110 px/m, c'est le moment où l'on regarde UN mur plutôt qu'un logement :
- * on cherche alors où tombe la prise, pas à quoi ressemble la pièce.
- */
-const ZOOM_FONDU = 110;
-
 export function Iso3DView({
   value,
   onChange,
@@ -695,14 +687,6 @@ export function Iso3DView({
           area: string;
         };
     const items: Item[] = polys.map((p) => ({ kind: 'poly' as const, ...p }));
-    /**
-     * Les meubles à effacer : ceux qui cachent un appareil, une fois zoomé.
-     *
-     * Rempli par la passe électrique plus bas, appliqué à la toute fin :
-     * on ne sait qu'un meuble gêne qu'après avoir cherché ce qu'il cache.
-     */
-    const fondus = new Set<string>();
-
     // Semis du sol : même code que le plan 2D, projeté sur le plan y = 0.
     // C'est ce fond pointillé qui distingue la surface au sol des murs.
     if (showSurfaces && !interacting) {
@@ -818,10 +802,6 @@ export function Iso3DView({
          * et « ce meuble est transparent », deux affirmations qui ne
          * tiennent pas ensemble. En mode plein, on ne fond plus rien.
          */
-        if (!solidWalls && scale >= ZOOM_FONDU) {
-          for (const b of cachePar) fondus.add(b.id);
-        }
-
         // Tant que la plaque est trop petite pour se voir, un point de sa
         // couleur en tient lieu ; il s'efface à mesure qu'elle grandit.
         const taille = (x1 - x0) * scale;
@@ -872,11 +852,16 @@ export function Iso3DView({
           // La désignation en toutes lettres, POSÉE SUR l'appareil. Le
           // symbole gravé se réduisait à trois traits gris : un mot se lit.
           // Caché et vu de loin : pas de mot, juste le point de couleur.
-          nom:
-            scale > 70 && (cachePar.length === 0 || scale >= ZOOM_FONDU)
-              ? assemblyTag(postes)
-              : undefined,
-          derriere: cachePar.length > 0 && scale < ZOOM_FONDU,
+          nom: scale > 70 ? assemblyTag(postes) : undefined,
+          /*
+            CACHÉ PAR UN MEUBLE : le repère le dit, à tous les zooms.
+
+            Ce drapeau ne valait qu'en dessous du zoom où le meuble
+            s'effaçait — au-delà, l'appareil n'était plus « derrière »
+            puisqu'on avait rendu le meuble fantôme. Le meuble reste
+            maintenant plein : l'appareil est derrière lui, point.
+          */
+          derriere: cachePar.length > 0,
           bx: qb.sx,
           by: qb.sy,
           sx: qs.sx,
@@ -957,19 +942,20 @@ export function Iso3DView({
       }
     }
 
-    /**
-     * Les meubles qui cachent un appareil s'effacent, une fois zoomé.
-     *
-     * Pas de disparition : un fantôme à 22 %, qui garde sa silhouette et
-     * son arête. On doit comprendre que la prise est DERRIÈRE le rangement,
-     * pas croire que le rangement n'existe pas.
-     */
-    if (fondus.size > 0) {
-      for (const it of items) {
-        if (it.kind !== 'poly' || !it.owner) continue;
-        if (fondus.has(it.owner)) it.voile = Math.min(it.voile, 0.22);
-      }
-    }
+    /*
+      LE FONDU DES MEUBLES A ÉTÉ RETIRÉ — il effaçait pour rien.
+
+      Un meuble qui cachait un appareil passait à 22 % d'opacité une fois
+      zoomé : c'est ce qui faisait « disparaître » le haut d'un rangement
+      ou une tête de lit, d'un angle à l'autre, sans qu'on comprenne
+      pourquoi. Deux meubles voisins détectés séparément par le scanner —
+      le cas courant — et c'est la moitié d'une armoire qui s'évapore.
+
+      Or le repère d'appareil est déjà peint PAR-DESSUS toute la géométrie
+      (`depth: 1e6`, quelques lignes plus haut) : la prise derrière le
+      rangement se voit de toute façon. On effaçait donc le meuble pour
+      découvrir ce qui était déjà visible.
+    */
 
     items.sort((p, q) => p.depth - q.depth);
     return items;

@@ -361,6 +361,46 @@ describe('le banc d’épreuve de la vue 3D', () => {
       }
     }
   });
+  /**
+   * ET L'INVERSE, QUI MANQUAIT : un meuble DEVANT un mur reste devant.
+   *
+   * Le banc vérifiait qu'un meuble caché par un mur ne passe pas par-dessus
+   * lui. Il ne vérifiait pas l'autre sens — et c'est celui qu'on voyait à
+   * l'écran : le haut d'une armoire mangé par le mur derrière elle, la tête
+   * de lit disparue. Vue de dessus, le couronnement d'un mur est une bande
+   * large : projetée, elle balaie tout ce qui se tient devant.
+   */
+  it('garde chaque meuble DEVANT le mur qu’il cache', () => {
+    for (const logement of LOGEMENTS) {
+      if (logement.objects.length === 0) continue;
+      const { faces } = buildScene(logement.walls, [], logement.objects, {
+        palette: PAL,
+        showSurfaces: true,
+      });
+      const centre = sceneFraming(faces).center;
+      for (const cam of ANGLES) {
+        const project = projecteur(cam, centre, 40);
+        const vues = faces.filter((f) => !isHiddenFace(f, cam));
+        const meubles = vues.filter((f) => f.ownerId && f.fill !== null);
+        for (const m of meubles) {
+          const dm = faceDepth(m, project, cam);
+          // Les murs que ce meuble cache : ceux qu'il recouvre à l'écran et
+          // qui sont ENTIÈREMENT derrière lui.
+          const derriere = vues.filter(
+            (w) =>
+              !w.ownerId &&
+              !w.isFloor &&
+              w.fill !== null &&
+              recouvre(w, m, project) &&
+              plusProche(m, w, project),
+          );
+          for (const w of derriere) {
+            expect(dm).toBeGreaterThanOrEqual(faceDepth(w, project, cam) - 1e-6);
+          }
+        }
+      }
+    }
+  });
 });
 
 /** Les deux projections se chevauchent-elles à l'écran ? */
