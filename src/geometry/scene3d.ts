@@ -252,6 +252,28 @@ export interface SceneOptions {
    */
   ceiling?: CeilingFixture[];
   /**
+   * LES GAINES, en volume.
+   *
+   * Le plan les montrait en tireté, la 3D pas du tout : on préparait un
+   * chantier sur un modèle qui ne disait pas où passe le conduit. Ce sont
+   * des TUBES, posés dans la chape et remontés au nu du mur jusqu'à
+   * l'appareil — de quoi lire un cheminement sans le déduire.
+   */
+  routes?: { id: string; path: Pt[] }[];
+  /**
+   * LE PLAFOND PLEIN — seulement pour la visite intérieure.
+   *
+   * Vue de dessus, une pièce coiffée n'est plus une pièce : on ne voit que
+   * des dalles. Vue de l'INTÉRIEUR, une pièce sans plafond n'en est pas
+   * une non plus — on lève les yeux et on voit le vide. Le modèle porte
+   * donc la dalle haute à la demande, et elle ne gêne personne : sa normale
+   * pointe vers le bas, elle disparaît donc d'elle-même dès qu'on regarde
+   * la maquette de dessus.
+   */
+  ceilingSlab?: boolean;
+  /** Hauteur de l'appareil desservi par chaque gaine, pour la remontée. */
+  routeHeights?: Record<string, number>;
+  /**
    * Rendu allégé pendant un geste : les pans ne sont plus découpés en bandes,
    * ce qui divise le nombre de polygones par cinq. Le volume reste complet,
    * contours compris — seule la finesse du tri en profondeur baisse, et le
@@ -529,6 +551,20 @@ export function buildScene(
         stroke: pal.floorStroke,
         isFloor: true,
       });
+      if (opts.ceilingSlab) {
+        // La hauteur de CETTE pièce : un logement n'a pas partout la même.
+        const h =
+          part.walls.reduce((m, w) => Math.max(m, w.height), 0) || 2.5;
+        faces.push({
+          // Sens inversé : vue de dessous, la dalle doit se présenter de face.
+          pts: [...surface.pts]
+            .reverse()
+            .map((p) => ({ x: p.x, y: h, z: p.z })),
+          fill: mixHex(pal.wall, '#000000', 0.06),
+          stroke: pal.wallTopStroke,
+          normal: { x: 0, y: -1, z: 0 },
+        });
+      }
       const ftex = opts.showTextures ? floor?.texture : undefined;
       if (ftex && ftex.cols > 0 && ftex.rows > 0) {
         const cw = (ftex.maxX - ftex.minX) / ftex.cols;
@@ -961,6 +997,115 @@ export function buildScene(
         // La menuiserie appartient au plan du mur : elle s'y classe avec lui.
         depthY: w.height / 2,
       });
+    }
+  }
+
+  // ------------------------------------------------------------- gaines
+  /**
+   * LA GAINE EST UN TUBE, pas un trait.
+   *
+   * Section carrée de vingt-cinq millimètres — un ICTA 25, celui qu'on
+   * tire pour du 2,5 mm² — posée à cinq centimètres du nu de la dalle,
+   * dans la chape. Quatre faces par tronçon, pas une de plus : un
+   * appartement compte cent mètres de conduit, et un tube à douze pans les
+   * ferait payer en images par seconde.
+   *
+   * La couleur est celle du chantier, orange ICTA, et les faces portent le
+   * remplissage « annelure » : c'est la vue qui dessine les nervures, à
+   * l'échelle de l'écran, là où des arêtes réelles coûteraient mille faces.
+   */
+  const R_GAINE = 0.0125;
+  const gaineTeinte = '#E4702A';
+  const tronc = (
+    a: { x: number; y: number; z: number },
+    b: { x: number; y: number; z: number },
+  ) => {
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const dz = b.z - a.z;
+    const len = Math.hypot(dx, dy, dz);
+    if (len < 1e-4) return;
+    // Repère du tronçon : l'axe, puis deux perpendiculaires.
+    const ux = dx / len;
+    const uy = dy / len;
+    const uz = dz / len;
+    // Une première perpendiculaire, prise sur la verticale sauf si l'axe
+    // l'est déjà (une remontée le long d'un mur).
+    const vertical = Math.abs(uy) > 0.9;
+    const px = vertical ? 1 : -uz;
+    const py = 0;
+    const pz = vertical ? 0 : ux;
+    const pl = Math.hypot(px, py, pz) || 1;
+    const p = { x: (px / pl) * R_GAINE, y: 0, z: (pz / pl) * R_GAINE };
+    // La seconde : le produit vectoriel axe ∧ première.
+    const qx = uy * p.z - uz * p.y;
+    const qy = uz * p.x - ux * p.z;
+    const qz = ux * p.y - uy * p.x;
+    const ql = Math.hypot(qx, qy, qz) || 1;
+    const q = {
+      x: (qx / ql) * R_GAINE,
+      y: (qy / ql) * R_GAINE,
+      z: (qz / ql) * R_GAINE,
+    };
+    const coin = (
+      base: { x: number; y: number; z: number },
+      sp: number,
+      sq: number,
+    ) => ({
+      x: base.x + p.x * sp + q.x * sq,
+      y: base.y + p.y * sp + q.y * sq,
+      z: base.z + p.z * sp + q.z * sq,
+    });
+    const signes: [number, number][] = [
+      [1, 1],
+      [-1, 1],
+      [-1, -1],
+      [1, -1],
+    ];
+    for (let i = 0; i < 4; i++) {
+      const s0 = signes[i];
+      const s1 = signes[(i + 1) % 4];
+      const pts = [
+        coin(a, s0[0], s0[1]),
+        coin(a, s1[0], s1[1]),
+        coin(b, s1[0], s1[1]),
+        coin(b, s0[0], s0[1]),
+      ];
+      // La normale sortante de cette face : le milieu des deux signes.
+      const nx = (p.x * (s0[0] + s1[0])) / 2 + (q.x * (s0[1] + s1[1])) / 2;
+      const ny = (p.y * (s0[0] + s1[0])) / 2 + (q.y * (s0[1] + s1[1])) / 2;
+      const nz = (p.z * (s0[0] + s1[0])) / 2 + (q.z * (s0[1] + s1[1])) / 2;
+      const nl = Math.hypot(nx, ny, nz) || 1;
+      faces.push({
+        pts,
+        fill: gaineTeinte,
+        stroke: '#9C4412',
+        shade: true,
+        normal: { x: nx / nl, y: ny / nl, z: nz / nl },
+        ownerId: 'gaine',
+      });
+    }
+  };
+
+  for (const route of opts.routes ?? []) {
+    const pts = route.path;
+    if (pts.length < 2) continue;
+    const sol = floorY + 0.05;
+    for (let i = 1; i < pts.length; i++) {
+      tronc(
+        { x: pts[i - 1].x, y: sol, z: pts[i - 1].z },
+        { x: pts[i].x, y: sol, z: pts[i].z },
+      );
+    }
+    // La remontée jusqu'à l'appareil : c'est elle qu'on cherche des yeux
+    // quand on se demande par où arrive le fil.
+    const haut = opts.routeHeights?.[route.id];
+    const fin = pts[pts.length - 1];
+    if (haut !== undefined && haut > 0.1) {
+      tronc(
+        { x: fin.x, y: sol, z: fin.z },
+        { x: fin.x, y: floorY + haut, z: fin.z },
+      );
     }
   }
 

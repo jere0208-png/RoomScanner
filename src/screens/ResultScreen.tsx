@@ -45,6 +45,7 @@ import {
 } from '../components/ToolPill';
 import { Compass, PlayCircle } from 'lucide-react-native';
 import { ClientTour } from '../components/ClientTour';
+import { WalkView } from '../components/WalkView';
 import {
   DEFAULT_VIEW3D,
   Iso3DView,
@@ -157,7 +158,6 @@ function matchItem(item: CatalogItem, quete: string): boolean {
 export function ResultScreen() {
   const walls = useScanStore((s) => s.walls);
   const objects = useScanStore((s) => s.objects);
-  const modelPath = useScanStore((s) => s.modelPath);
   const scanName = useScanStore((s) => s.scanName);
   const saves = useScanStore((s) => s.saves);
   const photos = useScanStore((s) => s.photos);
@@ -387,6 +387,8 @@ export function ResultScreen() {
   const [showNorth, setShowNorth] = useState(false);
   /** La visite guidée, plein écran : ce qu'on montre au client. */
   const [visite, setVisite] = useState(false);
+  /** La visite INTÉRIEURE : on entre dans le modèle et on y marche. */
+  const [visiteInterieure, setVisiteInterieure] = useState(false);
   const [editMode, setEditMode] = useState(false);
   /**
    * Jeu de pastilles affiché. Il RETARDE sur `editMode` : les anciennes
@@ -770,6 +772,26 @@ export function ResultScreen() {
     () => planRoutes(walls, rooms, parts, fixtures, placement, ceiling),
     [walls, rooms, parts, fixtures, placement, ceiling],
   );
+
+  /**
+   * À QUELLE HAUTEUR ARRIVE CHAQUE GAINE.
+   *
+   * Le tracé s'arrête à l'aplomb de l'appareil ; c'est cette table qui dit
+   * de combien le tube remonte ensuite — vingt-cinq centimètres pour une
+   * prise, un mètre dix pour un interrupteur, la hauteur sous plafond pour
+   * un point lumineux. Sans elle, le modèle montrait des gaines qui
+   * s'arrêtent au sol, sous des appareils alimentés par magie.
+   */
+  const hauteursDesservies = useMemo(() => {
+    const t: Record<string, number> = {};
+    for (const f of fixtures) t[f.id] = f.height;
+    for (const cl of ceiling) {
+      const piece = parts.find((p) => p.roomId === cl.roomId);
+      const h = (piece?.walls ?? walls).reduce((m, w) => Math.max(m, w.height), 0);
+      t[cl.id] = h || 2.5;
+    }
+    return t;
+  }, [fixtures, ceiling, parts, walls]);
 
   /**
    * Repère de circuit par appareil (C1, C2…).
@@ -1421,6 +1443,11 @@ export function ResultScreen() {
           <Iso3DView
             showMeasures={show3DMeasures}
             showElecTags={showElecTags}
+            /* Le même calque que sur le plan, mais en volume : le tube
+               court dans la chape et remonte au nu du mur. C'est ce
+               dessin-là qu'on emporte sur le chantier. */
+            cableRoutes={showRoutes ? cheminements?.traces : undefined}
+            routeHeights={showRoutes ? hauteursDesservies : undefined}
             showNorth={showNorth}
             showCeiling={showCeiling}
             value={view3d}
@@ -2098,20 +2125,24 @@ export function ResultScreen() {
             Présentation
           </Text>
         </TouchableOpacity>
-        {Platform.OS === 'ios' && modelPath && (
+        {/*
+          « MODÈLE AR » EST DEVENU « VISITE ».
+          
+          Le bouton ouvrait le .usdz du scan dans la visionneuse d'Apple :
+          la maquette se posait sur une table, en réalité augmentée, avec
+          l'image de la caméra derrière — et sans aucune des retouches
+          faites depuis (murs déplacés, cloisons ajoutées, appareillage,
+          gaines). Pour préparer une pose, c'est l'inverse de ce qu'il
+          faut : on veut se tenir DANS le logement, celui qu'on a corrigé,
+          et ne voir que lui.
+        */}
+        {walls.length > 0 && (
           <TouchableOpacity
             style={styles.secondaryButton}
-            onPress={() =>
-              RoomScan.viewModel(modelPath).catch(() =>
-                Alert.alert(
-                  'Modèle 3D indisponible',
-                  'Le fichier de ce scan a été supprimé (désinstallation de ' +
-                    "l'app). Le plan et la vue 3D restent disponibles.",
-                ),
-              )
-            }>
+            accessibilityLabel="Visite"
+            onPress={() => setVisiteInterieure(true)}>
             <Text style={styles.secondaryText} numberOfLines={1}>
-              Modèle AR
+              Visite
             </Text>
           </TouchableOpacity>
         )}
@@ -2122,6 +2153,14 @@ export function ResultScreen() {
         </TouchableOpacity>
       </View>
       <ClientTour visible={visite} onClose={() => setVisite(false)} />
+      {/* On entre dans le modèle : mêmes murs, mêmes appareils, mêmes
+          gaines que sur le plan — vus d'en dedans, à hauteur d'œil. */}
+      <WalkView
+        visible={visiteInterieure}
+        onClose={() => setVisiteInterieure(false)}
+        cableRoutes={cheminements?.traces}
+        routeHeights={hauteursDesservies}
+      />
 
 
       {/* Transition vers l'export : ondes EchoPlan sur toute la page */}

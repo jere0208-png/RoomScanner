@@ -105,6 +105,16 @@ interface Props {
   /** Le calque du plafond, comme sur le plan 2D. */
   showCeiling?: boolean;
   /**
+   * LES GAINES, en volume : le même calque que sur le plan.
+   *
+   * Sur le plan, un tireté suffit — on lit un tracé. Dans le modèle, on
+   * prépare une pose : il faut voir le tube arriver au pied du mur et
+   * remonter dans la cloison jusqu'à la boîte.
+   */
+  cableRoutes?: { id: string; path: Pt[] }[];
+  /** Hauteur de l'appareil desservi, pour dessiner la remontée. */
+  routeHeights?: Record<string, number>;
+  /**
    * Force l'écorché, quel que soit le réglage de l'utilisateur.
    *
    * Pendant la présentation, on ne demande pas au client d'aller cocher
@@ -145,6 +155,8 @@ export function Iso3DView({
   focusRoomId,
   showNorth = true,
   showCeiling = true,
+  cableRoutes,
+  routeHeights,
   cutaway,
   elecCotes = null,
 }: Props) {
@@ -375,6 +387,8 @@ export function Iso3DView({
         // Le plafond suit son propre calque, comme sur le plan : superposé
         // au mobilier, il ne se lit plus.
         ceiling: showCeiling ? ceiling : [],
+        routes: cableRoutes,
+        routeHeights,
         // Pendant un geste : mêmes volumes et mêmes contours, mais des pans
         // d'un seul tenant. C'est le découpage en bandes qui coûtait cher,
         // pas les contours — les supprimer faisait fondre le modèle en blanc.
@@ -384,6 +398,8 @@ export function Iso3DView({
       keptWalls,
       keptOpenings,
       keptObjects,
+      cableRoutes,
+      routeHeights,
       palette,
       colorOpenings,
       showSurfaces,

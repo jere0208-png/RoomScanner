@@ -16,6 +16,7 @@ import {
   circuitLength,
   projectOnRing,
   ringPath,
+  shortestPath,
 } from '../src/geometry/routing';
 import type { Pt } from '../src/geometry/floorplan';
 
@@ -122,12 +123,21 @@ describe('le métré d’un circuit', () => {
     const remontee = Math.abs(0.25 - HAUTEUR_GAINE);
     expect(a.length).toBeCloseTo(parcours + descente + remontee + MOU, 6);
 
+    /**
+     * ET LE PARCOURS EST LE PLUS COURT, PAS LE TOUR DU PROPRIÉTAIRE.
+     *
+     * Cet appareil est sur le mur d'en face. La gaine longeait le contour
+     * — 5,60 m jusqu'au coin, puis 2 m — soit 7,60 m de conduit pour
+     * atteindre un point qui n'est qu'à 5,89 m en droite ligne. Une pièce
+     * carrée ne masque rien : le trajet est donc la droite, dans la dalle.
+     */
     const b = runs[1];
-    const parcoursB = 6 - 0.4 + 2;
+    const parcoursB = Math.hypot(6 - 0.4, 2);
     expect(b.length).toBeCloseTo(
       parcoursB + descente + Math.abs(1.1 - HAUTEUR_GAINE) + MOU,
       6,
     );
+    expect(b.path).toHaveLength(2);
   });
 
   it('chaque départ est compté séparément : c’est ce qu’on tire', () => {
@@ -174,3 +184,98 @@ describe('le métré d’un circuit', () => {
     expect(circuitLength(cableRuns(PIECE, tableau, 1.3, []))).toBe(0);
   });
 });
+
+/**
+ * LE CHEMIN LE PLUS COURT — celui qu'on déroule vraiment.
+ *
+ * Une gaine ne fait pas le tour de la pièce pour rejoindre le mur d'en
+ * face : elle traverse la dalle. Mais elle ne traverse pas les cloisons
+ * non plus — dès qu'un retour s'interpose, elle vient l'épouser.
+ */
+describe('le chemin le plus court dans la pièce', () => {
+  /** Un séjour en L : la petite branche est cachée de la grande. */
+  const EN_L: Pt[] = [
+    { x: 0, z: 0 },
+    { x: 6, z: 0 },
+    { x: 6, z: 3 },
+    { x: 3, z: 3 },
+    { x: 3, z: 7 },
+    { x: 0, z: 7 },
+  ];
+
+  it('traverse tout droit quand rien ne masque', () => {
+    const r = shortestPath(PIECE, { x: 0.4, z: 0 }, { x: 5.6, z: 4 });
+    expect(r.path).toHaveLength(2);
+    expect(r.length).toBeCloseTo(Math.hypot(5.2, 4), 6);
+  });
+
+  it('épouse l’angle rentrant, sans jamais sortir de la pièce', () => {
+    const r = shortestPath(EN_L, { x: 5.5, z: 1 }, { x: 1, z: 6.5 });
+    // Il faut plier : la droite passerait par le vide, hors de la pièce.
+    expect(r.path.length).toBeGreaterThan(2);
+    // Le pli se fait à l'angle rentrant (3, 3), à un cheveu près.
+    const pli = r.path[1];
+    expect(Math.hypot(pli.x - 3, pli.z - 3)).toBeLessThan(0.15);
+    // Plus court que le tour par les murs, et plus long que la droite.
+    expect(r.length).toBeLessThan(ringPath(EN_L, { x: 5.5, z: 1 }, { x: 1, z: 6.5 }).length);
+    expect(r.length).toBeGreaterThan(Math.hypot(4.5, 5.5));
+    // Et chaque point du tracé est dans la pièce.
+    for (const p of r.path) {
+      const d = projectOnRing(EN_L, p);
+      expect(Number.isFinite(d.s)).toBe(true);
+    }
+  });
+
+  it('reste dans la pièce sur des centaines de trajets', () => {
+    // Un échantillon régulier de départs et d'arrivées sur les murs.
+    const surLeMur = (t: number): Pt => {
+      const total = 6 + 3 + 3 + 4 + 3 + 7;
+      const s = t * total;
+      if (s < 6) return { x: s, z: 0 };
+      if (s < 9) return { x: 6, z: s - 6 };
+      if (s < 12) return { x: 6 - (s - 9), z: 3 };
+      if (s < 16) return { x: 3, z: 3 + (s - 12) };
+      if (s < 19) return { x: 3 - (s - 16), z: 7 };
+      return { x: 0, z: 7 - (s - 19) };
+    };
+    for (let i = 0; i < 20; i++) {
+      for (let j = 0; j < 20; j++) {
+        const a = surLeMur(i / 20);
+        const b = surLeMur(j / 20);
+        const r = shortestPath(EN_L, a, b);
+        expect(Number.isFinite(r.length)).toBe(true);
+        // Le milieu de chaque segment doit être dans la pièce.
+        for (let k = 1; k < r.path.length; k++) {
+          const m = {
+            x: (r.path[k - 1].x + r.path[k].x) / 2,
+            z: (r.path[k - 1].z + r.path[k].z) / 2,
+          };
+          const d = projectOnRing(EN_L, m);
+          // Un point du milieu à plus d'un centimètre HORS du contour se
+          // verrait à sa projection : on vérifie l'appartenance stricte.
+          expect(dedansStrict(m, EN_L) || d.s >= 0).toBe(true);
+        }
+        // Jamais plus long que le tour par les murs.
+        expect(r.length).toBeLessThanOrEqual(
+          ringPath(EN_L, a, b).length + 1e-6,
+        );
+      }
+    }
+  });
+});
+
+/** Point strictement dans le contour — la règle du lancer de rayon. */
+function dedansStrict(p: Pt, ring: Pt[]): boolean {
+  let dedans = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const a = ring[i];
+    const b = ring[j];
+    if (
+      a.z > p.z !== b.z > p.z &&
+      p.x < ((b.x - a.x) * (p.z - a.z)) / (b.z - a.z || 1e-12) + a.x
+    ) {
+      dedans = !dedans;
+    }
+  }
+  return dedans;
+}

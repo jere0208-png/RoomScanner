@@ -6,12 +6,23 @@
  * seule donnée du devis qu'on ne pouvait pas déduire du relevé, et celle
  * qu'un électricien estime encore au pas dans le couloir.
  *
- * Le modèle est volontairement SIMPLE, et il le dit : la gaine longe le
- * contour de la pièce à hauteur de plinthe, tourne aux angles, puis remonte
- * ou descend jusqu'à l'appareil. On ne prétend pas dessiner un vrai
- * cheminement — cloisons creuses, faux plafonds, réservations — mais donner
- * le chemin le plus court PAR LE BÂTI, celui dont on ne s'écarte qu'en
- * connaissance de cause.
+ * LE CHEMIN LE PLUS COURT, DANS LA PIÈCE.
+ *
+ * La gaine faisait le tour du propriétaire : elle longeait le contour d'un
+ * bout à l'autre, entrait dans chaque renfoncement, ressortait, et le métré
+ * gonflait d'autant. Sur un séjour en L, atteindre une prise à six mètres
+ * coûtait onze mètres de conduit — personne ne tire comme ça.
+ *
+ * On calcule désormais la GÉODÉSIQUE : le plus court trajet qui reste dans
+ * la pièce. Dans une pièce carrée c'est la droite, dans la dalle ou sous la
+ * chape ; dès qu'un retour de cloison s'interpose, le trajet vient
+ * l'épouser — il contourne au plus juste, en frôlant l'angle, exactement
+ * comme on déroule une gaine au sol.
+ *
+ * Ce que le modèle ne prétend toujours PAS connaître : ce qu'il y a dans les
+ * cloisons, les réservations, les faux plafonds. Il donne un trajet
+ * constructible et sa longueur ; on ne s'en écarte qu'en connaissance de
+ * cause.
  */
 import type { Pt } from './floorplan';
 
@@ -116,6 +127,136 @@ export function ringPath(ring: Pt[], from: Pt, to: Pt): { path: Pt[]; length: nu
   return { path, length };
 }
 
+/** Le segment ]a, b[ reste-t-il dans le contour ? */
+function segmentDedans(ring: Pt[], a: Pt, b: Pt): boolean {
+  // On échantillonne l'INTÉRIEUR du segment. Tester les intersections
+  // d'arêtes ne suffit pas : un segment qui longe exactement un mur ne
+  // croise rien et sort pourtant de la pièce dès le mur suivant.
+  const N = 12;
+  for (let i = 1; i < N; i++) {
+    const t = i / N;
+    const p = { x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t };
+    if (!dansLeContour(p, ring)) return false;
+  }
+  return true;
+}
+
+/** Point dans le contour, arête comprise à un cheveu près. */
+function dansLeContour(p: Pt, ring: Pt[]): boolean {
+  let dedans = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const a = ring[i];
+    const b = ring[j];
+    if (
+      a.z > p.z !== b.z > p.z &&
+      p.x < ((b.x - a.x) * (p.z - a.z)) / (b.z - a.z || 1e-12) + a.x
+    ) {
+      dedans = !dedans;
+    }
+  }
+  if (dedans) return true;
+  // Tolérance d'un centimètre : les départs et arrivées sont AU NU du mur,
+  // et un arrondi les jetterait dehors.
+  for (let i = 0; i < ring.length; i++) {
+    const a = ring[i];
+    const b = ring[(i + 1) % ring.length];
+    const ex = b.x - a.x;
+    const ez = b.z - a.z;
+    const l2 = ex * ex + ez * ez || 1e-9;
+    const t = Math.min(1, Math.max(0, ((p.x - a.x) * ex + (p.z - a.z) * ez) / l2));
+    if (Math.hypot(p.x - (a.x + ex * t), p.z - (a.z + ez * t)) < 0.01) return true;
+  }
+  return false;
+}
+
+/**
+ * LE PLUS COURT TRAJET QUI RESTE DANS LA PIÈCE.
+ *
+ * Graphe de visibilité : les deux bouts, plus chaque angle RENTRANT de la
+ * pièce — ce sont les seuls points où un trajet le plus court peut plier.
+ * On relie tout ce qui se voit, puis Dijkstra. Une pièce compte vingt
+ * sommets au plus : le calcul est instantané, et il est exact.
+ *
+ * Les angles sont légèrement RENTRÉS (six centimètres) : une gaine ne se
+ * plie pas sur l'arête d'une cloison, elle la contourne avec son rayon.
+ */
+export function shortestPath(
+  ring: Pt[],
+  from: Pt,
+  to: Pt,
+): { path: Pt[]; length: number } {
+  if (ring.length < 3) return { path: [from, to], length: dist(from, to) };
+  if (segmentDedans(ring, from, to)) {
+    return { path: [from, to], length: dist(from, to) };
+  }
+  const RENTRE = 0.06;
+  /** Aire signée : elle dit le sens du contour, donc où est l'intérieur. */
+  let aire = 0;
+  for (let i = 0; i < ring.length; i++) {
+    const a = ring[i];
+    const b = ring[(i + 1) % ring.length];
+    aire += a.x * b.z - b.x * a.z;
+  }
+  const sens = aire >= 0 ? 1 : -1;
+  const coins: Pt[] = [];
+  for (let i = 0; i < ring.length; i++) {
+    const p = ring[i];
+    const a = ring[(i - 1 + ring.length) % ring.length];
+    const b = ring[(i + 1) % ring.length];
+    const u = { x: p.x - a.x, z: p.z - a.z };
+    const v = { x: b.x - p.x, z: b.z - p.z };
+    const croix = (u.x * v.z - u.z * v.x) * sens;
+    // Angle RENTRANT : c'est lui qui masque, et donc lui qui fait plier.
+    if (croix >= -1e-9) continue;
+    const lu = Math.hypot(u.x, u.z) || 1;
+    const lv = Math.hypot(v.x, v.z) || 1;
+    const bx = -u.x / lu + v.x / lv;
+    const bz = -u.z / lu + v.z / lv;
+    const lb = Math.hypot(bx, bz) || 1;
+    const c = { x: p.x + (bx / lb) * RENTRE, z: p.z + (bz / lb) * RENTRE };
+    coins.push(dansLeContour(c, ring) ? c : p);
+  }
+  const noeuds = [from, ...coins, to];
+  const n = noeuds.length;
+  const arc: number[][] = Array.from({ length: n }, () => new Array(n).fill(Infinity));
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      if (!segmentDedans(ring, noeuds[i], noeuds[j])) continue;
+      const d = dist(noeuds[i], noeuds[j]);
+      arc[i][j] = d;
+      arc[j][i] = d;
+    }
+  }
+  // Dijkstra, sur vingt nœuds : la version simple suffit largement.
+  const cout = new Array(n).fill(Infinity);
+  const avant = new Array(n).fill(-1);
+  const vu = new Array(n).fill(false);
+  cout[0] = 0;
+  for (let k = 0; k < n; k++) {
+    let u = -1;
+    for (let i = 0; i < n; i++) {
+      if (!vu[i] && (u === -1 || cout[i] < cout[u])) u = i;
+    }
+    if (u === -1 || cout[u] === Infinity) break;
+    vu[u] = true;
+    if (u === n - 1) break;
+    for (let v = 0; v < n; v++) {
+      if (vu[v] || arc[u][v] === Infinity) continue;
+      if (cout[u] + arc[u][v] < cout[v]) {
+        cout[v] = cout[u] + arc[u][v];
+        avant[v] = u;
+      }
+    }
+  }
+  if (cout[n - 1] === Infinity) {
+    // Aucun trajet trouvé (contour incohérent) : on longe, comme avant.
+    return ringPath(ring, from, to);
+  }
+  const path: Pt[] = [];
+  for (let i = n - 1; i !== -1; i = avant[i]) path.unshift(noeuds[i]);
+  return { path, length: cout[n - 1] };
+}
+
 /**
  * Le cheminement d'un circuit : du tableau à chaque appareil.
  *
@@ -136,7 +277,7 @@ export function cableRuns(
   const entree = projectOnRing(ring, panel);
   const traverse = dist(panel, entree.at);
   return devices.map((d) => {
-    const { path, length } = ringPath(ring, panel, d.at);
+    const { path, length } = shortestPath(ring, entree.at, d.at);
     const descente = Math.abs(panelHeight - HAUTEUR_GAINE);
     const remontee = Math.abs(d.height - HAUTEUR_GAINE);
     const parcours = traverse + length + descente + remontee;
