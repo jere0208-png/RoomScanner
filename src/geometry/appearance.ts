@@ -87,25 +87,110 @@ function lisser(tex: SurfaceTexture): SurfaceTexture {
       return v[Math.floor((v.length - 1) / 2)];
     }) as [number, number, number];
 
+  /**
+   * LA TEINTE DE LA SURFACE, ET LA PREUVE QU'ON S'EN ÉCARTE.
+   *
+   * Le lissage local ne suffisait pas, et le chantier l'a dit deux fois :
+   * « on voit encore une formation de carrés de couleurs différentes ». La
+   * médiane du voisinage rattrape la case aberrante ; elle ne rattrape pas
+   * un mur où CHAQUE case est à quinze unités de sa voisine — ce qui est
+   * l'ordinaire d'un relévé fait en marchant, où l'exposition de la caméra
+   * bouge d'une seconde à l'autre. Le résultat reste un patchwork, et un
+   * mur peint d'une seule couleur n'a pas à sortir en patchwork.
+   *
+   * On renverse donc la charge de la preuve. La surface a UNE teinte — la
+   * médiane de tout ce qu'on en a vu — et chaque case doit la porter, SAUF
+   * si elle s'en écarte franchement ET que ses voisines s'en écartent dans
+   * le même sens. Un lambris, un pan d'accent, une trace d'humidité : ces
+   * choses-là couvrent plusieurs cases, elles survivent. Le bruit
+   * d'exposition, non : il change de signe d'une case à l'autre.
+   */
+  const tous = pixels.filter(Boolean) as [number, number, number][];
+  const dominante = tous.length > 0 ? mediane(tous) : null;
+  /** Au-delà : la case a peut-être quelque chose à dire. */
+  const SEUIL = 30;
+
   const out: string[] = [];
   for (let row = 0; row < rows; row++) {
     for (let col = 0; col < cols; col++) {
       const p = pixels[row * cols + col];
       const autour = voisins(col, row);
-      if (!p || autour.length === 0) {
+      if (!p || autour.length === 0 || !dominante) {
         out.push(texels[row * cols + col]);
         continue;
       }
       const med = mediane(autour);
       // Franchement hors du lot : c'est du bruit, pas une couleur de mur.
-      const ecart = Math.max(...[0, 1, 2].map((k) => Math.abs(p[k] - med[k])));
-      const base = ecart > 46 ? med : p;
+      const ecartVoisins = Math.max(...[0, 1, 2].map((k) => Math.abs(p[k] - med[k])));
+      const base = ecartVoisins > 46 ? med : p;
       // Puis un flou léger : deux tiers la case, un tiers son voisinage.
       const moyenne = [0, 1, 2].map(
         (k) => autour.reduce((t, q) => t + q[k], 0) / autour.length,
       ) as [number, number, number];
+      const lisse2 = [0, 1, 2].map(
+        (k) => base[k] * 0.67 + moyenne[k] * 0.33,
+      ) as [number, number, number];
+
+      // Ce qui sépare cette case de la teinte de la surface, et le CANAL
+      // sur lequel ça se joue.
+      let canal = 0;
+      let ecart = 0;
+      for (const k of [0, 1, 2]) {
+        const d = Math.abs(lisse2[k] - dominante[k]);
+        if (d > ecart) {
+          ecart = d;
+          canal = k;
+        }
+      }
+      if (ecart <= SEUIL) {
+        // Dans la famille : c'est la teinte de la surface, pas une autre.
+        // On garde un souffle de la case (un dixième) pour que le mur ne
+        // sorte pas plat comme un aplat de peinture numérique.
+        out.push(
+          hexDe([0, 1, 2].map((k) => dominante[k] * 0.9 + lisse2[k] * 0.1) as [
+            number,
+            number,
+            number,
+          ]),
+        );
+        continue;
+      }
+      // Écart franc : il faut qu'il soit PARTAGÉ. On regarde les quatre
+      // voisines directes : au moins deux doivent s'écarter dans le même
+      // sens, sur le même canal.
+      const sens = Math.sign(lisse2[canal] - dominante[canal]);
+      let accord = 0;
+      for (const [dx, dy] of [
+        [-1, 0],
+        [1, 0],
+        [0, -1],
+        [0, 1],
+      ] as [number, number][]) {
+        const x = col + dx;
+        const y = row + dy;
+        if (x < 0 || y < 0 || x >= cols || y >= rows) continue;
+        const q = pixels[y * cols + x];
+        if (!q) continue;
+        const d = q[canal] - dominante[canal];
+        if (Math.sign(d) === sens && Math.abs(d) > SEUIL * 0.6) accord += 1;
+      }
+      if (accord >= 2) {
+        /*
+          UN VRAI PAN GARDE SA COULEUR, ENTIÈREMENT.
+
+          Une première version le ramenait à mi-chemin de la teinte
+          dominante « pour rester en famille ». Sur un mur peint en deux
+          couleurs — la moitié verte, la moitié bleue — la médiane tombe
+          d'un côté ou de l'autre, et l'autre moitié virait au gris-bleu :
+          le pan d'accent perdait précisément ce qui en fait un pan
+          d'accent. Ce que ses voisines confirment, on le garde tel quel.
+        */
+        out.push(hexDe(lisse2));
+        continue;
+      }
+      // Seule de son avis : c'est un reflet, pas une couleur de mur.
       out.push(
-        hexDe([0, 1, 2].map((k) => base[k] * 0.67 + moyenne[k] * 0.33) as [
+        hexDe([0, 1, 2].map((k) => dominante[k] * 0.85 + lisse2[k] * 0.15) as [
           number,
           number,
           number,

@@ -309,22 +309,42 @@ describe('sampleTexture', () => {
 
   it('rend chaque coin à SA case (ligne 0 = haut, colonne 0 = extrémité A)', () => {
     /**
-     * L'échantillonnage est bilinéaire : un coin ne rend plus exactement sa
-     * case, il rend un mélange dominé par elle. C'est le prix — et
-     * l'objet — du changement : une grille de six cases par quatre étalée
-     * sur trois mètres donnait sinon des carrés de cinquante centimètres,
-     * francs comme un carrelage. On vérifie donc l'ORDRE : chaque coin
-     * reste plus proche de sa case que des autres.
+     * QUATRE QUARTIERS FRANCS, et non quatre cases voisines.
+     *
+     * Deux choses se superposent ici, et il faut les démêler pour que
+     * l'épreuve dise quelque chose.
+     *
+     * L'échantillonnage est BILINÉAIRE : un coin ne rend pas exactement sa
+     * case, il rend un mélange dominé par elle. Et le lissage ramène
+     * désormais à la teinte de la surface toute case qui s'en écarte SEULE
+     * — c'est ce qui empêche un mur uni de sortir en damier. Une grille de
+     * deux par deux où les quatre cases diffèrent légèrement est donc,
+     * pour ce lissage, un mur uni bruité : il l'aplanit, et l'orientation
+     * n'est plus lisible.
+     *
+     * On l'éprouve donc sur ce qu'elle sait préserver : quatre QUARTIERS
+     * francs, chacun sur quatre cases. Chaque case y est confirmée par ses
+     * voisines, les couleurs survivent, et l'orientation se vérifie.
      */
+    const quartiers = { ha: '#B03020', hb: '#20A040', ba: '#2040B0', bb: '#C0B020' };
+    const grille: string[] = [];
+    for (let r = 0; r < 4; r++) {
+      for (let c = 0; c < 4; c++) {
+        grille.push(
+          r < 2 ? (c < 2 ? quartiers.ha : quartiers.hb) : c < 2 ? quartiers.ba : quartiers.bb,
+        );
+      }
+    }
+    const gros = { cols: 4, rows: 4, texels: grille };
     const coins: [number, number, string][] = [
-      [0.02, 0.02, '#111111'],
-      [0.98, 0.02, '#222222'],
-      [0.02, 0.98, '#333333'],
-      [0.98, 0.98, '#444444'],
+      [0.08, 0.08, quartiers.ha],
+      [0.92, 0.08, quartiers.hb],
+      [0.08, 0.92, quartiers.ba],
+      [0.92, 0.92, quartiers.bb],
     ];
     for (const [u, v, attendu] of coins) {
-      const vu = sampleTexture(tex, u, v)!;
-      for (const autre of tex.texels) {
+      const vu = sampleTexture(gros, u, v)!;
+      for (const autre of Object.values(quartiers)) {
         if (autre === attendu) continue;
         expect(ecartCouleur(vu, attendu)).toBeLessThan(ecartCouleur(vu, autre));
       }
