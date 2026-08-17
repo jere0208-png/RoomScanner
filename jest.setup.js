@@ -29,3 +29,20 @@ jest.mock('react-native-room-scan', () => ({
   scanEvents: { addListener: jest.fn(), removeAllListeners: jest.fn() },
   RoomScanView: 'RoomScanView',
 }));
+
+/**
+ * Les icônes de Lucide, en doublet — pour le temps, pas pour la forme.
+ *
+ * Le paquet est publié en modules ES que Jest ne transforme pas, et sa
+ * version CommonJS charge les mille sept cents icônes d'un bloc : soixante
+ * secondes par suite qui touche un écran. Ce que nos tests vérifient, c'est
+ * qu'une icône est demandée et où elle se pose, jamais son tracé.
+ */
+jest.mock('lucide-react-native', () =>
+  new Proxy(
+    {},
+    {
+      get: (_cible, nom) => (nom === '__esModule' ? true : 'LucideIcon'),
+    },
+  ),
+);

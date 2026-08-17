@@ -292,6 +292,91 @@ export function worktopsOnWall(
   return out;
 }
 
+/** Un meuble vu DE FACE, projeté sur le mur. */
+export interface WallFurniture {
+  /** Emprise sur la face, en abscisse (m). */
+  from: number;
+  to: number;
+  /** Hauteur hors tout, depuis le sol (m). */
+  top: number;
+  /** À quelle distance du nu du mur il se tient (m). */
+  ecart: number;
+  category: string;
+}
+
+/**
+ * LES MEUBLES QUI SE TIENNENT DEVANT CE MUR.
+ *
+ * Face au mur, on décide où percer — et on décide à l'aveugle : le dessin
+ * montre une belle surface libre là où se dresse une bibliothèque. La
+ * prise se pose, le plan part au chantier, et personne ne la revoit avant
+ * d'avoir à déplacer le meuble.
+ *
+ * On reprend donc la projection des plans de travail, sans son filtre de
+ * catégorie ni sa fourchette de hauteur : tout ce qui se tient devant la
+ * face, à moins de 75 cm, avec son emprise et sa hauteur. Ce qui dépasse
+ * du mur est borné à la face — un canapé en travers n'a pas à déborder
+ * du dessin.
+ */
+export function wallFurniture(
+  face: { A: Pt; ux: number; uz: number; nx: number; nz: number; len: number },
+  objects: {
+    category?: string;
+    width: number;
+    depth: number;
+    height: number;
+    transform: number[];
+  }[],
+  floorY = 0,
+): WallFurniture[] {
+  const out: WallFurniture[] = [];
+  for (const o of objects) {
+    const cx = o.transform[12];
+    const cz = o.transform[14];
+    const top = o.transform[13] + (o.height ?? 0) / 2 - floorY;
+    if (!(top > 0.05)) continue;
+    const yaw = Math.atan2(o.transform[2], o.transform[0]);
+    const cos = Math.cos(yaw);
+    const sin = Math.sin(yaw);
+    let x0 = Infinity;
+    let x1 = -Infinity;
+    let pres = Infinity;
+    let proche = Infinity;
+    for (const [sx, sz] of [
+      [-1, -1],
+      [1, -1],
+      [1, 1],
+      [-1, 1],
+    ]) {
+      const lx = (sx * o.width) / 2;
+      const lz = (sz * o.depth) / 2;
+      const px = cx + lx * cos - lz * sin;
+      const pz = cz + lx * sin + lz * cos;
+      const dx = px - face.A.x;
+      const dz = pz - face.A.z;
+      x0 = Math.min(x0, dx * face.ux + dz * face.uz);
+      x1 = Math.max(x1, dx * face.ux + dz * face.uz);
+      const de = dx * face.nx + dz * face.nz;
+      pres = Math.min(pres, de);
+      proche = Math.min(proche, Math.abs(de));
+    }
+    // Derrière la face, ou trop loin : c'est le meuble d'une autre pièce,
+    // ou d'un autre bout de la pièce.
+    if (pres < -0.1 || proche > 0.75) continue;
+    const a = Math.max(0, x0);
+    const b = Math.min(face.len, x1);
+    if (b - a < 0.1) continue;
+    out.push({
+      from: a,
+      to: b,
+      top,
+      ecart: Math.max(0, pres),
+      category: o.category ?? '',
+    });
+  }
+  return out.sort((p, q) => p.from - q.from);
+}
+
 /**
  * La règle de hauteur qui s'applique VRAIMENT à cet endroit du mur.
  *

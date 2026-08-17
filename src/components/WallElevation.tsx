@@ -63,6 +63,7 @@ import {
   checkElectrical,
   fixturePlacement,
   heightRuleAt,
+  wallFurniture,
   worktopsOnWall,
   requirementFor,
   roomInputsOf,
@@ -84,6 +85,8 @@ import { useScanStore } from '../store/scanStore';
 import { haptic } from '../ui/haptic';
 import { CloseCross } from './CloseCross';
 import { wallLabel } from '../geometry/naming';
+import { frCategory } from '../geometry/furniture';
+import { Sofa } from 'lucide-react-native';
 
 const PAD_X = 30;
 const PAD_TOP = 26;
@@ -173,6 +176,16 @@ export function WallElevation({
     centre: boolean;
   } | null>(null);
   const [draft, setDraft] = useState('');
+  /**
+   * La règle complète, repliée par défaut.
+   *
+   * On la lit une fois, quand on conteste le constat ; la relire à chaque
+   * pose coûte le tiers de l'écran pour rien.
+   */
+  const [regleOuverte, setRegleOuverte] = useState(false);
+  /** Les meubles du mur, en creux. Montrés d'emblée : c'est une surprise
+   *  qu'on veut avoir AVANT de percer, pas après. */
+  const [voirMeubles, setVoirMeubles] = useState(true);
 
   const wall = walls.find((w) => w.id === wallId) ?? null;
   const mine = useMemo(
@@ -463,6 +476,20 @@ export function WallElevation({
     });
   }, [pendingJoin, face, fixtures, wall, clearPendingJoin]);
 
+  /**
+   * LES MEUBLES QUI SE TIENNENT DEVANT CE MUR.
+   *
+   * On décide où percer sur un dessin qui montre une belle surface libre,
+   * là où se dresse une bibliothèque : la prise se pose, le plan part au
+   * chantier, et personne ne la revoit avant d'avoir à déplacer le meuble.
+   * Ils s'affichent en creux, derrière l'appareillage — et se cachent,
+   * parce qu'à quatre meubles le mur ne se voit plus.
+   */
+  const meublesDuMur = useMemo(
+    () => (face ? wallFurniture(face, objects) : []),
+    [face, objects],
+  );
+
   /** Les plans de travail que ce mur longe : ils changent la règle. */
   const plansDeTravail = useMemo(() => {
     if (!face || !wall) return [];
@@ -734,6 +761,25 @@ export function WallElevation({
         </TouchableOpacity>
       </View>
 
+      {meublesDuMur.length > 0 && (
+        <TouchableOpacity
+          style={[styles.calque, voirMeubles && styles.calqueOn]}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityLabel="Meubles devant ce mur"
+          onPress={() => setVoirMeubles((v) => !v)}>
+          <Sofa
+            size={16}
+            color={voirMeubles ? '#FFFFFF' : c.inkSoft}
+            strokeWidth={2}
+          />
+          <Text
+            style={[styles.calqueText, voirMeubles && styles.calqueTextOn]}>
+            {`${meublesDuMur.length} meuble${
+              meublesDuMur.length > 1 ? 's' : ''
+            }`}
+          </Text>
+        </TouchableOpacity>
+      )}
       <View
         style={styles.canvas}
         onLayout={(e) =>
@@ -923,6 +969,42 @@ export function WallElevation({
                 {`H ${H.toFixed(2).replace('.', ',')} m`}
               </SvgText>
             </G>
+
+            {/*
+              LES MEUBLES, EN CREUX, sous tout le reste.
+
+              Une silhouette hachurée et son nom : de quoi comprendre qu'un
+              socle tombera derrière la bibliothèque, sans masquer le mur ni
+              se confondre avec une baie. Le trait du haut donne la hauteur
+              du meuble, la seule cote qui décide.
+            */}
+            {voirMeubles &&
+              meublesDuMur.map((m, i) => (
+                <G key={`mb${i}`}>
+                  <Rect
+                    x={px(m.from)}
+                    y={py(Math.min(m.top, H))}
+                    width={Math.max(2, (m.to - m.from) * scale)}
+                    height={Math.min(m.top, H) * scale}
+                    fill={c.inkFaint}
+                    fillOpacity={0.09}
+                    stroke={c.inkFaint}
+                    strokeWidth={1}
+                    strokeDasharray="5 4"
+                  />
+                  {(m.to - m.from) * scale > 46 && (
+                    <SvgText
+                      x={px((m.from + m.to) / 2)}
+                      y={py(Math.min(m.top, H)) + 12}
+                      fill={c.inkFaint}
+                      fontSize={8.5}
+                      fontWeight="700"
+                      textAnchor="middle">
+                      {`${frCategory(m.category)} ${Math.round(m.top * 100)}`}
+                    </SvgText>
+                  )}
+                </G>
+              ))}
 
             {/* Portes et fenêtres : on ne perce pas un mur à leur place. */}
             {holes.map((hole, i) => {
@@ -1345,83 +1427,98 @@ export function WallElevation({
           );
         })()}
 
-      {objectif && (
-        <View style={styles.guide}>
-          <View style={styles.guideHead}>
-            <Text style={styles.guideTitle} numberOfLines={1}>
-              {objectif.nom}
-            </Text>
-            <Text
-              style={[
-                styles.guideState,
-                objectif.poses >= objectif.exiges ? styles.guideOk : styles.guideKo,
-              ]}>
-              {`${objectif.poses}/${objectif.exiges}`}
-            </Text>
-            {objectif.poses < objectif.exiges && (
-              <TouchableOpacity
-                style={styles.guideFix}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                onPress={() => poser('prise', objectif.surPlan ? 1.1 : undefined)}>
-                <Svg width={17} height={17} viewBox="0 0 24 24">
-                  {['M12 5 v14', 'M5 12 h14'].map((d) => (
-                    <Path
-                      key={d}
-                      d={d}
-                      stroke="#FFFFFF"
-                      strokeWidth={2.6}
-                      strokeLinecap="round"
-                      fill="none"
-                    />
-                  ))}
-                </Svg>
-              </TouchableOpacity>
+      {/*
+        LA CONFORMITÉ TIENT EN UNE LIGNE.
+
+        Elle en prenait six : un bandeau d'objectif avec sa règle en toutes
+        lettres, puis un encadré rouge par constat — qui répétait LA MÊME
+        phrase. Sur un téléphone, ça mangeait le tiers de l'écran, juste
+        au-dessus des boutons, et on lisait deux fois « trois socles 16 A au
+        minimum » sans jamais voir le mur.
+
+        Ce qui compte se dit en une ligne : où on en est (2/3), ce qui
+        manque, et le geste qui corrige. La règle complète reste à un appui
+        — on la lit quand on la conteste, pas à chaque pose.
+      */}
+      {(objectif || constats.length > 0) && (
+        <View style={styles.bilan}>
+          <TouchableOpacity
+            style={styles.bilanHead}
+            activeOpacity={0.7}
+            onPress={() => setRegleOuverte((v) => !v)}>
+            {objectif && (
+              <View style={styles.bilanJauge}>
+                <View
+                  style={[
+                    styles.bilanFill,
+                    objectif.poses >= objectif.exiges && styles.bilanFillOk,
+                    {
+                      width: `${Math.min(
+                        100,
+                        (objectif.poses / Math.max(1, objectif.exiges)) * 100,
+                      )}%`,
+                    },
+                  ]}
+                />
+              </View>
             )}
-          </View>
-          <View style={styles.guideBar}>
-            <View
-              style={[
-                styles.guideFill,
-                objectif.poses >= objectif.exiges && styles.guideFillOk,
-                {
-                  width: `${Math.min(
-                    100,
-                    (objectif.poses / objectif.exiges) * 100,
-                  )}%`,
-                },
-              ]}
-            />
-          </View>
-          <Text style={styles.guideRule} numberOfLines={2}>
-            {objectif.regle}
-          </Text>
+            <View style={styles.bilanTextes}>
+              <Text style={styles.bilanTitre} numberOfLines={1}>
+                {objectif
+                  ? `${objectif.nom} · ${objectif.poses}/${objectif.exiges} socles`
+                  : 'Conformité'}
+              </Text>
+              {constats.length > 0 && (
+                <Text style={styles.bilanManque} numberOfLines={1}>
+                  {constats.map((i2) => i2.message.split(' : ').pop()).join(' · ')}
+                </Text>
+              )}
+            </View>
+            {/* Le premier geste qui corrige, et lui seul : proposer trois
+                boutons rouges à la fois, c'est n'en faire toucher aucun. */}
+            {(() => {
+              const fix = constats.find((i2) => i2.fix?.type === 'poser')?.fix as
+                | { kind: FixtureKind; height?: number; label: string }
+                | undefined;
+              if (fix) {
+                return (
+                  <TouchableOpacity
+                    style={styles.bilanFix}
+                    hitSlop={{ top: 2, bottom: 2, left: 4, right: 4 }}
+                    onPress={() => poser(fix.kind, fix.height)}>
+                    <Text style={styles.bilanFixText} numberOfLines={1}>
+                      {fix.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              }
+              if (objectif && objectif.poses < objectif.exiges) {
+                return (
+                  <TouchableOpacity
+                    style={styles.bilanFix}
+                    hitSlop={{ top: 2, bottom: 2, left: 4, right: 4 }}
+                    onPress={() =>
+                      poser('prise', objectif.surPlan ? 1.1 : undefined)
+                    }>
+                    <Text style={styles.bilanFixText}>Poser une prise</Text>
+                  </TouchableOpacity>
+                );
+              }
+              return null;
+            })()}
+          </TouchableOpacity>
+          {regleOuverte && (
+            <Text style={styles.bilanRegle}>
+              {[objectif?.regle, ...constats.map((i2) => i2.regle)]
+                .filter(Boolean)
+                .filter((r, k, t) => t.indexOf(r) === k)
+                .join('\n')}
+            </Text>
+          )}
         </View>
       )}
 
-      {constats.map((issue) => (
-        <View key={issue.code + issue.message} style={styles.warn}>
-          <View style={styles.warnHead}>
-            <Text style={styles.warnTitle} numberOfLines={2}>
-              {issue.message}
-            </Text>
-            {issue.fix?.type === 'poser' && (
-              <TouchableOpacity
-                style={styles.warnFix}
-                onPress={() =>
-                  poser(
-                    (issue.fix as { kind: FixtureKind }).kind,
-                    (issue.fix as { height?: number }).height,
-                  )
-                }>
-                <Text style={styles.warnFixText}>{issue.fix.label}</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-          <Text style={styles.warnRule}>{issue.regle}</Text>
-        </View>
-      ))}
-
-{/* Un ensemble multiposte ne se pose pas au jugé : voici où percer,
+      {/* Un ensemble multiposte ne se pose pas au jugé : voici où percer,
           depuis le bord gauche du mur. C'est la seule chose que
           l'électricien ait à reporter sur son tracé. */}
       {selected && postsOf(selected.kind).length > 1 && face && (
@@ -1492,11 +1589,21 @@ export function WallElevation({
         </View>
       )}
 
-      <View style={styles.fields}>
-        {field('g', 'Gauche', selX)}
-        {field('d', 'Droite', face.len - selX)}
-        {field('h', 'Hauteur', selected?.height ?? 0)}
-      </View>
+      {/*
+        LES COTES NE S'AFFICHENT QUE S'IL Y A UN APPAREIL.
+
+        Trois champs à « — » et cinq boutons éteints occupaient le bas de
+        l'écran dès l'ouverture : de la place prise par des commandes qui
+        ne commandaient rien. Sans sélection, il n'y a qu'une chose à
+        faire sur un mur vide, et elle tient sur un bouton.
+      */}
+      {selected && (
+        <View style={styles.fields}>
+          {field('g', 'Gauche', selX)}
+          {field('d', 'Droite', face.len - selX)}
+          {field('h', 'Hauteur', selected.height)}
+        </View>
+      )}
 
       {/* Quatre colonnes de même largeur, rien à faire défiler : la
           suppression était au bout d'une rangée qui débordait, il fallait
@@ -1538,12 +1645,19 @@ export function WallElevation({
               // équipement à la même cote du coin, et trois occasions de se
               // tromper d'un centimètre.
               key: 'clip',
+              /**
+               * « RELEVER » NE VOULAIT RIEN DIRE.
+               *
+               * Le mot désigne le fait de mesurer un local ; ici il
+               * copiait l'appareillage du mur pour le reporter sur un
+               * autre. Personne ne pouvait le deviner — et c'est
+               * pourtant le geste qui fait gagner le plus de temps dans
+               * un couloir de trois chambres identiques.
+               */
               label:
                 wallClip && wallClip.from !== wallId
                   ? `Coller ${wallClip.items.length}`
-                  : mine.length > 0
-                  ? 'Relever'
-                  : 'Relever',
+                  : 'Copier',
               on: wallClip ? wallClip.from !== wallId : mine.length > 0,
               tint: c.blue,
               paths:
@@ -1730,6 +1844,69 @@ const getStyles = themedStyles((c: Palette) =>
       borderWidth: 1,
       borderColor: c.line,
       overflow: 'hidden',
+    },
+    /**
+     * L'interrupteur des meubles, posé SUR le dessin.
+     *
+     * Une ligne de plus dans une feuille déjà dense coûte plus cher qu'un
+     * bouton posé là où se voit son effet. Il ne paraît que si ce mur a
+     * des meubles devant lui — sinon il n'a rien à montrer.
+     */
+    calque: {
+      position: 'absolute',
+      top: 62,
+      left: 22,
+      zIndex: 3,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      minHeight: 30,
+      paddingHorizontal: 10,
+      borderRadius: radius.pill,
+      backgroundColor: c.surfaceSunken,
+    },
+    calqueOn: { backgroundColor: c.inkSoft },
+    calqueText: { color: c.inkSoft, fontSize: 11, fontWeight: '800' },
+    calqueTextOn: { color: '#FFFFFF' },
+    /** LE BANDEAU DE CONFORMITÉ : une ligne, une jauge, un geste. */
+    bilan: {
+      marginTop: 10,
+      backgroundColor: c.surfaceSunken,
+      borderRadius: radius.sm,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+    },
+    bilanHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    /** La jauge est VERTICALE et fine : elle dit l'avancement sans ligne. */
+    bilanJauge: {
+      width: 4,
+      height: 30,
+      borderRadius: 2,
+      backgroundColor: c.line,
+      justifyContent: 'flex-end',
+      overflow: 'hidden',
+    },
+    bilanFill: { width: 4, backgroundColor: c.danger, borderRadius: 2 },
+    bilanFillOk: { backgroundColor: c.green },
+    bilanTextes: { flex: 1, minWidth: 0 },
+    bilanTitre: { color: c.ink, fontSize: 13, fontWeight: '800' },
+    bilanManque: { color: c.danger, fontSize: 11.5, fontWeight: '700', marginTop: 1 },
+    bilanFix: {
+      backgroundColor: c.blue,
+      borderRadius: radius.pill,
+      paddingHorizontal: 12,
+      // 40 points dessinés, 44 sous le doigt avec son débord : la règle
+      // d'iOS, que le banc d'essai vérifie bouton par bouton.
+      minHeight: 40,
+      maxWidth: 150,
+      justifyContent: 'center',
+    },
+    bilanFixText: { color: '#FFFFFF', fontSize: 12, fontWeight: '800' },
+    bilanRegle: {
+      color: c.inkFaint,
+      fontSize: 11.5,
+      lineHeight: 16,
+      marginTop: 8,
     },
     guide: {
       marginTop: 10,
