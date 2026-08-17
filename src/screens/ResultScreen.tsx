@@ -38,7 +38,8 @@ import { FloorplanEditor } from '../components/FloorplanEditor';
 import { WallElevation } from '../components/WallElevation';
 import { SidePill } from '../components/SidePill';
 import { CeilingIcon } from '../components/CeilingIcon';
-import { Compass } from 'lucide-react-native';
+import { Compass, PlayCircle } from 'lucide-react-native';
+import { ClientTour } from '../components/ClientTour';
 import {
   DEFAULT_VIEW3D,
   Iso3DView,
@@ -367,6 +368,8 @@ export function ResultScreen() {
    * se cachent donc comme les meubles ou les surfaces.
    */
   const [showNorth, setShowNorth] = useState(true);
+  /** La visite guidée, plein écran : ce qu'on montre au client. */
+  const [visite, setVisite] = useState(false);
   const [editMode, setEditMode] = useState(false);
   /**
    * Jeu de pastilles affiché. Il RETARDE sur `editMode` : les anciennes
@@ -2164,7 +2167,26 @@ export function ResultScreen() {
           <Text style={styles.primaryText}>Exporter</Text>
         </TouchableOpacity>
       )}
+      {/*
+        LA PRÉSENTATION SE LANCE D'ICI, pas du fond de l'écran d'export.
+
+        Je l'avais posée à côté du bouton du PDF, par symétrie : deux
+        sorties, deux publics. Mais on n'entre pas dans l'écran d'export
+        pour montrer un plan à quelqu'un — on y entre pour régler un
+        document. Montrer, ça se fait depuis le plan, la tablette déjà
+        tournée vers le client.
+      */}
       <View style={styles.actions}>
+        <TouchableOpacity
+          style={styles.secondaryButton}
+          onPress={() => setVisite(true)}>
+          <PlayCircle size={16} color={teinte.blue} strokeWidth={2.2} />
+          <Text
+            style={[styles.secondaryText, styles.secondaryTextBlue]}
+            numberOfLines={1}>
+            Présentation
+          </Text>
+        </TouchableOpacity>
         {Platform.OS === 'ios' && modelPath && (
           <TouchableOpacity
             style={styles.secondaryButton}
@@ -2177,13 +2199,18 @@ export function ResultScreen() {
                 ),
               )
             }>
-            <Text style={styles.secondaryText}>Modèle AR</Text>
+            <Text style={styles.secondaryText} numberOfLines={1}>
+              Modèle AR
+            </Text>
           </TouchableOpacity>
         )}
         <TouchableOpacity style={styles.secondaryButton} onPress={reset}>
-          <Text style={styles.secondaryText}>Nouveau scan</Text>
+          <Text style={styles.secondaryText} numberOfLines={1}>
+            Nouveau scan
+          </Text>
         </TouchableOpacity>
       </View>
+      <ClientTour visible={visite} onClose={() => setVisite(false)} />
 
 
       {/* Transition vers l'export : ondes EchoPlan sur toute la page */}
@@ -3544,11 +3571,17 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     backgroundColor: c.surface,
     borderRadius: radius.pill,
     paddingVertical: 15,
+    // Trois boutons sur la ligne : l'icône et le mot se serrent la main
+    // plutôt que de s'empiler.
+    flexDirection: 'row',
+    gap: 6,
     alignItems: 'center',
+    justifyContent: 'center',
     ...shadowCard,
     shadowOpacity: 0.05,
   },
-  secondaryText: { color: c.ink, fontSize: 15.5, fontWeight: '600' },
+  secondaryText: { color: c.ink, fontSize: 14, fontWeight: '600' },
+  secondaryTextBlue: { color: c.blue, fontWeight: '700' },
   modalBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(11,13,18,0.45)',
