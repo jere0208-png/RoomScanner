@@ -91,7 +91,7 @@ const textes = (tree: TestRenderer.ReactTestRenderer) =>
     .join(' | ');
 
 describe('la présentation animée', () => {
-  it('se choisit sur le bouton « Exporter », avec les autres sorties', () => {
+  it('se choisit sur le bouton « Exporter », en dernier de la liste', () => {
     const tree = monter('scan');
     const exporter = tree.root
       .findAllByType(TouchableOpacity)
@@ -105,6 +105,21 @@ describe('la présentation animée', () => {
     // Elle voisine avec les autres sorties, elle ne les remplace pas.
     expect(vu).toContain('Plan PDF');
     expect(vu).toContain('Modèle 3D');
+    /**
+     * ET ELLE FERME LA MARCHE.
+     *
+     * Les quatre premières sorties donnent un FICHIER — c'est ce qu'on
+     * vient chercher neuf fois sur dix en touchant « Exporter ». La
+     * présentation, elle, ouvre un moment : on descend jusqu'à elle quand
+     * on a quelqu'un en face de soi.
+     */
+    const titres = ['Plan PDF', 'Modèle 3D', 'Liste du matériel', 'Image', 'Présentation animée'];
+    const rangs = titres.map((t) => vu.indexOf(t));
+    for (let i = 1; i < rangs.length; i++) {
+      expect(`${titres[i]} après ${titres[i - 1]} : ${rangs[i] > rangs[i - 1]}`).toBe(
+        `${titres[i]} après ${titres[i - 1]} : true`,
+      );
+    }
   });
 
   /**

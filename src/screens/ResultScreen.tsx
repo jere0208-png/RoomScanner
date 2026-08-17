@@ -2168,27 +2168,6 @@ export function ResultScreen() {
             </Text>
             {(
               [
-                /*
-                  LA PRÉSENTATION SE CHOISIT ICI, avec les autres sorties.
-
-                  Elle a longtemps cherché sa place : au pied de l'écran
-                  d'export, puis sur l'écran du scan, puis sous l'aperçu du
-                  plan. À chaque fois le même malentendu — on la rangeait
-                  dans le réglage d'un DOCUMENT, alors que c'est une SORTIE,
-                  au même titre qu'un PDF ou un modèle 3D. Elle est donc
-                  dans le menu qui les propose, et en premier : c'est celle
-                  qu'on lance devant quelqu'un.
-                */
-                [
-                  'presentation',
-                  'Présentation animée',
-                  'Le logement se présente tout seul, pièce par pièce. ' +
-                    'À montrer au client, sur place.',
-                  () => {
-                    setExporting(false);
-                    apresFermeture(() => setVisite(true));
-                  },
-                ],
                 [
                   'pdf',
                   'Plan PDF',
@@ -2226,6 +2205,28 @@ export function ResultScreen() {
                     apresFermeture(shareImage);
                   },
                 ],
+                /*
+                  LA PRÉSENTATION SE CHOISIT ICI, avec les autres sorties.
+
+                  Elle a longtemps cherché sa place : au pied de l'écran
+                  d'export, puis sur l'écran du scan, puis sous l'aperçu du
+                  plan. À chaque fois le même malentendu — on la rangeait
+                  dans le réglage d'un DOCUMENT, alors que c'est une SORTIE,
+                  au même titre qu'un PDF ou un modèle 3D. Elle est donc
+                  dans le menu qui les propose, et en premier : c'est celle
+                  qu'on lance devant quelqu'un.
+                */
+                [
+                  'presentation',
+                  'Présentation animée',
+                  'Le logement se présente tout seul, pièce par pièce. ' +
+                    'À montrer au client, sur place.',
+                  () => {
+                    setExporting(false);
+                    apresFermeture(() => setVisite(true));
+                  },
+                ],
+
               ] as [ExportArtKind, string, string, () => void][]
             ).map(([art, titre, detail, action]) => (
               <TouchableOpacity
