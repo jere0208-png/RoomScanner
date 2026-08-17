@@ -20,9 +20,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
+  Dimensions,
   useWindowDimensions,
   Easing,
-  KeyboardAvoidingView,
+  Keyboard,
   Modal,
   Platform,
   Pressable,
@@ -93,6 +94,51 @@ export interface PromptData {
  * Exportée : tout ce qui s'ouvre par-dessus le plan doit avoir cette
  * carrosserie, sinon chaque écran réinvente la sienne.
  */
+/**
+ * LA HAUTEUR DU CLAVIER, MESURÉE — pas devinée par un composant.
+ *
+ * `KeyboardAvoidingView` tenait ce rôle, et il tombait à côté DANS UNE
+ * FENÊTRE MODALE : il mesure par rapport à la fenêtre principale, pas à la
+ * nôtre. Résultat, en touchant « CLIENT » dans l'écran d'export : le voile
+ * s'allumait, le clavier montait, et la feuille restait POSÉE AU FOND,
+ * entièrement cachée derrière lui. On tapait une lettre à l'aveugle, un
+ * rendu de plus finissait par appliquer une marge partielle, et la feuille
+ * réapparaissait — ses boutons coupés.
+ *
+ * iOS annonce le clavier AVANT qu'il monte (`keyboardWillChangeFrame`), et
+ * il annonce sa position à l'écran. On en déduit la hauteur couverte, et la
+ * feuille se pose juste au-dessus. Plus rien à mesurer, plus rien à
+ * deviner — et ça vaut pour TOUTES les saisies de l'app, puisqu'elles
+ * passent toutes par cette coquille.
+ */
+export function useKeyboardInset(): number {
+  const [inset, setInset] = useState(0);
+  useEffect(() => {
+    const bouge = (e: {
+      endCoordinates: { screenY: number; height: number };
+    }) => {
+      const ecran = Dimensions.get('window').height;
+      const couvert =
+        Platform.OS === 'ios'
+          ? Math.max(0, ecran - e.endCoordinates.screenY)
+          : e.endCoordinates.height;
+      setInset(couvert);
+    };
+    const abonnements = [
+      Keyboard.addListener(
+        Platform.OS === 'ios' ? 'keyboardWillChangeFrame' : 'keyboardDidShow',
+        bouge,
+      ),
+      Keyboard.addListener(
+        Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+        () => setInset(0),
+      ),
+    ];
+    return () => abonnements.forEach((a) => a.remove());
+  }, []);
+  return inset;
+}
+
 export function SheetShell({
   visible,
   onClose,
@@ -115,6 +161,7 @@ export function SheetShell({
   children: React.ReactNode;
 }) {
   const styles = getStyles(useTheme());
+  const clavier = useKeyboardInset();
   /**
    * SUR TABLETTE, UNE FEUILLE NE TRAVERSE PAS L'ÉCRAN.
    *
@@ -171,9 +218,8 @@ export function SheetShell({
           pointerEvents="none"
           style={[StyleSheet.absoluteFill, styles.veil, { opacity: monte }]}
         />
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={styles.avoider}>
+        {/* La feuille se pose SUR le clavier, jamais dessous. */}
+        <View style={[styles.avoider, { paddingBottom: clavier }]}>
           <Animated.View
             style={{
               opacity: monte,
@@ -193,7 +239,7 @@ export function SheetShell({
               {children}
             </Pressable>
           </Animated.View>
-        </KeyboardAvoidingView>
+        </View>
       </Pressable>
     </Modal>
   );

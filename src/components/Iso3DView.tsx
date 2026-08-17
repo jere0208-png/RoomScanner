@@ -132,6 +132,17 @@ interface Props {
    * comprend sans légende, et c'est ce qu'on veut devant un client.
    */
   elecCotes?: number | null;
+  /**
+   * RENDU ALLÉGÉ EN CONTINU — pour ce qui bouge tout seul.
+   *
+   * Le mode existait déjà, mais seulement pendant un geste : dès que le
+   * doigt se lève, le modèle repasse en pans découpés. Une présentation,
+   * elle, bouge sans qu'aucun doigt ne la touche : elle se rendait donc
+   * toujours en qualité pleine, et un logement meublé — mille faces — ne
+   * suivait plus. Vu de loin, en mouvement, la découpe en bandes ne se
+   * voit pas ; les saccades, si.
+   */
+  light?: boolean;
 }
 
 /**
@@ -159,6 +170,7 @@ export function Iso3DView({
   routeHeights,
   cutaway,
   elecCotes = null,
+  light = false,
 }: Props) {
   const walls = useScanStore((s) => s.walls);
   const openings = useScanStore((s) => s.openings);
@@ -392,12 +404,13 @@ export function Iso3DView({
         // Pendant un geste : mêmes volumes et mêmes contours, mais des pans
         // d'un seul tenant. C'est le découpage en bandes qui coûtait cher,
         // pas les contours — les supprimer faisait fondre le modèle en blanc.
-        coarse: interacting,
+        coarse: interacting || light,
       }),
     [
       keptWalls,
       keptOpenings,
       keptObjects,
+      light,
       cableRoutes,
       routeHeights,
       palette,

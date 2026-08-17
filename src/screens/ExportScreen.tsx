@@ -680,6 +680,7 @@ const styles = getStyles(c);
           document. Ici, elle suit immédiatement l'aperçu — on voit le
           logement, et juste dessous le bouton qui le fait tourner.
         */}
+        <Text style={styles.sheetLabel}>À montrer au client</Text>
         <TouchableOpacity
           style={styles.visiteButton}
           accessibilityLabel="Présentation animée"
@@ -932,15 +933,25 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: 'rgba(20,24,32,0.55)',
   },
+  /**
+   * ELLE NE SE CONFOND PLUS AVEC UNE LIGNE DE RÉGLAGE.
+   *
+   * Posée en blanc sur fond gris, sous l'aperçu, elle passait pour un
+   * intitulé de plus — on la cherchait sans la voir. Elle porte donc son
+   * propre titre (« À montrer au client », comme les feuilles portent le
+   * leur), un fond bleuté et un cadre : c'est une SORTIE, pas un réglage.
+   */
   visiteButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    paddingHorizontal: 16,
-    minHeight: 60,
+    padding: 10,
+    paddingRight: 16,
     borderRadius: radius.md,
-    backgroundColor: c.surface,
-    marginTop: 10,
+    backgroundColor: c.blueSoft,
+    borderWidth: 1,
+    borderColor: c.blue,
+    marginTop: 2,
   },
   visiteTextes: { flex: 1, minWidth: 0 },
   visiteText: { color: c.blue, fontSize: 15, fontWeight: '800' },

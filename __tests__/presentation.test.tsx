@@ -22,6 +22,7 @@ import TestRenderer, { act } from 'react-test-renderer';
 import { ExportScreen } from '../src/screens/ExportScreen';
 import { ResultScreen } from '../src/screens/ResultScreen';
 import { Iso3DView } from '../src/components/Iso3DView';
+import { ClientTour } from '../src/components/ClientTour';
 import { useScanStore } from '../src/store/scanStore';
 import {
   SNAPSHOT_FIXTURES,
@@ -141,5 +142,50 @@ describe('la présentation animée', () => {
     const vu = textes(tree);
     expect(vu).not.toContain('Visite');
     expect(vu).not.toContain('Modèle AR');
+  });
+});
+
+/**
+ * LA PRÉSENTATION SE PRÉPARE AVANT DE JOUER.
+ *
+ * Le modèle se bâtit à la première image — murs extrudés, mobilier,
+ * appareillage. Sur un logement meublé c'est le plus gros calcul de l'app,
+ * et il tombait pendant les premières secondes de la présentation : le
+ * client voyait un départ haché qui se calmait ensuite. On lève donc le
+ * rideau seulement quand le modèle est monté, et l'horloge n'avance pas
+ * tant qu'il est là.
+ */
+describe('le rideau de préparation', () => {
+  it('couvre la première image, puis se retire', () => {
+    let tree!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      useScanStore.setState({
+        screen: 'result',
+        scanName: 'Chantier test',
+        walls: SNAPSHOT_WALLS,
+        openings: SNAPSHOT_OPENINGS,
+        objects: SNAPSHOT_OBJECTS,
+        rooms: SNAPSHOT_ROOMS.map((r, i) => ({
+          id: r.id,
+          name: `Pièce ${i + 1}`,
+          floor: null,
+        })),
+        fixtures: SNAPSHOT_FIXTURES,
+        ceiling: [],
+      });
+      tree = TestRenderer.create(<ClientTour visible onClose={() => {}} />);
+    });
+    arbre = tree;
+    expect(textes(tree)).toContain('Préparation de la présentation');
+    // Le modèle est déjà monté DERRIÈRE le rideau : c'est tout l'objet du
+    // préchargement — il se calcule pendant qu'on lit le titre.
+    expect(tree.root.findAllByType(Iso3DView).length).toBe(1);
+    // Et il se rend en pans d'un seul tenant, pour tenir la cadence.
+    expect(tree.root.findByType(Iso3DView).props.light).toBe(true);
+
+    act(() => {
+      jest.advanceTimersByTime(600);
+    });
+    expect(textes(tree)).not.toContain('Préparation de la présentation');
   });
 });

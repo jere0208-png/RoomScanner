@@ -25,6 +25,7 @@ import {
   Modal,
   Pressable,
   StyleSheet,
+  Text,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -228,6 +229,21 @@ export function ClientTour({
     oy: 0,
   });
   const [avance, setAvance] = useState(0);
+  /**
+   * ON PRÉPARE, PUIS ON JOUE.
+   *
+   * Le modèle se bâtit à la première image : murs extrudés, mobilier,
+   * appareillage, sols. Sur un logement meublé, c'est le plus gros calcul
+   * de l'app — et il tombait pendant les premières secondes de la
+   * présentation, celles où la caméra démarre. Le client voyait donc un
+   * départ haché, puis ça se calmait : exactement l'inverse de ce qu'on
+   * veut montrer.
+   *
+   * On lève donc le rideau seulement quand le modèle est monté : la vue
+   * 3D se rend une première fois derrière un carton de préparation, et
+   * l'horloge ne part qu'ensuite.
+   */
+  const [pret, setPret] = useState(false);
   /** Avancement du tracé des cotes, ou `null` hors des étapes de mur. */
   const [cotes, setCotes] = useState<number | null>(null);
 
@@ -305,10 +321,28 @@ export function ClientTour({
   }, [etapes]);
 
   useEffect(() => {
-    if (visible) {
-      rembobiner();
-      setJoue(true);
+    if (!visible) {
+      setPret(false);
+      return;
     }
+    rembobiner();
+    setJoue(true);
+    setPret(false);
+    // Deux images pour que la vue 3D se monte et se peigne, puis un souffle
+    // — le temps que le modèle soit vraiment à l'écran plutôt que dans la
+    // file de rendu.
+    let a = 0;
+    let b = 0;
+    const t = setTimeout(() => {
+      a = requestAnimationFrame(() => {
+        b = requestAnimationFrame(() => setPret(true));
+      });
+    }, 380);
+    return () => {
+      clearTimeout(t);
+      if (a) cancelAnimationFrame(a);
+      if (b) cancelAnimationFrame(b);
+    };
   }, [visible, rembobiner]);
 
   /**
@@ -321,7 +355,7 @@ export function ClientTour({
    * suive sans saccader.
    */
   useEffect(() => {
-    if (!visible || !joue || !etape) return;
+    if (!visible || !joue || !etape || !pret) return;
     let vivant = true;
     const t0 = Date.now() - debut.current;
     const tick = () => {
@@ -379,7 +413,7 @@ export function ClientTour({
       vivant = false;
       if (boucle.current) clearTimeout(boucle.current);
     };
-  }, [visible, joue, etape, index, etapes.length]);
+  }, [visible, joue, etape, index, etapes.length, pret]);
 
   if (!etape) return null;
 
@@ -402,7 +436,30 @@ export function ClientTour({
           cutaway
           elecCotes={cotes}
           focusRoomId={etape.roomId}
+          /* Le modèle bouge tout seul, trente fois par seconde : on le
+             rend en pans d'un seul tenant. La découpe en bandes ne se voit
+             pas sur une image qui tourne — les saccades, si. */
+          light
         />
+
+        {/*
+          LE RIDEAU DE PRÉPARATION.
+
+          Il couvre la première image — celle qui coûte : murs extrudés,
+          mobilier, appareillage — et se retire quand tout est monté. Sans
+          lui, on assistait à la construction du modèle, ce qui n'intéresse
+          personne, surtout pas un client.
+
+          Il n'est pas décoratif : tant qu'il est là, l'horloge de la
+          présentation ne tourne pas. Le mouvement commence donc à la
+          première image où il peut être fluide.
+        */}
+        {!pret && (
+          <View style={styles.rideau} accessibilityLabel="Préparation">
+            <Text style={styles.rideauTitre}>{scanName}</Text>
+            <Text style={styles.rideauSous}>Préparation de la présentation…</Text>
+          </View>
+        )}
 
         {/* Le carton : il monte du bas, il ne clignote pas. Un titre qu'on
             lit sans effort pendant que le modèle tourne derrière. */}
@@ -472,6 +529,19 @@ export function ClientTour({
 const getStyles = themedStyles((c: Palette) =>
   StyleSheet.create({
     plein: { flex: 1, backgroundColor: c.bg, paddingTop: 40 },
+  rideau: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: c.bg,
+    gap: 6,
+  },
+  rideauTitre: { color: c.ink, fontSize: 20, fontWeight: '800' },
+  rideauSous: { color: c.inkFaint, fontSize: 13 },
     carton: {
       position: 'absolute',
       left: 20,
