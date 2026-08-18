@@ -270,16 +270,30 @@ describe('l’écran du scan, refondu', () => {
     ).toBe(false);
   });
 
-  it('replie les mesures, et les déplie à la demande', () => {
+  /**
+   * LES MESURES SONT LÀ DÈS L'OUVERTURE.
+   *
+   * Elles se sont repliées le temps d'une version, pour rendre au plan la
+   * hauteur qu'elles prenaient. Le chantier a tranché : on ouvre un scan
+   * pour voir un plan ET ses chiffres, et un chiffre qu'il faut déplier est
+   * un chiffre qu'on ne lit plus.
+   */
+  it('montre les mesures sans qu’on les demande', () => {
+    const vu = textes(monter('scan'));
+    // Les libellés sont mis en capitales par le style, pas par le texte.
+    expect(vu).toContain('m² sol');
+    expect(vu).toContain('m périm.');
+  });
+
+  it('et n’offre plus de les masquer', () => {
     const tree = monter('scan');
-    // Repliées : une seule ligne de résumé, pas six cartouches.
-    expect(textes(tree)).not.toContain('M² SOL');
-    const plus = tree.root
+    const menu = tree.root
       .findAllByType(TouchableOpacity)
-      .find((n) => n.props.accessibilityLabel === 'Voir les mesures');
-    expect(plus).toBeDefined();
-    act(() => plus!.props.onPress());
-    expect(textes(tree)).toContain('m² sol');
+      .find((n) => n.props.accessibilityLabel === 'Plus');
+    act(() => menu!.props.onPress());
+    const vu = textes(tree);
+    expect(vu).not.toContain('Masquer les mesures');
+    expect(vu).not.toContain('Voir les mesures');
   });
 
   it('et propose d’ajouter une pièce, sans effacer le relevé', () => {
@@ -292,5 +306,50 @@ describe('l’écran du scan, refondu', () => {
     expect(textes(tree)).toContain('Ajouter une pièce');
     // « Nouveau scan » y reste, mais il a quitté le pied de page.
     expect(textes(tree)).toContain('Nouveau scan');
+  });
+});
+
+/**
+ * LA BARRE D'OUTILS EST EN BAS, ET LE SÉLECTEUR DE VUE EST UNE PASTILLE.
+ *
+ * Relevé du chantier, deux fois : « les boutons encadrent le plan sur le
+ * haut/droite mais empiètent trop sur l'espace de travail », et « nos
+ * boutons 2D/3D prennent beaucoup de place ». Le dessin était cerné par une
+ * rangée en haut et une colonne à droite, et surmonté d'un bandeau de
+ * cinquante points pour deux mots.
+ */
+describe('l’espace de travail du plan', () => {
+  /** Le style aplati d'un nœud, quel que soit son empilement. */
+  const style = (n: TestRenderer.ReactTestInstance) => {
+    const plats = Array.isArray(n.props.style) ? n.props.style : [n.props.style];
+    return Object.assign({}, ...plats.filter(Boolean).flat(Infinity));
+  };
+
+  it('pose les outils au pied du plan, pas sur ses côtés', () => {
+    const tree = monter('scan');
+    // La barre d'outils : le rail qui porte les pastilles.
+    const rail = tree.root
+      .findAll((n) => typeof n.props?.horizontal === 'boolean' && n.props.horizontal)
+      .map(style)
+      .find((st) => typeof st.bottom === 'number' && st.position === 'absolute');
+    expect(rail).toBeDefined();
+    // Ancrée en bas, sur toute la largeur — et plus en colonne à droite.
+    expect(rail!.bottom).toBeLessThan(20);
+    expect(rail!.flexDirection).toBe('row');
+    expect(rail!.top).toBeUndefined();
+  });
+
+  it('remplace le bandeau 2D/3D par une pastille', () => {
+    const tree = monter('scan');
+    const pastille = tree.root
+      .findAllByType(TouchableOpacity)
+      .find((n) => n.props.accessibilityLabel === 'Passer en 3D');
+    expect(pastille).toBeDefined();
+    const st = style(pastille!);
+    // Posée SUR le dessin, en haut à droite : elle ne prend aucune bande.
+    expect(st.position).toBe('absolute');
+    expect(st.height).toBeLessThanOrEqual(36);
+    // Et les deux mots du bandeau ont disparu.
+    expect(textes(tree)).not.toContain('Plan 2D');
   });
 });

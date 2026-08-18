@@ -23,7 +23,6 @@ import {
   glow,
   radius,
   shadowCard,
-  shadowLift,
   themedStyles,
   useTheme,
   type Palette,
@@ -37,13 +36,16 @@ import { ObjectBar } from '../components/ObjectBar';
 import { RoomBar } from '../components/RoomBar';
 import { StripBar } from '../components/StripBar';
 import {
-  ANCHOR_TOP,
-  PILL_CELL_H,
   PILL_GAP,
   PillSlot,
   ToolPill,
 } from '../components/ToolPill';
-import { Compass, MoreHorizontal, Share2 } from 'lucide-react-native';
+import {
+  ChevronsUpDown,
+  Compass,
+  MoreHorizontal,
+  Share2,
+} from 'lucide-react-native';
 import {
   DEFAULT_VIEW3D,
   Iso3DView,
@@ -107,6 +109,7 @@ import { useScanStore } from '../store/scanStore';
 import { DiagnosticSheet, type Constat } from '../components/DiagnosticSheet';
 import { ExportArt, type ExportArtKind } from '../components/ExportArt';
 import { ClientTour } from '../components/ClientTour';
+import { RoomChoice } from '../components/RoomChoice';
 import { EnAttente } from '../components/PendingPill';
 import {
   CEILINGS,
@@ -125,6 +128,15 @@ import {
 } from '../components/Sheet';
 
 type Tab = '2d' | '3d';
+
+/**
+ * La hauteur que prend la barre d'outils, au pied du plan.
+ *
+ * Une pastille (38) plus son mot (12 + 3) plus la marge du bas (8), plus
+ * un souffle : c'est ce qu'il faut laisser aux bandeaux contextuels pour
+ * qu'ils se posent AU-DESSUS d'elle et non par-dessus.
+ */
+const BARRE_OUTILS = 76;
 
 /**
  * Ce qui peut COMMANDER un point lumineux.
@@ -279,8 +291,6 @@ export function ResultScreen() {
   const [checking, setChecking] = useState(false);
   // Choix du format d'export : plan PDF, modèle 3D, ou image de la vue.
   const [exporting, setExporting] = useState(false);
-  /** Le détail des mesures : replié par défaut, le plan passe avant. */
-  const [mesuresOuvertes, setMesuresOuvertes] = useState(false);
   /** La feuille « Ajouter une pièce » : nom, largeur, profondeur. */
   const [ajoutPiece, setAjoutPiece] = useState(false);
   /** La présentation guidée, plein écran : ce qu'on montre au client. */
@@ -1201,11 +1211,6 @@ export function ResultScreen() {
                   },
                 },
                 {
-                  label: mesuresOuvertes ? 'Masquer les mesures' : 'Voir les mesures',
-                  icon: 'regle' as const,
-                  onPress: () => setMesuresOuvertes((v) => !v),
-                },
-                {
                   /**
                    * AJOUTER UNE PIÈCE, sans tout recommencer.
                    *
@@ -1241,28 +1246,15 @@ export function ResultScreen() {
           partagent désormais la largeur à parts égales, et le chiffre se
           réduit plutôt que de déborder. */}
       {/*
-        LES MESURES SE REPLIENT.
+        LES MESURES SONT LÀ, TOUJOURS.
 
-        Six chiffres en gros bloc, c'est quatre-vingts points de hauteur
-        permanents pour une information qu'on lit à l'ouverture et qu'on ne
-        relit plus. Elles tiennent désormais sur UNE ligne, et le détail se
-        déplie par le menu — comme l'application dont on s'inspire, où les
-        informations du niveau se cherchent d'un balayage.
+        Elles se sont repliées le temps d'une version, pour rendre au plan la
+        hauteur qu'elles prenaient. C'était une mauvaise économie : on ouvre
+        un scan pour voir un plan ET ses chiffres — la surface, le
+        périmètre, le nombre d'appareils — et un chiffre qu'il faut déplier
+        est un chiffre qu'on ne lit plus. Le cartouche est simplement plus
+        serré qu'avant.
       */}
-      {!mesuresOuvertes && (
-        <TouchableOpacity
-          style={styles.metricsLigne}
-          accessibilityLabel="Voir les mesures"
-          onPress={() => setMesuresOuvertes(true)}>
-          <Text style={styles.metricsResume} numberOfLines={1}>
-            {metrics
-              .slice(0, 4)
-              .map((m) => `${m.value} ${m.label.toLowerCase()}`)
-              .join('   ·   ')}
-          </Text>
-        </TouchableOpacity>
-      )}
-      {mesuresOuvertes && (
       <View style={styles.metricsRow}>
         {metrics.map((m, i) => (
           <View key={m.label} style={[styles.metric, i > 0 && styles.metricBorder]}>
@@ -1279,9 +1271,6 @@ export function ResultScreen() {
           </View>
         ))}
       </View>
-      )}
-
-      <Segment tab={tab} onChange={setTab} />
 
       <Animated.View
         style={[
@@ -1552,7 +1541,12 @@ export function ResultScreen() {
         {/* Toute la quincaillerie s'efface pendant une capture : une image
             qu'on envoie ne doit montrer QUE le plan et le logo. */}
         {capturing ? null : vue === '2d' ? (
-          <View style={styles.planTools}>
+          <ScrollView
+            style={styles.planTools}
+            contentContainerStyle={styles.planToolsRail}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled">
             {/* Deux barres, jamais mélangées.
                 En lecture, on ne fait que REGARDER : la barre ne porte que
                 ce qui s'affiche ou non. En édition, on TRAVAILLE : les
@@ -1763,7 +1757,7 @@ export function ResultScreen() {
                   {el}
                 </PillSlot>
               ))}
-          </View>
+          </ScrollView>
         ) : (
           /*
             EN 3D, LA COLONNE COMMENCE EN HAUT.
@@ -1774,7 +1768,12 @@ export function ResultScreen() {
             laisser la place à une rangée qui n'existe pas, et la
             dernière pastille se retrouvait à mi-hauteur du modèle.
           */
-          <View style={[styles.planTools, styles.planToolsHaut]}>
+          <ScrollView
+            style={[styles.planTools, styles.planToolsHaut]}
+            contentContainerStyle={styles.planToolsRail}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled">
             <ToolPill
               icon="ruler"
               label="Cotes"
@@ -1853,7 +1852,29 @@ export function ResultScreen() {
                 }
               />
             )}
-          </View>
+          </ScrollView>
+        )}
+
+        {/*
+          2D / 3D : UNE PASTILLE, POSÉE SUR LE PLAN.
+
+          C'était un bandeau pleine largeur au-dessus du dessin : cinquante
+          points de hauteur pour deux mots, dont un seul sert à la fois. Les
+          applications de plan mettent ce réglage dans un petit bouton flottant,
+          en haut du dessin, avec les deux chevrons qui disent qu'il en existe
+          un autre. On fait pareil : on gagne la bande, et le geste reste à
+          portée de pouce.
+        */}
+        {!capturing && (
+          <TouchableOpacity
+            style={styles.vuePastille}
+            accessibilityLabel={vue === '2d' ? 'Passer en 3D' : 'Passer en 2D'}
+            onPress={() => setTab(vue === '2d' ? '3d' : '2d')}>
+            <Text style={styles.vuePastilleTexte}>
+              {vue === '2d' ? '2D' : '3D'}
+            </Text>
+            <ChevronsUpDown size={15} color={teinte.inkFaint} strokeWidth={2.4} />
+          </TouchableOpacity>
         )}
 
         {/* Le bouton d'édition ne défile pas avec les autres : c'est le
@@ -2043,31 +2064,47 @@ export function ResultScreen() {
               surface={targetPart?.surface ?? null}
               extent={targetExtent}
               hauteur={roomHeight(targetPart?.walls ?? [])}
-              voisines={rooms.filter((r) => r.id !== selectedRoomId).length}
               styles={styles}
               onName={() => setNaming(true)}
               onHeight={promptRoomHeight}
-              onMerge={promptMerge}
-              onSplit={() => {
-                splitRoom(selectedRoomId);
-                setSelectedRoomId(null);
-              }}
-              onRemove={() =>
+              onMore={() =>
                 setMenu({
-                  title: 'Retirer cette pièce ?',
+                  title: targetRoom.name || 'Pièce sans nom',
                   subtitle:
-                    'Ses murs, ses meubles et son appareillage quittent le ' +
-                    'plan. Le scan d’origine, lui, ne bouge pas.',
+                    'Ce qui change la structure du plan : réunir deux pièces ' +
+                    'que le scan a séparées, en couper une qu’il a réunie, ' +
+                    'ou la retirer.',
                   actions: [
+                    ...(rooms.filter((r) => r.id !== selectedRoomId).length > 0
+                      ? [
+                          {
+                            label: 'Fusionner avec une autre pièce',
+                            icon: 'fusionner' as const,
+                            onPress: promptMerge,
+                          },
+                        ]
+                      : []),
                     {
-                      label: 'Retirer la pièce',
-                      icon: 'supprimer',
-                      danger: true,
+                      label: 'Scinder la pièce',
+                      icon: 'scinder' as const,
                       onPress: () => {
-                        removeRoom(selectedRoomId);
+                        splitRoom(selectedRoomId);
                         setSelectedRoomId(null);
                       },
                     },
+                    ...(rooms.filter((r) => r.id !== selectedRoomId).length > 0
+                      ? [
+                          {
+                            label: 'Retirer la pièce',
+                            icon: 'supprimer' as const,
+                            danger: true,
+                            onPress: () => {
+                              removeRoom(selectedRoomId);
+                              setSelectedRoomId(null);
+                            },
+                          },
+                        ]
+                      : []),
                   ],
                 })
               }
@@ -2354,47 +2391,69 @@ export function ResultScreen() {
           <Pressable style={styles.modalCard} onPress={() => {}}>
             <Text style={styles.modalTitle}>Ajouter une pièce</Text>
             <Text style={styles.modalSubtitle}>
-              Elle se pose à côté du plan, aux cotes choisies. Les murs se
-              déplacent ensuite au doigt, et se cotent comme les autres.
+              {selectedWallId
+                ? 'Elle s’accole au mur choisi et le partage avec lui : ' +
+                  'elle en prend la longueur, et vous donnez la profondeur.'
+                : 'Elle se pose à côté du plan. Pour l’accoler, touchez ' +
+                  'd’abord le mur qui les séparera, puis ajoutez-la.'}
             </Text>
             <ScrollView style={styles.nameScroll}>
-              <View style={styles.nameGrid}>
-                {(
-                  [
-                    ['Chambre', 3.4, 3],
-                    ['Séjour', 5, 4],
-                    ['Cuisine', 3.2, 2.6],
-                    ['Salle de bain', 2.4, 2],
-                    ['WC', 1.4, 1],
-                    ['Dégagement', 3, 1.2],
-                    ['Bureau', 3, 2.6],
-                    ['Buanderie', 2.2, 1.8],
-                  ] as [string, number, number][]
-                ).map(([nom, larg, prof]) => (
-                  <TouchableOpacity
-                    key={nom}
-                    style={styles.nameChip}
-                    onPress={() => {
-                      const id = addRoomBox(larg, prof, nom);
-                      setAjoutPiece(false);
-                      seuleSelection('piece');
-                      setSelectedRoomId(id);
-                      setEditMode(true);
-                      haptic('succes');
-                    }}>
-                    <Text style={styles.nameChipText}>{nom}</Text>
-                    <Text style={styles.nameChipDim}>
-                      {`${fr(larg, 2)} × ${fr(prof, 2)} m`}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+              <RoomChoice
+                modeles={[
+                  { nom: 'Chambre', largeur: 3.4, profondeur: 3 },
+                  { nom: 'Séjour', largeur: 5, profondeur: 4 },
+                  { nom: 'Cuisine', largeur: 3.2, profondeur: 2.6 },
+                  { nom: 'Salle de bain', largeur: 2.4, profondeur: 2 },
+                  { nom: 'WC', largeur: 1.4, profondeur: 1 },
+                  { nom: 'Dégagement', largeur: 3, profondeur: 1.2 },
+                  { nom: 'Bureau', largeur: 3, profondeur: 2.6 },
+                  { nom: 'Buanderie', largeur: 2.2, profondeur: 1.8 },
+                ]}
+                onChoose={(m) => {
+                  // Accolée au mur choisi, s'il y en a un : c'est ainsi
+                  // qu'on bâtit un appartement de proche en proche.
+                  const id = addRoomBox(
+                    m.largeur,
+                    Math.min(m.largeur, m.profondeur),
+                    m.nom,
+                    selectedWallId,
+                  );
+                  setAjoutPiece(false);
+                  seuleSelection('piece');
+                  setSelectedRoomId(id);
+                  setEditMode(true);
+                  haptic('succes');
+                }}
+                onCustom={() => {
+                  setAjoutPiece(false);
+                  apresFermeture(() =>
+                    setPrompt({
+                      title: 'Pièce sur mesure',
+                      subtitle:
+                        'Largeur et profondeur en mètres, séparées par un × ' +
+                        '(par exemple 3,60 x 2,80).',
+                      value: '3,60 x 2,80',
+                      onSubmit: (t) => {
+                        const [l, p] = t
+                          .replace(',', '.')
+                          .replace(',', '.')
+                          .split(/[x×*]/i)
+                          .map((v) => parseFloat(v.replace(',', '.').trim()));
+                        if (!isFinite(l) || !isFinite(p) || l <= 0 || p <= 0) {
+                          haptic('alerte');
+                          return;
+                        }
+                        const id = addRoomBox(l, p, '', selectedWallId);
+                        seuleSelection('piece');
+                        setSelectedRoomId(id);
+                        setEditMode(true);
+                        haptic('succes');
+                      },
+                    }),
+                  );
+                }}
+              />
             </ScrollView>
-            <TouchableOpacity
-              style={styles.removeRoomButton}
-              onPress={() => setAjoutPiece(false)}>
-              <Text style={styles.nameChipText}>Annuler</Text>
-            </TouchableOpacity>
           </Pressable>
         </Pressable>
       </Modal>
@@ -2698,62 +2757,6 @@ export function ResultScreen() {
   );
 }
 
-function Segment({ tab, onChange }: { tab: Tab; onChange: (t: Tab) => void }) {
-  const styles = getStyles(useTheme());
-  const [w, setW] = useState(0);
-  const x = useRef(new Animated.Value(tab === '2d' ? 0 : 1)).current;
-  useEffect(() => {
-    Animated.spring(x, {
-      toValue: tab === '2d' ? 0 : 1,
-      damping: 17,
-      stiffness: 230,
-      mass: 0.75,
-      useNativeDriver: true,
-    }).start();
-  }, [tab, x]);
-  const half = Math.max(0, (w - 8) / 2);
-  return (
-    <View
-      style={styles.segment}
-      onLayout={(e) => setW(e.nativeEvent.layout.width)}>
-      {w > 0 && (
-        <Animated.View
-          style={[
-            styles.segmentThumb,
-            {
-              width: half,
-              transform: [
-                {
-                  translateX: x.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0, half],
-                  }),
-                },
-              ],
-            },
-          ]}
-        />
-      )}
-      {(
-        [
-          ['2d', 'Plan 2D'],
-          ['3d', 'Vue 3D'],
-        ] as [Tab, string][]
-      ).map(([key, label]) => (
-        <TouchableOpacity
-          key={key}
-          activeOpacity={0.7}
-          style={styles.segmentItem}
-          onPress={() => onChange(key)}>
-          <Text
-            style={[styles.segmentText, tab === key && styles.segmentTextActive]}>
-            {label}
-          </Text>
-        </TouchableOpacity>
-      ))}
-    </View>
-  );
-}
 
 /**
  * La vignette d'un meuble du catalogue : son symbole de plan, vu de dessus,
@@ -2835,18 +2838,6 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     shadowOpacity: 0.07,
     shadowRadius: 8,
   },
-  /** Les mesures repliées : une ligne, discrète, qu'on peut déplier. */
-  metricsLigne: {
-    marginTop: 8,
-    marginBottom: 8,
-    paddingVertical: 2,
-  },
-  metricsResume: {
-    color: c.inkFaint,
-    fontSize: 12.5,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
   backButton: {
     width: 38,
     height: 38,
@@ -2895,9 +2886,10 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     // Pleine largeur : c'est ce qui borne le cadre. Les cellules se
     // répartissent l'espace au lieu de le réclamer.
     alignSelf: 'stretch',
-    marginTop: 10,
-    marginBottom: 10,
-    paddingVertical: 10,
+    marginTop: 8,
+    marginBottom: 8,
+    // Plus serré qu'avant : les chiffres restent, la hauteur perdue non.
+    paddingVertical: 7,
     paddingHorizontal: 4,
     ...shadowCard,
   },
@@ -2924,35 +2916,23 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     letterSpacing: 0.2,
     marginTop: 2,
   },
-  segment: {
-    flexDirection: 'row',
-    backgroundColor: c.surfaceSunken,
-    borderRadius: radius.pill,
-    padding: 4,
-    marginBottom: 10,
-  },
-  segmentThumb: {
+  /** Le sélecteur de vue, posé en haut à droite du dessin. */
+  vuePastille: {
     position: 'absolute',
-    left: 4,
-    top: 4,
-    bottom: 4,
+    top: 10,
+    right: 10,
+    zIndex: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    height: 34,
+    paddingHorizontal: 12,
     borderRadius: radius.pill,
     backgroundColor: c.surface,
-    ...shadowLift,
+    ...shadowCard,
     shadowOpacity: 0.1,
   },
-  segmentItem: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: 'center',
-  },
-  segmentText: {
-    color: c.inkSoft,
-    fontSize: 14.5,
-    fontWeight: '700',
-    letterSpacing: -0.2,
-  },
-  segmentTextActive: { color: c.blue },
+  vuePastilleTexte: { color: c.ink, fontSize: 14, fontWeight: '800' },
   canvas: { flex: 1, ...shadowCard, borderRadius: radius.lg },
   // Jusqu'à neuf pastilles : la barre défile plutôt que de se replier sur
   // deux rangs et de manger le plan.
@@ -2960,28 +2940,42 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   // droit : la main qui vient de le toucher n'a plus qu'à glisser vers le
   // bas. Une rangée horizontale, elle, finissait par défiler — donc par
   // cacher la moitié des outils.
+  /**
+   * LES OUTILS SONT EN BAS, ET NON PLUS AUTOUR DU PLAN.
+   *
+   * Ils encadraient le dessin : une rangée en haut, une colonne à droite.
+   * Deux bandes de soixante points qui mordaient sur l'espace de travail —
+   * et sur un plan de biais, le logement se retrouvait cerné. Les
+   * applications de plan les posent toutes en bas, sur une seule ligne :
+   * la main y est déjà, et le dessin garde ses quatre côtés.
+   */
   planTools: {
     position: 'absolute',
-    // Juste sous la rangée d'ancrage, du même écart qu'entre deux pastilles.
-    top: ANCHOR_TOP + PILL_CELL_H + PILL_GAP,
-    // La cellule fait 58 de large pour son mot, la pastille 38 : on recule
-    // de la moitié de la différence pour que les pastilles restent sur
-    // l'axe qu'elles occupaient.
-    right: -1,
+    left: 0,
+    right: 0,
+    bottom: 8,
+    flexDirection: 'row',
     alignItems: 'flex-end',
     gap: PILL_GAP,
+    paddingHorizontal: 10,
   },
+  /** Le rail qui défile, quand les outils dépassent la largeur. */
+  planToolsRail: { alignItems: 'flex-end', gap: PILL_GAP, paddingRight: 4 },
   /** Sans rangée au-dessus, la colonne prend sa place. */
-  planToolsHaut: { top: ANCHOR_TOP },
+  planToolsHaut: {},
+  /**
+   * L'ancrage suit les outils : même ligne, en bas à droite.
+   *
+   * « Édition » commande le contenu de la barre : il reste à demeure, et
+   * les outils défilent à sa gauche, jamais dessous.
+   */
   editAnchor: {
     position: 'absolute',
-    top: ANCHOR_TOP,
-    right: -1,
+    bottom: 8,
+    right: 10,
     zIndex: 4,
     flexDirection: 'row',
-    // En haut, pas au centre : les cellules de la rangée doivent partager
-    // la ligne des pastilles, même quand l'une porte un mot plus long.
-    alignItems: 'flex-start',
+    alignItems: 'flex-end',
     gap: 6,
   },
   /**
@@ -3078,7 +3072,9 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   // d'enregistrement. Elle dit l'essentiel et ne mange pas le dessin.
   wallStrip: {
     position: 'absolute',
-    bottom: 12,
+    // AU-DESSUS de la barre d'outils, qui occupe désormais le pied du plan.
+    // Posé à la même hauteur, il lui passait dessus.
+    bottom: BARRE_OUTILS,
     left: 12,
     // La colonne d'outils descend du HAUT du plan : sous elle, la largeur
     // est libre. On lui laissait pourtant soixante-dix points de marge —
@@ -3126,7 +3122,7 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   // derrière la pastille bleue.
   editBar: {
     position: 'absolute',
-    bottom: 12,
+    bottom: BARRE_OUTILS,
     left: 12,
     // Toute la largeur : les 84 points réservés au bouton de sauvegarde
     // n'ont plus lieu d'être, et c'était eux qui poussaient la validation

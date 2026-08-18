@@ -374,7 +374,9 @@ describe('l’écran des résultats', () => {
 
     const vu = textes(tree);
     expect(vu).toContain('Nommer');
-    expect(vu).toMatch(/Hauteur \d/);
+    // La hauteur tient en trois caractères : « H 2,50 m ». Le mot entier
+    // poussait le troisième bouton hors du bandeau.
+    expect(vu).toMatch(/H \d/);
     // Le bandeau annonce la pièce qu'il règle, avec sa surface.
     expect(vu).toMatch(/Pièce \d/);
   });

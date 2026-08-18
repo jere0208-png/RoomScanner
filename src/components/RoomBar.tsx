@@ -2,16 +2,22 @@
  * LE BANDEAU D'UNE PIÈCE — la nommer, la mesurer, la corriger.
  *
  * Un scan ne découpe pas toujours juste : il réunit une entrée et un séjour
- * qu'aucune porte ne sépare, ou coupe en deux une pièce en L. Ces deux
- * gestes-là — fusionner, scinder — ne se devinent pas dans un menu ; ils se
- * tiennent avec le nom et la hauteur sous plafond, c'est-à-dire avec tout ce
- * qui ne regarde QUE la pièce sélectionnée.
+ * qu'aucune porte ne sépare, ou coupe en deux une pièce en L. Ces gestes-là
+ * — fusionner, scinder, retirer — se tiennent avec le nom et la hauteur
+ * sous plafond : tout ce qui ne regarde QUE la pièce sélectionnée.
  *
- * Les cinq tiennent sur une ligne qui défile : à cinq boutons sur un
- * téléphone étroit, le dernier tomberait sinon hors de l'écran.
+ * PREMIÈRE VERSION : cinq boutons sur une ligne qui défile. Sur un
+ * téléphone, le troisième était coupé en plein mot au bord de l'écran —
+ * « Fusionner » tranché après le second n — et rien ne disait qu'il y en
+ * avait d'autres derrière. Un bandeau qui défile sans le montrer, c'est un
+ * bandeau qui cache.
+ *
+ * DÉSORMAIS : deux gestes tenus à la main, et les trois qui touchent à la
+ * STRUCTURE du plan derrière un « … ». Rien ne dépasse, rien ne défile, et
+ * la ligne de mesures se lit d'un coup.
  */
 import React from 'react';
-import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { Text, TouchableOpacity, View } from 'react-native';
 
 const fr = (v: number, d = 1) => v.toFixed(d).replace('.', ',');
 
@@ -20,13 +26,10 @@ export function RoomBar({
   surface,
   extent,
   hauteur,
-  voisines,
   styles,
   onName,
   onHeight,
-  onMerge,
-  onSplit,
-  onRemove,
+  onMore,
 }: {
   room: { id: string; name: string };
   /** Surface au sol, quand le contour se referme. */
@@ -34,30 +37,28 @@ export function RoomBar({
   /** Encombrement hors tout de la pièce. */
   extent: { width: number; depth: number };
   hauteur: number;
-  /** Combien d'autres pièces : sans voisine, on ne fusionne ni ne retire. */
-  voisines: number;
   styles: Record<string, object>;
   onName: () => void;
   onHeight: () => void;
-  onMerge: () => void;
-  onSplit: () => void;
-  onRemove: () => void;
+  /** Fusionner, scinder, retirer : les gestes qui changent le plan. */
+  onMore: () => void;
 }) {
   return (
     <View style={styles.editBar}>
-      <Text style={styles.editLabel}>
-        {room.name || 'Pièce sans nom'}
-        {surface
-          ? ` · ${surface.exact ? '' : '≈ '}${fr(surface.area)} m² · ${fr(
-              extent.width,
-              2,
-            )} × ${fr(extent.depth, 2)} m`
-          : ''}
-      </Text>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled">
+      <View style={styles.roomHead}>
+        <Text style={styles.roomNom} numberOfLines={1}>
+          {room.name || 'Pièce sans nom'}
+        </Text>
+        <Text style={styles.roomCotes} numberOfLines={1}>
+          {surface
+            ? `${surface.exact ? '' : '≈ '}${fr(surface.area)} m²  ·  ${fr(
+                extent.width,
+                2,
+              )} × ${fr(extent.depth, 2)} m`
+            : `${fr(extent.width, 2)} × ${fr(extent.depth, 2)} m`}
+        </Text>
+      </View>
+      <View style={styles.roomActions}>
         <TouchableOpacity
           style={styles.applyButton}
           accessibilityLabel="Nommer la pièce"
@@ -68,31 +69,15 @@ export function RoomBar({
           style={styles.roomAction}
           accessibilityLabel="Hauteur sous plafond"
           onPress={onHeight}>
-          <Text style={styles.roomActionText}>Hauteur {fr(hauteur, 2)} m</Text>
+          <Text style={styles.roomActionText}>{`H ${fr(hauteur, 2)} m`}</Text>
         </TouchableOpacity>
-        {voisines > 0 && (
-          <TouchableOpacity
-            style={styles.roomAction}
-            accessibilityLabel="Fusionner avec une autre pièce"
-            onPress={onMerge}>
-            <Text style={styles.roomActionText}>Fusionner</Text>
-          </TouchableOpacity>
-        )}
         <TouchableOpacity
           style={styles.roomAction}
-          accessibilityLabel="Scinder la pièce"
-          onPress={onSplit}>
-          <Text style={styles.roomActionText}>Scinder</Text>
+          accessibilityLabel="Autres gestes sur la pièce"
+          onPress={onMore}>
+          <Text style={styles.roomActionText}>…</Text>
         </TouchableOpacity>
-        {voisines > 0 && (
-          <TouchableOpacity
-            style={styles.removeRoomButton}
-            accessibilityLabel="Retirer la pièce"
-            onPress={onRemove}>
-            <Text style={styles.removeRoomText}>Retirer</Text>
-          </TouchableOpacity>
-        )}
-      </ScrollView>
+      </View>
     </View>
   );
 }

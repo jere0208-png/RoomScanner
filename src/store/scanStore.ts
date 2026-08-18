@@ -463,7 +463,21 @@ interface ScanState {
    * une pièce de la taille demandée, accolée au plan existant, qu'on ajuste
    * ensuite au doigt comme n'importe quel mur.
    */
-  addRoomBox: (largeur: number, profondeur: number, nom: string) => string;
+  addRoomBox: (
+    largeur: number,
+    profondeur: number,
+    nom: string,
+    /**
+     * LE MUR CONTRE LEQUEL ON L'ACCOLE, s'il y en a un.
+     *
+     * C'est ce qui permet de bâtir un appartement de proche en proche :
+     * on touche un mur, on ajoute une pièce, elle se pose de l'autre côté
+     * en PARTAGEANT ce mur — pas à côté, pas par-dessus, accolée. Le mur
+     * mitoyen appartient alors aux deux pièces, comme dans un vrai
+     * logement, et la cloison ne se dessine qu'une fois.
+     */
+    contreWallId?: string | null,
+  ) => string;
   /** Appareillage électrique posé sur les murs (prises, commandes, RJ45…). */
   fixtures: Fixture[];
   /** Cap du scan : d'où vient le nord. `null` = boussole muette. */
@@ -1033,12 +1047,74 @@ export const useScanStore = create<ScanState>((set, get) => {
       });
     },
 
-    addRoomBox: (largeur, profondeur, nom) => {
+    addRoomBox: (largeur, profondeur, nom, contreWallId) => {
       const st = get();
       pushHistory('addRoom');
       const h = st.walls[0]?.height ?? 2.5;
       const cle = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
       const roomId = `piece-${cle}`;
+
+      /**
+       * ACCOLÉE À UN MUR : elle en prend la longueur, et le partage.
+       *
+       * Le mur choisi devient la cloison mitoyenne — il figure dans les
+       * listes des DEUX pièces. On n'ajoute donc que trois murs, et le plan
+       * reste cohérent : une seule maçonnerie entre deux pièces, cotée une
+       * fois, équipée des deux côtés.
+       *
+       * La nouvelle pièce prend la LONGUEUR du mur plutôt que celle du
+       * modèle : c'est la seule façon d'avoir une cloison qui coïncide
+       * exactement. Sa profondeur, elle, est bien celle qu'on a choisie.
+       */
+      const contre = contreWallId
+        ? st.walls.find((w) => w.id === contreWallId)
+        : undefined;
+      if (contre) {
+        const len = Math.hypot(contre.b.x - contre.a.x, contre.b.z - contre.a.z);
+        if (len > 0.4) {
+          const u = {
+            x: (contre.b.x - contre.a.x) / len,
+            z: (contre.b.z - contre.a.z) / len,
+          };
+          // La normale qui S'ÉLOIGNE de la pièce existante : la nouvelle se
+          // pose de l'autre côté, jamais par-dessus.
+          // `interiorSide` dit de quel côté est la pièce, par rapport à
+          // `perpOf(u)` = (−uz, ux). La nouvelle pièce va à l'OPPOSé.
+          const dedans = interiorSide(contre, st.walls, st.rooms);
+          const n = { x: u.z * dedans, z: -u.x * dedans };
+          const p = Math.max(0.6, profondeur);
+          const c1 = { x: contre.b.x + n.x * p, z: contre.b.z + n.z * p };
+          const c2 = { x: contre.a.x + n.x * p, z: contre.a.z + n.z * p };
+          const murs = [
+            { a: contre.b, b: c1 },
+            { a: c1, b: c2 },
+            { a: c2, b: contre.a },
+          ].map((seg, i) => ({
+            id: `mur-${cle}-${i}`,
+            type: 'wall' as const,
+            a: seg.a,
+            b: seg.b,
+            height: h,
+            yCenter: h / 2,
+            roomId,
+          }));
+          set({
+            walls: [...st.walls, ...murs],
+            rooms: [
+              ...st.rooms,
+              {
+                id: roomId,
+                name: nom,
+                floor: null,
+                // Le mur mitoyen d'abord : c'est lui qui les relie.
+                wallIds: [contre.id, ...murs.map((w) => w.id)],
+              },
+            ],
+            dirty: true,
+          });
+          return roomId;
+        }
+      }
       /**
        * OÙ SE POSE LA NOUVELLE PIÈCE : À DROITE DE CE QUI EXISTE.
        *
