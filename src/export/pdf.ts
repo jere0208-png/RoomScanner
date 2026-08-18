@@ -40,7 +40,7 @@ import {
   type FixtureKind,
   type SymbolStroke,
 } from '../geometry/electrical';
-import type { Differential, MaterialList } from '../geometry/nfc15100';
+import type { Circuit, Differential, MaterialList } from '../geometry/nfc15100';
 import {
   circuitColor,
   type MultiWireSchema,
@@ -2918,6 +2918,110 @@ function wrapText(str: string, size: number, maxW: number): string[] {
  * qu'on envoie à un client ou à un fournisseur — il porte donc le cartouche
  * et le logo comme les autres feuilles.
  */
+/**
+ * LE TABLEAU, EN IMAGE — la moitié manquante du dossier d'exécution.
+ *
+ * L'app savait répartir l'appareillage en circuits et proposer la protection
+ * de chacun ; elle en donnait la LISTE. Or un tableau ne se monte pas avec
+ * une liste : on le monte rangée par rangée, module par module, et ce qu'on
+ * cherche sur le chantier c'est « qu'est-ce qui va où ».
+ *
+ * Le dessin suit la façon dont on l'équipe réellement :
+ *
+ * - **une rangée par interrupteur différentiel**, lui-même en tête de sa
+ *   rangée (deux modules), suivi des disjoncteurs qu'il protège ;
+ * - **treize modules par rangée**, la largeur d'un coffret courant. Un
+ *   différentiel qui déborde passe à la rangée suivante plutôt que d'être
+ *   dessiné hors du coffret ;
+ * - **la réserve reste dessinée**, en emplacements vides : la norme demande
+ *   20 % de modules libres, et un tableau plein à ras bord est un tableau
+ *   qu'on ne pourra pas faire évoluer. On la voit, donc on la compte ;
+ * - **les modules sont numérotés**, et la légende dessous dit le circuit, sa
+ *   section et son calibre. Un libellé de circuit ne tient pas dans quatorze
+ *   points de large ; le numéro, si — c'est d'ailleurs ce qu'on écrit sur
+ *   l'étiquette du tableau.
+ *
+ * Les courants faibles n'y figurent pas : ils ne sont pas protégés par un
+ * disjoncteur et rejoignent le coffret de communication, qui est un autre
+ * boîtier.
+ */
+const MODULES_PAR_RANGEE = 13;
+
+export interface BoardModule {
+  /** Numéro d'ordre, celui qu'on écrit sur l'étiquette. */
+  numero: number;
+  /** Ce qui s'écrit dans le module : le calibre, ou « ID ». */
+  marque: string;
+  /** Largeur en modules : deux pour un différentiel, un pour le reste. */
+  largeur: number;
+  /** La légende de la ligne, sous le dessin. */
+  legende: string;
+  differentiel: boolean;
+}
+
+export interface BoardRow {
+  label: string;
+  modules: BoardModule[];
+  /** Emplacements laissés libres dans la rangée. */
+  libres: number;
+}
+
+/**
+ * Répartit circuits et différentiels en rangées de treize modules.
+ *
+ * Exportée : c'est un calcul, pas un dessin, et c'est lui qu'on vérifie.
+ */
+export function boardRows(list: MaterialList): BoardRow[] {
+  const parLabel = new Map(list.circuits.map((c) => [c.label, c]));
+  const rows: BoardRow[] = [];
+  let numero = 0;
+  for (const diff of list.differentials) {
+    const proteges = diff.circuits
+      .map((l) => parLabel.get(l))
+      .filter((c): c is Circuit => !!c);
+    // Le différentiel en tête, puis ses disjoncteurs, treize par treize.
+    let reste = proteges;
+    let premiere = true;
+    do {
+      const place = MODULES_PAR_RANGEE - (premiere ? 2 : 0);
+      const lot = reste.slice(0, place);
+      reste = reste.slice(place);
+      const modules: BoardModule[] = [];
+      if (premiere) {
+        numero += 1;
+        modules.push({
+          numero,
+          marque: 'ID',
+          largeur: 2,
+          legende: `${diff.label} — ${diff.rating} A · 30 mA · type ${diff.type}`,
+          differentiel: true,
+        });
+      }
+      for (const c of lot) {
+        numero += 1;
+        modules.push({
+          numero,
+          marque: c.breaker === null ? '—' : `${c.breaker}`,
+          largeur: 1,
+          legende:
+            `${c.label} · ${c.breaker} A · ` +
+            `${String(c.section).replace('.', ',')} mm²` +
+            (c.rooms.length > 0 ? ` (${c.rooms.join(', ')})` : ''),
+          differentiel: false,
+        });
+      }
+      const pris = modules.reduce((n, m) => n + m.largeur, 0);
+      rows.push({
+        label: `${diff.label} · type ${diff.type}`,
+        modules,
+        libres: Math.max(0, MODULES_PAR_RANGEE - pris),
+      });
+      premiere = false;
+    } while (reste.length > 0);
+  }
+  return rows;
+}
+
 export function buildMaterialPdf(
   name: string,
   list: MaterialList,
@@ -3033,7 +3137,86 @@ export function buildMaterialPdf(
   }
 
   // ------------------------------------------------------------- tableau
-  titre('Tableau électrique');
+  /*
+    LE COFFRET, DESSINÉ — puis sa légende.
+
+    On monte un tableau rangée par rangée, module par module : c'est cette
+    image-là qu'on cherche sur le chantier, pas une liste. Elle vient donc
+    AVANT le tableau des protections, qui reste pour le chiffrage.
+  */
+  const rangees = boardRows(list);
+  if (rangees.length > 0) {
+    titre('Tableau électrique');
+    // Le coffret prend la LARGEUR DE LA FEUILLE : bridés à vingt points, les
+    // modules se serraient dans le quart gauche de la page, illisibles, et
+    // les trois quarts restaient blancs.
+    const MOD_W = (w - 12) / MODULES_PAR_RANGEE;
+    const MOD_H = 30;
+    // Deux points d'écart entre rangées, plus la légende de chacune.
+    for (const r of rangees) {
+      // La rangée et ses légendes ne se coupent jamais en deux pages.
+      need(MOD_H + 26 + r.modules.length * 11);
+      const x1 = x0 + 6;
+      // Le rail : un cadre qui tient les treize emplacements.
+      d.rect(
+        x1 - 4,
+        y - MOD_H - 4,
+        MOD_W * MODULES_PAR_RANGEE + 8,
+        MOD_H + 8,
+        null,
+        GREY_LIGHT,
+        0.8,
+      );
+      let mx = x1;
+      for (const m of r.modules) {
+        const mw = MOD_W * m.largeur;
+        d.rect(mx, y - MOD_H, mw - 2, MOD_H, m.differentiel ? '#EEF2FA' : '#FFFFFF', INK, 0.9);
+        // Le calibre, gros : c'est ce qu'on lit en levant les yeux.
+        d.text(m.marque, mx + (mw - 2) / 2, y - 13, 10.5, INK, {
+          bold: true,
+          align: 'center',
+        });
+        // Le numéro d'ordre, en pied de module : celui de l'étiquette.
+        d.text(`${m.numero}`, mx + (mw - 2) / 2, y - MOD_H + 5, 7.5, GREY, {
+          align: 'center',
+        });
+        mx += mw;
+      }
+      // La RÉSERVE, dessinée vide : la norme en demande 20 %, et un tableau
+      // plein à ras bord est un tableau qu'on ne fera pas évoluer.
+      for (let i = 0; i < r.libres; i++) {
+        d.rect(mx, y - MOD_H, MOD_W - 2, MOD_H, null, GREY_LIGHT, 0.6);
+        mx += MOD_W;
+      }
+      y -= MOD_H + 10;
+      if (r.libres > 0) {
+        d.text(
+          `${r.libres} module${r.libres > 1 ? 's' : ''} de réserve`,
+          x0 + w,
+          y,
+          7.5,
+          GREY_LIGHT,
+          { align: 'right' },
+        );
+      }
+      y -= 10;
+      for (const m of r.modules) {
+        ligne(`${m.numero} — ${m.legende}`, '', { indent: 10, grey: true });
+      }
+      y -= 8;
+    }
+    const vdi = list.circuits.filter((c) => c.nature === 'vdi').length;
+    if (vdi > 0) {
+      note(
+        `   Les courants faibles (${vdi} circuit${vdi > 1 ? 's' : ''}) ne sont ` +
+          'pas protégés par un disjoncteur : ils rejoignent le coffret de ' +
+          'communication.',
+      );
+    }
+    y -= 6;
+  }
+
+  titre(rangees.length > 0 ? 'Protections, circuit par circuit' : 'Tableau électrique');
   ligne('Circuit', 'Protection', { bold: true, grey: true });
   for (const c of list.circuits) {
     const protection =

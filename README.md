@@ -301,6 +301,29 @@ un mètre qu'on tire, filet après filet : pendant qu'un trait s'allonge, son
 nombre n'est pas encore là, et l'œil suit le mouvement au lieu de lire. Un mur
 équipé porte huit cotes ; huit petits mouvements successifs, c'est du bruit.
 
+### Le tableau se dessine
+
+L'app savait répartir l'appareillage en circuits et proposer la protection de
+chacun ; elle en donnait la **liste**. Or un tableau ne se monte pas avec une
+liste : rangée par rangée, module par module, et ce qu'on cherche sur le
+chantier c'est « qu'est-ce qui va où ». Le dossier d'exécution en était à
+moitié vide.
+
+Le PDF du matériel porte donc le **coffret dessiné** : une rangée par
+interrupteur différentiel, lui-même en tête sur ses deux modules, suivi des
+disjoncteurs qu'il protège, à leur calibre. Treize modules par rangée — la
+largeur d'un coffret courant : ce qui déborde passe à la rangée suivante
+plutôt que d'être dessiné hors du boîtier. Les **emplacements libres restent
+tracés** : la norme demande 20 % de réserve, et un tableau plein à ras bord
+est un tableau qu'on ne fera pas évoluer ; on la voit, donc on la compte.
+
+Les modules sont **numérotés**, et la légende dessous donne le circuit, sa
+section et son calibre — un libellé ne tient pas dans quatorze points de
+large, un numéro si, et c'est justement ce qu'on écrit sur l'étiquette du
+tableau. Les courants faibles n'y figurent pas : ils ne sont pas protégés par
+un disjoncteur et rejoignent le coffret de communication, qui est un autre
+boîtier.
+
 ### La typo de la marque
 
 Le mot « EchoPlan » n'est plus composé : c'est **l'image de la marque**,
