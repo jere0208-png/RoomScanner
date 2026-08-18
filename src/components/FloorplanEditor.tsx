@@ -2482,7 +2482,21 @@ export function SideHandle({
   // UNE FOIS, et tout ce qui change en cours de geste passe par la référence.
   const live = useRef({ mapping, normale });
   live.current = { mapping, normale };
-  const fait = useRef(0);
+  /**
+   * LE MEUBLE TEL QU'IL ÉTAIT À L'APPUI — le point fixe du geste.
+   *
+   * On envoyait des pas relatifs : « agrandis de trois millimètres de
+   * plus ». Chaque image repartait donc d'une taille déjà corrigée par
+   * l'aimant ou par la butée des murs, et la correction se rajoutait à la
+   * suivante. Le chantier l'a filmé : un meuble contre un mur passait de
+   * 0,44 m à 1,53 puis 1,93, en traversant la maçonnerie.
+   *
+   * On retient donc l'état de départ, et l'on envoie la distance TOTALE
+   * parcourue depuis. Rien ne se cumule.
+   */
+  const depart = useRef<
+    { width: number; depth: number; cx: number; cz: number } | null
+  >(null);
   const pan = useMemo(
     () =>
       PanResponder.create({
@@ -2491,23 +2505,38 @@ export function SideHandle({
         onPanResponderTerminationRequest: () => false,
         onShouldBlockNativeResponder: () => true,
         onPanResponderGrant: () => {
-          fait.current = 0;
+          const o = useScanStore
+            .getState()
+            .objects.find((x) => x.id === objectId);
+          depart.current = o
+            ? {
+                width: o.width,
+                depth: o.depth,
+                cx: o.transform[12],
+                cz: o.transform[14],
+              }
+            : null;
         },
         onPanResponderMove: (_e, g) => {
+          const base = depart.current;
+          if (!base) return;
           const d = live.current.mapping.deltaToMeters(g.dx, g.dy);
           const n = live.current.normale;
-          // Depuis l'appui : on n'applique que ce qui reste à faire, sinon
-          // chaque image rejouerait tout le glissement depuis le début.
           const total = d.x * n.x + d.z * n.z;
-          const pas = total - fait.current;
-          fait.current = total;
-          if (Math.abs(pas) < 1e-5) return;
-          const r = useScanStore.getState().resizeObjectSide(objectId, cote, pas);
+          const r = useScanStore
+            .getState()
+            .resizeObjectSide(objectId, cote, total, base);
           if (r.accroche) haptic('accroche', true);
           else releaseHaptic('accroche');
         },
-        onPanResponderRelease: () => releaseHaptic('accroche'),
-        onPanResponderTerminate: () => releaseHaptic('accroche'),
+        onPanResponderRelease: () => {
+          depart.current = null;
+          releaseHaptic('accroche');
+        },
+        onPanResponderTerminate: () => {
+          depart.current = null;
+          releaseHaptic('accroche');
+        },
       }),
     [objectId, cote],
   );

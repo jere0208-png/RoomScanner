@@ -336,18 +336,31 @@ describe('un meuble s’étire par ses côtés', () => {
     const o = useScanStore.getState().objects.find((x) => x.id === id)!;
     return { w: o.width, d: o.depth };
   };
-  /** Le geste : N images, chacune tirant le bord d'un peu plus. */
+  /**
+   * LE GESTE, TEL QUE LA POIGNÉE L'ENVOIE.
+   *
+   * Elle retient le meuble à l'appui et envoie la distance TOTALE parcourue
+   * depuis — jamais un pas relatif. Le banc doit faire pareil, sinon il
+   * éprouve un mode que l'application n'emploie plus.
+   */
   const tirer = (
     id: string,
     cote: 'largeur+' | 'largeur-' | 'profondeur+' | 'profondeur-',
     total: number,
     images = 20,
   ) => {
+    const o = useScanStore.getState().objects.find((x) => x.id === id)!;
+    const base = {
+      width: o.width,
+      depth: o.depth,
+      cx: o.transform[12],
+      cz: o.transform[14],
+    };
     let accroche = false;
-    for (let i = 0; i < images; i++) {
+    for (let i = 1; i <= images; i++) {
       const r = useScanStore
         .getState()
-        .resizeObjectSide(id, cote, total / images);
+        .resizeObjectSide(id, cote, (total * i) / images, base);
       accroche = accroche || r.accroche;
     }
     return accroche;
@@ -440,15 +453,31 @@ describe('le bord s’aligne sur le bout d’un mur', () => {
       z,
     );
   };
+  /**
+   * LE GESTE, TEL QUE LA POIGNÉE L'ENVOIE.
+   *
+   * Elle retient le meuble à l'appui et envoie la distance TOTALE parcourue
+   * depuis — jamais un pas relatif. Le banc doit faire pareil, sinon il
+   * éprouve un mode que l'application n'emploie plus.
+   */
   const tirer = (
     id: string,
     cote: 'largeur+' | 'largeur-' | 'profondeur+' | 'profondeur-',
     total: number,
     images = 20,
   ) => {
+    const o = useScanStore.getState().objects.find((x) => x.id === id)!;
+    const base = {
+      width: o.width,
+      depth: o.depth,
+      cx: o.transform[12],
+      cz: o.transform[14],
+    };
     let accroche = false;
-    for (let i = 0; i < images; i++) {
-      const r = useScanStore.getState().resizeObjectSide(id, cote, total / images);
+    for (let i = 1; i <= images; i++) {
+      const r = useScanStore
+        .getState()
+        .resizeObjectSide(id, cote, (total * i) / images, base);
       accroche = accroche || r.accroche;
     }
     return accroche;
@@ -490,5 +519,117 @@ describe('le bord s’aligne sur le bout d’un mur', () => {
     expect(accroche).toBe(false);
     // Il s'est agrandi de ce qu'on a demandé, sans un centimètre de plus.
     expect(bordDe(id, -1)).toBeCloseTo(1.24, 2);
+  });
+});
+
+/**
+ * CE QUI SE PASSAIT QUAND ON AGRANDISSAIT UN MEUBLE CONTRE UN MUR.
+ *
+ * Enregistrement d'écran du chantier : un meuble de 0,73 m plaqué au mur,
+ * qu'on étire — il passe à 0,44, puis saute à 1,53, puis 1,93, en traversant
+ * la maçonnerie, et finit ailleurs dans la pièce.
+ *
+ * Deux fautes, et la seconde explique les sauts :
+ *
+ * 1. **Rien n'arrêtait le geste.** Le redimensionnement ne consultait aucun
+ *    mur : on tirait, le meuble entrait dans la cloison, et le plan montrait
+ *    un caisson au milieu du béton.
+ * 2. **Chaque image repartait de la précédente.** Les pas étaient RELATIFS :
+ *    l'image suivante s'appuyait sur une taille déjà corrigée par l'aimant,
+ *    et la correction se rajoutait à la suivante. Une accroche de trois
+ *    centimètres devenait un mètre en trente images.
+ */
+describe('agrandir un meuble contre un mur', () => {
+  const poserLa = (x: number, z: number, w = 0.6, d = 0.4) => {
+    useScanStore.setState({
+      walls: CHAMBRE,
+      rooms: [{ id: 'r1', name: 'Chambre', wallIds: CHAMBRE.map((m) => m.id) }],
+      objects: [],
+      openings: [],
+      fixtures: [],
+    });
+    return useScanStore.getState().addObject(
+      { key: 'meuble', label: 'Meuble', w, d, h: 0.8, category: 'storage' },
+      x,
+      z,
+    );
+  };
+  const etat = (id: string) => {
+    const o = useScanStore.getState().objects.find((x) => x.id === id)!;
+    return { w: o.width, d: o.depth, cx: o.transform[12], cz: o.transform[14] };
+  };
+  /** Le geste réel : ancré à l'appui, distance totale à chaque image. */
+  const geste = (
+    id: string,
+    cote: 'largeur+' | 'largeur-' | 'profondeur+' | 'profondeur-',
+    total: number,
+    images: number,
+  ) => {
+    const o = etat(id);
+    const base = { width: o.w, depth: o.d, cx: o.cx, cz: o.cz };
+    for (let i = 1; i <= images; i++) {
+      useScanStore
+        .getState()
+        .resizeObjectSide(id, cote, (total * i) / images, base);
+    }
+    return etat(id);
+  };
+
+  /**
+   * LE MÊME GESTE DONNE LE MÊME MEUBLE, quelle que soit la cadence.
+   *
+   * C'est l'invariant que la dérive violait : à doigt égal, le résultat
+   * dépendait du nombre d'images — donc de la charge du téléphone.
+   */
+  it('ne dérive pas avec le nombre d’images', () => {
+    // Un AGRANDISSEMENT au large : ni butée, ni minimum, rien qui masque la
+    // dérive en saturant des deux côtés.
+    const a = poserLa(1.7, 1.2);
+    const lent = geste(a, 'profondeur+', 0.4, 5);
+    const b = poserLa(1.7, 1.2);
+    const vif = geste(b, 'profondeur+', 0.4, 120);
+    expect(lent.d).toBeCloseTo(0.8, 3);
+    expect(vif.d).toBeCloseTo(lent.d, 6);
+    expect(vif.cz).toBeCloseTo(lent.cz, 6);
+  });
+
+  /**
+   * ET LA MAÇONNERIE ARRÊTE LE GESTE.
+   *
+   * Le meuble est contre le mur nord ; on tire son bord vers ce mur, loin
+   * au-delà. Il doit s'arrêter AU NU, pas le traverser.
+   */
+  it('bute sur le mur au lieu de le traverser', () => {
+    const id = poserLa(L / 2, 1.2, 0.6, 0.4);
+    // On le colle d'abord au mur nord.
+    const colle = glisser(id, 0, -3);
+    expect(colle.z).toBeCloseTo(0.4 / 2 + WALL_T / 2, 2);
+    // Puis on tire le bord haut DANS le mur, d'un mètre.
+    const apres = geste(id, 'profondeur-', 1, 30);
+    const bordHaut = apres.cz - apres.d / 2;
+    // Le bord s'arrête au nu : jamais au-delà, à un millimètre près.
+    expect(bordHaut).toBeGreaterThanOrEqual(WALL_T / 2 - 0.001);
+  });
+
+  /**
+   * SANS JAMAIS ÉCRASER LE MEUBLE.
+   *
+   * Une butée mal posée aurait ramené la cote au minimum de dix
+   * centimètres : le meuble aurait disparu sous le doigt.
+   */
+  it('garde une taille utile quand il bute', () => {
+    const id = poserLa(L / 2, 1.2, 0.6, 0.4);
+    glisser(id, 0, -3);
+    const apres = geste(id, 'profondeur-', 1, 30);
+    expect(apres.d).toBeGreaterThan(0.3);
+  });
+
+  /** Et le bord opposé reste où il est, même en butée. */
+  it('laisse le bord opposé en place', () => {
+    const id = poserLa(L / 2, 1.2, 0.6, 0.4);
+    const avant = etat(id);
+    const bordBas = avant.cz + avant.d / 2;
+    const apres = geste(id, 'profondeur-', 0.5, 30);
+    expect(apres.cz + apres.d / 2).toBeCloseTo(bordBas, 3);
   });
 });

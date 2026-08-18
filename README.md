@@ -184,6 +184,24 @@ son prolongement, l'écart dans la portée —, faute de quoi la cloison d'en fa
 attirerait le meuble à travers la pièce. La main le sent, l'œil étant caché
 par le doigt.
 
+**Le geste est ancré à l'appui, et la maçonnerie l'arrête.** Deux fautes
+filmées sur le chantier, un meuble contre un mur qu'on étire : il passait de
+0,73 m à 0,44, sautait à 1,53 puis 1,93, traversait la cloison et finissait
+ailleurs dans la pièce.
+
+La première faute : rien n'arrêtait le geste. Le redimensionnement ne
+consultait aucun mur. Le bord bute désormais au **nu**, jugé sur trois rayons
+— le milieu du bord fixe et ses deux bouts : un seul rayon manque le mur qu'un
+coin touche déjà, dans un logement dont les angles ne sont jamais droits.
+
+La seconde explique les sauts : chaque image envoyait un pas **relatif**, donc
+repartait d'une taille déjà corrigée par l'aimant ou par la butée — et la
+correction se rajoutait à la suivante. Trois centimètres d'accroche devenaient
+un mètre en trente images. La poignée retient donc le meuble tel qu'il était à
+l'appui et envoie la distance **totale** parcourue depuis : à doigt égal,
+résultat égal, quelle que soit la cadence des images. C'est l'invariant que le
+banc vérifie, en rejouant le même geste en 5 images puis en 120.
+
 Les poignées se posent **juste à l'extérieur** du contour. Posées dessus,
 leurs quarante points de zone touchable se rejoignaient au milieu d'un meuble
 de soixante centimètres : il devenait impossible de le déplacer, chaque appui

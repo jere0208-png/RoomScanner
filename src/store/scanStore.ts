@@ -23,6 +23,7 @@ import {
   pushOutOfObjects,
   separerMeubles,
   hugWall,
+  castToWall,
   pushOutOfWalls,
   snapSideToWalls,
   roomExtent,
@@ -852,6 +853,21 @@ interface ScanState {
     id: string,
     cote: 'largeur+' | 'largeur-' | 'profondeur+' | 'profondeur-',
     distance: number,
+    /**
+     * L'ÉTAT AU DÉBUT DU GESTE — et pourquoi il ne peut pas s'en passer.
+     *
+     * Le premier jet appliquait des pas RELATIFS : « agrandis de trois
+     * millimètres de plus ». Chaque image repartait donc de la taille que le
+     * store venait d'écrire — c'est-à-dire d'une taille déjà corrigée par
+     * l'aimant ou par la butée. La correction se rajoutait à la suivante, et
+     * le meuble partait en vrille : 0,44 m, puis 1,53, puis 1,93, en
+     * traversant les murs. C'est le défaut filmé sur le chantier.
+     *
+     * La poignée retient donc la taille et le centre à l'appui, et envoie la
+     * distance TOTALE parcourue depuis. Rien ne se cumule : à doigt égal,
+     * résultat égal, quelle que soit la cadence des images.
+     */
+    depuis?: { width: number; depth: number; cx: number; cz: number },
   ) => { accroche: boolean };
   /** Abandonne les modifications : recharge la dernière sauvegarde. */
   revertCurrent: () => void;
@@ -2595,7 +2611,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       });
     },
 
-    resizeObjectSide: (id, cote, distance) => {
+    resizeObjectSide: (id, cote, distance, depuis) => {
       const st = get();
       const obj = st.objects.find((o) => o.id === id);
       if (!obj) return { accroche: false };
@@ -2609,34 +2625,77 @@ export const useScanStore = create<ScanState>((set, get) => {
           : { x: -Math.sin(yaw), z: Math.cos(yaw) };
       const sens = cote.endsWith('+') ? 1 : -1;
       const n = { x: axe.x * sens, z: axe.z * sens };
+      // La direction du bord lui-même : elle sert aux rayons de butée.
+      const leLong = { x: -n.z, z: n.x };
       const surLargeur = cote.startsWith('largeur');
-      const avant = surLargeur ? obj.width : obj.depth;
+      // Tout se calcule depuis l'état du DÉBUT du geste : sans ce point
+      // fixe, les corrections de l'aimant et de la butée se cumulent d'une
+      // image à l'autre, et le meuble part en vrille.
+      const base = depuis ?? {
+        width: obj.width,
+        depth: obj.depth,
+        cx: obj.transform[12],
+        cz: obj.transform[14],
+      };
+      const avant = surLargeur ? base.width : base.depth;
+      const long = surLargeur ? base.depth : base.width;
       // Dix centimètres au minimum : en deçà, le meuble devient un trait
       // qu'on ne sait plus attraper.
       let apres = Math.max(0.1, Math.min(12, avant + distance));
-      const bouge = apres - avant;
-      const centre = {
-        x: obj.transform[12] + n.x * (bouge / 2),
-        z: obj.transform[14] + n.z * (bouge / 2),
+      /*
+        LE BORD OPPOSÉ NE BOUGE PAS : c'est lui le point fixe du geste, et
+        c'est de lui qu'on mesure tout le reste.
+      */
+      const fixe = {
+        x: base.cx - n.x * (avant / 2),
+        z: base.cz - n.z * (avant / 2),
       };
-      // L'aimant : le bord tiré se pose sur le nu du mur qu'il longe.
-      const bord = {
-        x: centre.x + n.x * (apres / 2),
-        z: centre.z + n.z * (apres / 2),
-      };
-      const long = surLargeur ? obj.depth : obj.width;
       const parts = roomParts(st.walls, st.rooms);
-      const ici = { x: obj.transform[12], z: obj.transform[14] };
+      const ici = { x: base.cx, z: base.cz };
       const part =
         parts.find((p) => p.roomId === obj.roomId) ??
         parts.find((p) => pointInPolygon(ici, p.surface?.pts ?? []));
-      const colle = snapSideToWalls(bord, n, long / 2, part?.walls ?? st.walls);
-      if (colle !== 0) {
-        const vise = Math.max(0.1, Math.min(12, apres + colle));
-        centre.x += n.x * ((vise - apres) / 2);
-        centre.z += n.z * ((vise - apres) / 2);
-        apres = vise;
+      const murs = part?.walls ?? st.walls;
+      /*
+        ET LA MAÇONNERIE ARRÊTE LE GESTE.
+
+        Un meuble qu'on agrandit contre un mur le traversait : on tirait, il
+        entrait dans la cloison, et le plan montrait un caisson au milieu du
+        béton. Sur le chantier, un meuble qui bute est un meuble qui bute.
+
+        Trois rayons plutôt qu'un — le milieu du bord fixe et ses deux
+        bouts : un seul rayon manque le mur qu'un coin touche déjà, sur un
+        logement dont les angles ne sont jamais droits.
+      */
+      if (distance > 0) {
+        let libre = Infinity;
+        for (const k of [-0.5, 0, 0.5]) {
+          const de = {
+            x: fixe.x + leLong.x * (long * k),
+            z: fixe.z + leLong.z * (long * k),
+          };
+          const d = castToWall(de, n, murs);
+          if (d !== null) libre = Math.min(libre, d);
+        }
+        // Une butée qui vaudrait zéro — un bord déjà dans la maçonnerie —
+        // écraserait le meuble : on ne la retient que si elle laisse de quoi
+        // exister.
+        if (isFinite(libre) && libre > 0.1) apres = Math.min(apres, libre);
       }
+      // L'aimant : le bord tiré se pose sur le nu du mur qu'il longe, ou sur
+      // le bout de celui qui se termine.
+      const bord = {
+        x: fixe.x + n.x * apres,
+        z: fixe.z + n.z * apres,
+      };
+      const colle = snapSideToWalls(bord, n, long / 2, murs);
+      if (colle !== 0) {
+        apres = Math.max(0.1, Math.min(12, apres + colle));
+      }
+      const centre = {
+        x: fixe.x + n.x * (apres / 2),
+        z: fixe.z + n.z * (apres / 2),
+      };
       set({
         objects: st.objects.map((o) => {
           if (o.id !== id) return o;
