@@ -26,6 +26,7 @@ import {
   CEILING_SYMBOL,
   linkAnchor,
   linkCurve,
+  ceilingChain,
   type CeilingFixture,
 } from '../geometry/ceiling';
 
@@ -39,6 +40,7 @@ export function CeilingLayer({
   showCeiling,
   selectedCeilingId,
   selectedCeilingRow,
+  showMeasures,
   onSelectCeiling,
   fixtures,
   walls,
@@ -58,6 +60,16 @@ export function CeilingLayer({
    * quatre spots pendant que le dessin n'en montrait aucun de choisi.
    */
   selectedCeilingRow?: string | null;
+  /**
+   * LE BOUTON « COTES » VAUT AUSSI POUR LE PLAFOND.
+   *
+   * Il cotait les murs et l'appareillage, pas ce qu'on pose en l'air. Or
+   * une ligne de spots s'implante exactement comme une rangée de prises :
+   * du mur au premier, entre chacun, du dernier au mur. Sans ces écarts, on
+   * relit six positions et on refait la soustraction à la main, sous le
+   * plafond, le mètre à bout de bras.
+   */
+  showMeasures?: boolean;
   onSelectCeiling?: (id: string) => void;
   fixtures?: Fixture[];
   walls: WallSeg[];
@@ -154,6 +166,84 @@ export function CeilingLayer({
               />
             );
           }),
+        )}
+
+      {/*
+        LES ÉCARTS D'UNE LIGNE D'APPAREILS, sous le bouton « Cotes ».
+
+        Une ligne de spots se pose au cordeau : ce qu'on lit pour
+        l'implanter, ce sont les écarts, pas six paires de coordonnées. On
+        les écrit en centimètres, le long de la ligne, avec les deux cotes
+        de bout jusqu'aux murs — la chaîne complète, celle qu'on relève au
+        mètre.
+      */}
+      {showCeiling &&
+        showMeasures &&
+        [...new Set((ceiling ?? []).map((x) => x.row).filter(Boolean))].map(
+          (row) => {
+            const lot = (ceiling ?? []).filter((cl) => cl.row === row);
+            const murs = partOf.get(lot[0].roomId)?.walls ?? walls;
+            const chaine = ceilingChain(lot, murs, frame);
+            if (!chaine) return null;
+            const jalons: (Pt | null)[] = [
+              chaine.bouts[0],
+              ...chaine.points,
+              chaine.bouts[1],
+            ];
+            return (
+              <G key={`chaine-${row}`}>
+                {chaine.cotes.map((val, i) => {
+                  const a = jalons[i];
+                  const b = jalons[i + 1];
+                  if (val === null || !a || !b) return null;
+                  const A = mapping.toPx(a);
+                  const B = mapping.toPx(b);
+                  if (Math.hypot(B.x - A.x, B.y - A.y) < 18) return null;
+                  let angle = (Math.atan2(B.y - A.y, B.x - A.x) * 180) / Math.PI;
+                  if (angle > 90) angle -= 180;
+                  if (angle < -90) angle += 180;
+                  const mx = (A.x + B.x) / 2;
+                  const my = (A.y + B.y) / 2;
+                  return (
+                    <G key={`c${i}`}>
+                      <Line
+                        x1={A.x}
+                        y1={A.y}
+                        x2={B.x}
+                        y2={B.y}
+                        stroke={c.inkFaint}
+                        strokeWidth={1}
+                        strokeDasharray="4 3"
+                      />
+                      {/* Le nombre se lit toujours à l'endroit, posé sur un
+                          fond clair : une cote écrite sur un semis de sol ne
+                          se lit pas. */}
+                      <Rect
+                        x={mx - 13}
+                        y={my - 7}
+                        width={26}
+                        height={14}
+                        rx={4}
+                        fill={c.surface}
+                        opacity={0.9}
+                        transform={`rotate(${angle}, ${mx}, ${my})`}
+                      />
+                      <SvgText
+                        x={mx}
+                        y={my + 3.5}
+                        fill={c.inkSoft}
+                        fontSize={9.5}
+                        fontWeight="700"
+                        textAnchor="middle"
+                        transform={`rotate(${angle}, ${mx}, ${my})`}>
+                        {Math.round(val * 100)}
+                      </SvgText>
+                    </G>
+                  );
+                })}
+              </G>
+            );
+          },
         )}
 
       {/*

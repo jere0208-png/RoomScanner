@@ -14,7 +14,7 @@
  * huit points lumineux sans dire lequel commande quoi n'est pas un plan de
  * travail, c'est un inventaire.
  */
-import { interiorPole, type Pt } from './floorplan';
+import { castToWall, interiorPole, type Pt, type WallSeg } from './floorplan';
 import { pointInPolygon } from './appearance';
 
 export type CeilingKind =
@@ -568,4 +568,80 @@ export function spreadPoints(
     const tb = versTrame(b);
     return surX ? ta.x - tb.x || ta.z - tb.z : ta.z - tb.z || ta.x - tb.x;
   });
+}
+
+/**
+ * LA CHAÎNE DE COTES D'UNE LIGNE D'APPAREILS DE PLAFOND.
+ *
+ * Poser six spots, ce n'est pas poser six points : c'est tracer une ligne au
+ * cordeau et percer à intervalles réguliers. Ce qu'on lit sur le plan pour
+ * les implanter, ce sont donc les ÉCARTS — du mur au premier, entre chacun,
+ * du dernier au mur — et non six paires de coordonnées.
+ *
+ * C'est la cote qu'on emporte sur le chantier, celle qu'on relève au mètre
+ * en levant les yeux. Un plan qui ne la donne pas se recalcule à la main,
+ * spot par spot, avec une chance sur deux de se tromper d'un centimètre.
+ *
+ * L'axe se prend sur la TRAME du logement : une ligne relevée de biais se
+ * cote quand même d'équerre avec les murs.
+ */
+export interface CeilingChain {
+  /** Les appareils, ordonnés le long de la ligne. */
+  points: Pt[];
+  /** Les deux points de mur qui ferment la chaîne, s'ils existent. */
+  bouts: [Pt | null, Pt | null];
+  /**
+   * Les écarts successifs, en mètres : mur→1, 1→2, …, n→mur.
+   *
+   * Les extrémités valent `null` quand le rayon ne rencontre aucun mur —
+   * un contour ouvert, un scan incomplet : mieux vaut ne rien écrire que
+   * d'annoncer une cote inventée.
+   */
+  cotes: (number | null)[];
+}
+
+export function ceilingChain(
+  items: CeilingFixture[],
+  walls: WallSeg[],
+  frame: number,
+): CeilingChain | null {
+  if (items.length < 2) return null;
+  const cos = Math.cos(frame);
+  const sin = Math.sin(frame);
+  // Deux axes possibles : celui de la trame et sa perpendiculaire. On garde
+  // celui sur lequel la ligne s'étend — c'est le sens dans lequel on l'a
+  // tendue.
+  const le = { x: cos, z: sin };
+  const tr = { x: -sin, z: cos };
+  const etendue = (d: Pt) => {
+    const vs = items.map((c) => c.at.x * d.x + c.at.z * d.z);
+    return Math.max(...vs) - Math.min(...vs);
+  };
+  const axe = etendue(le) >= etendue(tr) ? le : tr;
+  const points = [...items]
+    .sort((a, b) => a.at.x * axe.x + a.at.z * axe.z - (b.at.x * axe.x + b.at.z * axe.z))
+    .map((c) => c.at);
+
+  const versArriere = castToWall(points[0], { x: -axe.x, z: -axe.z }, walls);
+  const dernier = points[points.length - 1];
+  const versAvant = castToWall(dernier, axe, walls);
+  const bout = (p: Pt, d: Pt, gap: number | null): Pt | null =>
+    gap === null ? null : { x: p.x + d.x * gap, z: p.z + d.z * gap };
+
+  const cotes: (number | null)[] = [versArriere];
+  for (let i = 1; i < points.length; i++) {
+    cotes.push(
+      Math.hypot(points[i].x - points[i - 1].x, points[i].z - points[i - 1].z),
+    );
+  }
+  cotes.push(versAvant);
+
+  return {
+    points,
+    bouts: [
+      bout(points[0], { x: -axe.x, z: -axe.z }, versArriere),
+      bout(dernier, axe, versAvant),
+    ],
+    cotes,
+  };
 }

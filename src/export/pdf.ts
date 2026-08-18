@@ -49,6 +49,7 @@ import {
 import type { BuyRow, PullRow } from '../geometry/conduits';
 import {
   CEILINGS,
+  ceilingChain,
   CEILING_SYMBOL,
   lightingLoad,
   linkAnchor,
@@ -1556,6 +1557,20 @@ function planPage(
         const tag = FIXTURE_TAG[f.kind];
         if (tag) d.text(tag, q.x + 13, q.y + 4, 5.5, spec.color, { align: 'left' });
       }
+    }
+
+    {
+      /**
+       * LE PLAFOND NE DÉPEND PAS DE L'APPAREILLAGE MURAL.
+       *
+       * Ce bloc vivait À L'INTÉRIEUR de celui des prises : un logement où
+       * l'on avait posé six spots mais pas encore une seule prise sortait
+       * avec un plan muet — ni symbole, ni cote, ni lien de commande. C'est
+       * l'ordre de travail le plus naturel qui était puni : on équipe
+       * souvent le plafond d'abord, pièce par pièce.
+       */
+      const quadsMur = wallQuads(walls);
+      const murParId = new Map(walls.map((w) => [w.id, w]));
       /**
        * LE PLAFOND, SUR LE MÊME PLAN.
        *
@@ -1571,9 +1586,9 @@ function planPage(
         for (const cl of plafond) {
           for (const fid of cl.commands ?? []) {
             const f = (ctx.fixtures ?? []).find((x) => x.id === fid);
-            const w = f ? byId.get(f.wallId) : undefined;
+            const w = f ? murParId.get(f.wallId) : undefined;
             if (!f || !w) continue;
-            const face = wallFace(w, murQuads.get(w.id), f.side);
+            const face = wallFace(w, quadsMur.get(w.id), f.side);
             const depart = facePoint(face, faceX(face, f.along), 0.16);
             const arrivee = linkAnchor(
               { x: depart.x, z: depart.z },
@@ -1639,6 +1654,47 @@ function planPage(
           }
         }
 
+        /**
+         * ET LES ÉCARTS D'UNE LIGNE, en chaîne.
+         *
+         * Deux cotes par spot suffisent à le POSER ; elles ne suffisent pas
+         * à poser une LIGNE. Sur le chantier, on tend un cordeau et on
+         * perçea intervalles : ce qu'on lit alors, c'est « 68, 150, 150,
+         * 150, 68 » — du mur au premier, entre chacun, du dernier au mur.
+         * Sans cette chaîne, l'électricien refait la soustraction sous le
+         * plafond, le mètre à bout de bras.
+         */
+        for (const row of new Set(
+          plafond.map((cl) => cl.row).filter(Boolean),
+        )) {
+          const lot = plafond.filter((cl) => cl.row === row);
+          const chaine = ceilingChain(lot, walls, trame);
+          if (!chaine) continue;
+          // Le « Pt » de ce fichier est un point de PAGE (x, y) ; celui de la
+          // géométrie est un point du MONDE (x, z). On nomme donc ce qu'on
+          // manipule, plutôt que d'emprunter le mauvais type.
+          const jalons: ({ x: number; z: number } | null)[] = [
+            chaine.bouts[0],
+            ...chaine.points,
+            chaine.bouts[1],
+          ];
+          chaine.cotes.forEach((val, i) => {
+            const A = jalons[i];
+            const B = jalons[i + 1];
+            if (val === null || !A || !B) return;
+            const a = px(A);
+            const b = px(B);
+            if (!dansLeCadre(a) || !dansLeCadre(b)) return;
+            if (Math.hypot(b.x - a.x, b.y - a.y) < 14) return;
+            d.dashedPath([a, b], 0.6, GREY, [2, 2]);
+            const m = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+            d.rect(m.x - 9, m.y - 4.5, 18, 9, '#FFFFFFDD', null, 0);
+            d.text(`${Math.round(val * 100)}`, m.x, m.y - 2.5, 6.5, INK, {
+              bold: true,
+            });
+          });
+        }
+
         // Puis les appareils, à leur diamètre réel, jamais plus petits
         // que lisibles : un spot de 9 cm ferait deux points au 1:100.
         for (const cl of plafond) {
@@ -1664,7 +1720,7 @@ function planPage(
        */
       const presents = extra?.hideLegend
         ? []
-        : [...new Set(ctx.fixtures.map((f) => f.kind))];
+        : [...new Set((ctx.fixtures ?? []).map((f) => f.kind))];
       // Ce que porte le plafond : une colonne de plus dans le MÊME cadre.
       // Deux boîtes cherchant chacune le coin le plus libre finissent l'une
       // sur l'autre — on l'a vécu sur la feuille du plafond.

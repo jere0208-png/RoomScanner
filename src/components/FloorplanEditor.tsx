@@ -1185,6 +1185,9 @@ export function FloorplanEditor({
               showCeiling={showCeiling}
               selectedCeilingId={selectedCeilingId}
               selectedCeilingRow={selectedCeilingRow}
+              /* Le bouton « Cotes » vaut aussi pour le plafond : les écarts
+                 d'une ligne de spots s'y lisent comme ceux d'un mur. */
+              showMeasures={showMeasures && !navigating}
               onSelectCeiling={onSelectCeiling}
               fixtures={fixtures}
               walls={walls}
