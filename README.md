@@ -428,6 +428,25 @@ dessine rien d'autre. Le fond est translucide, l'ombre prend la couleur du
 bouton, et l'appui l'enfonce de trois pour cent : un bouton qui ne bouge pas
 sous le doigt laisse douter qu'il a pris.
 
+### Le dossier avale le scan
+
+Un scan lâché sur un dossier disparaissait de la liste. C'est juste, et ça ne
+se voit pas : on ne sait pas s'il est RANGÉ ou PERDU, et le doute revient à
+rouvrir le dossier pour vérifier.
+
+Le dossier joue donc le geste — une feuille tombe entre le dos et la façade,
+la façade se relève pour la laisser passer puis se referme. Le dessin est le
+même qu'avant et **à la même taille** (72 × 58) : on ne change pas une icône
+que la main a appris à viser ; il est simplement fait de trois plans au lieu
+de deux.
+
+L'animation part **au dépôt**, jamais au survol : au survol on hésite encore,
+et une feuille qui tombe à chaque passage du doigt raconterait un rangement
+qui n'a pas eu lieu. La descente se pilote par un nombre et non par une chaîne
+de transformation — interpoler `translate(0 -26) scale(1)` vers
+`translate(0 12)` exige le même nombre de composants de part et d'autre, et la
+moindre distraction fait tomber le rendu entier.
+
 ### La typo de la marque
 
 Le mot « EchoPlan » n'est plus composé : c'est **l'image de la marque**,

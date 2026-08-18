@@ -1,6 +1,7 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
+  Easing,
   PanResponder,
   ScrollView,
   StyleSheet,
@@ -9,7 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import Svg, { Line, Path, Polygon, Text as SvgText } from 'react-native-svg';
+import Svg, { G, Line, Path, Polygon, Rect, Text as SvgText } from 'react-native-svg';
 import {
   glow,
   radius,
@@ -214,18 +215,95 @@ function PlanThumb({ scan, c }: { scan: SavedScan; c: Palette }) {
   );
 }
 
-/** Le dossier, dessiné : rabat au fond, façade par-dessus. */
-function FolderGlyph({ back, front }: { back: string; front: string }) {
+/** Un groupe SVG qu'on peut animer : la façade pivote, la feuille tombe. */
+const AnimatedG = Animated.createAnimatedComponent(G);
+
+/**
+ * LE DOSSIER QUI AVALE LE SCAN.
+ *
+ * Un scan lâché sur un dossier disparaissait de la liste : c'est juste, et
+ * ça ne se voit pas. On ne sait pas s'il est RANGÉ ou PERDU — et sur un
+ * dossier de chantier, le doute revient à rouvrir pour vérifier.
+ *
+ * Le dossier joue donc le geste : une feuille tombe entre le dos et la
+ * façade, la façade se relève pour la laisser passer, puis se referme et le
+ * dossier tressaute. C'est le même dessin qu'avant, à la même taille — on ne
+ * change pas une icône que l'utilisateur a appris à viser —, simplement il
+ * est fait de trois plans au lieu de deux.
+ *
+ * L'animation ne se déclenche PAS au survol : au survol, on hésite encore.
+ * Elle part au dépôt, une fois, et dit ce qui vient de se passer.
+ */
+export function FolderGlyph({
+  back,
+  front,
+  /** La feuille : 0 = rien, 1 = un tour d'animation à jouer. */
+  chute,
+  page,
+}: {
+  back: string;
+  front: string;
+  chute?: Animated.Value;
+  page?: string;
+}) {
+  const t = chute ?? new Animated.Value(0);
   return (
     <Svg width={72} height={58} viewBox="0 0 72 58">
+      {/* Le dos du dossier : il ne bouge jamais. */}
       <Path
         d="M3 12 a7 7 0 0 1 7 -7 h15.5 a5 5 0 0 1 3.9 1.9 l4.2 5.3 h31.4 a7 7 0 0 1 7 7 v31.8 a7 7 0 0 1 -7 7 H10 a7 7 0 0 1 -7 -7 z"
         fill={back}
       />
-      <Path
-        d="M3 22 h66 v26.9 a7 7 0 0 1 -7 7 H10 a7 7 0 0 1 -7 -7 z"
-        fill={front}
-      />
+      {/* La feuille, entre les deux plans : elle tombe et rétrécit, comme
+          une page qui s'enfonce. */}
+      <AnimatedG
+        opacity={t.interpolate({
+          inputRange: [0, 0.08, 0.62, 0.78],
+          outputRange: [0, 1, 1, 0],
+          extrapolate: 'clamp',
+        })}
+        // La descente se pilote par un NOMBRE, pas par une chaîne de
+        // transformation : interpoler « translate(0 -26) scale(1) » vers
+        // « translate(0 12) » exige le même nombre de composants de part et
+        // d'autre, et la moindre distraction fait tomber le rendu entier.
+        y={t.interpolate({
+          inputRange: [0, 0.7, 1],
+          outputRange: [-26, 12, 12],
+          extrapolate: 'clamp',
+        })}>
+        <Rect
+          x={20}
+          y={12}
+          width={32}
+          height={26}
+          rx={4}
+          fill={page ?? '#FFFFFF'}
+          stroke="rgba(11,13,18,0.12)"
+          strokeWidth={1}
+        />
+        {/* Deux traits : c'est un document, pas une carte blanche. */}
+        <Path
+          d="M26 21 h20 M26 27 h14"
+          stroke="rgba(11,13,18,0.25)"
+          strokeWidth={2}
+          strokeLinecap="round"
+        />
+      </AnimatedG>
+      {/* La façade : elle bascule sur son bord bas pour laisser entrer la
+          feuille, puis se referme. */}
+      <AnimatedG
+        originX={36}
+        originY={56}
+        rotation={t.interpolate({
+          inputRange: [0, 0.18, 0.55, 0.8, 1],
+          outputRange: [0, -13, -13, 3, 0],
+          extrapolate: 'clamp',
+        })}>
+        <Path
+          d="M3 22 h66 v26.9 a7 7 0 0 1 -7 7 H10 a7 7 0 0 1 -7 -7 z"
+          fill={front}
+        />
+      </AnimatedG>
     </Svg>
   );
 }
@@ -234,6 +312,8 @@ interface TileProps {
   folder: ScanFolder;
   count: number;
   over: boolean;
+  /** Incrémenté à chaque scan rangé ICI : c'est le signal de l'animation. */
+  recu: number;
   lift: Animated.Value;
   styles: ReturnType<typeof getStyles>;
   palette: Palette;
@@ -253,6 +333,7 @@ function FolderTile({
   folder,
   count,
   over,
+  recu,
   lift,
   styles,
   palette,
@@ -264,11 +345,40 @@ function FolderTile({
     inputRange: [0, 1],
     outputRange: [1, over ? 1.26 : 1.12],
   });
+  /*
+    LA CHUTE SE JOUE UNE FOIS, quand un scan atterrit ici.
+
+    Elle part du signal `recu` plutôt que du survol : au survol on hésite
+    encore, et une feuille qui tombe à chaque passage du doigt raconterait
+    un rangement qui n'a pas eu lieu.
+  */
+  const chute = useRef(new Animated.Value(0)).current;
+  const premier = useRef(true);
+  useEffect(() => {
+    if (premier.current) {
+      premier.current = false;
+      return;
+    }
+    chute.setValue(0);
+    Animated.timing(chute, {
+      toValue: 1,
+      duration: 760,
+      easing: Easing.out(Easing.cubic),
+      // Les attributs SVG ne passent pas par le fil natif.
+      useNativeDriver: false,
+    }).start();
+  }, [recu, chute]);
   return (
     <Animated.View style={[styles.tile, { transform: [{ scale }] }]}>
       <View ref={bind} collapsable={false}>
         <TouchableOpacity
           activeOpacity={0.8}
+          // Le dossier s'annonce AVEC SON COMPTE : un lecteur d'écran qui
+          // énumère le contenu de la tuile dit « Chantier, 3 » sans qu'on
+          // sache si trois est un nombre de scans ou un rang.
+          accessibilityLabel={`Dossier ${folder.name}, ${count} scan${
+            count > 1 ? 's' : ''
+          }`}
           onPress={onOpen}
           onLongPress={onLong}
           style={styles.tileTouch}>
@@ -276,6 +386,8 @@ function FolderTile({
             <FolderGlyph
               back={over ? palette.blue : palette.blueDark}
               front={over ? palette.sky : palette.blue}
+              chute={chute}
+              page={palette.surface}
             />
             {count > 0 && (
               <View style={styles.tileBadge}>
@@ -492,6 +604,8 @@ export function LibraryScreen() {
   // pixel de mouvement).
   const [dragId, setDragId] = useState<string | null>(null);
   const [over, setOver] = useState<string | null>(null);
+  /** Combien de scans ont atterri dans chaque dossier depuis l'ouverture. */
+  const [ranges, setRanges] = useState<Record<string, number>>({});
   const dragRef = useRef<string | null>(null);
   const overRef = useRef<string | null>(null);
   const shift = useRef(new Animated.Value(0)).current;
@@ -538,7 +652,12 @@ export function LibraryScreen() {
       duration: 160,
       useNativeDriver: true,
     }).start();
-    if (deposer && scan && cible) moveToFolder(scan, cible);
+    if (deposer && scan && cible) {
+      moveToFolder(scan, cible);
+      // Le dossier joue sa chute : c'est ce qui dit que le scan est RANGÉ,
+      // et non perdu quelque part entre deux listes.
+      setRanges((r) => ({ ...r, [cible]: (r[cible] ?? 0) + 1 }));
+    }
   };
 
   const pan = useRef(
@@ -749,6 +868,7 @@ export function LibraryScreen() {
                   folder={f}
                   count={(byFolder.get(f.id) ?? []).length}
                   over={over === f.id}
+                  recu={ranges[f.id] ?? 0}
                   lift={lift}
                   styles={styles}
                   palette={palette}

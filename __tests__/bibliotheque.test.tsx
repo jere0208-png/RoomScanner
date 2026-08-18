@@ -16,9 +16,10 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 import React from 'react';
-import { Text, TouchableOpacity } from 'react-native';
+import { Animated, Text, TouchableOpacity } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
-import { LibraryScreen } from '../src/screens/LibraryScreen';
+import { G } from 'react-native-svg';
+import { FolderGlyph, LibraryScreen } from '../src/screens/LibraryScreen';
 import { useScanStore, type SavedScan } from '../src/store/scanStore';
 import { SNAPSHOT_WALLS } from '../src/export/snapshotFixture';
 
@@ -122,5 +123,75 @@ describe('la bibliothèque des relevés', () => {
     expect(restants).toHaveLength(1);
     // C'est le bon qui est parti : l'autre relevé est intact.
     expect(restants[0].name).toBe('Chantier Martin');
+  });
+});
+
+/**
+ * LE DOSSIER AVALE LE SCAN — et ça se voit.
+ *
+ * Un scan lâché sur un dossier disparaissait de la liste : c'est juste, et
+ * ça ne se voit pas. On ne sait pas s'il est RANGÉ ou PERDU, et le doute
+ * revient à rouvrir le dossier pour vérifier.
+ *
+ * Le dessin est fait de trois plans — le dos, la feuille, la façade — et
+ * c'est la feuille qui tombe entre les deux autres. Ce banc tient la
+ * STRUCTURE : sans elle, il n'y a rien à animer.
+ */
+describe('le dossier qui reçoit un scan', () => {
+  const rendre = (chute: number) => {
+    let arbre!: TestRenderer.ReactTestRenderer;
+    const v = new Animated.Value(chute);
+    act(() => {
+      arbre = TestRenderer.create(
+        <FolderGlyph back="#1B4FD8" front="#2F6BFF" chute={v} page="#FFFFFF" />,
+      );
+    });
+    return arbre;
+  };
+
+  it('a ses trois plans : le dos, la feuille, la façade', () => {
+    const arbre = rendre(0);
+    // Deux groupes animés : la feuille et la façade. Le dos, lui, ne bouge
+    // jamais — c'est ce qui donne la profondeur au geste.
+    expect(arbre.root.findAllByType(G).length).toBeGreaterThanOrEqual(2);
+    act(() => arbre.unmount());
+  });
+
+  it('garde la taille de l’icône qu’on visait déjà', () => {
+    const arbre = rendre(0);
+    const svg = arbre.root.findAll(
+      (n) => n.props?.viewBox === '0 0 72 58',
+    );
+    // Soixante-douze sur cinquante-huit : la tuile n'a pas bougé d'un point,
+    // et la main qui visait le dossier le vise encore.
+    expect(svg.length).toBe(1);
+    expect(svg[0].props.width).toBe(72);
+    expect(svg[0].props.height).toBe(58);
+    act(() => arbre.unmount());
+  });
+
+  /**
+   * LA FEUILLE N'EXISTE QUE PENDANT LA CHUTE.
+   *
+   * Au repos, un dossier est un dossier : une feuille qui dépasse en
+   * permanence dirait qu'il y a quelque chose à finir de ranger.
+   */
+  it('ne montre la feuille que pendant le geste', () => {
+    const opacites = (arbre: TestRenderer.ReactTestRenderer) =>
+      arbre.root
+        .findAllByType(G)
+        .map((n) => n.props.opacity)
+        .filter((o) => o !== undefined);
+    // `Animated.Value` : on lit la valeur courante via son interpolation.
+    const lire = (v: unknown) =>
+      typeof v === 'object' && v !== null && '__getValue' in v
+        ? (v as { __getValue: () => number }).__getValue()
+        : v;
+    const repos = rendre(0);
+    expect(opacites(repos).map(lire)).toContain(0);
+    act(() => repos.unmount());
+    const plein = rendre(0.3);
+    expect(opacites(plein).map(lire)).toContain(1);
+    act(() => plein.unmount());
   });
 });
