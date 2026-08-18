@@ -171,6 +171,18 @@ export function ResultScreen() {
    */
   const marges = useSafeAreaInsets();
   const basSysteme = Math.max(marges.bottom, 10);
+  /**
+   * TROIS ÉTAGES AU BAS DE LA CARTE, ET RIEN QUI DÉBORDE.
+   *
+   * Le blanc du plan descend maintenant jusqu'au bord de la carte — c'est
+   * lui le fond des commandes. On remonte donc chaque étage à la main :
+   * la marge système d'abord (la barre d'accueil de l'iPhone), puis la
+   * rangée des calques, puis le bandeau contextuel au-dessus d'elle.
+   * Auparavant la carte portait cette marge en PADDING : le blanc s'arrêtait
+   * plus haut, et les pastilles tombaient sur le gris de la page.
+   */
+  const ligneOutils = basSysteme + 8;
+  const ligneBandeau = ligneOutils + PILL_CELL_H + PILL_GAP;
   const walls = useScanStore((s) => s.walls);
   const objects = useScanStore((s) => s.objects);
   const scanName = useScanStore((s) => s.scanName);
@@ -251,6 +263,16 @@ export function ResultScreen() {
   const reset = useScanStore((s) => s.reset);
   const teinte = useTheme();
   const styles = getStyles(teinte);
+  // Les bandeaux contextuels se posent au-dessus de la rangée de calques.
+  const stylesBarres = useMemo(
+    () => ({
+      ...styles,
+      wallStrip: [styles.wallStrip, { bottom: ligneBandeau }],
+      editBar: [styles.editBar, { bottom: ligneBandeau }],
+    }),
+    [styles, ligneBandeau],
+  );
+
 
   const [tab, setTab] = useState<Tab>('2d');
   /** Calque des cheminements de gaines (métré à l'appui). */
@@ -1336,7 +1358,6 @@ export function ResultScreen() {
       <Animated.View
         style={[
           styles.canvas,
-          { paddingBottom: basSysteme },
           {
             opacity: bascule,
             transform: [
@@ -1612,9 +1633,10 @@ export function ResultScreen() {
             qu'on envoie ne doit montrer QUE le plan et le logo. */}
         {capturing ? null : vue === '2d' ? (
           <ScrollView
-            style={styles.planTools}
+            horizontal
+            style={[styles.planTools, { bottom: ligneOutils }]}
             contentContainerStyle={styles.planToolsRail}
-            showsVerticalScrollIndicator={false}
+            showsHorizontalScrollIndicator={false}
             keyboardShouldPersistTaps="handled">
             {/* Deux barres, jamais mélangées.
                 En lecture, on ne fait que REGARDER : la barre ne porte que
@@ -1838,9 +1860,10 @@ export function ResultScreen() {
             dernière pastille se retrouvait à mi-hauteur du modèle.
           */
           <ScrollView
-            style={[styles.planTools, styles.planToolsHaut]}
+            horizontal
+            style={[styles.planTools, { bottom: ligneOutils }]}
             contentContainerStyle={styles.planToolsRail}
-            showsVerticalScrollIndicator={false}
+            showsHorizontalScrollIndicator={false}
             keyboardShouldPersistTaps="handled">
             <ToolPill
               icon="ruler"
@@ -1945,15 +1968,16 @@ export function ResultScreen() {
           </TouchableOpacity>
         )}
 
-        {/* Le bouton d'édition ne défile pas avec les autres : c'est le
-            seul qu'on cherche toujours, et il commande le contenu de la
-            barre. Il reste donc à demeure, en haut à droite, aligné sur la
-            rangée — les outils défilent DERRIÈRE lui, jamais dessous. */}
+        {/* Les ACTIONS tiennent leur propre colonne, contre le bord droit :
+            elles ne défilent pas avec les calques et ne se confondent pas
+            avec eux. « Édition » occupe le bas de la pile — c'est le bouton
+            qu'on cherche le plus souvent, et c'est lui qui commande le
+            contenu de la rangée. */}
         {vue === '2d' && !capturing && (
-          <View style={styles.editAnchor}>
-            {/* Revenir en arrière ne descend pas avec les outils : c'est le
-                geste qu'on cherche dans l'urgence, et il se tient à côté du
-                bouton qui commande l'édition, sur sa ligne. */}
+          <View style={[styles.editAnchor, { bottom: ligneOutils }]}>
+            {/* Revenir en arrière ne défile pas avec les calques : c'est le
+                geste qu'on cherche dans l'urgence, et il se tient dans la
+                colonne, juste au-dessus de l'édition. */}
             {/* Modifications non enregistrées : la sauvegarde se tient AVEC
                 les autres commandes, à gauche de l'édition. Elle flottait
                 seule en bas à droite du plan, loin du seul endroit qu'on
@@ -2006,7 +2030,7 @@ export function ResultScreen() {
         {vue === '2d' && selectedObject && showFurniture && objDims && !capturing && (
           <ObjectBar
             object={selectedObject}
-            styles={styles}
+            styles={stylesBarres}
             palette={teinte}
             onPrompt={setPrompt}
             onResize={(w, d) => {
@@ -2036,7 +2060,7 @@ export function ResultScreen() {
               fixture={cl}
               walls={part?.walls ?? walls}
               trame={trame}
-              styles={styles}
+              styles={stylesBarres}
               palette={teinte}
               onMove={(at) => moveCeiling(cl.id, at)}
               onPrompt={setPrompt}
@@ -2086,7 +2110,7 @@ export function ResultScreen() {
           };
           return (
             <StripBar
-              styles={styles}
+              styles={stylesBarres}
               strong={`${ligne.length} spots`}
               note={
                 `${rooms.find((r) => r.id === ligne[0].roomId)?.name ?? 'Pièce'} · ` +
@@ -2132,7 +2156,7 @@ export function ResultScreen() {
               surface={targetPart?.surface ?? null}
               extent={targetExtent}
               hauteur={roomHeight(targetPart?.walls ?? [])}
-              styles={styles}
+              styles={stylesBarres}
               onName={() => setNaming(true)}
               onHeight={promptRoomHeight}
               onMore={() =>
@@ -2216,7 +2240,7 @@ export function ResultScreen() {
             regarder quand on a touché quelque chose. */}
         {vue === '2d' && editMode && selectedOpening && !capturing && (
           <StripBar
-            styles={styles}
+            styles={stylesBarres}
             strong={`${fr(segLength(selectedOpening), 2)} × ${fr(
               selectedOpening.height,
               2,
@@ -2247,7 +2271,7 @@ export function ResultScreen() {
             bandeau mangeait le dessin qu'on est en train de regarder. */}
         {vue === '2d' && !selectedObject && !selectedOpening && editMode && selectedWall && !capturing && (
           <StripBar
-            styles={styles}
+            styles={stylesBarres}
             strong={`${fr(segLength(selectedWall), 2)} m`}
             note={`${fr(selectedWall.height, 2)} m sous plafond`}
             actions={[
@@ -3031,26 +3055,34 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
    * depuis le bouton d'édition au lieu de descendre sur le plan, et le
    * dessin garde son quart supérieur, celui qu'on regarde.
    */
+  /**
+   * LES CALQUES EN RANGÉE, LES ACTIONS EN COLONNE.
+   *
+   * Ce sont deux natures de commandes, et elles ne se manipulent pas
+   * pareil. Les CALQUES — cotes, meubles, surfaces, nord, murs — s'allument
+   * et s'éteignent, souvent, l'un après l'autre : une rangée au bas du
+   * dessin les met tous à portée du pouce, et l'œil les balaie d'un coup.
+   * Les ACTIONS — enregistrer, annuler, contrôler, éditer — se choisissent
+   * une à la fois : une colonne à droite les tient séparées des calques,
+   * sans qu'on les confonde.
+   *
+   * Tout se pose DANS la carte du plan : rien ne déborde sur le gris de la
+   * page — c'est ce qui faisait flotter les pastilles hors du dessin.
+   */
   planTools: {
     position: 'absolute',
-    right: 2,
-    // Juste au-dessus du bouton d'édition, du même écart qu'entre deux
-    // pastilles.
-    bottom: 8 + PILL_CELL_H + PILL_GAP,
-    maxHeight: '70%',
+    left: 0,
+    // La colonne des actions tient la droite : la rangée s'arrête avant elle,
+    // sinon les dernières pastilles défilent DERRIÈRE et deviennent
+    // introuvables.
+    right: 62,
   },
-  /** La colonne qui défile, quand les outils dépassent la hauteur. */
   planToolsRail: {
+    flexDirection: 'row',
     alignItems: 'flex-end',
     gap: PILL_GAP,
-    // Le rail se remplit PAR LE BAS : le premier outil est le plus proche
-    // du pouce, et les suivants s'empilent vers le haut.
-    justifyContent: 'flex-end',
-    flexGrow: 1,
-    paddingBottom: 2,
+    paddingHorizontal: 10,
   },
-  /** Sans bouton d'édition dessous, la colonne descend d'un cran. */
-  planToolsHaut: { bottom: 8 },
   /**
    * L'ancrage suit les outils : même ligne, en bas à droite.
    *
@@ -3059,12 +3091,10 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
    */
   editAnchor: {
     position: 'absolute',
-    bottom: 8,
-    right: 2,
+    right: 4,
     zIndex: 4,
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 6,
+    alignItems: 'center',
+    gap: PILL_GAP,
   },
   /**
    * La cellule d'un outil : la pastille, et son mot dessous.
@@ -3160,9 +3190,11 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   // d'enregistrement. Elle dit l'essentiel et ne mange pas le dessin.
   wallStrip: {
     position: 'absolute',
+    // Le pied réel est recalculé à l'affichage : un étage au-dessus de la
+    // rangée de calques, pour ne jamais lui passer dessous.
     bottom: 10,
     left: 12,
-    // La colonne d'outils occupe la droite : le bandeau s'arrête avant
+    // La colonne d'actions tient la droite : le bandeau s'arrête avant
     // elle, sinon ses boutons passent dessous.
     marginRight: 62,
     // La colonne d'outils descend du HAUT du plan : sous elle, la largeur

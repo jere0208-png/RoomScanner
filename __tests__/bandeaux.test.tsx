@@ -23,7 +23,14 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 import React from 'react';
-import { Text, TextInput, TouchableOpacity, View } from 'react-native';
+import {
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { PILL_CELL_H } from '../src/components/ToolPill';
 import { Circle, Path, Text as SvgText } from 'react-native-svg';
 import TestRenderer, { act } from 'react-test-renderer';
 import { ResultScreen } from '../src/screens/ResultScreen';
@@ -299,6 +306,60 @@ describe('l’écran des résultats', () => {
     // Et le bandeau du bas donne ses cotes, avec de quoi les changer.
     expect(vu).toContain('sous plafond');
     expect(vu).toContain('Coter');
+  });
+
+  /**
+   * LE BANDEAU NE PASSE JAMAIS SOUS LA RANGÉE DE CALQUES.
+   *
+   * Relevé du chantier : « il y a des superpositions de boutons ». Le
+   * bandeau et les outils partageaient la même ligne de fond ; le bouton
+   * « Coter » finissait derrière une pastille, et on appuyait à côté.
+   * Trois étages, désormais, du bas vers le haut : l'indicateur d'accueil,
+   * la rangée des calques, puis le bandeau. On vérifie l'ordre, pas les
+   * chiffres — pour qu'il tienne quel que soit le téléphone.
+   */
+  it('pose le bandeau AU-DESSUS de la rangée d’outils', () => {
+    const tree = monter();
+    act(() => bouton(tree, 'Édition')!.props.onPress());
+    act(() => {
+      jest.advanceTimersByTime(500);
+    });
+    const mur = tree.root
+      .findAll((n) => typeof n.props?.onPress === 'function')
+      .find((n) => n.findAll((x) => x.props?.strokeWidth === 30).length > 0);
+    act(() => mur!.props.onPress());
+
+    const plat = (n: TestRenderer.ReactTestInstance) => {
+      const st = n.props.style;
+      return Object.assign(
+        {},
+        ...(Array.isArray(st) ? st : [st]).filter(Boolean).flat(Infinity),
+      );
+    };
+    /** La ligne de fond de la rangée de calques. */
+    const rail = tree.root
+      .findAllByType(ScrollView)
+      .map(plat)
+      .find((st) => st.position === 'absolute' && typeof st.bottom === 'number');
+    expect(rail).toBeDefined();
+    /** Le bandeau : la barre blanche qui porte les cotes du mur. */
+    const bandeau = tree.root
+      .findAll(
+        (n) =>
+          typeof n.type === 'string' &&
+          plat(n).position === 'absolute' &&
+          typeof plat(n).bottom === 'number' &&
+          plat(n).left === 12,
+      )
+      .map(plat)[0];
+    expect(bandeau).toBeDefined();
+    // Un étage complet le sépare des pastilles : hauteur d'une cellule, et
+    // l'écart habituel.
+    expect(bandeau.bottom).toBeGreaterThanOrEqual(
+      rail!.bottom + PILL_CELL_H,
+    );
+    // Et il s'arrête avant la colonne d'actions, sur sa droite.
+    expect(bandeau.marginRight).toBeGreaterThanOrEqual(50);
   });
 
   /**

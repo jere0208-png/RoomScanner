@@ -60,6 +60,7 @@ import { planFrameAngle } from '../geometry/floorplan';
 import { assignOpenings } from '../geometry/scene3d';
 import { wallRuns } from '../geometry/floorplan';
 import {
+  ajusterBlocs,
   faceDepth,
   buildScene,
   isHiddenFace,
@@ -917,8 +918,21 @@ function draw3DView(
       const fill = shadeFill(f, ct, st);
       // Pan sans contour propre : bordé de sa propre couleur, sinon la couture
       // entre deux bandes voisines se voit à l'impression.
-      return { pts, depth, fill, stroke: f.stroke ?? fill, dashed: !!f.dashed };
+      return {
+        pts,
+        depth,
+        fill,
+        stroke: f.stroke ?? fill,
+        dashed: !!f.dashed,
+        // De quoi départager les faces d'un même meuble à l'écran : le PDF
+        // peint dans le même ordre que l'application, sans quoi le dossier
+        // d'un canapé s'imprimerait par-dessus son assise.
+        proj: pts.map((q) => ({ sx: q.x, sy: q.y, depth: q.depth })),
+        owner: f.ownerId,
+        room: f.roomId,
+      };
     });
+  ajusterBlocs(polys);
   // Cotes insérées dans le tri de profondeur : un mur proche les recouvre.
   type Item =
     | {

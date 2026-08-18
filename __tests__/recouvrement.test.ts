@@ -16,6 +16,7 @@
  * moyenne — c'est la définition même de « recouvrir ».
  */
 import {
+  ajusterBlocs,
   buildScene,
   faceDepth,
   isHiddenFace,
@@ -277,4 +278,107 @@ describe('l’ordre de peinture, jugé au pixel', () => {
       expect(`${fautes.length} recouvrement(s)`).toBe('0 recouvrement(s)');
     });
   }
+});
+
+/**
+ * UN MEUBLE NE SE TRAVERSE PAS LUI-MÊME.
+ *
+ * Relevé du chantier, capture à l'appui : « le canapé possède des bandes »,
+ * « les meubles ne doivent pas être transparents ». Ce n'était pas une
+ * transparence : c'était le DOS du canapé peint par-dessus son assise.
+ *
+ * Un meuble adossé reçoit le point de tri du mur qu'il longe, avancé de sa
+ * saillie — le même pour TOUTES ses pièces. Dossier, assise et accoudoirs se
+ * retrouvaient donc à égalité parfaite, et c'est l'ordre de construction qui
+ * tranchait : le dossier, poussé en dernier, repeignait l'assise qui était
+ * pourtant devant. D'où les bandes, et l'impression de voir au travers.
+ *
+ * Le banc juge au pixel, comme le précédent, mais entre CONTENUS — y compris
+ * deux morceaux du même meuble.
+ */
+const SALON = {
+  nom: 'salon meublé',
+  walls: [
+    mur('n', 0, 0, 5, 0),
+    mur('e', 5, 0, 5, 4),
+    mur('s', 5, 4, 0, 4),
+    mur('o', 0, 4, 0, 0),
+  ],
+  rooms: [{ id: 'r1' }],
+  objects: [
+    // Canapé dos au mur nord, lit dos au mur ouest, rangement en angle,
+    // et un meuble haut accroché à 1,50 m.
+    boite('canape', 'sofa', 2.2, 0.5, 2.1, 0.9, 0.85),
+    boite('lit', 'bed', 0.9, 2.4, 1.5, 2, 0.55),
+    boite('range', 'storage', 4.6, 1.2, 0.6, 1.2, 2),
+    {
+      ...boite('haut', 'storage', 3.6, 0.3, 1.2, 0.4, 0.7),
+      transform: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 3.6, 1.75, 0.3, 1],
+    },
+  ],
+  fixtures: [] as Fixture[],
+};
+
+describe('un meuble ne se traverse pas lui-même', () => {
+  it('peint toujours la face la plus proche en dernier', () => {
+    const { faces, rooms } = buildScene(SALON.walls, [], SALON.objects, {
+      palette: PAL,
+      showSurfaces: true,
+      rooms: SALON.rooms,
+      fixtures: SALON.fixtures,
+    });
+    const centre = sceneFraming(faces).center;
+    const fautes = new Map<string, number>();
+    for (const cam of ANGLES) {
+      const project = projecteur(cam, centre, 60);
+      const rangs = roomRanks(rooms, cam);
+      // On refait CE QUE FAIT L'ÉCRAN : même projection, même tri, même
+      // résolution interne des blocs. Un banc qui jugerait la formule de tri
+      // seule ne verrait pas ce que l'œil voit.
+      const vues = faces
+        .filter(
+          (f) =>
+            !isHiddenFace(f, cam) &&
+            f.fill !== null &&
+            f.pts.length >= 3 &&
+            f.ownerId,
+        )
+        .map((f) => ({
+          f,
+          proj: f.pts.map(project),
+          depth: faceDepth(f, project, cam, rangs),
+          owner: f.ownerId,
+          room: f.roomId,
+        }));
+      ajusterBlocs(vues);
+      const peintes = [...vues].sort((a, b) => a.depth - b.depth);
+      const rang = new Map(peintes.map((p, i) => [p.f, i] as [Face3D, number]));
+      for (const a of vues) {
+        const pt = {
+          sx: a.proj.reduce((s, p) => s + p.sx, 0) / a.proj.length,
+          sy: a.proj.reduce((s, p) => s + p.sy, 0) / a.proj.length,
+        };
+        const da = profondeurAu(a.f, pt, project);
+        if (da === null) continue;
+        for (const b of vues) {
+          if (b === a || !dansLePolygone(pt, b.proj)) continue;
+          const db = profondeurAu(b.f, pt, project);
+          if (db === null) continue;
+          // `a` est devant `b` en ce point : `b` ne doit pas être peinte
+          // après elle. Deux centimètres de tolérance — l'épaisseur d'un
+          // placage, que l'œil ne départage pas.
+          if (da > db + 0.02 && rang.get(b.f)! > rang.get(a.f)!) {
+            const cle = `${b.owner} sur ${a.owner}`;
+            fautes.set(cle, (fautes.get(cle) ?? 0) + 1);
+          }
+        }
+      }
+    }
+    const total = [...fautes.values()].reduce((s, n) => s + n, 0);
+    expect(
+      `${total} recouvrement(s)${
+        total ? ' — ' + [...fautes.keys()].slice(0, 6).join(', ') : ''
+      }`,
+    ).toBe('0 recouvrement(s)');
+  });
 });

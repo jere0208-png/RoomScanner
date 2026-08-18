@@ -326,25 +326,59 @@ describe('l’espace de travail du plan', () => {
   };
 
   /**
-   * LES OUTILS MONTENT DEPUIS LE BOUTON D'ÉDITION, en bas à droite.
+   * DEUX FAMILLES, DEUX AXES — ET TOUT DANS LA CARTE.
    *
-   * Trois positions ont été essayées. En colonne depuis le HAUT, ils
-   * cernaient le dessin. En ligne au pied du plan, ils s'étalaient sur
-   * toute la largeur et se chevauchaient quand la place manquait. Ils
-   * reprennent leur colonne — tout à la file, dans l'axe du pouce — mais
-   * ancrée en bas : le dessin garde son quart supérieur.
+   * Relevé du chantier, capture à l'appui : « les boutons en bas ne sont pas
+   * dans le bloc blanc de fond du plan », et « inverse ce qui s'affiche
+   * verticalement et ce qui s'affiche horizontalement ».
+   *
+   * Les CALQUES — cotes, meubles, surfaces — s'allument l'un après l'autre :
+   * ils forment une rangée au pied du dessin, que l'œil balaie d'un coup.
+   * Les ACTIONS — enregistrer, annuler, contrôler, éditer — se choisissent
+   * une seule à la fois : elles tiennent une colonne à droite, séparées des
+   * calques pour qu'on ne les confonde jamais.
    */
-  it('empile les outils en bas à droite, et non sur les côtés du plan', () => {
+  it('pose les calques en rangée et les actions en colonne', () => {
     const tree = monter('scan');
     const rail = tree.root
       .findAllByType(ScrollView)
-      .map(style)
-      .find((st) => st.position === 'absolute' && typeof st.bottom === 'number');
+      .find(
+        (n) =>
+          style(n).position === 'absolute' &&
+          typeof style(n).bottom === 'number',
+      );
     expect(rail).toBeDefined();
-    // Ancrée en bas à droite, jamais par le haut.
-    expect(rail!.top).toBeUndefined();
-    expect(rail!.right).toBeLessThan(12);
-    expect(rail!.flexDirection).toBeUndefined();
+    // La rangée : horizontale, ancrée en bas, et jamais par le haut.
+    expect(rail!.props.horizontal).toBe(true);
+    expect(style(rail!).top).toBeUndefined();
+    expect(style(rail!).left).toBe(0);
+    const contenu = Object.assign(
+      {},
+      ...[rail!.props.contentContainerStyle].flat(Infinity).filter(Boolean),
+    );
+    expect(contenu.flexDirection).toBe('row');
+
+    // La colonne d'actions : même ligne de fond, mais empilée — pas de
+    // flexDirection, donc l'axe vertical par défaut.
+    const colonne = tree.root
+      .findAll(
+        (n) =>
+          typeof n.type === 'string' &&
+          style(n).position === 'absolute' &&
+          style(n).zIndex === 4 &&
+          // La pastille 2D/3D porte le même plan, mais elle est ancrée en
+          // haut : c'est le pied qui distingue la colonne d'actions.
+          typeof style(n).bottom === 'number',
+      )
+      .map(style)[0];
+    expect(colonne).toBeDefined();
+    expect(colonne.flexDirection).toBeUndefined();
+    expect(colonne.right).toBeLessThan(12);
+    // Elles partagent le même pied : rien ne flotte plus bas que l'autre.
+    expect(colonne.bottom).toBe(style(rail!).bottom);
+    // Et la rangée s'arrête AVANT la colonne, sinon les dernières pastilles
+    // défilent derrière elle.
+    expect(style(rail!).right).toBeGreaterThanOrEqual(50);
   });
 
   it('remplace le bandeau 2D/3D par une pastille', () => {
@@ -372,22 +406,25 @@ describe('l’espace de travail du plan', () => {
  * sur un modèle à encoche, sur un modèle à bouton, et sur un iPad.
  */
 describe('les marges du système', () => {
-  it('réserve la bande de l’indicateur sous le plan', () => {
+  it('remonte les commandes au-dessus de l’indicateur, sans creuser la carte', () => {
     const tree = monter('scan');
-    // Le cadre du plan porte la réserve : tout ce qui y est ancré en bas
-    // remonte d'autant, d'un seul coup.
-    const reserves = tree.root
-      .findAll((n) => {
-        const st = n.props?.style;
-        const plats = Array.isArray(st) ? st.flat(Infinity) : [st];
-        return plats.some(
-          (p: unknown) =>
-            !!p &&
-            typeof p === 'object' &&
-            (p as { paddingBottom?: number }).paddingBottom === 34,
-        );
-      })
-      .length;
-    expect(`${reserves > 0 ? 'réservée' : 'absente'}`).toBe('réservée');
+    const style = (n: TestRenderer.ReactTestInstance) => {
+      const plats = Array.isArray(n.props.style) ? n.props.style : [n.props.style];
+      return Object.assign({}, ...plats.filter(Boolean).flat(Infinity));
+    };
+    // La carte ne porte PLUS la réserve en padding : son blanc descend
+    // jusqu'au bord, sinon les pastilles tombent sur le gris de la page —
+    // c'est exactement ce que montrait la capture.
+    const creuse = tree.root.findAll(
+      (n) => style(n).paddingBottom === 34 && style(n).flex === 1,
+    ).length;
+    expect(`${creuse === 0 ? 'plein' : 'creusé'}`).toBe('plein');
+    // Ce sont les commandes qui remontent : au-dessus des 34 points de
+    // l'indicateur d'accueil, marge comprise.
+    const rail = tree.root
+      .findAllByType(ScrollView)
+      .map(style)
+      .find((st) => st.position === 'absolute' && typeof st.bottom === 'number');
+    expect(rail!.bottom).toBeGreaterThanOrEqual(34);
   });
 });

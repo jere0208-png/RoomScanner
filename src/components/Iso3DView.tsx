@@ -27,6 +27,7 @@ import { dotStep, floorDots, inkOn, mixHex } from '../geometry/appearance';
 import {
   faceDepth,
   buildScene,
+  ajusterBlocs,
   cutawayOpacity,
   isHiddenFace,
   sceneFraming,
@@ -625,8 +626,13 @@ export function Iso3DView({
         voile,
         dashed: !!face.dashed,
         owner: face.ownerId,
+        room: face.roomId,
       };
       });
+    // Un meuble se trie d'un bloc : ses propres faces se départagent à
+    // l'écran, là où elles se recouvrent. Sans ça, sa carcasse repeint sa
+    // porte et son dossier repeint son assise — les « bandes » du chantier.
+    ajusterBlocs(polys);
 
     // Cotes insérées DANS le tri de profondeur : un mur proche recouvre
     // les cotes des éléments situés derrière lui (fini les fuites).

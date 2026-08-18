@@ -69,6 +69,22 @@ export interface Face3D {
    * se lit pas en transparence.
    */
   cutaway?: boolean;
+  /**
+   * TRI FIN, À L'INTÉRIEUR D'UN MÊME BLOC.
+   *
+   * Un meuble se trie comme un tout : toutes ses faces partagent le même
+   * point de tri, celui qui le situe par rapport aux murs. Ses morceaux se
+   * retrouvent donc à égalité parfaite entre eux, et c'est l'ordre de
+   * construction qui tranchait — le dossier d'un canapé repeignait son
+   * assise, pourtant plus proche de l'œil. On voyait ça comme des bandes,
+   * et comme une transparence.
+   *
+   * Ce point-ci est la VRAIE position de la face. Il n'intervient qu'au
+   * millième : assez pour ordonner les morceaux d'un même meuble entre eux,
+   * bien trop peu pour le faire passer devant ou derrière quoi que ce soit
+   * d'autre.
+   */
+  /**
   /** Trait pointillé : réservé aux passages, qui sont des vides. */
   dashed?: boolean;
   /**
@@ -206,6 +222,10 @@ function couche(face: Face3D, cam: CameraTrig): number {
   return vers > 0 ? 0 : 2 * COUCHE;
 }
 
+/**
+ * La profondeur de TRI d'une face : rang de sa pièce, puis sa couche, puis
+ * sa distance à l'œil.
+ */
 export function faceDepth(
   face: Face3D,
   project: (p: P3) => { depth: number },
@@ -239,6 +259,194 @@ export function faceDepth(
  * l'autre, dans l'ordre où l'œil les rencontre. Le centre suffit à les
  * ordonner — elles ne s'interpénètrent pas.
  */
+/**
+ * L'ORDRE INTERNE D'UN BLOC SE JUGE À L'ÉCRAN.
+ *
+ * Un meuble se trie comme un TOUT face au reste de la scène : c'est ce qui
+ * l'empêche de passer devant le mur qu'il longe — son altitude ne doit pas
+ * entrer en ligne de compte. Mais ses propres faces se retrouvent alors à
+ * égalité, et c'est l'ordre de construction qui tranchait : la carcasse d'un
+ * caisson repeignait sa porte, le dossier d'un canapé repeignait son assise.
+ * Le chantier voyait des bandes en travers des meubles, et croyait à une
+ * transparence.
+ *
+ * Aucune formule ne départage deux faces à coup sûr — ni leur milieu, ni
+ * leur plan, ni un rayon tiré du centre : chacune a été mesurée au banc, et
+ * chacune laissait autant de fautes qu'elle en corrigeait. On tranche donc
+ * comme l'œil : LÀ OÙ DEUX FACES SE RECOUVRENT, celle qui est devant se
+ * peint en dernier.
+ *
+ * Un tri par insertion, sur quelques dizaines de faces par meuble. Le
+ * critère n'est pas transitif — trois faces peuvent se recouvrir en ronde —
+ * et un tri général s'y perdrait.
+ */
+export interface FacePeinte {
+  proj: { sx: number; sy: number; depth: number }[];
+}
+
+export function ordreLocal<T extends FacePeinte>(items: T[]): T[] {
+  if (items.length < 2) return items;
+  const boites = items.map((it) => {
+    let x0 = Infinity;
+    let x1 = -Infinity;
+    let y0 = Infinity;
+    let y1 = -Infinity;
+    let sx = 0;
+    let sy = 0;
+    for (const p of it.proj) {
+      x0 = Math.min(x0, p.sx);
+      x1 = Math.max(x1, p.sx);
+      y0 = Math.min(y0, p.sy);
+      y1 = Math.max(y1, p.sy);
+      sx += p.sx;
+      sy += p.sy;
+    }
+    const n = it.proj.length || 1;
+    return { x0, x1, y0, y1, cx: sx / n, cy: sy / n };
+  });
+
+  /** `a` doit-elle être peinte AVANT `b` ? (donc : est-elle derrière ?) */
+  const avant = (a: number, b: number): boolean => {
+    const A = boites[a];
+    const B = boites[b];
+    // Deux faces qui ne se touchent pas à l'écran ne se cachent pas : leur
+    // ordre n'a aucune importance, et on garde celui qu'on avait.
+    if (A.x1 < B.x0 || B.x1 < A.x0 || A.y1 < B.y0 || B.y1 < A.y0) return false;
+    const paires: [number, number, { sx: number; sy: number }][] = [
+      [a, b, { sx: A.cx, sy: A.cy }],
+      [b, a, { sx: B.cx, sy: B.cy }],
+    ];
+    for (const [u, v, pt] of paires) {
+      if (!dansPoly(pt, items[v].proj)) continue;
+      const du = profondeurAu(items[u].proj, pt);
+      const dv = profondeurAu(items[v].proj, pt);
+      if (du === null || dv === null) continue;
+      // Deux millimètres : en deçà, deux faces sont coplanaires à l'œil et
+      // l'ordre n'a plus de sens.
+      if (Math.abs(du - dv) < 0.002) continue;
+      return (du < dv ? u : v) === a;
+    }
+    return false;
+  };
+
+  /*
+    ON REPASSE JUSQU'À CE QUE PLUS RIEN NE BOUGE.
+
+    Le critère n'est pas transitif : un seul passage laisse des inversions
+    derrière lui — le banc en comptait encore trois cents. On échange donc les
+    voisins mal placés, autant de fois qu'il le faut. Dix passages au plus :
+    trois faces peuvent se recouvrir en ronde, et la ronde ne se dénoue pas.
+    Ce sont quelques dizaines de faces par meuble — le coût est négligeable.
+  */
+  const ordre = items.map((_, i) => i);
+  for (let passe = 0; passe < 6; passe++) {
+    let bouge = false;
+    // TOUTES les paires, pas seulement les voisines : une face peut devoir
+    // remonter de cinq rangs, et l'échange de proche en proche ne la voit
+    // jamais.
+    for (let i = 0; i < ordre.length; i++) {
+      for (let j = i + 1; j < ordre.length; j++) {
+        if (!avant(ordre[j], ordre[i])) continue;
+        // `j` est derrière `i` : elle doit se peindre avant lui.
+        const [x] = ordre.splice(j, 1);
+        ordre.splice(i, 0, x);
+        bouge = true;
+      }
+    }
+    if (!bouge) break;
+  }
+  return ordre.map((i) => items[i]);
+}
+
+/**
+ * L'ordre interne des blocs, écrit dans la profondeur de tri.
+ *
+ * Les faces d'un même meuble portent toutes la même profondeur — il se trie
+ * d'un bloc. On les départage à l'écran (`ordreLocal`), puis on inscrit ce
+ * classement dans un millésime de profondeur : le tri général, qui mêle les
+ * pans, les arêtes et les cotes, le respectera sans rien savoir des meubles.
+ *
+ * L'écart est d'un millième de millimètre : il ne peut dépasser aucun autre
+ * élément de la scène.
+ */
+export function ajusterBlocs<
+  T extends FacePeinte & { depth: number; owner?: string; room?: string },
+>(items: T[]): void {
+  /*
+    UN GROUPE PAR PIÈCE, ET NON PAR MEUBLE.
+
+    Deux meubles voisins se recouvrent aussi — le canapé passait devant le
+    caisson accroché au-dessus de lui. Or les meubles d'une même pièce
+    occupent DÉJÀ une couche à eux, entre le mur du fond et celui de devant :
+    rien de la maçonnerie ne peut se glisser entre eux. On peut donc les
+    résoudre tous ensemble, sans risquer de déranger le reste.
+
+    Le classement obtenu se réécrit dans la PLAGE que le groupe occupait
+    déjà : ce qui n'est pas du mobilier — un appareillage, un point lumineux —
+    garde ainsi sa place relative parmi eux.
+  */
+  const parBloc = new Map<string, T[]>();
+  for (const it of items) {
+    if (!it.owner) continue;
+    const cle = it.room ?? it.owner;
+    const l = parBloc.get(cle);
+    if (l) l.push(it);
+    else parBloc.set(cle, [it]);
+  }
+  for (const groupe of parBloc.values()) {
+    if (groupe.length < 2) continue;
+    const bas = Math.min(...groupe.map((g) => g.depth));
+    const haut = Math.max(...groupe.map((g) => g.depth));
+    const pas = Math.max(1e-6, (haut - bas) / groupe.length);
+    ordreLocal(groupe).forEach((g, k) => {
+      g.depth = bas + k * pas;
+    });
+  }
+}
+
+/** Le point est-il dans ce polygone d'écran ? */
+function dansPoly(
+  pt: { sx: number; sy: number },
+  poly: { sx: number; sy: number }[],
+): boolean {
+  let dedans = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    if (
+      poly[i].sy > pt.sy !== poly[j].sy > pt.sy &&
+      pt.sx <
+        ((poly[j].sx - poly[i].sx) * (pt.sy - poly[i].sy)) /
+          (poly[j].sy - poly[i].sy) +
+          poly[i].sx
+    ) {
+      dedans = !dedans;
+    }
+  }
+  return dedans;
+}
+
+/**
+ * La profondeur du plan de cette face au point donné. La projection étant
+ * orthographique, elle s'interpole linéairement : trois sommets suffisent.
+ */
+function profondeurAu(
+  proj: { sx: number; sy: number; depth: number }[],
+  pt: { sx: number; sy: number },
+): number | null {
+  for (let i = 1; i + 1 < proj.length; i++) {
+    const [a, b, c] = [proj[0], proj[i], proj[i + 1]];
+    const det = (b.sy - c.sy) * (a.sx - c.sx) + (c.sx - b.sx) * (a.sy - c.sy);
+    if (Math.abs(det) < 1e-9) continue;
+    const l1 =
+      ((b.sy - c.sy) * (pt.sx - c.sx) + (c.sx - b.sx) * (pt.sy - c.sy)) / det;
+    const l2 =
+      ((c.sy - a.sy) * (pt.sx - c.sx) + (a.sx - c.sx) * (pt.sy - c.sy)) / det;
+    const l3 = 1 - l1 - l2;
+    if (l1 < -0.02 || l2 < -0.02 || l3 < -0.02) continue;
+    return a.depth * l1 + b.depth * l2 + c.depth * l3;
+  }
+  return null;
+}
+
 export function roomRanks(rooms: SceneRoom[], cam: CameraTrig): Map<string, number> {
   const cle = (r: SceneRoom) =>
     (r.centroid.x * cam.st + r.centroid.z * cam.ct) * cam.sp;
@@ -710,6 +918,21 @@ export function buildScene(
       /** Le pan appartient à la face extérieure d'un mur. */
       cutaway?: boolean;
       /**
+       * D'UN SEUL TENANT — aucune découpe en bandes.
+       *
+       * Un mur se découpe : ses bandes lui donnent la finesse de tri qu'un
+       * grand pan n'a pas, et sa texture s'y échantillonne. Un MEUBLE, non.
+       * Ses morceaux se touchent presque — une porte dépasse de seize
+       * millimètres du caisson qui la porte — et chaque bande du caisson,
+       * triée sur son propre milieu, pouvait repasser par-dessus la porte :
+       * autant de rayures en travers du meuble. C'est ce que le chantier a
+       * photographié sur le canapé.
+       *
+       * D'un seul tenant, il n'y a plus de bande à mal trier — et le modèle
+       * s'allège d'autant.
+       */
+      whole?: boolean;
+      /**
        * ALTITUDE DE TRI : un mur se classe COMME UN PLAN, pas morceau par
        * morceau.
        *
@@ -729,7 +952,9 @@ export function buildScene(
       depthY?: number;
     } = {},
   ) => {
-    const cols = Math.max(1, Math.ceil(Math.hypot(q.x - p.x, q.z - p.z) / step));
+    const cols = o.whole
+      ? 1
+      : Math.max(1, Math.ceil(Math.hypot(q.x - p.x, q.z - p.z) / step));
     // PAS de découpe en hauteur — sauf pour poser une texture.
     //
     // Je l'avais ajoutée sur un raisonnement : un pan pleine hauteur se trie
@@ -816,8 +1041,12 @@ export function buildScene(
     outline?: string,
     /** +1 = dessus d'un volume, −1 = dessous (linteau vu d'en dessous). */
     facing: 1 | -1 = 1,
+    /** D'un seul tenant : un dessus de meuble ne se découpe pas. */
+    whole = false,
   ) => {
-    const n = Math.max(1, Math.ceil(Math.hypot(e1b.x - e1a.x, e1b.z - e1a.z) / step));
+    const n = whole
+      ? 1
+      : Math.max(1, Math.ceil(Math.hypot(e1b.x - e1a.x, e1b.z - e1a.z) / step));
     const at = (p: Pt): P3 => ({ x: p.x, y, z: p.z });
     const normal: P3 = { x: 0, y: facing, z: 0 };
     for (let i = 0; i < n; i++) {
@@ -877,6 +1106,8 @@ export function buildScene(
       closeBottom?: boolean;
       /** Ombrage selon l'orientation (les meubles restent en aplat). */
       shade?: boolean;
+      /** Pans d'un seul tenant : voir `pushStrips`. */
+      whole?: boolean;
       /** Altitude de tri commune à tout le mur (voir `pushStrips`). */
       depthY?: number;
       /**
@@ -917,6 +1148,7 @@ export function buildScene(
         normal: outwardOf(p, r),
         cutaway: extra.cutaway,
         depthY: o.depthY,
+        whole: o.whole,
       });
 
     // `texOnPlus` dit déjà quelle face regarde la pièce : l'AUTRE est
@@ -932,9 +1164,9 @@ export function buildScene(
     // Tableaux (chants) : trop étroits pour mériter un découpage.
     face(p2, p1);
     face(r1, r2);
-    pushTopStrips(p1, r1, p2, r2, yt, o.top, o.topStroke);
+    pushTopStrips(p1, r1, p2, r2, yt, o.top, o.topStroke, 1, o.whole);
     if (o.closeBottom) {
-      pushTopStrips(r1, p1, r2, p2, yb, o.top, o.topStroke, -1);
+      pushTopStrips(r1, p1, r2, p2, yb, o.top, o.topStroke, -1, o.whole);
     }
   };
 
@@ -1608,6 +1840,8 @@ export function buildScene(
           // Une télé ou une étagère ne touchent pas le sol : leur dessous se
           // voit depuis le bas de la pièce.
           closeBottom: fond > 1e-3,
+          // Pas de bandes sur un meuble : elles se repeignaient entre elles.
+          whole: true,
         },
       );
     };
@@ -1720,10 +1954,6 @@ export function buildScene(
      */
     let triRefs: P3[] = [{ x: obj.cx, y: hauteurTri / 2, z: obj.cz }];
     let triCote: P3 | undefined;
-    /** Le mur auquel il est adossé : de quoi projeter chaque morceau. */
-    let adosse:
-      | { ax: number; az: number; ux: number; uz: number; ox: number; oz: number }
-      | undefined;
     {
       const murs = wallsOf.get(roomOf(source)) ?? walls;
       let best = Infinity;
@@ -1750,17 +1980,6 @@ export function buildScene(
         best = Math.abs(d);
         const sens = d >= 0 ? 1 : -1;
         const saillie = Math.abs(d) + demi;
-        // Le plan de tri du meuble : le nu du mur, avancé de sa saillie.
-        // Chaque morceau s'y projettera à son abscisse — plus besoin de
-        // mesurer son emprise le long du mur, sa propre position suffit.
-        adosse = {
-          ax: w.a.x,
-          az: w.a.z,
-          ux: u.x,
-          uz: u.z,
-          ox: n.x * sens * saillie,
-          oz: n.z * sens * saillie,
-        };
         triRefs = [
           {
             x: w.a.x + u.x * (t * len) + n.x * sens * saillie,
@@ -1800,26 +2019,22 @@ export function buildScene(
       f.roomId = pieceDuPoint({ x: obj.cx, z: obj.cz }) ?? roomOf(source);
       if (f.isFloor) continue;
       f.depthFacing = triCote;
-      if (!adosse) {
-        f.depthRefs = triRefs;
-        continue;
-      }
-      // Le milieu du morceau, ramené sur le plan avancé du meuble.
-      let cx = 0;
-      let cz = 0;
-      for (const p of f.pts) {
-        cx += p.x;
-        cz += p.z;
-      }
-      cx /= f.pts.length;
-      cz /= f.pts.length;
-      const e = (cx - adosse.ax) * adosse.ux + (cz - adosse.az) * adosse.uz;
-      f.depthRefs = undefined;
-      f.depthAt = {
-        x: adosse.ax + adosse.ux * e + adosse.ox,
-        y: hauteurTri / 2,
-        z: adosse.az + adosse.uz * e + adosse.oz,
-      };
+      /*
+        LE BLOC SE TRIE EN UN POINT, SES MORCEAUX À LEUR VRAIE PLACE.
+
+        Deux tris, et non un seul. Face au reste de la scène — les murs, les
+        autres meubles — le meuble compte pour UN : toutes ses faces
+        partagent le point de tri calculé plus haut, celui qui le pose devant
+        sa maçonnerie sans que son altitude s'en mêle. Entre elles, les faces
+        d'un même meuble s'ordonnent à leur VRAIE profondeur.
+
+        On avait essayé de tout régler d'un seul point par face, projeté sur
+        le plan du mur : les morceaux tombaient à égalité et l'ordre de
+        construction tranchait au hasard — le dossier du canapé repeignait
+        son assise. Le banc en comptait plus de mille par scène.
+      */
+      f.depthAt = undefined;
+      f.depthRefs = triRefs;
     }
   }
 
