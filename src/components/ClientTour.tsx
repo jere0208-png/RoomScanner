@@ -263,7 +263,18 @@ export function ClientTour({
         const recul = Math.max(1.2, Math.min(3.4, jusquAuFond * 0.8));
         return {
           x: mid.x + n.x * recul,
-          y: solY + 1.6,
+          /*
+            L'ŒIL D'UN ADULTE DEBOUT : 1,65 m.
+
+            Relevé du chantier : « la présentation nous fait plus petit que le
+            canapé ». Le regard était à 1,60 m — la bonne hauteur — mais
+            l'objectif à 68 degrés grossissait tout ce qui est proche : un
+            dossier de canapé à un mètre remplissait le bas du cadre et
+            paraissait nous dépasser. Un homme voit à peu près soixante
+            degrés de haut en bas ; c'est cette focale-là qui rend l'échelle
+            juste.
+          */
+          y: solY + 1.65,
           z: mid.z + n.z * recul,
         };
       };
@@ -529,10 +540,11 @@ export function ClientTour({
             dep.yaw +
             (etape.pose.yaw - dep.yaw) * arrivee +
             (balaye * Math.PI) / 180,
-          pitch: 0,
+          // Un regard légèrement plongeant, comme lorsqu'on visite une pièce.
+          pitch: -0.06,
           // Une ouverture large : dans une pièce de trois mètres, un objectif
           // étroit ne montrerait qu'un pan de mur.
-          fov: 68,
+          fov: 58,
         });
       } else {
         setPov(null);
@@ -671,6 +683,53 @@ export function ClientTour({
           ))}
         </View>
 
+        {/*
+          LA NAVIGATION D'UNE STORY.
+
+          Relevé du chantier : « au clic on passe à l'animation suivante, slide
+          arrière revient en arrière, comme une story Instagram ». C'est le
+          geste que tout le monde connaît, et il vaut mieux qu'un bouton :
+          devant un client, on ne cherche pas une commande, on tape.
+
+          Deux moitiés invisibles : à droite on avance, à gauche on revient. La
+          bande du bas reste libre pour la pause — sinon on suspend la visite
+          en voulant simplement passer au mur suivant.
+        */}
+        <View style={styles.storyZones} pointerEvents="box-none">
+          <Pressable
+            style={styles.storyMoitie}
+            accessibilityLabel="Étape précédente"
+            onPress={() => {
+              depart.current = vue;
+              poseDepart.current = pov
+                ? { at: pov.at, yaw: pov.yaw }
+                : poseDepart.current;
+              debut.current = 0;
+              setAvance(0);
+              setIndex((i) => Math.max(0, i - 1));
+              setJoue(true);
+            }}
+          />
+          <Pressable
+            style={styles.storyMoitie}
+            accessibilityLabel="Étape suivante"
+            onPress={() => {
+              depart.current = vue;
+              poseDepart.current = pov
+                ? { at: pov.at, yaw: pov.yaw }
+                : poseDepart.current;
+              debut.current = 0;
+              setAvance(0);
+              if (index + 1 < etapes.length) {
+                setIndex(index + 1);
+                setJoue(true);
+              } else {
+                setJoue(false);
+              }
+            }}
+          />
+        </View>
+
         <View style={styles.commandes}>
           <TouchableOpacity
             style={styles.rond}
@@ -752,7 +811,20 @@ const getStyles = themedStyles((c: Palette) =>
       overflow: 'hidden',
     },
     railFill: { height: 3, backgroundColor: c.blue, borderRadius: 2 },
-    commandes: {
+    /**
+   * Les deux moitiés d'écran de la story : invisibles, et au-dessus du
+   * modèle. Elles s'arrêtent avant la barre du bas, qui garde la pause.
+   */
+  storyZones: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 120,
+    flexDirection: 'row',
+  },
+  storyMoitie: { flex: 1 },
+  commandes: {
       position: 'absolute',
       right: 20,
       bottom: 44,

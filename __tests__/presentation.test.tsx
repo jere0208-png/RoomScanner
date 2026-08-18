@@ -642,3 +642,82 @@ describe('le préchargement du dossier', () => {
     espion.mockRestore();
   });
 });
+
+/**
+ * LA VISITE SE PARCOURT COMME UNE STORY.
+ *
+ * Relevé du chantier : « au clic on passe à l'animation suivante, slide
+ * arrière revient en arrière ». Et : « la présentation nous fait plus petit
+ * que le canapé » — l'œil était à la bonne hauteur, mais l'objectif trop
+ * large grossissait tout ce qui est proche.
+ */
+describe('la visite, parcourue au doigt', () => {
+  const ouvrir = () => {
+    let tree!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      useScanStore.setState({
+        screen: 'result',
+        scanName: 'Chantier test',
+        walls: SNAPSHOT_WALLS,
+        openings: SNAPSHOT_OPENINGS,
+        objects: SNAPSHOT_OBJECTS,
+        rooms: SNAPSHOT_ROOMS.map((r, i) => ({
+          id: r.id,
+          name: `Pièce ${i + 1}`,
+          floor: null,
+        })),
+        fixtures: SNAPSHOT_FIXTURES,
+        ceiling: [],
+      });
+      tree = TestRenderer.create(<ClientTour visible onClose={() => {}} />);
+    });
+    act(() => {
+      jest.advanceTimersByTime(600);
+    });
+    return tree;
+  };
+
+  it('avance et recule au doigt, sans chercher de bouton', () => {
+    const tree = ouvrir();
+    arbre = tree;
+    const zone = (nom: string) =>
+      tree.root
+        .findAll((n) => typeof n.props?.onPress === 'function')
+        .find((n) => n.props.accessibilityLabel === nom);
+    expect(zone('Étape suivante')).toBeDefined();
+    expect(zone('Étape précédente')).toBeDefined();
+    const titre = () => String(textes(tree));
+    const debut = titre();
+    act(() => zone('Étape suivante')!.props.onPress());
+    act(() => {
+      jest.advanceTimersByTime(300);
+    });
+    expect(titre()).not.toBe(debut);
+    act(() => zone('Étape précédente')!.props.onPress());
+    act(() => {
+      jest.advanceTimersByTime(300);
+    });
+    expect(titre()).toBe(debut);
+  });
+
+  it('regarde à hauteur d’homme, avec une focale d’homme', () => {
+    const tree = ouvrir();
+    arbre = tree;
+    let vu = false;
+    for (let i = 0; i < 60 && !vu; i++) {
+      act(() => {
+        jest.advanceTimersByTime(500);
+      });
+      const p = tree.root.findByType(Iso3DView).props.pov;
+      if (!p) continue;
+      vu = true;
+      // 1,65 m : l'œil d'un adulte debout.
+      expect(p.at.y).toBeGreaterThan(1.6);
+      expect(p.at.y).toBeLessThan(1.75);
+      // Une focale d'homme : au-delà de soixante degrés, tout ce qui est
+      // proche enfle et l'échelle ment.
+      expect(p.fov).toBeLessThanOrEqual(60);
+    }
+    expect(`${vu ? 'vue' : 'jamais en POV'}`).toBe('vue');
+  });
+});
