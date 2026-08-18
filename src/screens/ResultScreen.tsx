@@ -177,6 +177,21 @@ export function ResultScreen() {
    */
   const marges = useSafeAreaInsets();
   const basSysteme = Math.max(marges.bottom, 10);
+  /*
+    UNE SAUVEGARDE PERDUE SE DIT TOUT DE SUITE.
+
+    Le stockage d'un téléphone se remplit, et un relevé chargé en photos peut
+    ne pas s'écrire. L'échec était avalé en silence : on repartait du chantier
+    en croyant son dossier enregistré. C'est le seul défaut de cette
+    application qui pouvait coûter une visite entière.
+  */
+  const panne = useScanStore((st) => st.panne);
+  useEffect(() => {
+    if (!panne) return;
+    Alert.alert('Enregistrement impossible', panne.message, [
+      { text: 'Compris', onPress: () => useScanStore.getState().oublierPanne() },
+    ]);
+  }, [panne]);
   const { width: winLargeur } = useWindowDimensions();
   /*
     COMBIEN DE CALQUES TIENNENT SUR LA LIGNE DU BAS ?

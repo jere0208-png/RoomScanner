@@ -386,6 +386,22 @@ let persistTimer: ReturnType<typeof setTimeout> | null = null;
  * Désormais : une clé par scan, plus un index qui donne l'ordre. On compare
  * au dernier état écrit et on ne touche qu'aux scans réellement modifiés.
  */
+/**
+ * UNE ÉCRITURE PERDUE SE DIT.
+ *
+ * Le disque d'un téléphone se remplit, et le stockage de l'app a ses limites :
+ * un relevé chargé en photos peut ne PAS s'écrire. Jusqu'ici, l'échec était
+ * avalé en silence — trois `catch` vides — et l'électricien repartait du
+ * chantier en croyant son dossier enregistré. C'est le seul défaut de cette
+ * application qui pouvait lui coûter une visite entière.
+ *
+ * Le store porte donc un témoin d'échec, que l'écran affiche. On ne prévient
+ * qu'UNE FOIS par incident : une alerte à chaque tentative rendrait l'app
+ * inutilisable précisément au moment où il faut sauver ce qui peut l'être.
+ */
+export type PanneEcriture = { quand: number; message: string } | null;
+let signalerPanne: (p: PanneEcriture) => void = () => {};
+
 function persistSoon(saves: SavedScan[]) {
   if (persistTimer) clearTimeout(persistTimer);
   persistTimer = setTimeout(() => {
@@ -396,10 +412,17 @@ function persistSoon(saves: SavedScan[]) {
         const json = JSON.stringify(s);
         if (ecrits.get(s.id) === json) continue;
         ecrits.set(s.id, json);
-        AsyncStorage.setItem(scanKey(s.id), json).catch(() => {
+        AsyncStorage.setItem(scanKey(s.id), json).catch((e) => {
           // Écriture perdue : on oublie ce qu'on croyait avoir écrit, la
-          // prochaine sauvegarde réessaiera.
+          // prochaine sauvegarde réessaiera — et on le DIT.
           ecrits.delete(s.id);
+          signalerPanne({
+            quand: Date.now(),
+            message:
+              `« ${s.name} » n'a pas pu être enregistré : ` +
+              `${e?.message ?? 'stockage indisponible'}. ` +
+              'Libérez de la place, puis touchez Enregistrer.',
+          });
         });
       }
       for (const id of [...ecrits.keys()]) {
@@ -410,7 +433,14 @@ function persistSoon(saves: SavedScan[]) {
       AsyncStorage.setItem(
         INDEX_KEY,
         JSON.stringify(saves.map((s) => s.id)),
-      ).catch(() => {});
+      ).catch((e) => {
+        signalerPanne({
+          quand: Date.now(),
+          message:
+            `La liste des scans n'a pas pu être écrite : ` +
+            `${e?.message ?? 'stockage indisponible'}.`,
+        });
+      });
     } catch {
       // Un scan illisible ne doit pas emporter les autres.
     }
@@ -735,6 +765,13 @@ interface ScanState {
   rotateObject: (id: string, quarts?: number) => void;
   /** Oriente un meuble à l'angle donné (radians). */
   setObjectYaw: (id: string, yaw: number) => void;
+  /**
+   * La dernière écriture qui a échoué, tant que l'électricien ne l'a pas lue.
+   * `null` = tout va bien.
+   */
+  panne: PanneEcriture;
+  /** Il a lu l'avertissement : on l'oublie jusqu'au prochain incident. */
+  oublierPanne: () => void;
   removeObject: (id: string) => void;
   /** Pose en une fois ce que « Normes auto » propose. */
   poserDAuto: (fixtures: Fixture[], ceiling: CeilingFixture[]) => void;
@@ -755,6 +792,12 @@ const solDe = (walls: WallSeg[]) =>
     : 0;
 
 export const useScanStore = create<ScanState>((set, get) => {
+  // Le pont entre l'écriture différée — qui vit hors du store — et l'état que
+  // l'écran observe. Une seule alerte par incident : voir `persistSoon`.
+  signalerPanne = (p) => {
+    if (p && get().panne) return;
+    set({ panne: p });
+  };
   /**
    * Photographie le plan avant de le modifier. `key` regroupe les appels
    * rapprochés d'un même geste : un glissement de coin ne doit produire
@@ -2261,6 +2304,9 @@ export const useScanStore = create<ScanState>((set, get) => {
         dirty: true,
       });
     },
+
+    panne: null,
+    oublierPanne: () => set({ panne: null }),
 
     removeObject: (id) => {
       pushHistory('removeObject');
