@@ -436,6 +436,23 @@ interface ScanState {
   setRoomName: (roomId: string, name: string) => void;
   /** Retire une pièce du scan (sa géométrie part avec elle). */
   removeRoom: (roomId: string) => void;
+  /**
+   * DÉPLACE UNE PIÈCE ENTIÈRE, avec ce qu'elle porte.
+   *
+   * Une pièce ajoutée tombe à côté du plan : il faut pouvoir la pousser
+   * contre celle qui la jouxte. On translate donc ses murs, son mobilier,
+   * son appareillage et ses points lumineux d'un bloc — tout ce qui la
+   * compose reste à sa place DANS la pièce.
+   *
+   * Et à l'arrivée, elle S'AIMANTE : si l'un de ses murs se retrouve à
+   * moins de vingt-cinq centimètres d'un mur parallèle du plan, elle se cale
+   * dessus exactement. C'est ce qui permet de construire un appartement sans
+   * jamais viser au pixel.
+   *
+   * Une pièce qui PARTAGE déjà un mur ne bouge pas : la déplacer
+   * déchirerait sa voisine. Elle est déjà à sa place, par construction.
+   */
+  moveRoom: (roomId: string, dx: number, dz: number) => void;
   /** Réunit deux pièces en une : la cloison qui les sépare cesse de les séparer. */
   mergeRooms: (a: string, b: string) => void;
   /** Pose une cloison en travers d'une pièce, puis redétecte : elle se scinde. */
@@ -839,6 +856,108 @@ export const useScanStore = create<ScanState>((set, get) => {
       set({
         rooms: get().rooms.map((r) =>
           r.id === roomId ? { ...r, name: name.trim() } : r,
+        ),
+        dirty: true,
+      });
+    },
+
+    moveRoom: (roomId, dx, dz) => {
+      const st = get();
+      const piece = st.rooms.find((r) => r.id === roomId);
+      if (!piece) return;
+      const aMoi = new Set(
+        piece.wallIds ??
+          st.walls.filter((w) => roomOf(w) === roomId).map((w) => w.id),
+      );
+      if (aMoi.size === 0) return;
+      // Un mur porté par une AUTRE pièce est mitoyen : on ne déplace pas.
+      const partage = st.rooms.some(
+        (r) => r.id !== roomId && (r.wallIds ?? []).some((id) => aMoi.has(id)),
+      );
+      if (partage) return;
+
+      /**
+       * L'AIMANT : on cherche le petit réajustement qui aligne.
+       *
+       * Pour chaque mur déplacé et chaque mur du reste du plan, s'ils sont
+       * PARALLÈLES et que leurs projections se recouvrent, l'écart
+       * perpendiculaire donne le décalage à rattraper. On garde le plus
+       * petit, et on ne l'applique que sous vingt-cinq centimètres : au-delà,
+       * c'est que l'électricien voulait bien poser la pièce là.
+       */
+      const AIMANT = 0.25;
+      const bouges = st.walls
+        .filter((w) => aMoi.has(w.id))
+        .map((w) => ({
+          a: { x: w.a.x + dx, z: w.a.z + dz },
+          b: { x: w.b.x + dx, z: w.b.z + dz },
+        }));
+      const autres = st.walls.filter((w) => !aMoi.has(w.id));
+      let cale = { x: 0, z: 0 };
+      let mieux = AIMANT;
+      for (const m of bouges) {
+        const lm = Math.hypot(m.b.x - m.a.x, m.b.z - m.a.z) || 1;
+        const um = { x: (m.b.x - m.a.x) / lm, z: (m.b.z - m.a.z) / lm };
+        for (const o of autres) {
+          const lo = Math.hypot(o.b.x - o.a.x, o.b.z - o.a.z) || 1;
+          const uo = { x: (o.b.x - o.a.x) / lo, z: (o.b.z - o.a.z) / lo };
+          // Parallèles ? Le produit vectoriel des directions est nul.
+          if (Math.abs(um.x * uo.z - um.z * uo.x) > 0.08) continue;
+          // Les projections se recouvrent-elles ? Sinon les murs sont
+          // alignés mais bout à bout, et il n'y a rien à aimanter.
+          const t = (p: Pt) => (p.x - o.a.x) * uo.x + (p.z - o.a.z) * uo.z;
+          const t0 = Math.min(t(m.a), t(m.b));
+          const t1 = Math.max(t(m.a), t(m.b));
+          if (t1 < -0.2 || t0 > lo + 0.2) continue;
+          // L'écart perpendiculaire, signé.
+          const n = { x: -uo.z, z: uo.x };
+          const e = (m.a.x - o.a.x) * n.x + (m.a.z - o.a.z) * n.z;
+          if (Math.abs(e) < mieux && Math.abs(e) > 1e-9) {
+            mieux = Math.abs(e);
+            cale = { x: -n.x * e, z: -n.z * e };
+          }
+        }
+      }
+      const ddx = dx + cale.x;
+      const ddz = dz + cale.z;
+
+      pushHistory(`moveRoom:${roomId}`);
+      set({
+        walls: st.walls.map((w) =>
+          aMoi.has(w.id)
+            ? {
+                ...w,
+                a: { x: w.a.x + ddx, z: w.a.z + ddz },
+                b: { x: w.b.x + ddx, z: w.b.z + ddz },
+              }
+            : w,
+        ),
+        // Les menuiseries de ces murs suivent, sinon elles restent en l'air.
+        openings: st.openings.map((o) => {
+          const proche = nearestWall(o, st.walls.filter((w) => aMoi.has(w.id)));
+          return proche.dist < 0.4
+            ? {
+                ...o,
+                a: { x: o.a.x + ddx, z: o.a.z + ddz },
+                b: { x: o.b.x + ddx, z: o.b.z + ddz },
+              }
+            : o;
+        }),
+        // Le mobilier et le plafond de la pièce voyagent avec elle.
+        objects: st.objects.map((o) =>
+          roomOf(o) === roomId
+            ? {
+                ...o,
+                transform: o.transform.map((v, i) =>
+                  i === 12 ? v + ddx : i === 14 ? v + ddz : v,
+                ),
+              }
+            : o,
+        ),
+        ceiling: st.ceiling.map((cl) =>
+          cl.roomId === roomId
+            ? { ...cl, at: { x: cl.at.x + ddx, z: cl.at.z + ddz } }
+            : cl,
         ),
         dirty: true,
       });

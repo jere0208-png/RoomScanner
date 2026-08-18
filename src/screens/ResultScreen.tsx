@@ -207,6 +207,7 @@ export function ResultScreen() {
   const ceiling = useScanStore((s) => s.ceiling);
   const addCeiling = useScanStore((s) => s.addCeiling);
   const addRoomBox = useScanStore((s) => s.addRoomBox);
+  const moveRoom = useScanStore((s) => s.moveRoom);
   const removeCeiling = useScanStore((s) => s.removeCeiling);
   const moveCeiling = useScanStore((s) => s.moveCeiling);
   const setCeilingRow = useScanStore((s) => s.setCeilingRow);
@@ -1337,6 +1338,11 @@ export function ResultScreen() {
               setSelectedOpeningId(id);
             }}
             selectedRoomId={selectedRoomId}
+            /* Glisser dans la pièce choisie la déplace, avec ses meubles et
+               son appareillage — et elle s'aimante aux murs voisins. */
+            onMoveRoom={(dx, dz) =>
+              selectedRoomId && moveRoom(selectedRoomId, dx, dz)
+            }
             ceiling={ceiling}
             showCeiling={showCeiling}
             showNorth={showNorth}

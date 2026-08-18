@@ -170,3 +170,112 @@ describe('accoler une pièce à un mur existant', () => {
     expect(st.rooms.find((r) => r.id === id)!.wallIds).toHaveLength(4);
   });
 });
+
+/**
+ * DÉPLACER UNE PIÈCE, ET LA COLLER À SA VOISINE.
+ *
+ * Poser une pièce à côté du plan ne suffit pas : il faut la pousser contre
+ * celle qui la jouxte, et qu'elle s'y cale exactement. Viser au centimètre
+ * avec le doigt est impossible — c'est l'aimant qui fait le travail, comme
+ * dans tous les logiciels de plan.
+ */
+describe('déplacer une pièce', () => {
+  const CARRE = [
+    { id: 'n', a: { x: 0, z: 0 }, b: { x: 4, z: 0 } },
+    { id: 'e', a: { x: 4, z: 0 }, b: { x: 4, z: 4 } },
+    { id: 's', a: { x: 4, z: 4 }, b: { x: 0, z: 4 } },
+    { id: 'o', a: { x: 0, z: 4 }, b: { x: 0, z: 0 } },
+  ].map((w) => ({
+    ...w,
+    type: 'wall' as const,
+    height: 2.5,
+    yCenter: 1.25,
+    roomId: 'r1',
+  }));
+
+  beforeEach(() => {
+    useScanStore.setState({
+      walls: CARRE,
+      openings: [],
+      objects: [],
+      rooms: [
+        { id: 'r1', name: 'Séjour', floor: null, wallIds: CARRE.map((w) => w.id) },
+      ],
+      fixtures: [],
+      ceiling: [],
+    });
+  });
+
+  /** La pièce ajoutée à côté, à déplacer. */
+  const ajoutee = () => useScanStore.getState().addRoomBox(3, 3, 'Chambre', null);
+
+  it('translate tous ses murs, et rien d’autre', () => {
+    const id = ajoutee();
+    const avant = useScanStore.getState().walls;
+    const siens = new Set(
+      useScanStore.getState().rooms.find((r) => r.id === id)!.wallIds!,
+    );
+    useScanStore.getState().moveRoom(id, 1, 0.6);
+    const apres = useScanStore.getState().walls;
+    for (let i = 0; i < avant.length; i++) {
+      if (siens.has(avant[i].id)) {
+        expect(apres[i].a.x).toBeCloseTo(avant[i].a.x + 1, 6);
+        expect(apres[i].a.z).toBeCloseTo(avant[i].a.z + 0.6, 6);
+      } else {
+        // Le séjour n'a pas bougé d'un millimètre.
+        expect(apres[i]).toEqual(avant[i]);
+      }
+    }
+  });
+
+  it('s’aimante au mur voisin quand elle en approche', () => {
+    const id = ajoutee();
+    const st = () => useScanStore.getState();
+    const siens = () => new Set(st().rooms.find((r) => r.id === id)!.wallIds!);
+    // Elle est posée à 0,50 m à droite du séjour (x = 4,5). On la pousse
+    // de 40 cm vers la gauche : il reste 10 cm — l'aimant les rattrape.
+    useScanStore.getState().moveRoom(id, -0.4, 0);
+    const gauche = Math.min(
+      ...st()
+        .walls.filter((w) => siens().has(w.id))
+        .flatMap((w) => [w.a.x, w.b.x]),
+    );
+    expect(`bord gauche ${gauche.toFixed(3)}`).toBe('bord gauche 4.000');
+  });
+
+  it('emmène ses meubles et ses points lumineux avec elle', () => {
+    const id = ajoutee();
+    useScanStore.setState({
+      objects: [
+        {
+          id: 'o1',
+          category: 'storage',
+          width: 1,
+          depth: 0.5,
+          height: 1.8,
+          roomId: id,
+          transform: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 5, 0.9, 1, 1],
+        } as never,
+      ],
+      ceiling: [{ id: 'cl1', kind: 'dcl', roomId: id, at: { x: 5, z: 1 } }],
+    });
+    useScanStore.getState().moveRoom(id, 0, 2);
+    const st = useScanStore.getState();
+    expect(st.objects[0].transform[14]).toBeCloseTo(3, 6);
+    expect(st.ceiling[0].at.z).toBeCloseTo(3, 6);
+  });
+
+  /**
+   * MAIS UNE PIÈCE ACCOLÉE NE BOUGE PAS.
+   *
+   * Elle partage sa cloison avec sa voisine : la déplacer déchirerait le
+   * plan — un mur ne peut pas être à deux endroits. Elle est déjà à sa
+   * place, par construction.
+   */
+  it('refuse de déplacer une pièce qui partage un mur', () => {
+    const id = useScanStore.getState().addRoomBox(3, 3, 'Chambre', 'n');
+    const avant = useScanStore.getState().walls;
+    useScanStore.getState().moveRoom(id, 1, 1);
+    expect(useScanStore.getState().walls).toEqual(avant);
+  });
+});

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   PanResponder,
+  type GestureResponderEvent,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -160,6 +161,16 @@ interface Props {
   selectedRoomId?: string | null;
   /** Appui sur le sol d'une pièce (mode édition) : la sélectionne. */
   onSelectRoom?: (id: string | null) => void;
+  /**
+   * DÉPLACER LA PIÈCE CHOISIE, au doigt.
+   *
+   * Une pièce ajoutée tombe à côté du plan ; il faut la pousser contre
+   * celle qui la jouxte. Le doigt posé DANS son contour la prend et la
+   * fait glisser — le même geste que pour un meuble, et le même aimant
+   * à l'arrivée. Les déplacements arrivent en mètres, dans le repère du
+   * monde : la vue peut être tournée, le plan ne s'en occupe pas.
+   */
+  onMoveRoom?: (dx: number, dz: number) => void;
   /** Appui sur le cartouche d'une pièce (mode édition) : la renomme. */
   onEditRoomName?: (id: string) => void;
   /**
@@ -253,6 +264,7 @@ export function FloorplanEditor({
   onDeleteObject,
   selectedRoomId,
   onSelectRoom,
+  onMoveRoom,
   onEditRoomName,
   onWallAction,
   onSelectFixture,
@@ -332,6 +344,58 @@ export function FloorplanEditor({
   const objBox = useRef<{ x: number; y: number; hw: number; hh: number } | null>(
     null,
   );
+  /**
+   * Le doigt est-il dans le contour de la pièce choisie ?
+   *
+   * On travaille en pixels d'écran : le contour est déjà projeté, et c'est
+   * la seule mesure que le geste connaît.
+   */
+  const contourChoisi = useRef<{ x: number; y: number }[] | null>(null);
+  const pieceSousLeDoigt = (e: GestureResponderEvent) => {
+    const poly = contourChoisi.current;
+    if (!poly || poly.length < 3) return false;
+    const { locationX: x, locationY: y } = e.nativeEvent;
+    let dedans = false;
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      if (
+        poly[i].y > y !== poly[j].y > y &&
+        x <
+          ((poly[j].x - poly[i].x) * (y - poly[i].y)) /
+            (poly[j].y - poly[i].y) +
+            poly[i].x
+      ) {
+        dedans = !dedans;
+      }
+    }
+    return dedans;
+  };
+
+  /** Le glissement de la pièce : en mètres, dans le repère du monde. */
+  const piece = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (e, g) =>
+        !!onMoveRoom &&
+        Math.abs(g.dx) + Math.abs(g.dy) > 4 &&
+        pieceSousLeDoigt(e),
+      onPanResponderGrant: () => {
+        pieceDep.current = { x: 0, y: 0 };
+      },
+      onPanResponderMove: (_e, g) => {
+        const m = mappingRef.current;
+        if (!m) return;
+        const dx = g.dx - pieceDep.current.x;
+        const dy = g.dy - pieceDep.current.y;
+        pieceDep.current = { x: g.dx, y: g.dy };
+        // Écran → monde : la conversion est déjà écrite, rotation et zoom
+        // compris. La réécrire ici, c'est se tromper d'un signe un jour.
+        const d = m.deltaToMeters(dx, dy);
+        onMoveRoom?.(d.x, d.z);
+      },
+    }),
+  ).current;
+  const pieceDep = useRef({ x: 0, y: 0 });
+
   const nav = useRef(
     PanResponder.create({
       // Ne prend la main QUE sur un mouvement : les taps (sélection de mur)
@@ -342,6 +406,9 @@ export function FloorplanEditor({
       // sous le doigt et le meuble ne bougeait pas d'un pouce.
       onMoveShouldSetPanResponder: (e, g) => {
         if (Math.abs(g.dx) + Math.abs(g.dy) <= 6) return false;
+        // Un geste qui commence DANS la pièce choisie lui appartient : il
+        // la déplace au lieu de promener le plan.
+        if (pieceSousLeDoigt(e)) return false;
         const b = objBox.current;
         if (b) {
           const { locationX: x, locationY: y } = e.nativeEvent;
@@ -434,6 +501,10 @@ export function FloorplanEditor({
       },
     };
   }, [baseMapping, view, layout]);
+  /** Le geste lit le cadrage courant sans se reconstruire à chaque image. */
+  const mappingRef = useRef(mapping);
+  mappingRef.current = mapping;
+
 
   /**
    * Niveau de détail des cotes, de 0 à 1, piloté par le zoom.
@@ -564,6 +635,22 @@ export function FloorplanEditor({
   }, [rooms]);
   // Pièces du plan : chacune a son contour, son centre et sa teinte de sol.
   const parts = useMemo(() => roomParts(walls, rooms), [walls, rooms]);
+
+  /**
+   * Le contour à l'écran de la pièce choisie, retenu pour le geste.
+   *
+   * Le glissement doit savoir, au moment où le doigt se pose, s'il tombe
+   * dans la pièce : il lit donc le polygone déjà projeté, sans refaire le
+   * cadrage ni parcourir la scène.
+   */
+  contourChoisi.current = useMemo(() => {
+    if (!editable || !selectedRoomId || !mapping) return null;
+    const part = parts.find((p) => p.roomId === selectedRoomId);
+    const pts = part?.surface?.pts;
+    if (!pts || pts.length < 3) return null;
+    return pts.map((p) => mapping.toPx(p));
+  }, [editable, selectedRoomId, mapping, parts]);
+
   const roomById = useMemo(() => new Map(rooms.map((r) => [r.id, r])), [rooms]);
   // Le sol garde sa teinte neutre. Les couleurs relevées au scan ne servent
   // qu'à la vue 3D : sur un plan vu de dessus, sous le poché des murs et le
@@ -641,6 +728,21 @@ export function FloorplanEditor({
             setNorth(((cap - rot) % 360 + 360) % 360);
             haptic('succes');
           }}
+        />
+      )}
+      {/*
+        LA ZONE QUI PREND LE GLISSEMENT DE LA PIÈCE.
+
+        Posée SOUS le dessin (aucun pixel peint), elle ne répond qu'au
+        mouvement, et seulement dans le contour de la pièce choisie : le
+        reste — taper un mur, promener le plan, saisir un meuble — continue
+        de fonctionner exactement pareil.
+      */}
+      {editable && selectedRoomId && onMoveRoom && (
+        <View
+          style={StyleSheet.absoluteFill}
+          pointerEvents="box-only"
+          {...piece.panHandlers}
         />
       )}
       {mapping && (
