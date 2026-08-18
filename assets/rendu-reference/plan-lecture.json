@@ -338,7 +338,7 @@
            "strokeLinecap",
            "strokeLinejoin"
           ],
-          "d": "M-84.3 -21.1 L84.3 -21.1"
+          "d": "M-105.4 -52.7 L105.4 -52.7 L105.4 -23.7 L-105.4 -23.7 L-105.4 -52.7"
          },
          "children": null
         },
@@ -360,7 +360,7 @@
            "strokeLinecap",
            "strokeLinejoin"
           ],
-          "d": "M-84.3 -21.1 L-84.3 36.9"
+          "d": "M-105.4 -23.7 L-75.9 -23.7 L-75.9 52.7 L-105.4 52.7 L-105.4 -23.7"
          },
          "children": null
         },
@@ -382,7 +382,51 @@
            "strokeLinecap",
            "strokeLinejoin"
           ],
-          "d": "M84.3 -21.1 L84.3 36.9"
+          "d": "M75.9 -23.7 L105.4 -23.7 L105.4 52.7 L75.9 52.7 L75.9 -23.7"
+         },
+         "children": null
+        },
+        {
+         "type": "RNSVGPath",
+         "props": {
+          "fill": null,
+          "stroke": {
+           "type": 0,
+           "payload": 4284114034
+          },
+          "strokeWidth": 1.2,
+          "strokeLinecap": 1,
+          "strokeLinejoin": 1,
+          "propList": [
+           "fill",
+           "stroke",
+           "strokeWidth",
+           "strokeLinecap",
+           "strokeLinejoin"
+          ],
+          "d": "M-25.3 -23.7 L-25.3 52.7"
+         },
+         "children": null
+        },
+        {
+         "type": "RNSVGPath",
+         "props": {
+          "fill": null,
+          "stroke": {
+           "type": 0,
+           "payload": 4284114034
+          },
+          "strokeWidth": 1.2,
+          "strokeLinecap": 1,
+          "strokeLinejoin": 1,
+          "propList": [
+           "fill",
+           "stroke",
+           "strokeWidth",
+           "strokeLinecap",
+           "strokeLinejoin"
+          ],
+          "d": "M25.3 -23.7 L25.3 52.7"
          },
          "children": null
         },
@@ -502,7 +546,29 @@
            "strokeLinecap",
            "strokeLinejoin"
           ],
-          "d": "M-59.7 0.0 L59.7 0.0"
+          "d": "M-66.1 -1.9 L66.1 -1.9 L66.1 1.9 L-66.1 1.9 L-66.1 -1.9"
+         },
+         "children": null
+        },
+        {
+         "type": "RNSVGPath",
+         "props": {
+          "fill": null,
+          "stroke": {
+           "type": 0,
+           "payload": 4284114034
+          },
+          "strokeWidth": 1.2,
+          "strokeLinecap": 1,
+          "strokeLinejoin": 1,
+          "propList": [
+           "fill",
+           "stroke",
+           "strokeWidth",
+           "strokeLinecap",
+           "strokeLinejoin"
+          ],
+          "d": "M-17.6 1.9 L17.6 1.9"
          },
          "children": null
         }
@@ -568,7 +634,7 @@
            "strokeLinecap",
            "strokeLinejoin"
           ],
-          "d": "M-41.0 -41.0 L41.0 41.0"
+          "d": "M-38.9 0.0 L38.9 0.0"
          },
          "children": null
         },
@@ -590,7 +656,7 @@
            "strokeLinecap",
            "strokeLinejoin"
           ],
-          "d": "M41.0 -41.0 L-41.0 41.0"
+          "d": "M-8.2 -22.5 L-8.2 -10.2"
          },
          "children": null
         },
@@ -636,7 +702,7 @@
              "type": 0,
              "payload": 4278190080
             },
-            "content": "Électroménager",
+            "content": "Réfrigérateur",
             "font": {},
             "x": [],
             "y": [],
