@@ -1642,11 +1642,67 @@ export function FloorplanEditor({
               const hw = Math.max(28, (w * cw + d * sw) / 2 + 10);
               const hh = Math.max(28, (w * sw + d * cw) / 2 + 10);
               objBox.current = { x: p.x, y: p.y, hw, hh };
-              // Les boutons flottants restent DANS le plan, et à gauche de
-              // la colonne d'outils : posés sur elle, on cliquait l'un pour
-              // l'autre.
-              const bx = Math.min(layout.w - 106, Math.max(46, p.x + hw + 2));
-              const by = Math.min(layout.h - 96, Math.max(30, p.y - hh - 30));
+              /*
+                LES COMMANDES SUIVENT LE MEUBLE, ET RIEN D'AUTRE.
+
+                Elles étaient bornées au cadre du plan : dès que le meuble
+                approchait d'un bord, elles s'en détachaient et restaient
+                plantées au milieu de l'écran — la croix rouge se retrouvait
+                sur un AUTRE meuble, et l'on supprimait celui qu'on ne
+                regardait pas. Elles se posent maintenant à huit points de
+                son contour, et elles s'en vont avec lui.
+
+                Trois pastilles en rangée, centrées sur le meuble : pivoter,
+                coter, retirer. La suppression est la dernière — c'est le
+                geste qu'on ne rattrape pas, il ne doit pas tomber sous le
+                pouce par hasard.
+              */
+              const ECART = 42;
+              const rangeeW = ECART * 2;
+              // Au-dessus du contour ; en dessous s'il n'y a pas la place —
+              // le meuble reste visible, ses commandes doivent l'être aussi.
+              /*
+                Et elle laisse la place aux poignées quand elles sont là :
+                posée à vingt-six points, la rangée mordait sur la poignée du
+                bord haut — deux cibles superposées, dont on ne sait laquelle
+                répondra.
+              */
+              const RECUL = showObjectDims ? 44 : 26;
+              const dessus = p.y - hh - RECUL > 4;
+              const by = dessus ? p.y - hh - RECUL : p.y + hh + RECUL;
+              const bx = p.x - rangeeW / 2;
+              /*
+                ET ELLES DISPARAISSENT AVEC LUI.
+
+                Un meuble poussé hors du cadre laissait ses boutons collés au
+                bord, sans rien à commander de visible. On juge sur la boîte
+                du meuble : si elle ne mord plus sur le plan, il n'y a plus
+                rien à afficher — les poignées restent calées sur le meuble,
+                simplement personne ne les voit.
+              */
+              const dansLeChamp =
+                p.x + hw > 0 &&
+                p.x - hw < layout.w &&
+                p.y + hh > 0 &&
+                p.y - hh < layout.h;
+              if (!dansLeChamp) return null;
+              /*
+                LES QUATRE BORDS SE TIRENT — quand les cotes sont demandées.
+
+                Hors cotes, on déplace ; en cotes, on dimensionne. Les
+                afficher en permanence poserait quatre cibles de plus autour
+                d'un meuble qu'on veut seulement pousser.
+              */
+              const cotesTirables: {
+                cote: 'largeur+' | 'largeur-' | 'profondeur+' | 'profondeur-';
+                n: { x: number; z: number };
+                demi: number;
+              }[] = [
+                { cote: 'largeur+', n: { x: Math.cos(f.yaw), z: Math.sin(f.yaw) }, demi: f.width / 2 },
+                { cote: 'largeur-', n: { x: -Math.cos(f.yaw), z: -Math.sin(f.yaw) }, demi: f.width / 2 },
+                { cote: 'profondeur+', n: { x: -Math.sin(f.yaw), z: Math.cos(f.yaw) }, demi: f.depth / 2 },
+                { cote: 'profondeur-', n: { x: Math.sin(f.yaw), z: -Math.cos(f.yaw) }, demi: f.depth / 2 },
+              ];
               return (
                 <>
                   <ObjectDragHandle
@@ -1656,19 +1712,63 @@ export function FloorplanEditor({
                     mapping={mapping}
                     raw={o}
                   />
+                  {showObjectDims &&
+                    cotesTirables.map((b) => {
+                      // Milieu du bord, et un point voisin LE LONG du bord :
+                      // deux projections suffisent à connaître son angle à
+                      // l'écran, quelle que soit la rotation du plan.
+                      const mil = mapping.toPx({
+                        x: f.cx + b.n.x * b.demi,
+                        z: f.cz + b.n.z * b.demi,
+                      });
+                      const cote2 = mapping.toPx({
+                        x: f.cx + b.n.x * b.demi - b.n.z * 0.2,
+                        z: f.cz + b.n.z * b.demi + b.n.x * 0.2,
+                      });
+                      const inclinaison =
+                        (Math.atan2(cote2.y - mil.y, cote2.x - mil.x) * 180) /
+                        Math.PI;
+                      /*
+                        LA POIGNÉE SE POSE JUSTE DEHORS, pas sur le meuble.
+
+                        Sa zone touchable fait quarante points ; posées sur
+                        les quatre bords d'un meuble de soixante centimètres,
+                        elles se rejoignaient au milieu et couvraient toute
+                        sa surface — il devenait impossible de le DÉPLACER,
+                        chaque appui tombant sur une poignée. Douze points
+                        vers l'extérieur, et l'intérieur du meuble redevient
+                        ce qu'il doit être : la prise pour le pousser.
+                      */
+                      const vers = Math.hypot(mil.x - p.x, mil.y - p.y) || 1;
+                      const at = {
+                        x: mil.x + ((mil.x - p.x) / vers) * 12,
+                        y: mil.y + ((mil.y - p.y) / vers) * 12,
+                      };
+                      return (
+                        <SideHandle
+                          key={b.cote}
+                          objectId={o.id}
+                          cote={b.cote}
+                          at={at}
+                          angle={inclinaison}
+                          normale={b.n}
+                          mapping={mapping}
+                        />
+                      );
+                    })}
                   <RotateHandle
                     objectId={o.id}
                     center={p}
-                    at={{
-                      x: Math.min(layout.w - 130, Math.max(24, p.x - hw - 16)),
-                      y: Math.min(layout.h - 60, Math.max(24, p.y - hh - 16)),
-                    }}
+                    at={{ x: bx, y: by }}
                     raw={o}
                     viewRot={view.rot}
                     frame={frame}
                   />
                   <TouchableOpacity
-                    style={[styles.objDelete, { left: bx, top: by }]}
+                    style={[
+                      styles.objDelete,
+                      { left: bx + ECART * 2 - 17, top: by - 17 },
+                    ]}
                     accessibilityLabel="Retirer le meuble"
                     hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                     onPress={() => onDeleteObject?.(o.id)}>
@@ -1682,7 +1782,7 @@ export function FloorplanEditor({
                     style={[
                       styles.objMeasure,
                       showObjectDims && styles.objMeasureOn,
-                      { left: bx, top: by + 36 },
+                      { left: bx + ECART - 17, top: by - 17 },
                     ]}
                     accessibilityLabel="Cotes du meuble"
                     hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
@@ -2198,6 +2298,7 @@ export function RotateHandle({
     <>
       <View
         {...pan.panHandlers}
+        accessibilityLabel="Pivoter le meuble"
         style={[styles.rotHandle, { left: at.x - 17, top: at.y - 17 }]}>
         <Svg width={19} height={19} viewBox="0 0 24 24">
           <Path
@@ -2223,6 +2324,91 @@ export function RotateHandle({
         </View>
       )}
     </>
+  );
+}
+
+/**
+ * LA POIGNÉE D'UN CÔTÉ — on prend le bord et on tire.
+ *
+ * Régler un meuble à la cote, c'était taper une largeur : il fallait faire le
+ * calcul dans sa tête pour qu'il aille JUSQU'AU MUR. Sur un chantier on ne
+ * calcule pas, on tire le mètre jusqu'à la maçonnerie. Le bord opposé reste
+ * en place — c'est ce qui distingue un étirement d'un déplacement.
+ *
+ * Le doigt travaille dans le repère de l'ÉCRAN, la cote dans celui du
+ * logement : on projette donc son déplacement sur la normale du bord, en
+ * mètres. Un geste de travers ne compte que pour sa part utile, et le meuble
+ * ne part jamais en biais.
+ *
+ * L'aimant du store finit le geste (`snapSideToWalls`) ; la main le sent
+ * (`haptic`), parce que l'œil, lui, est caché par le doigt.
+ */
+export function SideHandle({
+  objectId,
+  cote,
+  at,
+  /** Angle du bord à l'écran, en degrés : la barre s'y couche. */
+  angle,
+  /** Normale sortante du bord, dans le repère du logement. */
+  normale,
+  mapping,
+}: {
+  objectId: string;
+  cote: 'largeur+' | 'largeur-' | 'profondeur+' | 'profondeur-';
+  at: { x: number; y: number };
+  angle: number;
+  normale: { x: number; z: number };
+  mapping: EffMapping;
+}) {
+  const c = useTheme();
+  const styles = getStyles(c);
+  // Même précaution que la poignée de déplacement : le responder est créé
+  // UNE FOIS, et tout ce qui change en cours de geste passe par la référence.
+  const live = useRef({ mapping, normale });
+  live.current = { mapping, normale };
+  const fait = useRef(0);
+  const pan = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        onPanResponderTerminationRequest: () => false,
+        onShouldBlockNativeResponder: () => true,
+        onPanResponderGrant: () => {
+          fait.current = 0;
+        },
+        onPanResponderMove: (_e, g) => {
+          const d = live.current.mapping.deltaToMeters(g.dx, g.dy);
+          const n = live.current.normale;
+          // Depuis l'appui : on n'applique que ce qui reste à faire, sinon
+          // chaque image rejouerait tout le glissement depuis le début.
+          const total = d.x * n.x + d.z * n.z;
+          const pas = total - fait.current;
+          fait.current = total;
+          if (Math.abs(pas) < 1e-5) return;
+          const r = useScanStore.getState().resizeObjectSide(objectId, cote, pas);
+          if (r.accroche) haptic('accroche', true);
+          else releaseHaptic('accroche');
+        },
+        onPanResponderRelease: () => releaseHaptic('accroche'),
+        onPanResponderTerminate: () => releaseHaptic('accroche'),
+      }),
+    [objectId, cote],
+  );
+  return (
+    <View
+      {...pan.panHandlers}
+      accessibilityLabel={`Étirer le côté ${cote}`}
+      // La zone touchable déborde largement la barre : un doigt couvre
+      // quinze points, la barre en fait huit.
+      style={[styles.sideTouch, { left: at.x - 20, top: at.y - 20 }]}>
+      <View
+        style={[
+          styles.sideBar,
+          { transform: [{ rotate: `${angle}deg` }] },
+        ]}
+      />
+    </View>
   );
 }
 
@@ -2328,6 +2514,27 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     fontWeight: '600',
     marginTop: 1,
   },
+  /**
+   * LA POIGNÉE D'UN BORD : une barre posée SUR le contour.
+   *
+   * Assez large pour se voir sans masquer le meuble, et sa zone touchable
+   * déborde de tous les côtés — c'est elle qu'on vise du pouce, pas le trait.
+   */
+  sideTouch: {
+    position: 'absolute',
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sideBar: {
+    width: 30,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: c.surface,
+    borderWidth: 2,
+    borderColor: c.blue,
+  },
   rotHandle: {
     position: 'absolute',
     width: 34,
@@ -2380,10 +2587,12 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   dragZone: { position: 'absolute' as const },
   objDelete: {
     position: 'absolute',
-    opacity: 0.75,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    opacity: 0.92,
+    // Trente-quatre points, comme la poignée de rotation et la pastille des
+    // cotes : trois tailles différentes sur une même rangée se voient.
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     backgroundColor: c.danger,
     alignItems: 'center',
     justifyContent: 'center',
@@ -2395,9 +2604,9 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   },
   objMeasure: {
     position: 'absolute',
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     backgroundColor: c.surface,
     alignItems: 'center',
     justifyContent: 'center',

@@ -24,6 +24,7 @@ import {
   separerMeubles,
   hugWall,
   pushOutOfWalls,
+  snapSideToWalls,
   roomExtent,
   roomHeight,
   roomOf,
@@ -786,6 +787,27 @@ interface ScanState {
    */
   setObjectCenter: (id: string, x: number, z: number, aimant?: boolean) => void;
   resizeObject: (id: string, width: number, depth: number) => void;
+  /**
+   * ÉTIRE UN MEUBLE PAR UN DE SES CÔTÉS, le côté opposé restant en place.
+   *
+   * C'est le geste du mètre ruban : on prend un bord et on le tire. Régler
+   * une largeur au clavier oblige à faire le calcul dans sa tête — on veut
+   * que le meuble aille JUSQU'AU MUR, pas qu'il fasse 1,47 m.
+   *
+   * `cote` désigne le bord tiré dans le repère du meuble : `largeur+` est
+   * celui vers lequel pointe son axe de largeur, `profondeur-` le bord
+   * arrière. `distance` est le déplacement de ce bord, en mètres, compté
+   * vers l'extérieur : positif, le meuble grandit.
+   *
+   * Le bord s'accroche au nu des murs qu'il longe (voir `snapSideToWalls`) :
+   * viser l'affleurement au doigt, à trois millimètres près, n'est pas un
+   * geste humain.
+   */
+  resizeObjectSide: (
+    id: string,
+    cote: 'largeur+' | 'largeur-' | 'profondeur+' | 'profondeur-',
+    distance: number,
+  ) => { accroche: boolean };
   /** Abandonne les modifications : recharge la dernière sauvegarde. */
   revertCurrent: () => void;
   loadSaves: () => Promise<void>;
@@ -2493,6 +2515,72 @@ export const useScanStore = create<ScanState>((set, get) => {
         }),
         dirty: true,
       });
+    },
+
+    resizeObjectSide: (id, cote, distance) => {
+      const st = get();
+      const obj = st.objects.find((o) => o.id === id);
+      if (!obj) return { accroche: false };
+      pushHistory(`resizeSide:${id}`);
+      const yaw = Math.atan2(obj.transform[2], obj.transform[0]);
+      // Axe de la largeur, puis celui de la profondeur : la même convention
+      // que le plaquage et la poussée.
+      const axe =
+        cote === 'largeur+' || cote === 'largeur-'
+          ? { x: Math.cos(yaw), z: Math.sin(yaw) }
+          : { x: -Math.sin(yaw), z: Math.cos(yaw) };
+      const sens = cote.endsWith('+') ? 1 : -1;
+      const n = { x: axe.x * sens, z: axe.z * sens };
+      const surLargeur = cote.startsWith('largeur');
+      const avant = surLargeur ? obj.width : obj.depth;
+      // Dix centimètres au minimum : en deçà, le meuble devient un trait
+      // qu'on ne sait plus attraper.
+      let apres = Math.max(0.1, Math.min(12, avant + distance));
+      const bouge = apres - avant;
+      const centre = {
+        x: obj.transform[12] + n.x * (bouge / 2),
+        z: obj.transform[14] + n.z * (bouge / 2),
+      };
+      // L'aimant : le bord tiré se pose sur le nu du mur qu'il longe.
+      const bord = {
+        x: centre.x + n.x * (apres / 2),
+        z: centre.z + n.z * (apres / 2),
+      };
+      const long = surLargeur ? obj.depth : obj.width;
+      const parts = roomParts(st.walls, st.rooms);
+      const ici = { x: obj.transform[12], z: obj.transform[14] };
+      const part =
+        parts.find((p) => p.roomId === obj.roomId) ??
+        parts.find((p) => pointInPolygon(ici, p.surface?.pts ?? []));
+      const colle = snapSideToWalls(bord, n, long / 2, part?.walls ?? st.walls);
+      if (colle !== 0) {
+        const vise = Math.max(0.1, Math.min(12, apres + colle));
+        centre.x += n.x * ((vise - apres) / 2);
+        centre.z += n.z * ((vise - apres) / 2);
+        apres = vise;
+      }
+      set({
+        objects: st.objects.map((o) => {
+          if (o.id !== id) return o;
+          const t = [...o.transform];
+          t[12] = centre.x;
+          t[14] = centre.z;
+          const width = surLargeur ? apres : o.width;
+          const depth = surLargeur ? o.depth : apres;
+          // La cote tirée à la main devient LA référence, comme celle qu'on
+          // tape : elle ne doit pas être reprise par l'ajustement en niche.
+          return {
+            ...o,
+            width,
+            depth,
+            baseWidth: width,
+            baseDepth: depth,
+            transform: t,
+          };
+        }),
+        dirty: true,
+      });
+      return { accroche: colle !== 0 };
     },
 
     resizeObject: (id, width, depth) => {

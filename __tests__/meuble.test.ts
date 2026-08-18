@@ -317,3 +317,94 @@ describe('les flèches déplacent le meuble au centimètre', () => {
     expect(pas(id, 0, -0.01).z).toBeCloseTo(d.z, 4);
   });
 });
+
+/**
+ * ÉTIRER UN MEUBLE PAR UN CÔTÉ — le geste du mètre ruban.
+ *
+ * On prend un bord et on le tire ; le bord opposé ne bouge pas. C'est ce
+ * qu'on fait avec un mètre sur un chantier, et c'est ce qu'on ne pouvait pas
+ * faire dans l'app : il fallait taper une largeur, donc faire le calcul dans
+ * sa tête pour que le meuble aille jusqu'au mur.
+ *
+ * L'aimant fait le reste : à sept centimètres du nu, le bord s'y pose. Viser
+ * l'affleurement à trois millimètres près avec un doigt qui en couvre quinze
+ * n'est pas un geste humain — et « le meuble touche le mur » décide qu'une
+ * prise est accessible ou condamnée.
+ */
+describe('un meuble s’étire par ses côtés', () => {
+  const dims = (id: string) => {
+    const o = useScanStore.getState().objects.find((x) => x.id === id)!;
+    return { w: o.width, d: o.depth };
+  };
+  /** Le geste : N images, chacune tirant le bord d'un peu plus. */
+  const tirer = (
+    id: string,
+    cote: 'largeur+' | 'largeur-' | 'profondeur+' | 'profondeur-',
+    total: number,
+    images = 20,
+  ) => {
+    let accroche = false;
+    for (let i = 0; i < images; i++) {
+      const r = useScanStore
+        .getState()
+        .resizeObjectSide(id, cote, total / images);
+      accroche = accroche || r.accroche;
+    }
+    return accroche;
+  };
+
+  it('agrandit par un bord et laisse l’autre en place', () => {
+    const id = poser(LIT, L / 2, P / 2);
+    const c0 = centre(id);
+    const bordFixe = c0.x - 1.4 / 2;
+    tirer(id, 'largeur+', 0.3);
+    expect(dims(id).w).toBeCloseTo(1.7, 2);
+    // Le bord opposé n'a pas bougé d'un millimètre.
+    expect(centre(id).x - dims(id).w / 2).toBeCloseTo(bordFixe, 3);
+    // Et la profondeur n'a pas été touchée.
+    expect(dims(id).d).toBeCloseTo(1.9, 3);
+  });
+
+  it('rétrécit quand on tire vers l’intérieur', () => {
+    const id = poser(LIT, L / 2, P / 2);
+    tirer(id, 'largeur+', -0.4);
+    expect(dims(id).w).toBeCloseTo(1.0, 2);
+  });
+
+  it('ne descend pas sous dix centimètres', () => {
+    const id = poser(LIT, L / 2, P / 2);
+    tirer(id, 'largeur+', -3);
+    expect(dims(id).w).toBeCloseTo(0.1, 3);
+  });
+
+  /**
+   * L'AIMANT : le bord s'arrête AU NU DU MUR, pas trois centimètres avant.
+   *
+   * Le lit fait 1,90 de profondeur au milieu d'une pièce de 2,44 : il reste
+   * 27 cm de chaque côté. On tire son bord vers le mur nord en s'arrêtant
+   * volontairement 4 cm trop court — l'aimant doit finir le geste.
+   */
+  it('accroche le bord au nu du mur qu’il longe', () => {
+    const id = poser(LIT, L / 2, P / 2);
+    const jeu = P / 2 - 1.9 / 2 - WALL_T / 2;
+    const accroche = tirer(id, 'profondeur-', jeu - 0.04);
+    expect(accroche).toBe(true);
+    // Le bord tiré affleure le nu : centre − profondeur/2 = WALL_T/2.
+    const o = useScanStore.getState().objects.find((x) => x.id === id)!;
+    expect(o.transform[14] - o.depth / 2).toBeCloseTo(WALL_T / 2, 3);
+  });
+
+  /**
+   * ET IL NE S'ACCROCHE PAS À N'IMPORTE QUOI.
+   *
+   * Un mur perpendiculaire au bord tiré ne donne aucun affleurement : s'il
+   * attirait, le meuble sauterait en travers de la pièce.
+   */
+  it('ignore les murs qui ne sont pas parallèles au bord', () => {
+    const id = poser(LIT, L / 2, P / 2);
+    // Le bord de largeur regarde le mur est ; on s'arrête loin de lui.
+    const accroche = tirer(id, 'largeur+', 0.2);
+    expect(accroche).toBe(false);
+    expect(dims(id).w).toBeCloseTo(1.6, 2);
+  });
+});

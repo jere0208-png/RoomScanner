@@ -155,6 +155,48 @@ le graphe, donc retirer les voisins déformerait la maçonnerie qu'on garde ; et
 le cadrage doit rester celui du logement entier, sinon le modèle saute à
 chaque mur présenté.
 
+### Un meuble se tire par ses bords
+
+Régler un meuble à la cote, c'était taper une largeur : il fallait faire le
+calcul dans sa tête pour qu'il aille JUSQU'AU mur. Sur un chantier, on ne
+calcule pas — on tire le mètre jusqu'à la maçonnerie.
+
+Sélectionner un meuble et demander ses cotes fait donc sortir **quatre
+poignées, une par bord**. On en prend une et on tire : le bord suit le doigt,
+le bord opposé ne bouge pas. Le geste ne compte que pour sa part utile — le
+déplacement du doigt est projeté sur la normale du bord —, si bien qu'un
+mouvement de travers ne fait pas partir le meuble en biais.
+
+**L'aimant finit le geste.** À sept centimètres du nu d'un mur qu'il longe, le
+bord s'y pose (`snapSideToWalls`). Viser l'affleurement à trois millimètres
+près avec un doigt qui en couvre quinze n'est pas un geste humain, et « le
+meuble touche le mur » n'est pas un détail de dessin : c'est ce qui décide
+qu'une prise est accessible ou condamnée. Trois conditions pour accrocher — le
+mur parallèle au bord à douze degrés près, le bord en face de lui et non dans
+son prolongement, l'écart dans la portée —, faute de quoi la cloison d'en face
+attirerait le meuble à travers la pièce. La main le sent, l'œil étant caché
+par le doigt.
+
+Les poignées se posent **juste à l'extérieur** du contour. Posées dessus,
+leurs quarante points de zone touchable se rejoignaient au milieu d'un meuble
+de soixante centimètres : il devenait impossible de le déplacer, chaque appui
+tombant sur une poignée.
+
+**Les commandes suivent le meuble.** Pivoter, coter, retirer : trois pastilles
+en rangée, centrées au-dessus de son contour, à quelques points de lui. Elles
+étaient bornées au cadre du plan — dès que le meuble approchait d'un bord,
+elles s'en détachaient et restaient plantées au milieu de l'écran, la croix
+rouge posée sur un AUTRE meuble. Elles s'effacent maintenant avec lui quand il
+sort du champ, et se reculent d'un cran quand les poignées sont là, pour ne
+pas se superposer à celle du bord haut.
+
+**Et la flèche du bandeau prime sur l'aimant.** Le plaquage automatique
+referme tout jour de moins de cinq centimètres : il reprenait chaque pas d'un
+centimètre à peine posé, et l'on croyait le bouton mort — c'est justement
+contre un mur qu'on se sert des flèches. `setObjectCenter` reçoit donc un
+`aimant` : vrai au doigt, qui vise à peu près ; faux à la flèche, qui vise
+juste.
+
 ### Garde-fou visuel
 
 Les tests vérifient des nombres ; aucun n'a vu le jour où le pointillé des
