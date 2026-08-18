@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Animated,
+  InteractionManager,
   Easing,
   PanResponder,
   ScrollView,
@@ -387,14 +388,41 @@ const styles = getStyles(c);
           if (b64) vignettes.push({ wallId: ph.wallId, base64: b64 });
         }
       }
-      const conv = (v: View3DParams, b: { w: number; h: number }) => ({
-        theta: v.theta,
-        tilt: v.tilt,
-        zoom: v.zoom,
-        fx: v.ox / (b.w / 2),
-        fy: v.oy / (b.h / 2),
-      });
-      const bytes = buildScanPdf(
+      const bytes =
+        pret.current && pret.current.cle === empreinte && vignettes.length === 0
+          ? pret.current.bytes
+          : batir(vignettes);
+      await RoomScan.sharePDF(toBase64(bytes), pdfFilename(scanName));
+    } catch (e: any) {
+      Alert.alert('Export impossible', e?.message ?? 'Erreur inconnue');
+    }
+  };
+
+  /**
+   * LE DOSSIER SE BÂTIT PENDANT QU'ON CHOISIT, PAS APRÈS.
+   *
+   * Sur un logement meublé, l'assemblage du PDF prend près d'une demi-seconde :
+   * plan, deux vues 3D, élévations, schémas, métré. Elle tombait tout entière
+   * APRÈS l'appui sur « Exporter » — l'écran se fige, et l'électricien croit
+   * que rien ne s'est passé.
+   *
+   * Or il passe plusieurs secondes à régler ses options : c'est là qu'on
+   * travaille. Dès que ses choix se posent — six cents millisecondes sans
+   * changement, et une fois les animations finies — on bâtit le document en
+   * tâche de fond et on le garde. S'il n'a rien retouché depuis, l'appui sur le
+   * bouton n'a plus qu'à partager des octets déjà prêts.
+   */
+  /** Une vue de l'écran, dans les unités du document. */
+  const conv = (v: View3DParams, b: { w: number; h: number }) => ({
+    theta: v.theta,
+    tilt: v.tilt,
+    zoom: v.zoom,
+    fx: v.ox / (b.w / 2),
+    fy: v.oy / (b.h / 2),
+  });
+
+  const batir = (vignettes: { wallId: string; base64: string }[]) =>
+    buildScanPdf(
         {
           name: scanName,
           walls,
@@ -437,11 +465,61 @@ const styles = getStyles(c);
           elevations,
         },
       );
-      await RoomScan.sharePDF(toBase64(bytes), pdfFilename(scanName));
-    } catch (e: any) {
-      Alert.alert('Export impossible', e?.message ?? 'Erreur inconnue');
-    }
-  };
+
+  /** L'empreinte des choix : si elle n'a pas bougé, le document non plus. */
+  const empreinte = JSON.stringify([
+    scanName,
+    walls.length,
+    openings.length,
+    objects.length,
+    rooms.length,
+    fixtures.length,
+    ceiling.length,
+    showFurniture,
+    showSurfaces,
+    showTextures,
+    showOpeningColors,
+    measures2D,
+    measures3D,
+    includeMetre,
+    elevations,
+    gaines,
+    schema,
+    plafond,
+    cardinaux,
+    include3D,
+    client,
+    address,
+    plan,
+    v1,
+    v2,
+  ]);
+  const pret = useRef<{ cle: string; bytes: Uint8Array } | null>(null);
+  useEffect(() => {
+    // Les élévations relisent les photos sur le disque : c'est asynchrone, et
+    // c'est le geste coûteux. On ne prépare donc que les dossiers sans photo.
+    if (elevations && photos.length > 0) return;
+    let vivant = true;
+    let tache: { cancel: () => void } | null = null;
+    const t = setTimeout(() => {
+      tache = InteractionManager.runAfterInteractions(() => {
+        if (!vivant) return;
+        try {
+          pret.current = { cle: empreinte, bytes: batir([]) };
+        } catch {
+          // Un dossier qui refuse de se bâtir à blanc le dira à l'appui :
+          // ici, on ne dérange personne.
+          pret.current = null;
+        }
+      });
+    }, 600);
+    return () => {
+      vivant = false;
+      clearTimeout(t);
+      tache?.cancel();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [empreinte]);
 
   // Arrivée en fondu rapide, dans la continuité de l'onde de transition.
   const fade = useRef(new Animated.Value(0)).current;

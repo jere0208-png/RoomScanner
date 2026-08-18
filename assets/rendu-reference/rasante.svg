@@ -299,9 +299,12 @@
 <polygon points="140.54,200.52 163.03,213.37 163.03,200.51 140.54,187.66" fill="#ccd4e3" stroke="#9FACBF" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
 <polygon points="163.03,213.37 191.45,211.22 191.45,198.35 163.03,200.51" fill="#e5ebf6" stroke="#9FACBF" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
 <polygon points="140.54,187.66 163.03,200.51 191.45,198.35 168.96,185.51" fill="#e4eaf6" stroke="#9FACBF" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
-<polygon points="147.56,188.87 164.66,198.64 164.66,193.21 147.56,183.44" fill="#d7dde6" stroke="#9FACBF" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
-<polygon points="164.66,198.64 187.52,196.91 187.52,191.48 164.66,193.21" fill="#f0f4f9" stroke="#9FACBF" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
-<polygon points="147.56,183.44 164.66,193.21 187.52,191.48 170.43,181.71" fill="#f0f4fa" stroke="#9FACBF" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
+<polygon points="148.01,189.13 156.11,193.75 156.11,187.75 148.01,183.13" fill="#d7dde6" stroke="#9FACBF" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
+<polygon points="156.11,193.75 178.97,192.03 178.97,186.02 156.11,187.75" fill="#f0f4f9" stroke="#9FACBF" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
+<polygon points="148.01,183.13 156.11,187.75 178.97,186.02 170.88,181.4" fill="#f0f4fa" stroke="#9FACBF" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
+<polygon points="156.56,194.01 164.66,198.64 164.66,192.63 156.56,188.01" fill="#d7dde6" stroke="#9FACBF" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
+<polygon points="164.66,198.64 187.52,196.91 187.52,190.9 164.66,192.63" fill="#f0f4f9" stroke="#9FACBF" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
+<polygon points="156.56,188.01 164.66,192.63 187.52,190.9 179.42,186.28" fill="#f0f4fa" stroke="#9FACBF" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
 <polygon points="140.54,187.66 163.03,200.51 163.03,184.78 140.54,171.94" fill="#ccd4e3" stroke="#9FACBF" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
 <polygon points="163.03,200.51 167.97,200.13 167.97,184.41 163.03,184.78" fill="#e5ebf6" stroke="#9FACBF" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
 <polygon points="140.54,171.94 163.03,184.78 167.97,184.41 145.48,171.56" fill="#e4eaf6" stroke="#9FACBF" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>

@@ -614,3 +614,31 @@ describe('la bascule entre le plan et le volume', () => {
     expect(vue3d().theta).toBeCloseTo(90, 3);
   });
 });
+
+/**
+ * LE DOSSIER SE PRÉPARE PENDANT QU'ON CHOISIT.
+ *
+ * Relevé du chantier : « aucune latence n'est tolérée si elle peut être évitée
+ * en chargeant au préalable ». L'assemblage du PDF — plan, deux vues 3D,
+ * élévations, schémas, métré — tombait tout entier APRÈS l'appui sur le
+ * bouton : l'écran se figeait une demi-seconde, et l'on croyait avoir mal
+ * appuyé. Or l'électricien passe plusieurs secondes à régler ses options :
+ * c'est là qu'il faut travailler.
+ */
+describe('le préchargement du dossier', () => {
+  it('bâtit le PDF dès que les choix se posent, avant tout appui', () => {
+    const pdf = require('../src/export/pdf');
+    const espion = jest.spyOn(pdf, 'buildScanPdf');
+    espion.mockClear();
+    const tree = monter('export');
+    arbre = tree;
+    // Rien tant que la main bouge encore.
+    expect(espion).not.toHaveBeenCalled();
+    act(() => {
+      jest.advanceTimersByTime(1200);
+    });
+    // ...et le dossier est prêt, sans que personne n'ait touché le bouton.
+    expect(espion.mock.calls.length).toBeGreaterThan(0);
+    espion.mockRestore();
+  });
+});

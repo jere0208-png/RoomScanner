@@ -887,6 +887,31 @@ export function coupeDevant(pts: P3[], cam: PovCamera): P3[] {
     (p.x - cam.at.x) * b.avant.x +
     (p.y - cam.at.y) * b.avant.y +
     (p.z - cam.at.z) * b.avant.z;
+  /*
+    UN TRAIT SE TAILLE AUSSI — et ce n'est pas un détail.
+
+    On ne coupait que les contours fermés : les ARÊTES, elles, partaient
+    telles quelles. Une arête de mur qui traverse le plan de l'œil projette
+    alors un point de l'autre côté de l'infini, et le trait barre l'écran en
+    diagonale. L'audit en a compté quarante-cinq mille sur un tour d'horizon.
+
+    Un segment se traite comme une ligne OUVERTE : on ne referme pas la
+    boucle, sinon on invente une arête de retour qui n'existe pas.
+  */
+  if (pts.length === 2) {
+    const [p, q] = pts;
+    const dp = devant(p) - PRES;
+    const dq = devant(q) - PRES;
+    if (dp < 0 && dq < 0) return [];
+    if (dp >= 0 && dq >= 0) return pts;
+    const t = dp / (dp - dq);
+    const coupe: P3 = {
+      x: p.x + (q.x - p.x) * t,
+      y: p.y + (q.y - p.y) * t,
+      z: p.z + (q.z - p.z) * t,
+    };
+    return dp >= 0 ? [p, coupe] : [coupe, q];
+  }
   const sortie: P3[] = [];
   for (let i = 0; i < pts.length; i++) {
     const a = pts[i];

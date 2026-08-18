@@ -621,7 +621,9 @@ export function Iso3DView({
       // De l'intérieur, une face peut être à cheval sur le plan de l'œil :
       // on la taille avant de la projeter, sinon elle se retourne et barre
       // l'écran.
-      const pts = pov && face.pts.length >= 3 ? coupeDevant(face.pts, pov) : face.pts;
+      // La coupe vaut pour les arêtes autant que pour les pans : un trait
+      // qui traverse le plan de l'œil barre l'écran en diagonale.
+      const pts = pov ? coupeDevant(face.pts, pov) : face.pts;
       const proj = pts.map(project);
       // Une arête se trie avec le pan qu'elle borde (`depthAt`), pas sur sa
       // propre position : sinon l'arête basse d'un mur passe avant lui et le
@@ -680,6 +682,9 @@ export function Iso3DView({
         bord: face.bordDe,
       };
       });
+    // Ce que la coupe a entièrement retranché — une face derrière l'œil —
+    // n'a plus rien à dessiner.
+    const dessinables = pov ? polys.filter((p) => p.proj.length >= 2) : polys;
     // Un meuble se trie d'un bloc : ses propres faces se départagent à
     // l'écran, là où elles se recouvrent. Sans ça, sa carcasse repeint sa
     // porte et son dossier repeint son assise — les « bandes » du chantier.
@@ -687,7 +692,7 @@ export function Iso3DView({
     // au lieu d'être classées une à une (voir `ajusterBlocs`).
     // La visite animée (mode « light ») joue trente images par seconde sans
     // interruption : elle garde le classement allégé, comme pendant un geste.
-    ajusterBlocs(polys, interacting || !!light);
+    ajusterBlocs(dessinables, interacting || !!light);
 
     // Cotes insérées DANS le tri de profondeur : un mur proche recouvre
     // les cotes des éléments situés derrière lui (fini les fuites).
@@ -754,7 +759,7 @@ export function Iso3DView({
           name: string;
           area: string;
         };
-    const items: Item[] = polys.map((p) => ({ kind: 'poly' as const, ...p }));
+    const items: Item[] = dessinables.map((p) => ({ kind: 'poly' as const, ...p }));
     // Semis du sol : même code que le plan 2D, projeté sur le plan y = 0.
     // C'est ce fond pointillé qui distingue la surface au sol des murs.
     if (showSurfaces && !interacting) {

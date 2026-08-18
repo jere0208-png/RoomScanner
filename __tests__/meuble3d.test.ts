@@ -103,7 +103,11 @@ describe('chaque meuble a une silhouette, et elle tient dans son emprise', () =>
   });
 
   it('ce qu’on ne sait pas nommer reste une boîte', () => {
-    expect(furnitureParts('stairs')).toHaveLength(0);
+    // L'escalier a désormais ses marches : la boîte témoin, c'est ce que le
+    // scanner n'a pas su nommer. Un parallélépipède de deux mètres au milieu
+    // d'un séjour ne ressemblait à rien, et le client ne le reconnaissait pas.
+    expect(furnitureParts('stairs').length).toBeGreaterThan(6);
+    expect(furnitureParts('chose inconnue')).toHaveLength(0);
     expect(furnitureParts('')).toHaveLength(0);
   });
 });
@@ -113,7 +117,7 @@ describe('dans la scène, la silhouette remplace la boîte', () => {
     buildScene(PIECE, [], [objet(category, 1.4, 1.9, 0.5)], { palette: PAL });
 
   it('un lit produit plus de faces qu’une boîte pleine', () => {
-    const boite = scene('stairs').faces.length;
+    const boite = scene('chose inconnue').faces.length;
     const lit = scene('bed').faces.length;
     expect(lit).toBeGreaterThan(boite + 8);
   });
@@ -202,6 +206,6 @@ describe('dans la scène, la silhouette remplace la boîte', () => {
       buildScene(PIECE, [], [objet(cat, 1.4, 1.9, 0.5)], { palette: PAL, coarse })
         .faces.length -
       buildScene(PIECE, [], [], { palette: PAL, coarse }).faces.length;
-    expect(compte('bed', true)).toBeGreaterThan(compte('stairs', true) + 8);
-    expect(compte('bed', false)).toBeGreaterThan(compte('stairs', false) + 8);
+    expect(compte('bed', true)).toBeGreaterThan(compte('chose inconnue', true) + 8);
+    expect(compte('bed', false)).toBeGreaterThan(compte('chose inconnue', false) + 8);
   });});

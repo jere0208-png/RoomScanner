@@ -89,9 +89,13 @@ export function furnitureParts(category: string): FurnPart[] {
   }
 
   if (c.includes('sofa') || c.includes('couch')) {
+    // Assise, coussins, dossier, accoudoirs : un canapé se reconnaît à ses
+    // coussins autant qu'à sa forme — c'est ce qui le distingue d'un banc.
     return [
       P(0, 1, 0, 0.45, 0.08, 1),
-      P(0.12, 0.88, 0.45, 0.64, 0.12, 0.86, 'soft'),
+      // Deux coussins d'assise, séparés d'un doigt.
+      P(0.14, 0.5, 0.45, 0.66, 0.12, 0.86, 'soft'),
+      P(0.52, 0.88, 0.45, 0.66, 0.12, 0.86, 'soft'),
       P(0, 1, 0.45, 1, 0.84, 1),
       P(0, 0.13, 0.45, 0.8, 0.04, 1),
       P(0.87, 1, 0.45, 0.8, 0.04, 1),
@@ -182,6 +186,40 @@ export function furnitureParts(category: string): FurnPart[] {
 
   if (c.includes('storage') || c.includes('cabinet') || c.includes('wardrobe')) {
     return [P(0, 1, 0, 1, 0.03, 1), ...portes()];
+  }
+
+  /*
+    L'ESCALIER : ses marches, et non un bloc.
+
+    Le catalogue le laissait en boîte pleine — « le bon dessin pour un
+    escalier », disait le commentaire. C'est faux dès qu'on regarde le modèle :
+    un parallélépipède de deux mètres au milieu d'un séjour ne ressemble à
+    rien, et le client ne le reconnaît pas. Douze marches, elles, se lisent
+    immédiatement — et elles disent le sens de la montée.
+  */
+  if (c.includes('stair')) {
+    const marches: FurnPart[] = [];
+    const n = 12;
+    for (let i = 0; i < n; i++) {
+      const t = i / n;
+      marches.push(P(0, 1, t, t + 1 / n, t, Math.min(1, t + 1.6 / n), i % 2 ? 'soft' : 'body'));
+    }
+    return marches;
+  }
+
+  /*
+    LA CHEMINÉE : son âtre, son manteau et son conduit.
+  */
+  if (c.includes('fireplace')) {
+    return [
+      P(0, 1, 0, 1, 0, 1),
+      // Le foyer, creusé et sombre.
+      P(0.18, 0.82, 0.1, 0.62, -0.02, 0.42, 'dark'),
+      // Le manteau, en saillie.
+      P(-0.04, 1.04, 0.62, 0.72, -0.06, 1, 'soft'),
+      // Le conduit, plus étroit.
+      P(0.24, 0.76, 0.72, 1.35, 0.1, 0.9),
+    ];
   }
 
   if (c.includes('plant')) {
