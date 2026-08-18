@@ -645,6 +645,20 @@ export function pushOutOfObjects(
   const demi = (e: { width: number; depth: number; yaw: number }, n: Pt) =>
     Math.abs(Math.cos(e.yaw) * n.x + Math.sin(e.yaw) * n.z) * (e.width / 2) +
     Math.abs(-Math.sin(e.yaw) * n.x + Math.cos(e.yaw) * n.z) * (e.depth / 2);
+  /*
+    DEUX PASSES : ON AIMANTE, PUIS ON SÉPARE.
+
+    Relevé du chantier : « le magnétisme de meubles à meubles est mal calculé,
+    celui-ci rentre dans le meuble sur lequel on est aimanté ». C'était vrai, et
+    l'ordre en était la cause : l'aimant refermait un jour de trois centimètres
+    avec le voisin de gauche, ce qui poussait le meuble de trois centimètres
+    DANS celui de droite — et plus personne ne revenait vérifier.
+
+    La seconde passe ne fait que séparer : elle ne peut donc pas créer de
+    nouveau chevauchement, et le meuble finit toujours À TOUCHE-TOUCHE plutôt
+    que dedans.
+  */
+  for (let passe = 0; passe < 2; passe++)
   for (const o of autres) {
     const gene = memeEtage(o);
     const axes: Pt[] = [];
@@ -690,7 +704,9 @@ export function pushOutOfObjects(
       vrai jour — celui qu'on referme. Deux ou plus : ils se manquent par un
       coin, en diagonale ; les aimanter les ferait sauter de travers.
     */
-    if (separateurs.length !== 1) continue;
+    // L'aimant ne joue qu'à la première passe : la seconde ne fait que
+    // séparer ce que la première a pu rapprocher de trop.
+    if (passe > 0 || separateurs.length !== 1) continue;
     const a = separateurs[0];
     if (a.jeu >= AIMANT) continue;
     const sens = a.d >= 0 ? 1 : -1;

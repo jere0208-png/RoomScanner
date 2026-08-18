@@ -80,7 +80,9 @@ export function furnitureParts(category: string): FurnPart[] {
       // catalogue, est celle du couchage — 55 cm — et un dosseret à 55 cm
       // ne se voit pas. À 1,6 fois cette hauteur on retrouve les 90 cm
       // d'un vrai dosseret, et le lit se reconnaît du premier coup d'œil.
-      P(0.04, 0.96, 0, 0.4, 0.05, 0.95),
+      // Le sommier s'arrête AVANT la tête de lit : deux volumes qui se
+      // traversent ne peuvent être ordonnés par aucun tri du peintre.
+      P(0.04, 0.96, 0, 0.4, 0.05, 0.92),
       P(0, 1, 0.4, 0.76, 0, 0.92, 'soft'),
       P(0.07, 0.47, 0.76, 0.92, 0.68, 0.9, 'soft'),
       P(0.53, 0.93, 0.76, 0.92, 0.68, 0.9, 'soft'),
@@ -94,11 +96,12 @@ export function furnitureParts(category: string): FurnPart[] {
     return [
       P(0, 1, 0, 0.45, 0.08, 1),
       // Deux coussins d'assise, séparés d'un doigt.
-      P(0.14, 0.5, 0.45, 0.66, 0.12, 0.86, 'soft'),
-      P(0.52, 0.88, 0.45, 0.66, 0.12, 0.86, 'soft'),
+      // Ils s'arrêtent au nu du dossier (0,84) et à celui des accoudoirs.
+      P(0.15, 0.49, 0.45, 0.66, 0.12, 0.82, 'soft'),
+      P(0.51, 0.85, 0.45, 0.66, 0.12, 0.82, 'soft'),
       P(0, 1, 0.45, 1, 0.84, 1),
-      P(0, 0.13, 0.45, 0.8, 0.04, 1),
-      P(0.87, 1, 0.45, 0.8, 0.04, 1),
+      P(0, 0.13, 0.45, 0.8, 0.04, 0.82),
+      P(0.87, 1, 0.45, 0.8, 0.04, 0.82),
     ];
   }
 
@@ -129,8 +132,8 @@ export function furnitureParts(category: string): FurnPart[] {
     return [
       P(0, 1, 0, 1, 0.04, 1),
       // Deux portes superposées, congélateur en bas, et leurs poignées.
-      P(0.02, 0.98, 0.36, 0.98, -0.01, 0.05, 'soft'),
-      P(0.02, 0.98, 0.02, 0.34, -0.01, 0.05, 'soft'),
+      P(0.02, 0.98, 0.36, 0.98, -0.01, 0.03, 'soft'),
+      P(0.02, 0.98, 0.02, 0.34, -0.01, 0.03, 'soft'),
       P(0.86, 0.9, 0.45, 0.9, -0.03, 0, 'dark'),
       P(0.86, 0.9, 0.08, 0.28, -0.03, 0, 'dark'),
     ];
@@ -146,7 +149,7 @@ export function furnitureParts(category: string): FurnPart[] {
       P(0.12, 0.42, 1, 1.02, 0.56, 0.86, 'dark'),
       P(0.58, 0.88, 1, 1.02, 0.56, 0.86, 'dark'),
       // Porte du four et sa barre.
-      P(0.04, 0.96, 0.08, 0.72, -0.01, 0.05, 'soft'),
+      P(0.04, 0.96, 0.08, 0.72, -0.01, 0.03, 'soft'),
       P(0.1, 0.9, 0.76, 0.82, -0.03, 0, 'dark'),
     ];
   }
@@ -155,10 +158,10 @@ export function furnitureParts(category: string): FurnPart[] {
     const hublot = c.includes('washer') || c.includes('dryer');
     return [
       P(0, 1, 0, 1, 0.04, 1),
-      P(0.03, 0.97, 0.04, 0.96, -0.01, 0.05, 'soft'),
+      P(0.03, 0.97, 0.04, 0.96, -0.01, 0.03, 'soft'),
       hublot
-        ? P(0.24, 0.76, 0.3, 0.74, -0.02, 0.02, 'dark')
-        : P(0.1, 0.9, 0.84, 0.9, -0.03, 0, 'dark'),
+        ? P(0.24, 0.76, 0.3, 0.74, -0.03, -0.015, 'dark')
+        : P(0.1, 0.9, 0.84, 0.9, -0.03, -0.015, 'dark'),
     ];
   }
 
@@ -167,7 +170,10 @@ export function furnitureParts(category: string): FurnPart[] {
       // Plan de travail, cuve creusée dedans, robinet au fond.
       P(0, 1, 0.86, 1, 0, 1, 'soft'),
       P(0, 1, 0, 0.86, 0.04, 1),
-      P(0.16, 0.84, 0.72, 0.88, 0.14, 0.8, 'dark'),
+      // La cuve se POSE sur le plan de travail : on ne peut pas la creuser
+      // dedans — un volume évidé dans un autre est indécidable au tri, et
+      // c'est ce qui faisait clignoter les pièces d'un meuble selon l'angle.
+      P(0.16, 0.84, 1, 1.04, 0.14, 0.8, 'dark'),
       P(0.46, 0.54, 1, 1.35, 0.84, 0.92, 'dark'),
     ];
   }
@@ -212,13 +218,15 @@ export function furnitureParts(category: string): FurnPart[] {
   */
   if (c.includes('fireplace')) {
     return [
-      P(0, 1, 0, 1, 0, 1),
-      // Le foyer, creusé et sombre.
-      P(0.18, 0.82, 0.1, 0.62, -0.02, 0.42, 'dark'),
+      // Le corps s'arrête sous le manteau, et le foyer est une plaque
+      // sombre EN FAÇADE : un foyer creusé dans le corps serait un volume
+      // évidé dans un autre — indécidable au tri.
+      P(0, 1, 0, 0.62, 0, 1),
+      P(0.18, 0.82, 0.1, 0.58, -0.03, -0.01, 'dark'),
       // Le manteau, en saillie.
       P(-0.04, 1.04, 0.62, 0.72, -0.06, 1, 'soft'),
       // Le conduit, plus étroit.
-      P(0.24, 0.76, 0.72, 1.35, 0.1, 0.9),
+      P(0.24, 0.76, 0.72, 1.35, 0.12, 0.88),
     ];
   }
 
