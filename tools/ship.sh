@@ -62,11 +62,15 @@ echo "── Build"
 # rend alors la main et la conclusion revient VIDE. Une panne de réseau
 # n'est pas un échec de compilation — on redemande, et on n'accuse le build
 # que s'il a vraiment conclu autre chose que « success ».
+# Vingt-cinq minutes de patience : un build iOS en prend dix à quinze, et
+# `run watch` rend parfois la main au bout de quelques secondes quand l'API
+# tousse. Deux minutes d'attente — ce qu'on faisait — laissaient donc le
+# script conclure « échec » sur un build parfaitement en cours.
 ETAT=""
-for essai in 1 2 3 4 5 6; do
+for essai in $(seq 1 100); do
   ETAT=$("$GH" run view "$RUN" --json status,conclusion     -q 'select(.status=="completed") | .conclusion' 2>/dev/null || true)
   [ -n "$ETAT" ] && break
-  sleep 20
+  sleep 15
 done
 if [ "$ETAT" != "success" ]; then
   echo "ÉCHEC DU BUILD (${ETAT:-inconnu}) — run $RUN"
