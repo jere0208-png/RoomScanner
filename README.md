@@ -392,21 +392,33 @@ pictogrammes et neuf mots pour dire ce qu'une seule image montre mieux — le
 résultat. On ne vend pas un scanner de pièces avec une notice, on le vend avec
 le plan qui en sort.
 
-À la place, **un téléphone qui s'incline avec un logement meublé dans son
-écran**. Le boîtier bascule sur son axe (`rotateY`, `rotateZ`, perspective)
-pendant que la maquette tourne sur elle-même, plus vite que lui : c'est ce
-décalage qui donne la profondeur, comme un objet qu'on tourne dans la main.
+À la place, **un téléphone posé, et le plan qui se lève dans son écran** : un
+plan 2D coté, murs pochés en noir et appareils électriques repérés, qui se
+redresse pour devenir un logement meublé en volume. Les cotes s'effacent en
+montant — on ne cote pas une perspective —, les appareils restent, parce que
+c'est ce qu'on vient chercher ici. C'est le geste de l'app, la bascule 2D/3D,
+joué tout seul.
 
-**Ce n'est pas une illustration.** Le logement passe par le même chemin que la
-vue 3D de l'app — `buildScene`, `sceneFraming`, le tri du peintre, `shadeFill`
-et l'écorché de `cutawayOpacity`. Si le rendu change, la vitrine change avec
-lui, et elle ne peut pas promettre ce que l'application ne fait pas. Trois
-réglages lui sont propres, parce qu'une maquette de trois centimètres n'est
-pas un plan grandeur nature : la scène se bâtit en pans d'un seul tenant
-(`coarse`), la palette est plus contrastée — un gris clair sur blanc n'existe
-pas à cette taille —, et l'horloge tourne à vingt-cinq images par seconde. Un
-écran d'accueil n'a pas le droit de faire chauffer le téléphone avant qu'on
-ait scanné quoi que ce soit.
+**Les images sont cuites au build, pas calculées sur le téléphone.** La
+première version rendait la scène vingt-cinq fois par seconde sur l'appareil.
+`npm run showcase` produit désormais les quarante-quatre images
+(`src/export/showcaseFrames.ts` → SVG → PNG palettisés, 440 ko) et l'app ne
+fait que les feuilleter : rien à recalculer, donc rien qui puisse ramer,
+chauffer, ni diverger d'un appareil à l'autre. Le boîtier ne bouge plus non
+plus — c'est le contenu qui raconte.
+
+Le revers d'une image cuite, c'est qu'elle ne se corrige pas toute seule : un
+banc compte les images embarquées et les compare au scénario, faute de quoi un
+changement de géométrie laisserait l'accueil jouer l'ancienne animation sans
+que rien ne le dise.
+
+**Ce n'est pas une illustration** pour autant : les images sortent de
+`buildScene`, `sceneFraming`, du tri du peintre, de `shadeFill` et de
+l'écorché de `cutawayOpacity` — le chemin de la vue 3D. Deux réglages leur
+sont propres, parce qu'une maquette de trois centimètres n'est pas un plan
+grandeur nature : les pans sont d'un seul tenant (`coarse`), et le poché des
+murs est noir à plat puis s'éclaircit en montant — c'est la convention du
+dessin d'architecte, et un gris clair sur blanc n'existe pas à cette taille.
 
 **Les deux boutons ont un contour qui court.** Un segment lumineux fait le
 tour du bord, sans fin, en deux secondes et demie — un tracé SVG dont le

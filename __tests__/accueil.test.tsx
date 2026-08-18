@@ -35,13 +35,14 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 import React from 'react';
-import { Text } from 'react-native';
-import { Polygon } from 'react-native-svg';
+import { Image, Text } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import { HomeScreen } from '../src/screens/HomeScreen';
 import { PhoneShowcase } from '../src/components/PhoneShowcase';
 import { GlowButton } from '../src/components/GlowButton';
 import { useScanStore } from '../src/store/scanStore';
+import { SHOWCASE_IMAGES } from '../src/assets/showcase';
+import { SHOWCASE_FRAMES } from '../src/export/showcaseFrames';
 
 beforeEach(() => {
   jest.useFakeTimers();
@@ -94,12 +95,25 @@ describe('l’accueil', () => {
     expect(vu).toContain('en plan coté');
   });
 
-  it('montre un logement en volume, pas un dessin', () => {
+  it('montre le logement, image par image', () => {
     const t = monter();
     expect(t.root.findAllByType(PhoneShowcase)).toHaveLength(1);
-    // Une centaine de faces au moins : c'est une scène 3D construite, pas
-    // une illustration en trois traits.
-    expect(t.root.findAllByType(Polygon).length).toBeGreaterThan(60);
+    // Toutes les images sont montées d'emblée : les charger une par une
+    // ferait sauter la première boucle.
+    expect(
+      t.root.findByType(PhoneShowcase).findAllByType(Image),
+    ).toHaveLength(SHOWCASE_IMAGES.length);
+  });
+
+  /**
+   * LES IMAGES CUITES SUIVENT LE SCÉNARIO.
+   *
+   * Elles sont calculées au build : si quelqu'un change le scénario sans
+   * relancer `npm run showcase`, l'accueil joue l'ancienne animation et rien
+   * ne le dit. Le compte, lui, le dit.
+   */
+  it('a autant d’images que le scénario en demande', () => {
+    expect(SHOWCASE_IMAGES).toHaveLength(SHOWCASE_FRAMES);
   });
 
   /**
@@ -108,22 +122,30 @@ describe('l’accueil', () => {
    * Une maquette figée aurait exactement le même arbre au premier rendu :
    * seule la comparaison dans le temps prouve le mouvement.
    */
-  it('fait tourner la maquette toute seule', () => {
+  it('déroule l’animation toute seule, et en boucle', () => {
     const t = monter();
-    const points = () =>
+    /**
+     * L'image visible : la seule de la VITRINE dont l'opacité n'est pas
+     * nulle. On cherche dans la vitrine et non dans l'écran entier — le
+     * logotype de la marque est une image lui aussi, et il passait devant.
+     */
+    const visible = () =>
       t.root
-        .findAllByType(Polygon)
-        .slice(0, 12)
-        .map((n) => n.props.points)
-        .join(';');
-    const avant = points();
-    act(() => jest.advanceTimersByTime(1200));
-    const apres = points();
-    expect(apres).not.toBe(avant);
-    // Et elle continue : une animation qui s'arrête au premier tour se
-    // remarque au bout de trente secondes, sur un écran qu'on regarde.
-    act(() => jest.advanceTimersByTime(4000));
-    expect(points()).not.toBe(apres);
+        .findByType(PhoneShowcase)
+        .findAllByType(Image)
+        .findIndex((n) => {
+          const st = Array.isArray(n.props.style)
+            ? Object.assign({}, ...n.props.style.filter(Boolean))
+            : n.props.style;
+          return (st?.opacity ?? 1) !== 0;
+        });
+    expect(visible()).toBe(0);
+    act(() => jest.advanceTimersByTime(500));
+    const apres = visible();
+    expect(apres).toBeGreaterThan(0);
+    // Elle boucle : après un cycle complet, on est revenu au plan.
+    act(() => jest.advanceTimersByTime(68 * SHOWCASE_FRAMES));
+    expect(visible()).toBe(apres);
   });
 
   it('porte ses deux boutons, et le second seulement s’il y a des scans', () => {
