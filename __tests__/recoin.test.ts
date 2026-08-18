@@ -350,32 +350,6 @@ describe('le meuble de biais dans une alcôve', () => {
  * chevauchent ne veulent rien dire — et vu de dessus, ça ne se voit même pas.
  */
 describe('deux meubles qui se rencontrent', () => {
-  /** Se recouvrent-ils ? (théorème de l'axe séparateur, cas rectangulaire) */
-  const seTouchent = (
-    a: { cx: number; cz: number; width: number; depth: number; yaw: number },
-    b: { cx: number; cz: number; width: number; depth: number; yaw: number },
-  ) => {
-    const demi = (
-      e: { width: number; depth: number; yaw: number },
-      n: { x: number; z: number },
-    ) =>
-      Math.abs(Math.cos(e.yaw) * n.x + Math.sin(e.yaw) * n.z) * (e.width / 2) +
-      Math.abs(-Math.sin(e.yaw) * n.x + Math.cos(e.yaw) * n.z) * (e.depth / 2);
-    for (const yaw of [a.yaw, b.yaw]) {
-      for (const n of [
-        { x: Math.cos(yaw), z: Math.sin(yaw) },
-        { x: -Math.sin(yaw), z: Math.cos(yaw) },
-      ]) {
-        const d = Math.abs((a.cx - b.cx) * n.x + (a.cz - b.cz) * n.z);
-        // Un millimètre de tolérance : deux meubles POSÉS côte à côte se
-        // touchent, et c'est ce qu'on veut — ce qu'on refuse, c'est qu'ils
-        // se chevauchent.
-        if (d > demi(a, n) + demi(b, n) - 0.001) return false;
-      }
-    }
-    return true;
-  };
-
   const COMMODE = {
     cx: 2.5,
     cz: 2,
@@ -384,22 +358,17 @@ describe('deux meubles qui se rencontrent', () => {
     yaw: 0,
   };
 
-  it('ressort par le côté le plus court', () => {
-    // Une table posée presque au même endroit que la commode.
+  it('se chevauchent si on le demande — un meuble peut en surmonter un autre', () => {
+    // Une télé posée sur un meuble bas : l'emprise au sol se chevauche, et
+    // c'est parfaitement légitime. Le relevé du chantier est explicite —
+    // « n'empêche pas la superposition, un meuble peut être au-dessus ».
     const p = pushOutOfObjects(
       { x: 2.6, z: 2.1 },
       { width: 1, depth: 0.8, yaw: 0 },
       [COMMODE],
     );
-    expect(
-      seTouchent(
-        { ...p2e(p), width: 1, depth: 0.8, yaw: 0 },
-        COMMODE,
-      ),
-    ).toBe(false);
-    // Il est sorti par la profondeur — le plus court chemin — et non le
-    // long de la commode.
-    expect(Math.abs(p.x - 2.6)).toBeLessThan(0.01);
+    expect(p.x).toBeCloseTo(2.6, 6);
+    expect(p.z).toBeCloseTo(2.1, 6);
   });
 
   it('referme un jour de trois centimètres', () => {
@@ -422,8 +391,3 @@ describe('deux meubles qui se rencontrent', () => {
     expect(p.z).toBeCloseTo(3.6, 6);
   });
 });
-
-/** Un point en emprise, pour le banc. */
-function p2e(p: { x: number; z: number }) {
-  return { cx: p.x, cz: p.z };
-}

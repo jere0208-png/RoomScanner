@@ -496,7 +496,10 @@ describe('les arêtes du bâti', () => {
           room: f.roomId,
           pan: f.panId,
           bord: f.bordDe,
-        }));
+        }))
+        // Le calque se relève AVANT le classement : celui-ci réécrit les
+        // profondeurs, et l'on ne pourrait plus le lire ensuite.
+        .map((v) => ({ ...v, calque: Math.floor(v.depth / 1e4) }));
       ajusterBlocs(vues);
       const peintes = [...vues].sort((a, b) => a.depth - b.depth);
       const rang = new Map(peintes.map((p, i) => [p.f, i] as [Face3D, number]));
@@ -511,7 +514,7 @@ describe('les arêtes du bâti', () => {
         for (const a of aplats) {
           // Un mur vu de DEHORS couvre la pièce : c'est voulu, et c'est
           // réglé par les calques, pas ici.
-          if (Math.floor(a.depth / 1e4) !== Math.floor(t.depth / 1e4)) continue;
+          if (a.calque !== t.calque) continue;
           if (!dansLePolygone(pt, a.proj)) continue;
           const da = profondeurAu(a.f, pt, project);
           if (da === null) continue;
@@ -571,5 +574,80 @@ describe('les traits, après le classement', () => {
       }
     }
     expect(`${fautes} trait(s) effacé(s)`).toBe('0 trait(s) effacé(s)');
+  });
+});
+
+/**
+ * UN RETOUR DE MUR CACHE CE QU'IL Y A DERRIÈRE.
+ *
+ * Relevé du chantier, vidéo à l'appui : « à travers un retour de mur, le
+ * meuble qui est censé être derrière ». Ce n'était pas un accident de tri :
+ * c'était la RÈGLE. Une pièce se peignait en trois couches — le mur du fond,
+ * le contenu, le mur de devant — ce qui suppose une pièce CONVEXE. Dès qu'un
+ * refend rentre dans la pièce, un pan « vu de l'intérieur » se trouve DEVANT
+ * du mobilier, et aucune couche ne pouvait le dire.
+ *
+ * Depuis, le mur du fond et le contenu d'une même pièce se départagent à
+ * l'écran, là où ils se recouvrent vraiment.
+ */
+describe('le retour de mur', () => {
+  /** Une pièce en L : le refend rentre d'un mètre vingt dans le séjour. */
+  const AVEC_RETOUR = [
+    mur('n', 0, 0, 5, 0),
+    mur('e', 5, 0, 5, 4),
+    mur('s', 5, 4, 0, 4),
+    mur('o', 0, 4, 0, 0),
+    mur('retour', 2.6, 0, 2.6, 1.6),
+  ];
+  /** Le meuble se tient DERRIÈRE le retour, vu depuis le séjour. */
+  const DERRIERE = [
+    boite('cache', 'storage', 1.5, 0.8, 1.1, 0.55, 2),
+  ];
+
+  it('ne laisse pas passer le meuble qui est derrière lui', () => {
+    const { faces, rooms } = buildScene(AVEC_RETOUR, [], DERRIERE, {
+      palette: PAL,
+      showSurfaces: true,
+      rooms: [{ id: 'r1' }],
+    });
+    const centre = sceneFraming(faces).center;
+    let fautes = 0;
+    for (const cam of ANGLES) {
+      const project = projecteur(cam, centre, 60);
+      const rangs = roomRanks(rooms, cam);
+      const vues = faces
+        .filter((f) => !isHiddenFace(f, cam) && f.fill !== null && f.pts.length >= 3)
+        .map((f) => ({
+          f,
+          proj: f.pts.map(project),
+          depth: faceDepth(f, project, cam, rangs),
+          owner: f.ownerId,
+          room: f.roomId,
+          pan: f.panId,
+          bord: f.bordDe,
+        }));
+      ajusterBlocs(vues);
+      const peintes = [...vues].sort((a, b) => a.depth - b.depth);
+      const rang = new Map(peintes.map((p, i) => [p.f, i] as [Face3D, number]));
+      // Le meuble contre la maçonnerie : partout où un pan de mur est DEVANT
+      // lui, il ne doit pas se peindre après.
+      for (const m of vues.filter((v) => v.owner)) {
+        const pt = {
+          sx: m.proj.reduce((s, p) => s + p.sx, 0) / m.proj.length,
+          sy: m.proj.reduce((s, p) => s + p.sy, 0) / m.proj.length,
+        };
+        const dm = profondeurAu(m.f, pt, project);
+        if (dm === null) continue;
+        for (const w of vues) {
+          if (w.owner || w.f.isFloor) continue;
+          if (!dansLePolygone(pt, w.proj)) continue;
+          const dw = profondeurAu(w.f, pt, project);
+          if (dw === null) continue;
+          // Le mur est devant le meuble en ce point : il doit le couvrir.
+          if (dw > dm + 0.02 && rang.get(w.f)! < rang.get(m.f)!) fautes++;
+        }
+      }
+    }
+    expect(`${fautes} traversée(s)`).toBe('0 traversée(s)');
   });
 });

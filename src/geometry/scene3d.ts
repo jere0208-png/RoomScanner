@@ -349,10 +349,27 @@ export function ordreLocal<T extends FacePeinte>(
     const A = boites[a];
     const B = boites[b];
 
-    const paires: [number, number, { sx: number; sy: number }][] = [
-      [a, b, { sx: A.cx, sy: A.cy }],
-      [b, a, { sx: B.cx, sy: B.cy }],
-    ];
+    /*
+      OÙ REGARDER SI ELLES SE RECOUVRENT.
+
+      Pour deux aplats, le milieu de l'un dans l'autre suffit : ils sont
+      larges, et se manquer par le milieu tout en se recouvrant demande une
+      géométrie tordue. Pour un TRAIT, non : une arête de mur longue d'un
+      mètre peut ne croiser un meuble que sur son dernier tiers, et son
+      milieu ne dit alors rien. On l'échantillonne donc en trois points —
+      c'est le seul cas où le milieu ment souvent.
+    */
+    const points = (i: number, C: { cx: number; cy: number }) => {
+      const p = items[i].proj;
+      if (p.length !== 2) return [{ sx: C.cx, sy: C.cy }];
+      return [0.25, 0.5, 0.75].map((t) => ({
+        sx: p[0].sx + (p[1].sx - p[0].sx) * t,
+        sy: p[0].sy + (p[1].sy - p[0].sy) * t,
+      }));
+    };
+    const paires: [number, number, { sx: number; sy: number }][] = [];
+    for (const pt of points(a, A)) paires.push([a, b, pt]);
+    for (const pt of points(b, B)) paires.push([b, a, pt]);
     for (const [u, v, pt] of paires) {
       // Un trait ne contient rien : on ne teste que « le milieu de l'un
       // tombe-t-il DANS l'autre », et un trait n'est jamais le contenant.
@@ -472,7 +489,34 @@ export function ordreLocal<T extends FacePeinte>(
   for (let i = 0; i < n; i++) if (degre[i] === 0) enfiler(i);
   const ordre: number[] = [];
   const pose = new Array<boolean>(n).fill(false);
-  while (pret.length > 0) {
+  /*
+    LES RONDES SE DÉNOUENT PAR LE FOND.
+
+    Trois faces peuvent se recouvrir en ronde — A devant B, B devant C, C
+    devant A : c'est possible en géométrie, et aucun ordre ne les satisfait
+    toutes. Il faut donc trancher. On les posait à la fin, c'est-à-dire par
+    -dessus tout le reste : le plus mauvais choix possible, puisqu'une face
+    coincée dans une ronde repeignait alors la scène entière. On sort désormais
+    LA PLUS LOINTAINE : elle est celle qui a le plus de chances d'être
+    réellement derrière, et la ronde se dénoue d'elle-même ensuite.
+  */
+  const moyenne = (i: number) => {
+    let t = 0;
+    for (const q of items[i].proj) t += q.depth;
+    return t / Math.max(1, items[i].proj.length);
+  };
+  const denouer = () => {
+    let choix = -1;
+    for (let i = 0; i < n; i++) {
+      if (pose[i] || degre[i] === 0) continue;
+      if (choix < 0 || moyenne(i) < moyenne(choix)) choix = i;
+    }
+    if (choix < 0) return false;
+    degre[choix] = 0;
+    enfiler(choix);
+    return true;
+  };
+  while (pret.length > 0 || denouer()) {
     // Le plus ancien d'abord : c'est ce qui rend le résultat stable.
     const i = pret[0];
     pret[0] = pret[pret.length - 1];
@@ -485,8 +529,6 @@ export function ordreLocal<T extends FacePeinte>(
       if (degre[j] === 0) enfiler(j);
     }
   }
-  // Les cycles : on les pose à leur place d'origine, faute de mieux.
-  for (let i = 0; i < n; i++) if (!pose[i]) ordre.push(i);
   return ordre.map((i) => items[i]);
 }
 
@@ -552,20 +594,51 @@ export function ajusterBlocs<
   const parBloc = new Map<string, T[]>();
   for (const it of items) {
     if (!isFinite(it.depth)) continue;
-    const cle = it.owner
-      ? `bloc:${it.room ?? it.owner}`
-      : `calque:${Math.floor(it.depth / COUCHE)}`;
+    /*
+      LE MUR DU FOND ET CE QU'IL Y A DEDANS : UN SEUL GROUPE.
+
+      Relevé du chantier, vidéo à l'appui : « à travers un retour de mur, le
+      meuble qui est censé être derrière ». Le défaut n'était pas un accident
+      de tri : il était dans la RÈGLE. Une pièce se peignait en trois
+      couches — le mur du fond, le contenu, le mur de devant — et cette
+      règle-là suppose une pièce CONVEXE. Dès qu'un refend rentre dans la
+      pièce, un pan « vu de l'intérieur » se trouve DEVANT du mobilier, et
+      aucune couche ne pouvait le dire.
+
+      On fusionne donc les deux premières couches d'une même pièce et l'on
+      tranche à l'écran, là où les faces se recouvrent vraiment. Le mur de
+      devant, lui, garde sa couche : c'est lui qui s'efface en écorché, et
+      son sort ne se joue pas à la géométrie mais au réglage.
+    */
+    const calque = Math.floor(it.depth / COUCHE);
+    const rang = Math.floor(calque / 100);
+    const etage = calque - rang * 100;
+    /*
+      LE CALQUE SUFFIT À DÉSIGNER LE GROUPE — pas l'étiquette de pièce.
+
+      Les volumes d'une ouverture (le dormant, le vitrage, le seuil) ne
+      portent aucune pièce : ils appartiennent à un mur, qui est mitoyen par
+      nature. Groupés sur l'étiquette, ils tombaient donc à côté des arêtes du
+      mur qu'ils percent, et rien ne les départageait plus : c'est ce qui
+      effaçait les traits autour des fenêtres. Le rang de la pièce, lui, est
+      déjà dans la profondeur — il suffit, et il ne ment pas.
+
+      En mouvement, on s'en tient aux meubles : le grand groupe d'une pièce
+      compte un millier de faces, et le départager à chaque image coûterait
+      les images elles-mêmes.
+    */
+    const cle = rapide
+      ? it.owner
+        ? `bloc:${it.room ?? it.owner}`
+        : ''
+      : `${rang}:${etage >= 2 ? 'dehors' : 'dedans'}`;
+    if (!cle) continue;
     const l = parBloc.get(cle);
     if (l) l.push(it);
     else parBloc.set(cle, [it]);
   }
-  for (const [cle, groupe] of parBloc) {
+  for (const groupe of parBloc.values()) {
     if (groupe.length < 2) continue;
-    // EN MOUVEMENT, ON NE TOUCHE PAS AUX MURS. Leur ordre par calque tient
-    // déjà debout : ce qu'on gagne à les départager au pixel, ce sont
-    // quelques arêtes d'ouverture — on peut attendre le lâcher pour les
-    // retrouver, et garder les images fluides pendant le geste.
-    if (rapide && !cle.startsWith('bloc:')) continue;
     const bas = Math.min(...groupe.map((g) => g.depth));
     const haut = Math.max(...groupe.map((g) => g.depth));
     if (!rapide) {
