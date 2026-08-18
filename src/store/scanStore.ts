@@ -736,6 +736,8 @@ interface ScanState {
   /** Oriente un meuble à l'angle donné (radians). */
   setObjectYaw: (id: string, yaw: number) => void;
   removeObject: (id: string) => void;
+  /** Pose en une fois ce que « Normes auto » propose. */
+  poserDAuto: (fixtures: Fixture[], ceiling: CeilingFixture[]) => void;
   setObjectCenter: (id: string, x: number, z: number) => void;
   resizeObject: (id: string, width: number, depth: number) => void;
   /** Abandonne les modifications : recharge la dernière sauvegarde. */
@@ -2239,6 +2241,23 @@ export const useScanStore = create<ScanState>((set, get) => {
           t[10] = cos;
           return { ...o, transform: t };
         }),
+        dirty: true,
+      });
+    },
+
+    /**
+     * POSE D'UN COUP tout ce que « Normes auto » a calculé.
+     *
+     * Un seul pas d'historique : c'est UN geste pour l'électricien, même s'il
+     * ajoute quinze appareils. Devoir annuler quinze fois serait une punition.
+     */
+    poserDAuto: (fixtures, ceiling) => {
+      if (fixtures.length === 0 && ceiling.length === 0) return;
+      pushHistory('normesAuto');
+      const st = get();
+      set({
+        fixtures: [...st.fixtures, ...fixtures],
+        ceiling: [...st.ceiling, ...ceiling],
         dirty: true,
       });
     },

@@ -36,6 +36,7 @@ import { SidePill } from '../components/SidePill';
 import { CeilingIcon } from '../components/CeilingIcon';
 import { CeilingBar } from '../components/CeilingBar';
 import { ObjectBar } from '../components/ObjectBar';
+import { poserAuxNormes } from '../geometry/auto';
 import { RangeeOutils } from '../components/RangeeOutils';
 import { RoomBar } from '../components/RoomBar';
 import { StripBar } from '../components/StripBar';
@@ -161,6 +162,9 @@ function matchItem(item: CatalogItem, quete: string): boolean {
   if (!q) return true;
   return sansAccent(`${item.label} ${item.category}`).includes(q);
 }
+
+/** Le saut de ligne des rapports, ecrit une fois. */
+const SAUT = String.fromCharCode(10);
 
 export function ResultScreen() {
   /**
@@ -1335,6 +1339,50 @@ export function ResultScreen() {
    * FAIRE, pas décider à la place de l'électricien — c'est la règle qu'on
    * a déjà appliquée aux noms de pièces.
    */
+  /**
+   * POSER CE QUI MANQUE, ET LE DIRE.
+   *
+   * Le calcul est ailleurs (`poserAuxNormes`) : ici on lui donne le plan tel
+   * qu'il est à l'écran — pièces détectées, meubles, appareils déjà posés —
+   * et l'on rend compte. Un outil qui modifie un dossier sans dire quoi ne
+   * s'utilise pas deux fois.
+   */
+  const poserNormes = () => {
+    const pose = poserAuxNormes({
+      rooms: roomInputs.map((r) => {
+        const part = parts.find((p) => p.roomId === r.id);
+        return { ...r, interieur: part?.labelAt ?? { x: 0, z: 0 } };
+      }),
+      walls,
+      openings,
+      objects,
+      fixtures,
+      ceiling,
+      placement,
+      id: (prefixe) =>
+        `${prefixe}-${Date.now().toString(36)}-${Math.random()
+          .toString(36)
+          .slice(2, 6)}`,
+    });
+    if (pose.conforme) {
+      Alert.alert(
+        'Tout est aux normes',
+        'Chaque pièce a son compte de socles, ses prises RJ45, sa commande ' +
+          'd’éclairage et son point lumineux. Rien à ajouter.',
+      );
+      return;
+    }
+    useScanStore.getState().poserDAuto(pose.fixtures, pose.ceiling);
+    Alert.alert(
+      `${pose.fixtures.length + pose.ceiling.length} pose(s) ajoutée(s)`,
+      pose.rapport.join(SAUT) +
+        SAUT +
+        SAUT +
+        'Tout est placé hors meubles et hors menuiseries. À vous de ' +
+        'déplacer ce qui ne vous convient pas.',
+    );
+  };
+
   const menuDuScan = () =>
     setMenu({
                 title: scanName,
@@ -1363,6 +1411,22 @@ export function ResultScreen() {
                     icon: 'piece' as const,
                     hint: 'Un rectangle aux cotes que vous donnez, à côté du plan.',
                     onPress: () => setAjoutPiece(true),
+                  },
+                  {
+                    /*
+                      NORMES AUTO — l'installation qui se pose toute seule.
+
+                      Elle COMPLÈTE ce qui existe : on ne touche à rien de ce
+                      que l'électricien a placé. Et si tout est déjà conforme,
+                      elle le DIT — un outil qui ne répond rien laisse croire
+                      qu'il n'a pas compris la demande.
+                    */
+                    label: 'Normes auto',
+                    icon: 'renommer' as const,
+                    hint:
+                      'Pose ce qui manque pour la NF C 15-100 : socles, RJ45, ' +
+                      'interrupteurs et points lumineux, hors meubles.',
+                    onPress: poserNormes,
                   },
                   {
                     label: 'Nouveau scan',
