@@ -1011,6 +1011,19 @@ export function hugWall(
  *   travers la pièce ;
  * - et l'écart doit tenir dans `PRISE`.
  *
+ * ET L'AUTRE SENS : LE BOUT D'UN MUR QUI SE TERMINE.
+ *
+ * Relevé du chantier, capture à l'appui : « en haut du meuble, on est contre
+ * une fin de mur et pourtant pas d'alignement avec notre fin de meuble ».
+ * L'aimant ne connaissait que l'affleurement FACE À FACE — un bord contre le
+ * nu d'un mur parallèle. Or on aligne tout autant un meuble sur l'ABOUT d'une
+ * cloison : le retour d'un mur, le jambage d'une porte, le bout d'un refend.
+ * Le meuble arrive alors À FLEUR du passage, et c'est ce qu'on cherche à
+ * l'œil en poussant le meuble contre le coin.
+ *
+ * Le plan de l'about d'un mur PERPENDICULAIRE est parallèle au bord qu'on
+ * tire : c'est donc une ligne d'accroche, exactement comme un nu.
+ *
  * On rend le déplacement à appliquer AU CÔTÉ, le long de sa normale
  * sortante : zéro quand rien n'accroche.
  */
@@ -1029,12 +1042,44 @@ export function snapSideToWalls(
   const t = { x: -n.z, z: n.x };
   let meilleur = 0;
   let ecartMin = Infinity;
+  /** Retient le meilleur écart, tous candidats confondus. */
+  const proposer = (ecart: number) => {
+    if (Math.abs(ecart) > prise) return;
+    if (Math.abs(ecart) < ecartMin) {
+      ecartMin = Math.abs(ecart);
+      meilleur = ecart;
+    }
+  };
+  const DOUZE = Math.cos((12 * Math.PI) / 180);
+
   for (const w of walls) {
     const len = segLength(w);
     if (len < 1e-6) continue;
     const u = { x: (w.b.x - w.a.x) / len, z: (w.b.z - w.a.z) / len };
+    /*
+      MUR PERPENDICULAIRE : c'est son BOUT qui donne la ligne.
+
+      Le plan de l'about est perpendiculaire à l'axe du mur, donc parallèle
+      au bord qu'on tire. Ses deux nus sont candidats : une cloison a une
+      épaisseur, et l'on peut vouloir arriver à fleur d'un côté comme de
+      l'autre.
+    */
+    if (Math.abs(u.x * n.x + u.z * n.z) >= DOUZE) {
+      for (const bout of [w.a, w.b]) {
+        // Le bout doit être EN REGARD du côté, pas à l'autre bout de la
+        // pièce : sans quoi une cloison lointaine, mais bien orientée,
+        // tirerait le meuble à travers le logement.
+        const lateral = (bout.x - bord.x) * t.x + (bout.z - bord.z) * t.z;
+        if (Math.abs(lateral) > demi + 0.4) continue;
+        // Le point d'extrémité EST le nu de l'about : la maçonnerie d'un
+        // mur libre s'arrête là, elle ne déborde pas d'une demi-épaisseur.
+        // Proposer aussi des lignes décalées créerait des accroches
+        // fantômes à sept centimètres du seul endroit qui existe.
+        proposer((bout.x - bord.x) * n.x + (bout.z - bord.z) * n.z);
+      }
+    }
     // Parallèles ? On compare les directions, au signe près.
-    if (Math.abs(u.x * t.x + u.z * t.z) < Math.cos((12 * Math.PI) / 180)) continue;
+    if (Math.abs(u.x * t.x + u.z * t.z) < DOUZE) continue;
     const nw = perpOf(u);
     // Le nu du mur qui regarde le côté : l'axe, décalé d'une demi-épaisseur
     // du bon côté. C'est cette face-là qu'on affleure, pas l'axe.
@@ -1050,10 +1095,7 @@ export function snapSideToWalls(
     // sur le mur doit mordre sur le segment.
     const c = (bord.x - w.a.x) * u.x + (bord.z - w.a.z) * u.z;
     if (c < -demi || c > len + demi) continue;
-    if (Math.abs(long) < ecartMin) {
-      ecartMin = Math.abs(long);
-      meilleur = long;
-    }
+    proposer(long);
   }
   return meilleur;
 }

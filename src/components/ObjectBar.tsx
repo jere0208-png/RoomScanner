@@ -9,7 +9,7 @@
  * C'est le même remède qu'au plafond, pour la même raison ; il n'y a aucune
  * raison qu'un meuble se règle autrement qu'un point lumineux.
  */
-import React from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { frCategory } from '../geometry/furniture';
@@ -19,6 +19,93 @@ import type { Palette } from '../theme';
 import type { ObjectData } from 'react-native-room-scan';
 
 const fr2 = (v: number) => v.toFixed(2).replace('.', ',');
+
+/**
+ * TENIR LA FLÈCHE, C'EST CONTINUER — de plus en plus vite.
+ *
+ * Un pas par appui : décaler un meuble de vingt centimètres demandait vingt
+ * appuis. On tient donc la flèche, et le meuble avance tout seul.
+ *
+ * La cadence part LENTEMENT et accélère : au premier dixième de seconde on
+ * vise encore le centimètre — c'est le geste de précision, celui pour lequel
+ * les flèches existent — puis, quand il devient clair qu'on veut traverser
+ * la pièce, elle monte jusqu'à dix pas par seconde. Sans cette montée, il
+ * faut choisir entre un réglage fin impossible et une traversée interminable.
+ *
+ * Le délai avant la première répétition (`ATTENTE`) est ce qui distingue un
+ * appui d'un maintien : sans lui, un simple tapotement partirait en course.
+ */
+const ATTENTE = 420;
+const CADENCE_LENTE = 260;
+/** Dix pas par seconde : la pleine vitesse. */
+const CADENCE_VIVE = 100;
+/** Temps de montée en régime, une fois la répétition lancée. */
+const MONTEE = 1400;
+
+function useRepetition(action: () => void) {
+  const horloge = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const vivant = useRef(action);
+  vivant.current = action;
+  const arreter = useCallback(() => {
+    if (horloge.current) clearTimeout(horloge.current);
+    horloge.current = null;
+  }, []);
+  // Un doigt qui quitte l'écran pendant que la fiche se ferme laisserait
+  // l'horloge tourner sur un meuble qui n'est plus là.
+  useEffect(() => arreter, [arreter]);
+  const demarrer = useCallback(() => {
+    arreter();
+    vivant.current();
+    const debut = Date.now();
+    const prochain = (attente: number) => {
+      horloge.current = setTimeout(() => {
+        vivant.current();
+        const passe = Date.now() - debut - ATTENTE;
+        const t = Math.max(0, Math.min(1, passe / MONTEE));
+        prochain(CADENCE_LENTE + (CADENCE_VIVE - CADENCE_LENTE) * t);
+      }, attente);
+    };
+    prochain(ATTENTE);
+  }, [arreter]);
+  return { demarrer, arreter };
+}
+
+/** Une flèche qui répète tant qu'on la tient. */
+function Fleche({
+  nom,
+  d,
+  couleur,
+  style,
+  onPas,
+}: {
+  nom: string;
+  d: string;
+  couleur: string;
+  style: object;
+  onPas: () => void;
+}) {
+  const { demarrer, arreter } = useRepetition(onPas);
+  return (
+    <TouchableOpacity
+      style={style}
+      accessibilityLabel={nom}
+      // Le pas part à l'APPUI, pas au relâchement : sans quoi le premier
+      // centimètre attendrait que le doigt se lève.
+      onPressIn={demarrer}
+      onPressOut={arreter}>
+      <Svg width={17} height={17} viewBox="0 0 24 24">
+        <Path
+          d={d}
+          stroke={couleur}
+          strokeWidth={2.2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
+        />
+      </Svg>
+    </TouchableOpacity>
+  );
+}
 
 export function ObjectBar({
   object,
@@ -82,23 +169,16 @@ export function ObjectBar({
     </TouchableOpacity>
   );
 
-  /** Une flèche : un centimètre, dans l'axe de l'écran. */
+  /** Une flèche : un centimètre par pas, dans l'axe de l'écran. */
   const fleche = (nom: string, dx: number, dy: number, d: string) => (
-    <TouchableOpacity
+    <Fleche
+      key={nom}
+      nom={nom}
+      d={d}
+      couleur={palette.ink}
       style={styles.nudgeBtn}
-      accessibilityLabel={nom}
-      onPress={() => onNudge?.(dx, dy)}>
-      <Svg width={17} height={17} viewBox="0 0 24 24">
-        <Path
-          d={d}
-          stroke={palette.ink}
-          strokeWidth={2.2}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          fill="none"
-        />
-      </Svg>
-    </TouchableOpacity>
+      onPas={() => onNudge?.(dx, dy)}
+    />
   );
 
   return (
@@ -109,7 +189,9 @@ export function ObjectBar({
           {fleche('Déplacer vers la gauche', -1, 0, 'M19 12 H6 M12 6 L6 12 L12 18')}
           {fleche('Déplacer vers la droite', 1, 0, 'M5 12 H18 M12 6 L18 12 L12 18')}
           {fleche('Déplacer vers le bas', 0, 1, 'M12 5 V18 M6 12 L12 18 L18 12')}
-          <Text style={styles.nudgeNote}>1 cm</Text>
+          {/* Ce que fait le geste, en trois mots : sans cette note, le
+              maintien ne se découvre que par hasard. */}
+          <Text style={styles.nudgeNote}>1 cm · maintenir</Text>
         </View>
       )}
       <View style={styles.editRow}>

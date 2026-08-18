@@ -408,3 +408,87 @@ describe('un meuble s’étire par ses côtés', () => {
     expect(dims(id).w).toBeCloseTo(1.6, 2);
   });
 });
+
+/**
+ * ALIGNER UN MEUBLE SUR LE BOUT D'UN MUR.
+ *
+ * Relevé du chantier, capture à l'appui : « en haut du meuble, on est contre
+ * une fin de mur et pourtant pas d'alignement avec notre fin de meuble ».
+ * L'aimant ne savait faire qu'une chose — coller un bord au nu d'un mur
+ * PARALLÈLE. Or on aligne tout autant un meuble sur l'ABOUT d'une cloison :
+ * le retour d'un mur, le jambage d'une porte, le bout d'un refend. Le meuble
+ * arrive alors à fleur du passage, et c'est ce qu'on cherche à l'œil en le
+ * poussant contre le coin.
+ */
+describe('le bord s’aligne sur le bout d’un mur', () => {
+  /** La chambre, plus un refend qui descend du mur nord et s'arrête net. */
+  const AVEC_REFEND: WallSeg[] = [
+    ...CHAMBRE,
+    mur('refend', 2.2, 0, 2.2, 1.2),
+  ];
+  const poserLa = (x: number, z: number) => {
+    useScanStore.setState({
+      walls: AVEC_REFEND,
+      rooms: [{ id: 'r1', name: 'Chambre', wallIds: AVEC_REFEND.map((w) => w.id) }],
+      objects: [],
+      openings: [],
+      fixtures: [],
+    });
+    return useScanStore.getState().addObject(
+      { key: 'meuble', label: 'Meuble', w: 0.6, d: 1, h: 0.8, category: 'storage' },
+      x,
+      z,
+    );
+  };
+  const tirer = (
+    id: string,
+    cote: 'largeur+' | 'largeur-' | 'profondeur+' | 'profondeur-',
+    total: number,
+    images = 20,
+  ) => {
+    let accroche = false;
+    for (let i = 0; i < images; i++) {
+      const r = useScanStore.getState().resizeObjectSide(id, cote, total / images);
+      accroche = accroche || r.accroche;
+    }
+    return accroche;
+  };
+  const bordDe = (id: string, sens: -1 | 1) => {
+    const o = useScanStore.getState().objects.find((x) => x.id === id)!;
+    return o.transform[14] + (sens * o.depth) / 2;
+  };
+
+  /**
+   * Le refend s'arrête à 1,20 m. On tire le bord haut du meuble vers lui en
+   * s'arrêtant volontairement quatre centimètres trop court : l'aimant doit
+   * finir le geste, et le meuble arriver À FLEUR du passage.
+   */
+  it('finit le geste quand le bord arrive près de l’about', () => {
+    const id = poserLa(2.6, 2);
+    const haut = bordDe(id, -1);
+    // Ce qui manque pour atteindre le bout du refend, moins quatre
+    // centimètres : c'est là que le doigt s'arrête.
+    const aParcourir = haut - 1.2 - 0.04;
+    const accroche = tirer(id, 'profondeur-', aParcourir);
+    expect(accroche).toBe(true);
+    expect(bordDe(id, -1)).toBeCloseTo(1.2, 3);
+  });
+
+  /**
+   * ET IL N'ATTIRE PAS DE LOIN.
+   *
+   * Un bout de mur à l'autre bout de la pièce, même bien orienté, ne doit
+   * pas tirer le meuble à travers le logement : il faut qu'il soit EN
+   * REGARD du bord.
+   */
+  it('ignore un about qui n’est pas en face du bord', () => {
+    // Le meuble est loin du refend sur l'axe des x : son bord ne le
+    // rencontre jamais.
+    const id = poserLa(0.5, 2);
+    const haut = bordDe(id, -1);
+    const accroche = tirer(id, 'profondeur-', haut - 1.2 - 0.04);
+    expect(accroche).toBe(false);
+    // Il s'est agrandi de ce qu'on a demandé, sans un centimètre de plus.
+    expect(bordDe(id, -1)).toBeCloseTo(1.24, 2);
+  });
+});

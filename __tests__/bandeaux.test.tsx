@@ -438,11 +438,14 @@ describe('l’écran des résultats', () => {
     act(() => cotes!.props.onPress());
 
     const avant = useScanStore.getState().objects[0].transform.slice();
+    // La flèche répond à l'APPUI et répète tant qu'on la tient : le pas part
+    // donc sur `onPressIn`, et s'arrête quand le doigt se lève.
     const droite = tree.root
-      .findAll((n) => typeof n.props?.onPress === 'function')
+      .findAll((n) => typeof n.props?.onPressIn === 'function')
       .find((n) => n.props.accessibilityLabel === 'Déplacer vers la droite');
     expect(droite).toBeDefined();
-    act(() => droite!.props.onPress());
+    act(() => droite!.props.onPressIn());
+    act(() => droite!.props.onPressOut());
     const apres = useScanStore.getState().objects[0].transform;
     const pas = Math.hypot(apres[12] - avant[12], apres[14] - avant[14]);
     // Un centimètre, pas un de plus : c'est la promesse.

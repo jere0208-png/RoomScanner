@@ -167,8 +167,15 @@ le bord opposé ne bouge pas. Le geste ne compte que pour sa part utile — le
 déplacement du doigt est projeté sur la normale du bord —, si bien qu'un
 mouvement de travers ne fait pas partir le meuble en biais.
 
-**L'aimant finit le geste.** À sept centimètres du nu d'un mur qu'il longe, le
-bord s'y pose (`snapSideToWalls`). Viser l'affleurement à trois millimètres
+**L'aimant finit le geste, dans les deux sens.** À sept centimètres du nu d'un
+mur qu'il longe, le bord s'y pose (`snapSideToWalls`) — et il s'aligne tout
+autant sur le **bout d'un mur qui se termine** : le retour d'une cloison, le
+jambage d'une porte, l'about d'un refend. Le plan de cet about est parallèle
+au bord qu'on tire, c'est donc une ligne d'accroche comme un nu, et le meuble
+arrive à fleur du passage. Il faut que l'about soit EN REGARD du bord, sans
+quoi une cloison lointaine mais bien orientée tirerait le meuble à travers le
+logement. Relevé du chantier : « on est contre une fin de mur et pourtant pas
+d'alignement avec notre fin de meuble ». Viser l'affleurement à trois millimètres
 près avec un doigt qui en couvre quinze n'est pas un geste humain, et « le
 meuble touche le mur » n'est pas un détail de dessin : c'est ce qui décide
 qu'une prise est accessible ou condamnée. Trois conditions pour accrocher — le
@@ -189,6 +196,15 @@ elles s'en détachaient et restaient plantées au milieu de l'écran, la croix
 rouge posée sur un AUTRE meuble. Elles s'effacent maintenant avec lui quand il
 sort du champ, et se reculent d'un cran quand les poignées sont là, pour ne
 pas se superposer à celle du bord haut.
+
+**Tenir une flèche, c'est continuer.** Un pas par appui, c'était vingt appuis
+pour décaler un meuble de vingt centimètres. Le maintien répète donc, en
+accélérant : la première demi-seconde reste lente — c'est encore le geste de
+précision, celui pour lequel ces flèches existent — puis la cadence monte
+jusqu'à **dix pas par seconde**, pas au-delà : plus vite, le meuble file et
+l'on ne voit plus où il va. Le pas part à l'appui et non au relâchement, et
+l'horloge meurt avec le bandeau — un doigt qui quitte l'écran pendant que la
+fiche se ferme laisserait la répétition tourner sur un meuble absent.
 
 **Et la flèche du bandeau prime sur l'aimant.** Le plaquage automatique
 referme tout jour de moins de cinq centimètres : il reprenait chaque pas d'un
