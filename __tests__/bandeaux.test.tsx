@@ -365,6 +365,41 @@ describe('l’écran des résultats', () => {
   });
 
   /**
+   * LES QUATRE FLÈCHES DU MEUBLE.
+   *
+   * Relevé du chantier : « au-dessus de ce bloc, affiche quatre flèches qui
+   * permettent de modifier au pixel près l'emplacement d'un meuble ». Le doigt
+   * déplace de trois centimètres quand on en voulait un, et il cache ce qu'il
+   * pousse. Les flèches poussent d'un centimètre, DANS L'AXE DE L'ÉCRAN — pas
+   * dans celui du scan, qui n'a aucun sens pour l'œil.
+   */
+  it('déplace le meuble d’un centimètre à la flèche', () => {
+    const tree = monter();
+    // On touche le meuble sur le plan, puis on ouvre ses cotes : c'est là que
+    // les flèches se trouvent.
+    const meuble = tree.root
+      .findAll((n) => typeof n.props?.onPress === 'function')
+      .find((n) => n.findAll((x) => x.props?.rx === 3).length > 0);
+    expect(meuble).toBeDefined();
+    act(() => meuble!.props.onPress());
+    const cotes = bouton(tree, 'Cotes du meuble');
+    expect(cotes).toBeDefined();
+    act(() => cotes!.props.onPress());
+
+    const avant = useScanStore.getState().objects[0].transform.slice();
+    const droite = tree.root
+      .findAll((n) => typeof n.props?.onPress === 'function')
+      .find((n) => n.props.accessibilityLabel === 'Déplacer vers la droite');
+    expect(droite).toBeDefined();
+    act(() => droite!.props.onPress());
+    const apres = useScanStore.getState().objects[0].transform;
+    const pas = Math.hypot(apres[12] - avant[12], apres[14] - avant[14]);
+    // Un centimètre, pas un de plus : c'est la promesse.
+    expect(pas).toBeGreaterThan(0.005);
+    expect(pas).toBeLessThan(0.015);
+  });
+
+  /**
    * LE BANDEAU DU MEUBLE.
    *
    * On touche le meuble, puis sa pastille de cotes : le bandeau donne sa

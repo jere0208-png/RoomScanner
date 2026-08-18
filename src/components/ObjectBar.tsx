@@ -29,6 +29,7 @@ export function ObjectBar({
   onRotate,
   onCancel,
   onDone,
+  onNudge,
 }: {
   object: ObjectData;
   /** Les styles de l'écran : le bandeau partage ceux des autres barres. */
@@ -39,6 +40,16 @@ export function ObjectBar({
   onRotate: () => void;
   onCancel: () => void;
   onDone: () => void;
+  /**
+   * LE DÉPLACEMENT AU CENTIMÈTRE, À LA FLÈCHE.
+   *
+   * Le doigt déplace un meuble de trois centimètres quand on en voulait un :
+   * il cache ce qu'il pousse, et un écran de téléphone ne rend pas le
+   * millimètre. Quatre flèches font ce que le doigt ne sait pas faire — et
+   * elles poussent DANS L'AXE DE L'ÉCRAN, pas dans celui du plan : c'est la
+   * direction qu'on voit, pas celle du repère du scan.
+   */
+  onNudge?: (dx: number, dz: number) => void;
 }) {
   /** Une cote qu'on touche : elle ouvre la feuille, qui suit le clavier. */
   const champ = (
@@ -67,8 +78,36 @@ export function ObjectBar({
     </TouchableOpacity>
   );
 
+  /** Une flèche : un centimètre, dans l'axe de l'écran. */
+  const fleche = (nom: string, dx: number, dy: number, d: string) => (
+    <TouchableOpacity
+      style={styles.nudgeBtn}
+      accessibilityLabel={nom}
+      onPress={() => onNudge?.(dx, dy)}>
+      <Svg width={17} height={17} viewBox="0 0 24 24">
+        <Path
+          d={d}
+          stroke={palette.ink}
+          strokeWidth={2.2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
+        />
+      </Svg>
+    </TouchableOpacity>
+  );
+
   return (
     <View style={styles.editBar}>
+      {onNudge && (
+        <View style={styles.nudgeRow}>
+          {fleche('Déplacer vers le haut', 0, -1, 'M12 19 V6 M6 12 L12 6 L18 12')}
+          {fleche('Déplacer vers la gauche', -1, 0, 'M19 12 H6 M12 6 L6 12 L12 18')}
+          {fleche('Déplacer vers la droite', 1, 0, 'M5 12 H18 M12 6 L18 12 L12 18')}
+          {fleche('Déplacer vers le bas', 0, 1, 'M12 5 V18 M6 12 L12 18 L18 12')}
+          <Text style={styles.nudgeNote}>1 cm</Text>
+        </View>
+      )}
       <View style={styles.editRow}>
         {champ('Largeur', object.width, (v) => onResize(v, object.depth))}
         <Text style={styles.unit}>×</Text>

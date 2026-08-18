@@ -2171,6 +2171,26 @@ export function ResultScreen() {
             onRotate={() => rotateObject(selectedObject.id)}
             onCancel={cancelObject}
             onDone={applyObjectDims}
+            onNudge={(dx, dy) => {
+              /*
+                UN CENTIMÈTRE DANS L'AXE DE L'ÉCRAN.
+
+                Le plan peut avoir été tourné : « vers le haut » ne veut rien
+                dire dans le repère du scan. On ramène donc la flèche de
+                l'écran vers le monde en défaisant la rotation du plan — sans
+                quoi le meuble part de travers, et l'on ne comprend pas
+                pourquoi.
+              */
+              const c = Math.cos(-vuePlan.rot);
+              const s = Math.sin(-vuePlan.rot);
+              const PAS = 0.01;
+              const mx = (dx * c - dy * s) * PAS;
+              const mz = (dx * s + dy * c) * PAS;
+              const t0 = selectedObject.transform;
+              useScanStore
+                .getState()
+                .setObjectCenter(selectedObject.id, t0[12] + mx, t0[14] + mz);
+            }}
           />
         )}
 
@@ -3373,7 +3393,10 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     position: 'absolute',
     bottom: 10,
     left: 12,
-    marginRight: 62,
+    // Soixante-douze points : la colonne d'actions en tient soixante-deux, et
+    // le bouton de validation débordait du bloc blanc pour aller toucher
+    // « Contrôle ». Dix points de plus, et il rentre chez lui.
+    marginRight: 72,
     // Toute la largeur : les 84 points réservés au bouton de sauvegarde
     // n'ont plus lieu d'être, et c'était eux qui poussaient la validation
     // HORS du bandeau blanc — un bouton bleu flottant à côté de sa barre,
@@ -3436,18 +3459,40 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   },
   // `flexShrink: 0` : les trois boutons gardent leur taille, ce sont les
   // champs qui cèdent si la place manque — jamais l'inverse.
-  editIcons: { flexDirection: 'row', gap: 6, marginLeft: 'auto', flexShrink: 0 },
+  editIcons: { flexDirection: 'row', gap: 5, marginLeft: 'auto', flexShrink: 0 },
+  /**
+   * LA RANGÉE DES FLÈCHES, au-dessus des cotes.
+   *
+   * Elle tient dans le MÊME bloc blanc : un second bloc flottant se serait
+   * posé sur la rangée d'outils ou sur la colonne d'actions, et l'on aurait
+   * repris le défaut qu'on vient de corriger.
+   */
+  nudgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 6,
+  },
+  nudgeBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: radius.sm,
+    backgroundColor: c.surfaceSunken,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  nudgeNote: { color: c.inkFaint, fontSize: 11, fontWeight: '600', marginLeft: 2 },
   iconBtn: {
-    width: 34,
-    height: 34,
+    width: 32,
+    height: 32,
     borderRadius: radius.sm,
     backgroundColor: c.surfaceSunken,
     alignItems: 'center',
     justifyContent: 'center',
   },
   iconBtnOk: {
-    width: 34,
-    height: 34,
+    width: 32,
+    height: 32,
     borderRadius: radius.sm,
     backgroundColor: c.blue,
     alignItems: 'center',
