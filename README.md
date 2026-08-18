@@ -385,6 +385,37 @@ reconnaît le sien. Repris, il redevient le scan courant, **jamais enregistré**
 nouveau scan l'efface : le garder ferait proposer au démarrage suivant un
 relevé qu'on vient soi-même de mettre à la corbeille.
 
+### L'accueil montre, il n'explique plus
+
+Il récitait un mode d'emploi : « Scannez, ajustez, explorez », trois
+pictogrammes et neuf mots pour dire ce qu'une seule image montre mieux — le
+résultat. On ne vend pas un scanner de pièces avec une notice, on le vend avec
+le plan qui en sort.
+
+À la place, **un téléphone qui s'incline avec un logement meublé dans son
+écran**. Le boîtier bascule sur son axe (`rotateY`, `rotateZ`, perspective)
+pendant que la maquette tourne sur elle-même, plus vite que lui : c'est ce
+décalage qui donne la profondeur, comme un objet qu'on tourne dans la main.
+
+**Ce n'est pas une illustration.** Le logement passe par le même chemin que la
+vue 3D de l'app — `buildScene`, `sceneFraming`, le tri du peintre, `shadeFill`
+et l'écorché de `cutawayOpacity`. Si le rendu change, la vitrine change avec
+lui, et elle ne peut pas promettre ce que l'application ne fait pas. Trois
+réglages lui sont propres, parce qu'une maquette de trois centimètres n'est
+pas un plan grandeur nature : la scène se bâtit en pans d'un seul tenant
+(`coarse`), la palette est plus contrastée — un gris clair sur blanc n'existe
+pas à cette taille —, et l'horloge tourne à vingt-cinq images par seconde. Un
+écran d'accueil n'a pas le droit de faire chauffer le téléphone avant qu'on
+ait scanné quoi que ce soit.
+
+**Les deux boutons ont un contour qui court.** Un segment lumineux fait le
+tour du bord, sans fin, en deux secondes et demie — un tracé SVG dont le
+tireté se décale. La propriété n'a pas d'équivalent natif : elle s'anime donc
+sur le fil JS, ce qui se paie ici et nulle part ailleurs, sur un écran qui ne
+dessine rien d'autre. Le fond est translucide, l'ombre prend la couleur du
+bouton, et l'appui l'enfonce de trois pour cent : un bouton qui ne bouge pas
+sous le doigt laisse douter qu'il a pris.
+
 ### La typo de la marque
 
 Le mot « EchoPlan » n'est plus composé : c'est **l'image de la marque**,
