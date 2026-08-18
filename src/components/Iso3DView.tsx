@@ -286,6 +286,16 @@ export function Iso3DView({
   // Pendant un geste, les cotes sont masquées : c'est leur recalcul à
   // chaque frame qui faisait ramer les mouvements.
   const [interacting, setInteracting] = useState(false);
+  /**
+   * Le classement du dernier calcul : l'angle où il a été fait, la scène à
+   * laquelle il appartient, et la profondeur de chaque pan.
+   */
+  const ordreMemo = useRef<{
+    theta: number;
+    tilt: number;
+    faces: typeof faces;
+    d: Map<number, number>;
+  } | null>(null);
 
   // Créé UNE seule fois : un responder recréé en plein geste perd le suivi.
   const pan = useRef(
@@ -685,14 +695,53 @@ export function Iso3DView({
     // Ce que la coupe a entièrement retranché — une face derrière l'œil —
     // n'a plus rien à dessiner.
     const dessinables = pov ? polys.filter((p) => p.proj.length >= 2) : polys;
-    // Un meuble se trie d'un bloc : ses propres faces se départagent à
-    // l'écran, là où elles se recouvrent. Sans ça, sa carcasse repeint sa
-    // porte et son dossier repeint son assise — les « bandes » du chantier.
-    // Pendant un geste, le classement s'allège : les arêtes suivent leur pan
-    // au lieu d'être classées une à une (voir `ajusterBlocs`).
-    // La visite animée (mode « light ») joue trente images par seconde sans
-    // interruption : elle garde le classement allégé, comme pendant un geste.
-    ajusterBlocs(dessinables, interacting || !!light);
+    /*
+      PENDANT UN GESTE, ON GARDE LE CLASSEMENT DU DERNIER REPOS.
+
+      Le classement exact — chaque face départagée à l'écran, là où elle en
+      recouvre une autre — coûte une dizaine de millisecondes sur un logement
+      meublé : trop pour le refaire trente fois par seconde. On repliait donc
+      la scène sur la règle des couches le temps du geste, et cette règle lâche
+      justement dans les angles rasants. Le chantier l'a vu deux fois : un mur
+      qui passe devant toute la pièce en pleine rotation, et un coussin de
+      canapé qui paraît plus bas que son voisin selon l'angle — « tout n'est
+      pas comme un vrai modèle 3D, fixe dans toutes les positions ».
+
+      Or une scène qui tourne ne change pas de FORME, seulement d'angle : un
+      ordre juste à un angle le reste quelques degrés plus loin. On le
+      recalcule donc tous les quatre degrés, et l'on réutilise le précédent
+      entre-temps — chaque pan retrouve sa profondeur par son numéro, chaque
+      arête suit le sien. Le coût moyen retombe au quart, et le modèle garde
+      le classement EXACT dans toutes les positions.
+    */
+    const memoire = ordreMemo.current;
+    const perime =
+      !memoire ||
+      Math.abs(view.theta - memoire.theta) > 4 ||
+      Math.abs(view.tilt - memoire.tilt) > 4 ||
+      memoire.faces !== faces;
+    if (perime) {
+      ajusterBlocs(dessinables, false);
+      const table = new Map<number, number>();
+      for (const p of dessinables) {
+        if (p.pan !== undefined) table.set(p.pan, p.depth);
+      }
+      ordreMemo.current = {
+        theta: view.theta,
+        tilt: view.tilt,
+        faces,
+        d: table,
+      };
+    } else {
+      for (const p of dessinables) {
+        const d = p.pan !== undefined ? memoire!.d.get(p.pan) : undefined;
+        if (d !== undefined) p.depth = d;
+        else if (p.bord !== undefined) {
+          const dp = memoire!.d.get(p.bord);
+          if (dp !== undefined) p.depth = dp + 1e-6;
+        }
+      }
+    }
 
     // Cotes insérées DANS le tri de profondeur : un mur proche recouvre
     // les cotes des éléments situés derrière lui (fini les fuites).
@@ -1051,7 +1100,6 @@ export function Iso3DView({
     solidWalls,
     walls,
     interacting,
-    light,
     pov,
   ]);
 
