@@ -921,16 +921,67 @@ export const useScanStore = create<ScanState>((set, get) => {
       const ddx = dx + cale.x;
       const ddz = dz + cale.z;
 
+      /**
+       * PUIS LA SOUDURE : deux murs superposés n'en font plus qu'un.
+       *
+       * L'aimant colle la pièce contre sa voisine — et laisse DEUX
+       * maçonneries au même endroit, l'une à la nouvelle pièce, l'autre à
+       * l'ancienne. Sur le dessin ça ne se voit pas ; dans le métré, si :
+       * la cloison est comptée deux fois, et le dossier ment d'un mur.
+       *
+       * On soude donc ce qui se recouvre : le mur déplacé disparaît, et la
+       * pièce récupère celui qui était déjà là. Le mitoyen appartient alors
+       * aux deux, comme une cloison de vrai logement — et l'appareillage
+       * qu'il portait le suit.
+       */
+      const soudes = new Map<string, string>();
+      for (const w of st.walls) {
+        if (!aMoi.has(w.id)) continue;
+        const A = { x: w.a.x + ddx, z: w.a.z + ddz };
+        const B = { x: w.b.x + ddx, z: w.b.z + ddz };
+        for (const o of st.walls) {
+          if (aMoi.has(o.id)) continue;
+          // Mêmes extrémités, à cinq centimètres près, dans un sens ou dans
+          // l'autre : c'est la même maçonnerie.
+          const memeSens =
+            Math.hypot(A.x - o.a.x, A.z - o.a.z) < 0.05 &&
+            Math.hypot(B.x - o.b.x, B.z - o.b.z) < 0.05;
+          const inverse =
+            Math.hypot(A.x - o.b.x, A.z - o.b.z) < 0.05 &&
+            Math.hypot(B.x - o.a.x, B.z - o.a.z) < 0.05;
+          if (memeSens || inverse) {
+            soudes.set(w.id, o.id);
+            break;
+          }
+        }
+      }
+
       pushHistory(`moveRoom:${roomId}`);
       set({
-        walls: st.walls.map((w) =>
-          aMoi.has(w.id)
+        walls: st.walls
+          .filter((w) => !soudes.has(w.id))
+          .map((w) =>
+            aMoi.has(w.id)
+              ? {
+                  ...w,
+                  a: { x: w.a.x + ddx, z: w.a.z + ddz },
+                  b: { x: w.b.x + ddx, z: w.b.z + ddz },
+                }
+              : w,
+          ),
+        // La pièce troque ses murs soudés contre ceux qu'elle a rejoints.
+        rooms: st.rooms.map((r) =>
+          r.id === roomId && r.wallIds
             ? {
-                ...w,
-                a: { x: w.a.x + ddx, z: w.a.z + ddz },
-                b: { x: w.b.x + ddx, z: w.b.z + ddz },
+                ...r,
+                wallIds: r.wallIds.map((id) => soudes.get(id) ?? id),
               }
-            : w,
+            : r,
+        ),
+        // L'appareillage d'un mur soudé passe sur le mur conservé : il est
+        // posé sur la même maçonnerie, il n'a pas bougé d'un centimètre.
+        fixtures: st.fixtures.map((f) =>
+          soudes.has(f.wallId) ? { ...f, wallId: soudes.get(f.wallId)! } : f,
         ),
         // Les menuiseries de ces murs suivent, sinon elles restent en l'air.
         openings: st.openings.map((o) => {

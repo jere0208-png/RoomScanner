@@ -17,7 +17,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 import React from 'react';
-import { Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import { ExportScreen } from '../src/screens/ExportScreen';
 import { ResultScreen } from '../src/screens/ResultScreen';
@@ -325,18 +325,26 @@ describe('l’espace de travail du plan', () => {
     return Object.assign({}, ...plats.filter(Boolean).flat(Infinity));
   };
 
-  it('pose les outils au pied du plan, pas sur ses côtés', () => {
+  /**
+   * LES OUTILS MONTENT DEPUIS LE BOUTON D'ÉDITION, en bas à droite.
+   *
+   * Trois positions ont été essayées. En colonne depuis le HAUT, ils
+   * cernaient le dessin. En ligne au pied du plan, ils s'étalaient sur
+   * toute la largeur et se chevauchaient quand la place manquait. Ils
+   * reprennent leur colonne — tout à la file, dans l'axe du pouce — mais
+   * ancrée en bas : le dessin garde son quart supérieur.
+   */
+  it('empile les outils en bas à droite, et non sur les côtés du plan', () => {
     const tree = monter('scan');
-    // La barre d'outils : le rail qui porte les pastilles.
     const rail = tree.root
-      .findAll((n) => typeof n.props?.horizontal === 'boolean' && n.props.horizontal)
+      .findAllByType(ScrollView)
       .map(style)
-      .find((st) => typeof st.bottom === 'number' && st.position === 'absolute');
+      .find((st) => st.position === 'absolute' && typeof st.bottom === 'number');
     expect(rail).toBeDefined();
-    // Ancrée en bas, sur toute la largeur — et plus en colonne à droite.
-    expect(rail!.bottom).toBeLessThan(20);
-    expect(rail!.flexDirection).toBe('row');
+    // Ancrée en bas à droite, jamais par le haut.
     expect(rail!.top).toBeUndefined();
+    expect(rail!.right).toBeLessThan(12);
+    expect(rail!.flexDirection).toBeUndefined();
   });
 
   it('remplace le bandeau 2D/3D par une pastille', () => {

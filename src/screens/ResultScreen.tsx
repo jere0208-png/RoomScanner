@@ -36,6 +36,7 @@ import { ObjectBar } from '../components/ObjectBar';
 import { RoomBar } from '../components/RoomBar';
 import { StripBar } from '../components/StripBar';
 import {
+  PILL_CELL_H,
   PILL_GAP,
   PillSlot,
   ToolPill,
@@ -130,14 +131,6 @@ import {
 
 type Tab = '2d' | '3d';
 
-/**
- * La hauteur que prend la barre d'outils, au pied du plan.
- *
- * Une pastille (38) plus son mot (12 + 3) plus la marge du bas (8), plus
- * un souffle : c'est ce qu'il faut laisser aux bandeaux contextuels pour
- * qu'ils se posent AU-DESSUS d'elle et non par-dessus.
- */
-const BARRE_OUTILS = 76;
 
 /**
  * Ce qui peut COMMANDER un point lumineux.
@@ -943,9 +936,65 @@ export function ResultScreen() {
   );
 
   /** Ouvre le choix du nom pour une pièce (appui sur son cartouche). */
+  /**
+   * TOUCHER LE NOM D'UNE PIÈCE OUVRE SES OPTIONS, pas le renommage.
+   *
+   * Le cartouche ouvrait directement la liste des noms. C'est le geste le
+   * plus fréquent, mais pas le seul : on touche aussi une pièce pour
+   * corriger sa hauteur, la fusionner avec la voisine que le scan a
+   * séparée, ou la retirer. Un appui qui n'ouvre QU'UNE des cinq portes en
+   * ferme quatre — et l'utilisateur ne sait pas qu'elles existent.
+   */
   const promptRoomFor = (roomId: string) => {
     setSelectedRoomId(roomId);
-    setNaming(true);
+    const piece = rooms.find((r) => r.id === roomId);
+    const autres = rooms.filter((r) => r.id !== roomId).length;
+    setMenu({
+      title: piece?.name || 'Pièce sans nom',
+      subtitle: 'Ce qu’on peut faire de cette pièce.',
+      actions: [
+        {
+          label: 'Renommer',
+          icon: 'renommer' as const,
+          onPress: () => setNaming(true),
+        },
+        {
+          label: 'Hauteur sous plafond',
+          icon: 'hauteur' as const,
+          onPress: promptRoomHeight,
+        },
+        ...(autres > 0
+          ? [
+              {
+                label: 'Fusionner avec une autre pièce',
+                icon: 'fusionner' as const,
+                onPress: promptMerge,
+              },
+            ]
+          : []),
+        {
+          label: 'Scinder la pièce',
+          icon: 'scinder' as const,
+          onPress: () => {
+            splitRoom(roomId);
+            setSelectedRoomId(null);
+          },
+        },
+        ...(autres > 0
+          ? [
+              {
+                label: 'Retirer la pièce',
+                icon: 'supprimer' as const,
+                danger: true,
+                onPress: () => {
+                  removeRoom(roomId);
+                  setSelectedRoomId(null);
+                },
+              },
+            ]
+          : []),
+      ],
+    });
   };
 
   /** Applique un nom choisi dans la liste, en numérotant les homonymes. */
@@ -1565,8 +1614,7 @@ export function ResultScreen() {
           <ScrollView
             style={styles.planTools}
             contentContainerStyle={styles.planToolsRail}
-            horizontal
-            showsHorizontalScrollIndicator={false}
+            showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled">
             {/* Deux barres, jamais mélangées.
                 En lecture, on ne fait que REGARDER : la barre ne porte que
@@ -1792,8 +1840,7 @@ export function ResultScreen() {
           <ScrollView
             style={[styles.planTools, styles.planToolsHaut]}
             contentContainerStyle={styles.planToolsRail}
-            horizontal
-            showsHorizontalScrollIndicator={false}
+            showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled">
             <ToolPill
               icon="ruler"
@@ -2970,20 +3017,40 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
    * applications de plan les posent toutes en bas, sur une seule ligne :
    * la main y est déjà, et le dessin garde ses quatre côtés.
    */
+  /**
+   * LES OUTILS REMONTENT DEPUIS LE BOUTON D'ÉDITION, en bas à droite.
+   *
+   * Trois positions essayées, et le chantier a tranché les deux premières.
+   * En colonne à droite DEPUIS LE HAUT, ils cernaient le dessin. En ligne
+   * au pied du plan, ils s'y étalaient sur toute la largeur, se
+   * chevauchaient quand la place manquait, et passaient sous l'indicateur
+   * d'accueil.
+   *
+   * Ils reprennent donc leur colonne — la main y trouve tout à la file,
+   * dans l'axe du pouce — mais ancrée EN BAS : les pastilles montent
+   * depuis le bouton d'édition au lieu de descendre sur le plan, et le
+   * dessin garde son quart supérieur, celui qu'on regarde.
+   */
   planTools: {
     position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 8,
-    flexDirection: 'row',
+    right: 2,
+    // Juste au-dessus du bouton d'édition, du même écart qu'entre deux
+    // pastilles.
+    bottom: 8 + PILL_CELL_H + PILL_GAP,
+    maxHeight: '70%',
+  },
+  /** La colonne qui défile, quand les outils dépassent la hauteur. */
+  planToolsRail: {
     alignItems: 'flex-end',
     gap: PILL_GAP,
-    paddingHorizontal: 10,
+    // Le rail se remplit PAR LE BAS : le premier outil est le plus proche
+    // du pouce, et les suivants s'empilent vers le haut.
+    justifyContent: 'flex-end',
+    flexGrow: 1,
+    paddingBottom: 2,
   },
-  /** Le rail qui défile, quand les outils dépassent la largeur. */
-  planToolsRail: { alignItems: 'flex-end', gap: PILL_GAP, paddingRight: 4 },
-  /** Sans rangée au-dessus, la colonne prend sa place. */
-  planToolsHaut: {},
+  /** Sans bouton d'édition dessous, la colonne descend d'un cran. */
+  planToolsHaut: { bottom: 8 },
   /**
    * L'ancrage suit les outils : même ligne, en bas à droite.
    *
@@ -2993,7 +3060,7 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   editAnchor: {
     position: 'absolute',
     bottom: 8,
-    right: 10,
+    right: 2,
     zIndex: 4,
     flexDirection: 'row',
     alignItems: 'flex-end',
@@ -3093,10 +3160,11 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   // d'enregistrement. Elle dit l'essentiel et ne mange pas le dessin.
   wallStrip: {
     position: 'absolute',
-    // AU-DESSUS de la barre d'outils, qui occupe désormais le pied du plan.
-    // Posé à la même hauteur, il lui passait dessus.
-    bottom: BARRE_OUTILS,
+    bottom: 10,
     left: 12,
+    // La colonne d'outils occupe la droite : le bandeau s'arrête avant
+    // elle, sinon ses boutons passent dessous.
+    marginRight: 62,
     // La colonne d'outils descend du HAUT du plan : sous elle, la largeur
     // est libre. On lui laissait pourtant soixante-dix points de marge —
     // un cinquième de l'écran perdu, pendant que la cote était tronquée.
@@ -3143,8 +3211,9 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   // derrière la pastille bleue.
   editBar: {
     position: 'absolute',
-    bottom: BARRE_OUTILS,
+    bottom: 10,
     left: 12,
+    marginRight: 62,
     // Toute la largeur : les 84 points réservés au bouton de sauvegarde
     // n'ont plus lieu d'être, et c'était eux qui poussaient la validation
     // HORS du bandeau blanc — un bouton bleu flottant à côté de sa barre,
@@ -3237,15 +3306,29 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     backgroundColor: c.blue,
     borderRadius: radius.sm,
     paddingHorizontal: 18,
-    paddingVertical: 11,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   applyText: { color: '#FFFFFF', fontWeight: '700', fontSize: 14 },
+  /**
+   * LE BANDEAU D'UNE PIÈCE.
+   *
+   * Ces styles manquaient : sans `roomActions`, les trois boutons
+   * retombaient en colonne, chacun pleine largeur, et la carte sortait
+   * difforme — c'est ce qu'on voyait après l'ajout d'une pièce.
+   */
+  roomHead: { paddingHorizontal: 4, paddingBottom: 8 },
+  roomNom: { color: c.ink, fontSize: 15, fontWeight: '800' },
+  roomCotes: { color: c.inkFaint, fontSize: 12.5, fontWeight: '600', marginTop: 1 },
+  roomActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   roomAction: {
     backgroundColor: c.surfaceSunken,
     borderRadius: radius.sm,
-    paddingHorizontal: 14,
-    paddingVertical: 11,
-    marginLeft: 8,
+    paddingHorizontal: 16,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   roomActionText: { color: c.inkSoft, fontWeight: '700', fontSize: 13.5 },
   exportChoice: {

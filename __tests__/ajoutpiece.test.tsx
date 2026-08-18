@@ -279,3 +279,83 @@ describe('déplacer une pièce', () => {
     expect(useScanStore.getState().walls).toEqual(avant);
   });
 });
+
+/**
+ * ET QUAND ELLE ARRIVE AU CONTACT, ÇA SOUDE.
+ *
+ * L'aimant colle la pièce contre sa voisine — et laisse deux maçonneries au
+ * même endroit, l'une à chacune. Sur le dessin ça ne se voit pas ; dans le
+ * métré, si : la cloison est comptée deux fois, et le dossier ment d'un mur.
+ */
+describe('la soudure au contact', () => {
+  const CARRE = [
+    { id: 'n', a: { x: 0, z: 0 }, b: { x: 4, z: 0 } },
+    { id: 'e', a: { x: 4, z: 0 }, b: { x: 4, z: 4 } },
+    { id: 's', a: { x: 4, z: 4 }, b: { x: 0, z: 4 } },
+    { id: 'o', a: { x: 0, z: 4 }, b: { x: 0, z: 0 } },
+  ].map((w) => ({
+    ...w,
+    type: 'wall' as const,
+    height: 2.5,
+    yCenter: 1.25,
+    roomId: 'r1',
+  }));
+
+  beforeEach(() => {
+    useScanStore.setState({
+      walls: CARRE,
+      openings: [],
+      objects: [],
+      rooms: [
+        { id: 'r1', name: 'Séjour', floor: null, wallIds: CARRE.map((w) => w.id) },
+      ],
+      fixtures: [],
+      ceiling: [],
+    });
+  });
+
+  it('fond les deux murs superposés en un seul, partagé', () => {
+    /**
+     * LA SOUDURE DEMANDE DEUX MURS IDENTIQUES.
+     *
+     * Ici la chambre fait 4 m de profond comme le séjour : poussée contre
+     * lui, son mur gauche tombe EXACTEMENT sur le mur est — mêmes deux
+     * bouts. C'est la seule superposition qu'on ose fondre sans rien
+     * inventer ; deux murs de longueurs différentes se contentent de
+     * s'aligner, et il faudrait les découper pour les souder.
+     */
+    const id = useScanStore.getState().addRoomBox(4, 4, 'Chambre', null);
+    const avant = useScanStore.getState().walls.length;
+    useScanStore.getState().moveRoom(id, -0.4, 0);
+    const st = useScanStore.getState();
+    // Un mur de moins qu'avant le déplacement : les deux n'en font qu'un.
+    expect(`${st.walls.length} murs`).toBe(`${avant - 1} murs`);
+    // Et la cloison appartient bien aux deux pièces.
+    const chambre = st.rooms.find((r) => r.id === id)!;
+    expect(chambre.wallIds).toContain('e');
+    expect(st.rooms.find((r) => r.id === 'r1')!.wallIds).toContain('e');
+  });
+
+  it('et l’appareillage du mur soudé reste posé dessus', () => {
+    const id = useScanStore.getState().addRoomBox(4, 3, 'Chambre', null);
+    const sien = useScanStore.getState().rooms.find((r) => r.id === id)!
+      .wallIds![3];
+    useScanStore.setState({
+      fixtures: [
+        { id: 'f1', kind: 'prise', wallId: sien, along: 1, height: 0.25, side: 1 },
+      ],
+    });
+    useScanStore.getState().moveRoom(id, -0.4, 0);
+    const st = useScanStore.getState();
+    // La prise a suivi la maçonnerie conservée, elle n'est pas orpheline.
+    expect(st.walls.some((w) => w.id === st.fixtures[0].wallId)).toBe(true);
+  });
+
+  it('mais ne soude rien quand les murs ne se recouvrent pas', () => {
+    const id = useScanStore.getState().addRoomBox(2, 2, 'WC', null);
+    const avant = useScanStore.getState().walls.length;
+    // On l'éloigne : aucun mur ne tombe sur un autre.
+    useScanStore.getState().moveRoom(id, 3, 3);
+    expect(useScanStore.getState().walls).toHaveLength(avant);
+  });
+});
