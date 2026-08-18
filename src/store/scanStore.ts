@@ -18,6 +18,8 @@ import {
   detectRooms,
   mergeColinear,
   pointOnSeg,
+  fitInNook,
+  hugWall,
   pushOutOfWalls,
   roomExtent,
   roomHeight,
@@ -2229,13 +2231,41 @@ export const useScanStore = create<ScanState>((set, get) => {
         parts.find((p) => pointInPolygon({ x, z }, p.surface?.pts ?? [])) ??
         parts.find((p) => p.roomId === roomOf(obj));
       const yaw = Math.atan2(obj.transform[2], obj.transform[0]);
-      const pose = part
-        ? pushOutOfWalls(
+      /*
+        LE MEUBLE S'ADAPTE AU RECOIN, il ne s'en fait plus chasser.
+
+        On repart TOUJOURS de sa cote d'origine, pas de celle qu'il porte :
+        sans ça, un meuble une fois raboté le resterait, et traverser une
+        niche l'aurait rétréci un peu plus à chaque passage. Ressorti au
+        large, il retrouve donc sa vraie taille tout seul.
+      */
+      const base = {
+        width: obj.baseWidth ?? obj.width,
+        depth: obj.baseDepth ?? obj.depth,
+      };
+      const ajuste = part
+        ? fitInNook(
             { x, z },
-            { width: obj.width, depth: obj.depth, yaw },
+            { width: base.width, depth: base.depth, yaw },
+            part.walls,
+            part.surface?.pts,
+          )
+        : { width: base.width, depth: base.depth, centre: { x, z } };
+      const pose = part
+        ? // Et une fois arrêté par les murs, il se PLAQUE contre celui qu'il
+          // frôle : un jour de trois centimètres n'existe pas sur un
+          // chantier, il vient du doigt qui vise à peu près.
+          hugWall(
+            pushOutOfWalls(
+              ajuste.centre,
+              { width: ajuste.width, depth: ajuste.depth, yaw },
+              part.walls,
+              part.labelAt,
+              part.surface?.pts,
+            ),
+            { width: ajuste.width, depth: ajuste.depth, yaw },
             part.walls,
             part.labelAt,
-            part.surface?.pts,
           )
         : { x, z };
       set({
@@ -2244,7 +2274,14 @@ export const useScanStore = create<ScanState>((set, get) => {
           const t = [...o.transform];
           t[12] = pose.x;
           t[14] = pose.z;
-          return { ...o, transform: t };
+          return {
+            ...o,
+            width: ajuste.width,
+            depth: ajuste.depth,
+            baseWidth: base.width,
+            baseDepth: base.depth,
+            transform: t,
+          };
         }),
         dirty: true,
       });
@@ -2255,7 +2292,12 @@ export const useScanStore = create<ScanState>((set, get) => {
       pushHistory(`resize:${id}`);
       set({
         objects: get().objects.map((o) =>
-          o.id === id ? { ...o, width, depth } : o,
+          o.id === id
+            ? // Une cote saisie à la main devient LA référence : c'est
+              // l'électricien qui a mesuré, et son chiffre prime sur celui
+              // du scanner comme sur l'ajustement d'une niche.
+              { ...o, width, depth, baseWidth: width, baseDepth: depth }
+            : o,
         ),
         dirty: true,
       });

@@ -473,6 +473,124 @@ export function pushOutOfWalls(
   return p;
 }
 
+/**
+ * UN MEUBLE S'AJUSTE AU RECOIN OÙ ON LE POSE.
+ *
+ * Relevé du chantier, vidéo à l'appui : une table poussée dans une niche
+ * entre trois murs « se téléporte à côté ». C'est mécanique — deux murs qui
+ * se font face poussent chacun dans son sens, et le meuble finit par sortir
+ * par le côté ouvert. Un plan de chantier n'a que faire de ce jeu de
+ * quilles : dans une niche de 1,10 m, on pose un meuble de 1,10 m.
+ *
+ * On mesure donc la place RÉELLEMENT disponible autour du point visé, dans
+ * les deux axes du meuble, et on rabote ce qui dépasse. Le meuble se centre
+ * dans sa niche, et l'on garde sa cote d'origine à part (`baseWidth`) : dès
+ * qu'il en ressort, il la reprend. Rien n'est perdu, tout est réversible.
+ *
+ * Deux garde-fous : on ne rabote jamais en dessous de 45 % de la cote (une
+ * armoire de 2 m ne devient pas un tabouret pour tenir dans un placard à
+ * balais), ni en dessous de 40 cm. Sous ce seuil, la niche n'est pas une
+ * place pour ce meuble-là — les murs le repoussent, comme avant.
+ */
+export function fitInNook(
+  centre: Pt,
+  box: { width: number; depth: number; yaw: number },
+  walls: WallSeg[],
+  outline?: Pt[],
+): { width: number; depth: number; centre: Pt } {
+  /** Jeu total laissé autour du meuble : un centimètre de chaque côté. */
+  const JEU = 0.02;
+  /** En deçà, ce n'est plus un ajustement mais une mutilation. */
+  const MINI = 0.4;
+  let p = { ...centre };
+  if (outline && outline.length >= 3 && !insidePoly(p, outline)) {
+    p = nearestOnRing(p, outline);
+  }
+  const cos = Math.cos(box.yaw);
+  const sin = Math.sin(box.yaw);
+  const portee = (dx: number, dz: number) =>
+    castToWall(p, { x: dx, z: dz }, walls) ?? Infinity;
+  /** La cote tenable dans cet axe, et de combien il faut se recentrer. */
+  const selon = (dx: number, dz: number, cote: number) => {
+    const plus = portee(dx, dz);
+    const moins = portee(-dx, -dz);
+    const libre = plus + moins - JEU;
+    if (!isFinite(libre) || libre >= cote) return { cote, glisse: 0 };
+    if (libre < Math.max(MINI, cote * 0.45)) return { cote, glisse: 0 };
+    // Le meuble se centre dans sa niche : sans ça il resterait collé au
+    // mur que le doigt visait, et l'autre bord baîllerait.
+    return { cote: libre, glisse: (plus - moins) / 2 };
+  };
+  const large = selon(cos, sin, box.width);
+  const profond = selon(-sin, cos, box.depth);
+  return {
+    width: large.cote,
+    depth: profond.cote,
+    centre: {
+      x: p.x + cos * large.glisse - sin * profond.glisse,
+      z: p.z + sin * large.glisse + cos * profond.glisse,
+    },
+  };
+}
+
+/**
+ * UN MEUBLE LÂCHÉ PRÈS D'UN MUR S'Y PLAQUE.
+ *
+ * Personne ne pose une commode à trois centimètres du mur : soit elle y est
+ * appuyée, soit elle est ailleurs. Le doigt, lui, ne vise pas au millimètre,
+ * et le plan gardait ces jours-là — invisibles à l'écran, mais bien réels
+ * quand on cote une prise derrière le meuble ou qu'on calcule un
+ * dégagement.
+ *
+ * On ne referme QUE les petits jours (cinq centimètres), et seulement contre
+ * un mur que le meuble longe déjà à peu près parallèlement : un meuble posé
+ * de biais est un choix, pas une erreur de visée. Une seule correction par
+ * axe, la plus petite : dans un angle, le meuble se cale contre les deux
+ * murs sans jamais partir en diagonale.
+ */
+export function hugWall(
+  centre: Pt,
+  box: { width: number; depth: number; yaw: number },
+  walls: WallSeg[],
+  inside: Pt,
+): Pt {
+  /** Le jour qu'on referme sans discuter. */
+  const JOUR = 0.05;
+  const cos = Math.cos(box.yaw);
+  const sin = Math.sin(box.yaw);
+  let p = { ...centre };
+  for (let passe = 0; passe < 2; passe++) {
+    let mieux: { n: Pt; jeu: number } | undefined;
+    for (const w of walls) {
+      const len = segLength(w);
+      if (len < 1e-6) continue;
+      const u = { x: (w.b.x - w.a.x) / len, z: (w.b.z - w.a.z) / len };
+      let n = perpOf(u);
+      const mid = { x: (w.a.x + w.b.x) / 2, z: (w.a.z + w.b.z) / 2 };
+      if ((inside.x - mid.x) * n.x + (inside.z - mid.z) * n.z < 0) {
+        n = { x: -n.x, z: -n.z };
+      }
+      // Le meuble longe-t-il ce mur ? On compare leurs directions : au-delà
+      // de douze degrés, il est de biais, et c'est voulu.
+      const versU = Math.abs(cos * u.x + sin * u.z);
+      const versV = Math.abs(-sin * u.x + cos * u.z);
+      if (Math.max(versU, versV) < Math.cos((12 * Math.PI) / 180)) continue;
+      const t = ((p.x - w.a.x) * u.x + (p.z - w.a.z) * u.z) / len;
+      if (t < 0 || t > 1) continue;
+      const demi =
+        Math.abs((cos * n.x + sin * n.z) * (box.width / 2)) +
+        Math.abs((-sin * n.x + cos * n.z) * (box.depth / 2));
+      const jeu =
+        (p.x - w.a.x) * n.x + (p.z - w.a.z) * n.z - demi - WALL_T / 2;
+      if (jeu <= 1e-4 || jeu > JOUR) continue;
+      if (!mieux || jeu < mieux.jeu) mieux = { n, jeu };
+    }
+    if (!mieux) break;
+    p = { x: p.x - mieux.n.x * mieux.jeu, z: p.z - mieux.n.z * mieux.jeu };
+  }
+  return p;
+}
+
 /** Point du contour le plus proche : la sortie de secours d'un point égaré. */
 function nearestOnRing(p: Pt, ring: Pt[]): Pt {
   let best = ring[0];

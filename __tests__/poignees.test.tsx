@@ -44,7 +44,7 @@ describe('la poignée de déplacement', () => {
       center={{ x: x * 100, y: z * 100 }}
       half={{ x: 70, y: 95 }}
       mapping={mapping}
-      raw={{ transform: tf(x, z) }}
+      raw={{ transform: tf(x, z), width: 1.4 }}
     />
   );
 

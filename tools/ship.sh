@@ -58,9 +58,18 @@ echo "── Build"
 # livraison réussie, sans IPA, et il fallait s'en apercevoir tout seul.
 # On relit donc la CONCLUSION du run, et on montre ce qui a brûlé.
 "$GH" run watch "$RUN" --exit-status > /dev/null || true
-ETAT=$("$GH" run view "$RUN" --json conclusion -q .conclusion)
+# L'API GitHub tousse (« HTTP 502 » en pleine surveillance) : `run watch`
+# rend alors la main et la conclusion revient VIDE. Une panne de réseau
+# n'est pas un échec de compilation — on redemande, et on n'accuse le build
+# que s'il a vraiment conclu autre chose que « success ».
+ETAT=""
+for essai in 1 2 3 4 5 6; do
+  ETAT=$("$GH" run view "$RUN" --json status,conclusion     -q 'select(.status=="completed") | .conclusion' 2>/dev/null || true)
+  [ -n "$ETAT" ] && break
+  sleep 20
+done
 if [ "$ETAT" != "success" ]; then
-  echo "ÉCHEC DU BUILD ($ETAT) — run $RUN"
+  echo "ÉCHEC DU BUILD (${ETAT:-inconnu}) — run $RUN"
   "$GH" run view "$RUN" --log-failed 2>/dev/null | tail -60 || true
   exit 1
 fi

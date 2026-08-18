@@ -65,6 +65,17 @@ export interface ObjectData {
   color?: string;
   /** Pièce d'appartenance, estampillée côté JS après le scan. */
   roomId?: string;
+  /**
+   * TAILLE DE RÉFÉRENCE, quand le meuble s'est ajusté à un recoin.
+   *
+   * Un meuble posé dans une niche plus étroite que lui s'y adapte au lieu
+   * d'être éjecté (voir `fitInNook`). Il faut donc se souvenir de ce qu'il
+   * mesurait AVANT, sinon il resterait rabougri une fois ressorti. Ces deux
+   * cotes sont la vérité du relevé ; `width` et `depth` sont ce qu'on
+   * dessine ici et maintenant.
+   */
+  baseWidth?: number;
+  baseDepth?: number;
 }
 
 /** Relevé colorimétrique du sol de la pièce. */

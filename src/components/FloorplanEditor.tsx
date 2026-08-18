@@ -1916,7 +1916,7 @@ export function ObjectDragHandle({
   /** Demi-largeur et demi-hauteur de l'emprise à l'écran. */
   half: { x: number; y: number };
   mapping: EffMapping;
-  raw: { transform: number[] };
+  raw: { transform: number[]; width: number };
 }) {
   const styles = getStyles(useTheme());
   const startRef = useRef({ x: raw.transform[12], z: raw.transform[14] });
@@ -1970,6 +1970,11 @@ export function ObjectDragHandle({
           );
           if (ecart > 0.01) haptic('butee', true);
           else releaseHaptic('butee');
+          // Le meuble vient de se rabattre dans une niche (ou d'en
+          // ressortir) : c'est une aide, elle doit s'annoncer.
+          if (Math.abs(apres.width - live.current.raw.width) > 0.005) {
+            haptic('accroche');
+          }
         },
         onPanResponderRelease: () => releaseHaptic('butee'),
         onPanResponderTerminate: () => releaseHaptic('butee'),
