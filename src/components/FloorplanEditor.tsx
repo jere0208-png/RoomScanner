@@ -649,18 +649,6 @@ export function FloorplanEditor({
     () => new Map(walls.map((w) => [w.id, w])),
     [walls],
   );
-  // Quel mur borde quelle pièce : un refend en borde deux.
-  const roomsOfWall = useMemo(() => {
-    const m = new Map<string, string[]>();
-    for (const r of rooms) {
-      for (const id of r.wallIds ?? []) {
-        const list = m.get(id) ?? [];
-        list.push(r.id);
-        m.set(id, list);
-      }
-    }
-    return m;
-  }, [rooms]);
   // Pièces du plan : chacune a son contour, son centre et sa teinte de sol.
   const parts = useMemo(() => roomParts(walls, rooms), [walls, rooms]);
 
@@ -960,10 +948,6 @@ export function FloorplanEditor({
                 mapping={mapping}
                 showMeasure={showMeasures && !navigating}
                 measureOpacity={1 - detail}
-                alert={
-                  !!alertRooms?.size &&
-                  (roomsOfWall.get(w.id) ?? []).some((id) => alertRooms.has(id))
-                }
                 selected={editable && w.id === selectedWallId}
                 onPress={
                   editable
@@ -1275,6 +1259,36 @@ export function FloorplanEditor({
                   : c.sky
                 : c.inkFaint;
               const choisie = o.id === selectedOpeningId;
+              /*
+                OÙ S'OUVRE LE VANTAIL : vers la pièce, jamais vers le mur.
+
+                Le pivot se met du côté du dormant le plus proche d'un angle
+                — c'est ainsi qu'on pose une porte, pour que le battant se
+                range contre le mur. Faute de mieux, le premier bout fait
+                l'affaire : ce qui compte, c'est le SENS d'ouverture.
+              */
+              const battant = (() => {
+                if (o.type !== 'door') return null;
+                const ancre = partOf.get(roomOf(o))?.labelAt;
+                if (!ancre) return null;
+                const dedans = mapping.toPx(ancre);
+                const mx = (a.x + b.x) / 2;
+                const my = (a.y + b.y) / 2;
+                const ex = b.x - a.x;
+                const ey = b.y - a.y;
+                const r = Math.hypot(ex, ey);
+                if (r < 6) return null;
+                // La normale écran tournée vers l'intérieur de la pièce.
+                let n = { x: -ey / r, y: ex / r };
+                if ((dedans.x - mx) * n.x + (dedans.y - my) * n.y < 0) {
+                  n = { x: -n.x, y: -n.y };
+                }
+                const pivot = a;
+                const bout = { x: pivot.x + n.x * r, y: pivot.y + n.y * r };
+                // Sens de l'arc : celui qui ramène le battant sur le dormant.
+                const croix = n.x * ey - n.y * ex;
+                return { pivot, bout, autre: b, r, sens: croix > 0 ? 1 : 0 };
+              })();
               return (
                 <G
                   key={o.id}
@@ -1306,6 +1320,26 @@ export function FloorplanEditor({
                     strokeWidth={choisie ? 5 : 3}
                     strokeLinecap="butt"
                   />
+                  {/*
+                    LE VANTAIL ET SON ARC.
+
+                    Une porte, sur un plan, ce n'est pas un trait dans un
+                    mur : c'est un battant et le quart de cercle qu'il
+                    balaie. C'est ce qui dit de quel côté elle s'ouvre — donc
+                    où l'on peut poser un interrupteur, et où rien ne doit
+                    traîner. Tous les plans du métier le dessinent ; le nôtre
+                    ne le faisait pas.
+                  */}
+                  {o.type === 'door' && battant && (
+                    <Path
+                      d={`M ${battant.pivot.x} ${battant.pivot.y} L ${battant.bout.x} ${battant.bout.y} A ${battant.r} ${battant.r} 0 0 ${battant.sens} ${battant.autre.x} ${battant.autre.y}`}
+                      fill="none"
+                      stroke={choisie ? c.blue : color}
+                      strokeWidth={1.2}
+                      strokeLinecap="round"
+                      opacity={0.9}
+                    />
+                  )}
                 </G>
               );
             })}
@@ -1376,12 +1410,20 @@ export function FloorplanEditor({
                 pose un point lumineux. */}
             {(selectedCeilingId ? [] : parts).map((part) => {
               const roomName = roomById.get(part.roomId)?.name ?? '';
-              const areaText =
-                showSurfaces && part.surface
-                  ? `${part.surface.exact ? '' : '≈ '}${part.surface.area
-                      .toFixed(1)
-                      .replace('.', ',')} m²`
-                  : null;
+              /*
+                LA SURFACE SOUS LE NOM, TOUJOURS.
+
+                Elle dépendait du calque « Surfaces », qui allume aussi le
+                semis coloré des sols. On voulait donc la surface, et l'on
+                obtenait un plan barbouillé ; ou un plan propre, et pas de
+                surface. Or « Salon · 15,6 m² », c'est la première chose que
+                lit un client, et tous les plans du métier l'écrivent là.
+              */
+              const areaText = part.surface
+                ? `${part.surface.exact ? '' : '≈ '}${part.surface.area
+                    .toFixed(1)
+                    .replace('.', ',')} m²`
+                : null;
               // En édition, la pièce a toujours son cartouche : c'est par lui
               // qu'on la nomme, même quand elle n'a encore ni nom ni surface.
               if (roomName === '' && !areaText && !editable) return null;
@@ -1410,8 +1452,17 @@ export function FloorplanEditor({
                 fill: string;
                 bold: boolean;
               }[] = [];
+              // Un constat de conformité sur cette pièce : un point ambre
+              // devant son nom. Discret, mais là où l'on regarde.
+              const enAlerte = !!alertRooms?.has(part.roomId);
               if (roomName !== '') {
-                lignes.push({ t: roomName, size: 11, fill: selectedRoomId === part.roomId && editable ? c.blue : c.ink, bold: true });
+                lignes.push({
+                  t: roomName,
+                  size: 11,
+                  fill:
+                    selectedRoomId === part.roomId && editable ? c.blue : c.ink,
+                  bold: true,
+                });
               }
               if (areaText) {
                 lignes.push({
@@ -1493,6 +1544,17 @@ export function FloorplanEditor({
                     stroke={selected ? c.blue : c.lineStrong}
                     strokeWidth={selected ? 2 : 1}
                   />
+                  {/* Le constat de conformité : un point ambre au coin du
+                      cartouche. Il remplaçait la couleur des quatre murs de
+                      la pièce — un plan barbouillé pour une prise manquante. */}
+                  {enAlerte && (
+                    <Circle
+                      cx={p.x - wpx / 2 + 7}
+                      cy={p.y - hpx / 2 + 7}
+                      r={3.2}
+                      fill={c.amber}
+                    />
+                  )}
                   {lignes.map((l, li) => (
                     <SvgText
                       key={li}
@@ -1765,7 +1827,6 @@ function WallBody({
   showMeasure,
   measureOpacity = 1,
   selected,
-  alert,
   onPress,
 }: {
   wall: WallSeg;
@@ -1776,7 +1837,6 @@ function WallBody({
   measureOpacity?: number;
   selected: boolean;
   /** Le mur borde une pièce en défaut de conformité électrique. */
-  alert?: boolean;
   onPress?: () => void;
 }) {
   const c = useTheme();
@@ -1807,10 +1867,21 @@ function WallBody({
     y: (a.y + b.y) / 2 + n.y * (bodyPx / 2 + 9),
   };
   const label = `${segLength(wall).toFixed(2).replace('.', ',')} m`;
-  // Rouge foncé : assez sombre pour rester un mur poché, assez rouge pour
-  // qu'on ne le confonde pas avec les autres. La sélection reste bleue —
-  // c'est un état, pas un défaut.
-  const teinte = selected ? c.blue : alert ? '#8E1B1B' : c.ink;
+  /*
+    LA COUPE DU MUR EST NOIRE. TOUJOURS.
+
+    Elle virait au rouge foncé dès qu'un constat de conformité touchait la
+    pièce — et comme un salon en porte presque toujours un, TOUS les murs
+    sortaient bordeaux. Le relevé du chantier, en comparant à un plan
+    concurrent : « l'épaisseur vue du dessus est noire ». C'est la convention
+    du dessin d'architecte, et c'est ce qui rend un plan lisible d'un coup
+    d'œil : le poché dit la maçonnerie, rien d'autre.
+
+    L'alerte n'est pas perdue pour autant : elle se dit sur le CARTOUCHE de
+    la pièce, d'un point ambre à côté du nom. Un défaut se signale là où
+    on lit la pièce, pas en repeignant ses quatre murs.
+  */
+  const teinte = selected ? c.blue : c.ink;
 
   return (
     <G onPress={onPress}>

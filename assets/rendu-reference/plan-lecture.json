@@ -1798,6 +1798,27 @@
           "y2": 356.857
          },
          "children": null
+        },
+        {
+         "type": "RNSVGPath",
+         "props": {
+          "fill": null,
+          "stroke": {
+           "type": 0,
+           "payload": 4293435707
+          },
+          "strokeWidth": 1.2,
+          "strokeLinecap": 1,
+          "propList": [
+           "fill",
+           "stroke",
+           "strokeWidth",
+           "strokeLinecap"
+          ],
+          "opacity": 0.9,
+          "d": "M 40 251.42857142857142 L 145.42857142857142 251.42857142857142 A 105.42857142857142 105.42857142857142 0 0 1 40 356.85714285714283"
+         },
+         "children": null
         }
        ]
       },
@@ -1871,6 +1892,27 @@
           "y1": 251.429,
           "x2": 508.571,
           "y2": 356.857
+         },
+         "children": null
+        },
+        {
+         "type": "RNSVGPath",
+         "props": {
+          "fill": null,
+          "stroke": {
+           "type": 0,
+           "payload": 4293435707
+          },
+          "strokeWidth": 1.2,
+          "strokeLinecap": 1,
+          "propList": [
+           "fill",
+           "stroke",
+           "strokeWidth",
+           "strokeLinecap"
+          ],
+          "opacity": 0.9,
+          "d": "M 508.57142857142856 251.42857142857142 L 403.1428571428571 251.42857142857142 A 105.42857142857142 105.42857142857142 0 0 0 508.57142857142856 356.85714285714283"
          },
          "children": null
         }

@@ -172,3 +172,54 @@ describe('planche de rendu du plan 2D', () => {
   }
 });
 
+
+/**
+ * LE PLAN PREND L'ALLURE D'UN PLAN.
+ *
+ * Relevé du chantier, capture d'un concurrent à l'appui : « son plan 2D me
+ * plaît, il est très compréhensible ». Trois choses l'en séparaient, et
+ * aucune n'est une question de moteur — ce sont des conventions de dessin.
+ */
+describe('les conventions du dessin de plan', () => {
+  /** Tous les nœuds SVG d'un type donné, avec leurs props. */
+  const tous = (tree: TestRenderer.ReactTestRenderer, type: string) =>
+    tree.root.findAll((n) => (n.type as { displayName?: string })?.displayName === type ||
+      String((n.type as { name?: string })?.name) === type);
+
+  it('poche la coupe des murs en noir, jamais en rouge', () => {
+    const tree = rendu(false);
+    const murs = tous(tree, 'Polygon').filter(
+      (n) => typeof n.props.fill === 'string' && n.props.stroke === 'none',
+    );
+    expect(murs.length).toBeGreaterThan(0);
+    // Un constat de conformité ne repeint plus la maçonnerie : le bordeaux
+    // d'alerte a quitté le plan, il se dit sur le cartouche de la pièce.
+    for (const m of murs) expect(m.props.fill).not.toBe('#8E1B1B');
+  });
+
+  it('écrit la surface sous le nom, sans qu’on allume un calque', () => {
+    // Le calque des surfaces éteint : le nom garde sa surface.
+    useScanStore.setState({ showSurfaces: false });
+    const tree = rendu(false);
+    const textes = tree.root
+      .findAll((n) => (n.type as { displayName?: string })?.displayName === 'Text')
+      .map((n) => String(n.props.children));
+    expect(textes.some((t) => t.includes('m²'))).toBe(true);
+  });
+
+  it('dessine le vantail des portes et son quart de cercle', () => {
+    const tree = rendu(false);
+    const arcs = tous(tree, 'Path')
+      .map((n) => String(n.props.d ?? ''))
+      .filter((d) => d.includes('A '));
+    // Une porte au moins, et son arc décrit un rayon égal à sa largeur —
+    // c'est ce qui fait un débattement juste, et non un compas au hasard.
+    expect(arcs.length).toBeGreaterThan(0);
+    for (const d of arcs) {
+      const m = d.match(/A (\d+(?:\.\d+)?) (\d+(?:\.\d+)?)/);
+      expect(m).toBeTruthy();
+      expect(Number(m![1])).toBeCloseTo(Number(m![2]), 6);
+      expect(Number(m![1])).toBeGreaterThan(5);
+    }
+  });
+});

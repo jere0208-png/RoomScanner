@@ -1657,6 +1657,27 @@
           "y2": 273.073
          },
          "children": null
+        },
+        {
+         "type": "RNSVGPath",
+         "props": {
+          "fill": null,
+          "stroke": {
+           "type": 0,
+           "payload": 4293435707
+          },
+          "strokeWidth": 1.2,
+          "strokeLinecap": 1,
+          "propList": [
+           "fill",
+           "stroke",
+           "strokeWidth",
+           "strokeLinecap"
+          ],
+          "opacity": 0.9,
+          "d": "M 85.64124602337745 176.4465243901656 L 182.26757714744033 196.98508510068544 A 98.78502084099975 98.78502084099975 0 0 1 65.1026853128576 273.0728555142285"
+         },
+         "children": null
         }
        ]
       },
@@ -1730,6 +1751,27 @@
           "y1": 267.729,
           "x2": 494.553,
           "y2": 364.355
+         },
+         "children": null
+        },
+        {
+         "type": "RNSVGPath",
+         "props": {
+          "fill": null,
+          "stroke": {
+           "type": 0,
+           "payload": 4293435707
+          },
+          "strokeWidth": 1.2,
+          "strokeLinecap": 1,
+          "propList": [
+           "fill",
+           "stroke",
+           "strokeWidth",
+           "strokeLinecap"
+          ],
+          "opacity": 0.9,
+          "d": "M 515.0916065747682 267.72901643692046 L 418.46527545070524 247.19045572640061 A 98.78502084099983 98.78502084099983 0 0 0 494.55304586424836 364.35534756098343"
          },
          "children": null
         }
