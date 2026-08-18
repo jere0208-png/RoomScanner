@@ -685,7 +685,9 @@ export function Iso3DView({
     // porte et son dossier repeint son assise — les « bandes » du chantier.
     // Pendant un geste, le classement s'allège : les arêtes suivent leur pan
     // au lieu d'être classées une à une (voir `ajusterBlocs`).
-    ajusterBlocs(polys, interacting);
+    // La visite animée (mode « light ») joue trente images par seconde sans
+    // interruption : elle garde le classement allégé, comme pendant un geste.
+    ajusterBlocs(polys, interacting || !!light);
 
     // Cotes insérées DANS le tri de profondeur : un mur proche recouvre
     // les cotes des éléments situés derrière lui (fini les fuites).
@@ -1044,6 +1046,7 @@ export function Iso3DView({
     solidWalls,
     walls,
     interacting,
+    light,
     pov,
   ]);
 

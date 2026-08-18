@@ -370,6 +370,26 @@ export function ordreLocal<T extends FacePeinte>(
     const paires: [number, number, { sx: number; sy: number }][] = [];
     for (const pt of points(a, A)) paires.push([a, b, pt]);
     for (const pt of points(b, B)) paires.push([b, a, pt]);
+    /*
+      ET SI LES MILIEUX SE MANQUENT, ON REGARDE LES COINS.
+
+      Deux pans de mur qui se croisent en biais ne se touchent souvent que par
+      un angle : leurs milieux tombent chacun à côté de l'autre, aucune flèche
+      n'était posée, et l'ordre restait celui de la construction. On essaie
+      donc les sommets, ramenés d'un dixième vers le centre pour rester
+      franchement à l'intérieur — et seulement en second recours, car c'est
+      quatre fois plus de travail.
+    */
+    const coins = (i: number, C: { cx: number; cy: number }) => {
+      const p = items[i].proj;
+      if (p.length < 3) return [];
+      return p.slice(0, 4).map((q) => ({
+        sx: q.sx + (C.cx - q.sx) * 0.1,
+        sy: q.sy + (C.cy - q.sy) * 0.1,
+      }));
+    };
+    for (const pt of coins(a, A)) paires.push([a, b, pt]);
+    for (const pt of coins(b, B)) paires.push([b, a, pt]);
     for (const [u, v, pt] of paires) {
       // Un trait ne contient rien : on ne teste que « le milieu de l'un
       // tombe-t-il DANS l'autre », et un trait n'est jamais le contenant.
@@ -610,9 +630,21 @@ export function ajusterBlocs<
       devant, lui, garde sa couche : c'est lui qui s'efface en écorché, et
       son sort ne se joue pas à la géométrie mais au réglage.
     */
-    const calque = Math.floor(it.depth / COUCHE);
-    const rang = Math.floor(calque / 100);
-    const etage = calque - rang * 100;
+    /*
+      LE CALQUE SE LIT À L'ARRONDI, JAMAIS AU PLANCHER.
+
+      La profondeur vaut rang de pièce, couche, puis la distance à l'œil — et
+      cette distance est SIGNÉE. Un mur du fond à cinquante centimètres
+      derrière le centre de la scène donnait donc une profondeur négative, que
+      le plancher rangeait dans un calque « moins un » : il se retrouvait
+      seul dans son groupe, sans personne à qui se comparer, et rien
+      n'empêchait plus ses voisins de lui passer dessus.
+
+      L'audit l'a trouvé en balayant les inclinaisons rasantes, là où les
+      profondeurs changent de signe : trois cents recouvrements sur les
+      quinze cents caméras du banc. L'arrondi, lui, tombe juste des deux
+      côtés de zéro — la distance ne pèse que deux millèmes de calque.
+    */
     /*
       LE CALQUE SUFFIT À DÉSIGNER LE GROUPE — pas l'étiquette de pièce.
 
@@ -631,7 +663,22 @@ export function ajusterBlocs<
       ? it.owner
         ? `bloc:${it.room ?? it.owner}`
         : ''
-      : `${rang}:${etage >= 2 ? 'dehors' : 'dedans'}`;
+      : /*
+          AU REPOS, TOUT LE LOGEMENT DANS UN SEUL GROUPE.
+
+          Les couches et les rangs de pièces sont des règles commodes — le mur
+          du fond, le contenu, le mur de devant ; la pièce lointaine avant la
+          proche. Elles tiennent de face et lâchent ailleurs : à la verticale,
+          le canapé posé contre un mur passe au-dessus de lui ; entre deux
+          pièces qui s'imbriquent, le rang se trompe de sens. L'audit l'a
+          montré sur trois cents caméras.
+
+          Au repos, on ne s'appuie donc sur aucune règle : toutes les faces
+          d'un logement se départagent à l'écran, là où elles se recouvrent.
+          Les règles restent la pensée de secours du mode rapide, pendant les
+          gestes — elles sont bonnes neuf fois sur dix, et gratuites.
+        */
+        'logement';
     if (!cle) continue;
     const l = parBloc.get(cle);
     if (l) l.push(it);

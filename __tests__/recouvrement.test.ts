@@ -499,7 +499,7 @@ describe('les arêtes du bâti', () => {
         }))
         // Le calque se relève AVANT le classement : celui-ci réécrit les
         // profondeurs, et l'on ne pourrait plus le lire ensuite.
-        .map((v) => ({ ...v, calque: Math.floor(v.depth / 1e4) }));
+        .map((v) => ({ ...v, calque: Math.round(v.depth / 1e4) }));
       ajusterBlocs(vues);
       const peintes = [...vues].sort((a, b) => a.depth - b.depth);
       const rang = new Map(peintes.map((p, i) => [p.f, i] as [Face3D, number]));
