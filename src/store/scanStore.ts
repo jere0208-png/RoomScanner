@@ -2307,10 +2307,21 @@ export const useScanStore = create<ScanState>((set, get) => {
           width: o.width,
           depth: o.depth,
           yaw: Math.atan2(o.transform[2], o.transform[0]),
+          // Son étage : du dessous au dessus. C'est lui qui autorise une télé
+          // à surmonter un meuble bas, et qui interdit à une table de traverser
+          // un canapé.
+          y0: o.transform[13] - o.height / 2,
+          y1: o.transform[13] + o.height / 2,
         }));
       const libre = pushOutOfObjects(
         pose,
-        { width: ajuste.width, depth: ajuste.depth, yaw },
+        {
+          width: ajuste.width,
+          depth: ajuste.depth,
+          yaw,
+          y0: obj.transform[13] - obj.height / 2,
+          y1: obj.transform[13] + obj.height / 2,
+        },
         voisins,
       );
       set({

@@ -581,13 +581,23 @@ export function fitInNook(
   };
 }
 
-/** Une emprise au sol : centre, cotes, orientation. */
+/** Une emprise au sol : centre, cotes, orientation — et son étage. */
 export interface Emprise {
   cx: number;
   cz: number;
   width: number;
   depth: number;
   yaw: number;
+  /**
+   * L'ÉTAGE QU'IL OCCUPE : du sol à son dessus.
+   *
+   * Deux meubles peuvent partager la même place au sol — une télé sur un
+   * meuble bas, une lampe sur une commode. Ils ne peuvent pas partager le
+   * même VOLUME : une table qui traverse un canapé n'existe pas. C'est
+   * l'altitude qui fait la différence, et c'est elle qu'on regarde.
+   */
+  y0?: number;
+  y1?: number;
 }
 
 /** Une emprise au sol : centre, cotes, orientation. */
@@ -617,9 +627,18 @@ export interface Emprise {
  */
 export function pushOutOfObjects(
   centre: Pt,
-  box: { width: number; depth: number; yaw: number },
+  box: { width: number; depth: number; yaw: number; y0?: number; y1?: number },
   autres: Emprise[],
 ): Pt {
+  /** Deux meubles se gêlent-ils vraiment, c'est-à-dire au même étage ? */
+  const memeEtage = (o: Emprise) => {
+    if (box.y0 === undefined || o.y0 === undefined) return true;
+    const bas = Math.max(box.y0, o.y0);
+    const haut = Math.min(box.y1 ?? box.y0, o.y1 ?? o.y0);
+    // Cinq centimètres de recouvrement : en deçà, l'un est POSÉ sur l'autre,
+    // et c'est une pose parfaitement légitime.
+    return haut - bas > 0.05;
+  };
   /** Jour refermé sans discuter, comme contre un mur. */
   const AIMANT = 0.04;
   let p = { ...centre };
@@ -627,6 +646,7 @@ export function pushOutOfObjects(
     Math.abs(Math.cos(e.yaw) * n.x + Math.sin(e.yaw) * n.z) * (e.width / 2) +
     Math.abs(-Math.sin(e.yaw) * n.x + Math.cos(e.yaw) * n.z) * (e.depth / 2);
   for (const o of autres) {
+    const gene = memeEtage(o);
     const axes: Pt[] = [];
     for (const n of [
       { x: Math.cos(box.yaw), z: Math.sin(box.yaw) },
@@ -646,10 +666,29 @@ export function pushOutOfObjects(
     });
     const separateurs = jeux.filter((a) => a.jeu > 0);
     /*
+      AUCUN AXE QUI SÉPARE : ils se chevauchent.
+
+      Permis s'ils sont à des étages différents — une télé sur un meuble bas.
+      Interdit au même étage : le chantier l'a filmé, « il doit être impossible
+      qu'une table rentre en collision avec un canapé ». On ressort alors par
+      le côté le plus court — le geste naturel, celui qui dérange le moins la
+      position visée.
+    */
+    if (separateurs.length === 0) {
+      if (!gene) continue;
+      let sortie = jeux[0];
+      for (const a of jeux) if (a.jeu > sortie.jeu) sortie = a;
+      const sens = sortie.d >= 0 ? 1 : -1;
+      p = {
+        x: p.x + sortie.n.x * sens * -sortie.jeu,
+        z: p.z + sortie.n.z * sens * -sortie.jeu,
+      };
+      continue;
+    }
+    /*
       UN SEUL AXE QUI SÉPARE : ils sont CÔTE À CÔTE, et le jeu qui reste est un
-      vrai jour — celui qu'on referme. Aucun axe : ils se chevauchent, et
-      c'est permis. Deux ou plus : ils se manquent par un coin, en diagonale ;
-      les aimanter les ferait sauter de travers.
+      vrai jour — celui qu'on referme. Deux ou plus : ils se manquent par un
+      coin, en diagonale ; les aimanter les ferait sauter de travers.
     */
     if (separateurs.length !== 1) continue;
     const a = separateurs[0];
@@ -688,39 +727,44 @@ export function alignToFit(
   depuis?: Pt,
 ): number {
   /**
-   * Le meuble TIENT-IL ici, à cet angle ?
+   * Le meuble TIENT-IL là, à cet angle et à cette taille ?
    *
-   * Non pas « le mur l'arrête-t-il » — un meuble poussé contre une cloison
-   * est arrêté, et c'est très bien ainsi : personne ne veut qu'on lui
-   * redresse un lit parce qu'il l'a glissé jusqu'au mur. La question est de
-   * savoir si, une fois la poussée faite, il reste des murs QUI LE
-   * CHEVAUCHENT : deux cloisons qui se font face à moins que son emprise se
-   * le renvoient sans fin, et c'est là seulement qu'il ne passe pas.
+   * Non pas « le mur l'arrête-t-il » — un meuble poussé contre une cloison est
+   * arrêté, et c'est très bien ainsi : personne ne veut qu'on lui redresse un
+   * lit parce qu'il l'a glissé jusqu'au mur. La question est de savoir si,
+   * une fois la poussée faite, il reste des murs QUI LE CHEVAUCHENT : deux
+   * cloisons qui se font face à moins que son emprise se le renvoient sans
+   * fin, et c'est là seulement qu'il ne passe pas.
    */
-  const tient = (yaw: number) => {
+  const tient = (
+    yaw: number,
+    w = box.width,
+    d = box.depth,
+    depart: Pt = centre,
+  ) => {
     const cos = Math.cos(yaw);
     const sin = Math.sin(yaw);
     const p = pushOutOfWalls(
-      centre,
-      { ...box, yaw },
+      depart,
+      { width: w, depth: d, yaw },
       walls,
       inside,
       outline,
       depuis,
     );
-    for (const w of walls) {
-      const len = segLength(w);
+    for (const wall of walls) {
+      const len = segLength(wall);
       if (len < 1e-6) continue;
-      const u = { x: (w.b.x - w.a.x) / len, z: (w.b.z - w.a.z) / len };
-      const t = ((p.x - w.a.x) * u.x + (p.z - w.a.z) * u.z) / len;
+      const u = { x: (wall.b.x - wall.a.x) / len, z: (wall.b.z - wall.a.z) / len };
+      const t = ((p.x - wall.a.x) * u.x + (p.z - wall.a.z) * u.z) / len;
       if (t < -0.15 || t > 1.15) continue;
       const n = perpOf(u);
       const demi =
-        Math.abs((cos * n.x + sin * n.z) * (box.width / 2)) +
-        Math.abs((-sin * n.x + cos * n.z) * (box.depth / 2));
-      const d = Math.abs((p.x - w.a.x) * n.x + (p.z - w.a.z) * n.z);
+        Math.abs((cos * n.x + sin * n.z) * (w / 2)) +
+        Math.abs((-sin * n.x + cos * n.z) * (d / 2));
+      const dist = Math.abs((p.x - wall.a.x) * n.x + (p.z - wall.a.z) * n.z);
       // Un centimètre de tolérance : c'est le jeu que laisse la poussée.
-      if (d < demi + WALL_T / 2 - 0.01) return false;
+      if (dist < demi + WALL_T / 2 - 0.01) return false;
     }
     return true;
   };
@@ -742,7 +786,39 @@ export function alignToFit(
     if (Math.abs(yaw - box.yaw) < 0.02) continue;
     if (tient(yaw)) return yaw;
   }
-  return box.yaw;
+  /*
+    ET SI RIEN NE TIENT À SA TAILLE, ON REDRESSE ET ON RABOTE ENSEMBLE.
+
+    Relevé du chantier, capture à l'appui : « j'ai essayé de rentrer le meuble
+    dans un coin, il se met en biais et ne s'adapte pas à la forme de ce coin ».
+    C'était logique et c'était bête : on n'essayait les quarts de tour qu'à la
+    COTE D'ORIGINE. Dans une niche plus petite que le meuble, aucun angle ne
+    passe — alors on renonçait, et le meuble restait de travers dans un coin où
+    il ne rentrait pas.
+
+    Les deux gestes vont ensemble : d'équerre avec les murs, PUIS raboté à ce
+    que la niche permet. On retient donc l'angle qui, une fois le meuble
+    raboté, LE FAIT ENTRER — et parmi ceux-là, celui qui lui laisse la plus
+    grande surface. Un meuble resté de biais garde sa taille, mais il ne
+    rentre nulle part : ce n'est pas ce qu'on cherche.
+  */
+  let mieux = box.yaw;
+  let meilleure = -1;
+  let entre = false;
+  for (const yaw of [box.yaw, ...candidats]) {
+    const a = fitInNook(centre, { ...box, yaw }, walls, outline);
+    const ok = tient(yaw, a.width, a.depth, a.centre);
+    const aire = a.width * a.depth;
+    if (ok && (!entre || aire > meilleure + 1e-4)) {
+      entre = true;
+      meilleure = aire;
+      mieux = yaw;
+    } else if (!entre && aire > meilleure) {
+      meilleure = aire;
+      mieux = yaw;
+    }
+  }
+  return mieux;
 }
 
 /**

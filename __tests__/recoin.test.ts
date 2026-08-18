@@ -358,17 +358,33 @@ describe('deux meubles qui se rencontrent', () => {
     yaw: 0,
   };
 
-  it('se chevauchent si on le demande — un meuble peut en surmonter un autre', () => {
-    // Une télé posée sur un meuble bas : l'emprise au sol se chevauche, et
-    // c'est parfaitement légitime. Le relevé du chantier est explicite —
-    // « n'empêche pas la superposition, un meuble peut être au-dessus ».
+  it('se superposent quand l’un SURMONTE l’autre', () => {
+    // Une télé posée sur un meuble bas : les emprises au sol se chevauchent,
+    // et c'est parfaitement légitime — elles ne partagent pas le même volume.
     const p = pushOutOfObjects(
       { x: 2.6, z: 2.1 },
-      { width: 1, depth: 0.8, yaw: 0 },
-      [COMMODE],
+      { width: 1, depth: 0.8, yaw: 0, y0: 0.9, y1: 1.5 },
+      [{ ...COMMODE, y0: 0, y1: 0.85 }],
     );
     expect(p.x).toBeCloseTo(2.6, 6);
     expect(p.z).toBeCloseTo(2.1, 6);
+  });
+
+  it('se repoussent quand ils occupent le MÊME volume', () => {
+    // Relevé du chantier, vidéo à l'appui : « il doit être impossible qu'une
+    // table rentre en collision avec un canapé ». Ici les deux touchent le
+    // sol : ils se gênent vraiment.
+    const p = pushOutOfObjects(
+      { x: 2.6, z: 2.1 },
+      { width: 1, depth: 0.8, yaw: 0, y0: 0, y1: 0.75 },
+      [{ ...COMMODE, y0: 0, y1: 0.85 }],
+    );
+    const ecart = Math.abs(p.z - 2);
+    // Ils ne se traversent plus : la distance des centres dépasse la somme
+    // des demi-profondeurs.
+    expect(ecart).toBeGreaterThan(0.4 + 0.25 - 0.001);
+    // Et ils sont ressortis par le côté le plus court : la profondeur.
+    expect(p.x).toBeCloseTo(2.6, 3);
   });
 
   it('referme un jour de trois centimètres', () => {
@@ -389,5 +405,77 @@ describe('deux meubles qui se rencontrent', () => {
       [COMMODE],
     );
     expect(p.z).toBeCloseTo(3.6, 6);
+  });
+});
+
+/**
+ * DANS UN COIN, LE MEUBLE SE MET D'ÉQUERRE ET SE RABOTE.
+ *
+ * Relevé du chantier, capture à l'appui : « j'ai essayé de rentrer le meuble
+ * dans un coin, il se met en biais et ne s'adapte pas à la forme de ce coin ».
+ * Les deux gestes vont ensemble : d'équerre avec les murs, puis raboté à ce
+ * que la niche permet. Séparés, ils ne servent à rien — c'est ce qui se
+ * passait, puisqu'on n'essayait les quarts de tour qu'à la cote d'origine.
+ */
+describe('le meuble poussé dans un coin', () => {
+  /** Un coin étroit : 1,05 m d'axe à axe, ouvert vers le séjour. */
+  const COIN = [
+    mur('fond', 0, 0, 1.05, 0),
+    mur('gauche', 0, 0, 0, 1.5),
+    mur('retour', 1.05, 0, 1.05, 1.1),
+    mur('sud', 0, 1.5, 4, 1.5),
+    mur('est', 4, 1.5, 4, -2),
+    mur('nord', 4, -2, 1.05, -2),
+    mur('haut', 1.05, -2, 1.05, 0),
+  ];
+  const DEDANS = { x: 2.4, z: 0.7 };
+  const CIBLE = { x: 0.5, z: 0.5 };
+
+  it('l’y met d’équerre, même quand aucun angle ne passe à sa taille', () => {
+    // Un meuble de 1,10 × 0,50, de biais : c'est le cas de la capture.
+    const yaw = alignToFit(
+      CIBLE,
+      { width: 1.1, depth: 0.5, yaw: 0.6 },
+      COIN,
+      DEDANS,
+      undefined,
+      { x: 2.4, z: 0.7 },
+    );
+    const reste = Math.abs(((yaw % (Math.PI / 2)) + Math.PI) % (Math.PI / 2));
+    expect(Math.min(reste, Math.PI / 2 - reste)).toBeLessThan(0.02);
+  });
+
+  it('et le rabote à la largeur du coin', () => {
+    useScanStore.setState({
+      walls: COIN,
+      openings: [],
+      objects: [
+        {
+          id: 'c1',
+          category: 'storage',
+          width: 1.1,
+          depth: 0.5,
+          height: 0.9,
+          transform: [
+            Math.cos(0.6), 0, Math.sin(0.6), 0,
+            0, 1, 0, 0,
+            -Math.sin(0.6), 0, Math.cos(0.6), 0,
+            2.4, 0.45, 0.7, 1,
+          ],
+        },
+      ],
+      rooms: [{ id: 'r1', name: 'Coin', floor: null }],
+      fixtures: [],
+      ceiling: [],
+    });
+    useScanStore.getState().setObjectCenter('c1', CIBLE.x, CIBLE.z);
+    const o = useScanStore.getState().objects[0];
+    // Il est DANS le coin, d'équerre, et sa plus grande cote tient dans la
+    // largeur disponible — 1,05 m d'axe à axe moins l'épaisseur d'un mur.
+    expect(o.transform[14]).toBeLessThan(1);
+    const yaw = Math.atan2(o.transform[2], o.transform[0]);
+    const reste = Math.abs(((yaw % (Math.PI / 2)) + Math.PI) % (Math.PI / 2));
+    expect(Math.min(reste, Math.PI / 2 - reste)).toBeLessThan(0.02);
+    expect(Math.max(o.width, o.depth)).toBeLessThan(1.05);
   });
 });
