@@ -296,7 +296,30 @@ export interface FacePeinte {
   proj: { sx: number; sy: number; depth: number }[];
 }
 
-export function ordreLocal<T extends FacePeinte>(items: T[]): T[] {
+export function ordreLocal<T extends FacePeinte>(
+  items: T[],
+  /**
+   * LIENS IMPOSÉS : « celle-ci d'abord », quoi qu'en dise le pixel.
+   *
+   * Une arête borde son pan : ils sont COPLANAIRES, et aucun test au pixel ne
+   * peut les départager — deux millimètres les séparent. Sans ce lien, le
+   * classement les laissait dans l'ordre où il les trouvait, et un pan passé
+   * après son arête l'effaçait : au lâcher du doigt, le modèle perdait ses
+   * traits. Le lien entre dans le graphe comme les autres, et l'arête garde
+   * en plus ses propres contraintes — elle ne doit pas non plus passer
+   * devant un pan qui la couvre.
+   */
+  liens: [number, number][] = [],
+  /**
+   * LE PAN DE CHAQUE FACE (ou −1). Une arête borde son pan : ce qui la couvre
+   * couvre aussi le pan, et ce qu'elle couvre, le pan le couvre. Sans cette
+   * propagation, le classement se contredisait — le pan avant l'arête (ils
+   * sont coplanaires), l'arête avant un pan de devant, et ce pan de devant
+   * avant le premier : une ronde impossible à dénouer, et des traits qui
+   * passaient au travers.
+   */
+  panDe: number[] = [],
+): T[] {
   if (items.length < 2) return items;
   const boites = items.map((it) => {
     let x0 = Infinity;
@@ -387,6 +410,11 @@ export function ordreLocal<T extends FacePeinte>(items: T[]): T[] {
     faces d'une pièce se pressent dans quelques cases, et le rangement coûte
     plus que les tests évités.)
   */
+  const fleche = (de: number, vers: number) => {
+    suivants[de].push(vers);
+    degre[vers] += 1;
+  };
+  for (const [de, vers] of liens) fleche(de, vers);
   const parX = Array.from({ length: n }, (_, i) => i).sort(
     (a, b) => boites[a].x0 - boites[b].x0,
   );
@@ -402,8 +430,13 @@ export function ordreLocal<T extends FacePeinte>(items: T[]): T[] {
       const r = avant(i, j);
       if (r === null) continue;
       const [de, vers] = r ? [i, j] : [j, i];
-      suivants[de].push(vers);
-      degre[vers] += 1;
+      fleche(de, vers);
+      // Ce qui vaut pour une arête vaut pour le pan qu'elle borde.
+      const pDe = panDe[de] ?? -1;
+      const pVers = panDe[vers] ?? -1;
+      if (pDe >= 0 && pDe !== vers) fleche(pDe, vers);
+      if (pVers >= 0 && pVers !== de) fleche(de, pVers);
+      if (pDe >= 0 && pVers >= 0 && pDe !== pVers) fleche(pDe, pVers);
     }
   }
 
@@ -539,7 +572,23 @@ export function ajusterBlocs<
       const pas = Math.max(1e-6, (haut - bas) / (groupe.length + 1));
       // Les arêtes entrent dans le classement avec les aplats : c'est par
       // elles qu'on croyait voir au travers des meubles.
-      ordreLocal(groupe).forEach((g, k) => {
+      // Chaque arête est LIÉE à son pan : elle passe après lui, sans perdre
+      // ses propres contraintes.
+      const ou = new Map<number, number>();
+      groupe.forEach((g, i) => {
+        if (g.pan !== undefined) ou.set(g.pan, i);
+      });
+      const liens: [number, number][] = [];
+      const panDe = groupe.map(() => -1);
+      groupe.forEach((g, i) => {
+        if (g.bord === undefined) return;
+        const j = ou.get(g.bord);
+        if (j !== undefined && j !== i) {
+          liens.push([j, i]);
+          panDe[i] = j;
+        }
+      });
+      ordreLocal(groupe, liens, panDe).forEach((g, k) => {
         g.depth = bas + k * pas;
       });
       continue;
@@ -1172,11 +1221,28 @@ export function buildScene(
           if (s) paint = s;
         }
         panCourant += 1;
+        /*
+          UN PAN D'UN SEUL TENANT PORTE SON CONTOUR.
+
+          Un mur se découpe en bandes, et l'on ne peut pas border chaque
+          bande : on verrait les coupures. Ses arêtes sont donc des faces à
+          part, triées avec le reste. Un MEUBLE, lui, est d'un seul tenant
+          depuis qu'on a supprimé ses bandes : son contour se trace avec son
+          aplat, d'un seul trait.
+
+          Ce n'est pas un détail. Les trois quarts des faces d'un meuble
+          étaient ses arêtes — quatre-vingt-huit traits pour un lit —, et
+          aucun tri ne peut départager un trait de son propre pan : ils sont
+          coplanaires. Tantôt le trait passait au travers du meuble, tantôt
+          le pan l'effaçait et le modèle perdait ses arêtes au lâcher du
+          doigt. Tracé AVEC son pan, le contour ne peut plus être ni perdu ni
+          déplacé — et le modèle s'allège des trois quarts de ses faces.
+        */
         faces.push({
           panId: panCourant,
           pts: vquad(s0, s1, bot, top),
           fill: paint,
-          stroke: null,
+          stroke: o.whole ? o.outline ?? null : null,
           shade: o.shade,
           captured: o.captured || !!o.tex,
           normal: o.normal,
@@ -1190,6 +1256,9 @@ export function buildScene(
                   z: (s0.z + s1.z) / 2,
                 },
         });
+
+        // D'un seul tenant : le contour est déjà posé sur l'aplat.
+        if (o.whole) continue;
 
         // Contour du POURTOUR, tuile par tuile.
         //
@@ -1252,10 +1321,12 @@ export function buildScene(
         panId: panCourant,
         pts: [c1, c2, c3, c4].map(at),
         fill,
-        stroke: null,
+        // Même raison qu'au-dessus : d'un seul tenant, le dessus d'un meuble
+        // porte son propre contour.
+        stroke: whole ? outline ?? null : null,
         normal,
       });
-      if (!outline) continue;
+      if (!outline || whole) continue;
       if (n === 1) {
         pushOutline([c1, c2, c3, c4].map(at), outline, normal);
         continue;

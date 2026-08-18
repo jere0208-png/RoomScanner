@@ -1253,13 +1253,18 @@ describe('portes et fenêtres en volumes', () => {
         const pleines = vis.filter(
           (f) => f.fill === TEST_PALETTE.object || f.fill === TEST_PALETTE.objectTop,
         );
-        const traits = vis.filter(
-          (f) => f.fill === null && f.stroke === TEST_PALETTE.objectStroke,
-        );
         // Jamais un meuble réduit à rien, et jamais une face sans son arête :
         // c'est ce qui donnait l'impression d'un volume amputé.
+        //
+        // Le contour ne se compte plus à part : depuis qu'un meuble est d'un
+        // seul tenant, chaque pan PORTE le sien. C'est ce qui a mis fin à
+        // deux défauts opposés — le trait qui traversait le meuble, puis le
+        // pan qui effaçait son propre trait : ils sont coplanaires, et aucun
+        // tri ne peut les départager.
         expect(pleines.length).toBeGreaterThanOrEqual(3);
-        expect(traits.length).toBeGreaterThanOrEqual(pleines.length);
+        expect(pleines.every((f) => f.stroke === TEST_PALETTE.objectStroke)).toBe(
+          true,
+        );
       }
     }
   });

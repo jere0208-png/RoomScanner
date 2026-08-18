@@ -121,19 +121,29 @@ it('classe un salon meublé en bien moins d’une image', () => {
       `${parImageRepos.toFixed(2)} ms au repos`,
   );
   /*
-    ON JUGE LE RAPPORT, PAS LE CHRONOMÈTRE.
+    ON JUGE LA MATIÈRE, PAS LE CHRONOMÈTRE.
 
     Une durée absolue ne veut rien dire ici : la suite tourne à plusieurs
-    processus en parallèle, et la même mesure double selon la charge de la
-    machine. Ce qui tient, en revanche, c'est l'écart entre les deux
-    régimes — il vient de la structure du calcul, pas du processeur.
+    processus en parallèle, et la même mesure double selon la charge. Ce qui
+    tient, c'est le NOMBRE DE FACES à classer — c'est lui qui faisait ramer le
+    modèle, et c'est lui qu'on a divisé par quatre en traçant le contour d'un
+    meuble avec son aplat plutôt qu'en quatre-vingt-huit traits séparés.
   */
-  const rapport = parImage / Math.max(0.001, parImageRepos);
-  expect(
-    `${rapport < 0.6 ? 'allégé' : `trop lourd (×${rapport.toFixed(2)})`}`,
-  ).toBe('allégé');
-  // Et un garde-fou large, pour attraper une explosion de coût : au repos,
-  // une image de tri ne doit pas dépasser trois images d'affichage.
+  const duMobilier = faces.filter((f) => f.ownerId);
+  const parMeuble = duMobilier.length / MEUBLES.length;
+  const traits = duMobilier.filter((f) => f.pts.length === 2).length;
+  console.log(
+    `${parMeuble.toFixed(0)} faces par meuble, ${traits} traits à part — ` +
+      `tri : ${parImage.toFixed(2)} ms en mouvement, ` +
+      `${parImageRepos.toFixed(2)} ms au repos`,
+  );
+  // Un meuble ne doit plus produire de trait à classer : son contour est
+  // dessiné avec son pan.
+  expect(`${traits} trait(s) séparé(s)`).toBe('0 trait(s) séparé(s)');
+  expect(`${parMeuble < 45 ? 'léger' : `lourd (${parMeuble.toFixed(0)})`}`).toBe(
+    'léger',
+  );
+  // Et un garde-fou large sur le temps, pour attraper une explosion de coût.
   expect(
     `${parImageRepos < 100 ? 'tenu' : `dépassé (${parImageRepos.toFixed(1)} ms)`}`,
   ).toBe('tenu');

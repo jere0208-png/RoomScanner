@@ -400,52 +400,37 @@ describe('un meuble ne se traverse pas lui-même', () => {
  * être peint après — sinon l'arête se voit par-dessus.
  */
 describe('les arêtes d’un meuble', () => {
-  it('ne se voient pas au travers de ses pans', () => {
-    const { faces, rooms } = buildScene(SALON.walls, [], SALON.objects, {
+  /**
+   * ELLES NE SE TRIENT PLUS : ELLES SONT SUR LE PAN.
+   *
+   * Deux relevés de chantier se sont répondus. « Les meubles sont toujours
+   * transparents » : les traits du dos passaient par-dessus l'avant. Puis,
+   * quand on les a rattachés à leur pan, « au lâcher du clic tout disparaît,
+   * les arêtes » : cette fois le pan effaçait son propre trait.
+   *
+   * Les deux défauts ont la même racine — une arête et son pan sont
+   * COPLANAIRES, et aucun tri au monde ne peut les départager. On a donc
+   * cessé de trier : depuis qu'un meuble n'est plus découpé en bandes, son
+   * contour se trace AVEC son aplat, en un seul objet. Il ne peut plus être
+   * ni perdu, ni déplacé — et le modèle s'allège des trois quarts de ses
+   * faces.
+   */
+  it('sont portées par leur pan, et non triées à part', () => {
+    const { faces } = buildScene(SALON.walls, [], SALON.objects, {
       palette: PAL,
       showSurfaces: true,
       rooms: SALON.rooms,
       fixtures: SALON.fixtures,
     });
-    const centre = sceneFraming(faces).center;
-    let fautes = 0;
-    for (const cam of ANGLES) {
-      const project = projecteur(cam, centre, 60);
-      const rangs = roomRanks(rooms, cam);
-      const vues = faces
-        .filter((f) => !isHiddenFace(f, cam) && f.ownerId)
-        .map((f) => ({
-          f,
-          proj: f.pts.map(project),
-          depth: faceDepth(f, project, cam, rangs),
-          owner: f.ownerId,
-          room: f.roomId,
-          pan: f.panId,
-          bord: f.bordDe,
-        }));
-      ajusterBlocs(vues);
-      const peintes = [...vues].sort((a, b) => a.depth - b.depth);
-      const rang = new Map(peintes.map((p, i) => [p.f, i] as [Face3D, number]));
-      const aplats = vues.filter((v) => v.f.fill !== null && v.proj.length >= 3);
-      for (const t of vues) {
-        if (t.f.fill !== null || t.proj.length !== 2) continue;
-        const pt = {
-          sx: (t.proj[0].sx + t.proj[1].sx) / 2,
-          sy: (t.proj[0].sy + t.proj[1].sy) / 2,
-        };
-        const dt = (t.proj[0].depth + t.proj[1].depth) / 2;
-        for (const a of aplats) {
-          if (!dansLePolygone(pt, a.proj)) continue;
-          const da = profondeurAu(a.f, pt, project);
-          if (da === null) continue;
-          // L'aplat est DEVANT le trait : il doit le couvrir, donc être
-          // peint après. Deux centimètres de tolérance : une arête borde
-          // son propre pan, ils sont coplanaires.
-          if (da > dt + 0.02 && rang.get(a.f)! < rang.get(t.f)!) fautes++;
-        }
-      }
-    }
-    expect(`${fautes} arête(s) au travers`).toBe('0 arête(s) au travers');
+    const duMobilier = faces.filter((f) => f.ownerId);
+    // Plus un seul trait à classer.
+    const traits = duMobilier.filter((f) => f.pts.length === 2);
+    expect(`${traits.length} trait(s)`).toBe('0 trait(s)');
+    // Et chaque pan porte son contour : sans ça, le meuble serait un aplat
+    // pâle sans arrête ni volume.
+    const pans = duMobilier.filter((f) => f.fill !== null && !f.isFloor);
+    expect(pans.length).toBeGreaterThan(0);
+    expect(pans.every((f) => !!f.stroke)).toBe(true);
   });
 });
 
@@ -535,5 +520,56 @@ describe('les arêtes du bâti', () => {
       }
     }
     expect(`${fautes} arête(s) effacée(s)`).toBe('0 arête(s) effacée(s)');
+  });
+});
+
+/**
+ * UNE ARÊTE PASSE TOUJOURS APRÈS SON PAN.
+ *
+ * Relevé du chantier, vidéo à l'appui : « en 3D, au lâcher du clic, tout
+ * disparaît, les arêtes — tout doit être bien fini au lâcher du doigt ». Le
+ * modèle ne disparaissait pas : il perdait ses TRAITS, et un volume sans
+ * arête n'est plus qu'un aplat pâle sur un fond blanc.
+ *
+ * La cause était dans le classement au lâcher : en réécrivant les
+ * profondeurs, il effaçait le léger biais qui tenait une arête devant le pan
+ * qu'elle borde. Or les deux sont COPLANAIRES — aucun test au pixel ne peut
+ * les départager, et le pan gagnait une fois sur deux.
+ */
+describe('les traits, après le classement', () => {
+  it('ne se laissent jamais effacer par leur propre pan', () => {
+    const { faces, rooms } = buildScene(SALON.walls, [], SALON.objects, {
+      palette: PAL,
+      showSurfaces: true,
+      rooms: SALON.rooms,
+      fixtures: SALON.fixtures,
+    });
+    const centre = sceneFraming(faces).center;
+    let fautes = 0;
+    for (const cam of ANGLES) {
+      const project = projecteur(cam, centre, 60);
+      const rangs = roomRanks(rooms, cam);
+      const vues = faces
+        .filter((f) => !isHiddenFace(f, cam))
+        .map((f) => ({
+          f,
+          proj: f.pts.map(project),
+          depth: faceDepth(f, project, cam, rangs),
+          owner: f.ownerId,
+          room: f.roomId,
+          pan: f.panId,
+          bord: f.bordDe,
+        }));
+      ajusterBlocs(vues);
+      const parPan = new Map<number, number>();
+      for (const v of vues) if (v.pan !== undefined) parPan.set(v.pan, v.depth);
+      for (const v of vues) {
+        if (v.bord === undefined) continue;
+        const d = parPan.get(v.bord);
+        if (d === undefined) continue;
+        if (v.depth <= d) fautes++;
+      }
+    }
+    expect(`${fautes} trait(s) effacé(s)`).toBe('0 trait(s) effacé(s)');
   });
 });
