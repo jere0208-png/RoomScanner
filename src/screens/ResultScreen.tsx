@@ -4,40 +4,33 @@ import {
   Animated,
   Image,
   Easing,
-  KeyboardAvoidingView,
-  Modal,
   Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   useWindowDimensions,
   View,
 } from 'react-native';
-import Svg, { Line as SvgLine, Rect as SvgRect } from 'react-native-svg';
 import { captureRef } from 'react-native-view-shot';
 import { RoomScan } from 'react-native-room-scan';
-import {
-  glow,
-  radius,
-  shadowCard,
-  themedStyles,
-  useTheme,
-  type Palette,
-} from '../theme';
+import { useTheme } from '../theme';
+import { getStyles } from './result/styles';
+import { fr } from './result/format';
+import { AddRoomSheet } from './result/AddRoomSheet';
+import { ElecSheet } from './result/ElecSheet';
+import { ExportSheet } from './result/ExportSheet';
+import { FurnitureSheet } from './result/FurnitureSheet';
+import { PhotoSheet } from './result/PhotoSheet';
+import { RenameSheet } from './result/RenameSheet';
+import { RoomNameSheet } from './result/RoomNameSheet';
+import { Toolbar2D, Toolbar3D } from './result/ResultToolbar';
 import {
   FloorplanEditor,
   type VuePlan,
 } from '../components/FloorplanEditor';
-import { WallElevation } from '../components/WallElevation';
 import { SidePill } from '../components/SidePill';
-import { CeilingIcon } from '../components/CeilingIcon';
 import { CeilingBar } from '../components/CeilingBar';
 import { ObjectBar } from '../components/ObjectBar';
 import { poserAuxNormes } from '../geometry/auto';
-import { RangeeOutils } from '../components/RangeeOutils';
 import { RoomBar } from '../components/RoomBar';
 import { StripBar } from '../components/StripBar';
 import {
@@ -47,7 +40,6 @@ import {
 } from '../components/ToolPill';
 import {
   ChevronsUpDown,
-  Compass,
   MoreHorizontal,
   Share2,
 } from 'lucide-react-native';
@@ -79,11 +71,8 @@ import {
 } from '../geometry/volumes';
 import { buyingList, pullSchedule } from '../geometry/conduits';
 import {
-  furnKind,
-  furnitureStrokes,
-  ROOM_NAME_CHOICES,
 } from '../geometry/furniture';
-import { CATALOGUE, type CatalogItem } from '../geometry/catalogue';
+import { type CatalogItem } from '../geometry/catalogue';
 import { buildObj, objFilename } from '../export/model3d';
 import { checkPlan } from '../geometry/diagnostics';
 import {
@@ -101,7 +90,6 @@ import {
 import { buildMaterialPdf, materialFilename, toBase64 } from '../export/pdf';
 import {
   FIXTURES,
-  FIXTURE_FAMILIES,
   faceX,
   facePoint,
   interiorSide,
@@ -112,13 +100,10 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useScanStore } from '../store/scanStore';
 import { DiagnosticSheet, type Constat } from '../components/DiagnosticSheet';
-import { ExportArt, type ExportArtKind } from '../components/ExportArt';
 import { ClientTour } from '../components/ClientTour';
-import { RoomChoice } from '../components/RoomChoice';
 import { EnAttente } from '../components/PendingPill';
 import {
   CEILINGS,
-  CEILING_KINDS,
   spreadPoints,
   type CeilingKind,
   type SpotAxis,
@@ -127,7 +112,6 @@ import { haptic } from '../ui/haptic';
 import {
   ActionSheet,
   PromptSheet,
-  SheetShell,
   type ActionData,
   type PromptData,
 } from '../components/Sheet';
@@ -150,18 +134,6 @@ const COMMANDES_MURALES: FixtureKind[] = [
   'poussoir',
   'variateur',
 ];
-
-const fr = (n: number, d = 1) => n.toFixed(d).replace('.', ',');
-
-/** Recherche sans accent ni casse : « evier » doit trouver « Évier ». */
-const sansAccent = (s: string) =>
-  s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-
-function matchItem(item: CatalogItem, quete: string): boolean {
-  const q = sansAccent(quete.trim());
-  if (!q) return true;
-  return sansAccent(`${item.label} ${item.category}`).includes(q);
-}
 
 /** Le saut de ligne des rapports, ecrit une fois. */
 const SAUT = String.fromCharCode(10);
@@ -232,12 +204,6 @@ export function ResultScreen() {
   const commitCurrent = useScanStore((s) => s.commitCurrent);
   const showFurniture = useScanStore((s) => s.showFurniture);
   const setShowFurniture = useScanStore((s) => s.setShowFurniture);
-  const showSurfaces = useScanStore((s) => s.showSurfaces);
-  const setShowSurfaces = useScanStore((s) => s.setShowSurfaces);
-  const showTextures = useScanStore((s) => s.showTextures);
-  const solidWalls = useScanStore((s) => s.solidWalls);
-  const toggleSolidWalls = useScanStore((s) => s.toggleSolidWalls);
-  const setShowTextures = useScanStore((s) => s.setShowTextures);
   const rooms = useScanStore((s) => s.rooms);
   const removeRoom = useScanStore((s) => s.removeRoom);
   const addOpening = useScanStore((s) => s.addOpening);
@@ -248,7 +214,6 @@ export function ResultScreen() {
   const setRoomHeight = useScanStore((s) => s.setRoomHeight);
   const mergeRooms = useScanStore((s) => s.mergeRooms);
   const splitRoom = useScanStore((s) => s.splitRoom);
-  const straightenPlan = useScanStore((s) => s.straightenPlan);
   const removeWall = useScanStore((s) => s.removeWall);
   const undo = useScanStore((s) => s.undo);
   const canUndo = useScanStore((s) => s.canUndo);
@@ -1821,334 +1786,54 @@ export function ResultScreen() {
         {/* Toute la quincaillerie s'efface pendant une capture : une image
             qu'on envoie ne doit montrer QUE le plan et le logo. */}
         {capturing ? null : vue === '2d' ? (
-          <RangeeOutils
-            styles={styles}
+          <Toolbar2D
             anim={swap}
             largeur={carteW}
-            reserve={62}
             bas={ligneOutils}
             dessus={Math.max(hActions, PILL_CELL_H) + PILL_GAP}
-            /* Deux barres, jamais mélangées.
-               En lecture, on ne fait que REGARDER : la barre ne porte que
-               ce qui s'affiche ou non. En édition, on TRAVAILLE : les
-               calques cèdent la place aux outils, et les cotes ou les
-               meubles restent tels qu'on les avait laissés.
-               Les pastilles rentrent dans le bouton d'édition et en
-               ressortent : c'est lui qui commande le changement, autant
-               qu'on le voie. */
-            elements={(barMode
-              ? [
-                  <ToolPill
-                    key="plus"
-                    icon="plus"
-                    label="Appareil"
-                    active={!!pendingKind}
-                    onPress={startFixture}
-                  />,
-                  <ToolPill
-                    key="square"
-                    icon="square"
-                    label="Redresser"
-                    active={false}
-                    onPress={straightenPlan}
-                  />,
-                  // En édition, la pastille des meubles OUVRE LE CATALOGUE.
-                  //
-                  // Elle portait un « + » à côté d'elle, et restait par
-                  // ailleurs un interrupteur d'affichage : deux boutons pour
-                  // un meme sujet, dont l'un modifiait le plan et l'autre
-                  // non. Or on n’entre pas en édition pour cacher les
-                  // meubles — on y entre pour en poser. Afficher ou cacher
-                  // redevient ce que c’est, un calque, et se règle hors
-                  // édition.
-                  <ToolPill
-                    key="furniture"
-                    icon="furniture"
-                    label="Ajouter"
-                    active={false}
-                    onPress={() => {
-                      seulGeste();
-                      setShowFurniture(true);
-                      setCatalogue(true);
-                    }}
-                  />,
-                  // Le plafond s'équipe comme les murs : on choisit
-                  // l'appareil, puis on touche la pièce qui le reçoit.
-                  <ToolPill
-                    key="plafond"
-                    icon="plafond"
-                    label="Plafond"
-                    active={!!pendingCeiling}
-                    onPress={() => {
-                      seulGeste('plafond');
-                      setShowCeiling(true);
-                      setMenu({
-                        title: 'Équiper le plafond',
-                        subtitle:
-                          'Choisissez l’appareil, puis touchez la pièce qui ' +
-                          'le reçoit. Il se pose en son centre.',
-                        actions: [
-                          /**
-                           * LA LIGNE DE SPOTS, en un geste.
-                           *
-                           * Quatre spots dans un séjour, c'était quatre
-                           * poses suivies de quatre réglages : un quart
-                           * d'heure pour ce que personne ne fait à la main
-                           * sur un chantier. Ils se répartissent par
-                           * zones, à intervalles égaux, et la ligne se
-                           * retourne ensuite d'un appui.
-                           */
-                          ...(rooms.length > 0
-                            ? [
-                                {
-                                  label: 'Ligne de spots',
-                                  node: <CeilingIcon kind="spots" />,
-                                  onPress: () =>
-                                    setMenu({
-                                      title: 'Combien de spots ?',
-                                      subtitle:
-                                        'Ils se répartissent par zones — le ' +
-                                        'retour d’une pièce en L reçoit les ' +
-                                        'siens — avec un demi-écart aux ' +
-                                        'extrémités. Longueur ou largeur se ' +
-                                        'choisit ensuite, sur le plan.',
-                                      actions: [2, 3, 4, 5, 6, 8].map((n) => ({
-                                        label: `${n} spots`,
-                                        hint:
-                                          n <= 3
-                                            ? 'Petite pièce, ou une simple ' +
-                                              'ligne d’appoint.'
-                                            : n >= 6
-                                            ? 'Grande pièce, ou éclairage ' +
-                                              'général sans plafonnier.'
-                                            : undefined,
-                                        onPress: () => {
-                                          seulGeste('plafond');
-                                          setPendingSpots(n);
-                                        },
-                                      })),
-                                    }),
-                                },
-                              ]
-                            : []),
-                          /*
-                            LE CATALOGUE SE LIT D'UN COUP D'ŒIL.
-
-                            Chaque appareil portait sa règle en trois lignes
-                            grises : la liste faisait deux écrans, et il
-                            fallait dérouler pour trouver un spot. Un
-                            électricien sait ce qu'est un détecteur de
-                            fumée ; ce qu'il veut, c'est le toucher. Les
-                            règles n'ont pas disparu pour autant — elles
-                            restent là où elles servent : le contrôle de
-                            conformité et le dossier imprimé.
-                          */
-                          ...CEILING_KINDS.map((k) => ({
-                            label: CEILINGS[k].label,
-                            node: <CeilingIcon kind={k} />,
-                            onPress: () => setPendingCeiling(k),
-                          })),
-                        ],
-                      });
-                    }}
-                  />,
-                ]
-              : [
-                  <ToolPill
-                    key="ruler"
-                    icon="ruler"
-                    label="Cotes"
-                    active={showMeasures}
-                    onPress={() => setShowMeasures((v) => !v)}
-                  />,
-                  // Le calque des gaines ne s'offre que s'il a quelque chose
-                  // à montrer : sans tableau posé, on ne sait pas d'où part
-                  // le câble, et une pastille qui n'allume rien est un piège.
-                  ...(cheminements
-                    ? [
-                        <ToolPill
-                          key="gaines"
-                          icon="gaines"
-                          label="Gaines"
-                          active={showRoutes}
-                          onPress={() => setShowRoutes((v) => !v)}
-                        />,
-                      ]
-                    : []),
-                  // HORS ÉDITION, une pastille ne fait qu'AFFICHER ou
-                  // CACHER. Le « + » du catalogue vivait ici : on pouvait
-                  // donc modifier le plan sans être en édition, et la barre
-                  // mélangeait deux natures de gestes. Il est passé dans la
-                  // barre d'édition, avec les autres outils.
-                  <ToolPill
-                    key="furniture"
-                    icon="furniture"
-                    label="Meubles"
-                    active={showFurniture}
-                    onPress={() => {
-                        // Éteindre le calque éteint tout ce qui l'accompagne :
-                        // les poignées d'un meuble invisible restaient à
-                        // l'écran, orphelines.
-                      if (showFurniture) {
-                        setSelectedObjectId(null);
-                        setObjDims(false);
-                      }
-                      setShowFurniture(!showFurniture);
-                    }}
-                  />,
-                  <ToolPill
-                    key="surface"
-                    icon="surface"
-                    label="Surfaces"
-                    active={showSurfaces}
-                    onPress={() => setShowSurfaces(!showSurfaces)}
-                  />,
-                  <ToolPill
-                    key="nord"
-                    icon="square"
-                    label="Nord"
-                    node={
-                      <Compass
-                        size={22}
-                        color={showNorth ? '#FFFFFF' : teinte.ink}
-                        strokeWidth={2}
-                      />
-                    }
-                    active={showNorth}
-                    onPress={() => setShowNorth((v) => !v)}
-                  />,
-                  // Le plafond se cache pour revoir le sol : superposés,
-                  // les deux calques deviennent illisibles.
-                  ...(ceiling.length > 0
-                    ? [
-                        <ToolPill
-                          key="plafond"
-                          icon="plafond"
-                          label="Plafond"
-                          active={showCeiling}
-                          onPress={() => setShowCeiling((v) => !v)}
-                        />,
-                      ]
-                    : []),
-                ]
-            ).filter((el): el is React.ReactElement => !!el)}
+            edition={barMode}
+            pendingKind={pendingKind}
+            pendingCeiling={pendingCeiling}
+            showMeasures={showMeasures}
+            setShowMeasures={setShowMeasures}
+            showRoutes={showRoutes}
+            setShowRoutes={setShowRoutes}
+            hasRoutes={!!cheminements}
+            showNorth={showNorth}
+            setShowNorth={setShowNorth}
+            showCeiling={showCeiling}
+            setShowCeiling={setShowCeiling}
+            onFixture={startFixture}
+            onFurniture={() => {
+              seulGeste();
+              setShowFurniture(true);
+              setCatalogue(true);
+            }}
+            onFurnitureOff={() => {
+              setSelectedObjectId(null);
+              setObjDims(false);
+            }}
+            seulGeste={seulGeste}
+            setMenu={setMenu}
+            setPendingCeiling={setPendingCeiling}
+            setPendingSpots={setPendingSpots}
           />
         ) : (
-          /*
-            EN 3D, LA COLONNE COMMENCE EN HAUT.
-
-            Elle partageait le décalage du plan 2D, où elle passe SOUS la
-            rangée du bouton d'édition. Mais la 3D n'a pas de bouton
-            d'édition : la colonne descendait donc d'une cellule pour
-            laisser la place à une rangée qui n'existe pas, et la
-            dernière pastille se retrouvait à mi-hauteur du modèle.
-          */
-          <RangeeOutils
-            styles={styles}
+          <Toolbar3D
             anim={swap}
             largeur={carteW}
-            /*
-              MÊME GRILLE QU'EN 2D.
-
-              La 3D n'a pas de colonne d'actions : la rangée prenait donc
-              toute la largeur, et ses pastilles ne tombaient pas aux mêmes
-              endroits qu'en plan — on le voit immédiatement en basculant
-              d'une vue à l'autre. Elle réserve désormais la même place à
-              droite : les calques qui ne tiennent pas y montent en colonne,
-              exactement où se tient « Édition » sur le plan.
-            */
-            reserve={62}
             bas={ligneOutils}
-            dessus={0}
-            elements={[
-            <ToolPill
-              key="ruler"
-              icon="ruler"
-              label="Cotes"
-              active={show3DMeasures}
-              onPress={() => setShow3DMeasures((v) => !v)}
-            />,
-            <ToolPill
-              key="furniture"
-              icon="furniture"
-              label="Meubles"
-              active={showFurniture}
-              onPress={() => setShowFurniture(!showFurniture)}
-            />,
-            <ToolPill
-              key="surface"
-              icon="surface"
-              label="Surfaces"
-              active={showSurfaces}
-              onPress={() => setShowSurfaces(!showSurfaces)}
-            />,
-            <ToolPill
-              key="nord"
-              icon="square"
-              label="Nord"
-              node={
-                <Compass
-                  size={22}
-                  color={showNorth ? '#FFFFFF' : teinte.ink}
-                  strokeWidth={2}
-                />
-              }
-              active={showNorth}
-              onPress={() => setShowNorth((v) => !v)}
-            />,
-            /* Le plafond existe aussi en 3D : même calque, même bouton. */
-            ceiling.length > 0 ? (
-              <ToolPill
-                key="plafond"
-                icon="plafond"
-                label="Plafond"
-                active={showCeiling}
-                onPress={() => setShowCeiling((v) => !v)}
-              />
-            ) : null,
-            /* Murs pleins ou écorché : l'écorché montre la pièce, les murs
-               pleins montrent le bâti. Ni l'un ni l'autre n'a toujours
-               raison — c'est un réglage, pas une trouvaille. */
-            <ToolPill
-              key="murs"
-              icon="murs"
-              label="Murs"
-              active={solidWalls}
-              onPress={toggleSolidWalls}
-            />,
-            /* Les repères électriques : indispensables pour poser,
-               encombrants pour montrer. Une pièce équipée en porte une
-               dizaine, et ils couvrent alors la moitié de la scène. */
-            fixtures.length > 0 ? (
-              <ToolPill
-                key="reperes"
-                icon="plus"
-                label="Repères"
-                active={showElecTags}
-                onPress={() => setShowElecTags((v) => !v)}
-              />
-            ) : null,
-            colorsAvailable ? (
-              <ToolPill
-                key="couleurs"
-                icon="colors"
-                label="Couleurs"
-                active={showTextures}
-                onPress={() => setShowTextures(!showTextures)}
-              />
-            ) : null,
-            rooms.length > 1 ? (
-              <ToolPill
-                key="pieces"
-                icon="rooms"
-                label="Pièces"
-                active={focusIdx >= 0}
-                onPress={() =>
-                  setFocusIdx((i) => (i + 2 > rooms.length ? -1 : i + 1))
-                }
-              />
-            ) : null,
-            ].filter((el): el is React.ReactElement => !!el)}
+            showMeasures={show3DMeasures}
+            setShowMeasures={setShow3DMeasures}
+            showNorth={showNorth}
+            setShowNorth={setShowNorth}
+            showCeiling={showCeiling}
+            setShowCeiling={setShowCeiling}
+            showElecTags={showElecTags}
+            setShowElecTags={setShowElecTags}
+            colorsAvailable={colorsAvailable}
+            focusIdx={focusIdx}
+            setFocusIdx={setFocusIdx}
           />
         )}
 
@@ -2591,179 +2276,84 @@ export function ResultScreen() {
       )}
 
       {/* ---------- Choix du format d'export ---------- */}
-      <Modal
+      <ExportSheet
         visible={exporting}
-        transparent
-        animationType="fade"
+        onClose={() => setExporting(false)}
         onDismiss={lancerPartage}
-        onRequestClose={() => setExporting(false)}>
-        <Pressable style={styles.modalBackdrop} onPress={() => setExporting(false)}>
-          <Pressable style={styles.modalCard} onPress={() => {}}>
-            <Text style={styles.modalTitle}>Exporter</Text>
-            <Text style={styles.modalSubtitle}>
-              Un document à remettre, ou une présentation à montrer.
-            </Text>
-            {(
-              [
-                [
-                  'pdf',
-                  'Plan PDF',
-                  'Plan coté, métré par pièce, vues 3D. À imprimer ou à envoyer.',
-                  () => {
-                    setExporting(false);
-                    goExport();
-                  },
-                ],
-                [
-                  'obj',
-                  'Modèle 3D',
-                  'Fichier OBJ du plan retouché, pour Blender ou SketchUp.',
-                  () => {
-                    setExporting(false);
-                    apresFermeture(shareObj);
-                  },
-                ],
-                [
-                  'materiel',
-                  'Liste du matériel',
-                  'Appareillage par pièce, circuits et disjoncteurs, ' +
-                    'conformité. Le document à chiffrer.',
-                  () => {
-                    setExporting(false);
-                    apresFermeture(shareMaterial);
-                  },
-                ],
-                [
-                  'image',
-                  'Image',
-                  'Capture de la vue affichée, avec le filigrane EchoPlan.',
-                  () => {
-                    setExporting(false);
-                    apresFermeture(shareImage);
-                  },
-                ],
-                /*
-                  LA PRÉSENTATION SE CHOISIT ICI, avec les autres sorties.
+        onPdf={() => {
+          setExporting(false);
+          goExport();
+        }}
+        onObj={() => {
+          setExporting(false);
+          apresFermeture(shareObj);
+        }}
+        onMaterial={() => {
+          setExporting(false);
+          apresFermeture(shareMaterial);
+        }}
+        onImage={() => {
+          setExporting(false);
+          apresFermeture(shareImage);
+        }}
+        onPresentation={() => {
+          setExporting(false);
+          apresFermeture(() => setVisite(true));
+        }}
+      />
 
-                  Elle a longtemps cherché sa place : au pied de l'écran
-                  d'export, puis sur l'écran du scan, puis sous l'aperçu du
-                  plan. À chaque fois le même malentendu — on la rangeait
-                  dans le réglage d'un DOCUMENT, alors que c'est une SORTIE,
-                  au même titre qu'un PDF ou un modèle 3D. Elle est donc
-                  dans le menu qui les propose, et en premier : c'est celle
-                  qu'on lance devant quelqu'un.
-                */
-                [
-                  'presentation',
-                  'Présentation animée',
-                  'Le logement se présente tout seul, pièce par pièce. ' +
-                    'À montrer au client, sur place.',
-                  () => {
-                    setExporting(false);
-                    apresFermeture(() => setVisite(true));
-                  },
-                ],
+      {/*
+        LA PRÉSENTATION N'EST MONTÉE QU'UNE FOIS.
 
-              ] as [ExportArtKind, string, string, () => void][]
-            ).map(([art, titre, detail, action]) => (
-              <TouchableOpacity
-                key={titre}
-                style={styles.exportChoice}
-                activeOpacity={0.8}
-                onPress={action}>
-                {/* La vignette dit CE QU'ON OBTIENT : une feuille cotée, un
-                    volume, un bordereau, une capture. On la reconnaît sans
-                    lire — quatre lignes de texte, non. */}
-                <ExportArt kind={art} c={teinte} />
-                <View style={styles.exportChoiceTexts}>
-                  <Text style={styles.exportChoiceTitle}>{titre}</Text>
-                  <Text style={styles.exportChoiceDetail}>{detail}</Text>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </Pressable>
-        </Pressable>
-      </Modal>
-
-      {/* La présentation, lancée depuis le menu « Exporter ». */}
-      <ClientTour visible={visite} onClose={() => setVisite(false)} />
+        Elle l'était deux fois, à deux endroits du même rendu — la seconde
+        cachée sous la première, avec ses propres minuteries. Elle se tient
+        plus haut, avec la transition d'export.
+      */}
 
       {/* ---------- Ajouter une pièce ---------- */}
-      <Modal
+      <AddRoomSheet
         visible={ajoutPiece}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setAjoutPiece(false)}>
-        <Pressable style={styles.modalBackdrop} onPress={() => setAjoutPiece(false)}>
-          <Pressable style={styles.modalCard} onPress={() => {}}>
-            <Text style={styles.modalTitle}>Ajouter une pièce</Text>
-            <Text style={styles.modalSubtitle}>
-              {selectedWallId
-                ? 'Elle s’accole au mur choisi et le partage avec lui : ' +
-                  'elle en prend la longueur, et vous donnez la profondeur.'
-                : 'Elle se pose à côté du plan. Pour l’accoler, touchez ' +
-                  'd’abord le mur qui les séparera, puis ajoutez-la.'}
-            </Text>
-            <ScrollView style={styles.nameScroll}>
-              <RoomChoice
-                modeles={[
-                  { nom: 'Chambre', largeur: 3.4, profondeur: 3 },
-                  { nom: 'Séjour', largeur: 5, profondeur: 4 },
-                  { nom: 'Cuisine', largeur: 3.2, profondeur: 2.6 },
-                  { nom: 'Salle de bain', largeur: 2.4, profondeur: 2 },
-                  { nom: 'WC', largeur: 1.4, profondeur: 1 },
-                  { nom: 'Dégagement', largeur: 3, profondeur: 1.2 },
-                  { nom: 'Bureau', largeur: 3, profondeur: 2.6 },
-                  { nom: 'Buanderie', largeur: 2.2, profondeur: 1.8 },
-                ]}
-                onChoose={(m) => {
-                  // Accolée au mur choisi, s'il y en a un : c'est ainsi
-                  // qu'on bâtit un appartement de proche en proche.
-                  const id = addRoomBox(
-                    m.largeur,
-                    Math.min(m.largeur, m.profondeur),
-                    m.nom,
-                    selectedWallId,
-                  );
-                  setAjoutPiece(false);
-                  seuleSelection('piece');
-                  setSelectedRoomId(id);
-                  setEditMode(true);
-                  haptic('succes');
-                }}
-                onCustom={() => {
-                  setAjoutPiece(false);
-                  apresFermeture(() =>
-                    setPrompt({
-                      title: 'Pièce sur mesure',
-                      subtitle:
-                        'Largeur et profondeur en mètres, séparées par un × ' +
-                        '(par exemple 3,60 x 2,80).',
-                      value: '3,60 x 2,80',
-                      onSubmit: (t) => {
-                        const [l, p] = t
-                          .replace(',', '.')
-                          .replace(',', '.')
-                          .split(/[x×*]/i)
-                          .map((v) => parseFloat(v.replace(',', '.').trim()));
-                        if (!isFinite(l) || !isFinite(p) || l <= 0 || p <= 0) {
-                          haptic('alerte');
-                          return;
-                        }
-                        const id = addRoomBox(l, p, '', selectedWallId);
-                        seuleSelection('piece');
-                        setSelectedRoomId(id);
-                        setEditMode(true);
-                        haptic('succes');
-                      },
-                    }),
-                  );
-                }}
-              />
-            </ScrollView>
-          </Pressable>
-        </Pressable>
-      </Modal>
+        accolee={!!selectedWallId}
+        onClose={() => setAjoutPiece(false)}
+        onChoose={(largeur, profondeur, nom) => {
+          // Accolée au mur choisi, s'il y en a un : c'est ainsi qu'on bâtit
+          // un appartement de proche en proche.
+          const id = addRoomBox(largeur, profondeur, nom, selectedWallId);
+          setAjoutPiece(false);
+          seuleSelection('piece');
+          setSelectedRoomId(id);
+          setEditMode(true);
+          haptic('succes');
+        }}
+        onCustom={() => {
+          setAjoutPiece(false);
+          apresFermeture(() =>
+            setPrompt({
+              title: 'Pièce sur mesure',
+              subtitle:
+                'Largeur et profondeur en mètres, séparées par un × ' +
+                '(par exemple 3,60 x 2,80).',
+              value: '3,60 x 2,80',
+              onSubmit: (t) => {
+                const [l, p] = t
+                  .replace(',', '.')
+                  .replace(',', '.')
+                  .split(/[x×*]/i)
+                  .map((v) => parseFloat(v.replace(',', '.').trim()));
+                if (!isFinite(l) || !isFinite(p) || l <= 0 || p <= 0) {
+                  haptic('alerte');
+                  return;
+                }
+                const id = addRoomBox(l, p, '', selectedWallId);
+                seuleSelection('piece');
+                setSelectedRoomId(id);
+                setEditMode(true);
+                haptic('succes');
+              },
+            }),
+          );
+        }}
+      />
 
       {/* ---------- Diagnostic du plan ---------- */}
       <DiagnosticSheet
@@ -2775,291 +2365,74 @@ export function ResultScreen() {
       />
 
       {/* ---------- Nom de la pièce : liste plutôt que clavier ---------- */}
-      <Modal
+      <RoomNameSheet
         visible={naming}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setNaming(false)}>
-        <Pressable style={styles.modalBackdrop} onPress={() => setNaming(false)}>
-          <Pressable style={styles.modalCard} onPress={() => {}}>
-            <Text style={styles.modalTitle}>Nom de la pièce</Text>
-            <Text style={styles.modalSubtitle}>
-              Il s'affiche sur le plan 2D, au même endroit sur la vue 3D, et
-              dans le métré du PDF.
-            </Text>
-            <ScrollView style={styles.nameScroll}>
-              <View style={styles.nameGrid}>
-                {ROOM_NAME_CHOICES.map((choice) => {
-                  const on =
-                    targetRoom?.name === choice ||
-                    (targetRoom?.name ?? '').startsWith(`${choice} `);
-                  return (
-                    <TouchableOpacity
-                      key={choice}
-                      style={[styles.nameChip, on && styles.nameChipOn]}
-                      onPress={() => applyRoomName(choice)}>
-                      <Text
-                        style={[
-                          styles.nameChipText,
-                          on && styles.nameChipTextOn,
-                        ]}>
-                        {choice}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </ScrollView>
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={styles.modalGhost}
-                onPress={() => setNaming(false)}>
-                <Text style={styles.modalGhostText}>Annuler</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.modalPrimary}
-                onPress={() => {
-                  setNaming(false);
-                  setPrompt({
-                    title: 'Autre nom',
-                    subtitle: 'Laissez vide pour retirer le nom.',
-                    value: targetRoom?.name ?? '',
-                    onSubmit: (t) => applyRoomName(t),
-                  });
-                }}>
-                <Text style={styles.modalPrimaryText}>Autre…</Text>
-              </TouchableOpacity>
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
+        nomActuel={targetRoom?.name ?? null}
+        onClose={() => setNaming(false)}
+        onChoose={applyRoomName}
+        onOther={() => {
+          setNaming(false);
+          setPrompt({
+            title: 'Autre nom',
+            subtitle: 'Laissez vide pour retirer le nom.',
+            value: targetRoom?.name ?? '',
+            onSubmit: (t) => applyRoomName(t),
+          });
+        }}
+      />
 
       <ActionSheet data={menu} onClose={() => setMenu(null)} />
       <PromptSheet data={prompt} onClose={() => setPrompt(null)} />
 
       {/* ---------- Photo de repérage, en grand ---------- */}
-      <Modal
-        visible={!!photoVue}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setPhotoVue(null)}>
-        <Pressable style={styles.photoFond} onPress={() => setPhotoVue(null)}>
-          {(() => {
-            const ph = photos.find((p) => p.id === photoVue);
-            if (!ph) return null;
-            const mur = walls.find((w) => w.id === ph.wallId);
-            return (
-              <>
-                <Image
-                  source={{ uri: `file://${ph.path}` }}
-                  style={styles.photoPleine}
-                  resizeMode="contain"
-                />
-                <View style={styles.photoBarre}>
-                  <Text style={styles.photoLegende} numberOfLines={1}>
-                    {mur
-                      ? `Mur de ${fr(segLength(mur), 2)} m`
-                      : 'Mur supprimé'}
-                  </Text>
-                  <TouchableOpacity
-                    onPress={() => {
-                      removePhoto(ph.id);
-                      setPhotoVue(null);
-                    }}>
-                    <Text style={styles.photoSuppr}>Supprimer</Text>
-                  </TouchableOpacity>
-                </View>
-              </>
-            );
-          })()}
-        </Pressable>
-      </Modal>
+      <PhotoSheet
+        photoId={photoVue}
+        photos={photos}
+        walls={walls}
+        onClose={() => setPhotoVue(null)}
+        onDelete={(id) => {
+          removePhoto(id);
+          setPhotoVue(null);
+        }}
+      />
 
       {/* ---------- Catalogue de mobilier ---------- */}
-      <Modal
+      <FurnitureSheet
         visible={catalogue}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setCatalogue(false)}>
-        <Pressable
-          style={styles.modalBackdrop}
-          onPress={() => setCatalogue(false)}>
-          <Pressable style={styles.modalCard} onPress={() => {}}>
-            <Text style={styles.modalTitle}>Ajouter un meuble</Text>
-            {/* Une recherche plutôt qu'un mode d'emploi : à trente entrées,
-                on sait ce qu'on cherche, et le faire défiler prend plus de
-                temps que de le taper. */}
-            <TextInput
-              style={styles.catSearch}
-              value={quete}
-              onChangeText={setQuete}
-              placeholder="Rechercher un meuble…"
-              placeholderTextColor={teinte.inkFaint}
-              autoCorrect={false}
-              clearButtonMode="while-editing"
-            />
-            <ScrollView style={styles.catScroll} keyboardShouldPersistTaps="handled">
-              {CATALOGUE.map((famille) => {
-                const trouves = famille.items.filter((i) => matchItem(i, quete));
-                if (trouves.length === 0) return null;
-                return (
-                <View key={famille.name}>
-                  <Text style={styles.elecFamily}>{famille.name}</Text>
-                  <View style={styles.catGrid}>
-                    {trouves.map((item) => (
-                      <TouchableOpacity
-                        key={item.key}
-                        style={styles.catCard}
-                        activeOpacity={0.8}
-                        onPress={() => placeObject(item)}>
-                        <FurnitureThumb item={item} />
-                        <Text style={styles.catName} numberOfLines={1}>
-                          {item.label}
-                        </Text>
-                        <Text style={styles.catDims}>
-                          {`${fr(item.w, 2)} × ${fr(item.d, 2)} m`}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-                );
-              })}
-            </ScrollView>
-          </Pressable>
-        </Pressable>
-      </Modal>
+        quete={quete}
+        onQuete={setQuete}
+        onClose={() => setCatalogue(false)}
+        onPick={placeObject}
+      />
 
       {/* ---------- Électricité : catalogue, puis le mur vu de face ---------- */}
-      <Modal
+      <ElecSheet
         visible={elecOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setElecOpen(false)}>
-        <Pressable
-          style={[
-            styles.modalBackdrop,
-            // L'établi électrique prend l'écran : on y place des appareils
-            // au doigt, à cinq centimètres près. Le catalogue, lui, reste
-            // une fenêtre — on y choisit, on n'y travaille pas.
-            elecView === 'mur' && styles.modalBackdropPlein,
-          ]}
-          onPress={() => setElecOpen(false)}>
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            style={[
-              styles.elecWrap,
-              elecView === 'mur' && styles.elecWrapPlein,
-            ]}>
-            <Pressable
-              onPress={() => {}}
-              style={elecView === 'mur' ? styles.elecPlein : undefined}>
-              {elecView === 'mur' && elecWallId ? (
-                <WallElevation
-                  wallId={elecWallId}
-                  focusX={cibleDuRetour(elecWallId)}
-                  selectedId={elecSel}
-                  onSelect={setElecSel}
-                  onAddRequest={() => setElecView('catalogue')}
-                  onClose={() => setElecOpen(false)}
-                />
-              ) : (
-                <View style={styles.modalCard}>
-                  <Text style={styles.modalTitle}>Ajouter un appareil</Text>
-                  <Text style={styles.modalSubtitle}>
-                    Il se pose à 20 cm du coin bas gauche du mur, puis se
-                    déplace au doigt ou à la cote, face au mur.
-                  </Text>
-                  <ScrollView style={styles.elecScroll}>
-                    {FIXTURE_FAMILIES.map((family) => (
-                      <View key={family.name}>
-                        <Text style={styles.elecFamily}>{family.name}</Text>
-                        <View style={styles.elecGrid}>
-                          {family.kinds.map((kind) => {
-                            const spec = FIXTURES[kind];
-                            return (
-                              <TouchableOpacity
-                                key={kind}
-                                style={styles.elecChip}
-                                onPress={() => chooseKind(kind)}>
-                                <View
-                                  style={[
-                                    styles.elecDot,
-                                    { backgroundColor: spec.color },
-                                  ]}>
-                                  <Text style={styles.elecDotText}>
-                                    {spec.short}
-                                  </Text>
-                                </View>
-                                <Text style={styles.elecChipText}>
-                                  {spec.label}
-                                </Text>
-                              </TouchableOpacity>
-                            );
-                          })}
-                        </View>
-                      </View>
-                    ))}
-                  </ScrollView>
-                </View>
-              )}
-            </Pressable>
-          </KeyboardAvoidingView>
-        </Pressable>
-      </Modal>
+        vue={elecView}
+        wallId={elecWallId}
+        focusX={elecWallId ? cibleDuRetour(elecWallId) : undefined}
+        selectedId={elecSel}
+        onSelect={setElecSel}
+        onAddRequest={() => setElecView('catalogue')}
+        onChoose={chooseKind}
+        onClose={() => setElecOpen(false)}
+      />
 
-      {/* ---------- Renommage ----------
-          EN FEUILLE DU BAS, pas en boîte centrée.
-          Une boîte au milieu de l'écran avec un champ de saisie finit
-          toujours par se faire manger la moitié : le clavier iOS occupe le
-          bas de l'écran, et recouvrait ici le champ lui-même, « Annuler »,
-          « Renommer » et la copie. La feuille, elle, monte avec lui. */}
-      <SheetShell visible={renaming} onClose={() => setRenaming(false)}>
-          <View>
-            <Text style={styles.modalTitle}>Nom du scan</Text>
-            <Text style={styles.modalSubtitle}>
-              Les modifications du plan s'enregistrent avec le bouton en bas à
-              droite du plan.
-            </Text>
-            <TextInput
-              style={styles.modalInput}
-              value={nameInput}
-              onChangeText={setNameInput}
-              autoFocus
-              maxLength={40}
-              returnKeyType="done"
-              onSubmitEditing={() => {
-                renameCurrent(nameInput);
-                setRenaming(false);
-              }}
-            />
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={styles.modalGhost}
-                onPress={() => setRenaming(false)}>
-                <Text style={styles.modalGhostText}>Annuler</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.modalPrimary}
-                onPress={() => {
-                  renameCurrent(nameInput);
-                  setRenaming(false);
-                }}>
-                <Text style={styles.modalPrimaryText}>Renommer</Text>
-              </TouchableOpacity>
-            </View>
-            <TouchableOpacity
-              style={styles.modalCopy}
-              onPress={() => {
-                saveAsCopy(nameInput);
-                setRenaming(false);
-              }}>
-              <Text style={styles.modalCopyText}>
-                Enregistrer comme nouvelle copie
-              </Text>
-            </TouchableOpacity>
-          </View>
-      </SheetShell>
+      {/* ---------- Renommage ---------- */}
+      <RenameSheet
+        visible={renaming}
+        valeur={nameInput}
+        onChange={setNameInput}
+        onClose={() => setRenaming(false)}
+        onRename={() => {
+          renameCurrent(nameInput);
+          setRenaming(false);
+        }}
+        onCopy={() => {
+          saveAsCopy(nameInput);
+          setRenaming(false);
+        }}
+      />
     </View>
   );
 }
@@ -3073,848 +2446,3 @@ export function ResultScreen() {
  * forme qu'on retrouvera, et non en lisant une liste de mots. Le nom passe
  * dessous, les cotes en plus petit encore.
  */
-function FurnitureThumb({ item }: { item: CatalogItem }) {
-  const c = useTheme();
-  const W = 74;
-  const H = 52;
-  // Emprise mise à l'échelle de la vignette, marges comprises.
-  const k = Math.min((W - 14) / item.w, (H - 14) / item.d);
-  const w = item.w * k;
-  const d = item.d * k;
-  return (
-    <Svg width={W} height={H}>
-      <SvgRect
-        x={(W - w) / 2}
-        y={(H - d) / 2}
-        width={w}
-        height={d}
-        rx={3}
-        fill={c.blueSoft}
-        stroke={c.blue}
-        strokeWidth={1.2}
-      />
-      {furnitureStrokes(furnKind(item.category), w, d).map((ligne, li) => (
-        <React.Fragment key={li}>
-          {ligne.slice(1).map((pt, pi) => (
-            <SvgLine
-              key={pi}
-              x1={W / 2 + ligne[pi].x}
-              y1={H / 2 + ligne[pi].y}
-              x2={W / 2 + pt.x}
-              y2={H / 2 + pt.y}
-              stroke={c.blue}
-              strokeWidth={1.1}
-              strokeLinecap="round"
-            />
-          ))}
-        </React.Fragment>
-      ))}
-    </Svg>
-  );
-}
-
-const getStyles = themedStyles((c: Palette) => StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: c.bg,
-    paddingTop: 58,
-    // Le plan touche presque les bords : c'est lui qu'on regarde.
-    paddingHorizontal: 12,
-  },
-  emptyContainer: { alignItems: 'center', justifyContent: 'center', padding: 32 },
-  emptyTitle: { color: c.ink, fontSize: 22, fontWeight: '800' },
-  emptyText: {
-    color: c.inkSoft,
-    fontSize: 14,
-    lineHeight: 20,
-    textAlign: 'center',
-    marginTop: 10,
-    marginBottom: 26,
-  },
-  headerRow: { flexDirection: 'row', alignItems: 'center' },
-  /** Les actions de l'en-tête : rondes, 38 points, comme le retour. */
-  headerIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    marginLeft: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: c.surface,
-    ...shadowCard,
-    shadowOpacity: 0.07,
-    shadowRadius: 8,
-  },
-  backButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: c.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...shadowCard,
-    shadowOpacity: 0.07,
-    shadowRadius: 8,
-    marginRight: 12,
-  },
-  backChevron: { color: c.ink, fontSize: 24, fontWeight: '600', marginTop: -3 },
-  titleWrap: { flexDirection: 'row', alignItems: 'center', flex: 1 },
-  title: {
-    color: c.ink,
-    fontSize: 24,
-    fontWeight: '800',
-    // Un titre serré se lit comme un titre ; espacé, comme une étiquette.
-    letterSpacing: -0.6,
-    flexShrink: 1,
-  },
-  titleCol: { flex: 1, minWidth: 0 },
-  titleSub: {
-    color: c.inkFaint,
-    fontSize: 11,
-    fontWeight: '600',
-    marginTop: 1,
-  },
-  editBadge: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: c.blueSoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 10,
-  },
-  editBadgeIcon: { color: c.blue, fontSize: 17, fontWeight: '700' },
-  // Plus de liseré ni de séparateurs : c'est l'ombre qui pose la barre, et
-  // l'écart entre le chiffre et son intitulé qui sépare les colonnes.
-  metricsRow: {
-    flexDirection: 'row',
-    backgroundColor: c.surface,
-    borderRadius: radius.md,
-    // Pleine largeur : c'est ce qui borne le cadre. Les cellules se
-    // répartissent l'espace au lieu de le réclamer.
-    alignSelf: 'stretch',
-    marginTop: 8,
-    marginBottom: 8,
-    // Plus serré qu'avant : les chiffres restent, la hauteur perdue non.
-    paddingVertical: 7,
-    paddingHorizontal: 4,
-    ...shadowCard,
-  },
-  metric: {
-    flex: 1,
-    // Sans cela, une cellule refuse de rétrécir sous la largeur de son
-    // texte, et la rangée repart en débordement.
-    minWidth: 0,
-    paddingHorizontal: 3,
-    alignItems: 'center',
-  },
-  metricBorder: { borderLeftWidth: 1, borderLeftColor: c.line },
-  metricValue: {
-    color: c.ink,
-    fontSize: 17,
-    fontWeight: '800',
-    letterSpacing: -0.4,
-  },
-  metricLabel: {
-    color: c.inkFaint,
-    fontSize: 8.5,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.2,
-    marginTop: 2,
-  },
-  /** Le sélecteur de vue, posé en haut à droite du dessin. */
-  vuePastille: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    zIndex: 4,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    height: 34,
-    paddingHorizontal: 12,
-    borderRadius: radius.pill,
-    backgroundColor: c.surface,
-    ...shadowCard,
-    shadowOpacity: 0.1,
-  },
-  vuePastilleTexte: { color: c.ink, fontSize: 14, fontWeight: '800' },
-  canvas: { flex: 1, ...shadowCard, borderRadius: radius.lg },
-  // Jusqu'à neuf pastilles : la barre défile plutôt que de se replier sur
-  // deux rangs et de manger le plan.
-  // Les outils descendent DANS L'AXE du bouton d'édition, contre le bord
-  // droit : la main qui vient de le toucher n'a plus qu'à glisser vers le
-  // bas. Une rangée horizontale, elle, finissait par défiler — donc par
-  // cacher la moitié des outils.
-  /**
-   * LES OUTILS SONT EN BAS, ET NON PLUS AUTOUR DU PLAN.
-   *
-   * Ils encadraient le dessin : une rangée en haut, une colonne à droite.
-   * Deux bandes de soixante points qui mordaient sur l'espace de travail —
-   * et sur un plan de biais, le logement se retrouvait cerné. Les
-   * applications de plan les posent toutes en bas, sur une seule ligne :
-   * la main y est déjà, et le dessin garde ses quatre côtés.
-   */
-  /**
-   * LES OUTILS REMONTENT DEPUIS LE BOUTON D'ÉDITION, en bas à droite.
-   *
-   * Trois positions essayées, et le chantier a tranché les deux premières.
-   * En colonne à droite DEPUIS LE HAUT, ils cernaient le dessin. En ligne
-   * au pied du plan, ils s'y étalaient sur toute la largeur, se
-   * chevauchaient quand la place manquait, et passaient sous l'indicateur
-   * d'accueil.
-   *
-   * Ils reprennent donc leur colonne — la main y trouve tout à la file,
-   * dans l'axe du pouce — mais ancrée EN BAS : les pastilles montent
-   * depuis le bouton d'édition au lieu de descendre sur le plan, et le
-   * dessin garde son quart supérieur, celui qu'on regarde.
-   */
-  /**
-   * LES CALQUES EN RANGÉE, LES ACTIONS EN COLONNE.
-   *
-   * Ce sont deux natures de commandes, et elles ne se manipulent pas
-   * pareil. Les CALQUES — cotes, meubles, surfaces, nord, murs — s'allument
-   * et s'éteignent, souvent, l'un après l'autre : une rangée au bas du
-   * dessin les met tous à portée du pouce, et l'œil les balaie d'un coup.
-   * Les ACTIONS — enregistrer, annuler, contrôler, éditer — se choisissent
-   * une à la fois : une colonne à droite les tient séparées des calques,
-   * sans qu'on les confonde.
-   *
-   * Tout se pose DANS la carte du plan : rien ne déborde sur le gris de la
-   * page — c'est ce qui faisait flotter les pastilles hors du dessin.
-   */
-  planTools: {
-    position: 'absolute',
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    paddingHorizontal: 10,
-    left: 0,
-    // La colonne des actions tient la droite : la rangée s'arrête avant elle,
-    // sinon les dernières pastilles défilent DERRIÈRE et deviennent
-    // introuvables.
-    right: 62,
-  },
-  /** Une part de la ligne : égale pour tous, quel que soit leur nombre. */
-  toolPart: { flex: 1, alignItems: 'center' },
-  /**
-   * LE TROP-PLEIN MONTE À DROITE.
-   *
-   * Ce qui ne tient pas sur la ligne s'empile au-dessus de la colonne des
-   * actions, dans le même axe : on lit la rangée, puis la colonne, sans
-   * jamais avoir à faire glisser quoi que ce soit.
-   */
-  planToolsSuite: {
-    position: 'absolute',
-    right: 4,
-    alignItems: 'center',
-    gap: PILL_GAP,
-  },
-  /**
-   * L'ancrage suit les outils : même ligne, en bas à droite.
-   *
-   * « Édition » commande le contenu de la barre : il reste à demeure, et
-   * les outils défilent à sa gauche, jamais dessous.
-   */
-  editAnchor: {
-    position: 'absolute',
-    right: 4,
-    zIndex: 4,
-    alignItems: 'center',
-    gap: PILL_GAP,
-  },
-  /**
-   * La cellule d'un outil : la pastille, et son mot dessous.
-   *
-   * Elle est plus large que la pastille pour loger le mot, mais reste
-   * CENTRÉE sur elle : les colonnes du plan 2D et de la 3D, et la rangée du
-   * bouton d'édition, gardent ainsi le même axe qu'avant.
-   */
-  transition: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    alignItems: 'center',
-    zIndex: 50,
-    elevation: 50,
-  },
-  transitionRing: {
-    position: 'absolute',
-    bottom: 60,
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    borderWidth: 4.5,
-    borderColor: c.blue,
-  },
-  transitionFill: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: c.bg,
-  },
-  watermark: {
-    position: 'absolute',
-    bottom: 10,
-    right: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.88)',
-    borderRadius: 9,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-    gap: 6,
-  },
-  photoFond: {
-    flex: 1,
-    backgroundColor: 'rgba(8,10,14,0.94)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  photoPleine: { width: '100%', height: '78%' },
-  photoBarre: {
-    position: 'absolute',
-    bottom: 40,
-    left: 20,
-    right: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  photoLegende: { color: '#FFFFFF', fontSize: 13, fontWeight: '700', flex: 1 },
-  photoSuppr: { color: '#FF6B6B', fontSize: 13, fontWeight: '800' },
-  watermarkLogo: { width: 116, height: 26, tintColor: c.ink, opacity: 0.85 },
-  watermarkText: { color: '#0B0D12', fontSize: 13, fontWeight: '800' },
-  watermarkAccent: { color: c.blue },
-  /**
-   * La pastille d'attente : EN BAS À GAUCHE.
-   *
-   * En haut, elle passait derrière les pastilles d'outils — son texte
-   * disparaissait sous le bouton « Contrôle ». En bas à gauche, elle est
-   * seule, sous le pouce, et loin du bandeau de cotes qui occupe la droite.
-   */
-  // Bandeau d'attente (pose d'un appareil) : en haut, il ne gêne rien.
-  wallLengthBar: {
-    position: 'absolute',
-    top: 10,
-    left: 10,
-    right: 58,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: c.surface,
-    borderRadius: radius.md,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    ...shadowCard,
-  },
-  wallLengthLabel: { color: c.inkFaint, fontSize: 12, fontWeight: '600', flex: 1 },
-  // Le mur sélectionné : une seule ligne, au pied du plan, à côté du bouton
-  // d'enregistrement. Elle dit l'essentiel et ne mange pas le dessin.
-  wallStrip: {
-    position: 'absolute',
-    // Le pied réel est recalculé à l'affichage : un étage au-dessus de la
-    // rangée de calques, pour ne jamais lui passer dessous.
-    bottom: 10,
-    left: 12,
-    // La colonne d'actions tient la droite : le bandeau s'arrête avant
-    // elle, sinon ses boutons passent dessous.
-    marginRight: 62,
-    // La colonne d'outils descend du HAUT du plan : sous elle, la largeur
-    // est libre. On lui laissait pourtant soixante-dix points de marge —
-    // un cinquième de l'écran perdu, pendant que la cote était tronquée.
-    right: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: c.surface,
-    borderRadius: radius.pill,
-    paddingLeft: 16,
-    paddingRight: 6,
-    paddingVertical: 6,
-    // Les boutons à droite, la cote à gauche : entre les deux, du vide
-    // plutôt qu'un texte écrasé contre eux.
-    justifyContent: 'space-between',
-    ...shadowCard,
-    shadowOpacity: 0.12,
-  },
-  // La précision en gris cède la place la première ; la cote, jamais.
-  wallStripText: { color: c.inkSoft, fontSize: 13, flexShrink: 1 },
-  wallStripStrong: {
-    color: c.ink,
-    fontWeight: '800',
-    fontSize: 14,
-    flexShrink: 0,
-  },
-  wallStripAction: {
-    backgroundColor: c.blue,
-    borderRadius: radius.pill,
-    paddingHorizontal: 13,
-    paddingVertical: 9,
-    marginLeft: 6,
-  },
-  wallStripActionText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
-  wallStripGhost: {
-    backgroundColor: c.surfaceSunken,
-    borderRadius: radius.pill,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    marginLeft: 6,
-  },
-  wallStripGhostText: { color: c.inkSoft, fontSize: 13, fontWeight: '800' },
-  // Une seule ligne, au pied du plan, et LOIN du bouton d'enregistrement :
-  // le bandeau faisait deux étages et son bouton de validation finissait
-  // derrière la pastille bleue.
-  editBar: {
-    position: 'absolute',
-    bottom: 10,
-    left: 12,
-    // Soixante-douze points : la colonne d'actions en tient soixante-deux, et
-    // le bouton de validation débordait du bloc blanc pour aller toucher
-    // « Contrôle ». Dix points de plus, et il rentre chez lui.
-    marginRight: 72,
-    // Toute la largeur : les 84 points réservés au bouton de sauvegarde
-    // n'ont plus lieu d'être, et c'était eux qui poussaient la validation
-    // HORS du bandeau blanc — un bouton bleu flottant à côté de sa barre,
-    // sans rien pour dire qu'il lui appartenait.
-    right: 12,
-    backgroundColor: c.surface,
-    borderRadius: radius.pill,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    ...shadowCard,
-    shadowOpacity: 0.12,
-  },
-  editLabel: { color: c.inkSoft, fontSize: 13, marginBottom: 8, fontWeight: '600' },
-  editRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'nowrap' },
-  input: {
-    backgroundColor: c.bg,
-    color: c.ink,
-    borderRadius: radius.sm,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    fontSize: 17,
-    fontWeight: '700',
-    minWidth: 70,
-    borderWidth: 1,
-    borderColor: c.lineStrong,
-  },
-  unit: { color: c.inkSoft, fontSize: 15, marginHorizontal: 8 },
-  // Champs resserrés : la fiche tient sur une ligne, boutons compris, sans
-  // passer sous le bouton d'enregistrement.
-  /**
-   * Une distance au mur, dans le bandeau du plafond.
-   *
-   * C'est une pastille qu'on TOUCHE, pas un champ qu'on remplit sur place :
-   * le bandeau est en bas de l'écran, et le clavier le recouvre en entier.
-   * L'appui ouvre la feuille de saisie, qui monte avec le clavier.
-   */
-  clChamp: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: c.surfaceSunken,
-    borderRadius: radius.sm,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    marginRight: 8,
-  },
-  clValeur: { color: c.ink, fontSize: 16, fontWeight: '800', minWidth: 30 },
-  inputSmall: {
-    backgroundColor: c.bg,
-    color: c.ink,
-    borderRadius: radius.sm,
-    paddingHorizontal: 6,
-    paddingVertical: 6,
-    fontSize: 14.5,
-    fontWeight: '700',
-    minWidth: 50,
-    textAlign: 'center',
-    borderWidth: 1,
-    borderColor: c.lineStrong,
-  },
-  // `flexShrink: 0` : les trois boutons gardent leur taille, ce sont les
-  // champs qui cèdent si la place manque — jamais l'inverse.
-  editIcons: { flexDirection: 'row', gap: 5, marginLeft: 'auto', flexShrink: 0 },
-  /**
-   * LA RANGÉE DES FLÈCHES, au-dessus des cotes.
-   *
-   * Elle tient dans le MÊME bloc blanc : un second bloc flottant se serait
-   * posé sur la rangée d'outils ou sur la colonne d'actions, et l'on aurait
-   * repris le défaut qu'on vient de corriger.
-   */
-  nudgeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 6,
-  },
-  nudgeBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: radius.sm,
-    backgroundColor: c.surfaceSunken,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  nudgeNote: { color: c.inkFaint, fontSize: 11, fontWeight: '600', marginLeft: 2 },
-  iconBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: radius.sm,
-    backgroundColor: c.surfaceSunken,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  iconBtnOk: {
-    width: 32,
-    height: 32,
-    borderRadius: radius.sm,
-    backgroundColor: c.blue,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  openingButton: {
-    backgroundColor: c.surfaceSunken,
-    borderRadius: radius.sm,
-    paddingHorizontal: 12,
-    paddingVertical: 11,
-    marginLeft: 'auto',
-    marginRight: 8,
-  },
-  openingText: { color: c.inkSoft, fontWeight: '700', fontSize: 13 },
-  applyButton: {
-    backgroundColor: c.blue,
-    borderRadius: radius.sm,
-    paddingHorizontal: 18,
-    minHeight: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  applyText: { color: '#FFFFFF', fontWeight: '700', fontSize: 14 },
-  /**
-   * LE BANDEAU D'UNE PIÈCE.
-   *
-   * Ces styles manquaient : sans `roomActions`, les trois boutons
-   * retombaient en colonne, chacun pleine largeur, et la carte sortait
-   * difforme — c'est ce qu'on voyait après l'ajout d'une pièce.
-   */
-  roomHead: { paddingHorizontal: 4, paddingBottom: 8 },
-  roomNom: { color: c.ink, fontSize: 15, fontWeight: '800' },
-  roomCotes: { color: c.inkFaint, fontSize: 12.5, fontWeight: '600', marginTop: 1 },
-  roomActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  roomAction: {
-    backgroundColor: c.surfaceSunken,
-    borderRadius: radius.sm,
-    paddingHorizontal: 16,
-    minHeight: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  roomActionText: { color: c.inkSoft, fontWeight: '700', fontSize: 13.5 },
-  exportChoice: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 13,
-    backgroundColor: c.surfaceSunken,
-    borderRadius: radius.md,
-    paddingHorizontal: 13,
-    paddingVertical: 12,
-    marginTop: 8,
-  },
-  exportChoiceTexts: { flex: 1 },
-  exportChoiceOn: { backgroundColor: c.blueSoft },
-  exportChoiceTitle: { color: c.ink, fontSize: 15.5, fontWeight: '700' },
-  exportChoiceTitleOn: { color: c.blue },
-  exportChoiceDetail: {
-    color: c.inkFaint,
-    fontSize: 12.5,
-    lineHeight: 17,
-    marginTop: 2,
-  },
-  issueScroll: { maxHeight: 320, marginTop: 4 },
-  issueRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    paddingVertical: 11,
-    borderBottomWidth: 1,
-    borderBottomColor: c.line,
-  },
-  issueDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginTop: 5,
-    marginRight: 11,
-    backgroundColor: c.inkFaint,
-  },
-  issueDotAlert: { backgroundColor: c.danger },
-  issueTexts: { flex: 1 },
-  issueMessage: { color: c.ink, fontSize: 14.5, fontWeight: '600' },
-  issueHint: { color: c.inkFaint, fontSize: 12.5, marginTop: 2, lineHeight: 17 },
-  nameScroll: { maxHeight: 260 },
-  nameGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
-  nameChip: {
-    backgroundColor: c.surfaceSunken,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: c.line,
-    paddingHorizontal: 13,
-    paddingVertical: 8,
-  },
-  nameChipOn: { backgroundColor: c.blueSoft, borderColor: c.blue },
-  nameChipText: { color: c.ink, fontSize: 14, fontWeight: '600' },
-  /** Les cotes de la pièce proposée, sous son nom. */
-  nameChipDim: { color: c.inkFaint, fontSize: 11, fontWeight: '600' },
-  nameChipTextOn: { color: c.blue, fontWeight: '800' },
-  removeRoomButton: {
-    backgroundColor: c.surfaceSunken,
-    borderRadius: radius.sm,
-    paddingHorizontal: 16,
-    paddingVertical: 11,
-    marginLeft: 10,
-  },
-  removeRoomText: { color: c.danger, fontWeight: '700', fontSize: 14 },
-  objectList: { maxHeight: 58, marginTop: 10, marginBottom: 6, flexGrow: 0 },
-  objectChipSelected: { borderColor: c.blue, borderWidth: 1.5 },
-  objectChip: {
-    backgroundColor: c.surface,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    borderColor: c.line,
-    paddingHorizontal: 13,
-    paddingVertical: 7,
-    marginRight: 8,
-  },
-  objectName: { color: c.ink, fontSize: 13, fontWeight: '700' },
-  objectDims: { color: c.inkFaint, fontSize: 11.5 },
-  exportButton: {
-    backgroundColor: c.blue,
-    borderRadius: radius.pill,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginTop: 14,
-    ...glow(c.blue),
-  },
-  switchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: c.bg,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    borderColor: c.line,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    marginTop: 4,
-  },
-  switchLabel: { color: c.ink, fontSize: 14.5, fontWeight: '600' },
-  actions: { flexDirection: 'row', gap: 10, paddingBottom: 34, paddingTop: 8 },
-  primaryButton: {
-    flex: 1,
-    backgroundColor: c.blue,
-    borderRadius: radius.pill,
-    paddingVertical: 15,
-    alignItems: 'center',
-    ...glow(c.blue),
-  },
-  primaryText: { color: '#FFFFFF', fontSize: 15.5, fontWeight: '700' },
-  secondaryButton: {
-    flex: 1,
-    backgroundColor: c.surface,
-    borderRadius: radius.pill,
-    paddingVertical: 15,
-    // Trois boutons sur la ligne : l'icône et le mot se serrent la main
-    // plutôt que de s'empiler.
-    flexDirection: 'row',
-    gap: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...shadowCard,
-    shadowOpacity: 0.05,
-  },
-  secondaryText: { color: c.ink, fontSize: 14, fontWeight: '600' },
-  secondaryTextBlue: { color: c.blue, fontWeight: '700' },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(11,13,18,0.45)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 28,
-  },
-  modalCard: {
-    backgroundColor: c.surface,
-    borderRadius: radius.lg,
-    padding: 20,
-    width: '100%',
-    ...shadowCard,
-  },
-  modalTitle: { color: c.ink, fontSize: 17, fontWeight: '800' },
-  elecWrap: { width: '100%' },
-  // L'établi ne s'étire plus jusqu'au bas de l'écran : il fait la taille
-  // de ce qu'il porte, et se pose au milieu de la hauteur libre.
-  elecWrapPlein: { flex: 1, justifyContent: 'center' },
-  elecPlein: { width: '100%' },
-  // Plein écran, aux marges près : le pouce a besoin de la place.
-  modalBackdropPlein: { padding: 12, paddingTop: 56, justifyContent: 'flex-end' },
-  // Diagnostic : un état d'abord — combien, et est-ce grave —, puis la
-  // liste. L'ancienne fenêtre commençait par une consigne d'usage.
-  // Le volet d'une pièce : son nom, le nombre de constats, un chevron qui
-  // pivote. Rien de plus — c'est un séparateur qu'on peut viser du pouce.
-  // Carte d'explication du mur rouge : posée sous la barre de cote, elle
-  // répond à l'appui sans couvrir le mur qu'on vient de toucher.
-  elecCard: {
-    position: 'absolute',
-    top: 62,
-    left: 10,
-    right: 58,
-    backgroundColor: c.surface,
-    borderRadius: radius.md,
-    borderLeftWidth: 4,
-    borderLeftColor: c.danger,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    ...shadowCard,
-  },
-  elecCardHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  elecDotAlert: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: c.danger,
-  },
-  elecCardTitle: { color: c.ink, fontSize: 13.5, fontWeight: '800', flex: 1 },
-  elecCardRule: {
-    color: c.inkSoft,
-    fontSize: 11.5,
-    lineHeight: 16,
-    marginTop: 5,
-  },
-  elecCardMore: {
-    color: c.blue,
-    fontSize: 12,
-    fontWeight: '700',
-    marginTop: 9,
-  },
-  // La rose des vents occupe le coin haut-gauche : les bandeaux se
-  // décalent pour ne pas la couvrir.
-  barShift: { left: 62 },
-  // Deux pastilles ancrées au lieu d'une : le bandeau recule d'autant.
-  barShiftRight: { right: 102 },
-  elecCardActions: { flexDirection: 'row', gap: 8, marginTop: 10 },
-  elecFix: {
-    backgroundColor: c.blue,
-    borderRadius: radius.sm,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-  },
-  elecFixText: { color: '#FFFFFF', fontSize: 12.5, fontWeight: '800' },
-  elecSee: {
-    backgroundColor: c.surfaceSunken,
-    borderRadius: radius.sm,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-  },
-  elecSeeText: { color: c.inkSoft, fontSize: 12.5, fontWeight: '700' },
-  elecScroll: { maxHeight: 340 },
-  elecFamily: {
-    color: c.inkFaint,
-    fontSize: 11.5,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginTop: 12,
-    marginBottom: 6,
-  },
-  elecGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  catSearch: {
-    backgroundColor: c.bg,
-    color: c.ink,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: c.lineStrong,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    fontSize: 15,
-    fontWeight: '600',
-    marginTop: 12,
-    marginBottom: 4,
-  },
-  catScroll: { maxHeight: 380 },
-  catGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  catCard: {
-    width: 92,
-    alignItems: 'center',
-    backgroundColor: c.surfaceSunken,
-    borderRadius: radius.md,
-    paddingVertical: 8,
-    paddingHorizontal: 4,
-  },
-  catName: {
-    color: c.ink,
-    fontSize: 11.5,
-    fontWeight: '700',
-    marginTop: 4,
-    textAlign: 'center',
-  },
-  catDims: { color: c.inkFaint, fontSize: 9.5, fontWeight: '600', marginTop: 1 },
-  elecChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: c.surfaceSunken,
-    borderRadius: radius.pill,
-    paddingLeft: 6,
-    paddingRight: 14,
-    paddingVertical: 6,
-  },
-  elecDot: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  elecDotText: { color: '#FFFFFF', fontSize: 9.5, fontWeight: '800' },
-  elecChipText: { color: c.ink, fontSize: 13.5, fontWeight: '700' },
-  modalSubtitle: {
-    color: c.inkFaint,
-    fontSize: 12.5,
-    lineHeight: 17,
-    marginTop: 4,
-    marginBottom: 12,
-  },
-  modalCopy: { alignItems: 'center', paddingTop: 14 },
-  modalCopyText: { color: c.blue, fontSize: 14, fontWeight: '700' },
-  modalInput: {
-    backgroundColor: c.bg,
-    color: c.ink,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    borderColor: c.lineStrong,
-    paddingHorizontal: 14,
-    paddingVertical: 11,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  modalActions: { flexDirection: 'row', gap: 10, marginTop: 16 },
-  modalGhost: {
-    flex: 1,
-    borderRadius: radius.sm,
-    paddingVertical: 12,
-    alignItems: 'center',
-    backgroundColor: c.surfaceSunken,
-  },
-  modalGhostText: { color: c.inkSoft, fontWeight: '600', fontSize: 14.5 },
-  modalPrimary: {
-    flex: 1,
-    borderRadius: radius.sm,
-    paddingVertical: 12,
-    alignItems: 'center',
-    backgroundColor: c.blue,
-  },
-  modalPrimaryText: { color: '#FFFFFF', fontWeight: '700', fontSize: 14.5 },
-}));

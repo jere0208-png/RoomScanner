@@ -34,8 +34,36 @@ src/
 ├── geometry/appearance.ts   Couleurs relevées au scan + semis du sol
 ├── native/useRoomScan.ts    Abonnement aux événements natifs + commandes
 ├── components/FloorplanEditor.tsx  Plan 2D SVG : coins déplaçables, cotes
-└── screens/                 Home / Scan (HUD sur vue AR) / Résultat (plan éditable)
+├── screens/                 Home / Scan (HUD sur vue AR) / Résultat (plan éditable)
+└── screens/result/          Ce que l'écran des résultats POSE PAR-DESSUS le
+                             plan : ses sept feuilles modales, ses deux
+                             rangées d'outils, et ses styles
 ```
+
+### L'écran des résultats se lit en morceaux
+
+C'est le fichier le plus risqué du dépôt : le plan, ses bandeaux, ses sept
+fenêtres et huit cents lignes de styles y tenaient ensemble, et une retouche
+de mise en page obligeait à traverser tout le reste pour arriver à la clé à
+changer — deux fois, des styles y ont été cassés sans que personne le voie.
+
+Ce qui se POSE PAR-DESSUS le plan vit désormais à côté, dans
+`src/screens/result/` : le choix du format d'export, l'ajout d'une pièce, le
+nom d'une pièce, la photo de repérage, le catalogue de mobilier, celui de
+l'appareillage, le renommage du scan — et les deux rangées d'outils, celle du
+plan et celle de la vue 3D. Les styles, eux, sont dans leur propre module :
+`themedStyles` mémoïse par palette, donc tout le monde reçoit LE MÊME objet,
+sans un style recalculé.
+
+Les rangées d'outils LISENT LE MAGASIN plutôt que de se faire passer les
+calques : `showFurniture`, `showSurfaces`, `solidWalls` y sont déjà, et les
+faire transiter par l'écran n'ajoutait que douze propriétés à recopier.
+
+**Le déplacement s'est prouvé, il ne s'est pas relu.** L'arbre rendu a été
+vidé dans six états — lecture, export ouvert, édition, catalogue de mobilier,
+établi électrique, vue 3D — avant et après : 1,77 Mo, identiques à l'octet
+près. Et `bandeaux.test.tsx`, qui ne regardait que les bandeaux du bas, couvre
+maintenant les sept feuilles et les deux rangées.
 
 ### Les pièces se détectent toutes seules
 

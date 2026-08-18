@@ -12,9 +12,10 @@
  * et il n'y en a jamais deux à la fois — ils occupent la même place au bas
  * de l'écran.
  *
- * Il sert aussi à découper cet écran de trois mille quatre cents lignes sans
- * rien casser : déplacer du code qu'aucun test ne regarde, c'est échanger
- * une dette contre un risque.
+ * Il a aussi servi à DÉCOUPER cet écran sans rien casser : déplacer du code
+ * qu'aucun test ne regarde, c'est échanger une dette contre un risque. Les
+ * sept feuilles modales et les deux rangées d'outils, parties dans
+ * `src/screens/result/`, ont donc chacune leur épreuve plus bas.
  */
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn(async () => null),
@@ -33,6 +34,10 @@ import { PILL_CELL_H } from '../src/components/ToolPill';
 import { Circle, Path, Text as SvgText } from 'react-native-svg';
 import TestRenderer, { act } from 'react-test-renderer';
 import { ResultScreen } from '../src/screens/ResultScreen';
+import { ClientTour } from '../src/components/ClientTour';
+import { FloorplanEditor } from '../src/components/FloorplanEditor';
+import { FIXTURE_FAMILIES } from '../src/geometry/electrical';
+import { CEILINGS, CEILING_KINDS } from '../src/geometry/ceiling';
 import { useScanStore } from '../src/store/scanStore';
 import {
   SNAPSHOT_FIXTURES,
@@ -544,5 +549,327 @@ describe('l’écran des résultats', () => {
     // Le bandeau du plafond est ouvert : celui du mur ne doit pas l'être.
     expect(bouton(tree, 'Relier à une commande')).toBeDefined();
     expect(bouton(tree, 'Élec')).toBeUndefined();
+  });
+});
+
+/**
+ * LES FEUILLES MODALES DE L'ÉCRAN — le banc qui manquait pour les déplacer.
+ *
+ * Sept fenêtres se relaient par-dessus le plan : le choix du format
+ * d'export, le renommage du scan, l'ajout d'une pièce, la liste des noms de
+ * pièce, le catalogue de mobilier, celui de l'appareillage, et la photo de
+ * repérage en grand. Elles vivaient au milieu de l'écran des résultats, dans
+ * le même fichier que le plan et ses bandeaux, et rien ne les regardait :
+ * les sortir sans banc, c'était échanger une dette contre un risque.
+ *
+ * On vérifie ce qui compte pour chacune : le geste qui l'ouvre l'ouvre bien,
+ * et elle porte ce qu'elle annonce.
+ */
+describe('les feuilles de l’écran des résultats', () => {
+  /** L'action d'une feuille de menu, prise par son intitulé. */
+  const actionDuMenu = (
+    tree: TestRenderer.ReactTestRenderer,
+    label: string,
+  ) => {
+    const cible = tree.root
+      .findAll((n) => typeof n.props?.onPress === 'function')
+      .filter((n) =>
+        n.findAllByType(Text).some((x) => x.props.children === label),
+      )
+      .pop();
+    expect(cible).toBeDefined();
+    act(() => cible!.props.onPress());
+    // La feuille se retire AVANT que l'action parte : c'est la règle iOS,
+    // deux écrans ne se présentent pas ensemble.
+    act(() => {
+      jest.advanceTimersByTime(600);
+    });
+  };
+
+  /**
+   * LE CHOIX DU FORMAT — cinq sorties, pas une de moins.
+   *
+   * Chacune a dû se battre pour sa place ; une disparition passerait
+   * inaperçue jusqu'au jour où quelqu'un cherche son PDF.
+   */
+  it('ouvre le format d’export, avec ses cinq sorties', () => {
+    const tree = monter();
+    const b = bouton(tree, 'Exporter');
+    expect(b).toBeDefined();
+    act(() => b!.props.onPress());
+    const vu = textes(tree);
+    expect(vu).toContain('Plan PDF');
+    expect(vu).toContain('Modèle 3D');
+    expect(vu).toContain('Liste du matériel');
+    expect(vu).toContain('Image');
+    expect(vu).toContain('Présentation animée');
+  });
+
+  /**
+   * LA PRÉSENTATION N'EST MONTÉE QU'UNE FOIS.
+   *
+   * Elle l'était deux fois, à deux endroits du même rendu : deux visites
+   * animées superposées, chacune avec ses minuteries et son état. Personne
+   * ne l'avait vu — la seconde est cachée sous la première.
+   */
+  it('ne monte la présentation qu’une seule fois', () => {
+    const tree = monter();
+    expect(tree.root.findAllByType(ClientTour)).toHaveLength(1);
+  });
+
+  /**
+   * LE RENOMMAGE DU SCAN, en feuille du bas : le clavier la pousse, il ne
+   * la recouvre pas. Elle porte aussi la copie — c'est là qu'on décide de
+   * garder l'ancien dossier.
+   */
+  it('ouvre le renommage du scan, avec sa copie', () => {
+    const tree = monter();
+    act(() => bouton(tree, 'Plus')!.props.onPress());
+    expect(textes(tree)).toContain('Renommer le scan');
+    actionDuMenu(tree, 'Renommer le scan');
+    const vu = textes(tree);
+    expect(vu).toContain('Nom du scan');
+    expect(vu).toContain('Enregistrer comme nouvelle copie');
+    // Le champ arrive REMPLI du nom courant : on retouche, on ne resaisit pas.
+    const champ = tree.root
+      .findAllByType(TextInput)
+      .find((n) => n.props.value === 'Chantier test');
+    expect(champ).toBeDefined();
+  });
+
+  /** L'AJOUT D'UNE PIÈCE : des gabarits, pas un formulaire. */
+  it('ouvre l’ajout d’une pièce, avec ses gabarits', () => {
+    const tree = monter();
+    act(() => bouton(tree, 'Plus')!.props.onPress());
+    actionDuMenu(tree, 'Ajouter une pièce');
+    const vu = textes(tree);
+    expect(vu).toContain('Ajouter une pièce');
+    expect(vu).toContain('Chambre');
+    expect(vu).toContain('Cuisine');
+    expect(vu).toContain('WC');
+  });
+
+  /**
+   * LA LISTE DES NOMS — une liste, pas un clavier.
+   *
+   * On l'atteint par le bandeau de la pièce, ouvert en touchant son sol.
+   */
+  it('ouvre la liste des noms de pièce depuis son bandeau', () => {
+    const tree = monter();
+    act(() => bouton(tree, 'Édition')!.props.onPress());
+    act(() => {
+      jest.advanceTimersByTime(500);
+    });
+    const sol = tree.root
+      .findAll((n) => typeof n.props?.onPress === 'function')
+      .find(
+        (n) => n.findAll((x) => x.props?.fill === 'url(#floorDots)').length > 0,
+      );
+    act(() => sol!.props.onPress());
+    act(() => bouton(tree, 'Nommer la pièce')!.props.onPress());
+    const vu = textes(tree);
+    expect(vu).toContain('Nom de la pièce');
+    expect(vu).toContain('Séjour');
+    expect(vu).toContain('Autre…');
+  });
+
+  /**
+   * LE CATALOGUE DE MOBILIER, et sa recherche.
+   *
+   * À trente entrées, on sait ce qu'on cherche : le champ doit réduire la
+   * liste, accents compris — « evier » trouve « Évier ».
+   */
+  it('ouvre le catalogue de mobilier, et le filtre sans accent', () => {
+    const tree = monter();
+    act(() => bouton(tree, 'Édition')!.props.onPress());
+    act(() => {
+      jest.advanceTimersByTime(500);
+    });
+    act(() => bouton(tree, 'Ajouter')!.props.onPress());
+    expect(textes(tree)).toContain('Ajouter un meuble');
+    const champ = tree.root
+      .findAllByType(TextInput)
+      .find((n) => n.props.placeholder === 'Rechercher un meuble…');
+    expect(champ).toBeDefined();
+    expect(textes(tree)).toContain('Lit double');
+    act(() => champ!.props.onChangeText('evier'));
+    const apres = textes(tree);
+    expect(apres).toContain('Évier');
+    expect(apres).not.toContain('Lit double');
+  });
+
+  /**
+   * LE CATALOGUE DE L'APPAREILLAGE, par familles.
+   *
+   * Aucun mur n'est désigné : c'est le catalogue qui s'ouvre, pas le mur vu
+   * de face — on choisit l'appareil, puis on touche le mur qui le reçoit.
+   */
+  it('ouvre le catalogue de l’appareillage, par familles', () => {
+    const tree = monter();
+    act(() => bouton(tree, 'Édition')!.props.onPress());
+    act(() => {
+      jest.advanceTimersByTime(500);
+    });
+    act(() => bouton(tree, 'Appareil')!.props.onPress());
+    const vu = textes(tree);
+    expect(vu).toContain('Ajouter un appareil');
+    // Toutes les familles du catalogue sont annoncées, pas seulement la
+    // première : c'est le déroulé entier qu'on déplace.
+    for (const famille of FIXTURE_FAMILIES) {
+      expect(vu).toContain(famille.name);
+    }
+  });
+
+  /**
+   * LA PHOTO DE REPÉRAGE, EN GRAND — et ce qu'elle montre.
+   *
+   * Une photo sans légende ne sert à rien trois semaines plus tard : elle
+   * annonce le mur qu'elle documente, avec sa longueur.
+   */
+  it('ouvre la photo de repérage, légendée de son mur', () => {
+    const tree = monter();
+    act(() =>
+      useScanStore.setState({
+        photos: [
+          {
+            id: 'ph1',
+            wallId: SNAPSHOT_WALLS[0].id,
+            path: '/tmp/mur.jpg',
+            at: 0,
+            along: 0.5,
+          },
+        ],
+      }),
+    );
+    const plan = tree.root.findAllByType(FloorplanEditor)[0];
+    act(() => plan.props.onSelectPhoto('ph1'));
+    const vu = textes(tree);
+    expect(vu).toMatch(/Mur de \d+,\d+ m/);
+    expect(vu).toContain('Supprimer');
+  });
+});
+
+/**
+ * LA RANGÉE D'OUTILS — les deux jeux, et le menu du plafond.
+ *
+ * Elle vivait au milieu de l'écran des résultats, et seule sa moitié 2D
+ * était regardée : la rangée de la vue 3D — neuf calques, dont trois qui ne
+ * paraissent que si le scan les justifie — n'avait aucun banc. Or c'est
+ * précisément celle qu'on casse sans s'en apercevoir : il faut basculer de
+ * vue pour la voir.
+ */
+describe('la rangée d’outils', () => {
+  /** Bascule en vue 3D, animation comprise. */
+  const passerEn3D = (tree: TestRenderer.ReactTestRenderer) => {
+    act(() => bouton(tree, 'Passer en 3D')!.props.onPress());
+    act(() => {
+      jest.advanceTimersByTime(1200);
+    });
+  };
+
+  /**
+   * EN LECTURE, une pastille ne fait qu'AFFICHER ou CACHER ; en édition,
+   * elle TRAVAILLE. Les deux jeux ne se mélangent jamais — c'est la règle
+   * qui a fait sortir le « + » du catalogue de la rangée de lecture.
+   */
+  it('échange les calques contre les outils en édition', () => {
+    const tree = monter();
+    expect(bouton(tree, 'Cotes')).toBeDefined();
+    expect(bouton(tree, 'Appareil')).toBeUndefined();
+    act(() => bouton(tree, 'Édition')!.props.onPress());
+    act(() => {
+      jest.advanceTimersByTime(500);
+    });
+    expect(bouton(tree, 'Appareil')).toBeDefined();
+    expect(bouton(tree, 'Redresser')).toBeDefined();
+    expect(bouton(tree, 'Ajouter')).toBeDefined();
+    // Les calques ont cédé la place : ils reviendront en sortant d'édition.
+    expect(bouton(tree, 'Cotes')).toBeUndefined();
+    expect(bouton(tree, 'Surfaces')).toBeUndefined();
+  });
+
+  /**
+   * LE MENU DU PLAFOND, et la ligne de spots en tête.
+   *
+   * Quatre spots dans un séjour, c'était quatre poses suivies de quatre
+   * réglages. La ligne se demande donc d'un geste, et le nombre se choisit
+   * dans la foulée.
+   */
+  it('ouvre le menu du plafond, ligne de spots en tête', () => {
+    const tree = monter();
+    act(() => bouton(tree, 'Édition')!.props.onPress());
+    act(() => {
+      jest.advanceTimersByTime(500);
+    });
+    act(() => bouton(tree, 'Plafond')!.props.onPress());
+    const vu = textes(tree);
+    expect(vu).toContain('Équiper le plafond');
+    expect(vu).toContain('Ligne de spots');
+    // Et le catalogue entier derrière elle, pas seulement le premier.
+    for (const k of CEILING_KINDS) {
+      expect(vu).toContain(CEILINGS[k].label);
+    }
+  });
+
+  /**
+   * LA RANGÉE DE LA VUE 3D — neuf calques, dont trois conditionnels.
+   *
+   * « Repères » n'a de sens qu'avec de l'appareillage posé, « Pièces »
+   * qu'à partir de deux pièces, « Plafond » qu'avec un plafond équipé. Une
+   * pastille qui n'allume rien est un piège : on appuie, il ne se passe
+   * rien, et on croit l'application cassée.
+   */
+  it('porte ses calques en vue 3D, murs et repères compris', () => {
+    const tree = monter();
+    passerEn3D(tree);
+    expect(bouton(tree, 'Passer en 2D')).toBeDefined();
+    expect(bouton(tree, 'Murs')).toBeDefined();
+    expect(bouton(tree, 'Cotes')).toBeDefined();
+    expect(bouton(tree, 'Meubles')).toBeDefined();
+    expect(bouton(tree, 'Surfaces')).toBeDefined();
+    expect(bouton(tree, 'Nord')).toBeDefined();
+    // Le scan de référence porte de l'appareillage, un plafond et deux
+    // pièces : les trois pastilles conditionnelles sont donc là.
+    expect(bouton(tree, 'Repères')).toBeDefined();
+    expect(bouton(tree, 'Plafond')).toBeDefined();
+    expect(bouton(tree, 'Pièces')).toBeDefined();
+    // Le bouton d'édition, lui, n'existe PAS en 3D : on n'y retouche rien.
+    expect(bouton(tree, 'Édition')).toBeUndefined();
+  });
+
+  /**
+   * ET LES PASTILLES CONDITIONNELLES SE TAISENT quand rien ne les justifie.
+   */
+  it('n’offre ni repères ni pièces sur un scan nu', () => {
+    let tree!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      useScanStore.setState({
+        screen: 'result',
+        scanName: 'Scan nu',
+        walls: SNAPSHOT_WALLS,
+        openings: [],
+        objects: [],
+        rooms: [{ id: SNAPSHOT_ROOMS[0].id, name: 'Séjour', floor: null }],
+        fixtures: [],
+        ceiling: [],
+        photos: [],
+      });
+      tree = TestRenderer.create(<ResultScreen />);
+    });
+    act(() => {
+      for (const n of tree.root.findAllByType(View)) {
+        if (typeof n.props.onLayout === 'function') {
+          n.props.onLayout({
+            nativeEvent: { layout: { width: 390, height: 520 } },
+          });
+        }
+      }
+    });
+    passerEn3D(tree);
+    expect(bouton(tree, 'Murs')).toBeDefined();
+    expect(bouton(tree, 'Repères')).toBeUndefined();
+    expect(bouton(tree, 'Pièces')).toBeUndefined();
+    expect(bouton(tree, 'Plafond')).toBeUndefined();
+    act(() => tree.unmount());
   });
 });
