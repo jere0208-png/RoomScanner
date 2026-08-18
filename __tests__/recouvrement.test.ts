@@ -349,6 +349,8 @@ describe('un meuble ne se traverse pas lui-même', () => {
           depth: faceDepth(f, project, cam, rangs),
           owner: f.ownerId,
           room: f.roomId,
+          pan: f.panId,
+          bord: f.bordDe,
         }));
       ajusterBlocs(vues);
       const peintes = [...vues].sort((a, b) => a.depth - b.depth);
@@ -380,5 +382,69 @@ describe('un meuble ne se traverse pas lui-même', () => {
         total ? ' — ' + [...fautes.keys()].slice(0, 6).join(', ') : ''
       }`,
     ).toBe('0 recouvrement(s)');
+  });
+});
+
+/**
+ * ET SES ARÊTES NE TRAVERSENT PAS.
+ *
+ * Relevé du chantier : « les meubles sont toujours transparents ». Ce n'était
+ * pas une opacité — aucune face de meuble n'en porte — mais SES ARÊTES : les
+ * trois quarts des faces d'un meuble sont des traits, quatre-vingt-huit pour
+ * un lit. Un trait n'a pas de surface : le tri à l'écran ne peut rien en
+ * dire, et ceux du dos passaient par-dessus l'avant. On croit alors voir au
+ * travers.
+ *
+ * Chaque arête suit désormais SON pan. Le banc le vérifie comme l'œil : au
+ * milieu d'une arête, si un aplat du même meuble est DEVANT elle, il doit
+ * être peint après — sinon l'arête se voit par-dessus.
+ */
+describe('les arêtes d’un meuble', () => {
+  it('ne se voient pas au travers de ses pans', () => {
+    const { faces, rooms } = buildScene(SALON.walls, [], SALON.objects, {
+      palette: PAL,
+      showSurfaces: true,
+      rooms: SALON.rooms,
+      fixtures: SALON.fixtures,
+    });
+    const centre = sceneFraming(faces).center;
+    let fautes = 0;
+    for (const cam of ANGLES) {
+      const project = projecteur(cam, centre, 60);
+      const rangs = roomRanks(rooms, cam);
+      const vues = faces
+        .filter((f) => !isHiddenFace(f, cam) && f.ownerId)
+        .map((f) => ({
+          f,
+          proj: f.pts.map(project),
+          depth: faceDepth(f, project, cam, rangs),
+          owner: f.ownerId,
+          room: f.roomId,
+          pan: f.panId,
+          bord: f.bordDe,
+        }));
+      ajusterBlocs(vues);
+      const peintes = [...vues].sort((a, b) => a.depth - b.depth);
+      const rang = new Map(peintes.map((p, i) => [p.f, i] as [Face3D, number]));
+      const aplats = vues.filter((v) => v.f.fill !== null && v.proj.length >= 3);
+      for (const t of vues) {
+        if (t.f.fill !== null || t.proj.length !== 2) continue;
+        const pt = {
+          sx: (t.proj[0].sx + t.proj[1].sx) / 2,
+          sy: (t.proj[0].sy + t.proj[1].sy) / 2,
+        };
+        const dt = (t.proj[0].depth + t.proj[1].depth) / 2;
+        for (const a of aplats) {
+          if (!dansLePolygone(pt, a.proj)) continue;
+          const da = profondeurAu(a.f, pt, project);
+          if (da === null) continue;
+          // L'aplat est DEVANT le trait : il doit le couvrir, donc être
+          // peint après. Deux centimètres de tolérance : une arête borde
+          // son propre pan, ils sont coplanaires.
+          if (da > dt + 0.02 && rang.get(a.f)! < rang.get(t.f)!) fautes++;
+        }
+      }
+    }
+    expect(`${fautes} arête(s) au travers`).toBe('0 arête(s) au travers');
   });
 });

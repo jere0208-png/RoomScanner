@@ -20,6 +20,7 @@ import type { ObjectData } from 'react-native-room-scan';
 import {
   WALL_T,
   alignToFit,
+  pushOutOfObjects,
   fitInNook,
   hugWall,
   roomParts,
@@ -340,3 +341,89 @@ describe('le meuble de biais dans une alcôve', () => {
     expect(Math.min(reste, Math.PI / 2 - reste)).toBeLessThan(0.02);
   });
 });
+
+/**
+ * DEUX MEUBLES NE SE SUPERPOSENT PAS.
+ *
+ * Relevé du chantier : « empêche la superposition de meubles avec une logique
+ * de magnétisme à l'approche d'un autre ». Sur un plan, deux emprises qui se
+ * chevauchent ne veulent rien dire — et vu de dessus, ça ne se voit même pas.
+ */
+describe('deux meubles qui se rencontrent', () => {
+  /** Se recouvrent-ils ? (théorème de l'axe séparateur, cas rectangulaire) */
+  const seTouchent = (
+    a: { cx: number; cz: number; width: number; depth: number; yaw: number },
+    b: { cx: number; cz: number; width: number; depth: number; yaw: number },
+  ) => {
+    const demi = (
+      e: { width: number; depth: number; yaw: number },
+      n: { x: number; z: number },
+    ) =>
+      Math.abs(Math.cos(e.yaw) * n.x + Math.sin(e.yaw) * n.z) * (e.width / 2) +
+      Math.abs(-Math.sin(e.yaw) * n.x + Math.cos(e.yaw) * n.z) * (e.depth / 2);
+    for (const yaw of [a.yaw, b.yaw]) {
+      for (const n of [
+        { x: Math.cos(yaw), z: Math.sin(yaw) },
+        { x: -Math.sin(yaw), z: Math.cos(yaw) },
+      ]) {
+        const d = Math.abs((a.cx - b.cx) * n.x + (a.cz - b.cz) * n.z);
+        // Un millimètre de tolérance : deux meubles POSÉS côte à côte se
+        // touchent, et c'est ce qu'on veut — ce qu'on refuse, c'est qu'ils
+        // se chevauchent.
+        if (d > demi(a, n) + demi(b, n) - 0.001) return false;
+      }
+    }
+    return true;
+  };
+
+  const COMMODE = {
+    cx: 2.5,
+    cz: 2,
+    width: 1.2,
+    depth: 0.5,
+    yaw: 0,
+  };
+
+  it('ressort par le côté le plus court', () => {
+    // Une table posée presque au même endroit que la commode.
+    const p = pushOutOfObjects(
+      { x: 2.6, z: 2.1 },
+      { width: 1, depth: 0.8, yaw: 0 },
+      [COMMODE],
+    );
+    expect(
+      seTouchent(
+        { ...p2e(p), width: 1, depth: 0.8, yaw: 0 },
+        COMMODE,
+      ),
+    ).toBe(false);
+    // Il est sorti par la profondeur — le plus court chemin — et non le
+    // long de la commode.
+    expect(Math.abs(p.x - 2.6)).toBeLessThan(0.01);
+  });
+
+  it('referme un jour de trois centimètres', () => {
+    // Bord à bord à trois centimètres près, dans l'axe de la profondeur.
+    const cz = 2 + 0.25 + 0.4 + 0.03;
+    const p = pushOutOfObjects(
+      { x: 2.5, z: cz },
+      { width: 1, depth: 0.8, yaw: 0 },
+      [COMMODE],
+    );
+    expect(cz - p.z).toBeCloseTo(0.03, 2);
+  });
+
+  it('ne touche pas à un meuble posé au large', () => {
+    const p = pushOutOfObjects(
+      { x: 2.5, z: 3.6 },
+      { width: 1, depth: 0.8, yaw: 0 },
+      [COMMODE],
+    );
+    expect(p.z).toBeCloseTo(3.6, 6);
+  });
+});
+
+/** Un point en emprise, pour le banc. */
+function p2e(p: { x: number; z: number }) {
+  return { cx: p.x, cz: p.z };
+}

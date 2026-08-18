@@ -581,6 +581,96 @@ export function fitInNook(
   };
 }
 
+/** Une emprise au sol : centre, cotes, orientation. */
+export interface Emprise {
+  cx: number;
+  cz: number;
+  width: number;
+  depth: number;
+  yaw: number;
+}
+
+/**
+ * DEUX MEUBLES NE SE SUPERPOSENT PAS.
+ *
+ * Relevé du chantier : « empêche la superposition de meubles avec une logique
+ * de magnétisme à l'approche d'un autre ». Sur un plan de chantier, deux
+ * emprises qui se chevauchent ne veulent rien dire : on ne pose pas une
+ * commode dans un lit. Et l'œil ne rattrape pas l'erreur — vu de dessus, un
+ * meuble sur un autre ressemble à un meuble.
+ *
+ * On les sépare comme deux caisses qu'on pousse : la profondeur de
+ * pénétration se mesure sur les quatre directions des deux rectangles (leurs
+ * côtés), et l'on ressort par LA PLUS COURTE — c'est le geste naturel, celui
+ * qui dérange le moins la position visée. Et quand il ne reste qu'un jour de
+ * quelques centimètres, on le referme : deux meubles à trois centimètres l'un
+ * de l'autre sont deux meubles côte à côte.
+ */
+export function pushOutOfObjects(
+  centre: Pt,
+  box: { width: number; depth: number; yaw: number },
+  autres: Emprise[],
+): Pt {
+  /** Jour refermé sans discuter, comme contre un mur. */
+  const AIMANT = 0.04;
+  let p = { ...centre };
+  const demi = (e: { width: number; depth: number; yaw: number }, n: Pt) =>
+    Math.abs(Math.cos(e.yaw) * n.x + Math.sin(e.yaw) * n.z) * (e.width / 2) +
+    Math.abs(-Math.sin(e.yaw) * n.x + Math.cos(e.yaw) * n.z) * (e.depth / 2);
+  for (let passe = 0; passe < 2; passe++) {
+    for (const o of autres) {
+      // Les quatre directions à examiner : les côtés de l'un et de l'autre.
+      const axes: Pt[] = [];
+      for (const n of [
+        { x: Math.cos(box.yaw), z: Math.sin(box.yaw) },
+        { x: -Math.sin(box.yaw), z: Math.cos(box.yaw) },
+        { x: Math.cos(o.yaw), z: Math.sin(o.yaw) },
+        { x: -Math.sin(o.yaw), z: Math.cos(o.yaw) },
+      ]) {
+        // Deux meubles alignés donnent quatre fois les deux mêmes
+        // directions : garder les doublons ferait croire à deux axes
+        // séparateurs là où il n'y en a qu'un, et l'aimant ne prendrait
+        // jamais.
+        if (axes.some((m) => Math.abs(m.x * n.x + m.z * n.z) > 0.999)) continue;
+        axes.push(n);
+      }
+      /** Le jeu sur chaque axe : négatif quand ça se chevauche. */
+      const jeux = axes.map((n) => {
+        const d = (p.x - o.cx) * n.x + (p.z - o.cz) * n.z;
+        return { n, d, jeu: Math.abs(d) - demi(box, n) - demi(o, n) };
+      });
+      const separateurs = jeux.filter((a) => a.jeu > 0);
+      if (separateurs.length === 0) {
+        // Ils se chevauchent : on ressort par le côté le PLUS COURT — le
+        // geste naturel, celui qui dérange le moins la position visée.
+        let sortie = jeux[0];
+        for (const a of jeux) if (a.jeu > sortie.jeu) sortie = a;
+        const sens = sortie.d >= 0 ? 1 : -1;
+        p = {
+          x: p.x + sortie.n.x * sens * -sortie.jeu,
+          z: p.z + sortie.n.z * sens * -sortie.jeu,
+        };
+        continue;
+      }
+      /*
+        UN SEUL AXE QUI SÉPARE : ils sont CÔTE À CÔTE, et le jeu qui reste
+        est un vrai jour — celui qu'on referme. Deux axes ou plus, ils se
+        touchent par un coin, en diagonale : les aimanter les ferait sauter
+        de travers, on n'y touche pas.
+      */
+      if (separateurs.length > 1) continue;
+      const a = separateurs[0];
+      if (a.jeu >= AIMANT) continue;
+      const sens = a.d >= 0 ? 1 : -1;
+      p = {
+        x: p.x - a.n.x * sens * a.jeu,
+        z: p.z - a.n.z * sens * a.jeu,
+      };
+    }
+  }
+  return p;
+}
+
 /**
  * UN MEUBLE DE BIAIS QUI NE PASSE PAS SE REMET DROIT.
  *

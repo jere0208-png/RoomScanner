@@ -85,6 +85,18 @@ export interface Face3D {
    * d'autre.
    */
   /**
+  /**
+   * L'ARÊTE APPARTIENT À UN PAN, et se peint juste après lui.
+   *
+   * Les trois quarts des faces d'un meuble sont ses arêtes : cent seize pour
+   * un lit, dont quatre-vingt-huit traits. Triées séparément, celles du dos
+   * passaient par-dessus l'avant — des traits en travers du meuble, qu'on lit
+   * comme une transparence. On les attache donc à leur pan : où qu'il aille
+   * dans l'ordre de peinture, elles le suivent.
+   */
+  bordDe?: number;
+  /** Numéro de ce pan, pour que ses arêtes le retrouvent. */
+  panId?: number;
   /** Trait pointillé : réservé aux passages, qui sont des vides. */
   dashed?: boolean;
   /**
@@ -293,31 +305,46 @@ export function ordreLocal<T extends FacePeinte>(items: T[]): T[] {
     let y1 = -Infinity;
     let sx = 0;
     let sy = 0;
+    let d0 = Infinity;
+    let d1 = -Infinity;
     for (const p of it.proj) {
       x0 = Math.min(x0, p.sx);
       x1 = Math.max(x1, p.sx);
       y0 = Math.min(y0, p.sy);
       y1 = Math.max(y1, p.sy);
+      d0 = Math.min(d0, p.depth);
+      d1 = Math.max(d1, p.depth);
       sx += p.sx;
       sy += p.sy;
     }
     const n = it.proj.length || 1;
-    return { x0, x1, y0, y1, cx: sx / n, cy: sy / n };
+    return { x0, x1, y0, y1, d0, d1, cx: sx / n, cy: sy / n };
   });
 
   /** `a` doit-elle être peinte AVANT `b` ? (donc : est-elle derrière ?) */
-  const avant = (a: number, b: number): boolean => {
+  const avant = (a: number, b: number): boolean | null => {
     const A = boites[a];
     const B = boites[b];
-    // Deux faces qui ne se touchent pas à l'écran ne se cachent pas : leur
-    // ordre n'a aucune importance, et on garde celui qu'on avait.
-    if (A.x1 < B.x0 || B.x1 < A.x0 || A.y1 < B.y0 || B.y1 < A.y0) return false;
+
     const paires: [number, number, { sx: number; sy: number }][] = [
       [a, b, { sx: A.cx, sy: A.cy }],
       [b, a, { sx: B.cx, sy: B.cy }],
     ];
     for (const [u, v, pt] of paires) {
+      // Un trait ne contient rien : on ne teste que « le milieu de l'un
+      // tombe-t-il DANS l'autre », et un trait n'est jamais le contenant.
+      if (items[v].proj.length < 3) continue;
       if (!dansPoly(pt, items[v].proj)) continue;
+      /*
+        LE RACCOURCI QUI FAIT LA VITESSE.
+
+        Elles se recouvrent : reste à savoir laquelle est devant. Si toute
+        l'une est plus loin que le point le plus proche de l'autre, la
+        réponse ne dépend d'aucun point particulier — et l'on évite
+        l'interpolation, qui coûte dix fois plus cher.
+      */
+      if (A.d1 < B.d0 - 0.002) return true;
+      if (B.d1 < A.d0 - 0.002) return false;
       const du = profondeurAu(items[u].proj, pt);
       const dv = profondeurAu(items[v].proj, pt);
       if (du === null || dv === null) continue;
@@ -326,35 +353,107 @@ export function ordreLocal<T extends FacePeinte>(items: T[]): T[] {
       if (Math.abs(du - dv) < 0.002) continue;
       return (du < dv ? u : v) === a;
     }
-    return false;
+    return null;
   };
 
   /*
-    ON REPASSE JUSQU'À CE QUE PLUS RIEN NE BOUGE.
+    UN GRAPHE, PAS UN TRI PAR ÉCHANGES.
 
-    Le critère n'est pas transitif : un seul passage laisse des inversions
-    derrière lui — le banc en comptait encore trois cents. On échange donc les
-    voisins mal placés, autant de fois qu'il le faut. Dix passages au plus :
-    trois faces peuvent se recouvrir en ronde, et la ronde ne se dénoue pas.
-    Ce sont quelques dizaines de faces par meuble — le coût est négligeable.
+    La première version comparait toutes les paires et déplaçait les faces
+    une à une, plusieurs fois de suite : sur un logement meublé, cela faisait
+    des centaines de milliers de tests à CHAQUE image, et le modèle ramait dès
+    qu'on le tournait — le chantier l'a senti tout de suite.
+
+    On ne compare plus que les faces dont les BOÎTES se recouvrent à l'écran,
+    repérées par balayage : les autres ne peuvent pas se cacher, quoi qu'en
+    dise leur profondeur. Chaque comparaison utile devient une flèche « celle-ci
+    d'abord », et un tri topologique donne l'ordre d'un seul coup. Ce qui
+    reste dans un cycle — trois faces qui se recouvrent en ronde — garde
+    l'ordre de construction : il faut bien trancher.
   */
-  const ordre = items.map((_, i) => i);
-  for (let passe = 0; passe < 6; passe++) {
-    let bouge = false;
-    // TOUTES les paires, pas seulement les voisines : une face peut devoir
-    // remonter de cinq rangs, et l'échange de proche en proche ne la voit
-    // jamais.
-    for (let i = 0; i < ordre.length; i++) {
-      for (let j = i + 1; j < ordre.length; j++) {
-        if (!avant(ordre[j], ordre[i])) continue;
-        // `j` est derrière `i` : elle doit se peindre avant lui.
-        const [x] = ordre.splice(j, 1);
-        ordre.splice(i, 0, x);
-        bouge = true;
-      }
+  const n = items.length;
+  const suivants: number[][] = Array.from({ length: n }, () => []);
+  const degre = new Array<number>(n).fill(0);
+  /*
+    ON NE COMPARE QUE LES VOISINES.
+
+    Il y a plus de mille faces dans un salon meublé. Les comparer deux à deux
+    ferait un demi-million de tests par image — le modèle ramait dès qu'on le
+    tournait, et le chantier l'a dit tout de suite. On les range donc par
+    abscisse et l'on s'arrête dès qu'une boîte commence après la fin de la
+    nôtre : les suivantes ne peuvent plus la recouvrir.
+
+    (Une grille d'écran a été essayée, et mesurée : deux fois plus lente. Les
+    faces d'une pièce se pressent dans quelques cases, et le rangement coûte
+    plus que les tests évités.)
+  */
+  const parX = Array.from({ length: n }, (_, i) => i).sort(
+    (a, b) => boites[a].x0 - boites[b].x0,
+  );
+  for (let k = 0; k < parX.length; k++) {
+    const i = parX[k];
+    for (let l = k + 1; l < parX.length; l++) {
+      const j = parX[l];
+      if (boites[j].x0 > boites[i].x1) break;
+      if (boites[i].y1 < boites[j].y0 || boites[j].y1 < boites[i].y0) continue;
+      // DEUX TRAITS NE SE DÉPARTAGENT PAS : personne ne regarde lequel de
+      // deux traits d'un centimètre passe au-dessus de l'autre.
+      if (items[i].proj.length < 3 && items[j].proj.length < 3) continue;
+      const r = avant(i, j);
+      if (r === null) continue;
+      const [de, vers] = r ? [i, j] : [j, i];
+      suivants[de].push(vers);
+      degre[vers] += 1;
     }
-    if (!bouge) break;
   }
+
+  // Un TAS, et non une liste qu'on balaie : sur un logement meublé il y a
+  // plus de mille faces, et chercher le plus petit à chaque tour coûtait à
+  // lui seul autant que tout le reste.
+  const pret: number[] = [];
+  const monter = (k: number) => {
+    while (k > 0) {
+      const p = Math.floor((k - 1) / 2);
+      if (pret[p] <= pret[k]) break;
+      [pret[p], pret[k]] = [pret[k], pret[p]];
+      k = p;
+    }
+  };
+  const descendre = () => {
+    let k = 0;
+    for (;;) {
+      const g = 2 * k + 1;
+      const d = g + 1;
+      let m = k;
+      if (g < pret.length && pret[g] < pret[m]) m = g;
+      if (d < pret.length && pret[d] < pret[m]) m = d;
+      if (m === k) break;
+      [pret[m], pret[k]] = [pret[k], pret[m]];
+      k = m;
+    }
+  };
+  const enfiler = (v: number) => {
+    pret.push(v);
+    monter(pret.length - 1);
+  };
+  for (let i = 0; i < n; i++) if (degre[i] === 0) enfiler(i);
+  const ordre: number[] = [];
+  const pose = new Array<boolean>(n).fill(false);
+  while (pret.length > 0) {
+    // Le plus ancien d'abord : c'est ce qui rend le résultat stable.
+    const i = pret[0];
+    pret[0] = pret[pret.length - 1];
+    pret.pop();
+    descendre();
+    ordre.push(i);
+    pose[i] = true;
+    for (const j of suivants[i]) {
+      degre[j] -= 1;
+      if (degre[j] === 0) enfiler(j);
+    }
+  }
+  // Les cycles : on les pose à leur place d'origine, faute de mieux.
+  for (let i = 0; i < n; i++) if (!pose[i]) ordre.push(i);
   return ordre.map((i) => items[i]);
 }
 
@@ -370,8 +469,28 @@ export function ordreLocal<T extends FacePeinte>(items: T[]): T[] {
  * élément de la scène.
  */
 export function ajusterBlocs<
-  T extends FacePeinte & { depth: number; owner?: string; room?: string },
->(items: T[]): void {
+  T extends FacePeinte & {
+    depth: number;
+    owner?: string;
+    room?: string;
+    /** Numéro du pan, pour les aplats. */
+    pan?: number;
+    /** Pan dont cette face est une arête. */
+    bord?: number;
+  },
+>(
+  items: T[],
+  /**
+   * EN MOUVEMENT, ON NE CLASSE QUE LES APLATS.
+   *
+   * Les arêtes sont les trois quarts des faces d'un meuble : les faire entrer
+   * dans le classement coûte quatre fois plus cher, et c'est trop pour trente
+   * images par seconde sur un téléphone. Pendant un geste, chacune suit donc
+   * simplement SON pan — le volume reste juste, seul le trait d'un dos peut
+   * apparaître une fraction de seconde. Dès qu'on lâche, tout se reclasse.
+   */
+  rapide = false,
+): void {
   /*
     UN GROUPE PAR PIÈCE, ET NON PAR MEUBLE.
 
@@ -380,10 +499,6 @@ export function ajusterBlocs<
     occupent DÉJÀ une couche à eux, entre le mur du fond et celui de devant :
     rien de la maçonnerie ne peut se glisser entre eux. On peut donc les
     résoudre tous ensemble, sans risquer de déranger le reste.
-
-    Le classement obtenu se réécrit dans la PLAGE que le groupe occupait
-    déjà : ce qui n'est pas du mobilier — un appareillage, un point lumineux —
-    garde ainsi sa place relative parmi eux.
   */
   const parBloc = new Map<string, T[]>();
   for (const it of items) {
@@ -397,10 +512,31 @@ export function ajusterBlocs<
     if (groupe.length < 2) continue;
     const bas = Math.min(...groupe.map((g) => g.depth));
     const haut = Math.max(...groupe.map((g) => g.depth));
-    const pas = Math.max(1e-6, (haut - bas) / groupe.length);
-    ordreLocal(groupe).forEach((g, k) => {
+    if (!rapide) {
+      const pas = Math.max(1e-6, (haut - bas) / (groupe.length + 1));
+      // Les arêtes entrent dans le classement avec les aplats : c'est par
+      // elles qu'on croyait voir au travers des meubles.
+      ordreLocal(groupe).forEach((g, k) => {
+        g.depth = bas + k * pas;
+      });
+      continue;
+    }
+    const aplats = groupe.filter((g) => g.proj.length >= 3 && g.pan !== undefined);
+    if (aplats.length < 2) continue;
+    const pas = Math.max(1e-6, (haut - bas) / (aplats.length + 1));
+    /** Profondeur attribuée à chaque pan : ses arêtes la reprennent. */
+    const rang = new Map<number, number>();
+    ordreLocal(aplats).forEach((g, k) => {
       g.depth = bas + k * pas;
+      if (g.pan !== undefined) rang.set(g.pan, g.depth);
     });
+    for (const g of groupe) {
+      if (g.bord === undefined) continue;
+      const d = rang.get(g.bord);
+      // Juste APRÈS son pan : elle le borde, elle ne se laisse pas repeindre
+      // par lui.
+      if (d !== undefined) g.depth = d + pas / 2;
+    }
   }
 }
 
@@ -432,6 +568,26 @@ function profondeurAu(
   proj: { sx: number; sy: number; depth: number }[],
   pt: { sx: number; sy: number },
 ): number | null {
+  /*
+    UN TRAIT AUSSI A UNE PROFONDEUR.
+
+    Les trois quarts des faces d'un meuble sont ses arêtes, et un segment n'a
+    pas d'aire : le tri ne pouvait rien en dire, et celles du dos passaient
+    par-dessus l'avant — le meuble paraissait transparent. On interpole donc
+    le long du segment, comme on interpole dans un triangle.
+  */
+  if (proj.length === 2) {
+    const [a, b] = proj;
+    const ex = b.sx - a.sx;
+    const ey = b.sy - a.sy;
+    const l2 = ex * ex + ey * ey;
+    if (l2 < 1e-9) return a.depth;
+    const t = Math.max(
+      0,
+      Math.min(1, ((pt.sx - a.sx) * ex + (pt.sy - a.sy) * ey) / l2),
+    );
+    return a.depth + (b.depth - a.depth) * t;
+  }
   for (let i = 1; i + 1 < proj.length; i++) {
     const [a, b, c] = [proj[0], proj[i], proj[i + 1]];
     const det = (b.sy - c.sy) * (a.sx - c.sx) + (c.sx - b.sx) * (a.sy - c.sy);
@@ -876,6 +1032,8 @@ export function buildScene(
   const EDGE_BIAS = 0.02;
 
   /** `at` = centre du pan bordé : c'est lui qui donne sa place à l'arête. */
+  /** Numéro du pan en cours : ses arêtes le porteront. */
+  let panCourant = 0;
   const pushEdge = (p: P3, q: P3, stroke: string, normal?: P3, at?: P3) => {
     faces.push({
       pts: [p, q],
@@ -884,12 +1042,20 @@ export function buildScene(
       bias: EDGE_BIAS,
       normal,
       depthAt: at,
+      bordDe: panCourant || undefined,
     });
   };
 
   /** Contour d'un quadrilatère non découpé : un seul polygone suffit. */
   const pushOutline = (pts: P3[], stroke: string, normal?: P3) => {
-    faces.push({ pts, fill: null, stroke, bias: EDGE_BIAS, normal });
+    faces.push({
+      pts,
+      fill: null,
+      stroke,
+      bias: EDGE_BIAS,
+      normal,
+      bordDe: panCourant || undefined,
+    });
   };
 
   /**
@@ -982,7 +1148,9 @@ export function buildScene(
           const s = sampleTexture(o.tex, u, (r + 0.5) / rows);
           if (s) paint = s;
         }
+        panCourant += 1;
         faces.push({
+          panId: panCourant,
           pts: vquad(s0, s1, bot, top),
           fill: paint,
           stroke: null,
@@ -1056,7 +1224,14 @@ export function buildScene(
       const c2 = lerp2(e1a, e1b, t1);
       const c3 = lerp2(e2a, e2b, t1);
       const c4 = lerp2(e2a, e2b, t0);
-      faces.push({ pts: [c1, c2, c3, c4].map(at), fill, stroke: null, normal });
+      panCourant += 1;
+      faces.push({
+        panId: panCourant,
+        pts: [c1, c2, c3, c4].map(at),
+        fill,
+        stroke: null,
+        normal,
+      });
       if (!outline) continue;
       if (n === 1) {
         pushOutline([c1, c2, c3, c4].map(at), outline, normal);

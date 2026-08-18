@@ -627,12 +627,18 @@ export function Iso3DView({
         dashed: !!face.dashed,
         owner: face.ownerId,
         room: face.roomId,
+        // Le pan, et l'arête qui le borde : elles voyagent ensemble dans
+        // l'ordre de peinture (voir `ajusterBlocs`).
+        pan: face.panId,
+        bord: face.bordDe,
       };
       });
     // Un meuble se trie d'un bloc : ses propres faces se départagent à
     // l'écran, là où elles se recouvrent. Sans ça, sa carcasse repeint sa
     // porte et son dossier repeint son assise — les « bandes » du chantier.
-    ajusterBlocs(polys);
+    // Pendant un geste, le classement s'allège : les arêtes suivent leur pan
+    // au lieu d'être classées une à une (voir `ajusterBlocs`).
+    ajusterBlocs(polys, interacting);
 
     // Cotes insérées DANS le tri de profondeur : un mur proche recouvre
     // les cotes des éléments situés derrière lui (fini les fuites).

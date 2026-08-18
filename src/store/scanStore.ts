@@ -20,6 +20,7 @@ import {
   pointOnSeg,
   alignToFit,
   fitInNook,
+  pushOutOfObjects,
   hugWall,
   pushOutOfWalls,
   roomExtent,
@@ -2290,12 +2291,34 @@ export const useScanStore = create<ScanState>((set, get) => {
             ici,
           )
         : { x, z };
+      /*
+        ET IL NE SE POSE PAS SUR UN AUTRE.
+
+        Les autres meubles de la même pièce le repoussent comme des caisses :
+        il ressort par le côté le plus court, et se cale contre eux quand il
+        n'en reste qu'un jour de quelques centimètres. Ceux d'à côté ne le
+        regardent pas — une cloison les sépare déjà.
+      */
+      const voisins = st.objects
+        .filter((o) => o.id !== id && roomOf(o) === roomOf(obj))
+        .map((o) => ({
+          cx: o.transform[12],
+          cz: o.transform[14],
+          width: o.width,
+          depth: o.depth,
+          yaw: Math.atan2(o.transform[2], o.transform[0]),
+        }));
+      const libre = pushOutOfObjects(
+        pose,
+        { width: ajuste.width, depth: ajuste.depth, yaw },
+        voisins,
+      );
       set({
         objects: st.objects.map((o) => {
           if (o.id !== id) return o;
           const t = [...o.transform];
-          t[12] = pose.x;
-          t[14] = pose.z;
+          t[12] = libre.x;
+          t[14] = libre.z;
           if (yaw !== yawPose) {
             const c = Math.cos(yaw);
             const s2 = Math.sin(yaw);

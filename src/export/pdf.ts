@@ -930,6 +930,8 @@ function draw3DView(
         proj: pts.map((q) => ({ sx: q.x, sy: q.y, depth: q.depth })),
         owner: f.ownerId,
         room: f.roomId,
+        pan: f.panId,
+        bord: f.bordDe,
       };
     });
   ajusterBlocs(polys);

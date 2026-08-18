@@ -1968,9 +1968,19 @@ export function ResultScreen() {
             styles={styles}
             anim={swap}
             largeur={carteW}
-            reserve={0}
+            /*
+              MÊME GRILLE QU'EN 2D.
+
+              La 3D n'a pas de colonne d'actions : la rangée prenait donc
+              toute la largeur, et ses pastilles ne tombaient pas aux mêmes
+              endroits qu'en plan — on le voit immédiatement en basculant
+              d'une vue à l'autre. Elle réserve désormais la même place à
+              droite : les calques qui ne tiennent pas y montent en colonne,
+              exactement où se tient « Édition » sur le plan.
+            */
+            reserve={62}
             bas={ligneOutils}
-            dessus={PILL_CELL_H + PILL_GAP}
+            dessus={0}
             elements={[
             <ToolPill
               key="ruler"
