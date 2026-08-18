@@ -118,6 +118,12 @@ interface EffMapping {
 }
 import { RoomScan } from 'react-native-room-scan';
 import { useScanStore } from '../store/scanStore';
+import {
+  cotesLisibles,
+  encombrement,
+  milieuVisible,
+  type Etiquette,
+} from '../geometry/cotes';
 import { haptic, releaseHaptic } from '../ui/haptic';
 
 
@@ -562,6 +568,109 @@ export function FloorplanEditor({
     : 0;
 
   /**
+   * OÙ S'ÉCRIT CHAQUE COTE, ET LAQUELLE ON SACRIFIE.
+   *
+   * Deux défauts relevés sur le chantier, une seule cause : personne ne
+   * regardait où tombaient les chiffres.
+   *
+   * 1. **Elles se superposaient.** Sur un mur en dents de scie — des retours
+   *    de vingt centimètres —, trois valeurs s'écrivaient au même endroit et
+   *    formaient une tache grise. Un chiffre illisible est pire qu'un
+   *    chiffre absent : absent, on va le chercher ; empilé, on croit
+   *    l'avoir lu. Les grandes cotes passent donc d'abord, et ce qui
+   *    viendrait les recouvrir renonce — la valeur reste au métré.
+   *
+   * 2. **Elles s'en allaient au zoom.** Une cote se pose au milieu de son
+   *    mur ; zoomé sur un angle, ce milieu est à deux écrans de là. On
+   *    croyait l'app incapable de coter de près, alors que c'est justement
+   *    de près qu'on lit les cotes. Chaque valeur se recale donc au milieu
+   *    de la PORTION VISIBLE de son mur.
+   *
+   * Les deux familles — la cote globale d'un mur et celles de ses tronçons —
+   * s'arbitrent ENSEMBLE, mais seulement quand elles sont réellement à
+   * l'écran : pendant la bascule du zoom, l'une s'efface tandis que l'autre
+   * paraît, et une cote invisible ne doit pas voler la place d'une autre.
+   */
+  const placementCotes = useMemo(() => {
+    const vide = {
+      murs: new Map<string, { x: number; y: number }>(),
+      runs: new Map<string, { x: number; y: number }>(),
+    };
+    if (!showMeasures || navigating || !mapping || layout.w === 0) return vide;
+    const items: Etiquette[] = [];
+    const murs = new Map<string, { x: number; y: number }>();
+    const runs = new Map<string, { x: number; y: number }>();
+    const bodyPx = WALL_T * mapping.scale;
+    for (const w of walls) {
+      const a = mapping.toPx(w.a);
+      const b = mapping.toPx(w.b);
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const norm = Math.hypot(dx, dy) || 1;
+      let n = { x: -dy / norm, y: dx / norm };
+      if (n.y > 0) n = { x: -n.x, y: -n.y };
+      let angle = (Math.atan2(dy, dx) * 180) / Math.PI;
+      if (angle > 90) angle -= 180;
+      if (angle < -90) angle += 180;
+      if (1 - detail > 0.02) {
+        const mil = milieuVisible(a, b, layout);
+        if (mil) {
+          const at = {
+            x: mil.x + n.x * (bodyPx / 2 + 9),
+            y: mil.y + n.y * (bodyPx / 2 + 9),
+          };
+          murs.set(w.id, at);
+          items.push({
+            id: `w:${w.id}`,
+            at,
+            taille: encombrement(
+              `${segLength(w).toFixed(2)} m`.replace('.', ','),
+              10,
+              angle,
+            ),
+            // La longueur du mur départage : c'est la grande cote qu'on lit.
+            poids: 1000 + segLength(w),
+          });
+        }
+      }
+      if (detail > 0.02) {
+        const off = bodyPx + 9;
+        wallRuns(w, openings).forEach((run, ri) => {
+          if ((run.t1 - run.t0) * norm < 26) return;
+          const t = (run.t0 + run.t1) / 2;
+          const brut = { x: a.x + dx * t, y: a.y + dy * t };
+          // Le tronçon a ses propres bouts : c'est SA portion visible qui
+          // compte, pas celle du mur entier.
+          const p0 = { x: a.x + dx * run.t0, y: a.y + dy * run.t0 };
+          const p1 = { x: a.x + dx * run.t1, y: a.y + dy * run.t1 };
+          const mil = milieuVisible(p0, p1, layout) ?? brut;
+          const at = { x: mil.x + n.x * off, y: mil.y + n.y * off };
+          const cle = `${w.id}#${ri}`;
+          runs.set(cle, at);
+          items.push({
+            id: `r:${cle}`,
+            at,
+            taille: encombrement(
+              run.length.toFixed(2).replace('.', ','),
+              9.5,
+              angle,
+            ),
+            poids: run.length,
+          });
+        });
+      }
+    }
+    const gardees = cotesLisibles(items);
+    for (const cle of [...murs.keys()]) {
+      if (!gardees.has(`w:${cle}`)) murs.delete(cle);
+    }
+    for (const cle of [...runs.keys()]) {
+      if (!gardees.has(`r:${cle}`)) runs.delete(cle);
+    }
+    return { murs, runs };
+  }, [walls, openings, mapping, layout, showMeasures, navigating, detail]);
+
+  /**
    * Retour de mur sélectionné : `{ mur, index du tronçon }`.
    *
    * Un mur percé d'une baie n'est pas un objet unique sur le chantier : il
@@ -946,7 +1055,8 @@ export function FloorplanEditor({
                 wall={w}
                 quad={quads.get(w.id)}
                 mapping={mapping}
-                showMeasure={showMeasures && !navigating}
+                showMeasure={placementCotes.murs.has(w.id)}
+                measureAt={placementCotes.murs.get(w.id)}
                 measureOpacity={1 - detail}
                 selected={editable && w.id === selectedWallId}
                 onPress={
@@ -1217,18 +1327,15 @@ export function FloorplanEditor({
                   const B = mapping.toPx(w.b);
                   const dx = B.x - A.x;
                   const dy = B.y - A.y;
-                  const norm = Math.hypot(dx, dy) || 1;
-                  let n = { x: -dy / norm, y: dx / norm };
-                  if (n.y > 0) n = { x: -n.x, y: -n.y };
-                  const t = (run.t0 + run.t1) / 2;
-                  const off = WALL_T * mapping.scale + 9;
-                  const px = A.x + dx * t + n.x * off;
-                  const py = A.y + dy * t + n.y * off;
                   let angle = (Math.atan2(dy, dx) * 180) / Math.PI;
                   if (angle > 90) angle -= 180;
                   if (angle < -90) angle += 180;
-                  // Une cote plus courte que son texte serait illisible.
-                  if ((run.t1 - run.t0) * norm < 26) return null;
+                  // Où elle s'écrit — et si elle s'écrit : le placement a
+                  // déjà tranché, valeur par valeur.
+                  const pose = placementCotes.runs.get(`${w.id}#${ri}`);
+                  if (!pose) return null;
+                  const px = pose.x;
+                  const py = pose.y;
                   return (
                     <SvgText
                       key={`run-${w.id}-${ri}`}
@@ -1934,6 +2041,7 @@ function WallBody({
   quad,
   mapping,
   showMeasure,
+  measureAt,
   measureOpacity = 1,
   selected,
   onPress,
@@ -1942,6 +2050,14 @@ function WallBody({
   quad?: WallQuad;
   mapping: EffMapping;
   showMeasure: boolean;
+  /**
+   * Où poser la valeur, décidée en amont.
+   *
+   * Le mur ne choisit plus tout seul : il faut voir TOUTES les cotes pour
+   * savoir laquelle recouvre laquelle, et une cote se recale dans la portion
+   * visible de son mur — deux choses qu'un mur, seul, ne peut pas savoir.
+   */
+  measureAt?: { x: number; y: number };
   /** Les cotes globales s'effacent quand les cotes de détail arrivent. */
   measureOpacity?: number;
   selected: boolean;
@@ -1971,7 +2087,7 @@ function WallBody({
   if (angle < -90) angle += 180;
   let n = { x: -dy / norm, y: dx / norm };
   if (n.y > 0) n = { x: -n.x, y: -n.y }; // toujours du côté "haut" écran
-  const mid = {
+  const mid = measureAt ?? {
     x: (a.x + b.x) / 2 + n.x * (bodyPx / 2 + 9),
     y: (a.y + b.y) / 2 + n.y * (bodyPx / 2 + 9),
   };

@@ -130,11 +130,18 @@ const INK = [0x0b, 0x0d, 0x12];
  * Plus dense en bas qu'en haut : la lumière vient du haut, comme le dégradé
  * du fond. Un liseré d'épaisseur et de teinte constantes fait cadre — c'est
  * la différence entre un bord et un encadrement.
+ *
+ * IL DOIT SE VOIR. Un premier essai l'avait posé en gris clair, par crainte
+ * d'alourdir : sur un fond blanc, un gris clair sur du blanc ne se voit pas,
+ * et le relevé du chantier a été net — « on ne voit pas le liseré ». Le
+ * contraste d'une icône SOMBRE cernée de clair (Gemini, TikTok) ne se
+ * transpose pas tel quel sur une icône claire : il faut l'inverser, et
+ * franchement.
  */
-const BORD_HAUT = [0xc9, 0xd0, 0xda];
-const BORD_BAS = [0x8f, 0x9b, 0xac];
+const BORD_HAUT = [0x5a, 0x66, 0x77];
+const BORD_BAS = [0x24, 0x2c, 0x38];
 /** Épaisseur vers l'intérieur, et débord rogné, en fraction du côté. */
-const TRAIT = 0.013;
+const TRAIT = 0.02;
 const DEBORD = 0.006;
 
 /**

@@ -88,6 +88,7 @@ import {
   wallToRooms,
 } from '../geometry/nfc15100';
 import { buildMaterialPdf, materialFilename, toBase64 } from '../export/pdf';
+import { buildMetreCsv, metreFilename, type RoomMetre } from '../export/csv';
 import {
   FIXTURES,
   faceX,
@@ -709,6 +710,52 @@ export function ResultScreen() {
       const tirage = { pull, buy: buyingList(pull, fixtures, ceiling) };
       const bytes = buildMaterialPdf(scanName, list, tirage);
       await RoomScan.sharePDF(toBase64(bytes), materialFilename(scanName));
+    } catch (e: any) {
+      Alert.alert('Export impossible', e?.message ?? 'Erreur inconnue');
+    }
+  };
+
+  /**
+   * LE MÉTRÉ EN TABLEUR — les mêmes chiffres, dans des colonnes.
+   *
+   * Le PDF se remet ; le tableur se chiffre. On y ajoute ce que le PDF ne
+   * porte pas, faute de place : le périmètre de chaque pièce et sa surface
+   * murale, qui commandent les saignées, les plinthes et les gaines.
+   */
+  const shareCsv = async () => {
+    try {
+      const list = materialList(
+        roomInputs,
+        fixtures,
+        wallRooms,
+        placement,
+        cheminements?.parCircuit,
+        ceiling,
+      );
+      const metre: RoomMetre[] = parts.map((p) => {
+        const nom = rooms.find((r) => r.id === p.roomId)?.name;
+        // Le périmètre se prend sur le CONTOUR, pas sur la somme des murs :
+        // un refend borde deux pièces, il ne compte qu'une fois de chaque
+        // côté, et un mur qui dépasse ne rallonge pas la pièce.
+        const pts = p.surface?.pts ?? [];
+        let tour = 0;
+        for (let i = 0; i < pts.length; i++) {
+          const a = pts[i];
+          const b = pts[(i + 1) % pts.length];
+          tour += Math.hypot(b.x - a.x, b.z - a.z);
+        }
+        return {
+          name: nom || `Pièce ${parts.indexOf(p) + 1}`,
+          area: p.surface?.area ?? null,
+          perimeter: pts.length > 0 ? tour : null,
+          height: roomHeight(p.walls),
+          walls: p.walls.length,
+        };
+      });
+      await RoomScan.shareText(
+        buildMetreCsv(scanName, metre, list),
+        metreFilename(scanName),
+      );
     } catch (e: any) {
       Alert.alert('Export impossible', e?.message ?? 'Erreur inconnue');
     }
@@ -2299,6 +2346,10 @@ export function ResultScreen() {
         onMaterial={() => {
           setExporting(false);
           apresFermeture(shareMaterial);
+        }}
+        onCsv={() => {
+          setExporting(false);
+          apresFermeture(shareCsv);
         }}
         onImage={() => {
           setExporting(false);

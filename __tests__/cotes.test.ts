@@ -12,6 +12,12 @@
  * revers : sur un plan qui a de la place, on n'a rien perdu.
  */
 import { buildScanPdf } from '../src/export/pdf';
+import {
+  cotesLisibles,
+  encombrement,
+  milieuVisible,
+  type Etiquette,
+} from '../src/geometry/cotes';
 import type { WallSeg } from '../src/geometry/floorplan';
 
 const mur = (id: string, ax: number, az: number, bx: number, bz: number): WallSeg => ({
@@ -161,5 +167,123 @@ describe('les valeurs de cote', () => {
       '5,00 m',
       '5,00 m',
     ]);
+  });
+});
+
+/**
+ * ET LES MÊMES RÈGLES À L'ÉCRAN.
+ *
+ * Le PDF arbitrait ; le plan à l'écran écrivait toutes les valeurs sans
+ * regarder. Relevé du chantier, capture à l'appui : sur un mur en dents de
+ * scie, « 0,65 m » et « 0,31 m » se recouvraient en une tache grise. Second
+ * défaut du même relevé : zoomé à fond, la cote d'un grand mur disparaissait
+ * — son milieu, où elle s'écrit, était sorti de l'écran.
+ */
+describe('les cotes de l’écran', () => {
+  /** Le cadre du plan sur un téléphone. */
+  const CADRE = { w: 360, h: 520 };
+
+  describe('le milieu visible', () => {
+    it('rend le milieu tout court quand le mur tient à l’écran', () => {
+      const m = milieuVisible({ x: 60, y: 100 }, { x: 260, y: 100 }, CADRE);
+      expect(m).toEqual({ x: 160, y: 100 });
+    });
+
+    /**
+     * LE CAS DU ZOOM : le mur traverse l'écran de part en part, son milieu
+     * réel est hors champ. La cote doit se poser dans ce qu'on voit.
+     */
+    it('recale la cote dans la portion visible d’un mur qui déborde', () => {
+      const m = milieuVisible({ x: -2000, y: 200 }, { x: 300, y: 200 }, CADRE)!;
+      expect(m).not.toBeNull();
+      expect(m.x).toBeGreaterThan(-30);
+      expect(m.x).toBeLessThan(CADRE.w);
+      // Au milieu de ce qu'on voit : entre le bord gauche et le bout du mur.
+      expect(m.x).toBeCloseTo((-26 + 300) / 2, 0);
+    });
+
+    it('ne rend rien quand le mur est entièrement hors du cadre', () => {
+      expect(milieuVisible({ x: 900, y: 50 }, { x: 1200, y: 80 }, CADRE)).toBeNull();
+      expect(milieuVisible({ x: 10, y: -500 }, { x: 200, y: -400 }, CADRE)).toBeNull();
+    });
+  });
+
+  describe('l’arbitrage', () => {
+    const etiquette = (
+      id: string,
+      x: number,
+      y: number,
+      texte: string,
+      poids: number,
+      angle = 0,
+    ): Etiquette => ({
+      id,
+      at: { x, y },
+      taille: encombrement(texte, 10, angle),
+      poids,
+    });
+
+    it('sacrifie la petite cote quand deux se recouvrent', () => {
+      const gardees = cotesLisibles([
+        etiquette('grande', 100, 100, '4,20 m', 4.2),
+        // Deux points plus loin : elles s'écrivent l'une sur l'autre.
+        etiquette('petite', 102, 101, '0,31 m', 0.31),
+      ]);
+      expect(gardees.has('grande')).toBe(true);
+      expect(gardees.has('petite')).toBe(false);
+    });
+
+    it('garde tout ce qui a de la place', () => {
+      const gardees = cotesLisibles([
+        etiquette('a', 40, 40, '1,00 m', 1),
+        etiquette('b', 200, 40, '2,00 m', 2),
+        etiquette('c', 40, 200, '3,00 m', 3),
+      ]);
+      expect(gardees.size).toBe(3);
+    });
+
+    /**
+     * DEUX COTES PERPENDICULAIRES NE SE GÊNENT PAS pour autant.
+     *
+     * Sans tenir compte de l'angle, une cote verticale occupe un ruban
+     * horizontal : on sacrifierait des valeurs qui se rangent très bien.
+     */
+    it('tient compte de l’inclinaison du texte', () => {
+      const gardees = cotesLisibles([
+        etiquette('horizontale', 100, 100, '1,20 m', 1.2, 0),
+        etiquette('verticale', 130, 130, '1,10 m', 1.1, 90),
+      ]);
+      expect(gardees.size).toBe(2);
+    });
+
+    /**
+     * LE CAS DE LA CAPTURE : un mur haché en retours courts.
+     *
+     * Six valeurs à quinze points d'écart : elles ne peuvent pas toutes
+     * tenir. Ce qu'on exige, ce n'est pas qu'elles tiennent — c'est
+     * qu'aucune paire retenue ne se recouvre.
+     */
+    it('ne laisse aucune paire se recouvrir sur un mur en dents de scie', () => {
+      const items = Array.from({ length: 6 }, (_, i) =>
+        etiquette(`d${i}`, 60 + i * 15, 90, '0,65 m', 0.65 + i * 0.01, -35),
+      );
+      const gardees = cotesLisibles(items);
+      expect(gardees.size).toBeGreaterThan(0);
+      expect(gardees.size).toBeLessThan(items.length);
+      const retenues = items.filter((e) => gardees.has(e.id));
+      for (let i = 0; i < retenues.length; i++) {
+        for (let j = i + 1; j < retenues.length; j++) {
+          const a = retenues[i];
+          const b = retenues[j];
+          const ox =
+            Math.min(a.at.x + a.taille.w / 2, b.at.x + b.taille.w / 2) -
+            Math.max(a.at.x - a.taille.w / 2, b.at.x - b.taille.w / 2);
+          const oy =
+            Math.min(a.at.y + a.taille.h / 2, b.at.y + b.taille.h / 2) -
+            Math.max(a.at.y - a.taille.h / 2, b.at.y - b.taille.h / 2);
+          expect(ox > 0 && oy > 0).toBe(false);
+        }
+      }
+    });
   });
 });

@@ -20,6 +20,7 @@ export type ExportArtKind =
   | 'pdf'
   | 'obj'
   | 'materiel'
+  | 'csv'
   | 'image'
   | 'presentation';
 
@@ -40,6 +41,7 @@ const TEINTE = (kind: ExportArtKind, c: Palette): string =>
     pdf: c.blueSoft ?? '#E7EEFF',
     obj: '#EAF6F2',
     materiel: '#FDF1E4',
+    csv: '#E9F7EE',
     image: '#F2ECFB',
     presentation: '#E9F3FF',
   }[kind]);
@@ -97,6 +99,35 @@ const DESSINS: Record<ExportArtKind, (c: Palette) => React.ReactNode> = {
   ),
 
   /** Un bordereau : la pince, et des lignes chiffrées à droite. */
+  /**
+   * LA GRILLE D'UN TABLEUR — pas une feuille de papier.
+   *
+   * Le bordereau et le métré sortent des mêmes chiffres ; ce qui les
+   * distingue, c'est ce qu'on en fait. L'un se remet, l'autre se chiffre. Une
+   * grille aux colonnes marquées le dit sans un mot.
+   */
+  csv: (c) => (
+    <>
+      <Rect
+        x={9}
+        y={11}
+        width={26}
+        height={22}
+        rx={2.5}
+        fill="#FFFFFF"
+        stroke={c.blue}
+        strokeWidth={1.6}
+      />
+      {/* La ligne d'en-tête, pleine. */}
+      <Rect x={9} y={11} width={26} height={6} rx={2.5} fill={c.blue} opacity={0.85} />
+      <Path
+        d="M18 17 v16 M27 17 v16 M9 23 h26 M9 28 h26"
+        stroke={c.blue}
+        strokeWidth={1.2}
+        opacity={0.55}
+      />
+    </>
+  ),
   materiel: () => (
     <>
       <Rect

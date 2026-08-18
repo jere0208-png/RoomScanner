@@ -18,6 +18,7 @@ export function ExportSheet({
   onPdf,
   onObj,
   onMaterial,
+  onCsv,
   onImage,
   onPresentation,
 }: {
@@ -28,6 +29,7 @@ export function ExportSheet({
   onPdf: () => void;
   onObj: () => void;
   onMaterial: () => void;
+  onCsv: () => void;
   onImage: () => void;
   onPresentation: () => void;
 }) {
@@ -50,8 +52,23 @@ export function ExportSheet({
       'materiel',
       'Liste du matériel',
       'Appareillage par pièce, circuits et disjoncteurs, ' +
-        'conformité. Le document à chiffrer.',
+        'conformité. Le document à remettre.',
       onMaterial,
+    ],
+    /*
+      LE MÊME MÉTRÉ, MAIS DANS UN TABLEUR.
+
+      Le PDF est fait pour être REMIS ; un devis, lui, se prépare dans un
+      tableur, où l'on colle ses prix à côté des quantités. Recopier soixante
+      lignes depuis un PDF, personne ne le fait : on refait le métré, et on
+      se trompe.
+    */
+    [
+      'csv',
+      'Métré CSV',
+      'Surfaces, appareillage, circuits et câble, en colonnes. ' +
+        'À ouvrir dans Excel pour chiffrer.',
+      onCsv,
     ],
     [
       'image',
