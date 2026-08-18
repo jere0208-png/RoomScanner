@@ -891,10 +891,21 @@ export function alignToFit(
     grande surface. Un meuble resté de biais garde sa taille, mais il ne
     rentre nulle part : ce n'est pas ce qu'on cherche.
   */
-  let mieux = box.yaw;
+  /*
+    ET UN MEUBLE QU'ON RABOTE SE MET D'ÉQUERRE, SANS EXCEPTION.
+
+    Relevé du chantier : « en forçant un meuble trop gros dans un espace, il ne
+    se met pas totalement d'équerre ». On laissait son angle d'origine
+    concourir avec les quarts de tour, et il gagnait parfois — de biais, un
+    meuble se rabote moins, donc il garde plus de surface. Mais un meuble
+    raboté de travers dans un coin n'a aucun sens sur un plan : dès qu'on
+    touche à ses cotes, il se range à l'équerre des murs. Son angle d'origine
+    ne revient dans la course que s'il n'y a aucun mur à suivre.
+  */
+  let mieux = candidats.length > 0 ? candidats[0] : box.yaw;
   let meilleure = -1;
   let entre = false;
-  for (const yaw of [box.yaw, ...candidats]) {
+  for (const yaw of candidats.length > 0 ? candidats : [box.yaw]) {
     const a = fitInNook(centre, { ...box, yaw }, walls, outline);
     const ok = tient(yaw, a.width, a.depth, a.centre);
     const aire = a.width * a.depth;

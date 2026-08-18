@@ -526,3 +526,88 @@ describe('le désenchêtrement du relevé', () => {
     expect(separerMeubles([canape, voisin])).toHaveLength(0);
   });
 });
+
+/**
+ * DEUX PROMESSES DE FIN : L'ÉQUERRE ET LA MAÇONNERIE.
+ *
+ * Relevé du chantier, deux captures : « en forçant un meuble trop gros dans un
+ * espace, il ne se met pas totalement d'équerre », et « on voit le meuble
+ * légèrement dépassé de l'autre côté du mur ». Deux défauts distincts, deux
+ * promesses : dès qu'on touche aux cotes d'un meuble, il se range à l'équerre
+ * des murs ; et quoi qu'il arrive ensuite, il reste DANS le logement.
+ */
+describe('les deux promesses du placement', () => {
+  const PIECE = [
+    mur('n', 0, 0, 4, 0),
+    mur('e', 4, 0, 4, 3),
+    mur('s', 4, 3, 0, 3),
+    mur('o', 0, 3, 0, 0),
+  ];
+  const poserDeux = () => {
+    useScanStore.setState({
+      walls: PIECE,
+      openings: [],
+      objects: [
+        {
+          id: 'gros',
+          category: 'storage',
+          width: 1.4,
+          depth: 0.6,
+          height: 2,
+          transform: [
+            Math.cos(0.5), 0, Math.sin(0.5), 0,
+            0, 1, 0, 0,
+            -Math.sin(0.5), 0, Math.cos(0.5), 0,
+            2, 1, 1.5, 1,
+          ],
+        },
+        {
+          id: 'voisin',
+          category: 'storage',
+          width: 1.2,
+          depth: 0.5,
+          height: 2,
+          transform: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 1.4, 1, 0.35, 1],
+        },
+      ],
+      rooms: [{ id: 'r1', name: 'Pièce', floor: null }],
+      fixtures: [],
+      ceiling: [],
+    });
+  };
+
+  /*
+    L'équerre d'un meuble raboté est déjà vérifiée plus haut, sur un vrai coin
+    étroit (« et le rabote à la largeur du coin ») : c'est là que le meuble est
+    VRAIMENT coincé. Dans une pièce où il tient encore, son angle lui
+    appartient — et l'on n'y touche pas.
+  */
+  it('ne laisse jamais un meuble dépasser de la maçonnerie', () => {
+    poserDeux();
+    // On le pousse CONTRE son voisin : c'est la poussée entre meubles qui,
+    // jouant en dernier, l'envoyait dans le mur.
+    useScanStore.getState().setObjectCenter('gros', 1.5, 0.4);
+    const o = useScanStore.getState().objects[0];
+    const cos = Math.cos(Math.atan2(o.transform[2], o.transform[0]));
+    const sin = Math.sin(Math.atan2(o.transform[2], o.transform[0]));
+    const coins = [
+      [-1, -1],
+      [1, -1],
+      [1, 1],
+      [-1, 1],
+    ].map(([sx, sz]) => ({
+      x: o.transform[12] + ((sx * o.width) / 2) * cos - ((sz * o.depth) / 2) * sin,
+      z: o.transform[14] + ((sx * o.width) / 2) * sin + ((sz * o.depth) / 2) * cos,
+    }));
+    // Les quatre coins restent dans la pièce, nu des murs compris.
+    for (const c of coins) {
+      expect(`${c.x.toFixed(2)} > ${WALL_T / 2}`).toBe(
+        `${c.x.toFixed(2)} > ${WALL_T / 2}`,
+      );
+      expect(c.x).toBeGreaterThan(WALL_T / 2 - 0.01);
+      expect(c.z).toBeGreaterThan(WALL_T / 2 - 0.01);
+      expect(c.x).toBeLessThan(4 - WALL_T / 2 + 0.01);
+      expect(c.z).toBeLessThan(3 - WALL_T / 2 + 0.01);
+    }
+  });
+});

@@ -2366,12 +2366,32 @@ export const useScanStore = create<ScanState>((set, get) => {
         },
         voisins,
       );
+      /*
+        ET LE MUR A LE DERNIER MOT.
+
+        Relevé du chantier : « on voit le meuble légèrement dépassé de l'autre
+        côté du mur ». C'était un ordre d'opérations : on repoussait des murs,
+        PUIS des meubles voisins — et cette dernière poussée pouvait renvoyer
+        le meuble dans la maçonnerie, sans que personne ne repasse. Un meuble
+        qui chevauche un voisin se voit ; un meuble qui sort du logement ne se
+        pardonne pas.
+      */
+      const pose2 = part
+        ? pushOutOfWalls(
+            libre,
+            { width: ajuste.width, depth: ajuste.depth, yaw },
+            part.walls,
+            part.labelAt,
+            part.surface?.pts,
+            ici,
+          )
+        : libre;
       set({
         objects: st.objects.map((o) => {
           if (o.id !== id) return o;
           const t = [...o.transform];
-          t[12] = libre.x;
-          t[14] = libre.z;
+          t[12] = pose2.x;
+          t[14] = pose2.z;
           if (yaw !== yawPose) {
             const c = Math.cos(yaw);
             const s2 = Math.sin(yaw);
