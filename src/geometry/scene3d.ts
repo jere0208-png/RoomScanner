@@ -2314,9 +2314,28 @@ export function buildScene(
   // Un meuble n'est recalé que contre les murs de SA pièce : sinon la
   // cloison d'à côté le repousserait au milieu du salon.
   for (const source of objects) {
+    /*
+      RESSORTI DE TOUTE MAÇONNERIE, PAS SEULEMENT DE LA SIENNE.
+
+      Relevé du chantier, capture à l'appui : « le meuble est coupé par le
+      mur ». Il l'était vraiment — son caisson chevauchait un refend, et là où
+      deux volumes se traversent, aucun ordre de peinture ne peut trancher :
+      la maçonnerie recouvre une moitié, le meuble l'autre. C'est la même
+      limite que pour les pièces d'un meuble, et le même remède : la
+      géométrie, pas le tri.
+
+      On ne le recalait que contre les murs de SA pièce — par prudence, pour
+      qu'une cloison voisine ne le repousse pas au milieu du salon. Mais un
+      retour de mur appartient souvent à la pièce d'à côté, ou à aucune : ce
+      mur-là ne le poussait jamais, et le meuble restait planté dedans.
+
+      Le garde-fou tient ailleurs, et il tient toujours : `clampFootprint` ne
+      déplace que ce qui est VRAIMENT dans la maçonnerie, et jamais de plus
+      que sa propre profondeur.
+    */
     const obj = clampFootprint(
       toFootprint(source),
-      wallsOf.get(roomOf(source)) ?? walls,
+      walls,
       interiorOf.get(roomOf(source)) ?? fallbackInterior,
     );
     const cosY = Math.cos(obj.yaw);
