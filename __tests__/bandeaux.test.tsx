@@ -365,6 +365,52 @@ describe('l’écran des résultats', () => {
   });
 
   /**
+   * L'ASTUCE DU RETOUR DE MUR SE LIT.
+   *
+   * Relevé du chantier : « le message qui dit qu'on peut sélectionner tout le
+   * mur est caché derrière l'interface ». Il était en bas à gauche, c'est-à-
+   * dire, depuis la refonte, sous la rangée de calques. Et « l'appui long ne
+   * fonctionne pas bien » : neuf cents millisecondes, c'est plus long que ce
+   * qu'un doigt tient immobile sur un écran.
+   */
+  it('pose l’astuce en haut du plan, et rend l’appui long prenable', () => {
+    const tree = monter();
+    act(() => bouton(tree, 'Édition')!.props.onPress());
+    act(() => {
+      jest.advanceTimersByTime(500);
+    });
+    // Le retour de mur se prend en touchant sa maçonnerie.
+    const retour = tree.root
+      .findAll((n) => typeof n.props?.onLongPress === 'function')
+      .find((n) => n.props.strokeWidth === 6);
+    expect(retour).toBeDefined();
+    // Un tiers de seconde : au-delà, le doigt a bougé et l'appui est perdu.
+    expect(retour!.props.delayLongPress).toBeLessThanOrEqual(400);
+    act(() => retour!.props.onPress());
+
+    const plat = (n: TestRenderer.ReactTestInstance) => {
+      const st = n.props.style;
+      return Object.assign(
+        {},
+        ...(Array.isArray(st) ? st : [st]).filter(Boolean).flat(Infinity),
+      );
+    };
+    const note = tree.root
+      .findAll(
+        (n) =>
+          typeof n.type === 'string' &&
+          plat(n).position === 'absolute' &&
+          typeof plat(n).top === 'number' &&
+          plat(n).maxWidth === 230,
+      )
+      .map(plat)[0];
+    expect(note).toBeDefined();
+    // En HAUT : le bas appartient aux calques et aux bandeaux.
+    expect(note.top).toBeLessThan(40);
+    expect(note.bottom).toBeUndefined();
+  });
+
+  /**
    * LES QUATRE FLÈCHES DU MEUBLE.
    *
    * Relevé du chantier : « au-dessus de ce bloc, affiche quatre flèches qui

@@ -985,7 +985,16 @@ export function FloorplanEditor({
                         onSelectObject?.(null);
                         setPier({ wallId: w.id, i: ri });
                       }}
-                      delayLongPress={900}
+                      /*
+                        NEUF CENTS MILLISECONDES, C'EST TROP LONG.
+
+                        Le doigt bouge toujours un peu sur un écran, et le
+                        moindre glissement annule l'appui : à ce régime, on
+                        réussit une fois sur trois. Un tiers de seconde suffit
+                        à distinguer un appui d'un tap, et c'est ce que font
+                        les applications de plan.
+                      */
+                      delayLongPress={320}
                       onLongPress={() => {
                         setPier(null);
                         onSelectWall(w.id);
@@ -2296,8 +2305,15 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
    */
   pierNote: {
     position: 'absolute',
-    // En bas à gauche : en haut, la rangée d'outils la recouvrait.
-    bottom: 12,
+    /*
+      EN HAUT À GAUCHE, là où il reste de la place.
+
+      Elle était en bas à gauche — c'est-à-dire, depuis la refonte, DERRIÈRE la
+      rangée de calques et le bandeau du mur : on lisait « Retour de mur » et
+      la ligne qui explique le geste passait sous les boutons. Le haut du plan
+      est libre : seule la pastille 2D/3D y tient, et elle est à droite.
+    */
+    top: 10,
     left: 10,
     maxWidth: 230,
     backgroundColor: c.blueSoft,
