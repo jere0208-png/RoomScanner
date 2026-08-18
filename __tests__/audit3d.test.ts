@@ -134,6 +134,33 @@ const SCENES = [
     rooms: [{ id: 'r1' }],
   },
   {
+    /*
+      LA SCÈNE DE LA VIDÉO : un meuble HAUT accroché près d'un retour de mur,
+      un meuble bas juste dessous, et le tout vu de très près. C'est la
+      configuration où le chantier voit encore la maçonnerie et le mobilier se
+      disputer l'ordre — un mur qui passe dans un caisson, une porte qui
+      ressort devant un trumeau.
+    */
+    nom: 'meubles hauts contre un retour',
+    walls: [
+      mur('n', 0, 0, 4.2, 0),
+      mur('e', 4.2, 0, 4.2, 3),
+      mur('s', 4.2, 3, 0, 3),
+      mur('o', 0, 3, 0, 0),
+      mur('retour', 1.6, 0, 1.6, 1.1),
+    ],
+    openings: [] as WallSeg[],
+    objects: [
+      // Le haut : accroché à 1,45 m, contre le mur nord, à côté du retour.
+      boite('haut', 'storage', 2.4, 0.3, 1.2, 0.4, 0.7, 1.8),
+      // Le bas : posé au sol, juste dessous.
+      boite('bas', 'storage', 2.4, 0.32, 1.2, 0.45, 0.9),
+      // Et un troisième, de l'autre côté du retour.
+      boite('voisin', 'storage', 0.9, 0.35, 1.1, 0.5, 2),
+    ],
+    rooms: [{ id: 'r1' }],
+  },
+  {
     nom: 'deux pièces mitoyennes',
     walls: [
       mur('n1', 0, 0, 3, 0),
