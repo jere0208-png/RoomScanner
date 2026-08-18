@@ -121,6 +121,21 @@ export interface ScanPhoto {
   at: number;
 }
 
+/** Ce qu'un brouillon retient : de quoi reprendre là où l'on s'est arrêté. */
+export interface BrouillonScan {
+  /** Horodatage de l'écriture : c'est lui qu'on montre à l'utilisateur. */
+  at: number;
+  name: string;
+  walls: WallSeg[];
+  openings: WallSeg[];
+  objects: ObjectData[];
+  rooms: RoomEntry[];
+  fixtures: Fixture[];
+  ceiling: CeilingFixture[];
+  photos: ScanPhoto[];
+  modelPath: string | null;
+}
+
 export interface SavedScan {
   id: string;
   name: string;
@@ -313,6 +328,18 @@ const STORAGE_KEY = 'roomscanner.saves.v1';
 /** L'ordre des scans. Le contenu, lui, vit une clé par scan. */
 const INDEX_KEY = 'roomscanner.index.v2';
 const scanKey = (id: string) => `roomscanner.scan.v2.${id}`;
+/**
+ * LE BROUILLON — le relevé en cours, écrit sans qu'on le demande.
+ *
+ * Un scan tenait entièrement en mémoire tant qu'on n'avait pas touché
+ * « Enregistrer ». Une app tuée par le système — un appel, une photo, un
+ * téléphone à court de mémoire — et la visite était à refaire. C'est le seul
+ * défaut de cette application qui coûte un déplacement.
+ *
+ * Il ne remplace pas la bibliothèque : c'est un filet, effacé dès que le
+ * relevé est enregistré pour de bon.
+ */
+const DRAFT_KEY = 'roomscanner.brouillon.v1';
 const FOLDERS_KEY = 'roomscanner.folders.v1';
 const THEME_KEY = 'roomscanner.themePref.v1';
 const COLORS_KEY = 'roomscanner.openingColors.v1';
@@ -402,6 +429,24 @@ let persistTimer: ReturnType<typeof setTimeout> | null = null;
  */
 export type PanneEcriture = { quand: number; message: string } | null;
 let signalerPanne: (p: PanneEcriture) => void = () => {};
+
+/**
+ * TOUTES LES TRENTE SECONDES, PAS PLUS SOUVENT.
+ *
+ * Un relevé produit des murs en continu ; écrire à chaque image userait le
+ * stockage pour rien. Trente secondes, c'est ce qu'on accepte de refaire —
+ * quelques pas dans un couloir — et c'est assez rare pour ne pas peser sur
+ * la cadence du scan.
+ */
+const DRAFT_PERIODE = 30000;
+let draftTimer: ReturnType<typeof setInterval> | null = null;
+/** Ce qui est déjà écrit : on ne réécrit pas un relevé qui n'a pas bougé. */
+let draftEcrit = '';
+
+function arreterBrouillon() {
+  if (draftTimer) clearInterval(draftTimer);
+  draftTimer = null;
+}
 
 function persistSoon(saves: SavedScan[]) {
   if (persistTimer) clearTimeout(persistTimer);
@@ -810,6 +855,20 @@ interface ScanState {
   ) => { accroche: boolean };
   /** Abandonne les modifications : recharge la dernière sauvegarde. */
   revertCurrent: () => void;
+  /**
+   * Le relevé retrouvé au démarrage, en attente d'une réponse.
+   *
+   * `null` = rien à reprendre. Sinon, l'écran d'accueil le propose : c'est
+   * un choix, jamais une reprise d'office — l'utilisateur peut avoir quitté
+   * volontairement un essai raté.
+   */
+  brouillon: BrouillonScan | null;
+  /** Écrit le relevé en cours. Appelée par la minuterie, et à la demande. */
+  ecrireBrouillon: () => void;
+  /** Reprend le relevé retrouvé : il redevient le scan courant. */
+  reprendreBrouillon: () => void;
+  /** Jette le brouillon : la question ne se reposera plus. */
+  oublierBrouillon: () => void;
   loadSaves: () => Promise<void>;
   openSave: (id: string) => void;
   deleteSave: (id: string) => void;
@@ -908,6 +967,7 @@ export const useScanStore = create<ScanState>((set, get) => {
     screen: 'home',
     supported: null,
     scanning: false,
+    brouillon: null,
     paused: false,
     processing: false,
     error: null,
@@ -1980,7 +2040,25 @@ export const useScanStore = create<ScanState>((set, get) => {
 
     setScreen: (screen) => set({ screen }),
     setSupported: (supported) => set({ supported }),
-    setScanning: (scanning) => set({ scanning }),
+    setScanning: (scanning) => {
+      set({ scanning });
+      /*
+        LA MINUTERIE VIT AVEC LE RELEVÉ.
+
+        Elle démarre au premier scan et continue APRÈS : un relevé terminé
+        mais non enregistré se perd exactement comme un relevé en cours, et
+        c'est même le cas le plus fréquent — on scanne, on regarde le plan,
+        le téléphone meurt.
+      */
+      if (scanning) {
+        // On RÉARME, on ne se contente pas de « s'il n'y en a pas déjà un » :
+        // une minuterie retenue par une référence morte — un scan repris
+        // après un retour de veille, un cycle de vie qui a coupé les
+        // horloges — laissait le relevé sans filet, et rien ne l'aurait dit.
+        arreterBrouillon();
+        draftTimer = setInterval(() => get().ecrireBrouillon(), DRAFT_PERIODE);
+      }
+    },
     setPaused: (paused) => set({ paused }),
     setProcessing: (processing) => set({ processing }),
     setError: (error) => set({ error }),
@@ -2685,6 +2763,68 @@ export const useScanStore = create<ScanState>((set, get) => {
       persistSoon(saves);
     },
 
+    ecrireBrouillon: () => {
+      const st = get();
+      // Rien à sauver : pas de murs, ou un relevé déjà enregistré tel quel.
+      if (st.walls.length === 0 || (st.currentSaveId && !st.dirty)) {
+        if (draftEcrit !== '') {
+          draftEcrit = '';
+          AsyncStorage.removeItem(DRAFT_KEY).catch(() => {});
+        }
+        return;
+      }
+      const brouillon: BrouillonScan = {
+        at: Date.now(),
+        name: st.scanName,
+        walls: st.walls,
+        openings: st.openings,
+        objects: st.objects,
+        rooms: st.rooms,
+        fixtures: st.fixtures,
+        ceiling: st.ceiling,
+        photos: st.photos,
+        modelPath: st.modelPath,
+      };
+      // L'horodatage change à chaque tick : on compare SANS lui, sinon on
+      // réécrirait un relevé identique toutes les trente secondes.
+      const empreinte = JSON.stringify({ ...brouillon, at: 0 });
+      if (empreinte === draftEcrit) return;
+      draftEcrit = empreinte;
+      AsyncStorage.setItem(DRAFT_KEY, JSON.stringify(brouillon)).catch(() => {
+        // Un brouillon perdu ne se signale pas : c'est un filet, et
+        // l'alerte du disque plein est déjà portée par l'enregistrement.
+        draftEcrit = '';
+      });
+    },
+
+    reprendreBrouillon: () => {
+      const b = get().brouillon;
+      if (!b) return;
+      set({
+        screen: 'result',
+        resultOrigin: 'scan',
+        scanName: b.name,
+        walls: b.walls,
+        openings: b.openings,
+        objects: separerLeMobilier(b.objects),
+        rooms: b.rooms,
+        fixtures: b.fixtures,
+        ceiling: b.ceiling,
+        photos: b.photos,
+        modelPath: b.modelPath,
+        // Il n'a jamais été enregistré : il l'est d'autant moins maintenant.
+        currentSaveId: null,
+        dirty: true,
+        brouillon: null,
+      });
+    },
+
+    oublierBrouillon: () => {
+      draftEcrit = '';
+      set({ brouillon: null });
+      AsyncStorage.removeItem(DRAFT_KEY).catch(() => {});
+    },
+
     loadSaves: async () => {
       try {
         const pref = await AsyncStorage.getItem(THEME_KEY);
@@ -2714,6 +2854,23 @@ export const useScanStore = create<ScanState>((set, get) => {
         }
         const saves = await loadLibrary();
         if (saves) set({ saves: saves.map(migrateSave) });
+        /*
+          LE RELEVÉ INTERROMPU, retrouvé au démarrage.
+
+          On ne le reprend PAS d'office : l'utilisateur a pu quitter
+          volontairement un essai raté, et se voir imposer son retour serait
+          pire que de l'avoir perdu. L'écran d'accueil pose la question.
+        */
+        const brut = await AsyncStorage.getItem(DRAFT_KEY);
+        if (brut) {
+          const b = JSON.parse(brut) as BrouillonScan;
+          // Un brouillon vide n'a rien à proposer.
+          if (b && Array.isArray(b.walls) && b.walls.length > 0) {
+            set({ brouillon: b });
+          } else {
+            AsyncStorage.removeItem(DRAFT_KEY).catch(() => {});
+          }
+        }
       } catch {
         // Stockage illisible : on repart des valeurs en mémoire.
       }
@@ -2771,9 +2928,20 @@ export const useScanStore = create<ScanState>((set, get) => {
       persistSoon(saves);
     },
 
-    reset: () =>
+    reset: () => {
+      /*
+        UN NOUVEAU SCAN EFFACE LE FILET.
+
+        Le brouillon décrit LE relevé en cours ; en repartir un autre le rend
+        caduc, et le garder ferait proposer au démarrage suivant un relevé
+        que l'utilisateur vient lui-même de jeter.
+      */
+      arreterBrouillon();
+      draftEcrit = '';
+      AsyncStorage.removeItem(DRAFT_KEY).catch(() => {});
       set({
         screen: 'home',
+        brouillon: null,
         scanning: false,
         paused: false,
         processing: false,
@@ -2795,6 +2963,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         photos: [],
         ceiling: [],
         north: null,
-      }),
+      });
+    },
   };
 });

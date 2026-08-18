@@ -116,11 +116,30 @@ const STEPS: {
   },
 ];
 
+/**
+ * « il y a un quart d'heure » plutôt qu'une date.
+ *
+ * Ce qu'on veut savoir d'un relevé interrompu, ce n'est pas le jour : c'est
+ * s'il s'agit de celui qu'on vient de perdre, ou d'un vieux fond de tiroir.
+ */
+function quand(at: number): string {
+  const min = Math.max(0, Math.round((Date.now() - at) / 60000));
+  if (min < 1) return "à l'instant";
+  if (min < 60) return `il y a ${min} min`;
+  const h = Math.round(min / 60);
+  if (h < 24) return `il y a ${h} h`;
+  const j = Math.round(h / 24);
+  return `il y a ${j} jour${j > 1 ? 's' : ''}`;
+}
+
 export function HomeScreen() {
   const supported = useScanStore((s) => s.supported);
   const setSupported = useScanStore((s) => s.setSupported);
   const error = useScanStore((s) => s.error);
   const saves = useScanStore((s) => s.saves);
+  const brouillon = useScanStore((s) => s.brouillon);
+  const reprendreBrouillon = useScanStore((s) => s.reprendreBrouillon);
+  const oublierBrouillon = useScanStore((s) => s.oublierBrouillon);
   const setScreen = useScanStore((s) => s.setScreen);
   const themePref = useScanStore((s) => s.themePref);
   const setThemePref = useScanStore((s) => s.setThemePref);
@@ -264,6 +283,46 @@ export function HomeScreen() {
         </View>
       )}
 
+      {/*
+        LE RELEVÉ INTERROMPU — proposé, jamais imposé.
+
+        L'app tuée en plein scan — un appel, une photo, un téléphone à court
+        de mémoire — emportait la visite entière. Le relevé s'écrit désormais
+        tout seul, toutes les trente secondes ; il attend ici.
+
+        On ne le rouvre PAS d'office : l'utilisateur a pu quitter
+        volontairement un essai raté, et se le voir réimposer au démarrage
+        serait pire que de l'avoir perdu. D'où deux gestes, et le second —
+        jeter — sans confirmation : ce qu'on jette est un brouillon, l'original
+        est dans la bibliothèque s'il a été enregistré.
+      */}
+      {brouillon && (
+        <Animated.View style={[styles.draftCard, fadeIn(3)]}>
+          <View style={styles.draftTexts}>
+            <Text style={styles.draftTitle}>Relevé interrompu</Text>
+            <Text style={styles.draftText}>
+              {`${brouillon.walls.length} mur${
+                brouillon.walls.length > 1 ? 's' : ''
+              } relevés${
+                brouillon.name ? ` · ${brouillon.name}` : ''
+              }, ${quand(brouillon.at)}.`}
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={styles.draftPrimary}
+            accessibilityLabel="Reprendre le relevé"
+            onPress={reprendreBrouillon}>
+            <Text style={styles.draftPrimaryText}>Reprendre</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.draftGhost}
+            accessibilityLabel="Jeter le relevé interrompu"
+            onPress={oublierBrouillon}>
+            <Text style={styles.draftGhostText}>Jeter</Text>
+          </TouchableOpacity>
+        </Animated.View>
+      )}
+
       <Animated.View style={[styles.ctaWrap, fadeIn(3)]}>
         <TouchableOpacity
           activeOpacity={0.85}
@@ -298,6 +357,38 @@ export function HomeScreen() {
 }
 
 const getStyles = themedStyles((c: Palette) => StyleSheet.create({
+  /**
+   * La carte du relevé interrompu : ambre, pas rouge.
+   *
+   * Rien n'est cassé — il y a quelque chose à reprendre. Le rouge dirait
+   * qu'on a fait une faute, et ferait chercher laquelle.
+   */
+  draftCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    alignSelf: 'stretch',
+    marginHorizontal: 20,
+    marginBottom: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: radius.md,
+    backgroundColor: c.surfaceSunken,
+    borderWidth: 1,
+    borderColor: c.amber,
+  },
+  draftTexts: { flex: 1 },
+  draftTitle: { color: c.ink, fontSize: 14.5, fontWeight: '800' },
+  draftText: { color: c.inkSoft, fontSize: 12, marginTop: 2, lineHeight: 16 },
+  draftPrimary: {
+    backgroundColor: c.blue,
+    borderRadius: radius.pill,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+  },
+  draftPrimaryText: { color: '#FFFFFF', fontWeight: '800', fontSize: 13 },
+  draftGhost: { paddingHorizontal: 4, paddingVertical: 9 },
+  draftGhostText: { color: c.inkFaint, fontWeight: '700', fontSize: 13 },
   container: {
     flex: 1,
     backgroundColor: c.bg,

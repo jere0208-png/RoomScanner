@@ -324,6 +324,33 @@ tableau. Les courants faibles n'y figurent pas : ils ne sont pas protégés par
 un disjoncteur et rejoignent le coffret de communication, qui est un autre
 boîtier.
 
+### Un relevé interrompu ne se perd plus
+
+Un scan tenait entièrement en mémoire tant qu'on n'avait pas touché
+« Enregistrer ». Une app tuée par le système — un appel, une photo, un
+téléphone à court de mémoire — et la visite était à refaire. C'est le seul
+défaut de cette application qui coûtait un déplacement.
+
+Le relevé s'écrit donc tout seul **toutes les trente secondes** (clé
+`roomscanner.brouillon.v1`), dès qu'il porte au moins un mur et tant qu'il
+n'est pas enregistré. Trente secondes, c'est ce qu'on accepte de refaire —
+quelques pas dans un couloir — et c'est assez rare pour ne pas peser sur la
+cadence du scan. L'écriture est comparée **hors horodatage** : un plan qui n'a
+pas bougé ne se réécrit pas.
+
+La minuterie **se réarme** à chaque démarrage de scan plutôt que de vérifier
+« s'il n'y en a pas déjà une » : une horloge retenue par une référence morte
+laissait le relevé sans filet, et rien ne l'aurait dit.
+
+Au démarrage suivant, l'accueil **propose** le relevé — il ne le rouvre pas.
+L'utilisateur a pu quitter volontairement un essai raté, et se le voir
+réimposer serait pire que de l'avoir perdu. La carte dit ce qu'il contient et
+quand il date (« 4 murs · Visite du 12, il y a 12 min ») : c'est à ça qu'on
+reconnaît le sien. Repris, il redevient le scan courant, **jamais enregistré**
+— le bouton de sauvegarde s'offre aussitôt. Jeté, il ne revient pas. Et un
+nouveau scan l'efface : le garder ferait proposer au démarrage suivant un
+relevé qu'on vient soi-même de mettre à la corbeille.
+
 ### La typo de la marque
 
 Le mot « EchoPlan » n'est plus composé : c'est **l'image de la marque**,
