@@ -775,7 +775,16 @@ interface ScanState {
   removeObject: (id: string) => void;
   /** Pose en une fois ce que « Normes auto » propose. */
   poserDAuto: (fixtures: Fixture[], ceiling: CeilingFixture[]) => void;
-  setObjectCenter: (id: string, x: number, z: number) => void;
+  /**
+   * Pose le meuble à cet endroit.
+   *
+   * `aimant` commande le PLAQUAGE : au doigt il vaut mieux le garder — on
+   * vise à peu près, et un jour de trois centimètres contre un mur n'existe
+   * pas sur un chantier. À la flèche, non : le pas d'un centimètre est une
+   * demande explicite, et l'aimant le reprenait aussitôt. Le meuble revenait
+   * se coller, et le bouton paraissait mort.
+   */
+  setObjectCenter: (id: string, x: number, z: number, aimant?: boolean) => void;
   resizeObject: (id: string, width: number, depth: number) => void;
   /** Abandonne les modifications : recharge la dernière sauvegarde. */
   revertCurrent: () => void;
@@ -2323,7 +2332,7 @@ export const useScanStore = create<ScanState>((set, get) => {
      * simple collision fait mieux et sans surprise : on pousse jusqu'au mur,
      * ça s'arrête pile contre le nu.
      */
-    setObjectCenter: (id, x, z) => {
+    setObjectCenter: (id, x, z, aimant = true) => {
       pushHistory(`moveObject:${id}`);
       const st = get();
       const obj = st.objects.find((o) => o.id === id);
@@ -2379,25 +2388,33 @@ export const useScanStore = create<ScanState>((set, get) => {
             part.surface?.pts,
           )
         : { width: base.width, depth: base.depth, centre: { x, z } };
-      const pose = part
-        ? // Et une fois arrêté par les murs, il se PLAQUE contre celui qu'il
-          // frôle : un jour de trois centimètres n'existe pas sur un
-          // chantier, il vient du doigt qui vise à peu près.
-          hugWall(
-            pushOutOfWalls(
+      const arrete = part
+        ? pushOutOfWalls(
               ajuste.centre,
               { width: ajuste.width, depth: ajuste.depth, yaw },
               part.walls,
               part.labelAt,
-              part.surface?.pts,
-              ici,
-            ),
+            part.surface?.pts,
+            ici,
+          )
+        : { x, z };
+      /*
+        ET UNE FOIS ARRÊTÉ PAR LES MURS, IL SE PLAQUE CONTRE CELUI QU'IL
+        FRÔLE — mais seulement quand c'est le doigt qui l'amène.
+
+        Un jour de trois centimètres n'existe pas sur un chantier : il vient
+        du doigt qui vise à peu près. La flèche, elle, vise juste, et son
+        centimètre doit rester où on l'a mis.
+      */
+      const pose = part && aimant
+        ? hugWall(
+            arrete,
             { width: ajuste.width, depth: ajuste.depth, yaw },
             part.walls,
             part.labelAt,
             ici,
           )
-        : { x, z };
+        : arrete;
       /*
         ET IL NE SE POSE PAS SUR UN AUTRE.
 

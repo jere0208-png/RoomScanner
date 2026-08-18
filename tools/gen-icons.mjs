@@ -113,6 +113,66 @@ const BOT = [0xf1, 0xf3, 0xf6];
 const INK = [0x0b, 0x0d, 0x12];
 
 /**
+ * LE LISERÉ DU BORD — ce qui pose l'icône sur le fond d'écran.
+ *
+ * Sans lui, une icône claire n'a pas de bord : elle se termine là où le
+ * système la découpe, et sur un fond d'écran clair elle se dilue. Les icônes
+ * du système en portent toutes un — c'est ce trait, et non l'ombre portée,
+ * qui donne le contour net qu'on voit sur l'écran d'accueil.
+ *
+ * Il est peint DANS l'image, pas ajouté par-dessus : iOS refuse la
+ * transparence sur une icône d'application, et découpe lui-même le carré au
+ * squircle. Le trait suit donc cette découpe, débordant légèrement au-delà
+ * (`DEBORD`) : ce qui dépasse est rogné, et il ne peut pas rester un filet
+ * de fond entre le liseré et le bord si notre forme et celle du système
+ * diffèrent d'un cheveu.
+ *
+ * Plus dense en bas qu'en haut : la lumière vient du haut, comme le dégradé
+ * du fond. Un liseré d'épaisseur et de teinte constantes fait cadre — c'est
+ * la différence entre un bord et un encadrement.
+ */
+const BORD_HAUT = [0xc9, 0xd0, 0xda];
+const BORD_BAS = [0x8f, 0x9b, 0xac];
+/** Épaisseur vers l'intérieur, et débord rogné, en fraction du côté. */
+const TRAIT = 0.013;
+const DEBORD = 0.006;
+
+/**
+ * DISTANCE AU BORD DE LA DÉCOUPE, en pixels, négative à l'intérieur.
+ *
+ * Le squircle d'iOS n'est pas un carré à coins ronds : ses coins n'ont pas
+ * de rayon constant, la courbure y entre progressivement. Une superellipse
+ * d'ordre 5 en est l'approximation d'usage. Elle ne donne pas directement
+ * une distance — seulement un « dedans / dehors » —, alors on la divise par
+ * la pente du champ : près du bord, c'est la distance au premier ordre, et
+ * c'est tout ce qu'il faut pour un trait d'un pixel. Sans cette division, le
+ * trait s'épaissirait dans les coins.
+ */
+function distBord(fx, fy, size, mask) {
+  const R = size / 2;
+  const x = fx - R;
+  const y = fy - R;
+  if (mask === 'circle') return Math.hypot(x, y) - R;
+  if (mask === 'round') {
+    const cr = size * 0.18;
+    const qx = Math.abs(x) - (R - cr);
+    const qy = Math.abs(y) - (R - cr);
+    return Math.min(Math.max(qx, qy), 0) + Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) - cr;
+  }
+  const n = 5;
+  const ax = Math.abs(x);
+  const ay = Math.abs(y);
+  const somme = Math.pow(ax, n) + Math.pow(ay, n);
+  if (somme === 0) return -R;
+  const rayon = Math.pow(somme, 1 / n);
+  // Pente du champ (|∇f|) : elle vaut 1 sur les côtés droits et tombe dans
+  // les coins, ce qui y étirerait le trait.
+  const pente =
+    Math.hypot(Math.pow(ax, n - 1), Math.pow(ay, n - 1)) * Math.pow(somme, 1 / n - 1);
+  return (rayon - R) / Math.max(pente, 1e-6);
+}
+
+/**
  * mask : 'none'  → plein cadre opaque (iOS, le système arrondit lui-même)
  *        'round' → carré arrondi avec alpha (Android classique)
  *        'circle'→ rond avec alpha (Android "round")
@@ -146,6 +206,22 @@ function render(size, mask) {
         cr_ = cr_ + (INK[0] - cr_) * w;
         cg_ = cg_ + (INK[1] - cg_) * w;
         cb_ = cb_ + (INK[2] - cb_) * w;
+        // Le liseré passe DEVANT le glyphe : il borde l'icône, et rien ne
+        // vient s'appuyer dessus par en dessous.
+        const db = distBord(fx, fy, size, mask);
+        const trait = size * TRAIT;
+        const bande = Math.min(
+          Math.max(0, Math.min(1, (size * DEBORD - db) / 1)),
+          Math.max(0, Math.min(1, (db + trait) / 1)),
+        );
+        if (bande > 0) {
+          const bh = BORD_HAUT;
+          const bb = BORD_BAS;
+          const u = fy / size;
+          cr_ = cr_ + (bh[0] + (bb[0] - bh[0]) * u - cr_) * bande;
+          cg_ = cg_ + (bh[1] + (bb[1] - bh[1]) * u - cg_) * bande;
+          cb_ = cb_ + (bh[2] + (bb[2] - bh[2]) * u - cb_) * bande;
+        }
         r += cr_ * shape;
         g += cg_ * shape;
         b += cb_ * shape;

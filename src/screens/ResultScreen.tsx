@@ -1951,9 +1951,17 @@ export function ResultScreen() {
               const mx = (dx * c - dy * s) * PAS;
               const mz = (dx * s + dy * c) * PAS;
               const t0 = selectedObject.transform;
+              // SANS AIMANT : le plaquage automatique referme tout jour de
+              // moins de cinq centimètres, et il reprenait chaque pas à
+              // peine posé — contre un mur, la flèche paraissait morte.
               useScanStore
                 .getState()
-                .setObjectCenter(selectedObject.id, t0[12] + mx, t0[14] + mz);
+                .setObjectCenter(
+                  selectedObject.id,
+                  t0[12] + mx,
+                  t0[14] + mz,
+                  false,
+                );
             }}
           />
         )}

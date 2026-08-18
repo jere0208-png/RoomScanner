@@ -367,28 +367,48 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   // Une seule ligne, au pied du plan, et LOIN du bouton d'enregistrement :
   // le bandeau faisait deux étages et son bouton de validation finissait
   // derrière la pastille bleue.
+  /**
+   * LE BANDEAU DU MEUBLE — et la seule règle qui compte : TOUT RENTRE.
+   *
+   * Le bouton de validation en sortait par la droite, posé sur la colonne
+   * d'actions, sans plus rien pour dire à quelle barre il appartenait. Deux
+   * corrections successives ont élargi le bloc en espérant que ça suffise ;
+   * ce n'était pas un problème de largeur mais de COMPRESSIBILITÉ. Le
+   * contenu était fait de blocs qui ne cèdent jamais : à la première valeur
+   * à quatre chiffres, la ligne dépassait, et rien ne l'arrêtait — une vue
+   * qui déborde n'est pas rognée, elle sort.
+   *
+   * Désormais les cotes cèdent (`flexShrink`) et les boutons non : quand la
+   * place manque, ce sont les pastilles de chiffres qui se serrent, jamais
+   * les commandes qui sortent.
+   *
+   * Les angles ont perdu leur pilule. Un rayon de 999 sur un bloc de cent
+   * points de haut fait un galet : les coins mangent les boutons qui s'en
+   * approchent, et il a fallu ces marges intérieures pour compenser. Seize
+   * points suffisent à poser une carte.
+   */
   editBar: {
     position: 'absolute',
     bottom: 10,
     left: 12,
     // Soixante-douze points : la colonne d'actions en tient soixante-deux, et
-    // le bouton de validation débordait du bloc blanc pour aller toucher
-    // « Contrôle ». Dix points de plus, et il rentre chez lui.
+    // le bouton de validation venait la toucher.
     marginRight: 72,
-    // Toute la largeur : les 84 points réservés au bouton de sauvegarde
-    // n'ont plus lieu d'être, et c'était eux qui poussaient la validation
-    // HORS du bandeau blanc — un bouton bleu flottant à côté de sa barre,
-    // sans rien pour dire qu'il lui appartenait.
     right: 12,
     backgroundColor: c.surface,
-    borderRadius: radius.pill,
-    paddingHorizontal: 10,
+    borderRadius: radius.md,
+    paddingHorizontal: 8,
     paddingVertical: 7,
     ...shadowCard,
     shadowOpacity: 0.12,
   },
   editLabel: { color: c.inkSoft, fontSize: 13, marginBottom: 8, fontWeight: '600' },
-  editRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'nowrap' },
+  editRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'nowrap',
+    gap: 5,
+  },
   input: {
     backgroundColor: c.bg,
     color: c.ink,
@@ -401,7 +421,7 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     borderWidth: 1,
     borderColor: c.lineStrong,
   },
-  unit: { color: c.inkSoft, fontSize: 15, marginHorizontal: 8 },
+  unit: { color: c.inkSoft, fontSize: 15, flexShrink: 0 },
   // Champs resserrés : la fiche tient sur une ligne, boutons compris, sans
   // passer sous le bouton d'enregistrement.
   /**
@@ -414,14 +434,16 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   clChamp: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 5,
     backgroundColor: c.surfaceSunken,
-    borderRadius: radius.sm,
-    paddingHorizontal: 10,
+    borderRadius: 10,
+    paddingHorizontal: 7,
     paddingVertical: 8,
-    marginRight: 8,
+    // C'est ELLE qui cède quand la place manque — jamais un bouton.
+    flexShrink: 1,
   },
-  clValeur: { color: c.ink, fontSize: 16, fontWeight: '800', minWidth: 30 },
+  clValeur: { color: c.ink, fontSize: 16, fontWeight: '800' },
   inputSmall: {
     backgroundColor: c.bg,
     color: c.ink,
@@ -437,7 +459,7 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   },
   // `flexShrink: 0` : les trois boutons gardent leur taille, ce sont les
   // champs qui cèdent si la place manque — jamais l'inverse.
-  editIcons: { flexDirection: 'row', gap: 5, marginLeft: 'auto', flexShrink: 0 },
+  editIcons: { flexDirection: 'row', gap: 4, marginLeft: 'auto', flexShrink: 0 },
   /**
    * LA RANGÉE DES FLÈCHES, au-dessus des cotes.
    *
@@ -454,24 +476,26 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   nudgeBtn: {
     width: 30,
     height: 30,
-    borderRadius: radius.sm,
+    borderRadius: 10,
     backgroundColor: c.surfaceSunken,
     alignItems: 'center',
     justifyContent: 'center',
   },
   nudgeNote: { color: c.inkFaint, fontSize: 11, fontWeight: '600', marginLeft: 2 },
   iconBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: radius.sm,
+    // Vingt-huit points DESSINÉS, quarante sous le doigt : le débord
+    // (`hitSlop`, dans le bandeau) élargit la cible sans manger la ligne.
+    width: 28,
+    height: 28,
+    borderRadius: 10,
     backgroundColor: c.surfaceSunken,
     alignItems: 'center',
     justifyContent: 'center',
   },
   iconBtnOk: {
-    width: 32,
-    height: 32,
-    borderRadius: radius.sm,
+    width: 28,
+    height: 28,
+    borderRadius: 10,
     backgroundColor: c.blue,
     alignItems: 'center',
     justifyContent: 'center',

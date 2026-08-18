@@ -56,6 +56,7 @@ export function ObjectBar({
     titre: string,
     valeur: number,
     poser: (v: number) => void,
+    unite?: string,
   ) => (
     <TouchableOpacity
       style={styles.clChamp}
@@ -74,7 +75,10 @@ export function ObjectBar({
           },
         })
       }>
-      <Text style={styles.clValeur}>{fr2(valeur)}</Text>
+      <Text style={styles.clValeur} numberOfLines={1}>
+        {fr2(valeur)}
+      </Text>
+      {unite ? <Text style={styles.unit}>{unite}</Text> : null}
     </TouchableOpacity>
   );
 
@@ -111,11 +115,13 @@ export function ObjectBar({
       <View style={styles.editRow}>
         {champ('Largeur', object.width, (v) => onResize(v, object.depth))}
         <Text style={styles.unit}>×</Text>
-        {champ('Profondeur', object.depth, (v) => onResize(object.width, v))}
-        <Text style={styles.unit}>m</Text>
+        {/* L'unité tient DANS la pastille : posée à côté, elle coûtait sa
+            propre largeur plus deux marges, pour une lettre. */}
+        {champ('Profondeur', object.depth, (v) => onResize(object.width, v), 'm')}
         <View style={styles.editIcons}>
           <TouchableOpacity
             style={styles.iconBtn}
+            hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
             accessibilityLabel="Pivoter"
             onPress={onRotate}>
             <Svg width={19} height={19} viewBox="0 0 24 24">
@@ -138,6 +144,7 @@ export function ObjectBar({
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.iconBtn}
+            hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
             accessibilityLabel="Annuler"
             onPress={onCancel}>
             <Svg width={19} height={19} viewBox="0 0 24 24">
@@ -155,6 +162,7 @@ export function ObjectBar({
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.iconBtnOk}
+            hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
             accessibilityLabel="Valider"
             onPress={onDone}>
             <Svg width={19} height={19} viewBox="0 0 24 24">

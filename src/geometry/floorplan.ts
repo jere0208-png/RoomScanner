@@ -992,6 +992,72 @@ export function hugWall(
   return p;
 }
 
+/**
+ * LE CÔTÉ QU'ON TIRE S'ACCROCHE AU MUR QU'IL LONGE.
+ *
+ * Étirer un meuble jusqu'au mur À LA MAIN, c'est viser trois millimètres
+ * avec un doigt qui en couvre quinze : on s'arrête à deux centimètres, ou on
+ * traverse. Or « le meuble touche le mur » n'est pas un détail de dessin —
+ * c'est ce qui décide qu'une prise est accessible ou condamnée.
+ *
+ * Le côté tiré se pose donc PILE sur le nu du mur dès qu'il en approche.
+ * Trois conditions, et l'accroche est refusée si l'une manque :
+ *
+ * - le mur doit être PARALLÈLE au côté (douze degrés de tolérance, la même
+ *   que le plaquage d'un meuble qu'on déplace) : un mur de biais ne donne
+ *   pas d'affleurement ;
+ * - le côté doit être EN FACE de lui, pas dans son prolongement — sans quoi
+ *   la cloison d'en face, parallèle et lointaine, attirerait le côté à
+ *   travers la pièce ;
+ * - et l'écart doit tenir dans `PRISE`.
+ *
+ * On rend le déplacement à appliquer AU CÔTÉ, le long de sa normale
+ * sortante : zéro quand rien n'accroche.
+ */
+export function snapSideToWalls(
+  /** Milieu du côté, à sa position visée. */
+  bord: Pt,
+  /** Normale sortante du côté (unitaire). */
+  n: Pt,
+  /** Demi-longueur du côté : de quoi savoir s'il est en face du mur. */
+  demi: number,
+  walls: WallSeg[],
+  /** Portée de l'aimant (m). */
+  prise = 0.07,
+): number {
+  // La direction du côté : perpendiculaire à sa normale.
+  const t = { x: -n.z, z: n.x };
+  let meilleur = 0;
+  let ecartMin = Infinity;
+  for (const w of walls) {
+    const len = segLength(w);
+    if (len < 1e-6) continue;
+    const u = { x: (w.b.x - w.a.x) / len, z: (w.b.z - w.a.z) / len };
+    // Parallèles ? On compare les directions, au signe près.
+    if (Math.abs(u.x * t.x + u.z * t.z) < Math.cos((12 * Math.PI) / 180)) continue;
+    const nw = perpOf(u);
+    // Le nu du mur qui regarde le côté : l'axe, décalé d'une demi-épaisseur
+    // du bon côté. C'est cette face-là qu'on affleure, pas l'axe.
+    const versBord = (bord.x - w.a.x) * nw.x + (bord.z - w.a.z) * nw.z;
+    const face = {
+      x: w.a.x + nw.x * (versBord >= 0 ? WALL_T / 2 : -WALL_T / 2),
+      z: w.a.z + nw.z * (versBord >= 0 ? WALL_T / 2 : -WALL_T / 2),
+    };
+    // Écart du côté au nu, mesuré le long de la normale du côté.
+    const long = (face.x - bord.x) * n.x + (face.z - bord.z) * n.z;
+    if (Math.abs(long) > prise) continue;
+    // En face de lui, et non dans son prolongement : la projection du côté
+    // sur le mur doit mordre sur le segment.
+    const c = (bord.x - w.a.x) * u.x + (bord.z - w.a.z) * u.z;
+    if (c < -demi || c > len + demi) continue;
+    if (Math.abs(long) < ecartMin) {
+      ecartMin = Math.abs(long);
+      meilleur = long;
+    }
+  }
+  return meilleur;
+}
+
 /** Point du contour le plus proche : la sortie de secours d'un point égaré. */
 function nearestOnRing(p: Pt, ring: Pt[]): Pt {
   let best = ring[0];

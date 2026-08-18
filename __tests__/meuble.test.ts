@@ -261,3 +261,59 @@ describe('l’orientation d’un meuble contre un mur', () => {
     expect(faceIntoRoom(libre, [MUR]).yaw).toBe(0);
   });
 });
+
+/**
+ * LES FLÈCHES DU BANDEAU — le centimètre demandé à la main.
+ *
+ * Relevé du chantier : « les flèches en bas ne déplacent pas les meubles ».
+ * Elles marchaient pourtant — au large. Contre un mur, non : le plaquage
+ * automatique referme tout jour de moins de cinq centimètres, et il reprenait
+ * chaque pas d'un centimètre à peine posé. Le meuble revenait se coller, et
+ * l'on croyait le bouton mort.
+ *
+ * C'est justement contre un mur qu'on se sert des flèches : décoller un
+ * meuble de deux centimètres pour dégager une plinthe, avancer une table de
+ * trois. Une demande explicite au centimètre passe donc AVANT le confort du
+ * plaquage — mais la maçonnerie garde le dernier mot : on ne pousse pas un
+ * meuble DANS un mur.
+ */
+describe('les flèches déplacent le meuble au centimètre', () => {
+  /** Le geste du bandeau : un pas d'un centimètre, sans aimant. */
+  const pas = (id: string, dx: number, dz: number) => {
+    const t = useScanStore.getState().objects.find((o) => o.id === id)!.transform;
+    useScanStore.getState().setObjectCenter(id, t[12] + dx, t[14] + dz, false);
+    return centre(id);
+  };
+
+  it('décolle un meuble plaqué contre un mur, pas à pas', () => {
+    const id = poser(LIT, L / 2, P / 2);
+    // On le colle au mur nord, puis on le rappelle vers le centre.
+    const colle = glisser(id, 0, -3);
+    expect(colle.z).toBeCloseTo(1.9 / 2 + WALL_T / 2, 3);
+    let vu = colle;
+    for (let i = 1; i <= 5; i++) {
+      vu = pas(id, 0, 0.01);
+      // Chaque pas se voit : sans quoi le bouton paraît mort.
+      expect(vu.z).toBeCloseTo(colle.z + i * 0.01, 4);
+    }
+    expect(vu.z).toBeCloseTo(colle.z + 0.05, 4);
+  });
+
+  it('ne pousse pas le meuble DANS la maçonnerie', () => {
+    const id = poser(LIT, L / 2, P / 2);
+    const colle = glisser(id, 0, -3);
+    // Vingt pas vers le mur : il est déjà contre, il n'ira pas plus loin.
+    let vu = colle;
+    for (let i = 0; i < 20; i++) vu = pas(id, 0, -0.01);
+    expect(vu.z).toBeGreaterThanOrEqual(1.9 / 2 + WALL_T / 2 - 1e-6);
+  });
+
+  it('marche aussi au large, dans les quatre directions', () => {
+    const id = poser(LIT, L / 2, P / 2);
+    const d = centre(id);
+    expect(pas(id, 0.01, 0).x).toBeCloseTo(d.x + 0.01, 4);
+    expect(pas(id, -0.01, 0).x).toBeCloseTo(d.x, 4);
+    expect(pas(id, 0, 0.01).z).toBeCloseTo(d.z + 0.01, 4);
+    expect(pas(id, 0, -0.01).z).toBeCloseTo(d.z, 4);
+  });
+});
