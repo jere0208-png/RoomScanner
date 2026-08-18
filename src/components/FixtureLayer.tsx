@@ -213,14 +213,41 @@ export function FixtureLayer({
                 r={Math.max(18, rayon + 8)}
                 fill="transparent"
               />
+              {/*
+                DE LOIN, ON ÉCRIT LE SIGLE — on ne pose plus un point.
+
+                Un disque de quatre pixels dit qu'il y a quelque chose, et
+                rien de plus : sur un mur qui en porte trois, on comptait des
+                confettis. Le sigle, lui, se lit à la même taille — « PC »,
+                « I », « RJ » — et l'on sait ce qu'on regarde sans zoomer.
+
+                Deux passes : un liseré blanc dessous, le texte coloré
+                par-dessus. Sans ce contour, un sigle ambre posé sur le poché
+                d'un mur disparaît dans le noir.
+              */}
               {lod < 0.98 && (
-                <Circle
-                  cx={p.x}
-                  cy={p.y}
-                  r={4}
-                  fill={spec.color}
-                  opacity={1 - lod}
-                />
+                <G opacity={1 - lod}>
+                  <SvgText
+                    x={p.x}
+                    y={p.y + 3.2}
+                    fill="none"
+                    stroke={c.surface}
+                    strokeWidth={2.6}
+                    fontSize={9.5}
+                    fontWeight="800"
+                    textAnchor="middle">
+                    {spec.short}
+                  </SvgText>
+                  <SvgText
+                    x={p.x}
+                    y={p.y + 3.2}
+                    fill={spec.color}
+                    fontSize={9.5}
+                    fontWeight="800"
+                    textAnchor="middle">
+                    {spec.short}
+                  </SvgText>
+                </G>
               )}
               {lod > 0.02 && (
                 <G opacity={lod}>

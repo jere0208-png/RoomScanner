@@ -812,6 +812,7 @@ export function Iso3DView({
           x: number;
           y: number;
           color: string;
+          sigle?: string;
           /** Opacité du point de repère : 1 de loin, 0 dès qu'on voit la plaque. */
           pastille: number;
           /** Cotes lues sur la face, affichées une fois zoomé dessus. */
@@ -988,6 +989,9 @@ export function Iso3DView({
           x: q.sx,
           y: q.sy,
           color: FIXTURES[lot[0].kind].color,
+          // Le sigle de la famille : c'est lui qu'on écrit de loin, à la
+          // place du point de couleur.
+          sigle: assemblyTag(postes),
           /**
            * LES COTES D'UN APPAREIL SONT DES COTES.
            *
@@ -1300,22 +1304,38 @@ export function Iso3DView({
                       />
                     </>
                   )}
+                  {/*
+                    LE SIGLE, ÉCRIT — et non un point de couleur.
+
+                    Vu de loin, l'appareil se réduisait à une pastille : on
+                    savait qu'il y avait quelque chose, jamais quoi. Le sigle
+                    tient dans la même place et dit la nature ; son liseré
+                    clair le détache d'un mur sombre comme d'un meuble.
+                  */}
                   {!item.derriere && item.pastille > 0.02 && (
                     <>
-                      <Circle
-                        cx={item.x}
-                        cy={item.y}
-                        r={6.5}
-                        fill={c.surface}
-                        opacity={item.pastille * 0.9}
-                      />
-                      <Circle
-                        cx={item.x}
-                        cy={item.y}
-                        r={4}
+                      <SvgText
+                        x={item.x}
+                        y={item.y + 3.4}
+                        fill="none"
+                        stroke={c.surface}
+                        strokeWidth={2.8}
+                        fontSize={10}
+                        fontWeight="800"
+                        textAnchor="middle"
+                        opacity={item.pastille}>
+                        {item.sigle}
+                      </SvgText>
+                      <SvgText
+                        x={item.x}
+                        y={item.y + 3.4}
                         fill={item.color}
-                        opacity={item.pastille}
-                      />
+                        fontSize={10}
+                        fontWeight="800"
+                        textAnchor="middle"
+                        opacity={item.pastille}>
+                        {item.sigle}
+                      </SvgText>
                     </>
                   )}
                   {item.haut && (

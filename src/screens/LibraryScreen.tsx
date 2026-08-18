@@ -410,7 +410,6 @@ interface RowProps {
   arme: boolean;
   fige: boolean;
   dedans?: boolean;
-  shift: Animated.Value;
   lift: Animated.Value;
   styles: ReturnType<typeof getStyles>;
   palette: Palette;
@@ -419,7 +418,7 @@ interface RowProps {
   onMenu: () => void;
   onTrash: () => void;
   onOut: () => void;
-  onHold: () => void;
+  onHold: (at: { x: number; y: number }) => void;
   onRelease: (deposer: boolean) => void;
 }
 
@@ -439,7 +438,6 @@ function ScanRow({
   arme,
   fige,
   dedans,
-  shift,
   lift,
   styles,
   palette,
@@ -450,21 +448,26 @@ function ScanRow({
   onHold,
   onRelease,
 }: RowProps) {
+  /*
+    LA LIGNE NE SE DÉPLACE PLUS : ELLE LAISSE SA PLACE.
+
+    Elle rétrécissait sur elle-même et suivait le doigt en hauteur — ni
+    vraiment tenue, ni vraiment posée : on croyait manipuler la liste, pas un
+    objet. Ce qu'on tient maintenant, c'est une BULLE qui flotte au-dessus de
+    l'écran (voir plus bas) ; la ligne, elle, reste où elle est et s'efface,
+    comme le trou laissé par ce qu'on a pris.
+  */
   const anim = pris
     ? {
-        opacity: lift.interpolate({ inputRange: [0, 1], outputRange: [1, 0.55] }),
-        transform: [
-          { translateY: shift },
-          {
-            scale: lift.interpolate({ inputRange: [0, 1], outputRange: [1, 0.88] }),
-          },
-        ],
+        opacity: lift.interpolate({ inputRange: [0, 1], outputRange: [1, 0.28] }),
       }
     : null;
   return (
     <Animated.View
       style={[styles.row, pris && styles.rowGhost, anim]}
-      onTouchStart={onHold}
+      onTouchStart={(e) =>
+        onHold({ x: e.nativeEvent.pageX, y: e.nativeEvent.pageY })
+      }
       onTouchEnd={() => onRelease(true)}
       onTouchCancel={() => onRelease(false)}>
       <TouchableOpacity
@@ -609,6 +612,10 @@ export function LibraryScreen() {
   const dragRef = useRef<string | null>(null);
   const overRef = useRef<string | null>(null);
   const shift = useRef(new Animated.Value(0)).current;
+  /** Où flotte la bulle, en coordonnées d'écran. */
+  const bulle = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
+  /** Le dernier point touché : c'est de là que la bulle se lève. */
+  const doigt = useRef({ x: 0, y: 0 });
   const lift = useRef(new Animated.Value(0)).current;
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const zones = useRef<
@@ -671,6 +678,9 @@ export function LibraryScreen() {
         shift.setValue(g.dy);
         const x = e.nativeEvent.pageX;
         const y = e.nativeEvent.pageY;
+        doigt.current = { x, y };
+        // La bulle suit le doigt en X ET EN Y : on la pose où l'on veut.
+        bulle.setValue({ x, y });
         const zone = zones.current.find(
           (z) => y >= z.top && y <= z.bottom && x >= z.left && x <= z.right,
         );
@@ -686,14 +696,17 @@ export function LibraryScreen() {
   ).current;
 
   /** Le doigt se pose : au bout d'une demi-seconde, le scan se décolle. */
-  const beginHold = (id: string) => {
+  const beginHold = (id: string, at?: { x: number; y: number }) => {
     stopHold();
+    if (at) doigt.current = at;
     // Rien à viser : pas de dossier, ou on est déjà dedans.
     if (dossierOuvert || folders.length === 0) return;
     holdTimer.current = setTimeout(() => {
       mesurer();
       dragRef.current = id;
       setDragId(id);
+      // Elle naît là où le doigt se trouve, pas au coin de l'écran.
+      bulle.setValue({ ...doigt.current });
       Animated.spring(lift, {
         toValue: 1,
         damping: 15,
@@ -710,10 +723,30 @@ export function LibraryScreen() {
     if (dragRef.current) endDrag(deposer);
   };
 
+
   // Nos fenêtres, pas celles du système : même typographie, mêmes rayons,
   // même bleu — et une icône par choix, qui se lit plus vite qu'un mot.
   const [menu, setMenu] = useState<ActionData | null>(null);
   const [prompt, setPrompt] = useState<PromptData | null>(null);
+
+  /*
+    UNE FENÊTRE QUI S'OUVRE REPOSE CE QU'ON TENAIT.
+
+    Relevé du chantier : « sa réduction est permanente, même après avoir
+    fermé le menu ». C'est le cycle tactile qui se rompt — quand une fenêtre
+    modale s'ouvre par-dessus, la vue du dessous ne reçoit ni fin ni
+    annulation de toucher, et le scan restait décollé pour toujours, effacé
+    au milieu de sa liste.
+
+    Le menu et la saisie reposent donc ce qui était en l'air : c'est le seul
+    endroit qui voit passer les deux.
+  */
+  useEffect(() => {
+    if (!menu && !prompt) return;
+    stopHold();
+    if (dragRef.current) endDrag(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [menu, prompt]);
 
   const folderMenu = (f: ScanFolder) =>
     setMenu({
@@ -829,6 +862,50 @@ export function LibraryScreen() {
         </View>
       )}
 
+      {/*
+        LA BULLE — ce qu'on tient vraiment.
+
+        Elle flotte au-dessus de tout, suit le doigt en X et en Y, et ne
+        reçoit aucun appui : c'est un reflet de ce qu'on transporte, pas une
+        cible. Le scan d'origine, lui, reste à sa place, effacé — le trou
+        laissé par ce qu'on a pris.
+      */}
+      {dragId !== null && (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.bulle,
+            {
+              transform: [
+                { translateX: Animated.subtract(bulle.x, 62) },
+                { translateY: Animated.subtract(bulle.y, 78) },
+                {
+                  scale: lift.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.8, 1],
+                  }),
+                },
+              ],
+              opacity: lift,
+            },
+          ]}>
+          {(() => {
+            const tenu = saves.find((x) => x.id === dragId);
+            if (!tenu) return null;
+            return (
+              <>
+                <View style={styles.bulleVignette}>
+                  <PlanThumb scan={tenu} c={palette} />
+                </View>
+                <Text style={styles.bulleNom} numberOfLines={1}>
+                  {tenu.name}
+                </Text>
+              </>
+            );
+          })()}
+        </Animated.View>
+      )}
+
       {dragId !== null && (
         <View style={styles.dragHint}>
           <Text style={styles.dragHintText}>
@@ -901,7 +978,6 @@ export function LibraryScreen() {
               pris={dragId === s.id}
               arme={armedId === s.id}
               fige={dragId !== null}
-              shift={shift}
               lift={lift}
               styles={styles}
               palette={palette}
@@ -909,7 +985,7 @@ export function LibraryScreen() {
               onMenu={() => scanMenu(s)}
               onTrash={() => onTrash(s.id)}
               onOut={() => moveToFolder(s.id, null)}
-              onHold={() => beginHold(s.id)}
+              onHold={(at) => beginHold(s.id, at)}
               onRelease={releaseRow}
             />
           ))}
@@ -1010,6 +1086,47 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     justifyContent: 'center',
   },
   countText: { color: c.blue, fontSize: 13.5, fontWeight: '800' },
+  /**
+   * LA BULLE — une carte qu'on tient au bout du doigt.
+   *
+   * Elle est posée en coordonnées d'ÉCRAN et non dans la liste : c'est ce
+   * qui lui permet de passer par-dessus les dossiers, la barre de recherche
+   * et tout le reste. Son ombre la décolle franchement — un objet qu'on
+   * porte ne rase pas la table.
+   */
+  bulle: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: 124,
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    borderRadius: radius.md,
+    backgroundColor: c.surface,
+    borderWidth: 1,
+    borderColor: c.blue,
+    shadowColor: '#0B0D12',
+    shadowOpacity: 0.28,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 12,
+    zIndex: 40,
+  },
+  bulleVignette: {
+    width: 96,
+    height: 62,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  bulleNom: {
+    color: c.ink,
+    fontSize: 11,
+    fontWeight: '700',
+    marginTop: 2,
+    maxWidth: 108,
+  },
   dragHint: {
     position: 'absolute',
     top: 104,

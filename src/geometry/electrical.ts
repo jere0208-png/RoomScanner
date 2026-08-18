@@ -143,11 +143,23 @@ export const plaqueLargeur = (n: number) =>
   Math.max(1, n - 1) * ENTRAXE + PLAQUE - (n > 1 ? 0 : 0);
 
 /** Teintes par famille : le modèle 3D doit se lire sans légende. */
-const C_PRISE = '#F0A202';
-const C_CMD = '#2D9CDB';
-const C_FAIBLE = '#9B51E0';
-const C_LUM = '#F2C94C';
-const C_DIVERS = '#EB5757';
+/*
+  LES COULEURS DE FAMILLE, ASSEZ FONCÉES POUR S'ÉCRIRE.
+
+  Elles ne servaient qu'à remplir des pastilles : sur un disque, un jaune vif
+  passe très bien, et le sigle par-dessus était blanc. Depuis que le sigle est
+  écrit À MÊME LE PLAN, dans la couleur de sa famille, c'est la couleur qui
+  doit porter le texte — et un jaune à 90 % de luminosité sur fond blanc ne
+  se lit pas, il se devine.
+
+  Les cinq teintes gardent donc leur famille (ambre, bleu, violet, or, rouge)
+  et descendent au niveau où un texte de neuf points tient sur du blanc.
+*/
+const C_PRISE = '#C8770A';
+const C_CMD = '#1E7FBF';
+const C_FAIBLE = '#7B3FC4';
+const C_LUM = '#A8820B';
+const C_DIVERS = '#D23B3B';
 
 export const FIXTURES: Record<FixtureKind, FixtureSpec> = {
   prise: {

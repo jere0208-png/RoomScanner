@@ -252,19 +252,23 @@ export function frameSvg(
     },
   ];
   /*
-    LES MEUBLES POUSSENT AVEC LES MURS.
+    LES MEUBLES SONT LÀ DÈS LE PLAN, et ils poussent avec les murs.
 
-    Posés d'emblée à leur taille, ils font des taches sur le plan — un plan
-    2D ne montre pas des caissons vus de dessus, il montre des symboles. Ils
-    sortent donc du sol en même temps que la maçonnerie, et le mobilier
-    apparaît quand il y a un volume pour l'accueillir.
+    Ils sortaient du sol au tiers de la levée : le plan de départ était nu,
+    et le mobilier apparaissait d'un coup — on ne reliait plus les deux
+    images, on en voyait deux. Un plan de relevé porte d'ailleurs ses
+    meubles, vus de dessus, comme ici.
+
+    Ils gardent donc leur emprise dès la première image (c'est elle qu'on lit
+    sur un plan) et ne gagnent que la HAUTEUR à mesure que la maçonnerie
+    monte.
   */
-  const pousse = Math.max(0.001, doux(Math.max(0, (t - 0.35) / 0.65)));
+  const pousse = doux(t);
   const meubles = PLAN.meubles.map(([id, cat, cx, cz, w, d, h]) =>
     meuble(id, cat, cx, cz, w, d, Math.max(0.02, h * pousse)),
   );
 
-  const scene = buildScene(murs, ouvertures, t > 0.05 ? meubles : [], {
+  const scene = buildScene(murs, ouvertures, meubles, {
     palette: scenePalette(p, t),
     showSurfaces: true,
     rooms: [{ id: 'r1', wallIds: PLAN.murs.map(([id]) => id) }],
@@ -291,9 +295,9 @@ export function frameSvg(
   const st = Math.sin(rad(theta));
   const cp = Math.cos(rad(tilt));
   const sp = Math.sin(rad(tilt));
-  // 0,68 plutôt que 0,78 : les cotes se posent HORS de la maçonnerie, et il
-  // leur faut leur bande.
-  const scale = (Math.min(W, H) * 0.68) / cadre.radius3d;
+  // Les cotes se posent HORS de la maçonnerie, et il leur faut leur bande :
+  // le logement laisse donc une marge franche sur les quatre côtés.
+  const scale = (Math.min(W, H) * 0.6) / cadre.radius3d;
   const project = (q: { x: number; y: number; z: number }) => {
     const x = q.x - cadre.center.x;
     const y = q.y - cadre.center.y;
@@ -358,13 +362,23 @@ export function frameSvg(
     };
     const q = project(at);
     const spec = FIXTURES[f.kind];
-    const r = 6.4;
+    /*
+      LE SIGLE S'ÉCRIT, il ne se met pas dans une pastille.
+
+      Un disque de couleur dit qu'il y a quelque chose, jamais quoi : sur un
+      mur qui en porte trois, on comptait des confettis. Le sigle se lit à la
+      même taille, dans la couleur de sa famille, avec un liseré clair qui le
+      détache du poché comme du mobilier.
+    */
+    const cx = q.sx.toFixed(1);
+    const cy = (q.sy + 3).toFixed(1);
+    const police =
+      `font-family="Helvetica" font-size="9" font-weight="bold" ` +
+      `text-anchor="middle"`;
     out.push(
-      `<circle cx="${q.sx.toFixed(1)}" cy="${q.sy.toFixed(1)}" r="${r}" ` +
-        `fill="${spec.color}" stroke="#FFFFFF" stroke-width="1.2"/>`,
-      `<text x="${q.sx.toFixed(1)}" y="${(q.sy + 2.2).toFixed(1)}" ` +
-        `font-family="Helvetica" font-size="6" font-weight="bold" ` +
-        `fill="#FFFFFF" text-anchor="middle">${spec.short}</text>`,
+      `<text x="${cx}" y="${cy}" ${police} fill="none" ` +
+        `stroke="#FFFFFF" stroke-width="3">${spec.short}</text>`,
+      `<text x="${cx}" y="${cy}" ${police} fill="${spec.color}">${spec.short}</text>`,
     );
   }
 
@@ -374,7 +388,19 @@ export function frameSvg(
     Elles se posent le long des murs extérieurs, à l'écart de la maçonnerie,
     et s'effacent dès que le plan quitte l'horizontale.
   */
-  const opaciteCotes = Math.max(0, 1 - t / 0.35);
+  /*
+    LE FONDU DES COTES DURE ASSEZ LONGTEMPS POUR SE VOIR.
+
+    Il s'étalait sur le premier tiers de la levée : à quarante-quatre images,
+    cela laissait DEUX images entre « pleine » et « éteinte » — l'œil ne voit
+    pas un fondu de deux images, il voit une coupure. Le relevé du chantier
+    le disait d'une cote en particulier, mais elles sautaient toutes, chacune
+    à un pas différent de l'autre selon sa position dans la rampe.
+
+    Le fondu couvre maintenant les deux tiers de la levée : une dizaine
+    d'images, de quoi voir les chiffres s'en aller.
+  */
+  const opaciteCotes = Math.max(0, 1 - t / 0.72);
   if (opaciteCotes > 0.01) {
     for (const w of murs) {
       if (w.id === 'refend') continue;
@@ -387,9 +413,16 @@ export function frameSvg(
       if ((mid.x - centre.x) * n.x + (mid.z - centre.z) * n.z < 0) {
         n = { x: -n.x, z: -n.z };
       }
-      // Serrées contre la maçonnerie : à trente-huit centimètres, les cotes
-      // latérales sortaient de l'écran.
-      const ecart = 0.22;
+      /*
+        LA COTE SE POSE FRANCHEMENT DEHORS.
+
+        À vingt-deux centimètres de l'axe — soit quinze du nu —, elle frôlait
+        la maçonnerie : à plat ça passait, mais dès les premiers degrés
+        d'inclinaison le poché NOIR du mur montait par-dessus, et un chiffre
+        gris sur noir ne s'estompe pas, il s'éteint. C'est ce qu'on a vu sur
+        la cote de gauche.
+      */
+      const ecart = 0.5;
       const a = project({
         x: w.a.x + n.x * ecart,
         y: 0,
@@ -420,6 +453,14 @@ export function frameSvg(
           `x2="${(b.sx + (a.sx - b.sx) * 0.02).toFixed(1)}" ` +
           `y2="${(b.sy + (a.sy - b.sy) * 0.02).toFixed(1)}" ` +
           `stroke="${p.cote}" stroke-width="2.4"/>` +
+          // Deux passes, comme les sigles : un liseré clair dessous, le
+          // chiffre par-dessus. Une cote doit se lire sur le blanc du sol
+          // comme sur le noir d'un mur.
+          `<text x="${mx.toFixed(1)}" y="${(my - 3.5).toFixed(1)}" ` +
+          `font-family="Helvetica" font-size="9" font-weight="bold" ` +
+          `fill="none" stroke="#FFFFFF" stroke-width="3" text-anchor="middle" ` +
+          `transform="rotate(${ang.toFixed(1)} ${mx.toFixed(1)} ${my.toFixed(1)})">` +
+          `${texte}</text>` +
           `<text x="${mx.toFixed(1)}" y="${(my - 3.5).toFixed(1)}" ` +
           `font-family="Helvetica" font-size="9" font-weight="bold" ` +
           `fill="${p.cote}" text-anchor="middle" ` +

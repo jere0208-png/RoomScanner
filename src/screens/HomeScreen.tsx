@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { RoomScan } from 'react-native-room-scan';
 import {
+  dark,
   glow,
   radius,
   shadowCard,
@@ -54,6 +55,8 @@ export function HomeScreen() {
   const setThemePref = useScanStore((s) => s.setThemePref);
   const { start } = useRoomScan();
   const c = useTheme();
+  /** Le fond est-il sombre ? C'est lui qui choisit le logotype. */
+  const sombre = c === dark;
   const styles = getStyles(c);
 
   useEffect(() => {
@@ -146,7 +149,20 @@ export function HomeScreen() {
               système ne sait faire. Teintée par le thème pour rester
               lisible en sombre. */}
           <Image
-            source={require('../assets/echoplan.png')}
+            /*
+              DEUX FICHIERS, ET PAS UNE TEINTE.
+
+              Le logotype portait un `tintColor` : l'image était noire, le
+              thème la repeignait. Le nouveau dessin a des ONDES en dégradé —
+              c'est son identité — et une teinte les écrase toutes en un
+              aplat. On embarque donc les deux versions, et l'on prend celle
+              qui va avec le fond.
+            */
+            source={
+              sombre
+                ? require('../assets/echoplan-dark.png')
+                : require('../assets/echoplan.png')
+            }
             style={styles.wordmark}
             resizeMode="contain"
             accessibilityLabel="EchoPlan"
@@ -315,11 +331,14 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     zIndex: 2,
   },
   themeIcon: { color: c.inkSoft, fontSize: 21 },
+  /**
+   * Le logotype tient sur DEUX lignes — « echo » au-dessus de « plan » —,
+   * d'où ces proportions : 160 × 102 et non plus une bande.
+   */
   wordmark: {
-    width: 244,
-    height: 54,
-    marginTop: 18,
-    tintColor: c.ink,
+    width: 160,
+    height: 102,
+    marginTop: 14,
   },
   subtitle: {
     color: c.inkSoft,

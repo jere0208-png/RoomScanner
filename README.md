@@ -428,6 +428,22 @@ dessine rien d'autre. Le fond est translucide, l'ombre prend la couleur du
 bouton, et l'appui l'enfonce de trois pour cent : un bouton qui ne bouge pas
 sous le doigt laisse douter qu'il a pris.
 
+### Ce qu'on tient est une bulle
+
+Un scan décollé par appui long rétrécissait sur place et suivait le doigt en
+hauteur : ni vraiment tenu, ni vraiment posé — on croyait manipuler la liste
+plutôt qu'un objet. Ce qu'on tient est maintenant une **bulle** : une carte
+avec la vignette du plan et son nom, posée en coordonnées d'écran, qui suit le
+doigt dans les deux axes et passe par-dessus tout. La ligne d'origine reste où
+elle est, effacée — le trou laissé par ce qu'on a pris.
+
+**Et elle se repose toujours.** Relevé du chantier : « sa réduction est
+permanente, même après avoir fermé le menu ». C'est le cycle tactile qui se
+rompt : quand une fenêtre modale s'ouvre par-dessus, la vue du dessous ne
+reçoit ni fin ni annulation de toucher, et le scan restait décollé pour
+toujours, effacé au milieu de sa liste. L'ouverture d'une fenêtre repose donc
+ce qui était en l'air.
+
 ### Le dossier avale le scan
 
 Un scan lâché sur un dossier disparaissait de la liste. C'est juste, et ça ne
@@ -446,6 +462,21 @@ qui n'a pas eu lieu. La descente se pilote par un nombre et non par une chaîne
 de transformation — interpoler `translate(0 -26) scale(1)` vers
 `translate(0 12)` exige le même nombre de composants de part et d'autre, et la
 moindre distraction fait tomber le rendu entier.
+
+### Les appareils s'écrivent
+
+Vu de loin, un appareil se réduisait à une pastille de quatre pixels : on
+savait qu'il y avait quelque chose, jamais quoi — sur un mur qui en porte
+trois, on comptait des confettis. Le **sigle** tient dans la même place et dit
+la nature : « PC », « I », « RJ », dans la couleur de sa famille, cerné d'un
+liseré clair. Sans ce contour, un sigle ambre posé sur le poché d'un mur
+disparaît dans le noir.
+
+Les cinq couleurs de famille ont donc **descendu d'un cran**. Elles ne
+servaient qu'à remplir des disques, où un jaune vif passe très bien ; depuis
+qu'elles portent du texte sur fond blanc, il leur faut la luminosité d'une
+encre. Même chose dans la vitrine et dans la vue 3D — c'est le même code
+couleur partout.
 
 ### La typo de la marque
 

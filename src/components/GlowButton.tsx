@@ -57,8 +57,17 @@ export function GlowButton({
   const course = useRef(new Animated.Value(0)).current;
   const appui = useRef(new Animated.Value(0)).current;
 
+  /*
+    LE CONTOUR NE COURT QUE SUR LE BOUTON PRINCIPAL.
+
+    Deux boutons qui s'animent en même temps, c'est deux choses qui bougent
+    pour un seul geste à faire : l'œil ne sait plus lequel est l'important.
+    « Mes scans » garde son liseré, sobre, et laisse le mouvement à celui
+    qu'on vient toucher.
+  */
+  const anime = variant === 'primary';
   useEffect(() => {
-    if (disabled) return;
+    if (disabled || !anime) return;
     const boucle = Animated.loop(
       Animated.timing(course, {
         toValue: 1,
@@ -71,7 +80,7 @@ export function GlowButton({
     );
     boucle.start();
     return () => boucle.stop();
-  }, [course, disabled, variant]);
+  }, [course, disabled, anime, variant]);
 
   const H = taille.h || 56;
   const W = taille.w || 240;
@@ -135,7 +144,7 @@ export function GlowButton({
         {right}
         {/* Le contour : posé PAR-DESSUS le fond, mais transparent au doigt —
             il ne doit pas voler l'appui qu'il invite à donner. */}
-        {taille.w > 0 && !disabled && (
+        {taille.w > 0 && !disabled && anime && (
           <View style={StyleSheet.absoluteFill} pointerEvents="none">
             <Svg width={W} height={H}>
               <Defs>
@@ -229,6 +238,10 @@ const getStyles = (() => {
       fantome: {
         backgroundColor: c.surface,
         opacity: 0.92,
+        // Le liseré vient du STYLE et non du tracé animé : sans contour qui
+        // court, il ne restait plus rien pour dessiner le bord.
+        borderWidth: 1,
+        borderColor: c.lineStrong,
       },
       eteint: { opacity: 0.45 },
       texte: { fontSize: 16.5, fontWeight: '800', letterSpacing: -0.2 },

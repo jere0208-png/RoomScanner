@@ -286,7 +286,12 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   },
   photoLegende: { color: '#FFFFFF', fontSize: 13, fontWeight: '700', flex: 1 },
   photoSuppr: { color: '#FF6B6B', fontSize: 13, fontWeight: '800' },
-  watermarkLogo: { width: 116, height: 26, tintColor: c.ink, opacity: 0.85 },
+  /**
+   * Le filigrane suit la forme du logotype : deux lignes, pas une bande.
+   * Pas de teinte non plus — les ondes du dessin ne survivraient pas à un
+   * aplat, et une capture se partage telle qu'elle est.
+   */
+  watermarkLogo: { width: 92, height: 59, opacity: 0.85 },
   watermarkText: { color: '#0B0D12', fontSize: 13, fontWeight: '800' },
   watermarkAccent: { color: c.blue },
   /**
