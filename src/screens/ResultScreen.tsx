@@ -27,7 +27,10 @@ import {
   useTheme,
   type Palette,
 } from '../theme';
-import { FloorplanEditor } from '../components/FloorplanEditor';
+import {
+  FloorplanEditor,
+  type VuePlan,
+} from '../components/FloorplanEditor';
 import { WallElevation } from '../components/WallElevation';
 import { SidePill } from '../components/SidePill';
 import { CeilingIcon } from '../components/CeilingIcon';
@@ -338,6 +341,92 @@ export function ResultScreen() {
   const [visite, setVisite] = useState(false);
   // Vue 3D : bascule « vue de dessus », comme un plan.
   const [view3d, setView3d] = useState<View3DParams>(DEFAULT_VIEW3D);
+  /*
+    LE PLAN SE RELÈVE EN VOLUME, ET SE RABAT EN PLAN.
+
+    Relevé du chantier : « au passage du 2D au 3D et inversement, le plan
+    doit se placer exactement comme l'autre ; ajoute une rapide animation,
+    comme si le 2D se construisait en 3D ».
+
+    Les deux vues partagent la même projection : la 3D vue à PLAT — aucune
+    inclinaison — EST le plan, au repaire près. La bascule n'a donc rien à
+    inventer : on entre en 3D à plat, dans l'orientation exacte du plan, et
+    l'on relève l'inclinaison en quatre cent cinquante millisecondes. Les
+    murs semblent sortir du papier. Au retour, on rabat d'abord, on change
+    de vue ensuite : le dessin ne saute jamais.
+  */
+  const [vuePlan, setVuePlan] = useState<VuePlan>({
+    zoom: 1,
+    ox: 0,
+    oy: 0,
+    rot: 0,
+  });
+  const view3dRef = useRef(view3d);
+  view3dRef.current = view3d;
+  const releve = useRef<ReturnType<typeof setInterval> | null>(null);
+  /** Un relèvement est demandé, dès que la vue 3D paraîtra. */
+  const attendReleve = useRef(false);
+  useEffect(() => () => {
+    if (releve.current) clearInterval(releve.current);
+  }, []);
+  /** À plat : la 3D est alors exactement le plan. */
+  const TILT_PLAN = 1;
+  /** Et l'inclinaison où le volume se lit le mieux. */
+  const TILT_VOLUME = DEFAULT_VIEW3D.tilt;
+  /** Relève (ou rabat) l'inclinaison, puis passe la main. */
+  const incliner = (de: number, vers: number, fini?: () => void) => {
+    if (releve.current) clearInterval(releve.current);
+    const t0 = Date.now();
+    const duree = 450;
+    releve.current = setInterval(() => {
+      const t = Math.min(1, (Date.now() - t0) / duree);
+      // Départ franc, arrivée douce : le geste d'un plan qu'on relève.
+      const e = 1 - Math.pow(1 - t, 3);
+      setView3d((v) => ({ ...v, tilt: de + (vers - de) * e }));
+      if (t >= 1) {
+        if (releve.current) clearInterval(releve.current);
+        releve.current = null;
+        fini?.();
+      }
+    }, 16);
+  };
+  useEffect(() => {
+    if (vue !== '3d' || !attendReleve.current) return;
+    attendReleve.current = false;
+    incliner(TILT_PLAN, TILT_VOLUME);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vue]);
+  const basculerVue = () => {
+    if (releve.current) return;
+    if (vue === '2d') {
+      // On entre à PLAT, dans l'orientation, le zoom et le cadrage du plan.
+      setView3d({
+        theta: (vuePlan.rot * 180) / Math.PI,
+        tilt: TILT_PLAN,
+        zoom: vuePlan.zoom,
+        ox: vuePlan.ox,
+        oy: vuePlan.oy,
+      });
+      setTab('3d');
+      // Le relèvement attend que la vue 3D soit à l'écran : la bascule
+      // commence par un fondu de cent dix millisecondes, et un quart du
+      // mouvement s'y perdrait — on verrait le volume déjà levé.
+      attendReleve.current = true;
+    } else {
+      // On rabat d'abord ; le plan reprendra ce cadrage-là.
+      incliner(view3dRef.current.tilt, TILT_PLAN, () => {
+        const v = view3dRef.current;
+        setVuePlan({
+          zoom: v.zoom,
+          ox: v.ox,
+          oy: v.oy,
+          rot: (v.theta * Math.PI) / 180,
+        });
+        setTab('2d');
+        setView3d((x) => ({ ...x, tilt: TILT_VOLUME }));
+      });
+    }
+  };
   // Coupe : index de la pièce isolée en 3D (-1 = tout le logement).
   const [focusIdx, setFocusIdx] = useState(-1);
   // Cotes du plan 2D masquées par défaut : la pastille « Cotes » les active.
@@ -1396,6 +1485,8 @@ export function ResultScreen() {
             les remonte, en une fois, sans les toucher un par un. */}
         {vue === '2d' ? (
           <FloorplanEditor
+            vueInitiale={vuePlan}
+            onView={setVuePlan}
             cableRoutes={showRoutes ? cheminements?.traces : undefined}
             circuitMarks={showRoutes ? marks : undefined}
             photos={photos}
@@ -1986,7 +2077,7 @@ export function ResultScreen() {
           <TouchableOpacity
             style={styles.vuePastille}
             accessibilityLabel={vue === '2d' ? 'Passer en 3D' : 'Passer en 2D'}
-            onPress={() => setTab(vue === '2d' ? '3d' : '2d')}>
+            onPress={basculerVue}>
             <Text style={styles.vuePastilleTexte}>
               {vue === '2d' ? '2D' : '3D'}
             </Text>

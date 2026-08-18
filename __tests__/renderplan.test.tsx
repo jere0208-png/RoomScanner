@@ -171,3 +171,4 @@ describe('planche de rendu du plan 2D', () => {
     });
   }
 });
+

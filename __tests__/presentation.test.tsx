@@ -24,6 +24,7 @@ import { ResultScreen } from '../src/screens/ResultScreen';
 import { Iso3DView } from '../src/components/Iso3DView';
 import { ExportArt } from '../src/components/ExportArt';
 import { ClientTour } from '../src/components/ClientTour';
+import { FloorplanEditor } from '../src/components/FloorplanEditor';
 import { useScanStore } from '../src/store/scanStore';
 import {
   SNAPSHOT_FIXTURES,
@@ -244,6 +245,72 @@ describe('le rideau de préparation', () => {
     });
     expect(textes(tree)).not.toContain('Préparation de la présentation');
   });
+
+  /**
+   * ELLE ENTRE DANS LES PIÈCES.
+   *
+   * Relevé du chantier : « d'abord un tour d'ensemble du modèle, puis rentrer
+   * TOTALEMENT au centre de chaque pièce pour présenter chaque mur autour —
+   * une immersion totale mais dynamique ». La visite survolait les pièces de
+   * cinquante degrés de hauteur : une maquette qu'on regarde, pas un logement
+   * où l'on se tient.
+   *
+   * On juge la CAMÉRA, pas les mots : le regard descend à hauteur d'homme, et
+   * le tour est complet.
+   */
+  it('descend au centre des pièces et en fait le tour complet', () => {
+    let tree!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      useScanStore.setState({
+        screen: 'result',
+        scanName: 'Chantier test',
+        walls: SNAPSHOT_WALLS,
+        openings: SNAPSHOT_OPENINGS,
+        objects: SNAPSHOT_OBJECTS,
+        rooms: SNAPSHOT_ROOMS.map((r, i) => ({
+          id: r.id,
+          name: `Pièce ${i + 1}`,
+          floor: null,
+        })),
+        fixtures: SNAPSHOT_FIXTURES,
+        ceiling: [],
+      });
+      tree = TestRenderer.create(<ClientTour visible onClose={() => {}} />);
+    });
+    arbre = tree;
+    act(() => {
+      jest.advanceTimersByTime(600);
+    });
+
+    /** Le regard le plus RASANT et le zoom le plus fort atteints. */
+    let tiltMini = 90;
+    let zoomMaxi = 0;
+    let toursDePiece = 0;
+    let piecesVues = new Set<string | null>();
+    const vue3d = () => tree.root.findByType(Iso3DView).props;
+    let piecePrecedente: string | null | undefined;
+    // Trente secondes de visite : le tour d'ensemble, puis les pièces.
+    for (let i = 0; i < 60; i++) {
+      act(() => {
+        jest.advanceTimersByTime(500);
+      });
+      const p = vue3d();
+      if (p.focusRoomId) {
+        tiltMini = Math.min(tiltMini, p.value.tilt);
+        zoomMaxi = Math.max(zoomMaxi, p.value.zoom);
+        piecesVues.add(p.focusRoomId);
+        if (p.focusRoomId !== piecePrecedente) toursDePiece++;
+      }
+      piecePrecedente = p.focusRoomId;
+    }
+    // On est DEDANS : le regard descend sous vingt-cinq degrés, et la vue
+    // se serre à plus du double du cadrage d'ensemble.
+    expect(`${tiltMini < 25 ? 'dedans' : 'au-dessus'}`).toBe('dedans');
+    expect(zoomMaxi).toBeGreaterThan(2);
+    // Et chaque pièce a bien été visitée.
+    expect(piecesVues.size).toBeGreaterThan(0);
+    expect(toursDePiece).toBeGreaterThan(0);
+  });
 });
 
 /**
@@ -432,5 +499,50 @@ describe('les marges du système', () => {
       )
       .map(style)[0];
     expect(rail.bottom).toBeGreaterThanOrEqual(34);
+  });
+});
+
+/**
+ * LA BASCULE 2D ↔ 3D : LE PLAN SE RELÈVE, IL NE SAUTE PAS.
+ *
+ * Relevé du chantier : « au passage du 2D au 3D et inversement, le plan doit
+ * se placer exactement comme l'autre ; ajoute une rapide animation, comme si
+ * le 2D se construisait en 3D ». Les deux vues partagent la même projection :
+ * la 3D SANS inclinaison EST le plan. La bascule n'invente donc rien — elle
+ * entre à plat, dans l'orientation exacte du plan, puis relève.
+ */
+describe('la bascule entre le plan et le volume', () => {
+  it('entre en 3D à plat, dans l’orientation du plan, puis relève', () => {
+    const tree = monter('scan');
+    const plan = tree.root.findByType(FloorplanEditor);
+    // Le plan a été tourné d'un quart de tour par l'utilisateur.
+    act(() =>
+      plan.props.onView({ zoom: 1.4, ox: 12, oy: -8, rot: Math.PI / 2 }),
+    );
+
+    const pastille = tree.root
+      .findAllByType(TouchableOpacity)
+      .find((n) => n.props.accessibilityLabel === 'Passer en 3D');
+    expect(pastille).toBeDefined();
+    act(() => pastille!.props.onPress());
+
+    // La bascule commence par un bref fondu : la vue 3D paraît ensuite.
+    act(() => {
+      jest.advanceTimersByTime(130);
+    });
+    const vue3d = () => tree.root.findByType(Iso3DView).props.value;
+    // Même orientation, même zoom, même cadrage — et À PLAT.
+    expect(vue3d().theta).toBeCloseTo(90, 3);
+    expect(vue3d().zoom).toBeCloseTo(1.4, 3);
+    expect(vue3d().ox).toBe(12);
+    expect(vue3d().tilt).toBeLessThan(12);
+
+    // Puis le volume se relève tout seul, en moins d'une demi-seconde.
+    act(() => {
+      jest.advanceTimersByTime(500);
+    });
+    expect(vue3d().tilt).toBeGreaterThan(30);
+    // ...sans avoir touché à l'orientation : le logement n'a pas pivoté.
+    expect(vue3d().theta).toBeCloseTo(90, 3);
   });
 });

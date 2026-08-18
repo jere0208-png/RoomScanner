@@ -134,9 +134,21 @@ function footprintOf(
   return clampFootprint(toFootprint(o), part.walls, part.labelAt);
 }
 
+/** Le cadrage du plan : rotation (rad), zoom, et déplacement en pixels. */
+export interface VuePlan {
+  zoom: number;
+  ox: number;
+  oy: number;
+  rot: number;
+}
+
 interface Props {
   /** Cotes visibles le long des murs. */
   showMeasures: boolean;
+  /** Cadrage de départ — celui que la 3D avait, quand on en revient. */
+  vueInitiale?: VuePlan;
+  /** Cadrage courant, remonté à chaque geste : la 3D le reprend tel quel. */
+  onView?: (v: VuePlan) => void;
   /** Mode édition : sélection des murs + poignées de coin. */
   editable: boolean;
   selectedWallId: string | null;
@@ -253,6 +265,8 @@ interface Props {
  */
 export function FloorplanEditor({
   showMeasures,
+  vueInitiale,
+  onView,
   editable,
   selectedWallId,
   onSelectWall,
@@ -306,7 +320,21 @@ export function FloorplanEditor({
   const [invite, setInvite] = useState(false);
 
   // Navigation du plan : zoom (pincer), déplacement (glisser), rotation (torsion).
-  const [view, setView] = useState({ zoom: 1, ox: 0, oy: 0, rot: 0 });
+  const [view, setView] = useState(
+    vueInitiale ?? { zoom: 1, ox: 0, oy: 0, rot: 0 },
+  );
+  /*
+    LE PLAN DIT OÙ IL EN EST — et la 3D reprend exactement là.
+
+    Passer en volume donnait un logement orienté autrement : on avait tourné
+    le plan pour l'avoir dans le bon sens, et la 3D repartait de son angle à
+    elle. Le relevé du chantier est net : « le plan doit se placer exactement
+    comme l'autre ». On remonte donc la rotation, le zoom et le déplacement à
+    l'écran qui les tient, et c'est lui qui les repasse à la vue d'à côté.
+  */
+  useEffect(() => {
+    onView?.(view);
+  }, [view, onView]);
   const viewRef = useRef(view);
   viewRef.current = view;
   const navBase = useRef({

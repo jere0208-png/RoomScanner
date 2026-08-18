@@ -63,6 +63,15 @@ interface Etape {
   /** Tour d'horizon pendant l'étape, en degrés (0 = caméra fixe). */
   balayage: number;
   /**
+   * ZOOM D'ARRIVÉE, s'il doit continuer à bouger pendant l'étape.
+   *
+   * Une caméra qui tourne à distance constante devient vite un manège. En
+   * avançant lentement pendant le tour d'horizon, on donne le sentiment
+   * d'entrer dans la pièce plutôt que de tourner autour — c'est ce que
+   * demandait le chantier : « une immersion totale mais dynamique ».
+   */
+  zoomFin?: number;
+  /**
    * L'étape présente UN MUR : on trace alors les cotes des appareils, et
    * on pose leur désignation. Le reste du temps, la scène reste nue — un
    * client ne lit pas dix nombres sur un volume qui tourne.
@@ -140,9 +149,11 @@ export function ClientTour({
         surface,
       )} m² · ${fixtures.length} appareil${fixtures.length > 1 ? 's' : ''}`,
       roomId: null,
+      // Un tour COMPLET du logement, vu de haut : avant d'entrer quelque
+      // part, le client doit savoir à quoi ressemble l'ensemble.
       vue: { theta: -32, tilt: 56, zoom: 1, ox: 0, oy: 0 },
-      balayage: 300,
-      duree: 7000,
+      balayage: 360,
+      duree: 8000,
     });
 
     for (const room of rooms) {
@@ -153,16 +164,47 @@ export function ClientTour({
         .map((w) => walls.find((x) => x.id === w.id))
         .filter((w): w is WallSeg => !!w && segLength(w) > 0.4);
 
-      // 2. La pièce, isolée et vue en tournant : on la reconnaît.
+      /*
+        2. ON ENTRE DANS LA PIÈCE, ET ON EN FAIT LE TOUR.
+
+        Relevé du chantier : « d'abord un tour d'ensemble, puis rentrer
+        TOTALEMENT au centre de chaque pièce pour présenter chaque mur qui
+        se trouve autour — une immersion totale mais dynamique ».
+
+        Trois réglages font l'immersion. Le REGARD descend à hauteur d'homme
+        (dix-sept degrés au lieu de cinquante) : on ne survole plus une
+        maquette, on se tient dedans. Le CADRAGE se serre sur la seule
+        pièce — elle est isolée, la vue se recadre donc sur elle et son
+        centre devient le centre de l'image. Et la caméra fait un TOUR
+        COMPLET : chaque mur passe devant l'œil, l'un après l'autre, sans
+        qu'on ait à les énumérer.
+
+        L'écorché fait le reste : le mur qui se trouve entre la caméra et la
+        pièce s'efface en gardant son arête. On voit donc du dedans, comme
+        si l'on se tenait au milieu.
+      */
+      const premier = murs[0];
       out.push({
         titre: room.name || 'Pièce',
         sous: part.surface
           ? `${fr1(part.surface.area)} m² · ${murs.length} murs`
           : undefined,
+        detail: 'Au centre de la pièce — tour complet',
         roomId: room.id,
-        vue: { theta: -32, tilt: 52, zoom: 1.15, ox: 0, oy: 0 },
-        balayage: 200,
-        duree: 5200,
+        vue: {
+          // On démarre face à un mur : un tour qui commence dans un angle
+          // ne montre d'abord que deux bouts de cloison.
+          theta: premier ? azimutFaceAuMur(premier, centre) : -32,
+          tilt: 17,
+          zoom: 2.1,
+          ox: 0,
+          oy: 0,
+        },
+        // Et l'on avance encore pendant le tour : c'est ce mouvement-là qui
+        // fait entrer, plutôt que tourner autour.
+        zoomFin: 2.6,
+        balayage: 360,
+        duree: 9000,
       });
 
       // 3. Chaque mur ÉQUIPÉ, vu de face, avec ses appareils nommés.
@@ -375,10 +417,15 @@ export function ClientTour({
       const d = depart.current;
       const a = etape.vue;
       const balaye = etape.balayage * Math.max(0, (t - 0.2) / 0.8);
+      // Le zoom continue de monter PENDANT le tour d'horizon : la caméra
+      // avance dans la pièce au lieu d'en faire le tour à distance fixe.
+      const zCible =
+        a.zoom +
+        ((etape.zoomFin ?? a.zoom) - a.zoom) * Math.max(0, (t - 0.25) / 0.75);
       setVue({
         theta: d.theta + (a.theta - d.theta) * arrivee + balaye,
         tilt: d.tilt + (a.tilt - d.tilt) * arrivee,
-        zoom: d.zoom + (a.zoom - d.zoom) * arrivee,
+        zoom: d.zoom + (zCible - d.zoom) * arrivee,
         ox: 0,
         oy: 0,
       });
@@ -405,6 +452,7 @@ export function ClientTour({
         depart.current = {
           ...a,
           theta: a.theta + etape.balayage,
+          zoom: etape.zoomFin ?? a.zoom,
         };
         debut.current = 0;
         if (index + 1 < etapes.length) setIndex(index + 1);
