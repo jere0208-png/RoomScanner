@@ -431,6 +431,24 @@ export function pushOutOfWalls(
   walls: WallSeg[],
   inside: Pt,
   outline?: Pt[],
+  /**
+   * D'OÙ VIENT LE MEUBLE — et c'est capital dès qu'il y a un RETOUR DE MUR.
+   *
+   * Un mur repousse vers l'intérieur de la pièce, et l'intérieur était donné
+   * par UN point : l'ancre de l'étiquette, quelque part au milieu du salon.
+   * Or un retour de mur crée une alcôve qui est de l'AUTRE côté de ce
+   * refend : le retour poussait donc le meuble à travers l'alcôve, vers le
+   * salon. C'est exactement ce que le chantier a filmé — « tant qu'il y a ce
+   * retour de mur à droite, ça ne rentre pas », et la place était pourtant
+   * là.
+   *
+   * En glissant un meuble, on sait mieux : il vient de quelque part. Chaque
+   * mur le repousse donc du côté où il ÉTAIT — la collision d'un objet
+   * qu'on pousse, et non la remise en ordre d'un plan mal relevé. L'ancre de
+   * la pièce ne sert plus que de recours, quand le meuble se trouve
+   * exactement sur le nu.
+   */
+  depuis?: Pt,
 ): Pt {
   const cos = Math.cos(box.yaw);
   const sin = Math.sin(box.yaw);
@@ -451,7 +469,37 @@ export function pushOutOfWalls(
       const u = { x: (w.b.x - w.a.x) / len, z: (w.b.z - w.a.z) / len };
       let n = perpOf(u);
       const mid = { x: (w.a.x + w.b.x) / 2, z: (w.a.z + w.b.z) / 2 };
-      if ((inside.x - mid.x) * n.x + (inside.z - mid.z) * n.z < 0) {
+      /*
+        DE QUEL CÔTÉ CE MUR REPOUSSE-T-IL ?
+
+        Trois réponses, dans cet ordre. D'abord LÀ OÙ LE MEUBLE EST : c'est
+        la collision d'un objet qu'on pousse, et le mur le renvoie du côté
+        d'où il l'aborde. Ensuite d'où il VENAIT, si le voilà pile sur le nu
+        et qu'on ne peut plus trancher. En dernier recours l'ancre de la
+        pièce — qui était, avant, le seul critère.
+        C'est ce critère unique qui bloquait les alcôves : l'ancre est au
+        milieu du salon, donc un RETOUR DE MUR poussait le meuble à travers
+        l'alcôve pour le ramener au salon. « Tant qu'il y a ce retour de mur,
+        ça ne rentre pas » — la place était pourtant là.
+      */
+      const versAncre = (inside.x - mid.x) * n.x + (inside.z - mid.z) * n.z;
+      let sens = versAncre;
+      if (depuis) {
+        // On DÉPLACE le meuble : c'est une collision, et le mur le renvoie
+        // du côté où il l'aborde. Sans point de départ, en revanche, on
+        // RÉPARE un relevé — une télé que le scanner a plantée dans la
+        // cloison doit revenir dans SA pièce, et là seule l'ancre le sait.
+        const versIci = (p.x - w.a.x) * n.x + (p.z - w.a.z) * n.z;
+        const versDepart =
+          (depuis.x - w.a.x) * n.x + (depuis.z - w.a.z) * n.z;
+        sens =
+          Math.abs(versIci) > WALL_T / 2
+            ? versIci
+            : Math.abs(versDepart) > WALL_T / 2
+              ? versDepart
+              : versAncre;
+      }
+      if (sens < 0) {
         n = { x: -n.x, z: -n.z };
       }
       // Demi-emprise dans la direction du mur : la boîte est tournée, ce
@@ -534,6 +582,91 @@ export function fitInNook(
 }
 
 /**
+ * UN MEUBLE DE BIAIS QUI NE PASSE PAS SE REMET DROIT.
+ *
+ * Relevé du chantier, vidéo à l'appui : « le meuble, plus petit que
+ * l'emplacement, ne rentre pas ». Il n'y avait pourtant pas de bug — le
+ * meuble était posé EN LOSANGE, à quarante-cinq degrés des murs, et un carré
+ * de biais occupe sa DIAGONALE : soixante-deux centimètres en encombrent
+ * quatre-vingt-huit. L'alcôve, elle, n'en offrait pas tant.
+ *
+ * La géométrie a raison, mais l'application doit résoudre ça à la place de
+ * l'électricien plutôt que de le laisser deviner : si le meuble ne tient pas
+ * à son angle et qu'il tiendrait ALIGNÉ sur les murs, on le redresse. On
+ * essaie d'abord le quart de tour le plus proche de son angle actuel : un
+ * meuble redressé doit rester orienté comme on l'avait mis, à l'équerre
+ * près.
+ *
+ * Et seulement s'il ne tient pas : un meuble volontairement de biais AU
+ * LARGE n'est jamais touché.
+ */
+export function alignToFit(
+  centre: Pt,
+  box: { width: number; depth: number; yaw: number },
+  walls: WallSeg[],
+  inside: Pt,
+  outline?: Pt[],
+  depuis?: Pt,
+): number {
+  /**
+   * Le meuble TIENT-IL ici, à cet angle ?
+   *
+   * Non pas « le mur l'arrête-t-il » — un meuble poussé contre une cloison
+   * est arrêté, et c'est très bien ainsi : personne ne veut qu'on lui
+   * redresse un lit parce qu'il l'a glissé jusqu'au mur. La question est de
+   * savoir si, une fois la poussée faite, il reste des murs QUI LE
+   * CHEVAUCHENT : deux cloisons qui se font face à moins que son emprise se
+   * le renvoient sans fin, et c'est là seulement qu'il ne passe pas.
+   */
+  const tient = (yaw: number) => {
+    const cos = Math.cos(yaw);
+    const sin = Math.sin(yaw);
+    const p = pushOutOfWalls(
+      centre,
+      { ...box, yaw },
+      walls,
+      inside,
+      outline,
+      depuis,
+    );
+    for (const w of walls) {
+      const len = segLength(w);
+      if (len < 1e-6) continue;
+      const u = { x: (w.b.x - w.a.x) / len, z: (w.b.z - w.a.z) / len };
+      const t = ((p.x - w.a.x) * u.x + (p.z - w.a.z) * u.z) / len;
+      if (t < -0.15 || t > 1.15) continue;
+      const n = perpOf(u);
+      const demi =
+        Math.abs((cos * n.x + sin * n.z) * (box.width / 2)) +
+        Math.abs((-sin * n.x + cos * n.z) * (box.depth / 2));
+      const d = Math.abs((p.x - w.a.x) * n.x + (p.z - w.a.z) * n.z);
+      // Un centimètre de tolérance : c'est le jeu que laisse la poussée.
+      if (d < demi + WALL_T / 2 - 0.01) return false;
+    }
+    return true;
+  };
+  if (tient(box.yaw)) return box.yaw;
+  /** Les angles des murs, ramenés au quart de tour le plus proche du sien. */
+  const candidats: number[] = [];
+  for (const w of walls) {
+    const len = segLength(w);
+    if (len < 1e-6) continue;
+    const dir = Math.atan2(w.b.z - w.a.z, w.b.x - w.a.x);
+    const k = Math.round((box.yaw - dir) / (Math.PI / 2));
+    const yaw = dir + k * (Math.PI / 2);
+    if (candidats.some((c) => Math.abs(c - yaw) < 0.02)) continue;
+    candidats.push(yaw);
+  }
+  candidats.sort((a, b) => Math.abs(a - box.yaw) - Math.abs(b - box.yaw));
+  for (const yaw of candidats) {
+    // Inutile de redresser d'un cheveu : ce n'est pas l'angle qui bloque.
+    if (Math.abs(yaw - box.yaw) < 0.02) continue;
+    if (tient(yaw)) return yaw;
+  }
+  return box.yaw;
+}
+
+/**
  * UN MEUBLE LÂCHÉ PRÈS D'UN MUR S'Y PLAQUE.
  *
  * Personne ne pose une commode à trois centimètres du mur : soit elle y est
@@ -553,6 +686,8 @@ export function hugWall(
   box: { width: number; depth: number; yaw: number },
   walls: WallSeg[],
   inside: Pt,
+  /** D'où vient le meuble : même raison que dans `pushOutOfWalls`. */
+  depuis?: Pt,
 ): Pt {
   /** Le jour qu'on referme sans discuter. */
   const JOUR = 0.05;
@@ -567,7 +702,18 @@ export function hugWall(
       const u = { x: (w.b.x - w.a.x) / len, z: (w.b.z - w.a.z) / len };
       let n = perpOf(u);
       const mid = { x: (w.a.x + w.b.x) / 2, z: (w.a.z + w.b.z) / 2 };
-      if ((inside.x - mid.x) * n.x + (inside.z - mid.z) * n.z < 0) {
+      // Même règle que pour la poussée : le côté où le meuble se trouve.
+      const versIci = (p.x - w.a.x) * n.x + (p.z - w.a.z) * n.z;
+      const versDepart = depuis
+        ? (depuis.x - w.a.x) * n.x + (depuis.z - w.a.z) * n.z
+        : 0;
+      const sens =
+        Math.abs(versIci) > WALL_T / 2
+          ? versIci
+          : depuis && Math.abs(versDepart) > WALL_T / 2
+            ? versDepart
+            : (inside.x - mid.x) * n.x + (inside.z - mid.z) * n.z;
+      if (sens < 0) {
         n = { x: -n.x, z: -n.z };
       }
       // Le meuble longe-t-il ce mur ? On compare leurs directions : au-delà

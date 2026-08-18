@@ -340,23 +340,24 @@ describe('l’espace de travail du plan', () => {
    */
   it('pose les calques en rangée et les actions en colonne', () => {
     const tree = monter('scan');
-    const rail = tree.root
-      .findAllByType(ScrollView)
-      .find(
-        (n) =>
-          style(n).position === 'absolute' &&
-          typeof style(n).bottom === 'number',
-      );
+    const rail = tree.root.find(
+      (n) =>
+        typeof n.type === 'string' &&
+        style(n).position === 'absolute' &&
+        style(n).flexDirection === 'row' &&
+        style(n).left === 0,
+    );
     expect(rail).toBeDefined();
     // La rangée : horizontale, ancrée en bas, et jamais par le haut.
-    expect(rail!.props.horizontal).toBe(true);
-    expect(style(rail!).top).toBeUndefined();
-    expect(style(rail!).left).toBe(0);
-    const contenu = Object.assign(
-      {},
-      ...[rail!.props.contentContainerStyle].flat(Infinity).filter(Boolean),
-    );
-    expect(contenu.flexDirection).toBe('row');
+    expect(style(rail).top).toBeUndefined();
+    expect(typeof style(rail).bottom).toBe('number');
+    // Et surtout : ELLE NE DÉFILE PAS. Un rail qui glisse cache ce qu'il
+    // porte — relevé du chantier, « évite la possibilité d'un slide ».
+    expect(
+      tree.root
+        .findAllByType(ScrollView)
+        .filter((n) => style(n).position === 'absolute').length,
+    ).toBe(0);
 
     // La colonne d'actions : même ligne de fond, mais empilée — pas de
     // flexDirection, donc l'axe vertical par défaut.
@@ -375,10 +376,10 @@ describe('l’espace de travail du plan', () => {
     expect(colonne.flexDirection).toBeUndefined();
     expect(colonne.right).toBeLessThan(12);
     // Elles partagent le même pied : rien ne flotte plus bas que l'autre.
-    expect(colonne.bottom).toBe(style(rail!).bottom);
+    expect(colonne.bottom).toBe(style(rail).bottom);
     // Et la rangée s'arrête AVANT la colonne, sinon les dernières pastilles
-    // défilent derrière elle.
-    expect(style(rail!).right).toBeGreaterThanOrEqual(50);
+    // se glisseraient dessous.
+    expect(style(rail).right).toBeGreaterThanOrEqual(50);
   });
 
   it('remplace le bandeau 2D/3D par une pastille', () => {
@@ -422,9 +423,14 @@ describe('les marges du système', () => {
     // Ce sont les commandes qui remontent : au-dessus des 34 points de
     // l'indicateur d'accueil, marge comprise.
     const rail = tree.root
-      .findAllByType(ScrollView)
-      .map(style)
-      .find((st) => st.position === 'absolute' && typeof st.bottom === 'number');
-    expect(rail!.bottom).toBeGreaterThanOrEqual(34);
+      .findAll(
+        (n) =>
+          typeof n.type === 'string' &&
+          style(n).position === 'absolute' &&
+          style(n).flexDirection === 'row' &&
+          style(n).left === 0,
+      )
+      .map(style)[0];
+    expect(rail.bottom).toBeGreaterThanOrEqual(34);
   });
 });

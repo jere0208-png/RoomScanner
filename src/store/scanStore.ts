@@ -18,6 +18,7 @@ import {
   detectRooms,
   mergeColinear,
   pointOnSeg,
+  alignToFit,
   fitInNook,
   hugWall,
   pushOutOfWalls,
@@ -2230,7 +2231,26 @@ export const useScanStore = create<ScanState>((set, get) => {
         parts.find((p) => pointInPolygon(ici, p.surface?.pts ?? [])) ??
         parts.find((p) => pointInPolygon({ x, z }, p.surface?.pts ?? [])) ??
         parts.find((p) => p.roomId === roomOf(obj));
-      const yaw = Math.atan2(obj.transform[2], obj.transform[0]);
+      const yawPose = Math.atan2(obj.transform[2], obj.transform[0]);
+      /*
+        UN MEUBLE DE BIAIS QUI NE PASSE PAS SE REMET DROIT.
+
+        Le chantier a filmé la scène : un meuble de 62 cm refusait une alcôve
+        plus large que lui. Il était en losange — de biais, un carré occupe sa
+        diagonale, 88 cm. Plutôt que de le laisser rebondir sur les murs, on
+        lui rend le quart de tour qui le fait entrer. Au large, on ne touche
+        à rien : son angle est un choix.
+      */
+      const yaw = part
+        ? alignToFit(
+            { x, z },
+            { width: obj.width, depth: obj.depth, yaw: yawPose },
+            part.walls,
+            part.labelAt,
+            part.surface?.pts,
+            ici,
+          )
+        : yawPose;
       /*
         LE MEUBLE S'ADAPTE AU RECOIN, il ne s'en fait plus chasser.
 
@@ -2262,10 +2282,12 @@ export const useScanStore = create<ScanState>((set, get) => {
               part.walls,
               part.labelAt,
               part.surface?.pts,
+              ici,
             ),
             { width: ajuste.width, depth: ajuste.depth, yaw },
             part.walls,
             part.labelAt,
+            ici,
           )
         : { x, z };
       set({
@@ -2274,6 +2296,14 @@ export const useScanStore = create<ScanState>((set, get) => {
           const t = [...o.transform];
           t[12] = pose.x;
           t[14] = pose.z;
+          if (yaw !== yawPose) {
+            const c = Math.cos(yaw);
+            const s2 = Math.sin(yaw);
+            t[0] = c;
+            t[2] = s2;
+            t[8] = -s2;
+            t[10] = c;
+          }
           return {
             ...o,
             width: ajuste.width,

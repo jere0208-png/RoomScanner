@@ -368,3 +368,34 @@ const getStyles = themedStyles((c: Palette) =>
   toolPillActive: { backgroundColor: c.blue, ...glow(c.blue) },
   }),
 );
+
+
+/**
+ * LA RANGÉE DU BAS NE DÉFILE PAS.
+ *
+ * Relevé du chantier : « évite la possibilité d'un slide, répartis proprement
+ * les boutons, et s'il y en a trop pour la ligne, fais-les monter en colonne
+ * en bas à droite ». Un rail qui défile cache ce qu'il contient : on ne
+ * DEVINE pas qu'il reste deux calques à droite, on croit les avoir tous vus.
+ * En 3D il y en a jusqu'à neuf, et les derniers n'existaient pour ainsi dire
+ * pas.
+ *
+ * On compte donc ce que la largeur permet, on répartit ceux-là sur toute la
+ * ligne — chacun sa part égale —, et le reste s'empile à droite, au-dessus
+ * des actions. Tout est visible d'un coup d'œil, sans un seul geste.
+ */
+export function repartirOutils(
+  nombre: number,
+  largeur: number,
+  /** Place tenue à droite par la colonne d'actions (0 s'il n'y en a pas). */
+  reserve: number,
+): number {
+  const MARGE = 10;
+  const dispo = Math.max(0, largeur - reserve - 2 * MARGE);
+  // Largeur d'accueil : la cellule, et l'écart qui la suit.
+  const tiennent = Math.floor((dispo + PILL_GAP) / (PILL_CELL_W + PILL_GAP));
+  return Math.max(1, Math.min(nombre, tiennent));
+}
+
+/** Largeur d'une cellule d'outil, mot compris. */
+export const PILL_CELL_W = 58;

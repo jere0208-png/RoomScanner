@@ -33,12 +33,12 @@ import { SidePill } from '../components/SidePill';
 import { CeilingIcon } from '../components/CeilingIcon';
 import { CeilingBar } from '../components/CeilingBar';
 import { ObjectBar } from '../components/ObjectBar';
+import { RangeeOutils } from '../components/RangeeOutils';
 import { RoomBar } from '../components/RoomBar';
 import { StripBar } from '../components/StripBar';
 import {
   PILL_CELL_H,
   PILL_GAP,
-  PillSlot,
   ToolPill,
 } from '../components/ToolPill';
 import {
@@ -75,7 +75,6 @@ import {
 } from '../geometry/volumes';
 import { buyingList, pullSchedule } from '../geometry/conduits';
 import {
-  frCategory,
   furnKind,
   furnitureStrokes,
   ROOM_NAME_CHOICES,
@@ -171,6 +170,20 @@ export function ResultScreen() {
    */
   const marges = useSafeAreaInsets();
   const basSysteme = Math.max(marges.bottom, 10);
+  const { width: winLargeur } = useWindowDimensions();
+  /*
+    COMBIEN DE CALQUES TIENNENT SUR LA LIGNE DU BAS ?
+
+    La carte du plan occupe la largeur de l'écran moins les douze points de
+    marge de la page, de chaque côté. On la calcule plutôt que de la mesurer :
+    un `onLayout` posé sur cette carte-là — qui est une vue animée, pilotée
+    par le fil natif — déclenche un rendu en plein milieu de la bascule
+    2D/3D, et l'animation se retrouve à écrire dans un nœud déjà démonté.
+    La hauteur de la pile d'actions, elle, se mesure sans risque : c'est une
+    vue ordinaire.
+  */
+  const carteW = Math.max(0, winLargeur - 24);
+  const [hActions, setHActions] = useState(0);
   /**
    * TROIS ÉTAGES AU BAS DE LA CARTE, ET RIEN QUI DÉBORDE.
    *
@@ -307,7 +320,8 @@ export function ResultScreen() {
         useNativeDriver: true,
       }).start();
     });
-    return () => {
+  
+  return () => {
       vivant = false;
     };
   }, [tab, vue, bascule]);
@@ -1223,6 +1237,52 @@ export function ResultScreen() {
       : []),
   ];
 
+  /**
+   * LE MENU DU PLAN — ouvert par son NOM autant que par les trois points.
+   *
+   * Le titre ouvrait directement la saisie du nom, et un crayon le
+   * répétait à côté. Deux défauts : le renommage se propose déjà dans le
+   * menu « … », et surtout un appui sur un nom doit montrer CE QU'ON PEUT
+   * FAIRE, pas décider à la place de l'électricien — c'est la règle qu'on
+   * a déjà appliquée aux noms de pièces.
+   */
+  const menuDuScan = () =>
+    setMenu({
+                title: scanName,
+                subtitle: majTexte ?? undefined,
+                actions: [
+                  {
+                    label: 'Renommer le scan',
+                    icon: 'renommer' as const,
+                    onPress: () => {
+                      setNameInput(scanName);
+                      setRenaming(true);
+                    },
+                  },
+                  {
+                    /**
+                     * AJOUTER UNE PIÈCE, sans tout recommencer.
+                     *
+                     * Un logement ne se relève pas toujours d'un trait : on
+                     * scanne le séjour, on est appelé ailleurs, on revient
+                     * pour la chambre. La seule porte de sortie était
+                     * « Nouveau scan » — qui efface tout. On pose donc une
+                     * pièce aux cotes qu'on donne, accolée au plan, et on
+                     * l'ajuste au doigt comme n'importe quel mur.
+                     */
+                    label: 'Ajouter une pièce',
+                    icon: 'piece' as const,
+                    hint: 'Un rectangle aux cotes que vous donnez, à côté du plan.',
+                    onPress: () => setAjoutPiece(true),
+                  },
+                  {
+                    label: 'Nouveau scan',
+                    icon: 'sortir' as const,
+                    onPress: reset,
+                  },
+                ],
+              });
+
   return (
     <View style={styles.container}>
       <View style={styles.headerRow}>
@@ -1237,10 +1297,8 @@ export function ResultScreen() {
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.titleWrap}
-          onPress={() => {
-            setNameInput(scanName);
-            setRenaming(true);
-          }}>
+          accessibilityLabel="Options du plan"
+          onPress={menuDuScan}>
           <View style={styles.titleCol}>
             <Text style={styles.title} numberOfLines={1}>
               {scanName}
@@ -1253,9 +1311,6 @@ export function ResultScreen() {
                 {majTexte}
               </Text>
             )}
-          </View>
-          <View style={styles.editBadge}>
-            <Text style={styles.editBadgeIcon}>✎</Text>
           </View>
         </TouchableOpacity>
         {/*
@@ -1280,43 +1335,7 @@ export function ResultScreen() {
           style={styles.headerIcon}
           accessibilityLabel="Plus"
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          onPress={() =>
-            setMenu({
-              title: scanName,
-              subtitle: majTexte ?? undefined,
-              actions: [
-                {
-                  label: 'Renommer le scan',
-                  icon: 'renommer' as const,
-                  onPress: () => {
-                    setNameInput(scanName);
-                    setRenaming(true);
-                  },
-                },
-                {
-                  /**
-                   * AJOUTER UNE PIÈCE, sans tout recommencer.
-                   *
-                   * Un logement ne se relève pas toujours d'un trait : on
-                   * scanne le séjour, on est appelé ailleurs, on revient
-                   * pour la chambre. La seule porte de sortie était
-                   * « Nouveau scan » — qui efface tout. On pose donc une
-                   * pièce aux cotes qu'on donne, accolée au plan, et on
-                   * l'ajuste au doigt comme n'importe quel mur.
-                   */
-                  label: 'Ajouter une pièce',
-                  icon: 'piece' as const,
-                  hint: 'Un rectangle aux cotes que vous donnez, à côté du plan.',
-                  onPress: () => setAjoutPiece(true),
-                },
-                {
-                  label: 'Nouveau scan',
-                  icon: 'sortir' as const,
-                  onPress: reset,
-                },
-              ],
-            })
-          }>
+          onPress={menuDuScan}>
           <MoreHorizontal size={19} color={teinte.ink} strokeWidth={2.4} />
         </TouchableOpacity>
       </View>
@@ -1632,21 +1651,22 @@ export function ResultScreen() {
         {/* Toute la quincaillerie s'efface pendant une capture : une image
             qu'on envoie ne doit montrer QUE le plan et le logo. */}
         {capturing ? null : vue === '2d' ? (
-          <ScrollView
-            horizontal
-            style={[styles.planTools, { bottom: ligneOutils }]}
-            contentContainerStyle={styles.planToolsRail}
-            showsHorizontalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled">
-            {/* Deux barres, jamais mélangées.
-                En lecture, on ne fait que REGARDER : la barre ne porte que
-                ce qui s'affiche ou non. En édition, on TRAVAILLE : les
-                calques cèdent la place aux outils, et les cotes ou les
-                meubles restent tels qu'on les avait laissés.
-                Les pastilles rentrent dans le bouton d'édition et en
-                ressortent : c'est lui qui commande le changement, autant
-                qu'on le voie. */}
-            {(barMode
+          <RangeeOutils
+            styles={styles}
+            anim={swap}
+            largeur={carteW}
+            reserve={62}
+            bas={ligneOutils}
+            dessus={Math.max(hActions, PILL_CELL_H) + PILL_GAP}
+            /* Deux barres, jamais mélangées.
+               En lecture, on ne fait que REGARDER : la barre ne porte que
+               ce qui s'affiche ou non. En édition, on TRAVAILLE : les
+               calques cèdent la place aux outils, et les cotes ou les
+               meubles restent tels qu'on les avait laissés.
+               Les pastilles rentrent dans le bouton d'édition et en
+               ressortent : c'est lui qui commande le changement, autant
+               qu'on le voie. */
+            elements={(barMode
               ? [
                   <ToolPill
                     key="plus"
@@ -1841,14 +1861,8 @@ export function ResultScreen() {
                       ]
                     : []),
                 ]
-            )
-              .filter((el): el is React.ReactElement => !!el)
-              .map((el, i) => (
-                <PillSlot key={el.key} index={i} anim={swap}>
-                  {el}
-                </PillSlot>
-              ))}
-          </ScrollView>
+            ).filter((el): el is React.ReactElement => !!el)}
+          />
         ) : (
           /*
             EN 3D, LA COLONNE COMMENCE EN HAUT.
@@ -1859,31 +1873,37 @@ export function ResultScreen() {
             laisser la place à une rangée qui n'existe pas, et la
             dernière pastille se retrouvait à mi-hauteur du modèle.
           */
-          <ScrollView
-            horizontal
-            style={[styles.planTools, { bottom: ligneOutils }]}
-            contentContainerStyle={styles.planToolsRail}
-            showsHorizontalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled">
+          <RangeeOutils
+            styles={styles}
+            anim={swap}
+            largeur={carteW}
+            reserve={0}
+            bas={ligneOutils}
+            dessus={PILL_CELL_H + PILL_GAP}
+            elements={[
             <ToolPill
+              key="ruler"
               icon="ruler"
               label="Cotes"
               active={show3DMeasures}
               onPress={() => setShow3DMeasures((v) => !v)}
-            />
+            />,
             <ToolPill
+              key="furniture"
               icon="furniture"
               label="Meubles"
               active={showFurniture}
               onPress={() => setShowFurniture(!showFurniture)}
-            />
+            />,
             <ToolPill
+              key="surface"
               icon="surface"
               label="Surfaces"
               active={showSurfaces}
               onPress={() => setShowSurfaces(!showSurfaces)}
-            />
+            />,
             <ToolPill
+              key="nord"
               icon="square"
               label="Nord"
               node={
@@ -1895,46 +1915,51 @@ export function ResultScreen() {
               }
               active={showNorth}
               onPress={() => setShowNorth((v) => !v)}
-            />
-            {/* Le plafond existe aussi en 3D : même calque, même bouton. */}
-            {ceiling.length > 0 && (
+            />,
+            /* Le plafond existe aussi en 3D : même calque, même bouton. */
+            ceiling.length > 0 ? (
               <ToolPill
+                key="plafond"
                 icon="plafond"
                 label="Plafond"
                 active={showCeiling}
                 onPress={() => setShowCeiling((v) => !v)}
               />
-            )}
-            {/* Murs pleins ou écorché : l'écorché montre la pièce, les murs
-                pleins montrent le bâti. Ni l'un ni l'autre n'a toujours
-                raison — c'est un réglage, pas une trouvaille. */}
+            ) : null,
+            /* Murs pleins ou écorché : l'écorché montre la pièce, les murs
+               pleins montrent le bâti. Ni l'un ni l'autre n'a toujours
+               raison — c'est un réglage, pas une trouvaille. */
             <ToolPill
+              key="murs"
               icon="murs"
               label="Murs"
               active={solidWalls}
               onPress={toggleSolidWalls}
-            />
-            {/* Les repères électriques : indispensables pour poser,
-                encombrants pour montrer. Une pièce équipée en porte une
-                dizaine, et ils couvrent alors la moitié de la scène. */}
-            {fixtures.length > 0 && (
+            />,
+            /* Les repères électriques : indispensables pour poser,
+               encombrants pour montrer. Une pièce équipée en porte une
+               dizaine, et ils couvrent alors la moitié de la scène. */
+            fixtures.length > 0 ? (
               <ToolPill
+                key="reperes"
                 icon="plus"
                 label="Repères"
                 active={showElecTags}
                 onPress={() => setShowElecTags((v) => !v)}
               />
-            )}
-            {colorsAvailable && (
+            ) : null,
+            colorsAvailable ? (
               <ToolPill
+                key="couleurs"
                 icon="colors"
                 label="Couleurs"
                 active={showTextures}
                 onPress={() => setShowTextures(!showTextures)}
               />
-            )}
-            {rooms.length > 1 && (
+            ) : null,
+            rooms.length > 1 ? (
               <ToolPill
+                key="pieces"
                 icon="rooms"
                 label="Pièces"
                 active={focusIdx >= 0}
@@ -1942,8 +1967,9 @@ export function ResultScreen() {
                   setFocusIdx((i) => (i + 2 > rooms.length ? -1 : i + 1))
                 }
               />
-            )}
-          </ScrollView>
+            ) : null,
+            ].filter((el): el is React.ReactElement => !!el)}
+          />
         )}
 
         {/*
@@ -1974,7 +2000,11 @@ export function ResultScreen() {
             qu'on cherche le plus souvent, et c'est lui qui commande le
             contenu de la rangée. */}
         {vue === '2d' && !capturing && (
-          <View style={[styles.editAnchor, { bottom: ligneOutils }]}>
+          <View
+            // Hauteur de la pile d'actions : le trop-plein de calques se pose
+            // juste au-dessus, sans jamais la recouvrir.
+            onLayout={(e) => setHActions(e.nativeEvent.layout.height)}
+            style={[styles.editAnchor, { bottom: ligneOutils }]}>
             {/* Revenir en arrière ne défile pas avec les calques : c'est le
                 geste qu'on cherche dans l'urgence, et il se tient dans la
                 colonne, juste au-dessus de l'édition. */}
@@ -2294,31 +2324,16 @@ export function ResultScreen() {
       </Animated.View>
 
 
-      {objects.length > 0 && showFurniture && vue === '2d' && !editMode && (
-        <ScrollView
-          style={styles.objectList}
-          horizontal
-          showsHorizontalScrollIndicator={false}>
-          {objects.map((o) => (
-            <TouchableOpacity
-              key={o.id}
-              style={[
-                styles.objectChip,
-                o.id === selectedObjectId && styles.objectChipSelected,
-              ]}
-              onPress={() => {
-                const next = o.id === selectedObjectId ? null : o.id;
-                setSelectedObjectId(next);
-                setSelectedWallId(null);
-              }}>
-              <Text style={styles.objectName}>{frCategory(o.category)}</Text>
-              <Text style={styles.objectDims}>
-                {fr(o.width, 2)} × {fr(o.depth, 2)} × {fr(o.height, 2)} m
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      )}
+      {/*
+        PLUS DE LISTE DE MEUBLES EN PIED D'ÉCRAN.
+
+        Une rangée de cartes « Rangement 1,27 × 0,64 × 0,94 m » défilait sous
+        la carte du plan. Relevé du chantier : « je ne trouve pas qu'elle
+        soit utile, et en plus mal placée ». Elle l'était deux fois : hors du
+        cadre blanc, et redondante — on sélectionne un meuble en le touchant
+        SUR le plan, là où on le voit, et son bandeau donne alors les mêmes
+        cotes en plus gros.
+      */}
 
       {/*
         PLUS DE PIED DE PAGE.
@@ -3071,17 +3086,29 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
    */
   planTools: {
     position: 'absolute',
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    paddingHorizontal: 10,
     left: 0,
     // La colonne des actions tient la droite : la rangée s'arrête avant elle,
     // sinon les dernières pastilles défilent DERRIÈRE et deviennent
     // introuvables.
     right: 62,
   },
-  planToolsRail: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
+  /** Une part de la ligne : égale pour tous, quel que soit leur nombre. */
+  toolPart: { flex: 1, alignItems: 'center' },
+  /**
+   * LE TROP-PLEIN MONTE À DROITE.
+   *
+   * Ce qui ne tient pas sur la ligne s'empile au-dessus de la colonne des
+   * actions, dans le même axe : on lit la rangée, puis la colonne, sans
+   * jamais avoir à faire glisser quoi que ce soit.
+   */
+  planToolsSuite: {
+    position: 'absolute',
+    right: 4,
+    alignItems: 'center',
     gap: PILL_GAP,
-    paddingHorizontal: 10,
   },
   /**
    * L'ancrage suit les outils : même ligne, en bas à droite.

@@ -19,6 +19,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 import type { ObjectData } from 'react-native-room-scan';
 import {
   WALL_T,
+  alignToFit,
   fitInNook,
   hugWall,
   roomParts,
@@ -248,5 +249,94 @@ describe('le plaquage contre le mur', () => {
       { x: 2.5, z: 2 },
     );
     expect(p.z).toBeCloseTo(4 - demi - 0.03, 3);
+  });
+});
+
+/**
+ * LE MEUBLE DE BIAIS QUI NE PASSE PAS.
+ *
+ * Relevé du chantier, vidéo à l'appui : « le meuble, plus petit que
+ * l'emplacement, ne rentre pas ». Rien n'était cassé : le meuble était en
+ * LOSANGE. De biais, un carré de 62 cm en encombre 88 — sa diagonale — et
+ * il lui faut 1,02 m entre les axes de murs là où aligné il se contente de
+ * 0,76. L'alcôve n'en offrait pas tant, et les murs le renvoyaient.
+ *
+ * On lui rend donc le quart de tour qui le fait entrer. Mais seulement s'il
+ * ne tient pas : un meuble mis de biais au large est un choix.
+ */
+describe('le meuble de biais dans une alcôve', () => {
+  /** Une alcôve de 90 cm d'axe à axe, creusée par un retour de mur. */
+  const ALCOVE = [
+    mur('fond', 0, 0, 0.9, 0),
+    mur('gauche', 0, 0, 0, 1.6),
+    mur('retour', 0.9, 0, 0.9, 1),
+    mur('sud', 0, 1.6, 4, 1.6),
+    mur('est', 4, 1.6, 4, -2),
+    mur('nord', 4, -2, 0.9, -2),
+    mur('haut', 0.9, -2, 0.9, 0),
+  ];
+  const DEDANS = { x: 2, z: 0.8 };
+  const CIBLE = { x: 0.45, z: 0.5 };
+
+  it('le redresse pour le faire entrer', () => {
+    const yaw = alignToFit(
+      CIBLE,
+      { width: 0.62, depth: 0.62, yaw: Math.PI / 4 },
+      ALCOVE,
+      DEDANS,
+      undefined,
+      // D'où vient le meuble : sans cette information, l'ancre de la pièce
+      // décide seule des sens de poussée, et le retour de mur rend l'alcôve
+      // inatteignable — c'était tout le défaut.
+      { x: 2.4, z: 0.6 },
+    );
+    // Aligné sur les murs de l'alcôve, au quart de tour près.
+    const reste = Math.abs(((yaw % (Math.PI / 2)) + Math.PI) % (Math.PI / 2));
+    expect(Math.min(reste, Math.PI / 2 - reste)).toBeLessThan(0.02);
+  });
+
+  it('ne redresse pas un meuble qui tient déjà', () => {
+    const yaw = alignToFit(
+      { x: 2.4, z: 0.6 },
+      { width: 0.62, depth: 0.62, yaw: Math.PI / 4 },
+      ALCOVE,
+      DEDANS,
+    );
+    expect(yaw).toBeCloseTo(Math.PI / 4, 6);
+  });
+
+  it('le pose dans l’alcôve, au lieu de le renvoyer', () => {
+    useScanStore.setState({
+      walls: ALCOVE,
+      openings: [],
+      objects: [
+        {
+          id: 'b1',
+          category: 'storage',
+          width: 0.62,
+          depth: 0.62,
+          height: 0.9,
+          // Posé en losange, au milieu de la pièce.
+          transform: [
+            Math.cos(Math.PI / 4), 0, Math.sin(Math.PI / 4), 0,
+            0, 1, 0, 0,
+            -Math.sin(Math.PI / 4), 0, Math.cos(Math.PI / 4), 0,
+            2.4, 0.45, 0.6, 1,
+          ],
+        },
+      ],
+      rooms: [{ id: 'r1', name: 'Alcôve', floor: null }],
+      fixtures: [],
+      ceiling: [],
+    });
+    useScanStore.getState().setObjectCenter('b1', CIBLE.x, CIBLE.z);
+    const o = useScanStore.getState().objects[0];
+    // Il est DANS l'alcôve — c'est tout l'objet de la manœuvre.
+    expect(Math.hypot(o.transform[12] - CIBLE.x, o.transform[14] - CIBLE.z))
+      .toBeLessThan(0.2);
+    // Et il s'est redressé.
+    const yaw = Math.atan2(o.transform[2], o.transform[0]);
+    const reste = Math.abs(((yaw % (Math.PI / 2)) + Math.PI) % (Math.PI / 2));
+    expect(Math.min(reste, Math.PI / 2 - reste)).toBeLessThan(0.02);
   });
 });

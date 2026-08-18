@@ -24,7 +24,6 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 
 import React from 'react';
 import {
-  ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
@@ -338,9 +337,14 @@ describe('l’écran des résultats', () => {
     };
     /** La ligne de fond de la rangée de calques. */
     const rail = tree.root
-      .findAllByType(ScrollView)
-      .map(plat)
-      .find((st) => st.position === 'absolute' && typeof st.bottom === 'number');
+      .findAll(
+        (n) =>
+          typeof n.type === 'string' &&
+          plat(n).position === 'absolute' &&
+          plat(n).flexDirection === 'row' &&
+          plat(n).left === 0,
+      )
+      .map(plat)[0];
     expect(rail).toBeDefined();
     /** Le bandeau : la barre blanche qui porte les cotes du mur. */
     const bandeau = tree.root
@@ -355,9 +359,7 @@ describe('l’écran des résultats', () => {
     expect(bandeau).toBeDefined();
     // Un étage complet le sépare des pastilles : hauteur d'une cellule, et
     // l'écart habituel.
-    expect(bandeau.bottom).toBeGreaterThanOrEqual(
-      rail!.bottom + PILL_CELL_H,
-    );
+    expect(bandeau.bottom).toBeGreaterThanOrEqual(rail.bottom + PILL_CELL_H);
     // Et il s'arrête avant la colonne d'actions, sur sa droite.
     expect(bandeau.marginRight).toBeGreaterThanOrEqual(50);
   });
