@@ -500,16 +500,39 @@ export function ajusterBlocs<
     rien de la maçonnerie ne peut se glisser entre eux. On peut donc les
     résoudre tous ensemble, sans risquer de déranger le reste.
   */
+  /*
+    ET LES MURS AUSSI, CALQUE PAR CALQUE.
+
+    Relevé du chantier, capture à l'appui : « regarde l'ouverture, toutes les
+    arêtes ne sont pas tracées ». Un mur percé d'une fenêtre est bâti en
+    morceaux — trumeaux, linteau, allège, tableaux — et le pan d'un morceau
+    passait par-dessus l'arête d'un autre : le trait disparaît, l'ouverture
+    perd un côté.
+
+    Le calque est déjà lisible dans la profondeur de tri : elle vaut
+    rang-de-pièce puis numéro de couche, et le reste tient dans la décimale.
+    On regroupe donc par calque — le mur du fond d'une pièce, son contenu,
+    son mur de devant — et l'on résout chacun à l'écran. Rien ne peut fuir
+    d'un calque à l'autre : chaque groupe se réécrit dans la plage qu'il
+    occupait déjà.
+  */
   const parBloc = new Map<string, T[]>();
   for (const it of items) {
-    if (!it.owner) continue;
-    const cle = it.room ?? it.owner;
+    if (!isFinite(it.depth)) continue;
+    const cle = it.owner
+      ? `bloc:${it.room ?? it.owner}`
+      : `calque:${Math.floor(it.depth / COUCHE)}`;
     const l = parBloc.get(cle);
     if (l) l.push(it);
     else parBloc.set(cle, [it]);
   }
-  for (const groupe of parBloc.values()) {
+  for (const [cle, groupe] of parBloc) {
     if (groupe.length < 2) continue;
+    // EN MOUVEMENT, ON NE TOUCHE PAS AUX MURS. Leur ordre par calque tient
+    // déjà debout : ce qu'on gagne à les départager au pixel, ce sont
+    // quelques arêtes d'ouverture — on peut attendre le lâcher pour les
+    // retrouver, et garder les images fluides pendant le geste.
+    if (rapide && !cle.startsWith('bloc:')) continue;
     const bas = Math.min(...groupe.map((g) => g.depth));
     const haut = Math.max(...groupe.map((g) => g.depth));
     if (!rapide) {

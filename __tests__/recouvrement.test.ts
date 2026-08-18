@@ -448,3 +448,92 @@ describe('les arêtes d’un meuble', () => {
     expect(`${fautes} arête(s) au travers`).toBe('0 arête(s) au travers');
   });
 });
+
+/**
+ * LES ARÊTES D'UNE OUVERTURE NE S'EFFACENT PAS.
+ *
+ * Relevé du chantier, capture à l'appui : « regarde l'ouverture, toutes les
+ * arêtes ne sont pas tracées ». Un mur percé d'une fenêtre est bâti en
+ * morceaux — deux trumeaux, un linteau, une allège, les tableaux — et le pan
+ * de l'un passait par-dessus l'arête de l'autre : le trait disparaît, et
+ * l'ouverture perd un côté.
+ *
+ * Le banc juge comme l'œil : au milieu d'un trait, un aplat SITUÉ DERRIÈRE ne
+ * doit jamais être peint après lui.
+ */
+describe('les arêtes du bâti', () => {
+  const PERCEE = {
+    walls: [
+      mur('n', 0, 0, 4, 0),
+      mur('e', 4, 0, 4, 3),
+      mur('s', 4, 3, 0, 3),
+      mur('o', 0, 3, 0, 0),
+    ],
+    // Une fenêtre au milieu du mur nord, une porte à l'ouest.
+    openings: [
+      {
+        id: 'fen',
+        type: 'window' as const,
+        a: { x: 1.2, z: 0 },
+        b: { x: 2.8, z: 0 },
+        height: 1.2,
+        yCenter: 1.5,
+      },
+      {
+        id: 'porte',
+        type: 'door' as const,
+        a: { x: 0, z: 1 },
+        b: { x: 0, z: 1.9 },
+        height: 2.05,
+        yCenter: 1.025,
+      },
+    ] as WallSeg[],
+  };
+
+  it('ne laisse aucun pan effacer un trait qui est devant', () => {
+    const { faces, rooms } = buildScene(PERCEE.walls, PERCEE.openings, [], {
+      palette: PAL,
+      showSurfaces: true,
+      rooms: [{ id: 'r1' }],
+    });
+    const centre = sceneFraming(faces).center;
+    let fautes = 0;
+    for (const cam of ANGLES) {
+      const project = projecteur(cam, centre, 60);
+      const rangs = roomRanks(rooms, cam);
+      const vues = faces
+        .filter((f) => !isHiddenFace(f, cam))
+        .map((f) => ({
+          f,
+          proj: f.pts.map(project),
+          depth: faceDepth(f, project, cam, rangs),
+          owner: f.ownerId,
+          room: f.roomId,
+          pan: f.panId,
+          bord: f.bordDe,
+        }));
+      ajusterBlocs(vues);
+      const peintes = [...vues].sort((a, b) => a.depth - b.depth);
+      const rang = new Map(peintes.map((p, i) => [p.f, i] as [Face3D, number]));
+      const aplats = vues.filter((v) => v.f.fill !== null && v.proj.length >= 3);
+      for (const t of vues) {
+        if (t.f.fill !== null || t.proj.length !== 2) continue;
+        const pt = {
+          sx: (t.proj[0].sx + t.proj[1].sx) / 2,
+          sy: (t.proj[0].sy + t.proj[1].sy) / 2,
+        };
+        const dt = (t.proj[0].depth + t.proj[1].depth) / 2;
+        for (const a of aplats) {
+          // Un mur vu de DEHORS couvre la pièce : c'est voulu, et c'est
+          // réglé par les calques, pas ici.
+          if (Math.floor(a.depth / 1e4) !== Math.floor(t.depth / 1e4)) continue;
+          if (!dansLePolygone(pt, a.proj)) continue;
+          const da = profondeurAu(a.f, pt, project);
+          if (da === null) continue;
+          if (da < dt - 0.02 && rang.get(a.f)! > rang.get(t.f)!) fautes++;
+        }
+      }
+    }
+    expect(`${fautes} arête(s) effacée(s)`).toBe('0 arête(s) effacée(s)');
+  });
+});
