@@ -721,3 +721,56 @@ describe('la visite, parcourue au doigt', () => {
     expect(`${vu ? 'vue' : 'jamais en POV'}`).toBe('vue');
   });
 });
+
+/**
+ * ET ELLE N'EN MONTRE QU'UN À LA FOIS.
+ *
+ * Le carton dit « Mur nord · Chambre » ; il faut que l'image le dise aussi.
+ * On juge le CÂBLAGE — quel mur la vue reçoit à chaque étape —, pas les
+ * pixels : le filtre lui-même est tenu par le banc de la caméra POV.
+ */
+describe('la visite guidée', () => {
+  it('ne présente qu’un mur à la fois, et en change', () => {
+    let tree!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      useScanStore.setState({
+        screen: 'result',
+        scanName: 'Chantier test',
+        walls: SNAPSHOT_WALLS,
+        openings: SNAPSHOT_OPENINGS,
+        objects: SNAPSHOT_OBJECTS,
+        rooms: SNAPSHOT_ROOMS.map((r, i) => ({
+          id: r.id,
+          name: `Pièce ${i + 1}`,
+          floor: null,
+        })),
+        fixtures: SNAPSHOT_FIXTURES,
+        ceiling: [],
+      });
+      tree = TestRenderer.create(<ClientTour visible onClose={() => {}} />);
+    });
+    arbre = tree;
+    act(() => {
+      jest.advanceTimersByTime(600);
+    });
+    const murs = new Set<string>();
+    let ensemble = 0;
+    for (let i = 0; i < 80; i++) {
+      act(() => {
+        jest.advanceTimersByTime(500);
+      });
+      const focus = tree.root.findByType(Iso3DView).props.focusWallId;
+      if (focus) murs.add(focus);
+      else ensemble++;
+    }
+    // Plusieurs murs présentés, l'un après l'autre.
+    expect(murs.size).toBeGreaterThan(1);
+    // Chacun est un vrai mur du relevé, pas une étiquette inventée.
+    for (const id of murs) {
+      expect(SNAPSHOT_WALLS.some((w) => w.id === id)).toBe(true);
+    }
+    // Et le tour d'ensemble, lui, montre le logement entier : une visite
+    // qui ne montrerait jamais qu'un pan de mur ne situerait plus rien.
+    expect(ensemble).toBeGreaterThan(0);
+  });
+});

@@ -130,6 +130,31 @@ L'outil « pièces » de la barre du plan relance la détection sur le graphe
 courant, en **gardant les noms donnés à la main** : chaque nouvelle pièce
 hérite du nom de l'ancienne dont le point de cartouche tombe dedans.
 
+### Un mur présenté, c'est lui seul
+
+La visite se place face à un mur et annonce ce qui s'y trouve : « Mur nord ·
+Chambre, 5 appareils ». Les trois autres murs restaient dans le champ — celui
+de gauche et celui de droite fuient vers l'œil et prennent la moitié de
+l'image. On désignait un mur devant quatre murs.
+
+Les autres sortent donc du champ le temps du carton, avec leurs menuiseries
+et l'appareillage qui y est plaqué. Le sol, le mobilier et le plafond
+restent : ils disent dans quelle pièce on se tient, et un pan de maçonnerie
+seul dans le vide ne se comprend plus.
+
+**Chaque face porte le mur dont elle vient** (`Face3D.wallId`), posé par
+`buildScene` au moment où le mur se bâtit — la boucle qui marquait déjà sa
+pièce et son côté. C'est nécessaire : un mur soudé à ses voisins n'a pas de
+frontière franche dans l'espace, et le retrouver à la géométrie image par
+image coûterait le prix d'une reconstruction.
+
+Le filtre (`visibleAvecLeMur`) s'applique **à la peinture**, pas aux entrées
+de `buildScene` — à la différence de `focusRoomId`, qui écarte les murs avant
+de bâtir. Deux raisons : les onglets des coins d'un mur se calculent sur tout
+le graphe, donc retirer les voisins déformerait la maçonnerie qu'on garde ; et
+le cadrage doit rester celui du logement entier, sinon le modèle saute à
+chaque mur présenté.
+
 ### Garde-fou visuel
 
 Les tests vérifient des nombres ; aucun n'a vu le jour où le pointillé des

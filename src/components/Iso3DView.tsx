@@ -32,6 +32,7 @@ import {
   cutawayOpacity,
   dosTourne,
   povProjector,
+  visibleAvecLeMur,
   type PovCamera,
   isHiddenFace,
   sceneFraming,
@@ -116,6 +117,22 @@ interface Props {
   showElecTags?: boolean;
   /** N'afficher qu'une pièce : ses murs, son sol, ses meubles. */
   focusRoomId?: string | null;
+  /**
+   * N'AFFICHER QU'UN MUR — celui qu'on est en train de présenter.
+   *
+   * La visite guidée se place face à un mur et annonce ce qui s'y trouve.
+   * Les trois autres restaient dans le champ : celui de gauche et celui de
+   * droite fuyaient vers l'œil et mangeaient la moitié de l'image, et le
+   * client ne savait plus lequel on lui montrait — on lui disait « ce
+   * mur-là » devant quatre murs.
+   *
+   * À la différence de `focusRoomId`, qui écarte les murs AVANT de bâtir la
+   * scène, celui-ci filtre à la peinture : un mur soudé à ses voisins tire
+   * sa forme de tout le graphe — le retirer des entrées changerait les
+   * onglets des coins du mur qu'on garde, et la maçonnerie présentée ne
+   * serait plus celle du logement.
+   */
+  focusWallId?: string | null;
   /** Les points cardinaux autour de la vue, comme sur le plan. */
   showNorth?: boolean;
   /** Le calque du plafond, comme sur le plan 2D. */
@@ -185,6 +202,7 @@ export function Iso3DView({
   showMeasures,
   showElecTags = true,
   focusRoomId,
+  focusWallId,
   showNorth = true,
   showCeiling = true,
   cableRoutes,
@@ -627,6 +645,19 @@ export function Iso3DView({
       .filter((face) =>
         pov ? !dosTourne(face, pov.at) && !face.isFloor : !isHiddenFace(face, cam),
       )
+      /*
+        UN MUR PRÉSENTÉ, C'EST LUI SEUL.
+
+        On ne retire QUE ce qui appartient à un autre mur : sa maçonnerie,
+        ses menuiseries, l'appareillage qui y est plaqué. Le sol, le
+        mobilier et le plafond restent — ils situent la pièce, et une pièce
+        vide autour d'un pan de mur ne se comprend plus.
+
+        Le filtre est posé APRÈS le cadrage : la vue garde le centre et
+        l'échelle du logement entier, sinon le modèle sauterait à chaque
+        mur présenté.
+      */
+      .filter((face) => visibleAvecLeMur(face, focusWallId))
       .map((face) => {
       // De l'intérieur, une face peut être à cheval sur le plan de l'œil :
       // on la taille avant de la projeter, sinon elle se retourne et barre
@@ -1101,6 +1132,7 @@ export function Iso3DView({
     walls,
     interacting,
     pov,
+    focusWallId,
   ]);
 
   // Tap sur un mur : oriente la caméra face au mur, zoome pour le voir entier.

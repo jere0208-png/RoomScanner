@@ -121,6 +121,20 @@ export interface Face3D {
   roomId?: string;
   roomSide?: P3;
   /**
+   * LE MUR DONT CETTE FACE EST FAITE.
+   *
+   * La maçonnerie d'un mur, ses menuiseries et l'appareillage qui y est
+   * plaqué portent tous son identifiant. C'est ce qui permet de N'EN
+   * MONTRER QU'UN — la visite guidée présente un mur à la fois, et les
+   * autres sortent du champ le temps du carton.
+   *
+   * Cette étiquette est posée ici, à la construction, et non retrouvée à la
+   * géométrie au moment du rendu : un mur soudé à ses voisins n'a pas de
+   * frontière franche dans l'espace, et le chercher image par image
+   * coûterait le prix d'une reconstruction.
+   */
+  wallId?: string;
+  /**
    * Point dont la profondeur classe la face, à la place de son propre centre.
    *
    * Une ARÊTE doit se trier avec le pan qu'elle borde, pas pour elle-même :
@@ -939,6 +953,24 @@ export function coupeDevant(pts: P3[], cam: PovCamera): P3[] {
  * droite se regardent, et c'est la position de l'œil qui dit lequel des deux
  * nous montre sa face.
  */
+/**
+ * NE GARDER QU'UN MUR — la règle de la visite guidée.
+ *
+ * On présente un mur : les autres sortent du champ, avec leurs menuiseries
+ * et l'appareillage qui y est plaqué. Tout ce qui n'appartient à aucun mur
+ * — le sol, le mobilier, le plafond — reste : c'est ce qui dit dans quelle
+ * pièce on se tient, et un pan de maçonnerie seul dans le vide ne se
+ * comprend plus.
+ *
+ * Sans mur désigné, rien n'est retiré.
+ */
+export function visibleAvecLeMur(
+  face: Face3D,
+  focusWallId: string | null | undefined,
+): boolean {
+  return !focusWallId || !face.wallId || face.wallId === focusWallId;
+}
+
 export function dosTourne(face: Face3D, oeil: P3): boolean {
   const n = face.normal;
   if (!n) return false;
@@ -1843,6 +1875,7 @@ export function buildScene(
     for (let i = avantMur; i < faces.length; i++) {
       faces[i].roomId = roomOf(w);
       faces[i].roomSide = versLaPiece;
+      faces[i].wallId = w.id;
     }
   }
 
@@ -2184,6 +2217,9 @@ export function buildScene(
       */
       fa.roomId = roomOf(w);
       fa.roomSide = undefined;
+      // Une prise part avec son mur : montrer l'appareillage d'une cloison
+      // qu'on a retirée le ferait flotter en l'air.
+      fa.wallId = w.id;
       const nf = fa.normal;
       const devant = !!nf && nf.x * face.nx + nf.z * face.nz > 0.9;
       // La façade se compare à TOUTES les tuiles qu'elle recouvre. Les

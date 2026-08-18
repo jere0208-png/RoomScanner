@@ -13,10 +13,12 @@ import {
   coupeDevant,
   dosTourne,
   povProjector,
+  visibleAvecLeMur,
   type P3,
   type PovCamera,
   type ScenePalette,
 } from '../src/geometry/scene3d';
+import type { Fixture } from '../src/geometry/electrical';
 import type { WallSeg } from '../src/geometry/floorplan';
 
 const PAL: ScenePalette = {
@@ -137,5 +139,73 @@ describe('la caméra posée dans la pièce', () => {
     // Ce qu'on voit droit devant change avec le regard : sans quoi le tour
     // d'horizon ne montrerait rien.
     expect([...nord].some((k) => !est.has(k))).toBe(true);
+  });
+});
+
+/**
+ * UN MUR À LA FOIS — ce que la visite guidée montre quand elle en présente un.
+ *
+ * On annonce « Mur nord · Chambre » : les trois autres murs sont dans le
+ * champ, celui de gauche et celui de droite fuient vers l'œil et prennent la
+ * moitié de l'image. Le client ne sait plus lequel on lui désigne.
+ *
+ * Deux choses à tenir, et ce banc les sépare : chaque face doit SAVOIR de
+ * quel mur elle vient — sans quoi il n'y a rien à filtrer —, et le filtre ne
+ * doit emporter QUE de la maçonnerie.
+ */
+describe('le mur présenté', () => {
+  /** Deux prises : une sur le mur nord, une sur le mur est. */
+  const PRISES: Fixture[] = [
+    { id: 'f-nord', kind: 'prise', wallId: 'n', along: 1.2, height: 0.3, side: 1 },
+    { id: 'f-est', kind: 'prise', wallId: 'e', along: 1.4, height: 0.3, side: 1 },
+  ];
+  const scene = () =>
+    buildScene(MURS, [], [], {
+      palette: PAL,
+      showSurfaces: true,
+      rooms: [{ id: 'r1' }],
+      fixtures: PRISES,
+    });
+
+  it('marque chaque face de la maçonnerie du mur dont elle vient', () => {
+    const { faces } = scene();
+    // Les quatre murs sont représentés, chacun par ses propres faces.
+    const parMur = new Map<string, number>();
+    for (const f of faces) {
+      if (!f.wallId) continue;
+      parMur.set(f.wallId, (parMur.get(f.wallId) ?? 0) + 1);
+    }
+    expect([...parMur.keys()].sort()).toEqual(['e', 'n', 'o', 's']);
+    for (const n of parMur.values()) expect(n).toBeGreaterThan(3);
+    // Le sol, lui, n'appartient à aucun mur : il reste quand on en isole un.
+    expect(faces.some((f) => f.isFloor && !f.wallId)).toBe(true);
+  });
+
+  it('emmène l’appareillage avec le mur qui le porte', () => {
+    const { faces } = scene();
+    // Une prise est un volume plaqué sur la face : plusieurs faces, toutes
+    // rattachées au mur, sinon elle resterait en l'air.
+    const ailleurs = faces.filter(
+      (f) => !visibleAvecLeMur(f, 'n') && f.wallId === 'e',
+    );
+    expect(ailleurs.length).toBeGreaterThan(0);
+    // Et rien de la prise du mur nord ne part avec le mur est.
+    const gardees = faces.filter((f) => visibleAvecLeMur(f, 'n'));
+    expect(gardees.some((f) => f.wallId === 'n')).toBe(true);
+    expect(gardees.every((f) => f.wallId !== 'e')).toBe(true);
+  });
+
+  it('ne retire que de la maçonnerie — le sol et le reste demeurent', () => {
+    const { faces } = scene();
+    const partis = faces.filter((f) => !visibleAvecLeMur(f, 'n'));
+    expect(partis.length).toBeGreaterThan(0);
+    // Tout ce qui s'en va appartient à un mur, et jamais au mur présenté.
+    for (const f of partis) {
+      expect(f.wallId).toBeTruthy();
+      expect(f.wallId).not.toBe('n');
+      expect(f.isFloor).toBeFalsy();
+    }
+    // Sans mur désigné, la scène est intacte.
+    expect(faces.every((f) => visibleAvecLeMur(f, null))).toBe(true);
   });
 });

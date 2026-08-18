@@ -79,6 +79,19 @@ interface Etape {
    * client ne lit pas dix nombres sur un volume qui tourne.
    */
   mur?: boolean;
+  /**
+   * LE MUR PRÉSENTÉ — et lui seul reste à l'écran.
+   *
+   * On annonce « Mur nord · Chambre » en montrant quatre murs : celui de
+   * gauche et celui de droite fuient vers l'œil et prennent la moitié de
+   * l'image, et le client cherche lequel on lui désigne. Les autres sortent
+   * donc du champ le temps du carton — la maçonnerie, les menuiseries et
+   * l'appareillage qui s'y trouve.
+   *
+   * Le sol et le mobilier restent : ils disent dans quelle pièce on se
+   * tient, et un pan de mur seul dans le vide ne se comprend plus.
+   */
+  wallId?: string;
   /** Durée, en millisecondes. */
   duree: number;
   /**
@@ -313,6 +326,7 @@ export function ClientTour({
               : undefined,
           roomId: room.id,
           mur: dessus.length > 0,
+          wallId: w.id,
           pose: { at: posteDe(w), yaw: azimut },
           vue: { theta: 0, tilt: 0, zoom: 1, ox: 0, oy: 0 },
           // Un léger balancement : une image fixe paraît gélée, même en
@@ -616,6 +630,8 @@ export function ClientTour({
           cutaway
           elecCotes={cotes}
           focusRoomId={etape.roomId}
+          /* Un mur à la fois : c'est de celui-là qu'on parle. */
+          focusWallId={etape.wallId ?? null}
           /* Le modèle bouge tout seul, trente fois par seconde : on le
              rend en pans d'un seul tenant. La découpe en bandes ne se voit
              pas sur une image qui tourne — les saccades, si. */
