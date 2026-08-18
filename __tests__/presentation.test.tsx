@@ -93,11 +93,11 @@ const textes = (tree: TestRenderer.ReactTestRenderer) =>
 describe('la présentation animée', () => {
   it('se choisit sur le bouton « Exporter », en dernier de la liste', () => {
     const tree = monter('scan');
+    // L'export est devenu une ICÔNE dans l'en-tête : on le désigne par son
+    // étiquette, comme le ferait la voix de VoiceOver.
     const exporter = tree.root
       .findAllByType(TouchableOpacity)
-      .find((n) =>
-        n.findAllByType(Text).some((t) => t.props.children === 'Exporter'),
-      );
+      .find((n) => n.props.accessibilityLabel === 'Exporter');
     expect(exporter).toBeDefined();
     act(() => exporter!.props.onPress());
     const vu = textes(tree);
@@ -131,11 +131,11 @@ describe('la présentation animée', () => {
    */
   it('porte sa vignette dans le menu', () => {
     const tree = monter('scan');
+    // L'export est devenu une ICÔNE dans l'en-tête : on le désigne par son
+    // étiquette, comme le ferait la voix de VoiceOver.
     const exporter = tree.root
       .findAllByType(TouchableOpacity)
-      .find((n) =>
-        n.findAllByType(Text).some((t) => t.props.children === 'Exporter'),
-      );
+      .find((n) => n.props.accessibilityLabel === 'Exporter');
     act(() => exporter!.props.onPress());
     const ligne = tree.root
       .findAllByType(TouchableOpacity)
@@ -243,5 +243,54 @@ describe('le rideau de préparation', () => {
       jest.advanceTimersByTime(600);
     });
     expect(textes(tree)).not.toContain('Préparation de la présentation');
+  });
+});
+
+/**
+ * LA REFONTE DE L'ÉCRAN — le plan d'abord, les commandes en icônes.
+ *
+ * Le reproche, en comparant à l'application concurrente : « notre bouton
+ * d'export prend beaucoup trop de place alors que j'aimerais que ce soit
+ * une petite icône ; leur plan est beaucoup mieux visible ». Deux blocs
+ * pleine largeur — l'export et le nouveau scan — mangeaient cent trente
+ * points de hauteur, et six chiffres en cartouche quatre-vingts de plus.
+ */
+describe('l’écran du scan, refondu', () => {
+  it('porte l’export en icône, et plus en bandeau', () => {
+    const tree = monter('scan');
+    const icone = tree.root
+      .findAllByType(TouchableOpacity)
+      .find((n) => n.props.accessibilityLabel === 'Exporter');
+    expect(icone).toBeDefined();
+    // Le bandeau bleu n'existe plus : plus aucun bouton n'écrit « Exporter ».
+    expect(
+      tree.root
+        .findAllByType(Text)
+        .some((t) => t.props.children === 'Exporter'),
+    ).toBe(false);
+  });
+
+  it('replie les mesures, et les déplie à la demande', () => {
+    const tree = monter('scan');
+    // Repliées : une seule ligne de résumé, pas six cartouches.
+    expect(textes(tree)).not.toContain('M² SOL');
+    const plus = tree.root
+      .findAllByType(TouchableOpacity)
+      .find((n) => n.props.accessibilityLabel === 'Voir les mesures');
+    expect(plus).toBeDefined();
+    act(() => plus!.props.onPress());
+    expect(textes(tree)).toContain('m² sol');
+  });
+
+  it('et propose d’ajouter une pièce, sans effacer le relevé', () => {
+    const tree = monter('scan');
+    const menu = tree.root
+      .findAllByType(TouchableOpacity)
+      .find((n) => n.props.accessibilityLabel === 'Plus');
+    expect(menu).toBeDefined();
+    act(() => menu!.props.onPress());
+    expect(textes(tree)).toContain('Ajouter une pièce');
+    // « Nouveau scan » y reste, mais il a quitté le pied de page.
+    expect(textes(tree)).toContain('Nouveau scan');
   });
 });

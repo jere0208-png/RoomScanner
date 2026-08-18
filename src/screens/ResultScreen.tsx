@@ -43,7 +43,7 @@ import {
   PillSlot,
   ToolPill,
 } from '../components/ToolPill';
-import { Compass } from 'lucide-react-native';
+import { Compass, MoreHorizontal, Share2 } from 'lucide-react-native';
 import {
   DEFAULT_VIEW3D,
   Iso3DView,
@@ -194,6 +194,7 @@ export function ResultScreen() {
   const addFixture = useScanStore((s) => s.addFixture);
   const ceiling = useScanStore((s) => s.ceiling);
   const addCeiling = useScanStore((s) => s.addCeiling);
+  const addRoomBox = useScanStore((s) => s.addRoomBox);
   const removeCeiling = useScanStore((s) => s.removeCeiling);
   const moveCeiling = useScanStore((s) => s.moveCeiling);
   const setCeilingRow = useScanStore((s) => s.setCeilingRow);
@@ -278,6 +279,10 @@ export function ResultScreen() {
   const [checking, setChecking] = useState(false);
   // Choix du format d'export : plan PDF, modèle 3D, ou image de la vue.
   const [exporting, setExporting] = useState(false);
+  /** Le détail des mesures : replié par défaut, le plan passe avant. */
+  const [mesuresOuvertes, setMesuresOuvertes] = useState(false);
+  /** La feuille « Ajouter une pièce » : nom, largeur, profondeur. */
+  const [ajoutPiece, setAjoutPiece] = useState(false);
   /** La présentation guidée, plein écran : ce qu'on montre au client. */
   const [visite, setVisite] = useState(false);
   // Vue 3D : bascule « vue de dessus », comme un plan.
@@ -1160,6 +1165,72 @@ export function ResultScreen() {
             <Text style={styles.editBadgeIcon}>✎</Text>
           </View>
         </TouchableOpacity>
+        {/*
+          L'EXPORT EST UNE ICÔNE, pas un bandeau.
+
+          Un bouton bleu pleine largeur au bas de l'écran, c'est
+          soixante-dix points de hauteur pris au plan — pour un geste qu'on
+          fait une fois par visite, à la fin. Les applications de plan le
+          posent en haut à droite, en pictogramme de partage : on le trouve
+          là sans y penser, et le dessin reprend la place.
+        */}
+        {Platform.OS === 'ios' && (
+          <TouchableOpacity
+            style={styles.headerIcon}
+            accessibilityLabel="Exporter"
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            onPress={() => setExporting(true)}>
+            <Share2 size={19} color={teinte.blue} strokeWidth={2.2} />
+          </TouchableOpacity>
+        )}
+        <TouchableOpacity
+          style={styles.headerIcon}
+          accessibilityLabel="Plus"
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          onPress={() =>
+            setMenu({
+              title: scanName,
+              subtitle: majTexte ?? undefined,
+              actions: [
+                {
+                  label: 'Renommer le scan',
+                  icon: 'renommer' as const,
+                  onPress: () => {
+                    setNameInput(scanName);
+                    setRenaming(true);
+                  },
+                },
+                {
+                  label: mesuresOuvertes ? 'Masquer les mesures' : 'Voir les mesures',
+                  icon: 'regle' as const,
+                  onPress: () => setMesuresOuvertes((v) => !v),
+                },
+                {
+                  /**
+                   * AJOUTER UNE PIÈCE, sans tout recommencer.
+                   *
+                   * Un logement ne se relève pas toujours d'un trait : on
+                   * scanne le séjour, on est appelé ailleurs, on revient
+                   * pour la chambre. La seule porte de sortie était
+                   * « Nouveau scan » — qui efface tout. On pose donc une
+                   * pièce aux cotes qu'on donne, accolée au plan, et on
+                   * l'ajuste au doigt comme n'importe quel mur.
+                   */
+                  label: 'Ajouter une pièce',
+                  icon: 'piece' as const,
+                  hint: 'Un rectangle aux cotes que vous donnez, à côté du plan.',
+                  onPress: () => setAjoutPiece(true),
+                },
+                {
+                  label: 'Nouveau scan',
+                  icon: 'sortir' as const,
+                  onPress: reset,
+                },
+              ],
+            })
+          }>
+          <MoreHorizontal size={19} color={teinte.ink} strokeWidth={2.4} />
+        </TouchableOpacity>
       </View>
 
       {/* Le bandeau tient TOUJOURS dans l'écran.
@@ -1169,6 +1240,29 @@ export function ResultScreen() {
           les derniers chiffres n'existaient plus pour personne. Elles se
           partagent désormais la largeur à parts égales, et le chiffre se
           réduit plutôt que de déborder. */}
+      {/*
+        LES MESURES SE REPLIENT.
+
+        Six chiffres en gros bloc, c'est quatre-vingts points de hauteur
+        permanents pour une information qu'on lit à l'ouverture et qu'on ne
+        relit plus. Elles tiennent désormais sur UNE ligne, et le détail se
+        déplie par le menu — comme l'application dont on s'inspire, où les
+        informations du niveau se cherchent d'un balayage.
+      */}
+      {!mesuresOuvertes && (
+        <TouchableOpacity
+          style={styles.metricsLigne}
+          accessibilityLabel="Voir les mesures"
+          onPress={() => setMesuresOuvertes(true)}>
+          <Text style={styles.metricsResume} numberOfLines={1}>
+            {metrics
+              .slice(0, 4)
+              .map((m) => `${m.value} ${m.label.toLowerCase()}`)
+              .join('   ·   ')}
+          </Text>
+        </TouchableOpacity>
+      )}
+      {mesuresOuvertes && (
       <View style={styles.metricsRow}>
         {metrics.map((m, i) => (
           <View key={m.label} style={[styles.metric, i > 0 && styles.metricBorder]}>
@@ -1185,6 +1279,7 @@ export function ResultScreen() {
           </View>
         ))}
       </View>
+      )}
 
       <Segment tab={tab} onChange={setTab} />
 
@@ -2096,21 +2191,18 @@ export function ResultScreen() {
         </ScrollView>
       )}
 
-      {Platform.OS === 'ios' && (
-        <TouchableOpacity
-          style={styles.exportButton}
-          onPress={() => setExporting(true)}>
-          <Text style={styles.primaryText}>Exporter</Text>
-        </TouchableOpacity>
-      )}
-      <View style={styles.actions}>
-        <TouchableOpacity style={styles.secondaryButton} onPress={reset}>
-          <Text style={styles.secondaryText} numberOfLines={1}>
-            Nouveau scan
-          </Text>
-        </TouchableOpacity>
-      </View>
+      {/*
+        PLUS DE PIED DE PAGE.
 
+        « Exporter » et « Nouveau scan » y prenaient cent trente points de
+        hauteur — un cinquième de l'écran d'un téléphone — pour deux gestes
+        qu'on fait une fois par visite. L'export est passé en icône dans
+        l'en-tête, le nouveau scan dans le menu « … », et le plan a récupéré
+        tout l'espace.
+      */}
+
+      {/* La présentation, lancée depuis le menu « Exporter ». */}
+      <ClientTour visible={visite} onClose={() => setVisite(false)} />
 
       {/* Transition vers l'export : ondes EchoPlan sur toute la page */}
       {transiting && (
@@ -2251,6 +2343,61 @@ export function ResultScreen() {
 
       {/* La présentation, lancée depuis le menu « Exporter ». */}
       <ClientTour visible={visite} onClose={() => setVisite(false)} />
+
+      {/* ---------- Ajouter une pièce ---------- */}
+      <Modal
+        visible={ajoutPiece}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setAjoutPiece(false)}>
+        <Pressable style={styles.modalBackdrop} onPress={() => setAjoutPiece(false)}>
+          <Pressable style={styles.modalCard} onPress={() => {}}>
+            <Text style={styles.modalTitle}>Ajouter une pièce</Text>
+            <Text style={styles.modalSubtitle}>
+              Elle se pose à côté du plan, aux cotes choisies. Les murs se
+              déplacent ensuite au doigt, et se cotent comme les autres.
+            </Text>
+            <ScrollView style={styles.nameScroll}>
+              <View style={styles.nameGrid}>
+                {(
+                  [
+                    ['Chambre', 3.4, 3],
+                    ['Séjour', 5, 4],
+                    ['Cuisine', 3.2, 2.6],
+                    ['Salle de bain', 2.4, 2],
+                    ['WC', 1.4, 1],
+                    ['Dégagement', 3, 1.2],
+                    ['Bureau', 3, 2.6],
+                    ['Buanderie', 2.2, 1.8],
+                  ] as [string, number, number][]
+                ).map(([nom, larg, prof]) => (
+                  <TouchableOpacity
+                    key={nom}
+                    style={styles.nameChip}
+                    onPress={() => {
+                      const id = addRoomBox(larg, prof, nom);
+                      setAjoutPiece(false);
+                      seuleSelection('piece');
+                      setSelectedRoomId(id);
+                      setEditMode(true);
+                      haptic('succes');
+                    }}>
+                    <Text style={styles.nameChipText}>{nom}</Text>
+                    <Text style={styles.nameChipDim}>
+                      {`${fr(larg, 2)} × ${fr(prof, 2)} m`}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
+            <TouchableOpacity
+              style={styles.removeRoomButton}
+              onPress={() => setAjoutPiece(false)}>
+              <Text style={styles.nameChipText}>Annuler</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       {/* ---------- Diagnostic du plan ---------- */}
       <DiagnosticSheet
@@ -2661,7 +2808,8 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     flex: 1,
     backgroundColor: c.bg,
     paddingTop: 58,
-    paddingHorizontal: 18,
+    // Le plan touche presque les bords : c'est lui qu'on regarde.
+    paddingHorizontal: 12,
   },
   emptyContainer: { alignItems: 'center', justifyContent: 'center', padding: 32 },
   emptyTitle: { color: c.ink, fontSize: 22, fontWeight: '800' },
@@ -2674,6 +2822,31 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     marginBottom: 26,
   },
   headerRow: { flexDirection: 'row', alignItems: 'center' },
+  /** Les actions de l'en-tête : rondes, 38 points, comme le retour. */
+  headerIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    marginLeft: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: c.surface,
+    ...shadowCard,
+    shadowOpacity: 0.07,
+    shadowRadius: 8,
+  },
+  /** Les mesures repliées : une ligne, discrète, qu'on peut déplier. */
+  metricsLigne: {
+    marginTop: 8,
+    marginBottom: 8,
+    paddingVertical: 2,
+  },
+  metricsResume: {
+    color: c.inkFaint,
+    fontSize: 12.5,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
   backButton: {
     width: 38,
     height: 38,
@@ -3110,6 +3283,8 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   },
   nameChipOn: { backgroundColor: c.blueSoft, borderColor: c.blue },
   nameChipText: { color: c.ink, fontSize: 14, fontWeight: '600' },
+  /** Les cotes de la pièce proposée, sous son nom. */
+  nameChipDim: { color: c.inkFaint, fontSize: 11, fontWeight: '600' },
   nameChipTextOn: { color: c.blue, fontWeight: '800' },
   removeRoomButton: {
     backgroundColor: c.surfaceSunken,

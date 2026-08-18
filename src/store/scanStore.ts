@@ -454,6 +454,16 @@ interface ScanState {
    * raccroche ; le second se déplace ensuite par sa poignée.
    */
   addWallBetween: (a: Pt, b: Pt) => void;
+  /**
+   * AJOUTE UNE PIÈCE RECTANGULAIRE au plan, et rend son identifiant.
+   *
+   * Un logement ne se scanne pas toujours d'un trait : on relève le séjour,
+   * on est appelé ailleurs, on revient pour la chambre. Jusqu'ici, la seule
+   * porte de sortie était « Nouveau scan » — qui efface tout. On pose donc
+   * une pièce de la taille demandée, accolée au plan existant, qu'on ajuste
+   * ensuite au doigt comme n'importe quel mur.
+   */
+  addRoomBox: (largeur: number, profondeur: number, nom: string) => string;
   /** Appareillage électrique posé sur les murs (prises, commandes, RJ45…). */
   fixtures: Fixture[];
   /** Cap du scan : d'où vient le nord. `null` = boussole muette. */
@@ -1021,6 +1031,52 @@ export const useScanStore = create<ScanState>((set, get) => {
         ],
         dirty: true,
       });
+    },
+
+    addRoomBox: (largeur, profondeur, nom) => {
+      const st = get();
+      pushHistory('addRoom');
+      const h = st.walls[0]?.height ?? 2.5;
+      const cle = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      const roomId = `piece-${cle}`;
+      /**
+       * OÙ SE POSE LA NOUVELLE PIÈCE : À DROITE DE CE QUI EXISTE.
+       *
+       * Au centre, elle recouvrirait le plan ; au hasard, on la chercherait.
+       * Collée au bord droit de l'emprise, avec un jeu d'un demi-mètre, elle
+       * se voit d'emblée et se pousse ensuite où l'on veut. Le premier scan
+       * d'un logement vide, lui, la pose à l'origine.
+       */
+      const xs = st.walls.flatMap((w) => [w.a.x, w.b.x]);
+      const zs = st.walls.flatMap((w) => [w.a.z, w.b.z]);
+      const x0 = xs.length > 0 ? Math.max(...xs) + 0.5 : 0;
+      const z0 = zs.length > 0 ? Math.min(...zs) : 0;
+      const x1 = x0 + Math.max(0.6, largeur);
+      const z1 = z0 + Math.max(0.6, profondeur);
+      const coins: Pt[] = [
+        { x: x0, z: z0 },
+        { x: x1, z: z0 },
+        { x: x1, z: z1 },
+        { x: x0, z: z1 },
+      ];
+      const murs = coins.map((p, i) => ({
+        id: `mur-${cle}-${i}`,
+        type: 'wall' as const,
+        a: p,
+        b: coins[(i + 1) % coins.length],
+        height: h,
+        yCenter: h / 2,
+        roomId,
+      }));
+      set({
+        walls: [...st.walls, ...murs],
+        rooms: [
+          ...st.rooms,
+          { id: roomId, name: nom, floor: null, wallIds: murs.map((w) => w.id) },
+        ],
+        dirty: true,
+      });
+      return roomId;
     },
 
     addFixture: (kind, wallId, at) => {
