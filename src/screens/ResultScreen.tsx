@@ -105,6 +105,7 @@ import {
   type Fixture,
   type FixtureKind,
 } from '../geometry/electrical';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useScanStore } from '../store/scanStore';
 import { DiagnosticSheet, type Constat } from '../components/DiagnosticSheet';
 import { ExportArt, type ExportArtKind } from '../components/ExportArt';
@@ -167,6 +168,16 @@ function matchItem(item: CatalogItem, quete: string): boolean {
 }
 
 export function ResultScreen() {
+  /**
+   * CE QUE LE SYSTÈME OCCUPE EN BAS, et qu'on lui laisse.
+   *
+   * La barre d'outils touchait le bord : sur un iPhone récent, l'indicateur
+   * d'accueil traversait les mots « Meubles » et « Surfaces ». Toutes les
+   * applications réservent cette bande ; on fait pareil, en la demandant au
+   * système plutôt qu'en la codant en dur.
+   */
+  const marges = useSafeAreaInsets();
+  const basSysteme = Math.max(marges.bottom, 10);
   const walls = useScanStore((s) => s.walls);
   const objects = useScanStore((s) => s.objects);
   const scanName = useScanStore((s) => s.scanName);
@@ -1276,6 +1287,7 @@ export function ResultScreen() {
       <Animated.View
         style={[
           styles.canvas,
+          { paddingBottom: basSysteme },
           {
             opacity: bascule,
             transform: [
@@ -1290,6 +1302,9 @@ export function ResultScreen() {
         ]}
         ref={canvasRef}
         collapsable={false}>
+        {/* Tout ce qui est ancré au bas du plan — barre d'outils, bandeaux —
+            se pose au-dessus de cette réserve : c'est le padding du cadre qui
+            les remonte, en une fois, sans les toucher un par un. */}
         {vue === '2d' ? (
           <FloorplanEditor
             cableRoutes={showRoutes ? cheminements?.traces : undefined}

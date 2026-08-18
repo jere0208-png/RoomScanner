@@ -353,3 +353,33 @@ describe('l’espace de travail du plan', () => {
     expect(textes(tree)).not.toContain('Plan 2D');
   });
 });
+
+/**
+ * LA BARRE DU BAS RESPECTE L'INDICATEUR D'ACCUEIL.
+ *
+ * Relevé du chantier, capture à l'appui : « le menu en bas est trop collé au
+ * bord ». Les mots « Meubles » et « Surfaces » étaient tranchés par le trait
+ * blanc de l'iPhone. Toutes les applications réservent cette bande ; on la
+ * demande au système plutôt que de la coder en dur — c'est la même mesure
+ * sur un modèle à encoche, sur un modèle à bouton, et sur un iPad.
+ */
+describe('les marges du système', () => {
+  it('réserve la bande de l’indicateur sous le plan', () => {
+    const tree = monter('scan');
+    // Le cadre du plan porte la réserve : tout ce qui y est ancré en bas
+    // remonte d'autant, d'un seul coup.
+    const reserves = tree.root
+      .findAll((n) => {
+        const st = n.props?.style;
+        const plats = Array.isArray(st) ? st.flat(Infinity) : [st];
+        return plats.some(
+          (p: unknown) =>
+            !!p &&
+            typeof p === 'object' &&
+            (p as { paddingBottom?: number }).paddingBottom === 34,
+        );
+      })
+      .length;
+    expect(`${reserves > 0 ? 'réservée' : 'absente'}`).toBe('réservée');
+  });
+});

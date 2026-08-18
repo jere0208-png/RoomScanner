@@ -57,3 +57,26 @@ jest.mock('lucide-react-native', () =>
 jest.mock('react-native-view-shot', () => ({
   captureRef: jest.fn(async () => 'file:///tmp/capture.png'),
 }));
+
+/**
+ * LES MARGES DU SYSTÈME, sous Node.
+ *
+ * `useSafeAreaInsets` lit un contexte fourni par `SafeAreaProvider`, qui
+ * lui-même mesure la fenêtre native. Sous Node il n'y en a pas, et le
+ * module refuse de répondre plutôt que d'inventer — c'est la bonne
+ * décision de sa part, et elle fait tomber tout écran qui l'appelle.
+ *
+ * Le banc rend donc les marges d'un iPhone à encoche : la barre du bas s'y
+ * mesure comme sur l'appareil, et une épreuve peut vérifier qu'on la
+ * respecte.
+ */
+jest.mock('react-native-safe-area-context', () => {
+  const React = require('react');
+  const marges = { top: 59, bottom: 34, left: 0, right: 0 };
+  return {
+    SafeAreaProvider: ({ children }) => React.createElement(React.Fragment, null, children),
+    SafeAreaView: ({ children }) => React.createElement(React.Fragment, null, children),
+    useSafeAreaInsets: () => marges,
+    useSafeAreaFrame: () => ({ x: 0, y: 0, width: 390, height: 844 }),
+  };
+});
