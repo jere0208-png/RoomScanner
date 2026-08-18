@@ -39,7 +39,6 @@ import {
   type Palette,
 } from '../theme';
 import {
-  castToWall,
   roomParts,
   segLength,
   type Pt,
@@ -170,6 +169,22 @@ export function ClientTour({
     );
     const surface = parts.reduce((t, p) => t + (p.surface?.area ?? 0), 0);
     const out: Etape[] = [];
+    /*
+      L'AZIMUT NE REVIENT JAMAIS EN ARRIÈRE — sur TOUTE la visite.
+
+      Il était remis à plat au début de chaque pièce : on tournait
+      proprement autour des murs d'un séjour, puis le logement pivotait d'un
+      demi-tour sec pour attaquer la cuisine. Un compteur unique, qui ne fait
+      qu'avancer, et chaque cap visé est rejoint par le chemin le plus court
+      VERS L'AVANT.
+    */
+    let azimut = -32;
+    const versAzimut = (cible: number) => {
+      let d = (cible - azimut) % 360;
+      while (d < 0) d += 360;
+      azimut += d;
+      return azimut;
+    };
 
     // 1. Le logement entier, qui tourne : on prend la mesure du volume.
     out.push({
@@ -180,10 +195,14 @@ export function ClientTour({
       roomId: null,
       // Un tour COMPLET du logement, vu de haut : avant d'entrer quelque
       // part, le client doit savoir à quoi ressemble l'ensemble.
-      vue: { theta: -32, tilt: 56, zoom: 1, ox: 0, oy: 0 },
+      vue: { theta: azimut, tilt: 56, zoom: 0.95, ox: 0, oy: 0 },
+      // Et le zoom avance déjà : la maquette se rapproche pendant qu'elle
+      // tourne, au lieu de rester à distance.
+      zoomFin: 1.05,
       balayage: 360,
       duree: 8000,
     });
+    azimut += 360;
 
     for (const room of rooms) {
       const part = parts.find((p) => p.roomId === room.id);
@@ -221,95 +240,57 @@ export function ClientTour({
         detail: 'On entre',
         roomId: room.id,
         vue: {
-          // On démarre face au mur par lequel la visite POV commencera : le
+          // On démarre face au mur par lequel le tour commencera : le
           // raccord se fait sans que la pièce pivote sous les yeux.
-          theta: premier ? azimutFaceAuMur(premier, centre) : -32,
-          tilt: 22,
-          zoom: 1.9,
+          theta: premier ? versAzimut(azimutFaceAuMur(premier, centre)) : azimut,
+          // VUE LARGE : on regarde la pièce de trois quarts haut, comme une
+          // maquette posée sur une table. Le regard rasant de l'immersion
+          // montrait un pan de mur et rien autour — on ne savait plus où
+          // l'on était.
+          tilt: 52,
+          zoom: 1.15,
           ox: 0,
           oy: 0,
         },
-        // L'entrée est BRÈVE : elle sert à reconnaître la pièce, pas à la
-        // visiter — c'est le tour en POV qui la montre, juste après.
-        zoomFin: 2.4,
-        balayage: 60,
-        duree: 3600,
+        // Et le zoom AVANCE pendant qu'on tourne : c'est ce mouvement-là qui
+        // fait entrer dans la pièce, pas une caméra posée au sol.
+        zoomFin: 1.35,
+        balayage: 40,
+        duree: 3400,
       });
+      azimut += 40;
 
-      /*
-        L'ŒIL SE POSE AU CENTRE, À 1,60 M DU SOL.
-
-        C'est la hauteur du regard d'un homme debout — celle à laquelle on
-        voit une pièce quand on y entre. Le sol, lui, est où ARKit l'a
-        trouvé : on le reprend au pied du mur le plus bas.
-      */
-      const solY = Math.min(...murs.map((w) => w.yCenter - w.height / 2));
-      /** L'azimut qui met ce mur en face : la même convention que la vue. */
-      const versLeMur = (w: WallSeg) =>
-        Math.atan2(
-          (w.a.x + w.b.x) / 2 - centre.x,
-          (w.a.z + w.b.z) / 2 - centre.z,
-        );
-      /**
-       * OÙ SE PLACER POUR MONTRER UN MUR.
-       *
-       * Au centre de la pièce, on est à un mètre cinquante des cloisons : un
-       * mur de 2,50 m déborde alors de l'écran de tous les côtés, et l'on ne
-       * voit plus qu'un pan blanc sans un angle pour se repérer. Un cadreur
-       * ferait ce que fait n'importe qui dans une pièce : il RECULE.
-       *
-       * On se place donc dos au mur d'en face, à la distance que la pièce
-       * permet — sans jamais coller à la cloison de derrière, ni s'éloigner
-       * au-delà de trois mètres et demi, où l'on ne distingue plus une prise.
-       */
-      const posteDe = (w: WallSeg): P3 => {
-        const mid = { x: (w.a.x + w.b.x) / 2, z: (w.a.z + w.b.z) / 2 };
-        const len = segLength(w) || 1;
-        const u = { x: (w.b.x - w.a.x) / len, z: (w.b.z - w.a.z) / len };
-        let n = { x: -u.z, z: u.x };
-        // La normale qui rentre dans la pièce.
-        if ((centre.x - mid.x) * n.x + (centre.z - mid.z) * n.z < 0) {
-          n = { x: -n.x, z: -n.z };
-        }
-        const depart = { x: mid.x + n.x * 0.1, z: mid.z + n.z * 0.1 };
-        const jusquAuFond = castToWall(depart, n, murs) ?? 3;
-        const recul = Math.max(1.2, Math.min(3.4, jusquAuFond * 0.8));
-        return {
-          x: mid.x + n.x * recul,
-          /*
-            L'ŒIL D'UN ADULTE DEBOUT : 1,65 m.
-
-            Relevé du chantier : « la présentation nous fait plus petit que le
-            canapé ». Le regard était à 1,60 m — la bonne hauteur — mais
-            l'objectif à 68 degrés grossissait tout ce qui est proche : un
-            dossier de canapé à un mètre remplissait le bas du cadre et
-            paraissait nous dépasser. Un homme voit à peu près soixante
-            degrés de haut en bas ; c'est cette focale-là qui rend l'échelle
-            juste.
-          */
-          y: solY + 1.65,
-          z: mid.z + n.z * recul,
-        };
-      };
       /*
         ON TOURNE DANS UN SEUL SENS, MUR APRÈS MUR.
 
         Les murs sont pris dans l'ordre où le regard les rencontre, et
-        l'azimut croît sans jamais revenir en arrière : la tête fait un tour
-        complet, comme on le ferait sur place. Un mur présenté en revenant
-        sur ses pas donnerait le mal de mer.
+        l'azimut croît sans jamais revenir en arrière : le logement fait un
+        tour complet sur lui-même. Un mur présenté en revenant sur ses pas
+        donnerait le mal de mer.
       */
-      const tour = [...murs].sort((a, b) => versLeMur(a) - versLeMur(b));
-      let azimut = tour.length > 0 ? versLeMur(tour[0]) : 0;
-      let precedent = azimut;
-      for (const w of tour) {
-        const brut = versLeMur(w);
-        let d = brut - precedent;
-        while (d < 0) d += Math.PI * 2;
-        azimut += d;
-        precedent = brut;
+      const tour = [...murs].sort(
+        (a, b) => azimutFaceAuMur(a, centre) - azimutFaceAuMur(b, centre),
+      );
+      tour.forEach((w, iw) => {
+        const cap = versAzimut(azimutFaceAuMur(w, centre));
         const dessus = fixtures.filter((f) => f.wallId === w.id);
         const aire = wallCardinal(w, centre, north);
+        /*
+          ON S'ARRÊTE SUR CHAQUE MUR, EN VUE LARGE.
+
+          La visite se tenait DANS la pièce, à hauteur d'homme, et tournait
+          la tête. C'était juste, et c'était trop près : un mur de deux
+          mètres cinquante vu à deux mètres remplit l'écran, on ne voit ni
+          ses bouts, ni la pièce autour, et le client ne sait plus ce qu'on
+          lui montre. Relevé du chantier : « fais juste une rotation qui
+          tourne et on zoome en tournant, on s'arrête sur chaque mur en vue
+          large ».
+
+          Le logement tourne donc devant l'objectif, et s'arrête face à
+          chaque mur — les autres étant retirés du champ le temps du carton.
+          Le zoom avance pendant l'arrêt : ce mouvement-là suffit à donner
+          la vie qu'un plan fixe n'a pas.
+        */
         out.push({
           titre: aire
             ? `Mur ${aire} · ${room.name || 'pièce'}`
@@ -327,16 +308,24 @@ export function ClientTour({
           roomId: room.id,
           mur: dessus.length > 0,
           wallId: w.id,
-          pose: { at: posteDe(w), yaw: azimut },
-          vue: { theta: 0, tilt: 0, zoom: 1, ox: 0, oy: 0 },
-          // Un léger balancement : une image fixe paraît gélée, même en
-          // perspective.
-          balayage: 6,
-          duree: dessus.length > 0 ? 5200 : 3400,
+          vue: {
+            theta: cap,
+            // Un mur se lit de face, à peine plongeant : plus haut, on voit
+            // le dessus des cloisons et plus leur nu.
+            tilt: 46,
+            zoom: 1.4 + Math.min(0.25, iw * 0.04),
+            ox: 0,
+            oy: 0,
+          },
+          // Le zoom continue d'avancer pendant l'arrêt.
+          zoomFin: 1.6 + Math.min(0.25, iw * 0.04),
+          // Un souffle de rotation : une image parfaitement fixe paraît
+          // gelée, même en perspective.
+          balayage: 8,
+          duree: dessus.length > 0 ? 5200 : 3200,
         });
-      }
-
-
+        azimut += 8;
+      });
     }
 
     // 4. Le mot de la fin : ce qu'il y a dans le devis, en trois chiffres.
@@ -349,7 +338,7 @@ export function ClientTour({
       } · ${fr1(surface)} m²`,
       detail: 'Plans, schémas et liste du matériel dans le dossier PDF.',
       roomId: null,
-      vue: { theta: 148, tilt: 62, zoom: 0.95, ox: 0, oy: 0 },
+      vue: { theta: versAzimut(148), tilt: 62, zoom: 0.95, ox: 0, oy: 0 },
       balayage: 120,
       duree: 6000,
     });

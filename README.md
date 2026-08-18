@@ -240,6 +240,67 @@ le toucher continue de le sélectionner d'un coup, sinon on aurait compliqué
 le geste courant sans rien apporter. La note ne s'affiche que quand un retour
 est tenu ; rien de sélectionné, rien à l'écran.
 
+### Le métré s'ouvre dans un tableur
+
+La liste du matériel existait déjà — dans le PDF. C'est le bon format pour
+REMETTRE un dossier, et le pire pour le CHIFFRER : un devis se prépare dans un
+tableur, où l'on colle ses prix dans une colonne à côté des quantités.
+Recopier soixante lignes à la main depuis un PDF, personne ne le fait ; on
+refait le métré, et on se trompe.
+
+« Métré CSV », dans le menu d'export, sort les mêmes chiffres en colonnes :
+métré par pièce (surface, périmètre, hauteur, **surface murale**, que le PDF
+ne porte pas faute de place), appareillage par pièce, circuits avec leur
+section, leur disjoncteur et leur métré de câble, différentiels, matériel de
+tableau, et les constats de conformité — ce qui manque se chiffre aussi.
+
+**Trois pièges du CSV français**, et ils y sont tous les trois : le séparateur
+est le **point-virgule** (Excel en français ouvre autrement le fichier en une
+seule colonne), les décimales sont des **virgules** (sinon le tableur y voit
+du texte et refuse d'additionner), et le fichier commence par une **marque
+d'ordre des octets** (sans elle, « Séjour » s'écrit « SÃ©jour »). Un nom de
+pièce contenant un point-virgule est échappé : une seule cellule non protégée
+décale toute la grille à partir de là, sans que rien ne le signale.
+
+### Le bord de l'icône
+
+Une icône claire n'a pas de contour : elle se termine là où le système la
+découpe, et sur un fond d'écran clair elle se dilue. Le liseré est donc peint
+DANS l'image — iOS refuse la transparence sur une icône d'application — le
+long de la découpe du système, une **superellipse d'ordre 5**, la forme du
+squircle. La distance au bord est divisée par la pente du champ, sans quoi le
+trait s'épaissit dans les coins ; et il déborde légèrement au-delà, ce qui
+dépasse étant rogné : il ne peut ainsi rester aucun filet de fond entre le
+liseré et le bord si notre forme et celle du système diffèrent d'un cheveu.
+
+**Trois teintes, pas deux.** Un premier essai l'avait posé en gris clair, par
+crainte d'alourdir : sur du blanc, un gris clair ne se voit pas. Le liseré de
+Gemini, pris comme repère, n'est pas d'une seule couleur — il passe du clair
+en haut au sombre en bas, comme l'arête d'un objet éclairé par le dessus.
+C'est ce qui le rend universel : sur un fond d'écran noir, le haut clair
+détache l'icône ; sur un fond blanc, le bas sombre. Un liseré d'une seule
+teinte doit choisir son fond.
+
+### La visite tourne autour, elle n'entre plus dedans
+
+La présentation s'est d'abord tenue DANS la pièce, à hauteur d'homme, tournant
+la tête d'un mur à l'autre — c'était la demande du chantier, et l'essai sur
+l'appareil l'a défaite : un mur de 2,50 m vu à deux mètres remplit l'écran, on
+ne voit ni ses bouts ni la pièce autour, et le client ne sait plus ce qu'on
+lui montre.
+
+Le logement tourne donc devant l'objectif et **s'arrête face à chaque mur, en
+vue large**, les autres murs sortant du champ le temps du carton. Le zoom
+avance pendant l'arrêt : ce mouvement-là suffit à donner la vie qu'un plan
+fixe n'a pas. L'azimut est **cumulé sur toute la visite** et ne revient jamais
+en arrière — remis à plat au début de chaque pièce, il faisait pivoter le
+logement d'un demi-tour sec entre le séjour et la cuisine.
+
+**Les cotes paraissent en fondu, toutes ensemble.** Elles se déroulaient comme
+un mètre qu'on tire, filet après filet : pendant qu'un trait s'allonge, son
+nombre n'est pas encore là, et l'œil suit le mouvement au lieu de lire. Un mur
+équipé porte huit cotes ; huit petits mouvements successifs, c'est du bruit.
+
 ### La typo de la marque
 
 Le mot « EchoPlan » n'est plus composé : c'est **l'image de la marque**,

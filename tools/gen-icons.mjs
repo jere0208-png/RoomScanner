@@ -138,8 +138,20 @@ const INK = [0x0b, 0x0d, 0x12];
  * transpose pas tel quel sur une icône claire : il faut l'inverser, et
  * franchement.
  */
-const BORD_HAUT = [0x5a, 0x66, 0x77];
-const BORD_BAS = [0x24, 0x2c, 0x38];
+/*
+  TROIS TEINTES, PAS DEUX — c'est ce qui fait tenir le bord sur TOUS les
+  fonds d'écran.
+
+  Le liseré de Gemini n'est pas d'une seule couleur : il passe du CLAIR en
+  haut au SOMBRE en bas, comme l'arête d'un objet éclairé par le dessus. Et
+  c'est précisément ce qui le rend universel — sur un fond d'écran noir,
+  c'est le haut clair qui détache l'icône ; sur un fond blanc, c'est le bas
+  sombre. Un liseré d'une seule teinte doit choisir son fond ; celui-ci n'a
+  pas à choisir.
+*/
+const BORD_HAUT = [0xff, 0xff, 0xff];
+const BORD_FLANC = [0x8c, 0x97, 0xa6];
+const BORD_BAS = [0x1e, 0x25, 0x30];
 /** Épaisseur vers l'intérieur, et débord rogné, en fraction du côté. */
 const TRAIT = 0.02;
 const DEBORD = 0.006;
@@ -222,12 +234,17 @@ function render(size, mask) {
           Math.max(0, Math.min(1, (db + trait) / 1)),
         );
         if (bande > 0) {
-          const bh = BORD_HAUT;
-          const bb = BORD_BAS;
+          // Le dégradé se lit sur la hauteur : blanc au sommet, gris à
+          // mi-hauteur — c'est le flanc, celui qui longe le fond d'écran —
+          // puis ardoise au pied.
           const u = fy / size;
-          cr_ = cr_ + (bh[0] + (bb[0] - bh[0]) * u - cr_) * bande;
-          cg_ = cg_ + (bh[1] + (bb[1] - bh[1]) * u - cg_) * bande;
-          cb_ = cb_ + (bh[2] + (bb[2] - bh[2]) * u - cb_) * bande;
+          const [c0, c1, t] =
+            u < 0.5
+              ? [BORD_HAUT, BORD_FLANC, u / 0.5]
+              : [BORD_FLANC, BORD_BAS, (u - 0.5) / 0.5];
+          cr_ = cr_ + (c0[0] + (c1[0] - c0[0]) * t - cr_) * bande;
+          cg_ = cg_ + (c0[1] + (c1[1] - c0[1]) * t - cg_) * bande;
+          cb_ = cb_ + (c0[2] + (c1[2] - c0[2]) * t - cb_) * bande;
         }
         r += cr_ * shape;
         g += cg_ * shape;

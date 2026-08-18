@@ -156,13 +156,19 @@ interface Props {
    */
   cutaway?: boolean;
   /**
-   * LES COTES QUI SE TRACENT, de 0 à 1.
+   * LES COTES DE LA PRÉSENTATION, EN FONDU — de 0 à 1.
    *
    * `null` = le comportement ordinaire (elles suivent le bouton « Cotes »
-   * et le zoom). Un nombre = la présentation les pilote : le filet part de
-   * l'appareil et s'étire jusqu'à son mur à mesure que la valeur monte,
-   * puis se rétracte. C'est le geste du mètre qu'on déroule — il se
-   * comprend sans légende, et c'est ce qu'on veut devant un client.
+   * et le zoom). Un nombre = la présentation les pilote : toutes les cotes
+   * du mur paraissent ENSEMBLE, en fondu, tiennent le temps qu'on les lise,
+   * puis s'effacent.
+   *
+   * Elles se déroulaient auparavant comme un mètre qu'on tire, chaque filet
+   * s'étirant de l'appareil vers le mur. Le geste était joli et il coûtait
+   * cher : pendant qu'un filet s'allonge, son nombre n'est pas encore là, et
+   * l'œil du client suit le mouvement au lieu de lire la valeur. Un mur
+   * équipé porte huit cotes ; huit petits mouvements successifs, c'est du
+   * bruit. Un fondu simultané pose le tout d'un coup, et l'on regarde.
    */
   elecCotes?: number | null;
   /**
@@ -794,7 +800,7 @@ export function Iso3DView({
           kind: 'elec';
           /** Bout de la ligne de cote vers le bord du mur. */
           /** Avancement du tracé des cotes, de 0 à 1. */
-          trace?: number;
+          fondu?: number;
           bx?: number;
           by?: number;
           /** Bout de la ligne de cote vers le sol. */
@@ -1001,7 +1007,7 @@ export function Iso3DView({
             (elecCotes === null ? showMeasures && scale > 90 : elecCotes > 0.02)
               ? `${Math.round(Math.abs(x - versBord) * 100)}`
               : undefined,
-          trace: elecCotes === null ? 1 : Math.max(0, Math.min(1, elecCotes)),
+          fondu: elecCotes === null ? 1 : Math.max(0, Math.min(1, elecCotes)),
           // La désignation en toutes lettres, POSÉE SUR l'appareil. Le
           // symbole gravé se réduisait à trois traits gris : un mot se lit.
           // Caché et vu de loin : pas de mot, juste le point de couleur.
@@ -1316,26 +1322,28 @@ export function Iso3DView({
                     <>
                       {/* Cote du bord : filet pointillé jusqu'au retour de
                           mur, nombre posé dessus. */}
-                      {/* Le filet s'étire de l'appareil vers le mur : c'est
-                          le mètre qu'on déroule. À l'arrêt (`trace` = 1) il
-                          est entier, comme avant. */}
+                      {/* Le filet est ENTIER dès qu'il paraît : c'est son
+                          opacité qui monte, pas sa longueur. Un trait qui
+                          s'allonge attire l'œil sur le mouvement ; ce qu'on
+                          veut faire lire, c'est le nombre au bout. */}
                       <Line
                         x1={item.x}
                         y1={item.y}
-                        x2={item.x + ((item.bx ?? item.x) - item.x) * (item.trace ?? 1)}
-                        y2={item.y + ((item.by ?? item.y) - item.y) * (item.trace ?? 1)}
+                        x2={item.bx ?? item.x}
+                        y2={item.by ?? item.y}
                         stroke={c.ink}
                         strokeWidth={1}
                         strokeDasharray="2 3"
-                        opacity={0.5 * (item.trace ?? 1)}
+                        opacity={0.5 * (item.fondu ?? 1)}
                       />
-                      {(item.trace ?? 1) > 0.85 && (
+                      {(item.fondu ?? 1) > 0.02 && (
                         <SvgText
                           x={((item.bx ?? item.x) + item.x) / 2}
                           y={((item.by ?? item.y) + item.y) / 2 - 4}
                           fill={c.ink}
                           fontSize={9.5}
                           fontWeight="800"
+                          opacity={item.fondu ?? 1}
                           textAnchor="middle">
                           {item.bord}
                         </SvgText>
@@ -1344,20 +1352,21 @@ export function Iso3DView({
                       <Line
                         x1={item.x}
                         y1={item.y}
-                        x2={item.x + ((item.sx ?? item.x) - item.x) * (item.trace ?? 1)}
-                        y2={item.y + ((item.sy ?? item.y) - item.y) * (item.trace ?? 1)}
+                        x2={item.sx ?? item.x}
+                        y2={item.sy ?? item.y}
                         stroke={c.ink}
                         strokeWidth={1}
                         strokeDasharray="2 3"
-                        opacity={0.5 * (item.trace ?? 1)}
+                        opacity={0.5 * (item.fondu ?? 1)}
                       />
-                      {(item.trace ?? 1) > 0.85 && (
+                      {(item.fondu ?? 1) > 0.02 && (
                         <SvgText
                           x={((item.sx ?? item.x) + item.x) / 2 + 7}
                           y={((item.sy ?? item.y) + item.y) / 2 + 3}
                           fill={c.ink}
                           fontSize={9.5}
-                          fontWeight="800">
+                          fontWeight="800"
+                          opacity={item.fondu ?? 1}>
                           {item.haut}
                         </SvgText>
                       )}

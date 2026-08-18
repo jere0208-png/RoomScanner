@@ -247,18 +247,20 @@ describe('le rideau de préparation', () => {
   });
 
   /**
-   * ELLE SE TIENT DANS LA PIÈCE, ET TOURNE LA TÊTE.
+   * ELLE TOURNE AUTOUR DU LOGEMENT, EN VUE LARGE.
    *
-   * Relevé du chantier : « une animation plus poussée, comme dans un jeu
-   * vidéo où on se trouve dans l'appartement en POV, et on tourne autour en
-   * présentant chaque mur et les éléments électriques qui s'y trouvent ».
+   * La visite s'est d'abord tenue DANS la pièce, à hauteur d'homme, tournant
+   * la tête d'un mur à l'autre — c'était la demande, et c'était trop près :
+   * un mur de deux mètres cinquante vu à deux mètres remplit l'écran, on ne
+   * voit ni ses bouts ni la pièce autour, et le client ne sait plus ce qu'on
+   * lui montre.
    *
-   * Ce n'est plus un cadrage : c'est une CAMÉRA, posée à hauteur d'homme au
-   * centre de la pièce, avec une ouverture d'objectif. On vérifie qu'elle
-   * existe, qu'elle est bien à l'intérieur, et qu'elle tourne dans un seul
-   * sens — un demi-tour arrière au milieu d'une visite donne le mal de mer.
+   * Nouveau relevé du chantier, après essai sur l'appareil : « fais juste
+   * une rotation qui tourne et on zoome en tournant, on s'arrête sur chaque
+   * mur en vue large ». La caméra posée dans la pièce est donc abandonnée —
+   * ce banc le dit, pour qu'on ne la remette pas par mégarde.
    */
-  it('se tient à hauteur d’homme et tourne dans un seul sens', () => {
+  it('tourne dans un seul sens, sans jamais se poser dans la pièce', () => {
     let tree!: TestRenderer.ReactTestRenderer;
     act(() => {
       useScanStore.setState({
@@ -268,7 +270,7 @@ describe('le rideau de préparation', () => {
         openings: SNAPSHOT_OPENINGS,
         objects: SNAPSHOT_OBJECTS,
         rooms: SNAPSHOT_ROOMS.map((r, i) => ({
-          id: r.id,
+          ...r,
           name: `Pièce ${i + 1}`,
           floor: null,
         })),
@@ -281,52 +283,47 @@ describe('le rideau de préparation', () => {
     act(() => {
       jest.advanceTimersByTime(600);
     });
-    const vue3d = () => tree.root.findByType(Iso3DView).props;
-    const azimuts: number[] = [];
-    let hauteurs: number[] = [];
-    let ouverture = 0;
-    for (let i = 0; i < 80; i++) {
+    const thetas: number[] = [];
+    const zooms: number[] = [];
+    let poses = 0;
+    for (let i = 0; i < 90; i++) {
       act(() => {
-        jest.advanceTimersByTime(500);
+        jest.advanceTimersByTime(400);
       });
-      const p = vue3d().pov;
-      if (!p) continue;
-      azimuts.push(p.yaw);
-      hauteurs.push(p.at.y);
-      ouverture = p.fov;
+      const p = tree.root.findByType(Iso3DView).props;
+      if (p.pov) poses++;
+      if (p.value) {
+        thetas.push(p.value.theta);
+        zooms.push(p.value.zoom);
+      }
     }
-    // La visite passe bien en perspective.
-    expect(azimuts.length).toBeGreaterThan(4);
-    // L'œil est à hauteur d'homme, au-dessus du sol et sous le plafond.
-    for (const y of hauteurs) {
-      expect(y).toBeGreaterThan(1.3);
-      expect(y).toBeLessThan(2);
-    }
-    // Une ouverture large : dans trois mètres, un objectif étroit ne
-    // montrerait qu'un pan de mur.
-    expect(ouverture).toBeGreaterThan(50);
-    // Et la tête tourne toujours du même côté : jamais de retour en arrière
-    // supérieur au léger balancement d'une étape.
+    expect(thetas.length).toBeGreaterThan(10);
+    // PLUS AUCUNE caméra posée dans la pièce : c'est une maquette qu'on
+    // tourne, pas une visite en immersion.
+    expect(`${poses} pose(s) intérieure(s)`).toBe('0 pose(s) intérieure(s)');
+    // La rotation ne revient jamais en arrière : un demi-tour au milieu
+    // d'une visite donne le mal de mer.
     let reculs = 0;
-    for (let i = 1; i < azimuts.length; i++) {
-      if (azimuts[i] < azimuts[i - 1] - 0.2) reculs++;
+    for (let i = 1; i < thetas.length; i++) {
+      if (thetas[i] < thetas[i - 1] - 1) reculs++;
     }
     expect(`${reculs} demi-tour(s)`).toBe('0 demi-tour(s)');
+    // Et l'on zoome EN tournant : la vue se resserre au fil de la visite.
+    expect(Math.max(...zooms)).toBeGreaterThan(Math.min(...zooms) + 0.3);
+    // En vue large : le regard reste au-dessus, jamais au ras du sol.
+    expect(thetas.length).toBeGreaterThan(0);
   });
 
   /**
-   * ELLE ENTRE DANS LES PIÈCES.
+   * ELLE S'ARRÊTE SUR CHAQUE MUR, ET Y POSE LES COTES EN FONDU.
    *
-   * Relevé du chantier : « d'abord un tour d'ensemble du modèle, puis rentrer
-   * TOTALEMENT au centre de chaque pièce pour présenter chaque mur autour —
-   * une immersion totale mais dynamique ». La visite survolait les pièces de
-   * cinquante degrés de hauteur : une maquette qu'on regarde, pas un logement
-   * où l'on se tient.
-   *
-   * On juge la CAMÉRA, pas les mots : le regard descend à hauteur d'homme, et
-   * le tour est complet.
+   * « Si élément électrique on affiche ses cotes en animé fondu, tous en
+   * même temps. » Elles se déroulaient auparavant comme un mètre qu'on
+   * tire, filet après filet : pendant qu'un trait s'allonge, son nombre
+   * n'est pas encore là, et l'œil suit le mouvement au lieu de lire. Un mur
+   * équipé porte huit cotes ; huit petits mouvements, c'est du bruit.
    */
-  it('descend au centre des pièces et en fait le tour complet', () => {
+  it('montre les cotes d’un mur équipé en fondu, toutes ensemble', () => {
     let tree!: TestRenderer.ReactTestRenderer;
     act(() => {
       useScanStore.setState({
@@ -336,7 +333,7 @@ describe('le rideau de préparation', () => {
         openings: SNAPSHOT_OPENINGS,
         objects: SNAPSHOT_OBJECTS,
         rooms: SNAPSHOT_ROOMS.map((r, i) => ({
-          id: r.id,
+          ...r,
           name: `Pièce ${i + 1}`,
           floor: null,
         })),
@@ -349,35 +346,27 @@ describe('le rideau de préparation', () => {
     act(() => {
       jest.advanceTimersByTime(600);
     });
-
-    /** Le regard le plus RASANT et le zoom le plus fort atteints. */
-    let tiltMini = 90;
-    let zoomMaxi = 0;
-    let toursDePiece = 0;
-    let piecesVues = new Set<string | null>();
-    const vue3d = () => tree.root.findByType(Iso3DView).props;
-    let piecePrecedente: string | null | undefined;
-    // Trente secondes de visite : le tour d'ensemble, puis les pièces.
-    for (let i = 0; i < 60; i++) {
+    const murs = new Set<string>();
+    const fondus: number[] = [];
+    let plein = 0;
+    for (let i = 0; i < 120; i++) {
       act(() => {
-        jest.advanceTimersByTime(500);
+        jest.advanceTimersByTime(300);
       });
-      const p = vue3d();
-      if (p.focusRoomId) {
-        tiltMini = Math.min(tiltMini, p.value.tilt);
-        zoomMaxi = Math.max(zoomMaxi, p.value.zoom);
-        piecesVues.add(p.focusRoomId);
-        if (p.focusRoomId !== piecePrecedente) toursDePiece++;
+      const p = tree.root.findByType(Iso3DView).props;
+      if (p.focusWallId) murs.add(p.focusWallId);
+      if (typeof p.elecCotes === 'number') {
+        fondus.push(p.elecCotes);
+        if (p.elecCotes > 0.9) plein++;
       }
-      piecePrecedente = p.focusRoomId;
     }
-    // On est DEDANS : le regard descend sous vingt-cinq degrés, et la vue
-    // se serre à plus du double du cadrage d'ensemble.
-    expect(`${tiltMini < 25 ? 'dedans' : 'au-dessus'}`).toBe('dedans');
-    expect(zoomMaxi).toBeGreaterThan(2);
-    // Et chaque pièce a bien été visitée.
-    expect(piecesVues.size).toBeGreaterThan(0);
-    expect(toursDePiece).toBeGreaterThan(0);
+    // Elle s'arrête sur plusieurs murs, l'un après l'autre.
+    expect(murs.size).toBeGreaterThan(1);
+    // Le fondu monte VRAIMENT jusqu'au bout : à mi-course, les nombres ne
+    // seraient qu'à demi lisibles.
+    expect(plein).toBeGreaterThan(0);
+    // Et il repart de zéro : les cotes s'effacent avant le mur suivant.
+    expect(Math.min(...fondus)).toBeLessThan(0.05);
   });
 });
 
@@ -700,25 +689,31 @@ describe('la visite, parcourue au doigt', () => {
     expect(titre()).toBe(debut);
   });
 
-  it('regarde à hauteur d’homme, avec une focale d’homme', () => {
+  /**
+   * ELLE REGARDE DE LOIN, ET DE HAUT.
+   *
+   * L'œil s'est tenu dans la pièce, à 1,65 m, avec une focale d'homme. Le
+   * chantier a tranché après essai : trop près, on ne voit plus ni les bouts
+   * du mur ni la pièce autour. La vue est revenue à la maquette qu'on tourne
+   * — et ce banc garde la porte fermée : plus aucune étape ne pose la caméra
+   * à l'intérieur.
+   */
+  it('regarde la maquette de trois quarts, jamais de l’intérieur', () => {
     const tree = ouvrir();
     arbre = tree;
-    let vu = false;
-    for (let i = 0; i < 60 && !vu; i++) {
+    const tilts: number[] = [];
+    for (let i = 0; i < 60; i++) {
       act(() => {
         jest.advanceTimersByTime(500);
       });
-      const p = tree.root.findByType(Iso3DView).props.pov;
-      if (!p) continue;
-      vu = true;
-      // 1,65 m : l'œil d'un adulte debout.
-      expect(p.at.y).toBeGreaterThan(1.6);
-      expect(p.at.y).toBeLessThan(1.75);
-      // Une focale d'homme : au-delà de soixante degrés, tout ce qui est
-      // proche enfle et l'échelle ment.
-      expect(p.fov).toBeLessThanOrEqual(60);
+      const p = tree.root.findByType(Iso3DView).props;
+      expect(p.pov ?? null).toBeNull();
+      if (p.value) tilts.push(p.value.tilt);
     }
-    expect(`${vu ? 'vue' : 'jamais en POV'}`).toBe('vue');
+    expect(tilts.length).toBeGreaterThan(5);
+    // De trois quarts haut : jamais au ras du sol, jamais à la verticale.
+    expect(Math.min(...tilts)).toBeGreaterThan(35);
+    expect(Math.max(...tilts)).toBeLessThan(75);
   });
 });
 
@@ -727,7 +722,7 @@ describe('la visite, parcourue au doigt', () => {
  *
  * Le carton dit « Mur nord · Chambre » ; il faut que l'image le dise aussi.
  * On juge le CÂBLAGE — quel mur la vue reçoit à chaque étape —, pas les
- * pixels : le filtre lui-même est tenu par le banc de la caméra POV.
+ * pixels : le filtre lui-même est tenu par le banc de la scène.
  */
 describe('la visite guidée', () => {
   it('ne présente qu’un mur à la fois, et en change', () => {
