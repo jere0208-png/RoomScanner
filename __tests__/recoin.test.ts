@@ -21,6 +21,7 @@ import {
   WALL_T,
   alignToFit,
   pushOutOfObjects,
+  separerMeubles,
   fitInNook,
   hugWall,
   roomParts,
@@ -477,5 +478,51 @@ describe('le meuble poussé dans un coin', () => {
     const reste = Math.abs(((yaw % (Math.PI / 2)) + Math.PI) % (Math.PI / 2));
     expect(Math.min(reste, Math.PI / 2 - reste)).toBeLessThan(0.02);
     expect(Math.max(o.width, o.depth)).toBeLessThan(1.05);
+  });
+});
+
+/**
+ * LE RELEVÉ SE DÉSENCHÊTRE À L'OUVERTURE.
+ *
+ * Le scanner rend des boîtes, et il lui arrive de les faire se traverser : une
+ * table DANS un canapé. Le chantier a tranché après que je l'aie déconseillé —
+ * c'est son relevé, et une table qui traverse un canapé coûte plus cher en
+ * crédibilité qu'un meuble déplacé de trois centimètres.
+ *
+ * Trois garde-fous, et ce banc les vérifie un par un.
+ */
+describe('le désenchêtrement du relevé', () => {
+  const canape = { cx: 2, cz: 2, width: 2.1, depth: 0.9, yaw: 0, y0: 0, y1: 0.85 };
+
+  it('écarte une table qui traverse un canapé', () => {
+    const basse = { cx: 2.2, cz: 2.3, width: 1.2, depth: 0.7, yaw: 0, y0: 0, y1: 0.45 };
+    const bouges = separerMeubles([canape, basse]);
+    expect(bouges).toHaveLength(1);
+    // C'est la TABLE qui cède : elle est la plus petite.
+    expect(bouges[0].index).toBe(1);
+    // Et elle ne bouge que de la pénétration : 0,45 + 0,35 − 0,30 = 0,50.
+    const pas = Math.hypot(bouges[0].dx, bouges[0].dz);
+    expect(pas).toBeGreaterThan(0.4);
+    expect(pas).toBeLessThan(0.6);
+  });
+
+  it('ne touche pas à une télé posée SUR un meuble', () => {
+    const meuble = { cx: 2, cz: 2, width: 1.6, depth: 0.45, yaw: 0, y0: 0, y1: 0.5 };
+    const tele = { cx: 2, cz: 2, width: 1.1, depth: 0.08, yaw: 0, y0: 0.55, y1: 1.2 };
+    expect(separerMeubles([meuble, tele])).toHaveLength(0);
+  });
+
+  it('ne touche pas à un chevauchement d’un centimètre', () => {
+    // L'imprécision ordinaire d'un relevé à la caméra : on n'y touche pas.
+    const voisin = {
+      cx: 2 + 1.05 + 0.35 - 0.01,
+      cz: 2,
+      width: 0.7,
+      depth: 0.7,
+      yaw: 0,
+      y0: 0,
+      y1: 0.8,
+    };
+    expect(separerMeubles([canape, voisin])).toHaveLength(0);
   });
 });

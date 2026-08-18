@@ -700,6 +700,79 @@ export function pushOutOfObjects(
 }
 
 /**
+ * DÉSENCHÊTRER LE RELEVÉ — quand deux meubles occupent le même volume.
+ *
+ * Le scanner rend des boîtes, et il lui arrive de les faire se traverser : sur
+ * le modèle, une table passe alors DANS un canapé. Le chantier l'a filmé, et a
+ * tranché : « il doit être impossible qu'une table rentre en collision avec un
+ * canapé ».
+ *
+ * Je l'ai d'abord déconseillé, et je maintiens la réserve : déplacer un meuble
+ * que le scanner a placé, c'est MODIFIER LE RELEVÉ. On limite donc les dégâts à
+ * trois règles :
+ *
+ *   — on ne sépare que les chevauchements FRANCS : cinq centimètres de
+ *     pénétration au sol, et cinq en hauteur. En deçà, c'est l'imprécision
+ *     ordinaire d'un relevé à la caméra, et l'on n'y touche pas ;
+ *   — seul le PLUS PETIT des deux bouge : c'est celui dont la position est la
+ *     moins sûre, et le déplacer dérange le moins le dessin ;
+ *   — on ne pousse jamais plus que la pénétration, par le côté le plus court.
+ *
+ * Deux meubles à des étages différents — une télé sur un meuble bas — ne se
+ * gênent pas : ils partagent la place au sol, pas le volume.
+ */
+export function separerMeubles<
+  T extends { cx: number; cz: number; width: number; depth: number; yaw: number; y0: number; y1: number },
+>(objets: T[]): { index: number; dx: number; dz: number }[] {
+  const FRANC = 0.05;
+  const bouges = objets.map(() => ({ dx: 0, dz: 0 }));
+  const demi = (e: T, n: Pt) =>
+    Math.abs(Math.cos(e.yaw) * n.x + Math.sin(e.yaw) * n.z) * (e.width / 2) +
+    Math.abs(-Math.sin(e.yaw) * n.x + Math.cos(e.yaw) * n.z) * (e.depth / 2);
+  // Trois passes : séparer deux meubles peut en rapprocher un troisième.
+  for (let passe = 0; passe < 3; passe++) {
+    for (let i = 0; i < objets.length; i++) {
+      for (let j = i + 1; j < objets.length; j++) {
+        const a = { ...objets[i], cx: objets[i].cx + bouges[i].dx, cz: objets[i].cz + bouges[i].dz };
+        const b = { ...objets[j], cx: objets[j].cx + bouges[j].dx, cz: objets[j].cz + bouges[j].dz };
+        // À des étages différents, ils ne se gênent pas.
+        const haut = Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0);
+        if (haut <= FRANC) continue;
+        const axes: Pt[] = [];
+        for (const n of [
+          { x: Math.cos(a.yaw), z: Math.sin(a.yaw) },
+          { x: -Math.sin(a.yaw), z: Math.cos(a.yaw) },
+          { x: Math.cos(b.yaw), z: Math.sin(b.yaw) },
+          { x: -Math.sin(b.yaw), z: Math.cos(b.yaw) },
+        ]) {
+          if (axes.some((m) => Math.abs(m.x * n.x + m.z * n.z) > 0.999)) continue;
+          axes.push(n);
+        }
+        const jeux = axes.map((n) => {
+          const d = (a.cx - b.cx) * n.x + (a.cz - b.cz) * n.z;
+          return { n, d, jeu: Math.abs(d) - demi(a, n) - demi(b, n) };
+        });
+        // Un axe qui sépare suffit : ils ne se traversent pas.
+        if (jeux.some((x) => x.jeu > -FRANC)) continue;
+        // La sortie la plus courte.
+        let sortie = jeux[0];
+        for (const x of jeux) if (x.jeu > sortie.jeu) sortie = x;
+        const sens = sortie.d >= 0 ? 1 : -1;
+        const pousse = -sortie.jeu;
+        // Le plus petit cède : sa position est la moins sûre.
+        const petit = a.width * a.depth <= b.width * b.depth ? i : j;
+        const signe = petit === i ? sens : -sens;
+        bouges[petit].dx += sortie.n.x * signe * pousse;
+        bouges[petit].dz += sortie.n.z * signe * pousse;
+      }
+    }
+  }
+  return bouges
+    .map((b, index) => ({ index, dx: b.dx, dz: b.dz }))
+    .filter((b) => Math.hypot(b.dx, b.dz) > 1e-6);
+}
+
+/**
  * UN MEUBLE DE BIAIS QUI NE PASSE PAS SE REMET DROIT.
  *
  * Relevé du chantier, vidéo à l'appui : « le meuble, plus petit que

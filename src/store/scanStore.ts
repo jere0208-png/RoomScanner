@@ -21,6 +21,7 @@ import {
   alignToFit,
   fitInNook,
   pushOutOfObjects,
+  separerMeubles,
   hugWall,
   pushOutOfWalls,
   roomExtent,
@@ -249,6 +250,43 @@ export function floorsOf(
 }
 
 /** Scans enregistrés avant le multi-pièces : une seule pièce, implicite. */
+/**
+ * DÉSENCHÊTRE LE MOBILIER D'UN RELEVÉ.
+ *
+ * Appelé à l'ouverture d'un scan, une fois pour toutes : deux meubles que le
+ * scanner a fait se traverser sont écartés du strict nécessaire. Voir
+ * `separerMeubles` pour les trois garde-fous — chevauchement franc seulement,
+ * le plus petit cède, jamais plus que la pénétration.
+ *
+ * C'est une modification du relevé, demandée en connaissance de cause : sur le
+ * modèle, une table qui traverse un canapé coûte plus cher en crédibilité
+ * qu'un meuble déplacé de trois centimètres.
+ */
+function separerLeMobilier(objects: ObjectData[]): ObjectData[] {
+  if (objects.length < 2) return objects;
+  const bouges = separerMeubles(
+    objects.map((o) => ({
+      cx: o.transform[12],
+      cz: o.transform[14],
+      width: o.width,
+      depth: o.depth,
+      yaw: Math.atan2(o.transform[2], o.transform[0]),
+      y0: o.transform[13] - o.height / 2,
+      y1: o.transform[13] + o.height / 2,
+    })),
+  );
+  if (bouges.length === 0) return objects;
+  const suite = objects.map((o) => o);
+  for (const b of bouges) {
+    const o = suite[b.index];
+    const t = [...o.transform];
+    t[12] += b.dx;
+    t[14] += b.dz;
+    suite[b.index] = { ...o, transform: t };
+  }
+  return suite;
+}
+
 function migrateSave(s: SavedScan): SavedScan {
   const fixtures = Array.isArray(s.fixtures) ? s.fixtures : [];
   if (Array.isArray(s.rooms) && s.rooms.length > 0) {
@@ -1910,13 +1948,17 @@ export const useScanStore = create<ScanState>((set, get) => {
           : [{ outline: [], wallIds: walls.map((w) => w.id), area: 0 }];
 
       // Chaque meuble revient à la pièce qui le contient.
-      const objects: ObjectData[] = incomingObjects.map((o) => ({
-        ...o,
-        roomId: `room-${roomIndexAt(
-          { x: o.transform[12], z: o.transform[14] },
-          shapes.map((s) => s.outline),
-        ) + 1}`,
-      }));
+      // À la sortie du scan comme à l'ouverture d'un dossier : deux meubles que
+      // la caméra a fait se traverser sont écartés du strict nécessaire.
+      const objects: ObjectData[] = separerLeMobilier(
+        incomingObjects.map((o) => ({
+          ...o,
+          roomId: `room-${roomIndexAt(
+            { x: o.transform[12], z: o.transform[14] },
+            shapes.map((s) => s.outline),
+          ) + 1}`,
+        })),
+      );
 
       const kinds = shapes.map((_, i) => {
         const id = `room-${i + 1}`;
@@ -2500,7 +2542,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         rooms: save.rooms,
         walls: save.walls,
         openings: save.openings,
-        objects: save.objects,
+        objects: separerLeMobilier(save.objects),
         fixtures: save.fixtures ?? [],
         photos: save.photos ?? [],
         ceiling: save.ceiling ?? [],
