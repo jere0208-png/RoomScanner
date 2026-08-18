@@ -39,11 +39,13 @@ import {
   type Palette,
 } from '../theme';
 import {
+  castToWall,
   roomParts,
   segLength,
   type Pt,
   type WallSeg,
 } from '../geometry/floorplan';
+import type { P3, PovCamera } from '../geometry/scene3d';
 import { FIXTURES } from '../geometry/electrical';
 import { deviceNames, wallCardinal } from '../geometry/naming';
 import { fixturePlacement, roomInputsOf } from '../geometry/nfc15100';
@@ -79,6 +81,20 @@ interface Etape {
   mur?: boolean;
   /** Durée, en millisecondes. */
   duree: number;
+  /**
+   * L'ŒIL DANS LA PIÈCE — la visite à hauteur d'homme.
+   *
+   * Relevé du chantier : « comme dans un jeu vidéo où on se trouve dans
+   * l'appartement en POV, et on tourne autour en présentant chaque mur et
+   * les éléments électriques qui s'y trouvent ». Quand cette pose est
+   * présente, la vue passe en perspective : on se tient au point donné, on
+   * regarde dans l'azimut donné, et le balayage fait tourner la tête.
+   *
+   * L'azimut n'est pas ramené dans un tour : il CROÎT d'un mur au suivant,
+   * pour que la tête tourne toujours dans le même sens — un demi-tour
+   * arrière au milieu d'une visite donne le mal de mer.
+   */
+  pose?: { at: P3; yaw: number };
 }
 
 const lissage = (t: number) =>
@@ -189,59 +205,113 @@ export function ClientTour({
         sous: part.surface
           ? `${fr1(part.surface.area)} m² · ${murs.length} murs`
           : undefined,
-        detail: 'Au centre de la pièce — tour complet',
+        detail: 'On entre',
         roomId: room.id,
         vue: {
-          // On démarre face à un mur : un tour qui commence dans un angle
-          // ne montre d'abord que deux bouts de cloison.
+          // On démarre face au mur par lequel la visite POV commencera : le
+          // raccord se fait sans que la pièce pivote sous les yeux.
           theta: premier ? azimutFaceAuMur(premier, centre) : -32,
-          tilt: 17,
-          zoom: 2.1,
+          tilt: 22,
+          zoom: 1.9,
           ox: 0,
           oy: 0,
         },
-        // Et l'on avance encore pendant le tour : c'est ce mouvement-là qui
-        // fait entrer, plutôt que tourner autour.
-        zoomFin: 2.6,
-        balayage: 360,
-        duree: 9000,
+        // L'entrée est BRÈVE : elle sert à reconnaître la pièce, pas à la
+        // visiter — c'est le tour en POV qui la montre, juste après.
+        zoomFin: 2.4,
+        balayage: 60,
+        duree: 3600,
       });
 
-      // 3. Chaque mur ÉQUIPÉ, vu de face, avec ses appareils nommés.
-      for (const w of murs) {
+      /*
+        L'ŒIL SE POSE AU CENTRE, À 1,60 M DU SOL.
+
+        C'est la hauteur du regard d'un homme debout — celle à laquelle on
+        voit une pièce quand on y entre. Le sol, lui, est où ARKit l'a
+        trouvé : on le reprend au pied du mur le plus bas.
+      */
+      const solY = Math.min(...murs.map((w) => w.yCenter - w.height / 2));
+      /** L'azimut qui met ce mur en face : la même convention que la vue. */
+      const versLeMur = (w: WallSeg) =>
+        Math.atan2(
+          (w.a.x + w.b.x) / 2 - centre.x,
+          (w.a.z + w.b.z) / 2 - centre.z,
+        );
+      /**
+       * OÙ SE PLACER POUR MONTRER UN MUR.
+       *
+       * Au centre de la pièce, on est à un mètre cinquante des cloisons : un
+       * mur de 2,50 m déborde alors de l'écran de tous les côtés, et l'on ne
+       * voit plus qu'un pan blanc sans un angle pour se repérer. Un cadreur
+       * ferait ce que fait n'importe qui dans une pièce : il RECULE.
+       *
+       * On se place donc dos au mur d'en face, à la distance que la pièce
+       * permet — sans jamais coller à la cloison de derrière, ni s'éloigner
+       * au-delà de trois mètres et demi, où l'on ne distingue plus une prise.
+       */
+      const posteDe = (w: WallSeg): P3 => {
+        const mid = { x: (w.a.x + w.b.x) / 2, z: (w.a.z + w.b.z) / 2 };
+        const len = segLength(w) || 1;
+        const u = { x: (w.b.x - w.a.x) / len, z: (w.b.z - w.a.z) / len };
+        let n = { x: -u.z, z: u.x };
+        // La normale qui rentre dans la pièce.
+        if ((centre.x - mid.x) * n.x + (centre.z - mid.z) * n.z < 0) {
+          n = { x: -n.x, z: -n.z };
+        }
+        const depart = { x: mid.x + n.x * 0.1, z: mid.z + n.z * 0.1 };
+        const jusquAuFond = castToWall(depart, n, murs) ?? 3;
+        const recul = Math.max(1.2, Math.min(3.4, jusquAuFond * 0.8));
+        return {
+          x: mid.x + n.x * recul,
+          y: solY + 1.6,
+          z: mid.z + n.z * recul,
+        };
+      };
+      /*
+        ON TOURNE DANS UN SEUL SENS, MUR APRÈS MUR.
+
+        Les murs sont pris dans l'ordre où le regard les rencontre, et
+        l'azimut croît sans jamais revenir en arrière : la tête fait un tour
+        complet, comme on le ferait sur place. Un mur présenté en revenant
+        sur ses pas donnerait le mal de mer.
+      */
+      const tour = [...murs].sort((a, b) => versLeMur(a) - versLeMur(b));
+      let azimut = tour.length > 0 ? versLeMur(tour[0]) : 0;
+      let precedent = azimut;
+      for (const w of tour) {
+        const brut = versLeMur(w);
+        let d = brut - precedent;
+        while (d < 0) d += Math.PI * 2;
+        azimut += d;
+        precedent = brut;
         const dessus = fixtures.filter((f) => f.wallId === w.id);
-        if (dessus.length === 0) continue;
         const aire = wallCardinal(w, centre, north);
         out.push({
           titre: aire
             ? `Mur ${aire} · ${room.name || 'pièce'}`
             : `Mur de ${fr1(segLength(w))} m · ${room.name || 'pièce'}`,
-          sous: `${dessus.length} appareil${dessus.length > 1 ? 's' : ''}`,
-          detail: dessus
-            .map((f) => noms.get(f.id)?.nom ?? FIXTURES[f.kind].label)
-            .join(' · '),
+          sous:
+            dessus.length > 0
+              ? `${dessus.length} appareil${dessus.length > 1 ? 's' : ''}`
+              : `${fr1(segLength(w))} m · rien de posé`,
+          detail:
+            dessus.length > 0
+              ? dessus
+                  .map((f) => noms.get(f.id)?.nom ?? FIXTURES[f.kind].label)
+                  .join(' · ')
+              : undefined,
           roomId: room.id,
-          mur: true,
-          /**
-           * PRESQUE DE FACE, ET LENTEMENT.
-           *
-           * De face pile, un mur devient un rectangle plat : on ne voit
-           * plus ni son épaisseur ni la profondeur de la pièce, et
-           * l'image paraît figée. Quelques degrés de biais suffisent à
-           * garder le volume, et un balayage lent — dix degrés sur six
-           * secondes — fait vivre l'image sans qu'on ait à suivre.
-           */
-          vue: {
-            theta: azimutFaceAuMur(w, centre) - 5,
-            tilt: 26,
-            zoom: 1.55,
-            ox: 0,
-            oy: 0,
-          },
-          balayage: 10,
-          duree: 6200,
+          mur: dessus.length > 0,
+          pose: { at: posteDe(w), yaw: azimut },
+          vue: { theta: 0, tilt: 0, zoom: 1, ox: 0, oy: 0 },
+          // Un léger balancement : une image fixe paraît gélée, même en
+          // perspective.
+          balayage: 6,
+          duree: dessus.length > 0 ? 5200 : 3400,
         });
       }
+
+
     }
 
     // 4. Le mot de la fin : ce qu'il y a dans le devis, en trois chiffres.
@@ -271,6 +341,14 @@ export function ClientTour({
     oy: 0,
   });
   const [avance, setAvance] = useState(0);
+  /**
+   * La caméra posée dans la pièce, ou `null` quand on regarde la maquette.
+   *
+   * Elle s'interpole comme le reste : on ne saute pas d'un mur à l'autre, on
+   * TOURNE LA TÊTE — c'est ce mouvement qui fait comprendre au client où il
+   * se trouve, bien plus qu'un carton.
+   */
+  const [pov, setPov] = useState<PovCamera | null>(null);
   /**
    * ON PRÉPARE, PUIS ON JOUE.
    *
@@ -354,6 +432,8 @@ export function ClientTour({
 
   const etape = etapes[Math.min(index, etapes.length - 1)];
   const depart = useRef<View3DParams>(vue);
+  /** D'où la tête part, quand l'étape se joue à hauteur d'homme. */
+  const poseDepart = useRef<{ at: P3; yaw: number } | null>(null);
   const debut = useRef(0);
   const boucle = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -429,6 +509,34 @@ export function ClientTour({
         ox: 0,
         oy: 0,
       });
+      /*
+        LA TÊTE TOURNE, ELLE NE SAUTE PAS.
+
+        Entre deux murs, l'azimut se rejoint comme le reste de la caméra : en
+        douceur, sur le premier tiers de l'étape. Et l'on ne repasse pas en
+        maquette entre deux murs — le regard reste dans la pièce tant que la
+        visite y est.
+      */
+      if (etape.pose) {
+        const dep = poseDepart.current ?? etape.pose;
+        setPov({
+          at: {
+            x: dep.at.x + (etape.pose.at.x - dep.at.x) * arrivee,
+            y: dep.at.y + (etape.pose.at.y - dep.at.y) * arrivee,
+            z: dep.at.z + (etape.pose.at.z - dep.at.z) * arrivee,
+          },
+          yaw:
+            dep.yaw +
+            (etape.pose.yaw - dep.yaw) * arrivee +
+            (balaye * Math.PI) / 180,
+          pitch: 0,
+          // Une ouverture large : dans une pièce de trois mètres, un objectif
+          // étroit ne montrerait qu'un pan de mur.
+          fov: 68,
+        });
+      } else {
+        setPov(null);
+      }
       /**
        * LES COTES SE TRACENT, PUIS S'EFFACENT.
        *
@@ -454,6 +562,12 @@ export function ClientTour({
           theta: a.theta + etape.balayage,
           zoom: etape.zoomFin ?? a.zoom,
         };
+        if (etape.pose) {
+          poseDepart.current = {
+            at: etape.pose.at,
+            yaw: etape.pose.yaw + (etape.balayage * Math.PI) / 180,
+          };
+        }
         debut.current = 0;
         if (index + 1 < etapes.length) setIndex(index + 1);
         else setJoue(false);
@@ -482,6 +596,7 @@ export function ClientTour({
           gardent leur arête, donc la pièce garde sa forme.
         */}
         <Iso3DView
+          pov={pov}
           value={vue}
           showMeasures={false}
           showElecTags={!!etape.mur}

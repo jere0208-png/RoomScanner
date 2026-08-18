@@ -28,7 +28,11 @@ import {
   faceDepth,
   buildScene,
   ajusterBlocs,
+  coupeDevant,
   cutawayOpacity,
+  dosTourne,
+  povProjector,
+  type PovCamera,
   isHiddenFace,
   sceneFraming,
   shadeFill,
@@ -86,6 +90,15 @@ function pointInPoly(x: number, y: number, pts: { sx: number; sy: number }[]) {
 }
 
 interface Props {
+  /**
+   * L'ŒIL DANS LE LOGEMENT, au lieu de la maquette vue de loin.
+   *
+   * Quand cette caméra est fournie, la vue passe en PERSPECTIVE : on se tient
+   * dans la pièce, à hauteur d'homme, et l'on tourne sur soi-même. Les murs
+   * s'écartent, le plafond passe au-dessus. C'est la « visite » du chantier,
+   * et ça ne sert qu'à montrer — on ne mesure pas sur une fuyante.
+   */
+  pov?: PovCamera | null;
   /** Mode contrôlé (aperçu d'export) : état de caméra fourni par le parent. */
   value?: View3DParams;
   onChange?: (v: View3DParams) => void;
@@ -166,6 +179,7 @@ interface Props {
  * Un doigt : tourner/incliner. Deux doigts : pincer pour zoomer, déplacer.
  */
 export function Iso3DView({
+  pov,
   value,
   onChange,
   showMeasures,
@@ -566,7 +580,19 @@ export function Iso3DView({
     const sp = Math.sin(rad(view.tilt));
     const scale = ((Math.min(layout.w, layout.h) * 0.44) / radius3d) * view.zoom;
 
-    const project = (p: P3) => {
+    /*
+      DEUX PROJECTIONS, UN SEUL RESTE.
+
+      En perspective, l'œil est DANS la pièce : les fuyantes convergent, et
+      c'est la position de l'œil — non plus une direction unique — qui dit
+      quelles faces nous montrent leur dos. Tout le reste du rendu ne
+      s'aperçoit de rien : mêmes faces, même tri du plus lointain au plus
+      proche, mêmes couleurs.
+    */
+    const perspective = pov ? povProjector(pov, layout) : null;
+    const project = perspective
+      ? (p: P3) => perspective(p)
+      : (p: P3) => {
       const x = p.x - center.x;
       const y = p.y - center.y;
       const z = p.z - center.z;
@@ -588,19 +614,40 @@ export function Iso3DView({
     // voir au travers de la cloison mitoyenne.
     const rangs = roomRanks(scene.rooms, cam);
     const polys = faces
-      .filter((face) => !isHiddenFace(face, cam))
+      .filter((face) =>
+        pov ? !dosTourne(face, pov.at) && !face.isFloor : !isHiddenFace(face, cam),
+      )
       .map((face) => {
-      const proj = face.pts.map(project);
+      // De l'intérieur, une face peut être à cheval sur le plan de l'œil :
+      // on la taille avant de la projeter, sinon elle se retourne et barre
+      // l'écran.
+      const pts = pov && face.pts.length >= 3 ? coupeDevant(face.pts, pov) : face.pts;
+      const proj = pts.map(project);
       // Une arête se trie avec le pan qu'elle borde (`depthAt`), pas sur sa
       // propre position : sinon l'arête basse d'un mur passe avant lui et le
       // pan la repeint — c'est ce qui effaçait le silhouettage.
       // Le rang de la pièce entre dans le tri : deux pièces ne se
       // traversent pas, et leurs contenus se peignent l'un après l'autre.
-      const depth = faceDepth(face, project, cam, rangs);
+      const depth = pov
+        ? // En perspective, la profondeur est la distance à l'œil : ni rang
+          // de pièce ni couche — on est dedans, il n'y a plus de « dehors ».
+          proj.reduce((t, q) => t + q.depth, 0) / Math.max(1, proj.length)
+        : faceDepth(face, project, cam, rangs);
 
       // Lumière liée à la caméra : les pans face à nous sont clairs, ceux de
       // profil s'assombrissent — le volume se lit immédiatement.
-      const fill = shadeFill(face, ct, st) ?? 'none';
+      /*
+        LA LUMIÈRE SUIT LE REGARD, même quand l'œil est dans la pièce.
+
+        L'ombrage se calcule par rapport à l'axe de la vue. En perspective,
+        cet axe n'est plus celui de la maquette mais celui de la tête : sans
+        ça, tous les murs reçoivent la même teinte et l'on se retrouve devant
+        un aplat blanc, sans un angle pour dire où s'arrête la pièce.
+      */
+      const fill =
+        (pov
+          ? shadeFill(face, Math.cos(pov.yaw), Math.sin(pov.yaw))
+          : shadeFill(face, ct, st)) ?? 'none';
       // Écorché : un mur qui nous fait face s'efface pour laisser voir la
       // pièce. Il garde son arête, donc sa présence.
       const voile =
@@ -997,6 +1044,7 @@ export function Iso3DView({
     solidWalls,
     walls,
     interacting,
+    pov,
   ]);
 
   // Tap sur un mur : oriente la caméra face au mur, zoome pour le voir entier.

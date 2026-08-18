@@ -247,6 +247,74 @@ describe('le rideau de préparation', () => {
   });
 
   /**
+   * ELLE SE TIENT DANS LA PIÈCE, ET TOURNE LA TÊTE.
+   *
+   * Relevé du chantier : « une animation plus poussée, comme dans un jeu
+   * vidéo où on se trouve dans l'appartement en POV, et on tourne autour en
+   * présentant chaque mur et les éléments électriques qui s'y trouvent ».
+   *
+   * Ce n'est plus un cadrage : c'est une CAMÉRA, posée à hauteur d'homme au
+   * centre de la pièce, avec une ouverture d'objectif. On vérifie qu'elle
+   * existe, qu'elle est bien à l'intérieur, et qu'elle tourne dans un seul
+   * sens — un demi-tour arrière au milieu d'une visite donne le mal de mer.
+   */
+  it('se tient à hauteur d’homme et tourne dans un seul sens', () => {
+    let tree!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      useScanStore.setState({
+        screen: 'result',
+        scanName: 'Chantier test',
+        walls: SNAPSHOT_WALLS,
+        openings: SNAPSHOT_OPENINGS,
+        objects: SNAPSHOT_OBJECTS,
+        rooms: SNAPSHOT_ROOMS.map((r, i) => ({
+          id: r.id,
+          name: `Pièce ${i + 1}`,
+          floor: null,
+        })),
+        fixtures: SNAPSHOT_FIXTURES,
+        ceiling: [],
+      });
+      tree = TestRenderer.create(<ClientTour visible onClose={() => {}} />);
+    });
+    arbre = tree;
+    act(() => {
+      jest.advanceTimersByTime(600);
+    });
+    const vue3d = () => tree.root.findByType(Iso3DView).props;
+    const azimuts: number[] = [];
+    let hauteurs: number[] = [];
+    let ouverture = 0;
+    for (let i = 0; i < 80; i++) {
+      act(() => {
+        jest.advanceTimersByTime(500);
+      });
+      const p = vue3d().pov;
+      if (!p) continue;
+      azimuts.push(p.yaw);
+      hauteurs.push(p.at.y);
+      ouverture = p.fov;
+    }
+    // La visite passe bien en perspective.
+    expect(azimuts.length).toBeGreaterThan(4);
+    // L'œil est à hauteur d'homme, au-dessus du sol et sous le plafond.
+    for (const y of hauteurs) {
+      expect(y).toBeGreaterThan(1.3);
+      expect(y).toBeLessThan(2);
+    }
+    // Une ouverture large : dans trois mètres, un objectif étroit ne
+    // montrerait qu'un pan de mur.
+    expect(ouverture).toBeGreaterThan(50);
+    // Et la tête tourne toujours du même côté : jamais de retour en arrière
+    // supérieur au léger balancement d'une étape.
+    let reculs = 0;
+    for (let i = 1; i < azimuts.length; i++) {
+      if (azimuts[i] < azimuts[i - 1] - 0.2) reculs++;
+    }
+    expect(`${reculs} demi-tour(s)`).toBe('0 demi-tour(s)');
+  });
+
+  /**
    * ELLE ENTRE DANS LES PIÈCES.
    *
    * Relevé du chantier : « d'abord un tour d'ensemble du modèle, puis rentrer

@@ -675,6 +675,142 @@ function profondeurAu(
   return null;
 }
 
+/**
+ * LA CAMÉRA POSÉE DANS LE LOGEMENT — la vue à hauteur d'homme.
+ *
+ * Tout le reste de ce fichier travaille en projection ORTHOGRAPHIQUE : les
+ * fuyantes restent parallèles, un mur du fond garde la taille d'un mur de
+ * devant. C'est ce qu'il faut pour un plan — on y mesure — et c'est
+ * exactement ce qu'il ne faut pas pour montrer une pièce à un client : dans
+ * une maquette vue de loin, personne ne se projette.
+ *
+ * Cette projection-ci met l'œil DANS la pièce, à 1,60 m du sol, avec une
+ * ouverture d'objectif : les murs s'écartent, le plafond passe au-dessus, et
+ * l'on tourne sur soi-même comme dans un jeu. Rien d'autre ne change : les
+ * mêmes faces, le même tri du plus lointain au plus proche, les mêmes
+ * couleurs.
+ *
+ * `yaw` est l'azimut du regard (0 = vers les z croissants), `pitch` son
+ * inclinaison (positif vers le haut), `fov` l'ouverture verticale en degrés.
+ */
+export interface PovCamera {
+  at: P3;
+  yaw: number;
+  pitch: number;
+  fov: number;
+}
+
+/** Distance minimale devant l'œil : en deçà, on coupe. */
+const PRES = 0.05;
+
+/**
+ * Le repère de l'œil : avant, droite, haut. C'est la seule trigonométrie de
+ * l'affaire, et elle se calcule une fois par image.
+ */
+export function povBase(cam: PovCamera) {
+  const cy = Math.cos(cam.yaw);
+  const sy = Math.sin(cam.yaw);
+  const cp = Math.cos(cam.pitch);
+  const sp = Math.sin(cam.pitch);
+  return {
+    avant: { x: sy * cp, y: sp, z: cy * cp },
+    droite: { x: cy, y: 0, z: -sy },
+    haut: { x: -sy * sp, y: cp, z: -cy * sp },
+  };
+}
+
+/**
+ * Projette un point du monde à l'écran, vu de cette caméra.
+ *
+ * `depth` suit la même convention que la vue orthographique : il CROÎT quand
+ * on se rapproche de l'œil, pour que le tri du plus lointain au plus proche
+ * ne change pas d'un mode à l'autre.
+ */
+export function povProjector(
+  cam: PovCamera,
+  layout: { w: number; h: number },
+): (p: P3) => { sx: number; sy: number; depth: number; devant: number } {
+  const b = povBase(cam);
+  // Focale : la moitié de la hauteur de l'écran divisée par la tangente du
+  // demi-angle. C'est la définition même de l'ouverture.
+  const f = layout.h / 2 / Math.tan(((cam.fov / 2) * Math.PI) / 180);
+  return (p: P3) => {
+    const dx = p.x - cam.at.x;
+    const dy = p.y - cam.at.y;
+    const dz = p.z - cam.at.z;
+    const devant = dx * b.avant.x + dy * b.avant.y + dz * b.avant.z;
+    const droite = dx * b.droite.x + dy * b.droite.y + dz * b.droite.z;
+    const haut = dx * b.haut.x + dy * b.haut.y + dz * b.haut.z;
+    const q = Math.max(PRES, devant);
+    return {
+      sx: layout.w / 2 + (droite / q) * f,
+      sy: layout.h / 2 - (haut / q) * f,
+      depth: -devant,
+      devant,
+    };
+  };
+}
+
+/**
+ * COUPE AU RAS DE L'ŒIL.
+ *
+ * Une face traversée par le plan de l'œil — le sol sous nos pieds, le mur
+ * qu'on frôle — a des sommets devant ET derrière. Les projeter tous
+ * donnerait un polygone retourné, qui barre l'écran. On découpe donc la
+ * face contre ce plan, comme on taillerait une planche : les sommets de
+ * devant sont gardés, et l'on ajoute le point de passage sur chaque arête
+ * qui traverse.
+ */
+export function coupeDevant(pts: P3[], cam: PovCamera): P3[] {
+  const b = povBase(cam);
+  const devant = (p: P3) =>
+    (p.x - cam.at.x) * b.avant.x +
+    (p.y - cam.at.y) * b.avant.y +
+    (p.z - cam.at.z) * b.avant.z;
+  const sortie: P3[] = [];
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i];
+    const c = pts[(i + 1) % pts.length];
+    const da = devant(a) - PRES;
+    const dc = devant(c) - PRES;
+    if (da >= 0) sortie.push(a);
+    if (da >= 0 !== dc >= 0) {
+      const t = da / (da - dc);
+      sortie.push({
+        x: a.x + (c.x - a.x) * t,
+        y: a.y + (c.y - a.y) * t,
+        z: a.z + (c.z - a.z) * t,
+      });
+    }
+  }
+  return sortie;
+}
+
+/**
+ * La face tourne-t-elle le dos à CE POINT DE VUE ?
+ *
+ * En orthographique, une seule direction de regard suffit pour toute la
+ * scène. De l'intérieur d'une pièce, non : le mur de gauche et celui de
+ * droite se regardent, et c'est la position de l'œil qui dit lequel des deux
+ * nous montre sa face.
+ */
+export function dosTourne(face: Face3D, oeil: P3): boolean {
+  const n = face.normal;
+  if (!n) return false;
+  let cx = 0;
+  let cy = 0;
+  let cz = 0;
+  for (const p of face.pts) {
+    cx += p.x;
+    cy += p.y;
+    cz += p.z;
+  }
+  const k = face.pts.length || 1;
+  const vers =
+    (cx / k - oeil.x) * n.x + (cy / k - oeil.y) * n.y + (cz / k - oeil.z) * n.z;
+  return vers >= 0;
+}
+
 export function roomRanks(rooms: SceneRoom[], cam: CameraTrig): Map<string, number> {
   const cle = (r: SceneRoom) =>
     (r.centroid.x * cam.st + r.centroid.z * cam.ct) * cam.sp;
