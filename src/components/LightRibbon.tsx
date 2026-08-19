@@ -15,10 +15,11 @@
  * transformation, confiée au pilote natif. Le motif se répète exactement
  * d'une période à l'autre, donc la boucle ne se voit pas.
  *
- * LA FRANGE EST SERRÉE. Sur l'original elle s'étale sur plusieurs pixels,
- * ce qui donne un arc-en-ciel ; à la taille d'un téléphone, cela devient une
- * bavure. Un point et demi de décalage suffit à dire « lumière décomposée »
- * sans que les couleurs se séparent vraiment.
+ * LA FRANGE S'ÉCARTE COMME DANS LE SHADER D'ORIGINE. Elle avait été serrée
+ * à un point et demi ; le relevé du chantier a tranché dans l'autre sens —
+ * sur l'original, la dispersion s'étale sur plusieurs pixels et c'est elle
+ * qui fait le prisme. Trois points et demi de part et d'autre : les couleurs
+ * se lisent, sans que le ruban se détache en trois fils.
  */
 import React, { useEffect, useMemo, useRef } from 'react';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
@@ -72,10 +73,14 @@ export function LightRibbon({
   width,
   palette,
   sombre,
+  /** Hauteur de la bande — l'accueil garde la sienne, un bouton en veut
+   *  une plus basse pour que l'onde le frôle au lieu de le déborder. */
+  height = RIBBON_H,
 }: {
   width: number;
   palette: Palette;
   sombre: boolean;
+  height?: number;
 }) {
   const glisse = useRef(new Animated.Value(0)).current;
   // Une seule longueur d'onde de course : au bout, le motif est identique à
@@ -95,7 +100,7 @@ export function LightRibbon({
     return () => boucle.stop();
   }, [glisse]);
 
-  const d = useMemo(() => onde(periode * 2, RIBBON_H), [periode]);
+  const d = useMemo(() => onde(periode * 2, height), [periode, height]);
 
   /*
     LE CŒUR CHANGE AVEC LE THÈME, PAS LA FRANGE.
@@ -108,7 +113,7 @@ export function LightRibbon({
   const opacite = sombre ? 0.5 : 0.28;
 
   return (
-    <View style={[styles.bande, { height: RIBBON_H, width }]} pointerEvents="none">
+    <View style={[styles.bande, { height, width }]} pointerEvents="none">
       {/*
         C'EST LA VUE QUI GLISSE, PAS L'ATTRIBUT.
 
@@ -134,20 +139,21 @@ export function LightRibbon({
             },
           ],
         }}>
-        <Svg width={periode * 2} height={RIBBON_H}>
+        <Svg width={periode * 2} height={height}>
         <G>
           {/* La lueur : deux passes larges et très pâles. Sans elles, le
               ruban est un fil ; avec, c'est une lumière. */}
           <Path d={d} stroke={coeur} strokeWidth={9} fill="none" opacity={opacite * 0.16} />
           <Path d={d} stroke={coeur} strokeWidth={5} fill="none" opacity={opacite * 0.3} />
-          {/* La frange : un point et demi de part et d'autre, pas plus. */}
+          {/* La frange : trois points et demi de part et d'autre — l'étalement
+              du shader d'origine, celui qui fait le prisme. */}
           <Path
             d={d}
             stroke={palette.sky}
             strokeWidth={2}
             fill="none"
             opacity={opacite * 0.6}
-            translateY={-1.5}
+            translateY={-3.5}
           />
           <Path
             d={d}
@@ -155,7 +161,7 @@ export function LightRibbon({
             strokeWidth={2}
             fill="none"
             opacity={opacite * 0.6}
-            translateY={1.5}
+            translateY={3.5}
           />
           {/* Le cœur, par-dessus : c'est lui qu'on suit des yeux. */}
           <Path d={d} stroke={coeur} strokeWidth={1.8} fill="none" opacity={Math.min(1, opacite * 1.7)} />

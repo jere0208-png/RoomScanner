@@ -403,7 +403,9 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     flex: 1,
     backgroundColor: c.bg,
     paddingHorizontal: 24,
-    paddingTop: 84,
+    // 72 et non 84 : la rangée du compte a pris sa part en bas, le haut
+    // rend la sienne pour que la maquette respire entre les deux.
+    paddingTop: 72,
     paddingBottom: 40,
   },
   // zIndex/elevation : l'onde d'arrivée pulse AU-DESSUS des cartes suivantes.

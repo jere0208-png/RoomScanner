@@ -64,20 +64,24 @@ describe('le ruban de l’accueil', () => {
   });
 
   /*
-    LA FRANGE EST SERRÉE.
+    LA FRANGE S'ÉCARTE, comme dans le shader d'origine.
 
-    Sur l'original elle s'étale sur plusieurs pixels, ce qui donne un
-    arc-en-ciel ; à la taille d'un téléphone, cela devient une bavure. Un
-    point et demi de part et d'autre suffit à dire « lumière décomposée »
-    sans que les couleurs se séparent vraiment.
+    Elle avait été serrée à un point et demi ; le relevé du chantier a
+    tranché dans l'autre sens — « écarte les couleurs, reprends le code de
+    base » : sur l'original, la dispersion s'étale sur plusieurs pixels et
+    c'est elle qui fait le prisme. Trois points et demi de part et d'autre :
+    les couleurs se voient, sans se détacher en trois fils.
   */
-  it('serre sa frange à un point et demi', () => {
+  it('écarte sa frange comme le shader d’origine', () => {
     const tree = rendre();
     const ecarts = traces(tree)
       .map((n) => n.props.translateY)
       .filter((v) => typeof v === 'number') as number[];
     expect(ecarts.length).toBe(2);
-    for (const e of ecarts) expect(Math.abs(e)).toBeLessThanOrEqual(2);
+    for (const e of ecarts) {
+      expect(Math.abs(e)).toBeGreaterThanOrEqual(3);
+      expect(Math.abs(e)).toBeLessThanOrEqual(5);
+    }
     // Et de part et d'autre : une frange d'un seul côté serait un défaut
     // d'impression, pas une dispersion.
     expect(Math.sign(ecarts[0])).toBe(-Math.sign(ecarts[1]));

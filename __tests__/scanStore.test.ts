@@ -812,3 +812,35 @@ describe('meubles posés à la main', () => {
     expect(Math.abs(Math.atan2(fin.transform[2], fin.transform[0]))).toBeCloseTo(0, 6);
   });
 });
+
+/**
+ * LE BROUILLON MEURT AVEC L'ENREGISTREMENT DE FIN DE SCAN.
+ *
+ * Relevé du chantier : la carte « Relevé interrompu » restait sur l'accueil
+ * alors que le scan était DANS la bibliothèque — la fin de scan enregistre
+ * toute seule, mais laissait le filet en place. Reprendre un relevé déjà
+ * rangé n'a pas de sens.
+ */
+describe('le brouillon et la fin de scan', () => {
+  beforeEach(reset);
+
+  it('s’efface à la sauvegarde automatique de fin de scan', () => {
+    useScanStore.setState({
+      brouillon: {
+        at: Date.now(),
+        name: 'Visite',
+        walls: [],
+        openings: [],
+        objects: [],
+        rooms: [],
+        fixtures: [],
+      } as never,
+    });
+    useScanStore.getState().finalize({
+      modelPath: '/tmp/scan.usdz',
+      surfaces: boxSurfaces('a', 0, 0, 4, 3),
+      objects: [],
+    });
+    expect(useScanStore.getState().brouillon).toBeNull();
+  });
+});

@@ -2380,7 +2380,16 @@ export const useScanStore = create<ScanState>((set, get) => {
         processing: false,
         scanning: false,
         screen: 'result',
+        /*
+          LE BROUILLON MEURT AVEC L'ENREGISTREMENT — relevé du chantier :
+          « le message de reprise est inutile, on le retrouve dans mes
+          scans ». Le filet ne protège que ce qui n'est PAS en bibliothèque ;
+          un scan terminé y est. Laisser la carte, c'était proposer de
+          reprendre un relevé déjà rangé.
+        */
+        brouillon: null,
       });
+      AsyncStorage.removeItem(DRAFT_KEY).catch(() => {});
       clearHistory();
       persistSoon(saves);
     },

@@ -19,17 +19,20 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { LogoMark } from '../components/LogoMark';
+import { LightRibbon } from '../components/LightRibbon';
 import { useAccountStore } from '../store/accountStore';
-import { useTheme, type Palette } from '../theme';
+import { dark, useTheme, type Palette } from '../theme';
 
 export function SignInScreen() {
   const c = useTheme();
   const s = themed(c);
-  const insets = useSafeAreaInsets();
+  const { width: largeur } = useWindowDimensions();
+  const sombre = c === dark;
   const connecter = useAccountStore((st) => st.connecter);
   const connecterApple = useAccountStore((st) => st.connecterApple);
   const [parEmail, setParEmail] = useState(false);
@@ -68,10 +71,21 @@ export function SignInScreen() {
     if (!r.ok) refuse(r.raison);
   };
 
+  /** L'onde derrière un bouton : le même ruban que l'accueil, en plus bas,
+   *  posé en absolu pour ne rien pousser — le bouton flotte dessus. */
+  const ruban = (
+    <View style={s.ruban} pointerEvents="none">
+      <LightRibbon width={largeur} palette={c} sombre={sombre} height={56} />
+    </View>
+  );
+
   return (
-    <KeyboardAvoidingView
-      style={[s.fond, { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    // La zone sûre par le composant, pas à la main : le premier jet posait
+    // les mentions SOUS l'indicateur d'accueil de l'iPhone.
+    <SafeAreaView style={s.fond} edges={['top', 'bottom']}>
+      <KeyboardAvoidingView
+        style={s.colonne}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={s.haut}>
         <LogoMark size={92} />
         <Text style={s.titre}>EchoPlan</Text>
@@ -82,29 +96,38 @@ export function SignInScreen() {
       </View>
 
       <View style={s.boutons}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Continuer avec Apple"
-          style={({ pressed }) => [s.btn, s.btnApple, pressed && s.enfonce]}
-          onPress={viaApple}>
-          <Text style={s.btnAppleTexte}> Continuer avec Apple</Text>
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Continuer avec Google"
-          style={({ pressed }) => [s.btn, s.btnClair, pressed && s.enfonce]}
-          onPress={viaGoogle}>
-          <Text style={s.btnClairTexte}>Continuer avec Google</Text>
-        </Pressable>
-
-        {!parEmail ? (
+        <View style={s.slot}>
+          {ruban}
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Continuer avec un e-mail"
-            style={({ pressed }) => [s.btn, s.btnClair, pressed && s.enfonce]}
-            onPress={() => setParEmail(true)}>
-            <Text style={s.btnClairTexte}>Continuer avec un e-mail</Text>
+            accessibilityLabel="Continuer avec Apple"
+            style={({ pressed }) => [s.btn, s.btnApple, pressed && s.enfonce]}
+            onPress={viaApple}>
+            <Text style={s.btnAppleTexte}> Continuer avec Apple</Text>
           </Pressable>
+        </View>
+        <View style={s.slot}>
+          {ruban}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Continuer avec Google"
+            style={({ pressed }) => [s.btn, s.btnClair, pressed && s.enfonce]}
+            onPress={viaGoogle}>
+            <Text style={s.btnClairTexte}>Continuer avec Google</Text>
+          </Pressable>
+        </View>
+
+        {!parEmail ? (
+          <View style={s.slot}>
+            {ruban}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Continuer avec un e-mail"
+              style={({ pressed }) => [s.btn, s.btnClair, pressed && s.enfonce]}
+              onPress={() => setParEmail(true)}>
+              <Text style={s.btnClairTexte}>Continuer avec un e-mail</Text>
+            </Pressable>
+          </View>
         ) : (
           <View style={s.formulaire}>
             <TextInput
@@ -140,19 +163,31 @@ export function SignInScreen() {
         Un seul compte par téléphone. Le plan gratuit permet un relevé ; le
         Pro les rend illimités.
       </Text>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const themed = (c: Palette) =>
   StyleSheet.create({
-    fond: {
+    fond: { flex: 1, backgroundColor: c.bg },
+    colonne: {
       flex: 1,
-      backgroundColor: c.bg,
       paddingHorizontal: 28,
+      paddingTop: 24,
+      paddingBottom: 12,
       justifyContent: 'space-between',
     },
     haut: { alignItems: 'center', marginTop: 36 },
+    /* Chaque bouton flotte sur son onde : la bande, posée en absolu et
+       débordant des marges, ne pousse rien et ne reçoit pas le doigt. */
+    slot: { justifyContent: 'center' },
+    ruban: {
+      position: 'absolute',
+      left: -28,
+      right: -28,
+      alignItems: 'center',
+    },
     titre: { color: c.ink, fontSize: 30, fontWeight: '800', marginTop: 18 },
     sousTitre: {
       color: c.inkSoft,

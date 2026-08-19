@@ -29,7 +29,12 @@ import { SHOWCASE_IMAGES } from '../assets/showcase';
 import { useTheme, type Palette } from '../theme';
 
 /** L'écran du téléphone, en points. Les images font le double, en pixels. */
-const ECRAN = { w: 132, h: 268 };
+/*
+  La maquette a MAIGRI quand l'accueil a gagné la rangée du compte : à
+  132 × 268, le boîtier montait recouvrir le sous-titre. L'écran reste au
+  même ratio, les images cuites se réduisent proprement.
+*/
+const ECRAN = { w: 118, h: 240 };
 const BOITIER = { w: ECRAN.w + 14, h: ECRAN.h + 14 };
 /** Quinze images par seconde : le cycle complet dure trois secondes. */
 const PERIODE = 68;
