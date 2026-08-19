@@ -182,7 +182,7 @@ export function Toolbar2D({
     ? [
         <ToolPill
           key="plus"
-          icon="plus"
+          icon="appareil"
           label="Appareil"
           active={!!pendingKind}
           onPress={onFixture}
@@ -440,7 +440,7 @@ export function Toolbar3D({
     fixtures.length > 0 ? (
       <ToolPill
         key="reperes"
-        icon="plus"
+        icon="reperes"
         label="Repères"
         active={showElecTags}
         onPress={() => setShowElecTags((v) => !v)}

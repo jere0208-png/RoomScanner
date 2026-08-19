@@ -36,23 +36,67 @@ import Svg, { Path } from 'react-native-svg';
 import { radius, shadowCard, themedStyles, useTheme, type Palette } from '../theme';
 
 /** Tracés des icônes de choix, en 24×24. */
+/**
+ * LES ICÔNES DES CHOIX, EN 24 × 24.
+ *
+ * Même main que les pastilles d'outils : bouts ronds, trait épais, et un
+ * symbole qui dit sa fonction sans qu'on lise le mot à côté. Elles sont
+ * plus petites qu'une pastille — vingt points — donc encore moins
+ * pardonnantes sur le détail : ce qui ne se lit pas en vingt points n'a rien
+ * à faire ici.
+ */
 const ICONS: Record<string, string[]> = {
+  // Le crayon sur une fiche : renommer, c'est réécrire l'étiquette.
   renommer: [
-    'M11 4 H6 a2 2 0 0 0 -2 2 v12 a2 2 0 0 0 2 2 h12 a2 2 0 0 0 2 -2 v-5',
-    'M18.3 2.7 l3 3 L11.2 15.8 l-4.1 1.1 1.1 -4.1 z',
+    'M11 4 H5.5 A1.5 1.5 0 0 0 4 5.5 v13 A1.5 1.5 0 0 0 5.5 20 h13 A1.5 1.5 0 0 0 20 18.5 V13',
+    'M18.4 2.6 l3 3 L11 16 l-4.2 1.2 1.2 -4.2 z',
   ],
-  supprimer: ['M5 7 h14', 'M9.5 7 V4.5 h5 V7', 'M6.5 7 l1 13 h9 l1 -13'],
-  fusionner: ['M4 8 h7 a4 4 0 0 1 4 4 h5', 'M4 16 h7', 'M16.5 8.5 L20 12 l-3.5 3.5'],
-  scinder: ['M12 3 v18', 'M4 8 h4', 'M16 8 h4', 'M4 16 h4', 'M16 16 h4'],
-  hauteur: ['M12 4 v16', 'M8.5 7.5 L12 4 l3.5 3.5', 'M8.5 16.5 L12 20 l3.5 -3.5'],
+  // La corbeille, couvercle compris.
+  supprimer: [
+    'M4 6.5 h16',
+    'M9.5 6.5 V3.8 h5 v2.7',
+    'M6 6.5 l1.1 13.7 h9.8 L18 6.5',
+    'M10 10.5 v6',
+    'M14 10.5 v6',
+  ],
+  // Deux traits qui se rejoignent en un : la fusion.
+  fusionner: [
+    'M3 7 h6 a5 5 0 0 1 5 5 h7',
+    'M3 17 h6 a5 5 0 0 0 5 -5',
+    'M17.5 8 L21.5 12 l-4 4',
+  ],
+  // Une cloison posée en travers, et ce qu'elle sépare.
+  scinder: [
+    'M12 2.5 v19',
+    'M3 6.5 h5',
+    'M3 17.5 h5',
+    'M16 6.5 h5',
+    'M16 17.5 h5',
+  ],
+  // La cote verticale : une hauteur se mesure du sol au plafond.
+  hauteur: [
+    'M12 3.5 v17',
+    'M8 7.5 L12 3.5 l4 4',
+    'M8 16.5 L12 20.5 l4 -4',
+    'M4.5 3.5 h4',
+    'M4.5 20.5 h4',
+  ],
+  // Le double-décimètre, comme dans la barre d'outils.
   regle: [
-    'M3.5 9 h17 a1.5 1.5 0 0 1 1.5 1.5 v3 a1.5 1.5 0 0 1 -1.5 1.5 h-17 a1.5 1.5 0 0 1 -1.5 -1.5 v-3 a1.5 1.5 0 0 1 1.5 -1.5 z',
-    'M7.5 9 v3',
-    'M11.5 9 v3',
-    'M15.5 9 v3',
+    'M2.5 9 h19 a1.6 1.6 0 0 1 1.6 1.6 v2.8 a1.6 1.6 0 0 1 -1.6 1.6 h-19 a1.6 1.6 0 0 1 -1.6 -1.6 v-2.8 a1.6 1.6 0 0 1 1.6 -1.6 z',
+    'M7 9 v3.4',
+    'M12 9 v4.4',
+    'M17 9 v3.4',
   ],
-  sortir: ['M14 4 h5 v16 h-5', 'M4 12 h10', 'M10.5 8.5 L14 12 l-3.5 3.5'],
-  piece: ['M4 5 h16 v14 h-16 z', 'M4 12 h6 v7'],
+  // Sortir : la flèche qui franchit la porte.
+  sortir: ['M13 3.5 h6.5 v17 H13', 'M3 12 h9', 'M8.5 8 L12.5 12 l-4 4'],
+  // Une pièce : son contour et sa porte, comme sur le plan.
+  piece: [
+    'M3.5 3.5 h17 v17 H14',
+    'M3.5 20.5 H8',
+    'M8 20.5 a6 6 0 0 0 6 -6',
+    'M8 20.5 v-5',
+  ],
 };
 
 export interface SheetAction {
@@ -311,7 +355,7 @@ export function ActionSheet({
                       key={d}
                       d={d}
                       stroke={a.danger ? c.danger : c.ink}
-                      strokeWidth={1.9}
+                      strokeWidth={2.2}
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       fill="none"

@@ -499,6 +499,37 @@ d'ordre des octets** (sans elle, « Séjour » s'écrit « SÃ©jour »). Un nom
 pièce contenant un point-virgule est échappé : une seule cellule non protégée
 décale toute la grille à partir de là, sans que rien ne le signale.
 
+### Les icônes disent ce qu'elles font
+
+Le jeu entier a été redessiné — vingt icônes d'outils, huit de feuilles —
+selon trois règles.
+
+**Un symbole dit sa fonction.** « Repères » était un `+`. « Appareil » aussi :
+deux boutons sans rapport, le même dessin, et aucun des deux ne disait ce
+qu'il faisait. Une icône qu'il faut légender n'est pas une icône, c'est une
+puce. « Repères » est maintenant une **mire de calage** — le cercle et sa
+croix qui déborde, ce qu'on peint sur un mur avant de mesurer ; « Appareil »
+une **prise 2P+T**, que n'importe quel électricien reconnaît à ses deux
+alvéoles et sa broche de terre. Une « pièce » n'est plus un carré à encoches
+mais un contour avec **sa porte et son arc de débattement** : c'est ainsi que
+tout le métier la dessine.
+
+**Gras.** Les traits filaires disparaissent sur une pastille de 18 points, vue
+à bout de bras, sur un chantier, avec les mains sales. Le jeu passe à 2,4
+d'épaisseur, et ce qui peut être rempli l'est — une silhouette porte plus loin
+qu'un contour.
+
+**Même main.** Bouts ronds, angles ronds, même marge au bord de la boîte. Un
+jeu d'icônes se reconnaît à sa main, pas à ses sujets ; les deux jeux — celui
+des pastilles et celui des feuilles — partagent désormais la leur, et le
+double-décimètre y est le même dessin.
+
+Elles restent des **tracés vectoriels**, pas des images : c'est ce qui leur
+permet de prendre la couleur du thème, de rester nettes à toute densité et de
+ne rien peser dans le paquet. Une icône bitmap perdrait les trois — et
+rouvrirait le défaut que la croix, le chevron et le soleil viennent de
+refermer.
+
 ### Le bord de l'icône
 
 Une icône claire n'a pas de contour : elle se termine là où le système la
