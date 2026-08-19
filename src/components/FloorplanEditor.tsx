@@ -54,6 +54,7 @@ import { frCategory, furnKind, furnitureStrokes } from '../geometry/furniture';
 import { markColor } from '../geometry/schema';
 import { CeilingLayer } from './CeilingLayer';
 import { FixtureLayer } from './FixtureLayer';
+import type { Fixture } from '../geometry/electrical';
 import type { CeilingFixture } from '../geometry/ceiling';
 import { CloseCross } from './CloseCross';
 import { CardinalRing, NorthBadge } from './CardinalRing';
@@ -66,6 +67,15 @@ import { CardinalRing, NorthBadge } from './CardinalRing';
  * dessous, en tout petit et en faible opacité — il est là pour la première
  * fois qu'on hésite, pas pour les cent suivantes.
  */
+/**
+ * La liste vide des appareils, partagée.
+ *
+ * Écrire `[]` à la volée en produirait une NEUVE à chaque rendu, ce qui
+ * réveillerait les mémoïsations de la couche qu'on cherche justement à
+ * alléger en la cachant.
+ */
+const VIDE: Fixture[] = [];
+
 const WALL_ACTIONS: {
   action: 'longueur' | 'ouverture' | 'electricite' | 'supprimer';
   label: string | null;
@@ -222,6 +232,14 @@ interface Props {
    * bord prennent la place des cotes qu'on est venu lire.
    */
   showNorth?: boolean;
+  /**
+   * L'appareillage électrique, affiché ou non.
+   *
+   * C'est le sujet de l'application, donc il est là par défaut. Mais sur un
+   * logement équipé, ses symboles couvrent la maçonnerie qu'on est venu
+   * regarder : il faut pouvoir voir le plan nu sans rien supprimer.
+   */
+  showFixtures?: boolean;
   /** `null` = plus rien de sélectionné au plafond (appui dans le vide). */
   onSelectCeiling?: (id: string | null) => void;
   /**
@@ -291,6 +309,7 @@ export function FloorplanEditor({
   ceiling,
   showCeiling,
   showNorth = true,
+  showFixtures = true,
   onSelectCeiling,
   placing,
   onPlaceAt,
@@ -338,9 +357,32 @@ export function FloorplanEditor({
     comme l'autre ». On remonte donc la rotation, le zoom et le déplacement à
     l'écran qui les tient, et c'est lui qui les repasse à la vue d'à côté.
   */
+  /**
+   * Le plan est EN TRAIN d'être déplacé.
+   *
+   * Déclaré ici, au-dessus de l'effet qui l'attend : c'est lui qui décide
+   * quand la position remonte à l'écran.
+   */
+  const [navigating, setNavigating] = useState(false);
+
+  /*
+    ET IL NE LE DIT QU'UNE FOIS LE DOIGT LEVÉ.
+
+    Relevé du chantier : « au mouvement, le modèle 3D bug moins que le 2D ».
+    La cause n'était pas le dessin — mesuré, le plan en mouvement dessine
+    quatre fois moins de nœuds que la vue 3D. Elle était ICI : l'annonce
+    partait à chaque image du geste, donc l'écran qui porte le plan se
+    rendait tout entier soixante fois par seconde, bandeaux, rangée d'outils
+    et sept feuilles comprises. Le plan, lui, n'y était pour rien.
+
+    Or le parent n'a besoin de cette position qu'AU MOMENT DE BASCULER en
+    volume, c'est-à-dire une fois le geste fini. On attend donc la fin :
+    quand `navigating` retombe, l'effet part avec la vue finale.
+  */
   useEffect(() => {
+    if (navigating) return;
     onView?.(view);
-  }, [view, onView]);
+  }, [view, navigating, onView]);
   const viewRef = useRef(view);
   viewRef.current = view;
   const navBase = useRef({
@@ -373,7 +415,6 @@ export function FloorplanEditor({
   };
   // Pendant un déplacement du plan, les cotes sont masquées : leur recalcul
   // et leur rotation à chaque image faisaient saccader le geste.
-  const [navigating, setNavigating] = useState(false);
   /** Emprise à l'écran du meuble sélectionné : zone interdite au plan. */
   const objBox = useRef<{ x: number; y: number; hw: number; hh: number } | null>(
     null,
@@ -1469,7 +1510,7 @@ export function FloorplanEditor({
                  d'une ligne de spots s'y lisent comme ceux d'un mur. */
               showMeasures={showMeasures && !navigating}
               onSelectCeiling={onSelectCeiling}
-              fixtures={fixtures}
+              fixtures={showFixtures ? fixtures : VIDE}
               walls={walls}
               quads={quads}
               partOf={partOf}
@@ -1507,7 +1548,7 @@ export function FloorplanEditor({
               />
             ))}
             <FixtureLayer
-              fixtures={fixtures}
+              fixtures={showFixtures ? fixtures : VIDE}
               circuitMarks={circuitMarks}
               walls={walls}
               quads={quads}

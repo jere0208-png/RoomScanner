@@ -292,6 +292,32 @@ describe('la bibliothèque des relevés', () => {
  * cible de dépôt se DILUAIT au moment précis où elle doit s'affirmer. Le
  * survol fonce donc les deux plans, et c'est la taille qui dit « c'est ici ».
  */
+/**
+ * LE TITRE EST CENTRÉ SUR L'ÉCRAN, PAS SUR CE QUI RESTE.
+ *
+ * Il vivait dans le flux, entre le bouton de retour et la pastille du
+ * nombre de scans : son centre dépendait donc de la largeur de cette
+ * pastille — « 3 » ou « 128 » ne donnent pas la même. Le titre bougeait
+ * d'un dossier à l'autre, ce qui se voit d'autant mieux qu'il est le seul
+ * mot de la ligne.
+ */
+describe('l’en-tête de la bibliothèque', () => {
+  it('centre son titre sans compter la pastille', () => {
+    const tree = monter();
+    const cadre = tree.root
+      .findAllByType(View)
+      .find((n) => n.props.accessibilityLabel === 'Titre de l’écran');
+    expect(cadre).toBeDefined();
+    const st = (Array.isArray(cadre!.props.style)
+      ? Object.assign({}, ...cadre!.props.style.filter(Boolean))
+      : cadre!.props.style) as { position?: string; left?: number; right?: number };
+    // Posé PAR-DESSUS la ligne, à égale distance des deux bords : c'est la
+    // seule façon que sa position ne dépende de rien d'autre.
+    expect(st.position).toBe('absolute');
+    expect(st.left).toBe(st.right);
+  });
+});
+
 describe('le dossier visé par un scan', () => {
   const luminance = (hex: string) => {
     const brut = hex.replace('#', '');

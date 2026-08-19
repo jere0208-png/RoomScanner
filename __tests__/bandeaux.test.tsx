@@ -853,6 +853,29 @@ describe('la rangée d’outils', () => {
    * elle TRAVAILLE. Les deux jeux ne se mélangent jamais — c'est la règle
    * qui a fait sortir le « + » du catalogue de la rangée de lecture.
    */
+  /*
+    L'APPAREILLAGE EST UN CALQUE COMME LES AUTRES.
+
+    C'est le sujet de l'app, donc il s'allume au départ — mais on doit
+    pouvoir l'éteindre : sur un logement équipé, les symboles couvrent la
+    maçonnerie qu'on est venu regarder, et il n'y avait aucun moyen de voir
+    le plan nu sans supprimer quelque chose.
+  */
+  it('cache et rallume l’appareillage du plan', () => {
+    const tree = monter();
+    const plan = () => tree.root.findAllByType(FloorplanEditor)[0];
+    // Allumé au départ : c'est ce qu'on vient chercher.
+    expect(plan().props.showFixtures).not.toBe(false);
+    const bouton = tree.root
+      .findAllByType(TouchableOpacity)
+      .find((n) => n.props.accessibilityLabel === 'Appareils');
+    expect(bouton).toBeDefined();
+    act(() => bouton!.props.onPress());
+    expect(plan().props.showFixtures).toBe(false);
+    act(() => bouton!.props.onPress());
+    expect(plan().props.showFixtures).toBe(true);
+  });
+
   it('échange les calques contre les outils en édition', () => {
     const tree = monter();
     expect(bouton(tree, 'Cotes')).toBeDefined();

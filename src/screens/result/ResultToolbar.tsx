@@ -56,6 +56,8 @@ export function Toolbar2D({
   showMeasures,
   setShowMeasures,
   showRoutes,
+  showFixtures,
+  setShowFixtures,
   setShowRoutes,
   hasRoutes,
   showNorth,
@@ -79,6 +81,9 @@ export function Toolbar2D({
   showMeasures: boolean;
   setShowMeasures: (f: (v: boolean) => boolean) => void;
   showRoutes: boolean;
+  /** L'appareillage : un calque, qu'on éteint pour voir le plan nu. */
+  showFixtures: boolean;
+  setShowFixtures: (f: (v: boolean) => boolean) => void;
   setShowRoutes: (f: (v: boolean) => boolean) => void;
   /** Un tableau est posé : on sait d'où part le câble. */
   hasRoutes: boolean;
@@ -251,6 +256,19 @@ export function Toolbar2D({
             if (showFurniture) onFurnitureOff();
             setShowFurniture(!showFurniture);
           }}
+        />,
+        // L'appareillage est le sujet de l'app : allumé au départ, mais il
+        // se coupe — sur un logement équipé, ses symboles couvrent la
+        // maçonnerie qu'on est venu regarder.
+        <ToolPill
+          key="elec"
+          icon="elec"
+          // Pas « Élec » : c'est déjà le nom de la commande qui ouvre
+          // l'établi depuis un mur, et deux boutons du même écran ne
+          // peuvent pas porter le même mot pour deux gestes différents.
+          label="Appareils"
+          active={showFixtures}
+          onPress={() => setShowFixtures((v) => !v)}
         />,
         <ToolPill
           key="surface"

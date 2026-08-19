@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { BackChevron } from '../components/BackChevron';
 import {
   Alert,
   Animated,
@@ -461,7 +462,7 @@ const styles = getStyles(c);
         ]}>
       <View style={styles.headerRow}>
         <TouchableOpacity style={styles.roundButton} onPress={() => setScreen('result')}>
-          <Text style={styles.backChevron}>‹</Text>
+          <BackChevron color={c.ink} />
         </TouchableOpacity>
         <Text style={styles.title}>Aperçu du PDF</Text>
         <TouchableOpacity
@@ -798,7 +799,6 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     shadowOpacity: 0.07,
     shadowRadius: 8,
   },
-  backChevron: { color: c.ink, fontSize: 24, fontWeight: '600', marginTop: -3 },
   resetButton: { marginLeft: 'auto' },
   resetIcon: { color: c.blue, fontSize: 20, fontWeight: '700' },
   title: {

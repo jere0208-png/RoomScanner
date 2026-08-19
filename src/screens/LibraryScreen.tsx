@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { BackChevron } from '../components/BackChevron';
 import {
   Animated,
   Easing,
@@ -498,7 +499,11 @@ function FolderTile({
               back={teintesDossier(over, palette).back}
               front={teintesDossier(over, palette).front}
               chute={chute}
-              page={palette.surface}
+              /* Une feuille est BLANCHE, quel que soit le thème : la
+                 teinte de surface suit le mode sombre, et l'animation y
+                 faisait tomber des feuilles noires dans un dossier bleu —
+                 on ne voyait plus rien tomber du tout. */
+              page="#FFFFFF"
             />
             {count > 0 && (
               <View style={styles.tileBadge}>
@@ -947,12 +952,33 @@ export function LibraryScreen() {
         <TouchableOpacity
           style={styles.backButton}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          // Le chevron était un caractère, et c'est lui qui nommait le
+          // bouton pour un lecteur d'écran. Devenu tracé, il ne dit plus
+          // rien : le nom s'écrit.
+          accessibilityLabel="Retour"
           onPress={() => (dossierOuvert ? setInside(null) : setScreen('home'))}>
-          <Text style={styles.backChevron}>‹</Text>
+          <BackChevron color={palette.ink} />
         </TouchableOpacity>
-        <Text style={styles.title} numberOfLines={1}>
-          {dossierOuvert ? dossierOuvert.name : 'Mes scans'}
-        </Text>
+        {/*
+          LE TITRE EST CENTRÉ SUR L'ÉCRAN, PAS SUR CE QUI RESTE.
+
+          Dans le flux, entre le bouton de retour et la pastille du nombre de
+          scans, son centre dépendait de la largeur de cette pastille — « 3 »
+          et « 128 » ne donnent pas la même. Le titre se déplaçait d'un
+          dossier à l'autre, ce qui se voit d'autant mieux qu'il est le seul
+          mot de la ligne. Posé PAR-DESSUS, à égale distance des deux bords,
+          il ne dépend plus de rien ; et il ne reçoit pas le doigt, pour ne
+          pas voler l'appui du retour ni celui de la pastille.
+        */}
+        <View
+          accessibilityLabel="Titre de l’écran"
+          style={styles.titreCadre}
+          pointerEvents="none">
+          <Text style={styles.title} numberOfLines={1}>
+            {dossierOuvert ? dossierOuvert.name : 'Mes scans'}
+          </Text>
+        </View>
+        <View style={styles.headerFill} />
         <View style={styles.countPill}>
           <Text style={styles.countText}>{liste.length}</Text>
         </View>
@@ -1195,7 +1221,17 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     shadowRadius: 8,
     marginRight: 12,
   },
-  backChevron: { color: c.ink, fontSize: 24, fontWeight: '600', marginTop: -3 },
+  /* Cinquante-six points de part et d'autre : la largeur du bouton de
+     retour et celle de la pastille, marges comprises. Le titre s'y centre,
+     et se coupe plutôt que de passer dessous. */
+  titreCadre: {
+    position: 'absolute',
+    left: 56,
+    right: 56,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerFill: { flex: 1 },
   title: {
     color: c.ink,
     fontSize: 24,

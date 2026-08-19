@@ -259,6 +259,59 @@ qui passe par `interiorSide` — lequel redécoupe le logement **pour chaque
 appareil**. On recalculait donc tous les cheminements de câble du logement
 pendant qu'un doigt déplaçait un meuble.
 
+### Le plan ne réveillait plus tout l'écran
+
+Relevé du chantier : « au mouvement, le modèle 3D bug moins que le 2D ». La
+cause n'était pas le dessin — mesuré, le plan 2D en mouvement dessine
+**quatre fois moins** de nœuds que la vue 3D (374 contre 1 387).
+
+Elle était dans la **remontée d'état**. Le plan annonce sa position à l'écran
+qui le porte, pour que la 3D reprenne le même cadrage quand on bascule ; cette
+annonce partait à chaque image du geste, donc `ResultScreen` tout entier se
+rendait soixante fois par seconde — bandeaux, rangée d'outils et sept feuilles
+comprises. Le plan, lui, n'y était pour rien. Or le parent n'a besoin de cette
+position **qu'au moment de basculer**, c'est-à-dire une fois le doigt levé :
+elle attend donc la fin du geste.
+
+### Un calque pour l'appareillage
+
+Il était le seul élément du plan qu'on ne pouvait pas éteindre. Sur un
+logement équipé, ses symboles couvrent la maçonnerie qu'on est venu regarder,
+et il n'y avait aucun moyen de voir le plan nu sans supprimer quelque chose.
+La pastille « Appareils » rejoint donc les calques — allumée au départ, c'est
+le sujet de l'app, et **locale à l'écran** : elle repart allumée à chaque
+ouverture, parce que l'éteindre est un geste ponctuel, « pour voir dessous »,
+pas un réglage qu'on garde et qu'on oublie. Elle ne s'appelle pas « Élec » :
+c'est déjà le nom de la commande qui ouvre l'établi depuis un mur, et deux
+boutons du même écran ne peuvent pas porter le même mot pour deux gestes
+différents.
+
+### Le chevron de retour était un caractère
+
+Dans l'en-tête d'un scan, le bouton de retour côtoie le partage et le « … ».
+Ces deux-là sont des icônes vectorielles, centrées dans leur rond par
+construction ; le chevron, lui, s'écrivait « ‹ » et se posait sur une ligne de
+base. Il tombait trop bas, on l'avait remonté de trois points à la main — un
+réglage qui ne vaut que pour une police et une taille. C'est la même leçon que
+la croix de fermeture, et `BackChevron` la applique aux quatre écrans qui
+portaient ce caractère.
+
+Au passage, le banc d'accessibilité a rattrapé la conséquence : le caractère
+servait de NOM au bouton pour un lecteur d'écran. Devenu tracé, il ne dit plus
+rien — le nom s'écrit.
+
+### Deux détails du thème sombre
+
+Le titre de la bibliothèque vivait dans le flux, entre le bouton de retour et
+la pastille du nombre de scans : son centre dépendait de la largeur de cette
+pastille — « 3 » et « 128 » ne donnent pas la même. Il est désormais posé
+par-dessus la ligne, à égale distance des deux bords.
+
+Et les feuilles qui tombent dans un dossier prenaient la teinte de surface du
+thème : en mode sombre, des feuilles **noires** tombaient dans un dossier bleu
+foncé, et l'on ne voyait plus rien tomber. Une feuille est blanche, quel que
+soit le thème.
+
 ### Garde-fou visuel
 
 Les tests vérifient des nombres ; aucun n'a vu le jour où le pointillé des

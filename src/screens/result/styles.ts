@@ -56,7 +56,6 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     shadowRadius: 8,
     marginRight: 12,
   },
-  backChevron: { color: c.ink, fontSize: 24, fontWeight: '600', marginTop: -3 },
   titleWrap: { flexDirection: 'row', alignItems: 'center', flex: 1 },
   title: {
     color: c.ink,

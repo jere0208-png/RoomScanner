@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { BackChevron } from '../components/BackChevron';
 import {
   Alert,
   Animated,
@@ -280,6 +281,15 @@ export function ResultScreen() {
   const [tab, setTab] = useState<Tab>('2d');
   /** Calque des cheminements de gaines (métré à l'appui). */
   const [showRoutes, setShowRoutes] = useState(false);
+  /*
+    L'APPAREILLAGE SE COUPE, mais il revient allumé.
+
+    C'est le sujet de l'application : on ouvre un relevé pour voir ses
+    prises. Le calque est donc local à l'écran et repart allumé à chaque
+    ouverture — l'éteindre est un geste ponctuel, « pour voir dessous », pas
+    un réglage qu'on garde et qu'on oublie.
+  */
+  const [showFixtures, setShowFixtures] = useState(true);
   /** Photo de repérage ouverte en grand. */
   const [photoVue, setPhotoVue] = useState<string | null>(null);
   /**
@@ -1526,7 +1536,7 @@ export function ResultScreen() {
           onPress={() =>
             setScreen(resultOrigin === 'library' ? 'library' : 'home')
           }>
-          <Text style={styles.backChevron}>‹</Text>
+          <BackChevron color={teinte.ink} />
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.titleWrap}
@@ -1632,6 +1642,7 @@ export function ResultScreen() {
             vueInitiale={vuePlan}
             onView={setVuePlan}
             cableRoutes={showRoutes ? cheminements?.traces : undefined}
+            showFixtures={showFixtures}
             circuitMarks={showRoutes ? marks : undefined}
             photos={photos}
             onSelectPhoto={setPhotoVue}
@@ -1897,6 +1908,8 @@ export function ResultScreen() {
             showMeasures={showMeasures}
             setShowMeasures={setShowMeasures}
             showRoutes={showRoutes}
+            showFixtures={showFixtures}
+            setShowFixtures={setShowFixtures}
             setShowRoutes={setShowRoutes}
             hasRoutes={!!cheminements}
             showNorth={showNorth}

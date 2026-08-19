@@ -34,6 +34,7 @@ export type ToolIcon =
   | 'edit'
   | 'ruler'
   | 'surface'
+  | 'elec'
   | 'furniture'
   | 'colors'
   | 'room'
@@ -97,6 +98,8 @@ const TOOL_PATHS: Record<ToolIcon, { d: string; fill?: boolean }[]> = {
     { d: 'M12 3.2 l7.8 4.4 v8.8 L12 20.8 l-7.8 -4.4 V7.6 z' },
     { d: 'M12 12 l7.8 -4.4 M12 12 L4.2 7.6 M12 12 v8.8' },
   ],
+  // L'éclair : le seul symbole que personne n'a besoin qu'on lui explique.
+  elec: [{ d: 'M13.5 2.5 L5.5 13.5 h5 l-1 8 8 -11 h-5 z', fill: true }],
   // Le « + » de l'appareillage electrique.
   plus: [{ d: 'M12 5 v14' }, { d: 'M5 12 h14' }],
   // Loupe : ce que le plan a d'incertain.

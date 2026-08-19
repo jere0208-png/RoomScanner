@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { BackChevron } from '../components/BackChevron';
 import {
   Linking,
   StyleSheet,
@@ -58,7 +59,7 @@ export function CameraScreen() {
   return (
     <View style={styles.container}>
       <TouchableOpacity style={styles.backButton} onPress={() => setScreen('home')}>
-        <Text style={styles.backChevron}>‹</Text>
+        <BackChevron color={c.ink} />
       </TouchableOpacity>
 
       <View style={styles.body}>
@@ -107,7 +108,6 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  backChevron: { color: c.ink, fontSize: 24, fontWeight: '600', marginTop: -3 },
   body: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   glyphCard: {
     width: 120,
