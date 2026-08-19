@@ -17,6 +17,7 @@ import { join } from 'node:path';
 import {
   avancement,
   frameSvg,
+  PLAN,
   SHOWCASE_FRAMES,
 } from '../src/export/showcaseFrames';
 
@@ -54,29 +55,90 @@ describe('le scénario de la vitrine', () => {
 describe('les images de la vitrine', () => {
   const svg = (t: number) => frameSvg(t, W, H);
 
-  it('dessine un plan coté à plat, appareils compris', () => {
-    const plat = svg(0);
-    // Les cotes : quatre murs extérieurs, chacun sa valeur en mètres.
-    expect((plat.match(/ m<\/text>/g) ?? []).length).toBeGreaterThanOrEqual(4);
-    // Et l'appareillage, qui est le sujet de l'application.
-    expect(plat).toContain('>PC<');
-    expect(plat).toContain('>I<');
+  /*
+    PLUS DE COTES — NULLE PART.
+
+    Elles disaient la taille d'un logement inventé, ce qui n'apprend rien, et
+    elles étaient le seul élément de l'image qui devait s'effacer en cours de
+    route : un fondu à régler, un écart à la maçonnerie à régler, et deux
+    corrections déjà. La vitrine montre un logement qui se lève ; les cotes,
+    c'est dans l'app.
+  */
+  it('ne cote plus rien, ni à plat ni en volume', () => {
+    for (const t of [0, 0.5, 1]) expect(svg(t)).not.toContain(' m</text>');
   });
 
-  /**
-   * EN VOLUME, LES COTES S'EFFACENT — les appareils, non.
-   *
-   * On ne cote pas une perspective : un volume couvert de chiffres ne se lit
-   * pas. Mais les prises restent, parce que c'est ce qu'on vient chercher.
-   */
-  it('lève le plan sans ses cotes, mais avec ses appareils', () => {
+  /*
+    LE MOBILIER ARRIVE EN FONDU, PAS D'UN COUP.
+
+    Il sortait du sol à pleine opacité : d'une image à l'autre, un logement
+    vide devenait un logement meublé. L'œil ne relie pas ces deux images, il
+    voit une coupure — et une coupure au milieu d'un mouvement se lit comme
+    un défaut d'affichage.
+
+    Le fondu est RAPIDE — quelques images — mais c'en est un : le mobilier
+    monte en opacité pendant que les murs se lèvent, et l'on comprend que
+    c'est le même logement qui se remplit.
+  */
+  it('fait apparaître le mobilier en fondu', () => {
+    // Le trait du mobilier : c'est le seul bleu du dessin, et il n'est pas
+    // ombré — donc lisible tel quel, contrairement au remplissage.
+    const opacite = (t: number) => {
+      const m = svg(t).match(
+        /stroke="#2F6BFF" stroke-width="[\d.]+" stroke-opacity="([\d.]+)"/,
+      );
+      return m ? parseFloat(m[1]) : 0;
+    };
+    const suite = Array.from({ length: SHOWCASE_FRAMES }, (_, i) =>
+      opacite(avancement(i)),
+    );
+    expect(Math.max(...suite)).toBeGreaterThan(0.9);
+    expect(suite[0]).toBeLessThan(0.05);
+    // Au moins trois images à mi-chemin : sans elles, le fondu tient en une
+    // image et n'en est plus un.
+    expect(suite.filter((o) => o > 0.05 && o < 0.95).length).toBeGreaterThanOrEqual(3);
+    // Et aucun saut brutal d'une image à la suivante.
+    for (let i = 1; i < suite.length; i++) {
+      expect(Math.abs(suite[i] - suite[i - 1])).toBeLessThan(0.5);
+    }
+  });
+
+  it('lève le plan en gardant ses appareils', () => {
     const volume = svg(1);
-    expect(volume).not.toContain(' m</text>');
     expect(volume).toContain('>PC<');
+    expect(volume).toContain('>I<');
     // Et il y a plus de matière qu'à plat : les murs ont poussé, les meubles
     // sont sortis.
     const faces = (s: string) => (s.match(/<polygon/g) ?? []).length;
     expect(faces(volume)).toBeGreaterThan(faces(svg(0)));
+  });
+
+  /*
+    UN APPARTEMENT QUI TIENT DEBOUT.
+
+    Le refend s'arrêtait au milieu du logement : la chambre n'était pas
+    fermée, et l'armoire flottait à cinquante centimètres de son mur. On
+    montrait un plan que personne n'a jamais relevé. Ce banc tient les deux
+    règles qui font qu'un plan se lit comme un logement : les pièces se
+    ferment, et le mobilier est CONTRE quelque chose.
+  */
+  it('ferme ses pièces et plaque ses meubles', () => {
+    for (const [id, , cx, cz, w, d] of PLAN.meubles) {
+      // Une table basse est au milieu du salon : c'est sa place.
+      if (id === 'table') continue;
+      const bords = [cx - w / 2, cz - d / 2, cx + w / 2, cz + d / 2];
+      const contre =
+        Math.abs(bords[0]) < 0.12 ||
+        Math.abs(bords[2] - 4.2) < 0.12 ||
+        Math.abs(bords[1]) < 0.12 ||
+        Math.abs(bords[3] - 6.4) < 0.12 ||
+        Math.abs(bords[1] - 2.7) < 0.12 ||
+        Math.abs(bords[3] - 2.7) < 0.12;
+      expect({ id, contre }).toEqual({ id, contre: true });
+    }
+    // Le refend traverse : sans quoi la chambre n'existe pas.
+    const refend = PLAN.murs.find((m) => m[0] === 'refend')!;
+    expect(Math.abs(refend[3] - refend[1])).toBeCloseTo(4.2);
   });
 
   it('tient dans le cadre de l’écran', () => {

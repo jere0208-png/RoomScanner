@@ -461,6 +461,36 @@ dessine rien d'autre. Le fond est translucide, l'ombre prend la couleur du
 bouton, et l'appui l'enfonce de trois pour cent : un bouton qui ne bouge pas
 sous le doigt laisse douter qu'il a pris.
 
+### La vitrine montre un logement, pas une maquette
+
+Trois défauts de l'animation d'accueil, tous vus en REGARDANT les images
+cuites côte à côte.
+
+**L'appartement ne tenait pas debout.** Le refend s'arrêtait au milieu du
+logement — la chambre n'était donc pas une pièce —, l'armoire flottait à
+cinquante centimètres de son mur, et la seule porte était celle de l'entrée.
+On montrait, dans une vitrine dont c'est tout le propos, un plan que personne
+n'a jamais relevé. Le refend traverse maintenant et porte sa porte, chaque
+pièce a sa fenêtre, et chaque meuble est CONTRE quelque chose — sauf la table
+basse, au milieu du salon, qui est à sa place. Un banc le vérifie meuble par
+meuble : c'est le genre de règle qu'on respecte en écrivant le plan et qu'on
+casse à la première retouche.
+
+**Le mobilier apparaissait d'un coup.** Il sortait du sol à pleine opacité :
+d'une image à l'autre, un logement vide devenait un logement meublé. L'œil ne
+relie pas ces deux images — il voit une coupure, et une coupure au milieu
+d'un mouvement se lit comme un défaut d'affichage, pas comme une intention.
+Il monte maintenant en **fondu rapide**, dès les premiers degrés
+d'inclinaison et jusqu'au tiers de la levée : le logement se remplit pendant
+que ses murs montent. Le banc mesure l'opacité image par image et refuse
+qu'elle saute.
+
+**Les cotes sont parties.** Elles donnaient la taille d'un logement inventé —
+ce qui n'apprend rien — et elles étaient le seul élément de l'image qui
+devait s'effacer en cours de route : un fondu à régler, un écart à la
+maçonnerie à régler, deux corrections déjà. La vitrine montre un plan qui se
+lève ; les cotes, c'est dans l'app.
+
 ### Ce qu'on tient est une bulle
 
 Un scan décollé par appui long rétrécissait sur place et suivait le doigt en

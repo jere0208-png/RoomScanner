@@ -68,40 +68,55 @@ const meuble = (
   transform: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, cx, h / 2, cz, 1],
 });
 
-/** Le logement de la vitrine : un T2 franc, meublé, équipé. */
 /**
- * UN LOGEMENT EN HAUTEUR, parce que l'écran l'est.
+ * LE LOGEMENT DE LA VITRINE : un T2 qu'on pourrait relever demain.
  *
- * Le premier essai était un T2 en largeur : dans un écran de téléphone, il
- * occupait une bande au milieu et laissait deux déserts au-dessus et en
- * dessous, cotes latérales comprises — hors champ. Le logement suit donc la
- * forme de l'écran : séjour en bas, chambre en haut.
+ * Il suit la forme de l'ÉCRAN — chambre en haut, séjour en bas — parce qu'un
+ * T2 en largeur occupait une bande au milieu d'un téléphone et laissait deux
+ * déserts au-dessus et en dessous.
+ *
+ * Et il tient debout, ce qui n'était pas le cas : le refend s'arrêtait au
+ * milieu du logement, donc la chambre n'était pas une pièce, et l'armoire
+ * flottait à cinquante centimètres de son mur. On montrait un plan que
+ * personne n'a jamais relevé — dans une vitrine dont c'est tout le propos.
+ *
+ * Les trois règles suivies ici sont celles d'un vrai relevé : les pièces se
+ * ferment, chaque meuble est CONTRE quelque chose (sauf la table basse, au
+ * milieu du salon, qui est à sa place), et chaque pièce a sa porte et sa
+ * fenêtre.
  */
-const PLAN = {
+export const PLAN = {
   murs: [
     ['n', 0, 0, 4.2, 0],
     ['e', 4.2, 0, 4.2, 6.4],
     ['s', 4.2, 6.4, 0, 6.4],
     ['o', 0, 6.4, 0, 0],
-    ['refend', 0, 2.7, 2.6, 2.7],
+    // Le refend TRAVERSE, et il est percé d'une porte.
+    ['refend', 0, 2.7, 4.2, 2.7],
   ] as [string, number, number, number, number][],
   meubles: [
-    ['canape', 'sofa', 2.1, 5.6, 2.1, 0.85, 0.8],
-    ['table', 'table', 2.1, 4.2, 1.2, 0.8, 0.75],
-    ['tv', 'television', 3.95, 4.4, 0.12, 1.3, 0.55],
-    ['biblio', 'storage', 0.3, 4.4, 0.4, 1.5, 1.9],
-    ['lit', 'bed', 1.6, 1.3, 1.4, 1.9, 0.5],
-    ['chevet', 'storage', 0.35, 0.35, 0.4, 0.4, 0.5],
-    ['armoire', 'storage', 3.4, 1.1, 0.6, 1.4, 2],
+    // --- Chambre (en haut) : lit tête au nord, armoire contre l'est.
+    ['lit', 'bed', 0.95, 1.05, 1.5, 2.0, 0.5],
+    ['chevet', 'storage', 1.95, 0.25, 0.45, 0.45, 0.5],
+    ['armoire', 'storage', 3.9, 1.5, 0.58, 1.8, 2.1],
+    // --- Séjour (en bas) : canapé dos au refend, télé en face, sur le
+    //     mur du fond ; la table basse entre les deux.
+    ['canape', 'sofa', 1.65, 3.15, 2.2, 0.88, 0.8],
+    ['table', 'table', 1.65, 4.5, 1.1, 0.6, 0.42],
+    ['tv', 'television', 1.65, 6.31, 1.3, 0.14, 0.62],
+    ['biblio', 'storage', 0.23, 5.1, 0.42, 1.6, 1.9],
   ] as [string, string, number, number, number, number, number][],
   /** L'appareillage : c'est lui qu'on vient chercher dans cette app. */
   elec: [
-    { id: 'f1', kind: 'prise', wallId: 'o', along: 4.4, height: 0.25, side: 1 },
-    { id: 'f2', kind: 'prise', wallId: 's', along: 2.2, height: 0.25, side: 1 },
-    { id: 'f3', kind: 'prise', wallId: 'n', along: 1.1, height: 0.25, side: 1 },
-    { id: 'f4', kind: 'inter', wallId: 'refend', along: 2.1, height: 1.1, side: 1 },
-    { id: 'f5', kind: 'inter', wallId: 'e', along: 5.2, height: 1.1, side: 1 },
-    { id: 'f6', kind: 'rj45', wallId: 'e', along: 4.1, height: 0.25, side: 1 },
+    // Séjour : une prise derrière la télé, une au canapé, l'interrupteur
+    // à l'entrée, la prise réseau au meuble bas.
+    { id: 'f1', kind: 'prise', wallId: 's', along: 1.9, height: 0.25, side: 1 },
+    { id: 'f2', kind: 'prise', wallId: 'o', along: 3.1, height: 0.25, side: 1 },
+    { id: 'f3', kind: 'inter', wallId: 'e', along: 5.4, height: 1.1, side: 1 },
+    { id: 'f4', kind: 'rj45', wallId: 's', along: 2.9, height: 0.25, side: 1 },
+    // Chambre : l'interrupteur près de la porte, une prise au chevet.
+    { id: 'f5', kind: 'inter', wallId: 'refend', along: 2.6, height: 1.1, side: -1 },
+    { id: 'f6', kind: 'prise', wallId: 'n', along: 2.3, height: 0.25, side: 1 },
   ] as Fixture[],
 };
 
@@ -237,32 +252,51 @@ export function frameSvg(
   const murs = PLAN.murs.map(([id, ax, az, bx, bz]) =>
     mur(id, ax, az, bx, bz, hauteur),
   );
+  /*
+    CHAQUE PIÈCE A SA PORTE ET SA FENÊTRE.
+
+    Le logement n'avait qu'une baie et une porte d'entrée : la chambre ne
+    s'ouvrait sur rien, ce qui se voit tout de suite sur un plan. Il y a
+    maintenant la porte palière, la porte de chambre dans le refend, et une
+    fenêtre par pièce — la chambre au nord, le séjour à l'ouest.
+  */
+  const baie = (
+    id: string,
+    ax: number,
+    az: number,
+    bx: number,
+    bz: number,
+    type: 'window' | 'door',
+    haut: number,
+    allege: number,
+  ): WallSeg => {
+    const h = Math.max(0.02, Math.min(haut, hauteur - allege));
+    return {
+      ...mur(id, ax, az, bx, bz, hauteur),
+      type,
+      height: h,
+      yCenter: allege + h / 2,
+    };
+  };
   const ouvertures: WallSeg[] = [
-    {
-      ...mur('baie', 1.1, 6.4, 3.1, 6.4, hauteur),
-      type: 'window',
-      height: Math.min(1.5, hauteur),
-      yCenter: hauteur * 0.55,
-    },
-    {
-      ...mur('porte', 4.2, 1.3, 4.2, 2.3, hauteur),
-      type: 'door',
-      height: Math.min(2.05, hauteur),
-      yCenter: Math.min(2.05, hauteur) / 2,
-    },
+    baie('fen-sejour', 0, 5.6, 0, 4.1, 'window', 1.45, 0.95),
+    baie('fen-chambre', 2.7, 0, 3.9, 0, 'window', 1.35, 1.0),
+    baie('porte-entree', 4.2, 5.05, 4.2, 5.95, 'door', 2.05, 0),
+    baie('porte-chambre', 3.0, 2.7, 3.85, 2.7, 'door', 2.05, 0),
   ];
   /*
-    LES MEUBLES SONT LÀ DÈS LE PLAN, et ils poussent avec les murs.
+    LE MOBILIER ARRIVE EN FONDU, PAS D'UN COUP.
 
-    Ils sortaient du sol au tiers de la levée : le plan de départ était nu,
-    et le mobilier apparaissait d'un coup — on ne reliait plus les deux
-    images, on en voyait deux. Un plan de relevé porte d'ailleurs ses
-    meubles, vus de dessus, comme ici.
+    Il sortait du sol à pleine opacité : d'une image à l'autre, un logement
+    vide devenait un logement meublé. L'œil ne relie pas ces deux images, il
+    voit une coupure — et une coupure au milieu d'un mouvement se lit comme
+    un défaut d'affichage, pas comme une intention.
 
-    Ils gardent donc leur emprise dès la première image (c'est elle qu'on lit
-    sur un plan) et ne gagnent que la HAUTEUR à mesure que la maçonnerie
-    monte.
+    Le fondu est RAPIDE — il commence dès les premiers degrés d'inclinaison
+    et se termine au tiers de la levée — mais c'en est un : le logement se
+    remplit pendant que ses murs montent, et l'on comprend que c'est le même.
   */
+  const apparition = Math.max(0, Math.min(1, (t - 0.06) / 0.3));
   const pousse = doux(t);
   const meubles = PLAN.meubles.map(([id, cat, cx, cz, w, d, h]) =>
     meuble(id, cat, cx, cz, w, d, Math.max(0.02, h * pousse)),
@@ -324,6 +358,9 @@ export function frameSvg(
         depth: faceDepth(f, project, cam),
         fill: shadeFill(f, ct, st),
         stroke: f.stroke,
+        // `ownerId` marque les faces d'un meuble : c'est ce qui permet de
+        // les faire apparaître ensemble.
+        meuble: !!f.ownerId,
         voile,
         n: proj.length,
         points: proj.map((q) => `${q.sx.toFixed(1)},${q.sy.toFixed(1)}`).join(' '),
@@ -331,14 +368,21 @@ export function frameSvg(
     })
     .sort((a, b) => a.depth - b.depth);
   for (const q of polys) {
+    // Le mobilier monte en opacité ; la maçonnerie, elle, est là dès la
+    // première image — c'est le plan.
+    const vu = q.meuble ? q.voile * apparition : q.voile;
+    if (vu < 0.01) continue;
+    // Le trait d'un meuble suit exactement son fondu ; celui de la
+    // maçonnerie garde son minimum, qui dit l'écorché.
+    const trait = q.meuble ? vu : 0.3 + 0.7 * vu;
     const commun =
       `stroke="${q.stroke ?? 'none'}" stroke-width="${q.n === 2 ? 1 : 0.9}" ` +
-      `stroke-opacity="${(0.3 + 0.7 * q.voile).toFixed(2)}"`;
+      `stroke-opacity="${trait.toFixed(2)}"`;
     out.push(
       q.n === 2
         ? `<polyline points="${q.points}" fill="none" ${commun}/>`
         : `<polygon points="${q.points}" fill="${q.fill ?? 'none'}" ` +
-          `fill-opacity="${q.voile.toFixed(2)}" ${commun}/>`,
+          `fill-opacity="${vu.toFixed(2)}" ${commun}/>`,
     );
   }
 
@@ -380,94 +424,6 @@ export function frameSvg(
         `stroke="#FFFFFF" stroke-width="3">${spec.short}</text>`,
       `<text x="${cx}" y="${cy}" ${police} fill="${spec.color}">${spec.short}</text>`,
     );
-  }
-
-  /*
-    LES COTES DU PLAN, tant qu'on est à plat.
-
-    Elles se posent le long des murs extérieurs, à l'écart de la maçonnerie,
-    et s'effacent dès que le plan quitte l'horizontale.
-  */
-  /*
-    LE FONDU DES COTES DURE ASSEZ LONGTEMPS POUR SE VOIR.
-
-    Il s'étalait sur le premier tiers de la levée : à quarante-quatre images,
-    cela laissait DEUX images entre « pleine » et « éteinte » — l'œil ne voit
-    pas un fondu de deux images, il voit une coupure. Le relevé du chantier
-    le disait d'une cote en particulier, mais elles sautaient toutes, chacune
-    à un pas différent de l'autre selon sa position dans la rampe.
-
-    Le fondu couvre maintenant les deux tiers de la levée : une dizaine
-    d'images, de quoi voir les chiffres s'en aller.
-  */
-  const opaciteCotes = Math.max(0, 1 - t / 0.72);
-  if (opaciteCotes > 0.01) {
-    for (const w of murs) {
-      if (w.id === 'refend') continue;
-      const len = segLength(w);
-      const mid = { x: (w.a.x + w.b.x) / 2, z: (w.a.z + w.b.z) / 2 };
-      const u = { x: (w.b.x - w.a.x) / len, z: (w.b.z - w.a.z) / len };
-      // Vers l'extérieur du logement : la cote ne se pose pas sur le sol.
-      const centre = { x: 2.1, z: 3.2 };
-      let n = { x: -u.z, z: u.x };
-      if ((mid.x - centre.x) * n.x + (mid.z - centre.z) * n.z < 0) {
-        n = { x: -n.x, z: -n.z };
-      }
-      /*
-        LA COTE SE POSE FRANCHEMENT DEHORS.
-
-        À vingt-deux centimètres de l'axe — soit quinze du nu —, elle frôlait
-        la maçonnerie : à plat ça passait, mais dès les premiers degrés
-        d'inclinaison le poché NOIR du mur montait par-dessus, et un chiffre
-        gris sur noir ne s'estompe pas, il s'éteint. C'est ce qu'on a vu sur
-        la cote de gauche.
-      */
-      const ecart = 0.5;
-      const a = project({
-        x: w.a.x + n.x * ecart,
-        y: 0,
-        z: w.a.z + n.z * ecart,
-      });
-      const b = project({
-        x: w.b.x + n.x * ecart,
-        y: 0,
-        z: w.b.z + n.z * ecart,
-      });
-      const mx = (a.sx + b.sx) / 2;
-      const my = (a.sy + b.sy) / 2;
-      let ang = (Math.atan2(b.sy - a.sy, b.sx - a.sx) * 180) / Math.PI;
-      if (ang > 90) ang -= 180;
-      if (ang < -90) ang += 180;
-      const texte = `${len.toFixed(2).replace('.', ',')} m`;
-      out.push(
-        `<g opacity="${opaciteCotes.toFixed(2)}">` +
-          `<line x1="${a.sx.toFixed(1)}" y1="${a.sy.toFixed(1)}" ` +
-          `x2="${b.sx.toFixed(1)}" y2="${b.sy.toFixed(1)}" ` +
-          `stroke="${p.cote}" stroke-width="0.8"/>` +
-          // Les deux traits d'about, qui font la cote d'un dessinateur.
-          `<line x1="${a.sx.toFixed(1)}" y1="${a.sy.toFixed(1)}" ` +
-          `x2="${(a.sx + (b.sx - a.sx) * 0.02).toFixed(1)}" ` +
-          `y2="${(a.sy + (b.sy - a.sy) * 0.02).toFixed(1)}" ` +
-          `stroke="${p.cote}" stroke-width="2.4"/>` +
-          `<line x1="${b.sx.toFixed(1)}" y1="${b.sy.toFixed(1)}" ` +
-          `x2="${(b.sx + (a.sx - b.sx) * 0.02).toFixed(1)}" ` +
-          `y2="${(b.sy + (a.sy - b.sy) * 0.02).toFixed(1)}" ` +
-          `stroke="${p.cote}" stroke-width="2.4"/>` +
-          // Deux passes, comme les sigles : un liseré clair dessous, le
-          // chiffre par-dessus. Une cote doit se lire sur le blanc du sol
-          // comme sur le noir d'un mur.
-          `<text x="${mx.toFixed(1)}" y="${(my - 3.5).toFixed(1)}" ` +
-          `font-family="Helvetica" font-size="9" font-weight="bold" ` +
-          `fill="none" stroke="#FFFFFF" stroke-width="3" text-anchor="middle" ` +
-          `transform="rotate(${ang.toFixed(1)} ${mx.toFixed(1)} ${my.toFixed(1)})">` +
-          `${texte}</text>` +
-          `<text x="${mx.toFixed(1)}" y="${(my - 3.5).toFixed(1)}" ` +
-          `font-family="Helvetica" font-size="9" font-weight="bold" ` +
-          `fill="${p.cote}" text-anchor="middle" ` +
-          `transform="rotate(${ang.toFixed(1)} ${mx.toFixed(1)} ${my.toFixed(1)})">` +
-          `${texte}</text></g>`,
-      );
-    }
   }
 
   return (
