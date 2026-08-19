@@ -463,6 +463,38 @@ de transformation — interpoler `translate(0 -26) scale(1)` vers
 `translate(0 12)` exige le même nombre de composants de part et d'autre, et la
 moindre distraction fait tomber le rendu entier.
 
+### Un geste, une intention
+
+Dans la bibliothèque, l'appui long faisait deux choses à la fois : à 420 ms
+il ouvrait le menu du relevé, à 500 ms la bulle se levait derrière lui. On
+se retrouvait avec un scan décollé sous une fenêtre qu'on n'avait pas
+demandée — et la fenêtre modale, en s'ouvrant, ne rendait ni fin ni
+annulation de toucher à la liste : le relevé restait effacé au milieu des
+siens.
+
+**L'appui long ne fait donc plus qu'une chose : lever la bulle**, celle qu'on
+promène et qu'on lâche sur un dossier. Ce qu'on peut FAIRE d'un relevé —
+renommer, dupliquer, sortir du dossier, supprimer — passe sous un « … »
+visible en permanence au bord de la ligne. Un geste caché ne s'apprend pas ;
+trois points se voient.
+
+Le « … » remplace la croix, et ce n'est pas qu'un dessin. La croix armait la
+suppression au premier appui et l'exécutait au second : deux appuis, mais
+tous deux au même endroit, et cet endroit était sur le trajet du pouce qui
+fait défiler la liste. La suppression vit maintenant au fond du menu, en
+rouge — même nombre de gestes, aucun au bord d'une liste qui bouge.
+
+Les tuiles de dossier ont reçu **le même « … »**. Rien ne se disputait leur
+appui long, mais laisser deux grammaires dans un seul écran — ici j'appuie
+long pour agir, deux centimètres plus bas j'appuie long pour prendre — est
+la meilleure façon de n'en faire apprendre aucune.
+
+Et le geste **répond partout**. Il ne se levait qu'à la racine, devant des
+dossiers ; dans un dossier ouvert, l'appui long ne produisait rien, ce qui se
+lit comme une panne de l'app et non comme une absence de destination. Dedans,
+la destination existe : c'est la sortie. L'en-tête devient la zone de dépôt,
+elle s'allume au survol, et le relevé lâché dessus revient à la racine.
+
 ### Les appareils s'écrivent
 
 Vu de loin, un appareil se réduisait à une pastille de quatre pixels : on
@@ -488,6 +520,23 @@ au-dessus de 190, typo en dessous de 70, rampe entre les deux pour garder
 l'anticrénelage des courbes —, puis on recadre au plus juste avec une marge
 de quelques pixels. Les pixels transparents restent NOIRS : sinon, un halo
 clair borde les lettres dès qu'on redimensionne.
+
+Un détourage par seuil ne garde pas que les lettres : il garde tout ce qui
+était sombre, **y compris ce qui traînait au bord de l'original**. Deux
+traits de trois pixels ont ainsi survécu dans les six fichiers livrés — un
+contre le « e » d'echo, l'autre sous le « n » de plan. À la taille où le logo
+s'affiche, ils passent pour de la poussière sur l'écran. Ils sont effacés, et
+`logotype.test.ts` monte la garde : il décode les six PNG (décodeur minimal,
+8 bits RGBA, une trentaine de lignes plutôt qu'une dépendance) et **compte
+les taches d'encre** de chaque image. Les lettres et les ondes en font une
+dizaine, toutes massives ; une saleté de détourage est par construction
+minuscule devant la plus petite d'entre elles. Le banc refuse donc toute
+composante connexe pesant moins d'un dixième de la plus grande — un critère
+qui tient même si la typo est un jour redessinée, là où un nombre de taches
+figé casserait au premier retouchage. Il vérifie aussi que @2x et @3x sont
+bien l'image de base deux et trois fois : un rapport qui dérive d'une densité
+à l'autre étire le logo sur la moitié des iPhone, et personne ne compare deux
+téléphones côte à côte.
 
 L'image est **teintée par le thème** (`tintColor: c.ink`), donc elle suit le
 mode sombre. Sur l'écran de lancement iOS, en revanche, le système dessine

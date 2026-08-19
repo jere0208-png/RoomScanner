@@ -34,7 +34,7 @@ import {
   type ActionData,
   type PromptData,
 } from '../components/Sheet';
-import { CloseCross } from '../components/CloseCross';
+import { MoreDots } from '../components/MoreDots';
 
 /**
  * Le dessin de l'état vide.
@@ -106,6 +106,14 @@ function detailsOf(item: SavedScan): string {
  * Une demi-seconde suffit à distinguer l'appui long du simple appui.
  */
 const HOLD_MS = 500;
+/**
+ * La clé de la zone « hors dossier » : l'en-tête, quand on est dedans.
+ *
+ * Pas la chaîne vide — c'est déjà, dans `byFolder`, la clé des scans qui ne
+ * sont dans aucun dossier, et deux sens pour une même clé finissent toujours
+ * par se croiser.
+ */
+const RACINE = '@racine';
 const THUMB_W = 78;
 const THUMB_H = 62;
 
@@ -318,7 +326,7 @@ interface TileProps {
   styles: ReturnType<typeof getStyles>;
   palette: Palette;
   onOpen: () => void;
-  onLong: () => void;
+  onMenu: () => void;
   bind: (node: View | null) => void;
 }
 
@@ -338,7 +346,7 @@ function FolderTile({
   styles,
   palette,
   onOpen,
-  onLong,
+  onMenu,
   bind,
 }: TileProps) {
   const scale = lift.interpolate({
@@ -380,7 +388,6 @@ function FolderTile({
             count > 1 ? 's' : ''
           }`}
           onPress={onOpen}
-          onLongPress={onLong}
           style={styles.tileTouch}>
           <View style={styles.tileGlyph}>
             <FolderGlyph
@@ -400,6 +407,22 @@ function FolderTile({
           </Text>
         </TouchableOpacity>
       </View>
+      {/*
+        LE MÊME « … » QUE SUR UNE LIGNE.
+
+        Le dossier ouvrait ses options sur un appui long. Ça ne gênait
+        personne — rien ne se dispute ce geste sur une tuile — mais ça
+        laissait DEUX grammaires dans le même écran : ici on appuie long
+        pour agir, deux centimètres plus bas on appuie long pour prendre.
+        Un seul signe veut dire « il y a plus à faire », et il se voit.
+      */}
+      <TouchableOpacity
+        style={styles.tileMore}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        accessibilityLabel={`Options du dossier ${folder.name}`}
+        onPress={onMenu}>
+        <MoreDots size={18} color={palette.inkSoft} dot={1.9} gap={6} />
+      </TouchableOpacity>
     </Animated.View>
   );
 }
@@ -407,17 +430,13 @@ function FolderTile({
 interface RowProps {
   item: SavedScan;
   pris: boolean;
-  arme: boolean;
   fige: boolean;
-  dedans?: boolean;
   lift: Animated.Value;
   styles: ReturnType<typeof getStyles>;
   palette: Palette;
   onOpen: () => void;
-  /** Appui long : renommer, dupliquer, supprimer. */
+  /** Le « … » : renommer, dupliquer, sortir du dossier, supprimer. */
   onMenu: () => void;
-  onTrash: () => void;
-  onOut: () => void;
   onHold: (at: { x: number; y: number }) => void;
   onRelease: (deposer: boolean) => void;
 }
@@ -435,16 +454,12 @@ interface RowProps {
 function ScanRow({
   item,
   pris,
-  arme,
   fige,
-  dedans,
   lift,
   styles,
   palette,
   onOpen,
   onMenu,
-  onTrash,
-  onOut,
   onHold,
   onRelease,
 }: RowProps) {
@@ -470,14 +485,21 @@ function ScanRow({
       }
       onTouchEnd={() => onRelease(true)}
       onTouchCancel={() => onRelease(false)}>
+      {/*
+        L'APPUI LONG NE FAIT PLUS QU'UNE CHOSE : LEVER LA BULLE.
+
+        Il ouvrait aussi le menu, et les deux se disputaient le même doigt :
+        la feuille montait à 420 ms, la bulle se levait à 500 ms derrière
+        elle, et le scan restait décollé sous une fenêtre qu'on n'avait pas
+        demandée. Un geste = une intention ; celle de l'appui long, c'est
+        prendre le relevé pour le ranger. Ce qu'on peut FAIRE du relevé est
+        sous le « … », visible en permanence — donc trouvable sans rien
+        savoir d'avance.
+      */}
       <TouchableOpacity
         style={styles.rowMain}
         activeOpacity={0.75}
         disabled={fige}
-        // Un appui long ouvre ce qu'on peut FAIRE du relévé — c'est le
-        // geste d'iOS, et il laisse l'appui simple à l'ouverture.
-        onLongPress={onMenu}
-        delayLongPress={420}
         onPress={onOpen}>
         <View style={styles.thumb}>
           <PlanThumb scan={item} c={palette} />
@@ -496,21 +518,13 @@ function ScanRow({
           <Text style={styles.rowDetails}>{detailsOf(item)}</Text>
         </View>
       </TouchableOpacity>
-      {dedans && !pris && (
-        <TouchableOpacity style={styles.outButton} onPress={onOut}>
-          <Text style={styles.outText}>Sortir</Text>
-        </TouchableOpacity>
-      )}
       {!pris && (
         <TouchableOpacity
-          style={[styles.trash, arme && styles.trashArmed]}
+          style={styles.more}
           hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
-          onPress={onTrash}>
-          {arme ? (
-            <Text style={[styles.trashText, styles.trashTextArmed]}>Supprimer</Text>
-          ) : (
-            <CloseCross size={18} color={palette.inkSoft} weight={2.9} />
-          )}
+          accessibilityLabel={`Options de ${item.name}`}
+          onPress={onMenu}>
+          <MoreDots size={20} color={palette.inkSoft} />
         </TouchableOpacity>
       )}
     </Animated.View>
@@ -532,19 +546,16 @@ export function LibraryScreen() {
   const palette = useTheme();
   const styles = getStyles(palette);
 
-  // Suppression en deux temps : premier appui = confirmation, second = suppression.
-  const [armedId, setArmedId] = useState<string | null>(null);
-  const disarmTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const onTrash = (id: string) => {
-    if (armedId === id) {
-      deleteSave(id);
-      setArmedId(null);
-      return;
-    }
-    setArmedId(id);
-    if (disarmTimer.current) clearTimeout(disarmTimer.current);
-    disarmTimer.current = setTimeout(() => setArmedId(null), 3000);
-  };
+  /*
+    LA SUPPRESSION N'EST PLUS ARMÉE, ELLE EST RANGÉE.
+
+    Une croix au bord de chaque ligne s'armait au premier appui et
+    supprimait au second : deux appuis, mais tous deux au même endroit, et
+    cet endroit était sur le trajet du pouce qui fait défiler. Elle vit
+    maintenant au fond du « … », en rouge, là où on ne tombe pas dessus par
+    accident — c'est le même nombre de gestes, et aucun ne se fait au bord
+    d'une liste qui bouge.
+  */
 
   /**
    * CHERCHER ET TRIER — à trente relevés, faire défiler ne suffit plus.
@@ -660,7 +671,8 @@ export function LibraryScreen() {
       useNativeDriver: true,
     }).start();
     if (deposer && scan && cible) {
-      moveToFolder(scan, cible);
+      moveToFolder(scan, cible === RACINE ? null : cible);
+      if (cible === RACINE) return;
       // Le dossier joue sa chute : c'est ce qui dit que le scan est RANGÉ,
       // et non perdu quelque part entre deux listes.
       setRanges((r) => ({ ...r, [cible]: (r[cible] ?? 0) + 1 }));
@@ -699,8 +711,15 @@ export function LibraryScreen() {
   const beginHold = (id: string, at?: { x: number; y: number }) => {
     stopHold();
     if (at) doigt.current = at;
-    // Rien à viser : pas de dossier, ou on est déjà dedans.
-    if (dossierOuvert || folders.length === 0) return;
+    /*
+      RIEN À VISER, PAS DE BULLE — mais « dedans » compte comme une cible.
+
+      Le geste ne se levait qu'à la racine, devant des dossiers. Dans un
+      dossier ouvert il ne produisait rien : un appui long qui ne répond pas
+      se lit comme une panne de l'app, pas comme une absence de destination.
+      Dedans, la destination existe — c'est la sortie, et elle est en haut.
+    */
+    if (!dossierOuvert && folders.length === 0) return;
     holdTimer.current = setTimeout(() => {
       mesurer();
       dragRef.current = id;
@@ -802,6 +821,18 @@ export function LibraryScreen() {
           icon: 'scinder',
           onPress: () => duplicateSave(item.id),
         },
+        // Sortir d'un dossier n'a de sens que dedans : ailleurs, la ligne
+        // porterait un choix sans effet.
+        ...(item.folderId
+          ? [
+              {
+                label: 'Sortir du dossier',
+                hint: 'Le relevé revient à la racine de la bibliothèque.',
+                icon: 'sortir' as const,
+                onPress: () => moveToFolder(item.id, null),
+              },
+            ]
+          : []),
         {
           label: 'Supprimer',
           icon: 'supprimer',
@@ -815,7 +846,15 @@ export function LibraryScreen() {
 
   return (
     <View style={styles.container} {...pan.panHandlers}>
-      <View style={styles.headerRow}>
+      <View
+        style={[styles.headerRow, over === RACINE && styles.headerRowOver]}
+        collapsable={false}
+        ref={(node: View | null) => {
+          // Elle n'est une cible que dans un dossier : à la racine, un scan
+          // lâché sur le titre n'aurait nulle part où aller.
+          if (dossierOuvert) tileRefs.current.set(RACINE, node);
+          else tileRefs.current.delete(RACINE);
+        }}>
         <TouchableOpacity
           style={styles.backButton}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -909,7 +948,13 @@ export function LibraryScreen() {
       {dragId !== null && (
         <View style={styles.dragHint}>
           <Text style={styles.dragHintText}>
-            {over ? 'Relâchez pour ranger ici' : 'Amenez le scan sur un dossier'}
+            {over
+              ? dossierOuvert
+                ? 'Relâchez pour le sortir du dossier'
+                : 'Relâchez pour ranger ici'
+              : dossierOuvert
+              ? 'Remontez le scan sur le titre pour l’en sortir'
+              : 'Amenez le scan sur un dossier'}
           </Text>
         </View>
       )}
@@ -950,7 +995,7 @@ export function LibraryScreen() {
                   styles={styles}
                   palette={palette}
                   onOpen={() => setInside(f.id)}
-                  onLong={() => folderMenu(f)}
+                  onMenu={() => folderMenu(f)}
                   bind={(node) => {
                     tileRefs.current.set(f.id, node);
                   }}
@@ -974,17 +1019,13 @@ export function LibraryScreen() {
             <ScanRow
               key={s.id}
               item={s}
-              dedans={!!dossierOuvert}
               pris={dragId === s.id}
-              arme={armedId === s.id}
               fige={dragId !== null}
               lift={lift}
               styles={styles}
               palette={palette}
               onOpen={() => openSave(s.id)}
               onMenu={() => scanMenu(s)}
-              onTrash={() => onTrash(s.id)}
-              onOut={() => moveToFolder(s.id, null)}
               onHold={(at) => beginHold(s.id, at)}
               onRelease={releaseRow}
             />
@@ -1211,26 +1252,26 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   rowName: { color: c.ink, fontSize: 16, fontWeight: '700' },
   rowSub: { color: c.inkFaint, fontSize: 12, marginTop: 2 },
   rowDetails: { color: c.inkSoft, fontSize: 13, marginTop: 4, fontWeight: '600' },
-  outButton: {
+  headerRowOver: {
     backgroundColor: c.surfaceSunken,
-    borderRadius: radius.pill,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginRight: 8,
+    borderRadius: radius.md,
   },
-  outText: { color: c.inkSoft, fontSize: 12, fontWeight: '700' },
-  trash: {
-    minWidth: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: c.surfaceSunken,
+  tileMore: {
+    position: 'absolute',
+    top: -2,
+    left: 0,
+    width: 30,
+    height: 30,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 10,
   },
-  trashArmed: { backgroundColor: c.danger },
-  trashText: { color: c.inkSoft, fontSize: 13, fontWeight: '700' },
-  trashTextArmed: { color: '#FFFFFF', fontSize: 12 },
+  more: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   fab: {
     position: 'absolute',
     right: 18,
