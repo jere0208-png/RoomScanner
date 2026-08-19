@@ -4,7 +4,6 @@ import {
   Animated,
   InteractionManager,
   Easing,
-  PanResponder,
   ScrollView,
   StyleSheet,
   Text,
@@ -25,7 +24,7 @@ import { FloorplanEditor } from '../components/FloorplanEditor';
 import { DEFAULT_VIEW3D, Iso3DView, type View3DParams } from '../components/Iso3DView';
 import { buildScanPdf, pdfFilename, toBase64 } from '../export/pdf';
 import { hasCapturedColors } from '../geometry/appearance';
-import { roomParts } from '../geometry/floorplan';
+import { roomParts, type Pt } from '../geometry/floorplan';
 import {
   fixturePlacement,
   materialList,
@@ -39,148 +38,69 @@ import { deviceNames } from '../geometry/naming';
 import { PromptSheet, type PromptData } from '../components/Sheet';
 import type { CeilingFixture } from '../geometry/ceiling';
 
-interface PlanView {
-  zoom: number;
-  ox: number;
-  oy: number;
-}
-const DEFAULT_PLAN: PlanView = { zoom: 1, ox: 0, oy: 0 };
-const DEFAULT_V1: View3DParams = { ...DEFAULT_VIEW3D };
-const DEFAULT_V2: View3DParams = { ...DEFAULT_VIEW3D, theta: 148, tilt: 42 };
-
-const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
 /**
- * Aperçu interactif du plan 2D : un doigt déplace, deux doigts zooment.
- * Le cadrage choisi ici est reproduit tel quel dans le PDF.
+ * LES ANGLES PROPOSÉS, dans l'ordre où on les ajoute.
+ *
+ * Une perspective de plus doit montrer AUTRE CHOSE : ajouter deux fois le
+ * même trois-quarts ferait deux pages identiques. Les angles tournent donc
+ * autour du logement, et l'inclinaison alterne entre le regard debout et la
+ * vue plongeante.
+ */
+const ANGLES: View3DParams[] = [
+  { ...DEFAULT_VIEW3D },
+  { ...DEFAULT_VIEW3D, theta: 148, tilt: 42 },
+  { ...DEFAULT_VIEW3D, theta: 58, tilt: 68 },
+  { ...DEFAULT_VIEW3D, theta: -122, tilt: 36 },
+];
+/** Au-delà, le dossier s'épaissit sans rien montrer de neuf. */
+const MAX_VUES = 4;
+const angleSuivant = (n: number): View3DParams => ({
+  ...(ANGLES[n % ANGLES.length] ?? ANGLES[0]),
+  theta: (ANGLES[n % ANGLES.length] ?? ANGLES[0]).theta + Math.floor(n / ANGLES.length) * 23,
+});
+
+/**
+ * L'APERÇU DU PLAN — une image, pas un cadrage.
+ *
+ * On pouvait le déplacer et le zoomer au doigt, et ce cadrage partait dans
+ * le PDF. C'est une liberté qui ne produit que des documents ratés : un plan
+ * coupé, décentré, à une échelle qui n'en est pas une. Un plan d'exécution
+ * se lit DROIT, entier, avec toutes ses cotes — le cadrage est l'affaire du
+ * document, qui sait la place dont il dispose, pas celle du doigt sur un
+ * écran de six pouces.
+ *
+ * Le geste est donc rendu au défilement : glisser sur l'aperçu fait défiler
+ * la page, comme partout ailleurs. C'est ce que la main essaie de faire
+ * neuf fois sur dix.
  */
 function PlanPreview({
-  value,
-  onChange,
-  onBox,
   cotes,
   routes,
   ceiling,
+  nord,
 }: {
-  value: PlanView;
-  onChange: (v: PlanView) => void;
-  onBox: (b: { w: number; h: number }) => void;
-  /**
-   * Ce que le document portera vraiment.
-   *
-   * L'aperçu montrait TOUJOURS les cotes, quel que soit l'interrupteur : on
-   * décochait « cotes sur le plan 2D » et rien ne changeait sous les yeux —
-   * on ne pouvait donc vérifier son réglage qu'en ouvrant le PDF.
-   */
   cotes: boolean;
-  routes?: { id: string; path: { x: number; z: number }[] }[];
-  /**
-   * Les appareils de plafond, quand c'est la feuille du plafond qu'on
-   * cadre. Un aperçu qui ne montre pas ce que la feuille portera ne sert
-   * à rien — et laisse croire que la feuille n'existe pas.
-   */
+  routes?: { id: string; path: Pt[] }[];
   ceiling?: CeilingFixture[];
+  /** La case « Nord » du dossier : elle vaut pour l'aperçu comme pour le PDF. */
+  nord: boolean;
 }) {
-  const valueRef = useRef(value);
-  valueRef.current = value;
-  const changeRef = useRef(onChange);
-  changeRef.current = onChange;
-  const baseRef = useRef({
-    v: DEFAULT_PLAN,
-    mode: 'pan' as 'pan' | 'pinch',
-    dx0: 0,
-    dy0: 0,
-    d0: 1,
-    mx0: 0,
-    my0: 0,
-  });
-
-  const pan = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_e, g) => Math.abs(g.dx) + Math.abs(g.dy) > 3,
-      onPanResponderGrant: (e, g) => {
-        const t = e.nativeEvent.touches;
-        baseRef.current = {
-          v: valueRef.current,
-          mode: t.length >= 2 ? 'pinch' : 'pan',
-          dx0: g.dx,
-          dy0: g.dy,
-          d0:
-            t.length >= 2
-              ? Math.max(8, Math.hypot(t[0].pageX - t[1].pageX, t[0].pageY - t[1].pageY))
-              : 1,
-          mx0: t.length >= 2 ? (t[0].pageX + t[1].pageX) / 2 : 0,
-          my0: t.length >= 2 ? (t[0].pageY + t[1].pageY) / 2 : 0,
-        };
-      },
-      onPanResponderMove: (e, g) => {
-        const t = e.nativeEvent.touches;
-        const mode = t.length >= 2 ? 'pinch' : 'pan';
-        if (mode !== baseRef.current.mode) {
-          baseRef.current = {
-            v: valueRef.current,
-            mode,
-            dx0: g.dx,
-            dy0: g.dy,
-            d0:
-              t.length >= 2
-                ? Math.max(8, Math.hypot(t[0].pageX - t[1].pageX, t[0].pageY - t[1].pageY))
-                : 1,
-            mx0: t.length >= 2 ? (t[0].pageX + t[1].pageX) / 2 : 0,
-            my0: t.length >= 2 ? (t[0].pageY + t[1].pageY) / 2 : 0,
-          };
-        }
-        const base = baseRef.current;
-        if (mode === 'pinch' && t.length >= 2) {
-          const d = Math.max(8, Math.hypot(t[0].pageX - t[1].pageX, t[0].pageY - t[1].pageY));
-          const mx = (t[0].pageX + t[1].pageX) / 2;
-          const my = (t[0].pageY + t[1].pageY) / 2;
-          changeRef.current({
-            zoom: clamp(base.v.zoom * (d / base.d0), 0.4, 4),
-            ox: base.v.ox + (mx - base.mx0),
-            oy: base.v.oy + (my - base.my0),
-          });
-        } else {
-          changeRef.current({
-            zoom: base.v.zoom,
-            ox: base.v.ox + (g.dx - base.dx0),
-            oy: base.v.oy + (g.dy - base.dy0),
-          });
-        }
-      },
-    }),
-  ).current;
-
   return (
     <View
+      accessibilityLabel="Aperçu du plan"
       style={planStyles.box}
-      onLayout={(e) =>
-        onBox({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })
-      }>
-      <View
-        pointerEvents="none"
-        style={[
-          planStyles.inner,
-          {
-            transform: [
-              { translateX: value.ox },
-              { translateY: value.oy },
-              { scale: value.zoom },
-            ],
-          },
-        ]}>
-        <FloorplanEditor
-          showMeasures={cotes}
-          cableRoutes={routes}
-          ceiling={ceiling}
-          showCeiling={!!ceiling}
-          editable={false}
-          selectedWallId={null}
-          onSelectWall={() => {}}
-        />
-      </View>
-      <View {...pan.panHandlers} style={StyleSheet.absoluteFill} />
+      pointerEvents="none">
+      <FloorplanEditor
+        showMeasures={cotes}
+        cableRoutes={routes}
+        ceiling={ceiling}
+        showCeiling={!!ceiling}
+        showNorth={nord}
+        editable={false}
+        selectedWallId={null}
+        onSelectWall={() => {}}
+      />
     </View>
   );
 }
@@ -354,17 +274,11 @@ const styles = getStyles(c);
   };
   /** Le plafond se dessine SUR le plan d'ensemble, pas sur une feuille à part. */
   const avecPlafond = plafond && ceiling.length > 0;
-  const [plan, setPlan] = useState<PlanView>(DEFAULT_PLAN);
-  const [v1, setV1] = useState<View3DParams>(DEFAULT_V1);
-  const [v2, setV2] = useState<View3DParams>(DEFAULT_V2);
-  const planBox = useRef({ w: 1, h: 1 });
-  const box1 = useRef({ w: 1, h: 1 });
-  const box2 = useRef({ w: 1, h: 1 });
+  const [vues, setVues] = useState<View3DParams[]>([{ ...ANGLES[0] }]);
+  const boites = useRef<{ w: number; h: number }[]>([{ w: 1, h: 1 }]);
 
   const reset = () => {
-    setPlan(DEFAULT_PLAN);
-    setV1(DEFAULT_V1);
-    setV2(DEFAULT_V2);
+    setVues((liste) => liste.map((_, i) => ({ ...angleSuivant(i) })));
   };
 
   const doExport = async () => {
@@ -380,10 +294,10 @@ const styles = getStyles(c);
        */
       const vignettes: { wallId: string; base64: string }[] = [];
       if (elevations) {
-        const vues = new Set<string>();
+        const dejaVus = new Set<string>();
         for (const ph of [...photos].sort((a, b) => b.at - a.at)) {
-          if (vues.has(ph.wallId)) continue;
-          vues.add(ph.wallId);
+          if (dejaVus.has(ph.wallId)) continue;
+          dejaVus.add(ph.wallId);
           const b64 = await RoomScan.readPhoto(ph.path, 900);
           if (b64) vignettes.push({ wallId: ph.wallId, base64: b64 });
         }
@@ -446,12 +360,10 @@ const styles = getStyles(c);
         },
         include3D,
         {
-          plan: {
-            zoom: plan.zoom,
-            fx: plan.ox / (planBox.current.w / 2),
-            fy: plan.oy / (planBox.current.h / 2),
-          },
-          views: [conv(v1, box1.current), conv(v2, box2.current)],
+          // Pas de `plan` : le document cadre le sien, droit et entier.
+          views: vues.map((v, i) =>
+            conv(v, boites.current[i] ?? { w: 1, h: 1 }),
+          ),
           colorOpenings: showOpeningColors,
           measures2D,
           measures3D,
@@ -490,9 +402,7 @@ const styles = getStyles(c);
     include3D,
     client,
     address,
-    plan,
-    v1,
-    v2,
+    vues,
   ]);
   const pret = useRef<{ cle: string; bytes: Uint8Array } | null>(null);
   useEffect(() => {
@@ -758,19 +668,15 @@ const styles = getStyles(c);
             : "Feuille 1 · Plan d'ensemble"}
         </Text>
         <View style={styles.sheetCard}>
-          {/* Le verrou de scroll ne couvre QUE la zone centrale du modèle */}
-          <View {...lockProps} style={styles.lockWrap}>
-            <PlanPreview
-              cotes={measures2D}
-              routes={gaines || schema ? cheminements?.traces : undefined}
-              ceiling={avecPlafond ? ceiling : undefined}
-              value={plan}
-              onChange={setPlan}
-              onBox={(b) => {
-                planBox.current = b;
-              }}
-            />
-          </View>
+          {/* Plus de verrou de défilement ici : rien ne se manipule sur le
+              plan, donc le doigt doit pouvoir le traverser pour faire
+              défiler la page. */}
+          <PlanPreview
+            cotes={measures2D}
+            routes={gaines || schema ? cheminements?.traces : undefined}
+            ceiling={avecPlafond ? ceiling : undefined}
+            nord={cardinaux}
+          />
         </View>
 
         {/*
@@ -786,50 +692,78 @@ const styles = getStyles(c);
 
         {include3D && (
           <>
-            <Text style={styles.sheetLabel}>
-              {`Feuille ${(includeMetre ? 1 : 0) + 2} · Vues 3D`}
-            </Text>
-            <View style={styles.sheetCard}>
-              <View
-                {...lockProps}
-                style={styles.view3d}
-                onLayout={(e) => {
-                  box1.current = {
-                    w: e.nativeEvent.layout.width,
-                    h: e.nativeEvent.layout.height,
-                  };
-                }}>
-                <Iso3DView
-                  value={v1}
-                  onChange={setV1}
-                  showMeasures={measures3D}
-                  showNorth={cardinaux}
-                />
-              </View>
-              <View
-                {...lockProps}
-                style={[styles.view3d, styles.view3dLast]}
-                onLayout={(e) => {
-                  box2.current = {
-                    w: e.nativeEvent.layout.width,
-                    h: e.nativeEvent.layout.height,
-                  };
-                }}>
-                <Iso3DView
-                  value={v2}
-                  onChange={setV2}
-                  showMeasures={measures3D}
-                  showNorth={cardinaux}
-                />
-              </View>
-            </View>
+            {/*
+              UNE PERSPECTIVE PAR FEUILLE, ET AUTANT QU'IL EN FAUT.
+
+              Deux vues se partageaient une page, chacune dans une case du
+              tiers d'un A4 : on n'y distinguait plus une porte d'une
+              fenêtre. Chacune prend maintenant sa feuille entière, et l'on
+              en ajoute quand un angle manque — de face pour la cuisine, de
+              l'autre bout pour le séjour.
+            */}
+            {vues.map((v, i) => (
+              <React.Fragment key={i}>
+                <View style={styles.sheetHead}>
+                  <Text style={styles.sheetLabel}>
+                    {`Feuille ${(includeMetre ? 1 : 0) + 2 + i} · Perspective${
+                      vues.length > 1 ? ` ${i + 1}` : ''
+                    }`}
+                  </Text>
+                  {i > 0 && (
+                    <TouchableOpacity
+                      accessibilityLabel={`Retirer la perspective ${i + 1}`}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                      onPress={() =>
+                        setVues((liste) => liste.filter((_, k) => k !== i))
+                      }>
+                      <Text style={styles.retirer}>Retirer</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+                <View style={styles.sheetCard}>
+                  <View
+                    {...lockProps}
+                    style={[styles.view3d, styles.view3dLast]}
+                    onLayout={(e) => {
+                      boites.current[i] = {
+                        w: e.nativeEvent.layout.width,
+                        h: e.nativeEvent.layout.height,
+                      };
+                    }}>
+                    <Iso3DView
+                      value={v}
+                      onChange={(nv) =>
+                        setVues((liste) =>
+                          liste.map((x, k) => (k === i ? nv : x)),
+                        )
+                      }
+                      showMeasures={measures3D}
+                      showNorth={cardinaux}
+                    />
+                  </View>
+                </View>
+              </React.Fragment>
+            ))}
+            {vues.length < MAX_VUES && (
+              <TouchableOpacity
+                style={styles.ajouter}
+                accessibilityLabel="Ajouter une perspective"
+                onPress={() =>
+                  setVues((liste) => [
+                    ...liste,
+                    { ...angleSuivant(liste.length) },
+                  ])
+                }>
+                <Text style={styles.ajouterTexte}>+ Ajouter une perspective</Text>
+              </TouchableOpacity>
+            )}
           </>
         )}
 
         <Text style={styles.hint}>
-          Cadrez chaque vue comme vous voulez la voir dans le PDF : un doigt
-          pour déplacer (ou tourner en 3D), deux doigts pour zoomer. ↻ remet
-          tout à zéro.
+          Le plan 2D est cadré par le document : droit, entier, coté. Les
+          perspectives, elles, se règlent — un doigt pour tourner, deux pour
+          zoomer. ↻ remet leurs angles à zéro.
         </Text>
       </ScrollView>
 
@@ -964,6 +898,31 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     marginTop: 10,
     marginBottom: 6,
   },
+  /* Le titre de feuille et son bouton « Retirer » sur la même ligne : le
+     bouton se lit comme une action SUR cette feuille-là, pas sur la
+     suivante. */
+  sheetHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  retirer: {
+    color: c.danger,
+    fontSize: 12.5,
+    fontWeight: '700',
+    marginTop: 10,
+    marginBottom: 6,
+  },
+  ajouter: {
+    marginTop: 12,
+    paddingVertical: 13,
+    borderRadius: radius.md,
+    borderWidth: 1.5,
+    borderColor: c.line,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+  },
+  ajouterTexte: { color: c.blue, fontSize: 14.5, fontWeight: '700' },
   sheetCard: {
     backgroundColor: c.surface,
     borderRadius: radius.lg,

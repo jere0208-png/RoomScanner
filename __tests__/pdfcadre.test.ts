@@ -148,7 +148,7 @@ describe('le plan PDF tient dans sa feuille', () => {
     const clips = [
       ...zoome.matchAll(/(-?[\d.]+) (-?[\d.]+) (-?[\d.]+) (-?[\d.]+) re W n/g),
     ].map((m) => m.slice(1).map(parseFloat));
-    // Deux vues par feuille : deux fenêtres de découpe au minimum.
+    // Une vue par feuille, deux feuilles : deux fenêtres de découpe.
     expect(clips.length).toBeGreaterThanOrEqual(2);
     for (const [x, y, w, h] of clips) {
       expect(x).toBeGreaterThanOrEqual(30);

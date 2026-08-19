@@ -1215,6 +1215,34 @@ Trois décisions tiennent ce repère :
   milieu du mur : au milieu, elle tombe en plein sur la porte dès que la baie
   est centrée, c'est-à-dire souvent.
 
+### Le dossier se compose, il ne se cadre pas
+
+Trois libertés de l'écran d'export ne produisaient que des documents ratés.
+
+**Le plan 2D ne se déplace ni ne se zoome plus.** On pouvait le cadrer au
+doigt avant l'export, et ce cadrage partait tel quel dans le PDF : un plan
+coupé, décentré, à une échelle qui n'en est pas une. Un plan d'exécution se
+lit droit, entier, avec toutes ses cotes — le cadrage est l'affaire du
+document, qui sait la place dont il dispose, pas celle d'un doigt sur un
+écran de six pouces. L'aperçu est donc `pointerEvents="none"` : le geste est
+rendu au défilement, ce que la main essaie de faire neuf fois sur dix.
+
+**La case « Nord » vaut pour tout l'aperçu.** Elle était passée aux deux vues
+3D et oubliée sur le plan 2D, qui gardait la valeur par défaut du composant —
+c'est-à-dire la rose allumée. On décochait, et l'aperçu continuait d'afficher
+ce que le PDF n'imprimerait pas.
+
+**Une perspective par feuille, et autant qu'il en faut.** Deux vues se
+partageaient une page, chacune dans une case de 290 points — le tiers d'un
+A4 : sur un logement de quatre pièces, on n'y distinguait plus une porte
+d'une fenêtre, et c'est justement ce qu'un client regarde en premier. Chaque
+angle prend maintenant la page entière, le dossier n'en porte plus qu'un par
+défaut, et l'on en ajoute jusqu'à quatre avant l'export. Les angles proposés
+tournent autour du logement et alternent le regard debout et la vue
+plongeante : ajouter deux fois le même trois-quarts ferait deux pages
+identiques. Le titre les numérote — « Perspective 2 » désigne quelque chose,
+« Vues 3D » répété quatre fois ne désigne rien.
+
 ### Le plan exporté
 
 **Il se dessine sur la trame du logement, pas dans le repère du scan.** ARKit

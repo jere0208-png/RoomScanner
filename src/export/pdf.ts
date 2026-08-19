@@ -190,7 +190,15 @@ export interface View3DParams {
 }
 export interface PdfOptions {
   plan?: PlanViewParams;
-  views?: [View3DParams, View3DParams];
+  /**
+   * Les perspectives à imprimer, une par page.
+   *
+   * Une liste, et non plus une paire : deux vues se partageaient une feuille
+   * A4, chacune dans une case du tiers de la page, et sur un logement de
+   * quatre pièces on n'y distinguait plus une porte d'une fenêtre. Autant
+   * d'angles qu'il en faut pour montrer le logement, chacun en grand.
+   */
+  views?: View3DParams[];
   colorOpenings?: boolean;
   /** Cotes sur le plan 2D / sur les vues 3D. */
   measures2D?: boolean;
@@ -2748,16 +2756,37 @@ function elevationWalls(ctx: SheetContext): WallSeg[] {
   return wallsInOrder(ctx).filter((w) => equipes.has(w.id));
 }
 
-const DEFAULT_PDF_VIEWS: [View3DParams, View3DParams] = [
+/**
+ * UNE SEULE perspective par défaut.
+ *
+ * Le dossier en portait deux d'office, dos à dos sur la même feuille — la
+ * seconde ne montrait souvent que l'envers des mêmes murs. On en imprime
+ * une, en grand ; les autres angles s'ajoutent avant l'export, quand ils
+ * apportent quelque chose.
+ */
+const DEFAULT_PDF_VIEWS: View3DParams[] = [
   { theta: -32, tilt: 58, zoom: 1, fx: 0, fy: 0 },
-  { theta: 148, tilt: 42, zoom: 1, fx: 0, fy: 0 },
 ];
 
+/**
+ * UNE PERSPECTIVE, TOUTE LA PAGE.
+ *
+ * Deux vues se partageaient une feuille : chacune tenait dans une case de
+ * 290 points, soit le tiers d'un A4. Sur un logement de quatre pièces, on
+ * n'y distinguait plus une porte d'une fenêtre — et c'est justement ce
+ * qu'un client regarde en premier, avant même de lire une cote.
+ *
+ * Chaque angle a donc sa page, et le dossier en porte autant qu'on en a
+ * réglé avant l'export. Le titre les numérote : « Perspective 2 » désigne
+ * quelque chose, « Vues 3D » répété quatre fois ne désigne rien.
+ */
 function threeDPage(
   ctx: SheetContext,
   sheet: string,
-  views: [View3DParams, View3DParams] = DEFAULT_PDF_VIEWS,
+  view: View3DParams,
   showDims = true,
+  rang = 1,
+  combien = 1,
 ): string {
   const d = new Draw();
   const opts = {
@@ -2770,22 +2799,42 @@ function threeDPage(
     fixtures: ctx.fixtures,
     showDims,
   };
-  const top = FRAME.y + FRAME.h;
-  d.text('Vue 1', FRAME.x + 20, top - 30, 10, GREY, { align: 'left' });
-  draw3DView(d, ctx.walls, ctx.openings, ctx.objects,
-    { x: FRAME.x + 30, y: FRAME.y + TITLE_H + 375, w: FRAME.w - 60, h: 290 },
-    views[0], opts);
-  d.text('Vue 2', FRAME.x + 20, FRAME.y + TITLE_H + 350, 10, GREY, { align: 'left' });
-  draw3DView(d, ctx.walls, ctx.openings, ctx.objects,
-    { x: FRAME.x + 30, y: FRAME.y + TITLE_H + 30, w: FRAME.w - 60, h: 290 },
-    views[1], opts);
+  const titre = combien > 1 ? `Perspective ${rang}` : 'Perspective';
+  d.text(titre, FRAME.x + 24, FRAME.y + FRAME.h - 20, 13, INK, {
+    bold: true,
+    align: 'left',
+  });
+  d.text(
+    `Vue d'ensemble du logement — angle ${Math.round(view.theta)}°, ` +
+      `inclinaison ${Math.round(view.tilt)}°.`,
+    FRAME.x + 24,
+    FRAME.y + FRAME.h - 34,
+    8,
+    GREY,
+    { align: 'left' },
+  );
+  // Toute la hauteur disponible entre le cartouche et le titre.
+  draw3DView(
+    d,
+    ctx.walls,
+    ctx.openings,
+    ctx.objects,
+    {
+      x: FRAME.x + 24,
+      y: FRAME.y + TITLE_H + 24,
+      w: FRAME.w - 48,
+      h: FRAME.h - TITLE_H - 72,
+    },
+    view,
+    opts,
+  );
 
   drawSheetChrome(d, {
     project: ctx.name,
     filename: ctx.filename,
     client: ctx.client,
     address: ctx.address,
-    sheetTitle: showDims ? 'Vues 3D cotées' : 'Vues 3D',
+    sheetTitle: showDims ? `${titre} cotée` : titre,
     sheet,
     scaleLabel: null,
   });
@@ -3601,10 +3650,14 @@ export function buildScanPdf(
   });
   // Trois feuilles : l'unifilaire hors sol, puis les deux schémas sur le
   // plan. Les tracés viennent des mêmes cheminements que le métré.
+  // Au moins une perspective quand on en demande : sans réglage, c'est la
+  // vue de trois quarts par défaut.
+  const vues =
+    opts.views && opts.views.length > 0 ? opts.views : [...DEFAULT_PDF_VIEWS];
   const total =
     1 +
     (withMetre ? 1 : 0) +
-    (include3D ? 1 : 0) +
+    (include3D ? vues.length : 0) +
     murs.length +
     (withSchema ? 1 : 0);
   const ctx: SheetContext = {
@@ -3632,9 +3685,18 @@ export function buildScanPdf(
     pages.push(metrePage(ctx, `${pages.length + 1} / ${total}`));
   }
   if (include3D) {
-    pages.push(
-      threeDPage(ctx, `${pages.length + 1} / ${total}`, opts.views, opts.measures3D ?? true),
-    );
+    vues.forEach((v, i) => {
+      pages.push(
+        threeDPage(
+          ctx,
+          `${pages.length + 1} / ${total}`,
+          v,
+          opts.measures3D ?? true,
+          i + 1,
+          vues.length,
+        ),
+      );
+    });
   }
   // Les élévations viennent après les plans et avant les schémas : on lit
   // le logement, puis chaque mur, puis le tableau.

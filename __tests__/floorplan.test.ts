@@ -1491,7 +1491,39 @@ describe('buildScanPdf', () => {
   it('ajoute la feuille des vues 3D quand demandé', () => {
     const s = latin1String(buildScanPdf(scan, true, { metre: false }));
     expect(s).toContain('/Count 2');
-    expect(s).toContain('Vues 3D');
+    expect(s).toContain('Perspective');
+  });
+
+  /*
+    UNE PERSPECTIVE PAR PAGE, ET AUTANT QU'ON EN DEMANDE.
+
+    Deux vues se partageaient une feuille A4 : chacune tenait dans une case
+    de 290 points de haut, soit le tiers de la page. Sur un logement de
+    quatre pièces, on n'y distinguait plus une porte d'une fenêtre — et
+    c'est justement ce qu'un client regarde en premier. Une vue prend donc
+    toute la page, et on en ajoute autant qu'il faut d'angles.
+  */
+  it('donne une page à chaque perspective demandée', () => {
+    const une = latin1String(
+      buildScanPdf(scan, true, {
+        metre: false,
+        views: [{ theta: -32, tilt: 58, zoom: 1, fx: 0, fy: 0 }],
+      }),
+    );
+    expect(une).toContain('/Count 2');
+    const trois = latin1String(
+      buildScanPdf(scan, true, {
+        metre: false,
+        views: [
+          { theta: -32, tilt: 58, zoom: 1, fx: 0, fy: 0 },
+          { theta: 148, tilt: 42, zoom: 1, fx: 0, fy: 0 },
+          { theta: 60, tilt: 70, zoom: 1, fx: 0, fy: 0 },
+        ],
+      }),
+    );
+    expect(trois).toContain('/Count 4');
+    // Et chacune se nomme, pour qu'on sache de quel angle on parle.
+    expect(trois).toContain('Perspective 3');
   });
 
   it('ajoute une feuille de métré, activable', () => {

@@ -200,6 +200,119 @@ describe('le nord dans le dossier', () => {
     expect(apres.length).toBeGreaterThan(0);
     for (const v of apres) expect(v.props.showNorth).toBe(true);
   });
+
+  /*
+    LA CASE VAUT POUR TOUT L'APERÇU, PAS SEULEMENT POUR LA 3D.
+
+    Relevé du chantier : « décocher Nord ne supprime pas les points
+    cardinaux affichés sur les plans en dessous ». Les deux vues 3D
+    recevaient bien le réglage ; le plan 2D, lui, gardait la valeur par
+    défaut du composant — c'est-à-dire la rose allumée. On décochait, et
+    l'aperçu continuait d'afficher ce que le PDF n'imprimerait pas.
+  */
+  it('vaut aussi pour le plan 2D de l’aperçu', () => {
+    const tree = monter('export');
+    const plans = () => tree.root.findAllByType(FloorplanEditor);
+    expect(plans().length).toBeGreaterThan(0);
+    for (const p of plans()) expect(p.props.showNorth).toBe(false);
+    const bouton = tree.root
+      .findAllByType(TouchableOpacity)
+      .find((n) => n.props.accessibilityLabel === 'Nord');
+    act(() => bouton!.props.onPress());
+    for (const p of plans()) expect(p.props.showNorth).toBe(true);
+  });
+});
+
+/**
+ * LES PERSPECTIVES S'AJOUTENT, ET CHACUNE PREND SA PAGE.
+ *
+ * Le dossier en portait deux d'office, dos à dos sur une même feuille —
+ * chacune dans une case du tiers d'un A4, où l'on ne distingue plus une
+ * porte d'une fenêtre. Une seule maintenant, en grand ; et si un angle
+ * manque pour montrer le logement, on en ajoute un.
+ */
+describe('les perspectives du dossier', () => {
+  const vues = (tree: TestRenderer.ReactTestRenderer) =>
+    tree.root.findAllByType(Iso3DView);
+  const boutonQuiDit = (tree: TestRenderer.ReactTestRenderer, label: string) =>
+    tree.root
+      .findAllByType(TouchableOpacity)
+      .find((n) => n.props.accessibilityLabel === label);
+
+  it('n’en propose qu’une au départ', () => {
+    expect(vues(monter('export'))).toHaveLength(1);
+  });
+
+  it('s’ajoutent, et se retirent', () => {
+    const tree = monter('export');
+    const ajouter = boutonQuiDit(tree, 'Ajouter une perspective');
+    expect(ajouter).toBeDefined();
+    act(() => ajouter!.props.onPress());
+    expect(vues(tree)).toHaveLength(2);
+    act(() => ajouter!.props.onPress());
+    expect(vues(tree)).toHaveLength(3);
+    // La deuxième s'enlève ; la première reste — un dossier sans aucune
+    // perspective n'aurait plus de feuille 3D du tout, et la case
+    // « Vues 3D » mentirait.
+    const retirer = boutonQuiDit(tree, 'Retirer la perspective 2');
+    expect(retirer).toBeDefined();
+    act(() => retirer!.props.onPress());
+    expect(vues(tree)).toHaveLength(2);
+  });
+
+  it('chacune part d’un angle différent', () => {
+    const tree = monter('export');
+    act(() => boutonQuiDit(tree, 'Ajouter une perspective')!.props.onPress());
+    const angles = vues(tree).map((v) => v.props.value.theta);
+    // Deux vues identiques feraient deux pages identiques.
+    expect(new Set(angles).size).toBe(angles.length);
+  });
+});
+
+/**
+ * LE PLAN DU DOSSIER NE SE CADRE PAS À LA MAIN.
+ *
+ * On pouvait le déplacer et le zoomer avant l'export, et ce cadrage partait
+ * dans le PDF. C'est une liberté qui ne produit que des documents ratés :
+ * un plan coupé, décentré, à une échelle qui n'est pas une échelle. Un plan
+ * d'exécution se lit droit, entier, avec toutes ses cotes — le cadrage est
+ * l'affaire du document, pas du doigt.
+ *
+ * Le geste est rendu au défilement : glisser sur l'aperçu fait défiler la
+ * page, comme partout ailleurs dans l'app.
+ */
+describe('le plan de l’aperçu', () => {
+  const zone = (tree: TestRenderer.ReactTestRenderer) =>
+    tree.root
+      .findAllByType(View)
+      .find((n) => n.props.accessibilityLabel === 'Aperçu du plan');
+
+  it('ne se déplace plus au doigt', () => {
+    const tree = monter('export');
+    const boite = zone(tree);
+    expect(boite).toBeDefined();
+    // Le doigt TRAVERSE l'aperçu : `pointerEvents="none"` neutralise d'un
+    // coup la boîte et tout ce qu'elle contient — y compris les gestes que
+    // l'éditeur de plan garde pour l'écran où on le retouche.
+    expect(boite!.props.pointerEvents).toBe('none');
+    expect(boite!.props.onStartShouldSetResponder).toBeUndefined();
+    expect(boite!.props.onMoveShouldSetResponder).toBeUndefined();
+  });
+
+  it('ne porte plus ni décalage ni échelle', () => {
+    const tree = monter('export');
+    const boite = zone(tree)!;
+    const styles = [boite, ...boite.findAllByType(View)].flatMap((n) =>
+      (Array.isArray(n.props.style) ? n.props.style : [n.props.style]).filter(
+        Boolean,
+      ),
+    );
+    // Un `transform` restant, et le cadrage au doigt serait revenu par la
+    // fenêtre : c'est lui qui portait le décalage et l'échelle.
+    for (const st of styles) {
+      expect((st as { transform?: unknown }).transform).toBeUndefined();
+    }
+  });
 });
 
 /**
