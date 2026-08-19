@@ -22,6 +22,7 @@ import {
 } from '../theme';
 import { GlowButton } from '../components/GlowButton';
 import { LogoMark } from '../components/LogoMark';
+import { LightRibbon, RIBBON_H } from '../components/LightRibbon';
 import { PhoneShowcase } from '../components/PhoneShowcase';
 import { useScanStore } from '../store/scanStore';
 import { useRoomScan } from '../native/useRoomScan';
@@ -192,6 +193,18 @@ export function HomeScreen() {
         chemin que la vue 3D de l'application.
       */}
       <Animated.View style={[styles.vitrine, fadeIn(2)]}>
+        {/*
+          LE RUBAN PASSE DERRIÈRE LA MAQUETTE.
+
+          Il traverse l'écran de bord à bord, à mi-hauteur du téléphone, et
+          ne reçoit jamais le doigt : c'est un fond, pas un objet. Posé en
+          absolu, il ne pousse rien — la maquette garde sa place au centre —
+          et son ondulation lente donne au bloc la profondeur qu'un aplat
+          n'a pas.
+        */}
+        <View style={styles.ruban} pointerEvents="none">
+          <LightRibbon width={winW} palette={c} sombre={themePref === 'dark'} />
+        </View>
         <PhoneShowcase />
       </Animated.View>
 
@@ -373,6 +386,17 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginVertical: 4,
+  },
+  /* Centré en hauteur sur la maquette, débordant des deux côtés : le ruban
+     doit sortir du cadre, sinon il paraît posé dans une boîte. */
+  ruban: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: '50%',
+    marginTop: -RIBBON_H / 2,
+    alignItems: 'center',
+    zIndex: -1,
   },
   /** Appareil incompatible, ou erreur du scan : un bandeau, pas une alerte. */
   warning: {

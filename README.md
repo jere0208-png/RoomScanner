@@ -759,6 +759,35 @@ devait s'effacer en cours de route : un fondu à régler, un écart à la
 maçonnerie à régler, deux corrections déjà. La vitrine montre un plan qui se
 lève ; les cotes, c'est dans l'app.
 
+### Le ruban de lumière, derrière la maquette
+
+L'accueil porte une onde qui traverse l'écran de bord à bord, à mi-hauteur du
+téléphone. La référence est un shader GLSL — un trait blanc qui ondule sur
+fond noir, bordé d'une frange chromatique. Il n'y a pas de WebGL ici, et il
+n'en faut pas : ce que l'œil retient de cette image, c'est **une courbe, sa
+lueur et sa frange**. Trois choses qui se dessinent au trait.
+
+**La courbe est dessinée une fois, et c'est le groupe qui glisse.** La
+recalculer à chaque image — soixante fois par seconde, sur un chemin de
+plusieurs centaines de points — coûterait à l'accueil ce que l'animation du
+plan a justement gagné en étant cuite au build. Le ruban est tracé sur deux
+longueurs d'onde, et une seule transformation, confiée au pilote natif, le
+fait défiler ; le motif se répète exactement d'une période à l'autre, donc la
+boucle ne se voit pas.
+
+**La frange est serrée.** Sur l'original elle s'étale sur plusieurs pixels, ce
+qui donne un arc-en-ciel ; à la taille d'un téléphone, cela devient une
+bavure. Un point et demi de part et d'autre suffit à dire « lumière
+décomposée ».
+
+**Et les tangentes suivent la pente.** Premier jet : les points de contrôle
+étaient posés à l'horizontale, à un tiers de pas de chaque point. Une Bézier
+ainsi bridée arrive à plat sur chaque sommet ET sur chaque flanc — la
+sinusoïde ondule entre ses propres points, et le ruban prend une allure de
+chenille. La pente d'un sinus est son cosinus ; chaque contrôle s'écarte donc
+le long de sa tangente. On a vu les bosses **sur le rendu** avant de les voir
+dans le code.
+
 ### Ce qu'on tient est une bulle
 
 Un scan décollé par appui long rétrécissait sur place et suivait le doigt en
