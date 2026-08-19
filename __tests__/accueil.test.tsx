@@ -219,11 +219,34 @@ describe('le bouton « Mes scans »', () => {
       .findAllByType(View)
       .find((n) => n.props.accessibilityLabel === 'Nombre de scans');
     expect(badge).toBeDefined();
-    const st = (Array.isArray(badge!.props.style)
-      ? Object.assign({}, ...badge!.props.style.filter(Boolean))
-      : badge!.props.style) as { position?: string; left?: string };
+    /*
+      ET ELLE EST CENTRÉE SUR LA LIGNE DU MOT.
+
+      Premier jet : la pastille était posée à « 50 % de haut, moins la
+      moitié de sa hauteur ». Deux approximations qui s'ajoutent — le
+      pourcentage se prend sur la boîte du texte, dont la hauteur dépend de
+      l'interligne de la police du téléphone, et la demi-hauteur de la
+      pastille était écrite en dur. Elle tombait sous la ligne.
+
+      Un cadre qui occupe TOUTE la hauteur du mot et centre son contenu ne
+      dépend d'aucun chiffre : c'est la seule façon que ça tienne d'un
+      appareil à l'autre.
+    */
+    const cadre = badge!.parent!;
+    const st = (Array.isArray(cadre.props.style)
+      ? Object.assign({}, ...cadre.props.style.filter(Boolean))
+      : cadre.props.style) as {
+      position?: string;
+      left?: string;
+      top?: number;
+      bottom?: number;
+      justifyContent?: string;
+    };
     expect(st.position).toBe('absolute');
     expect(st.left).toBe('100%');
+    expect(st.top).toBe(0);
+    expect(st.bottom).toBe(0);
+    expect(st.justifyContent).toBe('center');
     act(() => tree.unmount());
   });
 });

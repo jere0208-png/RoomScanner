@@ -21,11 +21,9 @@
  * sans que les couleurs se séparent vraiment.
  */
 import React, { useEffect, useMemo, useRef } from 'react';
-import { Animated, Easing, View } from 'react-native';
+import { Animated, Easing, StyleSheet, View } from 'react-native';
 import Svg, { G, Path } from 'react-native-svg';
 import type { Palette } from '../theme';
-
-const AnimatedG = Animated.createAnimatedComponent(G);
 
 /** Hauteur de la bande : le ruban ondule dedans, et rien ne dépasse. */
 export const RIBBON_H = 96;
@@ -110,13 +108,34 @@ export function LightRibbon({
   const opacite = sombre ? 0.5 : 0.28;
 
   return (
-    <View style={{ height: RIBBON_H, width }} pointerEvents="none">
-      <Svg width={width} height={RIBBON_H}>
-        <AnimatedG
-          x={glisse.interpolate({
-            inputRange: [0, 1],
-            outputRange: [0, -periode],
-          })}>
+    <View style={[styles.bande, { height: RIBBON_H, width }]} pointerEvents="none">
+      {/*
+        C'EST LA VUE QUI GLISSE, PAS L'ATTRIBUT.
+
+        Premier jet : la course était posée sur le `x` d'un groupe SVG. Le
+        ruban n'a pas bougé d'un pixel — et c'est logique, le pilote natif ne
+        connaît que les propriétés d'une VUE (position, opacité) ; il ignore
+        les attributs d'un dessin vectoriel. L'animation partait, personne ne
+        l'écoutait.
+
+        Le dessin fait donc deux longueurs d'onde, et c'est la vue qui le
+        porte qui se translate : une transformation, native, que le fil
+        principal n'a plus à réveiller soixante fois par seconde.
+      */}
+      <Animated.View
+        style={{
+          width: periode * 2,
+          transform: [
+            {
+              translateX: glisse.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0, -periode],
+              }),
+            },
+          ],
+        }}>
+        <Svg width={periode * 2} height={RIBBON_H}>
+        <G>
           {/* La lueur : deux passes larges et très pâles. Sans elles, le
               ruban est un fil ; avec, c'est une lumière. */}
           <Path d={d} stroke={coeur} strokeWidth={9} fill="none" opacity={opacite * 0.16} />
@@ -140,8 +159,15 @@ export function LightRibbon({
           />
           {/* Le cœur, par-dessus : c'est lui qu'on suit des yeux. */}
           <Path d={d} stroke={coeur} strokeWidth={1.8} fill="none" opacity={Math.min(1, opacite * 1.7)} />
-        </AnimatedG>
-      </Svg>
+        </G>
+        </Svg>
+      </Animated.View>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  /* Le ruban déborde de sa bande : sans ce rognage, sa seconde longueur
+     d'onde s'afficherait par-dessus le reste de l'écran. */
+  bande: { overflow: 'hidden' },
+});

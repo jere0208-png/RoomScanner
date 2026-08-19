@@ -16,6 +16,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 import React from 'react';
+import { Animated } from 'react-native';
 import { Path } from 'react-native-svg';
 import TestRenderer, { act } from 'react-test-renderer';
 import { LightRibbon, RIBBON_H } from '../src/components/LightRibbon';
@@ -97,6 +98,35 @@ describe('le ruban de l’accueil', () => {
     const ceuxDeJour = traces(jour).map((n) => String(n.props.stroke));
     expect(ceuxDeJour).not.toContain('#FFFFFF');
     expect(ceuxDeJour).toContain(light.blue);
+  });
+
+  /*
+    C'EST LA VUE QUI GLISSE, PAS L'ATTRIBUT DU DESSIN.
+
+    Premier jet : la course était posée sur le `x` d'un groupe SVG. Le ruban
+    n'a pas bougé d'un pixel — et c'est logique, le pilote natif ne connaît
+    que les propriétés d'une VUE ; il ignore les attributs d'un dessin
+    vectoriel. L'animation partait, personne ne l'écoutait, et l'accueil
+    montrait un trait courbé immobile.
+
+    Ce banc tient la seule chose qui garantit le mouvement : une
+    transformation, sur une vue, avec une valeur animée dedans.
+  */
+  it('translate une VUE, seule chose que le natif sait animer', () => {
+    const tree = rendre();
+    const anime = tree.root
+      .findAllByType(Animated.View)
+      .map((n) =>
+        Array.isArray(n.props.style)
+          ? Object.assign({}, ...n.props.style.filter(Boolean))
+          : n.props.style,
+      )
+      .find((st) => Array.isArray(st?.transform));
+    expect(anime).toBeDefined();
+    const t = anime.transform[0];
+    expect(t.translateX).toBeDefined();
+    // Une valeur animée, pas un nombre figé.
+    expect(typeof t.translateX).not.toBe('number');
   });
 
   it('reste dans sa bande, quelle que soit la largeur', () => {

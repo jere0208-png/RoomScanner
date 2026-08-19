@@ -557,7 +557,11 @@ rappelle le numéro que le mur porte sur le plan.
   se retrouvait poussé à gauche du milieu — d'autant plus loin que le nombre
   est long. Un bouton dont le texte se déplace selon le nombre de scans qu'on
   possède ne se lit plus comme un bouton. La pastille est posée dans le cadre
-  du mot, en absolu à son bord droit : elle déborde sans prendre de place.
+  du mot, dans un cadre haut comme lui qui la centre. Un premier jet la posait
+  à « 50 % de haut, moins la moitié de sa hauteur » : deux approximations qui
+  s'ajoutent — le pourcentage se prend sur la boîte du texte, dont la hauteur
+  dépend de l'interligne de la police du téléphone, et la demi-hauteur était
+  écrite en dur. La pastille tombait sous la ligne.
 - **L'écran de lancement montre ce que montre l'accueil** : l'icône ET le mot,
   composés en une seule image aux trois densités. Il n'en portait que la
   moitié.
@@ -767,7 +771,15 @@ fond noir, bordé d'une frange chromatique. Il n'y a pas de WebGL ici, et il
 n'en faut pas : ce que l'œil retient de cette image, c'est **une courbe, sa
 lueur et sa frange**. Trois choses qui se dessinent au trait.
 
-**La courbe est dessinée une fois, et c'est le groupe qui glisse.** La
+**C'est la VUE qui glisse, pas l'attribut du dessin.** Premier jet : la course
+était posée sur le `x` d'un groupe SVG. Le ruban n'a pas bougé d'un pixel — et
+c'est logique : le pilote natif ne connaît que les propriétés d'une vue, il
+ignore les attributs d'un dessin vectoriel. L'animation partait, personne ne
+l'écoutait, et l'accueil montrait un trait courbé immobile. Le banc tient
+désormais la seule chose qui garantit le mouvement : une transformation, sur
+une vue, avec une valeur animée dedans.
+
+**La courbe est dessinée une fois, et c'est la vue qui la porte qui glisse.** La
 recalculer à chaque image — soixante fois par seconde, sur un chemin de
 plusieurs centaines de points — coûterait à l'accueil ce que l'animation du
 plan a justement gagné en étant cuite au build. Le ruban est tracé sur deux

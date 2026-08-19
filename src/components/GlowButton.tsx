@@ -154,7 +154,20 @@ export function GlowButton({
             ]}>
             {label}
           </Text>
-          {right}
+          {/*
+            LE CADRE OCCUPE TOUTE LA HAUTEUR DU MOT, ET CENTRE CE QU'IL PORTE.
+
+            Premier jet : la pastille était posée à « 50 % de haut, moins la
+            moitié de sa hauteur ». Deux approximations qui s'ajoutent — le
+            pourcentage se prend sur la boîte du texte, dont la hauteur
+            dépend de l'interligne de la police du téléphone, et la
+            demi-hauteur était écrite en dur. Elle tombait sous la ligne.
+
+            Un cadre haut comme le mot, qui centre son contenu, ne dépend
+            d'aucun chiffre : c'est la seule façon que ça tienne d'un
+            appareil à l'autre.
+          */}
+          {right ? <View style={styles.suite}>{right}</View> : null}
         </View>
         {/* Le contour : posé PAR-DESSUS le fond, mais transparent au doigt —
             il ne doit pas voler l'appui qu'il invite à donner. */}
@@ -222,6 +235,14 @@ const getStyles = (() => {
   const cache = new Map<Palette, ReturnType<typeof creer>>();
   const creer = (c: Palette) =>
     StyleSheet.create({
+    /** Ce qui accompagne le mot : accroché à son bord droit, centré sur lui. */
+    suite: {
+      position: 'absolute',
+      left: '100%',
+      top: 0,
+      bottom: 0,
+      justifyContent: 'center',
+    },
       corps: {
         flexDirection: 'row',
         alignItems: 'center',
