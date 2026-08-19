@@ -192,9 +192,12 @@ function distBord(fx, fy, size, mask) {
 }
 
 /**
- * mask : 'none'  → plein cadre opaque (iOS, le système arrondit lui-même)
- *        'round' → carré arrondi avec alpha (Android classique)
- *        'circle'→ rond avec alpha (Android "round")
+ * mask : 'none'     → plein cadre opaque (iOS, le système arrondit lui-même)
+ *        'round'    → carré arrondi avec alpha (Android classique)
+ *        'circle'   → rond avec alpha (Android "round")
+ *        'squircle' → la découpe d'iOS, cuite avec alpha — pour l'écran de
+ *                     lancement, où AUCUN système ne viendra la faire : une
+ *                     UIImageView affiche le carré tel quel.
  */
 function render(size, mask) {
   const rgba = Buffer.alloc(size * size * 4);
@@ -214,6 +217,10 @@ function render(size, mask) {
           const qy = Math.abs(fy - size / 2) - (size / 2 - cr);
           const d = Math.min(Math.max(qx, qy), 0) + Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) - cr;
           shape = Math.max(0, Math.min(1, -d + 0.5));
+        } else if (mask === 'squircle') {
+          // La même superellipse d'ordre 5 que le liseré : la découpe et le
+          // trait qui la longe sortent du même champ, donc ne divergent pas.
+          shape = Math.max(0, Math.min(1, -distBord(fx, fy, size, 'squircle') + 0.5));
         }
         if (shape <= 0) continue;
         const gx = fx * S, gy = fy * S;
@@ -288,6 +295,45 @@ const contents = {
   info: { author: 'xcode', version: 1 },
 };
 writeFileSync(join(iosDir, 'Contents.json'), JSON.stringify(contents, null, 2));
+
+// ---------------------------------------------------- écran de lancement
+/*
+  L'ICÔNE DE L'APP, EN GRAND, AU CENTRE — et rien d'autre.
+
+  L'écran de lancement portait le logo composé (glyphe + mot) : le lancement
+  est pourtant le moment où l'on vient d'APPUYER sur l'icône, et la
+  retrouver seule au centre fait une continuité — le mot, lui, vit sur
+  l'accueil. L'image est DÉRIVÉE du même rendu que l'icône : même glyphe,
+  même liseré, et la découpe squircle est cuite ici avec son alpha,
+  puisqu'une UIImageView n'arrondit rien.
+*/
+const launchDir = join(ROOT, 'ios/RoomScanner/Images.xcassets/LaunchIcon.imageset');
+mkdirSync(launchDir, { recursive: true });
+const LAUNCH_PT = 180;
+for (const scale of [1, 2, 3]) {
+  const px = LAUNCH_PT * scale;
+  const suffix = scale === 1 ? '' : `@${scale}x`;
+  writeFileSync(
+    join(launchDir, `LaunchIcon${suffix}.png`),
+    encodePNG(px, render(px, 'squircle'), true),
+  );
+  console.log(`iOS LaunchIcon${suffix}.png (${px}px)`);
+}
+writeFileSync(
+  join(launchDir, 'Contents.json'),
+  JSON.stringify(
+    {
+      images: [1, 2, 3].map((s) => ({
+        idiom: 'universal',
+        scale: `${s}x`,
+        filename: `LaunchIcon${s === 1 ? '' : `@${s}x`}.png`,
+      })),
+      info: { author: 'xcode', version: 1 },
+    },
+    null,
+    2,
+  ),
+);
 
 // -------------------------------------------------------------- Android
 const densities = [

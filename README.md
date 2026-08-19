@@ -570,9 +570,16 @@ rappelle le numéro que le mur porte sur le plan.
   s'ajoutent — le pourcentage se prend sur la boîte du texte, dont la hauteur
   dépend de l'interligne de la police du téléphone, et la demi-hauteur était
   écrite en dur. La pastille tombait sous la ligne.
-- **L'écran de lancement montre ce que montre l'accueil** : l'icône ET le mot,
-  composés en une seule image aux trois densités. Il n'en portait que la
-  moitié.
+- **L'écran de lancement montre l'icône, en grand, au centre.** Il a d'abord
+  porté la moitié du logo, puis le logo entier (icône et mot) au tiers haut —
+  mais le lancement est le moment où l'on vient d'APPUYER sur cette icône :
+  la retrouver seule, au centre, fait une continuité, et le mot vit sur
+  l'accueil. L'image est cuite par `gen-icons` du même rendu que l'icône —
+  même glyphe, même liseré, découpe squircle comprise, puisqu'une
+  UIImageView n'arrondit rien — aux trois densités, et un banc
+  (`lancement.test.ts`) tient le storyboard : l'icône, seule, carrée,
+  centrée. iOS met cet écran en cache : après un changement, supprimer
+  l'app et réinstaller.
 - **Le logo du cartouche PDF passe de 38 à 50 points.** Au creux d'un cartouche
   qui en fait 66, il passait pour une vignette de pied de page — c'est pourtant
   la seule marque du document, celle qu'on voit quand le dossier traîne plié en
