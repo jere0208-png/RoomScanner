@@ -186,6 +186,43 @@ le graphe, donc retirer les voisins déformerait la maçonnerie qu'on garde ; et
 le cadrage doit rester celui du logement entier, sinon le modèle saute à
 chaque mur présenté.
 
+### Pousser un mur, le faire tourner
+
+Un mur ne se retouchait que par ses **coins**, un par un. Décaler une cloison
+de dix centimètres demandait donc de viser deux fois le même déplacement au
+doigt — ce qui ne donne jamais deux fois le même : le mur arrivait de travers,
+et on recommençait.
+
+Ce sont pourtant les deux gestes du métier. On **pousse** une cloison — elle
+reste parallèle à elle-même — et on la **pivote** — elle garde sa longueur.
+Ils ont désormais leurs poignées, sur le modèle exact de celles du mobilier,
+pour qu'il n'y ait rien à réapprendre : la prise est le mur lui-même, élargie
+à trente points, et un rond bleu au bout le fait tourner.
+
+Quatre décisions, toutes vérifiées au banc :
+
+- **Les voisins restent accrochés.** Dans un logement, pousser une cloison
+  ÉTIRE les deux murs qui la tiennent ; les laisser en place ouvrirait le
+  contour, et la pièce cesserait d'avoir une surface. Tout point du plan qui
+  coïncidait avec un bout du mur le suit — la même règle que pour un coin tiré
+  à la main.
+- **Le mur pivote autour de son MILIEU.** Autour d'un bout, l'autre extrémité
+  part au loin et le geste devient impossible à viser ; autour du milieu, ce
+  qu'on voit tourner est ce qu'on tient.
+- **Les aimants rattrapent la main sans la contredire.** Une cloison poussée à
+  trois centimètres de l'aplomb d'une autre est une cloison qu'on voulait
+  aligner ; au-delà de douze, c'est un choix, et le reprendre serait
+  insupportable. La rotation, elle, s'accroche tous les quinze degrés à trois
+  près : un mur se pose d'équerre ou en biais à quarante-cinq, rarement à
+  trente-sept.
+- **L'angle s'écrit pendant qu'on tourne.** Sans lui, on tourne à l'aveugle —
+  et c'est justement à l'aplomb qu'on veut revenir neuf fois sur dix.
+
+La prise du mur ne répond qu'au MOUVEMENT, jamais à l'appui : sans ce seuil de
+six points, un simple appui pour désélectionner déplacerait le mur d'un cheveu.
+Et ce qui est percé dedans — portes, fenêtres — voyage avec lui, sans quoi la
+baie resterait en l'air.
+
 ### Un meuble se tire par ses bords
 
 Régler un meuble à la cote, c'était taper une largeur : il fallait faire le

@@ -2077,6 +2077,27 @@ export function FloorplanEditor({
             corners.map((pt) => (
               <CornerHandle key={pt.key} corner={pt} mapping={mapping} />
             ))}
+
+          {/*
+            LE MUR CHOISI SE POUSSE ET SE TOURNE.
+
+            Les deux gestes du métier : on POUSSE une cloison — elle reste
+            parallèle à elle-même, ses voisins s'étirent — et on la PIVOTE,
+            elle garde sa longueur. Ils n'apparaissent que sur le mur
+            sélectionné : partout ailleurs, le doigt appartient au plan.
+          */}
+          {editable &&
+            selectedWallId &&
+            (() => {
+              const w = walls.find((x) => x.id === selectedWallId);
+              if (!w) return null;
+              return (
+                <React.Fragment key={`mur-${w.id}`}>
+                  <WallMoveHandle wall={w} mapping={mapping} />
+                  <WallRotateHandle wall={w} mapping={mapping} />
+                </React.Fragment>
+              );
+            })()}
         </>
       )}
     </View>
@@ -2609,6 +2630,185 @@ export function SideHandle({
   );
 }
 
+/**
+ * LE MUR CHOISI SE POUSSE AU DOIGT.
+ *
+ * On ne pouvait le retoucher que par ses COINS, un par un : décaler une
+ * cloison de dix centimètres demandait de viser deux fois le même
+ * déplacement, ce qui ne donne jamais deux fois le même — le mur arrivait
+ * de travers, et on recommençait.
+ *
+ * La zone de prise est le mur lui-même, élargie à trente points : c'est ce
+ * qu'on voit, donc ce qu'on attrape. Le geste ne se rend pas au plan, sans
+ * quoi les premiers pixels pousseraient le mur et le plan reprendrait tout.
+ */
+function WallMoveHandle({
+  wall,
+  mapping,
+}: {
+  wall: WallSeg;
+  mapping: EffMapping;
+}) {
+  const styles = getStyles(useTheme());
+  const depart = useRef({ x: 0, z: 0 });
+  const pan = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => false,
+        // Six points de course avant de prendre la main : sans ce seuil, un
+        // simple appui pour désélectionner déplacerait le mur d'un cheveu.
+        onMoveShouldSetPanResponder: (_e, g) =>
+          Math.abs(g.dx) + Math.abs(g.dy) > 6,
+        onPanResponderTerminationRequest: () => false,
+        onShouldBlockNativeResponder: () => true,
+        onPanResponderGrant: () => {
+          depart.current = { x: 0, z: 0 };
+        },
+        onPanResponderMove: (_e, g) => {
+          // Le magasin reçoit des PAS, pas une position : on lui envoie donc
+          // ce qui s'est ajouté depuis la dernière image. Sans quoi l'aimant,
+          // qui corrige le pas, se rajouterait à lui-même à chaque frame.
+          const d = mapping.deltaToMeters(g.dx, g.dy);
+          const dx = d.x - depart.current.x;
+          const dz = d.z - depart.current.z;
+          depart.current = d;
+          useScanStore.getState().moveWall(wall.id, dx, dz);
+        },
+      }),
+    [wall.id, mapping],
+  );
+  const a = mapping.toPx(wall.a);
+  const b = mapping.toPx(wall.b);
+  return (
+    <View
+      {...pan.panHandlers}
+      // Rien à dessiner : le mur est déjà là, sous le doigt. Seule la boîte
+      // se calcule, et elle change à chaque image du geste.
+      style={[
+        styles.wallGrab,
+        {
+          left: Math.min(a.x, b.x) - 15,
+          top: Math.min(a.y, b.y) - 15,
+          width: Math.abs(b.x - a.x) + 30,
+          height: Math.abs(b.y - a.y) + 30,
+        },
+      ]}
+    />
+  );
+}
+
+/**
+ * LA POIGNÉE DE ROTATION D'UN MUR — la même que celle d'un meuble.
+ *
+ * Un rond posé au bout du mur, qu'on tire : le mur suit l'angle du doigt
+ * autour de SON MILIEU. Autour d'un bout, l'autre extrémité partirait au
+ * loin et le geste deviendrait impossible à viser.
+ *
+ * L'angle s'affiche le temps du geste. Sans lui, on tourne à l'aveugle et
+ * l'on ne retrouve jamais l'aplomb — et c'est justement à l'aplomb qu'on
+ * veut revenir neuf fois sur dix.
+ */
+function WallRotateHandle({
+  wall,
+  mapping,
+}: {
+  wall: WallSeg;
+  mapping: EffMapping;
+}) {
+  const c = useTheme();
+  const styles = getStyles(c);
+  const [angle, setAngle] = useState<number | null>(null);
+  const vif = useRef({ wall, mapping });
+  vif.current = { wall, mapping };
+  const base = useRef(0);
+  const pan = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        onPanResponderTerminationRequest: () => false,
+        onShouldBlockNativeResponder: () => true,
+        onPanResponderGrant: (e) => {
+          const { wall: w, mapping: m } = vif.current;
+          const mid = m.toPx({
+            x: (w.a.x + w.b.x) / 2,
+            z: (w.a.z + w.b.z) / 2,
+          });
+          const { locationX: x, locationY: y } = e.nativeEvent;
+          base.current = Math.atan2(y - mid.y, x - mid.x);
+          setAngle(0);
+        },
+        onPanResponderMove: (e) => {
+          const { wall: w, mapping: m } = vif.current;
+          const mid = m.toPx({
+            x: (w.a.x + w.b.x) / 2,
+            z: (w.a.z + w.b.z) / 2,
+          });
+          const { locationX: x, locationY: y } = e.nativeEvent;
+          const vise = Math.atan2(y - mid.y, x - mid.x);
+          let pas = ((vise - base.current) * 180) / Math.PI;
+          pas = ((pas + 540) % 360) - 180;
+          if (Math.abs(pas) < 0.4) return;
+          base.current = vise;
+          useScanStore.getState().rotateWall(w.id, pas);
+          const apres = useScanStore
+            .getState()
+            .walls.find((x2) => x2.id === w.id);
+          if (apres) {
+            setAngle(
+              Math.round(
+                (Math.atan2(apres.b.z - apres.a.z, apres.b.x - apres.a.x) *
+                  180) /
+                  Math.PI,
+              ),
+            );
+          }
+        },
+        onPanResponderRelease: () => setAngle(null),
+        onPanResponderTerminate: () => setAngle(null),
+      }),
+    [],
+  );
+  const b = mapping.toPx(wall.b);
+  const a = mapping.toPx(wall.a);
+  // Posée dans le prolongement du mur, à vingt-six points du bout : elle ne
+  // couvre ni la maçonnerie ni la poignée de coin qui vit là.
+  const l = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+  const u = { x: (b.x - a.x) / l, y: (b.y - a.y) / l };
+  const at = { x: b.x + u.x * 26, y: b.y + u.y * 26 };
+  return (
+    <>
+      <View
+        {...pan.panHandlers}
+        accessibilityLabel="Tourner le mur"
+        style={[styles.wallRotate, { left: at.x - 17, top: at.y - 17 }]}>
+        <Svg width={20} height={20} viewBox="0 0 24 24">
+          <Path
+            d="M19.5 12 a7.5 7.5 0 1 1 -2.2 -5.3"
+            stroke={c.blue}
+            strokeWidth={2.2}
+            strokeLinecap="round"
+            fill="none"
+          />
+          <Path
+            d="M19.8 3.8 v4.4 h-4.4"
+            stroke={c.blue}
+            strokeWidth={2.2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            fill="none"
+          />
+        </Svg>
+      </View>
+      {angle !== null && (
+        <View style={[styles.wallAngle, { left: at.x - 26, top: at.y - 46 }]}>
+          <Text style={styles.wallAngleText}>{`${angle}°`}</Text>
+        </View>
+      )}
+    </>
+  );
+}
+
 function CornerHandle({
   corner,
   mapping,
@@ -2660,6 +2860,31 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     borderRadius: 20,
     overflow: 'hidden',
   },
+  /** La prise du mur : invisible, elle ne fait qu'attraper le doigt. */
+  wallGrab: { position: 'absolute', backgroundColor: 'transparent' },
+  /** La poignée de rotation d'un mur : un rond bleu clair, comme au meuble. */
+  wallRotate: {
+    position: 'absolute',
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: c.surface,
+    borderWidth: 1.5,
+    borderColor: c.blue,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...shadowCard,
+    shadowOpacity: 0.1,
+  },
+  wallAngle: {
+    position: 'absolute',
+    minWidth: 52,
+    paddingVertical: 4,
+    borderRadius: radius.pill,
+    backgroundColor: c.blue,
+    alignItems: 'center',
+  },
+  wallAngleText: { color: '#FFFFFF', fontSize: 12.5, fontWeight: '800' },
   handle: {
     position: 'absolute',
     width: 32,

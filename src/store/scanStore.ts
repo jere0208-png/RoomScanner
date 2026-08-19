@@ -799,6 +799,23 @@ interface ScanState {
   applyLiveUpdate: (u: ScanUpdate) => void;
   finalize: (r: ScanResult) => void;
   moveWallPoint: (id: string, end: 'a' | 'b', p: { x: number; z: number }) => void;
+  /**
+   * POUSSE un mur entier, ses voisins restant accrochés.
+   *
+   * Un mur ne se retouchait que par ses coins, un par un : pour décaler une
+   * cloison de dix centimètres, il fallait viser deux fois le même
+   * déplacement au doigt — ce qui ne donne jamais deux fois le même, et le
+   * mur arrivait de travers.
+   */
+  moveWall: (id: string, dx: number, dz: number) => void;
+  /**
+   * FAIT TOURNER un mur autour de son milieu, ses voisins suivant ses bouts.
+   *
+   * Autour d'un bout, l'autre extrémité part au loin et le geste devient
+   * impossible à viser ; autour du milieu, ce qu'on voit tourner est ce
+   * qu'on tient.
+   */
+  rotateWall: (id: string, deg: number) => void;
   setWallLength: (id: string, length: number) => void;
   renameCurrent: (name: string) => void;
   saveAsCopy: (name: string) => void;
@@ -2394,6 +2411,139 @@ export const useScanStore = create<ScanState>((set, get) => {
           return { ...w, a: move(w.a), b: move(w.b) };
         }),
         // Pas de sauvegarde automatique : le bouton d'enregistrement apparaît.
+        dirty: true,
+      });
+    },
+
+    moveWall: (id, dx, dz) => {
+      const st = get();
+      const wall = st.walls.find((w) => w.id === id);
+      if (!wall || (Math.abs(dx) < 1e-9 && Math.abs(dz) < 1e-9)) return;
+
+      /*
+        L'AIMANT RATTRAPE LA MAIN, IL NE LA CONTREDIT PAS.
+
+        Une cloison poussée à trois centimètres de l'aplomb d'une autre est
+        une cloison qu'on voulait aligner : le doigt ne fait pas mieux sur un
+        écran de six pouces. Au-delà de douze centimètres, c'est un choix —
+        et le reprendre serait insupportable.
+
+        On ne regarde que les murs PARALLÈLES dont la projection recouvre la
+        nôtre : deux murs alignés bout à bout ne s'aimantent pas, ils se
+        suivent déjà.
+      */
+      const AIMANT = 0.12;
+      const A = { x: wall.a.x + dx, z: wall.a.z + dz };
+      const B = { x: wall.b.x + dx, z: wall.b.z + dz };
+      const lm = Math.hypot(B.x - A.x, B.z - A.z) || 1;
+      const um = { x: (B.x - A.x) / lm, z: (B.z - A.z) / lm };
+      const n = { x: -um.z, z: um.x };
+      let cale = 0;
+      let mieux = AIMANT;
+      for (const o of st.walls) {
+        if (o.id === id) continue;
+        const lo = Math.hypot(o.b.x - o.a.x, o.b.z - o.a.z) || 1;
+        const uo = { x: (o.b.x - o.a.x) / lo, z: (o.b.z - o.a.z) / lo };
+        if (Math.abs(um.x * uo.z - um.z * uo.x) > 0.05) continue;
+        const t = (p: Pt) => (p.x - o.a.x) * uo.x + (p.z - o.a.z) * uo.z;
+        const t0 = Math.min(t(A), t(B));
+        const t1 = Math.max(t(A), t(B));
+        if (t1 < 0.05 || t0 > lo - 0.05) continue;
+        const e = (A.x - o.a.x) * n.x + (A.z - o.a.z) * n.z;
+        if (Math.abs(e) < mieux) {
+          mieux = Math.abs(e);
+          cale = -e;
+        }
+      }
+      const ddx = dx + n.x * cale;
+      const ddz = dz + n.z * cale;
+
+      /*
+        LES VOISINS RESTENT ACCROCHÉS.
+
+        Dans un logement, pousser une cloison ÉTIRE les deux murs qui la
+        tiennent. Les laisser où ils étaient ouvrirait le contour, et la
+        pièce cesserait d'avoir une surface. On déplace donc TOUT point du
+        plan qui coïncidait avec un bout du mur — c'est la même règle que
+        pour un coin tiré à la main.
+      */
+      pushHistory(`moveWall:${id}`);
+      const colle = (p: Pt, ref: Pt) => Math.hypot(p.x - ref.x, p.z - ref.z) < 1e-4;
+      const glisse = (p: Pt) => ({ x: p.x + ddx, z: p.z + ddz });
+      set({
+        walls: st.walls.map((w) => {
+          if (w.id === id) return { ...w, a: glisse(w.a), b: glisse(w.b) };
+          const suit = (p: Pt) =>
+            colle(p, wall.a) || colle(p, wall.b) ? glisse(p) : p;
+          return { ...w, a: suit(w.a), b: suit(w.b) };
+        }),
+        // Ce qui est PERCÉ dans ce mur voyage avec lui : une baie restée en
+        // arrière serait une baie dans le vide.
+        openings: st.openings.map((o) => {
+          const mid = { x: (o.a.x + o.b.x) / 2, z: (o.a.z + o.b.z) / 2 };
+          return pointOnSeg(mid, wall.a, wall.b).dist < 0.4
+            ? { ...o, a: glisse(o.a), b: glisse(o.b) }
+            : o;
+        }),
+        dirty: true,
+      });
+    },
+
+    rotateWall: (id, deg) => {
+      const st = get();
+      const wall = st.walls.find((w) => w.id === id);
+      if (!wall || !deg) return;
+      const centre = {
+        x: (wall.a.x + wall.b.x) / 2,
+        z: (wall.a.z + wall.b.z) / 2,
+      };
+      /*
+        IL S'ARRÊTE SUR LES ANGLES QU'ON VISE.
+
+        Un mur se pose d'équerre, en biais à quarante-cinq, rarement à
+        trente-sept degrés. L'accroche se fait donc tous les quinze degrés, à
+        trois près : de quoi retrouver l'aplomb du premier coup sans
+        interdire l'angle qu'on veut vraiment.
+
+        Elle porte sur l'ANGLE FINAL du mur, pas sur la rotation demandée :
+        c'est la direction du mur qu'on lit sur le plan, pas le chemin
+        parcouru par le doigt.
+      */
+      const actuel =
+        (Math.atan2(wall.b.z - wall.a.z, wall.b.x - wall.a.x) * 180) / Math.PI;
+      const vise = actuel + deg;
+      const cran = Math.round(vise / 15) * 15;
+      const final = Math.abs(vise - cran) <= 3 ? cran : vise;
+      const rot = ((final - actuel) * Math.PI) / 180;
+      const cos = Math.cos(rot);
+      const sin = Math.sin(rot);
+      const tourne = (p: Pt) => {
+        const x = p.x - centre.x;
+        const z = p.z - centre.z;
+        return {
+          x: centre.x + x * cos - z * sin,
+          z: centre.z + x * sin + z * cos,
+        };
+      };
+      const na = tourne(wall.a);
+      const nb = tourne(wall.b);
+      pushHistory(`rotateWall:${id}`);
+      const colle = (p: Pt, ref: Pt) => Math.hypot(p.x - ref.x, p.z - ref.z) < 1e-4;
+      set({
+        walls: st.walls.map((w) => {
+          if (w.id === id) return { ...w, a: na, b: nb };
+          // Les voisins suivent le bout auquel ils sont soudés : le contour
+          // reste fermé, quitte à ce qu'ils s'allongent ou raccourcissent.
+          const suit = (p: Pt) =>
+            colle(p, wall.a) ? na : colle(p, wall.b) ? nb : p;
+          return { ...w, a: suit(w.a), b: suit(w.b) };
+        }),
+        openings: st.openings.map((o) => {
+          const mid = { x: (o.a.x + o.b.x) / 2, z: (o.a.z + o.b.z) / 2 };
+          return pointOnSeg(mid, wall.a, wall.b).dist < 0.4
+            ? { ...o, a: tourne(o.a), b: tourne(o.b) }
+            : o;
+        }),
         dirty: true,
       });
     },

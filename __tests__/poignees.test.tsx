@@ -18,7 +18,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 import React from 'react';
-import { View } from 'react-native';
+import { Text, View } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import {
   FloorplanEditor,
@@ -275,5 +275,167 @@ describe('les commandes suivent le meuble', () => {
     expect(pose(dehors, 'Retirer le meuble')).toBeNull();
     expect(pose(dehors, 'Pivoter le meuble')).toBeNull();
     expect(pose(dehors, 'Étirer le côté largeur+')).toBeNull();
+  });
+});
+/**
+ * LES DEUX POIGNÉES D'UN MUR.
+ *
+ * Le magasin sait pousser et tourner un mur ; encore faut-il que le doigt
+ * atteigne ces gestes. Ce banc vérifie le chemin complet — la poignée
+ * existe, elle prend la main, et le mur bouge pour de bon.
+ */
+describe('le mur choisi', () => {
+  const CARRE = [
+    { id: 'n', a: { x: 0, z: 0 }, b: { x: 4, z: 0 } },
+    { id: 'e', a: { x: 4, z: 0 }, b: { x: 4, z: 4 } },
+    { id: 's', a: { x: 4, z: 4 }, b: { x: 0, z: 4 } },
+    { id: 'o', a: { x: 0, z: 4 }, b: { x: 0, z: 0 } },
+  ].map((w) => ({
+    ...w,
+    type: 'wall' as const,
+    height: 2.5,
+    yCenter: 1.25,
+    roomId: 'r1',
+  }));
+
+  const monterMur = (selection: string | null) => {
+    let tree!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      useScanStore.setState({
+        walls: CARRE.map((w) => ({ ...w, a: { ...w.a }, b: { ...w.b } })),
+        openings: [],
+        objects: [],
+        rooms: [
+          {
+            id: 'r1',
+            name: 'Séjour',
+            floor: null,
+            wallIds: CARRE.map((w) => w.id),
+          },
+        ],
+        fixtures: [],
+        ceiling: [],
+        photos: [],
+      });
+      tree = TestRenderer.create(
+        <FloorplanEditor
+          showMeasures
+          editable
+          selectedWallId={selection}
+          onSelectWall={() => {}}
+        />,
+      );
+    });
+    act(() => {
+      for (const n of tree.root.findAllByType(View)) {
+        if (typeof n.props.onLayout === 'function') {
+          n.props.onLayout({
+            nativeEvent: { layout: { width: 390, height: 620 } },
+          });
+        }
+      }
+    });
+    return tree;
+  };
+
+  /**
+   * Un événement tactile COMPLET.
+   *
+   * `PanResponder` ne lit pas que l'événement : il remonte l'historique
+   * tactile de React Native pour calculer le centre du geste. Sans lui, il
+   * lève avant même d'avoir bougé.
+   */
+  const doigt = (x: number, y: number, x0 = x, y0 = y) => ({
+    nativeEvent: {
+      touches: [{ pageX: x, pageY: y }],
+      locationX: x,
+      locationY: y,
+    },
+    touchHistory: {
+      numberActiveTouches: 1,
+      indexOfSingleActiveTouch: 0,
+      mostRecentTimeStamp: 100,
+      touchBank: [
+        {
+          touchActive: true,
+          // Le départ et l'arrivée sont DISTINCTS : c'est de leur écart que
+          // `PanResponder` déduit `dx`/`dy`, et il recalcule ces valeurs
+          // lui-même — les passer en argument ne servirait à rien.
+          startPageX: x0,
+          startPageY: y0,
+          startTimeStamp: 0,
+          currentPageX: x,
+          currentPageY: y,
+          currentTimeStamp: 100,
+          previousPageX: x0,
+          previousPageY: y0,
+          previousTimeStamp: 0,
+        },
+      ],
+    },
+  });
+
+  const rotation = (tree: TestRenderer.ReactTestRenderer) =>
+    tree.root
+      .findAllByType(View)
+      .find((n) => n.props.accessibilityLabel === 'Tourner le mur');
+
+  it('n’offre ses poignées qu’une fois choisi', () => {
+    const nu = monterMur(null);
+    expect(rotation(nu)).toBeUndefined();
+    act(() => nu.unmount());
+    const pris = monterMur('n');
+    expect(rotation(pris)).toBeDefined();
+    act(() => pris.unmount());
+  });
+
+  it('se pousse au doigt, et ses voisins suivent', () => {
+    const tree = monterMur('n');
+    // La zone de prise du mur : elle ne répond qu'au MOUVEMENT, jamais à
+    // l'appui — sinon désélectionner déplacerait le mur d'un cheveu.
+    const prise = tree.root
+      .findAllByType(View)
+      .find(
+        (n) =>
+          typeof n.props.onMoveShouldSetResponder === 'function' &&
+          n.props.onStartShouldSetResponder?.() === false &&
+          n.props.onResponderTerminationRequest?.() === false,
+      );
+    expect(prise).toBeDefined();
+    act(() => {
+      prise!.props.onMoveShouldSetResponder(doigt(200, 320, 200, 300));
+      prise!.props.onResponderGrant(doigt(200, 300, 200, 300));
+      prise!.props.onResponderMove(doigt(200, 340, 200, 300));
+    });
+    const murs = useScanStore.getState().walls;
+    const n = murs.find((w) => w.id === 'n')!;
+    // Il a bougé, il est resté horizontal, et le mur d'en face n'a pas suivi.
+    expect(n.a.z).not.toBeCloseTo(0, 3);
+    expect(n.a.z).toBeCloseTo(n.b.z, 9);
+    expect(murs.find((w) => w.id === 's')!.a.z).toBeCloseTo(4, 6);
+    // Et les murs qui le tiennent sont restés soudés.
+    expect(murs.find((w) => w.id === 'e')!.a.z).toBeCloseTo(n.b.z, 6);
+    act(() => tree.unmount());
+  });
+
+  it('se tourne par sa poignée, et l’angle s’affiche', () => {
+    const tree = monterMur('n');
+    const p = rotation(tree)!;
+    act(() => {
+      p.props.onStartShouldSetResponder(doigt(300, 90));
+      p.props.onResponderGrant(doigt(300, 90));
+      p.props.onResponderMove(doigt(300, 190));
+    });
+    const n = useScanStore.getState().walls.find((w) => w.id === 'n')!;
+    // Le mur n'est plus horizontal, et il a gardé sa longueur.
+    expect(Math.abs(n.b.z - n.a.z)).toBeGreaterThan(0.05);
+    expect(Math.hypot(n.b.x - n.a.x, n.b.z - n.a.z)).toBeCloseTo(4, 6);
+    // L'angle s'écrit le temps du geste : sans lui, on tourne à l'aveugle.
+    const vus = tree.root
+      .findAllByType(Text)
+      .map((t) => String(t.props.children))
+      .join(' | ');
+    expect(vus).toMatch(/-?\d+°/);
+    act(() => tree.unmount());
   });
 });
