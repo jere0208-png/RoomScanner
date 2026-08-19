@@ -80,3 +80,23 @@ jest.mock('react-native-safe-area-context', () => {
     useSafeAreaFrame: () => ({ x: 0, y: 0, width: 390, height: 844 }),
   };
 });
+
+/**
+ * LE SERVEUR NE RÉPOND JAMAIS DEPUIS UN BANC.
+ *
+ * `src/config/serveur.ts` porte l'URL de production (bourseur.fr) : sous
+ * Node 22, `fetch` existe pour de vrai, et le premier `connecter()` d'un
+ * test serait parti interroger la vraie base OVH — lenteur, réseau, et des
+ * comptes fantômes chez le client. Les bancs repartent donc TOUJOURS du
+ * mode local ; ceux qui veulent un serveur posent leur URL et leur mock de
+ * `fetch` eux-mêmes (voir compte.test.ts).
+ */
+try {
+  const { SERVEUR } = require('./src/config/serveur');
+  SERVEUR.url = '';
+} catch {
+  // Le module bouge ? Le banc du serveur le dira mieux que ce setup.
+}
+global.fetch = jest.fn(async () => {
+  throw new Error('fetch interdit dans un banc — mockez-le.');
+});

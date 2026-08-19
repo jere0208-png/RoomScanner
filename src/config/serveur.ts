@@ -10,8 +10,8 @@
  * chantier — le trousseau local garde le dernier état connu.
  */
 export const SERVEUR = {
-  /** ex. 'https://votre-domaine.fr/echoplan' — vide = tout en local. */
-  url: '',
+  /** L'API des comptes, à la racine de bourseur.fr — vide = tout en local. */
+  url: 'https://bourseur.fr',
   /** Le schéma de retour du flux Google, déclaré dans auth-google.php. */
   schemaRetour: 'echoplan',
 };
