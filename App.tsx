@@ -10,6 +10,7 @@ import { ExportScreen } from './src/screens/ExportScreen';
 import { CameraScreen } from './src/screens/CameraScreen';
 import { SignInScreen } from './src/screens/SignInScreen';
 import { PaywallScreen } from './src/screens/PaywallScreen';
+import { EssaiEpuise } from './src/components/EssaiEpuise';
 import { useScanStore } from './src/store/scanStore';
 import { useAccountStore } from './src/store/accountStore';
 
@@ -80,6 +81,7 @@ export default function App() {
       {screen === 'export' && <ExportScreen />}
       {screen === 'camera' && <CameraScreen />}
       <PaywallScreen />
+      <EssaiEpuise />
     </SafeAreaProvider>
   );
 }

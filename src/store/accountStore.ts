@@ -82,6 +82,12 @@ interface AccountState {
   proVia: 'abonnement' | 'code' | null;
   plansUtilises: number;
   paywallVisible: boolean;
+  /**
+   * Le popup « essai déjà utilisé » : levé à la CONNEXION quand le
+   * téléphone a déjà consommé son relevé gratuit — on accueille le compte,
+   * on annonce la couleur, on montre la page Pro. Jamais un refus.
+   */
+  essaiEpuiseVisible: boolean;
   /** Le jeton rendu par le serveur à la connexion — null hors ligne. */
   jeton: string | null;
 
@@ -107,6 +113,7 @@ interface AccountState {
   noterPlanCree: () => void;
   ouvrirPaywall: () => void;
   fermerPaywall: () => void;
+  fermerEssaiEpuise: () => void;
 }
 
 const persister = (s: AccountState) =>
@@ -153,6 +160,7 @@ export const useAccountStore = create<AccountState>((set, get) => ({
   proVia: null,
   plansUtilises: 0,
   paywallVisible: false,
+  essaiEpuiseVisible: false,
   jeton: null,
 
   charger: async () => {
@@ -201,19 +209,18 @@ export const useAccountStore = create<AccountState>((set, get) => ({
   },
 
   connecter: async (compte) => {
+    /*
+      TOUS LES COMPTES SONT LES BIENVENUS — l'essai, lui, appartient au
+      TÉLÉPHONE. L'ancien refus (« un compte par appareil ») bloquait le
+      patron lui-même en voulant essayer Google après l'e-mail. Le trousseau
+      et la base gardent le compteur de l'appareil ; un téléphone à sec voit
+      le popup et la page Pro, jamais une porte fermée.
+    */
     const marqueur = await lireMarqueur();
-    // Un marqueur au compte vidé (suppression) accueille un nouveau compte
-    // — mais garde son compteur de plans.
-    if (marqueur && marqueur.compte && marqueur.compte !== compte.id) {
-      return {
-        ok: false,
-        raison:
-          'Un compte a déjà été créé sur ce téléphone. Reconnectez-vous ' +
-          'avec celui-ci — le palier gratuit ne se remet pas à zéro.',
-      };
+    // Le Pro que le téléphone porte déjà vaut pour le compte qui entre.
+    if (marqueur?.pro && !get().pro) {
+      set({ pro: true, proVia: marqueur.pro });
     }
-    // Le serveur juge AUSSI, quand il est configuré : son refus est
-    // définitif (verrou en base) ; son silence n'empêche rien.
     const fusion = await fusionnerMarqueur({ compte: compte.id });
     const reponse = await api('connecter', {
       identifiant: compte.id,
@@ -222,10 +229,16 @@ export const useAccountStore = create<AccountState>((set, get) => ({
       appareil: fusion.appareil ?? '',
     });
     if (reponse && !reponse.ok) {
+      // Un refus serveur reste possible (compte banni, base en rade côté
+      // logique) : on le respecte et on le dit.
       await fusionnerMarqueur({ compte: marqueur?.compte ?? '' });
       return { ok: false, raison: String(reponse.raison ?? 'Refusé.') };
     }
-    set({ compte, jeton: reponse?.ok ? String(reponse.jeton ?? '') : null });
+    set({
+      compte,
+      jeton: reponse?.ok ? String(reponse.jeton ?? '') : null,
+      plansUtilises: Math.max(get().plansUtilises, marqueur?.plans ?? 0),
+    });
     if (reponse?.ok) {
       const proServeur =
         reponse.pro === 'code' || reponse.pro === 'abonnement'
@@ -237,6 +250,11 @@ export const useAccountStore = create<AccountState>((set, get) => ({
         proVia: s.proVia ?? proServeur,
         plansUtilises: Math.max(s.plansUtilises, Number(reponse.plans) || 0),
       });
+    }
+    // L'annonce, à l'entrée : ce téléphone a déjà donné son essai.
+    const s = get();
+    if (!s.pro && s.plansUtilises >= PLANS_GRATUITS) {
+      set({ essaiEpuiseVisible: true });
     }
     persister(get());
     return { ok: true };
@@ -317,14 +335,22 @@ export const useAccountStore = create<AccountState>((set, get) => ({
     const plans = s.plansUtilises + 1;
     set({ plansUtilises: plans });
     persister(get());
-    fusionnerMarqueur({ plans }).catch(() => {});
-    if (s.compte && s.jeton) {
-      api('plan', { identifiant: s.compte.id, jeton: s.jeton }).catch(
-        () => {},
-      );
-    }
+    fusionnerMarqueur({ plans })
+      .then((fusion) => {
+        if (s.compte && s.jeton) {
+          // L'appareil voyage avec : c'est LUI que l'essai débite en base.
+          return api('plan', {
+            identifiant: s.compte.id,
+            jeton: s.jeton,
+            appareil: fusion.appareil ?? '',
+          });
+        }
+        return null;
+      })
+      .catch(() => {});
   },
 
   ouvrirPaywall: () => set({ paywallVisible: true }),
   fermerPaywall: () => set({ paywallVisible: false }),
+  fermerEssaiEpuise: () => set({ essaiEpuiseVisible: false }),
 }));

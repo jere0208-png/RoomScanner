@@ -17,14 +17,18 @@ CREATE TABLE IF NOT EXISTS comptes (
   vu_le DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
 
--- Le verrou « un compte par téléphone », côté serveur : un appareil
--- (identifiant stable posé par l'app dans son trousseau) ne crée qu'un
+-- L'ESSAI GRATUIT APPARTIENT AU TÉLÉPHONE, pas au compte : un appareil
+-- (identifiant stable posé par l'app dans son trousseau) peut porter
+-- autant de comptes qu'on veut, mais son compteur `plans` est UN — le
+-- relevé offert se consomme une fois par téléphone, quel que soit le
 -- compte. Réinstaller ne le contourne pas ; changer de téléphone, si.
 CREATE TABLE IF NOT EXISTS appareils (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  appareil VARCHAR(191) NOT NULL UNIQUE,
+  appareil VARCHAR(191) NOT NULL,
   compte_id INT NOT NULL,
+  plans INT NOT NULL DEFAULT 0,
   cree_le DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY app_cpt (appareil, compte_id),
   FOREIGN KEY (compte_id) REFERENCES comptes (id) ON DELETE CASCADE
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
 

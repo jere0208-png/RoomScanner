@@ -45,31 +45,60 @@ beforeEach(() => {
     proVia: null,
     plansUtilises: 0,
     paywallVisible: false,
+    essaiEpuiseVisible: false,
+    jeton: null,
   });
 });
 
-describe('un seul compte par appareil', () => {
-  it('accepte le premier compte et pose le marqueur', async () => {
-    const r = await useAccountStore.getState().connecter(MARTIN);
-    expect(r.ok).toBe(true);
-    expect(mockMarqueur?.compte).toBe(MARTIN.id);
+/**
+ * L'ESSAI GRATUIT APPARTIENT AU TÉLÉPHONE, PAS AU COMPTE.
+ *
+ * L'ancienne règle refusait un second compte sur le même appareil — et
+ * bloquait le patron lui-même en voulant tester Google après l'e-mail. On
+ * accueille désormais TOUS les comptes ; ce qui se détecte, c'est l'essai :
+ * le trousseau se souvient des plans consommés par le téléphone, et un
+ * nouveau compte sur un téléphone à sec voit le popup « essai déjà
+ * utilisé » puis la page Pro — jamais un refus.
+ */
+describe('l’essai gratuit appartient au téléphone', () => {
+  it('accepte un compte, puis UN AUTRE, sans jamais refuser', async () => {
+    const r1 = await useAccountStore.getState().connecter(MARTIN);
+    expect(r1.ok).toBe(true);
+    useAccountStore.getState().deconnecter();
+    const r2 = await useAccountStore
+      .getState()
+      .connecter({ id: 'google:autre', methode: 'google' });
+    expect(r2.ok).toBe(true);
+    expect(useAccountStore.getState().compte?.id).toBe('google:autre');
   });
 
-  it('refuse un AUTRE compte sur le même téléphone, et dit pourquoi', async () => {
-    await useAccountStore.getState().connecter(MARTIN);
-    useAccountStore.getState().deconnecter();
+  it('le nouveau compte hérite de l’essai consommé par le téléphone', async () => {
+    mockMarqueur = { compte: MARTIN.id, plans: 1 };
     const r = await useAccountStore
       .getState()
-      .connecter({ id: 'email:autre@exemple.fr', methode: 'email' });
-    expect(r.ok).toBe(false);
-    expect(r.raison).toContain('déjà été créé');
+      .connecter({ id: 'google:autre', methode: 'google' });
+    expect(r.ok).toBe(true);
+    const s = useAccountStore.getState();
+    expect(s.plansUtilises).toBe(1);
+    expect(s.peutCreerPlan()).toBe(false);
+    // Et le popup l'annonce, plutôt qu'un scan qui bute plus tard.
+    expect(s.essaiEpuiseVisible).toBe(true);
   });
 
-  it('laisse toujours rentrer le compte D’ORIGINE', async () => {
-    await useAccountStore.getState().connecter(MARTIN);
-    useAccountStore.getState().deconnecter();
+  it('ne montre AUCUN popup quand l’essai est encore là', async () => {
     const r = await useAccountStore.getState().connecter(MARTIN);
     expect(r.ok).toBe(true);
+    expect(useAccountStore.getState().essaiEpuiseVisible).toBe(false);
+  });
+
+  it('un Pro ne voit jamais le popup, même téléphone à sec', async () => {
+    mockMarqueur = { compte: MARTIN.id, plans: 1, pro: 'code' };
+    await useAccountStore.getState().charger();
+    const r = await useAccountStore
+      .getState()
+      .connecter({ id: 'google:autre', methode: 'google' });
+    expect(r.ok).toBe(true);
+    expect(useAccountStore.getState().essaiEpuiseVisible).toBe(false);
   });
 });
 
@@ -242,7 +271,8 @@ describe('le mode serveur (base OVH)', () => {
     fetchMock.mockReturnValue(reponse({ ok: true }));
     useAccountStore.setState({ compte: MARTIN, jeton: 'J1' });
     useAccountStore.getState().noterPlanCree();
-    await Promise.resolve();
+    await tick();
+    await tick();
     const appels = fetchMock.mock.calls.map((c) => JSON.parse(c[1].body));
     expect(appels.some((a) => a.action === 'plan')).toBe(true);
   });

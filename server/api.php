@@ -62,23 +62,9 @@ if ($action === 'connecter') {
     sortir(['ok' => false, 'raison' => 'Appareil manquant.']);
   }
 
-  // Le verrou : cet appareil a-t-il déjà créé un compte ?
-  $req = mysqli_prepare(
-    $db,
-    'SELECT c.identifiant FROM appareils a JOIN comptes c ON c.id = a.compte_id WHERE a.appareil = ?',
-  );
-  mysqli_stmt_bind_param($req, 's', $appareil);
-  mysqli_stmt_execute($req);
-  $res = mysqli_stmt_get_result($req);
-  $lie = mysqli_fetch_assoc($res);
-  if ($lie && $lie['identifiant'] !== $identifiant && $lie['identifiant'] !== '') {
-    sortir([
-      'ok' => false,
-      'raison' => 'Un compte a déjà été créé sur ce téléphone. ' .
-        'Reconnectez-vous avec celui-ci — le palier gratuit ne se remet pas à zéro.',
-    ]);
-  }
-
+  // TOUS les comptes sont accueillis. Ce que la base retient, c'est
+  // l'ESSAI DU TÉLÉPHONE : le plus grand compteur `plans` porté par cet
+  // appareil, tous comptes confondus — c'est lui qui décide du popup.
   $compte = compteDe($db, $identifiant);
   if (!$compte) {
     $prenom = substr(trim((string) ($corps['prenom'] ?? '')), 0, 80);
@@ -92,21 +78,28 @@ if ($action === 'connecter') {
     $compte = compteDe($db, $identifiant);
   }
 
-  if (!$lie) {
-    $req = mysqli_prepare(
-      $db,
-      'INSERT INTO appareils (appareil, compte_id) VALUES (?, ?) ' .
-        'ON DUPLICATE KEY UPDATE compte_id = compte_id',
-    );
-    mysqli_stmt_bind_param($req, 'si', $appareil, $compte['id']);
-    mysqli_stmt_execute($req);
-  }
+  $req = mysqli_prepare(
+    $db,
+    'INSERT INTO appareils (appareil, compte_id) VALUES (?, ?) ' .
+      'ON DUPLICATE KEY UPDATE compte_id = compte_id',
+  );
+  mysqli_stmt_bind_param($req, 'si', $appareil, $compte['id']);
+  mysqli_stmt_execute($req);
+
+  $req = mysqli_prepare(
+    $db,
+    'SELECT COALESCE(MAX(plans), 0) AS p FROM appareils WHERE appareil = ?',
+  );
+  mysqli_stmt_bind_param($req, 's', $appareil);
+  mysqli_stmt_execute($req);
+  $res = mysqli_stmt_get_result($req);
+  $duTelephone = (int) (mysqli_fetch_assoc($res)['p'] ?? 0);
 
   sortir([
     'ok' => true,
     'jeton' => jeton($identifiant),
     'pro' => $compte['pro'],
-    'plans' => (int) $compte['plans'],
+    'plans' => max((int) $compte['plans'], $duTelephone),
   ]);
 }
 
@@ -127,6 +120,16 @@ if ($action === 'plan') {
   $req = mysqli_prepare($db, 'UPDATE comptes SET plans = plans + 1 WHERE id = ?');
   mysqli_stmt_bind_param($req, 'i', $compte['id']);
   mysqli_stmt_execute($req);
+  // L'essai se consomme au TÉLÉPHONE : toutes ses lignes avancent d'un.
+  $appareil = trim((string) ($corps['appareil'] ?? ''));
+  if ($appareil !== '') {
+    $req = mysqli_prepare(
+      $db,
+      'UPDATE appareils SET plans = plans + 1 WHERE appareil = ?',
+    );
+    mysqli_stmt_bind_param($req, 's', $appareil);
+    mysqli_stmt_execute($req);
+  }
   sortir(['ok' => true, 'plans' => (int) $compte['plans'] + 1]);
 }
 

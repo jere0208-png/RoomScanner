@@ -40,6 +40,7 @@ import React from 'react';
 import { Text, TextInput } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import { PaywallScreen } from '../src/screens/PaywallScreen';
+import { EssaiEpuise } from '../src/components/EssaiEpuise';
 import { SignInScreen } from '../src/screens/SignInScreen';
 import { HomeScreen } from '../src/screens/HomeScreen';
 import { GlowButton } from '../src/components/GlowButton';
@@ -56,6 +57,7 @@ beforeEach(() => {
     proVia: null,
     plansUtilises: 0,
     paywallVisible: true,
+    essaiEpuiseVisible: false,
   });
   useScanStore.setState({ screen: 'home', supported: true, saves: [], brouillon: null });
 });
@@ -176,5 +178,29 @@ describe('ce que l’essai adversarial a exigé', () => {
     useAccountStore.setState({ paywallVisible: false });
     const t = monter(<HomeScreen />);
     expect(bouton(t, 'Mon compte')).toBeTruthy();
+  });
+});
+
+describe('le popup « essai déjà utilisé »', () => {
+  it('annonce l’essai consommé et ouvre la page Pro', () => {
+    useAccountStore.setState({ essaiEpuiseVisible: true, paywallVisible: false });
+    const t = monter(<EssaiEpuise />);
+    expect(textesDe(t)).toContain('essai gratuit');
+    act(() => {
+      bouton(t, 'Passer en Pro').props.onPress();
+    });
+    const s = useAccountStore.getState();
+    expect(s.essaiEpuiseVisible).toBe(false);
+    expect(s.paywallVisible).toBe(true);
+  });
+
+  it('« Plus tard » referme sans rien vendre', () => {
+    useAccountStore.setState({ essaiEpuiseVisible: true, paywallVisible: false });
+    const t = monter(<EssaiEpuise />);
+    act(() => {
+      bouton(t, 'Plus tard').props.onPress();
+    });
+    expect(useAccountStore.getState().essaiEpuiseVisible).toBe(false);
+    expect(useAccountStore.getState().paywallVisible).toBe(false);
   });
 });

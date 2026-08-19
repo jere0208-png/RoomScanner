@@ -678,12 +678,16 @@ qu'il reste à câbler — OAuth —, il ne simule pas), ou e-mail local — pr�
 et adresse, **zéro mot de passe** : sans serveur, un mot de passe ne
 protégerait rien et en ferait perdre un.
 
-**Un seul compte par téléphone.** Le palier gratuit se contourne en recréant
-un compte ; le verrou est donc lié à l'APPAREIL : un marqueur dans le
+**Les comptes sont illimités ; l'ESSAI appartient au téléphone.** La
+première règle refusait un second compte par appareil — elle a bloqué le
+patron lui-même en voulant essayer Google après l'e-mail. Ce qui doit être
+défendu n'est pas l'identité, c'est le relevé offert : un marqueur dans le
 trousseau (`RoomScanAccount.swift`, Keychain — il survit à la
-désinstallation) retient l'identifiant du compte créé ici et le nombre de
-plans consommés. Créer un AUTRE compte sur le même téléphone est refusé avec
-la raison en clair ; se reconnecter au sien passe toujours.
+désinstallation) et la colonne `plans` de la table `appareils` en base
+retiennent ce que le TÉLÉPHONE a consommé, tous comptes confondus. Un
+compte neuf sur un téléphone à sec est accueilli, puis le popup « Vous avez
+déjà utilisé votre essai gratuit » (`EssaiEpuise.tsx`) annonce la couleur
+et tend la page Pro — jamais une porte fermée.
 
 **Gratuit : un relevé. Pro (4,90 €/mois) : illimité.** Le quota se consomme
 à l'ENREGISTREMENT du scan, pas à son lancement — un essai jeté ne brûle pas
