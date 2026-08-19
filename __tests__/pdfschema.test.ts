@@ -156,6 +156,20 @@ describe('la feuille unifilaire', () => {
     expect(doc).toContain('500 mA');
   });
 
+  /**
+   * CE QU'UN SCHÉMA CONSUEL PORTE TOUJOURS, le nôtre le porte.
+   *
+   * Comparé à des unifilaires réels : deux mentions réglementaires
+   * manquaient à l'origine du schéma. La COUPURE D'URGENCE — c'est l'AGCP,
+   * encore faut-il le dire et rappeler qu'il doit rester accessible — et le
+   * PARAFOUDRE, que l'app ne peut pas trancher (il dépend de la commune et
+   * du branchement) mais qu'un dossier réel mentionne toujours.
+   */
+  it('rappelle la coupure d’urgence et le parafoudre', () => {
+    expect(doc).toContain('urgence');
+    expect(doc).toContain('arafoudre');
+  });
+
   it('porte un repère par circuit, dans l’ordre du tableau', () => {
     expect(rows.length).toBeGreaterThan(3);
     for (const r of rows) expect(doc).toContain(r.mark);

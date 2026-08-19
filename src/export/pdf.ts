@@ -774,6 +774,14 @@ function drawSheetChrome(
     sheetTitle: string;
     sheet: string;
     scaleLabel: string | null;
+    /**
+     * L'échelle du dessin en points par mètre : quand elle est là, le
+     * cartouche dessine une BARRE D'ÉCHELLE graphique sous le ratio.
+     * « ~ 1:75 » ne survit ni à la photocopie ni à « ajuster à la page » ;
+     * la barre, elle, se mesure au double-décimètre quel que soit le
+     * tirage — c'est pour ça que tous les plans en portent une.
+     */
+    metersToPoints?: number;
     /** À qui est le dossier : à défaut, on retombe sur le nom du fichier. */
     client?: string;
     address?: string;
@@ -845,6 +853,29 @@ function drawSheetChrome(
   d.text(fitText(info.scaleLabel ?? '—', 9.5, width(1)), cols[1] + 12, ty + 12, 9.5, INK, {
     align: 'left',
   });
+  if (info.metersToPoints) {
+    // La longueur la plus ronde qui tient dans la case, étiquette comprise.
+    // Les paliers descendent sous le mètre : un plan de détail à 1:20 porte
+    // une barre de 50 ou 20 cm, comme les vrais.
+    const L = [5, 2, 1, 0.5, 0.2].find(
+      (m) => m * info.metersToPoints! <= width(1) - 16,
+    );
+    if (L) {
+      const bx = cols[1] + 12;
+      const by = ty + 3.5;
+      const wl = L * info.metersToPoints;
+      d.rect(bx, by, wl / 2, 3, INK, INK, 0.4);
+      d.rect(bx + wl / 2, by, wl / 2, 3, '#FFFFFF', INK, 0.4);
+      d.text(
+        L < 1 ? `${Math.round(L * 100)} cm` : `${L} m`,
+        bx + wl + 3,
+        by,
+        5,
+        GREY,
+        { align: 'left' },
+      );
+    }
+  }
 
   // Bloc feuille
   d.text('DOCUMENT', cols[2] + 12, ty + 50, 6.5, GREY_LIGHT, { align: 'left' });
@@ -1328,6 +1359,7 @@ function planPage(
     }
   }
   let scaleLabel: string | null = null;
+  let echellePtParM: number | undefined;
   if (isFinite(minX)) {
     // Rien du plan ne peut sortir de la feuille : le zoom choisi dans
     // l'aperçu s'applique tel quel, et un plan agrandi allait jusqu'à
@@ -1349,6 +1381,7 @@ function planPage(
     const ratio = 1000 / (scale * 0.352778);
     const nice = [20, 25, 50, 75, 100, 125, 150, 200].find((v) => v >= ratio) ?? 250;
     scaleLabel = `~ 1:${nice}`;
+    echellePtParM = scale;
 
     const cxw = (minX + maxX) / 2;
     const czw = (minZ + maxZ) / 2;
@@ -2017,12 +2050,29 @@ function planPage(
    * désormais, et le sous-titre dit ce qu'elle contient vraiment.
    */
   const titre = extra?.title ?? 'Plan d\u2019ensemble cot\u00e9';
+  /*
+    LA SURFACE TOTALE, EN CLAIR SOUS LE TITRE \u2014 tout plan r\u00e9el l'\u00e9crit.
+
+    C'est le premier chiffre qu'on cherche sur un plan de logement, et il
+    fallait aller l'additionner soi-m\u00eame sur le m\u00e9tr\u00e9. \u00ab \u2248 \u00bb d\u00e8s qu'une
+    pi\u00e8ce n'est pas relev\u00e9e en boucle ferm\u00e9e, comme partout ailleurs.
+  */
+  const surfaces = parts.filter((p) => p.surface);
+  const totalM2 = surfaces.reduce((t, p) => t + (p.surface?.area ?? 0), 0);
+  const exact = surfaces.every((p) => p.surface?.exact);
+  const mentionSurface =
+    totalM2 > 0
+      ? ` \u00b7 Surface relev\u00e9e : ${exact ? '' : '\u2248 '}${totalM2
+          .toFixed(1)
+          .replace('.', ',')} m\u00b2`
+      : '';
   const sous =
-    extra?.sub ??
-    (ctx.ceiling && ctx.ceiling.length > 0
-      ? 'Murs, ouvertures et surfaces, avec l\u2019appareillage et le plafond \u2014 ' +
-        'cotes en m\u00e8tres, cotes d\u2019appareil en centim\u00e8tres.'
-      : 'Murs, ouvertures et surfaces relev\u00e9s au scan \u2014 cotes en m\u00e8tres.');
+    (extra?.sub ??
+      (ctx.ceiling && ctx.ceiling.length > 0
+        ? 'Murs, ouvertures et surfaces, avec l\u2019appareillage et le plafond \u2014 ' +
+          'cotes en m\u00e8tres, cotes d\u2019appareil en centim\u00e8tres.'
+        : 'Murs, ouvertures et surfaces relev\u00e9s au scan \u2014 cotes en m\u00e8tres.')) +
+    (extra?.sub ? '' : mentionSurface);
   d.text(titre, FRAME.x + 24, TETE, 13, INK, {
     bold: true,
     align: 'left',
@@ -2081,6 +2131,7 @@ function planPage(
     sheetTitle: titre,
     sheet,
     scaleLabel,
+    metersToPoints: echellePtParM,
   });
   return d.stream();
 }
@@ -2301,9 +2352,20 @@ function unifilairePage(
   d.text(
     'Disjoncteur de branchement — origine de l’installation',
     BUS + 42,
-    y - 16,
+    y - 12,
     7.5,
     GREY,
+    { align: 'left' },
+  );
+  // Deux mentions qu'un schéma réel porte toujours : la coupure d'urgence
+  // (c'est l'AGCP, encore faut-il le dire) et le parafoudre, que l'app ne
+  // peut pas trancher — il dépend de la commune et du branchement.
+  d.text(
+    'Coupure d’urgence assurée par l’AGCP, à garder accessible · parafoudre selon exposition, à vérifier.',
+    BUS + 42,
+    y - 22,
+    6.5,
+    GREY_LIGHT,
     { align: 'left' },
   );
   y -= 26;
@@ -2979,6 +3041,7 @@ function elevationPage(
     sheet,
     // Un mètre vaut 2834,6 points à l'échelle 1:1 (72 pt par pouce).
     scaleLabel: `1:${Math.round(2834.6 / Math.max(scale, 1e-6))}`,
+    metersToPoints: scale,
   });
   return d.stream();
 }
@@ -3802,13 +3865,18 @@ export function buildMaterialPdf(
     ligne('Protection différentielle 30 mA', '', { bold: true });
     for (const diff of list.differentials) {
       // Le label porte déjà son type (« Différentiel type A 1 ») : le
-      // répéter écrivait « type A … type A » sur chaque ligne.
-      ligne(
+      // répéter écrivait « type A … type A » sur chaque ligne. Et la liste
+      // des circuits SE REPLIE : sur un T3, elle dépasse la ligne et
+      // sortait tronquée en « Spéci… » — ce que protège un différentiel ne
+      // se devine pas.
+      const texteDiff =
         `${diff.label} — ${diff.rating} A · 30 mA` +
-          (diff.circuits.length ? ` : ${diff.circuits.join(', ')}` : ''),
-        '',
-        { indent: 14 },
-      );
+        (diff.circuits.length ? ` : ${diff.circuits.join(', ')}` : '');
+      for (const l of wrapText(texteDiff, 10, w - 14)) {
+        need(16);
+        d.text(l, x0 + 14, y, 10, INK, { align: 'left' });
+        y -= 15;
+      }
     }
     note(
       'Un différentiel de type A au minimum : les courants de défaut de la ' +

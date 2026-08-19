@@ -162,6 +162,18 @@ describe('la liste du matériel, version chantier', () => {
     expect(doc).toMatch(/[\d,]+ m²/);
   });
 
+  /**
+   * LE PARAFOUDRE FIGURE AUX CONSTATS.
+   *
+   * L'app ne peut pas le trancher — il dépend de la zone kéraunique et du
+   * branchement — mais un dossier réel le mentionne toujours. Se taire
+   * ressemblerait à « rien à signaler », ce qui serait rassurer à tort.
+   */
+  it('mentionne le parafoudre dans la conformité, sans trancher', () => {
+    expect(doc).toContain('arafoudre');
+    expect(doc).toMatch(/v.rifier/);
+  });
+
   it('rappelle la règle de remplissage — un chiffre sans sa règle ne vaut rien', () => {
     expect(doc).toContain('15-100');
     expect(doc).toContain('tiers');

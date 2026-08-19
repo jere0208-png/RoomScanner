@@ -896,6 +896,25 @@ export function checkElectrical(
       fix: { type: 'poser', kind: 'tableau', label: 'Poser tableau' },
     });
   }
+  /**
+   * LE PARAFOUDRE FIGURE AUX CONSTATS — sans trancher.
+   *
+   * Un dossier réel le mentionne toujours ; l'app, elle, ne peut pas le
+   * décider : il dépend de la zone kéraunique de la commune et du mode de
+   * branchement. Se taire ressemblerait à « rien à signaler », ce qui
+   * serait rassurer à tort — on dit donc la règle, en info.
+   */
+  if (tableaux.length === 1) {
+    out.push({
+      code: 'tableau',
+      severity: 'info',
+      message: 'Parafoudre : non évalué, à vérifier',
+      regle:
+        'Obligatoire notamment en zone d’exposition à la foudre (AQ2) ou ' +
+        'sur une alimentation aérienne : à vérifier selon la commune et le ' +
+        'branchement. Il se pose en tête de tableau, au plus près de l’AGCP.',
+    });
+  }
   // Deux tableaux dans un logement, c'est une erreur de saisie neuf fois
   // sur dix — et une installation à revoir la dixième.
   if (tableaux.length > 1) {

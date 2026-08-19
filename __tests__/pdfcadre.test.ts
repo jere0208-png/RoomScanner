@@ -286,3 +286,27 @@ describe('l’export d’un scan sans mur', () => {
     expect(textes).toContain('Aucune pi');
   });
 });
+
+/**
+ * CE QU'UN PLAN D'ARCHITECTE PORTE, LE NÔTRE LE PORTE.
+ *
+ * Comparaison faite feuille contre feuille avec des plans d'exécution
+ * réels : deux choses manquaient. La BARRE D'ÉCHELLE graphique — « ~ 1:75 »
+ * ne survit ni à la photocopie ni à l'impression « ajuster à la page »,
+ * la barre si, c'est pour ça que tous les plans en portent une. Et la
+ * SURFACE TOTALE relevée, que tout plan écrit en clair.
+ */
+describe('les mentions d’un plan réel', () => {
+  const pdf = pdfDe({});
+  const textes = (pdf.match(/\(((?:[^()\\]|\\.)*)\) Tj/g) ?? []).join(' | ');
+
+  it('porte une barre d’échelle graphique dans le cartouche', () => {
+    // La barre gradue une longueur ronde — mètres, ou centimètres sur un
+    // plan de détail dessiné grand.
+    expect(textes).toMatch(/\((?:1|2|5) m\)|\((?:20|50) cm\)/);
+  });
+
+  it('écrit la surface totale relevée sous le titre', () => {
+    expect(textes).toContain('Surface relevée');
+  });
+});

@@ -225,3 +225,44 @@ describe('le coffret dans le PDF', () => {
     expect(doc).toContain('Prises 1, Prises 2, Éclairage 1');
   });
 });
+
+/**
+ * LA LISTE DES CIRCUITS D'UN DIFFÉRENTIEL SE REPLIE, elle ne se coupe plus.
+ *
+ * Sur un T3 réel, la ligne « Différentiel type A 1 — 40 A · 30 mA :
+ * Cuisson — Cuisine, Spécialisé 20 A — Séjour, … » dépasse la largeur de la
+ * feuille : elle sortait tronquée en « Spéci… ». Ce que protège un
+ * différentiel ne se devine pas — la ligne se replie sur autant de lignes
+ * qu'il faut.
+ */
+describe('le récapitulatif long d’un différentiel', () => {
+  it('se replie : le dernier circuit se lit encore', () => {
+    const longs = [
+      circuit('Cuisson — Cuisine', 'cuisson', 32, 6),
+      circuit('Spécialisé 20 A — Séjour', 'specialise', 20, 2.5),
+      circuit('Spécialisé 20 A — Cuisine', 'specialise', 20, 2.5),
+      circuit('Spécialisé 20 A — Salle de bains', 'specialise', 20, 2.5),
+    ];
+    const pdf2 = latin1(
+      buildMaterialPdf(
+        'Essai',
+        liste(longs, [
+          {
+            label: 'Différentiel type A 1',
+            type: 'A',
+            rating: 40,
+            circuits: longs.map((c) => c.label),
+          },
+        ]),
+      ),
+    );
+    const doc = (pdf2.match(/\(((?:[^()\\]|\\.)*)\) Tj/g) ?? []).join(' | ');
+    // Le dernier de la liste doit se lire — c'est lui que la troncature
+    // mangeait. Trois occurrences : la légende du coffret, la ligne de
+    // circuit, ET la ligne repliée du différentiel. Et aucune ellipse de
+    // troncature (0x85 en Windows-1252) nulle part sur ce document court.
+    const occurrences = doc.split('Salle de bains').length - 1;
+    expect(occurrences).toBeGreaterThanOrEqual(3);
+    expect(doc).not.toContain('\x85');
+  });
+});
