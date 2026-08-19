@@ -214,6 +214,7 @@ export function ResultScreen() {
   const setRoomName = useScanStore((s) => s.setRoomName);
   const setRoomHeight = useScanStore((s) => s.setRoomHeight);
   const setWallHeight = useScanStore((s) => s.setWallHeight);
+  const setObjectHeight = useScanStore((s) => s.setObjectHeight);
   const mergeRooms = useScanStore((s) => s.mergeRooms);
   const splitRoom = useScanStore((s) => s.splitRoom);
   const removeWall = useScanStore((s) => s.removeWall);
@@ -2004,6 +2005,10 @@ export function ResultScreen() {
             onPrompt={setPrompt}
             onResize={(w, d) => {
               resizeObject(selectedObject.id, w, d);
+              setDraftObject(null);
+            }}
+            onHeight={(h, base) => {
+              setObjectHeight(selectedObject.id, h, base);
               setDraftObject(null);
             }}
             onRotate={() => rotateObject(selectedObject.id)}

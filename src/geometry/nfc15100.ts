@@ -299,6 +299,16 @@ export interface WallFurniture {
   to: number;
   /** Hauteur hors tout, depuis le sol (m). */
   top: number;
+  /**
+   * Hauteur du DESSOUS au-dessus du sol (m).
+   *
+   * Zéro pour ce qui est posé par terre, et c'est le cas courant — mais la
+   * moitié de ce qui gêne un électricien est accroché en l'air : meuble
+   * haut de cuisine, hotte, télé, chauffe-eau. Sans cette cote, l'élévation
+   * les dessine tous depuis le carrelage, et le plan de travail sur lequel
+   * on pose les prises disparaît sous une colonne pleine.
+   */
+  base: number;
   /** À quelle distance du nu du mur il se tient (m). */
   ecart: number;
   category: string;
@@ -335,6 +345,9 @@ export function wallFurniture(
     const cz = o.transform[14];
     const top = o.transform[13] + (o.height ?? 0) / 2 - floorY;
     if (!(top > 0.05)) continue;
+    // Un scan place parfois un meuble légèrement enfoncé dans le sol : la
+    // silhouette n'a pas à déborder sous la ligne du plancher.
+    const base = Math.max(0, Math.min(top, o.transform[13] - (o.height ?? 0) / 2 - floorY));
     const yaw = Math.atan2(o.transform[2], o.transform[0]);
     const cos = Math.cos(yaw);
     const sin = Math.sin(yaw);
@@ -370,6 +383,7 @@ export function wallFurniture(
       from: a,
       to: b,
       top,
+      base,
       ecart: Math.max(0, pres),
       category: o.category ?? '',
     });

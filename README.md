@@ -913,6 +913,43 @@ longent le meuble et tournent avec lui, étant calculés dans le monde et non à
 l'écran. Rien dans une direction, ou plus de 4 m : pas de cote, plutôt qu'une
 cote qui ne veut rien dire.
 
+### Un meuble a une troisième cote
+
+Le relevé ne réglait qu'un meuble posé par terre : largeur, profondeur, et
+c'est tout. Or la moitié de ce qui gêne un électricien est **accroché en
+l'air** — meubles hauts de cuisine, hotte, télé, étagère, chauffe-eau. Deux
+chiffres manquaient : la hauteur du meuble, et la hauteur de son **dessous**
+au-dessus du sol.
+
+Le second est le plus important des deux, et c'est celui qu'aucun champ ne
+portait. Sans lui, l'élévation dessine tout depuis le carrelage : un meuble
+haut de cuisine y devient une colonne pleine du sol au plafond, et le plan de
+travail sur lequel on pose justement les prises disparaît dessous. On décidait
+d'un percement devant un dessin qui mentait.
+
+Les deux se règlent dans le bandeau du meuble, sur **leur propre ligne** — « H »
+et « Pose ». Quatre pastilles et trois boutons ne tiennent pas dans la largeur
+d'un iPhone : la dernière se serait écrasée, et c'est toujours celle qu'on
+vient lire. Chacune porte son mot devant, parce qu'un chiffre nu de plus dans
+une rangée de chiffres ne se rattache à rien.
+
+Les deux réglages sont **indépendants** : rehausser un meuble haut ne décolle
+pas son fond du plan de travail, et le monter de dix centimètres ne le rend
+pas plus grand. Dans le modèle, la hauteur de pose n'a pas de champ à elle —
+c'est `transform[13]`, l'altitude du centre du volume, qui la porte : le
+dessous plus la moitié de la hauteur.
+
+**En élévation, la silhouette part de son dessous** et la hauteur de pose se
+cote dans la même écriture que les trois cotes de l'appareillage. Deux
+précautions, vues sur le dessin et pas dans le code :
+
+- La cote se pose **au bord** du meuble, pas au milieu. Au centre, elle
+  traverse tout ce qui est en dessous — sous un meuble haut de cuisine, il y a
+  justement le meuble bas — et son étiquette se pose en plein sur lui. Au
+  bord, elle longe le montant, comme on cote une allège sur un plan.
+- Elle ne s'écrit **que pour ce qui décolle vraiment du sol** (plus de 2 cm).
+  Un « 0 » sous chaque caisson noierait les seules cotes qu'on vient lire.
+
 ### Menuiseries : les retailler
 
 Une porte détectée à 78 cm alors qu'elle en fait 83, une fenêtre dont le

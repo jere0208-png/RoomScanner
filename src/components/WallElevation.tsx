@@ -1186,34 +1186,87 @@ export function WallElevation({
               socle tombera derrière la bibliothèque, sans masquer le mur ni
               se confondre avec une baie. Le trait du haut donne la hauteur
               du meuble, la seule cote qui décide.
+
+              LA SILHOUETTE PART DE SON DESSOUS, pas du sol. Tout était
+              dessiné depuis le carrelage : un meuble haut de cuisine
+              devenait une colonne pleine, et le plan de travail sur lequel
+              on pose justement les prises disparaissait dessous. Ce qui est
+              accroché en l'air — meuble haut, hotte, télé, chauffe-eau — se
+              voit maintenant comme il est, et la place libre sous lui aussi.
             */}
             {voirMeubles &&
-              meublesDuMur.map((m, i) => (
-                <G key={`mb${i}`}>
-                  <Rect
-                    x={px(m.from)}
-                    y={py(Math.min(m.top, H))}
-                    width={Math.max(2, (m.to - m.from) * scale)}
-                    height={Math.min(m.top, H) * scale}
-                    fill={c.inkFaint}
-                    fillOpacity={0.09}
-                    stroke={c.inkFaint}
-                    strokeWidth={1}
-                    strokeDasharray="5 4"
-                  />
-                  {(m.to - m.from) * scale > 46 && (
-                    <SvgText
-                      x={px((m.from + m.to) / 2)}
-                      y={py(Math.min(m.top, H)) + 12}
+              meublesDuMur.map((m, i) => {
+                const haut = Math.min(m.top, H);
+                const bas = Math.min(m.base, haut);
+                return (
+                  <G key={`mb${i}`}>
+                    <Rect
+                      x={px(m.from)}
+                      y={py(haut)}
+                      width={Math.max(2, (m.to - m.from) * scale)}
+                      height={Math.max(1, (haut - bas) * scale)}
                       fill={c.inkFaint}
-                      fontSize={8.5}
-                      fontWeight="700"
-                      textAnchor="middle">
-                      {`${frCategory(m.category)} ${Math.round(m.top * 100)}`}
-                    </SvgText>
-                  )}
-                </G>
-              ))}
+                      fillOpacity={0.09}
+                      stroke={c.inkFaint}
+                      strokeWidth={1}
+                      strokeDasharray="5 4"
+                    />
+                    {(m.to - m.from) * scale > 46 && (
+                      <SvgText
+                        x={px((m.from + m.to) / 2)}
+                        y={py(haut) + 12}
+                        fill={c.inkFaint}
+                        fontSize={8.5}
+                        fontWeight="700"
+                        textAnchor="middle">
+                        {`${frCategory(m.category)} ${Math.round(m.top * 100)}`}
+                      </SvgText>
+                    )}
+                  </G>
+                );
+              })}
+
+            {/*
+              LA HAUTEUR DE POSE SE COTE, comme celle d'un appareil.
+
+              Un meuble accroché en l'air ne se décrit pas par sa seule
+              hauteur hors tout : ce qu'un cuisiniste et un électricien se
+              donnent, c'est la cote du DESSOUS — 1,40 m pour un meuble haut
+              de cuisine. Elle se dessine dans la même écriture que les trois
+              cotes de l'appareillage, sur l'axe du meuble, et seulement pour
+              ce qui décolle vraiment du sol : écrire « 0 » sous chaque
+              caisson noierait les seules cotes qu'on vient lire.
+            */}
+            {voirMeubles &&
+              meublesDuMur
+                .filter((m) => m.base > 0.02 && m.base < H)
+                .map((m, i) => {
+                  /*
+                    LA COTE SE POSE AU BORD, PAS AU MILIEU.
+
+                    Au centre du meuble, elle traverse tout ce qui est en
+                    dessous — sous un meuble haut de cuisine, il y a
+                    justement le meuble bas — et son étiquette se pose en
+                    plein sur lui. Au bord, elle longe le montant : c'est là
+                    qu'on cote une allège sur un plan, et le dessin reste
+                    lisible. Bornée au cadre, sinon l'étiquette du meuble le
+                    plus à gauche sort du dessin.
+                  */
+                  const xm = Math.max(px(0) + 22, px(m.from));
+                  return (
+                    <Dim
+                      key={`mbc${i}`}
+                      x1={xm}
+                      y1={py(0)}
+                      x2={xm}
+                      y2={py(m.base)}
+                      text={`${Math.round(m.base * 100)}`}
+                      c={c}
+                      vertical
+                      push={{ x: 1, y: 0 }}
+                    />
+                  );
+                })}
 
             {/* Portes et fenêtres : on ne perce pas un mur à leur place. */}
             {holes.map((hole, i) => {

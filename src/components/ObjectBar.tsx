@@ -113,6 +113,7 @@ export function ObjectBar({
   palette,
   onPrompt,
   onResize,
+  onHeight,
   onRotate,
   onCancel,
   onDone,
@@ -124,6 +125,14 @@ export function ObjectBar({
   palette: Palette;
   onPrompt: (p: PromptData) => void;
   onResize: (width: number, depth: number) => void;
+  /**
+   * LA TROISIÈME COTE, et la hauteur à laquelle elle commence.
+   *
+   * Deux réglages plutôt qu'un : la hauteur du meuble, et celle de son
+   * dessous au-dessus du sol. Omettre l'un le laisse tel quel — on ne
+   * remonte pas un meuble haut de cuisine en le rendant plus grand.
+   */
+  onHeight?: (height?: number, base?: number) => void;
   onRotate: () => void;
   onCancel: () => void;
   onDone: () => void;
@@ -138,12 +147,18 @@ export function ObjectBar({
    */
   onNudge?: (dx: number, dz: number) => void;
 }) {
+  /** Le dessous du meuble, au-dessus du sol. */
+  const pose = object.transform[13] - object.height / 2;
+
   /** Une cote qu'on touche : elle ouvre la feuille, qui suit le clavier. */
   const champ = (
     titre: string,
     valeur: number,
     poser: (v: number) => void,
     unite?: string,
+    sous?: string,
+    /** Une hauteur de pose peut valoir zéro — une largeur, jamais. */
+    depuisZero?: boolean,
   ) => (
     <TouchableOpacity
       style={styles.clChamp}
@@ -151,14 +166,15 @@ export function ObjectBar({
       onPress={() =>
         onPrompt({
           title: titre,
-          subtitle: `${frCategory(object.category)} — la cote se prend au sol.`,
+          subtitle:
+            sous ?? `${frCategory(object.category)} — la cote se prend au sol.`,
           value: fr2(valeur),
           unit: 'm',
           numeric: true,
           okLabel: 'Appliquer',
           onSubmit: (t) => {
             const v = parseFloat(t.replace(',', '.'));
-            if (v > 0.05 && v < 12) poser(v);
+            if (v >= (depuisZero ? 0 : 0.05) && v < 12) poser(v);
           },
         })
       }>
@@ -192,6 +208,36 @@ export function ObjectBar({
           {/* Ce que fait le geste, en trois mots : sans cette note, le
               maintien ne se découvre que par hasard. */}
           <Text style={styles.nudgeNote}>1 cm · maintenir</Text>
+        </View>
+      )}
+      {/*
+        LA TROISIÈME COTE SUR SA PROPRE LIGNE.
+
+        Quatre pastilles et trois boutons ne tiennent pas dans la largeur
+        d'un iPhone : la dernière se serait écrasée, et c'est toujours celle
+        qu'on vient lire. La hauteur et la pose vont donc au-dessus, avec
+        leur mot devant — « H », « Pose » — parce qu'un chiffre nu de plus
+        dans une rangée de chiffres ne se rattache à rien.
+      */}
+      {onHeight && (
+        <View style={styles.editRow}>
+          <Text style={styles.nudgeNote}>H</Text>
+          {champ(
+            'Hauteur du meuble',
+            object.height,
+            (v) => onHeight(v, undefined),
+            'm',
+            `${frCategory(object.category)} — du dessous au dessus.`,
+          )}
+          <Text style={styles.nudgeNote}>Pose</Text>
+          {champ(
+            'Hauteur de pose',
+            pose,
+            (v) => onHeight(undefined, v),
+            'm',
+            'Hauteur du DESSOUS au-dessus du sol. Zéro pour un meuble posé par terre.',
+            true,
+          )}
         </View>
       )}
       <View style={styles.editRow}>

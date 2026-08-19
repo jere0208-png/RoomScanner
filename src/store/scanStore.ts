@@ -844,6 +844,16 @@ interface ScanState {
   setObjectCenter: (id: string, x: number, z: number, aimant?: boolean) => void;
   resizeObject: (id: string, width: number, depth: number) => void;
   /**
+   * LA TROISIÈME COTE, et la hauteur à laquelle elle commence.
+   *
+   * `height` est la hauteur du meuble, `base` celle de son DESSOUS au-dessus
+   * du sol. Les deux sont indépendantes : rehausser un meuble haut de
+   * cuisine ne doit pas décoller son fond du plan de travail, et le monter
+   * de dix centimètres ne doit pas le rendre plus grand. Omettre l'une la
+   * laisse telle quelle.
+   */
+  setObjectHeight: (id: string, height?: number, base?: number) => void;
+  /**
    * ÉTIRE UN MEUBLE PAR UN DE SES CÔTÉS, le côté opposé restant en place.
    *
    * C'est le geste du mètre ruban : on prend un bord et on le tire. Régler
@@ -2802,6 +2812,31 @@ export const useScanStore = create<ScanState>((set, get) => {
               { ...o, width, depth, baseWidth: width, baseDepth: depth }
             : o,
         ),
+        dirty: true,
+      });
+    },
+
+    setObjectHeight: (id, height, base) => {
+      const o = get().objects.find((x) => x.id === id);
+      if (!o) return;
+      // Un meuble de deux centimètres ou de neuf mètres est une faute de
+      // frappe, pas un relevé ; une pose négative enfoncerait le meuble dans
+      // la dalle.
+      if (height !== undefined && !(height > 0.05 && height <= 4)) return;
+      if (base !== undefined && !(base >= 0 && base <= 6)) return;
+      if (height === undefined && base === undefined) return;
+      const h = height ?? o.height;
+      const b = base ?? o.transform[13] - o.height / 2;
+      pushHistory(`objectHeight:${id}`);
+      set({
+        objects: get().objects.map((x) => {
+          if (x.id !== id) return x;
+          const t = [...x.transform];
+          // L'altitude vit dans la matrice, à l'index 13 : c'est le centre
+          // du volume, donc le dessous plus la moitié de la hauteur.
+          t[13] = b + h / 2;
+          return { ...x, height: h, transform: t };
+        }),
         dirty: true,
       });
     },
