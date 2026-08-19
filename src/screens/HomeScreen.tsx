@@ -25,6 +25,7 @@ import { LogoMark } from '../components/LogoMark';
 import { LightRibbon, RIBBON_H } from '../components/LightRibbon';
 import { PhoneShowcase } from '../components/PhoneShowcase';
 import { useScanStore } from '../store/scanStore';
+import { useAccountStore } from '../store/accountStore';
 import { useRoomScan } from '../native/useRoomScan';
 
 
@@ -56,6 +57,8 @@ export function HomeScreen() {
   const themePref = useScanStore((s) => s.themePref);
   const setThemePref = useScanStore((s) => s.setThemePref);
   const { start } = useRoomScan();
+  const peutCreerPlan = useAccountStore((s) => s.peutCreerPlan);
+  const ouvrirPaywall = useAccountStore((s) => s.ouvrirPaywall);
   const c = useTheme();
   /** Le fond est-il sombre ? C'est lui qui choisit le logotype. */
   const sombre = c === dark;
@@ -267,7 +270,16 @@ export function HomeScreen() {
           label={supported === null ? 'Vérification…' : 'Commencer le scan'}
           accessibilityLabel="Commencer le scan"
           disabled={supported !== true}
-          onPress={start}
+          // Le palier gratuit s'arrête AVANT le scan, pas après : scanner
+          // vingt minutes pour découvrir qu'on ne peut pas enregistrer
+          // serait le pire moment pour l'apprendre.
+          onPress={() => {
+            if (!peutCreerPlan()) {
+              ouvrirPaywall();
+              return;
+            }
+            start();
+          }}
         />
       </Animated.View>
 

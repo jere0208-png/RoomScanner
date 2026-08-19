@@ -8,17 +8,42 @@ import { ResultScreen } from './src/screens/ResultScreen';
 import { LibraryScreen } from './src/screens/LibraryScreen';
 import { ExportScreen } from './src/screens/ExportScreen';
 import { CameraScreen } from './src/screens/CameraScreen';
+import { SignInScreen } from './src/screens/SignInScreen';
+import { PaywallScreen } from './src/screens/PaywallScreen';
 import { useScanStore } from './src/store/scanStore';
+import { useAccountStore } from './src/store/accountStore';
 
 export default function App() {
   const screen = useScanStore((s) => s.screen);
   const loadSaves = useScanStore((s) => s.loadSaves);
+  const compte = useAccountStore((s) => s.compte);
+  const compteCharge = useAccountStore((s) => s.charge);
+  const chargerCompte = useAccountStore((s) => s.charger);
   const c = useTheme();
   const darkContent = screen !== 'scan' && c.bg === '#F6F7F9';
 
   useEffect(() => {
     loadSaves();
-  }, [loadSaves]);
+    chargerCompte();
+  }, [loadSaves, chargerCompte]);
+
+  /**
+   * PAS D'APP SANS COMPTE. La porte d'entrée se montre tant que personne
+   * n'est connecté — et rien avant d'avoir LU le stockage : afficher la
+   * connexion une demi-seconde à quelqu'un qui a déjà un compte ferait
+   * croire à une déconnexion à chaque lancement.
+   */
+  if (compteCharge && !compte) {
+    return (
+      <SafeAreaProvider>
+        <StatusBar
+          barStyle={darkContent ? 'dark-content' : 'light-content'}
+          backgroundColor={c.bg}
+        />
+        <SignInScreen />
+      </SafeAreaProvider>
+    );
+  }
 
   /**
    * LES MARGES DU SYSTÈME, fournies à toute l'app.
@@ -42,6 +67,7 @@ export default function App() {
       {screen === 'library' && <LibraryScreen />}
       {screen === 'export' && <ExportScreen />}
       {screen === 'camera' && <CameraScreen />}
+      <PaywallScreen />
     </SafeAreaProvider>
   );
 }

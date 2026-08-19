@@ -20,6 +20,17 @@ RCT_EXTERN_METHOD(setTorch:(BOOL)on resolve:(RCTPromiseResolveBlock)resolve reje
 RCT_EXTERN_METHOD(tap:(NSString *)kind)
 @end
 
+@interface RCT_EXTERN_MODULE(RoomScanAccount, NSObject)
+RCT_EXTERN_METHOD(accountMarker:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
+RCT_EXTERN_METHOD(setAccountMarker:(NSString *)json
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+RCT_EXTERN_METHOD(appleSignIn:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
+RCT_EXTERN_METHOD(purchasePro:(NSString *)productId
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+@end
+
 @interface RCT_EXTERN_MODULE(RoomScanPhoto, NSObject)
 RCT_EXTERN_METHOD(takePhoto:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
 RCT_EXTERN_METHOD(deletePhotos:(NSArray *)paths

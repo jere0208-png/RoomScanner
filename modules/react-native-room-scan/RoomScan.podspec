@@ -12,7 +12,7 @@ Pod::Spec.new do |s|
   s.platforms    = { :ios => "16.0" }
   s.source       = { :git => "https://github.com/jere0/react-native-room-scan.git", :tag => s.version.to_s }
   s.source_files = "ios/**/*.{h,m,mm,swift}"
-  s.frameworks   = "RoomPlan", "ARKit", "QuickLook"
+  s.frameworks   = "RoomPlan", "ARKit", "QuickLook", "AuthenticationServices", "StoreKit"
   s.swift_version = "5.0"
 
   if respond_to?(:install_modules_dependencies, true)

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { deletePhotoFiles } from '../ui/photos';
+import { useAccountStore } from './accountStore';
 import {
   insetOnRing,
   type CeilingFixture,
@@ -2338,6 +2339,10 @@ export const useScanStore = create<ScanState>((set, get) => {
       }
 
       // Sauvegarde automatique : aucun scan terminé ne peut se perdre.
+      // C'est ICI que le palier gratuit se consomme — « générer un plan »,
+      // c'est en garder un. Un essai jeté avant la fin ne compte pas, et
+      // supprimer un relevé ne rend pas le quota.
+      useAccountStore.getState().noterPlanCree();
       const now = new Date();
       const save: SavedScan = {
         id: `${now.getTime()}-${Math.random().toString(36).slice(2, 8)}`,

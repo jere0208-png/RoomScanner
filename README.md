@@ -671,6 +671,37 @@ tableau. Les courants faibles n'y figurent pas : ils ne sont pas protégés par
 un disjoncteur et rejoignent le coffret de communication, qui est un autre
 boîtier.
 
+### Le compte, le palier gratuit et le Pro
+
+L'app s'ouvre sur une porte d'entrée : Apple (natif), Google (le bouton dit
+qu'il reste à câbler — OAuth —, il ne simule pas), ou e-mail local — prénom
+et adresse, **zéro mot de passe** : sans serveur, un mot de passe ne
+protégerait rien et en ferait perdre un.
+
+**Un seul compte par téléphone.** Le palier gratuit se contourne en recréant
+un compte ; le verrou est donc lié à l'APPAREIL : un marqueur dans le
+trousseau (`RoomScanAccount.swift`, Keychain — il survit à la
+désinstallation) retient l'identifiant du compte créé ici et le nombre de
+plans consommés. Créer un AUTRE compte sur le même téléphone est refusé avec
+la raison en clair ; se reconnecter au sien passe toujours.
+
+**Gratuit : un relevé. Pro (4,90 €/mois) : illimité.** Le quota se consomme
+à l'ENREGISTREMENT du scan, pas à son lancement — un essai jeté ne brûle pas
+l'unique plan gratuit — et supprimer un relevé ne rend pas le quota, sinon
+le palier serait infini par corbeille. La barrière se présente AVANT le
+scan : scanner vingt minutes pour découvrir qu'on ne peut pas enregistrer
+serait le pire moment pour l'apprendre. Le premier plan gratuit est COMPLET
+(plan coté, 3D, dossier PDF) : brider la qualité ferait fuir avant d'avoir
+convaincu.
+
+La page Pro compare les deux paliers, et porte un champ **code promo** :
+les codes du patron (CARIDI12) déverrouillent localement, à 100 %.
+L'abonnement réel passe par StoreKit 2 (`purchasePro`) : le produit
+`echoplan.pro.mensuel` doit exister dans **App Store Connect** — tant qu'il
+n'y est pas, le bouton l'explique au lieu d'échouer en silence. Deux
+prérequis App Store restent côté configuration : l'entitlement « Sign in
+with Apple » sur le profil de signature, et le produit d'abonnement.
+
 ### Un relevé interrompu ne se perd plus
 
 Un scan tenait entièrement en mémoire tant qu'on n'avait pas touché
