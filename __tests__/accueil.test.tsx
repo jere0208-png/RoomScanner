@@ -35,7 +35,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 import React from 'react';
-import { Image, Text } from 'react-native';
+import { Image, Text, View } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import { HomeScreen } from '../src/screens/HomeScreen';
 import { PhoneShowcase } from '../src/components/PhoneShowcase';
@@ -192,5 +192,38 @@ describe('l’accueil', () => {
     const t = monter();
     expect(bouton(t, 'Commencer le scan')!.props.disabled).toBe(true);
     expect(textes(t)).toContain('pas compatible');
+  });
+});
+/**
+ * « MES SCANS » EST CENTRÉ DANS SON BOUTON.
+ *
+ * Le mot et la pastille du compte vivaient côte à côte : c'est donc le
+ * COUPLE qui se centrait, et le mot se retrouvait poussé à gauche du milieu
+ * — d'autant plus loin que le nombre est long. Un bouton dont le texte
+ * bouge selon le nombre de scans qu'on possède ne se lit pas comme un
+ * bouton.
+ *
+ * La pastille se pose donc PAR RAPPORT au mot, à son bord droit, et ne pèse
+ * plus rien dans le centrage.
+ */
+describe('le bouton « Mes scans »', () => {
+  it('centre son mot, la pastille accrochée à côté', () => {
+    // La pastille n'existe qu'avec des relevés à compter.
+    act(() => {
+      useScanStore.setState({
+        saves: [{ id: 's1' }, { id: 's2' }] as never,
+      });
+    });
+    const tree = monter();
+    const badge = tree.root
+      .findAllByType(View)
+      .find((n) => n.props.accessibilityLabel === 'Nombre de scans');
+    expect(badge).toBeDefined();
+    const st = (Array.isArray(badge!.props.style)
+      ? Object.assign({}, ...badge!.props.style.filter(Boolean))
+      : badge!.props.style) as { position?: string; left?: string };
+    expect(st.position).toBe('absolute');
+    expect(st.left).toBe('100%');
+    act(() => tree.unmount());
   });
 });

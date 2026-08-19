@@ -901,15 +901,25 @@ describe('la rangée d’outils', () => {
     const st = (Array.isArray(colonne!.props.style)
       ? Object.assign({}, ...colonne!.props.style.filter(Boolean))
       : colonne!.props.style) as { top?: number; bottom?: number };
-    // Ancrée en haut : sa position ne dépend plus de ce qu'il y a dessous.
-    expect(typeof st.top).toBe('number');
-    expect(st.bottom).toBeUndefined();
-    // Et dans l'ordre : Enregistrer, puis l'annulation.
+    /*
+      LA PILE RESTE EN BAS — c'est le pouce qui commande.
+
+      Elle a été ancrée en haut le temps d'une version, pour que
+      « Enregistrer » ne descende plus quand les calques s'empilent au-dessus.
+      Mauvaise réponse à une bonne question : la colonne de droite appartient
+      au pouce, et la déraciner du bas éloignait tout le reste avec elle. Ce
+      qui compte, c'est l'ORDRE.
+    */
+    expect(typeof st.bottom).toBe('number');
+    expect(st.top).toBeUndefined();
+    // Enregistrer en tête, le retour en arrière juste dessous, Édition en
+    // dernier : c'est l'ordre de lecture de la colonne.
     const mots = colonne!
       .findAllByType(Text)
       .map((t) => String(t.props.children))
-      .filter((m) => m === 'Enregistrer' || m === 'Annuler');
+      .filter((m) => ['Enregistrer', 'Annuler', 'Édition'].includes(m));
     expect(mots[0]).toBe('Enregistrer');
+    expect(mots[mots.length - 1]).toBe('Édition');
   });
 
   it('échange les calques contre les outils en édition', () => {

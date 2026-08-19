@@ -551,11 +551,18 @@ rappelle le numéro que le mur porte sur le plan.
 
 ### Trois places qui ne dépendent plus de rien
 
-- **« Enregistrer » est au plus haut de sa colonne.** Il vivait au bas de la
-  pile d'actions, et le trop-plein de calques se posait au-dessus de lui : sa
-  hauteur dépendait donc du nombre de calques affichés, et sur un scan équipé
-  il descendait de deux crans. Les actions sont ancrées en haut — l'annulation
-  juste dessous — et « Édition » garde le bas, où le pouce tombe.
+- **« Enregistrer » est en tête de sa colonne**, le retour en arrière juste
+  dessous, « Édition » en dernier. La pile a été ancrée EN HAUT du plan le
+  temps d'une version, pour qu'elle ne descende plus quand le trop-plein de
+  calques s'empile au-dessus : mauvaise réponse à une bonne question — la
+  colonne de droite appartient au pouce, et la déraciner du bas éloignait tout
+  le reste avec elle. Elle est revenue en bas ; c'est l'ORDRE qui compte.
+- **Le bouton « Mes scans » centre son mot.** Le libellé et la pastille du
+  compte vivaient côte à côte : c'est donc le COUPLE qui se centrait, et le mot
+  se retrouvait poussé à gauche du milieu — d'autant plus loin que le nombre
+  est long. Un bouton dont le texte se déplace selon le nombre de scans qu'on
+  possède ne se lit plus comme un bouton. La pastille est posée dans le cadre
+  du mot, en absolu à son bord droit : elle déborde sans prendre de place.
 - **L'écran de lancement montre ce que montre l'accueil** : l'icône ET le mot,
   composés en une seule image aux trois densités. Il n'en portait que la
   moitié.

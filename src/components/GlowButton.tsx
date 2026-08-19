@@ -134,14 +134,28 @@ export function GlowButton({
             ],
           },
         ]}>
-        <Text
-          style={[
-            styles.texte,
-            variant === 'primary' ? styles.texteClair : styles.texteSombre,
-          ]}>
-          {label}
-        </Text>
-        {right}
+        {/*
+          LE MOT SE CENTRE SEUL, CE QUI L'ACCOMPAGNE SE POSE À CÔTÉ.
+
+          Le libellé et sa pastille vivaient côte à côte : c'est donc le
+          COUPLE qui se centrait dans le bouton, et le mot se retrouvait
+          poussé à gauche du milieu — d'autant plus loin que le nombre est
+          long. Un bouton dont le texte se déplace selon le nombre de scans
+          qu'on possède ne se lit plus comme un bouton.
+
+          L'accompagnement est donc posé DANS le cadre du mot, en absolu à
+          son bord droit : il déborde sans prendre de place.
+        */}
+        <View>
+          <Text
+            style={[
+              styles.texte,
+              variant === 'primary' ? styles.texteClair : styles.texteSombre,
+            ]}>
+            {label}
+          </Text>
+          {right}
+        </View>
         {/* Le contour : posé PAR-DESSUS le fond, mais transparent au doigt —
             il ne doit pas voler l'appui qu'il invite à donner. */}
         {taille.w > 0 && !disabled && anime && (

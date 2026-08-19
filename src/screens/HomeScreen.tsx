@@ -265,7 +265,9 @@ export function HomeScreen() {
             variant="ghost"
             onPress={() => setScreen('library')}
             right={
-              <View style={styles.libraryBadge}>
+              <View
+                accessibilityLabel="Nombre de scans"
+                style={styles.libraryBadge}>
                 <Text style={styles.libraryBadgeText}>{saves.length}</Text>
               </View>
             }
@@ -406,6 +408,12 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   },
   libraryText: { color: c.ink, fontSize: 15.5, fontWeight: '600' },
   libraryBadge: {
+    // Accrochée au bord droit du mot, centrée sur sa ligne : elle déborde
+    // du cadre sans y prendre de place, donc sans décaler le centrage.
+    position: 'absolute',
+    left: '100%',
+    top: '50%',
+    marginTop: -11,
     backgroundColor: c.blueSoft,
     borderRadius: radius.pill,
     paddingHorizontal: 9,
