@@ -15,10 +15,12 @@ import { NativeModules } from 'react-native';
 
 /** Ce que le trousseau retient de l'appareil, réinstallations comprises. */
 export interface DeviceMarker {
-  /** L'identifiant du compte créé sur cet appareil. */
+  /** L'identifiant du compte créé sur cet appareil — '' après suppression. */
   compte: string;
   /** Plans créés sur cet appareil, palier gratuit. */
   plans: number;
+  /** Le Pro, s'il a été acquis : il survit à la réinstallation lui aussi. */
+  pro?: 'code' | 'abonnement';
 }
 
 export interface AppleIdentity {
@@ -33,6 +35,7 @@ const natif = () => NativeModules.RoomScanAccount as
       setAccountMarker?: (json: string) => Promise<boolean>;
       appleSignIn?: () => Promise<AppleIdentity>;
       purchasePro?: (productId: string) => Promise<boolean>;
+      restorePro?: (productId: string) => Promise<boolean>;
     }
   | undefined;
 
@@ -42,7 +45,11 @@ export async function lireMarqueur(): Promise<DeviceMarker | null> {
     if (!brut) return null;
     const lu = JSON.parse(brut);
     if (typeof lu?.compte !== 'string') return null;
-    return { compte: lu.compte, plans: Number(lu.plans) || 0 };
+    return {
+      compte: lu.compte,
+      plans: Number(lu.plans) || 0,
+      pro: lu.pro === 'code' || lu.pro === 'abonnement' ? lu.pro : undefined,
+    };
   } catch {
     return null;
   }
@@ -75,6 +82,19 @@ export async function acheterAbonnement(productId: string): Promise<boolean> {
     throw new Error(
       'Achat indisponible — le produit doit être configuré dans App Store Connect.',
     );
+  }
+  return fn(productId);
+}
+
+/**
+ * « Restaurer l'achat » : demande à l'App Store si CET identifiant Apple
+ * détient déjà l'abonnement (nouvel appareil, réinstallation). Exigé par
+ * les règles de l'App Store dès qu'on vend un abonnement.
+ */
+export async function restaurerAbonnement(productId: string): Promise<boolean> {
+  const fn = natif()?.restorePro;
+  if (!fn) {
+    throw new Error('Restauration indisponible sur cet appareil.');
   }
   return fn(productId);
 }

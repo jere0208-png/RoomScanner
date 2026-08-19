@@ -26,6 +26,7 @@ import {
   connexionApple,
   ecrireMarqueur,
   lireMarqueur,
+  restaurerAbonnement,
 } from '../native/account';
 
 export const PLANS_GRATUITS = 1;
@@ -61,8 +62,16 @@ interface AccountState {
   connecter: (compte: Compte) => Promise<{ ok: boolean; raison?: string }>;
   connecterApple: () => Promise<{ ok: boolean; raison?: string }>;
   deconnecter: () => void;
+  /**
+   * Efface l'identité (exigence App Store : un compte doit pouvoir se
+   * supprimer) mais GARDE le compteur de plans : supprimer-recréer ne rend
+   * pas le palier gratuit. Le Pro tombe avec le compte — l'abonnement se
+   * retrouve par « Restaurer l'achat ».
+   */
+  supprimerCompte: () => Promise<void>;
   utiliserCode: (code: string) => boolean;
   acheterPro: () => Promise<void>;
+  restaurerPro: () => Promise<boolean>;
   peutCreerPlan: () => boolean;
   noterPlanCree: () => void;
   ouvrirPaywall: () => void;
@@ -97,13 +106,15 @@ export const useAccountStore = create<AccountState>((set, get) => ({
       // Un stockage illisible vaut un premier lancement.
     }
     // Le trousseau prime sur le stockage local : il a survécu aux
-    // réinstallations, lui.
+    // réinstallations, lui — le compteur de plans COMME le Pro. Sans ça,
+    // le code promo s'évaporait à la première réinstallation.
     const marqueur = await lireMarqueur();
     set({
       charge: true,
       compte: (local.compte as Compte) ?? null,
-      pro: !!local.pro,
-      proVia: (local.proVia as AccountState['proVia']) ?? null,
+      pro: !!local.pro || !!marqueur?.pro,
+      proVia:
+        (local.proVia as AccountState['proVia']) ?? marqueur?.pro ?? null,
       plansUtilises: Math.max(
         Number(local.plansUtilises) || 0,
         marqueur?.plans ?? 0,
@@ -113,6 +124,8 @@ export const useAccountStore = create<AccountState>((set, get) => ({
 
   connecter: async (compte) => {
     const marqueur = await lireMarqueur();
+    // Un marqueur au compte vidé (suppression) accueille un nouveau compte
+    // — mais garde son compteur de plans.
     if (marqueur && marqueur.compte && marqueur.compte !== compte.id) {
       return {
         ok: false,
@@ -124,6 +137,7 @@ export const useAccountStore = create<AccountState>((set, get) => ({
     await ecrireMarqueur({
       compte: compte.id,
       plans: marqueur?.plans ?? get().plansUtilises,
+      pro: marqueur?.pro,
     });
     set({ compte });
     persister(get());
@@ -150,11 +164,28 @@ export const useAccountStore = create<AccountState>((set, get) => ({
     persister(get());
   },
 
+  supprimerCompte: async () => {
+    const marqueur = await lireMarqueur();
+    // L'identité sort du trousseau ; le compteur de plans y reste.
+    await ecrireMarqueur({ compte: '', plans: marqueur?.plans ?? get().plansUtilises });
+    set({ compte: null, pro: false, proVia: null });
+    persister(get());
+  },
+
   utiliserCode: (code) => {
     const propre = code.trim().toUpperCase();
     if (!CODES_PROMO.includes(propre)) return false;
     set({ pro: true, proVia: 'code', paywallVisible: false });
     persister(get());
+    // Au trousseau aussi : le Pro au code survit à la réinstallation.
+    const s = get();
+    if (s.compte) {
+      ecrireMarqueur({
+        compte: s.compte.id,
+        plans: s.plansUtilises,
+        pro: 'code',
+      }).catch(() => {});
+    }
     return true;
   },
 
@@ -163,7 +194,24 @@ export const useAccountStore = create<AccountState>((set, get) => ({
     if (ok) {
       set({ pro: true, proVia: 'abonnement', paywallVisible: false });
       persister(get());
+      const s = get();
+      if (s.compte) {
+        ecrireMarqueur({
+          compte: s.compte.id,
+          plans: s.plansUtilises,
+          pro: 'abonnement',
+        }).catch(() => {});
+      }
     }
+  },
+
+  restaurerPro: async () => {
+    const ok = await restaurerAbonnement(PRODUIT_PRO);
+    if (ok) {
+      set({ pro: true, proVia: 'abonnement', paywallVisible: false });
+      persister(get());
+    }
+    return ok;
   },
 
   peutCreerPlan: () => {
@@ -177,7 +225,12 @@ export const useAccountStore = create<AccountState>((set, get) => ({
     set({ plansUtilises: plans });
     persister(get());
     if (s.compte) {
-      ecrireMarqueur({ compte: s.compte.id, plans }).catch(() => {});
+      // Sans écraser le Pro que le trousseau porte peut-être déjà.
+      ecrireMarqueur({
+        compte: s.compte.id,
+        plans,
+        pro: s.proVia ?? undefined,
+      }).catch(() => {});
     }
   },
 

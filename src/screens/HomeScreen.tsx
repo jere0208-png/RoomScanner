@@ -1,9 +1,11 @@
 import React, { useEffect, useRef } from 'react';
 import { ThemeGlyph } from '../components/ThemeGlyph';
 import {
+  Alert,
   Animated,
   Easing,
   Image,
+  Pressable,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -59,6 +61,11 @@ export function HomeScreen() {
   const { start } = useRoomScan();
   const peutCreerPlan = useAccountStore((s) => s.peutCreerPlan);
   const ouvrirPaywall = useAccountStore((s) => s.ouvrirPaywall);
+  const compte = useAccountStore((s) => s.compte);
+  const pro = useAccountStore((s) => s.pro);
+  const plansUtilises = useAccountStore((s) => s.plansUtilises);
+  const deconnecter = useAccountStore((s) => s.deconnecter);
+  const supprimerCompte = useAccountStore((s) => s.supprimerCompte);
   const c = useTheme();
   /** Le fond est-il sombre ? C'est lui qui choisit le logotype. */
   const sombre = c === dark;
@@ -304,6 +311,57 @@ export function HomeScreen() {
         Allumez les lumières et dégagez le centre de la pièce pour un meilleur
         résultat.
       </Animated.Text>
+
+      {/* Le compte, en pied d'écran : qui est connecté, où il en est du
+          palier — et la seule porte VOLONTAIRE vers la page Pro. Sans elle,
+          on ne pouvait payer qu'en butant sur la barrière. */}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Mon compte"
+        style={styles.compteRow}
+        onPress={() => {
+          Alert.alert(
+            compte?.prenom || compte?.email || 'Mon compte',
+            pro
+              ? 'EchoPlan Pro — relevés illimités.'
+              : `Plan gratuit — ${Math.max(0, 1 - plansUtilises)} relevé restant.`,
+            [
+              ...(pro
+                ? []
+                : [{ text: 'Passer en Pro / code promo', onPress: ouvrirPaywall }]),
+              { text: 'Se déconnecter', onPress: deconnecter },
+              {
+                text: 'Supprimer mon compte',
+                style: 'destructive' as const,
+                onPress: () =>
+                  Alert.alert(
+                    'Supprimer le compte ?',
+                    'Vos relevés restent sur l’appareil, mais l’identité est ' +
+                      'effacée. Le palier gratuit déjà consommé ne se remet ' +
+                      'pas à zéro.',
+                    [
+                      { text: 'Annuler', style: 'cancel' },
+                      {
+                        text: 'Supprimer',
+                        style: 'destructive',
+                        onPress: () => supprimerCompte(),
+                      },
+                    ],
+                  ),
+              },
+              { text: 'Fermer', style: 'cancel' as const },
+            ],
+          );
+        }}>
+        <Text style={styles.compteTexte}>
+          {compte?.prenom || compte?.email || 'Compte'}
+        </Text>
+        <View style={[styles.comptePastille, pro && styles.comptePro]}>
+          <Text style={[styles.comptePastilleTexte, pro && styles.compteProTexte]}>
+            {pro ? 'PRO' : 'Gratuit'}
+          </Text>
+        </View>
+      </Pressable>
     </View>
   );
 }
@@ -458,4 +516,26 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     marginTop: 14,
     lineHeight: 17,
   },
+  compteRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    alignSelf: 'center',
+    marginTop: 12,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+  },
+  compteTexte: { color: c.inkSoft, fontSize: 13, fontWeight: '600' },
+  comptePastille: {
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    backgroundColor: c.surfaceSunken,
+    borderWidth: 1,
+    borderColor: c.lineStrong,
+  },
+  comptePro: { backgroundColor: c.blue, borderColor: c.blue },
+  comptePastilleTexte: { color: c.inkSoft, fontSize: 11, fontWeight: '800' },
+  compteProTexte: { color: '#FFFFFF' },
 }));

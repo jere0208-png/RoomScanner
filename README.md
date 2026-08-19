@@ -695,12 +695,22 @@ serait le pire moment pour l'apprendre. Le premier plan gratuit est COMPLET
 convaincu.
 
 La page Pro compare les deux paliers, et porte un champ **code promo** :
-les codes du patron (CARIDI12) déverrouillent localement, à 100 %.
-L'abonnement réel passe par StoreKit 2 (`purchasePro`) : le produit
-`echoplan.pro.mensuel` doit exister dans **App Store Connect** — tant qu'il
-n'y est pas, le bouton l'explique au lieu d'échouer en silence. Deux
-prérequis App Store restent côté configuration : l'entitlement « Sign in
-with Apple » sur le profil de signature, et le produit d'abonnement.
+les codes du patron (CARIDI12) déverrouillent localement, à 100 %. **Le Pro
+s'écrit AUSSI dans le trousseau** — sans ça, l'essai l'a montré, le code
+promo s'évaporait à la première réinstallation. L'abonnement réel passe par
+StoreKit 2 (`purchasePro`), et « **Restaurer l'achat** » (exigé par l'App
+Store) redemande à `Transaction.currentEntitlements` sur un nouvel appareil.
+Le produit `echoplan.pro.mensuel` doit exister dans **App Store Connect** —
+tant qu'il n'y est pas, le bouton l'explique au lieu d'échouer en silence.
+Deux prérequis App Store restent côté configuration : l'entitlement « Sign
+in with Apple » sur le profil de signature, et le produit d'abonnement.
+
+**Le compte se quitte et se supprime** depuis la rangée « Mon compte » de
+l'accueil — la suppression est une exigence App Store (5.1.1). Elle efface
+l'identité du trousseau mais **garde le compteur de plans** : supprimer puis
+recréer un compte ne rend pas le palier gratuit. C'est aussi cette rangée
+qui offre la seule porte VOLONTAIRE vers la page Pro : sans elle, on ne
+pouvait payer qu'en butant sur la barrière.
 
 ### Un relevé interrompu ne se perd plus
 

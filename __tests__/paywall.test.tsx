@@ -165,3 +165,16 @@ describe('l’accueil et le quota', () => {
     expect(useAccountStore.getState().paywallVisible).toBe(false);
   });
 });
+
+describe('ce que l’essai adversarial a exigé', () => {
+  it('la page Pro offre « Restaurer l’achat »', () => {
+    const t = monter(<PaywallScreen />);
+    expect(bouton(t, 'Restaurer l’achat')).toBeTruthy();
+  });
+
+  it('l’accueil porte le compte : on peut en sortir, et payer sans y être forcé', () => {
+    useAccountStore.setState({ paywallVisible: false });
+    const t = monter(<HomeScreen />);
+    expect(bouton(t, 'Mon compte')).toBeTruthy();
+  });
+});

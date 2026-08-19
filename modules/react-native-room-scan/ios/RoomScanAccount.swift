@@ -167,4 +167,24 @@ class RoomScanAccount: NSObject, ASAuthorizationControllerDelegate,
       }
     }
   }
+
+  /** « Restaurer l'achat » : l'App Store dit si ce compte Apple détient
+   *  déjà l'abonnement — nouvel appareil ou réinstallation. */
+  @objc func restorePro(
+    _ productId: String,
+    resolve: @escaping RCTPromiseResolveBlock,
+    reject: @escaping RCTPromiseRejectBlock
+  ) {
+    Task {
+      for await resultat in Transaction.currentEntitlements {
+        if case .verified(let transaction) = resultat,
+          transaction.productID == productId
+        {
+          resolve(true)
+          return
+        }
+      }
+      resolve(false)
+    }
+  }
 }

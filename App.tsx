@@ -33,7 +33,19 @@ export default function App() {
    * connexion une demi-seconde à quelqu'un qui a déjà un compte ferait
    * croire à une déconnexion à chaque lancement.
    */
-  if (compteCharge && !compte) {
+  // Rien tant que le compte n'est pas LU : afficher l'accueil une
+  // demi-seconde avant la porte d'entrée ferait croire à une déconnexion.
+  if (!compteCharge) {
+    return (
+      <SafeAreaProvider>
+        <StatusBar
+          barStyle={darkContent ? 'dark-content' : 'light-content'}
+          backgroundColor={c.bg}
+        />
+      </SafeAreaProvider>
+    );
+  }
+  if (!compte) {
     return (
       <SafeAreaProvider>
         <StatusBar

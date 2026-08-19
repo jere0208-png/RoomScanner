@@ -13,7 +13,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 // Le trousseau simulé : un marqueur en mémoire, comme l'appareil le ferait.
-let mockMarqueur: { compte: string; plans: number } | null = null;
+let mockMarqueur: { compte: string; plans: number; pro?: string } | null = null;
 jest.mock('../src/native/account', () => ({
   lireMarqueur: jest.fn(async () => mockMarqueur),
   ecrireMarqueur: jest.fn(async (m: { compte: string; plans: number }) => {
@@ -21,6 +21,7 @@ jest.mock('../src/native/account', () => ({
   }),
   connexionApple: jest.fn(async () => ({ id: 'A1', prenom: 'Jé' })),
   acheterAbonnement: jest.fn(async () => true),
+  restaurerAbonnement: jest.fn(async () => true),
 }));
 
 import { PLANS_GRATUITS, useAccountStore } from '../src/store/accountStore';
@@ -98,6 +99,51 @@ describe('le palier gratuit', () => {
   });
 });
 
+describe('ce que la réinstallation ne défait pas', () => {
+  it('le Pro au code survit : il est écrit dans le trousseau', async () => {
+    await useAccountStore.getState().connecter(MARTIN);
+    useAccountStore.getState().utiliserCode('CARIDI12');
+    expect(mockMarqueur?.pro).toBe('code');
+    // « Réinstallation » : stockage local vidé, trousseau intact.
+    useAccountStore.setState({ pro: false, proVia: null });
+    await useAccountStore.getState().charger();
+    expect(useAccountStore.getState().pro).toBe(true);
+  });
+
+  it('noter un plan ne fait pas tomber le Pro du trousseau', async () => {
+    await useAccountStore.getState().connecter(MARTIN);
+    useAccountStore.getState().utiliserCode('CARIDI12');
+    useAccountStore.getState().noterPlanCree();
+    expect(mockMarqueur?.pro).toBe('code');
+    expect(mockMarqueur?.plans).toBe(1);
+  });
+});
+
+describe('la suppression du compte', () => {
+  it('efface l’identité mais GARDE le quota consommé', async () => {
+    await useAccountStore.getState().connecter(MARTIN);
+    useAccountStore.getState().noterPlanCree();
+    await useAccountStore.getState().supprimerCompte();
+    expect(useAccountStore.getState().compte).toBeNull();
+    // Le marqueur ne porte plus d'identité…
+    expect(mockMarqueur?.compte).toBe('');
+    // …mais le compteur reste : supprimer-recréer ne rend pas de plan.
+    expect(mockMarqueur?.plans).toBe(1);
+  });
+
+  it('autorise un NOUVEAU compte après suppression, quota conservé', async () => {
+    await useAccountStore.getState().connecter(MARTIN);
+    useAccountStore.getState().noterPlanCree();
+    await useAccountStore.getState().supprimerCompte();
+    const r = await useAccountStore
+      .getState()
+      .connecter({ id: 'email:autre@exemple.fr', methode: 'email' });
+    expect(r.ok).toBe(true);
+    await useAccountStore.getState().charger();
+    expect(useAccountStore.getState().peutCreerPlan()).toBe(false);
+  });
+});
+
 describe('le code promo et l’achat', () => {
   it('CARIDI12 déverrouille le Pro, quelle que soit la casse', () => {
     const s = useAccountStore.getState();
@@ -123,5 +169,11 @@ describe('le code promo et l’achat', () => {
     const r = await useAccountStore.getState().connecterApple();
     expect(r.ok).toBe(true);
     expect(useAccountStore.getState().compte?.id).toBe('apple:A1');
+  });
+
+  it('« Restaurer l’achat » redonne le Pro quand l’App Store le confirme', async () => {
+    await useAccountStore.getState().restaurerPro();
+    expect(useAccountStore.getState().pro).toBe(true);
+    expect(useAccountStore.getState().proVia).toBe('abonnement');
   });
 });

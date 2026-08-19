@@ -45,6 +45,7 @@ export function PaywallScreen() {
   const fermer = useAccountStore((st) => st.fermerPaywall);
   const utiliserCode = useAccountStore((st) => st.utiliserCode);
   const acheterPro = useAccountStore((st) => st.acheterPro);
+  const restaurerPro = useAccountStore((st) => st.restaurerPro);
   const [code, setCode] = useState('');
 
   const valideCode = () => {
@@ -119,6 +120,24 @@ export function PaywallScreen() {
           <Text style={s.ctaTexte}>S’abonner — {PRIX_PRO} / mois</Text>
         </Pressable>
         <Text style={s.sansEngagement}>Sans engagement, résiliable à tout moment.</Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Restaurer l’achat"
+          onPress={async () => {
+            try {
+              const ok = await restaurerPro();
+              Alert.alert(
+                ok ? 'Abonnement restauré' : 'Aucun achat trouvé',
+                ok
+                  ? 'Votre Pro est de retour.'
+                  : 'L’App Store ne connaît pas d’abonnement pour ce compte Apple.',
+              );
+            } catch (e) {
+              Alert.alert('Restauration impossible', (e as Error).message);
+            }
+          }}>
+          <Text style={s.restaurer}>Restaurer l’achat</Text>
+        </Pressable>
 
         <View style={s.promo}>
           <TextInput
@@ -197,6 +216,13 @@ const themed = (c: Palette) =>
       fontSize: 12,
       textAlign: 'center',
       marginTop: 8,
+    },
+    restaurer: {
+      color: c.blue,
+      fontSize: 13,
+      fontWeight: '600',
+      textAlign: 'center',
+      marginTop: 14,
     },
     promo: { flexDirection: 'row', gap: 10, marginTop: 26 },
     champ: {
