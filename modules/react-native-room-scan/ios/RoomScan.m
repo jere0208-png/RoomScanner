@@ -32,6 +32,10 @@ RCT_EXTERN_METHOD(purchasePro:(NSString *)productId
 RCT_EXTERN_METHOD(restorePro:(NSString *)productId
                   resolve:(RCTPromiseResolveBlock)resolve
                   reject:(RCTPromiseRejectBlock)reject)
+RCT_EXTERN_METHOD(webAuth:(NSString *)url
+                  scheme:(NSString *)scheme
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
 @end
 
 @interface RCT_EXTERN_MODULE(RoomScanPhoto, NSObject)

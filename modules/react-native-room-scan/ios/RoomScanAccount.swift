@@ -19,11 +19,14 @@ import React
  */
 @objc(RoomScanAccount)
 class RoomScanAccount: NSObject, ASAuthorizationControllerDelegate,
-  ASAuthorizationControllerPresentationContextProviding
+  ASAuthorizationControllerPresentationContextProviding,
+  ASWebAuthenticationPresentationContextProviding
 {
   private let service = "fr.echoplan.compte"
   private var signInResolve: RCTPromiseResolveBlock?
   private var signInReject: RCTPromiseRejectBlock?
+  /** La feuille web OAuth en cours : retenue, sinon iOS la ferme aussitôt. */
+  private var sessionWeb: ASWebAuthenticationSession?
 
   @objc static func requiresMainQueueSetup() -> Bool { false }
 
@@ -123,6 +126,16 @@ class RoomScanAccount: NSObject, ASAuthorizationControllerDelegate,
   func presentationAnchor(for controller: ASAuthorizationController)
     -> ASPresentationAnchor
   {
+    return fenetre()
+  }
+
+  func presentationAnchor(for session: ASWebAuthenticationSession)
+    -> ASPresentationAnchor
+  {
+    return fenetre()
+  }
+
+  private func fenetre() -> ASPresentationAnchor {
     return UIApplication.shared.connectedScenes
       .compactMap { $0 as? UIWindowScene }
       .flatMap { $0.windows }
@@ -165,6 +178,41 @@ class RoomScanAccount: NSObject, ASAuthorizationControllerDelegate,
       } catch {
         reject("achat", "Achat impossible : \(error.localizedDescription)", error)
       }
+    }
+  }
+
+  /**
+   * La feuille web de connexion (Google via le serveur) : ouvre l'URL dans
+   * une ASWebAuthenticationSession et rend l'URL de retour au schéma de
+   * l'app. C'est la session elle-même qui livre le retour — un lien forgé
+   * depuis ailleurs n'atteint jamais ce chemin.
+   */
+  @objc func webAuth(
+    _ url: String,
+    scheme: String,
+    resolve: @escaping RCTPromiseResolveBlock,
+    reject: @escaping RCTPromiseRejectBlock
+  ) {
+    guard let depart = URL(string: url) else {
+      reject("web", "URL de connexion invalide", nil)
+      return
+    }
+    DispatchQueue.main.async {
+      let session = ASWebAuthenticationSession(
+        url: depart,
+        callbackURLScheme: scheme
+      ) { retour, erreur in
+        self.sessionWeb = nil
+        if let retour = retour {
+          resolve(retour.absoluteString)
+        } else {
+          reject("web", "Connexion annulée", erreur)
+        }
+      }
+      session.presentationContextProvider = self
+      session.prefersEphemeralWebBrowserSession = false
+      self.sessionWeb = session
+      session.start()
     }
   }
 

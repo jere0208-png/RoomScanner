@@ -26,6 +26,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LogoMark } from '../components/LogoMark';
 import { LightRibbon } from '../components/LightRibbon';
 import { useAccountStore } from '../store/accountStore';
+import { connexionWeb } from '../native/account';
+import { SERVEUR } from '../config/serveur';
 import { dark, useTheme, type Palette } from '../theme';
 
 export function SignInScreen() {
@@ -47,13 +49,43 @@ export function SignInScreen() {
     if (!r.ok) refuse(r.raison);
   };
 
-  const viaGoogle = () => {
-    // Pas de SDK Google configuré : on le dit, on ne simule pas.
-    Alert.alert(
-      'Bientôt disponible',
-      'La connexion Google demande une configuration OAuth. ' +
-        'Utilisez Apple ou l’e-mail en attendant.',
-    );
+  const viaGoogle = async () => {
+    // Sans serveur configuré (src/config/serveur.ts), on le dit — on ne
+    // simule pas une connexion.
+    if (!SERVEUR.url) {
+      Alert.alert(
+        'Bientôt disponible',
+        'La connexion Google passe par le serveur EchoPlan, qui reste à ' +
+          'configurer. Utilisez Apple ou l’e-mail en attendant.',
+      );
+      return;
+    }
+    try {
+      // La feuille web fait tout le flux OAuth côté serveur, et rend
+      // l'identité par le schéma de retour — signée, non forgeable.
+      const retour = await connexionWeb(
+        `${SERVEUR.url}/auth-google.php`,
+        SERVEUR.schemaRetour,
+      );
+      const champ = (nom: string) => {
+        const m = new RegExp(`[?&]${nom}=([^&]*)`).exec(retour);
+        return m ? decodeURIComponent(m[1].replace(/\+/g, ' ')) : '';
+      };
+      const id = champ('id');
+      if (!id.startsWith('google:')) {
+        refuse('Le retour de Google est illisible.');
+        return;
+      }
+      const r = await connecter({
+        id,
+        prenom: champ('prenom') || undefined,
+        email: champ('email') || undefined,
+        methode: 'google',
+      });
+      if (!r.ok) refuse(r.raison);
+    } catch (e) {
+      refuse((e as Error).message);
+    }
   };
 
   const viaEmail = async () => {

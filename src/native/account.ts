@@ -21,6 +21,8 @@ export interface DeviceMarker {
   plans: number;
   /** Le Pro, s'il a été acquis : il survit à la réinstallation lui aussi. */
   pro?: 'code' | 'abonnement';
+  /** L'identité STABLE de l'appareil, pour le verrou côté serveur. */
+  appareil?: string;
 }
 
 export interface AppleIdentity {
@@ -36,6 +38,7 @@ const natif = () => NativeModules.RoomScanAccount as
       appleSignIn?: () => Promise<AppleIdentity>;
       purchasePro?: (productId: string) => Promise<boolean>;
       restorePro?: (productId: string) => Promise<boolean>;
+      webAuth?: (url: string, scheme: string) => Promise<string>;
     }
   | undefined;
 
@@ -49,6 +52,7 @@ export async function lireMarqueur(): Promise<DeviceMarker | null> {
       compte: lu.compte,
       plans: Number(lu.plans) || 0,
       pro: lu.pro === 'code' || lu.pro === 'abonnement' ? lu.pro : undefined,
+      appareil: typeof lu.appareil === 'string' ? lu.appareil : undefined,
     };
   } catch {
     return null;
@@ -97,4 +101,19 @@ export async function restaurerAbonnement(productId: string): Promise<boolean> {
     throw new Error('Restauration indisponible sur cet appareil.');
   }
   return fn(productId);
+}
+
+/**
+ * La feuille web de connexion (flux Google via le serveur) : rend l'URL de
+ * retour `echoplan://google?...` que la session livre — et elle seule.
+ */
+export async function connexionWeb(
+  url: string,
+  scheme: string,
+): Promise<string> {
+  const fn = natif()?.webAuth;
+  if (!fn) {
+    throw new Error('Connexion web indisponible sur cet appareil.');
+  }
+  return fn(url, scheme);
 }

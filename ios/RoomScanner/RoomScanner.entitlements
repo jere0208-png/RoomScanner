@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- La connexion Apple : le bouton existe dans l'app, c'est cette clé
+	     (appliquée À LA SIGNATURE) qui le fait fonctionner. Le build CI non
+	     signé l'ignore ; Xcode/App Store Connect l'exigent. -->
+	<key>com.apple.developer.applesignin</key>
+	<array>
+		<string>Default</string>
+	</array>
+</dict>
+</plist>

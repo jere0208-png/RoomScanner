@@ -25,6 +25,10 @@ jest.mock('../src/native/account', () => ({
 }));
 
 import { PLANS_GRATUITS, useAccountStore } from '../src/store/accountStore';
+import { SERVEUR } from '../src/config/serveur';
+
+/** La fusion du marqueur lit puis écrit : deux microtâches à laisser passer. */
+const tick = () => new Promise((r) => setImmediate(r));
 
 const MARTIN = {
   id: 'email:martin@exemple.fr',
@@ -81,6 +85,7 @@ describe('le palier gratuit', () => {
   it('retient le compteur dans le trousseau : la réinstallation ne rend rien', async () => {
     await useAccountStore.getState().connecter(MARTIN);
     useAccountStore.getState().noterPlanCree();
+    await tick();
     expect(mockMarqueur?.plans).toBe(1);
     // « Réinstallation » : le stockage local repart de zéro, pas le
     // trousseau. Le chargement reprend le compteur du marqueur.
@@ -103,6 +108,7 @@ describe('ce que la réinstallation ne défait pas', () => {
   it('le Pro au code survit : il est écrit dans le trousseau', async () => {
     await useAccountStore.getState().connecter(MARTIN);
     useAccountStore.getState().utiliserCode('CARIDI12');
+    await tick();
     expect(mockMarqueur?.pro).toBe('code');
     // « Réinstallation » : stockage local vidé, trousseau intact.
     useAccountStore.setState({ pro: false, proVia: null });
@@ -113,7 +119,9 @@ describe('ce que la réinstallation ne défait pas', () => {
   it('noter un plan ne fait pas tomber le Pro du trousseau', async () => {
     await useAccountStore.getState().connecter(MARTIN);
     useAccountStore.getState().utiliserCode('CARIDI12');
+    await tick();
     useAccountStore.getState().noterPlanCree();
+    await tick();
     expect(mockMarqueur?.pro).toBe('code');
     expect(mockMarqueur?.plans).toBe(1);
   });
@@ -123,6 +131,7 @@ describe('la suppression du compte', () => {
   it('efface l’identité mais GARDE le quota consommé', async () => {
     await useAccountStore.getState().connecter(MARTIN);
     useAccountStore.getState().noterPlanCree();
+    await tick();
     await useAccountStore.getState().supprimerCompte();
     expect(useAccountStore.getState().compte).toBeNull();
     // Le marqueur ne porte plus d'identité…
@@ -134,6 +143,7 @@ describe('la suppression du compte', () => {
   it('autorise un NOUVEAU compte après suppression, quota conservé', async () => {
     await useAccountStore.getState().connecter(MARTIN);
     useAccountStore.getState().noterPlanCree();
+    await tick();
     await useAccountStore.getState().supprimerCompte();
     const r = await useAccountStore
       .getState()
@@ -175,5 +185,65 @@ describe('le code promo et l’achat', () => {
     await useAccountStore.getState().restaurerPro();
     expect(useAccountStore.getState().pro).toBe(true);
     expect(useAccountStore.getState().proVia).toBe('abonnement');
+  });
+});
+
+/**
+ * LE MODE SERVEUR — la base OVH juge, sans jamais bloquer un chantier.
+ *
+ * Trois vérités à tenir : le refus du serveur est définitif (verrou en
+ * base), son état enrichit le local (Pro accordé ailleurs), et son SILENCE
+ * ne bloque rien — offline-first, un scan ne dépend pas du réseau.
+ */
+describe('le mode serveur (base OVH)', () => {
+  const fetchMock = jest.fn();
+
+  beforeEach(() => {
+    SERVEUR.url = 'https://exemple.fr/echoplan';
+    global.fetch = fetchMock as never;
+    fetchMock.mockReset();
+  });
+  afterEach(() => {
+    SERVEUR.url = '';
+  });
+
+  const reponse = (corps: unknown) =>
+    Promise.resolve({ json: async () => corps } as Response);
+
+  it('adopte le refus du serveur : le verrou vit aussi en base', async () => {
+    fetchMock.mockReturnValueOnce(
+      reponse({ ok: false, raison: 'Un compte a déjà été créé sur ce téléphone.' }),
+    );
+    const r = await useAccountStore.getState().connecter(MARTIN);
+    expect(r.ok).toBe(false);
+    expect(r.raison).toContain('déjà été créé');
+  });
+
+  it('rapporte le Pro et le quota que la base connaît', async () => {
+    fetchMock.mockReturnValueOnce(
+      reponse({ ok: true, jeton: 'J1', pro: 'code', plans: 1 }),
+    );
+    const r = await useAccountStore.getState().connecter(MARTIN);
+    expect(r.ok).toBe(true);
+    const s = useAccountStore.getState();
+    expect(s.jeton).toBe('J1');
+    expect(s.pro).toBe(true);
+    expect(s.plansUtilises).toBe(1);
+  });
+
+  it('un serveur muet ne bloque rien : le local tranche', async () => {
+    fetchMock.mockRejectedValueOnce(new Error('réseau'));
+    const r = await useAccountStore.getState().connecter(MARTIN);
+    expect(r.ok).toBe(true);
+    expect(useAccountStore.getState().jeton).toBeNull();
+  });
+
+  it('annonce chaque plan consommé au serveur', async () => {
+    fetchMock.mockReturnValue(reponse({ ok: true }));
+    useAccountStore.setState({ compte: MARTIN, jeton: 'J1' });
+    useAccountStore.getState().noterPlanCree();
+    await Promise.resolve();
+    const appels = fetchMock.mock.calls.map((c) => JSON.parse(c[1].body));
+    expect(appels.some((a) => a.action === 'plan')).toBe(true);
   });
 });

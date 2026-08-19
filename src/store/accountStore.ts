@@ -27,7 +27,36 @@ import {
   ecrireMarqueur,
   lireMarqueur,
   restaurerAbonnement,
+  type DeviceMarker,
 } from '../native/account';
+import { SERVEUR } from '../config/serveur';
+
+/**
+ * L'API du serveur, quand il est configuré. OFFLINE-FIRST : cinq secondes
+ * puis on passe — un serveur injoignable ne bloque jamais un chantier, et
+ * `null` dit « pas de réponse », jamais « refusé ».
+ */
+async function api(
+  action: string,
+  corps: Record<string, unknown>,
+): Promise<{ ok: boolean; [k: string]: unknown } | null> {
+  if (!SERVEUR.url) return null;
+  try {
+    const reponse = await Promise.race([
+      fetch(`${SERVEUR.url}/api.php`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, ...corps }),
+      }),
+      new Promise<never>((_, rej) =>
+        setTimeout(() => rej(new Error('délai')), 5000),
+      ),
+    ]);
+    return await reponse.json();
+  } catch {
+    return null;
+  }
+}
 
 export const PLANS_GRATUITS = 1;
 export const PRIX_PRO = '4,90 €';
@@ -53,6 +82,8 @@ interface AccountState {
   proVia: 'abonnement' | 'code' | null;
   plansUtilises: number;
   paywallVisible: boolean;
+  /** Le jeton rendu par le serveur à la connexion — null hors ligne. */
+  jeton: string | null;
 
   charger: () => Promise<void>;
   /**
@@ -86,8 +117,34 @@ const persister = (s: AccountState) =>
       pro: s.pro,
       proVia: s.proVia,
       plansUtilises: s.plansUtilises,
+      jeton: s.jeton,
     }),
   ).catch(() => {});
+
+/** Un identifiant d'appareil : posé une fois dans le trousseau, il sert au
+ *  verrou côté serveur. Pas besoin de vrai aléa cryptographique — il doit
+ *  être STABLE et unique, pas secret. */
+const nouvelAppareil = () =>
+  `ios-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+
+/** Relit le marqueur et le réécrit fusionné : aucun champ ne se perd. */
+async function fusionnerMarqueur(
+  patch: Partial<DeviceMarker>,
+): Promise<DeviceMarker> {
+  const courant = (await lireMarqueur()) ?? {
+    compte: '',
+    plans: 0,
+    appareil: nouvelAppareil(),
+  };
+  const fusion: DeviceMarker = {
+    compte: patch.compte ?? courant.compte,
+    plans: patch.plans ?? courant.plans,
+    pro: 'pro' in patch ? patch.pro : courant.pro,
+    appareil: courant.appareil ?? nouvelAppareil(),
+  };
+  await ecrireMarqueur(fusion);
+  return fusion;
+}
 
 export const useAccountStore = create<AccountState>((set, get) => ({
   charge: false,
@@ -96,6 +153,7 @@ export const useAccountStore = create<AccountState>((set, get) => ({
   proVia: null,
   plansUtilises: 0,
   paywallVisible: false,
+  jeton: null,
 
   charger: async () => {
     let local: Partial<AccountState> = {};
@@ -119,7 +177,27 @@ export const useAccountStore = create<AccountState>((set, get) => ({
         Number(local.plansUtilises) || 0,
         marqueur?.plans ?? 0,
       ),
+      jeton: typeof local.jeton === 'string' ? local.jeton : null,
     });
+    // Le serveur, s'il est là, a le dernier mot — sans jamais bloquer.
+    const s = get();
+    if (s.compte && s.jeton) {
+      const etat = await api('etat', {
+        identifiant: s.compte.id,
+        jeton: s.jeton,
+      });
+      if (etat?.ok) {
+        set({
+          pro: s.pro || etat.pro === 'code' || etat.pro === 'abonnement',
+          proVia:
+            s.proVia ??
+            (etat.pro === 'code' || etat.pro === 'abonnement'
+              ? (etat.pro as 'code' | 'abonnement')
+              : null),
+          plansUtilises: Math.max(s.plansUtilises, Number(etat.plans) || 0),
+        });
+      }
+    }
   },
 
   connecter: async (compte) => {
@@ -134,12 +212,32 @@ export const useAccountStore = create<AccountState>((set, get) => ({
           'avec celui-ci — le palier gratuit ne se remet pas à zéro.',
       };
     }
-    await ecrireMarqueur({
-      compte: compte.id,
-      plans: marqueur?.plans ?? get().plansUtilises,
-      pro: marqueur?.pro,
+    // Le serveur juge AUSSI, quand il est configuré : son refus est
+    // définitif (verrou en base) ; son silence n'empêche rien.
+    const fusion = await fusionnerMarqueur({ compte: compte.id });
+    const reponse = await api('connecter', {
+      identifiant: compte.id,
+      prenom: compte.prenom ?? '',
+      email: compte.email ?? '',
+      appareil: fusion.appareil ?? '',
     });
-    set({ compte });
+    if (reponse && !reponse.ok) {
+      await fusionnerMarqueur({ compte: marqueur?.compte ?? '' });
+      return { ok: false, raison: String(reponse.raison ?? 'Refusé.') };
+    }
+    set({ compte, jeton: reponse?.ok ? String(reponse.jeton ?? '') : null });
+    if (reponse?.ok) {
+      const proServeur =
+        reponse.pro === 'code' || reponse.pro === 'abonnement'
+          ? (reponse.pro as 'code' | 'abonnement')
+          : null;
+      const s = get();
+      set({
+        pro: s.pro || !!proServeur,
+        proVia: s.proVia ?? proServeur,
+        plansUtilises: Math.max(s.plansUtilises, Number(reponse.plans) || 0),
+      });
+    }
     persister(get());
     return { ok: true };
   },
@@ -165,10 +263,10 @@ export const useAccountStore = create<AccountState>((set, get) => ({
   },
 
   supprimerCompte: async () => {
-    const marqueur = await lireMarqueur();
-    // L'identité sort du trousseau ; le compteur de plans y reste.
-    await ecrireMarqueur({ compte: '', plans: marqueur?.plans ?? get().plansUtilises });
-    set({ compte: null, pro: false, proVia: null });
+    // L'identité sort du trousseau ; le compteur de plans y reste, et le
+    // Pro tombe avec le compte.
+    await fusionnerMarqueur({ compte: '', pro: undefined });
+    set({ compte: null, pro: false, proVia: null, jeton: null });
     persister(get());
   },
 
@@ -177,13 +275,15 @@ export const useAccountStore = create<AccountState>((set, get) => ({
     if (!CODES_PROMO.includes(propre)) return false;
     set({ pro: true, proVia: 'code', paywallVisible: false });
     persister(get());
-    // Au trousseau aussi : le Pro au code survit à la réinstallation.
+    // Au trousseau (le Pro survit à la réinstallation) et au serveur,
+    // meilleur effort : le local a déjà tranché.
+    fusionnerMarqueur({ pro: 'code' }).catch(() => {});
     const s = get();
-    if (s.compte) {
-      ecrireMarqueur({
-        compte: s.compte.id,
-        plans: s.plansUtilises,
-        pro: 'code',
+    if (s.compte && s.jeton) {
+      api('code', {
+        identifiant: s.compte.id,
+        jeton: s.jeton,
+        code: propre,
       }).catch(() => {});
     }
     return true;
@@ -194,14 +294,7 @@ export const useAccountStore = create<AccountState>((set, get) => ({
     if (ok) {
       set({ pro: true, proVia: 'abonnement', paywallVisible: false });
       persister(get());
-      const s = get();
-      if (s.compte) {
-        ecrireMarqueur({
-          compte: s.compte.id,
-          plans: s.plansUtilises,
-          pro: 'abonnement',
-        }).catch(() => {});
-      }
+      fusionnerMarqueur({ pro: 'abonnement' }).catch(() => {});
     }
   },
 
@@ -224,13 +317,11 @@ export const useAccountStore = create<AccountState>((set, get) => ({
     const plans = s.plansUtilises + 1;
     set({ plansUtilises: plans });
     persister(get());
-    if (s.compte) {
-      // Sans écraser le Pro que le trousseau porte peut-être déjà.
-      ecrireMarqueur({
-        compte: s.compte.id,
-        plans,
-        pro: s.proVia ?? undefined,
-      }).catch(() => {});
+    fusionnerMarqueur({ plans }).catch(() => {});
+    if (s.compte && s.jeton) {
+      api('plan', { identifiant: s.compte.id, jeton: s.jeton }).catch(
+        () => {},
+      );
     }
   },
 
