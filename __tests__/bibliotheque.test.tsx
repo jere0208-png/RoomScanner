@@ -310,11 +310,50 @@ describe('l’en-tête de la bibliothèque', () => {
     expect(cadre).toBeDefined();
     const st = (Array.isArray(cadre!.props.style)
       ? Object.assign({}, ...cadre!.props.style.filter(Boolean))
-      : cadre!.props.style) as { position?: string; left?: number; right?: number };
+      : cadre!.props.style) as {
+      position?: string;
+      left?: number;
+      right?: number;
+      top?: number;
+      bottom?: number;
+    };
     // Posé PAR-DESSUS la ligne, à égale distance des deux bords : c'est la
     // seule façon que sa position ne dépende de rien d'autre.
     expect(st.position).toBe('absolute');
     expect(st.left).toBe(st.right);
+    /*
+      ET IL OCCUPE TOUTE LA HAUTEUR DE LA LIGNE.
+
+      Un enfant absolu sans `top` ni `bottom` prend la hauteur de son
+      contenu et se cale EN HAUT de son parent : le titre se posait donc
+      au-dessus du bouton de retour au lieu d'être à son niveau. C'est le
+      défaut relevé — « toujours pas centré au bouton ».
+    */
+    expect(st.top).toBe(0);
+    expect(st.bottom).toBe(0);
+  });
+
+  /*
+    ET LA PASTILLE SE POSE JUSTE APRÈS LE TITRE.
+
+    Elle vivait contre le bord droit de l'écran, à un demi-écran du mot
+    qu'elle compte : on lisait « Mes scans », puis le regard traversait la
+    ligne pour trouver « 12 ». Collée au titre, elle se lit d'un seul coup
+    d'œil — et comme elle est posée PAR RAPPORT à lui, elle ne déplace pas
+    son centrage d'un point.
+  */
+  it('colle la pastille au titre, sans décaler son centre', () => {
+    const tree = monter();
+    const pastille = tree.root
+      .findAllByType(View)
+      .find((n) => n.props.accessibilityLabel === 'Nombre de scans');
+    expect(pastille).toBeDefined();
+    const st = (Array.isArray(pastille!.props.style)
+      ? Object.assign({}, ...pastille!.props.style.filter(Boolean))
+      : pastille!.props.style) as { position?: string; left?: string };
+    // Elle part du bord droit du titre, pas du bord de l'écran.
+    expect(st.position).toBe('absolute');
+    expect(st.left).toBe('100%');
   });
 });
 

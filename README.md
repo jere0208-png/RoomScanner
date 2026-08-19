@@ -218,6 +218,23 @@ Quatre décisions, toutes vérifiées au banc :
 - **L'angle s'écrit pendant qu'on tourne.** Sans lui, on tourne à l'aveugle —
   et c'est justement à l'aplomb qu'on veut revenir neuf fois sur dix.
 
+**La rotation a été refaite après une vidéo du chantier** — « ça part dans
+tous les sens ». Le premier jet lisait `locationX`/`locationY` de l'événement
+pour situer le doigt : or ces coordonnées sont relatives À LA VUE TOUCHÉE — la
+poignée, trente-quatre points de côté — et non au plan. L'angle calculé autour
+du milieu du mur n'avait donc aucun sens et sautait à chaque image ; le mur
+balayait le plan, et la pièce passait de 0,8 à 6,7 m² en trois dixièmes de
+seconde. Ce qui est fiable, c'est la COURSE du doigt (`dx`/`dy`), dans les
+mêmes unités que le plan : le doigt est à « départ + course », et l'angle se
+calcule proprement. Trois garde-fous s'y ajoutent, parce qu'un pouce sur un
+écran de six pouces n'est pas une souris : la poignée se pose
+**perpendiculairement au milieu** du mur (dans le prolongement du bout, sur un
+mur qui traverse l'écran, elle finissait dans un coin, parfois hors cadre), le
+pas est borné à **vingt degrés** par le magasin — le seul endroit qui protège
+de tout appelant, y compris d'un geste qu'on réécrira —, et la rotation
+cumulée d'un geste s'arrête à **quatre-vingt-dix degrés** : un mur retourné de
+plus est le même mur.
+
 La prise du mur ne répond qu'au MOUVEMENT, jamais à l'appui : sans ce seuil de
 six points, un simple appui pour désélectionner déplacerait le mur d'un cheveu.
 Et ce qui est percé dedans — portes, fenêtres — voyage avec lui, sans quoi la
@@ -823,6 +840,15 @@ figé casserait au premier retouchage. Il vérifie aussi que @2x et @3x sont
 bien l'image de base deux et trois fois : un rapport qui dérive d'une densité
 à l'autre étire le logo sur la moitié des iPhone, et personne ne compare deux
 téléphones côte à côte.
+
+**L'écran de lancement porte le même logotype.** Il gardait l'ancien — ECHOPLAN
+en capitales, le « O » en spirale — et son cadre était calé sur le rapport de
+cette image-là : 240 × 53 points. Y poser le nouveau tel quel l'aurait réduit à
+un timbre de 83 points de large, `scaleAspectFit` respectant le rapport. Le
+cadre suit donc désormais celui du logotype (200 × 128). Au passage, le
+« Powered by React Native » du gabarit a quitté cet écran : sur l'outil qu'on
+ouvre les mains pleines de plâtre, la pile technique du développeur n'a rien à
+faire.
 
 L'image est **teintée par le thème** (`tintColor: c.ink`), donc elle suit le
 mode sombre. Sur l'écran de lancement iOS, en revanche, le système dessine

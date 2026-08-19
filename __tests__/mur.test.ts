@@ -160,17 +160,46 @@ describe('tourner un mur', () => {
     l'angle qu'on veut vraiment.
   */
   it('s’accroche tous les quinze degrés', () => {
-    useScanStore.getState().rotateWall('n', 44);
+    // Un pas de 14° : l'accroche le ramène à 15, l'aplomb du dessinateur.
+    useScanStore.getState().rotateWall('n', 14);
     const w = mur('n');
     const deg = (Math.atan2(w.b.z - w.a.z, w.b.x - w.a.x) * 180) / Math.PI;
-    expect(deg).toBeCloseTo(45, 4);
+    expect(deg).toBeCloseTo(15, 4);
   });
 
   it('et laisse passer un angle franchement choisi', () => {
-    useScanStore.getState().rotateWall('n', 37);
+    // Dix degrés est à cinq du premier cran : c'est un choix, on le garde.
+    useScanStore.getState().rotateWall('n', 10);
     const w = mur('n');
     const deg = (Math.atan2(w.b.z - w.a.z, w.b.x - w.a.x) * 180) / Math.PI;
-    expect(deg).toBeCloseTo(37, 4);
+    expect(deg).toBeCloseTo(10, 4);
+  });
+
+  /*
+    UN PAS DE ROTATION EST BORNÉ — quoi qu'on lui demande.
+
+    Relevé du chantier, vidéo à l'appui : « la rotation part dans tous les
+    sens ». Le geste envoyait des pas aberrants, et le mur balayait le plan
+    d'une image à l'autre — la pièce passait de 0,8 à 6,7 m² en trois
+    dixièmes de seconde.
+
+    Le geste a été refait, mais la borne vit ICI, dans le magasin : c'est le
+    seul endroit qui protège de TOUT appelant, y compris d'un geste qu'on
+    réécrira un jour. Vingt degrés en un pas, c'est déjà un mouvement franc
+    du poignet.
+  */
+  it('ne tourne jamais de plus de vingt degrés d’un coup', () => {
+    useScanStore.getState().rotateWall('n', 200);
+    const w = mur('n');
+    const deg = (Math.atan2(w.b.z - w.a.z, w.b.x - w.a.x) * 180) / Math.PI;
+    expect(Math.abs(deg)).toBeLessThanOrEqual(20.001);
+  });
+
+  it('et pas davantage dans l’autre sens', () => {
+    useScanStore.getState().rotateWall('n', -95);
+    const w = mur('n');
+    const deg = (Math.atan2(w.b.z - w.a.z, w.b.x - w.a.x) * 180) / Math.PI;
+    expect(deg).toBeGreaterThanOrEqual(-20.001);
   });
 
   it('s’annule d’un seul retour en arrière', () => {

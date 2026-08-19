@@ -2698,15 +2698,31 @@ function WallMoveHandle({
 }
 
 /**
- * LA POIGNÉE DE ROTATION D'UN MUR — la même que celle d'un meuble.
+ * LA POIGNÉE DE ROTATION D'UN MUR.
  *
- * Un rond posé au bout du mur, qu'on tire : le mur suit l'angle du doigt
- * autour de SON MILIEU. Autour d'un bout, l'autre extrémité partirait au
- * loin et le geste deviendrait impossible à viser.
+ * PREMIÈRE VERSION, ET SON DÉFAUT — relevé sur vidéo : « ça part dans tous
+ * les sens ». Elle lisait `locationX`/`locationY` de l'événement pour situer
+ * le doigt. Or ces coordonnées sont relatives À LA VUE TOUCHÉE — la poignée
+ * elle-même, trente-quatre points de côté — et non au plan : l'angle calculé
+ * autour du milieu du mur n'avait donc aucun sens, et sautait à chaque image.
+ * Le mur balayait le plan, la pièce passait de 0,8 à 6,7 m² en trois
+ * dixièmes de seconde.
  *
- * L'angle s'affiche le temps du geste. Sans lui, on tourne à l'aveugle et
- * l'on ne retrouve jamais l'aplomb — et c'est justement à l'aplomb qu'on
- * veut revenir neuf fois sur dix.
+ * CE QUI EST FIABLE, C'EST LE DÉPLACEMENT. `PanResponder` fournit `dx`/`dy`,
+ * la course du doigt depuis l'appui, dans les mêmes unités que le plan. On
+ * connaît la position de départ de la poignée : le doigt est donc à
+ * « départ + course », et l'angle se calcule proprement autour du milieu.
+ *
+ * TROIS GARDE-FOUS, parce qu'un pouce sur un écran de six pouces n'est pas
+ * une souris :
+ *
+ *  - la poignée se pose PERPENDICULAIREMENT au milieu du mur, à quarante
+ *    points : dans le prolongement du bout, sur un mur qui traverse l'écran,
+ *    elle finissait dans un coin, parfois hors du cadre ;
+ *  - le pas par image est borné (le magasin le borne aussi, à vingt degrés) ;
+ *  - la rotation CUMULÉE d'un geste s'arrête à quatre-vingt-dix degrés. Un
+ *    mur retourné de plus est le même mur, et personne ne cherche ça au
+ *    doigt.
  */
 function WallRotateHandle({
   wall,
@@ -2720,7 +2736,8 @@ function WallRotateHandle({
   const [angle, setAngle] = useState<number | null>(null);
   const vif = useRef({ wall, mapping });
   vif.current = { wall, mapping };
-  const base = useRef(0);
+  /** L'état du geste : d'où part le doigt, et ce qu'on a déjà tourné. */
+  const geste = useRef({ x: 0, y: 0, mx: 0, my: 0, a0: 0, cumul: 0 });
   const pan = useMemo(
     () =>
       PanResponder.create({
@@ -2728,54 +2745,53 @@ function WallRotateHandle({
         onMoveShouldSetPanResponder: () => true,
         onPanResponderTerminationRequest: () => false,
         onShouldBlockNativeResponder: () => true,
-        onPanResponderGrant: (e) => {
+        onPanResponderGrant: () => {
           const { wall: w, mapping: m } = vif.current;
           const mid = m.toPx({
             x: (w.a.x + w.b.x) / 2,
             z: (w.a.z + w.b.z) / 2,
           });
-          const { locationX: x, locationY: y } = e.nativeEvent;
-          base.current = Math.atan2(y - mid.y, x - mid.x);
-          setAngle(0);
+          const p = poigneeAt(w, m);
+          geste.current = {
+            x: p.x,
+            y: p.y,
+            mx: mid.x,
+            my: mid.y,
+            a0: Math.atan2(p.y - mid.y, p.x - mid.x),
+            cumul: 0,
+          };
+          setAngle(angleDe(w));
         },
-        onPanResponderMove: (e) => {
-          const { wall: w, mapping: m } = vif.current;
-          const mid = m.toPx({
-            x: (w.a.x + w.b.x) / 2,
-            z: (w.a.z + w.b.z) / 2,
-          });
-          const { locationX: x, locationY: y } = e.nativeEvent;
-          const vise = Math.atan2(y - mid.y, x - mid.x);
-          let pas = ((vise - base.current) * 180) / Math.PI;
+        onPanResponderMove: (_e, g) => {
+          const { wall: w } = vif.current;
+          const b = geste.current;
+          // Le doigt est à « départ + course » : c'est la seule position
+          // fiable, et elle est dans les unités du plan.
+          const vise = Math.atan2(
+            b.y + g.dy - b.my,
+            b.x + g.dx - b.mx,
+          );
+          let pas = ((vise - b.a0) * 180) / Math.PI;
           pas = ((pas + 540) % 360) - 180;
-          if (Math.abs(pas) < 0.4) return;
-          base.current = vise;
+          // Le cumul du geste ne dépasse pas le quart de tour.
+          const reste = 90 - Math.abs(b.cumul);
+          if (reste <= 0) return;
+          pas = Math.max(-reste, Math.min(reste, pas));
+          if (Math.abs(pas) < 0.5) return;
+          b.a0 = vise;
+          b.cumul += pas;
           useScanStore.getState().rotateWall(w.id, pas);
           const apres = useScanStore
             .getState()
-            .walls.find((x2) => x2.id === w.id);
-          if (apres) {
-            setAngle(
-              Math.round(
-                (Math.atan2(apres.b.z - apres.a.z, apres.b.x - apres.a.x) *
-                  180) /
-                  Math.PI,
-              ),
-            );
-          }
+            .walls.find((x) => x.id === w.id);
+          if (apres) setAngle(angleDe(apres));
         },
         onPanResponderRelease: () => setAngle(null),
         onPanResponderTerminate: () => setAngle(null),
       }),
     [],
   );
-  const b = mapping.toPx(wall.b);
-  const a = mapping.toPx(wall.a);
-  // Posée dans le prolongement du mur, à vingt-six points du bout : elle ne
-  // couvre ni la maçonnerie ni la poignée de coin qui vit là.
-  const l = Math.hypot(b.x - a.x, b.y - a.y) || 1;
-  const u = { x: (b.x - a.x) / l, y: (b.y - a.y) / l };
-  const at = { x: b.x + u.x * 26, y: b.y + u.y * 26 };
+  const at = poigneeAt(wall, mapping);
   return (
     <>
       <View
@@ -2786,14 +2802,14 @@ function WallRotateHandle({
           <Path
             d="M19.5 12 a7.5 7.5 0 1 1 -2.2 -5.3"
             stroke={c.blue}
-            strokeWidth={2.2}
+            strokeWidth={2.4}
             strokeLinecap="round"
             fill="none"
           />
           <Path
             d="M19.8 3.8 v4.4 h-4.4"
             stroke={c.blue}
-            strokeWidth={2.2}
+            strokeWidth={2.4}
             strokeLinecap="round"
             strokeLinejoin="round"
             fill="none"
@@ -2807,6 +2823,30 @@ function WallRotateHandle({
       )}
     </>
   );
+}
+
+/** L'angle d'un mur, en degrés entiers — ce qu'on lit sur le plan. */
+function angleDe(w: WallSeg): number {
+  return Math.round((Math.atan2(w.b.z - w.a.z, w.b.x - w.a.x) * 180) / Math.PI);
+}
+
+/**
+ * Où se pose la poignée : à quarante points du milieu, PERPENDICULAIREMENT.
+ *
+ * Dans le prolongement du bout, sur un mur qui traverse l'écran, elle
+ * finissait dans un coin — parfois hors du cadre, et le geste devenait
+ * introuvable. Au milieu, elle est toujours à côté de ce qu'elle fait
+ * tourner.
+ */
+function poigneeAt(w: WallSeg, m: EffMapping): { x: number; y: number } {
+  const a = m.toPx(w.a);
+  const b = m.toPx(w.b);
+  const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+  const l = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+  return {
+    x: mid.x + (-(b.y - a.y) / l) * 40,
+    y: mid.y + ((b.x - a.x) / l) * 40,
+  };
 }
 
 function CornerHandle({

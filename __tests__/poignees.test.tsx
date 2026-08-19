@@ -421,10 +421,23 @@ describe('le mur choisi', () => {
   it('se tourne par sa poignée, et l’angle s’affiche', () => {
     const tree = monterMur('n');
     const p = rotation(tree)!;
+    /*
+      C'EST LA COURSE DU DOIGT QUI COMPTE, PAS SA POSITION DANS LA POIGNÉE.
+
+      La première version lisait `locationX`/`locationY` — des coordonnées
+      relatives à la poignée elle-même, trente-quatre points de côté. L'angle
+      autour du milieu du mur n'avait donc aucun sens et sautait à chaque
+      image : le mur balayait le plan. Le banc envoie maintenant ce que le
+      téléphone envoie vraiment : une course.
+    */
     act(() => {
       p.props.onStartShouldSetResponder(doigt(300, 90));
       p.props.onResponderGrant(doigt(300, 90));
-      p.props.onResponderMove(doigt(300, 190));
+      // LATÉRALEMENT : la poignée est pile sous le milieu du mur, et
+      // descendre tout droit vers le centre ne tourne rien — c'est
+      // géométriquement juste, et c'est ce que le premier jet de ce banc
+      // avait manqué.
+      p.props.onResponderMove(doigt(400, 90, 300, 90));
     });
     const n = useScanStore.getState().walls.find((w) => w.id === 'n')!;
     // Le mur n'est plus horizontal, et il a gardé sa longueur.

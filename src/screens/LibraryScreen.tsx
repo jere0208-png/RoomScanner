@@ -974,13 +974,25 @@ export function LibraryScreen() {
           accessibilityLabel="Titre de l’écran"
           style={styles.titreCadre}
           pointerEvents="none">
-          <Text style={styles.title} numberOfLines={1}>
-            {dossierOuvert ? dossierOuvert.name : 'Mes scans'}
-          </Text>
-        </View>
-        <View style={styles.headerFill} />
-        <View style={styles.countPill}>
-          <Text style={styles.countText}>{liste.length}</Text>
+          {/*
+            LA PASTILLE SE POSE PAR RAPPORT AU TITRE, PAS À L'ÉCRAN.
+
+            Elle vivait contre le bord droit : on lisait « Mes scans », puis
+            le regard traversait la ligne pour trouver « 12 ». Collée au mot
+            qu'elle compte, elle se lit d'un seul coup d'œil.
+
+            Et comme elle est posée DANS le cadre du titre, en absolu à son
+            bord droit, elle ne pèse rien dans le centrage : c'est le titre
+            seul qui se centre, quel que soit le nombre de scans.
+          */}
+          <View>
+            <Text style={styles.title} numberOfLines={1}>
+              {dossierOuvert ? dossierOuvert.name : 'Mes scans'}
+            </Text>
+            <View accessibilityLabel="Nombre de scans" style={styles.countPill}>
+              <Text style={styles.countText}>{liste.length}</Text>
+            </View>
+          </View>
         </View>
       </View>
 
@@ -1228,10 +1240,18 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     position: 'absolute',
     left: 56,
     right: 56,
+    /*
+      IL OCCUPE TOUTE LA HAUTEUR DE LA LIGNE.
+
+      Sans `top` ni `bottom`, un enfant absolu prend la hauteur de son
+      contenu et se cale EN HAUT de son parent : le titre se posait
+      au-dessus du bouton de retour au lieu d'être à son niveau.
+    */
+    top: 0,
+    bottom: 0,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerFill: { flex: 1 },
   title: {
     color: c.ink,
     fontSize: 24,
@@ -1242,11 +1262,17 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   // Cadre de hauteur fixe qui centre son chiffre : un Text à rembourrage
   // retombe plus bas que le titre, sa boîte incluant l'interligne.
   countPill: {
+    // Accrochée au bord droit du titre, centrée sur sa ligne d'écriture :
+    // elle déborde du cadre sans y prendre de place.
+    position: 'absolute',
+    left: '100%',
+    top: '50%',
+    marginTop: -12,
     minWidth: 26,
     height: 24,
     borderRadius: 12,
     paddingHorizontal: 8,
-    marginLeft: 10,
+    marginLeft: 8,
     backgroundColor: c.blueSoft,
     alignItems: 'center',
     justifyContent: 'center',

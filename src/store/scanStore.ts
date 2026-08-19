@@ -2509,9 +2509,24 @@ export const useScanStore = create<ScanState>((set, get) => {
         c'est la direction du mur qu'on lit sur le plan, pas le chemin
         parcouru par le doigt.
       */
+      /*
+        UN PAS EST BORNÉ À VINGT DEGRÉS.
+
+        Relevé du chantier, vidéo à l'appui : « la rotation part dans tous
+        les sens ». Le geste envoyait des pas aberrants — le mur balayait le
+        plan d'une image à l'autre, et la pièce passait de 0,8 à 6,7 m² en
+        trois dixièmes de seconde.
+
+        Le geste a été refait, mais la borne vit ICI : c'est le seul endroit
+        qui protège de TOUT appelant, y compris d'un geste qu'on réécrira un
+        jour. Vingt degrés en un pas, c'est déjà un franc mouvement du
+        poignet ; au-delà, c'est un accident de calcul.
+      */
+      const PAS_MAX = 20;
+      const pas = Math.max(-PAS_MAX, Math.min(PAS_MAX, deg));
       const actuel =
         (Math.atan2(wall.b.z - wall.a.z, wall.b.x - wall.a.x) * 180) / Math.PI;
-      const vise = actuel + deg;
+      const vise = actuel + pas;
       const cran = Math.round(vise / 15) * 15;
       const final = Math.abs(vise - cran) <= 3 ? cran : vise;
       const rot = ((final - actuel) * Math.PI) / 180;
