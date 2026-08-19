@@ -700,8 +700,12 @@ convaincu.
 
 La page Pro compare les deux paliers, et porte un champ **code promo** :
 les codes du patron (CARIDI12) déverrouillent localement, à 100 %. **Le Pro
-s'écrit AUSSI dans le trousseau** — sans ça, l'essai l'a montré, le code
-promo s'évaporait à la première réinstallation. L'abonnement réel passe par
+s'écrit AUSSI dans le trousseau, mais il appartient à SON COMPTE** — sans
+le trousseau, le code promo s'évaporait à la réinstallation ; sans le
+rattachement au compte, un compte neuf entrait « Pro directement » en
+héritant de celui d'un autre (relevé du chantier). Le Pro du trousseau ne
+se relit que pour le compte qui l'a acquis, il est purgé quand un autre
+compte s'installe, et la base reste l'autorité qui le rend à chacun. L'abonnement réel passe par
 StoreKit 2 (`purchasePro`), et « **Restaurer l'achat** » (exigé par l'App
 Store) redemande à `Transaction.currentEntitlements` sur un nouvel appareil.
 Le produit `echoplan.pro.mensuel` doit exister dans **App Store Connect** —

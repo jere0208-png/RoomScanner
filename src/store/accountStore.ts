@@ -172,15 +172,21 @@ export const useAccountStore = create<AccountState>((set, get) => ({
       // Un stockage illisible vaut un premier lancement.
     }
     // Le trousseau prime sur le stockage local : il a survécu aux
-    // réinstallations, lui — le compteur de plans COMME le Pro. Sans ça,
-    // le code promo s'évaporait à la première réinstallation.
+    // réinstallations, lui. Le compteur de plans vaut pour l'APPAREIL ;
+    // le Pro, lui, appartient à SON COMPTE — il ne se relit du trousseau
+    // que si c'est bien ce compte-là qui se recharge.
     const marqueur = await lireMarqueur();
+    const compteLocal = (local.compte as Compte) ?? null;
+    const proDuTrousseau =
+      marqueur?.pro && marqueur.compte === compteLocal?.id
+        ? marqueur.pro
+        : null;
     set({
       charge: true,
-      compte: (local.compte as Compte) ?? null,
-      pro: !!local.pro || !!marqueur?.pro,
+      compte: compteLocal,
+      pro: !!local.pro || !!proDuTrousseau,
       proVia:
-        (local.proVia as AccountState['proVia']) ?? marqueur?.pro ?? null,
+        (local.proVia as AccountState['proVia']) ?? proDuTrousseau ?? null,
       plansUtilises: Math.max(
         Number(local.plansUtilises) || 0,
         marqueur?.plans ?? 0,
@@ -217,11 +223,27 @@ export const useAccountStore = create<AccountState>((set, get) => ({
       le popup et la page Pro, jamais une porte fermée.
     */
     const marqueur = await lireMarqueur();
-    // Le Pro que le téléphone porte déjà vaut pour le compte qui entre.
-    if (marqueur?.pro && !get().pro) {
+    /*
+      LE PRO APPARTIENT AU COMPTE — pas au téléphone. Relevé du chantier :
+      un compte neuf entrait « Pro directement » parce que le trousseau de
+      l'appareil portait le Pro d'un autre. Trois gestes le garantissent :
+      l'état repart à zéro quand l'identité change, le Pro du trousseau ne
+      se relit que pour LE compte qui l'a acquis, et il est purgé du
+      trousseau quand un autre compte s'installe (le serveur, lui, saura
+      toujours le rendre au sien).
+    */
+    const memeCompte = marqueur?.compte === compte.id;
+    if (get().compte?.id !== compte.id) {
+      set({ pro: false, proVia: null, jeton: null });
+    }
+    if (memeCompte && marqueur?.pro && !get().pro) {
       set({ pro: true, proVia: marqueur.pro });
     }
-    const fusion = await fusionnerMarqueur({ compte: compte.id });
+    const fusion = await fusionnerMarqueur(
+      memeCompte
+        ? { compte: compte.id }
+        : { compte: compte.id, pro: undefined },
+    );
     const reponse = await api('connecter', {
       identifiant: compte.id,
       prenom: compte.prenom ?? '',

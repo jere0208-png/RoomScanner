@@ -91,14 +91,36 @@ describe('l’essai gratuit appartient au téléphone', () => {
     expect(useAccountStore.getState().essaiEpuiseVisible).toBe(false);
   });
 
-  it('un Pro ne voit jamais le popup, même téléphone à sec', async () => {
+  /**
+   * LE PRO APPARTIENT AU COMPTE — relevé du chantier : « je me suis
+   * inscrit et je suis pro directement alors que c'est un autre compte ».
+   * Le trousseau retient le Pro DU compte qui l'a acquis (marqueur.compte) ;
+   * un compte neuf sur le même téléphone entre gratuit, et voit le popup
+   * si l'essai de l'appareil est consommé.
+   */
+  it('un compte NEUF n’hérite jamais du Pro d’un autre', async () => {
     mockMarqueur = { compte: MARTIN.id, plans: 1, pro: 'code' };
-    await useAccountStore.getState().charger();
     const r = await useAccountStore
       .getState()
       .connecter({ id: 'google:autre', methode: 'google' });
     expect(r.ok).toBe(true);
-    expect(useAccountStore.getState().essaiEpuiseVisible).toBe(false);
+    const s = useAccountStore.getState();
+    expect(s.pro).toBe(false);
+    // Et l'essai du téléphone étant consommé, le popup l'annonce.
+    expect(s.essaiEpuiseVisible).toBe(true);
+    // Le trousseau ne porte plus le Pro de l'ancien compte : il ne doit
+    // pas se réappliquer au suivant par accident.
+    expect(mockMarqueur?.pro).toBeUndefined();
+  });
+
+  it('le MÊME compte retrouve son Pro en se reconnectant', async () => {
+    mockMarqueur = { compte: MARTIN.id, plans: 1, pro: 'code' };
+    const r = await useAccountStore.getState().connecter(MARTIN);
+    expect(r.ok).toBe(true);
+    const s = useAccountStore.getState();
+    expect(s.pro).toBe(true);
+    expect(s.proVia).toBe('code');
+    expect(s.essaiEpuiseVisible).toBe(false);
   });
 });
 
@@ -134,14 +156,19 @@ describe('le palier gratuit', () => {
 });
 
 describe('ce que la réinstallation ne défait pas', () => {
-  it('le Pro au code survit : il est écrit dans le trousseau', async () => {
+  it('le Pro au code survit à la réinstallation — pour SON compte', async () => {
     await useAccountStore.getState().connecter(MARTIN);
     useAccountStore.getState().utiliserCode('CARIDI12');
     await tick();
     expect(mockMarqueur?.pro).toBe('code');
-    // « Réinstallation » : stockage local vidé, trousseau intact.
-    useAccountStore.setState({ pro: false, proVia: null });
+    // « Réinstallation » : stockage local vidé, trousseau intact. Le Pro
+    // ne revient qu'à la RECONNEXION du compte qui l'a acquis — un
+    // chargement anonyme ne donne rien à personne.
+    useAccountStore.setState({ pro: false, proVia: null, compte: null });
     await useAccountStore.getState().charger();
+    expect(useAccountStore.getState().pro).toBe(false);
+    const r = await useAccountStore.getState().connecter(MARTIN);
+    expect(r.ok).toBe(true);
     expect(useAccountStore.getState().pro).toBe(true);
   });
 
