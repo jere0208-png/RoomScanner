@@ -17,7 +17,7 @@
  * que l'appelant est bien passé par `connecter` — assez pour une API de
  * quota, sans gestion de sessions.
  */
-require __DIR__ . '/config.php';
+require __DIR__ . '/config-echoplan.php';
 
 header('Content-Type: application/json; charset=utf-8');
 

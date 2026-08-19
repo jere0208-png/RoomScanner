@@ -36,10 +36,10 @@ sa base — une base seule ne suffit pas, il faut où poser les `.php`.
 3. **Téléverser l'API** : par FTP (ou le gestionnaire de fichiers OVH),
    copiez `server/api.php` et `server/auth-google.php` dans un dossier du
    site, par ex. `www/echoplan/`.
-4. **Configurer** : copiez `server/config.exemple.php` en `config.php` DANS
+4. **Configurer** : copiez `server/config-echoplan.exemple.php` en `config-echoplan.php` DANS
    LE MÊME DOSSIER sur le serveur, remplissez la base et le secret :
    `php -r "echo bin2hex(random_bytes(32));"` (ou n'importe quel générateur
-   de 64 hexadécimaux). Ne versionnez jamais `config.php`.
+   de 64 hexadécimaux). Ne versionnez jamais `config-echoplan.php` — et le nom porte « echoplan » pour ne jamais écraser le config.php d’un site déjà en place.
 5. **Brancher l'app** : dans `src/config/serveur.ts`, posez
    `url: 'https://votre-domaine.fr/echoplan'`. Dès lors : le verrou « un
    compte par téléphone » se juge AUSSI en base, le quota et le Pro se
@@ -62,7 +62,7 @@ qu'une feuille web sécurisée.
    **« Application Web »** (oui, Web : c'est le serveur qui parle à Google,
    pas l'app). URI de redirection autorisée :
    `https://votre-domaine.fr/echoplan/auth-google.php`
-3. Copiez l'**ID client** et le **secret** dans `config.php`
+3. Copiez l'**ID client** et le **secret** dans `config-echoplan.php`
    (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT).
 4. C'est tout : le bouton « Continuer avec Google » détecte que
    `SERVEUR.url` est renseigné et ouvre le flux. L'identité revient signée

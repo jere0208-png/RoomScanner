@@ -9,7 +9,7 @@
  * (`echoplan://google?...`), le tout SIGNÉ — l'app vérifie le HMAC avant
  * de créer le compte, personne ne forge une identité en tapant une URL.
  */
-require __DIR__ . '/config.php';
+require __DIR__ . '/config-echoplan.php';
 
 function repartir(string $url): void {
   /*

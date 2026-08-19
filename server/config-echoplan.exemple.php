@@ -1,6 +1,9 @@
 <?php
 // EchoPlan — configuration serveur.
-// COPIEZ ce fichier en `config.php` (jamais versionné) et remplissez-le.
+// COPIEZ ce fichier en `config-echoplan.php` (jamais versionné) et
+// remplissez-le. Le nom porte « echoplan » pour ne JAMAIS écraser le
+// config.php d'un site déjà en place sur le même hébergement — c'est
+// arrivé sur bourseur.fr.
 
 // ---- Base de données OVH (espace client → Hébergements → Bases de données)
 const DB_HOTE = 'xxxxx.mysql.db';      // ex. jere0208.mysql.db
