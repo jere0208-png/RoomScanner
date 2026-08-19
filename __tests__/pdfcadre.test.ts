@@ -309,4 +309,28 @@ describe('les mentions d’un plan réel', () => {
   it('écrit la surface totale relevée sous le titre', () => {
     expect(textes).toContain('Surface relevée');
   });
+
+  /**
+   * LA LÉGENDE A SA BANDE, elle ne recouvre plus le dessin.
+   *
+   * Posée « au coin le plus vide », elle ne mesurait que l'emprise des
+   * murs : les chaînes de cotes qui longent les quatre bords ne comptaient
+   * pas, et sur un logement large elle finissait SUR la chaîne du bas —
+   * vu sur la feuille du T3. Le dessin lui réserve donc une bande en pied
+   * de feuille : aucune cote ne peut descendre dans sa zone.
+   */
+  it('ne pose plus la légende sur une cote', () => {
+    // La légende de ce plan : trois appareils, 22 + 3 × 15 = 67 pt de haut,
+    // posée à 16 pt au-dessus du bandeau : son sommet est à 30 + 66 + 16
+    // + 67 = 179. Toute cote (« N,NN m ») doit rester au-dessus.
+    const HAUT_LEGENDE = 30 + 66 + 16 + 67;
+    // Toutes les cotes, chaînes verticales (matrice tournée) comprises.
+    const cotes = [
+      ...pdf.matchAll(/([-\d.]+) ([-\d.]+) Tm \(\d+,\d{2} m\) Tj/g),
+    ].map((m) => parseFloat(m[2]));
+    expect(cotes.length).toBeGreaterThan(2);
+    for (const y of cotes) {
+      expect(y).toBeGreaterThan(HAUT_LEGENDE);
+    }
+  });
 });

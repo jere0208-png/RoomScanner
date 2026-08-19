@@ -504,7 +504,8 @@ export type ElecCode =
   | 'eclairage'
   | 'daaf'
   | 'specialises'
-  | 'alignement';
+  | 'alignement'
+  | 'pose';
 
 export interface ElecIssue {
   code: ElecCode;
@@ -595,8 +596,19 @@ export function checkElectrical(
   worktops?: Map<string, { x: (f: Fixture) => number; plans: Worktop[] }>,
   /** Ce qui est posé au plafond : points lumineux, détection, ventilation. */
   ceiling: CeilingFixture[] = [],
+  /**
+   * La géométrie, quand l'appelant l'a : elle permet les constats de POSE
+   * (face extérieure, appareil dans le vide d'une baie). Sans elle, ces
+   * contrôles se taisent — ils ne peuvent pas deviner les murs.
+   */
+  geometrie?: { walls: WallSeg[]; openings: WallSeg[] },
 ): ElecIssue[] {
   const out: ElecIssue[] = [];
+  if (geometrie) {
+    out.push(
+      ...constatsDePose(geometrie.walls, geometrie.openings, rooms, fixtures),
+    );
+  }
   const roomOfFixture = (f: Fixture): string | undefined =>
     placement?.get(f.id) ?? roomOfWall.get(f.wallId)?.[0];
 
@@ -1112,6 +1124,99 @@ export function roomInputsOf(
  * en porte donc deux, et un appareil posé dessus compte pour la première —
  * celle de sa face, faute de mieux.
  */
+/**
+ * LES CONSTATS DE POSE — un appareil qui ne peut pas être là.
+ *
+ * Vus à l'œil sur une feuille rendue : un tableau et un va-et-vient
+ * dessinés DEHORS (la face choisie regardait l'extérieur d'un mur
+ * d'enveloppe), et une applique dans l'emprise d'une porte. Ces données
+ * peuvent exister — mauvaise face dans l'établi, baie percée après la
+ * pose — et rien ne le disait. Deux contrôles géométriques :
+ *
+ * - la FACE : le point du symbole, décalé du côté `side`, doit tomber dans
+ *   une pièce. S'il tombe dehors quand l'autre face donne sur une pièce,
+ *   on le dit — en info : un appareil extérieur existe (étanche, IP 44),
+ *   mais neuf fois sur dix c'est la face qui est à reprendre.
+ * - la BAIE : un appareil dont l'axe tombe dans le vide d'une porte ou
+ *   d'une fenêtre — à une hauteur SANS maçonnerie — est impossible, en
+ *   alerte. Au-dessus du linteau ou sur le trumeau, rien à dire.
+ */
+export function constatsDePose(
+  walls: WallSeg[],
+  openings: WallSeg[],
+  rooms: RoomInput[],
+  fixtures: Fixture[],
+): ElecIssue[] {
+  const out: ElecIssue[] = [];
+  const parId = new Map(walls.map((w) => [w.id, w]));
+  const dansUnePiece = (q: Pt) =>
+    rooms.some(
+      (r) => r.outline && r.outline.length > 2 && pointInPolygon(q, r.outline),
+    );
+  for (const f of fixtures) {
+    const w = parId.get(f.wallId);
+    if (!w) continue;
+    const dx = w.b.x - w.a.x;
+    const dz = w.b.z - w.a.z;
+    const len = Math.hypot(dx, dz);
+    if (len < 1e-6) continue;
+    const t = Math.min(1, Math.max(0, f.along / len));
+    const p = { x: w.a.x + dx * t, z: w.a.z + dz * t };
+    const n = { x: -dz / len, z: dx / len };
+    const nom = FIXTURES[f.kind].label;
+    // Quinze centimètres du nu : dans la pièce si la face est la bonne,
+    // franchement dehors sinon.
+    const ECART = 0.15;
+    const devant = {
+      x: p.x + n.x * ECART * f.side,
+      z: p.z + n.z * ECART * f.side,
+    };
+    const derriere = {
+      x: p.x - n.x * ECART * f.side,
+      z: p.z - n.z * ECART * f.side,
+    };
+    if (!dansUnePiece(devant) && dansUnePiece(derriere)) {
+      out.push({
+        code: 'pose',
+        fixtureId: f.id,
+        severity: 'info',
+        message: `${nom} : posé sur la face extérieure du mur`,
+        regle:
+          'La face choisie regarde dehors. Un appareil extérieur existe — ' +
+          'étanche, IP 44 — mais le plus souvent c’est la face qui est à ' +
+          'reprendre dans l’établi du mur.',
+      });
+    }
+    const base = w.yCenter - w.height / 2;
+    for (const o of openings) {
+      // La baie de CE mur : sur sa ligne, dans son emprise.
+      const ecart = Math.abs((o.a.x - w.a.x) * n.x + (o.a.z - w.a.z) * n.z);
+      if (ecart > 0.25) continue;
+      const ma = ((o.a.x - w.a.x) * dx + (o.a.z - w.a.z) * dz) / len;
+      const mb = ((o.b.x - w.a.x) * dx + (o.b.z - w.a.z) * dz) / len;
+      const m0 = Math.min(ma, mb);
+      const m1 = Math.max(ma, mb);
+      if (f.along < m0 + 0.02 || f.along > m1 - 0.02) continue;
+      const y0 = o.yCenter - o.height / 2 - base;
+      const y1 = y0 + o.height;
+      if (f.height > y0 + 0.02 && f.height < y1 - 0.02) {
+        out.push({
+          code: 'pose',
+          fixtureId: f.id,
+          severity: 'alerte',
+          message: `${nom} : posé dans le vide d’une baie`,
+          regle:
+            'L’axe tombe dans l’emprise d’une porte ou d’une fenêtre, à ' +
+            'une hauteur où il n’y a pas de maçonnerie. Décalez-le sur le ' +
+            'trumeau, ou au-dessus du linteau.',
+        });
+        break;
+      }
+    }
+  }
+  return out;
+}
+
 export function wallToRooms(rooms: RoomInput[]): Map<string, string[]> {
   const out = new Map<string, string[]>();
   for (const r of rooms) {

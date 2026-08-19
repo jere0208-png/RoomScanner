@@ -1323,11 +1323,44 @@ function planPage(
    */
   const BANDEAU = 44;
   // Zone de dessin (cotes extérieures comprises)
+  /*
+    LA LÉGENDE RÉSERVE SA PLACE AVANT LE CADRAGE.
+
+    Posée « au coin le plus vide », elle ne mesurait que l'emprise des
+    murs : les chaînes de cotes qui longent les quatre bords ne comptaient
+    pas, et sur un logement large elle finissait SUR la chaîne du bas — vu
+    sur la feuille du T3, une cote à moitié mangée. Le dessin lui cède donc
+    une bande en pied de feuille, et elle s'y pose toujours, à gauche.
+  */
+  const kindsLegende = extra?.hideLegend
+    ? []
+    : [...new Set((ctx.fixtures ?? []).map((f) => f.kind))];
+  const plafondLegende = extra?.hideLegend
+    ? []
+    : [...new Set((ctx.ceiling ?? []).map((c) => c.kind))];
+  const rangsLegende = Math.max(
+    kindsLegende.length > 0 ? kindsLegende.length + 1 : 0,
+    plafondLegende.length > 0 ? plafondLegende.length + 2 : 0,
+  );
+  const legendeW =
+    kindsLegende.length > 0 && plafondLegende.length > 0
+      ? 300
+      : plafondLegende.length > 0
+        ? 154
+        : 132;
+  const legendeH =
+    plafondLegende.length > 0
+      ? rangsLegende * CADRE_LIGNE + CADRE_MARGE * 2
+      : 22 + kindsLegende.length * 15;
+  const avecLegende = kindsLegende.length > 0 || plafondLegende.length > 0;
+  // 16 pt sous la légende, et 48 pt entre elle et le dessin : la place des
+  // chaînes de cotes qui pendent sous le cadre.
+  const reserve = avecLegende ? Math.max(0, legendeH + 16 + 48 - 70) : 0;
   const box = {
     x: FRAME.x + 70,
-    y: FRAME.y + TITLE_H + 70,
+    y: FRAME.y + TITLE_H + 70 + reserve,
     w: FRAME.w - 140,
-    h: FRAME.h - TITLE_H - 140 - BANDEAU,
+    h: FRAME.h - TITLE_H - 140 - BANDEAU - reserve,
   };
   /**
    * Le plan se dessine SUR LA TRAME DU LOGEMENT, pas dans le repère du scan.
@@ -1886,55 +1919,15 @@ function planPage(
        * expliquer. On mesure donc l'emprise du plan sur la page, et on
        * choisit le coin qu'il recouvre le moins.
        */
-      const presents = extra?.hideLegend
-        ? []
-        : [...new Set((ctx.fixtures ?? []).map((f) => f.kind))];
-      // Ce que porte le plafond : une colonne de plus dans le MÊME cadre.
-      // Deux boîtes cherchant chacune le coin le plus libre finissent l'une
-      // sur l'autre — on l'a vécu sur la feuille du plafond.
-      const vusPlafond = extra?.hideLegend
-        ? []
-        : [...new Set((ctx.ceiling ?? []).map((c) => c.kind))];
+      const presents = kindsLegende;
+      const vusPlafond = plafondLegende;
       if (presents.length > 0 || vusPlafond.length > 0) {
-        const deux = presents.length > 0 && vusPlafond.length > 0;
-        const rangs = Math.max(
-          presents.length > 0 ? presents.length + 1 : 0,
-          vusPlafond.length > 0 ? vusPlafond.length + 2 : 0,
-        );
-        const lw = deux ? 300 : vusPlafond.length > 0 ? 154 : 132;
-        const lh =
-          vusPlafond.length > 0
-            ? rangs * CADRE_LIGNE + CADRE_MARGE * 2
-            : 22 + presents.length * 15;
-        const marge = 16;
-        const gauche = FRAME.x + marge;
-        const droite = FRAME.x + FRAME.w - marge - lw;
-        const bas = FRAME.y + TITLE_H + marge + lh;
-        const haut = FRAME.y + FRAME.h - TITLE_H - marge;
-        // L'emprise du plan sur la feuille, coins compris.
-        const c1 = px({ x: minX, z: minZ });
-        const c2 = px({ x: maxX, z: maxZ });
-        const plan = {
-          x0: Math.min(c1.x, c2.x),
-          x1: Math.max(c1.x, c2.x),
-          y0: Math.min(c1.y, c2.y),
-          y1: Math.max(c1.y, c2.y),
-        };
-        /** Surface du plan qu'un emplacement viendrait couvrir. */
-        const gene = (lx: number, ly: number) => {
-          const ox = Math.min(plan.x1, lx + lw) - Math.max(plan.x0, lx);
-          const oy = Math.min(plan.y1, ly) - Math.max(plan.y0, ly - lh);
-          return Math.max(0, ox) * Math.max(0, oy);
-        };
-        const coins = [
-          { x: gauche, y: bas },
-          { x: droite, y: bas },
-          { x: droite, y: haut },
-          { x: gauche, y: haut },
-        ];
-        const choisi = coins.reduce((meilleur, coin) =>
-          gene(coin.x, coin.y) < gene(meilleur.x, meilleur.y) ? coin : meilleur,
-        );
+        const lw = legendeW;
+        const lh = legendeH;
+        void lw;
+        // Dans SA bande, réservée avant le cadrage : plus aucun coin à
+        // choisir, plus rien à recouvrir.
+        const choisi = { x: FRAME.x + 16, y: FRAME.y + TITLE_H + 16 + lh };
         if (vusPlafond.length === 0) {
           drawElecLegend(d, presents, choisi.x, choisi.y);
         } else {

@@ -9,6 +9,7 @@
 import {
   MAX_SOCLES,
   checkElectrical,
+  constatsDePose,
   materialList,
   planCircuits,
   planDifferentials,
@@ -608,5 +609,82 @@ describe('l’alignement des appareils', () => {
       w2r(rooms),
     );
     expect(issues.some((i) => i.code === 'alignement')).toBe(false);
+  });
+});
+
+/**
+ * LES CONSTATS DE POSE — ce que le plan du T3 a montré à l'œil.
+ *
+ * Sur la feuille rendue, un tableau et un va-et-vient étaient dessinés
+ * DEHORS (mauvaise face d'un mur d'enveloppe), et une applique tombait dans
+ * l'emprise de la porte d'entrée. Des données pareilles peuvent exister —
+ * et l'app ne disait rien. Deux contrôles géométriques les attrapent.
+ */
+describe('les constats de pose', () => {
+  const murPose = (id: string, ax: number, az: number, bx: number, bz: number) =>
+    ({
+      id,
+      type: 'wall',
+      a: { x: ax, z: az },
+      b: { x: bx, z: bz },
+      height: 2.5,
+      yCenter: 1.25,
+    }) as WallSeg;
+  const WP = [
+    murPose('n', 0, 0, 4, 0),
+    murPose('e', 4, 0, 4, 3),
+    murPose('s', 4, 3, 0, 3),
+    murPose('w', 0, 3, 0, 0),
+  ];
+  const PIECES = [
+    {
+      id: 'r1',
+      name: 'Séjour',
+      area: 12,
+      wallIds: ['n', 'e', 's', 'w'],
+      outline: [
+        { x: 0, z: 0 },
+        { x: 4, z: 0 },
+        { x: 4, z: 3 },
+        { x: 0, z: 3 },
+      ],
+    },
+  ];
+  const PORTE: WallSeg = {
+    id: 'p1',
+    type: 'door',
+    a: { x: 1, z: 0 },
+    b: { x: 1.9, z: 0 },
+    height: 2.05,
+    yCenter: 1.025,
+  };
+  const pose = (kind: FixtureKind, along: number, height: number, side: 1 | -1) =>
+    constatsDePose(
+      WP,
+      [PORTE],
+      PIECES,
+      [{ id: 'f1', kind, wallId: 'n', along, height, side }],
+    );
+
+  it('signale un appareil posé sur la face extérieure du mur', () => {
+    // Le mur nord borde la pièce côté +z : side -1 regarde dehors.
+    const dehors = pose('va', 3, 1.1, -1);
+    expect(dehors.some((i) => i.code === 'pose' && /ext/.test(i.message))).toBe(true);
+    // La bonne face, elle, ne dit rien.
+    expect(pose('va', 3, 1.1, 1).some((i) => /ext/.test(i.message))).toBe(false);
+  });
+
+  it('signale une prise posée dans le vide d’une porte', () => {
+    const dansLaBaie = pose('prise', 1.4, 0.25, 1);
+    expect(
+      dansLaBaie.some((i) => i.code === 'pose' && i.severity === 'alerte'),
+    ).toBe(true);
+  });
+
+  it('laisse l’applique au-dessus du linteau, et la prise du trumeau', () => {
+    // 2,20 m d'axe au-dessus d'une porte de 2,05 : c'est de la maçonnerie.
+    expect(pose('applique', 1.4, 2.2, 1)).toHaveLength(0);
+    // À côté de la baie, même hauteur basse : rien non plus.
+    expect(pose('prise', 0.5, 0.25, 1)).toHaveLength(0);
   });
 });

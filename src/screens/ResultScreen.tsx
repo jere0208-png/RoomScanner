@@ -82,6 +82,7 @@ import {
   roomUse,
   worktopsOnWall,
   type Worktop,
+  constatsDePose,
   fixturePlacement,
   materialList,
   roomInputsOf,
@@ -713,6 +714,8 @@ export function ResultScreen() {
         cheminements?.parCircuit,
         ceiling,
       );
+      // Les constats de pose rejoignent la conformité du document.
+      list.issues.push(...constatsDePose(walls, openings, roomInputs, fixtures));
       // Le tirage et la commande : ce qu'un patron lit avant le reste.
       const pull = pullSchedule(
         list.circuits,
@@ -744,6 +747,8 @@ export function ResultScreen() {
         cheminements?.parCircuit,
         ceiling,
       );
+      // Le CSV chiffre AUSSI les constats : mêmes yeux que le PDF.
+      list.issues.push(...constatsDePose(walls, openings, roomInputs, fixtures));
       const metre: RoomMetre[] = parts.map((p) => {
         const nom = rooms.find((r) => r.id === p.roomId)?.name;
         // Le périmètre se prend sur le CONTOUR, pas sur la somme des murs :
@@ -1070,6 +1075,9 @@ export function ResultScreen() {
         volumes,
         wallWorktops,
         ceiling,
+        // La géométrie ouvre les constats de pose : face extérieure d'un
+        // mur, appareil dans le vide d'une baie.
+        { walls, openings },
       ),
     [
       roomInputs,
@@ -1079,6 +1087,8 @@ export function ResultScreen() {
       volumes,
       wallWorktops,
       ceiling,
+      walls,
+      openings,
     ],
   );
   const alertRooms = useMemo(() => roomsInAlert(elecIssues), [elecIssues]);
