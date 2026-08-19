@@ -1833,6 +1833,31 @@ function planPage(
       }
     }
 
+    /*
+      LE NUMÉRO DE CHAQUE MUR, DANS SON ÉPAISSEUR.
+
+      Une pastille blanche cerclée d'encre, posée sur le poché : elle se
+      détache du noir du mur, et son cercle la garde lisible quand le mur
+      est trop fin pour la contenir. C'est le repère qui renvoie aux
+      feuilles d'élévation — sans lui, une feuille « Séjour, nord » ne
+      désigne rien de sûr sur un plan qui compte quatre pans au nord.
+
+      Elle se dessine APRÈS le mobilier et les cotes, AVANT la surcouche de
+      schéma : c'est une annotation du plan, pas du schéma.
+    */
+    {
+      const numeros = wallNumbers(ctx);
+      for (const w of walls) {
+        const n = numeros.get(w.id);
+        if (!n) continue;
+        const p = px(wallTagAt(w, openings));
+        const r = 6.2;
+        d.circle(p.x, p.y, r + 0.9, INK);
+        d.circle(p.x, p.y, r, '#FFFFFF');
+        d.text(String(n), p.x, p.y - 2.4, 7, INK, { bold: true });
+      }
+    }
+
     // La surcouche vient EN DERNIER, dans la même fenêtre de découpe : un
     // schéma se lit par-dessus le plan, jamais dessous.
     if (extra?.overlay) extra.overlay(d, px, scale, box);
@@ -2323,11 +2348,15 @@ function elevationPage(
     (p) => p.roomId === roomOf(wall),
   )?.labelAt;
   const cardinal = centre ? wallLabel(wall, centre, ctx.north ?? null) : null;
+  // Le numéro du mur, tel qu'il est écrit sur le plan : c'est par lui qu'on
+  // retrouve le pan dont parle cette feuille.
+  const numero = wallNumbers(ctx).get(wall.id);
 
   // ------------------------------------------------------------- cadre
   const hautTitre = TETE;
   d.text(
-    `Élévation — ${piece || 'mur'}${cardinal ? `, ${cardinal}` : ''}`,
+    `Élévation — ${numero ? `Mur ${numero} · ` : ''}${piece || 'mur'}` +
+      `${cardinal ? `, ${cardinal}` : ''}`,
     FRAME.x + 30,
     hautTitre,
     13,
@@ -2651,13 +2680,72 @@ const HAUTEURS_REF = [
  * Les murs qui méritent leur feuille, dans l'ordre où on visite le
  * logement : pièce par pièce, et dans chaque pièce l'ordre du relevé.
  */
-function elevationWalls(ctx: SheetContext): WallSeg[] {
+/**
+ * LES MURS DU DOSSIER, DANS L'ORDRE OÙ ON LES LIT.
+ *
+ * Pièce par pièce, et dans l'ordre du relevé à l'intérieur de chacune :
+ * c'est l'ordre dans lequel on fait le tour d'un logement, et celui des
+ * feuilles d'élévation.
+ *
+ * Les murs de moins de 30 cm en sont écartés — un tableau de fenêtre, un
+ * bout de refend : rien qu'on désigne, et rien où poser une pastille.
+ */
+function wallsInOrder(ctx: SheetContext): WallSeg[] {
   const ordre = new Map((ctx.rooms ?? []).map((r, i) => [r.id, i]));
   return ctx.walls
     .filter((w) => w.type === 'wall' && segLength(w) > 0.3)
     .map((w, i) => ({ w, i, r: ordre.get(roomOf(w) ?? '') ?? 999 }))
     .sort((a, b) => a.r - b.r || a.i - b.i)
     .map((e) => e.w);
+}
+
+/**
+ * LE NUMÉRO DE CHAQUE MUR — le seul repère qui traverse le dossier.
+ *
+ * Les élévations ne couvrent plus que les murs équipés : « Élévation —
+ * Séjour, nord » ne suffit donc plus à retrouver DE QUEL pan il s'agit,
+ * puisque rien, sur le plan, ne le désignait. Le numéro fait ce lien, et
+ * il est le même partout : sur la pastille du plan, dans le titre de la
+ * feuille, dans le renvoi des cotes.
+ *
+ * Il numérote TOUS les murs, équipés ou non : une numérotation qui sauterait
+ * les murs nus renverrait, sur le plan, à des numéros absents des feuilles —
+ * et personne ne saurait si le mur 5 manque parce qu'il est nu ou parce que
+ * la feuille s'est perdue.
+ */
+function wallNumbers(ctx: SheetContext): Map<string, number> {
+  return new Map(wallsInOrder(ctx).map((w, i) => [w.id, i + 1]));
+}
+
+/**
+ * Où poser la pastille : au milieu du plus long RETOUR de maçonnerie.
+ *
+ * Au milieu du mur tout court, elle tombe en plein sur la porte dès que la
+ * baie est centrée — c'est-à-dire souvent. Le plus long tronçon plein est
+ * toujours du mur, et c'est là qu'il y a la place.
+ */
+function wallTagAt(w: WallSeg, openings: WallSeg[]): { x: number; z: number } {
+  const pleins = wallRuns(w, openings)
+    .filter((r) => r.kind === 'mur')
+    .sort((a, b) => b.length - a.length);
+  const t = pleins.length > 0 ? (pleins[0].t0 + pleins[0].t1) / 2 : 0.5;
+  return {
+    x: w.a.x + (w.b.x - w.a.x) * t,
+    z: w.a.z + (w.b.z - w.a.z) * t,
+  };
+}
+
+/**
+ * LES MURS QUI MÉRITENT UNE FEUILLE : ceux qui portent quelque chose.
+ *
+ * Quatre murs donnaient quatre feuilles, dont trois annonçaient « Aucun
+ * appareil ». On feuillette du vide, et la seule feuille utile se perd au
+ * milieu — dans un dossier qu'on ouvre les mains pleines de plâtre, c'est
+ * le pire défaut possible.
+ */
+function elevationWalls(ctx: SheetContext): WallSeg[] {
+  const equipes = new Set((ctx.fixtures ?? []).map((f) => f.wallId));
+  return wallsInOrder(ctx).filter((w) => equipes.has(w.id));
 }
 
 const DEFAULT_PDF_VIEWS: [View3DParams, View3DParams] = [

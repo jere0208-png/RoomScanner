@@ -130,8 +130,36 @@ describe('lire un JPEG', () => {
 describe('les feuilles d’élévation', () => {
   it('n’existent que si on les demande', () => {
     expect(pages(doc({}))).toBe(1);
-    // Quatre murs, quatre feuilles de plus.
-    expect(pages(doc({ elevations: true }))).toBe(5);
+    /*
+      UNE FEUILLE PAR MUR ÉQUIPÉ — pas par mur.
+
+      Quatre murs donnaient quatre feuilles, dont trois ne portaient rien :
+      un dossier de pose de quatre pages pour deux appareils. On feuillette
+      du vide, et la seule feuille utile se perd au milieu. Ici, seul le mur
+      nord est équipé.
+    */
+    expect(pages(doc({ elevations: true }))).toBe(2);
+  });
+
+  /*
+    LE NUMÉRO FAIT LE LIEN ENTRE LE PLAN ET LA FEUILLE.
+
+    Les élévations ne couvrant plus tous les murs, « Élévation — Séjour,
+    nord » ne suffit plus à retrouver DE QUEL pan de mur il s'agit : sur le
+    plan, rien ne le désignait. Chaque mur porte donc son numéro dans une
+    pastille, posée dans son épaisseur, et la feuille d'élévation reprend ce
+    numéro dans son titre.
+  */
+  it('reprennent le numéro que le mur porte sur le plan', () => {
+    const vu = texte(doc({ elevations: true }));
+    expect(vu).toContain('Mur 1');
+  });
+
+  it('numérote TOUS les murs du plan, équipés ou non', () => {
+    // Le plan seul, sans élévation : les quatre pastilles y sont, sinon le
+    // numéro d'une feuille renverrait à un mur introuvable.
+    const vus = texte(doc({})).split(' | ');
+    for (const n of ['1', '2', '3', '4']) expect(vus).toContain(n);
   });
 
   it('portent la hauteur et la distance au bord de chaque appareil', () => {
@@ -151,8 +179,28 @@ describe('les feuilles d’élévation', () => {
     expect(vu).toMatch(/\b19[0-9]\b/);
   });
 
-  it('et disent quand un mur ne porte rien, plutôt que de rester muettes', () => {
-    expect(texte(doc({ elevations: true }))).toContain('Aucun appareil');
+  it('n’éditent plus de feuille pour un mur nu', () => {
+    // Le message « Aucun appareil » tenait lieu de feuille. Une page qui
+    // annonce qu'elle n'a rien à dire n'a pas lieu d'être imprimée.
+    expect(texte(doc({ elevations: true }))).not.toContain('Aucun appareil');
+  });
+
+  it('et n’en édite aucune quand rien n’est posé', () => {
+    const nu = latin1(
+      buildScanPdf(
+        {
+          name: 'Séjour',
+          walls: W,
+          openings: [PORTE],
+          objects: [],
+          rooms: R,
+          fixtures: [],
+        },
+        false,
+        { metre: false, elevations: true },
+      ),
+    );
+    expect(pages(nu)).toBe(1);
   });
 
   /**
@@ -202,6 +250,8 @@ describe('la photo de repérage', () => {
     ]);
     expect(src.startsWith('%PDF-1.4')).toBe(true);
     expect(src).not.toContain('/Subtype /Image');
-    expect(pages(src)).toBe(5);
+    // Le plan, et la seule feuille de mur équipé : la photo perdue ne coûte
+    // que sa vignette.
+    expect(pages(src)).toBe(2);
   });
 });

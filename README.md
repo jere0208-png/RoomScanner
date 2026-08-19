@@ -1188,6 +1188,33 @@ La barre de la vue 3D n'a plus de bascule « vue de dessus » : le geste y
 mène déjà — on incline la vue jusqu'à l'aplomb — et le plan 2D est là pour
 ça. Un bouton qui refait ce que la main fait mieux ne gagne pas sa place.
 
+### Chaque mur porte son numéro
+
+Les feuilles d'élévation ne couvrent plus **que les murs équipés** : quatre
+murs donnaient quatre feuilles, dont trois annonçaient « Aucun appareil ». On
+feuillette du vide, et la seule feuille utile se perd au milieu — dans un
+dossier qu'on ouvre les mains pleines de plâtre, c'est le pire défaut
+possible.
+
+Mais un dossier partiel a besoin d'un repère : « Élévation — Séjour, nord » ne
+dit plus DE QUEL pan il s'agit quand rien, sur le plan, ne le désigne. Chaque
+mur porte donc un **numéro dans une pastille** — un disque blanc cerclé
+d'encre, posé dans l'épaisseur du poché — et la feuille d'élévation reprend ce
+numéro dans son titre.
+
+Trois décisions tiennent ce repère :
+
+- **Tous les murs sont numérotés**, équipés ou non. Une numérotation qui
+  sauterait les murs nus renverrait, depuis le plan, à des numéros absents du
+  dossier — et personne ne saurait si le mur 5 manque parce qu'il ne porte
+  rien ou parce que la feuille s'est perdue.
+- **L'ordre est celui du dossier** : pièce par pièce, et dans l'ordre du
+  relevé à l'intérieur de chacune. C'est celui dans lequel on fait le tour
+  d'un logement.
+- **La pastille se pose au milieu du plus long retour de maçonnerie**, pas au
+  milieu du mur : au milieu, elle tombe en plein sur la porte dès que la baie
+  est centrée, c'est-à-dire souvent.
+
 ### Le plan exporté
 
 **Il se dessine sur la trame du logement, pas dans le repère du scan.** ARKit
