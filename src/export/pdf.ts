@@ -1830,9 +1830,33 @@ function planPage(
         const cp2 = px(part.labelAt);
         const label = roomNames[part.roomId] ?? '';
         const area = `${part.surface.exact ? '' : '≈ '}${fr1(part.surface.area)} m²`;
+        /*
+          LE CARTOUCHE POSE SON PROPRE FOND.
+
+          « Au large » ne veut pas dire « seul » : la cote d'un refend tombe
+          dans la pièce qu'il borde, et elle venait s'écrire en travers de
+          « Chambre · 12,0 m² ». Déplacer l'un ou l'autre ne règle qu'un cas
+          — le prochain élément qui passe par là recommencerait. Un
+          rectangle blanc à la taille du texte règle tous les cas d'un coup,
+          et c'est ce que fait un plan papier : on réserve la place du
+          cartouche.
+        */
+        const gros = big ? 14 : 10.5;
+        const larg =
+          Math.max(latin1(label).length * gros, latin1(area).length * (big ? 11 : 9)) *
+            0.52 +
+          10;
+        d.rect(
+          cp2.x - larg / 2,
+          cp2.y - (label ? 15 : 16),
+          larg,
+          label ? 30 : 32,
+          '#FFFFFF',
+          null,
+        );
         // Nom au-dessus, surface en dessous (l'axe y du PDF monte).
         if (label) {
-          d.text(label, cp2.x, cp2.y + 3, big ? 14 : 10.5, INK, { bold: true });
+          d.text(label, cp2.x, cp2.y + 3, gros, INK, { bold: true });
           d.text(area, cp2.x, cp2.y - 9, big ? 11 : 9, GREY);
         } else {
           d.text(area, cp2.x, cp2.y + 4, big ? 15 : 11, INK, { bold: true });
@@ -2513,10 +2537,18 @@ function elevationPage(
     INK,
     { bold: true },
   );
-  // La hauteur sous plafond, debout à gauche.
+  /*
+    LA HAUTEUR SOUS PLAFOND, DEBOUT À DROITE.
+
+    Elle était à gauche, à mi-hauteur du mur — exactement là où les cotes
+    d'appareils posent leurs pastilles. Un interrupteur à 1,10 m dans un mur
+    de 2,50 m tombe à mi-hauteur : on lisait « 110 » et « 2,50 m » l'un sur
+    l'autre. La droite du dessin, elle, est vide — les retours sont en haut,
+    la longueur en bas, les hauteurs à gauche.
+  */
   d.text(
     `H ${H.toFixed(2).replace('.', ',')} m`,
-    px(0) - 16,
+    px(face.len) + 18,
     py(H / 2),
     8,
     GREY,

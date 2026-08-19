@@ -1150,16 +1150,37 @@ export function assignOpenings(
     const ou = { x: od.x / ol, z: od.z / ol };
     const mid = { x: (o.a.x + o.b.x) / 2, z: (o.a.z + o.b.z) / 2 };
 
-    let best: { wall: WallSeg; dist: number } | null = null;
+    /*
+      LA PIÈCE DÉPARTAGE, ELLE N'EXCLUT PAS.
+
+      Le filtre était éliminatoire : tout mur dont la pièce différait de
+      celle de l'ouverture était écarté d'emblée. Une baie sans `roomId` —
+      un scan d'avant la détection des pièces, une ouverture ajoutée à la
+      main — ne trouvait alors AUCUN mur, disparaissait du modèle 3D et de
+      la feuille d'élévation, pendant que le plan 2D continuait de la
+      dessiner. La porte était sur le plan et absente du mur vu de face,
+      sans que rien ne le signale.
+
+      La pièce reste ce qui tranche quand deux murs se superposent — une
+      porte de palier ne doit pas percer la cloison du voisin — mais elle ne
+      décide plus seule qu'il n'y a pas de mur du tout : à égalité de
+      géométrie, le mur de sa pièce gagne ; sinon, le plus proche fait
+      l'affaire.
+    */
+    let best: { wall: WallSeg; dist: number; sienne: boolean } | null = null;
     for (const w of walls) {
-      if (roomOf(w) !== roomOf(o)) continue;
       const wd = { x: w.b.x - w.a.x, z: w.b.z - w.a.z };
       const wl = Math.hypot(wd.x, wd.z) || 1;
       // Parallèle à moins de ~25°, et posée à même le mur.
       if (Math.abs((wd.x * ou.x + wd.z * ou.z) / wl) < 0.9) continue;
       const { dist } = pointOnSeg(mid, w.a, w.b);
       if (dist > 0.6) continue;
-      if (!best || dist < best.dist) best = { wall: w, dist };
+      const sienne = roomOf(w) === roomOf(o);
+      const mieux =
+        !best ||
+        (sienne && !best.sienne) ||
+        (sienne === best.sienne && dist < best.dist);
+      if (mieux) best = { wall: w, dist, sienne };
     }
     if (!best) continue;
 

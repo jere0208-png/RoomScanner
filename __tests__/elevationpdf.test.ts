@@ -223,6 +223,62 @@ describe('les feuilles d’élévation', () => {
   });
 });
 
+/**
+ * LE CARTOUCHE D'UNE PIÈCE RESTE LISIBLE, QUOI QU'IL Y AIT DESSOUS.
+ *
+ * Le nom et la surface se posent au point le plus au large de la pièce —
+ * mais « au large » ne veut pas dire « seul » : la cote d'un refend tombe
+ * dans la pièce qu'il borde, et elle venait s'écrire en travers de
+ * « Chambre · 12,0 m² ». Deux textes superposés, aucun des deux lisible.
+ *
+ * Plutôt que de déplacer l'un ou l'autre — et de recommencer au prochain
+ * élément qui passe par là —, le cartouche pose son propre fond : un
+ * rectangle blanc à sa taille, juste avant ses lettres.
+ */
+/**
+ * LA HAUTEUR SOUS PLAFOND CHANGE DE CÔTÉ.
+ *
+ * Elle s'écrivait debout à GAUCHE du mur, à mi-hauteur — exactement là où
+ * les cotes d'appareils posent leurs pastilles. Un interrupteur à 1,10 m
+ * dans un mur de 2,50 m tombe à mi-hauteur : on lisait « 110 » et
+ * « 2,50 m » l'un sur l'autre. La droite du dessin, elle, est vide : les
+ * retours sont en haut, la longueur en bas, les hauteurs à gauche.
+ */
+describe('la cote de hauteur du mur', () => {
+  /** Abscisse d'un texte, lue dans la matrice qui le place. */
+  const xDe = (src: string, texte: string) => {
+    const k = src.indexOf(`(${texte}) Tj`);
+    if (k < 0) return NaN;
+    const avant = src.slice(Math.max(0, k - 60), k).trim().split(/\s+/);
+    // « … a b c d tx ty Tm » : l'abscisse est l'avant-avant-dernier jeton.
+    return parseFloat(avant[avant.length - 3]);
+  };
+
+  it('se pose à droite du mur, loin des cotes d’appareils', () => {
+    const src = doc({ elevations: true });
+    const hauteur = xDe(src, 'H 2,50 m');
+    const appareil = xDe(src, '110');
+    expect(Number.isNaN(hauteur)).toBe(false);
+    expect(Number.isNaN(appareil)).toBe(false);
+    // Les deux ne sont plus du même côté : au moins la moitié du mur les
+    // sépare.
+    expect(hauteur).toBeGreaterThan(appareil + 100);
+  });
+});
+
+describe('le cartouche de pièce', () => {
+  it('s’écrit sur un fond plein', () => {
+    const src = doc({});
+    // « Séjour » est aussi le nom du projet, écrit dans le cartouche de la
+    // feuille : c'est l'occurrence SUIVIE de la surface qui nous intéresse.
+    const i = src.indexOf('(20,0 m²) Tj');
+    expect(i).toBeGreaterThan(0);
+    // Le fond est posé juste avant : blanc, et rempli.
+    const avant = src.slice(Math.max(0, i - 400), i);
+    expect(avant).toMatch(/1 1 1 rg[^)]* f\s/);
+  });
+});
+
 describe('la photo de repérage', () => {
   const avec = () =>
     doc({ elevations: true }, [{ wallId: 'n', base64: JPEG_B64 }]);

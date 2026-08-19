@@ -1184,6 +1184,36 @@ describe('portes et fenêtres en volumes', () => {
     expect(d.y1).toBeCloseTo(2.05);
   });
 
+  /*
+    UNE BAIE SANS PIÈCE N'EST PAS UNE BAIE PERDUE.
+
+    Le rattachement écartait d'emblée tout mur dont la pièce ne portait pas
+    le même nom que celle de l'ouverture. C'est un départage déguisé en
+    exclusion : une ouverture sans `roomId` — un scan d'avant la détection,
+    une baie ajoutée à la main — ne trouvait plus AUCUN mur. Elle
+    disparaissait alors du modèle 3D et de la feuille d'élévation, alors que
+    le plan 2D, lui, continuait de la dessiner : la porte était sur le plan
+    et absente du mur vu de face, sans que rien ne le signale.
+  */
+  it('rattache une ouverture même sans pièce renseignée', () => {
+    const murs = rect.map((w) => ({ ...w, roomId: 'r1' }));
+    const orpheline = { ...porte, roomId: undefined };
+    const holes = assignOpenings(murs, [orpheline], 0);
+    expect(holes.get('n')).toHaveLength(1);
+  });
+
+  it('préfère malgré tout le mur de SA pièce', () => {
+    // Deux murs superposés, un par pièce : c'est le sien qui gagne, sinon
+    // une porte de palier percerait la cloison du voisin.
+    const doublon: WallSeg[] = [
+      { ...rect[0], id: 'n-r1', roomId: 'r1' },
+      { ...rect[0], id: 'n-r2', roomId: 'r2', a: { x: 0, z: 0.02 }, b: { x: 4, z: 0.02 } },
+    ];
+    const holes = assignOpenings(doublon, [{ ...porte, roomId: 'r2' }], 0);
+    expect(holes.get('n-r2')).toHaveLength(1);
+    expect(holes.get('n-r1')).toBeUndefined();
+  });
+
   it('n’attrape pas une ouverture d’un mur perpendiculaire ou lointain', () => {
     const ailleurs: WallSeg = { ...porte, id: 'x', a: { x: 1.5, z: 9 }, b: { x: 2.5, z: 9 } };
     expect(assignOpenings(rect, [ailleurs], 0).size).toBe(0);

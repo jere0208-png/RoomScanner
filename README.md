@@ -1243,6 +1243,31 @@ plongeante : ajouter deux fois le même trois-quarts ferait deux pages
 identiques. Le titre les numérote — « Perspective 2 » désigne quelque chose,
 « Vues 3D » répété quatre fois ne désigne rien.
 
+### Trois défauts vus sur le papier
+
+Trouvés en RENDANT le dossier hors ligne et en le regardant page par page —
+aucun test ne les voyait, et aucune relecture ne les aurait montrés.
+
+- **Une baie sans pièce disparaissait du mur vu de face.** Le rattachement
+  des ouvertures écartait d'emblée tout mur dont la pièce différait de celle
+  de l'ouverture : un départage déguisé en exclusion. Une fenêtre sans
+  `roomId` — scan d'avant la détection des pièces, ouverture ajoutée à la
+  main — ne trouvait alors AUCUN mur, disparaissait du modèle 3D et de la
+  feuille d'élévation, pendant que le plan 2D continuait de la dessiner. La
+  pièce reste ce qui tranche quand deux murs se superposent (une porte de
+  palier ne doit pas percer la cloison du voisin), mais elle ne décide plus
+  seule qu'il n'y a pas de mur du tout.
+- **Le cartouche d'une pièce se faisait traverser.** « Au large » ne veut pas
+  dire « seul » : la cote d'un refend tombe dans la pièce qu'il borde, et
+  elle s'écrivait en travers de « Chambre · 12,0 m² ». Le cartouche pose
+  maintenant son propre fond blanc — déplacer l'un ou l'autre n'aurait réglé
+  qu'un cas, le prochain élément qui passe par là recommencerait.
+- **La hauteur sous plafond a changé de côté.** Elle s'écrivait debout à
+  gauche du mur, à mi-hauteur, là même où les cotes d'appareils posent leurs
+  pastilles : un interrupteur à 1,10 m dans un mur de 2,50 m tombe à
+  mi-hauteur, et l'on lisait « 110 » et « 2,50 m » l'un sur l'autre. Elle est
+  passée à droite, où il n'y a rien.
+
 ### Le plan exporté
 
 **Il se dessine sur la trame du logement, pas dans le repère du scan.** ARKit
