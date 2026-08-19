@@ -16,9 +16,12 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   avancement,
+  camera,
+  cascade,
   frameSvg,
   PLAN,
   SHOWCASE_FRAMES,
+  SHOWCASE_PALETTE,
 } from '../src/export/showcaseFrames';
 
 /** La taille des images : celle de l'écran du téléphone, en double densité. */
@@ -45,10 +48,104 @@ describe('le scénario de la vitrine', () => {
       avancement(i),
     );
     for (let i = 1; i < suite.length; i++) {
-      // Aucun saut brutal : la levée se fait en douceur, jamais en deux
-      // images. C'est ce qui distingue une transition d'un changement d'écran.
-      expect(Math.abs(suite[i] - suite[i - 1])).toBeLessThan(0.2);
+      /*
+        LA VITESSE DE POINTE EST BORNÉE, pas seulement le saut.
+
+        À quinze images par seconde, c'est le pas le plus grand qui se voit :
+        l'ancien lissage quadratique culminait à 0,125 d'avancement par image
+        — cinq degrés et demi d'inclinaison d'un coup — et c'est là que la
+        levée paraissait par paliers. Le lissage sinusoïdal, sur une levée
+        plus longue, reste sous 0,11 : c'est mesuré ici, pas promis.
+      */
+      expect(Math.abs(suite[i] - suite[i - 1])).toBeLessThan(0.11);
     }
+  });
+});
+
+/*
+ * LA CAMÉRA VIT PENDANT LES PALIERS.
+ *
+ * Un palier où tout s'arrête se lit comme une image figée — trois secondes de
+ * diaporama. La visite guidée l'a déjà appris : c'est le zoom qui avance
+ * PENDANT l'arrêt qui donne la vie. Ici pareil : sur le palier du volume, la
+ * caméra dérive lentement en azimut et se rapproche d'un souffle ; puis tout
+ * revient se poser sur le plan, exactement là où le cycle recommence.
+ */
+describe('la caméra de la vitrine', () => {
+  const cycle = Array.from({ length: SHOWCASE_FRAMES }, (_, i) => ({
+    t: avancement(i),
+    ...camera(i),
+  }));
+
+  it('part du plan droit et y revient', () => {
+    expect(cycle[0].theta).toBe(0);
+    expect(cycle[0].zoom).toBe(1);
+    const dernier = cycle[SHOWCASE_FRAMES - 1];
+    expect(Math.abs(dernier.theta)).toBeLessThan(1);
+    expect(Math.abs(dernier.zoom - 1)).toBeLessThan(0.01);
+  });
+
+  it('dérive pendant le palier du volume au lieu de se figer', () => {
+    const palier = cycle.filter((c) => c.t === 1);
+    // Le palier tient : on a le temps de regarder les meubles.
+    expect(palier.length).toBeGreaterThanOrEqual(8);
+    const debut = palier[0];
+    const fin = palier[palier.length - 1];
+    expect(Math.abs(fin.theta - debut.theta)).toBeGreaterThan(3);
+    expect(fin.zoom).toBeGreaterThan(debut.zoom + 0.02);
+  });
+
+  it('ne saute jamais, bouclage compris', () => {
+    for (let i = 1; i <= SHOWCASE_FRAMES; i++) {
+      const a = cycle[i - 1];
+      const b = i === SHOWCASE_FRAMES ? cycle[0] : cycle[i];
+      expect(Math.abs(b.theta - a.theta)).toBeLessThan(2.2);
+      expect(Math.abs(b.zoom - a.zoom)).toBeLessThan(0.012);
+    }
+  });
+});
+
+/*
+ * LE MOBILIER ARRIVE EN VAGUE, du nord au sud.
+ *
+ * Le fondu global faisait apparaître tout le logement d'un bloc : correct,
+ * mais mécanique. La vague suit le sens de la lecture — la chambre en haut se
+ * meuble d'abord, le séjour en bas la rattrape — et chaque meuble sort du sol
+ * en fondu, sur sa propre fenêtre. C'est discret : les fenêtres se
+ * chevauchent largement, on voit une maison qui se remplit, pas des meubles
+ * qui poppent.
+ */
+describe('la vague du mobilier', () => {
+  const indexDe = (nom: string) =>
+    PLAN.meubles.findIndex(([id]) => id === nom);
+
+  it('la chambre se meuble avant le séjour', () => {
+    expect(cascade(0.35, indexDe('lit'))).toBeGreaterThan(0.6);
+    expect(cascade(0.35, indexDe('tv'))).toBeLessThan(0.1);
+  });
+
+  it('chaque meuble part de rien, monte sans redescendre, et est là avant le palier', () => {
+    for (let k = 0; k < PLAN.meubles.length; k++) {
+      expect(cascade(0, k)).toBe(0);
+      expect(cascade(0.75, k)).toBe(1);
+      let precedent = 0;
+      for (let t = 0; t <= 1.0001; t += 0.05) {
+        const v = cascade(t, k);
+        expect(v).toBeGreaterThanOrEqual(precedent - 1e-9);
+        precedent = v;
+      }
+    }
+  });
+
+  it("s'observe sur l'image : des opacités étagées à mi-levée", () => {
+    const s = frameSvg(0.3, 264, 536);
+    const etages = new Set(
+      [...s.matchAll(/fill-opacity="([\d.]+)" stroke="#2F6BFF"/g)].map(
+        (m) => m[1],
+      ),
+    );
+    // Au moins trois niveaux distincts : un fondu global n'en donne qu'un.
+    expect(etages.size).toBeGreaterThanOrEqual(3);
   });
 });
 
@@ -168,7 +265,12 @@ describe('les images de la vitrine', () => {
     mkdirSync(dir, { recursive: true });
     for (let i = 0; i < SHOWCASE_FRAMES; i++) {
       const nom = `frame-${String(i).padStart(2, '0')}.svg`;
-      writeFileSync(join(dir, nom), frameSvg(avancement(i), W, H));
+      // La caméra du cycle est passée en clair : c'est elle qui dérive sur
+      // les paliers, et `t` seul ne sait pas le dire.
+      writeFileSync(
+        join(dir, nom),
+        frameSvg(avancement(i), W, H, SHOWCASE_PALETTE, camera(i)),
+      );
     }
     expect(true).toBe(true);
   });

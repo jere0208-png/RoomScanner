@@ -31,8 +31,16 @@ import { segLength, type WallSeg } from '../geometry/floorplan';
 import { FIXTURES, type Fixture } from '../geometry/electrical';
 import type { ObjectData } from 'react-native-room-scan';
 
-/** Le nombre d'images du cycle complet. */
-export const SHOWCASE_FRAMES = 44;
+/**
+ * Le nombre d'images du cycle complet.
+ *
+ * Il est passé de 44 à 52 quand la levée s'est allongée : à cadence égale
+ * (quinze images par seconde), la douceur ne peut venir QUE d'un pas plus
+ * petit entre deux images — et le pas le plus grand de l'ancien cycle
+ * faisait cinq degrés et demi d'inclinaison d'un coup, ce qui se lisait
+ * comme des paliers. Huit images de plus, c'est 80 ko dans l'IPA.
+ */
+export const SHOWCASE_FRAMES = 52;
 
 const mur = (
   id: string,
@@ -189,28 +197,82 @@ const scenePalette = (p: FramePalette, t = 0): ScenePalette => ({
   objectStroke: p.meubleTrait,
 });
 
-/** Lissage : le plan démarre et s'arrête en douceur, comme une main. */
-const doux = (t: number) =>
-  t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
-
 /**
- * LE SCÉNARIO, en quatre temps.
+ * Lissage SINUSOÏDAL : le plan démarre et s'arrête en douceur, comme une
+ * main. Il a remplacé le quadratique pour sa vitesse de pointe : à mi-course,
+ * le quadratique file à 1,5 fois la moyenne, le sinus à π/2 — et à quinze
+ * images par seconde, c'est ce pic-là qui se voit. Il est borné : hors de
+ * [0, 1], une rampe n'a rien à dire.
+ */
+const soie = (t: number) =>
+  (1 - Math.cos(Math.PI * Math.max(0, Math.min(1, t)))) / 2;
+
+/*
+ * LE SCÉNARIO, en quatre temps — et la caméra ne s'arrête JAMAIS.
  *
- * Un palier sur le plan (on lit les cotes), la levée, un palier sur le
+ * Un palier sur le plan (on lit le logement), la levée, un palier sur le
  * volume (on regarde les meubles), puis le retour — et ça recommence. Les
  * paliers font l'essentiel du travail : sans eux, on ne voit qu'un
  * mouvement, jamais les deux états qu'il relie.
+ *
+ * Mais un palier où TOUT s'arrête se lit comme un diaporama. La visite
+ * guidée l'a déjà appris : c'est le zoom qui avance pendant l'arrêt qui
+ * donne la vie. Sur le palier du volume, la caméra dérive donc en azimut
+ * (−14° → −21°) et se rapproche d'un souffle (+4 %) — assez pour que
+ * l'image respire, trop peu pour qu'on le remarque. Le retour ramène tout
+ * (angle, zoom, hauteur) d'un seul geste : il part de la dérive là où elle
+ * s'est posée, et le cycle se referme sur le plan de départ.
  */
-export function avancement(frame: number): number {
+const PALIER_PLAN = 8;
+const LEVEE = 17;
+const PALIER_VOLUME = 11;
+
+interface Instant {
+  t: number;
+  theta: number;
+  zoom: number;
+}
+
+function instant(frame: number): Instant {
   const n = SHOWCASE_FRAMES;
   const i = ((frame % n) + n) % n;
-  const palier = Math.round(n * 0.18);
-  const levee = Math.round(n * 0.27);
-  if (i < palier) return 0;
-  if (i < palier + levee) return doux((i - palier) / levee);
-  if (i < palier * 2 + levee) return 1;
-  const reste = n - (palier * 2 + levee);
-  return 1 - doux((i - (palier * 2 + levee)) / reste);
+  if (i < PALIER_PLAN) return { t: 0, theta: 0, zoom: 1 };
+  if (i < PALIER_PLAN + LEVEE) {
+    const t = soie((i - PALIER_PLAN) / LEVEE);
+    return { t, theta: -14 * t, zoom: 1 + 0.045 * t };
+  }
+  if (i < PALIER_PLAN + LEVEE + PALIER_VOLUME) {
+    // La dérive est elle-même lissée : elle part du glissement nul où la
+    // levée l'a laissée, et se pose avant que le retour ne commence.
+    const h = soie((i - PALIER_PLAN - LEVEE) / (PALIER_VOLUME - 1));
+    return { t: 1, theta: -14 - 7 * h, zoom: 1.045 + 0.04 * h };
+  }
+  const reste = n - (PALIER_PLAN + LEVEE + PALIER_VOLUME);
+  const t = 1 - soie((i - PALIER_PLAN - LEVEE - PALIER_VOLUME) / reste);
+  return { t, theta: -21 * t, zoom: 1 + 0.085 * t };
+}
+
+export function avancement(frame: number): number {
+  return instant(frame).t;
+}
+
+/** La caméra d'une image du cycle : l'azimut (degrés) et le rapprochement. */
+export function camera(frame: number): { theta: number; zoom: number } {
+  const { theta, zoom } = instant(frame);
+  return { theta, zoom };
+}
+
+/*
+ * LA VAGUE DU MOBILIER : chaque meuble a sa fenêtre d'apparition, calée sur
+ * sa position — la chambre en haut se meuble d'abord, le séjour en bas la
+ * rattrape. Les fenêtres se chevauchent largement : on voit un logement qui
+ * se remplit, pas des meubles qui surgissent un à un. Et comme la fenêtre
+ * dépend de `t`, la vague se rejoue à l'envers pendant le retour, d'elle-même.
+ */
+export function cascade(t: number, k: number): number {
+  const cz = PLAN.meubles[k]?.[3] ?? 0;
+  const debut = 0.05 + (cz / 6.4) * 0.26;
+  return soie((t - debut) / 0.38);
 }
 
 /**
@@ -225,6 +287,9 @@ export function frameSvg(
   W: number,
   H: number,
   p: FramePalette = SHOWCASE_PALETTE,
+  // La caméra du CYCLE : `t` ne dit que la levée, la dérive des paliers
+  // vient d'ici. Sans elle, on retombe sur une caméra asservie à `t`.
+  cam?: { theta?: number; zoom?: number },
 ): string {
   /*
     LE PLAN SE LÈVE, AU SENS PROPRE.
@@ -246,8 +311,10 @@ export function frameSvg(
   */
   const tilt = 52 * t;
   // Un quart de tour très lent pendant la levée : le volume se révèle au
-  // lieu de se déplier de face.
-  const theta = -16 * t;
+  // lieu de se déplier de face. Le cycle complet passe sa propre caméra,
+  // qui dérive aussi pendant les paliers.
+  const theta = cam?.theta ?? -14 * t;
+  const zoom = cam?.zoom ?? 1;
 
   const murs = PLAN.murs.map(([id, ax, az, bx, bz]) =>
     mur(id, ax, az, bx, bz, hauteur),
@@ -285,21 +352,21 @@ export function frameSvg(
     baie('porte-chambre', 3.0, 2.7, 3.85, 2.7, 'door', 2.05, 0),
   ];
   /*
-    LE MOBILIER ARRIVE EN FONDU, PAS D'UN COUP.
+    LE MOBILIER ARRIVE EN VAGUE, PAS D'UN COUP — ni même d'un seul fondu.
 
-    Il sortait du sol à pleine opacité : d'une image à l'autre, un logement
-    vide devenait un logement meublé. L'œil ne relie pas ces deux images, il
-    voit une coupure — et une coupure au milieu d'un mouvement se lit comme
-    un défaut d'affichage, pas comme une intention.
-
-    Le fondu est RAPIDE — il commence dès les premiers degrés d'inclinaison
-    et se termine au tiers de la levée — mais c'en est un : le logement se
-    remplit pendant que ses murs montent, et l'on comprend que c'est le même.
+    Il sortait du sol à pleine opacité : une coupure, corrigée d'abord par un
+    fondu global. Mais un logement entier qui se matérialise d'un bloc reste
+    mécanique. Chaque meuble a maintenant sa fenêtre (`cascade`), calée sur
+    sa position : la vague suit la levée du nord au sud, chaque meuble sort
+    du sol en fondu, et les fenêtres se chevauchent assez pour qu'on voie un
+    logement se remplir — pas des meubles surgir.
   */
-  const apparition = Math.max(0, Math.min(1, (t - 0.06) / 0.3));
-  const pousse = doux(t);
-  const meubles = PLAN.meubles.map(([id, cat, cx, cz, w, d, h]) =>
-    meuble(id, cat, cx, cz, w, d, Math.max(0.02, h * pousse)),
+  const apparitions = PLAN.meubles.map((_, k) => cascade(t, k));
+  const appParId = new Map(
+    PLAN.meubles.map(([id], k) => [id, apparitions[k]]),
+  );
+  const meubles = PLAN.meubles.map(([id, cat, cx, cz, w, d, h], k) =>
+    meuble(id, cat, cx, cz, w, d, Math.max(0.02, h * apparitions[k])),
   );
 
   const scene = buildScene(murs, ouvertures, meubles, {
@@ -329,9 +396,10 @@ export function frameSvg(
   const st = Math.sin(rad(theta));
   const cp = Math.cos(rad(tilt));
   const sp = Math.sin(rad(tilt));
-  // Les cotes se posent HORS de la maçonnerie, et il leur faut leur bande :
-  // le logement laisse donc une marge franche sur les quatre côtés.
-  const scale = (Math.min(W, H) * 0.6) / cadre.radius3d;
+  // Le logement laisse une marge franche sur les quatre côtés — et le
+  // rapprochement du palier se paie ici, sur l'échelle : 8,5 % au plus,
+  // la marge l'absorbe sans qu'un mur sorte du cadre.
+  const scale = (Math.min(W, H) * 0.6 * zoom) / cadre.radius3d;
   const project = (q: { x: number; y: number; z: number }) => {
     const x = q.x - cadre.center.x;
     const y = q.y - cadre.center.y;
@@ -344,23 +412,23 @@ export function frameSvg(
       depth: rz * sp + y * cp,
     };
   };
-  const cam = { ct, st, cp, sp };
+  const oeil = { ct, st, cp, sp };
 
   const out: string[] = [];
   out.push(`<rect width="${W}" height="${H}" fill="${p.fond}"/>`);
 
   const polys = scene.faces
-    .filter((f) => !isHiddenFace(f, cam))
+    .filter((f) => !isHiddenFace(f, oeil))
     .map((f) => {
       const proj = f.pts.map(project);
-      const voile = f.cutaway && f.normal ? cutawayOpacity(f.normal, cam) : 1;
+      const voile = f.cutaway && f.normal ? cutawayOpacity(f.normal, oeil) : 1;
       return {
-        depth: faceDepth(f, project, cam),
+        depth: faceDepth(f, project, oeil),
         fill: shadeFill(f, ct, st),
         stroke: f.stroke,
-        // `ownerId` marque les faces d'un meuble : c'est ce qui permet de
-        // les faire apparaître ensemble.
-        meuble: !!f.ownerId,
+        // `ownerId` dit À QUEL meuble appartient la face : c'est ce qui
+        // permet à chacun de suivre sa propre fenêtre de la vague.
+        owner: f.ownerId,
         voile,
         n: proj.length,
         points: proj.map((q) => `${q.sx.toFixed(1)},${q.sy.toFixed(1)}`).join(' '),
@@ -368,13 +436,13 @@ export function frameSvg(
     })
     .sort((a, b) => a.depth - b.depth);
   for (const q of polys) {
-    // Le mobilier monte en opacité ; la maçonnerie, elle, est là dès la
-    // première image — c'est le plan.
-    const vu = q.meuble ? q.voile * apparition : q.voile;
+    // Chaque meuble monte en opacité sur sa fenêtre ; la maçonnerie, elle,
+    // est là dès la première image — c'est le plan.
+    const vu = q.owner ? q.voile * (appParId.get(q.owner) ?? 1) : q.voile;
     if (vu < 0.01) continue;
     // Le trait d'un meuble suit exactement son fondu ; celui de la
     // maçonnerie garde son minimum, qui dit l'écorché.
-    const trait = q.meuble ? vu : 0.3 + 0.7 * vu;
+    const trait = q.owner ? vu : 0.3 + 0.7 * vu;
     const commun =
       `stroke="${q.stroke ?? 'none'}" stroke-width="${q.n === 2 ? 1 : 0.9}" ` +
       `stroke-opacity="${trait.toFixed(2)}"`;

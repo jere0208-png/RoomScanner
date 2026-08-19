@@ -820,6 +820,41 @@ devait s'effacer en cours de route : un fondu à régler, un écart à la
 maçonnerie à régler, deux corrections déjà. La vitrine montre un plan qui se
 lève ; les cotes, c'est dans l'app.
 
+### La levée respire, et la caméra ne s'arrête plus
+
+Trois retouches du même geste, toutes bornées au banc — à cadence de
+feuilletage inchangée (quinze images par seconde).
+
+**Le pas le plus grand est ce qui se voit.** À quinze images par seconde, la
+douceur ne vient pas de la cadence — elle est fixée — mais du pas entre deux
+images : l'ancien lissage quadratique culminait à cinq degrés et demi
+d'inclinaison d'un coup, et la levée se lisait par paliers. Le lissage est
+passé au sinus (vitesse de pointe π/2 contre 1,5) et la levée s'est allongée
+de cinq images : le pic tombe sous 0,11 d'avancement par image, et c'est le
+banc qui le mesure, pas une promesse. Le cycle passe de 44 à 52 images —
+80 ko dans l'IPA.
+
+**Un palier figé est un diaporama.** La visite guidée l'avait déjà appris :
+c'est le zoom qui avance PENDANT l'arrêt qui donne la vie. Sur le palier du
+volume, la caméra dérive donc en azimut (−14° à −21°) et se rapproche d'un
+souffle (+4 %) — assez pour que l'image respire, trop peu pour qu'on le
+remarque. Le retour ramène tout d'un seul geste, de là où la dérive s'est
+posée jusqu'au plan de départ : le cycle se referme sans à-coup, bouclage
+vérifié image par image. Comme `t` seul ne sait pas dire cette dérive, le
+cycle passe sa caméra en clair à chaque image (`camera(i)`).
+
+**Le mobilier arrive en vague, du nord au sud.** Le fondu global faisait
+apparaître le logement d'un bloc : correct, mais mécanique. Chaque meuble a
+maintenant sa fenêtre d'apparition, calée sur sa position — la chambre en
+haut se meuble d'abord, le séjour en bas la rattrape, et chaque meuble sort
+du sol en fondu sur sa propre fenêtre. Les fenêtres se chevauchent
+largement : on voit un logement qui se remplit, pas des meubles qui
+surgissent. Et la fenêtre dépendant de `t`, la vague se rejoue à l'envers
+pendant le retour, d'elle-même. Le banc tient l'ordre (la chambre devance la
+télé), la montée sans redescente, et l'étagement observable sur l'image —
+au moins trois niveaux d'opacité distincts à mi-levée, là où un fondu global
+n'en donne qu'un.
+
 ### Le ruban de lumière, derrière la maquette
 
 L'accueil porte une onde qui traverse l'écran de bord à bord, à mi-hauteur du

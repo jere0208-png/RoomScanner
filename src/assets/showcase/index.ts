@@ -48,4 +48,12 @@ export const SHOWCASE_IMAGES = [
   require('./frame-41.png'),
   require('./frame-42.png'),
   require('./frame-43.png'),
+  require('./frame-44.png'),
+  require('./frame-45.png'),
+  require('./frame-46.png'),
+  require('./frame-47.png'),
+  require('./frame-48.png'),
+  require('./frame-49.png'),
+  require('./frame-50.png'),
+  require('./frame-51.png'),
 ];

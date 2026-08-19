@@ -36,7 +36,7 @@ import { useTheme, type Palette } from '../theme';
 */
 const ECRAN = { w: 118, h: 240 };
 const BOITIER = { w: ECRAN.w + 14, h: ECRAN.h + 14 };
-/** Quinze images par seconde : le cycle complet dure trois secondes. */
+/** Quinze images par seconde : le cycle complet dure trois secondes et demie. */
 const PERIODE = 68;
 
 export function PhoneShowcase() {
