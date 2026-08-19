@@ -231,6 +231,34 @@ contre un mur qu'on se sert des flèches. `setObjectCenter` reçoit donc un
 `aimant` : vrai au doigt, qui vise à peu près ; faux à la flèche, qui vise
 juste.
 
+### Ce que l'app recalculait pour rien
+
+Trois chaînes de calcul tournaient à chaque rendu, sans rien produire de
+neuf. Elles ne se voient pas — c'est du travail invisible qui mange des
+images — et un banc les compte désormais (`fluiditecalculs.test.tsx`) : on ne
+mesure pas des images par seconde depuis un banc d'essai, on mesure ce qui
+les coûte.
+
+**La liste des relevés redécoupait chaque plan à chaque frappe.** Chaque
+ligne redessine le plan du scan en vignette et énumère ses pièces sous son
+nom : deux appels à `roomParts()` par ligne et par rendu, soit soixante
+découpages de logement à trente relevés — à chaque lettre tapée dans la
+recherche. Or un scan enregistré est **immuable** : le retoucher en produit un
+autre objet. Sa référence est donc une clé de cache exacte, et une `WeakMap`
+laisse partir l'entrée avec le scan qu'on supprime.
+
+**L'écran du plan redécoupait le logement à chaque geste** — et c'était le
+moindre mal : `parts` sert de DÉPENDANCE à d'autres mémoïsations. Une
+référence neuve à chaque image, ce sont des `useMemo` qui ne mémoïsent plus
+rien.
+
+**Et derrière, une chaîne de trois.** `roomInputsOf` → `wallToRooms` →
+`fixturePlacement`, chacun nourrissant le suivant, et le dernier nourrissant
+le cheminement des gaines. Le plus lourd des trois est `fixturePlacement`,
+qui passe par `interiorSide` — lequel redécoupe le logement **pour chaque
+appareil**. On recalculait donc tous les cheminements de câble du logement
+pendant qu'un doigt déplaçait un meuble.
+
 ### Garde-fou visuel
 
 Les tests vérifient des nombres ; aucun n'a vu le jour où le pointillé des

@@ -903,7 +903,17 @@ export function ResultScreen() {
 
   const selectedWall = walls.find((w) => w.id === selectedWallId) ?? null;
   const perimeter = walls.reduce((s, w) => s + segLength(w), 0);
-  const parts = roomParts(walls, rooms);
+  /*
+    LE DÉCOUPAGE EN PIÈCES SE MÉMOÏSE — et pas seulement pour lui-même.
+
+    Il était appelé nu, à chaque rendu de l'écran. C'est déjà du travail
+    inutile ; le vrai coût était ailleurs : son résultat sert de DÉPENDANCE
+    au cheminement des gaines et aux constats de conformité. Une référence
+    neuve à chaque image, ce sont des `useMemo` qui ne mémoïsent plus rien —
+    on recalculait tous les cheminements de câble du logement pendant qu'un
+    doigt déplaçait un meuble.
+  */
+  const parts = useMemo(() => roomParts(walls, rooms), [walls, rooms]);
   const surface = totalArea(parts);
   // Une seule pièce : l'outil de nommage n'a pas besoin de sélection.
   const targetRoomId =
@@ -915,9 +925,24 @@ export function ResultScreen() {
     : { width: 0, depth: 0, angle: 0 };
   // Deux familles de constats, une seule liste : celui qui regarde son plan
   // se moque de savoir si le défaut est géométrique ou électrique.
-  const roomInputs = roomInputsOf(rooms, parts);
-  const wallRooms = wallToRooms(roomInputs);
-  const placement = fixturePlacement(fixtures, walls, roomInputs);
+  /*
+    TROIS CALCULS EN CHAÎNE — et c'est la chaîne qui coûtait.
+
+    Chacun sert de dépendance au suivant, et le dernier sert au cheminement
+    des gaines. Non mémoïsés, ils rendaient une référence neuve à chaque
+    image : les `useMemo` qui en dépendent ne mémoïsaient donc plus rien, et
+    l'on recalculait tous les cheminements de câble du logement pendant
+    qu'un doigt déplaçait un meuble.
+
+    `fixturePlacement` est le plus lourd des trois : il passe par
+    `interiorSide`, qui redécoupe le logement pour CHAQUE appareil.
+  */
+  const roomInputs = useMemo(() => roomInputsOf(rooms, parts), [rooms, parts]);
+  const wallRooms = useMemo(() => wallToRooms(roomInputs), [roomInputs]);
+  const placement = useMemo(
+    () => fixturePlacement(fixtures, walls, roomInputs),
+    [fixtures, walls, roomInputs],
+  );
   /**
    * Plans de travail par mur : la règle des 1,30 m dit « hors plan de
    * travail », encore faut-il savoir où il y en a un.

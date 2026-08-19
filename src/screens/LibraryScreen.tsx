@@ -85,9 +85,39 @@ function formatDate(ts: number): string {
   )}h${two(d.getMinutes())}`;
 }
 
-/** Ce qu'un scan raconte en une ligne : pièces, murs, surface, objets. */
-function detailsOf(item: SavedScan): string {
+/**
+ * LE DÉCOUPAGE D'UN RELEVÉ, CALCULÉ UNE FOIS.
+ *
+ * Chaque ligne de la liste redessine le plan en vignette et énumère ses
+ * pièces sous son nom : deux appels à `roomParts()` — le découpage du
+ * logement, contour de chaque pièce compris — PAR LIGNE ET PAR RENDU. À
+ * trente relevés, cela faisait soixante découpages de plan à chaque lettre
+ * tapée dans la recherche, à chaque appui, à chaque ouverture de menu.
+ *
+ * Or un scan enregistré est immuable : le retoucher en produit un autre
+ * objet. Sa RÉFÉRENCE est donc une clé de cache exacte — pas une
+ * approximation qu'il faudrait invalider à la main —, et une `WeakMap`
+ * laisse partir l'entrée avec le scan qu'on supprime.
+ */
+const decoupages = new WeakMap<
+  SavedScan,
+  { parts: ReturnType<typeof roomParts>; details: string }
+>();
+
+function decoupageDe(item: SavedScan) {
+  const vu = decoupages.get(item);
+  if (vu) return vu;
   const parts = roomParts(item.walls, item.rooms);
+  const calcule = { parts, details: ligneDetails(item, parts) };
+  decoupages.set(item, calcule);
+  return calcule;
+}
+
+/** Ce qu'un scan raconte en une ligne : pièces, murs, surface, objets. */
+function ligneDetails(
+  item: SavedScan,
+  parts: ReturnType<typeof roomParts>,
+): string {
   const total = totalArea(parts);
   return [
     ...(parts.length > 1 ? [`${parts.length} pièces`] : []),
@@ -125,7 +155,7 @@ const THUMB_H = 62;
  * retouché montre son nouveau contour à l'ouverture suivante de la liste.
  */
 function PlanThumb({ scan, c }: { scan: SavedScan; c: Palette }) {
-  const parts = roomParts(scan.walls, scan.rooms);
+  const { parts } = decoupageDe(scan);
   // Les mêmes constats que sur le plan : une pièce en défaut sort en rouge
   // ici aussi, sinon la vignette raconterait autre chose que le plan.
   const alertes = (() => {
@@ -574,7 +604,7 @@ function ScanRow({
             </Text>
           ) : null}
           <Text style={styles.rowSub}>{formatDate(item.updatedAt)}</Text>
-          <Text style={styles.rowDetails}>{detailsOf(item)}</Text>
+          <Text style={styles.rowDetails}>{decoupageDe(item).details}</Text>
         </View>
       </TouchableOpacity>
       {!pris && (
