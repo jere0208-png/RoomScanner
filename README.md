@@ -406,14 +406,9 @@ l'avait déjà écrite.
   l'anticrénelage laisse un trait de poché en travers de la baie ; le banc du
   plan mesure maintenant son épaisseur contre celle du mur.
 
-### Deux détails du thème sombre
+### Un détail du thème sombre
 
-Le titre de la bibliothèque vivait dans le flux, entre le bouton de retour et
-la pastille du nombre de scans : son centre dépendait de la largeur de cette
-pastille — « 3 » et « 128 » ne donnent pas la même. Il est désormais posé
-par-dessus la ligne, à égale distance des deux bords.
-
-Et les feuilles qui tombent dans un dossier prenaient la teinte de surface du
+Les feuilles qui tombent dans un dossier prenaient la teinte de surface du
 thème : en mode sombre, des feuilles **noires** tombaient dans un dossier bleu
 foncé, et l'on ne voyait plus rien tomber. Une feuille est blanche, quel que
 soit le thème.

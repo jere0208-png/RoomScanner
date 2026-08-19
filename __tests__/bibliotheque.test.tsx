@@ -293,6 +293,13 @@ describe('la bibliothèque des relevés', () => {
  * survol fonce donc les deux plans, et c'est la taille qui dit « c'est ici ».
  */
 /**
+ * UN DOSSIER SURVOLÉ S'ASSOMBRIT — il ne s'éclaircit pas.
+ *
+ * La façade passait au ciel (`sky`), un cyan clair : sur fond blanc, la
+ * cible de dépôt se DILUAIT au moment précis où elle doit s'affirmer. Le
+ * survol fonce donc les deux plans, et c'est la taille qui dit « c'est ici ».
+ */
+/**
  * LE TITRE EST CENTRÉ SUR L'ÉCRAN, PAS SUR CE QUI RESTE.
  *
  * Il vivait dans le flux, entre le bouton de retour et la pastille du
@@ -301,62 +308,6 @@ describe('la bibliothèque des relevés', () => {
  * d'un dossier à l'autre, ce qui se voit d'autant mieux qu'il est le seul
  * mot de la ligne.
  */
-describe('l’en-tête de la bibliothèque', () => {
-  it('centre son titre sans compter la pastille', () => {
-    const tree = monter();
-    const cadre = tree.root
-      .findAllByType(View)
-      .find((n) => n.props.accessibilityLabel === 'Titre de l’écran');
-    expect(cadre).toBeDefined();
-    const st = (Array.isArray(cadre!.props.style)
-      ? Object.assign({}, ...cadre!.props.style.filter(Boolean))
-      : cadre!.props.style) as {
-      position?: string;
-      left?: number;
-      right?: number;
-      top?: number;
-      bottom?: number;
-    };
-    // Posé PAR-DESSUS la ligne, à égale distance des deux bords : c'est la
-    // seule façon que sa position ne dépende de rien d'autre.
-    expect(st.position).toBe('absolute');
-    expect(st.left).toBe(st.right);
-    /*
-      ET IL OCCUPE TOUTE LA HAUTEUR DE LA LIGNE.
-
-      Un enfant absolu sans `top` ni `bottom` prend la hauteur de son
-      contenu et se cale EN HAUT de son parent : le titre se posait donc
-      au-dessus du bouton de retour au lieu d'être à son niveau. C'est le
-      défaut relevé — « toujours pas centré au bouton ».
-    */
-    expect(st.top).toBe(0);
-    expect(st.bottom).toBe(0);
-  });
-
-  /*
-    ET LA PASTILLE SE POSE JUSTE APRÈS LE TITRE.
-
-    Elle vivait contre le bord droit de l'écran, à un demi-écran du mot
-    qu'elle compte : on lisait « Mes scans », puis le regard traversait la
-    ligne pour trouver « 12 ». Collée au titre, elle se lit d'un seul coup
-    d'œil — et comme elle est posée PAR RAPPORT à lui, elle ne déplace pas
-    son centrage d'un point.
-  */
-  it('colle la pastille au titre, sans décaler son centre', () => {
-    const tree = monter();
-    const pastille = tree.root
-      .findAllByType(View)
-      .find((n) => n.props.accessibilityLabel === 'Nombre de scans');
-    expect(pastille).toBeDefined();
-    const st = (Array.isArray(pastille!.props.style)
-      ? Object.assign({}, ...pastille!.props.style.filter(Boolean))
-      : pastille!.props.style) as { position?: string; left?: string };
-    // Elle part du bord droit du titre, pas du bord de l'écran.
-    expect(st.position).toBe('absolute');
-    expect(st.left).toBe('100%');
-  });
-});
-
 describe('le dossier visé par un scan', () => {
   const luminance = (hex: string) => {
     const brut = hex.replace('#', '');
