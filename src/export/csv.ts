@@ -168,7 +168,11 @@ export function buildMetreCsv(
 
   // -------------------------------------------------------------- tableau
   section('TABLEAU', ['Désignation', 'Quantité']);
-  for (const b of list.board) out.push(ligne([b.label, b.quantity]));
+  // Quantité zéro = un total (le câble en mètres), pas un article : la
+  // cellule reste vide plutôt que d'écrire un « 0 » qui s'additionnerait.
+  for (const b of list.board) {
+    out.push(ligne([b.label, b.quantity > 0 ? b.quantity : '']));
+  }
 
   // ----------------------------------------------------------- conformité
   // Ce qui manque se chiffre AUSSI : c'est même la partie du devis qu'on

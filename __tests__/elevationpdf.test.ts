@@ -334,6 +334,31 @@ describe('la photo de repérage', () => {
 });
 
 /**
+ * UNE HAUTEUR, UNE PASTILLE.
+ *
+ * Trois prises à 25 cm écrivaient « 25 » trois fois, en colonnes qui
+ * reculaient vers la gauche : le mécanisme anti-collision est fait pour des
+ * hauteurs VOISINES, pas identiques. La même hauteur ne se dit qu'une fois.
+ */
+describe('les pastilles de hauteur d’une élévation', () => {
+  it('trois prises à 25 cm ne donnent qu’une pastille « 25 »', () => {
+    const trois: Fixture[] = [
+      { id: 'a', kind: 'prise', wallId: 'n', along: 1, height: 0.25, side: 1 },
+      { id: 'b', kind: 'prise', wallId: 'n', along: 2, height: 0.25, side: 1 },
+      { id: 'c', kind: 'prise', wallId: 'n', along: 3, height: 0.25, side: 1 },
+    ];
+    const src = latin1(
+      buildScanPdf(
+        { name: 'E', walls: W, openings: [], objects: [], fixtures: trois, rooms: R },
+        false,
+        { metre: false, elevations: true },
+      ),
+    );
+    expect((src.match(/\(25\) Tj/g) ?? []).length).toBe(1);
+  });
+});
+
+/**
  * LE TITRE D'UNE ÉLÉVATION NE BÉGAIE PAS.
  *
  * Une pièce sans nom donnait « Élévation — Mur 2 · mur, mur nord-est » :

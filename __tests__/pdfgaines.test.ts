@@ -174,6 +174,20 @@ describe('la liste du matériel, version chantier', () => {
     expect(nu).toContain('Tableau');
   });
 
+  /**
+   * LA LIGNE « CÂBLE » NE PORTE PAS DE FAUSSE QUANTITÉ.
+   *
+   * « Câble — 27 m au total … | 1 » : ce « 1 » ne compte rien — la ligne
+   * est un total en mètres, pas un article. Une colonne de quantités où se
+   * glisse un nombre sans objet fait douter de toutes les autres.
+   */
+  it('la ligne Câble des fournitures n’affiche pas de quantité', () => {
+    // Dans le flux, les parenthèses du libellé sont échappées : on ancre la
+    // vérification sur le texte seul.
+    expect(doc).toContain('hors chutes');
+    expect(doc).not.toMatch(/hors chutes[^|]*\| 1( \||$)/);
+  });
+
   it('les longueurs du document sont celles du plan, pas une autre estimation', () => {
     const c1 = pull.find((r) => r.cableLength > 0)!;
     expect(doc).toContain(`${c1.cableLength} m`);

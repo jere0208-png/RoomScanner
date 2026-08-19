@@ -2458,6 +2458,120 @@ function unifilairePage(
 }
 
 /**
+ * LA FEUILLE MULTIFILAIRE — le câblage, un trait par conducteur.
+ *
+ * `multiWire` était calculé à chaque export puis JETÉ : aucune feuille ne le
+ * dessinait, alors que le README promet le schéma de câblage dans le dossier
+ * et que ses couleurs normatives (`WIRE_COLORS`) étaient prêtes et testées.
+ * Un bloc par circuit : le repère à sa teinte de plan, puis chaque
+ * conducteur en trait plein à sa couleur, nommé en clair — et la note qui
+ * dit le principe quand le câblage dépend du chantier (va-et-vient,
+ * courants faibles).
+ */
+function multifilairePage(
+  ctx: SheetContext,
+  sheet: string,
+  multi: MultiWireSchema[],
+  rows: SchemaRow[],
+): string {
+  const d = new Draw();
+  const x0 = FRAME.x + 30;
+  const w = FRAME.w - 60;
+  let y = TETE - 22;
+
+  d.text('Schéma multifilaire', x0, y + 22, 13, INK, { bold: true, align: 'left' });
+  d.text(
+    'Un trait par conducteur, aux couleurs de la norme. Le câblage exact se choisit sur place.',
+    x0,
+    y + 8,
+    8,
+    GREY,
+    { align: 'left' },
+  );
+  y -= 8;
+
+  const BAS = FRAME.y + TITLE_H + 30;
+  const FIL_H = 10;
+  // La même teinte de repère que sur le plan et l'unifilaire : l'ordre du
+  // tableau fait la roue des couleurs, ici comme là-bas.
+  const ordre = new Map(rows.map((r, i) => [r.mark, i]));
+  // Les libellés à gauche, les traits à droite : la colonne des traits
+  // commence après le plus long libellé de conducteur.
+  const DEBUT_TRAIT = x0 + 168;
+  let restants = 0;
+
+  for (const m of multi) {
+    const noteLignes = m.note ? wrapText(m.note, 7.5, w - 26) : [];
+    const h = 22 + m.wires.length * FIL_H + noteLignes.length * 10 + 12;
+    if (y - h < BAS) {
+      restants += 1;
+      continue;
+    }
+    const teinte = circuitColor(ordre.get(m.mark) ?? 0);
+    markerAt(d, { x: x0 + 10, y: y - 8 }, m.mark, teinte);
+    d.text(m.label, x0 + 26, y - 11, 9, INK, { bold: true, align: 'left' });
+    if (m.devices.length > 0) {
+      d.text(
+        `${m.devices.length} appareil${m.devices.length > 1 ? 's' : ''}`,
+        x0 + w,
+        y - 11,
+        7.5,
+        GREY_LIGHT,
+        { align: 'right' },
+      );
+    }
+    y -= 24;
+    for (const fil of m.wires) {
+      d.text(fil.label, x0 + 26, y - 2, 6.5, fil.color, { align: 'left' });
+      d.line(DEBUT_TRAIT, y, x0 + w, y, 1.4, fil.color);
+      // La terre est BICOLORE sur le chantier : un tireté jaune court sur
+      // le vert — c'est à cette livrée qu'on la reconnaît d'un coup d'œil.
+      if (fil.role === 'terre') {
+        d.dashedPath(
+          [
+            { x: DEBUT_TRAIT, y },
+            { x: x0 + w, y },
+          ],
+          0.7,
+          '#E7C51B',
+          [4, 4],
+        );
+      }
+      y -= FIL_H;
+    }
+    for (const l of noteLignes) {
+      d.text(l, x0 + 26, y - 2, 7.5, GREY, { align: 'left' });
+      y -= 10;
+    }
+    y -= 12;
+  }
+
+  if (restants > 0) {
+    y -= 4;
+    d.text(
+      `${restants} circuit${restants > 1 ? 's' : ''} de plus — même câblage ` +
+        'type, sections et calibres sur l’unifilaire.',
+      x0,
+      y,
+      7.5,
+      GREY,
+      { align: 'left' },
+    );
+  }
+
+  drawSheetChrome(d, {
+    project: ctx.name,
+    filename: ctx.filename,
+    client: ctx.client,
+    address: ctx.address,
+    sheetTitle: 'Schéma multifilaire',
+    sheet,
+    scaleLabel: null,
+  });
+  return d.stream();
+}
+
+/**
  * Les deux schémas se lisent SUR LE PLAN.
  *
  * Un unifilaire hors sol dit d'où part quoi ; il ne dit pas où ça passe. Sur
@@ -2753,11 +2867,22 @@ function elevationPage(
    * endroit : on lisait « 25 » par-dessus un « 22 » à moitié effacé.
    * Quand deux cotes se touchent, la seconde recule d'une colonne.
    */
-  const parHauteur = [...poses].sort((a, b) => a.f.height - b.f.height);
+  /*
+    UNE HAUTEUR, UNE PASTILLE. Trois prises à 25 cm écrivaient « 25 » trois
+    fois, en colonnes qui reculaient vers la gauche : l'anti-collision est
+    fait pour des hauteurs VOISINES, pas identiques. On regroupe donc au
+    centimètre, et le fil de rappel court jusqu'à l'appareil le plus loin.
+  */
+  const parCote = new Map<number, number>();
+  for (const { f, x } of poses) {
+    const cm = Math.round(f.height * 100);
+    parCote.set(cm, Math.max(parCote.get(cm) ?? -Infinity, x));
+  }
+  const hauteurs = [...parCote.entries()].sort((a, b) => a[0] - b[0]);
   let hPrec = -Infinity;
   let colonne = 0;
-  for (const { f, x } of parHauteur) {
-    const y = py(f.height);
+  for (const [cm, xMax] of hauteurs) {
+    const y = py(cm / 100);
     colonne = y - hPrec < 12 ? colonne + 1 : 0;
     if (colonne > 2) colonne = 0;
     hPrec = y;
@@ -2765,14 +2890,14 @@ function elevationPage(
     d.dashedPath(
       [
         { x: lx + 11, y },
-        { x: px(x) - 10, y },
+        { x: px(xMax) - 10, y },
       ],
       0.5,
       '#B9C2CE',
       [2, 3],
     );
     d.circle(lx, y, 9, '#FFFFFF');
-    d.text(`${Math.round(f.height * 100)}`, lx, y - 2.5, 7, INK, { bold: true });
+    d.text(`${cm}`, lx, y - 2.5, 7, INK, { bold: true });
   }
 
   /**
@@ -3696,7 +3821,8 @@ export function buildMaterialPdf(
   if (list.board.length > 0) {
     titre('Fournitures de tableau');
     for (const row of list.board) {
-      ligne(row.label, row.quantity > 1 ? `${row.quantity}` : '1');
+      // Quantité zéro = un total, pas un article : la colonne reste vide.
+      ligne(row.label, row.quantity > 0 ? `${row.quantity}` : '');
     }
   }
 
@@ -3853,12 +3979,17 @@ export function buildScanPdf(
       : opts.views && opts.views.length > 0
         ? opts.views
         : [...DEFAULT_PDF_VIEWS];
+  // Deux feuilles de schéma : l'unifilaire, puis le multifilaire quand il
+  // a de la matière (un appelant qui ne fournit pas les conducteurs garde
+  // l'unifilaire seul plutôt qu'une page blanche).
+  const withMulti = withSchema && (schemas?.multi.length ?? 0) > 0;
   const total =
     1 +
     (withMetre ? 1 : 0) +
     (include3D ? vues.length : 0) +
     murs.length +
-    (withSchema ? 1 : 0);
+    (withSchema ? 1 : 0) +
+    (withMulti ? 1 : 0);
   const ctx: SheetContext = {
     name: scan.name,
     filename,
@@ -3911,14 +4042,14 @@ export function buildScanPdf(
   }
   if (withSchema && schemas) {
     /**
-     * LE SCHÉMA UNIFILAIRE, ET LUI SEUL.
+     * LES SCHÉMAS HORS SOL : unifilaire, puis multifilaire.
      *
      * Le dossier portait aussi les deux mêmes schémas POSÉS SUR LE PLAN,
      * un par mode de tracé. Ils promettaient de montrer où passe chaque
      * départ et ne montraient qu'un écheveau : sur un logement réel, une
      * dizaine de circuits se croisent, et aucun d'eux ne se suit à l'œil.
-     * Le cheminement se lit sur le plan des gaines, le tableau sur
-     * l'unifilaire ; les mélanger ne donnait ni l'un ni l'autre.
+     * Le cheminement se lit sur le plan des gaines, l'architecture sur
+     * l'unifilaire, le câblage sur le multifilaire.
      */
     pages.push(
       unifilairePage(
@@ -3929,6 +4060,16 @@ export function buildScanPdf(
         detailDesDeparts(scan, schemas.marks, schemas.rows),
       ),
     );
+    if (withMulti) {
+      pages.push(
+        multifilairePage(
+          ctx,
+          `${pages.length + 1} / ${total}`,
+          schemas.multi,
+          schemas.rows,
+        ),
+      );
+    }
   }
   return buildDocument(pages, images);
 }

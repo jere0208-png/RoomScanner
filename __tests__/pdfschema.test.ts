@@ -227,9 +227,12 @@ describe('rien ne sort de la feuille', () => {
     expect(pdf).toContain(trait('#2F6BFF'));
   });
 
-  it('le document ne compte QU’UNE feuille de plus', () => {
+  it('le document compte DEUX feuilles de plus : unifilaire et multifilaire', () => {
+    // Longtemps, `multiWire` a été calculé à chaque export… et jeté : aucune
+    // feuille ne le dessinait, alors que le README promettait le schéma de
+    // câblage dans le dossier. La feuille existe désormais.
     const feuilles = (src: string) => (src.match(/\/Type \/Page /g) ?? []).length;
-    expect(feuilles(pdf)).toBe(feuilles(sansSchema) + 1);
+    expect(feuilles(pdf)).toBe(feuilles(sansSchema) + 2);
   });
 
 });
@@ -351,6 +354,35 @@ describe('la lisibilité des feuilles de schéma', () => {
    * feuille ; le prétendre vérifié par un compte de coordonnées serait un
    * test qui rassure sans rien garantir.
    */
+});
+
+/**
+ * LA FEUILLE MULTIFILAIRE — le câblage, un trait par conducteur.
+ *
+ * `multiWire` était calculé à chaque export puis JETÉ : aucune feuille ne le
+ * dessinait, le README promettait un schéma que le dossier n'a jamais porté.
+ * La feuille montre chaque circuit avec ses conducteurs aux couleurs de la
+ * norme, et les notes qui disent le principe (va-et-vient, courants faibles).
+ */
+describe('la feuille multifilaire', () => {
+  const doc = texte(pdf);
+
+  it('existe quand on demande les schémas, pas sans', () => {
+    expect(doc).toContain('multifilaire');
+    expect(texte(sansSchema)).not.toContain('multifilaire');
+  });
+
+  it('nomme les conducteurs et les trace aux couleurs de la norme', () => {
+    expect(doc).toContain('bleu clair');
+    expect(doc).toContain('vert/jaune');
+    // Le bleu clair du neutre est réellement TRACÉ, pas seulement écrit.
+    expect(pdf).toContain(trait('#2E6FD6'));
+  });
+
+  it('dit le principe du va-et-vient de la cuisine', () => {
+    // La cuisine a un interrupteur et un va-et-vient : deux commandes.
+    expect(doc).toContain('navettes');
+  });
 });
 
 /**

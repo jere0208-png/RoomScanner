@@ -1613,7 +1613,9 @@ export function materialList(
         mesure > 0
           ? `Câble — ${metres} m au total, mesurés sur le plan (hors chutes)`
           : `Câble — environ ${metres} m au total (12 m par point, à ajuster)`,
-      quantity: 1,
+      // Zéro = « pas une quantité » : la ligne est un total en mètres, pas
+      // un article, et le « 1 » qui s'affichait à côté ne comptait rien.
+      quantity: 0,
     });
   }
 
