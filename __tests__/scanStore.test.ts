@@ -336,6 +336,106 @@ describe('retoucher les pièces à la main', () => {
     expect(roomHeight(parts[0].walls)).toBeCloseTo(2.5);
   });
 
+  /*
+    UN MUR N'A PAS TOUJOURS LA HAUTEUR DE SA PIÈCE.
+
+    La hauteur ne se réglait que par pièce : tous ses murs d'un coup. Or un
+    logement réel a des retombées de poutre, des sous-pentes, un muret de
+    cuisine à 1,10 m — et c'est cette hauteur-là qui commande le métré du
+    mur, la surface à peindre et la place qu'on a pour poser un appareil.
+  */
+  it('change la hauteur d’UN mur, sans toucher aux autres', () => {
+    deuxPieces();
+    const cible = useScanStore.getState().rooms[0].wallIds![0];
+    useScanStore.getState().setWallHeight(cible, 2.1);
+    const st = useScanStore.getState();
+    const mur = st.walls.find((w) => w.id === cible)!;
+    expect(mur.height).toBeCloseTo(2.1);
+    // Le sol ne bouge pas : c'est le plafond qui descend.
+    expect(mur.yCenter - mur.height / 2).toBeCloseTo(0);
+    // Ses voisins gardent la leur.
+    expect(
+      st.walls.filter((w) => w.id !== cible).every((w) => w.height === 2.5),
+    ).toBe(true);
+  });
+
+  it('accepte un muret, refuse l’aberrant', () => {
+    deuxPieces();
+    const cible = useScanStore.getState().rooms[0].wallIds![0];
+    // Un muret de cuisine, un allège de fenêtre en pignon : 1,10 m est une
+    // hauteur de mur parfaitement ordinaire, que la borne « plus d'un
+    // mètre » du réglage par pièce interdisait.
+    useScanStore.getState().setWallHeight(cible, 1.1);
+    expect(
+      useScanStore.getState().walls.find((w) => w.id === cible)!.height,
+    ).toBeCloseTo(1.1);
+    useScanStore.getState().setWallHeight(cible, 0.05);
+    useScanStore.getState().setWallHeight(cible, 9);
+    expect(
+      useScanStore.getState().walls.find((w) => w.id === cible)!.height,
+    ).toBeCloseTo(1.1);
+  });
+
+  it('fait redescendre l’appareillage que le plafond rattrape', () => {
+    deuxPieces();
+    const cible = useScanStore.getState().rooms[0].wallIds![0];
+    useScanStore.setState({
+      fixtures: [
+        { id: 'f1', kind: 'prise', wallId: cible, along: 1, height: 0.25, side: 1 },
+        { id: 'f2', kind: 'prise', wallId: cible, along: 2, height: 2.2, side: 1 },
+      ],
+    });
+    useScanStore.getState().setWallHeight(cible, 1.2);
+    const fx = useScanStore.getState().fixtures;
+    // Celui d'en bas ne bouge pas ; celui d'en haut se retrouverait DANS le
+    // plafond, il redescend sous lui — sinon le métré compte une prise qui
+    // n'existe nulle part.
+    expect(fx.find((f) => f.id === 'f1')!.height).toBeCloseTo(0.25);
+    expect(fx.find((f) => f.id === 'f2')!.height).toBeLessThan(1.2);
+    expect(fx.find((f) => f.id === 'f2')!.height).toBeGreaterThan(0);
+  });
+
+  it('rabat le linteau d’une baie devenue trop haute pour son mur', () => {
+    deuxPieces();
+    const st0 = useScanStore.getState();
+    const cible = st0.rooms[0].wallIds![0];
+    const mur = st0.walls.find((w) => w.id === cible)!;
+    useScanStore.setState({
+      openings: [
+        {
+          id: 'o-porte',
+          type: 'door',
+          a: {
+            x: mur.a.x + (mur.b.x - mur.a.x) * 0.3,
+            z: mur.a.z + (mur.b.z - mur.a.z) * 0.3,
+          },
+          b: {
+            x: mur.a.x + (mur.b.x - mur.a.x) * 0.6,
+            z: mur.a.z + (mur.b.z - mur.a.z) * 0.6,
+          },
+          height: 2.05,
+          yCenter: 1.025,
+        },
+      ],
+    });
+    useScanStore.getState().setWallHeight(cible, 1.6);
+    const o = useScanStore.getState().openings[0];
+    // Une porte de 2,05 m ne tient pas sous 1,60 m de mur : elle se rabat,
+    // et son allège reste au sol.
+    expect(o.yCenter + o.height / 2).toBeLessThanOrEqual(1.6 + 1e-6);
+    expect(o.height).toBeGreaterThan(0.2);
+  });
+
+  it('s’annule d’un seul retour en arrière', () => {
+    deuxPieces();
+    const cible = useScanStore.getState().rooms[0].wallIds![0];
+    useScanStore.getState().setWallHeight(cible, 2.1);
+    useScanStore.getState().undo();
+    expect(
+      useScanStore.getState().walls.find((w) => w.id === cible)!.height,
+    ).toBeCloseTo(2.5);
+  });
+
   it('donne les cotes hors-tout et la surface murale nette', () => {
     deuxPieces();
     const st = useScanStore.getState();

@@ -256,7 +256,7 @@ l'intérieur de la pièce et bornées au cadre : jamais sur le mur, jamais hors
 de l'écran.
 
 Ce qu'il mesure tient en **une ligne au pied du plan** : « 3,93 m · 2,50 m
-sous plafond », et un bouton « Coter ». Le champ de saisie posé à demeure
+sous plafond », et deux boutons — « Coter » et « Hauteur ». Le champ de saisie posé à demeure
 coûtait une barre entière — étiquette, saisie, unité, bouton d'application —
 pour un geste qu'on fait rarement, et il mangeait le dessin qu'on est
 justement en train de regarder. La question se pose maintenant à l'écran, le
@@ -273,6 +273,39 @@ comprises, avec son voile et ses commandes. Un mur plein n'a pas de retour :
 le toucher continue de le sélectionner d'un coup, sinon on aurait compliqué
 le geste courant sans rien apporter. La note ne s'affiche que quand un retour
 est tenu ; rien de sélectionné, rien à l'écran.
+
+**Un retour a maintenant son bandeau**, le même que le mur : sa longueur à
+lui, la hauteur du pan qui le porte, et de quoi la régler. Elle n'était
+écrite nulle part, alors que c'est elle qui dit la place qu'on a pour poser
+un interrupteur sur ces trente centimètres. Il n'offre pas « Coter » : coter
+un retour reviendrait à coter le mur entier, ce que la commande « Cotes » du
+menu fait déjà sans mentir sur sa cible.
+
+### La hauteur, mur par mur
+
+La hauteur ne se réglait que **par pièce** — tous ses murs d'un coup. C'est le
+bon geste quand RoomPlan s'est trompé de plafond, et le mauvais partout
+ailleurs : un logement réel a des retombées de poutre, des sous-pentes, un
+muret de cuisine à 1,10 m. Or c'est cette hauteur-là qui commande le métré du
+mur, sa surface à peindre et la place disponible pour l'appareillage.
+
+`setWallHeight()` règle donc **un mur seul**. Trois précautions, toutes
+vérifiées au banc :
+
+- **Le sol ne bouge pas** : c'est le plafond qui monte ou descend. Le mur est
+  décrit par son centre (`yCenter`) et sa hauteur ; recalculer naïvement
+  `yCenter = height / 2` enfoncerait dans le sol tout mur dont l'assise n'est
+  pas à zéro.
+- **La borne basse n'est pas celle d'une pièce.** Le réglage par pièce refuse
+  tout ce qui est sous le mètre — une pièce de 80 cm de haut n'existe pas. Un
+  MUR de 80 cm, si. On garde le plafond à 6 m et on descend le plancher à
+  30 cm, en dessous de quoi ce n'est plus un mur mais une plinthe.
+- **Ce qui est accroché au mur descend avec lui.** Abaisser un mur sans rien
+  d'autre laisse une prise flottant DANS le plafond et une porte qui dépasse
+  du toit — invisible sur le plan 2D, on ne s'en aperçoit qu'en élévation ou
+  au métré, c'est-à-dire trop tard. L'appareillage que le plafond rattrape
+  redescend sous lui ; une baie trop haute rabat son linteau, et si son allège
+  elle-même passait au-dessus, elle redescend jusqu'au sol.
 
 ### Le métré s'ouvre dans un tableur
 

@@ -213,6 +213,7 @@ export function ResultScreen() {
   const resizeObject = useScanStore((s) => s.resizeObject);
   const setRoomName = useScanStore((s) => s.setRoomName);
   const setRoomHeight = useScanStore((s) => s.setRoomHeight);
+  const setWallHeight = useScanStore((s) => s.setWallHeight);
   const mergeRooms = useScanStore((s) => s.mergeRooms);
   const splitRoom = useScanStore((s) => s.splitRoom);
   const removeWall = useScanStore((s) => s.removeWall);
@@ -1310,6 +1311,32 @@ export function ResultScreen() {
     });
   };
 
+  /**
+   * LA HAUTEUR D'UN MUR — celle-ci, et pas celle de la pièce.
+   *
+   * Le réglage par pièce existe déjà, dans la barre du sol : il descend
+   * tous les murs d'un coup, ce qui est juste quand on corrige un plafond
+   * mal vu par RoomPlan. Ici c'est l'inverse — une retombée de poutre, une
+   * sous-pente, un muret de cuisine : UN mur qui n'a pas la hauteur des
+   * autres. La fenêtre le dit, sinon on croit régler la pièce.
+   */
+  const promptWallHeight = (wallId: string) => {
+    const w = walls.find((x) => x.id === wallId);
+    if (!w) return;
+    setPrompt({
+      title: 'Hauteur du mur',
+      subtitle:
+        'Ce mur seul — retombée, sous-pente, muret. Le sol ne bouge pas, ce qui est accroché dessus redescend avec lui.',
+      value: w.height.toFixed(2).replace('.', ','),
+      unit: 'm',
+      numeric: true,
+      onSubmit: (t) => {
+        const v = parseFloat(t.replace(',', '.'));
+        if (v > 0) setWallHeight(wallId, v);
+      },
+    });
+  };
+
   const toggleEdit = () => {
     // Sortir d'un mode, c'est abandonner ce qu'on y avait commencé.
     seulGeste();
@@ -2245,10 +2272,57 @@ export function ResultScreen() {
             strong={`${fr(segLength(selectedWall), 2)} m`}
             note={`${fr(selectedWall.height, 2)} m sous plafond`}
             actions={[
-              { label: 'Coter', onPress: () => promptLength(selectedWall.id) },
+              {
+                label: 'Coter',
+                ghost: true,
+                onPress: () => promptLength(selectedWall.id),
+              },
+              {
+                label: 'Hauteur',
+                onPress: () => promptWallHeight(selectedWall.id),
+              },
             ]}
           />
         )}
+
+        {/*
+          UN RETOUR CHOISI MONTRE LE MÊME BANDEAU.
+
+          Le retour se cotait sur le plan et s'ouvrait à l'appareillage, mais
+          il n'avait pas de bandeau : sa longueur s'affichait au milieu du
+          dessin, et la hauteur du pan de mur qui le porte n'était écrite
+          nulle part. Or c'est justement sur ces trente centimètres qu'on
+          pose l'interrupteur d'entrée, et la place qu'on y a dépend de cette
+          hauteur-là. Le bandeau dit donc les deux — la longueur DU RETOUR,
+          la hauteur DE SON MUR — et n'offre que ce qui a un sens ici : la
+          hauteur. Coter un retour reviendrait à coter le mur entier, ce que
+          la commande « Cotes » du menu fait déjà, sans mentir sur sa cible.
+        */}
+        {vue === '2d' &&
+          !selectedObject &&
+          !selectedOpening &&
+          !selectedWall &&
+          editMode &&
+          pier &&
+          !capturing &&
+          (() => {
+            const mur = walls.find((w) => w.id === pier.wallId);
+            if (!mur) return null;
+            const L = segLength(mur);
+            return (
+              <StripBar
+                styles={stylesBarres}
+                strong={`${fr((pier.t1 - pier.t0) * L, 2)} m`}
+                note={`retour · ${fr(mur.height, 2)} m sous plafond`}
+                actions={[
+                  {
+                    label: 'Hauteur',
+                    onPress: () => promptWallHeight(mur.id),
+                  },
+                ]}
+              />
+            );
+          })()}
 
         {/* Watermark EchoPlan, visible uniquement sur les images générées */}
         {capturing && (

@@ -31,7 +31,7 @@ import {
   View,
 } from 'react-native';
 import { PILL_CELL_H } from '../src/components/ToolPill';
-import { Circle, Path, Text as SvgText } from 'react-native-svg';
+import { Circle, Path, Polygon, Text as SvgText } from 'react-native-svg';
 import TestRenderer, { act } from 'react-test-renderer';
 import { ResultScreen } from '../src/screens/ResultScreen';
 import { ClientTour } from '../src/components/ClientTour';
@@ -310,6 +310,84 @@ describe('l’écran des résultats', () => {
     // Et le bandeau du bas donne ses cotes, avec de quoi les changer.
     expect(vu).toContain('sous plafond');
     expect(vu).toContain('Coter');
+    // La hauteur se règle ICI, mur par mur : une retombée de poutre ou un
+    // muret n'a pas la hauteur de la pièce, et c'est elle qui commande le
+    // métré du mur.
+    expect(vu).toContain('Hauteur');
+  });
+
+  /**
+   * LA HAUTEUR SE SAISIT, ET ELLE S'APPLIQUE AU MUR TOUCHÉ.
+   *
+   * Le bouton pourrait ouvrir la bonne fenêtre et régler le mauvais mur —
+   * c'est exactement le genre de défaut qu'une relecture ne voit pas. On va
+   * donc jusqu'au bout : on répond, et on regarde le magasin.
+   */
+  it('applique la hauteur saisie au mur choisi, et à lui seul', () => {
+    const tree = monter();
+    act(() => bouton(tree, 'Édition')!.props.onPress());
+    act(() => {
+      jest.advanceTimersByTime(500);
+    });
+    const cible = tree.root
+      .findAll((n) => typeof n.props?.onPress === 'function')
+      .find((n) => n.findAll((x) => x.props?.strokeWidth === 30).length > 0);
+    act(() => cible!.props.onPress());
+    const avant = useScanStore.getState().walls.map((w) => w.height);
+    act(() => bouton(tree, 'Hauteur')!.props.onPress());
+    const champ = tree.root.findAllByType(TextInput)[0];
+    expect(champ).toBeDefined();
+    act(() => champ.props.onChangeText('2,15'));
+    // Le bouton de validation est un `Pressable`, que `findAllByType` ne
+    // retrouve pas dans cette version de React Native : on le cherche par
+    // ce qu'il porte.
+    const valider = tree.root
+      .findAll(
+        (n) =>
+          typeof n.props?.onPress === 'function' &&
+          n.findAllByType(Text).some((t) => String(t.props.children) === 'Valider'),
+      )
+      .pop();
+    act(() => valider!.props.onPress());
+    act(() => {
+      jest.advanceTimersByTime(600);
+    });
+    const apres = useScanStore.getState().walls.map((w) => w.height);
+    const changes = apres.filter((h, i) => Math.abs(h - avant[i]) > 1e-6);
+    expect(changes).toHaveLength(1);
+    expect(changes[0]).toBeCloseTo(2.15);
+  });
+
+  /**
+   * UN RETOUR AUSSI SE RÈGLE EN HAUTEUR.
+   *
+   * Le retour — les trente centimètres de maçonnerie entre l’angle et
+   * l’huisserie — se cotait sur le plan et recevait l’appareillage, mais
+   * n’avait pas de bandeau : la hauteur du pan qui le porte n’était écrite
+   * nulle part, alors que c’est elle qui dit la place qu’on a pour poser un
+   * interrupteur.
+   */
+  it('ouvre le bandeau d’un retour, avec la hauteur de son mur', () => {
+    const tree = monter();
+    act(() => bouton(tree, 'Édition')!.props.onPress());
+    act(() => {
+      jest.advanceTimersByTime(500);
+    });
+    // Les retours sont les seuls polygones transparents qui répondent au
+    // doigt : le reste du plan est plein, ou ne répond pas.
+    const retour = tree.root
+      .findAllByType(Polygon)
+      .find(
+        (n) =>
+          n.props.fill === 'transparent' &&
+          typeof n.props.onPress === 'function',
+      );
+    expect(retour).toBeDefined();
+    act(() => retour!.props.onPress());
+    const vu = textes(tree);
+    expect(vu).toContain('retour');
+    expect(vu).toContain('sous plafond');
+    expect(vu).toContain('Hauteur');
   });
 
   /**

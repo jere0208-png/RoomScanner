@@ -17,6 +17,7 @@ import {
   DEFAULT_ROOM_ID,
   detectRooms,
   mergeColinear,
+  openingsOn,
   pointOnSeg,
   alignToFit,
   fitInNook,
@@ -582,6 +583,15 @@ interface ScanState {
   straightenPlan: () => void;
   /** Hauteur sous plafond d'une pièce (applique à tous ses murs). */
   setRoomHeight: (roomId: string, height: number) => void;
+  /**
+   * La hauteur d'UN mur, sans toucher aux autres.
+   *
+   * Une retombée de poutre, une sous-pente, un muret de cuisine à 1,10 m :
+   * la hauteur d'un logement n'est pas une constante par pièce, et c'est
+   * elle qui commande le métré du mur, sa surface à peindre et la place
+   * qu'on a pour poser un appareil.
+   */
+  setWallHeight: (wallId: string, height: number) => void;
   /** Retire un mur du plan (et les ouvertures qu'il portait). */
   removeWall: (wallId: string) => void;
   /**
@@ -2042,6 +2052,66 @@ export const useScanStore = create<ScanState>((set, get) => {
         walls: st.walls.map((w) =>
           ids.has(w.id) ? { ...w, height, yCenter: height / 2 } : w,
         ),
+        dirty: true,
+      });
+    },
+
+    setWallHeight: (wallId, height) => {
+      /*
+        LA BORNE BASSE N'EST PAS CELLE D'UNE PIÈCE.
+
+        Le réglage par pièce refuse tout ce qui est sous le mètre — une
+        pièce de 80 cm de haut n'existe pas. Un MUR de 80 cm, si : c'est un
+        muret, une allège, un retour de cloison de douche. On garde
+        seulement le garde-fou du dessus, et un plancher à 30 cm en dessous
+        duquel ce n'est plus un mur mais une plinthe.
+      */
+      if (!(height >= 0.3) || height > 6) return;
+      const st = get();
+      const wall = st.walls.find((w) => w.id === wallId);
+      if (!wall || Math.abs(wall.height - height) < 1e-6) return;
+      pushHistory(`wallHeight:${wallId}`);
+      // Le sol reste où il est : c'est le plafond qui monte ou descend.
+      const sol = wall.yCenter - wall.height / 2;
+
+      /*
+        CE QUI EST ACCROCHÉ AU MUR DESCEND AVEC LUI.
+
+        Abaisser un mur sans rien d'autre laisse une prise flottant DANS le
+        plafond et une porte qui dépasse du toit. Ni l'une ni l'autre ne se
+        voit sur le plan 2D — on ne s'en aperçoit qu'en élévation, ou au
+        métré, c'est-à-dire trop tard.
+      */
+      const fixtures = st.fixtures.map((f) => {
+        if (f.wallId !== wallId) return f;
+        const demi = (FIXTURES[f.kind]?.h ?? 0.1) / 2;
+        const haut = sol + height - demi;
+        const bas = sol + demi;
+        if (f.height <= haut) return f;
+        return { ...f, height: Math.max(bas, haut) };
+      });
+
+      const surCeMur = new Set(
+        openingsOn([wall], st.openings).map((o) => o.id),
+      );
+      const openings = st.openings.map((o) => {
+        if (!surCeMur.has(o.id)) return o;
+        const base = o.yCenter - o.height / 2;
+        const plafond = sol + height;
+        if (base + o.height <= plafond) return o;
+        // On rabat d'abord le linteau ; si l'allège elle-même est au-dessus
+        // du nouveau plafond, la baie redescend jusqu'au sol.
+        const h = Math.max(0.2, Math.min(o.height, plafond - base));
+        const b = Math.min(base, plafond - h);
+        return { ...o, height: h, yCenter: b + h / 2 };
+      });
+
+      set({
+        walls: st.walls.map((w) =>
+          w.id === wallId ? { ...w, height, yCenter: sol + height / 2 } : w,
+        ),
+        fixtures,
+        openings,
         dirty: true,
       });
     },
