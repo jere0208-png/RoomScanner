@@ -17,7 +17,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 import React from 'react';
-import Svg, { Circle, Text as SvgText } from 'react-native-svg';
+import Svg, { Circle, Path, Text as SvgText } from 'react-native-svg';
 import TestRenderer, { act } from 'react-test-renderer';
 import { FixtureLayer } from '../src/components/FixtureLayer';
 import { wallQuads } from '../src/geometry/floorplan';
@@ -88,13 +88,29 @@ function rendre(scale: number, elecLod: number) {
 const textes = (a: TestRenderer.ReactTestRenderer) =>
   a.root.findAllByType(SvgText).map((n) => String(n.props.children));
 
+/*
+  D'ABORD LE SYMBOLE, LE MOT VIENT AU ZOOM.
+
+  Première règle, et son défaut : on écrivait le SIGLE de loin — « PC »,
+  « I », « RJ » — pour remplacer une pastille de quatre pixels qui ne disait
+  rien. C'était juste sur un appareil isolé. Sur un mur qui en porte trois,
+  relevé du chantier à l'appui, les mots se chevauchent et donnent
+  « PC2TAB » : une bouillie que ni l'œil ni le zoom ne démêlent.
+
+  Un symbole, lui, ne se chevauche pas de la même façon : il occupe une
+  place fixe et se reconnaît à sa forme. C'est donc lui qui tient le plan de
+  loin, et la dénomination n'apparaît qu'en zoomant — la règle de tout
+  logiciel de plan : c'est petit d'abord, et plus on agrandit, plus on lit.
+*/
 describe('les repères d’appareils, vus de loin', () => {
-  it('écrivent leur sigle au lieu de poser un point', () => {
+  it('montrent leur symbole, et aucun mot', () => {
     const a = rendre(45, 0);
+    // Le symbole est là : des tracés, pas un point.
+    expect(a.root.findAllByType(Path).length).toBeGreaterThan(0);
+    // Et pas un seul sigle : c'est ce qui formait la bouillie.
     const vus = textes(a);
-    expect(vus).toContain('PC');
-    expect(vus).toContain('I');
-    expect(vus).toContain('RJ');
+    expect(vus).not.toContain('PC');
+    expect(vus).not.toContain('RJ');
     act(() => a.unmount());
   });
 
@@ -116,31 +132,24 @@ describe('les repères d’appareils, vus de loin', () => {
     act(() => a.unmount());
   });
 
-  /**
-   * LE SIGLE PORTE SA COULEUR, ET UN LISERÉ CLAIR.
-   *
-   * Sans ce contour, un sigle ambre posé sur le poché d'un mur disparaît
-   * dans le noir — c'est le défaut qu'on vient de corriger sur les cotes de
-   * la vitrine, et il se pose ici de la même façon.
-   */
-  it('colore le sigle et le cerne de clair', () => {
-    const a = rendre(45, 0);
-    const pc = a.root
-      .findAllByType(SvgText)
-      .filter((n) => String(n.props.children) === 'PC');
-    // Deux passes : le liseré, puis le texte.
-    expect(pc.length).toBeGreaterThanOrEqual(2);
-    const couleurs = pc.map((n) => String(n.props.fill).toLowerCase());
-    expect(couleurs).toContain(FIXTURES.prise.color.toLowerCase());
-    expect(pc.some((n) => n.props.stroke && n.props.strokeWidth >= 2)).toBe(true);
-    act(() => a.unmount());
+  it('grossissent avec le zoom, sans jamais devenir un point', () => {
+    const loin = rendre(45, 0);
+    const petit = loin.root.findAllByType(Circle).map((n) => Number(n.props.r));
+    act(() => loin.unmount());
+    const pres = rendre(140, 1);
+    const grand = pres.root.findAllByType(Circle).map((n) => Number(n.props.r));
+    act(() => pres.unmount());
+    // Le fond du symbole grandit : de loin il reste lisible, de près il a la
+    // place de porter son dessin.
+    expect(Math.max(...grand)).toBeGreaterThan(Math.max(...petit));
+    expect(Math.min(...petit.filter((r) => r > 0))).toBeGreaterThan(3);
   });
 
-  /** De près, le symbole complet reprend la main : on ne double pas. */
-  it('cède la place au symbole quand on zoome', () => {
+  /** De près, la dénomination paraît : c'est là qu'on a la place de lire. */
+  it('écrivent leur nom une fois qu’on a zoomé', () => {
     const a = rendre(140, 1);
-    const cercles = a.root.findAllByType(Circle).length;
-    expect(cercles).toBeGreaterThan(0);
+    const vus = textes(a).join(' | ');
+    expect(vus).toContain('PC');
     act(() => a.unmount());
   });
 });

@@ -1998,10 +1998,19 @@ export function ResultScreen() {
             contenu de la rangée. */}
         {vue === '2d' && !capturing && (
           <View
-            // Hauteur de la pile d'actions : le trop-plein de calques se pose
-            // juste au-dessus, sans jamais la recouvrir.
+            /*
+              LES ACTIONS SONT ANCRÉES EN HAUT, « ÉDITION » RESTE EN BAS.
+
+              « Enregistrer » vivait au bas de cette pile, et le trop-plein
+              de calques — les pastilles qui ne tiennent pas dans la rangée
+              et montent à droite — se posait AU-DESSUS de lui : sa hauteur
+              dépendait donc du nombre de calques affichés. Sur un scan
+              équipé il descendait de deux crans, et on le cherchait. Un
+              bouton qui engage le travail se trouve sans le chercher.
+            */
+            accessibilityLabel="Actions du plan"
             onLayout={(e) => setHActions(e.nativeEvent.layout.height)}
-            style={[styles.editAnchor, { bottom: ligneOutils }]}>
+            style={[styles.editAnchor, { top: 12 }]}>
             {/* Revenir en arrière ne défile pas avec les calques : c'est le
                 geste qu'on cherche dans l'urgence, et il se tient dans la
                 colonne, juste au-dessus de l'édition. */}
@@ -2033,6 +2042,12 @@ export function ResultScreen() {
                 onPress={() => setChecking(true)}
               />
             </SidePill>
+          </View>
+        )}
+        {/* « Édition » commande le contenu de la rangée : il garde le bas,
+            là où le pouce tombe, et ne bouge jamais. */}
+        {vue === '2d' && !capturing && (
+          <View style={[styles.editAnchor, { bottom: ligneOutils }]}>
             <ToolPill
               icon="edit"
               label="Édition"

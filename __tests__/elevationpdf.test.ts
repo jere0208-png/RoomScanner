@@ -179,6 +179,27 @@ describe('les feuilles d’élévation', () => {
     expect(vu).toMatch(/\b19[0-9]\b/);
   });
 
+  /*
+    MAIS ON PEUT REDEMANDER TOUS LES MURS.
+
+    Réduire le dossier aux murs équipés lui a fait perdre ce qu'un
+    électricien vient parfois y chercher : le mur VU DE FACE, avec ses
+    retours cotés, même sans un seul appareil dessus — c'est le dessin sur
+    lequel on décide où percer avant d'avoir rien posé. Les deux usages sont
+    justes ; c'est donc une option, et le titre de chaque feuille rappelle le
+    numéro que le mur porte sur le plan.
+  */
+  it('couvrent TOUS les murs quand on le demande', () => {
+    const tous = doc({ elevations: true, toutesElevations: true });
+    // Quatre murs, quatre feuilles, plus le plan.
+    expect(pages(tous)).toBe(5);
+    const vu = texte(tous);
+    expect(vu).toContain('Mur 1');
+    expect(vu).toContain('Mur 4');
+    // Et un mur nu le dit, plutôt que de laisser croire à un oubli.
+    expect(vu).toContain('Aucun appareil');
+  });
+
   it('n’éditent plus de feuille pour un mur nu', () => {
     // Le message « Aucun appareil » tenait lieu de feuille. Une page qui
     // annonce qu'elle n'a rien à dire n'a pas lieu d'être imprimée.

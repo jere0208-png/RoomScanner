@@ -153,6 +153,12 @@ const EXPORT_ICONS = {
   ouvertures: ['M5 4 v16 h9 V4 z', 'M14 20 l5 2 V2 l-5 2', 'M8 12 h.01'],
   couleurs: ['M12 3 a9 9 0 1 0 0 18 h2 a2 2 0 0 0 0 -4 h-1 a2 2 0 0 1 0 -4 h3 a4 4 0 0 0 0 -8 z', 'M8 9 h.01', 'M12 7 h.01'],
   gaines: ['M4 20 h9 a3 3 0 0 0 3 -3 V7', 'M13 4 h6 v3 h-6 z', 'M4 17.5 v5'],
+  // Tous les murs : trois pans pochés, comme la coupe d'un plan.
+  murs: [
+    'M3 8.5 h18 v3.2 h-18 z',
+    'M3 15 h7.5 v6 h-7.5 z',
+    'M15.5 15 h5.5 v6 h-5.5 z',
+  ],
   // Élévation : un mur vu de face, sa cote au-dessus, une prise dessus.
   elevations: [
     'M4 19 h16',
@@ -201,6 +207,16 @@ const styles = getStyles(c);
    * celui qu'on envoie au client.
    */
   const [elevations, setElevations] = useState(false);
+  /*
+    TOUS LES MURS, OU SEULEMENT LES ÉQUIPÉS.
+
+    Le dossier ne portait plus que les murs qui tiennent quelque chose — un
+    gain net quand on relit une pose. Mais on vient parfois y chercher
+    l'inverse : le mur VU DE FACE avec ses retours cotés, AVANT d'avoir rien
+    posé, pour décider où percer. Les deux usages sont justes, celui-ci se
+    demande.
+  */
+  const [toutesElevations, setToutesElevations] = useState(false);
   /**
    * LES POINTS CARDINAUX SUR LE DOCUMENT — ÉTEINTS PAR DÉFAUT.
    *
@@ -376,6 +392,7 @@ const styles = getStyles(c);
           textures: showTextures,
           metre: includeMetre,
           elevations,
+          toutesElevations,
         },
       );
 
@@ -396,6 +413,7 @@ const styles = getStyles(c);
     measures3D,
     includeMetre,
     elevations,
+    toutesElevations,
     gaines,
     schema,
     plafond,
@@ -596,6 +614,18 @@ const styles = getStyles(c);
                 elevations,
                 () => setElevations(!elevations),
               ],
+              // Elle ne s'offre que si les élévations sont demandées : une
+              // case qui règle une feuille absente ne règle rien.
+              ...(elevations
+                ? [
+                    [
+                      'murs',
+                      'Tous les murs',
+                      toutesElevations,
+                      () => setToutesElevations(!toutesElevations),
+                    ] as OptionDef,
+                  ]
+                : []),
               // Le nord ne s'offre que si le scan en porte un : sans cap
               // relevé, l'option n'allumerait rien.
               ...(north !== null && north !== undefined

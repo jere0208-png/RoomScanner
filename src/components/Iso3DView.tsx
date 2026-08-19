@@ -808,6 +808,8 @@ export function Iso3DView({
           sy?: number;
           /** Désignation courte, posée au-dessus de l'appareil. */
           nom?: string;
+          /** Sa taille : elle grandit avec le zoom. */
+          nomTaille?: number;
           depth: number;
           x: number;
           y: number;
@@ -1012,10 +1014,21 @@ export function Iso3DView({
               ? `${Math.round(Math.abs(x - versBord) * 100)}`
               : undefined,
           fondu: elecCotes === null ? 1 : Math.max(0, Math.min(1, elecCotes)),
-          // La désignation en toutes lettres, POSÉE SUR l'appareil. Le
-          // symbole gravé se réduisait à trois traits gris : un mot se lit.
-          // Caché et vu de loin : pas de mot, juste le point de couleur.
-          nom: scale > 70 ? assemblyTag(postes) : undefined,
+          /*
+            LA DÉSIGNATION VIENT AU ZOOM, ET SE POSE À CÔTÉ.
+
+            Elle s'écrivait SUR l'appareil, à taille fixe, dès qu'on
+            distinguait le logement : sur une vue d'ensemble, « DOUBLE PC »
+            barrait le meuble qu'il désigne et couvrait ses voisins. C'est
+            l'inverse de ce qu'on attend d'un plan — c'est petit d'abord, et
+            plus on agrandit, plus on lit.
+
+            Elle n'apparaît donc qu'au-delà de cent dix pixels par mètre,
+            grandit avec le zoom, et se pose AU-DESSUS du repère : ce qu'on
+            nomme reste visible.
+          */
+          nom: scale > 110 ? assemblyTag(postes) : undefined,
+          nomTaille: Math.max(7, Math.min(11, 7 + (scale - 110) * 0.02)),
           /*
             CACHÉ PAR UN MEUBLE : le repère le dit, à tous les zooms.
 
@@ -1398,21 +1411,21 @@ export function Iso3DView({
                         <>
                           <SvgText
                             x={item.x}
-                            y={item.y + 3}
+                            y={item.y - 13}
                             fill="none"
                             stroke={c.surface}
                             strokeWidth={2.6}
                             strokeLinejoin="round"
-                            fontSize={9}
+                            fontSize={item.nomTaille ?? 9}
                             fontWeight="800"
                             textAnchor="middle">
                             {item.nom}
                           </SvgText>
                           <SvgText
                             x={item.x}
-                            y={item.y + 3}
+                            y={item.y - 13}
                             fill={c.ink}
-                            fontSize={9}
+                            fontSize={item.nomTaille ?? 9}
                             fontWeight="800"
                             textAnchor="middle">
                             {item.nom}

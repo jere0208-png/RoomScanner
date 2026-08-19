@@ -225,6 +225,16 @@ export interface PdfOptions {
    */
   elevations?: boolean;
   /**
+   * Toutes les élévations, et pas seulement celles des murs équipés.
+   *
+   * Réduire le dossier aux murs qui portent quelque chose lui a fait perdre
+   * ce qu'un électricien vient parfois y chercher : le mur VU DE FACE, avec
+   * ses retours cotés, même sans un seul appareil dessus — c'est le dessin
+   * sur lequel on décide où percer AVANT d'avoir rien posé. Les deux usages
+   * sont justes ; celui-ci se demande.
+   */
+  toutesElevations?: boolean;
+  /**
    * Schémas unifilaire et multifilaire : deux feuilles de plus, tirées des
    * circuits déjà calculés. Absent = pas de schéma, et le dossier garde sa
    * pagination d'avant.
@@ -759,10 +769,19 @@ function drawSheetChrome(
     d.line(cx, ty, cx, ty + TITLE_H, 0.8, INK);
   }
 
-  // Bloc marque
-  drawLogo(d, FRAME.x + 12, ty + 14, 38);
-  d.text('EchoPlan', FRAME.x + 58, ty + 36, 13, INK, { bold: true, align: 'left' });
-  d.text('Scan 3D & plans', FRAME.x + 58, ty + 22, 7.5, GREY, { align: 'left' });
+  /*
+    LE BLOC MARQUE, PLUS GRAND.
+
+    Le logo tenait dans trente-huit points au creux d'un cartouche qui en
+    fait soixante-six : sur une feuille imprimée, il passait pour une
+    vignette de pied de page. C'est pourtant la seule marque du document —
+    celle qu'on voit quand le dossier traîne sur un chantier, plié en deux
+    sur un établi. Il occupe maintenant cinquante points, et le nom se
+    décale d'autant.
+  */
+  drawLogo(d, FRAME.x + 12, ty + 8, 50);
+  d.text('EchoPlan', FRAME.x + 70, ty + 38, 14, INK, { bold: true, align: 'left' });
+  d.text('Scan 3D & plans', FRAME.x + 70, ty + 23, 7.5, GREY, { align: 'left' });
 
   // Bloc projet
   d.text('PROJET', cols[0] + 12, ty + 50, 6.5, GREY_LIGHT, { align: 'left' });
@@ -2783,7 +2802,8 @@ function wallTagAt(w: WallSeg, openings: WallSeg[]): { x: number; z: number } {
  * milieu — dans un dossier qu'on ouvre les mains pleines de plâtre, c'est
  * le pire défaut possible.
  */
-function elevationWalls(ctx: SheetContext): WallSeg[] {
+function elevationWalls(ctx: SheetContext, toutes = false): WallSeg[] {
+  if (toutes) return wallsInOrder(ctx);
   const equipes = new Set((ctx.fixtures ?? []).map((f) => f.wallId));
   return wallsInOrder(ctx).filter((w) => equipes.has(w.id));
 }
@@ -3663,7 +3683,9 @@ export function buildScanPdf(
   const schemas = opts.schemas ?? null;
   const withSchema = !!schemas && schemas.rows.length > 0;
 
-  const murs = opts.elevations ? elevationWalls(ctxTemporaire(scan)) : [];
+  const murs = opts.elevations
+    ? elevationWalls(ctxTemporaire(scan), opts.toutesElevations)
+    : [];
   /**
    * Les photos, prêtes à être posées : une par mur, la dernière prise.
    *

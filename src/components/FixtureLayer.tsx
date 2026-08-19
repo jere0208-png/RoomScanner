@@ -214,43 +214,30 @@ export function FixtureLayer({
                 fill="transparent"
               />
               {/*
-                DE LOIN, ON ÉCRIT LE SIGLE — on ne pose plus un point.
+                PENDANT LE GESTE, UN POINT SUFFIT.
 
-                Un disque de quatre pixels dit qu'il y a quelque chose, et
-                rien de plus : sur un mur qui en porte trois, on comptait des
-                confettis. Le sigle, lui, se lit à la même taille — « PC »,
-                « I », « RJ » — et l'on sait ce qu'on regarde sans zoomer.
-
-                Deux passes : un liseré blanc dessous, le texte coloré
-                par-dessus. Sans ce contour, un sigle ambre posé sur le poché
-                d'un mur disparaît dans le noir.
+                Le plan glisse sous le doigt : on ne lit pas, on vise. Le
+                symbole complet — un fond, une tige, trois tracés — coûte à
+                chaque image de ce mouvement, et c'est exactement ce qui
+                sépare un plan qui glisse d'un plan qui saute. Il revient
+                entier dès que le doigt se lève.
               */}
-              {lod < 0.98 && (
-                <G opacity={1 - lod}>
-                  <SvgText
-                    x={p.x}
-                    y={p.y + 3.2}
-                    fill="none"
-                    stroke={c.surface}
-                    strokeWidth={2.6}
-                    fontSize={9.5}
-                    fontWeight="800"
-                    textAnchor="middle">
-                    {spec.short}
-                  </SvgText>
-                  <SvgText
-                    x={p.x}
-                    y={p.y + 3.2}
-                    fill={spec.color}
-                    fontSize={9.5}
-                    fontWeight="800"
-                    textAnchor="middle">
-                    {spec.short}
-                  </SvgText>
-                </G>
+              {navigating && (
+                <Circle cx={p.x} cy={p.y} r={3.4} fill={spec.color} />
               )}
-              {lod > 0.02 && (
-                <G opacity={lod}>
+              {!navigating && (
+              <>
+              {/*
+                LE SYMBOLE TIENT LE PLAN À TOUTE ÉCHELLE.
+
+                Il n'apparaissait qu'au zoom, et de loin on écrivait le
+                SIGLE à sa place. Sur un mur qui en porte trois, les mots se
+                chevauchaient et donnaient « PC2TAB » — une bouillie que ni
+                l'œil ni le zoom ne démêlent. Un symbole, lui, occupe une
+                place fixe et se reconnaît à sa forme : c'est petit d'abord,
+                et plus on agrandit, plus on lit.
+              */}
+              <G>
                   <Line
                     x1={anchor.x}
                     y1={anchor.y}
@@ -278,7 +265,10 @@ export function FixtureLayer({
                     ))}
                   </G>
                   {(() => {
-                    if (!tag) return null;
+                    // Le mot vient AVEC LE ZOOM : sous 60 % du détail, il
+                    // n'y a pas la place de l'écrire sans recouvrir le
+                    // voisin.
+                    if (!tag || lod < 0.6) return null;
                     const pose = placeTag(p.x, p.y, tag);
                     if (!pose) return null;
                     return (
@@ -309,6 +299,7 @@ export function FixtureLayer({
                     </SvgText>
                   )}
                 </G>
+              </>
               )}
             </G>
           );

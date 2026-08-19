@@ -516,6 +516,54 @@ d'ordre des octets** (sans elle, « Séjour » s'écrit « SÃ©jour »). Un nom
 pièce contenant un point-virgule est échappé : une seule cellule non protégée
 décale toute la grille à partir de là, sans que rien ne le signale.
 
+### C'est petit d'abord, et plus on agrandit, plus on lit
+
+La même règle, appliquée aux deux endroits où elle manquait.
+
+**Sur le plan 2D**, on écrivait le SIGLE de loin — « PC », « I », « RJ » —
+pour remplacer une pastille de quatre pixels qui ne disait rien. C'était juste
+sur un appareil isolé. Sur un mur qui en porte trois, relevé du chantier à
+l'appui, les mots se chevauchent et donnent « PC2TAB » : une bouillie que ni
+l'œil ni le zoom ne démêlent. Un symbole, lui, occupe une place fixe et se
+reconnaît à sa forme — c'est donc lui qui tient le plan à toute échelle, et la
+dénomination n'apparaît qu'au-delà de 60 % du détail.
+
+Le geste, lui, garde son allègement : **pendant qu'on déplace le plan, un
+point suffit**. On ne lit pas, on vise ; le symbole complet — un fond, une
+tige, trois tracés — coûte à chaque image de ce mouvement. Il revient entier
+dès que le doigt se lève.
+
+**Sur les vues 3D**, la désignation s'écrivait SUR l'appareil, à taille fixe,
+dès qu'on distinguait le logement : sur une vue d'ensemble, « DOUBLE PC »
+barrait le meuble qu'il désigne et couvrait ses voisins. Elle n'apparaît
+maintenant qu'au-delà de 110 pixels par mètre, grandit avec le zoom, et se
+pose **au-dessus** du repère — ce qu'on nomme reste visible.
+
+### Le dossier retrouve ses murs nus
+
+Réduire les élévations aux murs équipés lui avait fait perdre ce qu'un
+électricien vient parfois y chercher : le mur **vu de face avec ses retours
+cotés**, même sans un seul appareil dessus — c'est le dessin sur lequel on
+décide où percer avant d'avoir rien posé. Les deux usages sont justes : « Tous
+les murs » est donc une case, offerte seulement quand les élévations le sont
+(une case qui règle une feuille absente ne règle rien), et chaque feuille
+rappelle le numéro que le mur porte sur le plan.
+
+### Trois places qui ne dépendent plus de rien
+
+- **« Enregistrer » est au plus haut de sa colonne.** Il vivait au bas de la
+  pile d'actions, et le trop-plein de calques se posait au-dessus de lui : sa
+  hauteur dépendait donc du nombre de calques affichés, et sur un scan équipé
+  il descendait de deux crans. Les actions sont ancrées en haut — l'annulation
+  juste dessous — et « Édition » garde le bas, où le pouce tombe.
+- **L'écran de lancement montre ce que montre l'accueil** : l'icône ET le mot,
+  composés en une seule image aux trois densités. Il n'en portait que la
+  moitié.
+- **Le logo du cartouche PDF passe de 38 à 50 points.** Au creux d'un cartouche
+  qui en fait 66, il passait pour une vignette de pied de page — c'est pourtant
+  la seule marque du document, celle qu'on voit quand le dossier traîne plié en
+  deux sur un établi.
+
 ### Les icônes disent ce qu'elles font
 
 Le jeu entier a été redessiné — vingt icônes d'outils, huit de feuilles —

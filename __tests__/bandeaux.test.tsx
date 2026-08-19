@@ -876,6 +876,42 @@ describe('la rangée d’outils', () => {
     expect(plan().props.showFixtures).toBe(true);
   });
 
+  /*
+    « ENREGISTRER » EST TOUJOURS AU PLUS HAUT DE SA COLONNE.
+
+    Il vivait au bas de la pile d'actions, et le trop-plein de calques — les
+    pastilles qui ne tiennent pas dans la rangée et montent à droite — se
+    posait AU-DESSUS de lui. Sa hauteur dépendait donc du nombre de calques
+    affichés : sur un scan équipé, il descendait de deux crans, et on le
+    cherchait. Un bouton qui engage le travail se trouve sans le chercher.
+
+    Les actions sont donc ancrées EN HAUT du plan — « Enregistrer » d'abord,
+    l'annulation juste dessous —, et « Édition » garde le bas, où le pouce
+    tombe.
+  */
+  it('pose Enregistrer au plus haut, l’annulation dessous', () => {
+    const tree = monter();
+    act(() => {
+      useScanStore.setState({ dirty: true });
+    });
+    const colonne = tree.root
+      .findAllByType(View)
+      .find((n) => n.props.accessibilityLabel === 'Actions du plan');
+    expect(colonne).toBeDefined();
+    const st = (Array.isArray(colonne!.props.style)
+      ? Object.assign({}, ...colonne!.props.style.filter(Boolean))
+      : colonne!.props.style) as { top?: number; bottom?: number };
+    // Ancrée en haut : sa position ne dépend plus de ce qu'il y a dessous.
+    expect(typeof st.top).toBe('number');
+    expect(st.bottom).toBeUndefined();
+    // Et dans l'ordre : Enregistrer, puis l'annulation.
+    const mots = colonne!
+      .findAllByType(Text)
+      .map((t) => String(t.props.children))
+      .filter((m) => m === 'Enregistrer' || m === 'Annuler');
+    expect(mots[0]).toBe('Enregistrer');
+  });
+
   it('échange les calques contre les outils en édition', () => {
     const tree = monter();
     expect(bouton(tree, 'Cotes')).toBeDefined();
