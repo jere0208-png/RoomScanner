@@ -183,3 +183,74 @@ describe('le plan PDF tient dans sa feuille', () => {
     expect(traces(fou)).toBe(traces(borne));
   });
 });
+
+
+/**
+ * LA PERSPECTIVE DU PDF MONTRE CE QUE MONTRE L'APP.
+ *
+ * Deux écarts vus en RENDANT la feuille (le dossier de l'appartement de
+ * référence, cuit en SVG) : les murs qui font face à l'objectif restaient
+ * pleins — le canapé du séjour était invisible derrière eux, alors que la
+ * vue de l'app les efface (`cutawayOpacity`) — et les cotes, insérées dans
+ * le tri de profondeur, se faisaient trancher par la maçonnerie voisine :
+ * « 3,00 m » sortait en « m » orphelin au coin d'un refend.
+ */
+describe('la perspective du PDF montre ce que montre l’app', () => {
+  const pdf = pdfDe({}, true);
+  const pages = [
+    ...pdf.matchAll(/<< \/Length \d+ >>\nstream\n([\s\S]*?)\nendstream/g),
+  ].map((m) => m[1]);
+  // La feuille 3D est la seconde (plan, puis perspective).
+  const flux = pages[1];
+
+  it('les murs qui font face à l’objectif s’effacent, comme à l’écran', () => {
+    // L'écorché : au moins un pan passe en transparence…
+    expect(flux).toMatch(/\/GA\d gs/);
+    // …et l'état graphique est déclaré au document.
+    expect(pdf).toContain('/ExtGState');
+  });
+
+  it('les cotes se lisent par-dessus la maçonnerie, jamais tranchées', () => {
+    const zone = flux.slice(flux.indexOf('W n'), flux.lastIndexOf('Q'));
+    const premierCote = zone.search(/\(\d+,\d{2} m\) Tj/);
+    expect(premierCote).toBeGreaterThan(0);
+    // Après la première cote : plus un seul pan. Seuls les halos blancs et
+    // le texte ont le droit de suivre — c'est ce qui garantit qu'aucune
+    // maçonnerie ne repassera par-dessus un nombre.
+    for (const ligne of zone.slice(premierCote).split('\n')) {
+      if (/ [ml] /.test(ligne) && /[bfsS]$/.test(ligne.trim())) {
+        expect(ligne).toContain('1 1 1 rg');
+      }
+    }
+  });
+});
+
+/**
+ * LE MÉTRÉ NE MONTRE JAMAIS UN IDENTIFIANT BRUT.
+ *
+ * Une pièce jamais nommée arrivait sur la feuille du métré sous son
+ * identifiant interne — « room-1 » sur un document qu'on remet au client.
+ * Le nom manquant se remplace par un rang (« Pièce 1 »), pas par la
+ * plomberie du logiciel.
+ */
+describe('le métré et les pièces sans nom', () => {
+  it('écrit « Pièce n », jamais l’identifiant', () => {
+    const doc = latin1(
+      buildScanPdf(
+        {
+          name: 'Biais',
+          walls: BIAIS.map((w) => ({ ...w, roomId: 'room-1' })),
+          openings: [],
+          objects: [],
+          fixtures: [],
+          rooms: [{ id: 'room-1', wallIds: ['n', 'e', 's', 'w'] }],
+        },
+        false,
+        { metre: true },
+      ),
+    );
+    const textes = (doc.match(/\(((?:[^()\\]|\\.)*)\) Tj/g) ?? []).join(' | ');
+    expect(textes).not.toContain('room-1');
+    expect(textes).toContain('Pièce 1');
+  });
+});

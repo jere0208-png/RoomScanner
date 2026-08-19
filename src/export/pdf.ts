@@ -61,6 +61,7 @@ import { assignOpenings } from '../geometry/scene3d';
 import { wallRuns } from '../geometry/floorplan';
 import {
   ajusterBlocs,
+  cutawayOpacity,
   faceDepth,
   buildScene,
   isHiddenFace,
@@ -397,13 +398,23 @@ function buildDocument(
           .map((im, i) => `/${im.name} ${imgIds[i]} 0 R`)
           .join(' ')} >>`
       : '';
+  // Les états de transparence de l'écorché : /GA1 = 10 %… /GA9 = 90 %.
+  // Déclarés en dur sur toutes les pages — un état qu'une page n'appelle
+  // pas ne coûte rien, comme les images.
+  const gstates =
+    ' /ExtGState << ' +
+    Array.from({ length: 9 }, (_, i) => {
+      const a = (i + 1) / 10;
+      return `/GA${i + 1} << /ca ${a} /CA ${a} >>`;
+    }).join(' ') +
+    ' >>';
   const contentIds = pageStreams.map((s) =>
     add(`<< /Length ${s.length} >>\nstream\n${s}\nendstream`),
   );
   const pageIds = contentIds.map((cid) =>
     add(
       `<< /Type /Page /Parent @P 0 R /MediaBox [0 0 ${PAGE_W} ${PAGE_H}] ` +
-        `/Resources << /Font << /F1 ${f1} 0 R /F2 ${f2} 0 R >>${xobj} >> ` +
+        `/Resources << /Font << /F1 ${f1} 0 R /F2 ${f2} 0 R >>${xobj}${gstates} >> ` +
         `/Contents ${cid} 0 R >>`,
     ),
   );
@@ -480,9 +491,18 @@ class Draw {
     strokeHex: string | null,
     sw = 0.8,
     dashed = false,
+    /**
+     * Transparence, par dixièmes (0,1 à 0,9) : l'écorché de la vue 3D.
+     * Les états `/GA1`…`/GA9` sont déclarés une fois par `buildDocument` ;
+     * en dessous, on encadre l'opérateur de `q … Q` pour que l'état ne
+     * contamine pas la suite du flux.
+     */
+    alpha = 1,
   ) {
     if (pts.length < 3) return;
-    let op = dashed ? '[4 3] 0 d ' : '[] 0 d ';
+    const ga = Math.round(Math.min(1, Math.max(0.1, alpha)) * 10);
+    let op = ga < 10 ? `q /GA${ga} gs ` : '';
+    op += dashed ? '[4 3] 0 d ' : '[] 0 d ';
     if (fillHex) {
       const [r, g, b] = hexRgb(fillHex);
       op += `${n2(r)} ${n2(g)} ${n2(b)} rg `;
@@ -495,6 +515,7 @@ class Draw {
       .map((p, i) => `${n2(p.x)} ${n2(p.y)} ${i === 0 ? 'm' : 'l'}`)
       .join(' ');
     op += fillHex && strokeHex ? ' b' : fillHex ? ' f' : ' s';
+    if (ga < 10) op += ' Q';
     this.ops.push(op);
   }
 
@@ -951,6 +972,11 @@ function draw3DView(
         fill,
         stroke: f.stroke ?? fill,
         dashed: !!f.dashed,
+        // L'écorché de la vue app : un mur qui fait face à l'objectif
+        // s'efface, sans quoi le canapé du séjour est invisible sur le
+        // papier alors qu'il se voit à l'écran.
+        alpha:
+          f.cutaway && f.normal ? cutawayOpacity(f.normal, cam) : 1,
         // De quoi départager les faces d'un même meuble à l'écran : le PDF
         // peint dans le même ordre que l'application, sans quoi le dossier
         // d'un canapé s'imprimerait par-dessus son assise.
@@ -962,7 +988,6 @@ function draw3DView(
       };
     });
   ajusterBlocs(polys);
-  // Cotes insérées dans le tri de profondeur : un mur proche les recouvre.
   type Item =
     | {
         kind: 'poly';
@@ -971,6 +996,7 @@ function draw3DView(
         fill: string | null;
         stroke: string | null;
         dashed?: boolean;
+        alpha?: number;
       }
     | { kind: 'dot'; depth: number; x: number; y: number; color: string }
     | { kind: 'label'; depth: number; x: number; y: number; text: string }
@@ -1008,15 +1034,33 @@ function draw3DView(
       y: w.height,
       z: (w.a.z + w.b.z) / 2,
     });
+    // Par-dessus la maçonnerie, comme les étiquettes de surface : insérée
+    // dans le tri de profondeur, une cote se faisait TRANCHER par le mur
+    // voisin du coin — « 3,00 m » sortait en « m » orphelin. Une cote est
+    // une annotation ; son halo blanc la détache de ce qu'elle survole.
     items.push({
       kind: 'label',
-      depth: mid.depth + 0.03,
+      depth: Infinity,
       x: mid.x,
       y: mid.y + 5,
       text: `${segLength(w).toFixed(2).replace('.', ',')} m`,
     });
   }
   items.sort((p, q) => p.depth - q.depth);
+  /** Le halo d'une annotation : un cartouche blanc sous le texte. */
+  const halo = (x: number, y: number, size: number, texte: string) => {
+    const demiW = (texte.length * size * 0.52) / 2 + 2;
+    d.poly(
+      [
+        { x: x - demiW, y: y - size * 0.25 },
+        { x: x + demiW, y: y - size * 0.25 },
+        { x: x + demiW, y: y + size * 0.8 },
+        { x: x - demiW, y: y + size * 0.8 },
+      ],
+      '#FFFFFF',
+      null,
+    );
+  };
   for (const item of items) {
     if (item.kind === 'poly') {
       if (item.pts.length === 2 && item.stroke) {
@@ -1030,13 +1074,22 @@ function draw3DView(
           item.stroke,
         );
       } else {
-        d.poly(item.pts, item.fill, item.stroke, item.dashed ? 1.3 : 0.7, item.dashed);
+        d.poly(
+          item.pts,
+          item.fill,
+          item.stroke,
+          item.dashed ? 1.3 : 0.7,
+          item.dashed,
+          item.alpha ?? 1,
+        );
       }
     } else if (item.kind === 'dot') {
       d.circle(item.x, item.y, 0.55, item.color);
     } else if (item.kind === 'area') {
+      halo(item.x, item.y, 9.5, item.text);
       d.text(item.text, item.x, item.y, 9.5, INK, { bold: true });
     } else {
+      halo(item.x, item.y, 8, item.text);
       d.text(item.text, item.x, item.y, 8, '#2A3340');
     }
   }
@@ -2046,7 +2099,10 @@ function metrePage(ctx: SheetContext, sheet: string): string {
   for (const part of parts) {
     if (y < FRAME.y + 90) break;
     y -= 20;
-    const name = ctx.roomNames[part.roomId] || part.roomId;
+    // Jamais l'identifiant interne sur un document client : une pièce
+    // sans nom prend son rang, comme partout ailleurs dans l'app.
+    const name =
+      ctx.roomNames[part.roomId] || `Pièce ${parts.indexOf(part) + 1}`;
     const ext = part.surface
       ? roomExtent(part.surface.pts)
       : { width: 0, depth: 0 };
@@ -2407,12 +2463,15 @@ function elevationPage(
   // Le numéro du mur, tel qu'il est écrit sur le plan : c'est par lui qu'on
   // retrouve le pan dont parle cette feuille.
   const numero = wallNumbers(ctx).get(wall.id);
+  // Nom de pièce et cardinal, sans bégayer : une pièce sans nom donnait
+  // « mur, mur nord-est » — le cardinal commence déjà par « mur », le
+  // bouche-trou ne sert que s'il n'y a ni l'un ni l'autre.
+  const quoi = [piece, cardinal].filter(Boolean).join(', ') || 'mur';
 
   // ------------------------------------------------------------- cadre
   const hautTitre = TETE;
   d.text(
-    `Élévation — ${numero ? `Mur ${numero} · ` : ''}${piece || 'mur'}` +
-      `${cardinal ? `, ${cardinal}` : ''}`,
+    `Élévation — ${numero ? `Mur ${numero} · ` : ''}${quoi}`,
     FRAME.x + 30,
     hautTitre,
     13,
@@ -2724,7 +2783,7 @@ function elevationPage(
     filename: ctx.filename,
     client: ctx.client,
     address: ctx.address,
-    sheetTitle: `Élévation — ${piece || 'mur'}${cardinal ? `, ${cardinal}` : ''}`,
+    sheetTitle: `Élévation — ${quoi}`,
     sheet,
     // Un mètre vaut 2834,6 points à l'échelle 1:1 (72 pt par pouce).
     scaleLabel: `1:${Math.round(2834.6 / Math.max(scale, 1e-6))}`,

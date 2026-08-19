@@ -9,6 +9,7 @@
  * catégorie du catalogue produit bien un volume.
  */
 import { CATALOGUE } from '../src/geometry/catalogue';
+import { furnitureStrokes } from '../src/geometry/furniture';
 import { furnitureParts } from '../src/geometry/furniture3d';
 import { type WallSeg } from '../src/geometry/floorplan';
 import { buildScene, type ScenePalette } from '../src/geometry/scene3d';
@@ -100,6 +101,44 @@ describe('chaque meuble a une silhouette, et elle tient dans son emprise', () =>
     const parts = furnitureParts('table');
     expect(parts).toHaveLength(5);
     expect(parts.filter((p) => p.tone === 'dark')).toHaveLength(4);
+  });
+
+  /**
+   * LE 2D ET LA 3D TOURNENT LE MÊME DOS.
+   *
+   * Relevé du chantier, capture à l'appui : la chaise du plan montrait son
+   * dossier vers l'intérieur de la pièce, et la vue 3D le posait contre
+   * l'angle du mur — les deux vues se contredisaient à 180°. La cause : le
+   * volume 3D met l'avant du meuble en z = 0 (le dos en z = 1), l'écran du
+   * plan projette +z monde vers +y écran… et le symbole 2D dessinait le dos
+   * du côté −y. Pour CHAQUE meuble orienté, le dos du symbole doit être du
+   * même côté que le dos du volume : +y local ↔ z > 0,5.
+   */
+  it('le dos du symbole 2D est du côté du dos du volume 3D', () => {
+    // Le dos 3D de chaque meuble orienté, identifié par sa pièce maîtresse.
+    const dos3d = {
+      // La tête de lit : le morceau qui monte au-dessus du couchage.
+      bed: furnitureParts('bed').find((p) => p.y1 > 1.2)!,
+      // Le dossier du canapé : pleine largeur, jusqu'en haut, mince en z.
+      sofa: furnitureParts('sofa').find((p) => p.y1 === 1 && p.z1 - p.z0 < 0.2)!,
+      // Le dossier de la chaise : pareil.
+      chair: furnitureParts('chair').find((p) => p.y1 === 1 && p.z1 - p.z0 < 0.2)!,
+    };
+    for (const part of Object.values(dos3d)) {
+      expect(part).toBeTruthy();
+      expect((part.z0 + part.z1) / 2).toBeGreaterThan(0.5);
+    }
+    // Le dos 2D : la polyligne du dossier (ou de la tête) du symbole.
+    const dosSymbole = (kind: 'bed' | 'sofa' | 'chair', index: number) => {
+      const lignes = furnitureStrokes(kind, 2, 2);
+      const l = lignes[index];
+      return l.reduce((s, p) => s + p.y, 0) / l.length;
+    };
+    // Dans chaque symbole, le dos est la PREMIÈRE polyligne (bandeau de
+    // tête, dossier) — voir furnitureStrokes. Pour la chaise, la seconde.
+    expect(dosSymbole('bed', 0)).toBeGreaterThan(0);
+    expect(dosSymbole('sofa', 0)).toBeGreaterThan(0);
+    expect(dosSymbole('chair', 1)).toBeGreaterThan(0);
   });
 
   it('ce qu’on ne sait pas nommer reste une boîte', () => {

@@ -332,3 +332,37 @@ describe('la photo de repérage', () => {
     expect(pages(src)).toBe(2);
   });
 });
+
+/**
+ * LE TITRE D'UNE ÉLÉVATION NE BÉGAIE PAS.
+ *
+ * Une pièce sans nom donnait « Élévation — Mur 2 · mur, mur nord-est » :
+ * le bouche-trou « mur » n'a rien à faire devant un cardinal qui commence
+ * lui-même par « mur ». Le cardinal parle seul ; le bouche-trou ne sert
+ * que s'il n'y a ni nom ni orientation.
+ */
+describe('le titre d’une élévation sans nom de pièce', () => {
+  it('laisse le cardinal parler seul', () => {
+    const src = latin1(
+      buildScanPdf(
+        {
+          name: 'Essai',
+          walls: W,
+          openings: [PORTE],
+          objects: [],
+          fixtures: FX,
+          rooms: [{ id: 'r1', wallIds: W.map((w) => w.id) }],
+          roomNames: { r1: '' },
+          north: 0,
+        },
+        false,
+        { metre: false, elevations: true },
+      ),
+    );
+    const vu = texte(src);
+    expect(vu).not.toContain('mur, mur');
+    // Le tiret cadratin du flux est un octet Windows-1252 : on ancre la
+    // vérification sur ce qui suit le numéro.
+    expect(vu).toMatch(/Mur \d · mur (nord|sud|est|ouest)/);
+  });
+});

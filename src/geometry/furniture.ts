@@ -240,6 +240,12 @@ export function frCategory(category: string): string {
  * Symbole 2D d'un meuble, en coordonnées locales centrées (x le long de la
  * largeur, y le long de la profondeur) : liste de polylignes à tracer dans
  * le rectangle w×d. Utilisé par le plan de l'app ET par le PDF.
+ *
+ * LE DOS DU MEUBLE EST EN +y. C'est la même convention que le volume 3D
+ * (`furniture3d.ts` : l'avant en z = 0, le dos en z = 1), et l'écran du plan
+ * projette +z monde vers +y écran : le dossier dessiné en −y montrait donc
+ * l'EXACT OPPOSÉ de la 3D — la chaise du chantier tournait le dos au mur sur
+ * le plan et à la pièce dans le volume.
  */
 export function furnitureStrokes(
   kind: FurnKind,
@@ -284,13 +290,13 @@ export function furnitureStrokes(
     */
     case 'bed':
       return [
-        // La tête de lit, en bandeau.
-        rect(-1, -1, 1, -0.72),
+        // La tête de lit, en bandeau, côté dos.
+        rect(-1, 0.72, 1, 1),
         // Deux oreillers côte à côte.
-        rect(-0.86, -0.66, -0.08, -0.24),
-        rect(0.08, -0.66, 0.86, -0.24),
+        rect(-0.86, 0.24, -0.08, 0.66),
+        rect(0.08, 0.24, 0.86, 0.66),
         // Le rabat de la couette.
-        trait(-1, 0.12, 1, 0.12),
+        trait(-1, -0.12, 1, -0.12),
       ];
 
     /*
@@ -299,22 +305,22 @@ export function furnitureStrokes(
     */
     case 'sofa': {
       const dessin = [
-        // Dossier.
-        rect(-1, -1, 1, -0.45),
+        // Dossier, côté dos.
+        rect(-1, 0.45, 1, 1),
         // Accoudoirs.
-        rect(-1, -0.45, -0.72, 1),
-        rect(0.72, -0.45, 1, 1),
+        rect(-1, -1, -0.72, 0.45),
+        rect(0.72, -1, 1, 0.45),
       ];
       const places = w > 1.9 ? 3 : 2;
       for (let i = 1; i < places; i++) {
         const x = -0.72 + (1.44 * i) / places;
-        dessin.push(trait(x, -0.45, x, 1));
+        dessin.push(trait(x, -1, x, 0.45));
       }
       return dessin;
     }
 
     case 'tv':
-      // L'écran, et son pied.
+      // L'écran, et sa platine murale côté dos — une télé se fixe au mur.
       return [rect(-0.94, -0.4, 0.94, 0.4), trait(-0.25, 0.4, 0.25, 0.4)];
 
     /*
@@ -327,7 +333,7 @@ export function furnitureStrokes(
 
     case 'chair':
       // Assise et dossier : le dossier du côté du dos.
-      return [rect(-0.78, -0.5, 0.78, 0.85), rect(-0.9, -0.95, 0.9, -0.55)];
+      return [rect(-0.78, -0.85, 0.78, 0.5), rect(-0.9, 0.55, 0.9, 0.95)];
 
     /*
       LE RANGEMENT : ses portes, avec leur poignée.
