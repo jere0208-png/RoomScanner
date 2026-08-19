@@ -254,3 +254,35 @@ describe('le métré et les pièces sans nom', () => {
     expect(textes).toContain('Pièce 1');
   });
 });
+
+/**
+ * LE SCAN VIDE NE SORT PAS EN PAGES BLANCHES.
+ *
+ * Vu en se mettant dans la peau d'un premier utilisateur : un scan raté
+ * (zéro mur) s'exportait en feuilles entièrement vides — plan blanc,
+ * perspective blanche — sans un mot. Un document muet ressemble à un bogue
+ * d'export ; il doit dire ce qui manque et quoi faire.
+ */
+describe('l’export d’un scan sans mur', () => {
+  const vide = latin1(
+    buildScanPdf(
+      { name: 'Premier essai', walls: [], openings: [], objects: [], fixtures: [], rooms: [] },
+      true,
+      { metre: true, elevations: true },
+    ),
+  );
+  const textes = (vide.match(/\(((?:[^()\\]|\\.)*)\) Tj/g) ?? []).join(' | ');
+
+  it('dit sur le plan qu’aucun mur n’a été relevé', () => {
+    expect(textes).toContain('Aucun mur relev');
+  });
+
+  it('n’imprime pas de perspective du néant', () => {
+    // Plan + métré : deux feuilles. La 3D d'un logement vide n'existe pas.
+    expect((vide.match(/\/Type \/Page /g) ?? []).length).toBe(2);
+  });
+
+  it('et le métré le dit aussi', () => {
+    expect(textes).toContain('Aucune pi');
+  });
+});

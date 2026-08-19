@@ -1231,6 +1231,43 @@ function planPage(
     roomNames,
   } = ctx;
   const d = new Draw();
+  /*
+    UN SCAN SANS MUR LE DIT, il ne sort pas en page blanche.
+
+    Le cas d'un premier utilisateur dont le relevé a échoué : la feuille
+    s'imprimait entièrement vide, sans un mot — on dirait un export cassé.
+    Le document explique ce qui manque et quoi refaire.
+  */
+  if (walls.length === 0) {
+    d.text(
+      extra?.title ?? 'Plan d’ensemble coté',
+      FRAME.x + 30,
+      TETE,
+      13,
+      INK,
+      { bold: true, align: 'left' },
+    );
+    d.text('Aucun mur relevé.', PAGE_W / 2, PAGE_H / 2 + 8, 12, INK, {
+      bold: true,
+    });
+    d.text(
+      'Reprenez le scan en longeant les murs, l’appareil face à la maçonnerie.',
+      PAGE_W / 2,
+      PAGE_H / 2 - 8,
+      9,
+      GREY,
+    );
+    drawSheetChrome(d, {
+      project: name,
+      filename,
+      client: ctx.client,
+      address: ctx.address,
+      sheetTitle: extra?.title ?? 'Plan d’ensemble coté',
+      sheet,
+      scaleLabel: null,
+    });
+    return d.stream();
+  }
   // Une entrée par pièce : contour, centre, teinte de sol. Tout ce qui suit
   // (meubles, ouvertures, cotes, cartouches) se règle sur la pièce concernée.
   const parts = roomParts(walls, ctx.rooms);
@@ -2094,6 +2131,13 @@ function metrePage(ctx: SheetContext, sheet: string): string {
   y -= 6;
   d.line(x0, y, x0 + w, y, 0.8, INK);
 
+  // Rien de relevé : le tableau le dit, plutôt que d'aligner des zéros.
+  if (parts.length === 0) {
+    y -= 24;
+    d.text('Aucune pièce relevée pour l’instant.', x0, y, 10, GREY, {
+      align: 'left',
+    });
+  }
   let totalArea2 = 0;
   let totalWalls = 0;
   let totalPoints = 0;
@@ -3801,9 +3845,14 @@ export function buildScanPdf(
   // Trois feuilles : l'unifilaire hors sol, puis les deux schémas sur le
   // plan. Les tracés viennent des mêmes cheminements que le métré.
   // Au moins une perspective quand on en demande : sans réglage, c'est la
-  // vue de trois quarts par défaut.
+  // vue de trois quarts par défaut. Sauf sans le moindre mur — la
+  // perspective d'un logement vide est une page blanche, pas une feuille.
   const vues =
-    opts.views && opts.views.length > 0 ? opts.views : [...DEFAULT_PDF_VIEWS];
+    scan.walls.length === 0
+      ? []
+      : opts.views && opts.views.length > 0
+        ? opts.views
+        : [...DEFAULT_PDF_VIEWS];
   const total =
     1 +
     (withMetre ? 1 : 0) +
