@@ -37,7 +37,9 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 import React from 'react';
 import { Image, Text, View } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
+import { Path } from 'react-native-svg';
 import { HomeScreen } from '../src/screens/HomeScreen';
+import { LogoMark } from '../src/components/LogoMark';
 import { PhoneShowcase } from '../src/components/PhoneShowcase';
 import { GlowButton } from '../src/components/GlowButton';
 import { useScanStore } from '../src/store/scanStore';
@@ -248,5 +250,61 @@ describe('le bouton « Mes scans »', () => {
     expect(st.bottom).toBe(0);
     expect(st.justifyContent).toBe('center');
     act(() => tree.unmount());
+  });
+});
+
+/**
+ * LE GLYPHE REMPLIT SON BLOC COMME SUR L'ICÔNE DU TÉLÉPHONE.
+ *
+ * Le logo de l'accueil et l'icône iOS sont le même dessin, mais l'icône
+ * l'agrandit de 1,45 autour du centre (`ZOOM` de tools/gen-icons.mjs) : posés
+ * côte à côte, le bloc de l'accueil semblait porter un glyphe de timbre-poste.
+ * On mesure ici la boîte des tracés, traits compris, dans le repère 76 du
+ * bloc — le même chiffre que l'icône, pour le même œil.
+ */
+describe('le logo de l’accueil', () => {
+  it('donne au glyphe la part du bloc que l’icône lui donne', () => {
+    const t = monter();
+    const logo = t.root.findByType(LogoMark);
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    const chemins = logo.findAllByType(Path);
+    expect(chemins.length).toBeGreaterThanOrEqual(3);
+    for (const p of chemins) {
+      const demi = (p.props.strokeWidth ?? 0) / 2;
+      // On ne lit que les POINTS D'ANCRAGE (M/L/H/V et l'arrivée des arcs) :
+      // rayons et drapeaux d'un « A » ne sont pas des coordonnées.
+      const d: string = p.props.d;
+      let x = 0;
+      let y = 0;
+      const re = /([MLHVA])([^MLHVA]*)/g;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(d))) {
+        const nb = (m[2].trim().match(/-?[\d.]+/g) ?? []).map(Number);
+        if (m[1] === 'H') x = nb[0];
+        else if (m[1] === 'V') y = nb[0];
+        else if (m[1] === 'A') {
+          x = nb[nb.length - 2];
+          y = nb[nb.length - 1];
+        } else {
+          x = nb[0];
+          y = nb[1];
+        }
+        minX = Math.min(minX, x - demi);
+        maxX = Math.max(maxX, x + demi);
+        minY = Math.min(minY, y - demi);
+        maxY = Math.max(maxY, y + demi);
+      }
+    }
+    // L'icône : boîte de 33 × le zoom de 1,45 → 63 % du bloc de 76.
+    expect((maxX - minX) / 76).toBeGreaterThan(0.61);
+    expect((maxX - minX) / 76).toBeLessThan(0.66);
+    expect((maxY - minY) / 76).toBeGreaterThan(0.61);
+    expect((maxY - minY) / 76).toBeLessThan(0.66);
+    // Et il est CENTRÉ, comme sur l'icône : marges égales des quatre côtés.
+    expect(Math.abs((minX + maxX) / 2 - 38)).toBeLessThan(0.75);
+    expect(Math.abs((minY + maxY) / 2 - 38)).toBeLessThan(0.75);
   });
 });

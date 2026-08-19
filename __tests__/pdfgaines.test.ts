@@ -148,6 +148,20 @@ describe('la liste du matériel, version chantier', () => {
     expect(doc).not.toContain('82 mm');
   });
 
+  /**
+   * L'EN-TÊTE D'UNE PIÈCE NE SE RÉPÈTE PAS.
+   *
+   * À droite du nom en gras, la feuille rappelait l'usage déduit et la
+   * surface : « Séjour … Séjour · 20,0 m² ». Quand l'usage EST le nom — le
+   * cas de toutes les pièces non renommées —, le rappel ne rappelle rien :
+   * il bégaie. La surface suffit ; l'usage ne s'écrit que s'il apprend
+   * quelque chose.
+   */
+  it('ne répète pas le nom de la pièce dans son rappel d’usage', () => {
+    expect(doc).not.toMatch(/Séjour · [\d,]+ m²/);
+    expect(doc).toMatch(/[\d,]+ m²/);
+  });
+
   it('rappelle la règle de remplissage — un chiffre sans sa règle ne vaut rien', () => {
     expect(doc).toContain('15-100');
     expect(doc).toContain('tiers');

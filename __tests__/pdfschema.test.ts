@@ -278,6 +278,70 @@ describe('la lisibilité des feuilles de schéma', () => {
   });
 
   /**
+   * LE NOMBRE DE CONDUCTEURS SE LIT — IL ÉTAIT SOUS LA PASTILLE.
+   *
+   * La convention de l'unifilaire : une barre oblique sur le départ, et son
+   * chiffre à côté. Le chiffre était écrit… puis la pastille du repère,
+   * dessinée APRÈS, posait son disque blanc dessus : la légende promettait un
+   * chiffre que la feuille ne montrait nulle part. On rejoue l'ordre du flux :
+   * aucun disque blanc ne se pose sur un chiffre de conducteurs.
+   */
+  it('n’écrase pas le chiffre des conducteurs sous la pastille du repère', () => {
+    // Les chiffres de conducteurs : taille 7, un ou deux caractères, à plat.
+    const chiffres: { at: number; x: number; y: number; w: number }[] = [];
+    const reTxt = /BT \/F1 7 Tf [\d. ]+rg 1 0 0 1 ([-\d.]+) ([-\d.]+) Tm \((\d\d?)\) Tj ET/g;
+    let m: RegExpExecArray | null;
+    while ((m = reTxt.exec(pdf))) {
+      chiffres.push({
+        at: m.index,
+        x: parseFloat(m[1]),
+        y: parseFloat(m[2]),
+        // La même métrique que fitText : ≈ 0,52 em par signe.
+        w: m[3].length * 7 * 0.52,
+      });
+    }
+    expect(chiffres.length).toBeGreaterThanOrEqual(rows.length);
+    // Les disques blancs des pastilles : 20 sommets, remplis en blanc.
+    const cercles: { at: number; xs: number[]; ys: number[] }[] = [];
+    const reCercle = /1 1 1 rg ((?:[-\d.]+ [-\d.]+ [ml] ?){20})f/g;
+    while ((m = reCercle.exec(pdf))) {
+      const nb = (m[1].match(/[-\d.]+/g) ?? []).map(Number);
+      cercles.push({
+        at: m.index,
+        xs: nb.filter((_, i) => i % 2 === 0),
+        ys: nb.filter((_, i) => i % 2 === 1),
+      });
+    }
+    for (const c of chiffres) {
+      for (const cercle of cercles) {
+        if (cercle.at < c.at) continue; // dessiné avant : il passe dessous
+        const x0c = Math.min(...cercle.xs);
+        const x1c = Math.max(...cercle.xs);
+        const y0c = Math.min(...cercle.ys);
+        const y1c = Math.max(...cercle.ys);
+        // La boîte du chiffre : sa largeur mesurée, sept points de haut.
+        const recouvre =
+          c.x < x1c && c.x + c.w > x0c && c.y < y1c && c.y + 7 > y0c;
+        expect(recouvre).toBe(false);
+      }
+    }
+  });
+
+  /**
+   * LE DÉTAIL D'UN DÉPART VA JUSQU'AU BORD — la place était libre.
+   *
+   * La ligne grise sous le libellé (« Cuisine, mur est — Interrupteur 1… »)
+   * se tronquait à la largeur du libellé, alors que la colonne de droite est
+   * VIDE à sa hauteur : l'applique du circuit d'éclairage sortait en
+   * « Ap… ». Ce qu'un départ dessert doit se lire en entier quand la feuille
+   * a la place de l'écrire.
+   */
+  it('écrit en entier ce que dessert le circuit d’éclairage', () => {
+    const doc = texte(pdf);
+    expect(doc).toContain('Applique murale 1');
+  });
+
+  /**
    * L'écartement des faisceaux ne se teste pas ici, et il faut le dire.
    *
    * Le plan est dessiné sur TROIS feuilles — le plan, l'unifilaire, le

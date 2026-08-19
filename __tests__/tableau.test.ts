@@ -208,4 +208,20 @@ describe('le coffret dans le PDF', () => {
       }
     }
   });
+
+  /**
+   * LE RÉCAPITULATIF D'UN DIFFÉRENTIEL NOMME TOUS SES CIRCUITS.
+   *
+   * La ligne « Différentiel type A 1 … : Cuisson, Spécialisé 1, … » se
+   * tronquait à la largeur d'une colonne de valeurs… qui est VIDE sur cette
+   * ligne : « Spéciali… ». Une liste de circuits amputée ne dit plus ce que
+   * le différentiel protège — et la place était là.
+   */
+  it('nomme tous les circuits de chaque différentiel, sans troncature', () => {
+    const doc = (pdf.match(/\(((?:[^()\\]|\\.)*)\) Tj/g) ?? [])
+      .map((m) => m.slice(1, m.lastIndexOf(')')))
+      .join(' | ');
+    expect(doc).toContain('Cuisson, Spécialisé 1, Spécialisé 2');
+    expect(doc).toContain('Prises 1, Prises 2, Éclairage 1');
+  });
 });

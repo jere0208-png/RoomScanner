@@ -1646,10 +1646,11 @@ export function FloorplanEditor({
               if (placeholder !== '' && lignes.length === 0) {
                 lignes.push({ t: placeholder, size: 11, fill: c.inkFaint, bold: true });
               }
-              // Le cartouche SERRE son texte, et son fond laisse voir le
-              // plan. Opaque et large, il masquait le sol qu'il annote — et
-              // c'est justement là, au centre de la pièce, que se pose un
-              // point lumineux.
+              // Le cartouche SERRE son texte, et son fond est OPAQUE, comme
+              // sur le PDF : translucide, il se faisait traverser par les
+              // meubles. Le sol qu'il annote reste accessible autrement — il
+              // s'efface pendant le réglage d'un appareil de plafond, et il
+              // esquive les meubles de sa pièce.
               const PAD = 5;
               const LH = 14;
               const hpx = PAD * 2 + lignes.length * LH;
@@ -1708,7 +1709,6 @@ export function FloorplanEditor({
                     height={hpx}
                     rx={5}
                     fill={c.surface}
-                    fillOpacity={0.55}
                     stroke={selected ? c.blue : c.lineStrong}
                     strokeWidth={selected ? 2 : 1}
                   />

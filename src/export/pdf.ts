@@ -2253,9 +2253,12 @@ function unifilairePage(
     d.line(DISJ + 16, cy, finTrait, cy, 0.9, INK);
     // La barre oblique et le nombre de conducteurs : la convention de
     // l'unifilaire, qui dit en un signe ce que le multifilaire détaille.
-    const oblique = DISJ + 34;
+    // L'oblique au MILIEU du segment, le chiffre à son épaule : posé au bout,
+    // le chiffre tombait sous le disque blanc de la pastille de repère,
+    // dessinée après lui — la légende promettait un chiffre invisible.
+    const oblique = (DISJ + 16 + finTrait) / 2;
     d.line(oblique - 4, cy - 5, oblique + 4, cy + 5, 0.9, INK);
-    d.text(`${r.wires}`, oblique + 7, cy + 2, 7, GREY, { align: 'left' });
+    d.text(`${r.wires}`, oblique + 7, cy + 4, 7, GREY);
     // Le repère, à sa teinte de circuit : la même que sur le plan.
     markerAt(d, { x: NOM - 14, y: cy }, r.mark, teinte);
     // Le libellé dispose de toute la place jusqu'à la colonne de droite.
@@ -2265,7 +2268,9 @@ function unifilairePage(
     });
     const dessert = detail?.get(r.mark) || r.points;
     if (dessert) {
-      d.text(fitText(dessert, 6.5, largeurNom), NOM, cy - 12, 6.5, GREY_LIGHT, {
+      // Toute la largeur : la colonne de droite est vide à cette hauteur,
+      // et « Applique murale 1 » sortait en « Ap… » avec de la place libre.
+      d.text(fitText(dessert, 6.5, CABLE - NOM), NOM, cy - 12, 6.5, GREY_LIGHT, {
         align: 'left',
       });
     }
@@ -3261,7 +3266,10 @@ export function buildMaterialPdf(
   ) => {
     need(16);
     const col = o.grey ? GREY : INK;
-    const dispo = w - COL_VAL - 10 - (o.indent ?? 0);
+    // Sans valeur à droite, la désignation dispose de TOUTE la ligne :
+    // réserver la colonne d'une valeur absente tronquait la liste des
+    // circuits d'un différentiel en « Spéciali… », la place libre à côté.
+    const dispo = w - (droite ? COL_VAL + 10 : 0) - (o.indent ?? 0);
     d.text(fitText(gauche, 10, dispo), x0 + (o.indent ?? 0), y, 10, col, {
       align: 'left',
       bold: o.bold,
@@ -3307,8 +3315,12 @@ export function buildMaterialPdf(
     if (room.rows.length === 0) continue;
     need(30);
     d.text(room.room, x0, y, 11, INK, { bold: true, align: 'left' });
+    // L'usage déduit ne se rappelle que s'il apprend quelque chose : pour
+    // une pièce non renommée, il EST le nom, et la feuille bégayait
+    // « Cuisine … Cuisine · 20,0 m² ».
+    const surface = `${room.area.toFixed(1).replace('.', ',')} m²`;
     d.text(
-      `${room.use} · ${room.area.toFixed(1).replace('.', ',')} m²`,
+      room.use && room.use !== room.room ? `${room.use} · ${surface}` : surface,
       x0 + w,
       y,
       9,
@@ -3538,8 +3550,10 @@ export function buildMaterialPdf(
     y -= 8;
     ligne('Protection différentielle 30 mA', '', { bold: true });
     for (const diff of list.differentials) {
+      // Le label porte déjà son type (« Différentiel type A 1 ») : le
+      // répéter écrivait « type A … type A » sur chaque ligne.
       ligne(
-        `${diff.label} — ${diff.rating} A type ${diff.type}` +
+        `${diff.label} — ${diff.rating} A · 30 mA` +
           (diff.circuits.length ? ` : ${diff.circuits.join(', ')}` : ''),
         '',
         { indent: 14 },

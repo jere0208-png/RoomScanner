@@ -197,6 +197,25 @@ describe('les conventions du dessin de plan', () => {
     for (const m of murs) expect(m.props.fill).not.toBe('#8E1B1B');
   });
 
+  /**
+   * LE CARTOUCHE A UN FOND QUE LES MEUBLES NE TRAVERSENT PAS.
+   *
+   * Relevé du chantier : à l'écran, le nom de la pièce se faisait traverser
+   * par les meubles — son fond était translucide à 55 %, alors que le même
+   * cartouche est opaque sur le PDF. La crainte d'origine (masquer le sol au
+   * moment d'y poser un point lumineux) est déjà traitée autrement : le
+   * cartouche s'efface pendant le réglage d'un appareil de plafond, et il
+   * esquive les meubles de sa pièce.
+   */
+  it('donne au cartouche un fond que les meubles ne traversent pas', () => {
+    const tree = rendu(false);
+    const cartouches = tous(tree, 'Rect').filter((n) => n.props.rx === 5);
+    expect(cartouches.length).toBeGreaterThan(0);
+    for (const r of cartouches) {
+      expect(r.props.fillOpacity ?? 1).toBeGreaterThanOrEqual(1);
+    }
+  });
+
   it('écrit la surface sous le nom, sans qu’on allume un calque', () => {
     // Le calque des surfaces éteint : le nom garde sa surface.
     useScanStore.setState({ showSurfaces: false });
