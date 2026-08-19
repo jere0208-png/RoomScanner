@@ -18,9 +18,15 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 import React from 'react';
 import { Animated, Text, TouchableOpacity, View } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
-import { G } from 'react-native-svg';
-import { FolderGlyph, LibraryScreen } from '../src/screens/LibraryScreen';
+import { G, Rect } from 'react-native-svg';
+import {
+  CHUTE_MS,
+  FolderGlyph,
+  LibraryScreen,
+  teintesDossier,
+} from '../src/screens/LibraryScreen';
 import { useScanStore, type SavedScan } from '../src/store/scanStore';
+import { dark, light } from '../src/theme';
 import { SNAPSHOT_WALLS } from '../src/export/snapshotFixture';
 
 beforeAll(() => jest.useFakeTimers());
@@ -145,16 +151,32 @@ describe('la bibliothèque des relevés', () => {
     expect(st.walls.length).toBe(SNAPSHOT_WALLS.length);
   });
 
-  it('n’ouvre plus les options sur un appui long', () => {
+  it('n’ouvre plus les options sur un appui long DE RELEVÉ', () => {
     const tree = monter([{ id: 'd1', name: 'Chantier' }]);
-    // L'appui long est le geste du RANGEMENT. Tant qu'il ouvrait aussi le
-    // menu, les deux se disputaient le même doigt : à 420 ms la feuille
-    // montait, à 500 ms la bulle se levait derrière elle, et le scan
-    // restait décollé sous une fenêtre.
-    const lignes = tree.root
+    /*
+      L'appui long d'un relevé est le geste du RANGEMENT. Tant qu'il ouvrait
+      aussi le menu, les deux se disputaient le même doigt : à 420 ms la
+      feuille montait, à 500 ms la bulle se levait derrière elle, et le scan
+      restait décollé sous une fenêtre.
+
+      Sur un DOSSIER, rien ne se dispute ce geste — un dossier ne se prend
+      pas, il reçoit. Il garde donc son appui long, et lui seul : trois
+      points sur une tuile de 96 points encombraient la cible qu'on vise
+      justement avec un scan au bout du doigt.
+    */
+    const longs = tree.root
       .findAllByType(TouchableOpacity)
       .filter((n) => n.props.onLongPress !== undefined);
-    expect(lignes).toHaveLength(0);
+    expect(longs).toHaveLength(1);
+    expect(String(longs[0].props.accessibilityLabel)).toContain('Dossier');
+    // Et aucun « … » sur les dossiers.
+    expect(
+      tree.root
+        .findAllByType(TouchableOpacity)
+        .filter((n) =>
+          String(n.props.accessibilityLabel ?? '').startsWith('Options du dossier'),
+        ),
+    ).toHaveLength(0);
   });
 
   it('lève la bulle au bout de l’appui, et prend la main sur le glissement', () => {
@@ -263,6 +285,42 @@ describe('la bibliothèque des relevés', () => {
  * c'est la feuille qui tombe entre les deux autres. Ce banc tient la
  * STRUCTURE : sans elle, il n'y a rien à animer.
  */
+/**
+ * UN DOSSIER SURVOLÉ S'ASSOMBRIT — il ne s'éclaircit pas.
+ *
+ * La façade passait au ciel (`sky`), un cyan clair : sur fond blanc, la
+ * cible de dépôt se DILUAIT au moment précis où elle doit s'affirmer. Le
+ * survol fonce donc les deux plans, et c'est la taille qui dit « c'est ici ».
+ */
+describe('le dossier visé par un scan', () => {
+  const luminance = (hex: string) => {
+    const brut = hex.replace('#', '');
+    const [r, v, b] = [0, 2, 4].map((i) => parseInt(brut.slice(i, i + 2), 16));
+    return 0.2126 * r + 0.7152 * v + 0.0722 * b;
+  };
+
+  it('fonce quand le doigt le survole, dans les deux thèmes', () => {
+    // Les teintes se DÉRIVENT de la palette : posées en dur, le dossier
+    // survolé virait au noir sur fond sombre.
+    for (const pal of [light, dark]) {
+      const repos = teintesDossier(false, pal);
+      const vise = teintesDossier(true, pal);
+      expect(luminance(vise.back)).toBeLessThan(luminance(repos.back));
+      expect(luminance(vise.front)).toBeLessThan(luminance(repos.front));
+    }
+  });
+
+  it('reste lisible : la façade tranche sur le dos', () => {
+    // Deux plans de la même teinte, et le dossier redevient une tache.
+    for (const pal of [light, dark]) {
+      for (const vise of [false, true]) {
+        const t = teintesDossier(vise, pal);
+        expect(Math.abs(luminance(t.front) - luminance(t.back))).toBeGreaterThan(8);
+      }
+    }
+  });
+});
+
 describe('le dossier qui reçoit un scan', () => {
   const rendre = (chute: number) => {
     let arbre!: TestRenderer.ReactTestRenderer;
@@ -281,6 +339,29 @@ describe('le dossier qui reçoit un scan', () => {
     // jamais — c'est ce qui donne la profondeur au geste.
     expect(arbre.root.findAllByType(G).length).toBeGreaterThanOrEqual(2);
     act(() => arbre.unmount());
+  });
+
+  /*
+    UNE SEULE FEUILLE, C'ÉTAIT UN CLIGNEMENT.
+
+    Elle tombait en 760 ms, et l'œil n'avait rien vu : sur un geste qu'on
+    fait au doigt, en regardant AILLEURS — le scan qu'on lâche —, il faut
+    que le mouvement dure assez pour être rattrapé du coin de l'œil. Ce sont
+    donc trois feuilles qui s'engouffrent, décalées, sur une seconde et
+    demie : c'est une liasse qu'on range, et ça se voit.
+  */
+  it('fait tomber une liasse, pas une feuille', () => {
+    const arbre = rendre(0.3);
+    // Chaque feuille est un document : un cadre et ses deux lignes.
+    const feuilles = arbre.root
+      .findAllByType(Rect)
+      .filter((n) => n.props.rx === 4);
+    expect(feuilles.length).toBeGreaterThanOrEqual(3);
+    act(() => arbre.unmount());
+  });
+
+  it('prend le temps qu’il faut pour être vue', () => {
+    expect(CHUTE_MS).toBeGreaterThanOrEqual(1300);
   });
 
   it('garde la taille de l’icône qu’on visait déjà', () => {

@@ -223,6 +223,43 @@ function PlanThumb({ scan, c }: { scan: SavedScan; c: Palette }) {
   );
 }
 
+/**
+ * LES DEUX TEINTES D'UN DOSSIER, selon qu'on le vise ou non.
+ *
+ * La façade passait au ciel quand le doigt la survolait — un cyan clair. Sur
+ * fond blanc, la cible de dépôt se DILUAIT au moment précis où elle doit
+ * s'affirmer : on lâchait sans être sûr d'avoir visé juste. Le survol fonce
+ * donc les deux plans, et c'est la taille qui crie « c'est ici ».
+ *
+ * Exportée parce qu'un banc la vérifie : la façade doit trancher sur le dos
+ * dans les deux états, sinon le dossier redevient une tache bleue.
+ */
+const assombrir = (hex: string, k: number) => {
+  const brut = hex.replace('#', '');
+  const canaux = [0, 2, 4].map((i) => parseInt(brut.slice(i, i + 2), 16));
+  return `#${canaux
+    .map((v) =>
+      Math.round(v * (1 - k))
+        .toString(16)
+        .padStart(2, '0'),
+    )
+    .join('')}`;
+};
+
+export const teintesDossier = (vise: boolean, c: Palette) =>
+  vise
+    ? { back: assombrir(c.blueDark, 0.45), front: assombrir(c.blue, 0.32) }
+    : { back: c.blueDark, front: c.blue };
+
+/**
+ * LA DURÉE DE LA CHUTE.
+ *
+ * 760 ms, c'était un clignement : on lâche le scan en regardant le doigt,
+ * pas le dossier, et le mouvement était fini avant que l'œil arrive. Une
+ * seconde et demie laisse le temps de le rattraper du coin de l'œil.
+ */
+export const CHUTE_MS = 1500;
+
 /** Un groupe SVG qu'on peut animer : la façade pivote, la feuille tombe. */
 const AnimatedG = Animated.createAnimatedComponent(G);
 
@@ -262,41 +299,72 @@ export function FolderGlyph({
         d="M3 12 a7 7 0 0 1 7 -7 h15.5 a5 5 0 0 1 3.9 1.9 l4.2 5.3 h31.4 a7 7 0 0 1 7 7 v31.8 a7 7 0 0 1 -7 7 H10 a7 7 0 0 1 -7 -7 z"
         fill={back}
       />
-      {/* La feuille, entre les deux plans : elle tombe et rétrécit, comme
-          une page qui s'enfonce. */}
-      <AnimatedG
-        opacity={t.interpolate({
-          inputRange: [0, 0.08, 0.62, 0.78],
-          outputRange: [0, 1, 1, 0],
-          extrapolate: 'clamp',
-        })}
-        // La descente se pilote par un NOMBRE, pas par une chaîne de
-        // transformation : interpoler « translate(0 -26) scale(1) » vers
-        // « translate(0 12) » exige le même nombre de composants de part et
-        // d'autre, et la moindre distraction fait tomber le rendu entier.
-        y={t.interpolate({
-          inputRange: [0, 0.7, 1],
-          outputRange: [-26, 12, 12],
-          extrapolate: 'clamp',
-        })}>
-        <Rect
-          x={20}
-          y={12}
-          width={32}
-          height={26}
-          rx={4}
-          fill={page ?? '#FFFFFF'}
-          stroke="rgba(11,13,18,0.12)"
-          strokeWidth={1}
-        />
-        {/* Deux traits : c'est un document, pas une carte blanche. */}
-        <Path
-          d="M26 21 h20 M26 27 h14"
-          stroke="rgba(11,13,18,0.25)"
-          strokeWidth={2}
-          strokeLinecap="round"
-        />
-      </AnimatedG>
+      {/*
+        UNE LIASSE, PAS UNE FEUILLE.
+
+        Une seule page tombait, et l'œil n'en voyait rien : le geste se fait
+        au doigt, en regardant le scan qu'on lâche, pas le dossier. Trois
+        feuilles s'engouffrent donc l'une après l'autre, DÉCALÉES d'un
+        cinquième de l'animation chacune — c'est le décalage qui fait la
+        liasse ; trois pages qui tombent ensemble ne feraient qu'une page
+        épaisse.
+
+        Elles ne partent pas du même point non plus : quelques pixels
+        d'écart en abscisse, comme des feuilles mal alignées qu'on jette
+        dans une chemise.
+      */}
+      {[0, 1, 2].map((i) => {
+        const retard = i * 0.19;
+        // Le fondu de la dernière feuille doit tenir DANS l'animation :
+        // au-delà de 1, elle s'évanouit d'un coup à la fin du geste.
+        const fin = Math.min(0.86, 0.5 + retard);
+        return (
+          <AnimatedG
+            key={i}
+            opacity={t.interpolate({
+              inputRange: [retard, retard + 0.06, fin, fin + 0.14],
+              outputRange: [0, 1, 1, 0],
+              extrapolate: 'clamp',
+            })}
+            // La descente se pilote par un NOMBRE, pas par une chaîne de
+            // transformation : interpoler « translate(0 -26) scale(1) » vers
+            // « translate(0 12) » exige le même nombre de composants de part
+            // et d'autre, et la moindre distraction fait tomber le rendu
+            // entier.
+            /*
+              LA COURSE VISIBLE EST ÉTROITE — d'où son étirement.
+
+              Une feuille n'est vue qu'entre le haut du dossier et le bord
+              de la façade : dix-sept points. Elle part donc de plus haut et
+              s'enfonce plus bas que le strict nécessaire, pour traverser
+              cette fenêtre lentement plutôt que de la franchir en deux
+              images.
+            */
+            y={t.interpolate({
+              inputRange: [retard, retard + 0.46, 1],
+              outputRange: [-32, 16, 16],
+              extrapolate: 'clamp',
+            })}>
+            <Rect
+              x={20 + (i - 1) * 4}
+              y={12}
+              width={32}
+              height={26}
+              rx={4}
+              fill={page ?? '#FFFFFF'}
+              stroke="rgba(11,13,18,0.12)"
+              strokeWidth={1}
+            />
+            {/* Deux traits : c'est un document, pas une carte blanche. */}
+            <Path
+              d={`M${26 + (i - 1) * 4} 21 h20 M${26 + (i - 1) * 4} 27 h14`}
+              stroke="rgba(11,13,18,0.25)"
+              strokeWidth={2}
+              strokeLinecap="round"
+            />
+          </AnimatedG>
+        );
+      })}
       {/* La façade : elle bascule sur son bord bas pour laisser entrer la
           feuille, puis se referme. */}
       <AnimatedG
@@ -370,7 +438,7 @@ function FolderTile({
     chute.setValue(0);
     Animated.timing(chute, {
       toValue: 1,
-      duration: 760,
+      duration: CHUTE_MS,
       easing: Easing.out(Easing.cubic),
       // Les attributs SVG ne passent pas par le fil natif.
       useNativeDriver: false,
@@ -388,11 +456,17 @@ function FolderTile({
             count > 1 ? 's' : ''
           }`}
           onPress={onOpen}
+          // Un dossier ne se PREND pas, il reçoit : rien ne se dispute son
+          // appui long, et trois points sur une tuile de 96 points
+          // encombraient la cible qu'on vise justement avec un scan au bout
+          // du doigt. Le « … » reste aux relevés, dont l'appui long est pris
+          // par le rangement.
+          onLongPress={onMenu}
           style={styles.tileTouch}>
           <View style={styles.tileGlyph}>
             <FolderGlyph
-              back={over ? palette.blue : palette.blueDark}
-              front={over ? palette.sky : palette.blue}
+              back={teintesDossier(over, palette).back}
+              front={teintesDossier(over, palette).front}
               chute={chute}
               page={palette.surface}
             />
@@ -407,22 +481,7 @@ function FolderTile({
           </Text>
         </TouchableOpacity>
       </View>
-      {/*
-        LE MÊME « … » QUE SUR UNE LIGNE.
 
-        Le dossier ouvrait ses options sur un appui long. Ça ne gênait
-        personne — rien ne se dispute ce geste sur une tuile — mais ça
-        laissait DEUX grammaires dans le même écran : ici on appuie long
-        pour agir, deux centimètres plus bas on appuie long pour prendre.
-        Un seul signe veut dire « il y a plus à faire », et il se voit.
-      */}
-      <TouchableOpacity
-        style={styles.tileMore}
-        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        accessibilityLabel={`Options du dossier ${folder.name}`}
-        onPress={onMenu}>
-        <MoreDots size={18} color={palette.inkSoft} dot={1.9} gap={6} />
-      </TouchableOpacity>
     </Animated.View>
   );
 }
@@ -1255,15 +1314,6 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   headerRowOver: {
     backgroundColor: c.surfaceSunken,
     borderRadius: radius.md,
-  },
-  tileMore: {
-    position: 'absolute',
-    top: -2,
-    left: 0,
-    width: 30,
-    height: 30,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   more: {
     width: 38,

@@ -491,7 +491,27 @@ de deux.
 
 L'animation part **au dépôt**, jamais au survol : au survol on hésite encore,
 et une feuille qui tombe à chaque passage du doigt raconterait un rangement
-qui n'a pas eu lieu. La descente se pilote par un nombre et non par une chaîne
+qui n'a pas eu lieu.
+
+**Une feuille, c'était un clignement.** Elle tombait en 760 ms et l'œil
+n'avait rien vu : on lâche le scan en regardant SON DOIGT, pas le dossier, et
+le mouvement était fini avant que le regard arrive. Ce sont donc trois
+feuilles qui s'engouffrent, décalées d'un cinquième de l'animation chacune —
+c'est le décalage qui fait la liasse, trois pages tombant ensemble ne
+feraient qu'une page épaisse — sur une seconde et demie. Leur course est
+étirée au-delà du nécessaire (de −32 à +16) parce que la fenêtre où une
+feuille est VISIBLE, entre le haut du dossier et le bord de la façade, ne
+fait que dix-sept points : sans cet étirement, elle la franchit en deux
+images.
+
+**Et le dossier visé fonce, il ne s'éclaircit plus.** Sa façade passait au
+ciel — un cyan clair : sur fond blanc, la cible de dépôt se DILUAIT au moment
+précis où elle doit s'affirmer. Les deux plans s'assombrissent maintenant
+(45 % pour le dos, 32 % pour la façade), et c'est la taille qui crie « c'est
+ici ». Les teintes se **dérivent de la palette** plutôt que d'être écrites en
+dur : posé en dur, le dossier survolé virait au noir en mode sombre. Un banc
+vérifie les deux thèmes — plus foncé qu'au repos, et la façade tranchant
+toujours sur le dos, faute de quoi le dossier redevient une tache bleue. La descente se pilote par un nombre et non par une chaîne
 de transformation — interpoler `translate(0 -26) scale(1)` vers
 `translate(0 12)` exige le même nombre de composants de part et d'autre, et la
 moindre distraction fait tomber le rendu entier.
@@ -517,10 +537,12 @@ tous deux au même endroit, et cet endroit était sur le trajet du pouce qui
 fait défiler la liste. La suppression vit maintenant au fond du menu, en
 rouge — même nombre de gestes, aucun au bord d'une liste qui bouge.
 
-Les tuiles de dossier ont reçu **le même « … »**. Rien ne se disputait leur
-appui long, mais laisser deux grammaires dans un seul écran — ici j'appuie
-long pour agir, deux centimètres plus bas j'appuie long pour prendre — est
-la meilleure façon de n'en faire apprendre aucune.
+Les tuiles de dossier, elles, **gardent leur appui long** et n'ont pas de
+« … ». Elles ont commencé par en recevoir un, par souci de grammaire unique ;
+c'était une erreur à l'usage. Un dossier ne se PREND pas, il reçoit : rien ne
+se dispute son appui long, et trois points posés sur une tuile de 96 points
+encombraient précisément la cible qu'on vise avec un scan au bout du doigt.
+Le signe va là où le geste manquait, pas partout par symétrie.
 
 Et le geste **répond partout**. Il ne se levait qu'à la racine, devant des
 dossiers ; dans un dossier ouvert, l'appui long ne produisait rien, ce qui se

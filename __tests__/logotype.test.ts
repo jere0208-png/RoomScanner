@@ -17,6 +17,12 @@
  * si la typo est un jour redessinée, là où un nombre de taches figé
  * casserait au premier retouchage.
  */
+/*
+  Le format PNG est défini en bits : filtres, canaux, entiers gros-boutistes.
+  Les opérateurs de bits sont ici le vocabulaire de la norme, pas une
+  optimisation — la règle qui les décourage ne s'applique pas à un décodeur.
+*/
+/* eslint-disable no-bitwise */
 import { readFileSync } from 'fs';
 import { inflateSync } from 'zlib';
 import { join } from 'path';
