@@ -130,6 +130,37 @@ L'outil « pièces » de la barre du plan relance la détection sur le graphe
 courant, en **gardant les noms donnés à la main** : chaque nouvelle pièce
 hérite du nom de l'ancienne dont le point de cartouche tombe dedans.
 
+### Ajouter une pièce, la fusionner, la détacher
+
+Trois gestes qui n'en font qu'un, et dont deux ne marchaient pas.
+
+**Une pièce ajoutée touche le logement.** Sans mur choisi, elle se posait à
+droite de l'emprise avec un jeu d'un demi-mètre : une boîte flottant dans le
+vide, reliée à rien. Le plan montrait deux logements, la détection n'y voyait
+aucune cloison commune — et « fusionner » n'avait plus rien à réunir, d'où
+l'impression qu'elle *ne faisait que renommer*. À défaut de choix, on prend
+donc le mur **extérieur le plus long** : c'est là qu'on agrandit un logement
+dans la vraie vie, et c'est celui qui a le plus de chances d'avoir de la place
+derrière lui. Les refends sont écartés — leur accoler une pièce la poserait
+dans l'une des deux qu'ils séparent.
+
+**On ne fusionne que des voisines.** La fusion réunit deux listes de murs en
+retirant ceux qu'elles ont en commun ; entre deux pièces qui n'en partagent
+aucun, elle produit une pièce faite de **deux contours disjoints** — plus de
+surface calculable, plus de métré, et à l'écran rien qu'un nom qui disparaît.
+C'est très exactement le défaut relevé. Le magasin refuse maintenant, et
+l'écran ne propose plus que les pièces mitoyennes : offrir un geste qui ne
+peut pas aboutir use la confiance plus vite qu'un geste absent.
+
+**Déplacer une pièce mitoyenne la détache.** Le déplacement refusait tout net
+dès qu'un mur était partagé ; depuis que l'ajout accole toujours, cela
+revenait à ne plus pouvoir déplacer aucune pièce ajoutée. Et laisser passer le
+geste tel quel serait pire — le mur mitoyen appartient aussi à la voisine, le
+tirer déchirerait son contour. La cloison se **dédouble** donc : la pièce
+emporte sa copie, la voisine garde la sienne et ne bouge pas d'un millimètre.
+C'est l'exact inverse de la soudure qui les recollera quand on la repoussera,
+et c'est ce qui se passe quand on décolle deux boîtes qui se touchaient.
+
 ### Un mur présenté, c'est lui seul
 
 La visite se place face à un mur et annonce ce qui s'y trouve : « Mur nord ·

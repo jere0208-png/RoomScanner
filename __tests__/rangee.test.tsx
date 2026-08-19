@@ -20,6 +20,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 import React from 'react';
 import { Animated, Text } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
+import { PILL_DEPART } from '../src/components/ToolPill';
 import { SidePill } from '../src/components/SidePill';
 
 beforeEach(() => jest.useFakeTimers());
@@ -56,6 +57,23 @@ const textes = (tree: TestRenderer.ReactTestRenderer) =>
     .join(' ');
 
 describe('le créneau de la rangée', () => {
+  /*
+    LES CALQUES MONTENT DU BOUTON, ILS NE TOMBENT PLUS DU HAUT.
+
+    La rangée entrait en glissant depuis le HAUT de l'écran — un décalage
+    négatif, une pastille par rang. C'était juste du temps où le bouton
+    d'édition vivait en haut ; il est descendu au pied du plan, et
+    l'animation est restée. Les calques arrivaient donc du côté opposé à
+    celui du doigt qui vient de les appeler : le mouvement disait « ça vient
+    de là-haut » alors qu'on regardait le bas.
+  */
+  it('fait monter les calques depuis le bas', () => {
+    // Le décalage de départ est POSITIF : la pastille part sous sa place et
+    // remonte. Il croît avec le rang, pour que la rangée se déplie.
+    expect(PILL_DEPART(0)).toBeGreaterThan(0);
+    expect(PILL_DEPART(2)).toBeGreaterThan(PILL_DEPART(0));
+  });
+
   it('ne monte rien tant que la pastille n’a pas lieu d’être', () => {
     expect(textes(monte(false))).toBe('');
   });

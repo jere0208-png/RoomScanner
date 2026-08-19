@@ -1156,10 +1156,12 @@ export function ResultScreen() {
           icon: 'hauteur' as const,
           onPress: promptRoomHeight,
         },
-        ...(autres > 0
+        // Offerte seulement s'il y a une VOISINE : ailleurs, le geste
+        // n'aboutit pas, et un choix qui ne fait rien use la confiance.
+        ...(voisinesDe(roomId).length > 0
           ? [
               {
-                label: 'Fusionner avec une autre pièce',
+                label: 'Fusionner avec une pièce voisine',
                 icon: 'fusionner' as const,
                 onPress: promptMerge,
               },
@@ -1222,6 +1224,24 @@ export function ResultScreen() {
     });
   };
 
+  /**
+   * LES VOISINES DE LA PIÈCE CHOISIE — celles qui partagent une cloison.
+   *
+   * La fusion réunit deux listes de murs en retirant ceux qu'elles ont en
+   * commun. Entre deux pièces qui n'en partagent AUCUN, elle produit une
+   * pièce faite de deux contours disjoints : plus de surface, plus de métré,
+   * et à l'écran rien qu'un nom qui disparaît. Les proposer était donc
+   * offrir un geste qui ne pouvait pas aboutir.
+   */
+  const voisinesDe = (id: string) => {
+    const cible = rooms.find((r) => r.id === id);
+    if (!cible) return [];
+    const siens = new Set(cible.wallIds ?? []);
+    return rooms.filter(
+      (r) => r.id !== id && (r.wallIds ?? []).some((w) => siens.has(w)),
+    );
+  };
+
   /** Réunit la pièce sélectionnée avec une voisine, au choix. */
   const promptMerge = () => {
     if (!targetRoom) return;
@@ -1229,8 +1249,7 @@ export function ResultScreen() {
       title: 'Fusionner avec…',
       subtitle:
         'Les deux pièces n’en feront plus qu’une ; la cloison reste dessinée.',
-      actions: rooms
-        .filter((r) => r.id !== targetRoom.id)
+      actions: voisinesDe(targetRoom.id)
         .slice(0, 6)
         .map((r) => ({
           label: r.name || r.id,

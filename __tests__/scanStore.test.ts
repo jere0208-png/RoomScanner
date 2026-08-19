@@ -436,6 +436,83 @@ describe('retoucher les pièces à la main', () => {
     ).toBeCloseTo(2.5);
   });
 
+  /*
+    UNE PIÈCE AJOUTÉE TOUCHE LE LOGEMENT.
+
+    Sans mur choisi, elle se posait à droite de l'emprise avec un jeu d'un
+    demi-mètre : une boîte flottant dans le vide, reliée à rien. Le plan
+    montrait deux logements, la détection n'y voyait pas de cloison commune,
+    et « fusionner » ne pouvait plus rien réunir — d'où l'impression qu'elle
+    ne faisait que renommer.
+
+    Elle s'accole donc TOUJOURS à un mur : celui qu'on a choisi, ou, à
+    défaut, le plus long du contour extérieur. Le mur devient mitoyen, et
+    figure dans les listes des deux pièces.
+  */
+  it('accroche une pièce ajoutée au mur le plus long', () => {
+    useScanStore.getState().finalize({
+      modelPath: '/tmp/scan.usdz',
+      surfaces: boxSurfaces('a', 0, 0, 6, 3),
+      objects: [],
+    });
+    const avant = useScanStore.getState().walls.length;
+    const id = useScanStore.getState().addRoomBox(3, 3, 'Chambre');
+    const st = useScanStore.getState();
+    expect(st.rooms).toHaveLength(2);
+    // Trois murs neufs, pas quatre : le quatrième est le mitoyen, partagé.
+    expect(st.walls.length).toBe(avant + 3);
+    const neuve = st.rooms.find((r) => r.id === id)!;
+    const vieille = st.rooms.find((r) => r.id !== id)!;
+    const commun = (neuve.wallIds ?? []).filter((w) =>
+      (vieille.wallIds ?? []).includes(w),
+    );
+    expect(commun).toHaveLength(1);
+    // Et son contour se ferme : une pièce dont la surface n'est pas exacte
+    // est une pièce que le métré ne sait pas compter.
+    const part = roomParts(st.walls, st.rooms).find((p) => p.roomId === id);
+    expect(part?.surface?.exact).toBe(true);
+    expect(part!.surface!.area).toBeGreaterThan(4);
+  });
+
+  /*
+    ON NE FUSIONNE QUE DES VOISINES.
+
+    La fusion réunit deux listes de murs en retirant ceux qu'elles ont en
+    commun. Entre deux pièces qui n'en partagent AUCUN, elle produit une
+    pièce faite de deux contours disjoints : plus de surface calculable,
+    plus de métré — et à l'écran, rien d'autre qu'un nom qui disparaît.
+    C'est ce qu'on a pris pour « la fusion ne fait que renommer ».
+  */
+  it('refuse de fusionner deux pièces qui ne se touchent pas', () => {
+    useScanStore.getState().finalize({
+      modelPath: '/tmp/scan.usdz',
+      surfaces: [...boxSurfaces('a', 0, 0, 4, 3), ...boxSurfaces('b', 20, 0, 4, 3)],
+      objects: [],
+    });
+    const st0 = useScanStore.getState();
+    expect(st0.rooms.length).toBeGreaterThanOrEqual(2);
+    const [r1, r2] = st0.rooms;
+    useScanStore.getState().mergeRooms(r1.id, r2.id);
+    // Rien n'a bougé : deux pièces, chacune avec sa surface.
+    const st = useScanStore.getState();
+    expect(st.rooms).toHaveLength(2);
+    for (const p of roomParts(st.walls, st.rooms)) {
+      expect(p.surface?.exact).toBe(true);
+    }
+  });
+
+  it('fusionne bien deux pièces mitoyennes', () => {
+    deuxPieces();
+    const [r1, r2] = useScanStore.getState().rooms;
+    useScanStore.getState().mergeRooms(r1.id, r2.id);
+    const st = useScanStore.getState();
+    expect(st.rooms).toHaveLength(1);
+    const part = roomParts(st.walls, st.rooms)[0];
+    expect(part.surface?.exact).toBe(true);
+    // La somme des deux, à l'épaisseur de cloison près.
+    expect(part.surface!.area).toBeGreaterThan(20);
+  });
+
   it('donne les cotes hors-tout et la surface murale nette', () => {
     deuxPieces();
     const st = useScanStore.getState();

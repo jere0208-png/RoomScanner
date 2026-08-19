@@ -1084,11 +1084,50 @@ export const useScanStore = create<ScanState>((set, get) => {
           st.walls.filter((w) => roomOf(w) === roomId).map((w) => w.id),
       );
       if (aMoi.size === 0) return;
-      // Un mur porté par une AUTRE pièce est mitoyen : on ne déplace pas.
-      const partage = st.rooms.some(
-        (r) => r.id !== roomId && (r.wallIds ?? []).some((id) => aMoi.has(id)),
+
+      /*
+        DÉPLACER UNE PIÈCE MITOYENNE LA DÉTACHE.
+
+        Le déplacement refusait tout net dès qu'un mur était partagé.
+        Depuis que l'ajout accole toujours la nouvelle pièce, cela revenait
+        à ne plus pouvoir en déplacer AUCUNE. Et laisser passer le geste tel
+        quel serait pire : le mur mitoyen appartient aussi à la voisine, le
+        tirer déchirerait son contour.
+
+        La cloison se DÉDOUBLE donc — la pièce déplacée emporte sa copie, la
+        voisine garde la sienne et ne bouge pas d'un millimètre. C'est ce qui
+        arrive quand on décolle deux boîtes qui se touchaient, et c'est
+        exactement l'inverse de la soudure qui les recollera.
+
+        L'appareillage, lui, reste sur l'original : il est posé sur la
+        maçonnerie qui n'a pas bougé.
+      */
+      const mitoyens = st.walls.filter(
+        (w) =>
+          aMoi.has(w.id) &&
+          st.rooms.some(
+            (r) => r.id !== roomId && (r.wallIds ?? []).includes(w.id),
+          ),
       );
-      if (partage) return;
+      let murs = st.walls;
+      let pieces = st.rooms;
+      let mesMurs = aMoi;
+      if (mitoyens.length > 0) {
+        const graine = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+        const copies = mitoyens.map((w, i) => ({
+          ...w,
+          id: `mur-${graine}-${i}`,
+          roomId,
+        }));
+        const remap = new Map(mitoyens.map((w, i) => [w.id, copies[i].id]));
+        murs = [...st.walls, ...copies];
+        mesMurs = new Set([...aMoi].map((id) => remap.get(id) ?? id));
+        pieces = st.rooms.map((r) =>
+          r.id === roomId && r.wallIds
+            ? { ...r, wallIds: r.wallIds.map((id) => remap.get(id) ?? id) }
+            : r,
+        );
+      }
 
       /**
        * L'AIMANT : on cherche le petit réajustement qui aligne.
@@ -1100,13 +1139,13 @@ export const useScanStore = create<ScanState>((set, get) => {
        * c'est que l'électricien voulait bien poser la pièce là.
        */
       const AIMANT = 0.25;
-      const bouges = st.walls
-        .filter((w) => aMoi.has(w.id))
+      const bouges = murs
+        .filter((w) => mesMurs.has(w.id))
         .map((w) => ({
           a: { x: w.a.x + dx, z: w.a.z + dz },
           b: { x: w.b.x + dx, z: w.b.z + dz },
         }));
-      const autres = st.walls.filter((w) => !aMoi.has(w.id));
+      const autres = murs.filter((w) => !mesMurs.has(w.id));
       let cale = { x: 0, z: 0 };
       let mieux = AIMANT;
       for (const m of bouges) {
@@ -1149,12 +1188,12 @@ export const useScanStore = create<ScanState>((set, get) => {
        * qu'il portait le suit.
        */
       const soudes = new Map<string, string>();
-      for (const w of st.walls) {
-        if (!aMoi.has(w.id)) continue;
+      for (const w of murs) {
+        if (!mesMurs.has(w.id)) continue;
         const A = { x: w.a.x + ddx, z: w.a.z + ddz };
         const B = { x: w.b.x + ddx, z: w.b.z + ddz };
-        for (const o of st.walls) {
-          if (aMoi.has(o.id)) continue;
+        for (const o of murs) {
+          if (mesMurs.has(o.id)) continue;
           // Mêmes extrémités, à cinq centimètres près, dans un sens ou dans
           // l'autre : c'est la même maçonnerie.
           const memeSens =
@@ -1172,10 +1211,10 @@ export const useScanStore = create<ScanState>((set, get) => {
 
       pushHistory(`moveRoom:${roomId}`);
       set({
-        walls: st.walls
+        walls: murs
           .filter((w) => !soudes.has(w.id))
           .map((w) =>
-            aMoi.has(w.id)
+            mesMurs.has(w.id)
               ? {
                   ...w,
                   a: { x: w.a.x + ddx, z: w.a.z + ddz },
@@ -1184,7 +1223,7 @@ export const useScanStore = create<ScanState>((set, get) => {
               : w,
           ),
         // La pièce troque ses murs soudés contre ceux qu'elle a rejoints.
-        rooms: st.rooms.map((r) =>
+        rooms: pieces.map((r) =>
           r.id === roomId && r.wallIds
             ? {
                 ...r,
@@ -1199,7 +1238,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         ),
         // Les menuiseries de ces murs suivent, sinon elles restent en l'air.
         openings: st.openings.map((o) => {
-          const proche = nearestWall(o, st.walls.filter((w) => aMoi.has(w.id)));
+          const proche = nearestWall(o, murs.filter((w) => mesMurs.has(w.id)));
           return proche.dist < 0.4
             ? {
                 ...o,
@@ -1267,6 +1306,16 @@ export const useScanStore = create<ScanState>((set, get) => {
       // pièce réunie, et le contour se referme sur l'enveloppe des deux.
       const inA = new Set(a.wallIds ?? []);
       const inB = new Set(b.wallIds ?? []);
+      /*
+        ON NE FUSIONNE QUE DES VOISINES.
+
+        Sans mur commun, réunir les deux listes produit une pièce faite de
+        deux contours DISJOINTS : plus de surface calculable, plus de métré,
+        et à l'écran rien d'autre qu'un nom qui disparaît. C'est ce qu'on a
+        pris pour « la fusion ne fait que renommer ».
+      */
+      const mitoyen = [...inA].some((id) => inB.has(id));
+      if (!mitoyen) return;
       const wallIds = [...new Set([...inA, ...inB])].filter(
         (id) => !(inA.has(id) && inB.has(id)),
       );
@@ -1450,9 +1499,35 @@ export const useScanStore = create<ScanState>((set, get) => {
        * modèle : c'est la seule façon d'avoir une cloison qui coïncide
        * exactement. Sa profondeur, elle, est bien celle qu'on a choisie.
        */
-      const contre = contreWallId
+      /*
+        ELLE S'ACCROCHE TOUJOURS À UN MUR.
+
+        Sans mur choisi, elle se posait à droite de l'emprise avec un jeu
+        d'un demi-mètre : une boîte flottant dans le vide, reliée à rien. Le
+        plan montrait deux logements, la détection n'y voyait aucune cloison
+        commune, et « fusionner » n'avait plus rien à réunir.
+
+        À défaut de choix, on prend le mur EXTÉRIEUR LE PLUS LONG : c'est
+        celui qui a le plus de chances d'avoir de la place derrière lui, et
+        c'est là qu'on agrandit un logement dans la vraie vie. La pièce se
+        pose de l'autre côté, et le mur devient mitoyen.
+      */
+      const choisi = contreWallId
         ? st.walls.find((w) => w.id === contreWallId)
         : undefined;
+      const bordures = new Set(
+        st.rooms.flatMap((r) => r.wallIds ?? []),
+      );
+      const auto = [...st.walls]
+        .filter((w) => w.type === 'wall' && bordures.has(w.id))
+        // Un mur qui borde DEUX pièces est un refend : lui accoler une
+        // troisième pièce la poserait dans l'une des deux.
+        .filter(
+          (w) =>
+            st.rooms.filter((r) => (r.wallIds ?? []).includes(w.id)).length === 1,
+        )
+        .sort((p, q) => segLength(q) - segLength(p))[0];
+      const contre = choisi ?? auto;
       if (contre) {
         const len = Math.hypot(contre.b.x - contre.a.x, contre.b.z - contre.a.z);
         if (len > 0.4) {

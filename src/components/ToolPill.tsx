@@ -169,6 +169,20 @@ export const PILL_GAP = 12;
 export const PILL_CELL_H = PILL_SIZE + PILL_LABEL_GAP + PILL_LABEL_H;
 /** Pas d'une pastille : sa cellule, et l'écart qui la suit. */
 export const PILL_PITCH = PILL_CELL_H + PILL_GAP;
+
+/**
+ * D'OÙ PART UNE PASTILLE QUAND LA RANGÉE S'OUVRE.
+ *
+ * Du BAS, et de plus en plus bas à mesure qu'on descend dans les rangs :
+ * elles montent du bouton d'édition, qui vit au pied du plan, et se
+ * déplient.
+ *
+ * Elles tombaient du haut — un décalage négatif. C'était juste du temps où
+ * le bouton d'édition était en haut de l'écran ; il est descendu, et
+ * l'animation est restée. Les calques arrivaient donc du côté opposé au
+ * doigt qui venait de les appeler.
+ */
+export const PILL_DEPART = (index: number) => (index + 1) * PILL_PITCH;
 /** Où la rangée d'ancrage se pose, et donc où la colonne commence. */
 export const ANCHOR_TOP = 10;
 
@@ -205,7 +219,7 @@ export function PillSlot({
           {
             translateY: t.interpolate({
               inputRange: [0, 1],
-              outputRange: [-(index + 1) * PILL_PITCH, 0],
+              outputRange: [PILL_DEPART(index), 0],
             }),
           },
           {

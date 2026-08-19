@@ -163,11 +163,33 @@ describe('accoler une pièce à un mur existant', () => {
     expect(part!.surface?.area ?? 0).toBeCloseTo(4 * 2.5, 1);
   });
 
-  it('et retombe à côté du plan quand aucun mur n’est choisi', () => {
+  /*
+    SANS MUR CHOISI, ELLE S'ACCROCHE QUAND MÊME.
+
+    Elle se posait à droite de l'emprise, avec un jeu d'un demi-mètre : une
+    boîte flottant dans le vide, reliée à rien. Le plan montrait deux
+    logements, la détection n'y voyait aucune cloison commune, et
+    « fusionner » n'avait plus rien à réunir — d'où l'impression qu'elle ne
+    faisait que renommer.
+
+    À défaut de choix, on prend le mur EXTÉRIEUR LE PLUS LONG : c'est là
+    qu'on agrandit un logement dans la vraie vie, et c'est celui qui a le
+    plus de chances d'avoir de la place derrière lui.
+  */
+  it('s’accroche au mur le plus long quand aucun n’est choisi', () => {
     const id = useScanStore.getState().addRoomBox(3, 3, 'Chambre', null);
     const st = useScanStore.getState();
-    expect(st.walls).toHaveLength(CARRE.length + 4);
-    expect(st.rooms.find((r) => r.id === id)!.wallIds).toHaveLength(4);
+    // Trois murs neufs, pas quatre : le quatrième est le mitoyen, partagé.
+    expect(st.walls).toHaveLength(CARRE.length + 3);
+    const neuve = st.rooms.find((r) => r.id === id)!;
+    expect(neuve.wallIds).toHaveLength(4);
+    const commun = (neuve.wallIds ?? []).filter((w) =>
+      CARRE.some((m) => m.id === w),
+    );
+    expect(commun).toHaveLength(1);
+    // Et son contour se ferme : sans quoi le métré ne sait pas la compter.
+    const part = roomParts(st.walls, st.rooms).find((p) => p.roomId === id);
+    expect(part?.surface?.exact).toBe(true);
   });
 });
 
@@ -206,11 +228,55 @@ describe('déplacer une pièce', () => {
     });
   });
 
-  /** La pièce ajoutée à côté, à déplacer. */
-  const ajoutee = () => useScanStore.getState().addRoomBox(3, 3, 'Chambre', null);
+  /** La pièce ajoutée, accolée au séjour — c'est elle qu'on déplace. */
+  const ajoutee = () => useScanStore.getState().addRoomBox(3, 3, 'Chambre', 'e');
+
+  /*
+    DÉPLACER UNE PIÈCE MITOYENNE LA DÉTACHE.
+
+    Le déplacement refusait tout net dès qu'un mur était partagé : depuis que
+    l'ajout accole toujours, cela revenait à ne plus pouvoir déplacer AUCUNE
+    pièce ajoutée. Et le laisser passer tel quel serait pire — le mur mitoyen
+    appartient aussi à la voisine, le tirer déchirerait le plan.
+
+    La cloison se DÉDOUBLE donc : la pièce déplacée emporte sa copie, la
+    voisine garde la sienne et ne bouge pas d'un millimètre. C'est ce qui se
+    passe quand on décolle deux boîtes qui se touchaient.
+  */
+  it('se détache de sa voisine, qui ne bouge pas', () => {
+    const id = ajoutee();
+    const avantMurs = useScanStore.getState().walls;
+    const sejour = avantMurs.filter((w) => CARRE.some((m) => m.id === w.id));
+    const combien = avantMurs.length;
+    useScanStore.getState().moveRoom(id, 1.4, 0);
+    const st = useScanStore.getState();
+    // Un mur de plus : la cloison mitoyenne s'est dédoublée.
+    expect(st.walls).toHaveLength(combien + 1);
+    // Le séjour est intact, au millimètre.
+    for (const w of sejour) {
+      const apres = st.walls.find((x) => x.id === w.id)!;
+      expect(apres.a).toEqual(w.a);
+      expect(apres.b).toEqual(w.b);
+    }
+    // Et la chambre a bien avancé de 1,40 m — on mesure le déplacement,
+    // pas une position : elle s'accole au premier mur le plus long, et
+    // lequel n'a pas à être écrit ici.
+    const siens = new Set(st.rooms.find((r) => r.id === id)!.wallIds!);
+    const xs = st.walls.filter((w) => siens.has(w.id)).flatMap((w) => [w.a.x, w.b.x]);
+    const avantXs = avantMurs
+      .filter((w) => !CARRE.some((m) => m.id === w.id))
+      .flatMap((w) => [w.a.x, w.b.x]);
+    expect(Math.min(...xs)).toBeCloseTo(Math.min(...avantXs) + 1.4, 6);
+    // Elle reste une pièce entière : son contour se ferme toujours.
+    const part = roomParts(st.walls, st.rooms).find((p) => p.roomId === id);
+    expect(part?.surface?.exact).toBe(true);
+  });
 
   it('translate tous ses murs, et rien d’autre', () => {
     const id = ajoutee();
+    // Un premier déplacement la détache ; on mesure le suivant, qui est une
+    // translation pure.
+    useScanStore.getState().moveRoom(id, 2, 0);
     const avant = useScanStore.getState().walls;
     const siens = new Set(
       useScanStore.getState().rooms.find((r) => r.id === id)!.wallIds!,
@@ -232,8 +298,9 @@ describe('déplacer une pièce', () => {
     const id = ajoutee();
     const st = () => useScanStore.getState();
     const siens = () => new Set(st().rooms.find((r) => r.id === id)!.wallIds!);
-    // Elle est posée à 0,50 m à droite du séjour (x = 4,5). On la pousse
-    // de 40 cm vers la gauche : il reste 10 cm — l'aimant les rattrape.
+    // On la détache de 50 cm (elle part de x = 4), puis on la repousse de
+    // 40 cm : il reste 10 cm — l'aimant les rattrape.
+    useScanStore.getState().moveRoom(id, 0.5, 0);
     useScanStore.getState().moveRoom(id, -0.4, 0);
     const gauche = Math.min(
       ...st()
@@ -245,6 +312,7 @@ describe('déplacer une pièce', () => {
 
   it('emmène ses meubles et ses points lumineux avec elle', () => {
     const id = ajoutee();
+    useScanStore.getState().moveRoom(id, 2, 0);
     useScanStore.setState({
       objects: [
         {
@@ -272,11 +340,21 @@ describe('déplacer une pièce', () => {
    * plan — un mur ne peut pas être à deux endroits. Elle est déjà à sa
    * place, par construction.
    */
-  it('refuse de déplacer une pièce qui partage un mur', () => {
+  it('détache au lieu de refuser, quand un mur est partagé', () => {
+    // Le déplacement refusait tout net dès qu'une cloison était mitoyenne.
+    // Depuis que l'ajout accole toujours, cela revenait à ne plus pouvoir
+    // déplacer aucune pièce ajoutée.
     const id = useScanStore.getState().addRoomBox(3, 3, 'Chambre', 'n');
     const avant = useScanStore.getState().walls;
     useScanStore.getState().moveRoom(id, 1, 1);
-    expect(useScanStore.getState().walls).toEqual(avant);
+    const st = useScanStore.getState();
+    expect(st.walls).not.toEqual(avant);
+    // Le séjour est intact.
+    for (const w of CARRE) {
+      const apres = st.walls.find((x) => x.id === w.id)!;
+      expect(apres.a).toEqual(w.a);
+      expect(apres.b).toEqual(w.b);
+    }
   });
 });
 
@@ -324,7 +402,11 @@ describe('la soudure au contact', () => {
      * inventer ; deux murs de longueurs différentes se contentent de
      * s'aligner, et il faudrait les découper pour les souder.
      */
-    const id = useScanStore.getState().addRoomBox(4, 4, 'Chambre', null);
+    const id = useScanStore.getState().addRoomBox(4, 4, 'Chambre', 'e');
+    // On la décolle d'un demi-mètre, puis on la repousse : l'aimant
+    // rattrape les dix derniers centimètres et la soudure se fait. C'est le
+    // geste réel — on écarte une pièce pour la regarder, puis on la remet.
+    useScanStore.getState().moveRoom(id, 0.5, 0);
     const avant = useScanStore.getState().walls.length;
     useScanStore.getState().moveRoom(id, -0.4, 0);
     const st = useScanStore.getState();
@@ -338,6 +420,7 @@ describe('la soudure au contact', () => {
 
   it('et l’appareillage du mur soudé reste posé dessus', () => {
     const id = useScanStore.getState().addRoomBox(4, 3, 'Chambre', null);
+    useScanStore.getState().moveRoom(id, 0.5, 0);
     const sien = useScanStore.getState().rooms.find((r) => r.id === id)!
       .wallIds![3];
     useScanStore.setState({
@@ -353,6 +436,7 @@ describe('la soudure au contact', () => {
 
   it('mais ne soude rien quand les murs ne se recouvrent pas', () => {
     const id = useScanStore.getState().addRoomBox(2, 2, 'WC', null);
+    useScanStore.getState().moveRoom(id, 0.5, 0);
     const avant = useScanStore.getState().walls.length;
     // On l'éloigne : aucun mur ne tombe sur un autre.
     useScanStore.getState().moveRoom(id, 3, 3);
