@@ -207,6 +207,51 @@ describe('les conventions du dessin de plan', () => {
     expect(textes.some((t) => t.includes('m²'))).toBe(true);
   });
 
+  /*
+    LA TROUÉE D'UN OUVRANT NE DÉBORDE PAS DU MUR.
+
+    Elle était dessinée à seize centimètres d'épaisseur pour un mur qui en
+    fait dix : elle dépassait donc de trois centimètres de chaque côté, et
+    ce débord — rempli d'une couleur pleine pour effacer le poché — formait
+    un liseré clair tout autour de chaque porte et de chaque fenêtre. Sur un
+    plan, ça se lit comme un fond blanc collé à la menuiserie.
+
+    Elle a besoin d'un cheveu de plus que le mur, pas d'un centimètre : sans
+    ce cheveu, l'anticrénelage laisse un trait de poché résiduel en travers
+    de la baie.
+  */
+  it('perce le mur sans déborder autour', () => {
+    const tree = rendu(false);
+    /** L'épaisseur d'un quadrilatère, mesurée sur son petit côté. */
+    const epaisseur = (pts: string) => {
+      const p2 = pts.trim().split(/\s+/).map((c) => c.split(',').map(Number));
+      if (p2.length !== 4) return NaN;
+      const cote = (i2: number, j2: number) =>
+        Math.hypot(p2[i2][0] - p2[j2][0], p2[i2][1] - p2[j2][1]);
+      return Math.min(cote(0, 1), cote(1, 2));
+    };
+    /** Sombre = le poché d'un mur ; clair = ce qui l'efface. */
+    const sombre = (hex: string) => {
+      const n = parseInt(String(hex).replace('#', ''), 16);
+      return Number.isNaN(n) ? false : ((n >> 16) & 255) + ((n >> 8) & 255) + (n & 255) < 300;
+    };
+    const quads = tous(tree, 'Polygon')
+      .filter((n) => n.props.stroke === 'none' && typeof n.props.points === 'string')
+      .map((n) => ({
+        e: epaisseur(String(n.props.points)),
+        mur: sombre(String(n.props.fill)),
+      }))
+      .filter((q) => !Number.isNaN(q.e) && q.e > 0);
+    const murs = quads.filter((q) => q.mur).map((q) => q.e);
+    const trouees = quads.filter((q) => !q.mur).map((q) => q.e);
+    expect(murs.length).toBeGreaterThan(0);
+    expect(trouees.length).toBeGreaterThan(0);
+    // La trouée fait l'épaisseur du mur, à un cheveu près — pas 60 % de
+    // plus, ce qui lui faisait déborder un liseré clair de chaque côté.
+    const mur = Math.min(...murs);
+    for (const t of trouees) expect(t).toBeLessThan(mur * 1.1);
+  });
+
   it('dessine le vantail des portes et son quart de cercle', () => {
     const tree = rendu(false);
     const arcs = tous(tree, 'Path')

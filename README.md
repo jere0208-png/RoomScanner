@@ -300,6 +300,27 @@ Au passage, le banc d'accessibilité a rattrapé la conséquence : le caractère
 servait de NOM au bouton pour un lecteur d'écran. Devenu tracé, il ne dit plus
 rien — le nom s'écrit.
 
+### Trois caractères qui n'étaient pas des icônes
+
+C'est la même leçon, payée trois fois — après la croix de fermeture, qui
+l'avait déjà écrite.
+
+- **Le chevron de retour** (« ‹ ») se posait sur une ligne de base, à côté de
+  deux icônes vectorielles centrées par construction. Il tombait trop bas, on
+  l'avait remonté de trois points à la main : un réglage qui ne vaut que pour
+  une police et une taille.
+- **Le soleil du bouton de thème** (« ☀ ») : iOS le rend en EMOJI COULEUR.
+  Un soleil jaune et ombré, au milieu d'une interface dont tous les autres
+  pictogrammes sont des traits gris — et un emoji ignore `color`, donc rien ne
+  permettait de le calmer. `ThemeGlyph` dessine le soleil et la lune.
+- **La trouée des ouvrants** n'est pas un caractère, mais elle relevait du
+  même à-peu-près : dessinée trois centimètres plus large que le mur DE CHAQUE
+  CÔTÉ — seize pour un mur de dix —, elle laissait un liseré clair tout autour
+  de chaque porte et de chaque fenêtre. Sur le plan, cela se lit comme un fond
+  blanc collé à la menuiserie. Elle garde un cheveu de débord, sans lequel
+  l'anticrénelage laisse un trait de poché en travers de la baie ; le banc du
+  plan mesure maintenant son épaisseur contre celle du mur.
+
 ### Deux détails du thème sombre
 
 Le titre de la bibliothèque vivait dans le flux, entre le bouton de retour et

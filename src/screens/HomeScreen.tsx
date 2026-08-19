@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { ThemeGlyph } from '../components/ThemeGlyph';
 import {
   Animated,
   Easing,
@@ -110,8 +111,14 @@ export function HomeScreen() {
     <View style={styles.container}>
       <TouchableOpacity
         style={styles.themeButton}
+        accessibilityLabel={
+          themePref === 'dark' ? 'Passer en thème clair' : 'Passer en thème sombre'
+        }
         onPress={() => setThemePref(themePref === 'dark' ? 'light' : 'dark')}>
-        <Text style={styles.themeIcon}>{themePref === 'dark' ? '☀' : '☾'}</Text>
+        <ThemeGlyph
+          quoi={themePref === 'dark' ? 'soleil' : 'lune'}
+          color={c.inkSoft}
+        />
       </TouchableOpacity>
 
       <View style={styles.hero}>
@@ -330,7 +337,6 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     justifyContent: 'center',
     zIndex: 2,
   },
-  themeIcon: { color: c.inkSoft, fontSize: 21 },
   /**
    * Le logotype tient sur DEUX lignes — « echo » au-dessus de « plan » —,
    * d'où ces proportions : 160 × 102 et non plus une bande.

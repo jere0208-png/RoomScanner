@@ -1399,9 +1399,20 @@ export function FloorplanEditor({
               const dx = o.b.x - o.a.x;
               const dz = o.b.z - o.a.z;
               const len = Math.hypot(dx, dz) || 1;
-              // Trouée un peu plus épaisse que le mur : elle le traverse net.
-              const nx = (-dz / len) * (WALL_T / 2 + 0.03);
-              const nz = (dx / len) * (WALL_T / 2 + 0.03);
+              /*
+                LA TROUÉE FAIT L'ÉPAISSEUR DU MUR, À UN CHEVEU PRÈS.
+
+                Elle en faisait trois centimètres de plus DE CHAQUE CÔTÉ —
+                seize pour un mur de dix. Ce débord, rempli d'une couleur
+                pleine pour effacer le poché, formait un liseré clair tout
+                autour de chaque porte et de chaque fenêtre : sur le plan, ça
+                se lit comme un fond blanc collé à la menuiserie.
+
+                Le cheveu, lui, reste nécessaire : sans lui, l'anticrénelage
+                laisse un trait de poché résiduel en travers de la baie.
+              */
+              const nx = (-dz / len) * (WALL_T / 2 + 0.004);
+              const nz = (dx / len) * (WALL_T / 2 + 0.004);
               const slot = [
                 { x: o.a.x + nx, z: o.a.z + nz },
                 { x: o.b.x + nx, z: o.b.z + nz },
