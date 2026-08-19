@@ -366,3 +366,71 @@ describe('le titre d’une élévation sans nom de pièce', () => {
     expect(vu).toMatch(/Mur \d · mur (nord|sud|est|ouest)/);
   });
 });
+
+/**
+ * L'ALLÈGE D'UNE FENÊTRE EST COTÉE.
+ *
+ * « 120 × 110 » dit la taille de la baie, pas où elle commence. C'est
+ * pourtant la hauteur d'allège qui décide d'une prise sous fenêtre ou d'un
+ * convecteur — et il fallait la mesurer à la règle sur la feuille.
+ */
+describe('l’allège d’une fenêtre', () => {
+  it('s’écrit sur l’élévation, du sol au repos de la baie', () => {
+    const FENETRE: WallSeg = {
+      id: 'w1',
+      type: 'window',
+      a: { x: 1.8, z: 0 },
+      b: { x: 3, z: 0 },
+      height: 1.1,
+      // Allège à 1,37 m : un nombre qu'on ne trouve nulle part ailleurs.
+      yCenter: 1.37 + 0.55,
+      roomId: 'r1',
+    };
+    const src = latin1(
+      buildScanPdf(
+        {
+          name: 'Essai',
+          walls: W,
+          openings: [FENETRE],
+          objects: [],
+          fixtures: FX,
+          rooms: R,
+          roomNames: { r1: 'Séjour' },
+        },
+        false,
+        { metre: false, elevations: true },
+      ),
+    );
+    expect(texte(src)).toContain('137');
+  });
+});
+
+/**
+ * UN TRAIT PLEIN RESTE PLEIN, même dessiné après un tireté.
+ *
+ * `poly(…, dashed)` règle le motif de tireté SANS le rendre : le trait
+ * suivant, s'il passe par `path()`/`line()` qui ne le réinitialisent pas,
+ * sort pointillé sur le document. Le défaut est resté invisible parce que
+ * presque tous les pleins passent par `poly`, qui remet le motif à zéro —
+ * presque. Chaque trait écrit donc son motif.
+ */
+describe('le tireté ne fuit pas d’un trait à l’autre', () => {
+  it('chaque trait plein porte sa remise à zéro du motif', () => {
+    const src = latin1(
+      buildScanPdf(
+        { name: 'Essai', walls: W, openings: [PORTE], objects: [], fixtures: FX, rooms: R },
+        true,
+        { metre: true, elevations: true },
+      ),
+    );
+    for (const flux of src.matchAll(/stream\n([\s\S]*?)\nendstream/g)) {
+      for (const op of flux[1].split('\n')) {
+        // Un tracé au trait (S final) hors enveloppe q…Q doit dire son
+        // motif : « [] 0 d » — sans quoi il hérite du dernier réglé.
+        if (/ S$/.test(op) && !op.startsWith('q ')) {
+          expect(op).toContain('[] 0 d');
+        }
+      }
+    }
+  });
+});

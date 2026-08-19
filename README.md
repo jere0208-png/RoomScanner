@@ -429,6 +429,14 @@ qui change l'image fait échouer le build avant même la compilation iOS**, et
 le diff apparaît dans la pull request. Quand le changement est voulu :
 `npm run snapshots`, puis on relit le diff avant de valider.
 
+**Les feuilles du PDF se regardent aussi** — Ghostscript absent, c'est
+`node tools/pdf-vers-svg.mjs <fichier.pdf> <dossier>` qui rend chaque page en
+SVG (puis `magick page.svg page.png`). Le script interprète le petit jeu
+d'opérateurs de la classe `Draw`, transparence de l'écorché comprise. C'est en
+REGARDANT ces feuilles qu'ont été trouvés le chiffre de conducteurs recouvert
+par sa pastille de repère, les cotes de perspective tranchées par la
+maçonnerie, et le canapé invisible derrière un mur que l'écran, lui, efface.
+
 ### Sélectionner un mur
 
 Toucher un mur en mode édition **estompe tout le reste du plan** et redessine

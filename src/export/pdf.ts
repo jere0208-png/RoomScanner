@@ -463,12 +463,14 @@ class Draw {
     this.path([{ x: x1, y: y1 }, { x: x2, y: y2 }], w, hex);
   }
 
-  /** Polyligne à bouts et angles ronds. */
+  /** Polyligne à bouts et angles ronds — pleine, quel que soit l'état.
+   *  Sans le `[] 0 d`, un trait dessiné après un `poly(…, dashed)` héritait
+   *  du motif de tireté resté dans l'état graphique et sortait pointillé. */
   path(pts: Pt[], w: number, hex: string) {
     if (pts.length < 2) return;
     const [r, g, b] = hexRgb(hex);
     this.ops.push(
-      `${n2(r)} ${n2(g)} ${n2(b)} RG ${n2(w)} w 1 J 1 j ` +
+      `${n2(r)} ${n2(g)} ${n2(b)} RG ${n2(w)} w [] 0 d 1 J 1 j ` +
         pts.map((p, i) => `${n2(p.x)} ${n2(p.y)} ${i === 0 ? 'm' : 'l'}`).join(' ') +
         ' S',
     );
@@ -2575,6 +2577,27 @@ function elevationPage(
         6.5,
         SKY,
       );
+      /*
+        L'ALLÈGE, COTÉE DU SOL AU REPOS DE LA BAIE.
+
+        « 120 × 110 » dit la taille de la fenêtre, pas où elle commence —
+        c'est pourtant la hauteur d'allège qui décide d'une prise sous
+        fenêtre ou d'un convecteur, et il fallait la mesurer à la règle.
+        Sur le jambage gauche, pour laisser le centre à l'étiquette de
+        taille ; rien pour une porte, son allège est le sol.
+      */
+      if (t.y0 > 0.02) {
+        const xa2 = px(gx) + 8;
+        d.line(xa2, py(0), xa2, py(t.y0), 0.6, SKY);
+        for (const yTick of [0, t.y0]) {
+          d.line(xa2 - 3, py(yTick), xa2 + 3, py(yTick), 1, SKY);
+        }
+        const ym = (py(0) + py(t.y0)) / 2;
+        d.circle(xa2, ym, 8, '#FFFFFF');
+        d.text(`${Math.round(t.y0 * 100)}`, xa2, ym - 2.5, 7, SKY, {
+          bold: true,
+        });
+      }
     }
   }
 
