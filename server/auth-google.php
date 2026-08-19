@@ -12,7 +12,17 @@
 require __DIR__ . '/config.php';
 
 function repartir(string $url): void {
-  header('Location: ' . $url, true, 302);
+  /*
+    PAS D'EN-TÊTE `Location` : l'hébergement OVH de bourseur.fr rend un 500
+    dès qu'une réponse le porte (règle de sécurité du site, constatée le
+    2026-08-20 — la même page en réponse 200 passe sans broncher). Une page
+    minuscule redirige donc en JavaScript, avec le meta-refresh en secours ;
+    la feuille web de l'app suit l'un comme l'autre, schéma echoplan://
+    compris.
+  */
+  $safe = htmlspecialchars($url, ENT_QUOTES);
+  echo '<!doctype html><meta http-equiv="refresh" content="0;url=' . $safe .
+    '"><script>location.replace(' . json_encode($url) . ');</script>';
   exit;
 }
 
