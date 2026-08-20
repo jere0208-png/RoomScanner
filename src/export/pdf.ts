@@ -35,6 +35,7 @@ import {
   interiorSide,
   masonryRuns,
   postsOf,
+  retourALaCote,
   postsSymbol,
   stackRanks,
   wallFace,
@@ -2777,7 +2778,7 @@ function elevationPage(
   ctx: SheetContext,
   sheet: string,
   wall: WallSeg,
-  photo: PdfImage | null,
+  cliches: { im: PdfImage; along?: number }[],
 ): string {
   const d = new Draw();
   const walls = ctx.walls;
@@ -2837,9 +2838,9 @@ function elevationPage(
     { align: 'left' },
   );
 
-  // La photo prend le bas de la feuille ; sans elle, le dessin descend.
+  // Les photos prennent le bas de la feuille ; sans elles, le dessin descend.
   const BAS = FRAME.y + TITLE_H + 34;
-  const hautPhoto = photo ? BAS + 190 : BAS;
+  const hautPhoto = cliches.length > 0 ? BAS + 190 : BAS;
   // Le dessin s'arrête SOUS le sous-titre, cote de longueur comprise : la
   // cote du haut dépasse le mur de 22 points, et c'est elle qui venait
   // barrer la ligne « Mur de 2,32 m sous 2,51 m ».
@@ -3219,23 +3220,68 @@ function elevationPage(
   }
 
   // ------------------------------------------------------------ la photo
-  if (photo) {
+  /*
+    PLUSIEURS VIGNETTES, CHACUNE LÉGENDÉE — relevé du patron.
+
+    Le dossier n'en gardait qu'une par mur. Sur un mur percé, le pan de
+    gauche et le tableau de droite sont deux chantiers : on photographie
+    l'un sans l'autre, et la feuille doit dire lequel on regarde. La
+    punaise (`along`) porte cette réponse, et le retour se déduit d'elle.
+  */
+  if (cliches.length > 0) {
+    const marge = 14;
     const hMax = 150;
-    const wMax = 210;
-    const k = Math.min(wMax / photo.w, hMax / photo.h);
-    const pw = photo.w * k;
-    const ph = photo.h * k;
-    const pxp = FRAME.x + (FRAME.w - pw) / 2;
-    const pyp = BAS + 14;
-    d.rect(pxp - 3, pyp - 3, pw + 6, ph + 6, '#FFFFFF', '#D6DBE3', 0.8);
-    d.image(photo.name, pxp, pyp, pw, ph);
-    d.text(
-      'Photo de repérage',
-      FRAME.x + FRAME.w / 2,
-      pyp + ph + 9,
-      7,
-      GREY_LIGHT,
+    // Trois vignettes de front tiennent encore la lecture ; au-delà, elles
+    // deviennent des timbres. La bande n'en porte donc pas plus, et la
+    // légende dit combien restent à l'app.
+    const montrees = cliches.slice(0, 3);
+    const reste = cliches.length - montrees.length;
+    const wMax = Math.min(
+      210,
+      (FRAME.w - marge * (montrees.length + 1)) / montrees.length,
     );
+    // Toutes à la même hauteur : des vignettes qui dansent d'un cliché à
+    // l'autre donnent une bande bancale.
+    const hCommune = Math.min(
+      hMax,
+      ...montrees.map((c) => (c.im.h * wMax) / c.im.w),
+    );
+    const largeurs = montrees.map((c) =>
+      Math.min(wMax, (c.im.w * hCommune) / c.im.h),
+    );
+    const totale =
+      largeurs.reduce((t, w2) => t + w2, 0) + marge * (montrees.length - 1);
+    let cx = FRAME.x + (FRAME.w - totale) / 2;
+    const pyp = BAS + 14;
+    montrees.forEach((c, i) => {
+      const pw = largeurs[i];
+      d.rect(cx - 3, pyp - 3, pw + 6, hCommune + 6, '#FFFFFF', '#D6DBE3', 0.8);
+      d.image(c.im.name, cx, pyp, pw, hCommune);
+      /*
+        LA LÉGENDE NOMME LE PAN. `retourALaCote` rend 0 pour un mur d'un
+        seul tenant : on écrit alors la mention d'autrefois, qui suffit.
+      */
+      const n =
+        c.along === undefined
+          ? 0
+          : retourALaCote(retours, faceX(face, c.along));
+      const legende =
+        n > 0
+          ? `Retour ${n}`
+          : montrees.length > 1
+          ? `Photo ${i + 1}`
+          : 'Photo de repérage';
+      d.text(
+        i === montrees.length - 1 && reste > 0
+          ? `${legende} · +${reste}`
+          : legende,
+        cx + pw / 2,
+        pyp + hCommune + 9,
+        7,
+        GREY_LIGHT,
+      );
+      cx += pw + marge;
+    });
   }
 
   drawSheetChrome(d, {
@@ -3326,11 +3372,23 @@ function wallTagAt(w: WallSeg, openings: WallSeg[]): { x: number; z: number } {
  * appareil ». On feuillette du vide, et la seule feuille utile se perd au
  * milieu — dans un dossier qu'on ouvre les mains pleines de plâtre, c'est
  * le pire défaut possible.
+ *
+ * UN MUR PHOTOGRAPHIÉ EN EST UN AUSSI. On ne sort pas l'appareil photo
+ * pour rien : un mur qu'on a pris en photo est un mur sur lequel on a
+ * quelque chose à dire — un existant à montrer, une contrainte à
+ * expliquer. Sa vignette disparaissait purement et simplement du dossier
+ * tant qu'aucune prise n'y était posée.
  */
-function elevationWalls(ctx: SheetContext, toutes = false): WallSeg[] {
+function elevationWalls(
+  ctx: SheetContext,
+  toutes = false,
+  photographies: Set<string> = new Set(),
+): WallSeg[] {
   if (toutes) return wallsInOrder(ctx);
   const equipes = new Set((ctx.fixtures ?? []).map((f) => f.wallId));
-  return wallsInOrder(ctx).filter((w) => equipes.has(w.id));
+  return wallsInOrder(ctx).filter(
+    (w) => equipes.has(w.id) || photographies.has(w.id),
+  );
 }
 
 /**
@@ -3452,15 +3510,21 @@ export interface ScanForPdf {
    */
   deviceNames?: Map<string, DeviceName>;
   /**
-   * Les photos de repérage, une par mur au plus, en JPEG base64.
+   * Les photos de repérage, en JPEG base64.
    *
    * L'app les garde en fichiers ; le PDF, lui, ne peut embarquer que des
    * octets. C'est donc l'écran d'export qui les relit et les réduit avant
    * de les passer ici — une photo d'appareil pleine résolution pèse
    * quatre mégaoctets, et un dossier de douze murs deviendrait
    * impartageable.
+   *
+   * PLUSIEURS PAR MUR — relevé du patron. Le dossier n'en gardait qu'une :
+   * « deux vignettes de la même cloison n'apprennent rien de plus ». C'est
+   * faux dès qu'un mur est percé — le pan de gauche et le tableau de
+   * droite sont deux chantiers. `along` dit à quelle cote la punaise est
+   * plantée : c'est elle qui nomme le retour sur la feuille.
    */
-  photos?: { wallId: string; base64: string }[];
+  photos?: { wallId: string; base64: string; along?: number }[];
 }
 
 
@@ -4221,22 +4285,30 @@ export function buildScanPdf(
   const withSchema = !!schemas && schemas.rows.length > 0;
 
   const murs = opts.elevations
-    ? elevationWalls(ctxTemporaire(scan), opts.toutesElevations)
+    ? elevationWalls(
+        ctxTemporaire(scan),
+        opts.toutesElevations,
+        // Un mur photographié mérite sa feuille : sinon la vignette qu'on
+        // est allé chercher sur le chantier n'arrive nulle part.
+        new Set((scan.photos ?? []).map((p) => p.wallId)),
+      )
     : [];
   /**
-   * Les photos, prêtes à être posées : une par mur, la dernière prise.
+   * Les photos, prêtes à être posées : TOUTES celles de chaque mur, dans
+   * l'ordre où elles ont été prises.
    *
    * Une photo illisible — fichier tronqué, format inattendu — est
    * simplement laissée de côté : la feuille sort sans elle. Un dossier
    * qui refuse de s'exporter serait bien pire qu'un dossier sans photo.
    */
-  const photos = new Map<string, PdfImage>();
+  const photos = new Map<string, { im: PdfImage; along?: number }[]>();
   const images: PdfImage[] = [];
   (scan.photos ?? []).forEach((p, i) => {
-    if (photos.has(p.wallId)) return;
     const im = pdfImage(`Im${i}`, p.base64);
     if (!im) return;
-    photos.set(p.wallId, im);
+    const lot = photos.get(p.wallId) ?? [];
+    lot.push({ im, along: p.along });
+    photos.set(p.wallId, lot);
     images.push(im);
   });
   // Trois feuilles : l'unifilaire hors sol, puis les deux schémas sur le
@@ -4308,7 +4380,7 @@ export function buildScanPdf(
         ctx,
         `${pages.length + 1} / ${total}`,
         w,
-        photos.get(w.id) ?? null,
+        photos.get(w.id) ?? [],
       ),
     );
   }

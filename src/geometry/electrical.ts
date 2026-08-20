@@ -1274,6 +1274,28 @@ export function masonryRuns(
 }
 
 /**
+ * LE RETOUR QUI PORTE UNE COTE — pour nommer ce qu'on photographie.
+ *
+ * Relevé du patron : « un retour de mur doit aussi pouvoir avoir sa photo,
+ * sans prendre tout le mur ». Une photo est punaisée à une ABSCISSE sur la
+ * face ; le pan de maçonnerie qui la porte se déduit — pas de champ de plus
+ * à stocker, et le rattachement ne peut pas mentir : il se recalcule au
+ * moindre coup de crayon sur les ouvertures.
+ *
+ * Le numéro rendu est celui qu'on lit sur la feuille, à partir de 1. Zéro
+ * veut dire « tout le mur » : un mur d'un seul tenant n'a pas de retour à
+ * nommer, et une cote tombée dans le vide d'une baie non plus.
+ */
+export function retourALaCote(
+  retours: { x0: number; x1: number }[],
+  x: number,
+): number {
+  if (retours.length < 2) return 0;
+  const i = retours.findIndex((r) => x >= r.x0 && x <= r.x1);
+  return i < 0 ? 0 : i + 1;
+}
+
+/**
  * LES AXES DES RETOURS — ce sur quoi le doigt s'accroche.
  *
  * Un mur a son milieu ; un retour de mur n'avait rien. On glissait un

@@ -2557,7 +2557,32 @@ déjà accordée pour le scan. L'image est ramenée à 1600 px de côté avant
 écriture — un plan n'a pas besoin de douze mégapixels, et la sauvegarde les
 traînerait à chaque écriture. Le fichier vit dans les Documents de l'app : il
 ne survit pas à une réinstallation, comme le `.usdz`, et un mur supprimé
-laisse sa photo orpheline plutôt que de la détruire.
+emporte ses photos (leur fichier part s'il ne sert à aucune sauvegarde).
+
+**Plusieurs par mur, et une par retour.** Relevé du patron : « la
+possibilité de prendre plusieurs photos d'un mur, et un retour de mur doit
+aussi pouvoir avoir sa photo, sans prendre tout le mur ». Le magasin en
+gardait déjà plusieurs, mais elles se punaisaient TOUTES au même endroit —
+au milieu du mur — et le dossier n'en imprimait qu'une, au motif que « deux
+vignettes de la même cloison n'apprennent rien de plus ». C'est faux dès
+qu'un mur est percé : le pan de gauche et le tableau de droite sont deux
+chantiers, qu'on photographie séparément.
+
+La photo vise donc **ce qu'on regarde** : le retour désigné sur le plan
+(`focusX`), ou à défaut celui qui porte l'appareil tenu ; sans rien de tout
+cela, le mur entier comme avant. Le bouton le dit (« Photo du retour ») et
+compte celles déjà prises. Aucun champ n'a été ajouté au modèle : la photo
+est punaisée à une COTE, et `retourALaCote` déduit le pan qui la porte —
+rien à maintenir en cohérence, le rattachement se recalcule au moindre coup
+de crayon sur les ouvertures.
+
+Le dossier imprime **toutes** les vignettes d'un mur, jusqu'à trois de front
+(au-delà ce sont des timbres ; la légende dit combien restent dans l'app),
+à la même hauteur pour que la bande ne danse pas, et chacune nommée :
+« Retour 1 », « Retour 2 », ou « Photo de repérage » sur un mur d'un seul
+tenant. Au passage, **un mur photographié mérite sa feuille** même sans un
+seul appareil posé : on ne sort pas l'appareil photo pour rien, et la
+vignette qu'on est allé chercher sur le chantier n'arrivait nulle part.
 
 ### Le document que lit un patron électricien
 

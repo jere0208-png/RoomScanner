@@ -29,6 +29,7 @@ import {
   fromFaceX,
   interiorSide,
   newFixture,
+  retourALaCote,
   stackRanks,
   wallFace,
   type Fixture,
@@ -436,5 +437,40 @@ describe('le store et l’appareillage', () => {
     });
     useScanStore.getState().openSave('vieux');
     expect(useScanStore.getState().fixtures).toEqual([]);
+  });
+});
+
+/**
+ * QUEL RETOUR DE MUR REGARDE-T-ON ?
+ *
+ * Relevé du patron : « un retour de mur doit aussi pouvoir avoir sa photo,
+ * sans prendre tout le mur ». Une photo est punaisée à une COTE sur la
+ * face ; le retour qui la porte se déduit — pas besoin d'un champ de plus,
+ * et le rattachement ne peut pas mentir : il se recalcule au moindre coup
+ * de crayon sur les ouvertures.
+ *
+ * Le numéro est celui qu'on lit sur la feuille : 1 pour le premier pan
+ * depuis la gauche. Zéro veut dire « tout le mur » — un mur d'un seul
+ * tenant n'a pas de retour à nommer.
+ */
+describe('le retour qui porte une cote', () => {
+  const RETOURS = [
+    { x0: 0, x1: 2 },
+    { x0: 2.9, x1: 5 },
+  ];
+
+  it('nomme le pan qui contient la cote', () => {
+    expect(retourALaCote(RETOURS, 1)).toBe(1);
+    expect(retourALaCote(RETOURS, 4)).toBe(2);
+  });
+
+  it('se tait pour un mur d’un seul tenant', () => {
+    expect(retourALaCote([{ x0: 0, x1: 5 }], 2.5)).toBe(0);
+  });
+
+  it('et pour une cote qui ne tombe dans aucun pan', () => {
+    // Dans le vide d'une baie : la photo montre la menuiserie, pas un
+    // morceau de maçonnerie.
+    expect(retourALaCote(RETOURS, 2.5)).toBe(0);
   });
 });

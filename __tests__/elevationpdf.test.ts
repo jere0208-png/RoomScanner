@@ -91,7 +91,10 @@ const JPEG = (() => {
 })();
 const JPEG_B64 = toBase64(JPEG);
 
-const doc = (opts: Parameters<typeof buildScanPdf>[2], photos?: { wallId: string; base64: string }[]) =>
+const doc = (
+  opts: Parameters<typeof buildScanPdf>[2],
+  photos?: { wallId: string; base64: string; along?: number }[],
+) =>
   latin1(
     buildScanPdf(
       {
@@ -575,5 +578,46 @@ describe('l’élévation du dossier montre ce que l’écran montre', () => {
     const cadres = (src: string) => (src.match(/0\.95 w/g) ?? []).length;
     expect(cadres(docFixtures(ENSEMBLE, { elevations: true }))).toBeGreaterThan(0);
     expect(cadres(docFixtures([ENSEMBLE[0]], { elevations: true }))).toBe(0);
+  });
+});
+
+/**
+ * PLUSIEURS PHOTOS PAR MUR, ET CELLE D'UN RETOUR.
+ *
+ * Relevé du patron. Le dossier n'en gardait qu'UNE par mur — « deux
+ * vignettes de la même cloison n'apprennent rien de plus », disait le
+ * commentaire. C'est faux dès qu'un mur est percé : le pan de gauche et le
+ * tableau de droite sont deux chantiers différents, et l'on photographie
+ * l'un sans l'autre.
+ */
+describe('les photos de repérage du dossier', () => {
+  const images = (src: string) => (src.match(/\/Subtype \/Image/g) ?? []).length;
+
+  it('en pose PLUSIEURS sur la même feuille', () => {
+    const src = doc({ elevations: true }, [
+      { wallId: 'n', base64: JPEG_B64, along: 1 },
+      { wallId: 'n', base64: JPEG_B64, along: 4 },
+    ]);
+    expect(images(src)).toBe(2);
+  });
+
+  it('et dit de QUEL retour chacune parle', () => {
+    const vu = texte(
+      doc({ elevations: true }, [
+        { wallId: 'n', base64: JPEG_B64, along: 1 },
+        { wallId: 'n', base64: JPEG_B64, along: 4 },
+      ]),
+    );
+    // Le mur nord est percé d'une porte : deux pans de maçonnerie.
+    expect(vu).toContain('Retour 1');
+    expect(vu).toContain('Retour 2');
+  });
+
+  it('sur un mur d’un seul tenant, elle ne nomme aucun retour', () => {
+    const vu = texte(
+      doc({ elevations: true }, [{ wallId: 'e', base64: JPEG_B64, along: 1 }]),
+    );
+    expect(vu).toContain('Photo de repérage');
+    expect(vu).not.toContain('Retour 1');
   });
 });

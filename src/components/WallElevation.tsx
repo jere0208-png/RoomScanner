@@ -162,6 +162,7 @@ export function WallElevation({
   const pendingJoin = useScanStore((s) => s.pendingJoin);
   const objects = useScanStore((s) => s.objects);
   const addPhoto = useScanStore((s) => s.addPhoto);
+  const photos = useScanStore((s) => s.photos);
   const north = useScanStore((s) => s.north);
   const clearPendingJoin = useScanStore((s) => s.clearPendingJoin);
   const c = useTheme();
@@ -595,6 +596,27 @@ export function WallElevation({
   const monRetour = selected
     ? retours.find((r) => selX >= r.x0 - 1e-6 && selX <= r.x1 + 1e-6) ?? null
     : null;
+  /**
+   * LE RETOUR QU'ON REGARDE — celui que la photo va montrer.
+   *
+   * Relevé du patron : « un retour de mur doit aussi pouvoir avoir sa
+   * photo, sans prendre tout le mur ». C'est le pan désigné sur le plan
+   * (`focusX`), ou à défaut celui qui porte l'appareil tenu : dans les deux
+   * cas, c'est le morceau de maçonnerie sous la main. Sans rien de tout
+   * cela, la photo montre le mur entier, comme avant.
+   */
+  const retourVise =
+    (focusX != null
+      ? retours.find((r) => focusX >= r.x0 && focusX <= r.x1)
+      : null) ??
+    monRetour ??
+    null;
+  /*
+    Les photos déjà punaisées sur ce mur : on peut en prendre plusieurs.
+    Un simple filtre, pas un `useMemo` : nous sommes ici après le retour
+    anticipé du mur introuvable, et un hook ne se place pas là.
+  */
+  const mesPhotos = photos.filter((p) => p.wallId === wallId);
   const roomName =
     rooms.find((r) => r.id === roomOf(wall))?.name ?? '';
   /**
@@ -893,7 +915,15 @@ export function WallElevation({
             répond mieux qu'une note. */}
         <TouchableOpacity
           style={styles.photo}
-          accessibilityLabel="Photo de repérage"
+          /*
+            LE BOUTON DIT CE QU'IL VA PHOTOGRAPHIER, et combien on en a
+            déjà : un tableau de porte se photographie pour lui-même, et
+            l'on prend souvent deux vues d'un même mur.
+          */
+          accessibilityLabel={
+            (retourVise ? 'Photo du retour' : 'Photo de repérage') +
+            (mesPhotos.length > 0 ? ` (${mesPhotos.length})` : '')
+          }
           // La cible déborde le dessin : 36 points se voient bien, 44 se
           // touchent bien. iOS distingue les deux, et c'est ce qui évite
           // d'ouvrir la caméra en visant la croix.
@@ -901,7 +931,12 @@ export function WallElevation({
           onPress={async () => {
             const chemin = await RoomScan.takePhoto();
             if (chemin) {
-              addPhoto(wallId, fromFaceX(face, face.len / 2), chemin);
+              // La punaise tombe au milieu de CE QU'ON REGARDE : le retour
+              // visé, ou le mur entier à défaut.
+              const cible = retourVise
+                ? (retourVise.x0 + retourVise.x1) / 2
+                : face.len / 2;
+              addPhoto(wallId, fromFaceX(face, cible), chemin);
               haptic('succes');
             }
           }}>

@@ -309,20 +309,32 @@ const styles = getStyles(c);
       /**
        * Les photos, relues et réduites AVANT de bâtir le document.
        *
-       * Une par mur, la dernière prise : deux vignettes de la même
-       * cloison n'apprennent rien de plus, et chacune pèse dans le
-       * fichier qu'on enverra par messagerie. Celle qui ne se relit pas
-       * — fichier effacé hors de l'app — est simplement absente : sa
-       * feuille sort sans elle.
+       * TOUTES, et dans l'ordre où elles ont été prises — relevé du
+       * patron : « plusieurs photos d'un mur, et un retour doit pouvoir
+       * avoir la sienne ». Le dossier n'en gardait qu'une par mur, au
+       * motif que « deux vignettes de la même cloison n'apprennent rien
+       * de plus » : c'est faux dès qu'un mur est percé, le pan de gauche
+       * et le tableau de droite sont deux chantiers. Chacune emporte la
+       * cote de sa punaise, qui dit de quel retour elle parle.
+       *
+       * Celle qui ne se relit pas — fichier effacé hors de l'app — est
+       * simplement absente : sa feuille sort sans elle.
        */
-      const vignettes: { wallId: string; base64: string }[] = [];
+      const vignettes: {
+        wallId: string;
+        base64: string;
+        along?: number;
+      }[] = [];
       if (elevations) {
-        const dejaVus = new Set<string>();
-        for (const ph of [...photos].sort((a, b) => b.at - a.at)) {
-          if (dejaVus.has(ph.wallId)) continue;
-          dejaVus.add(ph.wallId);
+        for (const ph of [...photos].sort((a, b) => a.at - b.at)) {
           const b64 = await RoomScan.readPhoto(ph.path, 900);
-          if (b64) vignettes.push({ wallId: ph.wallId, base64: b64 });
+          if (b64) {
+            vignettes.push({
+              wallId: ph.wallId,
+              base64: b64,
+              along: ph.along,
+            });
+          }
         }
       }
       const bytes =

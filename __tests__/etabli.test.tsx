@@ -458,3 +458,112 @@ describe('la mise en page de l’établi', () => {
     expect(sf.maxHeight).toBe('100%');
   });
 });
+
+/**
+ * PLUSIEURS PHOTOS PAR MUR, ET LA PHOTO D'UN RETOUR.
+ *
+ * Relevé du patron : « ajoute la possibilité de prendre plusieurs photos
+ * d'un mur, et un retour de mur doit aussi pouvoir avoir sa photo, sans
+ * prendre tout le mur ». Le magasin savait déjà en garder plusieurs ; ce
+ * qui manquait, c'est que la photo vise CE QU'ON REGARDE — sans quoi elles
+ * se punaisaient toutes au même endroit, au milieu du mur.
+ */
+describe('la photo de repérage', () => {
+  const RoomScan = require('react-native-room-scan').RoomScan;
+
+  beforeEach(() => {
+    RoomScan.takePhoto.mockImplementation(async () => '/tmp/p.jpg');
+  });
+  afterEach(() => {
+    RoomScan.takePhoto.mockImplementation(async () => null);
+  });
+
+  /** Le mur nord percé d'une porte : deux retours de maçonnerie. */
+  const PORTE: WallSeg = {
+    id: 'p1',
+    type: 'door',
+    a: { x: 2, z: 0 },
+    b: { x: 2.9, z: 0 },
+    height: 2.04,
+    yCenter: 1.02,
+    roomId: 'r1',
+  };
+
+  const rendreAvecPorte = (focusX?: number) => {
+    let tree!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      useScanStore.setState({
+        walls: W,
+        openings: [PORTE],
+        objects: [],
+        rooms: [{ id: 'r1', name: 'Chambre', floor: null }],
+        fixtures: [],
+        photos: [],
+        showFurniture: true,
+      });
+      tree = TestRenderer.create(
+        <WallElevation
+          wallId="n"
+          focusX={focusX}
+          selectedId={null}
+          onSelect={() => {}}
+          onAddRequest={() => {}}
+          onClose={() => {}}
+        />,
+      );
+    });
+    act(() => {
+      const zone = tree.root
+        .findAllByType(View)
+        .find((n) => typeof n.props.onLayout === 'function')!;
+      zone.props.onLayout({
+        nativeEvent: { layout: { width: 390, height: 380 } },
+      });
+    });
+    precedent = tree;
+    return tree;
+  };
+
+  const bouton = (tree: TestRenderer.ReactTestRenderer) =>
+    tree.root
+      .findAllByType(TouchableOpacity)
+      .find((n) =>
+        String(n.props.accessibilityLabel ?? '').startsWith('Photo'),
+      )!;
+
+  it('en garde PLUSIEURS, sans écraser la précédente', async () => {
+    const tree = rendreAvecPorte();
+    await act(async () => {
+      await bouton(tree).props.onPress();
+    });
+    await act(async () => {
+      await bouton(tree).props.onPress();
+    });
+    expect(useScanStore.getState().photos).toHaveLength(2);
+  });
+
+  it('vise le RETOUR regardé, pas le milieu du mur', async () => {
+    // Le retour de droite : entre la porte (2,90 m) et l'angle (5 m).
+    const tree = rendreAvecPorte(3.5);
+    await act(async () => {
+      await bouton(tree).props.onPress();
+    });
+    const [ph] = useScanStore.getState().photos;
+    expect(ph).toBeDefined();
+    // La punaise tombe dans le retour visé, pas au milieu du mur (2,50 m).
+    expect(ph.along).toBeGreaterThan(2.9);
+    expect(ph.along).toBeLessThan(5);
+    // Et le bouton dit ce qu'il va photographier.
+    expect(bouton(tree).props.accessibilityLabel).toContain('retour');
+  });
+
+  it('sans retour visé, elle prend le mur entier', async () => {
+    const tree = rendreAvecPorte();
+    expect(bouton(tree).props.accessibilityLabel).not.toContain('retour');
+    await act(async () => {
+      await bouton(tree).props.onPress();
+    });
+    const [ph] = useScanStore.getState().photos;
+    expect(ph.along).toBeCloseTo(2.5, 1);
+  });
+});
