@@ -20,6 +20,7 @@ import {
   View,
 } from 'react-native';
 import Svg, { Path, Rect } from 'react-native-svg';
+import { SOLAIRES } from '../ui/solaires';
 import {
   glow,
   shadowCard,
@@ -50,166 +51,16 @@ export type ToolIcon =
   | 'reperes'
   | 'plus';
 
-/**
- * LES TRACÉS DES ICÔNES, EN 24 × 24.
- *
- * Trois règles, tenues pour tout le jeu.
- *
- * 1. **Un symbole dit sa fonction.** « Repères » était un `+`, « Appareil »
- *    aussi : deux boutons différents, le même dessin, et aucun des deux ne
- *    disait ce qu'il faisait. Une icône qu'il faut légender deux fois n'est
- *    pas une icône, c'est une puce.
- * 2. **Gras.** Les traits filaires disparaissent sur une pastille de 18 px
- *    vue à bout de bras, sur un chantier, avec les mains sales. On dessine
- *    à 2,4 d'épaisseur et l'on remplit ce qui peut l'être : la silhouette
- *    porte plus loin que le contour.
- * 3. **Même famille.** Bouts ronds, angles ronds, même marge d'un point et
- *    demi au bord de la boîte. Un jeu d'icônes se reconnaît à sa main, pas
- *    à ses sujets.
- */
-const TOOL_PATHS: Record<ToolIcon, { d: string; fill?: boolean }[]> = {
-  // Un pan de mur poché, vu en plan : la coupe pleine du dessin d'archi.
-  murs: [
-    { d: 'M3 8.5 h18 v3.2 h-18 z', fill: true },
-    { d: 'M3 15 h7.5 v6 h-7.5 z', fill: true },
-    { d: 'M15.5 15 h5.5 v6 h-5.5 z', fill: true },
-  ],
-  // Le cheminement : une gaine qui sort du tableau et longe le mur.
-  gaines: [
-    { d: 'M14.5 3.5 h6 v4.5 h-6 z', fill: true },
-    { d: 'M17.5 8 v5.5 a3.5 3.5 0 0 1 -3.5 3.5 H6.5' },
-    { d: 'M3.5 17 h3' },
-    { d: 'M9.5 17 h3' },
-  ],
-  // Le double-décimètre, avec ses graduations.
-  ruler: [
-    { d: 'M2.5 9 h19 a1.6 1.6 0 0 1 1.6 1.6 v2.8 a1.6 1.6 0 0 1 -1.6 1.6 h-19 a1.6 1.6 0 0 1 -1.6 -1.6 v-2.8 a1.6 1.6 0 0 1 1.6 -1.6 z' },
-    { d: 'M7 9 v3.4' },
-    { d: 'M12 9 v4.4' },
-    { d: 'M17 9 v3.4' },
-  ],
-  // La surface au sol : un carré semé de points, comme le fond du plan.
-  surface: [
-    { d: 'M3.5 3.5 h17 v17 h-17 z' },
-    { d: 'M8 8.5 h0.01' },
-    { d: 'M16 8.5 h0.01' },
-    { d: 'M8 15.5 h0.01' },
-    { d: 'M16 15.5 h0.01' },
-    { d: 'M12 12 h0.01' },
-  ],
-  // Un fauteuil vu de face : le mobilier, et pas un carton.
-  furniture: [
-    { d: 'M5 11 V8.5 A2.5 2.5 0 0 1 7.5 6 h9 A2.5 2.5 0 0 1 19 8.5 V11' },
-    { d: 'M3.5 11 h17 v6 h-17 z', fill: true },
-    { d: 'M5.5 17 v3' },
-    { d: 'M18.5 17 v3' },
-  ],
-  // L'éclair : le seul symbole que personne n'a besoin qu'on lui explique.
-  elec: [{ d: 'M13.8 2 L5 13.8 h5.2 l-1 8.2 L18 10.2 h-5.2 z', fill: true }],
-  /*
-    UN APPAREIL, C'EST UNE PRISE — pas un « + ».
+/*
+  LES TRACES VIENNENT DU JEU « SOLAR BOLD » — refonte du patron.
 
-    Le bouton qui pose un appareil portait le même « + » que celui des
-    repères 3D. Deux gestes sans rapport, un seul dessin : on lisait
-    l'étiquette à chaque fois, donc l'icône ne servait à rien. Une prise 2P+T
-    française se reconnaît à ses deux alvéoles et sa broche de terre.
-  */
-  appareil: [
-    { d: 'M12 2.6 a9.4 9.4 0 1 0 0 18.8 a9.4 9.4 0 1 0 0 -18.8 z' },
-    { d: 'M8.6 11 h0.01' },
-    { d: 'M15.4 11 h0.01' },
-    { d: 'M12 15.6 h0.01' },
-  ],
-  /*
-    UN REPÈRE, C'EST UNE MIRE — pas un « + » non plus.
-
-    Relevé du chantier : « afficher les repères dans le modèle 3D est un
-    simple + ». C'est le symbole du point de calage, celui qu'on peint sur
-    un mur avant de mesurer : un cercle et sa croix qui déborde.
-  */
-  reperes: [
-    { d: 'M12 5.6 a6.4 6.4 0 1 0 0 12.8 a6.4 6.4 0 1 0 0 -12.8 z' },
-    { d: 'M12 1.8 v5' },
-    { d: 'M12 17.2 v5' },
-    { d: 'M1.8 12 h5' },
-    { d: 'M17.2 12 h5' },
-    { d: 'M12 12 h0.01' },
-  ],
-  // Le plafond : une pièce vue en coupe, et sa suspension.
-  plafond: [
-    { d: 'M2.5 4 h19', },
-    { d: 'M12 4 v5' },
-    { d: 'M6.5 17 a5.5 5.5 0 0 1 11 0 z', fill: true },
-    { d: 'M12 9 a2 2 0 0 1 0 0' },
-  ],
-  // La disquette : ce qui s'écrit et se retrouve.
-  save: [
-    { d: 'M4.5 3.5 h11.5 L20.5 8 v12.5 h-16 z' },
-    { d: 'M8 3.5 h7 v5 h-7 z', fill: true },
-    { d: 'M7.5 13 h9 v7.5 h-9 z' },
-  ],
-  // Le crayon, centré dans sa boîte.
-  edit: [
-    { d: 'M4 20 l1.4 -4.6 L16.4 4.4 a2 2 0 0 1 2.8 0 l1.4 1.4 a2 2 0 0 1 0 2.8 L9.6 19.6 z' },
-    { d: 'M14.5 6.3 l3.2 3.2' },
-  ],
-  // Le nuancier : trois pots de couleur relevée.
-  colors: [
-    { d: 'M12 2.8 C15.4 7.4 18.2 10.2 18.2 13.4 a6.2 6.2 0 1 1 -12.4 0 C5.8 10.2 8.6 7.4 12 2.8 z', fill: true },
-  ],
-  /*
-    UNE PIÈCE, C'EST UN CONTOUR ET SA PORTE.
-
-    Un carré avec deux encoches ne disait rien — on y voyait un cadre cassé.
-    Ce qui fait lire « pièce » sur un plan, c'est le vide de la baie et
-    l'arc du battant : tout le métier dessine ça.
-  */
-  room: [
-    { d: 'M3.5 3.5 h17 v17 H14' },
-    { d: 'M3.5 20.5 H8' },
-    { d: 'M8 20.5 a6 6 0 0 0 6 -6' },
-    { d: 'M8 20.5 v-5' },
-  ],
-  // La photo de repérage.
-  image: [
-    { d: 'M3 5.5 h18 v13 h-18 z' },
-    { d: 'M8.5 10 h0.01' },
-    { d: 'M3 16 l5.5 -5 4 3.6 3.5 -2.8 5 4.2' },
-  ],
-  // Le volume : un cube en perspective, arêtes visibles.
-  model: [
-    { d: 'M12 2.4 l8.6 4.8 v9.6 L12 21.6 l-8.6 -4.8 V7.2 z' },
-    { d: 'M12 12 l8.6 -4.8' },
-    { d: 'M12 12 L3.4 7.2' },
-    { d: 'M12 12 v9.6' },
-  ],
-  // Plusieurs pièces : le découpage d'un logement.
-  rooms: [
-    { d: 'M3 4 h8 v7 h-8 z', fill: true },
-    { d: 'M13 4 h8 v16 h-8 z' },
-    { d: 'M3 13 h8 v7 h-8 z' },
-  ],
-  // Revenir en arrière.
-  undo: [
-    { d: 'M4.2 12 a7.8 7.8 0 1 0 2.3 -5.5' },
-    { d: 'M3.6 3 v5 h5' },
-  ],
-  // L'équerre du dessinateur : remettre le plan d'aplomb.
-  square: [
-    { d: 'M3.5 3.5 v17 h17' },
-    { d: 'M3.5 20.5 L20.5 3.5' },
-    { d: 'M8 15 h4 v4' },
-  ],
-  // La loupe : ce que le plan a d'incertain.
-  check: [
-    { d: 'M10.5 2.6 a7.9 7.9 0 1 0 0 15.8 a7.9 7.9 0 1 0 0 -15.8 z' },
-    { d: 'M16.3 16.3 L21.5 21.5' },
-    { d: 'M10.5 6.6 v4.4' },
-    { d: 'M10.5 14 h0.01' },
-  ],
-  // Ajouter : le seul bouton qui mérite encore un « + ».
-  plus: [{ d: 'M12 4 v16' }, { d: 'M4 12 h16' }],
-};
+  Le jeu maison au trait (2,4 d'épaisseur) a été remplacé par les
+  silhouettes Solar Bold (collection SVGRepo, © Solar Icons, CC BY 4.0),
+  vendues en dur par tools/gen-solaires.mjs dans src/ui/solaires.ts :
+  une seule main pour tous les menus, et une silhouette porte plus loin
+  qu'un contour — c'était déjà la règle du jeu précédent, le nouveau
+  l'applique jusqu'au bout.
+*/
 
 /** Hauteur du mot : imposée, pour que le calcul ne dépende pas des réglages
  *  de police du téléphone. */
@@ -371,17 +222,9 @@ export function ToolPill({
             couvre les gestes de l'app, pas tout le vocabulaire du métier. */}
         {node ?? (
         <Svg width={22} height={22} viewBox="0 0 24 24">
-          {TOOL_PATHS[icon].map((seg, i) => (
-            <Path
-              key={i}
-              d={seg.d}
-              stroke={stroke}
-              strokeWidth={2.4}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              fill="none"
-            />
-          ))}
+          {/* La silhouette Solar : UN chemin plein — le Bold est un jeu de
+              pleins, un rendu au trait le rendrait méconnaissable. */}
+          <Path d={SOLAIRES[icon]} fill={stroke} fillRule="evenodd" />
         </Svg>
         )}
       </TouchableOpacity>

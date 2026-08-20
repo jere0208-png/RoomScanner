@@ -1,5 +1,8 @@
 import React, { useEffect, useRef } from 'react';
+import Svg, { Path } from 'react-native-svg';
 import { ThemeGlyph } from '../components/ThemeGlyph';
+import { TexteOr } from '../components/ContourOr';
+import { SOLAIRES } from '../ui/solaires';
 import {
   Alert,
   Animated,
@@ -126,6 +129,10 @@ export function HomeScreen() {
         accessibilityLabel={
           themePref === 'dark' ? 'Passer en thème clair' : 'Passer en thème sombre'
         }
+        // La cible déborde du rond — relevé du patron : « le clic doit
+        // être mal placé pour que ça active ». Le débord ne change rien
+        // au dessin, il élargit la prise, comme partout dans iOS.
+        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
         onPress={() => setThemePref(themePref === 'dark' ? 'light' : 'dark')}>
         <ThemeGlyph
           quoi={themePref === 'dark' ? 'soleil' : 'lune'}
@@ -319,13 +326,21 @@ export function HomeScreen() {
         résultat.
       </Animated.Text>
 
-      {/* Le compte, en pied d'écran : qui est connecté, où il en est du
-          palier — et la seule porte VOLONTAIRE vers la page Pro. Sans elle,
-          on ne pouvait payer qu'en butant sur la barrière. */}
+      {/*
+        LE PROFIL EST UN BLOC, EN HAUT À GAUCHE — croquis Paint du patron.
+
+        La mention du compte vivait en pied d'écran, minuscule ; elle est
+        maintenant un petit bloc qui ne gêne pas : l'avatar, le nom souligné
+        d'une barre, et le GRADE centré dessous — gris fade pour le
+        gratuit, la typo d'or de la page Pro pour le Pro. C'est toujours la
+        seule porte VOLONTAIRE vers la page Pro : le clic garde tout le
+        geste de l'ancienne rangée.
+      */}
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Mon compte"
-        style={styles.compteRow}
+        style={styles.profilBloc}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         onPress={() => {
           Alert.alert(
             compte?.prenom || compte?.email || 'Mon compte',
@@ -360,13 +375,23 @@ export function HomeScreen() {
             ],
           );
         }}>
-        <Text style={styles.compteTexte}>
-          {compte?.prenom || compte?.email || 'Compte'}
-        </Text>
-        <View style={[styles.comptePastille, pro && styles.comptePro]}>
-          <Text style={[styles.comptePastilleTexte, pro && styles.compteProTexte]}>
-            {pro ? 'PRO' : 'Gratuit'}
+        <Svg width={30} height={30} viewBox="0 0 24 24">
+          <Path d={SOLAIRES.avatar} fill={c.inkSoft} fillRule="evenodd" />
+        </Svg>
+        <View style={styles.profilColonne}>
+          <Text style={styles.profilNom} numberOfLines={1}>
+            {compte?.prenom || compte?.email || 'Compte'}
           </Text>
+          {/* La barre du croquis : elle souligne le nom et sert d'axe au
+              grade, centré dessous. */}
+          <View style={styles.profilBarre} />
+          {pro ? (
+            <TexteOr texte="PRO" taille={10.5} fond={c.bg} style={styles.profilGrade} />
+          ) : (
+            <Text style={[styles.profilGradeTexte, styles.profilGrade]}>
+              GRATUIT
+            </Text>
+          )}
         </View>
       </Pressable>
     </View>
@@ -525,26 +550,33 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     marginTop: 14,
     lineHeight: 17,
   },
-  compteRow: {
+  // Le bloc profil : en haut à gauche, le miroir du bouton de thème — la
+  // même bande, chacun son coin.
+  profilBloc: {
+    position: 'absolute',
+    top: 54,
+    left: 22,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    alignSelf: 'center',
-    marginTop: 12,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 999,
+    gap: 9,
+    maxWidth: '55%',
+    zIndex: 2,
   },
-  compteTexte: { color: c.inkSoft, fontSize: 13, fontWeight: '600' },
-  comptePastille: {
-    borderRadius: 999,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    backgroundColor: c.surfaceSunken,
-    borderWidth: 1,
-    borderColor: c.lineStrong,
+  profilColonne: { flexShrink: 1 },
+  profilNom: { color: c.ink, fontSize: 13.5, fontWeight: '800' },
+  profilBarre: {
+    alignSelf: 'stretch',
+    height: 2.5,
+    borderRadius: 2,
+    backgroundColor: c.lineStrong,
+    marginTop: 3,
+    marginBottom: 3,
   },
-  comptePro: { backgroundColor: c.blue, borderColor: c.blue },
-  comptePastilleTexte: { color: c.inkSoft, fontSize: 11, fontWeight: '800' },
-  compteProTexte: { color: '#FFFFFF' },
+  profilGrade: { alignSelf: 'center' },
+  profilGradeTexte: {
+    color: c.inkFaint,
+    fontSize: 10.5,
+    fontWeight: '700',
+    letterSpacing: 1.2,
+  },
 }));

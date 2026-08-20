@@ -35,7 +35,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 import React from 'react';
-import { Image, Text, View } from 'react-native';
+import { Image, StyleSheet, Text, View } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import { Path } from 'react-native-svg';
 import { HomeScreen } from '../src/screens/HomeScreen';
@@ -43,7 +43,10 @@ import { LogoMark } from '../src/components/LogoMark';
 import { PhoneShowcase } from '../src/components/PhoneShowcase';
 import { GlowButton } from '../src/components/GlowButton';
 import { ThemeGlyph } from '../src/components/ThemeGlyph';
+import { TexteOr } from '../src/components/ContourOr';
+import { SOLAIRES } from '../src/ui/solaires';
 import { useScanStore } from '../src/store/scanStore';
+import { useAccountStore } from '../src/store/accountStore';
 import { SHOWCASE_IMAGES } from '../src/assets/showcase';
 import { SHOWCASE_FRAMES } from '../src/export/showcaseFrames';
 
@@ -104,6 +107,72 @@ describe('l’accueil', () => {
     const glyphe = pastille.findAllByType(ThemeGlyph)[0];
     expect(glyphe).toBeDefined();
     expect(glyphe.props.size ?? 21).toBeGreaterThanOrEqual(26);
+    /*
+      ET LA CIBLE DÉBORDE DU ROND — relevé du patron : « le clic doit être
+      mal placé pour que ça active ». Une pastille de 46 points en haut
+      d'écran se rate d'un pouce pressé ; le débord ne change rien au
+      dessin, il élargit la prise, comme partout dans iOS.
+    */
+    const slop = pastille.props.hitSlop as
+      | { top: number; bottom: number; left: number; right: number }
+      | undefined;
+    expect(slop).toBeDefined();
+    for (const cote of ['top', 'bottom', 'left', 'right'] as const) {
+      expect(slop![cote]).toBeGreaterThanOrEqual(10);
+    }
+  });
+
+  /*
+   * LE PROFIL EST UN BLOC, EN HAUT À GAUCHE — croquis Paint du patron :
+   * l'avatar, le nom souligné d'une barre, et le grade centré dessous.
+   * GRATUIT s'écrit gris fade ; PRO respire comme sur la page Pro (la
+   * typo d'or). Le clic garde le geste de l'ancienne rangée du bas.
+   */
+  it('porte le profil en haut à gauche : avatar, nom souligné, grade', () => {
+    useAccountStore.setState({
+      compte: { id: 'email:j@c.fr', prenom: 'Jérôme', methode: 'email' },
+      pro: false,
+    });
+    const t = monter();
+    const bloc = t.root.findAll(
+      (n) =>
+        n.props?.accessibilityLabel === 'Mon compte' &&
+        typeof n.props?.onPress === 'function',
+    )[0];
+    expect(bloc).toBeDefined();
+    const st = StyleSheet.flatten(bloc.props.style) as {
+      position?: string;
+      top?: number;
+      left?: number;
+    };
+    expect(st.position).toBe('absolute');
+    expect(typeof st.top).toBe('number');
+    expect(typeof st.left).toBe('number');
+    // L'avatar est la silhouette Solar du jeu commun.
+    expect(
+      bloc.findAllByType(Path).filter((n) => n.props.d === SOLAIRES.avatar)
+        .length,
+    ).toBe(1);
+    const vu = textes(t);
+    expect(vu).toContain('Jérôme');
+    expect(vu).toContain('GRATUIT');
+  });
+
+  it('le grade Pro respire comme la page Pro', () => {
+    useAccountStore.setState({
+      compte: { id: 'email:j@c.fr', prenom: 'Jérôme', methode: 'email' },
+      pro: true,
+    });
+    const t = monter();
+    const bloc = t.root.findAll(
+      (n) =>
+        n.props?.accessibilityLabel === 'Mon compte' &&
+        typeof n.props?.onPress === 'function',
+    )[0];
+    const typos = bloc.findAllByType(TexteOr);
+    expect(typos).toHaveLength(1);
+    expect(typos[0].props.texte).toBe('PRO');
+    useAccountStore.setState({ pro: false });
   });
 
   it('ne récite plus le mode d’emploi', () => {

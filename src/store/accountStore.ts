@@ -20,6 +20,7 @@
  *   tant qu'il n'y est pas, le bouton d'achat le dit clairement.
  */
 import { create } from 'zustand';
+import { Linking } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   acheterAbonnement,
@@ -79,6 +80,13 @@ export const CODE_BIENVENUE = 'FIRST20';
 const CLE = 'roomscanner.compte.v1';
 /** La surprise ne se joue qu'une fois par appareil : le drapeau du déjà-vu. */
 const CLE_SURPRISE = 'roomscanner.surprise.v1';
+/**
+ * La page « Rédiger un avis » de l'app sur l'App Store. L'identifiant est
+ * un GABARIT tant que l'app n'est pas en ligne — à remplacer à la création
+ * de la fiche App Store Connect. Avant ça, l'ouverture échoue sans bruit.
+ */
+const URL_AVIS =
+  'itms-apps://apps.apple.com/app/id0000000000?action=write-review';
 
 export type MethodeConnexion = 'apple' | 'google' | 'email';
 
@@ -113,6 +121,17 @@ interface AccountState {
   /** Le code que la page Pro doit préremplir — personne ne recopie un
    *  code depuis un popup fermé. */
   codeOffert: string | null;
+  /**
+   * L'AVIS CONTRE UN ESSAI. Refuser la surprise quand l'essai est épuisé
+   * propose de laisser un avis App Store, contre UN relevé de plus.
+   * ATTENTION revue Apple : récompenser un avis est contraire aux règles
+   * (avis incités) — le patron est prévenu, à revoir avant la soumission.
+   */
+  avisVisible: boolean;
+  /** L'avis ne se laisse (et ne se paie) qu'une fois. */
+  avisDonne: boolean;
+  /** Relevés offerts en plus du palier gratuit (l'avis en donne un). */
+  bonusEssais: number;
   /** Le jeton rendu par le serveur à la connexion — null hors ligne. */
   jeton: string | null;
 
@@ -141,6 +160,9 @@ interface AccountState {
   fermerEssaiEpuise: () => void;
   ouvrirSurprise: () => void;
   fermerSurprise: () => void;
+  /** Ouvre la page d'avis, encaisse le bonus, referme. */
+  donnerAvis: () => void;
+  fermerAvis: () => void;
   /** Le clic sur la surprise : le code s'applique TOUT SEUL, et la page
    *  Pro s'ouvre avec le champ déjà rempli. */
   profiterSurprise: () => void;
@@ -155,6 +177,8 @@ const persister = (s: AccountState) =>
       proVia: s.proVia,
       plansUtilises: s.plansUtilises,
       remisePct: s.remisePct,
+      avisDonne: s.avisDonne,
+      bonusEssais: s.bonusEssais,
       jeton: s.jeton,
     }),
   ).catch(() => {});
@@ -195,6 +219,9 @@ export const useAccountStore = create<AccountState>((set, get) => ({
   surpriseVisible: false,
   remisePct: 0,
   codeOffert: null,
+  avisVisible: false,
+  avisDonne: false,
+  bonusEssais: 0,
   jeton: null,
 
   charger: async () => {
@@ -226,8 +253,11 @@ export const useAccountStore = create<AccountState>((set, get) => ({
         marqueur?.plans ?? 0,
       ),
       // La remise survit au redémarrage : un −20 % accepté puis perdu au
-      // relancement serait vécu comme une promesse reprise.
+      // relancement serait vécu comme une promesse reprise. Le bonus de
+      // l'avis pareil — c'est un dû.
       remisePct: Number(local.remisePct) || 0,
+      avisDonne: !!local.avisDonne,
+      bonusEssais: Number(local.bonusEssais) || 0,
       jeton: typeof local.jeton === 'string' ? local.jeton : null,
     });
     // Le serveur, s'il est là, a le dernier mot — sans jamais bloquer.
@@ -402,7 +432,7 @@ export const useAccountStore = create<AccountState>((set, get) => ({
 
   peutCreerPlan: () => {
     const s = get();
-    return s.pro || s.plansUtilises < PLANS_GRATUITS;
+    return s.pro || s.plansUtilises < PLANS_GRATUITS + s.bonusEssais;
   },
 
   noterPlanCree: () => {
@@ -429,7 +459,33 @@ export const useAccountStore = create<AccountState>((set, get) => ({
   fermerPaywall: () => set({ paywallVisible: false }),
   fermerEssaiEpuise: () => set({ essaiEpuiseVisible: false }),
   ouvrirSurprise: () => set({ surpriseVisible: true }),
-  fermerSurprise: () => set({ surpriseVisible: false }),
+  fermerSurprise: () => {
+    /*
+      REFUSER L'OFFRE OUVRE LA DERNIÈRE CHANCE : l'avis contre un essai —
+      seulement quand l'essai est vraiment épuisé (à la première
+      inscription, l'utilisateur a encore son relevé : on le laisse
+      découvrir l'app), et une seule fois.
+    */
+    const s = get();
+    const propose =
+      !s.pro &&
+      !s.avisDonne &&
+      s.plansUtilises >= PLANS_GRATUITS + s.bonusEssais;
+    set({ surpriseVisible: false, avisVisible: propose });
+  },
+  donnerAvis: () => {
+    // L'App Store s'ouvre sur « Rédiger un avis » ; le bonus est encaissé
+    // sur l'honneur — aucune API ne dit si l'avis a été posté. Et une
+    // ouverture qui échoue (fiche pas encore en ligne) ne bloque rien.
+    try {
+      Promise.resolve(Linking.openURL(URL_AVIS)).catch(() => {});
+    } catch {
+      // Rien : le bonus reste dû, l'App Store attendra.
+    }
+    set({ avisVisible: false, avisDonne: true, bonusEssais: get().bonusEssais + 1 });
+    persister(get());
+  },
+  fermerAvis: () => set({ avisVisible: false }),
   profiterSurprise: () => {
     set({
       surpriseVisible: false,

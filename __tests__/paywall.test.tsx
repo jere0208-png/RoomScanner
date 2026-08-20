@@ -39,12 +39,15 @@ jest.mock('../src/native/account', () => ({
 import React from 'react';
 import { Image, StyleSheet, Text, TextInput, type ViewStyle } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
-import { LinearGradient, Mask, Stop, Text as SvgText } from 'react-native-svg';
+import { LinearGradient, Mask, Path, Stop, Text as SvgText } from 'react-native-svg';
 import { PaywallScreen } from '../src/screens/PaywallScreen';
 import { BadgePro } from '../src/components/BadgePro';
-import { ContourOr, ORS, TexteOr } from '../src/components/ContourOr';
+import { ContourOr, ORS, TexteOr, TRAIT } from '../src/components/ContourOr';
+import { dark } from '../src/theme';
 import { EssaiEpuise } from '../src/components/EssaiEpuise';
 import { SurprisePro } from '../src/components/SurprisePro';
+import { AvisRecompense } from '../src/components/AvisRecompense';
+import { SOLAIRES } from '../src/ui/solaires';
 import { SignInScreen } from '../src/screens/SignInScreen';
 import { HomeScreen } from '../src/screens/HomeScreen';
 import { GlowButton } from '../src/components/GlowButton';
@@ -467,6 +470,52 @@ describe('la surprise Pro', () => {
     expect(s.paywallVisible).toBe(false);
   });
 
+  /*
+   * LES DEUX CARTES AU MÊME GABARIT, POUCES À MÊME HAUTEUR.
+   *
+   * Relevé du patron : le contenu du Gratuit était plus haut d'un trait —
+   * la carte Pro commence sous le contour d'or (1,5 pt), la Gratuit
+   * commençait à son bord. Le Gratuit descend d'autant, et les deux
+   * cartes partagent le rayon.
+   */
+  it('aligne les deux cartes du comparatif', () => {
+    const t = monter(<PaywallScreen />);
+    const carteGratuit = t.root.findAll((n) => {
+      const st = StyleSheet.flatten(n.props?.style) as
+        | { paddingTop?: number }
+        | undefined;
+      return (
+        st?.paddingTop === 18 + TRAIT &&
+        n.findAll((x) => x.props?.testID === 'pouce-gratuit').length > 0
+      );
+    });
+    expect(carteGratuit.length).toBeGreaterThan(0);
+    // Même rayon pour les deux blocs : le contour Pro à 20, comme la carte.
+    const contours = t.root.findAllByType(ContourOr);
+    expect(contours[0].props.rayon).toBe(20);
+  });
+
+  /*
+   * EN THÈME NUIT, LES BLOCS PRO SUIVENT LA NUIT.
+   *
+   * Relevé du patron : la carte Pro et le bouton d'achat restaient BLANCS
+   * sur le fond sombre — deux dalles éblouissantes. Ils prennent la
+   * surface du thème, et le contour d'or reste : c'est lui, la signature.
+   */
+  it('assombrit la carte Pro et le bouton en thème nuit', () => {
+    useScanStore.setState({ themePref: 'dark' });
+    const t = monter(<PaywallScreen />);
+    for (const contour of t.root.findAllByType(ContourOr)) {
+      expect(contour.props.fond).toBe(dark.surface);
+    }
+    // Et la typo d'or couvre du MÊME fond : un couvercle blanc sur carte
+    // sombre découperait des pavés clairs autour des mots.
+    for (const typo of t.root.findAllByType(TexteOr)) {
+      expect(typo.props.fond).toBe(dark.surface);
+    }
+    useScanStore.setState({ themePref: 'light' });
+  });
+
   it('la carte Pro lève le pouce, la carte Gratuit le baisse', () => {
     const t = monter(<PaywallScreen />);
     const haut = t.root.findAll((n) => n.props?.testID === 'pouce-pro');
@@ -475,6 +524,70 @@ describe('la surprise Pro', () => {
     expect(bas.length).toBeGreaterThanOrEqual(1);
     // Deux images distinctes : un pouce copié-collé dirait deux fois oui.
     expect(haut[0].props.source).not.toEqual(bas[0].props.source);
+  });
+});
+
+/*
+ * L'AVIS CONTRE UN ESSAI — l'offre de la dernière chance.
+ *
+ * Relevé du patron : refuser l'offre de réduction propose de laisser un
+ * avis App Store, contre UN relevé supplémentaire. ATTENTION revue Apple :
+ * récompenser un avis est contraire aux règles (avis incités) — le patron
+ * est prévenu, l'app assume en attendant la soumission.
+ */
+describe('l’avis contre un essai', () => {
+  it('refuser la surprise, essai épuisé, propose l’avis — pas avant', () => {
+    useAccountStore.setState({
+      surpriseVisible: true,
+      avisVisible: false,
+      avisDonne: false,
+      plansUtilises: 1,
+      pro: false,
+    });
+    act(() => useAccountStore.getState().fermerSurprise());
+    expect(useAccountStore.getState().avisVisible).toBe(true);
+    // À la première inscription, l'essai est encore là : pas d'avis à
+    // acheter, on laisse l'utilisateur découvrir l'app.
+    useAccountStore.setState({
+      surpriseVisible: true,
+      avisVisible: false,
+      plansUtilises: 0,
+    });
+    act(() => useAccountStore.getState().fermerSurprise());
+    expect(useAccountStore.getState().avisVisible).toBe(false);
+  });
+
+  it('l’avis débloque UN essai, une seule fois', () => {
+    useAccountStore.setState({
+      avisVisible: true,
+      avisDonne: false,
+      bonusEssais: 0,
+      plansUtilises: 1,
+      pro: false,
+    });
+    expect(useAccountStore.getState().peutCreerPlan()).toBe(false);
+    act(() => useAccountStore.getState().donnerAvis());
+    const s = useAccountStore.getState();
+    expect(s.avisVisible).toBe(false);
+    expect(s.avisDonne).toBe(true);
+    expect(s.bonusEssais).toBe(1);
+    expect(s.peutCreerPlan()).toBe(true);
+    // L'essai bonus consommé, refuser à nouveau ne rejoue rien : un avis
+    // ne se laisse qu'une fois.
+    useAccountStore.setState({ surpriseVisible: true, plansUtilises: 2 });
+    act(() => useAccountStore.getState().fermerSurprise());
+    expect(useAccountStore.getState().avisVisible).toBe(false);
+  });
+
+  it('montre cinq étoiles d’or et les deux gestes', () => {
+    useAccountStore.setState({ avisVisible: true });
+    const t = monter(<AvisRecompense />);
+    const etoiles = t.root
+      .findAllByType(Path)
+      .filter((n) => n.props.d === SOLAIRES.etoile);
+    expect(etoiles).toHaveLength(5);
+    expect(bouton(t, 'Laisser un avis')).toBeDefined();
+    expect(bouton(t, 'Plus tard')).toBeDefined();
   });
 });
 

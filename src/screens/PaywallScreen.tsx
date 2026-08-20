@@ -25,7 +25,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BadgePro } from '../components/BadgePro';
-import { ContourOr, TexteOr } from '../components/ContourOr';
+import { ContourOr, TexteOr, TRAIT } from '../components/ContourOr';
 import {
   CODE_BIENVENUE,
   PRIX_PRO,
@@ -129,7 +129,7 @@ export function PaywallScreen() {
                 prix — troués sur la même bande qui glisse (ContourOr). Les
                 bénéfices restent à l'encre : on les LIT, on ne les admire
                 pas. */}
-            <ContourOr rayon={18} fond="#FFFFFF" style={s.pleine}>
+            <ContourOr rayon={20} fond={c.surface} style={s.pleine}>
               <View style={s.carteDedans}>
                 <Image
                   testID="pouce-pro"
@@ -141,14 +141,14 @@ export function PaywallScreen() {
                   texte="Pro"
                   taille={14}
                   graisse="700"
-                  fond="#FFFFFF"
+                  fond={c.surface}
                   style={s.aGauche}
                 />
                 <View style={s.prixRangee}>
                   <TexteOr
                     texte={remisePct > 0 ? prixRemise(remisePct) : PRIX_PRO}
                     taille={26}
-                    fond="#FFFFFF"
+                    fond={c.surface}
                   />
                   {/* L'ancien prix reste visible, barré : une remise sans
                       référence n'est qu'un prix comme un autre. */}
@@ -159,7 +159,7 @@ export function PaywallScreen() {
                     texte="/ mois"
                     taille={13}
                     graisse="600"
-                    fond="#FFFFFF"
+                    fond={c.surface}
                     style={s.parMoisCale}
                   />
                 </View>
@@ -183,14 +183,14 @@ export function PaywallScreen() {
           onPress={acheter}>
           {/* Le geste qu'on vend a la peau du badge : blanc, contour d'or,
               et le mot lui-même respire — c'est la signature du Pro. */}
-          <ContourOr rayon={16} fond="#FFFFFF" style={s.pleine}>
+          <ContourOr rayon={16} fond={c.surface} style={s.pleine}>
             <View style={s.ctaDedans}>
               <TexteOr
                 texte={`S’abonner — ${
                   remisePct > 0 ? prixRemise(remisePct) : PRIX_PRO
                 } / mois`}
                 taille={16.5}
-                fond="#FFFFFF"
+                fond={c.surface}
               />
             </View>
           </ContourOr>
@@ -269,6 +269,9 @@ const themed = (c: Palette) =>
       backgroundColor: c.surface,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: c.lineStrong,
+      // Le Pro commence sous son contour d'or (le trait) : le Gratuit
+      // descend d'autant, et les deux pouces s'alignent — relevé du patron.
+      paddingTop: 18 + TRAIT,
     },
     pouce: { width: 56, height: 56, alignSelf: 'center', marginBottom: 2 },
     prixBarre: {

@@ -12,6 +12,7 @@ import { SignInScreen } from './src/screens/SignInScreen';
 import { PaywallScreen } from './src/screens/PaywallScreen';
 import { EssaiEpuise } from './src/components/EssaiEpuise';
 import { SurprisePro } from './src/components/SurprisePro';
+import { AvisRecompense } from './src/components/AvisRecompense';
 import { useScanStore } from './src/store/scanStore';
 import { useAccountStore } from './src/store/accountStore';
 
@@ -84,6 +85,7 @@ export default function App() {
       <PaywallScreen />
       <EssaiEpuise />
       <SurprisePro />
+      <AvisRecompense />
     </SafeAreaProvider>
   );
 }

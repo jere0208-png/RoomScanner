@@ -12,6 +12,7 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
+import { SOLAIRES } from '../ui/solaires';
 
 export interface StripAction {
   label: string;
@@ -26,21 +27,14 @@ export interface StripAction {
 }
 
 /**
- * Le crayon, TRACÉ dans la main du jeu d'icônes — bouts ronds, 2,4
- * d'épaisseur. Un caractère « ✏️ » serait un emoji couleur qui ignore la
- * teinte du bouton : la leçon du soleil du thème.
+ * Le crayon, la silhouette « Solar Bold » du jeu commun (solaires.ts).
+ * Un caractère « ✏️ » serait un emoji couleur qui ignore la teinte du
+ * bouton : la leçon du soleil du thème.
  */
 function Crayon({ teinte }: { teinte: string }) {
   return (
     <Svg width={13} height={13} viewBox="0 0 24 24">
-      <Path
-        d="M16.6 3.9a2.15 2.15 0 0 1 3.5 2.4 2.15 2.15 0 0 1-.5.7L7.9 18.7 3.4 20l1.3-4.5L16.4 3.8"
-        stroke={teinte}
-        strokeWidth={2.4}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        fill="none"
-      />
+      <Path d={SOLAIRES.crayon} fill={teinte} fillRule="evenodd" />
     </Svg>
   );
 }

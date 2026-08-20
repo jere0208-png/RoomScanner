@@ -82,48 +82,22 @@ const VIDE: Fixture[] = [];
  */
 export const WALL_MENU = { w: 204, h: 46 };
 
+/*
+  LES ICÔNES DU MENU VIENNENT DU JEU « SOLAR BOLD » (refonte du patron) —
+  les mêmes silhouettes que la rangée d'outils, généré dans
+  src/ui/solaires.ts. Le rendu est un plein, jamais un trait.
+*/
 const WALL_ACTIONS: {
   action: 'longueur' | 'ouverture' | 'electricite' | 'supprimer';
   label: string | null;
-  paths: { d: string; fill?: boolean }[];
+  d: string;
 }[] = [
-  {
-    action: 'longueur',
-    label: 'Cotes',
-    // Le double-décimètre.
-    paths: [
-      { d: 'M3.5 9 h17 a1.5 1.5 0 0 1 1.5 1.5 v3 a1.5 1.5 0 0 1 -1.5 1.5 h-17 a1.5 1.5 0 0 1 -1.5 -1.5 v-3 a1.5 1.5 0 0 1 1.5 -1.5 z' },
-      { d: 'M7.5 9 v3' },
-      { d: 'M11.5 9 v3' },
-      { d: 'M15.5 9 v3' },
-    ],
-  },
-  {
-    action: 'ouverture',
-    label: 'Ouvrir',
-    // Une baie vue en plan : deux tableaux et le débattement.
-    paths: [
-      { d: 'M2.5 18 h4.5' },
-      { d: 'M17 18 h4.5' },
-      { d: 'M7 18 a5 5 0 0 1 10 0' },
-      { d: 'M7 18 v-4' },
-      { d: 'M17 18 v-4' },
-    ],
-  },
-  {
-    action: 'electricite',
-    label: 'Élec',
-    // L'éclair : le seul symbole que personne n'a besoin qu'on lui explique.
-    paths: [{ d: 'M13.5 2.5 L5.5 13.5 h5 l-1 8 8 -11 h-5 z', fill: true }],
-  },
-  {
-    action: 'supprimer',
-    // Une croix se lit dans toutes les langues, mais pas dans une rangée
-    // où ses trois voisines portent un mot : c'est la seule sans titre, et
-    // c'est justement celle qui efface un mur. On la nomme.
-    label: 'Supprimer',
-    paths: [{ d: 'M6.5 6.5 L17.5 17.5' }, { d: 'M17.5 6.5 L6.5 17.5' }],
-  },
+  { action: 'longueur', label: 'Cotes', d: SOLAIRES.ruler },
+  { action: 'ouverture', label: 'Ouvrir', d: SOLAIRES.ouvertures },
+  { action: 'electricite', label: 'Élec', d: SOLAIRES.elec },
+  // Une croix se lit dans toutes les langues, mais pas dans une rangée où
+  // ses trois voisines portent un mot : la corbeille se nomme aussi.
+  { action: 'supprimer', label: 'Supprimer', d: SOLAIRES.supprimer },
 ];
 
 interface EffMapping {
@@ -141,6 +115,7 @@ import {
   type Etiquette,
 } from '../geometry/cotes';
 import { haptic, releaseHaptic } from '../ui/haptic';
+import { SOLAIRES } from '../ui/solaires';
 
 
 /**
@@ -2065,7 +2040,7 @@ export function FloorplanEditor({
                     { left: bx - WALL_MENU.w / 2, top: by - WALL_MENU.h / 2 },
                   ]}
                   pointerEvents="box-none">
-                  {WALL_ACTIONS.map(({ action, label, paths }) => {
+                  {WALL_ACTIONS.map(({ action, label, d }) => {
                     const teinte = action === 'supprimer' ? c.danger : c.ink;
                     return (
                       <TouchableOpacity
@@ -2074,17 +2049,7 @@ export function FloorplanEditor({
                         accessibilityLabel={label ?? action}
                         onPress={() => onWallAction(action, w.id)}>
                         <Svg width={19} height={19} viewBox="0 0 24 24">
-                          {paths.map((seg, i) => (
-                            <Path
-                              key={i}
-                              d={seg.d}
-                              stroke={teinte}
-                              strokeWidth={1.9}
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              fill={seg.fill ? teinte : 'none'}
-                            />
-                          ))}
+                          <Path d={d} fill={teinte} fillRule="evenodd" />
                         </Svg>
                         {label && (
                           <Text style={styles.wallActionText}>{label}</Text>

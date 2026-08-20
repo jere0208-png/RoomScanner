@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
+import { SOLAIRES } from '../ui/solaires';
 import { RoomScan } from 'react-native-room-scan';
 import {
   glow,
@@ -135,40 +136,27 @@ export function ExportScreen() {
 type OptionDef = [keyof typeof EXPORT_ICONS, string, boolean, () => void];
 
 /**
- * Icônes des options d'export, tracées en 24×24.
+ * Icônes des options d'export — le jeu « SOLAR BOLD », le même que la
+ * rangée d'outils (refonte du patron ; généré dans src/ui/solaires.ts).
  *
  * Un mot sous chacune : l'icône seule se devine mal — « surfaces » et
  * « couleurs » se ressemblent trop —, et le mot seul reprend la place qu'on
  * cherchait justement à gagner.
  */
 const EXPORT_ICONS = {
-  vues3d: ['M12 3 l8 4.5 v9 L12 21 l-8 -4.5 v-9 z', 'M12 12 l8 -4.5', 'M12 12 v9', 'M12 12 L4 7.5'],
-  metre: ['M4 5 h16 v14 H4 z', 'M4 12 h16', 'M12 5 v14'],
-  plafond: ['M3.5 6 h17', 'M12 6 v3.5', 'M7.5 15 a4.5 4.5 0 0 1 9 0 z', 'M6 18.5 h12'],
-  cotes2d: ['M3 12 h18', 'M6 9 v6', 'M18 9 v6', 'M9 4 h6 v3 H9 z'],
-  cotes3d: ['M4 18 l6 -12 6 6 4 -4', 'M3 21 h18', 'M6 15 v6'],
-  meubles: ['M4 17 v-5 a2 2 0 0 1 2 -2 h12 a2 2 0 0 1 2 2 v5', 'M4 17 h16', 'M6 17 v3', 'M18 17 v3'],
-  surface: ['M4 6 h16 v12 H4 z', 'M8 10 h.01', 'M12 10 h.01', 'M16 10 h.01', 'M8 14 h.01', 'M12 14 h.01', 'M16 14 h.01'],
-  ouvertures: ['M5 4 v16 h9 V4 z', 'M14 20 l5 2 V2 l-5 2', 'M8 12 h.01'],
-  couleurs: ['M12 3 a9 9 0 1 0 0 18 h2 a2 2 0 0 0 0 -4 h-1 a2 2 0 0 1 0 -4 h3 a4 4 0 0 0 0 -8 z', 'M8 9 h.01', 'M12 7 h.01'],
-  gaines: ['M4 20 h9 a3 3 0 0 0 3 -3 V7', 'M13 4 h6 v3 h-6 z', 'M4 17.5 v5'],
-  // Tous les murs : trois pans pochés, comme la coupe d'un plan.
-  murs: [
-    'M3 8.5 h18 v3.2 h-18 z',
-    'M3 15 h7.5 v6 h-7.5 z',
-    'M15.5 15 h5.5 v6 h-5.5 z',
-  ],
-  // Élévation : un mur vu de face, sa cote au-dessus, une prise dessus.
-  elevations: [
-    'M4 19 h16',
-    'M5 19 V8 h14 v11',
-    'M4 5.5 h16',
-    'M4 4 v3',
-    'M20 4 v3',
-    'M10.5 13.5 h3 v3 h-3 z',
-  ],
-  // Schémas : un peigne de tableau, deux départs sous une barre.
-  schema: ['M12 3 v4', 'M4 7 h16', 'M8 7 v4', 'M16 7 v4', 'M6 11 h4 v6 H6 z', 'M14 11 h4 v6 h-4 z'],
+  vues3d: SOLAIRES.vues3d,
+  metre: SOLAIRES.metre,
+  plafond: SOLAIRES.plafond,
+  cotes2d: SOLAIRES.cotes2d,
+  cotes3d: SOLAIRES.cotes3d,
+  meubles: SOLAIRES.meubles,
+  surface: SOLAIRES.surface,
+  ouvertures: SOLAIRES.ouvertures,
+  couleurs: SOLAIRES.couleurs,
+  gaines: SOLAIRES.gaines,
+  murs: SOLAIRES.murs,
+  elevations: SOLAIRES.elevations,
+  schema: SOLAIRES.schema,
 } as const;
 
 const styles = getStyles(c);
@@ -639,17 +627,12 @@ const styles = getStyles(c);
                 accessibilityLabel={label}
                 onPress={press}>
                 <Svg width={26} height={26} viewBox="0 0 24 24">
-                  {EXPORT_ICONS[icon].map((d) => (
-                    <Path
-                      key={d}
-                      d={d}
-                      stroke={actif ? '#FFFFFF' : c.ink}
-                      strokeWidth={1.9}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      fill="none"
-                    />
-                  ))}
+                  {/* La silhouette Solar, remplie — jamais de trait. */}
+                  <Path
+                    d={EXPORT_ICONS[icon]}
+                    fill={actif ? '#FFFFFF' : c.ink}
+                    fillRule="evenodd"
+                  />
                 </Svg>
               </TouchableOpacity>
               <Text

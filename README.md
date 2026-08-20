@@ -611,8 +611,23 @@ rappelle le numéro que le mur porte sur le plan.
 
 ### Les icônes disent ce qu'elles font
 
-Le jeu entier a été redessiné — vingt icônes d'outils, huit de feuilles —
-selon trois règles.
+**Le jeu est désormais « Solar Bold »** (collection SVGRepo, © Solar Icons,
+CC BY 4.0) — refonte du patron : toutes les icônes des menus des écrans de
+scan (rangée d'outils, feuilles d'export, menu du mur, crayon du bandeau)
+viennent du même jeu, une correspondance par icône. Il est GÉNÉRÉ par
+`tools/gen-solaires.mjs` (API Iconify, même jeu) et vendu en dur dans
+`src/ui/solaires.ts` : rien ne se télécharge à l'exécution, une icône
+introuvable casse la génération — pas le téléphone —, et on change une
+icône en changeant son candidat dans l'outil, jamais un tracé à la main.
+Le rendu est une SILHOUETTE (`fill`, `fillRule="evenodd"`), jamais un
+trait : le Bold de Solar est un jeu de pleins, et un plein porte plus loin
+qu'un contour — la planche s'est regardée avant livraison. Les
+correspondances parlent métier : la prise `socket` pour « Appareil », la
+mire `target` pour « Repères », l'équerre `ruler-angular` pour l'aplomb.
+
+L'histoire du jeu maison reste écrite : il avait été redessiné — vingt
+icônes d'outils, huit de feuilles — selon trois règles, que Solar respecte
+d'office.
 
 **Un symbole dit sa fonction.** « Repères » était un `+`. « Appareil » aussi :
 deux boutons sans rapport, le même dessin, et aucun des deux ne disait ce
@@ -779,7 +794,31 @@ vécu comme une promesse reprise.
 comparatif, la carte Gratuit baisse le pouce, la carte Pro le lève — même
 famille 3D que le cadeau. La page s'est modernisée au passage : plus d'air
 entre les colonnes, rayon des cartes à vingt points, filet d'un cheveu sur
-la carte Gratuit.
+la carte Gratuit. Les deux cartes partagent le GABARIT : le Gratuit
+descend son contenu d'un trait (celui du contour d'or du Pro) pour que les
+pouces s'alignent, et les rayons sont les mêmes. En thème nuit, la carte
+Pro et le bouton d'achat prennent la surface du thème — deux dalles
+blanches sur fond sombre éblouissaient — et le contour d'or reste : c'est
+lui, la signature.
+
+**Refuser l'offre ouvre la dernière chance : un avis contre un essai.**
+Quand l'essai est épuisé (jamais à la première inscription — l'utilisateur
+a encore son relevé) et qu'on repousse la surprise, un popup aux cinq
+étoiles d'or propose de laisser un avis App Store contre UN relevé
+supplémentaire. Le bonus s'encaisse SUR L'HONNEUR — aucune API ne dit si
+l'avis a été posté —, une seule fois, et il survit au redémarrage.
+ATTENTION REVUE APPLE : récompenser un avis est contraire aux règles de
+l'App Store (avis incités) ; le patron est prévenu, à revoir avant la
+soumission. L'URL d'avis porte un identifiant GABARIT tant que la fiche
+App Store Connect n'existe pas.
+
+**Le profil est un bloc, en haut à gauche** — croquis Paint du patron. La
+mention du compte vivait en pied d'écran, minuscule : c'est maintenant
+l'avatar Solar, le nom souligné d'une barre, et le GRADE centré dessous —
+« GRATUIT » gris fade, « PRO » dans la typo d'or de la page Pro. Le clic
+garde tout le geste de l'ancienne rangée (Pro, déconnexion, suppression),
+et le bloc est le miroir du bouton de thème : la même bande en haut de
+l'accueil, chacun son coin.
 
 ### Le badge Pro respire
 
