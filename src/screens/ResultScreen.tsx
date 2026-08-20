@@ -103,6 +103,7 @@ import {
 } from '../geometry/electrical';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useScanStore } from '../store/scanStore';
+import { demarrerComplement } from '../native/useRoomScan';
 import { DiagnosticSheet, type Constat } from '../components/DiagnosticSheet';
 import { ClientTour } from '../components/ClientTour';
 import { EnAttente } from '../components/PendingPill';
@@ -1631,6 +1632,32 @@ export function ResultScreen() {
                     icon: 'piece' as const,
                     hint: 'Un rectangle aux cotes que vous donnez, à côté du plan.',
                     onPress: () => setAjoutPiece(true),
+                  },
+                  {
+                    /**
+                     * SCANNER UNE PIÈCE DE PLUS — la vraie version.
+                     *
+                     * « Ajouter une pièce » pose un rectangle aux cotes
+                     * qu'on donne : c'est du dépannage. Ici on RELÈVE la
+                     * pièce, et `StructureBuilder` (iOS 17) l'aligne sur ce
+                     * qui existe déjà. L'appareillage posé survit, reprojeté
+                     * sur les murs neufs — sans quoi ajouter une chambre
+                     * coûterait vingt prises.
+                     */
+                    label: 'Scanner une pièce',
+                    icon: 'piece' as const,
+                    hint:
+                      'Un relevé de plus, réuni au plan. iOS 17 et appareil ' +
+                      'LiDAR requis.',
+                    onPress: () => {
+                      demarrerComplement().catch((e: any) =>
+                        Alert.alert(
+                          'Relevé impossible',
+                          e?.message ??
+                            'La réunion de plusieurs relevés demande iOS 17.',
+                        ),
+                      );
+                    },
                   },
                   {
                     /**

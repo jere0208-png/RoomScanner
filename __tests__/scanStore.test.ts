@@ -904,3 +904,84 @@ describe('la qualité du relevé, en direct', () => {
     expect(useScanStore.getState().mursDouteux).toBe(0);
   });
 });
+
+/**
+ * UN PASSAGE DE PLUS N'EFFACE PAS LE TRAVAIL DÉJÀ FAIT.
+ *
+ * Le logement se scanne pièce par pièce : `StructureBuilder` (iOS 17)
+ * aligne les passages, et le résultat REMPLACE la géométrie du plan. Mais
+ * l'électricien a pu poser vingt prises entre-temps — les perdre parce
+ * qu'il ajoute une chambre serait pire que tout, et il ne le pardonnerait
+ * qu'une fois.
+ *
+ * On remplace donc les murs, les ouvertures et les meubles ; on GARDE
+ * l'appareillage, le plafond et les photos, en reprojetant ce qui
+ * s'accroche à un mur — exactement ce que fait la redétection des pièces.
+ */
+describe('le relevé qu’on complète', () => {
+  beforeEach(reset);
+
+  it('garde l’appareillage posé, et le repose sur les nouveaux murs', () => {
+    useScanStore.getState().finalize({
+      modelPath: '/tmp/a.usdz',
+      surfaces: boxSurfaces('a', 0, 0, 4, 3),
+      objects: [],
+    });
+    const mur = useScanStore.getState().walls[0];
+    useScanStore.setState({
+      fixtures: [
+        {
+          id: 'pr1',
+          kind: 'prise',
+          wallId: mur.id,
+          along: 1,
+          height: 0.25,
+          side: 1,
+        },
+      ],
+      ceiling: [
+        { id: 'c1', kind: 'dcl', roomId: 'room-1', at: { x: 2, z: 1.5 } },
+      ],
+    });
+
+    // Deuxième passage : le même séjour, plus une chambre à côté.
+    useScanStore.getState().finalizeMerge({
+      modelPath: '/tmp/b.usdz',
+      surfaces: [
+        ...boxSurfaces('a', 0, 0, 4, 3),
+        ...boxSurfaces('b', 4, 0, 3, 3),
+      ],
+      objects: [],
+      passages: 2,
+    });
+
+    const st = useScanStore.getState();
+    // La chambre est arrivée…
+    expect(st.rooms.length).toBeGreaterThan(1);
+    // …et la prise est toujours là, sur un mur qui existe.
+    expect(st.fixtures).toHaveLength(1);
+    expect(st.walls.some((w) => w.id === st.fixtures[0].wallId)).toBe(true);
+    // Le plafond aussi.
+    expect(st.ceiling).toHaveLength(1);
+  });
+
+  it('n’entame pas le quota : c’est le même plan qu’on complète', () => {
+    useScanStore.getState().finalize({
+      modelPath: '/tmp/a.usdz',
+      surfaces: boxSurfaces('a', 0, 0, 4, 3),
+      objects: [],
+    });
+    const avant = useScanStore.getState().saves.length;
+    useScanStore.getState().finalizeMerge({
+      modelPath: '/tmp/b.usdz',
+      surfaces: [
+        ...boxSurfaces('a', 0, 0, 4, 3),
+        ...boxSurfaces('b', 4, 0, 3, 3),
+      ],
+      objects: [],
+      passages: 2,
+    });
+    // Pas de dossier de plus dans la bibliothèque : on a COMPLÉTÉ le sien.
+    expect(useScanStore.getState().saves).toHaveLength(avant);
+  });
+});

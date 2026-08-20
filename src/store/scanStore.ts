@@ -44,6 +44,7 @@ import {
   wallQuadsOf,
   wallRuns,
   weldCorners,
+  fusionnerMursDoubles,
   COFFRE_H,
   type TrouDeReleve,
   type Pt,
@@ -574,6 +575,12 @@ interface ScanState {
    * pièces qui ne se referment pas).
    */
   mursDouteux: number;
+  /**
+   * Le scan en cours COMPLÈTE le relevé au lieu de le remplacer : c'est
+   * une pièce de plus, et l'appareillage déjà posé doit survivre.
+   */
+  complementEnCours: boolean;
+  setComplement: (v: boolean) => void;
   wallCount: number;
   objectCount: number;
   doorCount: number;
@@ -853,6 +860,19 @@ interface ScanState {
   applyLiveUpdate: (u: ScanUpdate) => void;
   finalize: (r: ScanResult) => void;
   /**
+   * UN PASSAGE DE PLUS, réuni au relevé courant.
+   *
+   * Le logement se scanne pièce par pièce, et `StructureBuilder` (iOS 17)
+   * aligne les passages : le résultat REMPLACE la géométrie. Mais
+   * l'électricien a pu poser vingt prises entre-temps — les perdre parce
+   * qu'il ajoute une chambre serait pire que tout. On remplace donc les
+   * murs, les ouvertures et les meubles ; on GARDE l'appareillage, le
+   * plafond et les photos, en reprojetant ce qui s'accroche à un mur.
+   *
+   * Et l'on ne consomme aucun essai : c'est le MÊME plan qu'on complète.
+   */
+  finalizeMerge: (r: ScanResult) => void;
+  /**
    * L'ARRIVAGE d'un scan qui vient de finir : ce que le popup de choix
    * propose d'intégrer. RoomPlan DÉTECTE les meubles ; l'électricité, elle,
    * ne peut être que PROPOSÉE (l'implantation NF C 15-100, hors meubles) —
@@ -1100,6 +1120,7 @@ export const useScanStore = create<ScanState>((set, get) => {
     error: null,
     instruction: '',
     mursDouteux: 0,
+    complementEnCours: false,
     wallCount: 0,
     objectCount: 0,
     doorCount: 0,
@@ -2406,6 +2427,7 @@ export const useScanStore = create<ScanState>((set, get) => {
     setProcessing: (processing) => set({ processing }),
     setError: (error) => set({ error }),
     setInstruction: (instruction) => set({ instruction }),
+    setComplement: (v) => set({ complementEnCours: v }),
 
     applyLiveUpdate: (u) =>
       set({
@@ -2433,6 +2455,110 @@ export const useScanStore = create<ScanState>((set, get) => {
     retirerMeubles: () => {
       pushHistory('retirerMeubles');
       set({ objects: [], dirty: true });
+    },
+
+    finalizeMerge: (r) => {
+      const st = get();
+      const surfaces = r.rooms?.length
+        ? r.rooms.flatMap((x) => x.surfaces ?? [])
+        : r.surfaces ?? [];
+      const entrants = r.rooms?.length
+        ? r.rooms.flatMap((x) => x.objects ?? [])
+        : r.objects ?? [];
+      const segments = surfaces.map((x) => toSegment(x));
+      /*
+        LA CLOISON MITOYENNE EST VUE DEUX FOIS — une fois depuis chaque
+        pièce. Sans les réunir, chaque arête doublée fausse le parcours des
+        faces, et le logement ressort en une seule pièce, ou en aucune.
+      */
+      const walls = mergeColinear(
+        splitAtJunctions(
+          weldCorners(
+            fusionnerMursDoubles(segments.filter((x) => x.type === 'wall')),
+          ),
+        ),
+      );
+      if (walls.length === 0) return;
+      const openings = segments.filter((x) => x.type !== 'wall');
+      pushHistory('completerReleve');
+
+      const detected = detectRooms(walls, undefined, openings);
+      const shapes =
+        detected.length > 0
+          ? detected
+          : [{ outline: [], wallIds: walls.map((w) => w.id), area: 0 }];
+
+      /*
+        CE QUI S'ACCROCHE À UN MUR SE REPOSE SUR LE NOUVEAU JEU.
+
+        Les murs du second passage portent d'autres identifiants, et la
+        fusion a pu les redécouper : sans reprojection, chaque prise posée
+        se retrouverait sur un mur qui n'existe plus — disparue de l'écran,
+        des comptages et du métré.
+      */
+      const fixtures = reprojectFixtures(st.walls, walls, st.fixtures);
+      const photos = reprojectAnchors(st.walls, walls, st.photos);
+
+      const floor = r.floor ?? r.rooms?.[0]?.floor ?? st.rooms[0]?.floor ?? null;
+      const objects: ObjectData[] = separerLeMobilier(
+        entrants.map((o) => ({
+          ...o,
+          roomId: `room-${roomIndexAt(
+            { x: o.transform[12], z: o.transform[14] },
+            shapes.map((x) => x.outline),
+          ) + 1}`,
+        })),
+      );
+      const kinds = shapes.map((_, i) =>
+        deduceRoomKind(
+          objects
+            .filter((o) => o.roomId === `room-${i + 1}`)
+            .map((o) => o.category),
+        ),
+      );
+      const auto = nameRooms(kinds);
+      // Les noms donnés à la main survivent au second passage : on rattache
+      // chaque pièce neuve à l'ancienne dont le cartouche tombe dedans.
+      const anciennes = roomParts(st.walls, st.rooms);
+      const kept: RoomEntry[] = shapes.map((sh, i) => {
+        const avant = anciennes.find((pa) =>
+          pointInPolygon(pa.labelAt, sh.outline),
+        );
+        const garde = avant
+          ? st.rooms.find((x) => x.id === avant.roomId)
+          : undefined;
+        return {
+          id: `room-${i + 1}`,
+          name: garde?.name || auto[i],
+          wallIds: sh.wallIds,
+          kind: kinds[i] ?? undefined,
+          floor,
+        };
+      });
+      /*
+        LE PLAFOND SUIT SA PIÈCE, par la position de son ancrage : les
+        identifiants de pièce sont refaits à neuf.
+      */
+      const ceiling = st.ceiling.map((cl) => ({
+        ...cl,
+        roomId: `room-${roomIndexAt(cl.at, shapes.map((x) => x.outline)) + 1}`,
+      }));
+
+      set({
+        modelPath: r.modelPath ?? st.modelPath,
+        rooms: kept,
+        walls,
+        openings,
+        objects,
+        fixtures,
+        photos,
+        ceiling,
+        north: typeof r.north === 'number' ? r.north : st.north,
+        processing: false,
+        scanning: false,
+        screen: 'result',
+        dirty: true,
+      });
     },
 
     finalize: (r) => {
@@ -3572,6 +3698,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         error: null,
         instruction: '',
         mursDouteux: 0,
+        complementEnCours: false,
         wallCount: 0,
         objectCount: 0,
         doorCount: 0,

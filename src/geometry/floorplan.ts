@@ -1713,6 +1713,70 @@ export function linteauxRabotes(
     .map((o) => ({ id: o.id, linteau: reference, actuel: hautDe(o) }));
 }
 
+/**
+ * RÉUNIT LES MURS VUS DEUX FOIS.
+ *
+ * Quand on scanne un logement pièce par pièce, la cloison mitoyenne est vue
+ * DEUX FOIS : une fois depuis le séjour, une fois depuis la chambre. Les
+ * deux segments se superposent presque, à l'épaisseur du mur près. Le
+ * graphe, lui, n'y survit pas : chaque arête doublée fausse le parcours des
+ * faces, et le logement ressort en une seule pièce — ou en aucune.
+ *
+ * Le diagnostic les signalait depuis longtemps (« deux murs se
+ * superposent ») sans jamais les régler. On les réunit ici : un seul mur,
+ * l'enveloppe des deux, et l'identifiant du PLUS LONG — c'est lui qui porte
+ * le plus d'appareils, et le reprojeter coûterait moins cher de toute
+ * façon.
+ *
+ * Trois gardes : il faut qu'ils soient parallèles (à ~18° près), proches
+ * latéralement (moins de trente centimètres, l'épaisseur d'un mur porteur),
+ * et qu'ils SE RECOUVRENT — deux murs bout à bout sont un mur coupé, pas un
+ * doublon, et deux cloisons de couloir ne se confondent pas.
+ */
+export function fusionnerMursDoubles(
+  walls: WallSeg[],
+  ecartMax = 0.3,
+): WallSeg[] {
+  const out: WallSeg[] = [];
+  const absorbes = new Set<string>();
+  // Le plus long d'abord : c'est lui qui garde son identité.
+  const tries = [...walls].sort((a, b) => segLength(b) - segLength(a));
+  for (const w of tries) {
+    if (absorbes.has(w.id) || w.type !== 'wall') {
+      if (w.type !== 'wall') out.push(w);
+      continue;
+    }
+    let A = { ...w.a };
+    let B = { ...w.b };
+    const l = segLength(w) || 1;
+    const u = { x: (B.x - A.x) / l, z: (B.z - A.z) / l };
+    const n = { x: -u.z, z: u.x };
+    for (const o of tries) {
+      if (o.id === w.id || absorbes.has(o.id) || o.type !== 'wall') continue;
+      const lo = segLength(o) || 1;
+      const uo = { x: (o.b.x - o.a.x) / lo, z: (o.b.z - o.a.z) / lo };
+      if (Math.abs(u.x * uo.x + u.z * uo.z) < 0.95) continue;
+      // Distance latérale : les deux bouts doivent longer la même ligne.
+      const lat = (p: Pt) => Math.abs((p.x - A.x) * n.x + (p.z - A.z) * n.z);
+      if (lat(o.a) > ecartMax || lat(o.b) > ecartMax) continue;
+      // Recouvrement le long de l'axe : bout à bout ne compte pas.
+      const t = (p: Pt) => (p.x - A.x) * u.x + (p.z - A.z) * u.z;
+      const t0 = Math.min(t(o.a), t(o.b));
+      const t1 = Math.max(t(o.a), t(o.b));
+      const commun = Math.min(t1, l) - Math.max(t0, 0);
+      if (commun <= 0.05) continue;
+      // Absorbé : le mur retenu prend l'enveloppe des deux.
+      absorbes.add(o.id);
+      const deb = Math.min(0, t0);
+      const fin = Math.max(l, t1);
+      A = { x: A.x + u.x * deb, z: A.z + u.z * deb };
+      B = { x: A.x + u.x * (fin - deb), z: A.z + u.z * (fin - deb) };
+    }
+    out.push({ ...w, a: A, b: B });
+  }
+  return out;
+}
+
 /** Hauteur par défaut d'un coffre de volet — le tunnel courant, 25 cm. */
 export const COFFRE_H = 0.25;
 

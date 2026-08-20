@@ -145,6 +145,54 @@ L'outil « pièces » de la barre du plan relance la détection sur le graphe
 courant, en **gardant les noms donnés à la main** : chaque nouvelle pièce
 hérite du nom de l'ancienne dont le point de cartouche tombe dedans.
 
+### Le logement se scanne pièce par pièce, et les passages se réunissent
+
+« Fais tout ce que tu viens de dire. » Le chantier natif, donc — celui que
+la réponse précédente rangeait dans les possibles.
+
+**Deux réglages nous manquaient dans RoomPlan.** `RoomCaptureView`
+post-traite avec les options par défaut ; en partant nous-mêmes des données
+brutes (`CapturedRoomData`, gardées à la fin de chaque passage), on choisit
+les nôtres. `RoomBuilder(options: [.beautifyObjects])` redresse les meubles
+détectés — leurs cotes cessent d'être « à peu près ». Et surtout, dès qu'il
+y a PLUSIEURS passages, **`StructureBuilder` (iOS 17) les aligne en une
+structure unique**.
+
+C'est la réponse au logement qu'on relève en plusieurs fois : on scanne le
+séjour, on ferme une porte, on scanne la chambre — et le plan se complète
+tout seul. « Scanner une pièce » vit dans le menu du scan, à côté de
+« Ajouter une pièce » qui, lui, pose un rectangle aux cotes qu'on donne et
+reste le dépannage.
+
+Tout cela est asynchrone et faillible : si l'assemblage échoue, **on
+retombe sur le résultat de la vue**, qui est déjà bon. Un dossier livré vaut
+mieux qu'un dossier parfait qui n'arrive pas.
+
+**Et le travail déjà fait survit.** Un second passage REMPLACE la géométrie :
+sans précaution, l'électricien qui ajoute une chambre perdrait les vingt
+prises posées la veille — il ne le pardonnerait qu'une fois. `finalizeMerge`
+remplace donc les murs, les ouvertures et les meubles, mais garde
+l'appareillage, le plafond et les photos, en reprojetant ce qui s'accroche à
+un mur (`reprojectFixtures`, comme la redétection des pièces). Les noms de
+pièces donnés à la main survivent aussi, et aucun essai n'est consommé :
+c'est le MÊME plan qu'on complète.
+
+**Le défaut que le banc a révélé, et qui valait le détour** : deux relevés
+fusionnés voient la cloison mitoyenne DEUX FOIS — une fois depuis chaque
+pièce, à l'épaisseur du mur près. Le graphe n'y survit pas : chaque arête
+doublée fausse le parcours des faces, et le logement ressort en une seule
+pièce, ou en aucune. Le diagnostic les signalait depuis longtemps (« deux
+murs se superposent ») sans jamais les régler. `fusionnerMursDoubles` les
+réunit maintenant : un seul mur, l'enveloppe des deux, l'identifiant du plus
+long — celui qui porte le plus d'appareils. Trois gardes pour ne rien casser
+d'autre : parallèles à dix-huit degrés près, à moins de trente centimètres
+l'un de l'autre, et **se recouvrant** — deux murs bout à bout sont un mur
+coupé, deux cloisons de couloir ne se confondent pas.
+
+*Rappel de méthode : le Swift ne se compile pas sur cette machine. La chaîne
+de livraison bâtit sur macOS et valide la compilation ; le comportement,
+lui, se vérifie sur l'appareil.*
+
 ### Le relevé dit ce qu'il voit mal, pendant qu'on peut y retourner
 
 Question du patron : « as-tu moyen de rendre le scan plus performant, plus

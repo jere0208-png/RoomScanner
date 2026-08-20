@@ -99,6 +99,11 @@ export interface ScanUpdate {
  * du graphe des murs (`detectRooms`) puis les nomme d'après le mobilier.
  */
 export interface ScanResult {
+  /**
+   * Nombre de passages réunis dans ce relevé. Deux ou plus : le logement a
+   * été scanné pièce par pièce, et les passages ont été alignés.
+   */
+  passages?: number;
   /** Chemin local du modèle 3D (.usdz sur iOS, .obj sur Android). */
   modelPath: string;
   surfaces?: SurfaceData[];
@@ -138,6 +143,19 @@ export const RoomScan = {
     RoomScanModule ? RoomScanModule.isSupported() : Promise.resolve(false),
 
   start: (): Promise<void> => RoomScanModule.startRoomScan(),
+
+  /**
+   * UN PASSAGE DE PLUS, réuni au relevé déjà fait.
+   *
+   * Le logement se scanne alors pièce par pièce : `StructureBuilder`
+   * (iOS 17) aligne les passages en une structure unique, au lieu de
+   * laisser recoller les murs à la main. Rejette sous iOS 16 — l'app
+   * garde alors le geste manuel « Ajouter une pièce ».
+   */
+  startAdditional: (): Promise<void> =>
+    RoomScanModule?.startAdditionalScan
+      ? RoomScanModule.startAdditionalScan()
+      : Promise.reject(new Error('Non disponible sur cet appareil')),
 
   /** Autorisation caméra : 'granted' | 'denied' | 'undetermined'. */
   cameraStatus: (): Promise<'granted' | 'denied' | 'undetermined'> =>

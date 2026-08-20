@@ -12,6 +12,24 @@ const INSTRUCTIONS_FR: Record<string, string> = {
   lowTexture: 'Surface difficile à détecter',
 };
 
+/**
+ * UNE PIÈCE DE PLUS, réunie au relevé courant.
+ *
+ * `StructureBuilder` (iOS 17) aligne les passages : on relève le séjour, on
+ * ferme la porte, on relève la chambre — et le plan se complète tout seul,
+ * au lieu qu'on recolle les murs à la main.
+ *
+ * Fonction LIBRE, pas une commande du hook : l'écran des résultats l'appelle
+ * sans avoir à s'abonner au flux du scan, dont il n'a que faire.
+ */
+export async function demarrerComplement(): Promise<void> {
+  await RoomScan.startAdditional();
+  const st = useScanStore.getState();
+  st.setComplement(true);
+  st.setScreen('scan');
+  st.setScanning(true);
+}
+
 /** Abonne le store aux événements natifs et expose les commandes du scan. */
 export function useRoomScan() {
   const store = useScanStore();
@@ -66,15 +84,28 @@ export function useRoomScan() {
      */
     stop: async () => {
       store.setProcessing(true);
+      const complement = useScanStore.getState().complementEnCours;
       try {
         // Le post-traitement RoomPlan prend quelques secondes.
         const result = await RoomScan.stop();
-        useScanStore.getState().finalize(result);
+        /*
+          UN PASSAGE DE PLUS COMPLÈTE le relevé, il ne le remplace pas :
+          l'appareillage déjà posé survit, reprojeté sur les murs neufs.
+          Un scan ordinaire, lui, ouvre un dossier.
+        */
+        if (complement) {
+          useScanStore.getState().finalizeMerge(result);
+          useScanStore.getState().setComplement(false);
+        } else {
+          useScanStore.getState().finalize(result);
+        }
       } catch (e: any) {
         store.setProcessing(false);
+        store.setComplement(false);
         store.setError(e?.message ?? 'Échec du traitement du scan');
       }
     },
+    startComplement: demarrerComplement,
     /** Abandonne le scan en cours sans post-traitement ni sauvegarde. */
     cancel: () => {
       RoomScan.pause();

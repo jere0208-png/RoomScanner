@@ -61,6 +61,28 @@ class RoomScanModule: NSObject {
     resolve(nil)
   }
 
+  /**
+   UN PASSAGE DE PLUS, qui S'AJOUTE au logement déjà relevé.
+
+   Un appartement ne se scanne pas toujours d'un trait : on relève le
+   séjour, on ferme une porte, on relève la chambre. Chaque passage
+   écrasait le précédent — il fallait recoller les pièces à la main.
+   `StructureBuilder` (iOS 17) les aligne ; ici on lui garde la matière.
+   */
+  @objc func startAdditionalScan(_ resolve: RCTPromiseResolveBlock,
+                                 reject: RCTPromiseRejectBlock) {
+    guard #available(iOS 17.0, *), RoomCaptureSession.isSupported else {
+      reject(
+        "UNSUPPORTED",
+        "La réunion de plusieurs relevés demande iOS 17 et un appareil LiDAR",
+        nil,
+      )
+      return
+    }
+    RoomScanManager.shared.start(fresh: true, additif: true)
+    resolve(nil)
+  }
+
   @objc func stopRoomScan(_ resolve: @escaping RCTPromiseResolveBlock,
                           reject: @escaping RCTPromiseRejectBlock) {
     guard #available(iOS 16.0, *) else {

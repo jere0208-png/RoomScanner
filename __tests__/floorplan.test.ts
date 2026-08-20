@@ -22,6 +22,7 @@ import {
   toFootprint,
   dansLeCoffre,
   empriseDuCoffre,
+  fusionnerMursDoubles,
   linteauxRabotes,
   massifsTechniques,
   pivotsDesBattants,
@@ -1937,5 +1938,59 @@ describe('les linteaux rabotés', () => {
       baie('sdb', 2.15, 1.6),
     ];
     expect(linteauxRabotes(baies)).toHaveLength(0);
+  });
+});
+
+/**
+ * LES MURS EN DOUBLE — ce que deux relevés fusionnés produisent toujours.
+ *
+ * Quand on scanne un logement pièce par pièce, la cloison mitoyenne est vue
+ * DEUX FOIS : une fois depuis le séjour, une fois depuis la chambre. Les
+ * deux segments se superposent presque, à l'épaisseur du mur près. Le
+ * graphe des murs, lui, n'y survit pas : chaque arête doublée fausse le
+ * parcours des faces, et le logement entier ressort en une seule pièce —
+ * ou en aucune.
+ *
+ * Le diagnostic les signalait depuis longtemps (« deux murs se
+ * superposent ») sans jamais les régler. On les réunit maintenant : un
+ * seul mur, l'enveloppe des deux, et l'identifiant du plus long — celui
+ * sur lequel le plus d'appareils sont posés.
+ */
+describe('les murs vus deux fois', () => {
+  const mur = (id: string, ax: number, az: number, bx: number, bz: number): WallSeg => ({
+    id,
+    type: 'wall',
+    a: { x: ax, z: az },
+    b: { x: bx, z: bz },
+    height: 2.5,
+    yCenter: 1.25,
+  });
+
+  it('réunit deux relevés de la même cloison', () => {
+    // La même cloison, vue des deux côtés : dix centimètres d'écart.
+    const murs = [mur('long', 0, 0, 3, 0), mur('court', 0.2, 0.1, 2.8, 0.1)];
+    const propres = fusionnerMursDoubles(murs);
+    expect(propres).toHaveLength(1);
+    // L'identifiant du plus long survit : c'est lui qui porte les prises.
+    expect(propres[0].id).toBe('long');
+  });
+
+  it('garde l’enveloppe des deux quand ils se dépassent', () => {
+    const murs = [mur('a', 0, 0, 3, 0), mur('b', 2.5, 0.08, 5, 0.08)];
+    const propres = fusionnerMursDoubles(murs);
+    expect(propres).toHaveLength(1);
+    expect(segLength(propres[0])).toBeCloseTo(5, 1);
+  });
+
+  it('ne touche pas à deux murs qui se suivent bout à bout', () => {
+    // Un mur coupé en deux par une jonction : ils ne se recouvrent pas.
+    const murs = [mur('a', 0, 0, 2, 0), mur('b', 2, 0, 4, 0)];
+    expect(fusionnerMursDoubles(murs)).toHaveLength(2);
+  });
+
+  it('ni à deux cloisons parallèles d’un couloir', () => {
+    // Un mètre vingt d'écart : c'est un couloir, pas un doublon.
+    const murs = [mur('a', 0, 0, 3, 0), mur('b', 0, 1.2, 3, 1.2)];
+    expect(fusionnerMursDoubles(murs)).toHaveLength(2);
   });
 });

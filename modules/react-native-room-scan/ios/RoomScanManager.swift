@@ -20,6 +20,23 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
   // on mémorise la demande et on lance la session à la création de la vue.
   private var pendingStart = false
 
+  /**
+   LES RELEVÉS DÉJÀ FAITS, en attente de fusion.
+
+   Un logement ne se scanne pas toujours d'un trait : on relève le séjour,
+   on ferme une porte, on relève la chambre. Jusqu'ici chaque scan écrasait
+   le précédent — il fallait recoller les pièces à la main, mur par mur.
+
+   `StructureBuilder` (iOS 17) sait aligner plusieurs `CapturedRoomData` en
+   une structure unique : c'est lui qui fait le travail, à condition qu'on
+   garde les données brutes de chaque passage. On les empile donc ici.
+   */
+  private var releves: [CapturedRoomData] = []
+  /// Le prochain `stop()` s'AJOUTE au relevé au lieu de le remplacer.
+  private var additif = false
+  /// Les données brutes du passage en cours (remplies par `didEndWith`).
+  private var dernierReleve: CapturedRoomData?
+
   override init() { super.init() }
 
   // RoomCaptureViewDelegate hérite de NSCoding : implémentations requises.
@@ -48,11 +65,16 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
 
   /// `fresh` : nouveau scan (les couleurs relevées repartent de zéro).
   /// Une reprise après pause conserve ce qui a déjà été relevé.
-  func start(fresh: Bool = true) {
+  /// `additif` : ce passage S'AJOUTE au logement déjà relevé.
+  func start(fresh: Bool = true, additif: Bool = false) {
     if fresh {
       RoomColorSampler.shared.reset()
       RoomScanCompass.shared.reset()
+      // Un relevé tout neuf oublie les passages précédents ; un passage
+      // ajouté les garde, ce sont eux qu'on va fusionner.
+      if !additif { releves.removeAll() }
     }
+    if additif { self.additif = true }
     DispatchQueue.main.async {
       // Une vue d'un scan précédent peut encore traîner, détachée de l'écran :
       // ne relancer la session que sur une vue réellement affichée.
@@ -113,19 +135,138 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
       return
     }
 
+    /*
+     NOTRE PROPRE POST-TRAITEMENT, quand on peut faire mieux que la vue.
+
+     `RoomCaptureView` post-traite avec les options par défaut. Deux
+     réglages nous manquent :
+
+     - `.beautifyObjects` redresse les meubles détectés — leurs cotes
+       cessent d'être « à peu près » ;
+     - et surtout, dès qu'il y a PLUSIEURS passages, `StructureBuilder`
+       (iOS 17) les aligne en une structure unique. C'est la réponse au
+       logement qu'on relève pièce par pièce : jusqu'ici chaque scan
+       écrasait le précédent.
+
+     Tout cela est asynchrone. Si quoi que ce soit échoue, on retombe sur
+     le résultat de la vue, qui est déjà bon : un dossier livré vaut mieux
+     qu'un dossier parfait qui n'arrive pas.
+     */
+    if #available(iOS 17.0, *), let brut = dernierReleve {
+      let tous = releves + [brut]
+      Task { [weak self] in
+        guard let self = self else { return }
+        let fusion = tous.count > 1 ? await Self.fusionner(tous) : nil
+        let piece = fusion == nil ? await Self.embellir(brut) : nil
+        await MainActor.run {
+          self.releves = tous
+          self.dernierReleve = nil
+          self.additif = false
+          if let structure = fusion {
+            self.livrer(
+              walls: structure.walls,
+              doors: structure.doors,
+              windows: structure.windows,
+              openings: structure.openings,
+              objets: structure.objects,
+              exporter: { url in
+                try structure.export(to: url, exportOptions: .parametric)
+              },
+            )
+          } else {
+            self.livrerPiece(piece ?? processedResult)
+          }
+        }
+      }
+      return
+    }
+    livrerPiece(processedResult)
+  }
+
+  /// Une pièce seule : mêmes listes, l'export du modèle en plus.
+  private func livrerPiece(_ room: CapturedRoom) {
+    livrer(
+      walls: room.walls,
+      doors: room.doors,
+      windows: room.windows,
+      openings: room.openings,
+      objets: room.objects,
+      exporter: { url in try room.export(to: url, exportOptions: .parametric) },
+    )
+  }
+
+  /**
+   ASSEMBLE LES PASSAGES en un seul modèle.
+
+   Un seul relevé : `RoomBuilder` avec l'embellissement des objets. Plusieurs :
+   `StructureBuilder`, qui les aligne — c'est lui qui recolle les pièces.
+   `nil` si l'assemblage échoue : l'appelant garde alors le résultat de la
+   vue, qui n'a rien perdu.
+   */
+  @available(iOS 17.0, *)
+  static func fusionner(_ releves: [CapturedRoomData]) async -> CapturedStructure? {
+    do {
+      let batisseur = StructureBuilder(options: [.beautifyObjects])
+      return try await batisseur.capturedStructure(from: releves)
+    } catch {
+      return nil
+    }
+  }
+
+  /**
+   UN SEUL PASSAGE, mais mieux post-traité que par la vue.
+
+   `.beautifyObjects` redresse les meubles détectés : leurs cotes cessent
+   d'être « à peu près ». `nil` en cas d'échec — la vue a déjà produit un
+   résultat correct, et un dossier livré vaut mieux qu'un dossier parfait
+   qui n'arrive pas.
+   */
+  @available(iOS 16.0, *)
+  static func embellir(_ brut: CapturedRoomData) async -> CapturedRoom? {
+    do {
+      return try await RoomBuilder(options: [.beautifyObjects])
+        .capturedRoom(from: brut)
+    } catch {
+      return nil
+    }
+  }
+
+  /**
+   Écrit le modèle, sérialise, et résout la promesse du `stop()`.
+
+   Elle prend des LISTES plutôt qu'un `CapturedRoom` : un relevé fusionné
+   est une `CapturedStructure`, qui n'est pas convertible en pièce. Les
+   deux portent les mêmes types de surfaces et d'objets — c'est tout ce
+   dont la sérialisation a besoin —, et chacune sait s'exporter, d'où la
+   fermeture.
+   */
+  private func livrer(
+    walls: [CapturedRoom.Surface],
+    doors: [CapturedRoom.Surface],
+    windows: [CapturedRoom.Surface],
+    openings: [CapturedRoom.Surface],
+    objets: [CapturedRoom.Object],
+    exporter: (URL) throws -> Void,
+  ) {
     do {
       let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
       let usdzURL = docs.appendingPathComponent("scan-\(UUID().uuidString).usdz")
       // .parametric = murs/portes propres (pas le maillage brut).
-      try processedResult.export(to: usdzURL, exportOptions: .parametric)
+      try exporter(usdzURL)
       // L'USDZ RoomPlan est blanc uniforme : invisible sur le fond blanc
       // de Quick Look. On le teinte, avec les couleurs relevées si on en a.
       Self.tintModel(at: usdzURL)
 
       var payload: [String: Any] = [
         "modelPath": usdzURL.path,
-        "surfaces": Self.surfacesJSON(processedResult, withColors: true),
-        "objects": Self.objectsJSON(processedResult, withColors: true),
+        "surfaces": Self.surfacesJSON(
+          walls: walls, doors: doors, windows: windows, openings: openings,
+          withColors: true,
+        ),
+        "objects": Self.objectsJSON(objets, withColors: true),
+        // Combien de passages composent ce relevé : le JS s'en sert pour
+        // dire « deux pièces réunies » plutôt que de laisser deviner.
+        "passages": releves.count,
       ]
       if let floor = RoomColorSampler.shared.floorPayload() {
         payload["floor"] = floor
@@ -173,15 +314,25 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
     if let error = error {
       RoomScanEvents.shared?.emit(name: "onScanError",
                                   body: ["message": error.localizedDescription])
+      return
     }
+    // Les données BRUTES de ce passage : c'est d'elles que `RoomBuilder` et
+    // `StructureBuilder` partent. La vue, elle, produira son propre résultat
+    // post-traité — on ne s'en sert que comme filet de sécurité.
+    dernierReleve = data
   }
 
   // MARK: - Sérialisation JSON
 
   /// `withColors` : seul le résultat final porte les couleurs relevées —
   /// les inclure dans le flux temps réel coûterait cher pour rien.
-  static func surfacesJSON(_ room: CapturedRoom,
-                           withColors: Bool = false) -> [[String: Any]] {
+  static func surfacesJSON(
+    walls: [CapturedRoom.Surface],
+    doors: [CapturedRoom.Surface],
+    windows: [CapturedRoom.Surface],
+    openings: [CapturedRoom.Surface],
+    withColors: Bool = false,
+  ) -> [[String: Any]] {
     func encode(_ s: CapturedRoom.Surface, type: String) -> [String: Any] {
       var out: [String: Any] = [
         "id": s.identifier.uuidString,
@@ -199,15 +350,24 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
       }
       return out
     }
-    return room.walls.map { encode($0, type: "wall") }
-         + room.doors.map { encode($0, type: "door") }
-         + room.windows.map { encode($0, type: "window") }
-         + room.openings.map { encode($0, type: "opening") }
+    return walls.map { encode($0, type: "wall") }
+         + doors.map { encode($0, type: "door") }
+         + windows.map { encode($0, type: "window") }
+         + openings.map { encode($0, type: "opening") }
   }
 
-  static func objectsJSON(_ room: CapturedRoom,
+  /// Raccourci pour une pièce entière — le flux temps réel s'en sert.
+  static func surfacesJSON(_ room: CapturedRoom,
+                           withColors: Bool = false) -> [[String: Any]] {
+    surfacesJSON(
+      walls: room.walls, doors: room.doors, windows: room.windows,
+      openings: room.openings, withColors: withColors,
+    )
+  }
+
+  static func objectsJSON(_ objets: [CapturedRoom.Object],
                           withColors: Bool = false) -> [[String: Any]] {
-    room.objects.map { obj in
+    objets.map { obj in
       var out: [String: Any] = [
         "id": obj.identifier.uuidString,
         "category": String(describing: obj.category),
