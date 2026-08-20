@@ -37,13 +37,14 @@ jest.mock('../src/native/account', () => ({
 }));
 
 import React from 'react';
-import { StyleSheet, Text, TextInput, type ViewStyle } from 'react-native';
+import { Image, StyleSheet, Text, TextInput, type ViewStyle } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import { LinearGradient, Mask, Stop, Text as SvgText } from 'react-native-svg';
 import { PaywallScreen } from '../src/screens/PaywallScreen';
 import { BadgePro } from '../src/components/BadgePro';
 import { ContourOr, ORS, TexteOr } from '../src/components/ContourOr';
 import { EssaiEpuise } from '../src/components/EssaiEpuise';
+import { SurprisePro } from '../src/components/SurprisePro';
 import { SignInScreen } from '../src/screens/SignInScreen';
 import { HomeScreen } from '../src/screens/HomeScreen';
 import { GlowButton } from '../src/components/GlowButton';
@@ -335,8 +336,19 @@ describe('la porte d’entrée', () => {
 });
 
 describe('l’accueil et le quota', () => {
-  it('envoie au paywall — pas au scan — quand le plan gratuit est consommé', () => {
-    useAccountStore.setState({ plansUtilises: 1, paywallVisible: false });
+  /*
+    LA SURPRISE À LA PLACE DE LA PORTE — relevé du patron. Quand l'essai
+    est épuisé et qu'on relance un scan, on ne tombait que sur la page
+    Pro ; on tombe maintenant sur le popup « Surprise ! » et son −20 %,
+    qui TEND la page Pro avec le code déjà rempli. Le scan, lui, ne part
+    toujours pas : le palier s'arrête AVANT le scan, pas après.
+  */
+  it('ouvre la surprise — pas le scan ni la page Pro — quand le plan gratuit est consommé', () => {
+    useAccountStore.setState({
+      plansUtilises: 1,
+      paywallVisible: false,
+      surpriseVisible: false,
+    });
     const t = monter(<HomeScreen />);
     const cta = t.root
       .findAllByType(GlowButton)
@@ -344,7 +356,8 @@ describe('l’accueil et le quota', () => {
     act(() => {
       cta.props.onPress();
     });
-    expect(useAccountStore.getState().paywallVisible).toBe(true);
+    expect(useAccountStore.getState().surpriseVisible).toBe(true);
+    expect(useAccountStore.getState().paywallVisible).toBe(false);
     expect(useScanStore.getState().screen).toBe('home');
   });
 
@@ -371,6 +384,97 @@ describe('ce que l’essai adversarial a exigé', () => {
     useAccountStore.setState({ paywallVisible: false });
     const t = monter(<HomeScreen />);
     expect(bouton(t, 'Mon compte')).toBeTruthy();
+  });
+});
+
+/*
+ * LA SURPRISE DE BIENVENUE — le cadeau qui tend la page Pro.
+ *
+ * Relevé du patron : un popup « Surprise ! » avec le cadeau 3D, −20 % sur
+ * le Pro pour la première souscription (code FIRST20), qui se lève à la
+ * PREMIÈRE inscription et quand l'essai épuisé bloque un nouveau scan. Le
+ * clic applique le code TOUT SEUL : personne ne recopie un code depuis un
+ * popup fermé.
+ */
+describe('la surprise Pro', () => {
+  it('se lève à la première inscription, pas à la reconnexion', async () => {
+    useAccountStore.setState({
+      compte: null,
+      surpriseVisible: false,
+      essaiEpuiseVisible: false,
+    });
+    mockMarqueur = null;
+    await act(async () => {
+      await useAccountStore
+        .getState()
+        .connecter({ id: 'email:a@b.fr', methode: 'email' });
+    });
+    expect(useAccountStore.getState().surpriseVisible).toBe(true);
+    // Refermée, puis reconnexion du même compte : le trousseau connaît
+    // déjà cet appareil, la surprise ne se rejoue pas.
+    act(() => useAccountStore.getState().fermerSurprise());
+    await act(async () => {
+      await useAccountStore
+        .getState()
+        .connecter({ id: 'email:a@b.fr', methode: 'email' });
+    });
+    expect(useAccountStore.getState().surpriseVisible).toBe(false);
+  });
+
+  it('montre le cadeau, dit « Surprise ! » et annonce −20 %', () => {
+    useAccountStore.setState({ surpriseVisible: true });
+    const t = monter(<SurprisePro />);
+    expect(t.root.findAllByType(Image).length).toBeGreaterThanOrEqual(1);
+    const vu = textesDe(t);
+    expect(vu).toContain('Surprise');
+    expect(vu).toContain('20');
+    expect(bouton(t, 'Plus tard')).toBeDefined();
+  });
+
+  it('un clic applique FIRST20 tout seul et ouvre la page Pro remisée', () => {
+    useAccountStore.setState({ surpriseVisible: true, paywallVisible: false });
+    const t = monter(<SurprisePro />);
+    act(() => {
+      bouton(t, 'Profiter de -20 %')!.props.onPress();
+    });
+    const s = useAccountStore.getState();
+    expect(s.surpriseVisible).toBe(false);
+    expect(s.paywallVisible).toBe(true);
+    expect(s.remisePct).toBe(20);
+    // Une remise n'est PAS un déverrouillage : le Pro reste à acheter.
+    expect(s.pro).toBe(false);
+    // La page Pro arrive avec le code déjà dans son champ, et le prix
+    // remisé écrit sur le bouton.
+    const p = monter(<PaywallScreen />);
+    expect(p.root.findByType(TextInput).props.value).toBe('FIRST20');
+    const typos = p.root
+      .findAllByType(TexteOr)
+      .map((n) => String(n.props.texte));
+    expect(typos.some((x) => x.includes('3,92'))).toBe(true);
+  });
+
+  it('FIRST20 remise sans déverrouiller ; CARIDI12 déverrouille toujours', () => {
+    useAccountStore.setState({ paywallVisible: true, remisePct: 0 });
+    expect(useAccountStore.getState().utiliserCode('first20')).toBe(true);
+    let s = useAccountStore.getState();
+    expect(s.remisePct).toBe(20);
+    expect(s.pro).toBe(false);
+    // La page Pro RESTE ouverte : c'est là qu'on voit la remise.
+    expect(s.paywallVisible).toBe(true);
+    expect(useAccountStore.getState().utiliserCode('CARIDI12')).toBe(true);
+    s = useAccountStore.getState();
+    expect(s.pro).toBe(true);
+    expect(s.paywallVisible).toBe(false);
+  });
+
+  it('la carte Pro lève le pouce, la carte Gratuit le baisse', () => {
+    const t = monter(<PaywallScreen />);
+    const haut = t.root.findAll((n) => n.props?.testID === 'pouce-pro');
+    const bas = t.root.findAll((n) => n.props?.testID === 'pouce-gratuit');
+    expect(haut.length).toBeGreaterThanOrEqual(1);
+    expect(bas.length).toBeGreaterThanOrEqual(1);
+    // Deux images distinctes : un pouce copié-collé dirait deux fois oui.
+    expect(haut[0].props.source).not.toEqual(bas[0].props.source);
   });
 });
 

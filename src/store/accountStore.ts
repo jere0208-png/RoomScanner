@@ -60,11 +60,25 @@ async function api(
 
 export const PLANS_GRATUITS = 1;
 export const PRIX_PRO = '4,90 €';
+export const PRIX_PRO_NUM = 4.9;
 export const PRODUIT_PRO = 'echoplan.pro.mensuel';
+/** Le prix remisé, écrit à la française. */
+export const prixRemise = (pct: number) =>
+  `${(PRIX_PRO_NUM * (1 - pct / 100)).toFixed(2).replace('.', ',')} €`;
 /** Les codes qui déverrouillent le Pro, en clair : offre du patron. */
 const CODES_PROMO = ['CARIDI12'];
+/**
+ * Les codes de REMISE : ils baissent le prix, ils n'ouvrent rien. FIRST20
+ * est l'offre de bienvenue (−20 % sur la première souscription), portée
+ * par le popup « Surprise ! » — et par la table `codes_promo` en base,
+ * qui connaît déjà les pourcentages.
+ */
+const CODES_REMISE: Record<string, number> = { FIRST20: 20 };
+export const CODE_BIENVENUE = 'FIRST20';
 
 const CLE = 'roomscanner.compte.v1';
+/** La surprise ne se joue qu'une fois par appareil : le drapeau du déjà-vu. */
+const CLE_SURPRISE = 'roomscanner.surprise.v1';
 
 export type MethodeConnexion = 'apple' | 'google' | 'email';
 
@@ -88,6 +102,17 @@ interface AccountState {
    * on annonce la couleur, on montre la page Pro. Jamais un refus.
    */
   essaiEpuiseVisible: boolean;
+  /**
+   * Le popup « Surprise ! » : le cadeau qui offre −20 % (FIRST20). Levé à
+   * la PREMIÈRE inscription de l'appareil, et quand l'essai épuisé bloque
+   * un nouveau scan — l'offre à la place de la porte.
+   */
+  surpriseVisible: boolean;
+  /** La remise appliquée sur l'abonnement, en pour cent (0 = plein prix). */
+  remisePct: number;
+  /** Le code que la page Pro doit préremplir — personne ne recopie un
+   *  code depuis un popup fermé. */
+  codeOffert: string | null;
   /** Le jeton rendu par le serveur à la connexion — null hors ligne. */
   jeton: string | null;
 
@@ -114,6 +139,11 @@ interface AccountState {
   ouvrirPaywall: () => void;
   fermerPaywall: () => void;
   fermerEssaiEpuise: () => void;
+  ouvrirSurprise: () => void;
+  fermerSurprise: () => void;
+  /** Le clic sur la surprise : le code s'applique TOUT SEUL, et la page
+   *  Pro s'ouvre avec le champ déjà rempli. */
+  profiterSurprise: () => void;
 }
 
 const persister = (s: AccountState) =>
@@ -124,6 +154,7 @@ const persister = (s: AccountState) =>
       pro: s.pro,
       proVia: s.proVia,
       plansUtilises: s.plansUtilises,
+      remisePct: s.remisePct,
       jeton: s.jeton,
     }),
   ).catch(() => {});
@@ -161,6 +192,9 @@ export const useAccountStore = create<AccountState>((set, get) => ({
   plansUtilises: 0,
   paywallVisible: false,
   essaiEpuiseVisible: false,
+  surpriseVisible: false,
+  remisePct: 0,
+  codeOffert: null,
   jeton: null,
 
   charger: async () => {
@@ -191,6 +225,9 @@ export const useAccountStore = create<AccountState>((set, get) => ({
         Number(local.plansUtilises) || 0,
         marqueur?.plans ?? 0,
       ),
+      // La remise survit au redémarrage : un −20 % accepté puis perdu au
+      // relancement serait vécu comme une promesse reprise.
+      remisePct: Number(local.remisePct) || 0,
       jeton: typeof local.jeton === 'string' ? local.jeton : null,
     });
     // Le serveur, s'il est là, a le dernier mot — sans jamais bloquer.
@@ -273,9 +310,18 @@ export const useAccountStore = create<AccountState>((set, get) => ({
         plansUtilises: Math.max(s.plansUtilises, Number(reponse.plans) || 0),
       });
     }
-    // L'annonce, à l'entrée : ce téléphone a déjà donné son essai.
+    /*
+      LA SURPRISE DE BIENVENUE, à la PREMIÈRE inscription de l'appareil :
+      le trousseau n'avait encore porté aucun compte, et le drapeau du
+      déjà-vu est vierge — une reconnexion, elle, ne rejoue rien. Sinon,
+      l'annonce d'entrée : ce téléphone a déjà donné son essai.
+    */
+    const dejaVue = await AsyncStorage.getItem(CLE_SURPRISE).catch(() => null);
     const s = get();
-    if (!s.pro && s.plansUtilises >= PLANS_GRATUITS) {
+    if (!marqueur?.compte && !dejaVue && !s.pro) {
+      set({ surpriseVisible: true });
+      AsyncStorage.setItem(CLE_SURPRISE, '1').catch(() => {});
+    } else if (!s.pro && s.plansUtilises >= PLANS_GRATUITS) {
       set({ essaiEpuiseVisible: true });
     }
     persister(get());
@@ -312,6 +358,13 @@ export const useAccountStore = create<AccountState>((set, get) => ({
 
   utiliserCode: (code) => {
     const propre = code.trim().toUpperCase();
+    if (propre in CODES_REMISE) {
+      // Une remise n'ouvre rien : elle baisse le prix, et la page Pro
+      // reste ouverte — c'est là qu'on la VOIT s'appliquer.
+      set({ remisePct: CODES_REMISE[propre] });
+      persister(get());
+      return true;
+    }
     if (!CODES_PROMO.includes(propre)) return false;
     set({ pro: true, proVia: 'code', paywallVisible: false });
     persister(get());
@@ -375,4 +428,15 @@ export const useAccountStore = create<AccountState>((set, get) => ({
   ouvrirPaywall: () => set({ paywallVisible: true }),
   fermerPaywall: () => set({ paywallVisible: false }),
   fermerEssaiEpuise: () => set({ essaiEpuiseVisible: false }),
+  ouvrirSurprise: () => set({ surpriseVisible: true }),
+  fermerSurprise: () => set({ surpriseVisible: false }),
+  profiterSurprise: () => {
+    set({
+      surpriseVisible: false,
+      paywallVisible: true,
+      remisePct: CODES_REMISE[CODE_BIENVENUE],
+      codeOffert: CODE_BIENVENUE,
+    });
+    persister(get());
+  },
 }));

@@ -276,7 +276,10 @@ const styles = StyleSheet.create({
   // coupe — le bord compris, c'est lui le contour.
   cadre: { overflow: 'hidden' },
   bande: { position: 'absolute', top: 0, left: 0 },
-  couvercle: { flex: 1, margin: TRAIT, overflow: 'hidden' },
+  // `flexGrow` et non `flex: 1` : dans un bloc à hauteur AUTO (le popup
+  // de la surprise), une base de zéro écraserait le couvercle ; ici il
+  // prend la taille de son contenu, et grandit quand le bloc est fixé.
+  couvercle: { flexGrow: 1, margin: TRAIT, overflow: 'hidden' },
   // Le mot fantôme : il réserve la place et parle aux lecteurs d'écran,
   // le dessin le montre.
   fantome: { opacity: 0 },

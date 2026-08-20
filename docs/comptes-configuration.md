@@ -32,7 +32,9 @@ sa base — une base seule ne suffit pas, il faut où poser les `.php`.
    notez l'hôte (`xxxxx.mysql.db`), le nom, l'utilisateur, le mot de passe.
 2. **Importer le schéma** : phpMyAdmin → votre base → Importer →
    `server/schema.sql`. Trois tables (comptes, appareils, codes_promo) et
-   le code CARIDI12 déjà semé.
+   deux codes déjà semés : CARIDI12 (100 % — déverrouille le Pro) et
+   FIRST20 (20 % — la remise de bienvenue du popup « Surprise ! », qui
+   baisse le prix sans rien déverrouiller).
 3. **Téléverser l'API** : par FTP (ou le gestionnaire de fichiers OVH),
    copiez `server/api.php` et `server/auth-google.php` dans un dossier du
    site, par ex. `www/echoplan/`.

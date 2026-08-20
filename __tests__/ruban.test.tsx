@@ -64,6 +64,15 @@ describe('le ruban de l’accueil', () => {
     expect(ds.size).toBe(LIGNES.length);
     // Et les paramètres qui les distinguent sont bien distincts.
     expect(new Set(LIGNES.map((l) => l.phase)).size).toBe(LIGNES.length);
+    /*
+      MAIS LES TRAITS RESTENT PROCHES — relevé du patron : « plus proches
+      entre eux ». Un éventail de phases trop ouvert éparpillait chaque
+      ligne dans son coin de la bande ; resserré, elles voyagent en
+      faisceau et se croisent près les unes des autres, comme sur la
+      référence.
+    */
+    const phases = LIGNES.map((l) => l.phase);
+    expect(Math.max(...phases) - Math.min(...phases)).toBeLessThanOrEqual(1.4);
   });
 
   /*

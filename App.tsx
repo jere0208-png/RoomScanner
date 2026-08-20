@@ -11,6 +11,7 @@ import { CameraScreen } from './src/screens/CameraScreen';
 import { SignInScreen } from './src/screens/SignInScreen';
 import { PaywallScreen } from './src/screens/PaywallScreen';
 import { EssaiEpuise } from './src/components/EssaiEpuise';
+import { SurprisePro } from './src/components/SurprisePro';
 import { useScanStore } from './src/store/scanStore';
 import { useAccountStore } from './src/store/accountStore';
 
@@ -82,6 +83,7 @@ export default function App() {
       {screen === 'camera' && <CameraScreen />}
       <PaywallScreen />
       <EssaiEpuise />
+      <SurprisePro />
     </SafeAreaProvider>
   );
 }

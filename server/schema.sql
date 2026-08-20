@@ -43,3 +43,10 @@ CREATE TABLE IF NOT EXISTS codes_promo (
 INSERT INTO codes_promo (code, pour_cent, actif)
 VALUES ('CARIDI12', 100, 1)
 ON DUPLICATE KEY UPDATE actif = 1;
+
+-- L'offre de bienvenue : -20 % sur la première souscription, portée par
+-- le popup « Surprise ! » de l'app. Une REMISE, pas un déverrouillage :
+-- sous 100 %, l'app baisse le prix affiché, elle n'ouvre pas le Pro.
+INSERT INTO codes_promo (code, pour_cent, actif)
+VALUES ('FIRST20', 20, 1)
+ON DUPLICATE KEY UPDATE actif = 1;

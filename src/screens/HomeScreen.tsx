@@ -61,6 +61,7 @@ export function HomeScreen() {
   const { start } = useRoomScan();
   const peutCreerPlan = useAccountStore((s) => s.peutCreerPlan);
   const ouvrirPaywall = useAccountStore((s) => s.ouvrirPaywall);
+  const ouvrirSurprise = useAccountStore((s) => s.ouvrirSurprise);
   const compte = useAccountStore((s) => s.compte);
   const pro = useAccountStore((s) => s.pro);
   const plansUtilises = useAccountStore((s) => s.plansUtilises);
@@ -285,7 +286,10 @@ export function HomeScreen() {
           // serait le pire moment pour l'apprendre.
           onPress={() => {
             if (!peutCreerPlan()) {
-              ouvrirPaywall();
+              // L'offre à la place de la porte : le popup « Surprise ! »
+              // et son −20 % — c'est lui qui tend la page Pro, code déjà
+              // rempli.
+              ouvrirSurprise();
               return;
             }
             start();

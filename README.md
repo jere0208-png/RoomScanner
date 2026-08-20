@@ -751,6 +751,36 @@ recréer un compte ne rend pas le palier gratuit. C'est aussi cette rangée
 qui offre la seule porte VOLONTAIRE vers la page Pro : sans elle, on ne
 pouvait payer qu'en butant sur la barrière.
 
+### La surprise de bienvenue
+
+Un popup « Surprise ! » — le cadeau 3D en argile, la typo d'or du badge —
+offre **−20 % sur la première souscription** (code FIRST20). Il se lève à
+deux moments : à la **première inscription** de l'appareil (le trousseau
+n'avait encore porté aucun compte, et un drapeau local retient le déjà-vu —
+une reconnexion ne rejoue rien), et quand **l'essai épuisé bloque un
+nouveau scan** — l'offre à la place de la porte fermée qui n'ouvrait que la
+page Pro.
+
+**Toute la carte est le bouton, et le code s'applique tout seul.** Personne
+ne recopie un code depuis un popup fermé : le clic ferme la surprise,
+applique la remise et ouvre la page Pro avec le champ déjà rempli — le
+champ le MONTRE, parce qu'un prix qui baisse sans explication visible
+ressemble à une erreur. « Plus tard » referme sans insister.
+
+**Une remise n'est pas un déverrouillage.** FIRST20 baisse le prix (3,92 €
+au lieu de 4,90 €, l'ancien prix reste barré à côté — une remise sans
+référence n'est qu'un prix comme un autre) et la page Pro reste ouverte ;
+CARIDI12, lui, continue d'ouvrir à 100 %. La table `codes_promo` porte déjà
+les pourcentages (`pour_cent`) : FIRST20 y est semé à 20. Et la remise
+survit au redémarrage — un −20 % accepté puis perdu au relancement serait
+vécu comme une promesse reprise.
+
+**Les pouces d'argile disent le verdict d'un coup d'œil.** Sur le
+comparatif, la carte Gratuit baisse le pouce, la carte Pro le lève — même
+famille 3D que le cadeau. La page s'est modernisée au passage : plus d'air
+entre les colonnes, rayon des cartes à vingt points, filet d'un cheveu sur
+la carte Gratuit.
+
 ### Le badge Pro respire
 
 L'ancien badge était un bloc noir à texte jaune : un aplat, posé sur la
@@ -944,7 +974,10 @@ et sont lumineuses ». Chaque ligne a donc sa **phase** et son **amplitude**
 propres — c'est la différence de phase qui fait les croisements — et sa
 **vitesse** propre, toutes distinctes : à vitesse égale, les croisements
 resteraient plantés aux mêmes endroits et le dessin serait figé dans son
-mouvement. La lueur est une pile de trois passes par ligne — large et pâle,
+mouvement. Et les phases sont RESSERRÉES (moins de 1,4 rad d'éventail —
+relevé du patron : « plus proches entre eux ») : trop ouvertes, chaque
+ligne vivait dans son coin de la bande ; resserrées, elles voyagent en
+faisceau et se frôlent, comme sur la référence. La lueur est une pile de trois passes par ligne — large et pâle,
 serrée, puis le cœur : une lumière s'éteint en s'éloignant de sa source,
 donc la plus large est la plus pâle. Le cœur (blanc la nuit, bleu de marque
 le jour) est peint par-dessus : c'est lui qu'on suit des yeux ; les néons

@@ -11,9 +11,10 @@
  * pas dans App Store Connect, le bouton explique au lieu d'échouer en
  * silence.
  */
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Alert,
+  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -25,7 +26,12 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BadgePro } from '../components/BadgePro';
 import { ContourOr, TexteOr } from '../components/ContourOr';
-import { PRIX_PRO, useAccountStore } from '../store/accountStore';
+import {
+  CODE_BIENVENUE,
+  PRIX_PRO,
+  prixRemise,
+  useAccountStore,
+} from '../store/accountStore';
 import { useTheme, type Palette } from '../theme';
 
 const GRATUIT = [
@@ -48,7 +54,18 @@ export function PaywallScreen() {
   const utiliserCode = useAccountStore((st) => st.utiliserCode);
   const acheterPro = useAccountStore((st) => st.acheterPro);
   const restaurerPro = useAccountStore((st) => st.restaurerPro);
+  const remisePct = useAccountStore((st) => st.remisePct);
+  const codeOffert = useAccountStore((st) => st.codeOffert);
   const [code, setCode] = useState('');
+
+  /*
+    LE CODE OFFERT ARRIVE DÉJÀ ÉCRIT. La surprise applique FIRST20 toute
+    seule ; le champ le MONTRE, pour que la remise ait une explication
+    visible — un prix qui baisse sans raison ressemble à une erreur.
+  */
+  useEffect(() => {
+    if (visible && codeOffert) setCode(codeOffert);
+  }, [visible, codeOffert]);
 
   const valideCode = () => {
     if (utiliserCode(code)) {
@@ -89,6 +106,15 @@ export function PaywallScreen() {
 
         <View style={s.colonnes}>
           <View style={[s.carte, s.carteGratuit]}>
+            {/* Les pouces d'argile disent le verdict d'un coup d'œil —
+                relevé du patron : en bas pour le gratuit, en l'air pour
+                le Pro. */}
+            <Image
+              testID="pouce-gratuit"
+              source={require('../assets/pro/pouce-bas.png')}
+              style={s.pouce}
+              resizeMode="contain"
+            />
             <Text style={s.carteTitre}>Gratuit</Text>
             <Text style={s.cartePrix}>0 €</Text>
             {GRATUIT.map((l) => (
@@ -105,6 +131,12 @@ export function PaywallScreen() {
                 pas. */}
             <ContourOr rayon={18} fond="#FFFFFF" style={s.pleine}>
               <View style={s.carteDedans}>
+                <Image
+                  testID="pouce-pro"
+                  source={require('../assets/pro/pouce-haut.png')}
+                  style={s.pouce}
+                  resizeMode="contain"
+                />
                 <TexteOr
                   texte="Pro"
                   taille={14}
@@ -113,7 +145,16 @@ export function PaywallScreen() {
                   style={s.aGauche}
                 />
                 <View style={s.prixRangee}>
-                  <TexteOr texte={PRIX_PRO} taille={26} fond="#FFFFFF" />
+                  <TexteOr
+                    texte={remisePct > 0 ? prixRemise(remisePct) : PRIX_PRO}
+                    taille={26}
+                    fond="#FFFFFF"
+                  />
+                  {/* L'ancien prix reste visible, barré : une remise sans
+                      référence n'est qu'un prix comme un autre. */}
+                  {remisePct > 0 && (
+                    <Text style={s.prixBarre}>{PRIX_PRO}</Text>
+                  )}
                   <TexteOr
                     texte="/ mois"
                     taille={13}
@@ -145,13 +186,21 @@ export function PaywallScreen() {
           <ContourOr rayon={16} fond="#FFFFFF" style={s.pleine}>
             <View style={s.ctaDedans}>
               <TexteOr
-                texte={`S’abonner — ${PRIX_PRO} / mois`}
+                texte={`S’abonner — ${
+                  remisePct > 0 ? prixRemise(remisePct) : PRIX_PRO
+                } / mois`}
                 taille={16.5}
                 fond="#FFFFFF"
               />
             </View>
           </ContourOr>
         </Pressable>
+        {remisePct > 0 && (
+          <Text style={s.remiseNote}>
+            Code {CODE_BIENVENUE} appliqué — −{remisePct} % sur votre
+            abonnement.
+          </Text>
+        )}
         <Text style={s.sansEngagement}>Sans engagement, résiliable à tout moment.</Text>
         <Pressable
           accessibilityRole="button"
@@ -211,17 +260,35 @@ const themed = (c: Palette) =>
     fermerTexte: { color: c.inkSoft, fontSize: 16, fontWeight: '700' },
     titre: { color: c.ink, fontSize: 28, fontWeight: '800', marginTop: 6 },
     sousTitre: { color: c.inkSoft, fontSize: 15, marginTop: 6, lineHeight: 21 },
-    colonnes: { flexDirection: 'row', gap: 12, marginTop: 22 },
-    carte: { flex: 1, borderRadius: 18, padding: 16, gap: 7 },
+    // La refonte moderne : plus d'air (gap 14, rayon 20), un filet d'un
+    // cheveu sur la carte Gratuit — le contour des cartes de l'app — et
+    // les pouces d'argile en tête de colonne.
+    colonnes: { flexDirection: 'row', gap: 14, marginTop: 24 },
+    carte: { flex: 1, borderRadius: 20, padding: 18, gap: 7 },
     carteGratuit: {
       backgroundColor: c.surface,
-      borderWidth: 1,
+      borderWidth: StyleSheet.hairlineWidth,
       borderColor: c.lineStrong,
+    },
+    pouce: { width: 56, height: 56, alignSelf: 'center', marginBottom: 2 },
+    prixBarre: {
+      color: c.inkFaint,
+      fontSize: 14,
+      fontWeight: '600',
+      textDecorationLine: 'line-through',
+      marginBottom: 5,
+    },
+    remiseNote: {
+      color: '#C8861F',
+      fontSize: 12.5,
+      fontWeight: '700',
+      textAlign: 'center',
+      marginTop: 8,
     },
     // La colonne Pro : le contour rogne sa carte, le badge flotte dessus.
     colonnePro: { flex: 1 },
     pleine: { flex: 1 },
-    carteDedans: { flex: 1, padding: 16, gap: 7 },
+    carteDedans: { flex: 1, padding: 18, gap: 7 },
     // La typo d'or épouse la largeur de son mot : sans ça, elle prendrait
     // toute la colonne et le mot partirait au centre.
     aGauche: { alignSelf: 'flex-start' },

@@ -38,10 +38,18 @@ export const RIBBON_H = 96;
  * toujours aux mêmes endroits. Le cœur (`teinte: null` — il prend celle du
  * thème) est DERNIER : peint par-dessus, c'est lui qu'on suit des yeux.
  */
+/*
+  LES PHASES SONT RESSERRÉES — relevé du patron : « plus proches entre
+  eux ». Un éventail trop ouvert (jusqu'à 3,9 rad) éparpillait chaque
+  ligne dans son coin de la bande ; sous 1,4 rad d'écart total, elles
+  voyagent en FAISCEAU, se frôlent et se croisent près les unes des
+  autres — c'est le dessin de la référence. Les vitesses différentes
+  continuent de déplacer les croisements.
+*/
 export const LIGNES = [
-  { role: 'bleu', teinte: '#3A63FF', phase: 3.9, amplitude: 0.26, duree: 21500, epaisseur: 1.6 },
-  { role: 'vert', teinte: '#32D74B', phase: 2.6, amplitude: 0.3, duree: 17500, epaisseur: 1.6 },
-  { role: 'rouge', teinte: '#FF3B30', phase: 1.35, amplitude: 0.24, duree: 11500, epaisseur: 1.6 },
+  { role: 'bleu', teinte: '#3A63FF', phase: 1.35, amplitude: 0.26, duree: 21500, epaisseur: 1.6 },
+  { role: 'vert', teinte: '#32D74B', phase: 0.9, amplitude: 0.3, duree: 17500, epaisseur: 1.6 },
+  { role: 'rouge', teinte: '#FF3B30', phase: 0.45, amplitude: 0.24, duree: 11500, epaisseur: 1.6 },
   { role: 'coeur', teinte: null, phase: 0, amplitude: 0.28, duree: 14000, epaisseur: 1.8 },
 ] as const;
 
