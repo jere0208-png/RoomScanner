@@ -3282,6 +3282,34 @@ une capture d'écran : le plan est une liste de murs, on le retrace en
 quelques traits dans 54 px. Rien à stocker, rien à invalider — un scan
 retouché montre son nouveau contour à l'ouverture suivante de la liste.
 
+### L'app rend la place qu'elle prend
+
+Une installation a fini par échouer : `AFC_E_NO_SPACE_LEFT`, **le téléphone
+était plein**. Ce n'était pas l'app qui refusait de se poser, c'était le
+disque — mais en cherchant ce que l'app accumule, on a trouvé un vrai défaut.
+
+Chaque relevé écrit un **modèle 3D `.usdz` de plusieurs mégaoctets** dans les
+Documents de l'app. Supprimer un scan effaçait ses photos — jamais son
+modèle. Vingt chantiers, et rien ne revenait qu'en désinstallant.
+
+Le ménage se fait maintenant à deux moments : **à la suppression d'un scan**,
+et **à chaque ouverture de la bibliothèque**. Le second est le vrai gain : le
+premier ne rend rien à qui ne supprime jamais de scan, et ce sont justement
+les modèles entassés par les versions d'avant qui remplissaient le téléphone.
+
+Deux décisions valent d'être dites :
+
+- **on envoie la liste de ce qu'il faut GARDER**, jamais celle à effacer. Les
+  orphelins des anciennes versions n'ont plus de chemin connu de personne —
+  les nommer un par un serait impossible. Le natif balaie les Documents et ne
+  touche qu'aux `scan-….usdz` de la racine : rien que l'app n'ait écrit
+  elle-même n'est en jeu. Le modèle du plan affiché est gardé même si sa
+  sauvegarde s'en va — on ne retire pas la 3D des mains de qui la regarde ;
+- **l'app le DIT**. Le natif rend les octets libérés, et la bibliothèque
+  annonce « 134 Mo rendus » une fois, avec une croix. Un ménage muet laisse
+  l'électricien devant le même téléphone plein, sans savoir que quelque
+  chose a servi.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

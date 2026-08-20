@@ -282,6 +282,23 @@ export const RoomScan = {
     return Promise.resolve(0);
   },
 
+  /**
+   * Efface les modèles 3D (`scan-….usdz`) qu'aucun scan ne réclame plus, et
+   * rend les octets libérés.
+   *
+   * On donne la liste des modèles À GARDER, jamais celle à effacer : les
+   * versions précédentes de l'app n'effaçaient aucun modèle, et leurs
+   * orphelins — un par relevé, plusieurs mégaoctets pièce — dorment encore
+   * dans les Documents. Personne ne connaît leurs chemins ; les nommer un
+   * par un serait donc impossible. Le natif, lui, sait ce qu'il trouve.
+   */
+  cleanModels(gardes: string[]): Promise<number> {
+    if (Platform.OS === 'ios' && NativeModules.RoomScanPhoto?.cleanModels) {
+      return NativeModules.RoomScanPhoto.cleanModels(gardes);
+    }
+    return Promise.resolve(0);
+  },
+
   /** iOS : écrit le PDF (base64) en fichier temporaire et ouvre le partage. */
   sharePDF: (base64: string, filename: string): Promise<boolean> => {
     if (!NativeModules.RoomScanExport) {

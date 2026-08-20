@@ -45,6 +45,9 @@ RCT_EXTERN_METHOD(webAuth:(NSString *)url
 @end
 
 @interface RCT_EXTERN_MODULE(RoomScanPhoto, NSObject)
+RCT_EXTERN_METHOD(cleanModels:(NSArray *)gardes
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
 RCT_EXTERN_METHOD(takePhoto:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
 RCT_EXTERN_METHOD(deletePhotos:(NSArray *)paths
                   resolve:(RCTPromiseResolveBlock)resolve

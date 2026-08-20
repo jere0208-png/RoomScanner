@@ -10,8 +10,12 @@
  */
 import { NativeModules, Platform } from 'react-native';
 
-const natif = (): { deletePhotos?: (p: string[]) => Promise<number> } | undefined =>
-  Platform.OS === 'ios' ? NativeModules.RoomScanPhoto : undefined;
+const natif = ():
+  | {
+      deletePhotos?: (p: string[]) => Promise<number>;
+      cleanModels?: (gardes: string[]) => Promise<number>;
+    }
+  | undefined => (Platform.OS === 'ios' ? NativeModules.RoomScanPhoto : undefined);
 
 /**
  * Efface des photos de repérage devenues inutiles.
@@ -25,5 +29,24 @@ export function deletePhotoFiles(paths: string[]): void {
     natif()?.deletePhotos?.(paths)?.catch?.(() => {});
   } catch {
     // Rien à faire : le fichier restera, l'app continue.
+  }
+}
+
+/**
+ * Efface les modèles 3D qu'aucun scan ne réclame plus.
+ *
+ * On passe les modèles À GARDER : le natif balaie les Documents et fait le
+ * reste. Un modèle pèse plusieurs mégaoctets, et jusqu'ici aucun n'était
+ * jamais effacé — de quoi remplir un téléphone en une saison de chantiers.
+ *
+ * Ne lève jamais, pour la même raison que le ménage des photos.
+ */
+export function cleanModelFiles(gardes: string[]): Promise<number> {
+  try {
+    const p = natif()?.cleanModels?.(gardes);
+    return p ? p.catch(() => 0) : Promise.resolve(0);
+  } catch {
+    // Le modèle restera sur le disque, l'app continue.
+    return Promise.resolve(0);
   }
 }

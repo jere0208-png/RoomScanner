@@ -43,6 +43,44 @@ class RoomScanPhoto: NSObject {
   }
 
   /**
+   FAIT LE MÉNAGE DES MODÈLES 3D.
+
+   Chaque relevé écrit un `.usdz` dans les Documents de l'app — quelques
+   mégaoctets — et personne ne l'effaçait jamais : supprimer un scan
+   emportait ses photos, jamais son modèle. Vingt chantiers plus tard, le
+   téléphone est plein, et l'installation d'une mise à jour échoue faute de
+   place. C'est arrivé.
+
+   On garde ceux que la bibliothèque référence encore, et l'on efface les
+   autres. Comme pour les photos, la garde est stricte : rien en dehors des
+   fichiers que l'app a elle-même écrits (« scan-….usdz », à la racine des
+   Documents) ne peut être touché, quel que soit le chemin reçu.
+   */
+  @objc func cleanModels(_ gardes: [String],
+                         resolve: @escaping RCTPromiseResolveBlock,
+                         reject: @escaping RCTPromiseRejectBlock) {
+    let fm = FileManager.default
+    guard let docs = fm.urls(for: .documentDirectory, in: .userDomainMask).first,
+          let tous = try? fm.contentsOfDirectory(
+            at: docs, includingPropertiesForKeys: [.fileSizeKey]
+          ) else {
+      resolve(0)
+      return
+    }
+    let vivants = Set(gardes.map { URL(fileURLWithPath: $0).lastPathComponent })
+    var octets = 0
+    for url in tous {
+      let nom = url.lastPathComponent
+      guard nom.hasPrefix("scan-"), nom.hasSuffix(".usdz") else { continue }
+      guard !vivants.contains(nom) else { continue }
+      let taille = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
+      if (try? fm.removeItem(at: url)) != nil { octets += taille }
+    }
+    // Les octets rendus : l'app peut le DIRE, et pas seulement le faire.
+    resolve(octets)
+  }
+
+  /**
    Relit une photo de repérage, réduite, en JPEG base64.
 
    Le PDF ne sait embarquer que des octets : un chemin de fichier ne lui

@@ -672,6 +672,7 @@ export function LibraryScreen() {
   const moveToFolder = useScanStore((s) => s.moveToFolder);
   const renameSave = useScanStore((s) => s.renameSave);
   const duplicateSave = useScanStore((s) => s.duplicateSave);
+  const placeRendue = useScanStore((s) => s.placeRendue);
   const palette = useTheme();
   const styles = getStyles(palette);
 
@@ -1017,6 +1018,29 @@ export function LibraryScreen() {
         </View>
       </View>
 
+      {/*
+        LA PLACE RENDUE, DITE UNE FOIS.
+
+        Chaque relevé écrit un modèle 3D de plusieurs mégaoctets, et aucune
+        version d'avant n'en effaçait jamais un seul : le téléphone du
+        chantier a fini par refuser une mise à jour, faute de place.
+        L'app balaie maintenant les modèles orphelins à l'ouverture — et
+        elle le DIT, sinon rien ne distingue le ménage de l'inaction.
+      */}
+      {placeRendue !== null && (
+        <View style={styles.menageRow}>
+          <Text style={styles.menageTexte} numberOfLines={2}>
+            {`${Math.round(placeRendue / 1e6)} Mo rendus : anciens modèles 3D effacés`}
+          </Text>
+          <TouchableOpacity
+            accessibilityLabel="Fermer"
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            onPress={() => useScanStore.getState().oublierPlaceRendue()}>
+            <Text style={styles.menageCroix}>✕</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {!vide && (
         <View style={styles.chercheRow}>
           <View style={styles.champ}>
@@ -1231,6 +1255,18 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   // de dépasser : posée à −2 du haut de son icône, elle passait sous le
   // bloc du titre et se faisait trancher.
   headerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
+  menageRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: radius.pill,
+    backgroundColor: c.surface,
+  },
+  menageTexte: { flex: 1, color: c.inkSoft, fontSize: 13 },
+  menageCroix: { color: c.inkFaint, fontSize: 15, fontWeight: '700' },
   chercheRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 },
   champ: {
     flex: 1,

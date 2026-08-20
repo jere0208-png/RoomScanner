@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { deletePhotoFiles } from '../ui/photos';
+import { cleanModelFiles, deletePhotoFiles } from '../ui/photos';
 import { useAccountStore } from './accountStore';
 import {
   insetOnRing,
@@ -941,6 +941,14 @@ interface ScanState {
   panne: PanneEcriture;
   /** Il a lu l'avertissement : on l'oublie jusqu'au prochain incident. */
   oublierPanne: () => void;
+  /**
+   * Octets rendus par le dernier balayage des modèles 3D, `null` si rien
+   * n'a été effacé. La bibliothèque le dit une fois, puis l'oublie : un
+   * ménage muet laisse l'électricien devant le même téléphone plein.
+   */
+  placeRendue: number | null;
+  /** Il a lu le chiffre : on n'y revient pas. */
+  oublierPlaceRendue: () => void;
   removeObject: (id: string) => void;
   /** Pose en une fois ce que « Normes auto » propose. */
   poserDAuto: (fixtures: Fixture[], ceiling: CeilingFixture[]) => void;
@@ -3118,6 +3126,9 @@ export const useScanStore = create<ScanState>((set, get) => {
     panne: null,
     oublierPanne: () => set({ panne: null }),
 
+    placeRendue: null,
+    oublierPlaceRendue: () => set({ placeRendue: null }),
+
     removeObject: (id) => {
       pushHistory('removeObject');
       set({ objects: get().objects.filter((o) => o.id !== id), dirty: true });
@@ -3649,6 +3660,30 @@ export const useScanStore = create<ScanState>((set, get) => {
             AsyncStorage.removeItem(DRAFT_KEY).catch(() => {});
           }
         }
+        /*
+          LE GRAND BALAYAGE DES MODÈLES, une fois par ouverture.
+
+          Effacer le modèle d'un scan supprimé ne rend rien à qui ne supprime
+          jamais de scan — et ce sont justement les modèles entassés par les
+          versions précédentes, quand rien n'était effacé, qui ont fini par
+          remplir le téléphone du patron au point qu'une mise à jour ne
+          tenait plus.
+
+          On balaie donc au démarrage, en donnant tout ce que la bibliothèque
+          et le brouillon réclament encore. Le natif ne touche qu'aux
+          `scan-….usdz` de la racine des Documents : rien de ce que l'app
+          n'a pas écrit elle-même n'est en jeu.
+        */
+        const apres = get();
+        cleanModelFiles(
+          [
+            ...apres.saves.map((s) => s.modelPath),
+            apres.brouillon?.modelPath ?? null,
+            apres.modelPath,
+          ].filter((m): m is string => !!m),
+        ).then((octets) => {
+          if (octets > 0) set({ placeRendue: octets });
+        });
       } catch {
         // Stockage illisible : on repart des valeurs en mémoire.
       }
@@ -3699,6 +3734,27 @@ export const useScanStore = create<ScanState>((set, get) => {
         .map((p) => p.path)
         .filter((p) => !gardees.has(p));
       deletePhotoFiles(aEffacer);
+      /*
+        LE MODÈLE 3D PART AVEC SON SCAN.
+
+        Chaque relevé écrit un `scan-….usdz` de plusieurs mégaoctets dans les
+        Documents, et rien ne l'effaçait jamais : la place ne revenait qu'en
+        désinstallant l'app. Une mise à jour a fini par ne plus tenir sur le
+        téléphone.
+
+        On envoie les modèles ENCORE réclamés plutôt que celui qui part : le
+        natif efface tout le reste, ce qui emporte du même coup les orphelins
+        laissés par les versions d'avant. Le modèle du plan à l'écran reste
+        gardé même si sa sauvegarde s'en va — on ne retire pas la 3D des mains
+        de qui la regarde.
+      */
+      if (parti?.modelPath) {
+        const modeles = saves
+          .map((s) => s.modelPath)
+          .concat(st.modelPath)
+          .filter((m): m is string => !!m);
+        cleanModelFiles(modeles);
+      }
       set({
         saves,
         // Supprimer le scan courant emporte aussi sa question de fin de

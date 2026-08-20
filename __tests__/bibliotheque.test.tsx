@@ -448,3 +448,36 @@ describe('prendre un relevé, ou faire défiler', () => {
     expect(prendLeRelevé({ x: 100, y: 200 }, { x: 130, y: 200 })).toBe(false);
   });
 });
+
+/**
+ * LA PLACE RENDUE SE DIT.
+ *
+ * L'app entassait un modèle 3D par relevé sans jamais en effacer un seul :
+ * le téléphone du chantier a fini par refuser une mise à jour, faute de
+ * place. Le balayage arrive avec cette version — mais un ménage muet
+ * laisserait l'électricien devant le même téléphone plein, sans savoir que
+ * quelque chose a servi. La bibliothèque annonce donc ce qu'elle a rendu,
+ * une fois, et se laisse refermer.
+ */
+describe('le ménage des modèles 3D', () => {
+  it('annonce les mégaoctets rendus, et se laisse fermer', () => {
+    let t!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      useScanStore.setState({
+        saves: [],
+        folders: [],
+        screen: 'library',
+        currentSaveId: null,
+        placeRendue: 128 * 1024 * 1024,
+      });
+      t = TestRenderer.create(<LibraryScreen />);
+    });
+    expect(textes(t).some((s) => s.includes('134 Mo'))).toBe(true);
+    const fermer = t.root
+      .findAllByType(TouchableOpacity)
+      .find((n) => n.props.accessibilityLabel === 'Fermer');
+    act(() => fermer?.props.onPress());
+    expect(useScanStore.getState().placeRendue).toBeNull();
+    act(() => t.unmount());
+  });
+});
