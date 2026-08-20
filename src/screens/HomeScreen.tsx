@@ -335,16 +335,16 @@ export function HomeScreen() {
         */}
         {pro ? (
           <View pointerEvents="none">
-            <ContourOr rayon={16} fond={c.bg} style={styles.avatarOrZone}>
+            <ContourOr rayon={18} fond={c.bg} style={styles.avatarOrZone}>
               <View style={styles.avatarOrDedans}>
-                <Svg width={26} height={26} viewBox="0 0 24 24">
+                <Svg width={29} height={29} viewBox="0 0 24 24">
                   <Path d={SOLAIRES.avatar} fill={c.inkSoft} fillRule="evenodd" />
                 </Svg>
               </View>
             </ContourOr>
           </View>
         ) : (
-          <Svg width={30} height={30} viewBox="0 0 24 24" pointerEvents="none">
+          <Svg width={34} height={34} viewBox="0 0 24 24" pointerEvents="none">
             <Path d={SOLAIRES.avatar} fill={c.inkSoft} fillRule="evenodd" />
           </Svg>
         )}
@@ -459,10 +459,13 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     justifyContent: 'center',
     zIndex: 2,
   },
+  // La taille de l'AVATAR, exactement — relevé du patron : « le bouton
+  // thème à la même taille que le bouton profil, agrandi avant légèrement ».
+  // Deux ronds inégaux sur la même ligne se lisent comme un accident.
   themePastille: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: c.surface,
     ...shadowCard,
     shadowOpacity: 0.08,
@@ -599,8 +602,9 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   profilColonne: { flexShrink: 1 },
   // Moins gras — relevé du patron : le prénom n'est pas un titre.
   profilNom: { color: c.inkSoft, fontSize: 14.5, fontWeight: '600', maxWidth: 130 },
-  // L'anneau d'or AU RAS de l'icône : 32 pour un avatar de 26 — plus de
-  // disque clair entre eux, le couvercle est la couleur du fond.
-  avatarOrZone: { width: 32, height: 32 },
+  // L'anneau d'or AU RAS de l'icône : 36 pour un avatar de 29 — plus de
+  // disque clair entre eux, le couvercle est la couleur du fond. Et 36,
+  // c'est la pastille du thème : les deux ronds du bandeau sont jumeaux.
+  avatarOrZone: { width: 36, height: 36 },
   avatarOrDedans: { flexGrow: 1, alignItems: 'center', justifyContent: 'center' },
 }));

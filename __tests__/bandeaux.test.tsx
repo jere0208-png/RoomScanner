@@ -1369,3 +1369,73 @@ describe('la rangée d’outils', () => {
     act(() => tree.unmount());
   });
 });
+
+/**
+ * LES POIGNÉES DE COTES PARLENT AU MAGASIN — dans SA langue.
+ *
+ * Relevé du patron : « en glissant le côté droit, c'est son côté gauche qui
+ * change, il y a une inversion ». Le dessin retourne certains meubles d'un
+ * demi-tour (l'avant ne regarde pas le mur — faceIntoRoom) ; le magasin,
+ * lui, raisonne sur le transform BRUT. La poignée posée sur le bord « + »
+ * du dessin désignait alors le bord « − » du magasin : on tirait à droite,
+ * la gauche bougeait. La traduction est une règle pure, et la voici fixée.
+ */
+describe('les poignées de cotes des meubles', () => {
+  const { coteVersLeMagasin } = require('../src/components/FloorplanEditor');
+
+  it('traduisent le bord quand le meuble est dessiné retourné', () => {
+    expect(coteVersLeMagasin('largeur+', Math.PI, 0)).toBe('largeur-');
+    expect(coteVersLeMagasin('largeur-', Math.PI, 0)).toBe('largeur+');
+    expect(coteVersLeMagasin('profondeur+', 0, Math.PI)).toBe('profondeur-');
+  });
+
+  it('ne traduisent rien quand dessin et magasin sont d’accord', () => {
+    expect(coteVersLeMagasin('largeur+', 0.08, 0)).toBe('largeur+');
+    expect(coteVersLeMagasin('profondeur-', -0.05, 0)).toBe('profondeur-');
+  });
+});
+
+/**
+ * LE SIGLE 3D SUIT LE ZOOM — relevé du patron : « même en dézoomé ils sont
+ * trop gros, il faut une intelligence de zoom qui augmente la taille des
+ * noms avec ». Écrit en 10 fixe, « PC » couvrait la moitié d'une chambre
+ * vue de loin. La taille est une règle pure du zoom, bornée aux deux bouts.
+ */
+describe('le sigle des appareils en 3D', () => {
+  const { tailleDuSigle } = require('../src/components/Iso3DView');
+
+  it('grandit avec le zoom, borné aux deux bouts', () => {
+    expect(tailleDuSigle(45)).toBeLessThan(tailleDuSigle(95));
+    // De loin, discret ; jamais illisible pour autant.
+    expect(tailleDuSigle(25)).toBeGreaterThanOrEqual(5);
+    expect(tailleDuSigle(25)).toBeLessThanOrEqual(7);
+    // De près, jamais plus gros qu'avant : dix, c'était déjà le plafond.
+    expect(tailleDuSigle(600)).toBeLessThanOrEqual(10);
+  });
+});
+
+/**
+ * « NORMES AUTO » PORTE LE BOUCLIER — relevé du patron : la même icône que
+ * la pastille de contrôle du plan, pas le crayon du renommage.
+ */
+describe('le menu du scan', () => {
+  it('illustre Normes auto avec le bouclier du contrôle', () => {
+    const tree = monter();
+    const points = bouton(tree, 'Plus')!;
+    act(() => points.props.onPress());
+    const vu = textes(tree);
+    expect(vu).toContain('Normes auto');
+    // Les rangées du menu sont des Pressable : on cherche par le geste.
+    const ligne = tree.root
+      .findAll((n) => typeof n.props?.onPress === 'function')
+      .find((n) =>
+        n.findAllByType(Text).some((t) => t.props.children === 'Normes auto'),
+      )!;
+    expect(ligne).toBeDefined();
+    const { SOLAIRES } = require('../src/ui/solaires');
+    expect(
+      ligne.findAllByType(Path).filter((p) => p.props.d === SOLAIRES.bouclier)
+        .length,
+    ).toBe(1);
+  });
+});

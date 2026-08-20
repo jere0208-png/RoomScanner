@@ -82,9 +82,12 @@ export function ControlePastille({
               }),
               transform: [
                 {
+                  // 1,45 et pas plus — relevé du patron : « fais moins
+                  // propager l'onde ». À 1,9 elle léchait le sélecteur de
+                  // vue ; elle doit dire « viens voir », pas envahir.
                   scale: onde.interpolate({
                     inputRange: [0, 1],
-                    outputRange: [1, 1.9],
+                    outputRange: [1, 1.45],
                   }),
                 },
               ],

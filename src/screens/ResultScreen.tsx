@@ -1589,7 +1589,17 @@ export function ResultScreen() {
                       qu'il n'a pas compris la demande.
                     */
                     label: 'Normes auto',
-                    icon: 'renommer' as const,
+                    // Le bouclier de la pastille de contrôle — relevé du
+                    // patron : c'est le même sujet, c'est le même dessin.
+                    node: (
+                      <Svg width={20} height={20} viewBox="0 0 24 24">
+                        <Trace
+                          d={SOLAIRES.bouclier}
+                          fill={teinte.ink}
+                          fillRule="evenodd"
+                        />
+                      </Svg>
+                    ),
                     hint:
                       'Pose ce qui manque pour la NF C 15-100 : socles, RJ45, ' +
                       'interrupteurs et points lumineux, hors meubles.',

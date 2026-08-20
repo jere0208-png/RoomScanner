@@ -296,11 +296,73 @@ describe('l’accueil', () => {
     const stAnneau = StyleSheet.flatten(contour[0].props.style) as {
       width?: number;
     };
-    expect(stAnneau.width).toBeLessThanOrEqual(34);
+    expect(stAnneau.width).toBeLessThanOrEqual(38);
     // Et le prénom doré s'allège comme le gris.
     const typoNom = bloc.findAllByType(TexteOr)[0];
     expect(Number(typoNom.props.graisse)).toBeLessThanOrEqual(600);
     useAccountStore.setState({ pro: false });
+  });
+
+  /*
+   * LE THÈME FAIT LA TAILLE DU PROFIL — relevé du patron : « fais le
+   * bouton thème à la même taille que le bouton profil, mais agrandis
+   * avant légèrement le bouton profil ». La pastille blanche (40) dominait
+   * l'avatar (32) : le bandeau portait deux ronds inégaux. L'avatar prend
+   * donc quatre points, la pastille en rend quatre — les deux se lisent
+   * en 36, et l'égalité est ASSERTÉE, pas espérée.
+   */
+  it('la pastille du thème et l’avatar font la même taille', () => {
+    useAccountStore.setState({
+      compte: { id: 'email:j@c.fr', prenom: 'Jérôme', methode: 'email' },
+      pro: true,
+    });
+    const t = monter();
+    const bloc = t.root.findAll(
+      (n) =>
+        n.props?.accessibilityLabel === 'Mon compte' &&
+        typeof n.props?.onPress === 'function',
+    )[0];
+    // L'avatar Pro a grandi : l'anneau d'or se lit en 36.
+    const stAnneau = StyleSheet.flatten(
+      bloc.findAllByType(ContourOr)[0].props.style,
+    ) as { width?: number };
+    expect(stAnneau.width).toBeGreaterThanOrEqual(35);
+    // Et la pastille blanche du thème fait EXACTEMENT sa taille.
+    const zone = t.root.findAll((n) =>
+      String(n.props?.accessibilityLabel ?? '').startsWith('Passer en thème'),
+    )[0];
+    const blanche = zone.findAll((n) => {
+      const st = StyleSheet.flatten(n.props?.style) as
+        | { width?: number; borderRadius?: number }
+        | undefined;
+      return typeof st?.width === 'number' && (st.borderRadius ?? 0) >= 17;
+    })[0];
+    const stBlanche = StyleSheet.flatten(blanche.props.style) as {
+      width?: number;
+      height?: number;
+    };
+    expect(stBlanche.width).toBe(stAnneau.width);
+    expect(stBlanche.height).toBe(stAnneau.width);
+    // En gratuit, l'avatar nu suit le mouvement : lui aussi a grandi.
+    // Le premier arbre se démonte AVANT le second : deux accueils vivants
+    // à la fois, et leurs animations se disputent les minuteries sans fin.
+    act(() => t.unmount());
+    useAccountStore.setState({ pro: false });
+    const t2 = monter();
+    const bloc2 = t2.root.findAll(
+      (n) =>
+        n.props?.accessibilityLabel === 'Mon compte' &&
+        typeof n.props?.onPress === 'function',
+    )[0];
+    // On remonte jusqu'au Svg porteur de la taille : le parent direct du
+    // tracé est un intermédiaire sans largeur.
+    let avatarNu = bloc2
+      .findAllByType(Path)
+      .find((n) => n.props.d === SOLAIRES.avatar)!.parent;
+    while (avatarNu && avatarNu.props?.width === undefined) {
+      avatarNu = avatarNu.parent;
+    }
+    expect(Number(avatarNu?.props.width)).toBeGreaterThanOrEqual(33);
   });
 
   it('ne récite plus le mode d’emploi', () => {

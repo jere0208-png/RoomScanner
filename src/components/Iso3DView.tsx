@@ -75,6 +75,20 @@ export const DEFAULT_VIEW3D: View3DParams = {
 const rad = (d: number) => (d * Math.PI) / 180;
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
+/**
+ * LA TAILLE DU SIGLE (PC, INT…) SUIT LE ZOOM.
+ *
+ * Relevé du patron : « même en dézoomé ils sont trop gros — il faut une
+ * intelligence de zoom qui augmente la taille des noms avec ». Écrit en 10
+ * fixe, « PC » couvrait la moitié d'une chambre vue de loin. La taille est
+ * donc une fonction du zoom (pixels par mètre), bornée aux deux bouts :
+ * discret de loin sans devenir illisible, et jamais plus gros qu'avant de
+ * près — au-delà, c'est la désignation longue qui prend le relais.
+ */
+export function tailleDuSigle(scale: number): number {
+  return Math.max(5.5, Math.min(10, scale * 0.085));
+}
+
 function pointInPoly(x: number, y: number, pts: { sx: number; sy: number }[]) {
   let inside = false;
   for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
@@ -815,6 +829,8 @@ export function Iso3DView({
           y: number;
           color: string;
           sigle?: string;
+          /** Sa taille : elle suit le zoom, comme la désignation longue. */
+          sigleTaille?: number;
           /** Opacité du point de repère : 1 de loin, 0 dès qu'on voit la plaque. */
           pastille: number;
           /** Cotes lues sur la face, affichées une fois zoomé dessus. */
@@ -994,6 +1010,7 @@ export function Iso3DView({
           // Le sigle de la famille : c'est lui qu'on écrit de loin, à la
           // place du point de couleur.
           sigle: assemblyTag(postes),
+          sigleTaille: tailleDuSigle(scale),
           /**
            * LES COTES D'UN APPAREIL SONT DES COTES.
            *
@@ -1333,7 +1350,7 @@ export function Iso3DView({
                         fill="none"
                         stroke={c.surface}
                         strokeWidth={2.8}
-                        fontSize={10}
+                        fontSize={item.sigleTaille ?? 10}
                         fontWeight="800"
                         textAnchor="middle"
                         opacity={item.pastille}>
@@ -1343,7 +1360,7 @@ export function Iso3DView({
                         x={item.x}
                         y={item.y + 3.4}
                         fill={item.color}
-                        fontSize={10}
+                        fontSize={item.sigleTaille ?? 10}
                         fontWeight="800"
                         textAnchor="middle"
                         opacity={item.pastille}>

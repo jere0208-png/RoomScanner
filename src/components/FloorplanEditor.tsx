@@ -165,6 +165,27 @@ import { SOLAIRES } from '../ui/solaires';
  * Empreinte d'un meuble, recalée contre les murs de SA pièce seulement :
  * la cloison de la pièce voisine ne doit pas le repousser.
  */
+/**
+ * TRADUIT UN BORD DU DESSIN VERS LE MAGASIN.
+ *
+ * Le dessin retourne certains meubles d'un demi-tour (`faceIntoRoom` : les
+ * tiroirs ne s'ouvrent pas dans le plâtre) ; le magasin, lui, raisonne sur
+ * le transform BRUT. La poignée posée sur le bord « + » du dessin désignait
+ * alors le bord « − » du magasin — relevé du patron : « en glissant le côté
+ * droit, c'est son côté gauche qui change ». Quand les deux lacets se
+ * tournent le dos, le signe s'échange ; sinon rien à traduire.
+ */
+export function coteVersLeMagasin(
+  cote: 'largeur+' | 'largeur-' | 'profondeur+' | 'profondeur-',
+  yawDessin: number,
+  yawBrut: number,
+): 'largeur+' | 'largeur-' | 'profondeur+' | 'profondeur-' {
+  if (Math.cos(yawDessin - yawBrut) >= 0) return cote;
+  return (
+    cote.endsWith('+') ? cote.slice(0, -1) + '-' : cote.slice(0, -1) + '+'
+  ) as typeof cote;
+}
+
 function footprintOf(
   o: ObjectData,
   partOf: Map<string, RoomPart>,
@@ -1969,7 +1990,13 @@ export function FloorplanEditor({
                         <SideHandle
                           key={b.cote}
                           objectId={o.id}
-                          cote={b.cote}
+                          // Le magasin raisonne sur le transform brut : si le
+                          // dessin a retourné le meuble, le bord se traduit.
+                          cote={coteVersLeMagasin(
+                            b.cote,
+                            f.yaw,
+                            Math.atan2(o.transform[2], o.transform[0]),
+                          )}
                           at={at}
                           angle={inclinaison}
                           normale={b.n}

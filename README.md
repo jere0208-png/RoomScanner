@@ -252,6 +252,15 @@ le bord opposé ne bouge pas. Le geste ne compte que pour sa part utile — le
 déplacement du doigt est projeté sur la normale du bord —, si bien qu'un
 mouvement de travers ne fait pas partir le meuble en biais.
 
+**La poignée parle au magasin dans SA langue.** Relevé du patron : « en
+glissant le côté droit, c'est son côté gauche qui change ». Le dessin
+retourne certains meubles d'un demi-tour (`faceIntoRoom` : les tiroirs ne
+s'ouvrent pas dans le plâtre), mais le magasin raisonne sur le transform
+BRUT — la poignée posée sur le bord « + » du dessin désignait alors le
+bord « − » du magasin, et seul un meuble retourné trahissait le bug.
+`coteVersLeMagasin` échange le signe quand les deux lacets se tournent le
+dos, et le banc fixe la table de traduction.
+
 **L'aimant finit le geste, dans les deux sens.** À sept centimètres du nu d'un
 mur qu'il longe, le bord s'y pose (`snapSideToWalls`) — et il s'aligne tout
 autant sur le **bout d'un mur qui se termine** : le retour d'une cloison, le
@@ -918,9 +927,15 @@ qui débordait a disparu.
 Le bloc profil et la pastille du thème partagent désormais **la même
 boîte** (même sommet, même hauteur de 72 points) : alignés par
 construction, plus rien à calculer, donc plus rien à dériver. L'anneau
-d'or du Pro se pose **au ras de l'avatar gris** (32 points pour une icône
-de 26, couvercle couleur du fond — plus de disque clair), et le prénom
-s'allège (graisse 600) : ce n'est pas un titre.
+d'or du Pro se pose **au ras de l'avatar gris** (couvercle couleur du
+fond — plus de disque clair), et le prénom s'allège (graisse 600) : ce
+n'est pas un titre.
+
+**Et les deux ronds du bandeau sont jumeaux** — relevé du patron : « le
+bouton thème à la même taille que le bouton profil, agrandi avant
+légèrement ». La pastille blanche (40) dominait l'avatar (32) : l'avatar
+prend quatre points (36, icône 29 ; 34 nu en gratuit), la pastille en rend
+quatre (36). L'égalité est assertée au banc, pas espérée.
 
 ### Le catalogue d'appareillage se déroule, et montre les vrais symboles
 
@@ -1383,7 +1398,11 @@ normes, un contour vert fixe si rien n'est à redire ». C'est exactement ça �
 un rond de trente points, toujours au même endroit, dont la COULEUR parle
 avant qu'on l'ouvre : une bague rouge s'en échappe toutes les quatre
 secondes tant qu'une alerte reste, le contour passe au vert plein quand le
-logement est bon (`ControlePastille`).
+logement est bon (`ControlePastille`). Deuxième passe, sur l'appareil : la
+bague s'arrête à **1,45 fois le bouton** — à 1,9 elle léchait le sélecteur
+de vue, « fais moins propager l'onde ». Et « Normes auto », dans le menu
+« … », porte désormais **le même bouclier** que la pastille : même sujet,
+même dessin — le crayon du renommage n'avait rien à y faire.
 
 **Et chaque constat qui sait se régler porte son bouton.** La fenêtre
 listait ce qui manque et laissait poser à la main — or les constats
@@ -1844,11 +1863,15 @@ A a Z`), qui traite chaque arc comme un demi-cercle dont la corde est le
 diamètre — c'est ainsi que tous nos symboles sont écrits, et ça évite la
 paramétrisation générale des arcs SVG, source de bogues pour rien.
 
-**En 3D, un repère de taille fixe.** Le volume posé sur le mur fait 8 cm : à
-l'échelle d'un logement entier, c'est deux pixels — l'appareil existait mais
-ne se voyait pas. Le même symbole est donc posé par-dessus, à taille
-constante quel que soit le zoom, et masqué dès que sa face tourne le dos à la
-caméra. **En s'approchant** (au-delà de 90 px par mètre), il déplie ses deux
+**En 3D, un repère qui suit le zoom.** Le volume posé sur le mur fait 8 cm :
+à l'échelle d'un logement entier, c'est deux pixels — l'appareil existait
+mais ne se voyait pas. Le même symbole est donc posé par-dessus, et masqué
+dès que sa face tourne le dos à la caméra. Le sigle s'écrivait en 10 fixe —
+relevé du patron : « même en dézoomé ils sont trop gros, il faut une
+intelligence de zoom qui augmente la taille des noms avec ». Sa taille est
+désormais une règle pure du zoom (`tailleDuSigle` : 0,085 point par pixel
+par mètre, bornée de 5,5 à 10) : discret sur la vue d'ensemble, il grandit
+en s'approchant — jusqu'à ce que la désignation longue prenne le relais. **En s'approchant** (au-delà de 90 px par mètre), il déplie ses deux
 cotes dans une pastille sombre à deux lignes — « SOL 135 cm », « BORD 38 cm ».
 La première version montrait « ⇕135 ⇔38 » : les flèches sortaient en gros
 glyphes de police système, et un nombre sans rien pour dire de quoi il s'agit
