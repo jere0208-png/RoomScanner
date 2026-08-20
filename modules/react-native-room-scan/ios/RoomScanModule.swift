@@ -92,6 +92,31 @@ class RoomScanModule: NSObject {
     RoomScanManager.shared.stop(resolve: resolve, reject: reject)
   }
 
+  /**
+   POSE UN APPAREIL À L'ENDROIT VISÉ, pendant le scan.
+
+   Rend `false` quand le rayon ne rencontre aucune surface : l'app le dit
+   alors franchement plutôt que de poser au hasard.
+   */
+  @objc func poserAuViseur(_ kind: NSString,
+                           resolve: RCTPromiseResolveBlock,
+                           reject: RCTPromiseRejectBlock) {
+    guard #available(iOS 16.0, *) else {
+      resolve(false)
+      return
+    }
+    resolve(RoomScanManager.shared.poserAuViseur(kind: kind as String))
+  }
+
+  @objc func retirerDerniereAncre(_ resolve: RCTPromiseResolveBlock,
+                                  reject: RCTPromiseRejectBlock) {
+    guard #available(iOS 16.0, *) else {
+      resolve(false)
+      return
+    }
+    resolve(RoomScanManager.shared.retirerDerniereAncre())
+  }
+
   @objc func pauseRoomScan() {
     if #available(iOS 16.0, *) { RoomScanManager.shared.pause() }
   }

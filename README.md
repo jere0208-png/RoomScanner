@@ -145,6 +145,52 @@ L'outil « pièces » de la barre du plan relance la détection sur le graphe
 courant, en **gardant les noms donnés à la main** : chaque nouvelle pièce
 hérite du nom de l'ancienne dont le point de cartouche tombe dedans.
 
+### L'élec se pose PENDANT le scan, au viseur
+
+Relevé du chantier : « pendant un scan, permet d'ajouter manuellement des
+PC, inter, point lumineux. Le scan crée aussi un plafond, où l'on peut
+placer aussi les points lumineux plafond. Ça permettrait lors d'un devis de
+quantifier les éléments et leur placement — on mémorise l'emplacement avec
+un viseur au centre (un carré), dans lequel on peut placer des éléments élec
+(bouton placé sur le côté proprement). »
+
+C'est le bon moment pour le faire, et c'est même le seul : on est DEVANT le
+mur, on voit la boîte existante, on sait où passera la nouvelle. Viser au
+centre de l'écran vaut mieux que replacer de mémoire, une heure plus tard,
+sur un plan — et le devis se chiffre en sortant du logement.
+
+**Un carré au centre, des boutons sur le côté.** Le viseur est fait de
+quatre coins, pas d'un cadre plein : on doit VOIR le mur qu'on vise. Les
+boutons (PC, INT, LUM) tiennent une colonne contre le bord droit — hors du
+chemin du pouce qui tient le téléphone, et loin de la miniature 3D que
+RoomPlan pose au centre-bas. Un compteur dit ce qu'on a saisi, et une
+flèche retire le dernier : on vise mal une fois sur dix.
+
+**Le natif ne rend qu'un point.** Un rayon part du milieu de l'image
+(`ARFrame.raycastQuery` en coordonnées normalisées, donc 0,5 / 0,5) et
+s'arrête sur la première surface qu'ARKit connaît — le plan existant
+d'abord, l'estimation ensuite. C'est tout ce qu'un raycast sait dire ; et
+quand il ne rencontre rien, l'app le dit franchement (« Rien à viser ici —
+approchez-vous du mur ») plutôt que de poser au jugé un appareil dont
+personne ne saurait d'où il sort.
+
+**Tout le métier est en JS** (`ancrerElec`), et c'est là qu'il est testable.
+Chaque point est rattaché au mur le plus proche — mesuré à l'AXE, comme le
+modèle, et seulement si sa projection tombe DANS le segment, sinon un mur
+lointain mais bien orienté attraperait un point posé au-delà de son bout.
+Trente-cinq centimètres de portée : de quoi couvrir la demi-épaisseur du mur
+et l'imprécision de la main, sans jamais attraper la cloison d'en face (le
+plus étroit des couloirs fait quatre-vingts). La face retenue est celle qui
+regarde la pièce, la hauteur est celle du point visé, bornée au mur.
+
+Un point de plafond, lui, ne se juge pas à la hauteur seule : une applique
+visée haut reste contre son mur. C'est la CONJONCTION d'une hauteur et d'un
+éloignement des murs qui fait un plafond — ou la nature de l'appareil, un
+détecteur de fumée n'allant nulle part ailleurs. Et ce qui ne tombe ni sur
+un mur ni dans une pièce est **jeté** : on vise en marchant, la caméra passe
+par des fenêtres et des couloirs, et un appareil posé au hasard salirait le
+plan comme le métré.
+
 ### Le doigt qui fait défiler ne prend pas le relevé
 
 Relevé du chantier : « les fichiers deviennent des bulles pour le

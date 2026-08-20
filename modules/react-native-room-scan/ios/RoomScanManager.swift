@@ -38,6 +38,18 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
   /// Les données brutes du passage en cours (remplies par `didEndWith`).
   private var dernierReleve: CapturedRoomData?
 
+  /**
+   L'ÉLEC POSÉE PENDANT LE SCAN, au viseur.
+
+   Relevé du chantier : « pendant un scan, permet d'ajouter manuellement des
+   PC, inter, point lumineux ». C'est le bon moment pour le faire — on est
+   DEVANT le mur, on voit la boîte existante, on sait où passera la
+   nouvelle. Chaque appui mémorise le point du monde que vise le centre de
+   l'écran ; le JS en fera des appareils, rattachés à leur mur ou au
+   plafond de leur pièce.
+   */
+  private var ancresElec: [[String: Any]] = []
+
   override init() { super.init() }
 
   // RoomCaptureViewDelegate hérite de NSCoding : implémentations requises.
@@ -73,7 +85,10 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
       RoomScanCompass.shared.reset()
       // Un relevé tout neuf oublie les passages précédents ; un passage
       // ajouté les garde, ce sont eux qu'on va fusionner.
-      if !additif { releves.removeAll() }
+      if !additif {
+        releves.removeAll()
+        ancresElec.removeAll()
+      }
     }
     if additif { self.additif = true }
     DispatchQueue.main.async {
@@ -87,6 +102,49 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
         self.pendingStart = true
       }
     }
+  }
+
+  /**
+   POSE UN APPAREIL À L'ENDROIT VISÉ — au centre de l'écran.
+
+   Un rayon part du milieu de l'image et s'arrête sur la première surface
+   qu'ARKit connaît : le mur d'en face, le plafond au-dessus. On ne retient
+   que le POINT — le type, la face et la pièce sont l'affaire du JS, qui a
+   le plan sous la main.
+
+   Rend `false` quand le rayon ne rencontre rien : sans surface reconnue à
+   cet endroit, poser au jugé mettrait un appareil au hasard dans le plan,
+   et personne ne saurait d'où il sort.
+   */
+  func poserAuViseur(kind: String) -> Bool {
+    guard let session = captureView?.captureSession.arSession,
+          let frame = session.currentFrame else { return false }
+    // Le centre de l'image, en coordonnées normalisées : c'est là qu'est le
+    // viseur, et c'est ce que l'œil aligne sur la boîte.
+    let centre = CGPoint(x: 0.5, y: 0.5)
+    let cibles: [ARRaycastQuery.Target] = [.existingPlaneGeometry, .estimatedPlane]
+    for cible in cibles {
+      guard let query = frame.raycastQuery(
+        from: centre, allowing: cible, alignment: .any,
+      ) else { continue }
+      guard let hit = session.raycast(query).first else { continue }
+      let p = hit.worldTransform.columns.3
+      ancresElec.append([
+        "kind": kind,
+        "x": p.x,
+        "y": p.y,
+        "z": p.z,
+      ])
+      return true
+    }
+    return false
+  }
+
+  /// Le dernier appareil posé s'enlève : on vise mal une fois sur dix.
+  func retirerDerniereAncre() -> Bool {
+    guard !ancresElec.isEmpty else { return false }
+    ancresElec.removeLast()
+    return true
   }
 
   func pause() {
@@ -268,6 +326,9 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
           withColors: true,
         ),
         "objects": Self.objectsJSON(objets, withColors: true),
+        // Ce qu'on a posé au viseur pendant le relevé : des points du
+        // monde, que le JS rattachera aux murs et aux plafonds.
+        "elec": ancresElec,
         // Combien de passages composent ce relevé : le JS s'en sert pour
         // dire « deux pièces réunies » plutôt que de laisser deviner.
         "passages": releves.count,

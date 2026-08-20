@@ -12,6 +12,7 @@ import { themedStyles, useTheme, type Palette } from '../theme';
 import { useScanStore } from '../store/scanStore';
 import { useRoomScan } from '../native/useRoomScan';
 import { CloseCross } from '../components/CloseCross';
+import { haptic } from '../ui/haptic';
 
 /**
  * Écran de scan. RoomPlan dessine lui-même ses guides ET la miniature 3D
@@ -33,6 +34,28 @@ export function ScanScreen() {
 
   // Torche : éteinte en quittant l'écran.
   const [torch, setTorch] = useState(false);
+  /**
+   * CE QU'ON A POSÉ AU VISEUR — le compte, et le refus.
+   *
+   * Relevé du chantier : « pendant un scan, permet d'ajouter manuellement
+   * des PC, inter, point lumineux ». On est DEVANT le mur : c'est le
+   * moment. Le compte rassure (on sait ce qu'on a saisi), et le refus se
+   * dit franchement quand le rayon ne rencontre rien — poser au jugé
+   * mettrait un appareil au hasard dans le plan.
+   */
+  const [poses, setPoses] = useState(0);
+  const [refus, setRefus] = useState(false);
+  const poser = async (kind: string) => {
+    const ok = await RoomScan.poserAuViseur(kind);
+    if (ok) {
+      setPoses((n) => n + 1);
+      setRefus(false);
+      haptic('succes');
+    } else {
+      setRefus(true);
+      haptic('alerte');
+    }
+  };
   useEffect(() => {
     return () => {
       RoomScan.setTorch(false).catch(() => {});
@@ -120,6 +143,66 @@ export function ScanScreen() {
         )}
       </View>
 
+      {/*
+        LE VISEUR, ET CE QU'ON Y POSE.
+
+        Un carré au centre : on l'aligne sur la boîte, on appuie sur le
+        bouton du bon appareil. Les boutons vivent SUR LE CÔTÉ — relevé du
+        patron —, hors du chemin du pouce qui tient le téléphone et loin de
+        la miniature 3D de RoomPlan, qui occupe le centre-bas.
+      */}
+      {!paused && !processing && (
+        <>
+          <View style={styles.viseur} pointerEvents="none">
+            <View style={[styles.viseurCoin, styles.viseurHG]} />
+            <View style={[styles.viseurCoin, styles.viseurHD]} />
+            <View style={[styles.viseurCoin, styles.viseurBG]} />
+            <View style={[styles.viseurCoin, styles.viseurBD]} />
+          </View>
+          <View style={styles.poseColonne}>
+            {(
+              [
+                ['prise', 'PC'],
+                ['inter', 'INT'],
+                ['dcl', 'LUM'],
+              ] as const
+            ).map(([kind, mot]) => (
+              <TouchableOpacity
+                key={kind}
+                style={styles.poseBouton}
+                accessibilityLabel={`Poser ${mot} à l’endroit visé`}
+                onPress={() => poser(kind)}>
+                <Text style={styles.poseTexte}>{mot}</Text>
+              </TouchableOpacity>
+            ))}
+            {poses > 0 && (
+              <TouchableOpacity
+                style={[styles.poseBouton, styles.poseAnnule]}
+                accessibilityLabel="Retirer le dernier appareil posé"
+                onPress={async () => {
+                  if (await RoomScan.retirerDerniereAncre()) {
+                    setPoses((n) => Math.max(0, n - 1));
+                    haptic('leger');
+                  }
+                }}>
+                <Text style={styles.poseTexte}>↺</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          {(poses > 0 || refus) && (
+            <View style={styles.poseBandeau} pointerEvents="none">
+              <Text style={styles.instructionText}>
+                {refus
+                  ? 'Rien à viser ici — approchez-vous du mur'
+                  : `${poses} appareil${poses > 1 ? 's' : ''} posé${
+                      poses > 1 ? 's' : ''
+                    }`}
+              </Text>
+            </View>
+          )}
+        </>
+      )}
+
       {/* Coins inférieurs uniquement : le centre-bas appartient à la
           miniature 3D live de RoomPlan. */}
       <View style={styles.bottomHud} pointerEvents="box-none">
@@ -201,6 +284,53 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     justifyContent: 'center',
   },
   torchButtonOn: { backgroundColor: '#F4F6FA' },
+  /* Le viseur : quatre coins, pas un cadre plein — on doit VOIR le mur. */
+  viseur: {
+    position: 'absolute',
+    top: '46%',
+    left: '50%',
+    width: 74,
+    height: 74,
+    marginLeft: -37,
+    marginTop: -37,
+  },
+  viseurCoin: {
+    position: 'absolute',
+    width: 20,
+    height: 20,
+    borderColor: '#F4F6FA',
+  },
+  viseurHG: { top: 0, left: 0, borderTopWidth: 3, borderLeftWidth: 3 },
+  viseurHD: { top: 0, right: 0, borderTopWidth: 3, borderRightWidth: 3 },
+  viseurBG: { bottom: 0, left: 0, borderBottomWidth: 3, borderLeftWidth: 3 },
+  viseurBD: { bottom: 0, right: 0, borderBottomWidth: 3, borderRightWidth: 3 },
+  /* Les boutons de pose : une colonne contre le bord droit, à hauteur du
+     pouce, hors du chemin de la miniature 3D. */
+  poseColonne: {
+    position: 'absolute',
+    right: 16,
+    top: '38%',
+    gap: 10,
+  },
+  poseBouton: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: c.scanPill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  poseAnnule: { backgroundColor: c.scanPillSoft },
+  poseTexte: { color: c.scanInk, fontSize: 14, fontWeight: '800' },
+  poseBandeau: {
+    position: 'absolute',
+    bottom: 118,
+    alignSelf: 'center',
+    backgroundColor: c.scanPill,
+    borderRadius: 14,
+    paddingVertical: 7,
+    paddingHorizontal: 13,
+  },
   topHud: {
     position: 'absolute',
     top: 58,

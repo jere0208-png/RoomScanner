@@ -73,6 +73,7 @@ import {
   type FixtureKind,
 } from '../geometry/electrical';
 import { pointInPolygon } from '../geometry/appearance';
+import { ancrerElec } from '../geometry/viseur';
 import {
   deduceRoomKind,
   roomKindLabel,
@@ -2544,15 +2545,23 @@ export const useScanStore = create<ScanState>((set, get) => {
         roomId: `room-${roomIndexAt(cl.at, shapes.map((x) => x.outline)) + 1}`,
       }));
 
+      /* Ce que le viseur a posé PENDANT ce passage vient s'ajouter. */
+      const viseMerge = ancrerElec(
+        r.elec ?? [],
+        walls,
+        kept.map((x, i) => ({ id: x.id, outline: shapes[i]?.outline })),
+        (prefixe, n) => `${prefixe}-${Date.now().toString(36)}-${n}`,
+      );
+
       set({
         modelPath: r.modelPath ?? st.modelPath,
         rooms: kept,
         walls,
         openings,
         objects,
-        fixtures,
+        fixtures: [...fixtures, ...viseMerge.fixtures],
         photos,
-        ceiling,
+        ceiling: [...ceiling, ...viseMerge.ceiling],
         north: typeof r.north === 'number' ? r.north : st.north,
         processing: false,
         scanning: false,
@@ -2640,6 +2649,22 @@ export const useScanStore = create<ScanState>((set, get) => {
         return;
       }
 
+      /*
+        CE QU'ON A POSÉ AU VISEUR PENDANT LE RELEVÉ.
+
+        Le natif n'a rendu que des points du monde — c'est tout ce qu'un
+        rayon sait dire. `ancrerElec` les rattache : à leur mur et à leur
+        hauteur pour l'appareillage, à la pièce qu'ils surplombent pour les
+        points de plafond. Ce qui ne tombe nulle part est jeté plutôt que
+        posé au hasard.
+      */
+      const vise = ancrerElec(
+        r.elec ?? [],
+        walls,
+        kept.map((x, i) => ({ id: x.id, outline: shapes[i]?.outline })),
+        (prefixe, n) => `${prefixe}-${Date.now().toString(36)}-${n}`,
+      );
+
       // Sauvegarde automatique : aucun scan terminé ne peut se perdre.
       // C'est ICI que le palier gratuit se consomme — « générer un plan »,
       // c'est en garder un. Un essai jeté avant la fin ne compte pas, et
@@ -2656,9 +2681,9 @@ export const useScanStore = create<ScanState>((set, get) => {
         walls,
         openings,
         objects,
-        fixtures: [],
+        fixtures: vise.fixtures,
         photos: [],
-        ceiling: [],
+        ceiling: vise.ceiling,
         north: typeof r.north === 'number' ? r.north : undefined,
       };
       const saves = [save, ...get().saves];
@@ -2674,9 +2699,9 @@ export const useScanStore = create<ScanState>((set, get) => {
         walls,
         openings,
         objects,
-        fixtures: [],
+        fixtures: vise.fixtures,
         photos: [],
-        ceiling: [],
+        ceiling: vise.ceiling,
         north: typeof r.north === 'number' ? r.north : null,
         saves,
         processing: false,

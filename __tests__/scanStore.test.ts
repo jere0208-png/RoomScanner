@@ -985,3 +985,47 @@ describe('le relevé qu’on complète', () => {
     expect(useScanStore.getState().saves).toHaveLength(avant);
   });
 });
+
+/**
+ * CE QU'ON A POSÉ AU VISEUR ARRIVE DANS LE PLAN.
+ *
+ * Le relevé ne rend pas que des murs : il rend aussi ce que l'électricien a
+ * visé pendant qu'il balayait la pièce. Ces points deviennent des appareils
+ * — sur leur mur, à leur hauteur — et des points de plafond. C'est ce qui
+ * permet de chiffrer un devis en sortant du logement, sans rien replacer de
+ * mémoire.
+ */
+describe('l’élec posée au viseur', () => {
+  beforeEach(reset);
+
+  it('devient de vrais appareils, sur le mur visé', () => {
+    useScanStore.getState().finalize({
+      modelPath: '/tmp/a.usdz',
+      surfaces: boxSurfaces('a', 0, 0, 4, 3),
+      objects: [],
+      elec: [
+        // Une prise contre le mur du haut, à 25 cm du sol.
+        { kind: 'prise', x: 1.5, y: 0.25, z: 0.03 },
+        // Un point lumineux au milieu, sous le plafond.
+        { kind: 'dcl', x: 2, y: 2.45, z: 1.5 },
+      ],
+    });
+    const st = useScanStore.getState();
+    expect(st.fixtures).toHaveLength(1);
+    expect(st.fixtures[0].kind).toBe('prise');
+    expect(st.walls.some((w) => w.id === st.fixtures[0].wallId)).toBe(true);
+    expect(st.ceiling).toHaveLength(1);
+    expect(st.ceiling[0].kind).toBe('dcl');
+  });
+
+  it('et part avec le scan dans la bibliothèque', () => {
+    useScanStore.getState().finalize({
+      modelPath: '/tmp/a.usdz',
+      surfaces: boxSurfaces('a', 0, 0, 4, 3),
+      objects: [],
+      elec: [{ kind: 'prise', x: 1.5, y: 0.25, z: 0.03 }],
+    });
+    const save = useScanStore.getState().saves[0];
+    expect(save.fixtures).toHaveLength(1);
+  });
+});

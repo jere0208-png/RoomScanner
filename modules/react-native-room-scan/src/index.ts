@@ -100,6 +100,11 @@ export interface ScanUpdate {
  */
 export interface ScanResult {
   /**
+   * Ce qu'on a posé au viseur pendant le relevé : des points du monde,
+   * que le JS rattache aux murs et aux plafonds (`ancrerElec`).
+   */
+  elec?: { kind: string; x: number; y: number; z: number }[];
+  /**
    * Nombre de passages réunis dans ce relevé. Deux ou plus : le logement a
    * été scanné pièce par pièce, et les passages ont été alignés.
    */
@@ -174,6 +179,24 @@ export const RoomScan = {
 
   /** Arrête, post-traite et exporte. Compte quelques secondes sur iOS. */
   stop: (): Promise<ScanResult> => RoomScanModule.stopRoomScan(),
+
+  /**
+   * POSE UN APPAREIL À L'ENDROIT VISÉ, pendant le scan.
+   *
+   * Le viseur est au centre de l'écran : on aligne, on appuie. `false`
+   * quand le rayon ne rencontre aucune surface — l'app le dit plutôt que
+   * de poser au jugé.
+   */
+  poserAuViseur: (kind: string): Promise<boolean> =>
+    RoomScanModule?.poserAuViseur
+      ? RoomScanModule.poserAuViseur(kind)
+      : Promise.resolve(false),
+
+  /** Retire le dernier appareil posé : on vise mal une fois sur dix. */
+  retirerDerniereAncre: (): Promise<boolean> =>
+    RoomScanModule?.retirerDerniereAncre
+      ? RoomScanModule.retirerDerniereAncre()
+      : Promise.resolve(false),
 
   pause: (): void => RoomScanModule.pauseRoomScan(),
   resume: (): void => RoomScanModule.resumeRoomScan(),

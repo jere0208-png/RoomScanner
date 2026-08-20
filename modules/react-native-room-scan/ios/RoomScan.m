@@ -7,6 +7,11 @@ RCT_EXTERN_METHOD(isSupported:(RCTPromiseResolveBlock)resolve reject:(RCTPromise
 RCT_EXTERN_METHOD(startRoomScan:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
 RCT_EXTERN_METHOD(startAdditionalScan:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
 RCT_EXTERN_METHOD(stopRoomScan:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
+RCT_EXTERN_METHOD(poserAuViseur:(NSString *)kind
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+RCT_EXTERN_METHOD(retirerDerniereAncre:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
 RCT_EXTERN_METHOD(pauseRoomScan)
 RCT_EXTERN_METHOD(resumeRoomScan)
 RCT_EXTERN_METHOD(cameraStatus:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
