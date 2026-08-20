@@ -125,9 +125,11 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
     let centre = CGPoint(x: 0.5, y: 0.5)
     let cibles: [ARRaycastQuery.Target] = [.existingPlaneGeometry, .estimatedPlane]
     for cible in cibles {
-      guard let query = frame.raycastQuery(
+      // `ARFrame.raycastQuery` rend toujours une requête (à la différence
+      // de celle d'`ARView`, qui peut échouer à cadrer le point).
+      let query = frame.raycastQuery(
         from: centre, allowing: cible, alignment: .any,
-      ) else { continue }
+      )
       guard let hit = session.raycast(query).first else { continue }
       let p = hit.worldTransform.columns.3
       ancresElec.append([
