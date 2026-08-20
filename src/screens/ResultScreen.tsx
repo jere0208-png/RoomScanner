@@ -1622,6 +1622,27 @@ export function ResultScreen() {
                      * masquer. On le tire ensuite par ses coins, et l'aimant
                      * le soude à ses voisins comme n'importe quel mur.
                      */
+                    /**
+                     * REDÉTECTER LES PIÈCES — sur un plan déjà relevé.
+                     *
+                     * Sans ce geste, un correctif de détection ne profite
+                     * qu'aux scans À VENIR : les dossiers déjà faits gardent
+                     * leurs pièces manquantes pour toujours. La fonction
+                     * existait, mais aucun bouton n'y menait — elle ne se
+                     * déclenchait qu'en passant par « Redresser », qui bouge
+                     * la géométrie des murs par-dessus le marché.
+                     */
+                    label: 'Redétecter les pièces',
+                    icon: 'piece' as const,
+                    hint:
+                      'Recherche les espaces clos, les nomme et les cote. ' +
+                      'Les noms donnés à la main sont gardés.',
+                    onPress: () => {
+                      useScanStore.getState().redetectRooms();
+                      haptic('succes');
+                    },
+                  },
+                  {
                     label: 'Ajouter un mur',
                     icon: 'regle' as const,
                     hint: 'Un mètre au centre du plan, à tirer par ses coins.',

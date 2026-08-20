@@ -1481,7 +1481,9 @@ export const useScanStore = create<ScanState>((set, get) => {
       // Le graphe a pu changer (cloison ajoutée, coin déplacé) : on le
       // renettoie avant d'y rechercher les faces.
       const walls = mergeColinear(splitAtJunctions(weldCorners(st.walls)));
-      const shapes = detectRooms(walls);
+      // Les menuiseries départagent une petite PIÈCE d'une gaine technique :
+      // ce qui s'ouvre est une pièce, si petit soit-il.
+      const shapes = detectRooms(walls, undefined, st.openings);
       if (shapes.length === 0) return;
       /**
        * Le graphe vient d'être recousu : un mur coupé en deux ne garde son
@@ -2421,7 +2423,7 @@ export const useScanStore = create<ScanState>((set, get) => {
 
       // Détection automatique : les pièces sont les faces du graphe des murs.
       // Si rien ne se referme (scan trop partiel), tout tient en une pièce.
-      const detected = detectRooms(walls);
+      const detected = detectRooms(walls, undefined, openings);
       const shapes =
         detected.length > 0
           ? detected

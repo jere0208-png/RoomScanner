@@ -1652,3 +1652,119 @@ describe('ajouter un mur à la main', () => {
     expect(useScanStore.getState().walls).toHaveLength(avant);
   });
 });
+
+/**
+ * LE RECOIN TECHNIQUE SE POCHE EN NOIR.
+ *
+ * Relevé du patron : « quand il y a 4 murs qui encerclent un recoin vide
+ * (ici sous les WC, c'était une épaisseur pour les gaines), il doit être
+ * rempli de noir pour ne pas confondre avec une pièce ». Un vide blanc au
+ * milieu d'un plan se lit comme une pièce qu'on aurait oublié de nommer.
+ */
+describe('le recoin technique du plan', () => {
+  const mur = (id: string, ax: number, az: number, bx: number, bz: number) => ({
+    id,
+    type: 'wall' as const,
+    a: { x: ax, z: az },
+    b: { x: bx, z: bz },
+    height: 2.5,
+    yCenter: 1.25,
+  });
+
+  it('se remplit du noir de la maçonnerie', () => {
+    let tree!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      useScanStore.setState({
+        screen: 'result',
+        scanName: 'Gaine',
+        walls: [
+          // La pièce, avec sa porte.
+          mur('n', 0, 0, 4, 0),
+          mur('e', 4, 0, 4, 3),
+          mur('s', 4, 3, 0, 3),
+          mur('w', 0, 3, 0, 0),
+          // Et le coffre de gaines, collé dans l'angle : quatre murs, rien
+          // qui s'ouvre.
+          mur('g1', 4, 0, 4.5, 0),
+          mur('g2', 4.5, 0, 4.5, 0.8),
+          mur('g3', 4.5, 0.8, 4, 0.8),
+        ],
+        openings: [
+          {
+            id: 'p1',
+            type: 'door' as const,
+            a: { x: 1, z: 0 },
+            b: { x: 1.9, z: 0 },
+            height: 2.04,
+            yCenter: 1.02,
+          },
+        ],
+        objects: [],
+        rooms: [{ id: 'r1', name: 'Séjour', floor: null }],
+        fixtures: [],
+        ceiling: [],
+        photos: [],
+      });
+      tree = TestRenderer.create(<ResultScreen />);
+    });
+    act(() => {
+      for (const n of tree.root.findAllByType(View)) {
+        if (typeof n.props.onLayout === 'function') {
+          n.props.onLayout({ nativeEvent: { layout: { width: 390, height: 520 } } });
+        }
+      }
+    });
+    arbre = tree;
+    // Le poché : un polygone plein, de l'encre des murs.
+    const massifs = tree.root
+      .findAllByType(Polygon)
+      .filter((n) => n.props.fill === light.ink && !n.props.stroke);
+    expect(massifs.length).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * RELANCER LA DÉTECTION SUR UN PLAN DÉJÀ FAIT.
+ *
+ * Sans ce geste, un correctif de détection ne profite qu'aux scans à
+ * VENIR : les dossiers déjà relevés gardent leurs pièces manquantes pour
+ * toujours. `redetectRooms` existait, mais aucun bouton n'y menait — il ne
+ * se déclenchait qu'en passant par « Redresser », qui bouge la géométrie.
+ */
+describe('redétecter les pièces', () => {
+  it('est offert dans le menu du scan', () => {
+    const tree = monter();
+    act(() => bouton(tree, 'Plus')!.props.onPress());
+    expect(textes(tree)).toContain('Redétecter les pièces');
+  });
+
+  it('retrouve une pièce que l’ancienne détection avait ratée', () => {
+    // Un WC de 0,90 × 1,30 avec sa porte : sous l'ancien seuil de 1,2 m².
+    act(() => {
+      useScanStore.setState({
+        screen: 'result',
+        scanName: 'WC',
+        walls: [
+          { id: 'n', type: 'wall', a: { x: 0, z: 0 }, b: { x: 0.9, z: 0 }, height: 2.5, yCenter: 1.25 },
+          { id: 'e', type: 'wall', a: { x: 0.9, z: 0 }, b: { x: 0.9, z: 1.3 }, height: 2.5, yCenter: 1.25 },
+          { id: 's', type: 'wall', a: { x: 0.9, z: 1.3 }, b: { x: 0, z: 1.3 }, height: 2.5, yCenter: 1.25 },
+          { id: 'w', type: 'wall', a: { x: 0, z: 1.3 }, b: { x: 0, z: 0 }, height: 2.5, yCenter: 1.25 },
+        ],
+        openings: [
+          { id: 'p', type: 'door', a: { x: 0.1, z: 0 }, b: { x: 0.8, z: 0 }, height: 2.04, yCenter: 1.02 },
+        ],
+        objects: [],
+        rooms: [],
+        fixtures: [],
+        ceiling: [],
+        photos: [],
+      });
+    });
+    useScanStore.getState().redetectRooms();
+    const pieces = useScanStore.getState().rooms;
+    expect(pieces).toHaveLength(1);
+    // Et elle porte un nom : « chaque pièce doit avoir son nom et sa
+    // surface » — sans nom, le cartouche du plan reste muet.
+    expect(pieces[0].name).toBeTruthy();
+  });
+});

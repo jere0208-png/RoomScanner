@@ -28,6 +28,8 @@ import {
   quadPoints,
   roomExtent,
   roomOf,
+  massifsTechniques,
+  pivotsDesBattants,
   roomParts,
   segLength,
   toFootprint,
@@ -861,6 +863,30 @@ export function FloorplanEditor({
     poignée de comparaisons, et le résultat décide de ce qu'on dessine.
   */
   const trous = useMemo(() => trousDuRelevé(walls), [walls]);
+  /*
+    Les recoins techniques : les faces closes que rien n'ouvre. Ce sont
+    elles qu'on poche en noir, pour qu'aucun vide blanc ne se fasse passer
+    pour une pièce.
+  */
+  const massifs = useMemo(
+    () => massifsTechniques(walls, openings),
+    [walls, openings],
+  );
+  /*
+    De quel bout chaque porte pivote : le choix se fait sur TOUTES les
+    portes à la fois, pour qu'aucune paire de battants ne se croise.
+  */
+  const pivots = useMemo(
+    () =>
+      pivotsDesBattants(
+        openings.filter((o) => o.type === 'door').map((o) => ({
+          id: o.id,
+          a: o.a,
+          b: o.b,
+        })),
+      ),
+    [openings],
+  );
 
   /**
    * Le contour à l'écran de la pièce choisie, retenu pour le geste.
@@ -1174,6 +1200,30 @@ export function FloorplanEditor({
                 pointerEvents="none"
               />
             )}
+
+            {/*
+              LES RECOINS TECHNIQUES, POCHÉS COMME DE LA MAÇONNERIE.
+
+              Relevé du patron : « quand il y a 4 murs qui encerclent un
+              recoin vide, il doit être rempli de noir pour ne pas confondre
+              avec une pièce ». Un vide blanc au milieu d'un plan se lit
+              comme une pièce qu'on aurait oublié de nommer — alors que
+              c'est du plein : une gaine, un coffre, l'épaisseur entre deux
+              cloisons. On ne s'y pose rien et on n'y perce pas.
+
+              Ils passent SOUS les murs : leur poché rejoint celui de la
+              maçonnerie sans jamais mordre sur ses arêtes.
+            */}
+            {massifs.map((contour, i) => (
+              <Polygon
+                key={`massif-${i}`}
+                points={contour
+                  .map((p) => mapping.toPx(p))
+                  .map((p) => `${p.x},${p.y}`)
+                  .join(' ')}
+                fill={c.ink}
+              />
+            ))}
 
             {/* Murs : corps poché aux jonctions d'onglet */}
             {walls.map((w) => (
@@ -1566,11 +1616,23 @@ export function FloorplanEditor({
                 if ((dedans.x - mx) * n.x + (dedans.y - my) * n.y < 0) {
                   n = { x: -n.x, y: -n.y };
                 }
-                const pivot = a;
+                /*
+                  LE PIVOT N'EST PLUS LE PREMIER BOUT VENU.
+
+                  Il l'était : celui que le scan avait livré en premier. Deux
+                  portes voisines tombant du même côté, leurs quarts de
+                  cercle se croisaient — le plan racontait un contact qui
+                  n'existe pas. `pivotsDesBattants` les range dos à dos.
+                */
+                const cote = pivots.get(o.id) === 'b' ? b : a;
+                const opp = cote === a ? b : a;
+                const pivot = cote;
                 const bout = { x: pivot.x + n.x * r, y: pivot.y + n.y * r };
                 // Sens de l'arc : celui qui ramène le battant sur le dormant.
-                const croix = n.x * ey - n.y * ex;
-                return { pivot, bout, autre: b, r, sens: croix > 0 ? 1 : 0 };
+                const ax = opp.x - pivot.x;
+                const ay = opp.y - pivot.y;
+                const croix = n.x * ay - n.y * ax;
+                return { pivot, bout, autre: opp, r, sens: croix > 0 ? 1 : 0 };
               })();
               return (
                 <G

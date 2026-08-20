@@ -145,6 +145,55 @@ L'outil « pièces » de la barre du plan relance la détection sur le graphe
 courant, en **gardant les noms donnés à la main** : chaque nouvelle pièce
 hérite du nom de l'ancienne dont le point de cartouche tombe dedans.
 
+### Ce qui fait une pièce, c'est la porte — pas la surface
+
+Relevé du chantier, sur un scan « Dégagement + WC » : « il y a un espace en
+haut à gauche vide sur le plan, c'est les WC, pourtant c'est un espace clos
+avec une porte, on doit le détecter dans sa surface. Chaque pièce doit avoir
+son nom et sa surface. »
+
+La cause tenait dans un nombre. La détection jetait toute face de moins de
+**1,2 m²** — c'est-à-dire exactement la taille d'un WC (0,90 × 1,30 =
+1,17 m²). Le seuil de surface était le mauvais critère : il ne distingue pas
+un WC d'une gaine technique, il exclut simplement tout ce qui est petit.
+
+Le bon critère est la **porte**. Une pièce, si exiguë soit-elle, s'ouvre ;
+une gaine, jamais. `detectRooms` reçoit donc les menuiseries et garde toute
+face qui porte une ouverture, quelle que soit sa taille — le seuil ne sert
+plus qu'à écarter le bruit (0,5 m²). Une grande face sans ouverture reste
+une pièce, en revanche : c'est le scan qui a raté sa porte, pas la pièce qui
+n'existe pas (`AIRE_SANS_PORTE`, deux mètres carrés).
+
+**Et le recoin technique se poche en noir.** Relevé du patron : « quand il y
+a 4 murs qui encerclent un recoin vide (ici sous les WC, c'était une
+épaisseur pour les gaines), il doit être rempli de noir pour ne pas
+confondre avec une pièce ». Un vide blanc au milieu d'un plan se lit comme
+une pièce qu'on aurait oublié de nommer — alors que c'est du plein, un
+endroit où l'on ne pose rien et où l'on ne perce pas. `massifsTechniques`
+rend ces faces closes que rien n'ouvre ; elles se pochent de l'encre des
+murs, à l'écran **et** dans le PDF. Le parcours des faces a été extrait de
+la détection pour cela (`facesFermees`) : on énumère d'un côté, on décide de
+l'autre — et le recoin, écarté, n'existait pour personne.
+
+**Deux portes ne s'ouvrent plus l'une dans l'autre.** Relevé : « les portes
+s'entre-touchent alors qu'en réalité, ça ne se touche pas ». Le battant
+pivotait toujours sur le PREMIER bout du dormant, un choix hérité de l'ordre
+des points du scan : deux portes voisines tombant du même côté croisaient
+leurs quarts de cercle, et le plan racontait un contact qui n'existe pas —
+sur un plan d'électricien, c'est là qu'on décide où poser un interrupteur.
+Le relevé ne dit pas de quel côté une porte s'ouvre ; autant choisir le sens
+qui ne ment pas. `pivotsDesBattants` range les battants **dos à dos**, en
+deux passes pour que le résultat ne dépende pas de l'ordre de lecture et
+reste stable d'une image à l'autre.
+
+**Enfin, la détection se relance sur un plan déjà fait.** Sans quoi tout ce
+qui précède ne profiterait qu'aux scans à VENIR : les dossiers déjà relevés
+garderaient leurs pièces manquantes pour toujours. `redetectRooms` existait
+depuis longtemps, mais **aucun bouton n'y menait** — elle ne se déclenchait
+qu'en passant par « Redresser », qui bouge la géométrie par-dessus le
+marché. « Redétecter les pièces » vit maintenant dans le menu du scan, et
+garde les noms donnés à la main.
+
 ### La porte que le scan n'a pas vue
 
 Relevé du chantier, mot pour mot : « le scan n'a pas su capter une porte, je

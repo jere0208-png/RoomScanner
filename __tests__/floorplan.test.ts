@@ -20,6 +20,8 @@ import {
   splitAtJunctions,
   straightenWalls,
   toFootprint,
+  massifsTechniques,
+  pivotsDesBattants,
   toSegment,
   totalArea,
   trousDuRelevé,
@@ -1699,5 +1701,125 @@ describe('les trous du relevé', () => {
   it('ne rend qu’UNE fois le même trou', () => {
     const murs = [mur('a', 0, 0, 3, 0), mur('b', 3.8, 0, 6, 0)];
     expect(trousDuRelevé(murs)).toHaveLength(1);
+  });
+});
+
+/**
+ * UN WC EST UNE PIÈCE, UNE GAINE N'EN EST PAS UNE.
+ *
+ * Relevé du chantier, sur un scan « Dégagement + WC » : « il y a un espace
+ * en haut à gauche vide sur le plan, c'est les WC, pourtant c'est un espace
+ * clos avec une porte, on doit le détecter dans sa surface. Chaque pièce
+ * doit avoir son nom et sa surface. »
+ *
+ * La cause tenait dans un nombre : la détection jetait toute face de moins
+ * de 1,2 m² — c'est-à-dire EXACTEMENT la taille d'un WC (0,90 × 1,30). Le
+ * seuil de surface était le mauvais critère ; le bon est la PORTE. Une
+ * pièce, si petite soit-elle, s'ouvre ; une gaine technique, non.
+ */
+describe('les petites pièces et les gaines', () => {
+  const mur = (id: string, ax: number, az: number, bx: number, bz: number): WallSeg => ({
+    id,
+    type: 'wall',
+    a: { x: ax, z: az },
+    b: { x: bx, z: bz },
+    height: 2.5,
+    yCenter: 1.25,
+  });
+
+  /** Un WC de 0,90 × 1,30 — 1,17 m², sous l'ancien seuil. */
+  const WC = [
+    mur('n', 0, 0, 0.9, 0),
+    mur('e', 0.9, 0, 0.9, 1.3),
+    mur('s', 0.9, 1.3, 0, 1.3),
+    mur('w', 0, 1.3, 0, 0),
+  ];
+  const PORTE: WallSeg = {
+    id: 'p',
+    type: 'door',
+    a: { x: 0.1, z: 0 },
+    b: { x: 0.8, z: 0 },
+    height: 2.04,
+    yCenter: 1.02,
+  };
+
+  it('reconnaît un WC de 1,17 m², parce qu’il a une porte', () => {
+    const pieces = detectRooms(WC, 0.5, [PORTE]);
+    expect(pieces).toHaveLength(1);
+    expect(pieces[0].area).toBeCloseTo(1.17, 2);
+  });
+
+  it('mais laisse la gaine technique de côté : rien ne s’y ouvre', () => {
+    // La même boîte, sans porte : c'est un vide de construction.
+    expect(detectRooms(WC, 0.5, [])).toHaveLength(0);
+  });
+
+  it('une grande face sans porte reste une pièce : le scan a raté la sienne', () => {
+    const grande = [
+      mur('n2', 0, 0, 3, 0),
+      mur('e2', 3, 0, 3, 3),
+      mur('s2', 3, 3, 0, 3),
+      mur('w2', 0, 3, 0, 0),
+    ];
+    expect(detectRooms(grande, 0.5, [])).toHaveLength(1);
+  });
+
+  /**
+   * ET LE RECOIN SE POCHE EN NOIR — relevé du patron : « quand il y a 4
+   * murs qui encerclent un recoin vide (ici sous les WC, c'était une
+   * épaisseur pour les gaines), il doit être rempli de noir pour ne pas
+   * confondre avec une pièce ». Un vide blanc au milieu d'un plan se lit
+   * comme une pièce qu'on aurait oublié de nommer.
+   */
+  it('rend les recoins techniques, pour les pocher', () => {
+    const massifs = massifsTechniques(WC, []);
+    expect(massifs).toHaveLength(1);
+    expect(massifs[0].length).toBeGreaterThanOrEqual(4);
+    // Avec sa porte, ce n'est plus un massif : c'est le WC.
+    expect(massifsTechniques(WC, [PORTE])).toHaveLength(0);
+  });
+});
+
+/**
+ * DEUX PORTES NE S'OUVRENT PAS L'UNE DANS L'AUTRE.
+ *
+ * Relevé du chantier : « les portes s'entre-touchent alors qu'en réalité,
+ * ça ne se touche pas pour celle des WC et celle en face à droite ». Le
+ * battant était toujours pivoté sur le PREMIER bout du dormant — un choix
+ * arbitraire, hérité de l'ordre des points du scan. Quand deux portes
+ * voisines tombaient du même côté, leurs quarts de cercle se croisaient et
+ * le plan racontait un contact qui n'existe pas.
+ *
+ * Le scan ne dit pas de quel côté une porte s'ouvre : c'est une information
+ * qu'on n'a pas. Autant, alors, choisir celle qui ne ment pas — les portes
+ * se rangent dos à dos, comme on les pose.
+ */
+describe('le sens d’ouverture des portes', () => {
+  it('écarte deux battants qui se croiseraient', () => {
+    const portes = [
+      // Celle des WC, sur le mur du haut.
+      { id: 'wc', a: { x: 0, z: 0 }, b: { x: 0.9, z: 0 } },
+      // Celle d'en face, sur le retour de droite, tout près.
+      { id: 'face', a: { x: 1.1, z: 0.6 }, b: { x: 1.1, z: 1.5 } },
+    ];
+    const pivots = pivotsDesBattants(portes);
+    // Chacune pivote du côté le plus éloigné de l'autre.
+    expect(pivots.get('wc')).toBe('a');
+    expect(pivots.get('face')).toBe('b');
+  });
+
+  it('laisse une porte seule sur son premier bout', () => {
+    const seule = [{ id: 'p', a: { x: 0, z: 0 }, b: { x: 0.9, z: 0 } }];
+    expect(pivotsDesBattants(seule).get('p')).toBe('a');
+  });
+
+  it('ne dérange pas deux portes qui ne se gênent pas', () => {
+    const loin = [
+      { id: 'p1', a: { x: 0, z: 0 }, b: { x: 0.9, z: 0 } },
+      { id: 'p2', a: { x: 6, z: 0 }, b: { x: 6.9, z: 0 } },
+    ];
+    const pivots = pivotsDesBattants(loin);
+    expect(pivots.get('p1')).toBe('a');
+    expect(pivots.get('p2')).toBe('a');
   });
 });

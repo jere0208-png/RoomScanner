@@ -17,6 +17,8 @@ import {
   roomParts,
   segLength,
   toFootprint,
+  massifsTechniques,
+  pivotsDesBattants,
   wallAreaM2,
   wallQuads,
   WALL_T,
@@ -1506,6 +1508,25 @@ function planPage(
       if (q) d.poly(quadPoints(q).map(px), INK, null);
     }
 
+    /*
+      LES RECOINS TECHNIQUES, POCHÉS COMME LA MAÇONNERIE — la même encre
+      qu'à l'écran. Un vide blanc au milieu d'un plan imprimé se lit comme
+      une pièce qu'on aurait oublié de nommer ; c'est du plein.
+    */
+    for (const contour of massifsTechniques(walls, openings)) {
+      d.poly(contour.map(px), INK, null);
+    }
+
+    /*
+      DE QUEL BOUT CHAQUE PORTE PIVOTE : le même calcul qu'à l'écran, pour
+      que deux battants voisins ne se croisent pas sur le papier non plus.
+    */
+    const pivotsPorte = pivotsDesBattants(
+      openings
+        .filter((o) => o.type === 'door')
+        .map((o) => ({ id: o.id, a: o.a, b: o.b })),
+    );
+
     // Ouvertures : trouée blanche + symbole
     for (const o of openings) {
       const room = roomOf(o);
@@ -1536,16 +1557,20 @@ function planPage(
       }
 
       if (o.type === 'door') {
-        // Battant + arc d'ouverture (charnière en A)
-        const leafEnd = { x: o.a.x + inx * len, z: o.a.z + inz * len };
-        d.line(px(o.a).x, px(o.a).y, px(leafEnd).x, px(leafEnd).y, 1.4,
+        // Battant + arc d'ouverture, sur la charnière CHOISIE : deux
+        // portes en vis-à-vis se rangent dos à dos plutôt que de croiser
+        // leurs quarts de cercle.
+        const gond = pivotsPorte.get(o.id) === 'b' ? o.b : o.a;
+        const opp = gond === o.a ? o.b : o.a;
+        const leafEnd = { x: gond.x + inx * len, z: gond.z + inz * len };
+        d.line(px(gond).x, px(gond).y, px(leafEnd).x, px(leafEnd).y, 1.4,
                colorOpenings ? AMBER : GREY);
         const arc: Pt[] = [];
-        const a0 = Math.atan2(dz, dx);
+        const a0 = Math.atan2(opp.z - gond.z, opp.x - gond.x);
         const a1 = Math.atan2(inz, inx);
         for (let i = 0; i <= 10; i++) {
           const t = a0 + ((a1 - a0) * i) / 10;
-          arc.push(px({ x: o.a.x + Math.cos(t) * len, z: o.a.z + Math.sin(t) * len }));
+          arc.push(px({ x: gond.x + Math.cos(t) * len, z: gond.z + Math.sin(t) * len }));
         }
         d.path(arc, 0.8, GREY);
       } else {

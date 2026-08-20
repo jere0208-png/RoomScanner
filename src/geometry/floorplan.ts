@@ -2104,22 +2104,74 @@ function signedArea(pts: Pt[]): number {
 }
 
 /**
- * Découpe le plan en pièces, tout seul.
+ * DE QUEL BOUT CHAQUE PORTE PIVOTE — pour que deux battants ne se croisent
+ * jamais.
  *
- * Un appartement scanné d'une traite est UN graphe de murs : les pièces en
- * sont les faces. On les énumère par le parcours classique des faces d'un
- * graphe planaire — à chaque nœud, on repart par l'arête qui suit
- * immédiatement, dans le sens horaire, celle par laquelle on est arrivé. Le
- * parcours ferme naturellement chaque pièce, et la face extérieure (le tour
- * de l'appartement) sort avec l'orientation inverse : c'est à ça qu'on la
- * reconnaît et qu'on la jette.
+ * Relevé du chantier : « les portes s'entre-touchent alors qu'en réalité,
+ * ça ne se touche pas ». Le battant pivotait toujours sur le PREMIER bout
+ * du dormant — un choix arbitraire, hérité de l'ordre des points que le
+ * scan a livrés. Deux portes voisines tombant du même côté, leurs quarts
+ * de cercle se croisaient : le plan racontait un contact qui n'existe pas,
+ * et sur un plan d'électricien c'est un mensonge coûteux — c'est là qu'on
+ * décide où poser un interrupteur.
  *
- * Un refend appartient donc à deux pièces à la fois — d'où `wallIds` plutôt
- * qu'un `roomId` posé sur le mur. Les murs qui ne ferment rien (bouts
- * pendants, cloison isolée) ne créent pas de pièce : le parcours les longe
- * à l'aller et au retour, leur contribution à l'aire est nulle.
+ * Le relevé ne dit pas de quel côté une porte s'ouvre : cette information,
+ * on ne l'a pas. Autant choisir celle qui ne ment pas — les battants se
+ * rangent dos à dos, comme on pose des portes en vis-à-vis.
+ *
+ * Deux passes suffisent : une gloutonne, puis une qui réexamine chaque
+ * porte en tenant compte de toutes les autres. Le résultat ne dépend pas
+ * de l'ordre de lecture, et il est stable d'une image à l'autre — un
+ * battant qui saute de côté au moindre zoom serait pire que le croisement.
  */
-export function detectRooms(walls: WallSeg[], minArea = 1.2): DetectedRoom[] {
+export function pivotsDesBattants(
+  portes: { id: string; a: Pt; b: Pt }[],
+): Map<string, 'a' | 'b'> {
+  const choix = new Map<string, 'a' | 'b'>(portes.map((p) => [p.id, 'a']));
+  const rayon = (p: { a: Pt; b: Pt }) =>
+    Math.hypot(p.b.x - p.a.x, p.b.z - p.a.z);
+  const pivotDe = (p: { id: string; a: Pt; b: Pt }) =>
+    choix.get(p.id) === 'b' ? p.b : p.a;
+  /** Ce que ce pivot coûte : la somme des empiètements sur les voisines. */
+  const gene = (p: { id: string; a: Pt; b: Pt }, bout: 'a' | 'b') => {
+    const moi = bout === 'a' ? p.a : p.b;
+    const r = rayon(p);
+    let somme = 0;
+    for (const autre of portes) {
+      if (autre.id === p.id) continue;
+      const lui = pivotDe(autre);
+      const d = Math.hypot(lui.x - moi.x, lui.z - moi.z);
+      somme += Math.max(0, r + rayon(autre) - d);
+    }
+    return somme;
+  };
+  for (let passe = 0; passe < 2; passe++) {
+    for (const p of portes) {
+      const coutA = gene(p, 'a');
+      const coutB = gene(p, 'b');
+      // À égalité, on garde le premier bout : c'est le dessin d'avant, et
+      // rien ne justifie de le changer.
+      choix.set(p.id, coutB < coutA - 1e-9 ? 'b' : 'a');
+    }
+  }
+  return choix;
+}
+
+/**
+ * TOUTES LES FACES FERMÉES du graphe des murs, sans le moindre tri.
+ *
+ * Le parcours vivait dans `detectRooms`, qui filtrait dans la foulée : les
+ * recoins techniques, écartés, n'existaient donc nulle part — impossible de
+ * les pocher en noir. On sépare : ici on ÉNUMÈRE, ailleurs on décide de ce
+ * qu'est une pièce.
+ *
+ * À chaque nœud, on repart par l'arête qui suit immédiatement, dans le sens
+ * horaire, celle par laquelle on est arrivé. Le parcours ferme chaque face
+ * tout seul, et le contour extérieur sort à l'envers : c'est à son aire
+ * négative qu'on le reconnaît, et qu'on le jette.
+ */
+export function facesFermees(walls: WallSeg[]): DetectedRoom[] {
+
   interface HalfEdge {
     wallId: string;
     from: Pt;
@@ -2187,8 +2239,119 @@ export function detectRooms(walls: WallSeg[], minArea = 1.2): DetectedRoom[] {
   // Les faces intérieures tournent toutes dans le même sens ; le contour
   // extérieur, lui, sort à l'envers.
   return faces
-    .filter((f) => f.area > 0 && f.area >= minArea)
-    .map((f) => ({ outline: f.pts, wallIds: f.wallIds, area: f.area }))
+    .filter((f) => f.area > 0)
+    .map((f) => ({ outline: f.pts, wallIds: f.wallIds, area: f.area }));
+}
+
+/**
+ * Au-delà de cette surface, une face sans ouverture reste une pièce.
+ *
+ * En dessous, c'est un vide de construction : une gaine technique, un
+ * coffre, l'épaisseur entre deux cloisons. Deux mètres carrés : plus grand
+ * que tout local technique d'appartement, et de toute façon le plus exigu
+ * des WC a sa porte pour lui.
+ */
+const AIRE_SANS_PORTE = 2;
+
+/** Les murs sur lesquels une menuiserie est posée : porte, fenêtre, baie. */
+function mursOuverts(walls: WallSeg[], openings: WallSeg[]): Set<string> {
+  const out = new Set<string>();
+  for (const o of openings) {
+    const mid = { x: (o.a.x + o.b.x) / 2, z: (o.a.z + o.b.z) / 2 };
+    const lo = segLength(o) || 1;
+    const uo = { x: (o.b.x - o.a.x) / lo, z: (o.b.z - o.a.z) / lo };
+    let best: { id: string; dist: number } | null = null;
+    for (const w of walls) {
+      const lw = segLength(w) || 1;
+      const uw = { x: (w.b.x - w.a.x) / lw, z: (w.b.z - w.a.z) / lw };
+      // Parallèle à moins de ~25°, et posée à même le mur : la même règle
+      // que le percement du modèle 3D (`assignOpenings`).
+      if (Math.abs(uo.x * uw.x + uo.z * uw.z) < 0.9) continue;
+      const { dist } = pointOnSeg(mid, w.a, w.b);
+      if (dist > 0.6) continue;
+      if (!best || dist < best.dist) best = { id: w.id, dist };
+    }
+    if (best) out.add(best.id);
+  }
+  return out;
+}
+
+/**
+ * LES RECOINS TECHNIQUES — à pocher en noir, pas à nommer.
+ *
+ * Relevé du patron : « quand il y a 4 murs qui encerclent un recoin vide
+ * (ici sous les WC, c'était une épaisseur pour les gaines), il doit être
+ * rempli de noir pour ne pas confondre avec une pièce ». Un vide blanc au
+ * milieu d'un plan se lit comme une pièce qu'on aurait oublié de nommer —
+ * alors que c'est du plein, de la maçonnerie, un endroit où l'on ne pose
+ * rien et où l'on ne perce pas.
+ *
+ * Ce sont exactement les faces que la détection écarte : closes, petites,
+ * et sans la moindre ouverture.
+ */
+export function massifsTechniques(
+  walls: WallSeg[],
+  openings: WallSeg[],
+): Pt[][] {
+  /*
+    LE GRAPHE SE RECOUD D'ABORD. Un coffre de gaines s'appuie contre un mur
+    sans le couper : tant que ce point de contact n'est pas un nœud, aucune
+    face ne passe par lui et le recoin n'existe pour personne. C'est le même
+    nettoyage que la détection des pièces fait avant de chercher ses faces.
+  */
+  const propres = splitAtJunctions(weldCorners(walls));
+  const ouverts = mursOuverts(propres, openings);
+  return facesFermees(propres)
+    .filter(
+      (f) =>
+        f.area > 0.02 &&
+        f.area < AIRE_SANS_PORTE &&
+        !f.wallIds.some((id) => ouverts.has(id)),
+    )
+    .map((f) => f.outline);
+}
+
+/**
+ * Découpe le plan en pièces, tout seul.
+ *
+ * Un appartement scanné d'une traite est UN graphe de murs : les pièces en
+ * sont les faces. On les énumère par le parcours classique des faces d'un
+ * graphe planaire — à chaque nœud, on repart par l'arête qui suit
+ * immédiatement, dans le sens horaire, celle par laquelle on est arrivé. Le
+ * parcours ferme naturellement chaque pièce, et la face extérieure (le tour
+ * de l'appartement) sort avec l'orientation inverse : c'est à ça qu'on la
+ * reconnaît et qu'on la jette.
+ *
+ * Un refend appartient donc à deux pièces à la fois — d'où `wallIds` plutôt
+ * qu'un `roomId` posé sur le mur. Les murs qui ne ferment rien (bouts
+ * pendants, cloison isolée) ne créent pas de pièce : le parcours les longe
+ * à l'aller et au retour, leur contribution à l'aire est nulle.
+ *
+ * CE QUI FAIT UNE PIÈCE, C'EST LA PORTE — pas la surface.
+ *
+ * Relevé du chantier, sur un « Dégagement + WC » : « il y a un espace vide
+ * sur le plan, c'est les WC, pourtant c'est un espace clos avec une porte,
+ * on doit le détecter dans sa surface ». La cause tenait dans un nombre :
+ * on jetait toute face de moins de 1,2 m², c'est-à-dire EXACTEMENT la
+ * taille d'un WC (0,90 × 1,30). Le seuil de surface était le mauvais
+ * critère. Une pièce, si petite soit-elle, S'OUVRE ; une gaine technique,
+ * jamais — et c'est ce qui les sépare vraiment.
+ *
+ * Une grande face sans ouverture reste une pièce, en revanche : c'est le
+ * scan qui a raté sa porte, pas la pièce qui n'existe pas.
+ */
+export function detectRooms(
+  walls: WallSeg[],
+  minArea = 0.5,
+  openings: WallSeg[] = [],
+): DetectedRoom[] {
+  const ouverts = mursOuverts(walls, openings);
+  return facesFermees(walls)
+    .filter(
+      (f) =>
+        f.area >= minArea &&
+        (f.area >= AIRE_SANS_PORTE || f.wallIds.some((id) => ouverts.has(id))),
+    )
     .sort((a, b) => b.area - a.area);
 }
 
