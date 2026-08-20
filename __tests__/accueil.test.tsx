@@ -114,18 +114,29 @@ describe('l’accueil', () => {
         .length,
     ).toBe(1);
     /*
-      ET LA CIBLE DÉBORDE DU ROND — relevé du patron : « le clic doit être
-      mal placé pour que ça active ». Une pastille de 46 points en haut
-      d'écran se rate d'un pouce pressé ; le débord ne change rien au
-      dessin, il élargit la prise, comme partout dans iOS.
+      LA CIBLE EST UNE VRAIE ZONE, PAS UN DÉBORD — relevé du patron, deux
+      fois : « le clic ne fait rien, sauf à un endroit précis ». Le
+      `hitSlop` ne porte que dans les limites du parent ; le bouton est
+      donc un carré invisible d'au moins 56 points, et la pastille blanche
+      de 40 au plus n'est que le dessin en son centre.
     */
-    const slop = pastille.props.hitSlop as
-      | { top: number; bottom: number; left: number; right: number }
-      | undefined;
-    expect(slop).toBeDefined();
-    for (const cote of ['top', 'bottom', 'left', 'right'] as const) {
-      expect(slop![cote]).toBeGreaterThanOrEqual(10);
-    }
+    const stZone = StyleSheet.flatten(pastille.props.style) as {
+      width?: number;
+      height?: number;
+    };
+    expect(stZone.width).toBeGreaterThanOrEqual(56);
+    expect(stZone.height).toBeGreaterThanOrEqual(56);
+    const pastilleBlanche = pastille.findAll((n) => {
+      const st = StyleSheet.flatten(n.props?.style) as
+        | { width?: number; borderRadius?: number }
+        | undefined;
+      return (
+        typeof st?.width === 'number' &&
+        st.width <= 42 &&
+        (st.borderRadius ?? 0) >= 18
+      );
+    });
+    expect(pastilleBlanche.length).toBeGreaterThan(0);
     /*
       ET RIEN NE LE RECOUVRE — relevé du patron : « le clic ne fait rien,
       sauf à un endroit précis en bas à droite ». Le bloc héros, rendu
@@ -211,18 +222,24 @@ describe('l’accueil', () => {
     const stTheme = StyleSheet.flatten(pastilleTheme.props.style) as {
       top?: number;
     };
-    expect(stBloc.top).toBeGreaterThanOrEqual(60);
+    expect(stBloc.top).toBeGreaterThanOrEqual(48);
     /*
-      AXÉS PAR LEURS CENTRES : la pastille du thème est plus PETITE que la
-      ligne du profil (relevé du patron : « réduis le bloc blanc, sans
-      réduire les icônes ») — l'axe se juge donc au milieu, pas au bord.
+      LE CADRE INVISIBLE DU PROFIL — relevé du patron : « un clic même
+      autour doit fonctionner ». Le rembourrage vit DANS le bouton :
+      c'est de la vraie surface de toucher.
     */
+    const stCadre = StyleSheet.flatten(bloc.props.style) as {
+      padding?: number;
+      minHeight?: number;
+    };
+    expect(stCadre.padding ?? 0).toBeGreaterThanOrEqual(10);
+    // AXÉS PAR LEURS CENTRES, cadres compris.
     const stThemeTaille = StyleSheet.flatten(pastilleTheme.props.style) as {
-      width?: number;
       height?: number;
     };
-    expect(stThemeTaille.width).toBeLessThanOrEqual(42);
-    const centreBloc = (stBloc.top ?? 0) + 46 / 2;
+    const centreBloc =
+      (stBloc.top ?? 0) +
+      ((stCadre.minHeight ?? 46) + 2 * (stCadre.padding ?? 0)) / 2;
     const centreTheme =
       (stTheme.top ?? 0) + (stThemeTaille.height ?? 0) / 2;
     expect(Math.abs(centreTheme - centreBloc)).toBeLessThanOrEqual(1);

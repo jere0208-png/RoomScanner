@@ -40,11 +40,9 @@ import {
   PILL_GAP,
   ToolPill,
 } from '../components/ToolPill';
-import {
-  ChevronsUpDown,
-  MoreHorizontal,
-  Share2,
-} from 'lucide-react-native';
+import { ChevronsUpDown } from 'lucide-react-native';
+import Svg, { Path as Trace } from 'react-native-svg';
+import { SOLAIRES } from '../ui/solaires';
 import {
   DEFAULT_VIEW3D,
   Iso3DView,
@@ -1608,7 +1606,11 @@ export function ResultScreen() {
             accessibilityLabel="Exporter"
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             onPress={() => setExporting(true)}>
-            <Share2 size={19} color={teinte.blue} strokeWidth={2.2} />
+            {/* La silhouette Solar : centrée par construction — le dessin
+                lucide flottait au-dessus du centre de sa pastille. */}
+            <Svg width={20} height={20} viewBox="0 0 24 24">
+              <Trace d={SOLAIRES.partage} fill={teinte.blue} fillRule="evenodd" />
+            </Svg>
           </TouchableOpacity>
         )}
         <TouchableOpacity
@@ -1616,7 +1618,9 @@ export function ResultScreen() {
           accessibilityLabel="Plus"
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           onPress={menuDuScan}>
-          <MoreHorizontal size={19} color={teinte.ink} strokeWidth={2.4} />
+          <Svg width={20} height={20} viewBox="0 0 24 24">
+            <Trace d={SOLAIRES.points} fill={teinte.ink} fillRule="evenodd" />
+          </Svg>
         </TouchableOpacity>
       </View>
 

@@ -157,6 +157,11 @@ const getStyles = themedStyles((c: Palette) =>
     width: 36,
     height: 36,
     borderRadius: 18,
+  
+    // Un anneau vide n'a rien a centrer, mais la regle du banc de
+    // centrage vaut pour tous les ronds : uniforme, donc simple.
+    alignItems: 'center',
+    justifyContent: 'center',
   },
     attenteIcone: {
     width: 36,

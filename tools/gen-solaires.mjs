@@ -64,6 +64,9 @@ const CHOIX = {
   //     par le patron : la lune et le soleil du même jeu)
   lune: ['moon-bold'],
   soleil: ['sun-bold', 'sun-2-bold'],
+  // --- l'en-tête de l'écran des résultats
+  partage: ['share-bold', 'square-share-line-bold'],
+  points: ['menu-dots-bold'],
 };
 
 async function tracer(nom) {

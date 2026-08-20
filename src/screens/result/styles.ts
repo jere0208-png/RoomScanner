@@ -246,6 +246,11 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     borderRadius: 60,
     borderWidth: 4.5,
     borderColor: c.blue,
+  
+    // Un anneau vide n'a rien a centrer, mais la regle du banc de
+    // centrage vaut pour tous les ronds : uniforme, donc simple.
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   transitionFill: {
     position: 'absolute',

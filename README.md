@@ -635,6 +635,23 @@ L'histoire du jeu maison reste écrite : il avait été redessiné — vingt
 icônes d'outils, huit de feuilles — selon trois règles, que Solar respecte
 d'office.
 
+**L'en-tête des résultats aussi.** Le partage et le « … » restaient des
+tracés lucide au trait : le partage FLOTTAIT au-dessus du centre de sa
+pastille (relevé du patron, capture à l'appui) — l'optique d'un dessin au
+trait ne se corrige pas à la marge. Les deux passent aux silhouettes
+Solar (`share`, `menu-dots`), centrées par construction. Et un banc
+BALAYEUR est né de cette capture : tout style qui dessine un rond à
+taille fixe doit déclarer son centrage (`alignItems` ET `justifyContent`)
+— il lit le code, comme l'épreuve des boutons muets, et un rond décentré
+ajouté demain le fera tomber.
+
+**Les cibles du bandeau sont de VRAIES zones, pas des débords.** Le
+`hitSlop` ne porte que dans les limites du parent — le bouton de thème est
+resté capricieux après deux correctifs. Il est donc un carré INVISIBLE de
+64 points dont la pastille blanche de 40 n'est que le dessin central, et
+le bloc profil porte son cadre invisible (douze points de rembourrage DANS
+le bouton) : l'avatar, le nom, le grade et tout autour répondent au doigt.
+
 **Un symbole dit sa fonction.** « Repères » était un `+`. « Appareil » aussi :
 deux boutons sans rapport, le même dessin, et aucun des deux ne disait ce
 qu'il faisait. Une icône qu'il faut légender n'est pas une icône, c'est une

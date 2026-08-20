@@ -368,23 +368,27 @@ export function HomeScreen() {
         il le chevauchait : c'est l'ORDRE des frères qui fait l'empilement,
         ce qui flotte au bandeau vient donc après tout le reste.
       */}
+      {/*
+        LA CIBLE EST UNE VRAIE ZONE, pas un débord. Le `hitSlop` ne porte
+        que dans les limites du parent, et le clic restait capricieux —
+        relevé du patron, deux fois. Le bouton est donc un carré INVISIBLE
+        de 64 points, la pastille blanche de 40 dessinée en son centre :
+        ce qu'on vise est petit, ce qu'on touche est large, et plus rien
+        n'en dépend.
+      */}
       <TouchableOpacity
-        style={styles.themeButton}
+        style={styles.themeZone}
         accessibilityLabel={
           themePref === 'dark' ? 'Passer en thème clair' : 'Passer en thème sombre'
         }
-        // La cible déborde du rond — relevé du patron : « le clic doit
-        // être mal placé pour que ça active ». Le débord ne change rien
-        // au dessin, il élargit la prise, comme partout dans iOS.
-        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
         onPress={() => setThemePref(themePref === 'dark' ? 'light' : 'dark')}>
-        <ThemeGlyph
-          quoi={themePref === 'dark' ? 'soleil' : 'lune'}
-          // Grand dans sa pastille : à 21 points, le glyphe était un
-          // pictogramme timide à côté des autres — relevé du patron.
-          size={27}
-          color={c.inkSoft}
-        />
+        <View style={styles.themePastille} pointerEvents="none">
+          <ThemeGlyph
+            quoi={themePref === 'dark' ? 'soleil' : 'lune'}
+            size={27}
+            color={c.inkSoft}
+          />
+        </View>
       </TouchableOpacity>
 
       <MenuCompte visible={menuCompte} fermer={() => setMenuCompte(false)} />
@@ -437,16 +441,20 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   // zIndex/elevation : l'onde d'arrivée pulse AU-DESSUS des cartes suivantes.
   hero: { alignItems: 'center', zIndex: 20, elevation: 20 },
   /*
-    LA PASTILLE EST PETITE, LE GLYPHE RESTE GRAND — relevé du patron :
-    « réduis le bloc blanc, sans réduire les icônes ». Quarante points de
-    rond pour vingt-sept de glyphe : l'icône remplit sa pastille, et la
-    cible du doigt reste large grâce au débord. Le centre s'axe sur la
-    ligne du profil (62 + 23 = 65 + 20).
+    LA ZONE (64, invisible) PORTE LA PASTILLE (40, blanche). Le centre
+    s'axe sur la ligne du profil : 53 + 32 = 85, comme 50 + 35.
   */
-  themeButton: {
+  themeZone: {
     position: 'absolute',
-    top: 65,
-    right: 22,
+    top: 53,
+    right: 10,
+    width: 64,
+    height: 64,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2,
+  },
+  themePastille: {
     width: 40,
     height: 40,
     borderRadius: 20,
@@ -455,7 +463,6 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     shadowOpacity: 0.08,
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 2,
   },
   /**
    * Le logotype tient sur DEUX lignes — « echo » au-dessus de « plan » —,
@@ -481,6 +488,11 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     borderRadius: 38,
     borderWidth: 4,
     borderColor: c.blue,
+  
+    // Un anneau vide n'a rien a centrer, mais la regle du banc de
+    // centrage vaut pour tous les ronds : uniforme, donc simple.
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   /**
    * La vitrine prend la place laissée par les étapes : elle respire, et
@@ -553,17 +565,20 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   },
   // Le bloc profil : en haut à gauche, le miroir du bouton de thème — la
   // même bande, chacun son coin.
-  // Le bandeau du haut est AXÉ : le bloc profil et le bouton de thème
-  // descendent ensemble (top 62) et se centrent sur la même ligne.
+  // Le bandeau du haut est AXÉ, et le profil porte son CADRE INVISIBLE —
+  // relevé du patron : « un clic même autour doit fonctionner ». Le
+  // rembourrage est DANS le bouton : c'est de la vraie surface de toucher,
+  // pas un débord que le parent pourrait rogner.
   profilBloc: {
     position: 'absolute',
-    top: 62,
-    left: 22,
+    top: 50,
+    left: 10,
+    padding: 12,
     minHeight: 46,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 9,
-    maxWidth: '45%',
+    maxWidth: '50%',
     zIndex: 2,
   },
   profilColonne: { flexShrink: 1, alignItems: 'center' },
