@@ -42,7 +42,7 @@ import TestRenderer, { act } from 'react-test-renderer';
 import { LinearGradient, Mask, Stop, Text as SvgText } from 'react-native-svg';
 import { PaywallScreen } from '../src/screens/PaywallScreen';
 import { BadgePro } from '../src/components/BadgePro';
-import { ContourOr, ORS } from '../src/components/ContourOr';
+import { ContourOr, ORS, TexteOr } from '../src/components/ContourOr';
 import { EssaiEpuise } from '../src/components/EssaiEpuise';
 import { SignInScreen } from '../src/screens/SignInScreen';
 import { HomeScreen } from '../src/screens/HomeScreen';
@@ -255,6 +255,55 @@ describe('le badge Pro', () => {
     expect(
       badge.findAllByType(Stop).map((n) => String(n.props.stopColor)),
     ).toEqual([...ORS]);
+  });
+
+  /*
+   * LE BLOC EST BLANC, ET SA TYPO RESPIRE COMME LE BADGE.
+   *
+   * Relevé du patron : « mettre le bloc en blanc et typo animation comme
+   * le badge pro ». La carte du comparatif et le bouton d'abonnement
+   * prennent la peau exacte du badge : couvercle BLANC, et les mots qui
+   * vendent — « Pro », le prix, « S'abonner » — trouées au masque sur la
+   * même bande d'ors qui glisse.
+   */
+  it('le bloc Pro et le bouton sont blancs, à la typo d’or qui respire', () => {
+    const t = monter(<PaywallScreen />);
+    // Les deux contours couvrent BLANC — plus de bleu plein.
+    const contours = t.root.findAllByType(ContourOr);
+    expect(contours).toHaveLength(2);
+    for (const contour of contours) {
+      expect(contour.props.fond).toBe('#FFFFFF');
+    }
+    // La typo d'or : « Pro », le prix, « S'abonner… » au moins.
+    const typos = t.root.findAllByType(TexteOr);
+    expect(typos.length).toBeGreaterThanOrEqual(3);
+    const libelles = typos.map((n) => String(n.props.texte));
+    expect(libelles).toContain('Pro');
+    expect(libelles.some((l) => l.includes('S’abonner'))).toBe(true);
+    for (const typo of typos) {
+      // Le mot se mesure d'abord (une typo a la taille de son texte) : on
+      // donne la mesure, comme le téléphone le ferait.
+      const mesure = typo.findAll(
+        (n) => typeof n.props?.onLayout === 'function',
+      )[0];
+      act(() =>
+        mesure.props.onLayout({
+          nativeEvent: { layout: { width: 120, height: 24 } },
+        }),
+      );
+      // Même famille d'ors, arrêt pour arrêt, et le mot est la TROUÉE du
+      // masque — la recette exacte du badge.
+      const stops = typo
+        .findAllByType(Stop)
+        .map((n) => String(n.props.stopColor));
+      expect(stops).toEqual([...ORS]);
+      const masques = typo.findAllByType(Mask);
+      expect(masques).toHaveLength(1);
+      const lettres = masques[0].findAllByType(SvgText);
+      expect(lettres).toHaveLength(1);
+      expect(lettres[0].props.children).toBe(typo.props.texte);
+      expect(lettres[0].props.fill).toBe('#000000');
+    }
   });
 
   it('les lettres et le contour boivent au même dégradé', () => {

@@ -397,7 +397,9 @@ l'avait déjà écrite.
 - **Le soleil du bouton de thème** (« ☀ ») : iOS le rend en EMOJI COULEUR.
   Un soleil jaune et ombré, au milieu d'une interface dont tous les autres
   pictogrammes sont des traits gris — et un emoji ignore `color`, donc rien ne
-  permettait de le calmer. `ThemeGlyph` dessine le soleil et la lune.
+  permettait de le calmer. `ThemeGlyph` dessine le soleil et la lune — en
+  **27 points** dans leur pastille de 46 : à 21, le glyphe était un
+  pictogramme timide à côté des autres (relevé du patron).
 - **La trouée des ouvrants** n'est pas un caractère, mais elle relevait du
   même à-peu-près : dessinée trois centimètres plus large que le mur DE CHAQUE
   CÔTÉ — seize pour un mur de dix —, elle laissait un liseré clair tout autour
@@ -773,16 +775,22 @@ c'est la VUE qui glisse, au pilote natif — le banc tient la transformation
 animée, la famille monotone (rouge > vert > bleu sur chaque arrêt) et la
 couture.
 
-**Le contour gagne la carte et le bouton.** La carte Pro du comparatif et
-« S'abonner » portent le même contour d'or que le badge : c'est la
-signature du Pro, et elle se lit d'un coup d'œil sur les trois blocs qui le
-vendent. La recette vit dans UN composant (`ContourOr` — la famille d'ors,
-l'épaisseur du trait, le rythme de la vague) que le badge emprunte : trois
+**La carte et le bouton prennent la peau ENTIÈRE du badge.** D'abord son
+contour d'or ; puis, sur relevé du patron, son couvercle BLANC et sa typo
+qui respire : « Pro », le prix et « S'abonner — 4,90 € / mois » sont des
+trouées au masque sur la même bande d'ors qui glisse — la recette exacte
+des lettres du badge, étendue aux mots qui vendent. Les lignes de
+bénéfices, elles, restent à l'encre : on les LIT, on ne les admire pas, et
+de l'or en petit corps maigre ne se lirait plus. La recette vit dans UN
+composant (`ContourOr` : la famille d'ors, l'épaisseur du trait, le rythme
+de la vague, et `TexteOr` pour les mots) que le badge emprunte : des
 dégradés réglés à la main auraient divergé à la première retouche, et le
-banc tient l'unicité arrêt par arrêt. Deux différences avec le badge : la
-bande ne se dessine qu'une fois la taille du bloc connue — une carte a la
-hauteur de son contenu —, et le badge flotte AU-DESSUS du bord de la carte,
-donc HORS de son rognage, sinon sa moitié haute serait coupée.
+banc tient l'unicité arrêt par arrêt. Trois différences mécaniques avec le
+badge : la bande ne se dessine qu'une fois la taille du bloc connue — une
+carte a la hauteur de son contenu, un mot celle de sa police —, un vrai
+`Text` invisible réserve la place du mot et le garde lisible aux lecteurs
+d'écran, et le badge flotte AU-DESSUS du bord de la carte, donc HORS de
+son rognage, sinon sa moitié haute serait coupée.
 
 ### Un relevé interrompu ne se perd plus
 

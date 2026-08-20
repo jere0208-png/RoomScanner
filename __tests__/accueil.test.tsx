@@ -42,6 +42,7 @@ import { HomeScreen } from '../src/screens/HomeScreen';
 import { LogoMark } from '../src/components/LogoMark';
 import { PhoneShowcase } from '../src/components/PhoneShowcase';
 import { GlowButton } from '../src/components/GlowButton';
+import { ThemeGlyph } from '../src/components/ThemeGlyph';
 import { useScanStore } from '../src/store/scanStore';
 import { SHOWCASE_IMAGES } from '../src/assets/showcase';
 import { SHOWCASE_FRAMES } from '../src/export/showcaseFrames';
@@ -88,6 +89,23 @@ const bouton = (t: TestRenderer.ReactTestRenderer, label: string) =>
     .find((n) => (n.props.accessibilityLabel ?? n.props.label) === label);
 
 describe('l’accueil', () => {
+  /*
+   * LE SOLEIL ET LA LUNE SE VOIENT — relevé du patron : « grossis la lune
+   * et le soleil du bouton thème ». Le glyphe faisait 21 points dans une
+   * pastille de 46 : moins de la moitié, un pictogramme timide à côté des
+   * autres. Il en fait 27 — grand dans sa pastille, sans la toucher.
+   */
+  it('porte un glyphe de thème en grand dans sa pastille', () => {
+    const t = monter();
+    const pastille = t.root.findAll((n) =>
+      String(n.props?.accessibilityLabel ?? '').startsWith('Passer en thème'),
+    )[0];
+    expect(pastille).toBeDefined();
+    const glyphe = pastille.findAllByType(ThemeGlyph)[0];
+    expect(glyphe).toBeDefined();
+    expect(glyphe.props.size ?? 21).toBeGreaterThanOrEqual(26);
+  });
+
   it('ne récite plus le mode d’emploi', () => {
     const vu = textes(monter());
     for (const mot of ['Scannez', 'Ajustez', 'Explorez']) {

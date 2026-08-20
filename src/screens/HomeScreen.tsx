@@ -128,6 +128,9 @@ export function HomeScreen() {
         onPress={() => setThemePref(themePref === 'dark' ? 'light' : 'dark')}>
         <ThemeGlyph
           quoi={themePref === 'dark' ? 'soleil' : 'lune'}
+          // Grand dans sa pastille de 46 : à 21 points, le glyphe était un
+          // pictogramme timide à côté des autres — relevé du patron.
+          size={27}
           color={c.inkSoft}
         />
       </TouchableOpacity>

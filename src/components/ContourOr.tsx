@@ -20,11 +20,20 @@ import {
   Animated,
   Easing,
   StyleSheet,
+  Text,
   View,
   type StyleProp,
+  type TextStyle,
   type ViewStyle,
 } from 'react-native';
-import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
+import Svg, {
+  Defs,
+  LinearGradient,
+  Mask,
+  Rect,
+  Stop,
+  Text as SvgText,
+} from 'react-native-svg';
 
 /**
  * La famille d'ors, en boucle : doré, clair, bronze, et retour au doré —
@@ -135,10 +144,140 @@ export function ContourOr({
   );
 }
 
+/**
+ * LA TYPO D'OR — un mot qui respire comme les lettres du badge.
+ *
+ * Même recette exactement : la bande d'ors glisse au fond, et un couvercle
+ * de la couleur du bloc se pose dessus, TROUÉ au masque en forme du mot.
+ * La seule différence avec le badge, c'est que le mot n'a pas de cotes
+ * fixes : un vrai `Text` (invisible, mais lu par les lecteurs d'écran)
+ * réserve la place et donne la mesure, puis le sandwich se dessine dessus.
+ */
+export function TexteOr({
+  texte,
+  taille,
+  graisse = '800',
+  /** La couleur du couvercle : le fond du bloc qui porte le mot. */
+  fond,
+  style,
+}: {
+  texte: string;
+  taille: number;
+  graisse?: TextStyle['fontWeight'];
+  fond: string;
+  style?: StyleProp<ViewStyle>;
+}) {
+  const glisse = useRef(new Animated.Value(0)).current;
+  const [dims, setDims] = useState<{ w: number; h: number } | null>(null);
+
+  useEffect(() => {
+    const boucle = Animated.loop(
+      Animated.timing(glisse, {
+        toValue: 1,
+        duration: DUREE_VAGUE,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }),
+    );
+    boucle.start();
+    return () => boucle.stop();
+  }, [glisse]);
+
+  const periode = dims ? Math.max(60, dims.w) * 4 : 0;
+
+  return (
+    <View style={style}>
+      {/* Le mot réserve sa place et reste lisible aux lecteurs d'écran ;
+          c'est le dessin, par-dessus, qui le montre. */}
+      <Text
+        style={[styles.fantome, { fontSize: taille, fontWeight: graisse }]}
+        numberOfLines={1}
+        onLayout={(e) =>
+          setDims({
+            w: Math.ceil(e.nativeEvent.layout.width),
+            h: Math.ceil(e.nativeEvent.layout.height),
+          })
+        }>
+        {texte}
+      </Text>
+      {dims && (
+        <View
+          style={[StyleSheet.absoluteFill, styles.cadre]}
+          pointerEvents="none">
+          <Animated.View
+            style={{
+              width: periode * 2,
+              height: dims.h,
+              transform: [
+                {
+                  translateX: glisse.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0, -periode],
+                  }),
+                },
+              ],
+            }}>
+            <Svg width={periode * 2} height={dims.h}>
+              <Defs>
+                <LinearGradient id="typo-ors" x1="0" y1="0" x2="1" y2="0">
+                  {ORS.map((teinte, i) => (
+                    <Stop
+                      key={i}
+                      offset={`${Math.round((i / (ORS.length - 1)) * 100)}%`}
+                      stopColor={teinte}
+                    />
+                  ))}
+                </LinearGradient>
+              </Defs>
+              <Rect x={0} width={periode} height={dims.h} fill="url(#typo-ors)" />
+              <Rect
+                x={periode}
+                width={periode}
+                height={dims.h}
+                fill="url(#typo-ors)"
+              />
+            </Svg>
+          </Animated.View>
+          <Svg
+            width={dims.w}
+            height={dims.h}
+            style={StyleSheet.absoluteFill}>
+            <Defs>
+              <Mask id="typo-troue">
+                <Rect width={dims.w} height={dims.h} fill="#FFFFFF" />
+                <SvgText
+                  x={dims.w / 2}
+                  // La ligne de base : au tiers bas du cadratin, comme le
+                  // badge (H/2 + 0,36 × corps).
+                  y={dims.h / 2 + taille * 0.36}
+                  textAnchor="middle"
+                  fontSize={taille}
+                  fontWeight={String(graisse)}
+                  fill="#000000">
+                  {texte}
+                </SvgText>
+              </Mask>
+            </Defs>
+            <Rect
+              width={dims.w}
+              height={dims.h}
+              fill={fond}
+              mask="url(#typo-troue)"
+            />
+          </Svg>
+        </View>
+      )}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   // Le rognage fait la forme : la bande dépasse largement, le bloc la
   // coupe — le bord compris, c'est lui le contour.
   cadre: { overflow: 'hidden' },
   bande: { position: 'absolute', top: 0, left: 0 },
   couvercle: { flex: 1, margin: TRAIT, overflow: 'hidden' },
+  // Le mot fantôme : il réserve la place et parle aux lecteurs d'écran,
+  // le dessin le montre.
+  fantome: { opacity: 0 },
 });

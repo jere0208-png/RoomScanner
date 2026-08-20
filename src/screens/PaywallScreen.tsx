@@ -24,7 +24,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BadgePro } from '../components/BadgePro';
-import { ContourOr } from '../components/ContourOr';
+import { ContourOr, TexteOr } from '../components/ContourOr';
 import { PRIX_PRO, useAccountStore } from '../store/accountStore';
 import { useTheme, type Palette } from '../theme';
 
@@ -98,17 +98,32 @@ export function PaywallScreen() {
             ))}
           </View>
           <View style={s.colonnePro}>
-            {/* La carte qu'on vend porte le contour d'or du badge — la même
-                bande, la même famille, depuis la même source (ContourOr). */}
-            <ContourOr rayon={18} fond={c.blue} style={s.pleine}>
+            {/* La carte qu'on vend a la peau EXACTE du badge : couvercle
+                blanc, contour d'or, et les mots qui vendent — « Pro », le
+                prix — troués sur la même bande qui glisse (ContourOr). Les
+                bénéfices restent à l'encre : on les LIT, on ne les admire
+                pas. */}
+            <ContourOr rayon={18} fond="#FFFFFF" style={s.pleine}>
               <View style={s.carteDedans}>
-                <Text style={[s.carteTitre, s.surBleu]}>Pro</Text>
-                <Text style={[s.cartePrix, s.surBleu]}>
-                  {PRIX_PRO}
-                  <Text style={s.parMois}> / mois</Text>
-                </Text>
+                <TexteOr
+                  texte="Pro"
+                  taille={14}
+                  graisse="700"
+                  fond="#FFFFFF"
+                  style={s.aGauche}
+                />
+                <View style={s.prixRangee}>
+                  <TexteOr texte={PRIX_PRO} taille={26} fond="#FFFFFF" />
+                  <TexteOr
+                    texte="/ mois"
+                    taille={13}
+                    graisse="600"
+                    fond="#FFFFFF"
+                    style={s.parMoisCale}
+                  />
+                </View>
                 {PRO.map((l) => (
-                  <Text key={l} style={[s.ligne, s.surBleu]}>
+                  <Text key={l} style={s.ligne}>
                     ✓ {l}
                   </Text>
                 ))}
@@ -125,11 +140,15 @@ export function PaywallScreen() {
           accessibilityLabel="S’abonner"
           style={({ pressed }) => [s.ctaCadre, pressed && s.enfonce]}
           onPress={acheter}>
-          {/* Le geste qu'on vend porte le même contour d'or que la carte
-              et le badge : c'est la signature du Pro. */}
-          <ContourOr rayon={16} fond={c.blue} style={s.pleine}>
+          {/* Le geste qu'on vend a la peau du badge : blanc, contour d'or,
+              et le mot lui-même respire — c'est la signature du Pro. */}
+          <ContourOr rayon={16} fond="#FFFFFF" style={s.pleine}>
             <View style={s.ctaDedans}>
-              <Text style={s.ctaTexte}>S’abonner — {PRIX_PRO} / mois</Text>
+              <TexteOr
+                texte={`S’abonner — ${PRIX_PRO} / mois`}
+                taille={16.5}
+                fond="#FFFFFF"
+              />
             </View>
           </ContourOr>
         </Pressable>
@@ -203,17 +222,25 @@ const themed = (c: Palette) =>
     colonnePro: { flex: 1 },
     pleine: { flex: 1 },
     carteDedans: { flex: 1, padding: 16, gap: 7 },
+    // La typo d'or épouse la largeur de son mot : sans ça, elle prendrait
+    // toute la colonne et le mot partirait au centre.
+    aGauche: { alignSelf: 'flex-start' },
+    prixRangee: {
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      gap: 4,
+      marginBottom: 4,
+    },
+    // Cale « / mois » sur la ligne de pied du prix, à un cheveu près.
+    parMoisCale: { marginBottom: 3 },
     // La place du badge sur la carte ; sa peau (blanc, or animé) est à lui.
     badge: { position: 'absolute', top: -10, right: 12 },
     carteTitre: { fontSize: 14, fontWeight: '700', color: c.inkSoft },
     cartePrix: { fontSize: 26, fontWeight: '800', color: c.ink, marginBottom: 4 },
-    parMois: { fontSize: 13, fontWeight: '600' },
-    surBleu: { color: '#FFFFFF' },
     ligne: { color: c.ink, fontSize: 13.5, lineHeight: 19 },
     ctaCadre: { marginTop: 24, height: 54 },
     ctaDedans: { flex: 1, alignItems: 'center', justifyContent: 'center' },
     enfonce: { transform: [{ scale: 0.97 }] },
-    ctaTexte: { color: '#FFFFFF', fontSize: 16.5, fontWeight: '800' },
     sansEngagement: {
       color: c.inkFaint,
       fontSize: 12,
