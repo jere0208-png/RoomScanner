@@ -676,9 +676,21 @@ describe('l’espace de travail du plan', () => {
       .find((n) => n.props.accessibilityLabel === 'Passer en 3D');
     expect(pastille).toBeDefined();
     const st = style(pastille!);
-    // Posée SUR le dessin, en haut à droite : elle ne prend aucune bande.
-    expect(st.position).toBe('absolute');
     expect(st.height).toBeLessThanOrEqual(36);
+    // Posée SUR le dessin, en haut à droite, dans la rangée flottante
+    // qu'elle partage avec le contrôle des normes : c'est la RANGÉE qui
+    // porte l'ancrage, les pastilles restent alignées par construction.
+    const rangee = tree.root.findAllByType(View).find((v) => {
+      const s = style(v);
+      return (
+        s?.position === 'absolute' &&
+        s?.flexDirection === 'row' &&
+        v
+          .findAllByType(TouchableOpacity)
+          .some((b) => b.props.accessibilityLabel === 'Passer en 3D')
+      );
+    });
+    expect(rangee).toBeDefined();
     // Et les deux mots du bandeau ont disparu.
     expect(textes(tree)).not.toContain('Plan 2D');
   });

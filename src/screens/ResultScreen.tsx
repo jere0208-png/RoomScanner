@@ -32,7 +32,8 @@ import {
 import { SidePill } from '../components/SidePill';
 import { CeilingBar } from '../components/CeilingBar';
 import { ObjectBar } from '../components/ObjectBar';
-import { poserAuxNormes } from '../geometry/auto';
+import { corrigerConstat, poserAuxNormes } from '../geometry/auto';
+import { ControlePastille } from '../components/ControlePastille';
 import { RoomBar } from '../components/RoomBar';
 import { StripBar } from '../components/StripBar';
 import {
@@ -1107,6 +1108,10 @@ export function ResultScreen() {
         hint: i.regle,
         severity: i.severity as string,
         roomId: i.roomId,
+        // Le sujet et le geste voyagent avec le constat : l'icône de la
+        // ligne et son bouton « corriger » en vivent.
+        code: i.code,
+        fix: i.fix,
       })),
     ],
     [walls, rooms, elecIssues],
@@ -1499,6 +1504,50 @@ export function ResultScreen() {
         'Tout est placé hors meubles et hors menuiseries. À vous de ' +
         'déplacer ce qui ne vous convient pas.',
     );
+  };
+
+  /**
+   * CORRIGER UN CONSTAT — celui que le doigt vient de désigner.
+   *
+   * « Normes auto » refait le logement d'un trait ; ici on guide : la
+   * fenêtre de contrôle liste ce qui manque, et chaque ligne porte son
+   * bouton. La remise à hauteur bouge l'appareil fautif ; la pose trouve
+   * une place libre — hors meubles, hors menuiseries — dans la pièce du
+   * constat. La ligne s'efface alors d'elle-même : les constats se
+   * recalculent à chaque pose, et le décompte dit le travail accompli.
+   */
+  const corriger = (issue: Constat) => {
+    const fix = issue.fix;
+    if (!fix) return;
+    if (fix.type === 'hauteur') {
+      const f = fixtures.find((x) => x.id === fix.fixtureId);
+      if (f) moveFixture(f.id, f.along, fix.height);
+      return;
+    }
+    const res = corrigerConstat(fix, issue.roomId, {
+      rooms: roomInputs.map((r) => {
+        const part = parts.find((p) => p.roomId === r.id);
+        return { ...r, interieur: part?.labelAt ?? { x: 0, z: 0 } };
+      }),
+      walls,
+      openings,
+      objects,
+      fixtures,
+      id: (prefixe) =>
+        `${prefixe}-${Date.now().toString(36)}-${Math.random()
+          .toString(36)
+          .slice(2, 6)}`,
+    });
+    if (!res) {
+      Alert.alert(
+        'Aucune place libre',
+        'Tous les murs de la pièce sont pris — meubles, menuiseries ou ' +
+          'appareils déjà posés. Déplacez un meuble, ou posez l’appareil ' +
+          'à la main où vous avez la place.',
+      );
+      return;
+    }
+    useScanStore.getState().poserDAuto(res.fixtures, res.ceiling);
   };
 
   const menuDuScan = () =>
@@ -2004,15 +2053,27 @@ export function ResultScreen() {
           portée de pouce.
         */}
         {!capturing && (
-          <TouchableOpacity
-            style={styles.vuePastille}
-            accessibilityLabel={vue === '2d' ? 'Passer en 3D' : 'Passer en 2D'}
-            onPress={basculerVue}>
-            <Text style={styles.vuePastilleTexte}>
-              {vue === '2d' ? '2D' : '3D'}
-            </Text>
-            <ChevronsUpDown size={15} color={teinte.inkFaint} strokeWidth={2.4} />
-          </TouchableOpacity>
+          <View style={styles.vueRangee}>
+            {/*
+              LE CONTRÔLE VIT ICI, contre le sélecteur de vue — relevé du
+              patron. C'est un verdict, pas un outil : il se consulte d'un
+              coup d'œil, rouge qui pulse ou vert plein, en 2D comme en 3D,
+              et toujours au même endroit.
+            */}
+            <ControlePastille
+              alertes={alertes}
+              onPress={() => setChecking(true)}
+            />
+            <TouchableOpacity
+              style={styles.vuePastille}
+              accessibilityLabel={vue === '2d' ? 'Passer en 3D' : 'Passer en 2D'}
+              onPress={basculerVue}>
+              <Text style={styles.vuePastilleTexte}>
+                {vue === '2d' ? '2D' : '3D'}
+              </Text>
+              <ChevronsUpDown size={15} color={teinte.inkFaint} strokeWidth={2.4} />
+            </TouchableOpacity>
+          </View>
         )}
 
         {/* Les ACTIONS tiennent leur propre colonne, contre le bord droit :
@@ -2045,7 +2106,10 @@ export function ResultScreen() {
                 seule en bas à droite du plan, loin du seul endroit qu'on
                 regarde quand on modifie — et elle forçait la barre de cotes
                 à se raccourcir pour lui laisser la place. */}
-            <SidePill visible={dirty} index={2}>
+            {/* Le contrôle de conformité a quitté cette colonne pour la
+                rangée du sélecteur de vue : un verdict se consulte d'un
+                coup d'œil, il ne fait pas la queue avec les outils. */}
+            <SidePill visible={dirty} index={1}>
               <ToolPill
                 icon="save"
                 label="Enregistrer"
@@ -2053,20 +2117,8 @@ export function ResultScreen() {
                 onPress={commitCurrent}
               />
             </SidePill>
-            <SidePill visible={editMode && canUndo} index={1}>
+            <SidePill visible={editMode && canUndo} index={0}>
               <ToolPill icon="undo" label="Annuler" active={false} onPress={undo} />
-            </SidePill>
-            {/* Le contrôle de conformité ne défile plus avec les calques :
-                c’est un verdict sur le plan, pas un réglage d’affichage, et
-                on le cherche en édition comme en lecture. Il se tient donc
-                contre le bouton d’édition, à sa gauche. */}
-            <SidePill visible={issues.length > 0} index={0}>
-              <ToolPill
-                icon="check"
-                label="Contrôle"
-                active={alertes > 0}
-                onPress={() => setChecking(true)}
-              />
             </SidePill>
             {/* « Édition » commande le contenu de la rangée : il ferme la
                 pile, là où le pouce tombe, et ne bouge jamais. */}
@@ -2625,6 +2677,7 @@ export function ResultScreen() {
         issues={issues}
         rooms={rooms}
         onGoToIssue={goToIssue}
+        onFix={corriger}
       />
 
       {/* ---------- Nom de la pièce : liste plutôt que clavier ---------- */}

@@ -23,11 +23,17 @@
  *   3. ON DIT CE QU'ON A FAIT. Le rapport nomme chaque pose, pièce par pièce,
  *      et se tait pour dire que tout était déjà conforme.
  */
-import type { Fixture, FixtureKind } from './electrical';
+import { FIXTURES, type Fixture, type FixtureKind } from './electrical';
 import type { CeilingFixture } from './ceiling';
 import type { Pt, WallSeg } from './floorplan';
 import { segLength, perpOf } from './floorplan';
-import { requirementFor, roomUse, USE_LABEL, type RoomInput } from './nfc15100';
+import {
+  requirementFor,
+  roomUse,
+  USE_LABEL,
+  type ElecFix,
+  type RoomInput,
+} from './nfc15100';
 import type { RoomKind } from './furniture';
 
 /** Hauteurs d'axe, en mètres — celles qu'on relève sur un chantier. */
@@ -260,4 +266,112 @@ export function poserAuxNormes(input: {
     rapport,
     conforme: fixtures.length === 0 && ceiling.length === 0,
   };
+}
+
+/** Le plan tel qu'il est à l'écran : ce qu'il faut pour poser UNE fois. */
+export interface ContexteCorrection {
+  rooms: (RoomInput & { kind?: RoomKind | null; interieur: Pt })[];
+  walls: WallSeg[];
+  openings: WallSeg[];
+  objects: {
+    width: number;
+    depth: number;
+    height: number;
+    transform: number[];
+    roomId?: string;
+  }[];
+  fixtures: Fixture[];
+  id: (prefixe: string) => string;
+}
+
+/**
+ * CORRIGE UN CONSTAT — un seul, celui que le doigt vient de désigner.
+ *
+ * « Normes auto » refait tout le logement d'un coup ; ici on guide : le
+ * contrôle liste ce qui manque, et chaque ligne se règle d'un appui. Même
+ * règles de pose que l'auto — hors meubles, hors menuiseries, loin des
+ * angles — mais UNE pose à la fois, pour que l'électricien voie ce qui
+ * vient d'arriver sur son plan.
+ *
+ * Retourne ce qu'il faut AJOUTER, ou `null` quand aucun mur n'offre de
+ * place : mentir en posant dans un angle serait pire que d'avouer.
+ */
+export function corrigerConstat(
+  fix: ElecFix,
+  roomId: string | undefined,
+  ctx: ContexteCorrection,
+): { fixtures: Fixture[]; ceiling: CeilingFixture[] } | null {
+  // La remise à hauteur ne pose rien : elle se règle sur l'appareil même,
+  // et c'est l'écran qui la porte (il connaît le magasin).
+  if (fix.type === 'hauteur') return null;
+
+  if (fix.type === 'plafond') {
+    /*
+      Où poser ce qui va au plafond ? Dans la pièce du constat quand il en
+      vise une. Le DAAF du logement, lui, n'en vise aucune : la norme le
+      met dans la circulation qui dessert les chambres — à défaut, la plus
+      grande pièce qui ne soit ni cuisine ni salle d'eau, où les vapeurs
+      le feraient hurler pour rien.
+    */
+    let room = roomId ? ctx.rooms.find((r) => r.id === roomId) : undefined;
+    if (!room) {
+      const usede = (r: RoomInput) => roomUse(r.name, r.kind);
+      room =
+        ctx.rooms.find((r) => usede(r) === 'circulation') ??
+        [...ctx.rooms]
+          .filter((r) => usede(r) !== 'cuisine' && usede(r) !== 'sdb')
+          .sort((a, b) => b.area - a.area)[0];
+    }
+    if (!room) return null;
+    return {
+      fixtures: [],
+      ceiling: [
+        {
+          id: ctx.id(fix.kind),
+          kind: fix.kind,
+          roomId: room.id,
+          at: { ...room.interieur },
+        },
+      ],
+    };
+  }
+
+  // Poser au mur : les pièces candidates, la visée d'abord, puis toutes —
+  // le tableau du logement n'a pas de pièce attitrée, il va où il y a de
+  // la place, de préférence en dégagement.
+  const candidates = roomId
+    ? ctx.rooms.filter((r) => r.id === roomId)
+    : [...ctx.rooms].sort((a, b) => {
+        const rang = (r: RoomInput) =>
+          roomUse(r.name, r.kind) === 'circulation' ? 0 : 1;
+        return rang(a) - rang(b);
+      });
+  for (const room of candidates) {
+    const murs = ctx.walls.filter((w) => room.wallIds.includes(w.id));
+    if (murs.length === 0) continue;
+    const objets = ctx.objects.filter((o) => !o.roomId || o.roomId === room.id);
+    const places = placesLibres(
+      murs,
+      ctx.openings,
+      objets,
+      ctx.fixtures,
+      room.interieur,
+    );
+    const place = prendre(places);
+    if (!place) continue;
+    return {
+      fixtures: [
+        {
+          id: ctx.id(fix.kind),
+          kind: fix.kind,
+          wallId: place.wall.id,
+          along: place.along,
+          height: fix.height ?? FIXTURES[fix.kind].std,
+          side: place.side,
+        },
+      ],
+      ceiling: [],
+    };
+  }
+  return null;
 }

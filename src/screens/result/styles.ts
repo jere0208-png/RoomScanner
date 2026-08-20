@@ -121,12 +121,23 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     letterSpacing: 0.2,
     marginTop: 2,
   },
-  /** Le sélecteur de vue, posé en haut à droite du dessin. */
-  vuePastille: {
+  /**
+   * La rangée flottante en haut à droite du dessin : le contrôle des
+   * normes, puis le sélecteur de vue. C'est ELLE qui porte l'ancrage —
+   * ses pastilles restent alignées par construction, quelle que soit
+   * leur largeur.
+   */
+  vueRangee: {
     position: 'absolute',
     top: 10,
     right: 10,
     zIndex: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  /** Le sélecteur de vue, dans la rangée. */
+  vuePastille: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,

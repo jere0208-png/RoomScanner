@@ -1372,9 +1372,34 @@ hauteur qui détonne de plus de 40 cm, une « pièce » de moins de 1,5 m².
 
 Chaque constat porte **le geste qui le règle** et **désigne son élément** : un
 appui l'amène sous les yeux, sélectionné, en mode édition. Les alertes — celles
-qui rendent le plan faux — passent devant les simples vérifications. La
-pastille ne s'affiche que s'il y a quelque chose à dire, et devient rouge s'il
-y a une alerte.
+qui rendent le plan faux — passent devant les simples vérifications.
+
+**Le verdict tient dans un rond, contre le sélecteur 2D/3D.** Le contrôle
+vivait en pastille pleine largeur dans la colonne du bas, et apparaissait ou
+disparaissait avec les constats : un verdict qui bouge de place ne se
+consulte pas, il se cherche. Relevé du patron : « en plus petit à côté du
+switch 2D/3D, une légère onde rouge qui bump si l'appartement n'est pas aux
+normes, un contour vert fixe si rien n'est à redire ». C'est exactement ça —
+un rond de trente points, toujours au même endroit, dont la COULEUR parle
+avant qu'on l'ouvre : une bague rouge s'en échappe toutes les quatre
+secondes tant qu'une alerte reste, le contour passe au vert plein quand le
+logement est bon (`ControlePastille`).
+
+**Et chaque constat qui sait se régler porte son bouton.** La fenêtre
+listait ce qui manque et laissait poser à la main — or les constats
+portaient déjà leur geste (`fix`), que personne ne consommait. Refonte,
+relevé du patron : « correction auto au clic sur un élément manquant, on
+guide l'utilisateur ». Chaque ligne montre le dessin de son sujet (prise,
+règle, plafond…), et celles qui savent se corriger portent une baguette
+bleue : un appui pose l'appareil à une **place libre de la bonne pièce** —
+mêmes règles que « Normes auto » : hors meubles, hors menuiseries, loin des
+angles (`corrigerConstat`) — ou remet l'appareil fautif à sa hauteur. Les
+constats du plafond ont gagné leur geste au passage : le DCL manquant se
+pose au centre de la pièce, le détecteur de fumée file dans la
+**circulation** — jamais en cuisine, où la vapeur le ferait hurler. Une pose
+à la fois, sous les yeux : la ligne s'efface d'elle-même au recalcul des
+constats, et le décompte dit le travail accompli. Quand aucun mur n'offre de
+place, l'app l'avoue au lieu de poser dans un angle.
 
 ### Conformité NF C 15-100
 

@@ -72,6 +72,9 @@ const CHOIX = {
   largeur: ['transfer-vertical-bold'],
   retirer: ['close-circle-bold'],
   lien: ['link-round-bold', 'link-bold', 'link-circle-bold'],
+  // --- la pastille de contrôle des normes, et son geste de correction
+  bouclier: ['shield-check-bold', 'shield-star-bold', 'shield-bold'],
+  baguette: ['magic-stick-3-bold', 'magic-stick-bold', 'stars-bold'],
 };
 
 async function tracer(nom) {

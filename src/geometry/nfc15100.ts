@@ -489,7 +489,8 @@ const porteSocle = (k: FixtureKind) => socketsOf(k) > 0;
  */
 export type ElecFix =
   | { type: 'poser'; kind: FixtureKind; height?: number; label: string }
-  | { type: 'hauteur'; fixtureId: string; height: number; label: string };
+  | { type: 'hauteur'; fixtureId: string; height: number; label: string }
+  | { type: 'plafond'; kind: CeilingKind; label: string };
 
 /** Nature du constat : de quoi on parle, sans lire la phrase. */
 export type ElecCode =
@@ -1027,6 +1028,7 @@ export function checkElectrical(
           'Un point d’éclairage commandé au minimum par pièce, en plafond ' +
           'ou en applique. Une pièce sans éclairage fixe n’est pas ' +
           'réceptionnable.',
+        fix: { type: 'plafond', kind: 'dcl', label: 'Poser le DCL' },
       });
       continue;
     }
@@ -1069,6 +1071,7 @@ export function checkElectrical(
       regle:
         'Un DAAF au minimum par logement, dans la circulation qui dessert ' +
         'les chambres. Obligation du propriétaire depuis 2015.',
+      fix: { type: 'plafond', kind: 'daaf', label: 'Poser le DAAF' },
     });
   }
   for (const d of daaf) {

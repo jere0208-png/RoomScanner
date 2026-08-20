@@ -167,8 +167,13 @@ describe('le contrôle de conformité, crédence comprise', () => {
     expect(issues[0].message).toContain('trop bas');
     expect(issues[0].regle).toContain('plan de travail');
     // Et la correction proposée est VALIDE là où l'appareil se trouve.
-    expect(issues[0].fix?.height).toBeGreaterThanOrEqual(0.98);
-    expect(issues[0].fix?.label).toContain('98');
+    // (Le geste est une remise à hauteur : les poses au plafond, elles,
+    // n'ont pas de cote.)
+    const geste = issues[0].fix;
+    expect(geste?.type).toBe('hauteur');
+    if (geste?.type !== 'hauteur') return;
+    expect(geste.height).toBeGreaterThanOrEqual(0.98);
+    expect(geste.label).toContain('98');
   });
 
   it('la même prise, deux mètres plus loin, reste conforme', () => {

@@ -15,9 +15,12 @@
  */
 import React, { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
 import { SheetShell } from './Sheet';
+import { SOLAIRES } from '../ui/solaires';
 import { radius, themedStyles, useTheme, type Palette } from '../theme';
 import { haptic } from '../ui/haptic';
+import type { ElecFix } from '../geometry/nfc15100';
 
 /** Un constat du diagnostic, d'où qu'il vienne — géométrie ou électricité. */
 export interface Constat {
@@ -27,7 +30,35 @@ export interface Constat {
   severity: string;
   wallId?: string;
   roomId?: string;
+  /** De quoi on parle, sans lire la phrase : choisit l'icône de la ligne. */
+  code?: string;
+  /** Le geste qui règle le constat, quand il existe : un bouton le porte. */
+  fix?: ElecFix;
 }
+
+/**
+ * L'icône d'un constat : la silhouette Solar de son sujet.
+ *
+ * La liste était du texte nu — trente lignes grises qu'on relisait du début
+ * pour retrouver « le tableau ». L'œil trie par DESSIN avant de lire : une
+ * prise, une règle, un plafond, et l'on saute directement à ce qu'on
+ * cherche.
+ */
+const ICONE_DU_CODE: Record<string, string> = {
+  socles: SOLAIRES.elec,
+  surPlan: SOLAIRES.elec,
+  specialises: SOLAIRES.elec,
+  circuits: SOLAIRES.elec,
+  cuisson: SOLAIRES.elec,
+  rj45: SOLAIRES.appareil,
+  hauteur: SOLAIRES.ruler,
+  alignement: SOLAIRES.ruler,
+  tableau: SOLAIRES.schema,
+  eclairage: SOLAIRES.plafond,
+  daaf: SOLAIRES.plafond,
+  volumes: SOLAIRES.surface,
+  pose: SOLAIRES.crayon,
+};
 
 export interface DiagnosticSheetProps {
   visible: boolean;
@@ -36,6 +67,8 @@ export interface DiagnosticSheetProps {
   /** Pour nommer les volets : l'identifiant seul ne dit rien à personne. */
   rooms: { id: string; name?: string }[];
   onGoToIssue: (issue: Constat) => void;
+  /** Applique le geste que le constat porte : pose, remise à hauteur. */
+  onFix?: (issue: Constat) => void;
 }
 
 export function DiagnosticSheet({
@@ -44,8 +77,10 @@ export function DiagnosticSheet({
   issues,
   rooms,
   onGoToIssue,
+  onFix,
 }: DiagnosticSheetProps) {
-  const styles = getStyles(useTheme());
+  const c = useTheme();
+  const styles = getStyles(c);
   const alertes = useMemo(
     () => issues.filter((i) => i.severity === 'alerte').length,
     [issues],
@@ -95,6 +130,9 @@ export function DiagnosticSheet({
           <Text style={styles.sub}>
             {issues.length === 0
               ? 'Le plan ne présente aucune anomalie détectable.'
+              : issues.some((i) => i.fix)
+              ? 'La baguette pose l’élément manquant à une place libre. ' +
+                'La ligne vous emmène le voir sur le plan.'
               : 'Touchez une ligne pour aller voir l’élément sur le plan.'}
           </Text>
         </View>
@@ -124,24 +162,64 @@ export function DiagnosticSheet({
                 </Text>
               </TouchableOpacity>
               {deplie &&
-                g.lignes.map((issue) => (
-                  <TouchableOpacity
-                    key={issue.key}
-                    style={[
-                      styles.row,
-                      issue.severity === 'alerte' && styles.rowKo,
-                    ]}
-                    activeOpacity={0.75}
-                    onPress={() => onGoToIssue(issue)}>
-                    <View style={styles.texts}>
-                      <Text style={styles.message}>{issue.message}</Text>
-                      <Text style={styles.hint} numberOfLines={2}>
-                        {issue.hint}
-                      </Text>
-                    </View>
-                    <Text style={styles.chevron}>›</Text>
-                  </TouchableOpacity>
-                ))}
+                g.lignes.map((issue) => {
+                  const ko = issue.severity === 'alerte';
+                  return (
+                    <TouchableOpacity
+                      key={issue.key}
+                      accessibilityLabel={issue.message}
+                      style={[styles.row, ko && styles.rowKo]}
+                      activeOpacity={0.75}
+                      onPress={() => onGoToIssue(issue)}>
+                      <View style={[styles.puceIcone, ko && styles.puceIconeKo]}>
+                        <Svg width={16} height={16} viewBox="0 0 24 24">
+                          <Path
+                            d={ICONE_DU_CODE[issue.code ?? ''] ?? SOLAIRES.murs}
+                            fill={ko ? c.danger : c.inkSoft}
+                            fillRule="evenodd"
+                          />
+                        </Svg>
+                      </View>
+                      <View style={styles.texts}>
+                        <Text style={styles.message}>{issue.message}</Text>
+                        <Text style={styles.hint} numberOfLines={2}>
+                          {issue.hint}
+                        </Text>
+                        {/*
+                          LE GESTE QUI RÈGLE LE CONSTAT, sur la ligne même.
+
+                          La fenêtre disait ce qui manque et laissait chercher
+                          comment le poser. Quand le constat sait se régler —
+                          poser l'appareil, remettre à hauteur — son bouton le
+                          fait d'un appui, et la ligne s'efface d'elle-même :
+                          c'est le décompte qui dit le travail accompli.
+                        */}
+                        {issue.fix && onFix && (
+                          <TouchableOpacity
+                            accessibilityLabel={issue.fix.label}
+                            style={styles.corriger}
+                            activeOpacity={0.8}
+                            onPress={() => {
+                              haptic('succes');
+                              onFix(issue);
+                            }}>
+                            <Svg width={13} height={13} viewBox="0 0 24 24">
+                              <Path
+                                d={SOLAIRES.baguette}
+                                fill="#FFFFFF"
+                                fillRule="evenodd"
+                              />
+                            </Svg>
+                            <Text style={styles.corrigerTexte}>
+                              {issue.fix.label}
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                      <Text style={styles.chevron}>›</Text>
+                    </TouchableOpacity>
+                  );
+                })}
             </View>
           );
         })}
@@ -223,6 +301,29 @@ const getStyles = themedStyles((c: Palette) =>
       marginTop: 8,
     },
     rowKo: { borderLeftColor: c.danger },
+    /* Le sujet du constat, en dessin : l'œil trie avant de lire. */
+    puceIcone: {
+      width: 30,
+      height: 30,
+      borderRadius: 9,
+      backgroundColor: c.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    puceIconeKo: { backgroundColor: c.danger + '1F' },
+    /* Le bouton qui règle le constat : bleu franc, baguette, sur la ligne. */
+    corriger: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      alignSelf: 'flex-start',
+      gap: 5,
+      marginTop: 8,
+      height: 30,
+      paddingHorizontal: 11,
+      borderRadius: radius.pill,
+      backgroundColor: c.blue,
+    },
+    corrigerTexte: { color: '#FFFFFF', fontSize: 12, fontWeight: '800' },
     texts: { flex: 1 },
     message: { color: c.ink, fontSize: 14, fontWeight: '700', lineHeight: 19 },
     hint: { color: c.inkFaint, fontSize: 11.5, lineHeight: 15.5, marginTop: 3 },
