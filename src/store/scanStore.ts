@@ -805,6 +805,17 @@ interface ScanState {
   setInstruction: (i: string) => void;
   applyLiveUpdate: (u: ScanUpdate) => void;
   finalize: (r: ScanResult) => void;
+  /**
+   * L'ARRIVAGE d'un scan qui vient de finir : ce que le popup de choix
+   * propose d'intégrer. RoomPlan DÉTECTE les meubles ; l'électricité, elle,
+   * ne peut être que PROPOSÉE (l'implantation NF C 15-100, hors meubles) —
+   * une prise fait trois centimètres, le LiDAR voit des meubles. `null` =
+   * rien à demander (scan vide, ou choix déjà fait).
+   */
+  arrivage: { meubles: number } | null;
+  oublierArrivage: () => void;
+  /** Le patron a décoché les meubles : le plan s'en sépare d'un coup. */
+  retirerMeubles: () => void;
   moveWallPoint: (id: string, end: 'a' | 'b', p: { x: number; z: number }) => void;
   /**
    * POUSSE un mur entier, ses voisins restant accrochés.
@@ -2227,6 +2238,13 @@ export const useScanStore = create<ScanState>((set, get) => {
         windowCount: u.windowCount,
       }),
 
+    arrivage: null,
+    oublierArrivage: () => set({ arrivage: null }),
+    retirerMeubles: () => {
+      pushHistory('retirerMeubles');
+      set({ objects: [], dirty: true });
+    },
+
     finalize: (r) => {
       // Le scan est d'un seul tenant : une liste de surfaces, une liste de
       // meubles. Les pièces, on les trouve nous-mêmes.
@@ -2300,6 +2318,8 @@ export const useScanStore = create<ScanState>((set, get) => {
           processing: false,
           scanning: false,
           screen: 'result',
+          // Rien d'exploitable : rien à proposer non plus.
+          arrivage: null,
         });
         return;
       }
@@ -2346,6 +2366,9 @@ export const useScanStore = create<ScanState>((set, get) => {
         processing: false,
         scanning: false,
         screen: 'result',
+        // Le popup de fin de scan demandera quoi intégrer — même sans
+        // meuble : l'électricité aux normes se propose sur tout relevé.
+        arrivage: { meubles: objects.length },
         /*
           LE BROUILLON MEURT AVEC L'ENREGISTREMENT — relevé du chantier :
           « le message de reprise est inutile, on le retrouve dans mes

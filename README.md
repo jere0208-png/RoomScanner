@@ -70,6 +70,21 @@ maintenant les sept feuilles et les deux rangées.
 **Rien à découper à la main pendant le scan.** On parcourt le logement d'une
 traite, et les pièces sont trouvées après coup, dans la géométrie.
 
+**Et le scan fini demande quoi intégrer.** Relevé du patron : « à la fin du
+scan il doit demander si on veut intégrer les éléments électriques
+détectés, et les meubles — on coche nos choix et on valide ». Le popup
+(`ChoixScan`) paraît sur le résultat d'un scan frais, tout coché d'office :
+« N meubles **détectés** », « Électricité **proposée** aux normes ». Les
+mots sont pesés, parce que la vérité technique l'exige : RoomPlan détecte
+les meubles, mais **pas l'appareillage mural** — une prise fait trois
+centimètres, son modèle LiDAR voit des caissons. L'électricité cochée pose
+donc l'implantation NF C 15-100 du moteur « Normes auto » (hors meubles,
+hors menuiseries), rapport à l'appui ; les meubles décochés se retirent
+d'un coup (`retirerMeubles`). Écrire « détectée » pour l'élec serait
+mentir, et un plan qui ment est pire qu'un plan incomplet. Une vraie
+détection visuelle (Vision/CoreML pendant la capture) reste possible un
+jour — c'est un chantier NATIF, qui ne se règle pas sans Mac sous la main.
+
 **Avant de chercher les pièces, il faut couper les murs.** RoomPlan livre
 l'enveloppe d'un seul tenant, et la cloison qui sépare deux pièces vient
 s'appuyer au milieu d'un mur sans le couper. Tant que ce point de contact

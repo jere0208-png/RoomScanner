@@ -34,6 +34,7 @@ import { CeilingBar } from '../components/CeilingBar';
 import { ObjectBar } from '../components/ObjectBar';
 import { corrigerConstat, poserAuxNormes } from '../geometry/auto';
 import { ControlePastille } from '../components/ControlePastille';
+import { ChoixScan } from '../components/ChoixScan';
 import { RoomBar } from '../components/RoomBar';
 import { StripBar } from '../components/StripBar';
 import {
@@ -225,6 +226,9 @@ export function ResultScreen() {
   const removeCeilingRow = useScanStore((s) => s.removeCeilingRow);
   const toggleCeilingCommand = useScanStore((s) => s.toggleCeilingCommand);
   const toggleFixtureCommand = useScanStore((s) => s.toggleFixtureCommand);
+  // L'arrivage du scan : lu ICI, avec les autres liaisons — un hook après
+  // un retour anticipé casse l'ordre des hooks.
+  const arrivage = useScanStore((s) => s.arrivage);
   const moveFixture = useScanStore((s) => s.moveFixture);
   const resizeOpening = useScanStore((s) => s.resizeOpening);
   const removeOpening = useScanStore((s) => s.removeOpening);
@@ -1472,6 +1476,20 @@ export function ResultScreen() {
    * et l'on rend compte. Un outil qui modifie un dossier sans dire quoi ne
    * s'utilise pas deux fois.
    */
+  /**
+   * LE CHOIX DE FIN DE SCAN — « on coche nos choix et on valide ».
+   *
+   * Les meubles sont déjà dans le plan (RoomPlan les a DÉTECTÉS) : les
+   * décocher les retire. L'électricité, elle, est PROPOSÉE : cocher pose
+   * l'implantation NF C 15-100, avec le rapport qui dit ce qui vient
+   * d'arriver — le même que « Normes auto ».
+   */
+  const validerArrivage = (choix: { meubles: boolean; elec: boolean }) => {
+    useScanStore.getState().oublierArrivage();
+    if (!choix.meubles) useScanStore.getState().retirerMeubles();
+    if (choix.elec) poserNormes();
+  };
+
   const poserNormes = () => {
     const pose = poserAuxNormes({
       rooms: roomInputs.map((r) => {
@@ -2738,6 +2756,16 @@ export function ResultScreen() {
             }),
           );
         }}
+      />
+
+      {/* ---------- Le choix de fin de scan ---------- */}
+      <ChoixScan
+        visible={!!arrivage && !capturing}
+        meubles={arrivage?.meubles ?? 0}
+        onValider={validerArrivage}
+        // Fermer sans valider : les meubles restent (ils sont déjà là),
+        // rien ne se pose — et la question ne reviendra pas.
+        onClose={() => useScanStore.getState().oublierArrivage()}
       />
 
       {/* ---------- Diagnostic du plan ---------- */}
