@@ -176,50 +176,33 @@ describe('la présentation animée', () => {
 });
 
 /**
- * LES POINTS CARDINAUX SUR LE DOSSIER — À LA DEMANDE.
+ * LES POINTS CARDINAUX SUR LE DOSSIER — DE SÉRIE, SUR LE PLAN 2D SEULEMENT.
  *
- * Ils désignent un mur sans ambiguïté, et tous les dossiers n'en ont pas
- * besoin. Comme sur le plan de l'app, ils partent ÉTEINTS : quatre lettres
- * autour de chaque vue chargent la feuille quand personne ne les lit.
+ * Ils ont été une option « Nord », éteinte par défaut : le patron a
+ * tranché — pas de bouton. Le dossier désigne ses murs par leur cardinal
+ * (« Prise plinthe 1 · mur nord ») : le repère qui permet de le vérifier
+ * sur place n'est pas un ornement qu'on coche. Et il vit sur le PLAN 2D
+ * seulement — c'est la feuille qu'on oriente ; sur une perspective,
+ * quatre lettres au bord du cadre ne désignent plus rien.
  */
 describe('le nord dans le dossier', () => {
-  it('s’offre en option, éteinte au départ', () => {
+  it('ne s’offre plus en option : le plan 2D porte ses cardinaux d’office', () => {
     const tree = monter('export');
-    const bouton = tree.root
-      .findAllByType(TouchableOpacity)
-      // Le mot est en légende SOUS la pastille : c'est l'étiquette
-      // d'accessibilité qui nomme le bouton.
-      .find((n) => n.props.accessibilityLabel === 'Nord');
-    expect(bouton).toBeDefined();
-    // Éteinte : les vues 3D de l'aperçu ne portent pas la couronne.
-    for (const v of tree.root.findAllByType(Iso3DView)) {
-      expect(v.props.showNorth).toBe(false);
-    }
-    act(() => bouton!.props.onPress());
-    const apres = tree.root.findAllByType(Iso3DView);
-    expect(apres.length).toBeGreaterThan(0);
-    for (const v of apres) expect(v.props.showNorth).toBe(true);
+    expect(
+      tree.root
+        .findAllByType(TouchableOpacity)
+        .find((n) => n.props.accessibilityLabel === 'Nord'),
+    ).toBeUndefined();
+    const plans = tree.root.findAllByType(FloorplanEditor);
+    expect(plans.length).toBeGreaterThan(0);
+    for (const p of plans) expect(p.props.showNorth).toBe(true);
   });
 
-  /*
-    LA CASE VAUT POUR TOUT L'APERÇU, PAS SEULEMENT POUR LA 3D.
-
-    Relevé du chantier : « décocher Nord ne supprime pas les points
-    cardinaux affichés sur les plans en dessous ». Les deux vues 3D
-    recevaient bien le réglage ; le plan 2D, lui, gardait la valeur par
-    défaut du composant — c'est-à-dire la rose allumée. On décochait, et
-    l'aperçu continuait d'afficher ce que le PDF n'imprimerait pas.
-  */
-  it('vaut aussi pour le plan 2D de l’aperçu', () => {
+  it('et sur lui seulement : les perspectives restent nues', () => {
     const tree = monter('export');
-    const plans = () => tree.root.findAllByType(FloorplanEditor);
-    expect(plans().length).toBeGreaterThan(0);
-    for (const p of plans()) expect(p.props.showNorth).toBe(false);
-    const bouton = tree.root
-      .findAllByType(TouchableOpacity)
-      .find((n) => n.props.accessibilityLabel === 'Nord');
-    act(() => bouton!.props.onPress());
-    for (const p of plans()) expect(p.props.showNorth).toBe(true);
+    const vues = tree.root.findAllByType(Iso3DView);
+    expect(vues.length).toBeGreaterThan(0);
+    for (const v of vues) expect(v.props.showNorth).toBe(false);
   });
 });
 

@@ -79,13 +79,10 @@ function PlanPreview({
   cotes,
   routes,
   ceiling,
-  nord,
 }: {
   cotes: boolean;
   routes?: { id: string; path: Pt[] }[];
   ceiling?: CeilingFixture[];
-  /** La case « Nord » du dossier : elle vaut pour l'aperçu comme pour le PDF. */
-  nord: boolean;
 }) {
   return (
     <View
@@ -97,7 +94,9 @@ function PlanPreview({
         cableRoutes={routes}
         ceiling={ceiling}
         showCeiling={!!ceiling}
-        showNorth={nord}
+        // Les cardinaux sont DE SÉRIE sur le plan 2D — comme dans le PDF,
+        // que cet aperçu promet. Sans cap relevé, rien ne se dessine.
+        showNorth={true}
         editable={false}
         selectedWallId={null}
         onSelectWall={() => {}}
@@ -170,12 +169,6 @@ const EXPORT_ICONS = {
   ],
   // Schémas : un peigne de tableau, deux départs sous une barre.
   schema: ['M12 3 v4', 'M4 7 h16', 'M8 7 v4', 'M16 7 v4', 'M6 11 h4 v6 H6 z', 'M14 11 h4 v6 h-4 z'],
-  /** La rose des vents : un cercle, une aiguille, quatre branches. */
-  nord: [
-    'M12 3 a9 9 0 1 0 0 18 a9 9 0 1 0 0 -18',
-    'M12 6.5 L14.6 13 L12 11.6 L9.4 13 Z',
-    'M12 15 v2.5',
-  ],
 } as const;
 
 const styles = getStyles(c);
@@ -217,16 +210,18 @@ const styles = getStyles(c);
     demande.
   */
   const [toutesElevations, setToutesElevations] = useState(false);
-  /**
-   * LES POINTS CARDINAUX SUR LE DOCUMENT — ÉTEINTS PAR DÉFAUT.
-   *
-   * Ils désignent un mur sans ambiguïté : « la prise du mur nord » se
-   * vérifie sur place avec n'importe quel téléphone. Mais tous les
-   * dossiers n'en ont pas besoin, et quatre lettres autour de chaque vue
-   * chargent la feuille pour rien quand personne ne les lit. Comme sur le
-   * plan de l'app, on les allume à la demande.
-   */
-  const [cardinaux, setCardinaux] = useState(false);
+  /*
+    LES POINTS CARDINAUX — DE SÉRIE, SUR LE PLAN 2D SEULEMENT.
+
+    Ils ont été une option « Nord », éteinte par défaut : le patron a
+    tranché — pas de bouton. Le dossier désigne ses murs par leur cardinal
+    (« Prise plinthe 1 · mur nord ») : le repère qui permet de le vérifier
+    sur place n'est pas un ornement qu'on coche, c'est une pièce du
+    document. Il vit sur le plan 2D seulement — c'est la feuille qu'on
+    oriente ; sur une perspective, quatre lettres au bord du cadre ne
+    désignent plus rien. Et sans cap relevé au scan, rien ne se dessine :
+    on n'invente pas un nord.
+  */
 
   const parts = useMemo(() => roomParts(walls, rooms), [walls, rooms]);
   const placement = useMemo(
@@ -366,11 +361,6 @@ const styles = getStyles(c);
           roomNames: Object.fromEntries(rooms.map((r) => [r.id, r.name])),
           photos: vignettes,
           north,
-          // Éteinte, la rose des vents ne se dessine pas — mais les murs
-          // gardent leur nom : « Élévation — Chambre, mur nord » et
-          // « Prise plinthe 1 · mur nord » viennent du même relevé, et un
-          // dossier qui les perd ne désigne plus rien.
-          compass: cardinaux,
           deviceNames: noms,
           client,
           address,
@@ -417,7 +407,6 @@ const styles = getStyles(c);
     gaines,
     schema,
     plafond,
-    cardinaux,
     include3D,
     client,
     address,
@@ -626,18 +615,6 @@ const styles = getStyles(c);
                     ] as OptionDef,
                   ]
                 : []),
-              // Le nord ne s'offre que si le scan en porte un : sans cap
-              // relevé, l'option n'allumerait rien.
-              ...(north !== null && north !== undefined
-                ? [
-                    [
-                      'nord',
-                      'Nord',
-                      cardinaux,
-                      () => setCardinaux(!cardinaux),
-                    ] as OptionDef,
-                  ]
-                : []),
               ...(schemas
                 ? [
                     [
@@ -706,7 +683,6 @@ const styles = getStyles(c);
             cotes={measures2D}
             routes={gaines || schema ? cheminements?.traces : undefined}
             ceiling={avecPlafond ? ceiling : undefined}
-            nord={cardinaux}
           />
         </View>
 
@@ -769,7 +745,10 @@ const styles = getStyles(c);
                         )
                       }
                       showMeasures={measures3D}
-                      showNorth={cardinaux}
+                      // Les cardinaux appartiennent au plan 2D : sur une
+                      // perspective, quatre lettres au bord du cadre ne
+                      // désignent plus rien.
+                      showNorth={false}
                     />
                   </View>
                 </View>

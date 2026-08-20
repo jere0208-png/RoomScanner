@@ -1177,17 +1177,6 @@ interface SheetContext {
    * ne nomme alors aucun mur, plutôt que d'inventer une orientation.
    */
   north?: number | null;
-  /**
-   * LA BOUSSOLE SE DESSINE-T-ELLE ? — séparément du NOM des murs.
-   *
-   * Les deux étaient commandés par la même donnée : éteindre la rose des
-   * vents ôtait aussi « mur nord » du titre des élévations, pendant que le
-   * schéma unifilaire, lui, continuait d'appeler ses appareils « Prise
-   * plinthe 1 · mur nord » : le dossier se contredisait d'une feuille à
-   * l'autre. Ce sont deux choses distinctes — un DESSIN qu'on peut trouver
-   * encombrant, et un NOM dont tout le dossier dépend.
-   */
-  compass?: boolean;
 }
 
 /**
@@ -2083,7 +2072,7 @@ function planPage(
    * traverse le chantier. Elle est relevée au magnétomètre pendant le
    * scan, et tourne avec la trame du plan comme le dessin lui-même.
    */
-  if (ctx.north !== null && ctx.north !== undefined && ctx.compass !== false) {
+  if (ctx.north !== null && ctx.north !== undefined) {
     const cx = FRAME.x + FRAME.w - 44;
     const cy = TETE - 12;
     const nord = ctx.north;
@@ -3222,16 +3211,14 @@ export interface ScanForPdf {
   fixtures?: Fixture[];
   /** Cheminement des gaines, du tableau à chaque appareil (repère monde). */
   routes?: { id: string; path: { x: number; z: number }[] }[];
-  /** Cap du scan, pour nommer les murs par leur orientation. */
-  north?: number | null;
   /**
-   * La rose des vents se dessine-t-elle sur le plan ?
-   *
-   * Défait, on ne l'imprime pas — mais les murs gardent leur nom : ce sont
-   * deux choses distinctes, et les confondre faisait un dossier qui se
-   * contredisait d'une feuille à l'autre.
+   * Cap du scan, pour nommer les murs par leur orientation — et dessiner
+   * la rose des vents, DE SÉRIE, sur la seule feuille du plan 2D. Elle a
+   * été une option ; le patron a tranché : un dossier qui désigne ses murs
+   * par leur cardinal imprime le repère qui permet de le vérifier sur
+   * place. Sans cap relevé, ni nom ni rose — on n'invente pas un nord.
    */
-  compass?: boolean;
+  north?: number | null;
   /** À qui est ce dossier : le client, et l'adresse du chantier. */
   client?: string;
   address?: string;
@@ -3992,7 +3979,6 @@ function ctxTemporaire(scan: ScanForPdf): SheetContext {
     rooms: scan.rooms,
     fixtures: scan.fixtures ?? [],
     north: scan.north ?? null,
-    compass: scan.compass !== false,
     colorOpenings: false,
     showSurfaces: false,
     showTextures: false,
@@ -4066,7 +4052,6 @@ export function buildScanPdf(
     routes: scan.routes,
     ceiling: opts.ceiling ?? [],
     north: scan.north ?? null,
-    compass: scan.compass !== false,
     colorOpenings: opts.colorOpenings ?? false,
     showSurfaces: opts.surfaces ?? true,
     showTextures: opts.textures ?? false,

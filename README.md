@@ -1720,10 +1720,19 @@ document, qui sait la place dont il dispose, pas celle d'un doigt sur un
 écran de six pouces. L'aperçu est donc `pointerEvents="none"` : le geste est
 rendu au défilement, ce que la main essaie de faire neuf fois sur dix.
 
-**La case « Nord » vaut pour tout l'aperçu.** Elle était passée aux deux vues
-3D et oubliée sur le plan 2D, qui gardait la valeur par défaut du composant —
-c'est-à-dire la rose allumée. On décochait, et l'aperçu continuait d'afficher
-ce que le PDF n'imprimerait pas.
+**Les points cardinaux sont de série — sur le plan 2D, et seulement là.**
+Ils ont été une case « Nord », éteinte par défaut, qui valait pour tout
+l'aperçu ; le patron a tranché : pas de bouton. Le dossier désigne ses murs
+par leur cardinal (« Prise plinthe 1 · mur nord ») — le repère qui permet de
+le vérifier sur place n'est pas un ornement qu'on coche, c'est une pièce du
+document, et la rose s'imprime d'office sur la feuille du plan. Sur le plan
+2D SEULEMENT : c'est la feuille qu'on oriente ; sur une perspective, quatre
+lettres au bord du cadre ne désignent plus rien. L'aperçu promet la même
+chose que le PDF — cardinaux sur son plan 2D, perspectives nues. La rose
+garde son honnêteté : sans cap relevé au scan, rien ne se dessine — un nord
+inventé est pire que pas de nord du tout. Le dossier d'essai se regarde :
+`UPDATE_BOUSSOLE=1 npx jest boussole` l'écrit dans le dossier temporaire,
+puis `node tools/pdf-vers-svg.mjs` rend ses feuilles.
 
 **Une perspective par feuille, et autant qu'il en faut.** Deux vues se
 partageaient une page, chacune dans une case de 290 points — le tiers d'un
