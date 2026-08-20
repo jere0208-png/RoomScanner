@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { BackChevron } from '../components/BackChevron';
+import { RetourGlisse } from '../components/RetourGlisse';
 import {
   Animated,
   Easing,
@@ -959,6 +960,11 @@ export function LibraryScreen() {
           onPress={() => (dossierOuvert ? setInside(null) : setScreen('home'))}>
           <BackChevron color={palette.ink} />
         </TouchableOpacity>
+        {/* Le bord gauche rend le même retour que la flèche : il referme
+            d'abord le dossier ouvert, comme elle. */}
+        <RetourGlisse
+          onRetour={() => (dossierOuvert ? setInside(null) : setScreen('home'))}
+        />
         {/*
           LE TITRE SUIT LE BOUTON DE RETOUR, LA PASTILLE LE SUIT.
 

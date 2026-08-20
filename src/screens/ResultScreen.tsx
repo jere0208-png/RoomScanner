@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BackChevron } from '../components/BackChevron';
+import { RetourGlisse } from '../components/RetourGlisse';
 import {
   Alert,
   Animated,
@@ -1567,6 +1568,13 @@ export function ResultScreen() {
           }>
           <BackChevron color={teinte.ink} />
         </TouchableOpacity>
+        {/* Le bord gauche rend le même retour que la flèche — vingt
+            points au ras du cadre, le plan garde tout le reste. */}
+        <RetourGlisse
+          onRetour={() =>
+            setScreen(resultOrigin === 'library' ? 'library' : 'home')
+          }
+        />
         <TouchableOpacity
           style={styles.titleWrap}
           accessibilityLabel="Options du plan"

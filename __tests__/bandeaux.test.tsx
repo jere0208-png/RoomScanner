@@ -33,6 +33,7 @@ import {
 } from 'react-native';
 import { PILL_CELL_H } from '../src/components/ToolPill';
 import { WALL_MENU } from '../src/components/FloorplanEditor';
+import { estUnRetour, RetourGlisse } from '../src/components/RetourGlisse';
 import { Circle, Path, Polygon, Text as SvgText } from 'react-native-svg';
 import TestRenderer, { act } from 'react-test-renderer';
 import { ResultScreen } from '../src/screens/ResultScreen';
@@ -195,6 +196,10 @@ describe('l’écran des résultats', () => {
       (n) => Number(n.props?.strokeWidth) >= 2.5,
     );
     expect(grasses.length).toBeGreaterThan(0);
+    // Et elle est GRANDE dans sa pastille — relevé du patron : à 22
+    // points, elle restait timide à côté des silhouettes.
+    const larges = nord!.findAll((n) => Number(n.props?.size) >= 25);
+    expect(larges.length).toBeGreaterThan(0);
   });
 
   /**
@@ -283,6 +288,26 @@ describe('l’écran des résultats', () => {
     }
     // Et de quoi agir sans quitter le bandeau.
     expect(bouton(tree, 'Relier à une commande')).toBeDefined();
+  });
+
+  /*
+   * LE RETOUR AU GLISSEMENT — relevé du patron : « comme sur les apps
+   * modernes, ou même Safari ». Une bande de vingt points au bord gauche
+   * rend le même retour que la flèche, sur tous les écrans qui en portent
+   * une. Le seuil est FRANC : soixante points vers la droite, plus
+   * horizontal que vertical — un défilement ne déclenche rien.
+   */
+  it('rend le retour au bord gauche, comme Safari', () => {
+    const tree = monter();
+    const bord = tree.root.findAllByType(RetourGlisse)[0];
+    expect(bord).toBeDefined();
+    act(() => bord.props.onRetour());
+    expect(useScanStore.getState().screen).toBe('home');
+    // Les seuils du geste, comptés :
+    expect(estUnRetour(80, 10)).toBe(true);
+    expect(estUnRetour(40, 0)).toBe(false);
+    expect(estUnRetour(80, -90)).toBe(false);
+    expect(estUnRetour(-80, 0)).toBe(false);
   });
 
   /**

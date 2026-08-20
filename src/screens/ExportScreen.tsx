@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { BackChevron } from '../components/BackChevron';
+import { RetourGlisse } from '../components/RetourGlisse';
 import {
   Alert,
   Animated,
@@ -483,6 +484,8 @@ const styles = getStyles(c);
         <TouchableOpacity style={styles.roundButton} onPress={() => setScreen('result')}>
           <BackChevron color={c.ink} />
         </TouchableOpacity>
+        {/* Le bord gauche rend le même retour que la flèche. */}
+        <RetourGlisse onRetour={() => setScreen('result')} />
         <Text style={styles.title}>Aperçu du PDF</Text>
         <TouchableOpacity
           style={[styles.roundButton, styles.resetButton]}

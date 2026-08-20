@@ -658,6 +658,37 @@ describe('le menu du compte', () => {
     expect(bouton(t, 'Se déconnecter')).toBeUndefined();
   });
 
+  /*
+   * EN PRO, LA CARTE PREND LA PARURE — relevé du patron : « plus
+   * dynamique et coloré premium ». L'avatar se cercle du contour d'or
+   * qui respire, et le nom passe à la typo d'or — la signature du Pro,
+   * la même que le badge et la page. En gratuit, rien de tout ça.
+   */
+  it('en Pro, le menu se pare d’or : contour d’avatar et nom dorés', () => {
+    useAccountStore.setState({
+      paywallVisible: false,
+      pro: true,
+      compte: { id: 'email:j@c.fr', prenom: 'Jérémy', methode: 'email' },
+    });
+    const t = monter(<HomeScreen />);
+    act(() => bouton(t, 'Mon compte')!.props.onPress());
+    expect(t.root.findAllByType(ContourOr).length).toBeGreaterThan(0);
+    const ors = t.root
+      .findAllByType(TexteOr)
+      .map((n) => String(n.props.texte));
+    expect(ors).toContain('Jérémy');
+    act(() => t.unmount());
+    arbre = null;
+    // En gratuit : pas un contour, pas un nom doré.
+    useAccountStore.setState({ pro: false });
+    const g = monter(<HomeScreen />);
+    act(() => bouton(g, 'Mon compte')!.props.onPress());
+    expect(g.root.findAllByType(ContourOr)).toHaveLength(0);
+    expect(
+      g.root.findAllByType(TexteOr).map((n) => String(n.props.texte)),
+    ).not.toContain('Jérémy');
+  });
+
   it('le voile referme, comme partout', () => {
     useAccountStore.setState({
       paywallVisible: false,

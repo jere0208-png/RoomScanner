@@ -397,9 +397,15 @@ l'avait déjà écrite.
 - **Le soleil du bouton de thème** (« ☀ ») : iOS le rend en EMOJI COULEUR.
   Un soleil jaune et ombré, au milieu d'une interface dont tous les autres
   pictogrammes sont des traits gris — et un emoji ignore `color`, donc rien ne
-  permettait de le calmer. `ThemeGlyph` dessine le soleil et la lune — en
-  **27 points** dans leur pastille de 46 : à 21, le glyphe était un
-  pictogramme timide à côté des autres (relevé du patron).
+  permettait de le calmer. `ThemeGlyph` a d'abord dessiné le soleil et la
+  lune à la main ; depuis la refonte Solar, ils viennent du MÊME jeu que
+  toutes les icônes (fiches SVGRepo 526045 et 526341, désignées par le
+  patron), en **27 points** dans une pastille ramenée à 40 — « réduis le
+  bloc blanc, sans réduire les icônes ». Et la pastille se rend EN DERNIER
+  dans l'arbre de l'accueil : rendue avant le bloc héros, celui-ci
+  s'étendait par-dessus et avalait le toucher partout où il la chevauchait
+  — relevé du patron : « le clic ne fait rien, sauf en bas à droite ».
+  C'est l'ordre des frères qui fait l'empilement.
 - **La trouée des ouvrants** n'est pas un caractère, mais elle relevait du
   même à-peu-près : dessinée trois centimètres plus large que le mur DE CHAQUE
   CÔTÉ — seize pour un mur de dix —, elle laissait un liseré clair tout autour
@@ -843,7 +849,23 @@ filet pour la déconnexion, rouge nu pour la suppression), la **croix
 dessinée** en haut à droite — la leçon des caractères — et le voile qui
 referme, parce que c'est le geste que tout le monde essaie en premier. La
 confirmation de suppression RESTE une Alert système : pour un geste
-destructif, l'austérité du système est un avertissement en soi.
+destructif, l'austérité du système est un avertissement en soi. En PRO, la
+carte prend la parure — « plus dynamique et coloré premium » : l'avatar se
+cercle du contour d'or qui respire et le nom passe à la typo d'or ; en
+gratuit, elle reste sobre — la parure est ce qu'on achète.
+
+### Le retour se glisse depuis le bord
+
+Relevé du patron : « un glissement de gauche vers la droite doit faire
+revenir en arrière, comme sur les apps modernes, ou même Safari ». Une
+bande invisible de vingt points longe le bord gauche des quatre écrans qui
+portent la flèche de retour (`RetourGlisse` — Mes scans, résultats, aperçu
+du PDF, photo de repérage) et rend exactement le même retour qu'elle : la
+bibliothèque referme d'abord le dossier ouvert, les résultats reviennent
+d'où ils sont venus. La bande est étroite à dessein — elle ne vole le
+toucher qu'au ras du bord, où aucun bouton ne vit — et le seuil est FRANC
+(soixante points, plus horizontal que vertical, compté au banc) : un doigt
+qui hésite ou qui défile ne déclenche rien.
 
 ### Le badge Pro respire
 
@@ -1871,8 +1893,9 @@ structurelle (`feuillesElevations`) — cocher « Cotes Élec » ET
 seule série, la plus large. L'icône des élévations a changé au passage :
 la galerie d'images ne disait rien d'une cote — deux flèches verticales
 (`sort-vertical`, jeu Solar) disent une hauteur qu'on mesure. Et la
-boussole du calque « Nord » du plan s'est engraissée (trait 2,6) : à côté
-des silhouettes Solar, elle faisait maigrelette.
+boussole du calque « Nord » du plan s'est engraissée (trait 2,6) puis
+grandie (26 points) : à côté des silhouettes Solar, elle faisait
+maigrelette.
 
 **Une perspective par feuille, et autant qu'il en faut.** Deux vues se
 partageaient une page, chacune dans une case de 290 points — le tiers d'un

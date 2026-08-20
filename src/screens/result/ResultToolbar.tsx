@@ -283,10 +283,11 @@ export function Toolbar2D({
           label="Nord"
           node={
             <Compass
-              size={22}
+              // À côté des silhouettes Solar, 22 points et un trait de 2
+              // faisaient maigrelet — relevé du patron, en deux temps :
+              // plus grasse, puis plus grande.
+              size={26}
               color={showNorth ? '#FFFFFF' : teinte.ink}
-              // À côté des silhouettes Solar, le trait de 2 faisait
-              // maigrelet — relevé du patron : légèrement plus gras.
               strokeWidth={2.6}
             />
           }

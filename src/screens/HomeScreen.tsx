@@ -122,25 +122,6 @@ export function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity
-        style={styles.themeButton}
-        accessibilityLabel={
-          themePref === 'dark' ? 'Passer en thème clair' : 'Passer en thème sombre'
-        }
-        // La cible déborde du rond — relevé du patron : « le clic doit
-        // être mal placé pour que ça active ». Le débord ne change rien
-        // au dessin, il élargit la prise, comme partout dans iOS.
-        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-        onPress={() => setThemePref(themePref === 'dark' ? 'light' : 'dark')}>
-        <ThemeGlyph
-          quoi={themePref === 'dark' ? 'soleil' : 'lune'}
-          // Grand dans sa pastille de 46 : à 21 points, le glyphe était un
-          // pictogramme timide à côté des autres — relevé du patron.
-          size={27}
-          color={c.inkSoft}
-        />
-      </TouchableOpacity>
-
       <View style={styles.hero}>
         <View style={styles.logoWrap}>
           {[0, 0.15].map((delay, i) => (
@@ -359,14 +340,16 @@ export function HomeScreen() {
             soulignement qui suivrait la longueur du mot. Nom et grade se
             centrent sur elle.
           */}
-          <Svg width={96} height={5} style={styles.profilBarre}>
+          {/* Soixante-quatre points : à 96, elle frôlait le logo — le
+              bloc reste un coin, pas une bannière. */}
+          <Svg width={64} height={5} style={styles.profilBarre}>
             <Defs>
               <LinearGradient id="barre-profil" x1="0" y1="0" x2="1" y2="0">
                 <Stop offset="0%" stopColor={c.blue} />
                 <Stop offset="100%" stopColor="#3EB8E5" />
               </LinearGradient>
             </Defs>
-            <Rect width={96} height={5} rx={2.5} fill="url(#barre-profil)" />
+            <Rect width={64} height={5} rx={2.5} fill="url(#barre-profil)" />
           </Svg>
           {pro ? (
             <TexteOr texte="PRO" taille={10.5} fond={c.bg} style={styles.profilGrade} />
@@ -377,6 +360,32 @@ export function HomeScreen() {
           )}
         </View>
       </Pressable>
+
+      {/*
+        LE BOUTON DE THÈME SE REND EN DERNIER — relevé du patron : « le
+        clic ne fait rien, sauf en bas à droite ». Le bloc héros, rendu
+        après lui, s'étendait par-dessus et avalait le toucher partout où
+        il le chevauchait : c'est l'ORDRE des frères qui fait l'empilement,
+        ce qui flotte au bandeau vient donc après tout le reste.
+      */}
+      <TouchableOpacity
+        style={styles.themeButton}
+        accessibilityLabel={
+          themePref === 'dark' ? 'Passer en thème clair' : 'Passer en thème sombre'
+        }
+        // La cible déborde du rond — relevé du patron : « le clic doit
+        // être mal placé pour que ça active ». Le débord ne change rien
+        // au dessin, il élargit la prise, comme partout dans iOS.
+        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+        onPress={() => setThemePref(themePref === 'dark' ? 'light' : 'dark')}>
+        <ThemeGlyph
+          quoi={themePref === 'dark' ? 'soleil' : 'lune'}
+          // Grand dans sa pastille : à 21 points, le glyphe était un
+          // pictogramme timide à côté des autres — relevé du patron.
+          size={27}
+          color={c.inkSoft}
+        />
+      </TouchableOpacity>
 
       <MenuCompte visible={menuCompte} fermer={() => setMenuCompte(false)} />
     </View>
@@ -554,11 +563,11 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 9,
-    maxWidth: '55%',
+    maxWidth: '45%',
     zIndex: 2,
   },
   profilColonne: { flexShrink: 1, alignItems: 'center' },
-  profilNom: { color: c.ink, fontSize: 13.5, fontWeight: '800', maxWidth: 150 },
+  profilNom: { color: c.ink, fontSize: 13.5, fontWeight: '800', maxWidth: 118 },
   profilBarre: { marginTop: 4, marginBottom: 4 },
   profilGrade: { alignSelf: 'center' },
   profilGradeTexte: {

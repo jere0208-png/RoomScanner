@@ -17,6 +17,7 @@ import React from 'react';
 import { Alert, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { CloseCross } from './CloseCross';
+import { ContourOr, TexteOr } from './ContourOr';
 import { SOLAIRES } from '../ui/solaires';
 import { PLANS_GRATUITS, useAccountStore } from '../store/accountStore';
 import { useTheme, type Palette } from '../theme';
@@ -77,14 +78,39 @@ export function MenuCompte({
             onPress={fermer}>
             <CloseCross size={22} color={c.inkSoft} />
           </Pressable>
-          <View style={s.rondAvatar}>
-            <Svg width={34} height={34} viewBox="0 0 24 24">
-              <Path d={SOLAIRES.avatar} fill="#FFFFFF" fillRule="evenodd" />
-            </Svg>
-          </View>
-          <Text style={s.nom}>
-            {compte?.prenom || compte?.email || 'Mon compte'}
-          </Text>
+          {/*
+            EN PRO, LA PARURE — relevé du patron : « plus dynamique et
+            coloré premium ». L'avatar se cercle du contour d'or qui
+            respire, et le nom passe à la typo d'or : la signature du Pro,
+            la même que le badge et la page. En gratuit, la carte reste
+            sobre — la parure est ce qu'on achète.
+          */}
+          {pro ? (
+            <ContourOr rayon={30} fond={c.blue} style={s.rondAvatarOr}>
+              <View style={s.rondDedans}>
+                <Svg width={34} height={34} viewBox="0 0 24 24">
+                  <Path d={SOLAIRES.avatar} fill="#FFFFFF" fillRule="evenodd" />
+                </Svg>
+              </View>
+            </ContourOr>
+          ) : (
+            <View style={s.rondAvatar}>
+              <Svg width={34} height={34} viewBox="0 0 24 24">
+                <Path d={SOLAIRES.avatar} fill="#FFFFFF" fillRule="evenodd" />
+              </Svg>
+            </View>
+          )}
+          {pro ? (
+            <TexteOr
+              texte={compte?.prenom || compte?.email || 'Mon compte'}
+              taille={19}
+              fond={c.surface}
+            />
+          ) : (
+            <Text style={s.nom}>
+              {compte?.prenom || compte?.email || 'Mon compte'}
+            </Text>
+          )}
           <Text style={s.etat}>
             {pro
               ? 'EchoPlan Pro · relevés illimités'
@@ -153,6 +179,8 @@ const themed = (c: Palette) =>
       justifyContent: 'center',
       marginBottom: 2,
     },
+    rondAvatarOr: { width: 60, height: 60, marginBottom: 2 },
+    rondDedans: { flexGrow: 1, alignItems: 'center', justifyContent: 'center' },
     nom: { color: c.ink, fontSize: 19, fontWeight: '800' },
     etat: { color: c.inkSoft, fontSize: 13.5, marginBottom: 8 },
     cta: {

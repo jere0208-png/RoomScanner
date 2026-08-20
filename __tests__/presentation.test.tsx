@@ -20,6 +20,7 @@ import React from 'react';
 import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import { ExportScreen, feuillesElevations } from '../src/screens/ExportScreen';
+import { RetourGlisse } from '../src/components/RetourGlisse';
 import { ResultScreen } from '../src/screens/ResultScreen';
 import { Iso3DView } from '../src/components/Iso3DView';
 import { ExportArt } from '../src/components/ExportArt';
@@ -229,6 +230,14 @@ describe('le nord dans le dossier', () => {
       elevations: false,
       toutesElevations: false,
     });
+  });
+
+  it('l’aperçu du PDF rend le retour au bord gauche', () => {
+    const tree = monter('export');
+    const bord = tree.root.findAllByType(RetourGlisse)[0];
+    expect(bord).toBeDefined();
+    act(() => bord.props.onRetour());
+    expect(useScanStore.getState().screen).toBe('result');
   });
 
   it('et sur lui seulement : les perspectives restent nues', () => {

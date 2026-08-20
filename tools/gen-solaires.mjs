@@ -60,6 +60,10 @@ const CHOIX = {
   etoile: ['star-bold'],
   // --- le bloc profil de l'accueil
   avatar: ['user-circle-bold', 'user-rounded-bold'],
+  // --- le bouton de thème (fiches SVGRepo 526045 et 526341, désignées
+  //     par le patron : la lune et le soleil du même jeu)
+  lune: ['moon-bold'],
+  soleil: ['sun-bold', 'sun-2-bold'],
 };
 
 async function tracer(nom) {

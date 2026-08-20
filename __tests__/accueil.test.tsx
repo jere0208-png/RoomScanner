@@ -107,6 +107,12 @@ describe('l’accueil', () => {
     const glyphe = pastille.findAllByType(ThemeGlyph)[0];
     expect(glyphe).toBeDefined();
     expect(glyphe.props.size ?? 21).toBeGreaterThanOrEqual(26);
+    // Et c'est la lune SOLAR (fiche désignée par le patron) : le glyphe
+    // vient du même jeu que toutes les icônes des menus.
+    expect(
+      glyphe.findAllByType(Path).filter((n) => n.props.d === SOLAIRES.lune)
+        .length,
+    ).toBe(1);
     /*
       ET LA CIBLE DÉBORDE DU ROND — relevé du patron : « le clic doit être
       mal placé pour que ça active ». Une pastille de 46 points en haut
@@ -120,6 +126,28 @@ describe('l’accueil', () => {
     for (const cote of ['top', 'bottom', 'left', 'right'] as const) {
       expect(slop![cote]).toBeGreaterThanOrEqual(10);
     }
+    /*
+      ET RIEN NE LE RECOUVRE — relevé du patron : « le clic ne fait rien,
+      sauf à un endroit précis en bas à droite ». Le bloc héros, rendu
+      APRÈS lui, s'étendait par-dessus et avalait le toucher partout où il
+      le chevauchait. Ce qui flotte au bandeau se rend donc EN DERNIER :
+      dans l'arbre, la pastille du thème et le bloc profil viennent après
+      le héros — c'est l'ordre qui fait l'empilement.
+    */
+    // Le conteneur est le parent direct de la pastille : c'est SES
+    // enfants qui s'empilent.
+    const conteneur = pastille.parent!;
+    const enfants = conteneur.children.filter(
+      (e): e is TestRenderer.ReactTestInstance => typeof e !== 'string',
+    );
+    const rangHero = enfants.findIndex(
+      (n) => n.findAllByType(LogoMark).length > 0,
+    );
+    const rangTheme = enfants.findIndex((n) =>
+      String(n.props?.accessibilityLabel ?? '').startsWith('Passer en thème'),
+    );
+    expect(rangHero).toBeGreaterThanOrEqual(0);
+    expect(rangTheme).toBeGreaterThan(rangHero);
   });
 
   /*
@@ -169,7 +197,7 @@ describe('l’accueil', () => {
     expect(rubans.length).toBeGreaterThan(0);
     // Et sa taille est FIXE — la même en Gratuit et en Pro : une barre qui
     // change de longueur avec le mot qu'elle souligne n'est plus un axe.
-    expect(Number(rubans[0].props.width)).toBe(96);
+    expect(Number(rubans[0].props.width)).toBe(64);
     /*
       ET LE BANDEAU EST AXÉ — le bloc profil et le bouton de thème
       descendent ensemble et partagent leur ligne : deux éléments à la
@@ -232,7 +260,7 @@ describe('l’accueil', () => {
     const ruban = bloc
       .findAllByType(Rect)
       .filter((n) => Number(n.props.height) >= 4)[0];
-    expect(Number(ruban.props.width)).toBe(96);
+    expect(Number(ruban.props.width)).toBe(64);
     useAccountStore.setState({ pro: false });
   });
 

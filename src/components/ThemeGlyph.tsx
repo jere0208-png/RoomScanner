@@ -13,8 +13,15 @@
  * tracés la referment.
  */
 import React from 'react';
-import Svg, { Circle, Path } from 'react-native-svg';
+import Svg, { Path } from 'react-native-svg';
+import { SOLAIRES } from '../ui/solaires';
 
+/**
+ * Depuis la refonte Solar, la lune et le soleil viennent du MÊME jeu que
+ * tout le reste (fiches SVGRepo 526045 et 526341, désignées par le
+ * patron) : deux silhouettes pleines, régénérées par l'outil comme les
+ * autres — le dessin maison n'avait plus de raison de faire bande à part.
+ */
 export function ThemeGlyph({
   /** `soleil` = passer en clair, `lune` = passer en sombre. */
   quoi,
@@ -25,38 +32,13 @@ export function ThemeGlyph({
   size?: number;
   color: string;
 }) {
-  if (quoi === 'lune') {
-    return (
-      <Svg width={size} height={size} viewBox="0 0 24 24">
-        {/*
-          Le croissant est un SEUL contour, pas un disque mordu par un autre :
-          deux formes superposées demanderaient de connaître la couleur du
-          fond, qui change justement avec le thème.
-        */}
-        <Path
-          d="M20 14.5 A8.5 8.5 0 1 1 9.5 4 A7 7 0 0 0 20 14.5 z"
-          fill={color}
-        />
-      </Svg>
-    );
-  }
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24">
-      <Circle cx={12} cy={12} r={4.6} fill={color} />
-      {[0, 45, 90, 135, 180, 225, 270, 315].map((a) => {
-        const r = (a * Math.PI) / 180;
-        const x = 12 + Math.cos(r);
-        const y = 12 + Math.sin(r);
-        return (
-          <Path
-            key={a}
-            d={`M${(x + Math.cos(r) * 6.4).toFixed(2)} ${(y + Math.sin(r) * 6.4).toFixed(2)} L${(x + Math.cos(r) * 9).toFixed(2)} ${(y + Math.sin(r) * 9).toFixed(2)}`}
-            stroke={color}
-            strokeWidth={2}
-            strokeLinecap="round"
-          />
-        );
-      })}
+      <Path
+        d={quoi === 'lune' ? SOLAIRES.lune : SOLAIRES.soleil}
+        fill={color}
+        fillRule="evenodd"
+      />
     </Svg>
   );
 }

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { BackChevron } from '../components/BackChevron';
+import { RetourGlisse } from '../components/RetourGlisse';
 import {
   Linking,
   StyleSheet,
@@ -58,9 +59,17 @@ export function CameraScreen() {
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity style={styles.backButton} onPress={() => setScreen('home')}>
+      <TouchableOpacity
+        style={styles.backButton}
+        // Le chevron est un tracé : il ne dit rien à un lecteur d'écran,
+        // le nom s'écrit — comme sur les trois autres écrans.
+        accessibilityLabel="Retour"
+        onPress={() => setScreen('home')}>
         <BackChevron color={c.ink} />
       </TouchableOpacity>
+      {/* Le bord gauche rend le même retour que la flèche — le geste de
+          Safari, partout où elle vit. */}
+      <RetourGlisse onRetour={() => setScreen('home')} />
 
       <View style={styles.body}>
         <View style={styles.glyphCard}>
