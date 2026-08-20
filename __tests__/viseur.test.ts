@@ -177,7 +177,7 @@ describe('l’écran de scan', () => {
     expect(dits).toContain('1 appareil posé');
   });
 
-  it('et le dit franchement quand il n’y a rien à viser', async () => {
+  it('et le dit franchement quand la cible n’est pas un mur', async () => {
     const { RoomScan } = require('react-native-room-scan');
     RoomScan.poserAuViseur = jest.fn(async () => false);
     const TestRenderer = require('react-test-renderer');
@@ -189,7 +189,7 @@ describe('l’écran de scan', () => {
       .findAll((n: any) => typeof n.props?.children === 'string')
       .map((n: any) => n.props.children)
       .join(' | ');
-    expect(dits).toContain('Rien à viser');
+    expect(dits).toContain('Visez un mur');
   });
 });
 

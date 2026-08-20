@@ -75,12 +75,17 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
    mur, lui, se relit d'un coup d'œil — on voit ses trois prises alignées,
    ou celle qui a glissé sur la fenêtre.
 
-   La couche est une `ARSCNView` transparente PAR-DESSUS la vue de scan,
-   qui partage sa session ARKit : elle ne dessine que nos repères, la
-   caméra et les guides restant l'affaire de RoomPlan.
+   PREMIÈRE TENTATIVE, ET SON ÉCHEC : une `ARSCNView` transparente
+   par-dessus, partageant la session. Elle a pris le rendu à RoomPlan —
+   « on ne voit plus du tout ce qu'on scanne », écran noir, les repères
+   flottant seuls dans le vide. Une session ARKit ne se rend qu'une fois.
+
+   La couche ne dessine donc plus en 3D : elle PROJETTE. À chaque image,
+   chaque repère est ramené du monde vers l'écran par la caméra elle-même
+   (`ARCamera.projectPoint`), et une étiquette se pose à cet endroit. Rien
+   n'est disputé à RoomPlan — on ne fait que lire sa session.
    */
-  private var couche: ARSCNView?
-  private var noeuds: [SCNNode] = []
+  private var couche: RepereLayerView?
 
   override init() { super.init() }
 
@@ -102,17 +107,11 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
     scan.autoresizingMask = [.flexibleWidth, .flexibleHeight]
     boite.addSubview(scan)
 
-    let calque = ARSCNView(frame: .zero)
+    let calque = RepereLayerView(frame: .zero)
     calque.autoresizingMask = [.flexibleWidth, .flexibleHeight]
     calque.session = scan.captureSession.arSession
-    // Transparente : la caméra est déjà dessinée dessous, la redessiner
-    // ferait deux flux vidéo pour rien.
     calque.backgroundColor = .clear
-    calque.scene.background.contents = UIColor.clear
     calque.isUserInteractionEnabled = false
-    // Nos repères sont plats et opaques : l'éclairage de la pièce les
-    // ferait disparaître dans un contre-jour.
-    calque.autoenablesDefaultLighting = false
     boite.addSubview(calque)
     couche = calque
     return boite
@@ -192,6 +191,19 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
       )
       guard let hit = session.raycast(query).first else { continue }
       let p = hit.worldTransform.columns.3
+      /*
+        SUR UN MUR, ET NULLE PART AILLEURS — relevé du chantier : « les
+        éléments doivent pouvoir se mettre sur les murs uniquement ».
+
+        Le rayon s'arrête sur la première surface qu'ARKit connaît : le
+        sol, une table, un plan estimé en l'air. On en tirait des appareils
+        posés dans le vide, que le plan jetait ensuite sans rien dire. On
+        exige donc un mur RELEVÉ, sauf pour l'éclairage, qui a le droit
+        d'être au plafond — là où RoomPlan ne modélise aucune surface.
+      */
+      let mur = Self.murLePlusProche(de: p, dans: vueCourante)
+      let auPlafond = ["dcl", "spot"].contains(kind) && p.y > 1.9
+      if mur == nil && !auPlafond { continue }
       var ancre: [String: Any] = [
         "kind": kind,
         "x": p.x,
@@ -206,7 +218,7 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
         — abscisse depuis son bord, hauteur au-dessus de son pied — les
         deux mesures que l'établi et le plan emploient déjà.
       */
-      if let mur = Self.murLePlusProche(de: p, dans: vueCourante) {
+      if let mur = mur {
         let inv = simd_inverse(mur.transform)
         let local = inv * SIMD4<Float>(p.x, p.y, p.z, 1)
         let basMur = mur.transform.columns.3.y - mur.dimensions.y / 2
@@ -254,7 +266,7 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
     ancresElec.removeLast()
     // Le repère part avec l'ancre : deux comptes qui divergent, et l'on ne
     // sait plus lequel croire.
-    noeuds.popLast()?.removeFromParentNode()
+    couche?.retirerDernier()
     return true
   }
 
@@ -269,61 +281,12 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
    surfaces se disputent la profondeur), et le repère semble grésiller.
    */
   private func planterRepere(kind: String, sur transform: simd_float4x4) {
-    guard let calque = couche else { return }
-    let teinte: UIColor
-    let sigle: String
-    switch kind {
-    case "inter", "va", "poussoir", "variateur":
-      teinte = UIColor(red: 0.12, green: 0.36, blue: 1, alpha: 1)
-      sigle = "INT"
-    case "dcl", "spot", "applique":
-      teinte = UIColor(red: 0.88, green: 0.64, blue: 0.23, alpha: 1)
-      sigle = "LUM"
-    default:
-      teinte = UIColor(red: 0.91, green: 0.55, blue: 0.13, alpha: 1)
-      sigle = "PC"
-    }
-
-    let plaque = SCNPlane(width: 0.09, height: 0.09)
-    plaque.cornerRadius = 0.012
-    plaque.firstMaterial?.diffuse.contents = teinte
-    plaque.firstMaterial?.isDoubleSided = true
-    // `constant` : la plaque garde sa couleur quelle que soit la lumière —
-    // un repère qui s'assombrit dans un coin ne se voit plus.
-    plaque.firstMaterial?.lightingModel = .constant
-    let noeud = SCNNode(geometry: plaque)
-
-    let texte = SCNText(string: sigle, extrusionDepth: 0)
-    texte.font = UIFont.systemFont(ofSize: 3, weight: .heavy)
-    texte.firstMaterial?.diffuse.contents = UIColor.white
-    texte.firstMaterial?.lightingModel = .constant
-    let noeudTexte = SCNNode(geometry: texte)
-    // SCNText naît dans son coin bas gauche : on le recentre sur la plaque.
-    let (mini, maxi) = texte.boundingBox
-    noeudTexte.pivot = SCNMatrix4MakeTranslation(
-      (mini.x + maxi.x) / 2, (mini.y + maxi.y) / 2, 0,
-    )
-    noeudTexte.scale = SCNVector3(0.01, 0.01, 0.01)
-    noeudTexte.position = SCNVector3(0, 0, 0.001)
-    noeud.addChildNode(noeudTexte)
-
-    // La transform du rayon porte l'orientation de la surface : le repère
-    // se plaque donc au mur, incliné comme lui.
-    noeud.simdTransform = transform
-    // Deux centimètres devant le nu, le long de la normale de la surface.
-    let normale = SIMD3<Float>(
-      transform.columns.2.x, transform.columns.2.y, transform.columns.2.z,
-    )
-    noeud.simdPosition += simd_normalize(normale) * 0.02
-    calque.scene.rootNode.addChildNode(noeud)
-    noeuds.append(noeud)
+    let p = transform.columns.3
+    couche?.ajouter(kind: kind, at: SIMD3<Float>(p.x, p.y, p.z))
   }
 
   /// Un relevé tout neuf repart d'une pièce vide de repères.
-  private func viderReperes() {
-    for n in noeuds { n.removeFromParentNode() }
-    noeuds.removeAll()
-  }
+  private func viderReperes() { couche?.vider() }
 
   func pause() {
     RoomColorSampler.shared.detach()

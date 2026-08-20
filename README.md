@@ -227,15 +227,32 @@ dit qu'on a appuyé, pas qu'on a visé juste. Un carré posé sur le mur, lui,
 se relit d'un coup d'œil — on voit ses trois prises alignées, ou celle qui a
 glissé sur la fenêtre.
 
-Une `ARSCNView` transparente se superpose à la vue de scan et partage sa
-session ARKit : elle ne dessine que nos repères, la caméra et les guides
-restant l'affaire de RoomPlan. Chaque pose y plante un carré plat de neuf
-centimètres, plaqué à la surface visée (la transformation du rayon porte
-son orientation), à deux centimètres du nu — à fleur, les deux surfaces se
-disputent la profondeur et le repère grésille. Il prend la couleur du métier
-et porte son sigle : PC ambre, INT bleu, LUM doré, en éclairage `constant`
-pour qu'un contre-jour ne l'efface pas. Retirer le dernier appareil retire
-son repère : deux comptes qui divergent, et l'on ne sait plus lequel croire.
+**Première tentative, et son échec — à garder en mémoire.** Une `ARSCNView`
+transparente par-dessus la vue de scan, partageant sa session : elle a pris
+le rendu à RoomPlan. Retour du chantier, sans appel : « on ne voit plus du
+tout ce qu'on scanne » — écran noir, les repères flottant seuls dans le
+vide. **Une session ARKit ne se rend qu'une fois**, et c'est RoomPlan qui la
+rend ; lui seul sait dessiner ses guides.
+
+On ne dessine donc plus en 3D : on PROJETTE. À chaque image, la caméra
+elle-même ramène chaque point du monde vers l'écran
+(`ARCamera.projectPoint`) et une étiquette se pose à cet endroit
+(`RepereLayerView`). La vue ne fait que LIRE la session — rien ne lui est
+disputé. Deux conséquences heureuses : les étiquettes gardent leur taille et
+restent lisibles de loin (un carré de neuf centimètres, à quatre mètres, ne
+fait plus rien), et le coût est nul — une poignée de projections par image,
+pas un second rendu. Ce qui est DERRIÈRE la caméra se cache : `projectPoint`
+rend un point d'écran même pour ce qu'on a dépassé, et l'étiquette revenait
+alors se poser au milieu de l'image.
+
+**Et l'on ne pose que sur un MUR.** Relevé du chantier : « les éléments
+doivent pouvoir se mettre sur les murs uniquement ». Le rayon s'arrête sur
+la première surface qu'ARKit connaît — le sol, une table, un plan estimé en
+l'air : on en tirait des appareils posés dans le vide, que le plan jetait
+ensuite sans rien dire. La pose exige donc un mur RELEVÉ, et le refus dit
+quoi faire (« Visez un mur déjà relevé — balayez-le d'abord »). Seul
+l'éclairage garde le droit d'être en hauteur : le plafond, RoomPlan n'en
+modélise aucune surface.
 
 **Le natif ne rend qu'un point.** Un rayon part du milieu de l'image
 (`ARFrame.raycastQuery` en coordonnées normalisées, donc 0,5 / 0,5) et

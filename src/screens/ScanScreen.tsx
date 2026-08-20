@@ -193,7 +193,7 @@ export function ScanScreen() {
             <View style={styles.poseBandeau} pointerEvents="none">
               <Text style={styles.instructionText}>
                 {refus
-                  ? 'Rien à viser ici — approchez-vous du mur'
+                  ? 'Visez un mur déjà relevé — balayez-le d’abord'
                   : `${poses} appareil${poses > 1 ? 's' : ''} posé${
                       poses > 1 ? 's' : ''
                     }`}
