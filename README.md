@@ -846,18 +846,18 @@ l'App Store (avis incités) ; le patron est prévenu, à revoir avant la
 soumission. L'URL d'avis porte un identifiant GABARIT tant que la fiche
 App Store Connect n'existe pas.
 
-**Le profil est un bloc, en haut à gauche** — croquis Paint du patron. La
-mention du compte vivait en pied d'écran, minuscule : c'est maintenant
-l'avatar Solar, le nom souligné d'une **barre en dégradé** (du bleu de
-marque vers le ciel, cinq points, bouts ronds — et de taille FIXE, la même
-en Gratuit et en Pro : c'est un axe, pas un soulignement qui suivrait la
-longueur du mot), et le GRADE centré dessous — « GRATUIT » gris fade,
-« PRO » dans la typo d'or de la page Pro. TOUT le bloc prend le clic
-(avatar, nom, barre — les vues SVG sont transparentes au doigt, sinon
-elles l'avalent), et le bandeau est AXÉ : le bloc et le bouton de thème
-descendent ensemble et se centrent sur la même ligne. La pastille du
-thème, elle, a maigri (40 points pour un glyphe de 27 — « réduis le bloc
-blanc, sans réduire les icônes ») et sa cible déborde de douze points.
+**Le profil est un bloc, en haut à gauche** — et il s'est ÉPURÉ en trois
+retouches du patron : l'avatar Solar et le prénom, RIEN d'autre. La barre
+en dégradé et le grade écrit ont vécu — « GRATUIT » n'a pas besoin de
+s'écrire, il se voit : en gratuit tout se lit gris ; en Pro, le prénom
+passe à la typo d'or et l'avatar se cercle du contour qui respire — le
+grade se VOIT. TOUT le bloc prend le clic (les vues SVG sont transparentes
+au doigt, sinon elles l'avalent), le bandeau est AXÉ par les centres, et
+les deux blocs ont été REMONTÉS d'un cran après un dernier relevé (« le
+clic doit être fait un peu au-dessus ») avec des zones encore élargies —
+72 points pour le thème, un cadre de quatorze pour le profil — et le bloc
+héros passé en `box-none`, pour qu'aucune vue pleine largeur ne puisse
+plus s'interposer.
 
 **Le menu du compte est une carte à nous** — plus la feuille grise du
 système, « trop basique ». Avatar Solar sur pastille bleue, le nom, l'état

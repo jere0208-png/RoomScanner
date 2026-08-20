@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
-import Svg, { Defs, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
+import Svg, { Path } from 'react-native-svg';
 import { MenuCompte } from '../components/MenuCompte';
 import { ThemeGlyph } from '../components/ThemeGlyph';
-import { TexteOr } from '../components/ContourOr';
+import { ContourOr, TexteOr } from '../components/ContourOr';
 import { SOLAIRES } from '../ui/solaires';
 import {
   Animated,
@@ -122,7 +122,10 @@ export function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.hero}>
+      {/* `box-none` : le bloc pleine largeur laisse passer le doigt là où
+          lui-même n'a rien à toucher — plus jamais un fantôme au-dessus
+          des boutons du bandeau. */}
+      <View style={styles.hero} pointerEvents="box-none">
         <View style={styles.logoWrap}>
           {[0, 0.15].map((delay, i) => (
             <Animated.View
@@ -309,11 +312,10 @@ export function HomeScreen() {
         LE PROFIL EST UN BLOC, EN HAUT À GAUCHE — croquis Paint du patron.
 
         La mention du compte vivait en pied d'écran, minuscule ; elle est
-        maintenant un petit bloc qui ne gêne pas : l'avatar, le nom souligné
-        d'une barre, et le GRADE centré dessous — gris fade pour le
-        gratuit, la typo d'or de la page Pro pour le Pro. C'est toujours la
-        seule porte VOLONTAIRE vers la page Pro : le clic garde tout le
-        geste de l'ancienne rangée.
+        maintenant un petit bloc qui ne gêne pas : l'avatar et le prénom,
+        gris en gratuit, parés d'or en Pro. C'est toujours la seule porte
+        VOLONTAIRE vers la page Pro : le clic garde tout le geste de
+        l'ancienne rangée.
       */}
       <Pressable
         accessibilityRole="button"
@@ -323,39 +325,39 @@ export function HomeScreen() {
         // Le menu est une carte EchoPlan (MenuCompte), plus la feuille
         // grise du système — relevé du patron : « trop basique ».
         onPress={() => setMenuCompte(true)}>
-        {/* Les enfants sont transparents au doigt : une vue SVG avale le
-            toucher si on la laisse faire, et c'est TOUT le bloc — avatar,
-            nom, barre, grade — qui doit ouvrir le menu. */}
-        <Svg width={30} height={30} viewBox="0 0 24 24" pointerEvents="none">
-          <Path d={SOLAIRES.avatar} fill={c.inkSoft} fillRule="evenodd" />
-        </Svg>
-        <View style={styles.profilColonne} pointerEvents="none">
-          <Text style={styles.profilNom} numberOfLines={1}>
-            {compte?.prenom || compte?.email || 'Compte'}
-          </Text>
-          {/*
-            LA BARRE DU CROQUIS, en grand : cinq points, bouts ronds, en
-            DÉGRADÉ du bleu de marque vers le ciel. Sa taille est FIXE —
-            la même en Gratuit et en Pro : c'est un axe, pas un
-            soulignement qui suivrait la longueur du mot. Nom et grade se
-            centrent sur elle.
-          */}
-          {/* Soixante-quatre points : à 96, elle frôlait le logo — le
-              bloc reste un coin, pas une bannière. */}
-          <Svg width={64} height={5} style={styles.profilBarre}>
-            <Defs>
-              <LinearGradient id="barre-profil" x1="0" y1="0" x2="1" y2="0">
-                <Stop offset="0%" stopColor={c.blue} />
-                <Stop offset="100%" stopColor="#3EB8E5" />
-              </LinearGradient>
-            </Defs>
-            <Rect width={64} height={5} rx={2.5} fill="url(#barre-profil)" />
+        {/*
+          L'AVATAR ET LE PRÉNOM, RIEN D'AUTRE — relevé du patron : la
+          barre est partie, le grade écrit aussi. En gratuit, tout se lit
+          GRIS ; en Pro, le prénom passe à la typo d'or et l'avatar se
+          cercle du contour qui respire — le grade se VOIT, il ne s'écrit
+          plus. Les enfants restent transparents au doigt : c'est TOUT le
+          bloc qui ouvre le menu.
+        */}
+        {pro ? (
+          <View pointerEvents="none">
+            <ContourOr rayon={19} fond={c.bg} style={styles.avatarOrZone}>
+              <View style={styles.avatarOrDedans}>
+                <Svg width={26} height={26} viewBox="0 0 24 24">
+                  <Path d={SOLAIRES.avatar} fill={c.inkSoft} fillRule="evenodd" />
+                </Svg>
+              </View>
+            </ContourOr>
+          </View>
+        ) : (
+          <Svg width={30} height={30} viewBox="0 0 24 24" pointerEvents="none">
+            <Path d={SOLAIRES.avatar} fill={c.inkSoft} fillRule="evenodd" />
           </Svg>
+        )}
+        <View style={styles.profilColonne} pointerEvents="none">
           {pro ? (
-            <TexteOr texte="PRO" taille={10.5} fond={c.bg} style={styles.profilGrade} />
+            <TexteOr
+              texte={compte?.prenom || compte?.email || 'Compte'}
+              taille={14.5}
+              fond={c.bg}
+            />
           ) : (
-            <Text style={[styles.profilGradeTexte, styles.profilGrade]}>
-              GRATUIT
+            <Text style={styles.profilNom} numberOfLines={1}>
+              {compte?.prenom || compte?.email || 'Compte'}
             </Text>
           )}
         </View>
@@ -444,12 +446,14 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     LA ZONE (64, invisible) PORTE LA PASTILLE (40, blanche). Le centre
     s'axe sur la ligne du profil : 53 + 32 = 85, comme 50 + 35.
   */
+  // Zone remontée et encore élargie (72) — relevé du patron : le point
+  // qui répondait était AU-DESSUS du dessin.
   themeZone: {
     position: 'absolute',
-    top: 53,
-    right: 10,
-    width: 64,
-    height: 64,
+    top: 47,
+    right: 6,
+    width: 72,
+    height: 72,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 2,
@@ -569,11 +573,14 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   // relevé du patron : « un clic même autour doit fonctionner ». Le
   // rembourrage est DANS le bouton : c'est de la vraie surface de toucher,
   // pas un débord que le parent pourrait rogner.
+  // Remonté d'un cran — relevé du patron : « le clic doit être fait un
+  // peu au-dessus pour que ça fonctionne » — et le cadre invisible
+  // s'élargit encore : quatorze points de vraie surface tout autour.
   profilBloc: {
     position: 'absolute',
-    top: 50,
-    left: 10,
-    padding: 12,
+    top: 46,
+    left: 8,
+    padding: 14,
     minHeight: 46,
     flexDirection: 'row',
     alignItems: 'center',
@@ -581,14 +588,8 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     maxWidth: '50%',
     zIndex: 2,
   },
-  profilColonne: { flexShrink: 1, alignItems: 'center' },
-  profilNom: { color: c.ink, fontSize: 13.5, fontWeight: '800', maxWidth: 118 },
-  profilBarre: { marginTop: 4, marginBottom: 4 },
-  profilGrade: { alignSelf: 'center' },
-  profilGradeTexte: {
-    color: c.inkFaint,
-    fontSize: 10.5,
-    fontWeight: '700',
-    letterSpacing: 1.2,
-  },
+  profilColonne: { flexShrink: 1 },
+  profilNom: { color: c.inkSoft, fontSize: 14.5, fontWeight: '700', maxWidth: 130 },
+  avatarOrZone: { width: 38, height: 38 },
+  avatarOrDedans: { flexGrow: 1, alignItems: 'center', justifyContent: 'center' },
 }));

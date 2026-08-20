@@ -37,7 +37,9 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 import React from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
-import { LinearGradient, Path, Rect } from 'react-native-svg';
+import { LinearGradient, Path } from 'react-native-svg';
+import { ContourOr } from '../src/components/ContourOr';
+import { light } from '../src/theme';
 import { HomeScreen } from '../src/screens/HomeScreen';
 import { LogoMark } from '../src/components/LogoMark';
 import { PhoneShowcase } from '../src/components/PhoneShowcase';
@@ -194,21 +196,26 @@ describe('l’accueil', () => {
     ).toBe(1);
     const vu = textes(t);
     expect(vu).toContain('Jérôme');
-    expect(vu).toContain('GRATUIT');
     /*
-      LA BARRE EST GRANDE ET STYLISÉE — relevé du patron. Le simple filet
-      gris de 2,5 points est devenu une barre en DÉGRADÉ (du bleu de
-      marque vers le ciel), bouts ronds, 5 points : c'est elle qui
-      structure le bloc, elle doit se voir.
+      L'AVATAR ET LE PRÉNOM, RIEN D'AUTRE — relevé du patron : la barre
+      est partie, le grade écrit aussi. En gratuit, le prénom se lit GRIS
+      et rien ne brille ; c'est le Pro qui s'anime, et lui seul.
     */
-    expect(bloc.findAllByType(LinearGradient).length).toBeGreaterThan(0);
-    const rubans = bloc
-      .findAllByType(Rect)
-      .filter((n) => Number(n.props.height) >= 4);
-    expect(rubans.length).toBeGreaterThan(0);
-    // Et sa taille est FIXE — la même en Gratuit et en Pro : une barre qui
-    // change de longueur avec le mot qu'elle souligne n'est plus un axe.
-    expect(Number(rubans[0].props.width)).toBe(64);
+    expect(vu).not.toContain('GRATUIT');
+    expect(bloc.findAllByType(LinearGradient)).toHaveLength(0);
+    expect(bloc.findAllByType(ContourOr)).toHaveLength(0);
+    const nomGris = bloc
+      .findAllByType(Text)
+      .find((n) =>
+        (Array.isArray(n.props.children)
+          ? n.props.children.join('')
+          : String(n.props.children)
+        ).includes('Jérôme'),
+      );
+    expect(nomGris).toBeDefined();
+    expect(
+      (StyleSheet.flatten(nomGris!.props.style) as { color?: string }).color,
+    ).toBe(light.inkSoft);
     /*
       ET LE BANDEAU EST AXÉ — le bloc profil et le bouton de thème
       descendent ensemble et partagent leur ligne : deux éléments à la
@@ -222,7 +229,9 @@ describe('l’accueil', () => {
     const stTheme = StyleSheet.flatten(pastilleTheme.props.style) as {
       top?: number;
     };
-    expect(stBloc.top).toBeGreaterThanOrEqual(48);
+    // Remonté d'un cran (le clic répondait au-dessus du dessin), mais
+    // jamais collé au bord d'écran.
+    expect(stBloc.top).toBeGreaterThanOrEqual(44);
     /*
       LE CADRE INVISIBLE DU PROFIL — relevé du patron : « un clic même
       autour doit fonctionner ». Le rembourrage vit DANS le bouton :
@@ -259,7 +268,7 @@ describe('l’accueil', () => {
     ).toBe(0);
   });
 
-  it('le grade Pro respire comme la page Pro', () => {
+  it('en Pro, le prénom et le contour de l’avatar s’animent en couleurs', () => {
     useAccountStore.setState({
       compte: { id: 'email:j@c.fr', prenom: 'Jérôme', methode: 'email' },
       pro: true,
@@ -270,14 +279,12 @@ describe('l’accueil', () => {
         n.props?.accessibilityLabel === 'Mon compte' &&
         typeof n.props?.onPress === 'function',
     )[0];
+    // Le prénom respire dans la typo d'or…
     const typos = bloc.findAllByType(TexteOr);
     expect(typos).toHaveLength(1);
-    expect(typos[0].props.texte).toBe('PRO');
-    // La barre du Pro fait EXACTEMENT la taille de celle du Gratuit.
-    const ruban = bloc
-      .findAllByType(Rect)
-      .filter((n) => Number(n.props.height) >= 4)[0];
-    expect(Number(ruban.props.width)).toBe(64);
+    expect(typos[0].props.texte).toBe('Jérôme');
+    // …et l'avatar se cercle du contour d'or, le même que le badge.
+    expect(bloc.findAllByType(ContourOr)).toHaveLength(1);
     useAccountStore.setState({ pro: false });
   });
 
