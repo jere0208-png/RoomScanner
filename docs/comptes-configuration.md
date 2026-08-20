@@ -71,6 +71,17 @@ qu'une feuille web sécurisée.
    (HMAC) par le schéma `echoplan://google`, livrée uniquement à la feuille
    web qui l'a demandée.
 
+## La page vitrine (2 min)
+
+`server/echoplan.html` est la page de présentation de l'app : une seule
+page, un seul fichier (icône, animation du plan et pictogrammes embarqués
+en base64 — rien d'autre à téléverser), responsive. Le bouton App Store est
+volontairement INACTIF (« en attente ») tant que l'app n'est pas publiée :
+le jour venu, remplacer son `href="#"` par l'URL de la fiche.
+
+Déploiement : copier `server/echoplan.html` à la racine `www/` de
+l'hébergement (comme `api.php`) → https://bourseur.fr/echoplan.html
+
 ## Ce qui reste volontairement dehors
 
 - **L'abonnement 4,90 €** passe par StoreKit/App Store Connect (produit
