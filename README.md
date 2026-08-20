@@ -901,6 +901,18 @@ gratuit, elle reste sobre — la parure est ce qu'on achète.
   du nu, il prend la convention du plan — bleu, trait plein ; le lointain
   reste en creux.
 
+### Le catalogue d'appareillage se déroule, et montre les vrais symboles
+
+Deux relevés du patron, une même fenêtre. **Le blanc défile** : la carte du
+catalogue vivait DANS le Pressable du voile — sur les zones vides, c'est
+lui qui prenait le geste, et le déroulé ne partait que depuis un libellé.
+Le voile est désormais un FRÈRE posé derrière la carte : aucun ancêtre du
+déroulé ne porte de geste, et le banc tient cette structure. **Et les
+tuiles montrent le symbole normalisé** (NF EN 60617, celui que le plan
+dessinera) à la place de la pastille de couleur à sigle : on choisit ce
+qu'on va lire. Le symbole ne disant rien à un lecteur d'écran, chaque puce
+porte son nom en clair — c'est l'épreuve des boutons muets qui l'a exigé.
+
 ### Le retour se glisse depuis le bord
 
 Relevé du patron : « un glissement de gauche vers la droite doit faire

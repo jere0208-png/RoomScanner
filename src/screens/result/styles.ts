@@ -811,6 +811,18 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     justifyContent: 'center',
   },
   elecDotText: { color: '#FFFFFF', fontSize: 9.5, fontWeight: '800' },
+  // La tuile du catalogue : elle porte le SYMBOLE normalisé du plan —
+  // on choisit ce qu'on va lire, pas une pastille à sigle.
+  elecTuile: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: c.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: c.lineStrong,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   elecChipText: { color: c.ink, fontSize: 13.5, fontWeight: '700' },
   modalSubtitle: {
     color: c.inkFaint,

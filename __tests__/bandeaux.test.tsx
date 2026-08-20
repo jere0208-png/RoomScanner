@@ -25,6 +25,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 
 import React from 'react';
 import {
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -42,7 +43,7 @@ import TestRenderer, { act } from 'react-test-renderer';
 import { ResultScreen } from '../src/screens/ResultScreen';
 import { ClientTour } from '../src/components/ClientTour';
 import { FloorplanEditor } from '../src/components/FloorplanEditor';
-import { FIXTURE_FAMILIES } from '../src/geometry/electrical';
+import { FIXTURE_FAMILIES, FIXTURE_SYMBOL } from '../src/geometry/electrical';
 import { CEILINGS, CEILING_KINDS } from '../src/geometry/ceiling';
 import { useScanStore } from '../src/store/scanStore';
 import {
@@ -1086,6 +1087,29 @@ describe('les feuilles de l’écran des résultats', () => {
     // première : c'est le déroulé entier qu'on déplace.
     for (const famille of FIXTURE_FAMILIES) {
       expect(vu).toContain(famille.name);
+    }
+    /*
+      LE CATALOGUE MONTRE LES VRAIS SYMBOLES — relevé du patron : « des
+      images plus modernes et plus compréhensibles ». Une pastille de
+      couleur à sigle ne dit rien ; le symbole normalisé, c'est ce que le
+      plan dessinera. Le socle de prise du catalogue est CELUI du plan.
+    */
+    const scroll = tree.root.findAllByType(ScrollView).pop()!;
+    expect(
+      scroll
+        .findAllByType(Path)
+        .some((p) => p.props.d === FIXTURE_SYMBOL.prise[0].d),
+    ).toBe(true);
+    /*
+      ET LE BLANC DÉFILE — relevé du patron : « ça ne scrolle pas, il faut
+      scroller sur un nom ». Un Pressable ANCÊTRE avalait le geste sur les
+      zones vides : le voile est désormais un frère derrière la carte,
+      aucun ancêtre du déroulé ne porte de geste.
+    */
+    let parent = scroll.parent;
+    while (parent) {
+      expect(typeof parent.props?.onPress).not.toBe('function');
+      parent = parent.parent;
     }
   });
 
