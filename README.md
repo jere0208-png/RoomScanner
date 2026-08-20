@@ -929,32 +929,44 @@ n'en donne qu'un.
 
 ### Le ruban de lumière, derrière la maquette
 
-L'accueil porte une onde qui traverse l'écran de bord à bord, à mi-hauteur du
-téléphone. La référence est un shader GLSL — un trait blanc qui ondule sur
-fond noir, bordé d'une frange chromatique. Il n'y a pas de WebGL ici, et il
-n'en faut pas : ce que l'œil retient de cette image, c'est **une courbe, sa
-lueur et sa frange**. Trois choses qui se dessinent au trait.
+L'accueil porte des ondes qui traversent l'écran de bord à bord, à mi-hauteur
+du téléphone. La référence est un shader GLSL — **plusieurs ondes néon**,
+bleue, verte, rouge, et le trait blanc, qui se croisent et se séparent sur
+fond noir, chacune vivant sa vie. Il n'y a pas de WebGL ici, et il n'en faut
+pas : ce que l'œil retient de cette image, ce sont des courbes, leurs lueurs
+et leurs **croisements**. Tout se dessine au trait.
+
+**Chaque ligne a SA courbe, SA vitesse, SA lueur.** Le premier portage n'avait
+retenu qu'une onde : une courbe et sa frange collée (deux décalages de trois
+points et demi), glissant d'un seul bloc — des lignes parallèles, qui ne se
+croisent jamais. Relevé du patron, référence à l'appui : « chaque ligne bouge
+et sont lumineuses ». Chaque ligne a donc sa **phase** et son **amplitude**
+propres — c'est la différence de phase qui fait les croisements — et sa
+**vitesse** propre, toutes distinctes : à vitesse égale, les croisements
+resteraient plantés aux mêmes endroits et le dessin serait figé dans son
+mouvement. La lueur est une pile de trois passes par ligne — large et pâle,
+serrée, puis le cœur : une lumière s'éteint en s'éloignant de sa source,
+donc la plus large est la plus pâle. Le cœur (blanc la nuit, bleu de marque
+le jour) est peint par-dessus : c'est lui qu'on suit des yeux ; les néons
+gardent leurs couleurs sur les deux fonds — c'est la lumière décomposée.
 
 **C'est la VUE qui glisse, pas l'attribut du dessin.** Premier jet : la course
 était posée sur le `x` d'un groupe SVG. Le ruban n'a pas bougé d'un pixel — et
 c'est logique : le pilote natif ne connaît que les propriétés d'une vue, il
 ignore les attributs d'un dessin vectoriel. L'animation partait, personne ne
 l'écoutait, et l'accueil montrait un trait courbé immobile. Le banc tient
-désormais la seule chose qui garantit le mouvement : une transformation, sur
-une vue, avec une valeur animée dedans.
+désormais la seule chose qui garantit le mouvement : une transformation par
+ligne, sur une vue, avec une valeur animée dedans.
 
-**La courbe est dessinée une fois, et c'est la vue qui la porte qui glisse.** La
+**Chaque courbe est dessinée une fois, et c'est sa vue qui glisse.** La
 recalculer à chaque image — soixante fois par seconde, sur un chemin de
 plusieurs centaines de points — coûterait à l'accueil ce que l'animation du
-plan a justement gagné en étant cuite au build. Le ruban est tracé sur deux
-longueurs d'onde, et une seule transformation, confiée au pilote natif, le
-fait défiler ; le motif se répète exactement d'une période à l'autre, donc la
-boucle ne se voit pas.
-
-**La frange est serrée.** Sur l'original elle s'étale sur plusieurs pixels, ce
-qui donne un arc-en-ciel ; à la taille d'un téléphone, cela devient une
-bavure. Un point et demi de part et d'autre suffit à dire « lumière
-décomposée ».
+plan a justement gagné en étant cuite au build. Chaque ligne est tracée sur
+deux longueurs d'onde, et sa transformation, confiée au pilote natif, la fait
+défiler ; le motif se répète exactement d'une période à l'autre, donc la
+boucle ne se voit pas. Quatre transformations natives ne coûtent pas plus
+cher qu'une — ce qui coûte, c'est un chemin recalculé à l'image, et personne
+ne le fait.
 
 **Et les tangentes suivent la pente.** Premier jet : les points de contrôle
 étaient posés à l'horizontale, à un tiers de pas de chaque point. Une Bézier

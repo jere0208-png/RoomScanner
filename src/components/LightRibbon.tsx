@@ -1,60 +1,75 @@
 /**
- * LE RUBAN DE LUMIÈRE — l'onde qui passe derrière la maquette.
+ * LE RUBAN DE LUMIÈRE — les ondes qui passent derrière la maquette.
  *
- * L'original est un shader GLSL : un trait blanc qui ondule sur fond noir,
- * bordé d'une frange chromatique — du bleu d'un côté, de l'ambre de l'autre,
- * comme la dispersion d'un prisme. Il n'y a pas de WebGL ici, et il n'en faut
- * pas : ce que l'œil retient de cette image, c'est UNE COURBE, SA LUEUR et SA
- * FRANGE. Trois choses qui se dessinent au trait.
+ * L'original est un shader GLSL : PLUSIEURS ondes néon — bleue, verte,
+ * rouge, et le trait blanc — qui se croisent et se séparent, chacune
+ * vivant sa vie, toutes lumineuses. Il n'y a pas de WebGL ici, et il n'en
+ * faut pas : ce que l'œil retient de cette image, ce sont des courbes,
+ * leurs lueurs, et leurs CROISEMENTS.
  *
- * COMMENT ELLE BOUGE, ET POURQUOI AINSI. Recalculer la courbe à chaque image
- * — soixante fois par seconde, sur un chemin de plusieurs centaines de
- * points — coûterait à l'écran d'accueil ce que l'animation du plan a
- * justement gagné en étant cuite au build. Le ruban est donc dessiné UNE
- * FOIS, sur deux longueurs d'onde, et c'est le GROUPE qui glisse : une seule
- * transformation, confiée au pilote natif. Le motif se répète exactement
- * d'une période à l'autre, donc la boucle ne se voit pas.
+ * LE PREMIER PORTAGE N'AVAIT RETENU QU'UNE ONDE. Une courbe et sa frange
+ * collée (deux décalages de trois points et demi), glissant d'un seul
+ * bloc : des lignes parallèles, qui ne se croisent jamais — relevé du
+ * patron, référence à l'appui : « chaque ligne bouge et sont lumineuses ».
+ * Chaque ligne a donc SA courbe — sa phase, son amplitude —, SA vitesse
+ * et SA lueur : c'est la différence de phase qui fait les croisements, et
+ * la différence de vitesse qui les fait vivre.
  *
- * LA FRANGE S'ÉCARTE COMME DANS LE SHADER D'ORIGINE. Elle avait été serrée
- * à un point et demi ; le relevé du chantier a tranché dans l'autre sens —
- * sur l'original, la dispersion s'étale sur plusieurs pixels et c'est elle
- * qui fait le prisme. Trois points et demi de part et d'autre : les couleurs
- * se lisent, sans que le ruban se détache en trois fils.
+ * COMMENT ÇA BOUGE, ET POURQUOI AINSI. Chaque courbe est dessinée UNE
+ * FOIS, sur deux longueurs d'onde, et c'est SA vue qui glisse : une
+ * transformation par ligne, confiée au pilote natif. Quatre
+ * transformations natives ne coûtent pas plus cher qu'une — ce qui coûte,
+ * c'est de recalculer un chemin à l'image, et personne ne le fait.
  */
 import React, { useEffect, useMemo, useRef } from 'react';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
-import Svg, { G, Path } from 'react-native-svg';
+import Svg, { Path } from 'react-native-svg';
 import type { Palette } from '../theme';
 
-/** Hauteur de la bande : le ruban ondule dedans, et rien ne dépasse. */
+/** Hauteur de la bande : les ondes ondulent dedans, et rien ne dépasse. */
 export const RIBBON_H = 96;
 
 /**
- * La courbe, en deux longueurs d'onde exactement.
+ * LES LIGNES DE LA RÉFÉRENCE — chacune sa phase, son amplitude, sa vitesse.
  *
- * Deux, et pas une : la copie qui suit doit entrer par la droite pendant que
- * la première sort par la gauche, sinon la bande se vide à chaque tour.
+ * Les phases sont toutes distinctes : c'est ce qui fait qu'elles se
+ * croisent au lieu de se suivre en formation. Les vitesses aussi : à
+ * vitesse égale, le dessin serait figé dans son mouvement, les croisements
+ * toujours aux mêmes endroits. Le cœur (`teinte: null` — il prend celle du
+ * thème) est DERNIER : peint par-dessus, c'est lui qu'on suit des yeux.
  */
-function onde(largeur: number, hauteur: number): string {
+export const LIGNES = [
+  { role: 'bleu', teinte: '#3A63FF', phase: 3.9, amplitude: 0.26, duree: 21500, epaisseur: 1.6 },
+  { role: 'vert', teinte: '#32D74B', phase: 2.6, amplitude: 0.3, duree: 17500, epaisseur: 1.6 },
+  { role: 'rouge', teinte: '#FF3B30', phase: 1.35, amplitude: 0.24, duree: 11500, epaisseur: 1.6 },
+  { role: 'coeur', teinte: null, phase: 0, amplitude: 0.28, duree: 14000, epaisseur: 1.8 },
+] as const;
+
+/**
+ * Une courbe, en deux longueurs d'onde exactement.
+ *
+ * Deux, et pas une : la copie qui suit doit entrer par la droite pendant
+ * que la première sort par la gauche, sinon la bande se vide à chaque tour.
+ * Les tangentes suivent la pente — la pente d'un sinus est son cosinus —
+ * sans quoi la Bézier bossèle entre ses points (vu sur le rendu avant de
+ * le voir dans le code).
+ */
+function onde(
+  largeur: number,
+  hauteur: number,
+  phase: number,
+  ampFrac: number,
+): string {
   const N = 24;
   const pas = largeur / N;
   const milieu = hauteur / 2;
-  const amplitude = hauteur * 0.28;
-  const y = (i: number) => milieu - Math.sin((i / 12) * Math.PI * 2) * amplitude;
-  /*
-    LES TANGENTES SUIVENT LA PENTE, sinon la courbe bossèle.
-
-    Premier jet : les points de contrôle étaient posés à l'horizontale, à un
-    tiers de pas de chaque point. Une Bézier ainsi bridée arrive à plat sur
-    chaque sommet ET sur chaque flanc — la sinusoïde se met à onduler entre
-    ses propres points, et le ruban prend une allure de chenille. On a vu
-    les bosses sur le rendu avant de les voir dans le code.
-
-    La pente d'un sinus est son cosinus : chaque contrôle s'écarte donc du
-    point le long de SA tangente.
-  */
+  const amplitude = hauteur * ampFrac;
+  const y = (i: number) =>
+    milieu - Math.sin((i / 12) * Math.PI * 2 + phase) * amplitude;
   const pente = (i: number) =>
-    ((-amplitude * Math.cos((i / 12) * Math.PI * 2) * Math.PI * 2) / 12) / pas;
+    ((-amplitude * Math.cos((i / 12) * Math.PI * 2 + phase) * Math.PI * 2) /
+      12) /
+    pas;
   let d = `M0 ${y(0)}`;
   for (let i = 1; i <= N; i++) {
     const x = pas * i;
@@ -66,6 +81,94 @@ function onde(largeur: number, hauteur: number): string {
       ` ${x} ${y(i)}`;
   }
   return d;
+}
+
+/**
+ * Une ligne : sa courbe dessinée une fois, sa vue qui glisse à sa vitesse,
+ * et ses trois passes — la lueur large et pâle, la lueur serrée, le cœur.
+ * C'est la pile des passes qui fait « néon » : une lumière s'éteint en
+ * s'éloignant de sa source, donc la plus large est la plus pâle.
+ */
+function Ligne({
+  periode,
+  height,
+  teinte,
+  phase,
+  amplitude,
+  duree,
+  epaisseur,
+  opacite,
+}: {
+  periode: number;
+  height: number;
+  teinte: string;
+  phase: number;
+  amplitude: number;
+  duree: number;
+  epaisseur: number;
+  opacite: number;
+}) {
+  const glisse = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const boucle = Animated.loop(
+      Animated.timing(glisse, {
+        toValue: 1,
+        duration: duree,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }),
+    );
+    boucle.start();
+    return () => boucle.stop();
+  }, [glisse, duree]);
+
+  const d = useMemo(
+    () => onde(periode * 2, height, phase, amplitude),
+    [periode, height, phase, amplitude],
+  );
+
+  return (
+    <Animated.View
+      style={[
+        styles.calque,
+        {
+          width: periode * 2,
+          transform: [
+            {
+              translateX: glisse.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0, -periode],
+              }),
+            },
+          ],
+        },
+      ]}>
+      <Svg width={periode * 2} height={height}>
+        <Path
+          d={d}
+          stroke={teinte}
+          strokeWidth={epaisseur * 5}
+          fill="none"
+          opacity={opacite * 0.14}
+        />
+        <Path
+          d={d}
+          stroke={teinte}
+          strokeWidth={epaisseur * 2.6}
+          fill="none"
+          opacity={opacite * 0.3}
+        />
+        <Path
+          d={d}
+          stroke={teinte}
+          strokeWidth={epaisseur}
+          fill="none"
+          opacity={Math.min(1, opacite * 1.7)}
+        />
+      </Svg>
+    </Animated.View>
+  );
 }
 
 export function LightRibbon({
@@ -82,98 +185,43 @@ export function LightRibbon({
   sombre: boolean;
   height?: number;
 }) {
-  const glisse = useRef(new Animated.Value(0)).current;
   // Une seule longueur d'onde de course : au bout, le motif est identique à
   // lui-même et la boucle repart sans saut.
   const periode = Math.max(240, width);
 
-  useEffect(() => {
-    const boucle = Animated.loop(
-      Animated.timing(glisse, {
-        toValue: 1,
-        duration: 14000,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      }),
-    );
-    boucle.start();
-    return () => boucle.stop();
-  }, [glisse]);
-
-  const d = useMemo(() => onde(periode * 2, height), [periode, height]);
-
   /*
-    LE CŒUR CHANGE AVEC LE THÈME, PAS LA FRANGE.
+    LE CŒUR CHANGE AVEC LE THÈME, PAS LES NÉONS.
 
     Un trait blanc sur fond blanc n'existe pas : en clair, le cœur prend le
-    bleu de la marque. La frange, elle, garde ses deux teintes — c'est elle
-    qui dit « lumière », et elle se lit sur les deux fonds.
+    bleu de la marque. Le rouge, le vert et le bleu sont la lumière
+    décomposée — ils se lisent sur les deux fonds.
   */
   const coeur = sombre ? '#FFFFFF' : palette.blue;
   const opacite = sombre ? 0.5 : 0.28;
 
   return (
     <View style={[styles.bande, { height, width }]} pointerEvents="none">
-      {/*
-        C'EST LA VUE QUI GLISSE, PAS L'ATTRIBUT.
-
-        Premier jet : la course était posée sur le `x` d'un groupe SVG. Le
-        ruban n'a pas bougé d'un pixel — et c'est logique, le pilote natif ne
-        connaît que les propriétés d'une VUE (position, opacité) ; il ignore
-        les attributs d'un dessin vectoriel. L'animation partait, personne ne
-        l'écoutait.
-
-        Le dessin fait donc deux longueurs d'onde, et c'est la vue qui le
-        porte qui se translate : une transformation, native, que le fil
-        principal n'a plus à réveiller soixante fois par seconde.
-      */}
-      <Animated.View
-        style={{
-          width: periode * 2,
-          transform: [
-            {
-              translateX: glisse.interpolate({
-                inputRange: [0, 1],
-                outputRange: [0, -periode],
-              }),
-            },
-          ],
-        }}>
-        <Svg width={periode * 2} height={height}>
-        <G>
-          {/* La lueur : deux passes larges et très pâles. Sans elles, le
-              ruban est un fil ; avec, c'est une lumière. */}
-          <Path d={d} stroke={coeur} strokeWidth={9} fill="none" opacity={opacite * 0.16} />
-          <Path d={d} stroke={coeur} strokeWidth={5} fill="none" opacity={opacite * 0.3} />
-          {/* La frange : trois points et demi de part et d'autre — l'étalement
-              du shader d'origine, celui qui fait le prisme. */}
-          <Path
-            d={d}
-            stroke={palette.sky}
-            strokeWidth={2}
-            fill="none"
-            opacity={opacite * 0.6}
-            translateY={-3.5}
-          />
-          <Path
-            d={d}
-            stroke="#E8A13B"
-            strokeWidth={2}
-            fill="none"
-            opacity={opacite * 0.6}
-            translateY={3.5}
-          />
-          {/* Le cœur, par-dessus : c'est lui qu'on suit des yeux. */}
-          <Path d={d} stroke={coeur} strokeWidth={1.8} fill="none" opacity={Math.min(1, opacite * 1.7)} />
-        </G>
-        </Svg>
-      </Animated.View>
+      {LIGNES.map((l) => (
+        <Ligne
+          key={l.role}
+          periode={periode}
+          height={height}
+          teinte={l.teinte ?? coeur}
+          phase={l.phase}
+          amplitude={l.amplitude}
+          duree={l.duree}
+          epaisseur={l.epaisseur}
+          // Les néons, un cran sous le cœur : ils accompagnent, il mène.
+          opacite={l.teinte ? opacite * 0.85 : opacite}
+        />
+      ))}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  /* Le ruban déborde de sa bande : sans ce rognage, sa seconde longueur
-     d'onde s'afficherait par-dessus le reste de l'écran. */
+  /* Les ondes débordent de leur bande : sans ce rognage, leur seconde
+     longueur d'onde s'afficherait par-dessus le reste de l'écran. */
   bande: { overflow: 'hidden' },
+  calque: { position: 'absolute', top: 0, left: 0 },
 });

@@ -1,13 +1,16 @@
 /**
- * LE RUBAN DE LUMIÈRE — ce qui le rend tenable sur un téléphone.
+ * LE RUBAN DE LUMIÈRE — ce qui le rend fidèle à la référence, et tenable
+ * sur un téléphone.
  *
- * L'original est un shader GLSL : un trait blanc qui ondule sur fond noir,
- * bordé d'une frange chromatique. Il n'y a pas de WebGL ici, et il n'en faut
- * pas — ce que l'œil retient de cette image, c'est une courbe, sa lueur et sa
- * frange, trois choses qui se dessinent au trait.
+ * L'original est un shader GLSL : PLUSIEURS ondes néon — bleue, verte,
+ * rouge, et le trait blanc — qui se croisent et se séparent, chacune
+ * vivant sa vie. Le premier portage n'en avait retenu qu'une : une courbe
+ * et sa frange collée, qui glissaient d'un seul bloc — relevé du patron :
+ * « chaque ligne bouge et sont lumineuses ». Chaque ligne a donc SA
+ * courbe (sa phase, son amplitude), SA vitesse, et SA lueur.
  *
- * Ce banc tient les trois décisions sans lesquelles l'écran d'accueil se
- * mettrait à ramer, ou le ruban à se voir boucler.
+ * Ce banc tient les décisions sans lesquelles l'écran d'accueil se
+ * mettrait à ramer, ou le ruban à mentir sur la référence.
  */
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn(async () => null),
@@ -19,7 +22,7 @@ import React from 'react';
 import { Animated } from 'react-native';
 import { Path } from 'react-native-svg';
 import TestRenderer, { act } from 'react-test-renderer';
-import { LightRibbon, RIBBON_H } from '../src/components/LightRibbon';
+import { LIGNES, LightRibbon, RIBBON_H } from '../src/components/LightRibbon';
 import { dark, light } from '../src/theme';
 
 beforeAll(() => jest.useFakeTimers());
@@ -47,56 +50,88 @@ const traces = (tree: TestRenderer.ReactTestRenderer) =>
 
 describe('le ruban de l’accueil', () => {
   /*
-    LA COURBE EST DESSINÉE UNE FOIS, ET C'EST LE GROUPE QUI GLISSE.
+    UNE COURBE PAR LIGNE — c'est ce qui fait la référence.
 
-    La recalculer à chaque image — soixante fois par seconde, sur un chemin
-    de plusieurs centaines de points — coûterait à l'écran d'accueil ce que
-    l'animation du plan a justement gagné en étant cuite au build. Tous les
-    tracés partagent donc LE MÊME `d` : la lueur, la frange et le cœur sont
-    la même courbe, empilée.
+    Une seule sinusoïde décalée en Y donne des lignes parallèles qui ne se
+    croisent jamais ; sur l'original, elles se croisent et se séparent,
+    parce que chacune a SA phase et SON amplitude. Chaque courbe reste
+    dessinée UNE fois, puis empilée en passes : rien n'est recalculé à
+    l'image.
   */
-  it('ne dessine qu’une seule courbe, empilée', () => {
-    const tree = rendre();
-    const ds = new Set(traces(tree).map((n) => String(n.props.d)));
-    expect(ds.size).toBe(1);
-    // Cinq passes : deux de lueur, deux de frange, un cœur.
-    expect(traces(tree).length).toBe(5);
+  it('dessine une courbe PAR ligne, chacune la sienne', () => {
+    expect(LIGNES.length).toBeGreaterThanOrEqual(4);
+    const ds = new Set(traces(rendre()).map((n) => String(n.props.d)));
+    expect(ds.size).toBe(LIGNES.length);
+    // Et les paramètres qui les distinguent sont bien distincts.
+    expect(new Set(LIGNES.map((l) => l.phase)).size).toBe(LIGNES.length);
   });
 
   /*
-    LA FRANGE S'ÉCARTE, comme dans le shader d'origine.
+    CHAQUE LIGNE EST LUMINEUSE : sa lueur, puis son cœur.
 
-    Elle avait été serrée à un point et demi ; le relevé du chantier a
-    tranché dans l'autre sens — « écarte les couleurs, reprends le code de
-    base » : sur l'original, la dispersion s'étale sur plusieurs pixels et
-    c'est elle qui fait le prisme. Trois points et demi de part et d'autre :
-    les couleurs se voient, sans se détacher en trois fils.
+    Un trait seul est un fil ; le néon vient des passes larges et pâles
+    posées dessous — la plus large est la plus pâle, comme une lumière qui
+    s'éteint en s'éloignant de sa source.
   */
-  it('écarte sa frange comme le shader d’origine', () => {
-    const tree = rendre();
-    const ecarts = traces(tree)
-      .map((n) => n.props.translateY)
-      .filter((v) => typeof v === 'number') as number[];
-    expect(ecarts.length).toBe(2);
-    for (const e of ecarts) {
-      expect(Math.abs(e)).toBeGreaterThanOrEqual(3);
-      expect(Math.abs(e)).toBeLessThanOrEqual(5);
+  it('pose une lueur sous chaque ligne', () => {
+    const parCourbe = new Map<string, { w: number; o: number }[]>();
+    for (const p of traces(rendre())) {
+      const cle = String(p.props.d);
+      parCourbe.set(cle, [
+        ...(parCourbe.get(cle) ?? []),
+        { w: Number(p.props.strokeWidth), o: Number(p.props.opacity) },
+      ]);
     }
-    // Et de part et d'autre : une frange d'un seul côté serait un défaut
-    // d'impression, pas une dispersion.
-    expect(Math.sign(ecarts[0])).toBe(-Math.sign(ecarts[1]));
+    for (const [, passes] of parCourbe) {
+      expect(passes.length).toBeGreaterThanOrEqual(3);
+      const larges = [...passes].sort((a, b) => b.w - a.w);
+      // La passe la plus large fait plusieurs fois le cœur…
+      expect(larges[0].w).toBeGreaterThanOrEqual(
+        larges[larges.length - 1].w * 3,
+      );
+      // …et c'est la plus pâle.
+      expect(larges[0].o).toBeLessThan(larges[larges.length - 1].o);
+    }
   });
 
   /*
-    LE CŒUR CHANGE AVEC LE THÈME.
+    CHAQUE LIGNE GLISSE SUR SA VUE, À SA VITESSE.
+
+    Le pilote natif ne sait animer qu'une vue — la leçon du premier jet,
+    qui posait la course sur un attribut SVG que personne n'écoutait. Et
+    les vitesses sont TOUTES différentes : à vitesse égale, les lignes se
+    suivraient en formation, et la référence serait perdue.
+  */
+  it('translate une VUE par ligne, à des vitesses toutes différentes', () => {
+    const animees = rendre()
+      .root.findAllByType(Animated.View)
+      .map((n) =>
+        Array.isArray(n.props.style)
+          ? Object.assign({}, ...n.props.style.filter(Boolean))
+          : n.props.style,
+      )
+      .filter(
+        (st) =>
+          Array.isArray(st?.transform) &&
+          st.transform[0]?.translateX !== undefined &&
+          typeof st.transform[0].translateX !== 'number',
+      );
+    expect(animees.length).toBe(LIGNES.length);
+    expect(new Set(LIGNES.map((l) => l.duree)).size).toBe(LIGNES.length);
+  });
+
+  /*
+    LE CŒUR CHANGE AVEC LE THÈME ; les néons gardent leurs couleurs.
 
     Un trait blanc sur fond blanc n'existe pas : en clair, le cœur prend le
-    bleu de la marque.
+    bleu de la marque. Le rouge, le vert et le bleu, eux, sont la lumière
+    décomposée — ils se lisent sur les deux fonds.
   */
   it('adapte son cœur au fond', () => {
     const nuit = rendre(true);
-    const ceuxDeNuit = traces(nuit).map((n) => String(n.props.stroke));
-    expect(ceuxDeNuit).toContain('#FFFFFF');
+    expect(traces(nuit).map((n) => String(n.props.stroke))).toContain(
+      '#FFFFFF',
+    );
     act(() => nuit.unmount());
     const jour = rendre(false);
     const ceuxDeJour = traces(jour).map((n) => String(n.props.stroke));
@@ -104,47 +139,20 @@ describe('le ruban de l’accueil', () => {
     expect(ceuxDeJour).toContain(light.blue);
   });
 
-  /*
-    C'EST LA VUE QUI GLISSE, PAS L'ATTRIBUT DU DESSIN.
-
-    Premier jet : la course était posée sur le `x` d'un groupe SVG. Le ruban
-    n'a pas bougé d'un pixel — et c'est logique, le pilote natif ne connaît
-    que les propriétés d'une VUE ; il ignore les attributs d'un dessin
-    vectoriel. L'animation partait, personne ne l'écoutait, et l'accueil
-    montrait un trait courbé immobile.
-
-    Ce banc tient la seule chose qui garantit le mouvement : une
-    transformation, sur une vue, avec une valeur animée dedans.
-  */
-  it('translate une VUE, seule chose que le natif sait animer', () => {
-    const tree = rendre();
-    const anime = tree.root
-      .findAllByType(Animated.View)
-      .map((n) =>
-        Array.isArray(n.props.style)
-          ? Object.assign({}, ...n.props.style.filter(Boolean))
-          : n.props.style,
-      )
-      .find((st) => Array.isArray(st?.transform));
-    expect(anime).toBeDefined();
-    const t = anime.transform[0];
-    expect(t.translateX).toBeDefined();
-    // Une valeur animée, pas un nombre figé.
-    expect(typeof t.translateX).not.toBe('number');
-  });
-
   it('reste dans sa bande, quelle que soit la largeur', () => {
     for (const w of [320, 390, 440]) {
       const tree = rendre(true, w);
-      // Les nombres du chemin vont par PAIRES (x, y), commande après
-      // commande : on les extrait sans passer par un découpage, dont le
-      // premier morceau vide décalerait toute la parité.
-      const nombres = (String(traces(tree)[0].props.d).match(/-?\d+(?:\.\d+)?/g) ?? [])
-        .map(Number);
-      const y = nombres.filter((_, i) => i % 2 === 1);
-      for (const v of y) {
-        expect(v).toBeGreaterThanOrEqual(0);
-        expect(v).toBeLessThanOrEqual(RIBBON_H);
+      const courbes = new Set(traces(tree).map((n) => String(n.props.d)));
+      for (const d of courbes) {
+        // Les nombres du chemin vont par PAIRES (x, y), commande après
+        // commande : on les extrait sans passer par un découpage, dont le
+        // premier morceau vide décalerait toute la parité.
+        const nombres = (d.match(/-?\d+(?:\.\d+)?/g) ?? []).map(Number);
+        const y = nombres.filter((_, i) => i % 2 === 1);
+        for (const v of y) {
+          expect(v).toBeGreaterThanOrEqual(0);
+          expect(v).toBeLessThanOrEqual(RIBBON_H);
+        }
       }
       act(() => tree.unmount());
     }
