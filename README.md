@@ -219,6 +219,24 @@ chemin du pouce qui tient le téléphone, et loin de la miniature 3D que
 RoomPlan pose au centre-bas. Un compteur dit ce qu'on a saisi, et une
 flèche retire le dernier : on vise mal une fois sur dix.
 
+**Et le repère reste planté sur le mur.** Relevé du chantier : « tu peux
+afficher sur le mur du scan les ajouts ? Un bloc PC ou peu importe ce qu'on
+ajoute, qui se place sur le mur qu'on vise et il reste pendant le scan ».
+C'est ce qui manquait pour travailler en confiance : un compteur qui monte
+dit qu'on a appuyé, pas qu'on a visé juste. Un carré posé sur le mur, lui,
+se relit d'un coup d'œil — on voit ses trois prises alignées, ou celle qui a
+glissé sur la fenêtre.
+
+Une `ARSCNView` transparente se superpose à la vue de scan et partage sa
+session ARKit : elle ne dessine que nos repères, la caméra et les guides
+restant l'affaire de RoomPlan. Chaque pose y plante un carré plat de neuf
+centimètres, plaqué à la surface visée (la transformation du rayon porte
+son orientation), à deux centimètres du nu — à fleur, les deux surfaces se
+disputent la profondeur et le repère grésille. Il prend la couleur du métier
+et porte son sigle : PC ambre, INT bleu, LUM doré, en éclairage `constant`
+pour qu'un contre-jour ne l'efface pas. Retirer le dernier appareil retire
+son repère : deux comptes qui divergent, et l'on ne sait plus lequel croire.
+
 **Le natif ne rend qu'un point.** Un rayon part du milieu de l'image
 (`ARFrame.raycastQuery` en coordonnées normalisées, donc 0,5 / 0,5) et
 s'arrête sur la première surface qu'ARKit connaît — le plan existant

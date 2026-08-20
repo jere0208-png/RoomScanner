@@ -9,7 +9,9 @@ class RoomScanViewManager: RCTViewManager {
 
   override func view() -> UIView! {
     if #available(iOS 16.0, *), RoomCaptureSession.isSupported {
-      return RoomScanManager.shared.makeCaptureView()
+      // Le scan, et NOTRE couche de repères par-dessus : les appareils
+      // posés au viseur restent plantés sur leur mur pendant tout le relevé.
+      return RoomScanManager.shared.makeContainer()
     }
     // Fallback sur appareil non supporté : vue noire, le JS affiche le message.
     let fallback = UIView()

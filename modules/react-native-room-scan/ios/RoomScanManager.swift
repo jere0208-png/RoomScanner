@@ -63,6 +63,25 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
    */
   private var vueCourante: CapturedRoom?
 
+  /**
+   LES REPÈRES PLANTÉS DANS LA PIÈCE, en réalité augmentée.
+
+   Relevé du chantier : « tu peux afficher sur le mur du scan les ajouts ?
+   Un bloc PC ou peu importe ce qu'on ajoute, qui se place sur le mur qu'on
+   vise et il reste pendant le scan ».
+
+   C'est ce qui manquait pour travailler en confiance : un compteur qui
+   monte dit qu'on a appuyé, pas qu'on a visé juste. Un carré posé sur le
+   mur, lui, se relit d'un coup d'œil — on voit ses trois prises alignées,
+   ou celle qui a glissé sur la fenêtre.
+
+   La couche est une `ARSCNView` transparente PAR-DESSUS la vue de scan,
+   qui partage sa session ARKit : elle ne dessine que nos repères, la
+   caméra et les guides restant l'affaire de RoomPlan.
+   */
+  private var couche: ARSCNView?
+  private var noeuds: [SCNNode] = []
+
   override init() { super.init() }
 
   // RoomCaptureViewDelegate hérite de NSCoding : implémentations requises.
@@ -70,6 +89,34 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
   required init?(coder: NSCoder) { super.init() }
 
   // MARK: - Cycle de vie de la vue
+
+  /**
+   La vue montrée à l'écran : le scan de RoomPlan, et NOTRE couche par
+   dessus. Un conteneur les tient l'une sur l'autre — la couche ne reçoit
+   aucun toucher, c'est un calque, pas un bouton.
+   */
+  func makeContainer() -> UIView {
+    let boite = UIView(frame: .zero)
+    let scan = makeCaptureView()
+    scan.frame = boite.bounds
+    scan.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+    boite.addSubview(scan)
+
+    let calque = ARSCNView(frame: .zero)
+    calque.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+    calque.session = scan.captureSession.arSession
+    // Transparente : la caméra est déjà dessinée dessous, la redessiner
+    // ferait deux flux vidéo pour rien.
+    calque.backgroundColor = .clear
+    calque.scene.background.contents = UIColor.clear
+    calque.isUserInteractionEnabled = false
+    // Nos repères sont plats et opaques : l'éclairage de la pièce les
+    // ferait disparaître dans un contre-jour.
+    calque.autoenablesDefaultLighting = false
+    boite.addSubview(calque)
+    couche = calque
+    return boite
+  }
 
   func makeCaptureView() -> RoomCaptureView {
     let view = RoomCaptureView(frame: .zero)
@@ -101,6 +148,7 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
       if !additif {
         releves.removeAll()
         ancresElec.removeAll()
+        viderReperes()
       }
     }
     if additif { self.additif = true }
@@ -167,6 +215,8 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
         ancre["height"] = p.y - basMur
       }
       ancresElec.append(ancre)
+      // Et le repère se plante dans la pièce, à l'aplomb de ce qu'on vise.
+      planterRepere(kind: kind, sur: hit.worldTransform)
       return true
     }
     return false
@@ -202,7 +252,77 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
   func retirerDerniereAncre() -> Bool {
     guard !ancresElec.isEmpty else { return false }
     ancresElec.removeLast()
+    // Le repère part avec l'ancre : deux comptes qui divergent, et l'on ne
+    // sait plus lequel croire.
+    noeuds.popLast()?.removeFromParentNode()
     return true
+  }
+
+  /**
+   PLANTE UN REPÈRE SUR LE MUR VISÉ.
+
+   Un carré plat, plaqué à la surface, de la couleur du métier : ambre pour
+   les prises, bleu pour les commandes, doré pour l'éclairage. Il porte son
+   sigle — c'est ce qu'on relit de loin, exactement comme sur le plan.
+
+   Deux centimètres devant le nu : à fleur, le rendu clignote (les deux
+   surfaces se disputent la profondeur), et le repère semble grésiller.
+   */
+  private func planterRepere(kind: String, sur transform: simd_float4x4) {
+    guard let calque = couche else { return }
+    let teinte: UIColor
+    let sigle: String
+    switch kind {
+    case "inter", "va", "poussoir", "variateur":
+      teinte = UIColor(red: 0.12, green: 0.36, blue: 1, alpha: 1)
+      sigle = "INT"
+    case "dcl", "spot", "applique":
+      teinte = UIColor(red: 0.88, green: 0.64, blue: 0.23, alpha: 1)
+      sigle = "LUM"
+    default:
+      teinte = UIColor(red: 0.91, green: 0.55, blue: 0.13, alpha: 1)
+      sigle = "PC"
+    }
+
+    let plaque = SCNPlane(width: 0.09, height: 0.09)
+    plaque.cornerRadius = 0.012
+    plaque.firstMaterial?.diffuse.contents = teinte
+    plaque.firstMaterial?.isDoubleSided = true
+    // `constant` : la plaque garde sa couleur quelle que soit la lumière —
+    // un repère qui s'assombrit dans un coin ne se voit plus.
+    plaque.firstMaterial?.lightingModel = .constant
+    let noeud = SCNNode(geometry: plaque)
+
+    let texte = SCNText(string: sigle, extrusionDepth: 0)
+    texte.font = UIFont.systemFont(ofSize: 3, weight: .heavy)
+    texte.firstMaterial?.diffuse.contents = UIColor.white
+    texte.firstMaterial?.lightingModel = .constant
+    let noeudTexte = SCNNode(geometry: texte)
+    // SCNText naît dans son coin bas gauche : on le recentre sur la plaque.
+    let (mini, maxi) = texte.boundingBox
+    noeudTexte.pivot = SCNMatrix4MakeTranslation(
+      (mini.x + maxi.x) / 2, (mini.y + maxi.y) / 2, 0,
+    )
+    noeudTexte.scale = SCNVector3(0.01, 0.01, 0.01)
+    noeudTexte.position = SCNVector3(0, 0, 0.001)
+    noeud.addChildNode(noeudTexte)
+
+    // La transform du rayon porte l'orientation de la surface : le repère
+    // se plaque donc au mur, incliné comme lui.
+    noeud.simdTransform = transform
+    // Deux centimètres devant le nu, le long de la normale de la surface.
+    let normale = SIMD3<Float>(
+      transform.columns.2.x, transform.columns.2.y, transform.columns.2.z,
+    )
+    noeud.simdPosition += simd_normalize(normale) * 0.02
+    calque.scene.rootNode.addChildNode(noeud)
+    noeuds.append(noeud)
+  }
+
+  /// Un relevé tout neuf repart d'une pièce vide de repères.
+  private func viderReperes() {
+    for n in noeuds { n.removeFromParentNode() }
+    noeuds.removeAll()
   }
 
   func pause() {
