@@ -34,6 +34,15 @@ import { radius, useTheme, type Palette } from '../theme';
 
 const AnimatedRect = Animated.createAnimatedComponent(Rect);
 
+/**
+ * COMBIEN DE TOURS AVANT DE RENDRE LA MAIN.
+ *
+ * Trois : le temps qu'on met à lire l'écran. Voir la boucle plus bas — c'est
+ * la seule animation de l'application qui vivait sur le fil JS sans jamais
+ * s'arrêter, et elle tournait sur l'écran le plus longtemps affiché.
+ */
+export const TOURS = 3;
+
 export function GlowButton({
   label,
   onPress,
@@ -77,6 +86,23 @@ export function GlowButton({
         // le fil JS, et la boucle s'arrête avec le composant.
         useNativeDriver: false,
       }),
+      /*
+        IL FAIT SES TOURS, PUIS IL REND LA MAIN.
+
+        Relevé du chantier : « l'application fait chauffer le téléphone et
+        perdre la batterie rapidement ». Ce liseré en était la cause la plus
+        chère et la moins visible : l'animation vit sur le FIL JS — soixante
+        réveils de JavaScript par seconde, POUR TOUJOURS, sur l'écran que
+        l'application montre le plus longtemps. Un téléphone posé sur la
+        table, personne devant, continuait de calculer un trait qui tourne.
+
+        Trois tours suffisent à dire que le bouton est vivant : c'est le
+        temps qu'on met à lire l'écran. Ensuite le trait s'immobilise et le
+        processeur peut dormir. Chaque retour sur l'écran remonte le
+        composant, donc relance les trois tours : l'effet est intact, la
+        dépense ne l'est plus.
+      */
+      { iterations: TOURS },
     );
     boucle.start();
     return () => boucle.stop();

@@ -3191,6 +3191,32 @@ point au sol, en 2D comme en 3D et dans le PDF. Une extrémité libre reçoit un
 about droit ; posée sur le flanc d'un autre mur, elle est prolongée d'une
 demi-épaisseur pour entrer dans son corps (jonction en T).
 
+### Ce qui faisait chauffer le téléphone
+
+Relevé du chantier : « l'application fait chauffer le téléphone et perdre la
+batterie rapidement ». Deux causes, toutes deux invisibles à la lecture du
+code — elles ne se voient que sur le dos de la main.
+
+**Une boucle qui ne s'arrêtait jamais, sur le fil JS.** Le liseré qui court
+autour du bouton principal anime `strokeDashoffset`, un attribut SVG : il
+n'existe pas côté natif, donc l'animation vit sur le fil JavaScript. Elle
+tournait en boucle infinie, sur l'écran que l'application montre le plus
+longtemps — soixante réveils de JavaScript par seconde, téléphone posé sur la
+table, personne devant. Le liseré fait maintenant **trois tours** puis rend la
+main (`TOURS`), et chaque retour sur l'écran les relance : l'effet est intact,
+la dépense ne l'est plus. Les autres boucles de l'application (l'onde de la
+pastille de contrôle, le ruban d'accueil, le badge Pro) vivent sur le fil
+natif et respirent entre deux passages ; elles restent.
+
+**Deux rendus pour une image.** Le tactile d'un iPhone récent remonte jusqu'à
+cent vingt fois par seconde. Chaque mouvement du doigt sur la vue 3D
+reconstruisait la scène entière — plusieurs centaines de tracés — alors
+qu'entre deux images affichées, tous les rendus intermédiaires sauf le dernier
+finissent à la poubelle. `parImage()` ne garde que la **dernière** valeur
+reçue et n'affiche qu'au battement suivant de l'écran : rien ne se perd, le
+travail inutile disparaît. Le repère du geste, lui, est mis à jour sur-le-champ
+— le doigt calcule la suite à partir de là, il ne peut pas attendre l'écran.
+
 ### Le mur ajouté à la main naît accroché
 
 « Un mètre au centre du plan » : le mur neuf flottait au milieu du séjour, et

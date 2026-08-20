@@ -43,6 +43,7 @@ import {
   type ScenePalette,
 } from '../geometry/scene3d';
 import { hiddenByBox } from '../geometry/furniture';
+import { parImage } from '../ui/parImage';
 import { floorsOf, useScanStore } from '../store/scanStore';
 import { CardinalRing } from './CardinalRing';
 import {
@@ -298,13 +299,31 @@ export function Iso3DView({
     changeRef.current = onChange;
   }, [onChange]);
 
+  /*
+    UN SEUL RENDU PAR IMAGE.
+
+    Le tactile d'un iPhone récent remonte jusqu'à cent vingt fois par
+    seconde. Chaque mouvement du doigt reconstruisait la scène entière —
+    plusieurs centaines de tracés — alors qu'entre deux images affichées,
+    tous les rendus intermédiaires sauf le dernier finissent à la poubelle :
+    on calculait deux fois pour montrer une fois. C'est de la chaleur pure,
+    et une image de retard.
+
+    `viewRef` reste mis à jour SUR-LE-CHAMP — le geste s'appuie dessus pour
+    calculer la suite, il ne peut pas attendre l'écran — et seul l'affichage
+    est reporté au battement suivant.
+  */
+  const rendu = useRef(
+    parImage<View3DParams>((v) => {
+      if (changeRef.current) changeRef.current(v);
+      else setInner(v);
+    }),
+  ).current;
+  useEffect(() => rendu.annuler, [rendu]);
+
   const update = (v: View3DParams) => {
     viewRef.current = v;
-    if (changeRef.current) {
-      changeRef.current(v);
-    } else {
-      setInner(v);
-    }
+    rendu(v);
   };
 
   const baseRef = useRef({
