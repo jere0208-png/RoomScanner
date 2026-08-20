@@ -68,7 +68,12 @@ describe('le magasin, en fin de scan', () => {
       surfaces: boite('a', 0, 0, 4, 3),
       objects: [meuble('o1', 1, 1), meuble('o2', 2.5, 1.5)],
     });
-    expect(useScanStore.getState().arrivage).toEqual({ meubles: 2 });
+    // L'arrivage compte aussi ce qui a été posé au viseur : décocher les
+    // normes ne doit pas laisser croire qu'on perd ce travail-là.
+    expect(useScanStore.getState().arrivage).toEqual({
+      meubles: 2,
+      posesViseur: 0,
+    });
     useScanStore.getState().oublierArrivage();
     expect(useScanStore.getState().arrivage).toBeNull();
   });

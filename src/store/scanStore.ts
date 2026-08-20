@@ -880,7 +880,7 @@ interface ScanState {
    * une prise fait trois centimètres, le LiDAR voit des meubles. `null` =
    * rien à demander (scan vide, ou choix déjà fait).
    */
-  arrivage: { meubles: number } | null;
+  arrivage: { meubles: number; posesViseur?: number } | null;
   oublierArrivage: () => void;
   /** Le patron a décoché les meubles : le plan s'en sépare d'un coup. */
   retirerMeubles: () => void;
@@ -2707,9 +2707,16 @@ export const useScanStore = create<ScanState>((set, get) => {
         processing: false,
         scanning: false,
         screen: 'result',
-        // Le popup de fin de scan demandera quoi intégrer — même sans
-        // meuble : l'électricité aux normes se propose sur tout relevé.
-        arrivage: { meubles: objects.length },
+        /*
+          Le popup de fin de scan demandera quoi intégrer — même sans
+          meuble : l'électricité aux normes se propose sur tout relevé. Il
+          compte aussi ce qu'on a POSÉ AU VISEUR, pour qu'on sache que
+          décocher les normes ne retire rien de ce travail-là.
+        */
+        arrivage: {
+          meubles: objects.length,
+          posesViseur: vise.fixtures.length + vise.ceiling.length,
+        },
         /*
           LE BROUILLON MEURT AVEC L'ENREGISTREMENT — relevé du chantier :
           « le message de reprise est inutile, on le retrouve dans mes

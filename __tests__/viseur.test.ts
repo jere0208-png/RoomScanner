@@ -192,3 +192,78 @@ describe('l’écran de scan', () => {
     expect(dits).toContain('Rien à viser');
   });
 });
+
+/**
+ * LE MUR VISÉ SURVIT AU RECALAGE DU MODÈLE.
+ *
+ * Relevé du chantier : « j'ai essayé d'ajouter les éléments élec, ça a bien
+ * pris en compte mais rien ne s'affiche sur le plan 2D ensuite ».
+ *
+ * La cause : les ancres étaient des points du monde ARKit, mais le modèle
+ * livré passe par `RoomBuilder` — et par `StructureBuilder` dès qu'il y a
+ * plusieurs passages. Ces post-traitements RECALENT la géométrie dans leur
+ * propre repère. Les points, restés dans l'ancien, tombaient alors à des
+ * mètres de tout mur… et `ancrerElec` les jetait, exactement comme prévu :
+ * silencieusement.
+ *
+ * L'ancre porte donc l'IDENTIFIANT du mur visé et la cote relevée sur lui.
+ * Un identifiant ne se déplace pas, lui — et le plan garde celui que
+ * RoomPlan a donné à chaque surface.
+ */
+describe('l’ancre qui connaît son mur', () => {
+  it('se pose sur le mur nommé, même si le monde a bougé', () => {
+    // Le point du monde est faux — dix mètres à côté, comme après un
+    // recalage — mais l'ancre sait sur quel mur elle a été prise.
+    const { fixtures } = ancrerElec(
+      [
+        {
+          kind: 'prise',
+          wallId: 'n',
+          along: 1.5,
+          height: 0.25,
+          x: 40,
+          y: 40,
+          z: 40,
+        },
+      ],
+      W,
+      ROOMS,
+    );
+    expect(fixtures).toHaveLength(1);
+    expect(fixtures[0].wallId).toBe('n');
+    expect(fixtures[0].along).toBeCloseTo(1.5, 2);
+    expect(fixtures[0].height).toBeCloseTo(0.25, 2);
+  });
+
+  it('retombe sur le point du monde quand le mur a disparu', () => {
+    // La fusion a pu redécouper les murs : l'identifiant ne répond plus,
+    // et la position reprend la main.
+    const { fixtures } = ancrerElec(
+      [
+        {
+          kind: 'prise',
+          wallId: 'mur-qui-nexiste-plus',
+          along: 1.5,
+          height: 0.25,
+          x: 1.5,
+          y: 0.25,
+          z: 0.03,
+        },
+      ],
+      W,
+      ROOMS,
+    );
+    expect(fixtures).toHaveLength(1);
+    expect(fixtures[0].wallId).toBe('n');
+  });
+
+  it('borne la cote au mur : un relevé de travers ne sort pas du pan', () => {
+    const { fixtures } = ancrerElec(
+      [{ kind: 'inter', wallId: 'n', along: 99, height: 9, x: 0, y: 0, z: 0 }],
+      W,
+      ROOMS,
+    );
+    expect(fixtures[0].along).toBeLessThanOrEqual(4);
+    expect(fixtures[0].height).toBeLessThanOrEqual(2.5);
+  });
+});

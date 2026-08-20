@@ -51,6 +51,18 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
    */
   private var ancresElec: [[String: Any]] = []
 
+  /**
+   LA DERNIÈRE PIÈCE VUE, telle que la session la connaît à l'instant.
+
+   Elle sert à NOMMER le mur visé au moment de la pose. Sans cela, une ancre
+   n'est qu'un point du monde ARKit — et le modèle livré, lui, passe par
+   `RoomBuilder` (et par `StructureBuilder` dès qu'il y a plusieurs
+   passages), qui RECALENT la géométrie dans leur propre repère. Les points
+   tombaient alors à des mètres de tout mur, et le plan sortait vide de ce
+   qu'on venait d'y poser.
+   */
+  private var vueCourante: CapturedRoom?
+
   override init() { super.init() }
 
   // RoomCaptureViewDelegate hérite de NSCoding : implémentations requises.
@@ -132,15 +144,58 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
       )
       guard let hit = session.raycast(query).first else { continue }
       let p = hit.worldTransform.columns.3
-      ancresElec.append([
+      var ancre: [String: Any] = [
         "kind": kind,
         "x": p.x,
         "y": p.y,
         "z": p.z,
-      ])
+      ]
+      /*
+        ON NOMME LE MUR VISÉ, et l'on relève la cote SUR LUI.
+
+        Un identifiant ne se déplace pas : c'est la seule information qui
+        survive au recalage du modèle. La cote se lit dans le repère du mur
+        — abscisse depuis son bord, hauteur au-dessus de son pied — les
+        deux mesures que l'établi et le plan emploient déjà.
+      */
+      if let mur = Self.murLePlusProche(de: p, dans: vueCourante) {
+        let inv = simd_inverse(mur.transform)
+        let local = inv * SIMD4<Float>(p.x, p.y, p.z, 1)
+        let basMur = mur.transform.columns.3.y - mur.dimensions.y / 2
+        ancre["wallId"] = mur.identifier.uuidString
+        ancre["along"] = local.x + mur.dimensions.x / 2
+        ancre["height"] = p.y - basMur
+      }
+      ancresElec.append(ancre)
       return true
     }
     return false
+  }
+
+  /**
+   LE MUR LE PLUS PROCHE d'un point, dans la pièce vue à l'instant.
+
+   On mesure à la SURFACE, pas à son centre : un mur de quatre mètres a son
+   centre à deux mètres de ses bords, et le plus proche au sens du centre
+   n'est pas celui qu'on regarde. Quarante centimètres de tolérance : le nu
+   du mur, l'épaisseur, et la main qui ne vise pas au centimètre.
+   */
+  static func murLePlusProche(de p: SIMD4<Float>,
+                              dans room: CapturedRoom?) -> CapturedRoom.Surface? {
+    guard let room = room else { return nil }
+    var meilleur: (CapturedRoom.Surface, Float)?
+    for mur in room.walls {
+      let inv = simd_inverse(mur.transform)
+      let local = inv * SIMD4<Float>(p.x, p.y, p.z, 1)
+      // Hors du pan, en longueur ou en hauteur : ce n'est pas ce mur-là.
+      let demiL = mur.dimensions.x / 2
+      let demiH = mur.dimensions.y / 2
+      if abs(local.x) > demiL + 0.1 || abs(local.y) > demiH + 0.2 { continue }
+      let ecart = abs(local.z)
+      if ecart > 0.4 { continue }
+      if meilleur == nil || ecart < meilleur!.1 { meilleur = (mur, ecart) }
+    }
+    return meilleur?.0
   }
 
   /// Le dernier appareil posé s'enlève : on vise mal une fois sur dix.
@@ -359,6 +414,8 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
     // Le releveur de couleurs a besoin de la géométrie la plus fraîche
     // possible : on la lui passe à chaque mise à jour, sans throttle.
     RoomColorSampler.shared.update(room: room)
+    // C'est elle qui nommera le mur visé à la prochaine pose.
+    vueCourante = room
     // Throttle à 2 Hz : le JS n'a besoin que d'un aperçu.
     guard Date().timeIntervalSince(lastLiveEmit) > 0.5 else { return }
     lastLiveEmit = Date()

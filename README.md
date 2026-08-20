@@ -207,6 +207,29 @@ quand il ne rencontre rien, l'app le dit franchement (« Rien à viser ici —
 approchez-vous du mur ») plutôt que de poser au jugé un appareil dont
 personne ne saurait d'où il sort.
 
+**Et l'ancre connaît SON MUR.** Premier essai sur le chantier : « ça a bien
+pris en compte mais rien ne s'affiche sur le plan 2D ensuite ». La cause
+était en amont de tout le métier : une ancre n'était qu'un point du monde
+ARKit, or le modèle livré passe par `RoomBuilder` — et par
+`StructureBuilder` dès qu'il y a plusieurs passages. Ces post-traitements
+RECALENT la géométrie dans leur propre repère : les points, restés dans
+l'ancien, tombaient à des mètres de tout mur et se faisaient jeter,
+exactement comme la règle le prévoit — silencieusement.
+
+Le natif nomme donc le mur visé au moment de la pose (`murLePlusProche`,
+mesuré à la SURFACE et non à son centre : un mur de quatre mètres a son
+centre à deux mètres de ses bords) et relève la cote DANS SON REPÈRE :
+abscisse depuis le bord, hauteur au-dessus du pied. Un identifiant ne se
+déplace pas — c'est la seule information qu'un recalage ne peut pas fausser.
+Le point du monde reste en secours, pour le cas où la fusion aurait
+redécoupé le mur.
+
+**Et décocher les normes ne retire rien de ce travail.** « Je voulais avoir
+que ce que j'ai ajouté, pas le reste » : le popup de fin de scan compte
+désormais les appareils posés au viseur et le dit — la ligne devient
+« Compléter aux normes », et son détail rappelle que ce qui a été visé est
+déjà dans le plan. Sans quoi on décoche en croyant tout perdre.
+
 **Tout le métier est en JS** (`ancrerElec`), et c'est là qu'il est testable.
 Chaque point est rattaché au mur le plus proche — mesuré à l'AXE, comme le
 modèle, et seulement si sa projection tombe DANS le segment, sinon un mur

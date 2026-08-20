@@ -103,7 +103,20 @@ export interface ScanResult {
    * Ce qu'on a posé au viseur pendant le relevé : des points du monde,
    * que le JS rattache aux murs et aux plafonds (`ancrerElec`).
    */
-  elec?: { kind: string; x: number; y: number; z: number }[];
+  elec?: {
+    kind: string;
+    /**
+     * Le mur visé et la cote relevée SUR LUI, quand le natif a su le
+     * nommer : un identifiant survit au recalage du modèle, un point du
+     * monde non.
+     */
+    wallId?: string;
+    along?: number;
+    height?: number;
+    x: number;
+    y: number;
+    z: number;
+  }[];
   /**
    * Nombre de passages réunis dans ce relevé. Deux ou plus : le logement a
    * été scanné pièce par pièce, et les passages ont été alignés.

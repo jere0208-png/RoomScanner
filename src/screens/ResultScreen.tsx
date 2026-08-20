@@ -2906,6 +2906,7 @@ export function ResultScreen() {
       <ChoixScan
         visible={!!arrivage && !capturing}
         meubles={arrivage?.meubles ?? 0}
+        posesViseur={arrivage?.posesViseur ?? 0}
         onValider={validerArrivage}
         // Fermer sans valider : les meubles restent (ils sont déjà là),
         // rien ne se pose — et la question ne reviendra pas.

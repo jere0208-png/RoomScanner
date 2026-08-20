@@ -23,10 +23,30 @@ import { pointInPolygon } from './appearance';
 import { segLength, wallQuads, type Pt, type WallSeg } from './floorplan';
 import type { CeilingFixture, CeilingKind } from './ceiling';
 
-/** Ce que le viseur mémorise : un point du monde, et ce qu'on y pose. */
+/**
+ * Ce que le viseur mémorise.
+ *
+ * D'ABORD LE MUR VISÉ, quand le natif a su le nommer : un identifiant ne se
+ * déplace pas. Relevé du chantier : « ça a bien pris en compte mais rien ne
+ * s'affiche sur le plan 2D ensuite » — les ancres n'étaient que des points
+ * du monde ARKit, or le modèle livré passe par `RoomBuilder`, et par
+ * `StructureBuilder` dès qu'il y a plusieurs passages : ces
+ * post-traitements RECALENT la géométrie dans leur propre repère. Les
+ * points, restés dans l'ancien, tombaient à des mètres de tout mur, et se
+ * faisaient jeter — silencieusement.
+ *
+ * Le point du monde reste en secours : si le mur a été redécoupé par la
+ * fusion, son identifiant ne répond plus, et la position reprend la main.
+ */
 export interface AncreElec {
   /** Type d'appareil visé — mural (`prise`, `inter`…) ou de plafond. */
   kind: string;
+  /** Identifiant de la surface visée, tel que RoomPlan l'a donné. */
+  wallId?: string;
+  /** Cote relevée sur ce mur, depuis son extrémité `a` (m). */
+  along?: number;
+  /** Hauteur relevée au-dessus du sol de ce mur (m). */
+  height?: number;
   x: number;
   y: number;
   z: number;
@@ -92,6 +112,30 @@ export function ancrerElec(
     rooms.find((r) => (r.outline?.length ?? 0) >= 3 && pointInPolygon(p, r.outline!));
 
   ancres.forEach((a, n) => {
+    /*
+      LE MUR NOMMÉ D'ABORD. Le natif l'a identifié au moment de la pose,
+      dans le repère où il travaillait : c'est la seule information qu'un
+      recalage du modèle ne peut pas fausser.
+    */
+    const nomme = a.wallId ? walls.find((w) => w.id === a.wallId) : undefined;
+    if (nomme && a.along !== undefined && a.height !== undefined) {
+      const l = segLength(nomme) || 1;
+      const side = interiorSide(nomme, walls, rooms as never);
+      const kind = a.kind as FixtureKind;
+      if (FIXTURES[kind]) {
+        fixtures.push({
+          id: id(a.kind, n),
+          kind,
+          wallId: nomme.id,
+          // Bornées au mur : un relevé de travers ne sort pas du pan.
+          along: Math.max(0.02, Math.min(l - 0.02, a.along)),
+          height: Math.max(0.05, Math.min(nomme.height - 0.05, a.height)),
+          side,
+        });
+        return;
+      }
+    }
+
     const sol = { x: a.x, z: a.z };
     /*
       LE MUR LE PLUS PROCHE, et sa distance — mesurée à l'AXE, comme le

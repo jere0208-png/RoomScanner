@@ -65,12 +65,19 @@ const stylesCoche = StyleSheet.create({
 export function ChoixScan({
   visible,
   meubles,
+  posesViseur = 0,
   onValider,
   onClose,
 }: {
   visible: boolean;
   /** Meubles reconnus pendant le scan : 0 = la ligne ne paraît pas. */
   meubles: number;
+  /**
+   * Appareils posés au viseur PENDANT le relevé. Ils sont déjà dans le
+   * plan : la ligne le dit, pour qu'on ne croie pas devoir cocher
+   * l'électricité pour les garder.
+   */
+  posesViseur?: number;
   onValider: (choix: ChoixDuScan) => void;
   onClose: () => void;
 }) {
@@ -105,10 +112,26 @@ export function ChoixScan({
     {
       cle: 'elec' as const,
       icone: SOLAIRES.elec,
-      titre: 'Électricité proposée aux normes',
+      /*
+        CE QU'ON A POSÉ AU VISEUR EST DÉJÀ LÀ.
+
+        Relevé du chantier : « je voulais avoir que ce que j'ai ajouté, pas
+        le reste ». Décocher cette ligne ne retire donc RIEN de ce qui a été
+        visé pendant le relevé — elle ne commande que le COMPLÉMENT aux
+        normes. Le titre le dit, sinon on décoche en croyant tout perdre.
+      */
+      titre:
+        posesViseur > 0
+          ? 'Compléter aux normes'
+          : 'Électricité proposée aux normes',
       detail:
-        'Socles, RJ45, commandes et points lumineux selon la NF C 15-100, ' +
-        'posés hors meubles. Tout reste déplaçable.',
+        posesViseur > 0
+          ? `Vos ${posesViseur} appareil${
+              posesViseur > 1 ? 's' : ''
+            } posé${posesViseur > 1 ? 's' : ''} au viseur sont déjà dans le ` +
+            'plan. Cochez pour AJOUTER ce qui manque à la NF C 15-100.'
+          : 'Socles, RJ45, commandes et points lumineux selon la NF C 15-100, ' +
+            'posés hors meubles. Tout reste déplaçable.',
     },
   ];
 
