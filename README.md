@@ -1966,11 +1966,14 @@ dossier d'essai se regarde : `UPDATE_BOUSSOLE=1 npx jest boussole` l'écrit
 dans le dossier temporaire, puis `node tools/pdf-vers-svg.mjs` rend ses
 feuilles.
 
-**« Cotes Élec » : les murs équipés, de face, cotés.** C'est exactement la
-feuille des élévations sans « Tous les murs » : l'absorption est
-structurelle (`feuillesElevations`) — cocher « Cotes Élec » ET
-« Élévations » n'imprime jamais une feuille en double, le dossier sort une
-seule série, la plus large. L'icône des élévations a changé au passage :
+**Deux cases franches : « Élévations » = TOUS les murs, « Cotes Élec » =
+les murs équipés.** La case « Tous les murs » a vécu — relevé du patron :
+deux cases qui se conditionnaient pour dire trois états, c'était une de
+trop. L'absorption reste structurelle (`feuillesElevations`) : cocher les
+deux n'imprime jamais une feuille en double, le dossier sort une seule
+série, la plus large. Les tuiles d'options ont aussi maigri d'un cran —
+« réduis plus les blocs que les icônes » : la tuile perd six points
+(46 → 40), l'icône deux (26 → 24) — ce qu'on reconnaît, c'est le dessin. L'icône des élévations a changé au passage :
 la galerie d'images ne disait rien d'une cote — deux flèches verticales
 (`sort-vertical`, jeu Solar) disent une hauteur qu'on mesure. Et la
 boussole du calque « Nord » du plan s'est engraissée (trait 2,6) puis

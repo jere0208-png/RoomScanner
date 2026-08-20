@@ -17,7 +17,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 import React from 'react';
-import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import { ExportScreen, feuillesElevations } from '../src/screens/ExportScreen';
 import { RetourGlisse } from '../src/components/RetourGlisse';
@@ -202,34 +202,59 @@ describe('le nord dans le dossier', () => {
   });
 
   /*
-   * « COTES ÉLEC » : les murs équipés, vus de face avec leurs cotes.
+   * « ÉLÉVATIONS » = TOUS LES MURS ; « COTES ÉLEC » = LES MURS ÉQUIPÉS.
    *
-   * C'est EXACTEMENT la feuille des élévations sans « Tous les murs » :
-   * l'absorption est donc structurelle — cocher les deux ne double
-   * jamais une feuille, le dossier imprime une seule série.
+   * La case « Tous les murs » a vécu — relevé du patron : deux cases qui
+   * se conditionnaient pour dire trois états, c'était une de trop. Deux
+   * cases franches désormais, et cocher les deux n'imprime toujours
+   * qu'une seule série, la plus large.
    */
-  it('offre « Cotes Élec » sans jamais doubler les élévations', () => {
+  it('offre deux cases franches, sans jamais doubler les élévations', () => {
     const tree = monter('export');
     expect(
       tree.root
         .findAllByType(TouchableOpacity)
         .find((n) => n.props.accessibilityLabel === 'Cotes Élec'),
     ).toBeDefined();
-    // Cotes Élec seul : les élévations des murs équipés.
-    expect(feuillesElevations(false, false, true)).toEqual({
+    expect(
+      tree.root
+        .findAllByType(TouchableOpacity)
+        .find((n) => n.props.accessibilityLabel === 'Tous les murs'),
+    ).toBeUndefined();
+    // Cotes Élec seul : les murs équipés.
+    expect(feuillesElevations(false, true)).toEqual({
       elevations: true,
       toutesElevations: false,
     });
-    // Les deux cochés : une seule série de feuilles, la plus large.
-    expect(feuillesElevations(true, true, true)).toEqual({
+    // Élévations : TOUS les murs, d'office.
+    expect(feuillesElevations(true, false)).toEqual({
       elevations: true,
       toutesElevations: true,
     });
-    // « Tous les murs » sans élévations ne règle rien — comme avant.
-    expect(feuillesElevations(false, true, false)).toEqual({
+    // Les deux : une seule série, la plus large.
+    expect(feuillesElevations(true, true)).toEqual({
+      elevations: true,
+      toutesElevations: true,
+    });
+    expect(feuillesElevations(false, false)).toEqual({
       elevations: false,
       toutesElevations: false,
     });
+  });
+
+  it('les tuiles d’options sont basses, l’icône garde sa taille', () => {
+    // Relevé du patron : « réduis plus les blocs que les icônes ». La
+    // tuile perd six points (46 → 40), l'icône deux (26 → 24) : ce qu'on
+    // reconnaît, c'est le dessin, pas la surface bleue.
+    const tree = monter('export');
+    const tuile = tree.root
+      .findAllByType(TouchableOpacity)
+      .find((n) => n.props.accessibilityLabel === 'Vues 3D')!;
+    const st = StyleSheet.flatten(tuile.props.style) as { height?: number };
+    expect(st.height).toBeLessThanOrEqual(42);
+    const svg = tuile.findAll((n) => Number(n.props?.width) >= 22)[0];
+    expect(svg).toBeDefined();
+    expect(Number(svg.props.width)).toBeGreaterThanOrEqual(24);
   });
 
   it('l’aperçu du PDF rend le retour au bord gauche', () => {

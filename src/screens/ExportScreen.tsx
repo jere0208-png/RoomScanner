@@ -114,21 +114,21 @@ const planStyles = StyleSheet.create({
 });
 
 /**
- * LES ÉLÉVATIONS QUE LE DOSSIER IMPRIME, selon les trois cases.
+ * LES ÉLÉVATIONS QUE LE DOSSIER IMPRIME — deux cases franches.
  *
- * « Cotes Élec » demande les murs ÉQUIPÉS vus de face avec leurs cotes —
- * c'est EXACTEMENT la feuille des élévations sans « Tous les murs ».
- * L'absorption est donc structurelle : cocher les deux ne double jamais
- * une feuille, le dossier imprime une seule série, la plus large.
+ * « Élévations » = TOUS les murs, d'office ; « Cotes Élec » = les murs
+ * ÉQUIPÉS d'au moins un appareil. La case « Tous les murs » a vécu —
+ * relevé du patron : deux cases qui se conditionnaient pour dire trois
+ * états, c'était une de trop. L'absorption reste structurelle : cocher
+ * les deux n'imprime qu'une seule série, la plus large.
  */
 export function feuillesElevations(
   elevations: boolean,
-  toutesElevations: boolean,
   cotesElec: boolean,
 ): { elevations: boolean; toutesElevations: boolean } {
   return {
     elevations: elevations || cotesElec,
-    toutesElevations: elevations && toutesElevations,
+    toutesElevations: elevations,
   };
 }
 
@@ -219,7 +219,6 @@ const styles = getStyles(c);
     posé, pour décider où percer. Les deux usages sont justes, celui-ci se
     demande.
   */
-  const [toutesElevations, setToutesElevations] = useState(false);
   /** « Cotes Élec » : les murs équipés, de face, cotés — voir
    *  `feuillesElevations` pour l'absorption sans doublon. */
   const [cotesElec, setCotesElec] = useState(false);
@@ -394,7 +393,7 @@ const styles = getStyles(c);
           surfaces: showSurfaces,
           textures: showTextures,
           metre: includeMetre,
-          ...feuillesElevations(elevations, toutesElevations, cotesElec),
+          ...feuillesElevations(elevations, cotesElec),
         },
       );
 
@@ -415,7 +414,6 @@ const styles = getStyles(c);
     measures3D,
     includeMetre,
     elevations,
-    toutesElevations,
     cotesElec,
     gaines,
     schema,
@@ -626,18 +624,6 @@ const styles = getStyles(c);
                 cotesElec,
                 () => setCotesElec(!cotesElec),
               ] as OptionDef,
-              // Elle ne s'offre que si les élévations sont demandées : une
-              // case qui règle une feuille absente ne règle rien.
-              ...(elevations
-                ? [
-                    [
-                      'murs',
-                      'Tous les murs',
-                      toutesElevations,
-                      () => setToutesElevations(!toutesElevations),
-                    ] as OptionDef,
-                  ]
-                : []),
               ...(schemas
                 ? [
                     [
@@ -661,7 +647,7 @@ const styles = getStyles(c);
                 activeOpacity={0.8}
                 accessibilityLabel={label}
                 onPress={press}>
-                <Svg width={26} height={26} viewBox="0 0 24 24">
+                <Svg width={24} height={24} viewBox="0 0 24 24">
                   {/* La silhouette Solar, remplie — jamais de trait. */}
                   <Path
                     d={EXPORT_ICONS[icon]}
@@ -854,8 +840,9 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     // ce qu'on doit reconnaître, c'est le dessin, pas la surface bleue.
     width: '100%',
     // Neuf options remplissaient l'écran avant même l'aperçu du plan.
-    // À 46 px, les trois rangées tiennent dans ce que prenaient deux.
-    height: 46,
+    // Quarante points — relevé du patron : « réduis plus les blocs que
+    // les icônes » ; la tuile perd six points, l'icône deux.
+    height: 40,
     borderRadius: radius.sm,
     backgroundColor: c.surface,
     alignItems: 'center',
