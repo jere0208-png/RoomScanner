@@ -17,7 +17,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 import React from 'react';
-import { Alert, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Rect, Text as SvgText } from 'react-native-svg';
 import { light } from '../src/theme';
 import TestRenderer, { act } from 'react-test-renderer';
@@ -216,6 +216,10 @@ describe('le bas de l’établi', () => {
         fixtures: [
           { id: 'a', kind: 'prise', wallId: 'n', along: 1, height: 0.25, side: 1 },
         ],
+        // Le geste n'existe que si un parent sait le recevoir : sans lui,
+        // le bouton ne s'affiche pas du tout — un bouton qui ne commande
+        // rien prenait la place et donnait l'écran pour cassé.
+        onLink: () => {},
       }),
     );
     expect(vu).toContain('Lier');
@@ -244,11 +248,14 @@ describe('le bas de l’établi', () => {
       fixtures: [
         { id: 'rj', kind: 'rj45', wallId: 'n', along: 1, height: 0.25, side: 1 },
       ],
+      onLink: () => {},
     });
+    // Le bouton ne s'ÉTEINT plus, il n'est plus là : c'est la refonte
+    // « optimisé smartphone » — un geste impossible ne prend pas de place.
     const lier = tree.root
       .findAllByType(TouchableOpacity)
-      .find((n) => n.props.accessibilityLabel === 'Lier')!;
-    expect(lier.props.disabled).toBe(true);
+      .find((n) => n.props.accessibilityLabel === 'Lier');
+    expect(lier).toBeUndefined();
   });
 });
 
@@ -428,14 +435,21 @@ describe('la mise en page de l’établi', () => {
     expect(enregistrer).toBeDefined();
     const sc = style(croix!);
     const se = style(enregistrer!);
-    // Même hauteur : deux sorties voisines se ressemblent.
-    expect(`croix ${sc.height} · vert ${se.height}`).toBe(
-      `croix ${se.height} · vert ${se.height}`,
-    );
+    /*
+      LES DEUX SORTIES NE SE RESSEMBLENT PLUS, ET C'EST VOULU.
+
+      Elles étaient voisines dans l'en-tête, donc de même gabarit. La
+      refonte les sépare par ce qu'elles font : « Enregistrer » est
+      l'action principale — pleine largeur, en bas, sous le pouce ; la
+      croix est le geste rare qui ABANDONNE, et reste petite en haut.
+    */
+    expect(se.height).toBeGreaterThan(sc.height);
+    expect(se.width).toBe('100%');
     // Et un bloc, pas une pastille : le rayon n'est plus la moitié du côté.
     expect(sc.borderRadius).toBeLessThan(sc.height / 2);
-    // La règle des 44 points tient toujours.
+    // La règle des 44 points tient pour les deux.
     expect(sc.height).toBeGreaterThanOrEqual(44);
+    expect(se.height).toBeGreaterThanOrEqual(44);
   });
 
   it('pose la pastille des meubles DANS le flux, sous la légende', () => {
@@ -565,5 +579,85 @@ describe('la photo de repérage', () => {
     });
     const [ph] = useScanStore.getState().photos;
     expect(ph.along).toBeCloseTo(2.5, 1);
+  });
+});
+
+/**
+ * L'ÉTABLI REPENSÉ POUR LE POUCE — relevé du patron : « repense un peu
+ * cette page pour plus de simplicité, plus ergonomique et moderne, optimisé
+ * smartphone ».
+ *
+ * Trois défauts se voyaient sur sa capture :
+ *
+ * - le TITRE était tronqué deux fois (« Face au… », « mur sud-est de
+ *   2,8… ») : trois boutons se partageaient l'en-tête avec lui, dont un
+ *   « Enregistrer » vert qui prenait le tiers de la largeur ;
+ * - quatre boutons ÉTEINTS occupaient le bas dès l'ouverture — le défaut
+ *   que cet écran avait déjà corrigé une fois, et qui était revenu ;
+ * - l'action principale vivait EN HAUT, là où le pouce n'atteint pas sur
+ *   un téléphone tenu d'une main.
+ */
+describe('l’établi tient dans une main', () => {
+  const enTete = (tree: TestRenderer.ReactTestRenderer) =>
+    tree.root
+      .findAll((n) => {
+        const st = StyleSheet.flatten(n.props?.style) as
+          | { flexDirection?: string }
+          | undefined;
+        return (
+          st?.flexDirection === 'row' &&
+          n.findAllByType(Text).some((t) =>
+            String(t.props.children ?? '').includes('mur'),
+          )
+        );
+      })[0];
+
+  it('ne garde qu’une sortie dans l’en-tête : le titre a la place', () => {
+    const tree = rendu();
+    const tete = enTete(tree);
+    expect(tete).toBeDefined();
+    const boutons = tete
+      .findAllByType(TouchableOpacity)
+      .filter((n) => !String(n.props.accessibilityLabel ?? '').includes('Meubles'));
+    // La croix, et rien d'autre : « Enregistrer » et la photo sont
+    // descendus à portée de pouce.
+    expect(boutons).toHaveLength(1);
+    expect(String(boutons[0].props.accessibilityLabel)).toContain('Fermer');
+  });
+
+  it('n’affiche aucun bouton éteint quand rien n’est tenu', () => {
+    const tree = rendu();
+    const morts = tree.root
+      .findAllByType(TouchableOpacity)
+      .filter((n) => n.props.disabled === true);
+    expect(morts).toHaveLength(0);
+  });
+
+  it('garde le geste d’ajout et la photo sous le pouce', () => {
+    const vu = textes(rendu());
+    expect(vu).toContain('Ajouter');
+    // La photo devient un geste comme les autres, dans la même rangée.
+    const tree = rendu();
+    const photo = tree.root
+      .findAllByType(TouchableOpacity)
+      .find((n) => String(n.props.accessibilityLabel ?? '').startsWith('Photo'));
+    expect(photo).toBeDefined();
+  });
+
+  it('pose « Enregistrer » en bas, sur toute la largeur', () => {
+    const tree = rendu();
+    const valider = tree.root
+      .findAllByType(TouchableOpacity)
+      .find((n) =>
+        n.findAllByType(Text).some((t) => t.props.children === 'Enregistrer'),
+      )!;
+    expect(valider).toBeDefined();
+    const st = StyleSheet.flatten(valider.props.style) as {
+      alignSelf?: string;
+      width?: number | string;
+      flexGrow?: number;
+    };
+    // Pleine largeur : c'est l'action principale, elle se vise sans regarder.
+    expect(st.width === '100%' || st.alignSelf === 'stretch').toBe(true);
   });
 });

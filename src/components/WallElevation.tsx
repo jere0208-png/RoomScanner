@@ -910,96 +910,20 @@ export function WallElevation({
             </TouchableOpacity>
           )}
         </View>
-        <View style={styles.headerActions}>
-        {/* Photo de repérage : trois jours plus tard, la relecture achoppe
-            toujours sur « c'était quoi, ce mur ? ». Une photo punaisée y
-            répond mieux qu'une note. */}
-        <TouchableOpacity
-          style={styles.photo}
-          /*
-            LE BOUTON DIT CE QU'IL VA PHOTOGRAPHIER, et combien on en a
-            déjà : un tableau de porte se photographie pour lui-même, et
-            l'on prend souvent deux vues d'un même mur.
-          */
-          accessibilityLabel={
-            (retourVise ? 'Photo du retour' : 'Photo de repérage') +
-            (mesPhotos.length > 0 ? ` (${mesPhotos.length})` : '')
-          }
-          // La cible déborde le dessin : 36 points se voient bien, 44 se
-          // touchent bien. iOS distingue les deux, et c'est ce qui évite
-          // d'ouvrir la caméra en visant la croix.
-          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-          onPress={async () => {
-            const chemin = await RoomScan.takePhoto();
-            if (chemin) {
-              // La punaise tombe au milieu de CE QU'ON REGARDE : le retour
-              // visé, ou le mur entier à défaut.
-              const cible = retourVise
-                ? (retourVise.x0 + retourVise.x1) / 2
-                : face.len / 2;
-              addPhoto(wallId, fromFaceX(face, cible), chemin);
-              haptic('succes');
-            }
-          }}>
-          {/* L'appareil photo, redessiné comme la croix : trait franc,
-              angles arrondis, et surtout CENTRÉ. L'ancien tracé montait à
-              y=6 pour son viseur et descendait à 19 : son encre pesait un
-              demi-point trop bas dans la boîte, ce qui suffit à faire
-              paraître une icône « posée de travers » dans un rond. */}
-          <Svg width={20} height={20} viewBox="0 0 24 24">
-            <Rect
-              x={3.5}
-              y={7.5}
-              width={17}
-              height={11.5}
-              rx={2.6}
-              stroke="#FFFFFF"
-              strokeWidth={2.1}
-              strokeLinejoin="round"
-              fill="none"
-            />
-            <Path
-              d="M9 7.5 L10.4 5 h3.2 L15 7.5"
-              stroke="#FFFFFF"
-              strokeWidth={2.1}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              fill="none"
-            />
-            <Circle
-              cx={12}
-              cy={13.25}
-              r={3.4}
-              stroke="#FFFFFF"
-              strokeWidth={2.1}
-              fill="none"
-            />
-          </Svg>
-        </TouchableOpacity>
         {/*
-          DEUX SORTIES, ET ELLES NE FONT PAS LA MÊME CHOSE.
+          UNE SEULE SORTIE DANS L'EN-TÊTE — relevé du patron : « repense
+          cette page pour plus de simplicité, optimisé smartphone ».
 
-          Tout ce qu'on pose ici part dans le plan à l'instant même — c'est
-          ce qui permet de voir la cote bouger en glissant le doigt. La
-          croix ne fermait donc rien : elle laissait tout en place, et une
-          prise posée à côté restait dans le plan sans qu'on sache comment
-          l'annuler. Elle remet maintenant le mur dans l'état où on l'a
-          ouvert ; le bouton vert garde le travail et referme.
+          Ils étaient trois à s'y partager la place avec le titre : la
+          photo, un « Enregistrer » vert qui prenait le tiers de la
+          largeur, et la croix. Résultat, le titre sortait tronqué DEUX
+          fois — « Face au… », « mur sud-est de 2,8… » —, c'est-à-dire que
+          l'écran ne disait plus devant quoi on se trouvait.
 
-          Elle demande avant, évidemment : abandonner un quart d'heure de
-          pose sur un appui malheureux serait pire que le défaut d'origine.
-          Et sans modification, elle ferme sans rien demander.
+          Ne reste ici que la sortie qui ABANDONNE : le geste rare, petit,
+          en haut. Ce qu'on fait souvent — poser, photographier, garder —
+          descend sous le pouce.
         */}
-        <TouchableOpacity
-          style={styles.valider}
-          onPress={() => {
-            depart.current = null;
-            haptic('succes');
-            onClose();
-          }}>
-          <Check size={19} color="#FFFFFF" strokeWidth={2.8} />
-          <Text style={styles.validerText}>Enregistrer</Text>
-        </TouchableOpacity>
         <TouchableOpacity
           style={styles.close}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -1028,7 +952,6 @@ export function WallElevation({
           }}>
           <CloseCross size={22} color={c.inkSoft} weight={3} />
         </TouchableOpacity>
-        </View>
       </View>
       <View
         style={[styles.canvas, hauteurCadre ? { height: hauteurCadre } : null]}
@@ -1955,10 +1878,20 @@ export function WallElevation({
         </View>
       )}
 
-      {/* Quatre colonnes de même largeur, rien à faire défiler : la
-          suppression était au bout d'une rangée qui débordait, il fallait
-          la chercher en glissant. Chaque geste a son icône et son mot en
-          tout petit dessous. */}
+      {/*
+        LA RANGÉE NE MONTRE QUE CE QUI SERT — relevé du patron : « plus de
+        simplicité, optimisé smartphone ».
+
+        Quatre boutons ÉTEINTS occupaient le bas dès l'ouverture : de la
+        place prise par des commandes qui ne commandaient rien, et un écran
+        qui a l'air en panne. Sans appareil tenu, il n'y a que deux gestes
+        possibles sur un mur — en poser un, le photographier — et ils
+        tiennent au large. Dès qu'on en tient un, ses quatre gestes
+        remplacent les deux autres.
+
+        La photo descend ici : c'est une ACTION, elle n'avait rien à faire
+        dans l'en-tête à disputer sa place au titre.
+      */}
       <View style={styles.actions}>
         {(
           [
@@ -1969,6 +1902,29 @@ export function WallElevation({
               tint: c.blue,
               paths: ['M12 5 v14', 'M5 12 h14'],
               press: onAddRequest,
+            },
+            {
+              key: 'photo',
+              label:
+                (retourVise ? 'Photo du retour' : 'Photo') +
+                (mesPhotos.length > 0 ? ` (${mesPhotos.length})` : ''),
+              on: !selected,
+              tint: c.ink,
+              // L'appareil photo, au trait : boîtier, objectif, viseur.
+              paths: [
+                'M3.5 7.5 h4 l1.5 -2 h6 l1.5 2 h4 v11.5 h-17 z',
+                'M12 16.2 a3.2 3.2 0 1 0 0 -6.4 a3.2 3.2 0 0 0 0 6.4',
+              ],
+              press: async () => {
+                const chemin = await RoomScan.takePhoto();
+                if (chemin) {
+                  const cible = retourVise
+                    ? (retourVise.x0 + retourVise.x1) / 2
+                    : face.len / 2;
+                  addPhoto(wallId, fromFaceX(face, cible), chemin);
+                  haptic('succes');
+                }
+              },
             },
             {
               key: 'std',
@@ -2029,16 +1985,19 @@ export function WallElevation({
               },
             },
           ] as const
-        ).map((b) => (
+        )
+          // Un bouton qui ne commande rien ne s'affiche pas : il prenait
+          // la place, et donnait à l'écran l'air d'être en panne.
+          .filter((b) => b.on)
+          .map((b) => (
           <TouchableOpacity
             key={b.key}
             style={[styles.action, b.key === 'add' && styles.actionAdd]}
-            disabled={!b.on}
             // Le mot est dessous, en légende : c'est l'étiquette qui nomme
             // le bouton pour qui se fait lire l'écran.
             accessibilityLabel={b.label}
             onPress={b.press}>
-            <Svg width={21} height={21} viewBox="0 0 24 24" opacity={b.on ? 1 : 0.3}>
+            <Svg width={21} height={21} viewBox="0 0 24 24">
               {b.paths.map((d) => (
                 <Path
                   key={d}
@@ -2055,13 +2014,35 @@ export function WallElevation({
               style={[
                 styles.actionText,
                 b.key === 'add' && styles.actionTextAdd,
-                !b.on && styles.actionOff,
-              ]}>
+              ]}
+              numberOfLines={1}>
               {b.label}
             </Text>
           </TouchableOpacity>
         ))}
       </View>
+
+      {/*
+        GARDER ET REFERMER — l'action principale, en bas, sur toute la
+        largeur.
+
+        Elle vivait EN HAUT, en vert, coincée entre le titre et la croix :
+        sur un téléphone tenu d'une main, c'est le coin le plus difficile à
+        atteindre, et elle mangeait la place du titre. En bas et pleine
+        largeur, on la vise sans regarder — et elle prend le bleu de la
+        maison, le vert n'étant celui de rien d'autre dans l'app.
+      */}
+      <TouchableOpacity
+        style={styles.valider}
+        accessibilityLabel="Enregistrer et fermer"
+        onPress={() => {
+          depart.current = null;
+          haptic('succes');
+          onClose();
+        }}>
+        <Check size={19} color="#FFFFFF" strokeWidth={2.8} />
+        <Text style={styles.validerText}>Enregistrer</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -2178,18 +2159,24 @@ const getStyles = themedStyles((c: Palette) =>
       marginTop: 2,
     },
     /** L'enregistrement : vert, écrit, et à 44 points sous le doigt. */
+    /*
+      L'ACTION PRINCIPALE : pleine largeur, en bas, dans le bleu maison.
+      Le vert n'était la couleur de rien d'autre dans l'app, et il criait
+      plus fort que le titre qu'il écrasait.
+    */
     valider: {
+      width: '100%',
+      marginTop: 10,
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 6,
-      // 44 points : la règle d'iOS, que le banc d'essai vérifie bouton
-      // par bouton sur cet écran.
-      height: 44,
-      paddingHorizontal: 14,
+      justifyContent: 'center',
+      gap: 7,
+      // 50 points : on la vise sans regarder, le pouce à plat.
+      height: 50,
       borderRadius: radius.md,
-      backgroundColor: c.green,
+      backgroundColor: c.blue,
     },
-    validerText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
+    validerText: { color: '#FFFFFF', fontSize: 15.5, fontWeight: '800' },
     /**
      * LA CROIX EST UN BLOC, pas une pastille.
      *

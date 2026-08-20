@@ -145,6 +145,39 @@ L'outil « pièces » de la barre du plan relance la détection sur le graphe
 courant, en **gardant les noms donnés à la main** : chaque nouvelle pièce
 hérite du nom de l'ancienne dont le point de cartouche tombe dedans.
 
+### L'établi tient dans une main
+
+Relevé du patron, capture à l'appui : « repense un peu cette page pour plus
+de simplicité et plus ergonomique et moderne, optimisé smartphone ». Trois
+défauts s'y voyaient, et le même mal les explique — l'écran était rangé par
+NATURE des éléments, pas par ce qu'on en fait.
+
+**Le titre sortait tronqué deux fois** (« Face au… », « mur sud-est de
+2,8… ») : trois boutons se partageaient l'en-tête avec lui, dont un
+« Enregistrer » vert qui prenait le tiers de la largeur. Autrement dit,
+l'écran ne disait plus devant quoi on se trouvait. Ne reste en haut que la
+sortie qui ABANDONNE : le geste rare, petit, là où l'on ne va pas par
+mégarde.
+
+**Quatre boutons éteints occupaient le bas** dès l'ouverture — le défaut que
+cet écran avait déjà corrigé une fois, et qui était revenu par la porte des
+ajouts successifs. Un bouton qui ne commande rien ne s'affiche plus : sans
+appareil tenu il n'y a que deux gestes possibles sur un mur (en poser un, le
+photographier), et ils tiennent au large ; dès qu'on en tient un, ses quatre
+gestes remplacent les deux autres. La photo descend d'ailleurs là : c'est
+une ACTION, elle n'avait rien à faire dans l'en-tête à disputer sa place au
+titre.
+
+**Et l'action principale vivait en haut**, dans le coin le plus difficile à
+atteindre d'un téléphone tenu d'une main. « Enregistrer » est maintenant en
+bas, sur toute la largeur, dans le bleu de la maison — le vert n'était la
+couleur de rien d'autre dans l'app, et il criait plus fort que le titre
+qu'il écrasait.
+
+Les deux sorties ne se ressemblent donc plus, et c'est voulu : elles étaient
+voisines, donc de même gabarit ; elles sont maintenant séparées par ce
+qu'elles font.
+
 ### L'élec se pose PENDANT le scan, au viseur
 
 Relevé du chantier : « pendant un scan, permet d'ajouter manuellement des
