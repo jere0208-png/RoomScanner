@@ -18,7 +18,8 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 
 import React from 'react';
 import { Alert, Text, TouchableOpacity, View } from 'react-native';
-import { Text as SvgText } from 'react-native-svg';
+import { Rect, Text as SvgText } from 'react-native-svg';
+import { light } from '../src/theme';
 import TestRenderer, { act } from 'react-test-renderer';
 import { WallElevation } from '../src/components/WallElevation';
 import { wallFace } from '../src/geometry/electrical';
@@ -105,6 +106,43 @@ const textes = (tree: TestRenderer.ReactTestRenderer) =>
     .join(' | ');
 
 describe('les meubles devant le mur', () => {
+  /*
+   * CONTRE LE MUR, LE MEUBLE SE VOIT FRANCHEMENT — relevé du patron :
+   * « affiche aussi les meubles qui sont contre ce mur à quelques
+   * centimètres près ». Ils s'affichaient déjà, mais en creux (9 %
+   * d'opacité, tirets pâles) : invisibles. À douze centimètres ou moins
+   * du nu, la silhouette prend la convention du plan — bleu, trait
+   * plein ; la lointaine reste en creux.
+   */
+  it('dessine franchement le meuble contre le mur, en creux le lointain', () => {
+    const contre: ObjectData = {
+      id: 'c1',
+      category: 'storage',
+      width: 1,
+      depth: 0.4,
+      height: 2,
+      transform: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 3.6, 1, 0.2, 1],
+    };
+    const loin: ObjectData = {
+      id: 'l1',
+      category: 'table',
+      width: 1,
+      depth: 0.6,
+      height: 0.75,
+      transform: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 1, 0.375, 0.9, 1],
+    };
+    const tree = rendu({ objects: [contre, loin] });
+    const rects = tree.root.findAllByType(Rect);
+    expect(
+      rects.filter(
+        (n) => n.props.stroke === light.blue && !n.props.strokeDasharray,
+      ).length,
+    ).toBeGreaterThan(0);
+    expect(
+      rects.filter((n) => n.props.strokeDasharray === '5 4').length,
+    ).toBeGreaterThan(0);
+  });
+
   it('se projettent à leur place et à leur hauteur', () => {
     const face = wallFace(W[0], wallQuads(W).get('n'), 1);
     const vus = wallFurniture(face, [BIBLIO]);

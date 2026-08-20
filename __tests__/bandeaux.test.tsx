@@ -34,7 +34,10 @@ import {
 import { PILL_CELL_H } from '../src/components/ToolPill';
 import { WALL_MENU } from '../src/components/FloorplanEditor';
 import { estUnRetour, RetourGlisse } from '../src/components/RetourGlisse';
-import { Circle, Path, Polygon, Text as SvgText } from 'react-native-svg';
+import { light } from '../src/theme';
+import { SOLAIRES } from '../src/ui/solaires';
+import { cartoucheHeurte } from '../src/components/FloorplanEditor';
+import { Circle, Path, Polygon, Rect, Text as SvgText } from 'react-native-svg';
 import TestRenderer, { act } from 'react-test-renderer';
 import { ResultScreen } from '../src/screens/ResultScreen';
 import { ClientTour } from '../src/components/ClientTour';
@@ -198,8 +201,78 @@ describe('l’écran des résultats', () => {
     expect(grasses.length).toBeGreaterThan(0);
     // Et elle est GRANDE dans sa pastille — relevé du patron : à 22
     // points, elle restait timide à côté des silhouettes.
-    const larges = nord!.findAll((n) => Number(n.props?.size) >= 25);
+    const larges = nord!.findAll((n) => Number(n.props?.width) >= 25);
     expect(larges.length).toBeGreaterThan(0);
+    // Le losange de l'aiguille est PLEIN — relevé du patron : un contour
+    // vide flottait au milieu des silhouettes Solar.
+    const aiguille = nord!.findAll(
+      (n) =>
+        typeof n.props?.points === 'string' &&
+        n.props?.fill &&
+        n.props.fill !== 'none',
+    );
+    expect(aiguille.length).toBeGreaterThan(0);
+  });
+
+  it('le cartouche esquive les spots et laisse voir au travers', () => {
+    // Le prédicat : un spot sous le nom gêne ; à un mètre, non.
+    expect(
+      cartoucheHeurte({ x: 2, z: 2 }, 0.5, 0.2, [
+        { x: 2.1, z: 2.05, rx: 0.3, rz: 0.3 },
+      ]),
+    ).toBe(true);
+    expect(
+      cartoucheHeurte({ x: 2, z: 2 }, 0.5, 0.2, [
+        { x: 3.4, z: 2, rx: 0.3, rz: 0.3 },
+      ]),
+    ).toBe(false);
+    // Et le fond du cartouche déclare son opacité — relevé du patron.
+    const tree = monter();
+    const cartouches = tree.root
+      .findAllByType(Rect)
+      .filter((n) => n.props.rx === 5 && Number(n.props.fillOpacity) <= 0.9);
+    expect(cartouches.length).toBeGreaterThan(0);
+  });
+
+  it('ne pose plus de pastille de conformité sur le nom de la pièce', () => {
+    // Relevé du patron : le point ambre au coin du cartouche est parti —
+    // les constats vivent dans le dossier, pas sur le nom de la pièce.
+    const tree = monter();
+    const pastilles = tree.root
+      .findAllByType(Circle)
+      .filter((n) => n.props.fill === light.amber);
+    expect(pastilles).toHaveLength(0);
+  });
+
+  /*
+   * TOUCHER LE SOL LÂCHE LE MEUBLE TENU — relevé du patron : « ça ne
+   * fonctionne pas pour désélectionner le meuble ». La surface captait
+   * l'appui et choisissait la PIÈCE par-dessus le meuble encore tenu. Un
+   * geste, un effet : le premier appui au sol lâche le meuble, le suivant
+   * prend la pièce.
+   */
+  it('toucher le sol lâche le meuble tenu, sans prendre la pièce', () => {
+    const tree = monter();
+    act(() => bouton(tree, 'Édition')!.props.onPress());
+    act(() => {
+      jest.advanceTimersByTime(500);
+    });
+    const meuble = tree.root
+      .findAll((n) => typeof n.props?.onPress === 'function')
+      .find((n) => n.findAll((x) => x.props?.rx === 3).length > 0);
+    act(() => meuble!.props.onPress());
+    expect(bouton(tree, 'Cotes du meuble')).toBeDefined();
+    const sol = tree.root
+      .findAll((n) => typeof n.props?.onPress === 'function')
+      .find(
+        (n) =>
+          n.findAll((x) => x.props?.fill === 'url(#floorDots)').length > 0,
+      );
+    act(() => sol!.props.onPress());
+    // Le meuble est lâché…
+    expect(bouton(tree, 'Cotes du meuble')).toBeUndefined();
+    // …et la pièce n'est PAS prise à sa place.
+    expect(textes(tree)).not.toContain('Nommer');
   });
 
   /**
@@ -237,6 +310,28 @@ describe('l’écran des résultats', () => {
     expect(vu).toContain('sur la longueur');
     expect(bouton(tree, 'Largeur')).toBeDefined();
     expect(bouton(tree, 'Longueur')).toBeDefined();
+    /*
+      LES GESTES DE LA LIGNE SONT DES ICÔNES — relevé du patron : le
+      bandeau débordait sous la colonne d'ancrage. Les flèches Solar
+      disent l'axe, la croix retire ; les mots vivent dans l'étiquette
+      d'accessibilité, pas dans la largeur du bandeau.
+    */
+    expect(
+      bouton(tree, 'Longueur')!
+        .findAllByType(Path)
+        .some((p) => p.props.d === SOLAIRES.longueur),
+    ).toBe(true);
+    expect(bouton(tree, 'Longueur')!.findAllByType(Text)).toHaveLength(0);
+    expect(
+      bouton(tree, 'Largeur')!
+        .findAllByType(Path)
+        .some((p) => p.props.d === SOLAIRES.largeur),
+    ).toBe(true);
+    expect(
+      bouton(tree, 'Retirer')!
+        .findAllByType(Path)
+        .some((p) => p.props.d === SOLAIRES.retirer),
+    ).toBe(true);
 
     // Retourner la ligne : le bandeau le dit aussitôt.
     act(() => bouton(tree, 'Largeur')?.props.onPress());
@@ -249,6 +344,35 @@ describe('l’écran des résultats', () => {
     expect(vu).not.toContain('3 spots');
     // Le bandeau d'un appareil seul parle de sa place, en centimètres.
     expect(bouton(tree, 'Retirer')).toBeDefined();
+  });
+
+  /*
+   * LA LIGNE DE SPOTS SE RELIE À UNE COMMANDE — relevé du patron :
+   * « comme un autre point d'éclairage ». Un point seul avait son bouton
+   * de liaison ; la ligne, rien — il fallait relier spot par spot.
+   */
+  it('la ligne de spots se relie à une commande d’un geste', () => {
+    const tree = monter();
+    const RAYON = 'M-5 0 a5 5 0 1 0 10 0 a5 5 0 1 0 -10 0';
+    const spot = tree.root
+      .findAll((n) => typeof n.props?.onPress === 'function')
+      .filter((n) => n.findAllByType(Path).some((p) => p.props.d === RAYON))[0];
+    act(() => spot.props.onPress());
+    expect(bouton(tree, 'Relier')).toBeDefined();
+    act(() => bouton(tree, 'Relier')!.props.onPress());
+    // Toucher une COMMANDE du plan clôt la liaison, pour TOUTE la ligne.
+    const editeur = tree.root.findByType(FloorplanEditor);
+    const inter = useScanStore
+      .getState()
+      .fixtures.find((f) => f.kind === 'inter')!;
+    act(() => editeur.props.onSelectFixture(inter.id, inter.wallId));
+    const spots = useScanStore
+      .getState()
+      .ceiling.filter((s) => s.kind === 'spot');
+    expect(spots.length).toBeGreaterThan(1);
+    for (const s of spots) {
+      expect(s.commands ?? []).toContain(inter.id);
+    }
   });
 
   it('ouvre le bandeau du plafond quand on touche l’appareil', () => {

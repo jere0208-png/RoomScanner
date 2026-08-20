@@ -82,6 +82,24 @@ const VIDE: Fixture[] = [];
  */
 export const WALL_MENU = { w: 204, h: 46 };
 
+/**
+ * LE CARTOUCHE GÊNE-T-IL EN CE POINT ? Obstacles : les meubles de la
+ * pièce, et les appareils du plafond — relevé du patron, capture à
+ * l'appui : après l'ajout d'une ligne de spots, le nom de la pièce se
+ * posait SUR un spot. Chaque obstacle porte sa demi-emprise.
+ */
+export function cartoucheHeurte(
+  pt: { x: number; z: number },
+  demiW: number,
+  demiH: number,
+  obstacles: { x: number; z: number; rx: number; rz: number }[],
+): boolean {
+  return obstacles.some(
+    (o) =>
+      Math.abs(pt.x - o.x) < o.rx + demiW && Math.abs(pt.z - o.z) < o.rz + demiH,
+  );
+}
+
 /*
   LES ICÔNES DU MENU VIENNENT DU JEU « SOLAR BOLD » (refonte du patron) —
   les mêmes silhouettes que la rangée d'outils, généré dans
@@ -186,7 +204,6 @@ interface Props {
    * Pièces en défaut de conformité électrique : leurs murs passent en rouge
    * foncé. C'est le seul signal visible sans ouvrir un menu.
    */
-  alertRooms?: Set<string>;
   /** Cotes du meuble sélectionné : réclamées par sa pastille de mesure. */
   showObjectDims?: boolean;
   onToggleObjectDims?: () => void;
@@ -302,7 +319,6 @@ export function FloorplanEditor({
   onSelectObject,
   showObjectDims,
   onToggleObjectDims,
-  alertRooms,
 }: Props) {
   const walls = useScanStore((s) => s.walls);
   const openings = useScanStore((s) => s.openings);
@@ -960,10 +976,24 @@ export function FloorplanEditor({
                       key={part.roomId}
                       onPress={
                         editable && onSelectRoom
-                          ? () =>
+                          ? () => {
+                              /*
+                                TOUCHER LE SOL QUAND UN MEUBLE EST TENU,
+                                C'EST LE LÂCHER — pas choisir la pièce.
+                                Relevé du patron : la surface captait
+                                l'appui et ouvrait le bandeau de la pièce
+                                par-dessus le meuble encore tenu. Un
+                                geste, un effet : le premier appui lâche,
+                                le suivant prend la pièce.
+                              */
+                              if (selectedObjectId) {
+                                onSelectObject?.(null);
+                                return;
+                              }
                               onSelectRoom(
                                 part.roomId === selectedRoomId ? null : part.roomId,
-                              )
+                              );
+                            }
                           : undefined
                       }>
                       <Polygon
@@ -1603,7 +1633,6 @@ export function FloorplanEditor({
               }[] = [];
               // Un constat de conformité sur cette pièce : un point ambre
               // devant son nom. Discret, mais là où l'on regarde.
-              const enAlerte = !!alertRooms?.has(part.roomId);
               if (roomName !== '') {
                 lignes.push({
                   t: roomName,
@@ -1641,12 +1670,27 @@ export function FloorplanEditor({
               );
               const labelW = wpx / mapping.scale;
               const labelH = hpx / mapping.scale;
+              /*
+                LES OBSTACLES DU CARTOUCHE : les meubles, ET les appareils
+                du plafond — relevé du patron : après l'ajout d'une ligne
+                de spots, le nom se posait SUR un spot.
+              */
+              const obstacles = [
+                ...foots.map((f) => ({
+                  x: f.cx,
+                  z: f.cz,
+                  rx: f.width / 2,
+                  rz: f.depth / 2,
+                })),
+                ...(showCeiling ? ceiling ?? [] : []).map((sp) => ({
+                  x: sp.at.x,
+                  z: sp.at.z,
+                  rx: 0.3,
+                  rz: 0.3,
+                })),
+              ];
               const collides = (pt: Pt) =>
-                foots.some(
-                  (f) =>
-                    Math.abs(pt.x - f.cx) < (f.width + labelW) / 2 &&
-                    Math.abs(pt.z - f.cz) < (f.depth + labelH) / 2,
-                );
+                cartoucheHeurte(pt, labelW / 2, labelH / 2, obstacles);
               // Point le plus au large de la pièce : jamais dans un mur ni
               // collé à un. On s'en écarte juste assez pour éviter un meuble.
               const ctr = part.labelAt;
@@ -1690,20 +1734,20 @@ export function FloorplanEditor({
                     height={hpx}
                     rx={5}
                     fill={c.surface}
+                    /*
+                      LE FOND LAISSE VOIR — relevé du patron. Il a été
+                      opaque (les meubles le traversaient) ; maintenant que
+                      le cartouche ESQUIVE meubles et spots, la
+                      transparence ne coûte plus la lisibilité, et ce qui
+                      passe dessous reste deviné.
+                    */
+                    fillOpacity={0.85}
                     stroke={selected ? c.blue : c.lineStrong}
                     strokeWidth={selected ? 2 : 1}
                   />
-                  {/* Le constat de conformité : un point ambre au coin du
-                      cartouche. Il remplaçait la couleur des quatre murs de
-                      la pièce — un plan barbouillé pour une prise manquante. */}
-                  {enAlerte && (
-                    <Circle
-                      cx={p.x - wpx / 2 + 7}
-                      cy={p.y - hpx / 2 + 7}
-                      r={3.2}
-                      fill={c.amber}
-                    />
-                  )}
+                  {/* Le point ambre de conformité a vécu ici — relevé du
+                      patron : rien sur le nom de la pièce. Les constats se
+                      lisent dans le dossier, où ils se chiffrent. */}
                   {lignes.map((l, li) => (
                     <SvgText
                       key={li}

@@ -24,6 +24,14 @@ export interface StripAction {
    * suffit pas — « Mesures » sans lui se lirait comme une simple lecture.
    */
   crayon?: boolean;
+  /**
+   * Une silhouette Solar à la place (ou à côté) du mot. Avec `sansMot`,
+   * l'icône parle seule et le mot vit dans l'étiquette d'accessibilité —
+   * c'est ce qui a recadré le bandeau des spots, qui débordait sous la
+   * colonne d'ancrage à trois mots pleins.
+   */
+  icone?: string;
+  sansMot?: boolean;
 }
 
 /**
@@ -86,12 +94,17 @@ export function StripBar({
             key={a.label}
             style={[
               a.ghost ? styles.wallStripGhost : styles.wallStripAction,
-              a.crayon && stylesLocaux.avecCrayon,
+              (a.crayon || a.icone) && stylesLocaux.avecCrayon,
             ]}
             accessibilityLabel={a.label}
             onPress={a.onPress}>
             {a.crayon && <Crayon teinte={teinte} />}
-            <Text style={texte}>{a.label}</Text>
+            {a.icone && (
+              <Svg width={15} height={15} viewBox="0 0 24 24">
+                <Path d={a.icone} fill={teinte} fillRule="evenodd" />
+              </Svg>
+            )}
+            {!a.sansMot && <Text style={texte}>{a.label}</Text>}
           </TouchableOpacity>
         );
       })}

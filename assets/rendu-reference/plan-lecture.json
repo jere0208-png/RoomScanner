@@ -3942,6 +3942,7 @@
            "type": 0,
            "payload": 4294967295
           },
+          "fillOpacity": 0.85,
           "stroke": {
            "type": 0,
            "payload": 4292271075
@@ -3949,6 +3950,7 @@
           "strokeWidth": 1,
           "propList": [
            "fill",
+           "fillOpacity",
            "stroke",
            "strokeWidth"
           ],

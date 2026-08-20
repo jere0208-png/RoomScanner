@@ -871,6 +871,36 @@ carte prend la parure — « plus dynamique et coloré premium » : l'avatar se
 cercle du contour d'or qui respire et le nom passe à la typo d'or ; en
 gratuit, elle reste sobre — la parure est ce qu'on achète.
 
+### Six retouches d'un même relevé de chantier
+
+- **Toucher le sol lâche le meuble tenu.** La surface captait l'appui et
+  choisissait la pièce PAR-DESSUS le meuble encore tenu. Un geste, un
+  effet : le premier appui au sol lâche le meuble, le suivant prend la
+  pièce.
+- **La pastille ambre de conformité a quitté le cartouche** : rien sur le
+  nom de la pièce — les constats se lisent dans le dossier, où ils se
+  chiffrent.
+- **La boussole du calque « Nord »** : losange PLEIN (après plus grasse,
+  puis plus grande) — dessin maison, le tracé lucide gardait son aiguille
+  vide au milieu des silhouettes Solar.
+- **Le cartouche esquive les spots et laisse voir.** Après l'ajout d'une
+  ligne de spots, le nom se posait SUR un spot : les appareils du plafond
+  rejoignent les meubles dans les obstacles du cartouche
+  (`cartoucheHeurte`, benché), et son fond passe à 85 % — il a été
+  translucide (traversé), puis opaque ; l'esquive rend la transparence
+  gratuite.
+- **Le bandeau de la ligne de spots tient dans l'écran** : trois mots
+  pleins débordaient sous la colonne d'ancrage — les flèches Solar disent
+  l'axe, le maillon relie, la croix retire, et les mots vivent dans les
+  étiquettes d'accessibilité. **La ligne se relie à une commande d'un
+  geste**, comme un point seul : la liaison en attente accepte désormais
+  toute une ligne (le même appui sur l'interrupteur clôt tout).
+- **Sur l'établi du mur, le meuble COLLÉ se voit franchement** : les
+  silhouettes en creux (9 %, tirets pâles) ne se voyaient pas, et c'est le
+  meuble contre le mur qui condamne la prise. À douze centimètres ou moins
+  du nu, il prend la convention du plan — bleu, trait plein ; le lointain
+  reste en creux.
+
 ### Le retour se glisse depuis le bord
 
 Relevé du patron : « un glissement de gauche vers la droite doit faire

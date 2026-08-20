@@ -153,11 +153,16 @@ describe('l’élévation dessine les meubles à leur hauteur', () => {
     return tree;
   };
 
-  /** Les silhouettes de meubles : les seuls rectangles en pointillé. */
+  /** Les silhouettes de meubles : en pointillé au loin, en bleu plein
+   *  quand le meuble est CONTRE le mur (la convention du plan). */
   const silhouettes = (tree: TestRenderer.ReactTestRenderer) =>
     tree.root
       .findAllByType(Rect)
-      .filter((n) => n.props.strokeDasharray === '5 4');
+      .filter(
+        (n) =>
+          n.props.strokeDasharray === '5 4' ||
+          (Number(n.props.fillOpacity) === 0.1 && !n.props.strokeDasharray),
+      );
 
   it('ne fait pas descendre un meuble haut jusqu’au sol', () => {
     const tree = rendu([HAUT]);

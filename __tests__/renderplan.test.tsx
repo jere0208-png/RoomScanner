@@ -198,21 +198,22 @@ describe('les conventions du dessin de plan', () => {
   });
 
   /**
-   * LE CARTOUCHE A UN FOND QUE LES MEUBLES NE TRAVERSENT PAS.
+   * LE CARTOUCHE LAISSE VOIR, SANS SE FAIRE TRAVERSER.
    *
-   * Relevé du chantier : à l'écran, le nom de la pièce se faisait traverser
-   * par les meubles — son fond était translucide à 55 %, alors que le même
-   * cartouche est opaque sur le PDF. La crainte d'origine (masquer le sol au
-   * moment d'y poser un point lumineux) est déjà traitée autrement : le
-   * cartouche s'efface pendant le réglage d'un appareil de plafond, et il
-   * esquive les meubles de sa pièce.
+   * Il a été translucide à 55 % (les meubles le traversaient), puis
+   * OPAQUE. Le patron a retranché : depuis que le cartouche ESQUIVE les
+   * meubles ET les appareils du plafond, la transparence ne coûte plus la
+   * lisibilité — un fond à 85 % couvre ce qu'il annote et laisse deviner
+   * ce qui passe dessous. Ni vitre, ni dalle.
    */
-  it('donne au cartouche un fond que les meubles ne traversent pas', () => {
+  it('donne au cartouche un fond translucide mais couvrant', () => {
     const tree = rendu(false);
     const cartouches = tous(tree, 'Rect').filter((n) => n.props.rx === 5);
     expect(cartouches.length).toBeGreaterThan(0);
     for (const r of cartouches) {
-      expect(r.props.fillOpacity ?? 1).toBeGreaterThanOrEqual(1);
+      const op = Number(r.props.fillOpacity ?? 1);
+      expect(op).toBeGreaterThanOrEqual(0.75);
+      expect(op).toBeLessThanOrEqual(0.95);
     }
   });
 

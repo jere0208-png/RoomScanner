@@ -85,7 +85,6 @@ import {
   fixturePlacement,
   materialList,
   roomInputsOf,
-  roomsInAlert,
   wallToRooms,
 } from '../geometry/nfc15100';
 import { buildMaterialPdf, materialFilename, toBase64 } from '../export/pdf';
@@ -473,7 +472,9 @@ export function ResultScreen() {
    * et c'est justement la question qu'on se pose sur le chantier. Il faut
    * donc que quelqu'un le désigne, une fois.
    */
-  const [pendingLink, setPendingLink] = useState<string | null>(null);
+  /** La liaison en cours : les points de plafond qui attendent leur
+   *  commande — un seul, ou toute une ligne de spots. */
+  const [pendingLink, setPendingLink] = useState<string[] | null>(null);
   /**
    * L'origine des cotes d'une pièce, DANS LA TRAME DU LOGEMENT.
    *
@@ -1090,7 +1091,6 @@ export function ResultScreen() {
       openings,
     ],
   );
-  const alertRooms = useMemo(() => roomsInAlert(elecIssues), [elecIssues]);
   const issues: Constat[] = useMemo(
     () => [
       ...checkPlan(walls, rooms).map((i, n) => ({
@@ -1722,7 +1722,6 @@ export function ResultScreen() {
                * l'établi s'ouvre par son bouton — comme les trois autres.
                */
             }}
-            alertRooms={alertRooms}
             selectedOpeningId={selectedOpeningId}
             onSelectOpening={(id) => {
               if (id) seuleSelection('ouverture');
@@ -1844,7 +1843,7 @@ export function ResultScreen() {
                           icon: 'fusionner' as const,
                           onPress: () => {
                             seulGeste('lien');
-                            setPendingLink(id);
+                            setPendingLink([id]);
                           },
                         },
                       ]
@@ -1874,7 +1873,10 @@ export function ResultScreen() {
               if (pendingLink) {
                 const f = fixtures.find((x) => x.id === id);
                 if (f && COMMANDES_MURALES.includes(f.kind)) {
-                  toggleCeilingCommand(pendingLink, id);
+                  // Toute la ligne d'un coup, ou le point seul : même geste.
+                  for (const pid of pendingLink) {
+                    toggleCeilingCommand(pid, id);
+                  }
                   haptic('succes');
                   setPendingLink(null);
                 } else {
@@ -2162,7 +2164,7 @@ export function ResultScreen() {
                 CEILINGS[cl.kind].commandable
                   ? () => {
                       seulGeste('lien');
-                      setPendingLink(cl.id);
+                      setPendingLink([cl.id]);
                     }
                   : undefined
               }
@@ -2211,18 +2213,44 @@ export function ResultScreen() {
                 (axe === 'longueur' ? 'sur la longueur' : 'sur la largeur')
               }
               actions={[
+                /*
+                  DES ICÔNES, PAS DES MOTS — relevé du patron : trois mots
+                  pleins débordaient sous la colonne d'ancrage. Les flèches
+                  Solar disent l'axe, le maillon relie, la croix retire.
+                */
                 {
                   label: 'Longueur',
+                  icone: SOLAIRES.longueur,
+                  sansMot: true,
                   ghost: axe !== 'longueur',
                   onPress: () => tendre('longueur'),
                 },
                 {
                   label: 'Largeur',
+                  icone: SOLAIRES.largeur,
+                  sansMot: true,
                   ghost: axe !== 'largeur',
                   onPress: () => tendre('largeur'),
                 },
+                /*
+                  LA LIGNE SE RELIE D'UN GESTE — relevé du patron : « comme
+                  un autre point d'éclairage ». Un point seul avait sa
+                  liaison ; la ligne obligeait à relier spot par spot.
+                */
+                {
+                  label: 'Relier',
+                  icone: SOLAIRES.lien,
+                  sansMot: true,
+                  ghost: true,
+                  onPress: () => {
+                    seulGeste('lien');
+                    setPendingLink(ligne.map((s) => s.id));
+                  },
+                },
                 {
                   label: 'Retirer',
+                  icone: SOLAIRES.retirer,
+                  sansMot: true,
                   ghost: true,
                   onPress: () => {
                     removeCeilingRow(selRow);
@@ -2306,7 +2334,7 @@ export function ResultScreen() {
                 (pendingSpots ? 'spot' : null) ??
                 pendingCeiling ??
                 (pendingLink
-                  ? ceiling.find((x) => x.id === pendingLink)?.kind ?? null
+                  ? ceiling.find((x) => x.id === pendingLink[0])?.kind ?? null
                   : null)
               }
               cible={

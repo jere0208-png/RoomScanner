@@ -15,11 +15,31 @@
  */
 import React from 'react';
 import { Animated } from 'react-native';
-import { Compass } from 'lucide-react-native';
+import Svg, { Circle, Polygon } from 'react-native-svg';
 import { useTheme } from '../../theme';
 import { RangeeOutils } from '../../components/RangeeOutils';
 import { ToolPill } from '../../components/ToolPill';
 import { CeilingIcon } from '../../components/CeilingIcon';
+
+/**
+ * La boussole du calque « Nord » — cercle au trait, LOSANGE PLEIN.
+ * Relevé du patron, en trois temps : plus grasse, plus grande, remplie.
+ * Le tracé lucide gardait son aiguille vide au milieu des silhouettes.
+ */
+function BoussoleNord({ teinte }: { teinte: string }) {
+  return (
+    <Svg width={26} height={26} viewBox="0 0 24 24">
+      <Circle cx={12} cy={12} r={10} stroke={teinte} strokeWidth={2.6} fill="none" />
+      <Polygon
+        points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88"
+        fill={teinte}
+        stroke={teinte}
+        strokeWidth={1.2}
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
 import {
   CEILINGS,
   CEILING_KINDS,
@@ -281,16 +301,7 @@ export function Toolbar2D({
           key="nord"
           icon="square"
           label="Nord"
-          node={
-            <Compass
-              // À côté des silhouettes Solar, 22 points et un trait de 2
-              // faisaient maigrelet — relevé du patron, en deux temps :
-              // plus grasse, puis plus grande.
-              size={26}
-              color={showNorth ? '#FFFFFF' : teinte.ink}
-              strokeWidth={2.6}
-            />
-          }
+          node={<BoussoleNord teinte={showNorth ? '#FFFFFF' : teinte.ink} />}
           active={showNorth}
           onPress={() => setShowNorth((v) => !v)}
         />,
@@ -407,13 +418,7 @@ export function Toolbar3D({
       key="nord"
       icon="square"
       label="Nord"
-      node={
-        <Compass
-          size={22}
-          color={showNorth ? '#FFFFFF' : teinte.ink}
-          strokeWidth={2}
-        />
-      }
+      node={<BoussoleNord teinte={showNorth ? '#FFFFFF' : teinte.ink} />}
       active={showNorth}
       onPress={() => setShowNorth((v) => !v)}
     />,

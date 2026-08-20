@@ -1198,6 +1198,15 @@ export function WallElevation({
               meublesDuMur.map((m, i) => {
                 const haut = Math.min(m.top, H);
                 const bas = Math.min(m.base, haut);
+                /*
+                  CONTRE LE MUR, LE MEUBLE SE VOIT FRANCHEMENT — relevé du
+                  patron : les silhouettes en creux (9 % d'opacité, tirets
+                  pâles) ne se voyaient pas, et c'est le meuble COLLÉ qui
+                  condamne la prise. À douze centimètres ou moins du nu,
+                  il prend la convention du plan : bleu, trait plein. Le
+                  lointain reste en creux.
+                */
+                const contre = m.ecart <= 0.12;
                 return (
                   <G key={`mb${i}`}>
                     <Rect
@@ -1205,11 +1214,11 @@ export function WallElevation({
                       y={py(haut)}
                       width={Math.max(2, (m.to - m.from) * scale)}
                       height={Math.max(1, (haut - bas) * scale)}
-                      fill={c.inkFaint}
-                      fillOpacity={0.09}
-                      stroke={c.inkFaint}
-                      strokeWidth={1}
-                      strokeDasharray="5 4"
+                      fill={contre ? c.blue : c.inkFaint}
+                      fillOpacity={contre ? 0.1 : 0.09}
+                      stroke={contre ? c.blue : c.inkFaint}
+                      strokeWidth={contre ? 1.4 : 1}
+                      strokeDasharray={contre ? undefined : '5 4'}
                     />
                     {(m.to - m.from) * scale > 46 && (
                       <SvgText

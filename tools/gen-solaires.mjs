@@ -67,6 +67,11 @@ const CHOIX = {
   // --- l'en-tête de l'écran des résultats
   partage: ['share-bold', 'square-share-line-bold'],
   points: ['menu-dots-bold'],
+  // --- le bandeau de la ligne de spots
+  longueur: ['transfer-horizontal-bold'],
+  largeur: ['transfer-vertical-bold'],
+  retirer: ['close-circle-bold'],
+  lien: ['link-round-bold', 'link-bold', 'link-circle-bold'],
 };
 
 async function tracer(nom) {
