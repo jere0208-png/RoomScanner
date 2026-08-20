@@ -28,6 +28,9 @@ import {
   quadPoints,
   roomExtent,
   roomOf,
+  angleAimante,
+  anglesRemarquables,
+  deplier,
   massifsTechniques,
   pivotsDesBattants,
   roomParts,
@@ -3002,16 +3005,36 @@ function WallMoveHandle({
  * connaît la position de départ de la poignée : le doigt est donc à
  * « départ + course », et l'angle se calcule proprement autour du milieu.
  *
- * TROIS GARDE-FOUS, parce qu'un pouce sur un écran de six pouces n'est pas
+ * SECONDE VERSION, ET SON DÉFAUT — relevé du chantier : « la rotation ne
+ * suit pas bien le mouvement ». Elle envoyait au plan des PAS : un demi-degré,
+ * parfois moins, à chaque image. Or le magasin recollait chacun de ces pas
+ * aux crans de quinze degrés, et le pas suivant repartait du cran atteint.
+ * Le mur restait donc scotché à l'équerre pendant que le doigt s'en
+ * éloignait, puis rattrapait d'un coup — et cent arrondis le faisaient
+ * dériver au passage.
+ *
+ * ON NE COMPTE PLUS LE CHEMIN, ON LIT L'ARRIVÉE. À la prise, on retient
+ * l'angle du mur et celui du doigt. Ensuite, à chaque image : le mur vaut
+ * son angle de départ plus ce que le doigt a parcouru — un ANGLE ABSOLU,
+ * posé tel quel. Rien ne s'accumule, donc rien ne dérive, et une image
+ * perdue ne laisse aucune trace.
+ *
+ * L'accroche se décide ICI, une seule fois, sur cet angle voulu : à trois
+ * degrés d'un cran on colle (avec le petit choc au doigt qui le dit), à
+ * quatre on est libre. On s'en décolle aussi facilement qu'on s'y colle.
+ *
+ * DEUX GARDE-FOUS, parce qu'un pouce sur un écran de six pouces n'est pas
  * une souris :
  *
  *  - la poignée se pose PERPENDICULAIREMENT au milieu du mur, à quarante
  *    points : dans le prolongement du bout, sur un mur qui traverse l'écran,
  *    elle finissait dans un coin, parfois hors du cadre ;
- *  - le pas par image est borné (le magasin le borne aussi, à vingt degrés) ;
- *  - la rotation CUMULÉE d'un geste s'arrête à quatre-vingt-dix degrés. Un
- *    mur retourné de plus est le même mur, et personne ne cherche ça au
- *    doigt.
+ *  - l'angle du doigt est DÉPLIÉ (`deplier`) : franchir le demi-tour ne fait
+ *    plus repartir le mur d'un tour complet en sens inverse.
+ *
+ * Le plafond de quatre-vingt-dix degrés par geste est tombé avec les pas :
+ * il servait à borner une dérive qui n'existe plus, et il arrêtait net un
+ * mur que le doigt continuait de tourner.
  */
 function WallRotateHandle({
   wall,
@@ -3031,8 +3054,21 @@ function WallRotateHandle({
   const [angle, setAngle] = useState<number | null>(null);
   const vif = useRef({ wall, mapping, sens, borne });
   vif.current = { wall, mapping, sens, borne };
-  /** L'état du geste : d'où part le doigt, et ce qu'on a déjà tourné. */
-  const geste = useRef({ x: 0, y: 0, mx: 0, my: 0, a0: 0, cumul: 0 });
+  /**
+   * L'état du geste : d'où part le doigt, l'angle qu'il faisait alors, celui
+   * du mur au même instant, et les crans sur lesquels s'arrêter.
+   */
+  const geste = useRef({
+    x: 0,
+    y: 0,
+    mx: 0,
+    my: 0,
+    doigt0: 0,
+    doigt: 0,
+    mur0: 0,
+    crans: [] as number[],
+    collait: false,
+  });
   const pan = useMemo(
     () =>
       PanResponder.create({
@@ -3047,13 +3083,21 @@ function WallRotateHandle({
             z: (w.a.z + w.b.z) / 2,
           });
           const p = poigneeAt(w, m, vif.current.sens, vif.current.borne);
+          const d0 = (Math.atan2(p.y - mid.y, p.x - mid.x) * 180) / Math.PI;
           geste.current = {
             x: p.x,
             y: p.y,
             mx: mid.x,
             my: mid.y,
-            a0: Math.atan2(p.y - mid.y, p.x - mid.x),
-            cumul: 0,
+            doigt0: d0,
+            doigt: d0,
+            // L'angle vrai du mur, pas l'entier affiché : partir de l'arrondi
+            // ferait sauter le mur d'un demi-degré à la prise.
+            mur0: (Math.atan2(w.b.z - w.a.z, w.b.x - w.a.x) * 180) / Math.PI,
+            // Les crans se figent à la prise : recalculés à chaque image, le
+            // mur qu'on tourne s'offrirait ses propres angles successifs.
+            crans: anglesRemarquables(useScanStore.getState().walls, w.id),
+            collait: false,
           };
           setAngle(angleDe(w));
         },
@@ -3061,21 +3105,21 @@ function WallRotateHandle({
           const { wall: w } = vif.current;
           const b = geste.current;
           // Le doigt est à « départ + course » : c'est la seule position
-          // fiable, et elle est dans les unités du plan.
-          const vise = Math.atan2(
-            b.y + g.dy - b.my,
-            b.x + g.dx - b.mx,
-          );
-          let pas = ((vise - b.a0) * 180) / Math.PI;
-          pas = ((pas + 540) % 360) - 180;
-          // Le cumul du geste ne dépasse pas le quart de tour.
-          const reste = 90 - Math.abs(b.cumul);
-          if (reste <= 0) return;
-          pas = Math.max(-reste, Math.min(reste, pas));
-          if (Math.abs(pas) < 0.5) return;
-          b.a0 = vise;
-          b.cumul += pas;
-          useScanStore.getState().rotateWall(w.id, pas);
+          // fiable, et elle est dans les unités de l'écran.
+          const brut =
+            (Math.atan2(b.y + g.dy - b.my, b.x + g.dx - b.mx) * 180) /
+            Math.PI;
+          // Déplié depuis l'image précédente : le demi-tour ne casse rien.
+          const doigt = deplier(b.doigt, brut);
+          b.doigt = doigt;
+          const vise = b.mur0 + (doigt - b.doigt0);
+          const final = angleAimante(vise, b.crans, 3);
+          // Le petit choc au doigt À L'INSTANT où l'on prend le cran : sans
+          // lui, l'accroche ne se voit qu'en relisant le nombre.
+          const colle = final !== vise;
+          if (colle && !b.collait) haptic('accroche');
+          b.collait = colle;
+          useScanStore.getState().setWallAngle(w.id, final);
           const apres = useScanStore
             .getState()
             .walls.find((x) => x.id === w.id);

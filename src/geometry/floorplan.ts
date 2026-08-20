@@ -1909,6 +1909,160 @@ export function trousDuRelevé(
   return out.sort((x, y) => x.ecart - y.ecart);
 }
 
+/**
+ * LE COIN QUI SE SOUDE À UN BOUT DE MUR.
+ *
+ * Le magnétisme du plan alignait PAR AXE : le x sur un bout, le z sur un
+ * autre. Un coin tiré près d'une extrémité se retrouvait donc « à l'aplomb »
+ * des deux sans en toucher aucune — un contour qui paraît fermé et qui fuit
+ * par un interstice de dix centimètres. Ni surface, ni pièce, ni métré.
+ *
+ * On cherche donc d'abord une VRAIE jonction : l'extrémité de mur la plus
+ * proche, en distance franche, et on s'y pose exactement. Vingt-cinq
+ * centimètres de portée — le double de l'alignement par axe, parce qu'ici
+ * l'intention ne fait aucun doute : personne n'amène un coin à vingt
+ * centimètres d'un autre pour l'y laisser.
+ *
+ * `exclude` est le point qu'on tient : sans lui, le coin se soudrait à
+ * lui-même et ne bougerait plus.
+ */
+export function soudureAuBout(
+  p: Pt,
+  walls: WallSeg[],
+  tol = 0.25,
+  exclude?: Pt,
+): Pt | null {
+  let meilleur: Pt | null = null;
+  let court = tol;
+  for (const w of walls) {
+    if (segLength(w) < 0.05) continue;
+    for (const end of ['a', 'b'] as const) {
+      const q = w[end];
+      if (exclude && Math.hypot(q.x - exclude.x, q.z - exclude.z) < 1e-6) {
+        continue;
+      }
+      const d = Math.hypot(q.x - p.x, q.z - p.z);
+      if (d < court) {
+        court = d;
+        meilleur = { x: q.x, z: q.z };
+      }
+    }
+  }
+  return meilleur;
+}
+
+/**
+ * OÙ NAÎT UN MUR AJOUTÉ À LA MAIN.
+ *
+ * « Un mètre au centre du plan » : le mur neuf tombait au milieu du séjour,
+ * loin de tout, et il fallait le recoller des deux mains — deux coins à
+ * viser au doigt sur un écran de six pouces. Or ce qu'on ajoute à la main
+ * manque TOUJOURS quelque part au bout de ce qui existe.
+ *
+ * Le mur neuf part donc du dernier bout libre du tracé et CONTINUE DROIT,
+ * comme un trait de crayon qu'on reprend : son premier coin est déjà soudé,
+ * il ne reste qu'à tirer le second. Enchaînés, ces murs referment une pièce
+ * l'un après l'autre.
+ *
+ * `null` quand le plan est vide ou déjà fermé : il n'y a alors aucun bout
+ * libre, et l'appelant pose au centre comme avant.
+ */
+export function murNeufDepuisUnBout(
+  walls: WallSeg[],
+  longueur = 1,
+  tol = 0.15,
+): { a: Pt; b: Pt } | null {
+  const pleins = walls.filter((w) => w.type === 'wall' && segLength(w) > 0.1);
+  const libre = (w: WallSeg, p: Pt) =>
+    !pleins.some(
+      (o) =>
+        o.id !== w.id &&
+        (Math.hypot(o.a.x - p.x, o.a.z - p.z) < tol ||
+          Math.hypot(o.b.x - p.x, o.b.z - p.z) < tol),
+    );
+  // Du plus récent au plus ancien : on reprend le tracé là où on l'a
+  // laissé, et par le bout `b` d'abord — c'est le sens dans lequel le mur
+  // a été posé.
+  for (let i = pleins.length - 1; i >= 0; i--) {
+    const w = pleins[i];
+    const l = segLength(w) || 1;
+    const u = { x: (w.b.x - w.a.x) / l, z: (w.b.z - w.a.z) / l };
+    if (libre(w, w.b)) {
+      return {
+        a: { x: w.b.x, z: w.b.z },
+        b: { x: w.b.x + u.x * longueur, z: w.b.z + u.z * longueur },
+      };
+    }
+    if (libre(w, w.a)) {
+      return {
+        a: { x: w.a.x, z: w.a.z },
+        b: { x: w.a.x - u.x * longueur, z: w.a.z - u.z * longueur },
+      };
+    }
+  }
+  return null;
+}
+
+/**
+ * L'ANGLE BRUT, RAMENÉ DANS LE TOUR OÙ LE GESTE SE TROUVE.
+ *
+ * Un `atan2` rend toujours un angle de ]-180°, 180°] : un doigt qui franchit
+ * le demi-tour faisait sauter le mur d'un tour complet en sens inverse. On
+ * ramène donc l'angle brut au multiple de 360° le plus proche du précédent :
+ * le geste devient continu, et le passage du demi-tour ne casse plus rien.
+ */
+export function deplier(precedent: number, brut: number): number {
+  return brut + Math.round((precedent - brut) / 360) * 360;
+}
+
+/**
+ * L'AIMANT DES ANGLES — appliqué UNE FOIS, sur l'angle voulu.
+ *
+ * Relevé du chantier : « la rotation ne suit pas bien le mouvement ». Le
+ * défaut n'était pas dans le doigt, il était ici : l'accroche portait sur
+ * chaque MICRO-PAS, et se rappliquait au pas suivant depuis le cran déjà
+ * atteint. Le mur restait scotché à l'équerre pendant que la main
+ * continuait — puis rattrapait d'un coup.
+ *
+ * L'aimant lit maintenant l'angle ABSOLU que le doigt désigne : à deux
+ * degrés d'un cran on colle, à cinq on est libre, et on s'en décolle aussi
+ * facilement qu'on s'y est collé.
+ */
+export function angleAimante(vise: number, crans: number[], tol = 3): number {
+  let mieux = tol;
+  let sortie = vise;
+  for (const c of crans) {
+    // Un cran vaut pour toutes ses images à 180° près : un mur retourné
+    // bout pour bout est le même mur sur le plan.
+    for (const k of [-540, -360, -180, 0, 180, 360, 540]) {
+      const d = Math.abs(vise - (c + k));
+      if (d < mieux) {
+        mieux = d;
+        sortie = c + k;
+      }
+    }
+  }
+  return sortie;
+}
+
+/**
+ * LES ANGLES SUR LESQUELS UN MUR S'ARRÊTE VOLONTIERS.
+ *
+ * L'équerre et ses quinzièmes — un mur se pose droit, en biais à
+ * quarante-cinq, rarement à trente-sept — ET les angles des murs déjà
+ * présents : aligner une cloison sur celle d'en face est le geste le plus
+ * courant du plan, il mérite le même cran que l'équerre.
+ */
+export function anglesRemarquables(walls: WallSeg[], sauf?: string): number[] {
+  const crans: number[] = [];
+  for (let d = -180; d <= 180; d += 15) crans.push(d);
+  for (const w of walls) {
+    if (w.id === sauf || segLength(w) < 0.1) continue;
+    crans.push((Math.atan2(w.b.z - w.a.z, w.b.x - w.a.x) * 180) / Math.PI);
+  }
+  return crans;
+}
+
 export function weldCorners(walls: WallSeg[], tol = 0.15): WallSeg[] {
   const out = walls.map((w) => ({ ...w, a: { ...w.a }, b: { ...w.b } }));
   const points: { wall: WallSeg; end: 'a' | 'b' }[] = [];

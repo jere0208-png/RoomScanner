@@ -38,6 +38,7 @@ import {
   segLength,
   snapAngle,
   snapToNeighbours,
+  soudureAuBout,
   splitAtJunctions,
   straightenWalls,
   toSegment,
@@ -902,6 +903,16 @@ interface ScanState {
    * qu'on tient.
    */
   rotateWall: (id: string, deg: number) => void;
+  /**
+   * POSE l'angle du mur, en degrés absolus, sans rien accrocher.
+   *
+   * Le geste de rotation empilait des petits pas, chacun re-collé aux crans
+   * de quinze degrés : le mur restait scotché à l'équerre pendant que le
+   * doigt continuait, et les arrondis dérivaient. L'angle se pose donc
+   * d'un coup, tel que le doigt le désigne — c'est le GESTE qui décide de
+   * l'accroche, une seule fois, sur l'angle voulu.
+   */
+  setWallAngle: (id: string, deg: number) => void;
   setWallLength: (id: string, length: number) => void;
   renameCurrent: (name: string) => void;
   saveAsCopy: (name: string) => void;
@@ -2754,11 +2765,23 @@ export const useScanStore = create<ScanState>((set, get) => {
       // du repère ARKit — ceux-ci dépendent de l'endroit où le scan a
       // commencé, et le magnétisme ne se déclenchait alors que par hasard.
       const frame = planFrameAngle(walls);
-      // D'abord l'alignement sur un mur voisin, puis l'équerre : ainsi un
-      // coin tiré « à peu près » dans le prolongement d'un autre mur s'y
-      // pose vraiment, au lieu d'un plan qui paraît droit sans l'être.
-      const aligned = snapToNeighbours(p, walls, frame, 0.12, old);
-      const snapped = snapAngle(fixed, aligned, 5, frame);
+      /*
+        LA SOUDURE PASSE AVANT TOUT LE RESTE.
+
+        Relevé du chantier : « une facilité pour le joindre à une extrémité
+        de mur ». L'aide au doigt alignait PAR AXE — le x d'un bout, le z
+        d'un autre — et ne joignait donc jamais rien : le coin se posait à
+        l'aplomb de deux extrémités sans en toucher aucune, et le contour
+        fuyait par un interstice qu'on ne voit pas à l'écran. Pas de
+        contour fermé, pas de surface, pas de métré.
+
+        Un bout de mur à moins de vingt-cinq centimètres, c'est une
+        intention : on s'y pose EXACTEMENT, et on ne redresse plus rien
+        après — l'équerre déferait la jonction qu'on vient de faire.
+      */
+      const soudure = soudureAuBout(p, walls, 0.25, old);
+      const aligned = soudure ?? snapToNeighbours(p, walls, frame, 0.12, old);
+      const snapped = soudure ?? snapAngle(fixed, aligned, 5, frame);
       const room = roomOf(wall);
       set({
         walls: walls.map((w) => {
@@ -2852,10 +2875,6 @@ export const useScanStore = create<ScanState>((set, get) => {
       const st = get();
       const wall = st.walls.find((w) => w.id === id);
       if (!wall || !deg) return;
-      const centre = {
-        x: (wall.a.x + wall.b.x) / 2,
-        z: (wall.a.z + wall.b.z) / 2,
-      };
       /*
         IL S'ARRÊTE SUR LES ANGLES QU'ON VISE.
 
@@ -2888,7 +2907,39 @@ export const useScanStore = create<ScanState>((set, get) => {
       const vise = actuel + pas;
       const cran = Math.round(vise / 15) * 15;
       const final = Math.abs(vise - cran) <= 3 ? cran : vise;
-      const rot = ((final - actuel) * Math.PI) / 180;
+      get().setWallAngle(id, final);
+    },
+
+    /*
+      L'ANGLE SE POSE, IL NE S'ACCUMULE PAS.
+
+      Relevé du chantier : « la rotation ne suit pas bien le mouvement ».
+      Le geste envoyait des petits pas — un demi-degré, parfois moins — et
+      CHACUN était re-collé aux crans de quinze degrés avant d'être appliqué,
+      le pas suivant repartant du cran atteint. Deux conséquences : le mur
+      restait scotché à l'équerre pendant que le doigt s'en éloignait, et
+      cent arrondis successifs le faisaient dériver.
+
+      On pose donc l'angle voulu, d'un seul coup, tel quel. L'accroche
+      appartient au geste, qui la décide UNE FOIS sur l'angle absolu —
+      voir `angleAimante`. Et le pivot reste le milieu : autour d'un bout,
+      l'autre extrémité part au loin et l'on ne vise plus rien.
+    */
+    setWallAngle: (id, deg) => {
+      const st = get();
+      const wall = st.walls.find((w) => w.id === id);
+      if (!wall || !Number.isFinite(deg)) return;
+      const centre = {
+        x: (wall.a.x + wall.b.x) / 2,
+        z: (wall.a.z + wall.b.z) / 2,
+      };
+      const actuel =
+        (Math.atan2(wall.b.z - wall.a.z, wall.b.x - wall.a.x) * 180) / Math.PI;
+      // Le chemin le plus court : poser 359° après 1° ne fait pas faire un
+      // tour complet au mur.
+      const ecart = ((deg - actuel + 540) % 360) - 180;
+      if (Math.abs(ecart) < 1e-6) return;
+      const rot = (ecart * Math.PI) / 180;
       const cos = Math.cos(rot);
       const sin = Math.sin(rot);
       const tourne = (p: Pt) => {

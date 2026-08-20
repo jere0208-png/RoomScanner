@@ -3191,6 +3191,51 @@ point au sol, en 2D comme en 3D et dans le PDF. Une extrémité libre reçoit un
 about droit ; posée sur le flanc d'un autre mur, elle est prolongée d'une
 demi-épaisseur pour entrer dans son corps (jonction en T).
 
+### Le mur ajouté à la main naît accroché
+
+« Un mètre au centre du plan » : le mur neuf flottait au milieu du séjour, et
+il fallait recoller **ses deux coins** au doigt. Relevé du chantier : « une
+facilité pour le joindre à une extrémité de mur ».
+
+Il part maintenant du **dernier bout libre du tracé**, droit dans la
+continuité de son mur (`murNeufDepuisUnBout`) : un coin est déjà soudé, il ne
+reste qu'à tirer l'autre — et le suivant repartira du bout de celui-ci,
+jusqu'à refermer la pièce. Le centre ne sert plus que de recours : plan vide,
+ou contour déjà fermé, les deux cas où il n'existe aucun bout libre.
+
+Et le coin tiré **se soude pour de bon** (`soudureAuBout`). L'aide au doigt
+alignait par AXE — le x d'un bout, le z d'un autre — sans jamais rien
+joindre : le coin se posait à l'aplomb de deux extrémités sans en toucher
+aucune, et le contour fuyait par un interstice invisible à l'écran. Pas de
+contour fermé, pas de surface, pas de métré. Une extrémité à moins de
+**25 cm** est une intention : on s'y pose exactement, et l'équerre ne repasse
+pas derrière défaire la jonction qu'on vient de faire.
+
+### La rotation d'un mur suit le doigt
+
+Relevé du chantier : « la rotation ne suit pas bien le mouvement ». Le geste
+envoyait des **pas** — un demi-degré, parfois moins, à chaque image — et le
+magasin recollait **chacun** aux crans de quinze degrés, le pas suivant
+repartant du cran atteint. Le mur restait donc scotché à l'équerre pendant que
+le doigt s'en éloignait, puis rattrapait d'un coup ; et cent arrondis
+successifs le faisaient dériver.
+
+**On ne compte plus le chemin, on lit l'arrivée.** À la prise, le geste retient
+l'angle du mur et celui du doigt ; ensuite le mur vaut son angle de départ plus
+ce que le doigt a parcouru — un angle **absolu**, posé tel quel par
+`setWallAngle`. Rien ne s'accumule, donc rien ne dérive, et une image perdue ne
+laisse aucune trace.
+
+L'accroche se décide alors **une seule fois**, sur cet angle voulu
+(`angleAimante`) : à trois degrés d'un cran on colle — avec le petit choc au
+doigt qui le dit — à quatre on est libre. Les crans sont l'équerre et ses
+quinzièmes **plus les angles des murs déjà là** (`anglesRemarquables`) :
+aligner une cloison sur celle d'en face est le geste le plus courant du plan.
+L'angle du doigt est déplié (`deplier`), si bien que franchir le demi-tour ne
+renvoie plus le mur d'un tour complet en arrière — et le plafond de 90° par
+geste est tombé avec les pas : il bornait une dérive qui n'existe plus, et
+arrêtait net un mur que le doigt continuait de tourner.
+
 ### Un geste ne se refabrique pas en cours de route
 
 La panne la plus coûteuse de tout le mobilier, et invisible à la lecture. Le

@@ -52,6 +52,7 @@ import {
 } from '../components/Iso3DView';
 import {
   fitsInRoom,
+  murNeufDepuisUnBout,
   planFrameAngle,
   roomOf,
   wallQuadsOf,
@@ -1697,8 +1698,26 @@ export function ResultScreen() {
                   {
                     label: 'Ajouter un mur',
                     icon: 'regle' as const,
-                    hint: 'Un mètre au centre du plan, à tirer par ses coins.',
+                    hint:
+                      'Un mètre accroché au bout libre du plan, ' +
+                      'à tirer par son coin.',
                     onPress: () => {
+                      /*
+                        IL NAÎT ACCROCHÉ, PAS AU MILIEU DU SÉJOUR.
+
+                        Relevé du chantier : « une facilité pour le joindre à
+                        une extrémité de mur ». Posé au centre du plan, le mur
+                        neuf flottait loin de tout et il fallait recoller ses
+                        DEUX coins au doigt. Il part maintenant du dernier
+                        bout libre du tracé, droit dans sa continuité : un
+                        coin est déjà soudé, il ne reste qu'à tirer l'autre —
+                        et le suivant repartira du bout de celui-ci, jusqu'à
+                        refermer la pièce.
+
+                        Le centre reste le recours quand il n'y a aucun bout
+                        libre : plan vide, ou contour déjà fermé.
+                      */
+                      const depuis = murNeufDepuisUnBout(walls, 1);
                       const xs = walls.flatMap((w) => [w.a.x, w.b.x]);
                       const zs = walls.flatMap((w) => [w.a.z, w.b.z]);
                       const cx = xs.length
@@ -1710,8 +1729,8 @@ export function ResultScreen() {
                       useScanStore
                         .getState()
                         .addWallBetween(
-                          { x: cx - 0.5, z: cz },
-                          { x: cx + 0.5, z: cz },
+                          depuis?.a ?? { x: cx - 0.5, z: cz },
+                          depuis?.b ?? { x: cx + 0.5, z: cz },
                         );
                       setEditMode(true);
                       haptic('succes');
