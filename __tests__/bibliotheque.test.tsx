@@ -25,6 +25,7 @@ import {
   LibraryScreen,
   teintesDossier,
 } from '../src/screens/LibraryScreen';
+import { HOLD_MS, prendLeRelevé } from '../src/screens/LibraryScreen';
 import { useScanStore, type SavedScan } from '../src/store/scanStore';
 import { dark, light } from '../src/theme';
 import { SNAPSHOT_WALLS } from '../src/export/snapshotFixture';
@@ -190,7 +191,7 @@ describe('la bibliothèque des relevés', () => {
     // Avant l'échéance, rien n'est décollé : un appui bref reste un appui.
     expect(dits(tree)).not.toContain('Amenez le scan');
     act(() => {
-      jest.advanceTimersByTime(600);
+      jest.advanceTimersByTime(HOLD_MS + 120);
     });
     expect(dits(tree)).toContain('Amenez le scan sur un dossier');
     // Et le glissement lui revient : sans ça la bulle reste collée au doigt
@@ -225,7 +226,7 @@ describe('la bibliothèque des relevés', () => {
     act(() => supprimer!.props.onPress());
     // La feuille joue sa descente avant que l'action parte.
     act(() => {
-      jest.advanceTimersByTime(600);
+      jest.advanceTimersByTime(HOLD_MS + 120);
     });
     const restants = useScanStore.getState().saves;
     expect(restants).toHaveLength(1);
@@ -247,7 +248,7 @@ describe('la bibliothèque des relevés', () => {
       ligneRow(tree, 'Chantier Dupont').props.onTouchStart({
         nativeEvent: { pageX: 120, pageY: 300 },
       });
-      jest.advanceTimersByTime(600);
+      jest.advanceTimersByTime(HOLD_MS + 120);
     });
     // Un appui long qui ne produit rien se lit comme une panne. Dedans, la
     // destination n'est pas un autre dossier : c'est la sortie.
@@ -416,5 +417,34 @@ describe('le dossier qui reçoit un scan', () => {
     const plein = rendre(0.3);
     expect(opacites(plein).map(lire)).toContain(1);
     act(() => plein.unmount());
+  });
+});
+
+/**
+ * LE DOIGT QUI FAIT DÉFILER NE PREND PAS LE RELEVÉ.
+ *
+ * Relevé du chantier : « les fichiers deviennent des bulles pour le
+ * déplacement mais trop facilement, le temps de poser le doigt pour scroll
+ * il se cible ». Le compte à rebours de l'appui long démarrait au contact
+ * et RIEN ne l'arrêtait : on posait le doigt pour faire défiler la liste,
+ * on n'avait pas fini de glisser que la bulle se levait — et le relevé
+ * partait en l'air alors qu'on voulait juste voir la suite.
+ *
+ * Deux réponses, et il faut les deux : le geste a plus de temps pour se
+ * déclarer, et un doigt QUI BOUGE renonce à prendre.
+ */
+describe('prendre un relevé, ou faire défiler', () => {
+  it('laisse au geste le temps de se déclarer', () => {
+    // Une demi-seconde, c'était le délai d'un appui long ordinaire ; sur
+    // une liste qui défile, c'est trop court pour distinguer les deux.
+    expect(HOLD_MS).toBeGreaterThanOrEqual(650);
+  });
+
+  it('renonce dès que le doigt glisse', () => {
+    // Huit points : moins, c'est le tremblement d'une main posée ; plus,
+    // c'est une intention de défiler.
+    expect(prendLeRelevé({ x: 100, y: 200 }, { x: 102, y: 203 })).toBe(true);
+    expect(prendLeRelevé({ x: 100, y: 200 }, { x: 100, y: 214 })).toBe(false);
+    expect(prendLeRelevé({ x: 100, y: 200 }, { x: 130, y: 200 })).toBe(false);
   });
 });

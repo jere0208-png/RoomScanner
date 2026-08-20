@@ -137,7 +137,35 @@ function ligneDetails(
  * Une seconde, c'était long : le doigt croit que rien ne se passe et repart.
  * Une demi-seconde suffit à distinguer l'appui long du simple appui.
  */
-const HOLD_MS = 500;
+/**
+ * LE TEMPS QU'ON LAISSE AU GESTE POUR SE DÉCLARER.
+ *
+ * Relevé du chantier : « les fichiers deviennent des bulles pour le
+ * déplacement mais trop facilement, le temps de poser le doigt pour scroll
+ * il se cible ». Une demi-seconde, c'est le délai d'un appui long
+ * ordinaire ; sur une liste qui défile, c'est trop court — le doigt qui se
+ * pose pour glisser n'a pas fini son mouvement que la bulle s'est levée.
+ */
+export const HOLD_MS = 700;
+
+/** Au-delà, ce n'est plus une main posée : c'est un glissement. */
+const BOUGE_MAX = 8;
+
+/**
+ * CE DOIGT PREND-IL ENCORE LE RELEVÉ ?
+ *
+ * Le compte à rebours démarrait au contact et RIEN ne l'arrêtait : la
+ * `ScrollView` finit bien par annuler le toucher de ses enfants, mais trop
+ * tard — la bulle était déjà en l'air. On surveille donc nous-mêmes : huit
+ * points d'écart et l'on renonce. Moins, c'est le tremblement d'une main
+ * posée ; plus, c'est une intention de faire défiler.
+ */
+export function prendLeRelevé(
+  depart: { x: number; y: number },
+  courant: { x: number; y: number },
+): boolean {
+  return Math.hypot(courant.x - depart.x, courant.y - depart.y) <= BOUGE_MAX;
+}
 /**
  * La clé de la zone « hors dossier » : l'en-tête, quand on est dedans.
  *
@@ -533,6 +561,8 @@ interface RowProps {
   /** Le « … » : renommer, dupliquer, sortir du dossier, supprimer. */
   onMenu: () => void;
   onHold: (at: { x: number; y: number }) => void;
+  /** Le doigt a bougé : au-delà d'un cheveu, il fait défiler. */
+  onHoldMove: (at: { x: number; y: number }) => void;
   onRelease: (deposer: boolean) => void;
 }
 
@@ -556,6 +586,7 @@ function ScanRow({
   onOpen,
   onMenu,
   onHold,
+  onHoldMove,
   onRelease,
 }: RowProps) {
   /*
@@ -577,6 +608,9 @@ function ScanRow({
       style={[styles.row, pris && styles.rowGhost, anim]}
       onTouchStart={(e) =>
         onHold({ x: e.nativeEvent.pageX, y: e.nativeEvent.pageY })
+      }
+      onTouchMove={(e) =>
+        onHoldMove({ x: e.nativeEvent.pageX, y: e.nativeEvent.pageY })
       }
       onTouchEnd={() => onRelease(true)}
       onTouchCancel={() => onRelease(false)}>
@@ -1141,6 +1175,16 @@ export function LibraryScreen() {
               onOpen={() => openSave(s.id)}
               onMenu={() => scanMenu(s)}
               onHold={(at) => beginHold(s.id, at)}
+              /*
+                LE DOIGT QUI GLISSE FAIT DÉFILER, il ne prend pas le
+                relevé : le compte à rebours s'arrête au premier vrai
+                mouvement, sans attendre que la liste réclame le geste.
+              */
+              onHoldMove={(at) => {
+                if (!dragRef.current && !prendLeRelevé(doigt.current, at)) {
+                  stopHold();
+                }
+              }}
               onRelease={releaseRow}
             />
           ))}

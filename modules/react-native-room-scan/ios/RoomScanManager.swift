@@ -27,11 +27,12 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
    on ferme une porte, on relève la chambre. Jusqu'ici chaque scan écrasait
    le précédent — il fallait recoller les pièces à la main, mur par mur.
 
-   `StructureBuilder` (iOS 17) sait aligner plusieurs `CapturedRoomData` en
-   une structure unique : c'est lui qui fait le travail, à condition qu'on
-   garde les données brutes de chaque passage. On les empile donc ici.
+   `StructureBuilder` (iOS 17) sait aligner plusieurs PIÈCES en une
+   structure unique : c'est lui qui fait le travail, à condition qu'on garde
+   chaque passage. On empile donc les pièces déjà construites — pas les
+   données brutes, qu'il faudrait reconstruire à chaque fois.
    */
-  private var releves: [CapturedRoomData] = []
+  private var releves: [CapturedRoom] = []
   /// Le prochain `stop()` s'AJOUTE au relevé au lieu de le remplacer.
   private var additif = false
   /// Les données brutes du passage en cours (remplies par `didEndWith`).
@@ -153,13 +154,16 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
      qu'un dossier parfait qui n'arrive pas.
      */
     if #available(iOS 17.0, *), let brut = dernierReleve {
-      let tous = releves + [brut]
+      let anciens = releves
       Task { [weak self] in
         guard let self = self else { return }
-        let fusion = tous.count > 1 ? await Self.fusionner(tous) : nil
-        let piece = fusion == nil ? await Self.embellir(brut) : nil
+        // Le passage qui vient de finir, post-traité par nos soins.
+        let piece = await Self.embellir(brut) ?? processedResult
+        // Plusieurs passages : on les aligne en une structure unique.
+        let fusion =
+          anciens.isEmpty ? nil : await Self.fusionner(anciens + [piece])
         await MainActor.run {
-          self.releves = tous
+          self.releves = anciens + [piece]
           self.dernierReleve = nil
           self.additif = false
           if let structure = fusion {
@@ -174,7 +178,7 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
               },
             )
           } else {
-            self.livrerPiece(piece ?? processedResult)
+            self.livrerPiece(piece)
           }
         }
       }
@@ -204,10 +208,10 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
    vue, qui n'a rien perdu.
    */
   @available(iOS 17.0, *)
-  static func fusionner(_ releves: [CapturedRoomData]) async -> CapturedStructure? {
+  static func fusionner(_ pieces: [CapturedRoom]) async -> CapturedStructure? {
     do {
       let batisseur = StructureBuilder(options: [.beautifyObjects])
-      return try await batisseur.capturedStructure(from: releves)
+      return try await batisseur.capturedStructure(from: pieces)
     } catch {
       return nil
     }

@@ -145,6 +145,22 @@ L'outil « pièces » de la barre du plan relance la détection sur le graphe
 courant, en **gardant les noms donnés à la main** : chaque nouvelle pièce
 hérite du nom de l'ancienne dont le point de cartouche tombe dedans.
 
+### Le doigt qui fait défiler ne prend pas le relevé
+
+Relevé du chantier : « les fichiers deviennent des bulles pour le
+déplacement mais trop facilement, le temps de poser le doigt pour scroll il
+se cible ». Le compte à rebours de l'appui long démarrait au contact et RIEN
+ne l'arrêtait : la `ScrollView` finit bien par annuler le toucher de ses
+enfants, mais trop tard — la bulle était déjà en l'air, et le relevé partait
+alors qu'on voulait juste voir la suite de la liste.
+
+Deux réponses, et il faut les deux. Le geste a **plus de temps pour se
+déclarer** (700 ms au lieu de 500 : une demi-seconde est le délai d'un appui
+long ordinaire, trop court sur une liste qui défile). Et surtout, **un doigt
+qui bouge renonce à prendre** : huit points d'écart et le compte à rebours
+s'arrête (`prendLeRelevé`) — moins, c'est le tremblement d'une main posée ;
+plus, c'est une intention de défiler.
+
 ### Le logement se scanne pièce par pièce, et les passages se réunissent
 
 « Fais tout ce que tu viens de dire. » Le chantier natif, donc — celui que
