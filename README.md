@@ -145,6 +145,40 @@ L'outil « pièces » de la barre du plan relance la détection sur le graphe
 courant, en **gardant les noms donnés à la main** : chaque nouvelle pièce
 hérite du nom de l'ancienne dont le point de cartouche tombe dedans.
 
+### Le relevé dit ce qu'il voit mal, pendant qu'on peut y retourner
+
+Question du patron : « as-tu moyen de rendre le scan plus performant, plus
+intelligent en détection ? » La réponse tient en trois étages, et un seul
+nous appartient vraiment.
+
+**Le moteur est celui d'Apple.** RoomPlan est une boîte noire : on ne
+l'améliore pas, on l'utilise. Deux API restent inexploitées et méritent un
+chantier natif à part — `RoomBuilder(options: [.beautifyObjects])` pour le
+post-traitement, et surtout, sous iOS 17, `StructureBuilder`, qui FUSIONNE
+plusieurs relevés en une structure unique : ce serait la vraie réponse au
+logement scanné pièce par pièce, aujourd'hui recollé à la main.
+
+**Le guidage, lui, nous appartient — et il dormait.** RoomPlan accorde une
+confiance à chaque surface et nous la donne **deux fois par seconde** ;
+l'app n'en gardait que le NOMBRE de murs, et jetait le reste. C'est
+pourtant là que tout se joue : un mur douteux se repasse en dix secondes
+tant qu'on est dans la pièce, et coûte une demi-heure de retouches une
+fois rentré — trous à combler, linteaux à remonter, pièces qui ne se
+referment pas. Tous les défauts remontés du chantier ces derniers jours
+naissent là.
+
+L'écran de scan affiche donc, en direct, « *3 murs mal vus · repassez
+lentement dessus* ». Un COMPTE, pas une liste : on ne lit pas un inventaire
+en balayant une pièce. Et rien du tout quand tout est franc — un voyant qui
+s'allume toujours n'avertit plus de rien. « Moyen » compte autant que
+« faible » : RoomPlan ne réserve pas sa confiance haute aux cas parfaits, et
+repasser ne coûte rien tant qu'on est devant.
+
+**Le post-traitement**, enfin, est le terrain qu'on laboure depuis le début
+(soudure des coins, redressement, détection des pièces par la porte, trous
+du relevé, linteaux rabotés, recoins techniques) : c'est lui qui rattrape ce
+que le moteur ne sait pas faire.
+
 ### La baie rabotée par un volet à moitié descendu
 
 Relevé du chantier, photo à l'appui : « le scan se cadre mal par rapport à

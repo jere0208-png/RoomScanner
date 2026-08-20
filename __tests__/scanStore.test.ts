@@ -844,3 +844,63 @@ describe('le brouillon et la fin de scan', () => {
     expect(useScanStore.getState().brouillon).toBeNull();
   });
 });
+
+/**
+ * LA QUALITÉ DU RELEVÉ SE DIT PENDANT LE SCAN — pas trois jours après.
+ *
+ * Question du patron : « as-tu moyen de rendre le scan plus performant,
+ * plus intelligent en détection ? » Le moteur, lui, est celui d'Apple : on
+ * ne le touche pas. Mais il nous PARLE, deux fois par seconde, et l'app
+ * n'écoutait qu'à moitié : chaque surface arrive avec la confiance que
+ * RoomPlan lui accorde, et l'on n'en gardait que le NOMBRE de murs.
+ *
+ * C'est pourtant là que tout se joue : un mur mal vu se repasse en dix
+ * secondes tant qu'on est dans la pièce, et coûte une demi-heure de
+ * retouches une fois rentré — trous à combler, linteaux à remonter, pièces
+ * qui ne se referment pas. Le relevé DIT donc ce qu'il voit mal, tant
+ * qu'on peut encore y retourner.
+ */
+describe('la qualité du relevé, en direct', () => {
+  const surface = (id: string, confidence: string) => ({
+    id,
+    type: 'wall',
+    length: 3,
+    height: 2.5,
+    confidence,
+    transform: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1.25, 0, 1],
+  });
+
+  it('compte les murs que RoomPlan voit mal', () => {
+    useScanStore.getState().applyLiveUpdate({
+      wallCount: 3,
+      objectCount: 0,
+      doorCount: 0,
+      windowCount: 0,
+      surfaces: [
+        surface('a', 'high'),
+        surface('b', 'low'),
+        surface('c', 'medium'),
+      ],
+    } as any);
+    // Faible ET moyen comptent : « medium » est déjà un mur qu'on ferait
+    // mieux de repasser, et c'est gratuit tant qu'on est devant.
+    expect(useScanStore.getState().mursDouteux).toBe(2);
+  });
+
+  it('et se tait quand tout est franc', () => {
+    useScanStore.getState().applyLiveUpdate({
+      wallCount: 2,
+      objectCount: 0,
+      doorCount: 0,
+      windowCount: 0,
+      surfaces: [surface('a', 'high'), surface('b', 'high')],
+    } as any);
+    expect(useScanStore.getState().mursDouteux).toBe(0);
+  });
+
+  it('repart de zéro au scan suivant', () => {
+    useScanStore.setState({ mursDouteux: 4 });
+    useScanStore.getState().reset();
+    expect(useScanStore.getState().mursDouteux).toBe(0);
+  });
+});

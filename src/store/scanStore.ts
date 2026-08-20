@@ -563,6 +563,17 @@ interface ScanState {
 
   // Pendant le scan (aperçu temps réel)
   instruction: string;
+  /**
+   * MURS QUE ROOMPLAN VOIT MAL, en direct.
+   *
+   * Chaque surface arrive avec la confiance qu'il lui accorde, deux fois
+   * par seconde — et l'app n'en gardait que le NOMBRE de murs. C'est
+   * pourtant là que tout se joue : un mur douteux se repasse en dix
+   * secondes tant qu'on est dans la pièce, et coûte une demi-heure de
+   * retouches une fois rentré (trous à combler, linteaux à remonter,
+   * pièces qui ne se referment pas).
+   */
+  mursDouteux: number;
   wallCount: number;
   objectCount: number;
   doorCount: number;
@@ -1088,6 +1099,7 @@ export const useScanStore = create<ScanState>((set, get) => {
     processing: false,
     error: null,
     instruction: '',
+    mursDouteux: 0,
     wallCount: 0,
     objectCount: 0,
     doorCount: 0,
@@ -2401,6 +2413,19 @@ export const useScanStore = create<ScanState>((set, get) => {
         objectCount: u.objectCount,
         doorCount: u.doorCount,
         windowCount: u.windowCount,
+        /*
+          « medium » compte AUTANT que « low ». RoomPlan ne réserve pas sa
+          confiance haute aux cas parfaits : un mur moyen est un mur qu'on
+          ferait mieux de repasser, et le repasser ne coûte rien tant qu'on
+          est devant. C'est le compte qui compte, pas le détail : on ne va
+          pas demander à quelqu'un qui balaie une pièce de lire une liste.
+        */
+        mursDouteux: (u.surfaces ?? []).filter((s2) => {
+          const c2 = String(s2.confidence ?? '').toLowerCase();
+          return (
+            (s2.type ?? 'wall') === 'wall' && (c2 === 'low' || c2 === 'medium')
+          );
+        }).length,
       }),
 
     arrivage: null,
@@ -3546,6 +3571,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         processing: false,
         error: null,
         instruction: '',
+        mursDouteux: 0,
         wallCount: 0,
         objectCount: 0,
         doorCount: 0,

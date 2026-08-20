@@ -24,6 +24,8 @@ export function ScanScreen() {
   const doorCount = useScanStore((s) => s.doorCount);
   const windowCount = useScanStore((s) => s.windowCount);
   const paused = useScanStore((s) => s.paused);
+  /* Ce que RoomPlan voit mal, tant qu'on peut encore y retourner. */
+  const mursDouteux = useScanStore((s) => s.mursDouteux);
   const processing = useScanStore((s) => s.processing);
   const { pause, resume, stop, cancel } = useRoomScan();
   const c = useTheme();
@@ -90,6 +92,30 @@ export function ScanScreen() {
         {paused && (
           <View style={[styles.instructionPill, styles.pausedPill]}>
             <Text style={styles.instructionText}>Scan en pause</Text>
+          </View>
+        )}
+        {/*
+          CE QUE LE RELEVÉ VOIT MAL, PENDANT QU'ON PEUT ENCORE Y RETOURNER.
+
+          RoomPlan accorde une confiance à chaque surface et nous la donne
+          deux fois par seconde ; l'app n'en gardait que le nombre de murs.
+          C'est pourtant là que tout se joue : un mur douteux se repasse en
+          dix secondes tant qu'on est dans la pièce, et coûte une demi-heure
+          de retouches une fois rentré — trous à combler, linteaux à
+          remonter, pièces qui ne se referment pas.
+
+          Un compte, pas une liste : on ne lit pas un inventaire en
+          balayant une pièce. Et rien du tout quand tout est franc — un
+          voyant qui s'allume toujours n'avertit plus de rien.
+        */}
+        {!paused && mursDouteux > 0 && (
+          <View style={[styles.instructionPill, styles.douteuxPill]}>
+            <View style={styles.instructionDot} />
+            <Text style={styles.instructionText}>
+              {`${mursDouteux} mur${mursDouteux > 1 ? 's' : ''} mal vu${
+                mursDouteux > 1 ? 's' : ''
+              } · repassez lentement dessus`}
+            </Text>
           </View>
         )}
       </View>
@@ -210,6 +236,8 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     marginTop: 10,
   },
   pausedPill: { backgroundColor: 'rgba(232,161,59,0.85)' },
+  /* Ambre comme la pause : c'est un avertissement, pas une faute. */
+  douteuxPill: { backgroundColor: 'rgba(232,161,59,0.9)' },
   instructionDot: {
     width: 7,
     height: 7,
