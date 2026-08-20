@@ -773,6 +773,17 @@ c'est la VUE qui glisse, au pilote natif — le banc tient la transformation
 animée, la famille monotone (rouge > vert > bleu sur chaque arrêt) et la
 couture.
 
+**Le contour gagne la carte et le bouton.** La carte Pro du comparatif et
+« S'abonner » portent le même contour d'or que le badge : c'est la
+signature du Pro, et elle se lit d'un coup d'œil sur les trois blocs qui le
+vendent. La recette vit dans UN composant (`ContourOr` — la famille d'ors,
+l'épaisseur du trait, le rythme de la vague) que le badge emprunte : trois
+dégradés réglés à la main auraient divergé à la première retouche, et le
+banc tient l'unicité arrêt par arrêt. Deux différences avec le badge : la
+bande ne se dessine qu'une fois la taille du bloc connue — une carte a la
+hauteur de son contenu —, et le badge flotte AU-DESSUS du bord de la carte,
+donc HORS de son rognage, sinon sa moitié haute serait coupée.
+
 ### Un relevé interrompu ne se perd plus
 
 Un scan tenait entièrement en mémoire tant qu'on n'avait pas touché

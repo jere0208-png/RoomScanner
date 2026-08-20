@@ -24,6 +24,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BadgePro } from '../components/BadgePro';
+import { ContourOr } from '../components/ContourOr';
 import { PRIX_PRO, useAccountStore } from '../store/accountStore';
 import { useTheme, type Palette } from '../theme';
 
@@ -96,29 +97,41 @@ export function PaywallScreen() {
               </Text>
             ))}
           </View>
-          <View style={[s.carte, s.cartePro]}>
-            {/* Le badge respire tout seul : blanc, contour et lettres d'or
-                nourris par la même bande qui glisse (voir BadgePro). */}
+          <View style={s.colonnePro}>
+            {/* La carte qu'on vend porte le contour d'or du badge — la même
+                bande, la même famille, depuis la même source (ContourOr). */}
+            <ContourOr rayon={18} fond={c.blue} style={s.pleine}>
+              <View style={s.carteDedans}>
+                <Text style={[s.carteTitre, s.surBleu]}>Pro</Text>
+                <Text style={[s.cartePrix, s.surBleu]}>
+                  {PRIX_PRO}
+                  <Text style={s.parMois}> / mois</Text>
+                </Text>
+                {PRO.map((l) => (
+                  <Text key={l} style={[s.ligne, s.surBleu]}>
+                    ✓ {l}
+                  </Text>
+                ))}
+              </View>
+            </ContourOr>
+            {/* Le badge flotte AU-DESSUS du bord de la carte : il vit hors
+                du rognage du contour, sinon sa moitié haute serait coupée. */}
             <BadgePro style={s.badge} />
-            <Text style={[s.carteTitre, s.surBleu]}>Pro</Text>
-            <Text style={[s.cartePrix, s.surBleu]}>
-              {PRIX_PRO}
-              <Text style={s.parMois}> / mois</Text>
-            </Text>
-            {PRO.map((l) => (
-              <Text key={l} style={[s.ligne, s.surBleu]}>
-                ✓ {l}
-              </Text>
-            ))}
           </View>
         </View>
 
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="S’abonner"
-          style={({ pressed }) => [s.cta, pressed && s.enfonce]}
+          style={({ pressed }) => [s.ctaCadre, pressed && s.enfonce]}
           onPress={acheter}>
-          <Text style={s.ctaTexte}>S’abonner — {PRIX_PRO} / mois</Text>
+          {/* Le geste qu'on vend porte le même contour d'or que la carte
+              et le badge : c'est la signature du Pro. */}
+          <ContourOr rayon={16} fond={c.blue} style={s.pleine}>
+            <View style={s.ctaDedans}>
+              <Text style={s.ctaTexte}>S’abonner — {PRIX_PRO} / mois</Text>
+            </View>
+          </ContourOr>
         </Pressable>
         <Text style={s.sansEngagement}>Sans engagement, résiliable à tout moment.</Text>
         <Pressable
@@ -186,7 +199,10 @@ const themed = (c: Palette) =>
       borderWidth: 1,
       borderColor: c.lineStrong,
     },
-    cartePro: { backgroundColor: c.blue },
+    // La colonne Pro : le contour rogne sa carte, le badge flotte dessus.
+    colonnePro: { flex: 1 },
+    pleine: { flex: 1 },
+    carteDedans: { flex: 1, padding: 16, gap: 7 },
     // La place du badge sur la carte ; sa peau (blanc, or animé) est à lui.
     badge: { position: 'absolute', top: -10, right: 12 },
     carteTitre: { fontSize: 14, fontWeight: '700', color: c.inkSoft },
@@ -194,14 +210,8 @@ const themed = (c: Palette) =>
     parMois: { fontSize: 13, fontWeight: '600' },
     surBleu: { color: '#FFFFFF' },
     ligne: { color: c.ink, fontSize: 13.5, lineHeight: 19 },
-    cta: {
-      marginTop: 24,
-      height: 54,
-      borderRadius: 16,
-      backgroundColor: c.blue,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
+    ctaCadre: { marginTop: 24, height: 54 },
+    ctaDedans: { flex: 1, alignItems: 'center', justifyContent: 'center' },
     enfonce: { transform: [{ scale: 0.97 }] },
     ctaTexte: { color: '#FFFFFF', fontSize: 16.5, fontWeight: '800' },
     sansEngagement: {

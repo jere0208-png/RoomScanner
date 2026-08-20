@@ -33,22 +33,17 @@ import Svg, {
   Stop,
   Text as SvgText,
 } from 'react-native-svg';
+// La famille d'ors, l'épaisseur du trait et le rythme vivent dans
+// `ContourOr` : la carte Pro et le bouton d'abonnement portent le même
+// contour, et une seule source les empêche de diverger.
+import { DUREE_VAGUE, ORS, TRAIT } from './ContourOr';
 
 /** Les cotes du badge, fixes : le mot ne change pas. */
 const LARGEUR = 46;
 const HAUTEUR = 21;
 const RAYON = 9;
-/** Le contour : ce qui reste visible de la bande autour du couvercle. */
-const TRAIT = 1.5;
 /** Une vague = quatre badges de large : longue, donc presque unie. */
 const PERIODE = LARGEUR * 4;
-
-/**
- * La famille d'ors, en boucle : doré, clair, bronze, et retour au doré —
- * le premier et le dernier arrêt sont LE MÊME, sans quoi la couture se
- * verrait à chaque tour.
- */
-const ORS = ['#C8861F', '#E9B54D', '#A3690F', '#C8861F'] as const;
 
 export function BadgePro({ style }: { style?: ViewStyle }) {
   const glisse = useRef(new Animated.Value(0)).current;
@@ -57,8 +52,7 @@ export function BadgePro({ style }: { style?: ViewStyle }) {
     const boucle = Animated.loop(
       Animated.timing(glisse, {
         toValue: 1,
-        // Une vague toutes les huit secondes : fluide, jamais pressée.
-        duration: 8000,
+        duration: DUREE_VAGUE,
         easing: Easing.linear,
         useNativeDriver: true,
       }),

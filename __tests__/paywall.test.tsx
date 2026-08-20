@@ -42,6 +42,7 @@ import TestRenderer, { act } from 'react-test-renderer';
 import { LinearGradient, Mask, Stop, Text as SvgText } from 'react-native-svg';
 import { PaywallScreen } from '../src/screens/PaywallScreen';
 import { BadgePro } from '../src/components/BadgePro';
+import { ContourOr, ORS } from '../src/components/ContourOr';
 import { EssaiEpuise } from '../src/components/EssaiEpuise';
 import { SignInScreen } from '../src/screens/SignInScreen';
 import { HomeScreen } from '../src/screens/HomeScreen';
@@ -201,6 +202,59 @@ describe('le badge Pro', () => {
       return typeof st?.width === 'number' && st.width >= 138;
     });
     expect(bandes.length).toBeGreaterThan(0);
+  });
+
+  /*
+   * LE CONTOUR D'OR GAGNE LA CARTE ET LE BOUTON.
+   *
+   * Relevé du patron : « même contour que le badge, sur le bloc de la
+   * comparaison Pro et le bouton pour s'abonner ». Les trois boivent à la
+   * MÊME source (`ContourOr` exporte la famille d'ors que le badge
+   * emprunte) : trois dégradés réglés à la main finiraient par diverger à
+   * la première retouche.
+   */
+  it('la carte Pro et le bouton d’abonnement portent le même contour', () => {
+    const t = monter(<PaywallScreen />);
+    const contours = t.root.findAllByType(ContourOr);
+    // La carte du comparatif, et le bouton « S'abonner ».
+    expect(contours).toHaveLength(2);
+    for (const contour of contours) {
+      // La bande ne se dessine qu'une fois la taille connue : on la donne.
+      const porteur = contour.findAll(
+        (n) => typeof n.props?.onLayout === 'function',
+      )[0];
+      act(() =>
+        porteur.props.onLayout({
+          nativeEvent: { layout: { width: 300, height: 100 } },
+        }),
+      );
+      // Même famille d'ors que le badge, arrêt pour arrêt.
+      const stops = contour
+        .findAllByType(Stop)
+        .map((n) => String(n.props.stopColor));
+      expect(stops).toEqual([...ORS]);
+      // Et c'est une VUE qui glisse, au pilote natif — comme le badge.
+      const animees = contour.findAll((n) => {
+        const st = StyleSheet.flatten(n.props.style) as ViewStyle | undefined;
+        if (!st || !Array.isArray(st.transform)) return false;
+        const tx = (st.transform as Record<string, unknown>[]).find(
+          (x) => 'translateX' in x,
+        );
+        return !!tx && typeof tx.translateX === 'object';
+      });
+      expect(animees.length).toBeGreaterThan(0);
+      // La bande est LONGUE : plusieurs blocs de large.
+      const bandes = contour.findAll((n) => {
+        const st = StyleSheet.flatten(n.props.style) as ViewStyle | undefined;
+        return typeof st?.width === 'number' && st.width >= 300 * 3;
+      });
+      expect(bandes.length).toBeGreaterThan(0);
+    }
+    // Le badge emprunte la même famille : une seule source pour les trois.
+    const badge = t.root.findByType(BadgePro);
+    expect(
+      badge.findAllByType(Stop).map((n) => String(n.props.stopColor)),
+    ).toEqual([...ORS]);
   });
 
   it('les lettres et le contour boivent au même dégradé', () => {
