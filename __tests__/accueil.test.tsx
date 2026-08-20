@@ -213,9 +213,13 @@ describe('l’accueil', () => {
         ).includes('Jérôme'),
       );
     expect(nomGris).toBeDefined();
-    expect(
-      (StyleSheet.flatten(nomGris!.props.style) as { color?: string }).color,
-    ).toBe(light.inkSoft);
+    const stNom = StyleSheet.flatten(nomGris!.props.style) as {
+      color?: string;
+      fontWeight?: string;
+    };
+    expect(stNom.color).toBe(light.inkSoft);
+    // Moins gras — relevé du patron : le prénom n'est pas un titre.
+    expect(Number(stNom.fontWeight)).toBeLessThanOrEqual(600);
     /*
       ET LE BANDEAU EST AXÉ — le bloc profil et le bouton de thème
       descendent ensemble et partagent leur ligne : deux éléments à la
@@ -238,20 +242,21 @@ describe('l’accueil', () => {
       c'est de la vraie surface de toucher.
     */
     const stCadre = StyleSheet.flatten(bloc.props.style) as {
-      padding?: number;
-      minHeight?: number;
+      paddingHorizontal?: number;
+      height?: number;
     };
-    expect(stCadre.padding ?? 0).toBeGreaterThanOrEqual(10);
-    // AXÉS PAR LEURS CENTRES, cadres compris.
+    expect(stCadre.paddingHorizontal ?? 0).toBeGreaterThanOrEqual(10);
+    /*
+      ALIGNÉS PAR CONSTRUCTION — relevé du patron : les deux blocs vivaient
+      dans des boîtes de hauteurs différentes et leurs centres dérivaient à
+      chaque retouche de contenu. Même sommet, MÊME hauteur : plus rien à
+      calculer, donc plus rien à dériver.
+    */
     const stThemeTaille = StyleSheet.flatten(pastilleTheme.props.style) as {
       height?: number;
     };
-    const centreBloc =
-      (stBloc.top ?? 0) +
-      ((stCadre.minHeight ?? 46) + 2 * (stCadre.padding ?? 0)) / 2;
-    const centreTheme =
-      (stTheme.top ?? 0) + (stThemeTaille.height ?? 0) / 2;
-    expect(Math.abs(centreTheme - centreBloc)).toBeLessThanOrEqual(1);
+    expect(stTheme.top).toBe(stBloc.top);
+    expect(stCadre.height).toBe(stThemeTaille.height);
     /*
       TOUT LE BLOC PREND LE CLIC — avatar, nom, barre, grade. Une vue SVG
       avale le toucher si on la laisse faire : les enfants directs du
@@ -283,8 +288,18 @@ describe('l’accueil', () => {
     const typos = bloc.findAllByType(TexteOr);
     expect(typos).toHaveLength(1);
     expect(typos[0].props.texte).toBe('Jérôme');
-    // …et l'avatar se cercle du contour d'or, le même que le badge.
-    expect(bloc.findAllByType(ContourOr)).toHaveLength(1);
+    // …et l'avatar se cercle du contour d'or, AU RAS de l'icône grise —
+    // relevé du patron : plus de disque clair entre l'anneau et l'avatar.
+    const contour = bloc.findAllByType(ContourOr);
+    expect(contour).toHaveLength(1);
+    expect(contour[0].props.fond).toBe(light.bg);
+    const stAnneau = StyleSheet.flatten(contour[0].props.style) as {
+      width?: number;
+    };
+    expect(stAnneau.width).toBeLessThanOrEqual(34);
+    // Et le prénom doré s'allège comme le gris.
+    const typoNom = bloc.findAllByType(TexteOr)[0];
+    expect(Number(typoNom.props.graisse)).toBeLessThanOrEqual(600);
     useAccountStore.setState({ pro: false });
   });
 

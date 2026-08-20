@@ -37,7 +37,7 @@ import { WALL_MENU } from '../src/components/FloorplanEditor';
 import { estUnRetour, RetourGlisse } from '../src/components/RetourGlisse';
 import { light } from '../src/theme';
 import { SOLAIRES } from '../src/ui/solaires';
-import { cartoucheHeurte } from '../src/components/FloorplanEditor';
+import { cartoucheHeurte, nomDeMeuble } from '../src/components/FloorplanEditor';
 import { Circle, Path, Polygon, Rect, Text as SvgText } from 'react-native-svg';
 import TestRenderer, { act } from 'react-test-renderer';
 import { ResultScreen } from '../src/screens/ResultScreen';
@@ -233,6 +233,40 @@ describe('l’écran des résultats', () => {
       .findAllByType(Rect)
       .filter((n) => n.props.rx === 5 && Number(n.props.fillOpacity) <= 0.9);
     expect(cartouches.length).toBeGreaterThan(0);
+  });
+
+  /*
+   * LE NOM D'UN MEUBLE NE RAYE JAMAIS SON MEUBLE — relevé du patron,
+   * capture à l'appui : « Rangement » débordait de l'armoire et se
+   * faisait barrer par ses traits. La règle de la maison s'applique :
+   * petit DEDANS, grandi par le zoom, absent s'il ne tient pas — c'est
+   * en zoomant qu'on lève le doute.
+   */
+  it('le nom d’un meuble ne raye jamais son meuble', () => {
+    // « Rangement » sur une armoire étroite : rien — le mot revient au zoom.
+    expect(nomDeMeuble('Rangement', 50, 20, 0, 60)).toBeNull();
+    // Sur un lit large : présent, et il grandit avec le zoom.
+    const pres = nomDeMeuble('Lit', 120, 80, 0, 60);
+    const zoome = nomDeMeuble('Lit', 240, 160, 0, 120);
+    expect(pres).not.toBeNull();
+    expect(zoome!.taille).toBeGreaterThan(pres!.taille);
+    // Et jamais plus large que l'emprise À L'ÉCRAN, rotation comprise.
+    for (const angle of [0, 0.5, 1.1]) {
+      for (const [w, d] of [
+        [40, 30],
+        [90, 40],
+        [200, 90],
+      ]) {
+        const pose = nomDeMeuble('Rangement', w, d, angle, 80);
+        if (pose) {
+          const dispo =
+            w * Math.abs(Math.cos(angle)) + d * Math.abs(Math.sin(angle));
+          expect('Rangement'.length * pose.taille * 0.62).toBeLessThanOrEqual(
+            dispo,
+          );
+        }
+      }
+    }
   });
 
   it('ne pose plus de pastille de conformité sur le nom de la pièce', () => {

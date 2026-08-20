@@ -475,14 +475,14 @@
           "content": null,
           "font": {
            "fontWeight": "600",
-           "fontSize": 8.5,
+           "fontSize": 12,
            "textAnchor": "middle"
           },
           "x": [
            0
           ],
           "y": [
-           3
+           4.2
           ],
           "dx": [],
           "dy": [],
@@ -683,60 +683,6 @@
           "d": "M-8.2 -22.5 L-8.2 -10.2"
          },
          "children": null
-        },
-        {
-         "type": "RNSVGText",
-         "props": {
-          "fill": {
-           "type": 0,
-           "payload": 4284114034
-          },
-          "propList": [
-           "fill"
-          ],
-          "matrix": [
-           -1,
-           0,
-           0,
-           -1,
-           0,
-           0
-          ],
-          "content": null,
-          "font": {
-           "fontWeight": "600",
-           "fontSize": 8.5,
-           "textAnchor": "middle"
-          },
-          "x": [
-           0
-          ],
-          "y": [
-           3
-          ],
-          "dx": [],
-          "dy": [],
-          "rotate": []
-         },
-         "children": [
-          {
-           "type": "RNSVGTSpan",
-           "props": {
-            "fill": {
-             "type": 0,
-             "payload": 4278190080
-            },
-            "content": "Réfrigérateur",
-            "font": {},
-            "x": [],
-            "y": [],
-            "dx": [],
-            "dy": [],
-            "rotate": []
-           },
-           "children": null
-          }
-         ]
         }
        ]
       },

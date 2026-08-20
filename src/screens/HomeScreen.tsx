@@ -335,7 +335,7 @@ export function HomeScreen() {
         */}
         {pro ? (
           <View pointerEvents="none">
-            <ContourOr rayon={19} fond={c.bg} style={styles.avatarOrZone}>
+            <ContourOr rayon={16} fond={c.bg} style={styles.avatarOrZone}>
               <View style={styles.avatarOrDedans}>
                 <Svg width={26} height={26} viewBox="0 0 24 24">
                   <Path d={SOLAIRES.avatar} fill={c.inkSoft} fillRule="evenodd" />
@@ -353,6 +353,7 @@ export function HomeScreen() {
             <TexteOr
               texte={compte?.prenom || compte?.email || 'Compte'}
               taille={14.5}
+              graisse="600"
               fond={c.bg}
             />
           ) : (
@@ -576,12 +577,19 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   // Remonté d'un cran — relevé du patron : « le clic doit être fait un
   // peu au-dessus pour que ça fonctionne » — et le cadre invisible
   // s'élargit encore : quatorze points de vraie surface tout autour.
+  /*
+    MÊME SOMMET, MÊME HAUTEUR QUE LA ZONE DU THÈME — relevé du patron :
+    les deux blocs vivaient dans des boîtes différentes et leurs centres
+    dérivaient à chaque retouche. Alignés par construction : plus rien à
+    calculer, donc plus rien à dériver. Le rembourrage horizontal reste le
+    cadre invisible du clic.
+  */
   profilBloc: {
     position: 'absolute',
-    top: 46,
+    top: 47,
     left: 8,
-    padding: 14,
-    minHeight: 46,
+    height: 72,
+    paddingHorizontal: 14,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 9,
@@ -589,7 +597,10 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     zIndex: 2,
   },
   profilColonne: { flexShrink: 1 },
-  profilNom: { color: c.inkSoft, fontSize: 14.5, fontWeight: '700', maxWidth: 130 },
-  avatarOrZone: { width: 38, height: 38 },
+  // Moins gras — relevé du patron : le prénom n'est pas un titre.
+  profilNom: { color: c.inkSoft, fontSize: 14.5, fontWeight: '600', maxWidth: 130 },
+  // L'anneau d'or AU RAS de l'icône : 32 pour un avatar de 26 — plus de
+  // disque clair entre eux, le couvercle est la couleur du fond.
+  avatarOrZone: { width: 32, height: 32 },
   avatarOrDedans: { flexGrow: 1, alignItems: 'center', justifyContent: 'center' },
 }));

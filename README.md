@@ -901,6 +901,27 @@ gratuit, elle reste sobre — la parure est ce qu'on achète.
   du nu, il prend la convention du plan — bleu, trait plein ; le lointain
   reste en creux.
 
+### Le nom d'un meuble ne raye jamais son meuble
+
+Relevé du patron, capture à l'appui : « Rangement » débordait de l'armoire
+et se faisait barrer par ses traits. La règle de la maison s'applique
+désormais au mobilier (`nomDeMeuble`, benchée) : le nom s'écrit petit
+DEDANS, sa taille suit le zoom (0,13 m d'écriture, bornée de 7 à 12
+points), et il s'ABSENTE quand il ne tient pas dans l'emprise du meuble
+projetée à l'écran, rotation comprise — c'est en zoomant qu'on lève le
+doute, comme pour les dénominations d'appareils. Les planches de rendu ont
+été régénérées : le diff montre la taille qui suit le cadrage, et le nom
+qui débordait a disparu.
+
+### Le bandeau de l'accueil, dernière passe
+
+Le bloc profil et la pastille du thème partagent désormais **la même
+boîte** (même sommet, même hauteur de 72 points) : alignés par
+construction, plus rien à calculer, donc plus rien à dériver. L'anneau
+d'or du Pro se pose **au ras de l'avatar gris** (32 points pour une icône
+de 26, couvercle couleur du fond — plus de disque clair), et le prénom
+s'allège (graisse 600) : ce n'est pas un titre.
+
 ### Le catalogue d'appareillage se déroule, et montre les vrais symboles
 
 Deux relevés du patron, une même fenêtre. **Le blanc défile** : la carte du
