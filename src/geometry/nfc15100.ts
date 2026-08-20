@@ -490,7 +490,12 @@ const porteSocle = (k: FixtureKind) => socketsOf(k) > 0;
 export type ElecFix =
   | { type: 'poser'; kind: FixtureKind; height?: number; label: string }
   | { type: 'hauteur'; fixtureId: string; height: number; label: string }
-  | { type: 'plafond'; kind: CeilingKind; label: string };
+  | { type: 'plafond'; kind: CeilingKind; label: string }
+  /**
+   * Remonter le linteau d'une baie que le scan a rabotée — le volet
+   * pendait sous son coffre au moment du relevé.
+   */
+  | { type: 'linteau'; openingId: string; haut: number; label: string };
 
 /** Nature du constat : de quoi on parle, sans lire la phrase. */
 export type ElecCode =

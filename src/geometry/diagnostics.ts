@@ -13,6 +13,7 @@
  * pointe l'élément concerné pour qu'un appui l'amène sous les yeux.
  */
 import {
+  linteauxRabotes,
   pointOnSeg,
   roomParts,
   segLength,
@@ -26,6 +27,7 @@ export type IssueKind =
   | 'murCourt'
   | 'doublon'
   | 'hauteur'
+  | 'linteau'
   | 'pieceMinuscule';
 
 export interface PlanIssue {
@@ -38,6 +40,10 @@ export interface PlanIssue {
   severity: 'alerte' | 'info';
   wallId?: string;
   roomId?: string;
+  /** La menuiserie visée, quand le constat parle d'une baie. */
+  openingId?: string;
+  /** Hauteur à laquelle remonter un linteau raboté (m, depuis le sol). */
+  linteau?: number;
 }
 
 /** Mur plus court que ça : presque toujours un artefact de détection. */
@@ -82,6 +88,11 @@ function nameOf(rooms: { id: string; name?: string }[], id: string): string {
 export function checkPlan(
   walls: WallSeg[],
   rooms: (RoomShape & { name?: string })[],
+  /**
+   * Les menuiseries, quand l'appelant les a : sans elles, le contrôle ne
+   * peut rien dire des linteaux que le volet a rabotés.
+   */
+  openings: WallSeg[] = [],
 ): PlanIssue[] {
   const issues: PlanIssue[] = [];
   if (walls.length === 0) return issues;
@@ -108,6 +119,30 @@ export function checkPlan(
       roomId: part.roomId,
       message: `Le contour de ${nameOf(rooms, part.roomId)} n’est pas fermé`,
       hint: 'Il manque un mur, ou un coin n’a pas rejoint son voisin.',
+    });
+  }
+
+  /*
+    LES BAIES RABOTÉES PAR UN VOLET À MOITIÉ DESCENDU.
+
+    Le scan cadre ce qu'il VOIT : un tablier pendant sous son coffre cache
+    le haut de la baie, et le linteau se pose sous le tablier. Dans un même
+    logement les linteaux s'alignent — celui qui tombe quinze centimètres
+    plus bas que les autres n'est pas une menuiserie particulière.
+  */
+  for (const r of linteauxRabotes(openings)) {
+    issues.push({
+      kind: 'linteau',
+      severity: 'alerte',
+      openingId: r.id,
+      linteau: r.linteau,
+      message: `Une baie s’arrête à ${Math.round(
+        r.actuel * 100,
+      )} cm, les autres à ${Math.round(r.linteau * 100)}`,
+      hint:
+        'Le volet devait pendre sous son coffre pendant le scan : la baie ' +
+        'a été cadrée sous le tablier. Un appui remonte son linteau au ' +
+        'niveau des autres.',
     });
   }
 

@@ -1100,13 +1100,25 @@ export function ResultScreen() {
   );
   const issues: Constat[] = useMemo(
     () => [
-      ...checkPlan(walls, rooms).map((i, n) => ({
+      ...checkPlan(walls, rooms, openings).map((i, n) => ({
         key: `p${n}`,
         message: i.message,
         hint: i.hint,
         severity: i.severity as string,
         wallId: i.wallId,
         roomId: i.roomId,
+        code: i.kind,
+        // Le linteau raboté sait se corriger : un appui le remonte au
+        // niveau des autres baies.
+        fix:
+          i.kind === 'linteau' && i.openingId && i.linteau
+            ? ({
+                type: 'linteau',
+                openingId: i.openingId,
+                haut: i.linteau,
+                label: 'Remonter le linteau',
+              } as const)
+            : undefined,
       })),
       ...elecIssues.map((i, n) => ({
         key: `e${n}`,
@@ -1120,7 +1132,7 @@ export function ResultScreen() {
         fix: i.fix,
       })),
     ],
-    [walls, rooms, elecIssues],
+    [walls, rooms, openings, elecIssues],
   );
   const alertes = useMemo(
     () => issues.filter((i) => i.severity === 'alerte').length,
@@ -1550,6 +1562,19 @@ export function ResultScreen() {
     if (fix.type === 'hauteur') {
       const f = fixtures.find((x) => x.id === fix.fixtureId);
       if (f) moveFixture(f.id, f.along, fix.height);
+      return;
+    }
+    if (fix.type === 'linteau') {
+      /*
+        L'ALLÈGE NE BOUGE PAS, c'est le linteau qui remonte : une baie
+        rabotée par un volet a gardé son appui, seul son haut est faux.
+        `resizeOpening` applique exactement cette règle.
+      */
+      const o = openings.find((x) => x.id === fix.openingId);
+      if (o) {
+        const allege = o.yCenter - o.height / 2;
+        resizeOpening(o.id, undefined, Math.max(0.2, fix.haut - allege));
+      }
       return;
     }
     const res = corrigerConstat(fix, issue.roomId, {

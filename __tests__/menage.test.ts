@@ -330,3 +330,56 @@ describe('combler un trou du relevé', () => {
     expect(st.openings).toHaveLength(0);
   });
 });
+
+/**
+ * REMONTER LE LINTEAU D'UNE BAIE RABOTÉE — d'un appui, depuis le contrôle.
+ *
+ * Le volet pendait sous son coffre pendant le scan : RoomPlan a cadré la
+ * baie SOUS le tablier. Le contrôle le voit (les autres linteaux
+ * s'alignent), et son geste remonte le haut sans toucher à l'appui — une
+ * baie rabotée a gardé son allège, seul son linteau est faux.
+ */
+describe('la baie rabotée par son volet', () => {
+  const baie = (id: string, haut: number, allege: number): WallSeg => ({
+    id,
+    type: 'window',
+    a: { x: id === 'd' ? 2 : 0, z: 0 },
+    b: { x: id === 'd' ? 3.2 : 1.2, z: 0 },
+    height: haut - allege,
+    yCenter: allege + (haut - allege) / 2,
+  });
+
+  it('le contrôle la voit, et le geste la remonte sans bouger l’allège', () => {
+    const { checkPlan } = require('../src/geometry/diagnostics');
+    const openings = [
+      baie('a', 2.15, 0.9),
+      baie('b', 2.15, 0.9),
+      baie('d', 1.8, 0.9),
+    ];
+    useScanStore.setState({
+      walls: [MUR],
+      openings,
+      rooms: [],
+      objects: [],
+      fixtures: [],
+      ceiling: [],
+      photos: [],
+    });
+    const constats = checkPlan([MUR], [], openings);
+    const raboté = constats.find(
+      (i: { kind: string }) => i.kind === 'linteau',
+    );
+    expect(raboté).toBeDefined();
+    expect(raboté.openingId).toBe('d');
+
+    // Le geste : la hauteur monte, l'allège ne bouge pas d'un millimètre.
+    const avant = useScanStore.getState().openings.find((o) => o.id === 'd')!;
+    const allege = avant.yCenter - avant.height / 2;
+    useScanStore
+      .getState()
+      .resizeOpening('d', undefined, raboté.linteau - allege);
+    const apres = useScanStore.getState().openings.find((o) => o.id === 'd')!;
+    expect(apres.yCenter + apres.height / 2).toBeCloseTo(2.15, 2);
+    expect(apres.yCenter - apres.height / 2).toBeCloseTo(allege, 3);
+  });
+});

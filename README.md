@@ -145,6 +145,31 @@ L'outil « pièces » de la barre du plan relance la détection sur le graphe
 courant, en **gardant les noms donnés à la main** : chaque nouvelle pièce
 hérite du nom de l'ancienne dont le point de cartouche tombe dedans.
 
+### La baie rabotée par un volet à moitié descendu
+
+Relevé du chantier, photo à l'appui : « le scan se cadre mal par rapport à
+la taille réelle d'une porte avec un volet un peu descendu, pourtant on voit
+bien le tour de la porte ». RoomPlan cadre ce qu'il VOIT : le tablier
+pendant sous son coffre lui masque le haut de la baie, et il pose son
+linteau **sous le tablier**. La porte-fenêtre sort à 1,80 m au lieu de
+2,15 — et tout ce qui en découle est faux : la hauteur d'allège, le dessin
+en élévation, la place qui reste pour un interrupteur.
+
+L'app ne peut pas savoir de combien le volet était descendu. Mais elle sait
+ce que tout bâtiment respecte : **dans un même logement, les linteaux sont
+au même niveau**. Trois baies à 2,15 m et une à 1,80 m, ce n'est pas une
+menuiserie particulière — c'est un volet qui pendait. `linteauxRabotes`
+prend donc le linteau le plus haut comme référence (un volet ne peut que
+rabaisser une baie, jamais la grandir) et signale celles qui tombent
+nettement dessous. Le seuil est large — quinze centimètres — parce qu'un
+châssis de salle de bains ou une imposte peuvent légitimement s'arrêter un
+peu plus bas ; et une allège haute ne trompe pas la règle, puisqu'on compare
+des LINTEAUX, pas des hauteurs de baie.
+
+Le constat porte son geste, comme les autres : **un appui remonte le
+linteau** au niveau commun, sans toucher à l'appui — une baie rabotée a
+gardé son allège, seul son haut est faux.
+
 ### Le coffre de volet, que le scan ne verra jamais
 
 Relevé du chantier, photo à l'appui : « le scan ne détecte pas les rebords

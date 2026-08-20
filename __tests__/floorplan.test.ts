@@ -22,6 +22,7 @@ import {
   toFootprint,
   dansLeCoffre,
   empriseDuCoffre,
+  linteauxRabotes,
   massifsTechniques,
   pivotsDesBattants,
   toSegment,
@@ -1876,5 +1877,65 @@ describe('le coffre de volet', () => {
     expect(dansLeCoffre(coffre, 0.7, 2.35)).toBe(true);
     // À la même hauteur, mais deux mètres plus loin : hors du coffre.
     expect(dansLeCoffre(coffre, 3.2, 2.35)).toBe(false);
+  });
+});
+
+/**
+ * LA BAIE RABOTÉE PAR SON VOLET À MOITIÉ DESCENDU.
+ *
+ * Relevé du chantier, photo à l'appui : « le scan se cadre mal par rapport
+ * à la taille réelle d'une porte avec un volet un peu descendu, pourtant on
+ * voit bien le tour de la porte ». RoomPlan cadre ce qu'il VOIT : le tablier
+ * pendant sous le coffre lui cache le haut de la baie, et il pose son
+ * linteau sous le tablier. La porte-fenêtre sort à 1,80 m au lieu de 2,15.
+ *
+ * L'app ne peut pas savoir de combien le volet est descendu. Mais elle sait
+ * une chose que tout bâtiment respecte : DANS UN MÊME LOGEMENT, LES
+ * LINTEAUX SONT AU MÊME NIVEAU. Trois baies à 2,15 m et une à 1,80 m, ce
+ * n'est pas une menuiserie particulière — c'est un volet qui pendait.
+ */
+describe('les linteaux rabotés', () => {
+  const baie = (id: string, haut: number, allege = 0): WallSeg => ({
+    id,
+    type: 'window',
+    a: { x: 0, z: 0 },
+    b: { x: 1.2, z: 0 },
+    height: haut - allege,
+    yCenter: allege + (haut - allege) / 2,
+  });
+
+  it('repère celle qui tombe sous le niveau commun', () => {
+    // Trois linteaux à 2,15 m, un à 1,80 : le dernier a été raboté.
+    const baies = [
+      baie('a', 2.15, 0.9),
+      baie('b', 2.15, 0.9),
+      baie('c', 2.15, 0),
+      baie('d', 1.8, 0),
+    ];
+    const rabotes = linteauxRabotes(baies);
+    expect(rabotes).toHaveLength(1);
+    expect(rabotes[0].id).toBe('d');
+    // Et l'app dit à quelle hauteur le remonter.
+    expect(rabotes[0].linteau).toBeCloseTo(2.15, 2);
+  });
+
+  it('ne dit rien quand tous les linteaux s’accordent', () => {
+    const baies = [baie('a', 2.15, 0.9), baie('b', 2.15, 0), baie('c', 2.13, 0)];
+    expect(linteauxRabotes(baies)).toHaveLength(0);
+  });
+
+  it('se tait sur un logement d’une seule baie : rien à comparer', () => {
+    expect(linteauxRabotes([baie('a', 1.6, 0)])).toHaveLength(0);
+  });
+
+  it('et ne confond pas un châssis haut avec un linteau raboté', () => {
+    // Un petit châssis de salle de bains, posé haut : son linteau est au
+    // niveau commun, c'est son allège qui est haute.
+    const baies = [
+      baie('a', 2.15, 0.9),
+      baie('b', 2.15, 0),
+      baie('sdb', 2.15, 1.6),
+    ];
+    expect(linteauxRabotes(baies)).toHaveLength(0);
   });
 });

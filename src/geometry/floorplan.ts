@@ -1678,6 +1678,41 @@ export function faceIntoRoom(
  *
  * Ne modifie pas les murs reçus : renvoie de nouveaux segments.
  */
+/**
+ * LES BAIES QUE LE VOLET A RABOTÉES.
+ *
+ * Relevé du chantier, photo à l'appui : « le scan se cadre mal par rapport
+ * à la taille réelle d'une porte avec un volet un peu descendu, pourtant on
+ * voit bien le tour de la porte ». RoomPlan cadre ce qu'il VOIT : le
+ * tablier pendant sous le coffre lui masque le haut de la baie, et il pose
+ * son linteau sous le tablier. La porte-fenêtre sort à 1,80 m au lieu de
+ * 2,15 — et tout ce qui en découle est faux : la hauteur d'allège, le
+ * dessin en élévation, la place qui reste pour un interrupteur.
+ *
+ * L'app ne peut pas savoir de combien le volet était descendu. Mais elle
+ * sait ce que tout bâtiment respecte : DANS UN MÊME LOGEMENT, LES LINTEAUX
+ * SONT AU MÊME NIVEAU. Trois baies à 2,15 m et une à 1,80 m, ce n'est pas
+ * une menuiserie particulière — c'est un volet qui pendait.
+ *
+ * On prend donc le linteau LE PLUS HAUT comme référence (un volet ne peut
+ * que rabaisser une baie, jamais la grandir), et l'on signale celles qui
+ * tombent nettement dessous. Le seuil est large — quinze centimètres —
+ * parce qu'un châssis de salle de bains ou une imposte peuvent
+ * légitimement s'arrêter plus bas de quelques centimètres.
+ */
+export function linteauxRabotes(
+  openings: WallSeg[],
+  ecartMin = 0.15,
+): { id: string; linteau: number; actuel: number }[] {
+  const baies = openings.filter((o) => o.type !== 'wall');
+  if (baies.length < 2) return [];
+  const hautDe = (o: WallSeg) => o.yCenter + o.height / 2;
+  const reference = Math.max(...baies.map(hautDe));
+  return baies
+    .filter((o) => reference - hautDe(o) >= ecartMin)
+    .map((o) => ({ id: o.id, linteau: reference, actuel: hautDe(o) }));
+}
+
 /** Hauteur par défaut d'un coffre de volet — le tunnel courant, 25 cm. */
 export const COFFRE_H = 0.25;
 

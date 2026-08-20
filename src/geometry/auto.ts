@@ -307,9 +307,12 @@ export function corrigerConstat(
   roomId: string | undefined,
   ctx: ContexteCorrection,
 ): { fixtures: Fixture[]; ceiling: CeilingFixture[] } | null {
-  // La remise à hauteur ne pose rien : elle se règle sur l'appareil même,
-  // et c'est l'écran qui la porte (il connaît le magasin).
-  if (fix.type === 'hauteur') return null;
+  /*
+    Deux gestes ne POSENT rien : la remise à hauteur d'un appareil et la
+    remontée d'un linteau. Ils se règlent sur l'élément lui-même, et c'est
+    l'écran qui les porte — lui seul tient le magasin.
+  */
+  if (fix.type === 'hauteur' || fix.type === 'linteau') return null;
 
   if (fix.type === 'plafond') {
     /*
