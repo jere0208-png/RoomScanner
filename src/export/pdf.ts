@@ -34,15 +34,26 @@ import {
   facePoint,
   interiorSide,
   masonryRuns,
+  postsOf,
+  postsSymbol,
   stackRanks,
   wallFace,
+  ENTRAXE,
+  PLAQUE,
+  SYMBOL_SPAN,
   type Fixture,
   type FixtureKind,
   type SymbolStroke,
 } from '../geometry/electrical';
-import type { Circuit, Differential, MaterialList } from '../geometry/nfc15100';
+import {
+  wallFurniture,
+  type Circuit,
+  type Differential,
+  type MaterialList,
+} from '../geometry/nfc15100';
 import {
   circuitColor,
+  markColor,
   type MultiWireSchema,
   type SchemaRow,
 } from '../geometry/schema';
@@ -247,6 +258,15 @@ export interface PdfOptions {
     /** Repère de circuit par appareil : ce qui relie le plan au tableau. */
     marks: Map<string, string>;
   } | null;
+  /**
+   * Les repères de circuit à écrire SUR LE PLAN.
+   *
+   * Ils vivaient dans `schemas`, donc n'existaient qu'avec la feuille de
+   * schéma cochée : le plan des gaines sortait muet sur les départs alors
+   * que l'app les connaissait. Ils voyagent maintenant à part — la feuille
+   * de schéma commande les PAGES, pas ce que le plan sait dire.
+   */
+  marks?: Map<string, string> | null;
 }
 
 function bytesOf(s: string): Uint8Array {
@@ -1156,6 +1176,13 @@ interface SheetContext {
   rooms?: RoomShape[];
   /** Appareillage électrique posé sur les murs. */
   fixtures?: Fixture[];
+  /**
+   * Repère de circuit par appareil (C1, C2…) : le lien entre le plan et le
+   * tableau. L'écran l'écrit sous chaque symbole depuis toujours ; le
+   * dossier imprimé le taisait, et celui qui tire les gaines devait
+   * deviner de quel départ dépend chaque prise.
+   */
+  marks?: Map<string, string>;
   colorOpenings: boolean;
   showSurfaces: boolean;
   showTextures: boolean;
@@ -1723,8 +1750,41 @@ function planPage(
           return { f, face, along: faceX(face, f.along) };
         })
         .filter((v): v is NonNullable<typeof v> => !!v);
+      /**
+       * UN ENSEMBLE SE DESSINE UNE FOIS, avec tous ses postes.
+       *
+       * Le papier dessinait un symbole PAR APPAREIL : une double prise
+       * sortait en deux symboles distants de 71 mm — deux pixels à
+       * l'échelle d'un logement — qui se recouvraient. Sur le mur, c'est
+       * pourtant UNE plaque, à deux mécanismes. L'écran le savait depuis
+       * longtemps ; le dossier imprimé, non.
+       */
+      const lots = new Map<string, typeof poses>();
+      for (const v of poses) {
+        const cle = v.f.group
+          ? `g:${v.f.group}:${v.f.wallId}:${v.f.side}`
+          : `s:${v.f.id}`;
+        const l = lots.get(cle);
+        if (l) l.push(v);
+        else lots.set(cle, [v]);
+      }
+      const unites = [...lots.values()].map((membres) => {
+        const tri = [...membres].sort((a, b) => a.along - b.along);
+        const xs = tri.map((m) => m.along);
+        return {
+          f: tri[0].f,
+          face: tri[0].face,
+          // Le symbole se pose au MILIEU de la plaque : c'est ce qu'on
+          // voit sur le mur, et ce que l'écran dessine déjà.
+          along: (Math.min(...xs) + Math.max(...xs)) / 2,
+          postes: tri.flatMap((m) => postsOf(m.f.kind)),
+          membres: tri,
+        };
+      });
+      // L'échelonnement compte les PLAQUES, pas les postes : deux appareils
+      // d'un même ensemble ne s'écartent pas l'un de l'autre.
       const ranks = stackRanks(
-        poses.map((v) => ({
+        unites.map((v) => ({
           id: v.f.id,
           wallId: v.f.wallId,
           side: v.f.side,
@@ -1738,10 +1798,13 @@ function planPage(
         s'arrêtait vingt-huit centimètres avant un appareil échelonné.
       */
       const sortie = (g: Fixture) => 0.2 + (ranks.get(g.id) ?? 0) * 0.24;
-      for (const v of poses) {
-        for (const cid of v.f.commands ?? []) {
-          const cible = poses.find((p) => p.f.id === cid);
-          if (!cible) continue;
+      /** L'unité qui porte cet appareil : un lien vise une PLAQUE. */
+      const uniteDe = (id: string) =>
+        unites.find((u) => u.membres.some((m) => m.f.id === id));
+      for (const v of unites) {
+        for (const cid of v.membres.flatMap((m) => m.f.commands ?? [])) {
+          const cible = uniteDe(cid);
+          if (!cible || cible === v) continue;
           const de = facePoint(
             v.face,
             Math.max(0, Math.min(v.face.len, v.along)),
@@ -1760,7 +1823,7 @@ function planPage(
           );
         }
       }
-      for (const { f, face, along } of poses) {
+      for (const { f, face, along, postes, membres } of unites) {
         const spec = FIXTURES[f.kind];
         // Une cote d'appareil devenue folle — un mur recoupé depuis la pose,
         // par exemple — enverrait son symbole à l'autre bout de la feuille.
@@ -1771,10 +1834,51 @@ function planPage(
         const q = px(facePoint(face, x, out));
         if (!dansLeCadre(q)) continue;
         d.path([anchor, q], 0.6, spec.color);
-        d.circle(q.x, q.y, 6.5, '#FFFFFF');
-        drawSymbol(d, assemblySymbol(f.kind), q.x, q.y, 0.5, spec.color, 0.9);
-        const tag = FIXTURE_TAG[f.kind];
-        if (tag) d.text(tag, q.x + 13, q.y + 4, 5.5, spec.color, { align: 'left' });
+        /*
+          LE DISQUE PREND LA MESURE DE LA PLAQUE.
+
+          Relu à l'œil sur le document : un rond fait pour un poste laissait
+          les symboles d'un ensemble de trois déborder des deux côtés, et
+          le fond blanc ne protégeait plus rien. Le rayon suit donc l'empan
+          RÉEL du symbole composé — même pas d'entraxe que `postsSymbol`,
+          demi-symbole aux extrémités, le tout à l'échelle du dessin.
+        */
+        const ech = 0.5;
+        const pas = (ENTRAXE / PLAQUE) * SYMBOL_SPAN;
+        const rayon =
+          6.5 + ((Math.max(1, postes.length) - 1) * pas * ech) / 2;
+        d.circle(q.x, q.y, rayon, '#FFFFFF');
+        drawSymbol(d, postsSymbol(postes, f.kind), q.x, q.y, ech, spec.color, 0.9);
+        /*
+          LE SIGLE CUMULÉ. Le plan reste sobre — seuls les appareils qui se
+          distinguent portent un mot (20 A, RJ, TV) —, mais une plaque
+          annonce TOUT ce qu'elle porte : « RJ » sous une prise + RJ45,
+          « RJ + TV » sous une plaque de communication.
+        */
+        const tags = [
+          ...new Set(postes.map((k) => FIXTURE_TAG[k]).filter(Boolean)),
+        ].join(' + ');
+        if (tags) {
+          // À DROITE DU DISQUE, pas à droite du centre : sur une plaque de
+          // trois postes, le sigle tombait en plein sur le dernier symbole.
+          d.text(tags, q.x + rayon + 5, q.y + 4, 5.5, spec.color, {
+            align: 'left',
+          });
+        }
+        /*
+          LE REPÈRE DE CIRCUIT, sous l'appareil — celui-là même qu'on lit à
+          l'écran et qu'on retrouve sur le tableau. Le dossier le taisait :
+          celui qui tire les gaines devait deviner de quel départ dépend
+          chaque prise, alors que l'app le sait.
+        */
+        const mark = ctx.marks?.get(membres[0].f.id);
+        if (mark) {
+          // SOUS le disque (l'axe y du PDF monte) : écrit à onze points du
+          // centre, il se posait sur les pieds des symboles.
+          d.text(mark, q.x, q.y - rayon - 6, 5.5, markColor(mark), {
+            bold: true,
+          });
+        }
       }
     }
 
@@ -2682,6 +2786,8 @@ function elevationPage(
   const face = wallFace(wall, wallQuads(walls).get(wall.id), side);
   const H = wall.height;
   const mine = (ctx.fixtures ?? []).filter((f) => f.wallId === wall.id);
+  /* Ce qui est posé sur l'AUTRE face : on ne perce pas dos à dos. */
+  const dos = mine.filter((f) => f.side !== side);
   const piece = ctx.roomNames[roomOf(wall) ?? ''] ?? '';
   /**
    * DE QUEL MUR S'AGIT-IL ? Celui du nord, celui de l'est.
@@ -2711,11 +2817,19 @@ function elevationPage(
     INK,
     { bold: true, align: 'left' },
   );
+  const poses0 = mine.length - dos.length;
   d.text(
     `Mur de ${face.len.toFixed(2).replace('.', ',')} m sous ` +
       `${H.toFixed(2).replace('.', ',')} m · ` +
-      `${mine.length} appareil${mine.length > 1 ? 's' : ''} · cotes en cm ` +
-      'depuis le nu du mur et depuis le sol.',
+      `${poses0} appareil${poses0 > 1 ? 's' : ''} · cotes en cm ` +
+      'depuis le nu du mur et depuis le sol.' +
+      // La légende n'existe que s'il y a quelque chose à expliquer : on
+      // ne commente pas ce qui n'est pas dessiné.
+      (dos.length > 0
+        ? ` En clair : ${dos.length} appareil${
+            dos.length > 1 ? 's' : ''
+          } de l’autre face.`
+        : ''),
     FRAME.x + 30,
     hautTitre - 14,
     8,
@@ -2757,6 +2871,43 @@ function elevationPage(
     d.line(x, py(0) - 6, x + 5, py(0), 0.6, GREY_LIGHT);
   }
 
+  const solY = Math.min(...walls.map((w) => w.yCenter - w.height / 2));
+
+  /*
+    LES MEUBLES DEVANT LE MUR — ce que l'écran montre depuis toujours, et
+    que le papier taisait.
+
+    C'est le plus grave des trois écarts : la feuille imprimée montrait un
+    mur LIBRE là où se dresse une bibliothèque. On emporte le dossier, on
+    perce, et l'on découvre le caisson. Contre le mur (douze centimètres ou
+    moins), la silhouette prend la convention du plan — bleu, trait plein ;
+    plus loin, elle reste en creux.
+  */
+  for (const m of wallFurniture(face, ctx.objects ?? [], solY)) {
+    const haut = Math.min(m.top, H);
+    const bas = Math.min(m.base, haut);
+    const contre = m.ecart <= 0.12;
+    const larg = Math.max(2, (m.to - m.from) * scale);
+    d.rect(
+      px(m.from),
+      py(bas),
+      larg,
+      Math.max(1, (haut - bas) * scale),
+      contre ? '#EDF3FF' : '#F2F4F7',
+      contre ? '#2F6BFF' : GREY_LIGHT,
+      contre ? 1.1 : 0.7,
+    );
+    if (larg > 46) {
+      d.text(
+        `${frCategory(m.category)} ${Math.round(m.top * 100)}`,
+        px((m.from + m.to) / 2),
+        py(haut) - 11,
+        7,
+        GREY,
+      );
+    }
+  }
+
   // Les hauteurs de référence, en filigrane : ce sont les quatre lignes
   // sur lesquelles une installation se pose.
   for (const r of HAUTEURS_REF) {
@@ -2776,7 +2927,6 @@ function elevationPage(
   }
 
   // ---------------------------------------------------- baies et retours
-  const solY = Math.min(...walls.map((w) => w.yCenter - w.height / 2));
   const trous = assignOpenings(walls, ctx.openings, solY).get(wall.id) ?? [];
   for (const t of trous) {
     const xa = faceXofT(face, t.t0);
@@ -2898,6 +3048,21 @@ function elevationPage(
     .map((f) => ({ f, x: faceX(face, f.along) }))
     .sort((a, b) => a.x - b.x);
 
+  /*
+    ET CE QUI EST POSÉ DE L'AUTRE CÔTÉ, en clair.
+
+    Un mur a deux faces, et l'on ne perce pas dos à dos : une prise de la
+    chambre tombant au même endroit qu'une prise du séjour, ce sont deux
+    boîtes qui se rencontrent dans la cloison. L'écran garde donc les
+    appareils de l'autre face en fantôme ; la feuille imprimée les jetait
+    purement et simplement.
+  */
+  for (const f of dos) {
+    const x = faceX(face, f.along);
+    const pale = mixHex(FIXTURES[f.kind].color, '#FFFFFF', 0.62);
+    drawSymbol(d, assemblySymbol(f.kind), px(x), py(f.height), 0.62, pale, 0.8);
+  }
+
   /**
    * LES DISQUES D'ABORD, LES SYMBOLES ENSUITE.
    *
@@ -2931,6 +3096,36 @@ function elevationPage(
     } else {
       d.text(tag, px(x), py(f.height) + 14, 6, spec.color);
     }
+  }
+
+  /*
+    LA PLAQUE COMMUNE D'UN ENSEMBLE — un cadre autour des postes réunis.
+
+    C'est ce qu'on visse, et ça se voit sur le mur : deux mécanismes sous
+    une seule plaque, ce n'est pas la même fourniture ni la même boîte que
+    deux appareils voisins. L'écran l'encadre ; le papier ne le disait pas,
+    et rien ne distinguait un ensemble de deux appareils côte à côte.
+  */
+  for (const g of new Set(poses.map((p) => p.f.group).filter(Boolean))) {
+    const lot = poses.filter((p) => p.f.group === g);
+    if (lot.length < 2) continue;
+    const xs = lot.map((p) => p.x);
+    const ys = lot.map((p) => p.f.height);
+    const larg = Math.max(...lot.map((p) => FIXTURES[p.f.kind].w));
+    const haut = Math.max(...lot.map((p) => FIXTURES[p.f.kind].h));
+    const gx0 = Math.min(...xs) - larg / 2;
+    const gx1 = Math.max(...xs) + larg / 2;
+    const gy0 = Math.min(...ys) - haut / 2;
+    const gy1 = Math.max(...ys) + haut / 2;
+    d.rect(
+      px(gx0) - 3,
+      py(gy0) - 3,
+      (gx1 - gx0) * scale + 6,
+      (gy1 - gy0) * scale + 6,
+      null,
+      GREY_LIGHT,
+      0.95,
+    );
   }
 
   /**
@@ -4078,6 +4273,8 @@ export function buildScanPdf(
     roomNames: scan.roomNames ?? {},
     rooms: scan.rooms,
     fixtures: scan.fixtures ?? [],
+    // Les repères passés à part, ou ceux du schéma quand il est demandé.
+    marks: opts.marks ?? schemas?.marks ?? undefined,
     routes: scan.routes,
     ceiling: opts.ceiling ?? [],
     north: scan.north ?? null,

@@ -386,6 +386,11 @@ const styles = getStyles(c);
           measures2D,
           measures3D,
           schemas: schema ? schemas : null,
+          // Les repères de circuit voyagent À PART : le plan les porte dès
+          // que l'app les connaît, que la feuille de schéma soit demandée
+          // ou non. C'est le lien entre le plan et le tableau, pas une
+          // dépendance de pagination.
+          marks: schemas?.marks ?? null,
           // Le plafond ne s'impose pas : il fait une feuille de plus, et
           // tout le monde n'équipe pas les plafonds.
           ceiling: plafond ? ceiling : undefined,

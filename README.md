@@ -385,6 +385,47 @@ de l'aperçu PDF porte enfin son nom, les lignes du choix de fin de scan
 sont de vraies cases (rôle, état, titre complet), et chaque appareil du
 plan 2D dit son nom au lecteur d'écran.
 
+### Le dossier imprimé dit ce que l'écran montre
+
+Le tour avait laissé trois écarts entre l'écran et le papier — et c'est le
+papier qu'on emmène sur le chantier. Ils sont comblés.
+
+**Un ensemble se dessine une fois, avec tous ses postes.** Le plan du PDF
+dessinait un symbole PAR APPAREIL : une double prise sortait en deux
+symboles distants de 71 mm — deux pixels à l'échelle d'un logement — qui se
+recouvraient. Il regroupe maintenant par plaque comme l'écran (`postsOf`,
+`postsSymbol`), pose le symbole composé au MILIEU, et l'échelonnement des
+appareils superposés compte les plaques, plus les postes. Le sigle est
+cumulé, mais le plan garde sa sobriété : seuls les postes qui se
+distinguent portent un mot (« RJ », « 20 A »), joints par un « + ».
+
+**Le repère de circuit s'imprime sur le plan.** Il vivait dans `schemas`,
+donc n'existait qu'avec la feuille de schéma cochée : celui qui tire les
+gaines devait deviner de quel départ dépend chaque prise, alors que l'app
+le sait. Il voyage désormais à part (`marks`) — la feuille de schéma
+commande les PAGES, pas ce que le plan sait dire — et s'écrit sous chaque
+plaque, à la teinte de son circuit, comme à l'écran.
+
+**L'élévation montre les meubles, et l'autre face.** C'était le plus grave :
+la feuille imprimée montrait un mur LIBRE là où se dresse une bibliothèque.
+On emporte le dossier, on perce, on découvre le caisson. Les silhouettes de
+`wallFurniture` s'y dessinent maintenant, nommées et cotées, contre le mur
+en bleu plein (douze centimètres ou moins) et en creux plus loin — posées
+SOUS les lignes de repère, sans quoi leur aplat coupait « tableau 135 » et
+« commande 110 ». Les appareils de l'AUTRE face y reviennent en clair (on
+ne perce pas dos à dos), avec la légende qui l'explique — et pas de légende
+quand il n'y a rien à expliquer. Enfin la plaque commune d'un ensemble
+porte son cadre : deux mécanismes sous une plaque, ce n'est ni la même
+fourniture ni la même boîte que deux appareils voisins.
+
+**Trois défauts de lisibilité n'ont été vus qu'à l'œil**, sur le document
+rendu en image (`tools/pdf-vers-svg.mjs`), et pas un banc ne les voyait :
+le disque blanc, taillé pour un poste, laissait déborder les symboles d'un
+ensemble de trois ; le sigle se posait sur le dernier symbole ; le repère
+de circuit tombait sur les pieds du dessin. Le rayon suit maintenant
+l'empan réel de la plaque, et le sigle comme le repère se placent par
+rapport à lui.
+
 ### Ce que l'app recalculait pour rien
 
 Trois chaînes de calcul tournaient à chaque rendu, sans rien produire de

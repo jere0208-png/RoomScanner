@@ -25,6 +25,7 @@ import {
   toBase64,
 } from '../src/export/pdf';
 
+import type { ObjectData } from 'react-native-room-scan';
 import type { Fixture } from '../src/geometry/electrical';
 import type { WallSeg } from '../src/geometry/floorplan';
 
@@ -457,5 +458,122 @@ describe('le tireté ne fuit pas d’un trait à l’autre', () => {
         }
       }
     }
+  });
+});
+
+/**
+ * LE DOSSIER IMPRIMÉ DIT CE QUE L'ÉCRAN MONTRE.
+ *
+ * Trois écarts relevés au tour de l'application, corrigés ensemble :
+ * l'écran fusionne les ensembles sous une plaque, écrit le repère de
+ * circuit sous chaque appareil, et montre en élévation les meubles devant
+ * le mur comme les appareils de l'autre face. Le papier, lui, se taisait —
+ * or c'est le papier qu'on emmène sur le chantier.
+ */
+const ENSEMBLE: Fixture[] = [
+  { id: 'g1', kind: 'prise', wallId: 'n', along: 2, height: 0.25, side: 1, group: 'pl-1' },
+  { id: 'g2', kind: 'rj45', wallId: 'n', along: 2.071, height: 0.25, side: 1, group: 'pl-1' },
+];
+
+/** Une bibliothèque de 1,20 m adossée au mur nord, à 2 m du coin. */
+const BIBLIO: ObjectData = {
+  id: 'o1',
+  category: 'storage',
+  width: 1.2,
+  depth: 0.4,
+  height: 1.8,
+  transform: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 2, 0.9, 0.22, 1],
+};
+
+const docFixtures = (
+  fixtures: Fixture[],
+  opts: Parameters<typeof buildScanPdf>[2] = {},
+  objects: ObjectData[] = [],
+) =>
+  latin1(
+    buildScanPdf(
+      {
+        name: 'Séjour',
+        walls: W,
+        openings: [PORTE],
+        objects,
+        rooms: R,
+        fixtures,
+      },
+      false,
+      { metre: false, ...opts },
+    ),
+  );
+
+describe('le plan du dossier fusionne les ensembles', () => {
+  /*
+    Un ensemble, c'est UN point de pose : une plaque, un disque blanc, un
+    symbole à plusieurs postes. Le PDF en dessinait un par appareil — deux
+    symboles distants de 71 mm, soit deux pixels à l'échelle d'un logement,
+    qui se recouvraient.
+
+    On compte les DISQUES BLANCS (le fond d'un point de pose) : deux
+    appareils sous une même plaque doivent en produire autant qu'un
+    appareil seul.
+  */
+  const disques = (src: string) => (src.match(/1 1 1 rg/g) ?? []).length;
+
+  it('deux postes sous une plaque ne font qu’un point de pose', () => {
+    const seul = docFixtures([ENSEMBLE[0]]);
+    const groupe = docFixtures(ENSEMBLE);
+    expect(disques(groupe)).toBe(disques(seul));
+  });
+
+  it('et le sigle cumulé dit ce que porte la plaque', () => {
+    // Le poste RJ45 de l'ensemble garde son sigle : la plaque annonce ce
+    // qu'elle porte, comme à l'écran.
+    expect(texte(docFixtures(ENSEMBLE))).toContain('RJ');
+  });
+});
+
+describe('le plan du dossier porte les repères de circuit', () => {
+  it('écrit le repère sous l’appareil, comme à l’écran', () => {
+    const src = docFixtures(FX, {
+      marks: new Map([
+        ['i1', 'C2'],
+        ['pr', 'C1'],
+      ]),
+    });
+    const vu = texte(src);
+    expect(vu).toContain('C1');
+    expect(vu).toContain('C2');
+  });
+
+  it('et se tait quand personne ne les a calculés', () => {
+    expect(texte(docFixtures(FX))).not.toContain('C1');
+  });
+});
+
+describe('l’élévation du dossier montre ce que l’écran montre', () => {
+  it('dessine les meubles devant le mur, nommés et cotés', () => {
+    const vu = texte(docFixtures(FX, { elevations: true }, [BIBLIO]));
+    // Le nom du meuble et sa hauteur hors tout, comme face au mur.
+    expect(vu).toContain('Rangement');
+    expect(vu).toContain('180');
+  });
+
+  it('montre en clair les appareils de l’AUTRE face, et le dit', () => {
+    const dosADos: Fixture[] = [
+      ...FX,
+      { id: 'dos', kind: 'prise', wallId: 'n', along: 2.5, height: 0.25, side: -1 },
+    ];
+    const avec = texte(docFixtures(dosADos, { elevations: true }));
+    expect(avec).toContain('autre face');
+    // Sans rien de l'autre côté, pas de légende : on n'explique pas ce
+    // qui n'est pas dessiné.
+    const sans = texte(docFixtures(FX, { elevations: true }));
+    expect(sans).not.toContain('autre face');
+  });
+
+  it('encadre la plaque commune d’un ensemble', () => {
+    // Le cadre de plaque est le seul trait de 0,95 point du dossier.
+    const cadres = (src: string) => (src.match(/0\.95 w/g) ?? []).length;
+    expect(cadres(docFixtures(ENSEMBLE, { elevations: true }))).toBeGreaterThan(0);
+    expect(cadres(docFixtures([ENSEMBLE[0]], { elevations: true }))).toBe(0);
   });
 });
