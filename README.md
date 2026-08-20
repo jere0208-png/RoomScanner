@@ -145,6 +145,34 @@ L'outil « pièces » de la barre du plan relance la détection sur le graphe
 courant, en **gardant les noms donnés à la main** : chaque nouvelle pièce
 hérite du nom de l'ancienne dont le point de cartouche tombe dedans.
 
+### Le coffre de volet, que le scan ne verra jamais
+
+Relevé du chantier, photo à l'appui : « le scan ne détecte pas les rebords
+de coffrage de volet ». Et il ne les détectera pas : RoomPlan modélise des
+murs, des menuiseries et des meubles — un caisson de volet est un accident
+de la maçonnerie au-dessus de la baie, pas une surface qu'ARKit sait nommer.
+Comme pour l'appareillage mural, la réponse honnête n'est pas de prétendre
+le deviner, c'est de rendre le geste manuel le plus court possible.
+
+Pour qui perce, c'est une contrainte de premier ordre : derrière la trappe
+il y a la coulisse, le tablier enroulé et son tube. Une sortie de câble
+percée là-dedans, c'est le tablier bloqué au premier usage — et le
+percement se voit depuis la rue.
+
+**Un bouton, et tout le reste suit.** La menuiserie sélectionnée porte
+« Coffre » dans son bandeau : un appui le déclare à la hauteur courante d'un
+tunnel (25 cm), un second le retire. Pas de liste à part — c'est une hauteur
+portée par la baie qu'il coiffe (`coffre?: number`) : il la suit quand elle
+bouge, s'en va quand on la ferme, et rien ne peut se désynchroniser.
+
+Il se dessine alors **en élévation, à l'écran comme au PDF** : un bandeau
+ambre hachuré au-dessus de la baie, coté, avec le nom de la menuiserie
+remonté par-dessus lui. Et le contrôle en tire la conséquence qui compte :
+**un appareil dont l'axe tombe dans son emprise passe en alerte**
+(`dansLeCoffre`), avec la règle qui explique où le mettre — sous le
+linteau, ou sur le trumeau ; le moteur, lui, s'alimente par une sortie de
+câble placée à l'aplomb du coffre.
+
 ### Ce qui fait une pièce, c'est la porte — pas la surface
 
 Relevé du chantier, sur un scan « Dégagement + WC » : « il y a un espace en

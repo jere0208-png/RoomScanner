@@ -74,6 +74,7 @@ import {
   wallToRooms,
 } from '../geometry/nfc15100';
 import { assignOpenings } from '../geometry/scene3d';
+import { empriseDuCoffre } from '../geometry/floorplan';
 import {
   FIXTURES,
   faceX,
@@ -1349,6 +1350,42 @@ export function WallElevation({
                         : 'Porte'}
                     </SvgText>
                   )}
+                  {/*
+                    LE COFFRE DE VOLET, HACHURÉ — la zone où l'on ne perce
+                    pas. Le scan ne le voit pas ; déclaré d'un geste, il se
+                    dessine ici, coté, au-dessus de sa baie.
+                  */}
+                  {(() => {
+                    const e = empriseDuCoffre(hole.seg, x0);
+                    if (!e) return null;
+                    const hh = (e.y1 - e.y0) * scale;
+                    return (
+                      <G>
+                        <Rect
+                          x={px(e.x0)}
+                          y={py(e.y1)}
+                          width={(e.x1 - e.x0) * scale}
+                          height={hh}
+                          fill={c.amber}
+                          fillOpacity={0.14}
+                          stroke={c.amber}
+                          strokeWidth={1.2}
+                          strokeDasharray="4 3"
+                        />
+                        {w * scale > 70 && hh > 11 && (
+                          <SvgText
+                            x={px(e.x0 + (e.x1 - e.x0) / 2)}
+                            y={py(e.y0) - hh / 2 + 3.5}
+                            fill={c.amber}
+                            fontSize={9}
+                            fontWeight="800"
+                            textAnchor="middle">
+                            {`COFFRE ${Math.round(hole.seg.coffre! * 100)}`}
+                          </SvgText>
+                        )}
+                      </G>
+                    );
+                  })()}
                 </G>
               );
             })}

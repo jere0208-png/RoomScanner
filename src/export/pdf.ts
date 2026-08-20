@@ -17,6 +17,7 @@ import {
   roomParts,
   segLength,
   toFootprint,
+  empriseDuCoffre,
   massifsTechniques,
   pivotsDesBattants,
   wallAreaM2,
@@ -2968,11 +2969,41 @@ function elevationPage(
       SKY,
       1,
     );
+    /*
+      LE COFFRE DE VOLET, au-dessus de sa baie — la zone où l'on ne perce
+      pas. Le scan ne le voit pas ; déclaré à la main, il s'imprime comme
+      il s'affiche : hachuré, ambre, coté.
+    */
+    const coffre = empriseDuCoffre(t.seg, gx);
+    if (coffre) {
+      const hc = (coffre.y1 - coffre.y0) * scale;
+      d.rect(
+        px(coffre.x0),
+        py(coffre.y0),
+        (coffre.x1 - coffre.x0) * scale,
+        hc,
+        '#FDF3E2',
+        AMBER,
+        1,
+      );
+      if (larg * scale > 60 && hc > 9) {
+        d.text(
+          `COFFRE ${Math.round((t.seg.coffre ?? 0) * 100)}`,
+          px(coffre.x0 + (coffre.x1 - coffre.x0) / 2),
+          py(coffre.y0) + hc / 2 - 2.5,
+          6.5,
+          AMBER,
+          { bold: true },
+        );
+      }
+    }
     if (larg * scale > 40) {
       d.text(
         t.seg.type === 'window' ? 'Fenêtre' : t.seg.open ? 'Passage' : 'Porte',
         px(gx + larg / 2),
-        py(t.y1) + 5,
+        // Au-dessus du COFFRE quand il y en a un : posé sur le linteau, le
+        // nom de la baie tombait en plein dans le bandeau ambre.
+        py(t.y1 + (t.seg.coffre ?? 0)) + 5,
         7,
         SKY,
         { bold: true },

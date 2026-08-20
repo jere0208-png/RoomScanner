@@ -44,6 +44,7 @@ import {
   wallQuadsOf,
   wallRuns,
   weldCorners,
+  COFFRE_H,
   type TrouDeReleve,
   type Pt,
   type WallSeg,
@@ -881,6 +882,15 @@ interface ScanState {
    * hauteur depuis son allège : une fenêtre monte, elle ne descend pas.
    */
   resizeOpening: (id: string, width?: number, height?: number) => void;
+  /**
+   * DÉCLARE (ou retire) LE COFFRE DE VOLET qui coiffe cette menuiserie.
+   *
+   * Le scan ne le voit pas — c'est un accident de maçonnerie au-dessus de
+   * la baie, pas une surface qu'ARKit sait nommer. Un geste le pose, à la
+   * hauteur courante d'un tunnel ; on la corrige ensuite si le chantier
+   * en décide autrement.
+   */
+  toggleCoffre: (id: string, hauteur?: number) => void;
   removeOpening: (id: string) => void;
   /**
    * Pose un meuble du catalogue au point donné. Renvoie son identifiant,
@@ -2781,6 +2791,20 @@ export const useScanStore = create<ScanState>((set, get) => {
         yCenter: base + h / 2,
       };
       set({ openings: [...st.openings, opening], dirty: true });
+    },
+
+    toggleCoffre: (id, hauteur) => {
+      const st = get();
+      const o = st.openings.find((x) => x.id === id);
+      if (!o) return;
+      pushHistory('coffre');
+      const neuf = hauteur ?? (o.coffre ? undefined : COFFRE_H);
+      set({
+        openings: st.openings.map((x) =>
+          x.id === id ? { ...x, coffre: neuf } : x,
+        ),
+        dirty: true,
+      });
     },
 
     resizeOpening: (id, width, height) => {

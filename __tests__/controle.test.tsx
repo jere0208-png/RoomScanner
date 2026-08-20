@@ -328,3 +328,74 @@ describe('la pastille sur l’écran des résultats', () => {
     act(() => tree.unmount());
   });
 });
+
+/**
+ * ON NE PERCE PAS DANS UN COFFRE DE VOLET.
+ *
+ * Relevé du chantier : le scan ne voit pas les coffres, on les déclare donc
+ * à la main — et dès qu'ils sont là, le contrôle en tire la conséquence
+ * qui compte. Derrière la trappe : la coulisse, le tablier enroulé, le
+ * tube. Une sortie de câble percée là-dedans, c'est le tablier bloqué au
+ * premier usage, et le percement se voit de la rue.
+ */
+describe('le coffre de volet au contrôle', () => {
+  const { checkElectrical: check } = require('../src/geometry/nfc15100');
+
+  const murs = carre('w');
+  const rooms = [piece('r1', 'Séjour', murs)];
+  /** Une baie de 1,40 m sur le mur nord, allège 0,90, coffre de 25 cm. */
+  const baie = {
+    id: 'f1',
+    type: 'window' as const,
+    a: { x: 1, z: 0 },
+    b: { x: 2.4, z: 0 },
+    height: 1.35,
+    yCenter: 0.9 + 1.35 / 2,
+    coffre: 0.25,
+  };
+
+  const fixture = (along: number, height: number) => ({
+    id: 'f',
+    kind: 'sortieCable' as const,
+    wallId: 'w1',
+    along,
+    height,
+    side: 1 as const,
+  });
+
+  it('signale l’appareil posé dans l’emprise du coffre', () => {
+    const issues = check(
+      rooms,
+      [fixture(1.7, 2.35)],
+      wallToRooms(rooms),
+      undefined,
+      undefined,
+      undefined,
+      [],
+      { walls: murs, openings: [baie] },
+    );
+    const dedans = issues.find((i: { message: string }) =>
+      i.message.toLowerCase().includes('coffre'),
+    );
+    expect(dedans).toBeDefined();
+    expect(dedans!.severity).toBe('alerte');
+  });
+
+  it('et se tait pour le même appareil posé plus bas', () => {
+    const issues = check(
+      rooms,
+      [fixture(1.7, 1.1)],
+      wallToRooms(rooms),
+      undefined,
+      undefined,
+      undefined,
+      [],
+      { walls: murs, openings: [baie] },
+    );
+    expect(
+      issues.filter((i: { message: string }) =>
+        i.message.toLowerCase().includes('coffre'),
+      ),
+    ).toHaveLength(0);
+  });
+});

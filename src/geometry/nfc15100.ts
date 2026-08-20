@@ -1215,6 +1215,27 @@ export function constatsDePose(
         });
         break;
       }
+      /*
+        ET LE COFFRE DE VOLET, juste au-dessus — la zone où l'on ne perce
+        pas. Le scan ne le voit pas ; une fois déclaré, il vaut consigne :
+        derrière la trappe il y a la coulisse, le tablier enroulé et le
+        tube. Une sortie de câble percée là, c'est le tablier bloqué au
+        premier usage — et le percement se voit depuis la rue.
+      */
+      if (o.coffre && f.height > y1 - 0.02 && f.height < y1 + o.coffre + 0.02) {
+        out.push({
+          code: 'pose',
+          fixtureId: f.id,
+          severity: 'alerte',
+          message: `${nom} : posé dans le coffre de volet`,
+          regle:
+            'Le coffre abrite la coulisse, le tablier enroulé et son tube : ' +
+            'on n’y perce pas. Descendez l’appareil sous le linteau, ou ' +
+            'décalez-le sur le trumeau — le moteur, lui, s’alimente depuis ' +
+            'le coffre par une sortie de câble placée à son aplomb.',
+        });
+        break;
+      }
     }
   }
   return out;

@@ -41,6 +41,21 @@ export interface WallSeg {
    * s'en sert pour désigner les murs à vérifier.
    */
   confidence?: string;
+  /**
+   * HAUTEUR DU COFFRE DE VOLET ROULANT qui coiffe cette menuiserie (m).
+   *
+   * Relevé du chantier, photo à l'appui : « le scan ne détecte pas les
+   * rebords de coffrage de volet ». RoomPlan modélise des murs, des
+   * menuiseries et des meubles ; un caisson de volet est un accident de la
+   * maçonnerie au-dessus de la baie, et il ne sait pas le voir. On le
+   * déclare donc à la main — c'est une contrainte de premier ordre pour
+   * qui perce : coulisse, tablier enroulé, tube, et le moteur à alimenter.
+   *
+   * Pas de liste à part : une hauteur portée par la baie qu'il coiffe. Il
+   * la suit quand elle bouge, s'en va quand on la ferme, et rien ne peut
+   * se désynchroniser.
+   */
+  coffre?: number;
 }
 
 /** Pièce d'un élément, valeur par défaut comprise. */
@@ -1663,6 +1678,51 @@ export function faceIntoRoom(
  *
  * Ne modifie pas les murs reçus : renvoie de nouveaux segments.
  */
+/** Hauteur par défaut d'un coffre de volet — le tunnel courant, 25 cm. */
+export const COFFRE_H = 0.25;
+
+/**
+ * L'EMPRISE D'UN COFFRE DE VOLET, sur la face du mur.
+ *
+ * Du haut de la baie au haut du coffre, sur toute la largeur de la
+ * menuiserie : c'est le rectangle où l'on ne perce pas, et celui qu'il faut
+ * voir en élévation avant de décider où passe la commande.
+ */
+export function empriseDuCoffre(
+  o: WallSeg,
+  /**
+   * Abscisse du bord gauche de la baie SUR LA FACE, quand l'appelant
+   * travaille dans le repère du mur (l'élévation, le contrôle). Zéro par
+   * défaut : on reste alors dans le repère de la menuiserie seule.
+   */
+  xBaie = 0,
+): { x0: number; x1: number; y0: number; y1: number } | null {
+  if (!o.coffre || o.coffre <= 0) return null;
+  const haut = o.yCenter + o.height / 2;
+  return {
+    x0: xBaie,
+    x1: xBaie + segLength(o),
+    y0: haut,
+    y1: haut + o.coffre,
+  };
+}
+
+/**
+ * Cet appareil tombe-t-il dans le coffre ? `x` est compté depuis le bord
+ * de la baie, comme l'emprise — c'est à l'appelant de se placer dans le
+ * même repère que la menuiserie.
+ */
+export function dansLeCoffre(
+  o: WallSeg,
+  x: number,
+  y: number,
+  xBaie = 0,
+): boolean {
+  const e = empriseDuCoffre(o, xBaie);
+  if (!e) return false;
+  return x >= e.x0 && x <= e.x1 && y >= e.y0 && y <= e.y1;
+}
+
 /** Un manque de maçonnerie entre deux bouts de mur qui se font face. */
 export interface TrouDeReleve {
   /** Le bout libre du premier mur, et celui du second. */

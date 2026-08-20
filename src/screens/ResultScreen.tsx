@@ -2582,6 +2582,23 @@ export function ResultScreen() {
               },
               {
                 /*
+                  LE COFFRE DE VOLET, DÉCLARÉ EN UN GESTE.
+
+                  Relevé du chantier : « le scan ne détecte pas les rebords
+                  de coffrage de volet ». Il ne le fera jamais — ce n'est ni
+                  un mur, ni une menuiserie, ni un meuble. Or pour qui
+                  perce, c'est une contrainte de premier ordre : coulisse,
+                  tablier enroulé, tube, et le moteur à alimenter.
+                */
+                label: selectedOpening.coffre ? 'Sans coffre' : 'Coffre',
+                ghost: true,
+                onPress: () => {
+                  useScanStore.getState().toggleCoffre(selectedOpening.id);
+                  haptic('succes');
+                },
+              },
+              {
+                /*
                   FERMER : le trou disparaît, le mur redevient continu.
 
                   Relevé du patron : « fermer une ouverture et la remettre

@@ -20,6 +20,8 @@ import {
   splitAtJunctions,
   straightenWalls,
   toFootprint,
+  dansLeCoffre,
+  empriseDuCoffre,
   massifsTechniques,
   pivotsDesBattants,
   toSegment,
@@ -1821,5 +1823,58 @@ describe('le sens d’ouverture des portes', () => {
     const pivots = pivotsDesBattants(loin);
     expect(pivots.get('p1')).toBe('a');
     expect(pivots.get('p2')).toBe('a');
+  });
+});
+
+/**
+ * LE COFFRE DE VOLET ROULANT — ce que le scan ne verra jamais.
+ *
+ * Relevé du chantier, photo à l'appui : « le scan ne détecte pas les rebords
+ * de coffrage de volet ». RoomPlan modélise des murs, des menuiseries et des
+ * meubles ; un caisson de volet est un accident de la maçonnerie au-dessus
+ * de la baie, et il ne sait pas le voir.
+ *
+ * Pour un électricien, c'est pourtant une contrainte de premier ordre : on
+ * n'y perce pas — il y a la coulisse, le tablier enroulé et le tube — et le
+ * moteur qu'il abrite demande son alimentation. On le DÉCLARE donc, en un
+ * geste, et l'app en tire tout le reste.
+ *
+ * Il n'a pas sa propre liste : c'est une hauteur portée par la menuiserie
+ * qu'il coiffe. Il suit la baie quand elle bouge, part avec elle quand on la
+ * ferme, et rien ne peut se désynchroniser.
+ */
+describe('le coffre de volet', () => {
+  const BAIE: WallSeg = {
+    id: 'f1',
+    type: 'window',
+    a: { x: 0, z: 0 },
+    b: { x: 1.4, z: 0 },
+    height: 1.35,
+    // Allège à 0,90 m : la baie monte donc jusqu'à 2,25 m.
+    yCenter: 0.9 + 1.35 / 2,
+  };
+
+  it('se pose AU-DESSUS de la baie, à sa largeur', () => {
+    const emprise = empriseDuCoffre({ ...BAIE, coffre: 0.25 });
+    expect(emprise).not.toBeNull();
+    // Du haut de la baie au haut du coffre.
+    expect(emprise!.y0).toBeCloseTo(2.25, 2);
+    expect(emprise!.y1).toBeCloseTo(2.5, 2);
+    expect(emprise!.x0).toBeCloseTo(0, 2);
+    expect(emprise!.x1).toBeCloseTo(1.4, 2);
+  });
+
+  it('n’existe pas quand personne ne l’a déclaré', () => {
+    expect(empriseDuCoffre(BAIE)).toBeNull();
+  });
+
+  it('dit ce qui tombe dedans — on n’y perce pas', () => {
+    const coffre = { ...BAIE, coffre: 0.25 };
+    // Un interrupteur à 1,10 m : bien en dessous, rien à signaler.
+    expect(dansLeCoffre(coffre, 0.7, 1.1)).toBe(false);
+    // Une sortie de câble à 2,35 m au droit de la baie : en plein dedans.
+    expect(dansLeCoffre(coffre, 0.7, 2.35)).toBe(true);
+    // À la même hauteur, mais deux mètres plus loin : hors du coffre.
+    expect(dansLeCoffre(coffre, 3.2, 2.35)).toBe(false);
   });
 });
