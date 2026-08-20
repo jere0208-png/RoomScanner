@@ -184,6 +184,17 @@ describe('l’écran des résultats', () => {
     expect(bouton(tree, 'Surfaces')).toBeDefined();
     // Le plafond est équipé : son calque doit être proposé.
     expect(bouton(tree, 'Plafond')).toBeDefined();
+    /*
+      LA BOUSSOLE DU CALQUE « NORD » PÈSE COMME LES AUTRES — relevé du
+      patron : à côté des silhouettes Solar, son trait de 2 faisait
+      maigrelet. Légèrement plus grasse : 2,6.
+    */
+    const nord = bouton(tree, 'Nord');
+    expect(nord).toBeDefined();
+    const grasses = nord!.findAll(
+      (n) => Number(n.props?.strokeWidth) >= 2.5,
+    );
+    expect(grasses.length).toBeGreaterThan(0);
   });
 
   /**

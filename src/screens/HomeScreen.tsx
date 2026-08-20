@@ -1,10 +1,10 @@
-import React, { useEffect, useRef } from 'react';
-import Svg, { Path } from 'react-native-svg';
+import React, { useEffect, useRef, useState } from 'react';
+import Svg, { Defs, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
+import { MenuCompte } from '../components/MenuCompte';
 import { ThemeGlyph } from '../components/ThemeGlyph';
 import { TexteOr } from '../components/ContourOr';
 import { SOLAIRES } from '../ui/solaires';
 import {
-  Alert,
   Animated,
   Easing,
   Image,
@@ -63,13 +63,11 @@ export function HomeScreen() {
   const setThemePref = useScanStore((s) => s.setThemePref);
   const { start } = useRoomScan();
   const peutCreerPlan = useAccountStore((s) => s.peutCreerPlan);
-  const ouvrirPaywall = useAccountStore((s) => s.ouvrirPaywall);
   const ouvrirSurprise = useAccountStore((s) => s.ouvrirSurprise);
   const compte = useAccountStore((s) => s.compte);
   const pro = useAccountStore((s) => s.pro);
-  const plansUtilises = useAccountStore((s) => s.plansUtilises);
-  const deconnecter = useAccountStore((s) => s.deconnecter);
-  const supprimerCompte = useAccountStore((s) => s.supprimerCompte);
+  /** Le menu du compte : une carte à nous, ouverte par le bloc profil. */
+  const [menuCompte, setMenuCompte] = useState(false);
   const c = useTheme();
   /** Le fond est-il sombre ? C'est lui qui choisit le logotype. */
   const sombre = c === dark;
@@ -341,50 +339,35 @@ export function HomeScreen() {
         accessibilityLabel="Mon compte"
         style={styles.profilBloc}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        onPress={() => {
-          Alert.alert(
-            compte?.prenom || compte?.email || 'Mon compte',
-            pro
-              ? 'EchoPlan Pro — relevés illimités.'
-              : `Plan gratuit — ${Math.max(0, 1 - plansUtilises)} relevé restant.`,
-            [
-              ...(pro
-                ? []
-                : [{ text: 'Passer en Pro / code promo', onPress: ouvrirPaywall }]),
-              { text: 'Se déconnecter', onPress: deconnecter },
-              {
-                text: 'Supprimer mon compte',
-                style: 'destructive' as const,
-                onPress: () =>
-                  Alert.alert(
-                    'Supprimer le compte ?',
-                    'Vos relevés restent sur l’appareil, mais l’identité est ' +
-                      'effacée. Le palier gratuit déjà consommé ne se remet ' +
-                      'pas à zéro.',
-                    [
-                      { text: 'Annuler', style: 'cancel' },
-                      {
-                        text: 'Supprimer',
-                        style: 'destructive',
-                        onPress: () => supprimerCompte(),
-                      },
-                    ],
-                  ),
-              },
-              { text: 'Fermer', style: 'cancel' as const },
-            ],
-          );
-        }}>
-        <Svg width={30} height={30} viewBox="0 0 24 24">
+        // Le menu est une carte EchoPlan (MenuCompte), plus la feuille
+        // grise du système — relevé du patron : « trop basique ».
+        onPress={() => setMenuCompte(true)}>
+        {/* Les enfants sont transparents au doigt : une vue SVG avale le
+            toucher si on la laisse faire, et c'est TOUT le bloc — avatar,
+            nom, barre, grade — qui doit ouvrir le menu. */}
+        <Svg width={30} height={30} viewBox="0 0 24 24" pointerEvents="none">
           <Path d={SOLAIRES.avatar} fill={c.inkSoft} fillRule="evenodd" />
         </Svg>
-        <View style={styles.profilColonne}>
+        <View style={styles.profilColonne} pointerEvents="none">
           <Text style={styles.profilNom} numberOfLines={1}>
             {compte?.prenom || compte?.email || 'Compte'}
           </Text>
-          {/* La barre du croquis : elle souligne le nom et sert d'axe au
-              grade, centré dessous. */}
-          <View style={styles.profilBarre} />
+          {/*
+            LA BARRE DU CROQUIS, en grand : cinq points, bouts ronds, en
+            DÉGRADÉ du bleu de marque vers le ciel. Sa taille est FIXE —
+            la même en Gratuit et en Pro : c'est un axe, pas un
+            soulignement qui suivrait la longueur du mot. Nom et grade se
+            centrent sur elle.
+          */}
+          <Svg width={96} height={5} style={styles.profilBarre}>
+            <Defs>
+              <LinearGradient id="barre-profil" x1="0" y1="0" x2="1" y2="0">
+                <Stop offset="0%" stopColor={c.blue} />
+                <Stop offset="100%" stopColor="#3EB8E5" />
+              </LinearGradient>
+            </Defs>
+            <Rect width={96} height={5} rx={2.5} fill="url(#barre-profil)" />
+          </Svg>
           {pro ? (
             <TexteOr texte="PRO" taille={10.5} fond={c.bg} style={styles.profilGrade} />
           ) : (
@@ -394,6 +377,8 @@ export function HomeScreen() {
           )}
         </View>
       </Pressable>
+
+      <MenuCompte visible={menuCompte} fermer={() => setMenuCompte(false)} />
     </View>
   );
 }
@@ -442,13 +427,20 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   },
   // zIndex/elevation : l'onde d'arrivée pulse AU-DESSUS des cartes suivantes.
   hero: { alignItems: 'center', zIndex: 20, elevation: 20 },
+  /*
+    LA PASTILLE EST PETITE, LE GLYPHE RESTE GRAND — relevé du patron :
+    « réduis le bloc blanc, sans réduire les icônes ». Quarante points de
+    rond pour vingt-sept de glyphe : l'icône remplit sa pastille, et la
+    cible du doigt reste large grâce au débord. Le centre s'axe sur la
+    ligne du profil (62 + 23 = 65 + 20).
+  */
   themeButton: {
     position: 'absolute',
-    top: 54,
+    top: 65,
     right: 22,
-    width: 46,
-    height: 46,
-    borderRadius: 23,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: c.surface,
     ...shadowCard,
     shadowOpacity: 0.08,
@@ -552,26 +544,22 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   },
   // Le bloc profil : en haut à gauche, le miroir du bouton de thème — la
   // même bande, chacun son coin.
+  // Le bandeau du haut est AXÉ : le bloc profil et le bouton de thème
+  // descendent ensemble (top 62) et se centrent sur la même ligne.
   profilBloc: {
     position: 'absolute',
-    top: 54,
+    top: 62,
     left: 22,
+    minHeight: 46,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 9,
     maxWidth: '55%',
     zIndex: 2,
   },
-  profilColonne: { flexShrink: 1 },
-  profilNom: { color: c.ink, fontSize: 13.5, fontWeight: '800' },
-  profilBarre: {
-    alignSelf: 'stretch',
-    height: 2.5,
-    borderRadius: 2,
-    backgroundColor: c.lineStrong,
-    marginTop: 3,
-    marginBottom: 3,
-  },
+  profilColonne: { flexShrink: 1, alignItems: 'center' },
+  profilNom: { color: c.ink, fontSize: 13.5, fontWeight: '800', maxWidth: 150 },
+  profilBarre: { marginTop: 4, marginBottom: 4 },
   profilGrade: { alignSelf: 'center' },
   profilGradeTexte: {
     color: c.inkFaint,

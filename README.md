@@ -782,6 +782,17 @@ applique la remise et ouvre la page Pro avec le champ déjà rempli — le
 champ le MONTRE, parce qu'un prix qui baisse sans explication visible
 ressemble à une erreur. « Plus tard » referme sans insister.
 
+**Un seul chiffre, en héros.** Le premier jet disait trois prix dans une
+phrase coupée et un code dans le bouton — relevé du patron, capture à
+l'appui : « trop de chiffres, les phrases sont cassées, l'ensemble ne
+donne pas envie de lire ». Le popup dit UNE chose : « −20 % » en grand,
+dans l'or de la maison ; le bouton dit « J'en profite », et c'est tout. Le
+banc COMPTE les nombres : un seul groupe de chiffres dans tout le popup.
+Même cure sur la zone d'abonnement : le bouton se lit comme une phrase
+(« S'abonner pour 3,92 € par mois » — zéro tiret) et la note de remise est
+une pastille sans code ni chiffre (« ✓ Remise de bienvenue appliquée ») —
+le prix barré de la carte dit déjà tout.
+
 **Une remise n'est pas un déverrouillage.** FIRST20 baisse le prix (3,92 €
 au lieu de 4,90 €, l'ancien prix reste barré à côté — une remise sans
 référence n'est qu'un prix comme un autre) et la page Pro reste ouverte ;
@@ -814,11 +825,25 @@ App Store Connect n'existe pas.
 
 **Le profil est un bloc, en haut à gauche** — croquis Paint du patron. La
 mention du compte vivait en pied d'écran, minuscule : c'est maintenant
-l'avatar Solar, le nom souligné d'une barre, et le GRADE centré dessous —
-« GRATUIT » gris fade, « PRO » dans la typo d'or de la page Pro. Le clic
-garde tout le geste de l'ancienne rangée (Pro, déconnexion, suppression),
-et le bloc est le miroir du bouton de thème : la même bande en haut de
-l'accueil, chacun son coin.
+l'avatar Solar, le nom souligné d'une **barre en dégradé** (du bleu de
+marque vers le ciel, cinq points, bouts ronds — et de taille FIXE, la même
+en Gratuit et en Pro : c'est un axe, pas un soulignement qui suivrait la
+longueur du mot), et le GRADE centré dessous — « GRATUIT » gris fade,
+« PRO » dans la typo d'or de la page Pro. TOUT le bloc prend le clic
+(avatar, nom, barre — les vues SVG sont transparentes au doigt, sinon
+elles l'avalent), et le bandeau est AXÉ : le bloc et le bouton de thème
+descendent ensemble et se centrent sur la même ligne. La pastille du
+thème, elle, a maigri (40 points pour un glyphe de 27 — « réduis le bloc
+blanc, sans réduire les icônes ») et sa cible déborde de douze points.
+
+**Le menu du compte est une carte à nous** — plus la feuille grise du
+système, « trop basique ». Avatar Solar sur pastille bleue, le nom, l'état
+du palier en une ligne, les gestes en boutons pleins (bleu pour le Pro,
+filet pour la déconnexion, rouge nu pour la suppression), la **croix
+dessinée** en haut à droite — la leçon des caractères — et le voile qui
+referme, parce que c'est le geste que tout le monde essaie en premier. La
+confirmation de suppression RESTE une Alert système : pour un geste
+destructif, l'austérité du système est un avertissement en soi.
 
 ### Le badge Pro respire
 
@@ -1830,12 +1855,24 @@ par leur cardinal (« Prise plinthe 1 · mur nord ») — le repère qui permet 
 le vérifier sur place n'est pas un ornement qu'on coche, c'est une pièce du
 document, et la rose s'imprime d'office sur la feuille du plan. Sur le plan
 2D SEULEMENT : c'est la feuille qu'on oriente ; sur une perspective, quatre
-lettres au bord du cadre ne désignent plus rien. L'aperçu promet la même
-chose que le PDF — cardinaux sur son plan 2D, perspectives nues. La rose
-garde son honnêteté : sans cap relevé au scan, rien ne se dessine — un nord
-inventé est pire que pas de nord du tout. Le dossier d'essai se regarde :
-`UPDATE_BOUSSOLE=1 npx jest boussole` l'écrit dans le dossier temporaire,
-puis `node tools/pdf-vers-svg.mjs` rend ses feuilles.
+lettres au bord du cadre ne désignent plus rien. L'APERÇU, lui, reste NU
+(relevé du patron) : les cardinaux ne s'affichent que sur le plan 2D du
+document — sur l'écran d'export, ils chargeraient la vignette qu'on est en
+train de régler. La rose garde son honnêteté : sans cap relevé au scan,
+rien ne se dessine — un nord inventé est pire que pas de nord du tout. Le
+dossier d'essai se regarde : `UPDATE_BOUSSOLE=1 npx jest boussole` l'écrit
+dans le dossier temporaire, puis `node tools/pdf-vers-svg.mjs` rend ses
+feuilles.
+
+**« Cotes Élec » : les murs équipés, de face, cotés.** C'est exactement la
+feuille des élévations sans « Tous les murs » : l'absorption est
+structurelle (`feuillesElevations`) — cocher « Cotes Élec » ET
+« Élévations » n'imprime jamais une feuille en double, le dossier sort une
+seule série, la plus large. L'icône des élévations a changé au passage :
+la galerie d'images ne disait rien d'une cote — deux flèches verticales
+(`sort-vertical`, jeu Solar) disent une hauteur qu'on mesure. Et la
+boussole du calque « Nord » du plan s'est engraissée (trait 2,6) : à côté
+des silhouettes Solar, elle faisait maigrelette.
 
 **Une perspective par feuille, et autant qu'il en faut.** Deux vues se
 partageaient une page, chacune dans une case de 290 points — le tiers d'un

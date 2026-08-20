@@ -285,7 +285,9 @@ export function Toolbar2D({
             <Compass
               size={22}
               color={showNorth ? '#FFFFFF' : teinte.ink}
-              strokeWidth={2}
+              // À côté des silhouettes Solar, le trait de 2 faisait
+              // maigrelet — relevé du patron : légèrement plus gras.
+              strokeWidth={2.6}
             />
           }
           active={showNorth}

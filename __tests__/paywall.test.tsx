@@ -424,13 +424,24 @@ describe('la surprise Pro', () => {
     expect(useAccountStore.getState().surpriseVisible).toBe(false);
   });
 
-  it('montre le cadeau, dit « Surprise ! » et annonce −20 %', () => {
+  /*
+   * LE POPUP SE LIT D'UN COUP D'ŒIL — relevé du patron, capture à
+   * l'appui : « trop de chiffres, les phrases sont cassées, l'ensemble ne
+   * donne pas envie de lire ». Trois prix dans une phrase coupée et un
+   * code dans le bouton, ça se COMPTE : le popup ne porte plus qu'UN
+   * nombre — le « −20 % » en héros doré — et des mots courts. Les prix,
+   * c'est la page Pro qui les montre, ancien barré à l'appui.
+   */
+  it('montre le cadeau, « Surprise ! », et UN seul nombre : −20 %', () => {
     useAccountStore.setState({ surpriseVisible: true });
     const t = monter(<SurprisePro />);
     expect(t.root.findAllByType(Image).length).toBeGreaterThanOrEqual(1);
     const vu = textesDe(t);
     expect(vu).toContain('Surprise');
     expect(vu).toContain('20');
+    // Le seul groupe de chiffres de tout le popup : « 20 ». Ni 3,92,
+    // ni 4,90, ni FIRST20.
+    expect(vu.match(/\d+/g)).toEqual(['20']);
     expect(bouton(t, 'Plus tard')).toBeDefined();
   });
 
@@ -438,7 +449,7 @@ describe('la surprise Pro', () => {
     useAccountStore.setState({ surpriseVisible: true, paywallVisible: false });
     const t = monter(<SurprisePro />);
     act(() => {
-      bouton(t, 'Profiter de -20 %')!.props.onPress();
+      bouton(t, 'J’en profite')!.props.onPress();
     });
     const s = useAccountStore.getState();
     expect(s.surpriseVisible).toBe(false);
@@ -454,6 +465,17 @@ describe('la surprise Pro', () => {
       .findAllByType(TexteOr)
       .map((n) => String(n.props.texte));
     expect(typos.some((x) => x.includes('3,92'))).toBe(true);
+    /*
+      LA ZONE D'ABONNEMENT SE LIT COMME UNE PHRASE — relevé du patron :
+      « trop de chiffres et de tirets ». Le bouton dit « S'abonner pour
+      3,92 € par mois » (zéro tiret), et la note n'a plus ni code ni
+      chiffre : la remise se voit déjà sur le prix barré de la carte.
+    */
+    expect(typos.some((x) => x.includes('S’abonner pour'))).toBe(true);
+    expect(typos.some((x) => x.includes('—'))).toBe(false);
+    const vuPaywall = textesDe(p);
+    expect(vuPaywall).toContain('Remise de bienvenue appliquée');
+    expect(vuPaywall).not.toContain('FIRST20');
   });
 
   it('FIRST20 remise sans déverrouiller ; CARIDI12 déverrouille toujours', () => {
@@ -493,6 +515,20 @@ describe('la surprise Pro', () => {
     // Même rayon pour les deux blocs : le contour Pro à 20, comme la carte.
     const contours = t.root.findAllByType(ContourOr);
     expect(contours[0].props.rayon).toBe(20);
+    /*
+      ET MÊME LARGEUR — relevé du patron : la carte Pro sortait plus large,
+      parce que son prix (« 4,90 € », l'ancien barré, « / mois ») impose
+      une largeur minimale de contenu. `minWidth: 0` rend l'arbitrage à
+      `flex: 1` : deux colonnes, deux moitiés, toujours.
+    */
+    const stGratuit = StyleSheet.flatten(
+      carteGratuit[0].props.style,
+    ) as ViewStyle;
+    expect(stGratuit.minWidth).toBe(0);
+    const colonnePro = StyleSheet.flatten(
+      contours[0].parent!.props.style,
+    ) as ViewStyle;
+    expect(colonnePro.minWidth).toBe(0);
   });
 
   /*
@@ -588,6 +624,55 @@ describe('l’avis contre un essai', () => {
     expect(etoiles).toHaveLength(5);
     expect(bouton(t, 'Laisser un avis')).toBeDefined();
     expect(bouton(t, 'Plus tard')).toBeDefined();
+  });
+});
+
+/*
+ * LE MENU DU COMPTE — blanc et bleu, à nous, plus la feuille grise du
+ * système. Relevé du patron : « le menu utilisateur est trop basique ».
+ * L'Alert d'iOS devient une carte EchoPlan : avatar, nom, état du palier,
+ * gestes en boutons pleins — et une CROIX dessinée en haut à droite (la
+ * leçon des caractères), le voile refermant lui aussi.
+ */
+describe('le menu du compte', () => {
+  it('s’ouvre en carte EchoPlan, avec ses gestes en vrais boutons', () => {
+    useAccountStore.setState({
+      paywallVisible: false,
+      pro: false,
+      compte: { id: 'email:j@c.fr', prenom: 'Jérémy', methode: 'email' },
+    });
+    const t = monter(<HomeScreen />);
+    act(() => bouton(t, 'Mon compte')!.props.onPress());
+    expect(bouton(t, 'Passer en Pro / code promo')).toBeDefined();
+    expect(bouton(t, 'Se déconnecter')).toBeDefined();
+    expect(bouton(t, 'Supprimer mon compte')).toBeDefined();
+    // La croix est un TRACÉ, en haut à droite — pas un mot « Fermer ».
+    const croix = bouton(t, 'Fermer');
+    expect(croix).toBeDefined();
+    expect(
+      croix!.findAll((n) => typeof n.props?.d === 'string').length,
+    ).toBeGreaterThan(0);
+    // « Passer en Pro » referme le menu et ouvre la page.
+    act(() => bouton(t, 'Passer en Pro / code promo')!.props.onPress());
+    expect(useAccountStore.getState().paywallVisible).toBe(true);
+    expect(bouton(t, 'Se déconnecter')).toBeUndefined();
+  });
+
+  it('le voile referme, comme partout', () => {
+    useAccountStore.setState({
+      paywallVisible: false,
+      compte: { id: 'email:j@c.fr', prenom: 'Jérémy', methode: 'email' },
+    });
+    const t = monter(<HomeScreen />);
+    act(() => bouton(t, 'Mon compte')!.props.onPress());
+    const voile = t.root.findAll(
+      (n) =>
+        n.props?.testID === 'voile-compte' &&
+        typeof n.props?.onPress === 'function',
+    )[0];
+    expect(voile).toBeDefined();
+    act(() => voile.props.onPress());
+    expect(bouton(t, 'Se déconnecter')).toBeUndefined();
   });
 });
 

@@ -26,12 +26,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BadgePro } from '../components/BadgePro';
 import { ContourOr, TexteOr, TRAIT } from '../components/ContourOr';
-import {
-  CODE_BIENVENUE,
-  PRIX_PRO,
-  prixRemise,
-  useAccountStore,
-} from '../store/accountStore';
+import { PRIX_PRO, prixRemise, useAccountStore } from '../store/accountStore';
 import { useTheme, type Palette } from '../theme';
 
 const GRATUIT = [
@@ -185,10 +180,12 @@ export function PaywallScreen() {
               et le mot lui-même respire — c'est la signature du Pro. */}
           <ContourOr rayon={16} fond={c.surface} style={s.pleine}>
             <View style={s.ctaDedans}>
+              {/* Une PHRASE, pas une formule — relevé du patron : « trop de
+                  chiffres et de tirets ». Un seul nombre, zéro tiret. */}
               <TexteOr
-                texte={`S’abonner — ${
+                texte={`S’abonner pour ${
                   remisePct > 0 ? prixRemise(remisePct) : PRIX_PRO
-                } / mois`}
+                } par mois`}
                 taille={16.5}
                 fond={c.surface}
               />
@@ -196,10 +193,11 @@ export function PaywallScreen() {
           </ContourOr>
         </Pressable>
         {remisePct > 0 && (
-          <Text style={s.remiseNote}>
-            Code {CODE_BIENVENUE} appliqué — −{remisePct} % sur votre
-            abonnement.
-          </Text>
+          /* La pastille de remise : ni code, ni chiffre — le prix barré de
+             la carte dit déjà tout, elle ne fait que confirmer. */
+          <View style={s.remisePastille}>
+            <Text style={s.remiseNote}>✓ Remise de bienvenue appliquée</Text>
+          </View>
         )}
         <Text style={s.sansEngagement}>Sans engagement, résiliable à tout moment.</Text>
         <Pressable
@@ -264,7 +262,13 @@ const themed = (c: Palette) =>
     // cheveu sur la carte Gratuit — le contour des cartes de l'app — et
     // les pouces d'argile en tête de colonne.
     colonnes: { flexDirection: 'row', gap: 14, marginTop: 24 },
-    carte: { flex: 1, borderRadius: 20, padding: 18, gap: 7 },
+    /*
+      `minWidth: 0` sur les DEUX colonnes : sans lui, le prix de la carte
+      Pro (« 4,90 € », l'ancien barré, « / mois ») impose une largeur
+      minimale de contenu et la carte sort plus large que la Gratuit —
+      relevé du patron. L'arbitrage revient à `flex: 1` : deux moitiés.
+    */
+    carte: { flex: 1, minWidth: 0, borderRadius: 20, padding: 18, gap: 7 },
     carteGratuit: {
       backgroundColor: c.surface,
       borderWidth: StyleSheet.hairlineWidth,
@@ -281,15 +285,23 @@ const themed = (c: Palette) =>
       textDecorationLine: 'line-through',
       marginBottom: 5,
     },
+    remisePastille: {
+      alignSelf: 'center',
+      marginTop: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 5,
+      borderRadius: 999,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: '#C8861F',
+    },
     remiseNote: {
       color: '#C8861F',
       fontSize: 12.5,
       fontWeight: '700',
       textAlign: 'center',
-      marginTop: 8,
     },
     // La colonne Pro : le contour rogne sa carte, le badge flotte dessus.
-    colonnePro: { flex: 1 },
+    colonnePro: { flex: 1, minWidth: 0 },
     pleine: { flex: 1 },
     carteDedans: { flex: 1, padding: 18, gap: 7 },
     // La typo d'or épouse la largeur de son mot : sans ça, elle prendrait
@@ -298,6 +310,7 @@ const themed = (c: Palette) =>
     prixRangee: {
       flexDirection: 'row',
       alignItems: 'flex-end',
+      flexWrap: 'wrap',
       gap: 4,
       marginBottom: 4,
     },

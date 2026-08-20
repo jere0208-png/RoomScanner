@@ -95,9 +95,10 @@ function PlanPreview({
         cableRoutes={routes}
         ceiling={ceiling}
         showCeiling={!!ceiling}
-        // Les cardinaux sont DE SÉRIE sur le plan 2D — comme dans le PDF,
-        // que cet aperçu promet. Sans cap relevé, rien ne se dessine.
-        showNorth={true}
+        // Les cardinaux ne s'affichent QUE sur le plan 2D du PDF lui-même
+        // (relevé du patron) : l'aperçu reste dégagé, la rose est de série
+        // dans le document.
+        showNorth={false}
         editable={false}
         selectedWallId={null}
         onSelectWall={() => {}}
@@ -110,6 +111,25 @@ const planStyles = StyleSheet.create({
   box: { height: 380, borderRadius: 16, overflow: 'hidden' },
   inner: { flex: 1 },
 });
+
+/**
+ * LES ÉLÉVATIONS QUE LE DOSSIER IMPRIME, selon les trois cases.
+ *
+ * « Cotes Élec » demande les murs ÉQUIPÉS vus de face avec leurs cotes —
+ * c'est EXACTEMENT la feuille des élévations sans « Tous les murs ».
+ * L'absorption est donc structurelle : cocher les deux ne double jamais
+ * une feuille, le dossier imprime une seule série, la plus large.
+ */
+export function feuillesElevations(
+  elevations: boolean,
+  toutesElevations: boolean,
+  cotesElec: boolean,
+): { elevations: boolean; toutesElevations: boolean } {
+  return {
+    elevations: elevations || cotesElec,
+    toutesElevations: elevations && toutesElevations,
+  };
+}
 
 export function ExportScreen() {
   const setScreen = useScanStore((s) => s.setScreen);
@@ -156,6 +176,7 @@ const EXPORT_ICONS = {
   gaines: SOLAIRES.gaines,
   murs: SOLAIRES.murs,
   elevations: SOLAIRES.elevations,
+  cotesElec: SOLAIRES.elec,
   schema: SOLAIRES.schema,
 } as const;
 
@@ -198,6 +219,9 @@ const styles = getStyles(c);
     demande.
   */
   const [toutesElevations, setToutesElevations] = useState(false);
+  /** « Cotes Élec » : les murs équipés, de face, cotés — voir
+   *  `feuillesElevations` pour l'absorption sans doublon. */
+  const [cotesElec, setCotesElec] = useState(false);
   /*
     LES POINTS CARDINAUX — DE SÉRIE, SUR LE PLAN 2D SEULEMENT.
 
@@ -369,8 +393,7 @@ const styles = getStyles(c);
           surfaces: showSurfaces,
           textures: showTextures,
           metre: includeMetre,
-          elevations,
-          toutesElevations,
+          ...feuillesElevations(elevations, toutesElevations, cotesElec),
         },
       );
 
@@ -392,6 +415,7 @@ const styles = getStyles(c);
     includeMetre,
     elevations,
     toutesElevations,
+    cotesElec,
     gaines,
     schema,
     plafond,
@@ -404,7 +428,7 @@ const styles = getStyles(c);
   useEffect(() => {
     // Les élévations relisent les photos sur le disque : c'est asynchrone, et
     // c'est le geste coûteux. On ne prépare donc que les dossiers sans photo.
-    if (elevations && photos.length > 0) return;
+    if ((elevations || cotesElec) && photos.length > 0) return;
     let vivant = true;
     let tache: { cancel: () => void } | null = null;
     const t = setTimeout(() => {
@@ -591,6 +615,14 @@ const styles = getStyles(c);
                 elevations,
                 () => setElevations(!elevations),
               ],
+              // Les murs équipés, de face et cotés — absorbé par les
+              // élévations quand elles sont là : jamais de feuille double.
+              [
+                'cotesElec',
+                'Cotes Élec',
+                cotesElec,
+                () => setCotesElec(!cotesElec),
+              ] as OptionDef,
               // Elle ne s'offre que si les élévations sont demandées : une
               // case qui règle une feuille absente ne règle rien.
               ...(elevations

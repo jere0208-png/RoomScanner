@@ -19,7 +19,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 import React from 'react';
 import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
-import { ExportScreen } from '../src/screens/ExportScreen';
+import { ExportScreen, feuillesElevations } from '../src/screens/ExportScreen';
 import { ResultScreen } from '../src/screens/ResultScreen';
 import { Iso3DView } from '../src/components/Iso3DView';
 import { ExportArt } from '../src/components/ExportArt';
@@ -186,16 +186,49 @@ describe('la présentation animée', () => {
  * quatre lettres au bord du cadre ne désignent plus rien.
  */
 describe('le nord dans le dossier', () => {
-  it('ne s’offre plus en option : le plan 2D porte ses cardinaux d’office', () => {
+  it('ne s’offre plus en option, et l’aperçu reste NU — la rose vit dans le PDF', () => {
     const tree = monter('export');
     expect(
       tree.root
         .findAllByType(TouchableOpacity)
         .find((n) => n.props.accessibilityLabel === 'Nord'),
     ).toBeUndefined();
+    // Relevé du patron : les cardinaux ne s'affichent QUE sur le plan 2D
+    // du PDF lui-même — l'aperçu, lui, reste dégagé.
     const plans = tree.root.findAllByType(FloorplanEditor);
     expect(plans.length).toBeGreaterThan(0);
-    for (const p of plans) expect(p.props.showNorth).toBe(true);
+    for (const p of plans) expect(p.props.showNorth).toBe(false);
+  });
+
+  /*
+   * « COTES ÉLEC » : les murs équipés, vus de face avec leurs cotes.
+   *
+   * C'est EXACTEMENT la feuille des élévations sans « Tous les murs » :
+   * l'absorption est donc structurelle — cocher les deux ne double
+   * jamais une feuille, le dossier imprime une seule série.
+   */
+  it('offre « Cotes Élec » sans jamais doubler les élévations', () => {
+    const tree = monter('export');
+    expect(
+      tree.root
+        .findAllByType(TouchableOpacity)
+        .find((n) => n.props.accessibilityLabel === 'Cotes Élec'),
+    ).toBeDefined();
+    // Cotes Élec seul : les élévations des murs équipés.
+    expect(feuillesElevations(false, false, true)).toEqual({
+      elevations: true,
+      toutesElevations: false,
+    });
+    // Les deux cochés : une seule série de feuilles, la plus large.
+    expect(feuillesElevations(true, true, true)).toEqual({
+      elevations: true,
+      toutesElevations: true,
+    });
+    // « Tous les murs » sans élévations ne règle rien — comme avant.
+    expect(feuillesElevations(false, true, false)).toEqual({
+      elevations: false,
+      toutesElevations: false,
+    });
   });
 
   it('et sur lui seulement : les perspectives restent nues', () => {

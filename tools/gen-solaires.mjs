@@ -49,7 +49,9 @@ const CHOIX = {
   meubles: ['armchair-2-bold', 'armchair-bold'],
   ouvertures: ['exit-bold'],
   couleurs: ['palette-bold'],
-  elevations: ['gallery-wide-bold', 'gallery-bold'],
+  // Une élévation, c'est une HAUTEUR qu'on cote — pas une image : les deux
+  // flèches verticales, jamais une galerie (relevé du patron).
+  elevations: ['sort-vertical-bold', 'round-sort-vertical-bold', 'arrow-up-bold'],
   schema: ['server-minimalistic-bold', 'server-2-bold'],
   // --- le menu du mur, et le crayon du bandeau
   supprimer: ['trash-bin-trash-bold', 'trash-bin-minimalistic-bold'],

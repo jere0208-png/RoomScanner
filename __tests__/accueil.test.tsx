@@ -37,7 +37,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 import React from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
-import { Path } from 'react-native-svg';
+import { LinearGradient, Path, Rect } from 'react-native-svg';
 import { HomeScreen } from '../src/screens/HomeScreen';
 import { LogoMark } from '../src/components/LogoMark';
 import { PhoneShowcase } from '../src/components/PhoneShowcase';
@@ -156,6 +156,62 @@ describe('l’accueil', () => {
     const vu = textes(t);
     expect(vu).toContain('Jérôme');
     expect(vu).toContain('GRATUIT');
+    /*
+      LA BARRE EST GRANDE ET STYLISÉE — relevé du patron. Le simple filet
+      gris de 2,5 points est devenu une barre en DÉGRADÉ (du bleu de
+      marque vers le ciel), bouts ronds, 5 points : c'est elle qui
+      structure le bloc, elle doit se voir.
+    */
+    expect(bloc.findAllByType(LinearGradient).length).toBeGreaterThan(0);
+    const rubans = bloc
+      .findAllByType(Rect)
+      .filter((n) => Number(n.props.height) >= 4);
+    expect(rubans.length).toBeGreaterThan(0);
+    // Et sa taille est FIXE — la même en Gratuit et en Pro : une barre qui
+    // change de longueur avec le mot qu'elle souligne n'est plus un axe.
+    expect(Number(rubans[0].props.width)).toBe(96);
+    /*
+      ET LE BANDEAU EST AXÉ — le bloc profil et le bouton de thème
+      descendent ensemble et partagent leur ligne : deux éléments à la
+      même hauteur d'écran qui ne s'alignent pas se lisent comme un
+      accident.
+    */
+    const pastilleTheme = t.root.findAll((n) =>
+      String(n.props?.accessibilityLabel ?? '').startsWith('Passer en thème'),
+    )[0];
+    const stBloc = StyleSheet.flatten(bloc.props.style) as { top?: number };
+    const stTheme = StyleSheet.flatten(pastilleTheme.props.style) as {
+      top?: number;
+    };
+    expect(stBloc.top).toBeGreaterThanOrEqual(60);
+    /*
+      AXÉS PAR LEURS CENTRES : la pastille du thème est plus PETITE que la
+      ligne du profil (relevé du patron : « réduis le bloc blanc, sans
+      réduire les icônes ») — l'axe se juge donc au milieu, pas au bord.
+    */
+    const stThemeTaille = StyleSheet.flatten(pastilleTheme.props.style) as {
+      width?: number;
+      height?: number;
+    };
+    expect(stThemeTaille.width).toBeLessThanOrEqual(42);
+    const centreBloc = (stBloc.top ?? 0) + 46 / 2;
+    const centreTheme =
+      (stTheme.top ?? 0) + (stThemeTaille.height ?? 0) / 2;
+    expect(Math.abs(centreTheme - centreBloc)).toBeLessThanOrEqual(1);
+    /*
+      TOUT LE BLOC PREND LE CLIC — avatar, nom, barre, grade. Une vue SVG
+      avale le toucher si on la laisse faire : les enfants directs du
+      bouton sont donc transparents au doigt, et rien à l'intérieur ne
+      se dispute le geste.
+    */
+    expect(
+      bloc.findAll((n) => n.props?.pointerEvents === 'none').length,
+    ).toBeGreaterThanOrEqual(2);
+    expect(
+      bloc.findAll(
+        (n) => typeof n.props?.onPress === 'function' && n !== bloc,
+      ).length,
+    ).toBe(0);
   });
 
   it('le grade Pro respire comme la page Pro', () => {
@@ -172,6 +228,11 @@ describe('l’accueil', () => {
     const typos = bloc.findAllByType(TexteOr);
     expect(typos).toHaveLength(1);
     expect(typos[0].props.texte).toBe('PRO');
+    // La barre du Pro fait EXACTEMENT la taille de celle du Gratuit.
+    const ruban = bloc
+      .findAllByType(Rect)
+      .filter((n) => Number(n.props.height) >= 4)[0];
+    expect(Number(ruban.props.width)).toBe(96);
     useAccountStore.setState({ pro: false });
   });
 
