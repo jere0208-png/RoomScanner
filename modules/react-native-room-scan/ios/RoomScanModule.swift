@@ -98,23 +98,37 @@ class RoomScanModule: NSObject {
    Rend `false` quand le rayon ne rencontre aucune surface : l'app le dit
    alors franchement plutôt que de poser au hasard.
    */
+  /*
+    SUR LE THREAD PRINCIPAL, TOUJOURS.
+
+    Le module tourne sur un thread de fond (`requiresMainQueueSetup` vaut
+    `false`, et c'est bien ainsi pour tout le reste). Or poser un repère
+    touche à l'INTERFACE — une étiquette s'ajoute à une vue —, et UIKit ne
+    se manipule que depuis le thread principal : ailleurs, iOS ne se plaint
+    pas, il tue l'application. Retour du chantier, sans appel : « au clic
+    sur l'ajout d'un élément, crash de l'application ».
+  */
   @objc func poserAuViseur(_ kind: NSString,
-                           resolve: RCTPromiseResolveBlock,
+                           resolve: @escaping RCTPromiseResolveBlock,
                            reject: RCTPromiseRejectBlock) {
     guard #available(iOS 16.0, *) else {
       resolve(false)
       return
     }
-    resolve(RoomScanManager.shared.poserAuViseur(kind: kind as String))
+    DispatchQueue.main.async {
+      resolve(RoomScanManager.shared.poserAuViseur(kind: kind as String))
+    }
   }
 
-  @objc func retirerDerniereAncre(_ resolve: RCTPromiseResolveBlock,
+  @objc func retirerDerniereAncre(_ resolve: @escaping RCTPromiseResolveBlock,
                                   reject: RCTPromiseRejectBlock) {
     guard #available(iOS 16.0, *) else {
       resolve(false)
       return
     }
-    resolve(RoomScanManager.shared.retirerDerniereAncre())
+    DispatchQueue.main.async {
+      resolve(RoomScanManager.shared.retirerDerniereAncre())
+    }
   }
 
   @objc func pauseRoomScan() {

@@ -101,6 +101,16 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
    aucun toucher, c'est un calque, pas un bouton.
    */
   func makeContainer() -> UIView {
+    /*
+      LA COUCHE PRÉCÉDENTE S'EN VA D'ABORD.
+
+      React remonte l'écran de scan à chaque passage : sans ce ménage, on
+      empilait une couche et son horloge par relevé, toutes à battre sur
+      des sessions mortes. « Le scan ne fonctionne plus du tout » — il
+      finissait étouffé sous ses propres restes.
+    */
+    couche?.removeFromSuperview()
+    couche = nil
     let boite = UIView(frame: .zero)
     let scan = makeCaptureView()
     scan.frame = boite.bounds

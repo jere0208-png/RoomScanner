@@ -25,6 +25,20 @@ import UIKit
  ne fait plus rien), et le coût est nul — une poignée de projections par
  image, pas un second rendu de la scène.
  */
+/**
+ Le relais qui ne retient pas sa vue.
+
+ `CADisplayLink` garde une référence FORTE sur sa cible : la vue ne se
+ libérerait jamais, et son horloge continuerait de battre sur une session
+ morte. Le relais, lui, ne tient sa vue que faiblement.
+ */
+@available(iOS 16.0, *)
+private final class RelaisFaible {
+  weak var cible: RepereLayerView?
+  init(cible: RepereLayerView) { self.cible = cible }
+  @objc func battre() { cible?.rafraichir() }
+}
+
 @available(iOS 16.0, *)
 final class RepereLayerView: UIView {
 
@@ -43,10 +57,31 @@ final class RepereLayerView: UIView {
 
   deinit { horloge?.invalidate() }
 
+  /**
+   L'HORLOGE S'ARRÊTE AVEC LA VUE.
+
+   `CADisplayLink` retient fortement sa cible : une vue de scan quittée
+   gardait donc son horloge vivante, à battre trente fois par seconde sur
+   une session qui n'existe plus. Deux scans de suite, et l'app traînait
+   autant d'horloges que de passages — « le scan ne fonctionne plus du
+   tout ». Un relais faible casse le cycle, et le départ de l'écran
+   l'invalide.
+   */
+  override func willMove(toWindow newWindow: UIWindow?) {
+    super.willMove(toWindow: newWindow)
+    if newWindow == nil {
+      horloge?.invalidate()
+      horloge = nil
+    } else if session != nil && horloge == nil {
+      demarrerHorloge()
+    }
+  }
+
   private func demarrerHorloge() {
     horloge?.invalidate()
     guard session != nil else { return }
-    let h = CADisplayLink(target: self, selector: #selector(rafraichir))
+    let h = CADisplayLink(target: RelaisFaible(cible: self),
+                          selector: #selector(RelaisFaible.battre))
     // Trente images par seconde suffisent : ces étiquettes suivent un
     // mouvement de main, pas une animation.
     h.preferredFramesPerSecond = 30
@@ -95,7 +130,7 @@ final class RepereLayerView: UIView {
     }
   }
 
-  @objc private func rafraichir() {
+  @objc func rafraichir() {
     guard let frame = session?.currentFrame, bounds.width > 1 else { return }
     let orientation = UIApplication.shared.connectedScenes
       .compactMap { ($0 as? UIWindowScene)?.interfaceOrientation }
