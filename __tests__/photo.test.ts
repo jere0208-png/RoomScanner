@@ -125,19 +125,23 @@ describe('la photo suit le scan', () => {
     expect(useScanStore.getState().photos).toEqual([]);
   });
 
-  it('un mur supprimé laisse sa photo orpheline, et l’annulation rend tout', () => {
+  it('un mur supprimé emporte sa photo, et l’annulation rend tout', () => {
+    // Le tour de l'application a retourné la règle : la photo orpheline
+    // restait dans le scan SANS punaise ni feuille — introuvable à
+    // l'écran, gardée dans la sauvegarde, son fichier jamais éligible au
+    // ménage. Elle part maintenant avec son mur, et l'annulation rend le
+    // mur ET la photo, fichier compris (rien n'est effacé tant que
+    // l'histoire peut revenir... le fichier ne part que s'il ne sert à
+    // aucune sauvegarde).
     neuf();
     useScanStore.getState().addPhoto('n', 2, '/tmp/p1.jpg');
+    // Une sauvegarde référence la photo : son FICHIER doit survivre à la
+    // suppression du mur — seule l'entrée du plan courant s'en va.
+    useScanStore.getState().saveAsCopy('Avec photo');
     jest.advanceTimersByTime(2000);
     useScanStore.getState().removeWall('n');
-    // La photo reste dans le scan — on ne détruit pas un fichier parce
-    // qu'un mur a bougé — mais le plan ne la montre plus : sa punaise n'a
-    // plus de mur où se planter.
-    const photos = useScanStore.getState().photos;
-    expect(photos).toHaveLength(1);
-    const murs = useScanStore.getState().walls;
-    expect(murs.some((w) => w.id === 'n')).toBe(false);
-    expect(murs.some((w) => w.id === photos[0].wallId)).toBe(false);
+    expect(useScanStore.getState().photos).toHaveLength(0);
+    expect(useScanStore.getState().walls.some((w) => w.id === 'n')).toBe(false);
     useScanStore.getState().undo();
     expect(useScanStore.getState().walls.some((w) => w.id === 'n')).toBe(true);
     expect(useScanStore.getState().photos).toHaveLength(1);

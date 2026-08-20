@@ -1731,6 +1731,35 @@ function planPage(
           x: v.along,
         })),
       );
+      /*
+        LES LIENS MURAUX D'ABORD — même règle que le plafond : ils passent
+        SOUS les symboles, jamais dessus. Et le filet s'ancre LÀ OÙ EST le
+        symbole (0,2 + rang × 0,24 du mur) : ancré à 0,16 fixe, il
+        s'arrêtait vingt-huit centimètres avant un appareil échelonné.
+      */
+      const sortie = (g: Fixture) => 0.2 + (ranks.get(g.id) ?? 0) * 0.24;
+      for (const v of poses) {
+        for (const cid of v.f.commands ?? []) {
+          const cible = poses.find((p) => p.f.id === cid);
+          if (!cible) continue;
+          const de = facePoint(
+            v.face,
+            Math.max(0, Math.min(v.face.len, v.along)),
+            sortie(v.f),
+          );
+          const vers = facePoint(
+            cible.face,
+            Math.max(0, Math.min(cible.face.len, cible.along)),
+            sortie(cible.f),
+          );
+          d.dashedPath(
+            linkCurve({ x: de.x, z: de.z }, { x: vers.x, z: vers.z }).map(px),
+            0.7,
+            GREY,
+            [1.6, 3],
+          );
+        }
+      }
       for (const { f, face, along } of poses) {
         const spec = FIXTURES[f.kind];
         // Une cote d'appareil devenue folle — un mur recoupé depuis la pose,
@@ -1770,31 +1799,6 @@ function planPage(
        * feuilles côte à côte en reportant les cotes de l'une sur
        * l'autre. Sol et plafond sont la même pièce : un seul plan.
        */
-      /*
-        LES LIENS MURAUX AUSSI : une prise commandée ou une applique tient
-        à son interrupteur par le même filet que les points du plafond —
-        sur le papier comme à l'écran, un lien qui ne s'imprime pas est un
-        câble que personne ne tire.
-      */
-      for (const f of ctx.fixtures ?? []) {
-        for (const cid of f.commands ?? []) {
-          const cmd = (ctx.fixtures ?? []).find((x) => x.id === cid);
-          const wf = murParId.get(f.wallId);
-          const wc = cmd ? murParId.get(cmd.wallId) : undefined;
-          if (!cmd || !wf || !wc) continue;
-          const fa = wallFace(wf, quadsMur.get(wf.id), f.side);
-          const fc = wallFace(wc, quadsMur.get(wc.id), cmd.side);
-          const de = facePoint(fa, faceX(fa, f.along), 0.16);
-          const vers = facePoint(fc, faceX(fc, cmd.along), 0.16);
-          d.dashedPath(
-            linkCurve({ x: de.x, z: de.z }, { x: vers.x, z: vers.z }).map(px),
-            0.7,
-            GREY,
-            [1.6, 3],
-          );
-        }
-      }
-
       const plafond = ctx.ceiling ?? [];
       if (plafond.length > 0) {
         // Les liens d'abord : ils passent SOUS les symboles, jamais dessus.

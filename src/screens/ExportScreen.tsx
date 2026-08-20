@@ -175,7 +175,6 @@ const EXPORT_ICONS = {
   ouvertures: SOLAIRES.ouvertures,
   couleurs: SOLAIRES.couleurs,
   gaines: SOLAIRES.gaines,
-  murs: SOLAIRES.murs,
   elevations: SOLAIRES.elevations,
   cotesElec: SOLAIRES.elec,
   schema: SOLAIRES.schema,
@@ -479,7 +478,12 @@ const styles = getStyles(c);
           },
         ]}>
       <View style={styles.headerRow}>
-        <TouchableOpacity style={styles.roundButton} onPress={() => setScreen('result')}>
+        <TouchableOpacity
+          style={styles.roundButton}
+          // Le seul retour de l'app qui restait muet : le nom s'écrit,
+          // comme sur les trois autres écrans.
+          accessibilityLabel="Retour"
+          onPress={() => setScreen('result')}>
           <BackChevron color={c.ink} />
         </TouchableOpacity>
         {/* Le bord gauche rend le même retour que la flèche. */}
@@ -676,8 +680,8 @@ const styles = getStyles(c);
         */}
         <Text style={styles.sheetLabel}>
           {avecPlafond
-            ? "Feuille 1 · Plan d'ensemble et plafond"
-            : "Feuille 1 · Plan d'ensemble"}
+            ? 'Feuille 1 · Plan d’ensemble et plafond'
+            : 'Feuille 1 · Plan d’ensemble'}
         </Text>
         <View style={styles.sheetCard}>
           {/* Plus de verrou de défilement ici : rien ne se manipule sur le

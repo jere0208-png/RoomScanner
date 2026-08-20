@@ -329,6 +329,31 @@ function migrateSave(s: SavedScan): SavedScan {
  * scans d'avant. On la garde nommée ici : un jour où l'autre quelqu'un se
  * demandera pourquoi il traîne une clé « v1 » dans le stockage.
  */
+/**
+ * PURGE LES LIENS MORTS — par TOUS les chemins de suppression.
+ *
+ * `removeFixture` faisait le ménage, mais un interrupteur part aussi avec
+ * son mur ou sa pièce : les `commands` gardaient alors son id, le contrôle
+ * croyait le point « commandé » à jamais, et le constat « sans commande »
+ * ne tombait plus. La règle vit ici, et chaque suppression la traverse.
+ */
+function sansLiensMorts(
+  fixtures: Fixture[],
+  ceiling: CeilingFixture[],
+): { fixtures: Fixture[]; ceiling: CeilingFixture[] } {
+  const vivants = new Set(fixtures.map((f) => f.id));
+  const purge = (commands?: string[]) => {
+    if (!commands) return commands;
+    const restants = commands.filter((x) => vivants.has(x));
+    if (restants.length === commands.length) return commands;
+    return restants.length > 0 ? restants : undefined;
+  };
+  return {
+    fixtures: fixtures.map((f) => ({ ...f, commands: purge(f.commands) })),
+    ceiling: ceiling.map((c) => ({ ...c, commands: purge(c.commands) })),
+  };
+}
+
 const STORAGE_KEY = 'roomscanner.saves.v1';
 /** L'ordre des scans. Le contenu, lui, vit une clé par scan. */
 const INDEX_KEY = 'roomscanner.index.v2';
@@ -1325,9 +1350,27 @@ export const useScanStore = create<ScanState>((set, get) => {
           return dist < 0.6;
         }),
         objects: st.objects.filter((o) => roomOf(o) !== roomId),
-        fixtures: st.fixtures.filter((f) => !doomed.has(f.wallId)),
+        // Les appareils des murs partis, ET les liens qui les visaient.
+        ...sansLiensMorts(
+          st.fixtures.filter((f) => !doomed.has(f.wallId)),
+          // Le plafond d'une pièce détruite n'a plus rien à éclairer —
+          // il restait pourtant dessiné au-dessus du vide, et compté au
+          // métré comme aux circuits.
+          st.ceiling.filter((c) => c.roomId !== roomId),
+        ),
+        photos: st.photos.filter((p) => !doomed.has(p.wallId)),
         dirty: true,
       });
+      {
+        const partis = st.photos
+          .filter((p) => doomed.has(p.wallId))
+          .map((p) => p.path);
+        const gardees = new Set([
+          ...get().photos.map((p) => p.path),
+          ...st.saves.flatMap((s) => (s.photos ?? []).map((p) => p.path)),
+        ]);
+        deletePhotoFiles(partis.filter((p) => !gardees.has(p)));
+      }
     },
 
     mergeRooms: (aId, bId) => {
@@ -1359,6 +1402,12 @@ export const useScanStore = create<ScanState>((set, get) => {
           .map((r) => (r.id === aId ? { ...r, wallIds } : r)),
         objects: st.objects.map((o) =>
           roomOf(o) === bId ? { ...o, roomId: aId } : o,
+        ),
+        // Le plafond de la pièce absorbée suit ses meubles : sans ça, la
+        // pièce fusionnée était signalée « aucun point lumineux » alors
+        // qu'elle en porte.
+        ceiling: st.ceiling.map((c) =>
+          c.roomId === bId ? { ...c, roomId: aId } : c,
         ),
         dirty: true,
       });
@@ -1472,7 +1521,18 @@ export const useScanStore = create<ScanState>((set, get) => {
         seen.set(r.name, n);
         if (n > 1) r.name = `${r.name} ${n}`;
       }
-      set({ walls, rooms, objects, fixtures, photos, dirty: true });
+      /*
+        LE PLAFOND SUIT LA RENUMÉROTATION. Les pièces reçoivent de
+        nouveaux identifiants : un point lumineux qui garderait l'ancien
+        deviendrait orphelin — la pièce ressortait « sans point lumineux »
+        avec un DCL au plafond, et « Poser le DCL » en posait un deuxième.
+        Chaque point se rattache à la pièce qui contient son ancrage.
+      */
+      const ceiling = st.ceiling.map((cl) => {
+        const idx = roomIndexAt(cl.at, shapes.map((s) => s.outline));
+        return { ...cl, roomId: `room-${idx + 1}` };
+      });
+      set({ walls, rooms, objects, fixtures, photos, ceiling, dirty: true });
     },
 
     removeWall: (wallId) => {
@@ -1487,10 +1547,27 @@ export const useScanStore = create<ScanState>((set, get) => {
         })),
         // Une ouverture sans mur d'accueil n'a plus de sens.
         openings: st.openings.filter((o) => nearestWall(o, walls).dist < 0.6),
-        // Une prise non plus : elle était posée sur la face de ce mur.
-        fixtures: st.fixtures.filter((f) => f.wallId !== wallId),
+        // Une prise non plus : elle était posée sur la face de ce mur —
+        // et les liens vers un interrupteur parti s'effacent avec lui.
+        ...sansLiensMorts(
+          st.fixtures.filter((f) => f.wallId !== wallId),
+          st.ceiling,
+        ),
+        // La photo de repérage montrait CE mur : l'épingle n'a plus où
+        // vivre, et son fichier part s'il ne sert à personne d'autre.
+        photos: st.photos.filter((p) => p.wallId !== wallId),
         dirty: true,
       });
+      {
+        const partis = st.photos
+          .filter((p) => p.wallId === wallId)
+          .map((p) => p.path);
+        const gardees = new Set([
+          ...get().photos.map((p) => p.path),
+          ...st.saves.flatMap((s) => (s.photos ?? []).map((p) => p.path)),
+        ]);
+        deletePhotoFiles(partis.filter((p) => !gardees.has(p)));
+      }
     },
 
     addWallBetween: (a, b) => {
@@ -2085,6 +2162,9 @@ export const useScanStore = create<ScanState>((set, get) => {
     },
 
     removeFixture: (id) => {
+      // L'histoire se photographie AVANT le dégroupage : prise après, elle
+      // rendait à l'annulation deux prises sans leur plaque commune.
+      pushHistory('removeFixture');
       // Un ensemble réduit à un poste n'est plus un ensemble : sa plaque
       // redevient simple, et l'appareil restant redevient libre.
       {
@@ -2104,9 +2184,25 @@ export const useScanStore = create<ScanState>((set, get) => {
           }
         }
       }
-      pushHistory('removeFixture');
+      /*
+        ET SES LIENS PARTENT AVEC LUI. Un interrupteur supprimé restait la
+        « commande » des appliques et des points du plafond : le contrôle
+        croyait le point commandé alors que sa commande n'existe plus, et
+        le constat « sans commande » ne tombait jamais.
+      */
+      const purge = (commands?: string[]) => {
+        if (!commands?.includes(id)) return commands;
+        const restants = commands.filter((x) => x !== id);
+        return restants.length > 0 ? restants : undefined;
+      };
       set({
-        fixtures: get().fixtures.filter((f) => f.id !== id),
+        fixtures: get()
+          .fixtures.filter((f) => f.id !== id)
+          .map((f) => ({ ...f, commands: purge(f.commands) })),
+        ceiling: get().ceiling.map((cl) => ({
+          ...cl,
+          commands: purge(cl.commands),
+        })),
         dirty: true,
       });
     },
@@ -3095,6 +3191,15 @@ export const useScanStore = create<ScanState>((set, get) => {
         objects: migrated.objects,
         rooms: migrated.rooms,
         fixtures: migrated.fixtures ?? [],
+        // TOUT revient, pas les cinq premières listes : abandonner les
+        // modifications laissait les spots ajoutés, les photos prises et
+        // le nord tourné — et `dirty: false` promettait au prochain
+        // enregistrement d'écrire ce mélange dans la bibliothèque.
+        ceiling: migrated.ceiling ?? [],
+        photos: migrated.photos ?? [],
+        north: migrated.north ?? null,
+        client: migrated.client ?? '',
+        address: migrated.address ?? '',
         dirty: false,
       });
       clearHistory();
@@ -3300,10 +3405,11 @@ export const useScanStore = create<ScanState>((set, get) => {
         fixtures: save.fixtures ?? [],
         photos: save.photos ?? [],
         ceiling: save.ceiling ?? [],
-        // Un relevé de mur appartient au plan où il a été pris : le garder
-        // d'un scan à l'autre permettrait de coller les cotes d'un autre
-        // logement.
-            pendingJoin: null,
+        pendingJoin: null,
+        // L'arrivage appartient au scan qui vient de finir : ouvert sur un
+        // autre dossier, le popup proposerait d'y intégrer les meubles
+        // d'un autre logement.
+        arrivage: null,
         north: save.north ?? null,
         dirty: false,
         resultOrigin: 'library',
@@ -3329,7 +3435,11 @@ export const useScanStore = create<ScanState>((set, get) => {
       deletePhotoFiles(aEffacer);
       set({
         saves,
-        ...(st.currentSaveId === id ? { currentSaveId: null } : null),
+        // Supprimer le scan courant emporte aussi sa question de fin de
+        // scan : l'arrivage appartient au scan qui vient de finir.
+        ...(st.currentSaveId === id
+          ? { currentSaveId: null, arrivage: null }
+          : null),
       });
       persistSoon(saves);
     },
@@ -3369,6 +3479,8 @@ export const useScanStore = create<ScanState>((set, get) => {
         photos: [],
         ceiling: [],
         north: null,
+        // Le popup de fin de scan appartient au scan qui vient de finir.
+        arrivage: null,
       });
     },
   };

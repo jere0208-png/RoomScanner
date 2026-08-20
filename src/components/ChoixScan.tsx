@@ -86,7 +86,6 @@ export function ChoixScan({
   const lignes: {
     cle: keyof ChoixDuScan;
     icone: string;
-    label: string;
     titre: string;
     detail: string;
   }[] = [
@@ -95,7 +94,6 @@ export function ChoixScan({
           {
             cle: 'meubles' as const,
             icone: SOLAIRES.furniture,
-            label: 'Meubles détectés',
             titre: `${meubles} meuble${meubles > 1 ? 's' : ''} détecté${
               meubles > 1 ? 's' : ''
             }`,
@@ -107,7 +105,6 @@ export function ChoixScan({
     {
       cle: 'elec' as const,
       icone: SOLAIRES.elec,
-      label: 'Électricité aux normes',
       titre: 'Électricité proposée aux normes',
       detail:
         'Socles, RJ45, commandes et points lumineux selon la NF C 15-100, ' +
@@ -124,7 +121,11 @@ export function ChoixScan({
       {lignes.map((l) => (
         <TouchableOpacity
           key={l.cle}
-          accessibilityLabel={l.label}
+          // Le lecteur d'écran entend le VRAI titre (nombre compris), sait
+          // que c'est une case, et dans quel état elle est.
+          accessibilityLabel={l.titre}
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: choix[l.cle] }}
           style={[styles.ligne, choix[l.cle] && styles.ligneCochee]}
           activeOpacity={0.8}
           onPress={() => bascule(l.cle)}>

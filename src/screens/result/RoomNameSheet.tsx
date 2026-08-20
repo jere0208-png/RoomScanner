@@ -43,7 +43,7 @@ export function RoomNameSheet({
         <Pressable style={styles.modalCard} onPress={() => {}}>
           <Text style={styles.modalTitle}>Nom de la pièce</Text>
           <Text style={styles.modalSubtitle}>
-            Il s'affiche sur le plan 2D, au même endroit sur la vue 3D, et
+            Il s’affiche sur le plan 2D, au même endroit sur la vue 3D, et
             dans le métré du PDF.
           </Text>
           <ScrollView style={styles.nameScroll}>

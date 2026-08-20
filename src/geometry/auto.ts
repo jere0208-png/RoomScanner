@@ -232,12 +232,18 @@ export function poserAuxNormes(input: {
       const fait = poser('prise', manqueSocles, H_PRISE);
       if (fait > 0) pose.push(`${fait} socle${fait > 1 ? 's' : ''} 16 A`);
       if (fait < manqueSocles) {
-        pose.push(`${manqueSocles - fait} socle(s) sans place libre`);
+        const rate = manqueSocles - fait;
+        pose.push(`${rate} socle${rate > 1 ? 's' : ''} sans place libre`);
       }
     }
     const manqueRj = Math.max(0, besoin.rj45 - compte('rj45'));
-    if (manqueRj > 0 && poser('rj45', manqueRj, H_RJ) > 0) {
-      pose.push(`${manqueRj} prise${manqueRj > 1 ? 's' : ''} RJ45`);
+    if (manqueRj > 0) {
+      // Le rapport annonce ce qui a ÉTÉ posé, pas ce qui manquait : une
+      // RJ45 sur deux trouvée, le texte disait quand même « 2 prises ».
+      const faitRj = poser('rj45', manqueRj, H_RJ);
+      if (faitRj > 0) {
+        pose.push(`${faitRj} prise${faitRj > 1 ? 's' : ''} RJ45`);
+      }
     }
     // Une commande d'éclairage par pièce : sans elle, le point lumineux ne
     // s'allume pas, et c'est le premier réflexe d'un contrôle.

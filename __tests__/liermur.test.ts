@@ -100,3 +100,47 @@ describe('le magasin', () => {
     expect(ap.commands ?? []).toEqual([]);
   });
 });
+
+/**
+ * LE LIEN S'IMPRIME SOUS LES SYMBOLES — le tour de l'application l'a
+ * montré : le filet mural du PDF se dessinait APRÈS l'appareillage, donc
+ * PAR-DESSUS les plaques, à rebours de la convention écrite trois lignes
+ * plus bas pour le plafond (« les liens d'abord »). Un flux PDF est
+ * séquentiel : ce qui s'imprime d'abord apparaît d'abord.
+ */
+describe('le lien sur le papier', () => {
+  it('passe sous les symboles : son tireté precede leurs sigles', () => {
+    const { buildScanPdf } = require('../src/export/pdf');
+    const walls = [
+      MUR,
+      { ...MUR, id: 'e', a: { x: 5, z: 0 }, b: { x: 5, z: 4 } },
+      { ...MUR, id: 's', a: { x: 5, z: 4 }, b: { x: 0, z: 4 } },
+      { ...MUR, id: 'w', a: { x: 0, z: 4 }, b: { x: 0, z: 0 } },
+    ];
+    const bytes = buildScanPdf(
+      {
+        name: 'Lien test',
+        walls,
+        openings: [],
+        objects: [],
+        rooms: [{ id: 'r1', name: 'Séjour', wallIds: walls.map((w) => w.id) }],
+        fixtures: [
+          { ...fx('ap1', 'applique', 1), height: 1.8, commands: ['i1'] },
+          { ...fx('i1', 'inter', 3), height: 1.1 },
+          // Le témoin : son sigle « RJ » marque le bloc des symboles.
+          fx('rj', 'rj45', 4),
+        ],
+        photos: [],
+      },
+      false,
+      { metre: false },
+    );
+    let src = '';
+    for (let i = 0; i < bytes.length; i++) src += String.fromCharCode(bytes[i]);
+    const lien = src.indexOf('[1.6 3]');
+    const sigle = src.indexOf('(RJ');
+    expect(lien).toBeGreaterThanOrEqual(0);
+    expect(sigle).toBeGreaterThanOrEqual(0);
+    expect(lien).toBeLessThan(sigle);
+  });
+});

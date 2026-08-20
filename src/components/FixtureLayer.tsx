@@ -237,6 +237,9 @@ export function FixtureLayer({
           return (
             <G
               key={f.id}
+              // Le symbole ne dit rien à un lecteur d'écran : l'appareil
+              // porte son nom, comme ses frères du catalogue.
+              accessibilityLabel={spec.label}
               onPress={
                 onSelectFixture
                   ? () => onSelectFixture(f.id, f.wallId)

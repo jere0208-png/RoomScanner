@@ -1491,6 +1491,13 @@ export function ResultScreen() {
   };
 
   const poserNormes = () => {
+    /*
+      LE MAGASIN, PAS LA FERMETURE. Appelé juste après « retirer les
+      meubles » (popup de fin de scan), ce geste lisait les listes du
+      RENDU : il posait les socles en évitant des meubles qui venaient
+      d'être supprimés.
+    */
+    const frais = useScanStore.getState();
     const pose = poserAuxNormes({
       rooms: roomInputs.map((r) => {
         const part = parts.find((p) => p.roomId === r.id);
@@ -1498,9 +1505,9 @@ export function ResultScreen() {
       }),
       walls,
       openings,
-      objects,
-      fixtures,
-      ceiling,
+      objects: frais.objects,
+      fixtures: frais.fixtures,
+      ceiling: frais.ceiling,
       placement,
       id: (prefixe) =>
         `${prefixe}-${Date.now().toString(36)}-${Math.random()
@@ -1516,8 +1523,9 @@ export function ResultScreen() {
       return;
     }
     useScanStore.getState().poserDAuto(pose.fixtures, pose.ceiling);
+    const total = pose.fixtures.length + pose.ceiling.length;
     Alert.alert(
-      `${pose.fixtures.length + pose.ceiling.length} pose(s) ajoutée(s)`,
+      `${total} pose${total > 1 ? 's' : ''} ajoutée${total > 1 ? 's' : ''}`,
       pose.rapport.join(SAUT) +
         SAUT +
         SAUT +

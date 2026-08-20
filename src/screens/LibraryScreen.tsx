@@ -905,7 +905,7 @@ export function LibraryScreen() {
           icon: 'renommer',
           onPress: () =>
             setPrompt({
-              title: 'Nom du relevé',
+              title: 'Nom du scan',
               value: item.name,
               onSubmit: (t) => renameSave(item.id, t),
             }),
@@ -922,7 +922,7 @@ export function LibraryScreen() {
           ? [
               {
                 label: 'Sortir du dossier',
-                hint: 'Le relevé revient à la racine de la bibliothèque.',
+                hint: 'Le scan revient à la racine de la bibliothèque.',
                 icon: 'sortir' as const,
                 onPress: () => moveToFolder(item.id, null),
               },

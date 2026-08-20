@@ -340,6 +340,51 @@ contre un mur qu'on se sert des flèches. `setObjectCenter` reçoit donc un
 `aimant` : vrai au doigt, qui vise à peu près ; faux à la flèche, qui vise
 juste.
 
+### Le tour de l'application — ce que le balayage a corrigé
+
+Relevé du patron : « fais le tour de l'application et vois s'il y a des
+manques, des erreurs ou des incohérences ». Trois balayages croisés
+(textes/interface, cohérence du magasin, écran contre PDF), et une
+fournée de correctifs, chacun né d'un banc rouge (`menage.test.ts` et
+extensions) :
+
+**Le magasin ne garde plus de références mortes.** Un interrupteur part
+avec son mur ou sa pièce ; ses liens (`commands` des appliques et des
+points du plafond) partent avec lui — la règle vit dans `sansLiensMorts`,
+traversée par TOUS les chemins de suppression. Le plafond d'une pièce
+détruite s'en va (il restait dessiné au-dessus du vide, et compté au
+métré) ; la fusion de deux pièces remmène les points de la seconde ; la
+renumérotation (`redetectRooms`) rattache chaque point à la pièce qui
+contient son ancrage — sans quoi « Poser le DCL » doublait un plafond
+déjà équipé. « Abandonner les modifications » restaure TOUT (plafond,
+photos, nord, client) : il laissait les spots ajoutés et promettait, avec
+`dirty: false`, d'écrire ce mélange dans la bibliothèque. L'annulation de
+la suppression d'un appareil groupé rend l'ensemble ENTIER (l'histoire se
+photographie avant le dégroupage). Les photos d'un mur supprimé partent
+avec lui, fichier compris s'il ne sert à aucune sauvegarde. Et l'arrivage
+du scan meurt aussi avec `deleteSave`.
+
+**Le popup de fin de scan pose l'élec sur le plan RÉEL.** « Décocher les
+meubles puis cocher l'électricité » posait les socles en évitant des
+meubles qui venaient d'être supprimés : `poserNormes` lit le magasin, pas
+la fermeture du rendu.
+
+**Le PDF dit la même chose que l'écran.** Le filet d'une prise commandée
+passe SOUS les symboles (comme les liens du plafond, comme à l'écran), et
+s'ancre LÀ OÙ EST le symbole (0,2 + rang × 0,24) — à 0,16 fixe, il
+s'arrêtait vingt-huit centimètres avant un appareil échelonné.
+
+**Les mots se sont accordés.** La note de la double prise disait
+l'inverse du comptage (`socketsOf` : un socle double compte pour UN
+socle) ; le rapport « Normes auto » annonce ce qui a été posé, pas ce qui
+manquait, et accorde ses pluriels ; « 0/1 socles » a perdu son s ; le
+menu radial du mur dit « Mesures » comme le bandeau (même geste, même
+mot) ; la bibliothèque dit « scan » partout ; les apostrophes droites
+restantes sont passées en typographiques. Côté accessibilité : le retour
+de l'aperçu PDF porte enfin son nom, les lignes du choix de fin de scan
+sont de vraies cases (rôle, état, titre complet), et chaque appareil du
+plan 2D dit son nom au lecteur d'écran.
+
 ### Ce que l'app recalculait pour rien
 
 Trois chaînes de calcul tournaient à chaque rendu, sans rien produire de

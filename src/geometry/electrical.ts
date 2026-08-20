@@ -219,7 +219,9 @@ export const FIXTURES: Record<FixtureKind, FixtureSpec> = {
     depth: 0.022,
     color: C_PRISE,
     std: 0.25,
-    note: 'Deux socles sous une plaque : compte pour deux prises.',
+    // La règle du comptage est celle de `socketsOf` : un socle double
+    // compte pour UN socle au titre de la norme — la note disait l'inverse.
+    note: 'Deux socles sous une plaque : compte pour un socle au circuit.',
   },
   prise20: {
     label: 'Prise 20 A',

@@ -42,7 +42,7 @@ import { useRoomScan } from '../native/useRoomScan';
  */
 function quand(at: number): string {
   const min = Math.max(0, Math.round((Date.now() - at) / 60000));
-  if (min < 1) return "à l'instant";
+  if (min < 1) return 'à l’instant';
   if (min < 60) return `il y a ${min} min`;
   const h = Math.round(min / 60);
   if (h < 24) return `il y a ${h} h`;

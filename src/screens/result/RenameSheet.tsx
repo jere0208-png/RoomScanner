@@ -34,7 +34,7 @@ export function RenameSheet({
       <View>
         <Text style={styles.modalTitle}>Nom du scan</Text>
         <Text style={styles.modalSubtitle}>
-          Les modifications du plan s'enregistrent avec le bouton en bas à
+          Les modifications du plan s’enregistrent avec le bouton en bas à
           droite du plan.
         </Text>
         <TextInput

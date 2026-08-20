@@ -135,7 +135,7 @@ const WALL_ACTIONS: {
   label: string | null;
   d: string;
 }[] = [
-  { action: 'longueur', label: 'Cotes', d: SOLAIRES.ruler },
+  { action: 'longueur', label: 'Mesures', d: SOLAIRES.ruler },
   { action: 'ouverture', label: 'Ouvrir', d: SOLAIRES.ouvertures },
   { action: 'electricite', label: 'Élec', d: SOLAIRES.elec },
   // Une croix se lit dans toutes les langues, mais pas dans une rangée où

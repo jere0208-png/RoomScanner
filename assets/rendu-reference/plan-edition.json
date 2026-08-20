@@ -2525,7 +2525,8 @@
         "fill": {
          "type": 0,
          "payload": 4278190080
-        }
+        },
+        "accessibilityLabel": "Prise 16 A"
        },
        "children": [
         {
@@ -2732,7 +2733,8 @@
         "fill": {
          "type": 0,
          "payload": 4278190080
-        }
+        },
+        "accessibilityLabel": "Interrupteur"
        },
        "children": [
         {
@@ -2942,7 +2944,8 @@
         "fill": {
          "type": 0,
          "payload": 4278190080
-        }
+        },
+        "accessibilityLabel": "Prise double"
        },
        "children": [
         {
@@ -3215,7 +3218,8 @@
         "fill": {
          "type": 0,
          "payload": 4278190080
-        }
+        },
+        "accessibilityLabel": "Prise 20 A"
        },
        "children": [
         {
@@ -3444,7 +3448,8 @@
         "fill": {
          "type": 0,
          "payload": 4278190080
-        }
+        },
+        "accessibilityLabel": "Prise 32 A"
        },
        "children": [
         {
@@ -3695,7 +3700,8 @@
         "fill": {
          "type": 0,
          "payload": 4278190080
-        }
+        },
+        "accessibilityLabel": "Prise RJ45"
        },
        "children": [
         {
@@ -3924,7 +3930,8 @@
         "fill": {
          "type": 0,
          "payload": 4278190080
-        }
+        },
+        "accessibilityLabel": "Prise TV"
        },
        "children": [
         {

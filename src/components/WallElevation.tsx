@@ -575,7 +575,7 @@ export function WallElevation({
   if (!wall || !face) {
     return (
       <View style={styles.sheet}>
-        <Text style={styles.title}>Ce mur n'existe plus</Text>
+        <Text style={styles.title}>Ce mur n’existe plus</Text>
         <TouchableOpacity style={styles.ghost} onPress={onClose}>
           <Text style={styles.ghostText}>Fermer</Text>
         </TouchableOpacity>
@@ -1742,7 +1742,9 @@ export function WallElevation({
             <View style={styles.bilanTextes}>
               <Text style={styles.bilanTitre} numberOfLines={1}>
                 {objectif
-                  ? `${objectif.nom} · ${objectif.poses}/${objectif.exiges} socles`
+                  ? `${objectif.nom} · ${objectif.poses}/${objectif.exiges} socle${
+              objectif.exiges > 1 ? 's' : ''
+            }`
                   : 'Conformité'}
               </Text>
               {constats.length > 0 && (
