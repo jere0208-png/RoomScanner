@@ -10,13 +10,39 @@
  * qu'on est justement en train de regarder.
  */
 import React from 'react';
-import { Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
 
 export interface StripAction {
   label: string;
   onPress: () => void;
   /** Second rôle : contour discret plutôt qu'aplat plein. */
   ghost?: boolean;
+  /**
+   * Le crayon devant le mot : il dit « ça s'édite » là où le mot seul ne
+   * suffit pas — « Mesures » sans lui se lirait comme une simple lecture.
+   */
+  crayon?: boolean;
+}
+
+/**
+ * Le crayon, TRACÉ dans la main du jeu d'icônes — bouts ronds, 2,4
+ * d'épaisseur. Un caractère « ✏️ » serait un emoji couleur qui ignore la
+ * teinte du bouton : la leçon du soleil du thème.
+ */
+function Crayon({ teinte }: { teinte: string }) {
+  return (
+    <Svg width={13} height={13} viewBox="0 0 24 24">
+      <Path
+        d="M16.6 3.9a2.15 2.15 0 0 1 3.5 2.4 2.15 2.15 0 0 1-.5.7L7.9 18.7 3.4 20l1.3-4.5L16.4 3.8"
+        stroke={teinte}
+        strokeWidth={2.4}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+    </Svg>
+  );
 }
 
 export function StripBar({
@@ -52,18 +78,33 @@ export function StripBar({
       <Text style={styles.wallStripText} numberOfLines={1}>
         {`  ·  ${note}`}
       </Text>
-      {actions.map((a) => (
-        <TouchableOpacity
-          key={a.label}
-          style={a.ghost ? styles.wallStripGhost : styles.wallStripAction}
-          accessibilityLabel={a.label}
-          onPress={a.onPress}>
-          <Text
-            style={a.ghost ? styles.wallStripGhostText : styles.wallStripActionText}>
-            {a.label}
-          </Text>
-        </TouchableOpacity>
-      ))}
+      {actions.map((a) => {
+        const texte = a.ghost
+          ? styles.wallStripGhostText
+          : styles.wallStripActionText;
+        // Le crayon prend la couleur du mot qu'il précède : un seul style
+        // à changer si le bouton change de peau.
+        const teinte =
+          (StyleSheet.flatten(texte) as { color?: string })?.color ??
+          '#FFFFFF';
+        return (
+          <TouchableOpacity
+            key={a.label}
+            style={[
+              a.ghost ? styles.wallStripGhost : styles.wallStripAction,
+              a.crayon && stylesLocaux.avecCrayon,
+            ]}
+            accessibilityLabel={a.label}
+            onPress={a.onPress}>
+            {a.crayon && <Crayon teinte={teinte} />}
+            <Text style={texte}>{a.label}</Text>
+          </TouchableOpacity>
+        );
+      })}
     </View>
   );
 }
+
+const stylesLocaux = StyleSheet.create({
+  avecCrayon: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+});

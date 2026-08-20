@@ -76,6 +76,12 @@ import { CardinalRing, NorthBadge } from './CardinalRing';
  */
 const VIDE: Fixture[] = [];
 
+/**
+ * L'encombrement du menu du mur — partagé avec le banc, qui prouve mur par
+ * mur que la poignée de rotation ne le chevauche jamais.
+ */
+export const WALL_MENU = { w: 204, h: 46 };
+
 const WALL_ACTIONS: {
   action: 'longueur' | 'ouverture' | 'electricite' | 'supprimer';
   label: string | null;
@@ -2012,20 +2018,52 @@ export function FloorplanEditor({
               const ctr = partOf.get(roomOf(w))?.labelAt;
               const c2 = ctr ? mapping.toPx(ctr) : { x: layout.w / 2, y: layout.h / 2 };
               // Vers l'intérieur de la pièce : c'est là qu'on a de la place.
+              let flip: 1 | -1 = 1;
               if (nx * (c2.x - mid.x) + ny * (c2.y - mid.y) < 0) {
                 nx = -nx;
                 ny = -ny;
+                flip = -1;
               }
-              const gap = 54;
+              /*
+                LE MENU S'ÉCARTE ASSEZ POUR NE JAMAIS TOUCHER LA POIGNÉE.
+
+                La barre est LARGE : le long d'un mur vertical, son centre
+                décalé de cinquante-quatre points laisse encore une
+                demi-barre de l'AUTRE côté du mur — précisément là où la
+                poignée de rotation se pose, à la même hauteur. L'écart se
+                calcule donc sur l'encombrement RÉEL de la barre projeté
+                sur la direction du décalage (demi-largeur pour un mur
+                vertical, demi-hauteur pour un horizontal), et contre la
+                position VRAIMENT occupée par la poignée — celle que la
+                borne du cadre a pu rappeler vers le mur —, rayon dix-sept,
+                marge six.
+              */
+              const demiBarre =
+                Math.abs(nx) * (WALL_MENU.w / 2) +
+                Math.abs(ny) * (WALL_MENU.h / 2);
+              let gap = 54;
+              if (selectedWallId) {
+                const p = poigneeAt(w, mapping, flip === 1 ? -1 : 1, {
+                  w: layout.w,
+                  h: layout.h,
+                });
+                const dPoignee = (p.x - mid.x) * nx + (p.y - mid.y) * ny;
+                gap = Math.max(54, dPoignee + demiBarre + 17 + 6);
+              }
               let bx = mid.x + nx * gap;
               let by = mid.y + ny * gap;
-              // Et jamais hors du cadre : la barre porte quatre commandes,
-              // il lui faut 118 px de part et d'autre de son centre.
-              bx = Math.min(layout.w - 118, Math.max(118, bx));
-              by = Math.min(layout.h - 46, Math.max(46, by));
+              // Et jamais hors du cadre : l'encombrement est celui que le
+              // banc connaît (WALL_MENU), une seule vérité pour les deux.
+              const demiW = WALL_MENU.w / 2 + 4;
+              const demiH = WALL_MENU.h / 2 + 4;
+              bx = Math.min(layout.w - demiW, Math.max(demiW, bx));
+              by = Math.min(layout.h - demiH, Math.max(demiH, by));
               return (
                 <View
-                  style={[styles.wallActions, { left: bx - 114, top: by - 26 }]}
+                  style={[
+                    styles.wallActions,
+                    { left: bx - WALL_MENU.w / 2, top: by - WALL_MENU.h / 2 },
+                  ]}
                   pointerEvents="box-none">
                   {WALL_ACTIONS.map(({ action, label, paths }) => {
                     const teinte = action === 'supprimer' ? c.danger : c.ink;
@@ -2035,7 +2073,7 @@ export function FloorplanEditor({
                         style={styles.wallAction}
                         accessibilityLabel={label ?? action}
                         onPress={() => onWallAction(action, w.id)}>
-                        <Svg width={21} height={21} viewBox="0 0 24 24">
+                        <Svg width={19} height={19} viewBox="0 0 24 24">
                           {paths.map((seg, i) => (
                             <Path
                               key={i}
@@ -2091,10 +2129,41 @@ export function FloorplanEditor({
             (() => {
               const w = walls.find((x) => x.id === selectedWallId);
               if (!w) return null;
+              /*
+                LA POIGNÉE PREND LE CÔTÉ OPPOSÉ AU MENU.
+
+                Les deux se posent perpendiculairement au milieu du mur — le
+                menu du côté de la pièce, et la poignée, avant, d'un côté
+                FIXE : dès que ces deux côtés coïncidaient, quatorze points
+                les séparaient et le rond bleu se posait SUR la barre
+                (capture du chantier). Le côté de la pièce appartient au
+                menu — c'est là qu'on lit ; la poignée, qui est un geste,
+                prend l'autre flanc. Ils ne peuvent plus se toucher, par
+                construction, et le banc le prouve mur par mur.
+              */
+              const a2 = mapping.toPx(w.a);
+              const b2 = mapping.toPx(w.b);
+              const mid = { x: (a2.x + b2.x) / 2, y: (a2.y + b2.y) / 2 };
+              const ctr = partOf.get(roomOf(w))?.labelAt;
+              const cc = ctr
+                ? mapping.toPx(ctr)
+                : { x: layout.w / 2, y: layout.h / 2 };
+              const versPiece =
+                -(b2.y - a2.y) * (cc.x - mid.x) +
+                  (b2.x - a2.x) * (cc.y - mid.y) >=
+                0
+                  ? 1
+                  : -1;
+              const sens: 1 | -1 = versPiece === 1 ? -1 : 1;
               return (
                 <React.Fragment key={`mur-${w.id}`}>
                   <WallMoveHandle wall={w} mapping={mapping} />
-                  <WallRotateHandle wall={w} mapping={mapping} />
+                  <WallRotateHandle
+                    wall={w}
+                    mapping={mapping}
+                    sens={sens}
+                    borne={{ w: layout.w, h: layout.h }}
+                  />
                 </React.Fragment>
               );
             })()}
@@ -2727,15 +2796,21 @@ function WallMoveHandle({
 function WallRotateHandle({
   wall,
   mapping,
+  /** Le côté du mur où se poser : toujours l'OPPOSÉ du menu. */
+  sens = 1,
+  /** Le cadre du plan : une poignée hors écran est un geste introuvable. */
+  borne,
 }: {
   wall: WallSeg;
   mapping: EffMapping;
+  sens?: 1 | -1;
+  borne?: { w: number; h: number };
 }) {
   const c = useTheme();
   const styles = getStyles(c);
   const [angle, setAngle] = useState<number | null>(null);
-  const vif = useRef({ wall, mapping });
-  vif.current = { wall, mapping };
+  const vif = useRef({ wall, mapping, sens, borne });
+  vif.current = { wall, mapping, sens, borne };
   /** L'état du geste : d'où part le doigt, et ce qu'on a déjà tourné. */
   const geste = useRef({ x: 0, y: 0, mx: 0, my: 0, a0: 0, cumul: 0 });
   const pan = useMemo(
@@ -2751,7 +2826,7 @@ function WallRotateHandle({
             x: (w.a.x + w.b.x) / 2,
             z: (w.a.z + w.b.z) / 2,
           });
-          const p = poigneeAt(w, m);
+          const p = poigneeAt(w, m, vif.current.sens, vif.current.borne);
           geste.current = {
             x: p.x,
             y: p.y,
@@ -2791,7 +2866,7 @@ function WallRotateHandle({
       }),
     [],
   );
-  const at = poigneeAt(wall, mapping);
+  const at = poigneeAt(wall, mapping, sens, borne);
   return (
     <>
       <View
@@ -2831,22 +2906,34 @@ function angleDe(w: WallSeg): number {
 }
 
 /**
- * Où se pose la poignée : à quarante points du milieu, PERPENDICULAIREMENT.
+ * Où se pose la poignée : à quarante points du milieu, PERPENDICULAIREMENT,
+ * du côté que `sens` désigne — l'appelant lui donne l'OPPOSÉ du menu.
  *
  * Dans le prolongement du bout, sur un mur qui traverse l'écran, elle
  * finissait dans un coin — parfois hors du cadre, et le geste devenait
  * introuvable. Au milieu, elle est toujours à côté de ce qu'elle fait
- * tourner.
+ * tourner. Et `borne` la retient au cadre : côté extérieur d'un mur de
+ * façade, elle pourrait sinon sortir de l'écran.
  */
-function poigneeAt(w: WallSeg, m: EffMapping): { x: number; y: number } {
+function poigneeAt(
+  w: WallSeg,
+  m: EffMapping,
+  sens: 1 | -1 = 1,
+  borne?: { w: number; h: number },
+): { x: number; y: number } {
   const a = m.toPx(w.a);
   const b = m.toPx(w.b);
   const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
   const l = Math.hypot(b.x - a.x, b.y - a.y) || 1;
-  return {
-    x: mid.x + (-(b.y - a.y) / l) * 40,
-    y: mid.y + ((b.x - a.x) / l) * 40,
+  const p = {
+    x: mid.x + (-(b.y - a.y) / l) * 40 * sens,
+    y: mid.y + ((b.x - a.x) / l) * 40 * sens,
   };
+  if (borne) {
+    p.x = Math.min(borne.w - 21, Math.max(21, p.x));
+    p.y = Math.min(borne.h - 21, Math.max(21, p.y));
+  }
+  return p;
 }
 
 function CornerHandle({
@@ -3018,30 +3105,39 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   },
   rotBadgeText: { color: '#FFFFFF', fontSize: 12, fontWeight: '800' },
   // Commandes du mur sélectionné : posées à côté de lui, jamais dessus.
+  /*
+    UNE PILULE, PAS UNE DALLE — relevé du patron : « trop imposant et
+    vieillot ». Trois retouches qui se comptent : les colonnes perdent sept
+    points (la barre, un quart de sa largeur), le rayon passe à la pilule,
+    et un filet d'un cheveu la pose sur le plan — le contour des cartes de
+    l'app, à la place d'une ombre qui portait seule tout le relief.
+  */
   wallActions: {
     position: 'absolute',
     flexDirection: 'row',
     backgroundColor: c.surface,
-    borderRadius: radius.md,
-    paddingHorizontal: 4,
-    paddingVertical: 6,
+    borderRadius: radius.pill,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: c.line,
+    paddingHorizontal: 6,
+    paddingVertical: 5,
     ...shadowCard,
-    shadowOpacity: 0.14,
+    shadowOpacity: 0.09,
   },
   // Quatre colonnes de même largeur : la barre ne s'étire plus au gré de la
   // longueur des mots.
   wallAction: {
-    width: 55,
+    width: 48,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 2,
   },
   wallActionText: {
     color: c.ink,
-    fontSize: 9,
-    fontWeight: '700',
-    marginTop: 3,
-    opacity: 0.45,
+    fontSize: 8.5,
+    fontWeight: '600',
+    marginTop: 2,
+    opacity: 0.5,
   },
   // Hors de l'emprise et en retrait : une croix rouge posée SUR le meuble
   // se lit comme une partie de lui, et se touche par accident.

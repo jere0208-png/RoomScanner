@@ -2357,14 +2357,19 @@ export function ResultScreen() {
             strong={`${fr(segLength(selectedWall), 2)} m`}
             note={`${fr(selectedWall.height, 2)} m sous plafond`}
             actions={[
+              /*
+                UN SEUL GESTE : « MESURES », AVEC SON CRAYON.
+
+                « Coter » était du jargon de dessinateur — relevé du patron :
+                « tout le monde ne comprend pas facilement » — et « Hauteur »
+                un second bouton pour une retouche rare. La hauteur d'un mur
+                reste réglable par la pièce (barre du sol) et par le retour
+                d'un mur percé.
+              */
               {
-                label: 'Coter',
-                ghost: true,
+                label: 'Mesures',
+                crayon: true,
                 onPress: () => promptLength(selectedWall.id),
-              },
-              {
-                label: 'Hauteur',
-                onPress: () => promptWallHeight(selectedWall.id),
               },
             ]}
           />

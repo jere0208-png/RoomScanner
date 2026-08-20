@@ -37,9 +37,11 @@ jest.mock('../src/native/account', () => ({
 }));
 
 import React from 'react';
-import { Text, TextInput } from 'react-native';
+import { StyleSheet, Text, TextInput, type ViewStyle } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
+import { LinearGradient, Mask, Stop, Text as SvgText } from 'react-native-svg';
 import { PaywallScreen } from '../src/screens/PaywallScreen';
+import { BadgePro } from '../src/components/BadgePro';
 import { EssaiEpuise } from '../src/components/EssaiEpuise';
 import { SignInScreen } from '../src/screens/SignInScreen';
 import { HomeScreen } from '../src/screens/HomeScreen';
@@ -126,6 +128,94 @@ describe('la page Pro', () => {
       bouton(t, 'Appliquer le code').props.onPress();
     });
     expect(useAccountStore.getState().pro).toBe(false);
+  });
+});
+
+/*
+ * LE BADGE PRO — blanc, cerné et lettré d'un or qui respire.
+ *
+ * L'ancien badge était un bloc noir à texte jaune : un aplat, posé sur la
+ * seule carte qu'on vend. Le nouveau est BLANC, et une même bande d'ors
+ * glisse derrière lui : elle se voit dans le contour et dans les lettres —
+ * un couvercle blanc troué au masque en forme de « PRO » —, si bien que les
+ * deux respirent ensemble, par construction. Le dégradé est LONG (plusieurs
+ * badges de large) : à tout instant il est presque uni, et c'est le
+ * mouvement qu'on sent, pas les couleurs qu'on compte.
+ */
+describe('le badge Pro', () => {
+  const leBadge = () => monter(<PaywallScreen />).root.findByType(BadgePro);
+
+  it('est blanc — plus aucun bloc noir sur la page', () => {
+    const t = monter(<PaywallScreen />);
+    expect(t.root.findAllByType(BadgePro)).toHaveLength(1);
+    const noirs = t.root.findAll((n) => {
+      const st = StyleSheet.flatten(n.props.style) as ViewStyle | undefined;
+      return st?.backgroundColor === '#0B0D12';
+    });
+    expect(noirs).toHaveLength(0);
+    // Le couvercle du badge est blanc : c'est lui, le bloc arrière.
+    const badge = t.root.findByType(BadgePro);
+    expect(
+      badge.findAll((n) => n.props.fill === '#FFFFFF').length,
+    ).toBeGreaterThan(0);
+  });
+
+  it('une VUE glisse, au pilote natif — la leçon du ruban', () => {
+    // Le pilote natif ignore les attributs d'un dessin : seule une
+    // transformation animée sur une vue garantit le mouvement.
+    const animees = leBadge().findAll((n) => {
+      const st = StyleSheet.flatten(n.props.style) as ViewStyle | undefined;
+      if (!st || !Array.isArray(st.transform)) return false;
+      const tx = (st.transform as Record<string, unknown>[]).find(
+        (x) => 'translateX' in x,
+      );
+      return !!tx && typeof tx.translateX === 'object';
+    });
+    expect(animees.length).toBeGreaterThan(0);
+  });
+
+  it('le dégradé est long, monotone, et boucle sans couture', () => {
+    const badge = leBadge();
+    const stops = badge
+      .findAllByType(Stop)
+      .map((n) => String(n.props.stopColor));
+    expect(stops.length).toBeGreaterThanOrEqual(3);
+    // La couture : la bande se répète — dernier arrêt = premier, sinon la
+    // boucle saute d'une couleur à chaque tour.
+    expect(stops[0]).toBe(stops[stops.length - 1]);
+    // Monotone : une seule famille chaude (R > V > B sur chaque arrêt) —
+    // pas une teinte étrangère qui ferait arc-en-ciel.
+    for (const teinte of stops) {
+      const [r, v, b] = [1, 3, 5].map((i) =>
+        parseInt(teinte.slice(i, i + 2), 16),
+      );
+      expect({ teinte, chaud: r > v && v > b }).toEqual({
+        teinte,
+        chaud: true,
+      });
+    }
+    // Long : la bande qui glisse fait plusieurs badges de large — c'est ce
+    // qui rend le dégradé presque uni à tout instant.
+    const bandes = badge.findAll((n) => {
+      const st = StyleSheet.flatten(n.props.style) as ViewStyle | undefined;
+      return typeof st?.width === 'number' && st.width >= 138;
+    });
+    expect(bandes.length).toBeGreaterThan(0);
+  });
+
+  it('les lettres et le contour boivent au même dégradé', () => {
+    const badge = leBadge();
+    // UNE seule définition de dégradé : contour et lettres ne peuvent pas
+    // diverger, c'est la construction qui le garantit.
+    expect(badge.findAllByType(LinearGradient)).toHaveLength(1);
+    const masques = badge.findAllByType(Mask);
+    expect(masques).toHaveLength(1);
+    const lettres = masques[0].findAllByType(SvgText);
+    expect(lettres).toHaveLength(1);
+    expect(lettres[0].props.children).toBe('PRO');
+    // Le noir du masque, c'est la trouée : les lettres laissent voir la
+    // bande qui glisse dessous.
+    expect(lettres[0].props.fill).toBe('#000000');
   });
 });
 

@@ -25,12 +25,14 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 
 import React from 'react';
 import {
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { PILL_CELL_H } from '../src/components/ToolPill';
+import { WALL_MENU } from '../src/components/FloorplanEditor';
 import { Circle, Path, Polygon, Text as SvgText } from 'react-native-svg';
 import TestRenderer, { act } from 'react-test-renderer';
 import { ResultScreen } from '../src/screens/ResultScreen';
@@ -47,7 +49,7 @@ import {
   SNAPSHOT_WALLS,
 } from '../src/export/snapshotFixture';
 
-import { castToWall, planFrameAngle } from '../src/geometry/floorplan';
+import { castToWall, planFrameAngle, segLength } from '../src/geometry/floorplan';
 
 import type { CeilingFixture } from '../src/geometry/ceiling';
 
@@ -307,23 +309,37 @@ describe('l’écran des résultats', () => {
     const vu = textes(tree);
     expect(vu).toContain('Élec');
     expect(vu).toContain('Supprimer');
-    // Et le bandeau du bas donne ses cotes, avec de quoi les changer.
+    /*
+      UN SEUL GESTE POUR LES COTES : « MESURES », AVEC SON CRAYON.
+
+      « Coter » était du jargon de dessinateur — relevé du patron : « tout
+      le monde ne comprend pas facilement » — et « Hauteur » un second
+      bouton pour une retouche rare. Le bandeau n'offre plus qu'un mot que
+      tout le monde lit, et le crayon dit « ça s'édite ». La hauteur d'un
+      mur reste réglable ailleurs : par la pièce (barre du sol), et par le
+      retour d'un mur percé.
+    */
     expect(vu).toContain('sous plafond');
-    expect(vu).toContain('Coter');
-    // La hauteur se règle ICI, mur par mur : une retombée de poutre ou un
-    // muret n'a pas la hauteur de la pièce, et c'est elle qui commande le
-    // métré du mur.
-    expect(vu).toContain('Hauteur');
+    expect(vu).toContain('Mesures');
+    expect(vu).not.toContain('Coter');
+    expect(vu).not.toContain('Hauteur');
+    // Le crayon est un TRACÉ, pas un caractère — la leçon du chevron.
+    const mesures = bouton(tree, 'Mesures');
+    expect(
+      mesures!.findAll((x) => typeof x.props?.d === 'string').length,
+    ).toBeGreaterThan(0);
   });
 
   /**
-   * LA HAUTEUR SE SAISIT, ET ELLE S'APPLIQUE AU MUR TOUCHÉ.
+   * « MESURES » SAISIT LA LONGUEUR, ET L'APPLIQUE AU MUR TOUCHÉ.
    *
    * Le bouton pourrait ouvrir la bonne fenêtre et régler le mauvais mur —
    * c'est exactement le genre de défaut qu'une relecture ne voit pas. On va
-   * donc jusqu'au bout : on répond, et on regarde le magasin.
+   * donc jusqu'au bout : on répond, et on regarde le magasin. On ne compte
+   * pas les murs qui changent : allonger un mur DÉPLACE son extrémité, et
+   * les murs soudés suivent — c'est la règle du coin tiré à la main.
    */
-  it('applique la hauteur saisie au mur choisi, et à lui seul', () => {
+  it('applique la longueur saisie au mur choisi', () => {
     const tree = monter();
     act(() => bouton(tree, 'Édition')!.props.onPress());
     act(() => {
@@ -333,11 +349,13 @@ describe('l’écran des résultats', () => {
       .findAll((n) => typeof n.props?.onPress === 'function')
       .find((n) => n.findAll((x) => x.props?.strokeWidth === 30).length > 0);
     act(() => cible!.props.onPress());
-    const avant = useScanStore.getState().walls.map((w) => w.height);
-    act(() => bouton(tree, 'Hauteur')!.props.onPress());
+    const longueurs = () =>
+      useScanStore.getState().walls.map((w) => segLength(w));
+    expect(longueurs().some((L) => Math.abs(L - 3.33) < 0.005)).toBe(false);
+    act(() => bouton(tree, 'Mesures')!.props.onPress());
     const champ = tree.root.findAllByType(TextInput)[0];
     expect(champ).toBeDefined();
-    act(() => champ.props.onChangeText('2,15'));
+    act(() => champ.props.onChangeText('3,33'));
     // Le bouton de validation est un `Pressable`, que `findAllByType` ne
     // retrouve pas dans cette version de React Native : on le cherche par
     // ce qu'il porte.
@@ -352,10 +370,120 @@ describe('l’écran des résultats', () => {
     act(() => {
       jest.advanceTimersByTime(600);
     });
-    const apres = useScanStore.getState().walls.map((w) => w.height);
-    const changes = apres.filter((h, i) => Math.abs(h - avant[i]) > 1e-6);
-    expect(changes).toHaveLength(1);
-    expect(changes[0]).toBeCloseTo(2.15);
+    expect(longueurs().some((L) => Math.abs(L - 3.33) < 0.005)).toBe(true);
+  });
+
+  /**
+   * LA POIGNÉE DE ROTATION NE SE POSE JAMAIS SUR LE MENU DU MUR.
+   *
+   * Relevé du patron, capture à l'appui : le rond bleu de rotation
+   * chevauchait la barre des quatre gestes. Les deux se posaient
+   * perpendiculairement au milieu du mur — le menu du côté de la pièce, la
+   * poignée d'un côté FIXE : dès que ces deux côtés coïncidaient, quatorze
+   * points les séparaient et ils se marchaient dessus. La poignée prend
+   * maintenant TOUJOURS le côté opposé au menu. On le prouve mur par mur,
+   * sur tout le logement de référence.
+   */
+  it('ne pose jamais la poignée de rotation sur le menu du mur', () => {
+    const tree = monter();
+    act(() => bouton(tree, 'Édition')!.props.onPress());
+    act(() => {
+      jest.advanceTimersByTime(500);
+    });
+    const prises = () =>
+      tree.root
+        .findAll((n) => typeof n.props?.onPress === 'function')
+        .filter(
+          (n) => n.findAll((x) => x.props?.strokeWidth === 30).length > 0,
+        );
+    const nb = prises().length;
+    expect(nb).toBeGreaterThan(3);
+    let verifies = 0;
+    for (let i = 0; i < nb; i++) {
+      act(() => prises()[i].props.onPress());
+      // Un appui bref sur un mur percé prend le RETOUR : pas de poignée,
+      // donc pas de collision possible — on ne juge que les murs entiers.
+      const poignee = tree.root
+        .findAll((n) => n.props?.accessibilityLabel === 'Tourner le mur')
+        .pop();
+      if (!poignee) continue;
+      const menu = tree.root
+        .findAll((n) => {
+          const st = StyleSheet.flatten(n.props?.style) as
+            | { left?: number; top?: number }
+            | undefined;
+          if (typeof st?.left !== 'number' || typeof st?.top !== 'number') {
+            return false;
+          }
+          return (
+            n.findAll((x) => x.props?.accessibilityLabel === 'Élec').length > 0
+          );
+        })
+        .pop();
+      expect(menu).toBeDefined();
+      const m = StyleSheet.flatten(menu!.props.style) as {
+        left: number;
+        top: number;
+      };
+      const p = StyleSheet.flatten(poignee.props.style) as {
+        left: number;
+        top: number;
+      };
+      const chevauche =
+        p.left < m.left + WALL_MENU.w &&
+        p.left + 34 > m.left &&
+        p.top < m.top + WALL_MENU.h &&
+        p.top + 34 > m.top;
+      expect({ mur: i, chevauche }).toEqual({ mur: i, chevauche: false });
+      verifies++;
+    }
+    // Au moins un mur entier a bien été jugé, sinon le banc ne prouve rien.
+    expect(verifies).toBeGreaterThan(0);
+  });
+
+  /**
+   * LE MENU DU MUR S'EST ALLÉGÉ.
+   *
+   * Relevé du patron : « trop imposant et vieillot ». Ce qui se compte :
+   * des colonnes plus étroites (la barre perd un quart de sa largeur), une
+   * pilule au lieu d'un rectangle mou, et un filet d'un cheveu qui la pose
+   * sur le plan — le contour moderne, celui des cartes de l'app.
+   */
+  it('porte un menu de mur en pilule, étroit et cerné d’un filet', () => {
+    const tree = monter();
+    act(() => bouton(tree, 'Édition')!.props.onPress());
+    act(() => {
+      jest.advanceTimersByTime(500);
+    });
+    const prise = tree.root
+      .findAll((n) => typeof n.props?.onPress === 'function')
+      .find((n) => n.findAll((x) => x.props?.strokeWidth === 30).length > 0);
+    act(() => prise!.props.onPress());
+    const menu = tree.root
+      .findAll((n) => {
+        const st = StyleSheet.flatten(n.props?.style) as
+          | { left?: number }
+          | undefined;
+        return (
+          typeof st?.left === 'number' &&
+          n.findAll((x) => x.props?.accessibilityLabel === 'Élec').length > 0
+        );
+      })
+      .pop();
+    const st = StyleSheet.flatten(menu!.props.style) as {
+      borderRadius?: number;
+      borderWidth?: number;
+    };
+    expect(WALL_MENU.w).toBeLessThanOrEqual(210);
+    expect(st.borderRadius).toBeGreaterThanOrEqual(18);
+    expect(st.borderWidth).toBeLessThanOrEqual(StyleSheet.hairlineWidth);
+    // Et les colonnes se sont resserrées avec elle.
+    const colonne = StyleSheet.flatten(
+      tree.root
+        .findAll((n) => n.props?.accessibilityLabel === 'Élec')
+        .pop()!.props.style,
+    ) as { width?: number };
+    expect(colonne.width).toBeLessThanOrEqual(50);
   });
 
   /**

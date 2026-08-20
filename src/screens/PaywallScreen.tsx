@@ -23,6 +23,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BadgePro } from '../components/BadgePro';
 import { PRIX_PRO, useAccountStore } from '../store/accountStore';
 import { useTheme, type Palette } from '../theme';
 
@@ -96,9 +97,9 @@ export function PaywallScreen() {
             ))}
           </View>
           <View style={[s.carte, s.cartePro]}>
-            <View style={s.badge}>
-              <Text style={s.badgeTexte}>PRO</Text>
-            </View>
+            {/* Le badge respire tout seul : blanc, contour et lettres d'or
+                nourris par la même bande qui glisse (voir BadgePro). */}
+            <BadgePro style={s.badge} />
             <Text style={[s.carteTitre, s.surBleu]}>Pro</Text>
             <Text style={[s.cartePrix, s.surBleu]}>
               {PRIX_PRO}
@@ -186,16 +187,8 @@ const themed = (c: Palette) =>
       borderColor: c.lineStrong,
     },
     cartePro: { backgroundColor: c.blue },
-    badge: {
-      position: 'absolute',
-      top: -10,
-      right: 12,
-      backgroundColor: '#0B0D12',
-      borderRadius: 8,
-      paddingHorizontal: 8,
-      paddingVertical: 3,
-    },
-    badgeTexte: { color: '#FFD84D', fontSize: 11, fontWeight: '800' },
+    // La place du badge sur la carte ; sa peau (blanc, or animé) est à lui.
+    badge: { position: 'absolute', top: -10, right: 12 },
     carteTitre: { fontSize: 14, fontWeight: '700', color: c.inkSoft },
     cartePrix: { fontSize: 26, fontWeight: '800', color: c.ink, marginBottom: 4 },
     parMois: { fontSize: 13, fontWeight: '600' },

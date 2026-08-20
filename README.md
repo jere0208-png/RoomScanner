@@ -440,18 +440,40 @@ maçonnerie, et le canapé invisible derrière un mur que l'écran, lui, efface.
 ### Sélectionner un mur
 
 Toucher un mur en mode édition **estompe tout le reste du plan** et redessine
-ce mur par-dessus le voile. Ses commandes — coter, ajouter une ouverture,
+ce mur par-dessus le voile. Ses commandes — cotes, ajouter une ouverture,
 électricité, supprimer — viennent se poser **à côté de lui**, décalées vers
-l'intérieur de la pièce et bornées au cadre : jamais sur le mur, jamais hors
-de l'écran.
+l'intérieur de la pièce et bornées au cadre : jamais hors de l'écran.
+
+**Le menu est une pilule, et la poignée de rotation prend l'autre flanc.**
+Relevé du patron, capture à l'appui : le rond bleu de rotation se posait SUR
+la barre des quatre gestes. Les deux se plaçaient perpendiculairement au
+milieu du mur — le menu du côté de la pièce, la poignée d'un côté FIXE : dès
+que ces côtés coïncidaient, quatorze points les séparaient. Le côté de la
+pièce appartient au menu — c'est là qu'on lit ; la poignée, qui est un
+geste, prend TOUJOURS l'autre flanc, bornée au cadre. Et parce que la barre
+est large, son écart au mur se calcule sur son encombrement RÉEL projeté
+sur la direction du décalage — le long d'un mur vertical, un écart fixe
+laissait une demi-barre de l'autre côté, précisément sur la poignée — et
+contre la position vraiment occupée par celle-ci, que la borne du cadre a
+pu rappeler vers le mur. Le banc le prouve mur par mur, sur tout le
+logement de référence. Le menu lui-même s'est allégé — « trop imposant et
+vieillot » : colonnes resserrées d'un quart, rayon de pilule, filet d'un
+cheveu comme les cartes de l'app, ombre adoucie.
 
 Ce qu'il mesure tient en **une ligne au pied du plan** : « 3,93 m · 2,50 m
-sous plafond », et deux boutons — « Coter » et « Hauteur ». Le champ de saisie posé à demeure
-coûtait une barre entière — étiquette, saisie, unité, bouton d'application —
-pour un geste qu'on fait rarement, et il mangeait le dessin qu'on est
-justement en train de regarder. La question se pose maintenant à l'écran, le
-temps d'y répondre. Au passage, plus de clavier qui remonte par-dessus la
-barre : c'est ce défaut-là qui l'avait déjà fait déménager une fois.
+sous plafond », et UN bouton — « Mesures », précédé d'un crayon. Il s'est
+appelé « Coter », du jargon de dessinateur — relevé du patron : « tout le
+monde ne comprend pas facilement » — et un second bouton « Hauteur »
+doublait la rangée pour une retouche rare : la hauteur reste réglable par
+la pièce (barre du sol) et par le retour d'un mur percé. Le crayon est un
+tracé dans la main du jeu d'icônes, pas un caractère — un « ✏️ » serait un
+emoji couleur qui ignore la teinte du bouton, la leçon du soleil du thème.
+Le champ de saisie posé à demeure coûtait une barre entière — étiquette,
+saisie, unité, bouton d'application — pour un geste qu'on fait rarement, et
+il mangeait le dessin qu'on est justement en train de regarder. La question
+se pose maintenant à l'écran, le temps d'y répondre. Au passage, plus de
+clavier qui remonte par-dessus la barre : c'est ce défaut-là qui l'avait
+déjà fait déménager une fois.
 
 **Un mur percé se touche par morceaux.** Sur le chantier, un mur avec une
 baie n'est pas un objet : ce sont deux *retours* de maçonnerie et un vide
@@ -467,9 +489,9 @@ est tenu ; rien de sélectionné, rien à l'écran.
 **Un retour a maintenant son bandeau**, le même que le mur : sa longueur à
 lui, la hauteur du pan qui le porte, et de quoi la régler. Elle n'était
 écrite nulle part, alors que c'est elle qui dit la place qu'on a pour poser
-un interrupteur sur ces trente centimètres. Il n'offre pas « Coter » : coter
-un retour reviendrait à coter le mur entier, ce que la commande « Cotes » du
-menu fait déjà sans mentir sur sa cible.
+un interrupteur sur ces trente centimètres. Il n'offre pas « Mesures » :
+coter un retour reviendrait à coter le mur entier, ce que la commande
+« Cotes » du menu fait déjà sans mentir sur sa cible.
 
 ### La hauteur, mur par mur
 
@@ -726,6 +748,30 @@ l'identité du trousseau mais **garde le compteur de plans** : supprimer puis
 recréer un compte ne rend pas le palier gratuit. C'est aussi cette rangée
 qui offre la seule porte VOLONTAIRE vers la page Pro : sans elle, on ne
 pouvait payer qu'en butant sur la barrière.
+
+### Le badge Pro respire
+
+L'ancien badge était un bloc noir à texte jaune : un aplat, posé sur la
+seule carte qu'on vend. Le nouveau est **blanc**, et une bande d'ors glisse
+derrière lui, visible à deux endroits seulement : le **contour** du badge et
+les **lettres** « PRO ».
+
+**Une seule bande pour les deux.** Le badge est un sandwich : la bande
+dégradée glisse au fond, et un couvercle blanc se pose dessus — en retrait
+du bord, ce qui laisse le contour, et TROUÉ au masque en forme de « PRO »,
+ce qui laisse les lettres. Contour et lettres ne peuvent pas diverger : ils
+regardent la même bande, par construction, et le banc tient cette unicité
+(une seule définition de dégradé).
+
+**Le dégradé est long, donc discret.** La bande fait quatre badges de large
+pour une seule vague de teintes : à tout instant, ce qu'on en voit est
+presque uni — on sent le mouvement, on ne compte pas les couleurs. Une
+seule famille d'ors, du doré au bronze, et le dernier arrêt rejoint le
+premier : la boucle n'a pas de couture. C'est la leçon du ruban appliquée
+une fois de plus : la bande est dessinée UNE FOIS sur deux périodes, et
+c'est la VUE qui glisse, au pilote natif — le banc tient la transformation
+animée, la famille monotone (rouge > vert > bleu sur chaque arrêt) et la
+couture.
 
 ### Un relevé interrompu ne se perd plus
 
