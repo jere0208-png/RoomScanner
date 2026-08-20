@@ -31,6 +31,7 @@ import {
   roomParts,
   segLength,
   toFootprint,
+  trousDuRelevé,
   northScreenAngle,
   planFrameAngle,
   wallQuads,
@@ -39,6 +40,7 @@ import {
   type ObjectFootprint,
   type Pt,
   type RoomPart,
+  type TrouDeReleve,
   type WallQuad,
   type WallRun,
   type WallSeg,
@@ -255,6 +257,14 @@ interface Props {
   onToggleObjectDims?: () => void;
   /** Appui sur le vide : `null` retire aussi la sélection d'un meuble. */
   onSelectObject?: (id: string | null) => void;
+  /**
+   * COMBLER UN TROU DU RELEVÉ : le mur manquant, et la porte avec.
+   *
+   * Sans ce geste, deux bouts de mur que le scan a laissés séparés ne se
+   * rejoignaient par aucun moyen simple — il fallait deviner où poser un
+   * mur à la main, au pixel près.
+   */
+  onComblerTrou?: (trou: TrouDeReleve) => void;
   /** Ouverture sélectionnée : elle se retaille en largeur et en hauteur. */
   selectedOpeningId?: string | null;
   onSelectOpening?: (id: string | null) => void;
@@ -363,6 +373,7 @@ export function FloorplanEditor({
   selectedOpeningId,
   onSelectOpening,
   onSelectObject,
+  onComblerTrou,
   showObjectDims,
   onToggleObjectDims,
 }: Props) {
@@ -844,6 +855,12 @@ export function FloorplanEditor({
   );
   // Pièces du plan : chacune a son contour, son centre et sa teinte de sol.
   const parts = useMemo(() => roomParts(walls, rooms), [walls, rooms]);
+  /*
+    Les trous du relevé : deux bouts de mur qui se font face sans se
+    toucher. On les cherche à chaque changement de murs — c'est une
+    poignée de comparaisons, et le résultat décide de ce qu'on dessine.
+  */
+  const trous = useMemo(() => trousDuRelevé(walls), [walls]);
 
   /**
    * Le contour à l'écran de la pièce choisie, retenu pour le geste.
@@ -1181,6 +1198,35 @@ export function FloorplanEditor({
                 Une zone invisible par tronçon : c'est le dessin qui répond
                 « lequel », plutôt qu'un calcul de coordonnées sur un plan
                 qu'on peut avoir tourné et zoomé. */}
+            {/*
+              LE TROU QUE LE SCAN A LAISSÉ — montré, et comblé d'un appui.
+
+              Relevé du chantier : « le scan n'a pas su capter une porte, je
+              me suis retrouvé avec deux murs séparés, et impossible de les
+              joindre ». Le manque était invisible : deux bouts de mur qui
+              ne se touchent pas se lisent comme un couloir, pas comme un
+              défaut. Un tireté rouge le désigne, et la pastille le comble.
+            */}
+            {editable &&
+              trous.map((t, i) => {
+                const p0 = mapping.toPx(t.a);
+                const p1 = mapping.toPx(t.b);
+                return (
+                  <Line
+                    key={`trou-${i}`}
+                    x1={p0.x}
+                    y1={p0.y}
+                    x2={p1.x}
+                    y2={p1.y}
+                    stroke={c.danger}
+                    strokeWidth={2.4}
+                    strokeDasharray="5 4"
+                    strokeLinecap="round"
+                    opacity={0.85}
+                  />
+                );
+              })}
+
             {editable &&
               walls.map((w) =>
                 (retours.get(w.id) ?? []).map((run, ri) => {
@@ -2057,6 +2103,45 @@ export function FloorplanEditor({
                 </>
               );
             })()}
+
+          {/*
+            LA PASTILLE QUI REFERME LE PLAN.
+
+            Elle se pose au milieu du manque, et dit sa largeur : on sait ce
+            qu'on va poser avant d'appuyer. Un appui tend le mur — avec la
+            porte, si l'écart en a la taille.
+          */}
+          {editable &&
+            onComblerTrou &&
+            trous.map((t, i) => {
+              const p0 = mapping.toPx(t.a);
+              const p1 = mapping.toPx(t.b);
+              const mx = (p0.x + p1.x) / 2;
+              const my = (p0.y + p1.y) / 2;
+              return (
+                <TouchableOpacity
+                  key={`combler-${i}`}
+                  style={[styles.trouPastille, { left: mx - 17, top: my - 17 }]}
+                  accessibilityLabel={`Combler le trou de ${Math.round(
+                    t.ecart * 100,
+                  )} cm`}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  onPress={() => onComblerTrou(t)}>
+                  <Svg width={18} height={18} viewBox="0 0 24 24">
+                    {['M12 5 v14', 'M5 12 h14'].map((dd) => (
+                      <Path
+                        key={dd}
+                        d={dd}
+                        stroke="#FFFFFF"
+                        strokeWidth={2.6}
+                        strokeLinecap="round"
+                        fill="none"
+                      />
+                    ))}
+                  </Svg>
+                </TouchableOpacity>
+              );
+            })}
 
           {/*
             Mur ou RETOUR sélectionné : les commandes viennent se poser À
@@ -3216,6 +3301,20 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   // se lit comme une partie de lui, et se touche par accident.
   /** Zone de saisie d'une poignée : posée sur le dessin, sans décor. */
   dragZone: { position: 'absolute' as const },
+  /* La pastille qui referme un trou du relevé : rouge comme le manque. */
+  trouPastille: {
+    position: 'absolute',
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: c.danger,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#0B0D12',
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+  },
   objDelete: {
     position: 'absolute',
     opacity: 0.92,

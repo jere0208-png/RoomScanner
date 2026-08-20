@@ -22,6 +22,7 @@ import {
   toFootprint,
   toSegment,
   totalArea,
+  trousDuRelevé,
   wallQuads,
   wallRuns,
   weldCorners,
@@ -1640,5 +1641,63 @@ describe('buildScanPdf', () => {
     // Deux surfaces distinctes, pas une seule agrégée.
     expect(s).toContain('12,0 m');
     expect(s).toContain('9,0 m');
+  });
+});
+
+/**
+ * LE TROU QUE LE SCAN A LAISSÉ.
+ *
+ * Relevé du chantier : « le scan n'a pas su capter une porte, je me suis
+ * retrouvé avec deux murs séparés, et impossible de les joindre ou d'en
+ * créer un facilement ». C'est le défaut de relevé le plus courant — une
+ * porte ouverte, un miroir, un contre-jour — et il laisse un contour
+ * ouvert, donc pas de surface, pas de pièce, pas de métré.
+ *
+ * On cherche donc les BOUTS LIBRES qui se font face : deux extrémités que
+ * rien ne touche, assez proches pour qu'un mur les relie, et à peu près
+ * dans le même axe. Ce sont eux qu'un seul appui doit refermer.
+ */
+describe('les trous du relevé', () => {
+  const mur = (id: string, ax: number, az: number, bx: number, bz: number): WallSeg => ({
+    id,
+    type: 'wall',
+    a: { x: ax, z: az },
+    b: { x: bx, z: bz },
+    height: 2.5,
+    yCenter: 1.25,
+  });
+
+  it('voit la porte manquée entre deux murs alignés', () => {
+    // Un mur de 3 m, une coupure de 90 cm, puis 2 m — la porte manquée.
+    const murs = [mur('a', 0, 0, 3, 0), mur('b', 3.9, 0, 6, 0)];
+    const trous = trousDuRelevé(murs);
+    expect(trous).toHaveLength(1);
+    expect(trous[0].ecart).toBeCloseTo(0.9, 2);
+    expect(trous[0].a).toEqual({ x: 3, z: 0 });
+    expect(trous[0].b).toEqual({ x: 3.9, z: 0 });
+  });
+
+  it('ne voit rien là où les murs se touchent déjà', () => {
+    const murs = [mur('a', 0, 0, 3, 0), mur('b', 3, 0, 6, 0)];
+    expect(trousDuRelevé(murs)).toHaveLength(0);
+  });
+
+  it('ignore deux bouts trop loin l’un de l’autre', () => {
+    // Trois mètres de vide : c'est une pièce qui manque, pas une porte.
+    const murs = [mur('a', 0, 0, 3, 0), mur('b', 6, 0, 9, 0)];
+    expect(trousDuRelevé(murs)).toHaveLength(0);
+  });
+
+  it('refuse de relier un angle : les deux murs doivent se suivre', () => {
+    // Deux murs perpendiculaires dont les bouts sont proches : c'est un
+    // coin à souder, pas un trou à combler — et les relier créerait une
+    // diagonale en travers de la pièce.
+    const murs = [mur('a', 0, 0, 3, 0), mur('b', 3.2, 0.2, 3.2, 3)];
+    expect(trousDuRelevé(murs)).toHaveLength(0);
+  });
+
+  it('ne rend qu’UNE fois le même trou', () => {
+    const murs = [mur('a', 0, 0, 3, 0), mur('b', 3.8, 0, 6, 0)];
+    expect(trousDuRelevé(murs)).toHaveLength(1);
   });
 });

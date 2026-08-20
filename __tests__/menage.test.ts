@@ -232,3 +232,101 @@ describe('annuler la suppression d’un appareil groupe', () => {
     expect(st.fixtures.every((f) => f.group === 'pl-1')).toBe(true);
   });
 });
+
+/**
+ * COMBLER LE TROU D'UN RELEVÉ — d'un seul appui.
+ *
+ * Relevé du chantier : « impossible de les joindre ou d'en créer un
+ * facilement ». Le magasin savait ajouter un mur entre deux points, mais
+ * personne ne pouvait viser ces deux points-là au doigt. Le geste existe
+ * maintenant : il tend le mur d'un bout à l'autre — et si l'écart a la
+ * taille d'une porte, il y POSE la porte que le scan n'a pas vue.
+ */
+describe('combler un trou du relevé', () => {
+  const mur = (id: string, ax: number, az: number, bx: number, bz: number): WallSeg => ({
+    id,
+    type: 'wall',
+    a: { x: ax, z: az },
+    b: { x: bx, z: bz },
+    height: 2.5,
+    yCenter: 1.25,
+  });
+
+  it('tend le mur manquant, et y pose la porte manquée', () => {
+    useScanStore.setState({
+      walls: [mur('a', 0, 0, 3, 0), mur('b', 3.9, 0, 6, 0)],
+      openings: [],
+      rooms: [],
+      objects: [],
+      fixtures: [],
+      ceiling: [],
+      photos: [],
+    });
+    const trou = {
+      a: { x: 3, z: 0 },
+      b: { x: 3.9, z: 0 },
+      wallA: 'a',
+      wallB: 'b',
+      ecart: 0.9,
+    };
+    useScanStore.getState().comblerTrou(trou);
+    const st = useScanStore.getState();
+    expect(st.walls).toHaveLength(3);
+    // Le mur neuf relie exactement les deux bouts.
+    const neuf = st.walls.find((w) => !['a', 'b'].includes(w.id))!;
+    expect(neuf.a).toEqual({ x: 3, z: 0 });
+    expect(neuf.b).toEqual({ x: 3.9, z: 0 });
+    expect(neuf.height).toBeCloseTo(2.5);
+    // Et la porte que le scan n'a pas vue s'y trouve.
+    expect(st.openings).toHaveLength(1);
+    expect(st.openings[0].type).toBe('door');
+  });
+
+  it('sur un petit manque, il ne pose que la maçonnerie', () => {
+    useScanStore.setState({
+      walls: [mur('a', 0, 0, 3, 0), mur('b', 3.3, 0, 6, 0)],
+      openings: [],
+      rooms: [],
+      objects: [],
+      fixtures: [],
+      ceiling: [],
+      photos: [],
+    });
+    useScanStore.getState().comblerTrou({
+      a: { x: 3, z: 0 },
+      b: { x: 3.3, z: 0 },
+      wallA: 'a',
+      wallB: 'b',
+      ecart: 0.3,
+    });
+    const st = useScanStore.getState();
+    expect(st.walls).toHaveLength(3);
+    // Trente centimètres, ce n'est pas une porte : rien à ouvrir.
+    expect(st.openings).toHaveLength(0);
+  });
+
+  it('et l’annulation défait tout d’un coup', () => {
+    useScanStore.setState({
+      walls: [mur('a', 0, 0, 3, 0), mur('b', 3.9, 0, 6, 0)],
+      openings: [],
+      rooms: [],
+      objects: [],
+      fixtures: [],
+      ceiling: [],
+      photos: [],
+    });
+    jest.advanceTimersByTime(2000);
+    useScanStore.getState().comblerTrou({
+      a: { x: 3, z: 0 },
+      b: { x: 3.9, z: 0 },
+      wallA: 'a',
+      wallB: 'b',
+      ecart: 0.9,
+    });
+    jest.advanceTimersByTime(2000);
+    useScanStore.getState().undo();
+    const st = useScanStore.getState();
+    expect(st.walls).toHaveLength(2);
+    expect(st.openings).toHaveLength(0);
+  });
+});

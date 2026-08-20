@@ -1663,6 +1663,93 @@ export function faceIntoRoom(
  *
  * Ne modifie pas les murs reçus : renvoie de nouveaux segments.
  */
+/** Un manque de maçonnerie entre deux bouts de mur qui se font face. */
+export interface TrouDeReleve {
+  /** Le bout libre du premier mur, et celui du second. */
+  a: Pt;
+  b: Pt;
+  wallA: string;
+  wallB: string;
+  /** Largeur du manque, en mètres. */
+  ecart: number;
+}
+
+/**
+ * LES TROUS QUE LE SCAN A LAISSÉS — une porte manquée, presque toujours.
+ *
+ * Relevé du chantier : « le scan n'a pas su capter une porte, je me suis
+ * retrouvé avec deux murs séparés, et impossible de les joindre ou d'en
+ * créer un facilement ». C'est le défaut de relevé le plus courant : une
+ * porte ouverte, un miroir, un contre-jour — et il coûte cher, car un
+ * contour ouvert n'a ni surface, ni pièce, ni métré.
+ *
+ * On cherche les BOUTS LIBRES qui se font face : une extrémité que rien ne
+ * touche, en regard d'une autre, assez proche pour qu'un mur les relie.
+ *
+ * Trois gardes, chacune payée par un cas réel :
+ * - les bouts DÉJÀ soudés ne sont pas des trous (`weldCorners` s'en charge) ;
+ * - au-delà de deux mètres, ce n'est plus une menuiserie manquée mais une
+ *   pièce entière que le scan n'a pas vue : on ne devine pas un mur de
+ *   cette taille ;
+ * - les deux murs doivent SE SUIVRE, pas se croiser : deux murs
+ *   perpendiculaires dont les bouts sont voisins forment un coin, et les
+ *   relier tirerait une diagonale en travers de la pièce.
+ */
+export function trousDuRelevé(
+  walls: WallSeg[],
+  ecartMax = 2,
+  tol = 0.15,
+): TrouDeReleve[] {
+  const pleins = walls.filter((w) => w.type === 'wall' && segLength(w) > 0.1);
+  const bouts: { wall: WallSeg; p: Pt; u: Pt }[] = [];
+  for (const w of pleins) {
+    const l = segLength(w) || 1;
+    const u = { x: (w.b.x - w.a.x) / l, z: (w.b.z - w.a.z) / l };
+    // La direction SORTANTE de chaque bout : celle où le mur continuerait.
+    bouts.push({ wall: w, p: w.a, u: { x: -u.x, z: -u.z } });
+    bouts.push({ wall: w, p: w.b, u });
+  }
+  /** Ce bout touche-t-il déjà un autre mur ? Alors il n'y a rien à combler. */
+  const libre = (b: { wall: WallSeg; p: Pt }) =>
+    !pleins.some(
+      (o) =>
+        o.id !== b.wall.id &&
+        (Math.hypot(o.a.x - b.p.x, o.a.z - b.p.z) < tol ||
+          Math.hypot(o.b.x - b.p.x, o.b.z - b.p.z) < tol ||
+          pointOnSeg(b.p, o.a, o.b).dist < tol),
+    );
+  const out: TrouDeReleve[] = [];
+  const pris = new Set<string>();
+  for (let i = 0; i < bouts.length; i++) {
+    for (let j = i + 1; j < bouts.length; j++) {
+      const A = bouts[i];
+      const B = bouts[j];
+      if (A.wall.id === B.wall.id) continue;
+      const ecart = Math.hypot(B.p.x - A.p.x, B.p.z - A.p.z);
+      if (ecart < tol || ecart > ecartMax) continue;
+      if (!libre(A) || !libre(B)) continue;
+      // Les deux murs se suivent : leurs axes sont parallèles…
+      const ua = A.u;
+      const ub = B.u;
+      if (Math.abs(ua.x * ub.x + ua.z * ub.z) < 0.9) continue;
+      // …et chacun continue VERS l'autre, sinon ils se tournent le dos.
+      const versB = { x: (B.p.x - A.p.x) / ecart, z: (B.p.z - A.p.z) / ecart };
+      if (ua.x * versB.x + ua.z * versB.z < 0.9) continue;
+      const cle = [A.wall.id, B.wall.id].sort().join('|');
+      if (pris.has(cle)) continue;
+      pris.add(cle);
+      out.push({
+        a: { ...A.p },
+        b: { ...B.p },
+        wallA: A.wall.id,
+        wallB: B.wall.id,
+        ecart,
+      });
+    }
+  }
+  return out.sort((x, y) => x.ecart - y.ecart);
+}
+
 export function weldCorners(walls: WallSeg[], tol = 0.15): WallSeg[] {
   const out = walls.map((w) => ({ ...w, a: { ...w.a }, b: { ...w.b } }));
   const points: { wall: WallSeg; end: 'a' | 'b' }[] = [];

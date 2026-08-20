@@ -145,6 +145,41 @@ L'outil « pièces » de la barre du plan relance la détection sur le graphe
 courant, en **gardant les noms donnés à la main** : chaque nouvelle pièce
 hérite du nom de l'ancienne dont le point de cartouche tombe dedans.
 
+### La porte que le scan n'a pas vue
+
+Relevé du chantier, mot pour mot : « le scan n'a pas su capter une porte, je
+me suis retrouvé avec deux murs séparés, et impossible de les joindre ou
+d'en créer un facilement ». C'est le défaut de relevé le plus courant — une
+porte ouverte que la caméra traverse, un miroir, un contre-jour — et il
+coûte cher : un contour ouvert n'a ni surface, ni pièce, ni métré.
+
+**Le manque se voit.** `trousDuRelevé` cherche les BOUTS LIBRES qui se font
+face : une extrémité que rien ne touche, en regard d'une autre, assez proche
+pour qu'un mur les relie. Trois gardes, chacune pour un cas réel : les bouts
+déjà soudés n'en sont pas (c'est le travail de `weldCorners`) ; au-delà de
+deux mètres ce n'est plus une menuiserie manquée mais une pièce que le scan
+n'a pas vue, et l'on ne devine pas un mur de cette taille ; enfin les deux
+murs doivent SE SUIVRE, sinon deux murs perpendiculaires aux bouts voisins
+formeraient un coin, et les relier tirerait une diagonale en travers de la
+pièce. En édition, chaque trou porte un tireté rouge et une pastille.
+
+**Et il se comble d'un appui.** La pastille dit la largeur du manque — on
+sait ce qu'on va poser avant d'appuyer —, tend le mur d'un bout à l'autre,
+et **y pose la porte** si l'écart en a la taille (de 60 cm à 1,30 m). C'est
+le cas neuf fois sur dix : ce n'est pas de la maçonnerie qui manque, c'est
+la menuiserie que la caméra a traversée. Et si l'on s'est trompé, « Fermer »
+la referme d'un appui — le geste existe depuis la vague précédente, la
+boucle est complète. Un seul pas d'historique : une annulation défait le mur
+ET la porte.
+
+**Le geste de créer un mur existe enfin.** Seconde moitié de la phrase du
+patron : « ou d'en créer un facilement ». Et pour cause — le magasin savait
+poser un mur entre deux points (`addWallBetween`) depuis des mois, mais
+**aucun bouton de l'app n'y menait** : du code mort d'un côté, un manque
+criant de l'autre. « Ajouter un mur » vit maintenant dans le menu du scan,
+pose un mètre au centre du plan, et bascule en édition — on le tire ensuite
+par ses coins, et l'aimant le soude à ses voisins comme n'importe quel mur.
+
 ### Ajouter une pièce, la fusionner, la détacher
 
 Trois gestes qui n'en font qu'un, et dont deux ne marchaient pas.

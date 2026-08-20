@@ -44,6 +44,7 @@ import {
   wallQuadsOf,
   wallRuns,
   weldCorners,
+  type TrouDeReleve,
   type Pt,
   type WallSeg,
 } from '../geometry/floorplan';
@@ -628,6 +629,15 @@ interface ScanState {
    * raccroche ; le second se déplace ensuite par sa poignée.
    */
   addWallBetween: (a: Pt, b: Pt) => void;
+  /**
+   * COMBLE UN TROU DU RELEVÉ — le mur manquant, et la porte avec.
+   *
+   * Le défaut de scan le plus courant : une porte ouverte que la caméra
+   * traverse, et le logement sort en deux morceaux. Le geste tend le mur
+   * d'un bout à l'autre et, si l'écart a la taille d'une menuiserie, y
+   * pose la porte que le scan n'a pas vue — le tout en UN pas d'histoire.
+   */
+  comblerTrou: (trou: TrouDeReleve) => void;
   /**
    * AJOUTE UNE PIÈCE RECTANGULAIRE au plan, et rend son identifiant.
    *
@@ -1587,6 +1597,53 @@ export const useScanStore = create<ScanState>((set, get) => {
             yCenter: h / 2,
           },
         ],
+        dirty: true,
+      });
+    },
+
+    comblerTrou: (trou) => {
+      const st = get();
+      const ecart = Math.hypot(trou.b.x - trou.a.x, trou.b.z - trou.a.z);
+      if (ecart < 0.02) return;
+      pushHistory('comblerTrou');
+      const h = st.walls[0]?.height ?? 2.5;
+      const mur: WallSeg = {
+        id: `mur-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        type: 'wall',
+        a: { ...trou.a },
+        b: { ...trou.b },
+        height: h,
+        yCenter: h / 2,
+        // Le morceau neuf appartient à la pièce de ses voisins : sans ça
+        // il flotterait hors de tout, et la surface ne se refermerait pas.
+        roomId: st.walls.find((w) => w.id === trou.wallA)?.roomId,
+      };
+      /*
+        UNE PORTE MANQUÉE RESTE UNE PORTE.
+
+        Entre soixante centimètres et un mètre trente, un trou de relevé
+        n'est pas un défaut de maçonnerie : c'est la menuiserie que la
+        caméra a traversée. On la repose donc, sur toute la largeur du
+        manque — et si l'on s'est trompé, « Fermer » la referme d'un
+        appui, puisque le geste existe.
+      */
+      const porte: WallSeg[] =
+        ecart >= 0.6 && ecart <= 1.3
+          ? [
+              {
+                id: `op-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                type: 'door',
+                roomId: mur.roomId,
+                a: { ...trou.a },
+                b: { ...trou.b },
+                height: Math.min(2.05, h * 0.85),
+                yCenter: Math.min(2.05, h * 0.85) / 2,
+              },
+            ]
+          : [];
+      set({
+        walls: [...st.walls, mur],
+        openings: [...st.openings, ...porte],
         dirty: true,
       });
     },

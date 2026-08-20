@@ -1531,3 +1531,124 @@ describe('le lien mural sur le plan', () => {
     act(() => tree.unmount());
   });
 });
+
+/**
+ * LE TROU DU RELEVÉ SE COMBLE D'UN APPUI, SUR LE PLAN.
+ *
+ * Relevé du chantier : « le scan n'a pas su capter une porte, je me suis
+ * retrouvé avec deux murs séparés, et impossible de les joindre ou d'en
+ * créer un facilement ». Le manque se voit désormais sur le plan — un
+ * tireté rouge et une pastille au milieu — et l'appui tend le mur avec sa
+ * porte. Il n'apparaît qu'en ÉDITION : en lecture, on ne modifie rien.
+ */
+describe('le trou laissé par le scan', () => {
+  const monterTroue = () => {
+    let tree!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      useScanStore.setState({
+        screen: 'result',
+        scanName: 'Porte manquée',
+        // Un U dont le mur du bas est coupé net sur 90 cm.
+        walls: [
+          { id: 'w1', type: 'wall', a: { x: 0, z: 0 }, b: { x: 5, z: 0 }, height: 2.5, yCenter: 1.25 },
+          { id: 'w2', type: 'wall', a: { x: 5, z: 0 }, b: { x: 5, z: 4 }, height: 2.5, yCenter: 1.25 },
+          { id: 'w3', type: 'wall', a: { x: 5, z: 4 }, b: { x: 3, z: 4 }, height: 2.5, yCenter: 1.25 },
+          { id: 'w4', type: 'wall', a: { x: 2.1, z: 4 }, b: { x: 0, z: 4 }, height: 2.5, yCenter: 1.25 },
+          { id: 'w5', type: 'wall', a: { x: 0, z: 4 }, b: { x: 0, z: 0 }, height: 2.5, yCenter: 1.25 },
+        ],
+        openings: [],
+        objects: [],
+        rooms: [],
+        fixtures: [],
+        ceiling: [],
+        photos: [],
+      });
+      tree = TestRenderer.create(<ResultScreen />);
+    });
+    act(() => {
+      for (const n of tree.root.findAllByType(View)) {
+        if (typeof n.props.onLayout === 'function') {
+          n.props.onLayout({ nativeEvent: { layout: { width: 390, height: 520 } } });
+        }
+      }
+    });
+    arbre = tree;
+    return tree;
+  };
+
+  const pastille = (tree: TestRenderer.ReactTestRenderer) =>
+    tree.root
+      .findAll((n) => typeof n.props?.onPress === 'function')
+      .find((n) =>
+        String(n.props.accessibilityLabel ?? '').startsWith('Combler'),
+      );
+
+  it('ne s’affiche pas en lecture', () => {
+    expect(pastille(monterTroue())).toBeUndefined();
+  });
+
+  it('paraît en édition, et referme le plan d’un appui', () => {
+    const tree = monterTroue();
+    act(() => bouton(tree, 'Édition')!.props.onPress());
+    act(() => {
+      jest.advanceTimersByTime(500);
+    });
+    const cible = pastille(tree);
+    expect(cible).toBeDefined();
+    // Le libellé dit la largeur du manque : on sait ce qu'on va poser.
+    expect(cible!.props.accessibilityLabel).toContain('90');
+    const avant = useScanStore.getState().walls.length;
+    act(() => cible!.props.onPress());
+    const st = useScanStore.getState();
+    expect(st.walls).toHaveLength(avant + 1);
+    // Quatre-vingt-dix centimètres : c'est une porte, et elle est posée.
+    expect(st.openings).toHaveLength(1);
+    expect(st.openings[0].type).toBe('door');
+    // Le trou comblé, la pastille n'a plus lieu d'être.
+    expect(pastille(tree)).toBeUndefined();
+  });
+});
+
+/**
+ * CRÉER UN MUR À LA MAIN — le geste qui n'existait nulle part.
+ *
+ * Relevé du chantier, seconde moitié de la phrase : « impossible de les
+ * joindre OU D'EN CRÉER UN facilement ». Et pour cause : le magasin savait
+ * poser un mur entre deux points (`addWallBetween`) depuis des mois, mais
+ * aucun bouton de l'app n'y menait — du code mort d'un côté, un manque
+ * criant de l'autre. La pastille « Combler » règle les trous que l'app
+ * reconnaît ; ce bouton-ci règle tous les autres.
+ */
+describe('ajouter un mur à la main', () => {
+  /*
+    Le menu joue son action APRÈS s'être refermé, et cette descente ne se
+    déroule pas sous minuteries simulées : on vérifie donc ce qui est
+    observable ici — que le geste est OFFERT — et le geste lui-même sur le
+    magasin, qui est là où il vit.
+  */
+  it('est offert dans le menu du scan', () => {
+    const tree = monter();
+    act(() => bouton(tree, 'Plus')!.props.onPress());
+    expect(textes(tree)).toContain('Ajouter un mur');
+  });
+
+  it('pose un mur d’un mètre, qu’on peut ensuite tirer par ses coins', () => {
+    const avant = useScanStore.getState().walls.length;
+    useScanStore
+      .getState()
+      .addWallBetween({ x: 1, z: 1 }, { x: 2, z: 1 });
+    const murs = useScanStore.getState().walls;
+    expect(murs).toHaveLength(avant + 1);
+    const neuf = murs[murs.length - 1];
+    expect(segLength(neuf)).toBeCloseTo(1, 2);
+    // Il prend la hauteur des murs du logement : un mur neuf plus bas que
+    // ses voisins ferait un trou dans la 3D et dans les élévations.
+    expect(neuf.height).toBeCloseTo(useScanStore.getState().walls[0].height, 2);
+  });
+
+  it('mais refuse un trait de rien du tout', () => {
+    const avant = useScanStore.getState().walls.length;
+    useScanStore.getState().addWallBetween({ x: 1, z: 1 }, { x: 1.05, z: 1 });
+    expect(useScanStore.getState().walls).toHaveLength(avant);
+  });
+});

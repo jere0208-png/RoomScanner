@@ -1608,6 +1608,43 @@ export function ResultScreen() {
                     onPress: () => setAjoutPiece(true),
                   },
                   {
+                    /**
+                     * AJOUTER UN MUR — le geste qui manquait à l'appel.
+                     *
+                     * Relevé du chantier : « impossible de les joindre ou
+                     * d'en créer un facilement ». Et pour cause : le
+                     * magasin savait poser un mur entre deux points depuis
+                     * des mois, mais aucun bouton n'y menait — du code mort
+                     * d'un côté, un manque criant de l'autre.
+                     *
+                     * Le mur neuf se pose au MILIEU DU PLAN, d'un mètre :
+                     * assez grand pour se saisir, assez petit pour ne rien
+                     * masquer. On le tire ensuite par ses coins, et l'aimant
+                     * le soude à ses voisins comme n'importe quel mur.
+                     */
+                    label: 'Ajouter un mur',
+                    icon: 'regle' as const,
+                    hint: 'Un mètre au centre du plan, à tirer par ses coins.',
+                    onPress: () => {
+                      const xs = walls.flatMap((w) => [w.a.x, w.b.x]);
+                      const zs = walls.flatMap((w) => [w.a.z, w.b.z]);
+                      const cx = xs.length
+                        ? (Math.min(...xs) + Math.max(...xs)) / 2
+                        : 0;
+                      const cz = zs.length
+                        ? (Math.min(...zs) + Math.max(...zs)) / 2
+                        : 0;
+                      useScanStore
+                        .getState()
+                        .addWallBetween(
+                          { x: cx - 0.5, z: cz },
+                          { x: cx + 0.5, z: cz },
+                        );
+                      setEditMode(true);
+                      haptic('succes');
+                    },
+                  },
+                  {
                     /*
                       NORMES AUTO — l'installation qui se pose toute seule.
 
@@ -1785,6 +1822,15 @@ export function ResultScreen() {
             onSelectObject={(id) => {
               seuleSelection('meuble');
               setSelectedObjectId(id);
+            }}
+            /*
+              LE TROU DU RELEVÉ SE COMBLE D'UN APPUI — relevé du chantier :
+              « le scan n'a pas su capter une porte, je me suis retrouvé
+              avec deux murs séparés, et impossible de les joindre ».
+            */
+            onComblerTrou={(trou) => {
+              useScanStore.getState().comblerTrou(trou);
+              haptic('succes');
             }}
             showObjectDims={objDims}
             onToggleObjectDims={() => setObjDims((v) => !v)}
