@@ -1753,6 +1753,37 @@ En 3D, ces mêmes cotes apparaissent **au zoom**, sur le linteau et sur le
 tableau, comme toutes les cotes de détail : de loin elles s'empileraient sur
 celles du mur qui les porte.
 
+**Et une ouverture se ferme** — relevé du patron : « donne la possibilité de
+fermer une ouverture et la remettre en mur, en continuité de ses murs
+adjacents ». Le bandeau porte un troisième geste, « Fermer », à côté des
+deux cotes. Il n'y a aucune maçonnerie à inventer : les ouvertures sont des
+TROUS découpés dans des murs pleins (`assignOpenings`) — retirer le trou
+suffit, le mur redevient continu par construction, à l'écran comme dans le
+dossier. Et le retour en arrière existe, si la porte devait rouvrir.
+
+### L'établi lie, il ne copie plus
+
+Relevé du patron : « enlève le bouton copier, et remplace-le par un bouton
+lien... prise ou éclairage mural. Mais ça ne doit pas être possible pour le
+courant faible. »
+
+Le copier-coller de mur est parti tout entier — le bouton, le presse-papier
+(`wallClip`), le magasin et son banc : du code qu'aucun geste n'atteint
+plus est du code mort. À sa place, **« Lier »** : on tient une prise
+commandée ou une applique dans l'établi, l'établi se ferme, et l'on touche
+sur le plan **l'interrupteur qui la commande** — exactement le geste d'une
+ligne de spots. Le lien se noue et se dénoue du même toucher
+(`toggleFixtureCommand`), se dessine du même filet tireté que les liaisons
+du plafond, sur le plan comme dans le PDF, et vit DANS le scan.
+
+**La garde vit au magasin, pas seulement au bouton.** Ce qui SE COMMANDE
+est une règle pure (`seCommande`) : les prises 16 A — la prise commandée du
+séjour — et l'applique, rien d'autre. Une RJ45 n'a rien à allumer, un
+lave-linge (20 A) ne se commande pas du couloir, les ensembles mixtes
+portent du courant faible sous leur plaque, et une commande ne se commande
+pas elle-même. Le bouton « Lier » s'éteint sur tout ça, et le magasin
+refuse par-dessus : un lien impossible ne se noue par AUCUN chemin.
+
 ### Cotes : deux niveaux de détail
 
 **En 3D aussi.** De loin, seules les grandes cotes : une vue criblée de
@@ -2534,7 +2565,10 @@ vérifie qu'aucune prise ne sort de son mur.
   refusée au scan : `takePhoto` demande maintenant l'autorisation, et renonce
   proprement si elle est refusée.
 - **Le presse-papier de mur** survivait au changement de scan : on pouvait
-  coller sur un plan les cotes d'un autre logement. Il se vide à l'ouverture.
+  coller sur un plan les cotes d'un autre logement. Il se vidait à
+  l'ouverture — jusqu'à ce que le copier de mur disparaisse tout entier
+  (voir « L'établi lie, il ne copie plus ») : un lien vit DANS le scan,
+  plus rien à vider.
 
 Une règle en est sortie, qui vaut pour tout le store : **ne jamais importer
 `react-native-room-scan` depuis le store**. Le module construit un

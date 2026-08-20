@@ -1439,3 +1439,95 @@ describe('le menu du scan', () => {
     ).toBe(1);
   });
 });
+
+/**
+ * UNE OUVERTURE SE FERME — relevé du patron : « donne la possibilité de
+ * fermer une ouverture et le remettre en mur, en continuité de ses murs
+ * adjacents ». Les ouvertures sont des trous découpés dans des murs pleins
+ * (assignOpenings) : fermer, c'est retirer le trou — le mur redevient
+ * continu par construction, aucune maçonnerie à inventer. Le geste vit dans
+ * le bandeau de la menuiserie, à côté de Largeur et Hauteur.
+ */
+describe('la menuiserie selectionnee', () => {
+  it('offre « Fermer », qui rebouche le mur sans toucher aux murs', () => {
+    const tree = monter();
+    act(() => bouton(tree, 'Édition')!.props.onPress());
+    act(() => {
+      jest.advanceTimersByTime(500);
+    });
+    // La cible tactile d'une menuiserie : son trait transparent de 26.
+    const cible = tree.root
+      .findAll((n) => typeof n.props?.onPress === 'function')
+      .find((n) => n.findAll((x) => x.props?.strokeWidth === 26).length > 0);
+    expect(cible).toBeDefined();
+    act(() => cible!.props.onPress());
+    const vu = textes(tree);
+    expect(vu).toContain('Fermer');
+    const murs = useScanStore.getState().walls.length;
+    const trous = useScanStore.getState().openings.length;
+    act(() => bouton(tree, 'Fermer')!.props.onPress());
+    expect(useScanStore.getState().openings.length).toBe(trous - 1);
+    expect(useScanStore.getState().walls.length).toBe(murs);
+  });
+});
+
+/**
+ * LE LIEN D'UN APPAREIL MURAL SE VOIT SUR LE PLAN — même filet tireté que
+ * celui d'un point du plafond vers son interrupteur : une applique
+ * commandée sans trait sur le plan, c'est un câble que personne ne tire.
+ */
+describe('le lien mural sur le plan', () => {
+  it('trace le filet de l’applique à son interrupteur', () => {
+    let tree!: TestRenderer.ReactTestRenderer;
+    const wid = SNAPSHOT_FIXTURES[0].wallId;
+    act(() => {
+      useScanStore.setState({
+        screen: 'result',
+        scanName: 'Lien test',
+        walls: SNAPSHOT_WALLS,
+        openings: [],
+        objects: [],
+        rooms: SNAPSHOT_ROOMS.map((r, i) => ({
+          id: r.id,
+          name: `Pièce ${i + 1}`,
+          floor: null,
+        })),
+        fixtures: [
+          {
+            id: 'ap1',
+            kind: 'applique' as const,
+            wallId: wid,
+            along: 0.8,
+            height: 1.8,
+            side: 1 as const,
+            commands: ['i1'],
+          },
+          {
+            id: 'i1',
+            kind: 'inter' as const,
+            wallId: wid,
+            along: 1.6,
+            height: 1.1,
+            side: 1 as const,
+          },
+        ],
+        ceiling: [],
+        photos: [],
+      });
+      tree = TestRenderer.create(<ResultScreen />);
+    });
+    act(() => {
+      for (const n of tree.root.findAllByType(View)) {
+        if (typeof n.props.onLayout === 'function') {
+          n.props.onLayout({ nativeEvent: { layout: { width: 390, height: 520 } } });
+        }
+      }
+    });
+    // Le filet du lien : le tireté fin des liaisons de commande.
+    const filets = tree.root.findAll(
+      (n) => n.props?.strokeDasharray === '1.5 3.5',
+    );
+    expect(filets.length).toBeGreaterThanOrEqual(1);
+    act(() => tree.unmount());
+  });
+});

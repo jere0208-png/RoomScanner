@@ -11,7 +11,7 @@
  * élément, et il est resté vert — l'extraction n'a pas bougé un point.
  */
 import React from 'react';
-import { Circle, G, Line, Path, Text as SvgText } from 'react-native-svg';
+import { Circle, G, Line, Path, Polyline, Text as SvgText } from 'react-native-svg';
 import type { Palette } from '../theme';
 import {
   FIXTURES,
@@ -24,6 +24,7 @@ import {
   wallFace,
   type Fixture,
 } from '../geometry/electrical';
+import { linkCurve } from '../geometry/ceiling';
 import type { Pt, WallSeg } from '../geometry/floorplan';
 import { markColor } from '../geometry/schema';
 
@@ -70,6 +71,42 @@ export function FixtureLayer({
   const view = { rot: viewRot };
   return (
     <>
+      {/*
+        LE LIEN D'UNE PRISE COMMANDÉE OU D'UNE APPLIQUE à son interrupteur :
+        le même filet tireté qu'un point du plafond vers sa commande. Il se
+        dessine SOUS les symboles — c'est une liaison, pas une annotation.
+      */}
+      {(fixtures ?? []).flatMap((f) =>
+        (f.commands ?? []).map((cid) => {
+          const cmd = (fixtures ?? []).find((x) => x.id === cid);
+          if (!cmd) return null;
+          const wf = walls.find((x) => x.id === f.wallId);
+          const wc = walls.find((x) => x.id === cmd.wallId);
+          if (!wf || !wc) return null;
+          const fa = wallFace(wf, quads.get(wf.id), f.side);
+          const fc = wallFace(wc, quads.get(wc.id), cmd.side);
+          const de = facePoint(fa, faceX(fa, f.along), 0.16);
+          const vers = facePoint(fc, faceX(fc, cmd.along), 0.16);
+          const courbe = linkCurve(
+            { x: de.x, z: de.z },
+            { x: vers.x, z: vers.z },
+          ).map((pt) => {
+            const g = mapping.toPx(pt);
+            return `${g.x},${g.y}`;
+          });
+          return (
+            <Polyline
+              key={`lienmur-${f.id}-${cid}`}
+              points={courbe.join(' ')}
+              fill="none"
+              stroke={c.inkSoft}
+              strokeWidth={1.1}
+              strokeDasharray="1.5 3.5"
+              strokeLinecap="round"
+            />
+          );
+        }),
+      )}
       {/* L'appareillage se dessine APRÈS les menuiseries : la
           trouée d'une baie est un aplat opaque, et posée
           par-dessus elle effaçait les prises du mur — on croyait

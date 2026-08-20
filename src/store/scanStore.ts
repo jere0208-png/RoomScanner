@@ -52,6 +52,7 @@ import {
   type CatalogItem,
 } from '../geometry/catalogue';
 import {
+  COMMANDES_MURALES,
   FIXTURES,
   ENTRAXE,
   faceX,
@@ -63,6 +64,7 @@ import {
   reprojectAnchors,
   reprojectFixtures,
   overlaps,
+  seCommande,
   wallFace,
   type Fixture,
   type FixtureKind,
@@ -707,11 +709,15 @@ interface ScanState {
    * équipement, à la même cote du coin. Le refaire à la main, c'est trois
    * fois l'occasion de se tromper d'un centimètre.
    */
-  wallClip: { from: string; items: { kind: FixtureKind; x: number; height: number; group?: string }[] } | null;
   /** Relève l'appareillage d'un mur (face intérieure). */
-  copyWallFixtures: (wallId: string) => number;
+  /**
+   * Noue ou dénoue le lien entre un appareil mural et sa commande — le
+   * même geste qu'au plafond. Refuse ce qui ne se commande pas (courant
+   * faible, circuits spécialisés) et ce qui ne commande pas (une prise
+   * n'allume rien) : la garde vit ICI, quel que soit le chemin.
+   */
+  toggleFixtureCommand: (fixtureId: string, commandeId: string) => void;
   /** Repose le relevé sur un autre mur. Renvoie le nombre d'appareils posés. */
-  pasteWallFixtures: (wallId: string) => number;
   /**
    * Un appareil vient d'être rangé à côté d'un autre, sous une plaque
    * commune : l'écran de face le propose à l'utilisateur, qui choisit le
@@ -1036,7 +1042,6 @@ export const useScanStore = create<ScanState>((set, get) => {
     address: '',
     currentSaveId: null,
     pendingJoin: null,
-    wallClip: null,
     photos: [],
     ceiling: [],
     dirty: false,
@@ -1990,68 +1995,29 @@ export const useScanStore = create<ScanState>((set, get) => {
       set({ photos: get().photos.filter((p) => p.id !== id), dirty: true });
     },
 
-    copyWallFixtures: (wallId) => {
+    toggleFixtureCommand: (fixtureId, commandeId) => {
       const st = get();
-      const wall = st.walls.find((w) => w.id === wallId);
-      if (!wall) return 0;
-      const side = interiorSide(wall, st.walls, st.rooms);
-      const face = wallFace(wall, wallQuadsOf(st.walls).get(wallId), side);
-      const items = st.fixtures
-        .filter((f) => f.wallId === wallId && f.side === side)
-        // La cote est prise depuis le DÉBUT de la face, celle qu'on lit à
-        // l'écran : c'est elle qu'on veut retrouver à l'identique.
-        .map((f) => ({
-          kind: f.kind,
-          x: faceX(face, f.along),
-          height: f.height,
-          group: f.group,
-        }))
-        .sort((a, b) => a.x - b.x);
-      set({ wallClip: items.length > 0 ? { from: wallId, items } : null });
-      return items.length;
-    },
-
-    pasteWallFixtures: (wallId) => {
-      const st = get();
-      const clip = st.wallClip;
-      const wall = st.walls.find((w) => w.id === wallId);
-      if (!clip || !wall) return 0;
-      pushHistory('collerAppareillage');
-      const side = interiorSide(wall, st.walls, st.rooms);
-      const face = wallFace(wall, wallQuadsOf(st.walls).get(wallId), side);
-      // Les ensembles gardent leur cohésion, mais pas leur identifiant :
-      // deux plaques distinctes ne peuvent pas porter le même.
-      const neufs = new Map<string, string>();
-      const poses: Fixture[] = [];
-      let n = 0;
-      for (const it of clip.items) {
-        const spec = FIXTURES[it.kind];
-        // Ce qui ne tient pas sur le mur d'arrivée n'est pas posé de force.
-        if (it.x - spec.w / 2 < -1e-6 || it.x + spec.w / 2 > face.len + 1e-6) {
-          continue;
-        }
-        if (it.height + spec.h / 2 > wall.height + 1e-6) continue;
-        let group: string | undefined;
-        if (it.group) {
-          group =
-            neufs.get(it.group) ??
-            `pl-${Date.now()}-${n}-${Math.random().toString(36).slice(2, 5)}`;
-          neufs.set(it.group, group);
-        }
-        poses.push({
-          id: `el-${Date.now()}-${n}-${Math.random().toString(36).slice(2, 5)}`,
-          kind: it.kind,
-          wallId,
-          along: fromFaceX(face, it.x),
-          height: it.height,
-          side,
-          group,
-        });
-        n += 1;
-      }
-      if (poses.length === 0) return 0;
-      set({ fixtures: [...st.fixtures, ...poses], dirty: true });
-      return poses.length;
+      const cible = st.fixtures.find((f) => f.id === fixtureId);
+      const commande = st.fixtures.find((f) => f.id === commandeId);
+      // La garde vit au magasin : un lien qui n'existe pas dans la realite
+      // ne doit se nouer par AUCUN chemin.
+      if (!cible || !commande) return;
+      if (!seCommande(cible.kind)) return;
+      if (!COMMANDES_MURALES.includes(commande.kind)) return;
+      pushHistory('fixtureCommand');
+      set({
+        fixtures: st.fixtures.map((f) => {
+          if (f.id !== fixtureId) return f;
+          const cur = f.commands ?? [];
+          return {
+            ...f,
+            commands: cur.includes(commandeId)
+              ? cur.filter((x) => x !== commandeId)
+              : [...cur, commandeId],
+          };
+        }),
+        dirty: true,
+      });
     },
 
     placeAssembly: (baseId, movedId, base, moved) => {
@@ -3314,8 +3280,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         // Un relevé de mur appartient au plan où il a été pris : le garder
         // d'un scan à l'autre permettrait de coller les cotes d'un autre
         // logement.
-        wallClip: null,
-        pendingJoin: null,
+            pendingJoin: null,
         north: save.north ?? null,
         dirty: false,
         resultOrigin: 'library',

@@ -67,7 +67,13 @@ afterEach(() => {
   precedent = null;
 });
 
-function rendu(opts: { fixtures?: Fixture[]; objects?: ObjectData[] } = {}) {
+function rendu(
+  opts: {
+    fixtures?: Fixture[];
+    objects?: ObjectData[];
+    onLink?: (id: string) => void;
+  } = {},
+) {
   let tree!: TestRenderer.ReactTestRenderer;
   act(() => {
     useScanStore.setState({
@@ -85,6 +91,7 @@ function rendu(opts: { fixtures?: Fixture[]; objects?: ObjectData[] } = {}) {
         selectedId={opts.fixtures?.[0]?.id ?? null}
         onSelect={() => {}}
         onAddRequest={() => {}}
+        onLinkRequest={opts.onLink}
         onClose={() => {}}
       />,
     );
@@ -195,16 +202,53 @@ describe('le bas de l’établi', () => {
   });
 
   /**
-   * « RELEVER » NE VOULAIT RIEN DIRE.
+   * LE COPIER A VÉCU, LE LIEN LE REMPLACE — relevé du patron : « enlève le
+   * bouton copier, et remplace-le par un bouton lien... prise ou éclairage
+   * mural. Mais ça ne doit pas être possible pour le courant faible. »
    *
-   * Le mot désigne le fait de mesurer un local ; le bouton, lui, copiait
-   * l'appareillage du mur pour le reporter sur un autre — le geste qui fait
-   * gagner le plus de temps dans un couloir de trois chambres identiques.
+   * Une prise commandée, une applique : ils s'allument par un interrupteur,
+   * comme un point du plafond — le lien se noue depuis l'établi, puis se
+   * désigne sur le plan. Une RJ45, elle, n'a rien à commander.
    */
-  it('dit « Copier », pas « Relever »', () => {
-    const vu = textes(rendu());
-    expect(vu).toContain('Copier');
-    expect(vu).not.toContain('Relever');
+  it('dit « Lier », plus jamais « Copier »', () => {
+    const vu = textes(
+      rendu({
+        fixtures: [
+          { id: 'a', kind: 'prise', wallId: 'n', along: 1, height: 0.25, side: 1 },
+        ],
+      }),
+    );
+    expect(vu).toContain('Lier');
+    expect(vu).not.toContain('Copier');
+    expect(vu).not.toContain('Coller');
+  });
+
+  it('rend l’appareil tenu au parent, qui nouera le lien sur le plan', () => {
+    const onLink = jest.fn();
+    const tree = rendu({
+      fixtures: [
+        { id: 'ap1', kind: 'applique', wallId: 'n', along: 2, height: 1.8, side: 1 },
+      ],
+      onLink,
+    });
+    const lier = tree.root
+      .findAllByType(TouchableOpacity)
+      .find((n) => n.props.accessibilityLabel === 'Lier')!;
+    expect(lier.props.disabled).toBeFalsy();
+    act(() => lier.props.onPress());
+    expect(onLink).toHaveBeenCalledWith('ap1');
+  });
+
+  it('refuse le courant faible : une RJ45 n’a rien à commander', () => {
+    const tree = rendu({
+      fixtures: [
+        { id: 'rj', kind: 'rj45', wallId: 'n', along: 1, height: 0.25, side: 1 },
+      ],
+    });
+    const lier = tree.root
+      .findAllByType(TouchableOpacity)
+      .find((n) => n.props.accessibilityLabel === 'Lier')!;
+    expect(lier.props.disabled).toBe(true);
   });
 });
 

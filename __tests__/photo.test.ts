@@ -188,16 +188,7 @@ describe('le ménage des fichiers', () => {
     delete (NativeModules as Record<string, unknown>).RoomScanPhoto;
   });
 
-  it('changer de scan vide le presse-papier de mur', () => {
-    neuf();
-    useScanStore.getState().saveAsCopy('Un');
-    const un = useScanStore.getState().saves[0];
-    useScanStore.setState({
-      wallClip: { from: 'n', items: [{ kind: 'prise', x: 1, height: 0.25 }] },
-    });
-    useScanStore.getState().openSave(un.id);
-    // Un relevé appartient au plan où il a été pris : le coller ailleurs
-    // reporterait les cotes d'un autre logement.
-    expect(useScanStore.getState().wallClip).toBeNull();
-  });
+  // Le presse-papier de mur a vécu avec son bouton : le lien l'a remplacé
+  // (voir liermur.test), et un lien vit DANS le scan — rien à vider en
+  // changeant de plan.
 });

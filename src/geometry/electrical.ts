@@ -83,6 +83,42 @@ export interface Fixture {
    * identifiant partagé dit qu'ils se posent ensemble.
    */
   group?: string;
+  /**
+   * Les commandes qui allument cet appareil — identifiants d'interrupteurs.
+   *
+   * Même modèle qu'au plafond (`CeilingFixture.commands`) : une prise
+   * commandée ou une applique s'allume d'un interrupteur, et le plan trace
+   * le filet du lien. Réservé à ce qui SE COMMANDE (`seCommande`).
+   */
+  commands?: string[];
+}
+
+/**
+ * Ce qui peut COMMANDER : un interrupteur sous toutes ses formes.
+ *
+ * Une prise n'allume rien — le rappeler ici évite de tracer sur le plan un
+ * lien qui n'existe pas dans la réalité.
+ */
+export const COMMANDES_MURALES: FixtureKind[] = [
+  'inter',
+  'inter2',
+  'inter3',
+  'va',
+  'poussoir',
+  'variateur',
+];
+
+/**
+ * Ce qui SE COMMANDE depuis un interrupteur : les prises 16 A (la prise
+ * commandée du séjour) et l'applique. Relevé du patron : « prise ou
+ * éclairage mural, mais pas le courant faible » — une RJ45 n'a rien à
+ * allumer, un lave-linge (20 A) ne se commande pas du couloir, et les
+ * ensembles mixtes portent du courant faible sous leur plaque.
+ */
+export function seCommande(kind: FixtureKind): boolean {
+  return (
+    kind === 'prise' || kind === 'prise2' || kind === 'prise3' || kind === 'applique'
+  );
 }
 
 export interface FixtureSpec {

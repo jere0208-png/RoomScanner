@@ -36,6 +36,7 @@ export function ElecSheet({
   selectedId,
   onSelect,
   onAddRequest,
+  onLinkRequest,
   onChoose,
   onClose,
 }: {
@@ -48,6 +49,8 @@ export function ElecSheet({
   selectedId: string | null;
   onSelect: (id: string | null) => void;
   onAddRequest: () => void;
+  /** « Lier » depuis l'établi : l'appareil tenu attend sa commande. */
+  onLinkRequest?: (fixtureId: string) => void;
   onChoose: (kind: FixtureKind) => void;
   onClose: () => void;
 }) {
@@ -87,6 +90,7 @@ export function ElecSheet({
                 selectedId={selectedId}
                 onSelect={onSelect}
                 onAddRequest={onAddRequest}
+                onLinkRequest={onLinkRequest}
                 onClose={onClose}
               />
             </View>

@@ -59,6 +59,7 @@ import {
   masonryAxes,
   masonryRuns,
   postsOf,
+  seCommande,
   type FixtureKind,
 } from '../geometry/electrical';
 import {
@@ -130,6 +131,12 @@ interface Props {
   onSelect: (id: string | null) => void;
   /** Ouvre le catalogue pour poser un appareil de plus sur ce mur. */
   onAddRequest: () => void;
+  /**
+   * Rend l'appareil tenu au parent pour nouer son lien SUR LE PLAN : on
+   * ferme l'établi, puis on touche l'interrupteur qui le commande — le
+   * même geste que pour une ligne de spots.
+   */
+  onLinkRequest?: (fixtureId: string) => void;
   onClose: () => void;
 }
 
@@ -139,6 +146,7 @@ export function WallElevation({
   selectedId,
   onSelect,
   onAddRequest,
+  onLinkRequest,
   onClose,
 }: Props) {
   const walls = useScanStore((s) => s.walls);
@@ -154,10 +162,7 @@ export function WallElevation({
   const pendingJoin = useScanStore((s) => s.pendingJoin);
   const objects = useScanStore((s) => s.objects);
   const addPhoto = useScanStore((s) => s.addPhoto);
-  const wallClip = useScanStore((s) => s.wallClip);
   const north = useScanStore((s) => s.north);
-  const copyWallFixtures = useScanStore((s) => s.copyWallFixtures);
-  const pasteWallFixtures = useScanStore((s) => s.pasteWallFixtures);
   const clearPendingJoin = useScanStore((s) => s.clearPendingJoin);
   const c = useTheme();
   const styles = getStyles(c);
@@ -1911,37 +1916,31 @@ export function WallElevation({
               press: () => selected && flipFixture(selected.id),
             },
             {
-              // Relever un mur, puis le reporter sur un autre : dans un
-              // couloir ou une chambre symétrique, c'est trois fois le même
-              // équipement à la même cote du coin, et trois occasions de se
-              // tromper d'un centimètre.
-              key: 'clip',
               /**
-               * « RELEVER » NE VOULAIT RIEN DIRE.
+               * LE COPIER A VÉCU, LE LIEN LE REMPLACE — relevé du patron :
+               * « enlève le bouton copier, remplace-le par un bouton
+               * lien... prise ou éclairage mural. Mais ça ne doit pas être
+               * possible pour le courant faible. »
                *
-               * Le mot désigne le fait de mesurer un local ; ici il
-               * copiait l'appareillage du mur pour le reporter sur un
-               * autre. Personne ne pouvait le deviner — et c'est
-               * pourtant le geste qui fait gagner le plus de temps dans
-               * un couloir de trois chambres identiques.
+               * Une prise commandée, une applique : ils s'allument par un
+               * interrupteur, comme un point du plafond. On tient
+               * l'appareil ici, on ferme l'établi, et l'on touche sa
+               * commande sur le plan — le geste des lignes de spots.
                */
-              label:
-                wallClip && wallClip.from !== wallId
-                  ? `Coller ${wallClip.items.length}`
-                  : 'Copier',
-              on: wallClip ? wallClip.from !== wallId : mine.length > 0,
+              key: 'lien',
+              label: 'Lier',
+              on: !!selected && seCommande(selected.kind) && !!onLinkRequest,
               tint: c.blue,
-              paths:
-                wallClip && wallClip.from !== wallId
-                  ? ['M9 4 h6 v3 H9 z', 'M6 7 h12 v13 H6 z', 'M9.5 13.5 l2 2 4 -4']
-                  : ['M9 4 h6 v3 H9 z', 'M6 7 h12 v13 H6 z'],
-              press: () => {
-                if (wallClip && wallClip.from !== wallId) {
-                  pasteWallFixtures(wallId);
-                } else {
-                  copyWallFixtures(wallId);
-                }
-              },
+              // Deux maillons de chaîne, au trait comme ses voisins.
+              paths: [
+                'M9.5 14.5 l5 -5',
+                'M11.5 7.5 l1.6 -1.6 a3.1 3.1 0 0 1 4.4 4.4 L15.9 11.9',
+                'M12.5 16.5 l-1.6 1.6 a3.1 3.1 0 0 1 -4.4 -4.4 L8.1 12.1',
+              ],
+              press: () =>
+                selected &&
+                seCommande(selected.kind) &&
+                onLinkRequest?.(selected.id),
             },
             {
               key: 'del',

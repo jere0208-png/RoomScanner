@@ -92,6 +92,7 @@ import { buildMaterialPdf, materialFilename, toBase64 } from '../export/pdf';
 import { buildMetreCsv, metreFilename, type RoomMetre } from '../export/csv';
 import {
   FIXTURES,
+  COMMANDES_MURALES,
   faceX,
   facePoint,
   interiorSide,
@@ -122,20 +123,10 @@ type Tab = '2d' | '3d';
 
 
 /**
- * Ce qui peut COMMANDER un point lumineux.
- *
- * Une prise n'allume rien. Le rappeler ici évite de tracer sur le plan un
- * lien qui n'existe pas dans la réalité — et un plan qui ment est pire
- * qu'un plan incomplet.
+ * Ce qui peut COMMANDER vit désormais dans `electrical.ts`
+ * (`COMMANDES_MURALES`) : le magasin garde le même savoir pour refuser un
+ * lien impossible, et deux listes finiraient par diverger.
  */
-const COMMANDES_MURALES: FixtureKind[] = [
-  'inter',
-  'inter2',
-  'inter3',
-  'va',
-  'poussoir',
-  'variateur',
-];
 
 /** Le saut de ligne des rapports, ecrit une fois. */
 const SAUT = String.fromCharCode(10);
@@ -233,8 +224,10 @@ export function ResultScreen() {
   const setCeilingRow = useScanStore((s) => s.setCeilingRow);
   const removeCeilingRow = useScanStore((s) => s.removeCeilingRow);
   const toggleCeilingCommand = useScanStore((s) => s.toggleCeilingCommand);
+  const toggleFixtureCommand = useScanStore((s) => s.toggleFixtureCommand);
   const moveFixture = useScanStore((s) => s.moveFixture);
   const resizeOpening = useScanStore((s) => s.resizeOpening);
+  const removeOpening = useScanStore((s) => s.removeOpening);
   const addObject = useScanStore((s) => s.addObject);
   const rotateObject = useScanStore((s) => s.rotateObject);
 
@@ -477,6 +470,12 @@ export function ResultScreen() {
    *  commande — un seul, ou toute une ligne de spots. */
   const [pendingLink, setPendingLink] = useState<string[] | null>(null);
   /**
+   * L'appareil MURAL dont on noue le lien — prise commandée, applique.
+   * On le tient depuis l'établi (« Lier »), puis on touche l'interrupteur
+   * sur le plan : le même geste que pour une ligne de spots.
+   */
+  const [pendingLienMur, setPendingLienMur] = useState<string | null>(null);
+  /**
    * L'origine des cotes d'une pièce, DANS LA TRAME DU LOGEMENT.
    *
    * Un point lumineux ne se cote pas « en x = 3,42 » : ça ne veut rien dire
@@ -512,7 +511,10 @@ export function ResultScreen() {
         setPendingCeiling(null);
         setPendingSpots(null);
       }
-      if (garde !== 'lien') setPendingLink(null);
+      if (garde !== 'lien') {
+        setPendingLink(null);
+        setPendingLienMur(null);
+      }
       if (garde !== 'reglage') setSelCeiling(null);
     },
     [],
@@ -1928,6 +1930,33 @@ export function ResultScreen() {
             onEditRoomName={promptRoomFor}
             onPierChange={setPier}
             onSelectFixture={(id, wallId) => {
+              // Un appareil MURAL attend sa commande : ce toucher la donne.
+              if (pendingLienMur) {
+                const f = fixtures.find((x) => x.id === id);
+                if (f && COMMANDES_MURALES.includes(f.kind)) {
+                  toggleFixtureCommand(pendingLienMur, f.id);
+                  haptic('succes');
+                  setPendingLienMur(null);
+                } else {
+                  haptic('alerte');
+                  setMenu({
+                    title: 'Ce n’est pas une commande',
+                    subtitle:
+                      'Une prise commandée ou une applique s’allume par un ' +
+                      'interrupteur, un va-et-vient, un poussoir ou un ' +
+                      'variateur. Touchez l’un de ceux-là.',
+                    actions: [
+                      { label: 'Continuer', onPress: () => {} },
+                      {
+                        label: 'Abandonner la liaison',
+                        danger: true,
+                        onPress: () => setPendingLienMur(null),
+                      },
+                    ],
+                  });
+                }
+                return;
+              }
               // Une liaison est en cours : cet appareil devient la commande.
               if (pendingLink) {
                 const f = fixtures.find((x) => x.id === id);
@@ -2388,10 +2417,19 @@ export function ResultScreen() {
           )}
 
         {vue === '2d' &&
-          (pendingKind || pendingCeiling || pendingSpots || pendingLink) &&
+          (pendingKind ||
+            pendingCeiling ||
+            pendingSpots ||
+            pendingLink ||
+            pendingLienMur) &&
           !capturing && (
             <EnAttente
-              kind={pendingKind}
+              kind={
+                pendingKind ??
+                (pendingLienMur
+                  ? fixtures.find((x) => x.id === pendingLienMur)?.kind ?? null
+                  : null)
+              }
               plafond={
                 (pendingSpots ? 'spot' : null) ??
                 pendingCeiling ??
@@ -2404,6 +2442,8 @@ export function ResultScreen() {
                   ? `une pièce — ${pendingSpots} spots`
                   : pendingLink
                   ? 'l’interrupteur qui l’allume'
+                  : pendingLienMur
+                  ? 'l’interrupteur qui le commande'
                   : pendingCeiling
                   ? 'une pièce'
                   : pier
@@ -2415,6 +2455,7 @@ export function ResultScreen() {
                 setPendingCeiling(null);
                 setPendingSpots(null);
                 setPendingLink(null);
+                setPendingLienMur(null);
               }}
             />
           )}
@@ -2445,6 +2486,25 @@ export function ResultScreen() {
               {
                 label: 'Hauteur',
                 onPress: () => promptOpening(selectedOpening.id, 'hauteur'),
+              },
+              {
+                /*
+                  FERMER : le trou disparaît, le mur redevient continu.
+
+                  Relevé du patron : « fermer une ouverture et la remettre
+                  en mur, en continuité de ses murs adjacents ». Les
+                  ouvertures sont des trous découpés dans des murs pleins
+                  (assignOpenings) : il n'y a aucune maçonnerie à inventer,
+                  retirer le trou suffit — et le retour en arrière existe
+                  si la porte devait rouvrir.
+                */
+                label: 'Fermer',
+                ghost: true,
+                onPress: () => {
+                  removeOpening(selectedOpening.id);
+                  setSelectedOpeningId(null);
+                  haptic('succes');
+                },
               },
             ]}
           />
@@ -2740,6 +2800,14 @@ export function ResultScreen() {
         selectedId={elecSel}
         onSelect={setElecSel}
         onAddRequest={() => setElecView('catalogue')}
+        // « Lier » depuis l'établi : on ferme, et le plan attend
+        // l'interrupteur — le geste des lignes de spots.
+        onLinkRequest={(id) => {
+          setElecOpen(false);
+          seulGeste('lien');
+          setPendingLink(null);
+          setPendingLienMur(id);
+        }}
         onChoose={chooseKind}
         onClose={() => setElecOpen(false)}
       />
