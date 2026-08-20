@@ -1768,3 +1768,68 @@ describe('redétecter les pièces', () => {
     expect(pieces[0].name).toBeTruthy();
   });
 });
+
+/**
+ * LE BANDEAU D'ATTENTE NE MARCHE PLUS SUR LES OUTILS.
+ *
+ * Relevé du chantier : « le bouton qui dit de toucher un interrupteur après
+ * "Lier" est peu visible et mal placé, sur des autres blocs, en bas ». Il
+ * était calé en bas à gauche — c'est-à-dire par-dessus la rangée de
+ * calques, qui occupe toute cette bande — et son texte, bridé à cent
+ * trente-huit points, sortait tronqué : « Touchez l'interrupteur q… ».
+ *
+ * Il remonte en haut, où la place est libre : les pastilles de contrôle et
+ * de vue tiennent la droite, il s'arrête avant elles.
+ */
+describe('le bandeau d’attente', () => {
+  it('se pose en HAUT, jamais sur la rangée d’outils', () => {
+    const { EnAttente } = require('../src/components/PendingPill');
+    let tree!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      tree = TestRenderer.create(
+        <EnAttente kind="prise" plafond={null} cible={null} onCancel={() => {}} />,
+      );
+    });
+    const bloc = tree.root.findAllByType(View).find((n) => {
+      const st = StyleSheet.flatten(n.props?.style) as
+        | { position?: string; bottom?: number; top?: number }
+        | undefined;
+      return st?.position === 'absolute' && (st?.top !== undefined || st?.bottom !== undefined);
+    })!;
+    const st = StyleSheet.flatten(bloc.props.style) as {
+      top?: number;
+      bottom?: number;
+      right?: number;
+    };
+    expect(st.top).toBeDefined();
+    expect(st.bottom).toBeUndefined();
+    // Et il s'arrête avant les pastilles du coin haut droit.
+    expect(st.right).toBeGreaterThanOrEqual(90);
+    act(() => tree.unmount());
+  });
+
+  it('laisse la consigne se lire en entier', () => {
+    const { EnAttente } = require('../src/components/PendingPill');
+    let tree!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      tree = TestRenderer.create(
+        <EnAttente
+          kind="prise"
+          plafond={null}
+          cible="l’interrupteur qui le commande"
+          onCancel={() => {}}
+        />,
+      );
+    });
+    const consigne = tree.root
+      .findAllByType(Text)
+      .find((n) =>
+        String(n.props.children ?? '').includes('interrupteur'),
+      )!;
+    expect(consigne).toBeDefined();
+    // Deux lignes plutôt qu'une tronquée : la consigne dit QUOI toucher,
+    // elle ne sert à rien coupée en son milieu.
+    expect(consigne.props.numberOfLines).toBeGreaterThanOrEqual(2);
+    act(() => tree.unmount());
+  });
+});

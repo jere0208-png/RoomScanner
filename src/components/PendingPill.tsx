@@ -119,7 +119,7 @@ export function EnAttente({
         <Text style={styles.attenteNom} numberOfLines={1}>
           {spec.label}
         </Text>
-        <Text style={styles.attenteHint} numberOfLines={1}>
+        <Text style={styles.attenteHint} numberOfLines={2}>
           {cible ? `Touchez ${cible}` : 'Touchez un mur'}
         </Text>
       </View>
@@ -135,10 +135,22 @@ export function EnAttente({
 
 const getStyles = themedStyles((c: Palette) =>
   StyleSheet.create({
+    /*
+      EN HAUT, JAMAIS SUR LES OUTILS — relevé du chantier : « le bouton qui
+      dit de toucher un interrupteur est peu visible et mal placé, sur des
+      autres blocs, en bas ».
+
+      Il a fait les deux coins : en haut à droite il passait derrière les
+      pastilles de calques, en bas il recouvrait la rangée d'outils, qui
+      occupe toute cette bande. La bonne place est en haut À GAUCHE — libre
+      dans les deux cas — et il s'arrête avant les pastilles du coin droit
+      (contrôle, sélecteur de vue) au lieu de passer dessous.
+    */
     attente: {
     position: 'absolute',
     left: 10,
-    bottom: 12,
+    top: 10,
+    right: 96,
     zIndex: 5,
     flexDirection: 'row',
     alignItems: 'center',
@@ -172,7 +184,9 @@ const getStyles = themedStyles((c: Palette) =>
     alignItems: 'center',
     justifyContent: 'center',
   },
-    attenteTextes: { maxWidth: 138 },
+    // La consigne dit QUOI toucher : bridée à 138 points elle sortait
+    // tronquée (« Touchez l'interrupteur q… »), c'est-à-dire muette.
+    attenteTextes: { flex: 1 },
     attenteNom: { color: c.ink, fontSize: 13.5, fontWeight: '800' },
     attenteHint: { color: c.inkFaint, fontSize: 11, marginTop: 1 },
     attenteClose: {

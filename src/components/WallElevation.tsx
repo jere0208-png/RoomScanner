@@ -93,11 +93,20 @@ import { frCategory } from '../geometry/furniture';
 import { Check, Sofa } from 'lucide-react-native';
 
 const PAD_X = 30;
-const PAD_TOP = 26;
+/**
+ * La marge du haut doit contenir la COTE ET SON NOMBRE.
+ *
+ * Relevé du chantier : « la longueur du mur, sa cote est cachée en haut du
+ * bloc ». La ligne de cote se pose à `COTE_H` au-dessus du plafond et la
+ * marge en valait autant : le nombre écrit dessus débordait du cadre, et
+ * « 2,72 m » sortait coupé dans le sens de la hauteur. Une marge doit
+ * contenir ce qu'elle marge — le texte compte, pas seulement le trait.
+ */
+export const PAD_TOP = 42;
 /** Fuite du relief : l'épaisseur du mur, en pixels d'écran. */
 const FUITE = 9;
 /** Hauteur de la ligne de cote au-dessus du plafond. */
-const COTE_H = 26;
+export const COTE_H = 26;
 /**
  * Les hauteurs de référence d'une installation, en mètres.
  *

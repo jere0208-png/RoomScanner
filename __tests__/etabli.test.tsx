@@ -661,3 +661,23 @@ describe('l’établi tient dans une main', () => {
     expect(st.width === '100%' || st.alignSelf === 'stretch').toBe(true);
   });
 });
+
+/**
+ * LA COTE DU MUR TIENT DANS LE CADRE.
+ *
+ * Relevé du chantier : « la longueur du mur, sa cote est cachée en haut du
+ * bloc ». La ligne de cote se pose vingt-six points au-dessus du plafond
+ * (`COTE_H`) et la marge du dessin en valait autant (`PAD_TOP`) : le nombre
+ * écrit dessus débordait donc du cadre, et « 2,72 m » sortait coupé en deux
+ * dans le sens de la hauteur.
+ *
+ * Une marge doit contenir ce qu'elle marge : le texte compte, pas seulement
+ * le trait.
+ */
+describe('la cote de longueur', () => {
+  it('a la place de s’écrire au-dessus du mur', () => {
+    const { COTE_H, PAD_TOP } = require('../src/components/WallElevation');
+    // La ligne, PLUS son nombre : une douzaine de points de texte.
+    expect(PAD_TOP).toBeGreaterThanOrEqual(COTE_H + 12);
+  });
+});

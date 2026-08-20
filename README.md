@@ -145,6 +145,26 @@ L'outil « pièces » de la barre du plan relance la détection sur le graphe
 courant, en **gardant les noms donnés à la main** : chaque nouvelle pièce
 hérite du nom de l'ancienne dont le point de cartouche tombe dedans.
 
+### Deux choses qui se cachaient
+
+**Le bandeau d'attente ne marche plus sur les outils.** Relevé du chantier :
+« le bouton qui dit de toucher un interrupteur après "Lier" est peu visible
+et mal placé, sur des autres blocs, en bas ». Il avait fait les deux coins :
+en haut à droite il passait derrière les pastilles de calques, en bas il
+recouvrait la rangée d'outils — qui occupe toute cette bande. La bonne place
+était le haut À GAUCHE, libre dans les deux cas, en s'arrêtant avant les
+pastilles du coin droit. Et sa consigne, bridée à cent trente-huit points,
+sortait tronquée (« Touchez l'interrupteur q… ») : une consigne coupée en
+son milieu ne dit plus quoi toucher. Elle a maintenant deux lignes et toute
+la largeur.
+
+**La cote du mur tient dans son cadre.** « La longueur du mur, sa cote est
+cachée en haut du bloc » : la ligne de cote se pose vingt-six points
+au-dessus du plafond et la marge du dessin en valait *autant*, si bien que
+le nombre écrit dessus débordait — « 2,72 m » sortait coupé dans le sens de
+la hauteur. Une marge doit contenir ce qu'elle marge : le texte compte, pas
+seulement le trait.
+
 ### L'établi tient dans une main
 
 Relevé du patron, capture à l'appui : « repense un peu cette page pour plus
