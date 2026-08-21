@@ -357,10 +357,25 @@ describe('le plan de l’aperçu', () => {
         Boolean,
       ),
     );
-    // Un `transform` restant, et le cadrage au doigt serait revenu par la
-    // fenêtre : c'est lui qui portait le décalage et l'échelle.
+    /*
+      LA COUCHE DU GESTE EXISTE, MAIS ELLE EST À PLAT.
+
+      Le plan porte désormais une couche transformable — c'est elle qui rend
+      le déplacement fluide sur l'écran du plan, sans redessiner
+      (`fluidite.test.tsx`). Exiger qu'aucun `transform` n'existe ici
+      reviendrait à interdire cette couche partout ; ce qu'on veut, et ce
+      qu'on tient, c'est qu'elle soit NEUTRE dans l'aperçu : rien n'est
+      décalé, rien n'est agrandi, et le doigt ne la touche pas
+      (`pointerEvents: none`, banc précédent).
+    */
+    const neutre = (t: Record<string, unknown>) =>
+      Object.entries(t).every(([k, v]) =>
+        k === 'scale' ? v === 1 : k === 'rotate' ? v === '0deg' : v === 0,
+      );
     for (const st of styles) {
-      expect((st as { transform?: unknown }).transform).toBeUndefined();
+      const t = (st as { transform?: Record<string, unknown>[] }).transform;
+      if (t === undefined) continue;
+      expect(t.every(neutre)).toBe(true);
     }
   });
 });

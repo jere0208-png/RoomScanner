@@ -20,7 +20,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 import React from 'react';
-import { View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import { FloorplanEditor } from '../src/components/FloorplanEditor';
 import { useScanStore } from '../src/store/scanStore';
@@ -130,12 +130,33 @@ const zoneDuPlan = (tree: TestRenderer.ReactTestRenderer) =>
     .findAllByType(View)
     .find((n) => typeof n.props.onMoveShouldSetResponder === 'function')!;
 
+/**
+ * Un doigt qui a PARCOURU du chemin depuis sa prise.
+ *
+ * `doigt()` pose le même point comme départ et comme position courante : le
+ * `PanResponder` en déduit un déplacement nul, et le plan ne bouge pas d'un
+ * pixel. Pour mesurer un glissement, il faut que les deux diffèrent.
+ */
+const doigtDepuis = (x0: number, y0: number, x: number, y: number) => {
+  const e = doigt(x, y) as unknown as {
+    touchHistory: { touchBank: Record<string, number>[] };
+  };
+  e.touchHistory.touchBank[0].startPageX = x0;
+  e.touchHistory.touchBank[0].startPageY = y0;
+  e.touchHistory.touchBank[0].previousPageX = x0;
+  e.touchHistory.touchBank[0].previousPageY = y0;
+  return e as never;
+};
+
 function glisser(tree: TestRenderer.ReactTestRenderer) {
   const zone = zoneDuPlan(tree);
   expect(zone).toBeDefined();
   act(() => {
     zone.props.onMoveShouldSetResponder?.(doigt(400, 300));
     zone.props.onResponderGrant?.(doigt(400, 300));
+    // Le doigt AVANCE : sans mouvement, on ne mesure que la prise, et la
+    // couche n'a encore rien à porter.
+    zone.props.onResponderMove?.(doigtDepuis(400, 300, 460, 330));
   });
 }
 
@@ -221,24 +242,33 @@ describe('ce que le plan annonce pendant le geste', () => {
   });
 });
 
-describe('la fluidité du plan', () => {
-  it('allège nettement le dessin pendant qu’on déplace le plan', () => {
+/*
+  L'ALLÈGEMENT PENDANT LE GESTE A ÉTÉ RETIRÉ — et c'est un progrès, pas un
+  renoncement.
+
+  Le plan se dépouillait de ses cotes et de ses étiquettes dès qu'un doigt
+  se posait : c'était la seule parade tant que CHAQUE IMAGE du geste
+  recalculait le cadrage et redessinait tout. Moins de nœuds à recalculer,
+  moins de retard.
+
+  Depuis que le geste est une transformation native (voir plus bas), le plan
+  ne se redessine plus DU TOUT pendant qu'on le déplace : il n'y a plus rien
+  à alléger, et le faire coûterait deux rendus complets — un à la prise, un
+  au lâcher — pour économiser un travail qui n'existe plus. Le dessin reste
+  donc entier sous le doigt, ce qui est aussi plus juste : les cotes suivent
+  le plan au lieu de clignoter.
+*/
+describe('le dessin reste entier sous le doigt', () => {
+  it('ne retire plus ses cotes quand on prend le plan', () => {
     const tree = planEquipe();
     const repos = noeuds(tree);
     glisser(tree);
-    const geste = noeuds(tree);
-    // Un tiers de moins, au bas mot : c'est ce qui sépare un plan qui
-    // glisse d'un plan qui saute.
-    expect(
-      `${geste} nœuds pendant le geste, ${repos} au repos : ${
-        geste < repos * 0.7 ? 'allégé' : 'aussi lourd'
-      }`,
-    ).toBe(
-      `${geste} nœuds pendant le geste, ${repos} au repos : allégé`,
+    expect(`${noeuds(tree)} nœuds pendant le geste, ${repos} au repos`).toBe(
+      `${repos} nœuds pendant le geste, ${repos} au repos`,
     );
   });
 
-  it('et retrouve tout son détail dès que le doigt se lève', () => {
+  it('et n’a donc rien à retrouver quand le doigt se lève', () => {
     const tree = planEquipe();
     const repos = noeuds(tree);
     glisser(tree);
@@ -248,3 +278,84 @@ describe('la fluidité du plan', () => {
     expect(noeuds(tree)).toBe(repos);
   });
 });
+
+/**
+ * LE PLAN NE SE REDESSINE PLUS PENDANT QU'ON LE DÉPLACE.
+ *
+ * Relevé du patron : « plus les plans sont chargés en cotes et en meubles,
+ * plus au déplacement il est lent ». La mesure lui donne raison, et dit où :
+ * le calcul n'est plus en cause — trier et projeter la 3D d'un logement
+ * meublé coûte trois dixièmes de milliseconde par image. Ce qui coûte, c'est
+ * le NOMBRE DE NŒUDS : chaque trait, chaque cote, chaque symbole est une vue
+ * que le moteur repeint. Trois cent quarante vues, soixante fois par
+ * seconde, pendant que le doigt glisse.
+ *
+ * Or déplacer et agrandir un dessin déjà peint, c'est exactement ce qu'une
+ * TRANSFORMATION NATIVE sait faire — la leçon du ruban, de l'onde du bouton
+ * et du badge, appliquée cette fois au plan entier. Le dessin est calculé
+ * UNE fois, à la prise ; le geste ne fait que translater, tourner et
+ * agrandir la couche déjà rastérisée ; le vrai cadrage n'est posé qu'au
+ * lâcher, en un seul rendu.
+ *
+ * Ce banc tient la propriété qui produit la fluidité : PENDANT le geste, les
+ * coordonnées du dessin ne bougent pas d'un pixel, et c'est la transformation
+ * de la couche qui porte le mouvement.
+ */
+describe('le plan glisse sans se redessiner', () => {
+  /** La couche transformée : celle qui porte le geste, au-dessus du dessin. */
+  const couche = (t: TestRenderer.ReactTestRenderer) =>
+    t.root
+      .findAll((n) => {
+        const st = StyleSheet.flatten(n.props?.style) as
+          | { transform?: unknown[] }
+          | undefined;
+        return (
+          Array.isArray(st?.transform) &&
+          // Elle porte le dessin : au moins un trait vit dessous.
+          n.findAll((x) => typeof x.props?.x1 === 'number').length > 0
+        );
+      })
+      .pop();
+
+  /** Les coordonnées de tous les traits du dessin, en une empreinte. */
+  const empreinte = (t: TestRenderer.ReactTestRenderer) =>
+    t.root
+      .findAll((n) => typeof n.props?.x1 === 'number')
+      .map((n) => `${n.props.x1},${n.props.y1}`)
+      .join('|');
+
+  it('bouge la couche, pas les coordonnées', () => {
+    const tree = planEquipe();
+    const avant = empreinte(tree);
+    expect(avant.length).toBeGreaterThan(0);
+
+    glisser(tree);
+
+    // LE DESSIN N'A PAS BOUGÉ : aucune coordonnée recalculée, donc aucun
+    // rendu du plan — c'est là, et seulement là, que se gagne la fluidité
+    // d'un plan chargé.
+    expect(empreinte(tree)).toBe(avant);
+
+    // ET POURTANT LE PLAN A SUIVI LE DOIGT : la couche porte le mouvement.
+    const c = couche(tree);
+    expect(c).toBeDefined();
+    const st = StyleSheet.flatten(c!.props.style) as {
+      transform: Record<string, unknown>[];
+    };
+    expect(st.transform.some((x) => 'translateX' in x)).toBe(true);
+  });
+
+  it('pose le cadrage pour de bon quand le doigt se lève', () => {
+    const tree = planEquipe();
+    const avant = empreinte(tree);
+    glisser(tree);
+    act(() => {
+      zoneDuPlan(tree).props.onResponderRelease?.(doigt(430, 320));
+    });
+    // Au lâcher, UN rendu : le dessin est recalculé à sa nouvelle place, et
+    // la couche revient à zéro — sinon le déplacement se compterait deux
+    // fois au geste suivant.
+    expect(empreinte(tree)).not.toBe(avant);
+  });
+});
+

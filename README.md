@@ -1691,6 +1691,61 @@ carte a la hauteur de son contenu, un mot celle de sa police —, un vrai
 d'écran, et le badge flotte AU-DESSUS du bord de la carte, donc HORS de
 son rognage, sinon sa moitié haute serait coupée.
 
+### Le geste ne redessine plus le plan
+
+Relevé du patron : « plus les plans sont chargés en cotes et en meubles,
+plus au déplacement il est lent ». Avant de toucher au code, on a MESURÉ sur
+le logement de référence — et la mesure a désigné un coupable inattendu :
+
+| | mesure |
+|---|---|
+| 2D au repos | 571 nœuds dessinés |
+| 2D pendant le geste | 343 nœuds (l'allègement d'alors) |
+| 3D | 486 faces · scène bâtie en 7 ms · **0,30 ms par image** pour trier et projeter |
+
+**Le calcul n'était plus en cause.** Trois dixièmes de milliseconde par
+image, c'est un pour cent du budget d'une image à soixante par seconde : le
+tri du peintre avait déjà été réglé, les découpes étaient mémoïsées. Ce qui
+coûtait, c'était le NOMBRE DE VUES repeintes — trois cent quarante, soixante
+fois par seconde, parce que **chaque image du geste recalculait le cadrage
+et rendait tout le dessin**.
+
+**Or déplacer, tourner et agrandir un dessin DÉJÀ PEINT, c'est exactement ce
+qu'une transformation native sait faire.** C'est la leçon du ruban, du badge
+et de l'onde du bouton, appliquée cette fois au plan entier : le dessin est
+calculé une fois, à la prise ; le geste ne touche plus que quatre valeurs
+qui descendent au pilote natif sans réveiller React ; le vrai cadrage n'est
+posé qu'au lâcher, en UN rendu. Le banc tient la propriété qui produit la
+fluidité : pendant le geste, **les coordonnées du dessin ne bougent pas d'un
+pixel** — et c'est vérifié à l'octet près, les planches de référence du plan
+2D étant rigoureusement identiques après le changement.
+
+**L'allègement pendant le geste a donc été retiré**, et c'est un progrès :
+il n'existait que pour réduire ce qu'il fallait recalculer soixante fois par
+seconde. Comme plus rien ne se recalcule, le garder coûterait deux rendus
+complets — un à la prise, un au lâcher — pour économiser un travail qui
+n'existe plus. Le dessin reste entier sous le doigt, ce qui est aussi plus
+juste : les cotes suivent le plan au lieu de clignoter.
+
+**En 3D, le geste se coupe en deux.** Le PINCEMENT ne touche ni aux faces ni
+à leur ordre — zoomer et déplacer n'est qu'une transformation affine du
+résultat déjà projeté, et le banc le prouve à la décimale : le tri est
+identique à zoom 1 et à zoom 2,4. Il passe donc au natif comme la 2D, et ne
+rend plus rien. La ROTATION, elle, ne peut pas s'éviter : tourner change ce
+qu'on voit. On allège alors ce qu'on repeint — **les arêtes se taisent**
+(cent trente-huit des quatre cent quatre-vingt-six faces du logement de
+référence, près d'un tiers du dessin ; bien plus sur un meuble isolé, dont
+les trois quarts des faces sont des traits). Le tri n'en souffre pas : une
+arête suit le pan qu'elle borde, la retirer ne déplace rien de ce qui reste,
+et c'est l'ombrage des aplats qui dit le volume, pas le trait. Les contours
+reviennent au lâcher, quand on regarde vraiment.
+
+Deux détails qui font tenir l'ensemble. La couche est marquée
+`collapsable={false}` : sans lui, Android la fond dans son parent à
+l'optimisation et la transformation perd son support. Et au lâcher, le
+cadrage vrai et la remise à plat de la couche se posent dans le MÊME rendu —
+séparés, le plan sauterait à sa position d'avant le temps d'une image.
+
 ### Un relevé interrompu ne se perd plus
 
 Un scan tenait entièrement en mémoire tant qu'on n'avait pas touché

@@ -2849,7 +2849,7 @@ function unifilairePage(
  *
  * `multiWire` était calculé à chaque export puis JETÉ : aucune feuille ne le
  * dessinait, alors que le README promet le schéma de câblage dans le dossier
- * et que ses couleurs normatives (`WIRE_COLBLEUS`) étaient prêtes et testées.
+ * et que ses couleurs normatives (`WIRE_COLORS`) étaient prêtes et testées.
  * Un bloc par circuit : le repère à sa teinte de plan, puis chaque
  * conducteur en trait plein à sa couleur, nommé en clair — et la note qui
  * dit le principe quand le câblage dépend du chantier (va-et-vient,
@@ -4638,7 +4638,7 @@ export function buildScanPdf(
   }
   if (withSchema && schemas) {
     /**
-     * LES SCHÉMAS HBLEUS SOL : unifilaire, puis multifilaire.
+     * LES SCHÉMAS HORS SOL : unifilaire, puis multifilaire.
      *
      * Le dossier portait aussi les deux mêmes schémas POSÉS SUR LE PLAN,
      * un par mode de tracé. Ils promettaient de montrer où passe chaque

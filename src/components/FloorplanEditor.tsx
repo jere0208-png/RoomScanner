@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Animated,
   PanResponder,
   type GestureResponderEvent,
   StyleSheet,
@@ -518,6 +519,44 @@ export function FloorplanEditor({
   }, [view, navigating, onView]);
   const viewRef = useRef(view);
   viewRef.current = view;
+
+  /*
+    LE GESTE VIT SUR LE FIL NATIF, PAS DANS L'ÉTAT.
+
+    Relevé du patron : « plus les plans sont chargés en cotes et en meubles,
+    plus au déplacement il est lent ». La mesure lui donne raison et dit où :
+    le calcul n'est plus en cause — trier et projeter un logement meublé
+    coûte trois dixièmes de milliseconde. Ce qui coûte, c'est le NOMBRE DE
+    NŒUDS : trois cent quarante vues repeintes soixante fois par seconde,
+    parce que chaque image du geste recalculait le cadrage et rendait tout
+    le dessin.
+
+    Or déplacer, tourner et agrandir un dessin DÉJÀ PEINT, c'est exactement
+    ce qu'une transformation native sait faire — la leçon du ruban, du badge
+    et de l'onde du bouton, appliquée au plan entier. Le dessin est calculé
+    une fois, à la prise ; le geste ne touche plus que ces quatre valeurs,
+    qui descendent au pilote natif sans réveiller React ; le vrai cadrage
+    n'est posé qu'au lâcher, en UN rendu.
+
+    Elles portent le DELTA depuis la prise, jamais la position absolue : le
+    dessin sous elles est déjà à la position de départ.
+  */
+  const glisse = useRef({
+    tx: new Animated.Value(0),
+    ty: new Animated.Value(0),
+    ech: new Animated.Value(1),
+    rot: new Animated.Value(0),
+  }).current;
+  /** Le dernier cadrage calculé par le geste, posé pour de bon au lâcher. */
+  const vueVive = useRef(view);
+
+  /** Rend la couche à son état neutre : le dessin repart de la vérité. */
+  const rendreLaCouche = () => {
+    glisse.tx.setValue(0);
+    glisse.ty.setValue(0);
+    glisse.ech.setValue(1);
+    glisse.rot.setValue(0);
+  };
   const navBase = useRef({
     v: { zoom: 1, ox: 0, oy: 0, rot: 0 },
     mode: 'pan' as 'pan' | 'pinch',
@@ -642,13 +681,28 @@ export function FloorplanEditor({
       },
       onPanResponderGrant: (e, g) => {
         setNavigating(true);
+        vueVive.current = viewRef.current;
         // Le recalage repart de zero a chaque prise : le decalage se compte
         // en petits pas, et un geste qui commence herite du precedent.
         dernierPas.current = { x: g.dx, y: g.dy };
         snapshot(e, g);
       },
-      onPanResponderRelease: () => setNavigating(false),
-      onPanResponderTerminate: () => setNavigating(false),
+      /*
+        AU LÂCHER, LA VÉRITÉ — et la couche revient à zéro dans le MÊME
+        rendu. Les deux se posent ensemble : si la couche se remettait à
+        plat avant que le dessin ne soit recalculé, le plan sauterait à sa
+        position d'avant le temps d'une image.
+      */
+      onPanResponderRelease: () => {
+        setNavigating(false);
+        setView(vueVive.current);
+        rendreLaCouche();
+      },
+      onPanResponderTerminate: () => {
+        setNavigating(false);
+        setView(vueVive.current);
+        rendreLaCouche();
+      },
       onPanResponderMove: (e, g) => {
         const t = e.nativeEvent.touches;
         const mode = t.length >= 2 ? 'pinch' : 'pan';
@@ -664,12 +718,25 @@ export function FloorplanEditor({
           let twist = touchAngle(t) - base.a0;
           if (twist > Math.PI) twist -= 2 * Math.PI;
           if (twist < -Math.PI) twist += 2 * Math.PI;
-          setView({
-            zoom: Math.min(6, Math.max(0.4, base.v.zoom * (d / base.d0))),
+          /*
+            LE PINCEMENT EST UNE ÉCHELLE, PAS UN RECALCUL.
+
+            Le zoom du modèle est pris sur le CENTRE de la vue, et la
+            transformation native l'est aussi : les deux coïncident, et le
+            dessin déjà peint peut être agrandi tel quel. Ce que l'on pousse
+            ici est le RAPPORT depuis la prise, pas le zoom absolu.
+          */
+          const zoom = Math.min(6, Math.max(0.4, base.v.zoom * (d / base.d0)));
+          vueVive.current = {
+            zoom,
             ox: base.v.ox + (mx - base.mx0),
             oy: base.v.oy + (my - base.my0),
             rot: base.v.rot + twist,
-          });
+          };
+          glisse.ech.setValue(zoom / base.v.zoom);
+          glisse.rot.setValue(twist);
+          glisse.tx.setValue(mx - base.mx0);
+          glisse.ty.setValue(my - base.my0);
         } else if (recalageVif.current) {
           /*
             EN RECALAGE, LE DOIGT DÉPLACE L'ÉTAGE, PAS LA VUE.
@@ -689,11 +756,14 @@ export function FloorplanEditor({
           }
           dernierPas.current = { x: g.dx, y: g.dy };
         } else {
-          setView({
+          // Le glissement : deux nombres au pilote natif, et rien d'autre.
+          vueVive.current = {
             ...base.v,
             ox: base.v.ox + (g.dx - base.dx0),
             oy: base.v.oy + (g.dy - base.dy0),
-          });
+          };
+          glisse.tx.setValue(g.dx - base.dx0);
+          glisse.ty.setValue(g.dy - base.dy0);
         }
       },
     }),
@@ -802,7 +872,7 @@ export function FloorplanEditor({
       murs: new Map<string, { x: number; y: number }>(),
       runs: new Map<string, { x: number; y: number }>(),
     };
-    if (!showMeasures || navigating || !mapping || layout.w === 0) return vide;
+    if (!showMeasures || !mapping || layout.w === 0) return vide;
     const items: Etiquette[] = [];
     const murs = new Map<string, { x: number; y: number }>();
     const runs = new Map<string, { x: number; y: number }>();
@@ -874,7 +944,7 @@ export function FloorplanEditor({
       if (!gardees.has(`r:${cle}`)) runs.delete(cle);
     }
     return { murs, runs };
-  }, [walls, openings, mapping, layout, showMeasures, navigating, detail]);
+  }, [walls, openings, mapping, layout, showMeasures, detail]);
 
   /**
    * Retour de mur sélectionné : `{ mur, index du tronçon }`.
@@ -1106,15 +1176,43 @@ export function FloorplanEditor({
           {...piece.panHandlers}
         />
       )}
+      {/*
+          LA COUCHE QUI PORTE LE GESTE.
+
+          Tout le dessin vit dessous — le SVG et les cartouches posés
+          par-dessus lui. Pendant qu'on déplace le plan, c'est ELLE qui
+          bouge : quatre valeurs poussées au pilote natif, aucun rendu, et
+          les trois cent quarante vues du dessin restent exactement où
+          elles sont. Le cadrage vrai n'est recalculé qu'au lâcher.
+
+          `collapsable={false}` : sans lui, Android fond cette vue dans son
+          parent à l'optimisation et la transformation n'a plus de support.
+        */}
       {mapping && (
-        <>
+        <Animated.View
+          collapsable={false}
+          style={[
+            StyleSheet.absoluteFill,
+            {
+              transform: [
+                { translateX: glisse.tx },
+                { translateY: glisse.ty },
+                { rotate: glisse.rot.interpolate({
+                    inputRange: [-Math.PI, Math.PI],
+                    outputRange: ['-180deg', '180deg'],
+                  }) },
+                { scale: glisse.ech },
+              ],
+            },
+          ]}
+          pointerEvents="box-none">
           <Svg width={layout.w} height={layout.h}>
             {/* Toucher le vide désélectionne. Posé tout au fond du dessin :
                 murs, meubles et cartouches gardent la priorité, et seul ce
                 qui n'appartient à rien tombe ici. `transparent` et non
                 `none` — une surface sans couleur n'est pas touchable. */}
             {/*
-              Le fond répond MÊME HBLEUS ÉDITION.
+              Le fond répond MÊME HORS ÉDITION.
               Un meuble se sélectionne aussi en lecture — par sa vignette,
               ou en le touchant — et il fallait alors retoucher le meuble
               lui-même pour le lâcher : n'importe où ailleurs, rien ne se
@@ -1250,7 +1348,7 @@ export function FloorplanEditor({
                     on déplace un plan pour VOIR OÙ L'ON VA, la silhouette du
                     meuble suffit, et le détail revient au relâcher.
                   */}
-                  {!navigating &&
+                  {
                     furnitureStrokes(furnKind(f.category), w, d).map((line, li) => (
                       <Path
                         key={`s${li}`}
@@ -1269,7 +1367,7 @@ export function FloorplanEditor({
                     ))}
                   {/* Nom du meuble : petit dedans, grandi par le zoom,
                       absent s'il ne tient pas (`nomDeMeuble`). */}
-                  {!navigating &&
+                  {
                     (() => {
                       const pose = nomDeMeuble(
                         frCategory(f.category),
@@ -1508,7 +1606,7 @@ export function FloorplanEditor({
                     wall={w}
                     quad={quads.get(w.id)}
                     mapping={mapping}
-                    showMeasure={!navigating}
+                    showMeasure
                     selected
                     onPress={editable ? () => onSelectWall(null) : undefined}
                   />
@@ -1662,7 +1760,7 @@ export function FloorplanEditor({
 
             {/* Cotes de détail : retour de mur, baie, retour de mur. Elles
                 n'apparaissent qu'une fois le plan assez zoomé pour les lire. */}
-            {showMeasures && !navigating && detail > 0.02 &&
+            {showMeasures && detail > 0.02 &&
               walls.map((w) =>
                 wallRuns(w, openings).map((run, ri) => {
                   const A = mapping.toPx(w.a);
@@ -1832,7 +1930,7 @@ export function FloorplanEditor({
               selectedCeilingRow={selectedCeilingRow}
               /* Le bouton « Cotes » vaut aussi pour le plafond : les écarts
                  d'une ligne de spots s'y lisent comme ceux d'un mur. */
-              showMeasures={showMeasures && !navigating}
+              showMeasures={showMeasures}
               onSelectCeiling={onSelectCeiling}
               fixtures={showFixtures ? fixtures : VIDE}
               walls={walls}
@@ -1879,7 +1977,7 @@ export function FloorplanEditor({
               mapping={mapping}
               viewRot={view.rot}
               elecLod={elecLod}
-              navigating={navigating}
+              navigating={false}
               onSelectFixture={onSelectFixture}
               c={c}
             />
@@ -2105,7 +2203,7 @@ export function FloorplanEditor({
 
           {/* Meuble sélectionné : poignée de déplacement + bouton supprimer */}
           {/* Le meuble sélectionné : toute son emprise se glisse, sa croix
-              et sa poignée de rotation flottent HBLEUS de lui.
+              et sa poignée de rotation flottent HORS de lui.
 
               Une poignée de 44 px au centre ne suffisait pas : dès qu'on
               posait le doigt à côté du centre — c'est-à-dire presque
@@ -2215,7 +2313,7 @@ export function FloorplanEditor({
                         (Math.atan2(cote2.y - mil.y, cote2.x - mil.x) * 180) /
                         Math.PI;
                       /*
-                        LA POIGNÉE SE POSE JUSTE DEHBLEUS, pas sur le meuble.
+                        LA POIGNÉE SE POSE JUSTE DEHORS, pas sur le meuble.
 
                         Sa zone touchable fait quarante points ; posées sur
                         les quatre bords d'un meuble de soixante centimètres,
@@ -2597,7 +2695,7 @@ export function FloorplanEditor({
                 </React.Fragment>
               );
             })()}
-        </>
+        </Animated.View>
       )}
     </View>
   );

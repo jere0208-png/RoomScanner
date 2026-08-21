@@ -261,7 +261,7 @@ export function Toolbar2D({
               />,
             ]
           : []),
-        // HBLEUS ÉDITION, une pastille ne fait qu'AFFICHER ou CACHER. Le « + »
+        // HORS ÉDITION, une pastille ne fait qu'AFFICHER ou CACHER. Le « + »
         // du catalogue vivait ici : on pouvait donc modifier le plan sans
         // être en édition, et la barre mélangeait deux natures de gestes.
         <ToolPill

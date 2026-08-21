@@ -1136,7 +1136,7 @@ export function roomInputsOf(
  * LES CONSTATS DE POSE — un appareil qui ne peut pas être là.
  *
  * Vus à l'œil sur une feuille rendue : un tableau et un va-et-vient
- * dessinés DEHBLEUS (la face choisie regardait l'extérieur d'un mur
+ * dessinés DEHORS (la face choisie regardait l'extérieur d'un mur
  * d'enveloppe), et une applique dans l'emprise d'une porte. Ces données
  * peuvent exister — mauvaise face dans l'établi, baie percée après la
  * pose — et rien ne le disait. Deux contrôles géométriques :

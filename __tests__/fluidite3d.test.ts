@@ -303,3 +303,79 @@ it('ne cache jamais le meuble derriere son mur, geste ou pas', () => {
   */
   expect(anglesQuiCachent(true, true)).toBe(0);
 });
+
+/**
+ * LA 3D BOUGE SANS TOUT RECALCULER — les deux moitiés du geste.
+ *
+ * Relevé du patron : « plus les plans sont chargés en cotes et en meubles,
+ * plus au déplacement il est lent ». La mesure a montré que le calcul n'y
+ * était pour rien (trois dixièmes de milliseconde par image) : ce qui coûte,
+ * c'est le nombre de vues repeintes. Deux réponses, une par geste.
+ *
+ * LE PINCEMENT ne touche NI aux faces NI au tri : zoomer et déplacer n'est
+ * qu'une transformation affine du résultat déjà projeté. Elle passe donc au
+ * pilote natif, exactement comme sur le plan 2D — aucun recalcul, aucun
+ * rendu, tant que les doigts sont posés.
+ *
+ * LA ROTATION, elle, ne peut pas s'éviter : tourner change ce qu'on voit.
+ * Mais les arêtes en font une bonne part — cent trente-huit des quatre cent
+ * quatre-vingt-six faces du logement de référence, et les trois quarts de
+ * celles d'un meuble isolé. Elles se taisent pendant qu'on tourne (les
+ * aplats ombrés suffisent à lire le volume) et reviennent au lâcher. Le tri
+ * n'en souffre pas : une arête suit le pan qu'elle borde, la retirer ne
+ * déplace rien.
+ */
+describe('ce que la 3D recalcule pendant un geste', () => {
+  it('le pincement ne change ni les faces ni leur ordre', () => {
+    const scene = buildScene(MURS, [], MEUBLES, {
+      palette: PAL,
+      showSurfaces: true,
+      floors: {},
+      rooms: [],
+      fixtures: [],
+    });
+    const cam = { ct: 0.7, st: 0.7, cp: 0.8, sp: 0.6 };
+    const rangs = roomRanks(scene.rooms, cam);
+    const ordre = (zoom: number, ox: number) => {
+      const { center } = sceneFraming(scene.faces);
+      const project = (p: P3) => {
+        const x = p.x - center.x;
+        const y = p.y - center.y;
+        const z = p.z - center.z;
+        const rx = x * cam.ct - z * cam.st;
+        const rz = x * cam.st + z * cam.ct;
+        return {
+          sx: 195 + ox + rx * 100 * zoom,
+          sy: 310 + (rz * cam.cp - y * cam.sp) * 100 * zoom,
+          depth: rz * cam.sp + y * cam.cp,
+        };
+      };
+      return scene.faces
+        .filter((f) => !isHiddenFace(f, cam))
+        .map((f, i) => `${i}:${faceDepth(f, project, cam, rangs).toFixed(4)}`)
+        .join('|');
+    };
+    // Zoomer et déplacer laissent le tri IDENTIQUE, à la dernière décimale :
+    // c'est ce qui autorise à confier le geste au pilote natif au lieu de
+    // rejouer le rendu à chaque image.
+    expect(ordre(2.4, 80)).toBe(ordre(1, 0));
+  });
+
+  it('la rotation peut se passer des arêtes, qui font le gros du dessin', () => {
+    const scene = buildScene(MURS, [], MEUBLES, {
+      palette: PAL,
+      showSurfaces: true,
+      floors: {},
+      rooms: [],
+      fixtures: [],
+    });
+    const aretes = scene.faces.filter((f) => f.bordDe !== undefined);
+    // Un tiers au bas mot sur ce salon meublé : les taire pendant qu'on
+    // tourne n'est pas une économie de coin de table.
+    expect(aretes.length).toBeGreaterThan(scene.faces.length * 0.3);
+    // Et aucune ne porte de remplissage : ce qu'on retire est du TRAIT, le
+    // volume reste entièrement lisible à l'ombrage de ses aplats.
+    for (const a of aretes) expect(a.fill).toBeNull();
+  });
+});
+

@@ -616,7 +616,7 @@ describe('l’alignement des appareils', () => {
  * LES CONSTATS DE POSE — ce que le plan du T3 a montré à l'œil.
  *
  * Sur la feuille rendue, un tableau et un va-et-vient étaient dessinés
- * DEHBLEUS (mauvaise face d'un mur d'enveloppe), et une applique tombait dans
+ * DEHORS (mauvaise face d'un mur d'enveloppe), et une applique tombait dans
  * l'emprise de la porte d'entrée. Des données pareilles peuvent exister —
  * et l'app ne disait rien. Deux contrôles géométriques les attrapent.
  */

@@ -1,7 +1,7 @@
 /**
  * La règle de hauteur au-dessus d'un plan de travail.
  *
- * « Axe à 1,30 m du sol au maximum, HBLEUS PLAN DE TRAVAIL » — et c'est
+ * « Axe à 1,30 m du sol au maximum, HORS PLAN DE TRAVAIL » — et c'est
  * justement au-dessus d'une crédence qu'on pose le plus de prises. Sans
  * tenir compte du meuble, l'app signalait en défaut toute une cuisine, ce
  * qui revient à ne rien signaler : on n'écoute plus un garde-fou qui se
