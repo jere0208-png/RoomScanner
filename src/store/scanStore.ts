@@ -1,6 +1,12 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
+  catalogueDesPlans,
+  deposerPlan,
+  reprendrePlan,
+  type Identite,
+} from '../net/coffrePlans';
+import {
   cleanModelFiles,
   deletePhotoFiles,
   reposerDuCoffre,
@@ -789,6 +795,18 @@ interface ScanState {
    * après une réinstallation, typiquement — et réécrit le cache.
    */
   reposerPhoto: (id: string) => Promise<void>;
+  /**
+   * Dépose un relevé sous le compte, pour qu'il survive au téléphone.
+   *
+   * Silencieux : sans compte, sans serveur ou sans réseau, il ne se passe
+   * rien — c'est un filet, jamais une condition pour travailler.
+   */
+  deposerAuCompte: (id: string, qui: Identite | null) => Promise<void>;
+  /**
+   * Redescend les relevés que le compte garde et que ce téléphone n'a pas,
+   * et rend leur nombre. C'est le geste d'après une réinstallation.
+   */
+  reprendreDuCompte: (qui: Identite | null) => Promise<number>;
   removePhoto: (id: string) => void;
   /**
    * Presse-papier d'appareillage : le relevé d'un mur, cotes comprises.
@@ -2151,6 +2169,59 @@ export const useScanStore = create<ScanState>((set, get) => {
       plan. Marquer le scan « modifié » ici ferait réclamer une sauvegarde à
       chaque ouverture, pour un travail que l'utilisateur n'a pas fait.
     */
+    /*
+      LE RELEVÉ MONTE AU COMPTE, LES IMAGES RESTENT AU TÉLÉPHONE.
+
+      Un relevé de logement entier fait quelques dizaines de kilo-octets :
+      des murs, des ouvertures, de l'appareillage et les IDENTIFIANTS des
+      photos. C'est du texte, il monte sans rien coûter — et les images,
+      elles, ne quittent jamais la photothèque de l'électricien.
+    */
+    deposerAuCompte: async (id, qui) => {
+      if (!qui) return;
+      const save = get().saves.find((s) => s.id === id);
+      if (!save) return;
+      await deposerPlan(qui, {
+        scan: save.id,
+        nom: save.name,
+        maj: save.updatedAt,
+        contenu: JSON.stringify(save),
+      });
+    },
+
+    /*
+      CE QUE LE COMPTE GARDE ET QUE CE TÉLÉPHONE N'A PAS.
+
+      On ne redescend QUE ce qui manque : un plan déjà présent ici a pu être
+      retouché depuis, et l'écraser avec la version du serveur ferait perdre
+      le travail de la matinée. En cas de doute, c'est le téléphone qui a
+      raison — c'est lui qui était sur le chantier.
+    */
+    reprendreDuCompte: async (qui) => {
+      if (!qui) return 0;
+      const liste = await catalogueDesPlans(qui);
+      if (!liste?.length) return 0;
+      const ici = new Set(get().saves.map((s) => s.id));
+      let repris = 0;
+      for (const p of liste) {
+        if (ici.has(p.scan)) continue;
+        const plan = await reprendrePlan(qui, p.scan);
+        if (!plan) continue;
+        try {
+          const lu = JSON.parse(plan.contenu) as SavedScan;
+          if (!lu?.id || !Array.isArray(lu.walls)) continue;
+          const saves = [migrateSave(lu), ...get().saves];
+          set({ saves });
+          persistSoon(saves);
+          repris += 1;
+        } catch {
+          // Un plan illisible ne doit pas arrêter les suivants : le compte
+          // en garde peut-être neuf autres qui vont très bien.
+        }
+      }
+      return repris;
+    },
+
     reposerPhoto: async (id) => {
       const ph = get().photos.find((p) => p.id === id);
       if (!ph?.asset) return;

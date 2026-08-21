@@ -158,4 +158,89 @@ if ($action === 'code') {
   sortir(['ok' => true, 'pro' => 'code']);
 }
 
+/*
+  LES PLANS SUIVENT LE COMPTE.
+
+  Relevé du chantier : « que les photos soient lues même s'il réinstalle
+  l'application, tant qu'il est sur son compte ». Les photos vivent
+  désormais dans la photothèque du téléphone, où elles survivent — mais un
+  scan, lui, vit dans le stockage de l'application, et celui-là part avec
+  elle. Une photo restaurée n'aurait plus de plan où se punaiser.
+
+  Trois actions, et rien de plus : DÉPOSER un plan, LISTER ce que le compte
+  garde, REPRENDRE un plan. Les images ne montent jamais ici : le plan ne
+  porte que leurs identifiants dans la photothèque.
+
+  Nécessite la table `plans` — voir migration-plans.sql.
+*/
+if ($action === 'deposer') {
+  $scan = trim((string) ($corps['scan'] ?? ''));
+  $contenu = (string) ($corps['contenu'] ?? '');
+  $nom = trim((string) ($corps['nom'] ?? ''));
+  $maj = (int) ($corps['maj'] ?? 0);
+  if ($scan === '' || $contenu === '') {
+    sortir(['ok' => false, 'raison' => 'Plan vide.']);
+  }
+  // Deux mégaoctets : le relevé d'un logement entier en fait moins de cent
+  // kilo-octets. Au-delà, ce n'est plus un plan.
+  if (strlen($contenu) > 2097152) {
+    sortir(['ok' => false, 'raison' => 'Plan trop lourd.']);
+  }
+  $req = mysqli_prepare(
+    $db,
+    'INSERT INTO plans (identifiant, scan, nom, contenu, maj)
+     VALUES (?, ?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE nom = VALUES(nom), contenu = VALUES(contenu),
+       maj = VALUES(maj)',
+  );
+  mysqli_stmt_bind_param($req, 'ssssi', $identifiant, $scan, $nom, $contenu, $maj);
+  mysqli_stmt_execute($req);
+  sortir(['ok' => true]);
+}
+
+if ($action === 'catalogue') {
+  // Le contenu ne descend PAS ici : on liste ce que le compte garde, avec
+  // de quoi choisir. Un téléphone qui se reconnecte n'a pas à télécharger
+  // vingt relevés pour en ouvrir un.
+  $req = mysqli_prepare(
+    $db,
+    'SELECT scan, nom, maj, LENGTH(contenu) AS taille
+     FROM plans WHERE identifiant = ? ORDER BY maj DESC',
+  );
+  mysqli_stmt_bind_param($req, 's', $identifiant);
+  mysqli_stmt_execute($req);
+  $res = mysqli_stmt_get_result($req);
+  $liste = [];
+  while ($ligne = mysqli_fetch_assoc($res)) {
+    $liste[] = [
+      'scan' => $ligne['scan'],
+      'nom' => $ligne['nom'],
+      'maj' => (int) $ligne['maj'],
+      'taille' => (int) $ligne['taille'],
+    ];
+  }
+  sortir(['ok' => true, 'plans' => $liste]);
+}
+
+if ($action === 'reprendre') {
+  $scan = trim((string) ($corps['scan'] ?? ''));
+  $req = mysqli_prepare(
+    $db,
+    'SELECT nom, contenu, maj FROM plans WHERE identifiant = ? AND scan = ?',
+  );
+  mysqli_stmt_bind_param($req, 'ss', $identifiant, $scan);
+  mysqli_stmt_execute($req);
+  $res = mysqli_stmt_get_result($req);
+  $ligne = mysqli_fetch_assoc($res);
+  if (!$ligne) {
+    sortir(['ok' => false, 'raison' => 'Plan introuvable.']);
+  }
+  sortir([
+    'ok' => true,
+    'nom' => $ligne['nom'],
+    'contenu' => $ligne['contenu'],
+    'maj' => (int) $ligne['maj'],
+  ]);
+}
+
 sortir(['ok' => false, 'raison' => 'Action inconnue.']);

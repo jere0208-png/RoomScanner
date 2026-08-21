@@ -3397,8 +3397,33 @@ l'image de ses Photos, elle n'existe plus nulle part, et on ne boucle pas.
 
 **Ce volet ne suffit pas à lui seul**, et il faut le dire : une réinstallation
 efface aussi les scans eux-mêmes, qui vivent dans le stockage de l'app. Une
-photo restaurée n'a alors plus de plan où se punaiser. La seconde moitié — les
-plans qui suivent le compte, sur bourseur.fr — reste à faire.
+photo restaurée n'a alors plus de plan où se punaiser — d'où la seconde
+moitié, ci-dessous.
+
+### Les plans suivent le compte
+
+Un relevé de logement entier pèse quelques dizaines de kilo-octets : des murs,
+des ouvertures, de l'appareillage et les **identifiants** des photos. C'est du
+texte, il monte sans rien coûter — et **les images ne montent jamais** : elles
+restent dans la photothèque de l'électricien, le plan ne porte que leurs
+renvois. Une réinstallation redevient alors un non-événement : on se connecte,
+les plans redescendent, les photos se relisent depuis le téléphone.
+
+Trois actions côté serveur, et rien de plus : `deposer`, `catalogue`,
+`reprendre` (`server/api.php`). Le catalogue **ne descend pas les contenus** —
+un téléphone qui se reconnecte n'a pas à télécharger vingt relevés pour en
+ouvrir un. Et la reprise ne redescend **que ce qui manque** : un plan déjà
+présent ici a pu être retouché depuis, et l'écraser ferait perdre le travail
+de la matinée. En cas de doute, c'est le téléphone qui a raison — c'est lui
+qui était sur le chantier.
+
+**À faire une fois côté hébergement :** rejouer `server/migration-plans.sql`
+dans phpMyAdmin, puis renvoyer `server/api.php` par FTP.
+
+**Ce qui reste à brancher** : le dépôt automatique après enregistrement et la
+reprise automatique au premier lancement d'une app réinstallée. Les deux
+actions du magasin existent et sont testées (`deposerAuCompte`,
+`reprendreDuCompte`) ; il manque leurs déclencheurs.
 
 ### L'app rend la place qu'elle prend
 
