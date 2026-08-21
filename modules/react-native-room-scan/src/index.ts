@@ -155,6 +155,22 @@ export const scanEvents = new NativeEventEmitter(
   Platform.OS === 'ios' ? NativeModules.RoomScanEvents : undefined,
 );
 
+/**
+ * LE TÉLÉMÈTRE LASER — ses trois événements.
+ *
+ * `onLaserAppareil` : un télémètre trouvé sur la radio ({ id, nom, force }).
+ * `onLaserEtat`     : « pret », « eteint », « refuse », « indisponible »,
+ *                     « connecte », « deconnecte », « echec ».
+ * `onLaserMesure`   : une mesure, en mètres ({ metres }).
+ *
+ * L'émetteur est SÉPARÉ de celui du scan : un module d'événements ne peut
+ * en émettre que pour lui-même, et mêler les deux ferait recevoir les
+ * mesures à qui écoute les murs.
+ */
+export const laserEvents = new NativeEventEmitter(
+  Platform.OS === 'ios' ? NativeModules.RoomScanLaser : undefined,
+);
+
 export const RoomScan = {
   /** false = pas de LiDAR (iOS) ou pas d'ARCore (Android). */
   isSupported: (): Promise<boolean> =>
@@ -288,6 +304,48 @@ export const RoomScan = {
       return NativeModules.RoomScanPhoto.deletePhotos(paths);
     }
     return Promise.resolve(0);
+  },
+
+  /*
+    LE TÉLÉMÈTRE LASER.
+
+    La radio ne s'ouvre QUE pendant que la feuille du télémètre est à
+    l'écran : chercher en permanence viderait la batterie pour un outil
+    qu'on sort trois fois par mois, et ferait apparaître la demande
+    d'autorisation Bluetooth au premier lancement de l'application.
+
+    Sans module natif (Android, simulateur), tout rend `false` sans lever :
+    la feuille dira simplement qu'aucun télémètre n'est joignable.
+  */
+  /** Ouvre la radio et cherche les télémètres à portée. */
+  laserChercher(): Promise<boolean> {
+    if (Platform.OS === 'ios' && NativeModules.RoomScanLaser) {
+      return NativeModules.RoomScanLaser.chercher();
+    }
+    return Promise.resolve(false);
+  },
+
+  /** Ferme la radio. À appeler dès que la feuille se referme. */
+  laserArreter(): Promise<boolean> {
+    if (Platform.OS === 'ios' && NativeModules.RoomScanLaser) {
+      return NativeModules.RoomScanLaser.arreter();
+    }
+    return Promise.resolve(false);
+  },
+
+  /** Se connecte au télémètre choisi ; ses mesures arrivent ensuite seules. */
+  laserConnecter(id: string): Promise<boolean> {
+    if (Platform.OS === 'ios' && NativeModules.RoomScanLaser) {
+      return NativeModules.RoomScanLaser.connecter(id);
+    }
+    return Promise.resolve(false);
+  },
+
+  laserDeconnecter(): Promise<boolean> {
+    if (Platform.OS === 'ios' && NativeModules.RoomScanLaser) {
+      return NativeModules.RoomScanLaser.deconnecter();
+    }
+    return Promise.resolve(false);
   },
 
   /**

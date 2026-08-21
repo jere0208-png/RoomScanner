@@ -83,3 +83,19 @@ RCT_EXTERN_METHOD(shareFile:(NSString *)path
 
 @interface RCT_EXTERN_MODULE(RoomScanViewManager, RCTViewManager)
 @end
+
+/*
+  LE TELEMETRE LASER — un emetteur : c est l appareil qui parle quand on
+  appuie sur SON bouton, pas l application qui l interroge.
+*/
+@interface RCT_EXTERN_MODULE(RoomScanLaser, RCTEventEmitter)
+RCT_EXTERN_METHOD(chercher:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+RCT_EXTERN_METHOD(arreter:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+RCT_EXTERN_METHOD(connecter:(NSString *)identifiant
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+RCT_EXTERN_METHOD(deconnecter:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+@end

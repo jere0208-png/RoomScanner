@@ -25,8 +25,19 @@ jest.mock('react-native-room-scan', () => ({
     shareText: jest.fn(async () => true),
     shareFile: jest.fn(async () => true),
     viewModel: jest.fn(async () => false),
+    laserChercher: jest.fn(async () => false),
+    laserArreter: jest.fn(async () => false),
+    laserConnecter: jest.fn(async () => false),
+    laserDeconnecter: jest.fn(async () => false),
   },
   scanEvents: { addListener: jest.fn(), removeAllListeners: jest.fn() },
+  // Le telemetre a SON emetteur : un module d evenements n emet que pour
+  // lui-meme, et meler les deux ferait recevoir les mesures a qui ecoute
+  // les murs.
+  laserEvents: {
+    addListener: jest.fn(() => ({ remove: jest.fn() })),
+    removeAllListeners: jest.fn(),
+  },
   RoomScanView: 'RoomScanView',
 }));
 

@@ -20,6 +20,7 @@ import { fr } from './result/format';
 import { AddRoomSheet } from './result/AddRoomSheet';
 import { ElecSheet } from './result/ElecSheet';
 import { ExistantSheet } from './result/ExistantSheet';
+import { LaserSheet } from './result/LaserSheet';
 import { ExportSheet } from './result/ExportSheet';
 import { FurnitureSheet } from './result/FurnitureSheet';
 import { PhotoSheet } from './result/PhotoSheet';
@@ -391,6 +392,16 @@ export function ResultScreen() {
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [naming, setNaming] = useState(false);
   // Diagnostic du plan : ce dont il faut se méfier après un scan.
+  /*
+    LA CIBLE DU TÉLÉMÈTRE : ce qu'on cote, sa valeur relevée, et ce qu'on
+    en fait. Le tout dans un seul état — la feuille ne connaît ni les murs
+    ni le magasin, elle rend un nombre à qui l'a ouverte.
+  */
+  const [laser, setLaser] = useState<{
+    nom: string;
+    actuelle: number | null;
+    appliquer: (metres: number) => void;
+  } | null>(null);
   /** La feuille du tableau existant — rénovation. */
   const [existantOuvert, setExistantOuvert] = useState(false);
   const existant = useScanStore((s) => s.existant);
@@ -1296,6 +1307,28 @@ export function ResultScreen() {
           label: 'Hauteur sous plafond',
           icon: 'hauteur' as const,
           onPress: promptRoomHeight,
+        },
+        /*
+          LA HAUTEUR AU LASER — l'autre cote qu'on prend vraiment.
+
+          Debout au milieu de la pièce, le télémètre posé au sol et visant
+          le plafond : c'est le geste le plus simple du métier, et celui
+          dont dépendent les élévations, le volume et le métré mural.
+          RoomPlan la déduit du nuage de points, et se trompe d'autant plus
+          que le plafond est encombré.
+        */
+        {
+          label: 'Hauteur au laser',
+          icon: 'regle' as const,
+          onPress: () => {
+            const p = roomParts(walls, rooms).find((x) => x.roomId === roomId);
+            if (!p) return;
+            setLaser({
+              nom: 'la hauteur sous plafond',
+              actuelle: roomHeight(p.walls),
+              appliquer: (m: number) => setRoomHeight(roomId, m),
+            });
+          },
         },
         // Offerte seulement s'il y a une VOISINE : ailleurs, le geste
         // n'aboutit pas, et un choix qui ne fait rien use la confiance.
@@ -2894,6 +2927,27 @@ export function ResultScreen() {
                 crayon: true,
                 onPress: () => promptLength(selectedWall.id),
               },
+              /*
+                LE LASER, À CÔTÉ DU CLAVIER.
+
+                RoomPlan se trompe de deux à trois centimètres : sans
+                conséquence pour un plan d'ambiance, trop pour percer. Le
+                télémètre donne le millimètre — et il le donne DEVANT LE
+                CLIENT, ce qui compte autant. On vise, on appuie sur le
+                bouton de l'outil, la cote entre : rien à retenir, rien à
+                retaper.
+              */
+              {
+                label: 'Laser',
+                icone: SOLAIRES.metre,
+                onPress: () =>
+                  setLaser({
+                    nom: 'ce mur',
+                    actuelle: segLength(selectedWall),
+                    appliquer: (m: number) =>
+                      setWallLength(selectedWall.id, m),
+                  }),
+              },
             ]}
           />
         )}
@@ -3110,6 +3164,14 @@ export function ResultScreen() {
         // Fermer sans valider : les meubles restent (ils sont déjà là),
         // rien ne se pose — et la question ne reviendra pas.
         onClose={() => useScanStore.getState().oublierArrivage()}
+      />
+
+      {/* ---------- Le télémètre laser ---------- */}
+      <LaserSheet
+        visible={!!laser}
+        cible={laser}
+        onClose={() => setLaser(null)}
+        onAppliquer={(m) => laser?.appliquer(m)}
       />
 
       {/* ---------- Le tableau trouvé sur place (rénovation) ---------- */}

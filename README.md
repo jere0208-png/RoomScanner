@@ -3370,6 +3370,48 @@ une capture d'écran : le plan est une liste de murs, on le retrace en
 quelques traits dans 54 px. Rien à stocker, rien à invalider — un scan
 retouché montre son nouveau contour à l'ouverture suivante de la liste.
 
+### Le télémètre laser
+
+RoomPlan se trompe de deux à trois centimètres sur une pièce : sans
+conséquence pour un plan d'ambiance, **trop pour percer**. Le mètre laser donne
+le millimètre — et il le donne devant le client, ce qui compte autant : un
+outil de chantier qu'on sort et qui parle à l'application, ça se voit.
+
+**Ce qu'on parle** : le profil BLE des **Leica DISTO**, télémètre du bâtiment
+et le seul dont le service soit publiquement documenté — un service, une
+caractéristique, quatre octets de flottant en mètres, notifiés à chaque appui
+sur le bouton de l'outil. Bosch garde son protocole pour lui ; le code est
+écrit pour qu'un second profil s'ajoute sans le refondre, c'est la seule chose
+qu'on puisse honnêtement faire pour eux aujourd'hui. **Ce volet n'a pas encore
+été essayé sur un appareil réel** : le protocole est implémenté d'après sa
+documentation, et le premier DISTO branché dira le reste.
+
+Deux endroits où il sert, et ce sont les deux vrais : la **longueur d'un mur**
+(menu du mur → Laser) et la **hauteur sous plafond** (menu de la pièce →
+Hauteur au laser) — télémètre posé au sol, visant le plafond, le geste le plus
+simple du métier et celui dont dépendent les élévations, le volume et le métré
+mural.
+
+Trois décisions qui tiennent tout :
+
+- **la radio ne vit que le temps de la feuille**. Chercher en permanence
+  viderait la batterie pour un outil qu'on sort trois fois par mois, et ferait
+  apparaître la demande d'autorisation Bluetooth au premier lancement de
+  l'application, sans rapport avec ce qu'on faisait ;
+- **on s'abonne, on n'interroge pas**. C'est l'appareil qui pousse sa mesure
+  quand on appuie sur son bouton ; scruter la caractéristique en boucle aurait
+  vidé les deux batteries pour le même résultat ;
+- **on n'écrase jamais une cote sur un doute**. Le télémètre ne sait pas quel
+  mur on vise : braqué sur la cloison d'en face, il envoie une cote
+  parfaitement valable qui remplacerait un relevé juste. Quand l'écart au scan
+  dépasse à la fois **un cinquième et quinze centimètres**, ce n'est plus une
+  imprécision de LiDAR — c'est un autre mur : la feuille le dit et demande un
+  second appui. En dessous, on applique sans rien demander, sinon l'outil
+  devient inutilisable.
+
+La cote s'inscrit **au centimètre** : le laser donne le millimètre, mais écrire
+3,472 m sur une élévation promet une précision que la maçonnerie n'a pas.
+
 ### Les boutons de pose parlent français
 
 Relevé du chantier : « les 3 boutons de placement d'éléments élec lors d'un
