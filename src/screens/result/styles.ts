@@ -20,7 +20,36 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     // Le plan touche presque les bords : c'est lui qu'on regarde.
     paddingHorizontal: 12,
   },
-  emptyContainer: { alignItems: 'center', justifyContent: 'center', padding: 32 },
+  /*
+    L'ÉTAT VIDE OCCUPE CE QUI RESTE SOUS LA BARRE.
+
+    Il n'avait pas de `flex` : posé sous la barre de retour, il se serait
+    contenté de la hauteur de son texte, tout en haut de l'écran. Il prend
+    donc le reste de la page et centre ce qu'il porte.
+  */
+  emptyContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 32,
+  },
+  /*
+    LE BOUTON DE L'ÉTAT VIDE — à sa taille, pas à celle de la page.
+
+    Il empruntait `primaryButton`, qui vit dans une RANGÉE horizontale : son
+    `flex: 1` y prend la largeur restante. Dans une colonne, le même style
+    prend toute la HAUTEUR — le bouton remplissait l'écran et poussait le
+    texte contre le bord, où il se faisait couper. Un style de rangée ne se
+    réutilise pas dans une pile.
+  */
+  emptyPrimary: {
+    alignSelf: 'stretch',
+    backgroundColor: c.blue,
+    borderRadius: radius.pill,
+    paddingVertical: 15,
+    alignItems: 'center',
+    ...glow(c.blue),
+  },
   emptyTitle: { color: c.ink, fontSize: 22, fontWeight: '800' },
   emptyText: {
     color: c.inkSoft,

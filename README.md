@@ -3495,6 +3495,16 @@ manquait que la porte d'entrée**. Un bouton « Dessiner un plan » sur l'accuei
 toujours offert — même quand le scan l'est aussi, parce que c'est souvent le
 chemin le plus court, pas un lot de consolation.
 
+Deux défauts de cet écran, vus sur le téléphone et pas en banc, ont suivi —
+relevé du chantier : « le bouton prend toute la page verticalement avec le
+texte tout en haut et coupé par le bouton », et « pas de retour en arrière ».
+Le premier est un piège classique : le bouton empruntait le style de la rangée
+d'actions, dont le `flex: 1` prend la largeur restante **dans une rangée** et
+toute la hauteur **dans une colonne**. Un style de rangée ne se réutilise pas
+dans une pile. Le second était plus grave : un écran sans retour ne se quitte
+qu'en tuant l'application. Les deux sont maintenant tenus par des bancs, dont
+un qui inspecte le style appliqué au bouton.
+
 Dans la foulée, **l'écran d'un plan vide a été refait**. Il ne disait qu'une
 chose — « Aucun mur détecté, balayez plus lentement » — avec une seule sortie,
 « Réessayer » : le message d'un scan raté, servi aussi à qui venait de choisir

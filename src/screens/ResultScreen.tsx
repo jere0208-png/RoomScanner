@@ -1649,7 +1649,32 @@ export function ResultScreen() {
   */
   if (walls.length === 0) {
     return (
-      <View style={[styles.container, styles.emptyContainer]}>
+      <View style={styles.container}>
+        {/*
+          UN ÉCRAN SANS RETOUR EST UN PIÈGE.
+
+          Cet état n'avait ni barre ni flèche : on y entrait par « Dessiner
+          un plan » et l'on n'en sortait plus qu'en tuant l'application. La
+          barre du haut est celle de l'écran ordinaire, au mot près — on ne
+          change pas de repères parce que le plan est vide.
+        */}
+        <View style={styles.headerRow}>
+          <TouchableOpacity
+            style={styles.backButton}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityLabel="Retour"
+            onPress={() =>
+              setScreen(resultOrigin === 'library' ? 'library' : 'home')
+            }>
+            <BackChevron color={teinte.ink} />
+          </TouchableOpacity>
+          <RetourGlisse
+            onRetour={() =>
+              setScreen(resultOrigin === 'library' ? 'library' : 'home')
+            }
+          />
+        </View>
+        <View style={styles.emptyContainer}>
         <Text style={styles.emptyTitle}>
           {planVierge ? 'Plan vierge' : 'Aucun mur détecté'}
         </Text>
@@ -1662,8 +1687,17 @@ export function ResultScreen() {
               'lumière. Les grandes surfaces vitrées et les miroirs peuvent ' +
               'gêner la détection — ou tracez la pièce à ses cotes.'}
         </Text>
+        {/*
+          LE BOUTON A SA TAILLE, PAS CELLE DE LA PAGE.
+
+          Il portait `primaryButton`, qui vit normalement dans une RANGÉE
+          horizontale : son `flex: 1` y prend la largeur restante. Dans une
+          colonne, le même style prend toute la HAUTEUR — le bouton a
+          rempli l'écran et poussé le texte contre le bord haut, où il s'est
+          fait couper. Un style de rangée ne se réutilise pas dans une pile.
+        */}
         <TouchableOpacity
-          style={styles.primaryButton}
+          style={styles.emptyPrimary}
           accessibilityLabel="Ajouter une pièce"
           onPress={() => setAjoutPiece(true)}>
           <Text style={styles.primaryText}>Ajouter une pièce</Text>
@@ -1714,6 +1748,7 @@ export function ResultScreen() {
           }}
         />
         <PromptSheet data={prompt} onClose={() => setPrompt(null)} />
+        </View>
       </View>
     );
   }
