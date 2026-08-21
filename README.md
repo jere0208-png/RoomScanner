@@ -1335,6 +1335,17 @@ exclusifs se comparent d'un coup d'œil, là où une liste les fait lire un
 par un. Puis les **rangées à chevron** — mes scans, restaurer l'achat,
 confidentialité.
 
+**L'avatar est bleu, et son contour le serre.** Relevé du patron : « refais
+l'avatar en bleu et le contour autour de l'icône, sans marge blanche ». La
+silhouette se lisait GRISE dans un disque gris — rien ne la distinguait du
+reste de la page, alors que c'est l'utilisateur qu'elle représente. Or la
+silhouette Solar est un cercle PLEIN dont le buste est découpé : peinte en
+bleu, elle EST l'avatar, et le disque de fond derrière elle — celui qui
+faisait la marge claire — n'a plus de raison d'être. En Pro, le contour
+vif descend au ras : quatre-vingt-huit pour une icône de quatre-vingt-quatre,
+soit l'épaisseur du trait de chaque côté. C'est le réglage déjà obtenu sur
+l'accueil, où l'anneau avait dû se rapprocher pour la même raison.
+
 **L'apparence a gagné un troisième choix : Système**, et c'est désormais le
 défaut. Le thème se bornait à clair ou sombre, choisis à la main ; un
 électricien passe sa journée dehors et sa soirée dans un tableau — c'est le

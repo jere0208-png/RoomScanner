@@ -117,17 +117,17 @@ export function ProfilScreen() {
           sur l'accueil.
         */}
         {pro ? (
-          <ContourVif rayon={44} fond={c.bg} style={s.avatarOr}>
+          <ContourVif rayon={44} fond={c.bg} style={s.avatarCadre}>
             <View style={s.avatarDedans}>
-              <Svg width={64} height={64} viewBox="0 0 24 24">
-                <Path d={SOLAIRES.avatar} fill={c.inkSoft} fillRule="evenodd" />
+              <Svg width={84} height={84} viewBox="0 0 24 24">
+                <Path d={SOLAIRES.avatar} fill={c.blue} fillRule="evenodd" />
               </Svg>
             </View>
           </ContourVif>
         ) : (
           <View style={s.avatar}>
-            <Svg width={72} height={72} viewBox="0 0 24 24">
-              <Path d={SOLAIRES.avatar} fill={c.inkSoft} fillRule="evenodd" />
+            <Svg width={88} height={88} viewBox="0 0 24 24">
+              <Path d={SOLAIRES.avatar} fill={c.blue} fillRule="evenodd" />
             </Svg>
           </View>
         )}
@@ -328,16 +328,21 @@ const themed = (c: Palette) =>
       shadowOpacity: 0.07,
     },
     titreBarre: { color: c.ink, fontSize: 17, fontWeight: '700' },
-    avatar: {
-      width: 88,
-      height: 88,
-      borderRadius: 44,
-      backgroundColor: c.surfaceSunken,
-      alignSelf: 'center',
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    avatarOr: { width: 88, height: 88, alignSelf: 'center' },
+    /*
+      L'ICÔNE EST LE DISQUE — relevé du patron : « refais l'avatar en bleu
+      et le contour autour de l'icône, sans marge blanche ».
+
+      La silhouette Solar est un cercle PLEIN dont le buste est découpé :
+      peinte en bleu, elle EST l'avatar, et il n'y a plus de disque de
+      fond à poser derrière — c'est lui qui faisait la marge claire. Le
+      cadre ne garde donc que le centrage.
+    */
+    avatar: { alignSelf: 'center' },
+    // Le contour AU RAS : quatre-vingt-huit pour une icône de
+    // quatre-vingt-quatre, soit l'épaisseur du trait de chaque côté. Le
+    // même réglage que sur l'accueil, où l'anneau avait déjà dû se
+    // rapprocher — un disque clair entre les deux se lit comme un défaut.
+    avatarCadre: { width: 88, height: 88, alignSelf: 'center' },
     avatarDedans: { flexGrow: 1, alignItems: 'center', justifyContent: 'center' },
     nom: {
       color: c.ink,

@@ -27,8 +27,11 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 
 import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
-import { Alert } from 'react-native';
+import { Alert, StyleSheet } from 'react-native';
 import { ProfilScreen } from '../src/screens/ProfilScreen';
+import { ContourVif } from '../src/components/ContourVif';
+import { SOLAIRES } from '../src/ui/solaires';
+import { light } from '../src/theme';
 import { HomeScreen } from '../src/screens/HomeScreen';
 import { useScanStore } from '../src/store/scanStore';
 import { useAccountStore } from '../src/store/accountStore';
@@ -83,6 +86,46 @@ describe("l'identité en tête", () => {
       parLabel(a, 'Retour')?.props.onPress();
     });
     expect(useScanStore.getState().screen).toBe('home');
+  });
+});
+
+describe("l'avatar", () => {
+  /*
+    L'AVATAR EST BLEU, ET SON CONTOUR LE SERRE — relevé du patron : « refais
+    l'avatar en bleu et le contour autour de l'icône, sans marge blanche ».
+
+    La silhouette se lisait GRISE dans un disque gris : rien ne la
+    distinguait du reste de la page, alors que c'est l'utilisateur qu'elle
+    représente. Et en Pro, le contour vif était posé sur un cadre de
+    quatre-vingt-huit pour une icône de soixante-quatre : douze points de
+    fond entre l'anneau et l'icône, lus comme un liseré clair. C'est la
+    même leçon que sur l'accueil, où l'anneau avait déjà dû se rapprocher.
+  */
+  const silhouette = (a: TestRenderer.ReactTestRenderer) =>
+    noeuds(a).filter((n) => n.props?.d === SOLAIRES.avatar);
+
+  it('se dessine dans le bleu de l’app, en gratuit comme en Pro', () => {
+    const a = rendre(<ProfilScreen />);
+    expect(silhouette(a)[0]?.props.fill).toBe(light.blue);
+    useAccountStore.setState({ pro: true });
+    const b = rendre(<ProfilScreen />);
+    expect(silhouette(b)[0]?.props.fill).toBe(light.blue);
+  });
+
+  it('en Pro, le contour serre l’icône — pas de marge autour', () => {
+    useAccountStore.setState({ pro: true });
+    const a = rendre(<ProfilScreen />);
+    const contour = a.root.findAllByType(ContourVif)[0];
+    const cadre = StyleSheet.flatten(contour.props.style) as { width?: number };
+    // On remonte au Svg porteur de la taille : le parent du tracé est un
+    // intermédiaire sans largeur.
+    let icone = silhouette(a)[0].parent;
+    while (icone && icone.props?.width === undefined) icone = icone.parent;
+    // Quatre points d'écart au plus entre l'anneau et l'icône : c'est
+    // l'épaisseur du trait, rien de plus.
+    expect(Number(cadre.width) - Number(icone?.props.width)).toBeLessThanOrEqual(
+      4,
+    );
   });
 });
 
