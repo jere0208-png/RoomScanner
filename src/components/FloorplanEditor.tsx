@@ -132,6 +132,33 @@ export function cartoucheHeurte(
   );
 }
 
+/**
+ * UN SEGMENT PASSE-T-IL DANS UN CADRE ? — la question du menu de mur.
+ *
+ * Le menu d'un mur ne doit pas se poser sur le mur qu'on vient de choisir :
+ * c'est le seul trait qu'on regarde à ce moment-là. Savoir s'il le recouvre
+ * revient à demander si le segment traverse le rectangle de la barre.
+ *
+ * On échantillonne le segment plutôt que de croiser quatre droites : à
+ * quarante pas, aucun mur d'un logement ne se faufile entre deux points
+ * sans être vu, et la formule tient en trois lignes qu'on relit sans
+ * crayon — un test de Liang-Barsky, non.
+ */
+export function segmentDansCadre(
+  a: { x: number; y: number },
+  b: { x: number; y: number },
+  cadre: { x: number; y: number; rx: number; ry: number },
+): boolean {
+  for (let k = 0; k <= 40; k++) {
+    const x = a.x + ((b.x - a.x) * k) / 40;
+    const y = a.y + ((b.y - a.y) * k) / 40;
+    if (Math.abs(x - cadre.x) < cadre.rx && Math.abs(y - cadre.y) < cadre.ry) {
+      return true;
+    }
+  }
+  return false;
+}
+
 /*
   LES ICÔNES DU MENU VIENNENT DU JEU « SOLAR BOLD » (refonte du patron) —
   les mêmes silhouettes que la rangée d'outils, généré dans
@@ -1068,7 +1095,7 @@ export function FloorplanEditor({
                 qui n'appartient à rien tombe ici. `transparent` et non
                 `none` — une surface sans couleur n'est pas touchable. */}
             {/*
-              Le fond répond MÊME HORS ÉDITION.
+              Le fond répond MÊME HBLEUS ÉDITION.
               Un meuble se sélectionne aussi en lecture — par sa vignette,
               ou en le touchant — et il fallait alors retoucher le meuble
               lui-même pour le lâcher : n'importe où ailleurs, rien ne se
@@ -2059,7 +2086,7 @@ export function FloorplanEditor({
 
           {/* Meuble sélectionné : poignée de déplacement + bouton supprimer */}
           {/* Le meuble sélectionné : toute son emprise se glisse, sa croix
-              et sa poignée de rotation flottent HORS de lui.
+              et sa poignée de rotation flottent HBLEUS de lui.
 
               Une poignée de 44 px au centre ne suffisait pas : dès qu'on
               posait le doigt à côté du centre — c'est-à-dire presque
@@ -2169,7 +2196,7 @@ export function FloorplanEditor({
                         (Math.atan2(cote2.y - mil.y, cote2.x - mil.x) * 180) /
                         Math.PI;
                       /*
-                        LA POIGNÉE SE POSE JUSTE DEHORS, pas sur le meuble.
+                        LA POIGNÉE SE POSE JUSTE DEHBLEUS, pas sur le meuble.
 
                         Sa zone touchable fait quarante points ; posées sur
                         les quatre bords d'un meuble de soixante centimètres,
@@ -2361,23 +2388,73 @@ export function FloorplanEditor({
               const demiBarre =
                 Math.abs(nx) * (WALL_MENU.w / 2) +
                 Math.abs(ny) * (WALL_MENU.h / 2);
-              let gap = 54;
+              /*
+                L'ÉCART PART DU BORD DE LA BARRE, PAS DE SON CENTRE.
+
+                Il valait cinquante-quatre points, mesurés du milieu du mur
+                au CENTRE de la barre : pour un mur horizontal, la barre
+                fait quarante-six de haut, son bord arrivait donc à cinq
+                points du trait — relevé du patron, capture à l'appui :
+                « le bloc du menu ne doit pas toucher le mur ». On compte
+                désormais la demi-barre PLUS la marge, et le mur qu'on
+                vient de désigner reste entièrement visible.
+              */
+              const ECART_MUR = 22;
+              let gap = demiBarre + ECART_MUR;
               if (selectedWallId) {
                 const p = poigneeAt(w, mapping, flip === 1 ? -1 : 1, {
                   w: layout.w,
                   h: layout.h,
                 });
                 const dPoignee = (p.x - mid.x) * nx + (p.y - mid.y) * ny;
-                gap = Math.max(54, dPoignee + demiBarre + 17 + 6);
+                gap = Math.max(gap, dPoignee + demiBarre + 17 + 6);
               }
-              let bx = mid.x + nx * gap;
-              let by = mid.y + ny * gap;
-              // Et jamais hors du cadre : l'encombrement est celui que le
-              // banc connaît (WALL_MENU), une seule vérité pour les deux.
               const demiW = WALL_MENU.w / 2 + 4;
               const demiH = WALL_MENU.h / 2 + 4;
-              bx = Math.min(layout.w - demiW, Math.max(demiW, bx));
-              by = Math.min(layout.h - demiH, Math.max(demiH, by));
+              /*
+                LE RAPPEL DANS LE CADRE NE DOIT PAS RAMENER LA BARRE SUR LE
+                MUR — c'était la seconde cause, et la plus vicieuse : près
+                d'un bord, le menu poussé vers l'intérieur revenait
+                exactement en travers du trait.
+
+                On essaie donc les deux côtés du mur, et l'on garde celui
+                qui, UNE FOIS BORNÉ, laisse le mur libre. Si aucun ne
+                convient (un mur en plein bord d'écran), on glisse la barre
+                le long du mur jusqu'à le dégager : sortir du cadre n'est
+                jamais une option, cacher le mur ne l'est plus.
+              */
+              const borner = (px: number, py: number) => ({
+                x: Math.min(layout.w - demiW, Math.max(demiW, px)),
+                y: Math.min(layout.h - demiH, Math.max(demiH, py)),
+              });
+              const libre = (p: { x: number; y: number }) =>
+                !segmentDansCadre(a2, b2, {
+                  x: p.x,
+                  y: p.y,
+                  rx: WALL_MENU.w / 2 + ECART_MUR / 2,
+                  ry: WALL_MENU.h / 2 + ECART_MUR / 2,
+                });
+              let pos = borner(mid.x + nx * gap, mid.y + ny * gap);
+              if (!libre(pos)) {
+                const autre = borner(mid.x - nx * gap, mid.y - ny * gap);
+                if (libre(autre)) {
+                  pos = autre;
+                } else {
+                  // Le long du mur : on s'éloigne du milieu, par pas d'un
+                  // quart de barre, du côté où il reste de la place.
+                  const ux = (b2.x - a2.x) / len;
+                  const uy = (b2.y - a2.y) / len;
+                  for (let k = 1; k <= 12 && !libre(pos); k++) {
+                    const d = (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 26;
+                    pos = borner(
+                      mid.x + nx * gap + ux * d,
+                      mid.y + ny * gap + uy * d,
+                    );
+                  }
+                }
+              }
+              const bx = pos.x;
+              const by = pos.y;
               return (
                 <View
                   style={[

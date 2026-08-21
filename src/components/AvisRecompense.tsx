@@ -16,7 +16,7 @@ import React from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { SOLAIRES } from '../ui/solaires';
-import { ORS } from './ContourOr';
+import { BLEUS } from './ContourVif';
 import { useAccountStore } from '../store/accountStore';
 import { useTheme, type Palette } from '../theme';
 
@@ -40,7 +40,7 @@ export function AvisRecompense() {
           <View style={s.etoiles}>
             {[0, 1, 2, 3, 4].map((i) => (
               <Svg key={i} width={30} height={30} viewBox="0 0 24 24">
-                <Path d={SOLAIRES.etoile} fill={ORS[1]} fillRule="evenodd" />
+                <Path d={SOLAIRES.etoile} fill={BLEUS[1]} fillRule="evenodd" />
               </Svg>
             ))}
           </View>

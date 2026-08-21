@@ -41,7 +41,7 @@ export interface Wire {
 }
 
 /** Les couleurs de la norme, et rien d'autre. */
-export const WIRE_COLORS: Record<WireRole, { color: string; label: string }> = {
+export const WIRE_COLBLEUS: Record<WireRole, { color: string; label: string }> = {
   phase: { color: '#B8352A', label: 'Phase — rouge' },
   neutre: { color: '#2E6FD6', label: 'Neutre — bleu clair' },
   terre: { color: '#5A9E31', label: 'Terre — vert/jaune' },
@@ -95,9 +95,9 @@ export function wiresOf(circuit: Circuit, fixtures?: Fixture[]): Wire[] {
     ];
   }
   const base: Wire[] = [
-    { role: 'phase', ...WIRE_COLORS.phase, section },
-    { role: 'neutre', ...WIRE_COLORS.neutre, section },
-    { role: 'terre', ...WIRE_COLORS.terre, section },
+    { role: 'phase', ...WIRE_COLBLEUS.phase, section },
+    { role: 'neutre', ...WIRE_COLBLEUS.neutre, section },
+    { role: 'terre', ...WIRE_COLBLEUS.terre, section },
   ];
   if (circuit.nature !== 'eclairage') return base;
 
@@ -118,11 +118,11 @@ export function wiresOf(circuit: Circuit, fixtures?: Fixture[]): Wire[] {
 
   const out = [...base];
   if (commandes >= 1 && lumieres >= 1) {
-    out.push({ role: 'retour', ...WIRE_COLORS.retour, section });
+    out.push({ role: 'retour', ...WIRE_COLBLEUS.retour, section });
   }
   if (vaEtVient) {
-    out.push({ role: 'navette', ...WIRE_COLORS.navette, section });
-    out.push({ role: 'navette', ...WIRE_COLORS.navette, section });
+    out.push({ role: 'navette', ...WIRE_COLBLEUS.navette, section });
+    out.push({ role: 'navette', ...WIRE_COLBLEUS.navette, section });
   }
   return out;
 }

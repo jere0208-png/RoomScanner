@@ -38,14 +38,14 @@ import React from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import { LinearGradient, Path } from 'react-native-svg';
-import { ContourOr } from '../src/components/ContourOr';
+import { ContourVif } from '../src/components/ContourVif';
 import { light } from '../src/theme';
 import { HomeScreen } from '../src/screens/HomeScreen';
 import { LogoMark } from '../src/components/LogoMark';
 import { PhoneShowcase } from '../src/components/PhoneShowcase';
 import { GlowButton } from '../src/components/GlowButton';
 import { ThemeGlyph } from '../src/components/ThemeGlyph';
-import { TexteOr } from '../src/components/ContourOr';
+import { TexteVif } from '../src/components/ContourVif';
 import { SOLAIRES } from '../src/ui/solaires';
 import { useScanStore } from '../src/store/scanStore';
 import { useAccountStore } from '../src/store/accountStore';
@@ -200,7 +200,7 @@ describe('l’accueil', () => {
     */
     expect(vu).not.toContain('GRATUIT');
     expect(bloc.findAllByType(LinearGradient)).toHaveLength(0);
-    expect(bloc.findAllByType(ContourOr)).toHaveLength(0);
+    expect(bloc.findAllByType(ContourVif)).toHaveLength(0);
     const nomGris = bloc
       .findAllByType(Text)
       .find((n) =>
@@ -267,12 +267,12 @@ describe('l’accueil', () => {
         typeof n.props?.onPress === 'function',
     )[0];
     // Le prénom respire dans la typo d'or…
-    const typos = bloc.findAllByType(TexteOr);
+    const typos = bloc.findAllByType(TexteVif);
     expect(typos).toHaveLength(1);
     expect(typos[0].props.texte).toBe('Jérôme');
     // …et l'avatar se cercle du contour d'or, AU RAS de l'icône grise —
     // relevé du patron : plus de disque clair entre l'anneau et l'avatar.
-    const contour = bloc.findAllByType(ContourOr);
+    const contour = bloc.findAllByType(ContourVif);
     expect(contour).toHaveLength(1);
     expect(contour[0].props.fond).toBe(light.bg);
     const stAnneau = StyleSheet.flatten(contour[0].props.style) as {
@@ -280,7 +280,7 @@ describe('l’accueil', () => {
     };
     expect(stAnneau.width).toBeLessThanOrEqual(38);
     // Et le prénom doré s'allège comme le gris.
-    const typoNom = bloc.findAllByType(TexteOr)[0];
+    const typoNom = bloc.findAllByType(TexteVif)[0];
     expect(Number(typoNom.props.graisse)).toBeLessThanOrEqual(600);
     useAccountStore.setState({ pro: false });
   });
@@ -307,7 +307,7 @@ describe('l’accueil', () => {
     )[0];
     // L'avatar Pro : l'anneau d'or se lit en 36.
     const stAnneau = StyleSheet.flatten(
-      bloc.findAllByType(ContourOr)[0].props.style,
+      bloc.findAllByType(ContourVif)[0].props.style,
     ) as { width?: number };
     expect(stAnneau.width).toBeGreaterThanOrEqual(35);
     // En gratuit, l'avatar nu suit le mouvement : lui aussi a grandi.

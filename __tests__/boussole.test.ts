@@ -95,7 +95,7 @@ describe('la rose des vents du dossier', () => {
 
   /**
    * L'outil : `UPDATE_BOUSSOLE=1 npx jest boussole` écrit le dossier
-   * d'essai HORS du dépôt (dossier temporaire), pour le regarder avec
+   * d'essai HBLEUS du dépôt (dossier temporaire), pour le regarder avec
    * `node tools/pdf-vers-svg.mjs` — une rose se juge à l'œil, pas au grep.
    */
   it('écrit le dossier d’essai quand on le demande', () => {

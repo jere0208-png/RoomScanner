@@ -512,7 +512,7 @@ describe('les arêtes du bâti', () => {
         };
         const dt = (t.proj[0].depth + t.proj[1].depth) / 2;
         for (const a of aplats) {
-          // Un mur vu de DEHORS couvre la pièce : c'est voulu, et c'est
+          // Un mur vu de DEHBLEUS couvre la pièce : c'est voulu, et c'est
           // réglé par les calques, pas ici.
           if (a.calque !== t.calque) continue;
           if (!dansLePolygone(pt, a.proj)) continue;

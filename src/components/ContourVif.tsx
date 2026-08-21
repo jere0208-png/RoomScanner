@@ -1,7 +1,7 @@
 /**
- * LE CONTOUR D'OR — la peau du badge Pro, prêtée à d'autres blocs.
+ * LE CONTOUR VIF — la peau du badge Pro, prêtée à d'autres blocs.
  *
- * Le badge a établi la recette : une bande d'ors monotones qui glisse, et
+ * Le badge a établi la recette : une bande de bleus monotones qui glisse, et
  * un couvercle posé dessus, en retrait du bord — ce qui dépasse est le
  * contour, et il respire. La carte du comparatif Pro et le bouton
  * d'abonnement portent LE MÊME contour : trois dégradés réglés à la main
@@ -36,19 +36,36 @@ import Svg, {
 } from 'react-native-svg';
 
 /**
- * La famille d'ors, en boucle : doré, clair, bronze, et retour au doré —
- * le premier et le dernier arrêt sont LE MÊME, sans quoi la couture se
+ * LA FAMILLE DE BLEUS, EN BOUCLE.
+ *
+ * Le Pro s'est longtemps signé à l'OR : un doré, un clair, un bronze. Sur
+ * une application dont toute la signature tient en UN bleu saturé, cet or
+ * était le seul endroit à parler une autre langue — relevé du patron :
+ * « change le doré en bleu vivant ».
+ *
+ * Les trois teintes sont PROCHES, et c'est le cahier des charges : « on ne
+ * doit pas voir clairement l'animation, mais on doit voir que ça vit ». Un
+ * écart franc donnerait un arc-en-ciel qui défile ; ici la bande est
+ * presque unie à tout instant, et seule la lente respiration se remarque.
+ *
+ * Le premier et le dernier arrêt sont LE MÊME, sans quoi la couture se
  * verrait à chaque tour.
  */
-export const ORS = ['#C8861F', '#E9B54D', '#A3690F', '#C8861F'] as const;
+export const BLEUS = ['#2A62FF', '#6D9BFF', '#123FD1', '#2A62FF'] as const;
 
 /** L'épaisseur du contour : celle du badge. */
 export const TRAIT = 1.5;
 
-/** Une vague toutes les huit secondes : fluide, jamais pressée. */
-export const DUREE_VAGUE = 8000;
+/**
+ * UNE VAGUE TOUTES LES QUATORZE SECONDES.
+ *
+ * Huit secondes, c'était encore une animation qu'on REGARDE. Ce qu'on veut
+ * est plus discret : que le bloc ait l'air vivant quand l'œil s'y pose,
+ * sans jamais attirer le regard pendant qu'on lit le prix à côté.
+ */
+export const DUREE_VAGUE = 14000;
 
-export function ContourOr({
+export function ContourVif({
   rayon,
   fond,
   style,
@@ -109,11 +126,11 @@ export function ContourOr({
           ]}>
           <Svg width={periode * 2} height={dims.h}>
             <Defs>
-              <LinearGradient id="contour-ors" x1="0" y1="0" x2="1" y2="0">
-                {ORS.map((teinte, i) => (
+              <LinearGradient id="contour-vif" x1="0" y1="0" x2="1" y2="0">
+                {BLEUS.map((teinte, i) => (
                   <Stop
                     key={i}
-                    offset={`${Math.round((i / (ORS.length - 1)) * 100)}%`}
+                    offset={`${Math.round((i / (BLEUS.length - 1)) * 100)}%`}
                     stopColor={teinte}
                   />
                 ))}
@@ -121,12 +138,12 @@ export function ContourOr({
             </Defs>
             {/* Deux rectangles, même dégradé : la copie entre par la droite
                 pendant que l'originale sort par la gauche. */}
-            <Rect x={0} width={periode} height={dims.h} fill="url(#contour-ors)" />
+            <Rect x={0} width={periode} height={dims.h} fill="url(#contour-vif)" />
             <Rect
               x={periode}
               width={periode}
               height={dims.h}
-              fill="url(#contour-ors)"
+              fill="url(#contour-vif)"
             />
           </Svg>
         </Animated.View>
@@ -145,15 +162,15 @@ export function ContourOr({
 }
 
 /**
- * LA TYPO D'OR — un mot qui respire comme les lettres du badge.
+ * LA TYPO VIVE — un mot qui respire comme les lettres du badge.
  *
- * Même recette exactement : la bande d'ors glisse au fond, et un couvercle
+ * Même recette exactement : la bande de bleus glisse au fond, et un couvercle
  * de la couleur du bloc se pose dessus, TROUÉ au masque en forme du mot.
  * La seule différence avec le badge, c'est que le mot n'a pas de cotes
  * fixes : un vrai `Text` (invisible, mais lu par les lecteurs d'écran)
  * réserve la place et donne la mesure, puis le sandwich se dessine dessus.
  */
-export function TexteOr({
+export function TexteVif({
   texte,
   taille,
   graisse = '800',
@@ -219,22 +236,22 @@ export function TexteOr({
             }}>
             <Svg width={periode * 2} height={dims.h}>
               <Defs>
-                <LinearGradient id="typo-ors" x1="0" y1="0" x2="1" y2="0">
-                  {ORS.map((teinte, i) => (
+                <LinearGradient id="typo-vif" x1="0" y1="0" x2="1" y2="0">
+                  {BLEUS.map((teinte, i) => (
                     <Stop
                       key={i}
-                      offset={`${Math.round((i / (ORS.length - 1)) * 100)}%`}
+                      offset={`${Math.round((i / (BLEUS.length - 1)) * 100)}%`}
                       stopColor={teinte}
                     />
                   ))}
                 </LinearGradient>
               </Defs>
-              <Rect x={0} width={periode} height={dims.h} fill="url(#typo-ors)" />
+              <Rect x={0} width={periode} height={dims.h} fill="url(#typo-vif)" />
               <Rect
                 x={periode}
                 width={periode}
                 height={dims.h}
-                fill="url(#typo-ors)"
+                fill="url(#typo-vif)"
               />
             </Svg>
           </Animated.View>

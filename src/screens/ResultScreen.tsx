@@ -182,6 +182,8 @@ export function ResultScreen() {
   */
   const carteW = Math.max(0, winLargeur - 24);
   const [hActions, setHActions] = useState(0);
+  /** Ce que la colonne d'actions occupe VRAIMENT en largeur. */
+  const [wActions, setWActions] = useState(0);
   /**
    * TROIS ÉTAGES AU BAS DE LA CARTE, ET RIEN QUI DÉBORDE.
    *
@@ -331,14 +333,29 @@ export function ResultScreen() {
   const reset = useScanStore((s) => s.reset);
   const teinte = useTheme();
   const styles = getStyles(teinte);
+  /*
+    LA ZONE RÉSERVÉE DE LA COLONNE D'ACTIONS.
+
+    Relevé du patron, trait rouge tracé sur la capture : le bandeau du mur
+    passait SOUS « Enregistrer / Annuler / Édition », et son dernier bouton
+    se lisait tranché par une pastille bleue. La réserve valait
+    soixante-deux points écrits en dur — un pari sur la largeur d'une
+    colonne qui grandit avec ses mots : « Enregistrer » est plus long
+    qu'« Édition ».
+
+    On MESURE donc ce qu'elle occupe (le même `onLayout` qui donne déjà sa
+    hauteur), et tout ce qui vit à sa gauche s'arrête là, plus un vrai
+    blanc : deux blocs qui se frôlent se lisent comme un seul.
+  */
+  const garde = Math.max(62, wActions + 10);
   // Les bandeaux contextuels se posent au-dessus de la rangée de calques.
   const stylesBarres = useMemo(
     () => ({
       ...styles,
-      wallStrip: [styles.wallStrip, { bottom: ligneBandeau }],
-      editBar: [styles.editBar, { bottom: ligneBandeau }],
+      wallStrip: [styles.wallStrip, { bottom: ligneBandeau, marginRight: garde }],
+      editBar: [styles.editBar, { bottom: ligneBandeau, marginRight: garde }],
     }),
-    [styles, ligneBandeau],
+    [styles, ligneBandeau, garde],
   );
 
 
@@ -2722,7 +2739,10 @@ export function ResultScreen() {
               retour en arrière juste dessous.
             */
             accessibilityLabel="Actions du plan"
-            onLayout={(e) => setHActions(e.nativeEvent.layout.height)}
+            onLayout={(e) => {
+              setHActions(e.nativeEvent.layout.height);
+              setWActions(e.nativeEvent.layout.width);
+            }}
             style={[styles.editAnchor, { bottom: ligneOutils }]}>
             {/* Revenir en arrière ne défile pas avec les calques : c'est le
                 geste qu'on cherche dans l'urgence, et il se tient dans la

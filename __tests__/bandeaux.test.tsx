@@ -637,6 +637,140 @@ describe('l’écran des résultats', () => {
   });
 
   /**
+   * LA COLONNE D'ACTIONS A SA ZONE RÉSERVÉE — rien ne passe dessous.
+   *
+   * Relevé du patron, trait rouge tracé sur la capture : le bandeau du mur
+   * (« 0,65 m · Mesures · Laser · Détacher ») passait SOUS la colonne
+   * « Enregistrer / Annuler / Édition », et son dernier bouton se lisait à
+   * moitié, tranché par une pastille bleue.
+   *
+   * La réserve valait soixante-deux points, écrits en dur. C'était un pari
+   * sur la largeur de la colonne — et la colonne grandit avec ses mots :
+   * « Enregistrer » est plus long que « Édition ». On MESURE donc ce
+   * qu'elle occupe vraiment, et le bandeau s'arrête là.
+   */
+  it('réserve au bandeau la largeur réelle de la colonne d’actions', () => {
+    const tree = monter();
+    act(() => bouton(tree, 'Édition')!.props.onPress());
+    act(() => {
+      jest.advanceTimersByTime(500);
+    });
+    const colonne = tree.root
+      .findAll((n) => n.props?.accessibilityLabel === 'Actions du plan')
+      .pop();
+    expect(colonne).toBeDefined();
+    // Le téléphone mesure la colonne : elle est large de 96 points.
+    act(() =>
+      colonne!.props.onLayout({
+        nativeEvent: { layout: { width: 96, height: 150 } },
+      }),
+    );
+    // On sélectionne un mur : c'est lui qui lève le bandeau.
+    const prise = tree.root
+      .findAll((n) => typeof n.props?.onPress === 'function')
+      .find((n) => n.findAll((x) => x.props?.strokeWidth === 30).length > 0);
+    act(() => prise!.props.onPress());
+    const strip = tree.root
+      .findAll((n) => {
+        const st = StyleSheet.flatten(n.props?.style) as
+          | { marginRight?: number; borderRadius?: number }
+          | undefined;
+        return (
+          typeof st?.marginRight === 'number' &&
+          n.findAll((x) => x.props?.accessibilityLabel === 'Laser').length > 0
+        );
+      })
+      .pop();
+    expect(strip).toBeDefined();
+    const st = StyleSheet.flatten(strip!.props.style) as {
+      marginRight: number;
+    };
+    // La colonne mesurée, plus un vrai blanc entre les deux : deux blocs
+    // qui se frôlent se lisent comme un seul.
+    expect(st.marginRight).toBeGreaterThanOrEqual(96 + 8);
+  });
+
+  /**
+   * LE MENU NE SE POSE JAMAIS SUR LE MUR QU'ON VIENT DE CHOISIR.
+   *
+   * Relevé du patron, capture à l'appui : la barre d'actions se posait EN
+   * TRAVERS du mur sélectionné. C'est le seul trait de l'écran qu'on
+   * regarde à ce moment-là — on vient de le désigner du doigt, on s'apprête
+   * à le mesurer, à le percer ou à l'effacer — et le menu qui sert à ça le
+   * cachait.
+   *
+   * Deux causes, et le banc les tient toutes les deux : un écart trop court
+   * (calculé depuis le MILIEU du mur, sans compter la demi-hauteur de la
+   * barre, qui revenait donc lécher le trait), et le rappel dans le cadre,
+   * qui ramenait la barre sur le mur dès qu'elle débordait de l'écran.
+   */
+  it('ne pose jamais le menu sur le mur sélectionné', () => {
+    const tree = monter();
+    act(() => bouton(tree, 'Édition')!.props.onPress());
+    act(() => {
+      jest.advanceTimersByTime(500);
+    });
+    const prises = () =>
+      tree.root
+        .findAll((n) => typeof n.props?.onPress === 'function')
+        .filter(
+          (n) => n.findAll((x) => x.props?.strokeWidth === 30).length > 0,
+        );
+    const nb = prises().length;
+    expect(nb).toBeGreaterThan(3);
+    let verifies = 0;
+    for (let i = 0; i < nb; i++) {
+      const trait = prises()[i].findAll(
+        (x) => x.props?.strokeWidth === 30,
+      )[0].props as { x1: number; y1: number; x2: number; y2: number };
+      act(() => prises()[i].props.onPress());
+      const menu = tree.root
+        .findAll((n) => {
+          const st = StyleSheet.flatten(n.props?.style) as
+            | { left?: number; top?: number }
+            | undefined;
+          if (typeof st?.left !== 'number' || typeof st?.top !== 'number') {
+            return false;
+          }
+          return (
+            n.findAll((x) => x.props?.accessibilityLabel === 'Élec').length > 0
+          );
+        })
+        .pop();
+      if (!menu) continue;
+      const m = StyleSheet.flatten(menu.props.style) as {
+        left: number;
+        top: number;
+      };
+      /*
+        LE TRAIT DU MUR CONTRE LE RECTANGLE DE LA BARRE, par échantillons :
+        on marche le long du segment et l'on vérifie qu'aucun de ses points
+        ne tombe dedans. Une marge de six points s'ajoute au rectangle —
+        « ne pas toucher » n'est pas « ne pas recouvrir » : une barre posée
+        au ras du trait le mange autant, avec son ombre.
+      */
+      const MARGE = 6;
+      let dedans = false;
+      for (let k = 0; k <= 40; k++) {
+        const x = trait.x1 + ((trait.x2 - trait.x1) * k) / 40;
+        const y = trait.y1 + ((trait.y2 - trait.y1) * k) / 40;
+        if (
+          x > m.left - MARGE &&
+          x < m.left + WALL_MENU.w + MARGE &&
+          y > m.top - MARGE &&
+          y < m.top + WALL_MENU.h + MARGE
+        ) {
+          dedans = true;
+          break;
+        }
+      }
+      expect({ mur: i, surLeMur: dedans }).toEqual({ mur: i, surLeMur: false });
+      verifies++;
+    }
+    expect(verifies).toBeGreaterThan(0);
+  });
+
+  /**
    * LE MENU DU MUR S'EST ALLÉGÉ.
    *
    * Relevé du patron : « trop imposant et vieillot ». Ce qui se compte :

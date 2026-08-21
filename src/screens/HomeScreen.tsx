@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import Svg, { Path } from 'react-native-svg';
-import { ContourOr, TexteOr } from '../components/ContourOr';
+import { ContourVif, TexteVif } from '../components/ContourVif';
 import { SOLAIRES } from '../ui/solaires';
 import {
   Animated,
@@ -360,13 +360,13 @@ export function HomeScreen() {
         */}
         {pro ? (
           <View pointerEvents="none">
-            <ContourOr rayon={18} fond={c.bg} style={styles.avatarOrZone}>
+            <ContourVif rayon={18} fond={c.bg} style={styles.avatarOrZone}>
               <View style={styles.avatarOrDedans}>
                 <Svg width={29} height={29} viewBox="0 0 24 24">
                   <Path d={SOLAIRES.avatar} fill={c.inkSoft} fillRule="evenodd" />
                 </Svg>
               </View>
-            </ContourOr>
+            </ContourVif>
           </View>
         ) : (
           <Svg width={34} height={34} viewBox="0 0 24 24" pointerEvents="none">
@@ -375,7 +375,7 @@ export function HomeScreen() {
         )}
         <View style={styles.profilColonne} pointerEvents="none">
           {pro ? (
-            <TexteOr
+            <TexteVif
               texte={compte?.prenom || compte?.email || 'Compte'}
               taille={14.5}
               graisse="600"

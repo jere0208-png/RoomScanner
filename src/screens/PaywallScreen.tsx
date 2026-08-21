@@ -28,10 +28,12 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useWindowDimensions } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { BackChevron } from '../components/BackChevron';
 import { BadgePro } from '../components/BadgePro';
-import { ContourOr, TexteOr } from '../components/ContourOr';
+import { LightRibbon, RIBBON_H } from '../components/LightRibbon';
+import { ContourVif, TexteVif } from '../components/ContourVif';
 import { SOLAIRES } from '../ui/solaires';
 import {
   MOIS_OFFERTS,
@@ -41,7 +43,7 @@ import {
   useAccountStore,
   type Offre,
 } from '../store/accountStore';
-import { radius, shadowCard, useTheme, type Palette } from '../theme';
+import { dark, radius, shadowCard, useTheme, type Palette } from '../theme';
 
 /**
  * CE QU'ON ACHÈTE, ÉNUMÉRÉ.
@@ -52,11 +54,11 @@ import { radius, shadowCard, useTheme, type Palette } from '../theme';
  * ligne nomme une chose qui se FAIT, jamais une qualité.
  */
 const ATOUTS: { icone: keyof typeof SOLAIRES; mot: string }[] = [
-  { icone: 'rooms', mot: 'Relevés illimités, autant de pièces qu’il faut' },
-  { icone: 'partage', mot: 'Tous les exports : PDF coté, DXF, métré CSV' },
-  { icone: 'save', mot: 'Plans gardés sous votre compte, à l’abri du téléphone' },
-  { icone: 'elec', mot: 'Contrôle NF C 15-100, circuits et liste de matériel' },
-  { icone: 'metre', mot: 'Relevé du tableau existant et diagnostic' },
+  { icone: 'rooms', mot: 'Relevés illimités' },
+  { icone: 'partage', mot: 'Tous les exports : PDF, DXF, CSV' },
+  { icone: 'save', mot: 'Plans gardés sous votre compte' },
+  { icone: 'elec', mot: 'Contrôle NF C 15-100 et matériel' },
+  { icone: 'metre', mot: 'Tableau existant et diagnostic' },
   { icone: 'etoile', mot: 'Les nouveautés en premier' },
 ];
 
@@ -64,6 +66,7 @@ export function PaywallScreen() {
   const c = useTheme();
   const s = themed(c);
   const insets = useSafeAreaInsets();
+  const { width: largeur } = useWindowDimensions();
   const visible = useAccountStore((st) => st.paywallVisible);
   const fermer = useAccountStore((st) => st.fermerPaywall);
   const utiliserCode = useAccountStore((st) => st.utiliserCode);
@@ -80,6 +83,8 @@ export function PaywallScreen() {
     plus gros avant tout le reste.
   */
   const [offre, setOffre] = useState<Offre>('mensuel');
+  /** La feuille du code promo : appelee par « J'ai un code ». */
+  const [feuilleCode, setFeuilleCode] = useState(false);
 
   const annuel = offre === 'annuel';
   const prixPlein = annuel ? PRIX_PRO_AN : PRIX_PRO;
@@ -123,27 +128,50 @@ export function PaywallScreen() {
             <BackChevron color={c.ink} />
           </Pressable>
           <Text style={s.titreBarre}>Abonnement</Text>
-          {/* Le vide à droite garde le titre au centre : sans lui, il se
-              décale de la largeur du bouton de retour. */}
-          <View style={s.rondBarre} />
+          {/*
+            LE VIDE À DROITE RECENTRE LE TITRE, et rien de plus — relevé du
+            patron : « un bloc blanc rond en haut à droite sans raison ». Il
+            avait pris la peau du bouton de retour, ombre comprise : un
+            bouton qui ne fait rien, c'est un bouton qu'on essaie.
+          */}
+          <View style={s.videBarre} />
+        </View>
+
+        {/*
+          L'IDENTITÉ DE LA MAISON, DERRIÈRE LE TITRE.
+
+          Le design donné par le patron pose un dégradé coloré derrière son
+          en-tête ; nous, on a mieux qu'un dégradé — le RUBAN de l'accueil,
+          les ondes qui disent d'où vient le nom EchoPlan. Il passe ici
+          derrière le titre, bien plus discret que sur l'accueil : c'est un
+          fond, pas un spectacle, et il ne reçoit jamais le doigt.
+        */}
+        <View style={s.ruban} pointerEvents="none">
+          <LightRibbon width={largeur} palette={c} sombre={c === dark} />
         </View>
 
         <ScrollView
           contentContainerStyle={s.contenu}
           showsVerticalScrollIndicator={false}>
           {/*
-            LE TITRE NOMME L'OFFRE, ET LA MARQUE SE DÉTACHE.
+            LE TITRE EST CENTRÉ, ET LA MARQUE PORTE LA COULEUR.
 
-            « Passer en » à l'encre, « EchoPlan Pro » à la typo d'or : c'est
-            la signature du Pro dans toute l'application — le badge, la
-            carte, le bouton — et elle fait ici ce qu'un aplat de couleur
-            ferait ailleurs, dire d'un coup d'œil ce qu'on achète.
+            Calibré sur le design donné par le patron : « Passer en » à
+            l'encre, sur sa ligne, et le nom en dessous — plus gros, dans
+            le bleu vivant qui signe le Pro partout ailleurs (le badge, la
+            carte, le bouton). Aligné à gauche, le bloc penchait ; centré,
+            il tient l'écran comme une affiche, et le regard tombe droit
+            sur le nom.
           */}
           <Text style={s.titre}>Passer en</Text>
-          <TexteOr texte="EchoPlan Pro" taille={30} fond={c.bg} style={s.titreOr} />
+          <TexteVif
+            texte="EchoPlan Pro"
+            taille={31}
+            fond={c.bg}
+            style={s.titreNom}
+          />
           <Text style={s.sousTitre}>
-            Relevez, contrôlez et exportez sans compter. Un seul abonnement,
-            résiliable à tout moment.
+            Tout l’outil, sans compter. Résiliable à tout moment.
           </Text>
 
           {/*
@@ -170,6 +198,11 @@ export function PaywallScreen() {
                   <Text style={[s.ongletMot, actif && s.ongletMotActif]}>
                     {o === 'mensuel' ? 'Mensuel' : 'Annuel'}
                   </Text>
+                  {o === 'annuel' && (
+                    <Text style={s.ongletNote}>
+                      {`${MOIS_OFFERTS} mois offerts`}
+                    </Text>
+                  )}
                 </Pressable>
               );
             })}
@@ -180,10 +213,10 @@ export function PaywallScreen() {
               de son bord — il vit hors du rognage du contour, sinon sa
               moitié haute serait coupée. */}
           <View style={s.carteZone}>
-          <ContourOr rayon={22} fond={c.surface} style={s.carte}>
+          <ContourVif rayon={22} fond={c.surface} style={s.carte}>
             <View style={s.carteDedans}>
               <View style={s.prixRangee}>
-                <TexteOr texte={prix} taille={34} fond={c.surface} />
+                <TexteVif texte={prix} taille={30} fond={c.surface} />
                 <Text style={s.parQuoi}>{annuel ? '/an' : '/mois'}</Text>
                 {/* L'ancien prix reste visible, barré : une remise sans
                     référence n'est qu'un prix comme un autre. */}
@@ -191,7 +224,7 @@ export function PaywallScreen() {
               </View>
               <Text style={s.prixNote}>
                 {annuel
-                  ? `Soit ${MOIS_OFFERTS} mois offerts par rapport au mensuel.`
+                  ? 'Un an d’un coup, deux mois pour rien.'
                   : 'Sans engagement : vous arrêtez quand vous voulez.'}
               </Text>
 
@@ -210,46 +243,48 @@ export function PaywallScreen() {
                 </View>
               ))}
             </View>
-          </ContourOr>
+          </ContourVif>
             <BadgePro style={s.badge} />
           </View>
 
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Restaurer l’achat"
-            onPress={async () => {
-              try {
-                const ok = await restaurerPro();
-                Alert.alert(
-                  ok ? 'Abonnement restauré' : 'Aucun achat trouvé',
-                  ok
-                    ? 'Votre Pro est de retour.'
-                    : 'L’App Store ne connaît pas d’abonnement pour ce compte Apple.',
-                );
-              } catch (e) {
-                Alert.alert('Restauration impossible', (e as Error).message);
-              }
-            }}>
-            <Text style={s.restaurer}>Restaurer l’achat</Text>
-          </Pressable>
+          {/*
+            DEUX LIENS SUR UNE LIGNE, SOUS LA CARTE.
 
-          <View style={s.promo}>
-            <TextInput
-              accessibilityLabel="Code promo"
-              style={s.champ}
-              placeholder="Code promo"
-              placeholderTextColor={c.inkFaint}
-              value={code}
-              onChangeText={setCode}
-              autoCapitalize="characters"
-              autoCorrect={false}
-            />
+            Le champ de code promo vivait ici, en toutes lettres : un champ,
+            un bouton, quarante points de hauteur — et c'est le PRIX qui
+            sortait de l'écran pour lui faire place. Relevé du patron :
+            « tout doit être visible sans scroll ». Un code ne se saisit
+            qu'une fois dans une vie d'abonné ; il passe dans une feuille
+            qu'on appelle, et la restauration l'accompagne : elle non plus
+            ne sert qu'à qui la cherche.
+          */}
+          <View style={s.liens}>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Appliquer le code"
-              style={({ pressed }) => [s.btnCode, pressed && s.enfonce]}
-              onPress={valideCode}>
-              <Text style={s.btnCodeTexte}>Appliquer</Text>
+              accessibilityLabel="Restaurer l’achat"
+              hitSlop={8}
+              onPress={async () => {
+                try {
+                  const ok = await restaurerPro();
+                  Alert.alert(
+                    ok ? 'Abonnement restauré' : 'Aucun achat trouvé',
+                    ok
+                      ? 'Votre Pro est de retour.'
+                      : 'L’App Store ne connaît pas d’abonnement pour ce compte Apple.',
+                  );
+                } catch (e) {
+                  Alert.alert('Restauration impossible', (e as Error).message);
+                }
+              }}>
+              <Text style={s.lien}>Restaurer l’achat</Text>
+            </Pressable>
+            <Text style={s.lienPoint}>·</Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="J’ai un code"
+              hitSlop={8}
+              onPress={() => setFeuilleCode(true)}>
+              <Text style={s.lien}>J’ai un code</Text>
             </Pressable>
           </View>
         </ScrollView>
@@ -272,19 +307,61 @@ export function PaywallScreen() {
             accessibilityLabel="S’abonner"
             style={({ pressed }) => [s.ctaCadre, pressed && s.enfonce]}
             onPress={acheter}>
-            <ContourOr rayon={18} fond={c.surface} style={s.pleine}>
+            <ContourVif rayon={18} fond={c.surface} style={s.pleine}>
               <View style={s.ctaDedans}>
                 {/* Une PHRASE, pas une formule — relevé du patron : « trop
                     de chiffres et de tirets ». Un seul nombre, zéro tiret. */}
-                <TexteOr
+                <TexteVif
                   texte={`S’abonner pour ${prix} par ${annuel ? 'an' : 'mois'}`}
                   taille={16.5}
                   fond={c.surface}
                 />
               </View>
-            </ContourOr>
+            </ContourVif>
           </Pressable>
         </View>
+
+        {/*
+          LA FEUILLE DU CODE PROMO — appelée, jamais posée.
+
+          Elle porte le champ et son bouton, et rien d'autre : le code
+          arrive déjà écrit quand la surprise l'a offert, il ne reste qu'à
+          appuyer. Fermée, elle ne coûte pas un point de hauteur à la page
+          qui vend.
+        */}
+        <Modal
+          visible={feuilleCode}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setFeuilleCode(false)}>
+          <Pressable
+            testID="voile-code"
+            style={s.voile}
+            onPress={() => setFeuilleCode(false)}>
+            <Pressable style={s.feuille} onPress={() => {}}>
+              <Text style={s.feuilleTitre}>Code promo</Text>
+              <View style={s.promo}>
+                <TextInput
+                  accessibilityLabel="Code promo"
+                  style={s.champ}
+                  placeholder="Votre code"
+                  placeholderTextColor={c.inkFaint}
+                  value={code}
+                  onChangeText={setCode}
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                />
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Appliquer le code"
+                  style={({ pressed }) => [s.btnCode, pressed && s.enfonce]}
+                  onPress={valideCode}>
+                  <Text style={s.btnCodeTexte}>Appliquer</Text>
+                </Pressable>
+              </View>
+            </Pressable>
+          </Pressable>
+        </Modal>
       </View>
     </Modal>
   );
@@ -312,11 +389,45 @@ const themed = (c: Palette) =>
       shadowOpacity: 0.07,
     },
     titreBarre: { color: c.ink, fontSize: 17, fontWeight: '700' },
-    contenu: { paddingHorizontal: 22, paddingBottom: 18 },
+    videBarre: { width: 40, height: 40 },
+    contenu: { paddingHorizontal: 22, paddingBottom: 10 },
+    /*
+      LE RUBAN EST UN FOND : posé en absolu, il ne pousse rien, déborde des
+      deux côtés (un ruban qui s'arrête aux marges a l'air rangé dans une
+      boîte) et se tient très en retrait — vingt-deux pour cent, contre
+      l'opacité pleine de l'accueil : ici, ce qu'on doit lire, c'est le
+      prix.
+    */
+    ruban: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      top: 56,
+      height: RIBBON_H,
+      alignItems: 'center',
+      opacity: 0.22,
+      zIndex: -1,
+    },
     // Le titre est en deux morceaux : l'encre annonce, l'or nomme.
-    titre: { color: c.ink, fontSize: 30, fontWeight: '800', marginTop: 10 },
-    titreOr: { alignSelf: 'flex-start', marginTop: 2 },
-    sousTitre: { color: c.inkSoft, fontSize: 14.5, lineHeight: 20, marginTop: 10 },
+    // Le « Passer en » est la MISE EN BOUCHE : plus petit que le nom, il
+    // le laisse porter l'affiche. Serré dessus (interligne court), les
+    // deux lignes se lisent comme un seul titre.
+    titre: {
+      color: c.ink,
+      fontSize: 24,
+      fontWeight: '800',
+      textAlign: 'center',
+      marginTop: 2,
+    },
+    titreNom: { alignSelf: 'center', marginTop: -2 },
+    sousTitre: {
+      color: c.inkSoft,
+      fontSize: 14,
+      lineHeight: 19,
+      textAlign: 'center',
+      marginTop: 8,
+      paddingHorizontal: 8,
+    },
     // Le segment : une gouttière claire, la pastille blanche glisse dedans.
     segment: {
       flexDirection: 'row',
@@ -324,26 +435,50 @@ const themed = (c: Palette) =>
       backgroundColor: c.surfaceSunken,
       borderRadius: radius.pill,
       padding: 4,
-      marginTop: 20,
-      marginBottom: 18,
+      marginTop: 14,
+      marginBottom: 14,
     },
     onglet: {
       paddingHorizontal: 26,
       paddingVertical: 9,
       borderRadius: radius.pill,
     },
+    /*
+      LA PASTILLE ACTIVE SE DÉTACHE VRAIMENT — relevé du patron : le design
+      donné porte « un léger design sur les boutons mensuel/annuel ». Une
+      pastille blanche posée sur du gris clair se distingue à peine ; elle
+      prend donc un cheveu de bleu au bord et une ombre courte, teintée du
+      bleu de la marque. On voit LEQUEL des deux est choisi sans le lire.
+    */
     ongletActif: {
       backgroundColor: c.surface,
-      ...shadowCard,
-      shadowOpacity: 0.09,
+      borderWidth: 1,
+      borderColor: c.blueSoft,
+      shadowColor: c.blue,
+      shadowOpacity: 0.18,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 3 },
+      elevation: 3,
     },
     ongletMot: { color: c.inkSoft, fontSize: 14.5, fontWeight: '700' },
-    ongletMotActif: { color: c.ink },
+    ongletMotActif: { color: c.blue, fontWeight: '800' },
+    /*
+      LE MOT « ÉCONOMIE » VIT SUR L'ONGLET, pas dans la carte : c'est au
+      moment de CHOISIR la facturation qu'on veut savoir ce que l'annuel
+      fait gagner — après, il est trop tard, on a déjà choisi.
+    */
+    ongletNote: {
+      color: c.blue,
+      fontSize: 10.5,
+      fontWeight: '800',
+      textAlign: 'center',
+      marginTop: 1,
+    },
     carteZone: { alignSelf: 'stretch' },
     carte: { alignSelf: 'stretch' },
     // La place du badge sur la carte ; sa peau (blanc, or animé) est a lui.
     badge: { position: 'absolute', top: -11, right: 16 },
-    carteDedans: { padding: 20, gap: 4 },
+    carteDedans: { padding: 18, gap: 2 },
     prixRangee: { flexDirection: 'row', alignItems: 'flex-end', gap: 6 },
     // Cale « /mois » sur la ligne de pied du prix, à un cheveu près.
     parQuoi: { color: c.inkSoft, fontSize: 15, fontWeight: '700', marginBottom: 5 },
@@ -359,20 +494,42 @@ const themed = (c: Palette) =>
       flexDirection: 'row',
       alignItems: 'center',
       gap: 10,
-      marginVertical: 14,
+      marginVertical: 11,
     },
     filet: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: c.line },
     separateurMot: { color: c.inkFaint, fontSize: 12, fontWeight: '700' },
-    atout: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 5 },
-    atoutMot: { flex: 1, color: c.ink, fontSize: 13.5, lineHeight: 19 },
-    restaurer: {
-      color: c.blue,
-      fontSize: 13,
-      fontWeight: '600',
-      textAlign: 'center',
-      marginTop: 18,
+    atout: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 3.5 },
+    atoutMot: { flex: 1, color: c.ink, fontSize: 13.5, lineHeight: 18 },
+    liens: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      marginTop: 14,
     },
-    promo: { flexDirection: 'row', gap: 10, marginTop: 16 },
+    lien: { color: c.blue, fontSize: 13, fontWeight: '600' },
+    lienPoint: { color: c.inkFaint, fontSize: 13 },
+    voile: {
+      flex: 1,
+      backgroundColor: 'rgba(8, 10, 14, 0.45)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 26,
+    },
+    feuille: {
+      alignSelf: 'stretch',
+      borderRadius: radius.lg,
+      backgroundColor: c.surface,
+      padding: 20,
+      ...shadowCard,
+    },
+    feuilleTitre: {
+      color: c.ink,
+      fontSize: 16,
+      fontWeight: '800',
+      marginBottom: 12,
+    },
+    promo: { flexDirection: 'row', gap: 10 },
     champ: {
       flex: 1,
       height: 48,
@@ -406,7 +563,7 @@ const themed = (c: Palette) =>
       borderTopColor: c.line,
     },
     remiseNote: {
-      color: '#C8861F',
+      color: c.blue,
       fontSize: 12.5,
       fontWeight: '700',
       textAlign: 'center',

@@ -251,7 +251,7 @@ describe('le chemin le plus court dans la pièce', () => {
             z: (r.path[k - 1].z + r.path[k].z) / 2,
           };
           const d = projectOnRing(EN_L, m);
-          // Un point du milieu à plus d'un centimètre HORS du contour se
+          // Un point du milieu à plus d'un centimètre HBLEUS du contour se
           // verrait à sa projection : on vérifie l'appartenance stricte.
           expect(dedansStrict(m, EN_L) || d.s >= 0).toBe(true);
         }

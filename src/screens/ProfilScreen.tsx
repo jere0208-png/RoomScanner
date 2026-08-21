@@ -28,7 +28,7 @@ import { BackChevron } from '../components/BackChevron';
 import { MoreDots } from '../components/MoreDots';
 import { MenuCompte } from '../components/MenuCompte';
 import { ThemeGlyph } from '../components/ThemeGlyph';
-import { ContourOr, TexteOr } from '../components/ContourOr';
+import { ContourVif, TexteVif } from '../components/ContourVif';
 import { SOLAIRES } from '../ui/solaires';
 import { PLANS_GRATUITS, useAccountStore } from '../store/accountStore';
 import { useScanStore, type ThemePref } from '../store/scanStore';
@@ -117,13 +117,13 @@ export function ProfilScreen() {
           sur l'accueil.
         */}
         {pro ? (
-          <ContourOr rayon={44} fond={c.bg} style={s.avatarOr}>
+          <ContourVif rayon={44} fond={c.bg} style={s.avatarOr}>
             <View style={s.avatarDedans}>
               <Svg width={64} height={64} viewBox="0 0 24 24">
                 <Path d={SOLAIRES.avatar} fill={c.inkSoft} fillRule="evenodd" />
               </Svg>
             </View>
-          </ContourOr>
+          </ContourVif>
         ) : (
           <View style={s.avatar}>
             <Svg width={72} height={72} viewBox="0 0 24 24">
@@ -132,7 +132,7 @@ export function ProfilScreen() {
           </View>
         )}
         {pro ? (
-          <TexteOr texte={nom} taille={21} fond={c.bg} style={s.nomOr} />
+          <TexteVif texte={nom} taille={21} fond={c.bg} style={s.nomOr} />
         ) : (
           <Text style={s.nom} numberOfLines={1}>
             {nom}
@@ -153,7 +153,11 @@ export function ProfilScreen() {
           c'est la première chose qu'on vient vérifier ici après avoir payé.
         */}
         <View style={s.carteAbo}>
-          <View style={[s.rondEtoile, pro && s.rondEtoilePro]}>
+          {/* Le rond garde le BLEU de l'app, Pro ou pas — relevé du
+              patron. Il passait au vert en Pro : une couleur qui ne sert
+              qu'ici, sur un écran qui n'en a pas d'autre, se lit comme une
+              alerte plutôt que comme un grade. */}
+          <View style={s.rondEtoile}>
             <Svg width={22} height={22} viewBox="0 0 24 24">
               <Path d={SOLAIRES.etoile} fill="#FFFFFF" fillRule="evenodd" />
             </Svg>
@@ -377,7 +381,6 @@ const themed = (c: Palette) =>
       alignItems: 'center',
       justifyContent: 'center',
     },
-    rondEtoilePro: { backgroundColor: c.green },
     aboTextes: { flex: 1, minWidth: 0 },
     aboTitre: { color: c.ink, fontSize: 15.5, fontWeight: '700' },
     aboSous: { color: c.inkSoft, fontSize: 12.5, marginTop: 2, lineHeight: 17 },

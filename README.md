@@ -966,7 +966,30 @@ sur la direction du décalage — le long d'un mur vertical, un écart fixe
 laissait une demi-barre de l'autre côté, précisément sur la poignée — et
 contre la position vraiment occupée par celle-ci, que la borne du cadre a
 pu rappeler vers le mur. Le banc le prouve mur par mur, sur tout le
-logement de référence. Le menu lui-même s'est allégé — « trop imposant et
+logement de référence.
+
+**Et le menu ne se pose jamais SUR le mur qu'on vient de choisir.** Relevé
+du patron, capture à l'appui : la barre se couchait en travers du trait
+sélectionné — le seul de l'écran qu'on regarde à ce moment-là, celui qu'on
+s'apprête à mesurer, à percer ou à effacer. Deux causes. L'écart partait du
+CENTRE de la barre : cinquante-quatre points pour une barre haute de
+quarante-six, son bord arrivait donc à cinq points du mur ; il se compte
+maintenant depuis son BORD (demi-barre plus vingt-deux). Et le rappel dans
+le cadre ramenait la barre sur le mur dès qu'elle débordait de l'écran :
+on essaie donc les deux flancs, on garde celui qui — UNE FOIS BORNÉ —
+laisse le mur libre, et si aucun ne convient (un mur en plein bord), la
+barre glisse LE LONG du mur jusqu'à le dégager. Sortir du cadre n'est
+jamais une option ; cacher le mur ne l'est plus.
+
+**La colonne d'actions a sa zone réservée.** Deuxième trait rouge du
+patron : le bandeau du mur (« 0,65 m · Mesures · Laser · Détacher »)
+passait SOUS « Enregistrer / Annuler / Édition », son dernier bouton
+tranché par une pastille bleue. La réserve valait soixante-deux points
+écrits en dur — un pari sur la largeur d'une colonne qui grandit avec ses
+mots, et « Enregistrer » est plus long qu'« Édition ». On mesure donc ce
+qu'elle occupe vraiment (le même `onLayout` qui donnait déjà sa hauteur),
+et tout ce qui vit à sa gauche s'arrête là, plus un blanc franc : deux
+blocs qui se frôlent se lisent comme un seul. Le menu lui-même s'est allégé — « trop imposant et
 vieillot » : colonnes resserrées d'un quart, rayon de pilule, filet d'un
 cheveu comme les cartes de l'app, ombre adoucie.
 
@@ -1334,7 +1357,7 @@ l'écran pour rappeler ce que l'utilisateur a DÉJÀ, juste à l'endroit où il
 décide. Le design donné par le patron n'en a pas.
 
 La page se lit maintenant de haut en bas : le **titre** nomme l'offre
-(« Passer en » à l'encre, « EchoPlan Pro » à la typo d'or), le **choix de
+(« Passer en » à l'encre, « EchoPlan Pro » à la typo vive), le **choix de
 la facturation** en deux onglets, une **carte de prix** cerclée d'or qui
 énumère ce qu'on achète — six lignes, chacune une chose qui se FAIT —, et
 un **bouton épinglé en pied de page**. Il vivait au fil du texte : qui
@@ -1351,9 +1374,39 @@ interroge désormais **les deux produits** : qui a pris l'annuel et change de
 téléphone ne détient pas le mensuel, ne demander que celui-là lui
 répondrait « aucun achat trouvé » alors qu'il a payé l'année.
 
+
+#### Ce que la première capture a corrigé
+
+Le patron a essayé la page sur son iPhone, et trois choses sont revenues.
+
+**« Tout doit être visible sans scroll. »** Une page qui vend et qu'il faut
+faire défiler cache la moitié de ce qu'elle vend — on décide sur ce qu'on
+voit. Les six atouts sont réécrits pour tenir chacun sur UNE ligne (c'est
+le passage à deux lignes qui faisait déborder), le titre et la carte se
+resserrent, et le **code promo est parti dans une feuille** appelée par
+« J'ai un code » : un champ et son bouton, quarante points de hauteur, pour
+un geste qu'on ne fait qu'une fois dans une vie d'abonné — et c'est le PRIX
+qui sortait de l'écran pour lui faire place. La restauration d'achat
+l'accompagne, sur la même ligne de liens.
+
+**« Un bloc blanc rond en haut à droite sans raison. »** C'était le vide qui
+recentre le titre : il avait pris la peau du bouton de retour, ombre
+comprise. Un bouton qui ne fait rien est un bouton qu'on essaie.
+
+**« Mieux calibré sur le titre, un léger design sur les onglets, de
+l'identité. »** Le titre est désormais **centré** comme sur la maquette
+donnée — aligné à gauche, le bloc penchait —, l'onglet actif se détache
+d'un cheveu de bleu et d'une ombre courte teintée de la marque (une
+pastille blanche sur du gris clair se distingue à peine), et l'onglet
+annuel porte lui-même les « 2 mois offerts » : c'est au moment de CHOISIR
+qu'on veut le savoir, après il est trop tard. L'identité, enfin, ne vient
+pas d'un dégradé décoratif : c'est le **ruban de l'accueil** — les ondes
+qui disent d'où vient le nom EchoPlan — posé derrière le titre à
+vingt-deux pour cent d'opacité. Un fond, pas un spectacle.
+
 ### La surprise de bienvenue
 
-Un popup « Surprise ! » — le cadeau 3D en argile, la typo d'or du badge —
+Un popup « Surprise ! » — le cadeau 3D en argile, la typo vive du badge —
 offre **−20 % sur la première souscription** (code FIRST20). Il se lève à
 deux moments : à la **première inscription** de l'appareil (le trousseau
 n'avait encore porté aucun compte, et un drapeau local retient le déjà-vu —
@@ -1371,7 +1424,7 @@ ressemble à une erreur. « Plus tard » referme sans insister.
 phrase coupée et un code dans le bouton — relevé du patron, capture à
 l'appui : « trop de chiffres, les phrases sont cassées, l'ensemble ne
 donne pas envie de lire ». Le popup dit UNE chose : « −20 % » en grand,
-dans l'or de la maison ; le bouton dit « J'en profite », et c'est tout. Le
+dans le bleu vivant de la maison ; le bouton dit « J'en profite », et c'est tout. Le
 banc COMPTE les nombres : un seul groupe de chiffres dans tout le popup.
 Même cure sur la zone d'abonnement : le bouton se lit comme une phrase
 (« S'abonner pour 3,92 € par mois » — zéro tiret) et la note de remise est
@@ -1391,10 +1444,10 @@ comparatif, la carte Gratuit baisse le pouce, la carte Pro le lève — même
 famille 3D que le cadeau. La page s'est modernisée au passage : plus d'air
 entre les colonnes, rayon des cartes à vingt points, filet d'un cheveu sur
 la carte Gratuit. Les deux cartes partagent le GABARIT : le Gratuit
-descend son contenu d'un trait (celui du contour d'or du Pro) pour que les
+descend son contenu d'un trait (celui du contour vif du Pro) pour que les
 pouces s'alignent, et les rayons sont les mêmes. En thème nuit, la carte
 Pro et le bouton d'achat prennent la surface du thème — deux dalles
-blanches sur fond sombre éblouissaient — et le contour d'or reste : c'est
+blanches sur fond sombre éblouissaient — et le contour vif reste : c'est
 lui, la signature.
 
 **Refuser l'offre ouvre la dernière chance : un avis contre un essai.**
@@ -1412,7 +1465,7 @@ App Store Connect n'existe pas.
 retouches du patron : l'avatar Solar et le prénom, RIEN d'autre. La barre
 en dégradé et le grade écrit ont vécu — « GRATUIT » n'a pas besoin de
 s'écrire, il se voit : en gratuit tout se lit gris ; en Pro, le prénom
-passe à la typo d'or et l'avatar se cercle du contour qui respire — le
+passe à la typo vive et l'avatar se cercle du contour qui respire — le
 grade se VOIT. TOUT le bloc prend le clic (les vues SVG sont transparentes
 au doigt, sinon elles l'avalent), le bandeau est AXÉ par les centres, et
 les deux blocs ont été REMONTÉS d'un cran après un dernier relevé (« le
@@ -1430,7 +1483,7 @@ referme, parce que c'est le geste que tout le monde essaie en premier. La
 confirmation de suppression RESTE une Alert système : pour un geste
 destructif, l'austérité du système est un avertissement en soi. En PRO, la
 carte prend la parure — « plus dynamique et coloré premium » : l'avatar se
-cercle du contour d'or qui respire et le nom passe à la typo d'or ; en
+cercle du contour vif qui respire et le nom passe à la typo vive ; en
 gratuit, elle reste sobre — la parure est ce qu'on achète.
 
 ### Six retouches d'un même relevé de chantier
@@ -1518,7 +1571,7 @@ qui hésite ou qui défile ne déclenche rien.
 ### Le badge Pro respire
 
 L'ancien badge était un bloc noir à texte jaune : un aplat, posé sur la
-seule carte qu'on vend. Le nouveau est **blanc**, et une bande d'ors glisse
+seule carte qu'on vend. Le nouveau est **blanc**, et une bande de bleus glisse
 derrière lui, visible à deux endroits seulement : le **contour** du badge et
 les **lettres** « PRO ».
 
@@ -1532,22 +1585,33 @@ regardent la même bande, par construction, et le banc tient cette unicité
 **Le dégradé est long, donc discret.** La bande fait quatre badges de large
 pour une seule vague de teintes : à tout instant, ce qu'on en voit est
 presque uni — on sent le mouvement, on ne compte pas les couleurs. Une
-seule famille d'ors, du doré au bronze, et le dernier arrêt rejoint le
-premier : la boucle n'a pas de couture. C'est la leçon du ruban appliquée
-une fois de plus : la bande est dessinée UNE FOIS sur deux périodes, et
-c'est la VUE qui glisse, au pilote natif — le banc tient la transformation
-animée, la famille monotone (rouge > vert > bleu sur chaque arrêt) et la
-couture.
+seule famille, et le dernier arrêt rejoint le premier : la boucle n'a pas
+de couture. C'est la leçon du ruban appliquée une fois de plus : la bande
+est dessinée UNE FOIS sur deux périodes, et c'est la VUE qui glisse, au
+pilote natif — le banc tient la transformation animée, la famille monotone
+et la couture.
+
+**L'or est devenu un BLEU VIVANT.** Relevé du patron : « change le doré en
+bleu vivant, animé doucement ; on ne doit pas voir clairement l'animation,
+mais on doit voir que ça vit ». L'or était le seul endroit de
+l'application à parler une autre langue que le bleu de la marque. Trois
+teintes PROCHES le remplacent (`#2A62FF`, `#6D9BFF`, `#123FD1`) : un écart
+franc donnerait un arc-en-ciel qui défile, celui-là laisse une bande
+presque unie. Et la vague est passée de huit à **quatorze secondes** — huit,
+c'était encore une animation qu'on regarde. Le composant a suivi le
+changement de couleur (`ContourVif`, `TexteVif`, la famille `BLEUS`) : du
+code qui s'appelle « or » et qui peint du bleu se relit une fois de trop.
 
 **La carte et le bouton prennent la peau ENTIÈRE du badge.** D'abord son
-contour d'or ; puis, sur relevé du patron, son couvercle BLANC et sa typo
-qui respire : « Pro », le prix et « S'abonner — 4,90 € / mois » sont des
-trouées au masque sur la même bande d'ors qui glisse — la recette exacte
+contour ; puis, sur relevé du patron, son couvercle BLANC et sa typo
+qui respire : le nom, le prix et « S'abonner » sont des
+trouées au masque sur la même bande qui glisse — la recette exacte
 des lettres du badge, étendue aux mots qui vendent. Les lignes de
 bénéfices, elles, restent à l'encre : on les LIT, on ne les admire pas, et
-de l'or en petit corps maigre ne se lirait plus. La recette vit dans UN
-composant (`ContourOr` : la famille d'ors, l'épaisseur du trait, le rythme
-de la vague, et `TexteOr` pour les mots) que le badge emprunte : des
+une teinte animée en petit corps maigre ne se lirait plus. La recette vit
+dans UN composant (`ContourVif` : la famille de bleus, l'épaisseur du
+trait, le rythme de la vague, et `TexteVif` pour les mots) que le badge
+emprunte : des
 dégradés réglés à la main auraient divergé à la première retouche, et le
 banc tient l'unicité arrêt par arrêt. Trois différences mécaniques avec le
 badge : la bande ne se dessine qu'une fois la taille du bloc connue — une

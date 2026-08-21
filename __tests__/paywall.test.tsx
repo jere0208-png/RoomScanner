@@ -47,7 +47,7 @@ import TestRenderer, { act } from 'react-test-renderer';
 import { LinearGradient, Mask, Path, Stop, Text as SvgText } from 'react-native-svg';
 import { PaywallScreen } from '../src/screens/PaywallScreen';
 import { BadgePro } from '../src/components/BadgePro';
-import { ContourOr, ORS, TexteOr } from '../src/components/ContourOr';
+import { ContourVif, BLEUS, TexteVif } from '../src/components/ContourVif';
 import { dark, light } from '../src/theme';
 import { EssaiEpuise } from '../src/components/EssaiEpuise';
 import { SurprisePro } from '../src/components/SurprisePro';
@@ -135,6 +135,13 @@ describe('la page Pro', () => {
 
   it('le code CARIDI12 déverrouille et ferme la page', () => {
     const t = monter(<PaywallScreen />);
+    // LE CODE PROMO A QUITTÉ LE FIL DE LA PAGE — relevé du patron :
+    // « tout doit être visible sans scroll ». Le champ poussait le prix
+    // hors de l'écran pour un geste qu'on ne fait qu'une fois ; il vit
+    // maintenant dans une feuille, appelée par « J'ai un code ».
+    act(() => {
+      bouton(t, 'J’ai un code').props.onPress();
+    });
     act(() => {
       t.root.findByType(TextInput).props.onChangeText('CARIDI12');
     });
@@ -147,6 +154,9 @@ describe('la page Pro', () => {
 
   it('un mauvais code laisse tout verrouillé', () => {
     const t = monter(<PaywallScreen />);
+    act(() => {
+      bouton(t, 'J’ai un code').props.onPress();
+    });
     act(() => {
       t.root.findByType(TextInput).props.onChangeText('RIEN');
     });
@@ -209,17 +219,30 @@ describe('le badge Pro', () => {
     // La couture : la bande se répète — dernier arrêt = premier, sinon la
     // boucle saute d'une couleur à chaque tour.
     expect(stops[0]).toBe(stops[stops.length - 1]);
-    // Monotone : une seule famille chaude (R > V > B sur chaque arrêt) —
-    // pas une teinte étrangère qui ferait arc-en-ciel.
+    /*
+      MONOTONE, ET DÉSORMAIS BLEU.
+
+      L'assertion tenait la famille CHAUDE (R > V > B) : c'était l'or. Le
+      patron a tranché — « change le doré en bleu vivant » —, et l'or était
+      de toute façon le seul endroit de l'application à parler une autre
+      langue que le bleu de la marque. La propriété qu'on tient est la même
+      dans son esprit : une seule famille, pas un arc-en-ciel. Elle a juste
+      changé de côté du cercle chromatique.
+    */
     for (const teinte of stops) {
       const [r, v, b] = [1, 3, 5].map((i) =>
         parseInt(teinte.slice(i, i + 2), 16),
       );
-      expect({ teinte, chaud: r > v && v > b }).toEqual({
-        teinte,
-        chaud: true,
-      });
+      expect({ teinte, bleu: b > v && v > r }).toEqual({ teinte, bleu: true });
     }
+    /*
+      ET LES TEINTES SONT PROCHES — relevé du patron : « on ne doit pas
+      voir clairement l'animation, mais on doit voir que ça vit ». Un écart
+      franc entre les arrêts donnerait une vague qu'on REGARDE ; l'écart de
+      bleu reste donc mesuré, et la bande presque unie à tout instant.
+    */
+    const bleus = stops.map((t) => parseInt(t.slice(5, 7), 16));
+    expect(Math.max(...bleus) - Math.min(...bleus)).toBeLessThanOrEqual(60);
     // Long : la bande qui glisse fait plusieurs badges de large — c'est ce
     // qui rend le dégradé presque uni à tout instant.
     const bandes = badge.findAll((n) => {
@@ -234,13 +257,13 @@ describe('le badge Pro', () => {
    *
    * Relevé du patron : « même contour que le badge, sur le bloc de la
    * comparaison Pro et le bouton pour s'abonner ». Les trois boivent à la
-   * MÊME source (`ContourOr` exporte la famille d'ors que le badge
+   * MÊME source (`ContourVif` exporte la famille de bleus que le badge
    * emprunte) : trois dégradés réglés à la main finiraient par diverger à
    * la première retouche.
    */
   it('la carte Pro et le bouton d’abonnement portent le même contour', () => {
     const t = monter(<PaywallScreen />);
-    const contours = t.root.findAllByType(ContourOr);
+    const contours = t.root.findAllByType(ContourVif);
     // La carte du comparatif, et le bouton « S'abonner ».
     expect(contours).toHaveLength(2);
     for (const contour of contours) {
@@ -253,11 +276,11 @@ describe('le badge Pro', () => {
           nativeEvent: { layout: { width: 300, height: 100 } },
         }),
       );
-      // Même famille d'ors que le badge, arrêt pour arrêt.
+      // Même famille de bleus que le badge, arrêt pour arrêt.
       const stops = contour
         .findAllByType(Stop)
         .map((n) => String(n.props.stopColor));
-      expect(stops).toEqual([...ORS]);
+      expect(stops).toEqual([...BLEUS]);
       // Et c'est une VUE qui glisse, au pilote natif — comme le badge.
       const animees = contour.findAll((n) => {
         const st = StyleSheet.flatten(n.props.style) as ViewStyle | undefined;
@@ -279,7 +302,7 @@ describe('le badge Pro', () => {
     const badge = t.root.findByType(BadgePro);
     expect(
       badge.findAllByType(Stop).map((n) => String(n.props.stopColor)),
-    ).toEqual([...ORS]);
+    ).toEqual([...BLEUS]);
   });
 
   /*
@@ -294,7 +317,7 @@ describe('le badge Pro', () => {
   it('le bloc Pro et le bouton sont blancs, à la typo d’or qui respire', () => {
     const t = monter(<PaywallScreen />);
     // Les deux contours couvrent BLANC — plus de bleu plein.
-    const contours = t.root.findAllByType(ContourOr);
+    const contours = t.root.findAllByType(ContourVif);
     expect(contours).toHaveLength(2);
     for (const contour of contours) {
       expect(contour.props.fond).toBe('#FFFFFF');
@@ -303,11 +326,11 @@ describe('le badge Pro', () => {
     // carte : il couvre de ce fond-la. Un couvercle blanc sur le gris de
     // l'ecran decouperait un pave clair autour des lettres.
     const surFond = t.root
-      .findAllByType(TexteOr)
+      .findAllByType(TexteVif)
       .filter((n) => n.props.fond === light.bg);
     expect(surFond.length).toBeGreaterThan(0);
     // La typo d'or : « Pro », le prix, « S'abonner… » au moins.
-    const typos = t.root.findAllByType(TexteOr);
+    const typos = t.root.findAllByType(TexteVif);
     expect(typos.length).toBeGreaterThanOrEqual(3);
     const libelles = typos.map((n) => String(n.props.texte));
     // La page nomme la MARQUE entiere — « EchoPlan Pro » — la ou la carte
@@ -326,12 +349,12 @@ describe('le badge Pro', () => {
           nativeEvent: { layout: { width: 120, height: 24 } },
         }),
       );
-      // Même famille d'ors, arrêt pour arrêt, et le mot est la TROUÉE du
+      // Même famille de bleus, arrêt pour arrêt, et le mot est la TROUÉE du
       // masque — la recette exacte du badge.
       const stops = typo
         .findAllByType(Stop)
         .map((n) => String(n.props.stopColor));
-      expect(stops).toEqual([...ORS]);
+      expect(stops).toEqual([...BLEUS]);
       const masques = typo.findAllByType(Mask);
       expect(masques).toHaveLength(1);
       const lettres = masques[0].findAllByType(SvgText);
@@ -491,9 +514,14 @@ describe('la surprise Pro', () => {
     // La page Pro arrive avec le code déjà dans son champ, et le prix
     // remisé écrit sur le bouton.
     const p = monter(<PaywallScreen />);
+    // Le code offert attend DANS la feuille, déjà écrit : il ne reste qu'à
+    // l'ouvrir et à appuyer.
+    act(() => {
+      bouton(p, 'J’ai un code').props.onPress();
+    });
     expect(p.root.findByType(TextInput).props.value).toBe('FIRST20');
     const typos = p.root
-      .findAllByType(TexteOr)
+      .findAllByType(TexteVif)
       .map((n) => String(n.props.texte));
     expect(typos.some((x) => x.includes('3,92'))).toBe(true);
     /*
@@ -540,7 +568,7 @@ describe('la surprise Pro', () => {
     const t = monter(<PaywallScreen />);
     // La carte et le bouton : deux contours, pas trois — il n'y a plus de
     // colonne Gratuit à border.
-    const contours = t.root.findAllByType(ContourOr);
+    const contours = t.root.findAllByType(ContourVif);
     expect(contours).toHaveLength(2);
     const stCarte = StyleSheet.flatten(contours[0].props.style) as ViewStyle;
     expect(stCarte.alignSelf).toBe('stretch');
@@ -568,7 +596,7 @@ describe('la surprise Pro', () => {
   it('assombrit la carte Pro et le bouton en thème nuit', () => {
     useScanStore.setState({ themePref: 'dark' });
     const t = monter(<PaywallScreen />);
-    for (const contour of t.root.findAllByType(ContourOr)) {
+    for (const contour of t.root.findAllByType(ContourVif)) {
       expect(contour.props.fond).toBe(dark.surface);
     }
     /*
@@ -580,7 +608,7 @@ describe('la surprise Pro', () => {
       FOND. Chaque mot doit donc couvrir de SA surface, et il n'y a plus
       une seule bonne réponse pour toute la page.
     */
-    for (const typo of t.root.findAllByType(TexteOr)) {
+    for (const typo of t.root.findAllByType(TexteVif)) {
       expect([dark.surface, dark.bg]).toContain(typo.props.fond);
     }
     useScanStore.setState({ themePref: 'light' });

@@ -34,9 +34,9 @@ import Svg, {
   Text as SvgText,
 } from 'react-native-svg';
 // La famille d'ors, l'épaisseur du trait et le rythme vivent dans
-// `ContourOr` : la carte Pro et le bouton d'abonnement portent le même
+// `ContourVif` : la carte Pro et le bouton d'abonnement portent le même
 // contour, et une seule source les empêche de diverger.
-import { DUREE_VAGUE, ORS, TRAIT } from './ContourOr';
+import { DUREE_VAGUE, BLEUS, TRAIT } from './ContourVif';
 
 /** Les cotes du badge, fixes : le mot ne change pas. */
 const LARGEUR = 46;
@@ -80,10 +80,10 @@ export function BadgePro({ style }: { style?: ViewStyle }) {
         <Svg width={PERIODE * 2} height={HAUTEUR}>
           <Defs>
             <LinearGradient id="badge-ors" x1="0" y1="0" x2="1" y2="0">
-              {ORS.map((teinte, i) => (
+              {BLEUS.map((teinte, i) => (
                 <Stop
                   key={i}
-                  offset={`${Math.round((i / (ORS.length - 1)) * 100)}%`}
+                  offset={`${Math.round((i / (BLEUS.length - 1)) * 100)}%`}
                   stopColor={teinte}
                 />
               ))}

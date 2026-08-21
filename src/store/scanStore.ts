@@ -292,7 +292,7 @@ function castToOutline(
 
 /**
  * Pièce à laquelle rattacher un point. Un meuble plaqué contre un mur — une
- * télé, une étagère — a souvent son centre HORS du contour : on prend alors
+ * télé, une étagère — a souvent son centre HBLEUS du contour : on prend alors
  * la pièce la plus proche, et non la première venue.
  */
 function roomIndexAt(p: { x: number; z: number }, outlines: Pt[][]): number {
@@ -435,7 +435,7 @@ const scanKey = (id: string) => `roomscanner.scan.v2.${id}`;
 const DRAFT_KEY = 'roomscanner.brouillon.v1';
 const FOLDERS_KEY = 'roomscanner.folders.v1';
 const THEME_KEY = 'roomscanner.themePref.v1';
-const COLORS_KEY = 'roomscanner.openingColors.v1';
+const COLBLEUS_KEY = 'roomscanner.openingColors.v1';
 const FURNITURE_KEY = 'roomscanner.showFurniture.v1';
 const SURFACES_KEY = 'roomscanner.showSurfaces.v1';
 const TEXTURES_KEY = 'roomscanner.showTextures.v1';
@@ -1413,7 +1413,7 @@ export const useScanStore = create<ScanState>((set, get) => {
 
     setShowOpeningColors: (showOpeningColors) => {
       set({ showOpeningColors });
-      AsyncStorage.setItem(COLORS_KEY, showOpeningColors ? '1' : '0').catch(() => {});
+      AsyncStorage.setItem(COLBLEUS_KEY, showOpeningColors ? '1' : '0').catch(() => {});
     },
 
     showFurniture: true,
@@ -4244,7 +4244,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         if (pref === 'light' || pref === 'dark' || pref === 'system') {
           set({ themePref: pref });
         }
-        const colors = await AsyncStorage.getItem(COLORS_KEY);
+        const colors = await AsyncStorage.getItem(COLBLEUS_KEY);
         if (colors === '1' || colors === '0') {
           set({ showOpeningColors: colors === '1' });
         }

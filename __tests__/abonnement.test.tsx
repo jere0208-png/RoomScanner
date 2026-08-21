@@ -39,6 +39,7 @@ jest.mock('../src/native/account', () => ({
 }));
 
 import React from 'react';
+import { StyleSheet } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import { PaywallScreen } from '../src/screens/PaywallScreen';
 import {
@@ -153,9 +154,64 @@ describe('mensuel ou annuel', () => {
   });
 });
 
-describe('ce qui ne doit jamais disparaître', () => {
-  it('garde le champ de code promo du patron', () => {
+describe('la page tient dans l’écran, sans défilement', () => {
+  /*
+    RELEVÉ DU PATRON, CAPTURE À L'APPUI : « tout doit être visible sans
+    scroll ». Une page qui vend et qu'il faut faire défiler cache la
+    moitié de ce qu'elle vend — et le lecteur décide sur ce qu'il voit.
+
+    Ce banc ne mesure pas des pixels (ils dépendent du téléphone) : il
+    tient ce qui FAIT la hauteur — le nombre de lignes et leur longueur.
+    Chaque atout doit tenir sur UNE ligne ; c'est le passage à deux lignes
+    qui a fait déborder la page.
+  */
+  it('écrit ses atouts en une ligne chacun', () => {
     const a = rendre();
+    const lignes = noeuds(a).filter((n) => n.props?.testID === 'ligne-atout');
+    expect(lignes.length).toBeGreaterThanOrEqual(5);
+    for (const l of lignes) {
+      const mot = l.findAll((n) => typeof n.props?.children === 'string')[0];
+      expect(String(mot.props.children).length).toBeLessThanOrEqual(40);
+    }
+  });
+
+  it('range le code promo dans une feuille, pas au fil de la page', () => {
+    const a = rendre();
+    // Fermée, elle ne prend pas un point de hauteur : le code promo sert
+    // une fois, il n'a pas à pousser le prix hors de l'écran.
+    expect(parLabel(a, 'Code promo')).toBeUndefined();
+    act(() => {
+      parLabel(a, 'J’ai un code')?.props.onPress();
+    });
+    expect(parLabel(a, 'Code promo')).toBeDefined();
+    expect(parLabel(a, 'Appliquer le code')).toBeDefined();
+  });
+
+  it('ne pose rien d’inerte dans la barre du haut', () => {
+    const a = rendre();
+    // Relevé du patron : « un bloc blanc rond en haut à droite sans
+    // raison ». C'était le vide qui recentre le titre — il avait pris la
+    // peau du bouton de retour, ombre comprise.
+    const barre = parLabel(a, 'Retour')!.parent!;
+    const ronds = barre.children.filter(
+      (e): e is TestRenderer.ReactTestInstance => typeof e !== 'string',
+    );
+    for (const n of ronds) {
+      if (typeof n.props?.onPress === 'function') continue;
+      const st = StyleSheet.flatten(n.props?.style) as
+        | { backgroundColor?: string }
+        | undefined;
+      expect(st?.backgroundColor).toBeUndefined();
+    }
+  });
+});
+
+describe('ce qui ne doit jamais disparaître', () => {
+  it('garde le code promo du patron, sous la main', () => {
+    const a = rendre();
+    act(() => {
+      parLabel(a, 'J’ai un code')?.props.onPress();
+    });
     expect(parLabel(a, 'Code promo')).toBeDefined();
     expect(parLabel(a, 'Appliquer le code')).toBeDefined();
   });

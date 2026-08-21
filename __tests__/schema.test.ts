@@ -8,7 +8,7 @@
  * un schéma qui les emploierait à tort est faux avant même d'être lu.
  */
 import {
-  WIRE_COLORS,
+  WIRE_COLBLEUS,
   circuitMarks,
   fixtureMarks,
   multiWire,
@@ -59,15 +59,15 @@ const FIXTURES = [
 
 describe('les couleurs sont celles de la norme', () => {
   it('le neutre est bleu, la terre vert/jaune, et rien d’autre ne l’est', () => {
-    const bleu = WIRE_COLORS.neutre.color;
-    const vert = WIRE_COLORS.terre.color;
+    const bleu = WIRE_COLBLEUS.neutre.color;
+    const vert = WIRE_COLBLEUS.terre.color;
     const autres = (['phase', 'navette', 'retour'] as const).map(
-      (r) => WIRE_COLORS[r].color,
+      (r) => WIRE_COLBLEUS[r].color,
     );
     expect(autres).not.toContain(bleu);
     expect(autres).not.toContain(vert);
-    expect(WIRE_COLORS.neutre.label).toMatch(/bleu/i);
-    expect(WIRE_COLORS.terre.label).toMatch(/vert/i);
+    expect(WIRE_COLBLEUS.neutre.label).toMatch(/bleu/i);
+    expect(WIRE_COLBLEUS.terre.label).toMatch(/vert/i);
   });
 
   it('un circuit de prises : phase, neutre, terre', () => {
@@ -119,7 +119,7 @@ describe('les couleurs sont celles de la norme', () => {
     const w = wiresOf(VDI);
     expect(w).toHaveLength(1);
     expect(w[0].label).toMatch(/paires/i);
-    expect(w[0].color).not.toBe(WIRE_COLORS.phase.color);
+    expect(w[0].color).not.toBe(WIRE_COLBLEUS.phase.color);
   });
 });
 

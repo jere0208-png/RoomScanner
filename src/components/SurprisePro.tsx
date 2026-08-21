@@ -13,12 +13,12 @@
  * comme partout, jamais une porte fermée.
  *
  * La carte porte la peau du Pro — couvercle blanc, contour d'or, typo qui
- * respire (ContourOr) : c'est la même signature que le badge, la carte du
+ * respire (ContourVif) : c'est la même signature que le badge, la carte du
  * comparatif et le bouton d'abonnement.
  */
 import React from 'react';
 import { Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import { ContourOr, TexteOr } from './ContourOr';
+import { ContourVif, TexteVif } from './ContourVif';
 import { useAccountStore } from '../store/accountStore';
 import { useTheme, type Palette } from '../theme';
 
@@ -49,15 +49,15 @@ export function SurprisePro() {
           accessibilityLabel="J’en profite"
           style={({ pressed }) => [s.prise, pressed && s.enfonce]}
           onPress={profiter}>
-          <ContourOr rayon={24} fond="#FFFFFF">
+          <ContourVif rayon={24} fond="#FFFFFF">
             <View style={s.carte}>
               <Image
                 source={require('../assets/pro/cadeau.png')}
                 style={s.cadeau}
                 resizeMode="contain"
               />
-              <TexteOr texte="Surprise !" taille={22} fond="#FFFFFF" />
-              <TexteOr texte="−20 %" taille={44} fond="#FFFFFF" />
+              <TexteVif texte="Surprise !" taille={22} fond="#FFFFFF" />
+              <TexteVif texte="−20 %" taille={44} fond="#FFFFFF" />
               <Text style={s.corps}>
                 sur votre abonnement Pro,{'\n'}pour votre première
                 souscription.
@@ -75,7 +75,7 @@ export function SurprisePro() {
                 <Text style={s.plusTard}>Plus tard</Text>
               </Pressable>
             </View>
-          </ContourOr>
+          </ContourVif>
         </Pressable>
       </View>
     </Modal>
