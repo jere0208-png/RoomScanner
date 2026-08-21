@@ -1740,11 +1740,31 @@ arête suit le pan qu'elle borde, la retirer ne déplace rien de ce qui reste,
 et c'est l'ombrage des aplats qui dit le volume, pas le trait. Les contours
 reviennent au lâcher, quand on regarde vraiment.
 
-Deux détails qui font tenir l'ensemble. La couche est marquée
-`collapsable={false}` : sans lui, Android la fond dans son parent à
-l'optimisation et la transformation perd son support. Et au lâcher, le
-cadrage vrai et la remise à plat de la couche se posent dans le MÊME rendu —
-séparés, le plan sauterait à sa position d'avant le temps d'une image.
+Deux détails qui font tenir l'ensemble, et que le premier essai du patron a
+tous les deux corrigés.
+
+**La couche revient à plat AVEC le dessin, jamais avant.** « Au relâcher sur
+une autre position, on voit son ancienne position rapidement avant celle
+qu'on lâche. » La remise à plat était écrite dans le gestionnaire du lâcher,
+à côté du nouveau cadrage — mais une valeur animée se pose SUR-LE-CHAMP,
+hors du cycle de React, tandis que le dessin attend le rendu suivant pour se
+recalculer. Entre les deux, il restait une image du plan à son ancienne
+place, la couche déjà remise à zéro. Elle se fait donc à la MISE EN PAGE
+(`useLayoutEffect` sur le cadrage) : après le commit, avant que l'écran ne
+soit peint. Les deux ne peuvent plus se désynchroniser, quel que soit le
+retard du rendu.
+
+**Et la rotation 3D nourrit le cadrage retenu, elle aussi.** « Le glisser
+d'un doigt ne prend pas la position qu'on relâche, on revient au point de
+départ. » Confier le pincement au pilote natif demandait de retenir à part
+le cadrage atteint, pour le poser au lâcher ; la rotation, qui continue de
+rendre à chaque image, ne l'alimentait pas — le lâcher reposait donc la vue
+d'AVANT le geste. Une ligne, et un banc qui tourne, lâche, et exige que
+l'angle reste.
+
+Enfin la couche est marquée `collapsable={false}` : sans lui, Android la
+fond dans son parent à l'optimisation et la transformation perd son
+support.
 
 ### Un relevé interrompu ne se perd plus
 

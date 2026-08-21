@@ -345,6 +345,52 @@ describe('le plan glisse sans se redessiner', () => {
     expect(st.transform.some((x) => 'translateX' in x)).toBe(true);
   });
 
+  /*
+    ET LA COUCHE REVIENT À PLAT AVEC LUI.
+
+    Relevé du patron : « au relâcher sur une autre position, on voit son
+    ancienne position rapidement avant celle qu'on lâche ». La remise à plat
+    se faisait dans le gestionnaire du lâcher — donc SUR-LE-CHAMP, une valeur
+    animée ne passe pas par React — pendant que le dessin attendait le rendu
+    suivant. Il restait une image du plan à son ancienne place.
+
+    Elle se fait maintenant à la mise en page, après le commit du nouveau
+    cadrage : les deux ne peuvent plus se désynchroniser. Ce banc tient
+    l'état d'arrivée — dessin déplacé ET couche neutre —, qui attrape aussi
+    la faute inverse : une couche restée chargée compterait le déplacement
+    deux fois au geste suivant.
+  */
+  it('rend la couche à plat une fois le cadrage posé', () => {
+    const tree = planEquipe();
+    glisser(tree);
+    act(() => {
+      zoneDuPlan(tree).props.onResponderRelease?.(
+        doigtDepuis(400, 300, 460, 330),
+      );
+    });
+    const c = tree.root
+      .findAll((n) => {
+        const st = StyleSheet.flatten(n.props?.style) as
+          | { transform?: unknown[] }
+          | undefined;
+        return (
+          Array.isArray(st?.transform) &&
+          n.findAll((x) => typeof x.props?.x1 === 'number').length > 0
+        );
+      })
+      .pop()!;
+    const st = StyleSheet.flatten(c.props.style) as {
+      transform: Record<string, unknown>[];
+    };
+    for (const t of st.transform) {
+      for (const [k, v] of Object.entries(t)) {
+        expect(`${k}=${v}`).toBe(
+          k === 'scale' ? 'scale=1' : k === 'rotate' ? 'rotate=0deg' : `${k}=0`,
+        );
+      }
+    }
+  });
+
   it('pose le cadrage pour de bon quand le doigt se lève', () => {
     const tree = planEquipe();
     const avant = empreinte(tree);

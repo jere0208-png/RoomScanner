@@ -217,3 +217,105 @@ describe('la vue 3D', () => {
     expect(lettres(rendu3d(null, 0)).size).toBe(0);
   });
 });
+
+/**
+ * LE LÂCHER GARDE CE QUE LE GESTE A TOURNÉ.
+ *
+ * Relevé du patron, au premier essai de la refonte : « sur le plan 3D, le
+ * glisser simple avec un doigt ne prend pas la position qu'on relâche, on
+ * revient au point de départ ».
+ *
+ * La cause tient en une ligne : confier le PINCEMENT au pilote natif
+ * demandait de retenir à part le cadrage atteint, pour le poser au lâcher.
+ * La ROTATION, elle, continuait de rendre à chaque image — mais sans
+ * alimenter ce cadrage retenu. Au lâcher, on posait donc la vue d'AVANT le
+ * geste, et la maquette revenait d'où elle venait.
+ *
+ * Ce banc tourne d'un doigt, lâche, et exige que la vue rendue soit celle
+ * du dernier mouvement.
+ */
+describe('la rotation 3D survit au lâcher', () => {
+  const doigt3d = (x: number, y: number, x0 = x, y0 = y) =>
+    ({
+      nativeEvent: {
+        touches: [{ pageX: x, pageY: y }],
+        locationX: x,
+        locationY: y,
+      },
+      touchHistory: {
+        numberActiveTouches: 1,
+        indexOfSingleActiveTouch: 0,
+        mostRecentTimeStamp: 100,
+        touchBank: [
+          {
+            touchActive: true,
+            startPageX: x0,
+            startPageY: y0,
+            startTimeStamp: 0,
+            currentPageX: x,
+            currentPageY: y,
+            currentTimeStamp: 100,
+            previousPageX: x0,
+            previousPageY: y0,
+            previousTimeStamp: 0,
+          },
+        ],
+      },
+    }) as never;
+
+  it('garde l’angle atteint, au lieu de revenir au départ', () => {
+    const vues: { theta: number; tilt: number }[] = [];
+    let tree!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      useScanStore.setState({
+        walls: [
+          mur('n', 0, 0, 5, 0),
+          mur('e', 5, 0, 5, 4),
+          mur('s', 5, 4, 0, 4),
+          mur('o', 0, 4, 0, 0),
+        ],
+        openings: [],
+        objects: [],
+        rooms: [{ id: 'r1', name: 'Salon', floor: null }],
+        fixtures: [],
+        ceiling: [],
+      });
+      tree = TestRenderer.create(
+        <Iso3DView
+          value={{ theta: 30, tilt: 58, zoom: 1, ox: 0, oy: 0 }}
+          onChange={(v) => vues.push(v)}
+        />,
+      );
+    });
+    act(() => {
+      const z = tree.root
+        .findAllByType(View)
+        .find((n) => typeof n.props.onLayout === 'function')!;
+      z.props.onLayout({ nativeEvent: { layout: { width: 390, height: 620 } } });
+    });
+    const zone = tree.root
+      .findAllByType(View)
+      .find((n) => typeof n.props.onMoveShouldSetResponder === 'function')!;
+
+    act(() => {
+      zone.props.onResponderGrant?.(doigt3d(200, 300));
+      zone.props.onResponderMove?.(doigt3d(280, 300, 200, 300));
+      // La vue ne part qu'au battement suivant : un seul rendu par image.
+      jest.advanceTimersByTime(20);
+    });
+    const tourne = vues[vues.length - 1];
+    expect(tourne).toBeDefined();
+    // Le doigt a poussé vers la droite : l'angle a changé.
+    expect(tourne.theta).not.toBe(30);
+
+    act(() => {
+      zone.props.onResponderRelease?.(doigt3d(280, 300, 200, 300));
+      jest.advanceTimersByTime(20);
+    });
+    // ET IL RESTE. C'est tout le défaut : au lâcher, la vue repartait à 30.
+    const finale = vues[vues.length - 1];
+    expect(finale.theta).toBe(tourne.theta);
+    act(() => tree.unmount());
+  });
+});
+

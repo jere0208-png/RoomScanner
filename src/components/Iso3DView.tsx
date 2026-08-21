@@ -1,4 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { Animated, PanResponder, StyleSheet, View } from 'react-native';
 import Svg, {
   Circle,
@@ -375,11 +382,17 @@ export function Iso3DView({
   }).current;
   /** Le cadrage que le pincement a atteint, posé pour de bon au lâcher. */
   const vueVive = useRef(viewRef.current);
-  const rendreLaCouche = () => {
+  /*
+    ET ELLE REVIENT À PLAT AVEC LE RENDU, jamais avant — même piège que sur
+    le plan 2D, où le patron a vu « l'ancienne position rapidement avant
+    celle qu'on lâche » : une valeur animée se pose sur-le-champ, le dessin
+    attend le rendu suivant, et il reste une image entre les deux.
+  */
+  useLayoutEffect(() => {
     pince.tx.setValue(0);
     pince.ty.setValue(0);
     pince.ech.setValue(1);
-  };
+  }, [view, pince]);
 
   // Créé UNE seule fois : un responder recréé en plein geste perd le suivi.
   const pan = useRef(
@@ -465,12 +478,23 @@ export function Iso3DView({
         } else {
           const ddx = g.dx - base.dx0;
           const ddy = g.dy - base.dy0;
-          update({
+          /*
+            LA ROTATION NOURRIT LE CADRAGE RETENU, ELLE AUSSI.
+
+            Relevé du patron : « le glisser d'un doigt ne prend pas la
+            position qu'on relâche, on revient au point de départ ».
+            Confier le pincement au pilote natif demandait de retenir à part
+            le cadrage atteint, pour le poser au lâcher — et la rotation,
+            qui continue de rendre à chaque image, ne l'alimentait pas. Le
+            lâcher reposait donc la vue d'AVANT le geste.
+          */
+          vueVive.current = {
             ...base.v,
             // Glisser à droite « pousse » la face avant vers la droite.
             theta: base.v.theta - ddx * 0.45,
             tilt: clamp(base.v.tilt - ddy * 0.3, 15, 80),
-          });
+          };
+          update(vueVive.current);
         }
       },
       onPanResponderRelease: (_e, g) => {
@@ -479,7 +503,6 @@ export function Iso3DView({
         // couche revient à plat dans le même rendu : sinon la maquette
         // sauterait à sa taille d'avant le temps d'une image.
         update(vueVive.current);
-        rendreLaCouche();
         // Tap simple (sans glisser) : cadrer la vue sur le mur touché.
         //
         // « Sans glisser » ne suffisait pas : un pincement court laisse un

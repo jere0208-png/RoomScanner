@@ -1,4 +1,10 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   Animated,
   PanResponder,
@@ -550,13 +556,27 @@ export function FloorplanEditor({
   /** Le dernier cadrage calculé par le geste, posé pour de bon au lâcher. */
   const vueVive = useRef(view);
 
-  /** Rend la couche à son état neutre : le dessin repart de la vérité. */
-  const rendreLaCouche = () => {
+  /*
+    LA COUCHE REVIENT À PLAT QUAND LE DESSIN EST POSÉ — jamais avant.
+
+    Relevé du patron : « au relâcher sur une autre position, on voit son
+    ancienne position rapidement avant celle qu'on lâche ». La remise à plat
+    était faite dans le gestionnaire du lâcher, à côté du `setView` : or une
+    valeur animée se pose SUR-LE-CHAMP, hors du cycle de React, tandis que
+    le dessin attend le rendu suivant pour se recalculer. Entre les deux, il
+    restait une image du plan à son ancienne place, la couche déjà remise à
+    zéro — exactement le clignotement décrit.
+
+    L'effet de MISE EN PAGE la remet donc à plat après le commit du nouveau
+    cadrage et avant que l'écran ne soit peint : les deux ne peuvent plus se
+    désynchroniser, quel que soit le retard du rendu.
+  */
+  useLayoutEffect(() => {
     glisse.tx.setValue(0);
     glisse.ty.setValue(0);
     glisse.ech.setValue(1);
     glisse.rot.setValue(0);
-  };
+  }, [view, glisse]);
   const navBase = useRef({
     v: { zoom: 1, ox: 0, oy: 0, rot: 0 },
     mode: 'pan' as 'pan' | 'pinch',
@@ -696,12 +716,10 @@ export function FloorplanEditor({
       onPanResponderRelease: () => {
         setNavigating(false);
         setView(vueVive.current);
-        rendreLaCouche();
       },
       onPanResponderTerminate: () => {
         setNavigating(false);
         setView(vueVive.current);
-        rendreLaCouche();
       },
       onPanResponderMove: (e, g) => {
         const t = e.nativeEvent.touches;
