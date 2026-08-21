@@ -3208,6 +3208,23 @@ la dépense ne l'est plus. Les autres boucles de l'application (l'onde de la
 pastille de contrôle, le ruban d'accueil, le badge Pro) vivent sur le fil
 natif et respirent entre deux passages ; elles restent.
 
+**Un mur qui passait devant le meuble qu'il porte.** Relevé du chantier :
+« il y a des modèles 3D qui se font superposer par des murs lorsqu'on reste
+appuyé pour tourner » — le meuble disparaît derrière un mur qui est pourtant
+derrière lui, et revient dès qu'on lâche. Pendant un geste, la scène se
+bâtissait en mode **grossier** : chaque mur d'un seul tenant au lieu d'être
+découpé en bandes de 60 cm. Or c'est le découpage qui permet au tri du peintre
+de départager un mur long d'un objet posé devant lui — d'un seul tenant, le
+mur ne porte plus qu'**une** profondeur, celle de son centre, et il passe
+devant ou derrière en bloc.
+
+Le mode grossier est supprimé, et il coûtait plus qu'il ne rapportait : la
+scène entière était **reconstruite au premier contact du doigt, puis une
+seconde fois au lâcher** — deux fois le calcul le plus lourd de la vue, à
+chaque geste. Ce qu'on croyait économiser en pans se payait en
+reconstructions. Le geste reste allégé là où c'est sans conséquence : cotes,
+étiquettes et surfaces se taisent tant que le doigt est posé.
+
 **Deux rendus pour une image.** Le tactile d'un iPhone récent remonte jusqu'à
 cent vingt fois par seconde. Chaque mouvement du doigt sur la vue 3D
 reconstruisait la scène entière — plusieurs centaines de tracés — alors

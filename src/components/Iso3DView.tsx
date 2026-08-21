@@ -605,11 +605,32 @@ export function Iso3DView({
             ceiling: showCeiling ? ceiling : [],
             routes: cableRoutes,
             routeHeights,
-            // Pendant un geste : mêmes volumes et mêmes contours, mais des
-            // pans d'un seul tenant. C'est le découpage en bandes qui
-            // coûtait cher, pas les contours — les supprimer faisait fondre
-            // le modèle en blanc.
-            coarse: interacting,
+            /*
+              LES MURS GARDENT LEURS BANDES, MÊME EN PLEIN GESTE.
+
+              Relevé du chantier, capture à l'appui : « il y a des modèles 3D
+              qui se font superposer par des murs lorsqu'on reste appuyé pour
+              tourner ». Le meuble disparaît derrière un mur qui est pourtant
+              derrière lui, et il revient dès qu'on lâche le doigt.
+
+              La scène se bâtissait alors en mode GROSSIER — chaque mur d'un
+              seul tenant au lieu d'être découpé en bandes de soixante
+              centimètres — pour alléger le rendu. Or c'est le découpage qui
+              permet au tri du peintre de départager un mur long d'un objet
+              posé devant lui : d'un seul tenant, le mur ne porte plus qu'UNE
+              profondeur, celle de son centre, et il passe devant ou derrière
+              EN BLOC. Un meuble placé devant sa moitié proche se retrouve
+              classé derrière tout le mur.
+
+              Le mode grossier disparaît donc, et avec lui deux dépenses
+              qu'on ne voyait pas : la scène entière était RECONSTRUITE au
+              premier contact du doigt, puis une seconde fois au lâcher —
+              deux fois le calcul le plus lourd de la vue, à chaque geste.
+              Ce qu'on croyait économiser en pans, on le payait en
+              reconstructions. Le geste reste allégé là où c'est sans
+              conséquence : cotes, étiquettes et surfaces se taisent tant que
+              le doigt est posé.
+            */
           }),
     [
       keptWalls,
@@ -627,7 +648,6 @@ export function Iso3DView({
       ceiling,
       showCeiling,
       fixtures,
-      interacting,
       batir,
       focusRoomId,
     ],
@@ -635,8 +655,9 @@ export function Iso3DView({
   const faces = scene.faces;
 
   // Centre pris sur la BOÎTE ENGLOBANTE, jamais sur la moyenne des points :
-  // la moyenne dépend de la finesse du découpage, et le modèle sauterait au
-  // début de chaque geste, quand la scène passe en pans d'un seul tenant.
+  // la moyenne dépend de la finesse du découpage. La scène ne change plus de
+  // finesse en cours de geste, mais la règle reste la bonne — un centre qui
+  // dépend du nombre de points est un centre qui bouge pour rien.
   const { center, radius3d } = useMemo(() => sceneFraming(faces), [faces]);
 
   const rendered = useMemo(() => {

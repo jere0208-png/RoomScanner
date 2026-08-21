@@ -189,7 +189,7 @@ const dansLePolygone = (
  * profondeurs calculees jusqu a QUATRE DEGRES plus tot, au lieu de celles
  * de l angle courant.
  */
-const anglesQuiCachent = (figer: boolean) => {
+const anglesQuiCachent = (figer: boolean, grossier = false) => {
   const { faces, rooms } = buildScene(
     // Une cloison traverse la piece : c est ELLE qui vient recouvrir le
     // meuble quand elle est prise d un seul tenant — le cas de la capture.
@@ -203,10 +203,13 @@ const anglesQuiCachent = (figer: boolean) => {
         width: 2,
         depth: 0.9,
         height: 0.8,
-        transform: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 3, 0.4, 3.1, 1],
+        // Decale vers un BOUT de la cloison, pas devant son milieu : c est
+        // la que le mur pris d un seul tenant se trompe, sa profondeur
+        // moyenne etant celle de son centre.
+        transform: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 1.6, 0.4, 3.1, 1],
       },
     ],
-    { palette: PAL, showSurfaces: true, rooms: [{ id: 'r1' }] },
+    { palette: PAL, showSurfaces: true, rooms: [{ id: 'r1' }], coarse: grossier },
   );
   const centre = sceneFraming(faces).center;
   const rad = (d: number) => (d * Math.PI) / 180;
@@ -284,11 +287,19 @@ const anglesQuiCachent = (figer: boolean) => {
 };
 
 it('ne cache jamais le meuble derriere son mur, geste ou pas', () => {
-  // Au repos, chaque face porte la profondeur de l angle courant : rien ne
-  // se recouvre a tort.
+  // Au repos, chaque mur est decoupe en bandes de soixante centimetres et
+  // chaque bande porte sa propre profondeur : rien ne se recouvre a tort.
   expect(anglesQuiCachent(false)).toBe(0);
-  // Et pendant le geste non plus. C est CE cas qui ratait : l ordre etait
-  // fige jusqu a quatre degres, et pendant ces quatre degres un mur restait
-  // classe devant un meuble qui venait de passer devant lui.
+  // L ordre reutilise quelques degres ne suffit pas a tromper le tri.
   expect(anglesQuiCachent(true)).toBe(0);
+  /*
+    ET PENDANT LE GESTE NON PLUS — c est CE cas qui ratait.
+
+    La scene se batissait alors en mode GROSSIER : chaque mur d un seul
+    tenant, pour alleger le rendu. Un mur entier ne porte plus qu UNE
+    profondeur, celle de son centre — et un meuble place devant sa moitie
+    proche se retrouve classe DERRIERE lui. Le mur passe devant le meuble,
+    tant que le doigt reste pose ; on lache, tout revient en place.
+  */
+  expect(anglesQuiCachent(true, true)).toBe(0);
 });
