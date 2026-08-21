@@ -1149,10 +1149,10 @@ ajouté demain le fera tomber.
 
 **Les cibles du bandeau sont de VRAIES zones, pas des débords.** Le
 `hitSlop` ne porte que dans les limites du parent — le bouton de thème est
-resté capricieux après deux correctifs. Il est donc un carré INVISIBLE de
-64 points dont la pastille blanche de 40 n'est que le dessin central, et
-le bloc profil porte son cadre invisible (douze points de rembourrage DANS
-le bouton) : l'avatar, le nom, le grade et tout autour répondent au doigt.
+resté capricieux après deux correctifs, avant de partir dans la page profil
+où un réglage a sa place. La leçon lui a survécu : le bloc profil porte son
+cadre invisible (quatorze points de rembourrage DANS le bouton), et
+l'avatar, le nom et tout autour répondent au doigt.
 
 **Un symbole dit sa fonction.** « Repères » était un `+`. « Appareil » aussi :
 deux boutons sans rapport, le même dessin, et aucun des deux ne disait ce
@@ -1269,7 +1269,7 @@ serait le pire moment pour l'apprendre. Le premier plan gratuit est COMPLET
 (plan coté, 3D, dossier PDF) : brider la qualité ferait fuir avant d'avoir
 convaincu.
 
-La page Pro compare les deux paliers, et porte un champ **code promo** :
+La page Pro porte un champ **code promo** :
 les codes du patron (CARIDI12) déverrouillent localement, à 100 %. **Le Pro
 s'écrit AUSSI dans le trousseau, mais il appartient à SON COMPTE** — sans
 le trousseau, le code promo s'évaporait à la réinstallation ; sans le
@@ -1284,12 +1284,72 @@ tant qu'il n'y est pas, le bouton l'explique au lieu d'échouer en silence.
 Deux prérequis App Store restent côté configuration : l'entitlement « Sign
 in with Apple » sur le profil de signature, et le produit d'abonnement.
 
-**Le compte se quitte et se supprime** depuis la rangée « Mon compte » de
-l'accueil — la suppression est une exigence App Store (5.1.1). Elle efface
+**Le compte se quitte et se supprime** depuis le menu « ⋯ » de la page
+profil — la suppression est une exigence App Store (5.1.1). Elle efface
 l'identité du trousseau mais **garde le compteur de plans** : supprimer puis
-recréer un compte ne rend pas le palier gratuit. C'est aussi cette rangée
-qui offre la seule porte VOLONTAIRE vers la page Pro : sans elle, on ne
-pouvait payer qu'en butant sur la barrière.
+recréer un compte ne rend pas le palier gratuit. Et c'est la carte
+d'abonnement de cette même page qui offre la seule porte VOLONTAIRE vers
+l'offre : sans elle, on ne pouvait payer qu'en butant sur la barrière.
+
+### La page profil, et le thème qui a quitté l'accueil
+
+Le compte tenait dans une **carte modale** ouverte depuis l'accueil : un
+avatar, un nom, trois boutons. C'était le seul endroit où l'utilisateur
+existait, alors cette carte ramassait tout — et ce qui n'y tenait pas
+débordait sur l'écran d'arrivée. Le **bouton de thème** en est la preuve :
+seul réglage de l'application à vivre sur l'accueil, il y a occupé trois
+positions, deux tailles et une zone de clic reprise à chaque relevé du
+patron. Un réglage à portée du pouce qui vise « Commencer le scan » se
+déclenche en visant autre chose.
+
+Le patron a donné un **design à suivre**, et la page profil le suit : une
+barre sobre (retour, titre, « ⋯ »), l'identité en tête — grand avatar,
+cerclé d'or en Pro —, puis des sections titrées. L'**abonnement** en carte,
+qui dit l'ÉTAT et pas l'envie : elle vend en gratuit, elle rassure en Pro
+(proposer d'acheter ce qu'on a déjà est la faute qui fait douter d'un
+paiement passé). L'**apparence** en trois ronds côte à côte : trois choix
+exclusifs se comparent d'un coup d'œil, là où une liste les fait lire un
+par un. Puis les **rangées à chevron** — mes scans, restaurer l'achat,
+confidentialité.
+
+**L'apparence a gagné un troisième choix : Système**, et c'est désormais le
+défaut. Le thème se bornait à clair ou sombre, choisis à la main ; un
+électricien passe sa journée dehors et sa soirée dans un tableau — c'est le
+téléphone qui sait quand basculer. « Clair » et « Sombre » restent des
+choix DÉLIBÉRÉS et l'emportent : qui a forcé le sombre pour un tableau mal
+éclairé ne veut pas voir son écran repasser en blanc parce que le soleil
+s'est levé.
+
+Il ne reste au menu « ⋯ » que les deux gestes qu'on ne pose pas par
+mégarde : se déconnecter, supprimer son compte. La confirmation de
+suppression garde l'**Alert système** — pour un geste destructif, la
+feuille austère du système est un avertissement en soi.
+
+### La page d'abonnement, refondue
+
+Elle était un **comparatif** : deux colonnes, Gratuit contre Pro, chacune
+son pouce d'argile. Un comparatif se défend entre deux formules à choisir ;
+il n'y en a qu'une à vendre, et la colonne Gratuit prenait la moitié de
+l'écran pour rappeler ce que l'utilisateur a DÉJÀ, juste à l'endroit où il
+décide. Le design donné par le patron n'en a pas.
+
+La page se lit maintenant de haut en bas : le **titre** nomme l'offre
+(« Passer en » à l'encre, « EchoPlan Pro » à la typo d'or), le **choix de
+la facturation** en deux onglets, une **carte de prix** cerclée d'or qui
+énumère ce qu'on achète — six lignes, chacune une chose qui se FAIT —, et
+un **bouton épinglé en pied de page**. Il vivait au fil du texte : qui
+faisait défiler pour lire ce qu'il achetait devait remonter pour l'acheter.
+
+**L'annuel est nouveau, et il demande un produit.** Un second onglet n'a de
+sens qu'avec un second prix : **49 € l'an, soit deux mois offerts** — la
+remise classique, assez lisible pour être annoncée sans calcul, et l'onglet
+l'écrit (4,90 × 12 contre 49 ne se compare pas de tête). ⚠️ **Chantier
+Apple : le produit `echoplan.pro.annuel` doit être créé dans App Store
+Connect** à côté du mensuel ; tant qu'il n'y est pas, l'achat annuel échoue
+en le DISANT, comme le mensuel avant lui. Et « Restaurer l'achat »
+interroge désormais **les deux produits** : qui a pris l'annuel et change de
+téléphone ne détient pas le mensuel, ne demander que celui-là lui
+répondrait « aucun achat trouvé » alors qu'il a payé l'année.
 
 ### La surprise de bienvenue
 

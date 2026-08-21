@@ -1,7 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import Svg, { Path } from 'react-native-svg';
-import { MenuCompte } from '../components/MenuCompte';
-import { ThemeGlyph } from '../components/ThemeGlyph';
 import { ContourOr, TexteOr } from '../components/ContourOr';
 import { SOLAIRES } from '../ui/solaires';
 import {
@@ -60,15 +58,11 @@ export function HomeScreen() {
   const oublierBrouillon = useScanStore((s) => s.oublierBrouillon);
   const commencerAuClavier = useScanStore((s) => s.commencerAuClavier);
   const setScreen = useScanStore((s) => s.setScreen);
-  const themePref = useScanStore((s) => s.themePref);
-  const setThemePref = useScanStore((s) => s.setThemePref);
   const { start } = useRoomScan();
   const peutCreerPlan = useAccountStore((s) => s.peutCreerPlan);
   const ouvrirSurprise = useAccountStore((s) => s.ouvrirSurprise);
   const compte = useAccountStore((s) => s.compte);
   const pro = useAccountStore((s) => s.pro);
-  /** Le menu du compte : une carte à nous, ouverte par le bloc profil. */
-  const [menuCompte, setMenuCompte] = useState(false);
   const c = useTheme();
   /** Le fond est-il sombre ? C'est lui qui choisit le logotype. */
   const sombre = c === dark;
@@ -207,7 +201,7 @@ export function HomeScreen() {
           n'a pas.
         */}
         <View style={styles.ruban} pointerEvents="none">
-          <LightRibbon width={winW} palette={c} sombre={themePref === 'dark'} />
+          <LightRibbon width={winW} palette={c} sombre={sombre} />
         </View>
         <PhoneShowcase />
       </Animated.View>
@@ -355,9 +349,7 @@ export function HomeScreen() {
         accessibilityLabel="Mon compte"
         style={styles.profilBloc}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        // Le menu est une carte EchoPlan (MenuCompte), plus la feuille
-        // grise du système — relevé du patron : « trop basique ».
-        onPress={() => setMenuCompte(true)}>
+        onPress={() => setScreen('profil')}>
         {/*
           L'AVATAR ET LE PRÉNOM, RIEN D'AUTRE — relevé du patron : la
           barre est partie, le grade écrit aussi. En gratuit, tout se lit
@@ -397,37 +389,6 @@ export function HomeScreen() {
         </View>
       </Pressable>
 
-      {/*
-        LE BOUTON DE THÈME SE REND EN DERNIER — relevé du patron : « le
-        clic ne fait rien, sauf en bas à droite ». Le bloc héros, rendu
-        après lui, s'étendait par-dessus et avalait le toucher partout où
-        il le chevauchait : c'est l'ORDRE des frères qui fait l'empilement,
-        ce qui flotte au bandeau vient donc après tout le reste.
-      */}
-      {/*
-        LA CIBLE EST UNE VRAIE ZONE, pas un débord. Le `hitSlop` ne porte
-        que dans les limites du parent, et le clic restait capricieux —
-        relevé du patron, deux fois. Le bouton est donc un carré INVISIBLE
-        de 64 points, la pastille blanche de 40 dessinée en son centre :
-        ce qu'on vise est petit, ce qu'on touche est large, et plus rien
-        n'en dépend.
-      */}
-      <TouchableOpacity
-        style={styles.themeZone}
-        accessibilityLabel={
-          themePref === 'dark' ? 'Passer en thème clair' : 'Passer en thème sombre'
-        }
-        onPress={() => setThemePref(themePref === 'dark' ? 'light' : 'dark')}>
-        <View style={styles.themePastille} pointerEvents="none">
-          <ThemeGlyph
-            quoi={themePref === 'dark' ? 'soleil' : 'lune'}
-            size={27}
-            color={c.inkSoft}
-          />
-        </View>
-      </TouchableOpacity>
-
-      <MenuCompte visible={menuCompte} fermer={() => setMenuCompte(false)} />
     </View>
   );
 }
@@ -476,35 +437,6 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   },
   // zIndex/elevation : l'onde d'arrivée pulse AU-DESSUS des cartes suivantes.
   hero: { alignItems: 'center', zIndex: 20, elevation: 20 },
-  /*
-    LA ZONE (64, invisible) PORTE LA PASTILLE (40, blanche). Le centre
-    s'axe sur la ligne du profil : 53 + 32 = 85, comme 50 + 35.
-  */
-  // Zone remontée et encore élargie (72) — relevé du patron : le point
-  // qui répondait était AU-DESSUS du dessin.
-  themeZone: {
-    position: 'absolute',
-    top: 47,
-    right: 6,
-    width: 72,
-    height: 72,
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 2,
-  },
-  // La taille de l'AVATAR, exactement — relevé du patron : « le bouton
-  // thème à la même taille que le bouton profil, agrandi avant légèrement ».
-  // Deux ronds inégaux sur la même ligne se lisent comme un accident.
-  themePastille: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: c.surface,
-    ...shadowCard,
-    shadowOpacity: 0.08,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   /**
    * Le logotype tient sur DEUX lignes — « echo » au-dessus de « plan » —,
    * d'où ces proportions : 160 × 102 et non plus une bande.

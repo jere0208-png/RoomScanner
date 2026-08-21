@@ -1,0 +1,427 @@
+/**
+ * LA PAGE PROFIL — tout ce qui touche à l'utilisateur, au même endroit.
+ *
+ * Le compte tenait dans une carte modale ouverte depuis l'accueil : avatar,
+ * nom, trois boutons, et c'était tout. Rien n'avait donc de place pour
+ * grandir — ni les réglages, ni l'abonnement, ni l'apparence — et l'accueil
+ * ramassait ce qui débordait : le bouton de thème y flottait dans un coin,
+ * seul réglage de l'application à vivre sur l'écran d'arrivée, à portée
+ * d'un doigt qui visait le scan.
+ *
+ * Le patron a donné un design à suivre, et cette page le suit : une barre
+ * sobre, l'identité en tête, puis des sections titrées — l'abonnement en
+ * carte, l'apparence en ronds, le reste en rangées à chevron. Chaque bloc
+ * est une chose qu'on vient FAIRE ici, jamais une décoration.
+ */
+import React, { useState } from 'react';
+import {
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Path } from 'react-native-svg';
+import { BackChevron } from '../components/BackChevron';
+import { MoreDots } from '../components/MoreDots';
+import { MenuCompte } from '../components/MenuCompte';
+import { ThemeGlyph } from '../components/ThemeGlyph';
+import { ContourOr, TexteOr } from '../components/ContourOr';
+import { SOLAIRES } from '../ui/solaires';
+import { PLANS_GRATUITS, useAccountStore } from '../store/accountStore';
+import { useScanStore, type ThemePref } from '../store/scanStore';
+import { radius, shadowCard, useTheme, type Palette } from '../theme';
+
+/**
+ * LES TROIS APPARENCES, DANS L'ORDRE DU DESIGN.
+ *
+ * « Système » vient en premier parce que c'est le réglage par défaut et le
+ * bon conseil : le téléphone sait mieux que nous quand la nuit tombe. Les
+ * deux autres sont des choix délibérés, qui l'emportent tant qu'on ne les
+ * reprend pas.
+ */
+const APPARENCES: { cle: ThemePref; mot: string; label: string }[] = [
+  { cle: 'system', mot: 'Système', label: 'Thème système' },
+  { cle: 'light', mot: 'Clair', label: 'Thème clair' },
+  { cle: 'dark', mot: 'Sombre', label: 'Thème sombre' },
+];
+
+export function ProfilScreen() {
+  const c = useTheme();
+  const s = themed(c);
+  const insets = useSafeAreaInsets();
+  const setScreen = useScanStore((st) => st.setScreen);
+  const themePref = useScanStore((st) => st.themePref);
+  const setThemePref = useScanStore((st) => st.setThemePref);
+  const saves = useScanStore((st) => st.saves);
+  const compte = useAccountStore((st) => st.compte);
+  const pro = useAccountStore((st) => st.pro);
+  const proVia = useAccountStore((st) => st.proVia);
+  const plansUtilises = useAccountStore((st) => st.plansUtilises);
+  const bonusEssais = useAccountStore((st) => st.bonusEssais);
+  const ouvrirPaywall = useAccountStore((st) => st.ouvrirPaywall);
+  const restaurerPro = useAccountStore((st) => st.restaurerPro);
+  const [menu, setMenu] = useState(false);
+
+  const restant = Math.max(0, PLANS_GRATUITS + bonusEssais - plansUtilises);
+  const nom = compte?.prenom || compte?.email || 'Mon compte';
+
+  const restaurer = async () => {
+    try {
+      const ok = await restaurerPro();
+      Alert.alert(
+        ok ? 'Abonnement restauré' : 'Aucun achat trouvé',
+        ok
+          ? 'Votre Pro est de retour.'
+          : 'L’App Store ne connaît pas d’abonnement pour ce compte Apple.',
+      );
+    } catch (e) {
+      Alert.alert('Restauration impossible', (e as Error).message);
+    }
+  };
+
+  return (
+    <View style={[s.fond, { paddingTop: insets.top }]}>
+      <ScrollView
+        contentContainerStyle={[s.contenu, { paddingBottom: insets.bottom + 32 }]}
+        showsVerticalScrollIndicator={false}>
+        <View style={s.barre}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Retour"
+            style={s.rondBarre}
+            hitSlop={10}
+            onPress={() => setScreen('home')}>
+            <BackChevron color={c.ink} />
+          </Pressable>
+          <Text style={s.titreBarre}>Profil</Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Plus d’options"
+            style={s.rondBarre}
+            hitSlop={10}
+            onPress={() => setMenu(true)}>
+            <MoreDots color={c.ink} size={20} />
+          </Pressable>
+        </View>
+
+        {/*
+          L'IDENTITÉ EN TÊTE, ET RIEN QUI SE CLIQUE.
+
+          Le design pose un grand avatar, le nom, l'adresse. On n'a pas de
+          photo à montrer — l'app ne demande pas la pellicule pour ça — donc
+          l'avatar est notre silhouette Solar, cerclée d'or quand le compte
+          est Pro : le grade se VOIT sans qu'on l'écrive, exactement comme
+          sur l'accueil.
+        */}
+        {pro ? (
+          <ContourOr rayon={44} fond={c.bg} style={s.avatarOr}>
+            <View style={s.avatarDedans}>
+              <Svg width={64} height={64} viewBox="0 0 24 24">
+                <Path d={SOLAIRES.avatar} fill={c.inkSoft} fillRule="evenodd" />
+              </Svg>
+            </View>
+          </ContourOr>
+        ) : (
+          <View style={s.avatar}>
+            <Svg width={72} height={72} viewBox="0 0 24 24">
+              <Path d={SOLAIRES.avatar} fill={c.inkSoft} fillRule="evenodd" />
+            </Svg>
+          </View>
+        )}
+        {pro ? (
+          <TexteOr texte={nom} taille={21} fond={c.bg} style={s.nomOr} />
+        ) : (
+          <Text style={s.nom} numberOfLines={1}>
+            {nom}
+          </Text>
+        )}
+        {!!compte?.email && (
+          <Text style={s.email} numberOfLines={1}>
+            {compte.email}
+          </Text>
+        )}
+
+        <Text style={s.section}>Abonnement</Text>
+        {/*
+          LA CARTE DIT L'ÉTAT, PAS L'ENVIE.
+
+          En gratuit elle vend, en Pro elle rassure : proposer d'acheter ce
+          qu'on a déjà est la faute qui fait douter d'un paiement passé — et
+          c'est la première chose qu'on vient vérifier ici après avoir payé.
+        */}
+        <View style={s.carteAbo}>
+          <View style={[s.rondEtoile, pro && s.rondEtoilePro]}>
+            <Svg width={22} height={22} viewBox="0 0 24 24">
+              <Path d={SOLAIRES.etoile} fill="#FFFFFF" fillRule="evenodd" />
+            </Svg>
+          </View>
+          <View style={s.aboTextes}>
+            <Text style={s.aboTitre}>
+              {pro ? 'EchoPlan Pro' : 'Passer en Pro'}
+            </Text>
+            <Text style={s.aboSous} numberOfLines={2}>
+              {pro
+                ? proVia === 'code'
+                  ? 'Débloqué par code · relevés illimités'
+                  : 'Abonnement actif · relevés illimités'
+                : `Plan gratuit · ${restant} relevé${
+                    restant > 1 ? 's' : ''
+                  } restant${restant > 1 ? 's' : ''}`}
+            </Text>
+          </View>
+          {!pro && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Voir l’offre Pro"
+              style={({ pressed }) => [s.boutonAbo, pressed && s.enfonce]}
+              onPress={ouvrirPaywall}>
+              <Text style={s.boutonAboTexte}>Voir l’offre</Text>
+            </Pressable>
+          )}
+        </View>
+
+        <Text style={s.section}>Apparence</Text>
+        {/*
+          TROIS RONDS, PAS UNE LISTE — c'est le design du patron, et c'est
+          le bon geste : trois choix exclusifs se comparent d'un coup d'œil
+          quand ils sont côte à côte, alors qu'une liste les fait lire un
+          par un. Le choix du moment porte l'anneau bleu ; sans marque, on
+          ne sait pas d'où l'on part.
+        */}
+        <View style={s.apparences}>
+          {APPARENCES.map((a) => {
+            const actif = themePref === a.cle;
+            return (
+              <Pressable
+                key={a.cle}
+                accessibilityRole="button"
+                accessibilityLabel={a.label}
+                accessibilityState={{ selected: actif }}
+                style={s.apparence}
+                onPress={() => setThemePref(a.cle)}>
+                <View style={[s.apparenceRond, actif && s.apparenceRondActif]}>
+                  {a.cle === 'system' ? (
+                    <Svg width={24} height={24} viewBox="0 0 24 24">
+                      <Path
+                        d={SOLAIRES.telephone}
+                        fill={actif ? c.blue : c.inkSoft}
+                        fillRule="evenodd"
+                      />
+                    </Svg>
+                  ) : (
+                    <ThemeGlyph
+                      quoi={a.cle === 'dark' ? 'lune' : 'soleil'}
+                      size={24}
+                      color={actif ? c.blue : c.inkSoft}
+                    />
+                  )}
+                </View>
+                <Text style={[s.apparenceMot, actif && s.apparenceMotActif]}>
+                  {a.mot}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <Text style={s.section}>Données et compte</Text>
+        <Rangee
+          s={s}
+          c={c}
+          icone="rooms"
+          label="Mes scans"
+          note={saves.length ? String(saves.length) : undefined}
+          onPress={() => setScreen('library')}
+        />
+        <Rangee
+          s={s}
+          c={c}
+          icone="save"
+          label="Restaurer l’achat"
+          onPress={restaurer}
+        />
+        <Rangee
+          s={s}
+          c={c}
+          icone="bouclier"
+          label="Confidentialité des données"
+          onPress={() =>
+            Alert.alert(
+              'Vos données',
+              'Les relevés vivent sur votre téléphone. Seul leur TEXTE monte ' +
+                'sous votre compte pour survivre à une réinstallation : les ' +
+                'photos, elles, restent dans votre photothèque et ne partent ' +
+                'jamais.',
+            )
+          }
+        />
+      </ScrollView>
+
+      <MenuCompte visible={menu} fermer={() => setMenu(false)} />
+    </View>
+  );
+}
+
+/** Une rangée de réglage : icône, mot, chevron — le motif du design. */
+function Rangee({
+  s,
+  c,
+  icone,
+  label,
+  note,
+  onPress,
+}: {
+  s: ReturnType<typeof themed>;
+  c: Palette;
+  icone: keyof typeof SOLAIRES;
+  label: string;
+  note?: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      style={({ pressed }) => [s.rangee, pressed && s.rangeeEnfoncee]}
+      onPress={onPress}>
+      <Svg width={20} height={20} viewBox="0 0 24 24">
+        <Path d={SOLAIRES[icone]} fill={c.inkSoft} fillRule="evenodd" />
+      </Svg>
+      <Text style={s.rangeeMot}>{label}</Text>
+      {!!note && <Text style={s.rangeeNote}>{note}</Text>}
+      {/* Le chevron pointe à droite : la même flèche que le retour, retournée. */}
+      <View style={s.chevronDroit}>
+        <BackChevron color={c.inkFaint} size={20} weight={2.2} />
+      </View>
+    </Pressable>
+  );
+}
+
+const themed = (c: Palette) =>
+  StyleSheet.create({
+    fond: { flex: 1, backgroundColor: c.bg },
+    contenu: { paddingHorizontal: 22 },
+    barre: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginTop: 8,
+      marginBottom: 18,
+    },
+    // Les deux ronds de la barre sont jumeaux : deux tailles inégales sur
+    // la même ligne se lisent comme un accident.
+    rondBarre: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: c.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+      ...shadowCard,
+      shadowOpacity: 0.07,
+    },
+    titreBarre: { color: c.ink, fontSize: 17, fontWeight: '700' },
+    avatar: {
+      width: 88,
+      height: 88,
+      borderRadius: 44,
+      backgroundColor: c.surfaceSunken,
+      alignSelf: 'center',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    avatarOr: { width: 88, height: 88, alignSelf: 'center' },
+    avatarDedans: { flexGrow: 1, alignItems: 'center', justifyContent: 'center' },
+    nom: {
+      color: c.ink,
+      fontSize: 21,
+      fontWeight: '800',
+      textAlign: 'center',
+      marginTop: 12,
+    },
+    nomOr: { alignSelf: 'center', marginTop: 12 },
+    email: {
+      color: c.inkFaint,
+      fontSize: 13.5,
+      textAlign: 'center',
+      marginTop: 3,
+    },
+    // Les titres de section : petits, gras, à gauche — ils découpent la
+    // page sans jamais se disputer la vedette avec le nom.
+    section: {
+      color: c.ink,
+      fontSize: 16,
+      fontWeight: '800',
+      marginTop: 26,
+      marginBottom: 10,
+    },
+    carteAbo: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      backgroundColor: c.surface,
+      borderRadius: radius.lg,
+      paddingVertical: 14,
+      paddingHorizontal: 14,
+      ...shadowCard,
+      shadowOpacity: 0.06,
+    },
+    rondEtoile: {
+      width: 42,
+      height: 42,
+      borderRadius: 21,
+      backgroundColor: c.blue,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    rondEtoilePro: { backgroundColor: c.green },
+    aboTextes: { flex: 1, minWidth: 0 },
+    aboTitre: { color: c.ink, fontSize: 15.5, fontWeight: '700' },
+    aboSous: { color: c.inkSoft, fontSize: 12.5, marginTop: 2, lineHeight: 17 },
+    // Le bouton de la carte est PLEIN et sombre, comme dans le design : sur
+    // une carte blanche, c'est le seul contraste qui dit « touche ici ».
+    boutonAbo: {
+      backgroundColor: c.ink,
+      borderRadius: radius.pill,
+      paddingHorizontal: 15,
+      paddingVertical: 9,
+    },
+    boutonAboTexte: { color: c.bg, fontSize: 13, fontWeight: '800' },
+    apparences: { flexDirection: 'row', gap: 12 },
+    apparence: { flex: 1, alignItems: 'center', gap: 7 },
+    apparenceRond: {
+      width: 58,
+      height: 58,
+      borderRadius: 29,
+      backgroundColor: c.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1.5,
+      borderColor: 'transparent',
+      ...shadowCard,
+      shadowOpacity: 0.06,
+    },
+    apparenceRondActif: { borderColor: c.blue, backgroundColor: c.blueSoft },
+    apparenceMot: { color: c.inkSoft, fontSize: 12.5, fontWeight: '600' },
+    apparenceMotActif: { color: c.blue, fontWeight: '800' },
+    rangee: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      backgroundColor: c.surface,
+      borderRadius: radius.md,
+      paddingVertical: 15,
+      paddingHorizontal: 14,
+      marginBottom: 10,
+      ...shadowCard,
+      shadowOpacity: 0.05,
+    },
+    rangeeEnfoncee: { backgroundColor: c.surfaceSunken },
+    rangeeMot: { flex: 1, color: c.ink, fontSize: 14.5, fontWeight: '600' },
+    rangeeNote: { color: c.inkFaint, fontSize: 13, fontWeight: '700' },
+    chevronDroit: { transform: [{ rotate: '180deg' }] },
+    enfonce: { transform: [{ scale: 0.97 }] },
+  });

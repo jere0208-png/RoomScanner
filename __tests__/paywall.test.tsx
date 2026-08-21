@@ -1,9 +1,14 @@
 /**
  * LA PAGE PRO ET LA PORTE D'ENTRÉE — ce que voit celui qui paie.
  *
- * On monte les deux écrans et on vérifie ce qui compte : le comparatif
- * annonce le prix et les deux paliers, le code promo déverrouille, et
- * l'accueil envoie au paywall — pas au scan — quand le quota est épuisé.
+ * On monte les deux écrans et on vérifie ce qui compte : la page annonce
+ * l'offre et son prix, le code promo déverrouille, et l'accueil envoie au
+ * paywall — pas au scan — quand le quota est épuisé.
+ *
+ * Le comparatif à deux colonnes qu'elle montrait est parti : le détail de
+ * la page refondue vit dans `abonnement.test.tsx`. Ce qui reste ici, c'est
+ * la parure d'or (badge, contour, typo) et les chemins qui mènent à
+ * l'achat.
  */
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn(async () => null),
@@ -42,14 +47,15 @@ import TestRenderer, { act } from 'react-test-renderer';
 import { LinearGradient, Mask, Path, Stop, Text as SvgText } from 'react-native-svg';
 import { PaywallScreen } from '../src/screens/PaywallScreen';
 import { BadgePro } from '../src/components/BadgePro';
-import { ContourOr, ORS, TexteOr, TRAIT } from '../src/components/ContourOr';
-import { dark } from '../src/theme';
+import { ContourOr, ORS, TexteOr } from '../src/components/ContourOr';
+import { dark, light } from '../src/theme';
 import { EssaiEpuise } from '../src/components/EssaiEpuise';
 import { SurprisePro } from '../src/components/SurprisePro';
 import { AvisRecompense } from '../src/components/AvisRecompense';
 import { SOLAIRES } from '../src/ui/solaires';
 import { SignInScreen } from '../src/screens/SignInScreen';
 import { HomeScreen } from '../src/screens/HomeScreen';
+import { ProfilScreen } from '../src/screens/ProfilScreen';
 import { GlowButton } from '../src/components/GlowButton';
 import { useAccountStore } from '../src/store/accountStore';
 import { useScanStore } from '../src/store/scanStore';
@@ -102,14 +108,29 @@ const bouton = (t: TestRenderer.ReactTestRenderer, label: string) =>
   )[0];
 
 describe('la page Pro', () => {
-  it('compare les deux paliers, prix en tête', () => {
+  /*
+    LE COMPARATIF EST PARTI, L'OFFRE EST RESTÉE.
+
+    La page mettait deux colonnes côte à côte — « Gratuit » contre « Pro »,
+    chacune son pouce d'argile — et la moitié de l'écran servait donc à
+    rappeler ce que l'utilisateur a DÉJÀ, juste à l'endroit où il décide.
+    Un comparatif se défend entre deux formules à choisir ; il n'y en a
+    qu'une à vendre. Le design donné par le patron n'en a pas.
+
+    Ce qui compte est resté et se tient ici : le prix se lit tout de suite,
+    et l'offre s'ÉNUMÈRE. Le détail de la nouvelle page — facturation,
+    liste, bouton épinglé — vit dans `abonnement.test.tsx`.
+  */
+  it('annonce l’offre et son prix, sans comparatif', () => {
     const vu = textesDe(monter(<PaywallScreen />));
-    expect(vu).toContain('Gratuit');
     expect(vu).toContain('Pro');
     expect(vu).toContain('4,90 €');
-    expect(vu).toContain('1 relevé complet');
     expect(vu).toContain('Relevés illimités');
-    expect(vu).toContain('Sans engagement');
+    // Plus de colonne « Gratuit » : on ne vend pas ce que l'utilisateur
+    // possède déjà, et on ne lui prend pas la moitié de l'écran pour le
+    // lui rappeler.
+    expect(vu).not.toContain('Gratuit');
+    expect(vu).not.toContain('1 relevé complet');
   });
 
   it('le code CARIDI12 déverrouille et ferme la page', () => {
@@ -278,11 +299,21 @@ describe('le badge Pro', () => {
     for (const contour of contours) {
       expect(contour.props.fond).toBe('#FFFFFF');
     }
+    // Le titre en or, lui, est pose sur le FOND de la page et non sur une
+    // carte : il couvre de ce fond-la. Un couvercle blanc sur le gris de
+    // l'ecran decouperait un pave clair autour des lettres.
+    const surFond = t.root
+      .findAllByType(TexteOr)
+      .filter((n) => n.props.fond === light.bg);
+    expect(surFond.length).toBeGreaterThan(0);
     // La typo d'or : « Pro », le prix, « S'abonner… » au moins.
     const typos = t.root.findAllByType(TexteOr);
     expect(typos.length).toBeGreaterThanOrEqual(3);
     const libelles = typos.map((n) => String(n.props.texte));
-    expect(libelles).toContain('Pro');
+    // La page nomme la MARQUE entiere — « EchoPlan Pro » — la ou la carte
+    // du comparatif ecrivait « Pro » tout seul en tete de colonne : le
+    // titre est devenu la promesse, il n'y a plus de colonne a etiqueter.
+    expect(libelles.some((l) => l.includes('Pro'))).toBe(true);
     expect(libelles.some((l) => l.includes('S’abonner'))).toBe(true);
     for (const typo of typos) {
       // Le mot se mesure d'abord (une typo a la taille de son texte) : on
@@ -493,42 +524,38 @@ describe('la surprise Pro', () => {
   });
 
   /*
-   * LES DEUX CARTES AU MÊME GABARIT, POUCES À MÊME HAUTEUR.
+   * LES DEUX CARTES SONT DEVENUES UNE — et les pouces sont partis avec.
    *
-   * Relevé du patron : le contenu du Gratuit était plus haut d'un trait —
-   * la carte Pro commence sous le contour d'or (1,5 pt), la Gratuit
-   * commençait à son bord. Le Gratuit descend d'autant, et les deux
-   * cartes partagent le rayon.
+   * Ce banc tenait l'alignement d'un COMPARATIF : la carte Gratuit et la
+   * carte Pro côte à côte, même rayon, même largeur, leurs deux pouces
+   * d'argile alignés à un trait près. Chaque contrainte y avait sa raison,
+   * et toutes tombent ensemble avec le comparatif : il n'y a plus qu'une
+   * carte, elle prend toute la largeur, et rien en face de quoi s'aligner.
+   *
+   * Ce qui reste vrai, et qui est vérifié ici : la carte qu'on VEND porte
+   * le contour d'or — la peau du badge et du bouton — et elle occupe la
+   * largeur entière, comme dans le design donné par le patron.
    */
-  it('aligne les deux cartes du comparatif', () => {
+  it('ne montre qu’une carte, pleine largeur, cerclée d’or', () => {
     const t = monter(<PaywallScreen />);
-    const carteGratuit = t.root.findAll((n) => {
-      const st = StyleSheet.flatten(n.props?.style) as
-        | { paddingTop?: number }
-        | undefined;
-      return (
-        st?.paddingTop === 18 + TRAIT &&
-        n.findAll((x) => x.props?.testID === 'pouce-gratuit').length > 0
-      );
-    });
-    expect(carteGratuit.length).toBeGreaterThan(0);
-    // Même rayon pour les deux blocs : le contour Pro à 20, comme la carte.
+    // La carte et le bouton : deux contours, pas trois — il n'y a plus de
+    // colonne Gratuit à border.
     const contours = t.root.findAllByType(ContourOr);
-    expect(contours[0].props.rayon).toBe(20);
-    /*
-      ET MÊME LARGEUR — relevé du patron : la carte Pro sortait plus large,
-      parce que son prix (« 4,90 € », l'ancien barré, « / mois ») impose
-      une largeur minimale de contenu. `minWidth: 0` rend l'arbitrage à
-      `flex: 1` : deux colonnes, deux moitiés, toujours.
-    */
-    const stGratuit = StyleSheet.flatten(
-      carteGratuit[0].props.style,
-    ) as ViewStyle;
-    expect(stGratuit.minWidth).toBe(0);
-    const colonnePro = StyleSheet.flatten(
-      contours[0].parent!.props.style,
-    ) as ViewStyle;
-    expect(colonnePro.minWidth).toBe(0);
+    expect(contours).toHaveLength(2);
+    const stCarte = StyleSheet.flatten(contours[0].props.style) as ViewStyle;
+    expect(stCarte.alignSelf).toBe('stretch');
+    // Et les pouces d'argile ont disparu avec la comparaison : un pouce
+    // levé n'a de sens qu'en face d'un pouce baissé.
+    expect(t.root.findAll((n) => n.props?.testID === 'pouce-pro')).toHaveLength(
+      0,
+    );
+    expect(
+      t.root.findAll((n) => n.props?.testID === 'pouce-gratuit'),
+    ).toHaveLength(0);
+    // Ce qui les remplace dit ce qu'on achète, ligne par ligne.
+    expect(
+      t.root.findAll((n) => n.props?.testID === 'ligne-atout').length,
+    ).toBeGreaterThanOrEqual(5);
   });
 
   /*
@@ -544,22 +571,19 @@ describe('la surprise Pro', () => {
     for (const contour of t.root.findAllByType(ContourOr)) {
       expect(contour.props.fond).toBe(dark.surface);
     }
-    // Et la typo d'or couvre du MÊME fond : un couvercle blanc sur carte
-    // sombre découperait des pavés clairs autour des mots.
+    /*
+      ET CHAQUE MOT D'OR COUVRE DU FOND SUR LEQUEL IL EST POSÉ.
+
+      La règle n'a pas changé — un couvercle clair sur une carte sombre
+      découperait des pavés autour des lettres — mais la typo d'or ne vit
+      plus seulement sur la carte : le titre de la page est posé sur le
+      FOND. Chaque mot doit donc couvrir de SA surface, et il n'y a plus
+      une seule bonne réponse pour toute la page.
+    */
     for (const typo of t.root.findAllByType(TexteOr)) {
-      expect(typo.props.fond).toBe(dark.surface);
+      expect([dark.surface, dark.bg]).toContain(typo.props.fond);
     }
     useScanStore.setState({ themePref: 'light' });
-  });
-
-  it('la carte Pro lève le pouce, la carte Gratuit le baisse', () => {
-    const t = monter(<PaywallScreen />);
-    const haut = t.root.findAll((n) => n.props?.testID === 'pouce-pro');
-    const bas = t.root.findAll((n) => n.props?.testID === 'pouce-gratuit');
-    expect(haut.length).toBeGreaterThanOrEqual(1);
-    expect(bas.length).toBeGreaterThanOrEqual(1);
-    // Deux images distinctes : un pouce copié-collé dirait deux fois oui.
-    expect(haut[0].props.source).not.toEqual(bas[0].props.source);
   });
 });
 
@@ -634,59 +658,39 @@ describe('l’avis contre un essai', () => {
  * gestes en boutons pleins — et une CROIX dessinée en haut à droite (la
  * leçon des caractères), le voile refermant lui aussi.
  */
-describe('le menu du compte', () => {
-  it('s’ouvre en carte EchoPlan, avec ses gestes en vrais boutons', () => {
+/*
+ * LE MENU DU COMPTE A CHANGÉ DE NATURE — et de porte.
+ *
+ * Il s'ouvrait depuis l'accueil et portait tout le compte : avatar, nom,
+ * état du palier, « Passer en Pro », déconnexion, suppression. C'était le
+ * SEUL endroit où le compte existait, alors il ramassait tout — et une
+ * carte de trois boutons ne pouvait porter ni l'abonnement, ni l'apparence,
+ * ni les réglages.
+ *
+ * Le compte a maintenant une PAGE (`profil.test.tsx`) : l'identité, l'offre
+ * et l'apparence y vivent en grand. Il ne reste au menu que ce qu'un « ⋯ »
+ * doit contenir — les deux gestes qu'on ne pose pas par mégarde. Répéter
+ * ici le nom et la parure d'or ferait un doublon de la page qu'on vient
+ * d'ouvrir ; c'est pourquoi le banc de la parure a disparu avec elle, et
+ * l'or se voit désormais sur le grand avatar de la page.
+ */
+describe('le menu des trois points', () => {
+  it('ne garde que la déconnexion et la suppression', () => {
     useAccountStore.setState({
       paywallVisible: false,
       pro: false,
       compte: { id: 'email:j@c.fr', prenom: 'Jérémy', methode: 'email' },
     });
-    const t = monter(<HomeScreen />);
-    act(() => bouton(t, 'Mon compte')!.props.onPress());
-    expect(bouton(t, 'Passer en Pro / code promo')).toBeDefined();
+    const t = monter(<ProfilScreen />);
+    // Fermé, il ne montre rien : c'est un menu, pas une section.
+    expect(bouton(t, 'Se déconnecter')).toBeUndefined();
+    act(() => bouton(t, 'Plus d’options')!.props.onPress());
     expect(bouton(t, 'Se déconnecter')).toBeDefined();
     expect(bouton(t, 'Supprimer mon compte')).toBeDefined();
-    // La croix est un TRACÉ, en haut à droite — pas un mot « Fermer ».
-    const croix = bouton(t, 'Fermer');
-    expect(croix).toBeDefined();
-    expect(
-      croix!.findAll((n) => typeof n.props?.d === 'string').length,
-    ).toBeGreaterThan(0);
-    // « Passer en Pro » referme le menu et ouvre la page.
-    act(() => bouton(t, 'Passer en Pro / code promo')!.props.onPress());
-    expect(useAccountStore.getState().paywallVisible).toBe(true);
-    expect(bouton(t, 'Se déconnecter')).toBeUndefined();
-  });
-
-  /*
-   * EN PRO, LA CARTE PREND LA PARURE — relevé du patron : « plus
-   * dynamique et coloré premium ». L'avatar se cercle du contour d'or
-   * qui respire, et le nom passe à la typo d'or — la signature du Pro,
-   * la même que le badge et la page. En gratuit, rien de tout ça.
-   */
-  it('en Pro, le menu se pare d’or : contour d’avatar et nom dorés', () => {
-    useAccountStore.setState({
-      paywallVisible: false,
-      pro: true,
-      compte: { id: 'email:j@c.fr', prenom: 'Jérémy', methode: 'email' },
-    });
-    const t = monter(<HomeScreen />);
-    act(() => bouton(t, 'Mon compte')!.props.onPress());
-    expect(t.root.findAllByType(ContourOr).length).toBeGreaterThan(0);
-    const ors = t.root
-      .findAllByType(TexteOr)
-      .map((n) => String(n.props.texte));
-    expect(ors).toContain('Jérémy');
-    act(() => t.unmount());
-    arbre = null;
-    // En gratuit : pas un contour, pas un nom doré.
-    useAccountStore.setState({ pro: false });
-    const g = monter(<HomeScreen />);
-    act(() => bouton(g, 'Mon compte')!.props.onPress());
-    expect(g.root.findAllByType(ContourOr)).toHaveLength(0);
-    expect(
-      g.root.findAllByType(TexteOr).map((n) => String(n.props.texte)),
-    ).not.toContain('Jérémy');
+    // L'offre, elle, se prend sur la PAGE — en carte, avec l'état du
+    // palier écrit à côté. Un menu caché n'est pas un endroit pour vendre.
+    expect(bouton(t, 'Passer en Pro / code promo')).toBeUndefined();
+    expect(bouton(t, 'Voir l’offre Pro')).toBeDefined();
   });
 
   it('le voile referme, comme partout', () => {
@@ -694,8 +698,8 @@ describe('le menu du compte', () => {
       paywallVisible: false,
       compte: { id: 'email:j@c.fr', prenom: 'Jérémy', methode: 'email' },
     });
-    const t = monter(<HomeScreen />);
-    act(() => bouton(t, 'Mon compte')!.props.onPress());
+    const t = monter(<ProfilScreen />);
+    act(() => bouton(t, 'Plus d’options')!.props.onPress());
     const voile = t.root.findAll(
       (n) =>
         n.props?.testID === 'voile-compte' &&

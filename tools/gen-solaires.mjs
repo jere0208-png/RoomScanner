@@ -64,6 +64,10 @@ const CHOIX = {
   //     par le patron : la lune et le soleil du même jeu)
   lune: ['moon-bold'],
   soleil: ['sun-bold', 'sun-2-bold'],
+  // --- l'apparence « Système » de la page profil : c'est le TÉLÉPHONE qui
+  //     décide, l'icône le dit — un soleil ou une lune y désigneraient un
+  //     des deux thèmes, pas le fait de suivre l'appareil.
+  telephone: ['smartphone-bold', 'iphone-bold', 'phone-bold'],
   // --- l'en-tête de l'écran des résultats
   partage: ['share-bold', 'square-share-line-bold'],
   points: ['menu-dots-bold'],

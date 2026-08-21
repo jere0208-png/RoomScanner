@@ -95,72 +95,69 @@ const bouton = (t: TestRenderer.ReactTestRenderer, label: string) =>
 
 describe('l’accueil', () => {
   /*
-   * LE SOLEIL ET LA LUNE SE VOIENT — relevé du patron : « grossis la lune
-   * et le soleil du bouton thème ». Le glyphe faisait 21 points dans une
-   * pastille de 46 : moins de la moitié, un pictogramme timide à côté des
-   * autres. Il en fait 27 — grand dans sa pastille, sans la toucher.
+   * LE THÈME A QUITTÉ L'ACCUEIL — et ce banc en garde la trace.
+   *
+   * Il a longtemps vécu ici, en bas puis en haut à droite, dans une
+   * pastille dont la taille et la zone de clic ont été reprises trois fois
+   * sur relevé du patron. Rien de tout cela n'était perdu : c'était le
+   * signe qu'un RÉGLAGE n'a pas sa place sur l'écran d'arrivée. À portée
+   * du pouce qui vise « Commencer le scan », il se déclenche en visant
+   * autre chose — et il était le seul réglage de l'application à ne pas
+   * vivre avec les autres.
+   *
+   * Il est maintenant dans la page profil, en trois choix au lieu de deux
+   * (Système, Clair, Sombre) : voir `profil.test.tsx`. Ce qui reste vrai
+   * ici, c'est l'empilement — ce qui flotte au bandeau se rend EN DERNIER,
+   * sinon le bloc héros s'étend par-dessus et avale le toucher.
    */
-  it('porte un glyphe de thème en grand dans sa pastille', () => {
+  it('n’a plus de bouton de thème, et le profil reste au-dessus du héros', () => {
     const t = monter();
-    const pastille = t.root.findAll((n) =>
-      String(n.props?.accessibilityLabel ?? '').startsWith('Passer en thème'),
-    )[0];
-    expect(pastille).toBeDefined();
-    const glyphe = pastille.findAllByType(ThemeGlyph)[0];
-    expect(glyphe).toBeDefined();
-    expect(glyphe.props.size ?? 21).toBeGreaterThanOrEqual(26);
-    // Et c'est la lune SOLAR (fiche désignée par le patron) : le glyphe
-    // vient du même jeu que toutes les icônes des menus.
     expect(
-      glyphe.findAllByType(Path).filter((n) => n.props.d === SOLAIRES.lune)
-        .length,
-    ).toBe(1);
+      t.root.findAll((n) =>
+        String(n.props?.accessibilityLabel ?? '').startsWith('Passer en thème'),
+      ),
+    ).toHaveLength(0);
+    expect(t.root.findAllByType(ThemeGlyph)).toHaveLength(0);
+
     /*
-      LA CIBLE EST UNE VRAIE ZONE, PAS UN DÉBORD — relevé du patron, deux
-      fois : « le clic ne fait rien, sauf à un endroit précis ». Le
-      `hitSlop` ne porte que dans les limites du parent ; le bouton est
-      donc un carré invisible d'au moins 56 points, et la pastille blanche
-      de 40 au plus n'est que le dessin en son centre.
+      ET RIEN NE RECOUVRE LE PROFIL — relevé du patron : « le clic ne fait
+      rien, sauf à un endroit précis ». Le bloc héros, rendu APRÈS lui,
+      s'étendait par-dessus et avalait le toucher partout où il le
+      chevauchait. C'est l'ORDRE des frères qui fait l'empilement.
     */
-    const stZone = StyleSheet.flatten(pastille.props.style) as {
-      width?: number;
-      height?: number;
-    };
-    expect(stZone.width).toBeGreaterThanOrEqual(56);
-    expect(stZone.height).toBeGreaterThanOrEqual(56);
-    const pastilleBlanche = pastille.findAll((n) => {
-      const st = StyleSheet.flatten(n.props?.style) as
-        | { width?: number; borderRadius?: number }
-        | undefined;
-      return (
-        typeof st?.width === 'number' &&
-        st.width <= 42 &&
-        (st.borderRadius ?? 0) >= 18
-      );
-    });
-    expect(pastilleBlanche.length).toBeGreaterThan(0);
-    /*
-      ET RIEN NE LE RECOUVRE — relevé du patron : « le clic ne fait rien,
-      sauf à un endroit précis en bas à droite ». Le bloc héros, rendu
-      APRÈS lui, s'étendait par-dessus et avalait le toucher partout où il
-      le chevauchait. Ce qui flotte au bandeau se rend donc EN DERNIER :
-      dans l'arbre, la pastille du thème et le bloc profil viennent après
-      le héros — c'est l'ordre qui fait l'empilement.
-    */
-    // Le conteneur est le parent direct de la pastille : c'est SES
-    // enfants qui s'empilent.
-    const conteneur = pastille.parent!;
-    const enfants = conteneur.children.filter(
+    const bloc = t.root.findAll(
+      (n) =>
+        n.props?.accessibilityLabel === 'Mon compte' &&
+        typeof n.props?.onPress === 'function',
+    )[0];
+    const enfants = bloc.parent!.children.filter(
       (e): e is TestRenderer.ReactTestInstance => typeof e !== 'string',
     );
     const rangHero = enfants.findIndex(
       (n) => n.findAllByType(LogoMark).length > 0,
     );
-    const rangTheme = enfants.findIndex((n) =>
-      String(n.props?.accessibilityLabel ?? '').startsWith('Passer en thème'),
+    const rangProfil = enfants.findIndex(
+      (n) => n.props?.accessibilityLabel === 'Mon compte',
     );
     expect(rangHero).toBeGreaterThanOrEqual(0);
-    expect(rangTheme).toBeGreaterThan(rangHero);
+    expect(rangProfil).toBeGreaterThan(rangHero);
+  });
+
+  /*
+   * ET LE BLOC PROFIL OUVRE LA PAGE, plus la carte modale qu'il ouvrait.
+   * Le compte a maintenant un ENDROIT : un popup de trois boutons ne
+   * pouvait pas porter l'abonnement, l'apparence et les réglages.
+   */
+  it('mène à la page profil', () => {
+    const t = monter();
+    const bloc = t.root.findAll(
+      (n) =>
+        n.props?.accessibilityLabel === 'Mon compte' &&
+        typeof n.props?.onPress === 'function',
+    )[0];
+    act(() => bloc.props.onPress());
+    expect(useScanStore.getState().screen).toBe('profil');
+    useScanStore.setState({ screen: 'home' });
   });
 
   /*
@@ -221,20 +218,15 @@ describe('l’accueil', () => {
     // Moins gras — relevé du patron : le prénom n'est pas un titre.
     expect(Number(stNom.fontWeight)).toBeLessThanOrEqual(600);
     /*
-      ET LE BANDEAU EST AXÉ — le bloc profil et le bouton de thème
-      descendent ensemble et partagent leur ligne : deux éléments à la
-      même hauteur d'écran qui ne s'alignent pas se lisent comme un
-      accident.
+      LE BLOC RESTE POSÉ EN HAUT, PAS COLLÉ AU BORD — relevé du patron :
+      « le clic doit être fait un peu au-dessus pour que ça fonctionne ».
+      Il partageait sa ligne avec le bouton de thème, et les deux étaient
+      alignés par construction ; le thème est parti dans la page profil,
+      le profil garde sa hauteur — c'est celle qui a été réglée sur le
+      chantier, elle n'a pas de raison de bouger parce que son voisin s'en
+      est allé.
     */
-    const pastilleTheme = t.root.findAll((n) =>
-      String(n.props?.accessibilityLabel ?? '').startsWith('Passer en thème'),
-    )[0];
     const stBloc = StyleSheet.flatten(bloc.props.style) as { top?: number };
-    const stTheme = StyleSheet.flatten(pastilleTheme.props.style) as {
-      top?: number;
-    };
-    // Remonté d'un cran (le clic répondait au-dessus du dessin), mais
-    // jamais collé au bord d'écran.
     expect(stBloc.top).toBeGreaterThanOrEqual(44);
     /*
       LE CADRE INVISIBLE DU PROFIL — relevé du patron : « un clic même
@@ -246,17 +238,7 @@ describe('l’accueil', () => {
       height?: number;
     };
     expect(stCadre.paddingHorizontal ?? 0).toBeGreaterThanOrEqual(10);
-    /*
-      ALIGNÉS PAR CONSTRUCTION — relevé du patron : les deux blocs vivaient
-      dans des boîtes de hauteurs différentes et leurs centres dérivaient à
-      chaque retouche de contenu. Même sommet, MÊME hauteur : plus rien à
-      calculer, donc plus rien à dériver.
-    */
-    const stThemeTaille = StyleSheet.flatten(pastilleTheme.props.style) as {
-      height?: number;
-    };
-    expect(stTheme.top).toBe(stBloc.top);
-    expect(stCadre.height).toBe(stThemeTaille.height);
+    expect(Number(stCadre.height)).toBeGreaterThanOrEqual(56);
     /*
       TOUT LE BLOC PREND LE CLIC — avatar, nom, barre, grade. Une vue SVG
       avale le toucher si on la laisse faire : les enfants directs du
@@ -304,14 +286,15 @@ describe('l’accueil', () => {
   });
 
   /*
-   * LE THÈME FAIT LA TAILLE DU PROFIL — relevé du patron : « fais le
-   * bouton thème à la même taille que le bouton profil, mais agrandis
-   * avant légèrement le bouton profil ». La pastille blanche (40) dominait
-   * l'avatar (32) : le bandeau portait deux ronds inégaux. L'avatar prend
-   * donc quatre points, la pastille en rend quatre — les deux se lisent
-   * en 36, et l'égalité est ASSERTÉE, pas espérée.
+   * L'AVATAR GARDE SA TAILLE — relevé du patron : « agrandis légèrement le
+   * bouton profil ». Il l'avait prise pour égaler la pastille du thème, qui
+   * vivait à sa droite : deux ronds inégaux sur la même ligne se lisaient
+   * comme un accident. Le thème est parti dans la page profil ; la taille,
+   * elle, reste — c'est celle qu'on a réglée en la regardant, et un avatar
+   * qui rétrécirait au départ de son voisin serait une régression que
+   * personne n'a demandée.
    */
-  it('la pastille du thème et l’avatar font la même taille', () => {
+  it('garde l’avatar à la taille réglée, en Pro comme en gratuit', () => {
     useAccountStore.setState({
       compte: { id: 'email:j@c.fr', prenom: 'Jérôme', methode: 'email' },
       pro: true,
@@ -322,27 +305,11 @@ describe('l’accueil', () => {
         n.props?.accessibilityLabel === 'Mon compte' &&
         typeof n.props?.onPress === 'function',
     )[0];
-    // L'avatar Pro a grandi : l'anneau d'or se lit en 36.
+    // L'avatar Pro : l'anneau d'or se lit en 36.
     const stAnneau = StyleSheet.flatten(
       bloc.findAllByType(ContourOr)[0].props.style,
     ) as { width?: number };
     expect(stAnneau.width).toBeGreaterThanOrEqual(35);
-    // Et la pastille blanche du thème fait EXACTEMENT sa taille.
-    const zone = t.root.findAll((n) =>
-      String(n.props?.accessibilityLabel ?? '').startsWith('Passer en thème'),
-    )[0];
-    const blanche = zone.findAll((n) => {
-      const st = StyleSheet.flatten(n.props?.style) as
-        | { width?: number; borderRadius?: number }
-        | undefined;
-      return typeof st?.width === 'number' && (st.borderRadius ?? 0) >= 17;
-    })[0];
-    const stBlanche = StyleSheet.flatten(blanche.props.style) as {
-      width?: number;
-      height?: number;
-    };
-    expect(stBlanche.width).toBe(stAnneau.width);
-    expect(stBlanche.height).toBe(stAnneau.width);
     // En gratuit, l'avatar nu suit le mouvement : lui aussi a grandi.
     // Le premier arbre se démonte AVANT le second : deux accueils vivants
     // à la fois, et leurs animations se disputent les minuteries sans fin.

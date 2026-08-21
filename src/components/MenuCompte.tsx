@@ -1,26 +1,22 @@
 /**
- * LE MENU DU COMPTE — blanc et bleu, à nous.
+ * LE MENU DES TROIS POINTS DE LA PAGE PROFIL.
  *
- * C'était une Alert système : la feuille grise d'iOS, la même que dans
- * n'importe quelle app — relevé du patron : « trop basique ». C'est
- * maintenant une carte EchoPlan : l'avatar Solar en bleu, le nom, l'état
- * du palier en une ligne, et les gestes en boutons pleins. La CROIX
- * dessinée ferme en haut à droite (la leçon des caractères — jamais un
- * mot ni un « ✕ » au clavier), et le voile referme aussi : c'est le geste
- * que tout le monde essaie en premier.
+ * Il a été une carte de compte à part entière — avatar, nom, état du
+ * palier, boutons — ouverte depuis l'accueil, parce que le compte n'avait
+ * nulle part d'autre où vivre. La page profil porte maintenant tout cela,
+ * et en grand : répéter ici le nom et l'offre ferait un doublon de la page
+ * qu'on vient de quitter.
  *
- * La confirmation de suppression, elle, RESTE une Alert système : pour un
- * geste destructif, la feuille austère du système est un avertissement en
- * soi — la déguiser en jolie carte l'affaiblirait.
+ * Il ne lui reste donc que ce qu'un « ⋯ » doit contenir : les deux gestes
+ * qu'on ne pose pas par mégarde. Se déconnecter, et supprimer son compte —
+ * ce dernier en rouge, et confirmé par une Alert système : pour un geste
+ * destructif, la feuille austère du système est un avertissement en soi,
+ * la déguiser en jolie carte l'affaiblirait.
  */
 import React from 'react';
 import { Alert, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
-import { CloseCross } from './CloseCross';
-import { ContourOr, TexteOr } from './ContourOr';
-import { SOLAIRES } from '../ui/solaires';
-import { PLANS_GRATUITS, useAccountStore } from '../store/accountStore';
-import { useTheme, type Palette } from '../theme';
+import { useAccountStore } from '../store/accountStore';
+import { radius, shadowCard, useTheme, type Palette } from '../theme';
 
 export function MenuCompte({
   visible,
@@ -31,15 +27,8 @@ export function MenuCompte({
 }) {
   const c = useTheme();
   const s = themed(c);
-  const compte = useAccountStore((st) => st.compte);
-  const pro = useAccountStore((st) => st.pro);
-  const plansUtilises = useAccountStore((st) => st.plansUtilises);
-  const bonusEssais = useAccountStore((st) => st.bonusEssais);
-  const ouvrirPaywall = useAccountStore((st) => st.ouvrirPaywall);
   const deconnecter = useAccountStore((st) => st.deconnecter);
   const supprimerCompte = useAccountStore((st) => st.supprimerCompte);
-
-  const restant = Math.max(0, PLANS_GRATUITS + bonusEssais - plansUtilises);
 
   const confirmerSuppression = () =>
     Alert.alert(
@@ -67,83 +56,29 @@ export function MenuCompte({
       onRequestClose={fermer}>
       {/* Le voile referme : c'est le geste que tout le monde essaie. */}
       <Pressable testID="voile-compte" style={s.voile} onPress={fermer}>
-        {/* La carte avale le toucher : un appui DANS le menu ne doit pas
-            le refermer par ricochet. */}
+        {/*
+          LE MENU TOMBE SOUS SON BOUTON, en haut à droite. Un menu de « ⋯ »
+          centré au milieu de l'écran perd le lien avec ce qui l'a ouvert :
+          on le cherche des yeux là où le doigt vient d'appuyer.
+        */}
         <Pressable style={s.carte} onPress={() => {}}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Fermer"
-            style={s.croix}
-            hitSlop={8}
-            onPress={fermer}>
-            <CloseCross size={22} color={c.inkSoft} />
-          </Pressable>
-          {/*
-            EN PRO, LA PARURE — relevé du patron : « plus dynamique et
-            coloré premium ». L'avatar se cercle du contour d'or qui
-            respire, et le nom passe à la typo d'or : la signature du Pro,
-            la même que le badge et la page. En gratuit, la carte reste
-            sobre — la parure est ce qu'on achète.
-          */}
-          {pro ? (
-            <ContourOr rayon={30} fond={c.blue} style={s.rondAvatarOr}>
-              <View style={s.rondDedans}>
-                <Svg width={34} height={34} viewBox="0 0 24 24">
-                  <Path d={SOLAIRES.avatar} fill="#FFFFFF" fillRule="evenodd" />
-                </Svg>
-              </View>
-            </ContourOr>
-          ) : (
-            <View style={s.rondAvatar}>
-              <Svg width={34} height={34} viewBox="0 0 24 24">
-                <Path d={SOLAIRES.avatar} fill="#FFFFFF" fillRule="evenodd" />
-              </Svg>
-            </View>
-          )}
-          {pro ? (
-            <TexteOr
-              texte={compte?.prenom || compte?.email || 'Mon compte'}
-              taille={19}
-              fond={c.surface}
-            />
-          ) : (
-            <Text style={s.nom}>
-              {compte?.prenom || compte?.email || 'Mon compte'}
-            </Text>
-          )}
-          <Text style={s.etat}>
-            {pro
-              ? 'EchoPlan Pro · relevés illimités'
-              : `Plan gratuit · ${restant} relevé${restant > 1 ? 's' : ''} restant${restant > 1 ? 's' : ''}`}
-          </Text>
-          {!pro && (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Passer en Pro / code promo"
-              style={({ pressed }) => [s.cta, pressed && s.enfonce]}
-              onPress={() => {
-                fermer();
-                ouvrirPaywall();
-              }}>
-              <Text style={s.ctaTexte}>Passer en Pro / code promo</Text>
-            </Pressable>
-          )}
-          <Pressable
-            accessibilityRole="button"
             accessibilityLabel="Se déconnecter"
-            style={({ pressed }) => [s.secondaire, pressed && s.enfonce]}
+            style={({ pressed }) => [s.entree, pressed && s.enfoncee]}
             onPress={() => {
               fermer();
               deconnecter();
             }}>
-            <Text style={s.secondaireTexte}>Se déconnecter</Text>
+            <Text style={s.entreeTexte}>Se déconnecter</Text>
           </Pressable>
+          <View style={s.filet} />
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Supprimer mon compte"
-            onPress={confirmerSuppression}
-            hitSlop={6}>
-            <Text style={s.danger}>Supprimer mon compte</Text>
+            style={({ pressed }) => [s.entree, pressed && s.enfoncee]}
+            onPress={confirmerSuppression}>
+            <Text style={[s.entreeTexte, s.danger]}>Supprimer mon compte</Text>
           </Pressable>
         </Pressable>
       </Pressable>
@@ -155,54 +90,26 @@ const themed = (c: Palette) =>
   StyleSheet.create({
     voile: {
       flex: 1,
-      backgroundColor: 'rgba(8, 10, 14, 0.55)',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: 28,
+      backgroundColor: 'rgba(8, 10, 14, 0.35)',
+      alignItems: 'flex-end',
+      justifyContent: 'flex-start',
+      paddingTop: 96,
+      paddingHorizontal: 20,
     },
     carte: {
-      alignSelf: 'stretch',
-      borderRadius: 24,
+      minWidth: 220,
+      borderRadius: radius.md,
       backgroundColor: c.surface,
-      padding: 24,
-      paddingTop: 26,
-      alignItems: 'center',
-      gap: 10,
+      paddingVertical: 4,
+      ...shadowCard,
     },
-    croix: { position: 'absolute', top: 14, right: 14, zIndex: 1 },
-    rondAvatar: {
-      width: 56,
-      height: 56,
-      borderRadius: 28,
-      backgroundColor: c.blue,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginBottom: 2,
+    entree: { paddingVertical: 14, paddingHorizontal: 18 },
+    enfoncee: { backgroundColor: c.surfaceSunken },
+    entreeTexte: { color: c.ink, fontSize: 15, fontWeight: '600' },
+    danger: { color: c.danger },
+    filet: {
+      height: StyleSheet.hairlineWidth,
+      backgroundColor: c.line,
+      marginHorizontal: 12,
     },
-    rondAvatarOr: { width: 60, height: 60, marginBottom: 2 },
-    rondDedans: { flexGrow: 1, alignItems: 'center', justifyContent: 'center' },
-    nom: { color: c.ink, fontSize: 19, fontWeight: '800' },
-    etat: { color: c.inkSoft, fontSize: 13.5, marginBottom: 8 },
-    cta: {
-      alignSelf: 'stretch',
-      height: 50,
-      borderRadius: 14,
-      backgroundColor: c.blue,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    ctaTexte: { color: '#FFFFFF', fontSize: 15, fontWeight: '800' },
-    secondaire: {
-      alignSelf: 'stretch',
-      height: 50,
-      borderRadius: 14,
-      backgroundColor: c.surface,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: c.lineStrong,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    secondaireTexte: { color: c.ink, fontSize: 15, fontWeight: '700' },
-    danger: { color: c.danger, fontSize: 14, fontWeight: '700', padding: 6 },
-    enfonce: { transform: [{ scale: 0.97 }] },
   });

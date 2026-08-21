@@ -97,7 +97,14 @@ import {
   type RoomKind,
 } from '../geometry/furniture';
 
-export type Screen = 'home' | 'scan' | 'result' | 'library' | 'export' | 'camera';
+export type Screen =
+  | 'home'
+  | 'scan'
+  | 'result'
+  | 'library'
+  | 'export'
+  | 'camera'
+  | 'profil';
 
 /**
  * Une pièce du scan. La géométrie reste À PLAT dans `walls`/`openings`/
@@ -445,7 +452,16 @@ const TEXTURES_KEY = 'roomscanner.showTextures.v1';
  */
 const REPRISE_KEY = 'roomscanner.reprise.v1';
 
-export type ThemePref = 'light' | 'dark';
+/**
+ * TROIS CHOIX, ET « SYSTÈME » EN FAIT PARTIE.
+ *
+ * Le thème se bornait à clair ou sombre, choisis à la main sur l'accueil.
+ * Un électricien passe sa journée dehors et sa soirée dans un tableau
+ * électrique : c'est le téléphone qui sait quand basculer, pas nous. Le
+ * réglage rejoint donc la page profil avec l'option qui manquait — suivre
+ * l'appareil — et c'est elle qui accueille les nouveaux venus.
+ */
+export type ThemePref = 'system' | 'light' | 'dark';
 
 /**
  * Ce qui est déjà sur le disque, par scan. Sert à n'écrire QUE ce qui change.
@@ -1387,7 +1403,7 @@ export const useScanStore = create<ScanState>((set, get) => {
     saves: [],
     savesCharges: false,
     folders: [],
-    themePref: 'light',
+    themePref: 'system',
     showOpeningColors: false,
 
     setThemePref: (themePref) => {
@@ -4225,7 +4241,7 @@ export const useScanStore = create<ScanState>((set, get) => {
     loadSaves: async () => {
       try {
         const pref = await AsyncStorage.getItem(THEME_KEY);
-        if (pref === 'light' || pref === 'dark') {
+        if (pref === 'light' || pref === 'dark' || pref === 'system') {
           set({ themePref: pref });
         }
         const colors = await AsyncStorage.getItem(COLORS_KEY);

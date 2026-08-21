@@ -64,9 +64,32 @@ export const PLANS_GRATUITS = 1;
 export const PRIX_PRO = '4,90 €';
 export const PRIX_PRO_NUM = 4.9;
 export const PRODUIT_PRO = 'echoplan.pro.mensuel';
+/*
+  L'ANNUEL : DEUX MOIS OFFERTS, ET RIEN DE PLUS COMPLIQUÉ.
+
+  La page d'abonnement propose le choix de la facturation, comme le design
+  que le patron a donné. Un second onglet n'a de sens qu'avec un second
+  prix : 49 € l'an, soit dix mois payés pour douze — la remise classique de
+  l'abonnement annuel, assez lisible pour être annoncée sans calcul.
+
+  ATTENTION CHANTIER APPLE : le produit `echoplan.pro.annuel` doit être
+  créé dans App Store Connect à côté du mensuel. Tant qu'il n'y est pas,
+  l'achat annuel échoue en le DISANT, comme le mensuel avant lui.
+*/
+export const PRIX_PRO_AN = '49,00 €';
+export const PRIX_PRO_AN_NUM = 49;
+export const PRODUIT_PRO_AN = 'echoplan.pro.annuel';
+/** Ce que l'annuel fait gagner, en mois — de quoi l'écrire sans calculer. */
+export const MOIS_OFFERTS = Math.round(
+  (PRIX_PRO_NUM * 12 - PRIX_PRO_AN_NUM) / PRIX_PRO_NUM,
+);
+/** Les deux facturations, telles que la page les nomme. */
+export type Offre = 'mensuel' | 'annuel';
 /** Le prix remisé, écrit à la française. */
-export const prixRemise = (pct: number) =>
-  `${(PRIX_PRO_NUM * (1 - pct / 100)).toFixed(2).replace('.', ',')} €`;
+export const prixRemise = (pct: number, offre: Offre = 'mensuel') =>
+  `${((offre === 'annuel' ? PRIX_PRO_AN_NUM : PRIX_PRO_NUM) * (1 - pct / 100))
+    .toFixed(2)
+    .replace('.', ',')} €`;
 /** Les codes qui déverrouillent le Pro, en clair : offre du patron. */
 const CODES_PROMO = ['CARIDI12'];
 /**
@@ -152,7 +175,8 @@ interface AccountState {
    */
   supprimerCompte: () => Promise<void>;
   utiliserCode: (code: string) => boolean;
-  acheterPro: () => Promise<void>;
+  /** L'achat StoreKit de l'offre choisie. Mensuel par défaut. */
+  acheterPro: (offre?: Offre) => Promise<void>;
   restaurerPro: () => Promise<boolean>;
   peutCreerPlan: () => boolean;
   noterPlanCree: () => void;
@@ -413,8 +437,10 @@ export const useAccountStore = create<AccountState>((set, get) => ({
     return true;
   },
 
-  acheterPro: async () => {
-    const ok = await acheterAbonnement(PRODUIT_PRO);
+  acheterPro: async (offre = 'mensuel') => {
+    const ok = await acheterAbonnement(
+      offre === 'annuel' ? PRODUIT_PRO_AN : PRODUIT_PRO,
+    );
     if (ok) {
       set({ pro: true, proVia: 'abonnement', paywallVisible: false });
       persister(get());
@@ -423,7 +449,17 @@ export const useAccountStore = create<AccountState>((set, get) => ({
   },
 
   restaurerPro: async () => {
-    const ok = await restaurerAbonnement(PRODUIT_PRO);
+    /*
+      LES DEUX PRODUITS, PAS UN.
+
+      Qui a pris l'annuel et change de téléphone ne détient PAS le mensuel :
+      ne demander que celui-là lui répondrait « aucun achat trouvé » alors
+      qu'il a payé l'année. On interroge donc les deux, et le premier qui
+      répond oui suffit.
+    */
+    const ok =
+      (await restaurerAbonnement(PRODUIT_PRO)) ||
+      (await restaurerAbonnement(PRODUIT_PRO_AN));
     if (ok) {
       set({ pro: true, proVia: 'abonnement', paywallVisible: false });
       persister(get());

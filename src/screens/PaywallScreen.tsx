@@ -1,20 +1,24 @@
 /**
- * LA PAGE PRO — deux colonnes, un prix, un code.
+ * LA PAGE D'ABONNEMENT — une offre, son prix, ce qu'elle apporte.
  *
- * Le comparatif se lit en une passe : ce que le gratuit donne (UN relevé
- * complet, avec tout — plan coté, 3D, dossier PDF ; brider la qualité du
- * premier plan ferait fuir avant d'avoir convaincu), et ce que le Pro
- * ajoute : les relevés ILLIMITÉS. 4,90 € par mois, sans engagement.
+ * Elle a longtemps été un COMPARATIF : deux colonnes côte à côte, Gratuit
+ * contre Pro, chacune avec son pouce d'argile. Le comparatif se défend
+ * quand on hésite entre deux formules ; ici il n'y en a qu'une à vendre, et
+ * la colonne « Gratuit » prenait la moitié de l'écran pour rappeler ce que
+ * l'utilisateur a DÉJÀ — en tête de page, à l'endroit où l'on décide.
  *
- * Le champ « code promo » déverrouille localement (offres du patron —
- * CARIDI12). L'achat réel passe par StoreKit : tant que le produit n'existe
- * pas dans App Store Connect, le bouton explique au lieu d'échouer en
- * silence.
+ * Le patron a donné un design à suivre, et la page le suit : une barre
+ * sobre, un titre qui nomme l'offre, le choix de la facturation, une carte
+ * de prix qui énumère ce qu'on achète, et UN bouton, épinglé en bas, qui ne
+ * quitte jamais l'écran.
+ *
+ * Ce qui ne bouge pas, parce que ça ne peut pas : le champ de code promo
+ * (offres du patron — CARIDI12 déverrouille, FIRST20 remise) et
+ * « Restaurer l'achat », qu'Apple exige dès qu'on vend un abonnement.
  */
 import React, { useEffect, useState } from 'react';
 import {
   Alert,
-  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -24,20 +28,36 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Path } from 'react-native-svg';
+import { BackChevron } from '../components/BackChevron';
 import { BadgePro } from '../components/BadgePro';
-import { ContourOr, TexteOr, TRAIT } from '../components/ContourOr';
-import { PRIX_PRO, prixRemise, useAccountStore } from '../store/accountStore';
-import { useTheme, type Palette } from '../theme';
+import { ContourOr, TexteOr } from '../components/ContourOr';
+import { SOLAIRES } from '../ui/solaires';
+import {
+  MOIS_OFFERTS,
+  PRIX_PRO,
+  PRIX_PRO_AN,
+  prixRemise,
+  useAccountStore,
+  type Offre,
+} from '../store/accountStore';
+import { radius, shadowCard, useTheme, type Palette } from '../theme';
 
-const GRATUIT = [
-  '1 relevé complet',
-  'Plan 2D coté et 3D',
-  'Dossier PDF et exports',
-];
-const PRO = [
-  'Relevés illimités',
-  'Tous les exports, sans limite',
-  'Les nouveautés en premier',
+/**
+ * CE QU'ON ACHÈTE, ÉNUMÉRÉ.
+ *
+ * Un prix sans liste ne dit pas ce qu'on paie, et la moitié de ce que
+ * l'application sait faire ne se devine pas depuis l'accueil : le tableau
+ * existant, le DXF pour l'architecte, le télémètre au Bluetooth. Chaque
+ * ligne nomme une chose qui se FAIT, jamais une qualité.
+ */
+const ATOUTS: { icone: keyof typeof SOLAIRES; mot: string }[] = [
+  { icone: 'rooms', mot: 'Relevés illimités, autant de pièces qu’il faut' },
+  { icone: 'partage', mot: 'Tous les exports : PDF coté, DXF, métré CSV' },
+  { icone: 'save', mot: 'Plans gardés sous votre compte, à l’abri du téléphone' },
+  { icone: 'elec', mot: 'Contrôle NF C 15-100, circuits et liste de matériel' },
+  { icone: 'metre', mot: 'Relevé du tableau existant et diagnostic' },
+  { icone: 'etoile', mot: 'Les nouveautés en premier' },
 ];
 
 export function PaywallScreen() {
@@ -52,6 +72,18 @@ export function PaywallScreen() {
   const remisePct = useAccountStore((st) => st.remisePct);
   const codeOffert = useAccountStore((st) => st.codeOffert);
   const [code, setCode] = useState('');
+  /*
+    LE MENSUEL D'ABORD.
+
+    C'est l'engagement le plus court : personne ne prend un an d'une app
+    qu'il découvre, et proposer l'annuel en premier ferait lire le prix le
+    plus gros avant tout le reste.
+  */
+  const [offre, setOffre] = useState<Offre>('mensuel');
+
+  const annuel = offre === 'annuel';
+  const prixPlein = annuel ? PRIX_PRO_AN : PRIX_PRO;
+  const prix = remisePct > 0 ? prixRemise(remisePct, offre) : prixPlein;
 
   /*
     LE CODE OFFERT ARRIVE DÉJÀ ÉCRIT. La surprise applique FIRST20 toute
@@ -72,7 +104,7 @@ export function PaywallScreen() {
 
   const acheter = async () => {
     try {
-      await acheterPro();
+      await acheterPro(offre);
     } catch (e) {
       Alert.alert('Achat impossible', (e as Error).message);
     }
@@ -80,164 +112,180 @@ export function PaywallScreen() {
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={fermer}>
-      <ScrollView
-        style={s.fond}
-        contentContainerStyle={[
-          s.contenu,
-          { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 28 },
-        ]}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Fermer"
-          style={s.fermer}
-          onPress={fermer}>
-          <Text style={s.fermerTexte}>✕</Text>
-        </Pressable>
-
-        <Text style={s.titre}>Passez en Pro</Text>
-        <Text style={s.sousTitre}>
-          Le plan gratuit couvre un relevé — le Pro les rend illimités.
-        </Text>
-
-        <View style={s.colonnes}>
-          <View style={[s.carte, s.carteGratuit]}>
-            {/* Les pouces d'argile disent le verdict d'un coup d'œil —
-                relevé du patron : en bas pour le gratuit, en l'air pour
-                le Pro. */}
-            <Image
-              testID="pouce-gratuit"
-              source={require('../assets/pro/pouce-bas.png')}
-              style={s.pouce}
-              resizeMode="contain"
-            />
-            <Text style={s.carteTitre}>Gratuit</Text>
-            <Text style={s.cartePrix}>0 €</Text>
-            {GRATUIT.map((l) => (
-              <Text key={l} style={s.ligne}>
-                ✓ {l}
-              </Text>
-            ))}
-          </View>
-          <View style={s.colonnePro}>
-            {/* La carte qu'on vend a la peau EXACTE du badge : couvercle
-                blanc, contour d'or, et les mots qui vendent — « Pro », le
-                prix — troués sur la même bande qui glisse (ContourOr). Les
-                bénéfices restent à l'encre : on les LIT, on ne les admire
-                pas. */}
-            <ContourOr rayon={20} fond={c.surface} style={s.pleine}>
-              <View style={s.carteDedans}>
-                <Image
-                  testID="pouce-pro"
-                  source={require('../assets/pro/pouce-haut.png')}
-                  style={s.pouce}
-                  resizeMode="contain"
-                />
-                <TexteOr
-                  texte="Pro"
-                  taille={14}
-                  graisse="700"
-                  fond={c.surface}
-                  style={s.aGauche}
-                />
-                <View style={s.prixRangee}>
-                  <TexteOr
-                    texte={remisePct > 0 ? prixRemise(remisePct) : PRIX_PRO}
-                    taille={26}
-                    fond={c.surface}
-                  />
-                  {/* L'ancien prix reste visible, barré : une remise sans
-                      référence n'est qu'un prix comme un autre. */}
-                  {remisePct > 0 && (
-                    <Text style={s.prixBarre}>{PRIX_PRO}</Text>
-                  )}
-                  <TexteOr
-                    texte="/ mois"
-                    taille={13}
-                    graisse="600"
-                    fond={c.surface}
-                    style={s.parMoisCale}
-                  />
-                </View>
-                {PRO.map((l) => (
-                  <Text key={l} style={s.ligne}>
-                    ✓ {l}
-                  </Text>
-                ))}
-              </View>
-            </ContourOr>
-            {/* Le badge flotte AU-DESSUS du bord de la carte : il vit hors
-                du rognage du contour, sinon sa moitié haute serait coupée. */}
-            <BadgePro style={s.badge} />
-          </View>
-        </View>
-
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="S’abonner"
-          style={({ pressed }) => [s.ctaCadre, pressed && s.enfonce]}
-          onPress={acheter}>
-          {/* Le geste qu'on vend a la peau du badge : blanc, contour d'or,
-              et le mot lui-même respire — c'est la signature du Pro. */}
-          <ContourOr rayon={16} fond={c.surface} style={s.pleine}>
-            <View style={s.ctaDedans}>
-              {/* Une PHRASE, pas une formule — relevé du patron : « trop de
-                  chiffres et de tirets ». Un seul nombre, zéro tiret. */}
-              <TexteOr
-                texte={`S’abonner pour ${
-                  remisePct > 0 ? prixRemise(remisePct) : PRIX_PRO
-                } par mois`}
-                taille={16.5}
-                fond={c.surface}
-              />
-            </View>
-          </ContourOr>
-        </Pressable>
-        {remisePct > 0 && (
-          /* La pastille de remise : ni code, ni chiffre — le prix barré de
-             la carte dit déjà tout, elle ne fait que confirmer. */
-          <View style={s.remisePastille}>
-            <Text style={s.remiseNote}>✓ Remise de bienvenue appliquée</Text>
-          </View>
-        )}
-        <Text style={s.sansEngagement}>Sans engagement, résiliable à tout moment.</Text>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Restaurer l’achat"
-          onPress={async () => {
-            try {
-              const ok = await restaurerPro();
-              Alert.alert(
-                ok ? 'Abonnement restauré' : 'Aucun achat trouvé',
-                ok
-                  ? 'Votre Pro est de retour.'
-                  : 'L’App Store ne connaît pas d’abonnement pour ce compte Apple.',
-              );
-            } catch (e) {
-              Alert.alert('Restauration impossible', (e as Error).message);
-            }
-          }}>
-          <Text style={s.restaurer}>Restaurer l’achat</Text>
-        </Pressable>
-
-        <View style={s.promo}>
-          <TextInput
-            style={s.champ}
-            placeholder="Code promo"
-            placeholderTextColor={c.inkFaint}
-            value={code}
-            onChangeText={setCode}
-            autoCapitalize="characters"
-            autoCorrect={false}
-          />
+      <View style={[s.fond, { paddingTop: insets.top }]}>
+        <View style={s.barre}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Appliquer le code"
-            style={({ pressed }) => [s.btnCode, pressed && s.enfonce]}
-            onPress={valideCode}>
-            <Text style={s.btnCodeTexte}>Appliquer</Text>
+            accessibilityLabel="Retour"
+            style={s.rondBarre}
+            hitSlop={10}
+            onPress={fermer}>
+            <BackChevron color={c.ink} />
+          </Pressable>
+          <Text style={s.titreBarre}>Abonnement</Text>
+          {/* Le vide à droite garde le titre au centre : sans lui, il se
+              décale de la largeur du bouton de retour. */}
+          <View style={s.rondBarre} />
+        </View>
+
+        <ScrollView
+          contentContainerStyle={s.contenu}
+          showsVerticalScrollIndicator={false}>
+          {/*
+            LE TITRE NOMME L'OFFRE, ET LA MARQUE SE DÉTACHE.
+
+            « Passer en » à l'encre, « EchoPlan Pro » à la typo d'or : c'est
+            la signature du Pro dans toute l'application — le badge, la
+            carte, le bouton — et elle fait ici ce qu'un aplat de couleur
+            ferait ailleurs, dire d'un coup d'œil ce qu'on achète.
+          */}
+          <Text style={s.titre}>Passer en</Text>
+          <TexteOr texte="EchoPlan Pro" taille={30} fond={c.bg} style={s.titreOr} />
+          <Text style={s.sousTitre}>
+            Relevez, contrôlez et exportez sans compter. Un seul abonnement,
+            résiliable à tout moment.
+          </Text>
+
+          {/*
+            LE CHOIX DE LA FACTURATION, EN DEUX ONGLETS.
+
+            Les deux prix ne se comparent pas dans la tête : 4,90 par mois
+            contre 49 l'an demande une multiplication. L'onglet annuel écrit
+            donc ce qu'il fait gagner, en mois offerts — c'est la seule
+            façon de le rendre lisible sans calculette.
+          */}
+          <View style={s.segment}>
+            {(['mensuel', 'annuel'] as Offre[]).map((o) => {
+              const actif = offre === o;
+              return (
+                <Pressable
+                  key={o}
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    o === 'mensuel' ? 'Facturation mensuelle' : 'Facturation annuelle'
+                  }
+                  accessibilityState={{ selected: actif }}
+                  style={[s.onglet, actif && s.ongletActif]}
+                  onPress={() => setOffre(o)}>
+                  <Text style={[s.ongletMot, actif && s.ongletMotActif]}>
+                    {o === 'mensuel' ? 'Mensuel' : 'Annuel'}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          {/* La carte qu'on vend porte le contour d'or : la peau du badge,
+              celle du bouton, celle de la marque. Le badge flotte AU-DESSUS
+              de son bord — il vit hors du rognage du contour, sinon sa
+              moitié haute serait coupée. */}
+          <View style={s.carteZone}>
+          <ContourOr rayon={22} fond={c.surface} style={s.carte}>
+            <View style={s.carteDedans}>
+              <View style={s.prixRangee}>
+                <TexteOr texte={prix} taille={34} fond={c.surface} />
+                <Text style={s.parQuoi}>{annuel ? '/an' : '/mois'}</Text>
+                {/* L'ancien prix reste visible, barré : une remise sans
+                    référence n'est qu'un prix comme un autre. */}
+                {remisePct > 0 && <Text style={s.prixBarre}>{prixPlein}</Text>}
+              </View>
+              <Text style={s.prixNote}>
+                {annuel
+                  ? `Soit ${MOIS_OFFERTS} mois offerts par rapport au mensuel.`
+                  : 'Sans engagement : vous arrêtez quand vous voulez.'}
+              </Text>
+
+              <View style={s.separateur}>
+                <View style={s.filet} />
+                <Text style={s.separateurMot}>Ce que ça débloque</Text>
+                <View style={s.filet} />
+              </View>
+
+              {ATOUTS.map((a) => (
+                <View key={a.mot} testID="ligne-atout" style={s.atout}>
+                  <Svg width={19} height={19} viewBox="0 0 24 24">
+                    <Path d={SOLAIRES[a.icone]} fill={c.blue} fillRule="evenodd" />
+                  </Svg>
+                  <Text style={s.atoutMot}>{a.mot}</Text>
+                </View>
+              ))}
+            </View>
+          </ContourOr>
+            <BadgePro style={s.badge} />
+          </View>
+
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Restaurer l’achat"
+            onPress={async () => {
+              try {
+                const ok = await restaurerPro();
+                Alert.alert(
+                  ok ? 'Abonnement restauré' : 'Aucun achat trouvé',
+                  ok
+                    ? 'Votre Pro est de retour.'
+                    : 'L’App Store ne connaît pas d’abonnement pour ce compte Apple.',
+                );
+              } catch (e) {
+                Alert.alert('Restauration impossible', (e as Error).message);
+              }
+            }}>
+            <Text style={s.restaurer}>Restaurer l’achat</Text>
+          </Pressable>
+
+          <View style={s.promo}>
+            <TextInput
+              accessibilityLabel="Code promo"
+              style={s.champ}
+              placeholder="Code promo"
+              placeholderTextColor={c.inkFaint}
+              value={code}
+              onChangeText={setCode}
+              autoCapitalize="characters"
+              autoCorrect={false}
+            />
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Appliquer le code"
+              style={({ pressed }) => [s.btnCode, pressed && s.enfonce]}
+              onPress={valideCode}>
+              <Text style={s.btnCodeTexte}>Appliquer</Text>
+            </Pressable>
+          </View>
+        </ScrollView>
+
+        {/*
+          LE BOUTON NE QUITTE JAMAIS L'ÉCRAN.
+
+          Il vivait au fil du texte, entre les cartes et le code promo :
+          quiconque faisait défiler pour lire ce qu'il achetait devait
+          remonter pour l'acheter. Épinglé en pied de page, il est là au
+          moment où la décision se prend, quel que soit l'endroit où l'on
+          en est de la lecture.
+        */}
+        <View style={[s.pied, { paddingBottom: insets.bottom + 14 }]}>
+          {remisePct > 0 && (
+            <Text style={s.remiseNote}>✓ Remise de bienvenue appliquée</Text>
+          )}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="S’abonner"
+            style={({ pressed }) => [s.ctaCadre, pressed && s.enfonce]}
+            onPress={acheter}>
+            <ContourOr rayon={18} fond={c.surface} style={s.pleine}>
+              <View style={s.ctaDedans}>
+                {/* Une PHRASE, pas une formule — relevé du patron : « trop
+                    de chiffres et de tirets ». Un seul nombre, zéro tiret. */}
+                <TexteOr
+                  texte={`S’abonner pour ${prix} par ${annuel ? 'an' : 'mois'}`}
+                  taille={16.5}
+                  fond={c.surface}
+                />
+              </View>
+            </ContourOr>
           </Pressable>
         </View>
-      </ScrollView>
+      </View>
     </Modal>
   );
 }
@@ -245,99 +293,86 @@ export function PaywallScreen() {
 const themed = (c: Palette) =>
   StyleSheet.create({
     fond: { flex: 1, backgroundColor: c.bg },
-    contenu: { paddingHorizontal: 22 },
-    fermer: {
-      alignSelf: 'flex-end',
-      width: 36,
-      height: 36,
-      borderRadius: 18,
+    barre: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 22,
+      marginTop: 8,
+      marginBottom: 6,
+    },
+    rondBarre: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
       backgroundColor: c.surface,
       alignItems: 'center',
       justifyContent: 'center',
+      ...shadowCard,
+      shadowOpacity: 0.07,
     },
-    fermerTexte: { color: c.inkSoft, fontSize: 16, fontWeight: '700' },
-    titre: { color: c.ink, fontSize: 28, fontWeight: '800', marginTop: 6 },
-    sousTitre: { color: c.inkSoft, fontSize: 15, marginTop: 6, lineHeight: 21 },
-    // La refonte moderne : plus d'air (gap 14, rayon 20), un filet d'un
-    // cheveu sur la carte Gratuit — le contour des cartes de l'app — et
-    // les pouces d'argile en tête de colonne.
-    colonnes: { flexDirection: 'row', gap: 14, marginTop: 24 },
-    /*
-      `minWidth: 0` sur les DEUX colonnes : sans lui, le prix de la carte
-      Pro (« 4,90 € », l'ancien barré, « / mois ») impose une largeur
-      minimale de contenu et la carte sort plus large que la Gratuit —
-      relevé du patron. L'arbitrage revient à `flex: 1` : deux moitiés.
-    */
-    carte: { flex: 1, minWidth: 0, borderRadius: 20, padding: 18, gap: 7 },
-    carteGratuit: {
+    titreBarre: { color: c.ink, fontSize: 17, fontWeight: '700' },
+    contenu: { paddingHorizontal: 22, paddingBottom: 18 },
+    // Le titre est en deux morceaux : l'encre annonce, l'or nomme.
+    titre: { color: c.ink, fontSize: 30, fontWeight: '800', marginTop: 10 },
+    titreOr: { alignSelf: 'flex-start', marginTop: 2 },
+    sousTitre: { color: c.inkSoft, fontSize: 14.5, lineHeight: 20, marginTop: 10 },
+    // Le segment : une gouttière claire, la pastille blanche glisse dedans.
+    segment: {
+      flexDirection: 'row',
+      alignSelf: 'center',
+      backgroundColor: c.surfaceSunken,
+      borderRadius: radius.pill,
+      padding: 4,
+      marginTop: 20,
+      marginBottom: 18,
+    },
+    onglet: {
+      paddingHorizontal: 26,
+      paddingVertical: 9,
+      borderRadius: radius.pill,
+    },
+    ongletActif: {
       backgroundColor: c.surface,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: c.lineStrong,
-      // Le Pro commence sous son contour d'or (le trait) : le Gratuit
-      // descend d'autant, et les deux pouces s'alignent — relevé du patron.
-      paddingTop: 18 + TRAIT,
+      ...shadowCard,
+      shadowOpacity: 0.09,
     },
-    pouce: { width: 56, height: 56, alignSelf: 'center', marginBottom: 2 },
+    ongletMot: { color: c.inkSoft, fontSize: 14.5, fontWeight: '700' },
+    ongletMotActif: { color: c.ink },
+    carteZone: { alignSelf: 'stretch' },
+    carte: { alignSelf: 'stretch' },
+    // La place du badge sur la carte ; sa peau (blanc, or animé) est a lui.
+    badge: { position: 'absolute', top: -11, right: 16 },
+    carteDedans: { padding: 20, gap: 4 },
+    prixRangee: { flexDirection: 'row', alignItems: 'flex-end', gap: 6 },
+    // Cale « /mois » sur la ligne de pied du prix, à un cheveu près.
+    parQuoi: { color: c.inkSoft, fontSize: 15, fontWeight: '700', marginBottom: 5 },
     prixBarre: {
       color: c.inkFaint,
-      fontSize: 14,
+      fontSize: 15,
       fontWeight: '600',
       textDecorationLine: 'line-through',
-      marginBottom: 5,
+      marginBottom: 6,
     },
-    remisePastille: {
-      alignSelf: 'center',
-      marginTop: 10,
-      paddingHorizontal: 14,
-      paddingVertical: 5,
-      borderRadius: 999,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: '#C8861F',
-    },
-    remiseNote: {
-      color: '#C8861F',
-      fontSize: 12.5,
-      fontWeight: '700',
-      textAlign: 'center',
-    },
-    // La colonne Pro : le contour rogne sa carte, le badge flotte dessus.
-    colonnePro: { flex: 1, minWidth: 0 },
-    pleine: { flex: 1 },
-    carteDedans: { flex: 1, padding: 18, gap: 7 },
-    // La typo d'or épouse la largeur de son mot : sans ça, elle prendrait
-    // toute la colonne et le mot partirait au centre.
-    aGauche: { alignSelf: 'flex-start' },
-    prixRangee: {
+    prixNote: { color: c.inkSoft, fontSize: 13, lineHeight: 18, marginTop: 2 },
+    separateur: {
       flexDirection: 'row',
-      alignItems: 'flex-end',
-      flexWrap: 'wrap',
-      gap: 4,
-      marginBottom: 4,
+      alignItems: 'center',
+      gap: 10,
+      marginVertical: 14,
     },
-    // Cale « / mois » sur la ligne de pied du prix, à un cheveu près.
-    parMoisCale: { marginBottom: 3 },
-    // La place du badge sur la carte ; sa peau (blanc, or animé) est à lui.
-    badge: { position: 'absolute', top: -10, right: 12 },
-    carteTitre: { fontSize: 14, fontWeight: '700', color: c.inkSoft },
-    cartePrix: { fontSize: 26, fontWeight: '800', color: c.ink, marginBottom: 4 },
-    ligne: { color: c.ink, fontSize: 13.5, lineHeight: 19 },
-    ctaCadre: { marginTop: 24, height: 54 },
-    ctaDedans: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-    enfonce: { transform: [{ scale: 0.97 }] },
-    sansEngagement: {
-      color: c.inkFaint,
-      fontSize: 12,
-      textAlign: 'center',
-      marginTop: 8,
-    },
+    filet: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: c.line },
+    separateurMot: { color: c.inkFaint, fontSize: 12, fontWeight: '700' },
+    atout: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 5 },
+    atoutMot: { flex: 1, color: c.ink, fontSize: 13.5, lineHeight: 19 },
     restaurer: {
       color: c.blue,
       fontSize: 13,
       fontWeight: '600',
       textAlign: 'center',
-      marginTop: 14,
+      marginTop: 18,
     },
-    promo: { flexDirection: 'row', gap: 10, marginTop: 26 },
+    promo: { flexDirection: 'row', gap: 10, marginTop: 16 },
     champ: {
       flex: 1,
       height: 48,
@@ -360,4 +395,25 @@ const themed = (c: Palette) =>
       justifyContent: 'center',
     },
     btnCodeTexte: { color: c.ink, fontSize: 15, fontWeight: '700' },
+    // Le pied se pose SUR le fond, pas dans le défilement : il porte donc
+    // sa propre surface, sinon le texte qui glisse dessous se lirait au
+    // travers.
+    pied: {
+      paddingHorizontal: 22,
+      paddingTop: 12,
+      backgroundColor: c.bg,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: c.line,
+    },
+    remiseNote: {
+      color: '#C8861F',
+      fontSize: 12.5,
+      fontWeight: '700',
+      textAlign: 'center',
+      marginBottom: 8,
+    },
+    ctaCadre: { height: 56 },
+    pleine: { flex: 1 },
+    ctaDedans: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+    enfonce: { transform: [{ scale: 0.97 }] },
   });
