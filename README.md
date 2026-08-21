@@ -3370,6 +3370,34 @@ une capture d'écran : le plan est une liste de murs, on le retrace en
 quelques traits dans 54 px. Rien à stocker, rien à invalider — un scan
 retouché montre son nouveau contour à l'ouverture suivante de la liste.
 
+### Les boutons de pose parlent français
+
+Relevé du chantier : « les 3 boutons de placement d'éléments élec lors d'un
+scan ne sont pas forcément compréhensibles de tous ». C'est juste. **PC, INT,
+LUM** sont des abréviations de métier — et même à qui les connaît, trois ronds
+posés sur l'écran ne disent pas qu'on POSE quelque chose sur le mur qu'on
+filme.
+
+Trois réponses, réunies dans **un seul bloc** plutôt que trois pastilles
+éparses. Le **symbole du plan** — celui qu'on retrouvera sur le dossier
+imprimé, donc la même langue d'un bout à l'autre ; un bouton qui montre autre
+chose que ce qu'il produit fait apprendre deux langages pour un seul geste. Le
+**mot en clair** dessous — « Prise », pas « PC » : l'application sert aussi à
+montrer le travail au client. Et un **« ? »** qui rouvre l'explication.
+
+Cette explication est une page qui **montre le geste au lieu de le raconter** :
+trois scènes animées — le viseur qui cherche le mur, l'appareil qui s'y pose,
+les repères qui restent en place pendant que la caméra continue. Elle s'ouvre
+**une fois**, à la première caméra, sur l'écran encore vide, et jamais plus :
+une explication qui revient à chaque scan devient un obstacle, et on finit par
+la fermer sans la lire.
+
+Détail technique qui a décidé de la forme : **les scènes sont des vues
+animées, pas des SVG animés**. Animer un `<G>` de react-native-svg demande des
+props que le typage refuse, et le mouvement retombe sur le fil JS — pendant que
+RoomPlan mouline derrière. Décor fixe, vues animées par-dessus : tout part sur
+le fil natif.
+
 ### Le relevé de l'existant
 
 La moitié des chantiers d'un électricien est de la rénovation, et elle commence

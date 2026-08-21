@@ -13,6 +13,32 @@ import { useScanStore } from '../store/scanStore';
 import { useRoomScan } from '../native/useRoomScan';
 import { CloseCross } from '../components/CloseCross';
 import { haptic } from '../ui/haptic';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { GuidePose } from './scan/GuidePose';
+import { FIXTURE_SYMBOL } from '../geometry/electrical';
+import { CEILING_SYMBOL } from '../geometry/ceiling';
+
+/** Le guide de pose a été lu : on ne le remontre plus de lui-même. */
+const GUIDE_POSE_KEY = 'echoplan.guide-pose';
+
+/**
+ * CE QU'ON PEUT POSER AU VISEUR, et comment ça se dit.
+ *
+ * Le symbole est celui du PLAN — le même trait qu'on retrouvera sur le
+ * dossier imprimé. Un bouton qui montre autre chose que ce qu'il produit
+ * fait apprendre deux langages pour un seul geste.
+ *
+ * Le mot est en clair, pas en jargon : « Prise » et non « PC ». Le sigle
+ * était l'abréviation d'un métier, et l'application sert aussi à la
+ * montrer au client.
+ */
+const POSABLES = [
+  { kind: 'prise', mot: 'Prise', symbole: FIXTURE_SYMBOL.prise },
+  { kind: 'inter', mot: 'Inter', symbole: FIXTURE_SYMBOL.inter },
+  // Le point lumineux n'est pas un appareil MURAL : sa croix normalisée
+  // vit avec le plafond, et c'est celle que le plan dessinera.
+  { kind: 'dcl', mot: 'Lumière', symbole: CEILING_SYMBOL.dcl },
+] as const;
 
 /**
  * Écran de scan. RoomPlan dessine lui-même ses guides ET la miniature 3D
@@ -45,6 +71,31 @@ export function ScanScreen() {
    */
   const [poses, setPoses] = useState(0);
   const [refus, setRefus] = useState(false);
+  /*
+    LE GUIDE S'OUVRE UNE FOIS, à la première caméra.
+
+    Relevé du chantier : les trois boutons « ne sont pas forcément
+    compréhensibles de tous ». On explique donc AVANT, pendant que l'écran
+    est encore vide — et jamais plus ensuite : une explication qui revient à
+    chaque scan devient un obstacle, et on finit par la fermer sans la lire.
+    Le « ? » du bloc la rouvre quand on la veut.
+  */
+  const [guide, setGuide] = useState(false);
+  useEffect(() => {
+    let vivant = true;
+    AsyncStorage.getItem(GUIDE_POSE_KEY)
+      .then((vu) => {
+        if (vivant && vu !== '1') setGuide(true);
+      })
+      .catch(() => {});
+    return () => {
+      vivant = false;
+    };
+  }, []);
+  const fermerGuide = () => {
+    setGuide(false);
+    AsyncStorage.setItem(GUIDE_POSE_KEY, '1').catch(() => {});
+  };
   const poser = async (kind: string) => {
     const ok = await RoomScan.poserAuViseur(kind);
     if (ok) {
@@ -159,35 +210,65 @@ export function ScanScreen() {
             <View style={[styles.viseurCoin, styles.viseurBG]} />
             <View style={[styles.viseurCoin, styles.viseurBD]} />
           </View>
-          <View style={styles.poseColonne}>
-            {(
-              [
-                ['prise', 'PC'],
-                ['inter', 'INT'],
-                ['dcl', 'LUM'],
-              ] as const
-            ).map(([kind, mot]) => (
+          {/*
+            LE BLOC DE POSE — un tiroir d'outils, pas trois pastilles éparses.
+
+            Relevé du chantier : « les 3 boutons de placement d'éléments élec
+            ne sont pas forcément compréhensibles de tous ». Trois ronds
+            portant PC, INT et LUM ne disent rien à qui n'a pas le jargon —
+            et même à qui l'a, ils ne disent pas qu'on POSE quelque chose sur
+            le mur qu'on filme.
+
+            Trois réponses dans le même bloc : le SYMBOLE du plan — celui
+            qu'on retrouvera sur le dossier, donc la même langue d'un bout à
+            l'autre —, le MOT en clair dessous, et un « ? » qui rouvre
+            l'explication. Réunis sur un fond commun, ils se lisent comme un
+            outil, pas comme trois boutons qui traînent.
+          */}
+          <View style={styles.poseBloc}>
+            {POSABLES.map(({ kind, mot, symbole }) => (
               <TouchableOpacity
                 key={kind}
                 style={styles.poseBouton}
                 accessibilityLabel={`Poser ${mot} à l’endroit visé`}
                 onPress={() => poser(kind)}>
+                <Svg width={26} height={26} viewBox="-14 -14 28 28">
+                  {symbole.map((seg, i) => (
+                    <Path
+                      key={i}
+                      d={seg.d}
+                      stroke={c.scanInk}
+                      strokeWidth={1.9}
+                      strokeLinecap="round"
+                      fill="none"
+                    />
+                  ))}
+                </Svg>
                 <Text style={styles.poseTexte}>{mot}</Text>
               </TouchableOpacity>
             ))}
-            {poses > 0 && (
+            <View style={styles.poseSeparateur} />
+            <View style={styles.poseRangeeBasse}>
               <TouchableOpacity
-                style={[styles.poseBouton, styles.poseAnnule]}
-                accessibilityLabel="Retirer le dernier appareil posé"
-                onPress={async () => {
-                  if (await RoomScan.retirerDerniereAncre()) {
-                    setPoses((n) => Math.max(0, n - 1));
-                    haptic('leger');
-                  }
-                }}>
-                <Text style={styles.poseTexte}>↺</Text>
+                style={styles.poseSecondaire}
+                accessibilityLabel="À quoi servent ces boutons"
+                onPress={() => setGuide(true)}>
+                <Text style={styles.poseSecondaireTexte}>?</Text>
               </TouchableOpacity>
-            )}
+              {poses > 0 && (
+                <TouchableOpacity
+                  style={styles.poseSecondaire}
+                  accessibilityLabel="Retirer le dernier appareil posé"
+                  onPress={async () => {
+                    if (await RoomScan.retirerDerniereAncre()) {
+                      setPoses((n) => Math.max(0, n - 1));
+                      haptic('leger');
+                    }
+                  }}>
+                  <Text style={styles.poseSecondaireTexte}>↺</Text>
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
           {(poses > 0 || refus) && (
             <View style={styles.poseBandeau} pointerEvents="none">
@@ -242,6 +323,15 @@ export function ScanScreen() {
           <Text style={styles.stopText}>Terminer</Text>
         </TouchableOpacity>
       </View>
+
+      {/*
+        L'EXPLICATION PASSE AVANT LE SCAN, pas pendant.
+
+        Elle s'ouvre sur l'écran encore vide — au moment où l'on découvre
+        ces boutons —, et le scan continue derrière : RoomPlan tourne, la
+        pièce se relève, rien n'est perdu à lire trois phrases.
+      */}
+      <GuidePose visible={guide && !processing} onFermer={fermerGuide} />
 
       {processing && (
         <View style={styles.processing}>
@@ -306,22 +396,53 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   viseurBD: { bottom: 0, right: 0, borderBottomWidth: 3, borderRightWidth: 3 },
   /* Les boutons de pose : une colonne contre le bord droit, à hauteur du
      pouce, hors du chemin de la miniature 3D. */
-  poseColonne: {
+  /*
+    UN SEUL BLOC, contre le bord droit, à hauteur de pouce.
+
+    Les trois boutons vivaient séparés, chacun sur sa pastille ronde : rien
+    ne disait qu'ils allaient ensemble, ni qu'ils s'adressaient au viseur du
+    centre. Réunis dans un même tiroir, ils se lisent comme la boîte à
+    outils qu'ils sont — et le « ? » y a naturellement sa place.
+  */
+  poseBloc: {
     position: 'absolute',
-    right: 16,
-    top: '38%',
-    gap: 10,
+    right: 14,
+    top: '30%',
+    backgroundColor: c.scanPill,
+    borderRadius: 20,
+    padding: 6,
+    gap: 4,
+    alignItems: 'center',
   },
   poseBouton: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: c.scanPill,
+    width: 58,
+    height: 54,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 1,
+  },
+  poseTexte: { color: c.scanInk, fontSize: 10.5, fontWeight: '700' },
+  poseSeparateur: {
+    height: 1,
+    alignSelf: 'stretch',
+    marginHorizontal: 8,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+  },
+  poseRangeeBasse: { flexDirection: 'row', gap: 4 },
+  poseSecondaire: {
+    width: 27,
+    height: 34,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  poseAnnule: { backgroundColor: c.scanPillSoft },
-  poseTexte: { color: c.scanInk, fontSize: 14, fontWeight: '800' },
+  poseSecondaireTexte: {
+    color: c.scanInk,
+    fontSize: 15,
+    fontWeight: '800',
+    opacity: 0.85,
+  },
   poseBandeau: {
     position: 'absolute',
     bottom: 118,

@@ -154,11 +154,28 @@ describe('l’écran de scan', () => {
         String(n.props.accessibilityLabel ?? '').startsWith(debut),
       );
 
-  it('offre PC, INT et LUM à portée de pouce', () => {
+  /*
+    LES BOUTONS PARLENT FRANÇAIS, PLUS SIGLE.
+
+    Ce banc exigeait « Poser PC », « Poser INT », « Poser LUM » — les
+    abréviations du métier. Relevé du chantier : « les 3 boutons de
+    placement d'éléments élec ne sont pas forcément compréhensibles de
+    tous ». Ils portent maintenant le mot en clair ET le symbole du plan,
+    celui qu'on retrouvera sur le dossier imprimé : une seule langue, du
+    viseur à la feuille.
+  */
+  it('offre prise, inter et lumière à portée de pouce, en clair', () => {
     const tree = monter();
-    expect(bouton(tree, 'Poser PC')).toBeDefined();
-    expect(bouton(tree, 'Poser INT')).toBeDefined();
-    expect(bouton(tree, 'Poser LUM')).toBeDefined();
+    expect(bouton(tree, 'Poser Prise')).toBeDefined();
+    expect(bouton(tree, 'Poser Inter')).toBeDefined();
+    expect(bouton(tree, 'Poser Lumière')).toBeDefined();
+  });
+
+  it('explique le geste avant qu’on le cherche', () => {
+    // Le « ? » du bloc rouvre la page qui montre le geste : viser, poser,
+    // et le fait que le repère RESTE sur le mur une fois le scan repris.
+    const tree = monter();
+    expect(bouton(tree, 'À quoi servent ces boutons')).toBeDefined();
   });
 
   it('pose ce qu’on vise, et le compte', async () => {
@@ -167,7 +184,7 @@ describe('l’écran de scan', () => {
     const TestRenderer = require('react-test-renderer');
     const tree = monter();
     await TestRenderer.act(async () => {
-      await bouton(tree, 'Poser PC').props.onPress();
+      await bouton(tree, 'Poser Prise').props.onPress();
     });
     expect(RoomScan.poserAuViseur).toHaveBeenCalledWith('prise');
     const dits = tree.root
@@ -183,7 +200,7 @@ describe('l’écran de scan', () => {
     const TestRenderer = require('react-test-renderer');
     const tree = monter();
     await TestRenderer.act(async () => {
-      await bouton(tree, 'Poser LUM').props.onPress();
+      await bouton(tree, 'Poser Lumière').props.onPress();
     });
     const dits = tree.root
       .findAll((n: any) => typeof n.props?.children === 'string')
