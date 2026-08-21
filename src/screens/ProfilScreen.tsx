@@ -27,6 +27,7 @@ import Svg, { Path } from 'react-native-svg';
 import { BackChevron } from '../components/BackChevron';
 import { MoreDots } from '../components/MoreDots';
 import { MenuCompte } from '../components/MenuCompte';
+import { SupportSheet } from '../components/SupportSheet';
 import { ThemeGlyph } from '../components/ThemeGlyph';
 import { ContourVif, TexteVif } from '../components/ContourVif';
 import { SOLAIRES } from '../ui/solaires';
@@ -42,6 +43,33 @@ import { radius, shadowCard, useTheme, type Palette } from '../theme';
  * deux autres sont des choix délibérés, qui l'emportent tant qu'on ne les
  * reprend pas.
  */
+/**
+ * UNE DATE EN TOUTES LETTRES, SANS `Intl`.
+ *
+ * `toLocaleDateString('fr-FR', { month: 'long' })` dépend de la variante
+ * d'Hermès embarquée : sur certains builds elle rend « November ». Douze
+ * mots dans un tableau ne dépendent de rien, et c'est la date d'un
+ * PRÉLÈVEMENT — on ne la laisse pas au hasard d'une compilation.
+ */
+const MOIS = [
+  'janvier',
+  'février',
+  'mars',
+  'avril',
+  'mai',
+  'juin',
+  'juillet',
+  'août',
+  'septembre',
+  'octobre',
+  'novembre',
+  'décembre',
+];
+export function dateEnLettres(at: number): string {
+  const d = new Date(at);
+  return `${d.getDate()} ${MOIS[d.getMonth()]} ${d.getFullYear()}`;
+}
+
 const APPARENCES: { cle: ThemePref; mot: string; label: string }[] = [
   { cle: 'system', mot: 'Système', label: 'Thème système' },
   { cle: 'light', mot: 'Clair', label: 'Thème clair' },
@@ -62,8 +90,12 @@ export function ProfilScreen() {
   const plansUtilises = useAccountStore((st) => st.plansUtilises);
   const bonusEssais = useAccountStore((st) => st.bonusEssais);
   const ouvrirPaywall = useAccountStore((st) => st.ouvrirPaywall);
+  const proEcheance = useAccountStore((st) => st.proEcheance);
+  const proReconduit = useAccountStore((st) => st.proReconduit);
   const restaurerPro = useAccountStore((st) => st.restaurerPro);
   const [menu, setMenu] = useState(false);
+  /** Le mot au service client : sujet, message, photo. */
+  const [support, setSupport] = useState(false);
 
   const restant = Math.max(0, PLANS_GRATUITS + bonusEssais - plansUtilises);
   const nom = compte?.prenom || compte?.email || 'Mon compte';
@@ -97,14 +129,32 @@ export function ProfilScreen() {
             <BackChevron color={c.ink} />
           </Pressable>
           <Text style={s.titreBarre}>Profil</Text>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Plus d’options"
-            style={s.rondBarre}
-            hitSlop={10}
-            onPress={() => setMenu(true)}>
-            <MoreDots color={c.ink} size={20} />
-          </Pressable>
+          {/*
+            LA PORTE VERS UN HUMAIN — relevé du patron : une icône de tchat
+            pour le service client. L'application n'avait aucun endroit où
+            dire quelque chose à son auteur ; elle en a un, et il est là où
+            l'on va déjà quand quelque chose cloche avec son compte.
+          */}
+          <View style={s.barreDroite}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Écrire au service client"
+              style={s.rondBarre}
+              hitSlop={10}
+              onPress={() => setSupport(true)}>
+              <Svg width={20} height={20} viewBox="0 0 24 24">
+                <Path d={SOLAIRES.tchat} fill={c.ink} fillRule="evenodd" />
+              </Svg>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Plus d’options"
+              style={s.rondBarre}
+              hitSlop={10}
+              onPress={() => setMenu(true)}>
+              <MoreDots color={c.ink} size={20} />
+            </Pressable>
+          </View>
         </View>
 
         {/*
@@ -175,6 +225,28 @@ export function ProfilScreen() {
                     restant > 1 ? 's' : ''
                   } restant${restant > 1 ? 's' : ''}`}
             </Text>
+            {/*
+              JUSQU'À QUAND — relevé du patron : « sur le profil on doit voir
+              la date d'expiration de l'abonnement ».
+
+              C'est la question qu'on vient poser ici après avoir payé, et
+              « actif » n'y répond pas. Le mot dit aussi ce qui va SE PASSER :
+              un abonnement en cours se RECONDUIT, un abonnement résilié
+              court JUSQU'À sa date puis s'arrête. Confondre les deux, c'est
+              soit faire attendre un prélèvement qui ne viendra pas, soit
+              laisser quelqu'un perdre ses relevés illimités sans prévenir.
+
+              Rien ne s'écrit sans date : le Pro par code n'en a pas (il est
+              donné une fois), et l'App Store peut être muet — une échéance
+              inventée serait pire que pas d'échéance.
+            */}
+            {pro && proVia !== 'code' && !!proEcheance && (
+              <Text style={s.aboDate}>
+                {proReconduit
+                  ? `Renouvellement le ${dateEnLettres(proEcheance)}`
+                  : `Actif jusqu’au ${dateEnLettres(proEcheance)}`}
+              </Text>
+            )}
           </View>
           {!pro && (
             <Pressable
@@ -252,19 +324,12 @@ export function ProfilScreen() {
           c={c}
           icone="bouclier"
           label="Confidentialité des données"
-          onPress={() =>
-            Alert.alert(
-              'Vos données',
-              'Les relevés vivent sur votre téléphone. Seul leur TEXTE monte ' +
-                'sous votre compte pour survivre à une réinstallation : les ' +
-                'photos, elles, restent dans votre photothèque et ne partent ' +
-                'jamais.',
-            )
-          }
+          onPress={() => setScreen('confidentialite')}
         />
       </ScrollView>
 
       <MenuCompte visible={menu} fermer={() => setMenu(false)} />
+      <SupportSheet visible={support} fermer={() => setSupport(false)} />
     </View>
   );
 }
@@ -328,6 +393,8 @@ const themed = (c: Palette) =>
       shadowOpacity: 0.07,
     },
     titreBarre: { color: c.ink, fontSize: 17, fontWeight: '700' },
+    // Deux ronds jumeaux à droite : le tchat, puis le menu.
+    barreDroite: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     /*
       L'ICÔNE EST LE DISQUE — relevé du patron : « refais l'avatar en bleu
       et le contour autour de l'icône, sans marge blanche ».
@@ -389,6 +456,9 @@ const themed = (c: Palette) =>
     aboTextes: { flex: 1, minWidth: 0 },
     aboTitre: { color: c.ink, fontSize: 15.5, fontWeight: '700' },
     aboSous: { color: c.inkSoft, fontSize: 12.5, marginTop: 2, lineHeight: 17 },
+    // La date se lit d'un ton en dessous : c'est une précision, pas le
+    // titre — mais elle porte la graisse, parce qu'on vient la chercher.
+    aboDate: { color: c.blue, fontSize: 12, fontWeight: '700', marginTop: 3 },
     // Le bouton de la carte est PLEIN et sombre, comme dans le design : sur
     // une carte blanche, c'est le seul contraste qui dit « touche ici ».
     boutonAbo: {

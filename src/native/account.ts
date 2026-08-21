@@ -38,6 +38,13 @@ const natif = () => NativeModules.RoomScanAccount as
       appleSignIn?: () => Promise<AppleIdentity>;
       purchasePro?: (productId: string) => Promise<boolean>;
       restorePro?: (productId: string) => Promise<boolean>;
+      proExpiry?: (
+        productIds: string[],
+      ) => Promise<{
+        produit?: string;
+        expiration?: number;
+        reconduit?: boolean;
+      } | null>;
       webAuth?: (url: string, scheme: string) => Promise<string>;
     }
   | undefined;
@@ -101,6 +108,43 @@ export async function restaurerAbonnement(productId: string): Promise<boolean> {
     throw new Error('Restauration indisponible sur cet appareil.');
   }
   return fn(productId);
+}
+
+/** Ce que l'App Store sait de l'abonnement en cours. */
+export interface EcheancePro {
+  produit: string;
+  /** Fin de la période payée, en millisecondes. */
+  expiration: number;
+  /** Un prélèvement suivra-t-il ? Faux si l'utilisateur a résilié. */
+  reconduit: boolean;
+}
+
+/**
+ * L'ÉCHÉANCE DE L'ABONNEMENT, DEMANDÉE À L'APP STORE.
+ *
+ * `null` quand personne ne détient l'abonnement, quand l'App Store ne
+ * répond pas, ou quand l'appareil n'a pas le module natif : la page profil
+ * n'écrit alors PAS de date, plutôt qu'une date inventée. Une échéance
+ * fausse sur un abonnement est pire que pas d'échéance du tout.
+ */
+export async function echeanceAbonnement(
+  productIds: string[],
+): Promise<EcheancePro | null> {
+  const fn = natif()?.proExpiry;
+  if (!fn) return null;
+  try {
+    const r = await fn(productIds);
+    if (!r || typeof r.expiration !== 'number' || !isFinite(r.expiration)) {
+      return null;
+    }
+    return {
+      produit: String(r.produit ?? ''),
+      expiration: r.expiration,
+      reconduit: r.reconduit !== false,
+    };
+  } catch {
+    return null;
+  }
 }
 
 /**

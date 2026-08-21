@@ -104,7 +104,8 @@ export type Screen =
   | 'library'
   | 'export'
   | 'camera'
-  | 'profil';
+  | 'profil'
+  | 'confidentialite';
 
 /**
  * Une pièce du scan. La géométrie reste À PLAT dans `walls`/`openings`/

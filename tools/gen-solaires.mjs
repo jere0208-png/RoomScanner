@@ -68,6 +68,9 @@ const CHOIX = {
   //     décide, l'icône le dit — un soleil ou une lune y désigneraient un
   //     des deux thèmes, pas le fait de suivre l'appareil.
   telephone: ['smartphone-bold', 'iphone-bold', 'phone-bold'],
+  // --- le service client : une bulle de dialogue, celle que tout le monde
+  //     reconnait comme « on peut parler a quelqu'un ».
+  tchat: ['chat-round-dots-bold', 'chat-round-bold', 'chat-line-bold'],
   // --- l'en-tête de l'écran des résultats
   partage: ['share-bold', 'square-share-line-bold'],
   points: ['menu-dots-bold'],

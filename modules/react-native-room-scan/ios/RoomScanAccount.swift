@@ -235,4 +235,63 @@ class RoomScanAccount: NSObject, ASAuthorizationControllerDelegate,
       resolve(false)
     }
   }
+
+  /**
+   * L'ÉCHÉANCE DE L'ABONNEMENT — relevé du patron : « sur le profil on doit
+   * voir la date d'expiration de l'abonnement ».
+   *
+   * C'est la question qu'on vient poser à la page profil après avoir payé :
+   * jusqu'à quand est-ce réglé, et qu'est-ce qui se passe ensuite. L'App
+   * Store est la seule source honnête — c'est lui qui encaisse, et lui seul
+   * qui sait si l'utilisateur a résilié depuis les Réglages d'iOS.
+   *
+   * On rend la transaction la plus LOINTAINE des produits demandés (qui
+   * passe du mensuel à l'annuel en détient deux le temps d'un cycle), et
+   * `reconduit` dit si un prélèvement suivra : sans lui, on écrirait
+   * « renouvellement le 3 novembre » à quelqu'un qui a résilié, c'est-à-dire
+   * exactement le contraire de la vérité.
+   */
+  @objc func proExpiry(
+    _ productIds: [String],
+    resolve: @escaping RCTPromiseResolveBlock,
+    reject: @escaping RCTPromiseRejectBlock
+  ) {
+    Task {
+      var echeance: Date?
+      var produitActif: String?
+      for await resultat in Transaction.currentEntitlements {
+        guard case .verified(let transaction) = resultat,
+          productIds.contains(transaction.productID),
+          let fin = transaction.expirationDate
+        else { continue }
+        if echeance == nil || fin > echeance! {
+          echeance = fin
+          produitActif = transaction.productID
+        }
+      }
+      guard let fin = echeance, let produit = produitActif else {
+        resolve(nil)
+        return
+      }
+      // Le renouvellement se lit sur l'ABONNEMENT, pas sur la transaction :
+      // résilier ne touche pas l'achat déjà encaissé, il coupe la suite.
+      var reconduit = true
+      if let produits = try? await Product.products(for: [produit]),
+        let p = produits.first,
+        let abonnement = p.subscription,
+        let statuts = try? await abonnement.status
+      {
+        for statut in statuts {
+          if case .verified(let info) = statut.renewalInfo {
+            reconduit = info.willAutoRenew
+          }
+        }
+      }
+      resolve([
+        "produit": produit,
+        "expiration": fin.timeIntervalSince1970 * 1000,
+        "reconduit": reconduit,
+      ])
+    }
+  }
 }

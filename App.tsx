@@ -10,6 +10,7 @@ import { ExportScreen } from './src/screens/ExportScreen';
 import { CameraScreen } from './src/screens/CameraScreen';
 import { SignInScreen } from './src/screens/SignInScreen';
 import { ProfilScreen } from './src/screens/ProfilScreen';
+import { ConfidentialiteScreen } from './src/screens/ConfidentialiteScreen';
 import { PaywallScreen } from './src/screens/PaywallScreen';
 import { EssaiEpuise } from './src/components/EssaiEpuise';
 import { SurprisePro } from './src/components/SurprisePro';
@@ -99,6 +100,7 @@ export default function App() {
       />
       {screen === 'home' && <HomeScreen />}
       {screen === 'profil' && <ProfilScreen />}
+      {screen === 'confidentialite' && <ConfidentialiteScreen />}
       {screen === 'scan' && <ScanScreen />}
       {screen === 'result' && <ResultScreen />}
       {screen === 'library' && <LibraryScreen />}

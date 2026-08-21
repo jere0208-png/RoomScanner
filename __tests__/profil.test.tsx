@@ -29,6 +29,7 @@ import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { Alert, StyleSheet } from 'react-native';
 import { ProfilScreen } from '../src/screens/ProfilScreen';
+import { ConfidentialiteScreen } from '../src/screens/ConfidentialiteScreen';
 import { ContourVif } from '../src/components/ContourVif';
 import { SOLAIRES } from '../src/ui/solaires';
 import { light } from '../src/theme';
@@ -149,6 +150,79 @@ describe("l'abonnement, en carte", () => {
   });
 });
 
+describe("l'échéance de l'abonnement", () => {
+  /*
+    « SUR LE PROFIL ON DOIT VOIR LA DATE D'EXPIRATION DE L'ABONNEMENT » —
+    relevé du patron.
+
+    C'est la question qu'on vient poser à cette page après avoir payé :
+    jusqu'à quand est-ce réglé, et qu'est-ce qui se passe ensuite. « Actif »
+    n'y répond pas — et pour un abonnement qui se reconduit tout seul, ne
+    pas savoir QUAND il se reconduit est précisément ce qui inquiète.
+
+    L'App Store est la seule source honnête de cette date : c'est lui qui
+    encaisse. Le compte la relit donc de StoreKit, et la page l'écrit en
+    toutes lettres.
+  */
+  it('écrit la date de renouvellement quand l’App Store la donne', () => {
+    useAccountStore.setState({
+      pro: true,
+      proVia: 'abonnement',
+      // 3 novembre 2026, midi — une date qu'on reconnaît en la lisant.
+      proEcheance: new Date(2026, 10, 3, 12).getTime(),
+    });
+    const a = rendre(<ProfilScreen />);
+    const t = texte(a);
+    expect(t).toContain('3 novembre 2026');
+    // Le mot dit ce qui va se passer, pas seulement quand : un abonnement
+    // se RECONDUIT, il n'expire pas — sauf s'il a été résilié.
+    expect(t.toLowerCase()).toContain('renouvellement');
+  });
+
+  it('ne raconte rien quand la date est inconnue', () => {
+    // Hors ligne, ou App Store muet : on n'invente pas une date, et l'on ne
+    // laisse pas non plus la ligne d'avant traîner. Le reste tient debout.
+    useAccountStore.setState({
+      pro: true,
+      proVia: 'abonnement',
+      proEcheance: null,
+    });
+    const a = rendre(<ProfilScreen />);
+    const t = texte(a);
+    expect(t).toContain('Abonnement actif');
+    expect(t.toLowerCase()).not.toContain('renouvellement');
+  });
+
+  it('le Pro par code n’a pas d’échéance, et le dit', () => {
+    useAccountStore.setState({
+      pro: true,
+      proVia: 'code',
+      proEcheance: null,
+    });
+    const t = texte(rendre(<ProfilScreen />));
+    // Un code du patron ne se reconduit pas : il est donné une fois. Écrire
+    // « renouvellement » ferait attendre un prélèvement qui ne viendra pas.
+    expect(t.toLowerCase()).not.toContain('renouvellement');
+    expect(t).toContain('code');
+  });
+
+  it('annonce la FIN quand l’abonnement a été résilié', () => {
+    useAccountStore.setState({
+      pro: true,
+      proVia: 'abonnement',
+      proEcheance: new Date(2026, 10, 3, 12).getTime(),
+      proReconduit: false,
+    });
+    const t = texte(rendre(<ProfilScreen />));
+    // Résilié, il court jusqu'à sa date puis s'arrête : dire
+    // « renouvellement » serait le contraire de la vérité, et c'est le jour
+    // où l'électricien perdrait ses relevés illimités sans comprendre.
+    expect(t.toLowerCase()).toContain('jusqu’au');
+    expect(t).toContain('3 novembre 2026');
+    expect(t.toLowerCase()).not.toContain('renouvellement');
+  });
+});
+
 describe("l'apparence a quitté l'accueil", () => {
   it('offre les trois choix, celui du moment marqué', () => {
     const a = rendre(<ProfilScreen />);
@@ -237,3 +311,76 @@ describe('les rangées de réglages', () => {
     expect(useAccountStore.getState().compte).toBeNull();
   });
 });
+
+describe('la page Confidentialité', () => {
+  /*
+    UNE VRAIE PAGE, PAS UNE ALERTE — relevé du patron : « Confidentialité des
+    données doit ouvrir une vraie page avec les informations complètes ».
+
+    Le sujet tenait dans une `Alert` de quatre lignes. C'est trop peu pour
+    ce qu'il y a à dire — et c'est aussi la page qu'Apple exige d'une
+    application qui a des comptes et un abonnement. Quatre lignes dans une
+    boîte système ne sont ni lisibles, ni relisibles, ni citables.
+  */
+  it('s’ouvre depuis la rangée, et se referme', () => {
+    const a = rendre(<ProfilScreen />);
+    act(() => {
+      parLabel(a, 'Confidentialité des données')?.props.onPress();
+    });
+    expect(useScanStore.getState().screen).toBe('confidentialite');
+  });
+
+  it('dit ce qui reste sur le téléphone, ce qui monte, et ce qu’on peut exiger', () => {
+    const a = rendre(<ConfidentialiteScreen />);
+    const t = texte(a);
+    // Les trois questions qu'on vient poser à cette page.
+    expect(t).toContain('photo');
+    expect(t.toLowerCase()).toContain('compte');
+    expect(t.toLowerCase()).toContain('supprimer');
+    // Et la promesse qui tient toute l'architecture : les images ne montent
+    // jamais, seul le TEXTE du relevé suit le compte.
+    expect(t.toLowerCase()).toContain('jamais');
+  });
+
+  it('revient à la page profil, pas à l’accueil', () => {
+    const a = rendre(<ConfidentialiteScreen />);
+    act(() => {
+      parLabel(a, 'Retour')?.props.onPress();
+    });
+    // On y entre depuis le profil : en sortir doit rendre l'écran d'où
+    // l'on vient, sinon on repart de zéro pour changer un réglage.
+    expect(useScanStore.getState().screen).toBe('profil');
+  });
+});
+
+describe('le tchat du service client', () => {
+  /*
+    UNE PORTE VERS UN HUMAIN — relevé du patron : « ajoute une icône de
+    tchat service clientèle, qui ouvre un popup avec un titre, un message et
+    une pièce jointe, qui va à echoplansupport@gmail.com ».
+
+    L'application n'avait aucun moyen de dire quelque chose à son auteur.
+    Sur un chantier, le défaut se raconte en une photo — d'où la pièce
+    jointe, qui est l'essentiel de la demande.
+  */
+  it('ouvre le formulaire depuis la barre', () => {
+    const a = rendre(<ProfilScreen />);
+    expect(parLabel(a, 'Message')).toBeUndefined();
+    act(() => {
+      parLabel(a, 'Écrire au service client')?.props.onPress();
+    });
+    expect(parLabel(a, 'Sujet')).toBeDefined();
+    expect(parLabel(a, 'Message')).toBeDefined();
+    expect(parLabel(a, 'Joindre une photo')).toBeDefined();
+  });
+
+  it('n’envoie rien tant qu’il n’y a rien à envoyer', () => {
+    const a = rendre(<ProfilScreen />);
+    act(() => {
+      parLabel(a, 'Écrire au service client')?.props.onPress();
+    });
+    const envoyer = parLabel(a, 'Envoyer le message');
+    expect(envoyer?.props.accessibilityState?.disabled).toBe(true);
+  });
+});
+

@@ -26,6 +26,7 @@ import type { Identite } from '../net/coffrePlans';
 import {
   acheterAbonnement,
   connexionApple,
+  echeanceAbonnement,
   ecrireMarqueur,
   lireMarqueur,
   restaurerAbonnement,
@@ -158,6 +159,21 @@ interface AccountState {
   bonusEssais: number;
   /** Le jeton rendu par le serveur à la connexion — null hors ligne. */
   jeton: string | null;
+  /*
+    JUSQU'À QUAND EST-CE RÉGLÉ — relevé du patron : « sur le profil on doit
+    voir la date d'expiration de l'abonnement ».
+
+    C'est ce qu'on vient vérifier après avoir payé, et « actif » n'y répond
+    pas. La date vient de l'App Store, qui est le seul à savoir : c'est lui
+    qui encaisse, et lui seul qui voit une résiliation faite depuis les
+    Réglages d'iOS. `null` = inconnue, et la page n'écrit alors rien plutôt
+    qu'une date inventée.
+  */
+  proEcheance: number | null;
+  /** Un prélèvement suivra-t-il ? Faux quand l'abonnement a été résilié. */
+  proReconduit: boolean;
+  /** Redemande l'échéance à l'App Store. Silencieux : c'est un affichage. */
+  rafraichirEcheance: () => Promise<void>;
 
   charger: () => Promise<void>;
   /**
@@ -248,6 +264,37 @@ export const useAccountStore = create<AccountState>((set, get) => ({
   avisDonne: false,
   bonusEssais: 0,
   jeton: null,
+  proEcheance: null,
+  proReconduit: true,
+
+  /*
+    ON REDEMANDE À L'APP STORE, ON NE DÉDUIT RIEN.
+
+    Une date d'abonnement se calcule très bien à la main — et se trompe tout
+    aussi bien : un mois offert, un changement de formule, une résiliation
+    faite depuis les Réglages d'iOS, et le compte local raconte une histoire
+    que la banque ne suit pas. C'est l'App Store qui encaisse : c'est lui
+    qu'on interroge, à chaque ouverture de l'application.
+
+    Silencieux de bout en bout : un appareil sans module natif, un App Store
+    muet, un vol en avion — la page n'écrit alors pas de date, et rien
+    d'autre ne bouge.
+  */
+  rafraichirEcheance: async () => {
+    const e = await echeanceAbonnement([PRODUIT_PRO, PRODUIT_PRO_AN]);
+    if (!e) {
+      set({ proEcheance: null });
+      return;
+    }
+    set({ proEcheance: e.expiration, proReconduit: e.reconduit });
+    // Une échéance trouvée, c'est un abonnement DÉTENU : sur un téléphone
+    // neuf où l'utilisateur ne pense pas à « Restaurer l'achat », c'est
+    // elle qui lui rend son Pro.
+    if (!get().pro) {
+      set({ pro: true, proVia: 'abonnement' });
+      persister(get());
+    }
+  },
 
   charger: async () => {
     let local: Partial<AccountState> = {};
@@ -285,6 +332,9 @@ export const useAccountStore = create<AccountState>((set, get) => ({
       bonusEssais: Number(local.bonusEssais) || 0,
       jeton: typeof local.jeton === 'string' ? local.jeton : null,
     });
+    // L'App Store, lui, sait jusqu'à quand c'est payé : on le demande à
+    // chaque ouverture, sans attendre la réponse pour afficher l'app.
+    get().rafraichirEcheance().catch(() => {});
     // Le serveur, s'il est là, a le dernier mot — sans jamais bloquer.
     const s = get();
     if (s.compte && s.jeton) {
@@ -326,7 +376,7 @@ export const useAccountStore = create<AccountState>((set, get) => ({
     */
     const memeCompte = marqueur?.compte === compte.id;
     if (get().compte?.id !== compte.id) {
-      set({ pro: false, proVia: null, jeton: null });
+      set({ pro: false, proVia: null, jeton: null, proEcheance: null });
     }
     if (memeCompte && marqueur?.pro && !get().pro) {
       set({ pro: true, proVia: marqueur.pro });
@@ -407,7 +457,13 @@ export const useAccountStore = create<AccountState>((set, get) => ({
     // L'identité sort du trousseau ; le compteur de plans y reste, et le
     // Pro tombe avec le compte.
     await fusionnerMarqueur({ compte: '', pro: undefined });
-    set({ compte: null, pro: false, proVia: null, jeton: null });
+    set({
+      compte: null,
+      pro: false,
+      proVia: null,
+      jeton: null,
+      proEcheance: null,
+    });
     persister(get());
   },
 
@@ -445,6 +501,9 @@ export const useAccountStore = create<AccountState>((set, get) => ({
       set({ pro: true, proVia: 'abonnement', paywallVisible: false });
       persister(get());
       fusionnerMarqueur({ pro: 'abonnement' }).catch(() => {});
+      // La date vient de changer : la page profil doit la montrer JUSTE,
+      // pas au prochain lancement.
+      get().rafraichirEcheance().catch(() => {});
     }
   },
 
@@ -463,6 +522,7 @@ export const useAccountStore = create<AccountState>((set, get) => ({
     if (ok) {
       set({ pro: true, proVia: 'abonnement', paywallVisible: false });
       persister(get());
+      get().rafraichirEcheance().catch(() => {});
     }
     return ok;
   },

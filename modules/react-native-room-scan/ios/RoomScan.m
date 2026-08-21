@@ -38,6 +38,9 @@ RCT_EXTERN_METHOD(purchasePro:(NSString *)productId
 RCT_EXTERN_METHOD(restorePro:(NSString *)productId
                   resolve:(RCTPromiseResolveBlock)resolve
                   reject:(RCTPromiseRejectBlock)reject)
+RCT_EXTERN_METHOD(proExpiry:(NSArray *)productIds
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
 RCT_EXTERN_METHOD(webAuth:(NSString *)url
                   scheme:(NSString *)scheme
                   resolve:(RCTPromiseResolveBlock)resolve
@@ -97,5 +100,21 @@ RCT_EXTERN_METHOD(connecter:(NSString *)identifiant
                   resolve:(RCTPromiseResolveBlock)resolve
                   reject:(RCTPromiseRejectBlock)reject)
 RCT_EXTERN_METHOD(deconnecter:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+@end
+
+/*
+  LE SERVICE CLIENT — le composeur d'iOS, rempli d'avance, et le choix
+  d'une image pour la piece jointe. C'est l'utilisateur qui appuie sur
+  « Envoyer » : rien ne part dans son dos.
+*/
+@interface RCT_EXTERN_MODULE(RoomScanSupport, NSObject)
+RCT_EXTERN_METHOD(composeMail:(NSString *)destinataire
+                  subject:(NSString *)subject
+                  body:(NSString *)body
+                  attachment:(NSString *)attachment
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+RCT_EXTERN_METHOD(pickImage:(RCTPromiseResolveBlock)resolve
                   reject:(RCTPromiseRejectBlock)reject)
 @end

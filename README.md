@@ -1360,6 +1360,24 @@ vif descend au ras : quatre-vingt-huit pour une icône de quatre-vingt-quatre,
 soit l'épaisseur du trait de chaque côté. C'est le réglage déjà obtenu sur
 l'accueil, où l'anneau avait dû se rapprocher pour la même raison.
 
+**L'échéance de l'abonnement s'écrit en toutes lettres.** Relevé du
+patron : « sur le profil on doit voir la date d'expiration de
+l'abonnement ». C'est la question qu'on vient poser à cette page après
+avoir payé, et « actif » n'y répond pas. La date vient de **l'App Store**
+(`proExpiry`, StoreKit) — le seul à savoir, puisque c'est lui qui encaisse
+et lui seul qui voit une résiliation faite depuis les Réglages d'iOS. Le
+mot dit aussi ce qui va SE PASSER : un abonnement en cours porte
+« Renouvellement le … », un abonnement résilié « Actif jusqu'au … ».
+Confondre les deux, c'est soit faire attendre un prélèvement qui ne viendra
+pas, soit laisser quelqu'un perdre ses relevés illimités sans prévenir. Le
+Pro par CODE n'a pas d'échéance (il est donné une fois) et n'écrit rien ; et
+si l'App Store est muet, **rien ne s'affiche** — une date inventée sur un
+abonnement est pire que pas de date. Effet de bord utile : une échéance
+trouvée vaut abonnement DÉTENU, ce qui rend son Pro à qui change de
+téléphone sans penser à « Restaurer l'achat ». La date est écrite avec une
+table de douze mois maison, jamais `Intl` : la variante d'Hermès embarquée
+rend « November » sur certains builds, et c'est la date d'un prélèvement.
+
 **L'apparence a gagné un troisième choix : Système**, et c'est désormais le
 défaut. Le thème se bornait à clair ou sombre, choisis à la main ; un
 électricien passe sa journée dehors et sa soirée dans un tableau — c'est le
@@ -1367,6 +1385,34 @@ téléphone qui sait quand basculer. « Clair » et « Sombre » restent des
 choix DÉLIBÉRÉS et l'emportent : qui a forcé le sombre pour un tableau mal
 éclairé ne veut pas voir son écran repasser en blanc parce que le soleil
 s'est levé.
+
+**Deux portes de plus dans la barre.** « Confidentialité des données »
+ouvrait une `Alert` de quatre lignes ; c'est maintenant une **vraie page**
+(`ConfidentialiteScreen`) — relevé du patron —, et c'est aussi celle
+qu'Apple attend d'une application qui porte des comptes et un abonnement.
+Sept sections disent ce qui est VRAI de l'architecture, et rien de plus :
+les relevés vivent sur le téléphone, les photos ne quittent jamais la
+photothèque, seul le TEXTE monte sous le compte, le paiement passe par
+Apple, aucun traceur, et ce qu'on peut exiger. Chaque paragraphe correspond
+à un mécanisme qu'on peut aller lire dans le code — une politique qui
+promet ce que le logiciel ne fait pas est un mensonge écrit noir sur blanc.
+
+Et une **bulle de tchat** ouvre le mot au service client (`SupportSheet`) :
+sujet, message, et une **photo en pièce jointe** — sur un chantier, un
+défaut se raconte en une image, c'était l'essentiel de la demande. Deux
+décisions tiennent ce chemin. **C'est l'utilisateur qui envoie** : on
+remplit le composeur d'iOS et c'est son doigt qui appuie sur « Envoyer »,
+donc rien ne part dans son dos et son adresse reste la sienne — c'est elle
+qui nous permet de RÉPONDRE. Et **le composeur peut ne pas exister** :
+beaucoup d'iPhone n'ont aucun compte dans l'app Mail parce que tout se passe
+dans Gmail. Ce n'est pas une panne : on bascule sur un `mailto:`, qui ne
+sait pas porter de fichier, et l'app prévient que la photo n'est pas partie
+plutôt que de le laisser croire. Le contexte (version, formule, nombre de
+relevés) part en pied de message, où l'utilisateur le voit avant d'envoyer —
+un « ça ne marche pas » sans version coûte trois allers-retours avant de
+commencer à chercher. La pièce jointe se choisit par `PHPickerViewController`,
+qui ne demande **aucune autorisation** : le choix se fait dans une fenêtre du
+système et l'app ne reçoit que l'image désignée. Adresse : **echoplansupport@gmail.com**.
 
 Il ne reste au menu « ⋯ » que les deux gestes qu'on ne pose pas par
 mégarde : se déconnecter, supprimer son compte. La confirmation de
