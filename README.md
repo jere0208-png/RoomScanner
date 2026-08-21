@@ -3512,10 +3512,30 @@ batterie : son liseré tournant reposait sur un décalage de pointillés, propri
 sans équivalent natif, donc animée sur le fil JS — soixante réveils de
 JavaScript par seconde sur l'écran le plus longtemps affiché. On l'avait bornée
 à trois tours, après quoi le bouton restait figé. Un **reflet qui balaie** l'a
-remplacé : c'est une translation, que le fil natif porte de bout en bout. Elle
-tourne sans fin et ne coûte rien. Au passage, le bouton passe au **blanc cerné
-de bleu, texte bleu** — l'aplat pesait sur la page — et tous les boutons de
+remplacé : une translation, que le fil natif porte de bout en bout, qui tourne
+sans fin sans rien coûter. Au passage, le bouton passe au **blanc cerné de
+bleu, texte bleu** — l'aplat pesait sur la page — et tous les boutons de
 l'accueil perdent un cran de hauteur.
+
+**Puis le reflet a cédé la place à l'ONDE D'ÉCHO.** Relevé du patron : « refais
+une meilleure animation du bouton Commencer le scan ». Le reflet ne coûtait
+rien, mais c'était le miroitement de n'importe quelle carte bancaire — posé sur
+un bouton BLANC, où il se voyait à peine. Or ce que ce bouton propose, c'est de
+LIRE une pièce par écho, et le logo de l'accueil émet déjà ses ondes à
+l'ouverture : le bouton émet donc les mêmes. Deux anneaux naissent à son bord —
+même rayon, même épaisseur, même bleu que son contour, ce qui les fait lire
+comme émis PAR lui et non posés autour — et se dilatent en s'effaçant sur trois
+secondes et demie.
+
+Trois points de construction. **Une seule valeur pour deux anneaux** : chacun
+lit une tranche différente de la même montée (0 → 0,72 et 0,28 → 1), ce qui les
+décale sans coûter une seconde boucle — la mécanique exacte des ondes du logo.
+**Ils vivent HORS du corps**, dans une zone sœur qui ne rogne rien : le corps
+arrondit ses coins par `overflow: hidden`, une onde née dedans y mourrait sans
+jamais dépasser. Et **ils grandissent EN pâlissant** : un anneau qui s'ouvre
+sans s'effacer finit en cadre posé autour du bouton. Échelle et opacité sont
+portées par le pilote natif, donc l'onde bat sans fin sans réveiller le
+JavaScript — la règle de cet écran n'a pas bougé.
 
 **Le viseur du scan n'était pas là où l'on visait.** Le carré était dessiné à
 46 % de la hauteur, quatre points au-dessus du centre, pour dégager la

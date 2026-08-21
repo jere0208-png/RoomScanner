@@ -10,18 +10,21 @@
  * - **le blanc cerné de bleu** : l'aplat pesait sur la page et écrasait ce
  *   qui l'entoure. Le contour dit la même chose — « c'est ici qu'on appuie »
  *   — en laissant la page respirer, et il va avec le logotype ;
- * - **le reflet qui passe** : une bande claire traverse le bouton toutes les
- *   trois secondes. Un mouvement lent, qui se remarque sans agiter ;
+ * - **l'onde d'écho** : deux anneaux naissent au bord du bouton et se
+ *   dilatent en s'effaçant, comme le logo à l'ouverture. L'application
+ *   s'appelle EchoPlan et lit une pièce par écho : c'est la marque qui
+ *   bouge, pas un effet ;
  * - **l'enfoncement** : à l'appui, le bouton recule légèrement. Un bouton qui
  *   ne bouge pas sous le doigt laisse douter qu'il a pris.
  *
- * LE REFLET EST UNE TRANSLATION, et c'est tout son intérêt. Le contour
- * tournant d'avant reposait sur un décalage de pointillés, propriété sans
+ * TOUT PART SUR LE FIL NATIF, et c'est la règle de cet écran. Le contour
+ * tournant des débuts reposait sur un décalage de pointillés, propriété sans
  * équivalent natif : l'animation vivait sur le fil JS — soixante réveils de
  * JavaScript par seconde, sur l'écran le plus longtemps affiché de
  * l'application. On l'avait bornée à trois tours pour épargner la batterie,
  * après quoi le bouton restait figé, ce qui se voit tout de suite. Une
- * translation part sur le fil natif : elle tourne sans fin, sans rien coûter.
+ * échelle et une opacité, elles, sont portées de bout en bout par le pilote
+ * natif : l'onde peut battre sans fin sans rien coûter.
  */
 import React, { useEffect, useRef } from 'react';
 import {
@@ -32,16 +35,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { radius, useTheme, type Palette } from '../theme';
-
-/**
- * LA HAUTEUR DU REFLET, au-dela du bouton.
- *
- * Penche a dix-huit degres, un bandeau de la hauteur exacte du bouton
- * laisserait deux coins non couverts : on le fait deborder.
- */
-const H_REFLET = 40;
 
 export function GlowButton({
   label,
@@ -62,7 +56,6 @@ export function GlowButton({
 }) {
   const c = useTheme();
   const styles = getStyles(c);
-  const [taille, setTaille] = React.useState({ w: 0, h: 0 });
   const appui = useRef(new Animated.Value(0)).current;
 
   /*
@@ -92,29 +85,66 @@ export function GlowButton({
     discrète. Le liseré, lui, reste — mais immobile : c'est le bord du
     bouton, pas son animation.
   */
-  const balai = useRef(new Animated.Value(0)).current;
+  /*
+    UNE ONDE PLUTÔT QU'UN REFLET — relevé du patron : « refais une meilleure
+    animation du bouton Commencer le scan ».
+
+    Une bande claire traversait le bouton toutes les trois secondes. Elle ne
+    coûtait rien (une translation, portée par le fil natif) mais c'était le
+    miroitement de n'importe quelle carte bancaire, posé sur un bouton BLANC
+    où il se voyait à peine. Ce que le bouton propose, lui, c'est de LIRE
+    une pièce par écho — et le logo de l'accueil émet déjà ses ondes à
+    l'ouverture. Le bouton émet donc les mêmes.
+
+    UNE SEULE VALEUR pour deux anneaux : chacun lit une tranche différente
+    de la même montée (0 → 0,72 pour le premier, 0,28 → 1 pour le second),
+    ce qui les décale sans coûter une seconde boucle. C'est la mécanique du
+    logo, à l'identique — et tout part sur le fil natif, donc le JavaScript
+    n'est réveillé ni pour lancer l'onde ni pour la suivre.
+  */
+  const onde = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     if (disabled || !anime) return;
     const boucle = Animated.loop(
-      Animated.sequence([
-        Animated.timing(balai, {
-          toValue: 1,
-          duration: 1100,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-        // Le temps de respirer : un reflet qui repasse sans cesse devient
-        // un clignotant, et l'on finit par ne plus le voir.
-        Animated.delay(2200),
-        Animated.timing(balai, { toValue: 0, duration: 0, useNativeDriver: true }),
-      ]),
+      Animated.timing(onde, {
+        toValue: 1,
+        // Trois secondes et demie : le temps qu'une onde parte, s'ouvre et
+        // s'éteigne sans jamais donner l'impression de clignoter.
+        duration: 3500,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
     );
     boucle.start();
     return () => boucle.stop();
-  }, [balai, disabled, anime]);
+  }, [onde, disabled, anime]);
 
-  const H = taille.h || 56;
-  const W = taille.w || 240;
+  /**
+   * Un anneau, sur sa tranche de l'onde.
+   *
+   * Il grandit ET pâlit : un anneau qui s'ouvre sans s'effacer finit en
+   * cadre posé autour du bouton. Le sommet d'opacité est AU DÉBUT de sa
+   * course — une onde est la plus nette quand elle vient de partir.
+   */
+  const anneau = (depart: number) => {
+    const fin = Math.min(depart + 0.72, 1);
+    return {
+      opacity: onde.interpolate({
+        inputRange: [depart, depart + 0.06, fin],
+        outputRange: [0, 0.42, 0],
+        extrapolate: 'clamp' as const,
+      }),
+      transform: [
+        {
+          scale: onde.interpolate({
+            inputRange: [depart, fin],
+            outputRange: [1, 1.22],
+            extrapolate: 'clamp' as const,
+          }),
+        },
+      ],
+    };
+  };
 
   return (
     <Pressable
@@ -135,14 +165,34 @@ export function GlowButton({
           useNativeDriver: true,
         }).start()
       }
-      onPress={onPress}
-      onLayout={(e) =>
-        setTaille({
-          w: e.nativeEvent.layout.width,
-          h: e.nativeEvent.layout.height,
-        })
-      }>
-      <Animated.View
+      // Plus rien à mesurer : l'anneau se cale sur les quatre bords de la
+      // zone. C'est le reflet qui avait besoin de savoir d'où partir.
+      onPress={onPress}>
+      {/*
+        LA ZONE PORTE LES ANNEAUX, LE CORPS PORTE LE MOT.
+
+        Le corps rogne ce qu'il contient (`overflow: hidden`, c'est lui qui
+        arrondit ses coins) : une onde née dedans y mourrait sans jamais
+        dépasser. Elle vit donc dans une zone SŒUR, qui ne rogne rien, et
+        se dessine DERRIÈRE — c'est le bouton qu'on regarde, l'onde n'est
+        que ce qu'il émet.
+      */}
+      <View style={styles.zone}>
+        {/* Aucune mesure à attendre : l'anneau se cale sur les quatre bords
+            de la zone, quelle que soit sa taille. Le reflet, lui, devait
+            connaître la largeur pour savoir d'où partir. */}
+        {!disabled && anime && (
+          <>
+            {[0, 0.28].map((depart) => (
+              <Animated.View
+                key={depart}
+                pointerEvents="none"
+                style={[styles.anneau, anneau(depart)]}
+              />
+            ))}
+          </>
+        )}
+        <Animated.View
         style={[
           styles.corps,
           variant === 'primary' ? styles.primaire : styles.fantome,
@@ -193,55 +243,8 @@ export function GlowButton({
           */}
           {right ? <View style={styles.suite}>{right}</View> : null}
         </View>
-        {/*
-          LE REFLET QUI PASSE — porté par le fil natif.
-
-          Une bande claire, penchée, qui traverse le bouton de gauche à
-          droite puis attend. C'est une simple TRANSLATION : elle s'anime
-          nativement, donc elle peut tourner sans fin sans réveiller le
-          JavaScript — contrairement au liseré qui courait ici, et qu'il
-          avait fallu borner à trois tours pour épargner la batterie.
-
-          Transparente au doigt : elle ne doit pas voler l'appui qu'elle
-          invite à donner.
-        */}
-        {taille.w > 0 && !disabled && anime && (
-          <Animated.View
-            pointerEvents="none"
-            style={[
-              styles.reflet,
-              {
-                width: H * 1.5,
-                transform: [
-                  { rotate: '18deg' },
-                  {
-                    translateX: balai.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [-H * 2, W + H * 2],
-                    }),
-                  },
-                ],
-              },
-            ]}>
-            <Svg width={H * 1.5} height={H * 2.2}>
-              <Defs>
-                <LinearGradient id="reflet" x1="0" y1="0" x2="1" y2="0">
-                  <Stop offset="0" stopColor={c.blue} stopOpacity="0" />
-                  <Stop offset="0.5" stopColor={c.blue} stopOpacity="0.16" />
-                  <Stop offset="1" stopColor={c.blue} stopOpacity="0" />
-                </LinearGradient>
-              </Defs>
-              <Rect
-                x={0}
-                y={0}
-                width={H * 1.5}
-                height={H * 2.2}
-                fill="url(#reflet)"
-              />
-            </Svg>
-          </Animated.View>
-        )}
       </Animated.View>
+      </View>
     </Pressable>
   );
 }
@@ -275,8 +278,26 @@ const getStyles = (() => {
         borderRadius: radius.lg,
         overflow: 'hidden',
       },
-      /** Le reflet qui balaie : plus haut que le bouton, pour couvrir ses coins. */
-      reflet: { position: 'absolute', top: -H_REFLET, bottom: -H_REFLET },
+      /*
+        LA ZONE : elle ne rogne RIEN, sans quoi l'onde ne dépasserait pas.
+        Elle prend la taille du corps, et les anneaux s'y calquent.
+      */
+      zone: { position: 'relative' },
+      /*
+        L'ANNEAU : le contour du bouton, exactement — même rayon, même
+        épaisseur, même bleu. C'est ce qui fait lire l'onde comme émise PAR
+        le bouton, et non comme un cercle posé autour.
+      */
+      anneau: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        borderRadius: radius.lg,
+        borderWidth: 1.5,
+        borderColor: c.blue,
+      },
       /**
        * BLANC À TEXTE BLEU — relevé du chantier.
        *

@@ -552,3 +552,112 @@ describe('le logo de l’accueil', () => {
     expect(Math.abs((minY + maxY) / 2 - 38)).toBeLessThan(0.75);
   });
 });
+
+/**
+ * L'ONDE DU BOUTON PRINCIPAL — l'écho, pas un reflet.
+ *
+ * Le bouton portait une bande claire qui le traversait toutes les trois
+ * secondes. Elle avait le mérite de ne rien coûter (une translation, au fil
+ * natif), mais c'est l'animation de n'importe quelle application : un
+ * miroitement de carte bancaire, posé sur un bouton blanc où il se voit à
+ * peine — relevé du patron : « refais une meilleure animation ».
+ *
+ * Ce que le bouton fait maintenant, l'application entière le fait déjà :
+ * elle s'appelle EchoPlan, son logo émet des ondes à l'ouverture, et son
+ * métier est de LIRE une pièce par écho. Le bouton émet donc la même chose
+ * — deux anneaux qui naissent à son bord et se dilatent en s'effaçant.
+ * C'est la marque qui bouge, pas un effet.
+ *
+ * Trois propriétés le rendent honnête, et ce banc les tient : les anneaux
+ * vivent HORS du corps (qui rogne ce qu'il contient, sinon on ne verrait
+ * rien dépasser), ils ne prennent jamais le doigt, et le second bouton de
+ * l'accueil n'en a pas — deux choses qui bougent pour un seul geste à
+ * faire, et l'œil ne sait plus laquelle est l'importante.
+ */
+describe('l’onde du bouton principal', () => {
+  const anneaux = (t: TestRenderer.ReactTestRenderer, dans: unknown) =>
+    (dans as TestRenderer.ReactTestInstance).findAll((n) => {
+      const st = StyleSheet.flatten(n.props?.style) as
+        | {
+            borderColor?: string;
+            borderRadius?: number;
+            position?: string;
+            backgroundColor?: string;
+          }
+        | undefined;
+      // Le CORPS du bouton porte lui aussi un bord bleu et une échelle (son
+      // enfoncement) : ce qui distingue un anneau, c'est qu'il est posé en
+      // absolu et qu'il ne peint rien — il n'est que du contour.
+      return (
+        st?.borderColor === light.blue &&
+        st?.position === 'absolute' &&
+        st?.backgroundColor === undefined &&
+        typeof st?.borderRadius === 'number' &&
+        Array.isArray((st as { transform?: unknown[] }).transform)
+      );
+    });
+
+  it('émet deux anneaux, décalés, transparents au doigt', () => {
+    const t = monter();
+    const scan = t.root
+      .findAllByType(GlowButton)
+      .find((n) => n.props.accessibilityLabel === 'Commencer le scan')!;
+    const ondes = anneaux(t, scan);
+    // Deux, pas un : une onde seule bat comme un clignotant ; deux, décalées,
+    // se lisent comme une propagation.
+    expect(ondes.length).toBeGreaterThanOrEqual(2);
+    for (const o of ondes) {
+      expect(o.props.pointerEvents).toBe('none');
+      // Chacune se dilate ET s'efface : un anneau qui grandit sans pâlir
+      // finit en cadre posé autour du bouton.
+      const st = StyleSheet.flatten(o.props.style) as {
+        transform: Record<string, unknown>[];
+        opacity?: unknown;
+      };
+      // Le rendu de test résout les valeurs animées à leur instant zéro :
+      // ce qu'on tient ici, c'est que les deux LEVIERS sont branchés —
+      // l'échelle et l'opacité. Que la boucle qui les pousse soit native et
+      // sans fin, c'est `batterie.test.tsx` qui le prouve.
+      expect(st.transform.some((x) => 'scale' in x)).toBe(true);
+      expect(st.opacity).toBeDefined();
+    }
+  });
+
+  it('les laisse hors du corps, qui rogne ce qu’il porte', () => {
+    const t = monter();
+    const scan = t.root
+      .findAllByType(GlowButton)
+      .find((n) => n.props.accessibilityLabel === 'Commencer le scan')!;
+    for (const o of anneaux(t, scan)) {
+      let p = o.parent;
+      while (p) {
+        const st = StyleSheet.flatten(p.props?.style) as
+          | { overflow?: string }
+          | undefined;
+        // Un anneau qui déborde ne déborde que si rien ne le coupe.
+        expect(st?.overflow).not.toBe('hidden');
+        if (p.type === GlowButton) break;
+        p = p.parent;
+      }
+    }
+  });
+
+  it('n’en donne pas au second bouton, ni au bouton éteint', () => {
+    const t = monter();
+    const dessiner = t.root
+      .findAllByType(GlowButton)
+      .find((n) => n.props.label === 'Dessiner un plan')!;
+    expect(anneaux(t, dessiner)).toHaveLength(0);
+
+    // Éteint, le bouton n'invite à rien : l'animer serait mentir.
+    act(() => t.unmount());
+    useScanStore.setState({ supported: false });
+    const eteint = monter();
+    const scan = eteint.root
+      .findAllByType(GlowButton)
+      .find((n) => n.props.accessibilityLabel === 'Commencer le scan')!;
+    expect(anneaux(eteint, scan)).toHaveLength(0);
+    useScanStore.setState({ supported: true });
+  });
+});
+
