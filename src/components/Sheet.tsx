@@ -33,6 +33,7 @@ import {
   View,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
+import { CloseCross } from './CloseCross';
 import { radius, shadowCard, themedStyles, useTheme, type Palette } from '../theme';
 
 /** Tracés des icônes de choix, en 24×24. */
@@ -96,6 +97,50 @@ const ICONS: Record<string, string[]> = {
     'M3.5 20.5 H8',
     'M8 20.5 a6 6 0 0 0 6 -6',
     'M8 20.5 v-5',
+  ],
+  /*
+    CINQ ENTRÉES DU MENU DU SCAN PORTAIENT LA MÊME ICÔNE — « pièce », pour
+    ajouter une pièce, en scanner une, redétecter, monter un étage,
+    descendre au sous-sol et relever un tableau. Une icône répétée
+    n'informe pas : elle décore, et elle fait lire les six lignes pour
+    trouver la bonne. Chacune a maintenant la sienne, et chacune dit son
+    geste sans qu'on lise le mot à côté.
+  */
+  // Le téléphone qui vise un mur : c'est un RELEVÉ, pas un dessin.
+  scanner: [
+    'M6.5 3.5 h11 v17 h-11 z',
+    'M9.5 3.5 h5',
+    'M3 8 V5 a1.5 1.5 0 0 1 1.5 -1.5',
+    'M21 8 V5 a1.5 1.5 0 0 0 -1.5 -1.5',
+  ],
+  // La loupe sur le plan : on cherche ce qui s'y trouve déjà.
+  redetecter: [
+    'M3.5 3.5 h17 v9',
+    'M3.5 3.5 v17 h9',
+    'M13 17.5 a4 4 0 1 0 8 0 a4 4 0 1 0 -8 0',
+    'M20 20.5 L22 22.5',
+  ],
+  // Deux dalles empilées, la flèche qui monte : l'étage du dessus.
+  etage: [
+    'M3.5 14.5 h11 v6 h-11 z',
+    'M3.5 8.5 h11',
+    'M19 20.5 V4.5',
+    'M16 7.5 L19 4.5 l3 3',
+  ],
+  // Les mêmes dalles, la flèche qui descend : ce qui se range dessous.
+  soussol: [
+    'M3.5 3.5 h11 v6 h-11 z',
+    'M3.5 15.5 h11',
+    'M19 3.5 V19.5',
+    'M16 16.5 L19 19.5 l3 -3',
+  ],
+  // Le coffret et ses rangées de modules : un tableau électrique.
+  tableau: [
+    'M3.5 3.5 h17 v17 h-17 z',
+    'M3.5 9.5 h17',
+    'M3.5 15.5 h17',
+    'M8 6.5 v0.01',
+    'M8 12.5 v0.01',
   ],
 };
 
@@ -335,14 +380,46 @@ export function ActionSheet({
       }}>
       {vu && (
         <>
-          <Text style={styles.title}>{vu.title}</Text>
-          {vu.subtitle ? (
-            <Text style={styles.subtitle}>{vu.subtitle}</Text>
-          ) : null}
-          {vu.actions.map((a) => (
+          {/*
+            LE TITRE ET LA CROIX SUR LA MÊME LIGNE — relevé du patron : « il
+            manque la croix pour quitter la page ». On ne refermait qu'en
+            visant le voile, à côté d'une feuille qui remplit l'écran : sur
+            un menu de neuf entrées, il n'y avait plus de « à côté ».
+          */}
+          <View style={styles.entete}>
+            <View style={styles.enteteTextes}>
+              <Text style={styles.title}>{vu.title}</Text>
+              {vu.subtitle ? (
+                <Text style={styles.subtitle}>{vu.subtitle}</Text>
+              ) : null}
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Fermer"
+              style={styles.croix}
+              hitSlop={10}
+              onPress={onClose}>
+              <CloseCross size={20} color={c.inkSoft} />
+            </Pressable>
+          </View>
+          {/*
+            UN SEUL BLOC, DES FILETS ENTRE LES LIGNES.
+
+            Chaque choix était une carte, séparée de la suivante par sept
+            points de vide : neuf entrées, c'est soixante-trois points perdus
+            en gouttières et dix-huit coins arrondis qui hachent la lecture.
+            Le bloc porte la forme, les rangées ne sont que ses lignes — et
+            l'on gagne un tiers de la hauteur sans rien retirer.
+          */}
+          <View style={styles.bloc}>
+          {vu.actions.map((a, i) => (
             <Pressable
               key={a.label}
-              style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+              style={({ pressed }) => [
+                styles.row,
+                i > 0 && styles.rowFilet,
+                pressed && styles.rowPressed,
+              ]}
               onPress={() => {
                 attente.current = a.onPress;
                 onClose();
@@ -367,10 +444,21 @@ export function ActionSheet({
                 <Text style={[styles.rowLabel, a.danger && styles.rowDanger]}>
                   {a.label}
                 </Text>
-                {a.hint ? <Text style={styles.rowHint}>{a.hint}</Text> : null}
+                {a.hint ? (
+                  /*
+                    UNE LIGNE, PAS UN MODE D'EMPLOI. Les aides couraient sur
+                    trois lignes et faisaient à elles seules la hauteur d'une
+                    carte. Ce qui ne tient pas en une ligne se dit dans
+                    l'écran qui suit, pas dans le menu qui y mène.
+                  */
+                  <Text style={styles.rowHint} numberOfLines={1}>
+                    {a.hint}
+                  </Text>
+                ) : null}
               </View>
             </Pressable>
           ))}
+          </View>
         </>
       )}
     </SheetShell>
@@ -479,24 +567,47 @@ const getStyles = themedStyles((c: Palette) =>
       lineHeight: 17,
       marginTop: 3,
     },
+    entete: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 12,
+      marginBottom: 12,
+    },
+    enteteTextes: { flex: 1, minWidth: 0 },
+    croix: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: c.surfaceSunken,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    /* Le bloc porte la forme et le fond ; les rangées ne sont que ses
+       lignes, séparées d'un cheveu. */
+    bloc: {
+      borderRadius: radius.md,
+      backgroundColor: c.surfaceSunken,
+      overflow: 'hidden',
+    },
     row: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 13,
-      backgroundColor: c.surfaceSunken,
-      borderRadius: radius.md,
       paddingHorizontal: 15,
       // Une ligne sans description n'a pas besoin de treize points de
       // marge : à neuf appareils de plafond, on déroulait deux écrans
       // pour choisir un spot.
       paddingVertical: 11,
-      marginTop: 7,
     },
-    rowPressed: { opacity: 0.6 },
+    rowFilet: {
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: c.line,
+    },
+    rowPressed: { backgroundColor: c.line },
     rowTexts: { flex: 1 },
     rowLabel: { color: c.ink, fontSize: 15.5, fontWeight: '700' },
     rowDanger: { color: c.danger },
-    rowHint: { color: c.inkFaint, fontSize: 12, marginTop: 1, lineHeight: 16 },
+    rowHint: { color: c.inkFaint, fontSize: 12, marginTop: 1, lineHeight: 15 },
     champRow: {
       flexDirection: 'row',
       alignItems: 'center',

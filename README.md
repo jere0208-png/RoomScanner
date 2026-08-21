@@ -2596,6 +2596,40 @@ sous une liste il se lisait comme un choix de plus — un bouton pâle et bas,
 dont on ne savait pas s'il validait ou annulait. Les fenêtres qui portent une
 vraie alternative (renommer / annuler) gardent la leur.
 
+**Mais une CROIX est revenue en haut**, et pour une raison que le voile ne
+couvre pas — relevé du patron : « il manque la croix pour quitter la page ».
+Le voile est l'échappatoire tant qu'il reste du voile : sur le menu du scan,
+neuf entrées remplissaient l'écran, et il n'y avait plus de « à côté » où
+viser. La croix vit dans l'en-tête, à droite du titre, et c'est un TRACÉ —
+jamais un « ✕ » au clavier, la leçon des caractères.
+
+#### La feuille resserrée
+
+Relevé du patron, capture à l'appui : « fais une refonte de cette page pour
+que ça prenne moins de place, ce n'est pas agréable visuellement ». Trois
+choses gonflaient le menu du scan, et les trois sont tombées.
+
+**Chaque choix était une CARTE**, séparée de la suivante par sept points de
+vide : neuf entrées, c'est soixante-trois points perdus en gouttières et
+dix-huit coins arrondis qui hachent la lecture. Les rangées se touchent
+maintenant dans UN bloc, séparées par un filet d'un cheveu — le bloc porte la
+forme, les rangées ne sont que ses lignes. On gagne un tiers de la hauteur
+sans retirer une seule entrée.
+
+**La même icône revenait CINQ FOIS.** « Pièce » servait pour ajouter une
+pièce, en scanner une, redétecter, monter d'un étage, descendre au sous-sol
+et relever un tableau. Une icône répétée n'informe pas : elle décore, et
+elle oblige à lire les six lignes pour trouver la bonne. Chacune a désormais
+la sienne — le téléphone qui vise pour un relevé, la loupe sur le plan pour
+la redétection, deux dalles et une flèche qui monte pour l'étage, les mêmes
+avec la flèche qui descend pour le sous-sol, le coffret et ses rangées de
+modules pour le tableau.
+
+**Les aides couraient sur trois lignes** et faisaient à elles seules la
+hauteur d'une carte. Elles tiennent en UNE, et le texte a été raccourci pour
+ça : ce qui ne tient pas en une ligne se dit dans l'écran qui suit, pas dans
+le menu qui y mène.
+
 ### La barre d'outils
 
 **Deux barres, jamais mélangées.** Elle répondait à deux questions à la fois

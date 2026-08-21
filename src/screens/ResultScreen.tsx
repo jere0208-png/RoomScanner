@@ -1950,7 +1950,7 @@ export function ResultScreen() {
                      */
                     label: 'Ajouter une pièce',
                     icon: 'piece' as const,
-                    hint: 'Un rectangle aux cotes que vous donnez, à côté du plan.',
+                    hint: 'Un rectangle aux cotes données, à côté du plan.',
                     onPress: () => setAjoutPiece(true),
                   },
                   {
@@ -1965,10 +1965,8 @@ export function ResultScreen() {
                      * coûterait vingt prises.
                      */
                     label: 'Scanner une pièce',
-                    icon: 'piece' as const,
-                    hint:
-                      'Un relevé de plus, réuni au plan. iOS 17 et appareil ' +
-                      'LiDAR requis.',
+                    icon: 'scanner' as const,
+                    hint: 'Un relevé de plus, réuni au plan. iOS 17, LiDAR.',
                     onPress: () => {
                       demarrerComplement().catch((e: any) =>
                         Alert.alert(
@@ -1999,7 +1997,7 @@ export function ResultScreen() {
                         {
                           label: 'Revenir à la version enregistrée',
                           icon: 'supprimer' as const,
-                          hint: 'Jette les modifications faites depuis le dernier enregistrement.',
+                          hint: 'Jette tout depuis le dernier enregistrement.',
                           onPress: () => {
                             Alert.alert(
                               'Jeter les modifications ?',
@@ -2047,10 +2045,11 @@ export function ResultScreen() {
                      * la géométrie des murs par-dessus le marché.
                      */
                     label: 'Redétecter les pièces',
-                    icon: 'piece' as const,
-                    hint:
-                      'Recherche les espaces clos, les nomme et les cote. ' +
-                      'Les noms donnés à la main sont gardés.',
+                    icon: 'redetecter' as const,
+                    // Une ligne, pas un mode d'emploi : ce que la fonction
+                    // garde (les noms donnés à la main) se voit en la
+                    // lançant, et le README le raconte en entier.
+                    hint: 'Retrouve les espaces clos, les nomme et les cote.',
                     onPress: () => {
                       useScanStore.getState().redetectRooms();
                       haptic('succes');
@@ -2070,11 +2069,11 @@ export function ResultScreen() {
                       d'escalier.
                     */
                     label: 'Scanner un étage',
-                    icon: 'piece' as const,
+                    icon: 'etage' as const,
                     hint:
                       niveaux.length > 1
                         ? `Le dossier en compte ${niveaux.length}.`
-                        : 'Montez, relevez : il s’ajoute au-dessus de ce plan.',
+                        : 'Il s’ajoute au-dessus de ce plan.',
                     onPress: () => {
                       demarrerEtage(Math.max(...niveaux) + 1).catch(() => {});
                     },
@@ -2090,16 +2089,16 @@ export function ResultScreen() {
                       sait aussi lire ce qui est déjà là.
                     */
                     label: 'Relever le tableau existant',
-                    icon: 'piece' as const,
+                    icon: 'tableau' as const,
                     hint: existant?.departs.length
                       ? `${existant.departs.length} module(s) relevé(s).`
-                      : 'Rénovation : notez les départs, l’app dit ce qui cloche.',
+                      : 'Rénovation : notez les départs, l’app diagnostique.',
                     onPress: () => setExistantOuvert(true),
                   },
                   {
                     label: 'Scanner un sous-sol',
-                    icon: 'piece' as const,
-                    hint: 'Cave, garage, buanderie : il se range sous le plan.',
+                    icon: 'soussol' as const,
+                    hint: 'Cave, garage : il se range sous le plan.',
                     onPress: () => {
                       demarrerEtage(Math.min(...niveaux) - 1).catch(() => {});
                     },
@@ -2107,9 +2106,7 @@ export function ResultScreen() {
                   {
                     label: 'Ajouter un mur',
                     icon: 'regle' as const,
-                    hint:
-                      'Un mètre accroché au bout libre du plan, ' +
-                      'à tirer par son coin.',
+                    hint: 'Un mètre accroché au bout libre, à tirer.',
                     onPress: () => {
                       /*
                         IL NAÎT ACCROCHÉ, PAS AU MILIEU DU SÉJOUR.
@@ -2166,9 +2163,9 @@ export function ResultScreen() {
                         />
                       </Svg>
                     ),
-                    hint:
-                      'Pose ce qui manque pour la NF C 15-100 : socles, RJ45, ' +
-                      'interrupteurs et points lumineux, hors meubles.',
+                    // Une ligne : le détail de ce qui se pose est le sujet
+                    // de l'écran de contrôle, pas du menu qui y mène.
+                    hint: 'Pose ce qui manque pour la NF C 15-100.',
                     onPress: poserNormes,
                   },
                   {

@@ -17,7 +17,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 import React from 'react';
-import { Modal, Text } from 'react-native';
+import { Modal, StyleSheet, Text } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import { ActionSheet, SheetShell } from '../src/components/Sheet';
 
@@ -180,3 +180,101 @@ describe('l’enchaînement de deux feuilles', () => {
     expect(fait).toEqual(['largeur']);
   });
 });
+
+/**
+ * LA FEUILLE S'EST RESSERRÉE — relevé du patron, capture à l'appui : « fais
+ * une refonte de cette page pour que ça prenne moins de place, ce n'est pas
+ * agréable visuellement ».
+ *
+ * Le menu du scan sortait de l'écran pour neuf entrées. Trois choses le
+ * gonflaient, et ce banc les tient toutes les trois :
+ *
+ *   — CHAQUE CHOIX ÉTAIT UNE CARTE, séparée de la suivante par sept points
+ *     de vide. Neuf cartes, c'est soixante-trois points perdus en gouttières
+ *     et dix-huit coins arrondis qui découpent la lecture. Les rangées se
+ *     touchent maintenant dans UN bloc, séparées par un filet d'un cheveu.
+ *   — LA MÊME ICÔNE REVENAIT CINQ FOIS (« pièce ») : une icône répétée
+ *     n'informe pas, elle décore. Chaque entrée porte la sienne.
+ *   — ET IL MANQUAIT LA CROIX pour sortir : on ne pouvait refermer qu'en
+ *     visant le voile, à côté d'une feuille qui remplissait l'écran.
+ */
+describe('la feuille resserrée', () => {
+  const donnees = (n: number) => ({
+    title: 'Scan du 21/08',
+    subtitle: 'Dernière MAJ : aujourd’hui',
+    actions: Array.from({ length: n }, (_, i) => ({
+      label: `Choix ${i}`,
+      hint: 'Une explication courte.',
+      icon: 'piece' as const,
+      onPress: () => {},
+    })),
+  });
+
+  const monterFeuille = (n: number) => {
+    let t!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      t = TestRenderer.create(
+        <ActionSheet data={donnees(n)} onClose={() => {}} />,
+      );
+    });
+    return t;
+  };
+
+  it('colle ses rangées dans un bloc, sans gouttière entre elles', () => {
+    const t = monterFeuille(5);
+    const rangees = t.root.findAll(
+      (n) =>
+        typeof n.props?.onPress === 'function' &&
+        // UNE seule rangée par nœud : la feuille entière les contient toutes
+        // et porte, elle aussi, un `onPress` (elle avale le toucher). Deux
+        // nœuds par mot, et non un : le `Text` de React Native rend son
+        // élément natif sous lui, tous deux porteurs du même texte.
+        (() => {
+          const mots = n.findAll((x) =>
+            String(x.props?.children ?? '').startsWith('Choix'),
+          ).length;
+          return mots >= 1 && mots <= 2;
+        })(),
+    );
+    expect(rangees.length).toBeGreaterThanOrEqual(5);
+    for (const r of rangees) {
+      const st = StyleSheet.flatten(
+        typeof r.props.style === 'function'
+          ? r.props.style({ pressed: false })
+          : r.props.style,
+      ) as { marginTop?: number; borderRadius?: number };
+      // Plus de gouttière, plus de coins : c'est le BLOC qui porte la
+      // forme, les rangées ne sont que ses lignes.
+      expect(st.marginTop ?? 0).toBeLessThanOrEqual(0);
+      expect(st.borderRadius ?? 0).toBe(0);
+    }
+    act(() => t.unmount());
+  });
+
+  it('porte une croix pour sortir', () => {
+    const t = monterFeuille(3);
+    const croix = t.root
+      .findAll((n) => n.props?.accessibilityLabel === 'Fermer')
+      .pop();
+    expect(croix).toBeDefined();
+    // Un TRACÉ, jamais un « ✕ » au clavier : la leçon des caractères.
+    expect(
+      croix!.findAll((n) => typeof n.props?.d === 'string').length,
+    ).toBeGreaterThan(0);
+    act(() => t.unmount());
+  });
+
+  it('garde une explication d’une seule ligne', () => {
+    const t = monterFeuille(2);
+    const hints = t.root.findAll(
+      (n) => n.props?.children === 'Une explication courte.',
+    );
+    expect(hints.length).toBeGreaterThan(0);
+    // Une aide qui déborde sur trois lignes fait la hauteur d'une carte à
+    // elle seule : ce qui ne tient pas en une ligne n'est pas une aide,
+    // c'est un mode d'emploi.
+    for (const h of hints) expect(h.props.numberOfLines).toBe(1);
+    act(() => t.unmount());
+  });
+});
+
