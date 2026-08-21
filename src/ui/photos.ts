@@ -14,6 +14,7 @@ const natif = ():
   | {
       deletePhotos?: (p: string[]) => Promise<number>;
       cleanModels?: (gardes: string[]) => Promise<number>;
+      restorePhoto?: (asset: string) => Promise<string | null>;
     }
   | undefined => (Platform.OS === 'ios' ? NativeModules.RoomScanPhoto : undefined);
 
@@ -29,6 +30,24 @@ export function deletePhotoFiles(paths: string[]): void {
     natif()?.deletePhotos?.(paths)?.catch?.(() => {});
   } catch {
     // Rien à faire : le fichier restera, l'app continue.
+  }
+}
+
+/**
+ * Redemande au coffre — la photothèque de l'utilisateur — l'image d'une
+ * photo dont le fichier de cache a disparu, et rend son nouveau chemin.
+ *
+ * `null` si l'image n'y est plus (l'utilisateur l'a effacée de ses Photos),
+ * si l'accès est refusé, ou hors iOS. L'écran affiche alors la punaise sans
+ * vignette, comme pour toute photo dont le fichier manque : une photo perdue
+ * n'a jamais empêché de lire un plan.
+ */
+export function reposerDuCoffre(asset: string): Promise<string | null> {
+  try {
+    const p = natif()?.restorePhoto?.(asset);
+    return p ? p.catch(() => null) : Promise.resolve(null);
+  } catch {
+    return Promise.resolve(null);
   }
 }
 

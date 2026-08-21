@@ -215,11 +215,19 @@ export const RoomScan = {
   resume: (): void => RoomScanModule.resumeRoomScan(),
 
   /**
-   * Photo de repérage : l'appareil photo du système, puis le chemin du
-   * fichier écrit dans Documents. `null` si l'utilisateur annule ou si
-   * l'appareil n'a pas de caméra (simulateur).
+   * Photo de repérage : l'appareil photo du système, puis DEUX choses — le
+   * chemin du fichier de cache écrit dans Documents, et l'identifiant
+   * durable de l'image dans la photothèque de l'utilisateur.
+   *
+   * Le cache part avec l'application le jour où on la réinstalle ;
+   * l'identifiant, lui, retrouve l'image dans les Photos du téléphone. Il
+   * manque quand l'accès à la photothèque a été refusé : la photo vit alors
+   * comme avant, le temps que dure l'installation.
+   *
+   * `null` si l'utilisateur annule ou si l'appareil n'a pas de caméra
+   * (simulateur).
    */
-  async takePhoto(): Promise<string | null> {
+  async takePhoto(): Promise<{ path: string; asset?: string } | null> {
     if (Platform.OS !== 'ios' || !NativeModules.RoomScanPhoto) return null;
     // La caméra a pu être refusée au scan : sans cette demande, le
     // sélecteur s'ouvrait sur un écran noir, sans un mot d'explication.

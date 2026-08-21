@@ -1,6 +1,10 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { cleanModelFiles, deletePhotoFiles } from '../ui/photos';
+import {
+  cleanModelFiles,
+  deletePhotoFiles,
+  reposerDuCoffre,
+} from '../ui/photos';
 import { useAccountStore } from './accountStore';
 import {
   insetOnRing,
@@ -126,7 +130,21 @@ export interface ScanPhoto {
   wallId: string;
   /** Cote sur le mur (m depuis A), pour la punaise du plan. */
   along: number;
+  /**
+   * Le fichier de cache, dans les Documents de l'app. Il ne survit PAS à une
+   * réinstallation : c'est `asset` qui le reconstruit.
+   */
   path: string;
+  /**
+   * L'IDENTIFIANT DURABLE de l'image dans la photothèque de l'utilisateur.
+   *
+   * Les Documents de l'app disparaissent avec l'app ; la photothèque, elle,
+   * appartient à l'utilisateur — l'image y survit à la réinstallation, part
+   * dans sa sauvegarde iCloud et se retrouve dans ses Photos. Absent sur les
+   * photos d'avant le coffre, et sur celles prises quand l'accès a été
+   * refusé : le fichier est alors tout ce qu'on a.
+   */
+  asset?: string;
   /** Horodatage de la prise de vue. */
   at: number;
 }
@@ -756,7 +774,21 @@ interface ScanState {
   toggleCeilingCommand: (ceilingId: string, fixtureId: string) => void;
   photos: ScanPhoto[];
   /** Punaise une photo sur un mur, à la cote donnée. */
-  addPhoto: (wallId: string, along: number, path: string) => string;
+  /**
+   * Punaise une photo sur un mur. `asset` est son identifiant durable dans
+   * la photothèque, quand l'utilisateur a laissé l'application l'y ranger.
+   */
+  addPhoto: (
+    wallId: string,
+    along: number,
+    path: string,
+    asset?: string,
+  ) => string;
+  /**
+   * Redemande au coffre l'image d'une photo dont le fichier a disparu —
+   * après une réinstallation, typiquement — et réécrit le cache.
+   */
+  reposerPhoto: (id: string) => Promise<void>;
   removePhoto: (id: string) => void;
   /**
    * Presse-papier d'appareillage : le relevé d'un mur, cotes comprises.
@@ -2093,14 +2125,42 @@ export const useScanStore = create<ScanState>((set, get) => {
       set({ fixtures: list, dirty: true });
     },
 
-    addPhoto: (wallId, along, path) => {
+    addPhoto: (wallId, along, path, asset) => {
       pushHistory('photo');
       const id = `ph-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`;
       set({
-        photos: [...get().photos, { id, wallId, along, path, at: Date.now() }],
+        photos: [
+          ...get().photos,
+          { id, wallId, along, path, at: Date.now(), ...(asset ? { asset } : null) },
+        ],
         dirty: true,
       });
       return id;
+    },
+
+    /*
+      REPOSE UNE PHOTO DONT LE FICHIER A DISPARU.
+
+      Relevé du chantier : « que les photos soient lues même s'il réinstalle
+      l'application ». Les Documents de l'app partent avec l'app ; la
+      photothèque de l'utilisateur, non. On redemande donc l'image au coffre
+      et l'on réécrit le cache — le reste de l'application ne voit qu'un
+      fichier, comme avant.
+
+      Rien à enregistrer au passage : reposer une photo n'est pas modifier le
+      plan. Marquer le scan « modifié » ici ferait réclamer une sauvegarde à
+      chaque ouverture, pour un travail que l'utilisateur n'a pas fait.
+    */
+    reposerPhoto: async (id) => {
+      const ph = get().photos.find((p) => p.id === id);
+      if (!ph?.asset) return;
+      const chemin = await reposerDuCoffre(ph.asset);
+      if (!chemin) return;
+      set({
+        photos: get().photos.map((p) =>
+          p.id === id ? { ...p, path: chemin } : p,
+        ),
+      });
     },
 
     addCeiling: (kind, roomId, at, ligne) => {

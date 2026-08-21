@@ -1925,12 +1925,19 @@ export function WallElevation({
                 'M12 16.2 a3.2 3.2 0 1 0 0 -6.4 a3.2 3.2 0 0 0 0 6.4',
               ],
               press: async () => {
-                const chemin = await RoomScan.takePhoto();
-                if (chemin) {
+                const prise = await RoomScan.takePhoto();
+                if (prise) {
                   const cible = retourVise
                     ? (retourVise.x0 + retourVise.x1) / 2
                     : face.len / 2;
-                  addPhoto(wallId, fromFaceX(face, cible), chemin);
+                  // L'identifiant du coffre voyage avec la punaise : c'est
+                  // lui qui retrouvera l'image après une réinstallation.
+                  addPhoto(
+                    wallId,
+                    fromFaceX(face, cible),
+                    prise.path,
+                    prise.asset,
+                  );
                   haptic('succes');
                 }
               },

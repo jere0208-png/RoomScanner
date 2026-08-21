@@ -266,3 +266,84 @@ describe('le ménage des modèles 3D', () => {
     delete (NativeModules as Record<string, unknown>).RoomScanPhoto;
   });
 });
+
+/**
+ * LE COFFRE : LA PHOTOTHEQUE DE L UTILISATEUR.
+ *
+ * Releve du chantier : « fais en sorte que les photos soient stockees dans
+ * l appareil de la personne pour les murs et soient lues meme s il
+ * reinstalle l application ».
+ *
+ * Les Documents de l app ne survivent PAS a une desinstallation : la photo
+ * d un mur, prise sur un chantier, disparaissait avec l app sans que
+ * personne ne l ait effacee. La phototheque, elle, appartient a
+ * l utilisateur — l image y survit, part dans sa sauvegarde iCloud, et se
+ * retrouve dans ses Photos.
+ *
+ * Le scan retient donc DEUX choses : le chemin du cache, qu on relit vite,
+ * et l identifiant durable de l image. Quand le premier a disparu, le
+ * second le reconstruit.
+ */
+describe('la photo survit a la reinstallation', () => {
+  it('retient l identifiant durable a cote du chemin', () => {
+    neuf();
+    const id = useScanStore
+      .getState()
+      .addPhoto('n', 2, '/docs/photos/p-1.jpg', 'PH-4C2E/L0/001');
+    const ph = useScanStore.getState().photos.find((p) => p.id === id)!;
+    expect(ph.path).toBe('/docs/photos/p-1.jpg');
+    expect(ph.asset).toBe('PH-4C2E/L0/001');
+  });
+
+  it('la sauvegarde emporte l identifiant, l ouverture le rend', () => {
+    neuf();
+    useScanStore.getState().addPhoto('n', 2, '/docs/photos/p-1.jpg', 'PH-1');
+    useScanStore.getState().saveAsCopy('Chantier');
+    const save = useScanStore.getState().saves[0];
+    expect(save.photos?.[0].asset).toBe('PH-1');
+    useScanStore.getState().reset();
+    useScanStore.getState().openSave(save.id);
+    expect(useScanStore.getState().photos[0].asset).toBe('PH-1');
+  });
+
+  it('repose le fichier disparu, depuis le coffre', async () => {
+    const demandes: string[] = [];
+    (NativeModules as Record<string, unknown>).RoomScanPhoto = {
+      restorePhoto: (asset: string) => {
+        demandes.push(asset);
+        return Promise.resolve(`/docs/photos/repose-${asset}.jpg`);
+      },
+    };
+    neuf();
+    const id = useScanStore
+      .getState()
+      .addPhoto('n', 2, '/docs/photos/perdu.jpg', 'PH-7');
+    // Le scan vient d etre ouvert : rien n a ete modifie a la main.
+    useScanStore.setState({ dirty: false });
+    // Le fichier n existe plus : c est le cas d une app reinstallee.
+    await useScanStore.getState().reposerPhoto(id);
+    expect(demandes).toEqual(['PH-7']);
+    const ph = useScanStore.getState().photos.find((p) => p.id === id)!;
+    expect(ph.path).toBe('/docs/photos/repose-PH-7.jpg');
+    // Reposer une photo n est pas une MODIFICATION du plan : rien a
+    // enregistrer, sinon chaque ouverture reclamerait une sauvegarde.
+    expect(useScanStore.getState().dirty).toBe(false);
+    delete (NativeModules as Record<string, unknown>).RoomScanPhoto;
+  });
+
+  it('sans identifiant, elle ne demande rien au coffre', async () => {
+    const demandes: string[] = [];
+    (NativeModules as Record<string, unknown>).RoomScanPhoto = {
+      restorePhoto: (a: string) => {
+        demandes.push(a);
+        return Promise.resolve(null);
+      },
+    };
+    neuf();
+    // Une photo d avant le coffre : son fichier est tout ce qu on a.
+    const id = useScanStore.getState().addPhoto('n', 2, '/docs/photos/a.jpg');
+    await useScanStore.getState().reposerPhoto(id);
+    expect(demandes).toEqual([]);
+    delete (NativeModules as Record<string, unknown>).RoomScanPhoto;
+  });
+});

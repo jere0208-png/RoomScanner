@@ -1,4 +1,5 @@
 import Foundation
+import Photos
 import UIKit
 import React
 
@@ -117,6 +118,131 @@ class RoomScanPhoto: NSObject {
     resolve(data.base64EncodedString())
   }
 
+  // MARK: - Le coffre : la photothèque de l'utilisateur
+
+  /**
+   POURQUOI LA PHOTOTHÈQUE, ET PAS SEULEMENT LES DOCUMENTS DE L'APP.
+
+   Relevé du chantier : « fais en sorte que les photos soient stockées dans
+   l'appareil de la personne et soient lues même s'il réinstalle
+   l'application ». Les Documents de l'app ne survivent PAS à une
+   désinstallation : la photo d'un mur, prise sur un chantier, disparaissait
+   avec l'app — sans que personne ne l'ait effacée.
+
+   La photothèque, elle, appartient à l'utilisateur, pas à nous. Une image
+   qui y entre survit à la réinstallation, part dans sa sauvegarde iCloud,
+   se retrouve dans ses Photos et se partage sans passer par nous. Le scan
+   ne retient donc plus seulement un chemin de fichier — volatile — mais
+   l'IDENTIFIANT DURABLE de l'image dans sa photothèque.
+
+   Le fichier dans Documents reste : c'est le cache, celui qu'on relit vite
+   pour l'affichage et le PDF. S'il a disparu, l'identifiant le reconstruit.
+   */
+  private static let ALBUM = "EchoPlan"
+
+  /// L'album de l'application, cherché puis créé s'il manque.
+  private func album(_ suite: @escaping (PHAssetCollection?) -> Void) {
+    let options = PHFetchOptions()
+    options.predicate = NSPredicate(format: "title = %@", Self.ALBUM)
+    let trouve = PHAssetCollection.fetchAssetCollections(
+      with: .album, subtype: .albumRegular, options: options,
+    )
+    if let deja = trouve.firstObject {
+      suite(deja)
+      return
+    }
+    var marque: String?
+    PHPhotoLibrary.shared().performChanges({
+      let req = PHAssetCollectionChangeRequest
+        .creationRequestForAssetCollection(withTitle: Self.ALBUM)
+      marque = req.placeholderForCreatedAssetCollection.localIdentifier
+    }, completionHandler: { ok, _ in
+      guard ok, let id = marque else {
+        suite(nil)
+        return
+      }
+      suite(PHAssetCollection.fetchAssetCollections(
+        withLocalIdentifiers: [id], options: nil,
+      ).firstObject)
+    })
+  }
+
+  /**
+   Range l'image dans la photothèque et rend son identifiant durable.
+
+   `nil` si l'utilisateur refuse l'accès : le relevé continue avec le seul
+   fichier local — on ne bloque JAMAIS un chantier sur une autorisation.
+   */
+  private func archiver(_ data: Data, suite: @escaping (String?) -> Void) {
+    PHPhotoLibrary.requestAuthorization(for: .addOnly) { statut in
+      guard statut == .authorized || statut == .limited else {
+        suite(nil)
+        return
+      }
+      self.album { collection in
+        var marque: String?
+        PHPhotoLibrary.shared().performChanges({
+          let req = PHAssetCreationRequest.forAsset()
+          req.addResource(with: .photo, data: data, options: nil)
+          marque = req.placeholderForCreatedAsset?.localIdentifier
+          // L'album n'est qu'un rangement : sans lui la photo existe
+          // quand même, dans la pellicule.
+          if let c = collection,
+             let ajout = PHAssetCollectionChangeRequest(for: c),
+             let p = req.placeholderForCreatedAsset {
+            ajout.addAssets([p] as NSArray)
+          }
+        }, completionHandler: { ok, _ in
+          suite(ok ? marque : nil)
+        })
+      }
+    }
+  }
+
+  /// L'image d'un identifiant durable, en JPEG, côté long borné.
+  private func imageDe(_ id: String,
+                       maxSide: CGFloat,
+                       suite: @escaping (UIImage?) -> Void) {
+    guard let asset = PHAsset.fetchAssets(
+      withLocalIdentifiers: [id], options: nil,
+    ).firstObject else {
+      suite(nil)
+      return
+    }
+    let options = PHImageRequestOptions()
+    options.isSynchronous = false
+    options.deliveryMode = .highQualityFormat
+    // La photo peut n'être qu'en iCloud : on accepte de la télécharger,
+    // c'est le prix d'un relevé qu'on croyait perdu.
+    options.isNetworkAccessAllowed = true
+    PHImageManager.default().requestImage(
+      for: asset,
+      targetSize: CGSize(width: maxSide, height: maxSide),
+      contentMode: .aspectFit,
+      options: options,
+    ) { image, _ in suite(image) }
+  }
+
+  /**
+   RELIT UNE PHOTO DEPUIS LA PHOTOTHÈQUE, et la remet dans le cache.
+
+   C'est ce qui rend la réinstallation indolore : le fichier local n'existe
+   plus, mais l'identifiant, lui, a voyagé avec le scan. On réécrit l'image
+   dans Documents et l'on rend son nouveau chemin — le reste de
+   l'application ne voit qu'un fichier, comme avant.
+   */
+  @objc func restorePhoto(_ id: String,
+                          resolve: @escaping RCTPromiseResolveBlock,
+                          reject: @escaping RCTPromiseRejectBlock) {
+    imageDe(id, maxSide: 1600) { image in
+      guard let image = image else {
+        resolve(nil)
+        return
+      }
+      resolve(self.save(image))
+    }
+  }
+
   /// Prend une photo et renvoie son chemin, ou `nil` si l'utilisateur annule.
   @objc func takePhoto(_ resolve: @escaping RCTPromiseResolveBlock,
                        reject: @escaping RCTPromiseRejectBlock) {
@@ -156,8 +282,22 @@ class RoomScanPhoto: NSObject {
     top.present(picker, animated: true)
   }
 
-  private func finish(_ path: String?) {
-    resolve?(path)
+  /**
+   Rend ce que la prise a produit : le fichier de cache ET l'identifiant
+   durable dans la photothèque.
+
+   `nil` d'un bloc quand l'utilisateur a renoncé. L'identifiant seul peut
+   manquer — accès à la photothèque refusé — sans que le relevé en souffre :
+   la photo est alors simplement mortelle, comme avant.
+   */
+  private func finish(_ path: String?, asset: String? = nil) {
+    guard let path = path else {
+      resolve?(nil)
+      resolve = nil
+      reject = nil
+      return
+    }
+    resolve?(["path": path, "asset": asset as Any])
     resolve = nil
     reject = nil
   }
@@ -194,7 +334,25 @@ extension RoomScanPhoto: UIImagePickerControllerDelegate, UINavigationController
   ) {
     let image = info[.originalImage] as? UIImage
     picker.dismiss(animated: true) {
-      self.finish(image.flatMap { self.save($0) })
+      guard let image = image, let chemin = self.save(image) else {
+        self.finish(nil)
+        return
+      }
+      /*
+        LE FICHIER D'ABORD, LE COFFRE ENSUITE.
+
+        Le chemin local est écrit et sûr avant qu'on parle à la
+        photothèque : si l'autorisation est refusée, ou si le rangement
+        échoue, le relevé garde sa photo. On ne perd jamais l'image pour
+        une question de permission.
+      */
+      guard let data = FileManager.default.contents(atPath: chemin) else {
+        self.finish(chemin)
+        return
+      }
+      self.archiver(data) { id in
+        DispatchQueue.main.async { self.finish(chemin, asset: id) }
+      }
     }
   }
 

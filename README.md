@@ -3370,6 +3370,36 @@ une capture d'écran : le plan est une liste de murs, on le retrace en
 quelques traits dans 54 px. Rien à stocker, rien à invalider — un scan
 retouché montre son nouveau contour à l'ouverture suivante de la liste.
 
+### Les photos de mur vivent dans la photothèque
+
+Relevé du chantier : « fais en sorte que les photos soient stockées dans
+l'appareil de la personne pour les murs et soient lues même s'il réinstalle
+l'application, tant qu'il est sur son compte ».
+
+Les Documents de l'application **ne survivent pas** à une désinstallation : la
+photo d'un mur, prise sur un chantier, partait avec l'app sans que personne ne
+l'ait effacée. La photothèque, elle, appartient à l'utilisateur — une image qui
+y entre survit à la réinstallation, part dans sa sauvegarde iCloud, se retrouve
+dans ses Photos et se partage sans passer par nous.
+
+Chaque prise de vue range donc l'image dans un album **EchoPlan** et le scan
+retient **deux** choses : le chemin du fichier de cache, qu'on relit vite pour
+l'écran et le PDF, et l'`asset` — l'identifiant durable de l'image. Le fichier
+local est écrit **avant** qu'on parle à la photothèque : accès refusé ou
+rangement en échec, le relevé garde sa photo. On ne perd jamais une image pour
+une question de permission.
+
+La remise en cache se déclenche au bon moment : **quand l'affichage échoue**.
+C'est l'échec de chargement qui prouve que le fichier a disparu — plutôt que de
+tout relire à chaque ouverture d'un scan pour un cas qui n'arrive qu'après une
+réinstallation. Une seule tentative par photo : si l'utilisateur a effacé
+l'image de ses Photos, elle n'existe plus nulle part, et on ne boucle pas.
+
+**Ce volet ne suffit pas à lui seul**, et il faut le dire : une réinstallation
+efface aussi les scans eux-mêmes, qui vivent dans le stockage de l'app. Une
+photo restaurée n'a alors plus de plan où se punaiser. La seconde moitié — les
+plans qui suivent le compte, sur bourseur.fr — reste à faire.
+
 ### L'app rend la place qu'elle prend
 
 Une installation a fini par échouer : `AFC_E_NO_SPACE_LEFT`, **le téléphone

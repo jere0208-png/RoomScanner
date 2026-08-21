@@ -56,6 +56,9 @@ RCT_EXTERN_METHOD(readPhoto:(NSString *)path
                   maxSide:(nonnull NSNumber *)maxSide
                   resolve:(RCTPromiseResolveBlock)resolve
                   reject:(RCTPromiseRejectBlock)reject)
+RCT_EXTERN_METHOD(restorePhoto:(NSString *)assetId
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
 @end
 
 @interface RCT_EXTERN_MODULE(RoomScanHeading, NSObject)
