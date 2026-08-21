@@ -3370,6 +3370,59 @@ une capture d'écran : le plan est une liste de murs, on le retrace en
 quelques traits dans 54 px. Rien à stocker, rien à invalider — un scan
 retouché montre son nouveau contour à l'ouverture suivante de la liste.
 
+### Ce qu'un audit a trouvé, et refermé
+
+Un tour complet de l'application, mené sur pièces, a sorti quatre défauts du
+même genre : **des fonctions écrites, testées, et qu'aucun geste n'atteignait**.
+
+- **Le filigrane d'étage ne servait à rien.** Le plan du niveau inférieur
+  s'affichait en transparence pour poser l'étage d'aplomb, et rien ne
+  permettait de le bouger : `recalerNiveau` n'était appelé de nulle part. Le
+  glissement déplace maintenant l'étage — le geste qu'on ferait spontanément —
+  avec un bandeau qui annonce le mode et offre sa sortie au même endroit. Le
+  déplacement part **par petits pas** : renvoyer chaque fois la course totale
+  du doigt ferait filer l'étage à une vitesse carrée.
+- **« Jeter les modifications » n'existait pas.** L'écran annonçait
+  « Modifications non enregistrées » et n'offrait que de les enregistrer ;
+  l'autre moitié du choix était dans le magasin, testée, sans bouton. Une
+  demi-heure de retouches malheureuses ne se rattrapait qu'en annulant
+  quarante fois.
+- **Deux chemins morts supprimés** : `joinFixtures` (jamais appelé, même par
+  un banc) et `rotateWall`, doublon relatif de `setWallAngle` depuis que la
+  rotation se pose en absolu. Un magasin qui garde deux chemins pour la même
+  chose finit par diverger : l'un corrigé, l'autre pas.
+- **Le plan sans scanner**, ci-dessous — le plus lourd de conséquences.
+
+### Le plan sans scanner
+
+Un audit de l'application a trouvé la porte fermée à **trois publics à la
+fois**, pour la même raison : sans LiDAR, l'accueil annonçait « appareil non
+compatible » et s'arrêtait là.
+
+- **Les appareils sans LiDAR** — iPhone non Pro, iPad d'entrée de gamme,
+  Android — c'est-à-dire la moitié du marché artisan. Or les neuf dixièmes de
+  la valeur de l'application — normes, circuits, métré, tableau existant,
+  dossier PDF — ne demandent **aucun capteur**.
+- **Les petites interventions** : pour ajouter deux prises dans une cuisine,
+  on ne relève pas l'appartement. On trace la pièce à ses cotes, on pose, on
+  chiffre — trois minutes, devant le client.
+- **Les architectes**, qui esquissent au mètre avant d'avoir mis un pied sur
+  le chantier.
+
+Le magasin savait déjà bâtir un logement de proche en proche (`addRoomBox`,
+qui accole une pièce à un mur existant en partageant la cloison) : **il n'y
+manquait que la porte d'entrée**. Un bouton « Dessiner un plan » sur l'accueil,
+toujours offert — même quand le scan l'est aussi, parce que c'est souvent le
+chemin le plus court, pas un lot de consolation.
+
+Dans la foulée, **l'écran d'un plan vide a été refait**. Il ne disait qu'une
+chose — « Aucun mur détecté, balayez plus lentement » — avec une seule sortie,
+« Réessayer » : le message d'un scan raté, servi aussi à qui venait de choisir
+le clavier et se retrouvait alors sans aucune issue. Les deux situations ont
+désormais leur texte, et **la même action manquante** : poser une pièce. Elle
+vaut même après un scan raté — une cuisine se trace en dix secondes quand la
+caméra s'obstine.
+
 ### Le télémètre laser
 
 RoomPlan se trompe de deux à trois centimètres sur une pièce : sans

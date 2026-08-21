@@ -131,7 +131,7 @@ describe('tourner un mur', () => {
       x: (mur('n').a.x + mur('n').b.x) / 2,
       z: (mur('n').a.z + mur('n').b.z) / 2,
     };
-    useScanStore.getState().rotateWall('n', 30);
+    useScanStore.getState().setWallAngle('n', 30);
     expect(segLength(mur('n'))).toBeCloseTo(avant, 6);
     const apres = {
       x: (mur('n').a.x + mur('n').b.x) / 2,
@@ -142,7 +142,7 @@ describe('tourner un mur', () => {
   });
 
   it('emmène les murs qui le tiennent', () => {
-    useScanStore.getState().rotateWall('n', 30);
+    useScanStore.getState().setWallAngle('n', 30);
     // Les voisins restent soudés : leur extrémité colle au bout du mur qui
     // a tourné, au millimètre.
     expect(mur('o').b.x).toBeCloseTo(mur('n').a.x, 6);
@@ -152,58 +152,45 @@ describe('tourner un mur', () => {
   });
 
   /*
-    ET IL S'ARRÊTE SUR LES ANGLES QU'ON VISE.
+    L'ANGLE SE POSE, IL NE S'ACCUMULE PLUS — et l'accroche a déménagé.
 
-    Un mur se pose d'équerre, en biais à quarante-cinq, rarement à
-    trente-sept degrés. La rotation s'accroche donc tous les quinze degrés,
-    à trois près : de quoi retrouver l'aplomb du premier coup sans interdire
-    l'angle qu'on veut vraiment.
+    Ces bancs tenaient une rotation RELATIVE : on envoyait un pas, le
+    magasin l'ajoutait à l'angle courant, accrochait le résultat tous les
+    quinze degrés, et bornait le pas à vingt pour se protéger d'un geste qui
+    « partait dans tous les sens ».
+
+    Deux défauts, et le chantier les a trouvés tous les deux. L'accroche
+    appliquée à CHAQUE micro-pas collait le mur aux crans en permanence :
+    « la rotation ne suit pas bien le mouvement ». Et la borne de vingt
+    degrés arrêtait net un geste franc, ce qui donnait le même sentiment.
+
+    Le magasin POSE désormais un angle absolu, sans rien accrocher ni
+    borner : c'est l'ordre qu'on lui donne, il l'exécute. L'accroche vit
+    dans le geste, sur une règle pure — `angleAimante`, testée dans
+    murmanuel.test — appliquée une seule fois sur l'angle visé, ce qui la
+    laisse décoller dès que le doigt sort de la zone.
   */
-  it('s’accroche tous les quinze degrés', () => {
-    // Un pas de 14° : l'accroche le ramène à 15, l'aplomb du dessinateur.
-    useScanStore.getState().rotateWall('n', 14);
+  it('pose l’angle demandé, sans accrocher à quinze degrés', () => {
+    useScanStore.getState().setWallAngle('n', 14);
     const w = mur('n');
     const deg = (Math.atan2(w.b.z - w.a.z, w.b.x - w.a.x) * 180) / Math.PI;
-    expect(deg).toBeCloseTo(15, 4);
+    // 14° reste 14° : c'est au geste de décider s'il colle au cran, pas au
+    // magasin, qui ne sait pas si l'ordre vient d'un doigt ou d'un calcul.
+    expect(deg).toBeCloseTo(14, 4);
   });
 
-  it('et laisse passer un angle franchement choisi', () => {
-    // Dix degrés est à cinq du premier cran : c'est un choix, on le garde.
-    useScanStore.getState().rotateWall('n', 10);
+  it('accepte un angle franc sans le borner', () => {
+    // Un demi-tour est un ordre légitime quand il est ABSOLU : le mur se
+    // met à 200°, il ne « tourne » pas de 200° par petits pas.
+    useScanStore.getState().setWallAngle('n', 200);
     const w = mur('n');
     const deg = (Math.atan2(w.b.z - w.a.z, w.b.x - w.a.x) * 180) / Math.PI;
-    expect(deg).toBeCloseTo(10, 4);
-  });
-
-  /*
-    UN PAS DE ROTATION EST BORNÉ — quoi qu'on lui demande.
-
-    Relevé du chantier, vidéo à l'appui : « la rotation part dans tous les
-    sens ». Le geste envoyait des pas aberrants, et le mur balayait le plan
-    d'une image à l'autre — la pièce passait de 0,8 à 6,7 m² en trois
-    dixièmes de seconde.
-
-    Le geste a été refait, mais la borne vit ICI, dans le magasin : c'est le
-    seul endroit qui protège de TOUT appelant, y compris d'un geste qu'on
-    réécrira un jour. Vingt degrés en un pas, c'est déjà un mouvement franc
-    du poignet.
-  */
-  it('ne tourne jamais de plus de vingt degrés d’un coup', () => {
-    useScanStore.getState().rotateWall('n', 200);
-    const w = mur('n');
-    const deg = (Math.atan2(w.b.z - w.a.z, w.b.x - w.a.x) * 180) / Math.PI;
-    expect(Math.abs(deg)).toBeLessThanOrEqual(20.001);
-  });
-
-  it('et pas davantage dans l’autre sens', () => {
-    useScanStore.getState().rotateWall('n', -95);
-    const w = mur('n');
-    const deg = (Math.atan2(w.b.z - w.a.z, w.b.x - w.a.x) * 180) / Math.PI;
-    expect(deg).toBeGreaterThanOrEqual(-20.001);
+    // 200° et −160° sont la même direction : c'est celle-là qu'on vérifie.
+    expect(Math.abs(((deg - 200 + 540) % 360) - 180)).toBeLessThan(0.01);
   });
 
   it('s’annule d’un seul retour en arrière', () => {
-    useScanStore.getState().rotateWall('n', 30);
+    useScanStore.getState().setWallAngle('n', 30);
     useScanStore.getState().undo();
     expect(mur('n').a.z).toBeCloseTo(0, 6);
     expect(mur('n').b.z).toBeCloseTo(0, 6);

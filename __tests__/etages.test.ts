@@ -146,3 +146,38 @@ describe('changer de niveau', () => {
     expect(st().dirty).toBe(true);
   });
 });
+
+/**
+ * LE RECALAGE AVANCE PAR PETITS PAS.
+ *
+ * Le geste envoie le deplacement DEPUIS LA DERNIERE IMAGE, jamais depuis le
+ * debut du glissement : le magasin applique un decalage cumulatif, et lui
+ * renvoyer chaque fois la course totale ferait filer l etage a une vitesse
+ * carree — trois centimetres de doigt, un metre de plan.
+ *
+ * C est exactement le defaut qu on ne voit pas en banc unitaire et qui
+ * rend un geste inutilisable sur le chantier.
+ */
+describe('recaler un etage au doigt', () => {
+  it('cumule les pas d un glissement, sans les multiplier', () => {
+    const st = () => useScanStore.getState();
+    st().finalize(releve() as never);
+    st().finalizeEtage(releve(12) as never, 1);
+    const depart = st().walls.find((w) => niveauDe(w) === 1)!.a.x;
+    // Dix images de deux centimetres : un glissement de vingt centimetres.
+    for (let i = 0; i < 10; i++) st().recalerNiveau(1, 0.02, 0);
+    const arrivee = st().walls.find((w) => niveauDe(w) === 1)!.a.x;
+    expect(arrivee - depart).toBeCloseTo(0.2, 6);
+  });
+
+  it('ne bouge pas le niveau du dessous, meme apres dix pas', () => {
+    const st = () => useScanStore.getState();
+    st().finalize(releve() as never);
+    st().finalizeEtage(releve(12) as never, 1);
+    const bas = st().walls.filter((w) => niveauDe(w) === 0).map((w) => w.a.x);
+    for (let i = 0; i < 10; i++) st().recalerNiveau(1, 0.05, -0.03);
+    expect(st().walls.filter((w) => niveauDe(w) === 0).map((w) => w.a.x)).toEqual(
+      bas,
+    );
+  });
+});

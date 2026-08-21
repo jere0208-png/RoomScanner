@@ -402,6 +402,16 @@ export function ResultScreen() {
     actuelle: number | null;
     appliquer: (metres: number) => void;
   } | null>(null);
+  /*
+    LE RECALAGE D UN ETAGE.
+
+    Le filigrane du niveau du dessous ne servait a rien : il s affichait,
+    et aucun geste ne permettait de bouger le plan du dessus. Dans ce mode,
+    le glissement deplace L ETAGE au lieu de la vue — le geste qu on ferait
+    spontanement pour poser un calque sur un autre.
+  */
+  const planVierge = useScanStore((s) => s.planVierge);
+  const [recalage, setRecalage] = useState(false);
   /** La feuille du tableau existant — rénovation. */
   const [existantOuvert, setExistantOuvert] = useState(false);
   const existant = useScanStore((s) => s.existant);
@@ -496,6 +506,26 @@ export function ResultScreen() {
           haptic('leger');
         },
       })),
+      ...(niveauCourant !== Math.min(...niveaux)
+        ? [
+            {
+              /*
+                RECALER — seulement s il y a un niveau EN DESSOUS.
+
+                Recaler le rez-de-chaussee sur rien n aurait pas de sens :
+                c est lui la reference, et le filigrane qu on suit est
+                toujours celui du dessous.
+              */
+              label: 'Recaler cet étage',
+              hint: 'Glissez le plan sur le filigrane du niveau du dessous.',
+              icon: 'regle' as const,
+              onPress: () => {
+                setRecalage(true);
+                haptic('leger');
+              },
+            },
+          ]
+        : []),
       {
         label: 'Scanner un étage de plus',
         hint: 'Montez, relevez : il s’ajoute à ce dossier, au-dessus.',
@@ -1575,18 +1605,87 @@ export function ResultScreen() {
     });
   };
 
-  // ---------- État vide : rien d'exploitable dans le scan ----------
+  /*
+    ---------- PLAN VIDE : DEUX SITUATIONS, DEUX RÉPONSES ----------
+
+    L'écran ne disait qu'une chose — « Aucun mur détecté, balayez plus
+    lentement » — et n'offrait qu'une sortie : réessayer. C'était le
+    message d'un scan raté, servi aussi à qui venait de choisir « Dessiner
+    un plan » et n'avait alors AUCUN moyen d'ajouter quoi que ce soit.
+
+    Dans les deux cas, la même issue manque : POSER UNE PIÈCE. Elle vaut
+    même après un scan raté — le relevé d'une cuisine se trace en dix
+    secondes quand la caméra s'obstine — et c'est le geste attendu quand on
+    a choisi le clavier. Le conseil de balayage, lui, ne s'affiche que s'il
+    y a eu un balayage.
+  */
   if (walls.length === 0) {
     return (
       <View style={[styles.container, styles.emptyContainer]}>
-        <Text style={styles.emptyTitle}>Aucun mur détecté</Text>
-        <Text style={styles.emptyText}>
-          Balayez plus lentement, du sol au plafond, avec davantage de lumière.
-          Les grandes surfaces vitrées et les miroirs peuvent gêner la détection.
+        <Text style={styles.emptyTitle}>
+          {planVierge ? 'Plan vierge' : 'Aucun mur détecté'}
         </Text>
-        <TouchableOpacity style={styles.primaryButton} onPress={reset}>
-          <Text style={styles.primaryText}>Réessayer</Text>
+        <Text style={styles.emptyText}>
+          {planVierge
+            ? 'Posez une première pièce à ses cotes : les murs, les ' +
+              'surfaces et le métré en découlent, exactement comme après un ' +
+              'scan.'
+            : 'Balayez plus lentement, du sol au plafond, avec davantage de ' +
+              'lumière. Les grandes surfaces vitrées et les miroirs peuvent ' +
+              'gêner la détection — ou tracez la pièce à ses cotes.'}
+        </Text>
+        <TouchableOpacity
+          style={styles.primaryButton}
+          accessibilityLabel="Ajouter une pièce"
+          onPress={() => setAjoutPiece(true)}>
+          <Text style={styles.primaryText}>Ajouter une pièce</Text>
         </TouchableOpacity>
+        {!planVierge && (
+          <TouchableOpacity
+            style={styles.emptyGhost}
+            accessibilityLabel="Refaire un scan"
+            onPress={reset}>
+            <Text style={styles.emptyGhostText}>Refaire un scan</Text>
+          </TouchableOpacity>
+        )}
+        {/* La feuille d'ajout vit aussi ici : sans elle, le bouton
+            n'ouvrirait rien tant qu'il n'y a pas un seul mur. */}
+        <AddRoomSheet
+          visible={ajoutPiece}
+          accolee={false}
+          onClose={() => setAjoutPiece(false)}
+          onChoose={(largeur, profondeur, nom) => {
+            addRoomBox(largeur, profondeur, nom, null);
+            setAjoutPiece(false);
+            setEditMode(true);
+            haptic('succes');
+          }}
+          onCustom={() => {
+            setAjoutPiece(false);
+            setPrompt({
+              title: 'Cotes de la pièce',
+              subtitle:
+                'Largeur et profondeur en mètres, séparées par un × ' +
+                '(par exemple 3,60 x 2,80).',
+              value: '3,60 x 2,80',
+              onSubmit: (t) => {
+                const [l, p] = t
+                  .replace(',', '.')
+                  .replace(',', '.')
+                  .split(/[x×*]/i)
+                  .map((v) => parseFloat(v.replace(',', '.').trim()));
+                if (!isFinite(l) || !isFinite(p) || l <= 0 || p <= 0) {
+                  haptic('alerte');
+                  return;
+                }
+                addRoomBox(l, p, '', null);
+                setEditMode(true);
+                haptic('succes');
+              },
+            });
+          }}
+        />
+        <PromptSheet data={prompt} onClose={() => setPrompt(null)} />
       </View>
     );
   }
@@ -1800,6 +1899,48 @@ export function ResultScreen() {
                       );
                     },
                   },
+                  /*
+                    JETER LES MODIFICATIONS — l'issue qui manquait.
+
+                    L'écran annonce « Modifications non enregistrées » et
+                    offre de les ENREGISTRER. L'autre moitié du choix
+                    n'existait nulle part : le magasin savait revenir à la
+                    version rangée dans la bibliothèque, un banc le
+                    vérifiait, et aucun bouton n'y menait. Une demi-heure de
+                    retouches malheureuses ne se rattrapait qu'en annulant
+                    quarante fois.
+
+                    Offerte SEULEMENT s'il y a quelque chose à jeter et une
+                    version où revenir : sur un scan jamais enregistré, ce
+                    serait tout perdre.
+                  */
+                  ...(dirty && currentSaveId
+                    ? [
+                        {
+                          label: 'Revenir à la version enregistrée',
+                          icon: 'supprimer' as const,
+                          hint: 'Jette les modifications faites depuis le dernier enregistrement.',
+                          onPress: () => {
+                            Alert.alert(
+                              'Jeter les modifications ?',
+                              'Le plan revient à son dernier enregistrement. ' +
+                                'Ce qui a été fait depuis sera perdu.',
+                              [
+                                { text: 'Annuler', style: 'cancel' },
+                                {
+                                  text: 'Jeter',
+                                  style: 'destructive',
+                                  onPress: () => {
+                                    useScanStore.getState().revertCurrent();
+                                    haptic('succes');
+                                  },
+                                },
+                              ],
+                            );
+                          },
+                        },
+                      ]
+                    : []),
                   {
                     /**
                      * AJOUTER UN MUR — le geste qui manquait à l'appel.
@@ -2090,6 +2231,12 @@ export function ResultScreen() {
             showFixtures={showFixtures}
             circuitMarks={showRoutes ? marks : undefined}
             filigrane={filigrane}
+            recalage={
+              recalage
+                ? (dx, dz) =>
+                    useScanStore.getState().recalerNiveau(niveauCourant, dx, dz)
+                : undefined
+            }
             photos={photos}
             onSelectPhoto={setPhotoVue}
             showMeasures={showMeasures}
@@ -3165,6 +3312,31 @@ export function ResultScreen() {
         // rien ne se pose — et la question ne reviendra pas.
         onClose={() => useScanStore.getState().oublierArrivage()}
       />
+
+      {/*
+        LE BANDEAU DU RECALAGE.
+
+        Un mode qui change ce que fait le doigt doit se DIRE, et offrir sa
+        sortie au même endroit : sans lui, on glisserait le plan en croyant
+        déplacer la vue, et l'étage partirait sans qu'on comprenne pourquoi.
+      */}
+      {recalage && (
+        <View style={styles.wallLengthBar}>
+          <Text style={styles.wallLengthLabel}>
+            {`Glissez ${abregerNiveau(
+              niveauCourant,
+            )} pour le poser sur le filigrane du dessous`}
+          </Text>
+          <TouchableOpacity
+            accessibilityLabel="Terminer le recalage"
+            onPress={() => {
+              setRecalage(false);
+              haptic('succes');
+            }}>
+            <Text style={styles.wallLengthDone}>Terminé</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* ---------- Le télémètre laser ---------- */}
       <LaserSheet

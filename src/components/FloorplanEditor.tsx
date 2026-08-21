@@ -243,6 +243,20 @@ interface Props {
    * sinon on éditerait l'étage qu'on ne regarde pas.
    */
   filigrane?: WallSeg[];
+  /**
+   * MODE RECALAGE : le glissement déplace L'ÉTAGE, pas la vue.
+   *
+   * Le filigrane du niveau du dessous ne sert à rien si l'on ne peut pas
+   * poser l'étage dessus — c'était le cas : le repère s'affichait, et
+   * aucun geste ne permettait de bouger le plan du dessus. On détourne
+   * donc le geste le plus naturel, celui qu'on ferait spontanément :
+   * prendre le plan et le glisser jusqu'à ce que la cage d'escalier tombe
+   * en face de la cage d'escalier.
+   *
+   * Le déplacement arrive en MÈTRES : l'appelant n'a pas à connaître le
+   * zoom ni la rotation de la vue.
+   */
+  recalage?: (dx: number, dz: number) => void;
   /** Photos de repérage punaisées sur les murs. */
   photos?: { id: string; wallId: string; along: number }[];
   onSelectPhoto?: (id: string) => void;
@@ -368,6 +382,7 @@ export function FloorplanEditor({
   cableRoutes,
   circuitMarks,
   filigrane,
+  recalage,
   photos,
   onSelectPhoto,
   selectedObjectId,
@@ -467,6 +482,17 @@ export function FloorplanEditor({
     my0: 0,
     a0: 0,
   });
+  /*
+    LE RECALAGE, VU DU GESTE.
+
+    Le responder de navigation n'est créé qu'UNE fois — le recréer en plein
+    geste perdrait le suivi. Il ne peut donc pas lire une prop qui change :
+    on lui laisse des références vives, relues à chaque image.
+  */
+  const recalageVif = useRef(recalage);
+  recalageVif.current = recalage;
+  /** La course déjà envoyée : le recalage avance par petits pas. */
+  const dernierPas = useRef({ x: 0, y: 0 });
   const touchAngle = (t: { pageX: number; pageY: number }[]) =>
     Math.atan2(t[1].pageY - t[0].pageY, t[1].pageX - t[0].pageX);
   const snapshot = (e: any, g: any) => {
@@ -570,6 +596,9 @@ export function FloorplanEditor({
       },
       onPanResponderGrant: (e, g) => {
         setNavigating(true);
+        // Le recalage repart de zero a chaque prise : le decalage se compte
+        // en petits pas, et un geste qui commence herite du precedent.
+        dernierPas.current = { x: g.dx, y: g.dy };
         snapshot(e, g);
       },
       onPanResponderRelease: () => setNavigating(false),
@@ -595,6 +624,24 @@ export function FloorplanEditor({
             oy: base.v.oy + (my - base.my0),
             rot: base.v.rot + twist,
           });
+        } else if (recalageVif.current) {
+          /*
+            EN RECALAGE, LE DOIGT DÉPLACE L'ÉTAGE, PAS LA VUE.
+
+            On envoie le déplacement DEPUIS LA DERNIÈRE IMAGE, jamais
+            depuis le début du geste : l'appelant applique un décalage
+            cumulatif au plan, et lui renvoyer chaque fois la course totale
+            ferait filer l'étage à une vitesse carrée.
+          */
+          const m = mappingRef.current;
+          if (m) {
+            const pas = m.deltaToMeters(
+              g.dx - dernierPas.current.x,
+              g.dy - dernierPas.current.y,
+            );
+            recalageVif.current(pas.x, pas.z);
+          }
+          dernierPas.current = { x: g.dx, y: g.dy };
         } else {
           setView({
             ...base.v,

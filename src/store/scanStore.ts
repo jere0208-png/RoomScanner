@@ -792,11 +792,6 @@ interface ScanState {
   /** Bascule l'appareil sur l'autre face du mur, sans le déplacer. */
   flipFixture: (id: string) => void;
   /**
-   * Réunit deux appareils sous une même plaque : le second se pose à
-   * l'entraxe du premier, du côté demandé. Le premier ne bouge pas.
-   */
-  joinFixtures: (movedId: string, baseId: string, along: number, height: number) => void;
-  /**
    * Repose les DEUX appareils d'un ensemble d'un coup.
    *
    * Choisir « ensemble centré » déplace aussi le premier : il faut donc
@@ -1010,14 +1005,6 @@ interface ScanState {
    */
   moveWall: (id: string, dx: number, dz: number) => void;
   /**
-   * FAIT TOURNER un mur autour de son milieu, ses voisins suivant ses bouts.
-   *
-   * Autour d'un bout, l'autre extrémité part au loin et le geste devient
-   * impossible à viser ; autour du milieu, ce qu'on voit tourner est ce
-   * qu'on tient.
-   */
-  rotateWall: (id: string, deg: number) => void;
-  /**
    * POSE l'angle du mur, en degrés absolus, sans rien accrocher.
    *
    * Le geste de rotation empilait des petits pas, chacun re-collé aux crans
@@ -1154,6 +1141,33 @@ interface ScanState {
   openSave: (id: string) => void;
   deleteSave: (id: string) => void;
   reset: () => void;
+  /**
+   * OUVRE UN PLAN VIERGE, SANS SCANNER.
+   *
+   * Trois besoins, une seule réponse. Les appareils SANS LiDAR — iPhone non
+   * Pro, iPad d'entrée de gamme, Android — n'avaient accès à rien :
+   * l'accueil annonçait « appareil non compatible » et l'application
+   * s'arrêtait là, alors que les neuf dixièmes de sa valeur — les normes,
+   * les circuits, le métré, le tableau existant, le dossier — ne demandent
+   * aucun capteur. Les PETITES INTERVENTIONS ensuite : pour ajouter deux
+   * prises dans une cuisine, on ne relève pas l'appartement, on trace la
+   * pièce et l'on chiffre. Les ARCHITECTES enfin, qui esquissent au mètre
+   * avant d'avoir mis un pied sur le chantier.
+   *
+   * Le magasin savait déjà bâtir un logement de proche en proche
+   * (`addRoomBox`) : il n'y manquait que la porte d'entrée.
+   */
+  commencerAuClavier: () => void;
+  /**
+   * Vrai quand le plan a été ouvert AU CLAVIER, sans scanner.
+   *
+   * L écran vide n a pas le même sens dans les deux cas : après un scan
+   * raté, il faut conseiller de balayer autrement ; après « Dessiner un
+   * plan », ce conseil n a aucun sens et le geste attendu est d ajouter une
+   * pièce. Un booléen franc vaut mieux qu une déduction fragile tirée du
+   * nom du dossier ou de la présence d un modèle 3D.
+   */
+  planVierge: boolean;
 }
 
 /** Altitude du sol : le pied du mur le plus bas. */
@@ -1268,6 +1282,7 @@ export const useScanStore = create<ScanState>((set, get) => {
     photos: [],
     ceiling: [],
     existant: null,
+    planVierge: false,
     dirty: false,
     resultOrigin: 'scan',
     rooms: [],
@@ -2453,22 +2468,6 @@ export const useScanStore = create<ScanState>((set, get) => {
       });
     },
 
-    joinFixtures: (movedId, baseId, along, height) => {
-      const st = get();
-      const base = st.fixtures.find((f) => f.id === baseId);
-      if (!base) return;
-      pushHistory('joinFixtures');
-      const group = base.group ?? `pl-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`;
-      set({
-        fixtures: st.fixtures.map((f) => {
-          if (f.id === baseId) return { ...f, group };
-          if (f.id === movedId) return { ...f, along, height, group, side: base.side };
-          return f;
-        }),
-        dirty: true,
-      });
-    },
-
     flipFixture: (id) => {
       pushHistory(`flip:${id}`);
       set({
@@ -3020,6 +3019,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         processing: false,
         scanning: false,
         screen: 'result',
+        planVierge: false,
         dirty: true,
       });
     },
@@ -3306,45 +3306,6 @@ export const useScanStore = create<ScanState>((set, get) => {
       });
     },
 
-    rotateWall: (id, deg) => {
-      const st = get();
-      const wall = st.walls.find((w) => w.id === id);
-      if (!wall || !deg) return;
-      /*
-        IL S'ARRÊTE SUR LES ANGLES QU'ON VISE.
-
-        Un mur se pose d'équerre, en biais à quarante-cinq, rarement à
-        trente-sept degrés. L'accroche se fait donc tous les quinze degrés, à
-        trois près : de quoi retrouver l'aplomb du premier coup sans
-        interdire l'angle qu'on veut vraiment.
-
-        Elle porte sur l'ANGLE FINAL du mur, pas sur la rotation demandée :
-        c'est la direction du mur qu'on lit sur le plan, pas le chemin
-        parcouru par le doigt.
-      */
-      /*
-        UN PAS EST BORNÉ À VINGT DEGRÉS.
-
-        Relevé du chantier, vidéo à l'appui : « la rotation part dans tous
-        les sens ». Le geste envoyait des pas aberrants — le mur balayait le
-        plan d'une image à l'autre, et la pièce passait de 0,8 à 6,7 m² en
-        trois dixièmes de seconde.
-
-        Le geste a été refait, mais la borne vit ICI : c'est le seul endroit
-        qui protège de TOUT appelant, y compris d'un geste qu'on réécrira un
-        jour. Vingt degrés en un pas, c'est déjà un franc mouvement du
-        poignet ; au-delà, c'est un accident de calcul.
-      */
-      const PAS_MAX = 20;
-      const pas = Math.max(-PAS_MAX, Math.min(PAS_MAX, deg));
-      const actuel =
-        (Math.atan2(wall.b.z - wall.a.z, wall.b.x - wall.a.x) * 180) / Math.PI;
-      const vise = actuel + pas;
-      const cran = Math.round(vise / 15) * 15;
-      const final = Math.abs(vise - cran) <= 3 ? cran : vise;
-      get().setWallAngle(id, final);
-    },
-
     /*
       L'ANGLE SE POSE, IL NE S'ACCUMULE PAS.
 
@@ -3387,7 +3348,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       };
       const na = tourne(wall.a);
       const nb = tourne(wall.b);
-      pushHistory(`rotateWall:${id}`);
+      pushHistory(`setWallAngle:${id}`);
       const colle = (p: Pt, ref: Pt) => Math.hypot(p.x - ref.x, p.z - ref.z) < 1e-4;
       set({
         walls: st.walls.map((w) => {
@@ -4194,6 +4155,8 @@ export const useScanStore = create<ScanState>((set, get) => {
         fixtures: save.fixtures ?? [],
         photos: save.photos ?? [],
         ceiling: save.ceiling ?? [],
+        // Un dossier ouvert n est pas un plan vierge, meme s il est vide.
+        planVierge: false,
         // Le tableau trouvé sur place revient avec son relevé.
         existant: save.existant ?? null,
         pendingJoin: null,
@@ -4254,6 +4217,23 @@ export const useScanStore = create<ScanState>((set, get) => {
           : null),
       });
       persistSoon(saves);
+    },
+
+    commencerAuClavier: () => {
+      /*
+        On repart d'un plan VIERGE, comme après un scan raté : le dossier
+        ouvert précédemment n'a rien à faire ici, et son nom encore moins.
+        `resultOrigin` dit « scan » parce que c'est un relevé qui commence,
+        même sans caméra — c'est ce qui commande le retour de l'écran.
+      */
+      get().reset();
+      set({
+        planVierge: true,
+        screen: 'result',
+        scanName: `Plan du ${new Date().toLocaleDateString('fr-FR')}`,
+        resultOrigin: 'scan',
+        niveauCourant: NIVEAU_RDC,
+      });
     },
 
     reset: () => {

@@ -332,6 +332,8 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     ...shadowCard,
   },
   wallLengthLabel: { color: c.inkFaint, fontSize: 12, fontWeight: '600', flex: 1 },
+  /** La sortie d'un mode, posée contre ce qu'il annonce — jamais ailleurs. */
+  wallLengthDone: { color: c.blue, fontSize: 13, fontWeight: '800' },
   // Le mur sélectionné : une seule ligne, au pied du plan, à côté du bouton
   // d'enregistrement. Elle dit l'essentiel et ne mange pas le dessin.
   wallStrip: {
@@ -665,6 +667,9 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     ...glow(c.blue),
   },
   primaryText: { color: '#FFFFFF', fontSize: 15.5, fontWeight: '700' },
+  /** La seconde issue d'un écran vide : offerte, jamais mise en avant. */
+  emptyGhost: { paddingVertical: 14, alignItems: 'center' },
+  emptyGhostText: { color: c.inkSoft, fontSize: 14.5, fontWeight: '600' },
   secondaryButton: {
     flex: 1,
     backgroundColor: c.surface,

@@ -58,6 +58,7 @@ export function HomeScreen() {
   const brouillon = useScanStore((s) => s.brouillon);
   const reprendreBrouillon = useScanStore((s) => s.reprendreBrouillon);
   const oublierBrouillon = useScanStore((s) => s.oublierBrouillon);
+  const commencerAuClavier = useScanStore((s) => s.commencerAuClavier);
   const setScreen = useScanStore((s) => s.setScreen);
   const themePref = useScanStore((s) => s.themePref);
   const setThemePref = useScanStore((s) => s.setThemePref);
@@ -282,6 +283,38 @@ export function HomeScreen() {
               return;
             }
             start();
+          }}
+        />
+      </Animated.View>
+
+      {/*
+        LE PLAN SANS SCANNER — la seconde porte.
+
+        Elle n'existait pas, et l'application se fermait sur trois publics à
+        la fois. Les appareils SANS LiDAR d'abord : l'écran annonçait
+        « appareil non compatible » et s'arrêtait là, alors que les neuf
+        dixièmes de la valeur — normes, circuits, métré, tableau existant,
+        dossier — ne demandent aucun capteur. Les PETITES INTERVENTIONS
+        ensuite : pour ajouter deux prises dans une cuisine, on ne relève
+        pas l'appartement, on trace la pièce et l'on chiffre. Les
+        ARCHITECTES enfin, qui esquissent au mètre avant d'être sur place.
+
+        Elle est offerte MÊME quand le scan l'est : c'est souvent le chemin
+        le plus court, pas un lot de consolation.
+      */}
+      <Animated.View style={[styles.secondWrap, fadeIn(4)]}>
+        <GlowButton
+          label="Dessiner un plan"
+          variant="ghost"
+          accessibilityLabel="Dessiner un plan sans scanner"
+          onPress={() => {
+            // Le palier gratuit se juge ICI aussi : un plan tracé à la main
+            // est un plan, et il compte comme tel.
+            if (!peutCreerPlan()) {
+              ouvrirSurprise();
+              return;
+            }
+            commencerAuClavier();
           }}
         />
       </Animated.View>
