@@ -27,7 +27,13 @@ import { FloorplanEditor } from '../components/FloorplanEditor';
 import { DEFAULT_VIEW3D, Iso3DView, type View3DParams } from '../components/Iso3DView';
 import { buildScanPdf, pdfFilename, toBase64 } from '../export/pdf';
 import { hasCapturedColors } from '../geometry/appearance';
-import { roomParts, type Pt } from '../geometry/floorplan';
+import {
+  filtrerAuNiveau,
+  niveauxPresents,
+  nomDuNiveau,
+  roomParts,
+  type Pt,
+} from '../geometry/floorplan';
 import {
   fixturePlacement,
   materialList,
@@ -135,10 +141,10 @@ export function feuillesElevations(
 export function ExportScreen() {
   const setScreen = useScanStore((s) => s.setScreen);
   const scanName = useScanStore((s) => s.scanName);
-  const walls = useScanStore((s) => s.walls);
-  const openings = useScanStore((s) => s.openings);
-  const objects = useScanStore((s) => s.objects);
-  const fixtures = useScanStore((s) => s.fixtures);
+  const tousLesMurs = useScanStore((s) => s.walls);
+  const toutesLesOuvertures = useScanStore((s) => s.openings);
+  const tousLesMeubles = useScanStore((s) => s.objects);
+  const toutLAppareillage = useScanStore((s) => s.fixtures);
   const showOpeningColors = useScanStore((s) => s.showOpeningColors);
   const setShowOpeningColors = useScanStore((s) => s.setShowOpeningColors);
   const showFurniture = useScanStore((s) => s.showFurniture);
@@ -147,11 +153,7 @@ export function ExportScreen() {
   const setShowSurfaces = useScanStore((s) => s.setShowSurfaces);
   const showTextures = useScanStore((s) => s.showTextures);
   const setShowTextures = useScanStore((s) => s.setShowTextures);
-  const rooms = useScanStore((s) => s.rooms);
-  const colorsAvailable = hasCapturedColors(
-    walls,
-    rooms.map((r) => r.floor),
-  );
+  const toutesLesPieces = useScanStore((s) => s.rooms);
   const c = useTheme();
   /** Une case de la grille : icône, mot, état, bascule. */
 type OptionDef = [keyof typeof EXPORT_ICONS, string, boolean, () => void];
@@ -192,10 +194,63 @@ const styles = getStyles(c);
    * quand c'est l'électricien qui imprime.
    */
   const [gaines, setGaines] = useState(false);
-  const ceiling = useScanStore((s) => s.ceiling);
+  const toutLePlafond = useScanStore((s) => s.ceiling);
   /** La feuille d'implantation du plafond, avec ses liens de commande. */
   const [plafond, setPlafond] = useState(true);
-  const photos = useScanStore((s) => s.photos);
+  const toutesLesPhotos = useScanStore((s) => s.photos);
+  /*
+    LE DOSSIER SORT L'ÉTAGE QU'ON REGARDE.
+
+    Un PDF qui empilerait les niveaux donnerait un plan où les murs du haut
+    traversent les pièces du bas, un métré qui compte deux fois, et un
+    schéma où l'appareillage des deux étages se mêle sur le même tableau.
+    On exporte donc ce que l'écran montre — et le nom du fichier dit
+    lequel, pour qu'on ne se retrouve pas avec deux « Chantier Dupont.pdf »
+    dont on ne sait plus lequel est l'étage.
+  */
+  const niveauCourant = useScanStore((s) => s.niveauCourant);
+  const niveaux = useMemo(
+    () => niveauxPresents(tousLesMurs, toutesLesPieces),
+    [tousLesMurs, toutesLesPieces],
+  );
+  const { walls, openings, rooms, fixtures, photos, objects, ceiling } =
+    useMemo(
+      () =>
+        filtrerAuNiveau(
+          {
+            walls: tousLesMurs,
+            openings: toutesLesOuvertures,
+            rooms: toutesLesPieces,
+            fixtures: toutLAppareillage,
+            photos: toutesLesPhotos,
+            objects: tousLesMeubles,
+            ceiling: toutLePlafond,
+          },
+          niveauCourant,
+        ),
+      [
+        tousLesMurs,
+        toutesLesOuvertures,
+        toutesLesPieces,
+        toutLAppareillage,
+        toutesLesPhotos,
+        tousLesMeubles,
+        toutLePlafond,
+        niveauCourant,
+      ],
+    );
+  /** Le titre du dossier : il porte l'étage dès qu'il y en a plusieurs. */
+  const titreDuDossier =
+    niveaux.length > 1
+      ? `${scanName} — ${nomDuNiveau(niveauCourant)}`
+      : scanName;
+  // Les couleurs relevées se jugent sur l'étage qu'on exporte : le
+  // rez-de-chaussée peut les avoir et l'étage non, s'il a été scanné dans
+  // le noir.
+  const colorsAvailable = hasCapturedColors(
+    walls,
+    rooms.map((r) => r.floor),
+  );
   const north = useScanStore((s) => s.north);
   const client = useScanStore((s) => s.client);
   const address = useScanStore((s) => s.address);
@@ -341,7 +396,7 @@ const styles = getStyles(c);
         pret.current && pret.current.cle === empreinte && vignettes.length === 0
           ? pret.current.bytes
           : batir(vignettes);
-      await RoomScan.sharePDF(toBase64(bytes), pdfFilename(scanName));
+      await RoomScan.sharePDF(toBase64(bytes), pdfFilename(titreDuDossier));
     } catch (e: any) {
       Alert.alert('Export impossible', e?.message ?? 'Erreur inconnue');
     }
@@ -373,7 +428,7 @@ const styles = getStyles(c);
   const batir = (vignettes: { wallId: string; base64: string }[]) =>
     buildScanPdf(
         {
-          name: scanName,
+          name: titreDuDossier,
           walls,
           openings,
           objects: showFurniture ? objects : [],

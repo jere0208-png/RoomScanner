@@ -30,6 +30,27 @@ export async function demarrerComplement(): Promise<void> {
   st.setScanning(true);
 }
 
+/**
+ * SCANNER UN ÉTAGE, et l'empiler sur le relevé ouvert.
+ *
+ * Le geste du chantier : on relève le rez-de-chaussée, on monte l'escalier,
+ * on relève l'étage — et c'est le MÊME dossier.
+ *
+ * Le scan repart À NEUF, jamais en additif : ce sont d'autres murs, et
+ * `StructureBuilder` chercherait à les recoller à ceux du bas. On aurait un
+ * seul plan monstrueux au lieu de deux niveaux. Le rez-de-chaussée, lui,
+ * reste dans le magasin — le natif oublie ses passages, pas le JS son plan.
+ */
+export async function demarrerEtage(n: number): Promise<void> {
+  const st = useScanStore.getState();
+  st.scannerUnEtage(n);
+  st.beginScan();
+  await RoomScan.start();
+  st.setScreen('scan');
+  st.setScanning(true);
+  st.setPaused(false);
+}
+
 /** Abonne le store aux événements natifs et expose les commandes du scan. */
 export function useRoomScan() {
   const store = useScanStore();
@@ -85,15 +106,21 @@ export function useRoomScan() {
     stop: async () => {
       store.setProcessing(true);
       const complement = useScanStore.getState().complementEnCours;
+      const etage = useScanStore.getState().etageEnCours;
       try {
         // Le post-traitement RoomPlan prend quelques secondes.
         const result = await RoomScan.stop();
         /*
-          UN PASSAGE DE PLUS COMPLÈTE le relevé, il ne le remplace pas :
-          l'appareillage déjà posé survit, reprojeté sur les murs neufs.
-          Un scan ordinaire, lui, ouvre un dossier.
+          TROIS ISSUES, ET UNE SEULE OUVRE UN DOSSIER.
+
+          Un ÉTAGE s'empile sur le relevé ouvert : d'autres murs, d'autres
+          pièces, rien à fusionner. UN PASSAGE DE PLUS complète le relevé au
+          lieu de le remplacer — l'appareillage déjà posé survit, reprojeté
+          sur les murs neufs. Un scan ordinaire, lui, ouvre un dossier.
         */
-        if (complement) {
+        if (etage !== null) {
+          useScanStore.getState().finalizeEtage(result, etage);
+        } else if (complement) {
           useScanStore.getState().finalizeMerge(result);
           useScanStore.getState().setComplement(false);
         } else {
@@ -102,6 +129,10 @@ export function useRoomScan() {
       } catch (e: any) {
         store.setProcessing(false);
         store.setComplement(false);
+        // Un scan qui échoue ne laisse pas l'application armée pour
+        // l'étage : sans ça, le scan SUIVANT — celui d'un autre logement —
+        // atterrirait au premier étage d'un dossier qui n'a rien demandé.
+        useScanStore.getState().scannerUnEtage(null);
         store.setError(e?.message ?? 'Échec du traitement du scan');
       }
     },

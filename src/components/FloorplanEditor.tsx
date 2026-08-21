@@ -231,6 +231,18 @@ interface Props {
    * tire les gaines. Absent = pas de repérage, le plan reste nu.
    */
   circuitMarks?: Map<string, string>;
+  /**
+   * LE PLAN DU NIVEAU DU DESSOUS, en filigrane.
+   *
+   * On ne recale pas un étage sur du vide : sans le plan du bas en
+   * transparence, rien ne dit où tombe la cage d'escalier. C'est le seul
+   * repère commun entre deux relevés qu'ARKit a démarrés à deux endroits
+   * différents.
+   *
+   * Purement décoratif : rien ne s'y sélectionne et rien ne s'y aimante,
+   * sinon on éditerait l'étage qu'on ne regarde pas.
+   */
+  filigrane?: WallSeg[];
   /** Photos de repérage punaisées sur les murs. */
   photos?: { id: string; wallId: string; along: number }[];
   onSelectPhoto?: (id: string) => void;
@@ -355,6 +367,7 @@ export function FloorplanEditor({
   onSelectWall,
   cableRoutes,
   circuitMarks,
+  filigrane,
   photos,
   onSelectPhoto,
   selectedObjectId,
@@ -1227,6 +1240,33 @@ export function FloorplanEditor({
                 fill={c.ink}
               />
             ))}
+
+            {/*
+              LE NIVEAU DU DESSOUS, EN TRANSPARENCE.
+
+              Il passe sous tout le reste — c'est un repère, pas un plan :
+              on s'en sert pour poser l'étage d'aplomb au-dessus, la cage
+              d'escalier en face de la cage d'escalier. Un simple trait
+              d'axe suffit ; le poché du bas donnerait deux plans mêlés au
+              lieu d'un plan et de son ombre.
+            */}
+            {(filigrane ?? []).map((w) => {
+              const a = mapping.toPx(w.a);
+              const b = mapping.toPx(w.b);
+              return (
+                <Line
+                  key={`sous-${w.id}`}
+                  x1={a.x}
+                  y1={a.y}
+                  x2={b.x}
+                  y2={b.y}
+                  stroke={c.ink}
+                  strokeOpacity={0.16}
+                  strokeWidth={5}
+                  strokeLinecap="round"
+                />
+              );
+            })}
 
             {/* Murs : corps poché aux jonctions d'onglet */}
             {walls.map((w) => (

@@ -56,6 +56,19 @@ export interface WallSeg {
    * se désynchroniser.
    */
   coffre?: number;
+  /**
+   * L'ÉTAGE où vit ce mur. 0 = rez-de-chaussée, 1 = premier, −1 = sous-sol.
+   *
+   * Absent sur tous les scans d'avant les étages, et cette absence VAUT
+   * rez-de-chaussée : rien à migrer, rien à réécrire, les anciens dossiers
+   * s'ouvrent où ils ont toujours été.
+   *
+   * C'est le mur — et la pièce — qui porte le niveau ; tout le reste en
+   * hérite, puisque l'appareillage tient à un mur, le meuble à une pièce et
+   * la photo à un mur. Une liste de niveaux tenue à part aurait permis à un
+   * interrupteur de se retrouver à un étage où son mur n'est pas.
+   */
+  niveau?: number;
 }
 
 /** Pièce d'un élément, valeur par défaut comprise. */
@@ -2955,4 +2968,140 @@ export function castToWall(from: Pt, dir: Pt, walls: WallSeg[]): number | null {
   // Jusqu'au NU du mur, pas jusqu'à son axe : c'est la cote qu'on relève
   // sur place, mètre contre la plinthe.
   return isFinite(best) ? Math.max(0, best - WALL_T / 2) : null;
+}
+
+/* ====================================================================== */
+/*  LES ÉTAGES                                                            */
+/* ====================================================================== */
+
+/**
+ * Le rez-de-chaussée. C'est le niveau des scans qui n'en déclarent aucun :
+ * tous ceux d'avant les étages s'ouvrent donc là, sans migration.
+ */
+export const NIVEAU_RDC = 0;
+
+/** L'étage d'un mur, d'une pièce, de tout ce qui peut en porter un. */
+export function niveauDe(x: { niveau?: number } | null | undefined): number {
+  return x?.niveau ?? NIVEAU_RDC;
+}
+
+/**
+ * Le nom d'un niveau, tel qu'on le dit sur un chantier et tel qu'il
+ * s'imprime en tête du plan.
+ *
+ * « Niveau 0 » ne veut rien dire pour un client ; « Rez-de-chaussée », si.
+ */
+export function nomDuNiveau(n: number): string {
+  if (n === 0) return 'Rez-de-chaussée';
+  if (n === -1) return 'Sous-sol';
+  if (n < -1) return `Sous-sol ${n}`;
+  return n === 1 ? '1er étage' : `${n}e étage`;
+}
+
+/**
+ * Les niveaux qu'un dossier contient, DU HAUT VERS LE BAS.
+ *
+ * L'étage se choisit dans une colonne : le haut du bâtiment en haut de la
+ * liste, sinon le geste contredit ce qu'on regarde. Un plan vide garde son
+ * rez-de-chaussée, sans quoi le sélecteur n'aurait rien à montrer au
+ * premier scan.
+ */
+export function niveauxPresents(
+  walls: { niveau?: number }[],
+  rooms: { niveau?: number }[] = [],
+): number[] {
+  const vus = new Set<number>([NIVEAU_RDC]);
+  for (const w of walls) vus.add(niveauDe(w));
+  for (const r of rooms) vus.add(niveauDe(r));
+  return [...vus].sort((a, b) => b - a);
+}
+
+/**
+ * GLISSE UN ÉTAGE ENTIER au-dessus de celui du dessous.
+ *
+ * Deux scans ne se superposent jamais tout seuls : ARKit repart de
+ * l'endroit où l'on a appuyé sur « Scanner », jamais du même coin de mur.
+ * Superposés bruts, les deux plans se croisent n'importe comment. On donne
+ * donc la prise — l'étage se recale à la main sur le filigrane du niveau du
+ * dessous, jusqu'à ce que la cage d'escalier tombe juste.
+ */
+export function deplacerNiveau<T extends WallSeg>(
+  walls: T[],
+  niveau: number,
+  dx: number,
+  dz: number,
+): T[] {
+  if (dx === 0 && dz === 0) return walls;
+  return walls.map((w) =>
+    niveauDe(w) === niveau
+      ? {
+          ...w,
+          a: { x: w.a.x + dx, z: w.a.z + dz },
+          b: { x: w.b.x + dx, z: w.b.z + dz },
+        }
+      : w,
+  );
+}
+
+/**
+ * CE QUE MONTRE UN ÉTAGE, support compris.
+ *
+ * Le niveau n'est porté que par le mur et la pièce ; tout le reste en
+ * hérite de son support — l'appareillage et la photo tiennent à un mur, le
+ * meuble et le plafonnier à une pièce. Un seul filtre suffit donc, et
+ * personne ne peut se retrouver à un étage où son support n'est pas.
+ *
+ * L'ORPHELIN REVIENT AU REZ-DE-CHAUSSÉE. Un renvoi mort — un mur effacé
+ * dans une sauvegarde bancale — serait invisible à TOUS les étages : jamais
+ * vu, jamais effacé, et pourtant compté dans le métré. On le montre en bas,
+ * là où l'on peut le voir et le retirer.
+ */
+export function filtrerAuNiveau<
+  W extends { id: string; niveau?: number },
+  O extends { id: string; niveau?: number },
+  R extends { id: string; niveau?: number },
+  F extends { wallId: string },
+  P extends { wallId: string },
+  Ob extends { roomId?: string },
+  C extends { roomId?: string },
+>(
+  jeu: {
+    walls: W[];
+    openings: O[];
+    rooms: R[];
+    fixtures: F[];
+    photos: P[];
+    objects: Ob[];
+    ceiling: C[];
+  },
+  n: number,
+): typeof jeu {
+  const murAuNiveau = new Map(jeu.walls.map((w) => [w.id, niveauDe(w)]));
+  const pieceAuNiveau = new Map(jeu.rooms.map((r) => [r.id, niveauDe(r)]));
+  const parSupport = (
+    table: Map<string, number>,
+    cle: string | undefined,
+  ) => (table.get(cle ?? '') ?? NIVEAU_RDC) === n;
+  return {
+    walls: jeu.walls.filter((w) => niveauDe(w) === n),
+    openings: jeu.openings.filter((o) => niveauDe(o) === n),
+    rooms: jeu.rooms.filter((r) => niveauDe(r) === n),
+    fixtures: jeu.fixtures.filter((f) => parSupport(murAuNiveau, f.wallId)),
+    photos: jeu.photos.filter((p) => parSupport(murAuNiveau, p.wallId)),
+    objects: jeu.objects.filter((o) => parSupport(pieceAuNiveau, o.roomId)),
+    ceiling: jeu.ceiling.filter((c) => parSupport(pieceAuNiveau, c.roomId)),
+  };
+}
+
+/**
+ * Le nom COURT d'un niveau, pour la pastille du plan.
+ *
+ * Elle est large comme « 2D » : « Rez-de-chaussee » n'y entre pas. Les
+ * plans de batiment ecrivent R+1, R+2 — on ecrit comme eux.
+ */
+export function abregerNiveau(n: number): string {
+  if (n === 0) return 'RDC';
+  if (n === -1) return 'SS';
+  if (n < -1) return `SS${-n}`;
+  return `R+${n}`;
 }

@@ -54,6 +54,11 @@ import {
   fitsInRoom,
   murNeufDepuisUnBout,
   planFrameAngle,
+  filtrerAuNiveau,
+  nomDuNiveau,
+  abregerNiveau,
+  niveauDe,
+  niveauxPresents,
   roomOf,
   wallQuadsOf,
   roomExtent,
@@ -104,7 +109,7 @@ import {
 } from '../geometry/electrical';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useScanStore } from '../store/scanStore';
-import { demarrerComplement } from '../native/useRoomScan';
+import { demarrerComplement, demarrerEtage } from '../native/useRoomScan';
 import { DiagnosticSheet, type Constat } from '../components/DiagnosticSheet';
 import { ClientTour } from '../components/ClientTour';
 import { EnAttente } from '../components/PendingPill';
@@ -186,11 +191,11 @@ export function ResultScreen() {
    */
   const ligneOutils = basSysteme + 8;
   const ligneBandeau = ligneOutils + PILL_CELL_H + PILL_GAP;
-  const walls = useScanStore((s) => s.walls);
-  const objects = useScanStore((s) => s.objects);
+  const tousLesMurs = useScanStore((s) => s.walls);
+  const tousLesMeubles = useScanStore((s) => s.objects);
   const scanName = useScanStore((s) => s.scanName);
   const saves = useScanStore((s) => s.saves);
-  const photos = useScanStore((s) => s.photos);
+  const toutesLesPhotos = useScanStore((s) => s.photos);
   const removePhoto = useScanStore((s) => s.removePhoto);
   const currentSaveId = useScanStore((s) => s.currentSaveId);
   const setWallLength = useScanStore((s) => s.setWallLength);
@@ -200,7 +205,7 @@ export function ResultScreen() {
   const commitCurrent = useScanStore((s) => s.commitCurrent);
   const showFurniture = useScanStore((s) => s.showFurniture);
   const setShowFurniture = useScanStore((s) => s.setShowFurniture);
-  const rooms = useScanStore((s) => s.rooms);
+  const toutesLesPieces = useScanStore((s) => s.rooms);
   const removeRoom = useScanStore((s) => s.removeRoom);
   const addOpening = useScanStore((s) => s.addOpening);
   const resultOrigin = useScanStore((s) => s.resultOrigin);
@@ -215,10 +220,67 @@ export function ResultScreen() {
   const removeWall = useScanStore((s) => s.removeWall);
   const undo = useScanStore((s) => s.undo);
   const canUndo = useScanStore((s) => s.canUndo);
-  const openings = useScanStore((s) => s.openings);
-  const fixtures = useScanStore((s) => s.fixtures);
+  const toutesLesOuvertures = useScanStore((s) => s.openings);
+  const toutLAppareillage = useScanStore((s) => s.fixtures);
   const addFixture = useScanStore((s) => s.addFixture);
-  const ceiling = useScanStore((s) => s.ceiling);
+  const toutLePlafond = useScanStore((s) => s.ceiling);
+  /*
+    L'ÉCRAN NE MONTRE QU'UN ÉTAGE.
+
+    Superposés, deux niveaux donnent un plan illisible : les murs du haut
+    traversent les pièces du bas, le métré compte double, et le contrôle des
+    normes cherche l'interrupteur d'entrée d'une chambre parmi les murs du
+    rez-de-chaussée. Tout ce que l'écran manipule est donc filtré ICI, à la
+    source — une seule fois, plutôt qu'à chacun des cinquante endroits qui
+    lisent ces listes, où l'oubli serait certain.
+
+    La sauvegarde et l'export, eux, gardent le bâtiment entier : ils partent
+    du magasin, pas de cet écran.
+  */
+  const niveauCourant = useScanStore((s) => s.niveauCourant);
+  const { walls, openings, rooms, fixtures, photos, objects, ceiling } =
+    useMemo(
+      () =>
+        filtrerAuNiveau(
+          {
+            walls: tousLesMurs,
+            openings: toutesLesOuvertures,
+            rooms: toutesLesPieces,
+            fixtures: toutLAppareillage,
+            photos: toutesLesPhotos,
+            objects: tousLesMeubles,
+            ceiling: toutLePlafond,
+          },
+          niveauCourant,
+        ),
+      [
+        tousLesMurs,
+        toutesLesOuvertures,
+        toutesLesPieces,
+        toutLAppareillage,
+        toutesLesPhotos,
+        tousLesMeubles,
+        toutLePlafond,
+        niveauCourant,
+      ],
+    );
+  /** Les étages du dossier, du haut vers le bas — le sélecteur les montre. */
+  const niveaux = useMemo(
+    () => niveauxPresents(tousLesMurs, toutesLesPieces),
+    [tousLesMurs, toutesLesPieces],
+  );
+  /*
+    LE FILIGRANE DU NIVEAU DU DESSOUS.
+
+    On ne recale pas un étage sur du vide : sans le plan du dessous en
+    transparence, rien ne dit où tombe la cage d'escalier. C'est le seul
+    repère commun entre deux relevés qu'ARKit a démarrés à deux endroits
+    différents.
+  */
+  const filigrane = useMemo(
+    () => tousLesMurs.filter((w) => niveauDe(w) === niveauCourant - 1),
+    [tousLesMurs, niveauCourant],
+  );
   const addCeiling = useScanStore((s) => s.addCeiling);
   const addRoomBox = useScanStore((s) => s.addRoomBox);
   const moveRoom = useScanStore((s) => s.moveRoom);
@@ -392,6 +454,47 @@ export function ResultScreen() {
     incliner(TILT_PLAN, TILT_VOLUME);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vue]);
+  /*
+    LE MENU DES ÉTAGES.
+
+    Il liste les niveaux du haut vers le bas — comme un ascenseur — et
+    propose, sous eux, d'en scanner un de plus. Le nom complet s'écrit ici
+    (« 1er étage ») alors que la pastille abrège (« R+1 ») : dans une liste
+    on a la place, et « R+1 » ne se lit bien que quand on sait déjà.
+  */
+  const menuDesEtages = (): ActionData => ({
+    title: 'Étage',
+    subtitle:
+      'Le plan, le métré et le contrôle ne montrent que le niveau choisi.',
+    actions: [
+      ...niveaux.map((n) => ({
+        label: nomDuNiveau(n),
+        hint:
+          n === niveauCourant
+            ? 'Niveau affiché'
+            : `${
+                toutesLesPieces.filter((r) => niveauDe(r) === n).length
+              } pièce(s)`,
+        icon: 'piece' as const,
+        onPress: () => {
+          useScanStore.getState().allerAuNiveau(n);
+          haptic('leger');
+        },
+      })),
+      {
+        label: 'Scanner un étage de plus',
+        hint: 'Montez, relevez : il s’ajoute à ce dossier, au-dessus.',
+        icon: 'regle' as const,
+        onPress: () => {
+          // Au-dessus du plus haut : on monte, on ne creuse pas. Le
+          // sous-sol se demande depuis le menu du plan, où l'on a la place
+          // de le dire en toutes lettres.
+          demarrerEtage(Math.max(...niveaux) + 1).catch(() => {});
+        },
+      },
+    ],
+  });
+
   const basculerVue = () => {
     if (releve.current) return;
     if (vue === '2d') {
@@ -1696,6 +1799,37 @@ export function ResultScreen() {
                     },
                   },
                   {
+                    /*
+                      SCANNER UN NIVEAU DE PLUS.
+
+                      Une maison, c'est un rez-de-chaussée ET un étage —
+                      parfois un sous-sol. Le relevé du haut s'ajoute à CE
+                      dossier : un seul plan, un seul métré, un seul devis.
+
+                      L'étage arrive pré-calé au-dessus de celui du dessous,
+                      qui reste visible en filigrane : c'est là-dessus qu'on
+                      le pose d'aplomb, cage d'escalier contre cage
+                      d'escalier.
+                    */
+                    label: 'Scanner un étage',
+                    icon: 'piece' as const,
+                    hint:
+                      niveaux.length > 1
+                        ? `Le dossier en compte ${niveaux.length}.`
+                        : 'Montez, relevez : il s’ajoute au-dessus de ce plan.',
+                    onPress: () => {
+                      demarrerEtage(Math.max(...niveaux) + 1).catch(() => {});
+                    },
+                  },
+                  {
+                    label: 'Scanner un sous-sol',
+                    icon: 'piece' as const,
+                    hint: 'Cave, garage, buanderie : il se range sous le plan.',
+                    onPress: () => {
+                      demarrerEtage(Math.min(...niveaux) - 1).catch(() => {});
+                    },
+                  },
+                  {
                     label: 'Ajouter un mur',
                     icon: 'regle' as const,
                     hint:
@@ -1901,6 +2035,7 @@ export function ResultScreen() {
             cableRoutes={showRoutes ? cheminements?.traces : undefined}
             showFixtures={showFixtures}
             circuitMarks={showRoutes ? marks : undefined}
+            filigrane={filigrane}
             photos={photos}
             onSelectPhoto={setPhotoVue}
             showMeasures={showMeasures}
@@ -2267,6 +2402,30 @@ export function ResultScreen() {
               alertes={alertes}
               onPress={() => setChecking(true)}
             />
+            {/*
+              L'ÉTAGE, contre le contrôle et le 2D/3D.
+
+              La pastille n'apparaît QUE s'il y a plusieurs niveaux : un
+              appartement de plain-pied n'a pas à porter un sélecteur qui
+              n'aurait jamais qu'un choix. Le geste d'AJOUT, lui, vit dans
+              le menu « … » avec les autres actions du plan — on ne part pas
+              scanner un étage par mégarde en visant le sélecteur.
+            */}
+            {niveaux.length > 1 && (
+              <TouchableOpacity
+                style={styles.vuePastille}
+                accessibilityLabel="Changer d’étage"
+                onPress={() => setMenu(menuDesEtages())}>
+                <Text style={styles.vuePastilleTexte}>
+                  {abregerNiveau(niveauCourant)}
+                </Text>
+                <ChevronsUpDown
+                  size={15}
+                  color={teinte.inkFaint}
+                  strokeWidth={2.4}
+                />
+              </TouchableOpacity>
+            )}
             <TouchableOpacity
               style={styles.vuePastille}
               accessibilityLabel={vue === '2d' ? 'Passer en 3D' : 'Passer en 2D'}

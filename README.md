@@ -3370,6 +3370,48 @@ une capture d'écran : le plan est une liste de murs, on le retrace en
 quelques traits dans 54 px. Rien à stocker, rien à invalider — un scan
 retouché montre son nouveau contour à l'ouverture suivante de la liste.
 
+### Les étages
+
+Une maison, c'est un rez-de-chaussée **et** un étage. L'application ne
+connaissait qu'un plan à plat : relever une maison, c'était ouvrir deux
+dossiers, sortir deux PDF, faire deux devis — et rien ne disait que c'était le
+même logement. Le concurrent qu'on regarde gère les niveaux depuis toujours ;
+sans eux on perd les maisons individuelles, qui sont le gros du marché.
+
+**Le niveau est porté par ce qui existe déjà** — le mur et la pièce. Tout le
+reste en HÉRITE : l'appareillage tient à un mur, le meuble à une pièce, la
+photo à un mur. Aucun élément ne peut donc se retrouver à un étage où son
+support n'est pas, ce qu'une liste de niveaux tenue à part aurait permis au
+premier bug. Et **l'absence vaut rez-de-chaussée** : tous les anciens scans
+s'ouvrent là où ils ont toujours été, sans migration ni réécriture.
+
+Le geste du chantier : on relève le bas, on monte l'escalier, on relève le
+haut — et c'est le même dossier. Le scan d'un étage repart **à neuf**, jamais
+en additif : ce sont d'autres murs, et `StructureBuilder` chercherait à les
+recoller à ceux du bas, donnant un seul plan monstrueux au lieu de deux
+niveaux.
+
+Trois décisions qui viennent du terrain :
+
+- **l'étage arrive pré-calé** sur celui du dessous. ARKit repart de l'endroit
+  où l'on a appuyé sur « Scanner » : après l'escalier, le relevé du haut tombe
+  à vingt mètres de celui du bas. On aligne les emprises pour partir d'un
+  empilement plausible, puis le **filigrane** du niveau inférieur — un simple
+  trait d'axe, sous tout le reste — sert de repère pour poser l'étage
+  d'aplomb, cage d'escalier contre cage d'escalier ;
+- **les identifiants de pièce portent le niveau** (`room-1-3`). Détectés
+  séparément, les deux étages produisaient chacun un « room-1 » : le meuble du
+  salon se rattachait à la chambre du dessus et le métré comptait deux fois la
+  même pièce ;
+- **le filtrage se fait à la source**, dans l'écran, une seule fois — plutôt
+  qu'à chacun des cinquante endroits qui lisent ces listes, où l'oubli serait
+  certain. L'export suit l'étage affiché et **le nom du fichier le dit**, pour
+  qu'on ne se retrouve pas avec deux « Chantier Dupont.pdf ».
+
+Un scan qui échoue **désarme l'étage** : sans quoi le scan suivant — celui
+d'un autre logement — atterrirait au premier étage d'un dossier qui n'a rien
+demandé.
+
 ### Les photos de mur vivent dans la photothèque
 
 Relevé du chantier : « fais en sorte que les photos soient stockées dans

@@ -56,6 +56,9 @@ import {
   wallRuns,
   weldCorners,
   fusionnerMursDoubles,
+  NIVEAU_RDC,
+  niveauDe,
+  deplacerNiveau,
   COFFRE_H,
   type TrouDeReleve,
   type Pt,
@@ -113,6 +116,11 @@ export interface RoomEntry {
   kind?: RoomKind;
   /** Couleurs du sol relevées au scan. */
   floor?: FloorData | null;
+  /**
+   * L'ÉTAGE de la pièce. Absent = rez-de-chaussée, comme pour les murs.
+   * Ne pas confondre avec `floor`, qui est la couleur du SOL.
+   */
+  niveau?: number;
 }
 
 /** Un dossier de la bibliothèque. Il ne porte qu'un nom : ce sont les scans
@@ -606,6 +614,31 @@ interface ScanState {
    * une pièce de plus, et l'appareillage déjà posé doit survivre.
    */
   complementEnCours: boolean;
+  /**
+   * L'ÉTAGE qu'on regarde. Le plan, le métré et l'établi ne montrent que
+   * lui ; le niveau du dessous s'affiche en filigrane, pour se repérer.
+   */
+  niveauCourant: number;
+  /**
+   * Le niveau que le prochain scan viendra remplir, quand on a demandé
+   * « Ajouter un étage ». `null` = un scan ordinaire.
+   */
+  etageEnCours: number | null;
+  /** Change d'étage. */
+  allerAuNiveau: (n: number) => void;
+  /** Arme le prochain scan pour cet étage ; `null` désarme. */
+  scannerUnEtage: (n: number | null) => void;
+  /**
+   * Glisse un étage entier au-dessus de celui du dessous, murs, meubles et
+   * plafonniers compris. Les autres niveaux ne bougent pas.
+   */
+  recalerNiveau: (n: number, dx: number, dz: number) => void;
+  /**
+   * Range le relevé qui arrive à l'étage `n`, sans toucher aux niveaux déjà
+   * présents. C'est « compléter le relevé » à l'envers : rien à fusionner,
+   * ce ne sont pas les mêmes murs.
+   */
+  finalizeEtage: (r: ScanResult, n: number) => void;
   setComplement: (v: boolean) => void;
   wallCount: number;
   objectCount: number;
@@ -2713,6 +2746,190 @@ export const useScanStore = create<ScanState>((set, get) => {
         photos,
         ceiling: [...ceiling, ...viseMerge.ceiling],
         north: typeof r.north === 'number' ? r.north : st.north,
+        processing: false,
+        scanning: false,
+        screen: 'result',
+        dirty: true,
+      });
+    },
+
+    niveauCourant: NIVEAU_RDC,
+    etageEnCours: null,
+    allerAuNiveau: (n) => set({ niveauCourant: n }),
+    scannerUnEtage: (n) => set({ etageEnCours: n, complementEnCours: false }),
+
+    recalerNiveau: (n, dx, dz) => {
+      const st = get();
+      if (dx === 0 && dz === 0) return;
+      pushHistory(`recalerNiveau:${n}`);
+      const bouge = (p: Pt) => ({ x: p.x + dx, z: p.z + dz });
+      const auNiveau = (w: WallSeg) => niveauDe(w) === n;
+      const idsDuNiveau = new Set(
+        st.walls.filter(auNiveau).map((w) => w.id),
+      );
+      set({
+        walls: deplacerNiveau(st.walls, n, dx, dz),
+        openings: deplacerNiveau(st.openings, n, dx, dz),
+        // Le mobilier suit sa pièce, et le plafond son ancrage : tout ce qui
+        // vit à cet étage voyage avec lui, sinon on recalerait les murs en
+        // laissant les meubles vingt mètres plus loin.
+        objects: st.objects.map((o) => {
+          const piece = st.rooms.find((r) => r.id === o.roomId);
+          if (!piece || niveauDe(piece) !== n) return o;
+          const t = [...o.transform];
+          t[12] += dx;
+          t[14] += dz;
+          return { ...o, transform: t };
+        }),
+        ceiling: st.ceiling.map((cl) => {
+          const piece = st.rooms.find((r) => r.id === cl.roomId);
+          return piece && niveauDe(piece) === n
+            ? { ...cl, at: bouge(cl.at) }
+            : cl;
+        }),
+        dirty: true,
+      });
+      // L'appareillage et les photos tiennent à un mur par une cote le long
+      // de ce mur : le mur bouge, elles bougent avec lui sans rien à faire.
+      void idsDuNiveau;
+    },
+
+    /*
+      L'ÉTAGE S'EMPILE, IL NE REMPLACE RIEN.
+
+      « Compléter le relevé » repasse un scan et FUSIONNE avec l'existant :
+      ce sont les mêmes murs, vus une seconde fois. Un étage, c'est le
+      contraire — d'autres murs, d'autres pièces, et rien à fusionner. On
+      ajoute donc, en estampillant le niveau, sans toucher à ce qui est en
+      bas.
+
+      Deux précautions qui viennent du terrain :
+
+      — les identifiants de pièce portent le niveau (`room-1-3`). Détectés
+        séparément, les deux étages produisaient chacun un « room-1 » : le
+        meuble du salon se rattachait à la chambre du dessus, et le métré
+        comptait deux fois la même pièce.
+
+      — l'étage est PRÉ-CALÉ sur celui du dessous. ARKit repart de l'endroit
+        où l'on a appuyé sur « Scanner » : après l'escalier, le relevé du
+        haut tombe à vingt mètres de celui du bas. On aligne les emprises
+        pour partir d'un empilement plausible ; le recalage fin se fait
+        ensuite à la main, sur le filigrane.
+    */
+    finalizeEtage: (r, n) => {
+      const st = get();
+      const surfaces = r.rooms?.length
+        ? r.rooms.flatMap((x) => x.surfaces ?? [])
+        : r.surfaces ?? [];
+      const entrants = r.rooms?.length
+        ? r.rooms.flatMap((x) => x.objects ?? [])
+        : r.objects ?? [];
+      const segments = surfaces.map((s) => toSegment(s));
+      const bruts = mergeColinear(
+        splitAtJunctions(
+          weldCorners(
+            fusionnerMursDoubles(segments.filter((s) => s.type === 'wall')),
+          ),
+        ),
+      );
+      if (bruts.length === 0) {
+        set({ processing: false, scanning: false, etageEnCours: null });
+        return;
+      }
+      const ouverturesBrutes = segments.filter((s) => s.type !== 'wall');
+
+      /* Le pré-calage : les deux emprises, centre sur centre. */
+      const emprise = (ws: WallSeg[]) => {
+        const xs = ws.flatMap((w) => [w.a.x, w.b.x]);
+        const zs = ws.flatMap((w) => [w.a.z, w.b.z]);
+        return {
+          x: (Math.min(...xs) + Math.max(...xs)) / 2,
+          z: (Math.min(...zs) + Math.max(...zs)) / 2,
+        };
+      };
+      const dessous = st.walls.filter((w) => niveauDe(w) === n - 1);
+      const reference = dessous.length > 0 ? dessous : st.walls;
+      let dx = 0;
+      let dz = 0;
+      if (reference.length > 0) {
+        const cible = emprise(reference);
+        const venu = emprise(bruts);
+        dx = cible.x - venu.x;
+        dz = cible.z - venu.z;
+      }
+      const pose = <T extends WallSeg>(ws: T[]): T[] =>
+        ws.map((w) => ({
+          ...w,
+          id: `${w.id}-n${n}`,
+          a: { x: w.a.x + dx, z: w.a.z + dz },
+          b: { x: w.b.x + dx, z: w.b.z + dz },
+          niveau: n,
+        }));
+      const walls = pose(bruts);
+      const openings = pose(ouverturesBrutes);
+
+      const detected = detectRooms(walls, undefined, openings);
+      const shapes =
+        detected.length > 0
+          ? detected
+          : [{ outline: [], wallIds: walls.map((w) => w.id), area: 0 }];
+      const idPiece = (i: number) => `room-${n}-${i + 1}`;
+
+      const objects: ObjectData[] = separerLeMobilier(
+        entrants.map((o) => {
+          const t = [...o.transform];
+          t[12] += dx;
+          t[14] += dz;
+          return {
+            ...o,
+            id: `${o.id}-n${n}`,
+            transform: t,
+            roomId: idPiece(
+              roomIndexAt(
+                { x: t[12], z: t[14] },
+                shapes.map((s) => s.outline),
+              ),
+            ),
+          };
+        }),
+      );
+      const kinds = shapes.map((_, i) =>
+        deduceRoomKind(
+          objects
+            .filter((o) => o.roomId === idPiece(i))
+            .map((o) => o.category),
+        ),
+      );
+      const noms = nameRooms(kinds);
+      const pieces: RoomEntry[] = shapes.map((s, i) => ({
+        id: idPiece(i),
+        name: noms[i],
+        wallIds: s.wallIds,
+        kind: kinds[i] ?? undefined,
+        floor: r.floor ?? r.rooms?.[0]?.floor ?? null,
+        niveau: n,
+      }));
+
+      /* Ce que le viseur a posé pendant la montée arrive avec l'étage. */
+      const vise = ancrerElec(
+        r.elec ?? [],
+        walls,
+        pieces.map((x, i) => ({ id: x.id, outline: shapes[i]?.outline })),
+        (prefixe, k) => `${prefixe}-${Date.now().toString(36)}-n${n}-${k}`,
+      );
+
+      pushHistory('ajouterEtage');
+      set({
+        walls: [...st.walls, ...walls],
+        openings: [...st.openings, ...openings],
+        rooms: [...st.rooms, ...pieces],
+        objects: [...st.objects, ...objects],
+        fixtures: [...st.fixtures, ...vise.fixtures],
+        ceiling: [...st.ceiling, ...vise.ceiling],
+        // On travaille à l'étage qu'on vient de scanner, pas au
+        // rez-de-chaussée qu'on a quitté.
+        niveauCourant: n,
+        etageEnCours: null,
         processing: false,
         scanning: false,
         screen: 'result',
