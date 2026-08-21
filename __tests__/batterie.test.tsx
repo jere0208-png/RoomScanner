@@ -58,21 +58,59 @@ beforeEach(() => {
 
 afterEach(() => jest.restoreAllMocks());
 
-describe('le liseré du bouton principal', () => {
-  it('ne tourne pas indéfiniment sur le fil JS', () => {
+/*
+  L'ANIMATION DU BOUTON NE RÉVEILLE PLUS PERSONNE.
+
+  Ce banc exigeait qu'il EXISTE une boucle sur le fil JS, bornée à quelques
+  tours : c'était le compromis du liseré tournant, dont le décalage de
+  pointillés n'a pas d'équivalent natif. Il coûtait soixante réveils de
+  JavaScript par seconde sur l'écran le plus longtemps affiché — et la borne
+  se payait en retour, puisque passé trois tours le bouton restait figé. Le
+  chantier l'a vu tout de suite : « l'animation n'est plus animée ».
+
+  Le reflet qui l'a remplacé est une TRANSLATION, que le fil natif porte de
+  bout en bout. La règle se retourne donc : plus AUCUNE animation JS sur ce
+  bouton, et une boucle qui peut être infinie sans rien coûter.
+*/
+describe('l’animation du bouton principal', () => {
+  it('ne tourne plus du tout sur le fil JS', () => {
     let t!: TestRenderer.ReactTestRenderer;
     act(() => {
       t = TestRenderer.create(
         <GlowButton label="Scanner" onPress={() => {}} variant="primary" />,
       );
     });
-    const enJS = boucles.filter((b) => !b.natif);
-    expect(enJS.length).toBeGreaterThan(0);
-    for (const b of enJS) {
-      // Une boucle JS sans compte est une boucle qui ne s'arrête jamais.
-      expect(b.config?.iterations).toBeGreaterThan(0);
-      expect(b.config?.iterations).toBeLessThan(10);
-    }
+    const enJS = (Animated.timing as unknown as jest.Mock).mock.calls.filter(
+      ([, config]) => config?.useNativeDriver === false,
+    );
+    expect(enJS).toHaveLength(0);
+    act(() => t.unmount());
+  });
+
+  it('anime en boucle, sans se figer au bout de trois tours', () => {
+    let t!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      t = TestRenderer.create(
+        <GlowButton label="Scanner" onPress={() => {}} variant="primary" />,
+      );
+    });
+    expect(boucles).toHaveLength(1);
+    // Pas de compte de tours : elle tourne tant que l'écran est là — c'est
+    // gratuit, puisque rien de tout cela ne remonte au JavaScript.
+    expect(boucles[0].config?.iterations).toBeUndefined();
+    act(() => t.unmount());
+  });
+
+  it('reste immobile quand le bouton est éteint', () => {
+    // Un bouton désactivé n'invite à rien : l'animer serait mentir, et la
+    // dépense n'aurait même pas l'excuse d'être utile.
+    let t!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      t = TestRenderer.create(
+        <GlowButton label="Scanner" onPress={() => {}} disabled />,
+      );
+    });
+    expect(boucles).toHaveLength(0);
     act(() => t.unmount());
   });
 });

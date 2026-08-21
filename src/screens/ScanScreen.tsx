@@ -232,7 +232,7 @@ export function ScanScreen() {
                 style={styles.poseBouton}
                 accessibilityLabel={`Poser ${mot} à l’endroit visé`}
                 onPress={() => poser(kind)}>
-                <Svg width={26} height={26} viewBox="-14 -14 28 28">
+                <Svg width={22} height={22} viewBox="-14 -14 28 28">
                   {symbole.map((seg, i) => (
                     <Path
                       key={i}
@@ -375,9 +375,21 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   },
   torchButtonOn: { backgroundColor: '#F4F6FA' },
   /* Le viseur : quatre coins, pas un cadre plein — on doit VOIR le mur. */
+  /*
+    LE CARRÉ EST OÙ LE RAYON PART, ET PAS AILLEURS.
+
+    Il était dessiné à 46 % de la hauteur — quatre points au-dessus du
+    centre, pour dégager la miniature 3D du bas. Mais le rayon qui pose
+    l'appareil part du CENTRE EXACT de l'image (0,5 ; 0,5) : l'appareil se
+    posait donc quelques centimètres sous le carré qu'on venait de viser.
+
+    Relevé du chantier : « centre l'élément au carré que l'on a au milieu de
+    l'écran ». Deux repères pour un seul geste, c'est un de trop : le carré
+    descend au centre vrai, là où le rayon tire.
+  */
   viseur: {
     position: 'absolute',
-    top: '46%',
+    top: '50%',
     left: '50%',
     width: 74,
     height: 74,
@@ -404,25 +416,35 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     centre. Réunis dans un même tiroir, ils se lisent comme la boîte à
     outils qu'ils sont — et le « ? » y a naturellement sa place.
   */
+  /*
+    UN CRAN PLUS PETIT — relevé du chantier.
+
+    Le bloc prenait le tiers de la hauteur de l'écran, sur une vue où l'on
+    a besoin de VOIR ce qu'on scanne : trois boutons de cinquante-quatre
+    points, plus le séparateur et la rangée du bas. Réduits, ils restent
+    largement à portée du pouce — un carré de quarante-six points est la
+    taille d'une touche de clavier — et rendent la moitié de la place au
+    relevé.
+  */
   poseBloc: {
     position: 'absolute',
-    right: 14,
-    top: '30%',
+    right: 12,
+    top: '32%',
     backgroundColor: c.scanPill,
-    borderRadius: 20,
-    padding: 6,
-    gap: 4,
+    borderRadius: 17,
+    padding: 5,
+    gap: 3,
     alignItems: 'center',
   },
   poseBouton: {
-    width: 58,
-    height: 54,
-    borderRadius: 15,
+    width: 48,
+    height: 46,
+    borderRadius: 13,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 1,
   },
-  poseTexte: { color: c.scanInk, fontSize: 10.5, fontWeight: '700' },
+  poseTexte: { color: c.scanInk, fontSize: 9.5, fontWeight: '700' },
   poseSeparateur: {
     height: 1,
     alignSelf: 'stretch',

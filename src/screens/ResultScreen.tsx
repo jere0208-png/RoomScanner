@@ -3158,6 +3158,31 @@ export function ResultScreen() {
                       setWallLength(selectedWall.id, m),
                   }),
               },
+              /*
+                DÉTACHER — pour allonger un retour sans emmener son voisin.
+
+                Relevé du chantier : « un retour de mur perpendiculaire à un
+                long mur, si j'essaye de prolonger ce retour, c'est le long
+                mur qui est impacté ». Les deux comportements sont justes,
+                mais pas au même moment : le coin d'une pièce DOIT entraîner
+                ses murs — sinon le contour s'ouvre et la surface disparaît —
+                tandis qu'un retour qu'on allonge ne doit toucher que lui.
+
+                On ne devine pas l'intention : on la dit. Et l'aimant
+                raccroche dès qu'on ramène le bout près d'un autre.
+              */
+              ...(selectedWall.libre
+                ? []
+                : [
+                    {
+                      label: 'Détacher',
+                      icone: SOLAIRES.longueur,
+                      onPress: () => {
+                        useScanStore.getState().detacherMur(selectedWall.id);
+                        haptic('succes');
+                      },
+                    },
+                  ]),
             ]}
           />
         )}

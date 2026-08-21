@@ -1005,6 +1005,20 @@ interface ScanState {
    */
   moveWall: (id: string, dx: number, dz: number) => void;
   /**
+   * DESSOUDE UN MUR DE SES VOISINS.
+   *
+   * Deux murs qui partagent un point bougent ensemble : c'est ce qu'il faut
+   * pour le coin d'une pièce — sans quoi le contour s'ouvre, la surface
+   * disparaît et le métré avec elle. Mais pour un retour qu'on veut
+   * simplement allonger, c'est l'inverse : « si j'essaye de prolonger ce
+   * retour, c'est le long mur qui est impacté ».
+   *
+   * On ne devine pas laquelle des deux intentions on a : on la DIT. Détaché,
+   * le mur se déplace seul — et l'aimant le raccroche dès qu'on ramène son
+   * extrémité à moins de vingt-cinq centimètres d'une autre.
+   */
+  detacherMur: (id: string) => void;
+  /**
    * POSE l'angle du mur, en degrés absolus, sans rien accrocher.
    *
    * Le geste de rotation empilait des petits pas, chacun re-collé aux crans
@@ -3218,8 +3232,30 @@ export const useScanStore = create<ScanState>((set, get) => {
       const aligned = soudure ?? snapToNeighbours(p, walls, frame, 0.12, old);
       const snapped = soudure ?? snapAngle(fixed, aligned, 5, frame);
       const room = roomOf(wall);
+      /*
+        UN MUR DÉTACHÉ SE DÉPLACE SEUL.
+
+        Relevé du chantier : « si j'essaye de prolonger ce retour, c'est le
+        long mur qui est impacté ». Les deux comportements sont justes, mais
+        pas au même moment — le coin d'une pièce doit entraîner ses murs,
+        sinon le contour s'ouvre et la surface disparaît ; un retour qu'on
+        allonge ne doit toucher que lui.
+
+        On ne devine pas l'intention, on la lit : « Détacher ce mur » l'a
+        dite, et la marque survit jusqu'au raccrochage.
+      */
+      const seul = wall.libre === true;
+      // Raccrocher, c'est ressouder : un bout ramené sur celui d'un autre
+      // rend le mur solidaire, sans quoi il resterait libre pour toujours
+      // et le contour ne se refermerait jamais vraiment.
+      const rendreSolidaire = seul && soudure !== null;
       set({
         walls: walls.map((w) => {
+          if (w.id === id) {
+            const bouge = { ...w, [end]: snapped };
+            return rendreSolidaire ? { ...bouge, libre: undefined } : bouge;
+          }
+          if (seul) return w;
           // Seuls les murs de la MÊME pièce suivent le coin : la cloison
           // d'en face garde la sienne, même si les deux se touchent.
           if (roomOf(w) !== room) return w;
@@ -3228,6 +3264,42 @@ export const useScanStore = create<ScanState>((set, get) => {
           return { ...w, a: move(w.a), b: move(w.b) };
         }),
         // Pas de sauvegarde automatique : le bouton d'enregistrement apparaît.
+        dirty: true,
+      });
+    },
+
+    detacherMur: (id) => {
+      const st = get();
+      const wall = st.walls.find((w) => w.id === id);
+      if (!wall || wall.libre) return;
+      /*
+        RIEN NE BOUGE — on défait seulement la soudure.
+
+        Les murs ne se tiennent pas par une référence mais par leurs
+        COORDONNÉES : deux bouts au même endroit sont un coin. Écarter les
+        points pour les séparer déplacerait le mur, ce qu'on ne veut à aucun
+        prix — un retour se détache pour être allongé, pas pour sauter de
+        deux centimètres.
+
+        On pose donc une marque, et c'est `moveWallPoint` qui la lit : un
+        mur libre se déplace seul, ses voisins restent où ils sont.
+      */
+      const colle = (p: Pt, q: Pt) => Math.hypot(p.x - q.x, p.z - q.z) < 1e-4;
+      const tientAQuelquun = st.walls.some(
+        (w) =>
+          w.id !== id &&
+          (colle(w.a, wall.a) ||
+            colle(w.b, wall.a) ||
+            colle(w.a, wall.b) ||
+            colle(w.b, wall.b)),
+      );
+      // Un mur seul au monde n'a rien à détacher : ne pas toucher au plan
+      // évite une entrée d'historique et un bouton d'enregistrement pour
+      // un geste qui n'a rien fait.
+      if (!tientAQuelquun) return;
+      pushHistory(`detacher:${id}`);
+      set({
+        walls: st.walls.map((w) => (w.id === id ? { ...w, libre: true } : w)),
         dirty: true,
       });
     },

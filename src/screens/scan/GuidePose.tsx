@@ -22,12 +22,11 @@
  * par-dessus : le mouvement part sur le fil natif, et la page reste fluide
  * même pendant que RoomPlan mouline derrière.
  */
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
   Modal,
-  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -260,6 +259,27 @@ export function GuidePose({
 }) {
   const c = useTheme();
   const styles = getStyles(c);
+  /*
+    UNE ÉTAPE À LA FOIS — relevé du chantier : « fais un step by step en
+    3 étapes avec possibilité de passer ».
+
+    Les trois scènes étaient empilées dans une page qui défilait : on voyait
+    trois animations tourner ensemble, on lisait la première, et l'on
+    fermait sans dérouler le reste. Une étape seule à l'écran se regarde ;
+    et comme rien d'autre ne bouge, l'œil suit le geste qu'on lui montre.
+
+    LA SORTIE EST TOUJOURS LÀ, en haut à droite et dès la première étape :
+    qui sait déjà s'en va, et personne n'est retenu dans une explication.
+  */
+  const [etape, setEtape] = useState(0);
+  // Chaque ouverture repart du début : c'est une explication, pas un
+  // formulaire dont on garde l'avancement.
+  useEffect(() => {
+    if (visible) setEtape(0);
+  }, [visible]);
+  const derniere = etape >= ETAPES.length - 1;
+  const { titre, texte, Scene } = ETAPES[etape];
+
   return (
     <Modal
       visible={visible}
@@ -268,35 +288,47 @@ export function GuidePose({
       onRequestClose={onFermer}>
       <View style={styles.fond}>
         <View style={styles.carte}>
-          <Text style={styles.titre}>Posez vos appareils en scannant</Text>
-          <Text style={styles.chapeau}>
-            Vous êtes devant le mur : c’est le meilleur moment pour dire où
-            iront les prises et les interrupteurs.
-          </Text>
-          <ScrollView
-            style={styles.corps}
-            contentContainerStyle={styles.corpsFond}
-            showsVerticalScrollIndicator={false}>
-            {ETAPES.map(({ titre, texte, Scene }, i) => (
-              <View key={titre} style={styles.etape}>
-                <Scene c={c} styles={styles} />
-                <View style={styles.etapeTexte}>
-                  <View style={styles.numero}>
-                    <Text style={styles.numeroTexte}>{i + 1}</Text>
-                  </View>
-                  <View style={styles.etapeMots}>
-                    <Text style={styles.etapeTitre}>{titre}</Text>
-                    <Text style={styles.etapeCorps}>{texte}</Text>
-                  </View>
-                </View>
-              </View>
+          <View style={styles.tete}>
+            <Text style={styles.titre}>Posez vos appareils en scannant</Text>
+            <TouchableOpacity
+              accessibilityLabel="Passer l’explication"
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              onPress={onFermer}>
+              <Text style={styles.passer}>Passer</Text>
+            </TouchableOpacity>
+          </View>
+
+          <Scene c={c} styles={styles} />
+
+          <View style={styles.etapeTexte}>
+            <View style={styles.numero}>
+              <Text style={styles.numeroTexte}>{etape + 1}</Text>
+            </View>
+            <View style={styles.etapeMots}>
+              <Text style={styles.etapeTitre}>{titre}</Text>
+              <Text style={styles.etapeCorps}>{texte}</Text>
+            </View>
+          </View>
+
+          {/* Les trois points : où l'on en est, et combien il en reste. */}
+          <View style={styles.points}>
+            {ETAPES.map((e, i) => (
+              <View
+                key={e.titre}
+                style={[styles.point, i === etape && styles.pointActif]}
+              />
             ))}
-          </ScrollView>
+          </View>
+
           <TouchableOpacity
             style={styles.valider}
-            accessibilityLabel="Compris, commencer le scan"
-            onPress={onFermer}>
-            <Text style={styles.validerTexte}>C’est compris</Text>
+            accessibilityLabel={
+              derniere ? 'Compris, commencer le scan' : 'Étape suivante'
+            }
+            onPress={() => (derniere ? onFermer() : setEtape((n) => n + 1))}>
+            <Text style={styles.validerTexte}>
+              {derniere ? 'C’est compris' : 'Suivant'}
+            </Text>
           </TouchableOpacity>
           <Text style={styles.rappel}>
             Le « ? » rouvre cette page pendant le scan.
@@ -321,11 +353,31 @@ const getStyles = (c: Palette) =>
       padding: 20,
       maxHeight: '88%',
     },
-    titre: { color: c.ink, fontSize: 20, fontWeight: '800' },
+    tete: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 12,
+      marginBottom: 14,
+    },
+    titre: { color: c.ink, fontSize: 18, fontWeight: '800', flex: 1 },
+    /** La sortie, offerte des la premiere etape : personne n est retenu. */
+    passer: { color: c.inkFaint, fontSize: 14, fontWeight: '700' },
+    points: {
+      flexDirection: 'row',
+      gap: 6,
+      justifyContent: 'center',
+      marginTop: 16,
+      marginBottom: 14,
+    },
+    point: {
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+      backgroundColor: c.line,
+    },
+    pointActif: { backgroundColor: c.blue, width: 18 },
     chapeau: { color: c.inkSoft, fontSize: 13.5, lineHeight: 19, marginTop: 6 },
-    corps: { marginTop: 14 },
-    corpsFond: { paddingBottom: 6 },
-    etape: { marginBottom: 18 },
     scene: {
       height: SCENE_H,
       borderRadius: radius.md,

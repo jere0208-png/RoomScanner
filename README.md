@@ -3370,6 +3370,43 @@ une capture d'écran : le plan est une liste de murs, on le retrace en
 quelques traits dans 54 px. Rien à stocker, rien à invalider — un scan
 retouché montre son nouveau contour à l'ouverture suivante de la liste.
 
+### Retours du chantier : l'accueil, le viseur, les retours de mur
+
+**Le bouton de l'accueil ne s'animait plus.** C'était le prix de la passe
+batterie : son liseré tournant reposait sur un décalage de pointillés, propriété
+sans équivalent natif, donc animée sur le fil JS — soixante réveils de
+JavaScript par seconde sur l'écran le plus longtemps affiché. On l'avait bornée
+à trois tours, après quoi le bouton restait figé. Un **reflet qui balaie** l'a
+remplacé : c'est une translation, que le fil natif porte de bout en bout. Elle
+tourne sans fin et ne coûte rien. Au passage, le bouton passe au **blanc cerné
+de bleu, texte bleu** — l'aplat pesait sur la page — et tous les boutons de
+l'accueil perdent un cran de hauteur.
+
+**Le viseur du scan n'était pas là où l'on visait.** Le carré était dessiné à
+46 % de la hauteur, quatre points au-dessus du centre, pour dégager la
+miniature 3D ; mais le rayon qui pose l'appareil part du **centre exact** de
+l'image. L'appareil se posait donc à côté du carré qu'on venait d'aligner. Deux
+repères pour un seul geste, c'est un de trop : le carré est descendu là où le
+rayon tire. Le bloc de pose, lui, perd un tiers de sa taille — il mangeait la
+vue sur ce qu'on scanne.
+
+**Le guide de pose est devenu un pas-à-pas.** Les trois scènes étaient empilées
+dans une page qui défilait : trois animations tournaient ensemble, on lisait la
+première et l'on fermait sans dérouler le reste. Une étape seule à l'écran se
+regarde. Et **« Passer » est offert dès la première** : qui sait déjà s'en va,
+personne n'est retenu dans une explication.
+
+**Un retour de mur est maintenant indépendant.** Relevé du chantier : « si
+j'essaye de prolonger ce retour, c'est le long mur qui est impacté ». Deux murs
+qui partagent un point bougent ensemble — c'est ce qu'il faut pour le coin
+d'une pièce, sans quoi le contour s'ouvre, la surface disparaît et le métré
+avec elle. Pour un retour qu'on allonge, c'est l'inverse. **On ne devine pas
+l'intention, on la dit** : « Détacher » dessoude le mur de ses voisins, sans le
+déplacer d'un millimètre — les murs se tiennent par leurs coordonnées, et les
+écarter aurait fait sauter le mur. Une marque suffit, que le déplacement de
+coin lit. Et **raccrocher, c'est ressouder** : un bout ramené à moins de vingt
+centimètres d'un autre s'y pose exactement et rend le mur solidaire.
+
 ### L'export DXF
 
 L'application ne sortait que du PDF : un document qu'on **lit**, jamais un

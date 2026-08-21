@@ -1,5 +1,5 @@
 /**
- * LE BOUTON À CONTOUR TOURNANT.
+ * LE BOUTON DE L'ACCUEIL.
  *
  * Un aplat bleu à coins arrondis, c'est le bouton de 2015 : il dit « ceci se
  * touche » et rien d'autre. Ce qu'on veut ici, c'est qu'il ATTIRE — l'accueil
@@ -7,18 +7,21 @@
  *
  * Trois choses le distinguent d'un rectangle peint :
  *
- * - **la translucidité** : le fond laisse voir ce qui passe dessous, si bien
- *   que le bouton appartient à l'écran au lieu d'être collé dessus ;
- * - **le contour qui court** : un segment lumineux fait le tour du bord, sans
- *   fin. C'est un mouvement lent — deux secondes et demie par tour — qui se
- *   remarque sans agiter ;
+ * - **le blanc cerné de bleu** : l'aplat pesait sur la page et écrasait ce
+ *   qui l'entoure. Le contour dit la même chose — « c'est ici qu'on appuie »
+ *   — en laissant la page respirer, et il va avec le logotype ;
+ * - **le reflet qui passe** : une bande claire traverse le bouton toutes les
+ *   trois secondes. Un mouvement lent, qui se remarque sans agiter ;
  * - **l'enfoncement** : à l'appui, le bouton recule légèrement. Un bouton qui
  *   ne bouge pas sous le doigt laisse douter qu'il a pris.
  *
- * Le segment est un tracé SVG dont le tireté se décale (`strokeDashoffset`).
- * Cette propriété n'a pas d'équivalent natif : elle s'anime donc sur le fil
- * JS, ce qui est acceptable ici — un seul contour, sur un écran qui ne fait
- * rien d'autre. Dès qu'un plan se dessine à côté, on ne s'offre pas ça.
+ * LE REFLET EST UNE TRANSLATION, et c'est tout son intérêt. Le contour
+ * tournant d'avant reposait sur un décalage de pointillés, propriété sans
+ * équivalent natif : l'animation vivait sur le fil JS — soixante réveils de
+ * JavaScript par seconde, sur l'écran le plus longtemps affiché de
+ * l'application. On l'avait bornée à trois tours pour épargner la batterie,
+ * après quoi le bouton restait figé, ce qui se voit tout de suite. Une
+ * translation part sur le fil natif : elle tourne sans fin, sans rien coûter.
  */
 import React, { useEffect, useRef } from 'react';
 import {
@@ -32,16 +35,13 @@ import {
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { radius, useTheme, type Palette } from '../theme';
 
-const AnimatedRect = Animated.createAnimatedComponent(Rect);
-
 /**
- * COMBIEN DE TOURS AVANT DE RENDRE LA MAIN.
+ * LA HAUTEUR DU REFLET, au-dela du bouton.
  *
- * Trois : le temps qu'on met à lire l'écran. Voir la boucle plus bas — c'est
- * la seule animation de l'application qui vivait sur le fil JS sans jamais
- * s'arrêter, et elle tournait sur l'écran le plus longtemps affiché.
+ * Penche a dix-huit degres, un bandeau de la hauteur exacte du bouton
+ * laisserait deux coins non couverts : on le fait deborder.
  */
-export const TOURS = 3;
+const H_REFLET = 40;
 
 export function GlowButton({
   label,
@@ -63,7 +63,6 @@ export function GlowButton({
   const c = useTheme();
   const styles = getStyles(c);
   const [taille, setTaille] = React.useState({ w: 0, h: 0 });
-  const course = useRef(new Animated.Value(0)).current;
   const appui = useRef(new Animated.Value(0)).current;
 
   /*
@@ -75,48 +74,47 @@ export function GlowButton({
     qu'on vient toucher.
   */
   const anime = variant === 'primary';
+  /*
+    LE REFLET TOURNE SANS RÉVEILLER PERSONNE.
+
+    Le bouton portait un liseré qui courait le long de son bord — un
+    décalage de pointillés, propriété que le fil natif ne sait pas animer.
+    L'animation vivait donc sur le FIL JS : soixante réveils de JavaScript
+    par seconde, sur l'écran que l'application montre le plus longtemps.
+    C'est ce qui faisait chauffer le téléphone, et on l'avait bornée à trois
+    tours pour cette raison — après quoi le bouton restait figé, ce qui se
+    voit tout de suite : « l'animation n'est plus animée ».
+
+    Un REFLET qui balaie le bouton s'anime, lui, par une TRANSLATION : le
+    fil natif la porte de bout en bout, et le JavaScript n'est réveillé ni
+    pour la lancer ni pour la suivre. Elle peut donc tourner indéfiniment
+    sans rien coûter, avec une pause entre deux passages pour rester
+    discrète. Le liseré, lui, reste — mais immobile : c'est le bord du
+    bouton, pas son animation.
+  */
+  const balai = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     if (disabled || !anime) return;
     const boucle = Animated.loop(
-      Animated.timing(course, {
-        toValue: 1,
-        duration: variant === 'primary' ? 2500 : 3800,
-        easing: Easing.linear,
-        // `strokeDashoffset` n'existe pas côté natif : l'animation vit sur
-        // le fil JS, et la boucle s'arrête avec le composant.
-        useNativeDriver: false,
-      }),
-      /*
-        IL FAIT SES TOURS, PUIS IL REND LA MAIN.
-
-        Relevé du chantier : « l'application fait chauffer le téléphone et
-        perdre la batterie rapidement ». Ce liseré en était la cause la plus
-        chère et la moins visible : l'animation vit sur le FIL JS — soixante
-        réveils de JavaScript par seconde, POUR TOUJOURS, sur l'écran que
-        l'application montre le plus longtemps. Un téléphone posé sur la
-        table, personne devant, continuait de calculer un trait qui tourne.
-
-        Trois tours suffisent à dire que le bouton est vivant : c'est le
-        temps qu'on met à lire l'écran. Ensuite le trait s'immobilise et le
-        processeur peut dormir. Chaque retour sur l'écran remonte le
-        composant, donc relance les trois tours : l'effet est intact, la
-        dépense ne l'est plus.
-      */
-      { iterations: TOURS },
+      Animated.sequence([
+        Animated.timing(balai, {
+          toValue: 1,
+          duration: 1100,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        // Le temps de respirer : un reflet qui repasse sans cesse devient
+        // un clignotant, et l'on finit par ne plus le voir.
+        Animated.delay(2200),
+        Animated.timing(balai, { toValue: 0, duration: 0, useNativeDriver: true }),
+      ]),
     );
     boucle.start();
     return () => boucle.stop();
-  }, [course, disabled, anime, variant]);
+  }, [balai, disabled, anime]);
 
   const H = taille.h || 56;
   const W = taille.w || 240;
-  const R = Math.min(H / 2, radius.lg);
-  // Le tour du rectangle arrondi : deux longueurs, deux largeurs, moins ce
-  // que les quatre quarts de cercle raccourcissent, plus leur arc.
-  const tour = 2 * (W - 2 * R) + 2 * (H - 2 * R) + 2 * Math.PI * R;
-  // Le segment lumineux couvre le quart du tour : assez long pour se voir
-  // passer, assez court pour qu'on sache où il va.
-  const segment = tour * 0.26;
 
   return (
     <Pressable
@@ -195,62 +193,53 @@ export function GlowButton({
           */}
           {right ? <View style={styles.suite}>{right}</View> : null}
         </View>
-        {/* Le contour : posé PAR-DESSUS le fond, mais transparent au doigt —
-            il ne doit pas voler l'appui qu'il invite à donner. */}
+        {/*
+          LE REFLET QUI PASSE — porté par le fil natif.
+
+          Une bande claire, penchée, qui traverse le bouton de gauche à
+          droite puis attend. C'est une simple TRANSLATION : elle s'anime
+          nativement, donc elle peut tourner sans fin sans réveiller le
+          JavaScript — contrairement au liseré qui courait ici, et qu'il
+          avait fallu borner à trois tours pour épargner la batterie.
+
+          Transparente au doigt : elle ne doit pas voler l'appui qu'elle
+          invite à donner.
+        */}
         {taille.w > 0 && !disabled && anime && (
-          <View style={StyleSheet.absoluteFill} pointerEvents="none">
-            <Svg width={W} height={H}>
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.reflet,
+              {
+                width: H * 1.5,
+                transform: [
+                  { rotate: '18deg' },
+                  {
+                    translateX: balai.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [-H * 2, W + H * 2],
+                    }),
+                  },
+                ],
+              },
+            ]}>
+            <Svg width={H * 1.5} height={H * 2.2}>
               <Defs>
-                <LinearGradient id="fil" x1="0" y1="0" x2="1" y2="1">
-                  <Stop
-                    offset="0"
-                    stopColor={variant === 'primary' ? '#FFFFFF' : c.blue}
-                    stopOpacity="0"
-                  />
-                  <Stop
-                    offset="0.5"
-                    stopColor={variant === 'primary' ? '#FFFFFF' : c.blue}
-                    stopOpacity="0.95"
-                  />
-                  <Stop
-                    offset="1"
-                    stopColor={variant === 'primary' ? '#FFFFFF' : c.blue}
-                    stopOpacity="0"
-                  />
+                <LinearGradient id="reflet" x1="0" y1="0" x2="1" y2="0">
+                  <Stop offset="0" stopColor={c.blue} stopOpacity="0" />
+                  <Stop offset="0.5" stopColor={c.blue} stopOpacity="0.16" />
+                  <Stop offset="1" stopColor={c.blue} stopOpacity="0" />
                 </LinearGradient>
               </Defs>
-              {/* Le liseré permanent : discret, il tient le bord quand le
-                  segment est de l'autre côté. */}
               <Rect
-                x={1}
-                y={1}
-                width={W - 2}
-                height={H - 2}
-                rx={R}
-                fill="none"
-                stroke={variant === 'primary' ? '#FFFFFF' : c.lineStrong}
-                strokeOpacity={variant === 'primary' ? 0.35 : 1}
-                strokeWidth={1.2}
-              />
-              <AnimatedRect
-                x={1}
-                y={1}
-                width={W - 2}
-                height={H - 2}
-                rx={R}
-                fill="none"
-                stroke="url(#fil)"
-                strokeWidth={2.4}
-                strokeLinecap="round"
-                strokeDasharray={`${segment} ${tour - segment}`}
-                strokeDashoffset={course.interpolate({
-                  inputRange: [0, 1],
-                  // Le tour complet, dans le sens de lecture.
-                  outputRange: [tour, 0],
-                })}
+                x={0}
+                y={0}
+                width={H * 1.5}
+                height={H * 2.2}
+                fill="url(#reflet)"
               />
             </Svg>
-          </View>
+          </Animated.View>
         )}
       </Animated.View>
     </Pressable>
@@ -269,32 +258,45 @@ const getStyles = (() => {
       bottom: 0,
       justifyContent: 'center',
     },
+      /*
+        UN CRAN PLUS PETIT — relevé du chantier.
+
+        Cinquante-six points de haut sur un écran de six pouces, c'était un
+        bouton de page d'accueil de site web. L'application en montre deux à
+        trois d'affilée : ils prenaient le tiers de la page pour trois mots.
+      */
       corps: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
         gap: 10,
-        minHeight: 56,
-        paddingHorizontal: 26,
+        minHeight: 50,
+        paddingHorizontal: 22,
         borderRadius: radius.lg,
         overflow: 'hidden',
       },
+      /** Le reflet qui balaie : plus haut que le bouton, pour couvrir ses coins. */
+      reflet: { position: 'absolute', top: -H_REFLET, bottom: -H_REFLET },
       /**
-       * TRANSLUCIDE, PAS OPAQUE.
+       * BLANC À TEXTE BLEU — relevé du chantier.
        *
-       * Le bleu laisse passer le fond : le bouton se pose sur l'écran au
-       * lieu d'y être collé. C'est ce que fait le système partout depuis que
-       * les matériaux ont remplacé les aplats.
+       * L'aplat bleu était le geste par défaut d'une application de 2015 :
+       * il pèse sur la page et écrase tout ce qui l'entoure. Le blanc cerné
+       * de bleu dit la même chose — « c'est ici qu'on appuie » — en laissant
+       * la page respirer, et il va avec le logotype.
+       *
+       * L'ombre reste TEINTÉE de bleu : elle soulève le bouton du fond sans
+       * le cerner d'un trait de plus.
        */
       primaire: {
-        backgroundColor: c.blue,
-        // Une ombre teintée de la couleur du bouton : elle le soulève sans
-        // le cerner d'un trait.
+        backgroundColor: c.surface,
+        borderWidth: 1.5,
+        borderColor: c.blue,
         shadowColor: c.blue,
-        shadowOpacity: 0.4,
-        shadowRadius: 18,
-        shadowOffset: { width: 0, height: 8 },
-        elevation: 8,
+        shadowOpacity: 0.22,
+        shadowRadius: 14,
+        shadowOffset: { width: 0, height: 6 },
+        elevation: 6,
       },
       fantome: {
         backgroundColor: c.surface,
@@ -305,8 +307,9 @@ const getStyles = (() => {
         borderColor: c.lineStrong,
       },
       eteint: { opacity: 0.45 },
-      texte: { fontSize: 16.5, fontWeight: '800', letterSpacing: -0.2 },
-      texteClair: { color: '#FFFFFF' },
+      texte: { fontSize: 15.5, fontWeight: '800', letterSpacing: -0.2 },
+      /* Le mot du bouton principal : bleu sur blanc, comme son contour. */
+      texteClair: { color: c.blue },
       texteSombre: { color: c.ink },
     });
   return (c: Palette) => {

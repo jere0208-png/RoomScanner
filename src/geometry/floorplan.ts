@@ -69,6 +69,20 @@ export interface WallSeg {
    * interrupteur de se retrouver à un étage où son mur n'est pas.
    */
   niveau?: number;
+  /**
+   * CE MUR NE TIENT PLUS SES VOISINS.
+   *
+   * Deux murs qui partagent un point bougent ensemble : c'est ce qu'il faut
+   * pour le coin d'une pièce, dont le contour doit rester fermé. Mais un
+   * retour qu'on veut simplement allonger ne doit toucher que lui — relevé
+   * du chantier : « si j'essaye de prolonger ce retour, c'est le long mur
+   * qui est impacté ».
+   *
+   * Détaché, le mur se déplace seul. Il redevient solidaire dès que l'aimant
+   * recolle une de ses extrémités au bout d'un autre : raccrocher, c'est
+   * ressouder.
+   */
+  libre?: boolean;
 }
 
 /** Pièce d'un élément, valeur par défaut comprise. */

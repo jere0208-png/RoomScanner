@@ -24,25 +24,81 @@ import { GuidePose } from '../src/screens/scan/GuidePose';
 const textes = (t: TestRenderer.ReactTestRenderer) =>
   t.root.findAllByType(Text).map((n) => String(n.props.children));
 
+const bouton = (t: TestRenderer.ReactTestRenderer, nom: string) =>
+  t.root
+    .findAllByType(TouchableOpacity)
+    .find((n) => n.props.accessibilityLabel === nom);
+
+/*
+  UNE ÉTAPE À LA FOIS — relevé du chantier : « fais un step by step en
+  3 étapes avec possibilité de passer ».
+
+  Ce banc lisait les trois temps du geste sur UNE page : ils y étaient
+  empilés dans une vue qui défilait, avec trois animations qui tournaient
+  ensemble. On lisait la première et l'on fermait sans dérouler le reste.
+
+  Les trois étapes se suivent maintenant. La vérification change donc de
+  forme : on avance de l'une à l'autre, et l'on vérifie qu'aucune ne manque
+  au passage.
+*/
 describe('la page qui montre le geste', () => {
-  it('dit les trois temps du geste, dans l’ordre', () => {
+  it('déroule les trois temps, un par un', () => {
     let t!: TestRenderer.ReactTestRenderer;
     act(() => {
       t = TestRenderer.create(<GuidePose visible onFermer={() => {}} />);
     });
-    const mots = textes(t).join(' | ');
-    // Viser, poser, et le fait que ça RESTE : c'est ce dernier point qui
-    // manquait le plus — rien ne disait que le repère survivait au scan.
-    expect(mots).toMatch(/Visez le mur/);
-    expect(mots).toMatch(/Appuyez/);
-    expect(mots).toMatch(/reste sur le mur/);
-    // Pas de jargon dans l'explication : c'est tout l'objet de la page.
-    expect(mots).not.toMatch(/\bPC\b/);
-    expect(mots).not.toMatch(/\bDCL\b/);
+    // Première étape SEULE à l'écran : viser.
+    expect(textes(t).join(' | ')).toMatch(/Visez le mur/);
+    expect(textes(t).join(' | ')).not.toMatch(/Appuyez/);
+
+    act(() => bouton(t, 'Étape suivante')?.props.onPress());
+    expect(textes(t).join(' | ')).toMatch(/Appuyez/);
+
+    act(() => bouton(t, 'Étape suivante')?.props.onPress());
+    // Le dernier temps, celui qui manquait le plus : rien ne disait que le
+    // repère survivait au scan.
+    expect(textes(t).join(' | ')).toMatch(/reste sur le mur/);
+    // Et la dernière étape ne propose plus de suivante.
+    expect(bouton(t, 'Étape suivante')).toBeUndefined();
+    expect(bouton(t, 'Compris, commencer le scan')).toBeTruthy();
     act(() => t.unmount());
   });
 
-  it('se referme, et retient qu’elle a été lue', () => {
+  it('n’emploie pas le jargon qu’elle vient expliquer', () => {
+    let t!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      t = TestRenderer.create(<GuidePose visible onFermer={() => {}} />);
+    });
+    for (let i = 0; i < 3; i++) {
+      const mots = textes(t).join(' | ');
+      expect(mots).not.toMatch(/\bPC\b/);
+      expect(mots).not.toMatch(/\bDCL\b/);
+      act(() => bouton(t, 'Étape suivante')?.props.onPress());
+    }
+    act(() => t.unmount());
+  });
+
+  it('se passe dès la première étape', () => {
+    /*
+      Qui sait déjà s'en va. Une explication dont on ne peut sortir qu'en la
+      lisant jusqu'au bout est une explication qu'on subit — et le geste
+      qu'elle décrit se paie alors d'un agacement.
+    */
+    let ferme = 0;
+    let t!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      t = TestRenderer.create(
+        <GuidePose visible onFermer={() => (ferme += 1)} />,
+      );
+    });
+    const passer = bouton(t, 'Passer l’explication');
+    expect(passer).toBeTruthy();
+    act(() => passer?.props.onPress());
+    expect(ferme).toBe(1);
+    act(() => t.unmount());
+  });
+
+  it('se referme au bout, et retient qu’elle a été lue', () => {
     // Une explication qui revient à chaque scan devient un obstacle : on
     // finit par la fermer sans la lire, et elle n'explique plus rien.
     let ferme = 0;
@@ -52,11 +108,9 @@ describe('la page qui montre le geste', () => {
         <GuidePose visible onFermer={() => (ferme += 1)} />,
       );
     });
-    const bouton = t.root
-      .findAllByType(TouchableOpacity)
-      .find((n) => n.props.accessibilityLabel === 'Compris, commencer le scan');
-    expect(bouton).toBeTruthy();
-    act(() => bouton?.props.onPress());
+    act(() => bouton(t, 'Étape suivante')?.props.onPress());
+    act(() => bouton(t, 'Étape suivante')?.props.onPress());
+    act(() => bouton(t, 'Compris, commencer le scan')?.props.onPress());
     expect(ferme).toBe(1);
     act(() => t.unmount());
   });
