@@ -3756,10 +3756,47 @@ qui était sur le chantier.
 **À faire une fois côté hébergement :** rejouer `server/migration-plans.sql`
 dans phpMyAdmin, puis renvoyer `server/api.php` par FTP.
 
-**Ce qui reste à brancher** : le dépôt automatique après enregistrement et la
-reprise automatique au premier lancement d'une app réinstallée. Les deux
-actions du magasin existent et sont testées (`deposerAuCompte`,
-`reprendreDuCompte`) ; il manque leurs déclencheurs.
+#### Les deux déclencheurs
+
+Les deux gestes existaient et étaient testés (`deposerAuCompte`,
+`reprendreDuCompte`) — mais **personne ne les appelait**. Un filet qu'on ne
+lance jamais ne rattrape rien : le patron pouvait réinstaller l'application et
+retrouver une bibliothèque vide alors qu'il avait un compte. Ils sont
+maintenant branchés aux deux seuls moments qui ont du sens.
+
+**La montée, à l'enregistrement.** Le dépôt s'accroche au geste par lequel un
+relevé devient un dossier : `commitCurrent` (le bouton « Enregistrer »), la
+fin de scan qui range le relevé toute seule, la duplication, et le renommage —
+un « Chantier Dupont » renommé ici mais resté « Sans titre » au coffre serait
+introuvable après une réinstallation. Le dépôt part **deux secondes après le
+dernier geste**, coalescé par plan : enregistrer, renommer et dupliquer se
+suivent souvent à la seconde près, et le même texte partirait trois fois — trois
+fois le forfait de données, sur un chantier où le réseau est déjà mauvais.
+Rien n'est attendu : le plan est déjà écrit dans le téléphone quand on arrive
+là, et un serveur injoignable ne se voit **nulle part**.
+
+**La descente, une fois, au lendemain d'une réinstallation.**
+`repriseAuBesoin` redescend ce que le compte garde, puis pose un marqueur
+(`roomscanner.reprise.v1`). Ce marqueur vit dans le stockage de l'application,
+donc il **part avec elle** : une vraie réinstallation le perd et la reprise se
+refait ; un lancement ordinaire le garde et ne redemande jamais rien. Sans lui,
+chaque matin reposerait les plans supprimés la veille — le contraire d'un
+service.
+
+Deux gardes tiennent cette reprise, et elles disent la même chose : **ne rien
+faire dans le doute**. Sans compte connecté, on ne marque rien — le patron
+ouvre souvent l'app avant de se connecter, et une reprise déclarée faite alors
+qu'elle n'a rien repris serait une bibliothèque perdue pour de bon. Et tant que
+la bibliothèque du téléphone n'est pas **relue** (`savesCharges`), on attend :
+comparer le coffre à un `saves` vide parce qu'on n'a pas encore lu ferait
+redescendre en double des plans déjà là. `App.tsx` attend donc les deux
+lectures — compte et bibliothèque — plutôt que de parier sur leur ordre, ce qui
+couvre du même geste l'app rouverte avec un compte en poche et la connexion qui
+suit une réinstallation.
+
+Le banc `synchro.test.tsx` tient les deux moments et surtout ce que la synchro
+n'a pas le droit de faire : bloquer un enregistrement, monter deux fois le même
+plan, écraser une bibliothèque locale qu'on n'a pas fini de lire.
 
 ### L'app rend la place qu'elle prend
 

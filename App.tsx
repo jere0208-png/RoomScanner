@@ -19,6 +19,8 @@ import { useAccountStore } from './src/store/accountStore';
 export default function App() {
   const screen = useScanStore((s) => s.screen);
   const loadSaves = useScanStore((s) => s.loadSaves);
+  const savesCharges = useScanStore((s) => s.savesCharges);
+  const repriseAuBesoin = useScanStore((s) => s.repriseAuBesoin);
   const compte = useAccountStore((s) => s.compte);
   const compteCharge = useAccountStore((s) => s.charge);
   const chargerCompte = useAccountStore((s) => s.charger);
@@ -29,6 +31,24 @@ export default function App() {
     loadSaves();
     chargerCompte();
   }, [loadSaves, chargerCompte]);
+
+  /*
+    LES PLANS DU COMPTE REDESCENDENT DÈS QUE LES DEUX SONT LÀ.
+
+    Deux chemins mènent ici, et c'est voulu : l'app rouverte avec un compte
+    déjà en poche, et la connexion qui suit une réinstallation. Les deux
+    lectures — bibliothèque locale et compte — sont asynchrones et
+    n'arrivent pas dans un ordre garanti ; on attend donc les DEUX plutôt
+    que de parier sur l'une. `repriseAuBesoin` se charge de ne le faire
+    qu'une fois.
+  */
+  useEffect(() => {
+    if (!compte || !savesCharges) return;
+    repriseAuBesoin().catch(() => {
+      // Un serveur muet ne se dit pas au lancement : les plans du téléphone
+      // sont là, et la reprise se retentera au prochain démarrage.
+    });
+  }, [compte, savesCharges, repriseAuBesoin]);
 
   /**
    * PAS D'APP SANS COMPTE. La porte d'entrée se montre tant que personne

@@ -14,7 +14,7 @@ import {
   deletePhotoFiles,
   reposerDuCoffre,
 } from '../ui/photos';
-import { useAccountStore } from './accountStore';
+import { identiteDuCompte, useAccountStore } from './accountStore';
 import {
   insetOnRing,
   type CeilingFixture,
@@ -432,6 +432,18 @@ const COLORS_KEY = 'roomscanner.openingColors.v1';
 const FURNITURE_KEY = 'roomscanner.showFurniture.v1';
 const SURFACES_KEY = 'roomscanner.showSurfaces.v1';
 const TEXTURES_KEY = 'roomscanner.showTextures.v1';
+/**
+ * LE MARQUEUR « J'AI DÉJÀ REPRIS MES PLANS ICI ».
+ *
+ * Il vit dans le stockage de l'application — donc il PART avec elle. C'est
+ * exactement ce qu'on veut : une réinstallation le perd, et la reprise se
+ * refait ; une app qui tourne depuis six mois le garde, et ne redemande
+ * jamais rien au serveur.
+ *
+ * Sans lui, chaque lancement reposerait les plans que l'électricien a
+ * supprimés la veille : le contraire d'un service.
+ */
+const REPRISE_KEY = 'roomscanner.reprise.v1';
 
 export type ThemePref = 'light' | 'dark';
 
@@ -533,6 +545,21 @@ function arreterBrouillon() {
   if (draftTimer) clearInterval(draftTimer);
   draftTimer = null;
 }
+
+/**
+ * DEUX SECONDES APRÈS LE DERNIER GESTE, LE PLAN MONTE.
+ *
+ * Enregistrer, renommer, dupliquer : trois gestes qui se suivent souvent à
+ * la seconde près, pour un seul et même relevé. Sans ce délai, le même
+ * texte partirait trois fois — trois fois le forfait de données du patron,
+ * sur un chantier où le réseau est déjà mauvais.
+ *
+ * Le délai est court exprès : ce qui compte, c'est que le plan soit AU
+ * COMPTE avant que le téléphone ne soit rangé dans la poche.
+ */
+const DEPOT_DELAI = 2000;
+/** Un dépôt en attente par plan : deux plans différents ne s'annulent pas. */
+const depots = new Map<string, ReturnType<typeof setTimeout>>();
 
 function persistSoon(saves: SavedScan[]) {
   if (persistTimer) clearTimeout(persistTimer);
@@ -922,6 +949,15 @@ interface ScanState {
 
   // Bibliothèque persistée
   saves: SavedScan[];
+  /**
+   * La bibliothèque du téléphone a été RELUE depuis le stockage.
+   *
+   * Tant que c'est faux, `saves` est vide parce qu'on n'a pas encore lu —
+   * pas parce qu'il n'y a rien. La reprise du compte s'y fie : comparer le
+   * coffre à une bibliothèque pas encore lue redescendrait en double des
+   * plans déjà là.
+   */
+  savesCharges: boolean;
   /** Dossiers de la bibliothèque, dans l'ordre de création. */
   folders: ScanFolder[];
   /** Crée un dossier et renvoie son identifiant. */
@@ -1152,6 +1188,15 @@ interface ScanState {
   /** Jette le brouillon : la question ne se reposera plus. */
   oublierBrouillon: () => void;
   loadSaves: () => Promise<void>;
+  /**
+   * REDESCEND LES PLANS DU COMPTE, UNE FOIS, APRÈS UNE RÉINSTALLATION.
+   *
+   * Rend le nombre de relevés repris. Ne fait rien tant que la
+   * bibliothèque locale n'est pas relue, ni sans compte connecté — et pose
+   * alors son marqueur, pour ne plus jamais reposer un plan que
+   * l'électricien aurait supprimé depuis.
+   */
+  repriseAuBesoin: () => Promise<number>;
   openSave: (id: string) => void;
   deleteSave: (id: string) => void;
   reset: () => void;
@@ -1244,6 +1289,38 @@ export const useScanStore = create<ScanState>((set, get) => {
     set({ canUndo: false });
   };
 
+  /*
+    LE DÉCLENCHEUR DE LA MONTÉE.
+
+    Le coffre et le geste `deposerAuCompte` existaient déjà, mais personne
+    ne les appelait : le patron pouvait réinstaller l'application et
+    retrouver une bibliothèque vide alors qu'il avait un compte. On accroche
+    donc le dépôt à l'ENREGISTREMENT — le geste par lequel un relevé devient
+    un dossier, et le seul moment où l'électricien considère son travail
+    comme acquis.
+
+    Rien n'est attendu : la fonction rend la main tout de suite, et un
+    serveur injoignable ne se voit nulle part. Le plan est déjà écrit dans
+    le téléphone quand on arrive ici.
+  */
+  const deposerPlusTard = (id: string) => {
+    const enCours = depots.get(id);
+    if (enCours) clearTimeout(enCours);
+    depots.set(
+      id,
+      setTimeout(() => {
+        depots.delete(id);
+        get()
+          .deposerAuCompte(id, identiteDuCompte())
+          .catch(() => {
+            // Un dépôt manqué ne se dit pas : le prochain enregistrement
+            // remontera le plan, et l'original n'a jamais quitté le
+            // téléphone.
+          });
+      }, DEPOT_DELAI),
+    );
+  };
+
   /** Recopie le scan courant dans son entrée de bibliothèque et persiste. */
   const syncCurrent = () => {
     const st = get();
@@ -1270,6 +1347,7 @@ export const useScanStore = create<ScanState>((set, get) => {
     );
     set({ saves });
     persistSoon(saves);
+    deposerPlusTard(st.currentSaveId);
   };
 
   return {
@@ -1307,6 +1385,7 @@ export const useScanStore = create<ScanState>((set, get) => {
     north: null,
     canUndo: false,
     saves: [],
+    savesCharges: false,
     folders: [],
     themePref: 'light',
     showOpeningColors: false,
@@ -3197,6 +3276,9 @@ export const useScanStore = create<ScanState>((set, get) => {
       AsyncStorage.removeItem(DRAFT_KEY).catch(() => {});
       clearHistory();
       persistSoon(saves);
+      // Un scan terminé est un dossier : il monte comme les autres, sans
+      // attendre que le patron pense à toucher « Enregistrer ».
+      deposerPlusTard(save.id);
     },
 
     /**
@@ -3469,6 +3551,10 @@ export const useScanStore = create<ScanState>((set, get) => {
         );
         set({ saves });
         persistSoon(saves);
+        // Le compte garde le NOM avec le plan : un « Chantier Dupont »
+        // renommé ici et resté « Sans titre » au coffre serait introuvable
+        // après une réinstallation.
+        deposerPlusTard(st.currentSaveId);
       }
     },
 
@@ -4029,6 +4115,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       const saves = [save, ...st.saves];
       set({ saves, currentSaveId: save.id, scanName: clean, dirty: false });
       persistSoon(saves);
+      deposerPlusTard(save.id);
     },
 
     addFolder: (name) => {
@@ -4208,6 +4295,38 @@ export const useScanStore = create<ScanState>((set, get) => {
       } catch {
         // Stockage illisible : on repart des valeurs en mémoire.
       }
+      // Lue ou illisible, la question est tranchée : ce que `saves` contient
+      // maintenant est TOUT ce que le téléphone avait. La reprise du compte
+      // peut s'y comparer sans risquer le doublon.
+      set({ savesCharges: true });
+    },
+
+    /*
+      LE LENDEMAIN D'UNE RÉINSTALLATION.
+
+      Le téléphone est neuf ou l'app a été réinstallée : les Documents sont
+      vides, mais le compte, lui, garde les relevés. On les redescend une
+      seule fois — et le marqueur qui le dit part avec l'application, donc
+      une vraie réinstallation le refera, et un lancement ordinaire jamais.
+
+      L'ordre compte : sans compte connecté, on ne marque RIEN. Le patron
+      ouvre souvent l'app avant de se connecter, et une reprise déclarée
+      faite alors qu'elle n'a rien repris serait une bibliothèque perdue
+      pour de bon.
+    */
+    repriseAuBesoin: async () => {
+      if (!get().savesCharges) return 0;
+      const qui = identiteDuCompte();
+      if (!qui) return 0;
+      try {
+        if (await AsyncStorage.getItem(REPRISE_KEY)) return 0;
+      } catch {
+        // Marqueur illisible : mieux vaut une reprise de trop qu'une
+        // bibliothèque vide. `reprendreDuCompte` ne pose que ce qui manque.
+      }
+      const repris = await get().reprendreDuCompte(qui);
+      AsyncStorage.setItem(REPRISE_KEY, String(Date.now())).catch(() => {});
+      return repris;
     },
 
     openSave: (id) => {

@@ -22,6 +22,7 @@
 import { create } from 'zustand';
 import { Linking } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { Identite } from '../net/coffrePlans';
 import {
   acheterAbonnement,
   connexionApple,
@@ -496,3 +497,20 @@ export const useAccountStore = create<AccountState>((set, get) => ({
     persister(get());
   },
 }));
+
+/*
+  L'IDENTITE DU COMPTE, POUR LE COFFRE.
+
+  Le couple identifiant+jeton se recopiait a la main partout ou l'on parle
+  au serveur. Le coffre a plans en a besoin lui aussi, depuis un AUTRE
+  store : il le demande ici plutot que d'aller fouiller deux champs.
+
+  Sans jeton, pas d'identite : une connexion hors ligne ouvre bien l'app,
+  mais le serveur, lui, n'a rien valide.
+*/
+export const identiteDuCompte = (): Identite | null => {
+  const s = useAccountStore.getState();
+  return s.compte && s.jeton
+    ? { identifiant: s.compte.id, jeton: s.jeton }
+    : null;
+};
