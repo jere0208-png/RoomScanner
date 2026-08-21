@@ -529,6 +529,20 @@ la referme d'un appui — le geste existe depuis la vague précédente, la
 boucle est complète. Un seul pas d'historique : une annulation défait le mur
 ET la porte.
 
+**La pastille est à l'ÉCHELLE du plan.** Elle faisait trente-quatre points,
+quel que soit le zoom — relevé du patron, capture à l'appui : « le + d'une
+ouverture sans porte est trop gros en dézoom ; il doit grandir au zoom avec
+les proportions ». Sur la vue d'ensemble d'un logement, celle qu'on regarde
+le plus, un bouton de trente-quatre points couvre une pièce entière. Elle
+vaut donc **vingt-cinq centimètres de plan** (la largeur d'un bloc de
+maçonnerie), avec deux bornes aux extrêmes : jamais moins de quatorze points
+— en dessous on ne la vise plus du doigt —, jamais plus de trente-quatre, sa
+taille d'avant, au-delà de laquelle c'est elle qu'on regarde au lieu du mur
+qu'elle referme. Et ce qu'on TOUCHE ne rétrécit pas avec elle : le débord
+reprend exactement ce que la pastille a rendu, la cible garde ses
+trente-quatre points. Ce qu'on vise est petit, ce qu'on touche reste large —
+la leçon du bouton de thème, appliquée là où elle sert encore.
+
 **Le geste de créer un mur existe enfin.** Seconde moitié de la phrase du
 patron : « ou d'en créer un facilement ». Et pour cause — le magasin savait
 poser un mur entre deux points (`addWallBetween`) depuis des mois, mais

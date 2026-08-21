@@ -37,7 +37,11 @@ import { WALL_MENU } from '../src/components/FloorplanEditor';
 import { estUnRetour, RetourGlisse } from '../src/components/RetourGlisse';
 import { light } from '../src/theme';
 import { SOLAIRES } from '../src/ui/solaires';
-import { cartoucheHeurte, nomDeMeuble } from '../src/components/FloorplanEditor';
+import {
+  cartoucheHeurte,
+  nomDeMeuble,
+  taillePastilleTrou,
+} from '../src/components/FloorplanEditor';
 import { Circle, Path, Polygon, Rect, Text as SvgText } from 'react-native-svg';
 import TestRenderer, { act } from 'react-test-renderer';
 import { ResultScreen } from '../src/screens/ResultScreen';
@@ -1967,3 +1971,46 @@ describe('le bandeau d’attente', () => {
     act(() => tree.unmount());
   });
 });
+
+/**
+ * LA PASTILLE DU TROU SUIT L'ÉCHELLE DU PLAN.
+ *
+ * Elle faisait trente-quatre points, quel que soit le zoom. Sur un plan
+ * dézoomé — la vue d'ensemble d'un logement, celle qu'on regarde le plus —
+ * elle couvrait une pièce entière : relevé du patron, capture à l'appui,
+ * « le + d'une ouverture sans porte est trop gros en dézoom ».
+ *
+ * Elle est maintenant une TAILLE DU MONDE : vingt-cinq centimètres de plan,
+ * comme un bloc de maçonnerie. Elle grandit donc avec le zoom, dans les
+ * proportions du dessin — et deux bornes la tiennent : jamais si petite
+ * qu'on ne puisse la viser, jamais plus grosse qu'elle ne l'était.
+ */
+describe('la pastille qui referme un trou', () => {
+  it('grandit avec le zoom, dans les proportions du plan', () => {
+    // Deux échelles courantes : le plan entier, puis le même zoomé trois
+    // fois. La pastille suit — c'est tout l'objet du correctif.
+    const large = taillePastilleTrou(60);
+    const proche = taillePastilleTrou(180);
+    expect(proche).toBeGreaterThan(large);
+    // Et elle suit VRAIMENT l'échelle, elle ne fait pas que bouger d'un
+    // point : entre les deux, le rapport est celui du zoom, à la borne près.
+    expect(proche / large).toBeGreaterThan(1.8);
+  });
+
+  it('ne dépasse jamais sa taille d’avant, ni ne devient invisible', () => {
+    // Très zoomé : elle s'arrête à trente-quatre — au-delà, c'est elle
+    // qu'on regarde au lieu du mur qu'elle referme.
+    expect(taillePastilleTrou(2000)).toBe(34);
+    // Très dézoomé : elle garde de quoi être vue et visée. Un bouton de
+    // six points sur un plan d'appartement ne se touche pas.
+    expect(taillePastilleTrou(5)).toBeGreaterThanOrEqual(14);
+  });
+
+  it('vaut vingt-cinq centimètres de plan entre les deux bornes', () => {
+    // À quatre-vingts pixels le mètre, vingt-cinq centimètres font vingt
+    // pixels : la règle est lisible, et c'est elle qu'on relit dans six
+    // mois plutôt qu'une table de correspondances.
+    expect(taillePastilleTrou(80)).toBe(20);
+  });
+});
+

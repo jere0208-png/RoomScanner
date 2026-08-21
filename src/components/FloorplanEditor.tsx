@@ -133,6 +133,25 @@ export function cartoucheHeurte(
 }
 
 /**
+ * LA TAILLE DE LA PASTILLE QUI REFERME UN TROU, À L'ÉCHELLE DU PLAN.
+ *
+ * Elle faisait trente-quatre points, quel que soit le zoom : sur la vue
+ * d'ensemble d'un logement — celle qu'on regarde le plus — elle couvrait
+ * une pièce entière. Relevé du patron, capture à l'appui : « le + d'une
+ * ouverture sans porte est trop gros en dézoom ; il doit grandir au zoom
+ * avec les proportions ».
+ *
+ * Elle est donc une taille DU MONDE : vingt-cinq centimètres de plan, la
+ * largeur d'un bloc de maçonnerie. Deux bornes la tiennent aux extrêmes —
+ * en dessous de quatorze points on ne la vise plus du doigt, au-dessus de
+ * trente-quatre c'est elle qu'on regarde au lieu du mur qu'elle referme.
+ */
+export const PASTILLE_TROU_M = 0.25;
+export function taillePastilleTrou(echelle: number): number {
+  return Math.round(Math.min(34, Math.max(14, echelle * PASTILLE_TROU_M)));
+}
+
+/**
  * UN SEGMENT PASSE-T-IL DANS UN CADRE ? — la question du menu de mur.
  *
  * Le menu d'un mur ne doit pas se poser sur le mur qu'on vient de choisir :
@@ -2293,6 +2312,7 @@ export function FloorplanEditor({
           {editable &&
             onComblerTrou &&
             trous.map((t, i) => {
+              const dPastille = taillePastilleTrou(mapping.scale);
               const p0 = mapping.toPx(t.a);
               const p1 = mapping.toPx(t.b);
               const mx = (p0.x + p1.x) / 2;
@@ -2300,13 +2320,36 @@ export function FloorplanEditor({
               return (
                 <TouchableOpacity
                   key={`combler-${i}`}
-                  style={[styles.trouPastille, { left: mx - 17, top: my - 17 }]}
+                  style={[
+                    styles.trouPastille,
+                    {
+                      width: dPastille,
+                      height: dPastille,
+                      borderRadius: dPastille / 2,
+                      left: mx - dPastille / 2,
+                      top: my - dPastille / 2,
+                    },
+                  ]}
                   accessibilityLabel={`Combler le trou de ${Math.round(
                     t.ecart * 100,
                   )} cm`}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  /*
+                    CE QU'ON VISE EST PETIT, CE QU'ON TOUCHE RESTE LARGE.
+
+                    La pastille rétrécit avec le plan ; le doigt, lui, ne
+                    rétrécit pas. Le débord reprend donc exactement ce
+                    qu'elle a rendu — la cible garde les trente-quatre
+                    points d'avant, plus les huit de marge.
+                  */
+                  hitSlop={(() => {
+                    const d = Math.max(8, (34 - dPastille) / 2 + 8);
+                    return { top: d, bottom: d, left: d, right: d };
+                  })()}
                   onPress={() => onComblerTrou(t)}>
-                  <Svg width={18} height={18} viewBox="0 0 24 24">
+                  <Svg
+                    width={dPastille * 0.53}
+                    height={dPastille * 0.53}
+                    viewBox="0 0 24 24">
                     {['M12 5 v14', 'M5 12 h14'].map((dd) => (
                       <Path
                         key={dd}
@@ -3572,11 +3615,10 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   /** Zone de saisie d'une poignée : posée sur le dessin, sans décor. */
   dragZone: { position: 'absolute' as const },
   /* La pastille qui referme un trou du relevé : rouge comme le manque. */
+  /* Taille et rayon viennent de l'échelle du plan : voir
+     `taillePastilleTrou`. Ici, ce qui ne dépend pas du zoom. */
   trouPastille: {
     position: 'absolute',
-    width: 34,
-    height: 34,
-    borderRadius: 17,
     backgroundColor: c.danger,
     alignItems: 'center',
     justifyContent: 'center',
