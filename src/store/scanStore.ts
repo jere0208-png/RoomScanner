@@ -6,6 +6,9 @@ import {
   reprendrePlan,
   type Identite,
 } from '../net/coffrePlans';
+import type { DepartExistant, TableauExistant } from '../geometry/existant';
+
+export type { TableauExistant };
 import {
   cleanModelFiles,
   deletePhotoFiles,
@@ -176,6 +179,12 @@ export interface BrouillonScan {
   ceiling: CeilingFixture[];
   photos: ScanPhoto[];
   modelPath: string | null;
+  /**
+   * Le tableau relevé sur place, s'il y en a un. Le brouillon existe pour
+   * qu'un téléphone qui meurt ne coûte pas la visite : le quart d'heure
+   * passé à noter les départs d'un tableau en fait partie.
+   */
+  existant?: TableauExistant;
 }
 
 export interface SavedScan {
@@ -194,6 +203,16 @@ export interface SavedScan {
   photos?: ScanPhoto[];
   /** Appareils de plafond — points lumineux, détecteurs, VMC. */
   ceiling?: CeilingFixture[];
+  /**
+   * LE TABLEAU QU'ON A TROUVÉ EN ARRIVANT.
+   *
+   * Un relevé de rénovation porte deux installations : celle qui existe et
+   * celle qu'on va poser. La première ne se dessine pas sur le plan — c'est
+   * une liste de départs — mais elle voyage avec le scan et s'imprime dans
+   * le dossier. Absente sur un chantier neuf, et sur tous les scans d'avant
+   * la rénovation.
+   */
+  existant?: TableauExistant;
   /** Dossier qui contient ce scan. Absent = à la racine. */
   folderId?: string;
   /**
@@ -624,6 +643,18 @@ interface ScanState {
    * « Ajouter un étage ». `null` = un scan ordinaire.
    */
   etageEnCours: number | null;
+  /**
+   * LE TABLEAU TROUVÉ SUR PLACE. `null` tant qu'on n'en a pas relevé un :
+   * un chantier neuf ne porte pas de feuille « existant ».
+   */
+  existant: TableauExistant | null;
+  /** Note un départ de plus sur le rail ; rend son identifiant. */
+  ajouterDepart: (d: Omit<DepartExistant, 'id'>) => string;
+  /** Corrige un départ déjà noté. */
+  modifierDepart: (id: string, champs: Partial<DepartExistant>) => void;
+  retirerDepart: (id: string) => void;
+  /** Décrit le contenant : rangées, modules par rangée, note libre. */
+  decrireTableau: (t: Partial<Omit<TableauExistant, 'departs'>>) => void;
   /** Change d'étage. */
   allerAuNiveau: (n: number) => void;
   /** Arme le prochain scan pour cet étage ; `null` désarme. */
@@ -1236,6 +1267,7 @@ export const useScanStore = create<ScanState>((set, get) => {
     pendingJoin: null,
     photos: [],
     ceiling: [],
+    existant: null,
     dirty: false,
     resultOrigin: 'scan',
     rooms: [],
@@ -2753,6 +2785,61 @@ export const useScanStore = create<ScanState>((set, get) => {
       });
     },
 
+    /*
+      LE TABLEAU EXISTANT — il naît du premier départ noté.
+
+      Pas de structure vide posée d'avance : sa seule présence commande la
+      feuille « installation existante » du dossier, et un chantier neuf
+      n'a rien à en dire. Elle apparaît quand on ouvre un tableau, pas
+      quand on ouvre l'application.
+    */
+
+    ajouterDepart: (d) => {
+      const id = `dep-${Date.now().toString(36)}-${Math.random()
+        .toString(36)
+        .slice(2, 5)}`;
+      const ex = get().existant;
+      set({
+        existant: {
+          ...(ex ?? { departs: [] }),
+          departs: [...(ex?.departs ?? []), { ...d, id }],
+        },
+        dirty: true,
+      });
+      return id;
+    },
+
+    modifierDepart: (id, champs) => {
+      const ex = get().existant;
+      if (!ex) return;
+      set({
+        existant: {
+          ...ex,
+          departs: ex.departs.map((d) =>
+            d.id === id ? { ...d, ...champs, id } : d,
+          ),
+        },
+        dirty: true,
+      });
+    },
+
+    retirerDepart: (id) => {
+      const ex = get().existant;
+      if (!ex) return;
+      set({
+        existant: { ...ex, departs: ex.departs.filter((d) => d.id !== id) },
+        dirty: true,
+      });
+    },
+
+    decrireTableau: (t) => {
+      const ex = get().existant;
+      set({
+        existant: { ...(ex ?? { departs: [] }), ...t },
+        dirty: true,
+      });
+    },
+
     niveauCourant: NIVEAU_RDC,
     etageEnCours: null,
     allerAuNiveau: (n) => set({ niveauCourant: n }),
@@ -3901,6 +3988,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         fixtures: st.fixtures,
         photos: st.photos,
         ceiling: st.ceiling,
+        existant: st.existant ?? undefined,
         north: st.north ?? undefined,
         client: st.client || undefined,
         address: st.address || undefined,
@@ -3970,6 +4058,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         rooms: st.rooms,
         fixtures: st.fixtures,
         ceiling: st.ceiling,
+        existant: st.existant ?? undefined,
         photos: st.photos,
         modelPath: st.modelPath,
       };
@@ -4105,6 +4194,8 @@ export const useScanStore = create<ScanState>((set, get) => {
         fixtures: save.fixtures ?? [],
         photos: save.photos ?? [],
         ceiling: save.ceiling ?? [],
+        // Le tableau trouvé sur place revient avec son relevé.
+        existant: save.existant ?? null,
         pendingJoin: null,
         // L'arrivage appartient au scan qui vient de finir : ouvert sur un
         // autre dossier, le popup proposerait d'y intégrer les meubles
@@ -4201,6 +4292,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         fixtures: [],
         photos: [],
         ceiling: [],
+        existant: null,
         north: null,
         // Le popup de fin de scan appartient au scan qui vient de finir.
         arrivage: null,

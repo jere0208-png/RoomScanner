@@ -19,6 +19,7 @@ import { getStyles } from './result/styles';
 import { fr } from './result/format';
 import { AddRoomSheet } from './result/AddRoomSheet';
 import { ElecSheet } from './result/ElecSheet';
+import { ExistantSheet } from './result/ExistantSheet';
 import { ExportSheet } from './result/ExportSheet';
 import { FurnitureSheet } from './result/FurnitureSheet';
 import { PhotoSheet } from './result/PhotoSheet';
@@ -390,6 +391,9 @@ export function ResultScreen() {
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [naming, setNaming] = useState(false);
   // Diagnostic du plan : ce dont il faut se méfier après un scan.
+  /** La feuille du tableau existant — rénovation. */
+  const [existantOuvert, setExistantOuvert] = useState(false);
+  const existant = useScanStore((s) => s.existant);
   const [checking, setChecking] = useState(false);
   // Choix du format d'export : plan PDF, modèle 3D, ou image de la vue.
   const [exporting, setExporting] = useState(false);
@@ -1822,6 +1826,23 @@ export function ResultScreen() {
                     },
                   },
                   {
+                    /*
+                      LE TABLEAU QU'ON TROUVE EN ARRIVANT.
+
+                      La moitié des chantiers est de la rénovation, et elle
+                      commence toujours pareil : on ouvre le tableau, on note
+                      ce qu'il y a, on dit au client ce qu'il faut reprendre.
+                      Les applications de plan dessinent du neuf ; celle-ci
+                      sait aussi lire ce qui est déjà là.
+                    */
+                    label: 'Relever le tableau existant',
+                    icon: 'piece' as const,
+                    hint: existant?.departs.length
+                      ? `${existant.departs.length} module(s) relevé(s).`
+                      : 'Rénovation : notez les départs, l’app dit ce qui cloche.',
+                    onPress: () => setExistantOuvert(true),
+                  },
+                  {
                     label: 'Scanner un sous-sol',
                     icon: 'piece' as const,
                     hint: 'Cave, garage, buanderie : il se range sous le plan.',
@@ -3089,6 +3110,19 @@ export function ResultScreen() {
         // Fermer sans valider : les meubles restent (ils sont déjà là),
         // rien ne se pose — et la question ne reviendra pas.
         onClose={() => useScanStore.getState().oublierArrivage()}
+      />
+
+      {/* ---------- Le tableau trouvé sur place (rénovation) ---------- */}
+      <ExistantSheet
+        visible={existantOuvert}
+        existant={existant}
+        onClose={() => setExistantOuvert(false)}
+        onAjouter={(d) => useScanStore.getState().ajouterDepart(d)}
+        onModifier={(id, champs) =>
+          useScanStore.getState().modifierDepart(id, champs)
+        }
+        onRetirer={(id) => useScanStore.getState().retirerDepart(id)}
+        onDecrire={(t) => useScanStore.getState().decrireTableau(t)}
       />
 
       {/* ---------- Diagnostic du plan ---------- */}

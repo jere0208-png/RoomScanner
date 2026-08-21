@@ -26,6 +26,11 @@ import {
   type RoomShape,
   type WallSeg,
 } from '../geometry/floorplan';
+import {
+  diagnosticExistant,
+  modulesLibres,
+  type TableauExistant,
+} from '../geometry/existant';
 import { dotStep, floorDots, mixHex } from '../geometry/appearance';
 import { wallLabel, type DeviceName } from '../geometry/naming';
 import {
@@ -225,6 +230,11 @@ export interface PdfOptions {
   textures?: boolean;
   /** Feuille de métré par pièce (surfaces, périmètres, murs nets). */
   metre?: boolean;
+  /**
+   * Le tableau trouve sur place, en renovation. Sa presence ajoute la
+   * feuille « installation existante » ; son absence ne change rien.
+   */
+  existant?: TableauExistant;
   /**
    * Le plafond, posé SUR le plan d'ensemble : points lumineux, détection,
    * ventilation, leurs cotes aux murs et le lien de commande de chacun.
@@ -2408,6 +2418,148 @@ function metrePage(ctx: SheetContext, sheet: string): string {
 }
 
 /**
+ * L'INSTALLATION EXISTANTE — ce qu'on a trouvé, et ce qu'il faut reprendre.
+ *
+ * C'est la feuille que le client garde et relit : le tableau tel qu'il est
+ * aujourd'hui, puis les constats, du plus grave au moins pressant. Chaque
+ * remède est écrit pour devenir une ligne de devis — c'est la même phrase
+ * qu'on lui dira au téléphone.
+ *
+ * Elle ne s'imprime QUE si un tableau a été relevé : un chantier neuf n'a
+ * rien à dire de l'existant, et une page vide dans un dossier remis au
+ * client donne l'impression d'un travail bâclé.
+ */
+function existantPage(
+  ctx: SheetContext,
+  sheet: string,
+  tableau: TableauExistant,
+): string {
+  const d = new Draw();
+  const x0 = FRAME.x + 24;
+  const w = FRAME.w - 48;
+  let y = TETE - 22;
+
+  const constats = diagnosticExistant(
+    tableau.departs,
+    tableau.rangees && tableau.parRangee
+      ? { rangees: tableau.rangees, parRangee: tableau.parRangee }
+      : undefined,
+  );
+
+  d.text('Installation existante', x0, y + 24, 13, INK, {
+    bold: true,
+    align: 'left',
+  });
+
+  /* ------------------------------------------------ le tableau tel quel */
+  const cols = [0, 0.34, 0.5, 0.72].map((f) => x0 + f * w);
+  ['Module', 'Calibre', 'Protège', 'Sous'].forEach((t, i) => {
+    d.text(t, cols[i], y, 8.5, GREY, { align: 'left' });
+  });
+  y -= 6;
+  d.line(x0, y, x0 + w, y, 0.8, INK);
+
+  /* Les différentiels sont numérotés D1, D2… : c'est ainsi qu'on renvoie
+     chaque départ au sien, sans redessiner un unifilaire. */
+  const rang = new Map(
+    tableau.departs
+      .filter((x) => x.organe === 'differentiel')
+      .map((x, i) => [x.id, `D${i + 1}`]),
+  );
+  for (const dep of tableau.departs) {
+    y -= 17;
+    if (y < FRAME.y + 90) break;
+    const nom =
+      dep.organe === 'differentiel'
+        ? `${rang.get(dep.id) ?? 'D'} — Différentiel ${dep.sensibilite ?? 30} mA${
+            dep.typeDiff ? ` type ${dep.typeDiff}` : ''
+          }`
+        : dep.organe === 'fusible'
+          ? 'Porte-fusible'
+          : dep.organe === 'agcp'
+            ? 'Disjoncteur d’abonné'
+            : 'Disjoncteur';
+    d.text(nom, cols[0], y, 9.5, INK, { align: 'left' });
+    d.text(dep.calibre ? `${dep.calibre} A` : '—', cols[1], y, 9.5, INK, {
+      align: 'left',
+    });
+    d.text(dep.usage || '—', cols[2], y, 9.5, GREY, { align: 'left' });
+    d.text(
+      dep.sousDifferentiel ? (rang.get(dep.sousDifferentiel) ?? '—') : '—',
+      cols[3],
+      y,
+      9.5,
+      GREY,
+      { align: 'left' },
+    );
+  }
+
+  if (tableau.rangees && tableau.parRangee) {
+    y -= 20;
+    const places = tableau.rangees * tableau.parRangee;
+    d.text(
+      `Tableau : ${tableau.rangees} rangée(s) de ${tableau.parRangee} — ` +
+        `${modulesLibres(
+          tableau.departs,
+          tableau.rangees,
+          tableau.parRangee,
+        )} module(s) libre(s) sur ${places}.`,
+      x0,
+      y,
+      9.5,
+      GREY,
+      { align: 'left' },
+    );
+  }
+
+  /* --------------------------------------------- ce qu'il faut reprendre */
+  y -= 30;
+  d.text('Ce qu’il faut reprendre', x0, y, 12, INK, {
+    bold: true,
+    align: 'left',
+  });
+  y -= 8;
+  d.line(x0, y, x0 + w, y, 0.8, INK);
+
+  for (const k of constats) {
+    if (y < FRAME.y + 80) break;
+    y -= 20;
+    const mot =
+      k.gravite === 'danger'
+        ? 'DANGER'
+        : k.gravite === 'ecart'
+          ? 'ÉCART'
+          : 'À VÉRIFIER';
+    d.text(mot, x0, y, 8, k.gravite === 'danger' ? '#C0392B' : GREY, {
+      bold: true,
+      align: 'left',
+    });
+    d.text(k.titre, x0 + 62, y, 10, INK, { bold: true, align: 'left' });
+    y -= 13;
+    for (const ligne of wrapText(k.detail, 9, w - 62)) {
+      d.text(ligne, x0 + 62, y, 9, GREY, { align: 'left' });
+      y -= 11;
+    }
+    /* La fleche ne survit pas au jeu de caracteres du PDF : elle sortait
+       en « -> ». Un mot le dit mieux, et c'est celui qu'on emploie devant
+       le client. */
+    d.text(`À faire : ${k.remede}`, x0 + 62, y, 9, INK, { align: 'left' });
+    y -= 4;
+  }
+
+  drawSheetChrome(d, {
+    project: ctx.name,
+    filename: ctx.filename,
+    client: ctx.client,
+    address: ctx.address,
+    sheetTitle: 'Installation existante',
+    sheet,
+    scaleLabel: null,
+  });
+  return d.stream();
+}
+
+/**
  * Schéma unifilaire : l'architecture de l'installation.
  *
  * Ce que lit un contrôleur ou un confrère avant tout le reste — d'où part
@@ -4336,6 +4488,8 @@ export function buildScanPdf(
 ): Uint8Array {
   const filename = pdfFilename(scan.name);
   const withMetre = opts.metre ?? true;
+  /* La feuille de l existant : seulement si un tableau a ete releve. */
+  const existant = opts.existant?.departs.length ? opts.existant : null;
   // Les schémas ne s'impriment que s'il y a une installation à montrer.
   const schemas = opts.schemas ?? null;
   const withSchema = !!schemas && schemas.rows.length > 0;
@@ -4385,6 +4539,7 @@ export function buildScanPdf(
   const total =
     1 +
     (withMetre ? 1 : 0) +
+    (existant ? 1 : 0) +
     (include3D ? vues.length : 0) +
     murs.length +
     (withSchema ? 1 : 0) +
@@ -4413,6 +4568,16 @@ export function buildScanPdf(
   const pages = [planPage(ctx, `1 / ${total}`, opts.plan, opts.measures2D ?? true)];
   if (withMetre) {
     pages.push(metrePage(ctx, `${pages.length + 1} / ${total}`));
+  }
+  /*
+    L'EXISTANT VIENT JUSTE APRÈS LE MÉTRÉ.
+
+    C'est l'ordre de la visite : voici le logement, voici ce qu'il y a
+    dedans aujourd'hui, voici ce qu'on propose. Le client lit le dossier
+    dans cet ordre-là, et c'est dans cet ordre qu'on lui en parle.
+  */
+  if (existant) {
+    pages.push(existantPage(ctx, `${pages.length + 1} / ${total}`, existant));
   }
   if (include3D) {
     vues.forEach((v, i) => {

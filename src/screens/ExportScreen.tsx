@@ -251,6 +251,7 @@ const styles = getStyles(c);
     walls,
     rooms.map((r) => r.floor),
   );
+  const existant = useScanStore((s) => s.existant);
   const north = useScanStore((s) => s.north);
   const client = useScanStore((s) => s.client);
   const address = useScanStore((s) => s.address);
@@ -450,6 +451,10 @@ const styles = getStyles(c);
             conv(v, boites.current[i] ?? { w: 1, h: 1 }),
           ),
           colorOpenings: showOpeningColors,
+          // Le tableau trouve sur place : sa feuille ne sort qu en renovation,
+          // et seulement au rez-de-chaussee — un tableau ne se releve qu une
+          // fois, il n a pas a se repeter sur le dossier de chaque etage.
+          existant: niveauCourant === 0 ? (existant ?? undefined) : undefined,
           measures2D,
           measures3D,
           schemas: schema ? schemas : null,

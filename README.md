@@ -3370,6 +3370,50 @@ une capture d'écran : le plan est une liste de murs, on le retrace en
 quelques traits dans 54 px. Rien à stocker, rien à invalider — un scan
 retouché montre son nouveau contour à l'ouverture suivante de la liste.
 
+### Le relevé de l'existant
+
+La moitié des chantiers d'un électricien est de la rénovation, et elle commence
+toujours pareil : on ouvre le tableau, on regarde ce qu'il y a, on dit au client
+ce qu'il faut reprendre. **Aucun concurrent généraliste ne sait faire ça** — ils
+dessinent du neuf. Le relevé se faisait sur un carnet, puis se ressaisissait le
+soir.
+
+On note donc les départs tels qu'ils sont, et l'application dit ce qui cloche au
+regard de la NF C 15-100. **Ce n'est pas un diagnostic réglementaire** : mesurer
+une terre demande un appareil et la main de quelqu'un. Mais tout ce qui SE VOIT
+dans un tableau ouvert — les différentiels, leur type, leur nombre, ce qu'ils
+portent, les calibres, la place qui reste — l'application le voit aussi.
+
+**Trois degrés, et ils comptent.** `danger` : ce qui expose quelqu'un
+aujourd'hui — pas de 30 mA, des porte-fusibles en service. `ecart` :
+l'installation tient mais n'est pas aux normes, et c'est ce qui se chiffre dans
+le devis. `vigilance` : ce qu'il faut aller voir sur place. Tout mettre en
+rouge, c'est n'alerter sur rien — un électricien qui voit douze lignes rouges
+sur un tableau correct cesse de lire la liste. **Un tableau correct ne dit rien
+de faux** : c'est le seul verdict qui vaut.
+
+La saisie passe avant la beauté : on est debout devant un tableau ouvert, une
+main sur le téléphone. Chaque départ se note **en deux appuis**, les calibres
+qu'on rencontre vraiment (2, 10, 16, 20, 32 A) sont des boutons, et l'usage se
+prend dans une liste — un mot tapé au doigt sur un chantier est un mot mal tapé.
+**Le verdict vit en haut** et se refait à chaque module noté : on voit
+l'installation se juger à mesure qu'on la décrit, au lieu d'attendre un bouton
+« analyser » qu'on oublierait d'appuyer.
+
+Deux règles qui viennent du métier : **le calibre se juge sur l'usage** — un
+20 A sur de l'éclairage laisse fondre le 1,5 mm² sans jamais se déclencher, et
+c'est l'écart le plus fréquent des tableaux qu'on ouvre. Et **la réserve ne se
+juge que si l'on connaît le contenant** : sans les rangées relevées, treize
+modules occupés peuvent aussi bien remplir un tableau de treize que d'en occuper
+le tiers ; annoncer un manque de place serait un faux constat.
+
+Le dossier PDF gagne une feuille **« Installation existante »**, placée juste
+après le métré — c'est l'ordre de la visite : voici le logement, voici ce qu'il
+y a dedans aujourd'hui, voici ce qu'on propose. Chaque remède y est écrit pour
+devenir une ligne de devis. Elle ne sort **que** si un tableau a été relevé, et
+seulement au rez-de-chaussée : un tableau ne se relève qu'une fois, il n'a pas à
+se répéter sur le dossier de chaque étage.
+
 ### Les étages
 
 Une maison, c'est un rez-de-chaussée **et** un étage. L'application ne

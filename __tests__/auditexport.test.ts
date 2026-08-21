@@ -332,3 +332,80 @@ describe('le cadrage de la scène', () => {
     expect(ca.radius3d).toBeCloseTo(cb.radius3d, 6);
   });
 });
+
+/**
+ * LA FEUILLE DE L'INSTALLATION EXISTANTE.
+ *
+ * En renovation, c'est la page que le client garde : ce qu'on a trouve dans
+ * son tableau, et ce qu'il faut reprendre. Elle ne doit sortir QUE s'il y a
+ * un tableau releve — une page vide dans un dossier remis au client donne
+ * l'impression d'un travail bacle.
+ */
+describe('la feuille de l’existant', () => {
+  const BASE = {
+    name: 'Renovation',
+    walls: MURS,
+    openings: BAIES,
+    objects: MEUBLES,
+    fixtures: PRISES,
+    rooms: PIECES,
+  };
+
+  it('n’apparait pas sur un chantier neuf', () => {
+    const sans = flux(buildScanPdf(BASE, false, { metre: false }));
+    expect(sans).not.toContain('Installation existante');
+    // Ni avec un tableau vide : c'est le meme cas, vu de l'application.
+    const vide = flux(
+      buildScanPdf(BASE, false, { metre: false, existant: { departs: [] } }),
+    );
+    expect(vide).not.toContain('Installation existante');
+  });
+
+  it('sort avec le tableau releve et ce qu’il faut reprendre', () => {
+    const pdf = flux(
+      buildScanPdf(BASE, false, {
+        metre: false,
+        existant: {
+          departs: [
+            {
+              id: 'f1',
+              organe: 'fusible',
+              calibre: 10,
+              usage: 'Eclairage',
+            },
+          ],
+          rangees: 1,
+          parRangee: 13,
+        },
+      }),
+    );
+    expect(pdf).toContain('Installation existante');
+    // Le verdict est sur la feuille, pas seulement a l'ecran : un tableau
+    // a fusibles sans differentiel, c'est deux constats graves.
+    expect(pdf).toContain('DANGER');
+    expect(pdf).toContain('reprendre');
+  });
+
+  it('ne deborde pas de la feuille, meme avec un tableau charge', () => {
+    // Trente-neuf modules : trois rangees pleines, le cas d'un pavillon
+    // refait par morceaux depuis quarante ans.
+    const departs = Array.from({ length: 39 }, (_, i) => ({
+      id: `d${i}`,
+      organe: 'disjoncteur' as const,
+      calibre: 16,
+      usage: 'Prises',
+    }));
+    const pdf = flux(
+      buildScanPdf(BASE, false, {
+        metre: false,
+        existant: { departs, rangees: 3, parRangee: 13 },
+      }),
+    );
+    for (const p of points(pdf)) {
+      expect(p.x).toBeGreaterThan(-1);
+      expect(p.x).toBeLessThan(PAGE_W + 1);
+      expect(p.y).toBeGreaterThan(-1);
+      expect(p.y).toBeLessThan(PAGE_H + 1);
+    }
+  });
+});
