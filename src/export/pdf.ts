@@ -31,6 +31,7 @@ import {
   modulesLibres,
   type TableauExistant,
 } from '../geometry/existant';
+import { echelleNormalisee, graduationsRegle } from './echelle';
 import { dotStep, floorDots, mixHex } from '../geometry/appearance';
 import { wallLabel, type DeviceName } from '../geometry/naming';
 import {
@@ -808,6 +809,8 @@ function drawSheetChrome(
     sheetTitle: string;
     sheet: string;
     scaleLabel: string | null;
+    /** Le denominateur de l echelle : la regle graphique en depend. */
+    scaleRatio?: number | null;
     /**
      * L'échelle du dessin en points par mètre : quand elle est là, le
      * cartouche dessine une BARRE D'ÉCHELLE graphique sous le ratio.
@@ -887,28 +890,34 @@ function drawSheetChrome(
   d.text(fitText(info.scaleLabel ?? '—', 9.5, width(1)), cols[1] + 12, ty + 12, 9.5, INK, {
     align: 'left',
   });
-  if (info.metersToPoints) {
-    // La longueur la plus ronde qui tient dans la case, étiquette comprise.
-    // Les paliers descendent sous le mètre : un plan de détail à 1:20 porte
-    // une barre de 50 ou 20 cm, comme les vrais.
-    const L = [5, 2, 1, 0.5, 0.2].find(
-      (m) => m * info.metersToPoints! <= width(1) - 16,
+  /*
+    LA RÈGLE GRAPHIQUE — la preuve de l'échelle annoncée juste au-dessus.
+
+    Un cartouche qui dit 1:50 se croit sur parole ; une règle se VÉRIFIE, et
+    elle survit à la photocopie qui a réduit la feuille — ce qui arrive à
+    tous les plans de chantier.
+
+    Ses graduations viennent de `graduationsRegle`, la même règle que celle
+    qui sert à choisir l'échelle : deux calculs séparés auraient fini par
+    dire deux choses différentes du même dessin.
+  */
+  if (info.metersToPoints && info.scaleRatio) {
+    const r = graduationsRegle(info.scaleRatio, width(1) - 16);
+    const bx = cols[1] + 12;
+    const by = ty + 3.5;
+    const wl = r.longueurPt;
+    // Deux moitiés, l'une pleine l'autre vide : le peigne se lit d'un coup
+    // d'œil, même mal imprimé.
+    d.rect(bx, by, wl / 2, 3, INK, INK, 0.4);
+    d.rect(bx + wl / 2, by, wl / 2, 3, '#FFFFFF', INK, 0.4);
+    d.text(
+      r.total < 1 ? `${Math.round(r.total * 100)} cm` : `${r.total} m`,
+      bx + wl + 3,
+      by,
+      5,
+      GREY,
+      { align: 'left' },
     );
-    if (L) {
-      const bx = cols[1] + 12;
-      const by = ty + 3.5;
-      const wl = L * info.metersToPoints;
-      d.rect(bx, by, wl / 2, 3, INK, INK, 0.4);
-      d.rect(bx + wl / 2, by, wl / 2, 3, '#FFFFFF', INK, 0.4);
-      d.text(
-        L < 1 ? `${Math.round(L * 100)} cm` : `${L} m`,
-        bx + wl + 3,
-        by,
-        5,
-        GREY,
-        { align: 'left' },
-      );
-    }
   }
 
   // Bloc feuille
@@ -1423,6 +1432,8 @@ function planPage(
   }
   let scaleLabel: string | null = null;
   let echellePtParM: number | undefined;
+  /** Le denominateur choisi : la regle graphique en depend. */
+  let echelleRatio: number | null = null;
   if (isFinite(minX)) {
     // Rien du plan ne peut sortir de la feuille : le zoom choisi dans
     // l'aperçu s'applique tel quel, et un plan agrandi allait jusqu'à
@@ -1434,17 +1445,36 @@ function planPage(
       FRAME.w - 4,
       FRAME.h - TITLE_H - 4 - BANDEAU,
     );
-    const fit = Math.min(
-      box.w / Math.max(maxX - minX, 0.5),
-      box.h / Math.max(maxZ - minZ, 0.5),
-    );
-    // Cadrage validé dans l'aperçu : zoom et décalage du plan.
-    const scale = fit * (planView?.zoom ?? 1);
-    // 1 m = scale pt = scale × 0,3528 mm → ratio réel arrondi à l'usage.
-    const ratio = 1000 / (scale * 0.352778);
-    const nice = [20, 25, 50, 75, 100, 125, 150, 200].find((v) => v >= ratio) ?? 250;
-    scaleLabel = `~ 1:${nice}`;
+    /*
+      UNE ÉCHELLE VRAIE, PAS UNE MISE À LA FEUILLE.
+
+      Le plan était étiré jusqu'aux bords du cadre et l'échelle DÉDUITE de
+      la place occupée : « ~ 1:100 » — le tilde disait la vérité, ce n'était
+      l'échelle de rien. Un architecte, un bureau d'études, un économiste de
+      la construction posent leur kutch sur le papier : à 1:98,3 toutes
+      leurs cotes sont fausses, et le document ne vaut plus que comme
+      illustration.
+
+      On choisit donc l'échelle NORMALISÉE la plus grande qui tienne dans le
+      cadre, et l'on trace à celle-là exactement. Le plan occupe un peu
+      moins de place : c'est le prix, et c'est ainsi que travaille tout le
+      monde.
+
+      LE ZOOM DE L'APERÇU CHOISIT L'ÉCHELLE au lieu de la casser : zoomer
+      fait passer de 1:100 à 1:75, puis à 1:50 — on reste toujours sur un
+      cran de la série.
+    */
+    const zoom = planView?.zoom ?? 1;
+    // Chaque direction impose son échelle ; on garde la plus contraignante,
+    // c'est-à-dire le plus grand dénominateur — sinon le plan déborde dans
+    // l'autre sens.
+    const eLarg = echelleNormalisee(box.w * zoom, maxX - minX);
+    const eHaut = echelleNormalisee(box.h * zoom, maxZ - minZ);
+    const choisie = eLarg.ratio >= eHaut.ratio ? eLarg : eHaut;
+    const scale = choisie.ptParMetre;
+    scaleLabel = choisie.label;
     echellePtParM = scale;
+    echelleRatio = choisie.ratio;
 
     const cxw = (minX + maxX) / 2;
     const czw = (minZ + maxZ) / 2;
@@ -2283,6 +2313,7 @@ function planPage(
     sheetTitle: titre,
     sheet,
     scaleLabel,
+    scaleRatio: echelleRatio,
     metersToPoints: echellePtParM,
   });
   return d.stream();

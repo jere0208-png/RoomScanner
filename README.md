@@ -3370,6 +3370,40 @@ une capture d'écran : le plan est une liste de murs, on le retrace en
 quelques traits dans 54 px. Rien à stocker, rien à invalider — un scan
 retouché montre son nouveau contour à l'ouverture suivante de la liste.
 
+### L'échelle vraie
+
+Le document sortait **« ~ 1:100 »**. Le tilde disait la vérité : le plan était
+étiré jusqu'aux bords du cadre, et l'échelle *déduite* de la place occupée puis
+arrondie pour l'affichage. Ce n'était l'échelle de rien. Un architecte, un
+bureau d'études, un économiste de la construction posent leur kutch sur le
+papier : à 1:98,3, toutes leurs cotes sont fausses et le document ne vaut plus
+que comme illustration.
+
+Le calcul est renversé. On choisit une **échelle normalisée** — 1:20, 1:25,
+1:50, 1:75, 1:100, 1:125, 1:150, 1:200, celles qu'on trouve sur une règle de
+dessinateur — la plus grande qui tienne dans le cadre, et l'on trace à celle-là
+exactement. Le plan occupe un peu moins de place : c'est le prix, et c'est
+ainsi que travaille tout le monde. Le cartouche affiche **« 1:75 »**, sans
+tilde.
+
+Deux bornes disent le métier : un plan minuscule ne se dessine pas à 1:5 — ce
+n'est pas une échelle de logement, et le trait de mur ferait un centimètre de
+large —, et un immeuble de quatre-vingt-dix mètres sort de la série, où l'on
+continue alors par crans de cinquante. **Le zoom de l'aperçu choisit
+l'échelle** au lieu de la casser : zoomer fait passer de 1:100 à 1:75, puis à
+1:50, toujours sur un cran de la série.
+
+La **règle graphique** du cartouche vient désormais du même calcul que
+l'échelle — deux calculs séparés auraient fini par dire deux choses
+différentes du même dessin — et sa série descend sous le mètre pour les plans
+de détail, où une barre de cinq mètres ne tiendrait pas.
+
+Le banc qui compte n'est pas celui du libellé, mais **la preuve par le
+tracé** : on construit une pièce de dix mètres, on relit les coordonnées du
+PDF produit et l'on vérifie que la distance dessinée correspond à ce que
+l'échelle promet. C'est le seul test qui protège l'architecte au bout de la
+chaîne.
+
 ### Ce qu'un audit a trouvé, et refermé
 
 Un tour complet de l'application, mené sur pièces, a sorti quatre défauts du
