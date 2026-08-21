@@ -19,6 +19,7 @@ export function ExportSheet({
   onObj,
   onMaterial,
   onCsv,
+  onDxf,
   onImage,
   onPresentation,
 }: {
@@ -30,6 +31,7 @@ export function ExportSheet({
   onObj: () => void;
   onMaterial: () => void;
   onCsv: () => void;
+  onDxf: () => void;
   onImage: () => void;
   onPresentation: () => void;
 }) {
@@ -69,6 +71,22 @@ export function ExportSheet({
       'Surfaces, appareillage, circuits et câble, en colonnes. ' +
         'À ouvrir dans Excel pour chiffrer.',
       onCsv,
+    ],
+    /*
+      LE DESSIN QU'ON REPREND, pas le document qu'on lit.
+
+      Le PDF se remet à un client ; le DXF s'ouvre chez un architecte, un
+      économiste, un cuisiniste, une menuiserie — qui le posent sous LEUR
+      projet et l'annotent. C'est le format d'échange du bâtiment depuis
+      quarante ans, et ne pas l'avoir fermait la porte des clients qui
+      paient le mieux.
+    */
+    [
+      'dxf',
+      'Plan DXF',
+      'Le dessin en calques, pour AutoCAD, ArchiCAD ou SketchUp. ' +
+        'À envoyer à un architecte.',
+      onDxf,
     ],
     [
       'image',

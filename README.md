@@ -3370,6 +3370,52 @@ une capture d'écran : le plan est une liste de murs, on le retrace en
 quelques traits dans 54 px. Rien à stocker, rien à invalider — un scan
 retouché montre son nouveau contour à l'ouverture suivante de la liste.
 
+### L'export DXF
+
+L'application ne sortait que du PDF : un document qu'on **lit**, jamais un
+dessin qu'on **reprend**. Un architecte, un économiste de la construction, un
+cuisiniste, une menuiserie demandent un fichier qu'ils ouvrent dans AutoCAD,
+ArchiCAD, SketchUp ou leur machine à commande numérique — et l'on ne pouvait
+pas répondre. C'est le format d'échange du bâtiment depuis quarante ans ; ne
+pas l'avoir fermait la porte des clients qui paient le mieux.
+
+**On écrit du R12 (AC1009)**, le dialecte que *tout* lit — y compris les vieux
+logiciels de menuiserie et les découpeuses. Les versions récentes apportent des
+entités dont un plan de logement n'a aucun besoin, et referment la
+compatibilité qu'on cherchait précisément à ouvrir. Même raison pour les
+quatre entités seulement : `LINE`, `POLYLINE`, `CIRCLE`, `TEXT`. Un dessin fait
+de primitives simples s'ouvre partout et se retouche sans surprise.
+
+Quatre décisions, et chacune évite une erreur qu'on ne voit qu'en aval :
+
+- **des calques préfixés** (`ECHOPLAN-MURS`, `-OUVERTURES`, `-MEUBLES`,
+  `-ELEC`, `-PIECES`, `-COTES`). Un architecte éteint ce qui ne le concerne
+  pas ; un plan où tout est mélangé ne se nettoie pas, et le préfixe évite
+  d'écraser **ses** calques à lui quand il colle notre dessin dans son projet ;
+- **des millimètres**, l'unité des plans d'exécution, annoncés par `$INSUNITS`
+  pour que le logiciel d'accueil mette le dessin à l'échelle sans qu'on ait à
+  l'expliquer dans un courriel ;
+- **l'axe retourné**. Le relevé compte z vers le bas comme un écran, le DXF y
+  vers le haut comme les mathématiques : sans retournement, le plan s'ouvre
+  **en miroir** chez le destinataire — portes à gauche au lieu de la droite —,
+  une erreur qui ne se voit qu'une fois le mobilier commandé ;
+- **les accents translittérés**. Le R12 est de l'ASCII : un « é » y devient un
+  caractère de contrôle et le fichier s'ouvre avec des noms de pièces
+  illisibles, quand il s'ouvre. « Séjour » devient « Sejour », ce qu'un
+  dessinateur lit sans y penser.
+
+Les murs sortent **avec leur épaisseur** — le même contour que le PDF,
+jonctions d'onglet comprises : un mur réduit à son axe obligerait le
+destinataire à redonner l'épaisseur cloison par cloison. L'appareillage sort
+en repères simples, sur son propre calque, plutôt qu'en symboles normalisés
+qui ne se retoucheraient pas et que chaque logiciel dessine à sa façon.
+
+Le banc qui compte relit le fichier **comme le fera AutoCAD** : un automate
+qui suit les paires code/valeur, reconstruit les entités et mesure la
+géométrie obtenue. Vérifier que le fichier *contient* les bonnes chaînes ne
+prouverait rien — c'est le lecteur qui décide si le dessin s'ouvre ou si le
+logiciel affiche « fichier corrompu ».
+
 ### L'échelle vraie
 
 Le document sortait **« ~ 1:100 »**. Le tilde disait la vérité : le plan était

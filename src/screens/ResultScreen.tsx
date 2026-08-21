@@ -99,6 +99,7 @@ import {
 } from '../geometry/nfc15100';
 import { buildMaterialPdf, materialFilename, toBase64 } from '../export/pdf';
 import { buildMetreCsv, metreFilename, type RoomMetre } from '../export/csv';
+import { buildDxf, dxfFilename } from '../export/dxf';
 import {
   FIXTURES,
   COMMANDES_MURALES,
@@ -929,6 +930,33 @@ export function ResultScreen() {
       await RoomScan.shareText(
         buildMetreCsv(scanName, metre, list),
         metreFilename(scanName),
+      );
+    } catch (e: any) {
+      Alert.alert('Export impossible', e?.message ?? 'Erreur inconnue');
+    }
+  };
+
+  /*
+    LE PLAN EN DXF — le dessin qu'on reprend.
+
+    Le PDF se remet à un client ; le DXF s'ouvre chez un architecte, un
+    économiste, un cuisiniste — qui le posent sous LEUR projet et
+    l'annotent. Il part par le même chemin que le métré : un fichier texte,
+    et la feuille de partage du système.
+
+    Il porte le NIVEAU AFFICHÉ, comme le PDF : un fichier qui empilerait
+    deux étages donnerait un dessin où les murs du haut traversent les
+    pièces du bas, et personne ne saurait les démêler.
+  */
+  const shareDxf = async () => {
+    try {
+      await RoomScan.shareText(
+        buildDxf({ walls, openings, rooms, fixtures, objects }),
+        dxfFilename(
+          niveaux.length > 1
+            ? `${scanName} ${abregerNiveau(niveauCourant)}`
+            : scanName,
+        ),
       );
     } catch (e: any) {
       Alert.alert('Export impossible', e?.message ?? 'Erreur inconnue');
@@ -3238,6 +3266,10 @@ export function ResultScreen() {
         onCsv={() => {
           setExporting(false);
           apresFermeture(shareCsv);
+        }}
+        onDxf={() => {
+          setExporting(false);
+          apresFermeture(shareDxf);
         }}
         onImage={() => {
           setExporting(false);

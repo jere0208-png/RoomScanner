@@ -21,6 +21,7 @@ export type ExportArtKind =
   | 'obj'
   | 'materiel'
   | 'csv'
+  | 'dxf'
   | 'image'
   | 'presentation';
 
@@ -42,6 +43,7 @@ const TEINTE = (kind: ExportArtKind, c: Palette): string =>
     obj: '#EAF6F2',
     materiel: '#FDF1E4',
     csv: '#E9F7EE',
+    dxf: '#EDEFF4',
     image: '#F2ECFB',
     presentation: '#E9F3FF',
   }[kind]);
@@ -106,6 +108,32 @@ const DESSINS: Record<ExportArtKind, (c: Palette) => React.ReactNode> = {
    * distingue, c'est ce qu'on en fait. L'un se remet, l'autre se chiffre. Une
    * grille aux colonnes marquées le dit sans un mot.
    */
+  /*
+    LE DXF : un plan d angle, avec ses lignes d axe.
+
+    C est le dessin qu on REPREND, pas le document qu on lit : la tuile
+    montre donc de la geometrie nue — deux murs d equerre et les axes qui
+    les prolongent, comme dans une fenetre de CAO.
+  */
+  dxf: (c) => (
+    <>
+      <Path
+        d="M11 33 V13 h20"
+        stroke={c.ink}
+        strokeWidth={3.2}
+        fill="none"
+        strokeLinecap="round"
+      />
+      <Path
+        d="M8 20 h28 M20 8 v28"
+        stroke={c.blue}
+        strokeWidth={1}
+        opacity={0.5}
+        strokeDasharray="3 3"
+      />
+      <Rect x={17} y={17} width={6} height={6} fill="none" stroke={c.blue} strokeWidth={1.3} />
+    </>
+  ),
   csv: (c) => (
     <>
       <Rect
