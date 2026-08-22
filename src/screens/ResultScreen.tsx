@@ -939,6 +939,10 @@ export function ResultScreen() {
         list.circuits,
         cheminements?.metre,
         cheminements?.approx,
+        // L'appareillage donne le NOMBRE DE CONDUCTEURS, et c'est lui qui
+        // decide du diametre — releve du patron : « les diametres
+        // recommandes pour chaque tirage selon nombre de fils aux normes ».
+        fixtures,
       );
       const tirage = { pull, buy: buyingList(pull, fixtures, ceiling) };
       const bytes = buildMaterialPdf(scanName, list, tirage);

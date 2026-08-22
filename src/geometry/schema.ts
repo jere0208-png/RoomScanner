@@ -109,9 +109,26 @@ export function wiresOf(circuit: Circuit, fixtures?: Fixture[]): Wire[] {
   const commandes = poses
     ? poses.filter((f) => COMMANDES.includes(f.kind)).length
     : 1;
-  const lumieres = poses
-    ? poses.filter((f) => LUMIERES.includes(f.kind)).length
-    : 1;
+  /*
+    LES POINTS DE PLAFOND COMPTENT AUSSI — et c'est ce qui manquait.
+
+    Releve du patron : « le schema multifilaire dit n'importe quoi,
+    interrupteur et point lumineux il dit juste 3 fils a l'eclairage ». La
+    cause est une frontiere interne : un DCL, un spot, une VMC ne vivent pas
+    dans la liste de l'appareillage MURAL — ils ont la leur, parce qu'ils se
+    posent dans une piece et non sur une face de mur.
+
+    Le calcul ne regardait que les murs, n'y trouvait aucune lampe, et
+    concluait qu'il n'y avait rien a commander : phase, neutre, terre, et
+    rien d'autre. Or le retour de lampe est precisement le conducteur qui
+    distingue un circuit d'eclairage d'une simple alimentation — l'oublier,
+    c'est sous-compter le fil au metre et decrire un cablage qui n'existe
+    pas sur un document technique.
+  */
+  const auPlafond = circuit.ceilingIds?.length ?? 0;
+  const lumieres =
+    (poses ? poses.filter((f) => LUMIERES.includes(f.kind)).length : 1) +
+    auPlafond;
   const vaEtVient = poses
     ? commandes >= 2 || poses.some((f) => f.kind === 'va')
     : false;

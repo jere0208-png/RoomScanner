@@ -4671,6 +4671,47 @@ vide — la 3D la découpe hors maçonnerie et le métré compte une pose
 impossible. Le chiffre qu'on relit après coup dit alors la vérité, ce qu'un
 refus muet ne ferait pas.
 
+### Le schema multifilaire disait trois fils a l'eclairage
+
+Releve du patron : « le schema multifilaire dit n'importe quoi, interrupteur
+et point lumineux il dit juste 3 fils a l'eclairage ».
+
+Il a raison, et la cause est une FRONTIERE INTERNE de l'application : les
+points lumineux de plafond — DCL, spots, VMC — ne vivent pas dans la liste de
+l'appareillage MURAL, ils ont la leur, parce qu'ils se posent dans une piece
+et non sur une face de mur. Le calcul des conducteurs ne regardait que les
+murs, n'y trouvait aucune lampe, et concluait qu'il n'y avait rien a
+commander : phase, neutre, terre, et rien d'autre.
+
+Or le cablage d'un simple allumage est connu de tout electricien : du tableau
+au point, phase, neutre et terre ; du point a l'interrupteur, la phase qui
+part et le RETOUR DE LAMPE qui revient. Le retour est precisement le
+conducteur qui distingue un circuit d'eclairage d'une simple alimentation —
+l'oublier, c'est sous-compter le fil au metre et decrire un cablage qui
+n'existe pas sur un document technique.
+
+### Le diametre d'une gaine se calcule sur le nombre de fils
+
+Suite du meme releve : « les diametres recommandes pour chaque tirage selon
+nombre de fils aux normes ». L'application choisissait sur la SEULE section :
+1,5 mm² donnait ICTA 16, quel que soit le compte. C'est vrai pour trois fils,
+et faux des le quatrieme — un va-et-vient en tire six, et six ne passent pas
+dans du 16.
+
+La regle de la norme est celle du TIERS : la somme des sections exterieures
+des conducteurs ne depasse pas le tiers de la section interieure du conduit.
+C'est ce qui rend le tirage possible a la main — au-dela, le faisceau coince
+dans les coudes et l'on tire au treuil ce qui devrait glisser.
+
+Deux pieges valaient d'etre ecrits noir sur blanc : c'est l'ISOLANT qui
+occupe le conduit, pas le cuivre (un 1,5 mm² mesure trois millimetres hors
+tout) ; et le nombre qui NOMME une gaine est son diametre EXTERIEUR — un ICTA
+16 ne laisse passer que dix millimetres et demi. Confondre les deux fait
+croire qu'on tire six fils la ou trois passent a peine.
+
+Le compte de fils s'imprime a cote du conduit : celui qui tire doit pouvoir
+verifier avant de commander la couronne.
+
 ### La surface se voyait a travers les murs
 
 Releve du patron, capture 3D a l'appui : « la surface ne doit pas se voir a

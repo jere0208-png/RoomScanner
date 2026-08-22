@@ -24,11 +24,80 @@
 import { CEILINGS, type CeilingFixture } from './ceiling';
 import { FIXTURES, postsOf, type Fixture } from './electrical';
 import type { Circuit } from './nfc15100';
+import { wiresOf } from './schema';
 
 /** Diamètre extérieur du conduit ICTA, en millimètres. */
 export type ConduitD = 16 | 20 | 25 | 32;
 
-/** Le conduit qui convient à un circuit. */
+/**
+ * DIAMÈTRE EXTÉRIEUR D'UN CONDUCTEUR ISOLÉ H07V-U, en millimètres.
+ *
+ * C'est l'isolant qui occupe le conduit, pas le cuivre : un 1,5 mm² mesure
+ * trois millimètres de diamètre hors tout, soit sept millimètres carrés
+ * d'encombrement. Ce sont ces valeurs-là qui décident du tirage.
+ */
+const D_CONDUCTEUR: Record<number, number> = {
+  1.5: 3.0,
+  2.5: 3.6,
+  4: 4.2,
+  6: 4.8,
+  10: 6.4,
+  16: 7.8,
+};
+
+/**
+ * DIAMÈTRE INTÉRIEUR UTILE d'un ICTA, en millimètres.
+ *
+ * Le nombre qui nomme la gaine est son diamètre EXTÉRIEUR : un ICTA 16 ne
+ * laisse passer que dix millimètres et demi. Confondre les deux fait croire
+ * qu'on tire six fils là où trois passent à peine.
+ */
+const D_INTERIEUR: Record<ConduitD, number> = {
+  16: 10.7,
+  20: 14.1,
+  25: 18.3,
+  32: 24.3,
+};
+
+/**
+ * LE CONDUIT QUI CONVIENT, SELON LE NOMBRE DE FILS — la règle du tiers.
+ *
+ * Relevé du patron : « les diamètres recommandés pour chaque tirage selon
+ * nombre de fils aux normes ». L'application choisissait sur la SEULE
+ * section : 1,5 mm² donnait ICTA 16, quel que soit le compte. C'est vrai
+ * pour trois fils, et faux dès le quatrième — un va-et-vient en tire six, et
+ * six ne passent pas dans du 16.
+ *
+ * La norme borne le remplissage AU TIERS de la section intérieure du
+ * conduit. C'est ce qui rend le tirage possible à la main : au-delà, le
+ * faisceau coince dans les coudes et l'on tire au treuil ce qui devrait
+ * glisser. On calcule donc, plutôt que de recopier une table — et le calcul
+ * se vérifie.
+ *
+ * Les courants faibles gardent leur ICTA 25 : on y tire rarement une seule
+ * paire, et une gaine trop juste se paie au tirage.
+ */
+export function conduitPour(
+  section: number | null,
+  fils: number,
+): ConduitD {
+  if (section === null) return 25;
+  const d = D_CONDUCTEUR[section] ?? D_CONDUCTEUR[1.5];
+  const occupee = Math.max(1, fils) * Math.PI * (d / 2) ** 2;
+  for (const taille of [16, 20, 25, 32] as ConduitD[]) {
+    const utile = (Math.PI * D_INTERIEUR[taille] ** 2) / 4 / 3;
+    if (occupee <= utile) return taille;
+  }
+  return 32;
+}
+
+/**
+ * Le conduit qui convient à un circuit, d'après sa seule section.
+ *
+ * Reste employée là où le nombre de conducteurs n'est pas connu : elle vaut
+ * le câblage à trois fils, le plus courant. Quand on les compte, c'est
+ * `conduitPour` qui tranche.
+ */
 export function conduitFor(section: number | null): ConduitD {
   if (section === null) return 25; // courants faibles
   if (section <= 1.5) return 16;
@@ -40,6 +109,15 @@ export function conduitFor(section: number | null): ConduitD {
 export interface PullRow {
   circuitId: string;
   label: string;
+  /**
+   * Nombre de conducteurs tirés dans la gaine.
+   *
+   * C'est lui qui décide du diamètre, avec la section — relevé du patron :
+   * « les diamètres recommandés pour chaque tirage selon nombre de fils aux
+   * normes ». Il s'imprime à côté du conduit : celui qui tire doit pouvoir
+   * vérifier le compte avant de commander la couronne.
+   */
+  fils: number;
   /** Section des conducteurs (mm²), nulle en courants faibles. */
   section: number | null;
   conduit: ConduitD;
@@ -70,15 +148,23 @@ export function pullSchedule(
   metre?: Map<string, { conduit: number; cable: number; runs: number }>,
   /** Circuits dont le tracé longe un contour reconstitué (voir `ElecPlan`). */
   approx?: Set<string>,
+  /**
+   * L'appareillage posé, quand on l'a : il donne le NOMBRE DE CONDUCTEURS,
+   * et c'est lui qui décide du diamètre — voir `conduitPour`. Sans lui, on
+   * s'en tient au câblage à trois fils.
+   */
+  fixtures?: Fixture[],
 ): PullRow[] {
   return circuits.map((c) => {
     const m = metre?.get(c.id);
+    const fils = wiresOf(c, fixtures).length;
     return {
       approx: !!approx?.has(c.id),
       circuitId: c.id,
       label: c.label,
       section: c.section,
-      conduit: conduitFor(c.section),
+      fils,
+      conduit: conduitPour(c.section, fils),
       runs: m?.runs ?? c.fixtureIds.length,
       conduitLength: Math.ceil(m?.conduit ?? 0),
       cableLength: Math.ceil(m?.cable ?? 0),
