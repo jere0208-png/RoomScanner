@@ -314,6 +314,7 @@ export function ResultScreen() {
   const removeOpening = useScanStore((s) => s.removeOpening);
   const moveOpening = useScanStore((s) => s.moveOpening);
   const setAllege = useScanStore((s) => s.setAllege);
+  const setOpeningType = useScanStore((s) => s.setOpeningType);
   const addObject = useScanStore((s) => s.addObject);
   const rotateObject = useScanStore((s) => s.rotateObject);
 
@@ -3501,6 +3502,38 @@ export function ResultScreen() {
                       'tombe sur le mur, de quel côté elle s’ouvre, et ce ' +
                       'qui la coiffe.',
                     actions: [
+                      /*
+                        CE QU'ELLE EST — la première question, avant toute cote.
+
+                        Une ouverture posée à la main sortait toujours en
+                        BAIE, et rien ne permettait de dire autre chose : un
+                        plan tracé sans scanner ne comportait ni porte ni
+                        fenêtre, rien que des trous. Or la nature commande
+                        le dessin (le battant d'une porte, qui dit de quel
+                        côté se pose l'interrupteur) et les cotes (l'allège
+                        d'une fenêtre, qui décide d'une prise dessous).
+
+                        On ne propose que les DEUX AUTRES natures : un
+                        bouton qui redit ce qu'on est déjà ne fait rien, et
+                        un bouton qui ne fait rien se lit comme un geste
+                        raté.
+                      */
+                      ...(
+                        [
+                          ['door', 'C’est une porte'],
+                          ['window', 'C’est une fenêtre'],
+                          ['opening', 'C’est une baie libre'],
+                        ] as const
+                      )
+                        .filter(([t]) => t !== selectedOpening.type)
+                        .map(([t, mot]) => ({
+                          label: mot,
+                          icon: 'menuiserie' as const,
+                          onPress: () => {
+                            setOpeningType(selectedOpening.id, t);
+                            haptic('succes');
+                          },
+                        })),
                       {
                         /*
                           « LA PORTE À QUATRE-VINGT-DIX DU MUR » : la cote

@@ -148,6 +148,14 @@ const ICONS: Record<string, string[]> = {
     'M5 4 h7 v9 h-7',
     'M12.5 4.2 a9 9 0 0 1 6.3 8.8',
   ],
+  /*
+    LA MENUISERIE DANS SON MUR : ce qu'est cette ouverture.
+
+    Le trait plein du mur, la trouée au milieu, et le dormant qui la borde —
+    c'est le signe qu'on lit sur un plan pour dire « il y a quelque chose
+    ici ». Ce que c'est exactement, le mot de la rangée le dit.
+  */
+  menuiserie: ['M2.5 12 h5', 'M16.5 12 h5', 'M7.5 6.5 v11', 'M16.5 6.5 v11', 'M7.5 12 h9'],
   // Le caisson du volet, posé sur sa baie : ce que le scan ne voit jamais.
   coffre: ['M4 4 h16 v4.5 h-16 z', 'M6.5 8.5 v10', 'M17.5 8.5 v10', 'M6.5 18.5 h11'],
   // Le mur rebouché, appareillé : fermer une ouverture, c'est retirer le trou.

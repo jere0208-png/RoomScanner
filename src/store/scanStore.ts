@@ -1216,6 +1216,13 @@ interface ScanState {
    */
   setAllege: (id: string, h: number) => void;
   /**
+   * Déclare ce qu'est une ouverture : porte, fenêtre ou baie libre.
+   *
+   * Ce n'est pas une étiquette — la nature commande le dessin (le battant
+   * d'une porte) et les cotes (l'allège d'une fenêtre). Voir l'action.
+   */
+  setOpeningType: (id: string, type: 'door' | 'window' | 'opening') => void;
+  /**
    * DÉCLARE (ou retire) LE COFFRE DE VOLET qui coiffe cette menuiserie.
    *
    * Le scan ne le voit pas — c'est un accident de maçonnerie au-dessus de
@@ -2129,8 +2136,45 @@ export const useScanStore = create<ScanState>((set, get) => {
         return Math.max(0.05, ap - 0.05);
       };
 
+      /*
+        LE PLAN RESTE COUSU.
+
+        Une pièce accolée PARTAGE sa cloison — une seule maçonnerie entre
+        deux pièces, c'est la règle de `addRoomBox`. En redimensionnant, ce
+        mur mitoyen partait avec la pièce et la voisine restait sur place :
+        ses murs s'arrêtaient dix-huit centimètres avant, et le plan
+        s'ouvrait par une fente. Sur le dessin, deux pièces qui ne se
+        touchent plus ; dans le métré, un périmètre qui ne ferme pas ; en
+        3D, deux pans qui ne se rejoignent pas.
+
+        LA RÈGLE NE REGARDE NI LES PIÈCES NI LES IDENTIFIANTS, juste les
+        POINTS : ce qui était accroché à un coin qui bouge suit le coin.
+        C'est celle qu'applique déjà le déplacement d'un point de mur, et
+        elle vaut ici pour les quatre coins à la fois. Ce qui ne touchait
+        rien ne bouge pas : on recolle, on ne rassemble pas.
+      */
+      const SOUDE = 0.02;
+      /** Le point d'arrivée d'un coin déplacé, s'il en est un. */
+      const suivre = (p: Pt): Pt | null => {
+        for (const w of murs) {
+          for (const bout of [w.a, w.b] as const) {
+            if (Math.hypot(bout.x - p.x, bout.z - p.z) > SOUDE) continue;
+            const n = neufs.get(w.id)!;
+            const cible = bout === w.a ? n.a : n.b;
+            return { x: cible.x, z: cible.z };
+          }
+        }
+        return null;
+      };
+      const recousu = (w: WallSeg): WallSeg => {
+        if (neufs.has(w.id)) return neufs.get(w.id)!;
+        const a = suivre(w.a);
+        const b = suivre(w.b);
+        return a || b ? { ...w, a: a ?? w.a, b: b ?? w.b } : w;
+      };
+
       set({
-        walls: st.walls.map((w) => neufs.get(w.id) ?? w),
+        walls: st.walls.map(recousu),
         fixtures: st.fixtures.map((f) =>
           neufs.has(f.wallId) ? { ...f, along: recaler(f.along, f.wallId) } : f,
         ),
@@ -4394,6 +4438,51 @@ export const useScanStore = create<ScanState>((set, get) => {
       set({
         openings: st.openings.map((x) =>
           x.id === id ? { ...x, yCenter: base + x.height / 2 } : x,
+        ),
+        dirty: true,
+      });
+    },
+
+    /*
+      CE QU'EST UNE OUVERTURE — et pourquoi ça ne s'invente pas.
+
+      Une ouverture posée à la main sortait toujours en BAIE : le bandeau
+      donnait sa largeur, sa hauteur, sa position, son coffre, jamais ce
+      qu'elle EST. Un plan tracé sans scanner ne comportait donc ni porte ni
+      fenêtre, rien que des trous — et les deux réglages qui dépendent de la
+      nature (le sens du battant, l'allège) s'offraient à une ouverture qui
+      n'y avait pas droit, sans que personne puisse la lui donner.
+
+      LA NATURE COMMANDE LES COTES, donc on les ajuste en la déclarant :
+
+        — une PORTE part du sol. Une porte à soixante centimètres du
+          plancher n'existe pas, et garder l'ancienne allège produirait une
+          menuiserie qu'aucun contrôle ne rattraperait ;
+
+        — une FENÊTRE a une allège. Posée au sol, elle prend la cote la plus
+          courante — 95 cm — plutôt que de rester une baie qui s'appelle
+          fenêtre. Celle qui en avait déjà une la garde : c'est un relevé,
+          on ne le remplace pas par une valeur de catalogue.
+    */
+    setOpeningType: (id, type) => {
+      const st = get();
+      const o = st.openings.find((x) => x.id === id);
+      if (!o || o.type === type) return;
+      pushHistory(`nature:${id}`);
+      const base = o.yCenter - o.height / 2;
+      let nouvelleBase = base;
+      if (type === 'door') nouvelleBase = 0;
+      else if (type === 'window' && base < 0.05) {
+        // Bornée au mur : sur un mur bas, une baie haute ne peut pas
+        // remonter de 95 cm sans sortir par le plafond.
+        const plafond = hauteurDuMurPorteur(o, st.walls);
+        nouvelleBase = Math.max(0, Math.min(0.95, plafond - o.height));
+      }
+      set({
+        openings: st.openings.map((x) =>
+          x.id === id
+            ? { ...x, type, yCenter: nouvelleBase + x.height / 2 }
+            : x,
         ),
         dirty: true,
       });

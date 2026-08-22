@@ -98,3 +98,69 @@ describe('redimensionner une pièce', () => {
     expect(cotes(id).width).toBeCloseTo(5, 2);
   });
 });
+
+/**
+ * LE PLAN RESTE COUSU.
+ *
+ * Trouve en refaisant le parcours complet d'un plan dessine : on pose un
+ * sejour, on accole une chambre — les deux PARTAGENT leur cloison, une
+ * seule maconnerie entre elles, c'est la regle de `addRoomBox` — puis le
+ * metre dit 5,18 et l'on corrige le sejour.
+ *
+ * La cloison mitoyenne partait avec lui. La chambre, elle, restait a sa
+ * place : ses murs s'arretaient dix-huit centimetres avant, et le plan
+ * s'ouvrait par une fente. Sur le dessin, deux pieces qui ne se touchent
+ * plus ; dans le metre, un perimetre qui ne ferme pas ; en 3D, deux pans
+ * qui ne se rejoignent pas.
+ *
+ * LA REGLE : QUAND UN COIN BOUGE, CE QUI Y ETAIT ACCROCHE SUIT. Elle ne
+ * regarde ni les pieces ni les identifiants — juste les points. C'est celle
+ * qu'applique deja le deplacement d'un point de mur, et elle vaut ici pour
+ * les quatre coins a la fois.
+ */
+describe('redimensionner ne dechire pas le plan', () => {
+  it('emmene les murs des pieces voisines accrochees aux coins', () => {
+    st().reset();
+    st().commencerAuClavier();
+    st().addRoomBox(5, 4, 'Sejour');
+    st().addRoomBox(3, 3, 'Chambre');
+    const sejour = st().rooms.find((r) => r.name === 'Sejour')!;
+    st().resizeRoom(sejour.id, 5.18, 4.05);
+
+    // Le coin partage : il n'existe qu'UNE fois dans le plan.
+    const coins = st()
+      .walls.flatMap((w) => [w.a, w.b])
+      .filter((p) => Math.abs(p.z) < 1e-6 && p.x > 4);
+    expect(coins.length).toBeGreaterThan(0);
+    for (const p of coins) {
+      expect(p.x).toBeCloseTo(5.18, 3);
+    }
+  });
+
+  it('et n’en profite pas pour deplacer ce qui ne touchait rien', () => {
+    // Un mur pose a l'ecart n'a aucune raison de suivre : la regle recolle
+    // ce qui etait accroche, elle ne rassemble pas le plan.
+    st().reset();
+    st().commencerAuClavier();
+    st().addRoomBox(5, 4, 'Sejour');
+    const sejour = st().rooms[0];
+    useScanStore.setState({
+      walls: [
+        ...useScanStore.getState().walls,
+        {
+          id: 'isole',
+          type: 'wall',
+          a: { x: 20, z: 20 },
+          b: { x: 23, z: 20 },
+          height: 2.5,
+          yCenter: 1.25,
+          roomId: 'ailleurs',
+        },
+      ],
+    });
+    st().resizeRoom(sejour.id, 6, 4);
+    const isole = st().walls.find((w) => w.id === 'isole')!;
+    expect(isole.a).toEqual({ x: 20, z: 20 });
+    expect(isole.b).toEqual({ x: 23, z: 20 });
+  });
+});

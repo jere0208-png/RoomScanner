@@ -4671,6 +4671,43 @@ vide — la 3D la découpe hors maçonnerie et le métré compte une pose
 impossible. Le chiffre qu'on relit après coup dit alors la vérité, ce qu'un
 refus muet ne ferait pas.
 
+### Ce qu'une ouverture EST — et le plan qui se déchirait
+
+Ces deux défauts ont été trouvés de la même façon : en refaisant le parcours
+complet d'un plan dessiné sans scanner, du plan vierge à la réouverture. Les
+autres épreuves vérifient chacune un geste ; celle-ci vérifie qu'ils
+s'enchaînent, et c'est la seule manière de trouver les jointures qui cèdent.
+
+**Une ouverture posée à la main était toujours une BAIE.** Le bandeau donnait
+sa largeur, sa hauteur, sa position, son coffre — jamais ce qu'elle est. Un
+plan tracé sans scanner ne comportait donc ni porte ni fenêtre, rien que des
+trous. Ce n'est pas une étiquette : la nature commande le dessin (le battant
+d'une porte, qui dit de quel côté se pose l'interrupteur) et les cotes
+(l'allège d'une fenêtre, qui décide d'une prise dessous). Les deux réglages
+s'offraient à une ouverture qui n'y avait pas droit, sans que personne puisse
+la lui donner. La déclarer ajuste les cotes : une porte part du sol, une
+fenêtre posée au sol prend l'allège la plus courante — mais celle qui en
+avait déjà une la garde, c'est un relevé et non une valeur de catalogue.
+
+**Redimensionner une pièce déchirait le plan.** Une pièce accolée partage sa
+cloison — une seule maçonnerie entre deux pièces. En corrigeant le séjour de
+dix-huit centimètres, ce mur mitoyen partait avec lui et la voisine restait
+sur place : le plan s'ouvrait par une fente. Deux pièces qui ne se touchent
+plus sur le dessin, un périmètre qui ne ferme pas dans le métré, deux pans
+qui ne se rejoignent pas en 3D.
+
+La règle qui referme : **quand un coin bouge, ce qui y était accroché suit**.
+Elle ne regarde ni les pièces ni les identifiants, juste les points — c'est
+celle qu'applique déjà le déplacement d'un point de mur, et elle vaut ici
+pour les quatre coins à la fois. Ce qui ne touchait rien ne bouge pas : on
+recoud, on ne rassemble pas.
+
+À connaître, au passage : une pièce accolée prend la **longueur du mur
+d'appui**, pas celle du modèle. Une « chambre 3 × 3 » posée contre un séjour
+de cinq mètres sort en 5 × 3 ; seule sa profondeur est celle qu'on a choisie.
+C'est le prix d'une cloison qui coïncide exactement, et c'est maintenant
+rattrapable — les cotes se corrigent.
+
 ### L'allège, et le bandeau qui déborde
 
 L'allège — du sol au repos de la baie — était la seule cote de menuiserie
