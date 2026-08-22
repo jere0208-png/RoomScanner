@@ -2134,7 +2134,7 @@ affiché — Rez-de-chaussée. Changez de niveau pour vérifier les autres. » �
 et seulement quand le dossier a plus d'un niveau : sur une maison de
 plain-pied, la précision serait du bruit.
 
-### Deux gestes mènent dehors, deux gardes le protègent
+### Trois gestes mènent dehors, UNE garde les couvre
 
 Sixième et septième campagnes. La sixième n'a rien trouvé, et cela vaut
 d'être écrit : le **diagnostic du tableau existant** voit les douze circuits
@@ -2157,6 +2157,20 @@ pas quand deux gestes mènent dehors**. La bibliothèque pose donc la même
 question, avec les mêmes issues et dans le même ordre — enregistrer, jeter,
 rester — et ne demande rien quand il n'y a rien à perdre, ni quand on rouvre
 le plan qu'on tient déjà.
+
+**Et il y en avait un troisième, le pire.** « Nouveau scan », depuis le menu
+du plan, jetait le travail comme les deux autres — mais lui efface AUSSI le
+brouillon des trente secondes, celui qui rattrape d'ordinaire une
+application tuée. Après lui, le travail ne se retrouvait nulle part.
+
+Trois corrections auraient fait trois fois la même alerte à trois endroits :
+trois occasions de diverger, et une quatrième sortie qui naîtrait demain
+sans garde du tout. Elle vit donc dans UN endroit (`garderLeTravail`), et
+son banc tient ce qui compte : **« Enregistrer » vient en premier** — sur un
+chantier, on répond à une question sans la lire en entier —, le travail est
+rangé AVANT de partir (partir d'abord, c'est enregistrer un plan qu'on a
+déjà quitté), le geste destructeur est marqué comme tel, et « Rester » ne
+fait rien : c'est l'issue de celui qui a touché par erreur.
 
 Au passage, le geste PRINCIPAL de la bibliothèque n'était pas nommé : « … »
 et « Nouveau dossier » portaient une étiquette d'accessibilité, mais pas

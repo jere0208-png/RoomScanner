@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { BackChevron } from '../components/BackChevron';
 import { RetourGlisse } from '../components/RetourGlisse';
+import { garderLeTravail } from '../ui/gardeTravail';
 import {
-  Alert,
   Animated,
   Easing,
   PanResponder,
@@ -693,32 +693,18 @@ export function LibraryScreen() {
     plan qu'on tient déjà : une confirmation inutile est une confirmation
     qu'on apprend à balayer sans lire.
   */
-  const ouvrirLeScan = (id: string) => {
-    if (!dirty || id === currentSaveId) {
-      openSave(id);
-      return;
-    }
-    Alert.alert(
-      'Modifications non enregistrées',
-      'Le plan ouvert a été modifié. Ce que vous venez d’y faire sera perdu ' +
-        'si vous en ouvrez un autre.',
-      [
-        {
-          text: 'Enregistrer',
-          onPress: () => {
-            commitCurrent();
-            openSave(id);
-          },
-        },
-        {
-          text: 'Ouvrir sans enregistrer',
-          style: 'destructive',
-          onPress: () => openSave(id),
-        },
-        { text: 'Rester', style: 'cancel' },
-      ],
-    );
-  };
+  const ouvrirLeScan = (id: string) =>
+    garderLeTravail({
+      // Rouvrir le plan qu'on tient déjà ne perd rien : on est dessus.
+      dirty: dirty && id !== currentSaveId,
+      message:
+        'Le plan ouvert a été modifié. Ce que vous venez d’y faire sera ' +
+        'perdu si vous en ouvrez un autre.',
+      jeter: 'Ouvrir sans enregistrer',
+      enregistrer: commitCurrent,
+      partir: () => openSave(id),
+    });
+
   const deleteSave = useScanStore((s) => s.deleteSave);
   const addFolder = useScanStore((s) => s.addFolder);
   const renameFolder = useScanStore((s) => s.renameFolder);

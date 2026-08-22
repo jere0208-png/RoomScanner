@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BackChevron } from '../components/BackChevron';
 import { RetourGlisse } from '../components/RetourGlisse';
+import { garderLeTravail } from '../ui/gardeTravail';
 import {
   Alert,
   Animated,
@@ -1353,32 +1354,38 @@ export function ResultScreen() {
     demande rien : une confirmation inutile est une confirmation qu'on
     apprend à balayer sans lire.
   */
-  const sortirDuPlan = () => {
-    const ou = resultOrigin === 'library' ? 'library' : 'home';
-    if (!dirty) {
-      setScreen(ou);
-      return;
-    }
-    Alert.alert(
-      'Modifications non enregistrées',
-      'Ce que vous venez de faire sur ce plan sera perdu si vous partez.',
-      [
-        {
-          text: 'Enregistrer',
-          onPress: () => {
-            commitCurrent();
-            setScreen(ou);
-          },
-        },
-        {
-          text: 'Quitter sans enregistrer',
-          style: 'destructive',
-          onPress: () => setScreen(ou),
-        },
-        { text: 'Rester', style: 'cancel' },
-      ],
-    );
-  };
+  const sortirDuPlan = () =>
+    garderLeTravail({
+      dirty,
+      message:
+        'Ce que vous venez de faire sur ce plan sera perdu si vous partez.',
+      jeter: 'Quitter sans enregistrer',
+      enregistrer: commitCurrent,
+      partir: () => setScreen(resultOrigin === 'library' ? 'library' : 'home'),
+    });
+
+  /*
+    REPARTIR DE ZÉRO EST LE PLUS DESTRUCTEUR DES TROIS CHEMINS.
+
+    Après la flèche de retour et l'ouverture d'un plan depuis la
+    bibliothèque, voici le troisième geste qui mène dehors — et le pire :
+    « Nouveau scan » efface AUSSI le brouillon des trente secondes, qui
+    rattrape d'ordinaire une application tuée. Sans garde ici, le travail
+    ne se retrouve nulle part.
+
+    Même question, mêmes issues, même ordre : trois gestes mènent dehors,
+    trois gardes les couvrent.
+  */
+  const repartirDeZero = () =>
+    garderLeTravail({
+      dirty,
+      message:
+        'Repartir de zéro efface le plan à l’écran, et ce qui n’a pas été ' +
+        'enregistré ne se retrouvera nulle part.',
+      jeter: 'Repartir sans enregistrer',
+      enregistrer: commitCurrent,
+      partir: reset,
+    });
 
   /** Amène sous les yeux l'élément visé par un constat. */
   const goToIssue = (issue: Constat) => {
@@ -2211,7 +2218,7 @@ export function ResultScreen() {
                   {
                     label: 'Nouveau scan',
                     icon: 'sortir' as const,
-                    onPress: reset,
+                    onPress: repartirDeZero,
                   },
                 ],
               });
