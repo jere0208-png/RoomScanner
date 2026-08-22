@@ -29,6 +29,7 @@ import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { SupportSheet } from '../src/components/SupportSheet';
 import { SheetShell } from '../src/components/Sheet';
+import { CloseCross } from '../src/components/CloseCross';
 
 const monter = () => {
   let t!: TestRenderer.ReactTestRenderer;
@@ -64,5 +65,48 @@ describe('le formulaire du service client', () => {
       parLabel(t, 'Envoyer le message').props.accessibilityState?.disabled,
     ).toBe(true);
     act(() => t.unmount());
+  });
+});
+
+/**
+ * UNE SEULE CROIX POUR FERMER.
+ *
+ * Releve du patron : « la croix pour quitter la fenetre de contact du
+ * service client ». Il y en avait DEUX, l'une sur l'autre, en haut a
+ * droite : celle que la coquille pose pour TOUTES les feuilles, et une
+ * seconde propre a cet ecran, ecrite avant que la coquille n'en ait une.
+ *
+ * Deux croix superposees, c'est un bouton qui parait double-clique, une
+ * cible tactile qui se partage en deux, et un lecteur d'ecran qui annonce
+ * « Fermer, Fermer ». Rien ne casse — et tout le monde voit que quelque
+ * chose ne va pas.
+ *
+ * C'est la coquille qui garde la sienne : elle vaut pour toutes les
+ * feuilles, elle est posee en absolu (elle ne pousse aucune mise en page),
+ * et une feuille qui refabrique la sienne est une occasion de diverger.
+ */
+describe('la croix de la feuille de support', () => {
+  it('n’apparaît qu’une fois', () => {
+    const tree = monter();
+    // On compte les CROIX, pas les noeuds qui les portent : un Pressable
+    // etiquete se rend en plusieurs noeuds imbriques, et l'on compterait
+    // trois fois la meme.
+    expect(tree.root.findAllByType(CloseCross)).toHaveLength(1);
+    act(() => tree.unmount());
+  });
+
+  it('et ferme bien la feuille', () => {
+    const fermetures: number[] = [];
+    let tree!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      tree = TestRenderer.create(
+        <SupportSheet visible fermer={() => fermetures.push(1)} />,
+      );
+    });
+    const croix = parLabel(tree, 'Fermer');
+    expect(croix).toBeDefined();
+    act(() => croix.props.onPress());
+    expect(fermetures).toHaveLength(1);
+    act(() => tree.unmount());
   });
 });

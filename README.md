@@ -4671,6 +4671,23 @@ vide — la 3D la découpe hors maçonnerie et le métré compte une pose
 impossible. Le chiffre qu'on relit après coup dit alors la vérité, ce qu'un
 refus muet ne ferait pas.
 
+### Deux croix pour fermer une seule fenêtre
+
+Relevé du patron : « la croix pour quitter la fenêtre de contact du service
+client ». Il y en avait **deux, l'une sur l'autre** en haut à droite — celle
+que la coquille des feuilles pose pour toutes, et une seconde écrite dans le
+formulaire du support avant que la coquille n'en ait une.
+
+Deux croix superposées, c'est une cible tactile qui se partage en deux et un
+lecteur d'écran qui annonce « Fermer, Fermer ». Rien ne casse, et tout le
+monde voit que quelque chose ne va pas.
+
+C'est la coquille qui garde la sienne : elle vaut pour toutes les feuilles,
+elle est posée en absolu — elle ne pousse aucune mise en page — et une
+feuille qui refabrique la sienne est une occasion de diverger. Le titre garde
+en revanche sa place réservée à droite : sans elle, un titre long passerait
+sous la croix.
+
 ### Le mur qui passait sur une chaise : le banc mesurait à côté
 
 Relevé du patron, capture à l'appui. Première mesure : **vingt-deux angles de

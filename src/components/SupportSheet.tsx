@@ -106,15 +106,24 @@ export function SupportSheet({
   return (
     <SheetShell visible={visible} onClose={rendreEtFermer}>
       <>
+      {/*
+        UNE SEULE CROIX, ET C'EST CELLE DE LA COQUILLE.
+
+        Relevé du patron : « la croix pour quitter la fenêtre de contact du
+        service client ». Il y en avait DEUX, l'une sur l'autre en haut à
+        droite — celle que `SheetShell` pose pour TOUTES les feuilles, et
+        une seconde écrite ici avant que la coquille n'en ait une.
+
+        Deux croix superposées, c'est une cible tactile qui se partage en
+        deux et un lecteur d'écran qui annonce « Fermer, Fermer ». Rien ne
+        casse, et tout le monde voit que quelque chose ne va pas.
+
+        Le titre garde en revanche sa place réservée à droite : la croix de
+        la coquille est posée en ABSOLU — elle ne pousse rien — et sans
+        cette réserve un titre long passerait dessous.
+      */}
       <View style={s.entete}>
         <Text style={s.titre}>Écrire au service client</Text>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Fermer"
-          hitSlop={10}
-          onPress={rendreEtFermer}>
-          <CloseCross size={20} color={c.inkSoft} />
-        </Pressable>
       </View>
       <Text style={s.sous}>
         Une question, un défaut, une idée : on répond à la même adresse.
@@ -195,7 +204,15 @@ const themed = (c: Palette) =>
       justifyContent: 'space-between',
       gap: 12,
     },
-    titre: { flex: 1, color: c.ink, fontSize: 17, fontWeight: '800' },
+    titre: {
+      flex: 1,
+      color: c.ink,
+      fontSize: 17,
+      fontWeight: '800',
+      // La place de la croix de la coquille, posée en absolu à douze points
+      // du bord : sans cette réserve, un titre long passerait dessous.
+      paddingRight: 34,
+    },
     sous: { color: c.inkSoft, fontSize: 12.5, lineHeight: 17, marginTop: 4 },
     champ: {
       borderRadius: radius.sm,
