@@ -4671,6 +4671,22 @@ vide — la 3D la découpe hors maçonnerie et le métré compte une pose
 impossible. Le chiffre qu'on relit après coup dit alors la vérité, ce qu'un
 refus muet ne ferait pas.
 
+### L'application imprimait son propre échec
+
+Relevé à l'œil sur la liste du matériel — le document qui part au
+fournisseur, jamais inspecté jusqu'ici. Chaque pièce portait « **Autre
+pièce** · 12,0 m² » à droite de son nom.
+
+La règle existait pourtant : « l'usage déduit ne se rappelle que s'il apprend
+quelque chose », pour éviter d'écrire « Cuisine … Cuisine · 20,0 m² ». Mais
+elle ne couvrait qu'un cas — celui où l'usage RÉPÈTE le nom.
+
+« Autre pièce » est le fourre-tout : le mot que l'application emploie quand
+elle n'a pas su. L'imprimer, c'est écrire son propre échec à côté du nom du
+client, sur le document qu'il lit avant les chiffres. Il se tait désormais,
+comme se tait « Cuisine » sur une pièce appelée Cuisine — et la surface
+reste, c'est elle qu'on vient lire.
+
 ### « 1 pts »
 
 Relevé à l'œil sur la page du métré rendue en image. Un point lumineux, un

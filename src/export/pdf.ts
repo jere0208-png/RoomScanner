@@ -62,6 +62,7 @@ import {
   type SymbolStroke,
 } from '../geometry/electrical';
 import {
+  USE_LABEL,
   wallFurniture,
   type Circuit,
   type Differential,
@@ -4302,12 +4303,23 @@ export function buildMaterialPdf(
     if (room.rows.length === 0) continue;
     need(30);
     d.text(room.room, x0, y, 11, INK, { bold: true, align: 'left' });
-    // L'usage déduit ne se rappelle que s'il apprend quelque chose : pour
-    // une pièce non renommée, il EST le nom, et la feuille bégayait
-    // « Cuisine … Cuisine · 20,0 m² ».
+    /*
+      L'USAGE DÉDUIT NE SE RAPPELLE QUE S'IL APPREND QUELQUE CHOSE.
+
+      Pour une pièce non renommée, il EST le nom, et la feuille bégayait
+      « Cuisine … Cuisine · 20,0 m² ». La règle ne couvrait qu'un cas :
+      celui où l'usage RÉPÈTE le nom.
+
+      « Autre pièce » est le fourre-tout — le mot que l'application emploie
+      quand elle n'a PAS su. L'imprimer, c'est écrire son propre échec à
+      côté du nom du client, sur le document qu'il lit avant les chiffres.
+      Il se tait aussi, et la surface reste : c'est elle qu'on vient lire.
+    */
     const surface = `${room.area.toFixed(1).replace('.', ',')} m²`;
+    const usageParlant =
+      !!room.use && room.use !== room.room && room.use !== USE_LABEL.autre;
     d.text(
-      room.use && room.use !== room.room ? `${room.use} · ${surface}` : surface,
+      usageParlant ? `${room.use} · ${surface}` : surface,
       x0 + w,
       y,
       9,

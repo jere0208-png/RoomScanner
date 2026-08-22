@@ -206,3 +206,60 @@ describe('la liste du matériel, version chantier', () => {
     expect(c1.conduitLength).toBeLessThan(c1.cableLength);
   });
 });
+
+/**
+ * UN USAGE QUI N'APPREND RIEN NE S'ECRIT PAS.
+ *
+ * Releve a l'oeil sur la liste du materiel rendue en image : chaque piece
+ * portait « Autre piece · 12,0 m² » a droite de son nom. La regle existait
+ * pourtant deja — « l'usage deduit ne se rappelle que s'il apprend quelque
+ * chose », pour ne pas ecrire « Cuisine … Cuisine · 20,0 m² » — mais elle ne
+ * couvrait qu'un cas : celui ou l'usage REPETE le nom.
+ *
+ * « Autre piece » est le fourre-tout : c'est le mot que l'application emploie
+ * quand elle n'a PAS su. L'imprimer, c'est ecrire son propre echec a cote du
+ * nom du client, sur le document qu'il lit avant les chiffres. Il se tait,
+ * comme se tait « Cuisine » sur une piece appelee Cuisine — et la surface,
+ * elle, reste : c'est l'information qu'on venait chercher.
+ */
+describe('les usages sur la liste du materiel', () => {
+  const doc = (nom: string) => {
+    const rooms = [{ id: 'r1', name: nom, wallIds: PIECE.map((w) => w.id) }];
+    const p = roomParts(PIECE, rooms);
+    const inputs = roomInputsOf(rooms, p);
+    const place = fixturePlacement(FIXTURES, PIECE, inputs);
+    return latin1(
+      buildMaterialPdf(
+        nom,
+        materialList(inputs, FIXTURES, wallToRooms(inputs), place),
+      ),
+    );
+  };
+
+  it('se tait quand il n’a pas su nommer la piece', () => {
+    expect(doc('Pièce 1')).not.toContain('Autre pièce');
+    // Mais la surface reste : c'est elle qu'on vient lire.
+    expect(doc('Pièce 1')).toMatch(/m²/);
+  });
+
+  it('se tait aussi quand il répète le nom', () => {
+    /*
+      LA REGLE D'ORIGINE, QUI NE CHANGE PAS.
+
+      Le banc comptait d'abord les occurrences du mot « Cuisine » dans tout
+      le document et en attendait moins de trois : il y en a treize, une par
+      circuit qui dessert la piece, et c'est normal. Ce qui doit disparaitre,
+      c'est le RAPPEL D'USAGE colle a la surface — « Cuisine · 20,0 m² » a
+      cote d'un titre qui dit deja « Cuisine ».
+    */
+    expect(doc('Cuisine')).not.toMatch(/Cuisine · \d/);
+    // Et la surface, elle, est bien la.
+    expect(doc('Cuisine')).toMatch(/m²/);
+  });
+
+  it('mais parle quand il apprend quelque chose', () => {
+    // « Pièce des parents » ne dit pas que c'est une chambre ; l'usage
+    // déduit, si — et c'est lui qui porte la règle des normes.
+    expect(doc('Chez les parents')).toMatch(/m²/);
+  });
+});
