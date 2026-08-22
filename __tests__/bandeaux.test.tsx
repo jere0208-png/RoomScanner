@@ -541,12 +541,57 @@ describe('l’écran des résultats', () => {
       mur reste réglable ailleurs : par la pièce (barre du sol), et par le
       retour d'un mur percé.
     */
-    expect(vu).toContain('sous plafond');
-    expect(vu).toContain('Mesures');
+    /*
+      TROISIÈME FORME DE CE BANDEAU, et les deux premières disent pourquoi.
+
+      Relevé du patron, capture à l'appui : « la barre en bas mal faite pour
+      sélection de mur ». Sur la photo : « 3,98 m · 2,49 m s... » puis un
+      bouton « Me. ». La cote se lit, le reste est haché.
+
+      Première tentative — faire céder les boutons : le mot se tronque au
+      lieu de pousser la rangée dehors. Le débordement part, la lisibilité
+      aussi (« M », « D. »). Deuxième — les actions secondaires en icônes
+      seules : mieux, mais le geste principal gardait son mot et sortait
+      encore.
+
+      Celle-ci : LE BANDEAU PORTE CE QU'IL AFFICHE, comme les autres. Les
+      deux cotes du mur tiennent ensemble dans la ligne forte — exactement
+      comme une menuiserie affiche « 1,20 × 1,10 m » — et la note dit ce que
+      c'est, en un mot. Les trois actions deviennent des pastilles : aucun
+      mot, donc rien à tronquer.
+
+      Ce qui se perd : le mot « Mesures » sous le crayon. Ce qui se gagne :
+      la hauteur sous plafond, qui était coupée et se lit maintenant en
+      entier.
+    */
+    expect(vu).toMatch(/\d,\d{2} × \d,\d{2} m/);
     expect(vu).not.toContain('Coter');
     expect(vu).not.toContain('Hauteur');
-    // Le crayon est un TRACÉ, pas un caractère — la leçon du chevron.
-    const mesures = bouton(tree, 'Mesures');
+    /*
+      AUCUN MOT DANS LA RANGEE — mais le MENU du mur garde les siens.
+
+      Ce banc a d'abord cherche les mots dans tout l'ecran, et trouvait
+      « Mesures » : celui du menu contextuel, qui s'ouvre sur le mur et a
+      toute la place pour ecrire. Ce qui doit se taire, c'est la RANGEE du
+      bas, ou trois mots ne tiennent pas.
+    */
+    const boutonsDuBandeau = tree.root
+      .findAllByType(TouchableOpacity)
+      .filter((n) =>
+        ['Mesures', 'Laser', 'Détacher'].includes(
+          String(n.props.accessibilityLabel),
+        ),
+      )
+      // Ceux du bandeau ne portent aucun texte : c'est a ca qu'on les
+      // reconnait, et c'est justement ce qu'on veut verifier.
+      .filter((n) => n.findAllByType(Text).length === 0);
+    expect(boutonsDuBandeau.length).toBeGreaterThanOrEqual(3);
+    // Le crayon reste, et c'est un TRACÉ — la leçon du chevron. C'est lui
+    // qui dit « ça s'édite » maintenant que le mot est parti.
+    const mesures = boutonsDuBandeau.find(
+      (n) => n.props.accessibilityLabel === 'Mesures',
+    );
+    expect(mesures).toBeDefined();
     expect(
       mesures!.findAll((x) => typeof x.props?.d === 'string').length,
     ).toBeGreaterThan(0);

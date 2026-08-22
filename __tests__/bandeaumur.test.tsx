@@ -94,3 +94,4 @@ describe('le bandeau du mur tient dans son bloc', () => {
     act(() => t.unmount());
   });
 });
+

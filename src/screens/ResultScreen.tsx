@@ -3673,8 +3673,21 @@ export function ResultScreen() {
         {vue === '2d' && !selectedObject && !selectedOpening && editMode && selectedWall && !capturing && (
           <StripBar
             styles={stylesBarres}
-            strong={`${fr(segLength(selectedWall), 2)} m`}
-            note={`${fr(selectedWall.height, 2)} m sous plafond`}
+            /*
+              LES DEUX COTES DU MUR DANS LA LIGNE FORTE.
+
+              Releve du patron, capture a l'appui : « la barre en bas mal
+              faite pour selection de mur » — « 3,98 m . 2,49 m s... » et un
+              bouton « Me. ». Le bandeau porte maintenant ce qu'il affiche,
+              comme celui d'une menuiserie : longueur x hauteur ensemble, et
+              la note dit ce que c'est. La hauteur, qui se faisait couper, se
+              lit en entier.
+            */
+            strong={`${fr(segLength(selectedWall), 2)} × ${fr(
+              selectedWall.height,
+              2,
+            )} m`}
+            note="mur"
             actions={[
               /*
                 UN SEUL GESTE : « MESURES », AVEC SON CRAYON.
@@ -3703,8 +3716,14 @@ export function ResultScreen() {
                 d'accessibilité.
               */
               {
+                /*
+                  LE CRAYON SEUL — le mot ne tenait pas, et un mot tronque
+                  ne dit rien. « Me. » ne se lit pas ; un crayon, si. Le mot
+                  vit dans l'etiquette d'accessibilite, ou il sert vraiment.
+                */
                 label: 'Mesures',
                 crayon: true,
+                sansMot: true,
                 onPress: () => promptLength(selectedWall.id),
               },
               /*

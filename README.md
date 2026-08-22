@@ -4671,6 +4671,30 @@ vide — la 3D la découpe hors maçonnerie et le métré compte une pose
 impossible. Le chiffre qu'on relit après coup dit alors la vérité, ce qu'un
 refus muet ne ferait pas.
 
+### Le bandeau du mur, troisieme forme — et les deux premieres disent pourquoi
+
+Releve du patron, capture a l'appui : « la barre en bas mal faite pour
+selection de mur ». Sur la photo : « 3,98 m . 2,49 m s... » puis un bouton
+« Me. ». La cote se lit, le reste est hache.
+
+**Premiere tentative** — faire ceder les boutons (`flexShrink`) : le mot se
+tronque au lieu de pousser la rangee dehors. Le debordement part, la
+lisibilite aussi : « M », « D. ».
+
+**Deuxieme** — les actions secondaires en icones seules. Mieux, mais le geste
+principal gardait son mot et sortait encore.
+
+**Troisieme, celle-ci** : le bandeau porte ce qu'il AFFICHE, et il l'affiche
+comme les autres. Les deux cotes du mur tiennent ensemble dans la ligne forte
+— « 3,98 x 2,49 m », exactement comme une menuiserie affiche « 1,20 x 1,10 m »
+— et la note dit ce que c'est, en un mot. Les trois actions deviennent des
+pastilles : aucun mot, donc rien a tronquer.
+
+Ce qui se perd : le mot « Mesures » sous le crayon. Ce qui se gagne : la
+hauteur sous plafond, qui etait coupee et se lit maintenant en entier. Le
+MENU du mur, lui, garde ses mots — il s'ouvre sur le plan et a toute la place
+pour les ecrire.
+
 ### Le doigt commande, le mur refuse
 
 Relevé du patron : « on doit pouvoir les placer n'importe où, même traverser
