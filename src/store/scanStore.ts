@@ -89,8 +89,9 @@ import {
   type Fixture,
   type FixtureKind,
 } from '../geometry/electrical';
-import { pointInPolygon } from '../geometry/appearance';
+import { equilibrerLaScene, pointInPolygon } from '../geometry/appearance';
 import { ancrerElec } from '../geometry/viseur';
+import type { SurfaceTexture } from 'react-native-room-scan';
 import {
   deduceRoomKind,
   roomKindLabel,
@@ -379,6 +380,24 @@ function nearestWall(o: WallSeg, walls: WallSeg[]): { dist: number } {
     dist = Math.min(dist, pointOnSeg(mid, w.a, w.b).dist);
   }
   return { dist };
+}
+
+/**
+ * REMET LE BLANC D'APLOMB SUR TOUT UN RELEVÉ.
+ *
+ * Relevé du patron : « mon mur blanc devient marron ». Le relevé est fidèle
+ * — une caméra ne voit pas une couleur, elle voit une couleur ÉCLAIRÉE — et
+ * c'est justement pour ça qu'il faut le corriger avant de le montrer.
+ *
+ * ICI ET PAS AU RENDU : la 3D, le plan 2D, le PDF et l'export lisent tous
+ * les mêmes champs. Corrigé une fois à l'arrivée du scan, tout le monde voit
+ * la même chose, et personne n'a à se souvenir d'appliquer un gain.
+ */
+function blancsDAplomb<
+  W extends { color?: string; texture?: SurfaceTexture },
+  O extends { color?: string; texture?: SurfaceTexture },
+>(walls: W[], objects: O[]): { walls: W[]; objects: O[] } {
+  return equilibrerLaScene({ walls, objects });
 }
 
 /** Relevés de sol indexés par pièce, tels que `buildScene` les attend. */
@@ -3496,9 +3515,11 @@ export const useScanStore = create<ScanState>((set, get) => {
       set({
         modelPath: r.modelPath ?? st.modelPath,
         rooms: kept,
-        walls,
+        // Le blanc remis d'aplomb, une fois pour toutes : voir
+        // `blancsDAplomb`. Tout ce qui lit ces champs — 3D, plan, dossier,
+        // export — voit désormais la même chose.
+        ...blancsDAplomb(walls, objects),
         openings,
-        objects,
         fixtures: [...fixtures, ...viseMerge.fixtures],
         photos,
         ceiling: [...ceiling, ...viseMerge.ceiling],
@@ -3860,9 +3881,11 @@ export const useScanStore = create<ScanState>((set, get) => {
         updatedAt: now.getTime(),
         modelPath: r.modelPath ?? null,
         rooms: kept,
-        walls,
+        // Le blanc remis d'aplomb, une fois pour toutes : voir
+        // `blancsDAplomb`. Tout ce qui lit ces champs — 3D, plan, dossier,
+        // export — voit désormais la même chose.
+        ...blancsDAplomb(walls, objects),
         openings,
-        objects,
         fixtures: vise.fixtures,
         photos: [],
         ceiling: vise.ceiling,
@@ -3878,9 +3901,11 @@ export const useScanStore = create<ScanState>((set, get) => {
         dirty: false,
         resultOrigin: 'scan',
         rooms: kept,
-        walls,
+        // Le blanc remis d'aplomb, une fois pour toutes : voir
+        // `blancsDAplomb`. Tout ce qui lit ces champs — 3D, plan, dossier,
+        // export — voit désormais la même chose.
+        ...blancsDAplomb(walls, objects),
         openings,
-        objects,
         fixtures: vise.fixtures,
         photos: [],
         ceiling: vise.ceiling,

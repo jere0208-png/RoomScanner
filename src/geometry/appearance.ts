@@ -65,6 +65,234 @@ const hexDe = (c: [number, number, number]) =>
  * d'accent garde sa couleur : il occupe plusieurs cases, donc c'est LUI la
  * médiane.
  */
+/*
+  UNE CAMÉRA NE VOIT PAS UNE COULEUR, ELLE VOIT UNE COULEUR ÉCLAIRÉE.
+
+  Deux relevés du patron sur la même capture : « mon mur blanc devient
+  marron » et « il y a des lignes horizontales sur les murs en couleur ».
+  Les deux ont la même origine, et ce n'est pas le relevé qui est en cause —
+  il est fidèle. C'est ce qu'on en fait.
+*/
+
+/**
+ * APLATIT L'ÉCLAIRAGE D'UN MUR, ET GARDE SA PEINTURE.
+ *
+ * Le haut d'un mur reçoit moins de lumière que le bas, ou l'inverse selon la
+ * fenêtre : la grille relevée sort en DÉGRADÉ vertical. Et comme chaque
+ * rangée s'écarte de la teinte moyenne dans le même sens que sa voisine, le
+ * lissage anti-bruit la juge « partagée » et la CONSERVE — le mécanisme qui
+ * devait nettoyer protégeait l'éclairage. D'où les lignes horizontales.
+ *
+ * ON DISTINGUE L'ÉCLAIRAGE DE LA PEINTURE PAR LA FORME DE L'ÉCART :
+ *
+ *   — l'éclairage est PROGRESSIF : chaque rangée un peu plus sombre que la
+ *     précédente, dans le même sens, par petits pas comparables ;
+ *   — la peinture est FRANCHE : un soubassement, un lambris, c'est UN saut
+ *     net entre deux rangées, et rien avant ni après.
+ *
+ * Ce qui varie horizontalement n'est jamais touché : un pan d'accent, une
+ * porte, une trace d'humidité vivent dans les colonnes, pas dans les
+ * rangées.
+ */
+export function aplatirEclairage(tex: SurfaceTexture): SurfaceTexture {
+  const { cols, rows, texels } = tex;
+  if (rows < 3) return tex;
+  /** La teinte moyenne de chaque rangée, ou `null` si la rangée est vide. */
+  const parRangee: ([number, number, number] | null)[] = [];
+  for (let r = 0; r < rows; r++) {
+    const lot: [number, number, number][] = [];
+    for (let c = 0; c < cols; c++) {
+      const t = texels[r * cols + c];
+      if (valid(t)) lot.push(rgbDe(t));
+    }
+    parRangee.push(
+      lot.length === 0
+        ? null
+        : ([0, 1, 2].map(
+            (k) => lot.reduce((s2, p) => s2 + p[k], 0) / lot.length,
+          ) as [number, number, number]),
+    );
+  }
+  if (parRangee.some((p) => !p)) return tex;
+  /** L'écart de luminosité d'une rangée à la suivante. */
+  const pas: number[] = [];
+  for (let r = 1; r < rows; r++) {
+    const a = parRangee[r - 1]!;
+    const b = parRangee[r]!;
+    pas.push((b[0] + b[1] + b[2]) / 3 - (a[0] + a[1] + a[2]) / 3);
+  }
+  const amplitude = Math.max(...pas.map(Math.abs));
+  const total = Math.abs(pas.reduce((s2, v) => s2 + v, 0));
+  /*
+    UN SAUT FRANC SE RECONNAÎT À CE QU'IL DOMINE LES AUTRES.
+
+    Sur un dégradé d'éclairage, tous les pas se ressemblent : le plus grand
+    ne vaut guère plus que la moyenne. Sur un soubassement, un pas vaut à
+    lui seul presque tout l'écart du mur, et les autres sont plats. On
+    compare donc le plus grand pas à la somme : au-delà de 70 %, c'est une
+    frontière, on ne touche à rien.
+  */
+  if (total <= 0.5) return tex;
+  if (amplitude / total > 0.7 && amplitude > 12) return tex;
+  /*
+    ET L'ON N'APLATIT QUE CE QUI RESTE DISCRET.
+
+    Un dégradé de cent unités entre le haut et le bas n'est plus un jeu de
+    lumière : c'est une ombre portée massive, ou deux murs confondus. On
+    préfère alors laisser voir le relevé plutôt que d'inventer un aplat.
+  */
+  if (total > 90) return tex;
+
+  // La teinte du mur : la moyenne des rangées, débarrassée du gradient.
+  const teinte = [0, 1, 2].map(
+    (k) => parRangee.reduce((s2, p) => s2 + p![k], 0) / rows,
+  ) as [number, number, number];
+  const out: string[] = [];
+  for (let r = 0; r < rows; r++) {
+    const decal = [0, 1, 2].map((k) => teinte[k] - parRangee[r]![k]);
+    for (let c = 0; c < cols; c++) {
+      const t = texels[r * cols + c];
+      if (!valid(t)) {
+        out.push(t);
+        continue;
+      }
+      const p = rgbDe(t);
+      // On DÉPLACE la case du même écart que sa rangée : ce qui distinguait
+      // une colonne de sa voisine reste intact, seul le gradient part.
+      out.push(
+        hexDe([0, 1, 2].map((k) => p[k] + decal[k]) as [number, number, number]),
+      );
+    }
+  }
+  return { ...tex, texels: out };
+}
+
+/**
+ * LA BALANCE DES BLANCS DE LA PIÈCE.
+ *
+ * Un mur blanc sous une ampoule chaude renvoie du beige : le relevé est
+ * fidèle, et le résultat est faux. Personne ne dira jamais « mon mur est
+ * marron » de son mur blanc.
+ *
+ * LA SURFACE LA PLUS CLAIRE D'UN LOGEMENT EST BLANCHE — c'est vrai du
+ * plafond et des murs dans l'immense majorité des cas, et c'est l'hypothèse
+ * que fait tout appareil photo du monde. Si la plus claire des surfaces
+ * relevées tire vers l'orange, ce n'est pas la peinture, c'est l'ampoule :
+ * on annule sa dérive, et toutes les autres suivent du même gain.
+ *
+ * ON NE CORRIGE QUE CE QUI RESSEMBLE À UN BLANC DÉVIÉ. Un mur bleu franc
+ * n'est pas un mur blanc mal éclairé : ramener sa teinte au neutre
+ * effacerait ce que l'électricien a relevé, et repeindrait le salon du
+ * client au passage.
+ */
+export function balancerLesBlancs(couleurs: string[]): string[] {
+  const gain = gainDesBlancs(couleurs);
+  if (!gain) return couleurs;
+  return couleurs.map((c) => (valid(c) ? appliquerGain(c, gain) : c));
+}
+
+/** Applique un gain par canal à une couleur `#RRGGBB`. */
+export function appliquerGain(
+  hex: string,
+  gain: [number, number, number],
+): string {
+  const p = rgbDe(hex);
+  return hexDe([0, 1, 2].map((k) => p[k] * gain[k]) as [
+    number,
+    number,
+    number,
+  ]);
+}
+
+/**
+ * ÉQUILIBRE TOUTE UNE SCÈNE D'UN SEUL GAIN.
+ *
+ * Murs, sol et meubles ont été vus sous la même ampoule : corriger chaque
+ * surface pour elle-même reviendrait à blanchir tout le logement, meubles
+ * compris — un canapé rouge deviendrait rose, et le relevé ne vaudrait plus
+ * rien.
+ *
+ * Le gain se calcule sur les MURS seuls, parce que c'est d'eux qu'on sait
+ * quelque chose : le blanc du bâtiment. Un meuble clair peut être crème,
+ * beige ou chêne sans que ce soit un défaut d'éclairage. Puis il s'applique
+ * à tout, y compris aux grilles, case par case.
+ */
+export function equilibrerLaScene<
+  W extends { color?: string; texture?: SurfaceTexture },
+  O extends { color?: string; texture?: SurfaceTexture },
+>(scene: { walls: W[]; objects: O[] }): { walls: W[]; objects: O[] } {
+  const reperes = scene.walls.flatMap((w) => [
+    ...(w.color ? [w.color] : []),
+    ...(w.texture?.texels ?? []),
+  ]);
+  const gain = gainDesBlancs(reperes);
+  if (!gain) return scene;
+  const corriger = <T extends { color?: string; texture?: SurfaceTexture }>(
+    x: T,
+  ): T => ({
+    ...x,
+    color: x.color && valid(x.color) ? appliquerGain(x.color, gain) : x.color,
+    texture: x.texture
+      ? {
+          ...x.texture,
+          texels: x.texture.texels.map((t) =>
+            valid(t) ? appliquerGain(t, gain) : t,
+          ),
+        }
+      : x.texture,
+  });
+  return {
+    walls: scene.walls.map(corriger),
+    objects: scene.objects.map(corriger),
+  };
+}
+
+/**
+ * LE GAIN QUI REMET LE BLANC D'APLOMB, ou `null` s'il n'y a rien à corriger.
+ *
+ * Séparé de son application parce qu'UNE SCÈNE SE CORRIGE D'UN SEUL GAIN :
+ * murs, sol et meubles ont été vus sous la même ampoule. Corriger chaque
+ * surface pour elle-même reviendrait à blanchir tout le logement, meubles
+ * compris — un canapé rouge deviendrait rose.
+ */
+export function gainDesBlancs(
+  couleurs: string[],
+): [number, number, number] | null {
+  const lot = couleurs.filter(valid);
+  if (lot.length === 0) return null;
+  let repere: [number, number, number] | null = null;
+  let clarte = -1;
+  for (const c of lot) {
+    const p = rgbDe(c);
+    const l = (p[0] + p[1] + p[2]) / 3;
+    if (l > clarte) {
+      clarte = l;
+      repere = p;
+    }
+  }
+  if (!repere) return null;
+  const max = Math.max(...repere);
+  const min = Math.min(...repere);
+  /*
+    TROIS GARDE-FOUS, ET CHACUN DIT UN CAS RÉEL.
+
+    — Une surface sombre ne dit rien du blanc : sous 110, on ne conclut pas.
+    — Un écart de plus d'un quart entre canaux, ce n'est plus une dérive
+      d'éclairage : c'est une couleur, et elle reste.
+    — Un écart minuscule ne vaut pas une correction : on ne remue pas tout
+      le relevé pour trois unités.
+  */
+  if (clarte < 110) return null;
+  if (max - min > max * 0.26) return null;
+  if (max - min < 6) return null;
+
+  return [0, 1, 2].map((k) => clarte / Math.max(1, repere![k])) as [
+    number,
+    number,
+    number,
+  ];
+}
+
 function lisser(tex: SurfaceTexture): SurfaceTexture {
   const { cols, rows, texels } = tex;
   const pixels = texels.map((t) => (valid(t) ? rgbDe(t) : null));
@@ -210,7 +438,16 @@ const lisses = new WeakMap<SurfaceTexture, SurfaceTexture>();
 function lisse(tex: SurfaceTexture): SurfaceTexture {
   const connu = lisses.get(tex);
   if (connu) return connu;
-  const fait = lisser(tex);
+  /*
+    L'ÉCLAIRAGE PART D'ABORD, LE BRUIT ENSUITE.
+
+    Dans l'autre ordre, le lissage voit un dégradé régulier — chaque rangée
+    s'écartant de la teinte moyenne dans le même sens que sa voisine — et le
+    juge « partagé », donc réel : il le PROTÈGE. C'est ce qui dessinait les
+    lignes horizontales que le patron a photographiées. Le gradient retiré,
+    il ne reste que ce qu'il sait traiter : les cases aberrantes.
+  */
+  const fait = lisser(aplatirEclairage(tex));
   lisses.set(tex, fait);
   return fait;
 }

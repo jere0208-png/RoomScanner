@@ -4671,6 +4671,54 @@ vide — la 3D la découpe hors maçonnerie et le métré compte une pose
 impossible. Le chiffre qu'on relit après coup dit alors la vérité, ce qu'un
 refus muet ne ferait pas.
 
+### « Mon mur blanc devient marron »
+
+Deux relevés du patron sur la même capture : des couleurs fausses, et des
+**lignes horizontales** sur les murs colorés. Les deux ont la même origine,
+et ce n'est pas le relevé qui est en cause — il est fidèle. **Une caméra ne
+voit pas une couleur, elle voit une couleur ÉCLAIRÉE.**
+
+**Les lignes.** Le haut d'un mur reçoit moins de lumière que le bas, ou
+l'inverse selon la fenêtre : la grille relevée sort en dégradé vertical. Or
+le lissage anti-bruit ne supprime un écart que s'il est *isolé* — un écart
+« partagé » par les cases voisines est jugé réel et **protégé**. Un dégradé
+d'éclairage est justement partagé : le mécanisme qui devait nettoyer
+préservait les bandes.
+
+On distingue donc l'éclairage de la peinture par la **forme** de l'écart :
+l'éclairage est progressif (chaque rangée un peu plus sombre que la
+précédente, par pas comparables), la peinture est franche (un soubassement,
+un lambris : UN saut net entre deux rangées, et rien avant ni après). Le
+premier s'aplatit, le second reste. Ce qui varie horizontalement n'est jamais
+touché — un pan d'accent, une porte, une trace d'humidité vivent dans les
+colonnes.
+
+**Les couleurs.** Un mur blanc sous une ampoule chaude renvoie du beige.
+La surface la plus claire d'un logement est blanche — c'est vrai du plafond
+et des murs dans l'immense majorité des cas, et c'est l'hypothèse que fait
+tout appareil photo du monde. Si la plus claire tire vers l'orange, ce n'est
+pas la peinture, c'est l'ampoule : on annule sa dérive.
+
+**Trois garde-fous**, et chacun dit un cas réel : une surface sombre ne dit
+rien du blanc (sous 110, on ne conclut pas) ; un écart de plus d'un quart
+entre canaux n'est plus une dérive mais une couleur, et elle reste (un mur
+bleu franc n'est pas un mur blanc mal éclairé) ; un écart minuscule ne vaut
+pas qu'on remue tout le relevé.
+
+**Un seul gain pour toute la scène.** Murs, sol et meubles ont été vus sous
+la même ampoule : corriger chaque surface pour elle-même reviendrait à
+blanchir tout le logement, meubles compris — un canapé rouge deviendrait
+rose. Le gain se calcule sur les MURS seuls, parce que c'est d'eux qu'on sait
+quelque chose (le blanc du bâtiment) ; un meuble clair peut être crème, beige
+ou chêne sans que ce soit un défaut.
+
+**Corrigé à l'arrivée du scan, pas au rendu** : la 3D, le plan 2D, le dossier
+et l'export lisent les mêmes champs. Une fois d'aplomb, tout le monde voit la
+même chose, et personne n'a à se souvenir d'appliquer un gain.
+
+Vérifié en image, trois états côte à côte : relevé brut (quatre bandes, teinte
+beige), éclairage aplati (plus de bande), blancs rebalancés (gris neutre).
+
 ### On pose à la cote du métier, pas à la hauteur du doigt
 
 Relevé du patron : « lors d'un scan, j'aimerais qu'on pose de manière logique
