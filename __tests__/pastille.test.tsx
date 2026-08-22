@@ -46,6 +46,31 @@ const par = (t: TestRenderer.ReactTestRenderer, l: string) =>
  * vrai manque.
  */
 describe('la pastille de contrôle', () => {
+  /*
+    ET « COMMENCÉ » NE VEUT PAS DIRE « ÉQUIPÉ ».
+
+    Relevé du patron, capture à l'appui : la pastille restait GRISE, et le
+    panneau annonçait « 9 points à corriger » — dont sept sur le PLAN. Des
+    baies cadrées sous leur tablier de volet, avec le geste tout prêt :
+    « Remonter le linteau ». Rien à voir avec l'appareillage.
+
+    La règle d'origine tient toujours — on ne reproche pas cinq socles
+    manquants à quelqu'un qui vient d'ouvrir l'application — mais elle
+    taisait TOUT, y compris ce qui est vrai avant la pose du premier
+    appareil. Un défaut de relevé n'est pas un reproche prématuré : c'est
+    un défaut, et il se corrige d'un appui.
+
+    La pastille s'allume donc dès qu'il existe un constat qui NE DÉPEND PAS
+    de la pose : ceux du plan.
+  */
+  it('s’allume sur un défaut de PLAN, même sans un seul appareil', () => {
+    const t = monter(
+      <ControlePastille alertes={7} commence onPress={() => {}} />,
+    );
+    expect(par(t, 'Contrôle — 7 points à corriger')).toBeDefined();
+    act(() => t.unmount());
+  });
+
   it('reste neutre tant qu’aucun appareil n’est posé', () => {
     const t = monter(<ControlePastille alertes={3} commence={false} onPress={() => {}} />);
     expect(par(t, 'Contrôle des normes')).toBeDefined();

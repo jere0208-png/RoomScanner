@@ -4671,6 +4671,44 @@ vide — la 3D la découpe hors maçonnerie et le métré compte une pose
 impossible. Le chiffre qu'on relit après coup dit alors la vérité, ce qu'un
 refus muet ne ferait pas.
 
+### Trois relevés du chantier, en une fois
+
+**Les noms des boutons coupés.** Capture à l'appui : sur le bandeau d'un mur
+sélectionné, les libellés se tronquaient à une lettre — « M », « D. ». Sur un
+iPhone, la cote, la hauteur sous plafond et trois mots pleins ne tiennent pas
+dans la rangée une fois la colonne d'ancrage déduite. Un mot réduit à sa
+première lettre ne dit rien ; une icône, si — c'est le remède déjà retenu
+pour le bandeau des spots, sur le même relevé : « des icônes, pas des mots ».
+Le geste principal garde son mot (un crayon seul ne dit pas ce qu'il édite),
+les deux autres passent en silhouettes, leur mot vivant dans l'étiquette
+d'accessibilité.
+
+**La pastille des normes restait grise.** Elle attendait le premier appareil
+posé, et c'est une bonne règle pour ce qui se compte en appareils : on ne
+reproche pas cinq socles manquants à quelqu'un qui vient d'ouvrir
+l'application. Mais elle taisait aussi les défauts de RELEVÉ — sept baies
+cadrées sous leur tablier de volet, avec le geste tout prêt : « Remonter le
+linteau ». Un défaut de relevé n'est pas un reproche prématuré : il est vrai
+avant la pose, et il se corrige d'un appui. La pastille s'allume désormais
+dès qu'un constat ne dépend pas de la pose.
+
+**Le repère du geste se reprenait dans une vue périmée.** `snapshot` repartait
+de la vue posée dans l'état — celle qui ne se met à jour qu'au lâcher. Or ce
+repère se reprend aussi EN COURS DE GESTE, chaque fois que le nombre de
+doigts change : deux doigts ne se lèvent jamais à la même image, et il y a
+toujours un instant où il n'en reste qu'un. À cet instant, le zoom accumulé
+sous les doigts était remplacé par la vue d'avant le geste. Il repart
+maintenant de `vueVive`, la vérité pendant le geste.
+
+**Ce dernier point n'est pas couvert par un banc**, et c'est dit ici pour que
+personne ne s'y trompe. La simulation écrite pour le reproduire passait
+AVANT comme APRÈS la correction : elle n'empruntait pas le chemin fautif, et
+un banc qui ne distingue pas les deux versions ne prouve rien. Il a été
+retiré plutôt que laissé comme faux témoin. La correction tient au
+raisonnement — reprendre un repère dans un état périmé est faux en soi — et
+la mesure image par image de la vidéo (30 im/s) n'a montré aucun pic isolé
+après l'arrêt du doigt, ce qui ne l'exclut pas à 60 Hz.
+
 ### Ce que le rendu en image ne dit pas
 
 Piège payé une fois, noté dans l'outil. Sur la page de conformité, la norme

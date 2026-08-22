@@ -662,10 +662,25 @@ export function FloorplanEditor({
   const dernierPas = useRef({ x: 0, y: 0 });
   const touchAngle = (t: { pageX: number; pageY: number }[]) =>
     Math.atan2(t[1].pageY - t[0].pageY, t[1].pageX - t[0].pageX);
+  /*
+    LE REPÈRE SE REPREND SUR CE QU'ON VOIT, PAS SUR CE QUI EST RANGÉ.
+
+    Il repartait de `viewRef.current` — la vue POSÉE DANS L'ÉTAT, qui ne se
+    met à jour qu'au lâcher. Or ce repère se reprend aussi EN COURS DE
+    GESTE, chaque fois que le nombre de doigts change : deux doigts ne se
+    lèvent jamais à la même image, et il y a toujours un instant où il n'en
+    reste qu'un. À cet instant, tout le zoom accumulé sous les doigts était
+    remplacé par la vue d'avant le geste.
+
+    `vueVive` est la vérité pendant le geste ; l'état ne la rattrape qu'à la
+    fin, et c'est justement pour ça qu'on ne peut pas s'appuyer dessus
+    entre-temps. À la prise, les deux sont égales — la ligne du `Grant` les
+    aligne juste avant d'appeler ici.
+  */
   const snapshot = (e: any, g: any) => {
     const t = e.nativeEvent.touches;
     navBase.current = {
-      v: viewRef.current,
+      v: vueVive.current,
       mode: t.length >= 2 ? 'pinch' : 'pan',
       dx0: g.dx,
       dy0: g.dy,

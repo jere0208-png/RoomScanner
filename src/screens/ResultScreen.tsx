@@ -1446,6 +1446,33 @@ export function ResultScreen() {
     () => issues.filter((i) => i.severity === 'alerte').length,
     [issues],
   );
+  /*
+    LES CONSTATS QUI NE DÉPENDENT PAS DE LA POSE.
+
+    Relevé du patron, capture à l'appui : la pastille restait GRISE alors
+    que le panneau annonçait « 9 points à corriger » — dont sept sur le
+    plan, des baies cadrées sous leur tablier de volet, avec le geste tout
+    prêt : « Remonter le linteau ».
+
+    Le verdict attendait le premier appareil, et c'est une bonne règle pour
+    ce qui SE COMPTE en appareils : on ne reproche pas cinq socles
+    manquants à quelqu'un qui vient d'ouvrir l'application. Mais un défaut
+    de relevé n'est pas un reproche prématuré — il est vrai avant la pose,
+    et il se corrige d'un appui.
+
+    Les constats du plan portent une clé « p… », ceux de l'électricité une
+    clé « e… » : c'est le seul endroit où les deux familles se distinguent,
+    et ce n'est pas un hasard — le reste de l'écran les traite ensemble,
+    « celui qui regarde son plan se moque de savoir si le défaut est
+    géométrique ou électrique ».
+  */
+  const alertesDePlan = useMemo(
+    () =>
+      issues.filter(
+        (i) => i.severity === 'alerte' && !i.key.startsWith('e'),
+      ).length,
+    [issues],
+  );
 
   /*
     ON NE QUITTE PAS UN PLAN MODIFIÉ SANS LE SAVOIR.
@@ -2934,9 +2961,16 @@ export function ResultScreen() {
             <ControlePastille
               alertes={alertes}
               /* Un plan sans le moindre appareil n'est pas une installation
-                 non conforme : c'est une installation qui n'a pas commencé.
-                 Le verdict attend le premier socle. */
-              commence={fixtures.length > 0 || ceiling.length > 0}
+                 non conforme : c'est une installation qui n'a pas commencé,
+                 et le verdict attend le premier socle.
+
+                 MAIS un défaut de RELEVÉ, lui, est vrai avant la pose —
+                 relevé du patron : la pastille restait grise devant sept
+                 baies cadrées sous leur tablier. Il allume la pastille tout
+                 seul. */
+              commence={
+                fixtures.length > 0 || ceiling.length > 0 || alertesDePlan > 0
+              }
               onPress={() => setChecking(true)}
             />
             {/*
@@ -3655,6 +3689,23 @@ export function ResultScreen() {
                 reste réglable par la pièce (barre du sol) et par le retour
                 d'un mur percé.
               */
+              /*
+                LES MOTS DES ACTIONS SECONDAIRES CÈDENT LEUR PLACE.
+
+                Relevé du patron, capture à l'appui : « les noms des boutons
+                sont coupés, rien de lisible ». Sur un iPhone, la cote, la
+                hauteur sous plafond et trois mots pleins ne tiennent pas
+                dans la rangée une fois la colonne d'ancrage déduite : les
+                libellés se tronquaient à UNE LETTRE — « M », « D. ».
+
+                Un mot réduit à sa première lettre ne dit rien ; une icône,
+                si. C'est exactement le remède déjà retenu pour le bandeau
+                des spots — relevé du patron, déjà : « des icônes, pas des
+                mots ». Le geste PRINCIPAL garde le sien, parce qu'un crayon
+                seul ne dit pas ce qu'il édite ; les deux autres passent en
+                silhouettes, leur mot vivant dans l'étiquette
+                d'accessibilité.
+              */
               {
                 label: 'Mesures',
                 crayon: true,
@@ -3673,6 +3724,7 @@ export function ResultScreen() {
               {
                 label: 'Laser',
                 icone: SOLAIRES.metre,
+                sansMot: true,
                 onPress: () =>
                   setLaser({
                     nom: 'ce mur',
@@ -3700,6 +3752,7 @@ export function ResultScreen() {
                     {
                       label: 'Détacher',
                       icone: SOLAIRES.longueur,
+                      sansMot: true,
                       onPress: () => {
                         useScanStore.getState().detacherMur(selectedWall.id);
                         haptic('succes');
