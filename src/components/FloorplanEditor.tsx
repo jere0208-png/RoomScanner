@@ -784,6 +784,17 @@ export function FloorplanEditor({
     }),
   ).current;
   const pieceDep = useRef({ x: 0, y: 0 });
+  /*
+    LE MODE TRACE PASSE PAR UNE REFERENCE, comme tout ce que le geste lit.
+
+    Le `PanResponder` du plan est cree UNE FOIS (`useRef`) : une valeur lue
+    dans sa fermeture y reste figee a ce qu'elle valait au premier rendu.
+    `tracantPiece` y serait donc eternellement `false`, et le plan
+    continuerait de voler le geste — le defaut aurait ete invisible a la
+    lecture et evident au doigt.
+  */
+  const tracantRef = useRef(tracantPiece);
+  tracantRef.current = tracantPiece;
 
   const nav = useRef(
     PanResponder.create({
@@ -795,6 +806,19 @@ export function FloorplanEditor({
       // sous le doigt et le meuble ne bougeait pas d'un pouce.
       onMoveShouldSetPanResponder: (e, g) => {
         if (Math.abs(g.dx) + Math.abs(g.dy) <= 6) return false;
+        /*
+          PENDANT QU'ON TIRE UNE PIECE, LE PLAN NE BOUGE PAS.
+
+          Le trace exige un GLISSEMENT — poser, glisser, lacher — et le plan
+          prend la main des six pixels de mouvement. Sans cette exception, on
+          promenerait le plan en croyant tirer un rectangle, et le geste
+          neuf ne marcherait tout simplement pas.
+
+          Trouve avant l'essai, en relisant qui reclame le doigt : le calque
+          de POSE (un appareil de plafond) se contente d'un tap, il ne
+          rencontrait donc jamais ce conflit.
+        */
+        if (tracantRef.current) return false;
         // Un geste qui commence DANS la pièce choisie lui appartient : il
         // la déplace au lieu de promener le plan.
         if (pieceSousLeDoigt(e)) return false;

@@ -4703,6 +4703,18 @@ millimetre, alors un mur confondu a douze centimetres pres est le meme mur.
 Un appui sans glissement ne cree rien : ce n'est pas une piece, c'est un
 doigt pose.
 
+**Le plan cede le geste pendant qu'on trace.** Le trace exige un GLISSEMENT,
+et le plan prend la main des six pixels de mouvement : sans exception, on
+promenerait le plan en croyant tirer un rectangle, et le geste neuf ne
+marcherait tout simplement pas. Trouve avant l'essai, en relisant qui reclame
+le doigt — le calque de pose d'un appareil de plafond, lui, se contente d'un
+tap et ne rencontrait donc jamais ce conflit.
+
+Et l'exception passe par une REFERENCE, pas par la valeur : le `PanResponder`
+du plan est cree une seule fois, et ce qu'on lit dans sa fermeture y reste
+fige a ce qu'il valait au premier rendu. Le mode trace y serait
+eternellement « non » — un defaut invisible a la lecture, evident au doigt.
+
 **Et les deux coins se collent aux murs qui sont la.** Sans aide, tomber sur
 un mur existant releve de la chance : la reprise se joue a douze centimetres,
 deux pixels sur un plan dezoome. L'aimant a donc la MEME portee que la
