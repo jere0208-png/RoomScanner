@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { BackChevron } from '../components/BackChevron';
 import { RetourGlisse } from '../components/RetourGlisse';
 import {
+  Alert,
   Animated,
   Easing,
   PanResponder,
@@ -625,10 +626,16 @@ function ScanRow({
         sous le « … », visible en permanence — donc trouvable sans rien
         savoir d'avance.
       */}
+      {/* Le geste PRINCIPAL de cette liste n'était pas nommé : « … » et
+          « Nouveau dossier » l'étaient, mais pas ouvrir un relevé. Un
+          lecteur d'écran annonçait le contenu de la ligne sans jamais dire
+          ce qu'un appui ferait. */}
       <TouchableOpacity
         style={styles.rowMain}
         activeOpacity={0.75}
         disabled={fige}
+        accessibilityRole="button"
+        accessibilityLabel={`Ouvrir ${item.name}`}
         onPress={onOpen}>
         <View style={styles.thumb}>
           <PlanThumb scan={item} c={palette} />
@@ -665,6 +672,53 @@ export function LibraryScreen() {
   const folders = useScanStore((s) => s.folders);
   const setScreen = useScanStore((s) => s.setScreen);
   const openSave = useScanStore((s) => s.openSave);
+  const dirty = useScanStore((s) => s.dirty);
+  const currentSaveId = useScanStore((s) => s.currentSaveId);
+  const commitCurrent = useScanStore((s) => s.commitCurrent);
+
+  /*
+    OUVRIR UN AUTRE PLAN NE JETTE PAS CELUI QU'ON TIENT.
+
+    Trouvé en enchaînant les écrans comme on le fait sur un chantier : on
+    rouvre un relevé, on ajoute un WC, on revient ici prendre un autre
+    dossier — et le WC n'a jamais existé.
+
+    C'est le défaut de la flèche de retour, corrigé ailleurs, qui revenait
+    par ce chemin-ci : une garde à un seul endroit ne suffit pas quand deux
+    gestes mènent dehors. La question est donc la même, avec les mêmes
+    issues et dans le même ordre — enregistrer d'abord, jeter ensuite,
+    rester enfin.
+
+    Elle ne se pose pas quand il n'y a rien à perdre, ni quand on rouvre le
+    plan qu'on tient déjà : une confirmation inutile est une confirmation
+    qu'on apprend à balayer sans lire.
+  */
+  const ouvrirLeScan = (id: string) => {
+    if (!dirty || id === currentSaveId) {
+      openSave(id);
+      return;
+    }
+    Alert.alert(
+      'Modifications non enregistrées',
+      'Le plan ouvert a été modifié. Ce que vous venez d’y faire sera perdu ' +
+        'si vous en ouvrez un autre.',
+      [
+        {
+          text: 'Enregistrer',
+          onPress: () => {
+            commitCurrent();
+            openSave(id);
+          },
+        },
+        {
+          text: 'Ouvrir sans enregistrer',
+          style: 'destructive',
+          onPress: () => openSave(id),
+        },
+        { text: 'Rester', style: 'cancel' },
+      ],
+    );
+  };
   const deleteSave = useScanStore((s) => s.deleteSave);
   const addFolder = useScanStore((s) => s.addFolder);
   const renameFolder = useScanStore((s) => s.renameFolder);
@@ -1196,7 +1250,7 @@ export function LibraryScreen() {
               lift={lift}
               styles={styles}
               palette={palette}
-              onOpen={() => openSave(s.id)}
+              onOpen={() => ouvrirLeScan(s.id)}
               onMenu={() => scanMenu(s)}
               onHold={(at) => beginHold(s.id, at)}
               /*

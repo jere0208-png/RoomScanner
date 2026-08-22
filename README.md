@@ -2134,6 +2134,40 @@ affiché — Rez-de-chaussée. Changez de niveau pour vérifier les autres. » �
 et seulement quand le dossier a plus d'un niveau : sur une maison de
 plain-pied, la précision serait du bruit.
 
+### Deux gestes mènent dehors, deux gardes le protègent
+
+Sixième et septième campagnes. La sixième n'a rien trouvé, et cela vaut
+d'être écrit : le **diagnostic du tableau existant** voit les douze circuits
+sous un même différentiel et les calibres aberrants (32 A sur des prises,
+20 A sur de l'éclairage) — et la donnée dont il dépend est vraiment saisie,
+puisque chaque disjoncteur se rattache au dernier différentiel enregistré,
+c'est-à-dire dans l'ordre où l'on lit un tableau. Le **métré CSV** met entre
+guillemets toute cellule contenant un point-virgule, un guillemet ou un saut
+de ligne. Les **cheminements de gaines** encaissent le même point deux fois,
+un contour dégénéré, et même un contour VIDE — qui rend une ligne droite au
+lieu de lever une exception. Les modules de calcul sont solides : ils ont
+été bâtis avec leurs bancs.
+
+La septième, sur les enchaînements d'écrans, a trouvé. **Ouvrir un autre
+plan depuis la bibliothèque jetait le travail en cours** : on rouvre un
+relevé, on ajoute un WC, on revient prendre un autre dossier — et le WC n'a
+jamais existé. C'est le défaut de la flèche de retour, corrigé peu avant,
+qui revenait par un autre chemin : **une garde à un seul endroit ne suffit
+pas quand deux gestes mènent dehors**. La bibliothèque pose donc la même
+question, avec les mêmes issues et dans le même ordre — enregistrer, jeter,
+rester — et ne demande rien quand il n'y a rien à perdre, ni quand on rouvre
+le plan qu'on tient déjà.
+
+Au passage, le geste PRINCIPAL de la bibliothèque n'était pas nommé : « … »
+et « Nouveau dossier » portaient une étiquette d'accessibilité, mais pas
+« ouvrir un relevé ». Un lecteur d'écran annonçait le contenu de la ligne
+sans jamais dire ce qu'un appui ferait.
+
+Ce qui a tenu, dans la même série : se déconnecter garde le plan ouvert et
+les relevés sur l'appareil ; le quota épuisé n'empêche pas d'enrichir et de
+ré-enregistrer le plan en cours — on ne prend pas en otage le travail
+commencé.
+
 ### Un relevé interrompu ne se perd plus
 
 Un scan tenait entièrement en mémoire tant qu'on n'avait pas touché
