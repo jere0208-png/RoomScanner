@@ -4671,6 +4671,28 @@ vide — la 3D la découpe hors maçonnerie et le métré compte une pose
 impossible. Le chiffre qu'on relit après coup dit alors la vérité, ce qu'un
 refus muet ne ferait pas.
 
+### La vie d'un abonné, d'un bout à l'autre
+
+Septième parcours : celui du domaine où une erreur coûte un client ou de
+l'argent. Chaque règle avait déjà son banc ; celui-ci suit l'enchaînement,
+parce que c'est lui qui décide de ce que l'abonné voit — il essaie, se
+heurte au verrou, paie, et son téléphone tombe à l'eau.
+
+**La dernière étape est celle qui fâche.** Un client qui a payé et qui doit
+repayer ne revient pas. Sur un téléphone neuf, le bouton « Restaurer
+l'achat » existe et personne ne le cherche : on rouvre l'app, on la voit
+verrouillée, et l'on conclut qu'on a payé pour rien. Or l'App Store sait
+déjà que l'abonnement est détenu — il suffit de lui demander, et c'est ce
+que fait `rafraichirEcheance` : une échéance trouvée rend le Pro sans qu'on
+touche à rien. C'est la seule chance qu'a l'application de ne pas perdre
+quelqu'un qui a payé, et le parcours la garde désormais.
+
+Rien de cassé sur ce chemin — le verrou tombe avant le travail et non après,
+l'essai consommé suit le client et non l'appareil, le code du patron
+déverrouille sans s'user, et l'échéance dit aussi **si l'abonnement se
+reconduit** : « expire le 12 » et « se renouvelle le 12 » ne veulent pas dire
+la même chose au moment de résilier.
+
 ### Le filet qui retenait la moitié de ce qui tombe
 
 Trois parcours de plus — la bibliothèque, la rénovation, le relevé scanné —
