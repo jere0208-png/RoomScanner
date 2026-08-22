@@ -435,6 +435,19 @@ const scanKey = (id: string) => `roomscanner.scan.v2.${id}`;
  */
 const DRAFT_KEY = 'roomscanner.brouillon.v1';
 const FOLDERS_KEY = 'roomscanner.folders.v1';
+/** La plus grande cote qu'un mur puisse recevoir. Voir `setWallLength`. */
+const MUR_MAX_M = 60;
+/*
+  LA LONGUEUR DES NOMS, BORNÉE À LA SAISIE.
+
+  Le cartouche d'une pièce fait quelques centimètres sur le plan, et la
+  ligne d'un scan dans la bibliothèque une largeur d'écran. Deux cents
+  caractères n'y tiennent pas : ils se tronquent à l'affichage, mais on les
+  traîne dans chaque export, dans chaque sauvegarde et dans le courrier du
+  support. On coupe donc une fois pour toutes, là où le nom entre.
+*/
+const NOM_PIECE_MAX = 40;
+const NOM_PLAN_MAX = 60;
 const THEME_KEY = 'roomscanner.themePref.v1';
 const COLORS_KEY = 'roomscanner.openingColors.v1';
 const FURNITURE_KEY = 'roomscanner.showFurniture.v1';
@@ -1477,7 +1490,9 @@ export const useScanStore = create<ScanState>((set, get) => {
       pushHistory(`roomName:${roomId}`);
       set({
         rooms: get().rooms.map((r) =>
-          r.id === roomId ? { ...r, name: name.trim() } : r,
+          r.id === roomId
+            ? { ...r, name: name.trim().slice(0, NOM_PIECE_MAX) }
+            : r,
         ),
         dirty: true,
       });
@@ -1890,12 +1905,29 @@ export const useScanStore = create<ScanState>((set, get) => {
       const st = get();
       pushHistory('removeWall');
       const walls = st.walls.filter((w) => w.id !== wallId);
-      set({
-        walls,
-        rooms: st.rooms.map((r) => ({
+      /*
+        UNE PIÈCE SANS UN SEUL MUR N'EST PLUS UNE PIÈCE.
+
+        Elle restait pourtant dans la liste : invisible sur le plan, mais
+        bien présente au métré, au contrôle des normes (« Séjour : 0 socle
+        sur 5 exigés ») et dans le dossier PDF. Un fantôme qu'on ne peut ni
+        voir ni corriger, et qui reproche à l'électricien de ne pas l'avoir
+        équipé.
+
+        Elle s'en va donc avec son dernier mur — et elle seule : une pièce à
+        qui il reste un pan est une pièce en cours de retouche, pas une
+        pièce morte.
+      */
+      const vivantes = new Set(walls.map((w) => w.roomId).filter(Boolean));
+      const rooms = st.rooms
+        .filter((r) => vivantes.has(r.id))
+        .map((r) => ({
           ...r,
           wallIds: r.wallIds?.filter((id) => id !== wallId),
-        })),
+        }));
+      set({
+        walls,
+        rooms,
         // Une ouverture sans mur d'accueil n'a plus de sens.
         openings: st.openings.filter((o) => nearestWall(o, walls).dist < 0.6),
         // Une prise non plus : elle était posée sur la face de ce mur —
@@ -1991,6 +2023,7 @@ export const useScanStore = create<ScanState>((set, get) => {
 
     addRoomBox: (largeur, profondeur, nom, contreWallId) => {
       const st = get();
+      nom = nom?.slice(0, NOM_PIECE_MAX);
       pushHistory('addRoom');
       const h = st.walls[0]?.height ?? 2.5;
       const cle = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
@@ -3582,6 +3615,20 @@ export const useScanStore = create<ScanState>((set, get) => {
       const { walls, moveWallPoint } = get();
       const wall = walls.find((w) => w.id === id);
       if (!wall || length <= 0) return;
+      /*
+        NEUF CENT QUATRE-VINGT-DIX-NEUF MÈTRES.
+
+        La saisie acceptait n'importe quel nombre : un doigt qui tape
+        « 999 » au lieu de « 9,99 » — deux touches d'écart — envoyait un mur
+        à un kilomètre, et tout le plan devenait un point à l'écran sans
+        qu'on comprenne ce qu'on venait de faire. Le minimum était déjà
+        borné plus bas (soixante centimètres) ; il manquait l'autre bout.
+
+        Soixante mètres : trois fois la façade d'une maison, bien au-delà du
+        plus grand hangar qu'on relèvera avec un téléphone. Au-delà, ce
+        n'est plus une cote, c'est une faute de frappe.
+      */
+      length = Math.min(length, MUR_MAX_M);
       const dx = wall.b.x - wall.a.x;
       const dz = wall.b.z - wall.a.z;
       const cur = Math.hypot(dx, dz);
@@ -3593,7 +3640,7 @@ export const useScanStore = create<ScanState>((set, get) => {
     },
 
     renameCurrent: (name) => {
-      const clean = name.trim();
+      const clean = name.trim().slice(0, NOM_PLAN_MAX);
       if (!clean) return;
       set({ scanName: clean });
       // Le renommage est une action explicite : il s'enregistre seul,

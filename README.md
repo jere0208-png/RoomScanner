@@ -2059,6 +2059,38 @@ partagent bien leur mur (sept murs pour deux pièces), le brouillon rend le
 relevé entier (murs, pièces et appareillage), supprimer son compte laisse
 les plans sur l'appareil, et le DXF sort ses calques séparés.
 
+### Les coins où les chiffres n'ont plus de sens
+
+Troisième campagne, cette fois en poussant l'application dans ses coins,
+comme le ferait un doigt qui glisse sur le clavier. Rien ne plantait — et
+c'était bien le problème : tout était accepté tel quel, et le plan devenait
+illisible sans qu'on sache pourquoi.
+
+**Une cote à quatre chiffres.** « 999 » au lieu de « 9,99 » — deux touches
+d'écart — envoyait un mur à un kilomètre, et tout le plan devenait un point
+à l'écran. Le minimum était borné depuis longtemps (soixante centimètres) ;
+il manquait l'autre bout. **Soixante mètres** : trois fois la façade d'une
+maison, bien au-delà du plus grand hangar qu'on relèvera avec un téléphone.
+
+**Un nom de deux cents caractères.** Le cartouche d'une pièce fait quelques
+centimètres sur le plan, la ligne d'un scan une largeur d'écran : ils se
+tronquaient à l'affichage, mais on les traînait dans chaque export, chaque
+sauvegarde et le courrier du support. On coupe désormais **à la saisie**,
+quarante caractères pour une pièce, soixante pour un plan.
+
+**Une pièce qui perd tous ses murs.** Elle restait dans la liste :
+invisible sur le plan, mais bien présente au métré, au contrôle des normes
+(« Séjour : 0 socle sur 5 exigés ») et dans le dossier PDF. Un fantôme qu'on
+ne peut ni voir ni corriger, et qui reproche à l'électricien de ne pas
+l'avoir équipé. Elle s'en va maintenant avec son dernier mur — et elle
+seule : une pièce à qui il reste un pan est une pièce en cours de retouche,
+pas une pièce morte.
+
+Ce qui a tenu : quinze pièces posées en cinquante millisecondes, quarante
+prises sur un même mur, un enregistrement en une milliseconde, un appareil
+refusé sur un mur inexistant, et un mur ramené à zéro qui reprend ses
+soixante centimètres. La robustesse était là ; il manquait les bornes.
+
 ### Un relevé interrompu ne se perd plus
 
 Un scan tenait entièrement en mémoire tant qu'on n'avait pas touché
