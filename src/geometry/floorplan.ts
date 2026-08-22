@@ -2484,6 +2484,55 @@ function signedArea(pts: Pt[]): number {
  * de l'ordre de lecture, et il est stable d'une image à l'autre — un
  * battant qui saute de côté au moindre zoom serait pire que le croisement.
  */
+/**
+ * L'ARC QUE DÉCRIT UN BATTANT, du dormant au vantail ouvert.
+ *
+ * Trouvé à l'œil en regardant le DXF rendu en image : sur une porte ouvrant
+ * vers l'extérieur, l'arc partait dans le mauvais sens et décrivait presque
+ * un TOUR COMPLET — il traversait le mur, ressortait de l'autre côté, et
+ * enfermait la pièce dans une boucle.
+ *
+ * La cause tient à une soustraction d'angles. Le dormant est à un cap, le
+ * vantail ouvert à un autre, et l'on interpolait de l'un à l'autre en ligne
+ * droite : quand les deux caps tombent de part et d'autre de la coupure à
+ * ±π, l'écart calculé vaut trois cents degrés au lieu de soixante, et le
+ * tracé prend le chemin long. On ramène donc l'écart dans l'intervalle qui a
+ * un sens physique — une porte ne s'ouvre pas au-delà du demi-tour.
+ *
+ * Le calcul vivait recopié dans le dossier imprimé et dans l'export CAO ;
+ * il vit ici, une fois, et les deux le prennent.
+ *
+ * @param gond    Le bord qui pivote.
+ * @param opp     L'autre bord du dormant.
+ * @param normale Direction du vantail ouvert, unitaire.
+ * @param rayon   La largeur de la porte.
+ * @param pas     Nombre de segments du tracé.
+ */
+export function arcDuBattant(
+  gond: Pt,
+  opp: Pt,
+  normale: Pt,
+  rayon: number,
+  pas = 10,
+): Pt[] {
+  const a0 = Math.atan2(opp.z - gond.z, opp.x - gond.x);
+  const a1 = Math.atan2(normale.z, normale.x);
+  // L'écart le plus COURT entre les deux caps : le chemin qu'un vantail
+  // prend réellement.
+  let delta = a1 - a0;
+  while (delta > Math.PI) delta -= 2 * Math.PI;
+  while (delta < -Math.PI) delta += 2 * Math.PI;
+  const out: Pt[] = [];
+  for (let i = 0; i <= pas; i++) {
+    const t = a0 + (delta * i) / pas;
+    out.push({
+      x: gond.x + Math.cos(t) * rayon,
+      z: gond.z + Math.sin(t) * rayon,
+    });
+  }
+  return out;
+}
+
 export function pivotsDesBattants(
   portes: { id: string; a: Pt; b: Pt; pivot?: 'a' | 'b' }[],
 ): Map<string, 'a' | 'b'> {

@@ -4671,6 +4671,49 @@ vide — la 3D la découpe hors maçonnerie et le métré compte une pose
 impossible. Le chiffre qu'on relit après coup dit alors la vérité, ce qu'un
 refus muet ne ferait pas.
 
+### L'architecte recevait des trous dans des murs
+
+Huitième parcours : le même plan par ses trois portes de sortie — le PDF au
+client et au poseur, le DXF à l'architecte qui va le reposer dans son
+logiciel, le CSV au fournisseur qui chiffre. Il a montré que **le DXF réduit
+toute ouverture à un segment** : porte, fenêtre et baie libre, le même trait
+sur le même calque.
+
+Celui qui reçoit le fichier rouvrait donc le plan, ne voyait que des trous
+dans des murs, et redessinait à la main les battants qu'on lui avait déjà
+donnés sur le PDF. Deux dessins du même logement qui ne disent pas la même
+chose — et c'est celui qu'on croit à jour qui se trompe. Le sens d'ouverture
+est justement ce que l'électricien vient de régler : c'est lui qui décide de
+la place de l'interrupteur.
+
+Maintenant : **un calque par nature** — portes, fenêtres, passages libres —
+parce que c'est ainsi qu'un architecte travaille, il éteint ce qui ne le
+concerne pas. Et les portes partent avec leur dormant, leur vantail et leur
+arc. Une baie libre reste un simple segment : elle n'a pas de vantail, et
+lui en dessiner un serait inventer une menuiserie que personne n'a relevée.
+
+### Un battant qui faisait le tour de la pièce
+
+Et c'est en **regardant le DXF rendu en image** — pas en relisant le flux —
+qu'un second défaut est apparu : sur la porte ouvrant vers l'extérieur,
+l'arc partait dans le mauvais sens et décrivait presque un tour complet. Il
+traversait le mur, ressortait de l'autre côté, et enfermait la pièce dans
+une boucle.
+
+La cause tient à une soustraction d'angles. Le dormant est à un cap, le
+vantail ouvert à un autre, et l'on interpolait de l'un à l'autre en ligne
+droite : quand les deux caps tombent de part et d'autre de la coupure à ±π,
+l'écart calculé vaut trois cents degrés au lieu de soixante, et le tracé
+prend le chemin long. Une porte ne s'ouvre pas au-delà du demi-tour :
+l'écart se ramène désormais dans l'intervalle qui a un sens physique.
+
+**Le calcul vivait recopié** dans le dossier imprimé et dans l'export CAO —
+donc le PDF portait le même défaut, latent, en attente de la bonne
+orientation. Il vit maintenant dans `arcDuBattant`, une fois, et les deux le
+prennent. C'est exactement le genre de chose qu'aucune relecture du flux ne
+montre, et c'est pour cela que les documents de ce projet se vérifient en
+image.
+
 ### La vie d'un abonné, d'un bout à l'autre
 
 Septième parcours : celui du domaine où une erreur coûte un client ou de

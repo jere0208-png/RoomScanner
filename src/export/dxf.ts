@@ -22,6 +22,8 @@
  * qu'une fois le mobilier commandé.
  */
 import {
+  arcDuBattant,
+  pivotsDesBattants,
   roomParts,
   segLength,
   wallQuadsOf,
@@ -48,6 +50,21 @@ export interface CalqueDxf {
 export const DXF_CALQUES: CalqueDxf[] = [
   { nom: 'ECHOPLAN-MURS', couleur: 7 },
   { nom: 'ECHOPLAN-OUVERTURES', couleur: 5 },
+  /*
+    UN CALQUE PAR NATURE DE MENUISERIE.
+
+    Tout sortait en un segment sur un calque unique : porte, fenêtre et baie
+    libre, le même trait. Celui qui reçoit le fichier rouvrait le plan dans
+    son logiciel, ne voyait que des trous dans des murs, et redessinait à la
+    main les battants qu'on lui avait déjà donnés sur le PDF — deux dessins
+    du même logement qui ne disent pas la même chose, et c'est celui qu'on
+    croit à jour qui se trompe.
+
+    Séparés, parce que c'est ainsi qu'un architecte travaille : il éteint ce
+    qui ne le concerne pas.
+  */
+  { nom: 'ECHOPLAN-PORTES', couleur: 5 },
+  { nom: 'ECHOPLAN-FENETRES', couleur: 4 },
   { nom: 'ECHOPLAN-MEUBLES', couleur: 8 },
   { nom: 'ECHOPLAN-ELEC', couleur: 1 },
   { nom: 'ECHOPLAN-PIECES', couleur: 3 },
@@ -57,6 +74,8 @@ export const DXF_CALQUES: CalqueDxf[] = [
 const CALQUE = {
   murs: 'ECHOPLAN-MURS',
   ouvertures: 'ECHOPLAN-OUVERTURES',
+  portes: 'ECHOPLAN-PORTES',
+  fenetres: 'ECHOPLAN-FENETRES',
   meubles: 'ECHOPLAN-MEUBLES',
   elec: 'ECHOPLAN-ELEC',
   pieces: 'ECHOPLAN-PIECES',
@@ -235,9 +254,66 @@ export function buildDxf(plan: PlanPourDxf): string {
     else out += ligne(CALQUE.murs, w.a, w.b);
   }
 
-  /* Les ouvertures : un simple segment sur leur calque, qu'on peut éteindre. */
+  /*
+    LES MENUISERIES, CHACUNE SUR SON CALQUE — et les portes avec leur
+    battant.
+
+    Une baie libre reste un simple segment : elle n'a pas de vantail, et lui
+    en dessiner un serait inventer une menuiserie que personne n'a relevée.
+    Une porte, elle, porte le sens que l'électricien a réglé sur le plan —
+    c'est la cote qui décide de la place de l'interrupteur, et elle ne doit
+    pas se perdre en chemin.
+  */
+  const pivots = pivotsDesBattants(
+    plan.openings
+      .filter((o) => o.type === 'door')
+      .map((o) => ({ id: o.id, a: o.a, b: o.b, pivot: o.pivot })),
+  );
+  // Le découpage se calcule UNE fois : appelé par porte, il refaisait tout
+  // le parcours des faces du logement à chaque menuiserie.
+  const decoupage = roomParts(plan.walls, plan.rooms);
+  const centreDe = (o: WallSeg) =>
+    decoupage.find((x) => x.roomId === o.roomId)?.labelAt ?? null;
   for (const o of plan.openings) {
-    out += ligne(CALQUE.ouvertures, o.a, o.b);
+    if (o.type !== 'door') {
+      out += ligne(
+        o.type === 'window' ? CALQUE.fenetres : CALQUE.ouvertures,
+        o.a,
+        o.b,
+      );
+      continue;
+    }
+    // Le dormant.
+    out += ligne(CALQUE.portes, o.a, o.b);
+    const len = Math.hypot(o.b.x - o.a.x, o.b.z - o.a.z);
+    if (len < 0.05) continue;
+    const ux = (o.b.x - o.a.x) / len;
+    const uz = (o.b.z - o.a.z) / len;
+    // La normale tournée vers l'intérieur de la pièce, puis retournée si
+    // la porte ouvre de l'autre côté : le même choix qu'à l'écran.
+    let nx = -uz;
+    let nz = ux;
+    const dedans = centreDe(o);
+    const mid = { x: (o.a.x + o.b.x) / 2, z: (o.a.z + o.b.z) / 2 };
+    if (dedans && (dedans.x - mid.x) * nx + (dedans.z - mid.z) * nz < 0) {
+      nx = -nx;
+      nz = -nz;
+    }
+    if (o.versExterieur) {
+      nx = -nx;
+      nz = -nz;
+    }
+    const gond = pivots.get(o.id) === 'b' ? o.b : o.a;
+    const opp = gond === o.a ? o.b : o.a;
+    // Le vantail, ouvert à angle droit.
+    const bout = { x: gond.x + nx * len, z: gond.z + nz * len };
+    out += ligne(CALQUE.portes, gond, bout);
+    // Et l'arc qu'il décrit, du dormant au vantail — le calcul commun,
+    // qui ramène l'écart d'angle dans le demi-tour (voir `arcDuBattant`).
+    out += polyligne(
+      CALQUE.portes,
+      arcDuBattant(gond, opp, { x: nx, z: nz }, len, 8),
+    );
   }
 
   /*

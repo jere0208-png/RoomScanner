@@ -109,7 +109,17 @@ describe('les calques, comme un dessinateur les attend', () => {
     // Un architecte éteint les calques qui ne le concernent pas : s'ils
     // sont mélangés, il reçoit un plan qu'il ne peut pas nettoyer.
     expect(calques.has('ECHOPLAN-MURS')).toBe(true);
-    expect(calques.has('ECHOPLAN-OUVERTURES')).toBe(true);
+    /*
+      LA PORTE A CHANGÉ DE CALQUE, ET CE BANC AVEC ELLE.
+
+      Elle sortait sur ECHOPLAN-OUVERTURES, comme la fenêtre et la baie
+      libre : le même trait pour les trois. L'application sait désormais ce
+      qu'est chaque ouverture et de quel côté la porte pivote, et le fichier
+      le porte — un calque par nature, et le battant avec son arc. Ce que ce
+      banc garde est inchangé : rien n'est mélangé, chaque chose a son
+      calque à elle.
+    */
+    expect(calques.has('ECHOPLAN-PORTES')).toBe(true);
     expect(calques.has('ECHOPLAN-ELEC')).toBe(true);
     expect(calques.has('ECHOPLAN-PIECES')).toBe(true);
   });
@@ -252,5 +262,105 @@ describe('le fichier relu comme le fera AutoCAD', () => {
     // Tout ce qui se dessine vit dans ENTITIES : rien apres ENDSEC final.
     const fin = dxf.lastIndexOf('ENDSEC');
     expect(dxf.slice(fin).trim()).toBe('ENDSEC\n0\nEOF');
+  });
+});
+
+/**
+ * LES PORTES ARRIVENT CHEZ L'ARCHITECTE AVEC LEUR BATTANT.
+ *
+ * Toute ouverture sortait en UN SEGMENT sur un calque unique : porte,
+ * fenetre et baie libre, le meme trait. Or l'application sait desormais ce
+ * qu'est chaque ouverture, et de quel cote la porte pivote — c'est meme la
+ * cote qui decide de la place de l'interrupteur.
+ *
+ * Ce que ca coute a celui qui recoit le fichier : il rouvre le plan dans son
+ * logiciel, ne voit que des trous dans des murs, et redessine a la main les
+ * battants qu'on lui avait deja donnes sur le PDF. Deux dessins du meme
+ * logement qui ne disent pas la meme chose, c'est celui qu'on croit a jour
+ * qui se trompe.
+ *
+ * UN CALQUE PAR NATURE, parce que c'est ainsi qu'un architecte travaille :
+ * il eteint ce qui ne le concerne pas. Les menuiseries d'un cote, les
+ * passages libres de l'autre.
+ */
+describe('les menuiseries dans le DXF', () => {
+  const avecPortes = () =>
+    buildDxf({
+      ...PLAN,
+      openings: [
+        {
+          id: 'p1',
+          type: 'door',
+          a: { x: 1, z: 0 },
+          b: { x: 1.9, z: 0 },
+          height: 2.04,
+          yCenter: 1.02,
+          roomId: 'r1',
+        },
+        {
+          id: 'f1',
+          type: 'window',
+          a: { x: 3, z: 0 },
+          b: { x: 4.2, z: 0 },
+          height: 1.1,
+          yCenter: 1.65,
+          roomId: 'r1',
+        },
+      ],
+    });
+
+  it('rangent portes et fenetres sur des calques distincts', () => {
+    const dxf = avecPortes();
+    expect(dxf).toContain('ECHOPLAN-PORTES');
+    expect(dxf).toContain('ECHOPLAN-FENETRES');
+    // Et les calques sont DECLARES dans la table : un calque employe sans
+    // etre declare, et le fichier s'ouvre sans lui.
+    const table = dxf.slice(0, dxf.indexOf('ENTITIES'));
+    expect(table).toContain('ECHOPLAN-PORTES');
+    expect(table).toContain('ECHOPLAN-FENETRES');
+  });
+
+  it('tracent le battant et son arc', () => {
+    const dxf = avecPortes();
+    // L'arc du battant : une polyligne sur le calque des portes. Sans lui,
+    // l'architecte redessine ce qu'on lui avait deja donne.
+    const bloc = dxf.split('ECHOPLAN-PORTES').length - 1;
+    // Le dormant, le vantail, et l'arc : au moins trois entites.
+    expect(bloc).toBeGreaterThanOrEqual(3);
+  });
+
+  it('mais une baie libre reste un simple passage', () => {
+    // Elle n'a pas de vantail : lui en dessiner un serait inventer une
+    // menuiserie que personne n'a relevee.
+    const dxf = buildDxf({
+      ...PLAN,
+      openings: [
+        {
+          id: 'o1',
+          type: 'opening',
+          a: { x: 1, z: 0 },
+          b: { x: 1.9, z: 0 },
+          height: 2.05,
+          yCenter: 1.025,
+          roomId: 'r1',
+        },
+      ],
+    });
+    /*
+      ON REGARDE LES ENTITÉS, PAS LA TABLE.
+
+      Tous les calques y sont déclarés, employés ou non — un calque vide ne
+      gêne personne, tandis qu'une entité posée sur un calque non déclaré
+      fait s'ouvrir le fichier sans elle. Le code 8 est celui qui dit « cette
+      entité vit sur ce calque » : c'est lui qu'on compte, comme le fait
+      déjà le banc des calques.
+    */
+    const employes = new Set(
+      paires(dxf)
+        .filter(([code]) => code === '8')
+        .map(([, v]) => v),
+    );
+    expect(employes.has('ECHOPLAN-OUVERTURES')).toBe(true);
+    expect(employes.has('ECHOPLAN-PORTES')).toBe(false);
   });
 });

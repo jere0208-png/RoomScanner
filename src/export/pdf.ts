@@ -19,6 +19,7 @@ import {
   toFootprint,
   empriseDuCoffre,
   massifsTechniques,
+  arcDuBattant,
   pivotsDesBattants,
   wallAreaM2,
   wallQuads,
@@ -1617,14 +1618,19 @@ function planPage(
         const leafEnd = { x: gond.x + inx * len, z: gond.z + inz * len };
         d.line(px(gond).x, px(gond).y, px(leafEnd).x, px(leafEnd).y, 1.4,
                colorOpenings ? AMBER : GREY);
-        const arc: Pt[] = [];
-        const a0 = Math.atan2(opp.z - gond.z, opp.x - gond.x);
-        const a1 = Math.atan2(inz, inx);
-        for (let i = 0; i <= 10; i++) {
-          const t = a0 + ((a1 - a0) * i) / 10;
-          arc.push(px({ x: gond.x + Math.cos(t) * len, z: gond.z + Math.sin(t) * len }));
-        }
-        d.path(arc, 0.8, GREY);
+        /*
+          L'ARC DU BATTANT — le calcul commun.
+
+          Il vivait ici recopié, et il portait le même défaut latent que
+          l'export CAO : sur certaines orientations, l'écart d'angle passait
+          la coupure à ±π et le tracé prenait le chemin long — un tour
+          complet qui traverse le mur. Un seul calcul, une seule correction.
+        */
+        d.path(
+          arcDuBattant(gond, opp, { x: inx, z: inz }, len, 10).map(px),
+          0.8,
+          GREY,
+        );
       } else {
         // Fenêtre / ouverture : double trait dans la trouée
         const wx = (-dz / len) * (WALL_T / 4);
