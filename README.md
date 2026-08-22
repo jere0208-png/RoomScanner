@@ -4651,6 +4651,36 @@ pas un à la place de l'électricien. Les autres pièces gardent leurs murs, à
 déplacer un à un — c'est le prix d'une forme libre, et un bouton qui ne peut
 pas aboutir est pire qu'un bouton absent.
 
+### Le mot écrit au crayon dans la marge
+
+« Colonne montante ici », « attente TV à confirmer avec le client », « gaine
+à reprendre ». Ces phrases sont sur tous les plans papier du métier, et
+l'application n'avait aucun endroit pour elles : le nom de pièce nomme, le
+nom du plan est unique, l'appareillage se compte au métré. Faute de place,
+elles finissaient dans le nom du plan — « T3 Pasteur (vérifier colonne) » —
+ou nulle part, c'est-à-dire dans la tête de celui qui a fait le relevé, qui
+n'est pas toujours celui qui pose.
+
+La pastille **Note**, en édition, attend le point du plan puis demande le
+texte. **Une note tient à un POINT, pas à une pièce** : ce qu'on signale est
+souvent justement ce qui n'a pas encore de pièce — une arrivée dans un
+couloir, un percement dans une cloison qu'on n'a pas fini de tracer. Elle se
+pose donc partout, là où un appareil de plafond, lui, exige un contour.
+
+Sur le plan, la punaise marque le point et le cartouche s'écarte : posé
+dessus, il couvrirait exactement ce qu'il désigne. Le texte s'écrit **à
+taille constante** — c'est déjà la règle des cotes, elle vaut pour les mots.
+La pastille n'en montre que le début ; le bandeau, qui a la place, la dit en
+entier et c'est là qu'on la corrige ou la retire. Vider le champ retire la
+note : une pastille vide ne se lit plus et ne se vise plus.
+
+**Elles s'impriment sur le plan du dossier**, en dernier, par-dessus murs et
+meubles — une remarque à moitié cachée sous un canapé n'est pas une
+remarque. Et elles suivent leur étage, triées par `filtrerAuNiveau` comme
+les murs : le document, lui, imprime ce qu'on lui donne, et une seconde
+règle de tri cachée dans le dessinateur serait une deuxième place où une
+note pourrait disparaître.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

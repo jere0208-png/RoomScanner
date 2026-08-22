@@ -1221,6 +1221,8 @@ interface SheetContext {
    * le sol ET le plafond — c'est la même pièce.
    */
   ceiling?: CeilingFixture[];
+  /** Les mots écrits sur le plan, déjà filtrés à l'étage imprimé. */
+  notes?: { id: string; text: string; at: { x: number; z: number } }[];
   /**
    * Le cap du scan : d'où vient le nord, en degrés horaires sur l'axe −Z.
    * `null` = boussole muette (scan ancien, appareil sans magnétomètre) : on
@@ -2096,6 +2098,30 @@ function planPage(
           drawSymbol(d, CEILING_SYMBOL[cl.kind], q.x, q.y, r / 9, spec.color, 1.1);
           d.text(spec.short, q.x, q.y - r - 8, 6.5, spec.color, { bold: true });
         }
+      }
+
+      /*
+        LES MOTS ÉCRITS SUR LE PLAN.
+
+        « Colonne montante ici », « attente TV à confirmer avec le client »,
+        « gaine à reprendre » : ce qu'on écrivait au crayon dans la marge du
+        relevé papier. Elles n'entrent dans aucun métré et ne pèsent sur
+        aucun contrôle — leur seul travail est de passer de celui qui relève
+        à celui qui pose, et celui qui pose lit CETTE feuille.
+
+        Elles s'impriment EN DERNIER, par-dessus murs, meubles et appareils :
+        une remarque à moitié cachée sous un canapé n'est pas une remarque.
+        Et la punaise tombe au point visé, le cartouche à côté — sans quoi il
+        couvre exactement ce que la note désigne.
+      */
+      for (const note of ctx.notes ?? []) {
+        const q = px(note.at);
+        if (!dansLeCadre(q)) continue;
+        const mot = fitText(note.text, 6.5, 150);
+        const larg = latin1(mot).length * 6.5 * 0.5 + 10;
+        d.path([q, { x: q.x + 5, y: q.y - 3.5 }, { x: q.x + 5, y: q.y + 3.5 }, q], 0.8, INK);
+        d.rect(q.x + 5, q.y - 5.5, larg, 11, '#FFFFFFEE', INK, 0.5);
+        d.text(mot, q.x + 10, q.y - 2.2, 6.5, INK, { align: 'left' });
       }
 
       /**
@@ -3733,6 +3759,15 @@ export interface ScanForPdf {
   /** Cheminement des gaines, du tableau à chaque appareil (repère monde). */
   routes?: { id: string; path: { x: number; z: number }[] }[];
   /**
+   * LES MOTS ÉCRITS SUR LE PLAN.
+   *
+   * Une note qui ne vit qu'à l'écran n'a servi qu'à celui qui l'a écrite —
+   * or l'intérêt de ces phrases est justement de passer du relevé à celui
+   * qui pose, et celui qui pose lit le PDF sur le chantier. Elles arrivent
+   * DÉJÀ FILTRÉES à l'étage imprimé, comme les murs.
+   */
+  notes?: { id: string; text: string; at: { x: number; z: number } }[];
+  /**
    * Cap du scan, pour nommer les murs par leur orientation — et dessiner
    * la rose des vents, DE SÉRIE, sur la seule feuille du plan 2D. Elle a
    * été une option ; le patron a tranché : un dossier qui désigne ses murs
@@ -4591,6 +4626,7 @@ export function buildScanPdf(
     marks: opts.marks ?? schemas?.marks ?? undefined,
     routes: scan.routes,
     ceiling: opts.ceiling ?? [],
+    notes: scan.notes,
     north: scan.north ?? null,
     colorOpenings: opts.colorOpenings ?? false,
     showSurfaces: opts.surfaces ?? true,

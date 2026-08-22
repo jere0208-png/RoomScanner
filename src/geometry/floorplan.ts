@@ -3078,6 +3078,7 @@ export function filtrerAuNiveau<
   P extends { wallId: string },
   Ob extends { roomId?: string },
   C extends { roomId?: string },
+  N extends { niveau?: number } = { niveau?: number },
 >(
   jeu: {
     walls: W[];
@@ -3087,6 +3088,19 @@ export function filtrerAuNiveau<
     photos: P[];
     objects: Ob[];
     ceiling: C[];
+    /**
+     * LES NOTES DU PLAN — elles portent leur étage EN PROPRE.
+     *
+     * Tout le reste hérite de son support : l'appareillage tient à un mur,
+     * le meuble à une pièce. Une note, elle, désigne souvent ce qui n'a pas
+     * encore de pièce — une arrivée dans un couloir, un percement dans une
+     * cloison qu'on n'a pas fini de tracer. Elle se range donc avec les
+     * murs et les pièces, du côté de ce qui sait où il est.
+     *
+     * Absentes des appels qui n'en ont pas encore : le filtre servait
+     * avant qu'elles existent, et les relevés d'avant n'en portent aucune.
+     */
+    notes?: N[];
   },
   n: number,
 ): typeof jeu {
@@ -3104,6 +3118,7 @@ export function filtrerAuNiveau<
     photos: jeu.photos.filter((p) => parSupport(murAuNiveau, p.wallId)),
     objects: jeu.objects.filter((o) => parSupport(pieceAuNiveau, o.roomId)),
     ceiling: jeu.ceiling.filter((c) => parSupport(pieceAuNiveau, c.roomId)),
+    notes: jeu.notes?.filter((x) => niveauDe(x) === n),
   };
 }
 

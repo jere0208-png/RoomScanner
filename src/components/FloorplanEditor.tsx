@@ -68,6 +68,7 @@ import { frCategory, furnKind, furnitureStrokes } from '../geometry/furniture';
 import { markColor } from '../geometry/schema';
 import { CeilingLayer } from './CeilingLayer';
 import { FixtureLayer } from './FixtureLayer';
+import { NotesLayer } from './NotesLayer';
 import type { Fixture } from '../geometry/electrical';
 import type { CeilingFixture } from '../geometry/ceiling';
 import { CloseCross } from './CloseCross';
@@ -258,6 +259,7 @@ interface EffMapping {
 }
 import { RoomScan } from 'react-native-room-scan';
 import { useScanStore } from '../store/scanStore';
+import type { PlanNote } from '../store/scanStore';
 import {
   cotesLisibles,
   encombrement,
@@ -448,6 +450,15 @@ interface Props {
    * c'est justement ce qu'un canapé dessiné par-dessus empêche de voir.
    */
   selectedCeilingId?: string | null;
+  /**
+   * LES MOTS ÉCRITS SUR LE PLAN — voir {@link NotesLayer}.
+   *
+   * Ils se peignent au-dessus de tout le reste : une remarque à moitié
+   * cachée sous un canapé n'est pas une remarque.
+   */
+  notes?: PlanNote[];
+  selectedNoteId?: string | null;
+  onSelectNote?: (id: string) => void;
   /** La ligne de spots tenue en main : elle se surligne d'un bout à l'autre. */
   selectedCeilingRow?: string | null;
   /**
@@ -500,6 +511,9 @@ export function FloorplanEditor({
   onSelectCeiling,
   placing,
   onPlaceAt,
+  notes,
+  selectedNoteId,
+  onSelectNote,
   selectedCeilingId,
   selectedCeilingRow,
   onPierChange,
@@ -511,6 +525,7 @@ export function FloorplanEditor({
   onToggleObjectDims,
 }: Props) {
   const walls = useScanStore((s) => s.walls);
+  const niveauCourant = useScanStore((s) => s.niveauCourant);
   const openings = useScanStore((s) => s.openings);
   const allObjects = useScanStore((s) => s.objects);
   const showFurniture = useScanStore((s) => s.showFurniture);
@@ -2282,6 +2297,19 @@ export function FloorplanEditor({
                 </G>
               );
             })}
+            {/* LES MOTS ÉCRITS SUR LE PLAN, par-dessus le reste : une
+                remarque à moitié cachée sous un canapé n'est pas une
+                remarque. */}
+            {!!notes?.length && (
+              <NotesLayer
+                notes={notes}
+                mapping={mapping}
+                niveau={niveauCourant}
+                selectedId={selectedNoteId ?? null}
+                onSelect={onSelectNote}
+                c={c}
+              />
+            )}
             {/* Le calque de capture : au-dessus de TOUT, et seulement
                 pendant une pose. */}
             {placing && (

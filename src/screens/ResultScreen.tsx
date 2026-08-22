@@ -292,6 +292,10 @@ export function ResultScreen() {
     [tousLesMurs, niveauCourant],
   );
   const addCeiling = useScanStore((s) => s.addCeiling);
+  const notes = useScanStore((s) => s.notes);
+  const addNote = useScanStore((s) => s.addNote);
+  const editNote = useScanStore((s) => s.editNote);
+  const removeNote = useScanStore((s) => s.removeNote);
   const addRoomBox = useScanStore((s) => s.addRoomBox);
   const moveRoom = useScanStore((s) => s.moveRoom);
   const removeCeiling = useScanStore((s) => s.removeCeiling);
@@ -623,6 +627,10 @@ export function ResultScreen() {
   const [showCeiling, setShowCeiling] = useState(true);
   /** Appareil de plafond en attente de pose : on touche la pièce qui le reçoit. */
   const [pendingCeiling, setPendingCeiling] = useState<CeilingKind | null>(null);
+  /** On attend le point où poser un mot sur le plan. */
+  const [pendingNote, setPendingNote] = useState(false);
+  /** La note tenue en main : son bandeau propose de la reprendre. */
+  const [selNote, setSelNote] = useState<string | null>(null);
   /**
    * LA LIGNE de spots tenue en main, s'il y en a une.
    *
@@ -682,8 +690,11 @@ export function ResultScreen() {
    * avait demandé avant et laissé en plan.
    */
   const seulGeste = useCallback(
-    (garde?: 'mur' | 'plafond' | 'lien' | 'reglage') => {
+    (garde?: 'mur' | 'plafond' | 'lien' | 'reglage' | 'note') => {
       if (garde !== 'mur') setPendingKind(null);
+      // Un seul geste en attente à la fois : deux pastilles allumées, et
+      // le prochain appui sur le plan est une loterie.
+      if (garde !== 'note') setPendingNote(false);
       if (garde !== 'plafond') {
         setPendingCeiling(null);
         setPendingSpots(null);
@@ -2480,8 +2491,37 @@ export function ResultScreen() {
             showNorth={showNorth}
             selectedCeilingId={selCeiling}
             selectedCeilingRow={selRow}
-            placing={!!pendingCeiling || !!pendingSpots}
+            notes={notes}
+            selectedNoteId={selNote}
+            onSelectNote={setSelNote}
+            placing={!!pendingCeiling || !!pendingSpots || pendingNote}
             onPlaceAt={(at) => {
+              /*
+                LE MOT SE POSE PARTOUT, LUI.
+
+                Un appareil de plafond hors de tout contour n'aurait ni
+                circuit ni métré, et le geste se refuse. Une note, au
+                contraire, désigne souvent ce qui n'a pas encore de pièce :
+                une arrivée dans un couloir, un percement dans une cloison
+                qu'on n'a pas fini de tracer. Elle ne demande donc aucun
+                contour, et c'est précisément sa raison d'être.
+              */
+              if (pendingNote) {
+                setPendingNote(false);
+                setPrompt({
+                  title: 'Note sur le plan',
+                  subtitle:
+                    'Ce qu’on écrivait au crayon dans la marge : « colonne ' +
+                    'montante », « attente TV à confirmer ».',
+                  value: '',
+                  okLabel: 'Écrire',
+                  onSubmit: (t) => {
+                    addNote(t, at);
+                    haptic('succes');
+                  },
+                });
+                return;
+              }
               if (!pendingCeiling && !pendingSpots) return;
               // Dans quelle pièce le doigt s'est-il posé ? Hors de tout
               // contour, on ne pose rien : un appareil de plafond sans
@@ -2717,6 +2757,11 @@ export function ResultScreen() {
             edition={barMode}
             pendingKind={pendingKind}
             pendingCeiling={pendingCeiling}
+            pendingNote={pendingNote}
+            onNote={() => {
+              seulGeste('note');
+              setPendingNote((v) => !v);
+            }}
             showMeasures={showMeasures}
             setShowMeasures={setShowMeasures}
             showRoutes={showRoutes}
@@ -2996,6 +3041,55 @@ export function ResultScreen() {
                 setSelCeiling(null);
               }}
               onDone={() => setSelCeiling(null)}
+            />
+          );
+        })()}
+
+        {/*
+          LE BANDEAU DE LA NOTE TENUE EN MAIN.
+
+          La pastille du plan n'en montre que le début — une phrase entière
+          étalée sur le dessin masque la maçonnerie qu'on est venu voir. Le
+          bandeau, lui, a la place : il DIT LA NOTE EN ENTIER, et c'est là
+          qu'on la corrige ou qu'on la retire. Sans lui, une faute de frappe
+          serait définitive.
+        */}
+        {vue === '2d' && selNote && !capturing && (() => {
+          const note = notes.find((n) => n.id === selNote);
+          if (!note) return null;
+          return (
+            <StripBar
+              styles={stylesBarres}
+              strong="Note"
+              note={note.text}
+              actions={[
+                {
+                  label: 'Corriger',
+                  icone: SOLAIRES.crayon,
+                  onPress: () =>
+                    setPrompt({
+                      title: 'Note sur le plan',
+                      value: note.text,
+                      okLabel: 'Écrire',
+                      // Vider le champ retire la note : c'est la règle du
+                      // magasin, et elle évite un second bouton qui dirait
+                      // la même chose.
+                      onSubmit: (t) => {
+                        editNote(note.id, t);
+                        if (!t.trim()) setSelNote(null);
+                      },
+                    }),
+                },
+                {
+                  label: 'Retirer',
+                  icone: SOLAIRES.retirer,
+                  sansMot: true,
+                  onPress: () => {
+                    removeNote(note.id);
+                    setSelNote(null);
+                  },
+                },
+              ]}
             />
           );
         })()}

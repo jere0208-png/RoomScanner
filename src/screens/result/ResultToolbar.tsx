@@ -73,6 +73,8 @@ export function Toolbar2D({
   edition,
   pendingKind,
   pendingCeiling,
+  pendingNote,
+  onNote,
   showMeasures,
   setShowMeasures,
   showRoutes,
@@ -98,6 +100,9 @@ export function Toolbar2D({
   edition: boolean;
   pendingKind: FixtureKind | null;
   pendingCeiling: CeilingKind | null;
+  /** On attend le point où poser le mot : la pastille reste allumée. */
+  pendingNote: boolean;
+  onNote: () => void;
   showMeasures: boolean;
   setShowMeasures: (f: (v: boolean) => boolean) => void;
   showRoutes: boolean;
@@ -240,6 +245,25 @@ export function Toolbar2D({
           label="Plafond"
           active={!!pendingCeiling}
           onPress={menuDuPlafond}
+        />,
+        /*
+          LE MOT QU'ON ÉCRIVAIT AU CRAYON DANS LA MARGE.
+
+          « Colonne montante ici », « attente TV à confirmer avec le
+          client », « gaine à reprendre ». Ces phrases sont sur tous les
+          plans papier du métier et n'avaient nulle part où aller : elles
+          finissaient dans le nom du plan — « T3 Pasteur (vérifier
+          colonne) » — ou dans la tête de celui qui a fait le relevé, qui
+          n'est pas toujours celui qui pose.
+
+          Elle est EN ÉDITION : écrire sur le plan, c'est le modifier.
+        */
+        <ToolPill
+          key="note"
+          icon="note"
+          label="Note"
+          active={pendingNote}
+          onPress={onNote}
         />,
       ]
     : [

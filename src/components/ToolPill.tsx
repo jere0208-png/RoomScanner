@@ -31,6 +31,7 @@ import {
 
 export type ToolIcon =
   | 'plafond'
+  | 'note'
   | 'save'
   | 'edit'
   | 'ruler'

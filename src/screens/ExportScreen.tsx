@@ -195,6 +195,7 @@ const styles = getStyles(c);
    */
   const [gaines, setGaines] = useState(false);
   const toutLePlafond = useScanStore((s) => s.ceiling);
+  const toutesLesNotes = useScanStore((s) => s.notes);
   /** La feuille d'implantation du plafond, avec ses liens de commande. */
   const [plafond, setPlafond] = useState(true);
   const toutesLesPhotos = useScanStore((s) => s.photos);
@@ -213,7 +214,7 @@ const styles = getStyles(c);
     () => niveauxPresents(tousLesMurs, toutesLesPieces),
     [tousLesMurs, toutesLesPieces],
   );
-  const { walls, openings, rooms, fixtures, photos, objects, ceiling } =
+  const { walls, openings, rooms, fixtures, photos, objects, ceiling, notes } =
     useMemo(
       () =>
         filtrerAuNiveau(
@@ -225,6 +226,7 @@ const styles = getStyles(c);
             photos: toutesLesPhotos,
             objects: tousLesMeubles,
             ceiling: toutLePlafond,
+            notes: toutesLesNotes,
           },
           niveauCourant,
         ),
@@ -236,6 +238,7 @@ const styles = getStyles(c);
         toutesLesPhotos,
         tousLesMeubles,
         toutLePlafond,
+        toutesLesNotes,
         niveauCourant,
       ],
     );
@@ -436,6 +439,9 @@ const styles = getStyles(c);
           rooms,
           fixtures,
           routes: gaines || schema ? cheminements?.traces : undefined,
+          // Les mots du relevé passent au dossier : c'est celui qui pose
+          // qui les lit, et il lit cette feuille-là.
+          notes,
           floors: floorsOf(rooms),
           roomNames: Object.fromEntries(rooms.map((r) => [r.id, r.name])),
           photos: vignettes,

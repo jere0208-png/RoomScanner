@@ -185,6 +185,11 @@ export interface BrouillonScan {
   rooms: RoomEntry[];
   fixtures: Fixture[];
   ceiling: CeilingFixture[];
+  /**
+   * Absentes des brouillons écrits par les versions d'avant les notes : un
+   * relevé sauvé il y a dix minutes par l'ancienne app doit se rouvrir.
+   */
+  notes?: PlanNote[];
   photos: ScanPhoto[];
   modelPath: string | null;
   /**
@@ -194,6 +199,34 @@ export interface BrouillonScan {
    */
   existant?: TableauExistant;
 }
+
+/**
+ * UNE NOTE POSÉE SUR LE PLAN — le mot qu'on écrivait au crayon dans la marge.
+ *
+ * « Colonne montante ici », « attente TV à confirmer avec le client »,
+ * « gaine à reprendre ». Ces phrases existent sur tous les plans papier du
+ * métier, et l'application n'avait aucun endroit pour elles : le nom de
+ * pièce nomme, le nom du plan est unique, l'appareillage se compte au métré.
+ * Faute de place elles finissaient dans le nom du plan — « T3 Pasteur
+ * (vérifier colonne) » — ou nulle part, c'est-à-dire dans la tête de celui
+ * qui a fait le relevé, et qui n'est pas toujours celui qui pose.
+ *
+ * ELLE TIENT À UN POINT, PAS À UNE PIÈCE : ce qu'on signale est souvent
+ * justement ce qui n'a pas encore de pièce — une arrivée dans un couloir,
+ * un percement dans une cloison qu'on n'a pas fini de tracer.
+ */
+export interface PlanNote {
+  id: string;
+  /** Le texte, tel qu'il a été tapé. */
+  text: string;
+  /** Où elle est posée, dans le repère du plan. */
+  at: Pt;
+  /** L'étage qui la porte. Absent = le rez, comme partout ailleurs. */
+  niveau?: number;
+}
+
+/** Un plan porte des mots, pas des paragraphes : au-delà, plus rien ne se lit. */
+export const NOTE_MAX = 140;
 
 export interface SavedScan {
   id: string;
@@ -211,6 +244,8 @@ export interface SavedScan {
   photos?: ScanPhoto[];
   /** Appareils de plafond — points lumineux, détecteurs, VMC. */
   ceiling?: CeilingFixture[];
+  /** Notes écrites sur le plan. Absentes des relevés d'avant. */
+  notes?: PlanNote[];
   /**
    * LE TABLEAU QU'ON A TROUVÉ EN ARRIVANT.
    *
@@ -651,6 +686,7 @@ interface Snapshot {
   fixtures: Fixture[];
   photos: ScanPhoto[];
   ceiling: CeilingFixture[];
+  notes: PlanNote[];
 }
 const HISTORY_MAX = 40;
 const history: Snapshot[] = [];
@@ -887,6 +923,22 @@ interface ScanState {
    * la pièce, pas sur une face de mur à une hauteur.
    */
   ceiling: CeilingFixture[];
+  /**
+   * Les mots écrits sur le plan — voir {@link PlanNote}.
+   *
+   * Ils ne comptent dans aucun métré et ne pèsent sur aucun contrôle : ce
+   * sont des mots pour l'humain qui posera. C'est précisément pour ça
+   * qu'ils n'avaient nulle part où aller.
+   */
+  notes: PlanNote[];
+  /** Écrit une note à un point du plan. Un texte vide n'en crée aucune. */
+  addNote: (text: string, at: Pt) => void;
+  /** Déplace une note. */
+  moveNote: (id: string, at: Pt) => void;
+  /** Corrige le texte d'une note. Le vider la retire. */
+  editNote: (id: string, text: string) => void;
+  /** Retire une note. */
+  removeNote: (id: string) => void;
   /** Pose un appareil au plafond, dans la pièce dont on donne le contour. */
   addCeiling: (
     kind: CeilingKind,
@@ -1339,6 +1391,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       fixtures: st.fixtures,
       photos: st.photos,
       ceiling: st.ceiling,
+      notes: st.notes,
     });
     if (history.length > HISTORY_MAX) history.shift();
     if (!st.canUndo) set({ canUndo: true });
@@ -1455,6 +1508,7 @@ export const useScanStore = create<ScanState>((set, get) => {
             fixtures: st.fixtures,
             photos: st.photos,
             ceiling: st.ceiling,
+        notes: st.notes,
             north: st.north ?? undefined,
             modelPath: st.modelPath,
             updatedAt: Date.now(),
@@ -1489,6 +1543,7 @@ export const useScanStore = create<ScanState>((set, get) => {
     pendingJoin: null,
     photos: [],
     ceiling: [],
+    notes: [],
     existant: null,
     planVierge: false,
     dirty: false,
@@ -2849,6 +2904,62 @@ export const useScanStore = create<ScanState>((set, get) => {
       });
     },
 
+    /*
+      LES NOTES DU PLAN.
+
+      Elles n'entrent dans aucun calcul : ni surface, ni métré, ni contrôle
+      des normes. C'est ce qui les rend simples — et c'est aussi pourquoi
+      elles ont attendu si longtemps, chaque fonction de l'app ayant préféré
+      ce qui se compte.
+    */
+    addNote: (text, at) => {
+      const propre = text.trim().slice(0, NOTE_MAX);
+      // Un appui par mégarde ne sème pas de pastille muette sur le plan.
+      if (!propre) return;
+      pushHistory('addNote');
+      const st = get();
+      set({
+        notes: [
+          ...st.notes,
+          {
+            id: `note-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            text: propre,
+            at,
+            niveau: st.niveauCourant,
+          },
+        ],
+        dirty: true,
+      });
+    },
+
+    moveNote: (id, at) => {
+      pushHistory(`moveNote:${id}`);
+      set({
+        notes: get().notes.map((n) => (n.id === id ? { ...n, at } : n)),
+        dirty: true,
+      });
+    },
+
+    editNote: (id, text) => {
+      const propre = text.trim().slice(0, NOTE_MAX);
+      // Effacer ce qu'on avait écrit, c'est retirer la note : une pastille
+      // vide ne se lit plus et ne se vise plus.
+      if (!propre) {
+        get().removeNote(id);
+        return;
+      }
+      pushHistory('editNote');
+      set({
+        notes: get().notes.map((n) => (n.id === id ? { ...n, text: propre } : n)),
+        dirty: true,
+      });
+    },
+
+    removeNote: (id) => {
+      pushHistory('removeNote');
+      set({ notes: get().notes.filter((n) => n.id !== id), dirty: true });
+    },
+
     removeCeiling: (id) => {
       pushHistory('removeCeiling');
       set({ ceiling: get().ceiling.filter((c) => c.id !== id), dirty: true });
@@ -2997,6 +3108,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         fixtures: st.fixtures,
         photos: st.photos,
         ceiling: st.ceiling,
+        notes: st.notes,
       });
       set({
         ...prev,
@@ -3022,6 +3134,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         fixtures: st.fixtures,
         photos: st.photos,
         ceiling: st.ceiling,
+        notes: st.notes,
       });
       set({
         ...suite,
@@ -3589,6 +3702,7 @@ export const useScanStore = create<ScanState>((set, get) => {
           fixtures: [],
           photos: [],
           ceiling: [],
+          notes: [],
           processing: false,
           scanning: false,
           screen: 'result',
@@ -4020,6 +4134,7 @@ export const useScanStore = create<ScanState>((set, get) => {
           fixtures: st.fixtures,
           photos: st.photos,
           ceiling: st.ceiling,
+        notes: st.notes,
           existant: st.existant ?? undefined,
           north: st.north ?? undefined,
           client: st.client || undefined,
@@ -4581,6 +4696,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         fixtures: st.fixtures,
         photos: st.photos,
         ceiling: st.ceiling,
+        notes: st.notes,
         existant: st.existant ?? undefined,
         north: st.north ?? undefined,
         client: st.client || undefined,
@@ -4652,6 +4768,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         rooms: st.rooms,
         fixtures: st.fixtures,
         ceiling: st.ceiling,
+        notes: st.notes,
         existant: st.existant ?? undefined,
         photos: st.photos,
         modelPath: st.modelPath,
@@ -4822,6 +4939,8 @@ export const useScanStore = create<ScanState>((set, get) => {
         fixtures: save.fixtures ?? [],
         photos: save.photos ?? [],
         ceiling: save.ceiling ?? [],
+        // Les relevés d'avant les notes n'en portent aucune, et c'est bien.
+        notes: save.notes ?? [],
         // Un dossier ouvert n est pas un plan vierge, meme s il est vide.
         planVierge: false,
         // Le tableau trouvé sur place revient avec son relevé.
@@ -4950,6 +5069,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         fixtures: [],
         photos: [],
         ceiling: [],
+        notes: [],
         existant: null,
         north: null,
         // Le popup de fin de scan appartient au scan qui vient de finir.
