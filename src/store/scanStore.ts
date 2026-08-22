@@ -1968,6 +1968,8 @@ export const useScanStore = create<ScanState>((set, get) => {
             b,
             height: h,
             yCenter: h / 2,
+            // Il naît à l'étage où l'on travaille : voir `addRoomBox`.
+            niveau: st.niveauCourant,
           },
         ],
         dirty: true,
@@ -2098,6 +2100,15 @@ export const useScanStore = create<ScanState>((set, get) => {
             height: h,
             yCenter: h / 2,
             roomId,
+            // À L'ÉTAGE OÙ L'ON TRAVAILLE, pas au rez-de-chaussée.
+            //
+            // Seul le scan d'un étage posait le niveau ; tout ce qui se
+            // dessine à la main l'ignorait — or c'est précisément le chemin
+            // de ceux qui n'ont pas de caméra. La chambre ajoutée depuis le
+            // premier étage arrivait donc AU REZ-DE-CHAUSSÉE, superposée au
+            // séjour : deux pièces au même endroit, un métré faux, et une
+            // surface au sol qui double sans raison.
+            niveau: st.niveauCourant,
           }));
           set({
             walls: [...st.walls, ...murs],
@@ -2107,6 +2118,7 @@ export const useScanStore = create<ScanState>((set, get) => {
                 id: roomId,
                 name: nom,
                 floor: null,
+                niveau: st.niveauCourant,
                 // Le mur mitoyen d'abord : c'est lui qui les relie.
                 wallIds: [contre.id, ...murs.map((w) => w.id)],
               },
@@ -2144,12 +2156,20 @@ export const useScanStore = create<ScanState>((set, get) => {
         height: h,
         yCenter: h / 2,
         roomId,
+        // À l'étage où l'on travaille : voir le bloc accolé, plus haut.
+        niveau: st.niveauCourant,
       }));
       set({
         walls: [...st.walls, ...murs],
         rooms: [
           ...st.rooms,
-          { id: roomId, name: nom, floor: null, wallIds: murs.map((w) => w.id) },
+          {
+            id: roomId,
+            name: nom,
+            floor: null,
+            niveau: st.niveauCourant,
+            wallIds: murs.map((w) => w.id),
+          },
         ],
         dirty: true,
       });

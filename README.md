@@ -2091,6 +2091,26 @@ prises sur un même mur, un enregistrement en une milliseconde, un appareil
 refusé sur un mur inexistant, et un mur ramené à zéro qui reprend ses
 soixante centimètres. La robustesse était là ; il manquait les bornes.
 
+### Ce qu'on dessine à l'étage reste à l'étage
+
+Quatrième campagne : le dossier PDF, les niveaux empilés. Le PDF a tenu
+partout — plan complet, plan d'une seule pièce, plan VIDE, nom accentué et
+parenthésé : deux pages, aucune exception. Les étages, eux, ont livré un
+défaut de fond.
+
+On relève le rez-de-chaussée, on monte d'un niveau, on ajoute une chambre à
+la main — parce qu'on n'a pas de LiDAR, ou parce qu'il est plus rapide de la
+poser à ses cotes. **Elle arrivait au rez-de-chaussée**, superposée au
+séjour : deux pièces au même endroit, un métré faux, une surface au sol qui
+double sans raison.
+
+L'étage est porté par chaque mur et chaque pièce (`niveau`), et seul le SCAN
+d'un étage le posait. Tout ce qui se dessine à la main l'ignorait — or c'est
+précisément le chemin de ceux qui n'ont pas de caméra, c'est-à-dire ceux
+pour qui l'application a ouvert cette porte. Les trois créations manuelles
+(pièce libre, pièce accolée, mur tracé seul) portent désormais le niveau
+courant.
+
 ### Un relevé interrompu ne se perd plus
 
 Un scan tenait entièrement en mémoire tant qu'on n'avait pas touché
