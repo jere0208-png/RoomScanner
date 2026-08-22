@@ -105,3 +105,32 @@ export function graduationsRegle(ratio: number, largeurPt: number): Regle {
   const total = Math.round(n * pas * 1e6) / 1e6;
   return { pas, total, longueurPt: total * ptParMetre };
 }
+
+/**
+ * L'ÉCHELLE D'UNE ÉLÉVATION — la même règle que le plan, et pour une raison
+ * plus forte encore.
+ *
+ * Le plan d'ensemble a cessé depuis longtemps de se mettre à la feuille pour
+ * en DÉDUIRE son échelle. L'élévation, elle, continuait : elle divisait la
+ * place par la longueur du mur, puis arrondissait le résultat à l'affichage.
+ * Le cartouche annonçait « 1:25 », sans tilde, pour un tracé à 1:25,4.
+ *
+ * ET C'EST LA FEUILLE OÙ ÇA COMPTE LE PLUS. Le plan d'ensemble se lit sur une
+ * table ; l'élévation se tient DEVANT LE MUR, la perceuse dans l'autre main,
+ * et c'est sur elle qu'on reporte une cote au kutch pour retrouver l'axe
+ * d'une boîte. Un pour cent et demi sur deux mètres cinquante, ce sont quatre
+ * centimètres — la moitié d'un entraxe.
+ *
+ * Les deux directions imposent chacune la leur ; on garde la plus
+ * contraignante, sans quoi le mur déborde dans l'autre sens.
+ */
+export function echelleElevation(
+  zoneW: number,
+  zoneH: number,
+  longueurM: number,
+  hauteurM: number,
+): EchelleChoisie {
+  const eLarg = echelleNormalisee(zoneW, longueurM);
+  const eHaut = echelleNormalisee(zoneH, hauteurM);
+  return eLarg.ratio >= eHaut.ratio ? eLarg : eHaut;
+}

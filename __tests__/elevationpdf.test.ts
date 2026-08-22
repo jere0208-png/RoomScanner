@@ -17,6 +17,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   removeItem: jest.fn(async () => undefined),
 }));
 
+import { echelleElevation } from '../src/export/echelle';
 import {
   buildScanPdf,
   fromBase64,
@@ -619,5 +620,74 @@ describe('les photos de repérage du dossier', () => {
     );
     expect(vu).toContain('Photo de repérage');
     expect(vu).not.toContain('Retour 1');
+  });
+});
+
+/**
+ * L'ELEVATION DIT SON ECHELLE, ET C'EST LA VRAIE.
+ *
+ * Le plan d'ensemble a corrige ce defaut il y a longtemps : on ne met plus
+ * le dessin a la feuille pour DEDUIRE l'echelle ensuite et l'arrondir a
+ * l'affichage. « ~ 1:100 » ne trompait personne, mais l'elevation, elle,
+ * ecrivait « 1:25 » sans tilde pour un trace a 1:25,4.
+ *
+ * ET C'EST LA FEUILLE OU CA COMPTE LE PLUS. Le plan d'ensemble se lit sur
+ * une table ; l'elevation se tient DEVANT LE MUR, la perceuse dans l'autre
+ * main, et c'est sur elle qu'on reporte une cote au kutch pour retrouver
+ * l'axe d'une boite. Un pour cent et demi d'erreur sur deux metres
+ * cinquante, ce sont quatre centimetres — la moitie d'un entraxe.
+ *
+ * On choisit donc, ici aussi, la plus grande echelle NORMALISEE qui tienne,
+ * et l'on trace a celle-la exactement.
+ */
+describe('l’echelle d’une elevation', () => {
+  it('choisit un cran du batiment, jamais une echelle batarde', () => {
+    const pdf = latin1(
+      buildScanPdf(
+        {
+          name: 'Essai',
+          walls: W,
+          openings: [],
+          objects: [],
+          rooms: [{ id: 'r1', wallIds: W.map((w) => w.id) }],
+          fixtures: [],
+        },
+        false,
+        { metre: false, elevations: true },
+      ),
+    );
+    const crans = [...pdf.matchAll(/\(1:(\d+)\) Tj/g)].map((m) => Number(m[1]));
+    expect(crans.length).toBeGreaterThan(0);
+    for (const c of crans) {
+      expect([20, 25, 50, 75, 100, 125, 150, 200]).toContain(c);
+    }
+  });
+
+  it('et trace a CETTE echelle, pas a celle qui remplit la feuille', () => {
+    /*
+      LE BANC MESURAIT LE CADRE DE LA FEUILLE.
+
+      Premier jet : on cherchait le plus grand segment horizontal du flux
+      pour y lire la largeur du mur. C'est le CADRE de la page qu'on
+      mesurait — cinq cent trente-cinq points, quel que soit le mur. On
+      verifie donc le calcul la ou il se fait, et le document se contente de
+      dire quel cran il a retenu.
+    */
+    const PT_PAR_MM = 72 / 25.4;
+    // La zone d'une elevation A4 : environ 455 points de large.
+    const e = echelleElevation(455, 544, 3.86, 2.5);
+    expect(e.ratio).toBe(25);
+    // Un metre vaut 1000/25 millimetres de papier, exactement.
+    expect(e.ptParMetre).toBeCloseTo(40 * PT_PAR_MM, 6);
+    // Et le mur tient : 3,86 m a ce cran ne deborde pas.
+    expect(3.86 * e.ptParMetre).toBeLessThanOrEqual(455);
+  });
+
+  it('descend d’un cran plutot que de deborder', () => {
+    // Un mur de six metres ne tient pas au vingt-cinquieme sur A4 : il
+    // passe au cinquantieme, il ne s'etire pas jusqu'au bord.
+    const e = echelleElevation(455, 544, 6, 2.5);
+    expect(e.ratio).toBe(50);
+    expect(6 * e.ptParMetre).toBeLessThanOrEqual(455);
   });
 });

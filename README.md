@@ -4671,6 +4671,26 @@ vide — la 3D la découpe hors maçonnerie et le métré compte une pose
 impossible. Le chiffre qu'on relit après coup dit alors la vérité, ce qu'un
 refus muet ne ferait pas.
 
+### L'élévation annonçait une échelle qu'elle ne tenait pas
+
+Le plan d'ensemble a cessé depuis longtemps de se mettre à la feuille pour en
+DÉDUIRE son échelle. L'élévation, elle, continuait : elle divisait la place
+par la longueur du mur, puis arrondissait le résultat au cartouche. Elle
+écrivait « 1:25 », **sans tilde**, pour un tracé à 1:25,4.
+
+Et c'est la feuille où ça compte le plus. Le plan d'ensemble se lit sur une
+table ; l'élévation se tient **devant le mur, la perceuse dans l'autre
+main**, et c'est sur elle qu'on reporte une cote au kutch pour retrouver
+l'axe d'une boîte. Un pour cent et demi sur deux mètres cinquante, ce sont
+quatre centimètres — la moitié d'un entraxe.
+
+Elle choisit maintenant, comme le plan, la plus grande échelle normalisée qui
+tienne, et trace à celle-là exactement. Sa marge latérale est passée de
+cinquante-deux points à quarante pour la même raison que celle du plan : un
+mur courant de 3,86 m demande 438 points au vingt-cinquième et n'en avait que
+431 — sept points, et le mur sortait deux fois plus petit. Le cran est
+conservé, et il est vrai.
+
 ### Deux points de marge coûtaient un tiers du plan
 
 Relevé du patron, dossier rendu en image à l'appui : « je trouve le plan trop

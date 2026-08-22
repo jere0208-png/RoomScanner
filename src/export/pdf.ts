@@ -32,7 +32,11 @@ import {
   modulesLibres,
   type TableauExistant,
 } from '../geometry/existant';
-import { echelleNormalisee, graduationsRegle } from './echelle';
+import {
+  echelleElevation,
+  echelleNormalisee,
+  graduationsRegle,
+} from './echelle';
 import { ecarterDe } from '../ui/ecarter';
 import { dotStep, floorDots, mixHex } from '../geometry/appearance';
 import { wallLabel, type DeviceName } from '../geometry/naming';
@@ -3167,13 +3171,36 @@ function elevationPage(
   // Le dessin s'arrête SOUS le sous-titre, cote de longueur comprise : la
   // cote du haut dépasse le mur de 22 points, et c'est elle qui venait
   // barrer la ligne « Mur de 2,32 m sous 2,51 m ».
+  /*
+    LA MARGE LATÉRALE — et le cran d'échelle qu'elle décide.
+
+    Cinquante-deux points de chaque côté laissaient 431 points au dessin.
+    Un mur courant de 3,86 m demande 438 points au vingt-cinquième : il
+    manquait sept points, le cran était refusé, et le mur sortait DEUX FOIS
+    plus petit. Le même effet de seuil que sur le plan d'ensemble — relevé
+    du patron : « trop petit et illisible, trop de marge blanche ».
+
+    Quarante suffisent : la cote de longueur et ses attaches débordent de
+    douze points, les repères de bord d'autant.
+  */
+  const MARGE_ELEV = 40;
   const zone = {
-    x: FRAME.x + 52,
+    x: FRAME.x + MARGE_ELEV,
     y: hautPhoto + 46,
-    w: FRAME.w - 104,
+    w: FRAME.w - MARGE_ELEV * 2,
     h: hautTitre - 62 - (hautPhoto + 46),
   };
-  const scale = Math.min(zone.w / face.len, zone.h / H);
+  /*
+    L'ÉCHELLE VRAIE, ICI AUSSI.
+
+    Le dessin était mis à la feuille et l'échelle DÉDUITE de la place
+    occupée, puis arrondie au cartouche : « 1:25 » sans tilde pour un tracé
+    à 1:25,4. C'est la feuille qu'on tient devant le mur, la perceuse dans
+    l'autre main, et sur laquelle on reporte une cote au kutch — un pour
+    cent et demi sur deux mètres cinquante, ce sont quatre centimètres.
+  */
+  const echelle = echelleElevation(zone.w, zone.h, face.len, H);
+  const scale = echelle.ptParMetre;
   const x0 = zone.x + (zone.w - face.len * scale) / 2;
   /**
    * Le dessin se CENTRE dans sa zone.
@@ -3645,7 +3672,8 @@ function elevationPage(
     sheetTitle: `Élévation — ${quoi}`,
     sheet,
     // Un mètre vaut 2834,6 points à l'échelle 1:1 (72 pt par pouce).
-    scaleLabel: `1:${Math.round(2834.6 / Math.max(scale, 1e-6))}`,
+    // Plus d'arrondi : le cartouche dit l'échelle à laquelle on a tracé.
+    scaleLabel: echelle.label,
     metersToPoints: scale,
   });
   return d.stream();
