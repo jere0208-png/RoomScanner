@@ -8,7 +8,9 @@ import Svg, {
   Rect,
   Text as SvgText,
 } from 'react-native-svg';
+import { RoomScanCanvas } from 'react-native-room-scan';
 import { grouperTraces } from '../ui/traces';
+import { mettreAPlat } from '../ui/canevas';
 import { themedStyles, useTheme, type Palette } from '../theme';
 import {
   pointOnSeg,
@@ -1201,11 +1203,19 @@ export function Iso3DView({
       qui est posé PAR-DESSUS ensuite. C'est déjà ce que faisait le tri —
       un repère d'appareil se classe à `1e6`, tout au-devant.
     */
-    const groupes = grouperTraces(
-      items.filter((it) => it.kind === 'poly') as never,
-    );
+    const geometrie = items.filter((it) => it.kind === 'poly');
+    const groupes = grouperTraces(geometrie as never);
     const autres = items.filter((it) => it.kind !== 'poly');
-    return { groupes, autres };
+    /*
+      ET LE MÊME DESSIN, MIS À PLAT POUR LE CANEVAS NATIF.
+
+      Les deux chemins partent des MÊMES faces, dans le même ordre : le
+      canevas quand le natif est là, les balises sinon (Android, banc
+      d'essai). Deux transcriptions d'une seule vérité — jamais deux
+      calculs.
+    */
+    const canevas = mettreAPlat(geometrie as never);
+    return { groupes, autres, canevas };
   }, [
     scene,
     faces,
@@ -1317,7 +1327,26 @@ export function Iso3DView({
       {/* pointerEvents="none" : le SVG ne doit pas voler les gestes. */}
       {rendered && (
         <View pointerEvents="none">
-          <Svg width={layout.w} height={layout.h}>
+          {/*
+            LE CANEVAS PORTE LA GÉOMÉTRIE, le SVG ce qui se pose dessus.
+
+            Les repères d'appareillage, les semis de sol et les étiquettes
+            restent des balises : ils sont peu nombreux, ils portent du
+            TEXTE, et rien ne gagnerait à les décrire en nombres. La
+            géométrie, elle — trois cents formes recalculées à chaque image
+            —, passe au canevas natif : une seule vue, un seul dessin.
+          */}
+          {!!RoomScanCanvas && (
+            <RoomScanCanvas
+              style={{ width: layout.w, height: layout.h }}
+              formes={rendered.canevas.formes}
+              styles={rendered.canevas.styles}
+            />
+          )}
+          <Svg
+            width={layout.w}
+            height={layout.h}
+            style={RoomScanCanvas ? StyleSheet.absoluteFill : undefined}>
             {/*
               LES FACES VOISINES DE MÊME PEAU EN UN SEUL TRACÉ.
 
@@ -1331,7 +1360,8 @@ export function Iso3DView({
               côte, sans en réordonner aucune : le dessin est le même, au
               pixel près, pour moitié moins de vues.
             */}
-            {rendered.groupes.map((g, i) =>
+            {!RoomScanCanvas &&
+              rendered.groupes.map((g, i) =>
               g.trait ? (
                 <Path
                   key={`t${i}`}
@@ -1357,8 +1387,8 @@ export function Iso3DView({
                   fillOpacity={g.voile}
                   strokeOpacity={0.25 + 0.75 * g.voile}
                 />
-              ),
-            )}
+                ),
+              )}
             {rendered.autres.map((item, i) =>
               item.kind === 'dot' ? (
                 <Circle key={i} cx={item.x} cy={item.y} r={1.1} fill={item.color} />

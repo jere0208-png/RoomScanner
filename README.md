@@ -1828,14 +1828,49 @@ dessin est rigoureusement le même : **550 faces, 309 balises**.
 C'est la même idée que les bandes d'un mur, prise par l'autre bout : là on
 découpe pour trier juste, ici on recolle ce que le tri a laissé côte à côte.
 
-**Et il faut dire ce que cela ne fait pas.** Un facteur deux n'est pas un
-facteur dix, et MagicPlan reste plus fluide : ces applications dessinent
-leur 3D dans un moteur GPU natif (SceneKit, Metal), où le nombre de
-polygones ne compte plus, là où nous passons par des vues SVG. Le jour où le
-mobilier deviendra vraiment lourd, la réponse ne sera pas une optimisation
-de plus : ce sera un canevas accéléré — tout le calcul de scène, de tri et
-de projection est déjà écrit et resterait tel quel, seule la dernière
-étape — poser des balises — changerait.
+**Un facteur deux n'était pas un facteur dix**, et MagicPlan restait plus
+fluide : ces applications dessinent leur 3D dans un canevas, là où nous
+posions des vues. Le patron a tranché — « fais le canevas » —, et c'est ce
+qui suit.
+
+### Le canevas de la vue 3D
+
+Une SEULE vue native dessine tout le modèle. Pas de dépendance nouvelle :
+`RoomScanCanvas` est une `UIView` de trente lignes utiles, dans le module
+que le projet possède déjà. Skia aurait tiré Reanimated et Worklets avec
+lui, quinze mégaoctets et trois chantiers de compatibilité, pour un dessin
+que CoreGraphics fait très bien.
+
+**Ce qui a été gardé, c'est tout le difficile.** La scène, le tri du
+peintre, l'écorché, l'appareillage, les rangs de pièces : rien n'a bougé.
+Seule la dernière étape change — au lieu de poser trois cents balises, on
+transmet le dessin à plat.
+
+**Le format, et pourquoi celui-là.** Un tableau de nombres, un seul :
+
+    [ rang du style, nombre de points, x, y, x, y, … ] × formes
+
+et les styles à part, une chaîne chacun. Ce qui traverse le pont soixante
+fois par seconde doit se lire sans être analysé : un tableau de nombres se
+convertit d'un bloc, une chaîne se découpe caractère par caractère. Et les
+styles se répètent — deux cents faces d'un mur partagent la même peau —,
+d'où ce partage : les formes en nombres, les styles dits une seule fois.
+
+**Le dessin suit l'ordre reçu, sans exception.** C'est le tri du peintre :
+réordonner quoi que ce soit dans la vue native reviendrait à défaire, en
+dernière ligne, tout ce que la géométrie a établi — et un meuble
+retraverserait sa cloison.
+
+**Et le rendu SVG reste, en repli.** Sur Android, ou sur un iPhone dont le
+module natif n'a pas été rebâti, `RoomScanCanvas` est absent et les balises
+reprennent la main telles quelles. Une application qui perdrait sa 3D parce
+qu'une vue manque serait pire que lente. Le banc tient les deux moitiés :
+avec le canevas, plus une seule balise de géométrie ; sans lui, le modèle se
+dessine entier.
+
+Les repères d'appareillage, les semis de sol et les étiquettes restent des
+balises, posées PAR-DESSUS le canevas : ils sont peu nombreux, ils portent
+du texte, et rien ne gagnerait à les décrire en nombres.
 
 **La même optimisation a été essayée en 3D, puis ÉCARTÉE.** Le pincement y
 passait au natif (le tri est identique à zoom 1 et à zoom 2,4, le banc le

@@ -88,6 +88,17 @@ RCT_EXTERN_METHOD(shareFile:(NSString *)path
 @end
 
 /*
+  LE CANEVAS DE LA VUE 3D — une seule vue pour tout le modele, la ou l on
+  posait une vue par face. Les formes voyagent en NOMBRES (un tableau plat)
+  et les styles en clair, chacun dit une seule fois : ce qui traverse le
+  pont soixante fois par seconde doit se lire sans etre analyse.
+*/
+@interface RCT_EXTERN_MODULE(RoomScanCanvasManager, RCTViewManager)
+RCT_EXPORT_VIEW_PROPERTY(formes, NSArray)
+RCT_EXPORT_VIEW_PROPERTY(styles, NSArray)
+@end
+
+/*
   LE TELEMETRE LASER — un emetteur : c est l appareil qui parle quand on
   appuie sur SON bouton, pas l application qui l interroge.
 */

@@ -25,6 +25,7 @@ import {
   type ScenePalette,
 } from '../src/geometry/scene3d';
 import { grouperTraces } from '../src/ui/traces';
+import { mettreAPlat } from '../src/ui/canevas';
 import type { WallSeg } from '../src/geometry/floorplan';
 import type { ObjectData } from 'react-native-room-scan';
 
@@ -499,3 +500,57 @@ describe('le dessin se regroupe en tracés', () => {
   });
 });
 
+/**
+ * LE DESSIN MIS À PLAT POUR LA VUE NATIVE.
+ *
+ * Ce qui traverse le pont soixante fois par seconde doit se lire sans être
+ * analysé. Ce banc tient le format — l'ordre conservé, les styles
+ * mutualisés, et rien de perdu en route.
+ */
+describe('le dessin mis à plat', () => {
+  const face = (fill: string, pts: number) => ({
+    proj: Array.from({ length: pts }, (_, i) => ({ sx: i, sy: i * 2 })),
+    fill,
+    stroke: '#333333',
+    voile: 1,
+    dashed: false,
+  });
+
+  it('garde l’ordre des faces, qui est tout le tri', () => {
+    const d = mettreAPlat([face('#AAA', 3), face('#BBB', 4)] as never);
+    // Première forme : style 0, trois points, puis les six coordonnées.
+    expect(d.formes.slice(0, 8)).toEqual([0, 3, 0, 0, 1, 2, 2, 4]);
+    // Seconde : style 1 — une autre peau, donc un autre rang.
+    expect(d.formes[8]).toBe(1);
+    expect(d.formes[9]).toBe(4);
+  });
+
+  it('ne redit jamais deux fois le même style', () => {
+    // Deux cents faces d'un mur partagent la même peau : elle ne doit
+    // traverser le pont qu'UNE fois.
+    const d = mettreAPlat(
+      Array.from({ length: 200 }, () => face('#AAA', 4)) as never,
+    );
+    expect(d.styles).toHaveLength(1);
+  });
+
+  it('une arête n’a pas de fond : elle se dit « none »', () => {
+    const d = mettreAPlat([face('#AAA', 2)] as never);
+    expect(d.styles[0].startsWith('none,')).toBe(true);
+  });
+
+  it('ne perd rien : autant de points dedans que dehors', () => {
+    const faces = [face('#AAA', 4), face('#BBB', 2), face('#AAA', 3)];
+    const d = mettreAPlat(faces as never);
+    let i = 0;
+    let vus = 0;
+    while (i < d.formes.length) {
+      const n = d.formes[i + 1];
+      vus += n;
+      i += 2 + n * 2;
+    }
+    expect(vus).toBe(4 + 2 + 3);
+    // Et l'on retombe pile sur la fin : rien en trop, rien qui manque.
+    expect(i).toBe(d.formes.length);
+  });
+});

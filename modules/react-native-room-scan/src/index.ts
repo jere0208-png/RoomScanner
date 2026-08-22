@@ -3,6 +3,7 @@ import {
   NativeModules,
   Platform,
   requireNativeComponent,
+  UIManager,
   type ViewProps,
 } from 'react-native';
 
@@ -146,6 +147,31 @@ const RoomScanModule = NativeModules.RoomScanModule;
 
 /** Vue caméra AR native (RoomCaptureView sur iOS, ARSceneView sur Android). */
 export const RoomScanView = requireNativeComponent<ViewProps>('RoomScanView');
+
+/**
+ * LE CANEVAS DE LA VUE 3D — une seule vue pour tout le modèle.
+ *
+ * On y posait une vue par face : cinq cent cinquante pour un logement
+ * meublé, réconciliées par React et repeintes à chaque image du geste. Le
+ * calcul, lui, n'a jamais été en cause (trois dixièmes de milliseconde) :
+ * c'est le NOMBRE DE VUES qui plafonnait, et c'est exactement ce qui sépare
+ * notre 3D de celle des applications qui dessinent dans un canevas.
+ *
+ * `formes` porte tout le dessin à plat — `[rang du style, nombre de points,
+ * x, y, …]` — et `styles` les peaux, chacune dite une seule fois. Un
+ * tableau de nombres se convertit d'un bloc ; une chaîne se découpe
+ * caractère par caractère.
+ *
+ * `undefined` quand le natif n'est pas là (Android, banc d'essai) : le
+ * rendu SVG reste alors en place, et rien ne se voit.
+ */
+export const RoomScanCanvas = UIManager.getViewManagerConfig?.(
+  'RoomScanCanvas',
+)
+  ? requireNativeComponent<
+      ViewProps & { formes: number[]; styles: string[] }
+    >('RoomScanCanvas')
+  : undefined;
 
 /**
  * Émetteur d'événements du scan : 'onScanUpdate', 'onInstruction', 'onScanError'.
