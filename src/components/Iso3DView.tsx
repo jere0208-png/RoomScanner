@@ -4,10 +4,11 @@ import Svg, {
   Circle,
   G,
   Line,
-  Polygon,
+  Path,
   Rect,
   Text as SvgText,
 } from 'react-native-svg';
+import { grouperTraces } from '../ui/traces';
 import { themedStyles, useTheme, type Palette } from '../theme';
 import {
   pointOnSeg,
@@ -1191,7 +1192,20 @@ export function Iso3DView({
     */
 
     items.sort((p, q) => p.depth - q.depth);
-    return items;
+    /*
+      LE DESSIN SE SÉPARE EN DEUX : la géométrie, recollée en tracés (voir
+      `grouperTraces`), et le reste — repères, semis, étiquettes —, qui ne
+      se fusionne pas et garde ses propres nœuds.
+
+      Les deux listes suivent l'ordre de peinture : les tracés d'abord, ce
+      qui est posé PAR-DESSUS ensuite. C'est déjà ce que faisait le tri —
+      un repère d'appareil se classe à `1e6`, tout au-devant.
+    */
+    const groupes = grouperTraces(
+      items.filter((it) => it.kind === 'poly') as never,
+    );
+    const autres = items.filter((it) => it.kind !== 'poly');
+    return { groupes, autres };
   }, [
     scene,
     faces,
@@ -1304,39 +1318,49 @@ export function Iso3DView({
       {rendered && (
         <View pointerEvents="none">
           <Svg width={layout.w} height={layout.h}>
-            {rendered.map((item, i) =>
-              item.kind === 'poly' ? (
-                // Deux points = une arête : react-native-svg ne dessine pas
-                // un polygone dégénéré, il faut une vraie ligne.
-                item.proj.length === 2 ? (
-                  <Line
-                    key={i}
-                    x1={item.proj[0].sx}
-                    y1={item.proj[0].sy}
-                    x2={item.proj[1].sx}
-                    y2={item.proj[1].sy}
-                    stroke={item.stroke}
-                    strokeWidth={item.dashed ? 1.8 : 1}
-                    strokeDasharray={item.dashed ? '6 4' : '0'}
-                    strokeLinecap="round"
-                    opacity={item.voile}
-                  />
-                ) : (
-                <Polygon
-                  key={i}
-                  points={item.proj.map((q) => `${q.sx},${q.sy}`).join(' ')}
-                  fill={item.fill}
-                  stroke={item.stroke}
-                  strokeWidth={item.dashed ? 1.8 : 1}
-                  strokeDasharray={item.dashed ? '6 4' : '0'}
+            {/*
+              LES FACES VOISINES DE MÊME PEAU EN UN SEUL TRACÉ.
+
+              Chaque face était une vue native, réconciliée et repeinte à
+              chaque image : cinq cent cinquante d'entre elles sur un
+              logement meublé, et c'est le mur — relevé du patron, MagicScan
+              à l'appui. Le calcul, lui, ne coûte que trois dixièmes de
+              milliseconde : il n'a jamais été en cause.
+
+              `grouperTraces` recolle les faces QUE le tri a laissées côte à
+              côte, sans en réordonner aucune : le dessin est le même, au
+              pixel près, pour moitié moins de vues.
+            */}
+            {rendered.groupes.map((g, i) =>
+              g.trait ? (
+                <Path
+                  key={`t${i}`}
+                  d={g.d}
+                  fill="none"
+                  stroke={g.stroke}
+                  strokeWidth={g.dashed ? 1.8 : 1}
+                  strokeDasharray={g.dashed ? '6 4' : '0'}
+                  strokeLinecap="round"
+                  opacity={g.voile}
+                />
+              ) : (
+                <Path
+                  key={`p${i}`}
+                  d={g.d}
+                  fill={g.fill}
+                  stroke={g.stroke}
+                  strokeWidth={g.dashed ? 1.8 : 1}
+                  strokeDasharray={g.dashed ? '6 4' : '0'}
                   strokeLinejoin="round"
                   // L'aplat s'efface, l'arête reste : un mur estompé doit
                   // continuer à dire où il passe.
-                  fillOpacity={item.voile}
-                  strokeOpacity={0.25 + 0.75 * item.voile}
+                  fillOpacity={g.voile}
+                  strokeOpacity={0.25 + 0.75 * g.voile}
                 />
-                )
-              ) : item.kind === 'dot' ? (
+              ),
+            )}
+            {rendered.autres.map((item, i) =>
+              item.kind === 'dot' ? (
                 <Circle key={i} cx={item.x} cy={item.y} r={1.1} fill={item.color} />
               ) : item.kind === 'elec' ? (
                 <G key={i}>

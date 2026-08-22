@@ -1798,6 +1798,45 @@ décalage d'index entre deux scènes, l'une avec meuble et l'autre sans : la
 coïncidence de structure sur laquelle il reposait est tombée avec ce
 changement, il les isole maintenant par leur couleur.
 
+### Le dessin 3D se regroupe en tracés
+
+Deuxième retour d'essai : « le meublé est lourd, à peine quelques meubles et
+une latence est largement visible ; pourtant sur MagicScan, un grand nombre
+de meubles et aucun problème ». La comparaison est juste, et elle désigne la
+vraie limite de notre rendu.
+
+Ce qui coûte n'est pas le calcul — trier et projeter un logement meublé
+prend **trois dixièmes de milliseconde**, un pour cent d'une image. C'est
+que **chaque face est une VUE NATIVE** que React réconcilie et que le moteur
+repeint : cinq cent cinquante d'entre elles à chaque image du geste. Le
+détail des faces d'un logement meublé :
+
+| | total | visibles |
+|---|---|---|
+| arêtes (2 points) | 602 | 354 |
+| pans pleins | 316 | 176 |
+| contours et sols | 39 | 20 |
+
+On ne peut pas retirer de faces sans abîmer le tri — c'est lui qui empêche
+un meuble de traverser une cloison. Mais on peut réduire le nombre de VUES :
+dans l'ordre de peinture, les faces qui **se suivent** et partagent la même
+peau (remplissage, trait, opacité) se dessinent d'un seul tracé, un `Path`
+portant autant de contours fermés qu'il faut. L'ordre est respecté à la
+lettre — on ne fusionne que des voisines, on ne réordonne rien —, donc le
+dessin est rigoureusement le même : **550 faces, 309 balises**.
+
+C'est la même idée que les bandes d'un mur, prise par l'autre bout : là on
+découpe pour trier juste, ici on recolle ce que le tri a laissé côte à côte.
+
+**Et il faut dire ce que cela ne fait pas.** Un facteur deux n'est pas un
+facteur dix, et MagicPlan reste plus fluide : ces applications dessinent
+leur 3D dans un moteur GPU natif (SceneKit, Metal), où le nombre de
+polygones ne compte plus, là où nous passons par des vues SVG. Le jour où le
+mobilier deviendra vraiment lourd, la réponse ne sera pas une optimisation
+de plus : ce sera un canevas accéléré — tout le calcul de scène, de tri et
+de projection est déjà écrit et resterait tel quel, seule la dernière
+étape — poser des balises — changerait.
+
 **La même optimisation a été essayée en 3D, puis ÉCARTÉE.** Le pincement y
 passait au natif (le tri est identique à zoom 1 et à zoom 2,4, le banc le
 prouve à la décimale) et les arêtes se taisaient pendant la rotation — cent

@@ -24,6 +24,7 @@ import {
   type P3,
   type ScenePalette,
 } from '../src/geometry/scene3d';
+import { grouperTraces } from '../src/ui/traces';
 import type { WallSeg } from '../src/geometry/floorplan';
 import type { ObjectData } from 'react-native-room-scan';
 
@@ -429,6 +430,72 @@ describe('les bandes ne servent qu’à départager', () => {
     // Nettement plus de faces qu'à vide : les murs voisins du meuble se
     // sont découpés, et lui seul a fait la différence.
     expect(avec.faces.length).toBeGreaterThan(salonVide().faces.length + 40);
+  });
+});
+
+/**
+ * LES FACES VOISINES DE MÊME PEAU SE DESSINENT D'UN SEUL TRACÉ.
+ *
+ * Relevé du patron : « le meublé est lourd, à peine quelques meubles et une
+ * latence est largement visible ; pourtant sur MagicScan, un grand nombre
+ * de meubles et aucun problème ». La comparaison est juste, et elle désigne
+ * la vraie limite : chaque face est une VUE NATIVE que le moteur repeint et
+ * que React réconcilie. Cinq cent cinquante vues par image, c'est le mur.
+ *
+ * On ne peut pas réduire le nombre de faces sans abîmer le tri — il est
+ * juste, et c'est lui qui empêche un meuble de traverser une cloison. Mais
+ * on peut réduire le nombre de VUES : dans l'ordre de peinture, les faces
+ * qui se suivent et partagent la même peau (même remplissage, même trait,
+ * même opacité) peuvent être dessinées d'un seul tracé. L'ordre est
+ * respecté à la lettre — on ne fusionne QUE des voisines —, le dessin est
+ * rigoureusement le même, et le nombre de vues tombe de moitié.
+ *
+ * C'est la même idée que les bandes d'un mur, prise par l'autre bout : là
+ * on découpait pour trier juste, ici on recolle ce que le tri a laissé
+ * côte à côte.
+ */
+describe('le dessin se regroupe en tracés', () => {
+  const faces = (n: number, meme: boolean) =>
+    Array.from({ length: n }, (_, i) => ({
+      proj: [
+        { sx: i, sy: 0 },
+        { sx: i + 1, sy: 0 },
+        { sx: i + 1, sy: 1 },
+      ],
+      fill: meme || i % 2 === 0 ? '#AAA' : '#BBB',
+      stroke: '#333',
+      voile: 1,
+      dashed: false,
+    }));
+
+  it('recolle les voisines de même peau', () => {
+    const groupes = grouperTraces(faces(10, true) as never);
+    // Dix faces, un seul tracé : c'est le cas d'un meuble ou d'un mur dont
+    // les pans se suivent dans l'ordre de peinture.
+    expect(groupes).toHaveLength(1);
+    // Et le tracé porte les dix contours, chacun refermé.
+    expect((groupes[0].d.match(/Z/g) ?? []).length).toBe(10);
+  });
+
+  it('ne fusionne JAMAIS par-dessus une face d’une autre peau', () => {
+    // L'ordre de peinture est la seule chose qui empêche un meuble de
+    // traverser un mur : on ne réordonne rien, on ne saute rien.
+    const groupes = grouperTraces(faces(10, false) as never);
+    expect(groupes).toHaveLength(10);
+  });
+
+  it('sépare les arêtes des aplats : une ligne n’a pas de remplissage', () => {
+    const melange = [
+      { proj: [{ sx: 0, sy: 0 }, { sx: 1, sy: 1 }], fill: 'none', stroke: '#333', voile: 1, dashed: false },
+      { proj: [{ sx: 1, sy: 1 }, { sx: 2, sy: 2 }], fill: 'none', stroke: '#333', voile: 1, dashed: false },
+      { proj: [{ sx: 0, sy: 0 }, { sx: 1, sy: 0 }, { sx: 1, sy: 1 }], fill: '#AAA', stroke: '#333', voile: 1, dashed: false },
+    ];
+    const groupes = grouperTraces(melange as never);
+    // Les deux traits ensemble, l'aplat à part : un tracé ne peut pas être
+    // à la fois une ligne ouverte et un polygone fermé.
+    expect(groupes).toHaveLength(2);
+    expect(groupes[0].d).not.toContain('Z');
+    expect(groupes[1].d).toContain('Z');
   });
 });
 

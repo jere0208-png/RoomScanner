@@ -147,11 +147,22 @@ describe('le rangement devant une prise', () => {
 
   it('et les deux caissons sont dessinés, l’un comme l’autre', () => {
     const tree = modele(3.5, PRISE);
-    // Chaque caisson porte au moins ses faces vues : six par boîte au plus,
-    // trois au moins. On vérifie qu'AUCUN des deux n'a disparu.
-    const aplats = tree.root
-      .findAllByType(Polygon)
-      .filter((n) => typeof n.props.points === 'string' && n.props.points.length > 0);
-    expect(aplats.length).toBeGreaterThan(12);
+    /*
+      ON COMPTE LES CONTOURS, PLUS LES BALISES.
+
+      Le banc comptait des `Polygon` : un par face. Depuis que les faces
+      voisines de même peau se dessinent d'un seul tracé — c'est ce qui a
+      rendu le modèle meublé fluide —, une balise porte plusieurs faces, et
+      leur nombre ne se lit plus dans l'arbre.
+
+      Ce qu'on veut vérifier n'a pas changé : que les deux caissons soient
+      bien LÀ, avec leurs faces vues. On compte donc les contours fermés
+      dans les tracés (chaque `Z` en referme un), ce qui est exactement le
+      nombre de faces d'aplat dessinées.
+    */
+    const fermes = tree.root
+      .findAll((n) => typeof n.props?.d === 'string' && n.props.d.includes('Z'))
+      .reduce((t, n) => t + (String(n.props.d).match(/Z/g) ?? []).length, 0);
+    expect(fermes).toBeGreaterThan(12);
   });
 });
