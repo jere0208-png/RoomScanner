@@ -360,6 +360,7 @@
              "type": 0,
              "payload": 4293652735
             },
+            "fillOpacity": 1,
             "stroke": {
              "type": 0,
              "payload": 4292271075
@@ -367,6 +368,7 @@
             "strokeWidth": 1,
             "propList": [
              "fill",
+             "fillOpacity",
              "stroke",
              "strokeWidth"
             ],
@@ -586,6 +588,7 @@
              "type": 0,
              "payload": 4293652735
             },
+            "fillOpacity": 1,
             "stroke": {
              "type": 0,
              "payload": 4292271075
@@ -593,6 +596,7 @@
             "strokeWidth": 1,
             "propList": [
              "fill",
+             "fillOpacity",
              "stroke",
              "strokeWidth"
             ],
@@ -692,6 +696,7 @@
              "type": 0,
              "payload": 4293652735
             },
+            "fillOpacity": 1,
             "stroke": {
              "type": 0,
              "payload": 4292271075
@@ -699,6 +704,7 @@
             "strokeWidth": 1,
             "propList": [
              "fill",
+             "fillOpacity",
              "stroke",
              "strokeWidth"
             ],

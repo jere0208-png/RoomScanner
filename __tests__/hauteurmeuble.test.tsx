@@ -278,7 +278,6 @@ describe('le bandeau du meuble', () => {
           onHeight={onHeight}
           onRotate={() => {}}
           onCancel={() => {}}
-          onDone={() => {}}
         />,
       );
     });

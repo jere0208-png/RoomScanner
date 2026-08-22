@@ -4671,6 +4671,41 @@ vide — la 3D la découpe hors maçonnerie et le métré compte une pose
 impossible. Le chiffre qu'on relit après coup dit alors la vérité, ce qu'un
 refus muet ne ferait pas.
 
+### Le doigt commande, le mur refuse
+
+Relevé du patron : « on doit pouvoir les placer n'importe où, même traverser
+les murs, mais impossible à placer SUR un mur (meuble rouge au placement si
+impossible), et une légère attraction contre les murs (sans les toucher), et
+pas de bouton valider ».
+
+**C'était l'inverse.** Le meuble était contraint à chaque image : rabattu hors
+des murs, retourné pour entrer dans une niche, raboté pour tenir dans un
+recoin. Trois aides, chacune défendable seule ; ensemble, un meuble qui
+glisse tout seul sous le doigt sans qu'on comprenne pourquoi.
+
+La règle du patron est plus simple et plus juste. Le meuble suit exactement
+le doigt, **murs compris** — on traverse une cloison pour aller dans la pièce
+d'à côté, c'est le geste de qui déménage une commode. Ce qui est refusé, c'est
+de **lâcher** dans la maçonnerie : tant que le doigt y est, le meuble se
+signale en rouge ; au lâcher, il revient à la dernière position qui tenait.
+Sans ce retour, le refus ne serait qu'une couleur.
+
+**L'aimant amène au nu, jamais au-delà.** Une commode lâchée à vingt
+centimètres d'un mur n'a pas été posée là exprès — personne ne laisse
+volontairement ce jeu derrière un meuble. Portée : vingt-cinq centimètres. Au
+large, on ne touche à rien : un îlot de cuisine est au milieu de la pièce
+parce que quelqu'un l'y a mis.
+
+**Et le bouton « Valider » est parti.** Il n'adoptait qu'un meuble déjà posé :
+ses cotes partaient au magasin dès qu'on les tapait, sa position dès qu'on
+lâchait le doigt. Il ne restait qu'un rituel — une coche pour dire oui à ce
+qui était déjà fait — et un doute : tant qu'on ne l'avait pas touchée, on ne
+savait pas si le meuble comptait. La croix rouge reste, elle : c'est le geste
+qui RETIRE, et lui change quelque chose.
+
+Les flèches du bandeau, elles, gardent les anciennes aides : au centimètre
+près, on ne vise pas au doigt, et le meuble a le droit de se ranger tout seul.
+
 ### Attraper un meuble ne doit pas demander de viser
 
 Relevé du patron : « le clic sur un meuble est capricieux, il faut parfois

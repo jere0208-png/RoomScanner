@@ -340,9 +340,6 @@ export function ResultScreen() {
    * quand on la valide dans sa feuille. Il n'y a donc plus rien à lire ici
    * au moment de fermer, et plus de clavier à congédier.
    */
-  const applyObjectDims = () => {
-    setDraftObject(null);
-  };
   const setScreen = useScanStore((s) => s.setScreen);
   const reset = useScanStore((s) => s.reset);
   const teinte = useTheme();
@@ -3115,7 +3112,6 @@ export function ResultScreen() {
             }}
             onRotate={() => rotateObject(selectedObject.id)}
             onCancel={cancelObject}
-            onDone={applyObjectDims}
             onNudge={(dx, dy) => {
               /*
                 UN CENTIMÈTRE DANS L'AXE DE L'ÉCRAN.

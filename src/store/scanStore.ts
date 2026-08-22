@@ -91,6 +91,7 @@ import {
 } from '../geometry/electrical';
 import { equilibrerLaScene, pointInPolygon } from '../geometry/appearance';
 import { ancrerElec } from '../geometry/viseur';
+import { poserLibre } from '../geometry/poser';
 import type { SurfaceTexture } from 'react-native-room-scan';
 import {
   deduceRoomKind,
@@ -1288,7 +1289,17 @@ interface ScanState {
    * demande explicite, et l'aimant le reprenait aussitôt. Le meuble revenait
    * se coller, et le bouton paraissait mort.
    */
-  setObjectCenter: (id: string, x: number, z: number, aimant?: boolean) => void;
+  /**
+   * Pose un meuble. `libre` = LE DOIGT COMMANDE : aucune aide, aucun
+   * rabotage, on peut traverser les murs — voir `poserLibre`.
+   */
+  setObjectCenter: (
+    id: string,
+    x: number,
+    z: number,
+    aimant?: boolean,
+    libre?: boolean,
+  ) => void;
   resizeObject: (id: string, width: number, depth: number) => void;
   /**
    * LA TROISIÈME COTE, et la hauteur à laquelle elle commence.
@@ -4666,11 +4677,52 @@ export const useScanStore = create<ScanState>((set, get) => {
      * simple collision fait mieux et sans surprise : on pousse jusqu'au mur,
      * ça s'arrête pile contre le nu.
      */
-    setObjectCenter: (id, x, z, aimant = true) => {
+    setObjectCenter: (id, x, z, aimant = true, auDoigt = false) => {
       pushHistory(`moveObject:${id}`);
       const st = get();
       const obj = st.objects.find((o) => o.id === id);
       if (!obj) return;
+      /*
+        EN LIBRE, LE MAGASIN N'ARBITRE PLUS.
+
+        Relevé du patron : « on doit pouvoir les placer n'importe où, même
+        traverser les murs ». Les trois aides d'en dessous — repousser hors
+        de la maçonnerie, retourner pour entrer dans une niche, raboter pour
+        tenir dans un recoin — sont chacune défendable seule ; ensemble,
+        elles font glisser le meuble tout seul sous le doigt.
+
+        Ici on pose où l'on demande, et l'on se contente d'AIMANTER ce qui
+        frôle un mur. Dire si la position tient revient à l'écran, qui la
+        montre en rouge : c'est lui qui a le doigt sous les yeux.
+      */
+      if (auDoigt) {
+        const pose = poserLibre(
+          { x, z },
+          {
+            width: obj.baseWidth ?? obj.width,
+            depth: obj.baseDepth ?? obj.depth,
+            yaw: Math.atan2(obj.transform[2], obj.transform[0]),
+          },
+          st.walls,
+        );
+        set({
+          objects: st.objects.map((o) => {
+            if (o.id !== id) return o;
+            const t = [...o.transform];
+            t[12] = pose.centre.x;
+            t[14] = pose.centre.z;
+            return {
+              ...o,
+              transform: t,
+              // Les cotes du catalogue, toujours : on ne rabote plus.
+              width: o.baseWidth ?? o.width,
+              depth: o.baseDepth ?? o.depth,
+            };
+          }),
+          dirty: true,
+        });
+        return;
+      }
       const parts = roomParts(st.walls, st.rooms);
       // La pièce du meuble est celle où IL EST, pas celle que le doigt
       // survole : pousser un lit contre un mur, c'est justement viser

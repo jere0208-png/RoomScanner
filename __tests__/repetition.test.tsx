@@ -50,7 +50,6 @@ function monter() {
         onResize={() => {}}
         onRotate={() => {}}
         onCancel={() => {}}
-        onDone={() => {}}
         onNudge={(dx, dz) => pas.push([dx, dz])}
       />,
     );

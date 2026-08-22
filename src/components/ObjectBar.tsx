@@ -116,7 +116,6 @@ export function ObjectBar({
   onHeight,
   onRotate,
   onCancel,
-  onDone,
   onNudge,
 }: {
   object: ObjectData;
@@ -135,7 +134,6 @@ export function ObjectBar({
   onHeight?: (height?: number, base?: number) => void;
   onRotate: () => void;
   onCancel: () => void;
-  onDone: () => void;
   /**
    * LE DÉPLACEMENT AU CENTIMÈTRE, À LA FLÈCHE.
    *
@@ -288,22 +286,19 @@ export function ObjectBar({
               ))}
             </Svg>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.iconBtnOk}
-            hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
-            accessibilityLabel="Valider"
-            onPress={onDone}>
-            <Svg width={19} height={19} viewBox="0 0 24 24">
-              <Path
-                d="M5 12.5 L10 17.5 L19 6.5"
-                stroke="#FFFFFF"
-                strokeWidth={2.4}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                fill="none"
-              />
-            </Svg>
-          </TouchableOpacity>
+          {/*
+            PLUS DE BOUTON « VALIDER » — relevé du patron : « pas de bouton
+            valider ».
+
+            Il n'adoptait qu'un meuble déjà posé : ses cotes partaient au
+            magasin dès qu'on les tapait, et sa position dès qu'on lâchait le
+            doigt. Il ne restait qu'un rituel — une coche à cocher pour dire
+            oui à ce qui était déjà fait — et un doute : tant qu'on ne l'avait
+            pas touchée, on ne savait pas si le meuble comptait.
+
+            La croix rouge reste, elle : c'est le geste qui RETIRE, et lui
+            change quelque chose.
+          */}
         </View>
       </View>
     </View>

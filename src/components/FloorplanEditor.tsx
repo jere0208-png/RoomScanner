@@ -69,6 +69,7 @@ import { markColor } from '../geometry/schema';
 import { CeilingLayer } from './CeilingLayer';
 import { FixtureLayer } from './FixtureLayer';
 import { NotesLayer } from './NotesLayer';
+import { poserLibre } from '../geometry/poser';
 import type { Fixture } from '../geometry/electrical';
 import type { CeilingFixture } from '../geometry/ceiling';
 import { CloseCross } from './CloseCross';
@@ -576,6 +577,15 @@ export function FloorplanEditor({
    * quand la position remonte à l'écran.
    */
   const [navigating, setNavigating] = useState(false);
+  /*
+    LE MEUBLE QU'ON NE PEUT PAS POSER LÀ.
+
+    Relevé du patron : « impossible à placer sur un mur (meuble rouge au
+    placement si impossible) ». Le refus se voit AVANT le lâcher : c'est ce
+    qui distingue une aide d'une sanction — on sait qu'il ne faut pas lâcher
+    ici, on n'a pas à le découvrir après coup.
+  */
+  const [poseRefusee, setPoseRefusee] = useState(false);
 
   /*
     ET IL NE LE DIT QU'UNE FOIS LE DOIGT LEVÉ.
@@ -1463,13 +1473,32 @@ export function FloorplanEditor({
                 <G
                   key={f.id}
                   transform={`translate(${ctr.x}, ${ctr.y}) rotate(${((f.yaw + view.rot) * 180) / Math.PI})`}>
+                  {/*
+                    ROUGE QUAND ON NE PEUT PAS POSER LÀ — relevé du patron.
+                    Seul le meuble TENU se colore : les autres n'ont rien à
+                    dire, et un plan qui rougit en entier ne désigne plus
+                    rien.
+                  */}
                   <Rect
                     x={-w / 2}
                     y={-d / 2}
                     width={w}
                     height={d}
-                    fill={c.blueSoft}
-                    stroke={o.id === selectedObjectId ? c.blue : c.lineStrong}
+                    fill={
+                      poseRefusee && o.id === selectedObjectId
+                        ? c.danger
+                        : c.blueSoft
+                    }
+                    fillOpacity={
+                      poseRefusee && o.id === selectedObjectId ? 0.35 : 1
+                    }
+                    stroke={
+                      poseRefusee && o.id === selectedObjectId
+                        ? c.danger
+                        : o.id === selectedObjectId
+                        ? c.blue
+                        : c.lineStrong
+                    }
                     strokeWidth={o.id === selectedObjectId ? 2.5 : 1}
                     rx={3}
                   />
@@ -2496,6 +2525,7 @@ export function FloorplanEditor({
                     half={{ x: hw, y: hh }}
                     mapping={mapping}
                     raw={o}
+                    onRefus={setPoseRefusee}
                   />
                   {showObjectDims &&
                     cotesTirables.map((b) => {
@@ -3105,16 +3135,29 @@ export function ObjectDragHandle({
   half,
   mapping,
   raw,
+  onRefus,
 }: {
   objectId: string;
   center: { x: number; y: number };
   /** Demi-largeur et demi-hauteur de l'emprise à l'écran. */
   half: { x: number; y: number };
   mapping: EffMapping;
-  raw: { transform: number[]; width: number };
+  raw: {
+    transform: number[];
+    width: number;
+    depth?: number;
+    baseWidth?: number;
+    baseDepth?: number;
+  };
+  /** Le meuble ne peut pas se poser là : l'écran le montre en ROUGE. */
+  onRefus?: (refuse: boolean) => void;
 }) {
   const styles = getStyles(useTheme());
   const startRef = useRef({ x: raw.transform[12], z: raw.transform[14] });
+  /** La dernière position qui tenait : on y revient si le doigt lâche dans un mur. */
+  const derniereBonne = useRef<{ x: number; z: number } | null>(null);
+  /** L'aimant a-t-il joué à l'image précédente ? (pour ne vibrer qu'une fois) */
+  const aimanteAvant = useRef(false);
   /**
    * Ce qui change à chaque frame passe par une RÉFÉRENCE, jamais par les
    * dépendances du geste.
@@ -3128,8 +3171,14 @@ export function ObjectDragHandle({
    * « il revient tout seul ». Le responder est maintenant créé une fois pour
    * la vie de la poignée.
    */
-  const live = useRef({ mapping, raw });
-  live.current = { mapping, raw };
+  const live = useRef({ mapping, raw, onRefus });
+  /*
+    LE RAPPORT DE REFUS PASSE PAR LA RÉFÉRENCE, comme tout ce qui change à
+    chaque image : mis dans les dépendances du geste, il refabriquerait le
+    `PanResponder` à chaque rendu du parent — et le déplacement en cours
+    perdrait son point de départ.
+  */
+  live.current = { mapping, raw, onRefus };
   const pan = useMemo(
     () =>
       PanResponder.create({
@@ -3145,34 +3194,77 @@ export function ObjectDragHandle({
           const t = live.current.raw.transform;
           startRef.current = { x: t[12], z: t[14] };
         },
+        /*
+          LE DOIGT COMMANDE — relevé du patron : « on doit pouvoir les placer
+          n'importe où, même traverser les murs, mais impossible à placer SUR
+          un mur (meuble rouge au placement si impossible) ».
+
+          Le meuble suit donc exactement, murs compris. Ce qui est refusé,
+          c'est de LÂCHER dans la maçonnerie : tant que le doigt y est, le
+          meuble se signale en rouge ; au lâcher, il revient à la dernière
+          position qui tenait.
+        */
         onPanResponderMove: (_e, g) => {
           const d = live.current.mapping.deltaToMeters(g.dx, g.dy);
           const vise = {
             x: startRef.current.x + d.x,
             z: startRef.current.z + d.z,
           };
-          useScanStore.getState().setObjectCenter(objectId, vise.x, vise.z);
-          // Le doigt demande, les murs disposent : si la position obtenue
-          // n'est pas celle visée, c'est qu'on bute. La main doit le sentir,
-          // parce que l'œil, lui, est caché par le doigt.
-          const apres = useScanStore
-            .getState()
-            .objects.find((o) => o.id === objectId);
-          if (!apres) return;
-          const ecart = Math.hypot(
-            apres.transform[12] - vise.x,
-            apres.transform[14] - vise.z,
+          const m = live.current.raw;
+          // Le rapport de refus se lit dans la référence : il ne peut pas
+          // entrer dans les dépendances du geste sans le refabriquer à
+          // chaque image, et un geste refabriqué perd son point de départ.
+          const dire = live.current.onRefus;
+          const essai = poserLibre(
+            vise,
+            {
+              width: m.baseWidth ?? m.width,
+              // La profondeur du catalogue, à défaut celle du meuble : une
+              // emprise sans profondeur n'existe pas, et le carré du dessin
+              // est la plus sûre des valeurs par défaut.
+              depth: m.baseDepth ?? m.depth ?? m.width,
+              yaw: Math.atan2(m.transform[2], m.transform[0]),
+            },
+            useScanStore.getState().walls,
           );
-          if (ecart > 0.01) haptic('butee', true);
-          else releaseHaptic('butee');
-          // Le meuble vient de se rabattre dans une niche (ou d'en
-          // ressortir) : c'est une aide, elle doit s'annoncer.
-          if (Math.abs(apres.width - live.current.raw.width) > 0.005) {
-            haptic('accroche');
+          useScanStore
+            .getState()
+            .setObjectCenter(objectId, vise.x, vise.z, true, true);
+          dire?.(!essai.valide);
+          if (essai.valide) {
+            // La dernière position qui tient : c'est là qu'on reviendra si
+            // le doigt se lève dans un mur.
+            derniereBonne.current = essai.centre;
+            releaseHaptic('butee');
+            // L'aimant vient de coller le meuble au mur : la main doit le
+            // sentir, parce que l'œil est caché par le doigt.
+            if (essai.aimante && !aimanteAvant.current) haptic('accroche');
+          } else {
+            haptic('butee', true);
+          }
+          aimanteAvant.current = essai.aimante;
+        },
+        /*
+          AU LÂCHER, ON NE LAISSE PAS UN MEUBLE DANS UN MUR.
+
+          Il revient à la dernière position qui tenait — celle qu'il avait
+          juste avant d'entrer dans la maçonnerie. Sans ce retour, le refus
+          ne serait qu'une couleur : on lâcherait quand même dans le mur.
+        */
+        onPanResponderRelease: () => {
+          releaseHaptic('butee');
+          live.current.onRefus?.(false);
+          const bonne = derniereBonne.current;
+          if (bonne) {
+            useScanStore
+              .getState()
+              .setObjectCenter(objectId, bonne.x, bonne.z, true, true);
           }
         },
-        onPanResponderRelease: () => releaseHaptic('butee'),
-        onPanResponderTerminate: () => releaseHaptic('butee'),
+        onPanResponderTerminate: () => {
+          releaseHaptic('butee');
+          live.current.onRefus?.(false);
+        },
       }),
     [objectId],
   );
