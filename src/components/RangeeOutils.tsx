@@ -16,13 +16,36 @@
 import React from 'react';
 import { Animated, Text, View } from 'react-native';
 import Svg, { Line } from 'react-native-svg';
-import { PILL_GAP, PillSlot, repartirOutils } from './ToolPill';
+import {
+  PILL_CELL_H,
+  PILL_GAP,
+  PillSlot,
+  repartirOutils,
+} from './ToolPill';
 
-/** Hauteur des descentes du peigne, et sa place au-dessus de la rangée. */
-const PEIGNE_H = 14;
-const PEIGNE_BAS = 74;
-/** Le trait du peigne : une annotation, pas un cadre — donc discret. */
+/*
+  LE PEIGNE SE POSE AU RAS DES PASTILLES — relevé du patron : « descends le
+  Afficher et ses lignes, les traits doivent presque toucher les boutons ».
+
+  Il flottait vingt points trop haut, et cet espace vide entre l'annotation
+  et ce qu'elle annote se lisait comme deux blocs sans rapport. Sa place se
+  CALCULE désormais : la hauteur d'une cellule d'outil (la pastille et son
+  mot), plus deux points — ce qu'il faut pour ne pas toucher, et rien de
+  plus. Un nombre écrit à la main aurait dérivé au premier changement de
+  pastille.
+*/
+const PEIGNE_H = 10;
+const PEIGNE_BAS = PILL_CELL_H + 2;
+/*
+  UNE ANNOTATION, PAS UN CADRE.
+
+  Le trait et le mot se lisent EN RETRAIT — relevé du patron : « donne une
+  opacité au texte et aux lignes ». Ce peigne explique la rangée ; il ne
+  doit pas se disputer le regard avec elle, ni avec le plan qui est le sujet
+  de l'écran.
+*/
 const TRAIT_PEIGNE = '#B6BECB';
+const PEIGNE_OPACITE = 0.55;
 
 export function RangeeOutils({
   elements,
@@ -76,8 +99,26 @@ export function RangeeOutils({
   return (
     <>
       {peigne && (
-        <View
-          style={[styles.peigne, { bottom: bas + PEIGNE_BAS, right: reserve || 4 }]}
+        /*
+          IL PART COMME LES PASTILLES — relevé du patron : « donne-lui la
+          même animation que les boutons lors du clic sur Édition, il doit
+          disparaître sans coupure nette ».
+
+          Il s'éteignait d'un coup pendant que la rangée, elle, se retirait
+          en fondu : deux temps pour un seul geste, et l'œil voit le
+          raccord. Il boit donc à la MÊME source (`anim`), avec le rang
+          zéro — celui des premières pastilles : l'annotation s'en va avec
+          ce qu'elle annonce, pas après.
+        */
+        <Animated.View
+          style={[
+            styles.peigne,
+            {
+              bottom: bas + PEIGNE_BAS,
+              right: reserve || 4,
+              opacity: Animated.multiply(anim, PEIGNE_OPACITE),
+            },
+          ]}
           pointerEvents="none">
           <Text style={styles.peigneMot}>Afficher</Text>
           <Svg width={largeurUtile} height={PEIGNE_H}>
@@ -105,7 +146,7 @@ export function RangeeOutils({
               />
             ))}
           </Svg>
-        </View>
+        </Animated.View>
       )}
       <View
         style={[styles.planTools, { bottom: bas, right: reserve || 4 }]}

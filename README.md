@@ -1926,6 +1926,16 @@ nombre. **En édition, il disparaît** : les boutons y font des choses
 différentes (poser un appareil, redresser, ouvrir le catalogue), et un titre
 commun mentirait sur trois d'entre eux.
 
+Trois réglages sont venus de l'essai suivant. **Sa place se CALCULE** — la
+hauteur d'une cellule d'outil, plus deux points : « les traits doivent
+presque toucher les boutons », et un nombre écrit à la main aurait dérivé au
+premier changement de pastille. **Le trait et le mot se lisent en retrait**
+(55 % d'opacité) : ce peigne explique la rangée, il ne doit se disputer le
+regard ni avec elle ni avec le plan. Et **il part comme les pastilles** :
+« il doit disparaître sans coupure nette ». Il s'éteignait d'un coup pendant
+que la rangée se retirait en fondu — deux temps pour un seul geste, et l'œil
+voit le raccord. Il boit donc à la même horloge qu'elles.
+
 **« Meubles » et non « Ajouter ».** Le mot dit le SUJET, comme ses voisins
 de la rangée ; ce qu'on en fait dépend du mode, et c'est le mode qui le dit.
 
