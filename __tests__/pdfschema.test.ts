@@ -241,12 +241,26 @@ describe('rien ne sort de la feuille', () => {
     expect(pdf).toContain(trait('#2F6BFF'));
   });
 
-  it('le document compte DEUX feuilles de plus : unifilaire et multifilaire', () => {
-    // Longtemps, `multiWire` a été calculé à chaque export… et jeté : aucune
-    // feuille ne le dessinait, alors que le README promettait le schéma de
-    // câblage dans le dossier. La feuille existe désormais.
+  it('le document compte TROIS feuilles de plus : gaines, unifilaire, multifilaire', () => {
+    /*
+      TROIS, ET LA TROISIEME EST NEUVE.
+
+      Longtemps, `multiWire` etait calcule a chaque export… et jete : aucune
+      feuille ne le dessinait, alors que le README promettait le schema de
+      cablage. Les deux feuilles de schema sont nees de la.
+
+      La troisieme vient d'un releve du patron, plan exporte a l'appui : « on
+      y voit plein de traits incomprehensibles ; gaines sur plan a part "Plan
+      de gaines" avec les diametres recommandes pour chaque tirage selon
+      nombre de fils ». Le plan d'ensemble portait tout — maconnerie,
+      appareillage, cotes de pose, liens de commande ET cheminement — et
+      personne ne suivait un depart a l'oeil la-dedans.
+
+      Elle apparait des qu'un cheminement est fourni : le fournir, c'est
+      vouloir la feuille.
+    */
     const feuilles = (src: string) => (src.match(/\/Type \/Page /g) ?? []).length;
-    expect(feuilles(pdf)).toBe(feuilles(sansSchema) + 2);
+    expect(feuilles(pdf)).toBe(feuilles(sansSchema) + 3);
   });
 
 });

@@ -74,7 +74,7 @@ import {
   type MultiWireSchema,
   type SchemaRow,
 } from '../geometry/schema';
-import type { BuyRow, PullRow } from '../geometry/conduits';
+import { conduitPour, type BuyRow, type PullRow } from '../geometry/conduits';
 import {
   CEILINGS,
   ceilingChain,
@@ -1295,6 +1295,15 @@ function planPage(
      * plus libre finissaient l'une sur l'autre, et c'était illisible.
      */
     hideLegend?: boolean;
+    /**
+     * Tait les cotes de pose — appareillage et plafond.
+     *
+     * Sur la feuille des gaines, elles croisent les traces qu'on est venu
+     * suivre : releve du patron, « il faut faire un systeme intelligent ou
+     * rien ne se croise ». Elles se lisent sur le plan d'ensemble, qui
+     * existe pour ca.
+     */
+    hideCotesPose?: boolean;
   },
 ): string {
   const {
@@ -2067,7 +2076,7 @@ function planPage(
           prises.every(
             (q) => Math.abs(q.x - p.x) > 22 || Math.abs(q.y - p.y) > 11,
           );
-        for (const cl of plafond) {
+        for (const cl of extra?.hideCotesPose ? [] : plafond) {
           for (const axe of [
             { x: -cosP, z: -sinP },
             { x: sinP, z: -cosP },
@@ -2763,6 +2772,113 @@ function markerAt(d: Draw, at: Pt, texte: string, couleur: string) {
     0.8,
   );
   d.text(texte, at.x, at.y - 2.6, 6.5, couleur, { bold: true });
+}
+
+/**
+ * LA FEUILLE DES GAINES — le cheminement, et rien d'autre.
+ *
+ * Relevé du patron, plan exporté à l'appui : « sur un plan 2D rendu en export
+ * pour une simple pièce aux normes, on y voit plein de traits
+ * incompréhensibles ; il faut faire un système intelligent où rien ne se
+ * croise et tout doit être compréhensible. Gaines sur plan à part "Plan de
+ * gaines" avec les diamètres recommandés pour chaque tirage selon nombre de
+ * fils aux normes ».
+ *
+ * Le plan d'ensemble portait TOUT : maçonnerie, appareillage, cotes de pose,
+ * liens de commande ET cheminement des gaines. Sur une pièce de douze mètres
+ * carrés, cela fait déjà six familles de traits qui se croisent ; personne
+ * ne suit un départ à l'œil là-dedans, et le document perd sa raison d'être.
+ *
+ * Le cheminement part donc sur sa propre feuille, avec le tableau qui va
+ * avec : un tirage par ligne, son diamètre de conduit, et le nombre de fils
+ * qui l'a décidé. C'est ce qu'on emporte chez le grossiste.
+ */
+function gainesPage(
+  ctx: SheetContext,
+  sheet: string,
+  rows: SchemaRow[],
+): string {
+  /*
+    LE TABLEAU SOUS LE PLAN, pas à côté.
+
+    Celui qui tire regarde le tracé, puis descend lire ce qu'il commande.
+    Posé en marge, le tableau oblige à traverser la feuille des yeux à
+    chaque ligne.
+  */
+  const tirage: PlanOverlay = (d, _px, _scale, box) => {
+    if (rows.length === 0) return;
+    /*
+      LE TABLEAU SE POSE SOUS LE TITRE, pas sous le plan.
+
+      Premier jet : en dessous du dessin. Il se faisait couper par le
+      cartouche des qu'il passait deux lignes — vu a l'oeil sur la feuille
+      rendue en image. La place libre d'une feuille de plan est EN HAUT :
+      le dessin est centre dans sa boite, et le blanc qui reste au-dessus ne
+      sert a rien.
+    */
+    const x0 = box.x;
+    const w = box.w;
+    let y = box.y + box.h - 6;
+    d.text('Tirage par circuit', x0, y, 9, INK, { bold: true, align: 'left' });
+    y -= 14;
+    const cols = [x0, x0 + 26, x0 + w * 0.46, x0 + w * 0.64, x0 + w * 0.82];
+    d.text('Rep.', cols[0], y, 7, GREY_LIGHT, { align: 'left' });
+    d.text('Circuit', cols[1], y, 7, GREY_LIGHT, { align: 'left' });
+    d.text('Section', cols[2], y, 7, GREY_LIGHT, { align: 'left' });
+    d.text('Fils', cols[3], y, 7, GREY_LIGHT, { align: 'left' });
+    d.text('Conduit', cols[4], y, 7, GREY_LIGHT, { align: 'left' });
+    y -= 4;
+    d.line(x0, y, x0 + w, y, 0.6, '#D8DEE7');
+    y -= 12;
+    rows.forEach((r, i) => {
+      // On ne descend jamais sur le dessin : mieux vaut un tableau tronque
+      // qu'un tableau ecrit en travers du plan.
+      if (y < box.y + box.h - 110) return;
+      const teinte = circuitColor(i);
+      markerAt(d, { x: x0 + 7, y: y + 2 }, r.mark, teinte);
+      d.text(fitText(r.label, 8, cols[2] - cols[1] - 8), cols[1], y, 8, INK, {
+        align: 'left',
+      });
+      d.text(
+        r.section === null
+          ? 'courants faibles'
+          : `${fr1(r.section)} mm²`,
+        cols[2],
+        y,
+        8,
+        GREY,
+        { align: 'left' },
+      );
+      d.text(`${r.wires}`, cols[3], y, 8, GREY, { align: 'left' });
+      // Le diamètre se CALCULE ici, sur le compte de fils de cette ligne :
+      // c'est la règle du tiers, et elle se vérifie du regard.
+      d.text(
+        `ICTA ${conduitPour(r.section, r.wires)}`,
+        cols[4],
+        y,
+        8,
+        INK,
+        { bold: true, align: 'left' },
+      );
+      y -= 13;
+    });
+  };
+
+  const page = planPage(ctx, sheet, undefined, false, {
+    overlay: tirage,
+    title: 'Plan des gaines',
+    sub:
+      'Cheminement du tableau à chaque appareil. Diamètres calculés au ' +
+      'tiers de remplissage — le compte de fils est celui du schéma.',
+    // La légende d'appareillage se tait : la feuille parle de tirage, et
+    // deux boîtes cherchant le coin le plus libre finissent l'une sur
+    // l'autre.
+    hideLegend: true,
+    // Et les cotes de pose aussi : elles croisent les tracés qu'on est venu
+    // suivre. Elles se lisent sur le plan d'ensemble.
+    hideCotesPose: true,
+  });
+  return page;
 }
 
 function unifilairePage(
@@ -4745,9 +4861,16 @@ export function buildScanPdf(
   // a de la matière (un appelant qui ne fournit pas les conducteurs garde
   // l'unifilaire seul plutôt qu'une page blanche).
   const withMulti = withSchema && (schemas?.multi.length ?? 0) > 0;
+  /*
+    LA FEUILLE DES GAINES existe des qu'un cheminement a ete calcule : c'est
+    l'appelant qui decide de le fournir, et le fournir veut dire qu'on veut
+    la feuille.
+  */
+  const withGaines = (scan.routes?.length ?? 0) > 0;
   const total =
     1 +
     (withMetre ? 1 : 0) +
+    (withGaines ? 1 : 0) +
     (existant ? 1 : 0) +
     (include3D ? vues.length : 0) +
     murs.length +
@@ -4775,7 +4898,22 @@ export function buildScanPdf(
     showSurfaces: opts.surfaces ?? true,
     showTextures: opts.textures ?? false,
   };
-  const pages = [planPage(ctx, `1 / ${total}`, opts.plan, opts.measures2D ?? true)];
+  /*
+    LE PLAN D'ENSEMBLE NE PORTE PLUS LES GAINES.
+
+    Relevé du patron : « on y voit plein de traits incompréhensibles ». Le
+    cheminement part sur sa feuille — voir `gainesPage` — et le plan
+    d'ensemble redevient ce qu'il est : la maçonnerie, l'appareillage et
+    leurs cotes.
+  */
+  const pages = [
+    planPage(
+      { ...ctx, routes: undefined },
+      `1 / ${total}`,
+      opts.plan,
+      opts.measures2D ?? true,
+    ),
+  ];
   if (withMetre) {
     pages.push(metrePage(ctx, `${pages.length + 1} / ${total}`));
   }
@@ -4788,6 +4926,18 @@ export function buildScanPdf(
   */
   if (existant) {
     pages.push(existantPage(ctx, `${pages.length + 1} / ${total}`, existant));
+  }
+  /*
+    LE CHEMINEMENT, JUSTE APRES LE METRE.
+
+    C'est l'ordre du chantier : voici le logement, voici ce qu'il faut, voici
+    par ou ca passe. Et le tableau de tirage se lit sous le trace, sur la
+    meme feuille — celui qui commande la couronne a tout sous les yeux.
+  */
+  if (withGaines) {
+    pages.push(
+      gainesPage(ctx, `${pages.length + 1} / ${total}`, schemas?.rows ?? []),
+    );
   }
   if (include3D) {
     vues.forEach((v, i) => {

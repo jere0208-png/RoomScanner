@@ -4671,6 +4671,33 @@ vide — la 3D la découpe hors maçonnerie et le métré compte une pose
 impossible. Le chiffre qu'on relit après coup dit alors la vérité, ce qu'un
 refus muet ne ferait pas.
 
+### Les gaines ont leur feuille
+
+Releve du patron, plan exporte a l'appui : « sur un plan 2D rendu en export
+pour une simple piece aux normes, on y voit plein de traits
+incomprehensibles ; il faut faire un systeme intelligent ou rien ne se croise
+et tout doit etre comprehensible. Gaines sur plan a part "Plan de gaines"
+avec les diametres recommandes pour chaque tirage. Tout doit etre
+professionnel ».
+
+Le plan d'ensemble portait TOUT : maconnerie, appareillage, cotes de pose,
+liens de commande ET cheminement des gaines. Sur une piece de douze metres
+carres, cela fait six familles de traits qui se croisent — personne ne suit
+un depart a l'oeil la-dedans, et le document perd sa raison d'etre.
+
+Le cheminement part donc sur sa propre feuille, avec le tableau qui va avec :
+un tirage par ligne, sa section, son NOMBRE DE FILS, et le diametre de
+conduit qui en decoule. C'est ce qu'on emporte chez le grossiste. Les cotes
+de pose s'y taisent — elles croisent les traces qu'on est venu suivre, et
+elles se lisent sur le plan d'ensemble, qui existe pour ca.
+
+Deux choses vues a l'oeil sur la feuille rendue en image, et corrigees :
+le tableau, d'abord pose sous le dessin, se faisait couper par le cartouche
+des qu'il passait deux lignes — la place libre d'une feuille de plan est EN
+HAUT, le dessin etant centre dans sa boite. Et il ne descend jamais sur le
+plan : mieux vaut un tableau tronque qu'un tableau ecrit en travers du
+dessin.
+
 ### Le schema multifilaire disait trois fils a l'eclairage
 
 Releve du patron : « le schema multifilaire dit n'importe quoi, interrupteur
