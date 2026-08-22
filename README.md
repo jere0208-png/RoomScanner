@@ -4674,6 +4674,10 @@ La pastille n'en montre que le début ; le bandeau, qui a la place, la dit en
 entier et c'est là qu'on la corrige ou la retire. Vider le champ retire la
 note : une pastille vide ne se lit plus et ne se vise plus.
 
+Une note se REPOSE : « Déplacer » attend le nouveau point, comme à la pose.
+Pas un glisser — la pastille est petite, et un doigt posé dessus sur un plan
+chargé attrape aussi bien le mur qui passe dessous.
+
 **Elles s'impriment sur le plan du dossier**, en dernier, par-dessus murs et
 meubles — une remarque à moitié cachée sous un canapé n'est pas une
 remarque. Et elles suivent leur étage, triées par `filtrerAuNiveau` comme

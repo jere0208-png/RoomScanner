@@ -294,6 +294,7 @@ export function ResultScreen() {
   const addCeiling = useScanStore((s) => s.addCeiling);
   const notes = useScanStore((s) => s.notes);
   const addNote = useScanStore((s) => s.addNote);
+  const moveNote = useScanStore((s) => s.moveNote);
   const editNote = useScanStore((s) => s.editNote);
   const removeNote = useScanStore((s) => s.removeNote);
   const addRoomBox = useScanStore((s) => s.addRoomBox);
@@ -629,6 +630,14 @@ export function ResultScreen() {
   const [pendingCeiling, setPendingCeiling] = useState<CeilingKind | null>(null);
   /** On attend le point où poser un mot sur le plan. */
   const [pendingNote, setPendingNote] = useState(false);
+  /**
+   * La note qu'on REPOSE : on attend son nouveau point.
+   *
+   * Écrire au bon endroit du premier coup demanderait de viser avant de
+   * savoir ce qu'on va dire. On pose, on lit, et on rectifie — c'est déjà
+   * ce que font le meuble et l'appareil de plafond.
+   */
+  const [noteADeplacer, setNoteADeplacer] = useState<string | null>(null);
   /** La note tenue en main : son bandeau propose de la reprendre. */
   const [selNote, setSelNote] = useState<string | null>(null);
   /**
@@ -694,7 +703,10 @@ export function ResultScreen() {
       if (garde !== 'mur') setPendingKind(null);
       // Un seul geste en attente à la fois : deux pastilles allumées, et
       // le prochain appui sur le plan est une loterie.
-      if (garde !== 'note') setPendingNote(false);
+      if (garde !== 'note') {
+        setPendingNote(false);
+        setNoteADeplacer(null);
+      }
       if (garde !== 'plafond') {
         setPendingCeiling(null);
         setPendingSpots(null);
@@ -2494,7 +2506,9 @@ export function ResultScreen() {
             notes={notes}
             selectedNoteId={selNote}
             onSelectNote={setSelNote}
-            placing={!!pendingCeiling || !!pendingSpots || pendingNote}
+            placing={
+              !!pendingCeiling || !!pendingSpots || pendingNote || !!noteADeplacer
+            }
             onPlaceAt={(at) => {
               /*
                 LE MOT SE POSE PARTOUT, LUI.
@@ -2506,6 +2520,12 @@ export function ResultScreen() {
                 qu'on n'a pas fini de tracer. Elle ne demande donc aucun
                 contour, et c'est précisément sa raison d'être.
               */
+              if (noteADeplacer) {
+                moveNote(noteADeplacer, at);
+                setNoteADeplacer(null);
+                haptic('succes');
+                return;
+              }
               if (pendingNote) {
                 setPendingNote(false);
                 setPrompt({
@@ -2760,6 +2780,7 @@ export function ResultScreen() {
             pendingNote={pendingNote}
             onNote={() => {
               seulGeste('note');
+              setNoteADeplacer(null);
               setPendingNote((v) => !v);
             }}
             showMeasures={showMeasures}
@@ -3079,6 +3100,23 @@ export function ResultScreen() {
                         if (!t.trim()) setSelNote(null);
                       },
                     }),
+                },
+                {
+                  // « Déplacer » et non un glisser : la pastille est
+                  // petite, et un doigt posé dessus sur un plan chargé
+                  // attrape aussi bien le mur qui passe dessous. On
+                  // redésigne le point, comme à la pose.
+                  label: noteADeplacer === note.id ? 'Touchez le plan' : 'Déplacer',
+                  icone: SOLAIRES.points,
+                  ghost: noteADeplacer === note.id,
+                  onPress: () => {
+                    seulGeste('note');
+                    // Les deux gestes de note s'excluent : écrire un mot
+                    // neuf et reposer celui qu'on tient visent le même
+                    // appui sur le plan.
+                    setPendingNote(false);
+                    setNoteADeplacer((v) => (v === note.id ? null : note.id));
+                  },
                 },
                 {
                   label: 'Retirer',
