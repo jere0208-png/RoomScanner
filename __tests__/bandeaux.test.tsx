@@ -296,10 +296,22 @@ describe('l’écran des résultats', () => {
     act(() => {
       jest.advanceTimersByTime(500);
     });
-    const meuble = tree.root
-      .findAll((n) => typeof n.props?.onPress === 'function')
-      .find((n) => n.findAll((x) => x.props?.rx === 3).length > 0);
-    act(() => meuble!.props.onPress());
+    /*
+      LE MEUBLE SE PREND PAR SA CIBLE, PLUS PAR SON DESSIN.
+
+      Ce banc cherchait le groupe qui porte l'aplat (« celui qui contient un
+      rect aux coins arrondis »). L'appui a demenage : releve du patron, « le
+      clic sur un meuble est capricieux, il faut viser des endroits precis ».
+      Le dessin d'une chaise dezoomee fait neuf millimetres a l'ecran ; une
+      cible invisible, plus large de huit points de chaque cote, est posee
+      par-dessus et porte desormais le geste. Elle porte aussi son nom, ce
+      qui la rend trouvable ici comme au lecteur d'ecran.
+    */
+    const meuble = tree.root.findAll((n) =>
+      String(n.props?.accessibilityLabel ?? '').startsWith('Meuble'),
+    )[0];
+    expect(meuble).toBeDefined();
+    act(() => meuble.props.onPress());
     expect(bouton(tree, 'Cotes du meuble')).toBeDefined();
     const sol = tree.root
       .findAll((n) => typeof n.props?.onPress === 'function')
@@ -978,9 +990,11 @@ describe('l’écran des résultats', () => {
     const tree = monter();
     // On touche le meuble sur le plan, puis on ouvre ses cotes : c'est là que
     // les flèches se trouvent.
-    const meuble = tree.root
-      .findAll((n) => typeof n.props?.onPress === 'function')
-      .find((n) => n.findAll((x) => x.props?.rx === 3).length > 0);
+    // Le meuble se prend par sa cible nommée, plus par son dessin : voir
+    // l'épreuve « toucher le sol lâche le meuble tenu » pour le pourquoi.
+    const meuble = tree.root.findAll((n) =>
+      String(n.props?.accessibilityLabel ?? '').startsWith('Meuble'),
+    )[0];
     expect(meuble).toBeDefined();
     act(() => meuble!.props.onPress());
     const cotes = bouton(tree, 'Cotes du meuble');
@@ -1013,9 +1027,11 @@ describe('l’écran des résultats', () => {
   it('ouvre le bandeau du meuble, avec ses cotes', () => {
     const tree = monter();
     /** Un meuble : un groupe touchable qui porte son emprise arrondie. */
-    const meuble = tree.root
-      .findAll((n) => typeof n.props?.onPress === 'function')
-      .find((n) => n.findAll((x) => x.props?.rx === 3).length > 0);
+    // Le meuble se prend par sa cible nommée, plus par son dessin : voir
+    // l'épreuve « toucher le sol lâche le meuble tenu » pour le pourquoi.
+    const meuble = tree.root.findAll((n) =>
+      String(n.props?.accessibilityLabel ?? '').startsWith('Meuble'),
+    )[0];
     expect(meuble).toBeDefined();
     act(() => meuble!.props.onPress());
     const cotes = bouton(tree, 'Cotes du meuble');
@@ -1039,9 +1055,11 @@ describe('l’écran des résultats', () => {
    */
   it('ne pose aucun champ de saisie dans les bandeaux', () => {
     const tree = monter();
-    const meuble = tree.root
-      .findAll((n) => typeof n.props?.onPress === 'function')
-      .find((n) => n.findAll((x) => x.props?.rx === 3).length > 0);
+    // Le meuble se prend par sa cible nommée, plus par son dessin : voir
+    // l'épreuve « toucher le sol lâche le meuble tenu » pour le pourquoi.
+    const meuble = tree.root.findAll((n) =>
+      String(n.props?.accessibilityLabel ?? '').startsWith('Meuble'),
+    )[0];
     act(() => meuble!.props.onPress());
     act(() => bouton(tree, 'Cotes du meuble')!.props.onPress());
     expect(tree.root.findAllByType(TextInput)).toHaveLength(0);

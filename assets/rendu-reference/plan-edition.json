@@ -541,6 +541,24 @@
              "children": null
             }
            ]
+          },
+          {
+           "type": "RNSVGRect",
+           "props": {
+            "fill": {
+             "type": 0,
+             "payload": 0
+            },
+            "propList": [
+             "fill"
+            ],
+            "accessibilityLabel": "Meuble Canapé",
+            "x": -113.429,
+            "y": -60.714,
+            "width": 226.857,
+            "height": 121.429
+           },
+           "children": null
           }
          ]
         },
@@ -629,6 +647,24 @@
             "d": "M-17.6 1.9 L17.6 1.9"
            },
            "children": null
+          },
+          {
+           "type": "RNSVGRect",
+           "props": {
+            "fill": {
+             "type": 0,
+             "payload": 0
+            },
+            "propList": [
+             "fill"
+            ],
+            "accessibilityLabel": "Meuble Télévision",
+            "x": -78.286,
+            "y": -12.686,
+            "width": 156.571,
+            "height": 25.371
+           },
+           "children": null
           }
          ]
         },
@@ -715,6 +751,24 @@
              "strokeLinejoin"
             ],
             "d": "M-8.2 -22.5 L-8.2 -10.2"
+           },
+           "children": null
+          },
+          {
+           "type": "RNSVGRect",
+           "props": {
+            "fill": {
+             "type": 0,
+             "payload": 0
+            },
+            "propList": [
+             "fill"
+            ],
+            "accessibilityLabel": "Meuble Réfrigérateur",
+            "x": -49,
+            "y": -49,
+            "width": 98,
+            "height": 98
            },
            "children": null
           }

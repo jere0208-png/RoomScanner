@@ -201,7 +201,17 @@ export function transformeDuGeste(
  * en dessous de quatorze points on ne la vise plus du doigt, au-dessus de
  * trente-quatre c'est elle qu'on regarde au lieu du mur qu'elle referme.
  */
-export const PASTILLE_TROU_M = 0.25;
+export /**
+ * LA MARGE DE PRISE D'UN MEUBLE, en pixels d'écran.
+ *
+ * Huit points de chaque côté : la cible d'une chaise dézoomée passe ainsi de
+ * neuf à vingt-cinq millimètres, ce qui la rend attrapable sans viser. Plus
+ * large, elle mordrait sur le meuble d'à côté — un salon meublé en compte
+ * une dizaine à quelques centimètres les uns des autres.
+ */
+const PRISE_MARGE = 8;
+
+const PASTILLE_TROU_M = 0.25;
 export function taillePastilleTrou(echelle: number): number {
   return Math.round(Math.min(34, Math.max(14, echelle * PASTILLE_TROU_M)));
 }
@@ -1452,15 +1462,6 @@ export function FloorplanEditor({
               return (
                 <G
                   key={f.id}
-                  // Toucher un meuble le sélectionne : sans ça, ses poignées
-                  // n'apparaissaient jamais et le doigt ne déplaçait que le
-                  // plan. On le choisissait par la liste du bas, ce qui
-                  // n'est venu à l'idée de personne.
-                  onPress={
-                    onSelectObject
-                      ? () => onSelectObject(o.id === selectedObjectId ? null : o.id)
-                      : undefined
-                  }
                   transform={`translate(${ctr.x}, ${ctr.y}) rotate(${((f.yaw + view.rot) * 180) / Math.PI})`}>
                   <Rect
                     x={-w / 2}
@@ -1529,6 +1530,37 @@ export function FloorplanEditor({
                         </SvgText>
                       );
                     })()}
+                  {/*
+                    LA CIBLE DU DOIGT EST PLUS LARGE QUE LE DESSIN.
+
+                    Relevé du patron : « le clic sur un meuble est
+                    capricieux, il faut parfois cliquer plusieurs fois et
+                    viser des endroits précis ». La cible était le DESSIN
+                    lui-même — l'aplat et les traits du symbole. Un aplat de
+                    quarante-cinq centimètres au cinquantième fait neuf
+                    millimètres à l'écran, moins que la pulpe d'un doigt, et
+                    les traits du symbole ne répondent que sur le trait.
+
+                    Elle est POSÉE EN DERNIER, donc au-dessus de tout ce que
+                    le meuble dessine : plus rien ne peut lui voler l'appui.
+                    Invisible, elle ne change pas le plan d'un pixel.
+                  */}
+                  <Rect
+                    accessibilityLabel={`Meuble ${frCategory(f.category)}`}
+                    x={-w / 2 - PRISE_MARGE}
+                    y={-d / 2 - PRISE_MARGE}
+                    width={w + PRISE_MARGE * 2}
+                    height={d + PRISE_MARGE * 2}
+                    fill="transparent"
+                    onPress={
+                      onSelectObject
+                        ? () =>
+                            onSelectObject(
+                              o.id === selectedObjectId ? null : o.id,
+                            )
+                        : undefined
+                    }
+                  />
                 </G>
               );
             })}

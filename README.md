@@ -4671,6 +4671,27 @@ vide — la 3D la découpe hors maçonnerie et le métré compte une pose
 impossible. Le chiffre qu'on relit après coup dit alors la vérité, ce qu'un
 refus muet ne ferait pas.
 
+### Attraper un meuble ne doit pas demander de viser
+
+Relevé du patron : « le clic sur un meuble est capricieux, il faut parfois
+cliquer plusieurs fois et viser des endroits précis du meuble ».
+
+La cible tactile était le **dessin lui-même** — l'aplat du meuble et les
+traits de son symbole. Un aplat de quarante-cinq centimètres au cinquantième
+fait neuf millimètres à l'écran, moins que la pulpe d'un doigt ; et les
+traits du symbole, eux, ne répondent que sur le trait. Une chaise dézoomée
+passait largement sous les quarante-quatre points qu'Apple donne pour cible
+minimale.
+
+Chaque meuble porte maintenant une cible **invisible et plus large** — huit
+points de chaque côté, ce qui fait passer la chaise de neuf à vingt-cinq
+millimètres. Elle est posée **en dernier**, donc au-dessus de tout ce que le
+meuble dessine : plus rien ne peut lui voler l'appui. Et elle porte son nom,
+ce qui la rend trouvable au lecteur d'écran comme au banc d'essai.
+
+Huit points et pas plus : au-delà, elle mordrait sur le meuble d'à côté — un
+salon meublé en compte une dizaine à quelques centimètres les uns des autres.
+
 ### Deux croix pour fermer une seule fenêtre
 
 Relevé du patron : « la croix pour quitter la fenêtre de contact du service
