@@ -1909,6 +1909,48 @@ Enfin la couche est marquée `collapsable={false}` : sans lui, Android la
 fond dans son parent à l'optimisation et la transformation perd son
 support.
 
+### Ce que la rangée de calques dit d'elle-même
+
+Quatre retours du chantier, sur la même zone d'écran.
+
+**Le peigne « Afficher ».** Croquis Paint à l'appui : « lorsqu'on n'est pas
+en édition, l'utilisateur doit comprendre que les boutons sont des
+*Afficher* — texte Afficher + lignes vers les boutons ». Rien ne le disait :
+« Meubles », « Appareils », « Surfaces », « Nord » nomment une CHOSE sans
+dire ce qu'on en fait, et l'on peut aussi bien croire qu'on va en ajouter
+un. Un mot, une barre, une descente par bouton — c'est ainsi qu'on annote un
+plan, et c'est ce qu'un électricien lit tous les jours sur ses schémas. Le
+peigne se dessine à partir des parts égales de la rangée, les mêmes que les
+pastilles : chaque descente tombe au milieu de la sienne, quel qu'en soit le
+nombre. **En édition, il disparaît** : les boutons y font des choses
+différentes (poser un appareil, redresser, ouvrir le catalogue), et un titre
+commun mentirait sur trois d'entre eux.
+
+**« Meubles » et non « Ajouter ».** Le mot dit le SUJET, comme ses voisins
+de la rangée ; ce qu'on en fait dépend du mode, et c'est le mode qui le dit.
+
+**« Surfaces » commande le cartouche entier, nom compris.** La surface en
+avait été DÉTACHÉE, et pour une bonne raison d'alors : le calque allume
+aussi le semis coloré des sols, on obtenait donc soit la surface avec un
+plan barbouillé, soit un plan propre sans surface. Le patron a tranché
+autrement — « fais en sorte que Surfaces affiche et cache le nom des pièces
+aussi » — et le calque redevient ce que son nom dit : tout ce qui parle de
+la surface d'une pièce, son nom compris, puisque les deux vivent dans le
+même cartouche et qu'on ne coupe pas un cartouche en deux. **En édition il
+reste quoi qu'il arrive** : c'est par lui qu'on nomme une pièce, et un
+réglage d'affichage ne retire pas un outil de travail.
+
+**Et le bandeau du mur tient dans son bloc.** « Peu de place pour les
+informations du mur, les boutons prennent toute la place, et un bouton sort
+du bloc » — « Détacher » se lisait à moitié hors de la pilule, posé sur le
+plan. C'est le défaut que le bandeau du MEUBLE a déjà connu, et le remède
+est le même : ce n'est pas un problème de largeur mais de
+**compressibilité**. Une rangée faite de blocs qui ne cèdent jamais dépasse
+au premier mot de trop, et une vue qui déborde n'est pas rognée, elle SORT.
+Les boutons portent donc `flexShrink` — et `minWidth: 0`, sans quoi le mot à
+l'intérieur impose sa largeur et rien ne bouge —, leur libellé se tronque
+sur une ligne, et **la cote ne cède jamais** : c'est elle qu'on vient lire.
+
 ### Un relevé interrompu ne se perd plus
 
 Un scan tenait entièrement en mémoire tant qu'on n'avait pas touché

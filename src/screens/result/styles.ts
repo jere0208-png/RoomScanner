@@ -365,6 +365,20 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   wallLengthDone: { color: c.blue, fontSize: 13, fontWeight: '800' },
   // Le mur sélectionné : une seule ligne, au pied du plan, à côté du bouton
   // d'enregistrement. Elle dit l'essentiel et ne mange pas le dessin.
+  /*
+    LE PEIGNE « AFFICHER » — croquis Paint du patron.
+
+    Posé au-dessus de la rangée de calques, il ne reçoit jamais le doigt :
+    c'est une annotation, pas un bouton. Le mot se centre sur la barre, et
+    la barre sur les pastilles.
+  */
+  peigne: { position: 'absolute', left: 4, alignItems: 'center', zIndex: 1 },
+  peigneMot: {
+    color: c.inkFaint,
+    fontSize: 11,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
   wallStrip: {
     position: 'absolute',
     // Le pied réel est recalculé à l'affichage : un étage au-dessus de la
@@ -399,20 +413,39 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     fontSize: 14,
     flexShrink: 0,
   },
+  /*
+    LES BOUTONS CÈDENT, LA COTE JAMAIS.
+
+    Relevé du patron, capture à l'appui : « peu de place pour les
+    informations du mur, les boutons prennent toute la place, et un bouton
+    sort du bloc » — « Détacher » se lisait à moitié hors de la pilule,
+    posé sur le plan.
+
+    C'est le défaut que le bandeau du MEUBLE a déjà connu, et le remède est
+    le même : ce n'est pas un problème de largeur, c'est un problème de
+    COMPRESSIBILITÉ. Une rangée faite de blocs qui ne cèdent jamais dépasse
+    au premier mot de trop, et une vue qui déborde n'est pas rognée, elle
+    SORT. `flexShrink` la fait céder ; `minWidth: 0` lui en donne le droit,
+    sans quoi le mot à l'intérieur impose sa largeur et rien ne bouge.
+  */
   wallStripAction: {
     backgroundColor: c.blue,
     borderRadius: radius.pill,
-    paddingHorizontal: 13,
+    paddingHorizontal: 12,
     paddingVertical: 9,
     marginLeft: 6,
+    flexShrink: 1,
+    minWidth: 0,
   },
   wallStripActionText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
   wallStripGhost: {
     backgroundColor: c.surfaceSunken,
     borderRadius: radius.pill,
-    paddingHorizontal: 12,
+    paddingHorizontal: 11,
     paddingVertical: 9,
     marginLeft: 6,
+    flexShrink: 1,
+    minWidth: 0,
   },
   wallStripGhostText: { color: c.inkSoft, fontSize: 13, fontWeight: '800' },
   // Une seule ligne, au pied du plan, et LOIN du bouton d'enregistrement :

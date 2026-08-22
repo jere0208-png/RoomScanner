@@ -217,14 +217,49 @@ describe('les conventions du dessin de plan', () => {
     }
   });
 
-  it('écrit la surface sous le nom, sans qu’on allume un calque', () => {
-    // Le calque des surfaces éteint : le nom garde sa surface.
-    useScanStore.setState({ showSurfaces: false });
-    const tree = rendu(false);
-    const textes = tree.root
-      .findAll((n) => (n.type as { displayName?: string })?.displayName === 'Text')
-      .map((n) => String(n.props.children));
-    expect(textes.some((t) => t.includes('m²'))).toBe(true);
+  /*
+    « SURFACES » COMMANDE LE CARTOUCHE ENTIER — nom compris.
+
+    Ce banc a tenu l'inverse, et pour une bonne raison d'alors : la surface
+    dépendait du calque, qui allume aussi le semis coloré des sols. On
+    voulait donc la surface, et l'on obtenait un plan barbouillé ; ou un
+    plan propre, et pas de surface. On l'avait détachée.
+
+    Relevé du patron : « fais en sorte que Surfaces affiche et cache le nom
+    des pièces aussi ». Le calque redevient donc ce que son nom dit — tout
+    ce qui parle de la SURFACE d'une pièce, son nom compris, puisque nom et
+    surface vivent dans le même cartouche et qu'on ne coupe pas un cartouche
+    en deux. Qui veut un plan nu l'a d'un geste ; qui veut les pièces
+    nommées les rallume du même.
+
+    EN ÉDITION, LE CARTOUCHE RESTE quoi qu'il arrive : c'est par lui qu'on
+    nomme une pièce, et un réglage d'affichage ne doit pas retirer un outil
+    de travail.
+  */
+  it('cache le cartouche avec le calque des surfaces, sauf en édition', () => {
+    const mots = (t: ReturnType<typeof rendu>) =>
+      t.root
+        .findAll((n) => (n.type as { displayName?: string })?.displayName === 'Text')
+        .map((n) => String(n.props.children));
+
+    // `rendu()` rallume le calque à chaque montage : on l'éteint APRÈS,
+    // sur l'arbre déjà monté, et le composant se redessine.
+    const lecture = rendu(false);
+    expect(mots(lecture).some((t) => t.includes('m²'))).toBe(true);
+    act(() => {
+      useScanStore.setState({ showSurfaces: false });
+    });
+    expect(mots(lecture).some((t) => t.includes('m²'))).toBe(false);
+
+    // En édition, il revient : on nomme une pièce en touchant son cartouche.
+    const edition = rendu(true);
+    act(() => {
+      useScanStore.setState({ showSurfaces: false });
+    });
+    expect(mots(edition).some((t) => t.includes('m²'))).toBe(true);
+    act(() => {
+      useScanStore.setState({ showSurfaces: true });
+    });
   });
 
   /*

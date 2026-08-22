@@ -104,7 +104,14 @@ export function StripBar({
                 <Path d={a.icone} fill={teinte} fillRule="evenodd" />
               </Svg>
             )}
-            {!a.sansMot && <Text style={texte}>{a.label}</Text>}
+            {/* Le mot se tronque plutôt que de pousser la rangée dehors :
+                c'est la contrepartie de `flexShrink`, sans quoi le bouton
+                rétrécit mais son texte, lui, continue de sortir. */}
+            {!a.sansMot && (
+              <Text style={texte} numberOfLines={1}>
+                {a.label}
+              </Text>
+            )}
           </TouchableOpacity>
         );
       })}

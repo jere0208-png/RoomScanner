@@ -225,7 +225,10 @@ export function Toolbar2D({
         <ToolPill
           key="furniture"
           icon="furniture"
-          label="Ajouter"
+          // « Meubles » et non « Ajouter » — relevé du patron. Le mot dit
+          // le SUJET, comme ses voisins de la rangée ; ce qu'on en fait
+          // dépend du mode, et c'est le mode qui le dit.
+          label="Meubles"
           active={false}
           onPress={onFurniture}
         />,
@@ -328,6 +331,8 @@ export function Toolbar2D({
       reserve={62}
       bas={bas}
       dessus={dessus}
+      // Hors édition, la rangée dit ce qu'elle fait : « Afficher ».
+      edition={edition}
       elements={outils.filter((el): el is React.ReactElement => !!el)}
     />
   );

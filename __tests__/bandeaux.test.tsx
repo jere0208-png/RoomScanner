@@ -1227,7 +1227,10 @@ describe('les feuilles de l’écran des résultats', () => {
     act(() => {
       jest.advanceTimersByTime(500);
     });
-    act(() => bouton(tree, 'Ajouter')!.props.onPress());
+    // Le bouton s'appelle « Meubles » depuis le relevé du patron : le mot
+    // dit le SUJET, comme ses voisins de la rangée, et c'est le mode qui
+    // dit ce qu'on en fait. La feuille, elle, garde son titre d'action.
+    act(() => bouton(tree, 'Meubles')!.props.onPress());
     expect(textes(tree)).toContain('Ajouter un meuble');
     const champ = tree.root
       .findAllByType(TextInput)
@@ -1416,7 +1419,10 @@ describe('la rangée d’outils', () => {
     });
     expect(bouton(tree, 'Appareil')).toBeDefined();
     expect(bouton(tree, 'Redresser')).toBeDefined();
-    expect(bouton(tree, 'Ajouter')).toBeDefined();
+    // « Meubles » en édition ouvre le catalogue ; hors édition, c'est le
+    // calque. Même sujet, deux gestes selon le mode — et c'est le peigne
+    // « Afficher » qui dit lequel (voir `afficher.test.tsx`).
+    expect(bouton(tree, 'Meubles')).toBeDefined();
     // Les calques ont cédé la place : ils reviendront en sortant d'édition.
     expect(bouton(tree, 'Cotes')).toBeUndefined();
     expect(bouton(tree, 'Surfaces')).toBeUndefined();

@@ -2096,21 +2096,34 @@ export function FloorplanEditor({
             {(selectedCeilingId ? [] : parts).map((part) => {
               const roomName = roomById.get(part.roomId)?.name ?? '';
               /*
-                LA SURFACE SOUS LE NOM, TOUJOURS.
+                « SURFACES » COMMANDE LE CARTOUCHE ENTIER — nom compris.
 
-                Elle dépendait du calque « Surfaces », qui allume aussi le
-                semis coloré des sols. On voulait donc la surface, et l'on
-                obtenait un plan barbouillé ; ou un plan propre, et pas de
-                surface. Or « Salon · 15,6 m² », c'est la première chose que
-                lit un client, et tous les plans du métier l'écrivent là.
+                La surface en a été DÉTACHÉE un temps, et pour une bonne
+                raison d'alors : le calque allume aussi le semis coloré des
+                sols. On voulait donc la surface, et l'on obtenait un plan
+                barbouillé ; ou un plan propre, et pas de surface.
+
+                Relevé du patron : « fais en sorte que Surfaces affiche et
+                cache le nom des pièces aussi ». Le calque redevient donc ce
+                que son nom dit — tout ce qui parle de la surface d'une
+                pièce, son NOM compris, puisque les deux vivent dans le même
+                cartouche et qu'on ne coupe pas un cartouche en deux. Qui
+                veut un plan nu l'a d'un geste ; qui veut les pièces nommées
+                les rallume du même.
               */
               const areaText = part.surface
                 ? `${part.surface.exact ? '' : '≈ '}${part.surface.area
                     .toFixed(1)
                     .replace('.', ',')} m²`
                 : null;
-              // En édition, la pièce a toujours son cartouche : c'est par lui
-              // qu'on la nomme, même quand elle n'a encore ni nom ni surface.
+              /*
+                EN ÉDITION, LE CARTOUCHE RESTE QUOI QU'IL ARRIVE.
+
+                C'est par lui qu'on nomme une pièce — même quand elle n'a
+                encore ni nom ni surface, et même calque éteint : un réglage
+                d'AFFICHAGE ne doit jamais retirer un outil de travail.
+              */
+              if (!editable && !showSurfaces) return null;
               if (roomName === '' && !areaText && !editable) return null;
               const foots = objects
                 .filter((o) => roomOf(o) === part.roomId)
