@@ -2520,7 +2520,18 @@ function metrePage(ctx: SheetContext, sheet: string): string {
       frLen(h),
       fr1(nets),
       ...(avecEclairage
-        ? [lum && lum.points > 0 ? `${lum.points} pts · ${lum.watts} W` : '—']
+        ? [
+            lum && lum.points > 0
+              ? // « 1 pts », relevé à l'œil sur la page du métré : un point
+                // lumineux, un « s ». C'est une faute sur un document remis
+                // au client, à côté de son nom et de son adresse de
+                // chantier — et il la lit avant de lire les chiffres.
+                // « pts » se lit d'ailleurs « points PostScript » par tout
+                // le monde sauf un dessinateur : le mot entier tient dans
+                // la colonne, et ne se lit que d'une façon.
+                `${lum.points} point${lum.points > 1 ? 's' : ''} · ${lum.watts} W`
+              : '—',
+          ]
         : []),
     ];
     for (let i = 0; i < cells.length; i++) {
@@ -2538,10 +2549,14 @@ function metrePage(ctx: SheetContext, sheet: string): string {
   d.text(fr1(totalArea2), cols[2], y, 10, INK, { align: 'left', bold: true });
   d.text(fr1(totalWalls), cols[5], y, 10, INK, { align: 'left', bold: true });
   if (avecEclairage && totalPoints > 0) {
-    d.text(`${totalPoints} pts · ${totalWatts} W`, cols[6], y, 10, INK, {
-      align: 'left',
-      bold: true,
-    });
+    d.text(
+      `${totalPoints} point${totalPoints > 1 ? 's' : ''} · ${totalWatts} W`,
+      cols[6],
+      y,
+      10,
+      INK,
+      { align: 'left', bold: true },
+    );
   }
 
   y -= 26;

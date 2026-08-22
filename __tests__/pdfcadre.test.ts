@@ -349,3 +349,46 @@ describe('les mentions d’un plan réel', () => {
     }
   });
 });
+
+/**
+ * LE DOSSIER ECRIT LE FRANCAIS DU METIER.
+ *
+ * Releve a l'oeil sur la page du metre : « 1 pts · 60 W ». Un point
+ * lumineux, un « s ». Ce n'est pas une coquille de code, c'est une faute sur
+ * un document REMIS AU CLIENT, a cote du nom de l'electricien et de son
+ * adresse de chantier — et le client la lit avant de lire les chiffres.
+ *
+ * L'abreviation elle-meme n'aidait pas : « pts » se lit « points » par un
+ * dessinateur et « points PostScript » par personne d'autre. Le mot entier
+ * tient dans la colonne, et il ne se lit que d'une facon.
+ */
+describe('les mots du dossier', () => {
+  it('accorde le nombre de points lumineux', () => {
+    // Le métré par pièce n'existe que s'il y a une pièce : sans elle, la
+    // page ne porte aucune ligne, et le banc ne mesurerait rien.
+    const un = latin1(
+      buildScanPdf(
+        {
+          name: 'Biais',
+          walls: BIAIS,
+          openings: [porte],
+          objects: [],
+          rooms: [{ id: 'r1', wallIds: BIAIS.map((w) => w.id) }],
+          fixtures: prises,
+        },
+        false,
+        {
+          metre: true,
+          ceiling: [
+            { id: 'c1', kind: 'dcl', roomId: 'r1', at: { x: 1, z: 1 } } as never,
+          ],
+        },
+      ),
+    );
+    // Les libellés du flux, sans réécrire l'extraction : on cherche le mot.
+    const textes = un;
+    // Un point : pas de « s », ni au singulier ni dans le total.
+    expect(textes).not.toMatch(/\b1 points\b/);
+    expect(textes).toMatch(/1 point\b/);
+  });
+});

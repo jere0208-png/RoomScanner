@@ -832,9 +832,19 @@ describe('l’éclairage sur la feuille de métré', () => {
   it('compte les points et leur puissance, par pièce et au total', () => {
     const vu = doc(PLAFOND);
     expect(vu).toContain('Éclairage');
-    // DCL + spot : deux points, et la somme de leurs puissances.
+    /*
+      « POINTS », PAS « PTS » — et le nombre s'accorde.
+
+      La colonne écrivait « 1 pts · 60 W » : un point lumineux, un « s ».
+      Relevé à l'œil sur la page rendue en image, et ce n'est pas une
+      coquille de code — c'est une faute sur un document REMIS AU CLIENT, à
+      côté de son nom et de l'adresse du chantier, qu'il lit avant de lire
+      les chiffres. « pts » se lisait par ailleurs « points PostScript » par
+      tout le monde sauf un dessinateur ; le mot entier tient dans la
+      colonne et ne se lit que d'une façon.
+    */
     const total = CEILINGS.dcl.watts + CEILINGS.spot.watts;
-    expect(vu).toContain(`2 pts · ${total} W`);
+    expect(vu).toContain(`2 points · ${total} W`);
   });
 
   it('et la colonne n’existe pas quand aucun plafond n’est équipé', () => {

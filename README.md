@@ -4671,6 +4671,17 @@ vide — la 3D la découpe hors maçonnerie et le métré compte une pose
 impossible. Le chiffre qu'on relit après coup dit alors la vérité, ce qu'un
 refus muet ne ferait pas.
 
+### « 1 pts »
+
+Relevé à l'œil sur la page du métré rendue en image. Un point lumineux, un
+« s ». Ce n'est pas une coquille de code : c'est une faute sur un document
+**remis au client**, à côté de son nom et de l'adresse du chantier — et il la
+lit avant de lire les chiffres.
+
+L'abréviation n'aidait pas non plus : « pts » se lit « points PostScript »
+par tout le monde sauf un dessinateur. Le mot entier tient dans la colonne,
+il ne se lit que d'une façon, et il s'accorde.
+
 ### L'élévation annonçait une échelle qu'elle ne tenait pas
 
 Le plan d'ensemble a cessé depuis longtemps de se mettre à la feuille pour en
