@@ -301,9 +301,24 @@ describe('les mentions d’un plan réel', () => {
   const textes = (pdf.match(/\(((?:[^()\\]|\\.)*)\) Tj/g) ?? []).join(' | ');
 
   it('porte une barre d’échelle graphique dans le cartouche', () => {
-    // La barre gradue une longueur ronde — mètres, ou centimètres sur un
-    // plan de détail dessiné grand.
-    expect(textes).toMatch(/\((?:1|2|5) m\)|\((?:20|50) cm\)/);
+    /*
+      UNE LONGUEUR RONDE — et le banc ne dit plus laquelle.
+
+      Il énumérait les graduations admises : 1, 2 ou 5 mètres, 20 ou 50
+      centimètres. La marge du dessin s'étant resserrée, un petit logement
+      gagne un cran d'échelle et sort au vingt-cinquième : sa barre gradue
+      alors 40 cm, une longueur parfaitement ronde qui ne figurait pas dans
+      la liste. C'est le banc qui était trop étroit — ce qui compte est que
+      la graduation se lise et se reporte, pas qu'elle soit dans un jeu
+      fermé qu'il faudra rallonger au prochain cran.
+    */
+    const barre = textes.match(/\((\d+(?:,\d+)?) (m|cm)\)/);
+    expect(barre).toBeTruthy();
+    const valeur = Number(barre![1].replace(',', '.'));
+    // Ronde : un compte juste de centimètres, pas 37,4.
+    const cm = barre![2] === 'm' ? valeur * 100 : valeur;
+    expect(cm % 10).toBe(0);
+    expect(cm).toBeGreaterThan(0);
   });
 
   it('écrit la surface totale relevée sous le titre', () => {

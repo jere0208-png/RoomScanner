@@ -33,6 +33,7 @@ import {
   type TableauExistant,
 } from '../geometry/existant';
 import { echelleNormalisee, graduationsRegle } from './echelle';
+import { ecarterDe } from '../ui/ecarter';
 import { dotStep, floorDots, mixHex } from '../geometry/appearance';
 import { wallLabel, type DeviceName } from '../geometry/naming';
 import {
@@ -1398,11 +1399,29 @@ function planPage(
   // 16 pt sous la légende, et 48 pt entre elle et le dessin : la place des
   // chaînes de cotes qui pendent sous le cadre.
   const reserve = avecLegende ? Math.max(0, legendeH + 16 + 48 - 70) : 0;
+  /*
+    LA MARGE AUTOUR DU DESSIN — et l'effet de seuil qu'elle provoque.
+
+    Relevé du patron, dossier rendu en image à l'appui : « je trouve le plan
+    trop petit et illisible, trop de marge blanche non utilisée ». La mesure
+    lui donne raison et dit où : un T3 de sept mètres demande 397 points de
+    large au cinquantième, la boîte en offrait 395. Il manquait DEUX POINTS
+    — sept dixièmes de millimètre — et le cran était refusé : on retombait à
+    1:75, un plan une fois et demie plus petit au milieu de cinq centimètres
+    de blanc.
+
+    L'échelle normalisée n'y est pour rien et n'a pas bougé : un architecte
+    pose son kutch sur le papier. C'était la marge, à soixante-dix points
+    de chaque côté — deux centimètres et demi — là où les chaînes de cotes
+    et leurs repères en demandent la moitié. Cinquante suffisent, et un cran
+    d'échelle se gagne.
+  */
+  const MARGE = 50;
   const box = {
-    x: FRAME.x + 70,
-    y: FRAME.y + TITLE_H + 70 + reserve,
-    w: FRAME.w - 140,
-    h: FRAME.h - TITLE_H - 140 - BANDEAU - reserve,
+    x: FRAME.x + MARGE,
+    y: FRAME.y + TITLE_H + MARGE + reserve,
+    w: FRAME.w - MARGE * 2,
+    h: FRAME.h - TITLE_H - MARGE * 2 - BANDEAU - reserve,
   };
   /**
    * Le plan se dessine SUR LA TRAME DU LOGEMENT, pas dans le repère du scan.
@@ -1929,9 +1948,24 @@ function planPage(
         */
         const ech = 0.5;
         const pas = (ENTRAXE / PLAQUE) * SYMBOL_SPAN;
+        /*
+          L'EMPAN DU SYMBOLE — il portait un disque blanc, il ne sert plus
+          qu'à poser ce qui l'entoure : le sigle à sa droite, le repère de
+          circuit dessous. Même calcul, un dessin de moins.
+        */
         const rayon =
           6.5 + ((Math.max(1, postes.length) - 1) * pas * ech) / 2;
-        d.circle(q.x, q.y, rayon, '#FFFFFF');
+        /*
+          PLUS DE PASTILLE BLANCHE SOUS LE SYMBOLE — relevé du patron :
+          « enlève le bloc blanc derrière les icônes des éléments
+          électriques ».
+
+          Elle protégeait le symbole des hachures du mur, et elle perçait le
+          mur : une rangée de disques blancs mangeait la maçonnerie qu'on
+          est venu lire. Le symbole se pose au nu du mur, du côté de la
+          pièce, où le fond est clair de toute façon.
+        */
+
         drawSymbol(d, postsSymbol(postes, f.kind), q.x, q.y, ech, spec.color, 0.9);
         /*
           LE SIGLE CUMULÉ. Le plan reste sobre — seuls les appareils qui se
@@ -2115,29 +2149,6 @@ function planPage(
         }
       }
 
-      /*
-        LES MOTS ÉCRITS SUR LE PLAN.
-
-        « Colonne montante ici », « attente TV à confirmer avec le client »,
-        « gaine à reprendre » : ce qu'on écrivait au crayon dans la marge du
-        relevé papier. Elles n'entrent dans aucun métré et ne pèsent sur
-        aucun contrôle — leur seul travail est de passer de celui qui relève
-        à celui qui pose, et celui qui pose lit CETTE feuille.
-
-        Elles s'impriment EN DERNIER, par-dessus murs, meubles et appareils :
-        une remarque à moitié cachée sous un canapé n'est pas une remarque.
-        Et la punaise tombe au point visé, le cartouche à côté — sans quoi il
-        couvre exactement ce que la note désigne.
-      */
-      for (const note of ctx.notes ?? []) {
-        const q = px(note.at);
-        if (!dansLeCadre(q)) continue;
-        const mot = fitText(note.text, 6.5, 150);
-        const larg = latin1(mot).length * 6.5 * 0.5 + 10;
-        d.path([q, { x: q.x + 5, y: q.y - 3.5 }, { x: q.x + 5, y: q.y + 3.5 }, q], 0.8, INK);
-        d.rect(q.x + 5, q.y - 5.5, larg, 11, '#FFFFFFEE', INK, 0.5);
-        d.text(mot, q.x + 10, q.y - 2.2, 6.5, INK, { align: 'left' });
-      }
 
       /**
        * La légende se pose dans le coin le plus LIBRE, pas toujours à
@@ -2188,6 +2199,16 @@ function planPage(
       }
     }
 
+    /*
+      CE QUI RÉSERVE DÉJÀ SA PLACE SUR LA FEUILLE.
+
+      Les cartouches de pièce posent leur fond blanc — « on réserve la place
+      du cartouche », comme sur un plan papier. Les notes viennent APRÈS eux
+      et s'en écartent : sans ça, une note posée au milieu d'une pièce
+      s'écrit en travers de sa surface, et le lecteur perd les deux.
+    */
+    const emprises: { x: number; y: number; w: number; h: number }[] = [];
+
     // Cartouche au centre de chaque pièce : son nom, sa surface. Le texte
     // rétrécit à mesure que les pièces se multiplient et se resserrent.
     if (showSurfaces) {
@@ -2213,6 +2234,15 @@ function planPage(
           Math.max(latin1(label).length * gros, latin1(area).length * (big ? 11 : 9)) *
             0.52 +
           10;
+        // On retient l'emprise : les notes s'en écarteront, sans quoi
+        // elles se peignent par-dessus (elles passent en dernier) et le
+        // lecteur perd les DEUX informations d'un coup.
+        emprises.push({
+          x: cp2.x - larg / 2,
+          y: cp2.y - (label ? 15 : 16),
+          w: larg,
+          h: label ? 30 : 32,
+        });
         d.rect(
           cp2.x - larg / 2,
           cp2.y - (label ? 15 : 16),
@@ -2229,6 +2259,49 @@ function planPage(
           d.text(area, cp2.x, cp2.y + 4, big ? 15 : 11, INK, { bold: true });
           d.text('surface au sol', cp2.x, cp2.y - 10, 8, GREY);
         }
+      }
+      /*
+        LES MOTS ÉCRITS SUR LE PLAN.
+
+        « Colonne montante ici », « attente TV à confirmer avec le client »,
+        « gaine à reprendre » : ce qu'on écrivait au crayon dans la marge du
+        relevé papier. Elles n'entrent dans aucun métré et ne pèsent sur
+        aucun contrôle — leur seul travail est de passer de celui qui relève
+        à celui qui pose, et celui qui pose lit CETTE feuille.
+
+        Elles s'impriment EN DERNIER, par-dessus murs, meubles et appareils :
+        une remarque à moitié cachée sous un canapé n'est pas une remarque.
+        Et la punaise tombe au point visé, le cartouche à côté — sans quoi il
+        couvre exactement ce que la note désigne.
+      */
+      for (const note of ctx.notes ?? []) {
+        const q = px(note.at);
+        if (!dansLeCadre(q)) continue;
+        const mot = fitText(note.text, 6.5, 150);
+        const larg = latin1(mot).length * 6.5 * 0.5 + 10;
+        /*
+          LA PUNAISE NE BOUGE PAS, LE MOT SI.
+
+          Le point visé porte le sens — « gaine à reprendre » ne veut rien
+          dire trois mètres plus loin — mais l'étiquette peut monter ou
+          descendre sans rien perdre, et c'est ce qui l'empêche de couvrir
+          le cartouche de la pièce.
+        */
+        const pose = ecarterDe(
+          { x: q.x + 5, y: q.y - 5.5, w: larg, h: 11 },
+          emprises,
+        );
+        d.path([q, { x: q.x + 5, y: q.y - 3.5 }, { x: q.x + 5, y: q.y + 3.5 }, q], 0.8, INK);
+        // Le filet qui relie la punaise à son étiquette quand elle s'est
+        // écartée : sans lui, on ne sait plus quel mot désigne quel point.
+        if (Math.abs(pose.y - (q.y - 5.5)) > 0.5) {
+          d.line(q.x + 5, q.y, pose.x, pose.y + 5.5, 0.5, GREY);
+        }
+        d.rect(pose.x, pose.y, larg, 11, '#FFFFFFEE', INK, 0.5);
+        d.text(mot, pose.x + 5, pose.y + 3.3, 6.5, INK, { align: 'left' });
+        // Une note posée réserve sa place à son tour : deux notes voisines
+        // se couvriraient l'une l'autre.
+        emprises.push(pose);
       }
     }
 

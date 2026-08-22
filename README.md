@@ -4671,6 +4671,47 @@ vide — la 3D la découpe hors maçonnerie et le métré compte une pose
 impossible. Le chiffre qu'on relit après coup dit alors la vérité, ce qu'un
 refus muet ne ferait pas.
 
+### Deux points de marge coûtaient un tiers du plan
+
+Relevé du patron, dossier rendu en image à l'appui : « je trouve le plan trop
+petit et illisible, trop de marge blanche non utilisée ». La mesure lui donne
+raison et dit exactement où.
+
+Un T3 de sept mètres demande **397 points** de large à l'échelle 1:50 ; la
+boîte du dessin en offrait **395**. Il manquait deux points — sept dixièmes
+de millimètre — et le cran était refusé : on retombait à 1:75, c'est-à-dire
+un plan une fois et demie plus petit, au milieu de cinq centimètres de blanc.
+
+**L'échelle normalisée n'y est pour rien et n'a pas bougé** : un architecte
+pose son kutch sur le papier, et à 1:98,3 toutes ses cotes sont fausses.
+C'était la marge — soixante-dix points de chaque côté, deux centimètres et
+demi — là où les chaînes de cotes et leurs repères en demandent la moitié.
+Cinquante suffisent, et un cran d'échelle se gagne. L'effet de seuil est
+brutal : quelques points de marge en trop se voient à l'œil sur la feuille.
+
+### Plus de pastille blanche sous les symboles
+
+Relevé du patron sur la même image : « enlève le bloc blanc derrière les
+icônes des éléments électriques ». Le disque protégeait le symbole des
+hachures du mur — et il perçait le mur : une rangée de prises mangeait la
+maçonnerie qu'on est venu lire. Le symbole se pose au nu du mur, du côté de
+la pièce, où le fond est clair de toute façon. Son empan sert encore à poser
+ce qui l'entoure : le sigle à sa droite, le repère de circuit dessous.
+
+### Une note en travers de la surface
+
+Trouvé à l'œil sur le même dossier : une note posée au milieu d'une pièce —
+« colonne montante ici » — tombait exactement sur le cartouche « 12,0 m² ·
+surface au sol ». Les deux réservent leur fond blanc, et le lecteur perdait
+les DEUX informations d'un coup. Sur l'écran on déplace la note d'un appui ;
+sur le papier, non.
+
+**La punaise ne bouge pas, le mot si** : le point visé porte le sens — « gaine
+à reprendre » ne veut rien dire trois mètres plus loin — mais l'étiquette
+peut monter ou descendre sans rien perdre, et un filet la relie à sa punaise
+quand elle s'est écartée. Une note posée réserve sa place à son tour, sinon
+deux notes voisines se couvrent l'une l'autre.
+
 ### L'architecte recevait des trous dans des murs
 
 Huitième parcours : le même plan par ses trois portes de sortie — le PDF au
