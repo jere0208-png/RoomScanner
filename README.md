@@ -1756,6 +1756,48 @@ une seconde de glissement serait le contraire d'une optimisation. Le rendu
 qui l'agrandit tombe à la prise du doigt, avant le premier mouvement — là où
 personne ne le voit.
 
+### Une pièce vide ne se découpe plus en bandes
+
+Retour d'essai du patron : « la 3D n'est pas du tout fluide, même sans
+meuble ». Mesure faite, le chiffre est édifiant : une pièce VIDE — quatre
+murs, rien dedans — produisait **353 faces, dont 229 à repeindre à chaque
+image** du geste.
+
+D'où venaient-elles ? Du découpage des pans en bandes de soixante
+centimètres. Il a une raison, et une seule : donner au tri du peintre la
+finesse qu'un pan d'un seul tenant n'a pas, pour qu'un meuble posé devant
+la moitié proche d'un long mur ne soit pas classé derrière tout le mur.
+C'est le canapé du chantier, et c'est pour lui que le mode « grossier »
+avait été retiré.
+
+**Mais dans une pièce vide, il n'y a RIEN à départager** : on payait la
+finesse d'un tri qui n'avait aucun litige à trancher. On regarde donc, mur
+par mur, s'il a quelque chose devant lui — un meuble à moins de deux mètres
+du segment, ou de l'appareillage qu'il porte lui-même. Sinon, le pan reste
+d'un seul tenant.
+
+| | avant | après |
+|---|---|---|
+| pièce vide | 353 faces (229 visibles) | **21 faces (13 visibles)** |
+| logement de référence | 1110 faces (639 visibles) | 957 faces (550 visibles) |
+
+La marge est large exprès : elle se compare au CENTRE de l'objet, dont on
+ignore là l'encombrement exact et l'orientation. Une bande de trop ne coûte
+qu'un peu de dessin ; une bande manquante fait disparaître un canapé.
+
+**Et le rendu ne bouge pas d'un cheveu** : les cinq planches 3D de référence
+ont été régénérées et relues À L'ŒIL, avant/après, sur l'angle de trois
+quarts et sur le biais — celui où le tri est le plus fragile. Identiques.
+C'est exactement ce pour quoi ces planches existent.
+
+Trois bancs ont dû être réécrits, et le motif est le même pour les trois :
+ils bâtissaient une pièce NUE et exigeaient des bandes. Ils reçoivent
+désormais le meuble qu'ils supposaient — le litige rend la propriété qu'ils
+tiennent vraie ET utile. Un quatrième isolait les faces d'une télé par un
+décalage d'index entre deux scènes, l'une avec meuble et l'autre sans : la
+coïncidence de structure sur laquelle il reposait est tombée avec ce
+changement, il les isole maintenant par leur couleur.
+
 **La même optimisation a été essayée en 3D, puis ÉCARTÉE.** Le pincement y
 passait au natif (le tri est identique à zoom 1 et à zoom 2,4, le banc le
 prouve à la décimale) et les arêtes se taisaient pendant la rotation — cent

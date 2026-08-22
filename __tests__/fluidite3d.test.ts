@@ -376,3 +376,59 @@ describe('ce que le modèle 3D permettrait d’optimiser', () => {
   });
 });
 
+/**
+ * ON NE DÉCOUPE UN MUR QUE S'IL Y A QUELQUE CHOSE À DÉPARTAGER.
+ *
+ * Relevé du patron : « la 3D n'est pas du tout fluide, même sans meuble ».
+ * La mesure lui donne raison, et le chiffre est édifiant : une pièce VIDE —
+ * quatre murs, rien dedans — produisait TROIS CENT CINQUANTE-TROIS faces,
+ * dont deux cent vingt-neuf à repeindre à chaque image du geste.
+ *
+ * D'où venaient-elles ? Du découpage des pans en bandes de soixante
+ * centimètres. Il a une raison, et une seule : donner au tri du peintre la
+ * finesse qu'un pan d'un seul tenant n'a pas, pour qu'un meuble posé devant
+ * la moitié proche d'un long mur ne se retrouve pas classé derrière tout le
+ * mur. C'est le canapé du chantier, et le mode « grossier » a été retiré
+ * pour cette raison-là.
+ *
+ * Mais dans une pièce vide, il n'y a RIEN à départager : on payait la
+ * finesse d'un tri qui n'avait aucun litige à trancher. Un mur ne se découpe
+ * donc plus que s'il a quelque chose devant lui — un meuble, un appareil —
+ * assez près pour que la question se pose.
+ */
+describe('les bandes ne servent qu’à départager', () => {
+  const salonVide = () =>
+    buildScene(MURS, [], [], {
+      palette: PAL,
+      showSurfaces: true,
+      floors: {},
+      rooms: [{ id: 'r1', floor: null } as never],
+      fixtures: [],
+    });
+
+  it('une pièce vide ne découpe plus ses murs', () => {
+    const vide = salonVide();
+    // Quatre murs, un sol : quelques dizaines de faces, pas trois cents.
+    expect(
+      `${vide.faces.length} faces pour quatre murs nus`,
+    ).toBe(`${vide.faces.length} faces pour quatre murs nus`);
+    expect(vide.faces.length).toBeLessThan(120);
+  });
+
+  it('mais un mur qui porte un meuble devant lui garde les siennes', () => {
+    // Le canapé du chantier : posé le long du mur nord, il exige que ce
+    // mur-là reste découpé, sinon il repasse derrière en bloc.
+    const meuble = MEUBLES.slice(0, 1);
+    const avec = buildScene(MURS, [], meuble, {
+      palette: PAL,
+      showSurfaces: true,
+      floors: {},
+      rooms: [{ id: 'r1', floor: null } as never],
+      fixtures: [],
+    });
+    // Nettement plus de faces qu'à vide : les murs voisins du meuble se
+    // sont découpés, et lui seul a fait la différence.
+    expect(avec.faces.length).toBeGreaterThan(salonVide().faces.length + 40);
+  });
+});
+

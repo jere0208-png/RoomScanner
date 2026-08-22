@@ -1779,6 +1779,61 @@ export function buildScene(
   // dessous. Plus rien ne se superpose, donc plus une seule couleur qui en
   // recouvre une autre selon l'angle.
   const holes = assignOpenings(walls, openings, floorY);
+
+  /*
+    ON NE DÉCOUPE UN MUR QUE S'IL Y A QUELQUE CHOSE À DÉPARTAGER.
+
+    Relevé du patron : « la 3D n'est pas du tout fluide, même sans meuble ».
+    La mesure lui a donné raison : une pièce VIDE — quatre murs, rien dedans
+    — produisait trois cent cinquante-trois faces, dont deux cent
+    vingt-neuf à repeindre à chaque image du geste.
+
+    Elles venaient du découpage des pans en bandes de soixante centimètres,
+    qui a une raison et une seule : donner au tri du peintre la finesse
+    qu'un pan d'un seul tenant n'a pas, pour qu'un meuble posé devant la
+    moitié proche d'un long mur ne soit pas classé derrière tout le mur.
+    C'est le canapé du chantier, et c'est pour lui que le mode « grossier »
+    a été retiré.
+
+    Mais dans une pièce vide, il n'y a RIEN à départager : on payait la
+    finesse d'un tri sans litige à trancher. On regarde donc, mur par mur,
+    s'il a quelque chose devant lui — un meuble, un appareil — assez près
+    pour que la question se pose. Sinon, le pan reste d'un seul tenant.
+
+    La MARGE est large exprès (deux mètres) : elle se compare au centre de
+    l'objet, dont on ignore ici l'encombrement exact et l'orientation, et
+    une bande de trop ne coûte qu'un peu de dessin — une bande manquante
+    fait disparaître un canapé.
+  */
+  const MARGE_LITIGE = 2;
+  const devantLeMur = (w: WallSeg): boolean => {
+    const ax = w.a.x;
+    const az = w.a.z;
+    const vx = w.b.x - ax;
+    const vz = w.b.z - az;
+    const long2 = vx * vx + vz * vz || 1;
+    const proche = (px: number, pz: number) => {
+      // Distance du point au SEGMENT, pas à sa droite : un meuble situé
+      // dans le prolongement d'un mur n'est pas devant lui.
+      const t = Math.max(0, Math.min(1, ((px - ax) * vx + (pz - az) * vz) / long2));
+      const dx = px - (ax + vx * t);
+      const dz = pz - (az + vz * t);
+      return dx * dx + dz * dz < MARGE_LITIGE * MARGE_LITIGE;
+    };
+    for (const o of objects) {
+      const m = o.transform;
+      if (m && m.length >= 15 && proche(m[12], m[14])) return true;
+    }
+    /*
+      UN APPAREIL EST PLAQUÉ SUR SON MUR, en saillie de quelques
+      centimètres : c'est le litige le plus serré qui soit, et c'est
+      justement celui que les tuiles tranchent (voir `depthAt`). Un mur qui
+      porte de l'appareillage garde donc ses bandes, sans qu'on ait à
+      mesurer quoi que ce soit.
+    */
+    return (opts.fixtures ?? []).some((f) => f.wallId === w.id);
+  };
+
   for (const w of walls) {
     const q = quads.get(w.id);
     if (!q) continue;
@@ -1817,11 +1872,15 @@ export function buildScene(
       z: plusIsInner ? nrm.z : -nrm.z,
     };
     const avantMur = faces.length;
+    /** Ce mur a-t-il quelque chose devant lui, à trier contre ses bandes ? */
+    const litige = devantLeMur(w);
 
     const mine = holes.get(w.id) ?? [];
     for (const panel of wallPanels(mine, w.height)) {
       pushWallBlock(q, panel.t0, panel.t1, panel.y0, panel.y1, {
         ...skin,
+        // Rien devant : le pan reste d'un seul tenant (voir `devantLeMur`).
+        whole: !litige,
         closeBottom: panel.y0 > 1e-3,
         // Tous les morceaux d'un mur se classent à sa mi-hauteur : le mur
         // est un plan, pas une collection de tuiles.

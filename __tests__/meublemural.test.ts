@@ -100,14 +100,28 @@ const depth = (c: ReturnType<typeof cam>) => (f: Face3D) => {
   );
 };
 
-const nu = buildScene(MURS, [], [], { palette: PAL, rooms: ROOMS });
 const scene = buildScene(MURS, [], [TV], { palette: PAL, rooms: ROOMS });
 /**
- * Les faces de la télé : celles que la scène a EN PLUS. C'est la seule
- * façon sûre de les isoler — filtrer sur la couleur attrape les dessus de
- * murs, qui n'ont rien à voir.
+ * LES FACES DE LA TÉLÉ, ISOLÉES PAR LEUR COULEUR.
+ *
+ * Elles l'étaient par un DÉCALAGE D'INDEX : on bâtissait la même scène sans
+ * meuble, et l'on prenait les faces ajoutées à la fin. Cela tenait tant que
+ * les deux scènes bâtissaient leurs murs à l'identique — et cette
+ * coïncidence est tombée le jour où un mur ne se découpe en bandes que s'il
+ * a quelque chose à départager devant lui : la scène nue, sans meuble,
+ * garde ses pans d'un seul tenant, et le décalage attrapait des morceaux de
+ * mur.
+ *
+ * La couleur du mobilier ne dépend, elle, de rien d'autre que du mobilier.
  */
-const tele = scene.faces.slice(nu.faces.length).filter((f) => !f.isFloor);
+const tele = scene.faces.filter(
+  (f) =>
+    !f.isFloor &&
+    !!f.fill &&
+    f.fill !== PAL.wall &&
+    f.fill !== PAL.wallTop &&
+    f.fill !== PAL.floor,
+);
 /** Le refend, vu de la pièce d'à côté (z ≈ 3 − épaisseur/2). */
 const refend = scene.faces.filter(
   (f) =>

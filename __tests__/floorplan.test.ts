@@ -242,6 +242,25 @@ describe('wallQuads', () => {
   });
 });
 
+/*
+  LA PIÈCE PORTE DÉSORMAIS UN MEUBLE — et c'est ce qui rend le banc juste.
+
+  Il bâtissait une pièce NUE et exigeait des bandes. Depuis qu'un mur ne
+  se découpe que s'il a quelque chose à départager devant lui (le canapé
+  du chantier), une pièce vide garde ses pans d'un seul tenant : il n'y
+  avait plus un seul contour de bande à mesurer, et le banc mesurait le
+  vide. On lui donne donc le litige qu'il suppose — un meuble contre le
+  mur nord — et la propriété qu'il tient redevient vraie ET utile.
+*/
+const MEUBLE_TEMOIN = {
+  id: 'canape',
+  category: 'sofa',
+  width: 1.6,
+  depth: 0.8,
+  height: 0.8,
+  transform: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 2, 0.4, 0.6, 1],
+} as never;
+
 describe('roomSurface', () => {
   const rect = [
     seg('n', { x: 0, z: 0 }, { x: 4, z: 0 }),
@@ -1087,12 +1106,15 @@ describe('contours de la scène 3D', () => {
     return max;
   };
 
+
   it('ne pose aucun contour à cheval sur plusieurs bandes', () => {
     // Un contour d'un seul tenant sur un mur découpé se trierait à une
     // profondeur moyenne, et traverserait les meubles placés devant. Aucun
     // contour ne doit donc dépasser une bande (60 cm) — en diagonale, plus
     // l'épaisseur du mur pour le dessus des murs.
-    const scene = buildScene(rect, [], [], { palette: TEST_PALETTE });
+    const scene = buildScene(rect, [], [MEUBLE_TEMOIN], {
+      palette: TEST_PALETTE,
+    });
     const outlines = scene.faces.filter((f) => f.fill === null);
     expect(outlines.length).toBeGreaterThan(0);
     expect(Math.max(...outlines.map(span))).toBeLessThan(0.6 + WALL_T + 0.02);
@@ -1101,8 +1123,11 @@ describe('contours de la scène 3D', () => {
   });
 
   it('garde les contours en mode geste, avec des pans d’un seul tenant', () => {
-    const fine = buildScene(rect, [], [], { palette: TEST_PALETTE });
-    const coarse = buildScene(rect, [], [], { palette: TEST_PALETTE, coarse: true });
+    const fine = buildScene(rect, [], [MEUBLE_TEMOIN], { palette: TEST_PALETTE });
+    const coarse = buildScene(rect, [], [MEUBLE_TEMOIN], {
+      palette: TEST_PALETTE,
+      coarse: true,
+    });
     // Nettement moins de polygones…
     expect(coarse.faces.length).toBeLessThan(fine.faces.length * 0.75);
     // …mais toujours des contours : c'est leur disparition qui faisait
@@ -1312,7 +1337,12 @@ describe('portes et fenêtres en volumes', () => {
     // AVANT son propre pan, qui la repeignait. Le silhouettage disparaissait
     // donc à l'arrêt, et ne revenait que pendant un geste — où un pan non
     // découpé porte un contour d'un seul tenant, centré comme lui.
-    const scene = buildScene(rect, [], [], { palette: TEST_PALETTE });
+    // Un meuble contre le mur : sans litige à trancher, les pans restent
+    // d'un seul tenant et portent leur contour à quatre coins — il n'y
+    // aurait pas une arête isolée à examiner.
+    const scene = buildScene(rect, [], [MEUBLE_TEMOIN], {
+      palette: TEST_PALETTE,
+    });
     const traits = scene.faces.filter((f) => f.fill === null);
     // Une ARÊTE isolée (deux points) doit porter son point de tri. Un
     // contour d'un seul tenant, lui, a déjà les quatre coins de son pan :
