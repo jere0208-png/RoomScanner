@@ -17,6 +17,7 @@ import React, { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { SheetShell } from './Sheet';
+import { nomDuNiveau } from '../geometry/floorplan';
 import { SOLAIRES } from '../ui/solaires';
 import { radius, themedStyles, useTheme, type Palette } from '../theme';
 import { haptic } from '../ui/haptic';
@@ -63,6 +64,21 @@ const ICONE_DU_CODE: Record<string, string> = {
 export interface DiagnosticSheetProps {
   visible: boolean;
   onClose: () => void;
+  /*
+    SUR QUOI CE CONTRÔLE PORTE-T-IL ?
+
+    Il ne regarde que le NIVEAU AFFICHÉ — et c'est le bon choix : un constat
+    qu'on ne peut pas voir est un constat qu'on ne peut pas corriger. Mais
+    rien ne le disait, et l'électricien au rez-de-chaussée lisait « Rien de
+    bloquant » avant de livrer un dossier dont l'étage comptait cinq
+    manques. Un verdict partiel qui se présente comme un verdict complet est
+    pire que pas de verdict : il donne une confiance qu'il ne peut pas
+    tenir.
+  */
+  niveau?: number;
+  /** Vrai dès que le dossier a plus d'un niveau : sinon, la précision
+   *  serait du bruit. */
+  plusieursNiveaux?: boolean;
   issues: Constat[];
   /** Pour nommer les volets : l'identifiant seul ne dit rien à personne. */
   rooms: { id: string; name?: string }[];
@@ -73,6 +89,8 @@ export interface DiagnosticSheetProps {
 
 export function DiagnosticSheet({
   visible,
+  niveau = 0,
+  plusieursNiveaux = false,
   onClose,
   issues,
   rooms,
@@ -135,6 +153,13 @@ export function DiagnosticSheet({
                 'La ligne vous emmène le voir sur le plan.'
               : 'Touchez une ligne pour aller voir l’élément sur le plan.'}
           </Text>
+          {plusieursNiveaux && (
+            <Text style={styles.portee}>
+              {`Ce contrôle porte sur le niveau affiché — ${nomDuNiveau(
+                niveau,
+              )}. Changez de niveau pour vérifier les autres.`}
+            </Text>
+          )}
         </View>
       </View>
       <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
@@ -248,6 +273,8 @@ const getStyles = themedStyles((c: Palette) =>
       fontWeight: '800',
       letterSpacing: -0.3,
     },
+    /* La portée : dite en plus petit que le reste, mais dite. */
+    portee: { color: c.blue, fontSize: 11.5, lineHeight: 16, marginTop: 4 },
     sub: { color: c.inkFaint, fontSize: 12, lineHeight: 16, marginTop: 2 },
     scroll: { maxHeight: 380, marginTop: 12 },
     // Le volet d'une pièce : son nom, le nombre de constats, un chevron qui

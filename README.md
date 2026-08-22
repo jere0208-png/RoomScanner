@@ -2111,6 +2111,29 @@ pour qui l'application a ouvert cette porte. Les trois créations manuelles
 (pièce libre, pièce accolée, mur tracé seul) portent désormais le niveau
 courant.
 
+### Le contrôle dit sur quoi il porte
+
+Cinquième campagne, sur la même piste : les chemins « à la main » et les
+niveaux. Une partie de ce qu'on croyait défectueux ne l'était pas, et il
+vaut la peine de l'écrire — **un appareil hérite du niveau de son mur, un
+point de plafond de celui de sa pièce**. Ils ne portent pas de niveau
+propre, et c'est la bonne conception : une seule source de vérité, jamais
+deux à tenir d'accord. Vérifié en filtrant un dossier à deux niveaux : au
+rez-de-chaussée zéro prise et zéro plafond de l'étage, à l'étage les siens.
+
+Mais le contrôle des normes, lui, **ne regarde que le niveau affiché** — ce
+qui est le bon choix : un constat qu'on ne peut pas voir est un constat
+qu'on ne peut pas corriger. Le défaut était qu'il ne le DISAIT pas.
+L'électricien au rez-de-chaussée lisait « Rien de bloquant », refermait la
+feuille, et livrait un dossier dont l'étage comptait cinq manques. Un
+verdict partiel qui se présente comme un verdict complet est pire que pas de
+verdict : il donne une confiance qu'il ne peut pas tenir.
+
+La feuille annonce donc son périmètre — « Ce contrôle porte sur le niveau
+affiché — Rez-de-chaussée. Changez de niveau pour vérifier les autres. » —
+et seulement quand le dossier a plus d'un niveau : sur une maison de
+plain-pied, la précision serait du bruit.
+
 ### Un relevé interrompu ne se perd plus
 
 Un scan tenait entièrement en mémoire tant qu'on n'avait pas touché

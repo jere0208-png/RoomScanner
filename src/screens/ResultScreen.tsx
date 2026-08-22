@@ -3514,6 +3514,11 @@ export function ResultScreen() {
         onClose={() => setChecking(false)}
         issues={issues}
         rooms={rooms}
+        // Le contrôle porte sur le niveau AFFICHÉ : il le dit, sans quoi
+        // un « rien de bloquant » au rez-de-chaussée ferait livrer un
+        // dossier dont l'étage compte cinq manques.
+        niveau={niveauCourant}
+        plusieursNiveaux={niveaux.length > 1}
         onGoToIssue={goToIssue}
         onFix={corriger}
       />
