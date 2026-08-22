@@ -3433,6 +3433,47 @@ export function ResultScreen() {
                 crayon: true,
                 onPress: () => promptOpeningPos(selectedOpening.id),
               },
+              /*
+                LE SENS D'OUVERTURE — deux boutons, deux questions.
+
+                Le plan devine le battant, et il se trompe une fois sur
+                deux. Pour qui pose l'appareillage ce n'est pas un détail de
+                trait : l'interrupteur va du côté de la POIGNÉE, jamais du
+                côté des paumelles, et une porte dessinée à l'envers envoie
+                percer derrière le battant.
+
+                Ils ne s'affichent que sur une porte : une fenêtre n'a pas
+                de vantail dessiné, et un bouton qui ne change rien à
+                l'écran se lit comme un geste raté.
+              */
+              ...(selectedOpening.type === 'door'
+                ? [
+                    {
+                      label: 'Pivot',
+                      icone: SOLAIRES.largeur,
+                      sansMot: true,
+                      ghost: true,
+                      onPress: () => {
+                        useScanStore
+                          .getState()
+                          .flipBattant(selectedOpening.id, 'pivot');
+                        haptic('succes');
+                      },
+                    },
+                    {
+                      label: 'Sens',
+                      icone: SOLAIRES.longueur,
+                      sansMot: true,
+                      ghost: true,
+                      onPress: () => {
+                        useScanStore
+                          .getState()
+                          .flipBattant(selectedOpening.id, 'sens');
+                        haptic('succes');
+                      },
+                    },
+                  ]
+                : []),
               {
                 /*
                   LE COFFRE DE VOLET, DÉCLARÉ EN UN GESTE.

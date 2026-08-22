@@ -1567,7 +1567,10 @@ function planPage(
     const pivotsPorte = pivotsDesBattants(
       openings
         .filter((o) => o.type === 'door')
-        .map((o) => ({ id: o.id, a: o.a, b: o.b })),
+        // Le bord choisi à la main passe avant : le dossier imprime la
+        // porte telle qu'elle s'ouvre sur place, pas telle qu'elle arrange
+        // le dessin.
+        .map((o) => ({ id: o.id, a: o.a, b: o.b, pivot: o.pivot })),
     );
 
     // Ouvertures : trouée blanche + symbole
@@ -1595,6 +1598,12 @@ function planPage(
       let inx = -dz / len;
       let inz = dx / len;
       if (inx * (centroid.x - mid.x) + inz * (centroid.z - mid.z) < 0) {
+        inx = -inx;
+        inz = -inz;
+      }
+      // Une porte qui ouvre vers l'AUTRE pièce — placard, cellier, porte
+      // palière : le vantail bascule de l'autre côté du dormant.
+      if (o.versExterieur) {
         inx = -inx;
         inz = -inz;
       }

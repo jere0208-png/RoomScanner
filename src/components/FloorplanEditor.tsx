@@ -1156,6 +1156,9 @@ export function FloorplanEditor({
           id: o.id,
           a: o.a,
           b: o.b,
+          // Le bord choisi à la main passe avant la mise en place
+          // automatique : sinon la correction ne survit pas au rendu.
+          pivot: o.pivot,
         })),
       ),
     [openings],
@@ -1971,6 +1974,10 @@ export function FloorplanEditor({
                 if ((dedans.x - mx) * n.x + (dedans.y - my) * n.y < 0) {
                   n = { x: -n.x, y: -n.y };
                 }
+                // Une porte qui ouvre vers l'AUTRE pièce : le vantail
+                // bascule de l'autre côté du dormant. Fréquent sur un
+                // placard, un cellier, une porte palière.
+                if (o.versExterieur) n = { x: -n.x, y: -n.y };
                 /*
                   LE PIVOT N'EST PLUS LE PREMIER BOUT VENU.
 

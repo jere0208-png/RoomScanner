@@ -57,6 +57,26 @@ export interface WallSeg {
    */
   coffre?: number;
   /**
+   * DE QUEL BORD LA PORTE PIVOTE — quand quelqu'un l'a dit.
+   *
+   * Le plan le devine (`pivotsDesBattants` range les portes dos à dos pour
+   * qu'aucune paire d'arcs ne se croise), et cette supposition est fausse
+   * une fois sur deux : une porte réelle pivote du côté que le menuisier a
+   * choisi, pas du côté qui arrange le dessin. Pour un électricien ce n'est
+   * pas un détail de trait — l'interrupteur se pose du côté de la POIGNÉE,
+   * jamais du côté des paumelles.
+   *
+   * Absent = personne n'a tranché, la mise en place automatique décide.
+   */
+  pivot?: 'a' | 'b';
+  /**
+   * Le vantail s'ouvre vers l'AUTRE pièce que celle qui le porte.
+   *
+   * Par défaut il s'ouvre vers l'intérieur : c'est le cas le plus fréquent
+   * en logement, et c'est ce que le dessin supposait sans le dire.
+   */
+  versExterieur?: boolean;
+  /**
    * L'ÉTAGE où vit ce mur. 0 = rez-de-chaussée, 1 = premier, −1 = sous-sol.
    *
    * Absent sur tous les scans d'avant les étages, et cette absence VAUT
@@ -2465,9 +2485,11 @@ function signedArea(pts: Pt[]): number {
  * battant qui saute de côté au moindre zoom serait pire que le croisement.
  */
 export function pivotsDesBattants(
-  portes: { id: string; a: Pt; b: Pt }[],
+  portes: { id: string; a: Pt; b: Pt; pivot?: 'a' | 'b' }[],
 ): Map<string, 'a' | 'b'> {
-  const choix = new Map<string, 'a' | 'b'>(portes.map((p) => [p.id, 'a']));
+  const choix = new Map<string, 'a' | 'b'>(
+    portes.map((p) => [p.id, p.pivot ?? 'a']),
+  );
   const rayon = (p: { a: Pt; b: Pt }) =>
     Math.hypot(p.b.x - p.a.x, p.b.z - p.a.z);
   const pivotDe = (p: { id: string; a: Pt; b: Pt }) =>
@@ -2487,6 +2509,10 @@ export function pivotsDesBattants(
   };
   for (let passe = 0; passe < 2; passe++) {
     for (const p of portes) {
+      // LE CHOIX DE LA MAIN PASSE AVANT. Sans ça, la correction faite sur
+      // place dure jusqu'au premier rendu suivant, et l'électricien voit
+      // sa porte se retourner toute seule.
+      if (p.pivot) continue;
       const coutA = gene(p, 'a');
       const coutB = gene(p, 'b');
       // À égalité, on garde le premier bout : c'est le dessin d'avant, et

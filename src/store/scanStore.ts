@@ -1184,6 +1184,11 @@ interface ScanState {
    */
   moveOpening: (id: string, bord: number) => void;
   /**
+   * Retourne le battant d'une porte : son bord de pivot, ou la pièce vers
+   * laquelle il s'ouvre. Sans effet sur une fenêtre, qui n'en dessine pas.
+   */
+  flipBattant: (id: string, quoi: 'pivot' | 'sens') => void;
+  /**
    * DÉCLARE (ou retire) LE COFFRE DE VOLET qui coiffe cette menuiserie.
    *
    * Le scan ne le voit pas — c'est un accident de maçonnerie au-dessus de
@@ -4288,6 +4293,39 @@ export const useScanStore = create<ScanState>((set, get) => {
                   z: mur!.a.z + uz * (c + l / 2),
                 },
               }
+            : x,
+        ),
+        dirty: true,
+      });
+    },
+
+    /*
+      LE SENS D'OUVERTURE, CORRIGÉ À LA MAIN.
+
+      Le plan devine le battant, et il se trompe une fois sur deux : une
+      porte réelle pivote du côté que le menuisier a choisi. Pour un
+      électricien ce n'est pas un détail de trait — l'interrupteur se pose
+      du côté de la POIGNÉE, jamais du côté des paumelles, et une porte
+      dessinée à l'envers envoie percer derrière le battant.
+
+      DEUX GESTES, PAS UN. Le bord du pivot et la pièce vers laquelle le
+      vantail s'ouvre sont deux questions indépendantes ; un bouton unique
+      faisant le tour des quatre combinaisons obligerait à appuyer trois
+      fois pour revenir à la bonne.
+    */
+    flipBattant: (id, quoi) => {
+      const st = get();
+      const o = st.openings.find((x) => x.id === id);
+      // Une fenêtre ne dessine pas de battant : un réglage invisible est un
+      // réglage qu'on croit raté.
+      if (!o || o.type !== 'door') return;
+      pushHistory(`battant:${id}:${quoi}`);
+      set({
+        openings: st.openings.map((x) =>
+          x.id === id
+            ? quoi === 'pivot'
+              ? { ...x, pivot: (x.pivot ?? 'a') === 'a' ? 'b' : 'a' }
+              : { ...x, versExterieur: !x.versExterieur }
             : x,
         ),
         dirty: true,

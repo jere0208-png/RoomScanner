@@ -4671,6 +4671,34 @@ vide — la 3D la découpe hors maçonnerie et le métré compte une pose
 impossible. Le chiffre qu'on relit après coup dit alors la vérité, ce qu'un
 refus muet ne ferait pas.
 
+### De quel côté la porte s'ouvre
+
+Le plan dessine le quart de cercle du battant, et il le DEVINE :
+`pivotsDesBattants` range les portes dos à dos pour qu'aucune paire d'arcs
+ne se croise, et le vantail s'ouvre vers l'intérieur de la pièce. Bonne
+supposition, fausse une fois sur deux — une porte réelle pivote du côté que
+le menuisier a choisi, pas du côté qui arrange le dessin.
+
+**Pour un électricien ce n'est pas un détail de trait.** L'interrupteur se
+pose du côté de la poignée, jamais du côté des paumelles : une porte
+dessinée à l'envers envoie percer derrière le battant. La NF C 15-100 le dit
+autrement — la commande doit être atteignable en entrant — mais c'est la
+même paume sur le même mur.
+
+Deux boutons, parce que ce sont deux questions indépendantes : « Pivot »
+change le bord de charnière, « Sens » change la pièce vers laquelle le
+vantail s'ouvre (placard, cellier, porte palière). Un bouton unique faisant
+le tour des quatre combinaisons obligerait à appuyer trois fois pour revenir
+à la bonne. Ils ne s'affichent que sur une porte : une fenêtre n'a pas de
+vantail dessiné, et un bouton qui ne change rien à l'écran se lit comme un
+geste raté.
+
+**Le choix de la main tient** : `pivotsDesBattants` ne range plus une porte
+que personne n'a réglée. Sans ça, la correction faite sur place durait
+jusqu'au premier rendu suivant, et la porte se retournait toute seule. Écran
+et dossier imprimé suivent le même réglage — vérifié à l'œil sur les trois
+cas.
+
 ### Le mot écrit au crayon dans la marge
 
 « Colonne montante ici », « attente TV à confirmer avec le client », « gaine
