@@ -4703,6 +4703,15 @@ millimetre, alors un mur confondu a douze centimetres pres est le meme mur.
 Un appui sans glissement ne cree rien : ce n'est pas une piece, c'est un
 doigt pose.
 
+**Et les deux coins se collent aux murs qui sont la.** Sans aide, tomber sur
+un mur existant releve de la chance : la reprise se joue a douze centimetres,
+deux pixels sur un plan dezoome. L'aimant a donc la MEME portee que la
+reprise — sinon il collerait la ou le magasin ne reconnait plus rien, et l'on
+doublerait le mur juste a cote de l'ancien, ce qui est pire que pas d'aimant
+du tout. Chaque axe s'aimante separement : l'abscisse sur les murs verticaux,
+l'ordonnee sur les horizontaux. C'est ainsi qu'un logement se construit — les
+pieces s'alignent sur ce qui existe, elles ne flottent pas a cote.
+
 ### Le bandeau du mur, troisieme forme — et les deux premieres disent pourquoi
 
 Releve du patron, capture a l'appui : « la barre en bas mal faite pour

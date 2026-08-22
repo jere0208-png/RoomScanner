@@ -145,3 +145,57 @@ export function poserLibre(
 
   return { centre: vise, valide: true, aimante: false };
 }
+
+/**
+ * PORTÉE DE L'AIMANT DU TRACÉ, en mètres.
+ *
+ * Douze centimètres : c'est exactement la tolérance à laquelle `addRoomRect`
+ * reconnaît un mur existant et le reprend au lieu de le doubler. Les deux
+ * chiffres doivent être le même — un aimant qui colle plus loin que la
+ * reprise créerait un mur en double juste à côté de l'ancien, ce qui est
+ * pire que pas d'aimant du tout.
+ */
+export const PORTEE_TRACE = 0.12;
+
+/**
+ * COLLE UN COIN SUR LES LIGNES QUE LES MURS DESSINENT DÉJÀ.
+ *
+ * Le geste « poser, glisser, lâcher » reprend un mur existant quand un côté
+ * tombe dessus. Sans aide, y tomber relève de la CHANCE : douze centimètres
+ * sur un plan dézoomé, ce sont deux pixels.
+ *
+ * On aimante donc chaque axe séparément — l'abscisse sur les murs verticaux,
+ * l'ordonnée sur les horizontaux. C'est ainsi qu'un logement se construit :
+ * les pièces s'alignent sur ce qui existe, elles ne flottent pas à côté.
+ *
+ * ET SEULEMENT DE PRÈS : au large, on tire où l'on veut. Une pièce posée à
+ * un mètre du reste est un choix, pas une erreur de visée.
+ */
+export function aimanterCoin(
+  p: Pt,
+  murs: WallSeg[],
+  portee = PORTEE_TRACE,
+): Pt {
+  let dx = portee;
+  let x = p.x;
+  let dz = portee;
+  let z = p.z;
+  for (const w of murs) {
+    if (w.type !== 'wall') continue;
+    for (const bout of [w.a, w.b]) {
+      // Chaque bout de mur porte une ligne verticale et une horizontale :
+      // c'est l'union des deux qui fait la trame du logement.
+      const ex = Math.abs(bout.x - p.x);
+      if (ex < dx) {
+        dx = ex;
+        x = bout.x;
+      }
+      const ez = Math.abs(bout.z - p.z);
+      if (ez < dz) {
+        dz = ez;
+        z = bout.z;
+      }
+    }
+  }
+  return { x, z };
+}

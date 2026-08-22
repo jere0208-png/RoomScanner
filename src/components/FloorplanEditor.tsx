@@ -69,7 +69,7 @@ import { markColor } from '../geometry/schema';
 import { CeilingLayer } from './CeilingLayer';
 import { FixtureLayer } from './FixtureLayer';
 import { NotesLayer } from './NotesLayer';
-import { poserLibre } from '../geometry/poser';
+import { aimanterCoin, poserLibre } from '../geometry/poser';
 import type { Fixture } from '../geometry/electrical';
 import type { CeilingFixture } from '../geometry/ceiling';
 import { CloseCross } from './CloseCross';
@@ -2426,12 +2426,27 @@ export function FloorplanEditor({
                 accessibilityLabel="Tirer une piece"
                 onPressIn={(e) => {
                   const { locationX, locationY } = e.nativeEvent;
-                  const p = mapping.toMeters({ x: locationX, y: locationY });
+                  /*
+                    LES DEUX COINS SE COLLENT AUX MURS QUI SONT LA.
+
+                    Sans aide, tomber sur un mur existant releve de la
+                    chance : la reprise se joue a douze centimetres, deux
+                    pixels sur un plan dezoome. L'aimant a la MEME portee que
+                    la reprise — sinon il collerait la ou le magasin ne
+                    reconnait plus rien, et l'on doublerait le mur.
+                  */
+                  const p = aimanterCoin(
+                    mapping.toMeters({ x: locationX, y: locationY }),
+                    walls,
+                  );
                   setTirage({ a: p, b: p });
                 }}
                 onResponderMove={(e) => {
                   const { locationX, locationY } = e.nativeEvent;
-                  const p = mapping.toMeters({ x: locationX, y: locationY });
+                  const p = aimanterCoin(
+                    mapping.toMeters({ x: locationX, y: locationY }),
+                    walls,
+                  );
                   setTirage((t) => (t ? { a: t.a, b: p } : t));
                 }}
                 onPressOut={() => {
