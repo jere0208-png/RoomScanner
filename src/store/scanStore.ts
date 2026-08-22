@@ -5101,6 +5101,21 @@ export const useScanStore = create<ScanState>((set, get) => {
         rooms: b.rooms,
         fixtures: b.fixtures,
         ceiling: b.ceiling,
+        /*
+          TOUT CE QUI A ÉTÉ ÉCRIT EST RENDU.
+
+          Le brouillon sauvait déjà les notes et le tableau existant ; la
+          reprise, elle, les laissait sur le disque. Un filet qui retient la
+          moitié de ce qui tombe est un filet qui MENT : on croit avoir tout
+          retrouvé, et l'on repart sans le relevé des départs — ce quart
+          d'heure debout dans un couloir devant une porte ouverte, qui est
+          justement ce qui justifie le devis de remise aux normes.
+
+          Absents des brouillons écrits par les versions d'avant : un relevé
+          sauvé il y a dix minutes par l'ancienne app doit se reprendre.
+        */
+        notes: b.notes ?? [],
+        existant: b.existant ?? null,
         photos: b.photos,
         modelPath: b.modelPath,
         // Il n'a jamais été enregistré : il l'est d'autant moins maintenant.

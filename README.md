@@ -4671,6 +4671,35 @@ vide — la 3D la découpe hors maçonnerie et le métré compte une pose
 impossible. Le chiffre qu'on relit après coup dit alors la vérité, ce qu'un
 refus muet ne ferait pas.
 
+### Le filet qui retenait la moitié de ce qui tombe
+
+Trois parcours de plus — la bibliothèque, la rénovation, le relevé scanné —
+et un défaut là où il coûte le plus cher : le brouillon des trente secondes.
+
+Il **sauvait** les notes et le tableau existant ; `reprendreBrouillon`, lui,
+les laissait sur le disque. On reprenait un relevé retrouvé après une
+batterie à plat, on voyait revenir les murs, les meubles et l'appareillage —
+et le relevé des départs manquait. Ce quart d'heure debout dans un couloir
+devant une porte ouverte, c'est-à-dire précisément ce qui justifie le devis
+de remise aux normes. Un filet qui retient la moitié de ce qui tombe est un
+filet qui **ment** : on croit avoir tout retrouvé, et l'on repart amputé.
+
+Les deux autres parcours n'ont rien trouvé, ce qui est un résultat en soi.
+La **bibliothèque** tient : ranger, copier, renommer, et le ménage du
+vendredi soir — supprimer un dossier rend ses plans à la racine plutôt que
+de les emporter. La **rénovation** tient de bout en bout : ce qui est noté
+devant le tableau arrive au diagnostic, le diagnostic au dossier, et le tout
+survit à la réouverture.
+
+Deux fausses pistes, notées ici parce qu'elles disent quelque chose du
+projet. « Compléter le relevé » semblait perdre le premier passage : non —
+`StructureBuilder` livre le logement **entier** recalé, pas seulement la
+pièce neuve, et c'est le banc qui ne lui donnait que la moitié. Et la minute
+à risque n'est pas après le scan (un relevé terminé s'auto-enregistre) mais
+**avant le premier « Enregistrer » d'un plan dessiné**. Ce qui compte,
+vérifié : une prise posée entre deux passages survit à la réunion, reprojetée
+sur le nouveau jeu de murs.
+
 ### Une pièce du premier empruntait un mur au rez
 
 Troisième parcours complet — un pavillon à deux niveaux, du plan vierge à la
