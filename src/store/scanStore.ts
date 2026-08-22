@@ -1179,6 +1179,11 @@ interface ScanState {
    */
   resizeOpening: (id: string, width?: number, height?: number) => void;
   /**
+   * Replace une ouverture sur son mur : `bord` est la cote DU TABLEAU
+   * depuis le début du mur, en mètres. Voir l'action pour le pourquoi.
+   */
+  moveOpening: (id: string, bord: number) => void;
+  /**
    * DÉCLARE (ou retire) LE COFFRE DE VOLET qui coiffe cette menuiserie.
    *
    * Le scan ne le voit pas — c'est un accident de maçonnerie au-dessus de
@@ -4215,6 +4220,73 @@ export const useScanStore = create<ScanState>((set, get) => {
                 b: { x: mid.x + (ux * l) / 2, z: mid.z + (uz * l) / 2 },
                 height: h,
                 yCenter: base + h / 2,
+              }
+            : x,
+        ),
+        dirty: true,
+      });
+    },
+
+    /*
+      REPLACER UNE OUVERTURE SUR SON MUR.
+
+      Le bandeau donnait la largeur, la hauteur, le coffre et la fermeture —
+      rien pour la BOUGER. Or `resizeOpening` travaille autour du MILIEU :
+      élargir une porte l'ouvre symétriquement, elle ne se décale jamais.
+      Une porte posée à trente centimètres du bon endroit ne pouvait donc
+      que se supprimer et se reposer, en reperdant sa hauteur, son type et
+      son coffre.
+
+      ON REÇOIT LA COTE DU BORD, PAS DU MILIEU. Personne ne mesure jusqu'à
+      l'axe d'une porte : on mesure jusqu'à son tableau, mètre posé contre
+      le mur de refend. Le magasin fait la conversion, une fois, ici.
+    */
+    moveOpening: (id, bord) => {
+      const st = get();
+      const o = st.openings.find((x) => x.id === id);
+      if (!o) return;
+      // Le mur porteur : celui dont l'ouverture est le plus près. Sans lui,
+      // « depuis le début du mur » n'a pas de sens et on ne bouge rien.
+      let mur: WallSeg | null = null;
+      let best = Infinity;
+      const mid = { x: (o.a.x + o.b.x) / 2, z: (o.a.z + o.b.z) / 2 };
+      for (const w of st.walls) {
+        const d = pointOnSeg(mid, w.a, w.b).dist;
+        if (d < best) {
+          best = d;
+          mur = w;
+        }
+      }
+      if (!mur || best > 0.6) return;
+      const L = Math.hypot(mur.b.x - mur.a.x, mur.b.z - mur.a.z);
+      const l = Math.hypot(o.b.x - o.a.x, o.b.z - o.a.z);
+      if (L <= 0 || l <= 0) return;
+      const ux = (mur.b.x - mur.a.x) / L;
+      const uz = (mur.b.z - mur.a.z) / L;
+      /*
+        ELLE RESTE DANS SON MUR.
+
+        Poussée au-delà, une ouverture n'est plus une ouverture : la 3D la
+        découpe hors maçonnerie et le métré compte une menuiserie que
+        personne ne pourra poser. On s'arrête donc au coin — et le chiffre
+        qu'on lit ensuite dit la vérité, ce qu'un refus muet ne ferait pas.
+      */
+      const d0 = Math.min(Math.max(0, bord), Math.max(0, L - l));
+      const c = d0 + l / 2;
+      pushHistory(`opening:${id}`);
+      set({
+        openings: st.openings.map((x) =>
+          x.id === id
+            ? {
+                ...x,
+                a: {
+                  x: mur!.a.x + ux * (c - l / 2),
+                  z: mur!.a.z + uz * (c - l / 2),
+                },
+                b: {
+                  x: mur!.a.x + ux * (c + l / 2),
+                  z: mur!.a.z + uz * (c + l / 2),
+                },
               }
             : x,
         ),

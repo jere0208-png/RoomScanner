@@ -4651,6 +4651,26 @@ pas un à la place de l'électricien. Les autres pièces gardent leurs murs, à
 déplacer un à un — c'est le prix d'une forme libre, et un bouton qui ne peut
 pas aboutir est pire qu'un bouton absent.
 
+### « La porte à quatre-vingt-dix du mur »
+
+Le bandeau d'une ouverture donnait sa largeur, sa hauteur, son coffre de
+volet et sa fermeture — jamais sa POSITION. Et `resizeOpening` travaille
+autour du milieu : élargir une porte l'ouvre symétriquement, elle ne se
+décale pas. Une porte posée à trente centimètres du bon endroit ne pouvait
+donc que se supprimer et se reposer, en reperdant sa hauteur, son type et
+son coffre.
+
+« Position » demande la cote **du tableau, pas de l'axe** : personne ne
+mesure jusqu'au milieu d'une porte, on pose le mètre contre le refend et on
+lit jusqu'au bord de la menuiserie. La conversion se fait une fois, dans le
+magasin.
+
+Poussée au-delà du mur, l'ouverture s'arrête au coin plutôt que de sortir :
+une menuiserie qui dépasse n'est plus une ouverture mais un trou dans le
+vide — la 3D la découpe hors maçonnerie et le métré compte une pose
+impossible. Le chiffre qu'on relit après coup dit alors la vérité, ce qu'un
+refus muet ne ferait pas.
+
 ### Le mot écrit au crayon dans la marge
 
 « Colonne montante ici », « attente TV à confirmer avec le client », « gaine

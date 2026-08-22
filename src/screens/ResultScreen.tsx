@@ -67,6 +67,7 @@ import {
   roomExtent,
   roomHeight,
   roomParts,
+  pointOnSeg,
   segLength,
   totalArea,
   type RoomPart,
@@ -311,6 +312,7 @@ export function ResultScreen() {
   const moveFixture = useScanStore((s) => s.moveFixture);
   const resizeOpening = useScanStore((s) => s.resizeOpening);
   const removeOpening = useScanStore((s) => s.removeOpening);
+  const moveOpening = useScanStore((s) => s.moveOpening);
   const addObject = useScanStore((s) => s.addObject);
   const rotateObject = useScanStore((s) => s.rotateObject);
 
@@ -1142,6 +1144,61 @@ export function ResultScreen() {
         if (!(v > 0)) return;
         if (quoi === 'largeur') resizeOpening(id, v, undefined);
         else resizeOpening(id, undefined, v);
+      },
+    });
+  };
+
+  /**
+   * REPLACER UNE MENUISERIE SUR SON MUR.
+   *
+   * « La porte à quatre-vingt-dix du mur » est la cote qu'un poseur mesure
+   * sur place, et la seule que le plan ne savait pas recevoir : le bandeau
+   * donnait largeur, hauteur, coffre et fermeture, jamais la position. Une
+   * porte à trente centimètres du bon endroit ne pouvait que se supprimer
+   * et se reposer, en reperdant sa hauteur, son type et son coffre.
+   *
+   * ON DEMANDE LA COTE DU TABLEAU, pas de l'axe : personne ne mesure
+   * jusqu'au milieu d'une porte, on pose le mètre contre le refend et on
+   * lit jusqu'au bord de la menuiserie.
+   */
+  const promptOpeningPos = (id: string) => {
+    const o = openings.find((x) => x.id === id);
+    if (!o) return;
+    // Le mur porteur : le plus proche du milieu de l'ouverture, comme le
+    // magasin le retrouve pour appliquer la cote.
+    const mid = { x: (o.a.x + o.b.x) / 2, z: (o.a.z + o.b.z) / 2 };
+    let mur: (typeof walls)[number] | null = null;
+    let best = Infinity;
+    for (const w of walls) {
+      const d = pointOnSeg(mid, w.a, w.b).dist;
+      if (d < best) {
+        best = d;
+        mur = w;
+      }
+    }
+    if (!mur || best > 0.6) return;
+    // La cote actuelle, pour que le champ parte de la vérité du plan.
+    const L = segLength(mur);
+    const l = segLength(o);
+    const proj =
+      L > 0
+        ? ((mid.x - mur.a.x) * (mur.b.x - mur.a.x) +
+            (mid.z - mur.a.z) * (mur.b.z - mur.a.z)) /
+          L
+        : 0;
+    setPrompt({
+      title: 'Position sur le mur',
+      subtitle:
+        'Du coin du mur au BORD de la menuiserie — la cote qu’on mesure ' +
+        'sur place, mètre posé contre le refend.',
+      value: Math.max(0, proj - l / 2)
+        .toFixed(2)
+        .replace('.', ','),
+      unit: 'm',
+      numeric: true,
+      onSubmit: (t) => {
+        const v = parseFloat(t.replace(',', '.'));
+        if (isFinite(v)) moveOpening(id, v);
       },
     });
   };
@@ -3369,6 +3426,12 @@ export function ResultScreen() {
               {
                 label: 'Hauteur',
                 onPress: () => promptOpening(selectedOpening.id, 'hauteur'),
+              },
+              {
+                label: 'Position',
+                ghost: true,
+                crayon: true,
+                onPress: () => promptOpeningPos(selectedOpening.id),
               },
               {
                 /*
