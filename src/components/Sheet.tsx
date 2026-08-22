@@ -135,6 +135,23 @@ const ICONS: Record<string, string[]> = {
     'M16 16.5 L19 19.5 l3 -3',
   ],
   // Le coffret et ses rangées de modules : un tableau électrique.
+  /*
+    LE BATTANT ET SON DORMANT : de quel bord la porte pivote.
+
+    Pour qui pose l'appareillage ce n'est pas un détail de trait —
+    l'interrupteur va du côté de la poignée, jamais du côté des paumelles.
+    L'icône montre donc ce qu'on va changer : le montant, le vantail ouvert,
+    et l'arc qu'il décrit.
+  */
+  charniere: [
+    'M5 3.5 v17',
+    'M5 4 h7 v9 h-7',
+    'M12.5 4.2 a9 9 0 0 1 6.3 8.8',
+  ],
+  // Le caisson du volet, posé sur sa baie : ce que le scan ne voit jamais.
+  coffre: ['M4 4 h16 v4.5 h-16 z', 'M6.5 8.5 v10', 'M17.5 8.5 v10', 'M6.5 18.5 h11'],
+  // Le mur rebouché, appareillé : fermer une ouverture, c'est retirer le trou.
+  murer: ['M3.5 5 h17 v14 h-17 z', 'M3.5 12 h17', 'M12 5 v7', 'M8 12 v7', 'M16 12 v7'],
   tableau: [
     'M3.5 3.5 h17 v17 h-17 z',
     'M3.5 9.5 h17',

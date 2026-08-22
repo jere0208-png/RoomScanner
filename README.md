@@ -4671,6 +4671,31 @@ vide — la 3D la découpe hors maçonnerie et le métré compte une pose
 impossible. Le chiffre qu'on relit après coup dit alors la vérité, ce qu'un
 refus muet ne ferait pas.
 
+### L'allège, et le bandeau qui déborde
+
+L'allège — du sol au repos de la baie — était la seule cote de menuiserie
+qu'on pouvait LIRE sans pouvoir la corriger. Le plan la cote déjà, sur
+l'élévation du mur et sur le jambage gauche du dossier imprimé, parce que
+c'est elle qui décide d'une prise sous fenêtre ou d'un convecteur ; mais
+`resizeOpening` la tient expressément fixe (« l'allège ne bouge pas, c'est
+le linteau qui suit »). Bon réflexe quand on retaille une baie, impasse
+quand le scan l'a posée dix centimètres trop haut.
+
+**On déplace, on ne rogne pas** : une fenêtre remontée de dix centimètres
+reste une fenêtre de la même taille. Régler l'allège en mangeant la hauteur
+donnerait deux gestes qui se défont l'un l'autre. Poussée au-delà, elle
+s'arrête au linteau — comme la position s'arrête au coin, et pour la même
+raison.
+
+Ces ajouts portaient le bandeau de l'ouverture à **huit boutons en rangée**,
+c'est-à-dire exactement le défaut relevé sur celui du mur : « peu de place
+pour les informations, un bouton sort du bloc ». Il est donc réorganisé sur
+la règle qui a servi ailleurs — **le bandeau porte ce qu'il affiche**. En
+direct : les trois cotes de la menuiserie (largeur, hauteur, allège), celles
+que la ligne du haut donne déjà. Dans le menu : ce qui tient à la POSE et
+non à la menuiserie — où elle tombe sur le mur, de quel côté elle s'ouvre,
+le coffre de volet, et la fermeture.
+
 ### De quel côté la porte s'ouvre
 
 Le plan dessine le quart de cercle du battant, et il le DEVINE :

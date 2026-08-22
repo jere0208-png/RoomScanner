@@ -1600,11 +1600,22 @@ describe('le menu du scan', () => {
  * fermer une ouverture et le remettre en mur, en continuité de ses murs
  * adjacents ». Les ouvertures sont des trous découpés dans des murs pleins
  * (assignOpenings) : fermer, c'est retirer le trou — le mur redevient
- * continu par construction, aucune maçonnerie à inventer. Le geste vit dans
- * le bandeau de la menuiserie, à côté de Largeur et Hauteur.
+ * continu par construction, aucune maçonnerie à inventer.
+ *
+ * LE GESTE A CHANGÉ DE PLACE, ET CE BANC AVEC LUI. Il vivait dans la
+ * rangée du bandeau, « à côté de Largeur et Hauteur ». La menuiserie a
+ * depuis gagné trois réglages qu'elle n'avait pas — sa position sur le mur,
+ * son allège, le sens d'ouverture de son battant — ce qui portait la rangée
+ * à HUIT boutons, c'est-à-dire exactement le défaut relevé sur le bandeau
+ * du mur : « peu de place pour les informations, un bouton sort du bloc ».
+ *
+ * La rangée porte donc ce que le bandeau AFFICHE — les trois cotes de la
+ * menuiserie — et le menu porte ce qui tient à la POSE : où elle tombe sur
+ * le mur, de quel côté elle s'ouvre, son coffre, et sa fermeture. Ce qui se
+ * vérifie ici est inchangé : le trou part, les murs restent.
  */
 describe('la menuiserie selectionnee', () => {
-  it('offre « Fermer », qui rebouche le mur sans toucher aux murs', () => {
+  it('offre « Fermer l’ouverture », qui rebouche sans toucher aux murs', () => {
     const tree = monter();
     act(() => bouton(tree, 'Édition')!.props.onPress());
     act(() => {
@@ -1616,11 +1627,39 @@ describe('la menuiserie selectionnee', () => {
       .find((n) => n.findAll((x) => x.props?.strokeWidth === 26).length > 0);
     expect(cible).toBeDefined();
     act(() => cible!.props.onPress());
-    const vu = textes(tree);
-    expect(vu).toContain('Fermer');
+    // Les trois cotes restent en direct : c'est ce qu'on vient corriger.
+    expect(textes(tree)).toContain('Largeur');
+    // La fermeture, elle, se prend dans le menu de la menuiserie — qui
+    // porte son propre nom : l'écran a déjà un « Plus », celui de la pièce.
+    act(() => bouton(tree, 'Réglages de la menuiserie')!.props.onPress());
     const murs = useScanStore.getState().walls.length;
     const trous = useScanStore.getState().openings.length;
-    act(() => bouton(tree, 'Fermer')!.props.onPress());
+    // Les rangées du menu sont des Pressable sans étiquette : on les
+    // cherche par leur mot, comme le fait déjà le banc du bouclier.
+    // Le PLUS PROFOND des porteurs de geste : les premiers trouvés sont
+    // des conteneurs qui englobent toute la feuille, et leur `onPress`
+    // n'est pas celui de la rangée.
+    const lignes = tree.root
+      .findAll((n) => typeof n.props?.onPress === 'function')
+      .filter((n) =>
+        n
+          .findAllByType(Text)
+          .some((t) => t.props.children === 'Fermer l’ouverture'),
+      );
+    const ligne = lignes[lignes.length - 1];
+    expect(ligne).toBeDefined();
+    act(() => ligne.props.onPress());
+    /*
+      LE GESTE ATTEND QUE LA FEUILLE SOIT PARTIE.
+
+      Une rangée de menu ne fait pas son travail sous le doigt : elle range
+      le geste et referme, et c'est la fin de la fermeture qui l'exécute.
+      Sans quoi l'écran change DERRIÈRE une feuille encore ouverte — le
+      bandeau se réécrit sous les yeux pendant qu'elle glisse vers le bas.
+    */
+    act(() => {
+      jest.advanceTimersByTime(500);
+    });
     expect(useScanStore.getState().openings.length).toBe(trous - 1);
     expect(useScanStore.getState().walls.length).toBe(murs);
   });

@@ -313,6 +313,7 @@ export function ResultScreen() {
   const resizeOpening = useScanStore((s) => s.resizeOpening);
   const removeOpening = useScanStore((s) => s.removeOpening);
   const moveOpening = useScanStore((s) => s.moveOpening);
+  const setAllege = useScanStore((s) => s.setAllege);
   const addObject = useScanStore((s) => s.addObject);
   const rotateObject = useScanStore((s) => s.rotateObject);
 
@@ -1199,6 +1200,32 @@ export function ResultScreen() {
       onSubmit: (t) => {
         const v = parseFloat(t.replace(',', '.'));
         if (isFinite(v)) moveOpening(id, v);
+      },
+    });
+  };
+
+  /**
+   * L'ALLÈGE : du sol au repos de la baie.
+   *
+   * C'est la cote qui décide d'une prise sous fenêtre ou d'un convecteur,
+   * et elle se lit déjà partout — élévation, dossier imprimé. Elle se règle
+   * ici. La menuiserie MONTE, elle ne se rogne pas : une fenêtre remontée
+   * de dix centimètres reste une fenêtre de la même taille.
+   */
+  const promptAllege = (id: string) => {
+    const o = openings.find((x) => x.id === id);
+    if (!o) return;
+    setPrompt({
+      title: 'Allège',
+      subtitle: 'Du sol au repos de la baie — la cote d’une prise dessous.',
+      value: Math.max(0, o.yCenter - o.height / 2)
+        .toFixed(2)
+        .replace('.', ','),
+      unit: 'm',
+      numeric: true,
+      onSubmit: (t) => {
+        const v = parseFloat(t.replace(',', '.'));
+        if (isFinite(v)) setAllege(id, v);
       },
     });
   };
@@ -3418,6 +3445,19 @@ export function ResultScreen() {
                 : 'baie'
             }
             actions={[
+              /*
+                LES TROIS COTES DE LA MENUISERIE, EN DIRECT.
+
+                Ce sont celles que le bandeau AFFICHE — « 1,20 × 1,10 m » —
+                et l'allège complète le triplet : c'est elle qui décide
+                d'une prise dessous ou d'un convecteur. Le reste tient à la
+                POSE, pas à la menuiserie, et vit dans le menu.
+
+                Relevé du patron sur le bandeau du mur : « peu de place pour
+                les informations, un bouton sort du bloc ». Huit boutons en
+                rangée reproduiraient exactement ce défaut ; quatre tiennent,
+                et le menu porte le reste sans rien tronquer.
+              */
               {
                 label: 'Largeur',
                 ghost: true,
@@ -3425,90 +3465,140 @@ export function ResultScreen() {
               },
               {
                 label: 'Hauteur',
+                ghost: true,
                 onPress: () => promptOpening(selectedOpening.id, 'hauteur'),
               },
-              {
-                label: 'Position',
-                ghost: true,
-                crayon: true,
-                onPress: () => promptOpeningPos(selectedOpening.id),
-              },
-              /*
-                LE SENS D'OUVERTURE — deux boutons, deux questions.
-
-                Le plan devine le battant, et il se trompe une fois sur
-                deux. Pour qui pose l'appareillage ce n'est pas un détail de
-                trait : l'interrupteur va du côté de la POIGNÉE, jamais du
-                côté des paumelles, et une porte dessinée à l'envers envoie
-                percer derrière le battant.
-
-                Ils ne s'affichent que sur une porte : une fenêtre n'a pas
-                de vantail dessiné, et un bouton qui ne change rien à
-                l'écran se lit comme un geste raté.
-              */
-              ...(selectedOpening.type === 'door'
+              ...(selectedOpening.type !== 'door'
                 ? [
                     {
-                      label: 'Pivot',
-                      icone: SOLAIRES.largeur,
-                      sansMot: true,
+                      // Une porte a le sol pour allège, par définition : un
+                      // réglage qui ne peut valoir que zéro se lit comme un
+                      // geste raté.
+                      label: 'Allège',
                       ghost: true,
-                      onPress: () => {
-                        useScanStore
-                          .getState()
-                          .flipBattant(selectedOpening.id, 'pivot');
-                        haptic('succes');
-                      },
-                    },
-                    {
-                      label: 'Sens',
-                      icone: SOLAIRES.longueur,
-                      sansMot: true,
-                      ghost: true,
-                      onPress: () => {
-                        useScanStore
-                          .getState()
-                          .flipBattant(selectedOpening.id, 'sens');
-                        haptic('succes');
-                      },
+                      onPress: () => promptAllege(selectedOpening.id),
                     },
                   ]
                 : []),
               {
-                /*
-                  LE COFFRE DE VOLET, DÉCLARÉ EN UN GESTE.
+                // Pas « Plus » tout court : l'écran en porte déjà un, sur
+                // le bandeau de la pièce. Deux boutons du même mot pour
+                // deux menus différents, c'est une étiquette qui ne dit
+                // plus rien à qui navigue à la voix.
+                label: 'Réglages de la menuiserie',
+                icone: SOLAIRES.points,
+                sansMot: true,
+                onPress: () =>
+                  setMenu({
+                    title:
+                      selectedOpening.type === 'window'
+                        ? 'Fenêtre'
+                        : selectedOpening.type === 'door'
+                        ? 'Porte'
+                        : 'Baie',
+                    subtitle:
+                      'Ce qui tient à la pose, pas à la menuiserie : où elle ' +
+                      'tombe sur le mur, de quel côté elle s’ouvre, et ce ' +
+                      'qui la coiffe.',
+                    actions: [
+                      {
+                        /*
+                          « LA PORTE À QUATRE-VINGT-DIX DU MUR » : la cote
+                          qu'un poseur mesure sur place, et la seule que le
+                          plan ne savait pas recevoir. On demande le bord,
+                          pas l'axe — personne ne mesure jusqu'au milieu
+                          d'une porte.
+                        */
+                        label: 'Position sur le mur',
+                        icon: 'regle' as const,
+                        onPress: () => promptOpeningPos(selectedOpening.id),
+                      },
+                      /*
+                        LE SENS D'OUVERTURE — deux gestes, deux questions.
 
-                  Relevé du chantier : « le scan ne détecte pas les rebords
-                  de coffrage de volet ». Il ne le fera jamais — ce n'est ni
-                  un mur, ni une menuiserie, ni un meuble. Or pour qui
-                  perce, c'est une contrainte de premier ordre : coulisse,
-                  tablier enroulé, tube, et le moteur à alimenter.
-                */
-                label: selectedOpening.coffre ? 'Sans coffre' : 'Coffre',
-                ghost: true,
-                onPress: () => {
-                  useScanStore.getState().toggleCoffre(selectedOpening.id);
-                  haptic('succes');
-                },
-              },
-              {
-                /*
-                  FERMER : le trou disparaît, le mur redevient continu.
+                        Le plan devine le battant et se trompe une fois sur
+                        deux. Pour qui pose l'appareillage ce n'est pas un
+                        détail de trait : l'interrupteur va du côté de la
+                        POIGNÉE, jamais du côté des paumelles, et une porte
+                        dessinée à l'envers envoie percer derrière le
+                        battant.
 
-                  Relevé du patron : « fermer une ouverture et la remettre
-                  en mur, en continuité de ses murs adjacents ». Les
-                  ouvertures sont des trous découpés dans des murs pleins
-                  (assignOpenings) : il n'y a aucune maçonnerie à inventer,
-                  retirer le trou suffit — et le retour en arrière existe
-                  si la porte devait rouvrir.
-                */
-                label: 'Fermer',
-                ghost: true,
-                onPress: () => {
-                  removeOpening(selectedOpening.id);
-                  setSelectedOpeningId(null);
-                  haptic('succes');
-                },
+                        Rien pour une fenêtre : elle ne dessine pas de
+                        vantail, et un réglage invisible est un réglage
+                        qu'on croit raté.
+                      */
+                      ...(selectedOpening.type === 'door'
+                        ? [
+                            {
+                              label: 'Changer de charnière',
+                              icon: 'charniere' as const,
+                              onPress: () => {
+                                useScanStore
+                                  .getState()
+                                  .flipBattant(selectedOpening.id, 'pivot');
+                                haptic('succes');
+                              },
+                            },
+                            {
+                              // La flèche qui franchit la porte : elle dit
+                              // le SENS, qui est exactement le sujet.
+                              label: 'Ouvrir de l’autre côté',
+                              icon: 'sortir' as const,
+                              onPress: () => {
+                                useScanStore
+                                  .getState()
+                                  .flipBattant(selectedOpening.id, 'sens');
+                                haptic('succes');
+                              },
+                            },
+                          ]
+                        : []),
+                      {
+                        /*
+                          LE COFFRE DE VOLET, DÉCLARÉ EN UN GESTE.
+
+                          Relevé du chantier : « le scan ne détecte pas les
+                          rebords de coffrage de volet ». Il ne le fera
+                          jamais — ce n'est ni un mur, ni une menuiserie, ni
+                          un meuble. Or pour qui perce, c'est une contrainte
+                          de premier ordre : coulisse, tablier enroulé,
+                          tube, et le moteur à alimenter.
+                        */
+                        label: selectedOpening.coffre
+                          ? 'Retirer le coffre'
+                          : 'Coffre de volet',
+                        icon: 'coffre' as const,
+                        onPress: () => {
+                          useScanStore
+                            .getState()
+                            .toggleCoffre(selectedOpening.id);
+                          haptic('succes');
+                        },
+                      },
+                      {
+                        /*
+                          FERMER : le trou disparaît, le mur redevient
+                          continu.
+
+                          Relevé du patron : « fermer une ouverture et la
+                          remettre en mur, en continuité de ses murs
+                          adjacents ». Les ouvertures sont des trous
+                          découpés dans des murs pleins (assignOpenings) :
+                          il n'y a aucune maçonnerie à inventer, retirer le
+                          trou suffit — et le retour en arrière existe si la
+                          porte devait rouvrir.
+                        */
+                        label: 'Fermer l’ouverture',
+                        icon: 'murer' as const,
+                        danger: true,
+                        onPress: () => {
+                          removeOpening(selectedOpening.id);
+                          setSelectedOpeningId(null);
+                          haptic('succes');
+                        },
+                      },
+                    ],
+                  }),
               },
             ]}
           />

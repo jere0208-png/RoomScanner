@@ -350,6 +350,27 @@ function roomIndexAt(p: { x: number; z: number }, outlines: Pt[][]): number {
   return best;
 }
 
+/**
+ * SOUS QUEL PLAFOND vit cette menuiserie.
+ *
+ * Le mur porteur donne la hauteur disponible ; faute de mur retrouvé, on
+ * prend la hauteur d'étage courante plutôt que de refuser le réglage — une
+ * ouverture orpheline reste réglable, et elle se voit.
+ */
+function hauteurDuMurPorteur(o: WallSeg, walls: WallSeg[]): number {
+  let best = Infinity;
+  let h = 2.5;
+  const mid = { x: (o.a.x + o.b.x) / 2, z: (o.a.z + o.b.z) / 2 };
+  for (const w of walls) {
+    const d = pointOnSeg(mid, w.a, w.b).dist;
+    if (d < best) {
+      best = d;
+      h = w.height;
+    }
+  }
+  return best <= 0.6 ? h : 2.5;
+}
+
 /** Mur le plus proche d'une ouverture, et à quelle distance. */
 function nearestWall(o: WallSeg, walls: WallSeg[]): { dist: number } {
   const mid = { x: (o.a.x + o.b.x) / 2, z: (o.a.z + o.b.z) / 2 };
@@ -1188,6 +1209,12 @@ interface ScanState {
    * laquelle il s'ouvre. Sans effet sur une fenêtre, qui n'en dessine pas.
    */
   flipBattant: (id: string, quoi: 'pivot' | 'sens') => void;
+  /**
+   * Pose l'allège d'une fenêtre à la cote donnée, du sol au repos de la
+   * baie. La menuiserie MONTE, elle ne se rogne pas. Sans effet sur une
+   * porte, dont l'allège est le sol par définition.
+   */
+  setAllege: (id: string, h: number) => void;
   /**
    * DÉCLARE (ou retire) LE COFFRE DE VOLET qui coiffe cette menuiserie.
    *
@@ -4327,6 +4354,46 @@ export const useScanStore = create<ScanState>((set, get) => {
               ? { ...x, pivot: (x.pivot ?? 'a') === 'a' ? 'b' : 'a' }
               : { ...x, versExterieur: !x.versExterieur }
             : x,
+        ),
+        dirty: true,
+      });
+    },
+
+    /*
+      L'ALLÈGE, RÉGLÉE À LA MAIN.
+
+      Le plan la COTE déjà — sur l'élévation du mur et sur le jambage gauche
+      du dossier — parce que c'est elle qui décide d'une prise sous fenêtre
+      ou d'un convecteur. Elle était la seule cote de menuiserie qu'on
+      pouvait lire sans pouvoir la corriger : `resizeOpening` la tient
+      expressément fixe, ce qui est le bon réflexe quand on retaille une
+      baie, et une impasse quand le scan l'a posée dix centimètres trop
+      haut.
+
+      ON DÉPLACE, ON NE ROGNE PAS : une fenêtre remontée de dix centimètres
+      reste une fenêtre de la même taille. Régler l'allège en mangeant la
+      hauteur donnerait deux gestes qui se défont l'un l'autre.
+    */
+    setAllege: (id, h) => {
+      const st = get();
+      const o = st.openings.find((x) => x.id === id);
+      // Une porte a le sol pour allège, par définition : un réglage qui ne
+      // peut valoir que zéro est un réglage qu'on croit raté.
+      if (!o || o.type === 'door') return;
+      /*
+        ELLE RESTE DANS SON MUR.
+
+        Poussée au-delà, la menuiserie sortirait par le plafond : la 3D la
+        découperait hors maçonnerie et le métré compterait une pose
+        impossible. On s'arrête au linteau — et le chiffre relu après coup
+        dit la vérité, ce qu'un refus muet ne ferait pas.
+      */
+      const plafond = hauteurDuMurPorteur(o, st.walls);
+      const base = Math.min(Math.max(0, h), Math.max(0, plafond - o.height));
+      pushHistory(`allege:${id}`);
+      set({
+        openings: st.openings.map((x) =>
+          x.id === id ? { ...x, yCenter: base + x.height / 2 } : x,
         ),
         dirty: true,
       });
