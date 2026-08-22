@@ -391,6 +391,56 @@ describe('le plan glisse sans se redessiner', () => {
     }
   });
 
+  /**
+   * CE QUI SORT DU CADRE DOIT POUVOIR Y REVENIR.
+   *
+   * Relevé du patron : « si le plan sort du cadre et qu'on le ramène au
+   * centre, il est coupé — sa partie cachée reste cachée ».
+   *
+   * La cause est le prix de la fluidité : le dessin est calculé UNE fois, à
+   * la prise, dans une toile de la taille de l'écran. Ce qui débordait
+   * alors n'a pas été peint ; le geste ne fait que déplacer cette toile, et
+   * ramener le plan au centre fait entrer du VIDE — la partie manquante
+   * n'existe pas, elle n'a jamais été dessinée.
+   *
+   * La toile s'agrandit donc le temps du geste : elle prend une marge tout
+   * autour, assez large pour qu'un doigt ne puisse pas atteindre son bord.
+   * Au repos elle reprend sa taille — pas question de rastériser en
+   * permanence trois fois la surface de l'écran pour un geste qui dure une
+   * seconde.
+   */
+  it('dessine au-delà du cadre pendant le geste, pour qu’il puisse y revenir', () => {
+    const tree = planEquipe();
+    /* La toile du plan : la plus grande des surfaces dessinées — les
+       autres sont les pastilles et les symboles, larges de vingt points. */
+    const toile = () =>
+      tree.root
+        .findAll((n) => typeof n.props?.bbWidth === 'number')
+        .sort((a, b) => b.props.bbWidth - a.props.bbWidth)[0];
+    const auRepos = toile().props.bbWidth;
+
+    glisser(tree);
+    const enGeste = toile().props.bbWidth;
+    // Nettement plus large : de quoi ramener au centre ce qui était sorti.
+    expect(enGeste).toBeGreaterThan(auRepos * 1.5);
+    // Et la toile reste calée sur le dessin : c'est sa FENÊTRE qui s'ouvre,
+    // pas le plan qui se décale. Sans ce recalage, tout le dessin
+    // sauterait de la valeur de la marge à la prise du doigt.
+    // `react-native-svg` éclate le `viewBox` en quatre props : c'est
+    // `minX` qui porte le décalage du cadrage.
+    expect(toile().props.minX).toBe(-(enGeste - auRepos) / 2);
+
+    act(() => {
+      zoneDuPlan(tree).props.onResponderRelease?.(
+        doigtDepuis(400, 300, 460, 330),
+      );
+    });
+    // Au repos, la toile reprend sa taille : neuf fois la surface d'écran
+    // rastérisée en permanence pour un geste d'une seconde, c'est le
+    // contraire d'une optimisation.
+    expect(toile().props.bbWidth).toBe(auRepos);
+  });
+
   it('pose le cadrage pour de bon quand le doigt se lève', () => {
     const tree = planEquipe();
     const avant = empreinte(tree);

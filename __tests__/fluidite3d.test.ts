@@ -305,28 +305,25 @@ it('ne cache jamais le meuble derriere son mur, geste ou pas', () => {
 });
 
 /**
- * LA 3D BOUGE SANS TOUT RECALCULER — les deux moitiés du geste.
+ * L'OPTIMISATION DE LA 3D A ÉTÉ ESSAYÉE, PUIS ÉCARTÉE PAR LE PATRON.
  *
- * Relevé du patron : « plus les plans sont chargés en cotes et en meubles,
- * plus au déplacement il est lent ». La mesure a montré que le calcul n'y
- * était pour rien (trois dixièmes de milliseconde par image) : ce qui coûte,
- * c'est le nombre de vues repeintes. Deux réponses, une par geste.
+ * Deux gains avaient été portés ici, sur le modèle de ce qui a réussi au
+ * plan 2D : confier le PINCEMENT au pilote natif (zoomer et déplacer ne
+ * change ni les faces ni leur ordre, la propriété est tenue ci-dessous), et
+ * taire les ARÊTES pendant qu'on tourne, pour repeindre un tiers de moins.
  *
- * LE PINCEMENT ne touche NI aux faces NI au tri : zoomer et déplacer n'est
- * qu'une transformation affine du résultat déjà projeté. Elle passe donc au
- * pilote natif, exactement comme sur le plan 2D — aucun recalcul, aucun
- * rendu, tant que les doigts sont posés.
+ * Verdict de l'essai sur le téléphone : « remets le 3D comme c'était avant,
+ * ça semble moins fluide qu'avant ta recherche d'optimisation ». La vue 3D
+ * est donc revenue à son état d'origine, entière et rendue à chaque image.
  *
- * LA ROTATION, elle, ne peut pas s'éviter : tourner change ce qu'on voit.
- * Mais les arêtes en font une bonne part — cent trente-huit des quatre cent
- * quatre-vingt-six faces du logement de référence, et les trois quarts de
- * celles d'un meuble isolé. Elles se taisent pendant qu'on tourne (les
- * aplats ombrés suffisent à lire le volume) et reviennent au lâcher. Le tri
- * n'en souffre pas : une arête suit le pan qu'elle borde, la retirer ne
- * déplace rien.
+ * On ne jette pas la mesure pour autant : les deux propriétés ci-dessous
+ * sont VRAIES du modèle, elles ont été vérifiées, et c'est ce qui rendrait
+ * l'optimisation possible si le sujet revenait. Ce que l'essai a montré,
+ * c'est qu'elle ne suffit pas à faire gagner quelque chose ici — et qu'un
+ * gain se juge sur l'appareil, jamais sur le papier.
  */
-describe('ce que la 3D recalcule pendant un geste', () => {
-  it('le pincement ne change ni les faces ni leur ordre', () => {
+describe('ce que le modèle 3D permettrait d’optimiser', () => {
+  it('un pincement ne changerait ni les faces ni leur ordre', () => {
     const scene = buildScene(MURS, [], MEUBLES, {
       palette: PAL,
       showSurfaces: true,
@@ -361,7 +358,7 @@ describe('ce que la 3D recalcule pendant un geste', () => {
     expect(ordre(2.4, 80)).toBe(ordre(1, 0));
   });
 
-  it('la rotation peut se passer des arêtes, qui font le gros du dessin', () => {
+  it('les arêtes font une bonne part du dessin, et rien que du trait', () => {
     const scene = buildScene(MURS, [], MEUBLES, {
       palette: PAL,
       showSurfaces: true,

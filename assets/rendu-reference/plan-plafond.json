@@ -188,7 +188,13 @@
        }
       ],
       "bbWidth": 900,
-      "bbHeight": 620
+      "bbHeight": 620,
+      "minX": 0,
+      "minY": 0,
+      "vbWidth": 900,
+      "vbHeight": 620,
+      "align": "xMidYMid",
+      "meetOrSlice": 0
      },
      "children": [
       {

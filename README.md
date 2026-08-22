@@ -1727,18 +1727,29 @@ complets — un à la prise, un au lâcher — pour économiser un travail qui
 n'existe plus. Le dessin reste entier sous le doigt, ce qui est aussi plus
 juste : les cotes suivent le plan au lieu de clignoter.
 
-**En 3D, le geste se coupe en deux.** Le PINCEMENT ne touche ni aux faces ni
-à leur ordre — zoomer et déplacer n'est qu'une transformation affine du
-résultat déjà projeté, et le banc le prouve à la décimale : le tri est
-identique à zoom 1 et à zoom 2,4. Il passe donc au natif comme la 2D, et ne
-rend plus rien. La ROTATION, elle, ne peut pas s'éviter : tourner change ce
-qu'on voit. On allège alors ce qu'on repeint — **les arêtes se taisent**
-(cent trente-huit des quatre cent quatre-vingt-six faces du logement de
-référence, près d'un tiers du dessin ; bien plus sur un meuble isolé, dont
-les trois quarts des faces sont des traits). Le tri n'en souffre pas : une
-arête suit le pan qu'elle borde, la retirer ne déplace rien de ce qui reste,
-et c'est l'ombrage des aplats qui dit le volume, pas le trait. Les contours
-reviennent au lâcher, quand on regarde vraiment.
+**La toile s'ouvre le temps du geste.** C'est le prix de ce calcul unique, et
+le patron l'a vu tout de suite : « si le plan sort du cadre et qu'on le
+ramène au centre, il est coupé — sa partie cachée reste cachée ». Ce qui
+débordait de l'écran à la prise n'avait pas été peint ; le geste ne fait que
+déplacer la toile, et la ramener faisait entrer du VIDE. La toile prend donc
+une marge de huit dixièmes de sa plus grande dimension — plus qu'un doigt ne
+parcourt d'un trait —, son cadrage (`viewBox`) est décalé d'autant pour que
+les coordonnées ne bougent pas d'un pixel, et **tout cela seulement pendant
+le geste** : rastériser en permanence trois fois la surface de l'écran pour
+une seconde de glissement serait le contraire d'une optimisation. Le rendu
+qui l'agrandit tombe à la prise du doigt, avant le premier mouvement — là où
+personne ne le voit.
+
+**La même optimisation a été essayée en 3D, puis ÉCARTÉE.** Le pincement y
+passait au natif (le tri est identique à zoom 1 et à zoom 2,4, le banc le
+prouve à la décimale) et les arêtes se taisaient pendant la rotation — cent
+trente-huit des quatre cent quatre-vingt-six faces du logement de référence.
+Verdict de l'essai sur le téléphone : « remets le 3D comme c'était avant, ça
+semble moins fluide qu'avant ta recherche d'optimisation ». La vue 3D est
+donc revenue à son état d'origine. Les deux propriétés mesurées restent au
+banc (`fluidite3d.test.ts`), avec le motif de l'abandon : elles sont vraies
+du modèle, mais **un gain se juge sur l'appareil, jamais sur le papier** — et
+sur celui-ci, la 3D n'y gagnait rien.
 
 Deux détails qui font tenir l'ensemble, et que le premier essai du patron a
 tous les deux corrigés.
@@ -1754,13 +1765,13 @@ place, la couche déjà remise à zéro. Elle se fait donc à la MISE EN PAGE
 soit peint. Les deux ne peuvent plus se désynchroniser, quel que soit le
 retard du rendu.
 
-**Et la rotation 3D nourrit le cadrage retenu, elle aussi.** « Le glisser
-d'un doigt ne prend pas la position qu'on relâche, on revient au point de
-départ. » Confier le pincement au pilote natif demandait de retenir à part
-le cadrage atteint, pour le poser au lâcher ; la rotation, qui continue de
-rendre à chaque image, ne l'alimentait pas — le lâcher reposait donc la vue
-d'AVANT le geste. Une ligne, et un banc qui tourne, lâche, et exige que
-l'angle reste.
+**Et la rotation 3D perdait la position au lâcher** — « on revient au point
+de départ » — tant que la vue 3D portait cette mécanique : le cadrage retenu
+pour le pincement n'était pas alimenté par la rotation. Le défaut est parti
+avec l'optimisation qu'il accompagnait, mais son banc est resté
+(`couronne.test.tsx`) : il tourne d'un doigt, lâche, et exige que l'angle
+reste. Une vue 3D qui oublie ce qu'on vient de lui faire est une régression
+qu'on ne laisse pas revenir deux fois.
 
 Enfin la couche est marquée `collapsable={false}` : sans lui, Android la
 fond dans son parent à l'optimisation et la transformation perd son

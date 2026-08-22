@@ -829,6 +829,18 @@ export function FloorplanEditor({
       },
     };
   }, [baseMapping, view, layout]);
+  /*
+    LA MARGE DE LA TOILE : nulle au repos, large pendant le geste.
+
+    Huit dixièmes de la plus grande dimension : un doigt ne traverse pas
+    l'écran et demi d'un seul trait, donc son bord n'est jamais atteint. Un
+    nombre ROND, arrondi au point, sinon le `viewBox` change à chaque
+    fraction de pixel de mise en page.
+  */
+  const marge = navigating
+    ? Math.round(Math.max(layout.w, layout.h) * 0.8)
+    : 0;
+
   /** Le geste lit le cadrage courant sans se reconstruire à chaque image. */
   const mappingRef = useRef(mapping);
   mappingRef.current = mapping;
@@ -1224,7 +1236,34 @@ export function FloorplanEditor({
             },
           ]}
           pointerEvents="box-none">
-          <Svg width={layout.w} height={layout.h}>
+          {/*
+            LA TOILE S'OUVRE LE TEMPS DU GESTE.
+
+            Relevé du patron : « si le plan sort du cadre et qu'on le ramène
+            au centre, il est coupé — sa partie cachée reste cachée ». C'est
+            le prix de la fluidité : le dessin est calculé UNE fois, à la
+            prise, et ce qui débordait alors n'a pas été peint. Le geste ne
+            fait que déplacer cette toile ; la ramener fait entrer du vide.
+
+            Elle prend donc une marge tout autour — huit dixièmes de sa plus
+            grande dimension, plus qu'un doigt ne peut parcourir d'un trait —
+            et son cadrage (`viewBox`) est décalé d'autant, pour que les
+            coordonnées du dessin ne bougent pas d'un pixel : c'est sa
+            FENÊTRE qui s'ouvre, pas le plan qui se déplace.
+
+            Et seulement PENDANT le geste : rastériser en permanence trois
+            fois la surface de l'écran pour une seconde de glissement serait
+            le contraire d'une optimisation. Le rendu qui l'agrandit tombe à
+            la prise du doigt, avant le premier mouvement — là où personne
+            ne le voit.
+          */}
+          <Svg
+            width={layout.w + 2 * marge}
+            height={layout.h + 2 * marge}
+            viewBox={`${-marge} ${-marge} ${layout.w + 2 * marge} ${
+              layout.h + 2 * marge
+            }`}
+            style={marge ? { marginLeft: -marge, marginTop: -marge } : undefined}>
             {/* Toucher le vide désélectionne. Posé tout au fond du dessin :
                 murs, meubles et cartouches gardent la priorité, et seul ce
                 qui n'appartient à rien tombe ici. `transparent` et non

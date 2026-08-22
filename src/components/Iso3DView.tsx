@@ -1,12 +1,5 @@
-import React, {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
-import { Animated, PanResponder, StyleSheet, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { PanResponder, StyleSheet, View } from 'react-native';
 import Svg, {
   Circle,
   G,
@@ -361,39 +354,6 @@ export function Iso3DView({
     d: Map<number, number>;
   } | null>(null);
 
-  /*
-    LE PINCEMENT NE RECALCULE RIEN.
-
-    Relevé du patron : « plus les plans sont chargés en cotes et en meubles,
-    plus au déplacement il est lent ». Zoomer et déplacer la maquette ne
-    touche NI aux faces NI à leur ordre — c'est une transformation affine du
-    résultat déjà projeté, et `fluidite3d.test.ts` le prouve à la décimale.
-    Elle descend donc au pilote natif, comme sur le plan 2D : tant que les
-    deux doigts sont posés, pas un rendu.
-
-    La ROTATION, elle, ne peut pas s'éviter — tourner change ce qu'on voit.
-    C'est là qu'intervient l'autre moitié : les arêtes se taisent (voir
-    `interacting` plus bas).
-  */
-  const pince = useRef({
-    tx: new Animated.Value(0),
-    ty: new Animated.Value(0),
-    ech: new Animated.Value(1),
-  }).current;
-  /** Le cadrage que le pincement a atteint, posé pour de bon au lâcher. */
-  const vueVive = useRef(viewRef.current);
-  /*
-    ET ELLE REVIENT À PLAT AVEC LE RENDU, jamais avant — même piège que sur
-    le plan 2D, où le patron a vu « l'ancienne position rapidement avant
-    celle qu'on lâche » : une valeur animée se pose sur-le-champ, le dessin
-    attend le rendu suivant, et il reste une image entre les deux.
-  */
-  useLayoutEffect(() => {
-    pince.tx.setValue(0);
-    pince.ty.setValue(0);
-    pince.ech.setValue(1);
-  }, [view, pince]);
-
   // Créé UNE seule fois : un responder recréé en plein geste perd le suivi.
   const pan = useRef(
     PanResponder.create({
@@ -409,7 +369,6 @@ export function Iso3DView({
           multi: t.length >= 2,
           t0: Date.now(),
         };
-        vueVive.current = viewRef.current;
         baseRef.current = {
           v: viewRef.current,
           mode: t.length >= 2 ? 'pinch' : 'rotate',
@@ -454,55 +413,26 @@ export function Iso3DView({
           // Torsion des deux doigts : le modèle pivote en suivant les doigts.
           let twist = ((touchAngle(t) - base.a0) * 180) / Math.PI;
           twist = ((twist + 540) % 360) - 180;
-          const zoom = clamp(base.v.zoom * (d / base.d0), 0.4, 4);
-          vueVive.current = {
+          update({
             theta: base.v.theta + twist,
             tilt: base.v.tilt,
-            zoom,
+            zoom: clamp(base.v.zoom * (d / base.d0), 0.4, 4),
             ox: base.v.ox + (mx - base.mx0),
             oy: base.v.oy + (my - base.my0),
-          };
-          /*
-            LA TORSION EST LA SEULE À DEVOIR ÊTRE RENDUE : elle tourne le
-            modèle. Le zoom et le déplacement passent par la couche, et l'on
-            ne rejoue le dessin que si les doigts VRILLENT vraiment — un
-            degré de tolérance, sinon le moindre tremblement rappelle le
-            calcul qu'on cherche justement à éviter.
-          */
-          pince.ech.setValue(zoom / base.v.zoom);
-          pince.tx.setValue(mx - base.mx0);
-          pince.ty.setValue(my - base.my0);
-          if (Math.abs(twist) > 1) {
-            update({ ...vueVive.current, zoom: base.v.zoom, ox: base.v.ox, oy: base.v.oy });
-          }
+          });
         } else {
           const ddx = g.dx - base.dx0;
           const ddy = g.dy - base.dy0;
-          /*
-            LA ROTATION NOURRIT LE CADRAGE RETENU, ELLE AUSSI.
-
-            Relevé du patron : « le glisser d'un doigt ne prend pas la
-            position qu'on relâche, on revient au point de départ ».
-            Confier le pincement au pilote natif demandait de retenir à part
-            le cadrage atteint, pour le poser au lâcher — et la rotation,
-            qui continue de rendre à chaque image, ne l'alimentait pas. Le
-            lâcher reposait donc la vue d'AVANT le geste.
-          */
-          vueVive.current = {
+          update({
             ...base.v,
             // Glisser à droite « pousse » la face avant vers la droite.
             theta: base.v.theta - ddx * 0.45,
             tilt: clamp(base.v.tilt - ddy * 0.3, 15, 80),
-          };
-          update(vueVive.current);
+          });
         }
       },
       onPanResponderRelease: (_e, g) => {
         setInteracting(false);
-        // Ce que le pincement a atteint devient le cadrage vrai, et la
-        // couche revient à plat dans le même rendu : sinon la maquette
-        // sauterait à sa taille d'avant le temps d'une image.
-        update(vueVive.current);
         // Tap simple (sans glisser) : cadrer la vue sur le mur touché.
         //
         // « Sans glisser » ne suffisait pas : un pincement court laisse un
@@ -974,29 +904,7 @@ export function Iso3DView({
           name: string;
           area: string;
         };
-    /*
-      PENDANT QU'ON TOURNE, LES ARÊTES SE TAISENT.
-
-      Tourner ne peut pas s'éviter : le modèle change de face, il faut le
-      recalculer. Ce qu'on peut alléger, c'est ce qu'on repeint — et les
-      arêtes en font une bonne part : cent trente-huit des quatre cent
-      quatre-vingt-six faces du logement de référence, soit près d'un tiers
-      du dessin (bien plus sur un meuble isolé, dont les trois quarts des
-      faces sont des traits). Les taire ne touche pas au tri : une arête
-      suit le pan qu'elle borde, la retirer ne déplace rien de ce qui
-      reste.
-
-      Le volume reste entièrement lisible : c'est l'ombrage des aplats qui
-      dit la forme, pas le trait. Les contours reviennent au lâcher, quand
-      on regarde vraiment.
-
-      Le pincement, lui, ne passe pas par ici : il ne rend rien du tout.
-    */
-    const aPeindre =
-      interacting && !pov
-        ? dessinables.filter((p) => p.bord === undefined)
-        : dessinables;
-    const items: Item[] = aPeindre.map((p) => ({ kind: 'poly' as const, ...p }));
+    const items: Item[] = dessinables.map((p) => ({ kind: 'poly' as const, ...p }));
     // Semis du sol : même code que le plan 2D, projeté sur le plan y = 0.
     // C'est ce fond pointillé qui distingue la surface au sol des murs.
     if (showSurfaces && !interacting) {
@@ -1394,22 +1302,7 @@ export function Iso3DView({
       {...pan.panHandlers}>
       {/* pointerEvents="none" : le SVG ne doit pas voler les gestes. */}
       {rendered && (
-        /*
-          LA COUCHE DU PINCEMENT — elle porte le zoom et le déplacement
-          pendant que les doigts sont posés, et rien du tout au repos.
-          `collapsable={false}` : sans lui, Android la fond dans son parent
-          et la transformation perd son support.
-        */
-        <Animated.View
-          pointerEvents="none"
-          collapsable={false}
-          style={{
-            transform: [
-              { translateX: pince.tx },
-              { translateY: pince.ty },
-              { scale: pince.ech },
-            ],
-          }}>
+        <View pointerEvents="none">
           <Svg width={layout.w} height={layout.h}>
             {rendered.map((item, i) =>
               item.kind === 'poly' ? (
@@ -1695,7 +1588,7 @@ export function Iso3DView({
               />
             )}
           </Svg>
-        </Animated.View>
+        </View>
       )}
     </View>
   );
