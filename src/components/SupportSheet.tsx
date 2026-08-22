@@ -20,7 +20,6 @@
 import React, { useState } from 'react';
 import {
   Alert,
-  Modal,
   Platform,
   Pressable,
   StyleSheet,
@@ -30,11 +29,12 @@ import {
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { CloseCross } from './CloseCross';
+import { SheetShell } from './Sheet';
 import { SOLAIRES } from '../ui/solaires';
 import { choisirPieceJointe, ecrireAuSupport } from '../native/support';
 import { useAccountStore } from '../store/accountStore';
 import { useScanStore } from '../store/scanStore';
-import { radius, shadowCard, useTheme, type Palette } from '../theme';
+import { radius, useTheme, type Palette } from '../theme';
 
 export function SupportSheet({
   visible,
@@ -89,115 +89,106 @@ export function SupportSheet({
     }
   };
 
+  /*
+    UNE FEUILLE DU BAS, PAS UNE CARTE CENTRÉE.
+
+    Relevé du patron, capture à l'appui : « le bouton Envoyer n'est plus
+    visible à cause du clavier ». Le formulaire était centré : le clavier
+    monte, prend la moitié basse de l'écran, et le bouton passe dessous. On
+    tape son message et l'on ne peut plus l'envoyer.
+
+    C'est la leçon que toutes les fenêtres de cette application ont déjà
+    apprise — « le seul endroit de l'écran que le clavier ne peut pas
+    recouvrir, c'est le bas, puisque la feuille MONTE AVEC LUI ». Le
+    formulaire prend donc la coquille commune, qui porte déjà la montée, la
+    descente, le voile qui referme, et le décalage du clavier.
+  */
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={rendreEtFermer}>
-      <Pressable
-        testID="voile-support"
-        style={s.voile}
-        onPress={rendreEtFermer}>
-        <Pressable style={s.carte} onPress={() => {}}>
-          <View style={s.entete}>
-            <Text style={s.titre}>Écrire au service client</Text>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Fermer"
-              hitSlop={10}
-              onPress={rendreEtFermer}>
-              <CloseCross size={20} color={c.inkSoft} />
-            </Pressable>
-          </View>
-          <Text style={s.sous}>
-            Une question, un défaut, une idée : on répond à la même adresse.
-          </Text>
-
-          <TextInput
-            accessibilityLabel="Sujet"
-            style={s.champ}
-            placeholder="Sujet"
-            placeholderTextColor={c.inkFaint}
-            value={sujet}
-            onChangeText={setSujet}
-          />
-          {/*
-            LE MESSAGE EST HAUT — on écrit un paragraphe, pas une ligne.
-            `textAlignVertical` pour Android : sans lui, le texte se centre
-            dans la boîte et l'on tape au milieu du vide.
-          */}
-          <TextInput
-            accessibilityLabel="Message"
-            style={[s.champ, s.champLong]}
-            placeholder="Votre message…"
-            placeholderTextColor={c.inkFaint}
-            value={message}
-            onChangeText={setMessage}
-            multiline
-            textAlignVertical="top"
-          />
-
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Joindre une photo"
-            style={({ pressed }) => [s.joindre, pressed && s.enfonce]}
-            onPress={async () => {
-              const chemin = await choisirPieceJointe();
-              if (chemin) setPiece(chemin);
-            }}>
-            <Svg width={18} height={18} viewBox="0 0 24 24">
-              <Path d={SOLAIRES.image} fill={c.blue} fillRule="evenodd" />
-            </Svg>
-            <Text style={s.joindreMot} numberOfLines={1}>
-              {piece ? 'Photo jointe' : 'Joindre une photo'}
-            </Text>
-            {!!piece && (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Retirer la photo"
-                hitSlop={10}
-                onPress={() => setPiece(null)}>
-                <CloseCross size={16} color={c.inkFaint} />
-              </Pressable>
-            )}
-          </Pressable>
-
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Envoyer le message"
-            accessibilityState={{ disabled: !pret }}
-            disabled={!pret || envoiEnCours}
-            style={({ pressed }) => [
-              s.envoyer,
-              !pret && s.envoyerEteint,
-              pressed && s.enfonce,
-            ]}
-            onPress={envoyer}>
-            <Text style={s.envoyerMot}>Envoyer</Text>
-          </Pressable>
+    <SheetShell visible={visible} onClose={rendreEtFermer}>
+      <>
+      <View style={s.entete}>
+        <Text style={s.titre}>Écrire au service client</Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Fermer"
+          hitSlop={10}
+          onPress={rendreEtFermer}>
+          <CloseCross size={20} color={c.inkSoft} />
         </Pressable>
+      </View>
+      <Text style={s.sous}>
+        Une question, un défaut, une idée : on répond à la même adresse.
+      </Text>
+
+      <TextInput
+        accessibilityLabel="Sujet"
+        style={s.champ}
+        placeholder="Sujet"
+        placeholderTextColor={c.inkFaint}
+        value={sujet}
+        onChangeText={setSujet}
+      />
+      {/*
+        LE MESSAGE EST HAUT — on écrit un paragraphe, pas une ligne.
+        `textAlignVertical` pour Android : sans lui, le texte se centre
+        dans la boîte et l'on tape au milieu du vide.
+      */}
+      <TextInput
+        accessibilityLabel="Message"
+        style={[s.champ, s.champLong]}
+        placeholder="Votre message…"
+        placeholderTextColor={c.inkFaint}
+        value={message}
+        onChangeText={setMessage}
+        multiline
+        textAlignVertical="top"
+      />
+
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Joindre une photo"
+        style={({ pressed }) => [s.joindre, pressed && s.enfonce]}
+        onPress={async () => {
+          const chemin = await choisirPieceJointe();
+          if (chemin) setPiece(chemin);
+        }}>
+        <Svg width={18} height={18} viewBox="0 0 24 24">
+          <Path d={SOLAIRES.image} fill={c.blue} fillRule="evenodd" />
+        </Svg>
+        <Text style={s.joindreMot} numberOfLines={1}>
+          {piece ? 'Photo jointe' : 'Joindre une photo'}
+        </Text>
+        {!!piece && (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Retirer la photo"
+            hitSlop={10}
+            onPress={() => setPiece(null)}>
+            <CloseCross size={16} color={c.inkFaint} />
+          </Pressable>
+        )}
       </Pressable>
-    </Modal>
+
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Envoyer le message"
+        accessibilityState={{ disabled: !pret }}
+        disabled={!pret || envoiEnCours}
+        style={({ pressed }) => [
+          s.envoyer,
+          !pret && s.envoyerEteint,
+          pressed && s.enfonce,
+        ]}
+        onPress={envoyer}>
+        <Text style={s.envoyerMot}>Envoyer</Text>
+      </Pressable>
+      </>
+    </SheetShell>
   );
 }
 
 const themed = (c: Palette) =>
   StyleSheet.create({
-    voile: {
-      flex: 1,
-      backgroundColor: 'rgba(8, 10, 14, 0.45)',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: 24,
-    },
-    carte: {
-      alignSelf: 'stretch',
-      borderRadius: radius.lg,
-      backgroundColor: c.surface,
-      padding: 20,
-      ...shadowCard,
-    },
     entete: {
       flexDirection: 'row',
       alignItems: 'center',

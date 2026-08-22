@@ -2912,6 +2912,16 @@ sous une liste il se lisait comme un choix de plus — un bouton pâle et bas,
 dont on ne savait pas s'il validait ou annulait. Les fenêtres qui portent une
 vraie alternative (renommer / annuler) gardent la leur.
 
+**Le formulaire du service client a appris la même leçon.** Il était une
+carte CENTRÉE, et le patron l'a vu au premier message : « le bouton Envoyer
+n'est plus visible à cause du clavier ». On tape son texte, le clavier prend
+la moitié basse de l'écran, et le bouton passe dessous — sans rien pour
+refermer le clavier. Il prend donc la coquille commune, comme toutes les
+autres fenêtres : elle porte la montée, la descente, le voile qui referme
+ET le décalage du clavier. Une boîte centrée avec un champ de saisie finit
+toujours par se faire manger la moitié ; c'était écrit ici depuis
+longtemps, il fallait encore l'appliquer.
+
 **Mais une CROIX est revenue en haut**, et pour une raison que le voile ne
 couvre pas — relevé du patron : « il manque la croix pour quitter la page ».
 Le voile est l'échappatoire tant qu'il reste du voile : sur le menu du scan,
