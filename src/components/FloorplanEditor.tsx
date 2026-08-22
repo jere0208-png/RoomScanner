@@ -452,6 +452,16 @@ interface Props {
    * endroit.
    */
   placing?: boolean;
+  /**
+   * ON TIRE UNE PIECE : poser, glisser, lacher.
+   *
+   * Releve du patron : « a la selection d'une piece a ajouter, elle se place
+   * automatiquement et impossible de creer des murs pour faire la piece
+   * facilement ». Le geste rend les deux coins ; le magasin en fait quatre
+   * murs, et reprend ceux qui existent deja.
+   */
+  tracantPiece?: boolean;
+  onTracerPiece?: (a: Pt, b: Pt) => void;
   onPlaceAt?: (at: Pt) => void;
   /**
    * L'appareil de plafond en cours de réglage.
@@ -521,6 +531,8 @@ export function FloorplanEditor({
   showFixtures = true,
   onSelectCeiling,
   placing,
+  tracantPiece,
+  onTracerPiece,
   onPlaceAt,
   notes,
   selectedNoteId,
@@ -586,6 +598,8 @@ export function FloorplanEditor({
     ici, on n'a pas à le découvrir après coup.
   */
   const [poseRefusee, setPoseRefusee] = useState(false);
+  /** Les deux coins du rectangle qu'on est en train de tirer, en metres. */
+  const [tirage, setTirage] = useState<{ a: Pt; b: Pt } | null>(null);
 
   /*
     ET IL NE LE DIT QU'UNE FOIS LE DOIGT LEVÉ.
@@ -2395,6 +2409,90 @@ export function FloorplanEditor({
             )}
             {/* Le calque de capture : au-dessus de TOUT, et seulement
                 pendant une pose. */}
+            {/*
+              LE CALQUE QUI TIRE UNE PIECE.
+
+              Il vit au-dessus de tout, comme celui de la pose : on tire un
+              rectangle sur le plan sans risquer d'attraper un mur ou un
+              meuble en chemin. Il ne s'allume que quand on l'a demande.
+            */}
+            {tracantPiece && (
+              <Rect
+                x={0}
+                y={0}
+                width={layout.w}
+                height={layout.h}
+                fill="transparent"
+                accessibilityLabel="Tirer une piece"
+                onPressIn={(e) => {
+                  const { locationX, locationY } = e.nativeEvent;
+                  const p = mapping.toMeters({ x: locationX, y: locationY });
+                  setTirage({ a: p, b: p });
+                }}
+                onResponderMove={(e) => {
+                  const { locationX, locationY } = e.nativeEvent;
+                  const p = mapping.toMeters({ x: locationX, y: locationY });
+                  setTirage((t) => (t ? { a: t.a, b: p } : t));
+                }}
+                onPressOut={() => {
+                  const t = tirage;
+                  setTirage(null);
+                  if (t) onTracerPiece?.(t.a, t.b);
+                }}
+              />
+            )}
+            {/*
+              CE QU'ON EST EN TRAIN DE TIRER — et ses cotes, en direct.
+
+              Sans elles, on tire a l'aveugle et l'on corrige apres coup :
+              c'est precisement ce que le geste doit eviter.
+            */}
+            {tirage &&
+              (() => {
+                const p1 = mapping.toPx(tirage.a);
+                const p2 = mapping.toPx(tirage.b);
+                const x = Math.min(p1.x, p2.x);
+                const y = Math.min(p1.y, p2.y);
+                const w2 = Math.abs(p2.x - p1.x);
+                const h2 = Math.abs(p2.y - p1.y);
+                const lm = Math.abs(tirage.b.x - tirage.a.x);
+                const pm = Math.abs(tirage.b.z - tirage.a.z);
+                const cote = (v: number) =>
+                  `${v.toFixed(2).replace('.', ',')} m`;
+                return (
+                  <G pointerEvents="none">
+                    <Rect
+                      x={x}
+                      y={y}
+                      width={w2}
+                      height={h2}
+                      fill={c.blue}
+                      fillOpacity={0.12}
+                      stroke={c.blue}
+                      strokeWidth={2}
+                      strokeDasharray="6 4"
+                    />
+                    <SvgText
+                      x={x + w2 / 2}
+                      y={y - 6}
+                      fill={c.blue}
+                      fontSize={12}
+                      fontWeight="700"
+                      textAnchor="middle">
+                      {cote(lm)}
+                    </SvgText>
+                    <SvgText
+                      x={x - 8}
+                      y={y + h2 / 2}
+                      fill={c.blue}
+                      fontSize={12}
+                      fontWeight="700"
+                      textAnchor="end">
+                      {cote(pm)}
+                    </SvgText>
+                  </G>
+                );
+              })()}
             {placing && (
               <Rect
                 x={0}

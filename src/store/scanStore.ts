@@ -905,6 +905,17 @@ interface ScanState {
    * une pièce de la taille demandée, accolée au plan existant, qu'on ajuste
    * ensuite au doigt comme n'importe quel mur.
    */
+  /**
+   * Cree une piece RECTANGULAIRE entre deux coins tires au doigt.
+   *
+   * Rend son identifiant, ou `null` si le rectangle est trop petit pour
+   * etre une piece. Voir l'action pour le pourquoi du geste.
+   */
+  addRoomRect: (
+    a: Pt,
+    b: Pt,
+    nom?: string,
+  ) => string | null;
   addRoomBox: (
     largeur: number,
     profondeur: number,
@@ -2448,6 +2459,109 @@ export const useScanStore = create<ScanState>((set, get) => {
         openings: [...st.openings, ...porte],
         dirty: true,
       });
+    },
+
+    /*
+      TIRER UNE PIECE AU DOIGT — releve du patron : « a la selection d'une
+      piece a ajouter, elle se place automatiquement et impossible de creer
+      des murs pour faire la piece facilement. Il faut repenser un systeme
+      complet facile pour l'utilisateur ».
+
+      L'application posait la piece TOUTE SEULE : elle cherchait le mur
+      exterieur le plus long, s'accolait dessus, et prenait SA longueur. Le
+      resultat est une piece qu'on n'a pas choisie, a un endroit qu'on n'a
+      pas vise, aux cotes qu'on n'a pas demandees — une « chambre 3 x 3 »
+      sortant en 5 x 3 parce que le mur d'appui faisait cinq metres.
+
+      Deux coins suffisent a decrire un rectangle, et un rectangle decrit
+      presque toutes les pieces d'un logement. Pour un L, on en tire deux et
+      on les fusionne : l'application sait deja le faire.
+
+      ET LA CLOISON RESTE PARTAGEE : un cote qui tombe sur un mur existant
+      ne le double pas, il le REPREND. Une seule maconnerie entre deux
+      pieces, cotee une fois, equipee des deux cotes — sans quoi le metre
+      compte double et « fusionner » n'a plus rien a reunir.
+    */
+    addRoomRect: (a, b, nom) => {
+      const st = get();
+      const x0 = Math.min(a.x, b.x);
+      const x1 = Math.max(a.x, b.x);
+      const z0 = Math.min(a.z, b.z);
+      const z1 = Math.max(a.z, b.z);
+      // Un appui sans glissement n'est pas une piece, c'est un doigt pose.
+      if (x1 - x0 < 0.5 || z1 - z0 < 0.5) return null;
+
+      pushHistory('addRoom');
+      const h = st.walls[0]?.height ?? 2.5;
+      const cle = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      const roomId = `piece-${cle}`;
+      const coins: Pt[] = [
+        { x: x0, z: z0 },
+        { x: x1, z: z0 },
+        { x: x1, z: z1 },
+        { x: x0, z: z1 },
+      ];
+
+      /**
+       * LE MUR EXISTANT QUI PORTE DEJA CE COTE, s'il y en a un.
+       *
+       * On ne cherche pas une egalite parfaite : le doigt ne tombe jamais au
+       * millimetre, et l'aimantage du geste amene « tout pres », pas
+       * « exactement ». Colineaire, de meme longueur a dix centimetres pres,
+       * et confondu de bout en bout : c'est le meme mur.
+       */
+      const dejaLa = (p: Pt, q: Pt) =>
+        st.walls.find((w) => {
+          if (w.type !== 'wall') return false;
+          const memeSens =
+            Math.hypot(w.a.x - p.x, w.a.z - p.z) < 0.12 &&
+            Math.hypot(w.b.x - q.x, w.b.z - q.z) < 0.12;
+          const sensInverse =
+            Math.hypot(w.a.x - q.x, w.a.z - q.z) < 0.12 &&
+            Math.hypot(w.b.x - p.x, w.b.z - p.z) < 0.12;
+          return memeSens || sensInverse;
+        });
+
+      const neufs: WallSeg[] = [];
+      const wallIds: string[] = [];
+      coins.forEach((p, i) => {
+        const q = coins[(i + 1) % coins.length];
+        const repris = dejaLa(p, q);
+        if (repris) {
+          // Le mur mitoyen : il figure desormais dans les deux pieces.
+          wallIds.push(repris.id);
+          return;
+        }
+        const mur: WallSeg = {
+          id: `mur-${cle}-${i}`,
+          type: 'wall',
+          a: p,
+          b: q,
+          height: h,
+          yCenter: h / 2,
+          roomId,
+          // A l'etage ou l'on travaille : voir `addRoomBox`.
+          niveau: st.niveauCourant,
+        };
+        neufs.push(mur);
+        wallIds.push(mur.id);
+      });
+
+      set({
+        walls: [...st.walls, ...neufs],
+        rooms: [
+          ...st.rooms,
+          {
+            id: roomId,
+            name: (nom ?? '').slice(0, NOM_PIECE_MAX),
+            floor: null,
+            niveau: st.niveauCourant,
+            wallIds,
+          },
+        ],
+        dirty: true,
+      });
+      return roomId;
     },
 
     addRoomBox: (largeur, profondeur, nom, contreWallId) => {

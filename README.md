@@ -4671,6 +4671,38 @@ vide — la 3D la découpe hors maçonnerie et le métré compte une pose
 impossible. Le chiffre qu'on relit après coup dit alors la vérité, ce qu'un
 refus muet ne ferait pas.
 
+### On tire la piece, on ne la subit plus
+
+Releve du patron : « a la selection d'une piece a ajouter, elle se place
+automatiquement et impossible de creer des murs pour faire la piece
+facilement. Il faut repenser un systeme complet facile pour l'utilisateur ».
+
+L'application posait la piece TOUTE SEULE : elle cherchait le mur exterieur
+le plus long, s'accolait dessus, et prenait SA longueur. Le resultat est une
+piece qu'on n'a pas choisie, a un endroit qu'on n'a pas vise, aux cotes qu'on
+n'a pas demandees — une « chambre 3 x 3 » sortant en 5 x 3 parce que le mur
+d'appui faisait cinq metres. Le catalogue de gabarits n'y changeait rien : il
+donnait le choix des cotes, pas celui du resultat.
+
+**Le geste retenu** (choix du patron entre trois propositions) : on pose un
+doigt, on glisse, on lache. Les cotes s'ecrivent en direct le long du
+rectangle qu'on tire — sans elles, on tire a l'aveugle et l'on corrige apres
+coup, ce que le geste doit justement eviter.
+
+Deux coins suffisent a decrire un rectangle, et un rectangle decrit presque
+toutes les pieces d'un logement. Pour un L, on en tire deux et on les
+fusionne : l'application sait deja le faire.
+
+**La cloison reste partagee** (choix du patron) : un cote qui tombe sur un
+mur existant ne le double pas, il le REPREND — une seule maconnerie entre
+deux pieces, cotee une fois, equipee des deux cotes. Sans quoi le metre
+compte double et « fusionner » n'a plus rien a reunir. On ne cherche pas une
+egalite parfaite pour le reconnaitre : le doigt ne tombe jamais au
+millimetre, alors un mur confondu a douze centimetres pres est le meme mur.
+
+Un appui sans glissement ne cree rien : ce n'est pas une piece, c'est un
+doigt pose.
+
 ### Le bandeau du mur, troisieme forme — et les deux premieres disent pourquoi
 
 Releve du patron, capture a l'appui : « la barre en bas mal faite pour

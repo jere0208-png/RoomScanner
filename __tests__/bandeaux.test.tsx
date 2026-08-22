@@ -1254,15 +1254,31 @@ describe('les feuilles de l’écran des résultats', () => {
   });
 
   /** L'AJOUT D'UNE PIÈCE : des gabarits, pas un formulaire. */
-  it('ouvre l’ajout d’une pièce, avec ses gabarits', () => {
+  /*
+    « AJOUTER UNE PIECE » NE CHOISIT PLUS DANS UN CATALOGUE : ON LA TIRE.
+
+    Ce banc verifiait qu'un catalogue de gabarits s'ouvrait — Chambre,
+    Cuisine, WC — et que la piece se posait toute seule. Releve du patron :
+    « a la selection d'une piece a ajouter, elle se place automatiquement et
+    impossible de creer des murs pour faire la piece facilement. Il faut
+    repenser un systeme complet facile pour l'utilisateur ».
+
+    Le gabarit etait justement le probleme : la piece se posait contre le mur
+    le plus long, prenait SA longueur, et sortait aux cotes de personne — une
+    « chambre 3 x 3 » en 5 x 3. Le geste retenu (choix du patron) : poser un
+    doigt, glisser, lacher. Ce que le banc verifie maintenant, c'est que le
+    plan passe en mode TRACE et que le calque qui recoit le geste est la.
+  */
+  it('passe en mode « tirer une pièce » plutôt que d’en poser une', () => {
     const tree = monter();
     act(() => bouton(tree, 'Plus')!.props.onPress());
     actionDuMenu(tree, 'Ajouter une pièce');
-    const vu = textes(tree);
-    expect(vu).toContain('Ajouter une pièce');
-    expect(vu).toContain('Chambre');
-    expect(vu).toContain('Cuisine');
-    expect(vu).toContain('WC');
+    // Le calque qui recoit le geste, et lui seul : pas de catalogue.
+    const calque = tree.root.findAll(
+      (n) => n.props?.accessibilityLabel === 'Tirer une piece',
+    );
+    expect(calque.length).toBeGreaterThan(0);
+    expect(textes(tree)).not.toContain('WC');
   });
 
   /**

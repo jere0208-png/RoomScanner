@@ -299,6 +299,7 @@ export function ResultScreen() {
   const editNote = useScanStore((s) => s.editNote);
   const removeNote = useScanStore((s) => s.removeNote);
   const addRoomBox = useScanStore((s) => s.addRoomBox);
+  const addRoomRect = useScanStore((s) => s.addRoomRect);
   const moveRoom = useScanStore((s) => s.moveRoom);
   const removeCeiling = useScanStore((s) => s.removeCeiling);
   const moveCeiling = useScanStore((s) => s.moveCeiling);
@@ -449,6 +450,19 @@ export function ResultScreen() {
   const [exporting, setExporting] = useState(false);
   /** La feuille « Ajouter une pièce » : nom, largeur, profondeur. */
   const [ajoutPiece, setAjoutPiece] = useState(false);
+  /*
+    ON TIRE LA PIECE, ON NE LA SUBIT PLUS.
+
+    Releve du patron : « a la selection d'une piece a ajouter, elle se place
+    automatiquement et impossible de creer des murs pour faire la piece
+    facilement. Il faut repenser un systeme complet facile pour
+    l'utilisateur ».
+
+    Le geste retenu : poser un doigt, glisser, lacher. Deux coins suffisent a
+    decrire un rectangle, et un rectangle decrit presque toutes les pieces
+    d'un logement — pour un L, on en tire deux et on les fusionne.
+  */
+  const [tracePiece, setTracePiece] = useState(false);
   /** La présentation guidée, plein écran : ce qu'on montre au client. */
   const [visite, setVisite] = useState(false);
   // Vue 3D : bascule « vue de dessus », comme un plan.
@@ -2190,8 +2204,12 @@ export function ResultScreen() {
                      */
                     label: 'Ajouter une pièce',
                     icon: 'piece' as const,
-                    hint: 'Un rectangle aux cotes données, à côté du plan.',
-                    onPress: () => setAjoutPiece(true),
+                    hint: 'Tirez un rectangle sur le plan : posez, glissez, lâchez.',
+                    onPress: () => {
+                      seulGeste();
+                      setTracePiece(true);
+                      setEditMode(true);
+                    },
                   },
                   {
                     /**
@@ -2615,6 +2633,19 @@ export function ResultScreen() {
             notes={notes}
             selectedNoteId={selNote}
             onSelectNote={setSelNote}
+            tracantPiece={tracePiece}
+            onTracerPiece={(a, b) => {
+              setTracePiece(false);
+              const id = addRoomRect(a, b, '');
+              if (!id) {
+                // Un appui sans glissement : rien a creer, et on le dit.
+                haptic('alerte');
+                return;
+              }
+              seuleSelection('piece');
+              setSelectedRoomId(id);
+              haptic('succes');
+            }}
             placing={
               !!pendingCeiling || !!pendingSpots || pendingNote || !!noteADeplacer
             }
