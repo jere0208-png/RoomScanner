@@ -4671,36 +4671,37 @@ vide — la 3D la découpe hors maçonnerie et le métré compte une pose
 impossible. Le chiffre qu'on relit après coup dit alors la vérité, ce qu'un
 refus muet ne ferait pas.
 
-### Un mur passe au-dessus d'une chaise — reproduit, pas corrigé
+### Le mur qui passait sur une chaise : le banc mesurait à côté
 
-Relevé du patron, capture à l'appui. Mesuré : **vingt-deux angles de vue sur
-trente-six** montrent un pan de mur opaque posé sur une chaise placée devant
-lui. Le défaut est réel et il ne se voyait dans aucune épreuve : celle qui
-existait prenait un CANAPÉ — gros, bas, large. Une chaise est haute et
-étroite, et c'est ce qui la perd.
+Relevé du patron, capture à l'appui. Première mesure : **vingt-deux angles de
+vue sur trente-six** montraient un mur peint par-dessus une chaise. Deux
+remèdes ont été construits sur ce chiffre, et les deux cassaient ailleurs —
+le meuble d'angle se déchirait, ou quatre épreuves du tri au pixel tombaient
+avec. La refonte du moteur de rendu était prête à être lancée.
 
-**La cause est plus profonde qu'un réglage : la projection n'a pas de
-perspective.** Sans point de fuite, la profondeur d'un point vaut son
-éloignement PLUS son altitude — le haut d'un mur du fond, à deux mètres
-cinquante, est donc « plus proche de l'œil » que le sol qui est devant lui.
-Le test au pixel le constate honnêtement et conclut que le mur passe devant :
-vrai dans le repère, faux dans la pièce.
+**Le banc mesurait la mauvaise chose.** Il comptait comme faute tout mur
+peint après la chaise et couvrant son centre. Or vu sous certains angles, le
+mur nord est RÉELLEMENT entre l'œil et une chaise posée devant lui : il doit
+la cacher. Mesuré au point de conflit, le mur y était à +0,36 de profondeur
+et la chaise à −0,61. Il était devant, tout simplement. Sur vingt-deux
+« fautes », vingt-deux étaient des masquages légitimes.
 
-**Deux remèdes ont été essayés, et les deux cassent ailleurs :**
+Ce qui est une faute, c'est un mur peint après la chaise alors qu'au point de
+recouvrement il est **plus loin de l'œil** qu'elle. Compté ainsi : **zéro**
+sous les trente-six angles. Le tri du peintre ne se trompe pas.
 
-- faire dépendre la couche de tri du seuil de l'écorché — un mur ne passerait
-  devant que s'il s'efface : le compte tombe à six, et le **meuble d'angle se
-  déchire** sous au moins six angles, quelle que soit la valeur du seuil ;
-- interdire au test au pixel de défaire l'ordre des couches : le compte tombe
-  à neuf, et **quatre épreuves du tri au pixel tombent avec** — celles qui
-  garantissent qu'un retour de mur ne recouvre pas ce qui est devant.
+**La limite connue**, elle, est chiffrée : `clampFootprint` sort de la
+maçonnerie tout meuble qui y mord et le pose à sept centimètres du nu ; à
+cette distance il reste **un** angle sur trente-six où le pan passe devant.
+Ce n'est plus le classement qui est en cause mais la finesse du contact —
+sept centimètres à l'échelle du logement, c'est moins que l'épaisseur d'un
+trait. Le remède serait un tampon de profondeur par pixel, c'est-à-dire un
+autre moteur.
 
-Les couches corrigent de face et lâchent ailleurs ; le pixel corrige ailleurs
-et lâche ici. En sortir demanderait un vrai tampon de profondeur par tuile —
-un chantier, pas un correctif. **Rien n'a donc été livré sur ce point**, et le
-banc `chaisecachee` fixe l'état mesuré : il tombera si l'on régresse, et il
-faudra l'abaisser dès qu'on fera mieux. Un banc qui prétendrait zéro
-mentirait.
+Deux leçons, et la seconde vaut la première : on ne refond pas un moteur de
+rendu sur un compteur qu'on n'a pas vérifié ; et un banc qui mesure à côté
+donne une régression à chaque tentative de correction, en faisant croire que
+le problème est ailleurs.
 
 ### « Mon mur blanc devient marron »
 

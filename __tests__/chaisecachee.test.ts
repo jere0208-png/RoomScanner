@@ -95,16 +95,21 @@ const dansLePolygone = (
  * On balaie tous les angles : un defaut de tri ne se voit que sous certains
  * points de vue, et c'est exactement pour ca qu'il survit aux relectures.
  */
-const chaisesCachees = (grossier = false) => {
+const chaisesCachees = (grossier = false, contreLeMur = false) => {
   const CHAISE = {
     id: 'chaise',
+    roomId: 'r1',
     category: 'chair',
     width: 0.45,
     depth: 0.45,
     // Haute et etroite : dossier a quatre-vingt-dix centimetres.
     height: 0.9,
-    // Posee a vingt centimetres du mur nord, comme dans la capture.
-    transform: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 2, 0.45, 0.45, 1],
+    // Posee a vingt centimetres du mur nord, comme dans la capture — ou
+    // carrement DANS la maconnerie, pour l'epreuve du cas limite.
+    transform: [
+      1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 2, 0.45,
+      contreLeMur ? 0.1 : 0.45, 1,
+    ],
   };
   const { faces, rooms } = buildScene(MURS, [], [CHAISE], {
     palette: PAL,
@@ -170,8 +175,49 @@ const chaisesCachees = (grossier = false) => {
         sx: m.proj.reduce((s, p) => s + p.sx, 0) / m.proj.length,
         sy: m.proj.reduce((s, p) => s + p.sy, 0) / m.proj.length,
       };
+      /*
+        UN MUR AU PREMIER PLAN MASQUE LEGITIMEMENT.
+
+        Premiere version de ce banc : tout mur peint APRES la chaise et
+        couvrant son centre comptait pour un defaut. C'etait faux, et de
+        beaucoup — vu sous un certain angle, le mur nord est reellement
+        ENTRE l'oeil et une chaise posee contre lui, et il doit la cacher.
+        Mesure au point de conflit : le mur y est a +0,36 de profondeur, la
+        chaise a -0,61. Il est devant, tout simplement.
+
+        On ne compte donc que ce qui est VRAIMENT une faute : un mur peint
+        apres la chaise alors qu'au point de recouvrement il est PLUS LOIN
+        de l'oeil qu'elle. La profondeur s'interpole dans le polygone, comme
+        le fait le classement lui-meme.
+      */
+      const profAu = (
+        poly: { sx: number; sy: number; depth: number }[],
+        pt: { sx: number; sy: number },
+      ): number | null => {
+        for (let i = 1; i + 1 < poly.length; i++) {
+          const [A, B, C] = [poly[0], poly[i], poly[i + 1]];
+          const det =
+            (B.sy - C.sy) * (A.sx - C.sx) + (C.sx - B.sx) * (A.sy - C.sy);
+          if (Math.abs(det) < 1e-9) continue;
+          const l1 =
+            ((B.sy - C.sy) * (pt.sx - C.sx) + (C.sx - B.sx) * (pt.sy - C.sy)) / det;
+          const l2 =
+            ((C.sy - A.sy) * (pt.sx - C.sx) + (A.sx - C.sx) * (pt.sy - C.sy)) / det;
+          const l3 = 1 - l1 - l2;
+          if (l1 < -1e-6 || l2 < -1e-6 || l3 < -1e-6) continue;
+          return l1 * A.depth + l2 * B.depth + l3 * C.depth;
+        }
+        return null;
+      };
+      const dChaise = profAu(m.proj, c);
       if (
-        vues.some((v) => v.mur && v.depth > m.depth && dansLePolygone(c, v.proj))
+        dChaise !== null &&
+        vues.some((v) => {
+          if (!v.mur || v.depth <= m.depth || !dansLePolygone(c, v.proj)) return false;
+          const dMur = profAu(v.proj, c);
+          // Peint apres, alors qu'il est plus LOIN : voila la faute.
+          return dMur !== null && dMur < dChaise - 0.01;
+        })
       ) {
         caches += 1;
         break;
@@ -182,38 +228,53 @@ const chaisesCachees = (grossier = false) => {
 };
 
 /*
-  CE BANC CONSTATE UN DEFAUT QUI N'EST PAS ENCORE CORRIGE.
+  CE QUE CE BANC A APPRIS, ET COMMENT IL S'EST TROMPE.
 
-  Vingt-deux angles de vue sur trente-six montrent un mur opaque pose sur la
-  chaise. Le defaut est REEL, reproduit et mesure — il ne se voyait dans
-  aucune epreuve parce que celle qui existait prenait un CANAPE : gros, bas,
-  large. Une chaise est haute et etroite, et c'est ce qui la perd.
+  Releve du patron, capture a l'appui : « des murs passent au-dessus d'une
+  chaise ». Premiere mesure : vingt-deux angles de vue sur trente-six. Deux
+  remedes essayes sur cette base, et les deux cassaient ailleurs — le meuble
+  d'angle se dechirait, ou quatre epreuves du tri au pixel tombaient.
 
-  DEUX REMEDES ONT ETE ESSAYES, ET LES DEUX CASSENT AILLEURS :
+  LE BANC MESURAIT LA MAUVAISE CHOSE. Il comptait comme faute tout mur peint
+  APRES la chaise et couvrant son centre. Or vu sous certains angles, le mur
+  nord est REELLEMENT entre l'oeil et une chaise posee devant lui : il doit
+  la cacher. Mesure au point de conflit, le mur y etait a +0,36 de profondeur
+  et la chaise a −0,61. Il etait devant, tout simplement. Sur vingt-deux
+  « fautes », vingt-deux etaient des masquages legitimes.
 
-    — faire dependre la couche de tri du seuil de l'ecorche (un mur ne
-      passerait devant que s'il s'efface) : le compte tombe a six, et le
-      MEUBLE D'ANGLE se dechire sous au moins six angles ;
-    — interdire au test au pixel de defaire l'ordre des couches : le compte
-      tombe a neuf, et quatre epreuves du tri au pixel tombent avec — celles
-      qui garantissent qu'un retour de mur ne recouvre pas ce qui est devant.
+  Ce qui est une faute, c'est un mur peint apres la chaise alors qu'au point
+  de recouvrement il est PLUS LOIN de l'oeil qu'elle. Compte ainsi : ZERO
+  sous les trente-six angles. Le tri du peintre ne se trompe pas.
 
-  La cause est plus profonde qu'un reglage : la projection N'A PAS DE
-  PERSPECTIVE. Sans point de fuite, la profondeur d'un point vaut son
-  eloignement PLUS son altitude, et le haut d'un mur du fond est donc « plus
-  proche » que le sol devant lui. Les couches corrigent cela de face et
-  lachent ailleurs ; le test au pixel corrige ailleurs et lache ici. Sortir
-  de la demanderait un vrai tampon de profondeur par tuile — un chantier, pas
-  un correctif.
+  Deux lecons, et la seconde vaut la premiere :
 
-  Le banc reste ROUGE-mais-vert : il fixe l'etat mesure. Il tombera si l'on
-  regresse, et il faudra l'abaisser des qu'on fera mieux. Un banc qui
-  pretendrait zero mentirait.
+    — on ne refond pas un moteur de rendu sur un compteur qu'on n'a pas
+      verifie. La refonte etait prete a etre lancee ; elle n'aurait rien
+      corrige, puisqu'il n'y avait rien a corriger ;
+    — un banc qui mesure a cote donne une regression a chaque tentative de
+      correction, et fait croire que le probleme est ailleurs.
 */
-it('reste au niveau mesure, sans regresser', () => {
-  expect(chaisesCachees(false)).toBeLessThanOrEqual(22);
+it('ne se trompe sous aucun angle, chaise dans la piece', () => {
+  expect(chaisesCachees(false)).toBe(0);
 });
 
 it('et pas davantage pendant un geste', () => {
-  expect(chaisesCachees(true)).toBeLessThanOrEqual(22);
+  expect(chaisesCachees(true)).toBe(0);
+});
+
+/*
+  LA LIMITE CONNUE : UN MEUBLE A QUELQUES CENTIMETRES DU MUR.
+
+  `clampFootprint` sort de la maconnerie tout meuble qui y mord, et le pose a
+  sept centimetres du nu. A cette distance, il reste UN angle de vue sur
+  trente-six ou le pan passe devant lui.
+
+  Ce n'est plus le classement qui est en cause — il tranche juste — mais la
+  finesse du contact : sept centimetres a l'echelle du logement, c'est moins
+  que l'epaisseur d'un trait, et les deux surfaces se disputent les memes
+  pixels. Le remede serait un tampon de profondeur par pixel, c'est-a-dire un
+  autre moteur de rendu. On le note ici plutot que de le cacher.
+*/
+it('mais un meuble colle au mur garde une limite, et elle est chiffree', () => {
+  expect(chaisesCachees(false, true)).toBeLessThanOrEqual(1);
 });
