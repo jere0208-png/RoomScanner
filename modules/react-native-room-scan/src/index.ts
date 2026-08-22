@@ -241,8 +241,18 @@ export const RoomScan = {
    * Le viseur est au centre de l'écran : on aligne, on appuie. `false`
    * quand le rayon ne rencontre aucune surface — l'app le dit plutôt que
    * de poser au jugé.
+   *
+   * EN CAS DE SUCCÈS, LA COTE REVIENT AVEC. Elle n'existe qu'au moment du
+   * raycast : personne d'autre ne la connaît avant la finalisation, et
+   * c'est elle qui permet d'annoncer « Prise plinthe placée à 25 cm »
+   * DEVANT LE MUR, plutôt qu'une heure plus tard.
+   *
+   * `height` est la cote au-dessus du pied du mur visé ; `plafond` dit
+   * qu'on regardait le plafond, où il n'y a pas de mur à coter.
    */
-  poserAuViseur: (kind: string): Promise<boolean> =>
+  poserAuViseur: (
+    kind: string,
+  ): Promise<false | { ok: true; height: number; plafond: boolean }> =>
     RoomScanModule?.poserAuViseur
       ? RoomScanModule.poserAuViseur(kind)
       : Promise.resolve(false),

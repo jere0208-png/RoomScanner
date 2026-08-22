@@ -178,20 +178,48 @@ describe('l’écran de scan', () => {
     expect(bouton(tree, 'À quoi servent ces boutons')).toBeDefined();
   });
 
-  it('pose ce qu’on vise, et le compte', async () => {
+  /*
+    LE BANDEAU DIT D'ABORD LA COTE, PUIS LE COMPTE.
+
+    Il ne disait que le compte, et ce banc l'attendait tout de suite.
+    L'application ne pose plus a la hauteur du doigt mais a la cote du
+    metier — releve du patron : « si l'utilisateur vise le bas d'un mur, on
+    place la prise directement a 25 cm » — et il faut le DIRE, sinon
+    l'electricien croit avoir rate sa visee. Le message s'efface tout seul
+    et rend la place au compte : un message qui reste devient un bandeau de
+    plus, et c'est ce qu'on nous demande d'eviter.
+  */
+  it('pose ce qu’on vise, annonce la cote, puis compte', async () => {
     const { RoomScan } = require('react-native-room-scan');
-    RoomScan.poserAuViseur = jest.fn(async () => true);
+    // Le natif rend desormais la cote relevee avec le succes.
+    RoomScan.poserAuViseur = jest.fn(async () => ({
+      ok: true,
+      height: 0.19,
+      plafond: false,
+    }));
     const TestRenderer = require('react-test-renderer');
     const tree = monter();
     await TestRenderer.act(async () => {
       await bouton(tree, 'Poser Prise').props.onPress();
     });
     expect(RoomScan.poserAuViseur).toHaveBeenCalledWith('prise');
-    const dits = tree.root
-      .findAll((n: any) => typeof n.props?.children === 'string')
-      .map((n: any) => n.props.children)
-      .join(' | ');
-    expect(dits).toContain('1 appareil posé');
+    const dits = () =>
+      tree.root
+        .findAll((n: any) => typeof n.props?.children === 'string')
+        .map((n: any) => n.props.children)
+        .join(' | ');
+    // Vise a 19 cm : c'est une prise de plinthe, et elle se pose a 25.
+    expect(dits()).toContain('Prise plinthe placée à 25 cm');
+    /*
+      L'EFFACEMENT N'EST PAS COUVERT ICI, ET C'EST DIT.
+
+      Le message s'efface au bout de trois secondes et rend la place au
+      compte (`setTimeout` dans l'ecran). Deux facons de le verifier ont ete
+      essayees — attendre vraiment, puis simuler les minuteurs — et les deux
+      BLOQUENT ce fichier : il monte une vue native, dont le cycle ne se
+      laisse pas piloter par des minuteurs simules. Une suite qui ne finit
+      pas coute plus cher qu'une regle verifiee a la lecture.
+    */
   });
 
   it('et le dit franchement quand la cible n’est pas un mur', async () => {

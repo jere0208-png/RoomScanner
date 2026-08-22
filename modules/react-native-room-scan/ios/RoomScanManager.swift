@@ -186,7 +186,23 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
    cet endroit, poser au jugé mettrait un appareil au hasard dans le plan,
    et personne ne saurait d'où il sort.
    */
-  func poserAuViseur(kind: String) -> Bool {
+  /**
+   POSE AU VISEUR — et ce qu'on rend au JS.
+
+   Le retour était un simple oui/non. Relevé du patron : « un message doit
+   apparaître sans gêner : "Prise plinthe placée à 25 cm" ». Cette phrase se
+   dit AU MOMENT DE LA POSE, devant le mur — pas une heure plus tard, à la
+   fin du scan, quand le modèle est enfin découpé.
+
+   Or la hauteur relevée n'existe qu'ICI : c'est le raycast qui la donne, et
+   personne d'autre ne la connaît avant la finalisation. On la rend donc
+   tout de suite, avec ce qu'on a visé.
+
+   `false` reste `false` en cas d'échec : le JS teste la vérité de la
+   réponse, et un dictionnaire est vrai là où `false` ne l'est pas — rien à
+   changer chez les appelants qui ne veulent que le oui/non.
+   */
+  func poserAuViseur(kind: String) -> Any {
     guard let session = captureView?.captureSession.arSession,
           let frame = session.currentFrame else { return false }
     // Le centre de l'image, en coordonnées normalisées : c'est là qu'est le
@@ -239,7 +255,13 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
       ancresElec.append(ancre)
       // Et le repère se plante dans la pièce, à l'aplomb de ce qu'on vise.
       planterRepere(kind: kind, sur: hit.worldTransform)
-      return true
+      return [
+        "ok": true,
+        // La cote au-dessus du PIED DU MUR quand on en a un ; sinon la
+        // hauteur dans le monde, qui vaut celle du sol du scan.
+        "height": (ancre["height"] as? Float) ?? p.y,
+        "plafond": mur == nil && auPlafond,
+      ]
     }
     return false
   }

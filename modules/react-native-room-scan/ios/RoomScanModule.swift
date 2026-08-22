@@ -116,6 +116,7 @@ class RoomScanModule: NSObject {
       return
     }
     DispatchQueue.main.async {
+      // Un dictionnaire quand ça a pris, `false` sinon : voir le manager.
       resolve(RoomScanManager.shared.poserAuViseur(kind: kind as String))
     }
   }

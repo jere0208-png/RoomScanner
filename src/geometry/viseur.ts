@@ -23,6 +23,199 @@ import { pointInPolygon } from './appearance';
 import { segLength, wallQuads, type Pt, type WallSeg } from './floorplan';
 import type { CeilingFixture, CeilingKind } from './ceiling';
 
+/*
+  ON POSE À LA COTE DU MÉTIER, PAS À LA HAUTEUR DU DOIGT.
+
+  Relevé du patron : « si l'utilisateur vise le bas d'un mur, on cible bien
+  l'endroit du mur, mais on place la prise directement à 25 cm ; si
+  l'utilisateur vise le milieu du mur, 110 cm (prise crédence par exemple).
+  Pareil pour les lumières, on met automatiquement 1 m 90. »
+
+  C'est la différence entre un relevé et un PLAN D'EXÉCUTION. Personne ne
+  pose une prise à 23,7 cm : on pose à 25, et c'est ce qui se percera. Un
+  viseur tenu à bout de bras dans une pièce vide donne le centimètre près —
+  autant dire un chiffre faux, qu'il faudrait corriger un par un à la table.
+
+  LA COTE VISÉE CHOISIT LE PALIER, elle ne le remplace pas. Viser le bas
+  d'un mur veut dire « plinthe » ; viser à mi-hauteur veut dire « au-dessus
+  du plan de travail ». C'est l'INTENTION qu'on lit dans le geste.
+*/
+
+/** Les cotes usuelles d'un type, du sol vers le haut, avec leur nom. */
+const PALIERS: Partial<Record<FixtureKind, { h: number; mot: string }[]>> = {
+  prise: [
+    { h: 0.25, mot: 'Prise plinthe' },
+    { h: 1.1, mot: 'Prise plan de travail' },
+  ],
+  prise2: [
+    { h: 0.25, mot: 'Prise double plinthe' },
+    { h: 1.1, mot: 'Prise double plan de travail' },
+  ],
+  rj45: [
+    { h: 0.25, mot: 'RJ45 plinthe' },
+    { h: 1.1, mot: 'RJ45 en hauteur' },
+  ],
+  tv: [
+    { h: 0.25, mot: 'Prise TV plinthe' },
+    // L'attente derrière un téléviseur mural : la cote se relève sur place,
+    // mais 1,10 m est le point de départ de tout le monde.
+    { h: 1.1, mot: 'Prise TV murale' },
+  ],
+};
+
+/**
+ * La cote la plus proche parmi celles proposées.
+ *
+ * Exportée parce que la frontière compte autant que les paliers : à
+ * mi-chemin entre 25 cm et 1,10 m, il faut savoir de quel côté l'on bascule,
+ * et ça se vérifie.
+ */
+export function palierProche(paliers: number[], vise: number): number {
+  let best = paliers[0];
+  for (const p of paliers) {
+    if (Math.abs(p - vise) < Math.abs(best - vise)) best = p;
+  }
+  return best;
+}
+
+/**
+ * AU-DELÀ DE CETTE DISTANCE, ON NE DEVINE PLUS.
+ *
+ * Une prise visée à deux mètres n'est ni une plinthe ni une crédence : c'est
+ * une attente de téléviseur, ou une erreur de visée. Dans les deux cas, la
+ * ramener de force à 1,10 m effacerait ce que l'électricien a vu de ses
+ * yeux. Quarante-cinq centimètres : la moitié de l'écart entre les deux
+ * paliers d'une prise, moins une marge.
+ */
+const PORTEE_PALIER = 0.45;
+
+/**
+ * La hauteur à laquelle on pose vraiment, et le mot qui l'explique.
+ *
+ * `mot` est `null` quand on n'a rien aimanté : il n'y a alors rien à
+ * annoncer, et un message qui dit « posé où vous avez visé » est un message
+ * qu'on apprend à ignorer.
+ */
+export function aimanterHauteur(
+  kind: FixtureKind,
+  vise: number,
+): { hauteur: number; mot: string | null } {
+  const paliers = PALIERS[kind];
+  if (!paliers) {
+    /*
+      UN APPAREIL À COTE UNIQUE Y VA TOUJOURS.
+
+      Un interrupteur se pose à 1,10 m, une applique à 1,90 m, un tableau à
+      1,35 m — viser haut ou bas ne change pas ce qu'on va poser. La fiche
+      de l'appareil porte déjà cette cote (`std`), et c'est la même que
+      celle du catalogue et du dossier imprimé.
+    */
+    const spec = FIXTURES[kind];
+    if (!spec) return { hauteur: vise, mot: null };
+    return {
+      hauteur: spec.std,
+      mot: `${spec.label} placé${finFeminine(spec.label)} à ${enCm(spec.std)}`,
+    };
+  }
+  const h = palierProche(
+    paliers.map((p) => p.h),
+    vise,
+  );
+  if (Math.abs(h - vise) > PORTEE_PALIER) return { hauteur: vise, mot: null };
+  const nom = paliers.find((p) => p.h === h)!.mot;
+  return { hauteur: h, mot: `${nom} placée à ${enCm(h)}` };
+}
+
+/** « 25 cm », « 1,10 m » — comme on le dit sur un chantier. */
+function enCm(h: number): string {
+  return h < 1
+    ? `${Math.round(h * 100)} cm`
+    : `${h.toFixed(2).replace('.', ',')} m`;
+}
+
+/**
+ * Le « e » de « placée », quand le mot qui précède est féminin.
+ *
+ * Deux libellés sur trois sont des noms masculins (« Interrupteur »,
+ * « Tableau électrique ») : accorder au petit bonheur donnerait « Tableau
+ * électrique placée », qu'on lit une fois et qui décrédibilise tout le
+ * reste. On regarde donc le premier mot du libellé.
+ */
+function finFeminine(label: string): string {
+  return /^(prise|applique|boîte|sortie)/i.test(label) ? 'e' : '';
+}
+
+/**
+ * L'ÉCART SOUS LEQUEL UN DÉCALAGE EST UN TREMBLEMENT.
+ *
+ * Trente centimètres : au-delà, deux points de plafond ne sont plus mal
+ * alignés, ils sont posés en quinconce — et c'est un placement voulu, qu'on
+ * n'a pas à redresser.
+ */
+const ECART_AXE = 0.3;
+
+/**
+ * OÙ SE POSE VRAIMENT UN POINT DE PLAFOND.
+ *
+ * Relevé du patron : « si on vise le plafond pour mettre un point lumineux,
+ * on le centre à la largeur déjà calculée par le scan, et si c'est la même
+ * pièce, l'ajout d'un point s'axe automatiquement au premier ».
+ *
+ * C'est la règle du métier : un point de centre est AU CENTRE. Personne ne
+ * pose un DCL à quarante centimètres de l'axe parce que le téléphone
+ * tremblait ; et deux points d'une même pièce se posent sur un axe, pas en
+ * diagonale. Le scan connaît le contour — il sait où est le centre, et où
+ * passe l'axe du premier point.
+ *
+ * @param vise    Le point du sol sous la visée.
+ * @param contour Le contour de la pièce, ou `null` hors de toute pièce.
+ * @param deja    Les points déjà posés dans CETTE pièce.
+ */
+export function aimanterPlafond(
+  vise: Pt,
+  contour: Pt[] | null,
+  deja: Pt[],
+): { at: Pt; mot: string | null } {
+  /*
+    DEUX POINTS FONT UNE LIGNE, PAS UN NUAGE.
+
+    Le second se pose sur l'axe du premier — même abscisse s'il est
+    au-dessus ou au-dessous, même ordonnée s'il est à côté. On ne le
+    DÉPLACE pas le long de cet axe : sa distance au premier est ce que
+    l'électricien a voulu, c'est son alignement qui tremblait.
+  */
+  if (deja.length > 0) {
+    let proche = deja[0];
+    for (const p of deja) {
+      if (
+        Math.hypot(p.x - vise.x, p.z - vise.z) <
+        Math.hypot(proche.x - vise.x, proche.z - vise.z)
+      ) {
+        proche = p;
+      }
+    }
+    const dx = Math.abs(vise.x - proche.x);
+    const dz = Math.abs(vise.z - proche.z);
+    if (dx <= ECART_AXE && dx <= dz) {
+      return { at: { x: proche.x, z: vise.z }, mot: 'Point aligné sur le premier' };
+    }
+    if (dz <= ECART_AXE && dz < dx) {
+      return { at: { x: vise.x, z: proche.z }, mot: 'Point aligné sur le premier' };
+    }
+    return { at: vise, mot: null };
+  }
+
+  // Hors de tout contour, il n'y a pas de centre à trouver.
+  if (!contour || contour.length < 3) return { at: vise, mot: null };
+  const xs = contour.map((p) => p.x);
+  const zs = contour.map((p) => p.z);
+  const at = {
+    x: (Math.min(...xs) + Math.max(...xs)) / 2,
+    z: (Math.min(...zs) + Math.max(...zs)) / 2,
+  };
+  return { at, mot: 'Point centré dans la pièce' };
+}
+
 /**
  * Ce que le viseur mémorise.
  *
@@ -103,10 +296,18 @@ export function ancrerElec(
   /** Fabrique un identifiant : le magasin a le sien. */
   id: (prefixe: string, n: number) => string = (p, n) =>
     `${p}-vis-${n}-${Math.random().toString(36).slice(2, 6)}`,
-): { fixtures: Fixture[]; ceiling: CeilingFixture[] } {
+): { fixtures: Fixture[]; ceiling: CeilingFixture[]; mots: string[] } {
   const quads = wallQuads(walls);
   const fixtures: Fixture[] = [];
   const ceiling: CeilingFixture[] = [];
+  /*
+    CE QU'ON A POSÉ À LA PLACE DE CE QUI ÉTAIT VISÉ.
+
+    Relevé du patron : « un message doit apparaître sans gêner : "Prise
+    plinthe placée à 25 cm" ». Il ne se déduit pas après coup — seul cet
+    endroit sait qu'une cote a été RAMENÉE à un palier, et lequel.
+  */
+  const mots: string[] = [];
   /** La pièce qui contient ce point au sol. */
   const pieceDe = (p: Pt) =>
     rooms.find((r) => (r.outline?.length ?? 0) >= 3 && pointInPolygon(p, r.outline!));
@@ -123,13 +324,16 @@ export function ancrerElec(
       const side = interiorSide(nomme, walls, rooms as never);
       const kind = a.kind as FixtureKind;
       if (FIXTURES[kind]) {
+        // La cote du métier, pas celle du doigt : voir `aimanterHauteur`.
+        const pose = aimanterHauteur(kind, a.height);
+        if (pose.mot) mots.push(pose.mot);
         fixtures.push({
           id: id(a.kind, n),
           kind,
           wallId: nomme.id,
           // Bornées au mur : un relevé de travers ne sort pas du pan.
           along: Math.max(0.02, Math.min(l - 0.02, a.along)),
-          height: Math.max(0.05, Math.min(nomme.height - 0.05, a.height)),
+          height: Math.max(0.05, Math.min(nomme.height - 0.05, pose.hauteur)),
           side,
         });
         return;
@@ -168,11 +372,27 @@ export function ancrerElec(
       regardait, pas la cloison.
     */
     if (estDuPlafond(a.kind) && (loinDesMurs || enHaut) && piece) {
+      /*
+        AU CENTRE, OU SUR L'AXE DU PREMIER — voir `aimanterPlafond`.
+
+        On ne regarde que les points DÉJÀ POSÉS DANS CETTE PIÈCE : un point
+        du séjour n'a pas à aligner celui de la cuisine, et deux pièces
+        voisines ont chacune leur axe.
+      */
+      const voisins = ceiling
+        .filter((c) => c.roomId === piece.id)
+        .map((c) => c.at);
+      const pose = aimanterPlafond(
+        { x: a.x, z: a.z },
+        piece.outline ?? null,
+        voisins,
+      );
+      if (pose.mot) mots.push(pose.mot);
       ceiling.push({
         id: id(a.kind, n),
         kind: a.kind,
         roomId: piece.id,
-        at: { x: a.x, z: a.z },
+        at: pose.at,
       });
       return;
     }
@@ -190,14 +410,17 @@ export function ancrerElec(
     // L'abscisse de la face, et non celle de l'axe : c'est dans ce repère
     // que l'établi et les cotes travaillent.
     const surFace = faceX(face, best.along);
+    // La cote du métier, pas celle du doigt : voir `aimanterHauteur`.
+    const pose = aimanterHauteur(kind, a.y);
+    if (pose.mot) mots.push(pose.mot);
     fixtures.push({
       id: id(a.kind, n),
       kind,
       wallId: best.w.id,
       along: best.along,
-      // La hauteur relevée, bornée au mur : un raycast qui traverse une
+      // La hauteur retenue, bornée au mur : un raycast qui traverse une
       // baie peut revenir au-dessus du linteau.
-      height: Math.max(0.05, Math.min(best.w.height - 0.05, a.y)),
+      height: Math.max(0.05, Math.min(best.w.height - 0.05, pose.hauteur)),
       side,
     });
     // `surFace` ne sert qu'à vérifier que la pose tient sur la face ; un
@@ -210,5 +433,13 @@ export function ancrerElec(
     }
   });
 
-  return { fixtures, ceiling };
+  /*
+    UN SEUL MESSAGE, PAS UNE PILE.
+
+    Une session de scan pose dix appareils : dix bandeaux qui s'empilent ne
+    « gênent » pas moins qu'un seul qui reste. On garde le DERNIER — celui
+    qui vient d'être posé, le seul que l'électricien regarde — et les
+    doublons disparaissent d'eux-mêmes.
+  */
+  return { fixtures, ceiling, mots: [...new Set(mots)] };
 }

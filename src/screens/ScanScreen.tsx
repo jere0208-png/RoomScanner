@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   StyleSheet,
@@ -15,7 +15,8 @@ import { CloseCross } from '../components/CloseCross';
 import { haptic } from '../ui/haptic';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GuidePose } from './scan/GuidePose';
-import { FIXTURE_SYMBOL } from '../geometry/electrical';
+import { FIXTURE_SYMBOL, type FixtureKind } from '../geometry/electrical';
+import { aimanterHauteur } from '../geometry/viseur';
 import { CEILING_SYMBOL } from '../geometry/ceiling';
 
 /** Le guide de pose a été lu : on ne le remontre plus de lui-même. */
@@ -72,6 +73,26 @@ export function ScanScreen() {
   const [poses, setPoses] = useState(0);
   const [refus, setRefus] = useState(false);
   /*
+    CE QU'ON VIENT DE POSER, ET À QUELLE COTE.
+
+    Relevé du patron : « un message doit apparaître sans gêner : "Prise
+    plinthe placée à 25 cm" ». L'application ne pose plus à la hauteur du
+    doigt mais à la cote du métier (voir `aimanterHauteur`) — il faut donc
+    le DIRE, sinon l'électricien croit avoir raté sa visée.
+
+    Il s'efface tout seul et rend la place au compte : un message qui reste
+    devient un bandeau de plus, et c'est justement ce qu'on nous demande
+    d'éviter.
+  */
+  const [annonce, setAnnonce] = useState<string | null>(null);
+  const minuteurAnnonce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (minuteurAnnonce.current) clearTimeout(minuteurAnnonce.current);
+    },
+    [],
+  );
+  /*
     LE GUIDE S'OUVRE UNE FOIS, à la première caméra.
 
     Relevé du chantier : les trois boutons « ne sont pas forcément
@@ -97,11 +118,26 @@ export function ScanScreen() {
     AsyncStorage.setItem(GUIDE_POSE_KEY, '1').catch(() => {});
   };
   const poser = async (kind: string) => {
-    const ok = await RoomScan.poserAuViseur(kind);
-    if (ok) {
+    const pose = await RoomScan.poserAuViseur(kind);
+    if (pose) {
       setPoses((n) => n + 1);
       setRefus(false);
       haptic('succes');
+      /*
+        AU PLAFOND, LA POSITION SE DÉCIDE APRÈS.
+
+        Le centrage a besoin du contour de la pièce, que le scan ne livre
+        qu'à la fin. On annonce donc ce qui va se passer plutôt qu'une cote
+        qu'on n'a pas : promettre un chiffre faux serait pire que se taire.
+      */
+      const mot = pose.plafond
+        ? 'Point lumineux — il sera centré dans la pièce'
+        : aimanterHauteur(kind as FixtureKind, pose.height).mot;
+      if (mot) {
+        setAnnonce(mot);
+        if (minuteurAnnonce.current) clearTimeout(minuteurAnnonce.current);
+        minuteurAnnonce.current = setTimeout(() => setAnnonce(null), 3200);
+      }
     } else {
       setRefus(true);
       haptic('alerte');
@@ -270,12 +306,17 @@ export function ScanScreen() {
               )}
             </View>
           </View>
-          {(poses > 0 || refus) && (
+          {(poses > 0 || refus || annonce) && (
             <View style={styles.poseBandeau} pointerEvents="none">
               <Text style={styles.instructionText}>
+                {/* Le refus passe avant tout : c'est le seul cas où le
+                    geste n'a rien produit. Puis la cote qu'on vient de
+                    poser, tant qu'elle est fraîche ; le compte reprend la
+                    place ensuite. */}
                 {refus
                   ? 'Visez un mur déjà relevé — balayez-le d’abord'
-                  : `${poses} appareil${poses > 1 ? 's' : ''} posé${
+                  : annonce ??
+                    `${poses} appareil${poses > 1 ? 's' : ''} posé${
                       poses > 1 ? 's' : ''
                     }`}
               </Text>

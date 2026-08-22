@@ -4671,6 +4671,74 @@ vide — la 3D la découpe hors maçonnerie et le métré compte une pose
 impossible. Le chiffre qu'on relit après coup dit alors la vérité, ce qu'un
 refus muet ne ferait pas.
 
+### On pose à la cote du métier, pas à la hauteur du doigt
+
+Relevé du patron : « lors d'un scan, j'aimerais qu'on pose de manière logique
+les éléments et non EXACTEMENT là où on cible. Si l'utilisateur vise le bas
+d'un mur, on place la prise directement à 25 cm ; si l'utilisateur vise le
+milieu du mur, 110 cm (prise crédence par exemple). Pareil pour les lumières,
+1 m 90. »
+
+C'est la différence entre un relevé et un **plan d'exécution**. Personne ne
+pose une prise à 23,7 cm : on pose à 25, et c'est ce qui se percera. Un
+viseur tenu à bout de bras donne le centimètre près — autant dire un chiffre
+faux, qu'il faudrait corriger un par un à la table.
+
+**La cote visée choisit le palier, elle ne le remplace pas.** Viser le bas
+d'un mur veut dire « plinthe » ; viser à mi-hauteur veut dire « au-dessus du
+plan de travail ». C'est l'intention qu'on lit dans le geste. Les appareils à
+cote unique — interrupteur à 1,10 m, applique à 1,90 m, tableau à 1,35 m — y
+vont toujours : leur fiche porte déjà cette cote, la même que le catalogue et
+le dossier imprimé.
+
+**Et l'on ne devine que ce qui se devine.** Une prise visée à deux mètres
+n'est ni une plinthe ni une crédence : c'est une attente de téléviseur, ou
+une erreur de visée. Au-delà de quarante-cinq centimètres du palier le plus
+proche, la cote relevée est conservée — mieux vaut un chiffre relevé qu'un
+chiffre inventé.
+
+### Un point de plafond se pose au centre
+
+Suite du même relevé : « si on vise le plafond pour mettre un point lumineux,
+on le centre à la largeur déjà calculée par le scan, et si c'est la même
+pièce, l'ajout d'un point s'axe automatiquement au premier ».
+
+Viser le plafond était déjà possible ; ce qui manquait, c'est le placement.
+Un point de centre est **au centre** : personne ne pose un DCL à quarante
+centimètres de l'axe parce que le téléphone tremblait. Le scan connaît le
+contour, il sait où est le centre.
+
+Deux points font une ligne, pas un nuage : le second se pose sur l'axe du
+premier — même abscisse s'il est au-dessus, même ordonnée s'il est à côté. On
+ne le **déplace pas le long** de cet axe : sa distance au premier est ce que
+l'électricien a voulu, c'est son alignement qui tremblait. Au-delà de trente
+centimètres dans les deux sens, ce n'est plus un tremblement mais un
+placement voulu — en quinconce, ou dans un angle — et on n'y touche pas.
+
+### Le message qui dit ce qui a été posé
+
+« Un message doit apparaître sans gêner : "Prise plinthe placée à 25 cm" ».
+Sans lui, l'électricien croit avoir raté sa visée.
+
+Il fallait pour cela que **le natif rende la cote relevée** : elle n'existe
+qu'au moment du raycast, et personne ne la connaît avant la finalisation du
+scan. `poserAuViseur` rend donc un dictionnaire en cas de succès et `false`
+en cas d'échec — les appelants qui ne veulent que le oui/non n'ont rien à
+changer, un dictionnaire étant vrai là où `false` ne l'est pas.
+
+Le message se pose dans le bandeau qui existait déjà, celui du compte, et
+s'efface au bout de trois secondes : un message qui reste devient un bandeau
+de plus, et c'est précisément ce qu'on demandait d'éviter. Au plafond, il
+annonce ce qui va se passer — « il sera centré dans la pièce » — plutôt
+qu'une cote qu'on n'a pas encore : promettre un chiffre faux serait pire que
+se taire.
+
+**L'effacement n'est pas couvert par un banc.** Deux façons de le vérifier
+ont été essayées, attendre puis simuler les minuteurs, et les deux bloquent
+le fichier — il monte une vue native, dont le cycle ne se laisse pas piloter.
+Une suite qui ne finit pas coûte plus cher qu'une règle vérifiée à la
+lecture.
+
 ### Trois relevés du chantier, en une fois
 
 **Les noms des boutons coupés.** Capture à l'appui : sur le bandeau d'un mur
