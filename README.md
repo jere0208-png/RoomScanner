@@ -4671,6 +4671,20 @@ vide — la 3D la découpe hors maçonnerie et le métré compte une pose
 impossible. Le chiffre qu'on relit après coup dit alors la vérité, ce qu'un
 refus muet ne ferait pas.
 
+### Ce que le rendu en image ne dit pas
+
+Piège payé une fois, noté dans l'outil. Sur la page de conformité, la norme
+se lisait « NFC15-100 » — mal écrite, et un électricien le voit
+immédiatement. Le flux du PDF, lui, porte « NF C 15-100 » depuis toujours :
+c'est `pdf-vers-svg.mjs` qui resserre les espaces en composant le texte.
+
+On a failli corriger une faute qui n'existait pas. Donc : **ce rendu vaut
+pour les positions, les tailles et les chevauchements** — c'est pour ça qu'il
+existe, et il a trouvé un plan trop petit, des pastilles perçant un mur, une
+note en travers d'un cartouche et un battant qui faisait le tour de la
+pièce. Pour un libellé, on retourne au flux : `grep -a` dans le PDF dit la
+vérité.
+
 ### L'application imprimait son propre échec
 
 Relevé à l'œil sur la liste du matériel — le document qui part au

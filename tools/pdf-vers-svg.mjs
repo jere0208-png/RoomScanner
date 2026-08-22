@@ -11,6 +11,20 @@
  * jeu d'opérateurs non compressés : ce script les interprète, et ImageMagick
  * fait le reste (`magick feuille.svg feuille.png`).
  *
+ * CE RENDU MENT SUR LES ESPACES — piège payé une fois, noté ici.
+ *
+ * Le PDF pose chaque chaîne à une position ; ce script les rend en `<text>`
+ * SVG et laisse le moteur composer. Les espaces se resserrent, et « NF C
+ * 15-100 » se lit « NFC15-100 » sur l'image. On a failli « corriger » une
+ * faute qui n'existait pas : le code écrivait la norme correctement depuis
+ * le début.
+ *
+ * DONC : ce qu'on voit ici vaut pour les POSITIONS, les TAILLES et les
+ * CHEVAUCHEMENTS — c'est pour ça qu'il existe, et il a trouvé un plan trop
+ * petit, des pastilles perçant un mur, une note en travers d'un cartouche et
+ * un battant qui faisait le tour de la pièce. Pour un LIBELLÉ, on retourne
+ * au flux : `grep -a` dans le PDF dit la vérité.
+ *
  * Trois pièges du flux, tous payés une fois : les points d'un chemin vont
  * par PAIRES (x y), l'axe y du PDF est inversé (y' = 842 − y), et les
  * accents sont des octets Windows-1252 bruts dans les chaînes `(…) Tj`.
