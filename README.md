@@ -2134,6 +2134,31 @@ affiché — Rez-de-chaussée. Changez de niveau pour vérifier les autres. » �
 et seulement quand le dossier a plus d'un niveau : sur une maison de
 plain-pied, la précision serait du bruit.
 
+### Dupliquer une pièce, appareillage compris
+
+Un logement a trois chambres qui se ressemblent, deux WC, des combles
+découpés en cellules identiques. On les relevait une par une, et surtout on
+les ÉQUIPAIT une par une : cinq socles, un interrupteur, un point lumineux,
+à chaque fois, aux mêmes cotes. L'application savait dupliquer un plan
+entier ; pas une pièce.
+
+**Le gain n'est pas la géométrie** — quatre murs se retracent vite. C'est
+l'APPAREILLAGE : c'est lui qui prend le temps, et c'est lui que la copie
+emporte, avec les ouvertures, le mobilier et les points de plafond. Une
+chambre dupliquée est une chambre finie.
+
+Quatre décisions qui font la copie juste. Elle se pose **à droite de
+l'emprise, sur la même ligne** : deux pièces au même endroit, c'est un métré
+qui double sans raison et deux cartouches illisibles l'un sur l'autre. Le
+**nom se numérote** (« Chambre 2 », puis « Chambre 3 » — jamais deux fois le
+même, sinon le dossier ne dit plus laquelle porte quoi). Les **liens vers
+une commande ne suivent pas** : un interrupteur copié ne doit pas piloter le
+point lumineux de l'originale. Et elle **naît au niveau où l'on travaille**,
+comme tout ce qui se dessine à la main.
+
+Les ouvertures, elles, ne portent pas de pièce : c'est la proximité qui les
+rattache, la même règle que partout ailleurs dans ce code.
+
 ### « Refaire », l'autre moitié d'« Annuler »
 
 L'application savait revenir en arrière, jamais repartir en avant. Sur un

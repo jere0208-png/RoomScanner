@@ -213,6 +213,7 @@ export function ResultScreen() {
   const setShowFurniture = useScanStore((s) => s.setShowFurniture);
   const toutesLesPieces = useScanStore((s) => s.rooms);
   const removeRoom = useScanStore((s) => s.removeRoom);
+  const duplicateRoom = useScanStore((s) => s.duplicateRoom);
   const addOpening = useScanStore((s) => s.addOpening);
   const resultOrigin = useScanStore((s) => s.resultOrigin);
   const removeObject = useScanStore((s) => s.removeObject);
@@ -3049,10 +3050,26 @@ export function ResultScreen() {
                 setMenu({
                   title: targetRoom.name || 'Pièce sans nom',
                   subtitle:
-                    'Ce qui change la structure du plan : réunir deux pièces ' +
-                    'que le scan a séparées, en couper une qu’il a réunie, ' +
-                    'ou la retirer.',
+                    'Ce qui change la structure du plan : la copier telle ' +
+                    'quelle, réunir deux pièces que le scan a séparées, en ' +
+                    'couper une qu’il a réunie, ou la retirer.',
                   actions: [
+                    {
+                      /*
+                        TROIS CHAMBRES QUI SE RESSEMBLENT.
+
+                        On les équipait une par une, aux mêmes cotes : cinq
+                        socles, un interrupteur, un point lumineux. La copie
+                        emporte tout — c'est l'appareillage qui prend le
+                        temps, pas les quatre murs.
+                      */
+                      label: 'Dupliquer la pièce',
+                      icon: 'piece' as const,
+                      onPress: () => {
+                        const neuf = duplicateRoom(selectedRoomId);
+                        if (neuf) setSelectedRoomId(neuf);
+                      },
+                    },
                     ...(rooms.filter((r) => r.id !== selectedRoomId).length > 0
                       ? [
                           {

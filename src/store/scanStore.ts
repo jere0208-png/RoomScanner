@@ -790,6 +790,14 @@ interface ScanState {
   /** Retire un mur du plan (et les ouvertures qu'il portait). */
   removeWall: (wallId: string) => void;
   /**
+   * COPIE UNE PIÈCE ET TOUT CE QU'ELLE PORTE, à côté d'elle.
+   *
+   * Trois chambres qui se ressemblent, deux WC : on les équipait une par
+   * une, aux mêmes cotes. Le gain n'est pas la géométrie — quatre murs se
+   * retracent vite — c'est l'APPAREILLAGE.
+   */
+  duplicateRoom: (roomId: string) => string | null;
+  /**
    * Trace un mur entre deux points choisis sur le plan. Le premier est
    * généralement l'extrémité d'un mur existant, pour que le nouveau s'y
    * raccroche ; le second se déplace ensuite par sa poignée.
@@ -1935,6 +1943,135 @@ export const useScanStore = create<ScanState>((set, get) => {
         return { ...cl, roomId: `room-${idx + 1}` };
       });
       set({ walls, rooms, objects, fixtures, photos, ceiling, dirty: true });
+    },
+
+    /*
+      DUPLIQUER UNE PIÈCE — avec tout ce qu'on vient d'y poser.
+
+      Un logement a trois chambres qui se ressemblent, deux WC, des combles
+      découpés en cellules identiques. On les relevait une par une, et
+      surtout on les ÉQUIPAIT une par une : cinq socles, un interrupteur, un
+      point lumineux, à chaque fois, aux mêmes cotes.
+
+      Le gain n'est pas la géométrie — quatre murs se retracent vite. C'est
+      L'APPAREILLAGE : c'est lui qui prend le temps, et c'est lui que la
+      copie emporte, avec les ouvertures, le mobilier et les points de
+      plafond. Une chambre dupliquée est une chambre FINIE.
+    */
+    duplicateRoom: (roomId) => {
+      const st = get();
+      const source = st.rooms.find((r) => r.id === roomId);
+      const mursSource = st.walls.filter((w) => w.roomId === roomId);
+      if (!source || mursSource.length === 0) return null;
+
+      /*
+        ELLE SE POSE À DROITE, comme une pièce neuve — jamais par-dessus
+        l'originale : deux pièces au même endroit, c'est un métré qui double
+        sans raison et deux cartouches illisibles l'un sur l'autre.
+      */
+      const xs = st.walls.flatMap((w) => [w.a.x, w.b.x]);
+      const dx =
+        Math.max(...xs) +
+        0.5 -
+        Math.min(...mursSource.flatMap((w) => [w.a.x, w.b.x]));
+      // Elle se pose SUR LA MÊME LIGNE que l'originale : côte à côte, comme
+      // deux chambres d'un couloir — pas en diagonale.
+      const dz = 0;
+
+      const cle = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      const neufId = `piece-${cle}`;
+      /** Chaque mur copié retient d'où il vient : l'appareillage suivra. */
+      const parMur = new Map<string, string>();
+      const murs = mursSource.map((w, i) => {
+        const id = `mur-${cle}-${i}`;
+        parMur.set(w.id, id);
+        return {
+          ...w,
+          id,
+          a: { x: w.a.x + dx, z: w.a.z + dz },
+          b: { x: w.b.x + dx, z: w.b.z + dz },
+          roomId: neufId,
+          niveau: st.niveauCourant,
+        };
+      });
+
+      /*
+        LE NOM SE NUMÉROTE, il ne se répète pas : deux « Chambre » sur un
+        plan, et le dossier ne dit plus laquelle porte quoi. On prend le
+        premier rang libre — une troisième copie ne redevient pas « 2 ».
+      */
+      const base = (source.name || 'Pièce').replace(/\s+\d+$/, '');
+      const pris = new Set(st.rooms.map((r) => r.name));
+      let n = 2;
+      while (pris.has(`${base} ${n}`)) n += 1;
+
+      /*
+        LES OUVERTURES SUIVENT LEUR MUR — et elles ne portent pas de pièce :
+        c'est la PROXIMITÉ qui les rattache, la même règle que partout
+        ailleurs (voir `nearestWall`). Une porte copiée reste une porte, au
+        même endroit du même mur.
+      */
+      const baies = st.openings
+        .filter((o) => nearestWall(o, mursSource).dist < 0.6)
+        .map((o, i) => ({
+          ...o,
+          id: `op-${cle}-${i}`,
+          a: { x: o.a.x + dx, z: o.a.z + dz },
+          b: { x: o.b.x + dx, z: o.b.z + dz },
+          roomId: neufId,
+        }));
+
+      const appareils = st.fixtures
+        .filter((f) => parMur.has(f.wallId))
+        .map((f, i) => ({
+          ...f,
+          id: `fx-${cle}-${i}`,
+          wallId: parMur.get(f.wallId)!,
+          // Les liens vers une commande resteraient pendus vers l'original.
+          commandes: undefined,
+          group: undefined,
+        }));
+
+      const plafond = st.ceiling
+        .filter((c) => c.roomId === roomId)
+        .map((c, i) => ({
+          ...c,
+          id: `pl-${cle}-${i}`,
+          roomId: neufId,
+          at: c.at ? { x: c.at.x + dx, z: c.at.z + dz } : c.at,
+        }));
+
+      const meubles = st.objects
+        .filter((o) => roomOf(o) === roomId)
+        .map((o, i) => ({
+          ...o,
+          id: `ob-${cle}-${i}`,
+          roomId: neufId,
+          transform: o.transform
+            ? o.transform.map((v, k) => (k === 12 ? v + dx : k === 14 ? v + dz : v))
+            : o.transform,
+        }));
+
+      pushHistory('duplicateRoom');
+      set({
+        walls: [...st.walls, ...murs],
+        openings: [...st.openings, ...baies],
+        fixtures: [...st.fixtures, ...appareils],
+        ceiling: [...st.ceiling, ...plafond],
+        objects: [...st.objects, ...meubles],
+        rooms: [
+          ...st.rooms,
+          {
+            ...source,
+            id: neufId,
+            name: `${base} ${n}`,
+            niveau: st.niveauCourant,
+            wallIds: murs.map((w) => w.id),
+          },
+        ],
+        dirty: true,
+      });
+      return neufId;
     },
 
     removeWall: (wallId) => {
