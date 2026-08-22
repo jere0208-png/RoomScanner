@@ -139,6 +139,53 @@ export function cartoucheHeurte(
   );
 }
 
+/** Un cadrage du plan : ce que le geste fait varier. */
+export interface CadragePlan {
+  zoom: number;
+  ox: number;
+  oy: number;
+  rot: number;
+}
+
+/**
+ * CE QUE LA COUCHE DOIT PORTER POUR MENER D'UN CADRAGE À L'AUTRE.
+ *
+ * Pendant un geste, le dessin reste peint au cadrage de la PRISE et c'est
+ * une transformation native qui le déplace — d'où la fluidité. Encore
+ * faut-il que cette transformation mène AU PIXEL PRÈS au cadrage visé,
+ * sinon le lâcher, qui recalcule tout, fait sauter le plan.
+ *
+ * Relevé du patron : « si je zoome avec un pincement en le déplaçant, au
+ * lâcher il se recale et on voit une apparition du plan quelques pixels à
+ * côté ». Le premier jet posait simplement la course des doigts en
+ * translation. Il oubliait que le décalage DÉJÀ ACQUIS (`ox`, `oy` de la
+ * prise) est peint dans le dessin, et qu'il subit donc lui aussi
+ * l'agrandissement et la rotation de la couche. L'écart valait
+ * `(1 − échelle) × décalage de départ` : nul tant qu'on n'avait rien
+ * déplacé avant de zoomer — c'est pourquoi le glissement simple se calait
+ * parfaitement — et de quelques pixels dès qu'on zoomait un plan déjà
+ * déplacé.
+ *
+ * La formule tient en une ligne : la couche agrandit et tourne autour du
+ * centre de la vue, puis translate ; il faut donc DÉFAIRE ce que
+ * l'agrandissement a fait subir à l'ancien décalage, et poser le nouveau.
+ */
+export function transformeDuGeste(
+  prise: CadragePlan,
+  vise: CadragePlan,
+): { tx: number; ty: number; ech: number; rot: number } {
+  const ech = vise.zoom / prise.zoom;
+  const rot = vise.rot - prise.rot;
+  const cos = Math.cos(rot);
+  const sin = Math.sin(rot);
+  return {
+    tx: vise.ox - ech * (prise.ox * cos - prise.oy * sin),
+    ty: vise.oy - ech * (prise.ox * sin + prise.oy * cos),
+    ech,
+    rot,
+  };
+}
+
 /**
  * LA TAILLE DE LA PASTILLE QUI REFERME UN TROU, À L'ÉCHELLE DU PLAN.
  *
@@ -751,10 +798,11 @@ export function FloorplanEditor({
             oy: base.v.oy + (my - base.my0),
             rot: base.v.rot + twist,
           };
-          glisse.ech.setValue(zoom / base.v.zoom);
-          glisse.rot.setValue(twist);
-          glisse.tx.setValue(mx - base.mx0);
-          glisse.ty.setValue(my - base.my0);
+          const pose = transformeDuGeste(base.v, vueVive.current);
+          glisse.ech.setValue(pose.ech);
+          glisse.rot.setValue(pose.rot);
+          glisse.tx.setValue(pose.tx);
+          glisse.ty.setValue(pose.ty);
         } else if (recalageVif.current) {
           /*
             EN RECALAGE, LE DOIGT DÉPLACE L'ÉTAGE, PAS LA VUE.
@@ -780,8 +828,9 @@ export function FloorplanEditor({
             ox: base.v.ox + (g.dx - base.dx0),
             oy: base.v.oy + (g.dy - base.dy0),
           };
-          glisse.tx.setValue(g.dx - base.dx0);
-          glisse.ty.setValue(g.dy - base.dy0);
+          const pose = transformeDuGeste(base.v, vueVive.current);
+          glisse.tx.setValue(pose.tx);
+          glisse.ty.setValue(pose.ty);
         }
       },
     }),

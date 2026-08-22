@@ -22,7 +22,10 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
-import { FloorplanEditor } from '../src/components/FloorplanEditor';
+import {
+  FloorplanEditor,
+  transformeDuGeste,
+} from '../src/components/FloorplanEditor';
 import { useScanStore } from '../src/store/scanStore';
 import {
   SNAPSHOT_FIXTURES,
@@ -452,6 +455,120 @@ describe('le plan glisse sans se redessiner', () => {
     // la couche revient à zéro — sinon le déplacement se compterait deux
     // fois au geste suivant.
     expect(empreinte(tree)).not.toBe(avant);
+  });
+});
+
+/**
+ * LA COUCHE DOIT MONTRER EXACTEMENT CE QUE LE LÂCHER VA POSER.
+ *
+ * Relevé du patron : « si je zoome avec un pincement en le déplaçant, au
+ * lâcher il se recale et on voit une apparition du plan quelques pixels à
+ * côté de là où on lâche ».
+ *
+ * Quelques pixels, et une raison exacte. Le dessin est peint au cadrage de
+ * la PRISE ; la couche le transforme ; le lâcher recalcule tout au cadrage
+ * visé. Pour que rien ne saute, la transformation doit mener au pixel près
+ * du premier au second — et le décalage `ox/oy` du cadrage de départ subit
+ * lui aussi l'agrandissement de la couche, ce que le premier jet oubliait.
+ *
+ * D'où l'écart : il vaut `(1 − échelle) × décalage de départ`. Nul tant
+ * qu'on n'a rien déplacé avant de zoomer — c'est pourquoi le glissement
+ * simple, lui, se calait parfaitement — et de quelques pixels dès qu'on
+ * zoome un plan déjà déplacé.
+ *
+ * Ce banc compare les DEUX CHEMINS pour un même point : celui de la couche
+ * (dessin de la prise, puis transformation) et celui de la vérité (dessin
+ * recalculé au cadrage visé). Ils doivent tomber au même endroit.
+ */
+describe('la transformation du geste mène pile au cadrage visé', () => {
+  /** Où un point atterrit quand le plan est peint à ce cadrage. */
+  const peint = (
+    v: { zoom: number; ox: number; oy: number; rot: number },
+    b: { x: number; y: number },
+    c: { x: number; y: number },
+  ) => {
+    const dx = (b.x - c.x) * v.zoom;
+    const dy = (b.y - c.y) * v.zoom;
+    return {
+      x: c.x + dx * Math.cos(v.rot) - dy * Math.sin(v.rot) + v.ox,
+      y: c.y + dx * Math.sin(v.rot) + dy * Math.cos(v.rot) + v.oy,
+    };
+  };
+
+  /** Où la couche l'emmène : échelle et rotation autour du centre, puis
+   *  translation — l'ordre exact d'un `transform` de React Native. */
+  const parLaCouche = (
+    p: { x: number; y: number },
+    t: { tx: number; ty: number; ech: number; rot: number },
+    c: { x: number; y: number },
+  ) => {
+    const dx = (p.x - c.x) * t.ech;
+    const dy = (p.y - c.y) * t.ech;
+    return {
+      x: c.x + dx * Math.cos(t.rot) - dy * Math.sin(t.rot) + t.tx,
+      y: c.y + dx * Math.sin(t.rot) + dy * Math.cos(t.rot) + t.ty,
+    };
+  };
+
+  const centre = { x: 195, y: 310 };
+  const points = [
+    { x: 40, y: 90 },
+    { x: 195, y: 310 },
+    { x: 380, y: 560 },
+  ];
+
+  const verifier = (
+    nom: string,
+    v0: { zoom: number; ox: number; oy: number; rot: number },
+    v1: { zoom: number; ox: number; oy: number; rot: number },
+  ) => {
+    const t = transformeDuGeste(v0, v1);
+    for (const b of points) {
+      const attendu = peint(v1, b, centre);
+      const obtenu = parLaCouche(peint(v0, b, centre), t, centre);
+      expect(`${nom} x=${obtenu.x.toFixed(3)}`).toBe(
+        `${nom} x=${attendu.x.toFixed(3)}`,
+      );
+      expect(`${nom} y=${obtenu.y.toFixed(3)}`).toBe(
+        `${nom} y=${attendu.y.toFixed(3)}`,
+      );
+    }
+  };
+
+  it('pour un simple glissement', () => {
+    verifier(
+      'glisse',
+      { zoom: 1, ox: 0, oy: 0, rot: 0 },
+      { zoom: 1, ox: 60, oy: -25, rot: 0 },
+    );
+  });
+
+  it('pour un pincement sur un plan DÉJÀ déplacé — le défaut du chantier', () => {
+    // C'est ce cas-là, et lui seul, qui décalait de quelques pixels : le
+    // décalage de départ (80, −40) subit l'agrandissement de la couche.
+    verifier(
+      'pince',
+      { zoom: 1, ox: 80, oy: -40, rot: 0 },
+      { zoom: 1.7, ox: 130, oy: -10, rot: 0 },
+    );
+  });
+
+  it('pour un pincement qui vrille, plan déjà tourné', () => {
+    verifier(
+      'vrille',
+      { zoom: 1.3, ox: 45, oy: 70, rot: 0.4 },
+      { zoom: 2.1, ox: 20, oy: 95, rot: 0.9 },
+    );
+  });
+
+  it('et ne bouge rien quand le cadrage n’a pas changé', () => {
+    const t = transformeDuGeste(
+      { zoom: 1.4, ox: 30, oy: 12, rot: 0.2 },
+      { zoom: 1.4, ox: 30, oy: 12, rot: 0.2 },
+    );
+    expect(
+      `${t.tx.toFixed(6)} ${t.ty.toFixed(6)} ${t.ech} ${t.rot}`,
+    ).toBe('0.000000 0.000000 1 0');
   });
 });
 

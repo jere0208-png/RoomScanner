@@ -1727,6 +1727,22 @@ complets — un à la prise, un au lâcher — pour économiser un travail qui
 n'existe plus. Le dessin reste entier sous le doigt, ce qui est aussi plus
 juste : les cotes suivent le plan au lieu de clignoter.
 
+**Et la transformation doit mener AU PIXEL PRÈS au cadrage visé.** « Si je
+zoome avec un pincement en le déplaçant, au lâcher il se recale et on voit
+une apparition du plan quelques pixels à côté. » Quelques pixels, et une
+raison exacte : le premier jet posait simplement la course des doigts en
+translation, oubliant que le décalage DÉJÀ ACQUIS est peint dans le dessin —
+il subit donc lui aussi l'agrandissement et la rotation de la couche.
+L'écart valait `(1 − échelle) × décalage de départ` : nul tant qu'on n'avait
+rien déplacé avant de zoomer (d'où un glissement simple parfaitement calé),
+et de quelques pixels dès qu'on zoomait un plan déjà déplacé. La formule
+est maintenant une fonction pure, `transformeDuGeste`, et le banc compare
+les DEUX CHEMINS pour trois points : celui de la couche (dessin de la prise,
+puis transformation) et celui de la vérité (dessin recalculé au cadrage
+visé). Ils doivent tomber au même endroit, au millième de pixel — glissement
+simple, pincement sur plan déplacé, pincement qui vrille sur plan déjà
+tourné.
+
 **La toile s'ouvre le temps du geste.** C'est le prix de ce calcul unique, et
 le patron l'a vu tout de suite : « si le plan sort du cadre et qu'on le
 ramène au centre, il est coupé — sa partie cachée reste cachée ». Ce qui
