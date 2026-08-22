@@ -108,3 +108,59 @@ describe('tirer une piece au doigt', () => {
     expect(c.depth).toBeCloseTo(3, 2);
   });
 });
+
+/**
+ * UNE PIECE BASIQUE, POSEE DEVANT SOI, QU'ON DEPLACE ET QU'ON ETIRE.
+ *
+ * Deuxieme releve du patron sur le meme sujet, apres essai du geste
+ * precedent : « le "ajouter une piece" ne montre pas qu'il faut creer la
+ * piece, et de plus au glissement, ca s'annule tout seul avec le deplacement
+ * du plan. On doit faire une piece basique modifiable comme un meuble sur
+ * ses cotes, en pointilles, et on doit pouvoir le placer en le glissant avec
+ * le doigt dans sa surface ».
+ *
+ * TIRER UN RECTANGLE DANS LE VIDE NE MONTRE RIEN. Un ecran qui attend un
+ * geste qu'il n'annonce pas est un ecran ou il ne se passe rien : on touche,
+ * le plan bouge, et l'on conclut que le bouton ne marche pas.
+ *
+ * On POSE donc la piece — on la voit, elle est la, elle est a soi. Ce qui
+ * reste a faire se lit sur elle : des pointilles disent « pas encore
+ * arretee », ses cotes s'attrapent comme celles d'un meuble, et le doigt la
+ * pousse ou l'on veut. Trois gestes qu'on connait deja, sur un objet qu'on
+ * voit.
+ */
+describe('poser une piece basique', () => {
+  it('la met au milieu de ce qui existe, aux cotes demandees', () => {
+    st().addRoomRect({ x: 0, z: 0 }, { x: 6, z: 4 }, 'Sejour');
+    const id = st().addRoomLibre(3, 3, 'Chambre')!;
+    const c = cotes(id);
+    expect(c.width).toBeCloseTo(3, 2);
+    expect(c.depth).toBeCloseTo(3, 2);
+    // Au centre de l'emprise : la ou l'oeil est deja pose.
+    const p = roomParts(st().walls, st().rooms).find((x) => x.roomId === id)!;
+    const xs = p.walls.flatMap((w) => [w.a.x, w.b.x]);
+    expect((Math.min(...xs) + Math.max(...xs)) / 2).toBeCloseTo(3, 1);
+  });
+
+  it('et se pose a l’origine quand le plan est vide', () => {
+    const id = st().addRoomLibre(3, 3, '')!;
+    expect(id).toBeTruthy();
+    expect(st().walls).toHaveLength(4);
+  });
+
+  it('elle est NEUVE : c’est ce qui la montre en pointilles', () => {
+    const id = st().addRoomLibre(3, 3, '')!;
+    expect(st().rooms.find((r) => r.id === id)!.neuve).toBe(true);
+  });
+
+  it('et elle s’arrete des qu’on la lache', () => {
+    /*
+      « PAS DE BOUTON VALIDER » — releve du patron, deja tranche pour les
+      meubles. La piece cesse d'etre neuve quand on la deselectionne : le
+      trait se ferme, et c'est le geste qu'on faisait de toute facon.
+    */
+    const id = st().addRoomLibre(3, 3, '')!;
+    st().arreterPiece(id);
+    expect(st().rooms.find((r) => r.id === id)!.neuve).toBeFalsy();
+  });
+});

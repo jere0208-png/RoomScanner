@@ -4671,6 +4671,27 @@ vide — la 3D la découpe hors maçonnerie et le métré compte une pose
 impossible. Le chiffre qu'on relit après coup dit alors la vérité, ce qu'un
 refus muet ne ferait pas.
 
+### La surface se voyait a travers les murs
+
+Releve du patron, capture 3D a l'appui : « la surface ne doit pas se voir a
+travers les murs du modele 3D ». Sur l'image, les points du sol apparaissent
+DANS la bande du mur avant.
+
+Ce n'est pas un defaut de tri — le semis est peint en premier, tout au fond.
+C'est que le mur de devant est estompe (l'ecorche, qui existe pour qu'on voie
+DANS la piece sans la retourner) et qu'un mur a quinze pour cent d'opacite
+laisse voir ce qui est dessous.
+
+Le remede est donc GEOMETRIQUE, pas dans l'ordre de peinture : le contour
+d'une piece suit l'AXE de ses murs, et le semis s'etendait sous la moitie de
+leur epaisseur. Arrete au nu interieur, il n'y a plus rien a voir au travers
+— et le dessin gagne un lisere net le long des murs, comme sur un plan
+d'architecte. Verifie en image, avant et apres : la premiere rangee de points
+tombait dans l'epaisseur du mur, elle s'arrete maintenant devant.
+
+Sans mur connu, on ne retranche rien : mieux vaut un semis entier qu'un semis
+rogne au hasard.
+
 ### On tire la piece, on ne la subit plus
 
 Releve du patron : « a la selection d'une piece a ajouter, elle se place

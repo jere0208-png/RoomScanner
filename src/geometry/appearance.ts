@@ -578,3 +578,48 @@ export function floorDots(poly: Pt[], step: number, max = 1800): Pt[] {
   }
   return out;
 }
+
+/**
+ * LE SEMIS DU SOL, ARRÊTÉ AU NU DES MURS.
+ *
+ * Relevé du patron, capture 3D à l'appui : « la surface ne doit pas se voir
+ * à travers les murs du modèle 3D ». Sur l'image, les points du sol
+ * apparaissent DANS la bande du mur avant.
+ *
+ * Ce n'est pas un défaut de tri — le semis est peint en premier, tout au
+ * fond. C'est que le mur de devant est estompé (l'écorché, qui existe pour
+ * qu'on voie DANS la pièce sans la retourner) et qu'un mur à quinze pour
+ * cent d'opacité laisse voir ce qui est dessous.
+ *
+ * Le remède est donc géométrique : le contour d'une pièce suit l'AXE de ses
+ * murs, et le semis s'étendait sous la moitié de leur épaisseur. Arrêté au
+ * nu intérieur, il n'y a plus rien à voir au travers — et le dessin gagne un
+ * liseré net le long des murs, comme sur un plan d'architecte.
+ *
+ * Sans mur connu, on ne retranche rien : mieux vaut un semis entier qu'un
+ * semis rogné au hasard.
+ */
+export function pointsDuSol(
+  poly: Pt[],
+  murs: { a: Pt; b: Pt; type?: string }[],
+  step: number,
+  max = 1800,
+  marge = 0.075,
+): Pt[] {
+  const bruts = floorDots(poly, step, max);
+  if (murs.length === 0) return bruts;
+  const distance = (p: Pt, w: { a: Pt; b: Pt }) => {
+    const dx = w.b.x - w.a.x;
+    const dz = w.b.z - w.a.z;
+    const l2 = dx * dx + dz * dz;
+    if (l2 < 1e-9) return Math.hypot(p.x - w.a.x, p.z - w.a.z);
+    const t = Math.max(
+      0,
+      Math.min(1, ((p.x - w.a.x) * dx + (p.z - w.a.z) * dz) / l2),
+    );
+    return Math.hypot(p.x - (w.a.x + dx * t), p.z - (w.a.z + dz * t));
+  };
+  return bruts.filter((p) =>
+    murs.every((w) => (w.type ?? 'wall') !== 'wall' || distance(p, w) > marge),
+  );
+}

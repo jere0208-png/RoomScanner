@@ -26,7 +26,7 @@ const midOf = (o: WallSeg): Pt => ({
   x: (o.a.x + o.b.x) / 2,
   z: (o.a.z + o.b.z) / 2,
 });
-import { dotStep, floorDots, inkOn, mixHex } from '../geometry/appearance';
+import { dotStep, inkOn, mixHex, pointsDuSol } from '../geometry/appearance';
 import {
   faceDepth,
   buildScene,
@@ -918,7 +918,18 @@ export function Iso3DView({
         if (!room.surface) continue;
         const base = room.floorFill;
         const dotColor = mixHex(base, inkOn(base), 0.42);
-        for (const p of floorDots(room.surface.pts, dotStep(scale, 22), budget)) {
+        /*
+          ARRETE AU NU DES MURS — releve du patron : « la surface ne doit
+          pas se voir a travers les murs du modele 3D ». Le contour d'une
+          piece suit l'AXE de ses murs : sans ce retrait, le semis s'etend
+          sous la moitie de leur epaisseur, et l'ecorche le laisse voir.
+        */
+        for (const p of pointsDuSol(
+          room.surface.pts,
+          walls,
+          dotStep(scale, 22),
+          budget,
+        )) {
           const q = project({ x: p.x, y: 0, z: p.z });
           items.push({ kind: 'dot', depth: -Infinity, x: q.sx, y: q.sy, color: dotColor });
         }

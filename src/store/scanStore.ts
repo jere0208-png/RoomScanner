@@ -116,6 +116,18 @@ export type Screen =
  * qui est propre à la pièce : son nom et le relevé de son sol.
  */
 export interface RoomEntry {
+  /**
+   * ELLE VIENT D'ETRE POSEE ET N'EST PAS ENCORE ARRETEE.
+   *
+   * Releve du patron : « on doit faire une piece basique modifiable comme un
+   * meuble sur ses cotes, EN POINTILLES ». Le pointille dit ce qu'aucun mot
+   * ne dirait aussi vite : ceci n'est pas encore un mur, c'est une intention
+   * qu'on est en train de regler.
+   *
+   * Absent partout ailleurs : une piece scannee ou rouverte est arretee par
+   * definition.
+   */
+  neuve?: boolean;
   id: string;
   /** Nom affiché sur le plan ; vide = pièce non nommée. */
   name: string;
@@ -911,6 +923,13 @@ interface ScanState {
    * Rend son identifiant, ou `null` si le rectangle est trop petit pour
    * etre une piece. Voir l'action pour le pourquoi du geste.
    */
+  /**
+   * Pose une piece rectangulaire AU MILIEU de ce qui existe, prete a etre
+   * poussee et etiree. Rend son identifiant.
+   */
+  addRoomLibre: (largeur: number, profondeur: number, nom?: string) => string | null;
+  /** La piece cesse d'etre neuve : son trait se ferme. */
+  arreterPiece: (roomId: string) => void;
   addRoomRect: (
     a: Pt,
     b: Pt,
@@ -2482,6 +2501,57 @@ export const useScanStore = create<ScanState>((set, get) => {
       pieces, cotee une fois, equipee des deux cotes — sans quoi le metre
       compte double et « fusionner » n'a plus rien a reunir.
     */
+    /*
+      UNE PIECE BASIQUE, POSEE DEVANT SOI.
+
+      Releve du patron, apres essai du geste precedent : « le "ajouter une
+      piece" ne montre pas qu'il faut creer la piece, et de plus au
+      glissement, ca s'annule tout seul avec le deplacement du plan ».
+
+      Tirer un rectangle dans le vide ne montre rien : un ecran qui attend un
+      geste qu'il n'annonce pas est un ecran ou il ne se passe rien. On POSE
+      donc la piece — on la voit, elle est la — et ce qui reste a faire se
+      lit sur elle : des pointilles disent « pas encore arretee », ses cotes
+      s'attrapent comme celles d'un meuble, et le doigt la pousse ou l'on
+      veut. Trois gestes qu'on connait deja, sur un objet qu'on voit.
+
+      AU MILIEU DE CE QUI EXISTE, parce que c'est la que l'oeil est deja
+      pose. Sur un plan vierge, a l'origine — il n'y a pas d'ailleurs.
+    */
+    addRoomLibre: (largeur, profondeur, nom) => {
+      const st = get();
+      const l = Math.min(MUR_MAX_M, Math.max(0.6, largeur));
+      const p = Math.min(MUR_MAX_M, Math.max(0.6, profondeur));
+      const auNiveau = st.walls.filter((w) => niveauDe(w) === st.niveauCourant);
+      const xs = auNiveau.flatMap((w) => [w.a.x, w.b.x]);
+      const zs = auNiveau.flatMap((w) => [w.a.z, w.b.z]);
+      const cx = xs.length > 0 ? (Math.min(...xs) + Math.max(...xs)) / 2 : l / 2;
+      const cz = zs.length > 0 ? (Math.min(...zs) + Math.max(...zs)) / 2 : p / 2;
+      const id = get().addRoomRect(
+        { x: cx - l / 2, z: cz - p / 2 },
+        { x: cx + l / 2, z: cz + p / 2 },
+        nom,
+      );
+      if (!id) return null;
+      set({
+        rooms: get().rooms.map((r) => (r.id === id ? { ...r, neuve: true } : r)),
+      });
+      return id;
+    },
+
+    /*
+      « PAS DE BOUTON VALIDER » — deja tranche pour les meubles, et la regle
+      vaut ici. La piece cesse d'etre neuve quand on la lache : le trait se
+      ferme, et c'est le geste qu'on faisait de toute facon.
+    */
+    arreterPiece: (roomId) => {
+      set({
+        rooms: get().rooms.map((r) =>
+          r.id === roomId ? { ...r, neuve: undefined } : r,
+        ),
+      });
+    },
+
     addRoomRect: (a, b, nom) => {
       const st = get();
       const x0 = Math.min(a.x, b.x);
