@@ -4671,6 +4671,37 @@ vide — la 3D la découpe hors maçonnerie et le métré compte une pose
 impossible. Le chiffre qu'on relit après coup dit alors la vérité, ce qu'un
 refus muet ne ferait pas.
 
+### Un mur passe au-dessus d'une chaise — reproduit, pas corrigé
+
+Relevé du patron, capture à l'appui. Mesuré : **vingt-deux angles de vue sur
+trente-six** montrent un pan de mur opaque posé sur une chaise placée devant
+lui. Le défaut est réel et il ne se voyait dans aucune épreuve : celle qui
+existait prenait un CANAPÉ — gros, bas, large. Une chaise est haute et
+étroite, et c'est ce qui la perd.
+
+**La cause est plus profonde qu'un réglage : la projection n'a pas de
+perspective.** Sans point de fuite, la profondeur d'un point vaut son
+éloignement PLUS son altitude — le haut d'un mur du fond, à deux mètres
+cinquante, est donc « plus proche de l'œil » que le sol qui est devant lui.
+Le test au pixel le constate honnêtement et conclut que le mur passe devant :
+vrai dans le repère, faux dans la pièce.
+
+**Deux remèdes ont été essayés, et les deux cassent ailleurs :**
+
+- faire dépendre la couche de tri du seuil de l'écorché — un mur ne passerait
+  devant que s'il s'efface : le compte tombe à six, et le **meuble d'angle se
+  déchire** sous au moins six angles, quelle que soit la valeur du seuil ;
+- interdire au test au pixel de défaire l'ordre des couches : le compte tombe
+  à neuf, et **quatre épreuves du tri au pixel tombent avec** — celles qui
+  garantissent qu'un retour de mur ne recouvre pas ce qui est devant.
+
+Les couches corrigent de face et lâchent ailleurs ; le pixel corrige ailleurs
+et lâche ici. En sortir demanderait un vrai tampon de profondeur par tuile —
+un chantier, pas un correctif. **Rien n'a donc été livré sur ce point**, et le
+banc `chaisecachee` fixe l'état mesuré : il tombera si l'on régresse, et il
+faudra l'abaisser dès qu'on fera mieux. Un banc qui prétendrait zéro
+mentirait.
+
 ### « Mon mur blanc devient marron »
 
 Deux relevés du patron sur la même capture : des couleurs fausses, et des

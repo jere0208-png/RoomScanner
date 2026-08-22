@@ -226,6 +226,18 @@ export interface CameraTrig {
  */
 /** Écart entre deux couches : plus grand que toute profondeur réelle. */
 const COUCHE = 1e4;
+
+/**
+ * À PARTIR D'OÙ UN MUR S'EFFACE, en écorché.
+ *
+ * Faire dépendre la COUCHE de tri du même seuil a été essayé — c'était la
+ * piste la plus naturelle pour le mur qui passe sur la chaise — et écarté :
+ * quelle que soit la valeur, le meuble d'angle se déchire sous six angles au
+ * moins. Un remède qui casse ailleurs n'est pas un remède.
+ */
+const SEUIL_ECORCHE = 0.12;
+
+
 /** Écart entre deux pièces : plus grand que trois couches. */
 const PIECE = 1e6;
 
@@ -244,7 +256,21 @@ function couche(face: Face3D, cam: CameraTrig): number {
     face.roomSide.x * cam.st * cam.sp +
     face.roomSide.y * cam.cp +
     face.roomSide.z * cam.ct * cam.sp;
-  // On voit le côté pièce : le mur est AU FOND, derrière son contenu.
+  /*
+    ON VOIT LE CÔTÉ PIÈCE : LE MUR EST AU FOND, derrière son contenu.
+
+    CE SEUIL A ÉTÉ MIS EN CAUSE, PUIS DISCULPÉ. Relevé du patron, capture à
+    l'appui : un pan de mur passe sur une chaise posée devant lui — vingt-deux
+    angles de vue sur trente-six, mesurés. L'explication semblait tenir : un
+    mur bascule ici en couche « devant » dès qu'on n'en voit plus la face
+    intérieure, alors que l'écorché ne l'efface qu'à partir de 0,12 ; entre
+    les deux, des murs opaques classés devant le mobilier.
+
+    Aligner les deux seuils fait bien tomber le compte à six — et DÉCHIRE le
+    meuble d'angle sous au moins six angles, quelle que soit la valeur
+    choisie. La cause est ailleurs, plus profonde : voir le banc
+    `chaisecachee`.
+  */
   return vers > 0 ? 0 : 2 * COUCHE;
 }
 
@@ -1020,8 +1046,8 @@ export function isHiddenFace(face: Face3D, cam: CameraTrig): boolean {
  */
 export function cutawayOpacity(n: P3, cam: CameraTrig): number {
   const vers = n.x * cam.st * cam.sp + n.y * cam.cp + n.z * cam.ct * cam.sp;
-  if (vers <= 0.12) return 1;
-  const t = Math.min(1, (vers - 0.12) / 0.45);
+  if (vers <= SEUIL_ECORCHE) return 1;
+  const t = Math.min(1, (vers - SEUIL_ECORCHE) / 0.45);
   // Lissage cubique : ni marche, ni rampe linéaire visible.
   const doux = t * t * (3 - 2 * t);
   return 1 - 0.85 * doux;
