@@ -214,6 +214,7 @@ export function ResultScreen() {
   const toutesLesPieces = useScanStore((s) => s.rooms);
   const removeRoom = useScanStore((s) => s.removeRoom);
   const duplicateRoom = useScanStore((s) => s.duplicateRoom);
+  const resizeRoom = useScanStore((s) => s.resizeRoom);
   const addOpening = useScanStore((s) => s.addOpening);
   const resultOrigin = useScanStore((s) => s.resultOrigin);
   const removeObject = useScanStore((s) => s.removeObject);
@@ -1525,6 +1526,63 @@ export function ResultScreen() {
       onSubmit: (t) => {
         const v = parseFloat(t.replace(',', '.'));
         if (v > 0) setRoomHeight(targetRoom.id, v);
+      },
+    });
+  };
+
+  /**
+   * LA PIÈCE EST-ELLE UN RECTANGLE D'APLOMB ?
+   *
+   * C'est la seule forme dont « largeur × profondeur » décrit entièrement le
+   * contour. Sur un L, les deux mêmes nombres admettent une infinité de
+   * dessins : on n'en choisit pas un à la place de l'électricien, et le
+   * geste ne s'offre simplement pas.
+   */
+  const estRectangle = (
+    murs: { a: { x: number; z: number }; b: { x: number; z: number } }[],
+  ) =>
+    murs.length === 4 &&
+    murs.every(
+      (w) => Math.abs(w.a.x - w.b.x) < 1e-3 || Math.abs(w.a.z - w.b.z) < 1e-3,
+    );
+
+  /**
+   * REPOSER LA PIÈCE À SES COTES, en deux saisies.
+   *
+   * On pose un « Séjour 5,00 × 4,00 » depuis le catalogue, le mètre donne
+   * 5,18 × 4,05, et il fallait jusqu'ici déplacer QUATRE murs à la main pour
+   * dix-huit centimètres. Deux nombres suffisent.
+   *
+   * DEUX FEUILLES PLUTÔT QU'UNE À DEUX CHAMPS : la carrosserie de saisie de
+   * l'app tient un champ, et un champ qu'on remplit au clavier d'une main,
+   * sur un chantier, se valide au retour-chariot. Le plan ne bouge qu'à la
+   * fin, d'un seul geste — donc « Annuler » le rend d'un seul appui.
+   */
+  const promptRoomCotes = () => {
+    if (!targetRoom || !targetExtent) return;
+    const roomId = targetRoom.id;
+    const nb = (t: string) => parseFloat(t.replace(',', '.'));
+    setPrompt({
+      title: 'Largeur de la pièce',
+      subtitle: 'Le coin haut-gauche ne bouge pas : la pièce s’étend vers la droite et vers le bas.',
+      value: targetExtent.width.toFixed(2).replace('.', ','),
+      unit: 'm',
+      numeric: true,
+      okLabel: 'Suivant',
+      onSubmit: (t) => {
+        const L = nb(t);
+        if (!(L > 0)) return;
+        setPrompt({
+          title: 'Profondeur de la pièce',
+          subtitle: `Largeur retenue : ${L.toFixed(2).replace('.', ',')} m.`,
+          value: targetExtent.depth.toFixed(2).replace('.', ','),
+          unit: 'm',
+          numeric: true,
+          onSubmit: (t2) => {
+            const P = nb(t2);
+            if (P > 0) resizeRoom(roomId, L, P);
+          },
+        });
       },
     });
   };
@@ -3046,6 +3104,9 @@ export function ResultScreen() {
               styles={stylesBarres}
               onName={() => setNaming(true)}
               onHeight={promptRoomHeight}
+              onCotes={
+                estRectangle(targetPart?.walls ?? []) ? promptRoomCotes : undefined
+              }
               onMore={() =>
                 setMenu({
                   title: targetRoom.name || 'Pièce sans nom',

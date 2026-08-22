@@ -798,6 +798,13 @@ interface ScanState {
    */
   duplicateRoom: (roomId: string) => string | null;
   /**
+   * Repose une pièce RECTANGULAIRE à ses cotes, coin haut-gauche fixe.
+   *
+   * Un contour libre n'a pas de « largeur × profondeur » unique : le geste
+   * ne s'applique qu'aux rectangles, et les autres gardent leurs murs.
+   */
+  resizeRoom: (roomId: string, largeur: number, profondeur: number) => void;
+  /**
    * Trace un mur entre deux points choisis sur le plan. Le premier est
    * généralement l'extrémité d'un mur existant, pour que le nouveau s'y
    * raccroche ; le second se déplace ensuite par sa poignée.
@@ -1958,6 +1965,87 @@ export const useScanStore = create<ScanState>((set, get) => {
       copie emporte, avec les ouvertures, le mobilier et les points de
       plafond. Une chambre dupliquée est une chambre FINIE.
     */
+    /*
+      REDIMENSIONNER UNE PIÈCE À SES COTES.
+
+      On pose un « Séjour 5,00 × 4,00 » depuis le catalogue, puis le mètre
+      donne 5,18 × 4,05. Il fallait alors déplacer QUATRE murs à la main, un
+      par un, en veillant à ne pas ouvrir les coins — pour une correction de
+      dix-huit centimètres. Le bandeau affichait pourtant ces cotes, juste à
+      côté d'une hauteur éditable d'un appui.
+
+      LE GESTE N'A DE SENS QUE SUR UN RECTANGLE : redimensionner un contour
+      en L à « largeur × profondeur » n'a pas de réponse unique, et l'on
+      n'en invente pas. Les autres pièces gardent leurs murs, qu'on déplace
+      un à un — c'est le prix d'une forme libre.
+
+      LE COIN HAUT-GAUCHE NE BOUGE PAS : la pièce grandit vers la droite et
+      vers le bas, donc ce qu'on regarde ne saute pas et les pièces voisines
+      restent où elles sont.
+    */
+    resizeRoom: (roomId, largeur, profondeur) => {
+      const st = get();
+      const murs = st.walls.filter((w) => w.roomId === roomId);
+      if (murs.length !== 4) return;
+      // Une cote nulle ou négative n'est pas une intention, c'est une
+      // saisie ratée : on ne la borne pas, on l'ignore.
+      if (!(largeur > 0) || !(profondeur > 0)) return;
+      const L = Math.min(MUR_MAX_M, Math.max(0.6, largeur));
+      const P = Math.min(MUR_MAX_M, Math.max(0.6, profondeur));
+      const xs = murs.flatMap((w) => [w.a.x, w.b.x]);
+      const zs = murs.flatMap((w) => [w.a.z, w.b.z]);
+      const x0 = Math.min(...xs);
+      const z0 = Math.min(...zs);
+      const x1 = Math.max(...xs);
+      const z1 = Math.max(...zs);
+      // Un contour qui n'est pas d'aplomb n'est pas un rectangle : on ne
+      // touche pas à ce qu'on ne sait pas reconstruire.
+      const droit = murs.every(
+        (w) => Math.abs(w.a.x - w.b.x) < 1e-3 || Math.abs(w.a.z - w.b.z) < 1e-3,
+      );
+      if (!droit || x1 - x0 < 1e-3 || z1 - z0 < 1e-3) return;
+
+      pushHistory('resizeRoom');
+      const place = (v: number, min: number, max: number, taille: number) =>
+        Math.abs(v - min) < Math.abs(v - max) ? min : min + taille;
+      const murs2 = murs.map((w) => ({
+        ...w,
+        a: {
+          x: place(w.a.x, x0, x1, L),
+          z: place(w.a.z, z0, z1, P),
+        },
+        b: {
+          x: place(w.b.x, x0, x1, L),
+          z: place(w.b.z, z0, z1, P),
+        },
+      }));
+      const apres = new Map(
+        murs2.map((w) => [w.id, Math.hypot(w.b.x - w.a.x, w.b.z - w.a.z)]),
+      );
+      const neufs = new Map(murs2.map((w) => [w.id, w]));
+
+      /*
+        CE QUI EST POSÉ SUR UN MUR RACCOURCI REVIENT DEDANS.
+
+        Une prise à 4,50 m sur un mur ramené à 2 m flotterait dans le vide —
+        invisible sur le plan, mais bien comptée par le contrôle des normes.
+        On la recale au plus près du bord, comme le fait déjà la pose.
+      */
+      const recaler = (along: number, wallId: string) => {
+        const ap = apres.get(wallId) ?? 0;
+        if (ap <= 0 || along <= ap) return along;
+        return Math.max(0.05, ap - 0.05);
+      };
+
+      set({
+        walls: st.walls.map((w) => neufs.get(w.id) ?? w),
+        fixtures: st.fixtures.map((f) =>
+          neufs.has(f.wallId) ? { ...f, along: recaler(f.along, f.wallId) } : f,
+        ),
+        dirty: true,
+      });
+    },
+
     duplicateRoom: (roomId) => {
       const st = get();
       const source = st.rooms.find((r) => r.id === roomId);

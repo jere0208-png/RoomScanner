@@ -4628,6 +4628,29 @@ Deux décisions valent d'être dites :
   l'électricien devant le même téléphone plein, sans savoir que quelque
   chose a servi.
 
+### Une pièce se repose à ses cotes
+
+On pose un « Séjour 5,00 × 4,00 » depuis le catalogue, on sort le mètre, et
+la réalité donne 5,18 × 4,05. Le bandeau affichait ces deux nombres — juste
+à côté d'une hauteur sous plafond, elle, éditable d'un appui. Les corriger
+demandait de déplacer QUATRE murs à la main, un par un, en veillant à ne pas
+ouvrir les coins. Pour dix-huit centimètres.
+
+Les cotes portent maintenant le crayon, comme la hauteur et le nom : deux
+saisies, largeur puis profondeur, et la pièce se repose. **Le coin
+haut-gauche ne bouge pas** — la pièce s'étend vers la droite et vers le bas,
+donc ce qu'on regarde ne saute pas et les pièces voisines restent en place.
+L'appareillage suit son mur à sa cote ; ce qu'un rétrécissement mettrait
+dehors revient au bord, plutôt que de flotter hors du plan tout en comptant
+encore dans le contrôle des normes. Le tout s'annule d'un seul geste.
+
+**Le crayon n'apparaît que sur un rectangle d'aplomb.** « Largeur ×
+profondeur » ne décrit entièrement que cette forme-là ; sur un contour en L,
+les deux mêmes nombres admettent une infinité de dessins, et on n'en choisit
+pas un à la place de l'électricien. Les autres pièces gardent leurs murs, à
+déplacer un à un — c'est le prix d'une forme libre, et un bouton qui ne peut
+pas aboutir est pire qu'un bouton absent.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro
