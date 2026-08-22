@@ -4671,6 +4671,38 @@ vide — la 3D la découpe hors maçonnerie et le métré compte une pose
 impossible. Le chiffre qu'on relit après coup dit alors la vérité, ce qu'un
 refus muet ne ferait pas.
 
+### Une pièce du premier empruntait un mur au rez
+
+Troisième parcours complet — un pavillon à deux niveaux, du plan vierge à la
+réouverture — et il a trouvé le défaut le plus profond de la série.
+
+`addRoomBox` accole toujours la nouvelle pièce à un mur existant : c'est ce
+qui donne une cloison mitoyenne exacte plutôt que deux logements flottant
+côte à côte. Mais il choisissait « le mur extérieur le plus long » parmi
+**tous** les murs du plan, étages confondus. Une chambre posée depuis le
+premier sortait donc avec trois murs à elle et un quatrième emprunté au
+rez-de-chaussée.
+
+Ce que ça cassait, en cascade : la feuille du premier montrait une pièce
+**ouverte** — le filtre par étage retire le mur emprunté, le contour ne
+ferme plus, et sans contour il n'y a ni surface, ni métré, ni contrôle des
+normes. La feuille du rez montrait un mur bordant une pièce d'un autre
+niveau. Et les deux étages partageaient une maçonnerie : corriger les cotes
+de l'une déformait l'autre, un étage plus bas.
+
+**Quand l'étage est vide**, il n'y a rien à quoi s'accoler, et la règle
+d'origine — « à droite de ce qui existe, avec un jeu d'un demi-mètre » —
+était la mauvaise réponse : un étage se superpose à celui qu'il couvre, et
+poser la première pièce à côté oblige à la ramener à la main sur six mètres,
+après l'avoir cherchée au dézoom. Elle part maintenant du coin de l'emprise
+du niveau du dessous, et `recalerNiveau` ajuste ensuite.
+
+Trois parcours de bout en bout gardent désormais ces chaînes : le plan
+dessiné, l'équipement électrique (du premier socle au dossier imprimé), et
+le pavillon à deux niveaux. Les autres épreuves vérifient chacune un geste ;
+celles-ci vérifient qu'ils s'enchaînent — **une chaîne se rompt aux
+jointures, jamais au milieu d'un maillon**.
+
 ### Ce qu'une ouverture EST — et le plan qui se déchirait
 
 Ces deux défauts ont été trouvés de la même façon : en refaisant le parcours

@@ -2459,8 +2459,21 @@ export const useScanStore = create<ScanState>((set, get) => {
       const bordures = new Set(
         st.rooms.flatMap((r) => r.wallIds ?? []),
       );
+      /*
+        ON NE S'ACCOLE QU'À UN MUR DE SON PROPRE ÉTAGE.
+
+        Le choix se faisait parmi TOUS les murs du plan, étages confondus :
+        une chambre posée depuis le premier sortait avec trois murs à elle
+        et un quatrième emprunté au rez-de-chaussée. La feuille du premier
+        montrait alors une pièce OUVERTE — le filtre par étage retire le mur
+        emprunté, le contour ne ferme plus, et sans contour il n'y a ni
+        surface, ni métré, ni contrôle des normes. La feuille du rez, elle,
+        montrait un mur bordant une pièce d'un autre niveau, et corriger les
+        cotes de l'une déformait l'autre un étage plus bas.
+      */
       const auto = [...st.walls]
-        .filter((w) => w.type === 'wall' && bordures.has(w.id))
+        .filter((w) => w.type === 'wall' && niveauDe(w) === st.niveauCourant)
+        .filter((w) => bordures.has(w.id))
         // Un mur qui borde DEUX pièces est un refend : lui accoler une
         // troisième pièce la poserait dans l'une des deux.
         .filter(
@@ -2533,9 +2546,33 @@ export const useScanStore = create<ScanState>((set, get) => {
        * se voit d'emblée et se pousse ensuite où l'on veut. Le premier scan
        * d'un logement vide, lui, la pose à l'origine.
        */
-      const xs = st.walls.flatMap((w) => [w.a.x, w.b.x]);
-      const zs = st.walls.flatMap((w) => [w.a.z, w.b.z]);
-      const x0 = xs.length > 0 ? Math.max(...xs) + 0.5 : 0;
+      /*
+        LA PREMIÈRE PIÈCE D'UN ÉTAGE VIDE SE POSE AU-DESSUS DE CELUI DU
+        DESSOUS.
+
+        « À droite de ce qui existe, avec un jeu d'un demi-mètre » est la
+        bonne réponse pour une pièce de PLUS au même étage : elle se voit
+        d'emblée et se pousse ensuite. Pour la première pièce d'un étage
+        neuf, c'est la mauvaise : un étage se superpose à celui qu'il
+        couvre, et la poser à côté oblige à la ramener à la main sur six
+        mètres — après l'avoir cherchée au dézoom.
+
+        On part donc du coin de l'emprise du niveau du dessous, et
+        `recalerNiveau` ajuste ensuite au centimètre.
+      */
+      const memeNiveau = st.walls.filter(
+        (w) => niveauDe(w) === st.niveauCourant,
+      );
+      const dessous = st.walls.filter((w) => niveauDe(w) === st.niveauCourant - 1);
+      const reference = memeNiveau.length > 0 ? memeNiveau : dessous;
+      const xs = reference.flatMap((w) => [w.a.x, w.b.x]);
+      const zs = reference.flatMap((w) => [w.a.z, w.b.z]);
+      const x0 =
+        xs.length === 0
+          ? 0
+          : memeNiveau.length > 0
+          ? Math.max(...xs) + 0.5
+          : Math.min(...xs);
       const z0 = zs.length > 0 ? Math.min(...zs) : 0;
       const x1 = x0 + Math.max(0.6, largeur);
       const z1 = z0 + Math.max(0.6, profondeur);
