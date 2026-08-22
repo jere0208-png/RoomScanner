@@ -90,3 +90,48 @@ describe('« Enregistrer » sur un plan dessiné', () => {
     expect(useAccountStore.getState().plansUtilises).toBe(0);
   });
 });
+
+/**
+ * UN PLAN NE SE PAIE QU'UNE FOIS.
+ *
+ * Trouvé en poussant le parcours plus loin : on dessine un plan (le palier
+ * gratuit se consomme, c'est la règle), on le supprime de la bibliothèque —
+ * le plan RESTE à l'écran, et c'est voulu : « on ne retire pas la 3D des
+ * mains de qui la regarde ». On le retouche, on ré-enregistre… et le
+ * compteur monte une SECONDE fois. L'électricien a payé deux relevés pour
+ * un seul.
+ *
+ * La règle du projet est « supprimer un relevé ne rend pas le quota » —
+ * autrement dit le compteur ne redescend jamais. Elle ne dit pas qu'il peut
+ * monter deux fois pour le même travail. Le plan à l'écran retient donc
+ * qu'il a DÉJÀ été compté, et cette marque ne se lève qu'en repartant d'un
+ * plan neuf.
+ */
+describe('le palier gratuit ne se débite qu’une fois par plan', () => {
+  it('même après avoir supprimé le plan de la bibliothèque', () => {
+    useScanStore.getState().commencerAuClavier();
+    useScanStore.getState().addRoomBox(5, 4, 'Séjour');
+    useScanStore.getState().commitCurrent();
+    expect(useAccountStore.getState().plansUtilises).toBe(1);
+
+    const id = useScanStore.getState().currentSaveId!;
+    useScanStore.getState().deleteSave(id);
+    // Le plan reste sous les yeux : on le ré-enregistre.
+    useScanStore.getState().commitCurrent();
+    expect(useScanStore.getState().saves).toHaveLength(1);
+    expect(`${useAccountStore.getState().plansUtilises} relevé(s) débité(s)`).toBe(
+      '1 relevé(s) débité(s)',
+    );
+  });
+
+  it('mais un plan NEUF se compte, lui', () => {
+    useScanStore.getState().commencerAuClavier();
+    useScanStore.getState().addRoomBox(5, 4, 'Séjour');
+    useScanStore.getState().commitCurrent();
+    // On repart de zéro : c'est un autre relevé, il se débite.
+    useScanStore.getState().commencerAuClavier();
+    useScanStore.getState().addRoomBox(3, 3, 'Chambre');
+    useScanStore.getState().commitCurrent();
+    expect(useAccountStore.getState().plansUtilises).toBe(2);
+  });
+});

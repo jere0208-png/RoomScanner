@@ -2015,6 +2015,50 @@ encore. Le verdict attend donc le premier appareil posé ; jusque-là la
 pastille invite, sans juger. Dès le premier socle, il reprend tous ses
 droits.
 
+### Ce qu'une seconde campagne de tests a révélé
+
+La première portait sur le premier usage ; celle-ci vise les zones à risque
+que le parcours n'avait pas touchées — logement multi-pièces, bibliothèque,
+brouillon, exports, tableau existant, suppression de compte. La plupart ont
+tenu. Trois choses sont tombées.
+
+**Un plan se payait deux fois.** Effet de bord du correctif précédent : le
+palier gratuit se consomme quand une entrée de bibliothèque naît, or on peut
+supprimer cette entrée et garder le plan sous les yeux — c'est voulu, « on
+ne retire pas la 3D des mains de qui la regarde ». Le ré-enregistrer créait
+alors une SECONDE entrée et débitait une seconde fois : un relevé payé deux
+fois. La règle du projet dit que supprimer ne REND pas le quota ; elle ne dit
+pas qu'il peut se prendre deux fois pour le même travail. Une marque suit
+donc le plan à l'écran, et ne se lève qu'en repartant d'un plan neuf.
+
+**« Annuler » défaisait deux gestes d'un coup.** On pose deux prises l'une
+après l'autre, on annule… et les deux disparaissent. La fusion des pas
+d'historique a pourtant une bonne raison d'être : un mur qu'on fait glisser
+envoie cinquante états par seconde, et sans elle il faudrait cinquante
+annulations pour revenir en arrière d'un seul geste. Mais elle ne vaut que
+pour les gestes CONTINUS — ceux qui suivent le doigt —, et ils se
+reconnaissent à leur clé, qui désigne l'objet manipulé (`move:mur-3:a`). Un
+geste discret porte une clé simple et ne se fusionne plus jamais : si rapide
+soit-il, c'est un geste de plus, et « Annuler » lui doit un retour.
+
+**Et l'on quittait un plan modifié sans un mot.** On ouvre un plan
+enregistré, on ajoute une chambre, on touche la flèche — tout est perdu.
+L'en-tête affichait « Modifications non enregistrées », mais personne ne
+relit l'en-tête au moment de sortir : on regarde le bouton qu'on touche. Le
+brouillon des trente secondes ne rattrape pas ce cas, puisqu'il ne se relit
+qu'au REDÉMARRAGE de l'application. La sortie propose donc d'abord ce qu'on
+veut neuf fois sur dix — enregistrer — et garde « Quitter sans
+enregistrer », parce qu'on peut vouloir jeter un essai. Quand il n'y a rien
+à perdre, elle ne demande rien : une confirmation inutile est une
+confirmation qu'on apprend à balayer sans lire. **Le bord gauche est soumis
+aux mêmes gardes** que la flèche — sinon le geste le plus facile serait le
+seul à perdre le travail.
+
+Ce qui a tenu, et qu'il vaut la peine d'écrire : les pièces accolées
+partagent bien leur mur (sept murs pour deux pièces), le brouillon rend le
+relevé entier (murs, pièces et appareillage), supprimer son compte laisse
+les plans sur l'appareil, et le DXF sort ses calques séparés.
+
 ### Un relevé interrompu ne se perd plus
 
 Un scan tenait entièrement en mémoire tant qu'on n'avait pas touché

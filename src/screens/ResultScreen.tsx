@@ -1334,6 +1334,52 @@ export function ResultScreen() {
     [issues],
   );
 
+  /*
+    ON NE QUITTE PAS UN PLAN MODIFIÉ SANS LE SAVOIR.
+
+    Trouvé en simulant un utilisateur : on ouvre un plan enregistré, on
+    ajoute une chambre, on touche la flèche de retour — et tout est perdu,
+    sans un mot. L'en-tête affiche bien « Modifications non enregistrées »,
+    mais personne ne relit l'en-tête au moment de sortir : on regarde le
+    bouton qu'on touche.
+
+    Le brouillon des trente secondes ne rattrape pas ce cas : il ne se relit
+    qu'au REDÉMARRAGE de l'application, et l'on vient seulement de revenir à
+    la bibliothèque.
+
+    La sortie propose donc d'abord ce que l'utilisateur veut neuf fois sur
+    dix — enregistrer — et garde « Quitter sans enregistrer », parce qu'on
+    peut vouloir jeter un essai. Quand il n'y a rien à perdre, elle ne
+    demande rien : une confirmation inutile est une confirmation qu'on
+    apprend à balayer sans lire.
+  */
+  const sortirDuPlan = () => {
+    const ou = resultOrigin === 'library' ? 'library' : 'home';
+    if (!dirty) {
+      setScreen(ou);
+      return;
+    }
+    Alert.alert(
+      'Modifications non enregistrées',
+      'Ce que vous venez de faire sur ce plan sera perdu si vous partez.',
+      [
+        {
+          text: 'Enregistrer',
+          onPress: () => {
+            commitCurrent();
+            setScreen(ou);
+          },
+        },
+        {
+          text: 'Quitter sans enregistrer',
+          style: 'destructive',
+          onPress: () => setScreen(ou),
+        },
+        { text: 'Rester', style: 'cancel' },
+      ],
+    );
+  };
+
   /** Amène sous les yeux l'élément visé par un constat. */
   const goToIssue = (issue: Constat) => {
     setChecking(false);
@@ -1680,16 +1726,10 @@ export function ResultScreen() {
             style={styles.backButton}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityLabel="Retour"
-            onPress={() =>
-              setScreen(resultOrigin === 'library' ? 'library' : 'home')
-            }>
+            onPress={sortirDuPlan}>
             <BackChevron color={teinte.ink} />
           </TouchableOpacity>
-          <RetourGlisse
-            onRetour={() =>
-              setScreen(resultOrigin === 'library' ? 'library' : 'home')
-            }
-          />
+          <RetourGlisse onRetour={sortirDuPlan} />
         </View>
         <View style={styles.emptyContainer}>
         <Text style={styles.emptyTitle}>
@@ -2183,18 +2223,14 @@ export function ResultScreen() {
           style={styles.backButton}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           accessibilityLabel="Retour"
-          onPress={() =>
-            setScreen(resultOrigin === 'library' ? 'library' : 'home')
-          }>
+          onPress={sortirDuPlan}>
           <BackChevron color={teinte.ink} />
         </TouchableOpacity>
         {/* Le bord gauche rend le même retour que la flèche — vingt
             points au ras du cadre, le plan garde tout le reste. */}
-        <RetourGlisse
-          onRetour={() =>
-            setScreen(resultOrigin === 'library' ? 'library' : 'home')
-          }
-        />
+        {/* Le bord gauche sort comme la flèche : mêmes gardes, sinon le
+            geste le plus facile serait le seul à perdre le travail. */}
+        <RetourGlisse onRetour={sortirDuPlan} />
         <TouchableOpacity
           style={styles.titleWrap}
           accessibilityLabel="Options du plan"

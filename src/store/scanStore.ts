@@ -1266,7 +1266,27 @@ export const useScanStore = create<ScanState>((set, get) => {
    */
   const pushHistory = (key: string) => {
     const now = Date.now();
-    if (key === lastKey && now - lastAt < 800) {
+    /*
+      LA FUSION NE VAUT QUE POUR LES GESTES CONTINUS.
+
+      Trouvé en simulant un utilisateur qui équipe un mur : on pose deux
+      prises l'une après l'autre, on touche « Annuler »… et les DEUX
+      disparaissent. Deux gestes distincts n'en faisaient qu'un.
+
+      La fusion a pourtant une bonne raison d'être, et il faut la garder :
+      un mur qu'on fait glisser envoie cinquante états par seconde, et sans
+      elle il faudrait cinquante annulations pour revenir en arrière d'un
+      seul geste. Mais elle ne concerne QUE ces gestes-là, ceux qui suivent
+      le doigt — et ils se reconnaissent à leur clé, qui désigne l'objet
+      manipulé (`move:mur-3:a`, `moveObject:o1`).
+
+      Un geste DISCRET — poser une prise, ajouter une pièce, supprimer un
+      mur — porte une clé simple, sans deux-points, et ne se fusionne
+      jamais avec le suivant : si rapide soit-il, c'est un geste de plus, et
+      « Annuler » lui doit un retour en arrière.
+    */
+    const continu = key.includes(':');
+    if (continu && key === lastKey && now - lastAt < 800) {
       lastAt = now;
       return;
     }
@@ -1297,6 +1317,22 @@ export const useScanStore = create<ScanState>((set, get) => {
    * sans priver d'annulation ce qui a été fait avant la sauvegarde.
    */
   let savedDepth = 0;
+
+  /*
+    CE PLAN A-T-IL DÉJÀ ÉTÉ COMPTÉ ?
+
+    Le palier gratuit se consomme quand une entrée de bibliothèque naît. Or
+    on peut supprimer cette entrée et garder le plan sous les yeux — c'est
+    voulu, « on ne retire pas la 3D des mains de qui la regarde ». Le
+    ré-enregistrer créait alors une SECONDE entrée, et débitait une seconde
+    fois : un relevé payé deux fois.
+
+    La règle du projet dit que supprimer ne REND pas le quota ; elle ne dit
+    pas qu'il peut se prendre deux fois pour le même travail. La marque
+    suit donc le plan à l'écran, et ne se lève qu'en repartant d'un plan
+    neuf (`reset`, qui est le passage obligé de tout nouveau relevé).
+  */
+  let dejaCompte = false;
 
   /** Repart d'un plan vierge d'historique (nouveau scan, ouverture, revert). */
   const clearHistory = () => {
@@ -3234,6 +3270,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       // c'est en garder un. Un essai jeté avant la fin ne compte pas, et
       // supprimer un relevé ne rend pas le quota.
       useAccountStore.getState().noterPlanCree();
+      dejaCompte = true;
       const now = new Date();
       const save: SavedScan = {
         id: `${now.getTime()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -3602,7 +3639,10 @@ export const useScanStore = create<ScanState>((set, get) => {
       const st = get();
       if (!st.currentSaveId) {
         if (st.walls.length === 0) return;
-        useAccountStore.getState().noterPlanCree();
+        if (!dejaCompte) {
+          useAccountStore.getState().noterPlanCree();
+          dejaCompte = true;
+        }
         const now = Date.now();
         const save: SavedScan = {
           id: `${now}-${Math.random().toString(36).slice(2, 8)}`,
@@ -4403,6 +4443,8 @@ export const useScanStore = create<ScanState>((set, get) => {
     openSave: (id) => {
       const found = get().saves.find((s) => s.id === id);
       if (!found) return;
+      // Ce plan existe déjà : il a été payé le jour de sa création.
+      dejaCompte = true;
       const save = migrateSave(found);
       set({
         modelPath: save.modelPath,
@@ -4508,6 +4550,8 @@ export const useScanStore = create<ScanState>((set, get) => {
       */
       arreterBrouillon();
       draftEcrit = '';
+      // Un nouveau relevé se paie, lui : la marque tombe avec l'ancien.
+      dejaCompte = false;
       AsyncStorage.removeItem(DRAFT_KEY).catch(() => {});
       set({
         screen: 'home',

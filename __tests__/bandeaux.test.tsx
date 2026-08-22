@@ -464,6 +464,17 @@ describe('l’écran des résultats', () => {
     const tree = monter();
     const bord = tree.root.findAllByType(RetourGlisse)[0];
     expect(bord).toBeDefined();
+    /*
+      LE PLAN EST À JOUR : on mesure le GESTE, pas la garde.
+
+      Depuis qu'on ne quitte plus un plan modifié sans le savoir, sortir
+      demande confirmation quand il reste du travail à enregistrer — et le
+      bord gauche est soumis aux mêmes gardes que la flèche, sinon le geste
+      le plus facile serait le seul à perdre le travail
+      (`quitterplan.test.tsx`). Ici, rien à perdre : le retour part tout
+      droit.
+    */
+    act(() => useScanStore.setState({ dirty: false }));
     act(() => bord.props.onRetour());
     expect(useScanStore.getState().screen).toBe('home');
     // Les seuils du geste, comptés :
