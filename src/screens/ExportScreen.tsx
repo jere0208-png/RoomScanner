@@ -596,6 +596,19 @@ const styles = getStyles(c);
           ).map(([titre, valeur, invite, poser]) => (
             <TouchableOpacity
               key={titre}
+              /*
+                ON NE DEVINE PAS QU'UNE ÉTIQUETTE SE TOUCHE.
+
+                Ces deux cases s'éditaient déjà, mais rien ne le disait :
+                « CLIENT — Non renseigné » se lit comme une constatation, pas
+                comme un champ. Le parcours d'essai l'a montré — on arrive à
+                l'export, le cartouche annonce « non renseigné », et l'on
+                repart avec un dossier anonyme sans avoir compris qu'il
+                suffisait d'appuyer. Le crayon dit « ça s'édite » : c'est le
+                même signe que sur le bandeau des cotes, et il vaut mieux
+                qu'une notice.
+              */
+              accessibilityLabel={`Renseigner : ${invite}`}
               style={styles.dossierCase}
               onPress={() =>
                 setPrompt({
@@ -606,7 +619,16 @@ const styles = getStyles(c);
                   onSubmit: poser,
                 })
               }>
-              <Text style={styles.dossierTitre}>{titre.toUpperCase()}</Text>
+              <View style={styles.dossierEntete}>
+                <Text style={styles.dossierTitre}>{titre.toUpperCase()}</Text>
+                <Svg width={11} height={11} viewBox="0 0 24 24">
+                  <Path
+                    d={SOLAIRES.crayon}
+                    fill={c.inkFaint}
+                    fillRule="evenodd"
+                  />
+                </Svg>
+              </View>
               <Text
                 style={[styles.dossierValeur, !valeur && styles.dossierVide]}
                 numberOfLines={1}>
@@ -976,6 +998,9 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
+  /* Le titre et son crayon sur la même ligne : le signe est À CÔTÉ du mot
+     qu'il qualifie, pas perdu dans un coin de la case. */
+  dossierEntete: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   dossierTitre: {
     color: c.inkFaint,
     fontSize: 9.5,

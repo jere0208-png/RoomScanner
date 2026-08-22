@@ -433,10 +433,23 @@ describe('l’accueil', () => {
    * Un contour qui tourne sur un bouton qui ne fera rien est une promesse en
    * l'air : l'animation s'arrête avec lui.
    */
-  it('éteint le bouton sur un appareil incompatible', () => {
+  /*
+    IL NE L'ÉTEINT PLUS : IL LE RETIRE.
+
+    Ce banc exigeait que « Commencer le scan » soit là, désactivé. C'était
+    la moitié du chemin : un bouton éteint reste le plus gros élément de
+    l'écran, et sur un appareil sans LiDAR il annonçait en grand une chose
+    impossible, conseil de scan à l'appui. L'application sait pourtant tout
+    faire sans caméra — c'est même souvent le chemin le plus court.
+
+    Le scan disparaît donc, « Dessiner un plan » prend sa place et sa
+    couleur (voir plus bas), et le refus reste écrit : c'est lui qui
+    explique pourquoi.
+  */
+  it('retire le scan sur un appareil incompatible, et dit pourquoi', () => {
     useScanStore.setState({ supported: false });
     const t = monter();
-    expect(bouton(t, 'Commencer le scan')!.props.disabled).toBe(true);
+    expect(bouton(t, 'Commencer le scan')).toBeUndefined();
     expect(textes(t)).toContain('pas compatible');
   });
 });
@@ -649,15 +662,68 @@ describe('l’onde du bouton principal', () => {
       .find((n) => n.props.label === 'Dessiner un plan')!;
     expect(anneaux(t, dessiner)).toHaveLength(0);
 
-    // Éteint, le bouton n'invite à rien : l'animer serait mentir.
+    /*
+      ET LE BOUTON « VÉRIFICATION… » NON PLUS, tant qu'on ne sait pas si
+      l'appareil sait scanner : il n'invite à rien, l'animer serait mentir.
+      (Sur un appareil incompatible, le bouton n'existe simplement plus.)
+    */
     act(() => t.unmount());
-    useScanStore.setState({ supported: false });
-    const eteint = monter();
-    const scan = eteint.root
+    useScanStore.setState({ supported: null });
+    const attente = monter();
+    const scan = attente.root
       .findAllByType(GlowButton)
       .find((n) => n.props.accessibilityLabel === 'Commencer le scan')!;
-    expect(anneaux(eteint, scan)).toHaveLength(0);
+    expect(anneaux(attente, scan)).toHaveLength(0);
     useScanStore.setState({ supported: true });
+  });
+});
+
+/**
+ * SUR UN APPAREIL SANS LiDAR, L'ACCUEIL PROPOSE CE QU'ON PEUT FAIRE.
+ *
+ * Trouvé en parcourant l'application comme un utilisateur qui la découvre,
+ * sur le téléphone le plus courant — un iPhone qui n'est pas « Pro ».
+ * L'écran affichait le refus (« cet appareil n'est pas compatible »), et
+ * gardait pourtant « Commencer le scan » en bouton PRINCIPAL, éteint, avec
+ * un conseil de scan en pied de page : « allumez les lumières et dégagez le
+ * centre de la pièce ». Trois éléments sur quatre parlaient d'une chose
+ * impossible.
+ *
+ * Or l'application sait tout faire sans caméra — plan, normes, métré,
+ * dossier — et c'est même souvent le chemin le plus court. Sur un appareil
+ * sans LiDAR, « Dessiner un plan » devient donc le geste principal, le scan
+ * s'efface, et le conseil se tait.
+ */
+describe('l’accueil sur un appareil sans LiDAR', () => {
+  const sansLidar = () => {
+    useScanStore.setState({ supported: false });
+    return monter();
+  };
+
+  it('met « Dessiner un plan » en avant, et n’offre plus le scan', () => {
+    const t = sansLidar();
+    const principal = bouton(t, 'Dessiner un plan sans scanner');
+    expect(principal).toBeDefined();
+    // Le geste possible porte la couleur ; le scan a disparu, plutôt que de
+    // rester en gros et éteint.
+    expect(principal!.props.variant).toBe('primary');
+    expect(bouton(t, 'Commencer le scan')).toBeUndefined();
+  });
+
+  it('et se tait sur les conseils de scan', () => {
+    const vu = textes(sansLidar());
+    // « Allumez les lumières et dégagez le centre de la pièce » ne veut
+    // plus rien dire quand il n'y a pas de caméra à guider.
+    expect(vu).not.toContain('Allumez les lumières');
+    // Le refus, lui, reste : il explique POURQUOI le scan n'est pas là.
+    expect(vu).toContain('capteur LiDAR');
+  });
+
+  it('mais garde tout en place sur un appareil compatible', () => {
+    useScanStore.setState({ supported: true });
+    const t = monter();
+    expect(bouton(t, 'Commencer le scan')).toBeDefined();
+    expect(textes(t)).toContain('Allumez les lumières');
   });
 });
 

@@ -28,15 +28,31 @@ const D = 30;
 
 export function ControlePastille({
   alertes,
+  commence = true,
   onPress,
 }: {
   alertes: number;
+  /*
+    L'INSTALLATION A-T-ELLE COMMENCÉ ?
+
+    Trouvé en parcourant l'application comme un utilisateur qui la
+    découvre : on pose un séjour — le premier geste de l'app — et la
+    pastille passe aussitôt au rouge, onde qui bat, « 3 points à
+    corriger ». Les constats sont justes (cinq socles exigés, aucun posé)
+    mais ils reprochent à quelqu'un de n'avoir pas encore fait ce qu'il
+    vient d'ouvrir l'application pour faire.
+
+    Une pièce sans le moindre appareil n'est pas une installation NON
+    CONFORME : c'est une installation qui n'existe pas encore. Le verdict
+    attend donc le premier appareil posé.
+  */
+  commence?: boolean;
   onPress: () => void;
 }) {
   const c = useTheme();
   const styles = getStyles(c);
   const onde = useRef(new Animated.Value(0)).current;
-  const enAlerte = alertes > 0;
+  const enAlerte = alertes > 0 && commence;
 
   useEffect(() => {
     if (!enAlerte) {
@@ -66,10 +82,10 @@ export function ControlePastille({
     return () => boucle.stop();
   }, [enAlerte, onde]);
 
-  const teinte = enAlerte ? c.danger : c.green;
+  const teinte = !commence ? c.inkFaint : enAlerte ? c.danger : c.green;
   return (
     <Animated.View style={styles.cadre}>
-      {enAlerte && (
+      {enAlerte && commence && (
         <Animated.View
           pointerEvents="none"
           style={[
@@ -97,9 +113,13 @@ export function ControlePastille({
       )}
       <TouchableOpacity
         accessibilityLabel={
-          enAlerte
-            ? `Contrôle — ${alertes} point${alertes > 1 ? 's' : ''} à corriger`
-            : 'Contrôle — conforme'
+          !commence
+            ? // Rien n'est encore posé : la pastille INVITE, elle ne juge
+              // pas. Elle ouvre le même écran, qui dira quoi poser.
+              'Contrôle des normes'
+            : enAlerte
+              ? `Contrôle — ${alertes} point${alertes > 1 ? 's' : ''} à corriger`
+              : 'Contrôle — conforme'
         }
         activeOpacity={0.8}
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}

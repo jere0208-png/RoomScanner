@@ -3576,6 +3576,60 @@ export const useScanStore = create<ScanState>((set, get) => {
     },
 
     commitCurrent: () => {
+      /*
+        UN PLAN QUI N'A PAS ENCORE D'ENTRÉE S'EN VOIT CRÉER UNE.
+
+        Trouvé en parcourant l'application comme un utilisateur qui la
+        découvre : on choisit « Dessiner un plan », on pose un séjour, on
+        touche « Enregistrer »… et rien n'est enregistré. `syncCurrent`
+        recopie le plan courant DANS SON entrée de bibliothèque, et un plan
+        dessiné n'en a jamais eu — la fonction sortait donc sans rien faire,
+        puis le drapeau des modifications s'effaçait quand même.
+        L'application affirmait que le travail était sauvé alors qu'il
+        n'existait nulle part.
+
+        C'est le défaut le plus cher de cette application — le seul qui
+        coûte un déplacement. Seul un scan terminé créait une entrée, parce
+        que lui s'auto-enregistre à la fin du relevé ; le plan tracé à la
+        main n'avait pas son équivalent.
+
+        ET C'EST ICI QUE LE PALIER GRATUIT SE CONSOMME, exactement pour la
+        même raison qu'après un scan : « générer un plan, c'est en garder
+        un ». La règle ne dépend pas du chemin — un plan tracé à la main est
+        un plan. Un plan VIDE, lui, n'est rien : on ne débite pas l'essai de
+        quelqu'un qui a seulement ouvert l'écran.
+      */
+      const st = get();
+      if (!st.currentSaveId) {
+        if (st.walls.length === 0) return;
+        useAccountStore.getState().noterPlanCree();
+        const now = Date.now();
+        const save: SavedScan = {
+          id: `${now}-${Math.random().toString(36).slice(2, 8)}`,
+          name: st.scanName || defaultName(new Date(now)),
+          createdAt: now,
+          updatedAt: now,
+          modelPath: st.modelPath,
+          rooms: st.rooms,
+          walls: st.walls,
+          openings: st.openings,
+          objects: st.objects,
+          fixtures: st.fixtures,
+          photos: st.photos,
+          ceiling: st.ceiling,
+          existant: st.existant ?? undefined,
+          north: st.north ?? undefined,
+          client: st.client || undefined,
+          address: st.address || undefined,
+        };
+        const saves = [save, ...st.saves];
+        set({ saves, currentSaveId: save.id, dirty: false });
+        persistSoon(saves);
+        savedDepth = history.length;
+        // Le plan monte au compte comme n'importe quel enregistrement.
+        deposerPlusTard(save.id);
+        return;
+      }
       syncCurrent();
       savedDepth = history.length;
       set({ dirty: false });

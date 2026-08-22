@@ -249,7 +249,8 @@ export function SheetShell({
   onClosed?: () => void;
   children: React.ReactNode;
 }) {
-  const styles = getStyles(useTheme());
+  const c = useTheme();
+  const styles = getStyles(c);
   const clavier = useKeyboardInset();
   /**
    * SUR TABLETTE, UNE FEUILLE NE TRAVERSE PAS L'ÉCRAN.
@@ -325,6 +326,29 @@ export function SheetShell({
               style={[styles.sheet, carte && styles.sheetCarte]}
               onPress={() => {}}>
               <View style={styles.grip} />
+              {/*
+                LA CROIX VIT ICI, POUR TOUTES LES FEUILLES.
+
+                Elle avait été posée sur la feuille de CHOIX seulement —
+                relevé du patron : « il manque la croix pour quitter la
+                page ». Le parcours d'essai a montré que le défaut restait
+                entier ailleurs, et justement sur la plus longue de toutes :
+                la feuille de contrôle des normes, qu'on ouvre pour lire dix
+                constats et dont on ne savait pas sortir.
+
+                Le voile reste l'échappatoire naturelle, mais il n'y a plus
+                de voile à viser quand la feuille remplit l'écran. La croix
+                est donc dans la coquille COMMUNE : toute feuille qui s'ouvre
+                dans cette application sait désormais se refermer.
+              */}
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Fermer"
+                style={styles.croixFeuille}
+                hitSlop={10}
+                onPress={onClose}>
+                <CloseCross size={20} color={c.inkSoft} />
+              </Pressable>
               {children}
             </Pressable>
           </Animated.View>
@@ -393,14 +417,8 @@ export function ActionSheet({
                 <Text style={styles.subtitle}>{vu.subtitle}</Text>
               ) : null}
             </View>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Fermer"
-              style={styles.croix}
-              hitSlop={10}
-              onPress={onClose}>
-              <CloseCross size={20} color={c.inkSoft} />
-            </Pressable>
+            {/* Pas de croix ici : la coquille commune la porte pour
+                toutes les feuilles. */}
           </View>
           {/*
             UN SEUL BLOC, DES FILETS ENTRE LES LIGNES.
@@ -559,6 +577,22 @@ const getStyles = themedStyles((c: Palette) =>
       borderRadius: 2,
       backgroundColor: c.lineStrong,
       marginBottom: 12,
+    },
+    /*
+      LA CROIX DE LA COQUILLE : posée en absolu, au-dessus du contenu, elle
+      ne pousse rien. Les feuilles ont toutes leur mise en page, et une
+      croix qui prendrait sa place dans le flux les décalerait toutes.
+    */
+    croixFeuille: {
+      position: 'absolute',
+      top: 10,
+      right: 12,
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 5,
     },
     title: { color: c.ink, fontSize: 18, fontWeight: '800', letterSpacing: -0.3 },
     subtitle: {

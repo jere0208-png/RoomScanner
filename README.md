@@ -1961,6 +1961,60 @@ Les boutons portent donc `flexShrink` — et `minWidth: 0`, sans quoi le mot à
 l'intérieur impose sa largeur et rien ne bouge —, leur libellé se tronque
 sur une ligne, et **la cote ne cède jamais** : c'est elle qu'on vient lire.
 
+### Ce qu'un parcours de découverte a révélé
+
+L'application a été parcourue comme le ferait quelqu'un qui l'ouvre pour la
+première fois : porte d'entrée, accueil sur un iPhone SANS LiDAR (le cas le
+plus courant), plan dessiné à la main, contrôle des normes, export. Cinq
+choses en sont sorties, et la première n'était pas celle qu'on cherchait.
+
+**UN PLAN DESSINÉ NE S'ENREGISTRAIT PAS.** On choisit « Dessiner un plan »,
+on pose un séjour de vingt mètres carrés, on touche « Enregistrer » : la
+bibliothèque reste vide, et le bouton disparaît quand même. L'application
+affirmait donc que le travail était sauvé alors qu'il n'existait nulle part
+— on quitte l'écran, tout est perdu. La cause tient en une ligne :
+« Enregistrer » recopie le plan courant DANS SON entrée de bibliothèque, et
+un plan dessiné n'en avait jamais eu ; seul un scan terminé en créait une,
+puisque lui s'auto-enregistre à la fin du relevé. C'est le défaut le plus
+cher de cette application — **le seul qui coûte un déplacement** — et il
+vivait dans le chemin ouvert aux appareils sans LiDAR, c'est-à-dire au plus
+grand nombre.
+
+**Et il emportait le palier gratuit avec lui.** Le quota se consomme
+exactement là où une entrée se crée : un plan dessiné ne comptait donc pour
+rien, on pouvait en faire cent. La règle est écrite depuis longtemps — « un
+plan tracé à la main est un plan, et il compte comme tel » — elle n'était
+appliquée nulle part. Une seule correction règle les deux, au même endroit.
+
+**L'accueil mettait en avant l'impossible.** Sans LiDAR, l'écran affichait le
+refus et gardait pourtant « Commencer le scan » en bouton principal, éteint,
+avec un conseil de scan en pied de page : trois éléments sur quatre
+parlaient d'une chose hors de portée. Le scan disparaît désormais,
+« Dessiner un plan » prend sa place ET sa couleur, le conseil se tait — et
+le refus reste, puisque c'est lui qui explique pourquoi.
+
+**La croix a été remontée dans la coquille commune.** Elle avait été posée
+sur la feuille de CHOIX ; le parcours a montré que le défaut restait entier
+sur la plus longue de toutes, la feuille de contrôle des normes, qu'on ouvre
+pour lire dix constats et dont on ne savait pas sortir. Toute feuille qui
+s'ouvre dans cette application sait maintenant se refermer.
+
+**Le cartouche du dossier ne disait pas qu'il s'éditait.** « CLIENT — Non
+renseigné » se lit comme une constatation, pas comme un champ : on arrive à
+l'export, on repart avec un dossier anonyme sans avoir compris qu'il
+suffisait d'appuyer. Les deux cases portent le crayon, le même signe que sur
+le bandeau des cotes.
+
+**Et le contrôle ne crie plus avant qu'on ait commencé.** Poser une pièce —
+le premier geste de l'app — faisait passer la pastille au rouge, onde qui
+bat, « 3 points à corriger ». Les constats étaient justes, mais ils
+reprochaient à quelqu'un de n'avoir pas encore fait ce qu'il venait
+d'ouvrir l'application pour faire. Une pièce sans le moindre appareil n'est
+pas une installation NON CONFORME : c'est une installation qui n'existe pas
+encore. Le verdict attend donc le premier appareil posé ; jusque-là la
+pastille invite, sans juger. Dès le premier socle, il reprend tous ses
+droits.
+
 ### Un relevé interrompu ne se perd plus
 
 Un scan tenait entièrement en mémoire tant qu'on n'avait pas touché

@@ -2678,6 +2678,10 @@ export function ResultScreen() {
             */}
             <ControlePastille
               alertes={alertes}
+              /* Un plan sans le moindre appareil n'est pas une installation
+                 non conforme : c'est une installation qui n'a pas commencé.
+                 Le verdict attend le premier socle. */
+              commence={fixtures.length > 0 || ceiling.length > 0}
               onPress={() => setChecking(true)}
             />
             {/*

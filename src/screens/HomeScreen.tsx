@@ -260,6 +260,18 @@ export function HomeScreen() {
         </Animated.View>
       )}
 
+      {/*
+        SUR UN APPAREIL SANS LiDAR, ON PROPOSE CE QU'ON PEUT FAIRE.
+
+        L'écran affichait le refus et gardait pourtant « Commencer le scan »
+        en bouton PRINCIPAL, éteint, avec un conseil de scan en pied de
+        page : trois éléments sur quatre parlaient d'une chose impossible.
+        Or l'application sait tout faire sans caméra — plan, normes, métré,
+        dossier — et c'est même souvent le chemin le plus court. Le scan
+        s'efface donc, « Dessiner un plan » prend sa place, et le refus
+        reste : c'est lui qui explique pourquoi.
+      */}
+      {supported !== false && (
       <Animated.View style={[styles.ctaWrap, fadeIn(3)]}>
         <GlowButton
           label={supported === null ? 'Vérification…' : 'Commencer le scan'}
@@ -280,6 +292,7 @@ export function HomeScreen() {
           }}
         />
       </Animated.View>
+      )}
 
       {/*
         LE PLAN SANS SCANNER — la seconde porte.
@@ -299,7 +312,8 @@ export function HomeScreen() {
       <Animated.View style={[styles.secondWrap, fadeIn(4)]}>
         <GlowButton
           label="Dessiner un plan"
-          variant="ghost"
+          // Seul geste possible sans caméra : il en porte la couleur.
+          variant={supported === false ? 'primary' : 'ghost'}
           accessibilityLabel="Dessiner un plan sans scanner"
           onPress={() => {
             // Le palier gratuit se juge ICI aussi : un plan tracé à la main
@@ -330,10 +344,13 @@ export function HomeScreen() {
         </Animated.View>
       )}
 
-      <Animated.Text style={[styles.hint, fadeIn(5)]}>
-        Allumez les lumières et dégagez le centre de la pièce pour un meilleur
-        résultat.
-      </Animated.Text>
+      {/* Le conseil guide la CAMÉRA : sans elle, il ne veut plus rien dire. */}
+      {supported !== false && (
+        <Animated.Text style={[styles.hint, fadeIn(5)]}>
+          Allumez les lumières et dégagez le centre de la pièce pour un
+          meilleur résultat.
+        </Animated.Text>
+      )}
 
       {/*
         LE PROFIL EST UN BLOC, EN HAUT À GAUCHE — croquis Paint du patron.
