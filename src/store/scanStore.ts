@@ -970,7 +970,12 @@ interface ScanState {
   removeFixture: (id: string) => void;
   /** Annule la dernière retouche. Vide = plus rien à annuler. */
   undo: () => void;
+  /** Refait ce qu'une annulation vient de retirer. Voir `avenir`. */
+  redo: () => void;
   canUndo: boolean;
+  /** Y a-t-il quelque chose à refaire ? (une annulation, non suivie d'un
+   *  geste neuf) */
+  canRedo: boolean;
   /** D'où vient l'écran résultat : le bouton retour y renvoie. */
   resultOrigin: 'scan' | 'library';
   walls: WallSeg[];
@@ -1305,6 +1310,11 @@ export const useScanStore = create<ScanState>((set, get) => {
     }
     lastKey = key;
     lastAt = now;
+    // Un geste neuf ferme l'avenir : voir `avenir`.
+    if (avenir.length > 0) {
+      avenir.length = 0;
+      if (get().canRedo) set({ canRedo: false });
+    }
     const st = get();
     history.push({
       walls: st.walls,
@@ -1347,12 +1357,37 @@ export const useScanStore = create<ScanState>((set, get) => {
   */
   let dejaCompte = false;
 
+  /*
+    L'AVENIR : CE QU'UNE ANNULATION A RETIRÉ.
+
+    L'application savait revenir en arrière, jamais repartir en avant. Sur
+    un chantier, on annule d'un geste de trop — le doigt appuie deux fois,
+    ou l'on se ravise — et le travail était perdu pour de bon : le seul
+    chemin pour le retrouver était de le refaire à la main. C'est encore une
+    perte de travail, et la plus vicieuse : elle vient d'un bouton dont le
+    rôle est précisément de rattraper les erreurs.
+
+    Un geste NEUF vide cette pile : on ne refait pas ce qui n'a plus de sens
+    dans un plan qui a changé de branche. C'est la règle de tous les
+    éditeurs, et l'inverse produirait des états impossibles.
+  */
+  const avenir: Snapshot[] = [];
+
   /** Repart d'un plan vierge d'historique (nouveau scan, ouverture, revert). */
   const clearHistory = () => {
     history.length = 0;
+    /*
+      L'AVENIR PART AVEC LE PASSÉ.
+
+      Sans cette ligne, « Refaire » ressortirait des morceaux du relevé
+      PRÉCÉDENT dans le plan qu'on vient d'ouvrir : la pile survit au
+      changement de dossier, elle, et rien n'irait dire à l'utilisateur d'où
+      sortent ces murs.
+    */
+    avenir.length = 0;
     lastKey = '';
     savedDepth = 0;
-    set({ canUndo: false });
+    set({ canUndo: false, canRedo: false });
   };
 
   /*
@@ -1450,6 +1485,7 @@ export const useScanStore = create<ScanState>((set, get) => {
     fixtures: [],
     north: null,
     canUndo: false,
+    canRedo: false,
     saves: [],
     savesCharges: false,
     folders: [],
@@ -2726,11 +2762,46 @@ export const useScanStore = create<ScanState>((set, get) => {
     undo: () => {
       const prev = history.pop();
       if (!prev) return;
+      const st = get();
+      // Ce qu'on quitte part dans l'avenir : « Refaire » le ressortira.
+      avenir.push({
+        walls: st.walls,
+        openings: st.openings,
+        objects: st.objects,
+        rooms: st.rooms,
+        fixtures: st.fixtures,
+        photos: st.photos,
+        ceiling: st.ceiling,
+      });
       set({
         ...prev,
         canUndo: history.length > 0,
+        canRedo: true,
         // Revenu à l'état enregistré : il n'y a plus rien à enregistrer, et
         // le bouton de sauvegarde n'a plus lieu d'être.
+        dirty: history.length !== savedDepth,
+      });
+    },
+
+    redo: () => {
+      const suite = avenir.pop();
+      if (!suite) return;
+      const st = get();
+      // Et le voyage se fait dans les deux sens : ce qu'on quitte en
+      // avançant redevient annulable.
+      history.push({
+        walls: st.walls,
+        openings: st.openings,
+        objects: st.objects,
+        rooms: st.rooms,
+        fixtures: st.fixtures,
+        photos: st.photos,
+        ceiling: st.ceiling,
+      });
+      set({
+        ...suite,
+        canUndo: true,
+        canRedo: avenir.length > 0,
         dirty: history.length !== savedDepth,
       });
     },
@@ -4617,6 +4688,15 @@ export const useScanStore = create<ScanState>((set, get) => {
       */
       arreterBrouillon();
       draftEcrit = '';
+      /*
+        LE PASSÉ NE SURVIT PAS À UN NOUVEAU RELEVÉ.
+
+        L'historique était de portée MODULE : il traversait le « Nouveau
+        scan » sans broncher, et une annulation ramenait alors le plan
+        précédent — sans son entrée de bibliothèque, sans son nom, sorti de
+        nulle part. Le filet s'était transformé en piège.
+      */
+      clearHistory();
       // Un nouveau relevé se paie, lui : la marque tombe avec l'ancien.
       dejaCompte = false;
       AsyncStorage.removeItem(DRAFT_KEY).catch(() => {});

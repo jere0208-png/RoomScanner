@@ -34,6 +34,10 @@ const CHOIX = {
   model: ['box-bold'],
   rooms: ['widget-bold'],
   undo: ['undo-left-bold', 'undo-left-round-bold'],
+  // « Refaire » : la MÊME flèche que l'annulation, retournée. Deux dessins
+  // différents pour deux gestes symétriques se liraient comme deux
+  // fonctions sans rapport.
+  redo: ['undo-right-bold', 'undo-right-round-bold'],
   square: ['ruler-angular-bold'],
   check: ['magnifer-bold'],
   gaines: ['routing-2-bold', 'routing-bold'],

@@ -43,6 +43,8 @@ export type ToolIcon =
   | 'model'
   | 'rooms'
   | 'undo'
+  /* « Refaire » : la même flèche que l'annulation, retournée. */
+  | 'redo'
   | 'square'
   | 'check'
   | 'gaines'

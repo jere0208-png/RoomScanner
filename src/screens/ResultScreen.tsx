@@ -226,6 +226,8 @@ export function ResultScreen() {
   const removeWall = useScanStore((s) => s.removeWall);
   const undo = useScanStore((s) => s.undo);
   const canUndo = useScanStore((s) => s.canUndo);
+  const canRedo = useScanStore((s) => s.canRedo);
+  const redo = useScanStore((s) => s.redo);
   const toutesLesOuvertures = useScanStore((s) => s.openings);
   const toutLAppareillage = useScanStore((s) => s.fixtures);
   const addFixture = useScanStore((s) => s.addFixture);
@@ -2809,6 +2811,26 @@ export function ResultScreen() {
             </SidePill>
             <SidePill visible={editMode && canUndo} index={0}>
               <ToolPill icon="undo" label="Annuler" active={false} onPress={undo} />
+            </SidePill>
+            {/*
+              « REFAIRE » NE PARAÎT QU'APRÈS UNE ANNULATION.
+
+              L'application savait revenir en arrière, jamais repartir en
+              avant : on annulait d'un geste de trop et le travail était
+              perdu pour de bon. Le bouton dont le rôle est de rattraper les
+              erreurs en créait une qu'il ne savait pas rattraper.
+
+              Il reste caché tant qu'il n'y a rien à refaire — une colonne
+              de trois boutons dont un ne sert jamais, c'est un bouton qu'on
+              apprend à ignorer, et les deux autres avec lui.
+            */}
+            <SidePill visible={editMode && canRedo} index={2}>
+              <ToolPill
+                icon="redo"
+                label="Refaire"
+                active={false}
+                onPress={redo}
+              />
             </SidePill>
             {/* « Édition » commande le contenu de la rangée : il ferme la
                 pile, là où le pouce tombe, et ne bouge jamais. */}

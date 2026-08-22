@@ -2134,6 +2134,33 @@ affiché — Rez-de-chaussée. Changez de niveau pour vérifier les autres. » �
 et seulement quand le dossier a plus d'un niveau : sur une maison de
 plain-pied, la précision serait du bruit.
 
+### « Refaire », l'autre moitié d'« Annuler »
+
+L'application savait revenir en arrière, jamais repartir en avant. Sur un
+chantier, on annule d'un geste de trop — le doigt appuie deux fois, ou l'on
+se ravise — et le travail était perdu pour de bon : le seul chemin pour le
+retrouver était de le refaire à la main. **C'est encore une perte de
+travail, et la plus vicieuse : elle vient du bouton dont le rôle est
+précisément de rattraper les erreurs.**
+
+Ce qu'une annulation retire part donc dans une pile d'AVENIR, et « Refaire »
+l'en ressort. Un geste NEUF la vide : on ne refait pas ce qui n'a plus de
+sens dans un plan qui a changé de branche — c'est la règle de tous les
+éditeurs, et l'inverse produirait des états impossibles. Le bouton reste
+caché tant qu'il n'y a rien à refaire : une colonne de trois boutons dont un
+ne sert jamais, c'est un bouton qu'on apprend à ignorer, et les deux autres
+avec lui. Son icône est la MÊME flèche que l'annulation, retournée : deux
+dessins différents pour deux gestes symétriques se liraient comme deux
+fonctions sans rapport.
+
+**Et le passé ne survit plus à un nouveau relevé.** L'historique est de
+portée module : il traversait le « Nouveau scan » sans broncher, et une
+annulation ramenait alors le plan précédent — sans son entrée de
+bibliothèque, sans son nom, sorti de nulle part. Le filet s'était transformé
+en piège. Il se vide désormais avec l'avenir, sans quoi « Refaire »
+ressortirait des morceaux du relevé d'avant dans le plan qu'on vient
+d'ouvrir.
+
 ### Trois gestes mènent dehors, UNE garde les couvre
 
 Sixième et septième campagnes. La sixième n'a rien trouvé, et cela vaut
