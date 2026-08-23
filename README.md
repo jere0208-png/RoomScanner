@@ -5821,6 +5821,57 @@ comprenne pourquoi. La première version la recopiait — elle a coûté un
 `` transformé en caractère d'échappement, et un « WC » que la copie ne
 reconnaissait plus alors que l'original le reconnaissait.
 
+### Le plan imprimé : sol blanc, symboles nus, et une seule réserve
+
+Trois demandes du patron sur la même feuille, et la troisième commandait les
+deux autres.
+
+**« Fais la surface blanche et non avec des petits points. »** Le semis vient
+de l'écran, où il donne l'échelle sous le doigt et distingue le sol des murs
+pochés. Sur le papier il ne sert plus à rien : le plan porte ses cotes, et le
+lecteur écrit dessus. Quinze cents points gris derrière des chiffres bleus,
+c'est du bruit sous ce qu'on est venu lire — et de l'encre. L'aplat reste, en
+blanc franc : c'est lui qui pose la surface de la pièce sous les annotations.
+
+**« Enlève les blocs blancs derrière les icônes élec. »** Celui des appareils
+muraux avait déjà sauté ; restait celui des appareils de plafond. Il
+protégeait le symbole et perçait tout ce qui passait dessous. Sa place reste
+RETENUE — aucune étiquette ne vient s'y écrire — mais on ne creuse plus de
+trou pour ça.
+
+**« Fais en sorte que chaque ligne et chaque mesure n'empiète pas une autre
+et sa lisibilité complète. »** Le plan écrit une dizaine de familles de mots
+— nom de meuble, cote de mur, largeur de menuiserie, cote d'appareil, sigle,
+repère de circuit, cartouche de pièce, note, numéro de mur — et **chacune
+tenait sa propre liste, quand elle en tenait une**. Deux familles qui ne se
+voient pas se marchent forcément dessus un jour : c'était « Canapé » sous une
+note, et la largeur d'une porte sous la cote d'une prise.
+
+Elles partagent maintenant **une seule réserve**, remplie dans l'ordre de ce
+que chacune peut céder :
+
+| ce qui s'écrit | liberté | quand la place est prise |
+| --- | --- | --- |
+| numéro de mur | aucune — il tient dans l'épaisseur | il s'inscrit AVANT tout le monde |
+| symbole, sigle, repère de circuit | aucune — ils tiennent à l'appareil | ils réservent |
+| cartouche de pièce | quelques points en hauteur | il s'écarte des sigles |
+| cote d'appareil | le long de son trait, puis de part et d'autre | elle s'écarte, sinon **elle cède** |
+| cote de mur, largeur de menuiserie | trois écarts, deux côtés | elles cèdent (règle d'origine) |
+| nom de meuble | aucune | il cède |
+| note | toute la hauteur | elle s'écarte, et tire un filet vers sa punaise |
+
+La règle qui manquait le plus est la dernière ligne des cotes : **quand rien
+n'est libre, la valeur s'efface et la ligne de cote reste**. Deux appareils
+voisins — un DAAF à quinze centimètres d'un point lumineux — tirent deux
+cotes vers le même mur, parallèles à six points l'une de l'autre : aucun
+glissement le long du trait ne sépare les nombres. On essaie donc aussi de
+part et d'autre du trait, puis on renonce. Un chiffre imprimé sur un autre ne
+se lit pas, et fait douter des deux.
+
+Mesuré sur une feuille chargée — deux pièces, sept appareils muraux, cinq de
+plafond, trois notes, une porte, une baie, une fenêtre : **zéro paire de mots
+qui se touchent**, et pas un mot perdu au passage (le banc compte les deux).
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

@@ -1572,19 +1572,89 @@ function planPage(
       q.y > box.y - 30 &&
       q.y < box.y + box.h + 30;
 
-    // Surfaces au sol : un aplat et un semis par pièce, pour les distinguer
-    // d'emblée des murs pochés en noir.
+    /*
+      LE SOL DU PLAN IMPRIMÉ EST BLANC — relevé du patron : « fais la
+      surface blanche et non avec des petits points ».
+
+      Le semis vient de l'écran, où il donne l'échelle sous le doigt et
+      distingue le sol des murs pochés. Sur le papier, il ne sert plus à
+      rien : le plan porte ses cotes, et le lecteur y écrit. Mille cinq
+      cents points gris derrière des chiffres bleus, c'est du bruit sous ce
+      qu'on est venu lire — et une cartouche d'encre.
+
+      L'aplat reste, en blanc franc : c'est lui qui pose la surface de la
+      pièce sous les annotations, et qui dit où le logement s'arrête.
+    */
     if (showSurfaces) {
-      const budget = Math.max(300, Math.round(1500 / Math.max(1, parts.length)));
       for (const part of parts) {
         if (!part.surface) continue;
-        const fill = fillOf(part.roomId);
-        d.poly(part.surface.pts.map(px), fill, null);
-        const dotColor = mixHex(fill, '#3D4551', 0.55);
-        for (const p of floorDots(part.surface.pts, dotStep(scale, 13), budget)) {
-          const q = px(p);
-          d.circle(q.x, q.y, 0.55, dotColor);
-        }
+        d.poly(part.surface.pts.map(px), '#FFFFFF', null);
+      }
+    }
+
+    /*
+      UNE SEULE RÉSERVE POUR TOUTE LA FEUILLE.
+
+      Relevé du patron : « fais en sorte que chaque ligne et chaque mesure
+      n'empiète pas une autre ». Le plan écrit une dizaine de familles de
+      mots — nom de meuble, cote de mur, largeur de menuiserie, cote
+      d'appareil, sigle, repère de circuit, cartouche de pièce, note,
+      numéro de mur — et chacune tenait sa propre liste, quand elle en
+      tenait une. Deux familles qui ne se voient pas se marchent forcément
+      dessus un jour : c'est le canapé sous la note, et la largeur de porte
+      sous la cote d'une prise.
+
+      Elles partagent donc UNE liste, dans l'ordre de ce qu'elles peuvent
+      céder : ce qui ne peut pas bouger s'y inscrit d'abord, ce qui peut
+      glisser s'écarte ensuite. `libre()` interroge, `posees.push()`
+      réserve — et l'ordre du dessin fait le reste.
+    */
+    const posees: { x: number; y: number; w: number; h: number }[] = [];
+    /** Boîte d'un texte pivoté, à la louche : Helvetica ≈ 0,5 em par signe. */
+    const boite = (txt: string, cx: number, cy: number, size: number, ang: number) => {
+      const l = txt.length * size * 0.5;
+      const r = (Math.abs(ang) * Math.PI) / 180;
+      const w2 = l * Math.cos(r) + size * Math.sin(r);
+      const h2 = l * Math.sin(r) + size * Math.cos(r);
+      return { x: cx - w2 / 2, y: cy - h2 / 2, w: w2, h: h2 };
+    };
+    /**
+     * L'étiquette tient-elle ENTIÈREMENT dans la fenêtre de la feuille ?
+     *
+     * On se règle sur la fenêtre de découpe, pas sur la zone de dessin : le
+     * plan est cadré au plus juste dans celle-ci, et ses cotes extérieures
+     * débordent forcément de quelques dizaines de points. Ce qui compte,
+     * c'est qu'aucun chiffre ne se fasse trancher par le bord.
+     */
+    const dansLaFenetre = (b: { x: number; y: number; w: number; h: number }) =>
+      b.x > FRAME.x + 4 &&
+      b.x + b.w < FRAME.x + FRAME.w - 4 &&
+      b.y > FRAME.y + TITLE_H + 4 &&
+      b.y + b.h < FRAME.y + FRAME.h - 4;
+    const libre = (b: { x: number; y: number; w: number; h: number }) =>
+      posees.every(
+        (o) =>
+          b.x > o.x + o.w + 1.5 ||
+          o.x > b.x + b.w + 1.5 ||
+          b.y > o.y + o.h + 1.5 ||
+          o.y > b.y + b.h + 1.5,
+      );
+
+    /*
+      LES NUMÉROS DE MUR S'INSCRIVENT LES PREMIERS.
+
+      Ils se DESSINENT en dernier (ce sont des annotations posées sur le
+      plan fini), mais leur place ne se discute pas : un numéro tient sur
+      son mur, à un point qu'on calcule sans rien connaître du reste. Il
+      réserve donc son rond tout de suite, et les cotes s'en écartent au
+      lieu de se faire recouvrir dix mille points plus loin.
+    */
+    {
+      const numeros = wallNumbers(ctx);
+      for (const w of walls) {
+        if (!numeros.get(w.id)) continue;
+        const p2 = px(wallTagAt(w, openings));
+        posees.push({ x: p2.x - 7.1, y: p2.y - 7.1, w: 14.2, h: 14.2 });
       }
     }
 
@@ -1613,10 +1683,23 @@ function planPage(
       for (const line of furnitureStrokes(furnKind(o.category), o.width, o.depth)) {
         d.path(line.map((p) => loc(p.x, p.y)), 0.7, '#9FACBF');
       }
-      // Nom du meuble au centre, si la place le permet.
+      /*
+        LE NOM DU MEUBLE, si la place le permet — et si personne n'y est.
+
+        Il s'écrivait au centre du meuble quoi qu'il arrive, et une note
+        posée là-dessus (elles passent en dernier, avec leur fond) le
+        mangeait : « Canapé » sous « Colonne montante à reprendre ». Le nom
+        d'un meuble est ce qu'on cède le plus volontiers — sa silhouette le
+        dit déjà — mais tant qu'à l'écrire, autant qu'il se lise.
+      */
       if (o.width * scale > 42 && o.depth * scale > 16) {
         const ctr2 = loc(0, 0);
-        d.text(frCategory(o.category), ctr2.x, ctr2.y - 2.5, 7, GREY);
+        const mot = frCategory(o.category);
+        const bb = boite(mot, ctr2.x, ctr2.y, 7, 0);
+        if (libre(bb)) {
+          posees.push(bb);
+          d.text(mot, ctr2.x, ctr2.y - 2.5, 7, GREY);
+        }
       }
     }
 
@@ -1733,37 +1816,6 @@ function planPage(
      * on renonce à la valeur — la ligne de cote et ses tirets restent, la
      * longueur se retrouve au métré.
      */
-    const posees: { x: number; y: number; w: number; h: number }[] = [];
-    /** Boîte d'un texte pivoté, à la louche : Helvetica ≈ 0,5 em par signe. */
-    const boite = (txt: string, cx: number, cy: number, size: number, ang: number) => {
-      const l = txt.length * size * 0.5;
-      const r = (Math.abs(ang) * Math.PI) / 180;
-      const w2 = l * Math.cos(r) + size * Math.sin(r);
-      const h2 = l * Math.sin(r) + size * Math.cos(r);
-      return { x: cx - w2 / 2, y: cy - h2 / 2, w: w2, h: h2 };
-    };
-    /**
-     * L'étiquette tient-elle ENTIÈREMENT dans la fenêtre de la feuille ?
-     *
-     * On se règle sur la fenêtre de découpe, pas sur la zone de dessin : le
-     * plan est cadré au plus juste dans celle-ci, et ses cotes extérieures
-     * débordent forcément de quelques dizaines de points. Ce qui compte,
-     * c'est qu'aucun chiffre ne se fasse trancher par le bord.
-     */
-    const dansLaFenetre = (b: { x: number; y: number; w: number; h: number }) =>
-      b.x > FRAME.x + 4 &&
-      b.x + b.w < FRAME.x + FRAME.w - 4 &&
-      b.y > FRAME.y + TITLE_H + 4 &&
-      b.y + b.h < FRAME.y + FRAME.h - 4;
-    const libre = (b: { x: number; y: number; w: number; h: number }) =>
-      posees.every(
-        (o) =>
-          b.x > o.x + o.w + 1.5 ||
-          o.x > b.x + b.w + 1.5 ||
-          b.y > o.y + o.h + 1.5 ||
-          o.y > b.y + b.h + 1.5,
-      );
-
     // Les plus longues d'abord : à égalité de place, c'est la grande cote
     // qui doit gagner.
     const cotes = showDims
@@ -2035,6 +2087,7 @@ function planPage(
         if (tags) {
           // À DROITE DU DISQUE, pas à droite du centre : sur une plaque de
           // trois postes, le sigle tombait en plein sur le dernier symbole.
+          posees.push(boite(tags, q.x + rayon + 5 + tags.length * 1.4, q.y + 6, 5.5, 0));
           d.text(tags, q.x + rayon + 5, q.y + 4, 5.5, spec.color, {
             align: 'left',
           });
@@ -2049,6 +2102,7 @@ function planPage(
         if (mark) {
           // SOUS le disque (l'axe y du PDF monte) : écrit à onze points du
           // centre, il se posait sur les pieds des symboles.
+          posees.push(boite(mark, q.x, q.y - rayon - 4, 5.5, 0));
           d.text(mark, q.x, q.y - rayon - 6, 5.5, markColor(mark), {
             bold: true,
           });
@@ -2153,9 +2207,14 @@ function planPage(
          * entre elles : sur la capture du dossier, le sigle du DAAF tombait
          * en plein sur la cote « 293 » du point lumineux voisin.
          */
-        // Les cartouches sont déjà posés (voir `cartouchesPiece`) : les
-        // cotes s'en écartent comme du reste.
-        const etiquettes: Boite[] = [...cartouchesPiece];
+        /*
+          LE PLAFOND ÉCRIT DANS LA RÉSERVE DE LA FEUILLE, pas dans la
+          sienne. Il tenait sa propre liste, et ses cotes tombaient sur la
+          largeur d'une menuiserie ou sur le nom d'un meuble — deux
+          familles qui ne se voyaient pas.
+        */
+        const etiquettes = posees;
+        etiquettes.push(...cartouchesPiece);
         /**
          * ET LES PASTILLES DES APPAREILS, qui se peignent EN DERNIER.
          *
@@ -2207,6 +2266,9 @@ function planPage(
         etiquettes.push(...sigles.values());
         // Et le cartouche, lui, n'aura que les sigles à éviter.
         siglesPlafond.push(...sigles.values());
+        // Un symbole de plafond n'a plus de disque blanc sous lui : sa place
+        // reste retenue pour que rien ne vienne s'y écrire.
+        posees.push(...pastilles);
         const seTouchent = (a: Boite, b: Boite) =>
           a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
         const auLarge = (b: Boite) =>
@@ -2268,16 +2330,33 @@ function planPage(
               x: a.x + (b.x - a.x) * t,
               y: a.y + (b.y - a.y) * t,
             });
-            let p = sur(0.5);
-            if (!auLarge(boiteCote(p))) {
-              for (const t of [0.34, 0.66, 0.22, 0.78, 0.14, 0.86]) {
-                const q = sur(t);
+            /*
+              ET SI RIEN N'EST LIBRE, LA VALEUR CÈDE LA PLACE.
+
+              Deux appareils voisins — un DAAF à quinze centimètres d'un
+              point lumineux — tirent deux cotes vers le MÊME mur : leurs
+              traits sont parallèles à six points l'un de l'autre, et aucun
+              glissement le long du trait ne sépare les nombres. On essaie
+              donc aussi de part et d'autre du trait, puis on renonce : la
+              ligne de cote et son repère restent, le nombre s'efface. C'est
+              la règle des cotes de mur, et c'est la bonne — un chiffre
+              imprimé sur un autre ne se lit pas, et fait douter des deux.
+            */
+            const decale = (q: Pt, k: number) => ({
+              x: q.x + ((b.y - a.y) / l) * k,
+              y: q.y - ((b.x - a.x) / l) * k,
+            });
+            let p: Pt | null = null;
+            chercher: for (const k of [0, 9, -9, 18, -18]) {
+              for (const t of [0.5, 0.34, 0.66, 0.22, 0.78, 0.14, 0.86]) {
+                const q = decale(sur(t), k);
                 if (auLarge(boiteCote(q))) {
                   p = q;
-                  break;
+                  break chercher;
                 }
               }
             }
+            if (!p) continue;
             etiquettes.push(boiteCote(p));
             d.rect(p.x - 11, p.y - 5, 22, 10, '#FFFFFF', null);
             d.text(`${Math.round(dist * 100)}`, p.x, p.y - 2.5, 6.5, SKY, {
@@ -2358,7 +2437,16 @@ function planPage(
           const q = px(cl.at);
           if (!dansLeCadre(q)) continue;
           const r = Math.max(7, Math.min(16, (spec.d / 2) * scale));
-          d.circle(q.x, q.y, r + 2, '#FFFFFF');
+          /*
+            PLUS DE PASTILLE BLANCHE SOUS LE SYMBOLE DE PLAFOND — relevé du
+            patron : « enlève les blocs blancs derrière les icônes élec dans
+            le plan ». C'était le dernier : celle des appareils muraux avait
+            déjà sauté, pour la même raison. Le disque protégeait le symbole
+            et perçait tout ce qui passait dessous — le sol, un meuble, un
+            trait de cheminement. Sa place est RETENUE (voir `pastilles`) :
+            aucune étiquette ne vient s'y écrire, et le symbole se lit sans
+            avoir besoin de creuser un trou.
+          */
           drawSymbol(d, CEILING_SYMBOL[cl.kind], q.x, q.y, r / 9, spec.color, 1.1);
           // La place retenue plus haut, avant que les cotes ne se posent.
           const pose = sigles.get(cl.id);
@@ -2476,6 +2564,7 @@ function planPage(
         // sont un seul objet, ils ne se séparent pas.
         const dy = pose.y - (cp2.y - (label ? 15 : 16));
         emprises.push(pose);
+        posees.push(pose);
         d.rect(pose.x, pose.y, pose.w, pose.h, '#FFFFFF', null);
         // Nom au-dessus, surface en dessous (l'axe y du PDF monte).
         if (label) {
@@ -2515,7 +2604,10 @@ function planPage(
         */
         const pose = ecarterDe(
           { x: q.x + 5, y: q.y - 5.5, w: larg, h: 11 },
-          emprises,
+          // Tout ce que la feuille porte déjà, pas seulement les cartouches
+          // de pièce : un « Canapé » sous une note reste un mot perdu.
+          [...emprises, ...posees],
+          80,
         );
         d.path([q, { x: q.x + 5, y: q.y - 3.5 }, { x: q.x + 5, y: q.y + 3.5 }, q], 0.8, INK);
         // Le filet qui relie la punaise à son étiquette quand elle s'est
@@ -2528,6 +2620,7 @@ function planPage(
         // Une note posée réserve sa place à son tour : deux notes voisines
         // se couvriraient l'une l'autre.
         emprises.push(pose);
+        posees.push(pose);
       }
     }
 
