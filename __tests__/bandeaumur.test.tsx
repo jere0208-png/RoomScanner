@@ -6,17 +6,22 @@
  * sort du bloc ». « Détacher » se lisait à moitié hors de la pilule
  * blanche, posé sur le plan.
  *
- * C'est exactement le défaut que le bandeau du MEUBLE a déjà connu, et le
- * remède est le même : ce n'est pas un problème de largeur, c'est un
- * problème de COMPRESSIBILITÉ. Une rangée faite de blocs qui ne cèdent
- * jamais dépasse au premier mot de trop — et une vue qui déborde n'est pas
- * rognée, elle SORT.
+ * PREMIÈRE RÉPONSE — celle que ce banc tenait : rendre les boutons
+ * COMPRESSIBLES. `flexShrink` sur chacun, `minWidth: 0` pour que le mot
+ * n'impose plus sa largeur, et le mot tronqué à une ligne. Tout rentrait,
+ * en effet : plus rien ne sortait du bloc.
  *
- * Deux règles, donc, et ce banc les tient :
+ * SAUF QUE « RENTRER » N'EST PAS « SE LIRE ». Relevé suivant, capture à
+ * l'appui, sur le bandeau d'une ligne de spots : « 3 spots · Pièce 1 · … »
+ * et quatre pastilles rognées. « Toujours les boutons sont coupés et le
+ * texte aussi. Fais en 2 parties, avec le texte au-dessus et les boutons en
+ * dessous. » La compressibilité n'avait pas réglé le problème, elle l'avait
+ * RÉPARTI : chacun cédait un peu, donc tout était coupé un peu.
  *
- *   — les boutons cèdent (ils portent `flexShrink`), la COTE jamais : c'est
- *     elle qu'on vient lire, et elle tient en quatre caractères ;
- *   — leur mot se tronque plutôt que de pousser la rangée dehors.
+ * La forme est maintenant en deux parties (voir `bandeauxbas`) : en haut ce
+ * qu'on lit, en bas ce qu'on touche. Les boutons ne cèdent plus — ils
+ * passent à la ligne. Ce banc garde donc la question d'origine (« est-ce
+ * que tout rentre ? ») en la posant à la nouvelle forme.
  */
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn(async () => null),
@@ -57,29 +62,41 @@ const bouton = (t: TestRenderer.ReactTestRenderer, label: string) =>
   )[0];
 
 describe('le bandeau du mur tient dans son bloc', () => {
-  it('les boutons cèdent la place', () => {
+  it('les boutons passent à la ligne au lieu de rétrécir', () => {
     const t = monter(3);
     for (const l of ['Mesures', 'Laser', 'Détacher']) {
       const st = StyleSheet.flatten(bouton(t, l).props.style) as {
         flexShrink?: number;
-        minWidth?: number;
+        minHeight?: number;
       };
-      // Sans `flexShrink`, la rangée pousse et le dernier bouton sort.
-      expect(`${l} cède : ${(st.flexShrink ?? 0) > 0}`).toBe(`${l} cède : true`);
-      // `minWidth: 0` : sans lui, le mot à l'intérieur impose sa largeur et
-      // le bouton refuse de rétrécir malgré `flexShrink`.
-      expect(st.minWidth).toBe(0);
+      // Ils ne cèdent plus : c'est la rangée qui se replie (`flexWrap`).
+      expect(`${l} cède : ${(st.flexShrink ?? 0) > 0}`).toBe(`${l} cède : false`);
+      // Et chacun garde la taille d'un doigt, quoi qu'il arrive.
+      expect(st.minHeight).toBeGreaterThanOrEqual(44);
     }
     act(() => t.unmount());
   });
 
-  it('mais la cote, jamais : c’est elle qu’on vient lire', () => {
+  it('et la cote a sa propre ligne, au-dessus d’eux', () => {
     const t = monter(3);
     const cote = t.root
       .findAllByType(Text)
       .find((n) => n.props.children === '1,19 m')!;
-    const st = StyleSheet.flatten(cote.props.style) as { flexShrink?: number };
-    expect(st.flexShrink).toBe(0);
+    // Elle n'a plus à résister à personne : elle ne partage plus sa ligne.
+    expect(cote.props.numberOfLines).toBe(1);
+    const rangee = t.root
+      .findAll((n) => {
+        const st = StyleSheet.flatten(n.props?.style) as
+          | { flexWrap?: string }
+          | undefined;
+        return st?.flexWrap === 'wrap';
+      })
+      .pop();
+    expect(rangee).toBeDefined();
+    // La cote n'est pas DANS la rangée des boutons : c'est tout le sujet.
+    expect(
+      rangee!.findAllByType(Text).some((n) => n.props.children === '1,19 m'),
+    ).toBe(false);
     act(() => t.unmount());
   });
 

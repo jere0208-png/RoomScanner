@@ -196,7 +196,20 @@ export function ObjectBar({
   );
 
   return (
-    <View style={styles.editBar}>
+    <View style={styles.bandeau}>
+      {/*
+        EN HAUT CE QU'ON LIT ET CE QU'ON RÈGLE, EN BAS LES GESTES.
+
+        Trois rangées se partageaient une carte sans en-tête : on réglait
+        une largeur sans savoir de quel meuble. Le nom vient donc en tête,
+        les cotes dessous, et les gestes — pivoter, retirer — descendent dans
+        la rangée d'actions commune à tous les bandeaux du bas.
+      */}
+      <View style={styles.bandeauTexte}>
+        <Text style={styles.bandeauTitre} numberOfLines={1}>
+          {frCategory(object.category)}
+        </Text>
+      </View>
       {onNudge && (
         <View style={styles.nudgeRow}>
           {fleche('Déplacer vers le haut', 0, -1, 'M12 19 V6 M6 12 L12 6 L18 12')}
@@ -244,7 +257,8 @@ export function ObjectBar({
         {/* L'unité tient DANS la pastille : posée à côté, elle coûtait sa
             propre largeur plus deux marges, pour une lettre. */}
         {champ('Profondeur', object.depth, (v) => onResize(object.width, v), 'm')}
-        <View style={styles.editIcons}>
+      </View>
+      <View style={styles.bandeauActions}>
           <TouchableOpacity
             style={styles.iconBtn}
             hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
@@ -299,7 +313,6 @@ export function ObjectBar({
             La croix rouge reste, elle : c'est le geste qui RETIRE, et lui
             change quelque chose.
           */}
-        </View>
       </View>
     </View>
   );

@@ -14,7 +14,7 @@ import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { castToWall, type Pt, type WallSeg } from '../geometry/floorplan';
-import type { CeilingFixture } from '../geometry/ceiling';
+import { CEILINGS, type CeilingFixture } from '../geometry/ceiling';
 import { haptic } from '../ui/haptic';
 import type { PromptData } from './Sheet';
 import type { Palette } from '../theme';
@@ -117,12 +117,31 @@ export function CeilingBar({
           );
 
           return (
-            <View style={styles.editBar}>
-              <View style={styles.editRow}>
-                {champ('gauche', 'Distance au mur de gauche', 'gauche')}
-                {champ('haut', 'Distance au mur du haut', 'haut')}
-                <Text style={styles.unit}>cm</Text>
-                <View style={styles.editIcons}>
+            <View style={styles.bandeau}>
+              {/*
+                EN HAUT CE QU'ON LIT ET CE QU'ON RÈGLE, EN BAS LES GESTES.
+
+                Les deux cotes et les trois boutons tenaient sur une seule
+                ligne : à quatre pastilles, la dernière sortait du cadre.
+                C'est la forme commune à tous les bandeaux du bas depuis le
+                relevé du patron — « fais en 2 parties, avec le texte
+                au-dessus et les boutons en dessous ».
+
+                Le NOM de l'appareil s'ajoute au passage : la barre montrait
+                deux nombres et deux flèches, sans jamais dire ce qu'on
+                était en train de placer.
+              */}
+              <View style={styles.bandeauTexte}>
+                <Text style={styles.bandeauTitre} numberOfLines={1}>
+                  {CEILINGS[fixture.kind].label}
+                </Text>
+                <View style={styles.editRow}>
+                  {champ('gauche', 'Distance au mur de gauche', 'gauche')}
+                  {champ('haut', 'Distance au mur du haut', 'haut')}
+                  <Text style={styles.unit}>cm</Text>
+                </View>
+              </View>
+              <View style={styles.bandeauActions}>
                   {/* RELIER, à portée de pouce.
                       La liaison vivait au fond d'un menu qu'il fallait
                       ouvrir en touchant l'appareil une seconde fois — et
@@ -181,7 +200,6 @@ export function CeilingBar({
                       />
                     </Svg>
                   </TouchableOpacity>
-                </View>
               </View>
             </View>
           );

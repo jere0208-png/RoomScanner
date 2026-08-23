@@ -26,9 +26,6 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 import { getStyles } from '../src/screens/result/styles';
 import { light } from '../src/theme';
 
-/** Largeur d'un texte, en points. */
-const largeurTexte = (n: number, taille: number) => n * taille * 0.62;
-
 /**
  * Le plus étroit des iPhone encore en service : le SE, 375 points. Les
  * 320 points de l'iPhone 5 ne concernent plus aucun appareil sous iOS 17.
@@ -56,46 +53,55 @@ describe('le bandeau du meuble', () => {
    * CE QUI NE CÈDE JAMAIS : les trois commandes, le séparateur, l'unité, et
    * les deux pastilles réduites à leur texte.
    */
-  it('fait tenir ses commandes et ses cotes dans le bloc', () => {
-    const bouton = s.iconBtn.width as number;
-    const ecartIcones = s.editIcons.gap as number;
-    const ecartRangee = s.editRow.gap as number;
-    // Trois boutons : pivoter, annuler, valider.
-    const commandes = 3 * bouton + 2 * ecartIcones;
-    // Une pastille de cote : ses marges, quatre caractères (« 0,00 ») et,
-    // pour la seconde, l'unité collée dedans.
-    const pastille =
-      2 * (s.clChamp.paddingHorizontal as number) +
-      largeurTexte(4, s.clValeur.fontSize as number);
-    const unite =
-      (s.clChamp.gap as number) + largeurTexte(1, s.unit.fontSize as number);
-    const separateur = largeurTexte(1, s.unit.fontSize as number);
-    const total =
-      pastille + ecartRangee + separateur + ecartRangee + (pastille + unite) +
-      ecartRangee + commandes;
-    // Et il reste de la marge : une ligne qui tient au point près
-    // ressortira au premier libellé qui s'allonge.
-    expect(Math.round(total)).toBeLessThanOrEqual(disponible(ECRAN_ETROIT) - 20);
+  /*
+    CE BANC COMPTAIT UNE LIGNE QUI N'EXISTE PLUS.
+
+    Il additionnait, au point près, ce qu'une SEULE rangée devait porter :
+    deux pastilles de cote, un séparateur, une unité et trois boutons — et il
+    exigeait que la somme tienne dans la largeur d'un iPhone étroit. C'était
+    la bonne question tant que la réponse était « tout sur une ligne ».
+
+    Relevé du patron, capture à l'appui : « toujours les boutons sont coupés
+    et le texte aussi. Fais en 2 parties, avec le texte au-dessus et les
+    boutons en dessous. » La ligne unique était le défaut, pas sa largeur.
+
+    Ce qu'on vérifie maintenant est donc l'inverse : que PLUS RIEN ne dépend
+    d'un calcul de largeur. Les cotes tiennent leur rangée, les boutons la
+    leur, et chacun garde sa taille — c'est la rangée qui se replie.
+  */
+  it('ne fait plus tenir ses boutons dans la rangée des cotes', () => {
+    // Une rangée d'actions qui se replie : c'est elle qui remplace le
+    // calcul au point près.
+    expect(s.editIcons.flexWrap).toBe('wrap');
+    expect(s.bandeauActions.flexWrap).toBe('wrap');
   });
 
-  /**
-   * ET SI ÇA NE TIENT PLUS, CE SONT LES CHIFFRES QUI SE SERRENT.
-   *
-   * L'ordre de sacrifice est ce qui empêche le défaut de revenir : une
-   * pastille de cote peut se réduire, un bouton non. Sans ces deux
-   * propriétés, la ligne repousse le dernier bouton dehors dès qu'un
-   * libellé s'allonge.
-   */
-  it('sacrifie les cotes avant les boutons', () => {
-    expect(s.clChamp.flexShrink).toBe(1);
+  it('ne sacrifie plus rien : ni les cotes, ni les boutons', () => {
+    // Le `flexShrink` était l'ordre de sacrifice d'une ligne trop courte.
+    // Personne ne cède plus, parce que personne ne partage plus sa ligne.
+    expect(s.clChamp.flexShrink).toBe(0);
     expect(s.editIcons.flexShrink).toBe(0);
     expect(s.unit.flexShrink).toBe(0);
   });
 
+  /**
+   * ET CHAQUE COMMANDE A LA TAILLE D'UN DOIGT.
+   *
+   * Les pastilles faisaient vingt-huit points dessinés et empruntaient le
+   * reste au débord (`hitSlop`) : la cible était bonne, le dessin non —
+   * quatre ronds serrés au bout d'une ligne pleine. Depuis que la rangée
+   * d'actions vit sous le texte, la place est là.
+   */
+  it('donne à chaque commande la taille d’un doigt', () => {
+    expect(s.iconBtn.width).toBeGreaterThanOrEqual(44);
+    expect(s.iconBtnOk.width).toBeGreaterThanOrEqual(44);
+    expect(s.nudgeBtn.width).toBeGreaterThanOrEqual(44);
+    expect(s.clChamp.minHeight).toBeGreaterThanOrEqual(44);
+  });
+
   /** Les angles : une carte, plus un galet. */
   it('a des angles de carte, pas de pilule', () => {
-    expect(s.editBar.borderRadius).toBeLessThanOrEqual(16);
-    expect(s.iconBtn.borderRadius).toBeLessThanOrEqual(12);
-    expect(s.clChamp.borderRadius).toBeLessThanOrEqual(12);
+    expect(s.editBar.borderRadius).toBeLessThanOrEqual(20);
+    expect(s.bandeau.borderRadius).toBeLessThanOrEqual(20);
   });
 });

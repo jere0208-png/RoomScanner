@@ -5908,6 +5908,55 @@ Quatre d'un côté, une de l'autre, et l'appareil se serait référé à une tui
 qui n'existe plus. Les deux découpages sont maintenant écrits au même
 endroit.
 
+### Les bandeaux du bas : deux parties, et rien qui cède
+
+Relevé du patron, capture à l'appui — le bandeau d'une ligne de spots :
+« 3 spots · Pièce 1 · … » et quatre pastilles rondes rognées par le bord.
+« Toujours les boutons sont coupés et le texte aussi. Fais en 2 parties, avec
+le texte au-dessus et les boutons en dessous. Pareil pour la sélection d'un
+mur. Refais tout le design de cette partie. »
+
+**Le défaut venait de la forme, pas des largeurs.** Une seule ligne devait
+porter la cote, la précision et jusqu'à quatre boutons, sur trois cent trente
+points d'écran utile. Tout y était en `flexShrink` : chacun cédait un peu,
+donc tout était coupé un peu — et le premier sacrifié était le chiffre qu'on
+venait lire.
+
+Le plus instructif est que ce `flexShrink` était **déjà une correction**, et
+qu'un banc le défendait. Le relevé précédent disait « un bouton sort du
+bloc » ; on avait rendu les boutons compressibles, et plus rien ne sortait,
+en effet. Mais *rentrer* n'est pas *se lire* : la compressibilité n'avait pas
+réglé le défaut, elle l'avait **réparti**. Les deux bancs qui tenaient
+l'ancienne règle sont réécrits, pas supprimés — ils racontent maintenant le
+chemin complet, parce que la prochaine personne à toucher ces styles aura le
+même réflexe que nous.
+
+La forme commune, valable pour les sept bandeaux (mur, menuiserie, note,
+ligne de spots, pièce, meuble, appareil de plafond) :
+
+| partie | ce qu'elle contient | sa règle |
+| --- | --- | --- |
+| haut | la valeur en gras, ce que c'est en gris | deux lignes distinctes, rien ne cède |
+| bas | les gestes possibles | boutons de 44 points, la rangée passe à la ligne |
+
+Trois conséquences concrètes : les pastilles d'icône passent de vingt-huit
+points **dessinés** à quarante-quatre (la cible était bonne, le dessin non —
+elles empruntaient le reste au débord tactile) ; la flèche de réglage fin
+d'un meuble, qui est le geste le plus précis de l'app, passe de trente à
+quarante-quatre ; et les cotes d'une pièce quittent leur bouton-texte pour
+rejoindre la rangée des gestes, où on les cherche.
+
+Le banc `bandeauxbas` tient la règle pour les cinq bandeaux d'un coup, et
+vérifie en plus qu'aucun libellé n'est **à lui seul** plus large que sa carte
+sur un iPhone SE — la rangée qui se replie règle le nombre de boutons, pas un
+bouton trop long.
+
+**Un piège trouvé en chemin, et qu'un banc a rattrapé** : la nouvelle carte
+ne recevait pas les mesures que l'écran calcule à l'affichage — le pied réel
+au-dessus de la rangée d'outils, et la largeur vraie de la colonne d'actions.
+Elle serait repassée sous la barre d'outils, c'est-à-dire exactement le
+défaut corrigé deux relevés plus tôt.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

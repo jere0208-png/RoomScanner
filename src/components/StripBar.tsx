@@ -1,13 +1,24 @@
 /**
- * LE BANDEAU D'UNE LIGNE — ce qu'on a touché, et ce qu'on peut en faire.
+ * LE BANDEAU DU BAS — ce qu'on a touché, et ce qu'on peut en faire.
  *
- * Un mur et une menuiserie se règlent pareil : une cote lue en gras, une
- * précision en gris, et un ou deux boutons pour changer la valeur. Les deux
- * bandeaux étaient écrits deux fois dans l'écran, à quinze lignes d'écart —
- * même coquille, mêmes styles, mêmes marges à retoucher en double.
+ * Un mur, une menuiserie, une note, une ligne de spots : tous se règlent
+ * pareil, et ils partagent donc cette coquille. Elle vit au pied du plan —
+ * en haut, elle mangeait le dessin qu'on est justement en train de regarder.
  *
- * Il tient sur UNE ligne, au pied du plan : en haut, il mangeait le dessin
- * qu'on est justement en train de regarder.
+ * DEUX PARTIES, JAMAIS UNE LIGNE. Relevé du patron, capture à l'appui :
+ * « 3 spots · Pièce 1 · … » et quatre pastilles rognées par le bord.
+ * « Toujours les boutons sont coupés et le texte aussi. Fais en 2 parties,
+ * avec le texte au-dessus et les boutons en dessous. »
+ *
+ * Le défaut venait de la forme même. Une seule ligne devait porter la cote,
+ * la précision et jusqu'à quatre boutons, sur trois cent trente points
+ * d'écran utile : tout y était en `flexShrink`, chacun cédait un peu, donc
+ * tout était coupé un peu — et le premier sacrifié était le chiffre qu'on
+ * venait lire.
+ *
+ * En haut ce qu'on lit, en bas ce qu'on touche. Le texte ne cède plus, les
+ * boutons ont la taille d'un doigt, et la rangée passe à la ligne plutôt que
+ * de serrer.
  */
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -26,9 +37,7 @@ export interface StripAction {
   crayon?: boolean;
   /**
    * Une silhouette Solar à la place (ou à côté) du mot. Avec `sansMot`,
-   * l'icône parle seule et le mot vit dans l'étiquette d'accessibilité —
-   * c'est ce qui a recadré le bandeau des spots, qui débordait sous la
-   * colonne d'ancrage à trois mots pleins.
+   * l'icône parle seule et le mot vit dans l'étiquette d'accessibilité.
    */
   icone?: string;
   sansMot?: boolean;
@@ -41,7 +50,7 @@ export interface StripAction {
  */
 function Crayon({ teinte }: { teinte: string }) {
   return (
-    <Svg width={13} height={13} viewBox="0 0 24 24">
+    <Svg width={14} height={14} viewBox="0 0 24 24">
       <Path d={SOLAIRES.crayon} fill={teinte} fillRule="evenodd" />
     </Svg>
   );
@@ -61,64 +70,65 @@ export function StripBar({
   styles: Record<string, object>;
 }) {
   return (
-    <View style={styles.wallStrip}>
+    <View style={styles.bandeau}>
       {/*
-        LA COTE NE SE TRONQUE JAMAIS.
+        PARTIE HAUTE : CE QU'ON A TOUCHÉ.
 
-        Les deux textes vivaient dans une seule ligne, et c'est la LIGNE
-        entière qui était rognée : « 1,38 × 2,04 m · porte » n'entrant pas,
-        on lisait « 1,38 × 2,... ». Le seul chiffre qu'on venait chercher
-        était le premier sacrifié — un bandeau de cotes qui cache la cote.
+        Deux textes, deux lignes. Ils vivaient dans la MÊME ligne que les
+        boutons, et c'est la ligne entière qui était rognée : « 1,38 × 2,04 m
+        · porte » n'entrant pas, on lisait « 1,38 × 2,… ». Le seul chiffre
+        qu'on venait chercher était le premier sacrifié.
 
-        Ils sont donc séparés : la valeur garde toute sa place
-        (`flexShrink: 0`), et c'est la précision en gris, dont on se passe,
-        qui s'efface en premier quand la largeur manque.
+        La valeur tient sa ligne, la précision la sienne — et celle-ci a
+        droit à deux lignes, parce qu'« un retour · 2,49 m sous plafond » ne
+        doit pas se couper au milieu d'un mot.
       */}
-      <Text style={styles.wallStripStrong} numberOfLines={1}>
-        {strong}
-      </Text>
-      <Text style={styles.wallStripText} numberOfLines={1}>
-        {`  ·  ${note}`}
-      </Text>
-      {actions.map((a) => {
-        const texte = a.ghost
-          ? styles.wallStripGhostText
-          : styles.wallStripActionText;
-        // Le crayon prend la couleur du mot qu'il précède : un seul style
-        // à changer si le bouton change de peau.
-        const teinte =
-          (StyleSheet.flatten(texte) as { color?: string })?.color ??
-          '#FFFFFF';
-        return (
-          <TouchableOpacity
-            key={a.label}
-            style={[
-              a.ghost ? styles.wallStripGhost : styles.wallStripAction,
-              (a.crayon || a.icone) && stylesLocaux.avecCrayon,
-            ]}
-            accessibilityLabel={a.label}
-            onPress={a.onPress}>
-            {a.crayon && <Crayon teinte={teinte} />}
-            {a.icone && (
-              <Svg width={15} height={15} viewBox="0 0 24 24">
-                <Path d={a.icone} fill={teinte} fillRule="evenodd" />
-              </Svg>
-            )}
-            {/* Le mot se tronque plutôt que de pousser la rangée dehors :
-                c'est la contrepartie de `flexShrink`, sans quoi le bouton
-                rétrécit mais son texte, lui, continue de sortir. */}
-            {!a.sansMot && (
-              <Text style={texte} numberOfLines={1}>
-                {a.label}
-              </Text>
-            )}
-          </TouchableOpacity>
-        );
-      })}
+      <View style={styles.bandeauTexte}>
+        <Text style={styles.bandeauTitre} numberOfLines={1}>
+          {strong}
+        </Text>
+        <Text style={styles.bandeauSous} numberOfLines={2}>
+          {note}
+        </Text>
+      </View>
+
+      {/* PARTIE BASSE : CE QU'ON PEUT EN FAIRE. */}
+      <View style={styles.bandeauActions}>
+        {actions.map((a) => {
+          const texte = a.ghost
+            ? styles.bandeauBtnGhostTexte
+            : styles.bandeauBtnTexte;
+          // Le crayon prend la couleur du mot qu'il précède : un seul style
+          // à changer si le bouton change de peau.
+          const teinte =
+            (StyleSheet.flatten(texte) as { color?: string })?.color ??
+            '#FFFFFF';
+          return (
+            <TouchableOpacity
+              key={a.label}
+              style={[
+                a.ghost ? styles.bandeauBtnGhost : styles.bandeauBtn,
+                // Une icône seule tient dans un carré : le mot n'est pas là
+                // pour lui donner sa largeur.
+                a.sansMot && styles.bandeauBtnIcone,
+              ]}
+              accessibilityLabel={a.label}
+              onPress={a.onPress}>
+              {a.crayon && <Crayon teinte={teinte} />}
+              {a.icone && (
+                <Svg width={17} height={17} viewBox="0 0 24 24">
+                  <Path d={a.icone} fill={teinte} fillRule="evenodd" />
+                </Svg>
+              )}
+              {!a.sansMot && (
+                <Text style={texte} numberOfLines={1}>
+                  {a.label}
+                </Text>
+              )}
+            </TouchableOpacity>
+          );
+        })}
+      </View>
     </View>
   );
 }
-
-const stylesLocaux = StyleSheet.create({
-  avecCrayon: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-});

@@ -366,6 +366,11 @@ export function ResultScreen() {
     () => ({
       ...styles,
       wallStrip: [styles.wallStrip, { bottom: ligneBandeau, marginRight: garde }],
+      // La carte commune à tous les bandeaux du bas : elle reçoit la même
+      // mesure que les deux autres — le pied réel de l'écran et la largeur
+      // vraie de la colonne d'actions. Sans elle ici, le bandeau repassait
+      // sous la rangée d'outils, exactement ce qu'on avait corrigé.
+      bandeau: [styles.bandeau, { bottom: ligneBandeau, marginRight: garde }],
       editBar: [styles.editBar, { bottom: ligneBandeau, marginRight: garde }],
     }),
     [styles, ligneBandeau, garde],

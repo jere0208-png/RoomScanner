@@ -471,18 +471,108 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
    * approchent, et il a fallu ces marges intérieures pour compenser. Seize
    * points suffisent à poser une carte.
    */
+  /**
+   * LE BANDEAU DU BAS — DEUX PARTIES, JAMAIS UNE LIGNE.
+   *
+   * Relevé du patron, capture à l'appui : « 3 spots · Pièce 1 · … » et
+   * quatre pastilles rognées par le bord. « Toujours les boutons sont coupés
+   * et le texte aussi. Fais en 2 parties, avec le texte au-dessus et les
+   * boutons en dessous. Pareil pour la sélection d'un mur. »
+   *
+   * Le défaut venait de la FORME. Une seule ligne devait porter la cote, la
+   * précision et jusqu'à quatre boutons, sur trois cent trente points
+   * d'écran utile. Tout y était en `flexShrink` : chacun cédait un peu, donc
+   * tout était coupé un peu — et le premier sacrifié était le chiffre qu'on
+   * venait lire.
+   *
+   * Deux parties, donc, et une règle par partie :
+   *
+   *   — EN HAUT, ce qu'on a touché : la valeur en gras, ce que c'est en
+   *     gris, sur deux lignes distinctes. Rien n'y cède ;
+   *   — EN DESSOUS, ce qu'on peut en faire : des boutons à la taille d'un
+   *     doigt (quarante-quatre points), qui passent à la ligne plutôt que
+   *     de rétrécir.
+   *
+   * La carte garde sa marge à droite : la colonne d'actions flottante en
+   * tient soixante-deux, et le bandeau ne doit jamais passer dessous.
+   */
+  bandeau: {
+    position: 'absolute',
+    bottom: 10,
+    left: 12,
+    right: 12,
+    marginRight: 72,
+    backgroundColor: c.surface,
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingTop: 11,
+    paddingBottom: 12,
+    gap: 10,
+    ...shadowCard,
+    shadowOpacity: 0.12,
+  },
+  /* La partie haute : elle ne contient QUE ce qu'on lit. */
+  bandeauTexte: { gap: 2 },
+  bandeauTitre: { color: c.ink, fontSize: 15.5, fontWeight: '800' },
+  bandeauSous: { color: c.inkSoft, fontSize: 13, lineHeight: 17 },
+  /*
+    La partie basse : une rangée qui PASSE À LA LIGNE. C'est elle qui
+    remplace le `flexShrink` — cinq boutons sur un petit écran font deux
+    rangées, et aucun n'est rogné.
+  */
+  bandeauActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  /* Un bouton de bandeau : la taille d'un doigt, et il ne cède pas. */
+  bandeauBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: c.blue,
+    borderRadius: radius.pill,
+    paddingHorizontal: 16,
+    minHeight: 44,
+    minWidth: 44,
+    flexShrink: 0,
+  },
+  bandeauBtnGhost: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: c.surfaceSunken,
+    borderRadius: radius.pill,
+    paddingHorizontal: 16,
+    minHeight: 44,
+    minWidth: 44,
+    flexShrink: 0,
+  },
+  /* Une icône seule : carrée, même hauteur, pas de mot à loger. */
+  bandeauBtnIcone: { paddingHorizontal: 0, width: 44 },
+  bandeauBtnTexte: { color: '#FFFFFF', fontSize: 13.5, fontWeight: '800' },
+  bandeauBtnGhostTexte: { color: c.inkSoft, fontSize: 13.5, fontWeight: '800' },
+  /*
+    L'ANCIENNE CARTE, gardée pour les bandeaux qui portent des CHAMPS et pas
+    seulement des boutons — les cotes d'un meuble, celles d'un appareil de
+    plafond. Même coquille, même partie basse ; seule leur partie haute
+    diffère : des pastilles qu'on touche plutôt que du texte qu'on lit.
+  */
   editBar: {
     position: 'absolute',
     bottom: 10,
     left: 12,
-    // Soixante-douze points : la colonne d'actions en tient soixante-deux, et
-    // le bouton de validation venait la toucher.
     marginRight: 72,
     right: 12,
     backgroundColor: c.surface,
-    borderRadius: radius.md,
-    paddingHorizontal: 8,
-    paddingVertical: 7,
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingTop: 11,
+    paddingBottom: 12,
+    gap: 10,
     ...shadowCard,
     shadowOpacity: 0.12,
   },
@@ -521,11 +611,12 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     justifyContent: 'center',
     gap: 5,
     backgroundColor: c.surfaceSunken,
-    borderRadius: 10,
-    paddingHorizontal: 7,
-    paddingVertical: 8,
-    // C'est ELLE qui cède quand la place manque — jamais un bouton.
-    flexShrink: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    minHeight: 44,
+    // Elle ne cède plus : depuis que les boutons ont leur propre rangée,
+    // la ligne des cotes n'a plus personne à qui céder la place.
+    flexShrink: 0,
   },
   clValeur: { color: c.ink, fontSize: 16, fontWeight: '800' },
   inputSmall: {
@@ -541,9 +632,21 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     borderWidth: 1,
     borderColor: c.lineStrong,
   },
-  // `flexShrink: 0` : les trois boutons gardent leur taille, ce sont les
-  // champs qui cèdent si la place manque — jamais l'inverse.
-  editIcons: { flexDirection: 'row', gap: 4, marginLeft: 'auto', flexShrink: 0 },
+  /*
+    LA RANGÉE D'ICÔNES EST DEVENUE LA PARTIE BASSE.
+
+    Elle se serrait au bout de la ligne des cotes (`marginLeft: 'auto'`), et
+    c'est là qu'elle se faisait rogner. Elle descend d'un étage : même
+    rangée que partout ailleurs, à la taille du doigt, et elle passe à la
+    ligne s'il le faut.
+  */
+  editIcons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+    flexShrink: 0,
+  },
   /**
    * LA RANGÉE DES FLÈCHES, au-dessus des cotes.
    *
@@ -554,35 +657,45 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   nudgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginBottom: 6,
+    flexWrap: 'wrap',
+    gap: 8,
   },
   nudgeBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: 10,
+    // La flèche est le geste le PLUS fin du bandeau — un centimètre par
+    // appui : elle mérite la même cible que les autres, pas moins.
+    width: 44,
+    height: 44,
+    borderRadius: 14,
     backgroundColor: c.surfaceSunken,
     alignItems: 'center',
     justifyContent: 'center',
   },
   nudgeNote: { color: c.inkFaint, fontSize: 11, fontWeight: '600', marginLeft: 2 },
+  /*
+    QUARANTE-QUATRE POINTS, DESSINÉS — plus de cible au débord.
+
+    Ces pastilles faisaient vingt-huit points et empruntaient le reste au
+    `hitSlop` : la cible était bonne, le DESSIN non — quatre ronds serrés au
+    bout d'une ligne pleine, et le dernier rogné par le bord. Depuis que la
+    rangée d'actions vit sous le texte, la place est là : on la prend.
+  */
   iconBtn: {
-    // Vingt-huit points DESSINÉS, quarante sous le doigt : le débord
-    // (`hitSlop`, dans le bandeau) élargit la cible sans manger la ligne.
-    width: 28,
-    height: 28,
-    borderRadius: 10,
+    width: 44,
+    height: 44,
+    borderRadius: radius.pill,
     backgroundColor: c.surfaceSunken,
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   iconBtnOk: {
-    width: 28,
-    height: 28,
-    borderRadius: 10,
+    width: 44,
+    height: 44,
+    borderRadius: radius.pill,
     backgroundColor: c.blue,
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   openingButton: {
     backgroundColor: c.surfaceSunken,
@@ -612,7 +725,12 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   roomHead: { paddingHorizontal: 4, paddingBottom: 8 },
   roomNom: { color: c.ink, fontSize: 15, fontWeight: '800' },
   roomCotes: { color: c.inkFaint, fontSize: 12.5, fontWeight: '600', marginTop: 1 },
-  roomActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  roomActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
   roomAction: {
     backgroundColor: c.surfaceSunken,
     borderRadius: radius.sm,

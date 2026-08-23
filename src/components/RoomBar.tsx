@@ -9,12 +9,17 @@
  * PREMIÈRE VERSION : cinq boutons sur une ligne qui défile. Sur un
  * téléphone, le troisième était coupé en plein mot au bord de l'écran —
  * « Fusionner » tranché après le second n — et rien ne disait qu'il y en
- * avait d'autres derrière. Un bandeau qui défile sans le montrer, c'est un
- * bandeau qui cache.
+ * avait d'autres derrière.
  *
- * DÉSORMAIS : deux gestes tenus à la main, et les trois qui touchent à la
- * STRUCTURE du plan derrière un « … ». Rien ne dépasse, rien ne défile, et
- * la ligne de mesures se lit d'un coup.
+ * DEUXIÈME : deux gestes tenus à la main, et les trois qui touchent à la
+ * STRUCTURE du plan derrière un « … ».
+ *
+ * TROISIÈME, celle-ci — la forme commune à tous les bandeaux du bas (voir
+ * `bandeau` dans les styles) : en haut ce qu'on LIT, en bas ce qu'on TOUCHE.
+ * Les cotes se lisaient dans un bouton, à côté d'un crayon minuscule : elles
+ * redeviennent du texte, et l'édition rejoint la rangée des actions, où l'on
+ * cherche les gestes. Un mot dans une rangée de boutons se voit ; un crayon
+ * de douze points au bout d'une ligne grise, non.
  */
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -24,7 +29,7 @@ import { SOLAIRES } from '../ui/solaires';
 /** Le crayon : le même signe que partout, « ça s'édite ». */
 function Crayon({ teinte }: { teinte: string }) {
   return (
-    <Svg width={12} height={12} viewBox="0 0 24 24">
+    <Svg width={14} height={14} viewBox="0 0 24 24">
       <Path d={SOLAIRES.crayon} fill={teinte} fillRule="evenodd" />
     </Svg>
   );
@@ -57,87 +62,86 @@ export function RoomBar({
   /** Fusionner, scinder, retirer : les gestes qui changent le plan. */
   onMore: () => void;
 }) {
+  const teinteGhost =
+    (StyleSheet.flatten(styles.bandeauBtnGhostTexte) as { color?: string })
+      ?.color ?? '#5A6472';
+  const mesures = surface
+    ? `${surface.exact ? '' : '≈ '}${fr(surface.area)} m²  ·  ${fr(
+        extent.width,
+        2,
+      )} × ${fr(extent.depth, 2)} m`
+    : `${fr(extent.width, 2)} × ${fr(extent.depth, 2)} m`;
+
   return (
-    <View style={styles.editBar}>
-      <View style={styles.roomHead}>
-        <Text style={styles.roomNom} numberOfLines={1}>
+    <View style={styles.bandeau}>
+      {/* EN HAUT : ce qu'on lit. Le nom, puis les mesures — deux lignes qui
+          ne cèdent à personne. */}
+      <View style={styles.bandeauTexte}>
+        <Text style={styles.bandeauTitre} numberOfLines={1}>
           {room.name || 'Pièce sans nom'}
         </Text>
+        <Text style={styles.bandeauSous} numberOfLines={2}>
+          {mesures}
+        </Text>
+        {/*
+          TANT QU'ELLE EST NEUVE, LA BARRE DIT CE QUI L'ATTEND.
+
+          Relevé du patron sur le bouton d'ajout : « le "ajouter une pièce"
+          ne montre pas qu'il faut créer la pièce ». La pièce se pose
+          maintenant toute seule, en pointillés — reste à dire les deux
+          gestes qui la règlent. Une phrase, sous ses cotes, qui disparaît
+          dès qu'on la lâche : une consigne qu'on lit une fois ne doit pas
+          rester à vie.
+        */}
+        {room.neuve && (
+          <Text style={styles.roomNeuve} numberOfLines={1}>
+            Poussez-la du doigt · tirez ses côtés
+          </Text>
+        )}
+      </View>
+
+      {/* EN BAS : ce qu'on touche. */}
+      <View style={styles.bandeauActions}>
+        <TouchableOpacity
+          style={styles.bandeauBtn}
+          accessibilityLabel="Nommer la pièce"
+          onPress={onName}>
+          <Text style={styles.bandeauBtnTexte}>Nommer</Text>
+        </TouchableOpacity>
         {/*
           LES COTES S'ÉDITENT — quand la pièce est un rectangle.
 
-          Elles s'affichaient à côté d'une hauteur, elle, éditable d'un
-          appui : on posait un « Séjour 5,00 × 4,00 » depuis le catalogue,
-          le mètre donnait 5,18, et il fallait déplacer QUATRE murs à la
-          main pour dix-huit centimètres. Le crayon dit que ça se touche,
-          comme partout ailleurs.
-
-          Sur un contour libre, rien ne se touche : « largeur × profondeur »
-          n'y a pas de réponse unique, et un bouton qui ne fait rien est
-          pire qu'un bouton absent.
+          On pose un « Séjour 5,00 × 4,00 » depuis le catalogue, le mètre
+          donne 5,18, et il fallait déplacer QUATRE murs à la main pour
+          dix-huit centimètres. Sur un contour libre, en revanche,
+          « largeur × profondeur » n'a pas de réponse unique : le bouton ne
+          s'affiche pas, plutôt que de ne rien faire.
         */}
+        {!!onCotes && (
+          <TouchableOpacity
+            style={styles.bandeauBtnGhost}
+            accessibilityLabel="Cotes de la pièce"
+            onPress={onCotes}>
+            <Crayon teinte={teinteGhost} />
+            <Text style={styles.bandeauBtnGhostTexte}>Cotes</Text>
+          </TouchableOpacity>
+        )}
         <TouchableOpacity
-          disabled={!onCotes}
-          accessibilityLabel={onCotes ? 'Cotes de la pièce' : undefined}
-          onPress={onCotes}
-          style={stylesLocaux.ligne}>
-          <Text style={styles.roomCotes} numberOfLines={1}>
-            {surface
-              ? `${surface.exact ? '' : '≈ '}${fr(surface.area)} m²  ·  ${fr(
-                  extent.width,
-                  2,
-                )} × ${fr(extent.depth, 2)} m`
-              : `${fr(extent.width, 2)} × ${fr(extent.depth, 2)} m`}
-          </Text>
-          {!!onCotes && <Crayon teinte={teinteDuCrayon(styles)} />}
-        </TouchableOpacity>
-      </View>
-      {/*
-        TANT QU'ELLE EST NEUVE, LA BARRE DIT CE QUI L'ATTEND.
-
-        Relevé du patron sur ce bouton : « le "ajouter une pièce" ne montre
-        pas qu'il faut créer la pièce ». La pièce se pose maintenant toute
-        seule, en pointillés — reste à dire les deux gestes qui la règlent.
-        Une phrase, sous ses cotes, et qui disparaît dès qu'on la lâche :
-        une consigne qu'on lit une fois ne doit pas rester à vie.
-      */}
-      {room.neuve && (
-        <Text style={styles.roomNeuve} numberOfLines={1}>
-          Poussez-la du doigt · tirez ses côtés
-        </Text>
-      )}
-      <View style={styles.roomActions}>
-        <TouchableOpacity
-          style={styles.applyButton}
-          accessibilityLabel="Nommer la pièce"
-          onPress={onName}>
-          <Text style={styles.applyText}>Nommer</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.roomAction}
+          style={styles.bandeauBtnGhost}
           accessibilityLabel="Hauteur sous plafond"
           onPress={onHeight}>
-          <Text style={styles.roomActionText}>{`H ${fr(hauteur, 2)} m`}</Text>
+          <Text style={styles.bandeauBtnGhostTexte}>{`H ${fr(
+            hauteur,
+            2,
+          )} m`}</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={styles.roomAction}
+          style={[styles.bandeauBtnGhost, styles.bandeauBtnIcone]}
           accessibilityLabel="Autres gestes sur la pièce"
           onPress={onMore}>
-          <Text style={styles.roomActionText}>…</Text>
+          <Text style={styles.bandeauBtnGhostTexte}>…</Text>
         </TouchableOpacity>
       </View>
     </View>
   );
 }
-
-/** La teinte du crayon : celle du texte qu'il accompagne. */
-function teinteDuCrayon(styles: Record<string, object>): string {
-  const st = StyleSheet.flatten(styles.roomCotes) as { color?: string };
-  return st?.color ?? '#5A6472';
-}
-
-const stylesLocaux = StyleSheet.create({
-  /* Les cotes et leur crayon sur une ligne : le signe est À CÔTÉ du mot
-     qu'il qualifie, pas perdu au bout de la barre. */
-  ligne: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-});
