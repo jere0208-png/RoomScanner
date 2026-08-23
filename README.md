@@ -5544,6 +5544,54 @@ Le geste de tracé au doigt n'est plus offert à l'écran ; `addRoomRect` reste
 au magasin, avec son banc — c'est la même géométrie qui sert à la pièce
 posée, et le jour où un tracé revient, il n'y aura pas à la réécrire.
 
+### Le meuble qui perçait le mur : l'ordre avait quatre degrés de retard
+
+Relevé du patron, capture à l'appui : « les meubles dépassent encore parfois
+des murs selon un angle, comme le meuble intérieur qui dépasse sur la photo.
+Cela signifie que les murs ne sont pas strictement positionnés sur les
+meubles lorsqu'ils sont censés être devant. » Sur l'image, un coin de meuble
+affleure au milieu d'un pan qui devrait le cacher tout entier.
+
+C'est l'ENVERS du défaut de la chaise. `chaisecachee` mesure un mur peint
+par-dessus un meuble et ne trouve rien : le classement, **calculé pour
+l'angle courant**, est juste — c'est ce que ce banc avait déjà établi, après
+deux refontes lancées sur un compteur faux. Il fallait donc mesurer l'autre
+sens : un meuble peint par-dessus un mur qui, au point de recouvrement, est
+plus PRÈS de l'œil que lui.
+
+Et le coupable n'était pas le classement : c'était sa FRAÎCHEUR. La vue ne
+le recalcule que tous les quatre degrés et reprend le précédent entre-temps.
+L'économie est bonne — le classement exact coûte une dizaine de
+millisecondes sur un logement meublé, et pendant une rotation l'image
+suivante arrive dans trente. Mais elle valait **aussi au repos** : le doigt
+se levait à trois degrés du dernier calcul, et le modèle restait là,
+immobile, avec un ordre de peinture qui n'était pas le sien. Ce que la
+capture montre est une image FIXE — et une image fixe, on la regarde.
+
+Le banc `percemur` chiffre les deux, sur deux pièces meublées, cent
+quatre-vingts angles :
+
+| ordre de peinture | angles fautifs |
+| --- | --- |
+| celui de l'angle courant | 7 / 180 |
+| celui d'il y a quatre degrés | 89 / 180 |
+
+Treize fois plus, pour une économie qui ne sert qu'en mouvement. La mémoire
+ne sert donc plus que là où elle a un sens : **sous le doigt**, et pendant
+une présentation qui tourne toute seule (`light`). Dès que la vue se pose,
+l'ordre exact revient — ce que le code promettait déjà en commentaire (« dès
+qu'on lâche, tout se reclasse ») sans le tenir, faute d'avoir relié la
+péremption à l'état `interacting` qui existait juste au-dessus.
+
+**Ce qui reste, et pourquoi.** Sept angles sur cent quatre-vingts restent
+fautifs avec l'ordre exact. Ce n'est plus une affaire de fraîcheur : le
+classement compare les faces dont les boîtes se recouvrent à l'écran, et
+trois faces peuvent se recouvrir en ronde — A devant B, B devant C, C devant
+A. Aucun ordre ne les satisfait toutes ; il faut trancher, et l'on sort la
+plus lointaine. Le remède serait un tampon de profondeur par pixel,
+c'est-à-dire un autre moteur de rendu. Le banc fixe le chiffre pour
+l'empêcher d'empirer plutôt que de le cacher.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

@@ -809,8 +809,30 @@ export function Iso3DView({
       le classement EXACT dans toutes les positions.
     */
     const memoire = ordreMemo.current;
+    /*
+      ET DÈS QUE LA VUE SE POSE, L'ORDRE EXACT REVIENT.
+
+      Relevé du patron, capture à l'appui : « les meubles dépassent encore
+      parfois des murs selon un angle, comme le meuble intérieur qui dépasse
+      sur la photo ». L'économie ci-dessus valait AUSSI AU REPOS : le doigt
+      se levait à trois degrés du dernier calcul, et le modèle restait là,
+      immobile, avec un ordre de peinture qui n'était pas le sien. Ce que la
+      capture montre est une image FIXE — et une image fixe, on la regarde.
+
+      Mesuré au banc (`percemur`), sur deux pièces meublées : l'ordre de
+      l'angle courant laisse sept angles fautifs sur cent quatre-vingts,
+      celui d'il y a quatre degrés en laisse quatre-vingt-neuf. Treize fois
+      plus, pour une économie qui ne sert qu'en mouvement.
+
+      La mémoire ne sert donc plus que là où elle a un sens : sous le doigt,
+      et pendant une présentation qui tourne toute seule (`light`). Là,
+      l'image suivante arrive dans trente millisecondes et un trait de dos
+      qui paraît le temps d'un clignement ne se voit pas.
+    */
+    const enMouvement = interacting || light;
     const perime =
       !memoire ||
+      !enMouvement ||
       Math.abs(view.theta - memoire.theta) > 4 ||
       Math.abs(view.tilt - memoire.tilt) > 4 ||
       memoire.faces !== faces;
@@ -1246,6 +1268,10 @@ export function Iso3DView({
     solidWalls,
     walls,
     interacting,
+    // Le rendu allege pilote aussi la fraicheur du classement : sans lui
+    // dans cette liste, une presentation qui demarre garderait l'ordre
+    // calcule avant elle.
+    light,
     pov,
     focusWallId,
   ]);
