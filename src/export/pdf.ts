@@ -89,6 +89,7 @@ import { assignOpenings } from '../geometry/scene3d';
 import { wallRuns } from '../geometry/floorplan';
 import {
   ajusterBlocs,
+  masquesDeScene,
   cutawayOpacity,
   faceDepth,
   buildScene,
@@ -1038,6 +1039,20 @@ function draw3DView(
   // Même ordre de calques que dans l'app : pièce par pièce, mur du fond,
   // contenu, mur de devant.
   const rangs = roomRanks(scene.rooms, cam);
+  /*
+    ET LA MEME REGLE STRICTE QUE DANS L'APP : un pan qui nous fait face
+    masque tout ce qui est de l'autre cote de son plan. Le dossier imprime
+    se regarde de plus pres qu'un ecran, et un meuble qui traverse un mur y
+    reste sur le papier.
+  */
+  const masquesScene = masquesDeScene(faces);
+  const masqueDe = (panId?: number) => {
+    if (panId === undefined) return undefined;
+    const m = masquesScene.get(panId);
+    if (!m) return undefined;
+    const vers = m.n.x * st * sp + m.n.y * cp + m.n.z * ct * sp;
+    return vers > 0 ? m.cache : undefined;
+  };
   const polys = faces
     .filter((f) => !isHiddenFace(f, cam))
     .map((f) => {
@@ -1068,6 +1083,7 @@ function draw3DView(
         room: f.roomId,
         pan: f.panId,
         bord: f.bordDe,
+        cache: masqueDe(f.panId),
       };
     });
   ajusterBlocs(polys);

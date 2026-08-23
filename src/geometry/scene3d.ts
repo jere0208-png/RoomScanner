@@ -603,6 +603,99 @@ export function ordreLocal<T extends FacePeinte>(
  * L'écart est d'un millième de millimètre : il ne peut dépasser aucun autre
  * élément de la scène.
  */
+/**
+ * LES FLÈCHES « CE PAN MASQUE CETTE PIÈCE », pour un groupe de faces.
+ *
+ * Rend les couples (meuble d'abord, pan ensuite). Voir le champ `devant` :
+ * une pièce est tout entière du côté intérieur de ses murs, donc derrière
+ * celui de ses pans dont on voit la face extérieure.
+ */
+function masques<T extends { owner?: string; cache?: readonly string[] }>(
+  groupe: T[],
+): [number, number][] {
+  const parMeuble = new Map<string, number[]>();
+  let aMasquer = false;
+  groupe.forEach((g, i) => {
+    if (g.cache && g.cache.length > 0) aMasquer = true;
+    if (!g.owner) return;
+    const l = parMeuble.get(g.owner);
+    if (l) l.push(i);
+    else parMeuble.set(g.owner, [i]);
+  });
+  if (!aMasquer || parMeuble.size === 0) return [];
+  const fleches: [number, number][] = [];
+  groupe.forEach((g, j) => {
+    for (const id of g.cache ?? []) {
+      for (const i of parMeuble.get(id) ?? []) fleches.push([i, j]);
+    }
+  });
+  return fleches;
+}
+
+/**
+ * QUEL PAN MASQUE QUEL MEUBLE — la part qui ne dépend pas de l'angle.
+ *
+ * Pour chaque pan de mur, la liste des meubles entièrement situés du côté
+ * INTÉRIEUR de son plan (le côté opposé à sa normale). Un meuble de cette
+ * liste est derrière ce pan chaque fois que le pan nous fait face, et il
+ * l'est sous tous les angles où c'est le cas. La géométrie ne bouge pas
+ * quand la caméra tourne : ce calcul se fait donc une fois par scène.
+ *
+ * Rend, par numéro de pan, sa normale et les meubles qu'il masque.
+ */
+export function masquesDeScene(
+  faces: Face3D[],
+): Map<number, { n: P3; cache: string[] }> {
+  /** La boîte monde de chaque meuble : huit coins suffisent à trancher. */
+  const boites = new Map<string, { lo: P3; hi: P3 }>();
+  for (const f of faces) {
+    if (!f.ownerId) continue;
+    const b = boites.get(f.ownerId);
+    if (!b) {
+      const lo = { ...f.pts[0] };
+      const hi = { ...f.pts[0] };
+      for (const p of f.pts) {
+        lo.x = Math.min(lo.x, p.x); lo.y = Math.min(lo.y, p.y); lo.z = Math.min(lo.z, p.z);
+        hi.x = Math.max(hi.x, p.x); hi.y = Math.max(hi.y, p.y); hi.z = Math.max(hi.z, p.z);
+      }
+      boites.set(f.ownerId, { lo, hi });
+      continue;
+    }
+    for (const p of f.pts) {
+      b.lo.x = Math.min(b.lo.x, p.x); b.lo.y = Math.min(b.lo.y, p.y); b.lo.z = Math.min(b.lo.z, p.z);
+      b.hi.x = Math.max(b.hi.x, p.x); b.hi.y = Math.max(b.hi.y, p.y); b.hi.z = Math.max(b.hi.z, p.z);
+    }
+  }
+  const out = new Map<number, { n: P3; cache: string[] }>();
+  if (boites.size === 0) return out;
+  for (const f of faces) {
+    // Les meubles ne se masquent pas par cette règle : deux volumes qui se
+    // touchent n'ont pas de côté « intérieur » commun, et c'est le pixel
+    // qui les départage déjà très bien.
+    if (f.ownerId || !f.normal || f.panId === undefined || f.pts.length < 3) continue;
+    if (out.has(f.panId)) continue;
+    const n = f.normal;
+    const p0 = f.pts[0];
+    const d = n.x * p0.x + n.y * p0.y + n.z * p0.z;
+    const cache: string[] = [];
+    for (const [id, b] of boites) {
+      let derriere = true;
+      for (const x of [b.lo.x, b.hi.x]) {
+        for (const y of [b.lo.y, b.hi.y]) {
+          for (const z of [b.lo.z, b.hi.z]) {
+            // Cinq millimètres de marge : un meuble plaqué contre le nu du
+            // mur ne doit pas se disputer le plan avec lui.
+            if (n.x * x + n.y * y + n.z * z - d > -0.005) derriere = false;
+          }
+        }
+      }
+      if (derriere) cache.push(id);
+    }
+    if (cache.length > 0) out.set(f.panId, { n, cache });
+  }
+  return out;
+}
+
 export function ajusterBlocs<
   T extends FacePeinte & {
     depth: number;
@@ -612,6 +705,31 @@ export function ajusterBlocs<
     pan?: number;
     /** Pan dont cette face est une arête. */
     bord?: number;
+    /**
+     * LES MEUBLES QUE CE PAN MASQUE — le seul fait qui ne se discute pas.
+     *
+     * Relevé du patron, capture à l'appui : « on voit clairement des meubles
+     * traverser le mur blanc opaque… fais une correction stricte ». Le
+     * classement tranchait au pixel, et il se trompait vingt-trois fois sur
+     * cent quatre-vingts angles, murs pleins.
+     *
+     * Or il y a des cas où il n'y a RIEN à trancher. Un pan est un morceau de
+     * plan. Si ce plan nous fait face — si sa normale va vers l'œil — alors
+     * tout ce qui est de l'autre côté est derrière lui : le rayon qui va d'un
+     * meuble à l'œil traverse forcément ce plan. Ce n'est pas une préférence
+     * de tri, c'est de la géométrie, et c'est vrai sous TOUS les angles.
+     *
+     * On compare donc les meubles au plan de chaque pan — une boîte entière
+     * d'un côté, sans ambiguïté — et le classement en fait une flèche
+     * imposée : le meuble d'abord, le pan ensuite. Le pixel garde tout le
+     * reste, qui est l'immense majorité.
+     *
+     * (Le calcul lourd — quelle boîte est de quel côté de quel plan — ne
+     * dépend pas de l'angle : il se fait UNE fois par scène, voir
+     * `masquesDeScene`. Par image, il ne reste qu'un produit scalaire par
+     * pan pour savoir s'il nous fait face.)
+     */
+    cache?: readonly string[];
   },
 >(
   items: T[],
@@ -748,6 +866,7 @@ export function ajusterBlocs<
           panDe[i] = j;
         }
       });
+      for (const [i, j] of masques(groupe)) liens.push([i, j]);
       ordreLocal(groupe, liens, panDe).forEach((g, k) => {
         g.depth = bas + k * pas;
       });
@@ -758,7 +877,9 @@ export function ajusterBlocs<
     const pas = Math.max(1e-6, (haut - bas) / (aplats.length + 1));
     /** Profondeur attribuée à chaque pan : ses arêtes la reprennent. */
     const rang = new Map<number, number>();
-    ordreLocal(aplats).forEach((g, k) => {
+    // La règle du pan qui masque sa pièce vaut aussi sous le doigt : elle ne
+    // coûte rien — c'est une flèche, pas un test au pixel.
+    ordreLocal(aplats, masques(aplats)).forEach((g, k) => {
       g.depth = bas + k * pas;
       if (g.pan !== undefined) rang.set(g.pan, g.depth);
     });

@@ -31,6 +31,7 @@ import {
   faceDepth,
   buildScene,
   ajusterBlocs,
+  masquesDeScene,
   coupeDevant,
   cutawayOpacity,
   dosTourne,
@@ -663,6 +664,12 @@ export function Iso3DView({
   // dépend du nombre de points est un centre qui bouge pour rien.
   const { center, radius3d } = useMemo(() => sceneFraming(faces), [faces]);
 
+  /**
+   * Quel pan masque quel meuble : la part qui ne dépend pas de l'angle.
+   * Recalculée seulement quand la scène change, jamais quand on tourne.
+   */
+  const masquesScene = useMemo(() => masquesDeScene(faces), [faces]);
+
   const rendered = useMemo(() => {
     if (layout.w === 0 || layout.h === 0) return null;
     const ct = Math.cos(rad(view.theta));
@@ -704,6 +711,25 @@ export function Iso3DView({
     // proche. C'est lui qui empêche le mobilier de la pièce voisine de se
     // voir au travers de la cloison mitoyenne.
     const rangs = roomRanks(scene.rooms, cam);
+    /**
+     * LES MEUBLES QU'UN PAN MASQUE, POUR CETTE CAMÉRA.
+     *
+     * La liste, elle, ne dépend pas de l'angle (`masquesDeScene`) : reste à
+     * savoir si le plan nous fait face. C'est le même produit scalaire que
+     * l'écorché — la direction de l'œil, en projection orthographique, est
+     * (st·sp, cp, ct·sp).
+     *
+     * En vue subjective, l'œil est DANS la pièce et cette direction unique
+     * n'existe plus : la règle ne s'applique pas, et le pixel reprend la
+     * main comme avant.
+     */
+    const masqueDe = (panId?: number) => {
+      if (pov || panId === undefined) return undefined;
+      const m = masquesScene.get(panId);
+      if (!m) return undefined;
+      const vers = m.n.x * st * sp + m.n.y * cp + m.n.z * ct * sp;
+      return vers > 0 ? m.cache : undefined;
+    };
     const polys = faces
       .filter((face) =>
         pov ? !dosTourne(face, pov.at) && !face.isFloor : !isHiddenFace(face, cam),
@@ -784,6 +810,20 @@ export function Iso3DView({
         // l'ordre de peinture (voir `ajusterBlocs`).
         pan: face.panId,
         bord: face.bordDe,
+        /*
+          ET LE PAN DIT LES MEUBLES QU'IL MASQUE.
+
+          Voir `ajusterBlocs`. La liste ne dépend pas de l'angle (elle est
+          calculée une fois par scène) ; ce qui en dépend est la seule
+          question posée ici : ce plan nous fait-il face ? Si oui, tout ce
+          qu'il masque est derrière lui, et le classement n'a plus à en
+          juger.
+
+          La règle vaut dans les deux réglages : murs pleins, le pan cache ;
+          en écorché, il se voile — et un voile se peint par-dessus ce qu'il
+          voile, sinon il ne voile rien.
+        */
+        cache: masqueDe(face.panId),
       };
       });
     // Ce que la coupe a entièrement retranché — une face derrière l'œil —
@@ -1267,6 +1307,7 @@ export function Iso3DView({
     showSurfaces,
     solidWalls,
     walls,
+    masquesScene,
     interacting,
     // Le rendu allege pilote aussi la fraicheur du classement : sans lui
     // dans cette liste, une presentation qui demarre garderait l'ordre

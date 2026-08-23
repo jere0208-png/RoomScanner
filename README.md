@@ -5583,14 +5583,45 @@ l'ordre exact revient — ce que le code promettait déjà en commentaire (« d�
 qu'on lâche, tout se reclasse ») sans le tenir, faute d'avoir relié la
 péremption à l'état `interacting` qui existait juste au-dessus.
 
-**Ce qui reste, et pourquoi.** Sept angles sur cent quatre-vingts restent
-fautifs avec l'ordre exact. Ce n'est plus une affaire de fraîcheur : le
-classement compare les faces dont les boîtes se recouvrent à l'écran, et
-trois faces peuvent se recouvrir en ronde — A devant B, B devant C, C devant
-A. Aucun ordre ne les satisfait toutes ; il faut trancher, et l'on sort la
-plus lointaine. Le remède serait un tampon de profondeur par pixel,
-c'est-à-dire un autre moteur de rendu. Le banc fixe le chiffre pour
-l'empêcher d'empirer plutôt que de le cacher.
+**Et ce n'était pas assez.** Relevé suivant, capture à l'appui : « on voit
+clairement des meubles traverser le mur blanc opaque… fais une correction
+stricte ». Le compte ci-dessus était mesuré en ÉCORCHÉ, où un pan qui nous
+fait face s'efface à 15 % : on le retirait donc des coupables. Or la capture
+est prise avec le réglage **Murs pleins**, où ce même pan est opaque. Mesuré
+dans ce réglage-là : **23 angles sur 180**, et 7 après la correction de
+fraîcheur. Sept de trop.
+
+Ce qui restait tenait au principe même du classement : il tranche **au
+pixel**, et quand trois faces se recouvrent en ronde — A devant B, B devant
+C, C devant A — aucun ordre ne les satisfait toutes ; il faut choisir, et le
+choix tombe parfois du mauvais côté.
+
+Sauf que dans ce cas précis, **il n'y a rien à choisir**. Un pan est un
+morceau de plan. Si ce plan nous fait face, tout ce qui est de l'autre côté
+est derrière lui : le rayon qui va d'un meuble à l'œil traverse forcément ce
+plan. C'est vrai sous tous les angles, et ça ne se discute pas.
+
+Le classement reçoit donc ces couples-là comme des **flèches imposées** — le
+meuble d'abord, le pan ensuite —, au même titre que le lien qui existait déjà
+entre une arête et son pan. Le pixel garde tout le reste, qui est l'immense
+majorité. Le calcul lourd (quelle boîte est de quel côté de quel plan) ne
+dépend pas de l'angle : il se fait **une fois par scène** (`masquesDeScene`)
+et il ne reste, par image, qu'un produit scalaire par pan pour savoir s'il
+nous fait face.
+
+| réglage | avant | après la fraîcheur | après la règle stricte |
+| --- | --- | --- | --- |
+| murs pleins | 23 / 180 | 7 / 180 | **0 / 180** |
+
+La règle vaut aussi pour la planche 3D du dossier imprimé — c'est le même
+`ajusterBlocs`, et le papier se regarde de plus près qu'un écran. Elle ne
+s'applique pas à la vue subjective : l'œil y est DANS la pièce, il n'y a plus
+de direction de regard unique, et le pixel reprend la main.
+
+Ce qui subsiste, et qui est noté : avec un classement vieux de quatre degrés
+— donc **pendant un geste seulement** — il repasse des percées. Sous le
+doigt, l'image suivante arrive dans trente millisecondes ; au repos, le
+classement est exact et la règle stricte s'applique.
 
 ## Prérequis pour tester sur iPhone
 

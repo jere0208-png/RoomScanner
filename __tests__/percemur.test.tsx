@@ -44,10 +44,10 @@ jest.mock('../src/geometry/scene3d', () => {
 
 import {
   ajusterBlocs,
-  cutawayOpacity,
   buildScene,
   faceDepth,
   isHiddenFace,
+  masquesDeScene,
   roomRanks,
   sceneFraming,
   type P3,
@@ -176,6 +176,8 @@ const { faces, rooms } = buildScene(MURS, [], OBJETS as never, {
   rooms: [{ id: 'r1' }, { id: 'r2' }],
 });
 const centre = sceneFraming(faces).center;
+/** Quel pan masque quel meuble : calcule une fois, comme dans la vue. */
+const MASQUES = masquesDeScene(faces);
 
 const vuesA = (theta: number) => {
   const cam = camDe(theta);
@@ -201,11 +203,27 @@ const vuesA = (theta: number) => {
       pan: f.panId,
       bord: f.bordDe,
       meuble: !!f.ownerId,
-      // Un mur en ecorche ne cache rien, il se voile : on ne lui demande pas
-      // de masquer ce qu'on regarde justement au travers.
-      mur:
-        !f.ownerId &&
-        (!f.cutaway || !f.normal || cutawayOpacity(f.normal, cam) > 0.9),
+      room: f.roomId,
+      // Le pan dit les meubles qu'il masque : voir `ajusterBlocs`. La liste
+      // ne depend pas de l'angle ; seul le « me fait-il face » en depend.
+      cache: (() => {
+        if (f.panId === undefined) return undefined;
+        const m = MASQUES.get(f.panId);
+        if (!m) return undefined;
+        const vers = m.n.x * cam.st * cam.sp + m.n.y * cam.cp + m.n.z * cam.ct * cam.sp;
+        return vers > 0 ? m.cache : undefined;
+      })(),
+      /*
+        MURS PLEINS : TOUT PAN CACHE.
+
+        Le banc jugeait en ecorche, ou un pan qui nous fait face s'efface a
+        quinze pour cent — on le retirait donc des coupables. Mais le releve
+        du patron est pris avec le reglage « Murs », ou ce meme pan est
+        OPAQUE : « on voit clairement des meubles traverser le mur blanc
+        opaque ». C'est ce reglage-la qu'on met a l'epreuve, et il est plus
+        exigeant.
+      */
+      mur: !f.ownerId,
     }));
 };
 
@@ -271,29 +289,38 @@ const anglesQuiPercent = (fige: number) => {
 
 describe('un meuble ne perce pas le mur qui le cache', () => {
   /*
-    LA LIMITE CONNUE, CHIFFREE.
+    AUCUNE PERCEE, SOUS AUCUN ANGLE. C'est la correction stricte demandee.
 
-    Sept angles sur cent quatre-vingts restent fautifs avec l'ordre EXACT.
-    Ce n'est plus une question de fraicheur : le classement compare les faces
-    dont les boites se recouvrent, et quand trois faces se recouvrent en
-    ronde, il faut trancher — une face coincee dans un cycle est posee au
-    plus loin, faute de mieux. Le remede serait un tampon de profondeur par
-    pixel, c'est-a-dire un autre moteur de rendu. On le note plutot que de le
-    cacher, et on l'empeche d'empirer.
+    Le premier remede — reclasser des que la vue se pose — avait ramene les
+    fautes de vingt-trois a sept sur cent quatre-vingts (murs pleins). Sept
+    de trop : « on voit clairement des meubles traverser le mur blanc
+    opaque… fais une correction stricte ».
+
+    Ce qui restait tenait au principe meme du classement : il tranche au
+    PIXEL, et quand trois faces se recouvrent en ronde, il faut bien choisir.
+    Or dans ce cas precis il n'y a rien a choisir. Un pan est un morceau de
+    plan ; si ce plan nous fait face, tout ce qui est de l'autre cote est
+    derriere lui — le rayon qui va du meuble a l'oeil traverse forcement le
+    plan. C'est vrai sous tous les angles, et ca ne se discute pas.
+
+    Le classement recoit donc ces couples-la comme des FLECHES IMPOSEES (le
+    meuble d'abord, le pan ensuite), au meme titre que le lien entre une
+    arete et son pan. Le pixel garde tout le reste.
   */
-  it('garde sa limite connue avec le classement de l’angle courant', () => {
-    expect(anglesQuiPercent(0)).toBeLessThanOrEqual(7);
+  it('n’en laisse aucune, sous aucun angle', () => {
+    expect(anglesQuiPercent(0)).toBe(0);
   });
 
   /*
-    ET UN ORDRE VIEUX DE QUATRE DEGRES NE VAUT RIEN.
+    ET C'EST BIEN LA FRAICHEUR QUI FAISAIT LE RESTE.
 
-    C'est la mesure qui a designe le coupable : le meme calcul, pris quatre
-    degres plus tot, multiplie les fautes par treize. Le banc l'enregistre
-    pour que personne ne reprenne cette economie au repos.
+    Le meme calcul, pris quatre degres plus tot, en laisse encore passer :
+    les fleches imposees valent pour l'angle ou elles ont ete posees, pas
+    pour le suivant. C'est la mesure qui interdit de reprendre cette economie
+    au repos — sous le doigt, elle reste bonne.
   */
-  it('et un classement vieux de quatre degres en laisse dix fois plus', () => {
-    expect(anglesQuiPercent(4)).toBeGreaterThan(anglesQuiPercent(0) * 5);
+  it('mais un classement vieux de quatre degres en laisse passer', () => {
+    expect(anglesQuiPercent(4)).toBeGreaterThan(0);
   });
 });
 
