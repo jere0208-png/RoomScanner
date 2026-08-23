@@ -43,7 +43,7 @@ export function RoomBar({
   onHeight,
   onMore,
 }: {
-  room: { id: string; name: string };
+  room: { id: string; name: string; neuve?: boolean };
   /** Surface au sol, quand le contour se referme. */
   surface: { area: number; exact: boolean } | null;
   /** Encombrement hors tout de la pièce. */
@@ -92,6 +92,20 @@ export function RoomBar({
           {!!onCotes && <Crayon teinte={teinteDuCrayon(styles)} />}
         </TouchableOpacity>
       </View>
+      {/*
+        TANT QU'ELLE EST NEUVE, LA BARRE DIT CE QUI L'ATTEND.
+
+        Relevé du patron sur ce bouton : « le "ajouter une pièce" ne montre
+        pas qu'il faut créer la pièce ». La pièce se pose maintenant toute
+        seule, en pointillés — reste à dire les deux gestes qui la règlent.
+        Une phrase, sous ses cotes, et qui disparaît dès qu'on la lâche :
+        une consigne qu'on lit une fois ne doit pas rester à vie.
+      */}
+      {room.neuve && (
+        <Text style={styles.roomNeuve} numberOfLines={1}>
+          Poussez-la du doigt · tirez ses côtés
+        </Text>
+      )}
       <View style={styles.roomActions}>
         <TouchableOpacity
           style={styles.applyButton}

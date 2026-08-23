@@ -5659,6 +5659,41 @@ compte pas seulement les fautes : il vérifie que **l'ordre de peinture est
 identique, doigt posé ou levé**. C'est le défaut tel qu'il se voit — un
 modèle qui se redessine quand on lâche.
 
+### Trois frottements trouvés en se servant de l'app comme sur le chantier
+
+Passe de bout en bout, écran par écran, geste par geste — pas une relecture
+de code : on appuie sur tout ce qui se presse, on pose, on pousse, on annule.
+Trois choses en sont sorties, toutes sur le même bouton, celui qui a déjà été
+repris trois fois.
+
+**Elle tombait dans une pièce existante.** « Ajouter une pièce » → WC : la
+pièce se pose au MILIEU de l'emprise du plan. Le principe est bon — c'est là
+que l'œil est déjà, et le cadrage du plan étant figé sur ce qui existait, une
+pièce posée au large ne se verrait pas du tout (c'est exactement le défaut
+« le bouton ne fait rien » qu'on vient de corriger). Mais le milieu d'un
+logement, c'est le séjour : le rectangle neuf tombait en plein dedans, ses
+pointillés mêlés aux murs, et le premier geste demandé était de l'en sortir.
+Elle cherche maintenant la place libre la plus PROCHE du milieu, par anneaux
+d'une demi-pièce. Logement plein, elle revient au milieu : mieux vaut une
+pièce à déplacer qu'une pièce invisible.
+
+**Le bandeau ne disait pas le geste.** Le relevé du patron — « ne montre pas
+qu'il faut créer la pièce » — valait encore une fois la pièce posée : elle
+est là, en pointillés, et rien ne dit qu'on la pousse du doigt et qu'on tire
+ses côtés. Sa barre l'annonce, en une ligne, et se tait dès qu'on la lâche :
+une consigne qu'on lit une fois ne reste pas à vie.
+
+**Deux poses de suite laissaient deux pièces ouvertes.** La première gardait
+son trait pointillé pour toujours, alors qu'on ne la réglait plus. Le
+pointillé dit « en cours » ; il ne peut pas mentir sur deux pièces à la fois.
+
+Ce que la passe a AUSSI vérifié, et qui tient : chaque bouton de l'écran des
+résultats change quelque chose à l'écran (aucun bouton mort) ; chaque geste
+du magasin s'annule exactement, à l'état près, du tracé de mur à la pose d'un
+appareil ; une pièce ajoutée ne se soude pas aux murs des voisines et ne les
+déforme pas quand on la pousse ; la rangée d'outils se replie toute seule sur
+un écran étroit plutôt que de déborder.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

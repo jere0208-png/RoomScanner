@@ -661,6 +661,8 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   issueDotAlert: { backgroundColor: c.danger },
   issueTexts: { flex: 1 },
   issueMessage: { color: c.ink, fontSize: 14.5, fontWeight: '600' },
+  /* La consigne d'une pièce neuve : lisible, discrète, sur une ligne. */
+  roomNeuve: { color: c.blue, fontSize: 12.5, fontWeight: '600', marginTop: 4 },
   issueHint: { color: c.inkFaint, fontSize: 12.5, marginTop: 2, lineHeight: 17 },
   nameScroll: { maxHeight: 260 },
   nameGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },

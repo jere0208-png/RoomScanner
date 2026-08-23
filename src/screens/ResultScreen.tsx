@@ -4007,6 +4007,10 @@ export function ResultScreen() {
             : addRoomLibre(largeur, profondeur, nom);
           setAjoutPiece(false);
           seuleSelection('piece');
+          // Une SEULE pièce en pointillés à la fois : celle qu'on vient de
+          // poser. Sans ça, deux « Ajouter une pièce » de suite laissaient
+          // la première ouverte, dessinée en pointillés pour toujours.
+          fermerPiecesNeuves(id);
           setSelectedRoomId(id);
           setEditMode(true);
           haptic('succes');
@@ -4034,6 +4038,7 @@ export function ResultScreen() {
                   ? addRoomBox(l, p, '', selectedWallId)
                   : addRoomLibre(l, p, '');
                 seuleSelection('piece');
+                fermerPiecesNeuves(id);
                 setSelectedRoomId(id);
                 setEditMode(true);
                 haptic('succes');

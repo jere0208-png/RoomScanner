@@ -2618,9 +2618,61 @@ export const useScanStore = create<ScanState>((set, get) => {
       const zs = auNiveau.flatMap((w) => [w.a.z, w.b.z]);
       const cx = xs.length > 0 ? (Math.min(...xs) + Math.max(...xs)) / 2 : l / 2;
       const cz = zs.length > 0 ? (Math.min(...zs) + Math.max(...zs)) / 2 : p / 2;
+      /*
+        ELLE SE POSE SOUS LES YEUX, MAIS PAS SUR LES AUTRES.
+
+        Essai au doigt sur un relevé : « Ajouter une pièce » → WC. Le milieu
+        de l'emprise, c'est le séjour — le rectangle neuf tombait en plein
+        dedans, ses pointillés mêlés aux murs, et le premier geste demandé
+        était de l'en sortir.
+
+        On garde le principe (le milieu, là où l'œil est déjà posé : le
+        cadrage du plan est figé sur ce qui existait, une pièce posée au
+        large ne se verrait pas) et l'on cherche la place libre la plus
+        PROCHE de ce milieu. Si le logement est plein, elle revient au
+        milieu : mieux vaut une pièce à déplacer qu'une pièce invisible.
+      */
+      const prises = roomParts(st.walls, st.rooms)
+        .filter((r) => r.surface && r.surface.pts.length > 2)
+        .map((r) => {
+          const px = r.surface!.pts.map((q) => q.x);
+          const pz = r.surface!.pts.map((q) => q.z);
+          return {
+            x0: Math.min(...px),
+            x1: Math.max(...px),
+            z0: Math.min(...pz),
+            z1: Math.max(...pz),
+          };
+        });
+      const libre = (ax: number, az: number) =>
+        prises.every(
+          (r) =>
+            ax + l / 2 <= r.x0 + 0.01 ||
+            ax - l / 2 >= r.x1 - 0.01 ||
+            az + p / 2 <= r.z0 + 0.01 ||
+            az - p / 2 >= r.z1 - 0.01,
+        );
+      // Une spirale carrée, par pas d'une demi-pièce : la première place
+      // libre trouvée est la plus proche du milieu.
+      let ax = cx;
+      let az = cz;
+      chercher: for (let anneau = 0; anneau <= 6; anneau++) {
+        const d = anneau * Math.max(0.8, Math.max(l, p) * 0.6);
+        for (const [ux, uz] of [
+          [0, 0], [1, 0], [-1, 0], [0, 1], [0, -1],
+          [1, 1], [-1, 1], [1, -1], [-1, -1],
+        ]) {
+          const qx = cx + ux * d;
+          const qz = cz + uz * d;
+          if (!libre(qx, qz)) continue;
+          ax = qx;
+          az = qz;
+          break chercher;
+        }
+      }
       const id = get().addRoomRect(
-        { x: cx - l / 2, z: cz - p / 2 },
-        { x: cx + l / 2, z: cz + p / 2 },
+        { x: ax - l / 2, z: az - p / 2 },
+        { x: ax + l / 2, z: az + p / 2 },
         nom,
       );
       if (!id) return null;
