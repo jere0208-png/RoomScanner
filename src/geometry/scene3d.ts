@@ -2024,7 +2024,30 @@ export function buildScene(
     const nrm = { x: -(w.b.z - w.a.z) / len, z: (w.b.x - w.a.x) / len };
     const plusIsInner =
       (interior.x - mid.x) * nrm.x + (interior.z - mid.z) * nrm.z > 0;
-    const tex = opts.showTextures ? w.texture : undefined;
+    /*
+      UN MUR EN COULEUR EST D'UNE SEULE COULEUR.
+
+      Relevé du patron, troisième passage sur le même sujet : « il y a des
+      bandes sur les murs en couleur, tout doit être uni ».
+
+      Les deux premiers avaient corrigé la MATIÈRE — le relevé rendait des
+      cases bariolées, et `sampleTexture` les a ramenées à une teinte dont on
+      ne s'écarte que pour un vrai pan d'accent. Restait la DÉCOUPE : un mur
+      se dessine en bandes — c'est elle qui permet au tri du peintre de
+      départager un mur long d'un meuble posé devant sa moitié proche — et
+      chaque bande allait chercher SA teinte dans la texture. Quatre rangées,
+      une nuance par rangée : des bandes horizontales sur un mur que le
+      relevé donne pourtant uni à deux unités près.
+
+      On garde la découpe, qui sert au tri, et on lui retire sa palette : le
+      mur porte partout la MOYENNE relevée. Ce que ça coûte est assumé — un
+      mur peint en deux couleurs, bas lambrissé et haut clair, sort d'une
+      seule teinte. « Tout doit être uni » : c'est la réponse.
+
+      La texture reste relevée et transmise (le sol s'en sert, case par case,
+      et c'est là que la variation a un sens : un carrelage n'est pas un mur
+      peint).
+    */
     const avg = opts.showTextures ? w.color : undefined;
     const skin = {
       // Marque les deux faces : `pushWallBlock` saura laquelle est dehors.
@@ -2034,7 +2057,6 @@ export function buildScene(
       stroke: pal.wallStroke,
       topStroke: pal.wallTopStroke,
       captured: !!avg,
-      tex,
       texOnPlus: plusIsInner,
     };
 
@@ -2413,8 +2435,16 @@ export function buildScene(
     const xm = (x0 + x1) / 2;
     const ym = (y0 + y1) / 2;
     const saillie = 0.001 + PLAQUE_EP;
-    const texMur = opts.showTextures ? w.texture : undefined;
-    const rows = texMur ? Math.min(MAX_TEX_ROWS, Math.max(1, texMur.rows)) : 1;
+    /*
+      UNE SEULE RANGÉE, comme le mur lui-même.
+
+      Ce repère sert à savoir de quelle TUILE dépend un appareil, pour que le
+      tri le pose juste devant elle. Il comptait les rangées de la texture —
+      quatre — alors que le mur, depuis qu'il est uni, n'en dessine plus
+      qu'une. Deux découpages différents pour la même maçonnerie, et
+      l'appareil se serait référé à une tuile qui n'existe pas.
+    */
+    const rows = 1;
     const xOf = (t: number) => (lot[0].side > 0 ? t : 1 - t) * face.len;
     let xa = 0;
     let xb = face.len;

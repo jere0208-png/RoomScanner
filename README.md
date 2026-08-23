@@ -5872,6 +5872,42 @@ Mesuré sur une feuille chargée — deux pièces, sept appareils muraux, cinq d
 plafond, trois notes, une porte, une baie, une fenêtre : **zéro paire de mots
 qui se touchent**, et pas un mot perdu au passage (le banc compte les deux).
 
+### Les bandes sur les murs en couleur
+
+Relevé du patron, **troisième** passage sur le même sujet : « il y a des
+bandes sur les murs en couleur, tout doit être uni ».
+
+Les deux premiers avaient corrigé la MATIÈRE. Le relevé rend des cases
+bariolées — l'exposition de la caméra bouge d'une seconde à l'autre pendant
+qu'on marche — et `sampleTexture` les a ramenées à une teinte dont une case
+ne s'écarte que si ses voisines s'en écartent dans le même sens (voir
+`couleursunies`). C'était juste, et ça ne suffisait pas.
+
+Restait la DÉCOUPE. Un mur ne se dessine pas d'un seul tenant : il est coupé
+en bandes de soixante centimètres, et c'est cette coupe qui permet au tri du
+peintre de départager un mur long d'un meuble posé devant sa moitié proche
+(sans elle, le mur ne porte qu'UNE profondeur, celle de son centre, et passe
+devant ou derrière EN BLOC). Or chaque bande allait chercher sa propre teinte
+dans la texture, avec jusqu'à quatre rangées en hauteur : une nuance par
+rangée, c'est-à-dire des bandes horizontales sur un mur que le relevé donne
+pourtant uni à deux unités près.
+
+**On garde la découpe, qui sert au tri, et on lui retire sa palette** :
+toutes les bandes d'un même pan portent la moyenne relevée du mur. Un mur
+vert sort vert, un mur blanc sort blanc, et aucun des deux ne sort rayé.
+
+Ce que ça coûte, et qui est assumé : un mur peint en deux couleurs — bas
+lambrissé, haut clair — sort d'une seule teinte, la moyenne des deux. Le
+relevé dit « tout doit être uni » ; c'est la réponse. La texture continue
+d'être relevée et transmise : le SOL s'en sert case par case, et là la
+variation a un sens — un carrelage n'est pas un mur peint.
+
+Un piège au passage, invisible à la lecture : le repère qui dit de quelle
+tuile dépend un appareil comptait, lui aussi, les rangées de la texture.
+Quatre d'un côté, une de l'autre, et l'appareil se serait référé à une tuile
+qui n'existe plus. Les deux découpages sont maintenant écrits au même
+endroit.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro
