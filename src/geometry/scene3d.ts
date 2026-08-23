@@ -870,6 +870,38 @@ export function ajusterBlocs<
       ordreLocal(groupe, liens, panDe).forEach((g, k) => {
         g.depth = bas + k * pas;
       });
+      /*
+        ET L'ARÊTE RECOLLE À SON PAN, TOUJOURS.
+
+        Relevé du patron : « en tournant on voit les arêtes des murs, mais au
+        relâchement des arêtes disparaissent ; si j'appuie seulement, tout
+        apparaît ». Deux états du même modèle, deux dessins : c'est le
+        classement qui changeait de règle en cours de route.
+
+        Sous le doigt, chaque arête suit SON pan — elle se peint juste après
+        lui, et rien ne peut se glisser entre les deux. Au repos, elle entrait
+        dans le classement avec ses propres contraintes, et le lien qui la
+        rattache à son pan n'était qu'une flèche de plus dans le graphe : dès
+        qu'elle se trouvait prise dans une ronde (trois faces qui se
+        recouvrent en cercle), il fallait trancher, et le dénouement la
+        posait AVANT son pan — qui la repeignait aussitôt. Mesuré : deux
+        cent dix-sept arêtes perdues sur quatre-vingt-dix angles, contre zéro
+        sous le doigt.
+
+        On applique donc la même règle dans les deux états. Elle ne coûte
+        rien à l'ordre des PANS — le pas d'un rang étant deux fois l'écart
+        qu'on ajoute, un pan qui passe après le nôtre passe encore après son
+        arête — et le modèle cesse de changer de dessin quand on lâche.
+      */
+      const rangPan = new Map<number, number>();
+      for (const g of groupe) {
+        if (g.pan !== undefined) rangPan.set(g.pan, g.depth);
+      }
+      for (const g of groupe) {
+        if (g.bord === undefined) continue;
+        const d = rangPan.get(g.bord);
+        if (d !== undefined) g.depth = d + pas / 2;
+      }
       continue;
     }
     const aplats = groupe.filter((g) => g.proj.length >= 3 && g.pan !== undefined);

@@ -5623,6 +5623,42 @@ Ce qui subsiste, et qui est noté : avec un classement vieux de quatre degrés
 doigt, l'image suivante arrive dans trente millisecondes ; au repos, le
 classement est exact et la règle stricte s'applique.
 
+### Et les arêtes qui disparaissaient au relâchement
+
+Relevé du patron, dans la foulée : « sur le 3D en tournant on voit les arêtes
+des murs plus foncées, mais au relâchement des arêtes disparaissent… alors
+que si j'appuie seulement, tout apparaît ». Trois états du même modèle, deux
+dessins : doigt posé, le volume est complet ; doigt levé, il perd des traits.
+
+**La vue changeait de règle en cours de route.** Sous le doigt, chaque arête
+suit SON pan : elle se peint juste après lui, et rien ne peut se glisser
+entre les deux. Au repos, elle entrait dans le classement avec ses propres
+contraintes, et le lien qui la rattache à son pan n'était **qu'une flèche de
+plus** dans le graphe. Or ce graphe contient des rondes — trois faces qui se
+recouvrent en cercle. Il faut alors trancher, et le dénouement posait parfois
+l'arête AVANT son pan, qui la repeignait aussitôt.
+
+Ce n'est donc pas la correction stricte qui l'a causé — le compte est le même
+avec ou sans elle. C'est la recompilation exacte au repos qui l'a rendu
+permanent : avant, la vue servait le plus souvent un ordre mémorisé, et
+l'ordre mémorisé, lui, recolle les arêtes à leur pan.
+
+Mesure sur l'appartement de référence, murs percés, quatre-vingt-dix angles :
+
+| état | arêtes posées avant leur pan |
+| --- | --- |
+| sous le doigt | 0 |
+| au repos, avant | **217** |
+| au repos, après | 0 |
+
+La règle est maintenant la même dans les deux états, et c'est celle qui
+tenait déjà : l'arête recolle à son pan. Elle ne coûte rien à l'ordre des
+PANS — le pas d'un rang vaut deux fois l'écart qu'on ajoute, donc un pan qui
+passe après le nôtre passe encore après son arête. Le banc `aretesdumur` ne
+compte pas seulement les fautes : il vérifie que **l'ordre de peinture est
+identique, doigt posé ou levé**. C'est le défaut tel qu'il se voit — un
+modèle qui se redessine quand on lâche.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro
