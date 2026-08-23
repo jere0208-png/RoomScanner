@@ -894,6 +894,20 @@ interface ScanState {
    */
   resizeRoom: (roomId: string, largeur: number, profondeur: number) => void;
   /**
+   * Etire une piece RECTANGULAIRE par un de ses bords, le bord oppose fixe.
+   *
+   * `depuis` porte l'emprise au DEBUT du geste, et la poignee envoie la
+   * distance TOTALE parcourue : sans ce point fixe, chaque image repart
+   * d'une cote deja bornee et la piece part en vrille — le defaut filme sur
+   * le chantier avec les meubles (voir `resizeObjectSide`).
+   */
+  resizeRoomSide: (
+    roomId: string,
+    cote: 'largeur+' | 'largeur-' | 'profondeur+' | 'profondeur-',
+    distance: number,
+    depuis?: { x0: number; z0: number; largeur: number; profondeur: number },
+  ) => void;
+  /**
    * Trace un mur entre deux points choisis sur le plan. Le premier est
    * généralement l'extrémité d'un mur existant, pour que le nouveau s'y
    * raccroche ; le second se déplace ensuite par sa poignée.
@@ -1624,6 +1638,137 @@ export const useScanStore = create<ScanState>((set, get) => {
     deposerPlusTard(st.currentSaveId);
   };
 
+  /**
+   * REPOSE UNE PIECE RECTANGULAIRE a de nouvelles cotes.
+   *
+   * Le fond commun de deux gestes : taper « 5,18 x 4,05 » dans le
+   * bandeau, et tirer un cote au doigt. Ils ne different que par le coin
+   * qui ne bouge pas (`origine`) et par la cle d'historique — continue
+   * pour le doigt, qui envoie cinquante images par seconde, discrete
+   * pour le clavier, ou chaque saisie merite son « Annuler ».
+   */
+  const reposerPiece = (
+    roomId: string,
+    largeur: number,
+    profondeur: number,
+    origine: Pt | null,
+    cle: string,
+  ) => {
+      const st = get();
+      const murs = st.walls.filter((w) => w.roomId === roomId);
+      if (murs.length !== 4) return;
+      // Une cote nulle ou négative n'est pas une intention, c'est une
+      // saisie ratée : on ne la borne pas, on l'ignore.
+      if (!(largeur > 0) || !(profondeur > 0)) return;
+      const L = Math.min(MUR_MAX_M, Math.max(0.6, largeur));
+      const P = Math.min(MUR_MAX_M, Math.max(0.6, profondeur));
+      const xs = murs.flatMap((w) => [w.a.x, w.b.x]);
+      const zs = murs.flatMap((w) => [w.a.z, w.b.z]);
+      const x0 = Math.min(...xs);
+      const z0 = Math.min(...zs);
+      const x1 = Math.max(...xs);
+      const z1 = Math.max(...zs);
+      // Un contour qui n'est pas d'aplomb n'est pas un rectangle : on ne
+      // touche pas à ce qu'on ne sait pas reconstruire.
+      const droit = murs.every(
+        (w) => Math.abs(w.a.x - w.b.x) < 1e-3 || Math.abs(w.a.z - w.b.z) < 1e-3,
+      );
+      if (!droit || x1 - x0 < 1e-3 || z1 - z0 < 1e-3) return;
+
+      pushHistory(cle);
+      /*
+        LE COIN D'APPUI EST DONNE, il n'est plus toujours le haut-gauche.
+
+        Poser des cotes au clavier fait grandir la piece vers la droite
+        et vers le bas — rien ne saute a l'ecran. Mais TIRER un cote au
+        doigt, c'est l'inverse : le bord qu'on tient doit rester sous le
+        doigt, et c'est le bord OPPOSE qui ne bouge pas. Un seul calcul,
+        deux gestes.
+      */
+      const ax = origine?.x ?? x0;
+      const az = origine?.z ?? z0;
+      const place = (
+        v: number,
+        min: number,
+        max: number,
+        taille: number,
+        neuf: number,
+      ) => (Math.abs(v - min) < Math.abs(v - max) ? neuf : neuf + taille);
+      const murs2 = murs.map((w) => ({
+        ...w,
+        a: {
+          x: place(w.a.x, x0, x1, L, ax),
+          z: place(w.a.z, z0, z1, P, az),
+        },
+        b: {
+          x: place(w.b.x, x0, x1, L, ax),
+          z: place(w.b.z, z0, z1, P, az),
+        },
+      }));
+      const apres = new Map(
+        murs2.map((w) => [w.id, Math.hypot(w.b.x - w.a.x, w.b.z - w.a.z)]),
+      );
+      const neufs = new Map(murs2.map((w) => [w.id, w]));
+
+      /*
+        CE QUI EST POSÉ SUR UN MUR RACCOURCI REVIENT DEDANS.
+
+        Une prise à 4,50 m sur un mur ramené à 2 m flotterait dans le vide —
+        invisible sur le plan, mais bien comptée par le contrôle des normes.
+        On la recale au plus près du bord, comme le fait déjà la pose.
+      */
+      const recaler = (along: number, wallId: string) => {
+        const ap = apres.get(wallId) ?? 0;
+        if (ap <= 0 || along <= ap) return along;
+        return Math.max(0.05, ap - 0.05);
+      };
+
+      /*
+        LE PLAN RESTE COUSU.
+
+        Une pièce accolée PARTAGE sa cloison — une seule maçonnerie entre
+        deux pièces, c'est la règle de `addRoomBox`. En redimensionnant, ce
+        mur mitoyen partait avec la pièce et la voisine restait sur place :
+        ses murs s'arrêtaient dix-huit centimètres avant, et le plan
+        s'ouvrait par une fente. Sur le dessin, deux pièces qui ne se
+        touchent plus ; dans le métré, un périmètre qui ne ferme pas ; en
+        3D, deux pans qui ne se rejoignent pas.
+
+        LA RÈGLE NE REGARDE NI LES PIÈCES NI LES IDENTIFIANTS, juste les
+        POINTS : ce qui était accroché à un coin qui bouge suit le coin.
+        C'est celle qu'applique déjà le déplacement d'un point de mur, et
+        elle vaut ici pour les quatre coins à la fois. Ce qui ne touchait
+        rien ne bouge pas : on recolle, on ne rassemble pas.
+      */
+      const SOUDE = 0.02;
+      /** Le point d'arrivée d'un coin déplacé, s'il en est un. */
+      const suivre = (p: Pt): Pt | null => {
+        for (const w of murs) {
+          for (const bout of [w.a, w.b] as const) {
+            if (Math.hypot(bout.x - p.x, bout.z - p.z) > SOUDE) continue;
+            const n = neufs.get(w.id)!;
+            const cible = bout === w.a ? n.a : n.b;
+            return { x: cible.x, z: cible.z };
+          }
+        }
+        return null;
+      };
+      const recousu = (w: WallSeg): WallSeg => {
+        if (neufs.has(w.id)) return neufs.get(w.id)!;
+        const a = suivre(w.a);
+        const b = suivre(w.b);
+        return a || b ? { ...w, a: a ?? w.a, b: b ?? w.b } : w;
+      };
+
+      set({
+        walls: st.walls.map(recousu),
+        fixtures: st.fixtures.map((f) =>
+          neufs.has(f.wallId) ? { ...f, along: recaler(f.along, f.wallId) } : f,
+        ),
+        dirty: true,
+      });
+  };
+
   return {
     screen: 'home',
     supported: null,
@@ -2142,104 +2287,50 @@ export const useScanStore = create<ScanState>((set, get) => {
       vers le bas, donc ce qu'on regarde ne saute pas et les pièces voisines
       restent où elles sont.
     */
-    resizeRoom: (roomId, largeur, profondeur) => {
-      const st = get();
-      const murs = st.walls.filter((w) => w.roomId === roomId);
+    resizeRoom: (roomId, largeur, profondeur) =>
+      reposerPiece(roomId, largeur, profondeur, null, 'resizeRoom'),
+
+    /*
+      ET LE MEME RECTANGLE SE TIRE PAR UN BORD.
+
+      Releve du patron sur la piece qu'on ajoute : « on doit faire une
+      piece basique modifiable comme un meuble sur ses cotes ». C'est le
+      geste du metre sur le chantier — on tire jusqu'a la maconnerie, on
+      ne calcule pas une largeur dans sa tete.
+
+      LE BORD OPPOSE EST LE POINT FIXE, comme pour un meuble : sans lui,
+      la piece se decalerait a chaque image et le geste serait un
+      deplacement, pas un etirement.
+    */
+    resizeRoomSide: (roomId, cote, distance, depuis) => {
+      const murs = get().walls.filter((w) => w.roomId === roomId);
       if (murs.length !== 4) return;
-      // Une cote nulle ou négative n'est pas une intention, c'est une
-      // saisie ratée : on ne la borne pas, on l'ignore.
-      if (!(largeur > 0) || !(profondeur > 0)) return;
-      const L = Math.min(MUR_MAX_M, Math.max(0.6, largeur));
-      const P = Math.min(MUR_MAX_M, Math.max(0.6, profondeur));
       const xs = murs.flatMap((w) => [w.a.x, w.b.x]);
       const zs = murs.flatMap((w) => [w.a.z, w.b.z]);
-      const x0 = Math.min(...xs);
-      const z0 = Math.min(...zs);
-      const x1 = Math.max(...xs);
-      const z1 = Math.max(...zs);
-      // Un contour qui n'est pas d'aplomb n'est pas un rectangle : on ne
-      // touche pas à ce qu'on ne sait pas reconstruire.
-      const droit = murs.every(
-        (w) => Math.abs(w.a.x - w.b.x) < 1e-3 || Math.abs(w.a.z - w.b.z) < 1e-3,
-      );
-      if (!droit || x1 - x0 < 1e-3 || z1 - z0 < 1e-3) return;
-
-      pushHistory('resizeRoom');
-      const place = (v: number, min: number, max: number, taille: number) =>
-        Math.abs(v - min) < Math.abs(v - max) ? min : min + taille;
-      const murs2 = murs.map((w) => ({
-        ...w,
-        a: {
-          x: place(w.a.x, x0, x1, L),
-          z: place(w.a.z, z0, z1, P),
+      // Tout se mesure depuis l'etat de l'APPUI : voir `resizeObjectSide`,
+      // ou le cumul d'une image sur l'autre a ete filme sur le chantier.
+      const base = depuis ?? {
+        x0: Math.min(...xs),
+        z0: Math.min(...zs),
+        largeur: Math.max(...xs) - Math.min(...xs),
+        profondeur: Math.max(...zs) - Math.min(...zs),
+      };
+      const surLargeur = cote.startsWith('largeur');
+      const avant = surLargeur ? base.largeur : base.profondeur;
+      const apres = Math.min(MUR_MAX_M, Math.max(0.6, avant + distance));
+      // Le bord tire recule vers l'exterieur : le coin d'appui suit,
+      // pour que l'autre bord reste exactement ou il est.
+      const recul = cote.endsWith('-') ? apres - avant : 0;
+      reposerPiece(
+        roomId,
+        surLargeur ? apres : base.largeur,
+        surLargeur ? base.profondeur : apres,
+        {
+          x: base.x0 - (surLargeur ? recul : 0),
+          z: base.z0 - (surLargeur ? 0 : recul),
         },
-        b: {
-          x: place(w.b.x, x0, x1, L),
-          z: place(w.b.z, z0, z1, P),
-        },
-      }));
-      const apres = new Map(
-        murs2.map((w) => [w.id, Math.hypot(w.b.x - w.a.x, w.b.z - w.a.z)]),
+        `resizeRoomSide:${roomId}`,
       );
-      const neufs = new Map(murs2.map((w) => [w.id, w]));
-
-      /*
-        CE QUI EST POSÉ SUR UN MUR RACCOURCI REVIENT DEDANS.
-
-        Une prise à 4,50 m sur un mur ramené à 2 m flotterait dans le vide —
-        invisible sur le plan, mais bien comptée par le contrôle des normes.
-        On la recale au plus près du bord, comme le fait déjà la pose.
-      */
-      const recaler = (along: number, wallId: string) => {
-        const ap = apres.get(wallId) ?? 0;
-        if (ap <= 0 || along <= ap) return along;
-        return Math.max(0.05, ap - 0.05);
-      };
-
-      /*
-        LE PLAN RESTE COUSU.
-
-        Une pièce accolée PARTAGE sa cloison — une seule maçonnerie entre
-        deux pièces, c'est la règle de `addRoomBox`. En redimensionnant, ce
-        mur mitoyen partait avec la pièce et la voisine restait sur place :
-        ses murs s'arrêtaient dix-huit centimètres avant, et le plan
-        s'ouvrait par une fente. Sur le dessin, deux pièces qui ne se
-        touchent plus ; dans le métré, un périmètre qui ne ferme pas ; en
-        3D, deux pans qui ne se rejoignent pas.
-
-        LA RÈGLE NE REGARDE NI LES PIÈCES NI LES IDENTIFIANTS, juste les
-        POINTS : ce qui était accroché à un coin qui bouge suit le coin.
-        C'est celle qu'applique déjà le déplacement d'un point de mur, et
-        elle vaut ici pour les quatre coins à la fois. Ce qui ne touchait
-        rien ne bouge pas : on recolle, on ne rassemble pas.
-      */
-      const SOUDE = 0.02;
-      /** Le point d'arrivée d'un coin déplacé, s'il en est un. */
-      const suivre = (p: Pt): Pt | null => {
-        for (const w of murs) {
-          for (const bout of [w.a, w.b] as const) {
-            if (Math.hypot(bout.x - p.x, bout.z - p.z) > SOUDE) continue;
-            const n = neufs.get(w.id)!;
-            const cible = bout === w.a ? n.a : n.b;
-            return { x: cible.x, z: cible.z };
-          }
-        }
-        return null;
-      };
-      const recousu = (w: WallSeg): WallSeg => {
-        if (neufs.has(w.id)) return neufs.get(w.id)!;
-        const a = suivre(w.a);
-        const b = suivre(w.b);
-        return a || b ? { ...w, a: a ?? w.a, b: b ?? w.b } : w;
-      };
-
-      set({
-        walls: st.walls.map(recousu),
-        fixtures: st.fixtures.map((f) =>
-          neufs.has(f.wallId) ? { ...f, along: recaler(f.along, f.wallId) } : f,
-        ),
-        dirty: true,
-      });
     },
 
     duplicateRoom: (roomId) => {

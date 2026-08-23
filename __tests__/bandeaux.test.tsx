@@ -1253,32 +1253,65 @@ describe('les feuilles de l’écran des résultats', () => {
     expect(champ).toBeDefined();
   });
 
-  /** L'AJOUT D'UNE PIÈCE : des gabarits, pas un formulaire. */
   /*
-    « AJOUTER UNE PIECE » NE CHOISIT PLUS DANS UN CATALOGUE : ON LA TIRE.
+    « AJOUTER UNE PIECE » LA POSE — il n'y a plus rien a tirer.
 
-    Ce banc verifiait qu'un catalogue de gabarits s'ouvrait — Chambre,
-    Cuisine, WC — et que la piece se posait toute seule. Releve du patron :
-    « a la selection d'une piece a ajouter, elle se place automatiquement et
-    impossible de creer des murs pour faire la piece facilement. Il faut
-    repenser un systeme complet facile pour l'utilisateur ».
+    Ce banc a decrit trois etats successifs du meme bouton, et le troisieme
+    est le bon.
 
-    Le gabarit etait justement le probleme : la piece se posait contre le mur
-    le plus long, prenait SA longueur, et sortait aux cotes de personne — une
-    « chambre 3 x 3 » en 5 x 3. Le geste retenu (choix du patron) : poser un
-    doigt, glisser, lacher. Ce que le banc verifie maintenant, c'est que le
-    plan passe en mode TRACE et que le calque qui recoit le geste est la.
+    1. Un catalogue de gabarits, et la piece se posait TOUTE SEULE contre le
+       mur le plus long en prenant SA longueur : une « chambre 3 x 3 »
+       sortait en 5 x 3. Releve du patron : « a la selection d'une piece a
+       ajouter, elle se place automatiquement et impossible de creer des
+       murs pour faire la piece facilement ».
+    2. On a donc remplace le catalogue par un geste — poser un doigt,
+       glisser, lacher — et ce banc verifiait qu'on passait en mode TRACE.
+       Deuxieme releve, apres essai : « le "ajouter une piece" ne montre pas
+       qu'il faut creer la piece, et de plus au glissement, ca s'annule tout
+       seul avec le deplacement du plan ». Un ecran qui attend un geste
+       qu'il n'annonce pas est un ecran ou il ne se passe rien.
+    3. Le catalogue revient — ce n'etait pas lui le defaut, c'etait le
+       PLACEMENT automatique. La piece se pose desormais aux cotes demandees
+       (`addRoomLibre`), en pointilles, et se regle sur elle-meme.
+
+    Ce que le banc verifie donc : le bouton ouvre le choix des cotes, et il
+    n'ouvre plus de mode d'attente.
   */
-  it('passe en mode « tirer une pièce » plutôt que d’en poser une', () => {
+  it('ouvre le choix des cotes plutôt qu’un mode d’attente', () => {
     const tree = monter();
     act(() => bouton(tree, 'Plus')!.props.onPress());
     actionDuMenu(tree, 'Ajouter une pièce');
-    // Le calque qui recoit le geste, et lui seul : pas de catalogue.
+    // Les gabarits sont la...
+    expect(textes(tree)).toContain('WC');
+    // ...et le calque qui attendait un glissement n'y est plus.
     const calque = tree.root.findAll(
       (n) => n.props?.accessibilityLabel === 'Tirer une piece',
     );
-    expect(calque.length).toBeGreaterThan(0);
-    expect(textes(tree)).not.toContain('WC');
+    expect(calque).toHaveLength(0);
+  });
+
+  /**
+   * ET ELLE ARRIVE VRAIMENT SUR LE PLAN, en pointilles.
+   *
+   * « Le "ajouter une piece" ne montre pas qu'il faut creer la piece » : le
+   * seul remede qui vaille est que la piece SOIT LA, visible, des le choix
+   * fait. Neuve, donc pointillee, donc reglable par ses cotes.
+   */
+  it('pose la pièce choisie, neuve et prête à être réglée', () => {
+    const tree = monter();
+    const avant = useScanStore.getState().rooms.length;
+    act(() => bouton(tree, 'Plus')!.props.onPress());
+    actionDuMenu(tree, 'Ajouter une pièce');
+    const wc = tree.root
+      .findAll(
+        (n) =>
+          n.props?.accessibilityLabel === 'WC' &&
+          typeof n.props?.onPress === 'function',
+      )[0];
+    act(() => wc.props.onPress());
+    const rooms = useScanStore.getState().rooms;
+    expect(rooms).toHaveLength(avant + 1);
+    expect(rooms.some((r) => r.neuve)).toBe(true);
   });
 
   /**

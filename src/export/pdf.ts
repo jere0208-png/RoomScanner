@@ -37,7 +37,7 @@ import {
   echelleNormalisee,
   graduationsRegle,
 } from './echelle';
-import { ecarterDe } from '../ui/ecarter';
+import { ecarterDe, type Boite } from '../ui/ecarter';
 import { dotStep, floorDots, mixHex } from '../geometry/appearance';
 import { wallLabel, type DeviceName } from '../geometry/naming';
 import {
@@ -2071,11 +2071,93 @@ function planPage(
          */
         const cosP = Math.cos(trame);
         const sinP = Math.sin(trame);
-        const prises: Pt[] = [];
-        const libreIci = (p: Pt) =>
-          prises.every(
-            (q) => Math.abs(q.x - p.x) > 22 || Math.abs(q.y - p.y) > 11,
+        /**
+         * TOUT CE QUI EST DÉJÀ ÉCRIT SUR LE PLAFOND.
+         *
+         * Une seule réserve pour les trois sortes d'étiquettes — la cote
+         * d'un appareil, l'écart d'une chaîne, le sigle sous le symbole.
+         * Elles se tenaient chacune leur liste, et ne se voyaient donc pas
+         * entre elles : sur la capture du dossier, le sigle du DAAF tombait
+         * en plein sur la cote « 293 » du point lumineux voisin.
+         */
+        const etiquettes: Boite[] = [];
+        /**
+         * ET LES PASTILLES DES APPAREILS, qui se peignent EN DERNIER.
+         *
+         * Chaque symbole réserve son disque blanc avant de se dessiner : une
+         * cote posée dessous disparaît sous ce blanc. Sur la capture,
+         * « 243 » se lisait « 24 » — le dernier chiffre mangé par le spot
+         * qu'il servait justement à poser.
+         */
+        const pastilles: Boite[] = [];
+        for (const cl of plafond) {
+          const q = px(cl.at);
+          if (!dansLeCadre(q)) continue;
+          const r =
+            Math.max(7, Math.min(16, (CEILINGS[cl.kind].d / 2) * scale)) + 2;
+          pastilles.push({ x: q.x - r, y: q.y - r, w: r * 2, h: r * 2 });
+        }
+        /**
+         * LE SIGLE SE RÉSERVE SA PLACE LE PREMIER.
+         *
+         * C'est le seul qui n'ait aucune liberté : il tient sous SON
+         * symbole, sinon il ne nomme plus rien. Une cote, elle, glisse le
+         * long de son propre trait sans rien perdre. En laissant les sigles
+         * passer en dernier, on les envoyait chercher une place de plus en
+         * plus loin — jusque sous le cartouche de la pièce, où le dossier
+         * imprimé les a montrés à moitié mangés. C'est donc à la cote de
+         * s'écarter, parce qu'elle le peut.
+         *
+         * Reste le cas qui a tout déclenché : le DAAF posé à dix
+         * centimètres du point lumineux, comme la norme le veut dans la
+         * circulation. Là, deux sigles pour un même point : le second
+         * descend d'un cran, et le plan cesse de porter « DCAF ».
+         */
+        const sigles = new Map<string, Boite>();
+        for (const cl of plafond) {
+          const q = px(cl.at);
+          if (!dansLeCadre(q)) continue;
+          const spec = CEILINGS[cl.kind];
+          const r = Math.max(7, Math.min(16, (spec.d / 2) * scale));
+          const larg = spec.short.length * 6.5 * 0.5;
+          sigles.set(
+            cl.id,
+            ecarterDe(
+              { x: q.x - larg / 2, y: q.y - r - 8, w: larg, h: 6.5 },
+              [...sigles.values(), ...pastilles],
+              20,
+            ),
           );
+        }
+        etiquettes.push(...sigles.values());
+        const seTouchent = (a: Boite, b: Boite) =>
+          a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+        const auLarge = (b: Boite) =>
+          !etiquettes.some((o) => seTouchent(b, o)) &&
+          !pastilles.some((o) => seTouchent(b, o));
+        /**
+         * CE QUI EST DEJA COTE NE SE RECOTE PAS.
+         *
+         * La chaine d'une ligne de spots commence par « du mur au premier »
+         * — exactement ce que la cote d'appareil venait de mesurer, meme
+         * mur, meme spot. Les deux nombres tombaient au meme point de la
+         * page : « 139 » frappe deux fois se lit « 139 / 139 », ou une
+         * bouillie d'encre. On retient donc le SEGMENT cote, pas le nombre :
+         * deux appareils peuvent legitimement etre a 139 du meme mur.
+         */
+        const cotesPosees = new Set<string>();
+        const cleCote = (a: Pt, b: Pt) => {
+          const u = `${Math.round(a.x)},${Math.round(a.y)}`;
+          const v = `${Math.round(b.x)},${Math.round(b.y)}`;
+          return u < v ? `${u}|${v}` : `${v}|${u}`;
+        };
+        /** L'emprise du cartouche d'une cote, centré sur son point. */
+        const boiteCote = (p: Pt): Boite => ({
+          x: p.x - 11,
+          y: p.y - 5,
+          w: 22,
+          h: 10,
+        });
         for (const cl of extra?.hideCotesPose ? [] : plafond) {
           for (const axe of [
             { x: -cosP, z: -sinP },
@@ -2089,19 +2171,37 @@ function planPage(
               z: cl.at.z + axe.z * dist,
             });
             if (!dansLeCadre(a) || !dansLeCadre(b)) continue;
+            cotesPosees.add(cleCote(a, b));
             d.dashedPath([a, b], 0.6, SKY, [2, 3]);
             const l = Math.hypot(b.x - a.x, b.y - a.y) || 1;
             const nx = (b.y - a.y) / l;
             const ny = -(b.x - a.x) / l;
             d.line(b.x - nx * 3, b.y - ny * 3, b.x + nx * 3, b.y + ny * 3, 0.8, SKY);
-            // L'étiquette glisse vers le mur tant qu'elle en gêne une autre.
-            let t = 0.5;
-            let p = { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
-            for (let n = 0; n < 4 && !libreIci(p); n++) {
-              t += 0.16;
-              p = { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+            /*
+              L'ÉTIQUETTE GLISSE LE LONG DE SA COTE, sans jamais la quitter.
+
+              Elle ne cherchait qu'en s'éloignant de l'appareil, et de
+              proche en proche elle sortait par le mur : sur la capture,
+              « 343 » se retrouvait dans la marge, hors du plan, à côté d'un
+              trait qui, lui, s'arrêtait à la cloison. On essaie donc de part
+              et d'autre du milieu, sans jamais atteindre les bouts — un
+              nombre collé au mur ou au symbole ne se lit pas mieux.
+            */
+            const sur = (t: number) => ({
+              x: a.x + (b.x - a.x) * t,
+              y: a.y + (b.y - a.y) * t,
+            });
+            let p = sur(0.5);
+            if (!auLarge(boiteCote(p))) {
+              for (const t of [0.34, 0.66, 0.22, 0.78, 0.14, 0.86]) {
+                const q = sur(t);
+                if (auLarge(boiteCote(q))) {
+                  p = q;
+                  break;
+                }
+              }
             }
-            prises.push(p);
+            etiquettes.push(boiteCote(p));
             d.rect(p.x - 11, p.y - 5, 22, 10, '#FFFFFF', null);
             d.text(`${Math.round(dist * 100)}`, p.x, p.y - 2.5, 6.5, SKY, {
               bold: true,
@@ -2141,8 +2241,19 @@ function planPage(
             const b = px(B);
             if (!dansLeCadre(a) || !dansLeCadre(b)) return;
             if (Math.hypot(b.x - a.x, b.y - a.y) < 14) return;
+            if (cotesPosees.has(cleCote(a, b))) return;
             d.dashedPath([a, b], 0.6, GREY, [2, 2]);
-            const m = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+            const mil = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+            // Elle se pose au milieu de l'écart ; si la place est prise,
+            // elle monte ou descend de quelques points — la chaîne se lit
+            // toujours, c'est le trait qui porte la mesure.
+            const pose = ecarterDe(
+              { x: mil.x - 9, y: mil.y - 4.5, w: 18, h: 9 },
+              [...etiquettes, ...pastilles],
+              16,
+            );
+            etiquettes.push(pose);
+            const m = { x: mil.x, y: pose.y + 4.5 };
             d.rect(m.x - 9, m.y - 4.5, 18, 9, '#FFFFFFDD', null, 0);
             d.text(`${Math.round(val * 100)}`, m.x, m.y - 2.5, 6.5, INK, {
               bold: true,
@@ -2152,6 +2263,19 @@ function planPage(
 
         // Puis les appareils, à leur diamètre réel, jamais plus petits
         // que lisibles : un spot de 9 cm ferait deux points au 1:100.
+        /**
+         * LE SIGLE S'ECARTE DE CELUI DU VOISIN.
+         *
+         * Releve sur une capture du dossier : dans la circulation, le DAAF
+         * est pose a quelques centimetres du point lumineux — la norme le
+         * veut la, justement. Les deux sigles s'ecrivaient alors au meme
+         * point, l'un sur l'autre, et le plan portait un mot qui n'existe
+         * pas : « DCAF ». Deux informations perdues d'un coup.
+         *
+         * Meme remede que pour les notes : la punaise ne bouge pas, le mot
+         * si. On cherche court (20 points) — un sigle pose loin de son
+         * appareil ment davantage qu'un sigle serre.
+         */
         for (const cl of plafond) {
           const spec = CEILINGS[cl.kind];
           const q = px(cl.at);
@@ -2159,7 +2283,11 @@ function planPage(
           const r = Math.max(7, Math.min(16, (spec.d / 2) * scale));
           d.circle(q.x, q.y, r + 2, '#FFFFFF');
           drawSymbol(d, CEILING_SYMBOL[cl.kind], q.x, q.y, r / 9, spec.color, 1.1);
-          d.text(spec.short, q.x, q.y - r - 8, 6.5, spec.color, { bold: true });
+          // La place retenue plus haut, avant que les cotes ne se posent.
+          const pose = sigles.get(cl.id);
+          d.text(spec.short, q.x, pose ? pose.y : q.y - r - 8, 6.5, spec.color, {
+            bold: true,
+          });
         }
       }
 

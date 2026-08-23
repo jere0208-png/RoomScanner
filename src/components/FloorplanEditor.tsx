@@ -1704,6 +1704,9 @@ export function FloorplanEditor({
                 wall={w}
                 quad={quads.get(w.id)}
                 mapping={mapping}
+                /* Une piece qu'on vient de poser et qu'on n'a pas encore
+                   lachee : son trait reste ouvert. Voir `WallBody`. */
+                neuve={!!roomById.get(roomOf(w) ?? '')?.neuve}
                 showMeasure={placementCotes.murs.has(w.id)}
                 measureAt={placementCotes.murs.get(w.id)}
                 measureOpacity={1 - detail}
@@ -2769,6 +2772,80 @@ export function FloorplanEditor({
             })()}
 
           {/*
+            LA PIÈCE QU'ON VIENT DE POSER SE TIRE PAR SES BORDS.
+
+            Relevé du patron : « le "ajouter une pièce" ne montre pas qu'il
+            faut créer la pièce, et de plus au glissement, ça s'annule tout
+            seul avec le déplacement du plan. On doit faire une pièce basique
+            modifiable comme un meuble sur ses côtés, en pointillés, et on
+            doit pouvoir le placer en le glissant avec le doigt dans sa
+            surface ».
+
+            Les quatre poignées ne paraissent que tant que la pièce est
+            NEUVE : une fois lâchée, elle se règle comme les autres, et
+            quatre cibles de plus autour de chaque pièce choisie gêneraient
+            le geste qu'on fait vraiment — la pousser.
+          */}
+          {editable &&
+            selectedRoomId &&
+            roomById.get(selectedRoomId)?.neuve &&
+            (() => {
+              const pts = partOf.get(selectedRoomId)?.surface?.pts;
+              if (!pts || pts.length < 3) return null;
+              const xs = pts.map((q) => q.x);
+              const zs = pts.map((q) => q.z);
+              const x0 = Math.min(...xs);
+              const x1 = Math.max(...xs);
+              const z0 = Math.min(...zs);
+              const z1 = Math.max(...zs);
+              const cx = (x0 + x1) / 2;
+              const cz = (z0 + z1) / 2;
+              const centre = mapping.toPx({ x: cx, z: cz });
+              const bords = [
+                { cote: 'largeur+' as const, n: { x: 1, z: 0 }, mid: { x: x1, z: cz } },
+                { cote: 'largeur-' as const, n: { x: -1, z: 0 }, mid: { x: x0, z: cz } },
+                { cote: 'profondeur+' as const, n: { x: 0, z: 1 }, mid: { x: cx, z: z1 } },
+                { cote: 'profondeur-' as const, n: { x: 0, z: -1 }, mid: { x: cx, z: z0 } },
+              ];
+              return (
+                <>
+                  {bords.map((b) => {
+                    // Le milieu du bord et un point voisin LE LONG du bord :
+                    // deux projections donnent son angle à l'écran, quelle
+                    // que soit la rotation du plan.
+                    const m = mapping.toPx(b.mid);
+                    const long = mapping.toPx({
+                      x: b.mid.x - b.n.z * 0.2,
+                      z: b.mid.z + b.n.x * 0.2,
+                    });
+                    const inclinaison =
+                      (Math.atan2(long.y - m.y, long.x - m.x) * 180) / Math.PI;
+                    // Juste DEHORS, comme pour un meuble : posées sur le
+                    // bord, les quatre zones de quarante points se
+                    // rejoignaient au milieu d'une petite pièce et
+                    // l'empêchaient de se pousser.
+                    const vers = Math.hypot(m.x - centre.x, m.y - centre.y) || 1;
+                    const at = {
+                      x: m.x + ((m.x - centre.x) / vers) * 12,
+                      y: m.y + ((m.y - centre.y) / vers) * 12,
+                    };
+                    return (
+                      <SideHandle
+                        key={b.cote}
+                        roomId={selectedRoomId}
+                        cote={b.cote}
+                        at={at}
+                        angle={inclinaison}
+                        normale={b.n}
+                        mapping={mapping}
+                      />
+                    );
+                  })}
+                </>
+              );
+            })()}
+
+          {/*
             LA PASTILLE QUI REFERME LE PLAN.
 
             Elle se pose au milieu du manque, et dit sa largeur : on sait ce
@@ -3082,6 +3159,7 @@ function WallBody({
   measureAt,
   measureOpacity = 1,
   selected,
+  neuve,
   onPress,
 }: {
   wall: WallSeg;
@@ -3099,6 +3177,16 @@ function WallBody({
   /** Les cotes globales s'effacent quand les cotes de détail arrivent. */
   measureOpacity?: number;
   selected: boolean;
+  /**
+   * LE MUR D'UNE PIECE PAS ENCORE ARRETEE — il se dessine en pointillés.
+   *
+   * Relevé du patron sur la pièce qu'on ajoute : « on doit faire une pièce
+   * basique modifiable comme un meuble sur ses côtés, en pointillés ». Le
+   * poché noir dit la maçonnerie RELEVÉE ; celle qu'on est en train de
+   * poser n'en est pas encore une, et le trait ouvert le dit sans un mot.
+   * Il se referme au lâcher (`arreterPiece`).
+   */
+  neuve?: boolean;
   /** Le mur borde une pièce en défaut de conformité électrique. */
   onPress?: () => void;
 }) {
@@ -3150,7 +3238,20 @@ function WallBody({
     <G onPress={onPress}>
       {/* Zone de toucher élargie, invisible */}
       <Line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="transparent" strokeWidth={30} />
-      {body ? (
+      {neuve ? (
+        // Le contour seul, en tirets : rien n'est poché tant que la pièce
+        // n'est pas arrêtée.
+        <Line
+          x1={a.x}
+          y1={a.y}
+          x2={b.x}
+          y2={b.y}
+          stroke={teinte}
+          strokeWidth={2.5}
+          strokeLinecap="butt"
+          strokeDasharray="7,5"
+        />
+      ) : body ? (
         <Polygon points={body} fill={teinte} stroke="none" />
       ) : (
         <Line
@@ -3561,6 +3662,7 @@ export function RotateHandle({
  */
 export function SideHandle({
   objectId,
+  roomId,
   cote,
   at,
   /** Angle du bord à l'écran, en degrés : la barre s'y couche. */
@@ -3569,7 +3671,15 @@ export function SideHandle({
   normale,
   mapping,
 }: {
-  objectId: string;
+  objectId?: string;
+  /**
+   * UNE PIÈCE PLUTÔT QU'UN MEUBLE — même barre, même geste.
+   *
+   * Relevé du patron : « une pièce basique modifiable comme un meuble sur
+   * ses côtés ». Comme un meuble : donc la même poignée, pas une cousine
+   * qui se prendrait autrement. Seule change la cible du geste.
+   */
+  roomId?: string;
   cote: 'largeur+' | 'largeur-' | 'profondeur+' | 'profondeur-';
   at: { x: number; y: number };
   angle: number;
@@ -3597,6 +3707,13 @@ export function SideHandle({
   const depart = useRef<
     { width: number; depth: number; cx: number; cz: number } | null
   >(null);
+  /** L'emprise de la pièce à l'appui — même rôle, autre géométrie. */
+  const departPiece = useRef<{
+    x0: number;
+    z0: number;
+    largeur: number;
+    profondeur: number;
+  } | null>(null);
   const pan = useMemo(
     () =>
       PanResponder.create({
@@ -3605,6 +3722,23 @@ export function SideHandle({
         onPanResponderTerminationRequest: () => false,
         onShouldBlockNativeResponder: () => true,
         onPanResponderGrant: () => {
+          if (roomId) {
+            const murs = useScanStore
+              .getState()
+              .walls.filter((w) => w.roomId === roomId);
+            const xs = murs.flatMap((w) => [w.a.x, w.b.x]);
+            const zs = murs.flatMap((w) => [w.a.z, w.b.z]);
+            departPiece.current =
+              murs.length === 4
+                ? {
+                    x0: Math.min(...xs),
+                    z0: Math.min(...zs),
+                    largeur: Math.max(...xs) - Math.min(...xs),
+                    profondeur: Math.max(...zs) - Math.min(...zs),
+                  }
+                : null;
+            return;
+          }
           const o = useScanStore
             .getState()
             .objects.find((x) => x.id === objectId);
@@ -3618,11 +3752,19 @@ export function SideHandle({
             : null;
         },
         onPanResponderMove: (_e, g) => {
-          const base = depart.current;
-          if (!base) return;
           const d = live.current.mapping.deltaToMeters(g.dx, g.dy);
           const n = live.current.normale;
           const total = d.x * n.x + d.z * n.z;
+          if (roomId) {
+            const dep = departPiece.current;
+            if (!dep) return;
+            // Pas d'aimant sur une pièce : rien à faire sentir, donc rien
+            // à faire vibrer.
+            useScanStore.getState().resizeRoomSide(roomId, cote, total, dep);
+            return;
+          }
+          const base = depart.current;
+          if (!base || !objectId) return;
           const r = useScanStore
             .getState()
             .resizeObjectSide(objectId, cote, total, base);
@@ -3631,19 +3773,23 @@ export function SideHandle({
         },
         onPanResponderRelease: () => {
           depart.current = null;
+          departPiece.current = null;
           releaseHaptic('accroche');
         },
         onPanResponderTerminate: () => {
           depart.current = null;
+          departPiece.current = null;
           releaseHaptic('accroche');
         },
       }),
-    [objectId, cote],
+    [objectId, roomId, cote],
   );
   return (
     <View
       {...pan.panHandlers}
-      accessibilityLabel={`Étirer le côté ${cote}`}
+      accessibilityLabel={
+        roomId ? `Étirer le côté ${cote} de la pièce` : `Étirer le côté ${cote}`
+      }
       // La zone touchable déborde largement la barre : un doigt couvre
       // quinze points, la barre en fait huit.
       style={[styles.sideTouch, { left: at.x - 20, top: at.y - 20 }]}>

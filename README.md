@@ -5448,6 +5448,102 @@ les murs : le document, lui, imprime ce qu'on lui donne, et une seconde
 règle de tri cachée dans le dessinateur serait une deuxième place où une
 note pourrait disparaître.
 
+### « DCAF », et la cote frappée deux fois
+
+Relevé sur une capture du dossier imprimé, sur un plan de circulation. Deux
+défauts au même endroit, et le même remède au fond : **trois sortes
+d'étiquettes se posaient sur le plafond sans jamais se voir entre elles.**
+
+Le premier saute aux yeux : le plan portait le mot « DCAF ». Ce n'est le
+sigle de rien — c'est « DCL » et « DAAF » imprimés l'un sur l'autre. Le
+détecteur de fumée est posé à quelques centimètres du point lumineux, et
+c'est même la règle : la norme le veut dans la circulation qui dessert les
+chambres. Deux appareils voisins, deux sigles au même point, deux
+informations perdues d'un coup.
+
+Le second se lit moins vite : « 139 / 139 » sur le même appareil, ou une
+bouillie d'encre à la place d'un nombre. Une ligne de spots porte DEUX
+cotations : deux cotes par appareil, d'équerre depuis les murs, et la chaîne
+des écarts — du mur au premier, entre chacun, du dernier au mur. Or la
+première cote de la chaîne mesure **exactement** ce que la cote d'appareil
+venait de mesurer : même mur, même spot, même trait. Le nombre se frappait
+deux fois au même point.
+
+La règle retenue tient au SEGMENT, pas au nombre : deux appareils peuvent
+légitimement être à 139 du même mur, et le plan doit le dire deux fois. Ce
+qui ne se répète pas, c'est la même mesure entre les deux mêmes points.
+
+Pour les sigles, on a repris `ecarterDe` — écrite pour les notes, faite pour
+ça : la punaise ne bouge pas, le mot si. **Mais l'ordre importait plus que
+la fonction.** Écarté en dernier, le sigle cherchait sa place de plus en
+plus loin : d'abord sur la cote « 293 » du point lumineux voisin, puis, une
+fois cette cote comptée comme obstacle, sous le cartouche de la pièce, où le
+rendu en image l'a montré à moitié mangé. Deux corrections, deux fois pire.
+
+Le sigle est celui qui n'a AUCUNE liberté — il tient sous son symbole, sinon
+il ne nomme plus rien. Une cote, elle, glisse le long de son propre trait
+sans rien perdre. **Il se réserve donc sa place le premier, et c'est à la
+cote de s'écarter, parce qu'elle le peut.** Reste alors le seul vrai
+conflit, celui qui a tout déclenché : deux sigles pour un même point, et le
+second descend d'un cran.
+
+Le rendu en image a montré deux défauts de plus, invisibles à la lecture du
+code : « 243 » s'imprimait « 24 », le dernier chiffre mangé par le disque
+blanc du spot — les symboles se peignent EN DERNIER, et une cote posée
+dessous disparaît. Puis, en cherchant sa place, cette même cote sortait par
+le mur et s'imprimait dans la marge, à côté d'un trait qui, lui, s'arrêtait
+à la cloison. Elle cherche maintenant **de part et d'autre du milieu de son
+trait, sans jamais atteindre les bouts** : un nombre collé au mur ou au
+symbole ne se lit pas mieux qu'un nombre caché.
+
+Le banc juge les étiquettes ENSEMBLE, sur la scène qui les réunit toutes —
+un point lumineux, son détecteur voisin, une ligne de trois spots et sa
+chaîne : aucune paire ne doit se toucher. Trois étiquettes qui s'ignorent se
+marchent forcément dessus un jour.
+
+### « Ajouter une pièce » ne montrait pas qu'il fallait la créer
+
+Troisième état du même bouton, et le premier qui tienne.
+
+Au départ, un catalogue de gabarits — Chambre, Séjour, WC — et la pièce se
+posait TOUTE SEULE contre le mur extérieur le plus long, en prenant SA
+longueur. Relevé du patron : « à la sélection d'une pièce à ajouter, elle se
+place automatiquement et impossible de créer des murs pour faire la pièce
+facilement ». Une « chambre 3 × 3 » sortait en 5 × 3.
+
+On avait répondu par un geste : poser un doigt, glisser, lâcher — deux coins
+décrivent un rectangle. Deuxième relevé, après essai : « le "ajouter une
+pièce" ne montre pas qu'il faut créer la pièce, et de plus au glissement, ça
+s'annule tout seul avec le déplacement du plan. On doit faire une pièce
+basique modifiable comme un meuble sur ses côtés, en pointillés, et on doit
+pouvoir le placer en le glissant avec le doigt dans sa surface ».
+
+**Tirer un rectangle dans le vide ne montre rien.** Un écran qui attend un
+geste qu'il n'annonce pas est un écran où il ne se passe rien : on touche,
+le plan bouge, et l'on conclut que le bouton ne marche pas.
+
+Ce n'était donc pas le catalogue le défaut, c'était le PLACEMENT
+automatique. Le catalogue revient, et la pièce **se pose** aux cotes
+demandées, au milieu de ce qui existe (`addRoomLibre`). Ce qui reste à faire
+se lit sur elle : le trait **pointillé** dit « pas encore arrêtée », ses
+quatre côtés s'attrapent comme ceux d'un meuble — la même `SideHandle`,
+parce qu'un geste qu'on connaît déjà n'est pas un geste à apprendre — et le
+doigt posé dans sa surface la pousse où l'on veut. Pas de bouton « Valider »
+: elle s'arrête dès qu'on touche autre chose, comme un meuble.
+
+Le magasin ne gagne qu'une action, `resizeRoomSide`, et elle partage tout
+son calcul avec le redimensionnement au clavier (`reposerPiece`). Les deux
+ne diffèrent que par **le coin qui ne bouge pas** : le haut-gauche quand on
+tape des cotes — rien ne saute à l'écran —, le bord OPPOSÉ au doigt quand on
+tire, sans quoi le geste serait un déplacement. Et comme pour les meubles,
+la poignée retient l'emprise à l'appui et envoie la distance TOTALE
+parcourue : rien ne se cumule d'une image à l'autre, un geste ne fait qu'un
+pas d'annulation.
+
+Le geste de tracé au doigt n'est plus offert à l'écran ; `addRoomRect` reste
+au magasin, avec son banc — c'est la même géométrie qui sert à la pièce
+posée, et le jour où un tracé revient, il n'y aura pas à la réécrire.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

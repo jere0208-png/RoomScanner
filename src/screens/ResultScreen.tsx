@@ -299,7 +299,8 @@ export function ResultScreen() {
   const editNote = useScanStore((s) => s.editNote);
   const removeNote = useScanStore((s) => s.removeNote);
   const addRoomBox = useScanStore((s) => s.addRoomBox);
-  const addRoomRect = useScanStore((s) => s.addRoomRect);
+  const addRoomLibre = useScanStore((s) => s.addRoomLibre);
+  const arreterPiece = useScanStore((s) => s.arreterPiece);
   const moveRoom = useScanStore((s) => s.moveRoom);
   const removeCeiling = useScanStore((s) => s.removeCeiling);
   const moveCeiling = useScanStore((s) => s.moveCeiling);
@@ -451,18 +452,23 @@ export function ResultScreen() {
   /** La feuille « Ajouter une pièce » : nom, largeur, profondeur. */
   const [ajoutPiece, setAjoutPiece] = useState(false);
   /*
-    ON TIRE LA PIECE, ON NE LA SUBIT PLUS.
+    LE RECTANGLE QU'ON TIRAIT DANS LE VIDE — geste retire de l'ecran.
 
-    Releve du patron : « a la selection d'une piece a ajouter, elle se place
-    automatiquement et impossible de creer des murs pour faire la piece
-    facilement. Il faut repenser un systeme complet facile pour
-    l'utilisateur ».
+    Premier releve du patron : « a la selection d'une piece a ajouter, elle
+    se place automatiquement et impossible de creer des murs pour faire la
+    piece facilement ». On avait repondu par un geste : poser un doigt,
+    glisser, lacher.
 
-    Le geste retenu : poser un doigt, glisser, lacher. Deux coins suffisent a
-    decrire un rectangle, et un rectangle decrit presque toutes les pieces
-    d'un logement — pour un L, on en tire deux et on les fusionne.
+    Deuxieme releve, apres essai : « le "ajouter une piece" ne montre pas
+    qu'il faut creer la piece, et de plus au glissement, ca s'annule tout
+    seul avec le deplacement du plan ». Tirer un rectangle dans le vide ne
+    montre RIEN — on touche, le plan bouge, et l'on conclut que le bouton ne
+    marche pas. La piece se POSE donc, et se regle sur elle-meme.
+
+    `addRoomRect` reste au magasin, avec son banc : c'est la meme geometrie
+    qui sert a la piece posee, et le jour ou un geste de trace revient, il
+    n'y aura pas a la reecrire.
   */
-  const [tracePiece, setTracePiece] = useState(false);
   /** La présentation guidée, plein écran : ce qu'on montre au client. */
   const [visite, setVisite] = useState(false);
   // Vue 3D : bascule « vue de dessus », comme un plan.
@@ -773,18 +779,34 @@ export function ResultScreen() {
    * qu'on désignait. `seuleSelection('mur')` éteint tout sauf le mur ;
    * sans argument, elle éteint tout — c'est l'appui dans le vide.
    */
+  /**
+   * PAS DE BOUTON « VALIDER » — la pièce qu'on lâche se ferme.
+   *
+   * C'est déjà la règle des meubles, et le relevé du patron la reprend pour
+   * la pièce qu'on vient de poser : on la pousse, on l'étire, et dès qu'on
+   * touche autre chose son trait pointillé se referme. Un bouton de plus
+   * serait un geste de plus pour ne rien dire de neuf.
+   */
+  const fermerPiecesNeuves = useCallback((sauf?: string | null) => {
+    for (const r of useScanStore.getState().rooms) {
+      if (r.neuve && r.id !== sauf) arreterPiece(r.id);
+    }
+  }, [arreterPiece]);
   const seuleSelection = useCallback(
     (garde?: 'mur' | 'meuble' | 'piece' | 'ouverture' | 'plafond') => {
       if (garde !== 'mur') setSelectedWallId(null);
       if (garde !== 'meuble') setSelectedObjectId(null);
-      if (garde !== 'piece') setSelectedRoomId(null);
+      if (garde !== 'piece') {
+        setSelectedRoomId(null);
+        fermerPiecesNeuves();
+      }
       if (garde !== 'ouverture') setSelectedOpeningId(null);
       if (garde !== 'plafond') {
         setSelCeiling(null);
         setSelRow(null);
       }
     },
-    [],
+    [fermerPiecesNeuves],
   );
   const [renaming, setRenaming] = useState(false);
   const [nameInput, setNameInput] = useState('');
@@ -1992,7 +2014,9 @@ export function ResultScreen() {
           accolee={false}
           onClose={() => setAjoutPiece(false)}
           onChoose={(largeur, profondeur, nom) => {
-            addRoomBox(largeur, profondeur, nom, null);
+            // Rien au plan : elle se pose à l'origine, et elle est CHOISIE
+            // — sans quoi ni ses poignées ni son glissement n'existeraient.
+            setSelectedRoomId(addRoomLibre(largeur, profondeur, nom));
             setAjoutPiece(false);
             setEditMode(true);
             haptic('succes');
@@ -2015,7 +2039,7 @@ export function ResultScreen() {
                   haptic('alerte');
                   return;
                 }
-                addRoomBox(l, p, '', null);
+                setSelectedRoomId(addRoomLibre(l, p, ''));
                 setEditMode(true);
                 haptic('succes');
               },
@@ -2202,17 +2226,24 @@ export function ResultScreen() {
                      * Un logement ne se relève pas toujours d'un trait : on
                      * scanne le séjour, on est appelé ailleurs, on revient
                      * pour la chambre. La seule porte de sortie était
-                     * « Nouveau scan » — qui efface tout. On pose donc une
-                     * pièce aux cotes qu'on donne, accolée au plan, et on
-                     * l'ajuste au doigt comme n'importe quel mur.
+                     * « Nouveau scan » — qui efface tout.
+                     *
+                     * ELLE SE POSE, ON NE LA TIRE PAS. Le geste précédent
+                     * demandait de tirer un rectangle dans le vide : relevé
+                     * du patron, « le "ajouter une pièce" ne montre pas
+                     * qu'il faut créer la pièce, et de plus au glissement,
+                     * ça s'annule tout seul avec le déplacement du plan ».
+                     * Un écran qui attend un geste qu'il n'annonce pas est
+                     * un écran où il ne se passe rien. On pose donc la
+                     * pièce aux cotes qu'on donne, en pointillés, et tout
+                     * ce qui reste à faire se lit sur elle.
                      */
                     label: 'Ajouter une pièce',
                     icon: 'piece' as const,
-                    hint: 'Tirez un rectangle sur le plan : posez, glissez, lâchez.',
+                    hint: 'Elle se pose devant vous : poussez-la, étirez ses côtés.',
                     onPress: () => {
                       seulGeste();
-                      setTracePiece(true);
-                      setEditMode(true);
+                      setAjoutPiece(true);
                     },
                   },
                   {
@@ -2637,19 +2668,6 @@ export function ResultScreen() {
             notes={notes}
             selectedNoteId={selNote}
             onSelectNote={setSelNote}
-            tracantPiece={tracePiece}
-            onTracerPiece={(a, b) => {
-              setTracePiece(false);
-              const id = addRoomRect(a, b, '');
-              if (!id) {
-                // Un appui sans glissement : rien a creer, et on le dit.
-                haptic('alerte');
-                return;
-              }
-              seuleSelection('piece');
-              setSelectedRoomId(id);
-              haptic('succes');
-            }}
             placing={
               !!pendingCeiling || !!pendingSpots || pendingNote || !!noteADeplacer
             }
@@ -2810,6 +2828,7 @@ export function ResultScreen() {
             }}
             onSelectRoom={(id) => {
               seuleSelection('piece');
+              fermerPiecesNeuves(id);
               setSelectedRoomId(id);
             }}
             onEditRoomName={promptRoomFor}
@@ -3983,7 +4002,9 @@ export function ResultScreen() {
         onChoose={(largeur, profondeur, nom) => {
           // Accolée au mur choisi, s'il y en a un : c'est ainsi qu'on bâtit
           // un appartement de proche en proche.
-          const id = addRoomBox(largeur, profondeur, nom, selectedWallId);
+          const id = selectedWallId
+            ? addRoomBox(largeur, profondeur, nom, selectedWallId)
+            : addRoomLibre(largeur, profondeur, nom);
           setAjoutPiece(false);
           seuleSelection('piece');
           setSelectedRoomId(id);
@@ -4009,7 +4030,9 @@ export function ResultScreen() {
                   haptic('alerte');
                   return;
                 }
-                const id = addRoomBox(l, p, '', selectedWallId);
+                const id = selectedWallId
+                  ? addRoomBox(l, p, '', selectedWallId)
+                  : addRoomLibre(l, p, '');
                 seuleSelection('piece');
                 setSelectedRoomId(id);
                 setEditMode(true);
