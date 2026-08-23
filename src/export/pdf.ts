@@ -1375,6 +1375,32 @@ function planPage(
   // Une entrée par pièce : contour, centre, teinte de sol. Tout ce qui suit
   // (meubles, ouvertures, cotes, cartouches) se règle sur la pièce concernée.
   const parts = roomParts(walls, ctx.rooms);
+  /**
+   * QUI S'ÉCARTE DE QUI — l'ordre est celui des libertés.
+   *
+   * Relevé à l'œil sur le dossier imprimé : le sigle « DCL » d'un point
+   * lumineux disparaissait sous le cartouche « Séjour · 12,0 m² ». Les deux
+   * ont raison d'être là — un point lumineux se pose au milieu de la pièce,
+   * et le cartouche aussi — mais le cartouche se peint APRÈS, avec son fond
+   * blanc : il gagnait sans le savoir.
+   *
+   * Trois écritures se disputent le milieu d'une pièce, et elles n'ont pas
+   * la même marge de manœuvre :
+   *
+   *   — LE SIGLE d'un appareil de plafond n'en a AUCUNE : il tient sous son
+   *     symbole, sinon il ne nomme plus rien ;
+   *   — LE CARTOUCHE en a un peu : il peut monter ou descendre de quelques
+   *     points sans cesser de désigner sa pièce (c'est déjà ce qu'il fait à
+   *     l'écran face aux meubles) ;
+   *   — LA COTE en a beaucoup : elle glisse le long de son propre trait.
+   *
+   * Chacun s'écarte donc de ce qui est plus contraint que lui, et de rien
+   * d'autre : le cartouche évite les sigles, la cote évite les deux. Une
+   * réserve unique ferait chercher au cartouche une place introuvable au
+   * milieu des cotes, et il resterait là où il gêne.
+   */
+  const siglesPlafond: Boite[] = [];
+  const cartouchesPiece: Boite[] = [];
   const fillOf = (roomId: string) => {
     const captured = showTextures ? floors[roomId]?.color : undefined;
     return captured ? mixHex(captured, '#FFFFFF', 0.42) : '#F5F7FA';
@@ -2052,6 +2078,37 @@ function planPage(
        * l'autre. Sol et plafond sont la même pièce : un seul plan.
        */
       const plafond = ctx.ceiling ?? [];
+      /*
+        LA PLACE DES CARTOUCHES, RETENUE AVANT LES COTES DU PLAFOND.
+
+        Le cartouche se peint en dernier, avec son fond blanc : ce qui passe
+        dessous disparaît. On calcule donc son emprise ici — la MÊME formule
+        que le dessin, plus bas — pour que les cotes du plafond l'évitent.
+        Voir `siglesPlafond` pour l'autre moitié de la règle.
+      */
+      if (showSurfaces && cartouchesPiece.length === 0) {
+        const gros = parts.length === 1 ? 14 : 10.5;
+        for (const part of parts) {
+          if (!part.surface) continue;
+          const q = px(part.labelAt);
+          const nom = roomNames[part.roomId] ?? '';
+          const aire = `${part.surface.exact ? '' : '≈ '}${fr1(part.surface.area)} m²`;
+          const larg =
+            Math.max(
+              latin1(nom).length * gros,
+              latin1(aire).length * (parts.length === 1 ? 11 : 9),
+            ) *
+              0.52 +
+            10;
+          cartouchesPiece.push({
+            x: q.x - larg / 2,
+            y: q.y - (nom ? 15 : 16),
+            w: larg,
+            h: nom ? 30 : 32,
+          });
+        }
+      }
+
       if (plafond.length > 0) {
         // Les liens d'abord : ils passent SOUS les symboles, jamais dessus.
         for (const cl of plafond) {
@@ -2096,7 +2153,9 @@ function planPage(
          * entre elles : sur la capture du dossier, le sigle du DAAF tombait
          * en plein sur la cote « 293 » du point lumineux voisin.
          */
-        const etiquettes: Boite[] = [];
+        // Les cartouches sont déjà posés (voir `cartouchesPiece`) : les
+        // cotes s'en écartent comme du reste.
+        const etiquettes: Boite[] = [...cartouchesPiece];
         /**
          * ET LES PASTILLES DES APPAREILS, qui se peignent EN DERNIER.
          *
@@ -2146,6 +2205,8 @@ function planPage(
           );
         }
         etiquettes.push(...sigles.values());
+        // Et le cartouche, lui, n'aura que les sigles à éviter.
+        siglesPlafond.push(...sigles.values());
         const seTouchent = (a: Boite, b: Boite) =>
           a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
         const auLarge = (b: Boite) =>
@@ -2388,6 +2449,9 @@ function planPage(
           cartouche.
         */
         const gros = big ? 14 : 10.5;
+        // La MÊME emprise que celle retenue plus haut pour les étiquettes
+        // du plafond : deux formules qui divergeraient d'un point feraient
+        // revenir le défaut sans qu'on comprenne pourquoi.
         const larg =
           Math.max(latin1(label).length * gros, latin1(area).length * (big ? 11 : 9)) *
             0.52 +
@@ -2395,27 +2459,31 @@ function planPage(
         // On retient l'emprise : les notes s'en écarteront, sans quoi
         // elles se peignent par-dessus (elles passent en dernier) et le
         // lecteur perd les DEUX informations d'un coup.
-        emprises.push({
-          x: cp2.x - larg / 2,
-          y: cp2.y - (label ? 15 : 16),
-          w: larg,
-          h: label ? 30 : 32,
-        });
-        d.rect(
-          cp2.x - larg / 2,
-          cp2.y - (label ? 15 : 16),
-          larg,
-          label ? 30 : 32,
-          '#FFFFFF',
-          null,
+        // Il s'écarte de ce que le plafond a déjà écrit : voir
+        // `etiquettesPlafond`. On cherche large — un cartouche fait trente
+        // points de haut, il faut pouvoir dégager un sigle entier.
+        const pose = ecarterDe(
+          {
+            x: cp2.x - larg / 2,
+            y: cp2.y - (label ? 15 : 16),
+            w: larg,
+            h: label ? 30 : 32,
+          },
+          siglesPlafond,
+          34,
         );
+        // Le décalage retenu s'applique au texte comme au fond : les deux
+        // sont un seul objet, ils ne se séparent pas.
+        const dy = pose.y - (cp2.y - (label ? 15 : 16));
+        emprises.push(pose);
+        d.rect(pose.x, pose.y, pose.w, pose.h, '#FFFFFF', null);
         // Nom au-dessus, surface en dessous (l'axe y du PDF monte).
         if (label) {
-          d.text(label, cp2.x, cp2.y + 3, gros, INK, { bold: true });
-          d.text(area, cp2.x, cp2.y - 9, big ? 11 : 9, GREY);
+          d.text(label, cp2.x, cp2.y + 3 + dy, gros, INK, { bold: true });
+          d.text(area, cp2.x, cp2.y - 9 + dy, big ? 11 : 9, GREY);
         } else {
-          d.text(area, cp2.x, cp2.y + 4, big ? 15 : 11, INK, { bold: true });
-          d.text('surface au sol', cp2.x, cp2.y - 10, 8, GREY);
+          d.text(area, cp2.x, cp2.y + 4 + dy, big ? 15 : 11, INK, { bold: true });
+          d.text('surface au sol', cp2.x, cp2.y - 10 + dy, 8, GREY);
         }
       }
       /*
@@ -2531,8 +2599,46 @@ function planPage(
     bold: true,
     align: 'left',
   });
-  d.text(sous, FRAME.x + 24, TETE - 14, 8, GREY, {
-    align: 'left',
+  /*
+    LE SOUS-TITRE S'ARRÊTE AVANT LA ROSE DES VENTS.
+
+    Relevé à l'œil sur le dossier imprimé : « … cotes d'appareil en
+    centimètres. · Surface relevée : 21,5 m² » passait DERRIÈRE la rose, et
+    l'on perdait les deux — le chiffre qu'on cherche en premier sur un plan
+    de logement, et la seule chose qui dit de quel mur on parle.
+
+    La surface passe donc à la ligne quand la place manque. Elle ne se perd
+    pas, et la rose garde son coin : c'est là qu'un plan d'architecte la
+    met, et c'est là qu'on va la chercher.
+  */
+  const largeurTexte = (t: string, taille: number) =>
+    latin1(t).length * taille * 0.5;
+  /* La place disponible s'arrête avant la rose, quand il y en a une. */
+  const dispoTete =
+    (ctx.north !== null && ctx.north !== undefined
+      ? FRAME.x + FRAME.w - 72
+      : FRAME.x + FRAME.w - 24) -
+    (FRAME.x + 24);
+  /** Coupe au mot, à la largeur donnée : deux lignes au plus. */
+  const enLignes = (t: string, large: number, max = 2) => {
+    const mots = t.split(' ');
+    const out: string[] = [];
+    let ligne = '';
+    for (const mot of mots) {
+      const essai = ligne ? `${ligne} ${mot}` : mot;
+      if (largeurTexte(essai, 8) <= large || !ligne) {
+        ligne = essai;
+        continue;
+      }
+      out.push(ligne);
+      ligne = mot;
+      if (out.length === max) break;
+    }
+    if (out.length < max && ligne) out.push(ligne);
+    return out;
+  };
+  enLignes(sous, dispoTete).forEach((ligne, i) => {
+    d.text(ligne, FRAME.x + 24, TETE - 14 - i * 10, 8, GREY, { align: 'left' });
   });
 
   /**

@@ -5744,6 +5744,41 @@ quoi se désabonner. Tout banc touchant l'écran de scan tombait sur « n'est
 pas une fonction » au démontage, et l'erreur parlait du hook au lieu de
 parler du doublet. C'est réparé une fois pour toutes dans `jest.setup.js`.
 
+### Le dossier, page par page, en image
+
+Même méthode, sur le document lui-même : on le fabrique complet — plan coté,
+plafond équipé, notes, boussole, client, perspective, élévations, métré — on
+le rend en image, et on regarde chaque page. Deux mots s'y mangeaient l'un
+l'autre.
+
+**La rose des vents mangeait le sous-titre.** « … cotes d'appareil en
+centimètres. · Surface relevée : 21,0 m² » courait jusqu'au coin haut-droit,
+où la rose l'attendait. On perdait les deux : le premier chiffre qu'on
+cherche sur un plan de logement, et la seule chose qui dit de quel mur on
+parle. Le sous-titre se **coupe au mot** maintenant, sur deux lignes au plus,
+et s'arrête avant la rose. Rien n'est perdu, et la rose garde son coin —
+c'est là qu'un plan d'architecte la met, donc là qu'on va la chercher.
+
+**Le cartouche de la pièce mangeait le sigle du plafond.** « DCL »
+disparaissait sous « Séjour · 12,0 m² ». Les deux ont raison d'être là — un
+point lumineux se pose au milieu de la pièce, le cartouche aussi — mais le
+cartouche se peint APRÈS, avec son fond blanc : il gagnait sans le savoir.
+
+La règle retenue est celle des LIBERTÉS, et elle vaut pour les trois
+écritures qui se disputent le milieu d'une pièce :
+
+| écriture | marge de manœuvre | ce qu'elle évite |
+| --- | --- | --- |
+| sigle d'appareil | aucune — il tient sous son symbole | rien |
+| cartouche de pièce | quelques points en hauteur | les sigles |
+| cote | tout le long de son trait | les sigles et les cartouches |
+
+Chacun s'écarte de ce qui est plus contraint que lui, et de rien d'autre. Une
+réserve unique — tout le monde évite tout le monde — a été essayée d'abord :
+le cartouche cherchait alors une place introuvable au milieu des cotes, ne la
+trouvait pas, et restait exactement là où il gênait. C'est la hiérarchie qui
+règle le cas, pas la quantité d'obstacles.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro
