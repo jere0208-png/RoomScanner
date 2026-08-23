@@ -197,7 +197,7 @@ const styles = getStyles(c);
   const toutLePlafond = useScanStore((s) => s.ceiling);
   const toutesLesNotes = useScanStore((s) => s.notes);
   /** La feuille d'implantation du plafond, avec ses liens de commande. */
-  const [plafond, setPlafond] = useState(true);
+  const [plafond, setPlafond] = useState(false);
   const toutesLesPhotos = useScanStore((s) => s.photos);
   /*
     LE DOSSIER SORT L'ÉTAGE QU'ON REGARDE.
@@ -321,6 +321,35 @@ const styles = getStyles(c);
       ),
     [fixtures, walls, placement, rooms, parts, north],
   );
+  /**
+   * CE QUI EST COCHÉ QUAND ON ARRIVE — relevé du patron : « dans l'export
+   * PDF, on doit avoir de base coché : Vues 3D, Métré, Cotes 2D, Meubles.
+   * Le reste est décoché. »
+   *
+   * C'est le dossier qu'on envoie neuf fois sur dix : le plan coté avec ses
+   * meubles, le métré, les perspectives. Tout le reste — surfaces teintées,
+   * ouvertures en couleur, plafond, élévations, gaines, schémas, cotes 3D —
+   * répond à une demande particulière, et se coche quand elle se présente.
+   *
+   * Le défaut n'était pas d'avoir trop d'options : c'était d'en avoir six
+   * cochées d'office. Un dossier de onze feuilles partait chez le client
+   * quand on en voulait quatre, et personne ne décoche ce qu'il ne sait pas
+   * coché.
+   *
+   * QUATRE DE CES RÉGLAGES SONT CEUX DU PLAN (meubles, surfaces, ouvertures,
+   * couleurs), partagés par le magasin : on les pose ici, à l'ouverture.
+   * L'aperçu montre alors exactement ce que le dossier contiendra — c'est
+   * tout l'intérêt de cet écran — et le plan les retrouve tels quels en
+   * revenant, puisque ce sont les mêmes boutons.
+   */
+  useEffect(() => {
+    setShowFurniture(true);
+    setShowSurfaces(false);
+    setShowTextures(false);
+    setShowOpeningColors(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   /** Schémas unifilaire et multifilaire, tirés des mêmes circuits. */
   const [schema, setSchema] = useState(false);
   const schemas = useMemo(() => {
@@ -343,7 +372,7 @@ const styles = getStyles(c);
       marks: fixtureMarks(list.circuits),
     };
   }, [rooms, parts, fixtures, placement, cheminements, ceiling]);
-  const [measures3D, setMeasures3D] = useState(true);
+  const [measures3D, setMeasures3D] = useState(false);
   // Toucher un modèle verrouille le défilement (iOS annule sinon le geste
   // JS au profit du scroll natif) ; le relâcher le rend au ScrollView.
   const [scrollLocked, setScrollLocked] = useState(false);

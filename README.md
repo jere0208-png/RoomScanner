@@ -6003,6 +6003,24 @@ colonne d'actions — et ses marges se resserrent d'un cran (12 au lieu de 14,
 gardent leurs quarante-quatre points : c'est la taille d'un doigt, elle ne
 se négocie pas.
 
+### Ce qui est coché quand on ouvre l'export
+
+Relevé du patron : « dans l'export PDF, on doit avoir de base coché : Vues
+3D, Métré, Cotes 2D, Meubles. Le reste est décoché. »
+
+C'est le dossier qu'on envoie neuf fois sur dix. Le défaut n'était pas
+d'avoir treize options — chacune répond à une vraie demande — c'était d'en
+avoir **six cochées d'office** : cotes 3D, surfaces teintées, ouvertures en
+couleur, plafond, en plus des quatre bonnes. Un dossier de onze feuilles
+partait chez le client quand on en voulait quatre, et **personne ne décoche
+ce qu'il ne sait pas coché**.
+
+Quatre de ces réglages sont ceux du PLAN (meubles, surfaces, ouvertures,
+couleurs), partagés par le magasin. L'écran d'export les pose donc à son
+ouverture : l'aperçu montre alors exactement ce que le dossier contiendra —
+c'est tout l'intérêt de cet écran — et le plan les retrouve tels quels en
+revenant, puisque ce sont les mêmes boutons.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro
