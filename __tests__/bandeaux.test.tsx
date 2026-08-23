@@ -25,6 +25,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 
 import React from 'react';
 import {
+  Dimensions,
   ScrollView,
   StyleSheet,
   Text,
@@ -745,21 +746,35 @@ describe('l’écran des résultats', () => {
     const strip = tree.root
       .findAll((n) => {
         const st = StyleSheet.flatten(n.props?.style) as
-          | { marginRight?: number; borderRadius?: number }
+          | { marginRight?: number; maxWidth?: number; borderRadius?: number }
           | undefined;
+        // La garde se dit par une marge à droite OU par une largeur maxi :
+        // voir plus bas, la carte épouse désormais son contenu.
         return (
-          typeof st?.marginRight === 'number' &&
+          (typeof st?.marginRight === 'number' ||
+            typeof st?.maxWidth === 'number') &&
           n.findAll((x) => x.props?.accessibilityLabel === 'Laser').length > 0
         );
       })
       .pop();
     expect(strip).toBeDefined();
     const st = StyleSheet.flatten(strip!.props.style) as {
-      marginRight: number;
+      marginRight?: number;
+      maxWidth?: number;
+      left: number;
     };
-    // La colonne mesurée, plus un vrai blanc entre les deux : deux blocs
-    // qui se frôlent se lisent comme un seul.
-    expect(st.marginRight).toBeGreaterThanOrEqual(96 + 8);
+    /*
+      LA GARDE SE DIT MAINTENANT EN LARGEUR MAXI.
+
+      Le bandeau tenait toute la largeur et se réservait la colonne par une
+      marge à droite. Depuis qu'il ÉPOUSE son contenu (relevé du patron :
+      « trop de marge blanche sur son bloc »), il n'a plus de bord droit à
+      pousser : c'est sa largeur maximale qui l'empêche de passer sous la
+      colonne. La règle est la même, la mesure a changé de nom.
+    */
+    const ecran = Dimensions.get('window').width;
+    const garde = st.marginRight ?? ecran - st.left - (st.maxWidth ?? 0);
+    expect(garde).toBeGreaterThanOrEqual(96 + 8);
   });
 
   /**
@@ -972,8 +987,13 @@ describe('l’écran des résultats', () => {
     // Un étage complet le sépare des pastilles : hauteur d'une cellule, et
     // l'écart habituel.
     expect(bandeau.bottom).toBeGreaterThanOrEqual(rail.bottom + PILL_CELL_H);
-    // Et il s'arrête avant la colonne d'actions, sur sa droite.
-    expect(bandeau.marginRight).toBeGreaterThanOrEqual(50);
+    // Et il s'arrête avant la colonne d'actions, sur sa droite — par sa
+    // marge quand il tient toute la largeur, par sa largeur maxi depuis
+    // qu'il épouse son contenu.
+    const ecran2 = Dimensions.get('window').width;
+    expect(
+      bandeau.marginRight ?? ecran2 - bandeau.left - (bandeau.maxWidth ?? 0),
+    ).toBeGreaterThanOrEqual(50);
   });
 
   /**

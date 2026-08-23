@@ -5957,6 +5957,52 @@ au-dessus de la rangée d'outils, et la largeur vraie de la colonne d'actions.
 Elle serait repassée sous la barre d'outils, c'est-à-dire exactement le
 défaut corrigé deux relevés plus tôt.
 
+### La surface qui se voyait à travers les murs, et le menu devenu sourd
+
+Trois relevés du patron d'affilée, dont deux dus à la refonte des bandeaux :
+c'est le prix d'un changement de forme, et il se paie tout de suite.
+
+**« La surface du plan 3D d'un scan doit pas se voir à travers les murs. »**
+Deux choses portent ce nom sur le modèle, et les deux flottaient : le semis
+de points qui dit le sol, et l'étiquette « Séjour · 12,0 m² ». Ce n'était pas
+un défaut de tri — le semis se classait déjà sous tout, à moins l'infini —
+mais un défaut de COUCHE. Le modèle se dessine en deux : la géométrie, qui
+part au canevas natif, et par-dessus une couche de balises pour ce qui porte
+du texte. Ce qui vit dans la seconde est au-dessus des murs, quel que soit
+son rang.
+
+Un remède par couche. Le semis descend dans la géométrie : chaque point
+devient un carré minuscule, et le regroupement des tracés n'en fait qu'un
+chemin. L'étiquette, elle, reste une balise — c'est du texte, il doit rester
+net — mais **on décide avant de l'écrire** : si un pan plein se dresse entre
+l'œil et son point, on ne l'écrit pas. En écorché, elle reste : le mur y est
+justement effacé pour qu'on voie la pièce.
+
+Le premier essai, sur la planche du dossier, avait donné à l'étiquette la
+profondeur de son point pour laisser le tri faire. Regardé en image, c'était
+pire : « Séjour » sortait en « S », « Cuisine · 9,0 m² » en « sine · 9,0 m² »
+— le canapé et le réfrigérateur mangeaient la moitié des mots. **Un demi-mot
+est plus faux qu'un mot absent.** D'où la règle : tout entière, ou pas du
+tout.
+
+**« Les boutons qui s'affichent à côté du mur sont incliquables. »** Défaut
+introduit par la refonte, et instructif : le bandeau du bas a doublé de
+hauteur en passant à deux parties, et il se peint APRÈS le plan. Un menu de
+mur posé bas se retrouvait dessous — visible et sourd, le doigt touchant la
+carte blanche. Le plan n'a pas à connaître le bandeau ; l'écran, lui, sait ce
+qu'il pose en bas. Il transmet donc la hauteur RÉSERVÉE (`reserveBas`), et la
+barre d'actions du mur s'arrête au-dessus, comme elle s'arrête déjà au bord
+de l'écran.
+
+**« Trop gros, trop de marge blanche sur son bloc. »** La carte tenait la
+largeur entière : « 3 spots » suivi de quatre pastilles laissait la moitié
+d'un bandeau blanc à droite. Elle épouse maintenant son contenu — plus de
+bord droit, une largeur MAXIMALE qui l'empêche seulement de passer sous la
+colonne d'actions — et ses marges se resserrent d'un cran (12 au lieu de 14,
+9/10 au lieu de 11/12, l'écart entre les deux parties à 8). Les boutons
+gardent leurs quarante-quatre points : c'est la taille d'un doigt, elle ne
+se négocie pas.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

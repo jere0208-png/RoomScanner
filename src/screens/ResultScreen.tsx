@@ -198,6 +198,16 @@ export function ResultScreen() {
    */
   const ligneOutils = basSysteme + 8;
   const ligneBandeau = ligneOutils + PILL_CELL_H + PILL_GAP;
+  /**
+   * LA HAUTEUR QU'UN BANDEAU PEUT PRENDRE, au pire.
+   *
+   * Deux parties — le texte sur deux lignes, une rangée de boutons de
+   * quarante-quatre points qui peut se replier — plus les marges de la
+   * carte. On la majore une fois ici plutôt que de la mesurer : le plan s'en
+   * sert pour ne PAS y ranger le menu d'un mur, et une mesure qui arrive
+   * après le premier rendu ferait sauter la barre sous les doigts.
+   */
+  const HAUTEUR_BANDEAU = 132;
   const tousLesMurs = useScanStore((s) => s.walls);
   const tousLesMeubles = useScanStore((s) => s.objects);
   const scanName = useScanStore((s) => s.scanName);
@@ -366,14 +376,25 @@ export function ResultScreen() {
     () => ({
       ...styles,
       wallStrip: [styles.wallStrip, { bottom: ligneBandeau, marginRight: garde }],
-      // La carte commune à tous les bandeaux du bas : elle reçoit la même
-      // mesure que les deux autres — le pied réel de l'écran et la largeur
-      // vraie de la colonne d'actions. Sans elle ici, le bandeau repassait
-      // sous la rangée d'outils, exactement ce qu'on avait corrigé.
-      bandeau: [styles.bandeau, { bottom: ligneBandeau, marginRight: garde }],
-      editBar: [styles.editBar, { bottom: ligneBandeau, marginRight: garde }],
+      /*
+        LA CARTE REÇOIT SES MESURES ICI — c'est le seul endroit qui les
+        connaisse : le pied réel de l'écran (au-dessus de la rangée
+        d'outils) et la largeur VRAIE de la colonne d'actions.
+
+        `maxWidth` remplace le `right` : la carte épouse son contenu (relevé
+        du patron, « trop de marge blanche sur son bloc ») mais ne peut pas
+        déborder sous la colonne.
+      */
+      bandeau: [
+        styles.bandeau,
+        { bottom: ligneBandeau, maxWidth: Math.max(200, winLargeur - 12 - garde) },
+      ],
+      editBar: [
+        styles.editBar,
+        { bottom: ligneBandeau, maxWidth: Math.max(200, winLargeur - 12 - garde) },
+      ],
     }),
-    [styles, ligneBandeau, garde],
+    [styles, ligneBandeau, garde, winLargeur],
   );
 
 
@@ -2659,6 +2680,12 @@ export function ResultScreen() {
               if (id) seuleSelection('ouverture');
               setSelectedOpeningId(id);
             }}
+            /*
+              CE QUE L'ÉCRAN POSE EN BAS — pour que le menu d'un mur ne se
+              range jamais dessous. La rangée d'outils, le bandeau
+              contextuel, et un doigt de marge.
+            */
+            reserveBas={ligneBandeau + HAUTEUR_BANDEAU}
             selectedRoomId={selectedRoomId}
             /* Glisser dans la pièce choisie la déplace, avec ses meubles et
                son appareillage — et elle s'aimante aux murs voisins. */

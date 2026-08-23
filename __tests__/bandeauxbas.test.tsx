@@ -241,11 +241,12 @@ describe('la forme des bandeaux du bas', () => {
 describe('la largeur des boutons, sur un écran étroit', () => {
   const ECRAN = 375;
   const s = getStyles(light) as unknown as Record<string, Record<string, number>>;
+  // La carte part du bord gauche et s'arrête avant la colonne d'actions :
+  // sa largeur maxi est posée à l'affichage, où l'écran est connu.
   const dispo =
     ECRAN -
     (s.bandeau.left as number) -
-    (s.bandeau.right as number) -
-    (s.bandeau.marginRight as number) -
+    72 -
     2 * (s.bandeau.paddingHorizontal as number);
 
   it('laisse une vraie largeur au contenu', () => {

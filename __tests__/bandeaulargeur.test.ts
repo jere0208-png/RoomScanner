@@ -41,8 +41,9 @@ describe('le bandeau du meuble', () => {
   const disponible = (ecran: number) =>
     ecran -
     (s.editBar.left as number) -
-    (s.editBar.right as number) -
-    (s.editBar.marginRight as number) -
+    // La colonne d'actions garde soixante-douze points ; la carte part du
+    // bord gauche et s'arrête avant elle (`maxWidth`, posé à l'affichage).
+    72 -
     2 * (s.editBar.paddingHorizontal as number);
 
   it('laisse de la place à son contenu, même sur un écran étroit', () => {

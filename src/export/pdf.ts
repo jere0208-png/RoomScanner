@@ -1102,6 +1102,48 @@ function draw3DView(
     | { kind: 'area'; depth: number; x: number; y: number; text: string };
   const items: Item[] = polys.map((p) => ({ kind: 'poly' as const, ...p }));
 
+  /**
+   * UN PAN DE MUR PLEIN SE DRESSE-T-IL ENTRE L'ŒIL ET CE POINT ?
+   *
+   * Même raisonnement que le masquage strict des meubles : un pan est un
+   * morceau de plan ; si sa normale va vers l'œil et que le point est de
+   * l'autre côté, le rayon qui va du point à l'œil traverse ce plan. Reste à
+   * savoir si le morceau, à l'écran, couvre le point.
+   *
+   * PLEIN seulement : un mur en écorché s'efface justement pour qu'on voie
+   * la pièce derrière — lui demander de cacher son étiquette serait lui
+   * faire dire l'inverse de ce qu'il fait.
+   */
+  const masqueParUnMurPlein = (monde: { x: number; z: number }) => {
+    const vers = { x: st * sp, y: cp, z: ct * sp };
+    const e = project({ x: monde.x, y: 0, z: monde.z });
+    for (const f of faces) {
+      if (f.ownerId || !f.normal || f.pts.length < 3 || f.isFloor) continue;
+      if (f.cutaway && cutawayOpacity(f.normal, cam) < 0.9) continue;
+      const n = f.normal;
+      if (n.x * vers.x + n.y * vers.y + n.z * vers.z <= 0) continue;
+      const p0 = f.pts[0];
+      const q3 = { x: monde.x, y: 1.2, z: monde.z };
+      const d = n.x * (q3.x - p0.x) + n.y * (q3.y - p0.y) + n.z * (q3.z - p0.z);
+      if (d > -0.01) continue;
+      const poly = f.pts.map((pt) => project(pt));
+      let dedans = false;
+      for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+        if (
+          poly[i].y > e.y !== poly[j].y > e.y &&
+          e.x <
+            ((poly[j].x - poly[i].x) * (e.y - poly[i].y)) /
+              (poly[j].y - poly[i].y) +
+              poly[i].x
+        ) {
+          dedans = !dedans;
+        }
+      }
+      if (dedans) return true;
+    }
+    return false;
+  };
+
   // Semis du sol et surface : mêmes repères que sur le plan 2D, pièce
   // par pièce — chaque sol garde sa teinte et porte son propre libellé.
   if (opts.showSurfaces) {
@@ -1116,7 +1158,28 @@ function draw3DView(
       const q = project({ x: room.labelAt.x, y: 0, z: room.labelAt.z });
       const name = opts.roomNames?.[room.roomId] ?? '';
       const area = `${room.surface.exact ? '' : '≈ '}${fr1(room.surface.area)} m²`;
-      // Au large, et par-dessus les murs : c'est une annotation.
+      /*
+        TOUT ENTIÈRE, OU PAS DU TOUT.
+
+        Relevé du patron : « la surface du plan 3D d'un scan doit pas se voir
+        à travers les murs ». Elle se classait tout au-devant (`Infinity`),
+        avec cette raison : « c'est une annotation, pas un volume ». C'est
+        vrai d'un PLAN, où l'on regarde à travers ; c'est faux d'un MODÈLE,
+        qu'on regarde de l'extérieur.
+
+        Premier essai : lui donner la profondeur de son point, et laisser le
+        tri faire. Regardé en image, c'était pire — « Séjour » sortait coupé
+        en « S », « Cuisine · 9,0 m² » en « sine · 9,0 m² » : le canapé et
+        le réfrigérateur mangeaient la moitié des mots. Un demi-mot est plus
+        faux qu'un mot absent.
+
+        Elle reste donc au-dessus de tout, et l'on décide AVANT de l'écrire :
+        si un pan PLEIN se dresse entre l'œil et son point, on ne l'écrit
+        pas. En écorché — le réglage par défaut du dossier —, le pan de
+        devant s'efface à quinze pour cent : la pièce se voit, son étiquette
+        aussi.
+      */
+      if (masqueParUnMurPlein(room.labelAt)) continue;
       items.push({
         kind: 'area',
         depth: Infinity,

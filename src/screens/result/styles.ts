@@ -500,21 +500,31 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     position: 'absolute',
     bottom: 10,
     left: 12,
-    right: 12,
-    marginRight: 72,
+    /*
+      LA CARTE ÉPOUSE SON CONTENU — relevé du patron sur la refonte :
+      « le menu que tu as refait trop gros et trop de marge blanche sur son
+      bloc ».
+
+      Elle tenait la largeur entière (`left` ET `right`), et « 3 spots »
+      suivi de quatre pastilles laissait donc la moitié d'un bandeau blanc à
+      droite. Sans `right`, la carte prend la largeur de ce qu'elle porte et
+      s'arrête là ; `maxWidth` (posé à l'affichage, où l'on connaît l'écran)
+      l'empêche de passer sous la colonne d'actions.
+    */
+    alignSelf: 'flex-start',
     backgroundColor: c.surface,
-    borderRadius: 18,
-    paddingHorizontal: 14,
-    paddingTop: 11,
-    paddingBottom: 12,
-    gap: 10,
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingTop: 9,
+    paddingBottom: 10,
+    gap: 8,
     ...shadowCard,
     shadowOpacity: 0.12,
   },
   /* La partie haute : elle ne contient QUE ce qu'on lit. */
-  bandeauTexte: { gap: 2 },
-  bandeauTitre: { color: c.ink, fontSize: 15.5, fontWeight: '800' },
-  bandeauSous: { color: c.inkSoft, fontSize: 13, lineHeight: 17 },
+  bandeauTexte: { gap: 1 },
+  bandeauTitre: { color: c.ink, fontSize: 15, fontWeight: '800' },
+  bandeauSous: { color: c.inkSoft, fontSize: 12.5, lineHeight: 16 },
   /*
     La partie basse : une rangée qui PASSE À LA LIGNE. C'est elle qui
     remplace le `flexShrink` — cinq boutons sur un petit écran font deux
@@ -534,7 +544,9 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     gap: 6,
     backgroundColor: c.blue,
     borderRadius: radius.pill,
-    paddingHorizontal: 16,
+    // Treize points de marge, pas seize : la carte se resserre sans que la
+    // cible descende sous les quarante-quatre points du doigt.
+    paddingHorizontal: 13,
     minHeight: 44,
     minWidth: 44,
     flexShrink: 0,
@@ -546,7 +558,7 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     gap: 6,
     backgroundColor: c.surfaceSunken,
     borderRadius: radius.pill,
-    paddingHorizontal: 16,
+    paddingHorizontal: 13,
     minHeight: 44,
     minWidth: 44,
     flexShrink: 0,
@@ -565,14 +577,13 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     position: 'absolute',
     bottom: 10,
     left: 12,
-    marginRight: 72,
-    right: 12,
+    alignSelf: 'flex-start',
     backgroundColor: c.surface,
-    borderRadius: 18,
-    paddingHorizontal: 14,
-    paddingTop: 11,
-    paddingBottom: 12,
-    gap: 10,
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingTop: 9,
+    paddingBottom: 10,
+    gap: 8,
     ...shadowCard,
     shadowOpacity: 0.12,
   },

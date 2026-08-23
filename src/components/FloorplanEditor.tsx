@@ -493,6 +493,23 @@ interface Props {
     pier: { wallId: string; t0: number; t1: number } | null,
   ) => void;
   /** Commande lancée depuis les boutons flottants du mur sélectionné. */
+  /**
+   * CE QUE L'ÉCRAN POSE EN BAS, ET QUE LE PLAN NE DOIT PAS VISER.
+   *
+   * Relevé du patron, juste après la refonte des bandeaux : « les boutons
+   * lors d'un clic sur un mur pour le modifier, qui s'affichent à côté du
+   * mur, sont incliquables ».
+   *
+   * La cause n'était pas dans le menu : le bandeau du bas a doublé de
+   * hauteur en passant à deux parties, et il se peint APRÈS le plan. Un menu
+   * posé bas se retrouvait dessous — visible et sourd, le doigt touchant la
+   * carte blanche.
+   *
+   * Le plan n'a pas à connaître le bandeau ; l'écran, lui, sait ce qu'il
+   * pose. Il transmet donc la hauteur réservée, et la barre d'actions
+   * s'arrête au-dessus — comme elle s'arrête déjà au bord de l'écran.
+   */
+  reserveBas?: number;
   onWallAction?: (
     action: 'longueur' | 'ouverture' | 'electricite' | 'supprimer',
     wallId: string,
@@ -523,6 +540,7 @@ export function FloorplanEditor({
   onSelectRoom,
   onMoveRoom,
   onEditRoomName,
+  reserveBas = 0,
   onWallAction,
   onSelectFixture,
   ceiling,
@@ -3011,7 +3029,13 @@ export function FloorplanEditor({
               */
               const borner = (px: number, py: number) => ({
                 x: Math.min(layout.w - demiW, Math.max(demiW, px)),
-                y: Math.min(layout.h - demiH, Math.max(demiH, py)),
+                // Le bas utile s'arrête au-dessus de ce que l'écran réserve
+                // (voir `reserveBas`) : au-delà, la barre existe encore mais
+                // le bandeau lui prend les doigts.
+                y: Math.min(
+                  layout.h - reserveBas - demiH,
+                  Math.max(demiH, py),
+                ),
               });
               const libre = (p: { x: number; y: number }) =>
                 !segmentDansCadre(a2, b2, {

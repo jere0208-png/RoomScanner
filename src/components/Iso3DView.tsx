@@ -972,6 +972,49 @@ export function Iso3DView({
     const items: Item[] = dessinables.map((p) => ({ kind: 'poly' as const, ...p }));
     // Semis du sol : même code que le plan 2D, projeté sur le plan y = 0.
     // C'est ce fond pointillé qui distingue la surface au sol des murs.
+    /**
+     * UN PAN DE MUR PLEIN SE DRESSE-T-IL ENTRE L'ŒIL ET CE POINT ?
+     *
+     * Même raisonnement que le masquage strict des meubles : un pan est un
+     * morceau de plan ; si sa normale va vers l'œil et que le point est de
+     * l'autre côté, le rayon qui va du point à l'œil traverse ce plan. Reste
+     * à savoir si le morceau, à l'écran, couvre le point — sinon on regarde
+     * à côté du mur.
+     */
+    const masqueParUnMur = (
+      monde: { x: number; z: number },
+      ecran: { sx: number; sy: number },
+    ) => {
+      const vers = { x: st * sp, y: cp, z: ct * sp };
+      for (const f of faces) {
+        if (f.ownerId || !f.normal || f.pts.length < 3 || f.isFloor) continue;
+        const n = f.normal;
+        if (n.x * vers.x + n.y * vers.y + n.z * vers.z <= 0) continue;
+        const p0 = f.pts[0];
+        // Le point du sol, à hauteur d'homme : c'est la pièce qu'on cherche
+        // à voir, pas le millimètre de plancher sous le nu du mur.
+        const q3 = { x: monde.x, y: 1.2, z: monde.z };
+        const d =
+          n.x * (q3.x - p0.x) + n.y * (q3.y - p0.y) + n.z * (q3.z - p0.z);
+        if (d > -0.01) continue;
+        const poly = f.pts.map((pt) => project(pt));
+        let dedans = false;
+        for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+          if (
+            poly[i].sy > ecran.sy !== poly[j].sy > ecran.sy &&
+            ecran.sx <
+              ((poly[j].sx - poly[i].sx) * (ecran.sy - poly[i].sy)) /
+                (poly[j].sy - poly[i].sy) +
+                poly[i].sx
+          ) {
+            dedans = !dedans;
+          }
+        }
+        if (dedans) return true;
+      }
+      return false;
+    };
+
     if (showSurfaces && !interacting) {
       // Une pièce = un semis et une étiquette. Le budget de points est
       // partagé : dix pièces ne doivent pas coûter dix fois plus cher.
@@ -986,6 +1029,22 @@ export function Iso3DView({
           piece suit l'AXE de ses murs : sans ce retrait, le semis s'etend
           sous la moitie de leur epaisseur, et l'ecorche le laisse voir.
         */
+        /*
+          LE SEMIS DESCEND DANS LA GÉOMÉTRIE.
+
+          Relevé du patron, deuxième fois sur le même sujet : « la surface du
+          plan 3D d'un scan doit pas se voir à travers les murs ». La
+          première réponse avait arrêté le semis au nu des murs — juste, et
+          insuffisant : ce n'était pas une question de PROFONDEUR (il se
+          classait déjà sous tout, à moins l'infini) mais de COUCHE.
+
+          Le modèle se dessine en deux : la géométrie, qui part au canevas
+          natif, et par-dessus une couche de balises pour ce qui porte du
+          texte. Le semis vivait dans la seconde — donc au-dessus des murs,
+          quoi qu'en dise son rang. Chaque point devient un minuscule carré
+          de géométrie : il repasse sous la maçonnerie, et le regroupement
+          des tracés n'en fait qu'un seul chemin, comme pour le reste.
+        */
         for (const p of pointsDuSol(
           room.surface.pts,
           walls,
@@ -993,23 +1052,51 @@ export function Iso3DView({
           budget,
         )) {
           const q = project({ x: p.x, y: 0, z: p.z });
-          items.push({ kind: 'dot', depth: -Infinity, x: q.sx, y: q.sy, color: dotColor });
+          const r = 1.1;
+          items.push({
+            kind: 'poly',
+            depth: -Infinity,
+            proj: [
+              { sx: q.sx - r, sy: q.sy - r, depth: q.depth },
+              { sx: q.sx + r, sy: q.sy - r, depth: q.depth },
+              { sx: q.sx + r, sy: q.sy + r, depth: q.depth },
+              { sx: q.sx - r, sy: q.sy + r, depth: q.depth },
+            ],
+            fill: dotColor,
+            stroke: dotColor,
+            voile: 1,
+            dashed: false,
+          } as never);
         }
         // Même cartouche qu'en 2D, au même endroit : le nom donné sur le
         // plan se retrouve au centre de la pièce sur le modèle.
-        // Posé au large de la pièce, et par-dessus tout le reste : c'est
-        // une annotation, pas un volume — un mur ne doit pas la trancher.
         const q = project({ x: room.labelAt.x, y: 0, z: room.labelAt.z });
-        items.push({
-          kind: 'area',
-          depth: Infinity,
-          x: q.sx,
-          y: q.sy,
-          name: roomNames.get(room.roomId) ?? '',
-          area: `${room.surface.exact ? '' : '≈ '}${room.surface.area
-            .toFixed(1)
-            .replace('.', ',')} m²`,
-        });
+        /*
+          ET L'ÉTIQUETTE NE S'ÉCRIT PAS SUR UNE FAÇADE AVEUGLE.
+
+          Elle restait une balise — c'est du texte, il doit rester net — donc
+          au-dessus de toute la géométrie. Le code l'assumait : « posé
+          par-dessus tout le reste : un mur ne doit pas la trancher ». C'est
+          vrai d'un PLAN, où l'on regarde à travers ; c'est faux d'un MODÈLE,
+          qu'on regarde de l'extérieur : on lisait « 9,0 m² » sur un pan
+          plein, sans savoir de quelle pièce il s'agissait.
+
+          Elle ne se dessine donc plus quand un pan de mur PLEIN se dresse
+          entre l'œil et son point. En écorché, elle reste : le mur y est
+          justement effacé pour qu'on voie la pièce.
+        */
+        if (!solidWalls || !masqueParUnMur(room.labelAt, q)) {
+          items.push({
+            kind: 'area',
+            depth: Infinity,
+            x: q.sx,
+            y: q.sy,
+            name: roomNames.get(room.roomId) ?? '',
+            area: `${room.surface.exact ? '' : '≈ '}${room.surface.area
+              .toFixed(1)
+              .replace('.', ',')} m²`,
+          });
+        }
       }
     }
 
