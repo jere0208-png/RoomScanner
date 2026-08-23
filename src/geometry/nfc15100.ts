@@ -95,6 +95,30 @@ export function roomUse(name: string, kind?: RoomKind | null): RoomUse {
   }
 }
 
+/**
+ * L'USAGE DE CETTE PIÈCE EST-IL CONNU, ou déduit faute de mieux ?
+ *
+ * `roomUse` rend toujours une réponse — « autre » quand rien ne dit ce
+ * qu'est la pièce. C'est le bon défaut pour CALCULER (une pièce non nommée
+ * doit au moins un socle), et le mauvais pour AFFICHER : l'établi annonçait
+ * « 2/1 socle » sur une pièce sans nom, c'est-à-dire conforme, alors que la
+ * même pièce nommée « Chambre » en exige trois. Le relevé passe, le
+ * chantier non.
+ *
+ * Cette fonction dit la différence : l'exigence est-elle CELLE DE LA PIÈCE,
+ * ou le minimum qu'on applique en attendant de savoir ?
+ */
+export function usageConnu(name: string, kind?: RoomKind | null): boolean {
+  // On ne redit pas la liste des noms : elle vit dans `roomUse`, et deux
+  // listes qui divergent d'un mot feraient revenir le defaut sans qu'on
+  // comprenne pourquoi. « autre » est la seule reponse ambigue — c'est a la
+  // fois le cellier RECONNU et la piece dont on ne sait rien.
+  if (roomUse(name, kind) !== 'autre') return true;
+  return /dressing|buanderie|cellier|garage|placard|local/.test(
+    sansAccent(name),
+  );
+}
+
 export const USE_LABEL: Record<RoomUse, string> = {
   sejour: 'Séjour',
   chambre: 'Chambre',

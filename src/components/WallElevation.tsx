@@ -70,6 +70,7 @@ import {
   worktopsOnWall,
   requirementFor,
   roomInputsOf,
+  usageConnu,
   roomUse,
   wallToRooms,
 } from '../geometry/nfc15100';
@@ -336,6 +337,15 @@ export function WallElevation({
       exiges: req.socles,
       regle: req.regle,
       surPlan: req.surPlan > hauts,
+      /*
+        ET L'ON DIT QUAND ON NE SAIT PAS.
+
+        `roomUse` rend « autre » faute de mieux, et « autre » n'exige qu'un
+        socle : une pièce sans nom affichait donc « 2/1 socle », c'est-à-dire
+        CONFORME, alors que la même pièce nommée « Chambre » en exige trois.
+        Le relevé passait, le chantier non.
+      */
+      inconnu: !usageConnu(mien.name, mien.kind),
     };
   }, [rooms, walls, fixtures, wallId]);
 
@@ -1745,12 +1755,19 @@ export function WallElevation({
             )}
             <View style={styles.bilanTextes}>
               <Text style={styles.bilanTitre} numberOfLines={1}>
-                {objectif
-                  ? `${objectif.nom} · ${objectif.poses}/${objectif.exiges} socle${
-              objectif.exiges > 1 ? 's' : ''
-            }`
-                  : 'Conformité'}
+                {!objectif
+                  ? 'Conformité'
+                  : objectif.inconnu
+                    ? 'Pièce à nommer'
+                    : `${objectif.nom} · ${objectif.poses}/${objectif.exiges} socle${
+                        objectif.exiges > 1 ? 's' : ''
+                      }`}
               </Text>
+              {objectif?.inconnu && (
+                <Text style={styles.bilanManque} numberOfLines={1}>
+                  Ses exigences dépendent de son usage · minimum appliqué
+                </Text>
+              )}
               {constats.length > 0 && (
                 <Text style={styles.bilanManque} numberOfLines={1}>
                   {constats.map((i2) => i2.message.split(' : ').pop()).join(' · ')}

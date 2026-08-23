@@ -5779,6 +5779,48 @@ le cartouche cherchait alors une place introuvable au milieu des cotes, ne la
 trouvait pas, et restait exactement là où il gênait. C'est la hiérarchie qui
 règle le cas, pas la quantité d'obstacles.
 
+### L'établi électrique, passé au doigt — et la pièce qui passait conforme
+
+Même méthode : on ouvre un mur, on pose, on pousse, on tape des cotes, on
+saisit n'importe quoi, on abandonne. **L'établi tient**, et c'est un résultat
+en soi — le voici mesuré, pour qu'un refactor ne le défasse pas en silence :
+
+- **les flèches butent où il faut** : un socle poussé à gauche s'arrête à
+  11 cm du coin, à droite au symétrique, en bas à 4 cm du sol, en haut à 4 cm
+  du plafond ;
+- **une porte arrête le socle** : poussé vers une baie de 90 cm, il s'arrête
+  au nu du tableau et n'entre jamais dans l'ouverture ;
+- **un voisin aussi** : deux appareils gardent leur écart, on ne les empile
+  pas ;
+- **les cotes se tapent** et se comportent : « 200 » à gauche pose l'appareil
+  à 2,00 m du nu (et non de l'axe du mur), « 900 » se borne au bout du mur au
+  lieu de l'envoyer dans le vide, « abc » ne fait rien, « −50 » revient à la
+  butée ;
+- **le raccourci de conformité pose vraiment** : « Poser RJ45 » ajoute la
+  prise, et la ligne passe au constat suivant ;
+- **l'abandon demande** et rend le mur dans l'état où on l'a ouvert ;
+- sur un mur chargé de six appareils serrés, **une seule paire d'étiquettes
+  se touche** (le sigle d'un socle et la graduation « 25 » de la règle).
+
+**Le défaut trouvé est ailleurs, et il est sérieux.** Au retour du chantier,
+les pièces s'appellent « Pièce 1 », « Pièce 2 » — le nommage se fait au
+calme, plus tard. Or l'établi annonçait pour ces pièces-là : « Pièce 1 · 2/1
+socle ». C'est-à-dire **conforme**. La même pièce nommée « Chambre » en exige
+trois, « Cuisine » six.
+
+La faute n'est pas dans le calcul : `roomUse` rend « autre » faute de mieux,
+et « autre » exige bien un socle — c'est le bon minimum à appliquer en
+attendant de savoir. La faute est dans l'AFFICHAGE : un objectif atteint se
+lit comme une conformité acquise, alors qu'on ne sait pas encore de quelle
+pièce il s'agit. L'établi dit maintenant « Pièce à nommer · ses exigences
+dépendent de son usage · minimum appliqué ».
+
+`usageConnu` ne redit pas la liste des noms : elle vit dans `roomUse`, et
+deux listes qui divergeraient d'un mot feraient revenir le défaut sans qu'on
+comprenne pourquoi. La première version la recopiait — elle a coûté un
+`` transformé en caractère d'échappement, et un « WC » que la copie ne
+reconnaissait plus alors que l'original le reconnaissait.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro
