@@ -5694,6 +5694,56 @@ appareil ; une pièce ajoutée ne se soude pas aux murs des voisines et ne les
 déforme pas quand on la pousse ; la rangée d'outils se replie toute seule sur
 un écran étroit plutôt que de déborder.
 
+### Le relevé au scan, passé au doigt — et la croix qui effaçait tout
+
+Même méthode que pour l'écran des résultats : on tient le téléphone, on
+balaie, on vise, on pose, on abandonne, on rate. Quatre choses en sont
+sorties, et la première est la plus grave qu'on ait trouvée jusqu'ici.
+
+**La croix effaçait le logement, pas seulement le scan.** Elle est en haut à
+GAUCHE de l'écran de scan — exactement là où se pose l'index de la main qui
+tient le téléphone pendant qu'on balaie une pièce. Elle appelait `cancel`, et
+`cancel` appelait `reset` : murs, pièces, appareillage, notes, tout.
+
+Sur un scan neuf, c'est le bon geste — il n'y a rien d'autre à jeter. Sur les
+DEUX autres entrées, c'est une perte sèche : « Scanner une pièce » et
+« Monter un étage » partent d'un logement **déjà relevé**, souvent pas encore
+enregistré. Un doigt qui frotte la croix, et le chantier de la matinée
+disparaît. Un abandon n'abandonne désormais que ce qu'on est en train de
+faire : dès qu'il y a un plan, on y revient, intact. Et sur un scan neuf
+déjà avancé, la croix **demande** — ce n'est pas une confirmation de plus,
+c'est la seule chose qu'on ne rattrape pas. Tant que rien n'est relevé, elle
+ne demande rien : une confirmation inutile s'apprend à balayer sans lire.
+
+**Abandonner pendant l'assemblage rouvrait le plan jeté.** La croix et la
+torche portent un `zIndex` et flottaient donc au-dessus du voile
+« Assemblage du modèle 3D… », qui n'en a pas. On pouvait abandonner pendant
+ces quelques secondes : le magasin repartait à zéro, puis le résultat
+arrivait et ouvrait le plan qu'on venait de jeter. Les deux boutons
+s'effacent maintenant sous le voile, et le résultat qui arrive après un
+abandon ne rouvre rien — le drapeau `scanning` suffit à le dire.
+
+**Le refus du viseur restait à l'écran.** On vise le vide, l'app répond
+« Visez un mur déjà relevé — balayez-le d'abord ». Juste. Mais ce message ne
+partait qu'à la pose suivante RÉUSSIE : on balayait la pièce deux minutes
+avec, sous les yeux, un reproche qui ne valait plus. La cote annoncée après
+une pose réussie s'efface, elle, au bout de trois secondes — c'est la même
+règle, et le refus l'avait ratée.
+
+**Une fin de scan qui échoue restait muette.** Le post-traitement de RoomPlan
+échoue parfois (c'est le cas connu, « aucun mur détecté »). Le magasin
+retenait bien le message, mais SEUL l'écran d'accueil l'affiche : on restait
+devant une caméra morte, sans un mot, à réappuyer sur « Terminer » sur une
+session déjà close. L'application paraissait plantée alors qu'elle avait
+parfaitement compris. Le message se dit là où l'on est, avec la sortie à
+côté.
+
+Au passage, le doublet de test du module natif était incomplet — pas de
+`pause`, pas de `stop`, et un abonnement d'événements qui ne rendait pas de
+quoi se désabonner. Tout banc touchant l'écran de scan tombait sur « n'est
+pas une fonction » au démontage, et l'erreur parlait du hook au lieu de
+parler du doublet. C'est réparé une fois pour toutes dans `jest.setup.js`.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

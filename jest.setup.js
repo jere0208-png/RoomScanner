@@ -15,6 +15,19 @@
 jest.mock('react-native-room-scan', () => ({
   RoomScan: {
     isSupported: jest.fn(async () => false),
+    // Les commandes de la session : muettes, mais presentes. Sans elles, un
+    // banc qui touche l'ecran de scan tombe sur « n'est pas une fonction »
+    // au lieu de dire ce qu'il verifie.
+    start: jest.fn(async () => undefined),
+    startAdditional: jest.fn(async () => undefined),
+    stop: jest.fn(async () => ({ surfaces: [], objects: [], modelPath: '' })),
+    pause: jest.fn(() => undefined),
+    resume: jest.fn(() => undefined),
+    setTorch: jest.fn(async () => true),
+    cameraStatus: jest.fn(async () => 'granted'),
+    requestCamera: jest.fn(async () => true),
+    poserAuViseur: jest.fn(async () => null),
+    retirerDerniereAncre: jest.fn(async () => false),
     takePhoto: jest.fn(async () => null),
     readPhoto: jest.fn(async () => null),
     deletePhotos: jest.fn(async () => 0),
@@ -30,7 +43,13 @@ jest.mock('react-native-room-scan', () => ({
     laserConnecter: jest.fn(async () => false),
     laserDeconnecter: jest.fn(async () => false),
   },
-  scanEvents: { addListener: jest.fn(), removeAllListeners: jest.fn() },
+  // Un abonnement rend de quoi se DESABONNER : sans ce `remove`, tout
+  // ecran de scan demonte dans un banc tombe au demontage, et l'erreur
+  // parle du hook au lieu de parler du doublet.
+  scanEvents: {
+    addListener: jest.fn(() => ({ remove: jest.fn() })),
+    removeAllListeners: jest.fn(),
+  },
   // Le telemetre a SON emetteur : un module d evenements n emet que pour
   // lui-meme, et meler les deux ferait recevoir les mesures a qui ecoute
   // les murs.

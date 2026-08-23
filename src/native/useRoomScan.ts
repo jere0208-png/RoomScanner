@@ -111,6 +111,18 @@ export function useRoomScan() {
         // Le post-traitement RoomPlan prend quelques secondes.
         const result = await RoomScan.stop();
         /*
+          ET SI L'ON A ABANDONNÉ ENTRE-TEMPS, ON N'OUVRE RIEN.
+
+          L'assemblage dure quelques secondes. Un abandon pendant ce
+          moment-là remettait le magasin à zéro, puis le résultat arrivait
+          et ouvrait le plan qu'on venait de jeter. Le drapeau `scanning`
+          suffit à le dire : `cancel` et `reset` l'éteignent tous les deux.
+        */
+        if (!useScanStore.getState().scanning) {
+          store.setProcessing(false);
+          return;
+        }
+        /*
           TROIS ISSUES, ET UNE SEULE OUVRE UN DOSSIER.
 
           Un ÉTAGE s'empile sur le relevé ouvert : d'autres murs, d'autres
@@ -137,10 +149,39 @@ export function useRoomScan() {
       }
     },
     startComplement: demarrerComplement,
-    /** Abandonne le scan en cours sans post-traitement ni sauvegarde. */
+    /**
+     * ABANDONNE LE SCAN EN COURS — ET RIEN D'AUTRE.
+     *
+     * Relevé au doigt, sur l'écran de scan : la croix est en haut à GAUCHE,
+     * exactement là où se pose l'index de la main qui tient le téléphone
+     * pendant qu'on balaie une pièce. Elle appelait `reset`, c'est-à-dire
+     * la remise à zéro du magasin : murs, pièces, appareillage, notes.
+     *
+     * Sur un scan neuf, c'est le bon geste — il n'y a rien d'autre à jeter
+     * que le scan lui-même. Sur les DEUX autres entrées, c'est une perte
+     * sèche : « Scanner une pièce » et « Monter un étage » partent d'un
+     * logement déjà relevé, souvent pas encore enregistré. Un doigt qui
+     * frotte la croix, et le chantier de la matinée disparaît.
+     *
+     * On revient donc au plan, intact, dès qu'il y a un plan. Le natif, lui,
+     * reste en pause comme avant : la session suivante repart de zéro.
+     */
     cancel: () => {
       RoomScan.pause();
-      useScanStore.getState().reset();
+      const s = useScanStore.getState();
+      if (s.complementEnCours || s.etageEnCours !== null || s.walls.length > 0) {
+        s.setComplement(false);
+        // Sans ça, le scan SUIVANT atterrirait à l'étage qu'on vient
+        // d'abandonner : c'est la même précaution que sur l'échec du
+        // post-traitement.
+        s.scannerUnEtage(null);
+        s.setScanning(false);
+        s.setPaused(false);
+        s.setProcessing(false);
+        s.setScreen('result');
+        return;
+      }
+      s.reset();
     },
   };
 }

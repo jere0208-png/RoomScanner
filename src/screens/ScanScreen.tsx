@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -55,6 +56,8 @@ export function ScanScreen() {
   /* Ce que RoomPlan voit mal, tant qu'on peut encore y retourner. */
   const mursDouteux = useScanStore((s) => s.mursDouteux);
   const processing = useScanStore((s) => s.processing);
+  /* Ce que le post-traitement a refusé de faire : il faut bien le dire. */
+  const error = useScanStore((s) => s.error);
   const { pause, resume, stop, cancel } = useRoomScan();
   const c = useTheme();
   const styles = getStyles(c);
@@ -141,6 +144,16 @@ export function ScanScreen() {
     } else {
       setRefus(true);
       haptic('alerte');
+      /*
+        ET LE REFUS S'EFFACE, COMME L'ANNONCE.
+
+        Il ne partait qu'à la pose suivante RÉUSSIE : on balayait la pièce
+        pendant deux minutes avec, sous les yeux, un reproche qui ne valait
+        plus. Trois secondes suffisent à le lire ; passé ce délai, l'écran
+        appartient au relevé.
+      */
+      if (minuteurAnnonce.current) clearTimeout(minuteurAnnonce.current);
+      minuteurAnnonce.current = setTimeout(() => setRefus(false), 3200);
     }
   };
   useEffect(() => {
@@ -148,6 +161,32 @@ export function ScanScreen() {
       RoomScan.setTorch(false).catch(() => {});
     };
   }, []);
+  /**
+   * LA CROIX DEMANDE, quand il y a quelque chose à perdre.
+   *
+   * Elle est en haut à gauche, là où se pose l'index de la main qui tient
+   * le téléphone : c'est le bouton qu'on frôle, pas celui qu'on cherche. Et
+   * ce qu'il jette ne se rattrape pas — un relevé n'a pas d'annulation.
+   *
+   * Mais tant que rien n'est relevé, il ne demande rien : une confirmation
+   * inutile est une confirmation qu'on apprend à balayer sans lire.
+   */
+  const abandonner = () => {
+    if (wallCount === 0) {
+      cancel();
+      return;
+    }
+    Alert.alert(
+      'Abandonner ce relevé ?',
+      `${wallCount} mur${wallCount > 1 ? 's' : ''} déjà relevé${
+        wallCount > 1 ? 's' : ''
+      } — rien ne sera enregistré.`,
+      [
+        { text: 'Continuer le scan', style: 'cancel' },
+        { text: 'Abandonner', style: 'destructive', onPress: cancel },
+      ],
+    );
+  };
   const toggleTorch = () => {
     const next = !torch;
     setTorch(next);
@@ -166,16 +205,32 @@ export function ScanScreen() {
       {/* La vue AR native se rend elle-même à 60 FPS ; l'UI RN flotte au-dessus. */}
       <RoomScanView style={StyleSheet.absoluteFill} />
 
-      <TouchableOpacity
-        style={styles.cancelButton}
-        accessibilityLabel="Arrêter le scan"
-        onPress={cancel}>
-        <CloseCross size={20} color={c.scanInk} weight={3} />
-      </TouchableOpacity>
+      {/*
+        LA CROIX ET LA TORCHE S'EFFACENT PENDANT L'ASSEMBLAGE.
+
+        Elles portent un `zIndex` et flottaient donc AU-DESSUS du voile
+        d'assemblage, qui n'en a pas : on pouvait abandonner un relevé
+        pendant que RoomPlan le calculait. Le résultat arrivait quand même
+        quelques secondes plus tard, et ouvrait le plan qu'on venait de
+        jeter. Il n'y a rien à faire pendant ces secondes-là : on retire ce
+        qui peut être frôlé.
+      */}
+      {!processing && (
+        <TouchableOpacity
+          style={styles.cancelButton}
+          accessibilityLabel="Arrêter le scan"
+          onPress={abandonner}>
+          <CloseCross size={20} color={c.scanInk} weight={3} />
+        </TouchableOpacity>
+      )}
 
       {/* Torche : rond façon bouton de thème, avec un éclair. */}
       <TouchableOpacity
-        style={[styles.torchButton, torch && styles.torchButtonOn]}
+        style={[
+          styles.torchButton,
+          torch && styles.torchButtonOn,
+          processing && styles.cacheEnAssemblage,
+        ]}
         accessibilityLabel={torch ? 'Éteindre la torche' : 'Allumer la torche'}
         onPress={toggleTorch}>
         <Svg width={18} height={18} viewBox="0 0 24 24">
@@ -374,6 +429,31 @@ export function ScanScreen() {
       */}
       <GuidePose visible={guide && !processing} onFermer={fermerGuide} />
 
+      {/*
+        UNE FIN DE SCAN QUI ÉCHOUE SE DIT ICI.
+
+        Le post-traitement de RoomPlan échoue parfois — c'est le cas connu,
+        « aucun mur détecté ». Le magasin retenait bien le message, mais
+        SEUL l'écran d'accueil l'affiche : on restait donc devant une caméra
+        morte, sans un mot, à réappuyer sur « Terminer » sur une session
+        déjà close. L'application paraissait plantée alors qu'elle avait
+        parfaitement compris.
+
+        Le message se dit là où l'on est, et la sortie est à côté.
+      */}
+      {!!error && !processing && (
+        <View style={styles.pannePanneau}>
+          <Text style={styles.panneTitre}>Le relevé n’a pas abouti</Text>
+          <Text style={styles.panneTexte}>{error}</Text>
+          <TouchableOpacity
+            style={styles.panneBouton}
+            accessibilityLabel="Quitter le scan"
+            onPress={cancel}>
+            <Text style={styles.panneBoutonTexte}>Quitter le scan</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {processing && (
         <View style={styles.processing}>
           <ActivityIndicator size="large" color="#FFFFFF" />
@@ -390,6 +470,34 @@ export function ScanScreen() {
 
 const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
+  /* Le panneau d'échec : au milieu, lisible sur la caméra, avec sa sortie. */
+  pannePanneau: {
+    position: 'absolute',
+    left: 24,
+    right: 24,
+    top: '38%',
+    zIndex: 5,
+    backgroundColor: 'rgba(11,13,18,0.92)',
+    borderRadius: 18,
+    padding: 20,
+    alignItems: 'center',
+    gap: 8,
+  },
+  panneTitre: { color: '#F4F6FA', fontSize: 17, fontWeight: '700' },
+  panneTexte: {
+    color: '#C6CDD8',
+    fontSize: 14,
+    lineHeight: 19,
+    textAlign: 'center',
+  },
+  panneBouton: {
+    marginTop: 8,
+    paddingVertical: 11,
+    paddingHorizontal: 22,
+    borderRadius: 12,
+    backgroundColor: '#F4F6FA',
+  },
+  panneBoutonTexte: { color: '#0B0D12', fontSize: 15, fontWeight: '700' },
   cancelButton: {
     position: 'absolute',
     top: 58,
@@ -415,6 +523,8 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     justifyContent: 'center',
   },
   torchButtonOn: { backgroundColor: '#F4F6FA' },
+  /* Sous le voile d'assemblage : plus rien à toucher. */
+  cacheEnAssemblage: { opacity: 0, zIndex: 0 },
   /* Le viseur : quatre coins, pas un cadre plein — on doit VOIR le mur. */
   /*
     LE CARRÉ EST OÙ LE RAYON PART, ET PAS AILLEURS.
