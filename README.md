@@ -6690,7 +6690,15 @@ tient tant qu'on ne le regarde pas à côté des autres.
   COMPTE — l'abonnement, l'apparence, les réglages. Un rond de profil
   promettait une photo qui n'existe pas. **L'anneau d'or** qui le cerclait en
   Pro s'en va au passage — « enlève le contour présent » : le grade se voit
-  toujours, à côté, dans la typo dorée du prénom.
+  toujours, à côté, dans la typo dorée du prénom. Puis, relevé suivant :
+  « l'icône de l'avatar à l'accueil doit être **noire avec un contour
+  bleu** » — elle se lisait dans le gris des textes secondaires, au point de
+  se confondre avec le prénom posé à côté, alors que c'est la seule porte de
+  l'accueil vers le compte. Le contour est une silhouette DILATÉE, pas un
+  filet suivi sur le tracé : un trait sur une forme pleine aurait épaissi les
+  trois lignes de la fiche jusqu'à les souder. Et « noir » veut dire l'encre
+  du THÈME — un noir en dur disparaîtrait sur fond sombre, et il ne resterait
+  qu'un contour bleu vide.
 
 **Un piège découvert en chemin** : une icône écrite À LA MAIN dans le fichier
 généré ne survit pas à la génération suivante. `note` a disparu ainsi, le

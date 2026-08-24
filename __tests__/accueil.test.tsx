@@ -760,6 +760,37 @@ describe('le glyphe incrusté', () => {
     expect(logo.findAllByType(Path).length).toBeGreaterThanOrEqual(3);
   });
 
+  /*
+    L'AVATAR EST NOIR, CERNÉ DE BLEU — relevé du patron : « l'icône de
+    l'avatar à l'accueil doit être noire avec un contour bleu ».
+
+    Il se lisait dans le gris des textes secondaires : discret au point de se
+    confondre avec le prénom posé à côté, alors que c'est la seule porte de
+    l'accueil vers le compte. Le contour est une silhouette DILATÉE, pas un
+    filet suivi sur le tracé : un trait sur une forme pleine aurait épaissi
+    les trois lignes de la fiche jusqu'à les souder.
+
+    « Noir », c'est l'encre du THÈME : un noir en dur disparaîtrait sur un
+    fond sombre, et l'icône n'y serait plus qu'un contour bleu vide.
+  */
+  it('porte l’encre du thème, cernée du bleu de la maison', () => {
+    const t = monter();
+    const avatar = t.root
+      .findAll(
+        (n) => n.props?.accessibilityLabel === 'Mon compte' &&
+          typeof n.props?.onPress === 'function',
+      )[0]
+      .findByType(AvatarGlyph);
+    expect(avatar.props.teinte).toBe(light.ink);
+    expect(avatar.props.contour).toBe(light.blue);
+    // Deux tracés : le contour dessous, l'encre par-dessus.
+    const traces = avatar.findAllByType(Path);
+    expect(traces).toHaveLength(2);
+    expect(traces[0].props.stroke).toBe(light.blue);
+    expect(traces[1].props.fill).toBe(light.ink);
+    expect(traces[0].props.d).toBe(traces[1].props.d);
+  });
+
   it('et se lit EN RETRAIT : on le sent, on ne le lit pas', () => {
     const logo = monter().root.findByType(LogoMark);
     expect(Number(logo.findByType(Svg).props.opacity)).toBeLessThanOrEqual(0.12);

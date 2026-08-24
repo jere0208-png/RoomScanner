@@ -397,7 +397,7 @@ export function HomeScreen() {
           prénom garde la typo d'or juste à côté — et l'avatar redevient ce
           qu'il est, une porte vers le compte.
         */}
-        <AvatarGlyph size={34} teinte={c.inkSoft} />
+        <AvatarGlyph size={34} teinte={c.ink} contour={c.blue} />
         <View style={styles.profilColonne} pointerEvents="none">
           {pro ? (
             <TexteVif
