@@ -6664,10 +6664,14 @@ tient tant qu'on ne le regarde pas à côté des autres.
   entre le fauteuil des meubles et l'éclair de l'appareillage, elle se lisait
   comme une lampe de chevet — un objet qu'on POSE, pas un plafond qu'on
   équipe ;
-- **la photo de mur** prend l'appareil du jeu (`camera`), celui que porte
-  déjà la sortie « Image » : le même objet, le même dessin. Elle était un
-  rectangle et un rond au trait, seul pictogramme de l'app à ne pas venir du
-  jeu ;
+- **la photo de mur** prend l'appareil du jeu (`camera`). Il y en avait
+  DEUX, dessinés à la main chacun de son côté : la punaise posée sur le plan
+  (un rectangle et un rond) et le bouton qui DÉCLENCHE la photo dans
+  l'établi (boîtier, objectif, viseur). Le premier a été repris, le second
+  oublié — relevé du patron : « tu n'as pas remplacé les icônes de l'appareil
+  photo ». C'est le même objet : c'est le même dessin, aux deux endroits.
+  L'illustration « Image » de la feuille d'export, elle, reste un cadre avec
+  son horizon : elle ne montre pas l'appareil, elle montre CE QU'ON OBTIENT ;
 - **les quatre flèches du pavé de réglage** (`square-alt-arrow-*`) : le carré
   plein leur donne le poids d'une touche, et c'en est une — on l'appuie dix
   fois de suite pour gagner dix centimètres ;

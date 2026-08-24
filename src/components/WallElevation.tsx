@@ -1983,11 +1983,20 @@ export function WallElevation({
                 (mesPhotos.length > 0 ? ` (${mesPhotos.length})` : ''),
               on: !selected,
               tint: c.ink,
-              // L'appareil photo, au trait : boîtier, objectif, viseur.
-              paths: [
-                'M3.5 7.5 h4 l1.5 -2 h6 l1.5 2 h4 v11.5 h-17 z',
-                'M12 16.2 a3.2 3.2 0 1 0 0 -6.4 a3.2 3.2 0 0 0 0 6.4',
-              ],
+              /*
+                L'APPAREIL PHOTO DU JEU COMMUN — relevé du patron, lien à
+                l'appui : `camera`, « utilise cette icône là où il y a la
+                photo en icône pour la photo de mur ».
+
+                Il était dessiné à la main — boîtier, objectif, viseur, au
+                trait — et c'est le bouton qui DÉCLENCHE la photo : le
+                premier qu'on cherche du regard quand on veut garder une
+                trace d'un mur. La punaise posée sur le plan porte déjà la
+                même silhouette ; c'est le même objet, ce doit être le même
+                dessin.
+              */
+              paths: [],
+              plein: SOLAIRES.image,
               press: async () => {
                 const prise = await RoomScan.takePhoto();
                 if (prise) {
