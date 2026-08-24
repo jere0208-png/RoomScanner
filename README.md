@@ -7192,6 +7192,17 @@ une, trois, puis six images plus tard, et en exigeant le même cadrage final.
 posait à un point FIXE de l'écran, si bien que plus il tardait, plus l'écart
 de départ était petit — il mesurait sa propre mise en scène.)
 
+**8. La bande de bord est morte, et le geste vit partout.** Une bande
+invisible prend le toucher DÈS L'APPUI et ne le rend jamais
+(`onPanResponderTerminationRequest: () => false`) : elle mangeait les
+vingt-quatre premiers points de tout ce qu'elle recouvrait — le bord d'un
+plan, le bord d'une liste qu'on fait défiler, un bouton posé trop à gauche —
+sans que rien ne le dise. `RetourGlisse` ne s'emploie plus qu'en ENVELOPPE,
+et il est désormais posé sur les **sept** écrans qui portent une flèche de
+retour : le plan, le plan vide, la bibliothèque, l'aperçu du PDF, la caméra,
+le profil, la confidentialité et la page d'abonnement. Trois d'entre eux ne
+l'avaient jamais eu, alors que le relevé disait « partout où vit la flèche ».
+
 Et une leçon sur les bancs eux-mêmes, qui vaut pour tous ceux qui suivront :
 **`PanResponder` ne se sert pas de l'état de geste qu'on lui passe, il le
 RECALCULE depuis `e.touchHistory`**. Les premiers essais écrits ici

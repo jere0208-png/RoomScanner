@@ -17,6 +17,7 @@ import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BackChevron } from '../components/BackChevron';
+import { RetourGlisse } from '../components/RetourGlisse';
 import { useScanStore } from '../store/scanStore';
 import { radius, shadowCard, useTheme, type Palette } from '../theme';
 
@@ -93,7 +94,11 @@ export function ConfidentialiteScreen() {
   const setScreen = useScanStore((st) => st.setScreen);
 
   return (
-    <View style={[s.fond, { paddingTop: insets.top }]}>
+    /* Le bord gauche ramène au profil, comme la flèche : le geste vit
+       partout où elle vit. En enveloppe, il ne vole aucun appui. */
+    <RetourGlisse
+      onRetour={() => setScreen('profil')}
+      style={[s.fond, { paddingTop: insets.top }]}>
       <View style={s.barre}>
         <Pressable
           accessibilityRole="button"
@@ -127,7 +132,7 @@ export function ConfidentialiteScreen() {
         ))}
         <Text style={s.contact}>{COURRIEL_SUPPORT}</Text>
       </ScrollView>
-    </View>
+    </RetourGlisse>
   );
 }
 

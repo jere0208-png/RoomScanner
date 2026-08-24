@@ -14,27 +14,25 @@
  * l'on commence un glissement. Le défaut ne se voit pas en lisant le
  * composant : il faut regarder QUI le contient.
  *
- * DEUX FAÇONS DE S'EN SERVIR, ET IL FAUT SAVOIR POURQUOI :
+ * IL S'EMPLOIE EN ENVELOPPE, et d'une seule façon :
+ * `<RetourGlisse onRetour={…}>{contenu}</RetourGlisse>`. Le geste est
+ * CAPTURÉ en cours de route, comme le fait le système : on ne vole jamais
+ * l'appui — taps, poignées et pincements gardent la main — mais un
+ * glissement franc parti du bord gauche reprend le dessus, même si le plan
+ * avait commencé à suivre le doigt.
  *
- *   — EN ENVELOPPE (`<RetourGlisse …>{contenu}</RetourGlisse>`), pour un
- *     écran dont le contenu se touche : le plan, l'aperçu. Le geste est
- *     alors CAPTURÉ en cours de route, comme le fait le système : on ne
- *     vole jamais l'appui — taps, poignées et pincements gardent la main —
- *     mais un glissement franc parti du bord gauche reprend le dessus, même
- *     si le plan avait commencé à suivre le doigt.
- *   — EN BANDE (`<RetourGlisse />` seule), pour un écran sans canevas : une
- *     bande invisible de vingt-quatre points le long du bord, qui ne
- *     recouvre rien d'important.
- *
- * L'enveloppe est la bonne façon dès qu'il y a quelque chose à toucher : une
- * bande posée par-dessus un plan mangerait les vingt-quatre premiers points
- * de dessin, et rien ne le dirait à l'utilisateur — il croirait le plan
- * inerte de ce côté-là.
+ * IL A EXISTÉ UNE AUTRE FAÇON, une BANDE invisible de vingt-quatre points
+ * posée sur le bord, et elle est partie avec le premier banc de gestes qui
+ * l'a regardée en face : une bande prend le toucher DÈS L'APPUI et ne le
+ * rend jamais (`onPanResponderTerminationRequest: () => false`). Elle
+ * mangeait donc les vingt-quatre premiers points de tout ce qu'elle
+ * recouvrait — le bord d'un plan, le bord d'une liste qu'on fait défiler,
+ * un bouton posé trop à gauche — sans que rien ne le dise à personne. On
+ * croyait l'app inerte de ce côté-là.
  */
 import React, { useMemo, useRef } from 'react';
 import {
   PanResponder,
-  StyleSheet,
   View,
   type GestureResponderEvent,
   type StyleProp,
@@ -145,7 +143,7 @@ export function RetourGlisse({
   style,
 }: {
   onRetour: () => void;
-  /** Le contenu de l'écran. Présent, le geste se capture au lieu de guetter. */
+  /** Le contenu de l'écran : il vit DANS le geste, jamais sous une bande. */
   children?: React.ReactNode;
   style?: StyleProp<ViewStyle>;
 }) {
@@ -153,60 +151,33 @@ export function RetourGlisse({
   // appelle toujours le retour du jour.
   const vif = useRef(onRetour);
   vif.current = onRetour;
-  const enveloppe = children !== undefined;
   const pan = useMemo(
     () =>
-      PanResponder.create(
-        enveloppe
-          ? {
-              /*
-                ON NE VOLE JAMAIS L'APPUI. Un tap sur un mur, une poignée
-                qu'on saisit, un pincement : tout cela commence par un
-                appui, et il ne nous regarde pas.
-              */
-              onStartShouldSetPanResponderCapture: () => false,
-              // ... mais on reprend le geste en route, comme le système.
-              onMoveShouldSetPanResponderCapture: (e, g) => {
-                const x0 = departDuDoigt(e);
-                return (
-                  x0 !== null && partDuBord(x0, g.dx, g.dy, g.numberActiveTouches)
-                );
-              },
-              onPanResponderTerminationRequest: () => false,
-              onPanResponderRelease: (_e, g) => {
-                // Trente points DEPUIS LA CAPTURE : voir `SUITE_MIN`.
-                if (g.dx > SUITE_MIN && Math.abs(g.dy) < Math.abs(g.dx)) {
-                  vif.current();
-                }
-              },
-            }
-          : {
-              onStartShouldSetPanResponder: () => true,
-              onMoveShouldSetPanResponder: (_e, g) =>
-                g.dx > 8 && Math.abs(g.dy) < Math.abs(g.dx),
-              onPanResponderTerminationRequest: () => false,
-              onPanResponderRelease: (_e, g) => {
-                if (estUnRetour(g.dx, g.dy)) vif.current();
-              },
-            },
-      ),
-    [enveloppe],
+      PanResponder.create({
+        /*
+          ON NE VOLE JAMAIS L'APPUI. Un tap sur un mur, une poignée qu'on
+          saisit, un pincement, un défilement : tout cela commence par un
+          appui, et il ne nous regarde pas.
+        */
+        onStartShouldSetPanResponderCapture: () => false,
+        // ... mais on reprend le geste en route, comme le système.
+        onMoveShouldSetPanResponderCapture: (e, g) => {
+          const x0 = departDuDoigt(e);
+          return x0 !== null && partDuBord(x0, g.dx, g.dy, g.numberActiveTouches);
+        },
+        onPanResponderTerminationRequest: () => false,
+        onPanResponderRelease: (_e, g) => {
+          // Cinquante points DEPUIS LA CAPTURE : voir `SUITE_MIN`.
+          if (g.dx > SUITE_MIN && Math.abs(g.dy) < Math.abs(g.dx)) {
+            vif.current();
+          }
+        },
+      }),
+    [],
   );
-  if (!enveloppe) return <View {...pan.panHandlers} style={styles.bord} />;
   return (
     <View {...pan.panHandlers} style={style}>
       {children}
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  bord: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: BORD,
-    zIndex: 40,
-  },
-});

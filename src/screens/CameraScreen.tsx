@@ -58,7 +58,7 @@ export function CameraScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <RetourGlisse onRetour={() => setScreen('home')} style={styles.container}>
       <TouchableOpacity
         style={styles.backButton}
         // Le chevron est un tracé : il ne dit rien à un lecteur d'écran,
@@ -67,9 +67,6 @@ export function CameraScreen() {
         onPress={() => setScreen('home')}>
         <BackChevron color={c.ink} />
       </TouchableOpacity>
-      {/* Le bord gauche rend le même retour que la flèche — le geste de
-          Safari, partout où elle vit. */}
-      <RetourGlisse onRetour={() => setScreen('home')} />
 
       <View style={styles.body}>
         <View style={styles.glyphCard}>
@@ -95,7 +92,7 @@ export function CameraScreen() {
         </Text>
       </TouchableOpacity>
       <Text style={styles.hint}>Le scan démarre dès que l'accès est accordé.</Text>
-    </View>
+    </RetourGlisse>
   );
 }
 

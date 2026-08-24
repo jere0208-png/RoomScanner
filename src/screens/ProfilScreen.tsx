@@ -25,6 +25,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import { BackChevron } from '../components/BackChevron';
+import { RetourGlisse } from '../components/RetourGlisse';
 import { MoreDots } from '../components/MoreDots';
 import { MenuCompte } from '../components/MenuCompte';
 import { SupportSheet } from '../components/SupportSheet';
@@ -115,7 +116,11 @@ export function ProfilScreen() {
   };
 
   return (
-    <View style={[s.fond, { paddingTop: insets.top }]}>
+    /* Le bord gauche ramène à l'accueil, comme la flèche. En enveloppe : la
+       page défile, et une bande posée dessus lui volerait ses appuis. */
+    <RetourGlisse
+      onRetour={() => setScreen('home')}
+      style={[s.fond, { paddingTop: insets.top }]}>
       <ScrollView
         contentContainerStyle={[s.contenu, { paddingBottom: insets.bottom + 32 }]}
         showsVerticalScrollIndicator={false}>
@@ -330,7 +335,7 @@ export function ProfilScreen() {
 
       <MenuCompte visible={menu} fermer={() => setMenu(false)} />
       <SupportSheet visible={support} fermer={() => setSupport(false)} />
-    </View>
+    </RetourGlisse>
   );
 }
 

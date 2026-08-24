@@ -584,7 +584,13 @@ const styles = getStyles(c);
   }, [fade]);
 
   return (
-    <View style={styles.container}>
+    /*
+      EN ENVELOPPE, comme le plan et la bibliothèque : l'écran porte des
+      boutons jusqu'au bord, et une bande posée par-dessus leur volerait leurs
+      vingt-quatre premiers points sans que rien ne l'explique. L'enveloppe,
+      elle, ne prend le geste qu'en route.
+    */
+    <RetourGlisse onRetour={() => setScreen('result')} style={styles.container}>
       <Animated.View
         style={[
           styles.fadeWrap,
@@ -600,13 +606,6 @@ const styles = getStyles(c);
             ],
           },
         ]}>
-      {/*
-        LE BORD GAUCHE REND LE MÊME RETOUR QUE LA FLÈCHE — sur toute la
-        hauteur de l'écran, et non dans la seule barre du titre : une bande
-        posée en absolu se mesure dans son parent, et son parent était le
-        bandeau du haut.
-      */}
-      <RetourGlisse onRetour={() => setScreen('result')} />
       <View style={styles.headerRow}>
         <TouchableOpacity
           style={styles.roundButton}
@@ -943,7 +942,7 @@ const styles = getStyles(c);
       </TouchableOpacity>
       <PromptSheet data={prompt} onClose={() => setPrompt(null)} />
       </Animated.View>
-    </View>
+    </RetourGlisse>
   );
 }
 

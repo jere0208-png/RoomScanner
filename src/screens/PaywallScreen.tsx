@@ -31,6 +31,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useWindowDimensions } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { BackChevron } from '../components/BackChevron';
+import { RetourGlisse } from '../components/RetourGlisse';
 import { BadgePro } from '../components/BadgePro';
 import { LightRibbon, RIBBON_H } from '../components/LightRibbon';
 import { ContourVif, TexteVif } from '../components/ContourVif';
@@ -117,7 +118,12 @@ export function PaywallScreen() {
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={fermer}>
-      <View style={[s.fond, { paddingTop: insets.top }]}>
+      {/* Le bord gauche ferme la page, comme la flèche et comme le bouton
+          « retour » d'Android : une page qui s'ouvre en glissant doit pouvoir
+          se fermer pareil. */}
+      <RetourGlisse
+        onRetour={fermer}
+        style={[s.fond, { paddingTop: insets.top }]}>
         <View style={s.barre}>
           <Pressable
             accessibilityRole="button"
@@ -362,7 +368,7 @@ export function PaywallScreen() {
             </Pressable>
           </Pressable>
         </Modal>
-      </View>
+      </RetourGlisse>
     </Modal>
   );
 }
