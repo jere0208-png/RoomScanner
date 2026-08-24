@@ -48,6 +48,7 @@ import {
   type ScenePalette,
 } from '../geometry/scene3d';
 import { hiddenByBox } from '../geometry/furniture';
+import { MAQUETTE } from '../ui/maquette';
 import { parImage } from '../ui/parImage';
 import { floorsOf, useScanStore } from '../store/scanStore';
 import { CardinalRing } from './CardinalRing';
@@ -508,22 +509,26 @@ export function Iso3DView({
     }),
   ).current;
 
-  // Palette 3D de l'app : neutres du thème + teintes des ouvertures.
+  /*
+    LA PALETTE DE LA MAQUETTE — relevé du patron, image de référence à
+    l'appui : « j'aimerais que le rendu d'un plan 3D soit tel quel, fais en
+    sorte d'avoir le même réalisme en optimisant la fluidité ».
+
+    Elle vient des neutres du thème : bleu-gris, traits foncés — la palette
+    d'un écran technique. L'image montre une maquette de présentation :
+    crème, sable, blanc cassé, une touche d'ambre sur ce qui se pose. Tout
+    le gain est là, et il ne coûte pas un nœud de plus (voir
+    `src/ui/maquette.ts`).
+
+    Les menuiseries gardent les teintes du THÈME : elles ne décorent pas,
+    elles désignent, et elles doivent rester les mêmes que sur le plan 2D.
+  */
   const palette: ScenePalette = useMemo(
     () => ({
-      floor: c.surfaceSunken,
-      floorStroke: c.lineStrong,
-      wall: '#FFFFFF',
-      wallStroke: '#8A94A6',
-      wallTop: '#F4F7FB',
-      wallTopStroke: '#94A0B4',
-      opening: '#B9C2CE',
+      ...MAQUETTE,
       door: c.amber,
       window: c.sky,
       passage: c.blue,
-      object: '#D8E1F2',
-      objectTop: '#E9EEF9',
-      objectStroke: '#9FACBF',
     }),
     [c],
   );

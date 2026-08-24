@@ -6769,6 +6769,48 @@ aplati, un halo qui bat ressemble à un halo figé.
   portait déjà pour le menu de mur : c'était le même objet, dessiné deux fois
   de deux façons.
 
+### La maquette, à la place du dessin technique
+
+**« J'aimerais que le rendu d'un plan 3D soit tel quel »** — image de
+référence à l'appui : une maquette de présentation, crème, sable, blanc
+cassé, avec des touches d'ambre sur les lits et les canapés. **« Fais en
+sorte d'avoir le même réalisme en optimisant la fluidité. »**
+
+**Tout le gain était dans la couleur, et il ne coûte pas un nœud de plus.**
+Le moteur savait déjà l'essentiel : l'ombrage par orientation de face
+(`shadeFill`), les deux nappes d'ombre au pied de chaque meuble, le tri en
+profondeur. Rien de cela n'a été ajouté — c'est la palette qui les rendait
+invisibles. Elle venait des neutres du thème : bleu-gris, traits foncés, la
+palette d'un écran technique.
+
+Ce qui a été écarté, et pourquoi : un dégradé par face, une ombre floutée,
+une occlusion calculée coûteraient **un nœud SVG de plus par face**, sur un
+logement qui en compte déjà un millier. Le relevé demande justement
+l'inverse. Le réalisme vient ici de trois décisions de couleur :
+
+- **les traits s'effacent.** Ils étaient d'un bleu-gris franc, et c'est ce
+  qui donnait l'air « dessin technique » : sur une maquette, une arête est
+  une couture, pas un trait d'encre. Ils restent — sans eux, deux pans de
+  même teinte se confondent — mais à peine plus foncés que ce qu'ils bordent ;
+- **l'ombre se réchauffe.** Le côté sombre d'un mur empruntait un gris
+  bleuté, la couleur d'une ombre au néon. Dans une pièce éclairée par le
+  jour, une ombre garde la chaleur de ce qu'elle assombrit ;
+- **le mobilier moelleux prend l'ambre.** C'est la signature de ce style : le
+  bâti est neutre, et ce qu'on POSE dedans porte la couleur. Elle sert aussi
+  à LIRE le plan — on repère un lit d'un coup d'œil, là où quinze volumes
+  gris se ressemblent tous. La liste est courte et fermée (lit, canapé,
+  fauteuil, chaise) : si tout portait la couleur, elle ne dirait plus rien.
+  Et la couleur RELEVÉE au scan passe devant quand elle est demandée —
+  celle-là n'est pas un parti pris de dessin, c'est une mesure.
+
+**Une seule palette pour l'écran et pour les planches.** La planche de
+référence avait la sienne, recopiée : deux listes de treize teintes à tenir
+d'accord, et elles avaient déjà divergé. Or une planche ne garde rien si elle
+ne montre pas la même chose que l'écran — elles partagent donc `MAQUETTE`.
+
+Le PDF, lui, garde sa palette : un plan qu'on imprime se lit en encre, pas en
+maquette.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

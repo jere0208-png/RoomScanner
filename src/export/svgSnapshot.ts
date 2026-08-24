@@ -21,22 +21,18 @@ import {
   shadeFill,
   type ScenePalette,
 } from '../geometry/scene3d';
+import { MAQUETTE } from '../ui/maquette';
 
-export const SNAPSHOT_PALETTE: ScenePalette = {
-  floor: '#EEF1F6',
-  floorStroke: '#C9D1DC',
-  wall: '#FFFFFF',
-  wallStroke: '#8A94A6',
-  wallTop: '#F4F7FB',
-  wallTopStroke: '#94A0B4',
-  opening: '#B9C2CE',
-  door: '#E8A13B',
-  window: '#3EB8E5',
-  passage: '#2F6BFF',
-  object: '#D8E1F2',
-  objectTop: '#E9EEF9',
-  objectStroke: '#9FACBF',
-};
+/*
+  LA PLANCHE MONTRE CE QUE L'APP MONTRE.
+
+  Elle avait sa propre palette, recopiée de celle de l'écran : deux listes
+  de treize teintes à tenir d'accord, et elles avaient déjà divergé. La
+  planche sert de garde-fou visuel — elle ne garde rien si elle ne montre
+  pas la même chose. Elle prend donc la palette de la maquette, celle de
+  l'écran (`src/ui/maquette.ts`).
+*/
+export const SNAPSHOT_PALETTE: ScenePalette = MAQUETTE;
 
 export interface SnapshotView {
   theta: number;

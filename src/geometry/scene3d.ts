@@ -21,6 +21,7 @@ import {
   type WallSeg,
 } from './floorplan';
 import { floorColorAt, mixHex, pointInPolygon, sampleTexture } from './appearance';
+import { AMBRE_MEUBLE, MEUBLE_MOELLEUX } from '../ui/maquette';
 import { furnitureParts, type FurnPart } from './furniture3d';
 import { CEILINGS, type CeilingFixture } from './ceiling';
 import {
@@ -1460,9 +1461,18 @@ export function shadeFill(face: Face3D, ct: number, st: number): string | null {
         mixHex(face.fill, '#FFFFFF', 0.24),
         facing,
       )
-    : mixHex(
-        mixHex(face.fill, '#8A94A6', 0.35),
-        mixHex(face.fill, '#FFFFFF', 0.35),
+    : /*
+         L'OMBRE TIRE SUR LE BRUN, PAS SUR LE BLEU.
+
+         Le côté sombre d'un mur empruntait un gris bleuté — la couleur
+         d'une ombre au néon. Dans une pièce éclairée par le jour, une ombre
+         garde la chaleur de ce qu'elle assombrit. C'est le même calcul, à
+         une teinte près, et c'est ce qui fait passer le rendu du dessin
+         technique à la maquette.
+      */
+      mixHex(
+        mixHex(face.fill, '#A08D74', 0.38),
+        mixHex(face.fill, '#FFFFFF', 0.34),
         facing,
       );
 }
@@ -2676,11 +2686,26 @@ export function buildScene(
      */
     let yb = Math.max(0, obj.yCenter - obj.height / 2 - floorY);
     if (yb > 0 && yb < 0.45 && POSE_AU_SOL.test(obj.category ?? '')) yb = 0;
+    /*
+      L'AMBRE DU MOBILIER MOELLEUX — lits, canapés, fauteuils.
+
+      C'est la signature de la maquette que le patron a montrée : le bâti
+      est neutre, et ce qu'on POSE dedans porte la couleur. Elle sert aussi
+      à LIRE le plan — on repère un lit d'un coup d'œil, là où quinze
+      volumes gris se ressemblent tous.
+
+      La couleur RELEVÉE au scan passe devant, quand elle est demandée :
+      celle-là n'est pas un parti pris de dessin, c'est une mesure.
+    */
+    const teinteMoelleuse = MEUBLE_MOELLEUX.test(obj.category ?? '')
+      ? AMBRE_MEUBLE
+      : undefined;
     const skin = opts.showTextures ? obj.color : undefined;
+    const base = skin ?? teinteMoelleuse ?? pal.object;
     const teintes = {
-      body: skin ?? pal.object,
-      soft: mixHex(skin ?? pal.object, '#FFFFFF', 0.45),
-      dark: mixHex(skin ?? pal.object, '#0B0D12', 0.42),
+      body: base,
+      soft: mixHex(base, '#FFFFFF', 0.45),
+      dark: mixHex(base, '#0B0D12', 0.42),
     };
     // Un meuble est un VOLUME, comme un mur : ses faces portent leur normale
     // sortante et celles qui tournent le dos ne sont pas dessinées. Sans ça,

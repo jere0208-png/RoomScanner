@@ -1312,9 +1312,18 @@ describe('portes et fenêtres en volumes', () => {
           sp: Math.sin(rad(tilt)),
         };
         const vis = scene.faces.filter((f) => !isHiddenFace(f, cam));
-        const pleines = vis.filter(
-          (f) => f.fill === TEST_PALETTE.object || f.fill === TEST_PALETTE.objectTop,
-        );
+        /*
+          ON RECONNAÎT LE MEUBLE À SON CONTOUR, PLUS À SA COULEUR.
+
+          Les faces se comptaient par leur teinte — celle du meuble dans la
+          palette. Depuis que le mobilier MOELLEUX porte l'ambre de la
+          maquette (lits, canapés, fauteuils), un canapé n'a plus la teinte
+          « meuble » de la palette, et ce banc ne trouvait plus rien.
+          Ce qu'il vérifie n'a pourtant pas changé d'un pouce : qu'un volume
+          garde ses pans et que chaque pan porte son arête. C'est le CONTOUR
+          qui le dit, et il ne dépend d'aucun parti pris de couleur.
+        */
+        const pleines = vis.filter((f) => f.stroke === TEST_PALETTE.objectStroke);
         // Jamais un meuble réduit à rien, et jamais une face sans son arête :
         // c'est ce qui donnait l'impression d'un volume amputé.
         //
