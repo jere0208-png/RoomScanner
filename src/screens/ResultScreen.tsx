@@ -601,6 +601,49 @@ export function ResultScreen() {
             },
           ]
         : []),
+      /*
+        RETIRER L'ÉTAGE AFFICHÉ — relevé du patron : « rien ne peut se
+        séparer ».
+
+        Le menu savait en ajouter et les recaler, jamais en retirer. Or
+        c'est le relevé qu'on rate le plus souvent : on monte un escalier,
+        on scanne trois murs de travers, et le dossier entier était bon à
+        refaire. Il ne paraît que s'il reste un autre niveau derrière — un
+        dossier sans un seul mur n'est pas un dossier.
+      */
+      ...(niveaux.length > 1
+        ? [
+            {
+              label: `Retirer ${nomDuNiveau(niveauCourant).toLowerCase()}`,
+              hint: 'Ses murs, ses pièces, ses meubles et son appareillage.',
+              icon: 'supprimer' as const,
+              danger: true,
+              onPress: () => {
+                const pieces = toutesLesPieces.filter(
+                  (r) => niveauDe(r) === niveauCourant,
+                ).length;
+                setMenu({
+                  title: `Retirer ${nomDuNiveau(niveauCourant).toLowerCase()} ?`,
+                  subtitle:
+                    `${pieces} pièce${pieces > 1 ? 's' : ''} et tout ce qui ` +
+                    'y est posé quittent le dossier. Le reste ne bouge pas, ' +
+                    'et « Annuler » sait revenir en arrière.',
+                  actions: [
+                    {
+                      label: 'Retirer cet étage',
+                      icon: 'supprimer' as const,
+                      danger: true,
+                      onPress: () => {
+                        useScanStore.getState().retirerNiveau(niveauCourant);
+                        haptic('succes');
+                      },
+                    },
+                  ],
+                });
+              },
+            },
+          ]
+        : []),
       {
         label: 'Scanner un étage de plus',
         hint: 'Montez, relevez : il s’ajoute à ce dossier, au-dessus.',

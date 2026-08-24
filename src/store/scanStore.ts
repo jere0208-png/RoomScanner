@@ -61,6 +61,7 @@ import {
   fusionnerMursDoubles,
   NIVEAU_RDC,
   niveauDe,
+  niveauxPresents,
   deplacerNiveau,
   COFFRE_H,
   type TrouDeReleve,
@@ -810,6 +811,19 @@ interface ScanState {
    * plafonniers compris. Les autres niveaux ne bougent pas.
    */
   recalerNiveau: (n: number, dx: number, dz: number) => void;
+  /**
+   * RETIRE UN ÉTAGE DU DOSSIER, avec tout ce qui vit dessus.
+   *
+   * Relevé du patron : « rien ne peut se séparer ». Le menu savait ajouter
+   * un étage et le recaler, jamais le retirer — un relevé raté restait dans
+   * le dossier pour toujours, et c'est justement le relevé qu'on rate le
+   * plus souvent : on monte un escalier, on scanne trois murs de travers,
+   * et il n'y a plus qu'à recommencer le dossier entier.
+   *
+   * Le dernier niveau ne se retire pas : un dossier sans un seul mur n'est
+   * pas un dossier, c'est un plan vierge — et cela se demande autrement.
+   */
+  retirerNiveau: (n: number) => void;
   /**
    * Range le relevé qui arrive à l'étage `n`, sans toucher aux niveaux déjà
    * présents. C'est « compléter le relevé » à l'envers : rien à fusionner,
@@ -3999,6 +4013,59 @@ export const useScanStore = create<ScanState>((set, get) => {
       // L'appareillage et les photos tiennent à un mur par une cote le long
       // de ce mur : le mur bouge, elles bougent avec lui sans rien à faire.
       void idsDuNiveau;
+    },
+
+    /*
+      RETIRER UN ÉTAGE — relevé du patron : « rien ne peut se séparer ».
+
+      Le menu savait en ajouter et les recaler, jamais en retirer. Or c'est
+      le relevé qu'on rate le plus souvent : on monte un escalier, on scanne
+      trois murs de travers, et le dossier entier est bon à refaire.
+
+      Ce qui part avec lui n'est pas une liste écrite à la main : c'est ce
+      que le FILTRE désigne — le même que celui du plan, de la 3D et du
+      dossier. Un étage, c'est exactement ce qu'on voit quand on le regarde ;
+      le retirer, c'est retirer cela.
+
+      Le DERNIER niveau ne se retire pas. Un dossier sans un seul mur n'est
+      pas un dossier, c'est un plan vierge, et cela se demande autrement.
+    */
+    retirerNiveau: (n) => {
+      const st = get();
+      const restants = niveauxPresents(st.walls, st.rooms).filter((x) => x !== n);
+      if (restants.length === 0) return;
+      const aGarder = <T extends { niveau?: number }>(xs: T[]) =>
+        xs.filter((x) => niveauDe(x) !== n);
+      const mursGardes = aGarder(st.walls);
+      const idsMurs = new Set(mursGardes.map((w) => w.id));
+      const piecesGardees = aGarder(st.rooms);
+      const idsPieces = new Set(piecesGardees.map((r) => r.id));
+      pushHistory(`retirerNiveau:${n}`);
+      set({
+        walls: mursGardes,
+        rooms: piecesGardees,
+        openings: aGarder(st.openings),
+        notes: aGarder(st.notes),
+        // Ce qui tient à un mur s'en va avec lui ; ce qui tient à une pièce
+        // aussi. Aucun orphelin : un appareil sans mur ne se dessine nulle
+        // part et fausse le métré en silence.
+        fixtures: st.fixtures.filter((f) => idsMurs.has(f.wallId)),
+        photos: st.photos.filter((ph) => idsMurs.has(ph.wallId)),
+        objects: st.objects.filter((o) => idsPieces.has(o.roomId ?? '')),
+        ceiling: st.ceiling.filter((cl) => idsPieces.has(cl.roomId)),
+        // On ne reste pas sur un étage qui n'existe plus : on redescend au
+        // plus proche de ce qui reste, en dessous de préférence.
+        niveauCourant:
+          st.niveauCourant === n
+            ? restants.reduce((meilleur, x) =>
+                Math.abs(x - n) < Math.abs(meilleur - n) ||
+                (Math.abs(x - n) === Math.abs(meilleur - n) && x < meilleur)
+                  ? x
+                  : meilleur,
+              )
+            : st.niveauCourant,
+        dirty: true,
+      });
     },
 
     /*

@@ -42,6 +42,7 @@ import {
   pivotsDesBattants,
   roomParts,
   segLength,
+  filtrerAuNiveau,
   toFootprint,
   trousDuRelevé,
   northScreenAngle,
@@ -565,18 +566,61 @@ export function FloorplanEditor({
   showObjectDims,
   onToggleObjectDims,
 }: Props) {
-  const walls = useScanStore((s) => s.walls);
+  const tousLesMurs = useScanStore((s) => s.walls);
   const niveauCourant = useScanStore((s) => s.niveauCourant);
-  const openings = useScanStore((s) => s.openings);
-  const allObjects = useScanStore((s) => s.objects);
+  const toutesLesOuvertures = useScanStore((s) => s.openings);
+  const tousLesMeubles = useScanStore((s) => s.objects);
   const showFurniture = useScanStore((s) => s.showFurniture);
+  const currentSaveId = useScanStore((s) => s.currentSaveId);
+  const toutesLesPieces = useScanStore((s) => s.rooms);
+  const toutLAppareillage = useScanStore((s) => s.fixtures);
+  /*
+    UN SEUL ÉTAGE À LA FOIS — relevé du patron, capture à l'appui :
+    « ajouter un étage ne fonctionne pas bien, une construction mal faite
+    apparaît sur un autre plan ».
+
+    L'écran des résultats filtrait par niveau : ses chiffres, son métré, son
+    dossier ne parlaient que de l'étage choisi. Le DESSIN, lui, ne filtrait
+    rien — il lisait les murs, les pièces, les meubles et l'appareillage
+    directement dans le magasin, tous niveaux confondus. On voyait donc deux
+    logements l'un sur l'autre, chacun avec son cartouche de pièce.
+
+    Et ce n'était pas seulement laid : les jonctions d'onglet se calculent
+    sur le GRAPHE des murs. Deux étages mêlés, et un mur du haut s'assemble
+    avec un mur du bas qu'il croise — c'est la « construction mal faite ».
+
+    Le niveau du dessous reste visible, mais à sa place : en filigrane, un
+    trait d'axe, posé par l'écran (`filigrane`).
+  */
+  const { walls, openings, rooms, fixtures, objects: meublesDuNiveau } = useMemo(
+    () =>
+      filtrerAuNiveau(
+        {
+          walls: tousLesMurs,
+          openings: toutesLesOuvertures,
+          rooms: toutesLesPieces,
+          fixtures: toutLAppareillage,
+          photos: [],
+          objects: tousLesMeubles,
+          ceiling: [],
+        },
+        niveauCourant,
+      ),
+    [
+      tousLesMurs,
+      toutesLesOuvertures,
+      toutesLesPieces,
+      toutLAppareillage,
+      tousLesMeubles,
+      niveauCourant,
+    ],
+  );
   // Un appareil de plafond en réglage : le sol s'efface pour qu'on voie
   // où il tombe par rapport aux murs.
   const objects =
-    showFurniture && !selectedCeilingId && !selectedCeilingRow ? allObjects : [];
-  const currentSaveId = useScanStore((s) => s.currentSaveId);
-  const rooms = useScanStore((s) => s.rooms);
-  const fixtures = useScanStore((s) => s.fixtures);
+    showFurniture && !selectedCeilingId && !selectedCeilingRow
+      ? meublesDuNiveau
+      : [];
   const north = useScanStore((s) => s.north);
   const colorOpenings = useScanStore((s) => s.showOpeningColors);
   const showSurfaces = useScanStore((s) => s.showSurfaces);
@@ -1944,7 +1988,7 @@ export function FloorplanEditor({
               showFurniture &&
               showObjectDims &&
               (() => {
-                const o = allObjects.find((x) => x.id === selectedObjectId);
+                const o = meublesDuNiveau.find((x) => x.id === selectedObjectId);
                 if (!o) return null;
                 const f = footprintOf(o, partOf);
                 const murs = partOf.get(roomOf(o))?.walls ?? walls;
@@ -2608,7 +2652,7 @@ export function FloorplanEditor({
           {selectedObjectId &&
             showFurniture &&
             (() => {
-              const o = allObjects.find((x) => x.id === selectedObjectId);
+              const o = meublesDuNiveau.find((x) => x.id === selectedObjectId);
               if (!o) return null;
               const f = footprintOf(o, partOf);
               const p = mapping.toPx({ x: f.cx, z: f.cz });

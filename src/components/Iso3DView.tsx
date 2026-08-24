@@ -13,6 +13,7 @@ import { grouperTraces } from '../ui/traces';
 import { mettreAPlat } from '../ui/canevas';
 import { themedStyles, useTheme, type Palette } from '../theme';
 import {
+  filtrerAuNiveau,
   pointOnSeg,
   roomOf,
   segLength,
@@ -237,23 +238,72 @@ export function Iso3DView({
   light = false,
   prebuildRooms,
 }: Props) {
-  const walls = useScanStore((s) => s.walls);
-  const openings = useScanStore((s) => s.openings);
-  const allObjects = useScanStore((s) => s.objects);
+  const tousLesMurs = useScanStore((s) => s.walls);
+  const toutesLesOuvertures = useScanStore((s) => s.openings);
+  const tousLesMeubles = useScanStore((s) => s.objects);
+  const niveauCourant = useScanStore((s) => s.niveauCourant);
   const showFurniture = useScanStore((s) => s.showFurniture);
-  const objects = useMemo(
-    () => (showFurniture ? allObjects : []),
-    [showFurniture, allObjects],
-  );
   const north = useScanStore((s) => s.north);
-  const ceiling = useScanStore((s) => s.ceiling);
+  const toutLePlafond = useScanStore((s) => s.ceiling);
+  const toutesLesPieces = useScanStore((s) => s.rooms);
+  const toutLAppareillage = useScanStore((s) => s.fixtures);
+  /*
+    UN SEUL ÉTAGE À LA FOIS — et en volume, l'enjeu est plus grave qu'en
+    plan.
+
+    Les deux niveaux n'ont pas d'altitude propre : un étage se distingue par
+    son numéro, pas par une hauteur dans la scène. Rendus ensemble, ils sont
+    posés au MÊME niveau du sol — le haut est DANS le bas, murs au travers
+    des murs, meubles au travers des meubles. C'est la « construction mal
+    faite » du relevé du patron, vue en volume.
+
+    Le filtre est le même que celui du plan et de l'écran des résultats :
+    une seule règle, écrite une fois (`filtrerAuNiveau`).
+  */
+  const {
+    walls: tousLesMursDuNiveau,
+    openings: toutesLesOuverturesDuNiveau,
+    rooms: piecesDuNiveau,
+    fixtures: appareillageDuNiveau,
+    objects: meublesDuNiveau,
+    ceiling,
+  } = useMemo(
+    () =>
+      filtrerAuNiveau(
+        {
+          walls: tousLesMurs,
+          openings: toutesLesOuvertures,
+          rooms: toutesLesPieces,
+          fixtures: toutLAppareillage,
+          photos: [],
+          objects: tousLesMeubles,
+          ceiling: toutLePlafond,
+        },
+        niveauCourant,
+      ),
+    [
+      tousLesMurs,
+      toutesLesOuvertures,
+      toutesLesPieces,
+      toutLAppareillage,
+      tousLesMeubles,
+      toutLePlafond,
+      niveauCourant,
+    ],
+  );
+  const walls = tousLesMursDuNiveau;
+  const openings = toutesLesOuverturesDuNiveau;
+  const objects = useMemo(
+    () => (showFurniture ? meublesDuNiveau : []),
+    [showFurniture, meublesDuNiveau],
+  );
   const colorOpenings = useScanStore((s) => s.showOpeningColors);
   const showSurfaces = useScanStore((s) => s.showSurfaces);
   const showTextures = useScanStore((s) => s.showTextures);
   const solidWallsReglage = useScanStore((s) => s.solidWalls);
   // La présentation impose l'écorché ; ailleurs, c'est le réglage qui décide.
   const solidWalls = cutaway === undefined ? solidWallsReglage : !cutaway;
-  const allRooms = useScanStore((s) => s.rooms);
+  const allRooms = piecesDuNiveau;
   // Coupe : on ne garde que la pièce visée, murs et meubles compris.
   const rooms = useMemo(
     () => (focusRoomId ? allRooms.filter((r) => r.id === focusRoomId) : allRooms),
@@ -277,7 +327,7 @@ export function Iso3DView({
   );
   // L'appareillage suit son mur : en coupe sur une pièce, les prises des
   // autres pièces s'en vont avec les murs qui les portaient.
-  const allFixtures = useScanStore((s) => s.fixtures);
+  const allFixtures = appareillageDuNiveau;
   const fixtures = useMemo(() => {
     if (!focusRoomId) return allFixtures;
     const ids = new Set(keptWalls.map((w) => w.id));

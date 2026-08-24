@@ -6499,6 +6499,55 @@ qu'il montre, pas sur ce qu'on cachait la dernière fois. Les quatre portes
 sont couvertes par le banc (scan terminé, brouillon repris, plan rouvert,
 saisie au clavier) : une seule oubliée, et le défaut revient par elle.
 
+### Un étage à la fois, et un étage qu'on peut défaire
+
+**« Ajouter un étage ne fonctionne pas bien, une construction mal faite
+apparaît sur un autre plan, et rien ne peut se séparer, revois tout ça pour
+que ce soit facile, logique. »** Capture à l'appui : le sélecteur dit
+« R+1 », l'en-tête compte deux murs et 3,6 m², et l'on voit **deux logements
+l'un sur l'autre**, chacun avec son cartouche de pièce.
+
+Le défaut était là depuis le premier étage livré, et aucun banc ne pouvait le
+voir : **l'écran filtrait, le dessin non**. `ResultScreen` passe tout par
+`filtrerAuNiveau` — ses chiffres, son métré, son dossier ne parlent que de
+l'étage choisi. Mais `FloorplanEditor` et `Iso3DView` lisaient les murs, les
+pièces, les meubles et l'appareillage **directement dans le magasin**, tous
+niveaux confondus. Deux vues sur les mêmes données, deux règles.
+
+Ce n'est pas qu'une affaire de propreté. Les jonctions d'onglet se calculent
+sur le GRAPHE des murs : deux étages mêlés, et un mur du haut s'assemble avec
+un mur du bas qu'il croise — c'est la « construction mal faite ». En volume,
+c'est pire : les niveaux n'ont pas d'altitude propre (un étage se distingue
+par son numéro, pas par une hauteur dans la scène), donc les deux sont rendus
+au MÊME sol, l'un DANS l'autre.
+
+Les deux vues appliquent maintenant le même filtre que l'écran — **une seule
+règle, écrite une fois**. Le niveau du dessous reste visible, mais à sa
+place : en filigrane, un trait d'axe.
+
+**« Rien ne peut se séparer. »** Exact : le menu savait ajouter un étage et
+le recaler, jamais en retirer. Or c'est le relevé qu'on rate le plus souvent
+— on monte un escalier, on scanne trois murs de travers — et le dossier
+entier était bon à refaire. « Retirer cet étage » emporte ses murs, ses
+pièces, ses meubles, son appareillage, ses photos, son plafond et ses notes.
+
+Ce qui part n'est pas une liste écrite à la main : c'est **ce que le filtre
+désigne**, le même qui décide de ce qu'on voit. Un étage, c'est exactement ce
+qu'on voit quand on le regarde ; le retirer, c'est retirer cela. Aucun
+orphelin ne subsiste — un appareil sans mur ne se dessine nulle part et
+fausse le métré en silence.
+
+Trois garde-fous : le **dernier** niveau ne se retire pas (un dossier sans un
+seul mur n'est pas un dossier, c'est un plan vierge, et cela se demande
+autrement) ; on ne reste pas sur un étage qui n'existe plus (on redescend au
+plus proche de ce qui reste) ; et le geste passe par une feuille de
+confirmation qui dit ce qu'il emporte, « Annuler » sachant le rattraper.
+
+Le banc pose deux logements de tailles différentes à douze mètres l'un de
+l'autre — le cas NORMAL, ARKit repartant de l'endroit où l'on appuie sur
+« Scanner » — et lit ce qui est réellement peint : les cotes de l'étage
+regardé, jamais celles de l'autre.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro
