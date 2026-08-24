@@ -7141,6 +7141,30 @@ Deux pièges du système, trouvés en écrivant ces bancs :
   du seuil habituel reviendrait à en demander quatre-vingt-quatre au doigt,
   sans que rien ne le dise.
 
+**4. Le bord doit prendre la main AVANT le plan, sinon il ne l'aura jamais.**
+Le système négocie ainsi : quand une vue veut capturer un toucher que
+quelqu'un tient déjà, il DEMANDE au tenant de le rendre. Or le plan, les
+poignées et les bandeaux répondent tous `onPanResponderTerminationRequest:
+() => false` — et ils ont raison, un pan en cours ne se fait pas voler. Si le
+bord attendait vingt-quatre points, le plan aurait pris la main à dix, refusé
+de la rendre, et le retour n'aurait jamais fonctionné là où l'on s'en sert le
+plus. Le bord capture donc à **huit** points, sous le seuil de glissement de
+l'app. Le prix est connu et assumé : un glissement du plan commencé dans les
+vingt-quatre premiers points de l'écran part en retour — c'est exactement ce
+que fait iOS, dont le bord appartient au système. Un banc garde l'invariant
+(`CAPTURE_MIN < GLISSEMENT_MIN`), parce qu'une retouche de seuil le casserait
+sans bruit.
+
+**5. Un geste coupé ne laisse plus le meuble dans un mur.** Un appel entrant,
+une notification tirée du haut, et le système reprend le toucher :
+`Terminate` remplace `Release`. Il éteignait bien le halo rouge, mais il
+laissait le meuble là où le doigt l'avait mené — c'est-à-dire, une fois sur
+deux, DANS la maçonnerie, à une place que l'app refuse elle-même au lâcher.
+Il repose désormais à la dernière position qui tenait, comme le lâcher : le
+banc le vérifie en coupant un geste au moment précis où le meuble mord le
+mur, et il échoue franchement quand on retire le correctif (3,50 m au lieu de
+2,40).
+
 Et une leçon sur les bancs eux-mêmes, qui vaut pour tous ceux qui suivront :
 **`PanResponder` ne se sert pas de l'état de geste qu'on lui passe, il le
 RECALCULE depuis `e.touchHistory`**. Les premiers essais écrits ici

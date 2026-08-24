@@ -35,7 +35,11 @@ import {
   FloorplanEditor,
   ObjectDragHandle,
 } from '../src/components/FloorplanEditor';
-import { RetourGlisse, estUnRetour } from '../src/components/RetourGlisse';
+import {
+  CAPTURE_MIN,
+  RetourGlisse,
+  estUnRetour,
+} from '../src/components/RetourGlisse';
 import { useScanStore } from '../src/store/scanStore';
 import { GLISSEMENT_MIN } from '../src/ui/geste';
 import {
@@ -348,6 +352,51 @@ describe('le tremblement d’une main qui vise', () => {
     expect(apres[14]).toBeCloseTo(1.5, 2);
   });
 
+  it('repose le meuble où il tenait quand un appel coupe le geste', () => {
+    /*
+      UN GESTE COUPÉ NE LAISSE PAS LE MEUBLE DANS UN MUR.
+
+      Un appel entrant, une notification tirée du haut, et le système reprend
+      le toucher : `Terminate` remplace `Release`. Il éteignait le halo rouge
+      mais laissait le meuble là où le doigt l'avait mené — dans la
+      maçonnerie, à une place que l'app refuse elle-même au lâcher.
+    */
+    unMeuble();
+    act(() => {
+      useScanStore.setState({
+        walls: [
+          {
+            id: 'm1',
+            type: 'wall',
+            a: { x: 4, z: 0 },
+            b: { x: 4, z: 3 },
+            height: 2.5,
+            yCenter: 1.25,
+          },
+        ],
+      });
+    });
+    const h = poigneeDeMeuble(useScanStore.getState().objects[0].transform);
+    const m = main();
+    const e0 = m.poser(200, 150);
+    act(() => {
+      h.onStartShouldSetResponder?.(e0);
+      h.onResponderGrant?.(e0);
+      /*
+        Le meuble fait 1,20 m de large : il tient tant que son centre reste à
+        plus de 67 cm du mur. On l'emmène d'abord à 2,40 m — la dernière
+        place qui tienne — puis à 3,50 m, où il mord la maçonnerie. Et c'est
+        là que le système coupe.
+      */
+      h.onResponderMove?.(m.bouger(240, 150));
+      h.onResponderMove?.(m.bouger(350, 150));
+      h.onResponderTerminate?.(m.bouger(350, 150));
+    });
+    // Le meuble est revenu à la dernière place qui tenait : pas dans le mur.
+    const x = useScanStore.getState().objects[0].transform[12];
+    expect(x).toBeLessThan(2.9);
+  });
+
   it('garde le même seuil des deux côtés : ni tap ni glissement n’a de trou', () => {
     // Un seul chiffre pour toute l'app : le glissement commence là où le
     // tap finit, sans zone morte entre les deux.
@@ -399,6 +448,24 @@ describe('le retour au glissement depuis le bord', () => {
       ]);
     });
     expect(sortis).toHaveLength(1);
+  });
+
+  it('prend la main AVANT le plan, sinon il ne l’aurait jamais', () => {
+    /*
+      LA NÉGOCIATION DU SYSTÈME, ET POURQUOI CE CHIFFRE EST PLUS PETIT.
+
+      Quand une vue veut capturer un toucher que quelqu'un tient déjà, le
+      système DEMANDE au tenant de le rendre. Le plan, les poignées et les
+      bandeaux répondent tous non — et ils ont raison : un pan en cours ne se
+      fait pas voler. Si le bord attendait plus que le seuil de glissement,
+      le plan aurait pris la main le premier, refusé de la rendre, et le
+      retour n'aurait jamais marché là où l'on s'en sert le plus.
+
+      Ce banc ne peut pas rejouer la négociation — elle vit dans le système
+      de responders, pas dans nos composants. Il garde donc l'invariant qui
+      la décide, et qu'une retouche de seuil pourrait casser sans bruit.
+    */
+    expect(CAPTURE_MIN).toBeLessThan(GLISSEMENT_MIN);
   });
 
   it('ne vole jamais l’appui : un tap au bord reste au contenu', () => {

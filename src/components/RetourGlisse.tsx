@@ -87,11 +87,33 @@ export function departDuDoigt(e: GestureResponderEvent): number | null {
 }
 
 /**
+ * CE QU'IL FAUT PARCOURIR POUR QUE LE BORD PRENNE LA MAIN.
+ *
+ * HUIT POINTS — moins que le seuil de glissement de l'app (`GLISSEMENT_MIN`,
+ * dix), et ce n'est pas une coquetterie : c'est la seule façon que le geste
+ * marche sur le plan.
+ *
+ * Le système négocie ainsi : quand une vue veut capturer un toucher que
+ * quelqu'un tient déjà, il DEMANDE au tenant de le rendre. Or le plan, les
+ * poignées et les bandeaux répondent tous `onPanResponderTerminationRequest:
+ * () => false` — et ils ont raison : un pan en cours ne doit pas se faire
+ * voler. Si le bord attendait vingt-quatre points, le plan aurait pris la
+ * main à dix, refusé de la rendre, et le retour n'aurait jamais fonctionné
+ * là où on s'en sert le plus.
+ *
+ * On capture donc AVANT lui. Le prix est connu et assumé : un glissement du
+ * plan commencé dans les vingt-quatre premiers points de l'écran part en
+ * retour — c'est exactement ce que fait iOS, dont le bord appartient au
+ * système.
+ */
+export const CAPTURE_MIN = 8;
+
+/**
  * Le geste est-il un retour EN COURS, parti du bord ?
  *
- * Plus tôt que `estUnRetour` : on capture le geste dès qu'il ne fait plus
- * de doute — vingt-quatre points parcourus, deux fois plus horizontaux que
- * verticaux — pour que le contenu cesse de suivre le doigt.
+ * Plus tôt que `estUnRetour` : on prend la main dès que le geste ne fait
+ * plus de doute — parti du bord, franchement horizontal — pour que le
+ * contenu cesse de suivre le doigt.
  */
 export function partDuBord(
   x0: number,
@@ -99,7 +121,9 @@ export function partDuBord(
   dy: number,
   doigts = 1,
 ): boolean {
-  return doigts <= 1 && x0 <= BORD && dx > BORD && Math.abs(dy) * 2 < dx;
+  return (
+    doigts <= 1 && x0 <= BORD && dx > CAPTURE_MIN && Math.abs(dy) * 2 < dx
+  );
 }
 
 /**
@@ -108,11 +132,12 @@ export function partDuBord(
  * Le compteur du geste REPART DE ZÉRO quand le système accorde le toucher :
  * au lâcher, `dx` ne mesure plus que ce qui s'est passé depuis la capture,
  * pas depuis le bord de l'écran. Exiger là les soixante points de
- * `estUnRetour` reviendrait à en demander quatre-vingt-quatre au doigt, sans
- * que rien ne le dise. On en demande trente : le geste complet en vaut
- * cinquante-quatre, franc et confortable.
+ * `estUnRetour` reviendrait à en demander soixante-huit au doigt, sans que
+ * rien ne le dise. On en demande cinquante : le geste complet en vaut
+ * cinquante-huit, franc et confortable — et il faut qu'il le soit, puisque
+ * le bord prend la main dès huit points.
  */
-export const SUITE_MIN = 30;
+export const SUITE_MIN = 50;
 
 export function RetourGlisse({
   onRetour,

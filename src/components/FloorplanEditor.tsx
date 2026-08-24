@@ -3828,9 +3828,26 @@ export function ObjectDragHandle({
               .setObjectCenter(objectId, bonne.x, bonne.z, true, true);
           }
         },
+        /*
+          UN GESTE COUPÉ NE LAISSE PAS LE MEUBLE DANS UN MUR.
+
+          Un appel entrant, une notification tirée du haut, et le système
+          reprend le toucher au milieu du mouvement : `Terminate` remplace
+          alors `Release`. Il éteignait bien le halo rouge — mais il laissait
+          le meuble là où le doigt l'avait mené, c'est-à-dire, une fois sur
+          deux, DANS la maçonnerie, à une place que l'app elle-même refuse au
+          lâcher. On repose donc à la dernière position qui tenait, comme
+          au lâcher : c'est le même geste, il finit simplement autrement.
+        */
         onPanResponderTerminate: () => {
           releaseHaptic('butee');
           live.current.onRefus?.(false);
+          const bonne = derniereBonne.current;
+          if (bonne) {
+            useScanStore
+              .getState()
+              .setObjectCenter(objectId, bonne.x, bonne.z, true, true);
+          }
         },
       }),
     [objectId, seuil],
