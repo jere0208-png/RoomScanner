@@ -324,36 +324,6 @@ export function HomeScreen() {
         />
       </Animated.View>
 
-      {/*
-        LE PLAN QUI EXISTE DÉJÀ — la troisième porte.
-
-        Relevé du patron : « faisons un Scanner un plan papier, qui permet de
-        transformer un plan lu par notre app en un vrai plan 2D/3D ». C'est
-        le cas le plus fréquent en rénovation : le plan du logement existe,
-        il est sur une feuille, dans un dossier de copropriété ou dans un
-        PDF de permis. Le relever au LiDAR quand il est déjà dessiné, c'est
-        refaire à la main ce que quelqu'un a fait au trait.
-
-        Elle est offerte à tout le monde, LiDAR ou non : lire un plan ne
-        demande qu'un appareil photo.
-      */}
-      <Animated.View style={[styles.secondWrap, fadeIn(4)]}>
-        <GlowButton
-          label="Scanner un plan papier"
-          variant="ghost"
-          accessibilityLabel="Scanner un plan papier existant"
-          onPress={() => {
-            // Un plan lu est un plan : il compte au palier gratuit comme
-            // les autres, et se juge AVANT la photo.
-            if (!peutCreerPlan()) {
-              ouvrirSurprise();
-              return;
-            }
-            setScreen('papier');
-          }}
-        />
-      </Animated.View>
-
       {saves.length > 0 && (
         <Animated.View style={[styles.secondWrap, fadeIn(4)]}>
           <GlowButton

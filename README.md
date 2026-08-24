@@ -7023,531 +7023,62 @@ départ replié, point haut, point bas, retour au centre, redéploiement. C'est
 cette image qu'on regarde avant de livrer, et son diff qui préviendra le
 jour où le geste s'aplatira.
 
+L'écran pour lequel elle avait été faite n'existe plus (voir la section
+suivante) ; l'icône, elle, a été gardée : elle est testée, elle ne dépend de
+rien, et elle attend le prochain écran qui aura besoin de dire « je
+travaille ».
 
-### Scanner un plan papier — la fondation
+
+### Le scan de plan papier, essayé puis retiré
 
 Relevé du patron : **« faisons un Scanner un plan papier, qui permet de
-transformer un plan lu par notre app en un vrai plan 2D/3D, avec les
-éléments électriques s'il y en a, mesures respectées, cotes »** — et, dans
-la même phrase : **« tu testes ta propre fonction en simulant »**.
+transformer un plan lu par notre app en un vrai plan 2D/3D »**. Puis, l'essai
+fait sur ses propres plans : **« enlève la fonction de scan de plan, ça ne
+marche pas bien »**. Elle a été retirée le jour même — écran, bouton
+d'accueil, moteur, pont natif et bancs. Ce qui suit est le compte rendu de
+l'essai : à quoi il ressemblait, ce qu'il savait faire, et pourquoi cela ne
+suffisait pas. C'est le genre de chose qu'on ne veut pas réapprendre.
+
+**Ce qui marchait.** Sur une planche imprimée par notre propre simulateur,
+un appartement de 4,00 m sur 3,00 m ressortait au millimètre : murs, portes
+de 83 cm, fenêtre sur son allège, symboles reconnus, et le tout versé dans
+l'app par `finalize`, exactement comme un relevé LiDAR. Le lecteur savait
+lire les trois conventions de dessin (aplats, double trait, hachures),
+retrouver l'angle d'une feuille photographiée de travers, caler l'échelle
+sur les cotes écrites, et à défaut sur la largeur des portes.
+
+**Ce qui ne marchait pas.** Sur de VRAIS plans, le résultat allait de
+convenable à inutilisable, et rien ne permettait de savoir à l'avance dans
+quel cas on tombait :
+
+- un plan d'architecte trace ses cloisons sur un pixel, et le moindre
+  redimensionnement les efface ;
+- un plan porte des dessins qui ne sont pas le bâtiment — une voiture dans
+  le garage, du mobilier, des arcs — dont les traits parallèles ont
+  exactement l'allure de petits murs ;
+- une photo d'écran ajoute un moiré que le seuil local prend pour de
+  l'encre, et l'interface autour (onglets, barre des tâches) pour du dessin ;
+- sans OCR, l'échelle venait des portes : quelques pour cent d'erreur, ce
+  qui suffit à fausser un métré.
+
+**La leçon, et elle vaut pour la suite.** Un plan d'électricien faux d'un
+dixième est pire qu'un plan absent : on commande la gaine dessus, on perce
+dessus, on chiffre dessus. Une lecture qui réussit huit fois sur dix n'est
+pas une fonction utilisable — elle est un piège, parce que la neuvième ne
+s'annonce pas. Le scan LiDAR et le dessin à la main, eux, ne mentent jamais
+sur ce qu'ils ont relevé.
+
+**Où retrouver le code.** Tout vit dans l'historique, du commit
+« Plan papier : la fondation » à « Plan papier : la photo d'un écran » —
+douze livraisons, `src/papier/` et neuf bancs, dont un qui refabrique une
+photo d'écran de toutes pièces. Si l'on y revient un jour, c'est par là qu'il
+faut commencer, et avec un OCR en état de marche : c'est lui, et lui seul,
+qui donne l'échelle exacte d'un plan.
+
+L'icône animée du scan, elle, RESTE : elle avait été commandée à part, elle
+est testée, sa pellicule est versionnée, et elle ne dépend de rien
+(`src/components/ScanGlyph.tsx`, `src/ui/glypheScan.ts`).
 
-Cette dernière exigence a décidé de toute l'architecture. Un lecteur de plan
-ne se prouve pas sur des nombres : le difficile n'est pas de calculer, c'est
-de LIRE. On a donc commencé par l'imprimerie, pas par la lecture — un
-simulateur qui fabrique des plans dont on connaît les cotes au millimètre,
-et qui les photographie ensuite comme un téléphone le ferait : de travers,
-en perspective, à l'ombre, avec du grain et un peu de flou.
-
-`src/papier/` contient donc, dans cet ordre de dépendance :
-
-- **`image.ts`** — l'image en niveaux de gris, l'image intégrale, les îlots
-  d'encre et leurs trous. Le seuil y est **local** (Bradley et Roth) et
-  c'est tout le sujet : un seuil global — « plus sombre que 128 » — marche
-  sur un scanner et échoue sur toute photo réelle, le coin à l'ombre passant
-  en entier pour de l'encre. Le banc mène les DEUX essais côte à côte et
-  exige que le seuil global échoue : sans cela, personne ne saurait dire
-  dans six mois pourquoi ce fichier calcule des moyennes locales.
-- **`trace.ts`** — les quatre primitives dont un plan est fait : segment,
-  arc, disque, polyligne, avec un demi-pixel d'adoucissement parce qu'un
-  trait parfaitement dur n'existe sur aucune photo.
-- **`gabarits.ts`** — le dictionnaire des symboles, décrits comme des
-  DESSINS et non comme des images. Une seule source de vérité, qui sert deux
-  fois : à imprimer les planches d'essai, et à calculer les invariants de
-  référence de la reconnaissance.
-- **`simulateur.ts`** — l'imprimerie et l'appareil photo.
-- **`planches.ts`** — les appartements de référence, en mètres.
-- **`entree.ts`** — ce que l'app recevra du natif : une image grise, et les
-  textes que le téléphone y aura lus. L'OCR reste natif (`VNRecognizeTextRequest`
-  sait lire un texte imprimé mieux que tout ce qu'on écrirait ici) ; tout ce
-  qui se DÉDUIT reste en JavaScript, parce que ce qui se déduit se teste.
-
-Deux détails qui ne se voient qu'à l'image, et qui ont été trouvés comme ça
-— en regardant le PGM, jamais dans un nombre :
-
-- **Le cercle entier est un cas à part.** Ramené dans un tour, « de 0 à 2π »
-  devient « de 0 à 0 » : le cercle du point lumineux se réduisait à un point
-  unique posé sur sa droite, et le symbole perdait sa forme la plus
-  reconnaissable.
-- **Le châssis d'une fenêtre se dessine écarté.** Deux traits fins à trois
-  pixels l'un de l'autre se fondent en une barre pleine, et la fenêtre ne se
-  distinguait plus d'un bout de mur.
-
-Les images de contrôle s'écrivent à la demande : `PLANCHE_PAPIER=<dossier>`
-devant le banc dépose des PGM qu'on regarde (`magick x.pgm x.png`). Elles ne
-sont pas versionnées — leur diff ne dirait rien, et elles pèsent.
-
-
-### Plan papier — de l'encre à des traits
-
-Deuxième étage : `traits.ts`. C'est lui qui décide de tout ce qui suit — un
-mur manqué ici est un mur absent du plan final, un trait inventé est une
-cloison qui n'existe pas.
-
-**La transformée de Hough, et pas un suivi de pixels.** Un suivi s'arrête au
-premier croisement, et un plan n'est QUE des croisements : un refend coupe
-un mur, une ligne de cote traverse ses attaches, un vantail touche sa
-maçonnerie. La recherche de DROITES voit le trait entier même haché dix
-fois, ce qu'un banc vérifie explicitement sur le mur percé par la fenêtre.
-
-**On vote avec toute l'encre, pas avec les contours.** Un trait de trois
-pixels a deux contours : voter avec eux donnerait deux droites parallèles à
-un pixel et demi, à réunir ensuite. Voter avec la masse donne un pic unique,
-centré sur l'axe — et la largeur du pic donne l'épaisseur, qui distinguera
-plus loin un mur porteur d'une cloison, et la maçonnerie de la cotation.
-
-Trois choses ont été trouvées en REGARDANT le rendu des traits, jamais dans
-un nombre :
-
-- **Le mot « SEJOUR » ressortait en vingt traits obliques.** Un plan est
-  couvert d'écriture ; laissée dans le masque, chaque lettre devient une
-  poignée de petits segments, et l'on cherche des murs dedans. Ce que le
-  téléphone a su LIRE, on ne le regarde plus : `effacerBoites` retire les
-  boîtes de l'OCR du masque — mais pas de l'image, car ces mêmes boîtes
-  serviront à caler l'échelle sur les cotes écrites.
-- **On mesure d'abord, on efface ensuite, et l'on s'y reprend à deux fois.**
-  L'urne travaille au demi-degré : six pixels de dérive sur un mur de quatre
-  mètres, c'est-à-dire six centimètres sur la cote qu'on rendra. Recaler le
-  trait sur les pixels emportés ne suffisait pas : une bande inclinée qui
-  traverse un trait horizontal emporte un parallélogramme, dont l'axe est
-  incliné pareil — le défaut se recopiait lui-même. On ramasse large, on
-  recale, on ramasse de nouveau autour de l'axe recalé, et l'on efface
-  seulement là.
-- **On reprend le maximum de l'urne à chaque tour, et c'est voulu.** Ranger
-  les pics une bonne fois pour toutes faisait gagner deux secondes sur vingt
-  — et inventait vingt traits sur soixante-dix. Un pic dont l'encre vient
-  d'être emportée doit être REPESÉ, pas servi sur sa vieille valeur.
-
-`anglePrincipal` cherche de son côté l'inclinaison de la feuille : un plan
-est fait d'angles droits, c'est la seule chose dont on soit sûr avant de
-l'avoir lu, et l'orientation qui rend les projections les plus PIQUÉES est
-celle des murs. Le balayage se fait en deux temps — au degré, puis au quart
-de degré sur deux degrés — parce que la version en un seul passage coûtait
-quatre secondes par photo pour le même résultat.
-
-
-### Plan papier — des traits aux murs, et les trois façons d'en dessiner un
-
-Le lecteur a d'abord été écrit pour le seul DOUBLE TRAIT, celui du dessin
-d'architecte. Le premier vrai plan français est venu le démentir : sur un
-plan d'implantation électrique courant, les murs sont des **aplats** noirs et
-les cloisons des aplats gris, et il n'y a pas un double trait sur la feuille.
-Un troisième plan, coté celui-là, mélangeait les deux et **hachurait** ses
-porteurs. La planche d'essai sait donc imprimer les trois, et le banc lit le
-même appartement trois fois en exigeant les mêmes cotes — c'est le seul moyen
-d'être sûr qu'on lit un plan, et non qu'on reconnaît sa propre imprimerie.
-
-Le T1 de référence ressort à **4,00 m × 3,00 m avec un refend de 3,00 m**
-dans les trois conventions, murs porteurs à 20 cm et cloison à 10.
-
-Huit choses ont été apprises en chemin, toutes en regardant les images :
-
-- **Le trait fin se cherche en bas de la série, pas au milieu.** On prenait
-  la médiane des épaisseurs pour dire ce qu'est un trait fin. Sur un plan
-  d'implantation où TOUS les murs sont des aplats de vingt pixels, la médiane
-  valait vingt, le seuil de l'aplat quarante-quatre, et plus un seul mur
-  n'était reconnu.
-- **On mesure un run contigu, pas une bande.** Compter tous les pixels
-  allumés perpendiculairement donnait, sur un double trait, l'addition des
-  DEUX bords — un trait de trois annoncé à six.
-- **L'épaisseur est une médiane, pas une moyenne.** Là où un mur en croise un
-  autre, le run vaut l'épaisseur du mur croisé ; une moyenne s'en trouvait
-  tirée vers le haut et le bord de maçonnerie passait pour un aplat.
-- **La droite doit passer SUR l'encre.** On cherchait le pixel allumé le plus
-  proche dans toute la largeur admissible : une droite longeant un bord de
-  mur attrapait, dix pixels plus loin, l'attache d'une ligne de cote posée
-  dans son prolongement, et le mur ressortait soixante pixels trop long.
-- **Deux traits d'épaisseurs différentes ne sont pas le même trait**, et deux
-  bords d'un même mur sont tracés pareil. Sans cette règle, le bord d'un mur
-  épousait la ligne de cote qui court devant lui et l'on obtenait un mur de
-  quarante-cinq centimètres d'épaisseur, posé dehors.
-- **Un bord de mur est plein d'encre d'un bout à l'autre.** Les hachures d'un
-  porteur sont régulièrement espacées : leurs pointes s'alignent, et la
-  transformée de Hough voit là de vraies droites, parallèles aux bords, à
-  mi-chemin entre eux. Elles se mariaient avec le vrai bord et rendaient des
-  murs de douze centimètres au lieu de vingt. Un alignement de pointes n'est
-  couvert d'encre qu'à moitié : `Trait.plein` est ce qui le trahit, et rien
-  d'autre ne le pouvait.
-- **La sentinelle est `null`, et non −1.** Le calage parcourt l'axe DE PART
-  ET D'AUTRE du mur ; marquer « aucun morceau en cours » par −1 confondait la
-  sentinelle avec un morceau commencé un pixel avant le mur. Les murs
-  s'étendaient vers l'avant et jamais vers l'arrière — un défaut qui ne se
-  voyait que sur le mur percé d'une fenêtre, amputé de son premier mètre.
-- **Une ouverture se mesure en épaisseurs de mur porteur.** Faute d'échelle à
-  ce stade, `OUVERTURE_MAX = 7` dit « un mètre quarante » : de quoi franchir
-  une porte-fenêtre en recollant le mur, sans jamais réunir deux murs séparés
-  par un couloir.
-
-Et une abstention : **on n'invente pas de mur à partir d'un trait seul**. Un
-trait fin isolé, sur un plan, c'est neuf fois sur dix une ligne de cote, un
-vantail, un axe ou un renvoi. Les prendre pour des cloisons remplissait le
-plan de murs fantômes en travers des pièces.
-
-
-### Plan papier — les ouvertures, puis l'échelle
-
-**On ne cherche pas des portes, on cherche des TROUS.** Sur un plan, une
-menuiserie est d'abord une interruption de la maçonnerie ; on referme la
-tranche par deux tableaux, et l'on pose dans le vide de quoi dire ce que
-c'est : un vantail et son arc pour une porte, un ou deux traits fins
-parallèles au mur pour une fenêtre, rien du tout pour une baie qu'on
-traverse. C'est la façon dont on lit un plan quand on est du métier, et
-c'est devenu l'ordre du code.
-
-Deux règles ont été payées cher :
-
-- **Un vantail n'est jamais parallèle à son mur.** Le châssis d'une fenêtre a
-  exactement la longueur du trou et ses bouts touchent les deux tableaux :
-  sans cette règle, il passait pour un vantail et TOUTES les fenêtres du plan
-  ressortaient en portes.
-- **On remesure l'épaisseur du mur sur la maçonnerie elle-même.**
-  L'appariement de bords rend l'épaisseur des deux traits mariés — et si l'un
-  d'eux était le châssis plutôt que le nu du mur, elle est trop faible :
-  15,9 pour un mur de 20. Ce n'est pas qu'une cote fausse de quatre
-  centimètres, c'est la fenêtre qui DISPARAÎT : on cherche les trous à un
-  demi-mur de l'axe, et à 7,95 on retombe pile sur le châssis. Le mur
-  paraissait plein d'un bout à l'autre.
-
-**L'échelle** est la seule chose qu'un dessin ne dit pas de lui-même. Quatre
-sources, dans cet ordre : les **cotes écrites** (seule source exacte, avec
-vote médian pour qu'un « 8 » lu à la place d'un « 3 » n'emporte pas le
-relevé) ; l'**échelle déclarée** d'un PDF dont on connaît la finesse ; les
-**portes**, à 83 cm de passage, ce qui cale un plan sans une seule cote
-lisible à quelques pour cent près ; et la **main**, deux points et une
-distance, qui l'emporte sur tout. `Echelle.origine` accompagne le relevé
-jusqu'à l'écran : un plan calé sur des portes n'a pas le même statut qu'un
-plan calé sur les cotes du bureau d'études, et l'app doit le dire.
-
-Trois pièges de la cotation, tous trouvés sur la planche :
-
-- **La ligne de cote est le plus LONG trait du secteur, pas le plus proche.**
-  Le plus proche du nombre, c'est l'arrêt oblique posé juste à côté : quatre
-  mètres se trouvaient rapportés à trente-cinq pixels.
-- **Une marque croise la ligne, elle ne passe pas à côté.** On acceptait tout
-  trait court dont un bout tombait près d'elle ; un symbole posé à dix pixels
-  devenait une marque de cotation, et la portion mesurée tombait de moitié —
-  un logement de deux mètres cinquante de large.
-- **On recoud les lignes de cote avant de les mesurer.** Le nombre est posé
-  SUR sa ligne, et l'on efface du masque tout ce que l'OCR a lu : la ligne se
-  retrouvait coupée en deux morceaux de part et d'autre du nombre, qui ne se
-  rattachait plus à aucun des deux.
-
-
-### Plan papier — reconnaître les symboles sans comparer deux images
-
-Personne ne dessine une prise tout à fait pareil. La CEI 60617 en fixe
-l'esprit ; chaque bureau d'études en fait sa variante, un plan de rénovation
-tracé à la main en fait une troisième, et le même symbole se retrouve à trois
-échelles sur la même feuille. Comparer des pixels à des pixels ne peut donc
-pas marcher — c'est précisément ce que font les reconnaissances par gabarit
-qui échouent dès la deuxième feuille.
-
-On compare des **invariants** : ce qui survit à une rotation, à un changement
-d'échelle et à la main de celui qui a dessiné. Le nombre de TROUS d'abord —
-le seul qui soit entier, et le plus solide : un point lumineux (cercle barré
-d'une croix) en a quatre, un spot un, un socle de prise un (son demi-disque),
-un interrupteur aucun. Puis le remplissage du disque englobant, l'allongement
-tiré de l'inertie, la compacité, deux moments de Hu, et la symétrie à
-demi-tour. Sept nombres, et pas un pixel.
-
-**Les références sortent des mêmes dessins que les planches d'essai** :
-`gabarits.ts` est rasterisé une fois, à taille fixe, et l'on en tire les
-invariants. Une seule source de vérité — le jour où l'on redresse le symbole
-d'une prise, la référence suit toute seule.
-
-Le banc pose l'exigence dans le bon ordre : **la bibliothèque doit d'abord se
-distinguer elle-même**, chaque symbole rasterisé à deux tailles et sous
-quatre angles devant se reconnaître LUI. Si deux entrées du dictionnaire ne
-se séparent pas, aucune photo au monde ne les séparera : c'est le
-dictionnaire qu'il faut corriger, pas le lecteur.
-
-Trois choses apprises :
-
-- **Un intrus doit être étranger au dictionnaire, pas seulement absent de
-  lui.** Le premier essai — un pentagone barré — passait pour un tableau
-  électrique, et à juste titre : un polygone traversé d'une diagonale, c'est
-  exactement le symbole du tableau. Une spirale passait pour un WC. Les vrais
-  intrus d'un plan sont un MOT que l'OCR n'a pas lu et un bout de TRAIT resté
-  seul ; ce sont eux que le banc présente désormais.
-- **La gomme fait la largeur du trait, pas un pixel de plus.** Un symbole
-  mural se pose CONTRE la maçonnerie — c'est même à cela qu'on le reconnaît.
-  Effacer l'emprise entière du mur avant de chercher les symboles lui coupait
-  le pied : le cercle d'un point lumineux perdait son arc, ses quatre trous
-  devenaient deux, et il n'était plus reconnu. On n'efface donc que les deux
-  TRAITS de bord — sauf pour un mur en aplat, qui est plein et dans lequel
-  rien n'est jamais dessiné.
-- **Les bouts de trait ne sont pas des repères.** L'ébarbage laisse des
-  miettes, toutes longues et minces ; aucun symbole du dictionnaire ne dépasse
-  un rapport de deux et demi entre ses côtés. Sans ce filtre, le plan se
-  couvrait de repères à qualifier qui n'étaient que des débris.
-
-Et la règle qui vaut pour tout le lecteur : **ce qu'on ne reconnaît pas, on
-le dit**. Au-delà de six dixièmes d'écart, le symbole ressort sans nom — un
-repère à qualifier, posé au bon endroit. Mieux vaut un repère qu'un tableau
-imaginaire au milieu d'un séjour.
-
-
-### Plan papier — le relevé passe par le chemin du scan, pas à côté
-
-`lecture.ts` n'invente rien : il enchaîne les étages et rend un **`ScanResult`**,
-exactement celui que RoomPlan produirait. C'est la décision qui tient tout le
-reste : **un plan papier n'ouvre pas un deuxième chemin dans l'application**.
-Les murs passent par `finalize`, les pièces se détectent comme après un scan,
-les cotes se posent comme d'habitude — et l'électricité s'ancre par
-`ancrerElec`, le même code qui pose ce qu'on vise au viseur pendant un relevé
-LiDAR. Un symbole lu sur un plan n'a aucune raison d'emprunter un autre
-chemin : on lui donne un point du monde et sa nature, et tout le reste de
-l'app le traite comme le sien — `Fixture` sur un `wallId` à la hauteur du
-métier, `CeilingFixture` rattaché à sa pièce.
-
-Tout ce qui suit la lecture est donc, par construction, déjà éprouvé : le
-découpage aux jonctions, la soudure des coins, la détection des pièces, le
-métré, le PDF, la 3D.
-
-Le banc de bout en bout imprime le T1, le photographie **de travers, à
-l'ombre, grenu et flou**, le relit et VERSE le résultat dans le magasin. Le
-logement en ressort à **4,00 m sur 3,00 m**, porte de 83 cm, fenêtre de
-1,20 m posée sur son allège, appareils accrochés à leurs murs.
-
-Une chose s'est apprise là : **les cotes se mesurent sur l'EMPRISE, pas sur le
-plus long mur**. `finalize` découpe les faces aux jonctions, comme pour un
-relevé LiDAR : le mur de quatre mètres que traverse le refend en ressort en
-deux morceaux de 2,60 et 1,40. Mesurer le lecteur à travers ce découpage
-aurait été mesurer autre chose que lui.
-
-Et l'ordre des étages n'est pas négociable : réduire (la recherche de droites
-coûte le carré de la taille), binariser au seuil local, effacer ce que l'OCR a
-lu, chercher les traits puis les murs puis les trous, caler l'échelle,
-ébarber la maçonnerie et reconnaître les symboles, enfin redresser et mettre
-à l'échelle — sur les COORDONNÉES et jamais sur l'image, car tourner un
-million de pixels coûterait cher et abîmerait les traits fins qu'on vient
-tout juste de mesurer.
-
-
-### Plan papier — l'épreuve des vrais plans
-
-Relevé du patron : **« tes tests se feront sur des plans architecturaux que
-tu trouves sur internet (français) »**. C'est la seule épreuve qui compte :
-une planche fabriquée par notre propre simulateur ne prouve jamais qu'on lit
-un plan, seulement qu'on reconnaît sa propre imprimerie.
-
-Deux plans français ont servi : un **plan d'implantation électrique** (murs
-en aplats noirs, cloisons grises, symboles CEI, noms de pièces, aucune cote)
-et un **plan d'architecte coté** (murs en double trait, porteurs hachurés,
-chaînes de cotation « 10.83 » et « 1.60/2.48 », surfaces de pièces au
-cartouche, mobilier dessiné, voiture dans le garage).
-
-Ils ont démenti trois hypothèses de départ, et chacune a coûté une reprise :
-
-- **Les murs ne sont pas des doubles traits**, ou pas toujours : sur le plan
-  d'implantation, tous sont des aplats. D'où les trois conventions gérées.
-- **Les cotes ne s'écrivent pas « 350 »** mais « 10.83 », « 1.60/2.48 »
-  (largeur/hauteur d'une menuiserie) et « S : 12.73 m² » — cette dernière a
-  exactement l'allure d'une cote et fausserait l'échelle de moitié.
-- **Un plan contient des dessins qui ne sont pas le bâtiment** : une voiture
-  dans le garage, du mobilier, des arcs de porte. Deux traits parallèles pris
-  dans une carrosserie ont l'allure d'un petit mur, et le garage en
-  ressortait rempli. D'où `filtrerDEquerre` : un logement est fait d'angles
-  droits, et ce qui coupe l'angle dominant en biais est suspect. On ne jette
-  pas tout ce qui est de travers — un pan coupé, une cage d'escalier
-  existent — on jette ce qui est de travers ET court : un vrai mur oblique
-  fait la longueur de ses voisins, un pare-chocs le quart.
-
-Les images ne sont pas versées au dépôt (elles pèsent, et elles ne nous
-appartiennent pas) : on désigne un dossier au lancement.
-
-```
-magick plan.jpg -colorspace Gray plan.pgm
-PLANS_REELS=<dossier> PLANCHE_PAPIER=<dossier> npx jest papierreel
-```
-
-Le banc écrit alors le plan en gris pâle avec les murs lus par-dessus en
-noir : **ce qui manque saute aux yeux, ce qui a été inventé aussi**. C'est
-cette image-là qu'on regarde, et c'est elle qui a trouvé la voiture.
-
-
-### Plan papier — l'écran, et la troisième porte de l'accueil
-
-L'accueil avait deux portes : « Commencer le scan » et « Dessiner un plan ».
-Il en a une troisième, **« Scanner un plan papier »**, offerte à tout le
-monde — LiDAR ou non, lire un plan ne demande qu'un appareil photo. C'est le
-cas le plus fréquent en rénovation : le plan du logement existe déjà, sur une
-feuille, dans un dossier de copropriété ou dans un PDF de permis. Le relever
-au LiDAR quand il est déjà dessiné, c'est refaire à la main ce que quelqu'un
-a fait au trait.
-
-L'écran tient en trois moments — on donne une photo, on attend, on regarde ce
-qui a été compris — et son travail principal est d'être HONNÊTE :
-
-- **D'où vient l'échelle est écrit avant le bouton qui ouvre le plan**,
-  jamais après. « 3 cotes du plan concordent » n'a pas le même statut que
-  « calée sur 2 portes à 83 cm », et c'est sur ces centimètres-là qu'on
-  commande la gaine.
-- **Si l'échelle est estimée, on propose de la donner** : la longueur du plus
-  grand mur suffit à recaler tout le relevé, sans rien relire. C'est le geste
-  de n'importe quel dessinateur devant un plan sans cartouche.
-- **Ce qui n'a pas été reconnu est compté** (« À qualifier : 3 ») au lieu
-  d'être deviné.
-- **Les noms écrits sur le plan se recopient sur les pièces** — mais eux
-  seuls : un plan porte aussi « VR MOT », « B-B' » et « S : 12.73 m² » à côté
-  de « Chambre 1 », et aucun de ces trois-là n'est un nom de pièce. Une pièce
-  déjà nommée à la main n'est jamais renommée.
-
-C'est aussi pour cet écran que l'icône de scan est animée **en natif** : la
-lecture bloque le fil JS plusieurs secondes sur une grande photo, et la ligne
-de balayage est alors la seule chose qui vit. Elle est lancée après une
-image, sinon React n'aurait pas le temps de peindre l'écran d'attente.
-
-**Le pont natif reste à compiler.** `src/ui/planPapier.ts` déclare ce que le
-téléphone doit rendre — une image en niveaux de gris et les textes lus par
-`VNRecognizeTextRequest` — et `disponible()` rend faux tant que le module
-n'est pas là : l'écran affiche alors « recompilez l'application » plutôt que
-de planter sur un module absent.
-
-
-### Plan papier — le pont natif : une image en gris, et ce que Vision a lu
-
-`RoomScanPlan.swift` ne comprend rien au plan, et c'est voulu : il rend deux
-choses, l'image en niveaux de gris et les textes reconnus. Tout ce qui se
-déduit se déduit en JavaScript, où cela se teste — un moteur de lecture écrit
-en Swift ne serait éprouvé nulle part.
-
-- **L'OCR reste natif.** `VNRecognizeTextRequest` lit un texte imprimé depuis
-  dix ans, gratuitement, hors ligne, mieux que tout ce qu'on écrirait. Ses
-  lignes donnent l'échelle (les cotes écrites, seule source exacte) et les
-  noms des pièces. La correction linguistique est COUPÉE : un plan est
-  couvert de nombres à deux ou trois chiffres, et elle les remplacerait par
-  des mots.
-- **Du gris, et en base64.** Un plan est un dessin au trait : la couleur n'y
-  porte que du décor. Et une photo fait un à trois millions de pixels —
-  les passer en tableau de nombres à travers le pont voudrait dire
-  sérialiser autant d'entiers en JSON ; le base64 coûte un tiers de plus en
-  octets et cent fois moins en temps.
-- **Le passage par un contexte de dessin normalise l'ORIENTATION.** Une photo
-  prise en portrait porte son sens dans ses métadonnées, pas dans ses
-  pixels : sans ce redressement, le plan arriverait couché et tout ce qui
-  suit — l'angle de la feuille, les murs d'équerre — travaillerait de
-  travers.
-- **Les boîtes de texte sont converties EN PIXELS ici.** Vision les rend
-  normalisées et l'origine en bas à gauche ; le JavaScript travaille en
-  pixels depuis le haut. Transporter une convention de plus n'aurait servi
-  qu'à la faire oublier un jour.
-
-Non compilé sur cette machine (pas de Mac) : c'est une compilation EAS qui le
-dira. Tant que le module n'est pas là, `disponible()` rend faux et l'écran
-affiche « recompilez l'application » au lieu de planter.
-
-
-### Plan papier — le profil, et les trois fausses pistes
-
-La première lecture d'un vrai plan d'architecte a pris **quarante-sept
-secondes**. Sur un téléphone, personne n'attend cela. Trois optimisations ont
-été tentées AU JUGÉ avant qu'on se décide à mesurer, et les trois n'ont rien
-donné :
-
-1. **tenir le maximum de l'urne par ligne d'angle** au lieu de la relire en
-   entier à chaque trait — zéro gain ;
-2. **borner le parcours de la droite** à la portion qui traverse la feuille,
-   au lieu de suivre toute la diagonale — zéro gain ;
-3. **ranger les pics une fois pour toutes** — deux secondes gagnées sur
-   vingt, et vingt traits inventés sur soixante-dix : annulé.
-
-Le profil, lui, a répondu en une minute : **la recherche de droites coûtait
-onze secondes, et le reste une**. Le poste exact est le DÉPOUILLEMENT — chaque
-pixel d'encre dépose cent quatre-vingts voix, chacune dans une case tirée au
-hasard d'une urne d'un million : autant de défauts de cache. Cent cinquante
-mille pixels d'encre, et l'on y était.
-
-Ce qui a marché :
-
-- **Un pixel sur deux vote, en damier.** Un trait de plan fait trois à quatre
-  pixels d'épaisseur ; un damier en garde la moitié et le pic reste au même
-  endroit. Ce qui MESURE le trait n'est pas l'urne mais le parcours de la
-  droite, qui lui voit tous les pixels. Onze secondes → six.
-- **Un degré et deux pixels** pour l'urne, au lieu d'un demi-degré et un
-  pixel : quatre fois moins de cases, et rien en justesse — le pic ne sert
-  qu'à TROUVER le trait, ce sont ses propres pixels qui le mesurent ensuite.
-- **Deux cent soixante traits au plus.** Un plan de logement complet en
-  compte cent cinquante ; au-delà, on ramasse les miettes des symboles et le
-  grain du papier, et chaque miette coûte un parcours de droite entier.
-- **Un pixel sur quatre pour l'angle**, en damier lui aussi.
-
-Et le piège qui a failli passer : le sous-échantillonnage doit être
-**isotrope**. Prendre un indice sur huit dans le tableau de pixels, c'est
-prendre une colonne sur huit quand la largeur est paire — tous les murs
-verticaux tombaient entre deux colonnes retenues, et l'angle de la feuille
-ressortait à ONZE DEGRÉS de la vérité. Les bancs de la feuille prise de
-travers l'ont attrapé aussitôt ; à l'œil, on aurait cherché longtemps.
-
-Le prix payé, mesuré et écrit : sur une photo qui cumule cinq degrés de
-travers, une ombre mangeant les deux tiers de la lumière, du grain et du
-flou, l'écart passe de cinq à huit pour cent — vingt-cinq centimètres sur
-trois mètres. Sur une photo propre, le même appartement ressort au
-millimètre.
-
-
-### Plan papier — le premier essai sur le terrain, et ce qu'il a appris
-
-Relevé du patron, une photo à l'appui : **« voici un plan photographié et le
-plan que l'app ressort… rien à voir »**. Le relevé était un patchwork de
-segments sans structure. Trois choses s'étaient liguées, et la photo les
-disait toutes les trois : **le plan n'était pas sur une feuille, il était sur
-un ÉCRAN d'ordinateur**, photographié avec le bureau autour, les onglets du
-navigateur en haut et la barre des tâches en bas.
-
-- **La photo contenait autre chose que le plan.** Le lecteur travaillait sur
-  TOUTE l'image : il cherchait des murs dans une fenêtre de navigateur. Le
-  recadrage sur la zone dessinée était prévu depuis le premier jour et
-  n'avait jamais été écrit. Il l'est : `cadrer.ts`.
-- **Le moiré.** Photographier une dalle, c'est échantillonner une grille avec
-  une autre : il en sort des franges sur toute l'image, et elles SONT plus
-  sombres que leur voisinage — donc de l'encre, pour un seuil local.
-- **Le fond sombre.** Sur du noir uniforme, un seuil local ne compare que du
-  bruit à du bruit, et rend du bruit.
-
-Le banc `papiermoire` refabrique exactement cette photo à partir d'une
-planche dont on connaît les cotes — incrustée dans un écran, avec les
-onglets, la barre des tâches, les franges et le grain — et exige de
-retrouver l'appartement. **Il échouait sur le code qui a produit le relevé du
-patron** : c'est à cela qu'on reconnaît un banc qui sert à quelque chose.
-
-Quatre corrections, dont deux qui se sont mordu la queue :
-
-- **Un dessin est une ZONE, pas une ligne.** Le premier recadrage gardait
-  tout pavé portant de l'encre et prenait le plus grand ensemble d'un seul
-  tenant : c'était LE CADRE DE LA FENÊTRE du navigateur — quatre lignes de
-  pavés, refermées, parfaitement connexes. Le lecteur recadrait dessus et
-  prenait son contour pour le pourtour du logement : sept mètres de large.
-  Un plan, lui, est une surface : autour de n'importe lequel de ses points
-  on trouve d'autres traits. On ne garde un pavé que si son voisinage en
-  compte assez d'autres.
-- **Un écart absolu minimal**, déduit de l'étendue réelle des gris de
-  l'image : sept pour cent, borné entre six et dix-huit. Un seuil fixe à
-  quatorze effaçait la moitié des murs d'un plan d'architecte pâle, qui
-  n'étale ses valeurs que sur quarante niveaux.
-- **On ne débruite que si l'image est bruitée, et c'est le masque qui le
-  dit.** Le filtre médian efface les traits d'UN pixel — appliqué d'office,
-  il a fait disparaître la moitié des murs du plan pâle qui marchait la
-  veille. Un plan couvre deux à huit pour cent de sa feuille d'encre ;
-  au-delà de douze, ce n'est plus du dessin, et c'est là seulement qu'on
-  passe le médian.
-- **Ce qui longe le bord de l'image n'est pas un mur.** Après recadrage il
-  reste toujours un morceau de ce qu'on vient de couper — montant de
-  fenêtre, bord de feuille, arête de table : long, droit, d'équerre, et
-  collé au bord.
-
-Et une **régression trouvée au passage**, qui n'avait rien à voir avec la
-photo d'écran : la réduction d'image faisait une MOYENNE de bloc. Un plan
-d'architecte trace ses cloisons sur un pixel ; moyenné avec trois voisins
-blancs, ce pixel devient un gris que le seuil ne retient plus — quatre murs
-relevés sur vingt-trois. On prend désormais la moyenne des valeurs les plus
-SOMBRES de chaque bloc (le trait survit, puisqu'il est ce qu'il y a de plus
-sombre), et la largeur de travail remonte de 900 à 1 200 pixels. La vitesse
-ne vaut rien si le relevé est faux.
-
-Enfin, le conseil qui vaut mieux que tous les filtres, et que l'écran donne
-désormais : **celui qui photographie son écran a le fichier sous la main** —
-une capture, le PDF, l'image d'origine. Ce fichier-là se lit sans une seule
-frange.
 
 ## Prérequis pour tester sur iPhone
 
@@ -7708,21 +7239,6 @@ passe inaperçu jusqu'à la CI. C'est arrivé une fois.
 - Nommage : il ne peut être meilleur que la détection d'objets de RoomPlan.
   Un bureau, une entrée ou un couloir n'ont pas de mobilier caractéristique
   et sortiront en « Pièce N ».
-- **Plan papier — ce que le lecteur ne sait pas faire.** Un symbole qui MORD
-  franchement dans la maçonnerie reste illisible : l'ébarbage des bords le
-  coupe en deux arcs. Aucun dessinateur ne fait cela (un symbole posé dans le
-  noir d'un mur ne se verrait pas), et le corriger par une dilatation
-  déformerait tous les autres. Les meubles dessinés — une voiture dans un
-  garage, un canapé — donnent des paires de traits parallèles qui ont
-  l'allure de petits murs ; `filtrerDEquerre` en écarte la plus grande part,
-  pas la totalité. Un plan sans aucune cote écrite ni aucune porte reconnue
-  ne rend pas d'échelle du tout, et l'écran demande alors une longueur.
-- **Plan papier — la lecture bloque le fil JS** plusieurs secondes : huit
-  secondes sur une machine de bureau pour le plan d'architecte le plus
-  chargé qu'on ait essayé (1 200 × 793, deux chaînes de cotation, mobilier
-  complet), dont six pour la seule recherche de droites. Un téléphone est
-  deux à trois fois plus lent. C'est pour ce moment-là que l'icône de scan
-  est animée en natif : elle est la seule chose qui vit pendant ce temps.
 - Le relevé de couleurs du sol est une seule carte monde par scan, plafonnée
   à 64 × 64 cases de 40 cm (25,6 m de côté). Au-delà, seule la couleur
   moyenne subsiste. Chaque pièce n'y peint que les cases tombant dans son

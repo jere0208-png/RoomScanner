@@ -109,9 +109,7 @@ export type Screen =
   | 'export'
   | 'camera'
   | 'profil'
-  | 'confidentialite'
-  /** La lecture d'un plan papier : une photo entre, un relevé sort. */
-  | 'papier';
+  | 'confidentialite';
 
 /**
  * Une pièce du scan. La géométrie reste À PLAT dans `walls`/`openings`/
