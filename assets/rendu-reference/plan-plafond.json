@@ -4416,6 +4416,12 @@
       "onResponderEnd": "[fn]",
       "onResponderTerminate": "[fn]",
       "onResponderTerminationRequest": "[fn]",
+      "hitSlop": {
+       "top": 6,
+       "bottom": 6,
+       "left": 6,
+       "right": 6
+      },
       "style": [
        {
         "position": "absolute",
@@ -4447,6 +4453,12 @@
       "onResponderEnd": "[fn]",
       "onResponderTerminate": "[fn]",
       "onResponderTerminationRequest": "[fn]",
+      "hitSlop": {
+       "top": 6,
+       "bottom": 6,
+       "left": 6,
+       "right": 6
+      },
       "style": [
        {
         "position": "absolute",
@@ -4478,6 +4490,12 @@
       "onResponderEnd": "[fn]",
       "onResponderTerminate": "[fn]",
       "onResponderTerminationRequest": "[fn]",
+      "hitSlop": {
+       "top": 6,
+       "bottom": 6,
+       "left": 6,
+       "right": 6
+      },
       "style": [
        {
         "position": "absolute",
@@ -4509,6 +4527,12 @@
       "onResponderEnd": "[fn]",
       "onResponderTerminate": "[fn]",
       "onResponderTerminationRequest": "[fn]",
+      "hitSlop": {
+       "top": 6,
+       "bottom": 6,
+       "left": 6,
+       "right": 6
+      },
       "style": [
        {
         "position": "absolute",
@@ -4540,6 +4564,12 @@
       "onResponderEnd": "[fn]",
       "onResponderTerminate": "[fn]",
       "onResponderTerminationRequest": "[fn]",
+      "hitSlop": {
+       "top": 6,
+       "bottom": 6,
+       "left": 6,
+       "right": 6
+      },
       "style": [
        {
         "position": "absolute",
@@ -4571,6 +4601,12 @@
       "onResponderEnd": "[fn]",
       "onResponderTerminate": "[fn]",
       "onResponderTerminationRequest": "[fn]",
+      "hitSlop": {
+       "top": 6,
+       "bottom": 6,
+       "left": 6,
+       "right": 6
+      },
       "style": [
        {
         "position": "absolute",

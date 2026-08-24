@@ -7165,6 +7165,33 @@ banc le vérifie en coupant un geste au moment précis où le meuble mord le
 mur, et il échoue franchement quand on retire le correctif (3,50 m au lieu de
 2,40).
 
+**6. Deux poignées n'avaient pas leurs quarante-quatre points.** La règle de
+la maison est écrite depuis longtemps — « les 44 points du doigt valent pour
+la CIBLE, jamais pour le dessin » : les pastilles font 34 à 40 points
+dessinés, et `DEBORD_DOIGT` rend la différence. En mesurant TOUTES les zones
+tactiles du plan, deux l'avaient ratée : le **coin d'un mur** (trente-deux
+points nus, invisible de surcroît, à viser avec des gants) et la **rotation
+d'un meuble** (trente-quatre), alors que ses deux voisines l'appliquaient
+déjà. Le débord ne coûte rien au dessin — le diff des planches de référence
+ne contient que des `hitSlop`, pas un trait déplacé.
+
+Les **prises de mur** restent hors du lot, et c'est voulu : leur cible suit
+le poché (`max(12, poché + 6)`), parce que deux murs peuvent courir à vingt
+centimètres l'un de l'autre et qu'une cible de quarante-quatre points les
+rendrait indiscernables. Le banc les reconnaît à leur forme — une prise de
+mur est longue, une poignée est compacte.
+
+**7. Le pincement, lui, était bon** — et il l'est désormais sous garde. Le
+piège classique : si l'écart de départ entre les deux doigts est mesuré AVANT
+que le second ne soit là, il vaut un point, et le rapport « écart sur écart
+initial » envoie le zoom à l'infini dès la première image à deux doigts. Le
+plan et la maquette repartent d'une nouvelle prise chaque fois que le NOMBRE
+de doigts change ; deux bancs le prouvent en faisant arriver le second doigt
+une, trois, puis six images plus tard, et en exigeant le même cadrage final.
+(Le banc a d'abord échoué pour une mauvaise raison : le second doigt se
+posait à un point FIXE de l'écran, si bien que plus il tardait, plus l'écart
+de départ était petit — il mesurait sa propre mise en scène.)
+
 Et une leçon sur les bancs eux-mêmes, qui vaut pour tous ceux qui suivront :
 **`PanResponder` ne se sert pas de l'état de geste qu'on lui passe, il le
 RECALCULE depuis `e.touchHistory`**. Les premiers essais écrits ici

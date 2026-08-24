@@ -297,6 +297,7 @@ import {
 } from '../geometry/cotes';
 import { haptic, releaseHaptic } from '../ui/haptic';
 import { creerSeuil, estUnGlissement, estUnTap } from '../ui/geste';
+import { DEBORD_DOIGT } from '../ui/bandeau';
 import { SOLAIRES } from '../ui/solaires';
 
 
@@ -3966,6 +3967,9 @@ export function RotateHandle({
       <View
         {...pan.panHandlers}
         accessibilityLabel="Pivoter le meuble"
+        // Trente-quatre dessinés, quarante-six sous le doigt : la règle de
+        // l'app, que ses deux voisines appliquaient déjà.
+        hitSlop={DEBORD_DOIGT}
         style={[styles.rotHandle, { left: at.x - 17, top: at.y - 17 }]}>
         <Svg width={19} height={19} viewBox="0 0 24 24">
           <Path
@@ -4481,10 +4485,18 @@ function CornerHandle({
   );
 
   const px = mapping.toPx(corner);
-  // Zone de saisie invisible : le coin se déplace au doigt, sans marqueur.
+  /*
+    Zone de saisie invisible : le coin se déplace au doigt, sans marqueur.
+
+    TRENTE-DEUX POINTS DESSINÉS, QUARANTE-QUATRE SOUS LE DOIGT. La règle est
+    celle de toute l'app, et cette poignée-ci l'avait ratée : elle offrait
+    trente-deux points nus, à viser sur un chantier, avec des gants. Le
+    débord ne coûte rien au dessin — elle est invisible.
+  */
   return (
     <View
       {...pan.panHandlers}
+      hitSlop={DEBORD_DOIGT}
       style={[styles.handle, { left: px.x - 16, top: px.y - 16 }]}
     />
   );

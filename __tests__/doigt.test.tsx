@@ -29,7 +29,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 import React from 'react';
-import { View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import {
   FloorplanEditor,
@@ -43,6 +43,7 @@ import {
 import { useScanStore } from '../src/store/scanStore';
 import { GLISSEMENT_MIN } from '../src/ui/geste';
 import {
+  SNAPSHOT_FIXTURES,
   SNAPSHOT_OBJECTS,
   SNAPSHOT_OPENINGS,
   SNAPSHOT_ROOMS,
@@ -186,6 +187,39 @@ function jouer(h: Poignee, chemin: [number, number][]) {
   const fin = m.lever();
   if (tient) h.onResponderRelease?.(fin);
   return { reclame };
+}
+
+/** Le plan, monté avec un rapporteur de cadrage. */
+function planAvecVue() {
+  const vues: { zoom: number; ox: number; oy: number; rot: number }[] = [];
+  let tree!: TestRenderer.ReactTestRenderer;
+  act(() => {
+    useScanStore.setState({
+      walls: SNAPSHOT_WALLS,
+      openings: SNAPSHOT_OPENINGS,
+      objects: [],
+      rooms: SNAPSHOT_ROOMS.map((r, i) => ({ id: r.id, name: `Pièce ${i + 1}` })),
+      fixtures: [],
+      ceiling: [],
+      photos: [],
+    });
+    tree = TestRenderer.create(
+      <FloorplanEditor
+        editable={false}
+        showMeasures
+        selectedWallId={null}
+        onSelectWall={() => {}}
+        onView={(v) => vues.push({ ...v })}
+      />,
+    );
+  });
+  act(() => {
+    tree.root.findAllByType(View)[0].props.onLayout?.({
+      nativeEvent: { layout: { width: 390, height: 700 } },
+    });
+  });
+  arbre = tree;
+  return { tree, vues, dernier: () => vues[vues.length - 1] };
 }
 
 function planEditable() {
@@ -513,5 +547,185 @@ describe('le retour au glissement depuis le bord', () => {
       ]);
     });
     expect(c.sortis).toHaveLength(0);
+  });
+});
+
+describe('le pincement à deux doigts', () => {
+  /**
+   * Une image du geste : soit on la donne à qui tient le toucher, soit on
+   * fait négocier tout le monde, exactement comme le système.
+   */
+  const pas = (p: Poignee[], tenu: Poignee | null, e: unknown): Poignee | null => {
+    if (tenu) {
+      tenu.onResponderMove?.(e);
+      return tenu;
+    }
+    for (const h of p) {
+      if (
+        h.onMoveShouldSetResponderCapture?.(e) === true ||
+        h.onMoveShouldSetResponder?.(e) === true
+      ) {
+        h.onResponderGrant?.(e);
+        return h;
+      }
+    }
+    return null;
+  };
+
+  /**
+   * Le plan, pincé : deux doigts qui s'écartent de cent à deux cent
+   * cinquante points. `retard` dit de combien d'images le second doigt
+   * arrive après que le plan a pris la main — sur un vrai écran, il en
+   * arrive toujours au moins une.
+   */
+  const pincer = (retard: number) => {
+    const { tree, dernier } = planAvecVue();
+    const p = preneurs(tree);
+    const m = main();
+    let tenu: Poignee | null = null;
+    act(() => {
+      const e0 = m.poser(150, 400);
+      for (const h of p) {
+        h.onStartShouldSetResponderCapture?.(e0);
+        h.onStartShouldSetResponder?.(e0);
+      }
+      // Le premier doigt glisse assez pour que le plan prenne la main.
+      for (let i = 1; i <= 2 + retard; i++) {
+        tenu = pas(p, tenu, m.bouger(150 + i * 9, 400));
+      }
+      /*
+        Le second doigt se pose à cent points du premier — de sa position
+        DU MOMENT, pas d'un point fixe de l'écran. Sans cela, les deux
+        scénarios ne seraient pas le même geste : plus le doigt tarde, plus
+        le premier a glissé, et l'écart de départ change avec lui. Le banc
+        mesurerait alors sa propre mise en scène.
+      */
+      const depart = 150 + (2 + retard) * 9;
+      m.poser(depart + 100, 400, 1);
+      for (let i = 1; i <= 6; i++) {
+        m.bouger(depart + 100 + i * 12, 400, 1);
+        tenu = pas(p, tenu, m.bouger(depart - i * 12, 400));
+      }
+      tenu?.onResponderRelease?.(m.lever());
+      m.lever(1);
+    });
+    return { vue: dernier(), pris: !!tenu };
+  };
+
+  it('ne fait pas exploser le zoom quand le second doigt arrive en retard', () => {
+    /*
+      LE PIÈGE CLASSIQUE DU PINCEMENT. Si l'écart de départ entre les deux
+      doigts est mesuré AVANT que le second ne soit là, il vaut un pixel — et
+      le rapport « écart sur écart initial » envoie le zoom à l'infini dès la
+      première image à deux doigts. Le plan repart donc d'une nouvelle prise
+      chaque fois que le NOMBRE DE DOIGTS change ; ce banc le prouve en
+      faisant arriver le second doigt une, puis six images plus tard.
+    */
+    for (const retard of [1, 3, 6]) {
+      const { vue, pris } = pincer(retard);
+      expect(pris).toBe(true);
+      // Les doigts passent d'environ cent points d'écart à deux cent
+      // cinquante : le zoom double ou triple, il ne centuple pas.
+      expect(vue.zoom).toBeGreaterThan(1.4);
+      expect(vue.zoom).toBeLessThan(4);
+    }
+  });
+
+  it('rend un cadrage comparable, que le second doigt tarde ou non', () => {
+    // Un doigt qui traîne une image ou six ne change pas ce qu'on voit à la
+    // fin : c'est le même geste, fait par la même main.
+    const tot = pincer(1).vue;
+    const tard = pincer(6).vue;
+    expect(Math.abs(tard.zoom - tot.zoom)).toBeLessThan(0.5);
+  });
+});
+
+describe('la place qu’il faut au doigt', () => {
+  /**
+   * Le plan avec tout ce qui se saisit : un mur choisi, une pièce choisie,
+   * un meuble choisi, un appareil de plafond choisi. C'est le seul état où
+   * TOUTES les poignées de l'app sont à l'écran en même temps.
+   */
+  const planGarni = () => {
+    let tree!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      useScanStore.setState({
+        walls: SNAPSHOT_WALLS,
+        openings: SNAPSHOT_OPENINGS,
+        objects: SNAPSHOT_OBJECTS,
+        rooms: SNAPSHOT_ROOMS.map((r, i) => ({ id: r.id, name: `Pièce ${i + 1}` })),
+        fixtures: SNAPSHOT_FIXTURES,
+        ceiling: [
+          {
+            id: 'c1',
+            kind: 'dcl',
+            roomId: SNAPSHOT_ROOMS[0].id,
+            at: { x: 1, z: 1 },
+          },
+        ],
+        photos: [],
+        showFurniture: true,
+      });
+      tree = TestRenderer.create(
+        <FloorplanEditor
+          editable
+          showMeasures
+          selectedWallId={SNAPSHOT_WALLS[0].id}
+          selectedRoomId={SNAPSHOT_ROOMS[0].id}
+          selectedObjectId={SNAPSHOT_OBJECTS[0].id}
+          selectedCeilingId="c1"
+          onSelectWall={() => {}}
+          onMoveRoom={() => {}}
+        />,
+      );
+    });
+    act(() => {
+      tree.root.findAllByType(View)[0].props.onLayout?.({
+        nativeEvent: { layout: { width: 390, height: 700 } },
+      });
+    });
+    arbre = tree;
+    return tree;
+  };
+
+  it('donne quarante-quatre points à chaque poignée, débord compris', () => {
+    /*
+      LA RÈGLE DE LA MAISON, VÉRIFIÉE POUR DE BON.
+
+      « Les 44 points du doigt valent pour la CIBLE, jamais pour le dessin » :
+      les pastilles font 34 à 40 points dessinés, et le débord rend la
+      différence. Deux poignées l'avaient ratée — le COIN d'un mur (trente-deux
+      points nus, à viser avec des gants) et la ROTATION d'un meuble
+      (trente-quatre), alors que ses deux voisines l'appliquaient déjà.
+
+      LES PRISES DE MUR SONT HORS DU LOT, et c'est voulu : la cible d'un mur
+      suit son poché (`max(12, poché + 6)`), parce que deux murs peuvent
+      courir à vingt centimètres l'un de l'autre et qu'une cible de
+      quarante-quatre points les rendrait indiscernables. On les reconnaît à
+      leur forme : une prise de mur est LONGUE, une poignée est compacte.
+    */
+    const petites: string[] = [];
+    for (const n of planGarni().root.findAllByType(View)) {
+      const p = n.props as Poignee & { hitSlop?: unknown; style?: unknown };
+      const tactile =
+        typeof p.onResponderGrant === 'function' ||
+        typeof p.onStartShouldSetResponder === 'function';
+      if (!tactile) continue;
+      const st = (StyleSheet.flatten(p.style as never) ?? {}) as {
+        width?: number;
+        height?: number;
+      };
+      if (typeof st.width !== 'number' || typeof st.height !== 'number') continue;
+      // Une prise allongée est un mur, pas une poignée.
+      if (Math.max(st.width, st.height) > 3 * Math.min(st.width, st.height)) continue;
+      const slop = p.hitSlop as { left?: number; top?: number } | number | undefined;
+      const marge =
+        typeof slop === 'number' ? slop : Math.min(slop?.left ?? 0, slop?.top ?? 0);
+      const sousLeDoigt = Math.min(st.width, st.height) + 2 * (marge || 0);
+      if (sousLeDoigt < 44) {
+        petites.push(`${Math.round(st.width)}x${Math.round(st.height)}+${marge || 0}`);
+      }
+    }
+    expect(petites).toEqual([]);
   });
 });
