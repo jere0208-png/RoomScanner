@@ -62,9 +62,20 @@ function Halo({ teinte }: { teinte: string }) {
   return (
     <Svg width={SCENE} height={SCENE}>
       <Defs>
-        <RadialGradient id="halo" cx="50%" cy="50%" r="50%">
-          <Stop offset="0%" stopColor={teinte} stopOpacity={0.55} />
-          <Stop offset="45%" stopColor={teinte} stopOpacity={0.22} />
+        {/*
+          UNE LUEUR AUTOUR DE LA LAMPE, PAS UN PROJECTEUR.
+
+          Relevé du patron, après l'avoir vue sur l'appareil : « pour le gyro
+          fais moins de lumière, moins d'opacité et plus autour de l'icône,
+          pas trop loin ». Elle allait jusqu'au bord de la scène et montait à
+          55 % : de la lumière partout, donc de la lumière nulle part — c'est
+          le CONTRASTE avec le blanc de la carte qui fait croire à une lampe
+          allumée. Le dégradé s'éteint donc à mi-chemin du bord, et son
+          maximum est descendu d'un tiers.
+        */}
+        <RadialGradient id="halo" cx="50%" cy="50%" r="40%">
+          <Stop offset="0%" stopColor={teinte} stopOpacity={0.34} />
+          <Stop offset="52%" stopColor={teinte} stopOpacity={0.12} />
           <Stop offset="100%" stopColor={teinte} stopOpacity={0} />
         </RadialGradient>
       </Defs>
@@ -82,17 +93,29 @@ function Halo({ teinte }: { teinte: string }) {
  * n'éclaire pas à l'infini.
  */
 function Faisceaux({ teinte }: { teinte: string }) {
-  const r = SCENE / 2;
-  const ouverture = 26;
+  /*
+    ILS S'ARRÊTENT PRÈS DE LA LAMPE.
+
+    Ils balayaient toute la scène, jusqu'au bord : deux grandes ailes rouges
+    qui tournaient autour d'une petite sirène, et c'est l'aile qu'on
+    regardait. Relevé du patron : « plus autour de l'icône, pas trop loin ».
+    Ils s'arrêtent donc à un tiers de la scène — le tour de la sirène, plus
+    une main — et se resserrent de quatre degrés.
+  */
+  const r = SCENE * 0.34;
+  const ouverture = 22;
   const rad = (d: number) => (d * Math.PI) / 180;
-  const coin = (deg: number) => `${r + r * Math.cos(rad(deg))},${r + r * Math.sin(rad(deg))}`;
+  /* Le centre reste celui de la SCÈNE : c'est la lampe qui éclaire, pas le
+     coin du dessin. */
+  const cx = SCENE / 2;
+  const coin = (deg: number) => `${cx + r * Math.cos(rad(deg))},${cx + r * Math.sin(rad(deg))}`;
   const secteur = (centre: number) =>
-    `M${r},${r} L${coin(centre - ouverture)} A${r},${r} 0 0 1 ${coin(centre + ouverture)} Z`;
+    `M${cx},${cx} L${coin(centre - ouverture)} A${r},${r} 0 0 1 ${coin(centre + ouverture)} Z`;
   return (
     <Svg width={SCENE} height={SCENE}>
       <Defs>
-        <RadialGradient id="faisceau" cx="50%" cy="50%" r="50%">
-          <Stop offset="0%" stopColor={teinte} stopOpacity={0.38} />
+        <RadialGradient id="faisceau" cx="50%" cy="50%" r="34%">
+          <Stop offset="0%" stopColor={teinte} stopOpacity={0.2} />
           <Stop offset="100%" stopColor={teinte} stopOpacity={0} />
         </RadialGradient>
       </Defs>
@@ -208,15 +231,17 @@ export function AlerteSortie({
               style={[
                 styles.couche,
                 {
+                  /* Moins d'opacité, et une respiration plus courte : une
+                     lampe qui bat n'enfle pas, elle s'éclaire. */
                   opacity: battement.interpolate({
                     inputRange: [0, 1],
-                    outputRange: [0.35, 1],
+                    outputRange: [0.25, 0.72],
                   }),
                   transform: [
                     {
                       scale: battement.interpolate({
                         inputRange: [0, 1],
-                        outputRange: [0.88, 1.12],
+                        outputRange: [0.92, 1.06],
                       }),
                     },
                   ],
@@ -231,7 +256,7 @@ export function AlerteSortie({
                 {
                   opacity: battement.interpolate({
                     inputRange: [0, 1],
-                    outputRange: [0.5, 1],
+                    outputRange: [0.3, 0.78],
                   }),
                   transform: [
                     {

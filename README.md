@@ -6678,12 +6678,15 @@ tient tant qu'on ne le regarde pas à côté des autres.
   il appartient déjà à la famille ÉCLAIRAGE, il portait donc déjà l'ambre.
   C'est la seule silhouette d'un catalogue dessiné au trait (Lucide) :
   exception assumée, pour un dessin qui n'existe pas au trait dans ce jeu ;
-- **l'avatar** est la seule pièce hors Solar : un `user-circle` DUOTONE de
-  Phosphor (MIT), deux tracés dont un en retrait. L'avatar n'est pas un
-  outil, c'est une porte vers le compte, et un rond qui respire s'y lit mieux
-  qu'une tache pleine. **L'anneau d'or** qui le cerclait en Pro s'en va —
-  « enlève le contour présent » : le grade se voit toujours, à côté, dans la
-  typo dorée du prénom.
+- **l'avatar** est la seule pièce hors Solar. Il a d'abord été un
+  `user-circle` DUOTONE de Phosphor — un rond qui respire, là où la
+  silhouette pleine faisait une tache — puis, la chose vue sur l'appareil :
+  `user-detail` de BoxIcons (MIT), une silhouette suivie de ses trois lignes.
+  Et c'est plus juste : ce bouton n'ouvre pas un portrait, il ouvre le
+  COMPTE — l'abonnement, l'apparence, les réglages. Un rond de profil
+  promettait une photo qui n'existe pas. **L'anneau d'or** qui le cerclait en
+  Pro s'en va au passage — « enlève le contour présent » : le grade se voit
+  toujours, à côté, dans la typo dorée du prénom.
 
 **Un piège découvert en chemin** : une icône écrite À LA MAIN dans le fichier
 généré ne survit pas à la génération suivante. `note` a disparu ainsi, le

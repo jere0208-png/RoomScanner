@@ -1,28 +1,27 @@
 /**
- * L'AVATAR DE L'ACCUEIL — relevé du patron, lien à l'appui :
- * `svgrepo.com/svg/364064/user-circle-minus-duotone`, « utilise cette icône
- * pour l'avatar à l'accueil et enlève le contour présent ».
+ * L'AVATAR DE L'ACCUEIL — la fiche, pas le portrait.
  *
- * C'est un « user-circle » de la collection PHOSPHOR ICONS (MIT), en
- * variante DUOTONE : un aplat en retrait pour le corps du rond, un tracé
- * plein par-dessus. Le reste de l'app est en Solar Bold — une silhouette
- * pleine, sans contour ; celle-ci est la seule exception, et c'est voulu :
- * l'avatar n'est pas un outil, c'est une porte vers le compte, et un rond
- * qui respire s'y lit mieux qu'une tache noire.
+ * Relevé du patron, deux liens en deux temps. D'abord un « user-circle »
+ * duotone de Phosphor : un rond qui respire, là où la silhouette pleine
+ * faisait une tache. Puis, la chose vue sur l'appareil :
+ * `svgrepo.com/svg/334969/user-detail`, « au lieu de l'avatar ».
  *
- * Les deux tracés viennent du dépôt d'origine (`phosphor-icons/core`,
- * assets/duotone), sans retouche : un chemin recopié à la main dérive au
- * premier caractère oublié, et personne ne le voit avant l'écran.
+ * Et c'est plus juste. Ce bouton n'ouvre pas un portrait : il ouvre le
+ * COMPTE — l'abonnement, l'apparence, les réglages. Une silhouette suivie de
+ * ses trois lignes dit exactement cela : quelqu'un, et ce qu'on sait de lui.
+ * Un rond de profil promettait une photo qui n'existe pas.
+ *
+ * C'est un tracé de BOXICONS SOLID (MIT), recopié du dépôt d'origine sans
+ * retouche : un chemin réécrit à la main dérive au premier caractère oublié,
+ * et personne ne le voit avant l'écran. Le reste de l'app est en Solar Bold ;
+ * l'avatar reste l'exception, comme il l'était déjà.
  */
 import React from 'react';
 import Svg, { Path } from 'react-native-svg';
 
-/** L'aplat du fond : le rond, en retrait. */
-const FOND =
-  'M224,128a95.76,95.76,0,0,1-31.8,71.37A72,72,0,0,0,128,160a40,40,0,1,0-40-40,40,40,0,0,0,40,40,72,72,0,0,0-64.2,39.37h0A96,96,0,1,1,224,128Z';
-/** Le tracé plein : le cercle ouvert, la tête, les épaules, et la barre. */
-const TRAIT =
-  'M168,56a8,8,0,0,1,8-8h48a8,8,0,0,1,0,16H176A8,8,0,0,1,168,56Zm58.08,37.33a103.93,103.93,0,1,1-80.76-67.89,8,8,0,0,1-2.64,15.78A88.07,88.07,0,0,0,40,128a87.62,87.62,0,0,0,22.24,58.41A79.66,79.66,0,0,1,98.3,157.66a48,48,0,1,1,59.4,0,79.66,79.66,0,0,1,36.06,28.75A88,88,0,0,0,211,98.67a8,8,0,0,1,15.09-5.34ZM128,152a32,32,0,1,0-32-32A32,32,0,0,0,128,152Zm0,64a87.57,87.57,0,0,0,53.92-18.5,64,64,0,0,0-107.84,0A87.57,87.57,0,0,0,128,216Z';
+/** bxs:user-detail — la silhouette, et les trois lignes de sa fiche. */
+const FICHE =
+  'M15 11h7v2h-7zm1 4h6v2h-6zm-2-8h8v2h-8zM4 19h10v-1c0-2.757-2.243-5-5-5H7c-2.757 0-5 2.243-5 5v1zm4-7c1.995 0 3.5-1.505 3.5-3.5S9.995 5 8 5S4.5 6.505 4.5 8.5S6.005 12 8 12';
 
 export function AvatarGlyph({
   size = 34,
@@ -32,11 +31,8 @@ export function AvatarGlyph({
   teinte: string;
 }) {
   return (
-    <Svg width={size} height={size} viewBox="0 0 256 256" pointerEvents="none">
-      {/* Le duotone tient à cette opacité : sans elle, les deux tracés se
-          confondent en une tache et l'icône perd son air. */}
-      <Path d={FOND} fill={teinte} opacity={0.2} />
-      <Path d={TRAIT} fill={teinte} />
+    <Svg width={size} height={size} viewBox="0 0 24 24" pointerEvents="none">
+      <Path d={FICHE} fill={teinte} fillRule="evenodd" />
     </Svg>
   );
 }
