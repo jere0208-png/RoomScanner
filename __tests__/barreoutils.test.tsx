@@ -27,12 +27,13 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 import React from 'react';
-import { Animated, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { Line } from 'react-native-svg';
+import { Animated, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import Svg, { Line } from 'react-native-svg';
 import TestRenderer, { act } from 'react-test-renderer';
 import { ResultScreen } from '../src/screens/ResultScreen';
 import { RangeeOutils } from '../src/components/RangeeOutils';
 import { getStyles } from '../src/screens/result/styles';
+import { PILL_CELL_H } from '../src/components/ToolPill';
 import { useScanStore } from '../src/store/scanStore';
 import { light } from '../src/theme';
 import {
@@ -137,6 +138,8 @@ describe('le peigne « Afficher »', () => {
       <View key={`o${i}`} testID={`o${i}`} />
     ));
 
+  let dernier: TestRenderer.ReactTestRenderer | null = null;
+
   /**
    * `dessus` = la hauteur à franchir pour atteindre la pile de droite.
    *
@@ -160,9 +163,49 @@ describe('le peigne « Afficher »', () => {
       );
     });
     arbre = t;
+    dernier = t;
     return t
       .root.findAllByType(Line)
       .filter((x) => x.props.stroke === '#B6BECB');
+  };
+
+  /** Le bloc absolu qui porte le peigne : c'est lui qui dit son origine. */
+  const cadre = () => {
+    let n: TestRenderer.ReactTestInstance | null =
+      dernier!.root.findAllByType(Svg)[0];
+    while (n) {
+      const st = StyleSheet.flatten(n.props?.style) as
+        | { position?: string; left?: number }
+        | undefined;
+      if (st?.position === 'absolute' && typeof st.left === 'number') return st;
+      n = n.parent;
+    }
+    throw new Error('peigne introuvable');
+  };
+
+  /** Le milieu du mot « Afficher », mesuré depuis le bord de la carte. */
+  const axeDuMot = () => {
+    const mot = dernier!.root
+      .findAllByType(Text)
+      .find((n) => n.props.children === 'Afficher')!;
+    const st = StyleSheet.flatten(mot.props.style) as {
+      left: number;
+      width: number;
+    };
+    return cadre().left! + st.left + st.width / 2;
+  };
+
+  /**
+   * OÙ LA RANGÉE POSE VRAIMENT SES PASTILLES.
+   *
+   * Elle les répartit à parts égales dans `[0, largeur - reserve]`, dix
+   * points de marge de chaque côté (`planTools`, `paddingHorizontal`). Le
+   * peigne comptait, lui, sur `[4, largeur - reserve]` sans les marges :
+   * deux grilles voisines, et un écart qui grandit vers la droite.
+   */
+  const axePastille = (i: number, n: number, largeur: number) => {
+    const part = (largeur - 62 - 20) / n;
+    return 10 + part * (i + 0.5);
   };
 
   const long = (n: TestRenderer.ReactTestInstance) =>
@@ -219,7 +262,9 @@ describe('le peigne « Afficher »', () => {
     const { barre, branches, montees } = pieces(traits);
     // La barre s'arrête au bord gauche de la colonne — devant « Édition »,
     // jamais dessus.
-    expect(Number(barre.props.x2)).toBeLessThanOrEqual(390 - 8 - 58 + 0.5);
+    // La pile se tient à quatre points du bord, sur une cellule de 58 : le
+    // peigne s'arrête au bord GAUCHE de cette cellule.
+    expect(Number(barre.props.x2)).toBeLessThanOrEqual(390 - 4 - 58 + 0.5);
     // Une seule montée, et une branche par calque de la pile.
     expect(montees).toHaveLength(1);
     expect(branches).toHaveLength(3);
@@ -229,6 +274,41 @@ describe('le peigne « Afficher »', () => {
       expect(Number(b.props.x1)).toBeCloseTo(xEpine, 3);
       expect(Number(b.props.x2)).toBeGreaterThan(xEpine);
     }
+  });
+
+  /*
+    LE PEIGNE COMPTE SUR LA MÊME GRILLE QUE LES PASTILLES.
+
+    Relevé du patron : « le Afficher doit se centrer selon les boutons — si
+    cinq boutons et rien sur la colonne de droite, on axe aux cinq boutons ;
+    s'il y a un bouton sur la colonne, on axe aux boutons de la ligne, sans
+    compter le dernier à droite qui possède d'autres boutons au-dessus de
+    lui. Le Afficher doit s'adapter. »
+
+    Il comptait sur une grille VOISINE de celle des pastilles : la rangée
+    répartit dans `[0, largeur − reserve]` avec dix points de marge, le
+    peigne dans `[4, largeur − reserve]` sans marge. L'écart est nul au
+    milieu et grandit vers les bords — huit points sur la dernière descente,
+    soit un cinquième de pastille : le trait ne tombe plus sur son bouton.
+  */
+  it('tombe sur la pastille, pas à côté', () => {
+    const { descentes } = pieces(rangee(7, 390, 65));
+    const decalage = descentes.map((n, i) =>
+      Number(cadre().left) + Number(n.props.x1) - axePastille(i, 4, 390),
+    );
+    expect(decalage.map((d) => Math.round(d * 100) / 100)).toEqual([0, 0, 0, 0]);
+  });
+
+  it('et le mot s’axe sur les seules pastilles de la ligne', () => {
+    // Quatre sur la ligne, trois en pile : le mot ignore la pile.
+    const axeLigne =
+      (axePastille(0, 4, 390) + axePastille(3, 4, 390)) / 2;
+    rangee(7, 390, 65);
+    expect(axeDuMot()).toBeCloseTo(axeLigne, 3);
+    // Et quand tout tient sur la ligne, il s'axe sur tout le monde.
+    const axeTrois = (axePastille(0, 3, 390) + axePastille(2, 3, 390)) / 2;
+    rangee(3, 390);
+    expect(axeDuMot()).toBeCloseTo(axeTrois, 3);
   });
 
   it('garde la descente quand la pile commence sur la ligne (3D)', () => {
@@ -242,32 +322,62 @@ describe('le peigne « Afficher »', () => {
 });
 
 describe('le bouton Enregistrer', () => {
+  /** À quelle hauteur une pastille se tient : le bloc absolu qui la porte. */
+  const pastille = (t: TestRenderer.ReactTestRenderer, label: string) => {
+    const b = t.root
+      .findAllByType(TouchableOpacity)
+      .find((n) => n.props.accessibilityLabel === label);
+    if (!b) return null;
+    let n: TestRenderer.ReactTestInstance | null = b;
+    while (n) {
+      const st = StyleSheet.flatten(n.props?.style) as
+        | { position?: string; bottom?: number }
+        | undefined;
+      if (st?.position === 'absolute' && typeof st.bottom === 'number') {
+        return st.bottom;
+      }
+      n = n.parent;
+    }
+    return null;
+  };
+
   it('se tient au-dessus de tout le reste de la colonne', () => {
     const t = monter(true);
-    const pastille = (label: string) => {
-      const b = t.root
-        .findAllByType(TouchableOpacity)
-        .find((n) => n.props.accessibilityLabel === label);
-      if (!b) return null;
-      // On remonte au bloc absolu qui porte la pastille : c'est lui qui
-      // dit à quelle hauteur elle se tient.
-      let n: TestRenderer.ReactTestInstance | null = b;
-      while (n) {
-        const st = StyleSheet.flatten(n.props?.style) as
-          | { position?: string; bottom?: number }
-          | undefined;
-        if (st?.position === 'absolute' && typeof st.bottom === 'number') {
-          return st.bottom;
-        }
-        n = n.parent;
-      }
-      return null;
-    };
-    const save = pastille('Enregistrer');
-    const edition = pastille('Édition');
+    const save = pastille(t, 'Enregistrer');
+    const edition = pastille(t, 'Édition');
     expect(save).not.toBeNull();
     expect(edition).not.toBeNull();
     // Plus haut que les commandes, donc plus haut que tout le reste.
     expect(save!).toBeGreaterThan(edition!);
+  });
+
+  /*
+    EN 3D, IL NE RÉSERVE PLUS LA PLACE D'UNE COLONNE QUI N'Y EST PAS.
+
+    Relevé du patron, capture à l'appui : « le bouton Enregistrer se place
+    haut sans raison, il y a de la place plus bas ». Il se posait au-dessus
+    de la colonne des commandes — Édition, Annuler, Refaire — dont il
+    mesurait la hauteur. Or cette colonne est le propre du plan 2D : en 3D
+    on ne modifie rien, elle n'est pas rendue, et sa hauteur restait celle
+    du dernier passage en plan. Le bouton flottait donc au milieu de la
+    maquette, à trois pastilles au-dessus du vide.
+
+    Dans ce banc, tous les `onLayout` rendent 520 : c'est la hauteur que
+    prennent la colonne des commandes ET la pile de calques. Un
+    « Enregistrer » qui compte les deux se retrouve deux fois plus haut.
+  */
+  it('ne réserve pas, en 3D, la colonne de commandes qui n’y est pas', () => {
+    const t = monter(true);
+    const ligne = pastille(t, 'Édition')!;
+    const enPlan = pastille(t, 'Enregistrer')!;
+    presser(t, 'Passer en 3D');
+    const en3D = pastille(t, 'Enregistrer')!;
+    // Il redescend en passant en 3D : la colonne des commandes reste au plan.
+    expect(en3D).toBeLessThan(enPlan);
+    // Et il ne garde au-dessus de la ligne que la pile de calques — ici
+    // rien : les `onLayout` de ce banc partent avant que la carte soit
+    // mesurée, donc avant que la pile existe. Le bouton se pose sur la
+    // ligne, là où « Édition » se tenait en plan.
+    expect(en3D - ligne).toBeLessThanOrEqual(PILL_CELL_H);
   });
 });

@@ -10,7 +10,7 @@
  */
 import { StyleSheet } from 'react-native';
 import { glow, radius, shadowCard, themedStyles, type Palette } from '../../theme';
-import { PILL_GAP } from '../../components/ToolPill';
+import { MARGE_RANGEE, PILL_GAP } from '../../components/ToolPill';
 
 export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   container: {
@@ -226,7 +226,9 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     position: 'absolute',
     flexDirection: 'row',
     alignItems: 'flex-end',
-    paddingHorizontal: 10,
+    // Le peigne « Afficher » compte sur cette marge pour tomber sur les
+    // pastilles : elle se partage, elle ne se réécrit pas.
+    paddingHorizontal: MARGE_RANGEE,
     left: 0,
     // La colonne des actions tient la droite : la rangée s'arrête avant elle,
     // sinon les dernières pastilles défilent DERRIÈRE et deviennent
@@ -372,7 +374,9 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     c'est une annotation, pas un bouton. Le mot se centre sur la barre, et
     la barre sur les pastilles.
   */
-  peigne: { position: 'absolute', left: 4, alignItems: 'center', zIndex: 1 },
+  /* Il part du MÊME BORD que la rangée (zéro) : c'est ce qui lui permet de
+     compter les pastilles avec la grille de celle-ci, sans décalage. */
+  peigne: { position: 'absolute', left: 0, alignItems: 'center', zIndex: 1 },
   /*
     Il se pose PAR LE BAS, au-dessus de la barre : le dessin monte
     désormais vers la pile de droite, et un mot dans le flux serait monté

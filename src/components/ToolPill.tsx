@@ -298,13 +298,23 @@ const getStyles = themedStyles((c: Palette) =>
  * ligne — chacun sa part égale —, et le reste s'empile à droite, au-dessus
  * des actions. Tout est visible d'un coup d'œil, sans un seul geste.
  */
+/**
+ * LA MARGE DE LA RANGÉE, aux deux bouts de la ligne.
+ *
+ * C'est le `paddingHorizontal` de `planTools`, et c'est ce qui décale la
+ * grille des pastilles. Le peigne « Afficher » compte dessus lui aussi :
+ * écrite deux fois, elle a déjà divergé une fois — huit points d'écart sur
+ * la dernière descente, un trait à côté de son bouton.
+ */
+export const MARGE_RANGEE = 10;
+
 export function repartirOutils(
   nombre: number,
   largeur: number,
   /** Place tenue à droite par la colonne d'actions (0 s'il n'y en a pas). */
   reserve: number,
 ): number {
-  const MARGE = 10;
+  const MARGE = MARGE_RANGEE;
   const dispo = Math.max(0, largeur - reserve - 2 * MARGE);
   // Largeur d'accueil : la cellule, et l'écart qui la suit.
   const tiennent = Math.floor((dispo + PILL_GAP) / (PILL_CELL_W + PILL_GAP));

@@ -785,6 +785,24 @@ export function ResultScreen() {
   const [showElecTags, setShowElecTags] = useState(false);
   /** Hauteur de la pile des calques en trop, mesurée par la rangée. */
   const [hSuite, setHSuite] = useState(0);
+  /*
+    CE QUI SE TIENT ENTRE LA LIGNE ET LA PILE DE CALQUES.
+
+    En plan, la colonne des commandes — Édition, et l'annulation quand il y
+    a de quoi : le trop-plein de calques se pose au-dessus d'elle, et
+    « Enregistrer » au-dessus de tout. En 3D, RIEN : on ne modifie pas une
+    maquette, la colonne n'est pas rendue.
+
+    Relevé du patron, capture à l'appui : « le bouton Enregistrer se place
+    haut sans raison, il y a de la place plus bas ». Il réservait la hauteur
+    de cette colonne même en 3D — et pas n'importe laquelle : celle qu'on
+    avait MESURÉE au dernier passage en plan, trois pastilles quand on
+    venait d'annuler. Le bouton flottait à mi-modèle. Les deux piles
+    comptent désormais le même étage : ce qui n'est pas rendu ne réserve
+    rien.
+  */
+  const dessusOutils =
+    vue === '2d' ? Math.max(hActions, PILL_CELL_H) + PILL_GAP : 0;
   /**
    * Les points cardinaux : un calque, lui aussi — ÉTEINT au départ.
    *
@@ -2999,7 +3017,7 @@ export function ResultScreen() {
           <View
             style={[
               styles.editAnchor,
-              { bottom: ligneOutils + hActions + PILL_GAP + hSuite },
+              { bottom: ligneOutils + dessusOutils + hSuite },
             ]}
             pointerEvents="box-none">
             <SidePill visible index={0}>
@@ -3019,7 +3037,7 @@ export function ResultScreen() {
             anim={swap}
             largeur={carteW}
             bas={ligneOutils}
-            dessus={Math.max(hActions, PILL_CELL_H) + PILL_GAP}
+            dessus={dessusOutils}
             edition={barMode}
             pendingKind={pendingKind}
             pendingCeiling={pendingCeiling}

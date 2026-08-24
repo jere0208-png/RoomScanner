@@ -13,10 +13,11 @@
  * une part ÉGALE de la ligne, et empile le reste à droite, au-dessus de la
  * colonne des actions. Tout se voit d'un coup d'œil, sans un seul geste.
  */
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Animated, Text, View } from 'react-native';
 import Svg, { Line } from 'react-native-svg';
 import {
+  MARGE_RANGEE,
   PILL_CELL_H,
   PILL_CELL_W,
   PILL_GAP,
@@ -92,6 +93,18 @@ export function RangeeOutils({
   const rangee = elements.slice(0, tiennent);
   const colonne = elements.slice(tiennent);
   /*
+    PAS DE PILE = UNE PILE DE ZÉRO, ET IL FAUT LE DIRE.
+
+    La hauteur ne se rendait QUE par l'`onLayout` de la pile : sans pile,
+    personne ne parlait, et l'écran gardait la dernière hauteur connue —
+    celle de la vue d'avant. « Enregistrer », qui se pose au-dessus d'elle,
+    flottait alors au milieu du dessin, à hauteur d'une pile qui n'existe
+    plus.
+  */
+  useEffect(() => {
+    if (colonne.length === 0) onSuite?.(0);
+  }, [colonne.length, onSuite]);
+  /*
     LE PEIGNE « AFFICHER » — croquis Paint du patron.
 
     Rien ne disait ce que ces boutons font. « Meubles », « Appareils »,
@@ -104,12 +117,31 @@ export function RangeeOutils({
     bouton. C'est ainsi qu'on annote un plan, et c'est ce que
     l'électricien lit tous les jours sur ses schémas.
 
-    Il se dessine à partir des PARTS ÉGALES de la rangée — les mêmes que
-    les pastilles —, donc chaque descente tombe pile au milieu de la sienne,
-    quel que soit leur nombre.
+    IL COMPTE SUR LA GRILLE DE LA RANGÉE, PAS SUR UNE VOISINE.
+
+    Relevé du patron : « le Afficher doit se centrer selon les boutons — si
+    cinq boutons et rien sur la colonne de droite, on axe aux cinq boutons ;
+    s'il y a un bouton sur la colonne, on axe aux boutons de la ligne, sans
+    compter le dernier à droite qui possède d'autres boutons au-dessus de
+    lui ».
+
+    Il partait du bord du peigne (4) et divisait `largeur − reserve − 4` ;
+    la rangée, elle, part de zéro et répartit dans `largeur − reserve` avec
+    DIX POINTS DE MARGE de chaque côté (`planTools`). Deux grilles voisines,
+    d'accord au milieu et fausses aux bords : huit points d'écart sur la
+    dernière descente, soit un cinquième de pastille — le trait ne tombait
+    plus sur son bouton. Le peigne prend donc la grille de la rangée, et
+    part du même bord qu'elle.
   */
-  const largeurUtile = Math.max(0, largeur - (reserve || 4) - 4);
-  const part = rangee.length > 0 ? largeurUtile / rangee.length : 0;
+  const bordDroit = reserve || 4;
+  /** Le cadre de la rangée : c'est lui qui porte les parts égales. */
+  const largeurRangee = Math.max(0, largeur - bordDroit);
+  const part =
+    rangee.length > 0
+      ? Math.max(0, largeurRangee - 2 * MARGE_RANGEE) / rangee.length
+      : 0;
+  /** Le milieu de la pastille de rang `i` — le même calcul que la rangée. */
+  const xPastille = (i: number) => MARGE_RANGEE + part * (i + 0.5);
   const peigne = !edition && rangee.length > 1 && part > 0;
   /*
     LE PEIGNE SE COUCHE SUR LA LIGNE ET SE DRESSE SUR LA PILE — troisième
@@ -139,10 +171,11 @@ export function RangeeOutils({
     des cellules, une branche par pastille, de la même longueur qu'une
     descente. Même grammaire, tournée d'un quart de tour.
   */
-  const largeurPeigne = colonne.length > 0 ? largeur - 8 : largeurUtile;
-  const xColonne = largeurPeigne - CELLULE / 2;
+  const largeurPeigne = colonne.length > 0 ? largeur - 4 : largeurRangee;
+  /** La pile se tient à quatre points du bord : c'est son axe. */
+  const xColonne = largeur - 4 - CELLULE / 2;
   /** L'épine longe le bord gauche des cellules de la pile. */
-  const xEpine = largeurPeigne - CELLULE;
+  const xEpine = xColonne - CELLULE / 2;
   /** La branche s'arrête au ras de la pastille, comme la descente. */
   const xBranche = xColonne - PILL_SIZE / 2 - 2;
   /*
@@ -171,7 +204,7 @@ export function RangeeOutils({
   const yPied = hauteurSvg - 1;
   const xFin =
     colonne.length === 0
-      ? largeurUtile - part / 2
+      ? xPastille(rangee.length - 1)
       : surLaLigne
       ? xColonne
       : xEpine;
@@ -196,7 +229,7 @@ export function RangeeOutils({
               bottom: bas + PEIGNE_BAS,
               // Le peigne part du même bord que la ligne ; il s'étend
               // seulement plus loin quand il doit rejoindre la pile.
-              right: colonne.length > 0 ? 4 : reserve || 4,
+              right: colonne.length > 0 ? 4 : bordDroit,
               opacity: Animated.multiply(anim, PEIGNE_OPACITE),
             },
           ]}
@@ -212,14 +245,21 @@ export function RangeeOutils({
             nomme, la pile n'en est que la suite.
           */}
           <Text
-            style={[styles.peigneMot, { bottom: PEIGNE_H + 2, width: largeurUtile }]}>
+            style={[
+              styles.peigneMot,
+              // Le cadre de la RANGÉE, pas celui du peigne : le mot s'axe
+              // sur les pastilles de la ligne, et la pile de droite — qui
+              // porte d'autres boutons au-dessus d'elle — n'entre pas dans
+              // le compte.
+              { bottom: PEIGNE_H + 2, width: largeurRangee },
+            ]}>
             Afficher
           </Text>
           <Svg width={largeurPeigne} height={hauteurSvg}>
             {/* La barre ne court que d'une descente à l'autre : débordante,
                 elle ferait un cadre, et l'on annoterait la carte entière. */}
             <Line
-              x1={part / 2}
+              x1={xPastille(0)}
               y1={yBarre}
               x2={xFin}
               y2={yBarre}
@@ -230,9 +270,9 @@ export function RangeeOutils({
             {rangee.map((el, i) => (
               <Line
                 key={el.key}
-                x1={part * (i + 0.5)}
+                x1={xPastille(i)}
                 y1={yBarre}
-                x2={part * (i + 0.5)}
+                x2={xPastille(i)}
                 y2={yPied}
                 stroke={TRAIT_PEIGNE}
                 strokeWidth={1.5}

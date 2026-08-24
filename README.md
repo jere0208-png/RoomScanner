@@ -6171,6 +6171,42 @@ Vérifié à l'œil sur un rendu SVG de la zone (mêmes nombres que le composant
 et par bancs pour la structure : quatre descentes sur la ligne, une montée,
 une branche par calque de la pile, et la barre qui s'arrête avant la colonne.
 
+**Puis le peigne comptait sur une grille voisine de celle des pastilles.**
+Relevé du patron, capture à l'appui : « le Afficher doit se centrer selon les
+boutons — si cinq boutons et rien sur la colonne de droite, on axe aux cinq
+boutons ; s'il y a un bouton sur la colonne, on axe aux boutons de la ligne,
+sans compter le dernier à droite qui possède d'autres boutons au-dessus de
+lui. Le Afficher doit s'adapter. »
+
+Il partait du bord du peigne (4 points) et divisait `largeur − reserve − 4`.
+La rangée, elle, part de zéro et répartit dans `largeur − reserve` avec **dix
+points de marge** de chaque côté (`planTools`, `paddingHorizontal`). Deux
+grilles voisines : d'accord au milieu, fausses aux bords — huit points
+d'écart sur la dernière descente, un cinquième de pastille. Le trait ne
+tombait plus sur son bouton, et le mot était axé sur un cadre plutôt que sur
+les pastilles. Le peigne prend maintenant la grille de la rangée et part du
+même bord qu'elle ; la marge est **exportée une seule fois**
+(`MARGE_RANGEE`), parce qu'écrite deux fois elle a déjà divergé.
+
+Le mot s'axe sur le cadre de la RANGÉE, ce qui règle les deux cas d'un seul
+nombre : tout sur la ligne, il se centre sur tout le monde ; un calque en
+pile à droite, la pile est hors du cadre et n'entre pas dans le compte.
+
+**« Le bouton Enregistrer se place haut sans raison, il y a de la place plus
+bas. »** En 3D, il réservait la hauteur de la colonne des commandes —
+Édition, Annuler, Refaire. Or cette colonne est le propre du plan 2D : en 3D
+on ne modifie rien, elle n'est pas rendue. Il réservait donc la hauteur
+MESURÉE au dernier passage en plan — trois pastilles quand on venait
+d'annuler — et flottait à mi-modèle, au-dessus de rien. La hauteur de cet
+étage se calcule désormais une fois (`dessusOutils`, nul en 3D) et sert aux
+DEUX : la pile de calques et le bouton d'enregistrement, qui ne peuvent plus
+diverger.
+
+Deuxième moitié du même défaut : la hauteur de la pile ne se rendait que par
+l'`onLayout` de la pile. **Sans pile, personne ne parlait**, et l'écran
+gardait la dernière hauteur connue — celle de la vue d'avant. La rangée
+annonce maintenant zéro quand elle n'a rien à empiler.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro
