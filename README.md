@@ -6312,6 +6312,61 @@ c'est le point le plus éloigné des murs. Le bouton disparaît quand la pièce
 n'a pas de contour fermé : un bouton qui ne ferait rien est pire qu'un bouton
 absent.
 
+### La visite regardait les murs depuis la rue
+
+**« Présentation animée présente les murs d'une pièce vue de l'extérieur, ça
+ne sert à rien. »** Encore un signe, et le même mécanisme que la cote du
+plafond.
+
+Le cap qui « met un mur de face » était pris depuis le centre de la pièce
+VERS le mur. Or `theta` place l'œil dans la direction (sin θ, cos θ) — c'est
+la règle du rendu : une face est visible quand sa normale pointe vers ce
+vecteur-là (`isHiddenFace`). La caméra se posait donc DEHORS, derrière le mur
+qu'elle annonçait.
+
+Et ce n'est pas un cadrage discutable, c'est une étape vide : depuis la rue,
+le rendu retire l'appareillage — il est plaqué sur la face intérieure, qui
+tourne alors le dos à l'œil — et l'écorché efface la maçonnerie qui nous fait
+face. Le client voyait **un pan translucide et vide** pendant que le carton
+lui annonçait « Mur nord · trois appareils ».
+
+Le banc parcourt la visite, s'arrête à chaque arrêt sur un mur (cotes en
+place, carton affiché) et vérifie le SIGNE : le produit scalaire entre la
+direction de l'œil et le vecteur mur → centre de la pièce doit être positif.
+Il nommait les fautifs avant correction — « vus de la rue : refend, n ». La
+correction a été regardée à l'œil sur deux rendus du même mur, l'un depuis
+chaque côté : à gauche un pan nu, à droite le tableau et ses appareils.
+
+### Le liseré de l'icône : un fil sombre, et la lumière derrière
+
+**« Refais le liseré contour du logo de l'application, qui match avec un
+thème noir comme blanc, mais différent de celui-là, un peu comme Gemini. »**
+
+La première version allait du BLANC au sommet à l'ardoise au pied, en suivant
+la lumière. Le raisonnement se tenait — le haut clair détache l'icône d'un
+fond noir, le bas sombre d'un fond blanc — sauf qu'il oubliait le principal :
+**une icône claire se détache déjà toute seule d'un fond noir**, son corps est
+blanc. Ce que le haut clair produisait sur un fond d'écran blanc, c'était un
+bord absent, blanc sur blanc, et une icône qui paraît coupée en biais.
+
+Le liseré de Gemini est un corps SOMBRE cerné d'un fil CLAIR. Transposé sur
+une icône claire, c'est l'inverse qu'il faut : **un fil sombre tout autour**,
+qui ne change plus de nature avec la hauteur — seulement d'intensité, du gris
+ardoise au sommet au presque-noir au pied, comme une arête qui s'enfonce dans
+l'ombre.
+
+La lumière du haut ne disparaît pas : elle passe **derrière** le fil, en un
+second liseré blanc à l'intérieur, qui s'éteint avant la mi-hauteur. C'est lui
+qui donne le relief ; c'est le fil sombre qui fait la séparation. Un reflet
+qui ferait le tour complet serait un cadre, pas une lumière.
+
+Le banc **décode le PNG livré** et compte : au milieu de chacun des quatre
+côtés, à un cheveu du bord, aucun pixel ne doit dépasser 0,8 de luminance —
+au-dessus, un bord ne se distingue plus d'un fond blanc. L'ancien liseré
+répondait « haut (0.99) ». Deux autres règles l'encadrent : le corps reste
+clair (il tient sur un fond noir), et le fil reste un fil — à un pas du bord,
+on est déjà chez soi. Vérifié à l'œil sur trois fonds : blanc, noir, gris.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

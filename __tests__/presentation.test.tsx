@@ -27,6 +27,7 @@ import { ExportArt } from '../src/components/ExportArt';
 import { ClientTour } from '../src/components/ClientTour';
 import { FloorplanEditor } from '../src/components/FloorplanEditor';
 import { useScanStore } from '../src/store/scanStore';
+import { roomParts } from '../src/geometry/floorplan';
 import {
   SNAPSHOT_FIXTURES,
   SNAPSHOT_OBJECTS,
@@ -490,6 +491,83 @@ describe('le rideau de préparation', () => {
     expect(Math.max(...zooms)).toBeGreaterThan(Math.min(...zooms) + 0.3);
     // En vue large : le regard reste au-dessus, jamais au ras du sol.
     expect(thetas.length).toBeGreaterThan(0);
+  });
+
+  /**
+   * ELLE REGARDE LES MURS DEPUIS LA PIÈCE, PAS DEPUIS LA RUE.
+   *
+   * Relevé du patron, après essai sur l'appareil : « présentation animée
+   * présente les murs d'une pièce vue de l'extérieur, ça ne sert à rien ».
+   *
+   * Il avait raison, et c'est un signe. Le cap qui « met un mur de face »
+   * était pris VERS le mur, depuis le centre de la pièce ; or la vue place
+   * l'œil dans la direction (sin θ, cos θ) — du côté où l'on regarde. La
+   * caméra se posait donc DEHORS, derrière le mur qu'elle annonçait.
+   *
+   * Ce n'est pas un détail de cadrage : depuis dehors, le rendu retire
+   * l'appareillage (il est plaqué sur la face intérieure, qui tourne le dos
+   * à l'œil) et l'écorché efface la maçonnerie qui nous fait face. Le
+   * client voyait un pan translucide et vide, pendant que le carton lui
+   * annonçait « Mur nord · trois appareils ».
+   *
+   * On vérifie donc le SIGNE : l'œil doit se tenir du côté de la pièce.
+   */
+  it('regarde chaque mur depuis l’intérieur de la pièce', () => {
+    let tree!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      useScanStore.setState({
+        screen: 'result',
+        scanName: 'Chantier test',
+        walls: SNAPSHOT_WALLS,
+        openings: SNAPSHOT_OPENINGS,
+        objects: SNAPSHOT_OBJECTS,
+        rooms: SNAPSHOT_ROOMS.map((r, i) => ({
+          ...r,
+          name: `Pièce ${i + 1}`,
+          floor: null,
+        })),
+        fixtures: SNAPSHOT_FIXTURES,
+        ceiling: [],
+      });
+      tree = TestRenderer.create(<ClientTour visible onClose={() => {}} />);
+    });
+    arbre = tree;
+    act(() => {
+      jest.advanceTimersByTime(600);
+    });
+    const parts = roomParts(
+      SNAPSHOT_WALLS,
+      SNAPSHOT_ROOMS.map((r, i) => ({ id: r.id, name: `Pièce ${i + 1}`, floor: null })),
+    );
+    /** De quel côté du mur l'œil se tient-il ? > 0 = du côté de la pièce. */
+    const dedans = (wallId: string, theta: number) => {
+      const w = SNAPSHOT_WALLS.find((x) => x.id === wallId);
+      const part = parts.find((p2) => p2.walls.some((x) => x.id === wallId));
+      if (!w || !part) return null;
+      const milieu = { x: (w.a.x + w.b.x) / 2, z: (w.a.z + w.b.z) / 2 };
+      // L'œil se tient dans la direction (sin θ, cos θ) depuis la scène —
+      // c'est la règle du rendu (`isHiddenFace`) : une face est visible
+      // quand sa normale pointe vers ce vecteur-là.
+      const t = (theta * Math.PI) / 180;
+      const vers = { x: part.labelAt.x - milieu.x, z: part.labelAt.z - milieu.z };
+      return vers.x * Math.sin(t) + vers.z * Math.cos(t);
+    };
+    const dehors: string[] = [];
+    for (let i = 0; i < 120; i++) {
+      act(() => {
+        jest.advanceTimersByTime(300);
+      });
+      const p = tree.root.findByType(Iso3DView).props;
+      if (!p.focusWallId || !p.value) continue;
+      const d = dedans(p.focusWallId, p.value.theta);
+      // Le fondu d'un mur à l'autre passe forcément par des caps
+      // intermédiaires : on ne juge que les arrêts, quand les cotes sont
+      // posées et le carton affiché.
+      if (d !== null && d < 0 && p.elecCotes > 0.9) dehors.push(p.focusWallId);
+    }
+    expect(`vus de la rue : ${[...new Set(dehors)].join(', ') || 'aucun'}`).toBe(
+      'vus de la rue : aucun',
+    );
   });
 
   /**

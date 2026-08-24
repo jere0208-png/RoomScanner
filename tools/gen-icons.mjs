@@ -139,22 +139,48 @@ const INK = [0x0b, 0x0d, 0x12];
  * franchement.
  */
 /*
-  TROIS TEINTES, PAS DEUX — c'est ce qui fait tenir le bord sur TOUS les
-  fonds d'écran.
+  LE BORD EST SOMBRE PARTOUT, ET LA LUMIÈRE PASSE DERRIÈRE LUI.
 
-  Le liseré de Gemini n'est pas d'une seule couleur : il passe du CLAIR en
-  haut au SOMBRE en bas, comme l'arête d'un objet éclairé par le dessus. Et
-  c'est précisément ce qui le rend universel — sur un fond d'écran noir,
-  c'est le haut clair qui détache l'icône ; sur un fond blanc, c'est le bas
-  sombre. Un liseré d'une seule teinte doit choisir son fond ; celui-ci n'a
-  pas à choisir.
+  Deuxième version, relevé du patron : « refais le liseré contour du logo de
+  l'application, qui match avec un thème noir comme blanc, mais différent de
+  celui-là, un peu comme Gemini ».
+
+  La première allait du BLANC au sommet à l'ardoise au pied, en suivant la
+  lumière — le raisonnement était que le haut clair détacherait l'icône d'un
+  fond noir et le bas sombre d'un fond blanc. Sauf qu'une icône CLAIRE se
+  détache déjà toute seule d'un fond noir : son corps est blanc. Ce que le
+  haut clair produisait, sur un fond d'écran blanc, c'était un bord absent —
+  blanc sur blanc — et une icône qui paraît coupée en biais.
+
+  Le liseré de Gemini est un corps SOMBRE cerné d'un fil CLAIR. Transposé
+  sur une icône claire, c'est l'inverse qu'il faut : un fil sombre tout
+  autour. Il ne change plus de nature avec la hauteur — seulement
+  d'intensité, du gris ardoise au sommet au presque-noir au pied, comme une
+  arête qui s'enfonce dans l'ombre.
+
+  Et la lumière du haut ne disparaît pas pour autant : elle passe DERRIÈRE
+  le fil, en un second liseré blanc à l'intérieur, qui s'éteint à
+  mi-hauteur. C'est lui qui donne le relief — le bord posé sous une lumière
+  zénithale — pendant que le fil sombre, lui, fait le travail de séparation
+  sur tous les fonds d'écran.
 */
-const BORD_HAUT = [0xff, 0xff, 0xff];
-const BORD_FLANC = [0x8c, 0x97, 0xa6];
-const BORD_BAS = [0x1e, 0x25, 0x30];
+const BORD_HAUT = [0x5a, 0x64, 0x74];
+const BORD_FLANC = [0x3a, 0x43, 0x51];
+const BORD_BAS = [0x14, 0x19, 0x21];
 /** Épaisseur vers l'intérieur, et débord rogné, en fraction du côté. */
-const TRAIT = 0.02;
+const TRAIT = 0.019;
 const DEBORD = 0.006;
+/**
+ * LE REFLET INTÉRIEUR — juste derrière le fil sombre.
+ *
+ * Il ne sert pas à séparer l'icône du fond : c'est le fil sombre qui s'en
+ * charge. Il sert à dire que le bord a une épaisseur, et qu'il est éclairé
+ * d'en haut. Il s'éteint donc avant la mi-hauteur : un reflet qui ferait le
+ * tour complet serait un cadre, pas une lumière.
+ */
+const REFLET = 0.013;
+const REFLET_FORCE = 0.8;
+const REFLET_FIN = 0.55;
 
 /**
  * DISTANCE AU BORD DE LA DÉCOUPE, en pixels, négative à l'intérieur.
@@ -240,10 +266,28 @@ function render(size, mask) {
           Math.max(0, Math.min(1, (size * DEBORD - db) / 1)),
           Math.max(0, Math.min(1, (db + trait) / 1)),
         );
+        /*
+          LE REFLET SE PEINT AVANT LE FIL : il est DERRIÈRE lui, à
+          l'intérieur. Peint après, il mordrait sur le fil et le bord
+          s'éclaircirait justement là où il doit être net.
+        */
+        const reflet = size * REFLET;
+        const halo = Math.min(
+          Math.max(0, Math.min(1, (-db - trait) / 1)),
+          Math.max(0, Math.min(1, (db + trait + reflet) / 1)),
+        );
+        if (halo > 0) {
+          // Il s'éteint en descendant : la lumière vient du haut.
+          const force =
+            REFLET_FORCE * Math.max(0, 1 - fy / size / REFLET_FIN) * halo;
+          cr_ = cr_ + (0xff - cr_) * force;
+          cg_ = cg_ + (0xff - cg_) * force;
+          cb_ = cb_ + (0xff - cb_) * force;
+        }
         if (bande > 0) {
-          // Le dégradé se lit sur la hauteur : blanc au sommet, gris à
-          // mi-hauteur — c'est le flanc, celui qui longe le fond d'écran —
-          // puis ardoise au pied.
+          // Le fil ne change plus de nature avec la hauteur, seulement
+          // d'intensité : ardoise au sommet, presque noir au pied — une
+          // arête qui s'enfonce dans l'ombre.
           const u = fy / size;
           const [c0, c1, t] =
             u < 0.5

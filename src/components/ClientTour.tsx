@@ -115,20 +115,34 @@ const lissage = (t: number) =>
 const fr1 = (v: number) => v.toFixed(1).replace('.', ',');
 
 /**
- * L'AZIMUT QUI MET UN MUR DE FACE.
+ * L'AZIMUT QUI MET UN MUR DE FACE — VU DE LA PIÈCE.
  *
- * La vue projette un point du monde en tournant le plan de `theta` : la
- * profondeur y suit la direction (sin θ, cos θ). Regarder un mur de face,
- * c'est donc aligner cette direction sur sa normale — celle qui va du
- * centre de la pièce vers le mur, puisque la caméra se tient dans la pièce.
+ * Relevé du patron, après essai sur l'appareil : « présentation animée
+ * présente les murs d'une pièce vue de l'extérieur, ça ne sert à rien ».
+ *
+ * Un signe. `theta` place l'œil dans la direction (sin θ, cos θ) : c'est la
+ * règle du rendu — une face est visible quand sa normale pointe vers ce
+ * vecteur-là (`isHiddenFace`). Le cap était pris VERS le mur, depuis le
+ * centre de la pièce ; l'œil se posait donc DEHORS, derrière le mur qu'on
+ * annonçait.
+ *
+ * Et ce n'est pas qu'un cadrage discutable : depuis la rue, le rendu retire
+ * l'appareillage — il est plaqué sur la face intérieure, qui tourne alors
+ * le dos à l'œil — et l'écorché efface la maçonnerie qui nous fait face. Le
+ * client voyait un pan translucide et vide pendant que le carton lui
+ * annonçait « Mur nord · trois appareils ».
+ *
+ * L'œil se tient donc du côté de la pièce : on vise depuis le mur VERS le
+ * centre, et le mur montre la face qu'on est venu voir — celle où sont les
+ * prises.
  */
 function azimutFaceAuMur(wall: WallSeg, centre: Pt): number {
   const milieu = {
     x: (wall.a.x + wall.b.x) / 2,
     z: (wall.a.z + wall.b.z) / 2,
   };
-  const dx = milieu.x - centre.x;
-  const dz = milieu.z - centre.z;
+  const dx = centre.x - milieu.x;
+  const dz = centre.z - milieu.z;
   return (Math.atan2(dx, dz) * 180) / Math.PI;
 }
 
