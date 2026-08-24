@@ -7231,6 +7231,60 @@ Trois pièges de la cotation, tous trouvés sur la planche :
   retrouvait coupée en deux morceaux de part et d'autre du nombre, qui ne se
   rattachait plus à aucun des deux.
 
+
+### Plan papier — reconnaître les symboles sans comparer deux images
+
+Personne ne dessine une prise tout à fait pareil. La CEI 60617 en fixe
+l'esprit ; chaque bureau d'études en fait sa variante, un plan de rénovation
+tracé à la main en fait une troisième, et le même symbole se retrouve à trois
+échelles sur la même feuille. Comparer des pixels à des pixels ne peut donc
+pas marcher — c'est précisément ce que font les reconnaissances par gabarit
+qui échouent dès la deuxième feuille.
+
+On compare des **invariants** : ce qui survit à une rotation, à un changement
+d'échelle et à la main de celui qui a dessiné. Le nombre de TROUS d'abord —
+le seul qui soit entier, et le plus solide : un point lumineux (cercle barré
+d'une croix) en a quatre, un spot un, un socle de prise un (son demi-disque),
+un interrupteur aucun. Puis le remplissage du disque englobant, l'allongement
+tiré de l'inertie, la compacité, deux moments de Hu, et la symétrie à
+demi-tour. Sept nombres, et pas un pixel.
+
+**Les références sortent des mêmes dessins que les planches d'essai** :
+`gabarits.ts` est rasterisé une fois, à taille fixe, et l'on en tire les
+invariants. Une seule source de vérité — le jour où l'on redresse le symbole
+d'une prise, la référence suit toute seule.
+
+Le banc pose l'exigence dans le bon ordre : **la bibliothèque doit d'abord se
+distinguer elle-même**, chaque symbole rasterisé à deux tailles et sous
+quatre angles devant se reconnaître LUI. Si deux entrées du dictionnaire ne
+se séparent pas, aucune photo au monde ne les séparera : c'est le
+dictionnaire qu'il faut corriger, pas le lecteur.
+
+Trois choses apprises :
+
+- **Un intrus doit être étranger au dictionnaire, pas seulement absent de
+  lui.** Le premier essai — un pentagone barré — passait pour un tableau
+  électrique, et à juste titre : un polygone traversé d'une diagonale, c'est
+  exactement le symbole du tableau. Une spirale passait pour un WC. Les vrais
+  intrus d'un plan sont un MOT que l'OCR n'a pas lu et un bout de TRAIT resté
+  seul ; ce sont eux que le banc présente désormais.
+- **La gomme fait la largeur du trait, pas un pixel de plus.** Un symbole
+  mural se pose CONTRE la maçonnerie — c'est même à cela qu'on le reconnaît.
+  Effacer l'emprise entière du mur avant de chercher les symboles lui coupait
+  le pied : le cercle d'un point lumineux perdait son arc, ses quatre trous
+  devenaient deux, et il n'était plus reconnu. On n'efface donc que les deux
+  TRAITS de bord — sauf pour un mur en aplat, qui est plein et dans lequel
+  rien n'est jamais dessiné.
+- **Les bouts de trait ne sont pas des repères.** L'ébarbage laisse des
+  miettes, toutes longues et minces ; aucun symbole du dictionnaire ne dépasse
+  un rapport de deux et demi entre ses côtés. Sans ce filtre, le plan se
+  couvrait de repères à qualifier qui n'étaient que des débris.
+
+Et la règle qui vaut pour tout le lecteur : **ce qu'on ne reconnaît pas, on
+le dit**. Au-delà de six dixièmes d'écart, le symbole ressort sans nom — un
+repère à qualifier, posé au bon endroit. Mieux vaut un repère qu'un tableau
+imaginaire au milieu d'un séjour.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro
