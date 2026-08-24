@@ -530,3 +530,36 @@ export function calerSurLeMasque(murs: MurLu[], masque: Masque): MurLu[] {
     return { ...m, a, b, ep, len: long(a, b) };
   });
 }
+
+/**
+ * NE GARDE QUE CE QUI EST D'ÉQUERRE AVEC LE PLAN.
+ *
+ * Un logement est fait d'angles droits ; c'est la seule chose dont on soit
+ * sûr avant de l'avoir lu, et `anglePrincipal` la mesure sur la feuille
+ * entière. Tout ce qui coupe cet angle en biais est SUSPECT — sur les vrais
+ * plans, ce sont les traits d'une VOITURE dessinée dans le garage, l'arc
+ * d'une porte, le pied d'un fauteuil, la flèche d'un escalier. Deux traits
+ * parallèles pris dans une carrosserie ont exactement l'allure d'un petit
+ * mur, et le plan du garage en ressortait rempli.
+ *
+ * Mais des murs en biais existent — une cage d'escalier, un pan coupé, une
+ * façade oblique. On ne jette donc PAS tout ce qui est de travers : on jette
+ * ce qui est de travers ET court. Un vrai mur oblique fait la même longueur
+ * que ses voisins ; un pare-chocs, le quart.
+ */
+export function filtrerDEquerre(
+  murs: MurLu[],
+  angle: number,
+  { tolerance = 0.12, gardeSi = 0.4 } = {},
+): MurLu[] {
+  if (!murs.length) return murs;
+  const plusLong = Math.max(...murs.map((m) => m.len));
+  return murs.filter((m) => {
+    const a = angleDe({ ...m, plein: 1 });
+    const ecart = Math.min(
+      ecartAngle(a, angle),
+      ecartAngle(a, angle + Math.PI / 2),
+    );
+    return ecart <= tolerance || m.len >= plusLong * gardeSi;
+  });
+}

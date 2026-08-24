@@ -7322,6 +7322,48 @@ lu, chercher les traits puis les murs puis les trous, caler l'échelle,
 million de pixels coûterait cher et abîmerait les traits fins qu'on vient
 tout juste de mesurer.
 
+
+### Plan papier — l'épreuve des vrais plans
+
+Relevé du patron : **« tes tests se feront sur des plans architecturaux que
+tu trouves sur internet (français) »**. C'est la seule épreuve qui compte :
+une planche fabriquée par notre propre simulateur ne prouve jamais qu'on lit
+un plan, seulement qu'on reconnaît sa propre imprimerie.
+
+Deux plans français ont servi : un **plan d'implantation électrique** (murs
+en aplats noirs, cloisons grises, symboles CEI, noms de pièces, aucune cote)
+et un **plan d'architecte coté** (murs en double trait, porteurs hachurés,
+chaînes de cotation « 10.83 » et « 1.60/2.48 », surfaces de pièces au
+cartouche, mobilier dessiné, voiture dans le garage).
+
+Ils ont démenti trois hypothèses de départ, et chacune a coûté une reprise :
+
+- **Les murs ne sont pas des doubles traits**, ou pas toujours : sur le plan
+  d'implantation, tous sont des aplats. D'où les trois conventions gérées.
+- **Les cotes ne s'écrivent pas « 350 »** mais « 10.83 », « 1.60/2.48 »
+  (largeur/hauteur d'une menuiserie) et « S : 12.73 m² » — cette dernière a
+  exactement l'allure d'une cote et fausserait l'échelle de moitié.
+- **Un plan contient des dessins qui ne sont pas le bâtiment** : une voiture
+  dans le garage, du mobilier, des arcs de porte. Deux traits parallèles pris
+  dans une carrosserie ont l'allure d'un petit mur, et le garage en
+  ressortait rempli. D'où `filtrerDEquerre` : un logement est fait d'angles
+  droits, et ce qui coupe l'angle dominant en biais est suspect. On ne jette
+  pas tout ce qui est de travers — un pan coupé, une cage d'escalier
+  existent — on jette ce qui est de travers ET court : un vrai mur oblique
+  fait la longueur de ses voisins, un pare-chocs le quart.
+
+Les images ne sont pas versées au dépôt (elles pèsent, et elles ne nous
+appartiennent pas) : on désigne un dossier au lancement.
+
+```
+magick plan.jpg -colorspace Gray plan.pgm
+PLANS_REELS=<dossier> PLANCHE_PAPIER=<dossier> npx jest papierreel
+```
+
+Le banc écrit alors le plan en gris pâle avec les murs lus par-dessus en
+noir : **ce qui manque saute aux yeux, ce qui a été inventé aussi**. C'est
+cette image-là qu'on regarde, et c'est elle qui a trouvé la voiture.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

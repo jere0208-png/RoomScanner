@@ -38,7 +38,13 @@ import {
   type Echelle,
 } from './echelle';
 import type { PhotoDePlan, TexteLu } from './entree';
-import { calerSurLeMasque, mursDesTraits, souderLesCoins, type MurLu } from './murs';
+import {
+  calerSurLeMasque,
+  filtrerDEquerre,
+  mursDesTraits,
+  souderLesCoins,
+  type MurLu,
+} from './murs';
 import { ouverturesDesMurs, type OuvertureLue } from './ouvertures';
 import { effacerMurs, symbolesDuMasque, type SymboleLu } from './symboles';
 import { anglePrincipal, fusionnerTraits, segmentsDe, type Trait } from './traits';
@@ -156,9 +162,13 @@ export function lirePlanPapier(
   const brut = binariser(image);
   const masque = effacerBoites(brut, textes);
 
-  // 4. Les traits, les murs, les trous.
+  // 4. Les traits, les murs, les trous. L'angle de la feuille se mesure
+  // AVANT les murs : c'est lui qui dit ce qui est d'équerre avec le plan.
   const traits = fusionnerTraits(segmentsDe(masque));
-  const murs = souderLesCoins(calerSurLeMasque(mursDesTraits(traits), masque));
+  const angle = anglePrincipal(masque);
+  const murs = souderLesCoins(
+    calerSurLeMasque(filtrerDEquerre(mursDesTraits(traits), angle), masque),
+  );
   const ouvertures = ouverturesDesMurs(murs, masque, traits);
   if (murs.length === 0) {
     avertissements.push(
@@ -206,7 +216,6 @@ export function lirePlanPapier(
     mesurer. L'origine se pose au centre du dessin, comme un scan qui
     commence là où l'on se tient.
   */
-  const angle = murs.length ? anglePrincipal(masque) : 0;
   const co = Math.cos(-angle);
   const si = Math.sin(-angle);
   const cx = image.l / 2;

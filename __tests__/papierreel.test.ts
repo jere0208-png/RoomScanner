@@ -61,7 +61,12 @@ function aRegarder(nom: string, fond: ImageGrise, murs: { a: { x: number; y: num
   const img = imageVide(fond.l, fond.h, 255);
   // Le plan en gris pâle, les murs lus par-dessus en noir : ce qui manque
   // saute aux yeux, ce qui a été inventé aussi.
-  for (let k = 0; k < img.px.length; k++) img.px[k] = 200 + Math.round(fond.px[k] * 0.22);
+  // Borné à 255 : sans cela le blanc du papier (255 × 0,22 + 200 = 256)
+  // débordait de l'octet et retombait à zéro — le plan sortait en négatif,
+  // fond noir, et l'on ne voyait plus rien du tout.
+  for (let k = 0; k < img.px.length; k++) {
+    img.px[k] = Math.min(255, 170 + Math.round(fond.px[k] * 0.3));
+  }
   tracer(
     img,
     murs.map((m) => ({ t: 'seg' as const, a: m.a, b: m.b, w: Math.max(2, m.ep) })),
