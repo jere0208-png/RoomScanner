@@ -7285,6 +7285,43 @@ le dit**. Au-delà de six dixièmes d'écart, le symbole ressort sans nom — un
 repère à qualifier, posé au bon endroit. Mieux vaut un repère qu'un tableau
 imaginaire au milieu d'un séjour.
 
+
+### Plan papier — le relevé passe par le chemin du scan, pas à côté
+
+`lecture.ts` n'invente rien : il enchaîne les étages et rend un **`ScanResult`**,
+exactement celui que RoomPlan produirait. C'est la décision qui tient tout le
+reste : **un plan papier n'ouvre pas un deuxième chemin dans l'application**.
+Les murs passent par `finalize`, les pièces se détectent comme après un scan,
+les cotes se posent comme d'habitude — et l'électricité s'ancre par
+`ancrerElec`, le même code qui pose ce qu'on vise au viseur pendant un relevé
+LiDAR. Un symbole lu sur un plan n'a aucune raison d'emprunter un autre
+chemin : on lui donne un point du monde et sa nature, et tout le reste de
+l'app le traite comme le sien — `Fixture` sur un `wallId` à la hauteur du
+métier, `CeilingFixture` rattaché à sa pièce.
+
+Tout ce qui suit la lecture est donc, par construction, déjà éprouvé : le
+découpage aux jonctions, la soudure des coins, la détection des pièces, le
+métré, le PDF, la 3D.
+
+Le banc de bout en bout imprime le T1, le photographie **de travers, à
+l'ombre, grenu et flou**, le relit et VERSE le résultat dans le magasin. Le
+logement en ressort à **4,00 m sur 3,00 m**, porte de 83 cm, fenêtre de
+1,20 m posée sur son allège, appareils accrochés à leurs murs.
+
+Une chose s'est apprise là : **les cotes se mesurent sur l'EMPRISE, pas sur le
+plus long mur**. `finalize` découpe les faces aux jonctions, comme pour un
+relevé LiDAR : le mur de quatre mètres que traverse le refend en ressort en
+deux morceaux de 2,60 et 1,40. Mesurer le lecteur à travers ce découpage
+aurait été mesurer autre chose que lui.
+
+Et l'ordre des étages n'est pas négociable : réduire (la recherche de droites
+coûte le carré de la taille), binariser au seuil local, effacer ce que l'OCR a
+lu, chercher les traits puis les murs puis les trous, caler l'échelle,
+ébarber la maçonnerie et reconnaître les symboles, enfin redresser et mettre
+à l'échelle — sur les COORDONNÉES et jamais sur l'image, car tourner un
+million de pixels coûterait cher et abîmerait les traits fins qu'on vient
+tout juste de mesurer.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro
