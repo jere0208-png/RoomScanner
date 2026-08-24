@@ -20,6 +20,7 @@ import {
 import Svg, { Path } from 'react-native-svg';
 import { useTheme } from '../../theme';
 import { WallElevation } from '../../components/WallElevation';
+import type { ActionData } from '../../components/Sheet';
 import {
   FIXTURES,
   FIXTURE_FAMILIES,
@@ -39,6 +40,7 @@ export function ElecSheet({
   onLinkRequest,
   onChoose,
   onClose,
+  onDemander,
 }: {
   visible: boolean;
   /** Le catalogue, ou le mur vu de face : jamais les deux. */
@@ -53,6 +55,8 @@ export function ElecSheet({
   onLinkRequest?: (fixtureId: string) => void;
   onChoose: (kind: FixtureKind) => void;
   onClose: () => void;
+  /** La façon d'ouvrir NOS questions : l'établi n'a pas de feuille à lui. */
+  onDemander?: (data: ActionData) => void;
 }) {
   const styles = getStyles(useTheme());
   const plein = vue === 'mur';
@@ -92,6 +96,7 @@ export function ElecSheet({
                 onAddRequest={onAddRequest}
                 onLinkRequest={onLinkRequest}
                 onClose={onClose}
+                onDemander={onDemander}
               />
             </View>
           ) : (

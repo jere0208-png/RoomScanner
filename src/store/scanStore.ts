@@ -1827,14 +1827,25 @@ export const useScanStore = create<ScanState>((set, get) => {
       AsyncStorage.setItem(FURNITURE_KEY, showFurniture ? '1' : '0').catch(() => {});
     },
 
-    showSurfaces: true,
+    /*
+      LE MODÈLE S'OUVRE SUR LE BÂTI — relevé du patron : « sur la vue 3D de
+      base au scan, on coche les boutons pour afficher les meubles et les
+      murs seulement, le reste reste décoché ».
+
+      Les surfaces teintées, le plafond, les repères et les cotes répondent
+      chacun à une question précise ; allumés d'office, ils couvrent ce
+      qu'on vient regarder — la maçonnerie et ce qu'il y a dedans.
+    */
+    showSurfaces: false,
     setShowSurfaces: (showSurfaces) => {
       set({ showSurfaces });
       AsyncStorage.setItem(SURFACES_KEY, showSurfaces ? '1' : '0').catch(() => {});
     },
 
     showTextures: false,
-    solidWalls: false,
+    // Murs pleins d'office : c'est le bâti qu'on regarde en ouvrant un
+    // relevé. L'écorché reste à un appui, pour voir dedans.
+    solidWalls: true,
     toggleSolidWalls: () => set({ solidWalls: !get().solidWalls }),
     setShowTextures: (showTextures) => {
       set({ showTextures });

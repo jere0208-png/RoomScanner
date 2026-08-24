@@ -149,6 +149,7 @@ export function CeilingBar({
                       la poignée de glissement l'avalant. Trois appuis pour
                       un geste qu'on répète à chaque point lumineux. */}
                   {onLink && (
+                    <View style={styles.bandeauCellule}>
                     <TouchableOpacity
                       style={styles.iconBtn}
                       accessibilityLabel="Relier à une commande"
@@ -164,42 +165,52 @@ export function CeilingBar({
                         />
                       </Svg>
                     </TouchableOpacity>
+                      {/* Le mot sous la pastille : voir `bandeauMot`. Une
+                          icône seule ne se comprend qu'en l'essayant. */}
+                      <Text style={styles.bandeauMot}>Relier</Text>
+                    </View>
                   )}
                   {/* Deux boutons en pictogramme, et rien pour les nommer :
                       VoiceOver annonçait « bouton », deux fois, à côté de
                       la corbeille et de la validation. Toutes les autres
                       barres de l'app portent leur étiquette ; celles-ci
                       l'avaient perdue en chemin. */}
-                  <TouchableOpacity
-                    style={styles.iconBtn}
-                    accessibilityLabel="Retirer"
-                    onPress={onRemove}>
-                    <Svg width={19} height={19} viewBox="0 0 24 24">
-                      <Path
-                        d="M5 7 h14 M9.5 7 V4.5 h5 V7 M6.5 7 l1 13 h9 l1 -13"
-                        stroke={palette.danger}
-                        strokeWidth={2}
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        fill="none"
-                      />
-                    </Svg>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.iconBtnOk}
-                    accessibilityLabel="Terminer"
-                    onPress={onDone}>
-                    <Svg width={19} height={19} viewBox="0 0 24 24">
-                      <Path
-                        d="M5 12.5 L10 17.5 L19 6.5"
-                        stroke="#FFFFFF"
-                        strokeWidth={2.4}
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        fill="none"
-                      />
-                    </Svg>
-                  </TouchableOpacity>
+                  <View style={styles.bandeauCellule}>
+                    <TouchableOpacity
+                      style={styles.iconBtn}
+                      accessibilityLabel="Retirer"
+                      onPress={onRemove}>
+                      <Svg width={19} height={19} viewBox="0 0 24 24">
+                        <Path
+                          d="M5 7 h14 M9.5 7 V4.5 h5 V7 M6.5 7 l1 13 h9 l1 -13"
+                          stroke={palette.danger}
+                          strokeWidth={2}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          fill="none"
+                        />
+                      </Svg>
+                    </TouchableOpacity>
+                    <Text style={styles.bandeauMot}>Retirer</Text>
+                  </View>
+                  <View style={styles.bandeauCellule}>
+                    <TouchableOpacity
+                      style={styles.iconBtnOk}
+                      accessibilityLabel="Terminer"
+                      onPress={onDone}>
+                      <Svg width={19} height={19} viewBox="0 0 24 24">
+                        <Path
+                          d="M5 12.5 L10 17.5 L19 6.5"
+                          stroke="#FFFFFF"
+                          strokeWidth={2.4}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          fill="none"
+                        />
+                      </Svg>
+                    </TouchableOpacity>
+                    <Text style={styles.bandeauMot}>Terminer</Text>
+                  </View>
               </View>
             </View>
           );

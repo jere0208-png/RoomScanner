@@ -695,6 +695,8 @@ export function LibraryScreen() {
   */
   const ouvrirLeScan = (id: string) =>
     garderLeTravail({
+      // La question se pose dans NOTRE feuille : voir `garderLeTravail`.
+      demander: setMenu,
       // Rouvrir le plan qu'on tient déjà ne perd rien : on est dessus.
       dirty: dirty && id !== currentSaveId,
       message:

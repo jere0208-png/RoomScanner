@@ -57,6 +57,11 @@ type Cadre = {
   largeur: number;
   /** Ligne de fond : au-dessus de l'indicateur d'accueil. */
   bas: number;
+  /**
+   * La hauteur de la pile de calques en trop, rendue à l'écran : c'est elle
+   * qui dit où poser « Enregistrer », au-dessus de tout le reste.
+   */
+  onSuite?: (hauteur: number) => void;
 };
 
 /**
@@ -69,6 +74,7 @@ export function Toolbar2D({
   anim,
   largeur,
   bas,
+  onSuite,
   dessus,
   edition,
   pendingKind,
@@ -349,6 +355,7 @@ export function Toolbar2D({
 
   return (
     <RangeeOutils
+      onSuite={onSuite}
       styles={styles}
       anim={anim}
       largeur={largeur}
@@ -378,6 +385,7 @@ export function Toolbar2D({
  * droite.
  */
 export function Toolbar3D({
+  onSuite,
   anim,
   largeur,
   bas,
@@ -511,6 +519,7 @@ export function Toolbar3D({
       reserve={62}
       bas={bas}
       dessus={0}
+      onSuite={onSuite}
       elements={outils.filter((el): el is React.ReactElement => !!el)}
     />
   );

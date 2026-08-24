@@ -6021,6 +6021,96 @@ ouverture : l'aperçu montre alors exactement ce que le dossier contiendra —
 c'est tout l'intérêt de cet écran — et le plan les retrouve tels quels en
 revenant, puisque ce sont les mêmes boutons.
 
+### Le bouton Note, le peigne, et ce qui est allumé à l'ouverture
+
+Quatre relevés du patron en rafale, tous sur la même bande d'écran.
+
+**« Le bouton Note ne fait rien, n'affiche rien ? »** Il faisait pourtant
+quelque chose : il ARMAIT la pose. Le geste est en deux temps — on touche
+« Note », puis le point du plan à annoter, parce qu'une note tient à un POINT
+(« gaine à reprendre » ne veut rien dire trois mètres plus loin). Mais rien
+ne le disait : tous les autres gestes en deux temps — poser une prise, un
+point lumineux, relier une commande — affichent le bandeau d'attente, avec le
+symbole qui bat et « touchez un mur ». La note armait en silence.
+
+**Un geste qu'on arme sans le dire est un geste qui ne marche pas.** Elle a
+donc son bandeau, avec sa punaise et « Touchez le point à annoter » — et la
+même croix pour se décommander. Le déplacement d'une note aussi, qui avait le
+même trou.
+
+**« La ligne du Afficher ne va pas jusqu'au dernier bouton. »** Le peigne
+annote la rangée de calques : un mot, une barre, une descente par bouton. Il
+s'arrêtait au dernier outil de la LIGNE — or ce qui ne tient pas dans la
+ligne se range à droite, dans la même bande, et se retrouvait hors du peigne.
+Sur la capture, « Murs » : annoté par rien, il se lisait comme autre chose
+qu'un calque. La barre va maintenant jusqu'à cette pile, avec sa descente.
+Les commandes (édition, sauvegarde) restent dehors : elles ne montrent ni ne
+cachent rien.
+
+**« Le bouton Enregistrer doit être au-dessus du bouton Nord et de tout autre
+bouton de la colonne. »** Troisième version de la même question — on doit le
+trouver sans le chercher. Il a d'abord vécu au bas de la pile d'actions (le
+trop-plein de calques s'empilait au-dessus) ; puis toute la pile a été ancrée
+en haut du plan (mauvaise réponse : la colonne de droite appartient au
+pouce) ; il a maintenant son PROPRE ancrage, posé au-dessus des deux piles,
+dont on mesure les hauteurs. Les commandes gardent le bas.
+
+**« Sur la vue 3D de base au scan, on coche les meubles et les murs
+seulement. »** Le modèle s'ouvrait avec tout allumé — surfaces teintées,
+cotes, repères d'appareil — c'est-à-dire qu'il ne montrait plus le bâti qu'on
+vient regarder. Défauts revus : meubles et murs pleins, rien d'autre.
+
+Une exception, et elle est délibérée : **le calque du plafond reste allumé**.
+Les autres montrent ce que le SCAN a relevé ; celui-là montre ce que L'ON A
+POSÉ. Un point lumineux qu'on vient de placer et qui disparaît parce qu'un
+calque est éteint, c'est un geste qu'on croit raté. Et il ne coûte rien à
+l'ouverture : sans appareil de plafond, son bouton ne paraît même pas.
+
+### Les noms sous les boutons, et nos fenêtres jusqu'au bout
+
+**« Mets des noms sous les boutons… on doit comprendre ce que chaque bouton
+fait. Nom discret comme le "Afficher", mais sous ces boutons. »**
+
+La barre d'un mur les portait déjà — huit points et demi, à moitié effacés,
+sous chaque icône. Les bandeaux du bas, non : une ligne de spots offrait
+quatre pastilles rondes muettes (deux flèches, un maillon, une croix), et il
+fallait les essayer pour savoir. Le mot vivait dans l'étiquette
+d'accessibilité, ce qui sert au lecteur d'écran et à personne d'autre. Toutes
+les pastilles en icône seule portent maintenant leur nom dessous, en retrait,
+comme le peigne qu'elles imitent.
+
+Un mot a changé au passage, et c'est le plus instructif : la croix rouge du
+bandeau d'un meuble s'annonçait « Annuler » à VoiceOver alors qu'elle
+RETIRE le meuble du plan. Tant que le mot n'était pas écrit, personne ne
+voyait la contradiction ; en l'écrivant, elle saute aux yeux.
+
+**« La popup des modifications non enregistrées est trop basique, donne-lui
+notre identité »**, puis, devant « Abandonner les modifications ? » :
+**« refonte de ce popup aussi dans notre style ».**
+
+L'app a ses fenêtres depuis longtemps — feuilles du bas, notre typographie,
+nos rayons, nos icônes — et le fichier qui les porte s'ouvre sur la raison :
+« `Alert.alert` et `Alert.prompt` sont ceux d'iOS : police système, boutons
+bleus empilés, coins de 2019. Au milieu d'une app qui a sa typographie, ils
+font tache. » Deux gardes étaient pourtant restées à l'alerte système, et ce
+sont justement les deux qu'on voit le plus : celle qui protège le travail non
+enregistré (sur TROIS chemins de sortie) et celle du mur qu'on referme sans
+garder.
+
+Elles se posent maintenant dans une feuille, et la place qu'elle offre change
+la réponse : chaque issue dit sa CONSÉQUENCE sous son nom — « Range le
+travail, puis quitte », « Ce qui vient d'être fait sera perdu » —, ce qu'une
+alerte à trois boutons ne permettait pas.
+
+**« Rester » a disparu**, et c'est voulu : nos feuilles se referment d'un
+appui à côté ou d'un glissement vers le bas. La sortie est le geste, pas un
+bouton — un choix qui ne fait rien n'a plus à occuper une ligne.
+
+La garde n'ouvre pas la feuille elle-même : c'est l'écran qui la porte à
+l'écran, et il passe sa façon de le faire (`demander`). L'établi, qui n'a pas
+de feuille à lui, garde l'alerte système en dernier recours — mieux vaut une
+question laide qu'un mur abandonné sans qu'on demande.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

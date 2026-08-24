@@ -1507,19 +1507,28 @@ describe('la rangée d’outils', () => {
   });
 
   /*
-    « ENREGISTRER » EST TOUJOURS AU PLUS HAUT DE SA COLONNE.
+    « ENREGISTRER » EST TOUJOURS AU PLUS HAUT DE LA COLONNE — troisième
+    version, et la question est la même depuis le début : on doit le trouver
+    sans le chercher.
 
-    Il vivait au bas de la pile d'actions, et le trop-plein de calques — les
-    pastilles qui ne tiennent pas dans la rangée et montent à droite — se
-    posait AU-DESSUS de lui. Sa hauteur dépendait donc du nombre de calques
-    affichés : sur un scan équipé, il descendait de deux crans, et on le
-    cherchait. Un bouton qui engage le travail se trouve sans le chercher.
+    1. Il vivait au BAS de la pile d'actions, et le trop-plein de calques se
+       posait au-dessus de lui : sa hauteur dépendait du nombre de calques
+       affichés, et sur un scan équipé il descendait de deux crans.
+    2. On a donc ancré toute la pile EN HAUT du plan. Mauvaise réponse à une
+       bonne question : la colonne de droite appartient au pouce, et la
+       déraciner du bas éloignait tout le reste avec elle. Retour en bas,
+       avec un ORDRE — Enregistrer, annulation, Édition.
+    3. Sauf que l'ordre DANS la pile ne dit rien de ce qui s'empile
+       au-dessus d'elle. Relevé du patron : « le bouton Enregistrer doit être
+       au-dessus du bouton Nord et de tout autre bouton de la colonne,
+       lorsqu'il est affiché ». Le trop-plein de calques était toujours
+       par-dessus.
 
-    Les actions sont donc ancrées EN HAUT du plan — « Enregistrer » d'abord,
-    l'annulation juste dessous —, et « Édition » garde le bas, où le pouce
-    tombe.
+    Il a donc son PROPRE ancrage, posé au-dessus des deux piles — celle des
+    commandes et celle des calques —, dont les hauteurs sont mesurées. Les
+    commandes gardent le bas, où tombe le pouce.
   */
-  it('pose Enregistrer au plus haut, l’annulation dessous', () => {
+  it('pose Enregistrer au-dessus des commandes ET des calques', () => {
     const tree = monter();
     act(() => {
       useScanStore.setState({ dirty: true });
@@ -1531,25 +1540,34 @@ describe('la rangée d’outils', () => {
     const st = (Array.isArray(colonne!.props.style)
       ? Object.assign({}, ...colonne!.props.style.filter(Boolean))
       : colonne!.props.style) as { top?: number; bottom?: number };
-    /*
-      LA PILE RESTE EN BAS — c'est le pouce qui commande.
-
-      Elle a été ancrée en haut le temps d'une version, pour que
-      « Enregistrer » ne descende plus quand les calques s'empilent au-dessus.
-      Mauvaise réponse à une bonne question : la colonne de droite appartient
-      au pouce, et la déraciner du bas éloignait tout le reste avec elle. Ce
-      qui compte, c'est l'ORDRE.
-    */
+    // La pile des commandes reste en bas : c'est le pouce qui commande.
     expect(typeof st.bottom).toBe('number');
     expect(st.top).toBeUndefined();
-    // Enregistrer en tête, le retour en arrière juste dessous, Édition en
-    // dernier : c'est l'ordre de lecture de la colonne.
+    // Elle ne porte plus « Enregistrer » : il a son propre ancrage.
     const mots = colonne!
       .findAllByType(Text)
       .map((t) => String(t.props.children))
       .filter((m) => ['Enregistrer', 'Annuler', 'Édition'].includes(m));
-    expect(mots[0]).toBe('Enregistrer');
+    expect(mots).not.toContain('Enregistrer');
     expect(mots[mots.length - 1]).toBe('Édition');
+    /** La hauteur du bloc absolu qui porte cette pastille. */
+    const hauteurDe = (label: string) => {
+      const b = tree.root
+        .findAllByType(TouchableOpacity)
+        .find((n) => n.props.accessibilityLabel === label);
+      let n: TestRenderer.ReactTestInstance | null = b ?? null;
+      while (n) {
+        const s2 = (Array.isArray(n.props?.style)
+          ? Object.assign({}, ...n.props.style.filter(Boolean))
+          : n.props?.style) as { position?: string; bottom?: number } | undefined;
+        if (s2?.position === 'absolute' && typeof s2.bottom === 'number') {
+          return s2.bottom;
+        }
+        n = n.parent;
+      }
+      return null;
+    };
+    expect(hauteurDe('Enregistrer')).toBeGreaterThan(hauteurDe('Édition')!);
   });
 
   it('échange les calques contre les outils en édition', () => {

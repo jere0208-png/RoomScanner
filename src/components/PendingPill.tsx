@@ -40,21 +40,46 @@ import { CloseCross } from './CloseCross';
 export function EnAttente({
   kind,
   plafond,
+  note,
   cible,
   onCancel,
 }: {
   kind: FixtureKind | null;
   /** Appareil de plafond en attente : on touche la pièce, pas le mur. */
   plafond?: CeilingKind | null;
+  /**
+   * UNE NOTE EN ATTENTE — relevé du patron : « le bouton Note ne fait rien,
+   * n'affiche rien ? »
+   *
+   * Il faisait pourtant quelque chose : il armait la pose, en deux temps
+   * comme toutes les autres — on touche le bouton, puis le point du plan,
+   * parce qu'une note tient à un POINT. Mais rien ne le disait : les prises,
+   * les points lumineux et les liaisons montrent ce bandeau, la note armait
+   * en silence. Un geste qu'on arme sans le dire est un geste qui ne marche
+   * pas.
+   */
+  note?: boolean;
   /** Précision quand une cible est déjà désignée (un retour de mur). */
   cible: string | null;
   onCancel: () => void;
 }) {
   const c = useTheme();
   const styles = getStyles(c);
-  // Mur ou plafond : deux catalogues, un seul bandeau d'attente.
-  const spec = plafond ? CEILINGS[plafond] : FIXTURES[kind!];
-  const trace = plafond ? CEILING_SYMBOL[plafond] : assemblySymbol(kind!);
+  // Mur, plafond ou note : trois catalogues, un seul bandeau d'attente.
+  const spec = note
+    ? { color: c.ink, label: 'Note sur le plan' }
+    : plafond
+      ? CEILINGS[plafond]
+      : FIXTURES[kind!];
+  const trace = note
+    ? // La punaise du plan : le même signe que celui qui marquera le point.
+      [
+        { d: 'M0 -7 L0 7', fill: false },
+        { d: 'M0 -7 L6 -4 L0 -1 Z', fill: true },
+      ]
+    : plafond
+      ? CEILING_SYMBOL[plafond]
+      : assemblySymbol(kind!);
   const souffle = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     const boucle = Animated.loop(
@@ -120,7 +145,11 @@ export function EnAttente({
           {spec.label}
         </Text>
         <Text style={styles.attenteHint} numberOfLines={2}>
-          {cible ? `Touchez ${cible}` : 'Touchez un mur'}
+          {cible
+            ? `Touchez ${cible}`
+            : note
+              ? 'Touchez le point à annoter'
+              : 'Touchez un mur'}
         </Text>
       </View>
       <TouchableOpacity

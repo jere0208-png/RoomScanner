@@ -276,3 +276,58 @@ describe('la largeur des boutons, sur un écran étroit', () => {
     }
   });
 });
+
+/**
+ * CHAQUE BOUTON DIT CE QU'IL FAIT.
+ *
+ * Relevé du patron : « mets des noms sous les boutons qui s'affichent pour la
+ * sélection d'un mur et autres comme spots leds etc. On doit comprendre ce
+ * que chaque bouton fait. Nom discret comme le "Afficher", mais sous ces
+ * boutons. »
+ *
+ * La barre d'actions d'un mur les portait déjà — huit points et demi, à
+ * moitié effacés, sous chaque icône. Les bandeaux du bas, non : une ligne de
+ * spots offrait quatre pastilles rondes muettes (deux flèches, un maillon,
+ * une croix) et il fallait les essayer pour savoir. Le nom vit dans
+ * l'étiquette d'accessibilité, ce qui sert au lecteur d'écran et à personne
+ * d'autre.
+ */
+describe('les boutons en icône seule', () => {
+  it('portent leur nom, discrètement, dessous', () => {
+    for (const [nom, rendre] of CAS) {
+      const t = monter(rendre());
+      for (const b of boutons(t)) {
+        const label = String(b.props.accessibilityLabel ?? '');
+        if (!label || label === 'undefined') continue;
+        /*
+          DEUX FAÇONS DE SE NOMMER, et une seule suffit : le bouton porte du
+          TEXTE (« H 2,50 m », « Nommer »), ou son nom est écrit dessous.
+          Ce qu'on refuse, c'est la pastille muette.
+        */
+        const dedans = b
+          .findAllByType(Text)
+          .map((n) => String(n.props.children))
+          .filter((m) => m && m !== 'undefined').length > 0;
+        const dessous = t.root
+          .findAllByType(Text)
+          .map((n) =>
+            (Array.isArray(n.props.children) ? n.props.children : [n.props.children])
+              .filter((x: unknown) => typeof x === 'string')
+              .join(''),
+          )
+          // Le mot écrit est le nom COURT — « Relier » sous un bouton dont
+          // l'étiquette parlée dit « Relier à une commande ». Quatre lettres
+          // au moins : sans ce plancher, une chaîne vide passerait pour un
+          // nom.
+          .filter((m) => m.length >= 4)
+          .some((m) => label.startsWith(m) || m.startsWith(label));
+        const ecrit = dedans || dessous;
+        expect({ [`${nom} · ${label}`]: ecrit }).toEqual({
+          [`${nom} · ${label}`]: true,
+        });
+      }
+      act(() => t.unmount());
+      arbre = null;
+    }
+  });
+});

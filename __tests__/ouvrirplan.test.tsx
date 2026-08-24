@@ -27,7 +27,7 @@ jest.mock('react-native-room-scan', () => ({
 }));
 
 import React from 'react';
-import { Alert } from 'react-native';
+import { Alert, Text } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import { LibraryScreen } from '../src/screens/LibraryScreen';
 import { useScanStore } from '../src/store/scanStore';
@@ -80,22 +80,41 @@ const ligne = (t: TestRenderer.ReactTestRenderer, nom: string) =>
 
 describe('ouvrir un plan depuis la bibliothèque', () => {
   it('demande quoi faire du travail en cours', () => {
+    /*
+      LA QUESTION SE POSE DANS NOTRE FEUILLE, plus dans l'alerte du système.
+
+      Relevé du patron, capture à l'appui : « la popup des modifications non
+      enregistrées est trop basique, donne-lui notre identité ». Ce qui
+      change est le SUPPORT, pas la règle — mêmes issues, même ordre, même
+      silence quand il n'y a rien à perdre. Le banc lit donc les mots de la
+      feuille au lieu des boutons de l'alerte.
+    */
     const alerte = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     const { t, second } = deuxPlans();
     expect(st().dirty).toBe(true);
     const cible = ligne(t, second.name);
     expect(cible).toBeDefined();
     act(() => cible.props.onPress());
-    expect(alerte).toHaveBeenCalled();
+    act(() => {
+      jest.advanceTimersByTime(400);
+    });
+    expect(alerte).not.toHaveBeenCalled();
     // Rien n'a bougé tant qu'on n'a pas répondu.
     expect(st().rooms.some((r) => r.name === 'WC')).toBe(true);
-    // Et « Enregistrer » garde le travail AVANT d'ouvrir l'autre.
-    const choix = (alerte.mock.calls[0][2] ?? []) as {
-      text: string;
-      onPress?: () => void;
-    }[];
-    expect(choix.map((c) => c.text)).toContain('Enregistrer');
-    act(() => choix.find((c) => c.text === 'Enregistrer')?.onPress?.());
+    const bouton = (mot: string) =>
+      t.root
+        .findAll(
+          (n) =>
+            typeof n.props?.onPress === 'function' &&
+            n.findAllByType(Text).some((x) => String(x.props.children) === mot),
+        )
+        .pop();
+    // « Enregistrer » garde le travail AVANT d'ouvrir l'autre.
+    expect(bouton('Enregistrer')).toBeDefined();
+    act(() => bouton('Enregistrer')!.props.onPress());
+    act(() => {
+      jest.advanceTimersByTime(400);
+    });
     const garde = st().saves.find((s) => s.rooms.some((r) => r.name === 'WC'));
     expect(garde).toBeDefined();
     alerte.mockRestore();

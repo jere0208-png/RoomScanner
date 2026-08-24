@@ -18,10 +18,14 @@ import { Animated, Text, View } from 'react-native';
 import Svg, { Line } from 'react-native-svg';
 import {
   PILL_CELL_H,
+  PILL_CELL_W,
   PILL_GAP,
   PillSlot,
   repartirOutils,
 } from './ToolPill';
+
+/** La largeur d'une cellule d'outil : le peigne vise son milieu. */
+const CELLULE = PILL_CELL_W;
 
 /*
   LE PEIGNE SE POSE AU RAS DES PASTILLES — relevé du patron : « descends le
@@ -56,6 +60,7 @@ export function RangeeOutils({
   anim,
   styles,
   edition = false,
+  onSuite,
 }: {
   elements: React.ReactElement[];
   /** Largeur de la carte du plan. */
@@ -70,6 +75,14 @@ export function RangeeOutils({
   styles: Record<string, object>;
   /** En édition, chaque bouton fait autre chose : pas de titre commun. */
   edition?: boolean;
+  /**
+   * La hauteur de la pile de droite, mesurée et rendue à l'écran.
+   *
+   * Il en a besoin pour poser « Enregistrer » AU-DESSUS d'elle : la pile
+   * grandit avec le nombre de calques en trop, et un nombre écrit à la main
+   * dériverait au premier bouton ajouté.
+   */
+  onSuite?: (hauteur: number) => void;
 }) {
   // Tant que la carte n'est pas mesurée, on suppose qu'ils tiennent tous :
   // une rangée complète qui se replie à la première image se verrait.
@@ -96,6 +109,23 @@ export function RangeeOutils({
   const largeurUtile = Math.max(0, largeur - (reserve || 4) - 4);
   const part = rangee.length > 0 ? largeurUtile / rangee.length : 0;
   const peigne = !edition && rangee.length > 1 && part > 0;
+  /*
+    LE PEIGNE VA JUSQU'AU DERNIER BOUTON — relevé du patron : « la ligne du
+    Afficher ne va pas jusqu'au dernier bouton. Il doit faire tous les
+    boutons, et même sur la colonne de droite quand c'est des éléments à
+    afficher/cacher ».
+
+    Il s'arrêtait au dernier outil de la LIGNE. Or ce qui ne tient pas dans
+    la ligne se range à droite, dans la même bande — sur la capture,
+    « Murs » — et se retrouvait hors du peigne : annoté par rien, il se
+    lisait comme autre chose qu'un calque. Le peigne s'étend donc jusqu'à
+    cette pile, avec sa descente comme les autres.
+
+    Les commandes (édition, sauvegarde) ne sont PAS concernées : elles ne
+    montrent ni ne cachent rien, et vivent dans leur propre colonne.
+  */
+  const largeurPeigne = colonne.length > 0 ? largeur - 8 : largeurUtile;
+  const xColonne = largeurPeigne - CELLULE / 2;
   return (
     <>
       {peigne && (
@@ -115,19 +145,21 @@ export function RangeeOutils({
             styles.peigne,
             {
               bottom: bas + PEIGNE_BAS,
-              right: reserve || 4,
+              // Le peigne part du même bord que la ligne ; il s'étend
+              // seulement plus loin quand il doit rejoindre la pile.
+              right: colonne.length > 0 ? 4 : reserve || 4,
               opacity: Animated.multiply(anim, PEIGNE_OPACITE),
             },
           ]}
           pointerEvents="none">
           <Text style={styles.peigneMot}>Afficher</Text>
-          <Svg width={largeurUtile} height={PEIGNE_H}>
+          <Svg width={largeurPeigne} height={PEIGNE_H}>
             {/* La barre ne court que d'une descente à l'autre : débordante,
                 elle ferait un cadre, et l'on annoterait la carte entière. */}
             <Line
               x1={part / 2}
               y1={1}
-              x2={largeurUtile - part / 2}
+              x2={colonne.length > 0 ? xColonne : largeurUtile - part / 2}
               y2={1}
               stroke={TRAIT_PEIGNE}
               strokeWidth={1.5}
@@ -145,6 +177,19 @@ export function RangeeOutils({
                 strokeLinecap="round"
               />
             ))}
+            {/* La descente de la pile de droite : un seul trait, elles sont
+                les unes au-dessus des autres. */}
+            {colonne.length > 0 && (
+              <Line
+                x1={xColonne}
+                y1={1}
+                x2={xColonne}
+                y2={PEIGNE_H - 1}
+                stroke={TRAIT_PEIGNE}
+                strokeWidth={1.5}
+                strokeLinecap="round"
+              />
+            )}
           </Svg>
         </Animated.View>
       )}
@@ -165,6 +210,7 @@ export function RangeeOutils({
       {colonne.length > 0 && (
         <View
           style={[styles.planToolsSuite, { bottom: bas + dessus }]}
+          onLayout={(e) => onSuite?.(e.nativeEvent.layout.height)}
           pointerEvents="box-none">
           {colonne.map((el, i) => (
             <PillSlot key={el.key} index={rangee.length + i} anim={anim}>

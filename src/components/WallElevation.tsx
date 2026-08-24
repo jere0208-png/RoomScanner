@@ -127,6 +127,8 @@ const SNAP = 0.03;
 
 const cm = (m: number) => Math.round(m * 100);
 
+import type { ActionData } from './Sheet';
+
 interface Props {
   wallId: string;
   /**
@@ -149,6 +151,14 @@ interface Props {
    */
   onLinkRequest?: (fixtureId: string) => void;
   onClose: () => void;
+  /**
+   * COMMENT POSER UNE QUESTION — l'écran qui nous porte sait le faire.
+   *
+   * L'établi n'a pas de feuille à lui : il vit DANS l'écran des résultats,
+   * qui en a une (voir `ActionSheet`). Il lui passe donc sa façon d'ouvrir
+   * une question, plutôt que de tomber sur l'alerte du système.
+   */
+  onDemander?: (data: ActionData) => void;
 }
 
 export function WallElevation({
@@ -159,6 +169,7 @@ export function WallElevation({
   onAddRequest,
   onLinkRequest,
   onClose,
+  onDemander,
 }: Props) {
   const walls = useScanStore((s) => s.walls);
   const openings = useScanStore((s) => s.openings);
@@ -952,6 +963,41 @@ export function WallElevation({
               onClose();
               return;
             }
+            /*
+              LA QUESTION SE POSE DANS NOTRE FEUILLE.
+
+              Relevé du patron, capture à l'appui : « refonte de ce popup
+              aussi dans notre style ». C'était une `Alert.alert` posée au
+              milieu de l'établi — police système, deux boutons bleus côte à
+              côte, coins de 2019 — sur un écran qui a sa typographie, ses
+              rayons et son bleu.
+
+              L'écran qui nous porte sait ouvrir nos feuilles ; il nous
+              passe sa façon de le faire. Sans elle (un banc qui monte
+              l'établi tout seul), on garde l'alerte : mieux vaut une
+              question laide qu'un mur qu'on abandonne sans demander.
+            */
+            const abandonner = () => {
+              if (depart.current) restoreFixtures(depart.current);
+              depart.current = null;
+              onClose();
+            };
+            if (onDemander) {
+              onDemander({
+                title: 'Abandonner les modifications ?',
+                subtitle: 'Ce mur reviendra dans l’état où vous l’avez ouvert.',
+                actions: [
+                  {
+                    label: 'Abandonner',
+                    hint: 'Les appareils reprennent leur place d’origine.',
+                    icon: 'supprimer',
+                    danger: true,
+                    onPress: abandonner,
+                  },
+                ],
+              });
+              return;
+            }
             Alert.alert(
               'Abandonner les modifications ?',
               'Ce mur reviendra dans l’état où vous l’avez ouvert.',
@@ -960,11 +1006,7 @@ export function WallElevation({
                 {
                   text: 'Abandonner',
                   style: 'destructive',
-                  onPress: () => {
-                    if (depart.current) restoreFixtures(depart.current);
-                    depart.current = null;
-                    onClose();
-                  },
+                  onPress: abandonner,
                 },
               ],
             );

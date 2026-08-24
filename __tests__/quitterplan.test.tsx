@@ -23,7 +23,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 import React from 'react';
-import { Alert, View } from 'react-native';
+import { Alert, Text, View } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import { ResultScreen } from '../src/screens/ResultScreen';
 import { useScanStore } from '../src/store/scanStore';
@@ -70,20 +70,39 @@ const retour = (t: TestRenderer.ReactTestRenderer) =>
 
 describe('quitter un plan modifié', () => {
   it('demande confirmation, et ne quitte pas tout seul', () => {
+    /*
+      LA QUESTION SE POSE DANS NOTRE FEUILLE, plus dans l'alerte du système.
+
+      Relevé du patron, capture à l'appui : « la popup des modifications non
+      enregistrées est trop basique, donne-lui notre identité ». Ce qui
+      change est le SUPPORT, pas la règle — mêmes issues, même ordre, même
+      silence quand il n'y a rien à perdre. Le banc lit donc les mots de la
+      feuille au lieu des boutons de l'alerte.
+    */
     const alerte = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     const t = planModifie();
     expect(st().dirty).toBe(true);
     act(() => retour(t).props.onPress());
-    expect(alerte).toHaveBeenCalled();
+    act(() => {
+      jest.advanceTimersByTime(400);
+    });
+    expect(alerte).not.toHaveBeenCalled();
     // L'écran n'a pas bougé : c'est la réponse qui décidera.
     expect(st().screen).toBe('result');
-    // Et le premier choix ENREGISTRE : c'est ce qu'on veut neuf fois sur dix.
-    const choix = (alerte.mock.calls[0][2] ?? []) as {
-      text: string;
-      onPress?: () => void;
-    }[];
-    expect(choix.map((c) => c.text)).toContain('Enregistrer');
-    act(() => choix.find((c) => c.text === 'Enregistrer')?.onPress?.());
+    const bouton = (mot: string) =>
+      t.root
+        .findAll(
+          (n) =>
+            typeof n.props?.onPress === 'function' &&
+            n.findAllByType(Text).some((x) => String(x.props.children) === mot),
+        )
+        .pop();
+    // Le premier choix ENREGISTRE : c'est ce qu'on veut neuf fois sur dix.
+    expect(bouton('Enregistrer')).toBeDefined();
+    act(() => bouton('Enregistrer')!.props.onPress());
+    act(() => {
+      jest.advanceTimersByTime(400);
+    });
     expect(st().dirty).toBe(false);
     expect(st().saves[0].rooms).toHaveLength(2);
     alerte.mockRestore();

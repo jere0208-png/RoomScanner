@@ -103,13 +103,13 @@ export function StripBar({
           const teinte =
             (StyleSheet.flatten(texte) as { color?: string })?.color ??
             '#FFFFFF';
-          return (
+          const bouton = (
             <TouchableOpacity
               key={a.label}
               style={[
                 a.ghost ? styles.bandeauBtnGhost : styles.bandeauBtn,
                 // Une icône seule tient dans un carré : le mot n'est pas là
-                // pour lui donner sa largeur.
+                // pour lui donner sa largeur — il se lit dessous.
                 a.sansMot && styles.bandeauBtnIcone,
               ]}
               accessibilityLabel={a.label}
@@ -126,6 +126,21 @@ export function StripBar({
                 </Text>
               )}
             </TouchableOpacity>
+          );
+          /*
+            LE MOT SOUS LA PASTILLE — relevé du patron : « on doit comprendre
+            ce que chaque bouton fait ». Une icône seule ne se comprend qu'en
+            l'essayant ; le mot se lit en retrait, comme le peigne
+            « Afficher ».
+          */
+          if (!a.sansMot) return bouton;
+          return (
+            <View key={a.label} style={styles.bandeauCellule}>
+              {bouton}
+              <Text style={styles.bandeauMot} numberOfLines={1}>
+                {a.label}
+              </Text>
+            </View>
           );
         })}
       </View>

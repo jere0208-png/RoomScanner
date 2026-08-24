@@ -650,7 +650,9 @@ export function ResultScreen() {
   const [focusIdx, setFocusIdx] = useState(-1);
   // Cotes du plan 2D masquées par défaut : la pastille « Cotes » les active.
   const [showMeasures, setShowMeasures] = useState(false);
-  const [show3DMeasures, setShow3DMeasures] = useState(true);
+  // Éteintes d'office, comme les autres calques du modèle : voir
+  // `showSurfaces` dans le magasin — on ouvre sur le bâti et ses meubles.
+  const [show3DMeasures, setShow3DMeasures] = useState(false);
   /**
    * Le retour de mur choisi sur le plan.
    *
@@ -672,6 +674,17 @@ export function ResultScreen() {
    * autres calques, et c'est le premier réflexe quand on veut revoir le
    * plan de sol.
    */
+  /*
+    LE PLAFOND RESTE ALLUMÉ, lui, et c'est délibéré.
+
+    Les autres calques s'éteignent d'office (voir `showSurfaces`) : ils
+    montrent ce que le scan a relevé. Le plafond, non — il montre ce que
+    L'ON A POSÉ. Un point lumineux qu'on vient de placer et qui disparaît
+    parce qu'un calque est éteint, c'est un geste qu'on croit raté.
+
+    Et il ne coûte rien à l'ouverture d'un scan : sans appareil de plafond,
+    son bouton ne paraît même pas.
+  */
   const [showCeiling, setShowCeiling] = useState(true);
   /** Appareil de plafond en attente de pose : on touche la pièce qui le reçoit. */
   const [pendingCeiling, setPendingCeiling] = useState<CeilingKind | null>(null);
@@ -767,7 +780,11 @@ export function ResultScreen() {
     [],
   );
   /** Repères électriques en 3D : un calque comme les autres. */
-  const [showElecTags, setShowElecTags] = useState(true);
+  // Les repères d'appareil : indispensables pour poser, encombrants pour
+  // regarder. Une pièce équipée en porte une dizaine.
+  const [showElecTags, setShowElecTags] = useState(false);
+  /** Hauteur de la pile des calques en trop, mesurée par la rangée. */
+  const [hSuite, setHSuite] = useState(0);
   /**
    * Les points cardinaux : un calque, lui aussi — ÉTEINT au départ.
    *
@@ -1558,6 +1575,8 @@ export function ResultScreen() {
   */
   const sortirDuPlan = () =>
     garderLeTravail({
+      // La question se pose dans NOTRE feuille : voir `garderLeTravail`.
+      demander: setMenu,
       dirty,
       message:
         'Ce que vous venez de faire sur ce plan sera perdu si vous partez.',
@@ -1580,6 +1599,8 @@ export function ResultScreen() {
   */
   const repartirDeZero = () =>
     garderLeTravail({
+      // La question se pose dans NOTRE feuille : voir `garderLeTravail`.
+      demander: setMenu,
       dirty,
       message:
         'Repartir de zéro efface le plan à l’écran, et ce qui n’a pas été ' +
@@ -2963,8 +2984,38 @@ export function ResultScreen() {
 
         {/* Toute la quincaillerie s'efface pendant une capture : une image
             qu'on envoie ne doit montrer QUE le plan et le logo. */}
+        {/*
+          « ENREGISTRER » EN TÊTE DE COLONNE — relevé du patron : « le bouton
+          Enregistrer doit être au-dessus du bouton Nord et de tout autre
+          bouton de la colonne, lorsqu'il est affiché ».
+
+          Il vivait AVEC les commandes, en bas : le trop-plein de calques
+          s'empilait au-dessus de lui, et le geste le plus important de
+          l'écran se retrouvait le plus bas. Il a maintenant son propre
+          ancrage, posé au-dessus des deux piles — celle des commandes et
+          celle des calques —, dont on mesure les hauteurs.
+        */}
+        {!capturing && dirty && (
+          <View
+            style={[
+              styles.editAnchor,
+              { bottom: ligneOutils + hActions + PILL_GAP + hSuite },
+            ]}
+            pointerEvents="box-none">
+            <SidePill visible index={0}>
+              <ToolPill
+                icon="save"
+                label="Enregistrer"
+                active
+                onPress={commitCurrent}
+              />
+            </SidePill>
+          </View>
+        )}
+
         {capturing ? null : vue === '2d' ? (
           <Toolbar2D
+            onSuite={setHSuite}
             anim={swap}
             largeur={carteW}
             bas={ligneOutils}
@@ -3006,6 +3057,7 @@ export function ResultScreen() {
           />
         ) : (
           <Toolbar3D
+            onSuite={setHSuite}
             anim={swap}
             largeur={carteW}
             bas={ligneOutils}
@@ -3128,14 +3180,6 @@ export function ResultScreen() {
             {/* Le contrôle de conformité a quitté cette colonne pour la
                 rangée du sélecteur de vue : un verdict se consulte d'un
                 coup d'œil, il ne fait pas la queue avec les outils. */}
-            <SidePill visible={dirty} index={1}>
-              <ToolPill
-                icon="save"
-                label="Enregistrer"
-                active
-                onPress={commitCurrent}
-              />
-            </SidePill>
             <SidePill visible={editMode && canUndo} index={0}>
               <ToolPill icon="undo" label="Annuler" active={false} onPress={undo} />
             </SidePill>
@@ -3505,7 +3549,11 @@ export function ResultScreen() {
             pendingCeiling ||
             pendingSpots ||
             pendingLink ||
-            pendingLienMur) &&
+            pendingLienMur ||
+            // La note s'arme comme le reste : elle doit le dire comme le
+            // reste. Voir `EnAttente`.
+            pendingNote ||
+            !!noteADeplacer) &&
           !capturing && (
             <EnAttente
               kind={
@@ -3514,6 +3562,7 @@ export function ResultScreen() {
                   ? fixtures.find((x) => x.id === pendingLienMur)?.kind ?? null
                   : null)
               }
+              note={pendingNote || !!noteADeplacer}
               plafond={
                 (pendingSpots ? 'spot' : null) ??
                 pendingCeiling ??
@@ -3522,7 +3571,9 @@ export function ResultScreen() {
                   : null)
               }
               cible={
-                pendingSpots
+                noteADeplacer
+                  ? 'le nouveau point de la note'
+                  : pendingSpots
                   ? `une pièce — ${pendingSpots} spots`
                   : pendingLink
                   ? 'l’interrupteur qui l’allume'
@@ -3540,6 +3591,8 @@ export function ResultScreen() {
                 setPendingSpots(null);
                 setPendingLink(null);
                 setPendingLienMur(null);
+                setPendingNote(false);
+                setNoteADeplacer(null);
               }}
             />
           )}

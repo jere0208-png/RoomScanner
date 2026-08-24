@@ -259,6 +259,7 @@ export function ObjectBar({
         {champ('Profondeur', object.depth, (v) => onResize(object.width, v), 'm')}
       </View>
       <View style={styles.bandeauActions}>
+          <View style={styles.bandeauCellule}>
           <TouchableOpacity
             style={styles.iconBtn}
             hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
@@ -282,10 +283,22 @@ export function ObjectBar({
               />
             </Svg>
           </TouchableOpacity>
+            {/* Le mot sous la pastille : voir `bandeauMot`. */}
+            <Text style={styles.bandeauMot}>Pivoter</Text>
+          </View>
+          <View style={styles.bandeauCellule}>
           <TouchableOpacity
             style={styles.iconBtn}
             hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
-            accessibilityLabel="Annuler"
+            /*
+              « RETIRER », pas « Annuler » — le mot dit ce que le geste fait.
+
+              La croix rouge ne défait pas une saisie : elle enlève le meuble
+              du plan. L'étiquette parlée disait « Annuler », le mot écrit
+              dessous dit « Retirer » : deux noms pour un bouton, dont un
+              faux. C'est le second qui est juste.
+            */
+            accessibilityLabel="Retirer le meuble"
             onPress={onCancel}>
             <Svg width={19} height={19} viewBox="0 0 24 24">
               {['M6.5 6.5 L17.5 17.5', 'M17.5 6.5 L6.5 17.5'].map((d) => (
@@ -300,6 +313,8 @@ export function ObjectBar({
               ))}
             </Svg>
           </TouchableOpacity>
+            <Text style={styles.bandeauMot}>Retirer</Text>
+          </View>
           {/*
             PLUS DE BOUTON « VALIDER » — relevé du patron : « pas de bouton
             valider ».

@@ -563,8 +563,28 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     minWidth: 44,
     flexShrink: 0,
   },
-  /* Une icône seule : carrée, même hauteur, pas de mot à loger. */
+  /* Une icône seule : carrée, même hauteur, pas de mot À L'INTÉRIEUR. */
   bandeauBtnIcone: { paddingHorizontal: 0, width: 44 },
+  /**
+   * LE MOT SOUS LE BOUTON — relevé du patron : « mets des noms sous les
+   * boutons… on doit comprendre ce que chaque bouton fait. Nom discret comme
+   * le "Afficher", mais sous ces boutons. »
+   *
+   * Une pastille ronde muette ne se comprend qu'en l'essayant : deux
+   * flèches, un maillon et une croix sous une ligne de spots, et il faut
+   * toucher pour savoir. Le mot vivait dans l'étiquette d'accessibilité —
+   * ce qui sert au lecteur d'écran, et à personne d'autre.
+   *
+   * Il se lit EN RETRAIT, comme le peigne « Afficher » qu'il imite : c'est
+   * une légende, elle ne doit pas se disputer le regard avec le geste.
+   */
+  bandeauCellule: { alignItems: 'center', gap: 3 },
+  bandeauMot: {
+    color: c.inkFaint,
+    fontSize: 10.5,
+    fontWeight: '600',
+    opacity: 0.75,
+  },
   bandeauBtnTexte: { color: '#FFFFFF', fontSize: 13.5, fontWeight: '800' },
   bandeauBtnGhostTexte: { color: c.inkSoft, fontSize: 13.5, fontWeight: '800' },
   /*
