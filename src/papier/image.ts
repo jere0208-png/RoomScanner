@@ -325,3 +325,35 @@ export function echantillon(img: ImageGrise, x: number, y: number): number {
     a * (1 - fx) * (1 - fy) + b * fx * (1 - fy) + c * (1 - fx) * fy + d * fx * fy
   );
 }
+
+/**
+ * EFFACE DU MASQUE CE QUE L'OCR A LU.
+ *
+ * Un plan est couvert d'écriture : les cotes, les noms de pièces, le
+ * cartouche, les renvois. Laissée dans le masque, chaque lettre devient une
+ * poignée de petits traits obliques — sur la première planche d'essai, le
+ * mot « SEJOUR » en a produit une vingtaine, et l'on cherchait des murs
+ * dedans. Ce que le téléphone a su LIRE, il n'y a plus à le regarder : on
+ * l'efface, avec un peu de marge pour les jambages.
+ *
+ * On n'efface PAS le texte de l'image grise : les boîtes de l'OCR servent
+ * ensuite à rattacher chaque cote à sa ligne, et il faut savoir où elles
+ * étaient.
+ */
+export function effacerBoites(
+  m: Masque,
+  boites: { x: number; y: number; l: number; h: number }[],
+  marge = 2,
+): Masque {
+  const out = { l: m.l, h: m.h, on: m.on.slice() };
+  for (const b of boites) {
+    const x0 = Math.max(0, Math.floor(b.x - marge));
+    const y0 = Math.max(0, Math.floor(b.y - marge));
+    const x1 = Math.min(m.l - 1, Math.ceil(b.x + b.l + marge));
+    const y1 = Math.min(m.h - 1, Math.ceil(b.y + b.h + marge));
+    for (let y = y0; y <= y1; y++) {
+      for (let x = x0; x <= x1; x++) out.on[y * m.l + x] = 0;
+    }
+  }
+  return out;
+}

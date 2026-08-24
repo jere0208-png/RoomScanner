@@ -7076,6 +7076,54 @@ Les images de contrôle s'écrivent à la demande : `PLANCHE_PAPIER=<dossier>`
 devant le banc dépose des PGM qu'on regarde (`magick x.pgm x.png`). Elles ne
 sont pas versionnées — leur diff ne dirait rien, et elles pèsent.
 
+
+### Plan papier — de l'encre à des traits
+
+Deuxième étage : `traits.ts`. C'est lui qui décide de tout ce qui suit — un
+mur manqué ici est un mur absent du plan final, un trait inventé est une
+cloison qui n'existe pas.
+
+**La transformée de Hough, et pas un suivi de pixels.** Un suivi s'arrête au
+premier croisement, et un plan n'est QUE des croisements : un refend coupe
+un mur, une ligne de cote traverse ses attaches, un vantail touche sa
+maçonnerie. La recherche de DROITES voit le trait entier même haché dix
+fois, ce qu'un banc vérifie explicitement sur le mur percé par la fenêtre.
+
+**On vote avec toute l'encre, pas avec les contours.** Un trait de trois
+pixels a deux contours : voter avec eux donnerait deux droites parallèles à
+un pixel et demi, à réunir ensuite. Voter avec la masse donne un pic unique,
+centré sur l'axe — et la largeur du pic donne l'épaisseur, qui distinguera
+plus loin un mur porteur d'une cloison, et la maçonnerie de la cotation.
+
+Trois choses ont été trouvées en REGARDANT le rendu des traits, jamais dans
+un nombre :
+
+- **Le mot « SEJOUR » ressortait en vingt traits obliques.** Un plan est
+  couvert d'écriture ; laissée dans le masque, chaque lettre devient une
+  poignée de petits segments, et l'on cherche des murs dedans. Ce que le
+  téléphone a su LIRE, on ne le regarde plus : `effacerBoites` retire les
+  boîtes de l'OCR du masque — mais pas de l'image, car ces mêmes boîtes
+  serviront à caler l'échelle sur les cotes écrites.
+- **On mesure d'abord, on efface ensuite, et l'on s'y reprend à deux fois.**
+  L'urne travaille au demi-degré : six pixels de dérive sur un mur de quatre
+  mètres, c'est-à-dire six centimètres sur la cote qu'on rendra. Recaler le
+  trait sur les pixels emportés ne suffisait pas : une bande inclinée qui
+  traverse un trait horizontal emporte un parallélogramme, dont l'axe est
+  incliné pareil — le défaut se recopiait lui-même. On ramasse large, on
+  recale, on ramasse de nouveau autour de l'axe recalé, et l'on efface
+  seulement là.
+- **On reprend le maximum de l'urne à chaque tour, et c'est voulu.** Ranger
+  les pics une bonne fois pour toutes faisait gagner deux secondes sur vingt
+  — et inventait vingt traits sur soixante-dix. Un pic dont l'encre vient
+  d'être emportée doit être REPESÉ, pas servi sur sa vieille valeur.
+
+`anglePrincipal` cherche de son côté l'inclinaison de la feuille : un plan
+est fait d'angles droits, c'est la seule chose dont on soit sûr avant de
+l'avoir lu, et l'orientation qui rend les projections les plus PIQUÉES est
+celle des murs. Le balayage se fait en deux temps — au degré, puis au quart
+de degré sur deux degrés — parce que la version en un seul passage coûtait
+quatre secondes par photo pour le même résultat.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro
