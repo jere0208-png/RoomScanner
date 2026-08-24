@@ -6740,6 +6740,16 @@ l'autre (620 ms et 2 200 ms) : c'est ce qui donne une lumière jamais deux fois
 la même. Tout part sur le fil natif — c'est la règle de l'app pour ce qui
 tourne en boucle.
 
+**Réglé une seconde fois, après l'avoir vu sur l'appareil** : « pour le gyro
+fais moins de lumière, moins d'opacité et plus autour de l'icône, pas trop
+loin ». La lueur allait jusqu'au bord de la scène et montait à 55 % ; les
+faisceaux balayaient toute la largeur. De la lumière partout, donc de la
+lumière nulle part — c'est le CONTRASTE avec le blanc de la carte qui fait
+croire à une lampe allumée, pas la quantité de rouge. Le halo s'éteint
+maintenant à mi-chemin du bord, les faisceaux s'arrêtent au tour de la
+sirène, et les opacités descendent d'un tiers. La respiration se raccourcit
+aussi : une lampe qui bat n'enfle pas, elle s'éclaire.
+
 **Le plastique translucide, lui aussi, tient en trois couches** : un dégradé
 du clair au sombre (le volume d'un dôme), un reflet blanc en haut à gauche
 (la lumière qui frappe), et le reflet DÉCOUPÉ à la forme de la sirène — sans
