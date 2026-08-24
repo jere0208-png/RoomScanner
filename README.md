@@ -6896,29 +6896,76 @@ pris : l'appui ouvrait le bandeau de la PIÈCE par-dessus le menu du mur, deux
 blocs de réglage à l'écran pour un seul appui. Un geste, un effet : le premier
 appui lâche, le suivant prend la pièce.
 
-### La barre du mur se couche dans son axe
+### La barre du mur : droite, et dehors
 
 **« Réduis légèrement cette barre, proportionnellement en taille, et fais en
 sorte qu'elle s'affiche en parallèle du mur, comme s'il suivait sa
 trajectoire »**, puis **« réduis légèrement le bouton de rotation aussi »**.
 
-Elle était droite quel que soit le mur : sur une cloison de biais, un
-rectangle horizontal posé à côté d'un trait oblique se lit comme un objet SANS
-RAPPORT avec lui. Couchée dans son axe, elle appartient au mur qu'elle règle —
-c'est déjà ce que fait la cote, qui se pose le long du trait. Elle ne se
-retourne jamais : au-delà du quart de tour on lit l'angle opposé, sinon les
-quatre mots se liraient à l'envers.
+Elle a donc été couchée dans l'axe du mur. **Essayée sur l'appareil, elle
+s'est révélée pire**, et le relevé suivant est tombé le même jour : « ne la
+fais plus suivre la continuité du mur mais affiche-la en dehors de la pièce si
+possible et droite ». Elle penche, ses quatre mots penchent avec elle, et
+l'œil doit tourner la tête pour lire quatre commandes qu'il connaît par cœur.
 
-Deux conséquences dans le calcul de placement, et il fallait les deux : ce
-qui déborde vers le mur est maintenant sa HAUTEUR quel que soit l'angle (plus
-jamais sa largeur), et le cadre qui doit tenir dans l'écran est celui de la
-barre TOURNÉE.
+**Une barre de commandes n'est pas une cote** : la cote APPARTIENT au mur et
+se lit dans son axe ; la barre, elle, appartient à la main. C'est la
+différence qu'on avait manquée.
+
+**Et elle sort de la pièce.** Elle cherchait sa place dedans, « là où l'on a
+de la place » : c'est vrai d'un séjour et faux de tout le reste — la place
+d'une pièce est occupée par ce qu'on y règle, et par le plan qu'on est en
+train de lire. « Elle ne doit rien gêner et ne pas être gênée. »
+
+La poignée de rotation, qui avait le dehors, prend la place laissée dedans :
+ce qui compte n'a pas changé — elles sont sur des flancs OPPOSÉS, par
+construction. Et « libre » veut dire deux choses désormais : ni sur le mur, ni
+sur la poignée. Un mur de façade n'a pas de dehors ; la barre est alors
+rappelée dans le cadre, et sans cette seconde condition elle retombait sur le
+rond bleu.
 
 Le dessin descend de 48 × 40 à 44 × 36 pour les commandes, de 34 à 30 pour le
 bouton de rotation. **Les cibles, elles, restent à quarante-quatre** : le
 débord rend au doigt ce que le dessin a rendu au plan. C'est la même règle que
 les bandeaux du bas, et elle vaut ici pour la même raison — chaque point pris
 sur le plan est un point de dessin en moins.
+
+### Ce qui se pose sur le plan ne doit pas le trouer
+
+Trois relevés du patron sur la même capture, et le même principe derrière.
+
+**« Le bloc en bas cache le "Afficher". »** Le bandeau d'un mur montait d'une
+cellule au-dessus de la rangée — la hauteur des pastilles — sans compter le
+peigne, qui vit là lui aussi : sa barre, ses descentes, son mot. C'est le
+peigne qui dit maintenant ce qu'il prend (`PEIGNE_TOTAL`) ; l'écran ne le
+devine plus, et un nombre écrit à la main ne dérivera pas au premier
+changement de pastille.
+
+**« La taille des blocs bleus des boutons est trop grande, réduis sans réduire
+les icônes. »** C'est le DISQUE qui pesait, pas le dessin : il descend de
+quarante à trente-quatre points, l'icône garde ses dix-neuf. Le débord suit —
+la cible reste au-delà des quarante-quatre points du doigt, comme partout
+ailleurs.
+
+**« Supprimer est coupé dans la barre à côté du mur. »** Neuf lettres dans une
+colonne de quarante-quatre points : le mot passait à la ligne et le « r »
+tombait seul. C'est « **Retirer** » désormais — le mot de tous les autres
+bandeaux de l'app, et deux mots pour un même geste, c'était de toute façon un
+de trop. La feuille d'une photo garde « Supprimer » : elle a la place d'une
+ligne entière, et c'est un fichier qu'on efface, pas un objet du plan qu'on
+retire.
+
+**« Cette barre devrait avoir une opacité sur son fond blanc »**, et pour le
+cartouche : **« il est trop gros et devrait avoir une opacité du fond »**. Ce
+qui se pose SUR le plan ne doit pas le trouer — le mur qu'on règle passe
+dessous et se devine. Le thème porte donc une teinte `surfaceVoile` : la même
+surface, mais qu'on traverse. Une opacité posée sur le bloc entier fanerait
+aussi son texte ; c'est le FOND seul qui s'éclaircit.
+
+Le cartouche, lui, vit au milieu du sol — là où l'on pose les meubles et les
+points lumineux. Chaque point qu'il prend est un point de plan en moins : les
+corps descendent d'un demi, la marge et l'interligne d'un point et demi, et
+son fond passe de 85 à 70 %.
 
 ## Prérequis pour tester sur iPhone
 

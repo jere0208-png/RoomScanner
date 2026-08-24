@@ -10,6 +10,17 @@ import { useScanStore } from './store/scanStore';
 export interface Palette {
   bg: string;
   surface: string;
+  /**
+   * LA MÊME SURFACE, MAIS QU'ON TRAVERSE.
+   *
+   * Relevé du patron : « cette barre devrait avoir une opacité sur son fond
+   * blanc », et pour le cartouche d'une pièce : « devrait avoir une opacité
+   * du fond ». Ce qui se pose SUR le plan ne doit pas le trouer : un mur
+   * qui passe dessous se devine, et l'on garde le dessin en tête pendant
+   * qu'on le règle. Une opacité posée sur le bloc entier fanerait aussi son
+   * texte ; c'est le FOND seul qui s'éclaircit.
+   */
+  surfaceVoile: string;
   surfaceSunken: string;
   ink: string;
   inkSoft: string;
@@ -31,6 +42,7 @@ export interface Palette {
 export const light: Palette = {
   bg: '#F6F7F9',
   surface: '#FFFFFF',
+  surfaceVoile: 'rgba(255,255,255,0.9)',
   surfaceSunken: '#EFF1F5',
   ink: '#0B0D12',
   inkSoft: '#5A6472',
@@ -52,6 +64,7 @@ export const light: Palette = {
 export const dark: Palette = {
   bg: '#0D1015',
   surface: '#151A21',
+  surfaceVoile: 'rgba(21,26,33,0.9)',
   surfaceSunken: '#1D2530',
   ink: '#F2F5F9',
   inkSoft: '#A6B0BD',

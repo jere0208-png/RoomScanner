@@ -80,7 +80,16 @@ describe('le bandeau du mur tient dans son bloc', () => {
       */
       const hs = (b.props.hitSlop ?? {}) as Record<string, number>;
       const cible = Number(st.minHeight ?? 0) + (hs.top ?? 0) + (hs.bottom ?? 0);
-      expect(`${l} sous le doigt : ${cible}`).toBe(`${l} sous le doigt : 48`);
+      /*
+        Le dessin est descendu deux fois — quarante-quatre, puis quarante,
+        puis trente-quatre (« la taille des blocs bleus des boutons est trop
+        grande, réduis sans réduire les icônes ») — et le débord a suivi
+        chaque fois. Ce qui ne bouge pas, c'est la CIBLE : elle reste
+        au-delà des quarante-quatre points du doigt.
+      */
+      expect(`${l} sous le doigt : ${cible >= 44}`).toBe(
+        `${l} sous le doigt : true`,
+      );
     }
     act(() => t.unmount());
   });

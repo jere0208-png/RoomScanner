@@ -3989,7 +3989,7 @@
              "type": 0,
              "payload": 4294967295
             },
-            "fillOpacity": 0.85,
+            "fillOpacity": 0.7,
             "stroke": {
              "type": 0,
              "payload": 4292271075
@@ -4001,10 +4001,10 @@
              "stroke",
              "strokeWidth"
             ],
-            "x": 406.73,
-            "y": 284,
-            "width": 86.54,
-            "height": 52,
+            "x": 408.745,
+            "y": 287.25,
+            "width": 82.51,
+            "height": 45.5,
             "rx": 5
            },
            "children": null
@@ -4022,14 +4022,14 @@
             "content": null,
             "font": {
              "fontWeight": "700",
-             "fontSize": 11,
+             "fontSize": 10.5,
              "textAnchor": "middle"
             },
             "x": [
              450
             ],
             "y": [
-             299.85
+             301.175
             ],
             "dx": [],
             "dy": [],
@@ -4068,14 +4068,14 @@
             "content": null,
             "font": {
              "fontWeight": "600",
-             "fontSize": 10,
+             "fontSize": 9.5,
              "textAnchor": "middle"
             },
             "x": [
              450
             ],
             "y": [
-             313.5
+             313.325
             ],
             "dx": [],
             "dy": [],
@@ -4114,14 +4114,14 @@
             "content": null,
             "font": {
              "fontWeight": "600",
-             "fontSize": 9,
+             "fontSize": 8.5,
              "textAnchor": "middle"
             },
             "x": [
              450
             ],
             "y": [
-             327.15
+             325.475
             ],
             "dx": [],
             "dy": [],

@@ -267,9 +267,17 @@ const WALL_ACTIONS: {
   { action: 'longueur', label: 'Mesures', d: SOLAIRES.ruler },
   { action: 'ouverture', label: 'Ouvrir', d: SOLAIRES.ouvertures },
   { action: 'electricite', label: 'Élec', d: SOLAIRES.elec },
-  // Une croix se lit dans toutes les langues, mais pas dans une rangée où
-  // ses trois voisines portent un mot : la corbeille se nomme aussi.
-  { action: 'supprimer', label: 'Supprimer', d: SOLAIRES.supprimer },
+  /*
+    « RETIRER », PAS « SUPPRIMER » — relevé du patron, capture à l'appui :
+    « Supprimer est coupé dans la barre à côté du mur ».
+
+    Neuf lettres dans une colonne de quarante-quatre points : le mot passait
+    à la ligne et le « r » tombait seul sous les autres. C'est le mot de
+    TOUS les autres bandeaux de l'app — le plafond, le meuble, l'appareil —
+    et il tient. Deux mots pour un même geste, c'était de toute façon un de
+    trop.
+  */
+  { action: 'supprimer', label: 'Retirer', d: SOLAIRES.supprimer },
 ];
 
 interface EffMapping {
@@ -2472,10 +2480,22 @@ export function FloorplanEditor({
               }[] = [];
               // Un constat de conformité sur cette pièce : un point ambre
               // devant son nom. Discret, mais là où l'on regarde.
+              /*
+                LE CARTOUCHE SE RESSERRE — relevé du patron, capture à
+                l'appui : « le bloc qui affiche aussi la surface avec le nom
+                de pièce est trop gros et devrait avoir une opacité du
+                fond ».
+
+                Il vit AU MILIEU du sol, c'est-à-dire là où l'on pose les
+                meubles et les points lumineux : chaque point qu'il prend est
+                un point de plan en moins. Les corps descendent d'un demi, la
+                marge et l'interligne d'un point et demi — assez pour qu'il
+                reste lisible à bout de bras, et deux fois moins encombrant.
+              */
               if (roomName !== '') {
                 lignes.push({
                   t: roomName,
-                  size: 11,
+                  size: 10.5,
                   fill:
                     selectedRoomId === part.roomId && editable ? c.blue : c.ink,
                   bold: true,
@@ -2484,27 +2504,27 @@ export function FloorplanEditor({
               if (areaText) {
                 lignes.push({
                   t: areaText,
-                  size: roomName !== '' ? 10 : 11,
+                  size: roomName !== '' ? 9.5 : 10.5,
                   fill: roomName !== '' ? c.inkSoft : c.ink,
                   bold: roomName === '',
                 });
               }
               if (extText) {
-                lignes.push({ t: extText, size: 9, fill: c.inkFaint, bold: false });
+                lignes.push({ t: extText, size: 8.5, fill: c.inkFaint, bold: false });
               }
               if (placeholder !== '' && lignes.length === 0) {
-                lignes.push({ t: placeholder, size: 11, fill: c.inkFaint, bold: true });
+                lignes.push({ t: placeholder, size: 10.5, fill: c.inkFaint, bold: true });
               }
               // Le cartouche SERRE son texte, et son fond est OPAQUE, comme
               // sur le PDF : translucide, il se faisait traverser par les
               // meubles. Le sol qu'il annote reste accessible autrement — il
               // s'efface pendant le réglage d'un appareil de plafond, et il
               // esquive les meubles de sa pièce.
-              const PAD = 5;
-              const LH = 14;
+              const PAD = 4;
+              const LH = 12.5;
               const hpx = PAD * 2 + lignes.length * LH;
               const wpx = Math.max(
-                50,
+                44,
                 Math.max(...lignes.map((l) => l.t.length * (l.size * 0.62))) + 14,
               );
               const labelW = wpx / mapping.scale;
@@ -2580,7 +2600,10 @@ export function FloorplanEditor({
                       transparence ne coûte plus la lisibilité, et ce qui
                       passe dessous reste deviné.
                     */
-                    fillOpacity={0.85}
+                    /* Et son fond laisse voir davantage : sept dixièmes,
+                       pas huit et demi. Ce qui passe dessous — un meuble,
+                       une gaine — se devine sans qu'on ait à le déplacer. */
+                    fillOpacity={0.7}
                     stroke={selected ? c.blue : c.lineStrong}
                     strokeWidth={selected ? 2 : 1}
                   />
@@ -3131,9 +3154,23 @@ export function FloorplanEditor({
               let ny = dx / len;
               const ctr = partOf.get(roomOf(w))?.labelAt;
               const c2 = ctr ? mapping.toPx(ctr) : { x: layout.w / 2, y: layout.h / 2 };
-              // Vers l'intérieur de la pièce : c'est là qu'on a de la place.
+              /*
+                DEHORS D'ABORD — relevé du patron : « affiche-la en dehors de
+                la pièce si possible […] elle ne doit rien gêner et ne pas
+                être gênée ».
+
+                Elle se posait DANS la pièce, « là où l'on a de la place ».
+                C'est vrai d'un séjour, et c'est faux de tout le reste : la
+                place d'une pièce est occupée par ce qu'on y règle — les
+                meubles, les appareils, le cartouche, et le plan lui-même
+                qu'on est en train de lire. Dehors, il n'y a rien à cacher.
+
+                Le repli DANS la pièce reste : un mur de façade contre le
+                bord de l'écran n'a pas de dehors, et une barre hors cadre ne
+                se touche pas.
+              */
               let flip: 1 | -1 = 1;
-              if (nx * (c2.x - mid.x) + ny * (c2.y - mid.y) < 0) {
+              if (nx * (c2.x - mid.x) + ny * (c2.y - mid.y) > 0) {
                 nx = -nx;
                 ny = -ny;
                 flip = -1;
@@ -3153,28 +3190,26 @@ export function FloorplanEditor({
                 marge six.
               */
               /*
-                LA BARRE SUIT LE MUR — relevé du patron : « fais en sorte
-                qu'elle s'affiche en parallèle du mur, comme s'il suivait sa
-                trajectoire ».
+                ELLE RESTE DROITE — et elle l'a été, puis couchée, puis droite
+                de nouveau.
 
-                Elle était droite quel que soit le mur : sur une cloison de
-                biais, un rectangle horizontal posé à côté d'un trait oblique
-                se lit comme un objet SANS RAPPORT avec lui. Tournée dans son
-                axe, elle appartient au mur qu'elle règle — c'est le même
-                geste que la cote, qui se couche déjà le long du trait.
+                Le relevé disait d'abord : « fais en sorte qu'elle s'affiche
+                en parallèle du mur, comme s'il suivait sa trajectoire » — un
+                rectangle horizontal à côté d'un trait oblique se lit comme un
+                objet sans rapport avec lui. Essayée sur l'appareil, la barre
+                couchée s'est révélée pire : elle penche, ses quatre mots
+                penchent avec elle, et l'œil doit tourner la tête pour lire
+                quatre commandes qu'il connaît par cœur. Relevé suivant : « ne
+                la fais plus suivre la continuité du mur mais affiche-la en
+                dehors de la pièce si possible et droite ».
 
-                Elle ne se retourne jamais : au-delà du quart de tour, on lit
-                l'angle opposé, sinon les quatre mots se liraient à l'envers.
+                Une barre de commandes n'est pas une cote : la cote APPARTIENT
+                au mur et se lit dans son axe ; la barre, elle, appartient à
+                la main.
               */
-              let angleBarre = (Math.atan2(dy, dx) * 180) / Math.PI;
-              if (angleBarre > 90) angleBarre -= 180;
-              if (angleBarre < -90) angleBarre += 180;
-              const ab = (angleBarre * Math.PI) / 180;
-              const ca = Math.abs(Math.cos(ab));
-              const sa = Math.abs(Math.sin(ab));
-              /* Couchée dans l'axe du mur, c'est sa HAUTEUR qui déborde vers
-                 le trait — plus jamais sa largeur, quel que soit l'angle. */
-              const demiBarre = WALL_MENU.h / 2;
+              const demiBarre =
+                Math.abs(nx) * (WALL_MENU.w / 2) +
+                Math.abs(ny) * (WALL_MENU.h / 2);
               /*
                 L'ÉCART PART DU BORD DE LA BARRE, PAS DE SON CENTRE.
 
@@ -3196,10 +3231,8 @@ export function FloorplanEditor({
                 const dPoignee = (p.x - mid.x) * nx + (p.y - mid.y) * ny;
                 gap = Math.max(gap, dPoignee + demiBarre + 17 + 6);
               }
-              /* Le cadre qu'elle occupe UNE FOIS TOURNÉE : c'est lui qui
-                 doit tenir dans l'écran, pas le rectangle d'origine. */
-              const demiW = (ca * WALL_MENU.w + sa * WALL_MENU.h) / 2 + 4;
-              const demiH = (sa * WALL_MENU.w + ca * WALL_MENU.h) / 2 + 4;
+              const demiW = WALL_MENU.w / 2 + 4;
+              const demiH = WALL_MENU.h / 2 + 4;
               /*
                 LE RAPPEL DANS LE CADRE NE DOIT PAS RAMENER LA BARRE SUR LE
                 MUR — c'était la seconde cause, et la plus vicieuse : près
@@ -3222,13 +3255,49 @@ export function FloorplanEditor({
                   Math.max(demiH, py),
                 ),
               });
-              const libre = (p: { x: number; y: number }) =>
-                !segmentDansCadre(a2, b2, {
-                  x: p.x,
-                  y: p.y,
-                  rx: WALL_MENU.w / 2 + ECART_MUR / 2,
-                  ry: WALL_MENU.h / 2 + ECART_MUR / 2,
-                });
+              /*
+                LIBRE, C'EST : NI SUR LE MUR, NI SUR LA POIGNÉE.
+
+                Le mur seul suffisait tant que la barre et la poignée
+                vivaient chacune sur son flanc — la barre du côté de la
+                pièce, la poignée dehors. Depuis que la barre est SORTIE de
+                la pièce, elles peuvent se retrouver du même côté : un mur
+                de façade n'a pas de dehors, la barre est rappelée dans le
+                cadre, et elle retombe sur le rond bleu.
+
+                On teste donc les deux, et l'essai des côtés puis le
+                glissement le long du mur trouvent la place qui dégage
+                l'un ET l'autre — « elle ne doit rien gêner et ne pas être
+                gênée ».
+              */
+              /* La poignée se tient du côté de la pièce, c'est-à-dire à
+                 l'opposé de la barre : `flip` dit lequel des deux flancs la
+                 barre a pris. */
+              const rondPoignee = selectedWallId
+                ? poigneeAt(w, mapping, flip === 1 ? -1 : 1, {
+                    w: layout.w,
+                    h: layout.h,
+                  })
+                : null;
+              const libre = (p: { x: number; y: number }) => {
+                if (
+                  segmentDansCadre(a2, b2, {
+                    x: p.x,
+                    y: p.y,
+                    rx: WALL_MENU.w / 2 + ECART_MUR / 2,
+                    ry: WALL_MENU.h / 2 + ECART_MUR / 2,
+                  })
+                ) {
+                  return false;
+                }
+                if (!rondPoignee) return true;
+                /* Le rond fait trente points, plus six de marge : deux
+                   cibles qui se frôlent se disputent le doigt. */
+                return (
+                  Math.abs(rondPoignee.x - p.x) > WALL_MENU.w / 2 + 21 ||
+                  Math.abs(rondPoignee.y - p.y) > WALL_MENU.h / 2 + 21
+                );
+              };
               let pos = borner(mid.x + nx * gap, mid.y + ny * gap);
               if (!libre(pos)) {
                 const autre = borner(mid.x - nx * gap, mid.y - ny * gap);
@@ -3254,13 +3323,7 @@ export function FloorplanEditor({
                 <View
                   style={[
                     styles.wallActions,
-                    {
-                      left: bx - WALL_MENU.w / 2,
-                      top: by - WALL_MENU.h / 2,
-                      /* La rotation tourne autour du CENTRE : la barre reste
-                         donc posée là où le calcul l'a mise. */
-                      transform: [{ rotate: `${angleBarre}deg` }],
-                    },
+                    { left: bx - WALL_MENU.w / 2, top: by - WALL_MENU.h / 2 },
                   ]}
                   pointerEvents="box-none">
                   {WALL_ACTIONS.map(({ action, label, d }) => {
@@ -3344,7 +3407,17 @@ export function FloorplanEditor({
                 0
                   ? 1
                   : -1;
-              const sens: 1 | -1 = versPiece === 1 ? -1 : 1;
+              /*
+                ILS ONT ÉCHANGÉ LEURS FLANCS.
+
+                Le menu prenait le côté de la pièce — « c'est là qu'on lit » —
+                et la poignée l'autre. Relevé du patron : « affiche-la en
+                dehors de la pièce si possible ». Le menu est sorti ; la
+                poignée prend donc la place laissée, dedans. Ce qui compte
+                n'a pas changé d'un pouce : ils sont sur des flancs OPPOSÉS,
+                par construction, et le banc le prouve mur par mur.
+              */
+              const sens: 1 | -1 = versPiece;
               return (
                 <React.Fragment key={`mur-${w.id}`}>
                   <WallMoveHandle wall={w} mapping={mapping} />
@@ -4522,7 +4595,10 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     position: 'absolute',
     zIndex: 6,
     flexDirection: 'row',
-    backgroundColor: c.surface,
+    /* Elle se pose SUR le plan, elle ne doit pas le trouer — relevé du
+       patron : « cette barre devrait avoir une opacité sur son fond
+       blanc ». Le mur qu'on règle passe dessous et se devine. */
+    backgroundColor: c.surfaceVoile,
     borderRadius: radius.pill,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: c.line,

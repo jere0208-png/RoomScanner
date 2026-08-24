@@ -43,6 +43,20 @@ const CELLULE = PILL_CELL_W;
 */
 const PEIGNE_H = 10;
 const PEIGNE_BAS = PILL_CELL_H + 2;
+/**
+ * LA PLACE QUE LE PEIGNE PREND AU-DESSUS DE LA RANGÉE.
+ *
+ * Relevé du patron, capture à l'appui : « le bloc en bas cache le
+ * "Afficher" ». Le bandeau d'un mur se posait une cellule au-dessus de la
+ * rangée — la hauteur des pastilles — sans savoir que le peigne vit là,
+ * lui aussi : sa barre, ses descentes, et son mot par-dessus. Le bandeau
+ * lui passait donc dessus.
+ *
+ * Le peigne annonce désormais son encombrement, et l'écran s'en sert pour
+ * poser ce qui vient au-dessus. Un nombre écrit à la main dans l'écran
+ * dériverait au premier changement de pastille ou de police.
+ */
+export const PEIGNE_TOTAL = PEIGNE_BAS + PEIGNE_H + 2 + 14;
 /*
   UNE ANNOTATION, PAS UN CADRE.
 

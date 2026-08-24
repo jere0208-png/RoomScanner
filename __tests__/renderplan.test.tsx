@@ -212,8 +212,16 @@ describe('les conventions du dessin de plan', () => {
     expect(cartouches.length).toBeGreaterThan(0);
     for (const r of cartouches) {
       const op = Number(r.props.fillOpacity ?? 1);
-      expect(op).toBeGreaterThanOrEqual(0.75);
-      expect(op).toBeLessThanOrEqual(0.95);
+      /*
+        Il a été opaque, puis à 85 %, et il descend à 70 — relevé du
+        patron : « le bloc qui affiche la surface avec le nom de pièce est
+        trop gros et devrait avoir une opacité du fond ». Il vit au milieu
+        du sol, là où l'on pose les meubles : ce qui passe dessous doit se
+        deviner. En dessous de 60, en revanche, le nom ne se lirait plus
+        sur un sol teinté — ce n'est pas une vitre.
+      */
+      expect(op).toBeGreaterThanOrEqual(0.6);
+      expect(op).toBeLessThanOrEqual(0.8);
     }
   });
 

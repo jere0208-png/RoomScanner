@@ -46,6 +46,7 @@ import {
   PILL_GAP,
   ToolPill,
 } from '../components/ToolPill';
+import { PEIGNE_TOTAL } from '../components/RangeeOutils';
 import { ChevronsUpDown } from 'lucide-react-native';
 import Svg, { Path as Trace } from 'react-native-svg';
 import { SOLAIRES } from '../ui/solaires';
@@ -199,7 +200,17 @@ export function ResultScreen() {
    * plus haut, et les pastilles tombaient sur le gris de la page.
    */
   const ligneOutils = basSysteme + 8;
-  const ligneBandeau = ligneOutils + PILL_CELL_H + PILL_GAP;
+  /*
+    LE BANDEAU SE POSE AU-DESSUS DU PEIGNE, PAS DESSUS.
+
+    Relevé du patron, capture à l'appui : « le bloc en bas cache le
+    "Afficher" ». Il montait d'une cellule au-dessus de la rangée — la
+    hauteur des pastilles — sans compter le peigne, qui vit là lui aussi :
+    sa barre, ses descentes et son mot. C'est le peigne qui dit ce qu'il
+    prend (`PEIGNE_TOTAL`) ; l'écran ne le devine plus.
+  */
+  const ligneBandeau =
+    ligneOutils + Math.max(PILL_CELL_H + PILL_GAP, PEIGNE_TOTAL + 8);
   /**
    * LA HAUTEUR QU'UN BANDEAU PEUT PRENDRE, au pire.
    *

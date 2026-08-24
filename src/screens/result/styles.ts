@@ -588,8 +588,8 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     backgroundColor: c.blue,
     borderRadius: radius.pill,
     paddingHorizontal: 12,
-    minHeight: 40,
-    minWidth: 40,
+    minHeight: 34,
+    minWidth: 34,
     flexShrink: 0,
   },
   bandeauBtnGhost: {
@@ -600,12 +600,20 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     backgroundColor: c.surfaceSunken,
     borderRadius: radius.pill,
     paddingHorizontal: 12,
-    minHeight: 40,
-    minWidth: 40,
+    minHeight: 34,
+    minWidth: 34,
     flexShrink: 0,
   },
-  /* Une icône seule : carrée, même hauteur, pas de mot À L'INTÉRIEUR. */
-  bandeauBtnIcone: { paddingHorizontal: 0, width: 40 },
+  /*
+    UNE ICÔNE SEULE : carrée, même hauteur, pas de mot À L'INTÉRIEUR.
+
+    Trente-quatre points, pas quarante — relevé du patron, capture à
+    l'appui : « la taille des blocs bleus des boutons est trop grande,
+    réduis sans réduire les icônes ». C'est le DISQUE qui pesait, pas le
+    dessin : l'icône garde ses dix-neuf points, elle respire simplement
+    moins. Et le débord rend au doigt les six points rendus au plan.
+  */
+  bandeauBtnIcone: { paddingHorizontal: 0, width: 34 },
   /**
    * LE MOT SOUS LE BOUTON — relevé du patron : « mets des noms sous les
    * boutons… on doit comprendre ce que chaque bouton fait. Nom discret comme

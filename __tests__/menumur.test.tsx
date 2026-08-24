@@ -152,7 +152,10 @@ describe('la barre d’actions d’un mur du bas', () => {
  *     ou pas, selon l'endroit du mur.
  */
 describe('les commandes du menu de mur', () => {
-  const MOTS = ['Mesures', 'Ouvrir', 'Élec', 'Supprimer'];
+  /* « Retirer » depuis que « Supprimer » se coupait en deux dans sa
+     colonne de quarante-quatre points — et c'est le mot que portent tous
+     les autres bandeaux de l'app. */
+  const MOTS = ['Mesures', 'Ouvrir', 'Élec', 'Retirer'];
 
   const commande = (t: TestRenderer.ReactTestRenderer, label: string) =>
     t.root
@@ -192,29 +195,31 @@ describe('les commandes du menu de mur', () => {
 });
 
 /*
-  ET ELLE SE COUCHE DANS L'AXE DU MUR.
+  ELLE RESTE DROITE, ET ELLE SORT DE LA PIÈCE.
 
-  Relevé du patron : « fais en sorte qu'elle s'affiche en parallèle du mur,
-  comme s'il suivait sa trajectoire ». Elle était droite quel que soit le
-  mur : sur une cloison de biais, un rectangle horizontal posé à côté d'un
-  trait oblique se lit comme un objet SANS RAPPORT avec lui. Tournée dans son
-  axe, elle appartient au mur qu'elle règle — c'est déjà ce que fait la cote,
-  qui se couche le long du trait.
+  Trois versions, et les deux dernières sont du même jour. Le relevé disait
+  d'abord : « fais en sorte qu'elle s'affiche en parallèle du mur, comme s'il
+  suivait sa trajectoire » — un rectangle horizontal à côté d'un trait oblique
+  se lit comme un objet sans rapport avec lui. Essayée sur l'appareil, la
+  barre couchée s'est révélée pire : elle penche, ses quatre mots penchent
+  avec elle, et l'œil doit tourner la tête pour lire quatre commandes qu'il
+  connaît par cœur. Relevé suivant : « ne la fais plus suivre la continuité du
+  mur mais affiche-la en dehors de la pièce si possible et droite ».
 
-  Elle ne se retourne jamais : au-delà du quart de tour on lit l'angle
-  opposé, sinon les quatre mots se liraient à l'envers.
+  Une barre de commandes n'est pas une cote : la cote APPARTIENT au mur et se
+  lit dans son axe ; la barre, elle, appartient à la main.
+
+  Et elle se pose DEHORS. Elle cherchait sa place dans la pièce, « là où l'on
+  a de la place » : c'est vrai d'un séjour et faux de tout le reste — la place
+  d'une pièce est occupée par ce qu'on y règle, et par le plan qu'on est en
+  train de lire. « Elle ne doit rien gêner et ne pas être gênée. »
 */
-describe('la barre couchée dans l’axe du mur', () => {
-  const oblique = (ax: number, az: number, bx: number, bz: number) => {
+describe('la barre du mur, droite et dehors', () => {
+  const surLeMurDuHaut = () => {
     let t!: TestRenderer.ReactTestRenderer;
     act(() => {
       useScanStore.setState({
-        walls: [
-          mur('biais', ax, az, bx, bz),
-          mur('r', bx, bz, 6, 4),
-          mur('s', 6, 4, 0, 4),
-          mur('o', 0, 4, ax, az),
-        ],
+        walls: MURS,
         openings: [],
         objects: [],
         rooms: [{ id: 'r1', name: 'Séjour', floor: null }],
@@ -227,7 +232,7 @@ describe('la barre couchée dans l’axe du mur', () => {
         <FloorplanEditor
           editable
           showMeasures={false}
-          selectedWallId="biais"
+          selectedWallId="n"
           onSelectWall={() => {}}
           onWallAction={() => {}}
           reserveBas={0}
@@ -244,31 +249,40 @@ describe('la barre couchée dans l’axe du mur', () => {
       }
     });
     arbre = t;
+    return t;
+  };
+
+  it('ne penche jamais', () => {
+    const t = surLeMurDuHaut();
     const bloc = t.root
       .findAll((n) => typeof n.props?.onPress === 'function')
       .map((n) => n.parent)
       .find((n) => {
         const st = StyleSheet.flatten(n?.props?.style) as
-          | { flexDirection?: string; transform?: unknown[] }
+          | { flexDirection?: string; left?: number }
           | undefined;
-        return st?.flexDirection === 'row' && Array.isArray(st.transform);
+        return st?.flexDirection === 'row' && typeof st.left === 'number';
       })!;
-    const st = StyleSheet.flatten(bloc.props.style) as {
-      transform: { rotate: string }[];
-    };
-    return parseFloat(st.transform[0].rotate);
-  };
-
-  it('prend l’angle du mur qu’elle règle', () => {
-    // Un mur qui descend de 3 m sur 4 : 36,87°.
-    expect(oblique(0, 0, 4, 3)).toBeCloseTo(36.87, 1);
+    const st = StyleSheet.flatten(bloc.props.style) as { transform?: unknown[] };
+    expect(st.transform).toBeUndefined();
   });
 
-  it('et ne se retourne jamais : l’angle reste dans le quart de tour', () => {
-    // Le même mur pris à l'envers : la barre se lit du même côté.
-    expect(oblique(4, 3, 0, 0)).toBeCloseTo(36.87, 1);
-    for (const a of [oblique(0, 0, 1, 4), oblique(0, 4, 4, 0)]) {
-      expect(Math.abs(a)).toBeLessThanOrEqual(90);
-    }
+  it('et se pose du côté opposé à la pièce', () => {
+    const t = surLeMurDuHaut();
+    const p = barre(t)!;
+    /*
+      Le mur du haut va de (0,0) à (6,0) et la pièce descend vers les z
+      positifs : la barre doit donc se tenir AU-DESSUS du trait, dehors.
+    */
+    const traits = t.root
+      .findAll(
+        (n) =>
+          n.props?.stroke === 'transparent' &&
+          Number(n.props?.strokeWidth) >= 12 &&
+          typeof n.props?.y1 === 'number',
+      )
+      .map((n) => (Number(n.props.y1) + Number(n.props.y2)) / 2);
+    const yMur = Math.min(...traits);
+    expect(p.top + WALL_MENU.h / 2).toBeLessThan(yMur);
   });
 });

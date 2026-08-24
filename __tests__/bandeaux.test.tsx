@@ -190,9 +190,15 @@ describe('le bandeau d’une note', () => {
       const b = bouton(tree, mot);
       expect({ [mot]: b !== undefined }).toEqual({ [mot]: true });
       const st = StyleSheet.flatten(b!.props.style) as { width?: number };
-      // La pastille ronde, pas le bouton-phrase : quarante points dessinés,
-      // quarante-huit sous le doigt (le débord les rend).
-      expect({ [mot]: st.width }).toEqual({ [mot]: 40 });
+      /*
+        La pastille ronde, pas le bouton-phrase. Son dessin est descendu
+        deux fois — quarante-quatre, quarante, puis trente-quatre : « la
+        taille des blocs bleus des boutons est trop grande, réduis sans
+        réduire les icônes ». C'est le disque qui pesait ; l'icône, elle,
+        n'a pas bougé, et le débord tient la cible au-delà des
+        quarante-quatre points du doigt.
+      */
+      expect({ [mot]: st.width }).toEqual({ [mot]: 34 });
     }
   });
 
@@ -601,7 +607,10 @@ describe('l’écran des résultats', () => {
     // Le menu du mur paraît : ses quatre gestes, dont l'établi électrique.
     const vu = textes(tree);
     expect(vu).toContain('Élec');
-    expect(vu).toContain('Supprimer');
+    /* « Retirer » et non « Supprimer » : neuf lettres ne tenaient pas dans
+       une colonne de quarante-quatre points, et c'est le mot de tous les
+       autres bandeaux de l'app. */
+    expect(vu).toContain('Retirer');
     /*
       UN SEUL GESTE POUR LES COTES : « MESURES », AVEC SON CRAYON.
 
@@ -1528,6 +1537,9 @@ describe('les feuilles de l’écran des résultats', () => {
     act(() => plan.props.onSelectPhoto('ph1'));
     const vu = textes(tree);
     expect(vu).toMatch(/Mur de \d+,\d+ m/);
+    /* La feuille d'une photo, elle, garde « Supprimer » : elle a la place
+       d'une ligne entière, et c'est un fichier qu'on efface — pas un objet
+       du plan qu'on retire. */
     expect(vu).toContain('Supprimer');
   });
 });
