@@ -1104,7 +1104,20 @@ export function Iso3DView({
     // Le volume posé sur le mur fait 8 cm : à l'échelle d'un logement
     // entier, c'est deux pixels. On pose donc au-dessus un repère de taille
     // FIXE pour qu'un appareil se voie quel que soit le zoom.
-    if (!interacting && showElecTags) {
+    /*
+      LES COTES D'APPAREIL APPARTIENNENT AU BOUTON « COTES ».
+
+      Relevé du patron : « sur le plan 3D, afficher les cotes des éléments
+      élec en même temps que les murs à l'activation du bouton de cotes ».
+      Elles vivaient dans le calque « Repères », qui porte la DÉSIGNATION et
+      qui part éteint : le bouton « Cotes » ne pouvait donc rien montrer
+      tant qu'on n'avait pas allumé un autre calque, dont le nom ne parle
+      pas de cotes.
+
+      La couche se monte donc pour l'un OU l'autre, et chacun n'y prend que
+      ce qui est à lui : « Repères » la désignation, « Cotes » les nombres.
+    */
+    if (!interacting && (showElecTags || showMeasures)) {
       const quads = wallQuads(keptWalls);
       const byId = new Map(keptWalls.map((w) => [w.id, w]));
 
@@ -1212,7 +1225,10 @@ export function Iso3DView({
           color: FIXTURES[lot[0].kind].color,
           // Le sigle de la famille : c'est lui qu'on écrit de loin, à la
           // place du point de couleur.
-          sigle: assemblyTag(postes),
+          // Le sigle appartient à « Repères » : avec les seules cotes
+          // allumées, l'appareil se marque d'un point et se cote, mais ne
+          // se nomme pas.
+          sigle: showElecTags ? assemblyTag(postes) : undefined,
           sigleTaille: tailleDuSigle(scale),
           /**
            * LES COTES D'UN APPAREIL SONT DES COTES.
@@ -1223,14 +1239,23 @@ export function Iso3DView({
            * avec leurs filets pointillés jusqu'au sol. Un calque qui
            * n'éteint que la moitié de ce qu'il nomme n'est pas un calque.
            */
-          // La présentation décide seule quand les cotes paraissent ; sinon
-          // c'est le bouton « Cotes », et le zoom.
+          /*
+            LA PRÉSENTATION DÉCIDE SEULE quand les cotes paraissent ; sinon
+            c'est le bouton « Cotes », et lui seul.
+
+            Il y avait un second verrou : quatre-vingt-dix pixels par mètre.
+            Le seuil se défendait — une dizaine de cotes sur une vue
+            d'ensemble font une bouillie — mais il rendait le bouton
+            menteur : on l'allume, les murs se cotent, les prises non, et
+            rien ne dit qu'il faut s'approcher. Relevé du patron : « en même
+            temps que les murs ». Qui allume les cotes les veut toutes.
+          */
           haut:
-            (elecCotes === null ? showMeasures && scale > 90 : elecCotes > 0.02)
+            (elecCotes === null ? showMeasures : elecCotes > 0.02)
               ? `${Math.round(hauteur * 100)}`
               : undefined,
           bord:
-            (elecCotes === null ? showMeasures && scale > 90 : elecCotes > 0.02)
+            (elecCotes === null ? showMeasures : elecCotes > 0.02)
               ? `${Math.round(Math.abs(x - versBord) * 100)}`
               : undefined,
           fondu: elecCotes === null ? 1 : Math.max(0, Math.min(1, elecCotes)),

@@ -6432,6 +6432,73 @@ Vérifié à l'œil sur un rendu de la zone aux nombres d'un iPhone 16 Pro :
 « Redresser » hors du peigne, la barre d'« Ajouter » sur les trois autres,
 l'équerre qui monte vers « Note », et la colonne dans l'ordre voulu.
 
+### Le contour de fourmis du bouton d'édition
+
+**« Autour du bouton éditer, fais un contour de pointillés bleus de notre
+app, et fais-les tourner en animation. »** C'est la marque du logiciel de
+dessin depuis toujours : des tirets qui défilent disent « ceci est EN COURS
+de modification », là où un trait posé dit seulement « ceci est sélectionné ».
+
+Il faut le dire, parce que c'est écrit plus haut dans ce fichier : le contour
+actif est passé par un arc tournant, puis par un liseré en fondu, et les deux
+ont été **écartés** — quelque chose qui bouge en permanence dans un coin de
+l'écran se lit comme une attente. La différence ici tient en un mot : le
+mouvement ne dure QUE le temps du mode. On entre en édition, ça tourne ; on
+en sort, ça s'arrête et disparaît. Il ne dit plus « attendez », il dit « vous
+êtes en train de modifier ».
+
+**Le motif retombe juste.** Le contour est un carré de 36 aux angles arrondis
+de 12 : son tour vaut les quatre côtés droits plus le cercle des quatre
+quarts d'angle. Le cycle du pointillé en est un diviseur exact — sinon le
+dernier tiret est coupé au raccord et saute à chaque tour, ce qui se voit
+d'autant mieux que le motif défile. Le banc le vérifie au dixième de
+millième près.
+
+Le décalage d'un pointillé ne se pilote pas depuis le fil natif : la boucle
+s'arrête donc dès que le contour quitte l'écran, plutôt que de tourner pour
+rien. Et le banc ne se contente pas de constater qu'une valeur animée est
+posée — le composant animé rend la valeur RÉSOLUE, un nombre : il faut donc
+compter qu'elle CHANGE entre deux images, sinon un décalage figé passerait.
+
+### Les cotes des appareils suivent le bouton « Cotes », en 3D
+
+**« Sur le plan 3D, afficher les cotes des éléments élec en même temps que
+les murs à l'activation du bouton de cotes. »** Deux verrous les retenaient,
+et il fallait les deux pour voir un nombre.
+
+Le **zoom** d'abord : elles ne paraissaient qu'au-delà de quatre-vingt-dix
+pixels par mètre. Le seuil se défendait — une dizaine de cotes sur une vue
+d'ensemble font une bouillie — mais il rendait le bouton menteur : on
+l'allume, les murs se cotent, les prises non, et rien ne dit qu'il faut
+s'approcher. Qui allume les cotes les veut toutes.
+
+Le calque **« Repères »** ensuite : il porte la désignation de chaque
+appareil, et il part éteint. Les cotes vivaient dedans — le bouton « Cotes »
+ne pouvait donc rien montrer tant qu'on n'avait pas allumé un autre calque,
+dont le nom ne parle pas de cotes. La couche se monte maintenant pour l'un OU
+l'autre, et chacun n'y prend que ce qui est à lui : « Repères » la
+désignation, « Cotes » les nombres. Avec les seules cotes, l'appareil se
+marque d'un point et se cote, mais ne se nomme pas.
+
+### Un plan qui s'ouvre repose ses calques
+
+**« Sur le plan 3D, de base on doit avoir actif les meubles et les murs. »**
+Le relevé était déjà passé une fois, le banc était vert, et pourtant la chose
+ne tenait pas sur l'appareil.
+
+La raison n'était visible d'aucun banc : le calque des meubles est **gardé
+d'une session à l'autre** (`AsyncStorage`). Éteint une fois, sur un plan
+quelconque, il restait éteint — sur le scan suivant, et sur tous les
+suivants. Le réglage était juste ; ce qui ne l'était plus, c'est le défaut
+sur lequel il s'appliquait.
+
+Un plan qui s'ouvre repose donc ses calques : meubles et murs pleins allumés,
+surfaces teintées et couleurs relevées éteintes. Ce qu'on éteint ensuite vaut
+pour la séance, pas pour la vie de l'application — un plan s'ouvre sur ce
+qu'il montre, pas sur ce qu'on cachait la dernière fois. Les quatre portes
+sont couvertes par le banc (scan terminé, brouillon repris, plan rouvert,
+saisie au clavier) : une seule oubliée, et le défaut revient par elle.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

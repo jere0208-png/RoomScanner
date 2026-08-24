@@ -11,9 +11,10 @@
  * de l'écran s'alignent dessus — c'est la seule chose qu'il ait encore à
  * savoir de leur dessin.
  */
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   Animated,
+  Easing,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -140,6 +141,28 @@ export function PillSlot({
   );
 }
 
+/*
+  LE CONTOUR DE FOURMIS DU BOUTON D'ÉDITION.
+
+  Relevé du patron : « autour du bouton éditer, fais un contour de pointillés
+  bleus de notre app, et fais-les tourner en animation ». C'est la marque du
+  logiciel de dessin depuis toujours : des tirets qui défilent disent « ceci
+  est EN COURS de modification », là où un trait posé dit seulement « ceci est
+  sélectionné ».
+
+  LE MOTIF RETOMBE JUSTE. Le contour est un carré de 36 aux angles arrondis
+  de 12 : son tour vaut les quatre côtés droits plus le cercle des quatre
+  quarts d'angle. Le cycle du pointillé en est un diviseur EXACT — sinon le
+  dernier tiret est coupé au raccord et saute à chaque tour, ce qui se voit
+  d'autant mieux que le motif défile.
+*/
+const HALO_TOUR = 4 * (36 - 2 * 12) + 2 * Math.PI * 12;
+const HALO_CYCLE = HALO_TOUR / 20;
+const HALO_TIRET = HALO_CYCLE * 0.55;
+/** Un tour de fourmis par cycle : lent, régulier, sans à-coup au raccord. */
+const HALO_DUREE = 700;
+const RectAnime = Animated.createAnimatedComponent(Rect);
+
 export function ToolPill({
   icon,
   label,
@@ -175,6 +198,36 @@ export function ToolPill({
   const c = useTheme();
   const styles = getStyles(c);
   const plein = active && !halo;
+  /*
+    LES FOURMIS NE TOURNENT QUE PENDANT L'ÉDITION.
+
+    Le contour actif est passé par un arc tournant, puis par un liseré en
+    fondu, et les deux ont été écartés : quelque chose qui bouge en
+    permanence dans un coin de l'écran se lit comme une attente. La
+    différence ici, c'est que le mouvement ne dure QUE le temps du mode —
+    on entre en édition, ça tourne ; on en sort, ça s'arrête et disparaît.
+    Il ne dit plus « attendez », il dit « vous êtes en train de modifier ».
+
+    Le décalage du pointillé ne se pilote pas depuis le fil natif (aucun
+    équivalent de `strokeDashoffset` là-bas) : la boucle s'arrête donc dès
+    que le contour n'est plus à l'écran, plutôt que de tourner pour rien.
+  */
+  const fourmis = useRef(new Animated.Value(0)).current;
+  const tourne = halo && active;
+  useEffect(() => {
+    if (!tourne) return;
+    fourmis.setValue(0);
+    const boucle = Animated.loop(
+      Animated.timing(fourmis, {
+        toValue: 1,
+        duration: HALO_DUREE,
+        easing: Easing.linear,
+        useNativeDriver: false,
+      }),
+    );
+    boucle.start();
+    return () => boucle.stop();
+  }, [tourne, fourmis]);
   // Icône noire sur fond blanc ; blanche sur bleu quand l'outil est actif.
   const stroke = plein ? '#FFFFFF' : active ? c.blue : c.ink;
   /**
@@ -206,7 +259,7 @@ export function ToolPill({
             {/* Le contour épouse exactement la pastille : un anneau posé
                 dessus, ni plus grand ni décalé. */}
             <Svg width={40} height={40} viewBox="0 0 40 40">
-              <Rect
+              <RectAnime
                 x={2}
                 y={2}
                 width={36}
@@ -214,6 +267,15 @@ export function ToolPill({
                 rx={12}
                 stroke={c.blue}
                 strokeWidth={2.4}
+                strokeLinecap="round"
+                strokeDasharray={[HALO_TIRET, HALO_CYCLE - HALO_TIRET]}
+                /* Le décalage court d'un cycle entier : au bout, le motif
+                   est retombé sur lui-même et la boucle recommence sans que
+                   l'œil voie le raccord. */
+                strokeDashoffset={fourmis.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, -HALO_CYCLE],
+                })}
                 fill="none"
               />
             </Svg>

@@ -1455,6 +1455,31 @@ const solDe = (walls: WallSeg[]) =>
     ? Math.min(...walls.map((w) => w.yCenter - w.height / 2))
     : 0;
 
+/**
+ * LES CALQUES D'UN PLAN QUI S'OUVRE.
+ *
+ * Relevé du patron, deux fois : « sur la vue 3D de base au scan, on coche
+ * les boutons pour afficher les meubles et les murs seulement », puis, la
+ * chose n'ayant pas tenu sur l'appareil : « sur le plan 3D, de base on doit
+ * avoir actif les meubles et les murs ».
+ *
+ * Elle n'avait pas tenu pour une raison qu'aucun banc ne voyait : le calque
+ * des meubles est GARDÉ d'une session à l'autre. Éteint une fois, sur un
+ * plan quelconque, il restait éteint — sur le scan suivant, et sur tous les
+ * suivants. Le réglage était juste ; ce qui ne l'était plus, c'est le
+ * défaut sur lequel il s'appliquait.
+ *
+ * Un plan qui s'ouvre repose donc ses calques. Ce qu'on éteint ensuite vaut
+ * pour la séance, pas pour la vie de l'application : un plan s'ouvre sur ce
+ * qu'il montre, pas sur ce qu'on cachait la dernière fois.
+ */
+const CALQUES_DE_BASE = {
+  showFurniture: true,
+  solidWalls: true,
+  showSurfaces: false,
+  showTextures: false,
+} as const;
+
 export const useScanStore = create<ScanState>((set, get) => {
   // Le pont entre l'écriture différée — qui vit hors du store — et l'état que
   // l'écran observe. Une seule alerte par incident : voir `persistSoon`.
@@ -4193,6 +4218,8 @@ export const useScanStore = create<ScanState>((set, get) => {
           notes: [],
           processing: false,
           scanning: false,
+          /* Un plan qui s'ouvre repose ses calques. */
+          ...CALQUES_DE_BASE,
           screen: 'result',
           // Rien d'exploitable : rien à proposer non plus.
           arrivage: null,
@@ -4262,6 +4289,8 @@ export const useScanStore = create<ScanState>((set, get) => {
         saves,
         processing: false,
         scanning: false,
+        /* Un plan qui s'ouvre repose ses calques. */
+        ...CALQUES_DE_BASE,
         screen: 'result',
         /*
           Le popup de fin de scan demandera quoi intégrer — même sans
@@ -5507,6 +5536,8 @@ export const useScanStore = create<ScanState>((set, get) => {
       const b = get().brouillon;
       if (!b) return;
       set({
+        /* Un plan qui s'ouvre repose ses calques. */
+        ...CALQUES_DE_BASE,
         screen: 'result',
         resultOrigin: 'scan',
         scanName: b.name,
@@ -5686,6 +5717,8 @@ export const useScanStore = create<ScanState>((set, get) => {
         north: save.north ?? null,
         dirty: false,
         resultOrigin: 'library',
+        /* Un plan qui s'ouvre repose ses calques. */
+        ...CALQUES_DE_BASE,
         screen: 'result',
       });
       clearHistory();
@@ -5748,6 +5781,8 @@ export const useScanStore = create<ScanState>((set, get) => {
       get().reset();
       set({
         planVierge: true,
+        /* Un plan qui s'ouvre repose ses calques. */
+        ...CALQUES_DE_BASE,
         screen: 'result',
         scanName: `Plan du ${new Date().toLocaleDateString('fr-FR')}`,
         resultOrigin: 'scan',
