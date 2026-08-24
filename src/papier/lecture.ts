@@ -153,7 +153,16 @@ export function lirePlanPapier(
   const hauteur = reglage.hauteur ?? H_MUR;
 
   // 1. Réduire : la recherche de droites coûte le carré de la taille.
-  const largeurMax = reglage.largeurMax ?? 1100;
+  /*
+    NEUF CENTS PIXELS DE LARGE POUR TRAVAILLER.
+
+    La recherche de droites coûte le carré de la taille : à mille cent
+    pixels, le plan d'architecte le plus chargé demandait onze secondes, et
+    un téléphone est deux à trois fois plus lent qu'une machine de bureau.
+    À neuf cents, un trait fin d'imprimante fait encore un pixel et demi —
+    c'est le plancher, en dessous duquel la cotation disparaît.
+  */
+  const largeurMax = reglage.largeurMax ?? 900;
   const reduction = Math.max(1, Math.round(photo.image.l / largeurMax));
   const image = reduire(photo.image, reduction);
   const textes = reduireTextes(photo.textes ?? [], reduction);

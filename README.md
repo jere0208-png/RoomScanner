@@ -7436,6 +7436,54 @@ Non compilé sur cette machine (pas de Mac) : c'est une compilation EAS qui le
 dira. Tant que le module n'est pas là, `disponible()` rend faux et l'écran
 affiche « recompilez l'application » au lieu de planter.
 
+
+### Plan papier — le profil, et les trois fausses pistes
+
+La première lecture d'un vrai plan d'architecte a pris **quarante-sept
+secondes**. Sur un téléphone, personne n'attend cela. Trois optimisations ont
+été tentées AU JUGÉ avant qu'on se décide à mesurer, et les trois n'ont rien
+donné :
+
+1. **tenir le maximum de l'urne par ligne d'angle** au lieu de la relire en
+   entier à chaque trait — zéro gain ;
+2. **borner le parcours de la droite** à la portion qui traverse la feuille,
+   au lieu de suivre toute la diagonale — zéro gain ;
+3. **ranger les pics une fois pour toutes** — deux secondes gagnées sur
+   vingt, et vingt traits inventés sur soixante-dix : annulé.
+
+Le profil, lui, a répondu en une minute : **la recherche de droites coûtait
+onze secondes, et le reste une**. Le poste exact est le DÉPOUILLEMENT — chaque
+pixel d'encre dépose cent quatre-vingts voix, chacune dans une case tirée au
+hasard d'une urne d'un million : autant de défauts de cache. Cent cinquante
+mille pixels d'encre, et l'on y était.
+
+Ce qui a marché :
+
+- **Un pixel sur deux vote, en damier.** Un trait de plan fait trois à quatre
+  pixels d'épaisseur ; un damier en garde la moitié et le pic reste au même
+  endroit. Ce qui MESURE le trait n'est pas l'urne mais le parcours de la
+  droite, qui lui voit tous les pixels. Onze secondes → six.
+- **Un degré et deux pixels** pour l'urne, au lieu d'un demi-degré et un
+  pixel : quatre fois moins de cases, et rien en justesse — le pic ne sert
+  qu'à TROUVER le trait, ce sont ses propres pixels qui le mesurent ensuite.
+- **Deux cent soixante traits au plus.** Un plan de logement complet en
+  compte cent cinquante ; au-delà, on ramasse les miettes des symboles et le
+  grain du papier, et chaque miette coûte un parcours de droite entier.
+- **Un pixel sur quatre pour l'angle**, en damier lui aussi.
+
+Et le piège qui a failli passer : le sous-échantillonnage doit être
+**isotrope**. Prendre un indice sur huit dans le tableau de pixels, c'est
+prendre une colonne sur huit quand la largeur est paire — tous les murs
+verticaux tombaient entre deux colonnes retenues, et l'angle de la feuille
+ressortait à ONZE DEGRÉS de la vérité. Les bancs de la feuille prise de
+travers l'ont attrapé aussitôt ; à l'œil, on aurait cherché longtemps.
+
+Le prix payé, mesuré et écrit : sur une photo qui cumule cinq degrés de
+travers, une ombre mangeant les deux tiers de la lumière, du grain et du
+flou, l'écart passe de cinq à huit pour cent — vingt-cinq centimètres sur
+trois mètres. Sur une photo propre, le même appartement ressort au
+millimètre.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro
@@ -7604,10 +7652,12 @@ passe inaperçu jusqu'à la CI. C'est arrivé une fois.
   l'allure de petits murs ; `filtrerDEquerre` en écarte la plus grande part,
   pas la totalité. Un plan sans aucune cote écrite ni aucune porte reconnue
   ne rend pas d'échelle du tout, et l'écran demande alors une longueur.
-- **Plan papier — la lecture bloque le fil JS** plusieurs secondes sur une
-  grande photo (trois secondes pour un plan de 1 100 pixels de large sur une
-  machine de bureau). C'est pour ce moment-là que l'icône de scan est animée
-  en natif : elle est la seule chose qui vit pendant ce temps.
+- **Plan papier — la lecture bloque le fil JS** plusieurs secondes : huit
+  secondes sur une machine de bureau pour le plan d'architecte le plus
+  chargé qu'on ait essayé (1 200 × 793, deux chaînes de cotation, mobilier
+  complet), dont six pour la seule recherche de droites. Un téléphone est
+  deux à trois fois plus lent. C'est pour ce moment-là que l'icône de scan
+  est animée en natif : elle est la seule chose qui vit pendant ce temps.
 - Le relevé de couleurs du sol est une seule carte monde par scan, plafonnée
   à 64 × 64 cases de 40 cm (25,6 m de côté). Au-delà, seule la couleur
   moyenne subsiste. Chaque pièce n'y peint que les cases tombant dans son

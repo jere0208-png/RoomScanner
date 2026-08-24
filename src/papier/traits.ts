@@ -52,6 +52,8 @@ export interface Trait {
 export interface ReglageTraits {
   /** Pas d'exploration des angles (degrés). */
   pasAngle?: number;
+  /** Pas de l'urne sur la distance à l'origine (px). */
+  pasRho?: number;
   /** Longueur minimale d'un trait retenu (px). */
   longueurMin?: number;
   /** Trou toléré dans un trait (px) : un croisement, un pointillé. */
@@ -91,8 +93,24 @@ export function anglePrincipal(m: Masque, pas = 0.25): number {
 
 function balayer(m: Masque, deg0: number, deg1: number, pas: number): number {
   const pts: number[] = [];
-  // Un pixel sur trois suffit à trouver un angle, et divise le coût d'autant.
-  for (let i = 0; i < m.on.length; i += 3) if (m.on[i] === 1) pts.push(i);
+  /*
+    UN PIXEL SUR QUATRE, EN DAMIER — ET SURTOUT PAS UN SUR HUIT EN LIGNE.
+
+    On cherche une DIRECTION D'ENSEMBLE, pas un trait : le quart des pixels
+    d'un plan dit déjà tout, et le balayage coûte alors quatre fois moins.
+
+    Mais le sous-échantillonnage doit être ISOTROPE. Prendre un indice sur
+    huit dans le tableau, c'est prendre une COLONNE SUR HUIT quand la largeur
+    est paire — les murs verticaux tombaient tous entre deux colonnes
+    retenues, et l'angle de la feuille ressortait à onze degrés de la vérité.
+    Le damier, lui, ne privilégie aucune direction.
+  */
+  for (let i = 0; i < m.on.length; i++) {
+    if (m.on[i] !== 1) continue;
+    const x = i % m.l;
+    const y = (i - x) / m.l;
+    if ((x + y) % 4 === 0) pts.push(i);
+  }
   if (pts.length < 50) return 0;
   let meilleur = 0;
   let mieux = -1;
@@ -131,7 +149,21 @@ function balayer(m: Masque, deg0: number, deg1: number, pas: number): number {
  * séparés par des portes.
  */
 export function segmentsDe(m: Masque, reglage: ReglageTraits = {}): Trait[] {
-  const pas = reglage.pasAngle ?? 0.5;
+  /*
+    L'URNE SE PAIE EN SECONDES, ET ON LA RELIT À CHAQUE TRAIT.
+
+    Un demi-degré et un pixel, c'était une urne d'un million de cases —
+    relue en entier pour chaque trait trouvé, quatre cents fois. Sur un plan
+    d'architecte chargé, la lecture prenait QUARANTE-SEPT SECONDES : sur un
+    téléphone, personne n'attend cela.
+
+    Un degré et deux pixels divisent l'urne par quatre, et ne coûtent rien en
+    justesse : le pic ne sert qu'à TROUVER le trait, ce sont ensuite ses
+    propres pixels qui le mesurent (`affiner`). Deux murs parallèles distants
+    de deux pixels n'existent pas.
+  */
+  const pas = reglage.pasAngle ?? 1;
+  const pasR = Math.max(1, reglage.pasRho ?? 2);
   const lmin = reglage.longueurMin ?? Math.max(12, Math.min(m.l, m.h) * 0.04);
   const trouMax = reglage.trouMax ?? 6;
   /*
@@ -145,10 +177,19 @@ export function segmentsDe(m: Masque, reglage: ReglageTraits = {}): Trait[] {
     axe se posait sur un bord.
   */
   const largeurMax = reglage.largeurMax ?? 40;
-  const maxTraits = reglage.maxTraits ?? 400;
+  /*
+    DEUX CENT SOIXANTE TRAITS, ET C'EST BEAUCOUP.
+
+    Un plan de logement complet — quatre murs, six cloisons, huit
+    menuiseries, deux chaînes de cotation et leurs attaches — en compte
+    autour de cent cinquante. Au-delà de deux cent soixante, on ne lit plus
+    le plan : on ramasse les miettes des symboles et le grain du papier, et
+    chaque miette coûte un parcours de droite entier.
+  */
+  const maxTraits = reglage.maxTraits ?? 260;
 
   const nA = Math.round(180 / pas);
-  const diag = Math.ceil(Math.hypot(m.l, m.h)) + 2;
+  const diag = Math.ceil(Math.hypot(m.l, m.h) / pasR) + 2;
   const nR = diag * 2;
   const urne = new Int32Array(nA * nR);
   const cos = new Float64Array(nA);
@@ -163,15 +204,60 @@ export function segmentsDe(m: Masque, reglage: ReglageTraits = {}): Trait[] {
   const points: number[] = [];
   for (let i = 0; i < reste.length; i++) if (reste[i] === 1) points.push(i);
 
+  /*
+    LE MAXIMUM SE TIENT PAR LIGNE D'ANGLE.
+
+    On relisait l'urne ENTIÈRE pour trouver le pic suivant, quatre cents fois
+    de suite : le poste le plus cher de la lecture, et de loin. Or les voix ne
+    font que BAISSER — on n'en ajoute plus une seule après le premier
+    dépouillement. Il suffit donc de garder, pour chaque angle, où se trouve
+    son meilleur pic : chercher le prochain trait devient cent quatre-vingts
+    comparaisons au lieu d'un quart de million, et une ligne ne se relit que
+    si c'est ELLE qu'on vient d'écorner.
+  */
+  const maxT = new Int32Array(nA);
+  const argT = new Int32Array(nA);
+  const saleT = new Uint8Array(nA);
+  /*
+    UN PIXEL SUR DEUX VOTE, EN DAMIER.
+
+    Chaque pixel d'encre dépose cent quatre-vingts voix, chacune dans une
+    case tirée au hasard d'une urne d'un million : autant de défauts de cache.
+    Sur un plan chargé — cent cinquante mille pixels d'encre — c'était onze
+    secondes, et de loin le poste le plus cher de toute la lecture.
+
+    Or un trait de plan fait trois à quatre pixels d'épaisseur : un damier en
+    garde la moitié, et le pic reste au même endroit. Ce qui MESURE le trait,
+    de toute façon, n'est pas l'urne mais le parcours de la droite, qui lui
+    voit tous les pixels.
+  */
   const voter = (i: number, sens: 1 | -1) => {
     const x = i % m.l;
     const y = (i - x) / m.l;
+    if (((x + y) & 1) === 1) return;
     for (let t = 0; t < nA; t++) {
-      const r = Math.round(x * cos[t] + y * sin[t]) + diag;
-      urne[t * nR + r] += sens;
+      const r = Math.round((x * cos[t] + y * sin[t]) / pasR) + diag;
+      const k = t * nR + r;
+      urne[k] += sens;
+      if (sens < 0 && k === argT[t]) saleT[t] = 1;
     }
   };
   for (const i of points) voter(i, 1);
+  const refaireLigne = (t: number) => {
+    let best = 0;
+    let arg = t * nR;
+    for (let r = 0; r < nR; r++) {
+      const v = urne[t * nR + r];
+      if (v > best) {
+        best = v;
+        arg = t * nR + r;
+      }
+    }
+    maxT[t] = best;
+    argT[t] = arg;
+    saleT[t] = 0;
+  };
+  for (let t = 0; t < nA; t++) refaireLigne(t);
 
   const dedans = (x: number, y: number) => x >= 0 && y >= 0 && x < m.l && y < m.h;
   const vif = (x: number, y: number) => dedans(x, y) && reste[y * m.l + x] === 1;
@@ -189,17 +275,19 @@ export function segmentsDe(m: Masque, reglage: ReglageTraits = {}): Trait[] {
   */
   const out: Trait[] = [];
   for (let tour = 0; tour < maxTraits; tour++) {
+    // On remet à jour les lignes écornées, puis on prend la meilleure.
+    for (let t = 0; t < nA; t++) if (saleT[t]) refaireLigne(t);
     let meilleur = 0;
     let iBest = -1;
-    for (let k = 0; k < urne.length; k++) {
-      if (urne[k] > meilleur) {
-        meilleur = urne[k];
-        iBest = k;
+    for (let t = 0; t < nA; t++) {
+      if (maxT[t] > meilleur) {
+        meilleur = maxT[t];
+        iBest = argT[t];
       }
     }
     if (iBest < 0 || meilleur < lmin) break;
     const t = Math.floor(iBest / nR);
-    const r = (iBest % nR) - diag;
+    const r = ((iBest % nR) - diag) * pasR;
     const co = cos[t];
     const si = sin[t];
     // Un point de la droite, et sa direction.
@@ -210,7 +298,7 @@ export function segmentsDe(m: Masque, reglage: ReglageTraits = {}): Trait[] {
 
     // Ce que porte la droite, pas à pas : présent ou non, et sur quelle
     // épaisseur. On déborde du cadre : une droite oblique entre par un coin.
-    const portee = Math.ceil(diag);
+    const portee = Math.ceil(diag * pasR);
     const demi = Math.ceil(largeurMax / 2) + 1;
     /*
       ON MESURE UN RUN CONTIGU, PAS UNE BANDE.
@@ -380,6 +468,7 @@ export function segmentsDe(m: Masque, reglage: ReglageTraits = {}): Trait[] {
       // La droite ne portait rien d'assez long : on la retire de l'urne pour
       // ne pas la retrouver au tour suivant, sans toucher aux pixels.
       urne[iBest] = 0;
+      saleT[Math.floor(iBest / nR)] = 1;
     }
   }
   return out.sort((x, y) => y.len - x.len);
