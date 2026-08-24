@@ -7182,6 +7182,55 @@ trait fin isolé, sur un plan, c'est neuf fois sur dix une ligne de cote, un
 vantail, un axe ou un renvoi. Les prendre pour des cloisons remplissait le
 plan de murs fantômes en travers des pièces.
 
+
+### Plan papier — les ouvertures, puis l'échelle
+
+**On ne cherche pas des portes, on cherche des TROUS.** Sur un plan, une
+menuiserie est d'abord une interruption de la maçonnerie ; on referme la
+tranche par deux tableaux, et l'on pose dans le vide de quoi dire ce que
+c'est : un vantail et son arc pour une porte, un ou deux traits fins
+parallèles au mur pour une fenêtre, rien du tout pour une baie qu'on
+traverse. C'est la façon dont on lit un plan quand on est du métier, et
+c'est devenu l'ordre du code.
+
+Deux règles ont été payées cher :
+
+- **Un vantail n'est jamais parallèle à son mur.** Le châssis d'une fenêtre a
+  exactement la longueur du trou et ses bouts touchent les deux tableaux :
+  sans cette règle, il passait pour un vantail et TOUTES les fenêtres du plan
+  ressortaient en portes.
+- **On remesure l'épaisseur du mur sur la maçonnerie elle-même.**
+  L'appariement de bords rend l'épaisseur des deux traits mariés — et si l'un
+  d'eux était le châssis plutôt que le nu du mur, elle est trop faible :
+  15,9 pour un mur de 20. Ce n'est pas qu'une cote fausse de quatre
+  centimètres, c'est la fenêtre qui DISPARAÎT : on cherche les trous à un
+  demi-mur de l'axe, et à 7,95 on retombe pile sur le châssis. Le mur
+  paraissait plein d'un bout à l'autre.
+
+**L'échelle** est la seule chose qu'un dessin ne dit pas de lui-même. Quatre
+sources, dans cet ordre : les **cotes écrites** (seule source exacte, avec
+vote médian pour qu'un « 8 » lu à la place d'un « 3 » n'emporte pas le
+relevé) ; l'**échelle déclarée** d'un PDF dont on connaît la finesse ; les
+**portes**, à 83 cm de passage, ce qui cale un plan sans une seule cote
+lisible à quelques pour cent près ; et la **main**, deux points et une
+distance, qui l'emporte sur tout. `Echelle.origine` accompagne le relevé
+jusqu'à l'écran : un plan calé sur des portes n'a pas le même statut qu'un
+plan calé sur les cotes du bureau d'études, et l'app doit le dire.
+
+Trois pièges de la cotation, tous trouvés sur la planche :
+
+- **La ligne de cote est le plus LONG trait du secteur, pas le plus proche.**
+  Le plus proche du nombre, c'est l'arrêt oblique posé juste à côté : quatre
+  mètres se trouvaient rapportés à trente-cinq pixels.
+- **Une marque croise la ligne, elle ne passe pas à côté.** On acceptait tout
+  trait court dont un bout tombait près d'elle ; un symbole posé à dix pixels
+  devenait une marque de cotation, et la portion mesurée tombait de moitié —
+  un logement de deux mètres cinquante de large.
+- **On recoud les lignes de cote avant de les mesurer.** Le nombre est posé
+  SUR sa ligne, et l'on efface du masque tout ce que l'OCR a lu : la ligne se
+  retrouvait coupée en deux morceaux de part et d'autre du nombre, qui ne se
+  rattachait plus à aucun des deux.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

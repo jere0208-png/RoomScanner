@@ -61,9 +61,16 @@ describe('la planche d’essai', () => {
   it('imprime un plan de la bonne taille, ni vide ni noirci', () => {
     const photo = photographierPlanche(T1, { echelle: 100 });
     aRegarder('t1-propre', photo.image);
-    // 4 m + 2 × 0,6 m de marge à 100 px/m.
-    expect(photo.image.l).toBe(520);
-    expect(photo.image.h).toBe(420);
+    /*
+      Le T1 fait 4 m sur 3, la planche laisse UN MÈTRE de papier autour à
+      cent pixels par mètre. Cette marge n'est pas décorative : une ligne de
+      cote se pose à 45 cm du mur et son nombre 18 cm au-dessus d'elle, si
+      bien qu'avec 60 cm de marge le texte « 400 » tombait hors de la feuille
+      — l'OCR le rendait quand même (c'est une simulation) et le lecteur
+      cherchait sa ligne de cote au-delà du bord de l'image.
+    */
+    expect(photo.image.l).toBe(600);
+    expect(photo.image.h).toBe(500);
     const part = encre(binariser(photo.image));
     expect(part).toBeGreaterThan(0.005);
     expect(part).toBeLessThan(0.15);
@@ -84,16 +91,17 @@ describe('la planche d’essai', () => {
   it('perce vraiment la maçonnerie là où il y a une menuiserie', () => {
     const photo = photographierPlanche(T1, { echelle: 100 });
     const m = binariser(photo.image);
-    // Le mur du bas est en y = 0,6 m de marge → 60 px, avec 20 px d'épaisseur.
-    // La fenêtre est centrée en x = 1,3 m + marge = 190 px, large de 120 px.
+    // Le mur du haut est à y = 1 m de marge → 100 px, avec 20 px
+    // d'épaisseur. La fenêtre est centrée en x = 1 m + 1,3 m = 230 px et
+    // large de 120 ; la maçonnerie pleine se lit à x = 130.
     const encrePres = (x: number) => {
       let n = 0;
-      for (let y = 50; y < 72; y++) if (m.on[y * m.l + x] === 1) n++;
+      for (let y = 88; y < 113; y++) if (m.on[y * m.l + x] === 1) n++;
       return n;
     };
     // Sous la fenêtre : les deux bords du mur sont absents, seuls restent
     // les traits fins du châssis — donc moins d'encre qu'en pleine maçonnerie.
-    expect(encrePres(190)).toBeLessThan(encrePres(60));
+    expect(encrePres(230)).toBeLessThan(encrePres(130));
   });
 });
 

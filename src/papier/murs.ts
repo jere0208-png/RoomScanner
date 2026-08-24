@@ -412,9 +412,11 @@ export function calerSurLeMasque(murs: MurLu[], masque: Masque): MurLu[] {
     const ux = (m.b.x - m.a.x) / (m.len || 1);
     const uy = (m.b.y - m.a.y) / (m.len || 1);
     const demi = m.ep / 2;
+    const surLAxe = (s: number, d: number): P => ({
+      x: m.a.x + ux * s - uy * d,
+      y: m.a.y + uy * s + ux * d,
+    });
     const bord = (s: number, sens: 1 | -1) => {
-      const x0 = m.a.x + ux * s;
-      const y0 = m.a.y + uy * s;
       /*
         TROIS PIXELS DE JEU DE PART ET D'AUTRE DU BORD.
 
@@ -425,8 +427,8 @@ export function calerSurLeMasque(murs: MurLu[], masque: Masque): MurLu[] {
         s'étendre à sa propre maçonnerie.
       */
       for (let k = -3; k <= 3; k++) {
-        const d = sens * demi + k;
-        if (allume(masque, Math.round(x0 - uy * d), Math.round(y0 + ux * d))) return true;
+        const p = surLAxe(s, sens * demi + k);
+        if (allume(masque, Math.round(p.x), Math.round(p.y))) return true;
       }
       return false;
     };
@@ -491,6 +493,40 @@ export function calerSurLeMasque(murs: MurLu[], masque: Masque): MurLu[] {
     }
     const a = { x: m.a.x + ux * d0, y: m.a.y + uy * d0 };
     const b = { x: m.a.x + ux * f0, y: m.a.y + uy * f0 };
-    return { ...m, a, b, len: long(a, b) };
+
+    /*
+      ON REMESURE L'ÉPAISSEUR SUR LA MAÇONNERIE ELLE-MÊME.
+
+      L'appariement de bords rend une épaisseur qui vaut ce que valaient les
+      deux traits mariés — et si l'un des deux était le CHÂSSIS d'une fenêtre
+      plutôt que le nu du mur, elle est trop faible : quinze virgule neuf pour
+      un mur de vingt. Ce n'est pas qu'une cote fausse de quatre centimètres :
+      c'est la fenêtre elle-même qui disparaît, parce qu'on cherche ensuite
+      les trous de menuiserie à un demi-mur de l'axe, et qu'à sept virgule
+      neuf on retombe pile sur le châssis. Le mur paraissait plein d'un bout
+      à l'autre.
+
+      On repart donc du masque : pour chaque pas, le bord le plus ÉLOIGNÉ de
+      l'axe de chaque côté, sans dépasser une fois et demie l'épaisseur
+      supposée. La médiane sur toute la longueur ignore les croisements.
+    */
+    const bordLoin = (s: number, sens: 1 | -1) => {
+      let loin = 0;
+      for (let d = 1; d <= m.ep * 1.5; d++) {
+        const p = surLAxe(s, sens * d);
+        if (allume(masque, Math.round(p.x), Math.round(p.y))) loin = d;
+      }
+      return loin;
+    };
+    const epaisseurs: number[] = [];
+    for (let s = Math.round(d0); s <= f0; s += 2) {
+      const p = bordLoin(s, 1);
+      const q = bordLoin(s, -1);
+      if (p > 0 && q > 0) epaisseurs.push(p + q);
+    }
+    const ep = epaisseurs.length
+      ? epaisseurs.slice().sort((x, y) => x - y)[Math.floor(epaisseurs.length / 2)]
+      : m.ep;
+    return { ...m, a, b, ep, len: long(a, b) };
   });
 }

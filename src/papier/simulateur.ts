@@ -375,7 +375,16 @@ export function photographierPlanche(
   reglage: ReglagePhoto = {},
 ): PhotoSimulee {
   const pxm = reglage.echelle ?? 100;
-  const marge = reglage.marge ?? 0.6;
+  /*
+    UN MÈTRE DE PAPIER AUTOUR DU DESSIN.
+
+    Soixante centimètres ne suffisaient pas : une ligne de cote se pose à
+    quarante-cinq centimètres du mur, et son nombre dix-huit centimètres
+    au-dessus d'elle — le texte « 400 » tombait à trois pixels HORS de la
+    feuille, l'OCR le rendait tout de même (c'est une simulation), et le
+    lecteur cherchait sa ligne de cote au-delà du bord de l'image.
+  */
+  const marge = reglage.marge ?? 1;
   const trait = reglage.trait ?? 2;
   const rnd = dés(reglage.graine ?? 12345);
 
