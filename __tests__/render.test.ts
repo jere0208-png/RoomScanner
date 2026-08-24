@@ -21,6 +21,12 @@ import {
   SNAPSHOT_WALLS,
 } from '../src/export/snapshotFixture';
 import { buildObj } from '../src/export/model3d';
+import {
+  cheminDuCadre,
+  DUREE_SCAN,
+  MESURES,
+  poseDeLaLigne,
+} from '../src/ui/glypheScan';
 
 const input = {
   walls: SNAPSHOT_WALLS,
@@ -127,5 +133,69 @@ describe('export OBJ', () => {
       if (!line.startsWith('f ')) continue;
       expect(line.slice(2).split(' ').length).toBeGreaterThanOrEqual(3);
     }
+  });
+});
+
+/**
+ * LA PELLICULE DE L'ICÔNE DE SCAN.
+ *
+ * Une animation ne se relit pas dans un banc : on en fige donc six poses
+ * côte à côte, comme une pellicule, et c'est CETTE image qu'on regarde
+ * avant de livrer. Les six instants sont ceux qui font le geste — repos,
+ * départ replié, point haut, point bas, retour au centre, redéploiement ;
+ * si l'un d'eux se met à ressembler à son voisin, le mouvement s'est perdu.
+ */
+const POSES = [0, 0.5, 0.833, 1.167, 1.517, 1.833];
+const VIGNETTE = 96;
+
+function pelliculeDuScan(): string {
+  const l = MESURES.cote * VIGNETTE;
+  const e = MESURES.trait * VIGNETTE;
+  const cases = POSES.map((s, i) => {
+    const p = poseDeLaLigne(s * 1000);
+    const x = i * VIGNETTE;
+    const largeur = l * p.longueur;
+    return [
+      `<g transform="translate(${x} 0)">`,
+      `<path d="${cheminDuCadre(VIGNETTE)}" stroke="#0B0D12" stroke-width="${e}" ` +
+        'stroke-linecap="round" stroke-linejoin="round" fill="none"/>',
+      `<rect x="${((VIGNETTE - largeur) / 2).toFixed(3)}" y="${(
+        (VIGNETTE - e) / 2 +
+        p.dy * VIGNETTE
+      ).toFixed(3)}" width="${largeur.toFixed(3)}" height="${e}" rx="${e / 2}" fill="#1F5BFF"/>`,
+      `<text x="${VIGNETTE / 2}" y="${VIGNETTE - 6}" font-size="9" fill="#98A1AE" ` +
+        `text-anchor="middle">${s.toFixed(3)}s</text>`,
+      '</g>',
+    ].join('');
+  });
+  return (
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${POSES.length * VIGNETTE}" ` +
+    `height="${VIGNETTE}" viewBox="0 0 ${POSES.length * VIGNETTE} ${VIGNETTE}">` +
+    `<rect width="100%" height="100%" fill="#F6F7F9"/>${cases.join('')}</svg>`
+  );
+}
+
+describe('pellicule de l’icône de scan', () => {
+  it('n’a pas changé', () => {
+    const actual = pelliculeDuScan();
+    if (process.env.UPDATE_SNAPSHOTS) {
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, 'glyphe-scan.svg'), actual, 'utf8');
+      return;
+    }
+    const expected = readFileSync(join(dir, 'glyphe-scan.svg'), 'utf8');
+    if (actual !== expected) {
+      throw new Error(
+        'La pellicule de l’icône de scan a changé. Regardez ' +
+          'assets/rendu-reference/glyphe-scan.svg, puis `npm run snapshots`.',
+      );
+    }
+  });
+
+  it('montre bien six poses DIFFÉRENTES : le geste ne s’est pas aplati', () => {
+    const vues = POSES.map((s) => JSON.stringify(poseDeLaLigne(s * 1000)));
+    expect(new Set(vues).size).toBe(POSES.length);
+    // Et la dernière pose retombe sur la première : la boucle est franche.
+    expect(poseDeLaLigne(DUREE_SCAN).dy).toBeCloseTo(poseDeLaLigne(0).dy, 6);
   });
 });

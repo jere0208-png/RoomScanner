@@ -6975,6 +6975,54 @@ points lumineux. Chaque point qu'il prend est un point de plan en moins : les
 corps descendent d'un demi, la marge et l'interligne d'un point et demi, et
 son fond passe de 85 à 70 %.
 
+
+### L'icône du scan, lue et rejouée plutôt que copiée
+
+Le patron a envoyé une adresse — une animation « Scan » de LottieFiles — et
+une phrase : **« refais la même »**. Quatre équerres et un trait qui balaye,
+l'icône que tout le monde reconnaît sans légende, et celle qu'il faut devant
+« Scanner un plan papier ».
+
+On ne l'a pas EMBARQUÉE. Un fichier Lottie réclame un lecteur, le lecteur
+est une dépendance de plus, et l'app n'en a pas — en gagner une pour douze
+pixels de trait était hors de proportion. On a donc lu le fichier image par
+image : 480 × 480, soixante images par seconde, cent vingt et une images,
+deux couches. Un cadre de 204 points de côté, des coins arrondis sur 24, des
+équerres de 24 de bras, un trait de 12 partout ; une ligne qui vit sa vie
+au-dessus.
+
+Ce qui fait le geste tient en une phrase, et c'est là-dessus que veille le
+banc : **la ligne se rétracte AVANT de partir**. Elle passe de 95 % à 59 %
+de sa longueur pendant qu'elle est encore immobile, balaye vers le haut,
+redescend d'un trait, revient au centre, et ne se redéploie qu'une fois
+arrêtée. Elle a l'air de prendre son élan. Une ligne qui balaierait à pleine
+longueur passerait n'importe quel autre contrôle et n'aurait plus rien du
+modèle — c'est donc écrit tel quel : à tout instant où la ligne n'est pas au
+centre, elle doit être courte.
+
+Deux décisions valent d'être notées.
+
+**Tout est en fraction du côté.** L'original mesure ses traits en pixels
+d'un carré de 480 ; l'icône se pose ici à 28 points dans une barre et à 120
+sur un écran. Un « 12 » en dur aurait donné un trait de douze pixels sur une
+icône de vingt-huit. Le banc compare donc deux tailles au lieu de nommer un
+chiffre — même leçon que les murs, dont la zone de toucher se cherchait par
+« strokeWidth === 30 ».
+
+**La boucle est linéaire, l'assouplissement est dans les valeurs.** Une
+seule animation native tourne de 0 à 1 sur les deux secondes, et les deux
+courbes du geste sont échantillonnées puis données à `interpolate`. Une
+chaîne de six `timing` enchaînés aurait décalé tout le reste à la première
+retouche ; et surtout, le mouvement part au moteur natif : la ligne continue
+de balayer pendant que le fil JS mouline la lecture du plan — c'est-à-dire
+exactement au moment où on la regarde.
+
+Une animation ne se relit pas dans un banc. On en fige donc six poses côte à
+côte, `assets/rendu-reference/glyphe-scan.svg`, comme une pellicule : repos,
+départ replié, point haut, point bas, retour au centre, redéploiement. C'est
+cette image qu'on regarde avant de livrer, et son diff qui préviendra le
+jour où le geste s'aplatira.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro
