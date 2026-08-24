@@ -18,18 +18,19 @@
  * première aide à choisir, le second fait foi.
  */
 import React from 'react';
+import Svg, { Path } from 'react-native-svg';
 import {
   AirVent,
   AlarmSmoke,
   Cctv,
   CircleDot,
   Ellipsis,
-  Fan,
   LampCeiling,
   LampWallUp,
   ScanEye,
 } from 'lucide-react-native';
 import { useTheme } from '../theme';
+import { SOLAIRES } from '../ui/solaires';
 import { CEILINGS, type CeilingKind } from '../geometry/ceiling';
 
 /** « spots » = la ligne de spots, qui n'est pas un appareil mais un geste. */
@@ -40,7 +41,6 @@ const JEU = {
   dcl: LampCeiling,
   spot: CircleDot,
   applique: LampWallUp,
-  ventilateur: Fan,
   daaf: AlarmSmoke,
   camera: Cctv,
   vmc: AirVent,
@@ -55,10 +55,37 @@ export function CeilingIcon({
   size?: number;
 }) {
   const c = useTheme();
+  /*
+    LE VENTILATEUR DE PLAFOND — relevé du patron, lien à l'appui :
+    « remplace le ventilateur actuel par cette icône » (`black-hole-3`),
+    « de la couleur que tu ferais la lumière ».
+
+    Vu du dessous, un ventilateur de plafond n'a pas de pales : il a des
+    cercles. C'est ce que dessine ce tracé, et c'est ce qu'on voit sur un
+    plan. Sa teinte ne change pas pour autant : le ventilateur appartient
+    déjà à la famille ÉCLAIRAGE — il porte un point lumineux et se commande
+    — et il en portait donc déjà l'ambre.
+
+    C'est la seule silhouette du catalogue : les huit autres viennent de
+    Lucide, au trait. Une exception assumée, pour un dessin qui n'existe pas
+    au trait dans ce jeu-là.
+  */
+  const teinteFamille =
+    kind === 'spots' ? CEILINGS.spot.color : CEILINGS[kind].color;
+  if (kind === 'ventilateur') {
+    return (
+      <Svg width={size} height={size} viewBox="0 0 24 24">
+        <Path
+          d={SOLAIRES.ventilateur}
+          fill={teinteFamille || c.ink}
+          fillRule="evenodd"
+        />
+      </Svg>
+    );
+  }
   const Icone = JEU[kind];
   // La teinte de la famille : lumière, sécurité, ventilation. C'est la
   // même sur le plan et dans le dossier — on reconnaît un détecteur de
   // fumée à son rouge avant même de lire le mot.
-  const teinte = kind === 'spots' ? CEILINGS.spot.color : CEILINGS[kind].color;
-  return <Icone size={size} color={teinte || c.ink} strokeWidth={1.9} />;
+  return <Icone size={size} color={teinteFamille || c.ink} strokeWidth={1.9} />;
 }

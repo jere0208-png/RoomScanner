@@ -1,7 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import Svg, { Path } from 'react-native-svg';
-import { ContourVif, TexteVif } from '../components/ContourVif';
-import { SOLAIRES } from '../ui/solaires';
+import { TexteVif } from '../components/ContourVif';
 import {
   Animated,
   Easing,
@@ -25,6 +23,7 @@ import {
 } from '../theme';
 import { GlowButton } from '../components/GlowButton';
 import { LogoMark } from '../components/LogoMark';
+import { AvatarGlyph } from '../components/AvatarGlyph';
 import { LightRibbon, RIBBON_H } from '../components/LightRibbon';
 import { PhoneShowcase } from '../components/PhoneShowcase';
 import { useScanStore } from '../store/scanStore';
@@ -176,11 +175,6 @@ export function HomeScreen() {
             resizeMode="contain"
             accessibilityLabel="EchoPlan"
           />
-        </Animated.View>
-        <Animated.View style={fadeIn(1)}>
-          <Text style={styles.subtitle}>
-            Votre appartement en 3D et en plan coté,{'\n'}en quelques minutes.
-          </Text>
         </Animated.View>
       </View>
 
@@ -347,13 +341,25 @@ export function HomeScreen() {
         </Animated.View>
       )}
 
-      {/* Le conseil guide la CAMÉRA : sans elle, il ne veut plus rien dire. */}
-      {supported !== false && (
-        <Animated.Text style={[styles.hint, fadeIn(5)]}>
-          Allumez les lumières et dégagez le centre de la pièce pour un
-          meilleur résultat.
-        </Animated.Text>
-      )}
+      {/*
+        LA PROMESSE EN PIED DE PAGE — relevé du patron : « supprime le texte
+        sous le logo (votre appartement…), intègre-le en bas de page à la
+        place de "allumez les lumières" ».
+
+        Elle se lisait en gris clair juste sous la marque, là où l'œil est
+        encore occupé par le mot ; elle est maintenant la DERNIÈRE chose
+        qu'on lit avant de toucher le bouton, et c'est là qu'une promesse a
+        sa place.
+
+        Le conseil de scan qu'elle remplace — « allumez les lumières et
+        dégagez le centre de la pièce » — était un bon conseil de chantier
+        arrivé trop tôt : on le lisait sur l'accueil, on scannait dix minutes
+        plus tard. Il ne conditionne donc plus rien : la promesse vaut aussi
+        sur un appareil sans LiDAR, qui dessine son plan au clavier.
+      */}
+      <Animated.Text style={[styles.hint, fadeIn(5)]}>
+        Votre appartement en 3D et en plan coté,{'\n'}en quelques minutes.
+      </Animated.Text>
 
       {/*
         LE PROFIL EST UN BLOC, EN HAUT À GAUCHE — croquis Paint du patron.
@@ -378,21 +384,20 @@ export function HomeScreen() {
           plus. Les enfants restent transparents au doigt : c'est TOUT le
           bloc qui ouvre le menu.
         */}
-        {pro ? (
-          <View pointerEvents="none">
-            <ContourVif rayon={18} fond={c.bg} style={styles.avatarOrZone}>
-              <View style={styles.avatarOrDedans}>
-                <Svg width={29} height={29} viewBox="0 0 24 24">
-                  <Path d={SOLAIRES.avatar} fill={c.inkSoft} fillRule="evenodd" />
-                </Svg>
-              </View>
-            </ContourVif>
-          </View>
-        ) : (
-          <Svg width={34} height={34} viewBox="0 0 24 24" pointerEvents="none">
-            <Path d={SOLAIRES.avatar} fill={c.inkSoft} fillRule="evenodd" />
-          </Svg>
-        )}
+        {/*
+          L'AVATAR : LE MÊME DANS LES DEUX GRADES, ET SANS ANNEAU.
+
+          Relevé du patron, lien à l'appui : « utilise cette icône pour
+          l'avatar à l'accueil et enlève le contour présent ». C'est un
+          « user-circle » duotone de Phosphor — un rond qui respire, là où la
+          silhouette pleine faisait une tache.
+
+          L'anneau d'or qui cerclait l'avatar en Pro s'en va avec le reste :
+          c'est le CONTOUR qu'on retire. Le grade se voit toujours — le
+          prénom garde la typo d'or juste à côté — et l'avatar redevient ce
+          qu'il est, une porte vers le compte.
+        */}
+        <AvatarGlyph size={34} teinte={c.inkSoft} />
         <View style={styles.profilColonne} pointerEvents="none">
           {pro ? (
             <TexteVif
@@ -455,8 +460,17 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     paddingTop: 72,
     paddingBottom: 40,
   },
-  // zIndex/elevation : l'onde d'arrivée pulse AU-DESSUS des cartes suivantes.
-  hero: { alignItems: 'center', zIndex: 20, elevation: 20 },
+  /*
+    LE BLOC DESCEND D'UN CRAN — relevé du patron : « descends le logo
+    EchoPlan, et l'icône qu'on vient de modifier avec, en suivant la même
+    descente ».
+
+    Il était collé sous la barre du haut : la marque n'avait pas d'air
+    au-dessus d'elle. Le glyphe incrusté vit DANS ce bloc — il descend donc
+    avec lui, sans qu'on ait à le descendre séparément, et l'incrustation
+    reste centrée sur le mot.
+  */
+  hero: { alignItems: 'center', marginTop: 34, zIndex: 20, elevation: 20 },
   /**
    * Le logotype tient sur DEUX lignes — « echo » au-dessus de « plan » —,
    * d'où ces proportions : 160 × 102 et non plus une bande.
@@ -590,6 +604,4 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   // L'anneau d'or AU RAS de l'icône : 36 pour un avatar de 29 — plus de
   // disque clair entre eux, le couvercle est la couleur du fond. Et 36,
   // c'est la pastille du thème : les deux ronds du bandeau sont jumeaux.
-  avatarOrZone: { width: 36, height: 36 },
-  avatarOrDedans: { flexGrow: 1, alignItems: 'center', justifyContent: 'center' },
 }));

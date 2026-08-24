@@ -42,11 +42,11 @@ import { ContourVif } from '../src/components/ContourVif';
 import { light } from '../src/theme';
 import { HomeScreen } from '../src/screens/HomeScreen';
 import { LogoMark } from '../src/components/LogoMark';
+import { AvatarGlyph } from '../src/components/AvatarGlyph';
 import { PhoneShowcase } from '../src/components/PhoneShowcase';
 import { GlowButton } from '../src/components/GlowButton';
 import { ThemeGlyph } from '../src/components/ThemeGlyph';
 import { TexteVif } from '../src/components/ContourVif';
-import { SOLAIRES } from '../src/ui/solaires';
 import { useScanStore } from '../src/store/scanStore';
 import { useAccountStore } from '../src/store/accountStore';
 import { SHOWCASE_IMAGES } from '../src/assets/showcase';
@@ -186,11 +186,16 @@ describe('l’accueil', () => {
     expect(st.position).toBe('absolute');
     expect(typeof st.top).toBe('number');
     expect(typeof st.left).toBe('number');
-    // L'avatar est la silhouette Solar du jeu commun.
-    expect(
-      bloc.findAllByType(Path).filter((n) => n.props.d === SOLAIRES.avatar)
-        .length,
-    ).toBe(1);
+    /*
+      L'AVATAR EST UN ROND QUI RESPIRE, plus une silhouette pleine.
+
+      Relevé du patron, lien à l'appui : « utilise cette icône pour l'avatar
+      à l'accueil et enlève le contour présent ». C'est un « user-circle »
+      duotone de Phosphor — deux tracés, dont un en retrait. Le reste de
+      l'app garde le jeu Solar : l'avatar n'est pas un outil, c'est une
+      porte vers le compte.
+    */
+    expect(bloc.findAllByType(AvatarGlyph)).toHaveLength(1);
     const vu = textes(t);
     expect(vu).toContain('Jérôme');
     /*
@@ -270,15 +275,17 @@ describe('l’accueil', () => {
     const typos = bloc.findAllByType(TexteVif);
     expect(typos).toHaveLength(1);
     expect(typos[0].props.texte).toBe('Jérôme');
-    // …et l'avatar se cercle du contour d'or, AU RAS de l'icône grise —
-    // relevé du patron : plus de disque clair entre l'anneau et l'avatar.
-    const contour = bloc.findAllByType(ContourVif);
-    expect(contour).toHaveLength(1);
-    expect(contour[0].props.fond).toBe(light.bg);
-    const stAnneau = StyleSheet.flatten(contour[0].props.style) as {
-      width?: number;
-    };
-    expect(stAnneau.width).toBeLessThanOrEqual(38);
+    /*
+      …ET L'AVATAR NE SE CERCLE PLUS DE RIEN.
+
+      L'anneau d'or a cerclé l'avatar en Pro le temps de deux versions — le
+      grade se voyait au lieu de s'écrire. Relevé du patron, en même temps
+      que le changement d'icône : « enlève le contour présent ». Le grade se
+      voit toujours, à côté : c'est le prénom qui porte la typo d'or, et
+      l'avatar redevient une porte vers le compte, pas un blason.
+    */
+    expect(bloc.findAllByType(ContourVif)).toHaveLength(0);
+    expect(bloc.findAllByType(AvatarGlyph)).toHaveLength(1);
     // Et le prénom doré s'allège comme le gris.
     const typoNom = bloc.findAllByType(TexteVif)[0];
     expect(Number(typoNom.props.graisse)).toBeLessThanOrEqual(600);
@@ -305,11 +312,14 @@ describe('l’accueil', () => {
         n.props?.accessibilityLabel === 'Mon compte' &&
         typeof n.props?.onPress === 'function',
     )[0];
-    // L'avatar Pro : l'anneau d'or se lit en 36.
-    const stAnneau = StyleSheet.flatten(
-      bloc.findAllByType(ContourVif)[0].props.style,
-    ) as { width?: number };
-    expect(stAnneau.width).toBeGreaterThanOrEqual(35);
+    /*
+      L'avatar Pro se lisait en 36 dans son anneau d'or ; l'anneau est parti
+      — « enlève le contour présent » — et c'est le glyphe lui-même qui
+      porte la taille, la MÊME dans les deux grades. Un avatar qui change de
+      taille avec l'abonnement ferait sauter la barre du haut à chaque
+      renouvellement.
+    */
+    expect(bloc.findAllByType(AvatarGlyph)[0].props.size).toBe(34);
     // En gratuit, l'avatar nu suit le mouvement : lui aussi a grandi.
     // Le premier arbre se démonte AVANT le second : deux accueils vivants
     // à la fois, et leurs animations se disputent les minuteries sans fin.
@@ -321,15 +331,9 @@ describe('l’accueil', () => {
         n.props?.accessibilityLabel === 'Mon compte' &&
         typeof n.props?.onPress === 'function',
     )[0];
-    // On remonte jusqu'au Svg porteur de la taille : le parent direct du
-    // tracé est un intermédiaire sans largeur.
-    let avatarNu = bloc2
-      .findAllByType(Path)
-      .find((n) => n.props.d === SOLAIRES.avatar)!.parent;
-    while (avatarNu && avatarNu.props?.width === undefined) {
-      avatarNu = avatarNu.parent;
-    }
-    expect(Number(avatarNu?.props.width)).toBeGreaterThanOrEqual(33);
+    // En gratuit, le MÊME glyphe et la même taille : rien ne distingue plus
+    // les deux grades sur l'avatar — c'est le prénom qui les distingue.
+    expect(bloc2.findAllByType(AvatarGlyph)[0].props.size).toBe(34);
   });
 
   it('ne récite plus le mode d’emploi', () => {
@@ -723,7 +727,14 @@ describe('l’accueil sur un appareil sans LiDAR', () => {
     useScanStore.setState({ supported: true });
     const t = monter();
     expect(bouton(t, 'Commencer le scan')).toBeDefined();
-    expect(textes(t)).toContain('Allumez les lumières');
+    /*
+      Le pied de page portait le conseil de scan — « allumez les lumières et
+      dégagez le centre de la pièce » — et il ne paraissait que sur un
+      appareil capable de scanner. Relevé du patron : c'est la PROMESSE qui
+      s'y tient maintenant, et elle ne dépend d'aucun capteur : un appareil
+      sans LiDAR dessine son plan au clavier, et la promesse tient toujours.
+    */
+    expect(textes(t)).toContain('Votre appartement en 3D');
   });
 });
 
@@ -766,5 +777,73 @@ describe('le glyphe incrusté', () => {
       n = n.parent;
     }
     expect(absolu).toBe(true);
+  });
+});
+
+/**
+ * LE HÉROS DESCEND, ET LA PHRASE PART EN PIED DE PAGE.
+ *
+ * Relevé du patron : « sur l'accueil, descends le logo EchoPlan, et l'icône
+ * qu'on vient de modifier avec, en suivant la même descente. Supprime le
+ * texte sous le logo (votre appartement…), intègre-le en bas de page à la
+ * place de "allumez les lumières", etc. »
+ *
+ * Le bloc d'accueil était collé sous la barre du haut, et il portait trois
+ * choses : le glyphe, le mot, et la promesse. Le mot se retrouvait au
+ * milieu d'un sandwich, et la promesse — ce qu'on VEND — se lisait en gris
+ * clair juste sous lui, là où l'œil est encore occupé par la marque.
+ *
+ * Elle descend en pied de page, à la place du conseil de scan : c'est la
+ * dernière chose qu'on lit avant de toucher le bouton, et c'est là qu'une
+ * promesse a sa place. Le glyphe, lui, est DANS le bloc — il descend donc
+ * avec lui, sans qu'on ait à le descendre séparément.
+ */
+describe('le bloc d’accueil descendu', () => {
+  /** Le bloc de la marque : le plus PROCHE ancêtre du glyphe qui porte
+   *  aussi le logotype — la page entière les contient tous les deux. */
+  const hero = (t: TestRenderer.ReactTestRenderer) => {
+    let n: TestRenderer.ReactTestInstance | null = t.root.findByType(LogoMark)
+      .parent;
+    while (n) {
+      if (n.findAllByType(Image).length > 0) return n;
+      n = n.parent;
+    }
+    return null;
+  };
+
+  it('descend d’un cran sous la barre du haut', () => {
+    const bloc = hero(monter());
+    expect(bloc).toBeDefined();
+    const st = StyleSheet.flatten(bloc!.props.style) as { marginTop?: number };
+    expect(Number(st.marginTop ?? 0)).toBeGreaterThanOrEqual(24);
+  });
+
+  it('et le glyphe descend avec lui : il vit dedans', () => {
+    const bloc = hero(monter());
+    expect(bloc!.findAllByType(LogoMark)).toHaveLength(1);
+  });
+
+  it('la promesse a quitté le dessous du logo pour le pied de page', () => {
+    const t = monter();
+    const vu = textes(t);
+    expect(vu).toContain('Votre appartement en 3D');
+    // Elle n'est plus dans le bloc de la marque.
+    const dansLeHero = hero(t)!
+      .findAllByType(Text)
+      .map((x) => String(x.props.children))
+      .join(' | ');
+    expect(dansLeHero).not.toContain('Votre appartement');
+  });
+
+  /*
+    LE CONSEIL DE SCAN S'EN VA AVEC ELLE.
+
+    « Allumez les lumières et dégagez le centre de la pièce » a occupé ce
+    pied de page pendant plusieurs versions — c'est un bon conseil de
+    chantier, mais il vient trop tôt : on le lit sur l'accueil, on scanne
+    dix minutes plus tard. La promesse, elle, se lit juste avant d'appuyer.
+  */
+  it('et le conseil de scan a quitté l’accueil', () => {
+    expect(textes(monter())).not.toContain('Allumez les lumières');
   });
 });

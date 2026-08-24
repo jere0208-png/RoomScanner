@@ -21,7 +21,17 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 /** clé de l'app → candidats Solar Bold, du préféré au repli. */
 const CHOIX = {
   // --- la rangée d'outils du plan et de la 3D
-  plafond: ['lamp-bold'],
+  /*
+    LE PLAFOND EST UN LUSTRE — relevé du patron, lien à l'appui :
+    `svgrepo.com/svg/525753/chandelier`, « à la place de l'icône de
+    plafond ».
+
+    C'était une lampe (`lamp-bold`) : posée dans la rangée, à côté du
+    fauteuil des meubles et de l'éclair de l'appareillage, elle se lisait
+    comme une lampe de chevet — un objet qu'on POSE, pas un plafond qu'on
+    équipe. Le lustre, lui, ne peut être qu'au plafond.
+  */
+  plafond: ['chandelier-bold'],
   save: ['diskette-bold'],
   edit: ['pen-bold'],
   ruler: ['ruler-bold'],
@@ -43,6 +53,43 @@ const CHOIX = {
   gaines: ['routing-2-bold', 'routing-bold'],
   murs: ['buildings-bold', 'buildings-2-bold'],
   appareil: ['socket-bold'],
+  /*
+    LES QUATRE FLÈCHES DU PAVÉ DE RÉGLAGE — relevé du patron, liens à
+    l'appui : `square-alt-arrow-left/down/right/up`.
+
+    C'étaient quatre chevrons tracés à la main, au trait, dans une app qui
+    ne dessine qu'en silhouette : posés sous une rangée de pleins, ils se
+    lisaient comme des traits de construction plutôt que comme des boutons.
+    Le carré plein leur donne le poids d'une touche — et c'est bien d'une
+    touche qu'il s'agit : on l'appuie dix fois de suite pour gagner dix
+    centimètres.
+  */
+  flecheGauche: ['square-alt-arrow-left-bold'],
+  flecheDroite: ['square-alt-arrow-right-bold'],
+  flecheHaut: ['square-alt-arrow-up-bold'],
+  flecheBas: ['square-alt-arrow-down-bold'],
+  /*
+    LE V DE VALIDATION, ET LE MAILLON — relevé du patron, liens à l'appui :
+    `unread` (un V dans un carré) et `link-square`.
+
+    Les deux étaient tracés à la main dans le bandeau du plafond, au trait,
+    pendant que leurs voisins venaient du jeu. Un pictogramme dessiné à part
+    tient tant qu'on ne le regarde pas à côté des autres.
+  */
+  valider: ['unread-bold'],
+  lienCarre: ['link-square-bold'],
+  /*
+    LE VENTILATEUR DE PLAFOND — relevé du patron : « remplace le ventilateur
+    actuel par cette icône » (`black-hole-3`), « de la couleur que tu ferais
+    la lumière ».
+
+    Vu du dessous, un ventilateur de plafond n'a pas de pales : il a des
+    cercles. C'est exactement ce que dessine ce tracé-là, et c'est ce qu'on
+    voit sur un plan. Sa teinte ne change pas : le ventilateur appartient
+    déjà à la famille ÉCLAIRAGE (il porte un point lumineux et se commande),
+    et il en portait donc déjà l'ambre.
+  */
+  ventilateur: ['black-hole-3-bold'],
   reperes: ['target-bold'],
   plus: ['add-circle-bold'],
   // --- les feuilles du dossier (écran d'export)
@@ -97,6 +144,31 @@ async function tracer(nom) {
   return ds.length > 0 ? ds.join(' ') : null;
 }
 
+/*
+  LES TRACÉS MAISON, que l'outil recopie tels quels.
+
+  Une icône écrite À LA MAIN dans le fichier généré ne survit pas à la
+  génération suivante : `note` a disparu ainsi, le jour où l'on a changé
+  l'icône du plafond — la régénération a réécrit le fichier sans elle, et
+  rien ne l'a signalé avant l'écran. Ce qui n'est pas dans le jeu Solar se
+  déclare donc ICI, avec le reste.
+*/
+const MAISON = {
+  /*
+    LE MOT ÉCRIT SUR LE PLAN — une bulle, pas un crayon.
+
+    Le crayon dit « corriger ce qui est là » ; cette pastille-là POSE
+    quelque chose de neuf. Ses deux lignes creuses disent que ce qu'on pose
+    est du texte. Redessinée à la main sur la grille de 24 du jeu : la
+    bulle Solar d'origine n'a pas ces lignes, et sans elles on lit un
+    commentaire de messagerie.
+  */
+  note: {
+    nom: 'chat-square-bold (redessiné)',
+    d: 'M6 3H18C19.6569 3 21 4.34315 21 6V14C21 15.6569 19.6569 17 18 17H12L7 21V17H6C4.34315 17 3 15.6569 3 14V6C3 4.34315 4.34315 3 6 3ZM7 7.4H17V9H7V7.4ZM7 11H13V12.6H7V11Z',
+  },
+};
+
 const sorties = {};
 const rates = [];
 for (const [cle, candidats] of Object.entries(CHOIX)) {
@@ -120,6 +192,8 @@ if (rates.length > 0) {
   console.error(`INTROUVABLES : ${rates.join(' ; ')}`);
   process.exit(1);
 }
+
+Object.assign(sorties, MAISON);
 
 const lignes = Object.entries(sorties).map(
   ([cle, v]) => `  /** solar:${v.nom} */\n  ${cle}:\n    '${v.d}',`,

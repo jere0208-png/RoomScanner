@@ -6629,6 +6629,88 @@ Les deux anneaux qui battaient autour de lui s'en vont avec l'écrin : une
 pulsation autour d'un filigrane serait plus visible que le filigrane
 lui-même, et « pas de contour rien » vaut aussi pour ce qui tourne autour.
 
+### L'accueil descend, et la promesse passe en pied de page
+
+**« Descends le logo EchoPlan, et l'icône qu'on vient de modifier avec, en
+suivant la même descente. Supprime le texte sous le logo (votre
+appartement…), intègre-le en bas de page à la place de "allumez les
+lumières". »**
+
+Le bloc était collé sous la barre du haut et portait trois choses : le
+glyphe, le mot, la promesse. Le mot se retrouvait au milieu d'un sandwich, et
+la promesse — ce qu'on VEND — se lisait en gris juste sous lui, là où l'œil
+est encore occupé par la marque. Elle descend en pied de page : c'est la
+dernière chose qu'on lit avant de toucher le bouton.
+
+Le glyphe incrusté vit DANS le bloc : il descend avec lui, sans qu'on ait à
+le descendre séparément, et l'incrustation reste centrée sur le mot.
+
+Le conseil de scan qu'elle remplace — « allumez les lumières et dégagez le
+centre de la pièce » — était un bon conseil de chantier **arrivé trop tôt** :
+on le lisait sur l'accueil, on scannait dix minutes plus tard. Il ne
+conditionne plus rien non plus : il ne paraissait que sur un appareil capable
+de scanner, alors que la promesse vaut aussi pour qui dessine son plan au
+clavier.
+
+### Sept icônes reprises du jeu, et une exception
+
+Le patron a envoyé sept liens SVGRepo dans la même séance. Toutes sont du jeu
+**Solar** déjà vendu par `tools/gen-solaires.mjs` — sauf l'avatar. Le point
+commun de ce qu'elles remplacent : **des pictogrammes dessinés à la main**,
+au trait, dans une app qui ne dessine qu'en silhouette. Un dessin fait à part
+tient tant qu'on ne le regarde pas à côté des autres.
+
+- **le plafond** devient un LUSTRE (`chandelier`). C'était une lampe : posée
+  entre le fauteuil des meubles et l'éclair de l'appareillage, elle se lisait
+  comme une lampe de chevet — un objet qu'on POSE, pas un plafond qu'on
+  équipe ;
+- **la photo de mur** prend l'appareil du jeu (`camera`), celui que porte
+  déjà la sortie « Image » : le même objet, le même dessin. Elle était un
+  rectangle et un rond au trait, seul pictogramme de l'app à ne pas venir du
+  jeu ;
+- **les quatre flèches du pavé de réglage** (`square-alt-arrow-*`) : le carré
+  plein leur donne le poids d'une touche, et c'en est une — on l'appuie dix
+  fois de suite pour gagner dix centimètres ;
+- **le V de validation** (`unread`) et **le maillon** (`link-square`) du
+  bandeau du plafond ;
+- **le ventilateur de plafond** (`black-hole-3`). Vu du dessous, un
+  ventilateur n'a pas de pales : il a des cercles. Sa teinte ne change pas —
+  il appartient déjà à la famille ÉCLAIRAGE, il portait donc déjà l'ambre.
+  C'est la seule silhouette d'un catalogue dessiné au trait (Lucide) :
+  exception assumée, pour un dessin qui n'existe pas au trait dans ce jeu ;
+- **l'avatar** est la seule pièce hors Solar : un `user-circle` DUOTONE de
+  Phosphor (MIT), deux tracés dont un en retrait. L'avatar n'est pas un
+  outil, c'est une porte vers le compte, et un rond qui respire s'y lit mieux
+  qu'une tache pleine. **L'anneau d'or** qui le cerclait en Pro s'en va —
+  « enlève le contour présent » : le grade se voit toujours, à côté, dans la
+  typo dorée du prénom.
+
+**Un piège découvert en chemin** : une icône écrite À LA MAIN dans le fichier
+généré ne survit pas à la génération suivante. `note` a disparu ainsi, le
+jour où l'on a changé l'icône du plafond — la régénération a réécrit le
+fichier sans elle, et rien ne l'a signalé avant l'écran. Ce qui n'est pas
+dans le jeu Solar se déclare donc maintenant DANS l'outil (`MAISON`), qui le
+recopie tel quel.
+
+### Le menu d'un mur se touche
+
+**« Éditer et choisir un mur, le menu qui apparaît à côté du mur est pas
+cliquable ou pas facilement… corrige ça. »** Le même symptôme qu'une version
+précédente, deux causes neuves — et il fallait les deux pour que le geste
+rate :
+
+- **la cible.** Quatre colonnes de quarante-huit points de large, mais
+  **trente-quatre de haut**, sans le moindre débord. Sous la barre des
+  quarante-quatre du doigt : on visait juste, ou on ratait. Quarante
+  dessinés, huit de débord, et la barre ne grossit que de six points — sa
+  hauteur de référence (`WALL_MENU`) suit, sinon le placement l'aurait posée
+  à cheval sur le trait qu'elle annote ;
+- **l'empilement.** Rien ne portait de rang dans ce plan : c'est l'ordre du
+  rendu qui décidait, et le menu est dessiné AVANT les poignées de coin et de
+  rotation. Une poignée qui tombe dessus prend le doigt à sa place, sans rien
+  montrer — d'où le « pas facilement » : ça marchait, ou pas, selon l'endroit
+  du mur.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

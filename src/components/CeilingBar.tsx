@@ -16,6 +16,7 @@ import Svg, { Path } from 'react-native-svg';
 import { castToWall, type Pt, type WallSeg } from '../geometry/floorplan';
 import { CEILINGS, type CeilingFixture } from '../geometry/ceiling';
 import { haptic } from '../ui/haptic';
+import { SOLAIRES } from '../ui/solaires';
 import { DEBORD_DOIGT } from '../ui/bandeau';
 import type { PromptData } from './Sheet';
 import type { Palette } from '../theme';
@@ -224,14 +225,14 @@ export function CeilingBar({
                       style={styles.iconBtn}
                       accessibilityLabel="Relier à une commande"
                       onPress={onLink}>
+                      {/* Le maillon du jeu commun — relevé du patron :
+                          `link-square`. Il était tracé à la main, au trait,
+                          pendant que ses voisins venaient du jeu. */}
                       <Svg width={19} height={19} viewBox="0 0 24 24">
                         <Path
-                          d="M9.5 14.5 L14.5 9.5 M8 12 L5.5 14.5 a3.5 3.5 0 0 0 5 5 L13 17 M16 12 l2.5 -2.5 a3.5 3.5 0 0 0 -5 -5 L11 7"
-                          stroke={palette.blue}
-                          strokeWidth={2}
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          fill="none"
+                          d={SOLAIRES.lienCarre}
+                          fill={palette.blue}
+                          fillRule="evenodd"
                         />
                       </Svg>
                     </TouchableOpacity>
@@ -270,15 +271,10 @@ export function CeilingBar({
                       style={styles.iconBtnOk}
                       accessibilityLabel="Terminer"
                       onPress={onDone}>
+                      {/* Le V de validation du jeu commun — relevé du
+                          patron : `unread`, « c'est un V de valider ». */}
                       <Svg width={19} height={19} viewBox="0 0 24 24">
-                        <Path
-                          d="M5 12.5 L10 17.5 L19 6.5"
-                          stroke="#FFFFFF"
-                          strokeWidth={2.4}
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          fill="none"
-                        />
+                        <Path d={SOLAIRES.valider} fill="#FFFFFF" fillRule="evenodd" />
                       </Svg>
                     </TouchableOpacity>
                     <Text style={styles.bandeauMot}>Terminer</Text>

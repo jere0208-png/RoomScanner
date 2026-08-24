@@ -88,6 +88,7 @@ import {
 import { RoomScan } from 'react-native-room-scan';
 import { useScanStore } from '../store/scanStore';
 import { haptic } from '../ui/haptic';
+import { SOLAIRES } from '../ui/solaires';
 import { CloseCross } from './CloseCross';
 import { wallLabel } from '../geometry/naming';
 import { frCategory } from '../geometry/furniture';
@@ -1898,12 +1899,23 @@ export function WallElevation({
             onPress={() => setPas(pas === 0.01 ? 0.05 : 0.01)}>
             <Text style={styles.pavePasText}>{`${Math.round(pas * 100)} cm`}</Text>
           </TouchableOpacity>
+          {/*
+            LES QUATRE FLÈCHES VIENNENT DU JEU COMMUN — relevé du patron,
+            liens à l'appui : `square-alt-arrow-left/down/right/up`.
+
+            C'étaient quatre chevrons tracés à la main, au trait, dans une
+            app qui ne dessine qu'en silhouette : posés sous une rangée de
+            pleins, ils se lisaient comme des traits de construction plutôt
+            que comme des boutons. Le carré plein leur donne le poids d'une
+            touche — et c'en est une : on l'appuie dix fois de suite pour
+            gagner dix centimètres.
+          */}
           {(
             [
-              ['gauche', -1, 0, 'M15 5 L8 12 l7 7'],
-              ['droite', 1, 0, 'M9 5 L16 12 l-7 7'],
-              ['haut', 0, 1, 'M5 15 L12 8 l7 7'],
-              ['bas', 0, -1, 'M5 9 L12 16 l7 -7'],
+              ['gauche', -1, 0, SOLAIRES.flecheGauche],
+              ['droite', 1, 0, SOLAIRES.flecheDroite],
+              ['haut', 0, 1, SOLAIRES.flecheHaut],
+              ['bas', 0, -1, SOLAIRES.flecheBas],
             ] as const
           ).map(([cle, dx, dy, fleche]) => (
             <TouchableOpacity
@@ -1915,15 +1927,8 @@ export function WallElevation({
               // s'il glisse hors du bouton (`onPressOut` couvre les deux).
               onPressIn={() => lancerFleche(dx, dy)}
               onPressOut={arreterFleche}>
-              <Svg width={20} height={20} viewBox="0 0 24 24">
-                <Path
-                  d={fleche}
-                  stroke={c.ink}
-                  strokeWidth={2.2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  fill="none"
-                />
+              <Svg width={22} height={22} viewBox="0 0 24 24">
+                <Path d={fleche} fill={c.ink} fillRule="evenodd" />
               </Svg>
             </TouchableOpacity>
           ))}

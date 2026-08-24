@@ -98,7 +98,15 @@ const VIDE: Fixture[] = [];
  * L'encombrement du menu du mur — partagé avec le banc, qui prouve mur par
  * mur que la poignée de rotation ne le chevauche jamais.
  */
-export const WALL_MENU = { w: 204, h: 46 };
+/*
+  LA BARRE DU MENU DE MUR, en points.
+
+  Sa hauteur sert au PLACEMENT — on l'écarte du mur et des bords en comptant
+  sa demi-hauteur. Elle est passée de 46 à 50 le jour où ses commandes ont
+  pris la taille d'un doigt : un nombre resté en arrière aurait fait poser
+  la barre à cheval sur le trait qu'elle annote.
+*/
+export const WALL_MENU = { w: 204, h: 50 };
 
 /**
  * LE NOM D'UN MEUBLE : petit DEDANS, grandi par le zoom, absent s'il ne
@@ -2011,26 +2019,37 @@ export function FloorplanEditor({
               const p = facePoint(face, faceX(face, ph.along), 0.14);
               const q = mapping.toPx(p);
               return (
+                /*
+                  LE REPÈRE D'UNE PHOTO — l'appareil du jeu commun.
+
+                  Relevé du patron, lien à l'appui :
+                  `svgrepo.com/svg/525723/camera`, « utilise cette icône là
+                  où il y a la photo en icône pour la photo de mur ». C'est
+                  `solar:camera-bold`, celle que porte déjà la sortie
+                  « Image » : le même objet, le même dessin.
+
+                  Il était dessiné à la main — un rectangle et un rond au
+                  trait — et c'était le seul pictogramme de l'app à ne pas
+                  venir du jeu : posé à côté des silhouettes pleines, il se
+                  lisait comme un cadre vide.
+
+                  La pastille claire dessous reste : la silhouette est
+                  pleine, et sur un mur poché en noir elle disparaîtrait.
+                */
                 <G key={`photo-${ph.id}`} onPress={() => onSelectPhoto?.(ph.id)}>
-                  <Circle cx={q.x} cy={q.y} r={11} fill="transparent" />
-                  <Rect
-                    x={q.x - 8}
-                    y={q.y - 7}
-                    width={16}
-                    height={14}
-                    rx={3}
-                    fill={c.surface}
-                    stroke={c.ink}
-                    strokeWidth={1.3}
-                  />
+                  <Circle cx={q.x} cy={q.y} r={12} fill="transparent" />
                   <Circle
                     cx={q.x}
                     cy={q.y}
-                    r={3.2}
-                    fill="none"
-                    stroke={c.ink}
-                    strokeWidth={1.3}
+                    r={10}
+                    fill={c.surface}
+                    stroke={c.line}
+                    strokeWidth={1}
                   />
+                  <G
+                    transform={`translate(${q.x - 6.5} ${q.y - 6.5}) scale(${13 / 24})`}>
+                    <Path d={SOLAIRES.image} fill={c.ink} fillRule="evenodd" />
+                  </G>
                 </G>
               );
             })}
@@ -3206,6 +3225,8 @@ export function FloorplanEditor({
                         key={action}
                         style={styles.wallAction}
                         accessibilityLabel={label ?? action}
+                        /* Quarante dessinés, quarante-huit sous le doigt. */
+                        hitSlop={{ top: 4, bottom: 4, left: 2, right: 2 }}
                         onPress={() => onWallAction(action, w.id)}>
                         <Svg width={19} height={19} viewBox="0 0 24 24">
                           <Path d={d} fill={teinte} fillRule="evenodd" />
@@ -4408,8 +4429,19 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     et un filet d'un cheveu la pose sur le plan — le contour des cartes de
     l'app, à la place d'une ombre qui portait seule tout le relief.
   */
+  /*
+    IL PASSE DEVANT LES POIGNÉES DU MUR.
+
+    Relevé du patron : « le menu qui apparaît à côté du mur est pas
+    cliquable ou pas facilement ». Rien ne portait de rang dans ce plan :
+    c'est l'ORDRE DU RENDU qui tranchait, et le menu est dessiné avant les
+    poignées de coin et de rotation. Une poignée qui tombe dessus prend le
+    doigt à sa place, sans rien montrer — d'où le « pas facilement » : ça
+    marchait, ou pas, selon l'endroit du mur.
+  */
   wallActions: {
     position: 'absolute',
+    zIndex: 6,
     flexDirection: 'row',
     backgroundColor: c.surface,
     borderRadius: radius.pill,
@@ -4419,11 +4451,22 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     paddingVertical: 5,
     ...shadowCard,
     shadowOpacity: 0.09,
+    /* APRÈS l'ombre : elle porte sa propre élévation, et c'est la dernière
+       écrite qui gagne. Android empile sur l'élévation, pas sur le zIndex. */
+    elevation: 6,
   },
-  // Quatre colonnes de même largeur : la barre ne s'étire plus au gré de la
-  // longueur des mots.
+  /*
+    QUATRE COLONNES DE MÊME LARGEUR — la barre ne s'étire pas au gré de la
+    longueur des mots — ET DE LA HAUTEUR D'UN DOIGT.
+
+    Elles faisaient trente-quatre points de haut, sans débord : sous la
+    barre des quarante-quatre, c'est-à-dire qu'on visait juste ou qu'on
+    ratait. Quarante dessinés, huit de débord : quarante-huit sous le
+    doigt, et la barre ne grossit que de six points.
+  */
   wallAction: {
     width: 48,
+    minHeight: 40,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 2,
