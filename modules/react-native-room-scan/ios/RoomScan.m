@@ -64,6 +64,20 @@ RCT_EXTERN_METHOD(restorePhoto:(NSString *)assetId
                   reject:(RCTPromiseRejectBlock)reject)
 @end
 
+/*
+  LA PHOTO D'UN PLAN PAPIER.
+
+  Une seule méthode : elle rend l'image en niveaux de gris (base64) et les
+  textes que Vision y a lus. Tout ce qui se déduit d'un plan — murs,
+  menuiseries, symboles, échelle — se calcule en JavaScript, où cela se
+  teste.
+*/
+@interface RCT_EXTERN_MODULE(RoomScanPlan, NSObject)
+RCT_EXTERN_METHOD(choisirPlan:(NSString *)source
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+@end
+
 @interface RCT_EXTERN_MODULE(RoomScanHeading, NSObject)
 RCT_EXTERN_METHOD(start:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
 RCT_EXTERN_METHOD(stop:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)

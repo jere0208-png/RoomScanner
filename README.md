@@ -7403,6 +7403,39 @@ téléphone doit rendre — une image en niveaux de gris et les textes lus par
 n'est pas là : l'écran affiche alors « recompilez l'application » plutôt que
 de planter sur un module absent.
 
+
+### Plan papier — le pont natif : une image en gris, et ce que Vision a lu
+
+`RoomScanPlan.swift` ne comprend rien au plan, et c'est voulu : il rend deux
+choses, l'image en niveaux de gris et les textes reconnus. Tout ce qui se
+déduit se déduit en JavaScript, où cela se teste — un moteur de lecture écrit
+en Swift ne serait éprouvé nulle part.
+
+- **L'OCR reste natif.** `VNRecognizeTextRequest` lit un texte imprimé depuis
+  dix ans, gratuitement, hors ligne, mieux que tout ce qu'on écrirait. Ses
+  lignes donnent l'échelle (les cotes écrites, seule source exacte) et les
+  noms des pièces. La correction linguistique est COUPÉE : un plan est
+  couvert de nombres à deux ou trois chiffres, et elle les remplacerait par
+  des mots.
+- **Du gris, et en base64.** Un plan est un dessin au trait : la couleur n'y
+  porte que du décor. Et une photo fait un à trois millions de pixels —
+  les passer en tableau de nombres à travers le pont voudrait dire
+  sérialiser autant d'entiers en JSON ; le base64 coûte un tiers de plus en
+  octets et cent fois moins en temps.
+- **Le passage par un contexte de dessin normalise l'ORIENTATION.** Une photo
+  prise en portrait porte son sens dans ses métadonnées, pas dans ses
+  pixels : sans ce redressement, le plan arriverait couché et tout ce qui
+  suit — l'angle de la feuille, les murs d'équerre — travaillerait de
+  travers.
+- **Les boîtes de texte sont converties EN PIXELS ici.** Vision les rend
+  normalisées et l'origine en bas à gauche ; le JavaScript travaille en
+  pixels depuis le haut. Transporter une convention de plus n'aurait servi
+  qu'à la faire oublier un jour.
+
+Non compilé sur cette machine (pas de Mac) : c'est une compilation EAS qui le
+dira. Tant que le module n'est pas là, `disponible()` rend faux et l'écran
+affiche « recompilez l'application » au lieu de planter.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro
@@ -7562,6 +7595,19 @@ passe inaperçu jusqu'à la CI. C'est arrivé une fois.
 - Nommage : il ne peut être meilleur que la détection d'objets de RoomPlan.
   Un bureau, une entrée ou un couloir n'ont pas de mobilier caractéristique
   et sortiront en « Pièce N ».
+- **Plan papier — ce que le lecteur ne sait pas faire.** Un symbole qui MORD
+  franchement dans la maçonnerie reste illisible : l'ébarbage des bords le
+  coupe en deux arcs. Aucun dessinateur ne fait cela (un symbole posé dans le
+  noir d'un mur ne se verrait pas), et le corriger par une dilatation
+  déformerait tous les autres. Les meubles dessinés — une voiture dans un
+  garage, un canapé — donnent des paires de traits parallèles qui ont
+  l'allure de petits murs ; `filtrerDEquerre` en écarte la plus grande part,
+  pas la totalité. Un plan sans aucune cote écrite ni aucune porte reconnue
+  ne rend pas d'échelle du tout, et l'écran demande alors une longueur.
+- **Plan papier — la lecture bloque le fil JS** plusieurs secondes sur une
+  grande photo (trois secondes pour un plan de 1 100 pixels de large sur une
+  machine de bureau). C'est pour ce moment-là que l'icône de scan est animée
+  en natif : elle est la seule chose qui vit pendant ce temps.
 - Le relevé de couleurs du sol est une seule carte monde par scan, plafonnée
   à 64 × 64 cases de 40 cm (25,6 m de côté). Au-delà, seule la couleur
   moyenne subsiste. Chaque pièce n'y peint que les cases tombant dans son
