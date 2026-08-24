@@ -7,11 +7,14 @@
  *      les meubles et les murs seulement, le reste reste décoché. » Un
  *      modèle qui s'ouvre avec tout allumé — surfaces teintées, plafond,
  *      repères, cotes — ne montre plus le bâti qu'on vient regarder ;
- *   2. « La ligne du Afficher ne va pas jusqu'au dernier bouton. Il doit
- *      faire tous les boutons, et même sur la colonne de droite quand c'est
- *      des éléments à afficher/cacher. » Le peigne s'arrêtait au dernier
- *      outil de la LIGNE ; celui qui déborde à droite — « Murs » sur la
- *      capture — restait dehors, et se lisait donc comme autre chose ;
+ *   2. « La ligne du Afficher ne va pas jusqu'au dernier bouton… et même sur
+ *      la colonne de droite quand c'est des éléments à afficher/cacher »,
+ *      puis, la capture suivante à l'appui : « la barre s'arrête au dernier
+ *      calque de la LIGNE, puis monte en équerre vers les boutons de la
+ *      colonne qui sont des calques ». Le peigne s'est arrêté au dernier
+ *      outil de la ligne (le trop-plein de droite restait dehors, annoté
+ *      par rien), puis a couru jusqu'à la pile (et sa descente est tombée
+ *      sur « Édition », qui n'affiche rien) : il monte désormais ;
  *   3. « Le bouton Enregistrer doit être au-dessus du bouton Nord et de tout
  *      autre bouton de la colonne, lorsqu'il est affiché. » Il vivait avec
  *      les commandes, en bas de la colonne, sous le trop-plein de calques :
@@ -134,7 +137,14 @@ describe('le peigne « Afficher »', () => {
       <View key={`o${i}`} testID={`o${i}`} />
     ));
 
-  const rangee = (n: number, largeur: number) => {
+  /**
+   * `dessus` = la hauteur à franchir pour atteindre la pile de droite.
+   *
+   *   0  — la 3D : pas de bouton d'édition, la pile commence SUR la ligne ;
+   *   65 — le plan 2D : la pile est posée au-dessus de la colonne des
+   *        commandes, une cellule et un écart plus haut.
+   */
+  const rangee = (n: number, largeur: number, dessus = 0) => {
     let t!: TestRenderer.ReactTestRenderer;
     act(() => {
       t = TestRenderer.create(
@@ -144,7 +154,7 @@ describe('le peigne « Afficher »', () => {
           largeur={largeur}
           reserve={62}
           bas={10}
-          dessus={0}
+          dessus={dessus}
           elements={outilsFactices(n)}
         />,
       );
@@ -155,30 +165,79 @@ describe('le peigne « Afficher »', () => {
       .filter((x) => x.props.stroke === '#B6BECB');
   };
 
-  it('descend sur chaque outil de la ligne, et sur la pile de droite', () => {
+  const long = (n: TestRenderer.ReactTestInstance) =>
+    Math.abs(Number(n.props.x2) - Number(n.props.x1)) +
+    Math.abs(Number(n.props.y2) - Number(n.props.y1));
+
+  /** Le peigne démonté : la barre, les descentes, la montée, les branches. */
+  const pieces = (traits: TestRenderer.ReactTestInstance[]) => {
+    const horizontales = traits.filter((n) => n.props.y1 === n.props.y2);
+    const verticales = traits.filter((n) => n.props.x1 === n.props.x2);
+    // La barre est la plus longue des horizontales : les branches vers la
+    // colonne ne font que la longueur d'une descente.
+    const barre = horizontales.reduce((a, b) => (long(b) > long(a) ? b : a));
+    const yBarre = Number(barre.props.y1);
+    return {
+      barre,
+      branches: horizontales.filter((n) => n !== barre),
+      descentes: verticales.filter((n) => Number(n.props.y2) > yBarre),
+      montees: verticales.filter((n) => Number(n.props.y2) < yBarre),
+    };
+  };
+
+  it('descend sur chaque outil de la ligne', () => {
     // Sept outils sur trois cent quatre-vingt-dix points : quatre tiennent,
     // trois montent à droite.
-    const traits = rangee(7, 390);
-    const barre = traits.filter((n) => n.props.y1 === n.props.y2);
-    const descentes = traits.filter((n) => n.props.y1 !== n.props.y2);
-    expect(barre).toHaveLength(1);
-    // Quatre descentes pour la ligne, une pour la pile : cinq.
-    expect(descentes).toHaveLength(5);
-  });
-
-  it('et la barre va jusqu’à la dernière descente', () => {
-    const traits = rangee(7, 390);
-    const barre = traits.find((n) => n.props.y1 === n.props.y2)!;
-    const descentes = traits.filter((n) => n.props.y1 !== n.props.y2);
-    const plusADroite = Math.max(...descentes.map((n) => Number(n.props.x1)));
-    expect(Number(barre.props.x2)).toBeGreaterThanOrEqual(plusADroite - 0.5);
+    const { descentes } = pieces(rangee(7, 390, 65));
+    expect(descentes).toHaveLength(4);
   });
 
   it('s’arrête au dernier outil quand ils tiennent tous sur la ligne', () => {
     // Rien à rejoindre : la barre ne déborde pas vers une pile absente.
-    const traits = rangee(3, 390);
-    const descentes = traits.filter((n) => n.props.y1 !== n.props.y2);
+    const { descentes, branches, montees } = pieces(rangee(3, 390));
     expect(descentes).toHaveLength(3);
+    expect(branches).toHaveLength(0);
+    expect(montees).toHaveLength(0);
+  });
+
+  /*
+    LA BARRE NE VA PLUS JUSQU'À LA COLONNE — troisième version du peigne.
+
+    Elle s'est d'abord arrêtée au dernier outil de la LIGNE : le trop-plein
+    de calques, à droite, restait alors annoté par rien. On l'a donc
+    poussée jusqu'à la pile, avec une descente de plus — et sur le plan 2D
+    cette descente est tombée sur « Édition », qui n'affiche ni ne cache
+    quoi que ce soit. Relevé du patron, croquis rouge à l'appui : « la
+    barre s'arrête au dernier calque de la ligne, puis MONTE en équerre
+    vers les boutons de la colonne qui sont des calques ».
+
+    Le peigne se couche donc sur la ligne et se dresse sur la pile : même
+    grammaire, tournée d'un quart de tour.
+  */
+  it('monte en équerre vers la pile, sans descendre sur les commandes', () => {
+    const traits = rangee(7, 390, 65);
+    const { barre, branches, montees } = pieces(traits);
+    // La barre s'arrête au bord gauche de la colonne — devant « Édition »,
+    // jamais dessus.
+    expect(Number(barre.props.x2)).toBeLessThanOrEqual(390 - 8 - 58 + 0.5);
+    // Une seule montée, et une branche par calque de la pile.
+    expect(montees).toHaveLength(1);
+    expect(branches).toHaveLength(3);
+    // Elles partent toutes de la montée, et pointent vers la droite.
+    const xEpine = Number(montees[0].props.x1);
+    for (const b of branches) {
+      expect(Number(b.props.x1)).toBeCloseTo(xEpine, 3);
+      expect(Number(b.props.x2)).toBeGreaterThan(xEpine);
+    }
+  });
+
+  it('garde la descente quand la pile commence sur la ligne (3D)', () => {
+    // Sans bouton d'édition, la première pastille de la pile est SUR la
+    // ligne : elle se dessert comme les autres, par une descente.
+    const { descentes, branches } = pieces(rangee(7, 390, 0));
+    expect(descentes).toHaveLength(5);
+    // Les deux qui la surmontent sont desservies par des branches.
+    expect(branches).toHaveLength(2);
   });
 });
 

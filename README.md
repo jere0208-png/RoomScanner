@@ -6045,7 +6045,8 @@ ligne se range à droite, dans la même bande, et se retrouvait hors du peigne.
 Sur la capture, « Murs » : annoté par rien, il se lisait comme autre chose
 qu'un calque. La barre va maintenant jusqu'à cette pile, avec sa descente.
 Les commandes (édition, sauvegarde) restent dehors : elles ne montrent ni ne
-cachent rien.
+cachent rien. *(Suite de l'histoire plus bas, « Le peigne monte en équerre » :
+sur le plan 2D, cette descente tombait sur « Édition ».)*
 
 **« Le bouton Enregistrer doit être au-dessus du bouton Nord et de tout autre
 bouton de la colonne. »** Troisième version de la même question — on doit le
@@ -6110,6 +6111,48 @@ La garde n'ouvre pas la feuille elle-même : c'est l'écran qui la porte à
 l'écran, et il passe sa façon de le faire (`demander`). L'établi, qui n'a pas
 de feuille à lui, garde l'alerte système en dernier recours — mieux vaut une
 question laide qu'un mur abandonné sans qu'on demande.
+
+### Le peigne monte en équerre
+
+**« La barre s'arrête au dernier calque de la LIGNE, puis monte en équerre
+vers les boutons de la colonne qui sont des calques. »** Croquis rouge sur la
+capture. Troisième version du peigne, et la deuxième était de nous : la barre
+s'arrêtait au dernier outil de la ligne, on l'a poussée jusqu'à la pile de
+droite pour que le trop-plein de calques soit annoté lui aussi — et sa
+descente est tombée sur **« Édition »**, qui n'affiche ni ne cache rien. La
+colonne de droite du plan 2D mélange en effet deux natures : le trop-plein de
+calques par-dessus, les commandes (Édition, Enregistrer) en dessous. Une
+barre horizontale qui va « jusqu'au bout » les prend toutes.
+
+Le peigne se couche donc sur la ligne et **se dresse sur la pile** : la barre
+s'arrête au bord gauche de la colonne, monte en équerre, et sert chaque
+calque de la pile par une branche — même longueur qu'une descente, même
+grammaire tournée d'un quart de tour. Elle s'arrête au calque le plus haut :
+au-dessus, c'est « Enregistrer », qui reste dehors.
+
+**La rangée sait déjà lesquels sont des calques**, et c'est ce qui a évité
+un réglage de plus : elle ne reçoit QUE des calques — les commandes vivent
+dans leur propre colonne, posée par l'écran. Ce qu'elle ignorait, c'est OÙ la
+pile se tient ; `dessus`, la hauteur à franchir pour la rejoindre, le lui
+disait déjà. La hauteur de chaque branche s'en déduit — un pas de pastille
+par rang, compté depuis le bas, plus le milieu de la pastille dans sa
+cellule. Écrite à la main, elle aurait dérivé au premier bouton ajouté.
+
+**En 3D, la pile commence SUR la ligne** (`dessus` vaut zéro : il n'y a pas
+de bouton d'édition sous elle). Sa pastille du bas est à hauteur des autres
+et se dessert comme elles, par une descente ; l'équerre ne concerne que
+celles qui la surmontent. C'est la seule différence entre les deux vues, et
+elle se calcule au lieu de se choisir.
+
+Détail attrapé au passage : **le mot « Afficher » se pose maintenant par le
+bas.** Il vivait dans le flux, au-dessus du dessin ; le jour où le dessin
+s'est mis à monter vers la pile, le mot est monté avec lui — une légende à
+mi-hauteur du plan, loin de la rangée qu'elle nomme. Il est ancré deux points
+au-dessus de la barre, et centré sur la LIGNE seule.
+
+Vérifié à l'œil sur un rendu SVG de la zone (mêmes nombres que le composant),
+et par bancs pour la structure : quatre descentes sur la ligne, une montée,
+une branche par calque de la pile, et la barre qui s'arrête avant la colonne.
 
 ## Prérequis pour tester sur iPhone
 

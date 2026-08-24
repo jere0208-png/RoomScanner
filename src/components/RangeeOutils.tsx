@@ -20,6 +20,8 @@ import {
   PILL_CELL_H,
   PILL_CELL_W,
   PILL_GAP,
+  PILL_PITCH,
+  PILL_SIZE,
   PillSlot,
   repartirOutils,
 } from './ToolPill';
@@ -110,22 +112,69 @@ export function RangeeOutils({
   const part = rangee.length > 0 ? largeurUtile / rangee.length : 0;
   const peigne = !edition && rangee.length > 1 && part > 0;
   /*
-    LE PEIGNE VA JUSQU'AU DERNIER BOUTON — relevé du patron : « la ligne du
-    Afficher ne va pas jusqu'au dernier bouton. Il doit faire tous les
-    boutons, et même sur la colonne de droite quand c'est des éléments à
-    afficher/cacher ».
+    LE PEIGNE SE COUCHE SUR LA LIGNE ET SE DRESSE SUR LA PILE — troisième
+    version, croquis rouge du patron à l'appui.
 
-    Il s'arrêtait au dernier outil de la LIGNE. Or ce qui ne tient pas dans
-    la ligne se range à droite, dans la même bande — sur la capture,
-    « Murs » — et se retrouvait hors du peigne : annoté par rien, il se
-    lisait comme autre chose qu'un calque. Le peigne s'étend donc jusqu'à
-    cette pile, avec sa descente comme les autres.
+    Il s'est d'abord arrêté au dernier outil de la LIGNE : ce qui ne tient
+    pas dans la ligne se range à droite, dans la même bande, et se
+    retrouvait hors du peigne — annoté par rien, il se lisait comme autre
+    chose qu'un calque. On a donc poussé la barre jusqu'à la pile, avec une
+    descente de plus. Sur le plan 2D, cette descente est tombée sur
+    « Édition » : la colonne de droite y MÉLANGE deux natures — le
+    trop-plein de calques par-dessus, les commandes en dessous —, et rien
+    dans la barre ne disait où s'arrêter.
 
-    Les commandes (édition, sauvegarde) ne sont PAS concernées : elles ne
-    montrent ni ne cachent rien, et vivent dans leur propre colonne.
+    Relevé du patron : « la barre s'arrête au dernier calque de la ligne,
+    puis monte en équerre vers les boutons de la colonne qui sont des
+    calques ; elle ne doit couvrir ni Édition, ni Enregistrer : ceux-là ne
+    montrent ni ne cachent rien ».
+
+    La rangée sait lesquels sont des calques sans qu'on le lui dise : elle
+    ne reçoit QUE des calques (les commandes vivent dans leur propre
+    colonne, posée par l'écran), et sa pile de trop-plein est donc entière
+    à annoter. Ce qu'elle ignorait, c'est OÙ cette pile se tient — et
+    `dessus` le lui disait déjà : la hauteur à franchir pour la rejoindre.
+
+    Le peigne y monte donc, et se dresse : une épine le long du bord gauche
+    des cellules, une branche par pastille, de la même longueur qu'une
+    descente. Même grammaire, tournée d'un quart de tour.
   */
   const largeurPeigne = colonne.length > 0 ? largeur - 8 : largeurUtile;
   const xColonne = largeurPeigne - CELLULE / 2;
+  /** L'épine longe le bord gauche des cellules de la pile. */
+  const xEpine = largeurPeigne - CELLULE;
+  /** La branche s'arrête au ras de la pastille, comme la descente. */
+  const xBranche = xColonne - PILL_SIZE / 2 - 2;
+  /*
+    LA HAUTEUR D'UNE PASTILLE DE LA PILE, au-dessus du bas du peigne.
+
+    Elle se CALCULE — `dessus` pour rejoindre le pied de la pile, un pas par
+    rang, et le milieu de la pastille dans sa cellule (le mot est dessous).
+    Le rang se compte depuis le bas : la pile se rend de haut en bas, mais
+    elle est ancrée par le bas.
+  */
+  const hauteurPile = (i: number) =>
+    dessus +
+    PILL_PITCH * (colonne.length - 1 - i) +
+    (PILL_CELL_H - PILL_SIZE / 2) -
+    PEIGNE_BAS;
+  const hauteurs = colonne.map((_, i) => hauteurPile(i));
+  /*
+    EN 3D, LA PILE COMMENCE SUR LA LIGNE (`dessus` vaut zéro) : sa pastille
+    du bas est à hauteur des autres, et se dessert comme elles, par une
+    descente. Il n'y a pas de bouton d'édition sous elle pour s'y méprendre.
+  */
+  const surLaLigne = hauteurs.some((h) => h <= PEIGNE_H - 1);
+  const hautes = hauteurs.filter((h) => h > PEIGNE_H - 1);
+  const hauteurSvg = Math.max(PEIGNE_H, ...hautes.map((h) => h + 2));
+  const yBarre = hauteurSvg - (PEIGNE_H - 1);
+  const yPied = hauteurSvg - 1;
+  const xFin =
+    colonne.length === 0
+      ? largeurUtile - part / 2
+      : surLaLigne
+      ? xColonne
+      : xEpine;
   return (
     <>
       {peigne && (
@@ -152,15 +201,28 @@ export function RangeeOutils({
             },
           ]}
           pointerEvents="none">
-          <Text style={styles.peigneMot}>Afficher</Text>
-          <Svg width={largeurPeigne} height={PEIGNE_H}>
+          {/*
+            LE MOT RESTE COLLÉ À SA BARRE.
+
+            Il vivait AU-DESSUS du dessin, dans le flux : le jour où le
+            dessin s'est mis à monter vers la pile, le mot est monté avec
+            lui — une légende à mi-hauteur du plan, loin de ce qu'elle
+            légende. Il se pose donc par le bas, deux points au-dessus de
+            la barre, et se centre sur la LIGNE seule : c'est elle qu'il
+            nomme, la pile n'en est que la suite.
+          */}
+          <Text
+            style={[styles.peigneMot, { bottom: PEIGNE_H + 2, width: largeurUtile }]}>
+            Afficher
+          </Text>
+          <Svg width={largeurPeigne} height={hauteurSvg}>
             {/* La barre ne court que d'une descente à l'autre : débordante,
                 elle ferait un cadre, et l'on annoterait la carte entière. */}
             <Line
               x1={part / 2}
-              y1={1}
-              x2={colonne.length > 0 ? xColonne : largeurUtile - part / 2}
-              y2={1}
+              y1={yBarre}
+              x2={xFin}
+              y2={yBarre}
               stroke={TRAIT_PEIGNE}
               strokeWidth={1.5}
               strokeLinecap="round"
@@ -169,26 +231,54 @@ export function RangeeOutils({
               <Line
                 key={el.key}
                 x1={part * (i + 0.5)}
-                y1={1}
+                y1={yBarre}
                 x2={part * (i + 0.5)}
-                y2={PEIGNE_H - 1}
+                y2={yPied}
                 stroke={TRAIT_PEIGNE}
                 strokeWidth={1.5}
                 strokeLinecap="round"
               />
             ))}
-            {/* La descente de la pile de droite : un seul trait, elles sont
-                les unes au-dessus des autres. */}
-            {colonne.length > 0 && (
+            {/* La pastille de la pile qui se tient SUR la ligne : une
+                descente, comme les autres. */}
+            {surLaLigne && (
               <Line
                 x1={xColonne}
-                y1={1}
+                y1={yBarre}
                 x2={xColonne}
-                y2={PEIGNE_H - 1}
+                y2={yPied}
                 stroke={TRAIT_PEIGNE}
                 strokeWidth={1.5}
                 strokeLinecap="round"
               />
+            )}
+            {/* L'ÉQUERRE : l'épine monte de la barre jusqu'au calque le
+                plus haut de la pile, et rien au-delà — au-dessus d'elle,
+                ce sont les commandes. */}
+            {hautes.length > 0 && (
+              <Line
+                x1={xEpine}
+                y1={yBarre}
+                x2={xEpine}
+                y2={hauteurSvg - Math.max(...hautes)}
+                stroke={TRAIT_PEIGNE}
+                strokeWidth={1.5}
+                strokeLinecap="round"
+              />
+            )}
+            {colonne.map((el, i) =>
+              hauteurs[i] > PEIGNE_H - 1 ? (
+                <Line
+                  key={el.key}
+                  x1={xEpine}
+                  y1={hauteurSvg - hauteurs[i]}
+                  x2={xBranche}
+                  y2={hauteurSvg - hauteurs[i]}
+                  stroke={TRAIT_PEIGNE}
+                  strokeWidth={1.5}
+                  strokeLinecap="round"
+                />
+              ) : null,
             )}
           </Svg>
         </Animated.View>

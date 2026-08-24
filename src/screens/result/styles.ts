@@ -373,11 +373,19 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     la barre sur les pastilles.
   */
   peigne: { position: 'absolute', left: 4, alignItems: 'center', zIndex: 1 },
+  /*
+    Il se pose PAR LE BAS, au-dessus de la barre : le dessin monte
+    désormais vers la pile de droite, et un mot dans le flux serait monté
+    avec lui, loin de la rangée qu'il nomme. Sa hauteur et sa largeur —
+    celle de la ligne — viennent du peigne, qui seul les connaît.
+  */
   peigneMot: {
+    position: 'absolute',
+    left: 0,
+    textAlign: 'center',
     color: c.inkFaint,
     fontSize: 11,
     fontWeight: '700',
-    marginBottom: 2,
   },
   wallStrip: {
     position: 'absolute',
