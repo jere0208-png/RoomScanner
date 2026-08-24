@@ -8,6 +8,7 @@ import { ResultScreen } from './src/screens/ResultScreen';
 import { LibraryScreen } from './src/screens/LibraryScreen';
 import { ExportScreen } from './src/screens/ExportScreen';
 import { CameraScreen } from './src/screens/CameraScreen';
+import { PapierScreen } from './src/screens/PapierScreen';
 import { SignInScreen } from './src/screens/SignInScreen';
 import { ProfilScreen } from './src/screens/ProfilScreen';
 import { ConfidentialiteScreen } from './src/screens/ConfidentialiteScreen';
@@ -106,6 +107,7 @@ export default function App() {
       {screen === 'library' && <LibraryScreen />}
       {screen === 'export' && <ExportScreen />}
       {screen === 'camera' && <CameraScreen />}
+      {screen === 'papier' && <PapierScreen />}
       <PaywallScreen />
       <EssaiEpuise />
       <SurprisePro />

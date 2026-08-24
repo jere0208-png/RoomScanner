@@ -7364,6 +7364,45 @@ Le banc écrit alors le plan en gris pâle avec les murs lus par-dessus en
 noir : **ce qui manque saute aux yeux, ce qui a été inventé aussi**. C'est
 cette image-là qu'on regarde, et c'est elle qui a trouvé la voiture.
 
+
+### Plan papier — l'écran, et la troisième porte de l'accueil
+
+L'accueil avait deux portes : « Commencer le scan » et « Dessiner un plan ».
+Il en a une troisième, **« Scanner un plan papier »**, offerte à tout le
+monde — LiDAR ou non, lire un plan ne demande qu'un appareil photo. C'est le
+cas le plus fréquent en rénovation : le plan du logement existe déjà, sur une
+feuille, dans un dossier de copropriété ou dans un PDF de permis. Le relever
+au LiDAR quand il est déjà dessiné, c'est refaire à la main ce que quelqu'un
+a fait au trait.
+
+L'écran tient en trois moments — on donne une photo, on attend, on regarde ce
+qui a été compris — et son travail principal est d'être HONNÊTE :
+
+- **D'où vient l'échelle est écrit avant le bouton qui ouvre le plan**,
+  jamais après. « 3 cotes du plan concordent » n'a pas le même statut que
+  « calée sur 2 portes à 83 cm », et c'est sur ces centimètres-là qu'on
+  commande la gaine.
+- **Si l'échelle est estimée, on propose de la donner** : la longueur du plus
+  grand mur suffit à recaler tout le relevé, sans rien relire. C'est le geste
+  de n'importe quel dessinateur devant un plan sans cartouche.
+- **Ce qui n'a pas été reconnu est compté** (« À qualifier : 3 ») au lieu
+  d'être deviné.
+- **Les noms écrits sur le plan se recopient sur les pièces** — mais eux
+  seuls : un plan porte aussi « VR MOT », « B-B' » et « S : 12.73 m² » à côté
+  de « Chambre 1 », et aucun de ces trois-là n'est un nom de pièce. Une pièce
+  déjà nommée à la main n'est jamais renommée.
+
+C'est aussi pour cet écran que l'icône de scan est animée **en natif** : la
+lecture bloque le fil JS plusieurs secondes sur une grande photo, et la ligne
+de balayage est alors la seule chose qui vit. Elle est lancée après une
+image, sinon React n'aurait pas le temps de peindre l'écran d'attente.
+
+**Le pont natif reste à compiler.** `src/ui/planPapier.ts` déclare ce que le
+téléphone doit rendre — une image en niveaux de gris et les textes lus par
+`VNRecognizeTextRequest` — et `disponible()` rend faux tant que le module
+n'est pas là : l'écran affiche alors « recompilez l'application » plutôt que
+de planter sur un module absent.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

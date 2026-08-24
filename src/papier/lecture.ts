@@ -330,3 +330,106 @@ export function lirePlanPapier(
     vu: { masque, traits, murs, ouvertures, symboles, reduction },
   };
 }
+
+/**
+ * LES MOTS QUI DÉSIGNENT UNE PIÈCE sur un plan français.
+ *
+ * L'OCR rend tout ce qu'il lit : des noms de pièces, mais aussi « VR MOT »,
+ * « B-B' », « SA : 14.68 m² » et le nom du bureau d'études. On ne nomme donc
+ * une pièce que si le texte contient un mot du métier — et l'on écarte au
+ * passage les cartouches de surface, qui accompagnent justement le nom.
+ */
+const MOTS_DE_PIECE = [
+  'chambre',
+  'cuisine',
+  'sejour',
+  'séjour',
+  'salon',
+  'salle',
+  'sdb',
+  'bain',
+  'douche',
+  'wc',
+  'toilette',
+  'couloir',
+  'degagement',
+  'dégagement',
+  'dgt',
+  'entree',
+  'entrée',
+  'bureau',
+  'cellier',
+  'garage',
+  'buanderie',
+  'placard',
+  'dressing',
+  'palier',
+  'terrasse',
+  'balcon',
+  'atelier',
+  'grenier',
+  'cave',
+];
+
+/** Le texte nomme-t-il une pièce ? */
+export function estUnNomDePiece(texte: string): boolean {
+  const t = texte
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '');
+  if (/m²|m2|:\s*\d/.test(texte)) return false;
+  return MOTS_DE_PIECE.some((m) =>
+    t.includes(
+      m
+        .normalize('NFD')
+        .replace(/[̀-ͯ]/g, ''),
+    ),
+  );
+}
+
+/**
+ * Rattache les noms lus aux pièces détectées.
+ *
+ * Une pièce n'a pas de contour dans le magasin : elle a des MURS. Son centre
+ * est donc la moyenne des bouts de ses murs, et l'étiquette va à la pièce
+ * dont le centre est le plus proche — à condition d'être à portée, faute de
+ * quoi le nom d'un plan voisin viendrait se poser sur le nôtre.
+ *
+ * On ne renomme JAMAIS une pièce déjà nommée à la main : le nom écrit sur le
+ * plan vaut mieux qu'un nom déduit du mobilier, mais moins bien que celui
+ * que quelqu'un a tapé.
+ */
+export function nommerLesPieces(
+  etiquettes: { at: Pt; texte: string }[],
+  rooms: { id: string; name: string; wallIds?: string[] }[],
+  walls: { id: string; a: Pt; b: Pt }[],
+  portee = 6,
+): { roomId: string; nom: string }[] {
+  const centres = rooms.map((r) => {
+    const murs = walls.filter((w) => (r.wallIds ?? []).includes(w.id));
+    if (!murs.length) return null;
+    const pts = murs.flatMap((w) => [w.a, w.b]);
+    return {
+      id: r.id,
+      nom: r.name,
+      x: pts.reduce((s2, p) => s2 + p.x, 0) / pts.length,
+      z: pts.reduce((s2, p) => s2 + p.z, 0) / pts.length,
+    };
+  });
+  const out: { roomId: string; nom: string }[] = [];
+  const pris = new Set<string>();
+  for (const e of etiquettes) {
+    if (!estUnNomDePiece(e.texte)) continue;
+    let mieux: { id: string; d: number } | null = null;
+    for (const centre of centres) {
+      if (!centre || pris.has(centre.id) || centre.nom) continue;
+      const d = Math.hypot(centre.x - e.at.x, centre.z - e.at.z);
+      if (d > portee) continue;
+      if (!mieux || d < mieux.d) mieux = { id: centre.id, d };
+    }
+    if (!mieux) continue;
+    pris.add(mieux.id);
+    out.push({ roomId: mieux.id, nom: e.texte.trim() });
+  }
+  return out;
+}
