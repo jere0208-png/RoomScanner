@@ -48,6 +48,17 @@ function quand(at: number): string {
   return `il y a ${j} jour${j > 1 ? 's' : ''}`;
 }
 
+/**
+ * LA TAILLE DE L'INCRUSTATION, et son retrait.
+ *
+ * Deux cent quarante points : le glyphe déborde largement le logotype qu'il
+ * accompagne — c'est ce qui en fait un FOND et non une image posée à côté.
+ * Sept centièmes d'opacité : on le sent, on ne le lit pas. Au-delà, il
+ * redevient un objet et reprend la première place au mot.
+ */
+const FILIGRANE_LOGO = 240;
+const FILIGRANE_OPACITE = 0.07;
+
 export function HomeScreen() {
   const supported = useScanStore((s) => s.supported);
   const setSupported = useScanStore((s) => s.setSupported);
@@ -72,27 +83,25 @@ export function HomeScreen() {
     RoomScan.isSupported().then(setSupported);
   }, [setSupported]);
 
-  // Arrivée : le logo projette des ondes qui traversent TOUTE la page.
-  const { width: winW, height: winH } = useWindowDimensions();
-  const waveScale = (Math.max(winW, winH) * 2.4) / 76;
-  const wave = useRef(new Animated.Value(0)).current;
+  /*
+    L'ARRIVÉE : un simple fondu en cascade.
+
+    Le logo projetait deux ondes qui traversaient toute la page — elles
+    partaient de son badge, et le badge n'est plus là : le glyphe est
+    maintenant une incrustation du fond, et une pulsation autour d'un
+    filigrane serait plus visible que le filigrane. « Pas de contour rien »
+    vaut aussi pour ce qui tourne autour.
+  */
+  const { width: winW } = useWindowDimensions();
   const reveal = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    Animated.parallel([
-      Animated.timing(wave, {
-        toValue: 1,
-        duration: 750,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-      Animated.timing(reveal, {
-        toValue: 1,
-        duration: 700,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, [wave, reveal]);
+    Animated.timing(reveal, {
+      toValue: 1,
+      duration: 700,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [reveal]);
 
   // Fondu en cascade : chaque bloc apparaît juste après le précédent.
   const fadeIn = (i: number) => {
@@ -121,33 +130,27 @@ export function HomeScreen() {
           lui-même n'a rien à toucher — plus jamais un fantôme au-dessus
           des boutons du bandeau. */}
       <View style={styles.hero} pointerEvents="box-none">
-        <View style={styles.logoWrap}>
-          {[0, 0.15].map((delay, i) => (
-            <Animated.View
-              key={i}
-              pointerEvents="none"
-              style={[
-                styles.waveRing,
-                {
-                  opacity: wave.interpolate({
-                    inputRange: [delay, Math.min(delay + 0.2, 1), 1],
-                    outputRange: [0, 0.5, 0],
-                    extrapolate: 'clamp',
-                  }),
-                  transform: [
-                    {
-                      scale: wave.interpolate({
-                        inputRange: [delay, 1],
-                        outputRange: [0.6, waveScale],
-                        extrapolate: 'clamp',
-                      }),
-                    },
-                  ],
-                },
-              ]}
-            />
-          ))}
-          <LogoMark />
+        {/*
+          LE GLYPHE EST DANS LE FOND, IL N'EST PLUS POSÉ DESSUS.
+
+          Relevé du patron : « la première image (icône de l'app) est trop
+          visible. Récupère que ce qui est dedans, supprime le fond blanc, et
+          incruste-le dans le fond en faible opacité. Pas de contour rien. »
+
+          Il occupait le haut de l'accueil en badge blanc cerné d'un liseré,
+          juste au-dessus du logotype : deux fois la même marque l'une sur
+          l'autre, et c'est le badge — le plus bavard des deux — qui passait
+          devant celui qui porte le NOM. Il passe donc DERRIÈRE, en grand et
+          en retrait : on le sent plus qu'on ne le voit, et le mot reprend la
+          première place.
+
+          Les deux anneaux qui battaient autour de lui s'en vont avec
+          l'écrin. Une pulsation autour d'un filigrane serait plus visible
+          que le filigrane lui-même — et « pas de contour rien » vaut aussi
+          pour ce qui tourne autour.
+        */}
+        <View style={styles.filigraneLogo} pointerEvents="none">
+          <LogoMark size={FILIGRANE_LOGO} opacite={FILIGRANE_OPACITE} />
         </View>
         <Animated.View style={fadeIn(0)}>
           {/* La typo de la marque, détourée, plutôt que deux `Text` empilés :
@@ -470,20 +473,20 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     textAlign: 'center',
     marginTop: 8,
   },
-  logoWrap: { alignItems: 'center', justifyContent: 'center' },
-  waveRing: {
+  /*
+    L'INCRUSTATION : posée en absolu, elle ne pousse rien.
+
+    Centrée sur le bloc d'accueil, elle passe derrière le logotype et son
+    sous-titre — l'ordre des frères suffit, elle est rendue avant eux.
+  */
+  filigraneLogo: {
     position: 'absolute',
-    width: 76,
-    height: 76,
-    borderRadius: 38,
-    borderWidth: 4,
-    borderColor: c.blue,
-  
-    // Un anneau vide n'a rien a centrer, mais la regle du banc de
-    // centrage vaut pour tous les ronds : uniforme, donc simple.
+    top: -18,
+    left: 0,
+    right: 0,
     alignItems: 'center',
-    justifyContent: 'center',
   },
+
   /**
    * La vitrine prend la place laissée par les étapes : elle respire, et
    * c'est elle qu'on regarde en attendant de toucher le bouton.

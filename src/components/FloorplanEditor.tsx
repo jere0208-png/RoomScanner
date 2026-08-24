@@ -51,6 +51,7 @@ import {
   wallRuns,
   WALL_T,
   type ObjectFootprint,
+  type PoseDeMur,
   type Pt,
   type RoomPart,
   type TrouDeReleve,
@@ -358,6 +359,19 @@ interface Props {
    */
   filigrane?: WallSeg[];
   /**
+   * LES POSES OFFERTES À UN MUR NEUF — les fantômes bleus qu'on touche.
+   *
+   * Relevé du patron : « "Ajouter un mur" doit afficher les multiples
+   * possibilités d'attachement à un autre mur dans des angles de 90° et 180°
+   * pour droit, à chaque fin de mur ; ces choix de pose doivent être en bleu
+   * à faible opacité ».
+   *
+   * Elles se calculent dans la géométrie (`posesDeMur`) et se dessinent ici :
+   * le plan sait où sont les bouts, il ne sait pas ce qu'on veut y faire.
+   */
+  poses?: PoseDeMur[];
+  onPose?: (id: string) => void;
+  /**
    * MODE RECALAGE : le glissement déplace L'ÉTAGE, pas la vue.
    *
    * Le filigrane du niveau du dessous ne sert à rien si l'on ne peut pas
@@ -532,6 +546,8 @@ export function FloorplanEditor({
   cableRoutes,
   circuitMarks,
   filigrane,
+  poses,
+  onPose,
   recalage,
   photos,
   onSelectPhoto,
@@ -941,7 +957,11 @@ export function FloorplanEditor({
             dessin déjà peint peut être agrandi tel quel. Ce que l'on pousse
             ici est le RAPPORT depuis la prise, pas le zoom absolu.
           */
-          const zoom = Math.min(6, Math.max(0.4, base.v.zoom * (d / base.d0)));
+          /* Deux dixièmes, pas quatre : sur un plan déjà cadré serré — un
+             étage minuscule — s'arrêter à quatre dixièmes ne rendait rien.
+             « Impossible de le rendre plus petit que ça », relevé du
+             patron. */
+          const zoom = Math.min(6, Math.max(0.2, base.v.zoom * (d / base.d0)));
           vueVive.current = {
             zoom,
             ox: base.v.ox + (mx - base.mx0),
@@ -986,13 +1006,26 @@ export function FloorplanEditor({
     }),
   ).current;
 
-  // Cadrage figé sur le scan chargé (pas sur les éditions),
-  // sinon le plan "respire" pendant qu'on déplace un coin.
+  /*
+    CADRAGE FIGÉ sur le scan chargé — et sur l'ÉTAGE regardé.
+
+    Figé sur les éditions, sinon le plan « respire » pendant qu'on déplace un
+    coin. Mais il se refait quand on change de niveau : depuis que chaque
+    étage se dessine seul, garder le cadrage de l'autre revient à regarder à
+    côté.
+
+    IL COMPTE LE NIVEAU DU DESSOUS. C'est ce qu'on a sous les yeux — le
+    filigrane — et c'est le repère sur lequel on aligne l'étage. Un relevé
+    d'étage raté fait un mètre trente : cadré sur lui seul, il remplissait
+    l'écran et le repère fuyait hors du cadre, c'est-à-dire que l'on perdait
+    la seule chose qui aide. L'échelle est plafonnée par ailleurs
+    (`ECHELLE_MAX_PLAN`) : deux murs ne se grossissent pas jusqu'au bord.
+  */
   const baseMapping = useMemo(() => {
     if (layout.w === 0 || layout.h === 0) return null;
-    return makeMapping(bounds(walls), layout.w, layout.h);
+    return makeMapping(bounds([...walls, ...(filigrane ?? [])]), layout.w, layout.h);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentSaveId, layout.w, layout.h]);
+  }, [currentSaveId, niveauCourant, layout.w, layout.h]);
 
   // Cadrage composite : ajustement au canevas + navigation utilisateur.
   const mapping = useMemo(() => {
@@ -1765,6 +1798,47 @@ export function FloorplanEditor({
                   strokeWidth={5}
                   strokeLinecap="round"
                 />
+              );
+            })}
+
+            {/*
+              LES POSES D'UN MUR NEUF — en bleu, à faible opacité.
+
+              Un fantôme par choix : droit dans la continuité, ou à l'équerre
+              d'un côté ou de l'autre. Il a l'ÉPAISSEUR d'un mur, parce que
+              c'est un mur qu'on va poser — un trait fin se lirait comme une
+              cote ou un tracé de gaine.
+
+              La cible du doigt est un second trait, transparent et large :
+              une maçonnerie de quatorze centimètres fait cinq pixels au zoom
+              d'ensemble, et personne ne vise cinq pixels.
+            */}
+            {(poses ?? []).map((pose) => {
+              const a2 = mapping.toPx(pose.a);
+              const b2 = mapping.toPx(pose.b);
+              return (
+                <G key={`pose-${pose.id}`}>
+                  <Line
+                    x1={a2.x}
+                    y1={a2.y}
+                    x2={b2.x}
+                    y2={b2.y}
+                    stroke={c.blue}
+                    strokeOpacity={0.28}
+                    strokeWidth={Math.max(5, mapping.scale * WALL_T)}
+                    strokeLinecap="butt"
+                  />
+                  <Line
+                    x1={a2.x}
+                    y1={a2.y}
+                    x2={b2.x}
+                    y2={b2.y}
+                    stroke="transparent"
+                    strokeWidth={26}
+                    strokeLinecap="round"
+                    onPress={() => onPose?.(pose.id)}
+                  />
+                </G>
               );
             })}
 

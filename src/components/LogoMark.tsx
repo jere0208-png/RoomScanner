@@ -1,11 +1,22 @@
 import React from 'react';
-import Svg, { Path, Rect } from 'react-native-svg';
+import Svg, { Path } from 'react-native-svg';
 import { useTheme } from '../theme';
 
 /**
  * Le logo EchoPlan : des ondes d'écho, de plus en plus nettes, dont la
  * dernière se cristallise en angle de murs (le plan).
- * Fond blanc, glyphe noir — dans les deux thèmes.
+ *
+ * LE GLYPHE SEUL, SANS SON ÉCRIN — relevé du patron : « sur la page
+ * d'accueil, la première image (icône de l'app) est trop visible. Récupère
+ * que ce qui est dedans (l'angle et les 3 traits d'écho), supprime le fond
+ * blanc, et incruste-le dans le fond en faible opacité. Pas de contour
+ * rien. »
+ *
+ * Il portait son fond blanc et son liseré : une icône d'application, posée
+ * en haut de l'accueil, au-dessus du logotype. Deux fois la même marque
+ * l'une sur l'autre, et la plus bavarde des deux — un badge — passait
+ * devant celle qui porte le NOM. Le glyphe reste, l'écrin s'en va : c'est
+ * une incrustation, pas une image.
  */
 /**
  * Le glyphe remplit son bloc comme sur l'icône du téléphone : même
@@ -19,21 +30,25 @@ const X = (x: number) => +(38 + (x - 39) * ZOOM).toFixed(2);
 const Y = (y: number) => +(38 + (y - 37) * ZOOM).toFixed(2);
 const R = (r: number) => +(r * ZOOM).toFixed(2);
 
-export function LogoMark({ size = 76 }: { size?: number }) {
+export function LogoMark({
+  size = 76,
+  /**
+   * L'encre du glyphe. Par défaut celle du thème : incrusté dans le fond,
+   * il doit rester lisible en sombre comme en clair — un noir en dur y
+   * disparaîtrait.
+   */
+  teinte,
+  /** Son retrait. À 1, c'est la marque ; en dessous, c'est un filigrane. */
+  opacite = 1,
+}: {
+  size?: number;
+  teinte?: string;
+  opacite?: number;
+}) {
   const c = useTheme();
-  const ink = '#0B0D12';
+  const ink = teinte ?? c.ink;
   return (
-    <Svg width={size} height={size} viewBox="0 0 76 76">
-      <Rect
-        x={0.5}
-        y={0.5}
-        width={75}
-        height={75}
-        rx={20}
-        fill="#FFFFFF"
-        stroke={c.line}
-        strokeWidth={1}
-      />
+    <Svg width={size} height={size} viewBox="0 0 76 76" opacity={opacite}>
       {/* Deux ondes d'écho, balayage symétrique autour de la diagonale :
           le radar vise exactement l'angle des murs. */}
       <Path

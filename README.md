@@ -6548,6 +6548,87 @@ l'autre — le cas NORMAL, ARKit repartant de l'endroit où l'on appuie sur
 « Scanner » — et lit ce qui est réellement peint : les cotes de l'étage
 regardé, jamais celles de l'autre.
 
+### « Ajouter un mur » montre les poses, il n'en choisit plus une
+
+**« "Ajouter un mur" doit afficher les multiples possibilités d'attachement à
+un autre mur dans des angles de 90° et 180° pour droit, à chaque fin de mur ;
+ces choix de pose du mur doivent être en bleu à faible opacité. »**
+
+Le mur neuf naissait tout seul au dernier bout libre, droit devant. C'était
+déjà mieux que le mètre posé au milieu du séjour — mais l'application
+CHOISISSAIT à la place de l'électricien : sur un plan qui a trois bouts
+libres elle en prenait un, et pour tourner à l'équerre il fallait poser le
+mur puis le faire pivoter au doigt.
+
+Elle montre, il choisit. **Trois poses par bout libre, et trois seulement** :
+droit dans la continuité, à l'équerre d'un côté, à l'équerre de l'autre. Ce
+sont les seules qui tiennent debout sur un plan de bâtiment ; le mur de biais
+reste possible, on tire le coin après. Un éventail de douze directions aurait
+fait un oursin illisible sur un plan déjà chargé, pour un cas qui ne se
+présente presque jamais.
+
+Chaque fantôme a l'**épaisseur d'une maçonnerie** — un trait fin se lirait
+comme une cote ou une gaine — en bleu à 28 % d'opacité. Sa cible est un
+second trait, transparent et large de vingt-six points : une maçonnerie de
+quatorze centimètres fait cinq pixels au zoom d'ensemble, et personne ne vise
+cinq pixels. Le geste s'arme et se décommande comme les autres, par le
+bandeau d'attente. Sans aucun bout libre — plan vide, contour fermé — le mur
+se pose au centre comme avant : il n'y a rien à proposer.
+
+### Le cadrage d'un étage minuscule
+
+**« À la création d'un étage, tout est trop zoomé et impossible de le rendre
+plus petit que ça… il y a un réel bug »**, puis : **« il y a un bug de zoom
+clair quand il y a un étage aussi, le rdc semble se zoomer en fonction du r+1
+ou inversement ».**
+
+Les deux tiennent au même endroit, et le premier est arrivé **avec** le filtre
+de niveau — il était inévitable. Le cadrage AJUSTE le contenu au cadre : tant
+que le plan portait tous les étages, il y avait toujours de quoi remplir.
+Réduit au seul étage courant, un relevé raté de un mètre trente se retrouve
+grossi jusqu'à remplir un téléphone.
+
+Le second était là depuis plus longtemps : le cadrage est **figé** sur le scan
+chargé — à raison, sinon le plan « respire » pendant qu'on déplace un coin —
+mais il ne se refaisait pas au changement d'étage. On regardait donc le R+1
+avec le cadrage du rez, ou l'inverse.
+
+Trois réponses, et aucune ne suffit seule :
+
+- le cadrage compte **aussi le niveau du dessous**. C'est ce qu'on a sous les
+  yeux, et c'est le repère sur lequel on aligne l'étage : le mettre hors champ,
+  c'est retirer la seule chose qui aide ;
+- l'échelle est **plafonnée à 140 points par mètre** (`ECHELLE_MAX_PLAN`). Une
+  porte de 83 cm y fait la largeur d'un pouce ; au-delà on n'apprend plus rien
+  du plan, on perd le nord ;
+- le pincement descend à **deux dixièmes** au lieu de quatre. Sur un cadrage
+  déjà serré, s'arrêter à quatre dixièmes ne rendait rien.
+
+Et le cadrage se refait au changement de niveau, sans pour autant respirer
+pendant les éditions : c'est l'étage qui entre dans les dépendances, pas les
+murs.
+
+### Le glyphe de l'accueil passe dans le fond
+
+**« Sur la page d'accueil, la première image (icône de l'app) est trop
+visible. Récupère que ce qui est dedans (l'angle et les 3 traits d'écho),
+supprime le fond blanc, et incruste-le dans le fond en faible opacité. Pas de
+contour rien. »**
+
+Il occupait le haut de l'accueil en badge blanc cerné d'un liseré, juste
+au-dessus du logotype : **deux fois la même marque l'une sur l'autre**, et
+c'est le badge — le plus bavard des deux — qui passait devant celui qui porte
+le NOM. Le glyphe reste, l'écrin s'en va : deux cent quarante points, sept
+centièmes d'opacité, posé en absolu derrière le logotype. On le sent, on ne
+le lit pas.
+
+Son encre suit le thème : un noir en dur disparaîtrait sur un fond sombre.
+Vérifié à l'œil sur les deux fonds.
+
+Les deux anneaux qui battaient autour de lui s'en vont avec l'écrin : une
+pulsation autour d'un filigrane serait plus visible que le filigrane
+lui-même, et « pas de contour rien » vaut aussi pour ce qui tourne autour.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

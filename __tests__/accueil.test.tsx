@@ -37,7 +37,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 import React from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
-import { LinearGradient, Path } from 'react-native-svg';
+import Svg, { LinearGradient, Path, Rect } from 'react-native-svg';
 import { ContourVif } from '../src/components/ContourVif';
 import { light } from '../src/theme';
 import { HomeScreen } from '../src/screens/HomeScreen';
@@ -727,3 +727,44 @@ describe('l’accueil sur un appareil sans LiDAR', () => {
   });
 });
 
+
+/**
+ * LE GLYPHE EST DANS LE FOND, IL N'EST PLUS POSÉ DESSUS.
+ *
+ * Relevé du patron : « sur la page d'accueil, la première image (icône de
+ * l'app) est trop visible. Récupère que ce qui est dedans (l'angle et les 3
+ * traits d'écho), supprime le fond blanc, et incruste-le dans le fond en
+ * faible opacité. Pas de contour rien. »
+ *
+ * Il occupait le haut de l'accueil en badge blanc cerné d'un liseré, juste
+ * au-dessus du logotype : deux fois la même marque l'une sur l'autre, et
+ * c'est le badge — le plus bavard des deux — qui passait devant celui qui
+ * porte le NOM.
+ */
+describe('le glyphe incrusté', () => {
+  it('n’a plus ni fond blanc ni contour : les tracés, et rien d’autre', () => {
+    const logo = monter().root.findByType(LogoMark);
+    expect(logo.findAllByType(Rect)).toHaveLength(0);
+    // Les trois tracés restent : les deux ondes, et l'angle des murs.
+    expect(logo.findAllByType(Path).length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('et se lit EN RETRAIT : on le sent, on ne le lit pas', () => {
+    const logo = monter().root.findByType(LogoMark);
+    expect(Number(logo.findByType(Svg).props.opacity)).toBeLessThanOrEqual(0.12);
+  });
+
+  it('posé en absolu : une incrustation ne pousse rien', () => {
+    const t = monter();
+    const logo = t.root.findByType(LogoMark);
+    let n: TestRenderer.ReactTestInstance | null = logo.parent;
+    let absolu = false;
+    while (n && !absolu) {
+      const st = StyleSheet.flatten(n.props?.style) as { position?: string };
+      if (st?.position === 'absolute') absolu = true;
+      if (n.type === HomeScreen) break;
+      n = n.parent;
+    }
+    expect(absolu).toBe(true);
+  });
+});

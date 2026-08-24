@@ -55,7 +55,8 @@ import {
 } from '../components/Iso3DView';
 import {
   fitsInRoom,
-  murNeufDepuisUnBout,
+  posesDeMur,
+  type PoseDeMur,
   planFrameAngle,
   filtrerAuNiveau,
   nomDuNiveau,
@@ -741,6 +742,16 @@ export function ResultScreen() {
    * ce que font le meuble et l'appareil de plafond.
    */
   const [noteADeplacer, setNoteADeplacer] = useState<string | null>(null);
+  /**
+   * LES POSES OFFERTES À UN MUR NEUF — relevé du patron : « "Ajouter un mur"
+   * doit afficher les multiples possibilités d'attachement à un autre mur
+   * dans des angles de 90° et 180° pour droit, à chaque fin de mur ».
+   *
+   * Le mur naissait tout seul au dernier bout libre, droit devant :
+   * l'application choisissait à la place de l'électricien. Elle montre, et
+   * il choisit.
+   */
+  const [posesMur, setPosesMur] = useState<PoseDeMur[] | null>(null);
   /** La note tenue en main : son bandeau propose de la reprendre. */
   const [selNote, setSelNote] = useState<string | null>(null);
   /**
@@ -802,7 +813,7 @@ export function ResultScreen() {
    * avait demandé avant et laissé en plan.
    */
   const seulGeste = useCallback(
-    (garde?: 'mur' | 'plafond' | 'lien' | 'reglage' | 'note') => {
+    (garde?: 'mur' | 'plafond' | 'lien' | 'reglage' | 'note' | 'pose') => {
       if (garde !== 'mur') setPendingKind(null);
       // Un seul geste en attente à la fois : deux pastilles allumées, et
       // le prochain appui sur le plan est une loterie.
@@ -819,6 +830,9 @@ export function ResultScreen() {
         setPendingLienMur(null);
       }
       if (garde !== 'reglage') setSelCeiling(null);
+      /* Les fantômes d'un mur neuf s'en vont avec le reste : deux gestes
+         armés à la fois, et le prochain appui sur le plan est une loterie. */
+      if (garde !== 'pose') setPosesMur(null);
     },
     [],
   );
@@ -2547,7 +2561,26 @@ export function ResultScreen() {
                         Le centre reste le recours quand il n'y a aucun bout
                         libre : plan vide, ou contour déjà fermé.
                       */
-                      const depuis = murNeufDepuisUnBout(walls, 1);
+                      /*
+                        ON MONTRE LES POSES, ON N'EN CHOISIT PLUS UNE.
+
+                        Relevé du patron : « doit afficher les multiples
+                        possibilités d'attachement… dans des angles de 90° et
+                        180° pour droit, à chaque fin de mur ». Trois
+                        fantômes bleus par bout libre ; le doigt tranche.
+
+                        Sans aucun bout libre — plan vide, ou contour déjà
+                        fermé — il n'y a rien à proposer : le mur se pose au
+                        centre, comme avant, et il n'y a qu'à le tirer.
+                      */
+                      const choix = posesDeMur(walls, 1);
+                      setEditMode(true);
+                      if (choix.length > 0) {
+                        seulGeste('pose');
+                        setPosesMur(choix);
+                        haptic('leger');
+                        return;
+                      }
                       const xs = walls.flatMap((w) => [w.a.x, w.b.x]);
                       const zs = walls.flatMap((w) => [w.a.z, w.b.z]);
                       const cx = xs.length
@@ -2559,10 +2592,9 @@ export function ResultScreen() {
                       useScanStore
                         .getState()
                         .addWallBetween(
-                          depuis?.a ?? { x: cx - 0.5, z: cz },
-                          depuis?.b ?? { x: cx + 0.5, z: cz },
+                          { x: cx - 0.5, z: cz },
+                          { x: cx + 0.5, z: cz },
                         );
-                      setEditMode(true);
                       haptic('succes');
                     },
                   },
@@ -2728,6 +2760,15 @@ export function ResultScreen() {
             showFixtures={showFixtures}
             circuitMarks={showRoutes ? marks : undefined}
             filigrane={filigrane}
+            /* Les fantômes bleus d'un mur neuf, et le doigt qui tranche. */
+            poses={posesMur ?? undefined}
+            onPose={(id) => {
+              const pose = posesMur?.find((x) => x.id === id);
+              if (!pose) return;
+              useScanStore.getState().addWallBetween(pose.a, pose.b);
+              setPosesMur(null);
+              haptic('succes');
+            }}
             recalage={
               recalage
                 ? (dx, dz) =>
@@ -3671,6 +3712,9 @@ export function ResultScreen() {
             pendingSpots ||
             pendingLink ||
             pendingLienMur ||
+            /* Un mur qu'on va poser s'arme comme le reste, et le dit comme
+               le reste — c'est aussi par là qu'on se décommande. */
+            !!posesMur ||
             // La note s'arme comme le reste : elle doit le dire comme le
             // reste. Voir `EnAttente`.
             pendingNote ||
@@ -3684,6 +3728,7 @@ export function ResultScreen() {
                   : null)
               }
               note={pendingNote || !!noteADeplacer}
+              mur={!!posesMur}
               plafond={
                 (pendingSpots ? 'spot' : null) ??
                 pendingCeiling ??
@@ -3692,7 +3737,9 @@ export function ResultScreen() {
                   : null)
               }
               cible={
-                noteADeplacer
+                posesMur
+                  ? 'le départ du nouveau mur'
+                  : noteADeplacer
                   ? 'le nouveau point de la note'
                   : pendingSpots
                   ? `une pièce — ${pendingSpots} spots`
@@ -3714,6 +3761,7 @@ export function ResultScreen() {
                 setPendingLienMur(null);
                 setPendingNote(false);
                 setNoteADeplacer(null);
+                setPosesMur(null);
               }}
             />
           )}

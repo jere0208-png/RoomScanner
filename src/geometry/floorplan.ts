@@ -2051,6 +2051,90 @@ export function murNeufDepuisUnBout(
 }
 
 /**
+ * UNE POSE POSSIBLE POUR UN MUR NEUF : d'où il part, et où il va.
+ */
+export interface PoseDeMur {
+  /** `murId:bout:angle` — stable d'un rendu à l'autre. */
+  id: string;
+  /** Le mur dont le bout accueille la pose. */
+  wallId: string;
+  /** Lequel de ses deux bouts. */
+  bout: 'a' | 'b';
+  /** 0 = droit dans la continuité ; 90 et −90 = les deux équerres. */
+  angle: 0 | 90 | -90;
+  a: Pt;
+  b: Pt;
+}
+
+/**
+ * TOUTES LES POSES QU'ON PEUT OFFRIR À UN MUR NEUF.
+ *
+ * Relevé du patron : « "Ajouter un mur" doit afficher les multiples
+ * possibilités d'attachement à un autre mur dans des angles de 90° et 180°
+ * pour droit, à chaque fin de mur ».
+ *
+ * Le mur neuf naissait tout seul au dernier bout libre, droit devant
+ * (`murNeufDepuisUnBout`). C'était déjà mieux que le mètre posé au milieu du
+ * séjour, mais l'application CHOISISSAIT à la place de l'électricien : sur un
+ * plan qui a trois bouts libres elle en prenait un, et pour tourner à
+ * l'équerre il fallait poser le mur puis le faire pivoter au doigt.
+ *
+ * On montre donc, et c'est lui qui choisit. Trois poses par bout libre, et
+ * trois seulement — ce sont les seules qui tiennent debout sur un plan de
+ * bâtiment : droit dans la continuité, à l'équerre d'un côté, à l'équerre de
+ * l'autre. Le mur de biais reste possible : on tire le coin après, comme
+ * avant. Un éventail de douze directions aurait fait un oursin illisible sur
+ * un plan déjà chargé, pour un cas qui ne se présente presque jamais.
+ *
+ * Un bout est LIBRE quand aucun autre mur ne s'y termine : c'est la même
+ * règle que le mur neuf d'un seul bout, et c'est celle du chantier — un
+ * coin déjà fait ne s'ouvre pas.
+ */
+export function posesDeMur(
+  walls: WallSeg[],
+  longueur = 1,
+  tol = 0.15,
+): PoseDeMur[] {
+  const pleins = walls.filter((w) => w.type === 'wall' && segLength(w) > 0.1);
+  const libre = (w: WallSeg, p: Pt) =>
+    !pleins.some(
+      (o) =>
+        o.id !== w.id &&
+        (Math.hypot(o.a.x - p.x, o.a.z - p.z) < tol ||
+          Math.hypot(o.b.x - p.x, o.b.z - p.z) < tol),
+    );
+  const out: PoseDeMur[] = [];
+  for (const w of pleins) {
+    const l = segLength(w) || 1;
+    const u = { x: (w.b.x - w.a.x) / l, z: (w.b.z - w.a.z) / l };
+    for (const bout of ['a', 'b'] as const) {
+      const p = bout === 'b' ? w.b : w.a;
+      if (!libre(w, p)) continue;
+      // La direction SORTANTE : celle qui s'éloigne du mur, pas celle qui
+      // repasserait dessus.
+      const s = bout === 'b' ? u : { x: -u.x, z: -u.z };
+      const n = { x: -s.z, z: s.x };
+      const directions: [PoseDeMur['angle'], Pt][] = [
+        [0, s],
+        [90, n],
+        [-90, { x: -n.x, z: -n.z }],
+      ];
+      for (const [angle, d] of directions) {
+        out.push({
+          id: `${w.id}:${bout}:${angle}`,
+          wallId: w.id,
+          bout,
+          angle,
+          a: { x: p.x, z: p.z },
+          b: { x: p.x + d.x * longueur, z: p.z + d.z * longueur },
+        });
+      }
+    }
+  }
+  return out;
+}
+
+/**
  * L'ANGLE BRUT, RAMENÉ DANS LE TOUR OÙ LE GESTE SE TROUVE.
  *
  * Un `atan2` rend toujours un angle de ]-180°, 180°] : un doigt qui franchit
@@ -2942,10 +3026,34 @@ export function bounds(walls: WallSeg[]): Bounds {
 }
 
 /** Projection mètres → pixels pour le rendu SVG du plan. */
+/**
+ * L'ÉCHELLE MAXIMALE DU PLAN À L'OUVERTURE, en points par mètre.
+ *
+ * Relevé du patron, capture à l'appui : « à la création d'un étage, tout est
+ * trop zoomé et impossible de le rendre plus petit que ça… il y a un réel
+ * bug ». Deux murs relevés de travers — sept dixièmes de mètre carré — et le
+ * plan les affichait gros comme le bras.
+ *
+ * Le cadrage AJUSTE le contenu au cadre, et c'est juste tant qu'il y a de
+ * quoi remplir. Réduit au seul étage courant, un relevé raté de un mètre
+ * trente se retrouve grossi jusqu'à remplir un téléphone : on ne voit plus
+ * ni où l'on est, ni le niveau du dessous sur lequel on doit l'aligner.
+ *
+ * Cent quarante points par mètre, c'est déjà très près : une porte de
+ * quatre-vingt-trois centimètres y fait cent seize points, la largeur d'un
+ * pouce. Au-delà, on n'apprend plus rien du plan — on ne fait que perdre le
+ * nord. Le pincement, lui, reste libre d'aller plus loin.
+ */
+export const ECHELLE_MAX_PLAN = 140;
+
 export function makeMapping(b: Bounds, viewW: number, viewH: number, margin = 40) {
   const w = Math.max(b.maxX - b.minX, 0.5);
   const h = Math.max(b.maxZ - b.minZ, 0.5);
-  const scale = Math.min((viewW - margin * 2) / w, (viewH - margin * 2) / h);
+  const scale = Math.min(
+    (viewW - margin * 2) / w,
+    (viewH - margin * 2) / h,
+    ECHELLE_MAX_PLAN,
+  );
   const ox = (viewW - w * scale) / 2 - b.minX * scale;
   const oz = (viewH - h * scale) / 2 - b.minZ * scale;
   return {

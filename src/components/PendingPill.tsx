@@ -41,6 +41,7 @@ export function EnAttente({
   kind,
   plafond,
   note,
+  mur,
   cible,
   onCancel,
 }: {
@@ -59,6 +60,15 @@ export function EnAttente({
    * pas.
    */
   note?: boolean;
+  /**
+   * UN MUR NEUF EN ATTENTE DE SA POSE.
+   *
+   * Le plan montre alors les fantômes bleus des poses possibles à chaque
+   * bout libre. Ce bandeau dit ce qu'on attend — et surtout, il porte le
+   * « Annuler » : sans lui, on ne pourrait se décommander qu'en touchant le
+   * vide, ce que personne ne devine.
+   */
+  mur?: boolean;
   /** Précision quand une cible est déjà désignée (un retour de mur). */
   cible: string | null;
   onCancel: () => void;
@@ -66,12 +76,17 @@ export function EnAttente({
   const c = useTheme();
   const styles = getStyles(c);
   // Mur, plafond ou note : trois catalogues, un seul bandeau d'attente.
-  const spec = note
+  const spec = mur
+    ? { color: c.blue, label: 'Mur à poser' }
+    : note
     ? { color: c.ink, label: 'Note sur le plan' }
     : plafond
       ? CEILINGS[plafond]
       : FIXTURES[kind!];
-  const trace = note
+  const trace = mur
+    ? // Un bout de maçonnerie : le trait épais du plan, en petit.
+      [{ d: 'M-7 0 L7 0', fill: false }]
+    : note
     ? // La punaise du plan : le même signe que celui qui marquera le point.
       [
         { d: 'M0 -7 L0 7', fill: false },

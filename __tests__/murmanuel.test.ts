@@ -27,6 +27,7 @@ import {
   angleAimante,
   deplier,
   murNeufDepuisUnBout,
+  posesDeMur,
   soudureAuBout,
   type WallSeg,
 } from '../src/geometry/floorplan';
@@ -96,6 +97,70 @@ describe('où naît un mur ajouté à la main', () => {
 
   it('sur un plan vide, rien non plus — l’appelant pose au centre', () => {
     expect(murNeufDepuisUnBout([], 1)).toBeNull();
+  });
+});
+
+/**
+ * LES POSES POSSIBLES D'UN MUR NEUF.
+ *
+ * Relevé du patron : « "Ajouter un mur" doit afficher les multiples
+ * possibilités d'attachement à un autre mur dans des angles de 90° et 180°
+ * pour droit, à chaque fin de mur ; ces choix de pose doivent être en bleu à
+ * faible opacité ».
+ *
+ * Le mur neuf naissait TOUT SEUL au dernier bout libre, droit devant. C'était
+ * déjà mieux que le mètre posé au milieu du séjour, mais l'application
+ * choisissait à la place de l'électricien : sur un plan qui a trois bouts
+ * libres, elle en prenait un — et si l'on voulait tourner à l'équerre, il
+ * fallait poser le mur puis le faire pivoter au doigt.
+ *
+ * Elle MONTRE désormais, et c'est lui qui choisit : à chaque bout libre, les
+ * trois seules poses qui tiennent debout sur un plan de bâtiment — droit dans
+ * la continuité, à l'équerre d'un côté, à l'équerre de l'autre. Un mur de
+ * biais reste possible : on tire le coin après, comme avant.
+ */
+describe('les poses possibles d’un mur neuf', () => {
+  const cle = (p: { b: { x: number; z: number } }) =>
+    `${Math.round(p.b.x * 100) / 100},${Math.round(p.b.z * 100) / 100}`;
+
+  it('propose le droit et les deux équerres, à chaque bout libre', () => {
+    const poses = posesDeMur(EN_L, 1);
+    // Deux bouts libres — (0,0) et (4,3) — trois poses chacun.
+    expect(poses).toHaveLength(6);
+    // Au bout du mur est, en (4,3), la sortie va vers le sud : le droit
+    // continue en (4,4), les deux équerres partent en (3,3) et (5,3).
+    const auBout = poses.filter((x) => x.a.x === 4 && x.a.z === 3);
+    expect(auBout.map(cle).sort()).toEqual(['3,3', '4,4', '5,3']);
+  });
+
+  it('et chacune part bien du bout, jamais du milieu', () => {
+    for (const p of posesDeMur(EN_L, 1)) {
+      const bouts = EN_L.flatMap((w) => [w.a, w.b]);
+      expect(
+        bouts.some((q) => Math.hypot(q.x - p.a.x, q.z - p.a.z) < 1e-9),
+      ).toBe(true);
+    }
+  });
+
+  it('sur un contour fermé, aucune : il n’y a pas de bout libre', () => {
+    const carre = [
+      mur('n', 0, 0, 4, 0),
+      mur('e', 4, 0, 4, 3),
+      mur('s', 4, 3, 0, 3),
+      mur('w', 0, 3, 0, 0),
+    ];
+    expect(posesDeMur(carre, 1)).toHaveLength(0);
+  });
+
+  it('sur un plan vide, aucune non plus — l’appelant pose au centre', () => {
+    expect(posesDeMur([], 1)).toHaveLength(0);
+  });
+
+  it('n’en propose que des multiples de 90°', () => {
+    for (const p of posesDeMur(EN_L, 1)) {
+      const a = (Math.atan2(p.b.z - p.a.z, p.b.x - p.a.x) * 180) / Math.PI;
+      expect(Math.abs(a - Math.round(a / 90) * 90)).toBeLessThan(1e-6);
+    }
   });
 });
 
