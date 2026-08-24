@@ -29,7 +29,18 @@ export type Forme =
   | { t: 'seg'; a: P; b: P; w?: number }
   | { t: 'arc'; c: P; r: number; a0: number; a1: number; w?: number }
   | { t: 'disque'; c: P; r: number }
-  | { t: 'poly'; pts: P[]; w?: number; ferme?: boolean };
+  | { t: 'poly'; pts: P[]; w?: number; ferme?: boolean }
+  /**
+   * UN POLYGONE PLEIN — la maçonnerie des plans modernes.
+   *
+   * On a d'abord cru qu'un mur se dessinait toujours par deux traits
+   * parallèles ; les vrais plans démentent. Sur un plan d'implantation
+   * électrique courant, les murs porteurs sont des APLATS noirs et les
+   * cloisons des aplats gris. La planche d'essai doit donc savoir les
+   * imprimer, sans quoi le lecteur ne serait jamais éprouvé sur le cas le
+   * plus fréquent.
+   */
+  | { t: 'aplat'; pts: P[] };
 
 /** Distance d'un point à un segment — la seule géométrie du fichier. */
 function distSeg(px: number, py: number, a: P, b: P): number {
@@ -61,7 +72,7 @@ function cadre(f: Forme, marge: number) {
   const pts: P[] =
     f.t === 'seg'
       ? [f.a, f.b]
-      : f.t === 'poly'
+      : f.t === 'poly' || f.t === 'aplat'
       ? f.pts
       : [
           { x: f.c.x - f.r, y: f.c.y - f.r },
@@ -105,8 +116,8 @@ export function tracer(
   const trait = reglage.trait ?? 2;
   const noir = reglage.encre ?? 20;
   for (const f of formes) {
-    const w = ('w' in f ? f.w : undefined) ?? (f.t === 'disque' ? 0 : trait);
-    const demi = f.t === 'disque' ? 0 : w / 2;
+    const w = ('w' in f ? f.w : undefined) ?? (f.t === 'disque' || f.t === 'aplat' ? 0 : trait);
+    const demi = f.t === 'disque' || f.t === 'aplat' ? 0 : w / 2;
     const { x0, y0, x1, y1 } = cadre(f, demi + 1.5);
     for (let y = y0; y <= y1; y++) {
       for (let x = x0; x <= x1; x++) {
@@ -128,6 +139,10 @@ export function tracer(
           } else {
             d = Math.abs(Math.hypot(cx - f.c.x, cy - f.c.y) - f.r) - demi;
           }
+        } else if (f.t === 'aplat') {
+          // Dedans ou dehors : la règle du pair-impair, et l'on adoucit le
+          // bord d'un demi-pixel comme partout ailleurs.
+          d = dansLePoly(cx, cy, f.pts) ? -0.5 : bordDuPoly(cx, cy, f.pts);
         } else {
           d = Infinity;
           const n = f.pts.length;
@@ -144,6 +159,28 @@ export function tracer(
   }
 }
 
+/** Le test du pair-impair : une demi-droite qui sort du polygone. */
+function dansLePoly(x: number, y: number, pts: P[]): boolean {
+  let dedans = false;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const a = pts[i];
+    const b = pts[j];
+    if (a.y > y !== b.y > y && x < ((b.x - a.x) * (y - a.y)) / (b.y - a.y) + a.x) {
+      dedans = !dedans;
+    }
+  }
+  return dedans;
+}
+
+/** Distance au bord d'un polygone — pour adoucir sa lisière. */
+function bordDuPoly(x: number, y: number, pts: P[]): number {
+  let d = Infinity;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    d = Math.min(d, distSeg(x, y, pts[i], pts[j]));
+  }
+  return d;
+}
+
 /** Applique une transformation à des formes — poser un gabarit, c'est ça. */
 export function transformer(
   formes: Forme[],
@@ -158,6 +195,7 @@ export function transformer(
   return formes.map((f) => {
     if (f.t === 'seg') return { ...f, a: P(f.a), b: P(f.b), w: f.w && f.w * p.echelle };
     if (f.t === 'poly') return { ...f, pts: f.pts.map(P), w: f.w && f.w * p.echelle };
+    if (f.t === 'aplat') return { ...f, pts: f.pts.map(P) };
     if (f.t === 'disque') return { ...f, c: P(f.c), r: f.r * p.echelle };
     return {
       ...f,

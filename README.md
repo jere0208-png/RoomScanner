@@ -7124,6 +7124,64 @@ celle des murs. Le balayage se fait en deux temps — au degré, puis au quart
 de degré sur deux degrés — parce que la version en un seul passage coûtait
 quatre secondes par photo pour le même résultat.
 
+
+### Plan papier — des traits aux murs, et les trois façons d'en dessiner un
+
+Le lecteur a d'abord été écrit pour le seul DOUBLE TRAIT, celui du dessin
+d'architecte. Le premier vrai plan français est venu le démentir : sur un
+plan d'implantation électrique courant, les murs sont des **aplats** noirs et
+les cloisons des aplats gris, et il n'y a pas un double trait sur la feuille.
+Un troisième plan, coté celui-là, mélangeait les deux et **hachurait** ses
+porteurs. La planche d'essai sait donc imprimer les trois, et le banc lit le
+même appartement trois fois en exigeant les mêmes cotes — c'est le seul moyen
+d'être sûr qu'on lit un plan, et non qu'on reconnaît sa propre imprimerie.
+
+Le T1 de référence ressort à **4,00 m × 3,00 m avec un refend de 3,00 m**
+dans les trois conventions, murs porteurs à 20 cm et cloison à 10.
+
+Huit choses ont été apprises en chemin, toutes en regardant les images :
+
+- **Le trait fin se cherche en bas de la série, pas au milieu.** On prenait
+  la médiane des épaisseurs pour dire ce qu'est un trait fin. Sur un plan
+  d'implantation où TOUS les murs sont des aplats de vingt pixels, la médiane
+  valait vingt, le seuil de l'aplat quarante-quatre, et plus un seul mur
+  n'était reconnu.
+- **On mesure un run contigu, pas une bande.** Compter tous les pixels
+  allumés perpendiculairement donnait, sur un double trait, l'addition des
+  DEUX bords — un trait de trois annoncé à six.
+- **L'épaisseur est une médiane, pas une moyenne.** Là où un mur en croise un
+  autre, le run vaut l'épaisseur du mur croisé ; une moyenne s'en trouvait
+  tirée vers le haut et le bord de maçonnerie passait pour un aplat.
+- **La droite doit passer SUR l'encre.** On cherchait le pixel allumé le plus
+  proche dans toute la largeur admissible : une droite longeant un bord de
+  mur attrapait, dix pixels plus loin, l'attache d'une ligne de cote posée
+  dans son prolongement, et le mur ressortait soixante pixels trop long.
+- **Deux traits d'épaisseurs différentes ne sont pas le même trait**, et deux
+  bords d'un même mur sont tracés pareil. Sans cette règle, le bord d'un mur
+  épousait la ligne de cote qui court devant lui et l'on obtenait un mur de
+  quarante-cinq centimètres d'épaisseur, posé dehors.
+- **Un bord de mur est plein d'encre d'un bout à l'autre.** Les hachures d'un
+  porteur sont régulièrement espacées : leurs pointes s'alignent, et la
+  transformée de Hough voit là de vraies droites, parallèles aux bords, à
+  mi-chemin entre eux. Elles se mariaient avec le vrai bord et rendaient des
+  murs de douze centimètres au lieu de vingt. Un alignement de pointes n'est
+  couvert d'encre qu'à moitié : `Trait.plein` est ce qui le trahit, et rien
+  d'autre ne le pouvait.
+- **La sentinelle est `null`, et non −1.** Le calage parcourt l'axe DE PART
+  ET D'AUTRE du mur ; marquer « aucun morceau en cours » par −1 confondait la
+  sentinelle avec un morceau commencé un pixel avant le mur. Les murs
+  s'étendaient vers l'avant et jamais vers l'arrière — un défaut qui ne se
+  voyait que sur le mur percé d'une fenêtre, amputé de son premier mètre.
+- **Une ouverture se mesure en épaisseurs de mur porteur.** Faute d'échelle à
+  ce stade, `OUVERTURE_MAX = 7` dit « un mètre quarante » : de quoi franchir
+  une porte-fenêtre en recollant le mur, sans jamais réunir deux murs séparés
+  par un couloir.
+
+Et une abstention : **on n'invente pas de mur à partir d'un trait seul**. Un
+trait fin isolé, sur un plan, c'est neuf fois sur dix une ligne de cote, un
+vantail, un axe ou un renvoi. Les prendre pour des cloisons remplissait le
+plan de murs fantômes en travers des pièces.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

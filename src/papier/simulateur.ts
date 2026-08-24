@@ -40,6 +40,17 @@ export interface MurPapier {
   b: P;
   /** Épaisseur de la maçonnerie (m). Par défaut 0,2 : un mur de refend. */
   ep?: number;
+  /**
+   * COMMENT LE MUR EST DESSINÉ. Les trois conventions se rencontrent, et
+   * souvent sur la même planche : le porteur en aplat ou hachuré, la cloison
+   * en double trait.
+   *
+   * On a d'abord écrit le lecteur pour le seul double trait ; les plans
+   * réels ont démenti dès le premier — sur un plan d'implantation électrique
+   * courant, tous les murs sont des aplats. Une planche d'essai qui ne sait
+   * imprimer qu'une convention n'éprouve qu'un tiers du travail.
+   */
+  style?: 'double' | 'aplat' | 'hachure';
 }
 
 export interface OuverturePapier {
@@ -159,24 +170,60 @@ function formesDesMurs(planche: Planche): Forme[] {
   const out: Forme[] = [];
   planche.murs.forEach((m, i) => {
     const ep = m.ep ?? 0.2;
+    const style = m.style ?? 'double';
     const { len } = dir(m);
     // Les trous de ce mur, rangés le long de son axe.
     const trous = (planche.ouvertures ?? [])
       .filter((o) => o.mur === i)
-      .map((o) => ({ ...o, d: Math.max(0, o.at - o.largeur / 2), f: Math.min(len, o.at + o.largeur / 2) }))
+      .map((o) => ({
+        ...o,
+        d: Math.max(0, o.at - o.largeur / 2),
+        f: Math.min(len, o.at + o.largeur / 2),
+      }))
       .sort((a, b) => a.d - b.d);
-    for (const bord of [-1, 1]) {
-      let t = 0;
-      for (const trou of trous) {
-        if (trou.d > t) {
-          out.push({ t: 'seg', a: surLeMur(m, t, (bord * ep) / 2), b: surLeMur(m, trou.d, (bord * ep) / 2) });
-        }
-        t = Math.max(t, trou.f);
+
+    // La maçonnerie pleine, morceau par morceau entre les trous.
+    const troncons: { d: number; f: number }[] = [];
+    let t = 0;
+    for (const trou of trous) {
+      if (trou.d > t) troncons.push({ d: t, f: trou.d });
+      t = Math.max(t, trou.f);
+    }
+    if (t < len) troncons.push({ d: t, f: len });
+
+    for (const tr of troncons) {
+      if (style === 'aplat') {
+        out.push({
+          t: 'aplat',
+          pts: [
+            surLeMur(m, tr.d, -ep / 2),
+            surLeMur(m, tr.f, -ep / 2),
+            surLeMur(m, tr.f, ep / 2),
+            surLeMur(m, tr.d, ep / 2),
+          ],
+        });
+        continue;
       }
-      if (t < len) {
-        out.push({ t: 'seg', a: surLeMur(m, t, (bord * ep) / 2), b: surLeMur(m, len, (bord * ep) / 2) });
+      for (const bord of [-1, 1]) {
+        out.push({
+          t: 'seg',
+          a: surLeMur(m, tr.d, (bord * ep) / 2),
+          b: surLeMur(m, tr.f, (bord * ep) / 2),
+        });
+      }
+      if (style === 'hachure') {
+        // Les obliques du mur porteur, tous les demi-mur, à quarante-cinq
+        // degrés. Elles n'existent que pour dire « maçonnerie » — et elles
+        // sont, pour le lecteur, la principale source de faux traits.
+        const pas = ep / 2;
+        for (let s = tr.d + pas; s < tr.f; s += pas) {
+          const a = surLeMur(m, s, -ep / 2);
+          const b = surLeMur(m, Math.min(tr.f, s + ep), ep / 2);
+          out.push({ t: 'seg', a, b, w: 0.012 });
+        }
       }
     }
+
     // Les tableaux : la tranche de maçonnerie qui se voit dans le trou.
     for (const trou of trous) {
       for (const c of [trou.d, trou.f]) {
@@ -184,14 +231,16 @@ function formesDesMurs(planche: Planche): Forme[] {
       }
     }
     // Les abouts : un mur qui ne touche rien se ferme au bout.
-    for (const bout of [0, len]) {
-      const p = surLeMur(m, bout);
-      const colle = planche.murs.some((autre, j) => {
-        if (j === i) return false;
-        return [autre.a, autre.b].some((q) => Math.hypot(q.x - p.x, q.y - p.y) < ep);
-      });
-      if (!colle) {
-        out.push({ t: 'seg', a: surLeMur(m, bout, -ep / 2), b: surLeMur(m, bout, ep / 2) });
+    if (style !== 'aplat') {
+      for (const bout of [0, len]) {
+        const p = surLeMur(m, bout);
+        const colle = planche.murs.some((autre, j) => {
+          if (j === i) return false;
+          return [autre.a, autre.b].some((q) => Math.hypot(q.x - p.x, q.y - p.y) < ep);
+        });
+        if (!colle) {
+          out.push({ t: 'seg', a: surLeMur(m, bout, -ep / 2), b: surLeMur(m, bout, ep / 2) });
+        }
       }
     }
   });
@@ -226,7 +275,12 @@ function formesDesOuvertures(planche: Planche): Forme[] {
       // Le châssis se dessine bien ÉCARTÉ dans le tableau : deux traits à
       // trois pixels l'un de l'autre se fondent en une barre pleine, et la
       // fenêtre ne se distinguait plus d'un bout de mur.
-      for (const d of [-ep / 3, ep / 3]) {
+      // Le châssis se pose au quart de l'épaisseur : assez loin des bords
+      // pour ne pas se confondre avec eux — collé au bord, le lecteur
+      // prolongeait le trait de menuiserie en trait de maçonnerie et le mur
+      // ressortait amputé de son premier mètre — et assez écarté de son
+      // jumeau pour qu'on voie deux traits et non une barre pleine.
+      for (const d of [-ep / 4, ep / 4]) {
         out.push({
           t: 'seg',
           a: surLeMur(m, o.at - o.largeur / 2, d),
@@ -337,6 +391,7 @@ export function photographierPlanche(
     formes.map((f) => {
       if (f.t === 'seg') return { ...f, a: versPapier(f.a), b: versPapier(f.b), w: f.w && f.w * pxm };
       if (f.t === 'poly') return { ...f, pts: f.pts.map(versPapier), w: f.w && f.w * pxm };
+      if (f.t === 'aplat') return { ...f, pts: f.pts.map(versPapier) };
       if (f.t === 'disque') return { ...f, c: versPapier(f.c), r: f.r * pxm };
       return { ...f, c: versPapier(f.c), r: f.r * pxm, w: f.w && f.w * pxm };
     });
@@ -390,7 +445,15 @@ export function photographierPlanche(
     ];
     tracer(feuille, enPx(cotes), { trait: trait * 0.7, encre: encre + 40 });
     const texte = c.texte ?? String(Math.round(n * 100));
-    const milieu = { x: (A.x + B.x) / 2 + nx * 0.18, y: (A.y + B.y) / 2 + ny * 0.18 };
+    // LE NOMBRE SE POSE AU-DESSUS DE SA LIGNE, du côté opposé à ce qu'il
+    // cote. Posé de l'autre côté, il tombait sur la maçonnerie et l'effaçait
+    // — le bord du mur de droite disparaissait sous le texte « 300 », et le
+    // lecteur rendait un mur coupé en deux.
+    const cote = Math.sign(d) || 1;
+    const milieu = {
+      x: (A.x + B.x) / 2 + nx * 0.18 * cote,
+      y: (A.y + B.y) / 2 + ny * 0.18 * cote,
+    };
     tracer(feuille, enPx(formesDuTexte(texte, milieu, hauteurTexte)), {
       trait: trait * 0.6,
       encre: encre + 30,

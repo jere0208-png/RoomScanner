@@ -35,6 +35,18 @@ export interface Trait {
   ep: number;
   /** Longueur (px) — écrite une fois pour toutes, on la relit souvent. */
   len: number;
+  /**
+   * PART DU TRAIT RÉELLEMENT COUVERTE D'ENCRE, de 0 à 1.
+   *
+   * Un vrai trait est plein d'un bout à l'autre ; ce qui ne l'est pas est
+   * un ALIGNEMENT, et un plan en produit beaucoup — les pointes des hachures
+   * d'un mur porteur, régulièrement espacées, dessinent des droites
+   * fantômes parallèles aux bords, qui se mariaient avec eux et donnaient
+   * des murs de douze centimètres au lieu de vingt. La transformée de Hough
+   * ne sait pas faire la différence : elle compte des voix, et un alignement
+   * en a. Cette mesure-là, si.
+   */
+  plein: number;
 }
 
 export interface ReglageTraits {
@@ -122,7 +134,17 @@ export function segmentsDe(m: Masque, reglage: ReglageTraits = {}): Trait[] {
   const pas = reglage.pasAngle ?? 0.5;
   const lmin = reglage.longueurMin ?? Math.max(12, Math.min(m.l, m.h) * 0.04);
   const trouMax = reglage.trouMax ?? 6;
-  const largeurMax = reglage.largeurMax ?? 14;
+  /*
+    QUARANTE PIXELS, PARCE QU'UN MUR EST SOUVENT UN APLAT.
+
+    On avait réglé la largeur maximale sur l'épaisseur d'un TRAIT — quatorze
+    pixels, largement assez pour un tire-ligne. Puis les vrais plans sont
+    arrivés : sur un plan d'implantation électrique, un mur est un rectangle
+    NOIR de vingt à quarante pixels de large, et la mesure se trouvait
+    tronquée à quatorze. Les murs ressortaient deux fois trop minces et leur
+    axe se posait sur un bord.
+  */
+  const largeurMax = reglage.largeurMax ?? 40;
   const maxTraits = reglage.maxTraits ?? 400;
 
   const nA = Math.round(180 / pas);
@@ -190,45 +212,99 @@ export function segmentsDe(m: Masque, reglage: ReglageTraits = {}): Trait[] {
     // épaisseur. On déborde du cadre : une droite oblique entre par un coin.
     const portee = Math.ceil(diag);
     const demi = Math.ceil(largeurMax / 2) + 1;
+    /*
+      ON MESURE UN RUN CONTIGU, PAS UNE BANDE.
+
+      Compter tous les pixels allumés de la bande donnait, sur un double
+      trait, l'addition des DEUX bords — un mur de trois pixels annoncé à
+      six. On cherche donc le morceau d'encre d'un seul tenant le plus proche
+      de la droite, et l'on note sa largeur ET son centre : le centre servira
+      à recaler l'axe, ce qui règle du même coup le cas de l'aplat, dont
+      l'urne rend un plateau de vingt valeurs égales où le maximum tombe
+      n'importe où — souvent sur un bord.
+    */
     const presence: number[] = new Array(portee * 2 + 1).fill(0);
+    const centre: number[] = new Array(portee * 2 + 1).fill(0);
     for (let s = -portee; s <= portee; s++) {
       const x0 = px + ux * s;
       const y0 = py + uy * s;
       if (!dedans(Math.round(x0), Math.round(y0))) continue;
-      let large = 0;
-      for (let d = -demi; d <= demi; d++) {
-        const qx = Math.round(x0 + co * d);
-        const qy = Math.round(y0 + si * d);
-        if (vif(qx, qy)) large++;
+      /*
+        LA DROITE DOIT PASSER SUR L'ENCRE, PAS À CÔTÉ.
+
+        On cherchait le pixel allumé le plus proche dans toute la largeur
+        admissible — vingt et un pixels de part et d'autre. Une droite qui
+        longe un bord de mur attrapait alors, dix pixels plus loin, l'attache
+        d'une ligne de cote posée dans son prolongement, et le mur ressortait
+        soixante pixels trop long, débordant du logement. Deux pixels de
+        tolérance : de quoi encaisser l'arrondi de l'urne, pas de quoi
+        changer de trait.
+      */
+      const proche = 2;
+      let d0 = NaN;
+      for (let k = 0; k <= proche; k++) {
+        for (const d of k === 0 ? [0] : [-k, k]) {
+          if (vif(Math.round(x0 + co * d), Math.round(y0 + si * d))) {
+            d0 = d;
+            break;
+          }
+        }
+        if (!Number.isNaN(d0)) break;
       }
-      presence[s + portee] = large;
+      if (Number.isNaN(d0)) continue;
+      let bas = d0;
+      let haut = d0;
+      while (bas - 1 >= -demi && vif(Math.round(x0 + co * (bas - 1)), Math.round(y0 + si * (bas - 1)))) bas--;
+      while (haut + 1 <= demi && vif(Math.round(x0 + co * (haut + 1)), Math.round(y0 + si * (haut + 1)))) haut++;
+      presence[s + portee] = haut - bas + 1;
+      centre[s + portee] = (haut + bas) / 2;
     }
 
     // Découpage en morceaux : un trou de quelques pixels est un croisement,
     // pas une fin de trait.
-    const morceaux: { d: number; f: number; ep: number }[] = [];
+    const morceaux: { d: number; f: number; ep: number; dec: number; plein: number }[] = [];
     let debut = -1;
     let vide = 0;
-    let somme = 0;
     let n = 0;
+    let decs: number[] = [];
+    let larg: number[] = [];
     for (let k = 0; k <= presence.length; k++) {
       const on = k < presence.length && presence[k] > 0 && presence[k] <= largeurMax;
       if (on) {
         if (debut < 0) debut = k;
         vide = 0;
-        somme += presence[k];
+        decs.push(centre[k]);
+        larg.push(presence[k]);
         n++;
       } else if (debut >= 0) {
         vide++;
         if (vide > trouMax || k === presence.length) {
           const f = k - vide;
           if (f - debut >= lmin) {
-            morceaux.push({ d: debut - portee, f: f - portee, ep: n ? somme / n : 1 });
+            /*
+              L'ÉPAISSEUR EST UNE MÉDIANE, PAS UNE MOYENNE.
+
+              Là où un mur en croise un autre, le run mesuré perpendiculairement
+              vaut l'épaisseur du mur CROISÉ — vingt pixels au lieu de trois. Une
+              moyenne s'en trouvait tirée vers le haut, et le bord de maçonnerie
+              passait pour un aplat. La médiane ignore les croisements, qui sont
+              toujours minoritaires le long d'un trait.
+            */
+            const rangs = decs.slice().sort((x, y) => x - y);
+            const larges = larg.slice().sort((x, y) => x - y);
+            morceaux.push({
+              d: debut - portee,
+              f: f - portee,
+              ep: larges.length ? larges[Math.floor(larges.length / 2)] : 1,
+              dec: rangs.length ? rangs[Math.floor(rangs.length / 2)] : 0,
+              plein: n / Math.max(1, f - debut),
+            });
           }
           debut = -1;
           vide = 0;
-          somme = 0;
           n = 0;
+          decs = [];
+          larg = [];
         }
       }
     }
@@ -249,11 +325,18 @@ export function segmentsDe(m: Masque, reglage: ReglageTraits = {}): Trait[] {
     let pris = false;
     for (const mo of morceaux) {
       pris = true;
-      let ax = px + ux * mo.d;
-      let ay = py + uy * mo.d;
-      let bx = px + ux * mo.f;
-      let by = py + uy * mo.f;
-      let trait: Trait = { a: { x: ax, y: ay }, b: { x: bx, y: by }, ep: Math.max(1, mo.ep), len: 0 };
+      // On part de l'axe RECENTRÉ sur le ruban, pas de la droite de l'urne.
+      let ax = px + ux * mo.d + co * mo.dec;
+      let ay = py + uy * mo.d + si * mo.dec;
+      let bx = px + ux * mo.f + co * mo.dec;
+      let by = py + uy * mo.f + si * mo.dec;
+      let trait: Trait = {
+        a: { x: ax, y: ay },
+        b: { x: bx, y: by },
+        ep: Math.max(1, mo.ep),
+        len: 0,
+        plein: mo.plein,
+      };
       trait.len = long(trait.a, trait.b);
       for (let essai = 0; essai < 2; essai++) {
         const dx = (bx - ax) / (trait.len || 1);
@@ -270,7 +353,7 @@ export function segmentsDe(m: Masque, reglage: ReglageTraits = {}): Trait[] {
             ys.push(qy);
           }
         }
-        trait = affiner(xs, ys, { x: ax, y: ay }, { x: bx, y: by }, mo.ep);
+        trait = { ...affiner(xs, ys, { x: ax, y: ay }, { x: bx, y: by }, mo.ep), plein: mo.plein };
         ax = trait.a.x;
         ay = trait.a.y;
         bx = trait.b.x;
@@ -314,7 +397,9 @@ export function segmentsDe(m: Masque, reglage: ReglageTraits = {}): Trait[] {
  * ce sont les pixels qui le MESURENT.
  */
 function affiner(xs: number[], ys: number[], a0: P, b0: P, ep: number): Trait {
-  if (xs.length < 8) return { a: a0, b: b0, ep: Math.max(1, ep), len: long(a0, b0) };
+  if (xs.length < 8) {
+    return { a: a0, b: b0, ep: Math.max(1, ep), len: long(a0, b0), plein: 1 };
+  }
   const n = xs.length;
   let mx = 0;
   let my = 0;
@@ -346,7 +431,7 @@ function affiner(xs: number[], ys: number[], a0: P, b0: P, ep: number): Trait {
   }
   const a = { x: mx + ux * smin, y: my + uy * smin };
   const b = { x: mx + ux * smax, y: my + uy * smax };
-  return { a, b, ep: Math.max(1, ep), len: long(a, b) };
+  return { a, b, ep: Math.max(1, ep), len: long(a, b), plein: 1 };
 }
 
 /** Deux traits parlent-ils de la même droite ? */
@@ -387,6 +472,19 @@ export function fusionnerTraits(
       for (let i = 0; i < restants.length; i++) {
         const autre = restants[i];
         if (!memeDroite(cour, autre, tolAngle, tolEcart)) continue;
+        /*
+          DEUX TRAITS D'ÉPAISSEURS DIFFÉRENTES NE SONT PAS LE MÊME TRAIT.
+
+          Sur une planche cotée, l'attache d'une ligne de cote part du mur et
+          continue tout droit : elle est exactement dans le prolongement du
+          bord de maçonnerie, et se recollait à lui. Le mur ressortait
+          soixante pixels trop long et, son épaisseur étant la moyenne des
+          deux, il passait pour un mur en aplat. Un trait de cotation est
+          tracé plus fin qu'un trait de maçonnerie : c'est ce qui les sépare.
+        */
+        const gros = Math.max(cour.ep, autre.ep);
+        const mince = Math.min(cour.ep, autre.ep);
+        if (gros > mince * 1.8) continue;
         // Les quatre bouts, projetés sur la direction du courant.
         const ang = Math.atan2(cour.b.y - cour.a.y, cour.b.x - cour.a.x);
         const ux = Math.cos(ang);
@@ -407,6 +505,8 @@ export function fusionnerTraits(
           b,
           ep: (cour.ep * cour.len + autre.ep * autre.len) / (cour.len + autre.len),
           len: long(a, b),
+          plein:
+            (cour.plein * cour.len + autre.plein * autre.len) / (cour.len + autre.len),
         };
         restants.splice(i, 1);
         encore = true;
