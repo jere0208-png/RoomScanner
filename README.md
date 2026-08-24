@@ -6864,6 +6864,62 @@ largeur** — le nombre trente. Ils la cherchent maintenant par sa nature : un
 trait invisible et large. Un banc qui nomme un réglage par son chiffre casse
 au premier réglage.
 
+### Une porte appartient à son mur
+
+**« Les ouvrants ne suivent pas la modification lors de mouvements du mur et
+rotations. »** Deux gestes le faisaient déjà : POUSSER une cloison et lui
+POSER un angle emportaient les percements. Le troisième — TIRER UN COIN — ne
+les touchait pas, et c'est le plus courant des trois : celui qui rallonge,
+raccourcit et fait pivoter en même temps. La porte restait où elle était,
+c'est-à-dire dans le vide.
+
+**La règle : l'ouverture garde sa cote depuis le bout qui NE BOUGE PAS.**
+C'est la vérité du chantier — on tire un mur, la porte ne se déplace pas dans
+la pièce, c'est le mur qui s'allonge derrière elle. Et c'est déjà la
+convention de la saisie (`moveOpening` prend la cote du tableau depuis le
+début du mur). Son écart à l'axe est conservé tel quel : une menuiserie n'est
+pas exactement sur l'axe, et la recentrer la ferait sauter d'un côté à l'autre
+à chaque geste.
+
+**Les voisins comptent aussi.** Tirer un coin allonge les murs qui le
+tiennent : leurs fenêtres suivent, avec la même règle et leur propre bout
+fixe. Et rien ne déborde — un mur raccourci sous la porte qu'il porte
+laisserait une menuiserie à cheval sur son bout, c'est-à-dire un trou dans le
+contour et une surface qui fuit.
+
+### Toucher le sol, c'est lâcher le mur
+
+**« Lorsqu'un mur est sélectionné, le clic n'importe où sur la surface doit
+quitter la sélection. »** La règle existait déjà pour le meuble — « toucher le
+sol quand un meuble est tenu, c'est le lâcher » — et le mur, lui, restait
+pris : l'appui ouvrait le bandeau de la PIÈCE par-dessus le menu du mur, deux
+blocs de réglage à l'écran pour un seul appui. Un geste, un effet : le premier
+appui lâche, le suivant prend la pièce.
+
+### La barre du mur se couche dans son axe
+
+**« Réduis légèrement cette barre, proportionnellement en taille, et fais en
+sorte qu'elle s'affiche en parallèle du mur, comme s'il suivait sa
+trajectoire »**, puis **« réduis légèrement le bouton de rotation aussi »**.
+
+Elle était droite quel que soit le mur : sur une cloison de biais, un
+rectangle horizontal posé à côté d'un trait oblique se lit comme un objet SANS
+RAPPORT avec lui. Couchée dans son axe, elle appartient au mur qu'elle règle —
+c'est déjà ce que fait la cote, qui se pose le long du trait. Elle ne se
+retourne jamais : au-delà du quart de tour on lit l'angle opposé, sinon les
+quatre mots se liraient à l'envers.
+
+Deux conséquences dans le calcul de placement, et il fallait les deux : ce
+qui déborde vers le mur est maintenant sa HAUTEUR quel que soit l'angle (plus
+jamais sa largeur), et le cadre qui doit tenir dans l'écran est celui de la
+barre TOURNÉE.
+
+Le dessin descend de 48 × 40 à 44 × 36 pour les commandes, de 34 à 30 pour le
+bouton de rotation. **Les cibles, elles, restent à quarante-quatre** : le
+débord rend au doigt ce que le dessin a rendu au plan. C'est la même règle que
+les bandeaux du bas, et elle vaut ici pour la même raison — chaque point pris
+sur le plan est un point de dessin en moins.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

@@ -106,7 +106,7 @@ const VIDE: Fixture[] = [];
   pris la taille d'un doigt : un nombre resté en arrière aurait fait poser
   la barre à cheval sur le trait qu'elle annote.
 */
-export const WALL_MENU = { w: 204, h: 50 };
+export const WALL_MENU = { w: 186, h: 44 };
 
 /**
  * LE NOM D'UN MEUBLE : petit DEDANS, grandi par le zoom, absent s'il ne
@@ -1593,6 +1593,23 @@ export function FloorplanEditor({
                               */
                               if (selectedObjectId) {
                                 onSelectObject?.(null);
+                                return;
+                              }
+                              /*
+                                ET TOUCHER LE SOL QUAND UN MUR EST CHOISI,
+                                C'EST LE LÂCHER — relevé du patron :
+                                « lorsqu'un mur est sélectionné, le clic
+                                n'importe où sur la surface doit quitter la
+                                sélection ».
+
+                                La règle existait déjà pour le meuble ; le
+                                mur, lui, restait pris, et l'appui ouvrait
+                                le bandeau de la pièce PAR-DESSUS son menu.
+                                Un geste, un effet : le premier appui
+                                lâche, le suivant prend la pièce.
+                              */
+                              if (selectedWallId) {
+                                onSelectWall(null);
                                 return;
                               }
                               onSelectRoom(
@@ -3135,9 +3152,29 @@ export function FloorplanEditor({
                 borne du cadre a pu rappeler vers le mur —, rayon dix-sept,
                 marge six.
               */
-              const demiBarre =
-                Math.abs(nx) * (WALL_MENU.w / 2) +
-                Math.abs(ny) * (WALL_MENU.h / 2);
+              /*
+                LA BARRE SUIT LE MUR — relevé du patron : « fais en sorte
+                qu'elle s'affiche en parallèle du mur, comme s'il suivait sa
+                trajectoire ».
+
+                Elle était droite quel que soit le mur : sur une cloison de
+                biais, un rectangle horizontal posé à côté d'un trait oblique
+                se lit comme un objet SANS RAPPORT avec lui. Tournée dans son
+                axe, elle appartient au mur qu'elle règle — c'est le même
+                geste que la cote, qui se couche déjà le long du trait.
+
+                Elle ne se retourne jamais : au-delà du quart de tour, on lit
+                l'angle opposé, sinon les quatre mots se liraient à l'envers.
+              */
+              let angleBarre = (Math.atan2(dy, dx) * 180) / Math.PI;
+              if (angleBarre > 90) angleBarre -= 180;
+              if (angleBarre < -90) angleBarre += 180;
+              const ab = (angleBarre * Math.PI) / 180;
+              const ca = Math.abs(Math.cos(ab));
+              const sa = Math.abs(Math.sin(ab));
+              /* Couchée dans l'axe du mur, c'est sa HAUTEUR qui déborde vers
+                 le trait — plus jamais sa largeur, quel que soit l'angle. */
+              const demiBarre = WALL_MENU.h / 2;
               /*
                 L'ÉCART PART DU BORD DE LA BARRE, PAS DE SON CENTRE.
 
@@ -3159,8 +3196,10 @@ export function FloorplanEditor({
                 const dPoignee = (p.x - mid.x) * nx + (p.y - mid.y) * ny;
                 gap = Math.max(gap, dPoignee + demiBarre + 17 + 6);
               }
-              const demiW = WALL_MENU.w / 2 + 4;
-              const demiH = WALL_MENU.h / 2 + 4;
+              /* Le cadre qu'elle occupe UNE FOIS TOURNÉE : c'est lui qui
+                 doit tenir dans l'écran, pas le rectangle d'origine. */
+              const demiW = (ca * WALL_MENU.w + sa * WALL_MENU.h) / 2 + 4;
+              const demiH = (sa * WALL_MENU.w + ca * WALL_MENU.h) / 2 + 4;
               /*
                 LE RAPPEL DANS LE CADRE NE DOIT PAS RAMENER LA BARRE SUR LE
                 MUR — c'était la seconde cause, et la plus vicieuse : près
@@ -3215,7 +3254,13 @@ export function FloorplanEditor({
                 <View
                   style={[
                     styles.wallActions,
-                    { left: bx - WALL_MENU.w / 2, top: by - WALL_MENU.h / 2 },
+                    {
+                      left: bx - WALL_MENU.w / 2,
+                      top: by - WALL_MENU.h / 2,
+                      /* La rotation tourne autour du CENTRE : la barre reste
+                         donc posée là où le calcul l'a mise. */
+                      transform: [{ rotate: `${angleBarre}deg` }],
+                    },
                   ]}
                   pointerEvents="box-none">
                   {WALL_ACTIONS.map(({ action, label, d }) => {
@@ -3226,9 +3271,9 @@ export function FloorplanEditor({
                         style={styles.wallAction}
                         accessibilityLabel={label ?? action}
                         /* Quarante dessinés, quarante-huit sous le doigt. */
-                        hitSlop={{ top: 4, bottom: 4, left: 2, right: 2 }}
+                        hitSlop={{ top: 6, bottom: 6, left: 3, right: 3 }}
                         onPress={() => onWallAction(action, w.id)}>
-                        <Svg width={19} height={19} viewBox="0 0 24 24">
+                        <Svg width={17} height={17} viewBox="0 0 24 24">
                           <Path d={d} fill={teinte} fillRule="evenodd" />
                         </Svg>
                         {label && (
@@ -4219,8 +4264,9 @@ function WallRotateHandle({
       <View
         {...pan.panHandlers}
         accessibilityLabel="Tourner le mur"
-        style={[styles.wallRotate, { left: at.x - 17, top: at.y - 17 }]}>
-        <Svg width={20} height={20} viewBox="0 0 24 24">
+        hitSlop={{ top: 7, bottom: 7, left: 7, right: 7 }}
+        style={[styles.wallRotate, { left: at.x - 15, top: at.y - 15 }]}>
+        <Svg width={18} height={18} viewBox="0 0 24 24">
           <Path
             d="M19.5 12 a7.5 7.5 0 1 1 -2.2 -5.3"
             stroke={c.blue}
@@ -4339,9 +4385,12 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   /** La poignée de rotation d'un mur : un rond bleu clair, comme au meuble. */
   wallRotate: {
     position: 'absolute',
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    /* Relevé du patron : « réduis légèrement le bouton de rotation aussi ».
+       Trente points dessinés, et le débord le ramène à quarante-quatre sous
+       le doigt : c'est la règle de toute l'app. */
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     backgroundColor: c.surface,
     borderWidth: 1.5,
     borderColor: c.blue,
@@ -4477,8 +4526,8 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     borderRadius: radius.pill,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: c.line,
-    paddingHorizontal: 6,
-    paddingVertical: 5,
+    paddingHorizontal: 5,
+    paddingVertical: 4,
     ...shadowCard,
     shadowOpacity: 0.09,
     /* APRÈS l'ombre : elle porte sa propre élévation, et c'est la dernière
@@ -4495,8 +4544,12 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     doigt, et la barre ne grossit que de six points.
   */
   wallAction: {
-    width: 48,
-    minHeight: 40,
+    /* Resserrée d'un cran — relevé du patron : « réduis légèrement cette
+       barre, proportionnellement en taille ». Le dessin descend de 48 × 40
+       à 44 × 36 ; le débord rend au doigt les quatre points rendus à la
+       carte, et la cible reste à quarante-quatre. */
+    width: 44,
+    minHeight: 36,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 2,

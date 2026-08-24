@@ -189,3 +189,71 @@ describe('viser un mur', () => {
     }
   });
 });
+
+/*
+  TOUCHER LE SOL QUAND UN MUR EST CHOISI, C'EST LE LÂCHER.
+
+  Relevé du patron : « lorsqu'un mur est sélectionné, le clic n'importe où sur
+  la surface doit quitter la sélection ». La règle existait déjà pour le
+  meuble — « toucher le sol quand un meuble est tenu, c'est le lâcher » — et
+  le mur, lui, restait pris : l'appui ouvrait le bandeau de la PIÈCE
+  par-dessus le menu du mur, deux blocs de réglage à l'écran pour un seul
+  appui. Un geste, un effet : le premier appui lâche, le suivant prend la
+  pièce.
+*/
+describe('toucher le sol', () => {
+  const solDe = (t: TestRenderer.ReactTestRenderer) =>
+    t.root
+      .findAll((n) => typeof n.props?.onPress === 'function')
+      .find((n) => n.findAll((x) => x.props?.fill === 'url(#floorDots)').length > 0);
+
+  const planAvecSol = (murChoisi: string | null, fait: string[]) => {
+    let t!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      useScanStore.setState({
+        walls: LOGEMENT,
+        openings: [],
+        objects: [],
+        rooms: [{ id: 'r1', name: 'Séjour', floor: null }] as never,
+        fixtures: [],
+        ceiling: [],
+        photos: [],
+        notes: [],
+        showSurfaces: true,
+      });
+      t = TestRenderer.create(
+        <FloorplanEditor
+          showMeasures={false}
+          editable
+          selectedWallId={murChoisi}
+          onSelectWall={(id) => fait.push(`mur:${id}`)}
+          onSelectRoom={(id) => fait.push(`piece:${id}`)}
+        />,
+      );
+    });
+    act(() => {
+      const zone = t.root
+        .findAllByType(View)
+        .find((n) => typeof n.props.onLayout === 'function')!;
+      zone.props.onLayout({ nativeEvent: { layout: { width: 600, height: 480 } } });
+    });
+    arbre = t;
+    return t;
+  };
+
+  it('lâche le mur choisi, au lieu de prendre la pièce', () => {
+    const fait: string[] = [];
+    const t = planAvecSol('n', fait);
+    const sol = solDe(t);
+    expect(sol).toBeDefined();
+    act(() => sol!.props.onPress());
+    expect(fait).toEqual(['mur:null']);
+  });
+
+  it('et prend la pièce quand rien n’est tenu', () => {
+    const fait: string[] = [];
+    const t = planAvecSol(null, fait);
+    act(() => solDe(t)!.props.onPress());
+    expect(fait).toEqual(['piece:r1']);
+  });
+});

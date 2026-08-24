@@ -190,3 +190,85 @@ describe('les commandes du menu de mur', () => {
     expect(rang).toBeGreaterThanOrEqual(4);
   });
 });
+
+/*
+  ET ELLE SE COUCHE DANS L'AXE DU MUR.
+
+  Relevé du patron : « fais en sorte qu'elle s'affiche en parallèle du mur,
+  comme s'il suivait sa trajectoire ». Elle était droite quel que soit le
+  mur : sur une cloison de biais, un rectangle horizontal posé à côté d'un
+  trait oblique se lit comme un objet SANS RAPPORT avec lui. Tournée dans son
+  axe, elle appartient au mur qu'elle règle — c'est déjà ce que fait la cote,
+  qui se couche le long du trait.
+
+  Elle ne se retourne jamais : au-delà du quart de tour on lit l'angle
+  opposé, sinon les quatre mots se liraient à l'envers.
+*/
+describe('la barre couchée dans l’axe du mur', () => {
+  const oblique = (ax: number, az: number, bx: number, bz: number) => {
+    let t!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      useScanStore.setState({
+        walls: [
+          mur('biais', ax, az, bx, bz),
+          mur('r', bx, bz, 6, 4),
+          mur('s', 6, 4, 0, 4),
+          mur('o', 0, 4, ax, az),
+        ],
+        openings: [],
+        objects: [],
+        rooms: [{ id: 'r1', name: 'Séjour', floor: null }],
+        fixtures: [],
+        ceiling: [],
+        photos: [],
+        showFurniture: true,
+      });
+      t = TestRenderer.create(
+        <FloorplanEditor
+          editable
+          showMeasures={false}
+          selectedWallId="biais"
+          onSelectWall={() => {}}
+          onWallAction={() => {}}
+          reserveBas={0}
+        />,
+      );
+    });
+    act(() => {
+      for (const n of t.root.findAllByType(View)) {
+        if (typeof n.props.onLayout === 'function') {
+          n.props.onLayout({
+            nativeEvent: { layout: { width: 390, height: HAUTEUR } },
+          });
+        }
+      }
+    });
+    arbre = t;
+    const bloc = t.root
+      .findAll((n) => typeof n.props?.onPress === 'function')
+      .map((n) => n.parent)
+      .find((n) => {
+        const st = StyleSheet.flatten(n?.props?.style) as
+          | { flexDirection?: string; transform?: unknown[] }
+          | undefined;
+        return st?.flexDirection === 'row' && Array.isArray(st.transform);
+      })!;
+    const st = StyleSheet.flatten(bloc.props.style) as {
+      transform: { rotate: string }[];
+    };
+    return parseFloat(st.transform[0].rotate);
+  };
+
+  it('prend l’angle du mur qu’elle règle', () => {
+    // Un mur qui descend de 3 m sur 4 : 36,87°.
+    expect(oblique(0, 0, 4, 3)).toBeCloseTo(36.87, 1);
+  });
+
+  it('et ne se retourne jamais : l’angle reste dans le quart de tour', () => {
+    // Le même mur pris à l'envers : la barre se lit du même côté.
+    expect(oblique(4, 3, 0, 0)).toBeCloseTo(36.87, 1);
+    for (const a of [oblique(0, 0, 1, 4), oblique(0, 4, 4, 0)]) {
+      expect(Math.abs(a)).toBeLessThanOrEqual(90);
+    }
+  });
+});

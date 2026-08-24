@@ -2051,6 +2051,70 @@ export function murNeufDepuisUnBout(
 }
 
 /**
+ * REPORTE UNE OUVERTURE D'UN MUR QUI A BOUGÉ SUR CE QU'IL EST DEVENU.
+ *
+ * Relevé du patron : « les ouvrants ne suivent pas la modification lors de
+ * mouvements du mur et rotations ». Pousser une cloison et lui poser un angle
+ * emportaient déjà les percements ; TIRER UN COIN, non — et c'est le geste le
+ * plus courant des trois, celui qui rallonge, raccourcit et fait pivoter en
+ * même temps. La porte restait où elle était, c'est-à-dire dans le vide.
+ *
+ * LA RÈGLE : l'ouverture garde sa cote DEPUIS LE BOUT QUI NE BOUGE PAS
+ * (`ancre`). C'est la vérité du chantier — on tire un mur, la porte ne se
+ * déplace pas dans la pièce ; c'est le mur qui s'allonge derrière elle. Et
+ * c'est la convention de la saisie : `moveOpening` prend la cote du tableau
+ * depuis le début du mur.
+ *
+ * Son ÉCART À L'AXE est conservé tel quel : une menuiserie n'est pas
+ * exactement sur l'axe du mur, et la recentrer la ferait sauter d'un côté à
+ * l'autre à chaque geste.
+ *
+ * ET ELLE NE DÉBORDE JAMAIS. Un mur raccourci sous la porte qu'il porte
+ * laisserait une menuiserie à cheval sur son bout — c'est-à-dire un trou dans
+ * le contour, et une surface qui fuit. On la range dedans.
+ */
+export function reporterOuverture<T extends { a: Pt; b: Pt }>(
+  o: T,
+  avant: { a: Pt; b: Pt },
+  apres: { a: Pt; b: Pt },
+  ancre: 'a' | 'b',
+): T {
+  const l1 = Math.hypot(avant.b.x - avant.a.x, avant.b.z - avant.a.z);
+  const l2 = Math.hypot(apres.b.x - apres.a.x, apres.b.z - apres.a.z);
+  if (l1 < 1e-6 || l2 < 1e-6) return o;
+  const u1 = { x: (avant.b.x - avant.a.x) / l1, z: (avant.b.z - avant.a.z) / l1 };
+  const n1 = { x: -u1.z, z: u1.x };
+  const u2 = { x: (apres.b.x - apres.a.x) / l2, z: (apres.b.z - apres.a.z) / l2 };
+  const n2 = { x: -u2.z, z: u2.x };
+  /** La cote d'un point depuis `a`, et son écart à l'axe. */
+  const lire = (p: Pt) => ({
+    t: (p.x - avant.a.x) * u1.x + (p.z - avant.a.z) * u1.z,
+    e: (p.x - avant.a.x) * n1.x + (p.z - avant.a.z) * n1.z,
+  });
+  const A = lire(o.a);
+  const B = lire(o.b);
+  /* Depuis le bout FIXE : c'est lui qui ne bouge pas, donc lui qui garde
+     la cote. Tirer `b` laisse la porte à un mètre de `a` ; tirer `a` la
+     laisse à deux mètres dix de `b`. */
+  const reporte = (t: number) => (ancre === 'a' ? t : l2 - (l1 - t));
+  let ta = reporte(A.t);
+  let tb = reporte(B.t);
+  const bas = Math.min(ta, tb);
+  const haut = Math.max(ta, tb);
+  let cale = 0;
+  if (bas < 0) cale = -bas;
+  if (haut + cale > l2) cale = Math.min(cale, l2 - haut);
+  if (bas + cale < 0) cale = -bas;
+  ta += cale;
+  tb += cale;
+  const pose = (t: number, e: number): Pt => ({
+    x: apres.a.x + u2.x * t + n2.x * e,
+    z: apres.a.z + u2.z * t + n2.z * e,
+  });
+  return { ...o, a: pose(ta, A.e), b: pose(tb, B.e) };
+}
+
+/**
  * UNE POSE POSSIBLE POUR UN MUR NEUF : d'où il part, et où il va.
  */
 export interface PoseDeMur {

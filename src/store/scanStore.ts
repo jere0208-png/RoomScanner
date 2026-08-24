@@ -62,6 +62,7 @@ import {
   NIVEAU_RDC,
   niveauDe,
   niveauxPresents,
+  reporterOuverture,
   deplacerNiveau,
   COFFRE_H,
   type TrouDeReleve,
@@ -4436,19 +4437,51 @@ export const useScanStore = create<ScanState>((set, get) => {
       // rend le mur solidaire, sans quoi il resterait libre pour toujours
       // et le contour ne se refermerait jamais vraiment.
       const rendreSolidaire = seul && soudure !== null;
+      /*
+        CE QUI EST PERCÉ DANS UN MUR SUIT LE MUR — relevé du patron : « les
+        ouvrants ne suivent pas la modification lors de mouvements du mur et
+        rotations ».
+
+        Pousser une cloison et lui poser un angle emportaient déjà les
+        percements ; tirer un coin, non. Or c'est le geste le plus courant
+        des trois : il rallonge, raccourcit et fait pivoter en même temps, et
+        la porte restait où elle était — dans le vide.
+
+        Chaque mur qui bouge garde donc ses ouvertures à leur cote depuis le
+        bout FIXE (`reporterOuverture`), les VOISINS compris : un mur qui
+        s'allonge parce qu'on a tiré le coin d'à côté emporte aussi sa
+        fenêtre.
+      */
+      const bouges: { avant: WallSeg; apres: WallSeg; ancre: 'a' | 'b' }[] = [];
+      const murs = walls.map((w) => {
+        if (w.id === id) {
+          const bouge = { ...w, [end]: snapped } as WallSeg;
+          bouges.push({ avant: w, apres: bouge, ancre: end === 'a' ? 'b' : 'a' });
+          return rendreSolidaire ? { ...bouge, libre: undefined } : bouge;
+        }
+        if (seul) return w;
+        // Seuls les murs de la MÊME pièce suivent le coin : la cloison
+        // d'en face garde la sienne, même si les deux se touchent.
+        if (roomOf(w) !== room) return w;
+        const colle = (pt: { x: number; z: number }) =>
+          Math.hypot(pt.x - old.x, pt.z - old.z) < 1e-4;
+        if (!colle(w.a) && !colle(w.b)) return w;
+        const suivi = {
+          ...w,
+          a: colle(w.a) ? snapped : w.a,
+          b: colle(w.b) ? snapped : w.b,
+        } as WallSeg;
+        bouges.push({ avant: w, apres: suivi, ancre: colle(w.a) ? 'b' : 'a' });
+        return suivi;
+      });
       set({
-        walls: walls.map((w) => {
-          if (w.id === id) {
-            const bouge = { ...w, [end]: snapped };
-            return rendreSolidaire ? { ...bouge, libre: undefined } : bouge;
-          }
-          if (seul) return w;
-          // Seuls les murs de la MÊME pièce suivent le coin : la cloison
-          // d'en face garde la sienne, même si les deux se touchent.
-          if (roomOf(w) !== room) return w;
-          const move = (pt: { x: number; z: number }) =>
-            Math.hypot(pt.x - old.x, pt.z - old.z) < 1e-4 ? snapped : pt;
-          return { ...w, a: move(w.a), b: move(w.b) };
+        walls: murs,
+        openings: get().openings.map((o) => {
+          const mid = { x: (o.a.x + o.b.x) / 2, z: (o.a.z + o.b.z) / 2 };
+          const sur = bouges.find(
+            (m) => pointOnSeg(mid, m.avant.a, m.avant.b).dist < 0.4,
+          );
+          return sur ? reporterOuverture(o, sur.avant, sur.apres, sur.ancre) : o;
         }),
         // Pas de sauvegarde automatique : le bouton d'enregistrement apparaît.
         dirty: true,
