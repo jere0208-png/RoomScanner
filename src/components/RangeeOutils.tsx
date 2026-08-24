@@ -62,7 +62,7 @@ export function RangeeOutils({
   dessus,
   anim,
   styles,
-  edition = false,
+  peigne: peigneDemande = { mot: 'Afficher' },
   onSuite,
 }: {
   elements: React.ReactElement[];
@@ -76,8 +76,23 @@ export function RangeeOutils({
   dessus: number;
   anim: Animated.Value;
   styles: Record<string, object>;
-  /** En édition, chaque bouton fait autre chose : pas de titre commun. */
-  edition?: boolean;
+  /**
+   * LE PEIGNE : SON MOT, ET LE RANG DU PREMIER BOUTON QU'IL ANNOTE.
+   *
+   * Il a d'abord dit « Afficher », et disparu en édition — là, chaque
+   * bouton faisait autre chose. Relevé du patron : « dans l'édition fais le
+   * même système que le "Afficher" et ses lignes, mais cette fois
+   * "Ajouter" et on cible appareil, meuble, plafond, note ».
+   *
+   * Ils ne font pas chacun autre chose, en effet : quatre des cinq POSENT
+   * quelque chose sur le plan. Le cinquième — « Redresser » — ne pose rien,
+   * il remet le plan d'équerre ; il ouvre la rangée, et `depuis` dit au
+   * peigne de commencer après lui.
+   *
+   * `null` éteint le peigne : une rangée dont les boutons n'ont pas de
+   * geste commun ne se coiffe pas d'un mot.
+   */
+  peigne?: { mot: string; depuis?: number } | null;
   /**
    * La hauteur de la pile de droite, mesurée et rendue à l'écran.
    *
@@ -142,7 +157,19 @@ export function RangeeOutils({
       : 0;
   /** Le milieu de la pastille de rang `i` — le même calcul que la rangée. */
   const xPastille = (i: number) => MARGE_RANGEE + part * (i + 0.5);
-  const peigne = !edition && rangee.length > 1 && part > 0;
+  /** Le premier bouton coiffé : les précédents restent hors du peigne. */
+  const depuis = Math.min(peigneDemande?.depuis ?? 0, Math.max(0, rangee.length - 1));
+  const peigne = !!peigneDemande && rangee.length - depuis > 1 && part > 0;
+  /*
+    LE MOT S'AXE SUR LES BOUTONS QU'IL COIFFE, et sur eux seuls.
+
+    Tant que le peigne partait du premier bouton, cet axe était le milieu du
+    cadre de la rangée. Dès qu'il en saute un — « Redresser » —, les deux ne
+    coïncident plus : le mot doit suivre ce qu'il annonce, pas le cadre.
+  */
+  const axeDuMot = (xPastille(depuis) + xPastille(rangee.length - 1)) / 2;
+  /** Une boîte large, centrée sur l'axe : le mot ne se coupe jamais. */
+  const BOITE_MOT = 120;
   /*
     LE PEIGNE SE COUCHE SUR LA LIGNE ET SE DRESSE SUR LA PILE — troisième
     version, croquis rouge du patron à l'appui.
@@ -247,19 +274,22 @@ export function RangeeOutils({
           <Text
             style={[
               styles.peigneMot,
-              // Le cadre de la RANGÉE, pas celui du peigne : le mot s'axe
-              // sur les pastilles de la ligne, et la pile de droite — qui
-              // porte d'autres boutons au-dessus d'elle — n'entre pas dans
-              // le compte.
-              { bottom: PEIGNE_H + 2, width: largeurRangee },
+              // Les pastilles de la LIGNE qu'il coiffe : la pile de droite —
+              // qui porte d'autres boutons au-dessus d'elle — n'entre pas
+              // dans le compte, et les boutons sautés non plus.
+              {
+                bottom: PEIGNE_H + 2,
+                left: axeDuMot - BOITE_MOT / 2,
+                width: BOITE_MOT,
+              },
             ]}>
-            Afficher
+            {peigneDemande?.mot}
           </Text>
           <Svg width={largeurPeigne} height={hauteurSvg}>
             {/* La barre ne court que d'une descente à l'autre : débordante,
                 elle ferait un cadre, et l'on annoterait la carte entière. */}
             <Line
-              x1={xPastille(0)}
+              x1={xPastille(depuis)}
               y1={yBarre}
               x2={xFin}
               y2={yBarre}
@@ -267,12 +297,12 @@ export function RangeeOutils({
               strokeWidth={1.5}
               strokeLinecap="round"
             />
-            {rangee.map((el, i) => (
+            {rangee.slice(depuis).map((el, i) => (
               <Line
                 key={el.key}
-                x1={xPastille(i)}
+                x1={xPastille(depuis + i)}
                 y1={yBarre}
-                x2={xPastille(i)}
+                x2={xPastille(depuis + i)}
                 y2={yPied}
                 stroke={TRAIT_PEIGNE}
                 strokeWidth={1.5}

@@ -9,6 +9,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 
 import React from 'react';
 import { Animated, StyleSheet, Text, View } from 'react-native';
+import { Line } from 'react-native-svg';
 import TestRenderer, { act } from 'react-test-renderer';
 import { RangeeOutils } from '../src/components/RangeeOutils';
 import { getStyles } from '../src/screens/result/styles';
@@ -48,7 +49,7 @@ describe('le peigne « Afficher »', () => {
           reserve={62}
           bas={10}
           dessus={0}
-          edition={edition}
+          peigne={edition ? { mot: 'Ajouter', depuis: 1 } : { mot: 'Afficher' }}
           elements={['a', 'b', 'c', 'd'].map((k) => (
             <View key={k} />
           ))}
@@ -93,7 +94,7 @@ describe('le peigne « Afficher »', () => {
           reserve={62}
           bas={10}
           dessus={0}
-          edition={false}
+          peigne={{ mot: 'Afficher' }}
           elements={['a', 'b', 'c'].map((k) => (
             <View key={k} />
           ))}
@@ -118,12 +119,42 @@ describe('le peigne « Afficher »', () => {
     act(() => t.unmount());
   });
 
-  it('et disparaît en édition, où chaque bouton fait autre chose', () => {
+  /*
+    EN ÉDITION, IL CHANGE DE MOT — il ne disparaît plus.
+
+    Il s'est effacé le temps de deux versions : hors édition les boutons
+    montrent ou cachent, en édition ils font chacun autre chose, et un
+    « Afficher » sur des outils de pose aurait menti. Relevé du patron :
+    « dans l'édition fais le même système que le "Afficher" et ses lignes,
+    mais cette fois "Ajouter" et on cible appareil, meuble, plafond, note ».
+
+    Ils ne font pas « chacun autre chose », en effet : quatre des cinq
+    POSENT quelque chose sur le plan, et c'est le même geste. Le cinquième —
+    « Redresser » — ne pose rien : il remet tout le plan d'équerre. Il ouvre
+    la rangée, et le peigne commence après lui.
+  */
+  it('change de mot en édition, et annonce « Ajouter »', () => {
     const t = monter(true);
     const mots = t.root
       .findAllByType(Text)
       .map((n) => String(n.props.children));
+    expect(mots).toContain('Ajouter');
     expect(mots).not.toContain('Afficher');
+    act(() => t.unmount());
+  });
+
+  it('et laisse « Redresser » hors du peigne', () => {
+    const t = monter(true);
+    const traits = t.root
+      .findAllByType(Line)
+      .filter((x) => x.props.stroke === '#B6BECB');
+    const descentes = traits.filter((n) => n.props.x1 === n.props.x2);
+    // Quatre boutons, trois annotés : le premier reste dehors.
+    expect(descentes).toHaveLength(3);
+    const barre = traits.find((n) => n.props.y1 === n.props.y2)!;
+    const part = (390 - 62 - 20) / 4;
+    // La barre part du DEUXIÈME bouton, pas du bord de la rangée.
+    expect(Number(barre.props.x1)).toBeCloseTo(10 + part * 1.5, 3);
     act(() => t.unmount());
   });
 });

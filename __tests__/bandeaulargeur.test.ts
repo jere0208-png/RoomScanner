@@ -24,6 +24,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 import { getStyles } from '../src/screens/result/styles';
+import { DEBORD_DOIGT } from '../src/ui/bandeau';
 import { light } from '../src/theme';
 
 /**
@@ -86,18 +87,34 @@ describe('le bandeau du meuble', () => {
   });
 
   /**
-   * ET CHAQUE COMMANDE A LA TAILLE D'UN DOIGT.
+   * ET CHAQUE COMMANDE A LA TAILLE D'UN DOIGT — DÉBORD COMPRIS.
    *
-   * Les pastilles faisaient vingt-huit points dessinés et empruntaient le
-   * reste au débord (`hitSlop`) : la cible était bonne, le dessin non —
-   * quatre ronds serrés au bout d'une ligne pleine. Depuis que la rangée
-   * d'actions vit sous le texte, la place est là.
+   * Trois versions. Les pastilles ont d'abord fait vingt-huit points
+   * dessinés en empruntant le reste au débord : la cible était bonne, le
+   * dessin non — quatre ronds serrés au bout d'une ligne pleine. La rangée
+   * d'actions est passée sous le texte, la place était là, et elles sont
+   * montées à quarante-quatre dessinés, sans débord.
+   *
+   * Relevé du patron, capture à l'appui : « réduis légèrement la taille du
+   * bloc en diminuant les boutons très légèrement, et surtout les blocs des
+   * champs pour les cm, ils sont trop imposants ». Le bandeau se pose SUR le
+   * plan : chaque point qu'il prend est un point de dessin en moins. Le
+   * dessin redescend donc à quarante, et le débord — commun aux quatre
+   * bandeaux, `DEBORD_DOIGT` — rend au doigt ce qu'il a rendu à la carte.
+   *
+   * Ce banc compte donc la CIBLE, dessin plus débord : c'est elle qui doit
+   * quarante-quatre points, pas le dessin.
    */
+  const cible = (dessin: number) =>
+    dessin + DEBORD_DOIGT.top + DEBORD_DOIGT.bottom;
+
   it('donne à chaque commande la taille d’un doigt', () => {
-    expect(s.iconBtn.width).toBeGreaterThanOrEqual(44);
-    expect(s.iconBtnOk.width).toBeGreaterThanOrEqual(44);
-    expect(s.nudgeBtn.width).toBeGreaterThanOrEqual(44);
-    expect(s.clChamp.minHeight).toBeGreaterThanOrEqual(44);
+    expect(cible(s.iconBtn.width)).toBeGreaterThanOrEqual(44);
+    expect(cible(s.iconBtnOk.width)).toBeGreaterThanOrEqual(44);
+    expect(cible(s.nudgeBtn.width)).toBeGreaterThanOrEqual(44);
+    expect(cible(s.clChamp.minHeight)).toBeGreaterThanOrEqual(44);
+    // Et le dessin, lui, s'est bien resserré : sinon rien n'a été gagné.
+    expect(s.clChamp.minHeight).toBeLessThan(44);
   });
 
   /** Les angles : une carte, plus un galet. */

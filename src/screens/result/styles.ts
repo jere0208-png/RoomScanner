@@ -385,7 +385,6 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   */
   peigneMot: {
     position: 'absolute',
-    left: 0,
     textAlign: 'center',
     color: c.inkFaint,
     fontSize: 11,
@@ -513,6 +512,17 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     bottom: 10,
     left: 12,
     /*
+      IL PASSE DEVANT LE PEIGNE « AFFICHER ».
+
+      Relevé du patron, capture à l'appui : « le "Afficher" monte sur le
+      bloc d'édition de la lumière plafond, fais en sorte qu'il reste en
+      dessous ». Le peigne est posé au-dessus de la rangée de calques et le
+      bandeau au-dessus de lui : les deux se rencontrent forcément. L'un
+      annonce ce que font les boutons du fond, l'autre règle l'objet qu'on
+      tient en main — c'est le second qu'on regarde.
+    */
+    zIndex: 2,
+    /*
       LA CARTE ÉPOUSE SON CONTENU — relevé du patron sur la refonte :
       « le menu que tu as refait trop gros et trop de marge blanche sur son
       bloc ».
@@ -526,17 +536,19 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     alignSelf: 'flex-start',
     backgroundColor: c.surface,
     borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingTop: 9,
-    paddingBottom: 10,
-    gap: 8,
+    /* Resserré d'un point ou deux partout : le bandeau se pose SUR le plan,
+       et chaque point qu'il prend est un point de dessin en moins. */
+    paddingHorizontal: 11,
+    paddingTop: 8,
+    paddingBottom: 9,
+    gap: 7,
     ...shadowCard,
     shadowOpacity: 0.12,
   },
   /* La partie haute : elle ne contient QUE ce qu'on lit. */
   bandeauTexte: { gap: 1 },
-  bandeauTitre: { color: c.ink, fontSize: 15, fontWeight: '800' },
-  bandeauSous: { color: c.inkSoft, fontSize: 12.5, lineHeight: 16 },
+  bandeauTitre: { color: c.ink, fontSize: 14.5, fontWeight: '800' },
+  bandeauSous: { color: c.inkSoft, fontSize: 12, lineHeight: 15 },
   /*
     La partie basse : une rangée qui PASSE À LA LIGNE. C'est elle qui
     remplace le `flexShrink` — cinq boutons sur un petit écran font deux
@@ -556,9 +568,18 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     */
     alignItems: 'flex-start',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: 7,
   },
-  /* Un bouton de bandeau : la taille d'un doigt, et il ne cède pas. */
+  /*
+    UN BOUTON DE BANDEAU : QUARANTE POINTS DESSINÉS, QUARANTE-HUIT SOUS LE
+    DOIGT.
+
+    Il en faisait quarante-quatre, dessinés comme touchés. Relevé du
+    patron : « réduis légèrement la taille du bloc en diminuant les boutons
+    très légèrement ». Le dessin cède donc quatre points, et le débord
+    (`DEBORD_DOIGT`, posé par chaque bandeau) les rend au doigt — c'est déjà
+    la règle des pastilles de la rangée.
+  */
   bandeauBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -566,11 +587,9 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     gap: 6,
     backgroundColor: c.blue,
     borderRadius: radius.pill,
-    // Treize points de marge, pas seize : la carte se resserre sans que la
-    // cible descende sous les quarante-quatre points du doigt.
-    paddingHorizontal: 13,
-    minHeight: 44,
-    minWidth: 44,
+    paddingHorizontal: 12,
+    minHeight: 40,
+    minWidth: 40,
     flexShrink: 0,
   },
   bandeauBtnGhost: {
@@ -580,13 +599,13 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     gap: 6,
     backgroundColor: c.surfaceSunken,
     borderRadius: radius.pill,
-    paddingHorizontal: 13,
-    minHeight: 44,
-    minWidth: 44,
+    paddingHorizontal: 12,
+    minHeight: 40,
+    minWidth: 40,
     flexShrink: 0,
   },
   /* Une icône seule : carrée, même hauteur, pas de mot À L'INTÉRIEUR. */
-  bandeauBtnIcone: { paddingHorizontal: 0, width: 44 },
+  bandeauBtnIcone: { paddingHorizontal: 0, width: 40 },
   /**
    * LE MOT SOUS LE BOUTON — relevé du patron : « mets des noms sous les
    * boutons… on doit comprendre ce que chaque bouton fait. Nom discret comme
@@ -600,10 +619,10 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
    * Il se lit EN RETRAIT, comme le peigne « Afficher » qu'il imite : c'est
    * une légende, elle ne doit pas se disputer le regard avec le geste.
    */
-  bandeauCellule: { alignItems: 'center', gap: 3 },
+  bandeauCellule: { alignItems: 'center', gap: 2 },
   bandeauMot: {
     color: c.inkFaint,
-    fontSize: 10.5,
+    fontSize: 10,
     fontWeight: '600',
     opacity: 0.75,
   },
@@ -658,20 +677,29 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
    * le bandeau est en bas de l'écran, et le clavier le recouvre en entier.
    * L'appui ouvre la feuille de saisie, qui monte avec le clavier.
    */
+  /*
+    LE CHAMP DES CENTIMÈTRES — relevé du patron : « surtout les blocs des
+    champs pour les cm, ils sont trop imposants ».
+
+    C'était le plus gros morceau du bandeau : deux pavés de quarante-quatre
+    points de haut et d'une centaine de large, pour porter trois chiffres.
+    Ils tiennent en trente-huit, marges resserrées et flèche réduite — le
+    nombre, lui, reste gras et lisible : c'est ce qu'on vient lire.
+  */
   clChamp: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 5,
+    gap: 4,
     backgroundColor: c.surfaceSunken,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    minHeight: 44,
+    borderRadius: 11,
+    paddingHorizontal: 10,
+    minHeight: 38,
     // Elle ne cède plus : depuis que les boutons ont leur propre rangée,
     // la ligne des cotes n'a plus personne à qui céder la place.
     flexShrink: 0,
   },
-  clValeur: { color: c.ink, fontSize: 16, fontWeight: '800' },
+  clValeur: { color: c.ink, fontSize: 15.5, fontWeight: '800' },
   inputSmall: {
     backgroundColor: c.bg,
     color: c.ink,
@@ -733,8 +761,8 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     rangée d'actions vit sous le texte, la place est là : on la prend.
   */
   iconBtn: {
-    width: 44,
-    height: 44,
+    width: 40,
+    height: 40,
     borderRadius: radius.pill,
     backgroundColor: c.surfaceSunken,
     alignItems: 'center',
@@ -742,8 +770,8 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     flexShrink: 0,
   },
   iconBtnOk: {
-    width: 44,
-    height: 44,
+    width: 40,
+    height: 40,
     borderRadius: radius.pill,
     backgroundColor: c.blue,
     alignItems: 'center',

@@ -10,6 +10,7 @@
  * raison qu'un meuble se règle autrement qu'un point lumineux.
  */
 import React, { useCallback, useEffect, useRef } from 'react';
+import { DEBORD_DOIGT } from '../ui/bandeau';
 import { Text, TouchableOpacity, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { frCategory } from '../geometry/furniture';
@@ -159,6 +160,7 @@ export function ObjectBar({
     depuisZero?: boolean,
   ) => (
     <TouchableOpacity
+      hitSlop={DEBORD_DOIGT}
       style={styles.clChamp}
       accessibilityLabel={titre}
       onPress={() =>

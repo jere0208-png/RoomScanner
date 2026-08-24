@@ -223,6 +223,56 @@ describe('le bandeau d’une note', () => {
   });
 });
 
+/*
+  LE BANDEAU PASSE DEVANT L'ANNOTATION DE LA RANGÉE.
+
+  Relevé du patron, capture à l'appui : « le "Afficher" monte sur le bloc
+  d'édition de la lumière plafond, fais en sorte qu'il reste en dessous ».
+
+  Le peigne est posé au-dessus de la rangée de calques, et le bandeau
+  d'édition se pose au-dessus de lui : les deux se rencontrent forcément.
+  L'un annonce ce que font les boutons du fond, l'autre règle l'objet qu'on
+  tient en main — c'est le second qu'on regarde, et c'est donc lui qui
+  passe devant.
+*/
+describe('l’empilement au pied du plan', () => {
+  it('met le bandeau devant le peigne « Afficher »', () => {
+    const peigne = Number(plat(styles.peigne).zIndex ?? 0);
+    const bandeau = Number(plat(styles.bandeau).zIndex ?? 0);
+    expect(bandeau).toBeGreaterThan(peigne);
+  });
+});
+
+/*
+  LES BANDEAUX SE RESSERRENT — relevé du patron : « réduis légèrement la
+  taille du bloc en diminuant les boutons très légèrement, et surtout les
+  blocs des champs pour les cm, ils sont trop imposants ».
+
+  Le dessin descend à quarante points ; la CIBLE, elle, ne bouge pas — le
+  débord (`hitSlop`) rend au doigt ce que le dessin a rendu à la carte.
+  C'est déjà la règle des pastilles de la rangée : « 38 points dessinés, 44
+  sous le doigt ». L'épreuve d'à côté vérifie la cible ; celle-ci vérifie le
+  dessin, pour que le bloc ne regrossisse pas en douce.
+*/
+describe('la taille dessinée des bandeaux', () => {
+  const CAS_TAILLE = CAS;
+  for (const [nom, rendre] of CAS_TAILLE) {
+    it(`resserre le dessin du bandeau « ${nom} »`, () => {
+      const t = monter(rendre());
+      const gros: string[] = [];
+      for (const b of boutons(t)) {
+        const st = plat(b.props.style);
+        const haut = Number(st.minHeight ?? st.height ?? 0);
+        const large = Number(st.width ?? st.minWidth ?? 0);
+        if (haut > 40 || large > 40) {
+          gros.push(`${b.props.accessibilityLabel ?? '?'} (${haut}×${large})`);
+        }
+      }
+      expect(`trop gros : ${gros.join(', ') || 'aucun'}`).toBe('trop gros : aucun');
+    });
+  }
+});
+
 describe('la forme des bandeaux du bas', () => {
   for (const [nom, rendre] of CAS) {
     describe(nom, () => {

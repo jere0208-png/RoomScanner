@@ -16,6 +16,7 @@ import Svg, { Path } from 'react-native-svg';
 import { castToWall, type Pt, type WallSeg } from '../geometry/floorplan';
 import { CEILINGS, type CeilingFixture } from '../geometry/ceiling';
 import { haptic } from '../ui/haptic';
+import { DEBORD_DOIGT } from '../ui/bandeau';
 import type { PromptData } from './Sheet';
 import type { Palette } from '../theme';
 
@@ -107,6 +108,7 @@ export function CeilingBar({
             <TouchableOpacity
               style={styles.clChamp}
               accessibilityLabel={titre}
+              hitSlop={DEBORD_DOIGT}
               onPress={() => {
                 const actuel = ecart(k);
                 if (actuel === null) return;
@@ -182,6 +184,7 @@ export function CeilingBar({
                   {centre && (
                     <View style={styles.bandeauCellule}>
                       <TouchableOpacity
+                        hitSlop={DEBORD_DOIGT}
                         style={styles.iconBtn}
                         accessibilityLabel="Centrer dans la pièce"
                         onPress={() => {
@@ -217,6 +220,7 @@ export function CeilingBar({
                   {onLink && (
                     <View style={styles.bandeauCellule}>
                     <TouchableOpacity
+                      hitSlop={DEBORD_DOIGT}
                       style={styles.iconBtn}
                       accessibilityLabel="Relier à une commande"
                       onPress={onLink}>
@@ -243,6 +247,7 @@ export function CeilingBar({
                       l'avaient perdue en chemin. */}
                   <View style={styles.bandeauCellule}>
                     <TouchableOpacity
+                      hitSlop={DEBORD_DOIGT}
                       style={styles.iconBtn}
                       accessibilityLabel="Retirer"
                       onPress={onRemove}>
@@ -261,6 +266,7 @@ export function CeilingBar({
                   </View>
                   <View style={styles.bandeauCellule}>
                     <TouchableOpacity
+                      hitSlop={DEBORD_DOIGT}
                       style={styles.iconBtnOk}
                       accessibilityLabel="Terminer"
                       onPress={onDone}>

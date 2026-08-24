@@ -751,12 +751,21 @@ describe('l’espace de travail du plan', () => {
           // haut : c'est le pied qui distingue la colonne d'actions.
           typeof style(n).bottom === 'number',
       )
-      .map(style)[0];
-    expect(colonne).toBeDefined();
-    expect(colonne.flexDirection).toBeUndefined();
-    expect(colonne.right).toBeLessThan(12);
-    // Elles partagent le même pied : rien ne flotte plus bas que l'autre.
-    expect(colonne.bottom).toBe(style(rail).bottom);
+      .map(style);
+    expect(colonne.length).toBeGreaterThan(0);
+    expect(colonne[0].flexDirection).toBeUndefined();
+    for (const c of colonne) expect(c.right).toBeLessThan(12);
+    /*
+      Elles partagent le même pied : rien ne flotte plus bas que l'autre.
+
+      La colonne s'est coupée en deux depuis — relevé du patron : « le Note
+      doit être au-dessus de l'édition ». « Édition » garde le pied, les
+      commandes montent d'un étage pour laisser passer le trop-plein de la
+      rangée. C'est donc le PLUS BAS des ancrages qui doit toucher la ligne
+      de la rangée.
+    */
+    const pied = Math.min(...colonne.map((c) => Number(c.bottom)));
+    expect(pied).toBe(style(rail).bottom);
     // Et la rangée s'arrête AVANT la colonne, sinon les dernières pastilles
     // se glisseraient dessous.
     expect(style(rail).right).toBeGreaterThanOrEqual(50);

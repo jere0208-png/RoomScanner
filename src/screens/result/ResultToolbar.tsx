@@ -379,8 +379,15 @@ export function Toolbar2D({
       reserve={62}
       bas={bas}
       dessus={dessus}
-      // Hors édition, la rangée dit ce qu'elle fait : « Afficher ».
-      edition={edition}
+      /*
+        LA RANGÉE DIT CE QU'ELLE FAIT, DANS LES DEUX MODES.
+
+        Hors édition, ses boutons montrent ou cachent : « Afficher ». En
+        édition, quatre des cinq POSENT quelque chose : « Ajouter ». Le
+        cinquième est « Redresser », en tête de rangée — il ne pose rien, il
+        remet tout le plan d'équerre, et le peigne commence après lui.
+      */
+      peigne={edition ? { mot: 'Ajouter', depuis: 1 } : { mot: 'Afficher' }}
       elements={outils.filter((el): el is React.ReactElement => !!el)}
     />
   );

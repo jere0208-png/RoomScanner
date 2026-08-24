@@ -24,6 +24,7 @@ import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { SOLAIRES } from '../ui/solaires';
+import { DEBORD_DOIGT } from '../ui/bandeau';
 
 export interface StripAction {
   label: string;
@@ -113,6 +114,8 @@ export function StripBar({
                 a.sansMot && styles.bandeauBtnIcone,
               ]}
               accessibilityLabel={a.label}
+              /* Quarante points dessinés, quarante-huit sous le doigt. */
+              hitSlop={DEBORD_DOIGT}
               onPress={a.onPress}>
               {a.crayon && <Crayon teinte={teinte} />}
               {a.icone && (

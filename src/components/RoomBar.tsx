@@ -25,6 +25,7 @@ import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { SOLAIRES } from '../ui/solaires';
+import { DEBORD_DOIGT } from '../ui/bandeau';
 
 /** Le crayon : le même signe que partout, « ça s'édite ». */
 function Crayon({ teinte }: { teinte: string }) {
@@ -103,6 +104,7 @@ export function RoomBar({
       {/* EN BAS : ce qu'on touche. */}
       <View style={styles.bandeauActions}>
         <TouchableOpacity
+          hitSlop={DEBORD_DOIGT}
           style={styles.bandeauBtn}
           accessibilityLabel="Nommer la pièce"
           onPress={onName}>
@@ -119,6 +121,7 @@ export function RoomBar({
         */}
         {!!onCotes && (
           <TouchableOpacity
+            hitSlop={DEBORD_DOIGT}
             style={styles.bandeauBtnGhost}
             accessibilityLabel="Cotes de la pièce"
             onPress={onCotes}>
@@ -127,6 +130,7 @@ export function RoomBar({
           </TouchableOpacity>
         )}
         <TouchableOpacity
+          hitSlop={DEBORD_DOIGT}
           style={styles.bandeauBtnGhost}
           accessibilityLabel="Hauteur sous plafond"
           onPress={onHeight}>
@@ -136,6 +140,7 @@ export function RoomBar({
           )} m`}</Text>
         </TouchableOpacity>
         <TouchableOpacity
+          hitSlop={DEBORD_DOIGT}
           style={[styles.bandeauBtnGhost, styles.bandeauBtnIcone]}
           accessibilityLabel="Autres gestes sur la pièce"
           onPress={onMore}>

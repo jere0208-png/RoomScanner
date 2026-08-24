@@ -6367,6 +6367,71 @@ répondait « haut (0.99) ». Deux autres règles l'encadrent : le corps reste
 clair (il tient sur un fond noir), et le fil reste un fil — à un pas du bord,
 on est déjà chez soi. Vérifié à l'œil sur trois fonds : blanc, noir, gris.
 
+### Les bandeaux se resserrent, et passent devant le peigne
+
+**« Le "Afficher" monte sur le bloc d'édition de la lumière plafond, fais en
+sorte qu'il reste en dessous. »** Le peigne est posé au-dessus de la rangée de
+calques et le bandeau au-dessus de lui : les deux se rencontrent forcément.
+L'un annonce ce que font les boutons du fond, l'autre règle l'objet qu'on
+tient en main — c'est le second qu'on regarde, c'est lui qui passe devant.
+
+**« Réduis légèrement la taille du bloc en diminuant les boutons très
+légèrement, et surtout les blocs des champs pour les cm : ils sont trop
+imposants. »** Un bandeau se pose SUR le plan, et chaque point qu'il prend
+est un point de dessin en moins.
+
+Le dessin descend donc à **quarante points** — les pastilles, les
+boutons-phrases, et surtout les deux pavés de centimètres, qui portaient
+quarante-quatre points de haut pour trois chiffres et tombent à trente-huit.
+**La cible, elle, ne bouge pas** : le débord (`DEBORD_DOIGT`, exporté d'un
+seul endroit et posé par les quatre bandeaux) rend au doigt les quatre points
+rendus à la carte, soit quarante-huit sous le doigt. C'est déjà la règle des
+pastilles de la rangée — « 38 dessinés, 44 sous le doigt » — et c'est
+pourquoi le réglage des 44 points n'est pas trahi : il portait sur la CIBLE.
+
+Les trois bancs qui vérifiaient les 44 points ont été réécrits pour compter
+la cible au lieu du dessin, et un quatrième a été ajouté en face : le dessin,
+lui, ne doit PAS dépasser quarante — sinon le bloc regrossit en douce.
+
+### « Ajouter », le peigne de l'édition
+
+**« Dans l'édition fais le même système que le "Afficher" et ses lignes, mais
+cette fois "Ajouter" et on cible appareil, meuble, plafond, note. »**
+
+Le peigne s'effaçait en édition : hors édition les boutons montrent ou
+cachent, en édition ils font chacun autre chose, et un « Afficher » sur des
+outils de pose aurait menti. Sauf qu'ils ne font pas *chacun autre chose* :
+quatre des cinq POSENT quelque chose sur le plan, et c'est le même geste. Le
+cinquième — « Redresser » — ne pose rien, il remet tout le plan d'équerre :
+il ouvre la rangée, et le peigne commence après lui.
+
+Le peigne reçoit donc son mot et le rang du premier bouton qu'il coiffe. Le
+mot s'axe désormais sur les boutons COIFFÉS et non sur le cadre de la rangée
+— tant qu'il partait du premier, les deux coïncidaient ; dès qu'il en saute
+un, ils ne coïncident plus.
+
+### L'ordre de la colonne, du pied vers le haut
+
+**« Descends le "Note" d'un bouton, et remonte celui du retour en arrière ou
+refaire. Le Note doit être au-dessus de l'édition. »**
+
+Le trop-plein de la rangée se posait au-dessus de TOUTE la colonne des
+commandes. En édition, ce trop-plein n'est pas un calque de plus : c'est un
+**outil de pose** — « Note » sur la capture — et sa place est contre le
+bouton qui l'a fait paraître. Le retour en arrière, lui, monte : on le
+cherche moins souvent qu'on ne pose.
+
+« Édition » a donc quitté la colonne des commandes pour son propre ancrage au
+pied — il ne pouvait pas laisser passer le trop-plein tant qu'ils vivaient
+dans le même bloc. Quatre étages, chacun posé sur la hauteur mesurée du
+précédent : **Édition, le trop-plein, les commandes, l'enregistrement**. Ce
+qui n'est pas rendu ne réserve rien, et la 3D — qui n'a ni édition ni
+commandes — voit tout redescendre d'autant.
+
+Vérifié à l'œil sur un rendu de la zone aux nombres d'un iPhone 16 Pro :
+« Redresser » hors du peigne, la barre d'« Ajouter » sur les trois autres,
+l'équerre qui monte vers « Note », et la colonne dans l'ordre voulu.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

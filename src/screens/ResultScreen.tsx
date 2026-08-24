@@ -801,8 +801,31 @@ export function ResultScreen() {
     comptent désormais le même étage : ce qui n'est pas rendu ne réserve
     rien.
   */
-  const dessusOutils =
-    vue === '2d' ? Math.max(hActions, PILL_CELL_H) + PILL_GAP : 0;
+  /*
+    L'ORDRE DE LA COLONNE, DU PIED VERS LE HAUT.
+
+    Relevé du patron : « descends le "Note" d'un bouton, et remonte celui du
+    retour en arrière ou refaire. Le Note doit être au-dessus de l'édition. »
+
+    Le trop-plein de la rangée se posait au-dessus de TOUTE la colonne des
+    commandes. En édition, ce trop-plein n'est pas un calque de plus : c'est
+    un OUTIL DE POSE — « Note » sur la capture — et sa place est contre le
+    bouton qui l'a fait paraître. Le retour en arrière, lui, monte : on le
+    cherche moins souvent qu'on ne pose.
+
+    Quatre étages, chacun posé sur la hauteur MESURÉE du précédent :
+    « Édition » au pied, ce qui déborde de la rangée, les commandes, puis
+    l'enregistrement. Ce qui n'est pas rendu ne réserve rien — la 3D n'a ni
+    édition ni commandes, et tout redescend d'autant.
+  */
+  const dessusOutils = vue === '2d' ? PILL_CELL_H + PILL_GAP : 0;
+  /** L'étage des commandes : au-dessus du trop-plein de la rangée. */
+  const etageCommandes =
+    ligneOutils + dessusOutils + hSuite + (hSuite > 0 ? PILL_GAP : 0);
+  /** Et l'enregistrement au-dessus de tout, commandes comprises. */
+  const hCommandes = vue === '2d' ? hActions : 0;
+  const etageSauvegarde =
+    etageCommandes + (hCommandes > 0 ? hCommandes + PILL_GAP : 0);
   /**
    * Les points cardinaux : un calque, lui aussi — ÉTEINT au départ.
    *
@@ -3017,7 +3040,7 @@ export function ResultScreen() {
           <View
             style={[
               styles.editAnchor,
-              { bottom: ligneOutils + dessusOutils + hSuite },
+              { bottom: etageSauvegarde },
             ]}
             pointerEvents="box-none">
             <SidePill visible index={0}>
@@ -3186,7 +3209,9 @@ export function ResultScreen() {
               setHActions(e.nativeEvent.layout.height);
               setWActions(e.nativeEvent.layout.width);
             }}
-            style={[styles.editAnchor, { bottom: ligneOutils }]}>
+            /* Elles ne touchent plus le pied : le trop-plein de la rangée
+               s'intercale entre elles et « Édition ». */
+            style={[styles.editAnchor, { bottom: etageCommandes }]}>
             {/* Revenir en arrière ne défile pas avec les calques : c'est le
                 geste qu'on cherche dans l'urgence, et il se tient dans la
                 colonne, juste au-dessus de l'édition. */}
@@ -3221,8 +3246,15 @@ export function ResultScreen() {
                 onPress={redo}
               />
             </SidePill>
-            {/* « Édition » commande le contenu de la rangée : il ferme la
-                pile, là où le pouce tombe, et ne bouge jamais. */}
+          </View>
+        )}
+
+        {/* « Édition » commande le contenu de la rangée : il ferme la pile,
+            là où le pouce tombe, et ne bouge jamais. Il a QUITTÉ la colonne
+            des commandes pour son propre ancrage : celles-ci montent
+            au-dessus du trop-plein de la rangée, lui reste au pied. */}
+        {vue === '2d' && !capturing && (
+          <View style={[styles.editAnchor, { bottom: ligneOutils }]}>
             <ToolPill
               icon="edit"
               label="Édition"

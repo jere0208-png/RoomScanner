@@ -65,14 +65,22 @@ describe('le bandeau du mur tient dans son bloc', () => {
   it('les boutons passent à la ligne au lieu de rétrécir', () => {
     const t = monter(3);
     for (const l of ['Mesures', 'Laser', 'Détacher']) {
-      const st = StyleSheet.flatten(bouton(t, l).props.style) as {
+      const b = bouton(t, l);
+      const st = StyleSheet.flatten(b.props.style) as {
         flexShrink?: number;
         minHeight?: number;
       };
       // Ils ne cèdent plus : c'est la rangée qui se replie (`flexWrap`).
       expect(`${l} cède : ${(st.flexShrink ?? 0) > 0}`).toBe(`${l} cède : false`);
-      // Et chacun garde la taille d'un doigt, quoi qu'il arrive.
-      expect(st.minHeight).toBeGreaterThanOrEqual(44);
+      /*
+        Et chacun garde la taille d'un doigt — DÉBORD COMPRIS. Le dessin est
+        redescendu à quarante points pour que le bandeau prenne moins de
+        plan ; le débord (`DEBORD_DOIGT`) rend au doigt les quatre points
+        rendus à la carte, des deux côtés. C'est la cible qui compte.
+      */
+      const hs = (b.props.hitSlop ?? {}) as Record<string, number>;
+      const cible = Number(st.minHeight ?? 0) + (hs.top ?? 0) + (hs.bottom ?? 0);
+      expect(`${l} sous le doigt : ${cible}`).toBe(`${l} sous le doigt : 48`);
     }
     act(() => t.unmount());
   });

@@ -190,8 +190,9 @@ describe('le bandeau d’une note', () => {
       const b = bouton(tree, mot);
       expect({ [mot]: b !== undefined }).toEqual({ [mot]: true });
       const st = StyleSheet.flatten(b!.props.style) as { width?: number };
-      // Quarante-quatre points : la pastille ronde, pas le bouton-phrase.
-      expect({ [mot]: st.width }).toEqual({ [mot]: 44 });
+      // La pastille ronde, pas le bouton-phrase : quarante points dessinés,
+      // quarante-huit sous le doigt (le débord les rend).
+      expect({ [mot]: st.width }).toEqual({ [mot]: 40 });
     }
   });
 
@@ -1597,13 +1598,18 @@ describe('la rangée d’outils', () => {
     // La pile des commandes reste en bas : c'est le pouce qui commande.
     expect(typeof st.bottom).toBe('number');
     expect(st.top).toBeUndefined();
-    // Elle ne porte plus « Enregistrer » : il a son propre ancrage.
+    /*
+      Elle ne porte plus « Enregistrer » — il a son propre ancrage — NI
+      « Édition » depuis le relevé suivant : « le Note doit être au-dessus
+      de l'édition ». Le trop-plein de la rangée s'intercale entre les deux,
+      et il ne pouvait le faire tant qu'ils vivaient dans le même bloc.
+    */
     const mots = colonne!
       .findAllByType(Text)
       .map((t) => String(t.props.children))
       .filter((m) => ['Enregistrer', 'Annuler', 'Édition'].includes(m));
     expect(mots).not.toContain('Enregistrer');
-    expect(mots[mots.length - 1]).toBe('Édition');
+    expect(mots).not.toContain('Édition');
     /** La hauteur du bloc absolu qui porte cette pastille. */
     const hauteurDe = (label: string) => {
       const b = tree.root
@@ -1622,6 +1628,10 @@ describe('la rangée d’outils', () => {
       return null;
     };
     expect(hauteurDe('Enregistrer')).toBeGreaterThan(hauteurDe('Édition')!);
+    // L'ordre complet, du pied vers le haut : Édition, les commandes (avec
+    // le trop-plein de la rangée entre les deux), puis l'enregistrement.
+    expect(Number(st.bottom)).toBeGreaterThan(hauteurDe('Édition')!);
+    expect(hauteurDe('Enregistrer')!).toBeGreaterThanOrEqual(Number(st.bottom));
   });
 
   it('échange les calques contre les outils en édition', () => {

@@ -32,8 +32,9 @@ import Svg, { Line } from 'react-native-svg';
 import TestRenderer, { act } from 'react-test-renderer';
 import { ResultScreen } from '../src/screens/ResultScreen';
 import { RangeeOutils } from '../src/components/RangeeOutils';
+import { Toolbar2D } from '../src/screens/result/ResultToolbar';
 import { getStyles } from '../src/screens/result/styles';
-import { PILL_CELL_H } from '../src/components/ToolPill';
+import { PILL_CELL_H, PILL_GAP } from '../src/components/ToolPill';
 import { useScanStore } from '../src/store/scanStore';
 import { light } from '../src/theme';
 import {
@@ -349,6 +350,43 @@ describe('le bouton Enregistrer', () => {
     expect(edition).not.toBeNull();
     // Plus haut que les commandes, donc plus haut que tout le reste.
     expect(save!).toBeGreaterThan(edition!);
+  });
+
+  /*
+    LE TROP-PLEIN D'ÉDITION SE POSE JUSTE AU-DESSUS D'« ÉDITION ».
+
+    Relevé du patron : « descends le "Note" d'un bouton, et remonte celui du
+    retour en arrière ou refaire. Le Note doit être au-dessus de l'édition. »
+
+    La pile de trop-plein était posée au-dessus de TOUTE la colonne des
+    commandes — annuler, refaire, édition. En édition, ce trop-plein n'est
+    pas un calque de plus : c'est un OUTIL DE POSE, « Note » sur la capture,
+    et sa place est contre le bouton qui l'a fait apparaître. Le retour en
+    arrière, lui, monte : on le cherche moins souvent qu'on ne pose.
+
+    L'ordre de la colonne, du pied vers le haut : Édition, ce qui déborde de
+    la rangée, les commandes, puis l'enregistrement.
+  */
+  it('libère l’étage au-dessus d’« Édition » pour le trop-plein', () => {
+    const t = monter(true);
+    presser(t, 'Édition');
+    const ed = pastille(t, 'Édition')!;
+    /*
+      La fenêtre de ce banc est large : les cinq outils tiennent sur la
+      ligne, et « Note » n'a pas à monter. Ce qui se vérifie ici, c'est donc
+      la PLACE QU'ON LUI RÉSERVE — `dessus`, la hauteur que la rangée
+      franchit pour poser ce qui déborde. Une cellule et un écart : le
+      premier étage au-dessus d'« Édition », et rien de plus.
+    */
+    expect(t.root.findByType(Toolbar2D).props.dessus).toBe(
+      PILL_CELL_H + PILL_GAP,
+    );
+    // Les commandes ont quitté le pied : elles se posent sur ce même étage,
+    // et le trop-plein les repoussera d'autant quand il existera.
+    const bloc = t.root
+      .findAll((n) => n.props?.accessibilityLabel === 'Actions du plan')[0];
+    const st = StyleSheet.flatten(bloc.props.style) as { bottom?: number };
+    expect(Number(st.bottom) - ed).toBe(PILL_CELL_H + PILL_GAP);
   });
 
   /*
