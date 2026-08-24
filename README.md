@@ -7023,6 +7023,59 @@ départ replié, point haut, point bas, retour au centre, redéploiement. C'est
 cette image qu'on regarde avant de livrer, et son diff qui préviendra le
 jour où le geste s'aplatira.
 
+
+### Scanner un plan papier — la fondation
+
+Relevé du patron : **« faisons un Scanner un plan papier, qui permet de
+transformer un plan lu par notre app en un vrai plan 2D/3D, avec les
+éléments électriques s'il y en a, mesures respectées, cotes »** — et, dans
+la même phrase : **« tu testes ta propre fonction en simulant »**.
+
+Cette dernière exigence a décidé de toute l'architecture. Un lecteur de plan
+ne se prouve pas sur des nombres : le difficile n'est pas de calculer, c'est
+de LIRE. On a donc commencé par l'imprimerie, pas par la lecture — un
+simulateur qui fabrique des plans dont on connaît les cotes au millimètre,
+et qui les photographie ensuite comme un téléphone le ferait : de travers,
+en perspective, à l'ombre, avec du grain et un peu de flou.
+
+`src/papier/` contient donc, dans cet ordre de dépendance :
+
+- **`image.ts`** — l'image en niveaux de gris, l'image intégrale, les îlots
+  d'encre et leurs trous. Le seuil y est **local** (Bradley et Roth) et
+  c'est tout le sujet : un seuil global — « plus sombre que 128 » — marche
+  sur un scanner et échoue sur toute photo réelle, le coin à l'ombre passant
+  en entier pour de l'encre. Le banc mène les DEUX essais côte à côte et
+  exige que le seuil global échoue : sans cela, personne ne saurait dire
+  dans six mois pourquoi ce fichier calcule des moyennes locales.
+- **`trace.ts`** — les quatre primitives dont un plan est fait : segment,
+  arc, disque, polyligne, avec un demi-pixel d'adoucissement parce qu'un
+  trait parfaitement dur n'existe sur aucune photo.
+- **`gabarits.ts`** — le dictionnaire des symboles, décrits comme des
+  DESSINS et non comme des images. Une seule source de vérité, qui sert deux
+  fois : à imprimer les planches d'essai, et à calculer les invariants de
+  référence de la reconnaissance.
+- **`simulateur.ts`** — l'imprimerie et l'appareil photo.
+- **`planches.ts`** — les appartements de référence, en mètres.
+- **`entree.ts`** — ce que l'app recevra du natif : une image grise, et les
+  textes que le téléphone y aura lus. L'OCR reste natif (`VNRecognizeTextRequest`
+  sait lire un texte imprimé mieux que tout ce qu'on écrirait ici) ; tout ce
+  qui se DÉDUIT reste en JavaScript, parce que ce qui se déduit se teste.
+
+Deux détails qui ne se voient qu'à l'image, et qui ont été trouvés comme ça
+— en regardant le PGM, jamais dans un nombre :
+
+- **Le cercle entier est un cas à part.** Ramené dans un tour, « de 0 à 2π »
+  devient « de 0 à 0 » : le cercle du point lumineux se réduisait à un point
+  unique posé sur sa droite, et le symbole perdait sa forme la plus
+  reconnaissable.
+- **Le châssis d'une fenêtre se dessine écarté.** Deux traits fins à trois
+  pixels l'un de l'autre se fondent en une barre pleine, et la fenêtre ne se
+  distinguait plus d'un bout de mur.
+
+Les images de contrôle s'écrivent à la demande : `PLANCHE_PAPIER=<dossier>`
+devant le banc dépose des PGM qu'on regarde (`magick x.pgm x.png`). Elles ne
+sont pas versionnées — leur diff ne dirait rien, et elles pèsent.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro
