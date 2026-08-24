@@ -60,12 +60,28 @@ export function CeilingBar({
           const cm = (v: number | null) =>
             v === null ? '—' : String(Math.round(v * 100));
 
-          /** Déplace l'appareil pour obtenir CETTE distance à CE mur. */
+          /**
+           * Déplace l'appareil pour obtenir CETTE distance à CE mur.
+           *
+           * LE SIGNE : c'est lui qui faussait tout. `AXES[k]` pointe VERS le
+           * mur — c'est le sens de la visée qui mesure l'écart. Avancer d'un
+           * mètre dans ce sens RÉDUIT donc la cote d'un mètre : la correction
+           * se compte à l'envers de la mesure.
+           *
+           * Elle se comptait dans le même sens. Demander plus éloignait du
+           * mur opposé : on tapait 300 pour un appareil à 31, il partait de
+           * 2,69 m du mauvais côté, sortait de la pièce, et le contour le
+           * rabattait sur son bord — d'où deux cotes aberrantes, et
+           * l'impression que la saisie ne s'enregistrait pas, puisque la
+           * valeur relue n'était jamais celle qu'on avait tapée. Relevé du
+           * patron : « tout est faussé, et ça n'enregistre pas les mesures
+           * qu'on donne ».
+           */
           const poser = (k: keyof typeof AXES, valeurCm: string) => {
             const v = parseFloat(valeurCm.replace(',', '.'));
             const actuel = ecart(k);
             if (!isFinite(v) || v < 0 || actuel === null) return;
-            const d = v / 100 - actuel;
+            const d = actuel - v / 100;
             onMove({
               x: fixture.at.x + AXES[k].x * d,
               z: fixture.at.z + AXES[k].z * d,

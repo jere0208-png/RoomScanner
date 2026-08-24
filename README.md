@@ -6207,6 +6207,32 @@ l'`onLayout` de la pile. **Sans pile, personne ne parlait**, et l'écran
 gardait la dernière hauteur connue — celle de la vue d'avant. La rangée
 annonce maintenant zéro quand elle n'a rien à empiler.
 
+### La cote saisie sur un appareil de plafond partait du mauvais côté
+
+**« Lors d'un placement d'un élément de plafond par les mesures de ce bloc,
+tout est faussé, et ça n'enregistre pas les mesures qu'on donne. »** Capture
+à l'appui : un point lumineux DCL annoncé à 31 cm d'un côté et 619 de
+l'autre.
+
+Un signe. Le bandeau mesure les deux distances aux murs en VISANT le mur —
+l'axe pointe vers lui, et la longueur de la visée est la cote. Avancer d'un
+mètre dans ce sens réduit donc la cote d'un mètre : **la correction se compte
+à l'envers de la mesure**. Elle se comptait dans le même sens.
+
+Le résultat n'est pas un petit écart, c'est un miroir : on obtenait
+`2 × actuel − demandé`. Demander 50 sur un appareil à 243 le posait à 436.
+Et pour les grands écarts, l'appareil sortait carrément de sa pièce — le
+contour le rabattait alors sur son bord, ce qui donne les deux cotes
+aberrantes de la capture et l'impression que rien ne s'enregistrait : la
+valeur relue n'était jamais celle qu'on avait tapée.
+
+Le banc pilote le vrai bandeau — on ouvre le champ, on valide une valeur — et
+**relit la cote avec la fonction qui dessine celles du plan** : c'est le seul
+aller-retour qui prouve quelque chose ici. Il couvre les deux murs, le sens
+(demander plus éloigne, demander moins rapproche) et le cas neutre : retaper
+la valeur affichée ne doit pas bouger l'appareil d'un pouce — le seul que le
+code fautif passait, puisque `2 × actuel − actuel = actuel`.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

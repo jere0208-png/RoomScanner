@@ -14,13 +14,18 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 import React from 'react';
-import { View } from 'react-native';
+import { TouchableOpacity, View } from 'react-native';
 import { Text as SvgText } from 'react-native-svg';
 import TestRenderer, { act } from 'react-test-renderer';
 import { FloorplanEditor } from '../src/components/FloorplanEditor';
+import { CeilingBar } from '../src/components/CeilingBar';
+import { getStyles } from '../src/screens/result/styles';
+import { light } from '../src/theme';
 import { useScanStore } from '../src/store/scanStore';
 import { ceilingChain } from '../src/geometry/ceiling';
 import { buildScanPdf } from '../src/export/pdf';
+import { castToWall } from '../src/geometry/floorplan';
+import type { PromptData } from '../src/components/Sheet';
 import type { CeilingFixture } from '../src/geometry/ceiling';
 import type { WallSeg } from '../src/geometry/floorplan';
 
@@ -235,5 +240,96 @@ describe('la chaîne dans le dossier', () => {
     );
     // Cent cinquante centimètres entre deux spots : la chaîne le dit.
     expect(src.includes('(150)')).toBe(true);
+  });
+});
+
+/**
+ * LA COTE QU'ON SAISIT DANS LE BANDEAU DOIT ÊTRE CELLE QU'ON OBTIENT.
+ *
+ * Relevé du patron, capture à l'appui : « lors d'un placement d'un élément
+ * de plafond par les mesures de ce bloc, tout est faussé, et ça n'enregistre
+ * pas les mesures qu'on donne. »
+ *
+ * Le bandeau lit les deux distances aux murs — celles que le plan dessine en
+ * pointillés — et les rend modifiables : on tape 50, l'appareil se pose à
+ * 50 cm du mur. C'est le geste du chantier : on ne fait pas glisser un point
+ * lumineux au doigt, on le côte.
+ */
+describe('la cote saisie dans le bandeau du plafond', () => {
+  /** Pose le bandeau, ouvre un champ, valide une valeur, rend le point. */
+  const saisir = (champ: string, valeurCm: string, depart = { x: 2.5, z: 2 }) => {
+    let pose: { x: number; z: number } | null = null;
+    let feuille: PromptData | null = null;
+    let t!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      t = TestRenderer.create(
+        <CeilingBar
+          fixture={{ id: 'c1', kind: 'dcl', roomId: 'r1', at: depart }}
+          walls={PIECE}
+          trame={0}
+          styles={getStyles(light) as unknown as Record<string, object>}
+          palette={light}
+          onMove={(at) => {
+            pose = at;
+          }}
+          onPrompt={(p2) => {
+            feuille = p2;
+          }}
+          onRemove={() => {}}
+          onDone={() => {}}
+        />,
+      );
+    });
+    const b = t.root
+      .findAllByType(TouchableOpacity)
+      .find((n) => n.props.accessibilityLabel === champ)!;
+    act(() => b.props.onPress());
+    act(() => (feuille as unknown as PromptData).onSubmit?.(valeurCm));
+    act(() => t.unmount());
+    return pose as { x: number; z: number } | null;
+  };
+
+  /** Ce que le bandeau AFFICHERAIT ensuite : la même mesure, relue. */
+  const relire = (at: { x: number; z: number }, dir: { x: number; z: number }) =>
+    Math.round((castToWall(at, dir, PIECE) ?? 0) * 100);
+
+  it('pose l’appareil à la distance demandée du mur de gauche', () => {
+    const at = saisir('Distance au mur de gauche', '50')!;
+    expect(at).not.toBeNull();
+    expect(relire(at, { x: -1, z: 0 })).toBe(50);
+  });
+
+  it('et à celle demandée du mur du haut', () => {
+    const at = saisir('Distance au mur du haut', '80')!;
+    expect(relire(at, { x: 0, z: -1 })).toBe(80);
+  });
+
+  /*
+    LE SIGNE : c'est lui qui faussait tout.
+
+    L'écart se comptait DANS le sens de la visée — l'appareil vers le mur —
+    et la correction s'appliquait dans ce même sens. Approcher du mur de
+    gauche éloignait donc du mur de gauche : on demandait 300 pour un
+    appareil à 31, il partait de 2,69 m DU MAUVAIS CÔTÉ, sortait de la
+    pièce, et le contour le rabattait sur son bord. D'où les deux cotes
+    aberrantes de la capture, et l'impression que rien ne s'enregistrait :
+    à la relecture, la valeur affichée n'était jamais celle qu'on avait
+    tapée.
+  */
+  it('s’éloigne quand on demande plus, s’approche quand on demande moins', () => {
+    const loin = saisir('Distance au mur de gauche', '300')!;
+    expect(loin.x).toBeGreaterThan(2.5);
+    const pres = saisir('Distance au mur de gauche', '20')!;
+    expect(pres.x).toBeLessThan(2.5);
+    // Et la valeur relue est bien celle qu'on a tapée, des deux côtés.
+    expect(relire(loin, { x: -1, z: 0 })).toBe(300);
+    expect(relire(pres, { x: -1, z: 0 })).toBe(20);
+  });
+
+  it('ne bouge pas d’un pouce quand on retape la valeur affichée', () => {
+    // 2,5 m du nu du mur de gauche : la moitié de l'épaisseur en moins.
+    const actuel = Math.round((castToWall({ x: 2.5, z: 2 }, { x: -1, z: 0 }, PIECE) ?? 0) * 100);
+    const at = saisir('Distance au mur de gauche', String(actuel))!;
+    expect(at.x).toBeCloseTo(2.5, 6);
   });
 });
