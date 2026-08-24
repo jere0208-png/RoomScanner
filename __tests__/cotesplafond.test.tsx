@@ -326,6 +326,80 @@ describe('la cote saisie dans le bandeau du plafond', () => {
     expect(relire(pres, { x: -1, z: 0 })).toBe(20);
   });
 
+  /*
+    « CENTRER » — relevé du patron : « pour les points de plafond ajoute un
+    bouton Centrer qui se centrera dans la pièce où il se trouve
+    automatiquement ».
+
+    C'est le placement de neuf points lumineux sur dix : un DCL se pose au
+    milieu de la pièce, et on ne le discute pas. Il fallait pourtant y
+    arriver au doigt, ou par deux cotes calculées de tête — alors que
+    l'application sait exactement où est ce milieu : c'est le point où elle
+    écrit déjà le nom de la pièce.
+
+    Le PÔLE INTÉRIEUR, pas le barycentre : dans une pièce en L, le
+    barycentre tombe dans le vide, hors du contour. Le pôle, lui, est
+    intérieur par construction — c'est le point le plus éloigné des murs,
+    celui où l'on se tiendrait pour regarder la pièce.
+  */
+  it('centre l’appareil dans sa pièce, d’un seul bouton', () => {
+    let pose: { x: number; z: number } | null = null;
+    let t!: TestRenderer.ReactTestRenderer;
+    const centre = { x: 3, z: 2 };
+    act(() => {
+      t = TestRenderer.create(
+        <CeilingBar
+          fixture={{ id: 'c1', kind: 'dcl', roomId: 'r1', at: { x: 0.6, z: 0.7 } }}
+          walls={PIECE}
+          trame={0}
+          centre={centre}
+          styles={getStyles(light) as unknown as Record<string, object>}
+          palette={light}
+          onMove={(at) => {
+            pose = at;
+          }}
+          onPrompt={() => {}}
+          onRemove={() => {}}
+          onDone={() => {}}
+        />,
+      );
+    });
+    const b = t.root
+      .findAllByType(TouchableOpacity)
+      .find((n) => n.props.accessibilityLabel === 'Centrer dans la pièce');
+    expect(b).toBeDefined();
+    act(() => b!.props.onPress());
+    expect(pose).toEqual(centre);
+    act(() => t.unmount());
+  });
+
+  it('et se tait quand la pièce n’a pas de contour', () => {
+    // Sans contour, pas de milieu : un bouton qui ne ferait rien est pire
+    // qu'un bouton absent.
+    let t!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      t = TestRenderer.create(
+        <CeilingBar
+          fixture={{ id: 'c1', kind: 'dcl', roomId: 'r1', at: { x: 2.5, z: 2 } }}
+          walls={PIECE}
+          trame={0}
+          styles={getStyles(light) as unknown as Record<string, object>}
+          palette={light}
+          onMove={() => {}}
+          onPrompt={() => {}}
+          onRemove={() => {}}
+          onDone={() => {}}
+        />,
+      );
+    });
+    expect(
+      t.root
+        .findAllByType(TouchableOpacity)
+        .find((n) => n.props.accessibilityLabel === 'Centrer dans la pièce'),
+    ).toBeUndefined();
+    act(() => t.unmount());
+  });
+
   it('ne bouge pas d’un pouce quand on retape la valeur affichée', () => {
     // 2,5 m du nu du mur de gauche : la moitié de l'épaisseur en moins.
     const actuel = Math.round((castToWall({ x: 2.5, z: 2 }, { x: -1, z: 0 }, PIECE) ?? 0) * 100);

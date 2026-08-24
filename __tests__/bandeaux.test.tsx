@@ -153,6 +153,58 @@ const bouton = (tree: TestRenderer.ReactTestRenderer, label: string) =>
     .findAllByType(TouchableOpacity)
     .find((n) => n.props.accessibilityLabel === label);
 
+/*
+  LE BANDEAU D'UNE NOTE — relevé du patron, capture à l'appui : « le bloc qui
+  s'affiche pour le clic sur une note est trop imposant et mal fait (bouton
+  supprimer surélevé, etc.) ».
+
+  Deux pastilles PLEINES portant leur mot à l'intérieur — « Corriger »,
+  « Déplacer » — et une troisième réduite à une icône avec son mot DESSOUS :
+  deux hauteurs dans la même rangée, centrées l'une sur l'autre. La ronde
+  remontait au-dessus de ses voisines et son mot pendait sous elles. Le
+  bandeau prenait au passage la largeur de deux boutons-phrases, et passait
+  sous la colonne de droite.
+
+  Les trois gestes prennent donc la forme de ceux du plafond : une pastille
+  ronde, le mot dessous. Même hauteur, même axe, trois fois moins large.
+*/
+describe('le bandeau d’une note', () => {
+  const surLaNote = () => {
+    const tree = monter();
+    act(() =>
+      useScanStore.setState({
+        notes: [{ id: 'n1', text: 'Colonne montante', at: { x: 1, z: 1 } }],
+      }),
+    );
+    const pastille = tree.root.findAll(
+      (n) => n.props?.accessibilityLabel === 'Note : Colonne montante',
+    )[0];
+    expect(pastille).toBeDefined();
+    act(() => pastille.props.onPress());
+    return tree;
+  };
+
+  it('range ses trois gestes en pastilles de la taille d’un doigt', () => {
+    const tree = surLaNote();
+    for (const mot of ['Corriger', 'Déplacer', 'Retirer']) {
+      const b = bouton(tree, mot);
+      expect({ [mot]: b !== undefined }).toEqual({ [mot]: true });
+      const st = StyleSheet.flatten(b!.props.style) as { width?: number };
+      // Quarante-quatre points : la pastille ronde, pas le bouton-phrase.
+      expect({ [mot]: st.width }).toEqual({ [mot]: 44 });
+    }
+  });
+
+  it('dit dans sa partie haute qu’il attend un appui sur le plan', () => {
+    const tree = surLaNote();
+    act(() => bouton(tree, 'Déplacer')!.props.onPress());
+    // Le mot sous la pastille reste « Déplacer » — il ne peut pas porter
+    // une phrase. C'est la ligne du haut qui dit ce qu'on attend.
+    expect(textes(tree)).toContain('Touchez le plan pour la reposer.');
+    expect(bouton(tree, 'Déplacer')).toBeDefined();
+  });
+});
+
 describe('l’écran des résultats', () => {
   it('s’ouvre sur le plan, sans aucun bandeau de réglage', () => {
     const vu = textes(monter());
@@ -1370,10 +1422,12 @@ describe('les feuilles de l’écran des résultats', () => {
     act(() => {
       jest.advanceTimersByTime(500);
     });
-    // Le bouton s'appelle « Meubles » depuis le relevé du patron : le mot
-    // dit le SUJET, comme ses voisins de la rangée, et c'est le mode qui
-    // dit ce qu'on en fait. La feuille, elle, garde son titre d'action.
-    act(() => bouton(tree, 'Meubles')!.props.onPress());
+    // Le bouton dit le SUJET, et c'est le mode qui dit ce qu'on en fait.
+    // Il s'est appelé « Meubles » le temps d'une version : en édition on
+    // n'en pose qu'UN, comme « Appareil » ou « Plafond » à côté de lui —
+    // le pluriel est resté au CALQUE, qui les montre tous. La feuille, elle,
+    // garde son titre d'action.
+    act(() => bouton(tree, 'Meuble')!.props.onPress());
     expect(textes(tree)).toContain('Ajouter un meuble');
     const champ = tree.root
       .findAllByType(TextInput)
@@ -1580,13 +1634,35 @@ describe('la rangée d’outils', () => {
     });
     expect(bouton(tree, 'Appareil')).toBeDefined();
     expect(bouton(tree, 'Redresser')).toBeDefined();
-    // « Meubles » en édition ouvre le catalogue ; hors édition, c'est le
-    // calque. Même sujet, deux gestes selon le mode — et c'est le peigne
-    // « Afficher » qui dit lequel (voir `afficher.test.tsx`).
-    expect(bouton(tree, 'Meubles')).toBeDefined();
+    // « Meuble » en édition ouvre le catalogue ; « Meubles » hors édition,
+    // c'est le calque. Même sujet, deux gestes selon le mode — et c'est le
+    // peigne « Afficher » qui dit lequel (voir `afficher.test.tsx`).
+    expect(bouton(tree, 'Meuble')).toBeDefined();
     // Les calques ont cédé la place : ils reviendront en sortant d'édition.
     expect(bouton(tree, 'Cotes')).toBeUndefined();
     expect(bouton(tree, 'Surfaces')).toBeUndefined();
+  });
+
+  /*
+    « REDRESSER » OUVRE LA RANGÉE — relevé du patron : « mets le bouton
+    Redresser tout à gauche des autres boutons ».
+
+    Il ne pose rien : il remet TOUT le plan d'équerre d'un coup. C'est le
+    geste qu'on fait en premier en entrant en édition — on redresse le
+    relevé, puis on place dessus.
+  */
+  it('ouvre la rangée d’édition par « Redresser »', () => {
+    const tree = monter();
+    act(() => bouton(tree, 'Édition')!.props.onPress());
+    act(() => {
+      jest.advanceTimersByTime(500);
+    });
+    const OUTILS = ['Redresser', 'Appareil', 'Meuble', 'Plafond', 'Note'];
+    const ordre = tree.root
+      .findAllByType(TouchableOpacity)
+      .map((n) => String(n.props.accessibilityLabel ?? ''))
+      .filter((l) => OUTILS.includes(l));
+    expect(ordre[0]).toBe('Redresser');
   });
 
   /**

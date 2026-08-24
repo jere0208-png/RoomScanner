@@ -6233,6 +6233,85 @@ aller-retour qui prouve quelque chose ici. Il couvre les deux murs, le sens
 la valeur affichée ne doit pas bouger l'appareil d'un pouce — le seul que le
 code fautif passait, puisque `2 × actuel − actuel = actuel`.
 
+### La feuille des sorties, deux par ligne
+
+**« Refais ce pop-up pour le réduire en faisant des blocs de 2 par ligne. »**
+Sept sorties en pleine largeur, chacune avec sa vignette et deux lignes de
+texte : la feuille faisait plus haut que l'écran. L'image et la présentation
+ne se trouvaient qu'en défilant — et **une sortie qu'on ne voit pas n'existe
+pas**, quelle que soit la qualité du code qui la produit.
+
+La grille passe à la ligne toute seule : aucun découpage en rangs écrit à la
+main, qui se déréglerait à la sortie suivante. Les tuiles d'un même rang
+partagent leur hauteur — c'est le propre d'une ligne de flexbox — donc un
+détail de deux lignes ne décale pas sa voisine.
+
+**Le détail de chaque sortie s'est resserré à une ligne**, et ce n'est pas un
+raccourci : à mi-largeur, la phrase entière rendait la tuile plus haute que la
+rangée qu'elle remplaçait, et l'on n'aurait rien gagné. Ce qui reste est le
+« pour qui, pour quoi » — « pour Blender », « pour chiffrer dans Excel »,
+« à envoyer à l'architecte ».
+
+**La présentation animée garde sa pleine largeur.** Les six premières sont
+des FICHIERS : on les obtient, on les envoie. La dernière ne produit rien —
+c'est un spectacle qu'on lance devant quelqu'un, sur place. Deux natures,
+deux formes ; et sept tuiles dans une grille de deux laisseraient de toute
+façon un trou.
+
+### « Redresser » ouvre la rangée, et le meuble passe au singulier
+
+**« Mets le bouton Redresser tout à gauche des autres boutons. »** Il était
+deuxième, entre deux poses. Or il ne pose rien : il remet TOUT le plan
+d'équerre d'un coup, et c'est le geste qu'on fait en premier en entrant en
+édition — on redresse le relevé, puis on place dessus.
+
+**« Remplace Meubles par Meuble au singulier. »** En édition, le bouton ouvre
+le catalogue pour poser UNE pièce, exactement comme « Appareil », « Plafond »
+et « Note » à côté de lui — tous au singulier. Le pluriel reste au CALQUE,
+hors édition, qui montre ou cache tout le mobilier d'un coup. Même mot, deux
+nombres, et c'est le mode qui tranche.
+
+### Le bandeau d'une note, et ce qui le lâche
+
+**« Le bloc qui s'affiche pour le clic sur une note est trop imposant et mal
+fait (bouton supprimer surélevé). »** Deux pastilles PLEINES portant leur mot
+à l'intérieur — « Corriger », « Déplacer » — et une troisième réduite à une
+icône avec son mot DESSOUS. Une pastille à mot intérieur fait 44 de haut ;
+une pastille nue avec son mot dessous en fait 60. **Centrées**, les deux ne
+partagent plus leur axe : la ronde remontait de huit points au-dessus de ses
+voisines, et son mot pendait sous elles. Le bandeau prenait au passage la
+largeur de deux boutons-phrases, et passait sous la colonne de droite.
+
+Les trois gestes prennent donc la forme de ceux du plafond : une pastille
+ronde, le mot dessous. Et la rangée d'actions de TOUS les bandeaux s'aligne
+maintenant **par le haut** — c'est la règle que la note a révélée, elle vaut
+partout où deux formes de boutons se côtoient.
+
+Le mot sous une pastille ne peut pas dire une phrase : « Touchez le plan » se
+coupe à quarante-quatre points. L'instruction est donc passée dans la ligne
+du haut, là où il y a la place et là où l'œil va déjà lire la note.
+
+**« Une note doit quitter son bloc d'édition si on clique ailleurs. »** Elle
+était la dernière à ne pas suivre la règle du plan — appuyer à côté, c'est
+lâcher. Pire : le fond transparent qui intercepte cet appui ne se montait
+même pas pour elle, si bien qu'hors édition, avec une note en main, il n'y
+avait rien à toucher pour la lâcher.
+
+### « Centrer » un point de plafond
+
+**« Pour les points de plafond ajoute un bouton Centrer qui se centrera dans
+la pièce où il se trouve automatiquement. »** C'est le placement de neuf
+points lumineux sur dix : un DCL se pose au milieu de la pièce, et on ne le
+discute pas. Il fallait pourtant y arriver au doigt, ou par deux cotes
+calculées de tête — alors que l'application sait exactement où est ce milieu :
+c'est le point où elle écrit déjà le nom de la pièce.
+
+**Le pôle intérieur, pas le barycentre.** Dans une pièce en L, le barycentre
+tombe dans le vide, hors du contour ; le pôle est intérieur par construction —
+c'est le point le plus éloigné des murs. Le bouton disparaît quand la pièce
+n'a pas de contour fermé : un bouton qui ne ferait rien est pire qu'un bouton
+absent.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

@@ -479,7 +479,7 @@ interface Props {
    */
   notes?: PlanNote[];
   selectedNoteId?: string | null;
-  onSelectNote?: (id: string) => void;
+  onSelectNote?: (id: string | null) => void;
   /** La ligne de spots tenue en main : elle se surligne d'un bout à l'autre. */
   selectedCeilingRow?: string | null;
   /**
@@ -1441,7 +1441,10 @@ export function FloorplanEditor({
               gestes contraires pour la même intention — c'est le genre
               d'incohérence qu'on n'explique pas à un compagnon.
             */}
-            {(editable || selectedObjectId || selectedCeilingId) && (
+            {(editable ||
+              selectedObjectId ||
+              selectedCeilingId ||
+              selectedNoteId) && (
               <Rect
                 x={0}
                 y={0}
@@ -1455,6 +1458,12 @@ export function FloorplanEditor({
                   onSelectOpening?.(null);
                   onSelectObject?.(null);
                   onSelectCeiling?.(null);
+                  /* La note aussi — relevé du patron : « une note doit
+                     quitter son bloc d'édition si on clique ailleurs ».
+                     Elle était la dernière à ne pas suivre la règle, et le
+                     fond ne se montait même pas pour elle : hors édition,
+                     avec une note en main, il n'y avait rien à toucher. */
+                  onSelectNote?.(null);
                 }}
               />
             )}

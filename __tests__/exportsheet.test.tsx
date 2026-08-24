@@ -14,7 +14,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 import React from 'react';
-import { Text, TouchableOpacity } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import { ExportSheet } from '../src/screens/result/ExportSheet';
 
@@ -54,14 +54,70 @@ describe('les sorties offertes', () => {
     act(() => t.unmount());
   });
 
-  it('chaque tuile appelle la sienne, et pas celle d a cote', () => {
-    const t = monter();
-    const tuiles = t.root
+  /*
+    DEUX PAR LIGNE — releve du patron : « refais ce pop-up pour le reduire
+    en faisant des blocs de 2 par ligne ».
+
+    Sept sorties en pleine largeur, chacune avec sa vignette et deux lignes
+    de texte : la feuille faisait plus haut que l ecran, et les dernieres
+    sorties — l image, la presentation — se trouvaient en defilant. Une
+    sortie qu on ne voit pas n existe pas.
+  */
+  const tuiles = (t: TestRenderer.ReactTestRenderer) =>
+    t.root
       .findAllByType(TouchableOpacity)
       .filter((n) => typeof n.props.onPress === 'function');
-    // Six sorties : PDF, 3D, materiel, CSV, DXF, image, presentation.
-    expect(tuiles.length).toBeGreaterThanOrEqual(7);
-    for (const tuile of tuiles) act(() => tuile.props.onPress());
+
+  const plat = (st: unknown) =>
+    (StyleSheet.flatten(st as never) ?? {}) as {
+      width?: number | string;
+      flexWrap?: string;
+    };
+
+  it('range les sorties deux par ligne', () => {
+    const t = monter();
+    const liste = tuiles(t);
+    // La grille passe a la ligne toute seule : c est elle qui met deux
+    // tuiles par rang, pas un decoupage ecrit a la main.
+    let n: TestRenderer.ReactTestInstance | null = liste[0].parent;
+    let grille: TestRenderer.ReactTestInstance | null = null;
+    while (n) {
+      if (plat(n.props?.style).flexWrap === 'wrap') {
+        grille = n;
+        break;
+      }
+      n = n.parent;
+    }
+    expect(grille).not.toBeNull();
+    // Une demi-largeur chacune : deux tiennent cote a cote.
+    const largeurs = liste.map((x) => plat(x.props.style).width);
+    for (const l of largeurs.slice(0, 6)) {
+      expect(typeof l === 'string' && parseFloat(l) <= 50).toBe(true);
+    }
+    act(() => t.unmount());
+  });
+
+  /*
+    LA PRESENTATION GARDE SA PLEINE LARGEUR.
+
+    Les six premieres sont des FICHIERS : on les obtient, on les envoie.
+    La derniere ne produit rien — c est un spectacle qu on lance devant
+    quelqu un, sur place. Deux natures, deux formes ; et sept tuiles dans
+    une grille de deux laisseraient de toute facon un trou.
+  */
+  it('sauf la presentation, qui n est pas un fichier', () => {
+    const t = monter();
+    const l = plat(tuiles(t)[6].props.style).width;
+    expect(l).toBe('100%');
+    act(() => t.unmount());
+  });
+
+  it('chaque tuile appelle la sienne, et pas celle d a cote', () => {
+    const t = monter();
+    const liste = tuiles(t);
+    // Sept sorties : PDF, 3D, materiel, CSV, DXF, image, presentation.
+    expect(liste.length).toBeGreaterThanOrEqual(7);
+    for (const tuile of liste) act(() => tuile.props.onPress());
     // Chacune une fois, aucune deux fois : un doublon signalerait deux
     // entrees branchees sur la meme action.
     for (const nom of ['pdf', 'obj', 'materiel', 'csv', 'dxf', 'image']) {

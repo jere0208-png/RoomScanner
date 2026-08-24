@@ -211,19 +211,29 @@ export function Toolbar2D({
 
   const outils = edition
     ? [
-        <ToolPill
-          key="plus"
-          icon="appareil"
-          label="Appareil"
-          active={!!pendingKind}
-          onPress={onFixture}
-        />,
+        /*
+          « REDRESSER » OUVRE LA RANGÉE — relevé du patron : « mets le bouton
+          Redresser tout à gauche des autres boutons ».
+
+          Il était deuxième, entre deux poses. Or il ne pose rien : il agit
+          sur TOUT le plan d'un coup, et c'est le geste qu'on fait EN
+          PREMIER en entrant en édition — on remet le relevé d'équerre, puis
+          on place. Les quatre autres ajoutent un objet ; celui-ci corrige
+          le fond sur lequel on va les poser.
+        */
         <ToolPill
           key="square"
           icon="square"
           label="Redresser"
           active={false}
           onPress={straightenPlan}
+        />,
+        <ToolPill
+          key="plus"
+          icon="appareil"
+          label="Appareil"
+          active={!!pendingKind}
+          onPress={onFixture}
         />,
         // En édition, la pastille des meubles OUVRE LE CATALOGUE.
         //
@@ -236,10 +246,17 @@ export function Toolbar2D({
         <ToolPill
           key="furniture"
           icon="furniture"
-          // « Meubles » et non « Ajouter » — relevé du patron. Le mot dit
-          // le SUJET, comme ses voisins de la rangée ; ce qu'on en fait
-          // dépend du mode, et c'est le mode qui le dit.
-          label="Meubles"
+          /*
+            « MEUBLE », AU SINGULIER — relevé du patron.
+
+            Le mot dit le SUJET, comme ses voisins de la rangée ; ce qu'on
+            en fait dépend du mode. Et en édition, on n'en pose qu'UN : le
+            bouton ouvre le catalogue pour choisir une pièce, exactement
+            comme « Appareil », « Plafond » et « Note » à côté de lui — tous
+            au singulier. Le pluriel appartient au CALQUE, hors édition, qui
+            montre ou cache tout le mobilier d'un coup.
+          */
+          label="Meuble"
           active={false}
           onPress={onFurniture}
         />,

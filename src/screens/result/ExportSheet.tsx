@@ -41,20 +41,19 @@ export function ExportSheet({
     [
       'pdf',
       'Plan PDF',
-      'Plan coté, métré par pièce, vues 3D. À imprimer ou à envoyer.',
+      'Coté, métré, vues 3D.',
       onPdf,
     ],
     [
       'obj',
       'Modèle 3D',
-      'Fichier OBJ du plan retouché, pour Blender ou SketchUp.',
+      'Fichier OBJ, pour Blender.',
       onObj,
     ],
     [
       'materiel',
       'Liste du matériel',
-      'Appareillage par pièce, circuits et disjoncteurs, ' +
-        'conformité. Le document à remettre.',
+      'Appareillage, circuits, conformité.',
       onMaterial,
     ],
     /*
@@ -68,8 +67,7 @@ export function ExportSheet({
     [
       'csv',
       'Métré CSV',
-      'Surfaces, appareillage, circuits et câble, en colonnes. ' +
-        'À ouvrir dans Excel pour chiffrer.',
+      'En colonnes, pour chiffrer dans Excel.',
       onCsv,
     ],
     /*
@@ -84,14 +82,13 @@ export function ExportSheet({
     [
       'dxf',
       'Plan DXF',
-      'Le dessin en calques, pour AutoCAD, ArchiCAD ou SketchUp. ' +
-        'À envoyer à un architecte.',
+      'En calques, pour AutoCAD. À envoyer à l’architecte.',
       onDxf,
     ],
     [
       'image',
       'Image',
-      'Capture de la vue affichée, avec le filigrane EchoPlan.',
+      'La vue affichée, filigranée.',
       onImage,
     ],
     /*
@@ -125,22 +122,62 @@ export function ExportSheet({
           <Text style={styles.modalSubtitle}>
             Un document à remettre, ou une présentation à montrer.
           </Text>
-          {sorties.map(([art, titre, detail, action]) => (
-            <TouchableOpacity
-              key={titre}
-              style={styles.exportChoice}
-              activeOpacity={0.8}
-              onPress={action}>
-              {/* La vignette dit CE QU'ON OBTIENT : une feuille cotée, un
-                  volume, un bordereau, une capture. On la reconnaît sans
-                  lire — quatre lignes de texte, non. */}
-              <ExportArt kind={art} c={teinte} />
-              <View style={styles.exportChoiceTexts}>
-                <Text style={styles.exportChoiceTitle}>{titre}</Text>
-                <Text style={styles.exportChoiceDetail}>{detail}</Text>
-              </View>
-            </TouchableOpacity>
-          ))}
+          {/*
+            DEUX PAR LIGNE — relevé du patron : « refais ce pop-up pour le
+            réduire en faisant des blocs de 2 par ligne ».
+
+            Sept sorties en pleine largeur faisaient une feuille plus haute
+            que l'écran : l'image et la présentation ne se trouvaient qu'en
+            défilant, et une sortie qu'on ne voit pas n'existe pas. Le
+            détail de chacune s'est resserré à une ligne au passage — à
+            mi-largeur, la phrase entière rendait la tuile plus haute que
+            la rangée qu'elle remplaçait, et l'on n'aurait rien gagné.
+          */}
+          <View style={styles.exportGrille}>
+            {sorties.map(([art, titre, detail, action]) =>
+              /*
+                LA PRÉSENTATION GARDE SA PLEINE LARGEUR.
+
+                Les six premières sont des FICHIERS : on les obtient, on les
+                envoie. La dernière ne produit rien — c'est un spectacle
+                qu'on lance devant quelqu'un, sur place. Deux natures, deux
+                formes ; et sept tuiles dans une grille de deux laisseraient
+                de toute façon un trou.
+              */
+              art === 'presentation' ? (
+                <TouchableOpacity
+                  key={titre}
+                  style={[styles.exportChoice, styles.exportChoiceLarge]}
+                  activeOpacity={0.8}
+                  accessibilityLabel={titre}
+                  onPress={action}>
+                  <ExportArt kind={art} c={teinte} />
+                  <View style={styles.exportChoiceTexts}>
+                    <Text style={styles.exportChoiceTitle}>{titre}</Text>
+                    <Text style={styles.exportChoiceDetail}>{detail}</Text>
+                  </View>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  key={titre}
+                  style={styles.exportTuile}
+                  activeOpacity={0.8}
+                  /* La tuile se lit d'un nom : le commentaire qui la précède
+                     éloignait son titre du lecteur d'écran. */
+                  accessibilityLabel={titre}
+                  onPress={action}>
+                  {/* La vignette dit CE QU'ON OBTIENT : une feuille cotée,
+                      un volume, un bordereau, une capture. On la reconnaît
+                      sans lire — quatre lignes de texte, non. */}
+                  <View style={styles.exportTuileArt}>
+                    <ExportArt kind={art} c={teinte} />
+                  </View>
+                  <Text style={styles.exportChoiceTitle}>{titre}</Text>
+                  <Text style={styles.exportChoiceDetail}>{detail}</Text>
+                </TouchableOpacity>
+              ),
+            )}
+          </View>
         </Pressable>
       </Pressable>
     </Modal>

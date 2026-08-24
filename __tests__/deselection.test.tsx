@@ -48,15 +48,28 @@ const PLAFOND: CeilingFixture[] = [
   { id: 'pl1', kind: 'dcl', roomId: 'r1', at: { x: 2.5, z: 2 } },
 ];
 
+const NOTES = [{ id: 'n1', text: 'Colonne montante', at: { x: 2, z: 2 } }];
+
 interface Appels {
   mur: (string | null)[];
   meuble: (string | null)[];
   plafond: (string | null)[];
   piece: (string | null)[];
+  note: (string | null)[];
 }
 
-function rendu(opts: { editable: boolean; plafondSel: string | null }) {
-  const appels: Appels = { mur: [], meuble: [], plafond: [], piece: [] };
+function rendu(opts: {
+  editable: boolean;
+  plafondSel: string | null;
+  noteSel?: string | null;
+}) {
+  const appels: Appels = {
+    mur: [],
+    meuble: [],
+    plafond: [],
+    piece: [],
+    note: [],
+  };
   let tree!: TestRenderer.ReactTestRenderer;
   act(() => {
     useScanStore.setState({
@@ -80,6 +93,9 @@ function rendu(opts: { editable: boolean; plafondSel: string | null }) {
         showCeiling
         selectedCeilingId={opts.plafondSel}
         onSelectCeiling={(id) => appels.plafond.push(id)}
+        notes={NOTES}
+        selectedNoteId={opts.noteSel ?? null}
+        onSelectNote={(id) => appels.note.push(id)}
       />,
     );
   });
@@ -107,6 +123,28 @@ const fond = (tree: TestRenderer.ReactTestRenderer) =>
     );
 
 describe('l’appui dans le vide', () => {
+  /*
+    LA NOTE AUSSI — relevé du patron : « une note doit quitter son bloc
+    d'édition si on clique ailleurs ».
+
+    Elle était la dernière à ne pas suivre la règle : son bandeau restait
+    accroché en bas de l'écran jusqu'à ce qu'on la retouche elle-même. Pire,
+    le fond du plan ne se montait même pas pour elle — hors édition, avec
+    une seule note tenue en main, il n'y avait rien à toucher pour la
+    lâcher.
+  */
+  it('relâche la note tenue en main', () => {
+    const { tree, appels } = rendu({
+      editable: false,
+      plafondSel: null,
+      noteSel: 'n1',
+    });
+    const zone = fond(tree);
+    expect(zone).toBeDefined();
+    act(() => zone!.props.onPress());
+    expect(appels.note).toEqual([null]);
+  });
+
   it('relâche l’appareil de plafond en réglage', () => {
     const { tree, appels } = rendu({ editable: false, plafondSel: 'pl1' });
     const zone = fond(tree);

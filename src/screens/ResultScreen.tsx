@@ -3308,6 +3308,10 @@ export function ResultScreen() {
               fixture={cl}
               walls={part?.walls ?? walls}
               trame={trame}
+              /* Le point où le plan écrit le nom de la pièce : le pôle
+                 intérieur de son contour. Le bouton « Centrer » y pose
+                 l'appareil — même milieu pour le mot et pour la lampe. */
+              centre={part?.labelAt ?? null}
               styles={stylesBarres}
               palette={teinte}
               onMove={(at) => moveCeiling(cl.id, at)}
@@ -3345,11 +3349,34 @@ export function ResultScreen() {
             <StripBar
               styles={stylesBarres}
               strong="Note"
-              note={note.text}
+              /*
+                LA LIGNE DU HAUT PORTE L'INSTRUCTION.
+
+                Le mot sous une pastille ne peut pas dire une phrase : à
+                quarante-quatre points, « Touchez le plan » se coupe. C'est
+                donc ici que le bandeau dit ce qu'il attend — là où il y a
+                la place, et là où l'œil va déjà lire la note.
+              */
+              note={
+                noteADeplacer === note.id
+                  ? 'Touchez le plan pour la reposer.'
+                  : note.text
+              }
+              /*
+                TROIS GESTES, TROIS PASTILLES RONDES — relevé du patron :
+                « le bloc qui s'affiche pour le clic sur une note est trop
+                imposant et mal fait (bouton supprimer surélevé) ».
+
+                Deux boutons-phrases et une icône nue : deux hauteurs dans
+                la même rangée, et un bandeau large de deux phrases qui
+                passait sous la colonne de droite. Les trois prennent la
+                forme de ceux du plafond — une pastille, le mot dessous.
+              */
               actions={[
                 {
                   label: 'Corriger',
                   icone: SOLAIRES.crayon,
+                  sansMot: true,
                   onPress: () =>
                     setPrompt({
                       title: 'Note sur le plan',
@@ -3369,8 +3396,9 @@ export function ResultScreen() {
                   // petite, et un doigt posé dessus sur un plan chargé
                   // attrape aussi bien le mur qui passe dessous. On
                   // redésigne le point, comme à la pose.
-                  label: noteADeplacer === note.id ? 'Touchez le plan' : 'Déplacer',
+                  label: 'Déplacer',
                   icone: SOLAIRES.points,
+                  sansMot: true,
                   ghost: noteADeplacer === note.id,
                   onPress: () => {
                     seulGeste('note');

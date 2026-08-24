@@ -173,6 +173,56 @@ const CAS: [string, () => React.ReactElement][] = [
   ],
 ];
 
+/*
+  LE BANDEAU DE LA NOTE — relevé du patron, capture à l'appui : « le bloc
+  qui s'affiche pour le clic sur une note est trop imposant et mal fait
+  (bouton supprimer surélevé, etc.) ».
+
+  Deux pastilles PLEINES portant leur mot à l'intérieur — « Corriger »,
+  « Déplacer » — et une troisième réduite à une icône avec son mot DESSOUS.
+  Deux hauteurs dans la même rangée, centrées l'une sur l'autre : la ronde
+  remontait de sept points au-dessus de ses voisines, et son mot pendait
+  sous elles. Le bandeau, lui, prenait la largeur de deux boutons-phrases
+  et passait sous la colonne de droite.
+
+  Les trois gestes prennent donc la même forme que ceux du plafond : une
+  pastille ronde, le mot dessous. Même hauteur, même axe, trois fois moins
+  large.
+*/
+describe('le bandeau d’une note', () => {
+  const note = (armee = false) =>
+    monter(
+      <StripBar
+        styles={styles}
+        strong="Note"
+        note={armee ? 'Touchez le plan pour la reposer.' : 'Colonne montante'}
+        actions={[
+          { label: 'Corriger', icone: SOLAIRES.crayon, sansMot: true, onPress: () => {} },
+          {
+            label: 'Déplacer',
+            icone: SOLAIRES.points,
+            sansMot: true,
+            ghost: armee,
+            onPress: () => {},
+          },
+          { label: 'Retirer', icone: SOLAIRES.retirer, sansMot: true, onPress: () => {} },
+        ]}
+      />,
+    );
+
+  /*
+    La FORME du bandeau de la note se vérifie sur le vrai écran
+    (`bandeaux.test.tsx`) : ici, on garde la règle qui vaut pour TOUS les
+    bandeaux, celle que la note a révélée.
+  */
+  it('n’empile pas des hauteurs différentes dans la même rangée', () => {
+    const r = rangee(note())!;
+    // Centrées, une pastille nue et une pastille à mot ne partagent pas
+    // leur axe : c'est ce qui « surélevait » la corbeille.
+    expect(r.st.alignItems).not.toBe('center');
+  });
+});
+
 describe('la forme des bandeaux du bas', () => {
   for (const [nom, rendre] of CAS) {
     describe(nom, () => {

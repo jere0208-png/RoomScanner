@@ -544,7 +544,17 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   */
   bandeauActions: {
     flexDirection: 'row',
-    alignItems: 'center',
+    /*
+      PAR LE HAUT, PAS PAR LE MILIEU.
+
+      Une pastille qui porte son mot À L'INTÉRIEUR fait 44 de haut ; une
+      pastille nue avec son mot DESSOUS en fait 60. Centrées, les deux ne
+      partagent plus leur axe : la ronde remonte de huit points au-dessus
+      de ses voisines et son mot pend sous elles — le « bouton supprimer
+      surélevé » du relevé du patron. Alignées par le haut, les pastilles
+      sont sur la même ligne quelle que soit la longueur du mot dessous.
+    */
+    alignItems: 'flex-start',
     flexWrap: 'wrap',
     gap: 8,
   },
@@ -793,6 +803,35 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     paddingVertical: 12,
     marginTop: 8,
   },
+  /* La pleine largeur DANS la grille : elle y entre comme les autres, elle
+     prend seulement le rang entier. */
+  exportChoiceLarge: { width: '100%', marginTop: 0 },
+  /*
+    LES SORTIES EN GRILLE, DEUX PAR LIGNE.
+
+    Relevé du patron : « refais ce pop-up pour le réduire en faisant des
+    blocs de 2 par ligne ». Sept sorties en pleine largeur, chacune avec sa
+    vignette et deux lignes de texte, faisaient une feuille plus haute que
+    l'écran : l'image et la présentation se trouvaient en défilant, et une
+    sortie qu'on ne voit pas n'existe pas.
+
+    La grille passe à la ligne toute seule — aucun découpage en rangs écrit
+    à la main, qui se déréglerait à la sortie suivante. Les tuiles d'un même
+    rang partagent leur hauteur (c'est le propre d'une ligne de flexbox),
+    donc un détail de deux lignes ne décale pas sa voisine.
+  */
+  exportGrille: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
+  /** Une demi-largeur, l'écart déduit : deux tiennent côte à côte. */
+  exportTuile: {
+    width: '48%',
+    backgroundColor: c.surfaceSunken,
+    borderRadius: radius.md,
+    paddingHorizontal: 13,
+    paddingVertical: 12,
+  },
+  /** La vignette passe AU-DESSUS du texte : à mi-largeur, il n'y a plus la
+   *  place de la mettre à côté sans hacher le titre en trois lignes. */
+  exportTuileArt: { marginBottom: 7 },
   exportChoiceTexts: { flex: 1 },
   exportChoiceOn: { backgroundColor: c.blueSoft },
   exportChoiceTitle: { color: c.ink, fontSize: 15.5, fontWeight: '700' },

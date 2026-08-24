@@ -23,6 +23,7 @@ export function CeilingBar({
   fixture,
   walls,
   trame,
+  centre,
   styles,
   palette,
   onMove,
@@ -34,6 +35,15 @@ export function CeilingBar({
   fixture: CeilingFixture;
   /** Les murs de SA pièce : on se cote sur eux, pas sur ceux d'à côté. */
   walls: WallSeg[];
+  /**
+   * LE MILIEU DE SA PIÈCE — celui où l'écran écrit déjà son nom.
+   *
+   * C'est le PÔLE INTÉRIEUR du contour, pas le barycentre : dans une pièce
+   * en L, le barycentre tombe dans le vide, hors des murs. Absent quand la
+   * pièce n'a pas de contour fermé — et le bouton disparaît avec lui : un
+   * bouton qui ne fait rien est pire qu'un bouton absent.
+   */
+  centre?: Pt | null;
   /** L'orientation du logement : les cotes partent d'équerre avec elle. */
   trame: number;
   /** Les styles de l'écran : le bandeau partage ceux des autres barres. */
@@ -158,6 +168,46 @@ export function CeilingBar({
                 </View>
               </View>
               <View style={styles.bandeauActions}>
+                  {/*
+                    CENTRER — relevé du patron : « pour les points de plafond
+                    ajoute un bouton Centrer qui se centrera dans la pièce où
+                    il se trouve automatiquement ».
+
+                    C'est le placement de neuf points lumineux sur dix : un
+                    DCL se pose au milieu, et on ne le discute pas. Il
+                    fallait pourtant y arriver au doigt, ou par deux cotes
+                    calculées de tête — alors que l'app sait exactement où
+                    est ce milieu, puisqu'elle y écrit le nom de la pièce.
+                  */}
+                  {centre && (
+                    <View style={styles.bandeauCellule}>
+                      <TouchableOpacity
+                        style={styles.iconBtn}
+                        accessibilityLabel="Centrer dans la pièce"
+                        onPress={() => {
+                          onMove(centre);
+                          haptic('succes');
+                        }}>
+                        {/* Une cible : deux axes et un point au milieu. */}
+                        <Svg width={19} height={19} viewBox="0 0 24 24">
+                          <Path
+                            d="M12 3 v3 M12 18 v3 M3 12 h3 M18 12 h3"
+                            stroke={palette.blue}
+                            strokeWidth={2}
+                            strokeLinecap="round"
+                            fill="none"
+                          />
+                          <Path
+                            d="M12 8.2 a3.8 3.8 0 1 0 0.01 0"
+                            stroke={palette.blue}
+                            strokeWidth={2}
+                            fill="none"
+                          />
+                        </Svg>
+                      </TouchableOpacity>
+                      <Text style={styles.bandeauMot}>Centrer</Text>
+                    </View>
+                  )}
                   {/* RELIER, à portée de pouce.
                       La liaison vivait au fond d'un menu qu'il fallait
                       ouvrir en touchant l'appareil une seconde fois — et
