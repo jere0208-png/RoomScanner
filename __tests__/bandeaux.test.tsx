@@ -206,6 +206,23 @@ describe('le bandeau d’une note', () => {
   });
 });
 
+/*
+  ON RECONNAÎT LA CIBLE D'UN MUR À SA NATURE, PAS À SA LARGEUR.
+
+  Elle se cherchait par un nombre — trente points, la largeur qu'elle avait
+  alors. Relevé du patron : « la sélection d'un mur est capricieuse, et un
+  clic au centre de la pièce sélectionne un mur proche ». Trente points en
+  dur ne veulent rien dire tant qu'on ne sait pas à quelle échelle on
+  regarde : sur un plan dézoomé, ils couvraient un placard entier. La cible
+  suit désormais l'épaisseur DESSINÉE du mur, donc elle change avec le zoom
+  — et aucun banc ne peut plus la nommer par un chiffre.
+
+  Ce qui la distingue n'a pas changé : c'est un trait INVISIBLE et large,
+  posé sous le poché pour recevoir le doigt.
+*/
+const estCibleDeMur = (x: { props?: Record<string, unknown> }) =>
+  x.props?.stroke === 'transparent' && Number(x.props?.strokeWidth) >= 12;
+
 describe('l’écran des résultats', () => {
   it('s’ouvre sur le plan, sans aucun bandeau de réglage', () => {
     const vu = textes(monter());
@@ -567,7 +584,7 @@ describe('l’écran des résultats', () => {
       tree.root
         .findAll((n) => typeof n.props?.onPress === 'function')
         .find(
-          (n) => n.findAll((x) => x.props?.strokeWidth === 30).length > 0,
+          (n) => n.findAll((x) => estCibleDeMur(x)).length > 0,
         );
 
     // Hors édition : rien à toucher.
@@ -668,7 +685,7 @@ describe('l’écran des résultats', () => {
     });
     const cible = tree.root
       .findAll((n) => typeof n.props?.onPress === 'function')
-      .find((n) => n.findAll((x) => x.props?.strokeWidth === 30).length > 0);
+      .find((n) => n.findAll((x) => estCibleDeMur(x)).length > 0);
     act(() => cible!.props.onPress());
     const longueurs = () =>
       useScanStore.getState().walls.map((w) => segLength(w));
@@ -715,7 +732,7 @@ describe('l’écran des résultats', () => {
       tree.root
         .findAll((n) => typeof n.props?.onPress === 'function')
         .filter(
-          (n) => n.findAll((x) => x.props?.strokeWidth === 30).length > 0,
+          (n) => n.findAll((x) => estCibleDeMur(x)).length > 0,
         );
     const nb = prises().length;
     expect(nb).toBeGreaterThan(3);
@@ -794,7 +811,7 @@ describe('l’écran des résultats', () => {
     // On sélectionne un mur : c'est lui qui lève le bandeau.
     const prise = tree.root
       .findAll((n) => typeof n.props?.onPress === 'function')
-      .find((n) => n.findAll((x) => x.props?.strokeWidth === 30).length > 0);
+      .find((n) => n.findAll((x) => estCibleDeMur(x)).length > 0);
     act(() => prise!.props.onPress());
     const strip = tree.root
       .findAll((n) => {
@@ -854,14 +871,14 @@ describe('l’écran des résultats', () => {
       tree.root
         .findAll((n) => typeof n.props?.onPress === 'function')
         .filter(
-          (n) => n.findAll((x) => x.props?.strokeWidth === 30).length > 0,
+          (n) => n.findAll((x) => estCibleDeMur(x)).length > 0,
         );
     const nb = prises().length;
     expect(nb).toBeGreaterThan(3);
     let verifies = 0;
     for (let i = 0; i < nb; i++) {
       const trait = prises()[i].findAll(
-        (x) => x.props?.strokeWidth === 30,
+        (x) => estCibleDeMur(x),
       )[0].props as { x1: number; y1: number; x2: number; y2: number };
       act(() => prises()[i].props.onPress());
       const menu = tree.root
@@ -926,7 +943,7 @@ describe('l’écran des résultats', () => {
     });
     const prise = tree.root
       .findAll((n) => typeof n.props?.onPress === 'function')
-      .find((n) => n.findAll((x) => x.props?.strokeWidth === 30).length > 0);
+      .find((n) => n.findAll((x) => estCibleDeMur(x)).length > 0);
     act(() => prise!.props.onPress());
     const menu = tree.root
       .findAll((n) => {
@@ -1005,7 +1022,7 @@ describe('l’écran des résultats', () => {
     });
     const mur = tree.root
       .findAll((n) => typeof n.props?.onPress === 'function')
-      .find((n) => n.findAll((x) => x.props?.strokeWidth === 30).length > 0);
+      .find((n) => n.findAll((x) => estCibleDeMur(x)).length > 0);
     act(() => mur!.props.onPress());
 
     const plat = (n: TestRenderer.ReactTestInstance) => {

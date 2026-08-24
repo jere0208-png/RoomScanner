@@ -3408,8 +3408,38 @@ function WallBody({
 
   return (
     <G onPress={onPress}>
-      {/* Zone de toucher élargie, invisible */}
-      <Line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="transparent" strokeWidth={30} />
+      {/*
+        LA CIBLE SUIT LE MUR DESSINÉ — relevé du patron : « la sélection
+        d'un mur est capricieuse, et un clic au centre de la pièce
+        sélectionne un mur proche… il faut que ce soit le mur qui soit
+        strictement cliquable ».
+
+        Elle faisait TRENTE points de large, en dur : quinze débordant dans
+        la pièce, quinze au-dehors. Quinze points ne veulent rien dire tant
+        qu'on ne sait pas à quelle échelle on regarde — à l'ouverture d'un
+        logement ils valent trente-sept centimètres, et sur un plan dézoomé
+        près d'un mètre. Le placard d'un mètre dix était alors entièrement
+        couvert par les halos de ses quatre murs : plus un seul point où
+        toucher le sol.
+
+        Elle vaut donc l'ÉPAISSEUR DU POCHÉ plus trois points de chaque
+        côté — ce qu'il faut pour le tremblement du doigt, et rien de plus.
+        Elle grandit avec le zoom, comme le mur. Le plancher de douze points
+        garde visable un mur dessiné fin ; en dessous, on zoome, comme pour
+        tout le reste du plan.
+
+        Le même défaut avait déjà été corrigé sur les retours de mur percés
+        (« 18 px de halo débordaient de neuf pixels dans la pièce ») ; le mur
+        entier, lui, était resté à trente.
+      */}
+      <Line
+        x1={a.x}
+        y1={a.y}
+        x2={b.x}
+        y2={b.y}
+        stroke="transparent"
+        strokeWidth={Math.max(12, bodyPx + 6)}
+      />
       {neuve ? (
         // Le contour seul, en tirets : rien n'est poché tant que la pièce
         // n'est pas arrêtée.

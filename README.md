@@ -6828,6 +6828,42 @@ ne montre pas la même chose que l'écran — elles partagent donc `MAQUETTE`.
 Le PDF, lui, garde sa palette : un plan qu'on imprime se lit en encre, pas en
 maquette.
 
+### On vise le mur, pas son halo
+
+**« La sélection d'un mur est capricieuse, et un clic au centre de la pièce
+sélectionne un mur proche… il faut que ce soit le mur qui soit strictement
+cliquable. »**
+
+Chaque mur portait une zone de toucher invisible de **trente points** de
+large, en dur : quinze débordant dans la pièce, quinze au-dehors. Et quinze
+points ne veulent rien dire tant qu'on ne sait pas à quelle échelle on
+regarde — à l'ouverture d'un logement ils valent trente-sept centimètres, et
+sur un plan dézoomé près d'un mètre. Un placard d'un mètre dix était alors
+**entièrement couvert** par les halos de ses quatre murs : plus un seul point
+où toucher le sol, et le mur « le plus haut dans le dessin » gagnait. D'où le
+« capricieux » — ça marchait selon l'endroit, sans qu'on puisse dire pourquoi.
+
+La cible vaut désormais **l'épaisseur du poché plus trois points de chaque
+côté** : ce qu'il faut pour le tremblement du doigt, et rien de plus. Elle
+grandit avec le zoom, comme le mur. Un plancher de douze points garde visable
+un mur dessiné fin ; en dessous, on zoome — c'est la règle de tout le plan.
+
+Le même défaut avait **déjà été corrigé sur les retours de mur percés** — « 18
+px de halo débordaient de neuf pixels dans la pièce » — et le mur entier, lui,
+était resté à trente : la leçon avait été apprise à un endroit et pas à
+l'autre.
+
+Le banc reproduit le cas exact : un logement de douze mètres, un placard d'un
+mètre dix dedans, le plan à demi dézoomé — et il compte les murs attrapés au
+centre du placard. Il en trouvait quatre. Les planches de référence du plan 2D
+ne changent que d'une ligne par mur (30 → 22,4 à leur échelle) : le dessin,
+lui, n'a pas bougé d'un pixel.
+
+Au passage, cinq bancs cherchaient la zone de toucher d'un mur **par sa
+largeur** — le nombre trente. Ils la cherchent maintenant par sa nature : un
+trait invisible et large. Un banc qui nomme un réglage par son chiffre casse
+au premier réglage.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro
