@@ -296,6 +296,7 @@ import {
   type Etiquette,
 } from '../geometry/cotes';
 import { haptic, releaseHaptic } from '../ui/haptic';
+import { creerSeuil, estUnGlissement, estUnTap } from '../ui/geste';
 import { SOLAIRES } from '../ui/solaires';
 
 
@@ -858,9 +859,7 @@ export function FloorplanEditor({
     PanResponder.create({
       onStartShouldSetPanResponder: () => false,
       onMoveShouldSetPanResponder: (e, g) =>
-        !!onMoveRoom &&
-        Math.abs(g.dx) + Math.abs(g.dy) > 4 &&
-        pieceSousLeDoigt(e),
+        !!onMoveRoom && estUnGlissement(g.dx, g.dy) && pieceSousLeDoigt(e),
       onPanResponderGrant: () => {
         pieceDep.current = { x: 0, y: 0 };
       },
@@ -899,7 +898,7 @@ export function FloorplanEditor({
       // meuble, jamais au plan. Sans cette exception, le plan se déplaçait
       // sous le doigt et le meuble ne bougeait pas d'un pouce.
       onMoveShouldSetPanResponder: (e, g) => {
-        if (Math.abs(g.dx) + Math.abs(g.dy) <= 6) return false;
+        if (!estUnGlissement(g.dx, g.dy)) return false;
         /*
           PENDANT QU'ON TIRE UNE PIECE, LE PLAN NE BOUGE PAS.
 
@@ -3645,6 +3644,8 @@ export function CeilingDragHandle({
   live.current = { mapping, at };
   const tapRef = useRef(onTap);
   tapRef.current = onTap;
+  /* Le verrou du slop : un tap sur la poignée ne déplace plus rien. */
+  const seuil = useRef(creerSeuil()).current;
   const pan = useMemo(
     () =>
       PanResponder.create({
@@ -3653,10 +3654,12 @@ export function CeilingDragHandle({
         onPanResponderTerminationRequest: () => false,
         onShouldBlockNativeResponder: () => true,
         onPanResponderGrant: () => {
+          seuil.reprendre();
           startRef.current = live.current.at;
           haptic('accroche');
         },
         onPanResponderMove: (_e, g) => {
+          if (!seuil.franchi(g.dx, g.dy)) return;
           const d = live.current.mapping.deltaToMeters(g.dx, g.dy);
           useScanStore.getState().moveCeiling(id, {
             x: startRef.current.x + d.x,
@@ -3665,13 +3668,15 @@ export function CeilingDragHandle({
         },
         onPanResponderRelease: (_e, g) => {
           releaseHaptic('accroche');
-          // Moins de six pixels parcourus : le doigt n'a pas glissé, il a
-          // touché. Six, c'est le tremblement d'une main qui vise.
-          if (Math.hypot(g.dx, g.dy) < 6) tapRef.current?.();
+          // Le doigt n'a pas glissé : il a touché. Le seuil est celui de
+          // toute l'app (`GLISSEMENT_MIN`), et c'est le MÊME des deux côtés
+          // — sinon il resterait entre les deux une zone où le geste n'est
+          // ni un tap ni un glissement, et où lever le doigt ne fait rien.
+          if (estUnTap(g.dx, g.dy)) tapRef.current?.();
         },
         onPanResponderTerminate: () => releaseHaptic('accroche'),
       }),
-    [id],
+    [id, seuil],
   );
   return (
     <View
@@ -3737,6 +3742,8 @@ export function ObjectDragHandle({
     perdrait son point de départ.
   */
   live.current = { mapping, raw, onRefus };
+  /* Le verrou du slop : un tap sur la poignée ne déplace plus rien. */
+  const seuil = useRef(creerSeuil()).current;
   const pan = useMemo(
     () =>
       PanResponder.create({
@@ -3749,6 +3756,7 @@ export function ObjectDragHandle({
         onPanResponderTerminationRequest: () => false,
         onShouldBlockNativeResponder: () => true,
         onPanResponderGrant: () => {
+          seuil.reprendre();
           const t = live.current.raw.transform;
           startRef.current = { x: t[12], z: t[14] };
         },
@@ -3763,6 +3771,7 @@ export function ObjectDragHandle({
           position qui tenait.
         */
         onPanResponderMove: (_e, g) => {
+          if (!seuil.franchi(g.dx, g.dy)) return;
           const d = live.current.mapping.deltaToMeters(g.dx, g.dy);
           const vise = {
             x: startRef.current.x + d.x,
@@ -3824,7 +3833,7 @@ export function ObjectDragHandle({
           live.current.onRefus?.(false);
         },
       }),
-    [objectId],
+    [objectId, seuil],
   );
   return (
     <View
@@ -3876,6 +3885,8 @@ export function RotateHandle({
   // repartait de zéro.
   const live = useRef({ at, center, raw, viewRot, frame });
   live.current = { at, center, raw, viewRot, frame };
+  /* Le verrou du slop : un tap sur la poignée ne déplace plus rien. */
+  const seuil = useRef(creerSeuil()).current;
   const pan = useMemo(
     () =>
       PanResponder.create({
@@ -3888,6 +3899,7 @@ export function RotateHandle({
         onPanResponderTerminationRequest: () => false,
         onShouldBlockNativeResponder: () => true,
         onPanResponderGrant: () => {
+          seuil.reprendre();
           const L = live.current;
           base.current = {
             yaw: Math.atan2(L.raw.transform[2], L.raw.transform[0]),
@@ -3897,6 +3909,7 @@ export function RotateHandle({
           setAngle(Math.round(((base.current.yaw * 180) / Math.PI) % 360));
         },
         onPanResponderMove: (_e, g) => {
+          if (!seuil.franchi(g.dx, g.dy)) return;
           const L = live.current;
           const { at: at0, center: c0, viewRot: vr, frame: fr } = L;
           const a = Math.atan2(
@@ -3929,7 +3942,7 @@ export function RotateHandle({
         onPanResponderRelease: () => setAngle(null),
         onPanResponderTerminate: () => setAngle(null),
       }),
-    [objectId],
+    [objectId, seuil],
   );
   return (
     <>
@@ -4034,6 +4047,8 @@ export function SideHandle({
     largeur: number;
     profondeur: number;
   } | null>(null);
+  /* Le verrou du slop : un tap sur la poignée ne déplace plus rien. */
+  const seuil = useRef(creerSeuil()).current;
   const pan = useMemo(
     () =>
       PanResponder.create({
@@ -4042,6 +4057,7 @@ export function SideHandle({
         onPanResponderTerminationRequest: () => false,
         onShouldBlockNativeResponder: () => true,
         onPanResponderGrant: () => {
+          seuil.reprendre();
           if (roomId) {
             const murs = useScanStore
               .getState()
@@ -4072,6 +4088,7 @@ export function SideHandle({
             : null;
         },
         onPanResponderMove: (_e, g) => {
+          if (!seuil.franchi(g.dx, g.dy)) return;
           const d = live.current.mapping.deltaToMeters(g.dx, g.dy);
           const n = live.current.normale;
           const total = d.x * n.x + d.z * n.z;
@@ -4102,7 +4119,7 @@ export function SideHandle({
           releaseHaptic('accroche');
         },
       }),
-    [objectId, roomId, cote],
+    [objectId, roomId, cote, seuil],
   );
   return (
     <View
@@ -4148,10 +4165,12 @@ function WallMoveHandle({
     () =>
       PanResponder.create({
         onStartShouldSetPanResponder: () => false,
-        // Six points de course avant de prendre la main : sans ce seuil, un
-        // simple appui pour désélectionner déplacerait le mur d'un cheveu.
-        onMoveShouldSetPanResponder: (_e, g) =>
-          Math.abs(g.dx) + Math.abs(g.dy) > 6,
+        /*
+          CELUI-CI N'A PAS BESOIN DE VERROU : il ne prend la main qu'au
+          MOUVEMENT, et son seuil est déjà celui de toute l'app. Sans lui, un
+          simple appui pour désélectionner déplacerait le mur d'un cheveu.
+        */
+        onMoveShouldSetPanResponder: (_e, g) => estUnGlissement(g.dx, g.dy),
         onPanResponderTerminationRequest: () => false,
         onShouldBlockNativeResponder: () => true,
         onPanResponderGrant: () => {
@@ -4270,6 +4289,8 @@ function WallRotateHandle({
     crans: [] as number[],
     collait: false,
   });
+  /* Le verrou du slop : un tap sur la poignée ne déplace plus rien. */
+  const seuil = useRef(creerSeuil()).current;
   const pan = useMemo(
     () =>
       PanResponder.create({
@@ -4278,6 +4299,7 @@ function WallRotateHandle({
         onPanResponderTerminationRequest: () => false,
         onShouldBlockNativeResponder: () => true,
         onPanResponderGrant: () => {
+          seuil.reprendre();
           const { wall: w, mapping: m } = vif.current;
           const mid = m.toPx({
             x: (w.a.x + w.b.x) / 2,
@@ -4303,6 +4325,7 @@ function WallRotateHandle({
           setAngle(angleDe(w));
         },
         onPanResponderMove: (_e, g) => {
+          if (!seuil.franchi(g.dx, g.dy)) return;
           const { wall: w } = vif.current;
           const b = geste.current;
           // Le doigt est à « départ + course » : c'est la seule position
@@ -4329,7 +4352,7 @@ function WallRotateHandle({
         onPanResponderRelease: () => setAngle(null),
         onPanResponderTerminate: () => setAngle(null),
       }),
-    [],
+    [seuil],
   );
   const at = poigneeAt(wall, mapping, sens, borne);
   return (
@@ -4411,6 +4434,8 @@ function CornerHandle({
 }) {
   const styles = getStyles(useTheme());
   const startRef = useRef({ x: corner.x, z: corner.z });
+  /* Le verrou du slop : un tap sur la poignée ne déplace plus rien. */
+  const seuil = useRef(creerSeuil()).current;
   const pan = useMemo(
     () =>
       PanResponder.create({
@@ -4423,9 +4448,11 @@ function CornerHandle({
         onPanResponderTerminationRequest: () => false,
         onShouldBlockNativeResponder: () => true,
         onPanResponderGrant: () => {
+          seuil.reprendre();
           startRef.current = { x: corner.x, z: corner.z };
         },
         onPanResponderMove: (_e, g) => {
+          if (!seuil.franchi(g.dx, g.dy)) return;
           const d = mapping.deltaToMeters(g.dx, g.dy);
           useScanStore.getState().moveWallPoint(corner.wallId, corner.end, {
             x: startRef.current.x + d.x,
@@ -4433,7 +4460,7 @@ function CornerHandle({
           });
         },
       }),
-    [corner.wallId, corner.end, corner.x, corner.z, mapping],
+    [corner.wallId, corner.end, corner.x, corner.z, mapping, seuil],
   );
 
   const px = mapping.toPx(corner);

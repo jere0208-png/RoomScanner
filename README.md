@@ -7080,6 +7080,78 @@ est testée, sa pellicule est versionnée, et elle ne dépend de rien
 (`src/components/ScanGlyph.tsx`, `src/ui/glypheScan.ts`).
 
 
+
+### Les gestes, éprouvés avec une vraie main
+
+Relevé du patron : **« trouve des améliorations en faisant des tests en
+smartphone gestures »**. Les bancs de gestes qu'on avait vérifiaient des
+INVARIANTS — un responder qui ne change pas d'identité pendant qu'un meuble
+bouge, une couche qui revient à zéro au lâcher. Aucun ne rejouait un doigt
+tel qu'il est vraiment : tremblant, pressé, et jamais parfaitement immobile.
+`__tests__/doigt.test.tsx` le fait, et il a trouvé trois choses.
+
+**1. Un tap n'est jamais immobile — et l'app le prenait pour un glissement.**
+Une main qui vise dérive de deux à six points, davantage debout, en marchant
+ou avec des gants de chantier. iOS déclare un glissement à dix points de
+translation, Android à huit. L'app en comptait **quatre**, et pas en
+distance : en **somme des deux axes** — trois points de tremblement sur
+chaque axe font six, et le geste partait. On tapait une pièce pour la
+choisir, et on la déplaçait de cinq centimètres ; on tapait un mur, et le
+plan se mettait à glisser sous le doigt. `src/ui/geste.ts` porte désormais
+`GLISSEMENT_MIN = 10` pour toute l'app, en distance vraie, et le seuil du tap
+est LE MÊME des deux côtés — deux valeurs différentes laisseraient entre
+elles une zone où lever le doigt ne fait rien du tout.
+
+**2. Les poignées appliquaient le déplacement dès le premier pixel.** Une
+poignée a raison de prendre le toucher dès l'appui : on l'a visée. Mais rien
+ne la protégeait du tremblement, et taper un meuble pour le sélectionner le
+poussait de quatre centimètres. Un petit verrou (`creerSeuil`) reste fermé
+tant que le doigt n'a pas franchi les dix points, sur les six poignées du
+plan. **On n'efface pas la course une fois le seuil passé** : le déplacement
+rendu est celui du doigt depuis l'appui, comme le fait iOS — repartir de zéro
+laisserait l'objet en retard de dix points sur le doigt pour toujours, et
+dans une app de relevé dix points valent dix centimètres. Le banc vérifie les
+DEUX sens : rien ne bouge au tremblement, et soixante points de glissement
+déplacent bien le meuble de soixante centimètres.
+
+**3. Le geste de retour ne marchait qu'en haut de l'écran.** La bande de bord
+était posée en absolu — `top: 0, bottom: 0` — mais ces zéros se comptent dans
+le PARENT, et son parent était la barre du titre : cinquante points de haut
+sur un écran qui en fait sept cents. Le geste demandé « comme sur les apps
+modernes » ne répondait donc que dans le bandeau supérieur, c'est-à-dire
+nulle part où l'on commence un glissement. Le défaut ne se voit pas en lisant
+le composant : il faut regarder QUI le contient.
+
+`RetourGlisse` sait maintenant s'employer **en enveloppe** : il ne vole jamais
+l'appui — taps, poignées et pincements gardent la main — mais **capture** un
+glissement franc parti du bord gauche, même si le plan avait commencé à
+suivre le doigt. C'est exactement ce que fait le système, et cela ne coûte
+pas un point de dessin, là où une bande posée par-dessus aurait mangé les
+vingt-quatre premiers points du plan sans que rien ne l'explique.
+
+Deux pièges du système, trouvés en écrivant ces bancs :
+
+- **`gestureState.x0` vaut ZÉRO tant que le toucher n'a pas été accordé.**
+  Il n'est renseigné qu'au `grant` — or c'est justement AVANT le grant qu'on
+  décide de capturer. La garde « parti du bord gauche » ne gardait donc rien.
+  L'archive tactile, elle, sait toujours : `touchBank` garde pour chaque
+  doigt le point où il s'est posé (`departDuDoigt`).
+- **Le compteur du geste repart de zéro à la capture.** Au lâcher, `dx` ne
+  mesure plus que ce qui s'est passé depuis — exiger là les soixante points
+  du seuil habituel reviendrait à en demander quatre-vingt-quatre au doigt,
+  sans que rien ne le dise.
+
+Et une leçon sur les bancs eux-mêmes, qui vaut pour tous ceux qui suivront :
+**`PanResponder` ne se sert pas de l'état de geste qu'on lui passe, il le
+RECALCULE depuis `e.touchHistory`**. Les premiers essais écrits ici
+fabriquaient un `{ dx, dy }` à la main : ils passaient sans rien prouver,
+tous les gestes valant zéro déplacement. La main d'essai écrit donc
+l'ARCHIVE des doigts, pas la conclusion — et elle respecte l'ordre du
+système, capture puis bouillonnement, parce que `PanResponder` refuse de
+traiter deux fois le même horodatage : interroger la capture puis appeler le
+déplacement consomme l'événement dans la question, et le mouvement n'a
+jamais lieu.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

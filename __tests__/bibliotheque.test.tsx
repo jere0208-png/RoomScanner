@@ -182,7 +182,6 @@ describe('la bibliothèque des relevés', () => {
 
   it('lève la bulle au bout de l’appui, et prend la main sur le glissement', () => {
     const tree = monter([{ id: 'd1', name: 'Chantier' }]);
-    const racine = tree.root.findAllByType(View)[0];
     act(() => {
       ligneRow(tree, 'Chantier Dupont').props.onTouchStart({
         nativeEvent: { pageX: 120, pageY: 300 },
@@ -194,9 +193,19 @@ describe('la bibliothèque des relevés', () => {
       jest.advanceTimersByTime(HOLD_MS + 120);
     });
     expect(dits(tree)).toContain('Amenez le scan sur un dossier');
-    // Et le glissement lui revient : sans ça la bulle reste collée au doigt
-    // sans jamais bouger, c'est la liste qui défile sous elle.
-    expect(racine.props.onMoveShouldSetResponder()).toBe(true);
+    /*
+      ET LE GLISSEMENT LUI REVIENT : sans ça la bulle reste collée au doigt
+      sans jamais bouger, c'est la liste qui défile sous elle.
+
+      On interroge TOUTES les vues qui savent réclamer un geste, et non la
+      première : depuis que le retour au bord ENVELOPPE l'écran, la vue
+      racine est la sienne — elle ne réclame rien tant qu'on ne part pas du
+      bord gauche, et c'est très bien ainsi.
+    */
+    const reclame = tree.root
+      .findAllByType(View)
+      .some((n) => n.props.onMoveShouldSetResponder?.() === true);
+    expect(reclame).toBe(true);
   });
 
   it('ouvre les options par le « … », et plus par la croix', () => {

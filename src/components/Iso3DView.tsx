@@ -11,6 +11,7 @@ import Svg, {
 import { RoomScanCanvas } from 'react-native-room-scan';
 import { grouperTraces } from '../ui/traces';
 import { mettreAPlat } from '../ui/canevas';
+import { estUnGlissement, estUnTap } from '../ui/geste';
 import { themedStyles, useTheme, type Palette } from '../theme';
 import {
   filtrerAuNiveau,
@@ -413,8 +414,7 @@ export function Iso3DView({
   const pan = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_e, g) =>
-        Math.abs(g.dx) + Math.abs(g.dy) > 4,
+      onMoveShouldSetPanResponder: (_e, g) => estUnGlissement(g.dx, g.dy),
       onPanResponderGrant: (e, g) => {
         const t = e.nativeEvent.touches;
         setInteracting(true);
@@ -499,7 +499,7 @@ export function Iso3DView({
         if (
           !geste.multi &&
           baseRef.current.mode === 'rotate' &&
-          Math.abs(g.dx) + Math.abs(g.dy) < 6 &&
+          estUnTap(g.dx, g.dy) &&
           Date.now() - geste.t0 < 500
         ) {
           focusRef.current?.(geste.x, geste.y);

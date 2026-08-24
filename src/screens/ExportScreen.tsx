@@ -600,6 +600,13 @@ const styles = getStyles(c);
             ],
           },
         ]}>
+      {/*
+        LE BORD GAUCHE REND LE MÊME RETOUR QUE LA FLÈCHE — sur toute la
+        hauteur de l'écran, et non dans la seule barre du titre : une bande
+        posée en absolu se mesure dans son parent, et son parent était le
+        bandeau du haut.
+      */}
+      <RetourGlisse onRetour={() => setScreen('result')} />
       <View style={styles.headerRow}>
         <TouchableOpacity
           style={styles.roundButton}
@@ -609,8 +616,6 @@ const styles = getStyles(c);
           onPress={() => setScreen('result')}>
           <BackChevron color={c.ink} />
         </TouchableOpacity>
-        {/* Le bord gauche rend le même retour que la flèche. */}
-        <RetourGlisse onRetour={() => setScreen('result')} />
         <Text style={styles.title}>Aperçu du PDF</Text>
         <TouchableOpacity
           style={[styles.roundButton, styles.resetButton]}

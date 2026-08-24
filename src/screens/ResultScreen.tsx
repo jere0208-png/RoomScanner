@@ -2137,6 +2137,9 @@ export function ResultScreen() {
   if (walls.length === 0) {
     return (
       <View style={styles.container}>
+        {/* Une bande de bord suffit ici : cet écran n'a rien à toucher, et
+            elle court sur toute la hauteur puisque son parent est l'écran. */}
+        <RetourGlisse onRetour={sortirDuPlan} />
         {/*
           UN ÉCRAN SANS RETOUR EST UN PIÈGE.
 
@@ -2153,7 +2156,6 @@ export function ResultScreen() {
             onPress={sortirDuPlan}>
             <BackChevron color={teinte.ink} />
           </TouchableOpacity>
-          <RetourGlisse onRetour={sortirDuPlan} />
         </View>
         <View style={styles.emptyContainer}>
         <Text style={styles.emptyTitle}>
@@ -2672,7 +2674,17 @@ export function ResultScreen() {
               });
 
   return (
-    <View style={styles.container}>
+    /*
+      LE RETOUR AU GLISSEMENT ENVELOPPE L'ÉCRAN, il ne se pose plus dans la
+      barre du titre.
+
+      Une bande `top: 0, bottom: 0` se mesure dans son PARENT : posée dans le
+      bandeau du haut, elle ne faisait cinquante points de haut sur un écran
+      qui en fait sept cents, et le geste ne répondait donc que là-haut. En
+      enveloppe, il répond sur toute la hauteur — et sans manger un seul
+      point du plan, puisqu'il ne prend le geste qu'en cours de route.
+    */
+    <RetourGlisse onRetour={sortirDuPlan} style={styles.container}>
       <View style={styles.headerRow}>
         <TouchableOpacity
           style={styles.backButton}
@@ -2681,11 +2693,6 @@ export function ResultScreen() {
           onPress={sortirDuPlan}>
           <BackChevron color={teinte.ink} />
         </TouchableOpacity>
-        {/* Le bord gauche rend le même retour que la flèche — vingt
-            points au ras du cadre, le plan garde tout le reste. */}
-        {/* Le bord gauche sort comme la flèche : mêmes gardes, sinon le
-            geste le plus facile serait le seul à perdre le travail. */}
-        <RetourGlisse onRetour={sortirDuPlan} />
         <TouchableOpacity
           style={styles.titleWrap}
           accessibilityLabel="Options du plan"
@@ -4494,7 +4501,7 @@ export function ResultScreen() {
           setRenaming(false);
         }}
       />
-    </View>
+    </RetourGlisse>
   );
 }
 

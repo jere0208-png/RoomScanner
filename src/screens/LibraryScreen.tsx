@@ -1036,6 +1036,15 @@ export function LibraryScreen() {
   const vide = saves.length === 0 && folders.length === 0;
 
   return (
+    /*
+      LE BORD GAUCHE REFERME LE DOSSIER, comme la flèche — et sur toute la
+      hauteur. En ENVELOPPE plutôt qu'en bande : la liste se touche, et une
+      bande posée par-dessus mangerait les vingt-quatre premiers points de
+      chaque vignette sans que rien ne l'explique.
+    */
+    <RetourGlisse
+      onRetour={() => (dossierOuvert ? setInside(null) : setScreen('home'))}
+      style={styles.container}>
     <View style={styles.container} {...pan.panHandlers}>
       <View
         style={[styles.headerRow, over === RACINE && styles.headerRowOver]}
@@ -1056,11 +1065,6 @@ export function LibraryScreen() {
           onPress={() => (dossierOuvert ? setInside(null) : setScreen('home'))}>
           <BackChevron color={palette.ink} />
         </TouchableOpacity>
-        {/* Le bord gauche rend le même retour que la flèche : il referme
-            d'abord le dossier ouvert, comme elle. */}
-        <RetourGlisse
-          onRetour={() => (dossierOuvert ? setInside(null) : setScreen('home'))}
-        />
         {/*
           LE TITRE SUIT LE BOUTON DE RETOUR, LA PASTILLE LE SUIT.
 
@@ -1306,6 +1310,7 @@ export function LibraryScreen() {
         </TouchableOpacity>
       )}
     </View>
+    </RetourGlisse>
   );
 }
 
