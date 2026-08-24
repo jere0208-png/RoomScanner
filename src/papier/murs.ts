@@ -563,3 +563,38 @@ export function filtrerDEquerre(
     return ecart <= tolerance || m.len >= plusLong * gardeSi;
   });
 }
+
+/**
+ * ÉCARTE CE QUI LONGE LE BORD DE L'IMAGE.
+ *
+ * Après recadrage, il reste toujours un morceau de ce qu'on vient de
+ * couper : le montant d'une fenêtre de navigateur, le bord d'une feuille,
+ * l'arête d'une table. Ces restes-là sont longs, droits, d'équerre, et
+ * collés au bord — tout ce qu'il faut pour passer pour un mur de façade, et
+ * ils étirent l'emprise du logement de plusieurs mètres.
+ *
+ * Un vrai plan ne touche jamais le bord de son image : il y a toujours de la
+ * marge autour d'un dessin, et le recadrage en ajoute lui-même. On écarte
+ * donc ce qui court le long d'un bord — à la fois PRÈS du bord et LONG,
+ * car un petit trait près du bord peut parfaitement appartenir au plan.
+ */
+export function ecarterLeCadre(
+  murs: MurLu[],
+  l: number,
+  h: number,
+  { bord = 0.02, part = 0.45 } = {},
+): MurLu[] {
+  const mx = l * bord;
+  const my = h * bord;
+  return murs.filter((m) => {
+    const long1 = m.len >= Math.max(l, h) * part;
+    if (!long1) return true;
+    const horizontal = Math.abs(m.b.x - m.a.x) > Math.abs(m.b.y - m.a.y);
+    if (horizontal) {
+      const y = (m.a.y + m.b.y) / 2;
+      return y > my && y < h - my;
+    }
+    const x = (m.a.x + m.b.x) / 2;
+    return x > mx && x < l - mx;
+  });
+}

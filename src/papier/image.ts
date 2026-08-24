@@ -108,6 +108,25 @@ export interface ReglageSeuil {
    * et le masque grésille ; au-dessus, un trait fin au crayon disparaît.
    */
   ecart?: number;
+  /**
+   * ÉCART ABSOLU MINIMAL, en niveaux de gris.
+   *
+   * Le seuil relatif seul ne sait pas distinguer un trait d'un frisson : sur
+   * une zone UNIFORME — le fond noir autour d'une fenêtre, une barre grise,
+   * un ciel — la moyenne locale vaut le pixel, et le moindre bruit de
+   * capteur passe pour de l'encre. Photographier un écran en fait la
+   * démonstration : les franges de moiré sont bel et bien plus sombres que
+   * leur voisinage, et le masque devenait un champ de neige.
+   *
+   * Absent, il se DÉDUIT de l'image — et il le faut. Un plan d'architecte
+   * pâle, tout en gris clair sur blanc, n'étale ses valeurs que sur
+   * quarante niveaux : un seuil absolu de quatorze y effaçait la moitié des
+   * murs. Une photo d'écran, elle, va du noir du bureau au blanc de la
+   * page : deux cent vingt niveaux, et il faut bien quatorze pour ignorer
+   * les franges. On prend donc sept pour cent de l'étendue réelle des gris,
+   * borné entre six et dix-huit.
+   */
+  contrasteMin?: number;
 }
 
 /**
@@ -118,6 +137,7 @@ export function binariser(img: ImageGrise, reglage: ReglageSeuil = {}): Masque {
   const { l, h, px } = img;
   const fenetre = Math.max(3, Math.round(reglage.fenetre ?? l / 8));
   const ecart = (reglage.ecart ?? 12) / 100;
+  const contrasteMin = reglage.contrasteMin ?? contrasteDeduit(img);
   const S = integrale(img);
   const r = Math.floor(fenetre / 2);
   const m = masqueVide(l, h);
@@ -125,10 +145,66 @@ export function binariser(img: ImageGrise, reglage: ReglageSeuil = {}): Masque {
     for (let x = 0; x < l; x++) {
       const { total, n } = somme(S, l, h, x - r, y - r, x + r, y + r);
       const moyenne = total / n;
-      if (px[y * l + x] < moyenne * (1 - ecart)) m.on[y * l + x] = 1;
+      const v = px[y * l + x];
+      if (v < moyenne * (1 - ecart) && moyenne - v >= contrasteMin) {
+        m.on[y * l + x] = 1;
+      }
     }
   }
   return m;
+}
+
+/**
+ * L'ÉTENDUE RÉELLE DES GRIS D'UNE IMAGE, du cinquième au quatre-vingt-quinzième
+ * centile — les extrêmes sont laissés dehors, un seul pixel brûlé ne doit pas
+ * décider du réglage de toute la feuille.
+ */
+export function contrasteDeduit(img: ImageGrise): number {
+  const hist = new Int32Array(256);
+  for (let i = 0; i < img.px.length; i++) hist[img.px[i]]++;
+  const total = img.px.length;
+  const centile = (q: number) => {
+    let n = 0;
+    for (let v = 0; v < 256; v++) {
+      n += hist[v];
+      if (n >= total * q) return v;
+    }
+    return 255;
+  };
+  const etendue = centile(0.95) - centile(0.05);
+  return Math.max(6, Math.min(18, etendue * 0.07));
+}
+
+/**
+ * LE FILTRE MÉDIAN — contre le moiré et le grain, sans manger les traits.
+ *
+ * Une moyenne étale tout, y compris le trait de deux pixels qui porte une
+ * menuiserie. La médiane, elle, ne fabrique aucune valeur nouvelle : elle
+ * choisit celle du milieu, et un trait reste un trait tant qu'il occupe la
+ * moitié de la fenêtre. C'est le filtre des points isolés — et les franges
+ * d'une dalle photographiée en sont, à l'échelle de trois pixels.
+ */
+export function median3(img: ImageGrise): ImageGrise {
+  const { l, h, px } = img;
+  const out = new Uint8Array(l * h);
+  const v: number[] = new Array(9);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < l; x++) {
+      let n = 0;
+      for (let dy = -1; dy <= 1; dy++) {
+        const ny = y + dy;
+        if (ny < 0 || ny >= h) continue;
+        for (let dx = -1; dx <= 1; dx++) {
+          const nx = x + dx;
+          if (nx < 0 || nx >= l) continue;
+          v[n++] = px[ny * l + nx];
+        }
+      }
+      const bout = v.slice(0, n).sort((a, b) => a - b);
+      out[y * l + x] = bout[n >> 1];
+    }
+  }
+  return { l, h, px: out };
 }
 
 /** Part de l'image couverte d'encre — de quoi refuser une photo vide ou noire. */

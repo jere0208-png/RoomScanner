@@ -29,7 +29,15 @@
 import type { ObjectData, ScanResult, SurfaceData } from 'react-native-room-scan';
 import { catalogItem, catalogTransform } from '../geometry/catalogue';
 import type { Pt } from '../geometry/floorplan';
-import { binariser, effacerBoites, type ImageGrise, type Masque } from './image';
+import {
+  binariser,
+  effacerBoites,
+  encre,
+  median3,
+  type ImageGrise,
+  type Masque,
+} from './image';
+import { recadrer, zoneDessinee } from './cadrer';
 import {
   choisirEchelle,
   echelleDeclaree,
@@ -40,6 +48,7 @@ import {
 import type { PhotoDePlan, TexteLu } from './entree';
 import {
   calerSurLeMasque,
+  ecarterLeCadre,
   filtrerDEquerre,
   mursDesTraits,
   souderLesCoins,
@@ -82,6 +91,8 @@ export interface PlanLu {
     symboles: SymboleLu[];
     /** Facteur de réduction appliqué à l'image d'origine. */
     reduction: number;
+    /** Zone retenue dans l'image réduite, quand un recadrage a eu lieu. */
+    zone: { x: number; y: number; l: number; h: number } | null;
   };
 }
 
@@ -92,11 +103,20 @@ const H_FENETRE = 1.15;
 const ALLEGE = 0.95;
 
 /**
- * Réduit l'image d'un facteur ENTIER, par moyenne de blocs.
+ * RÉDUIT L'IMAGE — en gardant les traits fins, pas en les moyennant.
  *
- * Entier, parce qu'une moyenne de bloc est exacte et rapide là où un
- * rééchantillonnage quelconque flouterait les traits fins — et ce sont
- * justement les traits fins qui portent les menuiseries.
+ * Une moyenne de bloc est le réflexe, et c'est un piège pour un DESSIN AU
+ * TRAIT. Un plan d'architecte trace ses cloisons sur un pixel : moyenné avec
+ * ses trois voisins blancs, ce pixel devient un gris pâle que le seuil ne
+ * retient plus. On l'a payé comptant — un plan qui se lisait la veille est
+ * ressorti avec quatre murs sur vingt-trois le jour où l'image a commencé à
+ * être réduite de moitié.
+ *
+ * On prend donc, dans chaque bloc, la moyenne des `f` valeurs LES PLUS
+ * SOMBRES (deux sur quatre pour une réduction de moitié). Le trait survit,
+ * puisqu'il est ce qu'il y a de plus sombre ; et l'on ne prend pas le seul
+ * minimum, qui garderait chaque grain de capteur comme s'il était de
+ * l'encre.
  */
 export function reduire(img: ImageGrise, facteur: number): ImageGrise {
   const f = Math.max(1, Math.round(facteur));
@@ -104,13 +124,19 @@ export function reduire(img: ImageGrise, facteur: number): ImageGrise {
   const l = Math.floor(img.l / f);
   const h = Math.floor(img.h / f);
   const px = new Uint8Array(l * h);
+  const bloc: number[] = new Array(f * f);
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < l; x++) {
-      let s = 0;
+      let n = 0;
       for (let dy = 0; dy < f; dy++) {
-        for (let dx = 0; dx < f; dx++) s += img.px[(y * f + dy) * img.l + x * f + dx];
+        for (let dx = 0; dx < f; dx++) {
+          bloc[n++] = img.px[(y * f + dy) * img.l + x * f + dx];
+        }
       }
-      px[y * l + x] = Math.round(s / (f * f));
+      const rang = bloc.slice(0, n).sort((a, b) => a - b);
+      let s = 0;
+      for (let i = 0; i < f; i++) s += rang[i];
+      px[y * l + x] = Math.round(s / f);
     }
   }
   return { l, h, px };
@@ -154,31 +180,95 @@ export function lirePlanPapier(
 
   // 1. Réduire : la recherche de droites coûte le carré de la taille.
   /*
-    NEUF CENTS PIXELS DE LARGE POUR TRAVAILLER.
+    MILLE DEUX CENTS PIXELS DE LARGE POUR TRAVAILLER.
 
-    La recherche de droites coûte le carré de la taille : à mille cent
-    pixels, le plan d'architecte le plus chargé demandait onze secondes, et
-    un téléphone est deux à trois fois plus lent qu'une machine de bureau.
-    À neuf cents, un trait fin d'imprimante fait encore un pixel et demi —
-    c'est le plancher, en dessous duquel la cotation disparaît.
+    La recherche de droites coûte le carré de la taille, et l'on avait
+    descendu à neuf cents pour gagner des secondes. Un plan d'architecte de
+    mille cinq cents pixels s'est alors trouvé réduit de MOITIÉ — et ses
+    cloisons, tracées sur un pixel, ont perdu les trois quarts de leur
+    encre : quatre murs relevés sur vingt-trois. La vitesse ne vaut rien si
+    le relevé est faux. À mille deux cents, un plan de bureau d'études
+    courant passe sans être réduit du tout.
   */
-  const largeurMax = reglage.largeurMax ?? 900;
+  const largeurMax = reglage.largeurMax ?? 1200;
   const reduction = Math.max(1, Math.round(photo.image.l / largeurMax));
   const image = reduire(photo.image, reduction);
   const textes = reduireTextes(photo.textes ?? [], reduction);
 
-  // 2 et 3. Le masque, débarrassé de ce qui a été lu.
-  const brut = binariser(image);
-  const masque = effacerBoites(brut, textes);
+  /*
+    2. LE MASQUE — filtré, seuillé, puis RECADRÉ SUR LE DESSIN.
+
+    Le filtre médian passe d'abord : il tue les franges d'une dalle
+    photographiée et le grain d'un capteur sans manger les traits fins, là
+    où une moyenne les étalerait.
+
+    Le recadrage vient ensuite, et il a été ajouté après le premier essai
+    sur le terrain : le plan y était SUR UN ÉCRAN, et la photo portait le
+    bureau, les onglets du navigateur et la barre des tâches. Le lecteur
+    cherchait des murs dans une fenêtre de navigateur.
+  */
+  /*
+    ON NE DÉBRUITE QUE SI L'IMAGE EST BRUITÉE — et c'est le masque qui le
+    dit, pas un réglage.
+
+    Le filtre médian efface les traits d'UN pixel : sur une fenêtre de trois
+    par trois, un trait fin est minoritaire, et la valeur du milieu est celle
+    du papier. Appliqué d'office, il a fait disparaître la moitié des murs
+    d'un plan d'architecte pâle tracé au trait fin — celui-là même qui
+    marchait la veille.
+
+    Or un plan couvre deux à huit pour cent de sa feuille d'encre. Au-delà
+    de douze, ce n'est plus du dessin : c'est du grain, des franges de
+    moiré, ou une photo. C'est là, et seulement là, qu'on repasse au médian.
+  */
+  const premier = binariser(image);
+  const bruitee = encre(premier) > 0.12;
+  const lisse = bruitee ? median3(image) : image;
+  const brutEntier = bruitee ? binariser(lisse) : premier;
+  const zone = zoneDessinee(brutEntier);
+  const brut = zone ? recadrer(brutEntier, zone) : brutEntier;
+  const decalees = zone
+    ? textes.map((t) => ({ ...t, x: t.x - zone.x, y: t.y - zone.y }))
+    : textes;
+  const masque = effacerBoites(brut, decalees);
 
   // 4. Les traits, les murs, les trous. L'angle de la feuille se mesure
   // AVANT les murs : c'est lui qui dit ce qui est d'équerre avec le plan.
   const traits = fusionnerTraits(segmentsDe(masque));
   const angle = anglePrincipal(masque);
   const murs = souderLesCoins(
-    calerSurLeMasque(filtrerDEquerre(mursDesTraits(traits), angle), masque),
+    ecarterLeCadre(
+      calerSurLeMasque(filtrerDEquerre(mursDesTraits(traits), angle), masque),
+      masque.l,
+      masque.h,
+      /*
+        On se donne plus de marge QUAND ON A RECADRÉ : le recadrage garde
+        lui-même six pour cent de marge autour du dessin, donc rien de vrai
+        ne traîne à quatre pour cent du bord — alors que le montant de
+        fenêtre qu'on vient de couper, lui, y est encore. Sans recadrage, on
+        reste prudent : la photo peut être cadrée au plus juste sur le plan.
+      */
+      { bord: zone ? 0.04 : 0.015 },
+    ),
   );
   const ouvertures = ouverturesDesMurs(murs, masque, traits);
+  if (bruitee) {
+    /*
+      LE CONSEIL QUI VAUT MIEUX QUE TOUS LES FILTRES.
+
+      Une image aussi chargée, c'est presque toujours la PHOTO D'UN ÉCRAN :
+      photographier une dalle revient à échantillonner une grille avec une
+      autre, et les franges qui en sortent sont, pour le lecteur, de l'encre
+      comme une autre. On sait les atténuer ; on ne sait pas les faire
+      disparaître. Or celui qui photographie son écran a le fichier sous la
+      main — une capture, le PDF, l'image d'origine — et ce fichier-là se lit
+      sans une seule frange.
+    */
+    avertissements.push(
+      'Image très bruitée (photo d’écran ?) : une capture d’écran ou le ' +
+        'fichier d’origine donneraient un relevé bien plus juste.',
+    );
+  }
   if (murs.length === 0) {
     avertissements.push(
       'Aucun mur reconnu : la photo est peut-être trop floue, ou ce n’est pas un plan.',
@@ -189,7 +279,7 @@ export function lirePlanPapier(
   const echelle =
     reglage.echelle ??
     choisirEchelle(
-      echelleParCotes(textes, traits),
+      echelleParCotes(decalees, traits),
       echelleDeclaree(reglage.dpi, reglage.echelleDeclaree),
       echelleParPortes(
         ouvertures.filter((o) => o.nature === 'porte').map((o) => o.largeur),
@@ -227,8 +317,8 @@ export function lirePlanPapier(
   */
   const co = Math.cos(-angle);
   const si = Math.sin(-angle);
-  const cx = image.l / 2;
-  const cy = image.h / 2;
+  const cx = brut.l / 2;
+  const cy = brut.h / 2;
   const pxm = echelle?.pxParMetre || 100;
   const versMonde = (p: P): Pt => {
     const dx = p.x - cx;
@@ -318,7 +408,7 @@ export function lirePlanPapier(
     }
   });
 
-  const etiquettes = textes
+  const etiquettes = decalees
     .filter((t) => /[A-Za-zÀ-ÿ]{3,}/.test(t.texte))
     .map((t) => ({
       at: versMonde({ x: t.x + t.l / 2, y: t.y + t.h / 2 }),
@@ -336,7 +426,7 @@ export function lirePlanPapier(
     etiquettes,
     reperes,
     avertissements,
-    vu: { masque, traits, murs, ouvertures, symboles, reduction },
+    vu: { masque, traits, murs, ouvertures, symboles, reduction, zone },
   };
 }
 

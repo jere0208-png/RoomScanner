@@ -7484,6 +7484,71 @@ flou, l'écart passe de cinq à huit pour cent — vingt-cinq centimètres sur
 trois mètres. Sur une photo propre, le même appartement ressort au
 millimètre.
 
+
+### Plan papier — le premier essai sur le terrain, et ce qu'il a appris
+
+Relevé du patron, une photo à l'appui : **« voici un plan photographié et le
+plan que l'app ressort… rien à voir »**. Le relevé était un patchwork de
+segments sans structure. Trois choses s'étaient liguées, et la photo les
+disait toutes les trois : **le plan n'était pas sur une feuille, il était sur
+un ÉCRAN d'ordinateur**, photographié avec le bureau autour, les onglets du
+navigateur en haut et la barre des tâches en bas.
+
+- **La photo contenait autre chose que le plan.** Le lecteur travaillait sur
+  TOUTE l'image : il cherchait des murs dans une fenêtre de navigateur. Le
+  recadrage sur la zone dessinée était prévu depuis le premier jour et
+  n'avait jamais été écrit. Il l'est : `cadrer.ts`.
+- **Le moiré.** Photographier une dalle, c'est échantillonner une grille avec
+  une autre : il en sort des franges sur toute l'image, et elles SONT plus
+  sombres que leur voisinage — donc de l'encre, pour un seuil local.
+- **Le fond sombre.** Sur du noir uniforme, un seuil local ne compare que du
+  bruit à du bruit, et rend du bruit.
+
+Le banc `papiermoire` refabrique exactement cette photo à partir d'une
+planche dont on connaît les cotes — incrustée dans un écran, avec les
+onglets, la barre des tâches, les franges et le grain — et exige de
+retrouver l'appartement. **Il échouait sur le code qui a produit le relevé du
+patron** : c'est à cela qu'on reconnaît un banc qui sert à quelque chose.
+
+Quatre corrections, dont deux qui se sont mordu la queue :
+
+- **Un dessin est une ZONE, pas une ligne.** Le premier recadrage gardait
+  tout pavé portant de l'encre et prenait le plus grand ensemble d'un seul
+  tenant : c'était LE CADRE DE LA FENÊTRE du navigateur — quatre lignes de
+  pavés, refermées, parfaitement connexes. Le lecteur recadrait dessus et
+  prenait son contour pour le pourtour du logement : sept mètres de large.
+  Un plan, lui, est une surface : autour de n'importe lequel de ses points
+  on trouve d'autres traits. On ne garde un pavé que si son voisinage en
+  compte assez d'autres.
+- **Un écart absolu minimal**, déduit de l'étendue réelle des gris de
+  l'image : sept pour cent, borné entre six et dix-huit. Un seuil fixe à
+  quatorze effaçait la moitié des murs d'un plan d'architecte pâle, qui
+  n'étale ses valeurs que sur quarante niveaux.
+- **On ne débruite que si l'image est bruitée, et c'est le masque qui le
+  dit.** Le filtre médian efface les traits d'UN pixel — appliqué d'office,
+  il a fait disparaître la moitié des murs du plan pâle qui marchait la
+  veille. Un plan couvre deux à huit pour cent de sa feuille d'encre ;
+  au-delà de douze, ce n'est plus du dessin, et c'est là seulement qu'on
+  passe le médian.
+- **Ce qui longe le bord de l'image n'est pas un mur.** Après recadrage il
+  reste toujours un morceau de ce qu'on vient de couper — montant de
+  fenêtre, bord de feuille, arête de table : long, droit, d'équerre, et
+  collé au bord.
+
+Et une **régression trouvée au passage**, qui n'avait rien à voir avec la
+photo d'écran : la réduction d'image faisait une MOYENNE de bloc. Un plan
+d'architecte trace ses cloisons sur un pixel ; moyenné avec trois voisins
+blancs, ce pixel devient un gris que le seuil ne retient plus — quatre murs
+relevés sur vingt-trois. On prend désormais la moyenne des valeurs les plus
+SOMBRES de chaque bloc (le trait survit, puisqu'il est ce qu'il y a de plus
+sombre), et la largeur de travail remonte de 900 à 1 200 pixels. La vitesse
+ne vaut rien si le relevé est faux.
+
+Enfin, le conseil qui vaut mieux que tous les filtres, et que l'écran donne
+désormais : **celui qui photographie son écran a le fichier sous la main** —
+une capture, le PDF, l'image d'origine. Ce fichier-là se lit sans une seule
+frange.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro
