@@ -1,13 +1,19 @@
 /**
  * CE QUI EST COCHÉ QUAND ON OUVRE L'EXPORT.
  *
- * Relevé du patron : « dans l'export PDF, on doit avoir de base coché :
- * Vues 3D, Métré, Cotes 2D, Meubles. Le reste est décoché. »
+ * Relevé du patron, en deux temps :
+ *
+ *   1. « Dans l'export PDF, on doit avoir de base coché : Vues 3D, Métré,
+ *      Cotes 2D, Meubles. Le reste est décoché. »
+ *   2. « Coche aussi Élec et élévations de base. »
  *
  * C'est le dossier qu'on envoie neuf fois sur dix : le plan coté avec ses
- * meubles, le métré, et les perspectives. Tout le reste — surfaces teintées,
- * ouvertures en couleur, plafond, élévations, gaines, schémas, cotes 3D —
- * répond à une demande particulière, et se coche quand elle se présente.
+ * meubles, le métré, les perspectives — et LES MURS VUS DE FACE. Ceux-là
+ * ont d'abord été écartés parce qu'ils font une feuille par mur ; sauf que
+ * ce dossier-là est celui de l'électricien, et qu'un mur vu de face avec
+ * ses retours cotés est ce sur quoi il perce. Le reste — surfaces teintées,
+ * ouvertures en couleur, plafond, gaines, schémas, cotes 3D — répond à une
+ * demande particulière, et se coche quand elle se présente.
  *
  * Le défaut n'était pas d'avoir trop d'options : c'était d'en avoir six
  * cochées d'office. Un dossier de onze feuilles part chez le client alors
@@ -112,9 +118,16 @@ const options = (t: TestRenderer.ReactTestRenderer) => {
 };
 
 describe('les options cochées à l’ouverture de l’export', () => {
-  const COCHEES = ['Vues 3D', 'Métré', 'Cotes 2D', 'Meubles'];
+  const COCHEES = [
+    'Vues 3D',
+    'Métré',
+    'Cotes 2D',
+    'Meubles',
+    'Élévations',
+    'Cotes Élec',
+  ];
 
-  it('coche les quatre du dossier ordinaire', () => {
+  it('coche celles du dossier ordinaire', () => {
     const o = options(monter());
     for (const nom of COCHEES) {
       expect({ [nom]: o.get(nom) }).toEqual({ [nom]: true });

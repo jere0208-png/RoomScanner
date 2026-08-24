@@ -261,13 +261,16 @@ const styles = getStyles(c);
   const setClientInfo = useScanStore((s) => s.setClientInfo);
   const [prompt, setPrompt] = useState<PromptData | null>(null);
   /**
-   * LES ÉLÉVATIONS : un mur vu de face par feuille.
+   * LES ÉLÉVATIONS : un mur vu de face par feuille. COCHÉES DE BASE.
    *
-   * Décochées par défaut, et ce n'est pas de la prudence : elles font une
-   * feuille PAR MUR. C'est le dossier qu'on emporte sur le chantier, pas
-   * celui qu'on envoie au client.
+   * Elles ne l'étaient pas, et l'argument tenait : une feuille PAR MUR, un
+   * dossier qui triple. Relevé du patron : « coche aussi Élec et élévations
+   * de base ». C'est lui qui emporte le dossier, et ce qu'il regarde en
+   * perçant, c'est le mur VU DE FACE avec ses retours cotés — un plan vu du
+   * dessus ne dit pas à quelle hauteur poser. Les décocher reste un geste ;
+   * les chercher quand on est sur l'échelle n'en est pas un.
    */
-  const [elevations, setElevations] = useState(false);
+  const [elevations, setElevations] = useState(true);
   /*
     TOUS LES MURS, OU SEULEMENT LES ÉQUIPÉS.
 
@@ -277,9 +280,17 @@ const styles = getStyles(c);
     posé, pour décider où percer. Les deux usages sont justes, celui-ci se
     demande.
   */
-  /** « Cotes Élec » : les murs équipés, de face, cotés — voir
-   *  `feuillesElevations` pour l'absorption sans doublon. */
-  const [cotesElec, setCotesElec] = useState(false);
+  /*
+    « Cotes Élec » : les murs équipés, de face, cotés — voir
+    `feuillesElevations` pour l'absorption sans doublon.
+
+    COCHÉE DE BASE elle aussi, avec les élévations. Tant que les deux le
+    sont, elle n'ajoute rien : la plus large absorbe l'autre, et le dossier
+    ne double aucune feuille. Elle prend son sens au moment où l'on décoche
+    « Élévations » pour alléger — les murs ÉQUIPÉS restent alors dans le
+    dossier, et c'est le repli que l'on veut à ce moment-là, pas le vide.
+  */
+  const [cotesElec, setCotesElec] = useState(true);
   /*
     LES POINTS CARDINAUX — DE SÉRIE, SUR LE PLAN 2D SEULEMENT.
 

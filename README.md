@@ -6021,6 +6021,23 @@ ouverture : l'aperçu montre alors exactement ce que le dossier contiendra —
 c'est tout l'intérêt de cet écran — et le plan les retrouve tels quels en
 revenant, puisque ce sont les mêmes boutons.
 
+**Puis les élévations sont revenues, et « Cotes Élec » avec elles** — relevé
+du patron : « coche aussi Élec et élévations de base ». Elles étaient
+décochées pour une raison qui tenait : une feuille PAR MUR, un dossier qui
+triple. Sauf que ce dossier est d'abord celui de l'électricien, et que ce
+qu'il regarde en perçant, c'est le mur VU DE FACE avec ses retours cotés — un
+plan vu du dessus ne dit pas à quelle hauteur poser. Les décocher reste un
+geste ; les chercher quand on est sur l'échelle n'en est pas un.
+
+Tant que les deux sont cochées, **« Cotes Élec » n'ajoute rien** : la plus
+large absorbe l'autre (`feuillesElevations`), et le dossier ne double aucune
+feuille. Elle prend son sens au moment où l'on décoche « Élévations » pour
+alléger : les murs ÉQUIPÉS restent alors dedans, et c'est le repli qu'on veut
+à ce moment-là, pas le vide. Le dossier de défaut a été regardé à l'œil
+(`tools/pdf-vers-svg.mjs`) : dix feuilles sur le relevé de référence, dont
+les élévations avec leur cartouche, leurs ouvertures cotées et la mention
+« Aucun appareil sur ce mur » là où il n'y a rien de posé.
+
 ### Le bouton Note, le peigne, et ce qui est allumé à l'ouverture
 
 Quatre relevés du patron en rafale, tous sur la même bande d'écran.
