@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { BackChevron } from '../components/BackChevron';
 import { RetourGlisse } from '../components/RetourGlisse';
 import { garderLeTravail } from '../ui/gardeTravail';
+import { AlerteSortie } from '../components/AlerteSortie';
 import {
   Alert,
   Animated,
@@ -962,6 +963,15 @@ export function ResultScreen() {
   const [pendingKind, setPendingKind] = useState<FixtureKind | null>(null);
   // Nos fenêtres : une pour les choix, une pour les valeurs à saisir.
   const [menu, setMenu] = useState<ActionData | null>(null);
+  /**
+   * L'ALERTE DE SORTIE — la seule fenêtre de l'app posée au MILIEU.
+   *
+   * Elle porte la même donnée qu'une feuille (`garderLeTravail` décide du
+   * titre, de la phrase et de l'ordre des deux issues) ; c'est son écrin
+   * qui diffère, parce que ce qui se décide là ne se balaie pas d'un revers
+   * de pouce.
+   */
+  const [alerteSortie, setAlerteSortie] = useState<ActionData | null>(null);
   const [prompt, setPrompt] = useState<PromptData | null>(null);
   // Catalogue de mobilier : ouvert par le « + » posé à côté du calque meubles.
   const [catalogue, setCatalogue] = useState(false);
@@ -1673,8 +1683,17 @@ export function ResultScreen() {
   */
   const sortirDuPlan = () =>
     garderLeTravail({
-      // La question se pose dans NOTRE feuille : voir `garderLeTravail`.
-      demander: setMenu,
+      /*
+        LA QUESTION SE POSE AU MILIEU, dans sa propre page.
+
+        Elle vivait dans la feuille commune, qui monte du bas : c'est ce
+        qu'on veut d'un menu, qu'on ouvre par curiosité et qu'on referme
+        sans conséquence. Ici, l'appui suivant décide du sort du travail —
+        relevé du patron : « le pop-up doit être centré et doit afficher une
+        belle page ». Elle garde le MÊME contenu (`garderLeTravail` décide
+        de tout), seul son écrin change.
+      */
+      demander: setAlerteSortie,
       dirty,
       message:
         'Ce que vous venez de faire sur ce plan sera perdu si vous partez.',
@@ -1697,8 +1716,17 @@ export function ResultScreen() {
   */
   const repartirDeZero = () =>
     garderLeTravail({
-      // La question se pose dans NOTRE feuille : voir `garderLeTravail`.
-      demander: setMenu,
+      /*
+        LA QUESTION SE POSE AU MILIEU, dans sa propre page.
+
+        Elle vivait dans la feuille commune, qui monte du bas : c'est ce
+        qu'on veut d'un menu, qu'on ouvre par curiosité et qu'on referme
+        sans conséquence. Ici, l'appui suivant décide du sort du travail —
+        relevé du patron : « le pop-up doit être centré et doit afficher une
+        belle page ». Elle garde le MÊME contenu (`garderLeTravail` décide
+        de tout), seul son écrin change.
+      */
+      demander: setAlerteSortie,
       dirty,
       message:
         'Repartir de zéro efface le plan à l’écran, et ce qui n’a pas été ' +
@@ -4392,6 +4420,10 @@ export function ResultScreen() {
       />
 
       <ActionSheet data={menu} onClose={() => setMenu(null)} />
+      <AlerteSortie
+        data={alerteSortie}
+        onClose={() => setAlerteSortie(null)}
+      />
       <PromptSheet data={prompt} onClose={() => setPrompt(null)} />
 
       {/* ---------- Photo de repérage, en grand ---------- */}

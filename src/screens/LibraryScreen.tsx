@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { BackChevron } from '../components/BackChevron';
 import { RetourGlisse } from '../components/RetourGlisse';
 import { garderLeTravail } from '../ui/gardeTravail';
+import { AlerteSortie } from '../components/AlerteSortie';
 import {
   Animated,
   Easing,
@@ -695,8 +696,17 @@ export function LibraryScreen() {
   */
   const ouvrirLeScan = (id: string) =>
     garderLeTravail({
-      // La question se pose dans NOTRE feuille : voir `garderLeTravail`.
-      demander: setMenu,
+      /*
+        LA QUESTION SE POSE AU MILIEU, dans sa propre page.
+
+        Elle vivait dans la feuille commune, qui monte du bas : c'est ce
+        qu'on veut d'un menu, qu'on ouvre par curiosité et qu'on referme
+        sans conséquence. Ici, l'appui suivant décide du sort du travail —
+        relevé du patron : « le pop-up doit être centré et doit afficher une
+        belle page ». Elle garde le MÊME contenu (`garderLeTravail` décide
+        de tout), seul son écrin change.
+      */
+      demander: setAlerteSortie,
       // Rouvrir le plan qu'on tient déjà ne perd rien : on est dessus.
       dirty: dirty && id !== currentSaveId,
       message:
@@ -918,6 +928,15 @@ export function LibraryScreen() {
   // Nos fenêtres, pas celles du système : même typographie, mêmes rayons,
   // même bleu — et une icône par choix, qui se lit plus vite qu'un mot.
   const [menu, setMenu] = useState<ActionData | null>(null);
+  /**
+   * L'ALERTE DE SORTIE — la seule fenêtre de l'app posée au MILIEU.
+   *
+   * Elle porte la même donnée qu'une feuille (`garderLeTravail` décide du
+   * titre, de la phrase et de l'ordre des deux issues) ; c'est son écrin
+   * qui diffère, parce que ce qui se décide là ne se balaie pas d'un revers
+   * de pouce.
+   */
+  const [alerteSortie, setAlerteSortie] = useState<ActionData | null>(null);
   const [prompt, setPrompt] = useState<PromptData | null>(null);
 
   /*
@@ -1260,6 +1279,10 @@ export function LibraryScreen() {
       {/* Créer un dossier : bouton flottant en bas à droite, là où le pouce
           tombe naturellement. */}
       <ActionSheet data={menu} onClose={() => setMenu(null)} />
+      <AlerteSortie
+        data={alerteSortie}
+        onClose={() => setAlerteSortie(null)}
+      />
       <PromptSheet data={prompt} onClose={() => setPrompt(null)} />
 
       {!dossierOuvert && (

@@ -2057,7 +2057,13 @@ export function WallElevation({
               label: 'Retirer',
               on: !!selected,
               tint: c.danger,
-              paths: ['M5 7 h14', 'M9.5 7 V4.5 h5 V7', 'M6.5 7 l1 13 h9 l1 -13'],
+              /* La poubelle du jeu commun — relevé du patron :
+                 `trash-bin-trash`, « partout où il y a la poubelle ». Elle
+                 était tracée à la main, au trait ; c'est la seule
+                 silhouette de cette rangée, et c'est celle qui doit se
+                 reconnaître sans lire. */
+              paths: [],
+              plein: SOLAIRES.supprimer,
               press: () => {
                 if (!selected) return;
                 removeFixture(selected.id);
@@ -2078,17 +2084,21 @@ export function WallElevation({
             accessibilityLabel={b.label}
             onPress={b.press}>
             <Svg width={21} height={21} viewBox="0 0 24 24">
-              {b.paths.map((d) => (
-                <Path
-                  key={d}
-                  d={d}
-                  stroke={b.key === 'add' ? '#FFFFFF' : b.tint}
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  fill="none"
-                />
-              ))}
+              {'plein' in b && b.plein ? (
+                <Path d={b.plein} fill={b.tint} fillRule="evenodd" />
+              ) : (
+                b.paths.map((d) => (
+                  <Path
+                    key={d}
+                    d={d}
+                    stroke={b.key === 'add' ? '#FFFFFF' : b.tint}
+                    strokeWidth={2}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    fill="none"
+                  />
+                ))
+              )}
             </Svg>
             <Text
               style={[

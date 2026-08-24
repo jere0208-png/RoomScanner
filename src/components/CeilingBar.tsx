@@ -252,14 +252,14 @@ export function CeilingBar({
                       style={styles.iconBtn}
                       accessibilityLabel="Retirer"
                       onPress={onRemove}>
+                      {/* La poubelle du jeu commun — relevé du patron :
+                          `trash-bin-trash`, « partout où il y a la
+                          poubelle ». */}
                       <Svg width={19} height={19} viewBox="0 0 24 24">
                         <Path
-                          d="M5 7 h14 M9.5 7 V4.5 h5 V7 M6.5 7 l1 13 h9 l1 -13"
-                          stroke={palette.danger}
-                          strokeWidth={2}
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          fill="none"
+                          d={SOLAIRES.supprimer}
+                          fill={palette.danger}
+                          fillRule="evenodd"
                         />
                       </Svg>
                     </TouchableOpacity>

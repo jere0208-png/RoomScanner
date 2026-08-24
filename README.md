@@ -6711,6 +6711,64 @@ rate :
   montrer — d'où le « pas facilement » : ça marchait, ou pas, selon l'endroit
   du mur.
 
+### L'alerte de sortie : une page, pas une feuille
+
+**« Si on quitte un plan sans enregistrer, le pop-up doit être centré et doit
+afficher une belle page avec l'icône en gros, légère animation de la couleur
+dans l'icône, avec une lumière halo réaliste dynamique, faisant croire que le
+gyro est allumé. Donne-lui un effet rouge, plastique transparent. Ensuite gros
+texte moderne pour avertir, et les boutons en dessous, blanc, contour et texte
+bleu, pour enregistrer et rouge pour le quitter quand même. »**
+
+**Pourquoi au milieu, alors que tout le reste monte du bas.** Une feuille qui
+monte du bas se referme d'un glissement : c'est ce qu'on veut d'un menu,
+qu'on ouvre par curiosité et qu'on referme sans conséquence. Ici, l'appui
+suivant décide du sort du travail. Une fenêtre posée au centre arrête le
+regard — c'est la convention de tous les systèmes pour ce qui ne se balaie pas
+d'un revers de pouce.
+
+**Le gyrophare tient en trois couches, et il faut les trois.** Un halo en
+dégradé radial qui BAT (une ombre portée ne sait pas être rouge sur Android,
+et elle ne bat pas) ; deux faisceaux opposés qui TOURNENT — un seul donnerait
+un radar, c'est la paire qui fait le gyrophare, on voit passer la lumière deux
+fois par tour ; et la lampe elle-même qui respire, le rouge s'éclaircissant
+sans jamais s'éteindre. **Deux horloges** qui ne tombent pas juste l'une sur
+l'autre (620 ms et 2 200 ms) : c'est ce qui donne une lumière jamais deux fois
+la même. Tout part sur le fil natif — c'est la règle de l'app pour ce qui
+tourne en boucle.
+
+**Le plastique translucide, lui aussi, tient en trois couches** : un dégradé
+du clair au sombre (le volume d'un dôme), un reflet blanc en haut à gauche
+(la lumière qui frappe), et le reflet DÉCOUPÉ à la forme de la sirène — sans
+découpe, la tache blanche déborde et l'on ne voit plus une pièce moulée mais
+un autocollant.
+
+**Elle ne décide de rien.** La page REND une `ActionData` : le titre, la
+phrase et deux issues dans l'ordre que `garderLeTravail` a fixé — enregistrer
+d'abord, c'est ce qu'on veut neuf fois sur dix ; jeter ensuite, marqué comme
+tel. Changer le dessin de la fenêtre ne doit jamais changer ce qu'elle
+propose, et le banc de la garde n'a pas bougé d'une ligne. L'appui à côté ne
+décide de rien non plus : il referme, et l'on reste sur le plan.
+
+Un mot sur le banc : ces animations partent sur le fil natif, et l'arbre
+d'essai n'en a pas — leur valeur ne bougerait pas d'une image à l'autre même
+sur un vrai téléphone. Ce qui se compte, c'est leur NATURE : une valeur
+animée, pas un nombre écrit en dur. Et il faut lire le style BRUT, car
+`StyleSheet.flatten` résout une valeur animée en son nombre du moment :
+aplati, un halo qui bat ressemble à un halo figé.
+
+### Trois icônes de plus, du même jeu
+
+- **l'annulation et le rétablissement** passent dans leur carré
+  (`undo-left/right-round-square`) : les flèches nues se lisaient comme un
+  tracé du plan ; dans leur carré, elles ont le poids d'une touche, comme les
+  quatre flèches du pavé de réglage. Les deux gestes restent le même dessin
+  retourné ;
+- **la poubelle** (`trash-bin-trash`) remplace les deux corbeilles tracées à
+  la main — celle du bandeau du plafond et celle de l'établi. Le jeu la
+  portait déjà pour le menu de mur : c'était le même objet, dessiné deux fois
+  de deux façons.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

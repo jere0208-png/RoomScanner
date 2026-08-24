@@ -43,11 +43,21 @@ const CHOIX = {
   image: ['camera-bold'],
   model: ['box-bold'],
   rooms: ['widget-bold'],
-  undo: ['undo-left-bold', 'undo-left-round-bold'],
+  /*
+    L'ANNULATION ET LE RÉTABLISSEMENT, DANS LEUR CARRÉ — relevé du patron,
+    liens à l'appui : `undo-left-round-square`, `undo-right-round-square`.
+
+    Les flèches nues se lisaient comme un tracé du plan ; posées dans leur
+    carré, elles ont le poids d'une touche, comme les quatre flèches du pavé
+    de réglage. Et les deux gestes restent le MÊME dessin retourné : deux
+    dessins différents pour deux gestes symétriques se liraient comme deux
+    fonctions sans rapport.
+  */
+  undo: ['undo-left-round-square-bold', 'undo-left-bold'],
   // « Refaire » : la MÊME flèche que l'annulation, retournée. Deux dessins
   // différents pour deux gestes symétriques se liraient comme deux
   // fonctions sans rapport.
-  redo: ['undo-right-bold', 'undo-right-round-bold'],
+  redo: ['undo-right-round-square-bold', 'undo-right-bold'],
   square: ['ruler-angular-bold'],
   check: ['magnifer-bold'],
   gaines: ['routing-2-bold', 'routing-bold'],
@@ -129,6 +139,8 @@ const CHOIX = {
   longueur: ['transfer-horizontal-bold'],
   largeur: ['transfer-vertical-bold'],
   retirer: ['close-circle-bold'],
+  /* La sirène de l'alerte de sortie — relevé du patron : `siren`. */
+  sirene: ['siren-bold', 'siren-rounded-bold'],
   lien: ['link-round-bold', 'link-bold', 'link-circle-bold'],
   // --- la pastille de contrôle des normes, et son geste de correction
   bouclier: ['shield-check-bold', 'shield-star-bold', 'shield-bold'],
