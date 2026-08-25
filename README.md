@@ -7408,6 +7408,69 @@ la retire ; le récit de sa construction — pourquoi on lit un Lottie au lieu
 de l'embarquer — reste plus haut dans ce fichier, parce que la prochaine
 icône animée se fera de la même façon.
 
+### Les cotes courantes se touchent, elles ne se tapent plus
+
+Relevé du patron, après la feuille de choix des ouvertures : **« fais un tour
+complet de l'app, et optimise des choses qui pourraient prendre plus en
+facilité et moins de temps, comme cet ajout »**.
+
+Le tour a désigné le CLAVIER. Toutes les cotes de l'application passent par
+une seule feuille de saisie — hauteur sous plafond, hauteur d'un mur,
+largeur et hauteur d'une menuiserie, allège, position sur le mur. À chaque
+fois : un clavier numérique, une virgule à placer, d'une main, sur un
+chantier. Or la moitié de ces cotes ne sont pas des mesures, ce sont des
+VALEURS DE CATALOGUE. Un passage de porte fait 63, 73, 83 ou 93. Une allège
+est à 95, ou à 110 au-dessus d'un plan de travail. Un plafond fait 2,50, et
+2,70 dans l'ancien. Les taper, c'est retaper ce que tout le monde sait.
+
+La feuille porte donc une rangée de PASTILLES au-dessus de son champ, et un
+appui suffit : la pastille remplit le champ ET valide. Un choix explicite n'a
+pas besoin d'être confirmé une seconde fois — le demander, c'est reprendre
+d'une main ce qu'on donne de l'autre. Celle qui porte la cote déjà posée se
+distingue des autres, sinon on ne sait pas laquelle des quatre on a sous les
+yeux.
+
+**Quatre au plus.** Au-delà, on relit la liste au lieu de reconnaître sa
+cote, et la rangée déborde de l'écran d'un téléphone. Le champ, lui, reste à
+sa place : c'est le mètre qui tranche quand le bâtiment n'est pas du
+catalogue.
+
+**Elles disent la nature.** Les largeurs d'une porte ne sont pas celles d'une
+fenêtre, qui se compte par vantail, ni celles d'une baie libre, qui n'a pas
+de dormant qui la contraigne. Et la cote de POSE figure toujours dans la
+liste : `COTES_MENUISERIE` pose une porte de 83, et un banc compare les deux
+listes — sans lui, l'application se contredirait à un centimètre près, en
+proposant quatre largeurs dont aucune n'est celle qu'on a sous les yeux.
+
+**Sauf pour ce qui est une vraie mesure.** La longueur d'un mur n'a pas de
+pastilles : proposer des valeurs rondes serait suggérer une cote que
+personne n'a relevée. Et la POSITION d'une menuiserie sur son mur en a d'un
+autre genre — pas des cotes, des poses : « Centrée », « 10 à gauche », « 10
+à droite », calculées pour ce mur-là. « 1,35 » ne dit rien à personne ; « au
+milieu » et « au ras du refend » sont les deux seules positions qui ne se
+mesurent pas. Elles disparaissent quand la menuiserie remplit le mur : trois
+pastilles qui donneraient la même cote se lisent comme un geste raté.
+
+### La hauteur du logement, en un geste au lieu de huit
+
+Même relevé, autre trouvaille du tour. La hauteur sous plafond se réglait
+PIÈCE PAR PIÈCE. Sur un T4 — séjour, cuisine, trois chambres, salle de bain,
+WC, dégagement — c'est huit fois le même geste, pour une cote qu'un plancher
+coulé d'un seul tenant impose partout.
+
+Le réglage par pièce reste : il est juste, et c'est lui qui rattrape un
+plafond mal vu par RoomPlan. Ce qui change, c'est qu'après l'avoir posé,
+l'application POSE LA QUESTION — « et le reste du logement ? » — avec la cote
+déjà écrite dans le bouton. Un appui, et tous les murs suivent, y compris
+ceux qu'aucune pièce ne revendique : un recoin technique, un placard sous
+escalier, un refend laissé de côté par la détection. Les oublier produirait
+un logement à deux plafonds, visible en 3D et faux au métré.
+
+La question ne se pose que s'il reste vraiment des murs à une autre cote :
+poser une question dont on connaît déjà la réponse, c'est un geste de plus
+pour rien. Et l'accident garde son réglage à lui — une retombée de poutre,
+une sous-pente, un muret de cuisine se règlent mur par mur, après.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

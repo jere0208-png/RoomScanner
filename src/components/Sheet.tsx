@@ -200,6 +200,25 @@ export interface PromptData {
   unit?: string;
   numeric?: boolean;
   okLabel?: string;
+  /**
+   * LES COTES COURANTES, À TOUCHER PLUTÔT QU'À TAPER.
+   *
+   * Relevé du patron : « optimise des choses qui pourraient prendre plus en
+   * facilité et moins de temps ». La moitié des cotes de cette application
+   * ne sont pas des mesures, ce sont des valeurs de catalogue — 83 pour un
+   * passage, 95 pour une allège, 2,50 pour un plafond. Les taper au clavier
+   * numérique, d'une main, sur un chantier, c'est retaper ce que tout le
+   * monde sait.
+   *
+   * `label` est ce qu'on lit sur la pastille, dans la langue du métier (une
+   * menuiserie se commande en centimètres) ; `value` est ce qui entre dans
+   * le champ, donc des mètres avec la virgule. Voir `src/ui/cotesCourantes`.
+   *
+   * Rien ici pour ce qui est une VRAIE mesure — la longueur d'un mur :
+   * proposer des valeurs rondes serait suggérer une cote que personne n'a
+   * relevée.
+   */
+  choix?: { label: string; value: string }[];
   onSubmit: (value: string) => void;
 }
 
@@ -524,8 +543,14 @@ export function PromptSheet({
     setTexte(data?.value ?? '');
   }, [data]);
   const attente = useRef<null | (() => void)>(null);
-  const valider = () => {
-    const v = texte;
+  /*
+    LA VALEUR PART AVEC LE GESTE, pas avec l'état.
+
+    Une pastille remplit le champ ET valide. Passer par `setTexte` puis
+    valider aurait lu l'ancien état — le rendu ne s'est pas encore rejoué —
+    et posé la cote précédente. La valeur voyage donc en argument.
+  */
+  const valider = (v: string = texte) => {
     const suite = data?.onSubmit;
     attente.current = suite ? () => suite(v) : null;
     onClose();
@@ -554,16 +579,60 @@ export function PromptSheet({
               selectTextOnFocus
               keyboardType={vu.numeric ? 'decimal-pad' : 'default'}
               returnKeyType="done"
-              onSubmitEditing={valider}
+              onSubmitEditing={() => valider()}
               placeholderTextColor={c.inkFaint}
             />
             {vu.unit ? <Text style={styles.unit}>{vu.unit}</Text> : null}
           </View>
+          {/*
+            UN APPUI SUFFIT : la pastille remplit le champ et valide. Un
+            choix explicite n'a pas besoin d'être confirmé une seconde fois
+            — le demander, c'est reprendre d'une main ce qu'on donne de
+            l'autre.
+
+            Celle qui porte la cote DÉJÀ POSÉE se distingue : sans elle, on
+            ne sait pas laquelle des quatre on a sous les yeux.
+          */}
+          {vu.choix && vu.choix.length > 0 ? (
+            <View style={styles.pastilles}>
+              {vu.choix.map((ch) => {
+                const courante = ch.value === texte;
+                return (
+                  <Pressable
+                    key={ch.value}
+                    accessibilityRole="button"
+                    /* « Cote 83 » se lit ; « 83 » tout seul, non. Mais une
+                       pastille qui nomme un GESTE — « Centrée » — se dit
+                       telle quelle : « Cote centrée » ne veut rien dire. */
+                    accessibilityLabel={
+                      /^[0-9]/.test(ch.label) ? `Cote ${ch.label}` : ch.label
+                    }
+                    style={({ pressed }) => [
+                      styles.pastille,
+                      courante && styles.pastilleCourante,
+                      pressed && styles.pastillePressee,
+                    ]}
+                    onPress={() => {
+                      setTexte(ch.value);
+                      valider(ch.value);
+                    }}>
+                    <Text
+                      style={[
+                        styles.pastilleTexte,
+                        courante && styles.pastilleTexteCourant,
+                      ]}>
+                      {ch.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : null}
           <View style={styles.actions}>
             <Pressable style={styles.ghost} onPress={onClose}>
               <Text style={styles.ghostText}>Annuler</Text>
             </Pressable>
-            <Pressable style={styles.primary} onPress={valider}>
+            <Pressable style={styles.primary} onPress={() => valider()}>
               <Text style={styles.primaryText}>{vu.okLabel ?? 'Valider'}</Text>
             </Pressable>
           </View>
@@ -685,6 +754,26 @@ const getStyles = themedStyles((c: Palette) =>
       paddingVertical: 13,
     },
     unit: { color: c.inkFaint, fontSize: 14, fontWeight: '700' },
+    /* Une rangée qui passe à la ligne : quatre cotes tiennent sur un
+       téléphone, deux de plus sur une tablette, et rien ne déborde. */
+    pastilles: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
+    pastille: {
+      flexGrow: 1,
+      flexBasis: 0,
+      minWidth: 62,
+      // Quarante-quatre points sous le doigt : la cible, pas le dessin.
+      minHeight: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: radius.pill,
+      backgroundColor: c.surfaceSunken,
+      borderWidth: 1,
+      borderColor: 'transparent',
+    },
+    pastilleCourante: { borderColor: c.blue, backgroundColor: c.blueSoft },
+    pastillePressee: { backgroundColor: c.line },
+    pastilleTexte: { color: c.inkSoft, fontSize: 15, fontWeight: '700' },
+    pastilleTexteCourant: { color: c.blue },
     actions: { flexDirection: 'row', gap: 10, marginTop: 14 },
     ghost: {
       flex: 1,

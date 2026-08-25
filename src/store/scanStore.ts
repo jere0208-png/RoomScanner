@@ -887,6 +887,13 @@ interface ScanState {
   /** Hauteur sous plafond d'une pièce (applique à tous ses murs). */
   setRoomHeight: (roomId: string, height: number) => void;
   /**
+   * LA MÊME HAUTEUR PARTOUT — un plancher est coulé d'un seul tenant.
+   *
+   * Le réglage par pièce reste juste, mais sur un T4 c'est huit fois le
+   * même geste. Voir l'action pour ce qui suit, et ce qui ne suit pas.
+   */
+  setAllRoomHeights: (height: number) => void;
+  /**
    * La hauteur d'UN mur, sans toucher aux autres.
    *
    * Une retombée de poutre, une sous-pente, un muret de cuisine à 1,10 m :
@@ -3689,6 +3696,38 @@ export const useScanStore = create<ScanState>((set, get) => {
         walls: st.walls.map((w) =>
           ids.has(w.id) ? { ...w, height, yCenter: height / 2 } : w,
         ),
+        dirty: true,
+      });
+    },
+
+    /*
+      LA HAUTEUR DE TOUT LE LOGEMENT, EN UN GESTE.
+
+      Relevé du patron : « optimise des choses qui pourraient prendre plus en
+      facilité et moins de temps ». La hauteur se réglait pièce par pièce :
+      sur un T4 — séjour, cuisine, trois chambres, salle de bain, WC,
+      dégagement — huit fois le même geste, pour une cote que le plancher
+      impose partout.
+
+      TOUS LES MURS, y compris ceux qu'aucune pièce ne revendique : un recoin
+      technique, un placard sous escalier, un mur de refend laissé de côté
+      par la détection. Les oublier produirait un logement à deux plafonds,
+      visible en 3D et faux au métré.
+
+      L'accident garde son réglage à lui : une retombée de poutre, une
+      sous-pente, un muret de cuisine se règlent mur par mur
+      (`setWallHeight`), et c'est le geste qu'on fait APRÈS avoir posé la
+      hauteur du logement.
+    */
+    setAllRoomHeights: (height) => {
+      if (!(height > 1) || height > 6) return;
+      const st = get();
+      // Rien à changer, rien à annuler : un pas d'historique pour rien est
+      // une annulation qui ne défait rien, et le geste paraît perdu.
+      if (st.walls.every((w) => Math.abs(w.height - height) < 1e-6)) return;
+      pushHistory('height');
+      set({
+        walls: st.walls.map((w) => ({ ...w, height, yCenter: height / 2 })),
         dirty: true,
       });
     },

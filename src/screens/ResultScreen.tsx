@@ -5,6 +5,13 @@ import { garderLeTravail } from '../ui/gardeTravail';
 import { AlerteSortie } from '../components/AlerteSortie';
 import { ChoixOuverture } from '../components/ChoixOuverture';
 import {
+  ALLEGES_COURANTES,
+  HAUTEURS_SOUS_PLAFOND,
+  hauteursCourantes,
+  largeursCourantes,
+  pastilles,
+} from '../ui/cotesCourantes';
+import {
   Alert,
   Animated,
   Image,
@@ -1352,6 +1359,14 @@ export function ResultScreen() {
       value: actuel.toFixed(2).replace('.', ','),
       unit: 'm',
       numeric: true,
+      /* Les cotes du commerce, à toucher plutôt qu'à taper — et celles de
+         SA nature : on ne propose pas 63 pour une baie libre. */
+      choix: pastilles(
+        quoi === 'largeur'
+          ? largeursCourantes(o.type as 'door' | 'window' | 'opening')
+          : hauteursCourantes(o.type as 'door' | 'window' | 'opening'),
+        'cm',
+      ),
       onSubmit: (t) => {
         const v = parseFloat(t.replace(',', '.'));
         if (!(v > 0)) return;
@@ -1409,6 +1424,29 @@ export function ResultScreen() {
         .replace('.', ','),
       unit: 'm',
       numeric: true,
+      /*
+        ICI, LES PROPOSITIONS NE SONT PAS DES COTES, CE SONT DES POSES.
+
+        « 1,35 » ne dit rien à personne : cette cote-là dépend de la
+        longueur du mur et de la largeur de la menuiserie. Ce qu'un poseur
+        demande, c'est « au milieu » ou « au ras du refend » — les deux
+        seules positions qui ne se mesurent pas. Elles sont calculées ici,
+        pour CE mur, et le champ reste pour les 90 relevés au mètre.
+
+        Rien à proposer si la menuiserie remplit le mur : trois pastilles
+        qui donneraient toutes la même cote se lisent comme un geste raté.
+      */
+      choix:
+        L - l > 0.25
+          ? [
+              { label: 'Centrée', value: ((L - l) / 2).toFixed(2).replace('.', ',') },
+              { label: '10 à gauche', value: '0,10' },
+              {
+                label: '10 à droite',
+                value: (L - l - 0.1).toFixed(2).replace('.', ','),
+              },
+            ]
+          : undefined,
       onSubmit: (t) => {
         const v = parseFloat(t.replace(',', '.'));
         if (isFinite(v)) moveOpening(id, v);
@@ -1438,6 +1476,9 @@ export function ResultScreen() {
         .replace('.', ','),
       unit: 'm',
       numeric: true,
+      /* Zéro pour une porte-fenêtre, 110 au-dessus d'un plan de travail :
+         quatre appuis qui couvrent presque tout un logement. */
+      choix: pastilles(ALLEGES_COURANTES, 'cm'),
       onSubmit: (t) => {
         const v = parseFloat(t.replace(',', '.'));
         if (isFinite(v)) setAllege(id, v);
@@ -1894,9 +1935,48 @@ export function ResultScreen() {
       value: roomHeight(targetPart.walls).toFixed(2).replace('.', ','),
       unit: 'm',
       numeric: true,
+      choix: pastilles(HAUTEURS_SOUS_PLAFOND, 'm'),
       onSubmit: (t) => {
         const v = parseFloat(t.replace(',', '.'));
-        if (v > 0) setRoomHeight(targetRoom.id, v);
+        if (!(v > 0)) return;
+        setRoomHeight(targetRoom.id, v);
+        /*
+          ET LE RESTE DU LOGEMENT ?
+
+          Un plancher est coulé d'un seul tenant : la hauteur est la même
+          partout, sauf accident — et l'accident (retombée, sous-pente,
+          muret) a son réglage à lui, mur par mur. La régler pièce par
+          pièce, c'est huit fois le même geste sur un T4.
+
+          La question ne se pose QUE s'il reste des murs à une autre cote :
+          poser une question dont on connaît déjà la réponse, c'est un
+          geste de plus pour rien.
+        */
+        const reste = useScanStore
+          .getState()
+          .walls.filter((w) => Math.abs(w.height - v) > 0.01);
+        if (reste.length === 0) return;
+        const cote = v.toFixed(2).replace('.', ',');
+        setMenu({
+          title: 'Et le reste du logement ?',
+          subtitle:
+            'Une retombée de poutre ou une sous-pente se règle ensuite, ' +
+            'mur par mur.',
+          actions: [
+            {
+              label: `Tout le logement à ${cote} m`,
+              icon: 'hauteur' as const,
+              onPress: () => {
+                useScanStore.getState().setAllRoomHeights(v);
+                haptic('succes');
+              },
+            },
+            {
+              label: 'Cette pièce seulement',
+              onPress: () => {},
+            },
+          ],
+        });
       },
     });
   };
@@ -2119,6 +2199,7 @@ export function ResultScreen() {
       value: w.height.toFixed(2).replace('.', ','),
       unit: 'm',
       numeric: true,
+      choix: pastilles(HAUTEURS_SOUS_PLAFOND, 'm'),
       onSubmit: (t) => {
         const v = parseFloat(t.replace(',', '.'));
         if (v > 0) setWallHeight(wallId, v);
