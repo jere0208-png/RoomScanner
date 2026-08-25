@@ -114,6 +114,23 @@ const CHOIX = {
   // flèches verticales, jamais une galerie (relevé du patron).
   elevations: ['sort-vertical-bold', 'round-sort-vertical-bold', 'arrow-up-bold'],
   schema: ['server-minimalistic-bold', 'server-2-bold'],
+  /*
+    LES DEUX GESTES DES BANDEAUX DU BAS QUI SE DESSINAIENT À LA MAIN.
+
+    Relevé du patron : « je veux les icônes de la sélection d'un spot, mais
+    avec les tailles de la sélection de la ligne, et fais ça pour chaque
+    élément, pour avoir une continuité parfaite ». L'inventaire a trouvé
+    pire que deux tailles : « Pivoter » était un arc tracé au trait dans le
+    bandeau d'un meuble, « Centrer » une cible tracée au trait dans celui
+    d'un spot. Deux silhouettes hors du jeu, au milieu de leurs voisines qui
+    en venaient — et qui dérivent au premier changement de jeu.
+
+    `restart` est la flèche qui fait un quart de tour : c'est le geste, pas
+    une idée de rechargement. `gps` est la cible du viseur — le même dessin
+    que la main avait tenté, en propre.
+  */
+  pivoter: ['restart-bold', 'refresh-bold'],
+  centrer: ['gps-bold', 'target-bold'],
   // --- le menu du mur, et le crayon du bandeau
   supprimer: ['trash-bin-trash-bold', 'trash-bin-minimalistic-bold'],
   crayon: ['pen-bold'],

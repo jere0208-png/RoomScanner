@@ -42,6 +42,15 @@ export interface StripAction {
    */
   icone?: string;
   sansMot?: boolean;
+  /**
+   * LE GESTE QUI ENLÈVE, en rouge.
+   *
+   * « Retirer » se dessinait en gris d'encre sous une ligne de spots, en
+   * rouge sous un spot et sous un meuble. Une même conséquence doit avoir
+   * une même couleur : c'est la seule chose qui distingue, d'un coup d'œil,
+   * le bouton qu'on ne touche pas par erreur.
+   */
+  danger?: boolean;
 }
 
 /**
@@ -155,6 +164,22 @@ export function StripBar({
           const teinte =
             (StyleSheet.flatten(texte) as { color?: string })?.color ??
             '#FFFFFF';
+          /*
+            LA SILHOUETTE NE SUIT PAS LE MOT — relevé du patron : « je veux
+            les icônes de la sélection d'un spot ». Un spot les porte en
+            BLEU sur fond enfoncé ; le gris d'encre du mot se lisait comme
+            un libellé, pas comme un geste. Rouge quand le geste enlève,
+            blanc quand la pastille est pleine (elle dit alors un état, pas
+            une action de plus).
+          */
+          const teinteIcone =
+            (StyleSheet.flatten(
+              a.danger
+                ? styles.bandeauIconeDanger
+                : a.ghost
+                ? styles.bandeauIcone
+                : styles.bandeauIconePleine,
+            ) as { color?: string })?.color ?? teinte;
           const bouton = (
             <TouchableOpacity
               key={a.label}
@@ -171,7 +196,7 @@ export function StripBar({
               {a.crayon && <Crayon teinte={teinte} />}
               {a.icone && (
                 <Svg width={17} height={17} viewBox="0 0 24 24">
-                  <Path d={a.icone} fill={teinte} fillRule="evenodd" />
+                  <Path d={a.icone} fill={teinteIcone} fillRule="evenodd" />
                 </Svg>
               )}
               {!a.sansMot && (

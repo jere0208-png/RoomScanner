@@ -96,15 +96,14 @@ function Fleche({
       // centimètre attendrait que le doigt se lève.
       onPressIn={demarrer}
       onPressOut={arreter}>
+      {/* UNE SILHOUETTE, PAS UN TRAIT. Les quatre flèches étaient tracées
+          à la main, au trait, dans une application qui ne dessine qu'en
+          plein — c'est le même défaut que la rangée d'outils avait déjà
+          corrigé : « posés sous une rangée de pleins, ils se lisaient comme
+          des traits de construction plutôt que comme des boutons ». Le jeu
+          commun a ces quatre flèches dans leur carré. */}
       <Svg width={17} height={17} viewBox="0 0 24 24">
-        <Path
-          d={d}
-          stroke={couleur}
-          strokeWidth={2.2}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          fill="none"
-        />
+        <Path d={d} fill={couleur} fillRule="evenodd" />
       </Svg>
     </TouchableOpacity>
   );
@@ -219,10 +218,10 @@ export function ObjectBar({
       </View>
       {onNudge && (
         <View style={styles.nudgeRow}>
-          {fleche('Déplacer vers le haut', 0, -1, 'M12 19 V6 M6 12 L12 6 L18 12')}
-          {fleche('Déplacer vers la gauche', -1, 0, 'M19 12 H6 M12 6 L6 12 L12 18')}
-          {fleche('Déplacer vers la droite', 1, 0, 'M5 12 H18 M12 6 L18 12 L12 18')}
-          {fleche('Déplacer vers le bas', 0, 1, 'M12 5 V18 M6 12 L12 18 L18 12')}
+          {fleche('Déplacer vers le haut', 0, -1, SOLAIRES.flecheHaut)}
+          {fleche('Déplacer vers la gauche', -1, 0, SOLAIRES.flecheGauche)}
+          {fleche('Déplacer vers la droite', 1, 0, SOLAIRES.flecheDroite)}
+          {fleche('Déplacer vers le bas', 0, 1, SOLAIRES.flecheBas)}
           {/* Ce que fait le geste, en trois mots : sans cette note, le
               maintien ne se découvre que par hasard. */}
           <Text style={styles.nudgeNote}>1 cm · maintenir</Text>
@@ -272,22 +271,11 @@ export function ObjectBar({
             hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
             accessibilityLabel="Pivoter"
             onPress={onRotate}>
-            <Svg width={19} height={19} viewBox="0 0 24 24">
-              <Path
-                d="M19.5 12 a7.5 7.5 0 1 1 -2.2 -5.3"
-                stroke={palette.ink}
-                strokeWidth={2}
-                strokeLinecap="round"
-                fill="none"
-              />
-              <Path
-                d="M19.8 3.8 v4.4 h-4.4"
-                stroke={palette.ink}
-                strokeWidth={2}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                fill="none"
-              />
+            {/* LA FLÈCHE D'UN QUART DE TOUR, du jeu commun. Elle était
+                tracée à la main — un arc et sa pointe — et en encre, quand
+                toutes ses voisines de bandeau sont bleues. */}
+            <Svg width={17} height={17} viewBox="0 0 24 24">
+              <Path d={SOLAIRES.pivoter} fill={palette.blue} fillRule="evenodd" />
             </Svg>
           </TouchableOpacity>
             {/* Le mot sous la pastille : voir `bandeauMot`. */}
@@ -307,17 +295,17 @@ export function ObjectBar({
             */
             accessibilityLabel="Retirer le meuble"
             onPress={onCancel}>
-            <Svg width={19} height={19} viewBox="0 0 24 24">
-              {['M6.5 6.5 L17.5 17.5', 'M17.5 6.5 L6.5 17.5'].map((d) => (
-                <Path
-                  key={d}
-                  d={d}
-                  stroke={palette.danger}
-                  strokeWidth={2.2}
-                  strokeLinecap="round"
-                  fill="none"
-                />
-              ))}
+            {/* LA POUBELLE, comme partout ailleurs — relevé du patron :
+                « la poubelle partout où il y a la poubelle ». Une croix
+                nue disait « annuler » ; ce bouton-là ENLÈVE le meuble du
+                plan, et trois dessins servaient au même geste selon ce
+                qu'on avait touché. */}
+            <Svg width={17} height={17} viewBox="0 0 24 24">
+              <Path
+                d={SOLAIRES.supprimer}
+                fill={palette.danger}
+                fillRule="evenodd"
+              />
             </Svg>
           </TouchableOpacity>
             <Text style={styles.bandeauMot}>Retirer</Text>

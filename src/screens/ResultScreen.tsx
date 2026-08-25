@@ -3675,7 +3675,14 @@ export function ResultScreen() {
                 },
                 {
                   label: 'Retirer',
-                  icone: SOLAIRES.retirer,
+                  /* LA POUBELLE, comme sous un spot et sous un meuble —
+                     relevé du patron : « la poubelle partout où il y a la
+                     poubelle ». Une croix dans un cercle servait ici, au
+                     même geste, dans la même rangée. Et en ROUGE, comme
+                     partout ailleurs : une même conséquence, une même
+                     couleur. */
+                  icone: SOLAIRES.supprimer,
+                  danger: true,
                   sansMot: true,
                   onPress: () => {
                     removeNote(note.id);
@@ -3750,7 +3757,10 @@ export function ResultScreen() {
                 */
                 {
                   label: 'Relier',
-                  icone: SOLAIRES.lien,
+                  /* Le maillon CARRÉ, celui du bandeau d'un spot — relevé
+                     du patron à l'époque : `link-square`. Deux maillons
+                     pour un geste, à un écran d'écart. */
+                  icone: SOLAIRES.lienCarre,
                   sansMot: true,
                   ghost: true,
                   onPress: () => {
@@ -3760,7 +3770,14 @@ export function ResultScreen() {
                 },
                 {
                   label: 'Retirer',
-                  icone: SOLAIRES.retirer,
+                  /* LA POUBELLE, comme sous un spot et sous un meuble —
+                     relevé du patron : « la poubelle partout où il y a la
+                     poubelle ». Une croix dans un cercle servait ici, au
+                     même geste, dans la même rangée. Et en ROUGE, comme
+                     partout ailleurs : une même conséquence, une même
+                     couleur. */
+                  icone: SOLAIRES.supprimer,
+                  danger: true,
                   sansMot: true,
                   ghost: true,
                   onPress: () => {

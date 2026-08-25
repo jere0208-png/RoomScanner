@@ -441,8 +441,16 @@ describe('l’écran des résultats', () => {
     /*
       LES GESTES DE LA LIGNE SONT DES ICÔNES — relevé du patron : le
       bandeau débordait sous la colonne d'ancrage. Les flèches Solar
-      disent l'axe, la croix retire ; les mots vivent dans l'étiquette
-      d'accessibilité, pas dans la largeur du bandeau.
+      disent l'axe ; les mots vivent dans l'étiquette d'accessibilité, pas
+      dans la largeur du bandeau.
+
+      LA CROIX EST DEVENUE UNE POUBELLE. Ce banc exigeait `retirer`, la
+      croix dans un cercle — c'était le dessin de cette rangée-là, et
+      d'elle seule : un spot et un meuble avaient chacun le leur pour le
+      même geste. Relevé du patron : « je veux les icônes de la sélection
+      d'un spot… pour avoir une continuité parfaite ». C'est donc la
+      poubelle commune, en rouge comme partout ailleurs (voir
+      `continuite.test.tsx`, qui tient la règle pour les quatre coquilles).
     */
     expect(
       bouton(tree, 'Longueur')!
@@ -458,7 +466,7 @@ describe('l’écran des résultats', () => {
     expect(
       bouton(tree, 'Retirer')!
         .findAllByType(Path)
-        .some((p) => p.props.d === SOLAIRES.retirer),
+        .some((p) => p.props.d === SOLAIRES.supprimer),
     ).toBe(true);
 
     // Retourner la ligne : le bandeau le dit aussitôt.

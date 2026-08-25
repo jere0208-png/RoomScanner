@@ -126,21 +126,16 @@ export function CeilingBar({
                   onSubmit: (t) => poser(k, t),
                 });
               }}>
-              <Svg width={15} height={15} viewBox="0 0 24 24">
-                {(fleche === 'gauche'
-                  ? ['M3 12 h18', 'M8 7 L3 12 l5 5', 'M16 7 l5 5 -5 5']
-                  : ['M12 3 v18', 'M7 8 L12 3 l5 5', 'M7 16 l5 5 5 -5']
-                ).map((d2) => (
-                  <Path
-                    key={d2}
-                    d={d2}
-                    stroke={palette.inkSoft}
-                    strokeWidth={2}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    fill="none"
-                  />
-                ))}
+              {/* LE SIGNE DE L'AXE : la même double flèche que « Longueur »
+                  et « Largeur » sous une ligne de spots. Elle était tracée
+                  au trait ici, en plein là-bas, pour dire exactement la
+                  même chose. */}
+              <Svg width={17} height={17} viewBox="0 0 24 24">
+                <Path
+                  d={fleche === 'gauche' ? SOLAIRES.longueur : SOLAIRES.largeur}
+                  fill={palette.inkSoft}
+                  fillRule="evenodd"
+                />
               </Svg>
               <Text style={styles.clValeur}>{cm(ecart(k))}</Text>
             </TouchableOpacity>
@@ -196,20 +191,17 @@ export function CeilingBar({
                           onMove(centre);
                           haptic('succes');
                         }}>
-                        {/* Une cible : deux axes et un point au milieu. */}
-                        <Svg width={19} height={19} viewBox="0 0 24 24">
+                        {/* LA CIBLE DU JEU COMMUN. Elle était tracée à la
+                            main — deux axes et un cercle — au milieu de
+                            voisines qui venaient toutes du jeu Solar : une
+                            silhouette écrite à part dérive au premier
+                            changement, et personne ne le voit avant
+                            l'écran. */}
+                        <Svg width={17} height={17} viewBox="0 0 24 24">
                           <Path
-                            d="M12 3 v3 M12 18 v3 M3 12 h3 M18 12 h3"
-                            stroke={palette.blue}
-                            strokeWidth={2}
-                            strokeLinecap="round"
-                            fill="none"
-                          />
-                          <Path
-                            d="M12 8.2 a3.8 3.8 0 1 0 0.01 0"
-                            stroke={palette.blue}
-                            strokeWidth={2}
-                            fill="none"
+                            d={SOLAIRES.centrer}
+                            fill={palette.blue}
+                            fillRule="evenodd"
                           />
                         </Svg>
                       </TouchableOpacity>
@@ -232,7 +224,7 @@ export function CeilingBar({
                       {/* Le maillon du jeu commun — relevé du patron :
                           `link-square`. Il était tracé à la main, au trait,
                           pendant que ses voisins venaient du jeu. */}
-                      <Svg width={19} height={19} viewBox="0 0 24 24">
+                      <Svg width={17} height={17} viewBox="0 0 24 24">
                         <Path
                           d={SOLAIRES.lienCarre}
                           fill={palette.blue}
@@ -259,7 +251,7 @@ export function CeilingBar({
                       {/* La poubelle du jeu commun — relevé du patron :
                           `trash-bin-trash`, « partout où il y a la
                           poubelle ». */}
-                      <Svg width={19} height={19} viewBox="0 0 24 24">
+                      <Svg width={17} height={17} viewBox="0 0 24 24">
                         <Path
                           d={SOLAIRES.supprimer}
                           fill={palette.danger}
@@ -277,7 +269,7 @@ export function CeilingBar({
                       onPress={onDone}>
                       {/* Le V de validation du jeu commun — relevé du
                           patron : `unread`, « c'est un V de valider ». */}
-                      <Svg width={19} height={19} viewBox="0 0 24 24">
+                      <Svg width={17} height={17} viewBox="0 0 24 24">
                         <Path d={SOLAIRES.valider} fill="#FFFFFF" fillRule="evenodd" />
                       </Svg>
                     </TouchableOpacity>

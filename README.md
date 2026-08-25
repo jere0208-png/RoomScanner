@@ -7542,6 +7542,62 @@ attrapait. Il prend maintenant la DERNIÈRE — « ce qu'on touche est en
 dessous » est la forme même de ces bandeaux, et c'est un fait de dessin, pas
 un nom de style.
 
+### Un même geste se dessine partout pareil
+
+Relevé du patron : **« la sélection d'une ligne de spots affiche d'autres
+boutons et d'autres icônes que la sélection d'un seul spot. Je veux les
+icônes de la sélection d'un spot, mais avec les tailles de la sélection de
+la ligne, et fais ça pour chaque élément, pour avoir une continuité parfaite
+des éléments de l'interface. »**
+
+L'inventaire lui a donné raison, et au-delà. **« Retirer » se dessinait de
+trois façons** selon ce qu'on avait touché : une croix dans un cercle sous
+une ligne de spots, une poubelle sous un spot, une croix nue tracée à la main
+sous un meuble. **« Relier » avait deux maillons**, un rond et un carré.
+**« Pivoter » et « Centrer » étaient dessinés à la main**, hors du jeu, au
+milieu de voisines qui en venaient toutes. Les quatre flèches de déplacement
+d'un meuble étaient au trait dans une application qui ne dessine qu'en plein
+— exactement le défaut que la rangée d'outils avait déjà corrigé une fois.
+Et les pastilles avaient **deux tailles** : 34 points sous une ligne de
+spots, 40 sous un spot ou un meuble.
+
+**Trois règles, et un banc qui les tient.**
+
+1. **Tout tracé vient du jeu commun.** Une silhouette écrite à la main dans
+   un composant dérive du jeu au premier changement, et personne ne le voit
+   avant l'écran. Deux icônes manquaient : `pivoter` (la flèche d'un quart de
+   tour) et `centrer` (la cible du viseur) — déclarées dans
+   `tools/gen-solaires.mjs`, pas à la main dans le fichier généré, qui les
+   perdrait à la génération suivante.
+2. **Un geste, un tracé.** « Retirer » est la même poubelle partout — c'était
+   déjà un relevé : « la poubelle partout où il y a la poubelle » — et en
+   ROUGE partout, parce qu'une même conséquence doit avoir une même couleur.
+   « Relier » est le maillon carré, celui que le patron avait désigné.
+3. **Une seule taille**, celle de la ligne de spots, la plus serrée : 34 pour
+   la pastille, 17 pour la silhouette. Les 44 points du doigt ne sont pas en
+   cause — ils valent pour la CIBLE, et chaque pastille garde son débord.
+
+**Les silhouettes passent au bleu.** Un spot les portait en bleu sur fond
+enfoncé, une ligne de spots en gris d'encre douce : deux allures pour les
+mêmes gestes. C'est le bleu qui gagne — le gris se lisait comme un libellé,
+pas comme quelque chose qui se touche. Le mot sous la pastille, lui, garde
+son gris de légende : ce sont les silhouettes qu'on uniformise, pas les
+étiquettes.
+
+**Deux exceptions, écrites dans le banc plutôt que subies.** Le CRAYON qui
+précède un mot (« Corriger ») est un ornement dans un bouton à texte, pas une
+pastille : il se cale sur la taille du mot. Et les touches du PAVÉ
+DIRECTIONNEL d'un meuble restent carrées et plus grandes — c'est un choix
+déjà écrit : « la flèche est le geste le plus fin du bandeau, un centimètre
+par appui : elle mérite la même cible que les autres, pas moins ». Le banc
+compare donc les pastilles RONDES entre elles, ce qui est un fait de dessin
+et non un chiffre à retenir.
+
+Le bandeau d'une PIÈCE ne porte aucune silhouette d'action, et c'est écrit
+noir sur blanc dans le banc : ses quatre boutons disent des mots — « Nommer »,
+« Cotes », « H 2,50 » — et un mot n'a pas besoin d'une silhouette pour se
+comprendre.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

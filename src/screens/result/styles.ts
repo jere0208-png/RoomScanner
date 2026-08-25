@@ -660,6 +660,20 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     fontWeight: '600',
     opacity: 0.75,
   },
+  /*
+    LES TROIS TEINTES D'UNE SILHOUETTE DE BANDEAU.
+
+    Relevé du patron : « je veux les icônes de la sélection d'un spot ». Un
+    spot les portait en BLEU sur fond enfoncé, une ligne de spots en gris
+    d'encre douce : deux allures pour les mêmes gestes. C'est le bleu qui
+    gagne — il dit « ça se touche », là où le gris se lit comme un libellé.
+
+    Le mot sous la pastille, lui, garde son gris de légende : ce sont les
+    silhouettes qu'on uniformise, pas les étiquettes.
+  */
+  bandeauIcone: { color: c.blue },
+  bandeauIconeDanger: { color: c.danger },
+  bandeauIconePleine: { color: '#FFFFFF' },
   bandeauBtnTexte: { color: '#FFFFFF', fontSize: 13.5, fontWeight: '800' },
   bandeauBtnGhostTexte: { color: c.inkSoft, fontSize: 13.5, fontWeight: '800' },
   /*
@@ -794,9 +808,23 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     bout d'une ligne pleine, et le dernier rogné par le bord. Depuis que la
     rangée d'actions vit sous le texte, la place est là : on la prend.
   */
+  /*
+    LA PASTILLE D'UN BANDEAU, EN UNE SEULE TAILLE.
+
+    Elle faisait quarante points sous un spot et sous un meuble,
+    trente-quatre sous une ligne de spots : deux tailles pour la même
+    rangée, à un écran d'écart. Relevé du patron : « avec les tailles de la
+    sélection de la ligne ». C'est la plus serrée qui l'emporte — et les
+    quarante-quatre points du doigt ne sont pas en cause, ils valent pour la
+    CIBLE : chaque pastille garde son débord (`DEBORD_DOIGT`).
+
+    Ces deux-là ne sont plus que des ALIAS de la pastille commune : les
+    garder évite de réécrire trois bandeaux pour un nom de style, et leur
+    géométrie ne peut plus diverger.
+  */
   iconBtn: {
-    width: 40,
-    height: 40,
+    width: 34,
+    height: 34,
     borderRadius: radius.pill,
     backgroundColor: c.surfaceSunken,
     alignItems: 'center',
@@ -804,8 +832,8 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     flexShrink: 0,
   },
   iconBtnOk: {
-    width: 40,
-    height: 40,
+    width: 34,
+    height: 34,
     borderRadius: radius.pill,
     backgroundColor: c.blue,
     alignItems: 'center',
