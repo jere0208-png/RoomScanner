@@ -260,7 +260,7 @@ describe('l’accueil', () => {
     ).toBe(0);
   });
 
-  it('en Pro, le prénom et le contour de l’avatar s’animent en couleurs', () => {
+  it('en Pro, le prénom s’anime en couleurs et l’avatar reste nu', () => {
     useAccountStore.setState({
       compte: { id: 'email:j@c.fr', prenom: 'Jérôme', methode: 'email' },
       pro: true,
@@ -773,7 +773,25 @@ describe('le glyphe incrusté', () => {
     « Noir », c'est l'encre du THÈME : un noir en dur disparaîtrait sur un
     fond sombre, et l'icône n'y serait plus qu'un contour bleu vide.
   */
-  it('porte l’encre du thème, cernée du bleu de la maison', () => {
+  it('porte l’encre du thème, et plus aucun cerne', () => {
+    /*
+      TROIS HABITS EN TROIS RELEVÉS, ET C'EST LE TROISIÈME QUI TIENT.
+
+        1. le GRIS des textes secondaires — discrète au point de se confondre
+           avec le prénom posé à côté, alors que c'est la seule porte de
+           l'accueil vers le compte ;
+        2. l'ENCRE DU THÈME CERNÉE DE BLEU — « l'icône de l'avatar à
+           l'accueil doit être noire avec un contour bleu » ; le cerne était
+           une silhouette DILATÉE et non un filet suivi, car un trait posé
+           sur une forme pleine aurait soudé les trois lignes de la fiche ;
+        3. l'ENCRE SEULE — « enlève le contour bleu de l'avatar sur
+           l'accueil ».
+
+      Ce banc garde les trois, parce qu'un jour quelqu'un se demandera
+      pourquoi cette icône se peint en UN tracé quand deux seraient si
+      commodes pour la cerner. Ce qu'on vérifie aujourd'hui : un seul tracé,
+      à l'encre du THÈME — un noir en dur disparaîtrait sur fond sombre.
+    */
     const t = monter();
     const avatar = t.root
       .findAll(
@@ -782,13 +800,10 @@ describe('le glyphe incrusté', () => {
       )[0]
       .findByType(AvatarGlyph);
     expect(avatar.props.teinte).toBe(light.ink);
-    expect(avatar.props.contour).toBe(light.blue);
-    // Deux tracés : le contour dessous, l'encre par-dessus.
     const traces = avatar.findAllByType(Path);
-    expect(traces).toHaveLength(2);
-    expect(traces[0].props.stroke).toBe(light.blue);
-    expect(traces[1].props.fill).toBe(light.ink);
-    expect(traces[0].props.d).toBe(traces[1].props.d);
+    expect(traces).toHaveLength(1);
+    expect(traces[0].props.fill).toBe(light.ink);
+    expect(traces[0].props.stroke).toBeUndefined();
   });
 
   it('et se lit EN RETRAIT : on le sent, on ne le lit pas', () => {

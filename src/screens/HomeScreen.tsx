@@ -385,19 +385,19 @@ export function HomeScreen() {
           bloc qui ouvre le menu.
         */}
         {/*
-          L'AVATAR : LE MÊME DANS LES DEUX GRADES, ET SANS ANNEAU.
+          L'AVATAR : LE MÊME DANS LES DEUX GRADES, ET SANS AUCUN CERNE.
 
-          Relevé du patron, lien à l'appui : « utilise cette icône pour
-          l'avatar à l'accueil et enlève le contour présent ». C'est un
-          « user-circle » duotone de Phosphor — un rond qui respire, là où la
-          silhouette pleine faisait une tache.
+          Deux contours lui sont partis, dans cet ordre : l'anneau d'or du
+          Pro — « utilise cette icône pour l'avatar à l'accueil et enlève le
+          contour présent » —, puis le cerne bleu qui l'avait remplacé :
+          « enlève le contour bleu de l'avatar sur l'accueil ».
 
-          L'anneau d'or qui cerclait l'avatar en Pro s'en va avec le reste :
-          c'est le CONTOUR qu'on retire. Le grade se voit toujours — le
-          prénom garde la typo d'or juste à côté — et l'avatar redevient ce
-          qu'il est, une porte vers le compte.
+          Il ne reste que l'encre du thème, et c'est assez : le grade se lit
+          au prénom posé à côté, qui garde la typo d'or en Pro, et l'avatar
+          redevient ce qu'il est — une porte vers le compte, pas une
+          décoration.
         */}
-        <AvatarGlyph size={34} teinte={c.ink} contour={c.blue} />
+        <AvatarGlyph size={34} teinte={c.ink} />
         <View style={styles.profilColonne} pointerEvents="none">
           {pro ? (
             <TexteVif

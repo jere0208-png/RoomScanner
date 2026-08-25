@@ -7276,6 +7276,33 @@ voisin — un studio se reclasse à chaque degré, un logement meublé garde son
 économie. Le coût se mesure au moment où on le paie, plutôt que de se
 deviner à l'avance.
 
+
+### L'avatar de l'accueil perd son cerne
+
+Relevé du patron : **« enlève le contour bleu de l'avatar sur l'accueil »**.
+Troisième habit en trois relevés, et c'est celui-là qui tient :
+
+1. le **gris** des textes secondaires — discrète au point de se confondre
+   avec le prénom posé à côté, alors que c'est la seule porte de l'accueil
+   vers le compte ;
+2. l'**encre du thème cernée de bleu** — « l'icône de l'avatar à l'accueil
+   doit être noire avec un contour bleu » : elle prenait le poids d'un
+   bouton, et la couleur de la maison disait qu'on peut la toucher ;
+3. l'**encre seule**.
+
+Avec le cerne s'en va la mécanique qu'il demandait : on peignait la MÊME
+forme deux fois — en bleu grossie de son trait, puis en encre par-dessus —
+parce qu'un filet suivi sur une forme pleine épaissit ses parties fines, et
+que les trois lignes de la fiche se seraient soudées en un pâté. Un seul
+tracé suffit désormais, et la prop `contour` disparaît avec lui : du code que
+plus personne n'appelle est du code qui ment sur ce que fait l'app.
+
+Le banc de l'accueil garde les **trois** états dans son récit, comme le veut
+la maison — un jour quelqu'un se demandera pourquoi cette icône se peint en
+un seul tracé quand deux seraient si commodes pour la cerner. Ce qu'il
+vérifie aujourd'hui : un tracé, à l'encre du THÈME, sans `stroke`. « Encre du
+thème » et non un noir en dur : sur fond sombre, un noir figé disparaîtrait.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro
