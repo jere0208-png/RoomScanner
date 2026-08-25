@@ -28,16 +28,59 @@ import { SOLAIRES } from '../ui/solaires';
 import { IconeBandeau } from './StripBar';
 import { DEBORD_DOIGT } from '../ui/bandeau';
 
-/** Le crayon : le même signe que partout, « ça s'édite ». */
-function Crayon({ teinte }: { teinte: string }) {
+const fr = (v: number, d = 1) => v.toFixed(d).replace('.', ',');
+
+/**
+ * UNE PASTILLE DE BANDEAU : la silhouette, et le mot dessous.
+ *
+ * La même forme que sous une ligne de spots, un spot ou un meuble — le
+ * bandeau d'une pièce était le dernier à n'avoir que des mots. Les teintes
+ * viennent des styles communs (`bandeauIcone`), pour que les quatre
+ * coquilles ne puissent plus diverger.
+ */
+function Geste({
+  nom,
+  mot,
+  d,
+  plein,
+  danger,
+  styles,
+  onPress,
+}: {
+  nom: string;
+  mot: string;
+  d: string;
+  plein?: boolean;
+  danger?: boolean;
+  styles: Record<string, object>;
+  onPress: () => void;
+}) {
+  const teinte =
+    (StyleSheet.flatten(
+      (danger
+        ? styles.bandeauIconeDanger
+        : plein
+        ? styles.bandeauIconePleine
+        : styles.bandeauIcone) as never,
+    ) as { color?: string })?.color ?? '#1F5BFF';
   return (
-    <Svg width={14} height={14} viewBox="0 0 24 24">
-      <Path d={SOLAIRES.crayon} fill={teinte} fillRule="evenodd" />
-    </Svg>
+    <View style={styles.bandeauCellule}>
+      <TouchableOpacity
+        hitSlop={DEBORD_DOIGT}
+        style={[
+          plein ? styles.bandeauBtn : styles.bandeauBtnGhost,
+          styles.bandeauBtnIcone,
+        ]}
+        accessibilityLabel={nom}
+        onPress={onPress}>
+        <Svg width={17} height={17} viewBox="0 0 24 24">
+          <Path d={d} fill={teinte} fillRule="evenodd" />
+        </Svg>
+      </TouchableOpacity>
+      <Text style={styles.bandeauMot}>{mot}</Text>
+    </View>
   );
 }
-
-const fr = (v: number, d = 1) => v.toFixed(d).replace('.', ',');
 
 export function RoomBar({
   room,
@@ -48,7 +91,10 @@ export function RoomBar({
   onName,
   onCotes,
   onHeight,
-  onMore,
+  onDupliquer,
+  onFusionner,
+  onScinder,
+  onRetirer,
 }: {
   room: { id: string; name: string; neuve?: boolean };
   /** Surface au sol, quand le contour se referme. */
@@ -61,18 +107,41 @@ export function RoomBar({
   /** Repose la pièce à ses cotes. Absent sur un contour non rectangulaire. */
   onCotes?: () => void;
   onHeight: () => void;
-  /** Fusionner, scinder, retirer : les gestes qui changent le plan. */
-  onMore: () => void;
+  /**
+   * LES GESTES QUI CHANGENT LE PLAN, chacun le sien.
+   *
+   * Ils vivaient derrière un « … » — le jumeau exact de celui qu'une
+   * menuiserie portait, et qui est parti au relevé précédent : « mal placé,
+   * peu compréhensible sans lire le texte ». Ils ont maintenant leur
+   * pastille, leur silhouette et leur mot.
+   *
+   * CE QUI NE PEUT PAS ABOUTIR NE S'AFFICHE PAS : une pièce sans voisine ne
+   * se fusionne avec rien, la dernière pièce d'un plan ne se retire pas.
+   * L'écran le sait, le bandeau ne le devine pas — d'où deux gestes
+   * facultatifs.
+   */
+  onDupliquer: () => void;
+  onFusionner?: () => void;
+  onScinder: () => void;
+  onRetirer?: () => void;
 }) {
-  const teinteGhost =
-    (StyleSheet.flatten(styles.bandeauBtnGhostTexte) as { color?: string })
-      ?.color ?? '#5A6472';
-  const mesures = surface
-    ? `${surface.exact ? '' : '≈ '}${fr(surface.area)} m²  ·  ${fr(
-        extent.width,
-        2,
-      )} × ${fr(extent.depth, 2)} m`
-    : `${fr(extent.width, 2)} × ${fr(extent.depth, 2)} m`;
+  /*
+    LA HAUTEUR SE LIT, ELLE NE SE TOUCHE PAS.
+
+    Elle vivait DANS un bouton — « H 2,50 m » —, ce qui mélangeait les deux
+    moitiés du bandeau : un bouton qui affiche une valeur se lit comme une
+    étiquette, et l'on ne sait plus lequel des quatre fait quelque chose.
+    Elle rejoint la surface et les dimensions, en haut, avec ce qu'on lit ;
+    son bouton ne dit plus que le geste.
+  */
+  const mesures = `${
+    surface
+      ? `${surface.exact ? '' : '≈ '}${fr(surface.area)} m²  ·  ${fr(
+          extent.width,
+          2,
+        )} × ${fr(extent.depth, 2)} m`
+      : `${fr(extent.width, 2)} × ${fr(extent.depth, 2)} m`
+  }  ·  H ${fr(hauteur, 2)} m`;
 
   return (
     <View style={styles.bandeau}>
@@ -105,15 +174,17 @@ export function RoomBar({
         </View>
       </View>
 
-      {/* EN BAS : ce qu'on touche. */}
+      {/* EN BAS : ce qu'on touche. Une pastille par geste, sa silhouette
+          et son mot dessous — la forme commune à tous les bandeaux du bas. */}
       <View style={styles.bandeauActions}>
-        <TouchableOpacity
-          hitSlop={DEBORD_DOIGT}
-          style={styles.bandeauBtn}
-          accessibilityLabel="Nommer la pièce"
-          onPress={onName}>
-          <Text style={styles.bandeauBtnTexte}>Nommer</Text>
-        </TouchableOpacity>
+        <Geste
+          nom="Nommer la pièce"
+          mot="Nommer"
+          d={SOLAIRES.crayon}
+          plein
+          styles={styles}
+          onPress={onName}
+        />
         {/*
           LES COTES S'ÉDITENT — quand la pièce est un rectangle.
 
@@ -124,32 +195,54 @@ export function RoomBar({
           s'affiche pas, plutôt que de ne rien faire.
         */}
         {!!onCotes && (
-          <TouchableOpacity
-            hitSlop={DEBORD_DOIGT}
-            style={styles.bandeauBtnGhost}
-            accessibilityLabel="Cotes de la pièce"
-            onPress={onCotes}>
-            <Crayon teinte={teinteGhost} />
-            <Text style={styles.bandeauBtnGhostTexte}>Cotes</Text>
-          </TouchableOpacity>
+          <Geste
+            nom="Cotes de la pièce"
+            mot="Cotes"
+            d={SOLAIRES.cotes}
+            styles={styles}
+            onPress={onCotes}
+          />
         )}
-        <TouchableOpacity
-          hitSlop={DEBORD_DOIGT}
-          style={styles.bandeauBtnGhost}
-          accessibilityLabel="Hauteur sous plafond"
-          onPress={onHeight}>
-          <Text style={styles.bandeauBtnGhostTexte}>{`H ${fr(
-            hauteur,
-            2,
-          )} m`}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          hitSlop={DEBORD_DOIGT}
-          style={[styles.bandeauBtnGhost, styles.bandeauBtnIcone]}
-          accessibilityLabel="Autres gestes sur la pièce"
-          onPress={onMore}>
-          <Text style={styles.bandeauBtnGhostTexte}>…</Text>
-        </TouchableOpacity>
+        <Geste
+          nom="Hauteur sous plafond"
+          mot="Hauteur"
+          d={SOLAIRES.elevations}
+          styles={styles}
+          onPress={onHeight}
+        />
+        <Geste
+          nom="Dupliquer la pièce"
+          mot="Dupliquer"
+          d={SOLAIRES.dupliquer}
+          styles={styles}
+          onPress={onDupliquer}
+        />
+        {!!onFusionner && (
+          <Geste
+            nom="Fusionner avec une autre pièce"
+            mot="Fusionner"
+            d={SOLAIRES.fusionner}
+            styles={styles}
+            onPress={onFusionner}
+          />
+        )}
+        <Geste
+          nom="Scinder la pièce"
+          mot="Scinder"
+          d={SOLAIRES.scinder}
+          styles={styles}
+          onPress={onScinder}
+        />
+        {!!onRetirer && (
+          <Geste
+            nom="Retirer la pièce"
+            mot="Retirer"
+            d={SOLAIRES.supprimer}
+            danger
+            styles={styles}
+            onPress={onRetirer}
+          />
+        )}
       </View>
     </View>
   );

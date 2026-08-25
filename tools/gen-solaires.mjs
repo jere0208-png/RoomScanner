@@ -154,6 +154,24 @@ const CHOIX = {
     LE COFFRE de volet roulant est un caisson posé au-dessus de la baie :
     l'icône d'archive est ce caisson-là, couvercle compris.
   */
+  /*
+    LES QUATRE GESTES D'UNE PIÈCE, sortis de son menu « … » à leur tour.
+
+    Le bandeau d'une pièce était le dernier à cacher des gestes derrière
+    trois points — dupliquer, fusionner, scinder, retirer — et le seul de
+    l'application à ne porter aucune silhouette : quatre boutons de mots au
+    milieu de bandeaux dessinés.
+
+    DUPLIQUER : deux feuilles superposées, l'une décalée. FUSIONNER : deux
+    flèches qui rentrent l'une vers l'autre — ce que deux pièces font quand
+    elles n'en font plus qu'une. SCINDER : les ciseaux, qui coupent en deux.
+    COTER : le cadre de recadrage, qui dit qu'on reprend les dimensions du
+    rectangle sans toucher à ce qu'il y a dedans.
+  */
+  dupliquer: ['copy-bold', 'documents-bold'],
+  fusionner: ['minimize-square-bold'],
+  scinder: ['scissors-bold'],
+  cotes: ['crop-bold'],
   allege: ['align-bottom-bold'],
   charniere: ['mirror-left-bold', 'flip-horizontal-bold'],
   sens: ['logout-bold', 'exit-bold'],

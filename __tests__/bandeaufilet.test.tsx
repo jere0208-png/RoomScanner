@@ -192,7 +192,10 @@ const COQUILLES: [string, () => React.ReactElement][] = [
         onName={() => {}}
         onCotes={() => {}}
         onHeight={() => {}}
-        onMore={() => {}}
+        onDupliquer={() => {}}
+        onFusionner={() => {}}
+        onScinder={() => {}}
+        onRetirer={() => {}}
       />
     ),
   ],

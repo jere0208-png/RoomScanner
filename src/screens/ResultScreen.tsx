@@ -3821,62 +3821,51 @@ export function ResultScreen() {
               onCotes={
                 estRectangle(targetPart?.walls ?? []) ? promptRoomCotes : undefined
               }
-              onMore={() =>
-                setMenu({
-                  title: targetRoom.name || 'Pièce sans nom',
-                  subtitle:
-                    'Ce qui change la structure du plan : la copier telle ' +
-                    'quelle, réunir deux pièces que le scan a séparées, en ' +
-                    'couper une qu’il a réunie, ou la retirer.',
-                  actions: [
-                    {
-                      /*
-                        TROIS CHAMBRES QUI SE RESSEMBLENT.
+              /*
+                LES GESTES QUI CHANGENT LE PLAN, chacun sa pastille.
 
-                        On les équipait une par une, aux mêmes cotes : cinq
-                        socles, un interrupteur, un point lumineux. La copie
-                        emporte tout — c'est l'appareillage qui prend le
-                        temps, pas les quatre murs.
-                      */
-                      label: 'Dupliquer la pièce',
-                      icon: 'piece' as const,
-                      onPress: () => {
-                        const neuf = duplicateRoom(selectedRoomId);
-                        if (neuf) setSelectedRoomId(neuf);
-                      },
-                    },
-                    ...(rooms.filter((r) => r.id !== selectedRoomId).length > 0
-                      ? [
-                          {
-                            label: 'Fusionner avec une autre pièce',
-                            icon: 'fusionner' as const,
-                            onPress: promptMerge,
-                          },
-                        ]
-                      : []),
-                    {
-                      label: 'Scinder la pièce',
-                      icon: 'scinder' as const,
-                      onPress: () => {
-                        splitRoom(selectedRoomId);
-                        setSelectedRoomId(null);
-                      },
-                    },
-                    ...(rooms.filter((r) => r.id !== selectedRoomId).length > 0
-                      ? [
-                          {
-                            label: 'Retirer la pièce',
-                            icon: 'supprimer' as const,
-                            danger: true,
-                            onPress: () => {
-                              removeRoom(selectedRoomId);
-                              setSelectedRoomId(null);
-                            },
-                          },
-                        ]
-                      : []),
-                  ],
-                })
+                Ils vivaient derrière un « … », avec une phrase pour les
+                présenter : « ce qui change la structure du plan — la copier
+                telle quelle, réunir deux pièces que le scan a séparées, en
+                couper une qu'il a réunie, ou la retirer ». Quatre lignes de
+                menu pour quatre gestes, et un symbole muet pour y arriver.
+
+                Relevé du patron sur le jumeau de ce menu, celui d'une
+                menuiserie : « mal placé, peu compréhensible sans lire le
+                texte — peut-être proposer directement les choix sous forme
+                de boutons ». La même réponse vaut ici.
+              */
+              onDupliquer={() => {
+                /*
+                  TROIS CHAMBRES QUI SE RESSEMBLENT.
+
+                  On les équipait une par une, aux mêmes cotes : cinq
+                  socles, un interrupteur, un point lumineux. La copie
+                  emporte tout — c'est l'appareillage qui prend le temps,
+                  pas les quatre murs.
+                */
+                const neuf = duplicateRoom(selectedRoomId);
+                if (neuf) setSelectedRoomId(neuf);
+              }}
+              /* Une pièce sans voisine ne se fusionne avec rien, et la
+                 dernière pièce d'un plan ne se retire pas : le bandeau ne
+                 montre pas un geste qui ne peut pas aboutir. */
+              onFusionner={
+                rooms.filter((r) => r.id !== selectedRoomId).length > 0
+                  ? promptMerge
+                  : undefined
+              }
+              onScinder={() => {
+                splitRoom(selectedRoomId);
+                setSelectedRoomId(null);
+              }}
+              onRetirer={
+                rooms.filter((r) => r.id !== selectedRoomId).length > 0
+                  ? () => {
+                      removeRoom(selectedRoomId);
+                      setSelectedRoomId(null);
+                    }
+                  : undefined
               }
             />
           )}

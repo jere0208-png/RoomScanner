@@ -7696,6 +7696,39 @@ garde son allège. Un passe-plat, une baie de comptoir se cotent depuis le
 plancher — une refonte de bandeau n'est pas l'occasion de retirer un réglage
 qui marchait.
 
+### Le bandeau d'une pièce, dernier à cacher ses gestes
+
+Le « … » d'une menuiserie est parti au relevé précédent. Celui d'une PIÈCE
+était son jumeau exact, et il est resté : quatre gestes derrière trois
+points — dupliquer, fusionner, scinder, retirer — avec une phrase pour les
+présenter, « ce qui change la structure du plan ». Quatre lignes de menu pour
+quatre gestes, et un symbole muet pour y arriver.
+
+Le bandeau d'une pièce était aussi le SEUL de l'application à ne porter
+aucune silhouette : quatre boutons de mots au milieu de bandeaux dessinés. Le
+banc de continuité l'avait noté noir sur blanc, faute de pouvoir le corriger
+ce jour-là. Les deux se réparent d'un coup, et de la même façon : chaque
+geste prend sa pastille, sa silhouette du jeu commun et son mot dessous.
+
+Quatre silhouettes de plus, déclarées dans l'outil de génération : **dupliquer**
+(deux feuilles superposées), **fusionner** (deux flèches qui rentrent l'une
+vers l'autre — ce que deux pièces font quand elles n'en font plus qu'une),
+**scinder** (les ciseaux), et **coter** (le cadre de recadrage : on reprend les
+dimensions du rectangle sans toucher à ce qu'il contient).
+
+**La hauteur descend dans la ligne de lecture.** Elle vivait DANS un bouton —
+« H 2,50 m » —, ce qui mélangeait les deux moitiés du bandeau : un bouton qui
+affiche une valeur se lit comme une étiquette, et l'on ne sait plus lequel
+des quatre fait quelque chose. Elle rejoint la surface et les dimensions, en
+haut, avec ce qu'on lit ; son bouton ne dit plus que le geste.
+
+**Ce qui ne peut pas aboutir ne s'affiche pas** — c'était déjà vrai dans le
+menu, ça reste vrai en pastilles : une pièce sans voisine ne se fusionne avec
+rien, la dernière pièce d'un plan ne se retire pas, et un contour qui n'est
+pas un rectangle n'a pas de « largeur × profondeur ». Trois contrôles en sens
+inverse le tiennent, parce qu'un bandeau qui afficherait toujours les sept
+gestes passerait l'épreuve principale sans qu'on s'en aperçoive.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

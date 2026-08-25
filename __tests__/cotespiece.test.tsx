@@ -42,7 +42,8 @@ const monter = (onCotes?: () => void) => {
         onName={() => {}}
         onCotes={onCotes}
         onHeight={() => {}}
-        onMore={() => {}}
+        onDupliquer={() => {}}
+        onScinder={() => {}}
       />,
     );
   });

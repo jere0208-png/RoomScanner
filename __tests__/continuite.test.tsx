@@ -155,7 +155,10 @@ const COQUILLES: [string, () => React.ReactElement][] = [
         onName={() => {}}
         onCotes={() => {}}
         onHeight={() => {}}
-        onMore={() => {}}
+        onDupliquer={() => {}}
+        onFusionner={() => {}}
+        onScinder={() => {}}
+        onRetirer={() => {}}
       />
     ),
   ],
@@ -296,14 +299,21 @@ describe('une seule taille', () => {
       act(() => arbre?.unmount());
       arbre = null;
     }
-    // Le bandeau d'une PIECE n'en porte aucune : ses quatre boutons disent
-    // des mots — « Nommer », « Cotes », « H 2,50 » — et un mot n'a pas
-    // besoin d'une silhouette pour se comprendre. Les trois autres en ont.
+    /*
+      LES QUATRE EN ONT — la piece a rejoint les autres.
+
+      Elle etait la seule sans : ses boutons disaient des mots, « Nommer »,
+      « Cotes », « H 2,50 », et un « … » qui cachait quatre gestes de plus.
+      Ce banc l'ecrivait noir sur blanc, faute de pouvoir le corriger ce
+      jour-la. Le releve du patron sur le jumeau de ce menu — celui d'une
+      menuiserie, « mal place, peu comprehensible sans lire le texte » — a
+      fini par emporter les deux.
+    */
     expect(compte).toEqual([
       ['ligne de spots', true],
       ['un spot', true],
       ['un meuble', true],
-      ['une piece', false],
+      ['une piece', true],
     ]);
   });
 });
