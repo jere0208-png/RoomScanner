@@ -7471,6 +7471,36 @@ poser une question dont on connaît déjà la réponse, c'est un geste de plus
 pour rien. Et l'accident garde son réglage à lui — une retombée de poutre,
 une sous-pente, un muret de cuisine se règlent mur par mur, après.
 
+### Un plafond qui descend emporte ce qui est accroché dessous
+
+Trouvé en relisant deux actions côte à côte, juste après avoir ajouté « la
+même hauteur partout » — et signalé au patron plutôt que corrigé en douce ;
+réponse : **« corrige ça »**.
+
+Le réglage MUR PAR MUR faisait redescendre l'appareillage et raboter les
+menuiseries depuis longtemps, et il disait pourquoi : abaisser un mur sans
+rien d'autre laisse une prise flottant DANS le plafond et une porte qui
+dépasse du toit — ni l'une ni l'autre ne se voit sur le plan 2D, on ne s'en
+aperçoit qu'en élévation ou au métré, c'est-à-dire trop tard.
+
+Le réglage PAR PIÈCE, lui, ne le faisait pas. Il posait la hauteur sur ses
+murs et s'arrêtait là. Abaisser une pièce de 2,50 à 2,00 — un sous-sol, un
+comble aménagé, un plafond mal vu par RoomPlan — laissait donc toutes les
+prises hautes et les portes entières dans un logement qui ne les contenait
+plus. Et « la même hauteur partout », écrite sur le même modèle, héritait du
+même silence : le défaut aurait été multiplié par le nombre de pièces.
+
+Le calcul est maintenant unique (`rabattreSousLePlafond`) et les trois
+actions y passent — un mur, une pièce, le logement. Il reçoit les murs dans
+leur hauteur NEUVE : leur plafond fait la règle, leur sol ne bouge pas. Un
+appareil se range par son AXE, pas par son bord — il a une taille. Une
+menuiserie perd d'abord son linteau ; si son allège elle-même passe au-dessus
+du nouveau plafond, elle redescend jusqu'au sol.
+
+Ce que les bancs gardent en sens inverse, et qui compte autant : **un plafond
+qui MONTE ne bouge rien**. Une action qui rabaisserait tout à chaque passage
+passerait les épreuves du dessus sans qu'on s'en aperçoive.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

@@ -31,6 +31,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 import { useScanStore } from '../src/store/scanStore';
+import type { Fixture } from '../src/geometry/electrical';
 import type { WallSeg } from '../src/geometry/floorplan';
 
 const st = () => useScanStore.getState();
@@ -119,5 +120,101 @@ describe('la hauteur de tout le logement', () => {
     const avant = st().walls;
     st().setAllRoomHeights(2.5);
     expect(st().walls).toBe(avant);
+  });
+});
+
+/**
+ * CE QUI EST ACCROCHE AU MUR DESCEND AVEC LUI — pour une PIECE aussi.
+ *
+ * Le reglage mur par mur le faisait depuis longtemps, et il disait pourquoi :
+ * « abaisser un mur sans rien d'autre laisse une prise flottant DANS le
+ * plafond et une porte qui depasse du toit. Ni l'une ni l'autre ne se voit
+ * sur le plan 2D — on ne s'en apercoit qu'en elevation, ou au metre, c'est-a-
+ * dire trop tard. »
+ *
+ * Le reglage par PIECE, lui, ne le faisait pas : il posait la hauteur sur les
+ * murs et s'arretait la. Abaisser une piece de 2,50 a 2,00 — un sous-sol, un
+ * comble amenage, un plafond mal vu par RoomPlan — laissait donc toutes les
+ * prises hautes et les portes entieres dans un logement qui ne les contenait
+ * plus. Trouve en relisant les deux actions cote a cote, apres avoir ajoute
+ * « la meme hauteur partout », qui heritait du meme silence.
+ */
+const PRISE_HAUTE: Fixture = {
+  id: 'f1',
+  kind: 'prise',
+  wallId: 'a1',
+  along: 0.5,
+  height: 2.2,
+  side: 1,
+};
+
+const PORTE: WallSeg = {
+  id: 'o1',
+  type: 'door',
+  roomId: 'r1',
+  a: { x: 0.5, z: 0 },
+  b: { x: 1.33, z: 0 },
+  height: 2.04,
+  yCenter: 1.02,
+};
+
+const meubler = () =>
+  useScanStore.setState({ fixtures: [PRISE_HAUTE], openings: [{ ...PORTE }] });
+
+const prise = () => useScanStore.getState().fixtures[0];
+const porte = () => useScanStore.getState().openings[0];
+
+describe('abaisser une piece', () => {
+  beforeEach(meubler);
+
+  it('fait redescendre la prise sous le nouveau plafond', () => {
+    st().setRoomHeight('r1', 2);
+    // Le demi-appareil compte : c'est son AXE qu'on range, pas son bord.
+    expect(prise().height).toBeLessThanOrEqual(2 - 0.04 + 1e-6);
+    expect(prise().height).toBeGreaterThan(0);
+  });
+
+  it('rabote la porte qui depasserait du toit', () => {
+    st().setRoomHeight('r1', 1.8);
+    expect(porte().yCenter + porte().height / 2).toBeLessThanOrEqual(1.8 + 1e-6);
+  });
+
+  /*
+    LE CONTROLE EN SENS INVERSE : une action qui rabaisserait tout a chaque
+    passage passerait les deux epreuves ci-dessus.
+  */
+  it('mais ne touche a rien quand le plafond MONTE', () => {
+    st().setRoomHeight('r1', 2.8);
+    expect(prise().height).toBeCloseTo(2.2, 3);
+    expect(porte().height).toBeCloseTo(2.04, 3);
+  });
+
+  it('et laisse tranquille ce qui tient deja sous le plafond', () => {
+    st().setRoomHeight('r1', 2.5);
+    expect(prise().height).toBeCloseTo(2.2, 3);
+    expect(porte().height).toBeCloseTo(2.04, 3);
+  });
+
+  it('s’annule d’un seul geste, appareillage compris', () => {
+    st().setRoomHeight('r1', 2);
+    st().undo();
+    expect(prise().height).toBeCloseTo(2.2, 3);
+    expect(porte().height).toBeCloseTo(2.04, 3);
+  });
+});
+
+describe('abaisser tout le logement', () => {
+  beforeEach(meubler);
+
+  it('emporte l’appareillage et les menuiseries, comme une piece', () => {
+    st().setAllRoomHeights(2);
+    expect(prise().height).toBeLessThanOrEqual(2 - 0.04 + 1e-6);
+    expect(porte().yCenter + porte().height / 2).toBeLessThanOrEqual(2 + 1e-6);
+  });
+
+  it('mais ne les bouge pas quand le plafond monte', () => {
+    st().setAllRoomHeights(2.8);
+    expect(prise().height).toBeCloseTo(2.2, 3);
+    expect(porte().height).toBeCloseTo(2.04, 3);
   });
 });

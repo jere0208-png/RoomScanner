@@ -368,6 +368,63 @@ function roomIndexAt(p: { x: number; z: number }, outlines: Pt[][]): number {
 }
 
 /**
+ * CE QUI EST ACCROCHÉ AU MUR DESCEND AVEC LUI.
+ *
+ * Abaisser un mur sans rien d'autre laisse une prise flottant DANS le
+ * plafond et une porte qui dépasse du toit. Ni l'une ni l'autre ne se voit
+ * sur le plan 2D — on ne s'en aperçoit qu'en élévation, ou au métré,
+ * c'est-à-dire trop tard.
+ *
+ * LE RÉGLAGE PAR MUR LE FAISAIT, LE RÉGLAGE PAR PIÈCE NON. Le second posait
+ * la hauteur sur ses murs et s'arrêtait là : abaisser une pièce de 2,50 à
+ * 2,00 — un sous-sol, un comble aménagé, un plafond mal vu par RoomPlan —
+ * laissait toutes les prises hautes et les portes entières dans un logement
+ * qui ne les contenait plus. Trouvé en relisant les deux actions côte à
+ * côte, après avoir ajouté « la même hauteur partout », qui héritait du
+ * même silence. Un seul calcul, une seule correction, trois actions.
+ *
+ * On reçoit les murs dans leur hauteur NEUVE : c'est leur plafond qui sert
+ * de règle, et leur sol qui reste où il est.
+ */
+function rabattreSousLePlafond(
+  murs: WallSeg[],
+  fixtures: Fixture[],
+  openings: WallSeg[],
+): { fixtures: Fixture[]; openings: WallSeg[] } {
+  const parId = new Map(murs.map((w) => [w.id, w]));
+  const murDe = new Map<string, WallSeg>();
+  for (const w of murs) {
+    for (const o of openingsOn([w], openings)) murDe.set(o.id, w);
+  }
+  return {
+    fixtures: fixtures.map((f) => {
+      const w = parId.get(f.wallId ?? '');
+      if (!w) return f;
+      const sol = w.yCenter - w.height / 2;
+      // C'est son AXE qu'on range, pas son bord : un appareil a une taille.
+      const demi = (FIXTURES[f.kind]?.h ?? 0.1) / 2;
+      const haut = sol + w.height - demi;
+      const bas = sol + demi;
+      if (f.height <= haut) return f;
+      return { ...f, height: Math.max(bas, haut) };
+    }),
+    openings: openings.map((o) => {
+      const w = murDe.get(o.id);
+      if (!w) return o;
+      const sol = w.yCenter - w.height / 2;
+      const base = o.yCenter - o.height / 2;
+      const plafond = sol + w.height;
+      if (base + o.height <= plafond) return o;
+      // On rabat d'abord le linteau ; si l'allège elle-même est au-dessus
+      // du nouveau plafond, la baie redescend jusqu'au sol.
+      const h = Math.max(0.2, Math.min(o.height, plafond - base));
+      const b = Math.min(base, plafond - h);
+      return { ...o, height: h, yCenter: b + h / 2 };
+    }),
+  };
+}
+
+/**
  * LES COTES DU BÂTIMENT COURANT, par nature de menuiserie.
  *
  * Une ouverture posée à la main prenait 60 % de la longueur du mur et 85 %
@@ -3692,12 +3749,16 @@ export const useScanStore = create<ScanState>((set, get) => {
       const st = get();
       pushHistory('height');
       const ids = new Set(st.rooms.find((r) => r.id === roomId)?.wallIds ?? []);
-      set({
-        walls: st.walls.map((w) =>
-          ids.has(w.id) ? { ...w, height, yCenter: height / 2 } : w,
-        ),
-        dirty: true,
-      });
+      const walls = st.walls.map((w) =>
+        ids.has(w.id) ? { ...w, height, yCenter: height / 2 } : w,
+      );
+      // Les prises et les menuiseries de CES murs-là suivent leur plafond.
+      const suite = rabattreSousLePlafond(
+        walls.filter((w) => ids.has(w.id)),
+        st.fixtures,
+        st.openings,
+      );
+      set({ walls, ...suite, dirty: true });
     },
 
     /*
@@ -3726,10 +3787,9 @@ export const useScanStore = create<ScanState>((set, get) => {
       // une annulation qui ne défait rien, et le geste paraît perdu.
       if (st.walls.every((w) => Math.abs(w.height - height) < 1e-6)) return;
       pushHistory('height');
-      set({
-        walls: st.walls.map((w) => ({ ...w, height, yCenter: height / 2 })),
-        dirty: true,
-      });
+      const walls = st.walls.map((w) => ({ ...w, height, yCenter: height / 2 }));
+      const suite = rabattreSousLePlafond(walls, st.fixtures, st.openings);
+      set({ walls, ...suite, dirty: true });
     },
 
     setWallHeight: (wallId, height) => {
@@ -3749,45 +3809,13 @@ export const useScanStore = create<ScanState>((set, get) => {
       pushHistory(`wallHeight:${wallId}`);
       // Le sol reste où il est : c'est le plafond qui monte ou descend.
       const sol = wall.yCenter - wall.height / 2;
-
-      /*
-        CE QUI EST ACCROCHÉ AU MUR DESCEND AVEC LUI.
-
-        Abaisser un mur sans rien d'autre laisse une prise flottant DANS le
-        plafond et une porte qui dépasse du toit. Ni l'une ni l'autre ne se
-        voit sur le plan 2D — on ne s'en aperçoit qu'en élévation, ou au
-        métré, c'est-à-dire trop tard.
-      */
-      const fixtures = st.fixtures.map((f) => {
-        if (f.wallId !== wallId) return f;
-        const demi = (FIXTURES[f.kind]?.h ?? 0.1) / 2;
-        const haut = sol + height - demi;
-        const bas = sol + demi;
-        if (f.height <= haut) return f;
-        return { ...f, height: Math.max(bas, haut) };
-      });
-
-      const surCeMur = new Set(
-        openingsOn([wall], st.openings).map((o) => o.id),
-      );
-      const openings = st.openings.map((o) => {
-        if (!surCeMur.has(o.id)) return o;
-        const base = o.yCenter - o.height / 2;
-        const plafond = sol + height;
-        if (base + o.height <= plafond) return o;
-        // On rabat d'abord le linteau ; si l'allège elle-même est au-dessus
-        // du nouveau plafond, la baie redescend jusqu'au sol.
-        const h = Math.max(0.2, Math.min(o.height, plafond - base));
-        const b = Math.min(base, plafond - h);
-        return { ...o, height: h, yCenter: b + h / 2 };
-      });
-
+      const neuf = { ...wall, height, yCenter: sol + height / 2 };
+      // Prises et menuiseries suivent : voir `rabattreSousLePlafond`, qui
+      // sert aussi au réglage par pièce et à celui de tout le logement.
+      const suite = rabattreSousLePlafond([neuf], st.fixtures, st.openings);
       set({
-        walls: st.walls.map((w) =>
-          w.id === wallId ? { ...w, height, yCenter: sol + height / 2 } : w,
-        ),
-        fixtures,
-        openings,
+        walls: st.walls.map((w) => (w.id === wallId ? neuf : w)),
+        ...suite,
         dirty: true,
       });
     },
