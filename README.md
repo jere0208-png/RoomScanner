@@ -7214,6 +7214,35 @@ traiter deux fois le même horodatage : interroger la capture puis appeler le
 déplacement consomme l'événement dans la question, et le mouvement n'a
 jamais lieu.
 
+
+### Les quatre hauteurs de référence sortent du mur
+
+Défaut connu, noté et laissé ouvert : **« en élévation, les libellés de
+hauteur se serrent contre le bord droit du mur »**. Ce ne sont pas des
+décorations — plinthe 25, commande 110, tableau 135, applique 210 sont les
+quatre lignes sur lesquelles toute l'installation se pose, et les voir en
+filigrane fait repérer d'un coup l'appareil qui n'est aligné avec rien.
+
+Mais ils étaient écrits À L'INTÉRIEUR du dessin, calés sur le bord droit.
+« commande 110 » fait une cinquantaine de points à huit de corps : près d'un
+mètre de mur recouvert, à quatre hauteurs différentes, et toutes du même
+côté — celui où la place manque toujours, et précisément là où se posent les
+prises de plan de travail et les commandes d'entrée.
+
+Ils passent dans la MARGE que le cadre garde déjà de chaque côté. Elle vaut
+trente points au plus serré et le mot entier en demande cinquante : on
+l'abrège plutôt que de le laisser mordre. Trois lettres suffisent à un
+électricien pour distinguer une plinthe d'une commande (`pli 25`, `com 110`,
+`tab 135`, `app 210`), et si même cela ne tient pas, il reste le CHIFFRE, qui
+est ce qu'on vient lire. `libelleDeHauteur` choisit, dans cet ordre, ce qui
+tient.
+
+Le banc mesure ce qu'on ne voyait qu'à l'œil : la boîte de chaque libellé,
+estimée d'après son corps et sa longueur, ne doit mordre ni sur le champ du
+mur ni sur le bord de la feuille — et les quatre repères doivent rester
+lisibles, car les abréger jusqu'à les rendre muets ne serait pas une
+correction.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

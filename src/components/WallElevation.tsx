@@ -117,11 +117,38 @@ export const COTE_H = 26;
  * n'est aligné avec rien.
  */
 const HAUTEURS_REF = [
-  { y: 0.25, nom: 'plinthe 25' },
-  { y: 1.1, nom: 'commande 110' },
-  { y: 1.35, nom: 'tableau 135' },
-  { y: 2.1, nom: 'applique 210' },
+  { y: 0.25, nom: 'plinthe 25', court: 'pli 25', chiffre: '25' },
+  { y: 1.1, nom: 'commande 110', court: 'com 110', chiffre: '110' },
+  { y: 1.35, nom: 'tableau 135', court: 'tab 135', chiffre: '135' },
+  { y: 2.1, nom: 'applique 210', court: 'app 210', chiffre: '210' },
 ];
+
+/**
+ * LE LIBELLÉ D'UNE HAUTEUR SE MET DANS LA MARGE, PAS SUR LE MUR.
+ *
+ * Défaut relevé et laissé ouvert longtemps : « les libellés de hauteur se
+ * serrent contre le bord droit du mur ». Ils étaient écrits DANS le champ,
+ * calés sur le bord droit — « commande 110 » fait une cinquantaine de points
+ * à huit de corps, soit près d'un mètre de mur recouvert, à quatre hauteurs,
+ * et toutes du même côté : celui où la place manque toujours.
+ *
+ * Ils passent donc dehors, dans la marge que le cadre garde déjà. Elle vaut
+ * trente points au plus serré, et le mot entier en demande cinquante : on
+ * l'abrège plutôt que de le laisser mordre. Trois lettres suffisent à un
+ * électricien pour distinguer une plinthe d'une commande — et si même cela
+ * ne tient pas, il reste le CHIFFRE, qui est ce qu'on vient lire.
+ */
+export function libelleDeHauteur(
+  r: { nom: string; court: string; chiffre: string },
+  place: number,
+  corps: number,
+): string {
+  // Une lettre de ce corps-là mesure un peu plus de la moitié de sa hauteur.
+  const large = (mot: string) => mot.length * corps * 0.55;
+  if (large(r.nom) + 6 <= place) return r.nom;
+  if (large(r.court) + 6 <= place) return r.court;
+  return r.chiffre;
+}
 const PAD_BOTTOM = 34;
 /** Tolérance d'accrochage, en mètres. */
 const SNAP = 0.03;
@@ -1101,13 +1128,13 @@ export function WallElevation({
                   opacity={0.35}
                 />
                 <SvgText
-                  x={px(face.len) - 4}
-                  y={py(r.y) - 4}
+                  x={px(face.len) + 5}
+                  y={py(r.y) + 3}
                   fill={c.inkFaint}
-                  fontSize={8}
+                  fontSize={7.5}
                   fontWeight="700"
-                  textAnchor="end">
-                  {r.nom}
+                  textAnchor="start">
+                  {libelleDeHauteur(r, layout.w - px(face.len) - 5, 7.5)}
                 </SvgText>
               </G>
             ))}
