@@ -13,6 +13,8 @@ import React, { useCallback, useEffect, useRef } from 'react';
 import { DEBORD_DOIGT } from '../ui/bandeau';
 import { Text, TouchableOpacity, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
+import { SOLAIRES } from '../ui/solaires';
+import { IconeBandeau } from './StripBar';
 import { frCategory } from '../geometry/furniture';
 import type { PromptData } from './Sheet';
 import type { Palette } from '../theme';
@@ -207,10 +209,13 @@ export function ObjectBar({
         les cotes dessous, et les gestes — pivoter, retirer — descendent dans
         la rangée d'actions commune à tous les bandeaux du bas.
       */}
-      <View style={styles.bandeauTexte}>
-        <Text style={styles.bandeauTitre} numberOfLines={1}>
-          {frCategory(object.category)}
-        </Text>
+      <View style={styles.bandeauEntete}>
+        <IconeBandeau icone={SOLAIRES.meubles} styles={styles} />
+        <View style={styles.bandeauTexte}>
+          <Text style={styles.bandeauTitre} numberOfLines={1}>
+            {frCategory(object.category)}
+          </Text>
+        </View>
       </View>
       {onNudge && (
         <View style={styles.nudgeRow}>

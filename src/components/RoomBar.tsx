@@ -25,6 +25,7 @@ import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { SOLAIRES } from '../ui/solaires';
+import { IconeBandeau } from './StripBar';
 import { DEBORD_DOIGT } from '../ui/bandeau';
 
 /** Le crayon : le même signe que partout, « ça s'édite ». */
@@ -77,28 +78,31 @@ export function RoomBar({
     <View style={styles.bandeau}>
       {/* EN HAUT : ce qu'on lit. Le nom, puis les mesures — deux lignes qui
           ne cèdent à personne. */}
-      <View style={styles.bandeauTexte}>
-        <Text style={styles.bandeauTitre} numberOfLines={1}>
-          {room.name || 'Pièce sans nom'}
-        </Text>
-        <Text style={styles.bandeauSous} numberOfLines={2}>
-          {mesures}
-        </Text>
-        {/*
-          TANT QU'ELLE EST NEUVE, LA BARRE DIT CE QUI L'ATTEND.
-
-          Relevé du patron sur le bouton d'ajout : « le "ajouter une pièce"
-          ne montre pas qu'il faut créer la pièce ». La pièce se pose
-          maintenant toute seule, en pointillés — reste à dire les deux
-          gestes qui la règlent. Une phrase, sous ses cotes, qui disparaît
-          dès qu'on la lâche : une consigne qu'on lit une fois ne doit pas
-          rester à vie.
-        */}
-        {room.neuve && (
-          <Text style={styles.roomNeuve} numberOfLines={1}>
-            Poussez-la du doigt · tirez ses côtés
+      <View style={styles.bandeauEntete}>
+        <IconeBandeau icone={SOLAIRES.room} styles={styles} />
+        <View style={styles.bandeauTexte}>
+          <Text style={styles.bandeauTitre} numberOfLines={1}>
+            {room.name || 'Pièce sans nom'}
           </Text>
-        )}
+          <Text style={styles.bandeauSous} numberOfLines={2}>
+            {mesures}
+          </Text>
+          {/*
+            TANT QU'ELLE EST NEUVE, LA BARRE DIT CE QUI L'ATTEND.
+
+            Relevé du patron sur le bouton d'ajout : « le "ajouter une pièce"
+            ne montre pas qu'il faut créer la pièce ». La pièce se pose
+            maintenant toute seule, en pointillés — reste à dire les deux
+            gestes qui la règlent. Une phrase, sous ses cotes, qui disparaît
+            dès qu'on la lâche : une consigne qu'on lit une fois ne doit pas
+            rester à vie.
+          */}
+          {room.neuve && (
+            <Text style={styles.roomNeuve} numberOfLines={1}>
+              Poussez-la du doigt · tirez ses côtés
+            </Text>
+          )}
+        </View>
       </View>
 
       {/* EN BAS : ce qu'on touche. */}

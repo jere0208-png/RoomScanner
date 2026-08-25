@@ -546,7 +546,16 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     shadowOpacity: 0.12,
   },
   /* La partie haute : elle ne contient QUE ce qu'on lit. */
-  bandeauTexte: { gap: 1 },
+  /*
+    LA PARTIE HAUTE : LA SILHOUETTE, PUIS LA COTE.
+
+    Le titre est une cote — « 0,83 × 2,04 m » — et rien ne disait à quoi
+    elle appartient sinon le mot en gris dessous, qu'il faut lire. La
+    silhouette de l'élément se pose devant : porte, mur, note, ligne de
+    spots se reconnaissent sans lire, comme dans la rangée d'outils.
+  */
+  bandeauEntete: { flexDirection: 'row', alignItems: 'center', gap: 9 },
+  bandeauTexte: { gap: 1, flexShrink: 1 },
   bandeauTitre: { color: c.ink, fontSize: 14.5, fontWeight: '800' },
   bandeauSous: { color: c.inkSoft, fontSize: 12, lineHeight: 15 },
   /*
@@ -569,6 +578,23 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     alignItems: 'flex-start',
     flexWrap: 'wrap',
     gap: 7,
+    /*
+      LE FILET ENTRE LES DEUX PARTIES.
+
+      Relevé du patron : le bandeau est « trop simple » — « fais le filet et
+      icône ». Le bandeau a deux parties depuis longtemps, ce qu'on lit puis
+      ce qu'on touche, et rien ne les séparait qu'un blanc : sur un mur à
+      quatre boutons, la carte se lit comme un seul bloc où l'œil ne sait
+      pas où s'arrête la cote et où commencent les gestes.
+
+      Un cheveu, la même séparation que les rangées d'une feuille de choix.
+      Et de l'air au-dessus des boutons : collé à eux, le filet se lirait
+      comme un soulignement du texte.
+    */
+    marginTop: 9,
+    paddingTop: 9,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: c.line,
   },
   /*
     UN BOUTON DE BANDEAU : QUARANTE POINTS DESSINÉS, QUARANTE-HUIT SOUS LE

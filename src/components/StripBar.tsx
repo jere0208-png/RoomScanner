@@ -57,10 +57,45 @@ function Crayon({ teinte }: { teinte: string }) {
   );
 }
 
+/**
+ * LA SILHOUETTE DE CE QU'ON A TOUCHÉ, devant la cote du bandeau.
+ *
+ * Relevé du patron : le bandeau est « trop simple » — « fais le filet et
+ * icône ». Le titre est une cote, et rien ne disait à quoi elle appartient
+ * sinon le mot en gris dessous, qu'il faut lire.
+ *
+ * Partagée par les quatre coquilles du bas — mur et menuiserie (`StripBar`),
+ * pièce (`RoomBar`), meuble (`ObjectBar`), appareil de plafond
+ * (`CeilingBar`) : une seule d'entre elles restée sans silhouette se serait
+ * lue comme un bandeau d'un autre écran.
+ *
+ * Elle prend l'encre douce du sous-titre : elle accompagne la cote, elle ne
+ * lui dispute pas le regard. Et rien ne se dessine sans tracé donné — une
+ * silhouette par défaut mentirait sur ce qui est sélectionné.
+ */
+export function IconeBandeau({
+  icone,
+  styles,
+}: {
+  icone?: string;
+  styles: Record<string, object>;
+}) {
+  if (!icone) return null;
+  const teinte =
+    (StyleSheet.flatten(styles.bandeauSous as never) as { color?: string })
+      ?.color ?? '#5A6472';
+  return (
+    <Svg width={20} height={20} viewBox="0 0 24 24">
+      <Path d={icone} fill={teinte} fillRule="evenodd" />
+    </Svg>
+  );
+}
+
 export function StripBar({
   strong,
   note,
   actions,
+  icone,
   styles,
 }: {
   /** La cote, en gras : c'est elle qu'on vient lire. */
@@ -68,8 +103,21 @@ export function StripBar({
   /** Ce que c'est, en gris — « porte », « m sous plafond ». */
   note: string;
   actions: StripAction[];
+  /**
+   * LA SILHOUETTE DE CE QU'ON A TOUCHÉ, devant la cote.
+   *
+   * Relevé du patron : le bandeau est « trop simple » — « fais le filet et
+   * icône ». Le titre est une cote, et rien ne disait à quoi elle
+   * appartient sinon le mot en gris dessous, qu'il faut lire. Un tracé du
+   * jeu commun (`solaires.ts`), comme dans la rangée d'outils.
+   *
+   * Facultative : un bandeau qui n'en donne pas n'en dessine pas. Une
+   * silhouette par défaut mentirait sur ce qui est sélectionné.
+   */
+  icone?: string;
   styles: Record<string, object>;
 }) {
+
   return (
     <View style={styles.bandeau}>
       {/*
@@ -84,13 +132,16 @@ export function StripBar({
         droit à deux lignes, parce qu'« un retour · 2,49 m sous plafond » ne
         doit pas se couper au milieu d'un mot.
       */}
-      <View style={styles.bandeauTexte}>
-        <Text style={styles.bandeauTitre} numberOfLines={1}>
-          {strong}
-        </Text>
-        <Text style={styles.bandeauSous} numberOfLines={2}>
-          {note}
-        </Text>
+      <View style={styles.bandeauEntete}>
+        <IconeBandeau icone={icone} styles={styles} />
+        <View style={styles.bandeauTexte}>
+          <Text style={styles.bandeauTitre} numberOfLines={1}>
+            {strong}
+          </Text>
+          <Text style={styles.bandeauSous} numberOfLines={2}>
+            {note}
+          </Text>
+        </View>
       </View>
 
       {/* PARTIE BASSE : CE QU'ON PEUT EN FAIRE. */}

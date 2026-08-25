@@ -15,6 +15,7 @@ import { Text, TouchableOpacity, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { castToWall, type Pt, type WallSeg } from '../geometry/floorplan';
 import { CEILINGS, type CeilingFixture } from '../geometry/ceiling';
+import { IconeBandeau } from './StripBar';
 import { haptic } from '../ui/haptic';
 import { SOLAIRES } from '../ui/solaires';
 import { DEBORD_DOIGT } from '../ui/bandeau';
@@ -160,15 +161,18 @@ export function CeilingBar({
                 deux nombres et deux flèches, sans jamais dire ce qu'on
                 était en train de placer.
               */}
-              <View style={styles.bandeauTexte}>
-                <Text style={styles.bandeauTitre} numberOfLines={1}>
-                  {CEILINGS[fixture.kind].label}
-                </Text>
-                <View style={styles.editRow}>
-                  {champ('gauche', 'Distance au mur de gauche', 'gauche')}
-                  {champ('haut', 'Distance au mur du haut', 'haut')}
-                  <Text style={styles.unit}>cm</Text>
-                </View>
+              <View style={styles.bandeauEntete}>
+                <IconeBandeau icone={SOLAIRES.plafond} styles={styles} />
+                <View style={styles.bandeauTexte}>
+                  <Text style={styles.bandeauTitre} numberOfLines={1}>
+                    {CEILINGS[fixture.kind].label}
+                  </Text>
+                  <View style={styles.editRow}>
+                    {champ('gauche', 'Distance au mur de gauche', 'gauche')}
+                    {champ('haut', 'Distance au mur du haut', 'haut')}
+                    <Text style={styles.unit}>cm</Text>
+                  </View>
+              </View>
               </View>
               <View style={styles.bandeauActions}>
                   {/*

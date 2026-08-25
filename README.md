@@ -7501,6 +7501,47 @@ Ce que les bancs gardent en sens inverse, et qui compte autant : **un plafond
 qui MONTE ne bouge rien**. Une action qui rabaisserait tout à chaque passage
 passerait les épreuves du dessus sans qu'on s'en aperçoive.
 
+### Le bandeau du bas dit de quoi il parle, et où il se coupe en deux
+
+Relevé du patron : le bandeau du bas est **« trop simple »**. Trois pistes
+ont été posées — une teinte de fond selon ce qu'on a touché, un filet entre
+les deux parties, une icône devant le titre. Réponse : **« fais le filet et
+icône »**. La teinte de fond reste en attente ; elle change la peau du
+bandeau, et ce n'est pas ce qui a été demandé.
+
+**Le filet.** Le bandeau a deux parties depuis le relevé « fais en 2 parties,
+avec le texte au-dessus et les boutons en dessous » — et rien ne les séparait
+qu'un blanc. Sur un mur à quatre boutons, la carte se lit comme un seul bloc
+où l'œil ne sait pas où s'arrête la cote et où commencent les gestes. Un
+cheveu suffit, la même séparation que les rangées d'une feuille de choix, et
+de l'air au-dessus des boutons : collé à eux, le filet se lirait comme un
+soulignement du texte. Il arrive PARTOUT d'un coup, parce que les quatre
+coquilles du bas partagent déjà le style de leur rangée d'actions.
+
+**L'icône.** Le titre est une cote — « 0,83 × 2,04 m » — et rien ne disait à
+quoi elle appartient sinon le mot en gris dessous, qu'il faut lire. La
+silhouette de l'élément se pose devant : une porte, un mur, une note, une
+ligne de spots se reconnaissent sans lire, comme dans la rangée d'outils.
+Elle prend l'encre douce du sous-titre — elle accompagne la cote, elle ne lui
+dispute pas le regard.
+
+Elle est FACULTATIVE, et c'est le contrôle en sens inverse du banc : un
+bandeau qui n'en reçoit pas n'en dessine pas. Une silhouette par défaut
+mentirait sur ce qui est sélectionné — mieux vaut rien qu'un symbole faux.
+
+Les quatre coquilles la portent : mur et menuiserie (`StripBar`), pièce
+(`RoomBar`), meuble (`ObjectBar`), appareil de plafond (`CeilingBar`). Une
+seule restée sans se lirait comme le bandeau d'un autre écran, et le banc
+vérifie donc les quatre — et qu'elles sont DIFFÉRENTES, parce qu'une icône
+répétée n'informe pas, elle décore.
+
+**Ce que le banc a appris au passage.** Il cherchait « la première rangée qui
+passe à la ligne » pour trouver la partie basse : le bandeau d'un meuble en
+compte une autre au-dessus, les flèches de déplacement, et c'est elle qu'il
+attrapait. Il prend maintenant la DERNIÈRE — « ce qu'on touche est en
+dessous » est la forme même de ces bandeaux, et c'est un fait de dessin, pas
+un nom de style.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

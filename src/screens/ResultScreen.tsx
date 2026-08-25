@@ -3611,6 +3611,7 @@ export function ResultScreen() {
           return (
             <StripBar
               styles={stylesBarres}
+              icone={SOLAIRES.note}
               strong="Note"
               /*
                 LA LIGNE DU HAUT PORTE L'INSTRUCTION.
@@ -3716,6 +3717,7 @@ export function ResultScreen() {
           return (
             <StripBar
               styles={stylesBarres}
+              icone={SOLAIRES.plafond}
               strong={`${ligne.length} spots`}
               note={
                 `${rooms.find((r) => r.id === ligne[0].roomId)?.name ?? 'Pièce'} · ` +
@@ -3919,6 +3921,7 @@ export function ResultScreen() {
         {vue === '2d' && editMode && selectedOpening && !capturing && (
           <StripBar
             styles={stylesBarres}
+            icone={SOLAIRES.ouvertures}
             strong={`${fr(segLength(selectedOpening), 2)} × ${fr(
               selectedOpening.height,
               2,
@@ -4128,6 +4131,7 @@ export function ResultScreen() {
         {vue === '2d' && !selectedObject && !selectedOpening && editMode && selectedWall && !capturing && (
           <StripBar
             styles={stylesBarres}
+            icone={SOLAIRES.murs}
             /*
               LES DEUX COTES DU MUR DANS LA LIGNE FORTE.
 
@@ -4260,6 +4264,7 @@ export function ResultScreen() {
             return (
               <StripBar
                 styles={stylesBarres}
+                icone={SOLAIRES.murs}
                 strong={`${fr((pier.t1 - pier.t0) * L, 2)} m`}
                 note={`retour · ${fr(mur.height, 2)} m sous plafond`}
                 actions={[
