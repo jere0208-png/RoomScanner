@@ -1665,6 +1665,15 @@ export function clampFootprint(
 ): ObjectFootprint {
   let cx = f.cx;
   let cz = f.cz;
+  /*
+    CE QUE CHAQUE MUR A DÛ POUSSER — et dans quel sens.
+
+    Deux poussées opposées ne s'annulent pas : elles disent que la boîte est
+    plus large que la pièce, et c'est elle qu'il faut raboter (voir
+    `raboter`). Sans cette mémoire, le dernier mur gagnait et le meuble
+    partait dehors.
+  */
+  const pousses: Poussee[] = [];
   const cos = Math.cos(f.yaw);
   const sin = Math.sin(f.yaw);
   const localCorners: [number, number][] = [
@@ -1710,9 +1719,152 @@ export function clampFootprint(
     if (need > 0 && need < Math.max(0.8, f.depth + wallT)) {
       cx += nx * side * need;
       cz += nz * side * need;
+      pousses.push({
+        nx: nx * side,
+        nz: nz * side,
+        base: (w.a.x * nx + w.a.z * nz) * side,
+      });
     }
   }
-  return faceIntoRoom({ ...f, cx, cz }, walls);
+  return faceIntoRoom(
+    raboter({ ...f, cx, cz }, pousses, wallT, margin),
+    walls,
+  );
+}
+
+/**
+ * UN MUR QUI A DÛ POUSSER, et où passe son nu.
+ *
+ * On retient la NORMALE (vers l'intérieur) et `base`, la cote du plan du mur
+ * le long de cette normale : le nu intérieur est alors à `base + wallT / 2`.
+ *
+ * On ne retient PAS ce que la poussée a déplacé. Les poussées s'enchaînent —
+ * le deuxième mur mesure un meuble que le premier a déjà écarté — et les
+ * additionner comptait deux fois le même débord : le placard de 2,20 se
+ * rabotait à 1,03 dans une pièce de 1,60. Deux nus se comparent, eux, sans
+ * rien devoir à l'ordre dans lequel on les a rencontrés.
+ */
+interface Poussee {
+  nx: number;
+  nz: number;
+  base: number;
+}
+
+/**
+ * LE PLANCHER DU RABOTAGE — trente centimètres.
+ *
+ * Un meuble réduit à un trait n'est plus un meuble : c'est un défaut qu'on a
+ * rendu invisible. En dessous, on préfère laisser dépasser et qu'on le voie.
+ */
+const RABOT_MINI = 0.3;
+
+/**
+ * QUAND UN MEUBLE NE RENTRE PAS, C'EST LA BOÎTE QUI CÈDE.
+ *
+ * Relevé de chantier, capture à l'appui : « après un scan complet de ma
+ * salle de bain, les WC et le meuble placard au-dessus ont été déplacés
+ * automatiquement hors plan et le scan les a dimensionnés plus grand ; ils
+ * ne rentrent pas sur le plan, mais bien dans ma salle de bain ».
+ *
+ * LES DEUX MOITIÉS SE TIENNENT. RoomPlan mesure une boîte ENGLOBANTE : dans
+ * une pièce étroite, un WC vu de trois quarts avec son abattant relevé, ou
+ * un placard dont la porte était ouverte, ressortent plus larges que le
+ * meuble réel. Le recalage, lui, ne savait que POUSSER — il écarte le meuble
+ * du mur dans lequel il trempe, mur après mur. Quand la boîte est plus large
+ * que la pièce, chaque mur pousse à son tour, le dernier gagne, et le meuble
+ * finit dehors.
+ *
+ * Réponse du patron : « fais en sorte que si le meuble semble plus grand que
+ * l'endroit où il se situe, on l'adapte au max pour qu'il soit bien là où il
+ * doit être ».
+ *
+ * DEUX POUSSÉES OPPOSÉES DISENT TOUT. Si deux murs ont écarté le meuble dans
+ * des sens contraires, aucun déplacement ne peut plus le sauver : c'est la
+ * boîte qui est trop grande. On la réduit de ce que les deux murs ont dû
+ * pousser, et l'on rend au meuble la moitié du chemin — il se repose entre
+ * les deux nus, sans quitter le mur qu'il longeait.
+ *
+ * LE RABOTAGE SUIT LES AXES DU MEUBLE, pas ceux du monde : dans une pièce de
+ * biais, réduire « la largeur » n'a de sens que dans le repère du caisson.
+ * On range donc chaque poussée sur l'axe local dont elle est la plus proche.
+ */
+function raboter(
+  f: ObjectFootprint,
+  pousses: Poussee[],
+  wallT: number,
+  margin: number,
+): ObjectFootprint {
+  if (pousses.length < 2) return f;
+  const cos = Math.cos(f.yaw);
+  const sin = Math.sin(f.yaw);
+  // Les deux axes du meuble, dans le monde : +largeur et +profondeur.
+  const axes = [
+    { ax: cos, az: sin, cle: 'width' as const },
+    { ax: -sin, az: cos, cle: 'depth' as const },
+  ];
+  let { cx, cz, width, depth } = f;
+  for (const { ax, az, cle } of axes) {
+    /*
+      LES DEUX MURS QUI BORNENT CET AXE.
+
+      Celui dont la normale suit l'axe borne le bout −, celui qui lui fait
+      face borne le bout +. On garde les plus CONTRAIGNANTS de chaque côté :
+      dans un recoin, trois murs peuvent pousser dans le même sens.
+    */
+    let bas: Poussee | null = null;
+    let haut: Poussee | null = null;
+    for (const p of pousses) {
+      const dot = p.nx * ax + p.nz * az;
+      // Perpendiculaire à cet axe : c'est l'affaire de l'autre.
+      if (Math.abs(dot) < 0.7) continue;
+      if (dot > 0) {
+        if (!bas || p.base > bas.base) bas = p;
+      } else if (!haut || p.base > haut.base) haut = p;
+    }
+    // Un seul côté poussé : le déplacement a suffi, la boîte n'y est pour
+    // rien. C'est le cas de l'étagère enfoncée dans une cloison.
+    if (!bas || !haut) continue;
+    /*
+      L'ESPACE ENTRE LES DEUX NUS, mesuré le long de la normale du premier.
+
+      Les deux murs se font face, donc leurs normales sont opposées : la
+      distance de plan à plan vaut −(base₁ + base₂), et l'on retire une
+      épaisseur de mur pour passer des axes aux nus.
+    */
+    const dispo = -(bas.base + haut.base) - wallT - 2 * margin;
+    /*
+      UNE BOÎTE DE BIAIS TIENT PLUS DE PLACE QUE SES COTES.
+
+      Entre deux nus parallèles, une caisse tournée occupe la SOMME de ses
+      deux dimensions projetées sur la normale. Rabotée à la seule cote de
+      l'axe, elle débordait encore de ce que l'autre côté projetait — et
+      dans une pièce de biais, c'est le cas de tous les meubles. On retire
+      donc d'abord la part de l'autre axe, puis on divise par ce que le
+      nôtre projette.
+    */
+    const dotNotre = Math.abs(ax * bas.nx + az * bas.nz);
+    const dotAutre = Math.abs(-az * bas.nx + ax * bas.nz);
+    const autre = cle === 'width' ? depth : width;
+    const place = (dispo - dotAutre * autre) / Math.max(0.1, dotNotre);
+    const avant = cle === 'width' ? width : depth;
+    const voulu = Math.max(RABOT_MINI, Math.min(avant, place));
+    if (avant - voulu <= 1e-6) continue;
+    if (cle === 'width') width = voulu;
+    else depth = voulu;
+    /*
+      ET IL SE REPOSE ENTRE LES DEUX.
+
+      Les poussées se sont annulées l'une l'autre : la dernière a laissé le
+      meuble collé au mur d'en face. Le milieu des deux nus est la seule
+      position qui ne privilégie personne — et comme la boîte remplit
+      désormais l'espace, ce milieu la met au contact des DEUX.
+    */
+    const milieu = (bas.base - haut.base) / 2;
+    const ecart = milieu - (cx * bas.nx + cz * bas.nz);
+    cx += bas.nx * ecart;
+    cz += bas.nz * ecart;
+  }
+  return { ...f, cx, cz, width, depth };
 }
 
 /**

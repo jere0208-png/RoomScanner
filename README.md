@@ -7789,6 +7789,58 @@ FONT qui les distingue. L'exception qu'il portait pour elles a disparu avec
 le correctif ; celle du crayon reste, parce qu'un crayon qui précède un mot
 est un ornement dans un bouton à texte, pas une pastille.
 
+### Un meuble qui ne rentre pas se rabote, il ne s'exile pas
+
+Relevé de chantier, capture à l'appui : **« après un scan complet de ma salle
+de bain, les WC et le meuble placard au-dessus ont été déplacés
+automatiquement hors plan et le scan les a dimensionnés plus grand ; ils ne
+rentrent pas sur le plan, mais bien dans ma salle de bain. »**
+
+Les deux moitiés de la phrase se tiennent, et c'est ce qui rendait le défaut
+incompréhensible. RoomPlan mesure une boîte ENGLOBANTE : dans une pièce
+étroite, un WC vu de trois quarts avec son abattant relevé, ou un placard
+dont la porte était ouverte, ressortent plus larges que le meuble réel. Le
+recalage, lui, ne savait que POUSSER — il écarte le meuble du mur dans lequel
+il trempe, mur après mur. Quand la boîte est plus large que la pièce, chaque
+mur pousse à son tour, le dernier gagne, et le meuble finit dehors. Il n'était
+pas « déplacé au hasard » : il était poussé par le dernier mur qui l'avait
+regardé.
+
+Réponse du patron : **« fais en sorte que si le meuble semble plus grand que
+l'endroit où il se situe, on l'adapte au max pour qu'il soit bien là où il
+doit être »**. C'est exactement la bonne réponse : entre une cote fausse et
+une place fausse, c'est la cote qui doit céder — on relève un logement, pas
+un catalogue de meubles.
+
+**Deux poussées opposées disent tout.** Si deux murs ont écarté le meuble
+dans des sens contraires, aucun déplacement ne peut plus le sauver : c'est la
+boîte qui est trop grande. On la rabote alors à ce qui tient entre les deux
+nus, et le meuble s'y repose — au milieu, c'est-à-dire au contact des deux,
+puisqu'il remplit désormais l'espace. L'autre axe n'est pas touché : un
+placard mural reste contre son mur.
+
+**Ce que la première version comptait deux fois.** Elle additionnait ce que
+chaque mur avait dû pousser — mais les poussées s'enchaînent, et le deuxième
+mur mesure un meuble que le premier a déjà écarté. Le placard de 2,20 se
+rabotait à 1,03 dans une pièce de 1,60. On compare donc les deux NUS, qui ne
+doivent rien à l'ordre dans lequel on les a rencontrés : 1,42, et le compte
+est juste.
+
+**Et une boîte de biais tient plus de place que ses cotes.** Entre deux nus
+parallèles, une caisse tournée occupe la SOMME de ses deux dimensions
+projetées sur la normale. Rabotée à la seule cote de son axe, elle débordait
+encore de ce que l'autre côté projetait — et dans une pièce de biais, c'est
+le cas de tous les meubles. On retire donc d'abord la part de l'autre axe.
+
+**Le plancher : trente centimètres.** Un meuble réduit à un trait n'est plus
+un meuble, c'est un défaut qu'on a rendu invisible. En dessous, on préfère
+laisser dépasser et qu'on le voie.
+
+Les contrôles en sens inverse comptent autant que la correction : un meuble
+qui TIENT ne perd pas un centimètre, et une étagère à moitié enfoncée dans
+une cloison se pousse comme avant — un seul mur l'a écartée, sa taille n'y
+est pour rien.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro
