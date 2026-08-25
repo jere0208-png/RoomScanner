@@ -963,10 +963,7 @@ export function Iso3DView({
       memoire.faces !== faces;
     if (perime) {
       const t0 = Date.now();
-      // Sous le doigt, l'ordre resservira quelques degrés : il se veut
-      // robuste. Au repos, il ne sert qu'à l'image qu'on regarde, et se
-      // veut exact — voir `masques`.
-      ajusterBlocs(dessinables, false, enMouvement);
+      ajusterBlocs(dessinables, false);
       // Ce que ce classement vient de coûter décide du prochain seuil.
       coutTri.current = Date.now() - t0;
       const table = new Map<number, number>();

@@ -7900,7 +7900,30 @@ suite. `ajusterBlocs` reçoit donc un drapeau de plus, et la vue le renseigne
 avec ce qu'elle sait déjà : `enMouvement`.
 
 Le banc passe de trois recouvrements à **zéro sur les 216 prises de vue du
-tour**.
+tour**. Mais le chantier voyait encore le défaut, et c'est une VIDÉO qui a
+donné la clé : sur les images du milieu — pendant que la vue tourne — un pan
+recouvre nettement le bord du placard ; sur la dernière, vue posée, tout est
+propre. Ce qui précède n'était que la moitié du sujet.
+
+**Le classement est un tri TOPOLOGIQUE**, et c'est là que se cachait le
+reste. Il pose des flèches — l'arête après son pan, le meuble avant le mur
+qui le masque — puis sort les faces dans un ordre qui les respecte. Mais
+entre deux faces qu'AUCUNE flèche ne relie, il ne dit rien : il rendait alors
+l'ordre d'ARRIVÉE, c'est-à-dire celui de la construction de la scène. Un pan
+poussé par une flèche descend dans cet ordre, et rien ne le retient de passer
+sous des meubles construits plus tard. Le mur du lavabo était de ceux-là.
+
+**Le groupe entre donc trié par PROFONDEUR.** Les paires contraintes gardent
+leurs flèches ; toutes les autres — l'immense majorité — gardent l'ordre que
+la profondeur leur donnait déjà, et qui est juste. Le classement ne réordonne
+plus que ce qu'on lui demande de réordonner.
+
+**Et les deux moitiés se tiennent.** La restriction seule rendait l'image du
+repos exacte et laissait dix-huit percées pendant un geste, là où l'ordre
+ressert quelques degrés : il avait fallu un drapeau pour distinguer les deux
+régimes. Avec le tri par profondeur, la restriction tient PARTOUT — sous le
+doigt comme au repos —, le drapeau disparaît, et le code est plus simple
+qu'avant la correction.
 
 ## Prérequis pour tester sur iPhone
 

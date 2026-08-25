@@ -239,17 +239,8 @@ const anglesQuiPercent = (fige: number) => {
     if (fige > 0) {
       // Exactement ce que fait la memoire de la vue : chaque pan retrouve sa
       // profondeur par son numero, chaque arete suit le sien.
-      /*
-        UN ORDRE QU'ON REEMPLOIE SE VEUT ROBUSTE.
-
-        C'est tout le sujet de ce banc : l'ordre pris quelques degres plus
-        tot resservira ici. `ajusterBlocs` recoit donc le drapeau qui le dit,
-        et pose ses fleches ENTIERES — au repos, la vue les restreint a ce
-        qui se recouvre vraiment, pour que l'image qu'on regarde soit exacte
-        (voir `masques`, et le releve « des murs qui vont sur les meubles »).
-      */
       const anciennes = vuesA(theta - fige);
-      ajusterBlocs(anciennes, false, true);
+      ajusterBlocs(anciennes, false);
       const table = new Map<number, number>();
       for (const p of anciennes) {
         if (p.pan !== undefined) table.set(p.pan, p.depth);

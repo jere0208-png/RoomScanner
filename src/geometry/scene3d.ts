@@ -614,20 +614,7 @@ export function ordreLocal<T extends FacePeinte>(
  */
 function masques<
   T extends FacePeinte & { owner?: string; cache?: readonly string[] },
->(
-  groupe: T[],
-  /**
-   * VRAI quand ce classement ne servira QU'À CETTE IMAGE.
-   *
-   * Restreindre les flèches aux faces qui se recouvrent rend l'ordre exact
-   * ici, et un peu moins robuste ailleurs : c'est le bon marché tant qu'on
-   * ne le réemploie pas. Sous le doigt, où l'ordre resservira quelques
-   * degrés plus loin, on garde les flèches entières — un trait de dos qui
-   * paraît le temps d'un clignement ne se voit pas, un lavabo caché au
-   * repos se voit tout de suite.
-   */
-  pourCetteImage: boolean,
-): [number, number][] {
+>(groupe: T[]): [number, number][] {
   const parMeuble = new Map<string, number[]>();
   let aMasquer = false;
   groupe.forEach((g, i) => {
@@ -657,6 +644,12 @@ function masques<
     l'écran. Là où elles ne se recouvrent pas, l'ordre n'a aucune
     conséquence visible, et une contrainte sans conséquence visible est une
     contrainte qui n'a que des effets de bord.
+
+    CETTE RESTRICTION SEULE NE SUFFISAIT PAS : elle rendait l'image du repos
+    exacte et laissait dix-huit percées pendant un geste, là où l'ordre
+    ressert quelques degrés. Il a fallu l'autre moitié — faire ENTRER les
+    faces dans le classement par ordre de profondeur (voir `ajusterBlocs`) —
+    pour que les deux tiennent ensemble, sous le doigt comme au repos.
   */
   const boite = (it: T & FacePeinte) => {
     let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
@@ -677,7 +670,7 @@ function masques<
     for (const [id, indices] of parMeuble) {
       if (!masques.has(id)) continue;
       for (const i of indices) {
-        if (!pourCetteImage || seCroisent(i, j)) fleches.push([i, j]);
+        if (seCroisent(i, j)) fleches.push([i, j]);
       }
     }
   });
@@ -795,15 +788,6 @@ export function ajusterBlocs<
    * apparaître une fraction de seconde. Dès qu'on lâche, tout se reclasse.
    */
   rapide = false,
-  /**
-   * CE CLASSEMENT VA-T-IL RESSERVIR ?
-   *
-   * La vue garde son ordre quelques degrés pendant un geste. Un ordre qu'on
-   * réemploie doit être ROBUSTE — flèches entières ; un ordre calculé pour
-   * l'image qu'on regarde doit être EXACT — flèches restreintes à ce qui se
-   * recouvre. Voir `masques`.
-   */
-  reutilise = false,
 ): void {
   /*
     UN GROUPE PAR PIÈCE, ET NON PAR MEUBLE.
@@ -909,17 +893,40 @@ export function ajusterBlocs<
     const haut = Math.max(...groupe.map((g) => g.depth));
     if (!rapide) {
       const pas = Math.max(1e-6, (haut - bas) / (groupe.length + 1));
+      /*
+        ON ENTRE DANS LE CLASSEMENT DANS L'ORDRE DE LA PROFONDEUR.
+
+        Relevé de chantier, quatre fois : « des murs sur la vue 3D qui vont
+        sur les meubles alors que le meuble est plus vers nous ». La mesure a
+        fini par désigner le vrai coupable, et il ne se voyait pas.
+
+        Le classement est un tri TOPOLOGIQUE : il pose des flèches — l'arête
+        après son pan, le meuble avant le mur qui le masque — puis sort les
+        faces dans un ordre qui les respecte. Mais entre deux faces qu'AUCUNE
+        flèche ne relie, il ne dit rien : il rendait alors l'ordre d'ARRIVÉE,
+        c'est-à-dire celui de la construction de la scène. Or un pan poussé
+        par une flèche descend dans cet ordre, et rien ne le retient de
+        passer sous des meubles construits plus tard.
+        Le mur du lavabo était de ceux-là.
+
+        Le groupe entre donc trié par PROFONDEUR. Les paires contraintes
+        gardent leurs flèches ; toutes les autres — l'immense majorité —
+        gardent l'ordre que la profondeur leur donnait déjà, et qui est juste.
+        Le classement ne réordonne plus que ce qu'on lui demande de
+        réordonner.
+      */
+      const range = [...groupe].sort((a, b) => a.depth - b.depth);
       // Les arêtes entrent dans le classement avec les aplats : c'est par
       // elles qu'on croyait voir au travers des meubles.
       // Chaque arête est LIÉE à son pan : elle passe après lui, sans perdre
       // ses propres contraintes.
       const ou = new Map<number, number>();
-      groupe.forEach((g, i) => {
+      range.forEach((g, i) => {
         if (g.pan !== undefined) ou.set(g.pan, i);
       });
       const liens: [number, number][] = [];
-      const panDe = groupe.map(() => -1);
-      groupe.forEach((g, i) => {
+      const panDe = range.map(() => -1);
+      range.forEach((g, i) => {
         if (g.bord === undefined) return;
         const j = ou.get(g.bord);
         if (j !== undefined && j !== i) {
@@ -927,8 +934,8 @@ export function ajusterBlocs<
           panDe[i] = j;
         }
       });
-      for (const [i, j] of masques(groupe, !reutilise)) liens.push([i, j]);
-      ordreLocal(groupe, liens, panDe).forEach((g, k) => {
+      for (const [i, j] of masques(range)) liens.push([i, j]);
+      ordreLocal(range, liens, panDe).forEach((g, k) => {
         g.depth = bas + k * pas;
       });
       /*
@@ -972,7 +979,7 @@ export function ajusterBlocs<
     const rang = new Map<number, number>();
     // La règle du pan qui masque sa pièce vaut aussi sous le doigt : elle ne
     // coûte rien — c'est une flèche, pas un test au pixel.
-    ordreLocal(aplats, masques(aplats, false)).forEach((g, k) => {
+    ordreLocal(aplats, masques(aplats)).forEach((g, k) => {
       g.depth = bas + k * pas;
       if (g.pan !== undefined) rang.set(g.pan, g.depth);
     });
