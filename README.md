@@ -7355,9 +7355,16 @@ savoir — une porte que le scan a trouvée ouverte.
 La seconde tenait à ce qu'est une porte en volume. Elle se dessine désormais
 comme un PERCEMENT, pourtour du vide en pointillé sur les deux faces du mur,
 plus un SEUIL : une barre plate au sol, dans l'épaisseur du tableau, qui dit
-qu'ici on ferme alors qu'une baie se traverse. Quand le plan est en couleur,
-le pourtour d'une porte prend la teinte des portes — le seuil ne fait que
-deux centimètres, et il faut bien distinguer les deux d'un coup d'œil.
+qu'ici on ferme alors qu'une baie se traverse.
+
+Ce seuil ne fait que deux centimètres, et de loin une porte et une baie se
+ressemblaient encore trait pour trait. La teinte des portes a d'abord été
+réservée au réglage « Couleur des portes/fenêtres » — décoché par défaut,
+donc invisible pour qui ne l'a jamais trouvé. Question posée au patron,
+réponse : **« oui pour le pourtour »**. Une porte est donc cernée d'ambre en
+toutes circonstances, une baie garde le bleu des passages. C'est la règle que
+la palette énonçait déjà sans qu'on l'applique jusqu'au bout : les teintes de
+menuiserie ne décorent pas, elles DÉSIGNENT.
 
 **Le vantail en volume, essayé et écarté.** Le plan 2D dessine le battant
 ouvert à l'équerre et son quart de cercle ; le porter en trois dimensions

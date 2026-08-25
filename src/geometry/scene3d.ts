@@ -2131,11 +2131,19 @@ export function buildScene(
           faces.push({
             pts: vquad(p, r, hole.y0, hole.y1),
             fill: null,
-            /* Le pourtour d'une PORTE prend la teinte des portes quand le
-               plan est en couleur : c'est ce qui la distingue d'une baie
-               libre d'un coup d'œil, le seuil ne faisant que deux
-               centimètres. Sans le réglage, tout reste au trait. */
-            stroke: opts.colorOpenings && porte ? pal.door : pal.passage,
+            /*
+              LE POURTOUR D'UNE PORTE EST AMBRE, TOUJOURS.
+
+              Le seuil ne fait que deux centimètres : de loin, une porte et
+              une baie libre se ressemblaient trait pour trait. La teinte
+              des portes avait d'abord été réservée au réglage « Couleur des
+              portes/fenêtres » — décoché par défaut, donc invisible pour
+              qui ne l'a jamais trouvé. Décision du patron, sur question
+              posée : le pourtour la porte en toutes circonstances. C'est la
+              règle de la palette, d'ailleurs : les teintes de menuiserie ne
+              décorent pas, elles DÉSIGNENT (voir `MAQUETTE`).
+            */
+            stroke: porte ? pal.door : pal.passage,
             dashed: true,
             bias: 0.006,
             normal: outwardOf(p, r),

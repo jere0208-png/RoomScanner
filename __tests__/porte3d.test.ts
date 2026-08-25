@@ -92,7 +92,9 @@ const scene = (o: WallSeg) =>
   });
 
 /** Le pourtour du percement : un trait tirete, a la hauteur de la baie. */
-const pointilles = (faces: { dashed?: boolean; pts: { y: number }[] }[]) =>
+const pointilles = (
+  faces: { dashed?: boolean; stroke: string | null; pts: { y: number }[] }[],
+) =>
   faces.filter((f) => f.dashed && Math.max(...f.pts.map((p) => p.y)) > 1.5);
 
 /**
@@ -153,6 +155,25 @@ describe('la porte en volume', () => {
         scene({ ...menuiserie('door'), versExterieur: true }).faces,
       ),
     ).toHaveLength(0);
+  });
+
+  /*
+    LE POURTOUR DIT LA NATURE, SANS REGLAGE A COCHER.
+
+    Le seuil ne fait que deux centimetres : de loin, une porte et une baie
+    libre se ressemblaient trait pour trait. La teinte des portes a d'abord
+    ete reservee au reglage « Couleur des portes/fenetres » — decoche par
+    defaut, donc invisible pour qui ne l'a jamais trouve. Question posee au
+    patron, reponse : « oui pour le pourtour ». Les teintes de menuiserie ne
+    decorent pas, elles DESIGNENT (voir `MAQUETTE`) : le pourtour d'une porte
+    est ambre en toutes circonstances, celui d'une baie reste le bleu des
+    passages.
+  */
+  it('se distingue d’une baie au premier coup d’œil, sans rien cocher', () => {
+    const teinteDe = (o: WallSeg) =>
+      new Set(pointilles(scene(o).faces).map((f) => f.stroke));
+    expect([...teinteDe(menuiserie('door'))]).toEqual([MAQUETTE.door]);
+    expect([...teinteDe(menuiserie('opening'))]).toEqual([MAQUETTE.passage]);
   });
 
   /*

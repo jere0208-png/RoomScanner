@@ -1409,17 +1409,25 @@ describe('portes et fenêtres en volumes', () => {
       palette: TEST_PALETTE,
     });
     expect(vitree.faces.some((f) => f.dashed)).toBe(false);
-    // Une porte, une baie, une porte vue ouverte : le pourtour du vide, une
-    // face par cote du mur, et pas une de plus.
-    for (const seg of [
-      porte,
-      { ...porte, open: true },
-      { ...porte, type: 'opening' as const },
-    ]) {
+    /*
+      Une porte, une baie, une porte vue ouverte : le pourtour du vide, une
+      face par cote du mur, et pas une de plus.
+
+      LA TEINTE DU POURTOUR DIT LA NATURE. Elle etait celle des passages pour
+      tout le monde, et une porte ne se distinguait d'une baie que par son
+      seuil — deux centimetres, invisibles de loin. Le patron a tranche :
+      « oui pour le pourtour ». Une porte est donc ambre, une baie garde le
+      bleu des passages, et cela sans reglage a cocher.
+    */
+    for (const [seg, teinte] of [
+      [porte, TEST_PALETTE.door],
+      [{ ...porte, open: true }, TEST_PALETTE.door],
+      [{ ...porte, type: 'opening' as const }, TEST_PALETTE.passage],
+    ] as [WallSeg, string][]) {
       const scene = buildScene(rect, [seg], [sofa], { palette: TEST_PALETTE });
       const tirets = scene.faces.filter((f) => f.dashed);
       expect(tirets).toHaveLength(2);
-      expect(tirets.every((f) => f.stroke === TEST_PALETTE.passage)).toBe(true);
+      expect(tirets.every((f) => f.stroke === teinte)).toBe(true);
       // Aucun meuble, aucun mur : le pointille ne fuit pas.
       expect(tirets.every((f) => f.ownerId === undefined)).toBe(true);
     }
