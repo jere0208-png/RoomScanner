@@ -178,11 +178,23 @@ describe('les images de la vitrine', () => {
     c'est le même logement qui se remplit.
   */
   it('fait apparaître le mobilier en fondu', () => {
-    // Le trait du mobilier : c'est le seul bleu du dessin, et il n'est pas
-    // ombré — donc lisible tel quel, contrairement au remplissage.
+    /*
+      ON CHERCHE UN MEUBLE, PAS UNE COULEUR.
+
+      Ce banc lisait « le premier trait bleu du dessin », en se fiant à ce
+      que le bleu du mobilier soit le seul de la vitrine. Il l'a cessé le
+      jour où une porte a montré son percement : le pourtour d'un passage
+      prend LA MÊME teinte (`passage: p.meubleTrait`), il est là dès la
+      première image, et le banc lisait donc une opacité pleine du début à
+      la fin — plus aucun fondu, alors que le fondu était intact.
+
+      On cherche donc par NATURE : un meuble est un polygone PLEIN qui
+      monte en opacité ; le pourtour d'un passage est un contour vide
+      (`fill="none"`). La couleur ne départage rien, le remplissage si.
+    */
     const opacite = (t: number) => {
       const m = svg(t).match(
-        /stroke="#2F6BFF" stroke-width="[\d.]+" stroke-opacity="([\d.]+)"/,
+        /fill="#[0-9A-Fa-f]{6}" fill-opacity="([\d.]+)" stroke="#2F6BFF"/,
       );
       return m ? parseFloat(m[1]) : 0;
     };

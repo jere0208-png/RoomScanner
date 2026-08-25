@@ -20,6 +20,7 @@ import {
   empriseDuCoffre,
   massifsTechniques,
   arcDuBattant,
+  estTraversante,
   pivotsDesBattants,
   wallAreaM2,
   wallQuads,
@@ -3861,7 +3862,11 @@ function elevationPage(
     }
     if (larg * scale > 40) {
       d.text(
-        t.seg.type === 'window' ? 'Fenêtre' : t.seg.open ? 'Passage' : 'Porte',
+        t.seg.type === 'window'
+          ? 'Fenêtre'
+          : estTraversante(t.seg)
+          ? 'Passage'
+          : 'Porte',
         px(gx + larg / 2),
         // Au-dessus du COFFRE quand il y en a un : posé sur le linteau, le
         // nom de la baie tombait en plein dans le bandeau ambre.

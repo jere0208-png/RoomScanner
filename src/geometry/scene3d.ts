@@ -8,6 +8,7 @@
 import type { FloorData, ObjectData, SurfaceTexture } from 'react-native-room-scan';
 import {
   clampFootprint,
+  estTraversante,
   pointOnSeg,
   roomOf,
   roomParts,
@@ -2101,9 +2102,24 @@ export function buildScene(
 
     // ---------------------------------------- portes / fenêtres du mur
     for (const hole of mine) {
-      // Une baie libre ou une porte ouverte, ça se TRAVERSE : pas de panneau,
+      /*
+        UNE PORTE EST UN TROU, PAS UN PANNEAU DE PLUS.
+
+        Relevé de chantier, capture à l'appui : « en choisissant la porte,
+        elle est opaque, pas d'ouverture réelle ». Le mur était bien bâti
+        AUTOUR de la baie — trumeaux, linteau — puis le trou se rebouchait
+        d'un aplat de la couleur des portes : un rectangle beige sur un mur
+        beige, qui ne disait ni qu'on passe là, ni de quel côté ça s'ouvre.
+
+        Une porte se dessine donc comme une baie — le pourtour du vide, on
+        voit à travers — et porte son SEUIL, qui dit qu'ici on ferme. Le
+        sens d'ouverture, lui, reste l'affaire du plan : voir la note du
+        seuil, plus bas, pour le vantail en volume qu'on a écarté.
+      */
+      const porte = hole.seg.type === 'door';
+      // Une baie libre ou une porte, ça se TRAVERSE : pas de panneau,
       // juste le pourtour du vide, en pointillé, sur les deux faces du mur.
-      if (hole.seg.open) {
+      if (porte || estTraversante(hole.seg)) {
         const p1 = lerp2(q.a1, q.b1, hole.t0);
         const r1 = lerp2(q.a1, q.b1, hole.t1);
         const p2 = lerp2(q.a2, q.b2, hole.t0);
@@ -2115,10 +2131,43 @@ export function buildScene(
           faces.push({
             pts: vquad(p, r, hole.y0, hole.y1),
             fill: null,
-            stroke: pal.passage,
+            /* Le pourtour d'une PORTE prend la teinte des portes quand le
+               plan est en couleur : c'est ce qui la distingue d'une baie
+               libre d'un coup d'œil, le seuil ne faisant que deux
+               centimètres. Sans le réglage, tout reste au trait. */
+            stroke: opts.colorOpenings && porte ? pal.door : pal.passage,
             dashed: true,
             bias: 0.006,
             normal: outwardOf(p, r),
+          });
+        }
+        /*
+          LE SEUIL — ce qui distingue une porte d'un trou dans un mur.
+
+          UN VANTAIL EN VOLUME A ÉTÉ ESSAYÉ, ET ÉCARTÉ. Le plan 2D dessine
+          le battant ouvert à l'équerre et son quart de cercle ; le porter en
+          trois dimensions paraissait aller de soi. La mesure a dit non : sur
+          la chambre meublée du banc d'audit — porte de 90 sur le mur ouest,
+          lit à quarante-cinq centimètres de là — le vantail ouvert TRAVERSE
+          le lit. Deux volumes qui s'interpénètrent n'ont pas d'ordre de
+          peinture : l'audit comptait cent dix recouvrements, et le chantier
+          aurait vu une porte plantée dans un matelas. Le débattement réel
+          demanderait de connaître ce qui l'encombre, meuble par meuble, à
+          chaque image — c'est le prix qu'on a refusé.
+
+          Reste ce qu'un seuil dit à lui seul : ici on FERME, alors qu'une
+          baie libre se traverse. Il tient dans l'épaisseur du mur, ne
+          rencontre donc rien, et se lit de tous les angles.
+        */
+        if (porte) {
+          const teinte = opts.colorOpenings ? pal.door : pal.opening;
+          pushWallBlock(q, hole.t0, hole.t1, hole.y0, hole.y0 + 0.02, {
+            fill: teinte,
+            top: mixHex(teinte, '#FFFFFF', 0.25),
+            stroke: mixHex(teinte, '#000000', 0.12),
+            topStroke: mixHex(teinte, '#000000', 0.12),
+            shade: true,
+            depthY: w.height / 2,
           });
         }
         continue;

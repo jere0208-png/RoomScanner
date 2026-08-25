@@ -1377,9 +1377,25 @@ describe('portes et fenêtres en volumes', () => {
     }
   });
 
-  it('ne met en pointillé QUE les passages', () => {
-    // Le pointillé fuyait sur tout le modèle : les polygones sont retriés à
-    // chaque image et React réutilisait le composant d'un pan pointillé.
+  /*
+    LE POINTILLE NE DEBORDE PAS DE CE QU'ON TRAVERSE.
+
+    Deux versions de ce banc, et deux defauts differents.
+
+    D'ABORD LA FUITE : le pointille contaminait tout le modele. Les polygones
+    sont retries a chaque image, et React reutilisait le composant d'un pan
+    pointille pour peindre un mur. C'est ce que ce banc surveille depuis, et
+    ce qu'il surveille toujours.
+
+    ENSUITE LA PORTE. Le banc exigeait qu'une porte FERMEE n'ait aucun
+    pointille : elle etait alors un panneau plein, et le pointille disait
+    « ici, c'est du vide ». Une porte est desormais un PERCEMENT — releve de
+    chantier : « elle est opaque, pas d'ouverture reelle » — et son pourtour
+    se pointille comme celui d'une baie. Ce que le banc garde de son intention
+    d'origine : le pointille ne touche que des MENUISERIES, jamais un meuble
+    ni un pan de maconnerie.
+  */
+  it('ne met en pointillé QUE ce qu’on traverse', () => {
     const sofa = {
       id: 's',
       category: 'sofa',
@@ -1388,15 +1404,25 @@ describe('portes et fenêtres en volumes', () => {
       depth: 0.6,
       transform: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 2, 0.4, 2, 1],
     };
-    const scene = buildScene(rect, [porte], [sofa], { palette: TEST_PALETTE });
-    expect(scene.faces.some((f) => f.dashed)).toBe(false);
-    const ouverte = buildScene(rect, [{ ...porte, open: true }], [sofa], {
+    // Une fenetre garde son vitrage : rien a traverser, donc rien en tirets.
+    const vitree = buildScene(rect, [{ ...porte, type: 'window' }], [sofa], {
       palette: TEST_PALETTE,
     });
-    expect(ouverte.faces.filter((f) => f.dashed)).toHaveLength(2);
-    expect(
-      ouverte.faces.filter((f) => f.dashed).every((f) => f.stroke === TEST_PALETTE.passage),
-    ).toBe(true);
+    expect(vitree.faces.some((f) => f.dashed)).toBe(false);
+    // Une porte, une baie, une porte vue ouverte : le pourtour du vide, une
+    // face par cote du mur, et pas une de plus.
+    for (const seg of [
+      porte,
+      { ...porte, open: true },
+      { ...porte, type: 'opening' as const },
+    ]) {
+      const scene = buildScene(rect, [seg], [sofa], { palette: TEST_PALETTE });
+      const tirets = scene.faces.filter((f) => f.dashed);
+      expect(tirets).toHaveLength(2);
+      expect(tirets.every((f) => f.stroke === TEST_PALETTE.passage)).toBe(true);
+      // Aucun meuble, aucun mur : le pointille ne fuit pas.
+      expect(tirets.every((f) => f.ownerId === undefined)).toBe(true);
+    }
   });
 
   it('rend une baie et une porte ouverte en vide bleu pointillé', () => {
@@ -1414,18 +1440,40 @@ describe('portes et fenêtres en volumes', () => {
     expect(wallPanels(holes.get('n')!, height)).toHaveLength(3);
   });
 
-  it('rend la porte comme un bloc, sans plan flottant devant le mur', () => {
+  /*
+    CE QU'EST UNE PORTE EN VOLUME — trois etats de ce banc, trois lecons.
+
+    1. UN PLAN FLOTTANT, tenu devant le mur par un biais de tri. Il passait
+       devant ou derriere selon l'angle : le biais est parti.
+    2. UN BLOC PLEIN dans le tableau. Il ne flottait plus, mais il rebouchait
+       le trou : releve de chantier, « en choisissant la porte, elle est
+       opaque, pas d'ouverture reelle ». Un rectangle beige sur un mur beige.
+    3. UN PERCEMENT, avec son SEUIL. Le mur est bati autour, le vide se lit
+       en pointille, et une barre plate au sol dit qu'ici on ferme — alors
+       qu'une baie libre se traverse.
+
+    Un VANTAIL en volume a ete essaye entre les deux derniers etats, et
+    ecarte : ouvert a l'equerre, il traverse le mobilier (voir la note dans
+    `scene3d`, et l'audit du peintre qui comptait cent dix recouvrements).
+  */
+  it('rend la porte comme un percement seuille, jamais comme un panneau', () => {
     const scene = buildScene(rect, [porte], [], {
       palette: TEST_PALETTE,
       colorOpenings: true,
     });
     const portes = scene.faces.filter((f) => f.fill === TEST_PALETTE.door);
-    // Un bloc, donc plusieurs faces orientées différemment — pas un seul plan.
+    // Le seuil est un VOLUME : plusieurs faces, orientees differemment.
     expect(portes.length).toBeGreaterThan(3);
     expect(portes.every((f) => f.normal !== undefined)).toBe(true);
     // Plus aucun biais de tri : c'est lui qui faisait passer la porte devant
-    // ou derrière le mur selon l'angle.
+    // ou derriere le mur selon l'angle.
     expect(portes.every((f) => (f.bias ?? 0) < 0.01)).toBe(true);
+    // Il RASE LE SOL : ce n'est pas un panneau qui remplit la baie.
+    const haut = Math.max(...portes.flatMap((f) => f.pts.map((q) => q.y)));
+    expect(haut).toBeLessThan(0.1);
+    // Et le vide, lui, monte jusqu'au linteau.
+    const tirets = scene.faces.filter((f) => f.dashed);
+    expect(Math.max(...tirets.flatMap((f) => f.pts.map((q) => q.y)))).toBeGreaterThan(1.9);
   });
 
   it('cadre à l’identique en mode geste : le modèle ne saute pas', () => {

@@ -62,6 +62,7 @@ import {
   NIVEAU_RDC,
   niveauDe,
   niveauxPresents,
+  murPorteurDe,
   reporterOuverture,
   deplacerNiveau,
   COFFRE_H,
@@ -367,25 +368,28 @@ function roomIndexAt(p: { x: number; z: number }, outlines: Pt[][]): number {
 }
 
 /**
- * SOUS QUEL PLAFOND vit cette menuiserie.
+ * LES COTES DU BÂTIMENT COURANT, par nature de menuiserie.
  *
- * Le mur porteur donne la hauteur disponible ; faute de mur retrouvé, on
- * prend la hauteur d'étage courante plutôt que de refuser le réglage — une
- * ouverture orpheline reste réglable, et elle se voit.
+ * Une ouverture posée à la main prenait 60 % de la longueur du mur et 85 %
+ * de sa hauteur : sur un mur de cinq mètres, une baie de trois mètres sur
+ * deux dix. Ce ne sont les proportions d'aucune menuiserie — c'était un
+ * trou, à recoter entièrement à la main.
+ *
+ * On pose donc ce qu'un électricien retrouve sur neuf chantiers sur dix :
+ * le passage de circulation 83, la fenêtre à allège 95. Rien ici n'est un
+ * réglage d'application : ce sont des cotes de catalogue, un point de
+ * départ qu'on corrige au bandeau quand le mètre dit autre chose.
  */
-function hauteurDuMurPorteur(o: WallSeg, walls: WallSeg[]): number {
-  let best = Infinity;
-  let h = 2.5;
-  const mid = { x: (o.a.x + o.b.x) / 2, z: (o.a.z + o.b.z) / 2 };
-  for (const w of walls) {
-    const d = pointOnSeg(mid, w.a, w.b).dist;
-    if (d < best) {
-      best = d;
-      h = w.height;
-    }
-  }
-  return best <= 0.6 ? h : 2.5;
-}
+export const COTES_MENUISERIE: Record<
+  'door' | 'window' | 'opening',
+  { largeur: number; hauteur: number; allege: number }
+> = {
+  door: { largeur: 0.83, hauteur: 2.04, allege: 0 },
+  window: { largeur: 1.2, hauteur: 1.15, allege: 0.95 },
+  // Une baie libre est un passage : la largeur d'une porte double moins un
+  // dormant, et la hauteur d'un linteau de circulation.
+  opening: { largeur: 0.9, hauteur: 2.1, allege: 0 },
+};
 
 /** Mur le plus proche d'une ouverture, et à quelle distance. */
 function nearestWall(o: WallSeg, walls: WallSeg[]): { dist: number } {
@@ -1271,8 +1275,14 @@ interface ScanState {
   saveAsCopy: (name: string) => void;
   /** Enregistre les modifications du plan dans la bibliothèque. */
   commitCurrent: () => void;
-  /** Ajoute une ouverture manuelle centrée sur un mur (entrée sans porte, baie…). */
-  addOpening: (wallId: string) => void;
+  /**
+   * Pose une menuiserie au milieu d'un mur, aux cotes de sa nature
+   * (`COTES_MENUISERIE`). Sans nature dite, c'est une baie libre.
+   */
+  addOpening: (
+    wallId: string,
+    nature?: 'door' | 'window' | 'opening',
+  ) => void;
   /**
    * Retaille une ouverture. La largeur se prend autour de son axe, la
    * hauteur depuis son allège : une fenêtre monte, elle ne descend pas.
@@ -4774,27 +4784,46 @@ export const useScanStore = create<ScanState>((set, get) => {
       set({ dirty: false });
     },
 
-    addOpening: (wallId) => {
+    /*
+      LA NATURE SE CHOISIT A LA POSE, et elle apporte ses cotes.
+
+      Relevé du chantier : « ça devrait proposer directement si on veut une
+      porte, une fenêtre, etc. » Le menu du mur posait une baie, toujours, et
+      il fallait ensuite quatre gestes — ouvrir le bandeau, entrer dans les
+      réglages de la menuiserie, déclarer la nature, recoter — pour obtenir
+      une porte. Le plan restait couvert de trous entre-temps.
+
+      Le paramètre est facultatif : `addOpening(mur)` continue de poser une
+      baie, comme le geste d'avant.
+    */
+    addOpening: (wallId, nature = 'opening') => {
       const st = get();
-      pushHistory('addOpening');
       const wall = st.walls.find((w) => w.id === wallId);
+      // Rien à poser : pas d'entrée d'historique non plus, sinon l'annulation
+      // suivante ne défait rien et se lit comme un geste raté.
       if (!wall) return;
       const wallLen = segLength(wall);
       if (wallLen < 0.4) return;
-      const len = Math.min(1, wallLen * 0.6);
+      pushHistory('addOpening');
+      const cotes = COTES_MENUISERIE[nature];
+      // Le mur borne tout : la largeur avec ses deux tableaux, la hauteur
+      // avec son allège. Une menuiserie de catalogue sur un mur de placard
+      // se rabote, elle ne le perce pas de part en part.
+      const len = Math.min(cotes.largeur, wallLen * 0.9);
       const ux = (wall.b.x - wall.a.x) / wallLen;
       const uz = (wall.b.z - wall.a.z) / wallLen;
       const mid = { x: (wall.a.x + wall.b.x) / 2, z: (wall.a.z + wall.b.z) / 2 };
-      const h = Math.min(2.05, wall.height * 0.85);
       const base = wall.yCenter - wall.height / 2;
+      const allege = Math.min(cotes.allege, Math.max(0, wall.height - 0.4));
+      const h = Math.min(cotes.hauteur, wall.height - allege);
       const opening: WallSeg = {
         id: `op-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-        type: 'opening',
+        type: nature,
         roomId: roomOf(wall),
         a: { x: mid.x - (ux * len) / 2, z: mid.z - (uz * len) / 2 },
         b: { x: mid.x + (ux * len) / 2, z: mid.z + (uz * len) / 2 },
         height: h,
-        yCenter: base + h / 2,
+        yCenter: base + allege + h / 2,
       };
       set({ openings: [...st.openings, opening], dirty: true });
     },
@@ -4972,8 +5001,12 @@ export const useScanStore = create<ScanState>((set, get) => {
         impossible. On s'arrête au linteau — et le chiffre relu après coup
         dit la vérité, ce qu'un refus muet ne ferait pas.
       */
-      const plafond = hauteurDuMurPorteur(o, st.walls);
-      const base = Math.min(Math.max(0, h), Math.max(0, plafond - o.height));
+      const { sol, hauteur: plafond } = murPorteurDe(o, st.walls);
+      // `h` se compte DEPUIS LE SOL DU MUR — c'est ce que l'électricien
+      // mesure, mètre posé sur le plancher, et pas la cote dans le repère
+      // du scan (voir `murPorteurDe`).
+      const base =
+        sol + Math.min(Math.max(0, h), Math.max(0, plafond - o.height));
       pushHistory(`allege:${id}`);
       set({
         openings: st.openings.map((x) =>
@@ -5010,13 +5043,15 @@ export const useScanStore = create<ScanState>((set, get) => {
       if (!o || o.type === type) return;
       pushHistory(`nature:${id}`);
       const base = o.yCenter - o.height / 2;
+      // Le SOL DU MUR, pas le zéro du repère : voir `murPorteurDe`.
+      const { sol, hauteur: plafond } = murPorteurDe(o, st.walls);
       let nouvelleBase = base;
-      if (type === 'door') nouvelleBase = 0;
-      else if (type === 'window' && base < 0.05) {
+      if (type === 'door') nouvelleBase = sol;
+      else if (type === 'window' && base - sol < 0.05) {
         // Bornée au mur : sur un mur bas, une baie haute ne peut pas
         // remonter de 95 cm sans sortir par le plafond.
-        const plafond = hauteurDuMurPorteur(o, st.walls);
-        nouvelleBase = Math.max(0, Math.min(0.95, plafond - o.height));
+        nouvelleBase =
+          sol + Math.max(0, Math.min(COTES_MENUISERIE.window.allege, plafond - o.height));
       }
       set({
         openings: st.openings.map((x) =>

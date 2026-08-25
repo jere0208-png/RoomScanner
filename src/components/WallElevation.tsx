@@ -39,6 +39,7 @@ import Svg, {
 } from 'react-native-svg';
 import { radius, shadowCard, themedStyles, useTheme, type Palette } from '../theme';
 import {
+  estTraversante,
   roomOf,
   roomParts,
   segLength,
@@ -1355,9 +1356,12 @@ export function WallElevation({
                       fontSize={10}
                       fontWeight="700"
                       textAnchor="middle">
+                      {/* La NATURE nomme, pas un drapeau : une baie posée à
+                          la main s'appelait « Porte ». Voir
+                          `estTraversante`. */}
                       {hole.seg.type === 'window'
                         ? 'Fenêtre'
-                        : hole.seg.open
+                        : estTraversante(hole.seg)
                         ? 'Passage'
                         : 'Porte'}
                     </SvgText>

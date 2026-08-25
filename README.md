@@ -7075,9 +7075,10 @@ photo d'écran de toutes pièces. Si l'on y revient un jour, c'est par là qu'il
 faut commencer, et avec un OCR en état de marche : c'est lui, et lui seul,
 qui donne l'échelle exacte d'un plan.
 
-L'icône animée du scan, elle, RESTE : elle avait été commandée à part, elle
-est testée, sa pellicule est versionnée, et elle ne dépend de rien
-(`src/components/ScanGlyph.tsx`, `src/ui/glypheScan.ts`).
+L'icône animée du scan a d'abord été GARDÉE — elle avait été commandée à
+part, elle était testée, sa pellicule était versionnée, et elle ne dépendait
+de rien. Elle est partie au relevé suivant : voir « L'icône du scan s'en va
+avec ce qu'elle annonçait », plus bas.
 
 
 
@@ -7302,6 +7303,103 @@ la maison — un jour quelqu'un se demandera pourquoi cette icône se peint en
 un seul tracé quand deux seraient si commodes pour la cerner. Ce qu'il
 vérifie aujourd'hui : un tracé, à l'encre du THÈME, sans `stroke`. « Encre du
 thème » et non un noir en dur : sur fond sombre, un noir figé disparaîtrait.
+
+### Percer un mur : la nature d'abord, le trou ensuite
+
+Relevé de chantier : **« j'ai essayé de créer une ouverture sur un mur, ça
+devrait proposer directement si on veut une porte, une fenêtre, etc. avec un
+beau pop-up imagé. De plus, en choisissant la porte, elle se monte à
+l'envers et est opaque, pas d'ouverture réelle. »**
+
+Trois défauts dans une seule phrase, et ils tenaient tous à la même cause :
+l'application posait un TROU, puis demandait après coup ce qu'il était.
+
+**Le parcours.** Le bouton « Ouvrir » du menu du mur posait une baie de 60 %
+de la longueur du mur sur 85 % de sa hauteur — les proportions d'aucune
+menuiserie, et sur un mur de cinq mètres une baie de trois mètres. Pour
+obtenir une porte il fallait ensuite la sélectionner, ouvrir son bandeau,
+entrer dans « Réglages de la menuiserie », déclarer la nature, puis corriger
+la largeur et la hauteur : cinq gestes, et un plan couvert de trous
+entre-temps. La question se pose maintenant AVANT : trois vignettes — porte,
+fenêtre, baie libre —, chacune dessinée en élévation, avec sa cote de départ
+écrite dessous. Le catalogue (`COTES_MENUISERIE`) est la source unique : la
+feuille l'affiche, le store le pose, et deux listes ne peuvent plus se
+contredire. Porte 83 × 204 au sol, fenêtre 120 × 115 à 95 d'allège, baie
+90 × 210. Ce sont des cotes de bâtiment courant, pas des réglages de
+l'application : un point de départ qu'on recote au bandeau quand le mètre
+dit autre chose. Le mur borne tout — sur un mur de placard, la menuiserie se
+rabote au lieu de le percer de part en part.
+
+**« Elle se monte à l'envers ».** Déclarer une porte ramenait son allège à
+zéro — le zéro du REPÈRE. Or ARKit pose son origine là où le relevé a
+commencé, à hauteur de main le plus souvent : un scan livre couramment des
+murs dont le plancher tombe à −0,40, et la porte se décrochait d'autant.
+Toutes les cotes verticales d'une menuiserie se comptent désormais depuis le
+sol de SON MUR (`murPorteurDe`) — la pose, la déclaration de nature, le
+réglage d'allège, et le chiffre affiché au bandeau, qui ne correspondait
+alors à rien de ce qu'on mesure sur place.
+
+**« Opaque, pas d'ouverture réelle ».** La maquette bâtissait bien le mur
+autour de la baie — trumeaux, linteau, allège — puis rebouchait le trou d'un
+aplat de la couleur des portes : un rectangle beige sur un mur beige. Deux
+causes, deux corrections.
+
+La première tenait à un drapeau. `open` était posé une seule fois, à la
+lecture du scan : RoomPlan dit qu'il a vu la porte ouverte, ou que c'est une
+baie libre. Une baie posée à la MAIN ne passait jamais par là — le plan 2D la
+dessinait en trouée, la 3D la bouchait, la feuille d'élévation l'appelait
+« Porte ». Une baie libre est un vide par nature : `estTraversante` le dit
+une fois pour toutes, et le drapeau ne sert plus qu'à ce qu'il est seul à
+savoir — une porte que le scan a trouvée ouverte.
+
+La seconde tenait à ce qu'est une porte en volume. Elle se dessine désormais
+comme un PERCEMENT, pourtour du vide en pointillé sur les deux faces du mur,
+plus un SEUIL : une barre plate au sol, dans l'épaisseur du tableau, qui dit
+qu'ici on ferme alors qu'une baie se traverse. Quand le plan est en couleur,
+le pourtour d'une porte prend la teinte des portes — le seuil ne fait que
+deux centimètres, et il faut bien distinguer les deux d'un coup d'œil.
+
+**Le vantail en volume, essayé et écarté.** Le plan 2D dessine le battant
+ouvert à l'équerre et son quart de cercle ; le porter en trois dimensions
+paraissait aller de soi, et il a été écrit — gond et sens repris du plan,
+pour que les deux dessins ne se contredisent pas. La mesure a dit non. Sur la
+chambre meublée du banc d'audit — porte de 90 sur le mur ouest, lit à
+quarante-cinq centimètres — le vantail ouvert TRAVERSE le lit. Deux volumes
+qui s'interpénètrent n'ont pas d'ordre de peinture : l'audit du peintre est
+passé de zéro à cent dix recouvrements, et pas sur la porte — sur du
+mobilier situé à l'autre bout de la pièce, parce qu'un seul cycle dérange
+tout le classement du logement. (Deux plaques dos à dos, essayées d'abord,
+donnaient le même mal pour une autre raison : deux faces exactement
+superposées ne se départagent par aucun pixel.) Connaître le débattement
+réel demanderait de savoir ce qui l'encombre, meuble par meuble, à chaque
+image. C'est le prix qu'on a refusé. Le sens d'ouverture reste dit par le
+plan, le PDF et l'export CAO, qui le dessinent tous les trois.
+
+**Ce que trois bancs ont appris au passage.** `showcase` mesurait le fondu du
+mobilier en lisant « le premier trait bleu du dessin » : le pourtour d'un
+passage prend la même teinte, il est là dès la première image, et le banc a
+cru le fondu disparu alors qu'il était intact. Il cherche maintenant par
+NATURE — un meuble est un polygone plein, le pourtour d'un passage est un
+contour vide. Et les deux bancs de `floorplan` qui décrivaient la porte-bloc
+ont été réécrits en racontant les trois états successifs : le plan flottant
+tenu par un biais de tri, le bloc plein, le percement seuillé.
+
+### L'icône du scan s'en va avec ce qu'elle annonçait
+
+`ScanGlyph` — quatre équerres et une ligne qui balaye, relue image par image
+depuis un fichier Lottie plutôt qu'embarquée avec son lecteur — avait été
+commandée pour le bouton « Scanner un plan papier ». Le plan papier a été
+retiré ; l'icône est restée, et plus rien ne l'affichait. On l'a gardée un
+temps au motif qu'elle était testée et sa pellicule versionnée : ce sont de
+bonnes raisons de garder du code qui SERT, pas du code que personne
+n'appelle. Décision du patron, sur question posée : on l'enlève.
+
+S'en vont avec elle son banc, sa pellicule de référence
+(`assets/rendu-reference/glyphe-scan.svg`) et la moitié de `render.test.ts`
+qui la figeait en six poses. Tout vit dans l'historique, jusqu'au commit qui
+la retire ; le récit de sa construction — pourquoi on lit un Lottie au lieu
+de l'embarquer — reste plus haut dans ce fichier, parce que la prochaine
+icône animée se fera de la même façon.
 
 ## Prérequis pour tester sur iPhone
 

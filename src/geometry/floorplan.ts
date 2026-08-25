@@ -158,6 +158,66 @@ function isOpenPassage(s: SurfaceData): boolean {
   return s.type === 'door' && /isOpen:\s*true/.test(s.category ?? '');
 }
 
+/**
+ * CE QU'ON TRAVERSE — et pourquoi ça ne se retient pas dans un drapeau.
+ *
+ * `open` était posé une seule fois, à la lecture du scan : RoomPlan dit
+ * qu'il a vu la porte ouverte, ou que c'est une baie libre, et le segment
+ * gardait la réponse. Une baie posée à la MAIN ne passait jamais par là.
+ * Elle n'avait donc pas le drapeau : le plan 2D la dessinait en trouée, la
+ * 3D la bouchait d'un panneau plein. Deux dessins du même trou, et rien
+ * pour les réconcilier — c'est le « pas d'ouverture réelle » du relevé.
+ *
+ * Une baie libre est un vide PAR NATURE : le dire deux fois, c'est se
+ * donner l'occasion de se contredire. Le drapeau ne sert donc plus qu'à ce
+ * qu'il est seul à savoir : une PORTE que le scan a trouvée ouverte.
+ */
+/**
+ * SUR QUEL MUR vit cette menuiserie : son plancher et son plafond.
+ *
+ * Le mur porteur donne la hauteur disponible ; faute de mur retrouvé, on
+ * prend la hauteur d'étage courante plutôt que de refuser le réglage — une
+ * ouverture orpheline reste réglable, et elle se voit.
+ *
+ * LE SOL AUSSI VIENT DE LUI, et pas du zéro du repère. ARKit pose son
+ * origine là où le relevé a commencé — à hauteur de main, le plus souvent.
+ * Un scan livre donc couramment des murs dont le plancher tombe à −0,40, et
+ * ramener l'allège d'une porte à « zéro » dans ce repère-là la décroche du
+ * sol : relevé du chantier, « en choisissant la porte, elle se monte à
+ * l'envers ».
+ */
+export function murPorteurDe(
+  o: WallSeg,
+  walls: WallSeg[],
+): { sol: number; hauteur: number } {
+  let best = Infinity;
+  let porteur: WallSeg | null = null;
+  const mid = { x: (o.a.x + o.b.x) / 2, z: (o.a.z + o.b.z) / 2 };
+  for (const w of walls) {
+    const d = pointOnSeg(mid, w.a, w.b).dist;
+    if (d < best) {
+      best = d;
+      porteur = w;
+    }
+  }
+  if (!porteur || best > 0.6) {
+    // Orpheline : on garde SON propre plancher, faute de mieux — la
+    // remonter au zéro du repère serait la déplacer sans rien savoir.
+    return { sol: o.yCenter - o.height / 2, hauteur: 2.5 };
+  }
+  return {
+    sol: porteur.yCenter - porteur.height / 2,
+    hauteur: porteur.height,
+  };
+}
+
+export function estTraversante(o: {
+  type: WallSeg['type'];
+  open?: boolean;
+}): boolean {
+  return o.type === 'opening' || o.open === true;
+}
+
 export function toSegment(s: SurfaceData, roomId?: string): WallSeg {
   const skin = {
     color: s.color,

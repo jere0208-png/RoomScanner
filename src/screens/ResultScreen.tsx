@@ -3,6 +3,7 @@ import { BackChevron } from '../components/BackChevron';
 import { RetourGlisse } from '../components/RetourGlisse';
 import { garderLeTravail } from '../ui/gardeTravail';
 import { AlerteSortie } from '../components/AlerteSortie';
+import { ChoixOuverture } from '../components/ChoixOuverture';
 import {
   Alert,
   Animated,
@@ -65,6 +66,7 @@ import {
   abregerNiveau,
   niveauDe,
   niveauxPresents,
+  murPorteurDe,
   roomOf,
   wallQuadsOf,
   roomExtent,
@@ -795,6 +797,16 @@ export function ResultScreen() {
    * sur le plan : le même geste que pour une ligne de spots.
    */
   const [pendingLienMur, setPendingLienMur] = useState<string | null>(null);
+  /*
+    LE MUR QU'ON S'APPRÊTE À PERCER.
+
+    La feuille de choix se referme AVANT de poser la menuiserie (iOS ne
+    présente qu'une fenêtre modale à la fois, voir `SheetShell`) : l'état
+    qui la rend visible est déjà retombé à `null` quand le choix arrive. Le
+    mur voyage donc dans une référence, qui, elle, ne se vide pas en route.
+  */
+  const murAPercer = useRef<string | null>(null);
+  const [choixOuverture, setChoixOuverture] = useState(false);
   /**
    * L'origine des cotes d'une pièce, DANS LA TRAME DU LOGEMENT.
    *
@@ -1418,7 +1430,10 @@ export function ResultScreen() {
     setPrompt({
       title: 'Allège',
       subtitle: 'Du sol au repos de la baie — la cote d’une prise dessous.',
-      value: Math.max(0, o.yCenter - o.height / 2)
+      /* Depuis le SOL DU MUR, pas depuis le zéro du repère : ARKit place
+         son origine à hauteur de main, et la cote lue au bandeau ne
+         correspondait alors à rien de ce qu'on mesure sur place. */
+      value: Math.max(0, o.yCenter - o.height / 2 - murPorteurDe(o, walls).sol)
         .toFixed(2)
         .replace('.', ','),
       unit: 'm',
@@ -3126,7 +3141,12 @@ export function ResultScreen() {
               setElecOpen(true);
             }}
             onWallAction={(action, wallId) => {
-              if (action === 'ouverture') addOpening(wallId);
+              if (action === 'ouverture') {
+                // On demande CE QU'ON PERCE avant de percer : voir
+                // `ChoixOuverture`.
+                murAPercer.current = wallId;
+                setChoixOuverture(true);
+              }
               else if (action === 'electricite') openWallElevation(wallId);
               else if (action === 'supprimer') {
                 removeWall(wallId);
@@ -4437,6 +4457,17 @@ export function ResultScreen() {
         }}
       />
 
+      <ChoixOuverture
+        visible={choixOuverture}
+        onClose={() => setChoixOuverture(false)}
+        onChoisir={(nature) => {
+          const mur = murAPercer.current;
+          murAPercer.current = null;
+          if (!mur) return;
+          addOpening(mur, nature);
+          haptic('succes');
+        }}
+      />
       <ActionSheet data={menu} onClose={() => setMenu(null)} />
       <AlerteSortie
         data={alerteSortie}
