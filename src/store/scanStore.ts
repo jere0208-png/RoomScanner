@@ -810,8 +810,23 @@ let lastKey = '';
 let lastAt = 0;
 
 const two = (n: number) => String(n).padStart(2, '0');
-function defaultName(d: Date): string {
-  return `Scan du ${two(d.getDate())}/${two(d.getMonth() + 1)} à ${two(
+/**
+ * LE NOM D'UN RELEVÉ NEUF — assez court pour tenir.
+ *
+ * Il s'appelait « Scan du 25/08 à 23h45 » : vingt et un caractères, quand
+ * l'en-tête du plan en affiche dix-huit. Il était donc tronqué À CHAQUE
+ * FOIS — « Scan du 25/08 à 2… » —, dès la première seconde, sur l'écran où
+ * l'on passe le plus de temps, et pareil dans la bibliothèque.
+ *
+ * Trois mots n'y servaient à rien : « du », « à », et la place qu'ils
+ * prennent. « Scan 25/08 · 23h45 » dit exactement la même chose et tient.
+ *
+ * LES RELEVÉS EXISTANTS NE SONT PAS RENOMMÉS : un nom est ce que
+ * l'électricien a sous les yeux depuis des semaines, parfois ce qu'il a
+ * dicté au client. Seuls les nouveaux prennent la forme courte.
+ */
+export function defaultName(d: Date): string {
+  return `Scan ${two(d.getDate())}/${two(d.getMonth() + 1)} · ${two(
     d.getHours(),
   )}h${two(d.getMinutes())}`;
 }

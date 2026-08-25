@@ -23,8 +23,18 @@ export const PT_PAR_MM = 72 / 25.4;
  * 1:20 et 1:25 pour un détail d'exécution, 1:50 pour un plan de logement —
  * c'est celui du permis et du chantier —, 1:100 pour un étage entier, au-delà
  * pour un immeuble. Aucune règle ne porte de 1:37.
+ *
+ * ET LES DEUX CRANS DU SECOND ŒUVRE, 1:30 et 1:40. La série sautait de 1:25
+ * à 1:50, et le saut coûtait cher : sur le logement de référence — sept
+ * mètres de façade dans le cadre d'une A4 — on tombait à 1:50 quand 1:40
+ * tenait largement, et le plan n'occupait qu'un tiers de la page. Ces deux
+ * échelles sont sur tous les kutchs de second œuvre ; c'est même celle à
+ * laquelle un plombier ou un électricien dessine un détail de pièce humide.
+ * Deux crans de plus, un quart de dessin gagné.
  */
-export const ECHELLES_BATIMENT = [20, 25, 50, 75, 100, 125, 150, 200] as const;
+export const ECHELLES_BATIMENT = [
+  20, 25, 30, 40, 50, 75, 100, 125, 150, 200,
+] as const;
 
 export interface EchelleChoisie {
   /** Le dénominateur : 50 pour 1:50. */

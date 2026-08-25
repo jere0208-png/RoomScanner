@@ -17,7 +17,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   removeItem: jest.fn(async () => undefined),
 }));
 
-import { echelleElevation } from '../src/export/echelle';
+import { ECHELLES_BATIMENT, echelleElevation } from '../src/export/echelle';
 import {
   buildScanPdf,
   fromBase64,
@@ -659,7 +659,9 @@ describe('l’echelle d’une elevation', () => {
     const crans = [...pdf.matchAll(/\(1:(\d+)\) Tj/g)].map((m) => Number(m[1]));
     expect(crans.length).toBeGreaterThan(0);
     for (const c of crans) {
-      expect([20, 25, 50, 75, 100, 125, 150, 200]).toContain(c);
+      // La SERIE, pas une copie de la serie : elle s'est allongee de deux
+      // crans (1:30 et 1:40) et cette liste-la ne l'avait pas su.
+      expect([...ECHELLES_BATIMENT]).toContain(c);
     }
   });
 
@@ -683,11 +685,21 @@ describe('l’echelle d’une elevation', () => {
     expect(3.86 * e.ptParMetre).toBeLessThanOrEqual(455);
   });
 
+  /*
+    ET LA SERIE S'EST ALLONGEE DEPUIS.
+
+    Ce banc attendait 1:50 pour un mur de six metres : c'etait le cran
+    suivant, la serie sautant de 1:25 a 1:50. Elle porte desormais 1:30 et
+    1:40 — les deux echelles du second oeuvre, celles auxquelles un
+    electricien dessine un detail de piece humide. Le meme mur tient donc au
+    quarantieme, et l'elevation gagne un quart de dessin.
+
+    Ce que le banc verifie n'a pas change : on DESCEND d'un cran, on ne
+    s'etire pas jusqu'au bord.
+  */
   it('descend d’un cran plutot que de deborder', () => {
-    // Un mur de six metres ne tient pas au vingt-cinquieme sur A4 : il
-    // passe au cinquantieme, il ne s'etire pas jusqu'au bord.
     const e = echelleElevation(455, 544, 6, 2.5);
-    expect(e.ratio).toBe(50);
+    expect(e.ratio).toBe(40);
     expect(6 * e.ptParMetre).toBeLessThanOrEqual(455);
   });
 });

@@ -28,6 +28,36 @@ describe('choisir une échelle de bâtiment', () => {
     expect(ECHELLES_BATIMENT).not.toContain(37);
   });
 
+  /*
+    LA SERIE S'EST ALLONGEE — 1:30 et 1:40.
+
+    Elle sautait de 1:25 a 1:50, et le saut coutait cher : sur le logement de
+    reference, sept metres de facade dans un cadre A4, on tombait a 1:50
+    quand 1:40 tenait largement. Le plan occupait alors un tiers de la page,
+    et le blanc autour n'apprenait rien a personne.
+
+    1:30 et 1:40 sont sur tous les kutchs de second oeuvre — c'est meme
+    l'echelle a laquelle un plombier ou un electricien dessine un detail de
+    piece humide. Deux crans de plus, un quart de dessin gagne.
+  */
+  it('offre aussi les crans du second oeuvre', () => {
+    expect(ECHELLES_BATIMENT).toContain(30);
+    expect(ECHELLES_BATIMENT).toContain(40);
+    // Et la serie reste croissante : c'est ce qui permet de prendre « le
+    // premier qui tient » sans chercher plus loin.
+    const triee = [...ECHELLES_BATIMENT].sort((a, b) => a - b);
+    expect([...ECHELLES_BATIMENT]).toEqual(triee);
+  });
+
+  it('gagne un quart de dessin sur un logement courant', () => {
+    // Sept metres de facade, le cadre d'une A4 : 1:50 rendait 14 cm de
+    // dessin, 1:40 en rend 17,5.
+    const cadre = 500;
+    const e = echelleNormalisee(cadre, 7);
+    expect(e.ratio).toBe(40);
+    expect(e.ptParMetre * 7).toBeLessThanOrEqual(cadre);
+  });
+
   it('prend la plus grande qui tient dans le cadre', () => {
     // Un cadre de 400 pt pour 10 m de plan : il faut au moins 1:71, donc on
     // descend au cran suivant — 1:75 — et le plan tient, un peu plus petit.

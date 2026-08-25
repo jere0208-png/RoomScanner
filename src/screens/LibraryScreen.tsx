@@ -39,6 +39,7 @@ import {
   type PromptData,
 } from '../components/Sheet';
 import { MoreDots } from '../components/MoreDots';
+import { resumeDuScan } from '../ui/mots';
 
 /**
  * Le dessin de l'état vide.
@@ -123,14 +124,14 @@ function ligneDetails(
   parts: ReturnType<typeof roomParts>,
 ): string {
   const total = totalArea(parts);
-  return [
-    ...(parts.length > 1 ? [`${parts.length} pièces`] : []),
-    `${item.walls.length} murs`,
-    ...(total
-      ? [`${total.exact ? '' : '≈ '}${total.area.toFixed(1).replace('.', ',')} m²`]
-      : []),
-    ...(item.objects.length > 0 ? [`${item.objects.length} objets`] : []),
-  ].join(' · ');
+  // Un seul endroit sait accorder — celui-ci écrivait « 1 objets ». Voir
+  // `src/ui/mots.ts`.
+  return resumeDuScan({
+    pieces: parts.length,
+    murs: item.walls.length,
+    objets: item.objects.length,
+    surface: total,
+  });
 }
 
 /**

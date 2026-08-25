@@ -197,13 +197,24 @@ describe('les etiquettes du plafond, toutes ensemble', () => {
     expect(paires).toEqual([]);
   });
 
-  /** Et le sigle reste sous SON appareil : c'est ce qui le rattache. */
+  /*
+    ET LE SIGLE RESTE SOUS SON APPAREIL — c'est ce qui le rattache.
+
+    CE BANC NOMMAIT UNE POSITION PAR SON CHIFFRE : il exigeait un « y » entre
+    380 et 410 points de page. Le jour ou la serie d'echelles s'est allongee
+    (1:30 et 1:40 sont arrives), le plan a change de taille et le sigle est
+    tombe a 379,13 — le dessin etait juste, le banc criait au defaut. C'est
+    la faute que la maison connait le mieux, et elle recommence des qu'on
+    ecrit un chiffre absolu.
+    On verifie donc ce qu'on voulait vraiment dire : les trois spots sont sur
+    UNE MEME LIGNE, donc leurs trois sigles aussi — quelle que soit l'echelle
+    a laquelle la feuille les dessine.
+  */
   it('garde chaque sigle a portee de son symbole', () => {
     const plan = dossier(SCENE).split('(FEUILLE)')[0];
-    for (const m of motsDu(plan).filter((x) => x.texte === 'SP')) {
-      // Les trois spots sont sur la meme ligne : leurs sigles aussi.
-      expect(m.y).toBeGreaterThan(380);
-      expect(m.y).toBeLessThan(410);
-    }
+    const sigles = motsDu(plan).filter((x) => x.texte === 'SP');
+    expect(sigles.length).toBeGreaterThanOrEqual(3);
+    const ys = sigles.map((m) => m.y);
+    expect(Math.max(...ys) - Math.min(...ys)).toBeLessThan(1);
   });
 });

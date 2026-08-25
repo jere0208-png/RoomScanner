@@ -7961,6 +7961,50 @@ restent opaques — « un plan qu'on imprime ne se lit pas en transparence ».
 depuis cette machine : l'écorché n'existe que dans l'app, pas dans les
 planches de référence. C'est la mesure qui répond, pas l'image.
 
+### Trois petites choses, dont deux sous les yeux depuis le début
+
+**« 1 objets ».** La ligne de résumé d'un relevé, dans la bibliothèque,
+écrivait « 4 murs · 9,8 m² · 1 objets ». L'application savait pourtant
+accorder — le choix d'après-scan dit « 1 meuble détecté », la visite client
+dit « 1 pièce » — mais chaque endroit refaisait le calcul dans son coin, et
+trois d'entre eux l'avaient oublié. Un pluriel fautif sur un dossier qu'on
+montre au client, c'est le genre de détail qui fait douter du reste.
+
+Un seul module accorde désormais (`src/ui/mots.ts`), et deux bancs lisent les
+sources pour que plus personne ne recompte à la main. Zéro reste au
+singulier : c'est la règle du français, et l'app est française.
+
+**« Scan du 25/08 à 2… ».** Le nom d'un relevé neuf faisait vingt et un
+caractères quand l'en-tête du plan en affiche dix-huit : il était tronqué À
+CHAQUE FOIS, dès la première seconde, sur l'écran où l'on passe le plus de
+temps — et pareil dans la bibliothèque. Trois mots n'y servaient à rien :
+« du », « à », et la place qu'ils prennent. C'est maintenant
+« Scan 25/08 · 23h45 ».
+
+LES RELEVÉS EXISTANTS NE SONT PAS RENOMMÉS. Un nom est ce que l'électricien a
+sous les yeux depuis des semaines, parfois ce qu'il a dicté au client : seuls
+les nouveaux prennent la forme courte.
+
+**Deux crans d'échelle de plus : 1:30 et 1:40.** La série sautait de 1:25 à
+1:50, et le saut coûtait cher — une pièce de cinq mètres tombait à 1:50 quand
+1:40 tenait largement, et le plan n'occupait qu'un tiers de la page. Ces deux
+échelles sont sur tous les kutchs de second œuvre ; c'est même celle à
+laquelle un plombier ou un électricien dessine un détail de pièce humide.
+
+Vérifié à l'œil, et le résultat mérite d'être dit : **le logement de référence
+reste à 1:50**. Ses sept mètres de façade ne tiennent pas à 1:40 dans le cadre
+d'une A4 — le gain porte sur une autre famille de plans, pas sur celui-là.
+Une élévation de mur de six mètres, elle, passe de 1:50 à 1:40.
+
+**Et un banc qui nommait une position par son chiffre.** Celui des étiquettes
+de plafond exigeait un « y » entre 380 et 410 points de page. La série
+d'échelles ayant changé, le plan a changé de taille et le sigle est tombé à
+379,13 : le dessin était juste, le banc criait au défaut. C'est la faute que
+la maison connaît le mieux, et elle recommence dès qu'on écrit un chiffre
+absolu. Il vérifie maintenant ce qu'il voulait vraiment dire — les trois
+spots sont sur une même ligne, donc leurs trois sigles aussi, quelle que soit
+l'échelle.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

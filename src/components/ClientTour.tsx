@@ -49,6 +49,7 @@ import { FIXTURES } from '../geometry/electrical';
 import { deviceNames, wallCardinal } from '../geometry/naming';
 import { fixturePlacement, roomInputsOf } from '../geometry/nfc15100';
 import { useScanStore } from '../store/scanStore';
+import { pluriel } from '../ui/mots';
 
 /** Un moment de la visite : une caméra d'arrivée, un carton, une durée. */
 interface Etape {
@@ -203,7 +204,7 @@ export function ClientTour({
     // 1. Le logement entier, qui tourne : on prend la mesure du volume.
     out.push({
       titre: scanName || 'Le logement',
-      sous: `${rooms.length} pièce${rooms.length > 1 ? 's' : ''} · ${fr1(
+      sous: `${pluriel(rooms.length, 'pièce')} · ${fr1(
         surface,
       )} m² · ${fixtures.length} appareil${fixtures.length > 1 ? 's' : ''}`,
       roomId: null,
@@ -249,7 +250,7 @@ export function ClientTour({
       out.push({
         titre: room.name || 'Pièce',
         sous: part.surface
-          ? `${fr1(part.surface.area)} m² · ${murs.length} murs`
+          ? `${fr1(part.surface.area)} m² · ${pluriel(murs.length, 'mur')}`
           : undefined,
         detail: 'On entre',
         roomId: room.id,
