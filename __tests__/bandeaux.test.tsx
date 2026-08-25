@@ -1882,10 +1882,15 @@ describe('le menu du scan', () => {
  * à HUIT boutons, c'est-à-dire exactement le défaut relevé sur le bandeau
  * du mur : « peu de place pour les informations, un bouton sort du bloc ».
  *
- * La rangée porte donc ce que le bandeau AFFICHE — les trois cotes de la
- * menuiserie — et le menu porte ce qui tient à la POSE : où elle tombe sur
- * le mur, de quel côté elle s'ouvre, son coffre, et sa fermeture. Ce qui se
- * vérifie ici est inchangé : le trou part, les murs restent.
+ * La rangée portait donc ce que le bandeau AFFICHE — les trois cotes de la
+ * menuiserie — et un menu portait ce qui tient à la POSE : où elle tombe sur
+ * le mur, de quel côté elle s'ouvre, son coffre, sa fermeture.
+ *
+ * CE MENU N'EXISTE PLUS. Relevé du patron, une version plus tard : « le "…"
+ * de la menuiserie est mal placé, peu compréhensible sans lire le texte ».
+ * Chaque geste a désormais sa pastille et son mot. Ce que ce banc vérifie
+ * n'a pas bougé d'un pouce — le trou part, les murs restent ; c'est le
+ * CHEMIN pour y arriver qui a raccourci.
  */
 describe('la menuiserie selectionnee', () => {
   it('offre « Fermer l’ouverture », qui rebouche sans toucher aux murs', () => {
@@ -1902,26 +1907,23 @@ describe('la menuiserie selectionnee', () => {
     act(() => cible!.props.onPress());
     // Les trois cotes restent en direct : c'est ce qu'on vient corriger.
     expect(textes(tree)).toContain('Largeur');
-    // La fermeture, elle, se prend dans le menu de la menuiserie — qui
-    // porte son propre nom : l'écran a déjà un « Plus », celui de la pièce.
-    act(() => bouton(tree, 'Réglages de la menuiserie')!.props.onPress());
+    /*
+      LA FERMETURE EST SORTIE DU MENU.
+
+      Elle se prenait derriere « Reglages de la menuiserie », la pastille de
+      trois points du bandeau. Releve du patron : « au clic sur une porte, le
+      "…" de la menuiserie est mal place, peu comprehensible sans lire le
+      texte — peut-etre proposer directement les choix sous forme de
+      boutons ». Il n'y a plus de menu : chaque geste porte sa silhouette et
+      son mot, « Retirer » compris, comme sous une ligne de spots ou sous un
+      meuble (voir `bandeaumenuiserie.test.tsx`).
+
+      Ce que ce banc verifie n'a pas bouge d'un pouce : le trou part, les
+      murs restent. C'est le CHEMIN pour y arriver qui a raccourci.
+    */
     const murs = useScanStore.getState().walls.length;
     const trous = useScanStore.getState().openings.length;
-    // Les rangées du menu sont des Pressable sans étiquette : on les
-    // cherche par leur mot, comme le fait déjà le banc du bouclier.
-    // Le PLUS PROFOND des porteurs de geste : les premiers trouvés sont
-    // des conteneurs qui englobent toute la feuille, et leur `onPress`
-    // n'est pas celui de la rangée.
-    const lignes = tree.root
-      .findAll((n) => typeof n.props?.onPress === 'function')
-      .filter((n) =>
-        n
-          .findAllByType(Text)
-          .some((t) => t.props.children === 'Fermer l’ouverture'),
-      );
-    const ligne = lignes[lignes.length - 1];
-    expect(ligne).toBeDefined();
-    act(() => ligne.props.onPress());
+    act(() => bouton(tree, 'Retirer')!.props.onPress());
     /*
       LE GESTE ATTEND QUE LA FEUILLE SOIT PARTIE.
 

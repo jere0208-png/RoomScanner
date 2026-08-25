@@ -814,6 +814,15 @@ export function ResultScreen() {
   */
   const murAPercer = useRef<string | null>(null);
   const [choixOuverture, setChoixOuverture] = useState(false);
+  /*
+    LA MENUISERIE DONT ON CHANGE LA NATURE.
+
+    Même feuille imagée qu'à la pose, même raison de passer par une
+    référence : elle se referme AVANT de rendre son choix, et l'état qui la
+    montre est déjà retombé quand le choix arrive.
+  */
+  const natureAChanger = useRef<string | null>(null);
+  const [choixNature, setChoixNature] = useState(false);
   /**
    * L'origine des cotes d'une pièce, DANS LA TRAME DU LOGEMENT.
    *
@@ -3952,25 +3961,43 @@ export function ResultScreen() {
             }
             actions={[
               /*
-                LES TROIS COTES DE LA MENUISERIE, EN DIRECT.
+                TOUS LES GESTES D'UNE MENUISERIE, EN PASTILLES NOMMÉES.
 
-                Ce sont celles que le bandeau AFFICHE — « 1,20 × 1,10 m » —
-                et l'allège complète le triplet : c'est elle qui décide
-                d'une prise dessous ou d'un convecteur. Le reste tient à la
-                POSE, pas à la menuiserie, et vit dans le menu.
+                Relevé du patron : « au clic sur une porte, le "…" de la
+                menuiserie est mal placé, peu compréhensible sans lire le
+                texte — peut-être proposer directement les choix sous forme
+                de boutons ».
 
-                Relevé du patron sur le bandeau du mur : « peu de place pour
-                les informations, un bouton sort du bloc ». Huit boutons en
-                rangée reproduiraient exactement ce défaut ; quatre tiennent,
-                et le menu porte le reste sans rien tronquer.
+                Le bandeau montrait trois cotes puis une pastille de trois
+                points, et derrière elle SIX gestes : la nature, la position
+                sur le mur, le bord de pivot, le sens d'ouverture, le coffre
+                de volet, la suppression. Dont deux qu'on fait à chaque
+                porte. Une pastille muette au bout d'une rangée de mots se
+                lit comme un bouton de trop, pas comme une porte vers autre
+                chose.
+
+                Chaque geste a donc sa silhouette et son MOT dessous — la
+                forme du bandeau d'une ligne de spots, celle que la
+                continuité des icônes vient d'étendre partout. La rangée
+                passe à la ligne plutôt que de serrer : c'est déjà ce
+                qu'elle fait.
+
+                ET CHAQUE MENUISERIE N'A QUE LES SIENS. Une porte part du
+                sol : pas d'allège. Une fenêtre ne dessine pas de vantail :
+                ni charnière, ni sens d'ouverture. Un bouton qui ne peut
+                rien faire se lit comme un geste raté.
               */
               {
                 label: 'Largeur',
+                icone: SOLAIRES.longueur,
+                sansMot: true,
                 ghost: true,
                 onPress: () => promptOpening(selectedOpening.id, 'largeur'),
               },
               {
                 label: 'Hauteur',
+                icone: SOLAIRES.elevations,
+                sansMot: true,
                 ghost: true,
                 onPress: () => promptOpening(selectedOpening.id, 'hauteur'),
               },
@@ -3981,162 +4008,131 @@ export function ResultScreen() {
                       // réglage qui ne peut valoir que zéro se lit comme un
                       // geste raté.
                       label: 'Allège',
+                      icone: SOLAIRES.allege,
+                      sansMot: true,
                       ghost: true,
                       onPress: () => promptAllege(selectedOpening.id),
                     },
                   ]
                 : []),
               {
-                // Pas « Plus » tout court : l'écran en porte déjà un, sur
-                // le bandeau de la pièce. Deux boutons du même mot pour
-                // deux menus différents, c'est une étiquette qui ne dit
-                // plus rien à qui navigue à la voix.
-                label: 'Réglages de la menuiserie',
-                icone: SOLAIRES.points,
+                /*
+                  « LA PORTE À QUATRE-VINGT-DIX DU MUR » : la cote qu'un
+                  poseur mesure sur place. Elle vivait au fond du menu ;
+                  c'est pourtant l'un des deux gestes qu'on fait à chaque
+                  menuiserie.
+                */
+                label: 'Position sur le mur',
+                icone: SOLAIRES.ruler,
                 sansMot: true,
-                onPress: () =>
-                  setMenu({
-                    title:
-                      selectedOpening.type === 'window'
-                        ? 'Fenêtre'
-                        : selectedOpening.type === 'door'
-                        ? 'Porte'
-                        : 'Baie',
-                    subtitle:
-                      'Ce qui tient à la pose, pas à la menuiserie : où elle ' +
-                      'tombe sur le mur, de quel côté elle s’ouvre, et ce ' +
-                      'qui la coiffe.',
-                    actions: [
+                ghost: true,
+                onPress: () => promptOpeningPos(selectedOpening.id),
+              },
+              {
+                /*
+                  CE QU'ELLE EST — avec les MÊMES vignettes qu'à la pose.
+
+                  La nature se déclarait par trois lignes de texte au fond
+                  d'un menu (« C'est une porte », « C'est une fenêtre »…).
+                  La feuille imagée existe depuis qu'on pose les ouvertures ;
+                  elle sert aussi bien à corriger qu'à créer, et l'on ne
+                  décrit plus en mots ce qu'un dessin montre.
+                */
+                label: 'Nature',
+                icone: SOLAIRES.ouvertures,
+                sansMot: true,
+                ghost: true,
+                onPress: () => {
+                  natureAChanger.current = selectedOpening.id;
+                  setChoixNature(true);
+                },
+              },
+              /*
+                LE SENS D'OUVERTURE — deux gestes, deux questions.
+
+                Le plan devine le battant et se trompe une fois sur deux.
+                Pour qui pose l'appareillage ce n'est pas un détail de
+                trait : l'interrupteur va du côté de la POIGNÉE, jamais du
+                côté des paumelles, et une porte dessinée à l'envers envoie
+                percer derrière le battant.
+              */
+              ...(selectedOpening.type === 'door'
+                ? [
+                    {
+                      label: 'Charnière',
+                      icone: SOLAIRES.charniere,
+                      sansMot: true,
+                      ghost: true,
+                      onPress: () => {
+                        useScanStore
+                          .getState()
+                          .flipBattant(selectedOpening.id, 'pivot');
+                        haptic('succes');
+                      },
+                    },
+                    {
+                      label: 'Sens d’ouverture',
+                      icone: SOLAIRES.sens,
+                      sansMot: true,
+                      ghost: true,
+                      onPress: () => {
+                        useScanStore
+                          .getState()
+                          .flipBattant(selectedOpening.id, 'sens');
+                        haptic('succes');
+                      },
+                    },
+                  ]
+                : []),
+              ...(selectedOpening.type !== 'door'
+                ? [
+                    {
                       /*
-                        CE QU'ELLE EST — la première question, avant toute cote.
+                        LE COFFRE DE VOLET, DÉCLARÉ EN UN GESTE.
 
-                        Une ouverture posée à la main sortait toujours en
-                        BAIE, et rien ne permettait de dire autre chose : un
-                        plan tracé sans scanner ne comportait ni porte ni
-                        fenêtre, rien que des trous. Or la nature commande
-                        le dessin (le battant d'une porte, qui dit de quel
-                        côté se pose l'interrupteur) et les cotes (l'allège
-                        d'une fenêtre, qui décide d'une prise dessous).
-
-                        On ne propose que les DEUX AUTRES natures : un
-                        bouton qui redit ce qu'on est déjà ne fait rien, et
-                        un bouton qui ne fait rien se lit comme un geste
-                        raté.
+                        Relevé du chantier : « le scan ne détecte pas les
+                        rebords de coffrage de volet ». Il ne le fera
+                        jamais — ce n'est ni un mur, ni une menuiserie, ni
+                        un meuble. Or pour qui perce, c'est une contrainte
+                        de premier ordre : coulisse, tablier enroulé, tube,
+                        et le moteur à alimenter.
                       */
-                      ...(
-                        [
-                          ['door', 'C’est une porte'],
-                          ['window', 'C’est une fenêtre'],
-                          ['opening', 'C’est une baie libre'],
-                        ] as const
-                      )
-                        .filter(([t]) => t !== selectedOpening.type)
-                        .map(([t, mot]) => ({
-                          label: mot,
-                          icon: 'menuiserie' as const,
-                          onPress: () => {
-                            setOpeningType(selectedOpening.id, t);
-                            haptic('succes');
-                          },
-                        })),
-                      {
-                        /*
-                          « LA PORTE À QUATRE-VINGT-DIX DU MUR » : la cote
-                          qu'un poseur mesure sur place, et la seule que le
-                          plan ne savait pas recevoir. On demande le bord,
-                          pas l'axe — personne ne mesure jusqu'au milieu
-                          d'une porte.
-                        */
-                        label: 'Position sur le mur',
-                        icon: 'regle' as const,
-                        onPress: () => promptOpeningPos(selectedOpening.id),
+                      label: selectedOpening.coffre
+                        ? 'Retirer le coffre'
+                        : 'Coffre de volet',
+                      icone: SOLAIRES.coffre,
+                      sansMot: true,
+                      ghost: true,
+                      onPress: () => {
+                        useScanStore
+                          .getState()
+                          .toggleCoffre(selectedOpening.id);
+                        haptic('succes');
                       },
-                      /*
-                        LE SENS D'OUVERTURE — deux gestes, deux questions.
+                    },
+                  ]
+                : []),
+              {
+                /*
+                  FERMER : le trou disparaît, le mur redevient continu.
 
-                        Le plan devine le battant et se trompe une fois sur
-                        deux. Pour qui pose l'appareillage ce n'est pas un
-                        détail de trait : l'interrupteur va du côté de la
-                        POIGNÉE, jamais du côté des paumelles, et une porte
-                        dessinée à l'envers envoie percer derrière le
-                        battant.
-
-                        Rien pour une fenêtre : elle ne dessine pas de
-                        vantail, et un réglage invisible est un réglage
-                        qu'on croit raté.
-                      */
-                      ...(selectedOpening.type === 'door'
-                        ? [
-                            {
-                              label: 'Changer de charnière',
-                              icon: 'charniere' as const,
-                              onPress: () => {
-                                useScanStore
-                                  .getState()
-                                  .flipBattant(selectedOpening.id, 'pivot');
-                                haptic('succes');
-                              },
-                            },
-                            {
-                              // La flèche qui franchit la porte : elle dit
-                              // le SENS, qui est exactement le sujet.
-                              label: 'Ouvrir de l’autre côté',
-                              icon: 'sortir' as const,
-                              onPress: () => {
-                                useScanStore
-                                  .getState()
-                                  .flipBattant(selectedOpening.id, 'sens');
-                                haptic('succes');
-                              },
-                            },
-                          ]
-                        : []),
-                      {
-                        /*
-                          LE COFFRE DE VOLET, DÉCLARÉ EN UN GESTE.
-
-                          Relevé du chantier : « le scan ne détecte pas les
-                          rebords de coffrage de volet ». Il ne le fera
-                          jamais — ce n'est ni un mur, ni une menuiserie, ni
-                          un meuble. Or pour qui perce, c'est une contrainte
-                          de premier ordre : coulisse, tablier enroulé,
-                          tube, et le moteur à alimenter.
-                        */
-                        label: selectedOpening.coffre
-                          ? 'Retirer le coffre'
-                          : 'Coffre de volet',
-                        icon: 'coffre' as const,
-                        onPress: () => {
-                          useScanStore
-                            .getState()
-                            .toggleCoffre(selectedOpening.id);
-                          haptic('succes');
-                        },
-                      },
-                      {
-                        /*
-                          FERMER : le trou disparaît, le mur redevient
-                          continu.
-
-                          Relevé du patron : « fermer une ouverture et la
-                          remettre en mur, en continuité de ses murs
-                          adjacents ». Les ouvertures sont des trous
-                          découpés dans des murs pleins (assignOpenings) :
-                          il n'y a aucune maçonnerie à inventer, retirer le
-                          trou suffit — et le retour en arrière existe si la
-                          porte devait rouvrir.
-                        */
-                        label: 'Fermer l’ouverture',
-                        icon: 'murer' as const,
-                        danger: true,
-                        onPress: () => {
-                          removeOpening(selectedOpening.id);
-                          setSelectedOpeningId(null);
-                          haptic('succes');
-                        },
-                      },
-                    ],
-                  }),
+                  Relevé du patron : « fermer une ouverture et la remettre
+                  en mur, en continuité de ses murs adjacents ». Les
+                  ouvertures sont des trous découpés dans des murs pleins
+                  (`assignOpenings`) : il n'y a aucune maçonnerie à
+                  inventer, retirer le trou suffit — et l'annulation existe
+                  si la porte devait rouvrir.
+                */
+                label: 'Retirer',
+                icone: SOLAIRES.supprimer,
+                sansMot: true,
+                ghost: true,
+                danger: true,
+                onPress: () => {
+                  removeOpening(selectedOpening.id);
+                  setSelectedOpeningId(null);
+                  haptic('succes');
+                },
               },
             ]}
           />
@@ -4560,6 +4556,25 @@ export function ResultScreen() {
         }}
       />
 
+      {/*
+        LA MÊME FEUILLE POUR CORRIGER QUE POUR POSER.
+
+        La nature se déclarait par trois lignes de texte au fond d'un menu —
+        « C'est une porte », « C'est une fenêtre ». Les vignettes existent
+        depuis qu'on pose les ouvertures : on ne décrit plus en mots ce
+        qu'un dessin montre, et le geste est le même des deux côtés.
+      */}
+      <ChoixOuverture
+        visible={choixNature}
+        onClose={() => setChoixNature(false)}
+        onChoisir={(nature) => {
+          const id = natureAChanger.current;
+          natureAChanger.current = null;
+          if (!id) return;
+          setOpeningType(id, nature);
+          haptic('succes');
+        }}
+      />
       <ChoixOuverture
         visible={choixOuverture}
         onClose={() => setChoixOuverture(false)}

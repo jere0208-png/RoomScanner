@@ -7649,6 +7649,53 @@ traduction qui changerait TOUT `dcl` en applique ferait disparaître le point
 lumineux du plafond, celui qu'on pose neuf fois sur dix. Visé au milieu de la
 pièce, ou au ras du plafond même contre un mur, il reste un DCL.
 
+### Le bandeau d'une menuiserie ne cache plus ses gestes
+
+Relevé du patron : **« au clic sur une porte, le "…" de la menuiserie est mal
+placé, peu compréhensible sans lire le texte, etc. Peut-être proposer
+directement les choix sous forme de boutons. »**
+
+Le bandeau montrait trois cotes — largeur, hauteur, allège — puis une
+pastille de trois points. Derrière elle, SIX gestes : la nature de
+l'ouverture, sa position sur le mur, le bord de pivot, le sens d'ouverture,
+le coffre de volet, la suppression. Dont deux qu'on fait à chaque porte. Une
+pastille muette au bout d'une rangée de mots ne se lit pas comme une porte
+vers autre chose : elle se lit comme un bouton de trop.
+
+Tout est sorti du menu. Chaque geste a sa silhouette et son MOT dessous — la
+forme du bandeau d'une ligne de spots, celle que la continuité des icônes
+vient d'étendre partout. La rangée passe à la ligne plutôt que de serrer :
+c'est déjà ce qu'elle sait faire.
+
+Quatre silhouettes manquaient au jeu, et elles ont été déclarées dans l'outil
+de génération, pas à la main dans le fichier généré, qui les perdrait au
+passage suivant :
+
+- **l'allège** est une hauteur DEPUIS LE SOL : deux barres posées sur une
+  ligne, le dessin d'un alignement par le bas ;
+- **la charnière** : un panneau plein et son reflet en pointillé — le battant
+  qui bascule de l'autre bord. C'est le geste, pas l'objet ;
+- **le sens d'ouverture** : la flèche qui SORT du demi-cercle, ce que « ouvrir
+  de l'autre côté » met neuf mots à écrire ;
+- **le coffre** de volet roulant est un caisson posé au-dessus de la baie :
+  l'icône d'archive est ce caisson-là, couvercle compris.
+
+**La nature se change avec les mêmes vignettes qu'à la pose.** Elle se
+déclarait par trois lignes de texte au fond du menu — « C'est une porte »,
+« C'est une fenêtre ». La feuille imagée existe depuis qu'on pose les
+ouvertures : on ne décrit plus en mots ce qu'un dessin montre, et le geste
+est le même des deux côtés.
+
+**Chaque menuiserie n'a que ses gestes à elle.** Une porte part du sol : pas
+d'allège. Ni une fenêtre ni une baie ne dessinent de vantail : ni charnière,
+ni sens d'ouverture. Un bouton qui ne peut rien faire se lit comme un geste
+raté.
+
+Mais **rien ne disparaît au passage**, et le banc y veille : une baie libre
+garde son allège. Un passe-plat, une baie de comptoir se cotent depuis le
+plancher — une refonte de bandeau n'est pas l'occasion de retirer un réglage
+qui marchait.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

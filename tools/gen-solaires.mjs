@@ -131,6 +131,33 @@ const CHOIX = {
   */
   pivoter: ['restart-bold', 'refresh-bold'],
   centrer: ['gps-bold', 'target-bold'],
+  /*
+    LES QUATRE GESTES D'UNE MENUISERIE, sortis du menu « … ».
+
+    Relevé du patron : « au clic sur une porte, le "…" de la menuiserie est
+    mal placé, peu compréhensible sans lire le texte — peut-être proposer
+    directement les choix sous forme de boutons ». Les gestes qui vivaient
+    derrière ces trois points deviennent des pastilles, et il leur fallait
+    donc une silhouette.
+
+    L'ALLÈGE est une hauteur DEPUIS LE SOL : deux barres posées sur une
+    ligne, c'est le dessin d'un alignement par le bas et c'est exactement ce
+    qu'on règle.
+
+    LA CHARNIÈRE : un panneau plein et son reflet en pointillé — le battant
+    qui bascule de l'autre bord. C'est le geste, pas l'objet.
+
+    LE SENS D'OUVERTURE : la flèche qui SORT du demi-cercle. Elle dit qu'on
+    pousse vers l'autre pièce, ce que « ouvrir de l'autre côté » met neuf
+    mots à écrire.
+
+    LE COFFRE de volet roulant est un caisson posé au-dessus de la baie :
+    l'icône d'archive est ce caisson-là, couvercle compris.
+  */
+  allege: ['align-bottom-bold'],
+  charniere: ['mirror-left-bold', 'flip-horizontal-bold'],
+  sens: ['logout-bold', 'exit-bold'],
+  coffre: ['archive-bold'],
   // --- le menu du mur, et le crayon du bandeau
   supprimer: ['trash-bin-trash-bold', 'trash-bin-minimalistic-bold'],
   crayon: ['pen-bold'],
