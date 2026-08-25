@@ -81,6 +81,29 @@ export const DEFAULT_VIEW3D: View3DParams = {
 };
 
 const rad = (d: number) => (d * Math.PI) / 180;
+
+/**
+ * DE COMBIEN DE DEGRÉS ON PEUT SE PASSER D'UN NOUVEAU CLASSEMENT.
+ *
+ * Le classement exact — chaque face départagée au pixel, là où elle en
+ * recouvre une autre — coûte quelques millisecondes sur un logement meublé,
+ * et rien du tout sur une pièce nue. Le seuil était FIXE, à quatre degrés,
+ * réglé pour le pire cas : une pièce vide payait donc le prix d'un T5
+ * meublé, et laissait passer des percées qu'elle aurait pu s'épargner.
+ *
+ * Mesure au banc `percemur`, sur deux pièces meublées, en comptant les
+ * angles où un meuble traverse un mur pendant la rotation :
+ *
+ *     ordre frais 0 · 1° 0 · 2° 3 · 3° 3 · 4° 6 · 6° 9 · 8° 13
+ *
+ * À un degré, il n'y a plus rien à voir. Le seuil suit donc ce que le
+ * classement a COÛTÉ la dernière fois : un degré tant qu'il reste sous deux
+ * millisecondes et demie, quatre au-delà. Personne ne paie pour la scène du
+ * voisin.
+ */
+export function seuilDeReclassement(coutMs: number): number {
+  return Math.max(1, Math.min(4, Math.round(coutMs / 2.5)));
+}
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
 /**
@@ -725,6 +748,12 @@ export function Iso3DView({
    */
   const masquesScene = useMemo(() => masquesDeScene(faces), [faces]);
 
+  /**
+   * Ce qu'a coûté le dernier classement exact, en millisecondes. Il décide
+   * de la fréquence du suivant : voir `seuilDeReclassement`.
+   */
+  const coutTri = useRef(10);
+
   const rendered = useMemo(() => {
     if (layout.w === 0 || layout.h === 0) return null;
     const ct = Math.cos(rad(view.theta));
@@ -925,14 +954,18 @@ export function Iso3DView({
       qui paraît le temps d'un clignement ne se voit pas.
     */
     const enMouvement = interacting || light;
+    const seuil = seuilDeReclassement(coutTri.current);
     const perime =
       !memoire ||
       !enMouvement ||
-      Math.abs(view.theta - memoire.theta) > 4 ||
-      Math.abs(view.tilt - memoire.tilt) > 4 ||
+      Math.abs(view.theta - memoire.theta) > seuil ||
+      Math.abs(view.tilt - memoire.tilt) > seuil ||
       memoire.faces !== faces;
     if (perime) {
+      const t0 = Date.now();
       ajusterBlocs(dessinables, false);
+      // Ce que ce classement vient de coûter décide du prochain seuil.
+      coutTri.current = Date.now() - t0;
       const table = new Map<number, number>();
       for (const p of dessinables) {
         if (p.pan !== undefined) table.set(p.pan, p.depth);

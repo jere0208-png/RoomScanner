@@ -7243,6 +7243,39 @@ mur ni sur le bord de la feuille — et les quatre repères doivent rester
 lisibles, car les abréger jusqu'à les rendre muets ne serait pas une
 correction.
 
+
+### Le classement 3D ne coûte plus le même prix à tout le monde
+
+Défaut connu, laissé ouvert : **« en 3D pendant un geste, le classement d'il
+y a quatre degrés laisse repasser des percées ; au repos, il est exact »**. Un
+meuble traverse un mur le temps d'une rotation, puis rentre dans l'ordre dès
+qu'on lâche.
+
+On comptait les percées pour un ordre vieux de quatre degrés, sans jamais
+regarder ce que valaient les degrés d'avant. Les voici, mesurées sur deux
+pièces meublées, en comptant les angles où un meuble traverse un mur :
+
+| ordre repris | percées |
+| --- | --- |
+| frais | 0 |
+| 1° | **0** |
+| 2° | 3 |
+| 3° | 3 |
+| 4° (le réglage) | 6 |
+| 6° | 9 |
+| 8° | 13 |
+
+**À un degré, il n'y a plus rien à voir.** Et le seuil était FIXE, réglé pour
+le pire cas : une pièce nue, dont le tri ne coûte rien, payait le prix d'un
+T5 meublé et laissait passer des percées qu'elle aurait pu s'épargner.
+
+`seuilDeReclassement` le fait suivre ce que le classement a COÛTÉ la dernière
+fois : un degré tant qu'il reste sous deux millisecondes et demie, quatre
+au-delà, et il glisse entre les deux. Personne ne paie pour la scène du
+voisin — un studio se reclasse à chaque degré, un logement meublé garde son
+économie. Le coût se mesure au moment où on le paie, plutôt que de se
+deviner à l'avance.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

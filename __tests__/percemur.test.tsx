@@ -57,6 +57,7 @@ import type { WallSeg } from '../src/geometry/floorplan';
 import React from 'react';
 import { View } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
+import { seuilDeReclassement } from '../src/components/Iso3DView';
 import { Iso3DView } from '../src/components/Iso3DView';
 import { useScanStore } from '../src/store/scanStore';
 
@@ -321,6 +322,37 @@ describe('un meuble ne perce pas le mur qui le cache', () => {
   */
   it('mais un classement vieux de quatre degres en laisse passer', () => {
     expect(anglesQuiPercent(4)).toBeGreaterThan(0);
+  });
+
+  /*
+    LA COURBE, MESUREE — et ce qu'elle a change.
+
+    On comptait les percees pour un ordre vieux de quatre degres, sans jamais
+    regarder ce que valaient les degres d'avant. Les voici, sur cette scene :
+
+        ordre frais 0 · 1° 0 · 2° 3 · 3° 3 · 4° 6 · 6° 9 · 8° 13
+
+    A UN DEGRE, IL N'Y A PLUS RIEN A VOIR. Le seuil de la vue n'est donc plus
+    fixe : il suit ce que le classement a COUTE la derniere fois
+    (`seuilDeReclassement`). Une piece nue, ou le tri ne coute rien, se
+    reclasse a chaque degre et ne montre plus une seule percee pendant qu'on
+    la tourne ; un logement meuble garde ses quatre degres. Personne ne paie
+    pour la scene du voisin.
+  */
+  it('ne perce plus rien du tout a un degre', () => {
+    expect(anglesQuiPercent(1)).toBe(0);
+    expect(anglesQuiPercent(2)).toBeGreaterThan(0);
+  });
+
+  it('et le seuil de la vue suit le cout du classement', () => {
+    // Gratuit : on se reclasse a chaque degre.
+    expect(seuilDeReclassement(0)).toBe(1);
+    expect(seuilDeReclassement(2)).toBe(1);
+    // Cher : on garde l'ordre quatre degres, comme avant.
+    expect(seuilDeReclassement(10)).toBe(4);
+    expect(seuilDeReclassement(40)).toBe(4);
+    // Entre les deux, il glisse.
+    expect(seuilDeReclassement(5)).toBe(2);
   });
 });
 
