@@ -12,7 +12,6 @@ import {
   pastilles,
 } from '../ui/cotesCourantes';
 import {
-  Alert,
   Animated,
   Image,
   Easing,
@@ -143,6 +142,7 @@ import {
   type ActionData,
   type PromptData,
 } from '../components/Sheet';
+import { alerte } from '../ui/alerte';
 
 type Tab = '2d' | '3d';
 
@@ -178,8 +178,11 @@ export function ResultScreen() {
   const panne = useScanStore((st) => st.panne);
   useEffect(() => {
     if (!panne) return;
-    Alert.alert('Enregistrement impossible', panne.message, [
-      { text: 'Compris', onPress: () => useScanStore.getState().oublierPanne() },
+    alerte('Enregistrement impossible', panne.message, [
+      {
+        label: 'Compris',
+        onPress: () => useScanStore.getState().oublierPanne(),
+      },
     ]);
   }, [panne]);
   const { width: winLargeur } = useWindowDimensions();
@@ -1108,7 +1111,7 @@ export function ResultScreen() {
       await RoomScan.shareFile(uri);
     } catch (e: any) {
       setCapturing(false);
-      Alert.alert('Capture impossible', e?.message ?? 'Erreur inconnue');
+      alerte('Capture impossible', e?.message ?? 'Erreur inconnue');
     }
   };
 
@@ -1125,7 +1128,7 @@ export function ResultScreen() {
       );
       await RoomScan.shareText(obj, objFilename(scanName));
     } catch (e: any) {
-      Alert.alert('Export impossible', e?.message ?? 'Erreur inconnue');
+      alerte('Export impossible', e?.message ?? 'Erreur inconnue');
     }
   };
 
@@ -1160,7 +1163,7 @@ export function ResultScreen() {
       const bytes = buildMaterialPdf(scanName, list, tirage);
       await RoomScan.sharePDF(toBase64(bytes), materialFilename(scanName));
     } catch (e: any) {
-      Alert.alert('Export impossible', e?.message ?? 'Erreur inconnue');
+      alerte('Export impossible', e?.message ?? 'Erreur inconnue');
     }
   };
 
@@ -1208,7 +1211,7 @@ export function ResultScreen() {
         metreFilename(scanName),
       );
     } catch (e: any) {
-      Alert.alert('Export impossible', e?.message ?? 'Erreur inconnue');
+      alerte('Export impossible', e?.message ?? 'Erreur inconnue');
     }
   };
 
@@ -1235,7 +1238,7 @@ export function ResultScreen() {
         ),
       );
     } catch (e: any) {
-      Alert.alert('Export impossible', e?.message ?? 'Erreur inconnue');
+      alerte('Export impossible', e?.message ?? 'Erreur inconnue');
     }
   };
 
@@ -2421,7 +2424,7 @@ export function ResultScreen() {
           .slice(2, 6)}`,
     });
     if (pose.conforme) {
-      Alert.alert(
+      alerte(
         'Tout est aux normes',
         'Chaque pièce a son compte de socles, ses prises RJ45, sa commande ' +
           'd’éclairage et son point lumineux. Rien à ajouter.',
@@ -2430,7 +2433,7 @@ export function ResultScreen() {
     }
     useScanStore.getState().poserDAuto(pose.fixtures, pose.ceiling);
     const total = pose.fixtures.length + pose.ceiling.length;
-    Alert.alert(
+    alerte(
       `${total} pose${total > 1 ? 's' : ''} ajoutée${total > 1 ? 's' : ''}`,
       pose.rapport.join(SAUT) +
         SAUT +
@@ -2486,7 +2489,7 @@ export function ResultScreen() {
           .slice(2, 6)}`,
     });
     if (!res) {
-      Alert.alert(
+      alerte(
         'Aucune place libre',
         'Tous les murs de la pièce sont pris — meubles, menuiseries ou ' +
           'appareils déjà posés. Déplacez un meuble, ou posez l’appareil ' +
@@ -2553,7 +2556,7 @@ export function ResultScreen() {
                     hint: 'Un relevé de plus, réuni au plan. iOS 17, LiDAR.',
                     onPress: () => {
                       demarrerComplement().catch((e: any) =>
-                        Alert.alert(
+                        alerte(
                           'Relevé impossible',
                           e?.message ??
                             'La réunion de plusieurs relevés demande iOS 17.',
@@ -2583,15 +2586,15 @@ export function ResultScreen() {
                           icon: 'supprimer' as const,
                           hint: 'Jette tout depuis le dernier enregistrement.',
                           onPress: () => {
-                            Alert.alert(
+                            alerte(
                               'Jeter les modifications ?',
                               'Le plan revient à son dernier enregistrement. ' +
                                 'Ce qui a été fait depuis sera perdu.',
                               [
-                                { text: 'Annuler', style: 'cancel' },
+                                { label: 'Annuler' },
                                 {
-                                  text: 'Jeter',
-                                  style: 'destructive',
+                                  label: 'Jeter',
+                                  danger: true,
                                   onPress: () => {
                                     useScanStore.getState().revertCurrent();
                                     haptic('succes');

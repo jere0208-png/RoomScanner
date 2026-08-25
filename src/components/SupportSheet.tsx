@@ -19,7 +19,6 @@
  */
 import React, { useState } from 'react';
 import {
-  Alert,
   Platform,
   Pressable,
   StyleSheet,
@@ -35,6 +34,7 @@ import { choisirPieceJointe, ecrireAuSupport } from '../native/support';
 import { useAccountStore } from '../store/accountStore';
 import { useScanStore } from '../store/scanStore';
 import { radius, useTheme, type Palette } from '../theme';
+import { alerte } from '../ui/alerte';
 
 export function SupportSheet({
   visible,
@@ -76,7 +76,7 @@ export function SupportSheet({
       if (sortie === 'unavailable' && piece) {
         // Le repli `mailto:` ne sait pas porter de fichier : on le DIT,
         // plutôt que de laisser croire que la photo est partie.
-        Alert.alert(
+        alerte(
           'Photo non jointe',
           'Votre iPhone n’a pas de compte dans l’app Mail : le message s’est ' +
             'ouvert sans la photo. Vous pouvez l’ajouter à la main avant ' +

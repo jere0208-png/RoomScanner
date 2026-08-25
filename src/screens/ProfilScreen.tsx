@@ -15,7 +15,6 @@
  */
 import React, { useState } from 'react';
 import {
-  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -35,6 +34,7 @@ import { SOLAIRES } from '../ui/solaires';
 import { PLANS_GRATUITS, useAccountStore } from '../store/accountStore';
 import { useScanStore, type ThemePref } from '../store/scanStore';
 import { radius, shadowCard, useTheme, type Palette } from '../theme';
+import { alerte } from '../ui/alerte';
 
 /**
  * LES TROIS APPARENCES, DANS L'ORDRE DU DESIGN.
@@ -104,14 +104,14 @@ export function ProfilScreen() {
   const restaurer = async () => {
     try {
       const ok = await restaurerPro();
-      Alert.alert(
+      alerte(
         ok ? 'Abonnement restauré' : 'Aucun achat trouvé',
         ok
           ? 'Votre Pro est de retour.'
           : 'L’App Store ne connaît pas d’abonnement pour ce compte Apple.',
       );
     } catch (e) {
-      Alert.alert('Restauration impossible', (e as Error).message);
+      alerte('Restauration impossible', (e as Error).message);
     }
   };
 

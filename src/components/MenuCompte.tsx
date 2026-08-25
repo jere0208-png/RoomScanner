@@ -14,9 +14,16 @@
  * la déguiser en jolie carte l'affaiblirait.
  */
 import React from 'react';
-import { Alert, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { useAccountStore } from '../store/accountStore';
 import { radius, shadowCard, useTheme, type Palette } from '../theme';
+import { alerte } from '../ui/alerte';
 
 export function MenuCompte({
   visible,
@@ -31,15 +38,15 @@ export function MenuCompte({
   const supprimerCompte = useAccountStore((st) => st.supprimerCompte);
 
   const confirmerSuppression = () =>
-    Alert.alert(
+    alerte(
       'Supprimer le compte ?',
       'Vos relevés restent sur l’appareil, mais l’identité est effacée. ' +
         'Le palier gratuit déjà consommé ne se remet pas à zéro.',
       [
-        { text: 'Annuler', style: 'cancel' },
+        { label: 'Annuler' },
         {
-          text: 'Supprimer',
-          style: 'destructive',
+          label: 'Supprimer',
+          danger: true,
           onPress: () => {
             fermer();
             supprimerCompte();

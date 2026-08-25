@@ -31,11 +31,12 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 import React from 'react';
-import { Alert, Text, TouchableOpacity } from 'react-native';
+import { Text, TouchableOpacity } from 'react-native';
 import { RoomScan } from 'react-native-room-scan';
 import TestRenderer, { act } from 'react-test-renderer';
 import { ScanScreen } from '../src/screens/ScanScreen';
 import { useScanStore } from '../src/store/scanStore';
+import { useAlerte } from '../src/ui/alerte';
 import {
   SNAPSHOT_OBJECTS,
   SNAPSHOT_OPENINGS,
@@ -82,15 +83,6 @@ const croix = (t: TestRenderer.ReactTestRenderer) =>
     .findAllByType(TouchableOpacity)
     .find((n) => n.props.accessibilityLabel === 'Arrêter le scan')!;
 
-/** Le bouton destructeur d'une alerte, s'il y en a une. */
-const boutonRouge = (alerte: jest.SpyInstance) => {
-  const choix = (alerte.mock.calls[0]?.[2] ?? []) as {
-    text?: string;
-    style?: string;
-    onPress?: () => void;
-  }[];
-  return choix.find((b) => b.style === 'destructive') ?? choix[choix.length - 1];
-};
 
 describe('abandonner un complement de scan', () => {
   it('garde le logement releve, et revient au plan', () => {
@@ -124,9 +116,25 @@ describe('abandonner un etage', () => {
   });
 });
 
+/*
+  L'ALERTE EST DEVENUE LA NOTRE.
+
+  Ce banc espionnait `Alert.alert`, la fenetre du systeme. Elle a disparu de
+  l'application — « police systeme, boutons bleus empiles, coins de 2019 »,
+  disait deja `Sheet.tsx`, et vingt-cinq d'entre elles trainaient encore. La
+  confirmation passe maintenant par la feuille maison (`src/ui/alerte.ts`),
+  qu'on lit dans son magasin plutot que par un espion.
+
+  Ce qui se verifie ici n'a pas bouge : on demande avant de jeter, et c'est
+  la reponse ROUGE qui jette.
+*/
+const posee = () => useAlerte.getState().courante;
+const gesteRouge = () =>
+  (posee()?.actions ?? []).find((a) => a.danger);
+
 describe('abandonner un scan neuf', () => {
   it('ne demande rien tant qu’il n’y a rien a perdre', () => {
-    const alerte = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    useAlerte.setState({ courante: null, file: [] });
     act(() => {
       st().reset();
       useScanStore.setState({ screen: 'scan', scanning: true, wallCount: 0 });
@@ -135,23 +143,23 @@ describe('abandonner un scan neuf', () => {
     act(() => croix(t).props.onPress());
     // Rien de releve : une confirmation inutile est une confirmation qu'on
     // apprend a balayer sans lire.
-    expect(alerte).not.toHaveBeenCalled();
+    expect(posee()).toBeNull();
     expect(st().screen).toBe('home');
   });
 
   it('mais se confirme des que des murs sont releves', () => {
-    const alerte = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    useAlerte.setState({ courante: null, file: [] });
     act(() => {
       st().reset();
       useScanStore.setState({ screen: 'scan', scanning: true, wallCount: 6 });
     });
     const t = monter();
     act(() => croix(t).props.onPress());
-    expect(alerte).toHaveBeenCalled();
+    expect(posee()?.titre).toMatch(/Abandonner/);
     // Tant qu'on n'a pas repondu, le scan continue.
     expect(st().screen).toBe('scan');
     // Et la reponse rouge, elle, jette.
-    act(() => boutonRouge(alerte).onPress?.());
+    act(() => gesteRouge()?.onPress?.());
     expect(st().screen).toBe('home');
   });
 });

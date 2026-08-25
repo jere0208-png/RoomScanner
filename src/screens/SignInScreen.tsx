@@ -12,7 +12,6 @@
  */
 import React, { useState } from 'react';
 import {
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -29,6 +28,7 @@ import { useAccountStore } from '../store/accountStore';
 import { connexionWeb } from '../native/account';
 import { SERVEUR } from '../config/serveur';
 import { dark, useTheme, type Palette } from '../theme';
+import { alerte } from '../ui/alerte';
 
 export function SignInScreen() {
   const c = useTheme();
@@ -42,7 +42,7 @@ export function SignInScreen() {
   const [email, setEmail] = useState('');
 
   const refuse = (raison?: string) =>
-    Alert.alert('Connexion impossible', raison ?? 'Réessayez.');
+    alerte('Connexion impossible', raison ?? 'Réessayez.');
 
   const viaApple = async () => {
     const r = await connecterApple();
@@ -53,7 +53,7 @@ export function SignInScreen() {
     // Sans serveur configuré (src/config/serveur.ts), on le dit — on ne
     // simule pas une connexion.
     if (!SERVEUR.url) {
-      Alert.alert(
+      alerte(
         'Bientôt disponible',
         'La connexion Google passe par le serveur EchoPlan, qui reste à ' +
           'configurer. Utilisez Apple ou l’e-mail en attendant.',

@@ -18,7 +18,6 @@
  */
 import React, { useEffect, useState } from 'react';
 import {
-  Alert,
   Modal,
   Pressable,
   ScrollView,
@@ -45,6 +44,7 @@ import {
   type Offre,
 } from '../store/accountStore';
 import { dark, radius, shadowCard, useTheme, type Palette } from '../theme';
+import { alerte } from '../ui/alerte';
 
 /**
  * CE QU'ON ACHÈTE, ÉNUMÉRÉ.
@@ -102,9 +102,9 @@ export function PaywallScreen() {
 
   const valideCode = () => {
     if (utiliserCode(code)) {
-      Alert.alert('Bienvenue en Pro', 'Le code a été appliqué : tout est débloqué.');
+      alerte('Bienvenue en Pro', 'Le code a été appliqué : tout est débloqué.');
     } else {
-      Alert.alert('Code inconnu', 'Vérifiez le code — il ne correspond à aucune offre.');
+      alerte('Code inconnu', 'Vérifiez le code — il ne correspond à aucune offre.');
     }
   };
 
@@ -112,7 +112,7 @@ export function PaywallScreen() {
     try {
       await acheterPro(offre);
     } catch (e) {
-      Alert.alert('Achat impossible', (e as Error).message);
+      alerte('Achat impossible', (e as Error).message);
     }
   };
 
@@ -272,14 +272,14 @@ export function PaywallScreen() {
               onPress={async () => {
                 try {
                   const ok = await restaurerPro();
-                  Alert.alert(
+                  alerte(
                     ok ? 'Abonnement restauré' : 'Aucun achat trouvé',
                     ok
                       ? 'Votre Pro est de retour.'
                       : 'L’App Store ne connaît pas d’abonnement pour ce compte Apple.',
                   );
                 } catch (e) {
-                  Alert.alert('Restauration impossible', (e as Error).message);
+                  alerte('Restauration impossible', (e as Error).message);
                 }
               }}>
               <Text style={s.lien}>Restaurer l’achat</Text>

@@ -16,7 +16,6 @@
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Alert,
   PanResponder,
   StyleSheet,
   Text,
@@ -157,6 +156,7 @@ const SNAP = 0.03;
 const cm = (m: number) => Math.round(m * 100);
 
 import type { ActionData } from './Sheet';
+import { alerte } from '../ui/alerte';
 
 interface Props {
   wallId: string;
@@ -1027,16 +1027,12 @@ export function WallElevation({
               });
               return;
             }
-            Alert.alert(
+            alerte(
               'Abandonner les modifications ?',
               'Ce mur reviendra dans l’état où vous l’avez ouvert.',
               [
-                { text: 'Continuer', style: 'cancel' },
-                {
-                  text: 'Abandonner',
-                  style: 'destructive',
-                  onPress: abandonner,
-                },
+                { label: 'Continuer' },
+                { label: 'Abandonner', danger: true, onPress: abandonner },
               ],
             );
           }}>

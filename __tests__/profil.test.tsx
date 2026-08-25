@@ -27,7 +27,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 
 import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
-import { Alert, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { ProfilScreen } from '../src/screens/ProfilScreen';
 import { ConfidentialiteScreen } from '../src/screens/ConfidentialiteScreen';
 import { ContourVif } from '../src/components/ContourVif';
@@ -36,6 +36,7 @@ import { light } from '../src/theme';
 import { HomeScreen } from '../src/screens/HomeScreen';
 import { useScanStore } from '../src/store/scanStore';
 import { useAccountStore } from '../src/store/accountStore';
+import { useAlerte } from '../src/ui/alerte';
 
 /** Tous les nœuds de l'arbre, à plat : on cherche par étiquette. */
 const noeuds = (a: TestRenderer.ReactTestRenderer) =>
@@ -281,8 +282,18 @@ describe('les rangées de réglages', () => {
     expect(useScanStore.getState().screen).toBe('library');
   });
 
+/*
+  L'ALERTE EST DEVENUE LA NOTRE.
+
+  Ce banc espionnait `Alert.alert`, la fenetre du systeme. Elle a disparu de
+  l'application — « police systeme, boutons bleus empiles, coins de 2019 »,
+  disait deja `Sheet.tsx`, et vingt-cinq d'entre elles trainaient encore. La
+  confirmation passe par la feuille maison (`src/ui/alerte.ts`), qu'on lit
+  dans son magasin plutot que par un espion. Ce qui se verifie ici n'a pas
+  bouge : on demande avant de jeter, et c'est la reponse ROUGE qui jette.
+*/
   it('la suppression du compte demande confirmation', () => {
-    const alerte = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    useAlerte.setState({ courante: null, file: [] });
     const a = rendre(<ProfilScreen />);
     // Les deux gestes qu'on ne pose pas par mégarde vivent sous le « ⋯ » :
     // une déconnexion à portée de pouce, au milieu des réglages, se
@@ -293,11 +304,10 @@ describe('les rangées de réglages', () => {
     act(() => {
       parLabel(a, 'Supprimer mon compte')?.props.onPress();
     });
-    // Un geste destructif garde la feuille austère du système : la
-    // déguiser en jolie carte l'affaiblirait.
-    expect(alerte).toHaveBeenCalled();
+    // Un geste destructif DEMANDE, et il le demande dans la langue de
+    // l'application — pas dans celle du système.
+    expect(useAlerte.getState().courante?.titre).toMatch(/Supprimer/);
     expect(useAccountStore.getState().compte).not.toBeNull();
-    alerte.mockRestore();
   });
 
   it('la déconnexion rend la porte d’entrée', () => {

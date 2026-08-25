@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -19,6 +18,7 @@ import { GuidePose } from './scan/GuidePose';
 import { FIXTURE_SYMBOL } from '../geometry/electrical';
 import { aimanterHauteur, natureAuMur } from '../geometry/viseur';
 import { CEILING_SYMBOL } from '../geometry/ceiling';
+import { alerte } from '../ui/alerte';
 
 /** Le guide de pose a été lu : on ne le remontre plus de lui-même. */
 const GUIDE_POSE_KEY = 'echoplan.guide-pose';
@@ -185,14 +185,14 @@ export function ScanScreen() {
       cancel();
       return;
     }
-    Alert.alert(
+    alerte(
       'Abandonner ce relevé ?',
       `${wallCount} mur${wallCount > 1 ? 's' : ''} déjà relevé${
         wallCount > 1 ? 's' : ''
       } — rien ne sera enregistré.`,
       [
-        { text: 'Continuer le scan', style: 'cancel' },
-        { text: 'Abandonner', style: 'destructive', onPress: cancel },
+        { label: 'Continuer le scan' },
+        { label: 'Abandonner', danger: true, onPress: cancel },
       ],
     );
   };

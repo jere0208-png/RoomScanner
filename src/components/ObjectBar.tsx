@@ -91,6 +91,8 @@ function Fleche({
   return (
     <TouchableOpacity
       style={style}
+      // Ce que le dessin rend à la carte, le débord le rend au doigt.
+      hitSlop={DEBORD_DOIGT}
       accessibilityLabel={nom}
       // Le pas part à l'APPUI, pas au relâchement : sans quoi le premier
       // centimètre attendrait que le doigt se lève.

@@ -7729,6 +7729,66 @@ pas un rectangle n'a pas de « largeur × profondeur ». Trois contrôles en sen
 inverse le tiennent, parce qu'un bandeau qui afficherait toujours les sept
 gestes passerait l'épreuve principale sans qu'on s'en aperçoive.
 
+### Les vingt-cinq dernières fenêtres d'iOS
+
+`Sheet.tsx` le disait depuis longtemps, et c'était vrai partout ailleurs :
+« `Alert.alert` et `Alert.prompt` sont ceux d'iOS : police système, boutons
+bleus empilés, coins de 2019. Au milieu d'une app qui a sa typographie, ses
+rayons et son bleu, ils font tache. » Les feuilles maison avaient remplacé
+les saisies et les menus ; restaient VINGT-CINQ fenêtres système,
+disséminées. « Export impossible » à lui seul apparaissait cinq fois, plus
+« Enregistrement impossible », « Achat impossible », « Connexion
+impossible » — et le « Abandonner ce relevé ? » du scan, le seul dans un
+parcours normal, les autres n'arrivant qu'en cas d'échec.
+
+**Une porte d'entrée globale, et non un état par écran.** Une alerte naît le
+plus souvent dans un `catch` — un export qui échoue, un achat refusé —,
+parfois au fond d'un composant qui n'a ni menu ni feuille à lui : le mur vu
+de face, la fiche du compte. Leur demander à tous de porter un état, c'est se
+garantir que le prochain appellera `Alert.alert` « juste pour cette fois ».
+`alerte()` s'appelle donc de n'importe où, y compris hors de React, comme la
+fonction système qu'elle remplace, et l'hôte est monté une fois dans `App` —
+avec le mur d'abonnement et l'essai épuisé, les autres pièces qui s'ouvrent
+par-dessus n'importe quel écran. Un écran qui la monterait lui-même la ferait
+disparaître en même temps que lui, or c'est souvent EN QUITTANT qu'on apprend
+qu'un enregistrement a échoué.
+
+**Elle n'en montre qu'une à la fois.** Deux alertes empilées, c'est une
+fenêtre qui en cache une autre : la seconde attend son tour dans une file.
+iOS le faisait déjà ; on ne fait pas moins bien.
+
+**Et elle porte toujours une sortie.** Sans action donnée, elle affiche
+« Continuer » : la croix de la coquille referme déjà, mais un bouton se voit,
+et c'est lui qu'on cherche. Les gestes destructifs gardent leur rouge, comme
+partout ailleurs.
+
+**La moitié du travail qui se perd le plus vite**, c'est la suivante : il
+suffit d'un `catch` écrit vite pour rouvrir la porte, et rien ne le
+signalerait. Deux bancs lisent donc les sources — le seul moyen de tenir une
+règle qui porte sur ce qu'on N'ÉCRIT PLUS : plus aucun appel à l'alerte
+système, et plus même un import qui traîne, parce qu'un import qui traîne est
+un appel qui revient.
+
+### Le pavé directionnel rentre dans le rang
+
+Les quatre touches qui déplacent un meuble d'un centimètre faisaient
+quarante-quatre points DESSINÉS, au nom d'un argument juste — « la flèche est
+le geste le plus fin du bandeau, un centimètre par appui : elle mérite la
+même cible que les autres, pas moins » — mais appliqué au mauvais endroit.
+
+La cible ne se gagne pas en grossissant le dessin, elle se gagne au DÉBORD.
+Les autres pastilles font trente-quatre points et rendent la différence au
+`hitSlop` ; celles-ci prenaient dix points de plan de plus, et n'avaient même
+pas de débord : leur cible s'arrêtait à quarante-quatre, quand celle de leurs
+voisines va à quarante-six. À trente-quatre dessinés plus le débord commun,
+on rend six points de plan et le doigt en gagne deux.
+
+Le banc les cherche par leur ÉTIQUETTE — « Déplacer vers le haut » — et non
+par leur dessin : ce sont des flèches, comme d'autres, et c'est ce qu'elles
+FONT qui les distingue. L'exception qu'il portait pour elles a disparu avec
+le correctif ; celle du crayon reste, parce qu'un crayon qui précède un mot
+est un ornement dans un bouton à texte, pas une pastille.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

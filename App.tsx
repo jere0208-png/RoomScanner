@@ -15,6 +15,7 @@ import { PaywallScreen } from './src/screens/PaywallScreen';
 import { EssaiEpuise } from './src/components/EssaiEpuise';
 import { SurprisePro } from './src/components/SurprisePro';
 import { AvisRecompense } from './src/components/AvisRecompense';
+import { AlerteHote } from './src/components/AlerteHote';
 import { useScanStore } from './src/store/scanStore';
 import { useAccountStore } from './src/store/accountStore';
 
@@ -110,6 +111,10 @@ export default function App() {
       <EssaiEpuise />
       <SurprisePro />
       <AvisRecompense />
+      {/* Nos alertes à nous : voir `src/ui/alerte.ts`. Montée ici parce
+          qu'un message d'erreur doit survivre à l'écran qui l'a levé — on
+          apprend souvent EN QUITTANT qu'un enregistrement a échoué. */}
+      <AlerteHote />
     </SafeAreaProvider>
   );
 }

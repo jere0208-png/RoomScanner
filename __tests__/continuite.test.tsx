@@ -173,17 +173,18 @@ const traces = (t: TestRenderer.ReactTestRenderer) =>
 /**
  * LES PASTILLES D'ACTION : un bouton qui ne porte QU'une silhouette.
  *
- * Deux voisines n'en sont pas, et le banc les laisse tranquilles :
+ * UNE SEULE voisine n'en est pas, et le banc la laisse tranquille : LE
+ * CRAYON qui precede un mot (« Corriger »). C'est un ornement dans un bouton
+ * a texte, pas une pastille — il se cale sur la taille du mot, plus petite.
  *
- *   — LE CRAYON qui precede un mot (« Corriger ») : c'est un ornement dans
- *     un bouton a texte, pas une pastille — il se cale sur la taille du
- *     mot, plus petite ;
- *
- *   — LES TOUCHES DU PAVE DIRECTIONNEL d'un meuble, carrees et plus
- *     grandes. C'est un choix assume et ecrit : « la fleche est le geste le
- *     plus fin du bandeau — un centimetre par appui : elle merite la meme
- *     cible que les autres, pas moins ». On compare donc les pastilles
- *     RONDES entre elles, ce qui est un fait de dessin et non un chiffre.
+ * LES TOUCHES DU PAVE DIRECTIONNEL, elles, ont rejoint les autres. Elles
+ * etaient carrees et a quarante-quatre points DESSINES, au nom d'un argument
+ * juste — « la fleche est le geste le plus fin du bandeau, un centimetre par
+ * appui : elle merite la meme cible que les autres, pas moins » — mais
+ * appliqué au mauvais endroit : la cible ne se gagne pas en grossissant le
+ * dessin, elle se gagne au DEBORD. A trente-quatre dessines plus le debord
+ * commun, la cible passe meme de quarante-quatre a quarante-six points. On
+ * rend six points de plan, et le doigt y gagne.
  */
 const pastillesAction = (t: TestRenderer.ReactTestRenderer) =>
   t.root
@@ -191,7 +192,8 @@ const pastillesAction = (t: TestRenderer.ReactTestRenderer) =>
     .filter((n) => n.findAllByType(Path).length > 0)
     .filter((n) => n.findAllByType(Text).length === 0)
     .map((n) => ({ n, st: plat(n.props.style) }))
-    // Ronde : son rayon vaut au moins la moitie de son cote.
+    // Ronde : son rayon vaut au moins la moitie de son cote. Toutes le
+    // sont desormais — le pave directionnel compris.
     .filter((x) => {
       const cote = Number(x.st.width ?? x.st.minWidth);
       const r = Number(x.st.borderRadius);
@@ -286,6 +288,59 @@ describe('une seule taille', () => {
       arbre = null;
     }
     expect(cotes.size).toBe(1);
+  });
+
+  /*
+    LES TOUCHES DU PAVE DIRECTIONNEL, cherchees par leur ETIQUETTE.
+
+    Elles ne se distinguent pas par leur dessin — ce sont des fleches, comme
+    d'autres — mais par ce qu'elles font : deplacer d'un centimetre, et se
+    repeter tant que le doigt reste pose. Le banc les prend donc par leur
+    nom, et leur applique la meme regle qu'aux autres : ronde, meme taille,
+    et le debord qui rend la cible.
+  */
+  it('le pave directionnel suit la meme regle que le reste', () => {
+    const t = monter(COQUILLES[2][1]());
+    const touches = t.root
+      .findAllByType(TouchableOpacity)
+      .filter((n) =>
+        /^Déplacer vers/.test(String(n.props.accessibilityLabel ?? '')),
+      );
+    expect(touches).toHaveLength(4);
+    const autres = pastillesAction(t).map((x) => Number(x.st.width));
+    for (const b of touches) {
+      const st = plat(b.props.style);
+      const cote = Number(st.width);
+      // Ronde, comme toutes les pastilles d'action.
+      expect(Number(st.borderRadius)).toBeGreaterThanOrEqual(cote / 2);
+      // De la meme taille que ses voisines du meme bandeau.
+      expect(autres).toContain(cote);
+      // Et son debord : la cible ne se gagne pas en grossissant le dessin.
+      expect(Number(b.props.hitSlop?.top)).toBeGreaterThan(0);
+    }
+  });
+
+  /*
+    CE QUE LE DESSIN REND A LA CARTE, LE DEBORD LE REND AU DOIGT.
+
+    C'est la contrepartie de la taille unique, et elle n'est pas
+    negociable : une pastille de trente-quatre points sans debord est une
+    pastille qu'on rate. Les touches du pave directionnel viennent de perdre
+    dix points de dessin — elles doivent avoir gagne leur debord.
+  */
+  it('et chacune porte son debord : la cible ne retrecit pas', () => {
+    for (const [nom, faire] of COQUILLES) {
+      for (const { n } of pastillesAction(monter(faire()))) {
+        const slop = n.props.hitSlop;
+        expect([nom, typeof slop === 'object' && slop !== null]).toEqual([
+          nom,
+          true,
+        ]);
+        expect(Number(slop.top)).toBeGreaterThan(0);
+      }
+      act(() => arbre?.unmount());
+      arbre = null;
+    }
   });
 
   /*

@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { BackChevron } from '../components/BackChevron';
 import { RetourGlisse } from '../components/RetourGlisse';
 import {
-  Alert,
   Animated,
   InteractionManager,
   Easing,
@@ -46,6 +45,7 @@ import { floorsOf, useScanStore } from '../store/scanStore';
 import { deviceNames } from '../geometry/naming';
 import { PromptSheet, type PromptData } from '../components/Sheet';
 import type { CeilingFixture } from '../geometry/ceiling';
+import { alerte } from '../ui/alerte';
 
 
 /**
@@ -442,7 +442,7 @@ const styles = getStyles(c);
           : batir(vignettes);
       await RoomScan.sharePDF(toBase64(bytes), pdfFilename(titreDuDossier));
     } catch (e: any) {
-      Alert.alert('Export impossible', e?.message ?? 'Erreur inconnue');
+      alerte('Export impossible', e?.message ?? 'Erreur inconnue');
     }
   };
 

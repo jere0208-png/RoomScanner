@@ -17,7 +17,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 import React from 'react';
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Rect, Text as SvgText } from 'react-native-svg';
 import { light } from '../src/theme';
 import TestRenderer, { act } from 'react-test-renderer';
@@ -26,6 +26,7 @@ import { wallFace } from '../src/geometry/electrical';
 import { wallFurniture } from '../src/geometry/nfc15100';
 import { wallQuads } from '../src/geometry/floorplan';
 import { useScanStore } from '../src/store/scanStore';
+import { useAlerte } from '../src/ui/alerte';
 
 import type { ObjectData } from 'react-native-room-scan';
 import type { Fixture } from '../src/geometry/electrical';
@@ -313,24 +314,30 @@ describe('quitter l’établi', () => {
     });
     expect(useScanStore.getState().fixtures).toHaveLength(2);
 
+/*
+  L'ALERTE EST DEVENUE LA NOTRE.
+
+  Ce banc espionnait `Alert.alert`, la fenetre du systeme. Elle a disparu de
+  l'application — « police systeme, boutons bleus empiles, coins de 2019 »,
+  disait deja `Sheet.tsx`, et vingt-cinq d'entre elles trainaient encore. La
+  confirmation passe par la feuille maison (`src/ui/alerte.ts`), qu'on lit
+  dans son magasin plutot que par un espion. Ce qui se verifie ici n'a pas
+  bouge : on demande avant de jeter, et c'est la reponse ROUGE qui jette.
+*/
     // La croix : un ordre de restauration part vers le magasin.
     const croix = tree.root
       .findAllByType(TouchableOpacity)
       .find((n) => n.props.accessibilityLabel === 'Fermer sans garder')!;
     expect(croix).toBeDefined();
-    const alerte = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    useAlerte.setState({ courante: null, file: [] });
     act(() => croix.props.onPress());
     // Elle DEMANDE d'abord : abandonner un quart d'heure de pose sur un
     // appui malheureux serait pire que le défaut d'origine.
-    expect(alerte).toHaveBeenCalled();
-    const boutons = alerte.mock.calls[0][2] as {
-      text: string;
-      onPress?: () => void;
-    }[];
-    const abandon = boutons.find((b) => b.text === 'Abandonner')!;
+    const posee = useAlerte.getState().courante;
+    expect(posee?.titre).toMatch(/Abandonner/);
+    const abandon = (posee?.actions ?? []).find((b) => b.danger)!;
     act(() => abandon.onPress?.());
     expect(useScanStore.getState().fixtures).toHaveLength(1);
-    alerte.mockRestore();
   });
 
   it('et ne demande rien quand rien n’a bougé', () => {
@@ -338,10 +345,9 @@ describe('quitter l’établi', () => {
     const croix = tree.root
       .findAllByType(TouchableOpacity)
       .find((n) => n.props.accessibilityLabel === 'Fermer sans garder')!;
-    const alerte = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    useAlerte.setState({ courante: null, file: [] });
     act(() => croix.props.onPress());
-    expect(alerte).not.toHaveBeenCalled();
-    alerte.mockRestore();
+    expect(useAlerte.getState().courante).toBeNull();
   });
 });
 

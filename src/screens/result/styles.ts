@@ -790,11 +790,25 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     gap: 8,
   },
   nudgeBtn: {
-    // La flèche est le geste le PLUS fin du bandeau — un centimètre par
-    // appui : elle mérite la même cible que les autres, pas moins.
-    width: 44,
-    height: 44,
-    borderRadius: 14,
+    /*
+      LA CIBLE NE SE GAGNE PAS EN GROSSISSANT LE DESSIN.
+
+      Ces quatre touches faisaient quarante-quatre points DESSINÉS, au nom
+      d'un argument juste — « la flèche est le geste le plus fin du bandeau,
+      un centimètre par appui : elle mérite la même cible que les autres » —
+      mais appliqué au mauvais endroit. Les autres pastilles font
+      trente-quatre points et rendent la différence au DÉBORD ; celles-ci
+      prenaient dix points de plan de plus, et n'avaient même pas de débord :
+      leur cible s'arrêtait à quarante-quatre, quand celle de leurs voisines
+      va à quarante-six.
+
+      Relevé du patron : « je veux […] une continuité parfaite des éléments
+      de l'interface ». On rend donc six points de plan, et le doigt y
+      gagne deux.
+    */
+    width: 34,
+    height: 34,
+    borderRadius: radius.pill,
     backgroundColor: c.surfaceSunken,
     alignItems: 'center',
     justifyContent: 'center',
