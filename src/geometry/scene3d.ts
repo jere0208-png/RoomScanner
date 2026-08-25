@@ -1265,8 +1265,37 @@ export function isHiddenFace(face: Face3D, cam: CameraTrig): boolean {
  * mur qui disparaîtrait d'un coup ferait sauter le dessin à chaque degré
  * de rotation.
  */
-export function cutawayOpacity(n: P3, cam: CameraTrig): number {
+export function cutawayOpacity(
+  n: P3,
+  cam: CameraTrig,
+  /**
+   * CE QUE CE PAN CACHE — la liste que `masquesDeScene` en donne.
+   *
+   * Relevé de chantier, cinq fois, capture et vidéo à l'appui : « le mur se
+   * place sur le lavabo », « en relâché comme au toucher ». Le classement
+   * n'y était pour rien, et c'est ce qui rendait le défaut introuvable : ces
+   * murs-là sont VRAIMENT entre l'œil et le meuble, et le tri a raison de
+   * les peindre en dernier. C'est l'écorché qui aurait dû les effacer.
+   *
+   * Il ne regardait que l'ANGLE : « un mur vu de champ ne cache rien, il
+   * reste plein ». C'est vrai d'un mur vu de champ au milieu de nulle part ;
+   * c'est faux du mur vu de champ qui coupe justement le lavabo. Sur les
+   * trois salles d'eau du banc, deux mille trois cent soixante-six prises de
+   * vue montraient un pan extérieur opaque posé devant un meuble.
+   *
+   * La règle devient : un mur vu de champ ne cache rien — SAUF quand il
+   * cache vraiment quelque chose. Alors il se voile FRANCHEMENT, sans
+   * dégradé : ce qu'il masque ne se découvre pas à moitié.
+   *
+   * Et la bascule ne clignote pas. Ce qu'un pan masque ne dépend pas de
+   * l'angle (c'est de la géométrie, calculée une fois par scène) ; seul le
+   * `vers > 0` bascule, et il bascule quand le mur est vu exactement de
+   * champ — c'est-à-dire quand il n'a aucune largeur à l'écran.
+   */
+  cache?: readonly string[],
+): number {
   const vers = n.x * cam.st * cam.sp + n.y * cam.cp + n.z * cam.ct * cam.sp;
+  if (vers > 0 && cache && cache.length > 0) return 1 - 0.85;
   if (vers <= SEUIL_ECORCHE) return 1;
   const t = Math.min(1, (vers - SEUIL_ECORCHE) / 0.45);
   // Lissage cubique : ni marche, ni rampe linéaire visible.

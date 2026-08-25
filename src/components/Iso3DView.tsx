@@ -868,7 +868,9 @@ export function Iso3DView({
       // pièce. Il garde son arête, donc sa présence.
       const voile =
         !solidWalls && face.cutaway && face.normal
-          ? cutawayOpacity(face.normal, cam)
+          ? // Et ce qu'il masque décide de son voile : un mur vu de champ
+            // qui coupe un meuble ne reste pas plein (voir `cutawayOpacity`).
+            cutawayOpacity(face.normal, cam, masquesScene.get(face.panId ?? -1)?.cache)
           : 1;
 
       // Mode cotes : toutes les arêtes en noir.

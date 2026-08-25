@@ -7925,6 +7925,42 @@ régimes. Avec le tri par profondeur, la restriction tient PARTOUT — sous le
 doigt comme au repos —, le drapeau disparaît, et le code est plus simple
 qu'avant la correction.
 
+### Et ce n'était toujours pas fini : le mur qui cache, et qui a le droit
+
+Relevé de chantier, deux captures de plus : **« différents angles en images,
+où le mur passe sur le meuble lavabo toujours, en relâché comme au
+toucher »**. Le classement était pourtant juste, et les trois scènes du banc
+— rectangle, pièce à retours, pièce équipée d'une porte et de trois
+appareils — ne comptaient aucun recouvrement.
+
+**Parce que ces murs-là ont le droit d'être devant.** Ils sont VRAIMENT entre
+l'œil et le meuble : le tri a raison de les peindre en dernier. C'est ce qui
+rendait le défaut introuvable — on cherchait une erreur d'ordre là où l'ordre
+était juste. C'est l'ÉCORCHÉ qui aurait dû les effacer.
+
+Sa règle ne regardait que l'ANGLE : « un mur vu de champ ne cache rien, il
+reste plein ». C'est vrai d'un mur vu de champ au milieu de nulle part ;
+c'est faux du mur vu de champ qui coupe justement le lavabo. La mesure : sur
+les trois salles d'eau du banc, **2 366 prises de vue** montraient un pan
+extérieur opaque à plus de moitié posé devant un meuble.
+
+**La règle devient : un mur vu de champ ne cache rien — SAUF quand il cache
+vraiment quelque chose.** Alors il se voile franchement, sans dégradé : ce
+qu'il masque ne se découvre pas à moitié. Ce qu'un pan masque est déjà connu
+(`masquesDeScene`, calculé une fois par scène) — c'est la même liste qui
+servait aux flèches du classement, employée cette fois à décider d'un voile.
+
+Et la bascule ne peut pas clignoter : cette liste ne dépend pas de l'angle ;
+seul le « ce pan nous fait-il face » bascule, et il bascule quand le mur est
+vu EXACTEMENT de champ, c'est-à-dire quand il n'a aucune largeur à l'écran.
+
+Le dossier imprimé, lui, ne change pas : il passe la liste vide, et ses murs
+restent opaques — « un plan qu'on imprime ne se lit pas en transparence ».
+
+2 366 → **zéro**, sur les trois scènes. Ce rendu-là ne se vérifie pas à l'œil
+depuis cette machine : l'écorché n'existe que dans l'app, pas dans les
+planches de référence. C'est la mesure qui répond, pas l'image.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

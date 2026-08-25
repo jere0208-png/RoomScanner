@@ -50,6 +50,7 @@ import {
   buildScene,
   faceDepth,
   isHiddenFace,
+  cutawayOpacity,
   masquesDeScene,
   roomRanks,
   type Face3D,
@@ -57,8 +58,15 @@ import {
   type ScenePalette,
 } from '../src/geometry/scene3d';
 import { MAQUETTE } from '../src/ui/maquette';
-import { detectRooms, type WallSeg } from '../src/geometry/floorplan';
+import {
+  detectRooms,
+  mergeColinear,
+  splitAtJunctions,
+  weldCorners,
+  type WallSeg,
+} from '../src/geometry/floorplan';
 import type { ObjectData } from 'react-native-room-scan';
+import type { Fixture } from '../src/geometry/electrical';
 
 const PALETTE: ScenePalette = MAQUETTE;
 
@@ -117,15 +125,109 @@ const ROOMS = detectRooms(MURS).map((r, i) => ({
   wallIds: r.wallIds,
 }));
 
-const scene = buildScene(MURS, [], MEUBLES, {
-  palette: PALETTE,
-  showSurfaces: true,
-  rooms: ROOMS,
-});
-const faces = scene.faces;
-const masques = masquesDeScene(faces);
+/*
+  ET LA VRAIE SALLE D'EAU DU RELEVE : NEUF MURS POUR 3,8 m².
 
-const centre = (() => {
+  La premiere scene est un rectangle — quatre murs, la geometrie la plus
+  simple qui soit. Le chantier, lui, montrait « 9 MURS · 3,8 M² » : une piece
+  biscornue, avec des retours de maconnerie. Un retour est un pan COURT, vu
+  de champ sous la plupart des angles, et c'est exactement le genre de face
+  que le classement departage le plus mal.
+
+  Le banc porte donc les deux. Une correction qui ne tient que sur le
+  rectangle ne tient pas.
+*/
+const enL: WallSeg[] = mergeColinear(
+  splitAtJunctions(
+    weldCorners([
+      mur('a', 0, 0, 1.7, 0),
+      mur('b', 1.7, 0, 1.7, 0.9),
+      mur('c', 1.7, 0.9, 2.5, 0.9),
+      mur('d', 2.5, 0.9, 2.5, 2.3),
+      mur('e2', 2.5, 2.3, 0.6, 2.3),
+      mur('f', 0.6, 2.3, 0.6, 1.4),
+      mur('g', 0.6, 1.4, 0, 1.4),
+      mur('h', 0, 1.4, 0, 0),
+    ]),
+  ),
+);
+
+const MEUBLES_L: ObjectData[] = [
+  // Le meuble-vasque contre le grand mur du fond, et son placard au-dessus.
+  boite('vasque', 'storage', 1.5, 1.2, 0.9, 0.5, 0.85, 0.42),
+  boite('placard', 'storage', 1.5, 1.15, 0.9, 0.35, 0.7, 1.65),
+  // Les WC dans le retour : le cas qui n'existait pas sur un rectangle.
+  boite('wc', 'toilet', 1.2, 2, 0.4, 0.65, 0.8, 0.4),
+];
+
+const ROOMS_L = detectRooms(enL).map((r, i) => ({
+  id: `piece-${i + 1}`,
+  wallIds: r.wallIds,
+}));
+
+interface Plateau {
+  nom: string;
+  murs: WallSeg[];
+  scene: ReturnType<typeof buildScene>;
+  masques: ReturnType<typeof masquesDeScene>;
+}
+
+const monterScene = (
+  nom: string,
+  murs: WallSeg[],
+  meubles: ObjectData[],
+  pieces: { id: string; wallIds: string[] }[],
+  menuiseries: WallSeg[] = [],
+  elec: Fixture[] = [],
+): Plateau => {
+  const sc = buildScene(murs, menuiseries, meubles, {
+    palette: PALETTE,
+    showSurfaces: true,
+    rooms: pieces,
+    fixtures: elec,
+  });
+  return { nom, murs, scene: sc, masques: masquesDeScene(sc.faces) };
+};
+
+/*
+  ET LA MEME, EQUIPEE — parce qu'une salle d'eau nue n'existe pas.
+
+  Le releve montrait « 9 MURS · 4 MEUBLES · 3 ELEC. », et une porte cernee
+  d'ambre. Or une menuiserie DECOUPE son mur — trumeaux, linteau, allege —
+  et l'appareillage fait basculer le mur qui le porte sur un autre chemin de
+  tri (les tuiles, voir `depthRefs`). Deux façons de multiplier les pans
+  courts, et les pans courts sont ce que le classement departage le plus mal.
+*/
+const PORTE_L: WallSeg = {
+  id: 'porte-l',
+  type: 'door',
+  roomId: 'sdb',
+  a: { x: 0.15, z: 1.4 },
+  b: { x: 0.6, z: 1.4 },
+  height: 2.04,
+  yCenter: 1.02,
+};
+
+const ELEC_L: Fixture[] = [
+  { id: 'e1', kind: 'inter', wallId: enL[0]?.id ?? 'a', along: 0.4, height: 1.1, side: 1 },
+  { id: 'e2', kind: 'prise', wallId: enL[0]?.id ?? 'a', along: 1.2, height: 1.1, side: 1 },
+  { id: 'e3', kind: 'applique', wallId: enL[1]?.id ?? 'b', along: 0.4, height: 1.9, side: 1 },
+];
+
+const PLATEAUX: Plateau[] = [
+  monterScene('salle d’eau rectangulaire', MURS, MEUBLES, ROOMS),
+  monterScene('salle d’eau à retours (9 murs)', enL, MEUBLES_L, ROOMS_L),
+  monterScene(
+    'salle d’eau équipée : porte et appareillage',
+    enL,
+    MEUBLES_L,
+    ROOMS_L,
+    [PORTE_L],
+    ELEC_L,
+  ),
+];
+
+const centreDe = (faces: { pts: P3[] }[]) => {
   const pts = faces.flatMap((f) => f.pts);
   const lo = { x: Infinity, y: Infinity, z: Infinity };
   const hi = { x: -Infinity, y: -Infinity, z: -Infinity };
@@ -134,7 +236,7 @@ const centre = (() => {
     hi.x = Math.max(hi.x, p.x); hi.y = Math.max(hi.y, p.y); hi.z = Math.max(hi.z, p.z);
   }
   return { x: (lo.x + hi.x) / 2, y: (lo.y + hi.y) / 2, z: (lo.z + hi.z) / 2 };
-})();
+};
 
 const rad = (d: number) => (d * Math.PI) / 180;
 const camera = (theta: number, tilt: number) => ({
@@ -145,7 +247,8 @@ const camera = (theta: number, tilt: number) => ({
 });
 
 /** La projection orthographique de la vue, en points d'ecran. */
-const projecteur = (cam: ReturnType<typeof camera>) => (p: P3) => {
+const projecteur =
+  (cam: ReturnType<typeof camera>, centre: P3) => (p: P3) => {
   const x = p.x - centre.x;
   const y = p.y - centre.y;
   const z = p.z - centre.z;
@@ -209,9 +312,11 @@ const profAu = (
  * les deux volumes ne se traversent pas : la ou deux volumes s'interpenetrent,
  * aucun ordre de peinture n'est juste, et le rabotage est le remede.
  */
-function fautes(theta: number, tilt: number) {
+function fautes(plateau: Plateau, theta: number, tilt: number) {
+  const { scene, masques } = plateau;
+  const faces = scene.faces;
   const cam = camera(theta, tilt);
-  const project = projecteur(cam);
+  const project = projecteur(cam, centreDe(faces));
   const rangs = roomRanks(scene.rooms, cam);
   // Le pan nous fait-il face ? C'est la seule question qui depende de l'angle.
   const regardVers = (panId?: number) => {
@@ -262,13 +367,84 @@ function fautes(theta: number, tilt: number) {
   return n;
 }
 
+/**
+ * LES MURS OPAQUES POSES DEVANT UN MEUBLE.
+ *
+ * Ceux-la ne sont pas une faute de TRI : ils sont vraiment entre l'oeil et le
+ * meuble, et le classement a raison de les peindre en dernier. C'est
+ * l'ECORCHE qui devrait les effacer — le rendu estompe la face exterieure
+ * d'un mur pour qu'on voie DANS la piece sans avoir a tourner le modele par
+ * dessus.
+ *
+ * Il ne le faisait qu'en fonction de l'ANGLE : « un mur vu de champ ne cache
+ * rien, il reste plein ». C'est vrai d'un mur vu de champ au milieu de nulle
+ * part ; c'est faux du mur vu de champ qui coupe justement le lavabo. Sur les
+ * trois scenes de ce banc, DEUX MILLE TROIS CENT SOIXANTE-SIX prises de vue
+ * montraient un pan exterieur opaque a plus de moitie pose devant un meuble.
+ *
+ * La regle devient donc : un mur vu de champ ne cache rien — SAUF quand il
+ * cache vraiment quelque chose.
+ */
+const voilesOpaques = (plateau: Plateau, theta: number, tilt: number) => {
+  const { scene, masques } = plateau;
+  const faces = scene.faces;
+  const cam = camera(theta, tilt);
+  const project = projecteur(cam, centreDe(faces));
+  const vues = faces
+    .filter((f) => !isHiddenFace(f, cam) && f.fill !== null && f.pts.length >= 3)
+    .map((f) => ({ f, proj: f.pts.map(project) }));
+  let n = 0;
+  for (const a of vues) {
+    if (!a.f.ownerId) continue;
+    const pt = {
+      sx: a.proj.reduce((s2, p) => s2 + p.sx, 0) / a.proj.length,
+      sy: a.proj.reduce((s2, p) => s2 + p.sy, 0) / a.proj.length,
+    };
+    const da = profAu(a.proj, pt);
+    if (da === null) continue;
+    for (const b of vues) {
+      if (b === a || b.f.ownerId || !b.f.cutaway || !b.f.normal) continue;
+      if (!dansPoly(pt, b.proj)) continue;
+      const db = profAu(b.proj, pt);
+      if (db === null || db <= da + 0.02) continue;
+      // Il est devant le meuble : s'efface-t-il assez pour qu'on le voie ?
+      if (cutawayOpacity(b.f.normal, cam, masques.get(b.f.panId ?? -1)?.cache) > 0.5) {
+        n++;
+      }
+    }
+  }
+  return n;
+};
+
+describe('le voile d’un mur suit ce qu’il cache', () => {
+  it.each(PLATEAUX.map((p) => [p.nom, p] as const))(
+    '« %s » : aucun pan opaque posé devant un meuble',
+    (_nom, plateau) => {
+      let total = 0;
+      const fautifs: string[] = [];
+      for (let theta = 0; theta < 360; theta += 5) {
+        for (const tilt of [20, 35, 55]) {
+          const n = voilesOpaques(plateau, theta, tilt);
+          total += n;
+          if (n > 0 && fautifs.length < 6) fautifs.push(`${theta}°/${tilt}°`);
+        }
+      }
+      expect(`${total} pan(s) opaque(s)` + (total ? ` — ${fautifs.join(', ')}` : '')).toBe(
+        '0 pan(s) opaque(s)',
+      );
+    },
+  );
+});
+
 describe('un meuble collé à son mur', () => {
-  it('n’est jamais recouvert par lui, sur tout le tour', () => {
+  it.each(PLATEAUX.map((p) => [p.nom, p] as const))(
+    '« %s » : jamais recouvert, sur tout le tour',
+    (_nom, plateau) => {
     let total = 0;
     const fautifs: string[] = [];
     for (let theta = 0; theta < 360; theta += 5) {
       for (const tilt of [20, 35, 55]) {
-        const n = fautes(theta, tilt);
+        const n = fautes(plateau, theta, tilt);
         total += n;
         if (n > 0 && fautifs.length < 6) fautifs.push(`${theta}°/${tilt}°`);
       }
@@ -277,5 +453,6 @@ describe('un meuble collé à son mur', () => {
     expect(`${total} recouvrement(s)` + (total ? ` — ${fautifs.join(', ')}` : '')).toBe(
       '0 recouvrement(s)',
     );
-  });
+    },
+  );
 });
