@@ -4015,6 +4015,7 @@ export function ResultScreen() {
                   menuiserie.
                 */
                 label: 'Position sur le mur',
+                mot: 'Position',
                 icone: SOLAIRES.ruler,
                 sansMot: true,
                 ghost: true,
@@ -4064,6 +4065,7 @@ export function ResultScreen() {
                     },
                     {
                       label: 'Sens d’ouverture',
+                      mot: 'Sens',
                       icone: SOLAIRES.sens,
                       sansMot: true,
                       ghost: true,
@@ -4092,6 +4094,7 @@ export function ResultScreen() {
                       label: selectedOpening.coffre
                         ? 'Retirer le coffre'
                         : 'Coffre de volet',
+                      mot: 'Coffre',
                       icone: SOLAIRES.coffre,
                       sansMot: true,
                       ghost: true,

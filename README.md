@@ -8005,6 +8005,38 @@ absolu. Il vérifie maintenant ce qu'il voulait vraiment dire — les trois
 spots sont sur une même ligne, donc leurs trois sigles aussi, quelle que soit
 l'échelle.
 
+### Le mot sous la pastille était une phrase
+
+Défaut introduit la veille, en sortant les gestes d'une menuiserie de son
+menu : les mots écrits sous les pastilles étaient « Position sur le mur »,
+« Sens d'ouverture », « Coffre de volet ». Or une cellule prend la largeur de
+son contenu le plus large — la cellule faisait cent dix points pour une
+pastille de trente-quatre, et la rangée débordait. C'est exactement le défaut
+que le patron avait signalé en son temps sur le bandeau du mur : « peu de
+place pour les informations, un bouton sort du bloc ».
+
+La règle est maintenant écrite et vérifiée : **ce qui s'écrit sous une
+pastille est UN mot** — « Position », « Sens », « Coffre ». L'étiquette
+parlée, elle, garde sa phrase entière : c'est elle que lit la synthèse
+vocale, et elle a tout le temps de la dire. Une borne de largeur vient en
+ceinture, pour le jour où l'on oubliera la règle.
+
+### Un calque allumé ne se disait pas
+
+La pastille passe au bleu plein quand « Meubles » est actif : ça se voit, ça
+ne s'entendait pas. La synthèse vocale annonçait « Meubles, bouton » qu'il
+soit allumé ou éteint. Quatre autres endroits de l'application le disaient
+déjà — le choix d'après-scan, le mur d'abonnement, la page profil — et la
+rangée des calques, qui est à l'écran en permanence, l'avait oublié.
+
+Le contrôle en sens inverse compte autant que la correction : un calque
+ÉTEINT le dit aussi. Un état qui vaudrait toujours vrai ne dirait rien.
+
+**Et deux choses auditées qui vont bien**, notées ici pour qu'on ne les
+recherche pas : zéro apostrophe droite dans les textes affichés — la
+typographie est tenue partout —, et zéro bouton muet pour la synthèse vocale
+sur les cent soixante-douze que compte l'application.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

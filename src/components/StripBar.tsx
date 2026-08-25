@@ -43,6 +43,20 @@ export interface StripAction {
   icone?: string;
   sansMot?: boolean;
   /**
+   * LE MOT SOUS LA PASTILLE, quand l'étiquette est une phrase.
+   *
+   * La cellule qui porte une pastille n'a pas de largeur : elle prend celle
+   * de son contenu le plus large. « Position sur le mur » écrit sous un
+   * disque de trente-quatre points, et c'est la CELLULE qui fait cent dix —
+   * la rangée déborde, et l'on retrouve le défaut que le patron avait
+   * signalé sur le bandeau du mur : « un bouton sort du bloc ».
+   *
+   * Ce qui s'écrit sous une pastille est donc UN mot. L'étiquette parlée,
+   * elle, garde sa phrase entière : c'est elle que lit la synthèse vocale,
+   * et elle a tout le temps de la dire.
+   */
+  mot?: string;
+  /**
    * LE GESTE QUI ENLÈVE, en rouge.
    *
    * « Retirer » se dessinait en gris d'encre sous une ligne de spots, en
@@ -217,7 +231,7 @@ export function StripBar({
             <View key={a.label} style={styles.bandeauCellule}>
               {bouton}
               <Text style={styles.bandeauMot} numberOfLines={1}>
-                {a.label}
+                {a.mot ?? a.label}
               </Text>
             </View>
           );

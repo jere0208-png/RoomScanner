@@ -659,6 +659,16 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     fontSize: 10,
     fontWeight: '600',
     opacity: 0.75,
+    /*
+      ET IL NE TIRE PLUS LA CELLULE.
+
+      Une cellule prend la largeur de son contenu le plus large : un mot
+      trop long l'étirait bien au-delà de sa pastille, et la rangée
+      débordait. Le mot est court par règle (voir `mot`, dans `StripBar`) ;
+      cette borne est la ceinture, pour le jour où l'on oubliera.
+    */
+    maxWidth: 62,
+    textAlign: 'center',
   },
   /*
     LES TROIS TEINTES D'UNE SILHOUETTE DE BANDEAU.

@@ -244,6 +244,18 @@ export function ToolPill({
       <TouchableOpacity
         style={[styles.toolPill, plein && styles.toolPillActive]}
         accessibilityLabel={label}
+        /*
+          ET CE QUI EST ALLUMÉ SE DIT.
+
+          Un calque actif se voit — la pastille passe au bleu plein — et ne
+          s'entendait pas : la synthèse vocale annonçait « Meubles, bouton »
+          qu'il soit allumé ou éteint. Quatre autres endroits de
+          l'application le disaient déjà (`ChoixScan`, le mur d'abonnement,
+          la page profil) ; la rangée des calques, qui est à l'écran en
+          permanence, l'avait oublié.
+        */
+        accessibilityRole="button"
+        accessibilityState={{ selected: active }}
         /**
          * 38 POINTS DESSINÉS, 44 SOUS LE DOIGT.
          *
