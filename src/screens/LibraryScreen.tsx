@@ -1044,7 +1044,19 @@ export function LibraryScreen() {
     */
     <RetourGlisse
       onRetour={() => (dossierOuvert ? setInside(null) : setScreen('home'))}
-      style={styles.container}>
+      /*
+        L'ENVELOPPE REMPLIT L'ÉCRAN, ELLE NE MET PAS EN PAGE.
+
+        Elle portait `container` — le style de la page, marges comprises —
+        et le bloc qu'elle entoure le portait aussi. React Native additionne
+        deux boîtes imbriquées : la marge du haut a doublé d'un coup, en
+        silence. Relevé du patron, capture à l'appui : « dans mes scans tout
+        est descendu sans raison en laissant une marge en haut ».
+
+        L'enveloppe n'a besoin que de la HAUTEUR : c'est le bord gauche
+        qu'elle écoute. La mise en page reste où elle a toujours été.
+      */
+      style={styles.enveloppe}>
     <View style={styles.container} {...pan.panHandlers}>
       <View
         style={[styles.headerRow, over === RACINE && styles.headerRowOver]}
@@ -1315,6 +1327,9 @@ export function LibraryScreen() {
 }
 
 const getStyles = themedStyles((c: Palette) => StyleSheet.create({
+  // Voir le commentaire de `RetourGlisse`, plus haut : la hauteur et le
+  // fond, rien de plus.
+  enveloppe: { flex: 1, backgroundColor: c.bg },
   container: {
     flex: 1,
     backgroundColor: c.bg,

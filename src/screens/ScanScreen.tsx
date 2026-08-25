@@ -16,8 +16,8 @@ import { CloseCross } from '../components/CloseCross';
 import { haptic } from '../ui/haptic';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GuidePose } from './scan/GuidePose';
-import { FIXTURE_SYMBOL, type FixtureKind } from '../geometry/electrical';
-import { aimanterHauteur } from '../geometry/viseur';
+import { FIXTURE_SYMBOL } from '../geometry/electrical';
+import { aimanterHauteur, natureAuMur } from '../geometry/viseur';
 import { CEILING_SYMBOL } from '../geometry/ceiling';
 
 /** Le guide de pose a été lu : on ne le remontre plus de lui-même. */
@@ -133,9 +133,18 @@ export function ScanScreen() {
         qu'à la fin. On annonce donc ce qui va se passer plutôt qu'une cote
         qu'on n'a pas : promettre un chiffre faux serait pire que se taire.
       */
+      /*
+        ET AU MUR, ON DIT « APPLIQUE ».
+
+        Le bouton « Lumière » pose un `dcl`, qui n'a pas de cote murale :
+        l'annonce restait donc muette pour une applique, le seul appareil
+        qu'on posait sans que rien ne le confirme. C'est la même traduction
+        que fait l'ancrage (`natureAuMur`) — les deux ne peuvent plus se
+        contredire.
+      */
       const mot = pose.plafond
         ? 'Point lumineux — il sera centré dans la pièce'
-        : aimanterHauteur(kind as FixtureKind, pose.height).mot;
+        : aimanterHauteur(natureAuMur(kind), pose.height).mot;
       if (mot) {
         setAnnonce(mot);
         if (minuteurAnnonce.current) clearTimeout(minuteurAnnonce.current);

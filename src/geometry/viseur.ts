@@ -281,6 +281,30 @@ const estDuPlafond = (kind: string): kind is CeilingKind =>
   (AU_PLAFOND as string[]).includes(kind);
 
 /**
+ * CE QU'EST UNE « LUMIÈRE » QUAND ELLE TOMBE SUR UN MUR.
+ *
+ * Relevé du patron : « lors d'un scan, "lum" n'ajoute pas de lumière sur le
+ * mur, alors que l'élément se place bien sur le scan, mais rien sur le
+ * plan ». Les deux moitiés étaient vraies : le natif enregistrait la pose,
+ * et c'est l'ancrage qui la jetait en silence.
+ *
+ * Le bouton du viseur pose un `dcl` — un point lumineux de PLAFOND, avec sa
+ * croix normalisée. Visé sur une cloison à hauteur d'applique, il n'était ni
+ * assez haut ni assez loin des murs pour aller au plafond ; on cherchait
+ * alors `FIXTURES['dcl']`, qui n'existe pas — un dcl n'est pas un appareil
+ * mural — et l'on sortait sans rien poser.
+ *
+ * Ce qui manquait n'est pas un garde-fou, c'est une TRADUCTION. Sur un
+ * chantier, un point lumineux au mur porte un nom : c'est une applique. Le
+ * bouton dit « Lumière », et c'est à l'application de savoir laquelle selon
+ * l'endroit visé — au plafond un DCL, au mur une applique. L'électricien ne
+ * choisit pas entre deux boutons ce que sa main a déjà dit en visant.
+ */
+const AU_MUR: Record<string, FixtureKind> = { dcl: 'applique' };
+export const natureAuMur = (kind: string): FixtureKind =>
+  (AU_MUR[kind] ?? kind) as FixtureKind;
+
+/**
  * Rattache les points visés au plan : appareils muraux d'un côté, points
  * de plafond de l'autre.
  *
@@ -322,13 +346,14 @@ export function ancrerElec(
     if (nomme && a.along !== undefined && a.height !== undefined) {
       const l = segLength(nomme) || 1;
       const side = interiorSide(nomme, walls, rooms as never);
-      const kind = a.kind as FixtureKind;
+      // Une « Lumière » posée sur un mur est une applique : voir `AU_MUR`.
+      const kind = natureAuMur(a.kind);
       if (FIXTURES[kind]) {
         // La cote du métier, pas celle du doigt : voir `aimanterHauteur`.
         const pose = aimanterHauteur(kind, a.height);
         if (pose.mot) mots.push(pose.mot);
         fixtures.push({
-          id: id(a.kind, n),
+          id: id(kind, n),
           kind,
           wallId: nomme.id,
           // Bornées au mur : un relevé de travers ne sort pas du pan.
@@ -398,7 +423,7 @@ export function ancrerElec(
     }
 
     if (!best || best.dist > PORTEE_MUR) return;
-    const kind = a.kind as FixtureKind;
+    const kind = natureAuMur(a.kind);
     if (!FIXTURES[kind]) return;
     /*
       LA FACE QUI REGARDE LA PIÈCE. Le raycast donne un point, pas un côté :
@@ -414,7 +439,7 @@ export function ancrerElec(
     const pose = aimanterHauteur(kind, a.y);
     if (pose.mot) mots.push(pose.mot);
     fixtures.push({
-      id: id(a.kind, n),
+      id: id(kind, n),
       kind,
       wallId: best.w.id,
       along: best.along,

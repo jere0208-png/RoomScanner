@@ -7598,6 +7598,57 @@ noir sur blanc dans le banc : ses quatre boutons disent des mots — « Nommer �
 « Cotes », « H 2,50 » — et un mot n'a pas besoin d'une silhouette pour se
 comprendre.
 
+### Deux défauts relevés sur le téléphone, le même jour
+
+**« Dans mes scans tout est descendu sans raison en laissant une marge en
+haut »**, capture à l'appui : le titre « Mes scans » commençait au tiers de
+l'écran, sous un blanc que rien n'expliquait.
+
+La cause est un style posé DEUX FOIS. La bibliothèque a été enveloppée dans
+`RetourGlisse` — le retour au glissement du bord gauche — et l'on a passé à
+l'enveloppe le style de l'écran, `container`, sans le retirer du bloc qu'elle
+entoure. Les deux portaient donc le même `paddingTop`, et React Native les
+additionne comme deux boîtes imbriquées : la marge du haut a doublé d'un
+coup, en silence. C'est le genre de défaut qu'aucun banc de comportement ne
+voit — tout fonctionne, tout est atteignable, tout est simplement
+cinquante-huit points trop bas. L'enveloppe n'a plus que la hauteur et le
+fond ; la mise en page reste où elle a toujours été.
+
+Le banc ne compte pas les points, il compte les DÉCLARATIONS : une seule
+boîte de la chaîne d'emboîtement porte la marge du haut. Et son contrôle en
+sens inverse tient l'autre bout — il en faut bien une, sinon le titre
+viendrait coller à l'heure.
+
+---
+
+**« Lors d'un scan, "lum" n'ajoute pas de lumière sur le mur, alors que
+l'élément se place bien sur le scan, mais rien sur le plan. »** Les deux
+moitiés de la phrase étaient vraies, et c'est ce qui rendait le défaut
+difficile à voir : le natif enregistrait bien la pose — on la voyait dans la
+vue de scan, le compteur avançait, le retour haptique tombait — et c'est
+l'ANCRAGE, côté JS, qui la jetait sans rien dire.
+
+Le troisième bouton du viseur pose un `dcl` : un point lumineux de PLAFOND,
+avec sa croix normalisée. `ancrerElec` le range donc au plafond, mais à deux
+conditions — que le point soit loin des murs, ou franchement haut. Visé sur
+une cloison à hauteur d'applique, il n'était ni l'un ni l'autre. Le code
+passait alors à la branche des appareils MURAUX, cherchait `FIXTURES['dcl']`,
+ne le trouvait pas — un dcl n'est pas un appareil mural — et sortait sans
+rien poser.
+
+Ce qui manquait n'est pas un garde-fou, c'est une TRADUCTION. Sur un
+chantier, un point lumineux au mur porte un nom : c'est une **applique**. Le
+bouton dit « Lumière », et c'est à l'application de savoir laquelle selon
+l'endroit visé — au plafond un DCL, au mur une applique. L'électricien ne
+choisit pas entre deux boutons ce que sa main a déjà dit en visant. Elle
+arrive à la cote du catalogue, 1,90 m, et l'annonce du scan le dit enfin :
+c'était le seul appareil qu'on posait sans que rien ne le confirme.
+
+Les contrôles en sens inverse comptent autant que la correction : une
+traduction qui changerait TOUT `dcl` en applique ferait disparaître le point
+lumineux du plafond, celui qu'on pose neuf fois sur dix. Visé au milieu de la
+pièce, ou au ras du plafond même contre un mur, il reste un DCL.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro
