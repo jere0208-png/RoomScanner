@@ -14,20 +14,30 @@
  * fait face. Ce banc suit donc le chemin de l'ECRAN, avec ses fleches — le
  * seul qui puisse voir ce que le chantier voit.
  *
- * CE QUE LE BANC MESURE AUJOURD'HUI : TROIS recouvrements, a 230° d'azimut
- * et 55° d'inclinaison, sur les deux cent seize prises de vue du tour. Ce
- * n'est pas zero, et le chiffre est ecrit ici expres — c'est un VERROU : le
- * defaut ne doit pas grandir pendant qu'on travaille ailleurs.
+ * CE QUE LA MESURE A DESIGNE, ET CE N'ETAIT PAS LE PIXEL. Sans les fleches
+ * imposees par les masques, cette scene ne compte AUCUNE faute ; avec elles,
+ * trois. Ce sont donc les fleches qui inversaient l'ordre — non parce
+ * qu'elles sont fausses, mais parce qu'elles ne disent rien du reste. Un pan
+ * qui doit passer apres deux meubles descend dans le classement, et rien ne
+ * le retient de passer aussi apres un TROISIEME qu'il ne masque pas et qui,
+ * lui, est derriere lui.
  *
- * CE QUI A ETE ESSAYE, ET ECARTE. La regle des masques n'a qu'un sens : elle
- * dit « ce pan masque ces meubles » — le mur devant, le meuble derriere —
- * et ne dit rien du cas inverse, un mur du FOND avec ses meubles devant lui.
- * Poser cette fleche-la paraissait aller de soi : elle est aussi
- * geometrique que l'autre. La mesure a dit non — trois recouvrements sont
- * devenus VINGT-NEUF. Les fleches imposees entrent dans un classement par
- * insertion qui n'est pas transitif (voir `ordreLocal`) ; en ajouter de
- * justes peut en deranger d'autres, et le bilan se juge au compteur, pas au
- * raisonnement. La regle a ete retiree.
+ * LA FLECHE NE VAUT DONC QUE LA OU LES DEUX SE RENCONTRENT a l'ecran. Ailleurs,
+ * l'ordre n'a aucune consequence visible — et une contrainte sans consequence
+ * visible n'a que des effets de bord.
+ *
+ * MAIS PAS SOUS LE DOIGT. La vue garde son ordre quelques degres pendant un
+ * geste : un ordre qu'on reemploie doit etre ROBUSTE, donc garder ses fleches
+ * entieres. C'est la mesure de `percemur` qui l'impose — restreindre partout
+ * y ramenait dix-huit percees a un degre. Un trait de dos qui parait le temps
+ * d'un clignement ne se voit pas ; un lavabo cache au repos se voit tout de
+ * suite.
+ *
+ * DEUX AUTRES PISTES ONT ETE ESSAYEES ET ECARTEES, chiffres a l'appui :
+ * poser la fleche INVERSE — le mur du fond avant ses meubles — faisait
+ * passer les trois recouvrements a vingt-neuf ; et la restreindre aux seules
+ * rencontres a l'ecran ne suffisait pas non plus. C'est le compteur qui
+ * tranche, pas le raisonnement.
  *
  * ET UN PIEGE DE PLUS, ATTRAPE EN CHEMIN : ce banc avait d'abord recopie la
  * projection de la PLANCHE de reference, ou l'inclinaison joue autrement —
@@ -253,7 +263,7 @@ function fautes(theta: number, tilt: number) {
 }
 
 describe('un meuble collé à son mur', () => {
-  it('n’est pas recouvert par lui plus qu’on ne l’a mesuré', () => {
+  it('n’est jamais recouvert par lui, sur tout le tour', () => {
     let total = 0;
     const fautifs: string[] = [];
     for (let theta = 0; theta < 360; theta += 5) {
@@ -263,16 +273,9 @@ describe('un meuble collé à son mur', () => {
         if (n > 0 && fautifs.length < 6) fautifs.push(`${theta}°/${tilt}°`);
       }
     }
-    /*
-      LE VERROU, PAS LA CIBLE.
-
-      Trois recouvrements sur deux cent seize prises de vue : c'est ce que le
-      defaut vaut aujourd'hui, et le banc interdit qu'il grandisse. Le jour
-      ou on saura le ramener a zero, c'est ce chiffre-la qu'on baissera —
-      jamais l'inverse.
-    */
+    // Deux cent seize prises de vue, et pas un mur devant un meuble.
     expect(`${total} recouvrement(s)` + (total ? ` — ${fautifs.join(', ')}` : '')).toBe(
-      '3 recouvrement(s) — 230°/55°',
+      '0 recouvrement(s)',
     );
   });
 });

@@ -7841,7 +7841,7 @@ qui TIENT ne perd pas un centimètre, et une étagère à moitié enfoncée dans
 une cloison se pousse comme avant — un seul mur l'a écartée, sa taille n'y
 est pour rien.
 
-### Le mur qui passe devant le lavabo : mesuré, chiffré, pas encore corrigé
+### Le mur qui passait devant le lavabo
 
 Relevé de chantier, capture à l'appui : **« toujours pareil, le lavabo est
 caché par le mur, comme d'autres meubles »**, après le rabotage des boîtes
@@ -7878,6 +7878,29 @@ et `depth` s'y échangent sinus et cosinus. Il mesurait une autre caméra que
 celle du téléphone, et ses premiers chiffres ne disaient rien de ce que le
 chantier voit. Un banc qui n'est pas sur la même vue que l'écran ne prouve
 rien.
+
+**LA MESURE A DÉSIGNÉ LE COUPABLE, et ce n'était pas le pixel.** Sans les
+flèches imposées par les masques, cette scène ne compte AUCUNE faute ; avec
+elles, trois. Ce sont donc les flèches qui inversaient l'ordre — non parce
+qu'elles sont fausses, mais parce qu'elles ne disent rien du reste. Un pan
+qui doit passer après deux meubles descend dans le classement, et rien ne le
+retient de passer aussi après un TROISIÈME qu'il ne masque pas et qui, lui,
+est derrière lui. La flèche est juste ; sa conséquence ne l'est pas.
+
+**La flèche ne vaut donc que là où les deux se rencontrent** à l'écran.
+Ailleurs, l'ordre n'a aucune conséquence visible — et une contrainte sans
+conséquence visible n'a que des effets de bord.
+
+**Mais pas sous le doigt.** La vue garde son ordre quelques degrés pendant un
+geste : un ordre qu'on réemploie doit rester ROBUSTE, donc garder ses flèches
+entières. C'est la mesure de `percemur` qui l'impose — restreindre partout y
+ramenait dix-huit percées à un degré. Un trait de dos qui paraît le temps
+d'un clignement ne se voit pas ; un lavabo caché au repos se voit tout de
+suite. `ajusterBlocs` reçoit donc un drapeau de plus, et la vue le renseigne
+avec ce qu'elle sait déjà : `enMouvement`.
+
+Le banc passe de trois recouvrements à **zéro sur les 216 prises de vue du
+tour**.
 
 ## Prérequis pour tester sur iPhone
 

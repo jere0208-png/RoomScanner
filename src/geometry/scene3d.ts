@@ -612,8 +612,21 @@ export function ordreLocal<T extends FacePeinte>(
  * une pièce est tout entière du côté intérieur de ses murs, donc derrière
  * celui de ses pans dont on voit la face extérieure.
  */
-function masques<T extends { owner?: string; cache?: readonly string[] }>(
+function masques<
+  T extends FacePeinte & { owner?: string; cache?: readonly string[] },
+>(
   groupe: T[],
+  /**
+   * VRAI quand ce classement ne servira QU'À CETTE IMAGE.
+   *
+   * Restreindre les flèches aux faces qui se recouvrent rend l'ordre exact
+   * ici, et un peu moins robuste ailleurs : c'est le bon marché tant qu'on
+   * ne le réemploie pas. Sous le doigt, où l'ordre resservira quelques
+   * degrés plus loin, on garde les flèches entières — un trait de dos qui
+   * paraît le temps d'un clignement ne se voit pas, un lavabo caché au
+   * repos se voit tout de suite.
+   */
+  pourCetteImage: boolean,
 ): [number, number][] {
   const parMeuble = new Map<string, number[]>();
   let aMasquer = false;
@@ -625,10 +638,47 @@ function masques<T extends { owner?: string; cache?: readonly string[] }>(
     else parMeuble.set(g.owner, [i]);
   });
   if (!aMasquer || parMeuble.size === 0) return [];
+  /*
+    LA FLÈCHE NE VAUT QUE LÀ OÙ LES DEUX SE RENCONTRENT.
+
+    Relevé de chantier, trois fois : « des murs sur la vue 3D qui vont sur
+    les meubles alors que le meuble est plus vers nous ». La mesure a
+    désigné le coupable, et ce n'était pas celui qu'on croyait : sans ces
+    flèches, la scène du banc ne compte AUCUNE faute ; avec elles, trois.
+
+    Ce sont donc les flèches imposées qui inversaient l'ordre — non parce
+    qu'elles sont fausses, mais parce qu'elles ne disent rien du reste. Un
+    pan qui doit passer après deux meubles descend dans le classement, et
+    rien ne le retient de passer aussi après un TROISIÈME qu'il ne masque
+    pas et qui, lui, est derrière lui. La flèche est juste ; sa conséquence
+    ne l'est pas.
+
+    On ne la pose donc qu'entre deux faces qui se rencontrent VRAIMENT à
+    l'écran. Là où elles ne se recouvrent pas, l'ordre n'a aucune
+    conséquence visible, et une contrainte sans conséquence visible est une
+    contrainte qui n'a que des effets de bord.
+  */
+  const boite = (it: T & FacePeinte) => {
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    for (const p of it.proj) {
+      x0 = Math.min(x0, p.sx); x1 = Math.max(x1, p.sx);
+      y0 = Math.min(y0, p.sy); y1 = Math.max(y1, p.sy);
+    }
+    return { x0, x1, y0, y1 };
+  };
+  const boites = groupe.map((g) => boite(g as T & FacePeinte));
+  const seCroisent = (a: number, b: number) =>
+    !(boites[a].x1 < boites[b].x0 || boites[b].x1 < boites[a].x0 ||
+      boites[a].y1 < boites[b].y0 || boites[b].y1 < boites[a].y0);
   const fleches: [number, number][] = [];
   groupe.forEach((g, j) => {
-    for (const id of g.cache ?? []) {
-      for (const i of parMeuble.get(id) ?? []) fleches.push([i, j]);
+    const masques = new Set(g.cache ?? []);
+    if (masques.size === 0) return;
+    for (const [id, indices] of parMeuble) {
+      if (!masques.has(id)) continue;
+      for (const i of indices) {
+        if (!pourCetteImage || seCroisent(i, j)) fleches.push([i, j]);
+      }
     }
   });
   return fleches;
@@ -745,6 +795,15 @@ export function ajusterBlocs<
    * apparaître une fraction de seconde. Dès qu'on lâche, tout se reclasse.
    */
   rapide = false,
+  /**
+   * CE CLASSEMENT VA-T-IL RESSERVIR ?
+   *
+   * La vue garde son ordre quelques degrés pendant un geste. Un ordre qu'on
+   * réemploie doit être ROBUSTE — flèches entières ; un ordre calculé pour
+   * l'image qu'on regarde doit être EXACT — flèches restreintes à ce qui se
+   * recouvre. Voir `masques`.
+   */
+  reutilise = false,
 ): void {
   /*
     UN GROUPE PAR PIÈCE, ET NON PAR MEUBLE.
@@ -868,7 +927,7 @@ export function ajusterBlocs<
           panDe[i] = j;
         }
       });
-      for (const [i, j] of masques(groupe)) liens.push([i, j]);
+      for (const [i, j] of masques(groupe, !reutilise)) liens.push([i, j]);
       ordreLocal(groupe, liens, panDe).forEach((g, k) => {
         g.depth = bas + k * pas;
       });
@@ -913,7 +972,7 @@ export function ajusterBlocs<
     const rang = new Map<number, number>();
     // La règle du pan qui masque sa pièce vaut aussi sous le doigt : elle ne
     // coûte rien — c'est une flèche, pas un test au pixel.
-    ordreLocal(aplats, masques(aplats)).forEach((g, k) => {
+    ordreLocal(aplats, masques(aplats, false)).forEach((g, k) => {
       g.depth = bas + k * pas;
       if (g.pan !== undefined) rang.set(g.pan, g.depth);
     });
