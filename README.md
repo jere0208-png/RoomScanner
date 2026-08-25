@@ -7841,6 +7841,44 @@ qui TIENT ne perd pas un centimètre, et une étagère à moitié enfoncée dans
 une cloison se pousse comme avant — un seul mur l'a écartée, sa taille n'y
 est pour rien.
 
+### Le mur qui passe devant le lavabo : mesuré, chiffré, pas encore corrigé
+
+Relevé de chantier, capture à l'appui : **« toujours pareil, le lavabo est
+caché par le mur, comme d'autres meubles »**, après le rabotage des boîtes
+trop grandes. Celui-ci avait traité une moitié du sujet — un meuble à cheval
+sur une cloison ne peut être départagé par aucun ordre de peinture. L'autre
+moitié restait.
+
+**Il fallait d'abord pouvoir le VOIR.** `audit3d` éprouve le classement NU :
+il appelle `ajusterBlocs` sans les flèches imposées. L'écran, lui, en pose —
+`masquesDeScene` dit, pour chaque pan de mur, les meubles qu'il masque, et
+l'écran impose la règle dès que le plan lui fait face. Le nouveau banc suit
+donc le chemin de l'ÉCRAN, sur une salle d'eau de 1,80 × 2,20 avec un
+meuble-vasque, un placard haut et des WC tous collés à leur mur — la
+configuration du relevé. Verdict : **trois recouvrements** sur les 216 prises
+de vue du tour, à 230° d'azimut et 55° d'inclinaison.
+
+Le chiffre est écrit dans le banc, et c'est un VERROU : le défaut ne doit pas
+grandir pendant qu'on travaille ailleurs. Le jour où on saura le ramener à
+zéro, c'est ce chiffre-là qu'on baissera — jamais l'inverse.
+
+**Ce qui a été essayé, et écarté.** La règle des masques n'a qu'un sens :
+« ce pan masque ces meubles » — le mur devant, le meuble derrière. Elle ne
+dit rien du cas inverse, un mur du FOND avec ses meubles devant lui, où
+aucune flèche n'est imposée et où le pixel tranche seul. Poser cette flèche
+paraissait aller de soi : elle est aussi géométrique que l'autre. La mesure a
+dit non — trois recouvrements sont devenus VINGT-NEUF. Les flèches imposées
+entrent dans un classement par insertion qui n'est pas transitif (voir
+`ordreLocal`) : en ajouter de justes peut en déranger d'autres, et le bilan
+se juge au compteur, pas au raisonnement.
+
+**Et un piège de plus, attrapé en chemin.** Le banc avait d'abord recopié la
+projection de la PLANCHE de référence, où l'inclinaison joue autrement — `sy`
+et `depth` s'y échangent sinus et cosinus. Il mesurait une autre caméra que
+celle du téléphone, et ses premiers chiffres ne disaient rien de ce que le
+chantier voit. Un banc qui n'est pas sur la même vue que l'écran ne prouve
+rien.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro
