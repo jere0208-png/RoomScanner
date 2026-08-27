@@ -374,22 +374,6 @@
             "y2": 160.366
            },
            "children": null
-          },
-          {
-           "type": "RNSVGPath",
-           "props": {
-            "fill": {
-             "type": 0,
-             "payload": 4278914322
-            },
-            "stroke": null,
-            "propList": [
-             "fill",
-             "stroke"
-            ],
-            "d": "M114.37980673389734 78.19675917278545 528.7994046659894 166.28436399790394 539.5096731972751 152.85104498942349 102.54393133623506 59.97110933185036z"
-           },
-           "children": null
           }
          ]
         },
@@ -429,22 +413,6 @@
             "y1": 160.366,
             "x2": 860,
             "y2": 228.828
-           },
-           "children": null
-          },
-          {
-           "type": "RNSVGPath",
-           "props": {
-            "fill": {
-             "type": 0,
-             "payload": 4278914322
-            },
-            "stroke": null,
-            "propList": [
-             "fill",
-             "stroke"
-            ],
-            "d": "M543.8301672852881 169.47925121954034 850.8871750795324 234.7462330329701 869.1128249204676 222.91035763530786 539.5096731972751 152.85104498942349z"
            },
            "children": null
           }
@@ -488,22 +456,6 @@
             "y2": 550.916
            },
            "children": null
-          },
-          {
-           "type": "RNSVGPath",
-           "props": {
-            "fill": {
-             "type": 0,
-             "payload": 4278914322
-            },
-            "stroke": null,
-            "propList": [
-             "fill",
-             "stroke"
-            ],
-            "d": "M850.8871750795324 234.7462330329701 785.6201932661027 541.8032408272145 797.456068663765 560.0288906681496 869.1128249204676 222.91035763530786z"
-           },
-           "children": null
           }
          ]
         },
@@ -543,22 +495,6 @@
             "y1": 550.916,
             "x2": 469.45,
             "y2": 482.454
-           },
-           "children": null
-          },
-          {
-           "type": "RNSVGPath",
-           "props": {
-            "fill": {
-             "type": 0,
-             "payload": 4278914322
-            },
-            "stroke": null,
-            "propList": [
-             "fill",
-             "stroke"
-            ],
-            "d": "M785.6201932661027 541.8032408272145 478.5631854718583 476.53625901378473 467.8529169405725 489.9695780222652 797.456068663765 560.0288906681496z"
            },
            "children": null
           }
@@ -602,22 +538,6 @@
             "y2": 391.172
            },
            "children": null
-          },
-          {
-           "type": "RNSVGPath",
-           "props": {
-            "fill": {
-             "type": 0,
-             "payload": 4278914322
-            },
-            "stroke": null,
-            "propList": [
-             "fill",
-             "stroke"
-            ],
-            "d": "M463.5324228525596 473.34137179214827 49.112824920467574 385.25376696702983 30.887175079532426 397.08964236469205 467.8529169405725 489.9695780222652z"
-           },
-           "children": null
           }
          ]
         },
@@ -657,22 +577,6 @@
             "y1": 391.172,
             "x2": 108.462,
             "y2": 69.084
-           },
-           "children": null
-          },
-          {
-           "type": "RNSVGPath",
-           "props": {
-            "fill": {
-             "type": 0,
-             "payload": 4278914322
-            },
-            "stroke": null,
-            "propList": [
-             "fill",
-             "stroke"
-            ],
-            "d": "M49.112824920467574 385.25376696702983 114.37980673389734 78.19675917278545 102.54393133623506 59.97110933185036 30.887175079532426 397.08964236469205z"
            },
            "children": null
           }
@@ -716,7 +620,229 @@
             "y2": 482.454
            },
            "children": null
-          },
+          }
+         ]
+        },
+        {
+         "type": "RNSVGGroup",
+         "props": {
+          "onResponderMove": "[fn]",
+          "onResponderGrant": "[fn]",
+          "onResponderRelease": "[fn]",
+          "onResponderTerminate": "[fn]",
+          "onStartShouldSetResponder": "[fn]",
+          "onResponderTerminationRequest": "[fn]",
+          "responsible": true,
+          "fill": {
+           "type": 0,
+           "payload": 4278190080
+          }
+         },
+         "children": [
+          {
+           "type": "RNSVGPath",
+           "props": {
+            "fill": {
+             "type": 0,
+             "payload": 4278914322
+            },
+            "stroke": null,
+            "propList": [
+             "fill",
+             "stroke"
+            ],
+            "d": "M114.37980673389734 78.19675917278545 528.7994046659894 166.28436399790394 539.5096731972751 152.85104498942349 102.54393133623506 59.97110933185036z"
+           },
+           "children": null
+          }
+         ]
+        },
+        {
+         "type": "RNSVGGroup",
+         "props": {
+          "onResponderMove": "[fn]",
+          "onResponderGrant": "[fn]",
+          "onResponderRelease": "[fn]",
+          "onResponderTerminate": "[fn]",
+          "onStartShouldSetResponder": "[fn]",
+          "onResponderTerminationRequest": "[fn]",
+          "responsible": true,
+          "fill": {
+           "type": 0,
+           "payload": 4278190080
+          }
+         },
+         "children": [
+          {
+           "type": "RNSVGPath",
+           "props": {
+            "fill": {
+             "type": 0,
+             "payload": 4278914322
+            },
+            "stroke": null,
+            "propList": [
+             "fill",
+             "stroke"
+            ],
+            "d": "M543.8301672852881 169.47925121954034 850.8871750795324 234.7462330329701 869.1128249204676 222.91035763530786 539.5096731972751 152.85104498942349z"
+           },
+           "children": null
+          }
+         ]
+        },
+        {
+         "type": "RNSVGGroup",
+         "props": {
+          "onResponderMove": "[fn]",
+          "onResponderGrant": "[fn]",
+          "onResponderRelease": "[fn]",
+          "onResponderTerminate": "[fn]",
+          "onStartShouldSetResponder": "[fn]",
+          "onResponderTerminationRequest": "[fn]",
+          "responsible": true,
+          "fill": {
+           "type": 0,
+           "payload": 4278190080
+          }
+         },
+         "children": [
+          {
+           "type": "RNSVGPath",
+           "props": {
+            "fill": {
+             "type": 0,
+             "payload": 4278914322
+            },
+            "stroke": null,
+            "propList": [
+             "fill",
+             "stroke"
+            ],
+            "d": "M850.8871750795324 234.7462330329701 785.6201932661027 541.8032408272145 797.456068663765 560.0288906681496 869.1128249204676 222.91035763530786z"
+           },
+           "children": null
+          }
+         ]
+        },
+        {
+         "type": "RNSVGGroup",
+         "props": {
+          "onResponderMove": "[fn]",
+          "onResponderGrant": "[fn]",
+          "onResponderRelease": "[fn]",
+          "onResponderTerminate": "[fn]",
+          "onStartShouldSetResponder": "[fn]",
+          "onResponderTerminationRequest": "[fn]",
+          "responsible": true,
+          "fill": {
+           "type": 0,
+           "payload": 4278190080
+          }
+         },
+         "children": [
+          {
+           "type": "RNSVGPath",
+           "props": {
+            "fill": {
+             "type": 0,
+             "payload": 4278914322
+            },
+            "stroke": null,
+            "propList": [
+             "fill",
+             "stroke"
+            ],
+            "d": "M785.6201932661027 541.8032408272145 478.5631854718583 476.53625901378473 467.8529169405725 489.9695780222652 797.456068663765 560.0288906681496z"
+           },
+           "children": null
+          }
+         ]
+        },
+        {
+         "type": "RNSVGGroup",
+         "props": {
+          "onResponderMove": "[fn]",
+          "onResponderGrant": "[fn]",
+          "onResponderRelease": "[fn]",
+          "onResponderTerminate": "[fn]",
+          "onStartShouldSetResponder": "[fn]",
+          "onResponderTerminationRequest": "[fn]",
+          "responsible": true,
+          "fill": {
+           "type": 0,
+           "payload": 4278190080
+          }
+         },
+         "children": [
+          {
+           "type": "RNSVGPath",
+           "props": {
+            "fill": {
+             "type": 0,
+             "payload": 4278914322
+            },
+            "stroke": null,
+            "propList": [
+             "fill",
+             "stroke"
+            ],
+            "d": "M463.5324228525596 473.34137179214827 49.112824920467574 385.25376696702983 30.887175079532426 397.08964236469205 467.8529169405725 489.9695780222652z"
+           },
+           "children": null
+          }
+         ]
+        },
+        {
+         "type": "RNSVGGroup",
+         "props": {
+          "onResponderMove": "[fn]",
+          "onResponderGrant": "[fn]",
+          "onResponderRelease": "[fn]",
+          "onResponderTerminate": "[fn]",
+          "onStartShouldSetResponder": "[fn]",
+          "onResponderTerminationRequest": "[fn]",
+          "responsible": true,
+          "fill": {
+           "type": 0,
+           "payload": 4278190080
+          }
+         },
+         "children": [
+          {
+           "type": "RNSVGPath",
+           "props": {
+            "fill": {
+             "type": 0,
+             "payload": 4278914322
+            },
+            "stroke": null,
+            "propList": [
+             "fill",
+             "stroke"
+            ],
+            "d": "M49.112824920467574 385.25376696702983 114.37980673389734 78.19675917278545 102.54393133623506 59.97110933185036 30.887175079532426 397.08964236469205z"
+           },
+           "children": null
+          }
+         ]
+        },
+        {
+         "type": "RNSVGGroup",
+         "props": {
+          "onResponderMove": "[fn]",
+          "onResponderGrant": "[fn]",
+          "onResponderRelease": "[fn]",
+          "onResponderTerminate": "[fn]",
+          "onStartShouldSetResponder": "[fn]",
+          "onResponderTerminationRequest": "[fn]",
+          "responsible": true,
+          "fill": {
+           "type": 0,
+           "payload": 4278190080
+          }
+         },
+         "children": [
           {
            "type": "RNSVGPath",
            "props": {

@@ -1638,6 +1638,33 @@ export function FloorplanEditor({
               </G>
             )}
 
+            {/*
+              LE HALO DES MURS — la tolérance, et rien qu'elle.
+
+              Elle est posée ICI, sous les meubles, et non avec les murs :
+              voir `couche` dans `WallBody`. Un appui sur un meuble d'une
+              petite pièce revenait au mur d'à côté, parce que le mur se
+              peint après et que sa tolérance déborde de trois points.
+              Ce qu'on touche prime sur ce qui est à côté.
+            */}
+            {walls.map((w) => (
+              <WallBody
+                key={`halo-${w.id}`}
+                wall={w}
+                quad={quads.get(w.id)}
+                mapping={mapping}
+                couche="halo"
+                neuve={!!roomById.get(roomOf(w) ?? '')?.neuve}
+                showMeasure={false}
+                selected={false}
+                onPress={
+                  editable
+                    ? () => onSelectWall(w.id === selectedWallId ? null : w.id)
+                    : undefined
+                }
+              />
+            ))}
+
             {/* Objets (empreintes au sol) */}
             {objects.map((o) => {
               const f = footprintOf(o, partOf);
@@ -1875,7 +1902,8 @@ export function FloorplanEditor({
               );
             })}
 
-            {/* Murs : corps poché aux jonctions d'onglet */}
+            {/* Murs : corps poché aux jonctions d'onglet. Leur tolérance de
+                toucher, elle, est passée plus bas, sous les meubles. */}
             {walls.map((w) => (
               <WallBody
                 key={w.id}
@@ -3450,6 +3478,7 @@ function WallBody({
   measureOpacity = 1,
   selected,
   neuve,
+  couche = 'trait',
   onPress,
 }: {
   wall: WallSeg;
@@ -3477,6 +3506,28 @@ function WallBody({
    * Il se referme au lâcher (`arreterPiece`).
    */
   neuve?: boolean;
+  /**
+   * LES DEUX ZONES D'UN MUR N'ONT PAS LE MÊME DROIT.
+   *
+   * Relevé du patron : « fais en sorte que le mur ne soit pas sélectionné si
+   * on clique sur le centre d'une petite pièce — par exemple je clique sur
+   * un meuble dans une petite pièce, c'est le mur qui est sélectionné car
+   * proche ».
+   *
+   * Ce n'était pas une affaire de taille de cible, mais d'ORDRE DE DESSIN.
+   * Les murs se peignent APRÈS les meubles, donc au-dessus : les trois
+   * points de tolérance qui débordent de chaque côté du poché volaient
+   * l'appui à ce qui était dessous. Dans une salle d'eau de 3,8 m², une
+   * baignoire est plaquée contre le mur — son nu et le nu du poché ne font
+   * qu'un — et le halo mordait sur elle toute sa longueur.
+   *
+   * On sépare donc ce qui SE VOIT de ce qui ne se voit pas. Le `trait` — le
+   * poché, ce qu'on vise — reste au-dessus de tout. Le `halo` — la
+   * tolérance, invisible — descend SOUS les meubles, où il ne sert plus que
+   * là où rien d'autre n'est dessiné. Toucher un mur prend le mur ; toucher
+   * à côté d'un mur ne le prend que si la place est libre.
+   */
+  couche?: 'halo' | 'trait';
   /** Le mur borde une pièce en défaut de conformité électrique. */
   onPress?: () => void;
 }) {
@@ -3524,40 +3575,59 @@ function WallBody({
   */
   const teinte = selected ? c.blue : c.ink;
 
+  if (couche === 'halo') {
+    return (
+      <G onPress={onPress}>
+        {/*
+          LA CIBLE SUIT LE MUR DESSINÉ — relevé du patron : « la sélection
+          d'un mur est capricieuse, et un clic au centre de la pièce
+          sélectionne un mur proche… il faut que ce soit le mur qui soit
+          strictement cliquable ».
+
+          Elle faisait TRENTE points de large, en dur : quinze débordant dans
+          la pièce, quinze au-dehors. Quinze points ne veulent rien dire tant
+          qu'on ne sait pas à quelle échelle on regarde — à l'ouverture d'un
+          logement ils valent trente-sept centimètres, et sur un plan dézoomé
+          près d'un mètre. Le placard d'un mètre dix était alors entièrement
+          couvert par les halos de ses quatre murs : plus un seul point où
+          toucher le sol.
+
+          Elle vaut donc l'ÉPAISSEUR DU POCHÉ plus trois points de chaque
+          côté — ce qu'il faut pour le tremblement du doigt, et rien de plus.
+          Elle grandit avec le zoom, comme le mur. Le plancher de douze points
+          garde visable un mur dessiné fin ; en dessous, on zoome, comme pour
+          tout le reste du plan.
+
+          Le même défaut avait déjà été corrigé sur les retours de mur percés
+          (« 18 px de halo débordaient de neuf pixels dans la pièce ») ; le mur
+          entier, lui, était resté à trente.
+
+          ET ELLE SE DESSINE SOUS LES MEUBLES — voir `couche` : une tolérance
+          invisible n'a pas à voler l'appui d'un dessin qu'on voit.
+        */}
+        <Line
+          x1={a.x}
+          y1={a.y}
+          x2={b.x}
+          y2={b.y}
+          stroke="transparent"
+          strokeWidth={Math.max(12, bodyPx + 6)}
+        />
+      </G>
+    );
+  }
+
   return (
     <G onPress={onPress}>
       {/*
-        LA CIBLE SUIT LE MUR DESSINÉ — relevé du patron : « la sélection
-        d'un mur est capricieuse, et un clic au centre de la pièce
-        sélectionne un mur proche… il faut que ce soit le mur qui soit
-        strictement cliquable ».
+        ICI, PLUS DE HALO : la cible de cette couche, c'est le poché
+        lui-même — ce qu'on voit et ce qu'on vise. La tolérance est passée
+        dessous, avec les meubles (voir `couche`).
 
-        Elle faisait TRENTE points de large, en dur : quinze débordant dans
-        la pièce, quinze au-dehors. Quinze points ne veulent rien dire tant
-        qu'on ne sait pas à quelle échelle on regarde — à l'ouverture d'un
-        logement ils valent trente-sept centimètres, et sur un plan dézoomé
-        près d'un mètre. Le placard d'un mètre dix était alors entièrement
-        couvert par les halos de ses quatre murs : plus un seul point où
-        toucher le sol.
-
-        Elle vaut donc l'ÉPAISSEUR DU POCHÉ plus trois points de chaque
-        côté — ce qu'il faut pour le tremblement du doigt, et rien de plus.
-        Elle grandit avec le zoom, comme le mur. Le plancher de douze points
-        garde visable un mur dessiné fin ; en dessous, on zoome, comme pour
-        tout le reste du plan.
-
-        Le même défaut avait déjà été corrigé sur les retours de mur percés
-        (« 18 px de halo débordaient de neuf pixels dans la pièce ») ; le mur
-        entier, lui, était resté à trente.
+        Un mur dessiné fin — plan dézoomé, poché plus mince qu'un trait —
+        n'est donc plus visable QUE par son halo. C'est voulu : qui vise un
+        mur fin zoome, comme pour tout le reste du plan.
       */}
-      <Line
-        x1={a.x}
-        y1={a.y}
-        x2={b.x}
-        y2={b.y}
-        stroke="transparent"
-        strokeWidth={Math.max(12, bodyPx + 6)}
-      />
       {neuve ? (
         // Le contour seul, en tirets : rien n'est poché tant que la pièce
         // n'est pas arrêtée.

@@ -8115,6 +8115,71 @@ bancs existants du sujet (`audit3d`, `percemur`, `chaisecachee`,
 parcours) avant de remplacer quoi que ce soit. Si l'arbre ne tient pas ses
 promesses, c'est le compteur qui tranchera, pas le raisonnement.
 
+### Ce qu'on touche prime sur ce qui est à côté
+
+Relevé du patron : « fais en sorte que le mur ne soit pas sélectionné si on
+clique sur le centre d'une petite pièce — par exemple je clique sur un meuble
+dans une petite pièce, c'est le mur qui est sélectionné car proche ».
+
+C'est la suite d'une histoire déjà écrite. La cible d'un mur faisait trente
+points en dur ; elle suit depuis son poché (`max(12, poché + 6)`), et le banc
+`viserlemur` garde ce résultat : au centre d'un placard d'un mètre dix, plus
+aucun mur n'est attrapé. Mais ce banc-là prenait le problème par le centre.
+Dans une salle d'eau de 3,8 m², **il n'y a pas de centre libre** : une
+baignoire est plaquée contre le mur, son nu et le nu du poché ne font qu'un,
+et les trois points de tolérance du mur mordent sur elle **toute sa
+longueur**. C'est exactement là que le doigt tombe.
+
+**Et ce n'était pas la taille de la cible, c'était l'ordre de dessin.** Les
+murs se peignent APRÈS les meubles, donc au-dessus. Une tolérance invisible
+volait l'appui à un dessin qu'on voit.
+
+La règle qui en sort : **un mur a deux zones, et elles n'ont pas le même
+droit**. Le POCHÉ — ce qu'on voit, ce qu'on vise — reste au-dessus de tout. Le
+HALO — la tolérance, invisible — descend SOUS les meubles, où il ne sert plus
+que là où rien d'autre n'est dessiné. Toucher un mur prend le mur ; toucher à
+côté d'un mur ne le prend que si la place est libre. Un mur dessiné fin, sur
+un plan dézoomé, n'est donc plus visable que par son halo — c'est voulu : qui
+vise un mur fin zoome, comme pour tout le reste du plan.
+
+#### Le banc a dû s'y reprendre à trois fois, et les deux premiers passaient
+
+**Premier banc** : quatre appuis, un par coin du meuble, à un quart de la
+diagonale. Vert du premier coup — et pour rien. À cette distance du bord, le
+halo du mur n'arrive pas : le banc ne reproduisait pas le défaut. Pire, il
+lisait les coordonnées SANS la transformation du groupe du meuble : il
+mesurait des points qui n'existent pas à l'écran.
+
+**Deuxième banc** : on balaie tout le dessin du meuble, deux cent
+cinquante-six appuis, et on appelle la fonction de chaque cible pour voir qui
+répond. Trois cent cinquante-deux réponses pour deux cent cinquante-six
+appuis — parce qu'un appui change la sélection, et que le suivant ne trouve
+plus le même plan. Un banc qui se marche dessus ne mesure rien.
+
+**Troisième banc** — celui qui reste. On ne déclenche plus rien : on demande
+qui est le DERNIER dessin peint sous le doigt, ce que fait le téléphone. Et
+surtout on distingue deux sortes de voleurs. Le cartouche d'une pièce ou le
+poché d'un mur se dessinent par-dessus le meuble : les toucher, c'est les
+toucher pour de bon, ils ont le droit. Le halo d'un mur, lui, **n'a pas de
+couleur** — il n'a rien à voler. Le critère tient en une phrase : *aucun appui
+sur le dessin d'un meuble ne doit être pris par une cible qu'on ne voit pas.*
+
+Avant correction : **8 appuis volés sur 256**, tous par le halo d'un mur.
+Après : zéro.
+
+**Deux contrôles en sens inverse**, sans lesquels on aurait pu rendre le mur
+intouchable et déclarer le défaut corrigé : un appui franchement sur l'axe du
+poché donne toujours le mur, et un appui sur le sol nu, à un point du bord du
+halo, le donne encore.
+
+**Et la preuve que le plan n'a pas bougé d'un pixel.** Les trois planches de
+référence du plan 2D (`assets/rendu-reference/plan-*.json`) ont changé : le
+halo n'est plus au même rang dans l'arbre. En retirant de ces planches tout ce
+qui est invisible — les traits sans couleur et les groupes qui n'existaient
+que pour le doigt — les deux versions sont **identiques élément par élément**,
+149, 164 et 162 dessins dans le même ordre et aux mêmes coordonnées. Seule la
+cible a bougé ; le dessin, non.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

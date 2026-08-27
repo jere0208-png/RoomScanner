@@ -318,6 +318,244 @@
           "fill": {
            "type": 0,
            "payload": 4278190080
+          }
+         },
+         "children": [
+          {
+           "type": "RNSVGLine",
+           "props": {
+            "fill": {
+             "type": 0,
+             "payload": 4278190080
+            },
+            "stroke": {
+             "type": 0,
+             "payload": 0
+            },
+            "strokeWidth": 22.4,
+            "propList": [
+             "stroke",
+             "strokeWidth"
+            ],
+            "x1": 40,
+            "y1": 134.286,
+            "x2": 508.571,
+            "y2": 134.286
+           },
+           "children": null
+          }
+         ]
+        },
+        {
+         "type": "RNSVGGroup",
+         "props": {
+          "fill": {
+           "type": 0,
+           "payload": 4278190080
+          }
+         },
+         "children": [
+          {
+           "type": "RNSVGLine",
+           "props": {
+            "fill": {
+             "type": 0,
+             "payload": 4278190080
+            },
+            "stroke": {
+             "type": 0,
+             "payload": 0
+            },
+            "strokeWidth": 22.4,
+            "propList": [
+             "stroke",
+             "strokeWidth"
+            ],
+            "x1": 508.571,
+            "y1": 134.286,
+            "x2": 860,
+            "y2": 134.286
+           },
+           "children": null
+          }
+         ]
+        },
+        {
+         "type": "RNSVGGroup",
+         "props": {
+          "fill": {
+           "type": 0,
+           "payload": 4278190080
+          }
+         },
+         "children": [
+          {
+           "type": "RNSVGLine",
+           "props": {
+            "fill": {
+             "type": 0,
+             "payload": 4278190080
+            },
+            "stroke": {
+             "type": 0,
+             "payload": 0
+            },
+            "strokeWidth": 22.4,
+            "propList": [
+             "stroke",
+             "strokeWidth"
+            ],
+            "x1": 860,
+            "y1": 134.286,
+            "x2": 860,
+            "y2": 485.714
+           },
+           "children": null
+          }
+         ]
+        },
+        {
+         "type": "RNSVGGroup",
+         "props": {
+          "fill": {
+           "type": 0,
+           "payload": 4278190080
+          }
+         },
+         "children": [
+          {
+           "type": "RNSVGLine",
+           "props": {
+            "fill": {
+             "type": 0,
+             "payload": 4278190080
+            },
+            "stroke": {
+             "type": 0,
+             "payload": 0
+            },
+            "strokeWidth": 22.4,
+            "propList": [
+             "stroke",
+             "strokeWidth"
+            ],
+            "x1": 860,
+            "y1": 485.714,
+            "x2": 508.571,
+            "y2": 485.714
+           },
+           "children": null
+          }
+         ]
+        },
+        {
+         "type": "RNSVGGroup",
+         "props": {
+          "fill": {
+           "type": 0,
+           "payload": 4278190080
+          }
+         },
+         "children": [
+          {
+           "type": "RNSVGLine",
+           "props": {
+            "fill": {
+             "type": 0,
+             "payload": 4278190080
+            },
+            "stroke": {
+             "type": 0,
+             "payload": 0
+            },
+            "strokeWidth": 22.4,
+            "propList": [
+             "stroke",
+             "strokeWidth"
+            ],
+            "x1": 508.571,
+            "y1": 485.714,
+            "x2": 40,
+            "y2": 485.714
+           },
+           "children": null
+          }
+         ]
+        },
+        {
+         "type": "RNSVGGroup",
+         "props": {
+          "fill": {
+           "type": 0,
+           "payload": 4278190080
+          }
+         },
+         "children": [
+          {
+           "type": "RNSVGLine",
+           "props": {
+            "fill": {
+             "type": 0,
+             "payload": 4278190080
+            },
+            "stroke": {
+             "type": 0,
+             "payload": 0
+            },
+            "strokeWidth": 22.4,
+            "propList": [
+             "stroke",
+             "strokeWidth"
+            ],
+            "x1": 40,
+            "y1": 485.714,
+            "x2": 40,
+            "y2": 134.286
+           },
+           "children": null
+          }
+         ]
+        },
+        {
+         "type": "RNSVGGroup",
+         "props": {
+          "fill": {
+           "type": 0,
+           "payload": 4278190080
+          }
+         },
+         "children": [
+          {
+           "type": "RNSVGLine",
+           "props": {
+            "fill": {
+             "type": 0,
+             "payload": 4278190080
+            },
+            "stroke": {
+             "type": 0,
+             "payload": 0
+            },
+            "strokeWidth": 22.4,
+            "propList": [
+             "stroke",
+             "strokeWidth"
+            ],
+            "x1": 508.571,
+            "y1": 134.286,
+            "x2": 508.571,
+            "y2": 485.714
+           },
+           "children": null
+          }
+         ]
+        },
+        {
+         "type": "RNSVGGroup",
+         "props": {
+          "fill": {
+           "type": 0,
+           "payload": 4278190080
           },
           "matrix": [
            1,
@@ -766,29 +1004,6 @@
          },
          "children": [
           {
-           "type": "RNSVGLine",
-           "props": {
-            "fill": {
-             "type": 0,
-             "payload": 4278190080
-            },
-            "stroke": {
-             "type": 0,
-             "payload": 0
-            },
-            "strokeWidth": 22.4,
-            "propList": [
-             "stroke",
-             "strokeWidth"
-            ],
-            "x1": 40,
-            "y1": 134.286,
-            "x2": 508.571,
-            "y2": 134.286
-           },
-           "children": null
-          },
-          {
            "type": "RNSVGPath",
            "props": {
             "fill": {
@@ -815,29 +1030,6 @@
           }
          },
          "children": [
-          {
-           "type": "RNSVGLine",
-           "props": {
-            "fill": {
-             "type": 0,
-             "payload": 4278190080
-            },
-            "stroke": {
-             "type": 0,
-             "payload": 0
-            },
-            "strokeWidth": 22.4,
-            "propList": [
-             "stroke",
-             "strokeWidth"
-            ],
-            "x1": 508.571,
-            "y1": 134.286,
-            "x2": 860,
-            "y2": 134.286
-           },
-           "children": null
-          },
           {
            "type": "RNSVGPath",
            "props": {
@@ -866,29 +1058,6 @@
          },
          "children": [
           {
-           "type": "RNSVGLine",
-           "props": {
-            "fill": {
-             "type": 0,
-             "payload": 4278190080
-            },
-            "stroke": {
-             "type": 0,
-             "payload": 0
-            },
-            "strokeWidth": 22.4,
-            "propList": [
-             "stroke",
-             "strokeWidth"
-            ],
-            "x1": 860,
-            "y1": 134.286,
-            "x2": 860,
-            "y2": 485.714
-           },
-           "children": null
-          },
-          {
            "type": "RNSVGPath",
            "props": {
             "fill": {
@@ -915,29 +1084,6 @@
           }
          },
          "children": [
-          {
-           "type": "RNSVGLine",
-           "props": {
-            "fill": {
-             "type": 0,
-             "payload": 4278190080
-            },
-            "stroke": {
-             "type": 0,
-             "payload": 0
-            },
-            "strokeWidth": 22.4,
-            "propList": [
-             "stroke",
-             "strokeWidth"
-            ],
-            "x1": 860,
-            "y1": 485.714,
-            "x2": 508.571,
-            "y2": 485.714
-           },
-           "children": null
-          },
           {
            "type": "RNSVGPath",
            "props": {
@@ -966,29 +1112,6 @@
          },
          "children": [
           {
-           "type": "RNSVGLine",
-           "props": {
-            "fill": {
-             "type": 0,
-             "payload": 4278190080
-            },
-            "stroke": {
-             "type": 0,
-             "payload": 0
-            },
-            "strokeWidth": 22.4,
-            "propList": [
-             "stroke",
-             "strokeWidth"
-            ],
-            "x1": 508.571,
-            "y1": 485.714,
-            "x2": 40,
-            "y2": 485.714
-           },
-           "children": null
-          },
-          {
            "type": "RNSVGPath",
            "props": {
             "fill": {
@@ -1016,29 +1139,6 @@
          },
          "children": [
           {
-           "type": "RNSVGLine",
-           "props": {
-            "fill": {
-             "type": 0,
-             "payload": 4278190080
-            },
-            "stroke": {
-             "type": 0,
-             "payload": 0
-            },
-            "strokeWidth": 22.4,
-            "propList": [
-             "stroke",
-             "strokeWidth"
-            ],
-            "x1": 40,
-            "y1": 485.714,
-            "x2": 40,
-            "y2": 134.286
-           },
-           "children": null
-          },
-          {
            "type": "RNSVGPath",
            "props": {
             "fill": {
@@ -1065,29 +1165,6 @@
           }
          },
          "children": [
-          {
-           "type": "RNSVGLine",
-           "props": {
-            "fill": {
-             "type": 0,
-             "payload": 4278190080
-            },
-            "stroke": {
-             "type": 0,
-             "payload": 0
-            },
-            "strokeWidth": 22.4,
-            "propList": [
-             "stroke",
-             "strokeWidth"
-            ],
-            "x1": 508.571,
-            "y1": 134.286,
-            "x2": 508.571,
-            "y2": 485.714
-           },
-           "children": null
-          },
           {
            "type": "RNSVGPath",
            "props": {
