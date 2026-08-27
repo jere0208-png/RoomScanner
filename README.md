@@ -8853,6 +8853,58 @@ retombe alors sur l'ancien compte, qui majore. Mieux vaut majorer que manquer.
 Vérifié à l'envers en forçant ce garde-fou : les deux épreuves du modèle en
 étoile crient, et elles seules.
 
+### Le pontage des prises — la seule exception à l'étoile
+
+Relevé du patron : « fais un système intelligent de calcul pour les prises : si
+elles sont voisines, même pan de mur, et que ça rentre dans la norme en terme de
+quantité, pièce etc, on fait des pontages de prise à prise. **C'est le seul
+élément qu'on ponte au mur** (la gaine va de prise en prise du coup si c'est
+valide). » Puis, sur la fiche de pose : « on propose de lier le câblage élec des
+prises entre elles ; **on peut refuser** pour faire un circuit indépendant par
+prise. »
+
+Tout le reste remonte au tableau — c'est le relevé de la veille. Les socles font
+exception, et c'est ce que fait tout le monde : la norme borne le **nombre** de
+socles par circuit, pas la façon de les alimenter.
+
+**Quatre conditions, toutes nécessaires** : un socle 16 A et rien d'autre ; le
+même circuit ; le même pan de mur et la même face ; et la prise ne l'a pas
+refusé. Un interrupteur porte son retour de lampe, qui lui est propre ; un socle
+spécialisé a son circuit à lui ; une porte coupe le pan — proposer de ponter à
+travers une huisserie, sur le document même qui sert à percer, serait un comble.
+
+**La tête de chaîne est la prise la plus proche du tableau**, et non la première
+par abscisse. Prendre la première venue allongeait le départ de toute la
+longueur du pan : le tableau est à un bout, et on alimentait l'autre. De la
+tête, on s'éloigne dans les deux sens — c'est le tirage réel.
+
+Sur quatre prises alignées à un mètre l'une de l'autre, la gaine passe de
+**22 m à 7 m** : un départ depuis le tableau et trois sauts d'un mètre.
+
+**Le refus se pose sur la fiche de pose**, où l'on regarde déjà la prise : un
+bouton qui dit l'état — « Pontée » ou « Seule » — et qui n'apparaît que s'il y a
+une voisine sur le même pan. Ailleurs il n'y a rien à ponter, et un bouton qui
+ne commande rien donne à l'écran l'air d'être en panne. L'écran applique la même
+règle de pan que le métré, pour ne jamais proposer ce que le calcul refusera.
+
+Et c'est un **refus** qu'on enregistre, pas un accord : un relevé qui ne dit
+rien décrit l'installation la plus courante, celle où les socles voisins se
+pontent. Ne rien dire ne doit jamais valoir « fais l'inhabituel ».
+
+**8 bancs**, une condition et son contraire à chaque fois, tous vérifiés à
+l'envers : en coupant le chaînage, les huit crient. L'un d'eux passait pourtant
+sans le correctif — celui des deux faces d'une cloison — parce qu'il comparait
+deux totaux de gaine, et que changer de face déplace la prise donc la longueur.
+Il compte maintenant les **sauts** : un saut ne peut venir que d'un pontage.
+
+#### Et un défaut trouvé en chemin
+
+Le bouton du plan ne recevait pas les articles écartés du devis : il annonçait le
+total plein pendant que la page annonçait le réduit. Le banc qui garde cette
+égalité appelait le calcul directement, pas l'écran — il vérifiait la fonction,
+pas le chemin. Corrigé, et le bouton reçoit aussi les menuiseries, qui décident
+des pontages.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

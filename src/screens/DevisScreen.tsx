@@ -212,6 +212,7 @@ export function DevisScreen() {
   const rooms = useScanStore((s) => s.rooms);
   const fixtures = useScanStore((s) => s.fixtures);
   const ceiling = useScanStore((s) => s.ceiling);
+  const openings = useScanStore((s) => s.openings);
 
   const gamme = useScanStore((s) => s.gammeDevis);
   const setGamme = useScanStore((s) => s.setGammeDevis);
@@ -232,8 +233,8 @@ export function DevisScreen() {
   */
   const horsJeu = useMemo(() => new Set(ecartes), [ecartes]);
   const devis: Devis = useMemo(
-    () => chiffrerLePlan(walls, rooms, fixtures, ceiling, gamme, horsJeu),
-    [walls, rooms, fixtures, ceiling, gamme, horsJeu],
+    () => chiffrerLePlan(walls, rooms, fixtures, ceiling, gamme, horsJeu, openings),
+    [walls, rooms, fixtures, ceiling, gamme, horsJeu, openings],
   );
 
   /*

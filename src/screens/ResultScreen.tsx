@@ -381,6 +381,7 @@ export function ResultScreen() {
    */
   const setScreen = useScanStore((s) => s.setScreen);
   const gammeDevis = useScanStore((s) => s.gammeDevis);
+  const devisEcartes = useScanStore((s) => s.devisEcartes);
   const reset = useScanStore((s) => s.reset);
   const teinte = useTheme();
   const styles = getStyles(teinte);
@@ -1569,8 +1570,8 @@ export function ResultScreen() {
    * document et l'écran ne racontent jamais deux choses.
    */
   const cheminements = useMemo(
-    () => planRoutes(walls, rooms, parts, fixtures, placement, ceiling),
-    [walls, rooms, parts, fixtures, placement, ceiling],
+    () => planRoutes(walls, rooms, parts, fixtures, placement, ceiling, openings),
+    [walls, rooms, parts, fixtures, placement, ceiling, openings],
   );
 
   /**
@@ -1588,8 +1589,16 @@ export function ResultScreen() {
    */
   const totalDevis = useMemo(() => {
     if (fixtures.length === 0 && ceiling.length === 0) return null;
-    return chiffrerLePlan(walls, rooms, fixtures, ceiling, gammeDevis).total;
-  }, [walls, rooms, fixtures, ceiling, gammeDevis]);
+    return chiffrerLePlan(
+      walls,
+      rooms,
+      fixtures,
+      ceiling,
+      gammeDevis,
+      new Set(devisEcartes),
+      openings,
+    ).total;
+  }, [walls, rooms, fixtures, ceiling, gammeDevis, devisEcartes, openings]);
 
   /**
    * À QUELLE HAUTEUR ARRIVE CHAQUE GAINE.

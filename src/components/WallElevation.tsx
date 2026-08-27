@@ -227,6 +227,7 @@ export function WallElevation({
   const moveFixture = useScanStore((s) => s.moveFixture);
   const addFixture = useScanStore((s) => s.addFixture);
   const flipFixture = useScanStore((s) => s.flipFixture);
+  const basculerPontage = useScanStore((s) => s.basculerPontage);
   const removeFixture = useScanStore((s) => s.removeFixture);
   const placeAssembly = useScanStore((s) => s.placeAssembly);
   const splitFixture = useScanStore((s) => s.splitFixture);
@@ -390,6 +391,36 @@ export function WallElevation({
     const cible = Math.max(HAUTEUR_MIN_CADRE, hauteurCadre - Math.ceil(trop));
     if (cible < hauteurCadre) setHauteurCadre(cible);
   };
+
+  /**
+   * Y A-T-IL DE QUOI PONTER ? — une prise voisine sur le même pan.
+   *
+   * Le bouton de pontage ne s'affiche que si la question se pose. On cherche
+   * donc une AUTRE prise, sur le même mur, la même face, et le même tronçon
+   * plein : une porte entre les deux les sépare, la gaine ne traverse pas
+   * une menuiserie. C'est la règle du métré (`planRoutes`), reprise ici pour
+   * que l'écran ne propose jamais ce que le calcul refusera.
+   */
+  const voisinePontable = useMemo(() => {
+    if (!selected || selected.kind !== 'prise' || !wall) return null;
+    const L = segLength(wall) || 1;
+    const pans = wallRuns(wall, openings);
+    const panDe = (along: number) =>
+      pans.findIndex(
+        (r) => r.kind === 'mur' && along / L >= r.t0 - 1e-6 && along / L <= r.t1 + 1e-6,
+      );
+    const mien = panDe(selected.along);
+    return (
+      fixtures.find(
+        (f) =>
+          f.id !== selected.id &&
+          f.kind === 'prise' &&
+          f.wallId === selected.wallId &&
+          f.side === selected.side &&
+          panDe(f.along) === mien,
+      ) ?? null
+    );
+  }, [selected, wall, openings, fixtures]);
 
   const holes = useMemo(() => {
     if (!wall || walls.length === 0) return [];
@@ -2098,6 +2129,34 @@ export function WallElevation({
               paths: ['M12 4 v16', 'M8.5 7.5 L12 4 l3.5 3.5', 'M8.5 16.5 L12 20 l3.5 -3.5'],
               press: () =>
                 selected && spec && moveFixture(selected.id, selected.along, spec.std),
+            },
+            {
+              /*
+                PONTER OU NON — proposé, jamais imposé.
+
+                Relevé du patron : « on propose de lier le câblage élec des
+                prises entre elles ; on peut refuser pour faire un circuit
+                indépendant par prise ». Le bouton n'apparaît que sur un
+                socle 16 A qui A UNE VOISINE sur le même pan : ailleurs il n'y
+                a rien à ponter, et un bouton qui ne commande rien donne à
+                l'écran l'air d'être en panne.
+
+                Il dit l'ÉTAT, pas le geste : « Ponté » quand la gaine passe
+                de prise en prise, « Seule » quand ce socle repart du
+                tableau. On lit ce qui est, on ne devine pas ce qui va
+                arriver.
+              */
+              key: 'pont',
+              label: selected?.sansPontage ? 'Seule' : 'Pontée',
+              on: !!selected && !!voisinePontable,
+              tint: selected?.sansPontage ? c.inkSoft : c.blue,
+              // Deux socles reliés par un trait : le pontage, en deux ronds.
+              paths: [
+                'M6 12 m-3 0 a3 3 0 1 0 6 0 a3 3 0 1 0 -6 0',
+                'M18 12 m-3 0 a3 3 0 1 0 6 0 a3 3 0 1 0 -6 0',
+                'M9 12 h6',
+              ],
+              press: () => selected && basculerPontage(selected.id),
             },
             {
               key: 'flip',

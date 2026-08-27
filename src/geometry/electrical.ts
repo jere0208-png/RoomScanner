@@ -91,6 +91,22 @@ export interface Fixture {
    * le filet du lien. Réservé à ce qui SE COMMANDE (`seCommande`).
    */
   commands?: string[];
+  /**
+   * CETTE PRISE PART SEULE DU TABLEAU — elle refuse le pontage.
+   *
+   * Relevé du patron : « fais un système intelligent de calcul pour les
+   * prises : si elles sont voisines, même pan de mur, et que ça rentre dans
+   * la norme, on fait des pontages de prise à prise. C'est le seul élément
+   * qu'on ponte au mur. » Puis, sur la fiche de pose : « on propose de lier
+   * le câblage élec des prises entre elles ; on peut refuser pour faire un
+   * circuit indépendant par prise. »
+   *
+   * Le pontage est donc PROPOSÉ, pas imposé — d'où ce refus, et pas un
+   * accord : un relevé qui ne dit rien décrit l'installation la plus
+   * courante, celle où les socles voisins se pontent. Ne rien dire ne doit
+   * jamais valoir « fais l'inhabituel ».
+   */
+  sansPontage?: boolean;
 }
 
 /**

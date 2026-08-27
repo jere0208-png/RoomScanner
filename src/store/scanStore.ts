@@ -1219,6 +1219,15 @@ interface ScanState {
    * de poser sur un mur sans toucher au reste du plan.
    */
   restoreFixtures: (list: Fixture[]) => void;
+  /**
+   * ACCEPTER OU REFUSER LE PONTAGE D'UNE PRISE.
+   *
+   * Relevé du patron, sur la fiche de pose : « on propose de lier le câblage
+   * élec des prises entre elles ; on peut refuser pour faire un circuit
+   * indépendant par prise ». Le pontage est proposé par défaut — c'est
+   * l'installation courante — et ce geste le retire.
+   */
+  basculerPontage: (id: string) => void;
   removeFixture: (id: string) => void;
   /** Annule la dernière retouche. Vide = plus rien à annuler. */
   undo: () => void;
@@ -3697,6 +3706,15 @@ export const useScanStore = create<ScanState>((set, get) => {
         ),
         dirty: true,
       });
+    },
+
+    basculerPontage: (id) => {
+      set((e) => ({
+        fixtures: e.fixtures.map((f) =>
+          f.id === id ? { ...f, sansPontage: !f.sansPontage } : f,
+        ),
+      }));
+      pushHistory('basculerPontage');
     },
 
     removeFixture: (id) => {

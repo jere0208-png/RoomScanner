@@ -310,8 +310,8 @@ const styles = getStyles(c);
     [fixtures, walls, rooms, parts],
   );
   const cheminements = useMemo(
-    () => planRoutes(walls, rooms, parts, fixtures, placement, ceiling),
-    [walls, rooms, parts, fixtures, placement, ceiling],
+    () => planRoutes(walls, rooms, parts, fixtures, placement, ceiling, openings),
+    [walls, rooms, parts, fixtures, placement, ceiling, openings],
   );
   /**
    * Le nom de chaque appareil : « Séjour, mur nord — Prise plinthe 2 ».

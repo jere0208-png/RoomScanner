@@ -38,6 +38,8 @@ export function chiffrerLePlan(
   gamme: GammeId,
   /** Les articles écartés à la main : voir `chiffrer`. */
   ecartes?: ReadonlySet<string>,
+  /** Les menuiseries : elles coupent les pans, donc les pontages. */
+  openings: WallSeg[] = [],
 ): Devis {
   const parts = roomParts(walls, rooms);
   const nommees = rooms.map((r) => ({ ...r, name: r.name ?? '' }));
@@ -45,7 +47,15 @@ export function chiffrerLePlan(
   const placement = fixturePlacement(fixtures, walls, entrees);
   // Sans tableau posé, `planRoutes` s'abstient — et le bordereau estime
   // alors au forfait, en le disant (voir `buyingList`).
-  const chemins = planRoutes(walls, nommees, parts, fixtures, placement, ceiling);
+  const chemins = planRoutes(
+    walls,
+    nommees,
+    parts,
+    fixtures,
+    placement,
+    ceiling,
+    openings,
+  );
   const liste = materialList(
     entrees,
     fixtures,

@@ -12,12 +12,20 @@ import {
   wallFace,
   type Fixture,
 } from './electrical';
-import { wallQuadsOf, type Pt, type RoomPart, type WallSeg } from './floorplan';
-import { planCircuits, roomUse } from './nfc15100';
+import {
+  segLength,
+  wallQuadsOf,
+  wallRuns,
+  type Pt,
+  type RoomPart,
+  type WallSeg,
+} from './floorplan';
+import { planCircuits, roomUse, type Circuit } from './nfc15100';
 import { COMMANDES, LUMIERES } from './schema';
 import type { RoomKind } from './furniture';
 import {
   HAUTEUR_GAINE,
+  MOU,
   cableRuns,
   circuitLength,
   projectOnRing,
@@ -97,6 +105,15 @@ export function planRoutes(
   placement: Map<string, string>,
   /** Les appareils de plafond : eux aussi demandent du fil. */
   ceiling: CeilingFixture[] = [],
+  /**
+   * LES MENUISERIES, POUR LE PONTAGE DES PRISES.
+   *
+   * Une porte coupe le pan : deux socles de part et d'autre ne se pontent
+   * pas, la gaine ne traverse pas une menuiserie. Sans cette liste, on ne
+   * voit pas les trous et l'on ponterait à travers — d'où ce paramètre,
+   * plutôt qu'un pan deviné.
+   */
+  openings: WallSeg[] = [],
 ): ElecPlan | null {
   const tableau = fixtures.find((f) => f.kind === 'tableau');
   if (!tableau) return null;
@@ -141,12 +158,112 @@ export function planRoutes(
   const traces: { id: string; path: Pt[] }[] = [];
   const approx = new Set<string>();
 
+  /*
+    LE PONTAGE DES PRISES — la seule exception à l'étoile.
+
+    Relevé du patron : « si elles sont voisines, même pan de mur, et que ça
+    rentre dans la norme en terme de quantité, pièce etc : on fait des
+    pontages de prise à prise. C'est le seul élément qu'on ponte au mur (la
+    gaine va de prise en prise du coup si c'est valide). »
+
+    C'est ce que fait tout le monde, et c'est ce que la norme permet : elle
+    borne le nombre de socles par circuit, pas la façon de les alimenter. Un
+    interrupteur, lui, ne se ponte pas — son retour de lampe lui est propre —
+    et un socle spécialisé encore moins, puisqu'il a son circuit à lui.
+
+    QUATRE CONDITIONS, et elles sont toutes nécessaires :
+      — c'est un socle 16 A (`prise`), rien d'autre ;
+      — même circuit : la norme compte les socles par circuit, et deux
+        circuits qui se pontent, c'est un pont entre deux disjoncteurs ;
+      — même pan de mur et même face : on ne ponte pas à travers une porte,
+        et pas non plus d'un côté d'une cloison à l'autre ;
+      — la prise ne l'a pas refusé (`sansPontage`).
+
+    LA TÊTE DE CHAÎNE EST LA PLUS PROCHE DU TABLEAU, et non la première par
+    ordre d'abscisse : c'est elle qu'on alimente, et les autres se prennent
+    de proche en proche en s'éloignant. Prendre la première venue allongeait
+    le départ de toute la longueur du pan.
+  */
+  const murParId = new Map(walls.map((w) => [w.id, w]));
+  const chaines = (c: Circuit): Map<string, string[]> => {
+    const groupes = new Map<string, Fixture[]>();
+    for (const id of c.fixtureIds) {
+      const f = fixtures.find((x) => x.id === id);
+      if (!f || f.kind !== 'prise' || f.sansPontage) continue;
+      const w = murParId.get(f.wallId);
+      if (!w) continue;
+      // Le pan : le tronçon plein qui porte la prise. Une porte entre deux
+      // socles les sépare — la gaine ne traverse pas une menuiserie.
+      const L = segLength(w) || 1;
+      const t = f.along / L;
+      const pan = wallRuns(w, openings).findIndex(
+        (r) => r.kind === 'mur' && t >= r.t0 - 1e-6 && t <= r.t1 + 1e-6,
+      );
+      const cle = `${f.wallId}|${f.side}|${pan}`;
+      const l = groupes.get(cle);
+      if (l) l.push(f);
+      else groupes.set(cle, [f]);
+    }
+    /** Pour chaque prise pontée, celle dont elle se nourrit. */
+    const amont = new Map<string, string[]>();
+    for (const lot of groupes.values()) {
+      if (lot.length < 2) continue;
+      const tri = [...lot].sort((a, b) => a.along - b.along);
+      // La tête : celle dont le départ depuis le tableau est le plus court.
+      let tete = 0;
+      let court = Infinity;
+      tri.forEach((f, i) => {
+        const pos = posDe(f);
+        if (!pos) return;
+        const d = Math.hypot(pos.at.x - depart.at.x, pos.at.z - depart.at.z);
+        if (d < court) {
+          court = d;
+          tete = i;
+        }
+      });
+      // On s'éloigne de la tête dans les deux sens : c'est le tirage réel.
+      for (let i = tete + 1; i < tri.length; i++) {
+        amont.set(tri[i].id, [tri[i - 1].id]);
+      }
+      for (let i = tete - 1; i >= 0; i--) {
+        amont.set(tri[i].id, [tri[i + 1].id]);
+      }
+    }
+    return amont;
+  };
+
   for (const c of circuits) {
+    const pontees = chaines(c);
     const runs = c.fixtureIds.flatMap((id) => {
       const f = fixtures.find((x) => x.id === id);
       if (!f || f.id === tableau.id) return [];
       const pos = posDe(f);
       if (!pos) return [];
+      /*
+        UNE PRISE PONTÉE NE PART PAS DU TABLEAU : elle part de sa voisine.
+        Le tronçon vaut l'écart le long du mur, plus le mou d'about — et
+        c'est le seul endroit de l'application où une gaine ne remonte pas
+        au tableau.
+      */
+      const source = pontees.get(f.id)?.[0];
+      if (source) {
+        const voisine = fixtures.find((x) => x.id === source);
+        const w = murParId.get(f.wallId);
+        if (voisine && w) {
+          const ecart = Math.abs(voisine.along - f.along);
+          const de = posDe(voisine);
+          if (de) {
+            return [
+              {
+                fixtureId: f.id,
+                path: [de.at, pos.at],
+                conduit: ecart,
+                length: ecart + MOU,
+              },
+            ];
+          }
+        }
+      }
       // La gaine longe le contour de la pièce DESSERVIE ; à défaut, celui
       // de la première pièce du plan — mieux vaut un tracé approché qu'une
       // ligne droite à travers les cloisons.
