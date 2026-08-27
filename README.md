@@ -8180,6 +8180,98 @@ que pour le doigt — les deux versions sont **identiques élément par élémen
 149, 164 et 162 dessins dans le même ordre et aux mêmes coordonnées. Seule la
 cible a bougé ; le dessin, non.
 
+### « Combien j'en aurais pour mon installation actuelle ? »
+
+Relevé du patron, 27/08/2026 : un bouton vert en haut de l'écran, une page de
+questions étape par étape (le modèle d'appareillage voulu), et un prix
+approximatif avec un récapitulatif détaillé et un plan qui **explique** ce
+prix. « Un outil complet, autonome et précis sur les prix. »
+
+Première moitié livrée : **le catalogue et le chiffrage**. L'écran suit.
+
+#### On ne recompte rien
+
+Tout le métré existait déjà et sert ailleurs. Les gaines et le fil viennent de
+`buyingList` (`conduits.ts`), qui lit le tracé réel du plan ; les circuits et
+leurs protections de `planCircuits` / `planDifferentials` (`nfc15100.ts`). Le
+devis n'ajoute **qu'une chose** : un prix par article.
+
+C'est volontaire, et c'est la décision structurante. Le jour où le métré
+change, le devis change avec lui, et il ne peut pas dire autre chose que le
+bordereau de matériel. Un devis qui recompterait de son côté donnerait au même
+logement **deux vérités** — et c'est toujours celle qu'on n'a pas relue qui
+part au client. Un banc garde ce point : chaque quantité chiffrée est
+exactement celle du bordereau, unité comprise.
+
+Ce qu'il a fallu ajouter pour ça : un **code d'article** sur chaque ligne du
+bordereau (`BuyRow.code`). Le libellé est fait pour être lu au comptoir, pas
+pour servir de clé — « Plaque de finition 2 postes » se réécrit le jour où l'on
+change un mot, et le chiffrage suivrait sans rien dire.
+
+#### Cinq gammes, et une seule table qui bouge
+
+`src/geometry/prix.ts` : trois Legrand (dooxie, Mosaic, Céliane) et deux
+Schneider (Ovalis, Odace). Un prix = **le mécanisme avec son enjoliveur,
+plaque non comprise** — c'est le découpage du bordereau, où les mécanismes se
+comptent par type et les plaques par nombre de postes. Les confondre ferait
+compter deux fois la finition d'un ensemble double. Les plaques ont leur propre
+table par nombre de postes : une plaque triple ne vaut pas trois plaques
+simples, la matière est partagée.
+
+Le contrôle en sens inverse du choix, tenu par un banc : **changer de gamme ne
+change que l'appareillage et la finition**. Une gaine est une gaine, un
+disjoncteur est un disjoncteur. Un chiffrage qui bougerait partout mélangerait
+ses tables, et personne ne le verrait puisque seul le total s'affiche.
+
+#### Chaque prix porte sa date et sa source
+
+Un tarif vieillit, et pas au même rythme : le cuivre bouge d'un trimestre à
+l'autre, l'appareillage beaucoup moins. Un chiffre nu, dans six mois, ne se
+distingue plus d'un chiffre juste. Chaque article porte donc le **mois de son
+relevé** et **l'endroit où on l'a vu**, et le devis porte la version du
+catalogue (`2026-08`) : deux devis d'un même logement à deux mois d'écart ne
+donnent pas le même total, encore faut-il pouvoir le dire.
+
+**D'où viennent ces prix, honnêtement.** Les sites de vente refusent la lecture
+automatique : Leroy Merlin et 123elec renvoient tous deux une page de
+vérification anti-robot, en direct comme par le navigateur. Ces tarifs sont donc
+posés à la main, aux ordres de grandeur du marché français d'août 2026, TTC, et
+chacun porte écrit `« Ordre de grandeur du marché français, à valider au
+comptoir »`. **Ils attendent d'être relus par quelqu'un qui achète.**
+
+#### Ce qui n'est pas compté le dit, et ce qui manque le dit aussi
+
+Les luminaires ne se chiffrent pas — « cela dépend des envies ». Un point
+lumineux vaut neuf euros ou neuf cents ; ce qui se chiffre, c'est ce qui
+l'alimente. Ils restent donc au récapitulatif, **à zéro euro, avec la raison
+écrite dessus** : un article absent passe pour un article oublié. Le contrôle
+en sens inverse compte autant — la **boîte** DCL, le fil et la commande, eux,
+sont comptés, tout comme le détecteur de fumée, qui n'est pas un luminaire non
+plus.
+
+Et un article que le catalogue ne connaît pas ne disparaît pas du total en
+silence : il remonte dans `sansPrix` et l'écran l'affichera. Un total qui avale
+une ligne sans rien dire est un total faux dont personne ne s'aperçoit.
+
+#### Le plan qui explique le prix, préparé côté calcul
+
+Le devis rend des **vedettes** : les lots que le plan mettra en valeur —
+prises, commandes, courants faibles, points de plafond — chacun avec son
+nombre, son prix moyen public et son poids. Une vedette ne se calcule pas à
+part : elle **regroupe des lignes déjà chiffrées**. Le nombre affiché sur le
+plan et celui du récapitulatif sont donc le même nombre — c'est la seule façon
+que l'écran ne se contredise pas lui-même sur une seule page. Les lots sortent
+triés du plus lourd au plus léger : on explique un prix en commençant par ce
+qui le fait.
+
+**21 bancs**, dont deux vérifiés à l'envers en neutralisant le code : ôter
+l'exclusion des luminaires fait crier deux bancs, fausser d'une unité le compte
+d'un lot en fait crier deux autres.
+
+**Un écart assumé, écrit sur la ligne** : le tableau compte aussi pour une
+boîte d'encastrement et une plaque un poste dans le bordereau. Environ trois
+euros en trop, dits plutôt que corrigés en douce.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

@@ -187,6 +187,15 @@ export function pullSchedule(
 export interface BuyRow {
   /** Rayon : « Conduits et câbles », « Encastrement », « Appareillage ». */
   family: string;
+  /**
+   * L'ARTICLE, POUR LE CATALOGUE DE PRIX.
+   *
+   * Le libellé est fait pour être lu au comptoir, pas pour servir de clé :
+   * « Plaque de finition 2 postes » se réécrit le jour où l'on change un
+   * mot, et le chiffrage suivrait sans rien dire. Le code, lui, ne change
+   * que si l'article change. Voir `chiffrer` et `src/geometry/prix.ts`.
+   */
+  code?: string;
   label: string;
   /** Ce qui précise l'article : norme, matière, dimensions utiles. */
   spec?: string;
@@ -249,6 +258,7 @@ export function buyingList(
     if (m <= 0) continue;
     out.push({
       family: 'Conduits et conducteurs',
+      code: `icta-${d}`,
       label: `Conduit ICTA Ø${d} mm`,
       spec: 'Gaine annelée souple avec tire-fil, NF EN 61386',
       quantity: Math.ceil(m / COURONNE),
@@ -263,6 +273,7 @@ export function buyingList(
     const brins = m * 3;
     out.push({
       family: 'Conduits et conducteurs',
+      code: `fil-${s}`,
       label: `Conducteur H07V-U ${frSection(s)} mm²`,
       spec: 'Rigide cuivre 450/750 V — rouge, bleu, vert-jaune',
       quantity: Math.ceil(brins / COURONNE),
@@ -281,6 +292,7 @@ export function buyingList(
   if (postes > 0) {
     out.push({
       family: 'Encastrement et finition',
+      code: 'boite-encastrement',
       label: 'Boîte d’encastrement Ø 67 mm',
       spec: 'Profondeur 40 mm, à sceller ou pour cloison sèche',
       quantity: postes,
@@ -293,6 +305,7 @@ export function buyingList(
   for (const [n, q] of [...plaques.entries()].sort((a, b) => a[0] - b[0])) {
     out.push({
       family: 'Encastrement et finition',
+      code: `plaque-${n}`,
       label: `Plaque de finition ${n} poste${n > 1 ? 's' : ''}`,
       // La largeur d'une plaque ne se commande pas : elle découle du nombre
       // de postes. Ce qui se vérifie, en revanche, c'est l'entraxe — et
@@ -314,6 +327,7 @@ export function buyingList(
   for (const [k, q] of parType) {
     out.push({
       family: 'Appareillage',
+      code: `meca-${k}`,
       label: FIXTURES[k as keyof typeof FIXTURES].label,
       spec: 'Mécanisme à encastrer, entraxe 60 mm, griffes ou vis',
       quantity: q,
@@ -330,6 +344,7 @@ export function buyingList(
     const spec = CEILINGS[k as keyof typeof CEILINGS];
     out.push({
       family: 'Plafond',
+      code: `plafond-${k}`,
       label: spec.label,
       spec: spec.note,
       quantity: q,
@@ -341,6 +356,7 @@ export function buyingList(
   if (dcl > 0) {
     out.push({
       family: 'Plafond',
+      code: 'boite-dcl',
       label: 'Boîte de centre DCL',
       spec: 'Avec fiche et douille, crochet pour luminaire suspendu',
       quantity: dcl,
@@ -352,6 +368,7 @@ export function buyingList(
   if (derivation > 0) {
     out.push({
       family: 'Plafond',
+      code: 'boite-derivation',
       label: 'Boîte de dérivation Ø 80 mm',
       spec: 'Pour applique : la DCL ne convient qu\u2019au point de centre',
       quantity: derivation,
