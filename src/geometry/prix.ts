@@ -266,9 +266,9 @@ export const TARIFS_COMMUNS: Record<string, Tarif> = {
   'coffret-2': t(38),
   'coffret-3': t(52),
   'coffret-4': t(68),
-  // Ce qui relie les modules entre eux, et qu'on oublie toujours.
+  // Le peigne, qu'on oublie toujours. (Le bornier de terre, lui, est fourni
+  // avec le coffret : voir `chiffrer`.)
   peigne: t(9),
-  'bornier-terre': t(8),
   // Plafond : ce qui n'est pas un luminaire.
   'plafond-daaf': t(18),
   'plafond-vmc': t(12),

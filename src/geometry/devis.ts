@@ -294,15 +294,23 @@ export function chiffrer(
     });
   }
   /*
-    LE COFFRET, SES PEIGNES ET SON BORNIER DE TERRE.
+    LE COFFRET ET SES PEIGNES.
 
     Relevé du patron, en relisant le devis : « il manque des choses, refais
     un passage d'éléments ». Le coffret n'existait que si l'on avait posé un
     tableau SUR UN MUR du plan — or on sait combien de modules il faut bien
     avant de savoir où on l'accroche, et un devis sans coffret manque le
-    poste le plus visible du tableau. Les peignes et le bornier de terre,
-    eux, n'y étaient pas du tout : ce sont exactement les articles qu'on
-    oublie au comptoir et qu'on retourne chercher.
+    poste le plus visible du tableau. Les peignes, eux, n'y étaient pas du
+    tout : c'est exactement l'article qu'on oublie au comptoir et qu'on
+    retourne chercher.
+
+    UN BORNIER DE TERRE A FIGURÉ ICI, ET IL EN EST PARTI. Relevé du patron :
+    « pas besoin de bornier de terre, c'est déjà dans les tableaux
+    actuels ». C'est vrai de tous les coffrets du commerce depuis longtemps
+    — le comptabiliser, c'était faire payer deux fois une pièce déjà dans la
+    boîte. La photo qu'on lui avait trouvée était en prime un répartiteur de
+    phases, ce qui aurait fait acheter la mauvaise pièce à qui se fie à
+    l'image.
 
     On compte un module par disjoncteur, deux par différentiel, et deux de
     réserve par rangée — la règle de tout tableau qu'on veut pouvoir
@@ -329,14 +337,6 @@ export function chiffrer(
       quantite: rangees,
       unite: 'u',
       note: 'un par rangée',
-    });
-    poser({
-      famille: 'Tableau',
-      code: 'bornier-terre',
-      libelle: 'Bornier de terre',
-      precision: 'Répartition du conducteur de protection',
-      quantite: 1,
-      unite: 'u',
     });
   }
 

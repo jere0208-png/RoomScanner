@@ -453,6 +453,9 @@ describe('le plafond au bordereau', () => {
       brins: TROIS_FILS(1.5),
       fils: 3,
       conduit: 16 as const,
+      // Le detail des departs ne change rien ici : `pullSchedule` les
+      // repartit egalement quand on ne les donne pas.
+      troncons: [],
       runs: 2,
       conduitLength: 20,
       cableLength: 24,

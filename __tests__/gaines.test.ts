@@ -10,6 +10,7 @@
  */
 import {
   buyingList,
+  couronnes,
   conduitFor,
   pullSchedule,
   type PullRow,
@@ -111,6 +112,8 @@ describe('la liste d’achat', () => {
       brins: TROIS_FILS(2.5),
       fils: 3,
       conduit: 20,
+      // Huit departs egaux : 60 m de gaine et 66 m de cable a se partager.
+      troncons: Array.from({ length: 8 }, () => ({ conduit: 7.5, cable: 8.25 })),
       runs: 8,
       conduitLength: 60,
       cableLength: 66,
@@ -124,6 +127,7 @@ describe('la liste d’achat', () => {
       brins: TROIS_FILS(1.5),
       fils: 3,
       conduit: 16,
+      troncons: Array.from({ length: 5 }, () => ({ conduit: 9, cable: 10 })),
       runs: 5,
       conduitLength: 45,
       cableLength: 50,
@@ -138,6 +142,7 @@ describe('la liste d’achat', () => {
     brins: [],
       fils: 3,
       conduit: 25,
+      troncons: Array.from({ length: 2 }, () => ({ conduit: 12, cable: 13.5 })),
       runs: 2,
       conduitLength: 24,
       cableLength: 27,
@@ -343,5 +348,82 @@ describe('la liste d’achat', () => {
 
   it('un chantier vide ne commande rien', () => {
     expect(buyingList([], [])).toEqual([]);
+  });
+});
+
+/*
+  UNE COURONNE SERT PLUSIEURS TRONÇONS — MAIS ON NE LA RABOUTE PAS.
+
+  Releve du patron : « si une gaine est achetee, elle est utile pas pour un
+  seul trajet, mais peut servir sur les 100 m, donc pas une gaine par circuit
+  mais pour tout ou il peut etre utile (sauf si longueur plus longue que le
+  restant de gaine, on ne rallonge pas les gaines) ».
+
+  Les deux moities comptent autant. Diviser le total par cent suppose qu'on
+  peut decouper la couronne n'importe ou — vrai — ET rabouter les chutes —
+  faux. Un troncon se tire d'un seul tenant ou il ne se tire pas.
+*/
+describe('le découpage en couronnes', () => {
+  it('remplit une couronne avec plusieurs tronçons', () => {
+    // Quatre departs de vingt metres tiennent dans une seule couronne : c'est
+    // la premiere moitie du releve, et c'est ce que faisait deja la division.
+    expect(couronnes([20, 20, 20, 20]).nombre).toBe(1);
+  });
+
+  it('mais n’en raboute jamais deux — et c’est là que la division ment', () => {
+    /*
+      Trois departs de cinquante-et-un metres font cent cinquante-trois : la
+      division annonce DEUX couronnes. Or apres le premier, il reste
+      quarante-neuf metres — pas assez pour le deuxieme, et on ne raboute pas.
+      Il en faut TROIS, et le bordereau qui en annonce deux envoie l'ouvrier
+      au comptoir en plein chantier.
+    */
+    const paquet = couronnes([51, 51, 51]);
+    expect(`${paquet.nombre} couronnes pour 153 m`).toBe(
+      '3 couronnes pour 153 m',
+    );
+    expect(Math.ceil(153 / 100)).toBe(2);
+  });
+
+  it('et rend la chute, qui explique l’écart', () => {
+    // Sans elle, le bordereau a l'air de se tromper : on lit « 153 m » et on
+    // achete trois cents metres.
+    expect(couronnes([51, 51, 51]).chute).toBe(147);
+  });
+
+  it('et signale un tronçon qu’aucune couronne ne peut tirer', () => {
+    /*
+      Le controle en sens inverse : un depart de plus de cent metres ne se
+      tire pas d'un seul tenant, et aucune decoupe n'y change rien. On le dit
+      plutot que de faire semblant — c'est le genre de chose qu'on decouvre
+      autrement le jour du tirage.
+    */
+    const paquet = couronnes([130, 20]);
+    expect(paquet.horsGabarit).toBe(1);
+  });
+
+  it('et le bordereau écrit la chute sur la ligne de gaine', () => {
+    const lignes = pullSchedule(
+      [circuit('c9', 'Prises — Séjour', 2.5, 20, ['a', 'b', 'c'])],
+      new Map([
+        [
+          'c9',
+          {
+            conduit: 153,
+            cable: 160,
+            runs: 3,
+            troncons: [
+              { conduit: 51, cable: 53 },
+              { conduit: 51, cable: 53 },
+              { conduit: 51, cable: 54 },
+            ],
+          },
+        ],
+      ]),
+    );
+    const list = buyingList(lignes, []);
+    const gaine = list.find((r) => r.code === 'icta-20')!;
+    expect(gaine.quantity).toBe(3);
+    expect(gaine.note).toContain('de chute');
   });
 });

@@ -1777,7 +1777,9 @@ export function FloorplanEditor({
                     Invisible, elle ne change pas le plan d'un pixel.
                   */}
                   <Rect
-                    accessibilityLabel={`Meuble ${frCategory(f.category)}`}
+                    accessibilityLabel={`Autour du meuble ${frCategory(
+                      f.category,
+                    )}`}
                     x={-w / 2 - PRISE_MARGE}
                     y={-d / 2 - PRISE_MARGE}
                     width={w + PRISE_MARGE * 2}
@@ -1795,6 +1797,64 @@ export function FloorplanEditor({
                 </G>
               );
             })}
+
+            {/*
+              CE QU'ON VOIT SOUS LE DOIGT PASSE AVANT CE QUI EST À CÔTÉ.
+
+              Relevé du patron : « quand un meuble est sur un autre,
+              impossible de sélectionner celui qu'on souhaite facilement…
+              pourtant on clique sur celui qu'on souhaite visuellement ».
+
+              Chaque meuble porte une cible plus large que son dessin — huit
+              points de débord, sans quoi une chaise dézoomée est invisable.
+              Cette tolérance MORD sur le voisin : une chaise glissée sous une
+              table voyait son dessin recouvert par le débord de la table, et
+              c'est la table qui répondait. Pire, l'ordre des cibles était
+              celui de la LISTE DES MEUBLES — donc l'ordre du scan, qui ne
+              veut rien dire à l'écran.
+
+              On sépare donc, comme pour le halo d'un mur : le débord reste
+              avec le dessin, et la cible STRICTE — le dessin, exactement —
+              passe par-dessus tous les meubles. Toucher un meuble prend ce
+              meuble ; toucher à côté ne prend le voisin que si la place est
+              libre.
+
+              ET LE PLUS PETIT PASSE DEVANT. Une chaise posée sur un tapis est
+              entièrement contenue dans lui : si le tapis gagnait, la chaise
+              serait injoignable, alors que le tapis reste attrapable partout
+              ailleurs. On range donc du plus grand au plus petit, et c'est le
+              plus petit qui se pose en dernier.
+
+              Cette couche reste SOUS les murs, les appareils et les
+              menuiseries : eux sont dessinés par-dessus les meubles, et leur
+              tour de priorité est déjà réglé.
+            */}
+            {onSelectObject &&
+              objects
+                .map((o) => ({ o, f: footprintOf(o, partOf) }))
+                .sort((a, b) => b.f.width * b.f.depth - a.f.width * a.f.depth)
+                .map(({ o, f }) => {
+                  const ctr = mapping.toPx({ x: f.cx, z: f.cz });
+                  const w = f.width * mapping.scale;
+                  const d = f.depth * mapping.scale;
+                  return (
+                    <Rect
+                      key={`prise-${f.id}`}
+                      accessibilityLabel={`Meuble ${frCategory(f.category)}`}
+                      x={-w / 2}
+                      y={-d / 2}
+                      width={w}
+                      height={d}
+                      fill="transparent"
+                      transform={`translate(${ctr.x}, ${ctr.y}) rotate(${
+                        ((f.yaw + view.rot) * 180) / Math.PI
+                      })`}
+                      onPress={() =>
+                        onSelectObject(o.id === selectedObjectId ? null : o.id)
+                      }
+                    />
+                  );
+                })}
 
             {/* Voile d'estompage : quand un mur est sélectionné, tout le
                 reste passe en retrait pour qu'on ne lise plus que lui. */}

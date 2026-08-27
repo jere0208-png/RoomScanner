@@ -53,7 +53,6 @@ export const PHOTOS: Record<string, ImageSourcePropType> = {
   'boite-dcl': require('../../assets/produits/boite-dcl.png'),
   'boite-derivation': require('../../assets/produits/boite-derivation.png'),
   'boite-encastrement': require('../../assets/produits/boite-encastrement.png'),
-  'bornier-terre': require('../../assets/produits/bornier-terre.png'),
   'coax': require('../../assets/produits/coax.png'),
   'coffret-1': require('../../assets/produits/coffret-1.png'),
   'coffret-2': require('../../assets/produits/coffret-2.png'),
@@ -99,7 +98,23 @@ export const PHOTOS: Record<string, ImageSourcePropType> = {
 };
 // ---- fin du bloc régénéré ----
 
-/** La photo d'un article, renvois compris. */
+/**
+ * La photo d'un article, renvois compris.
+ *
+ * UNE COURONNE DE FIL EST UNE COURONNE DE FIL. Le bordereau distingue les
+ * conducteurs par leur rôle — `fil-1.5-phase`, `fil-1.5-retour` — parce qu'on
+ * achète une couronne par couleur ; la photo, elle, est la même bobine. Le
+ * jour où le fil s'est mis à sortir couleur par couleur, toutes les vignettes
+ * de fil ont disparu du ticket d'un coup : elles étaient rangées à
+ * `fil-1.5`, et plus personne ne demandait ce code-là. On retombe donc sur la
+ * section, comme le prix le fait déjà (voir `tarifDe`).
+ */
 export function photoDe(code: string): ImageSourcePropType | null {
-  return PHOTOS[RENVOIS[code] ?? code] ?? null;
+  const renvoi = RENVOIS[code];
+  if (renvoi) return PHOTOS[renvoi] ?? null;
+  if (PHOTOS[code]) return PHOTOS[code];
+  if (code.startsWith('fil-')) {
+    return PHOTOS[`fil-${code.slice(4).split('-')[0]}`] ?? null;
+  }
+  return null;
 }

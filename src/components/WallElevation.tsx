@@ -109,6 +109,26 @@ export const PAD_TOP = 42;
 const FUITE = 9;
 /** Hauteur de la ligne de cote au-dessus du plafond. */
 export const COTE_H = 26;
+
+/**
+ * CE QUE LES COMMANDES PRENNENT SOUS LE DESSIN, en points.
+ *
+ * Bandeau de conformité, pas de réglage, trois champs, cinq boutons : une
+ * ESTIMATION, et c'est bien pour cela qu'elle ne décide pas seule. Le dessin
+ * se rabote ensuite sur ce que la feuille mesure vraiment (voir `raboter`).
+ */
+const RESERVE_COMMANDES = 390;
+
+/** Ce qu'on laisse respirer en bas de l'écran, sous la feuille. */
+const MARGE_ECRAN = 24;
+
+/**
+ * Le dessin ne descend pas sous cette hauteur.
+ *
+ * En dessous, un mur de deux mètres cinquante n'a plus de quoi montrer une
+ * prise à vingt-cinq centimètres : autant ne rien dessiner.
+ */
+const HAUTEUR_MIN_CADRE = 170;
 /**
  * Les hauteurs de référence d'une installation, en mètres.
  *
@@ -336,13 +356,40 @@ export function WallElevation({
      * de conformité, pas de réglage, trois champs, cinq boutons) et le
      * dessin prend ce qui reste.
      */
-    const reste = hauteurEcran - 390;
+    const reste = hauteurEcran - RESERVE_COMMANDES;
     setHauteurCadre(
       Math.round(
-        Math.min(430, Math.max(170, reste), Math.max(190, voulue + PAD_TOP + PAD_BOTTOM)),
+        Math.min(430, Math.max(HAUTEUR_MIN_CADRE, reste), Math.max(190, voulue + PAD_TOP + PAD_BOTTOM)),
       ),
     );
   }, [face, wall, layout.w, hauteurEcran]);
+
+  /**
+   * ET SI ÇA DÉBORDE QUAND MÊME, ON RABOTE — mesuré, pas deviné.
+   *
+   * Relevé du patron, capture à l'appui : sur un mur étroit — trente-trois
+   * centimètres de large pour deux mètres cinquante de haut — la feuille
+   * descendait sous le bas de l'écran et le bouton « Enregistrer » était
+   * coupé en deux.
+   *
+   * La réserve ci-dessus est une ESTIMATION de ce que prennent les
+   * commandes, et une estimation se trompe : le bandeau de conformité
+   * apparaît ou non, l'ensemble de fusion aussi, et un téléphone étroit
+   * fait passer une rangée de boutons sur deux lignes. Plutôt que d'ajuster
+   * le chiffre au jugé — il l'a déjà été deux fois —, on regarde ce que la
+   * feuille MESURE une fois rendue, et on rend au dessin ce qui dépasse.
+   *
+   * Le raccourci ne peut que RÉTRÉCIR le cadre : rétrécir réduit la hauteur
+   * totale, donc le débord, donc l'ajustement suivant. Il converge en une
+   * passe et ne peut pas se mettre à battre.
+   */
+  const raboter = (hauteurRendue: number) => {
+    if (hauteurCadre === null) return;
+    const trop = hauteurRendue - (hauteurEcran - MARGE_ECRAN);
+    if (trop <= 1) return;
+    const cible = Math.max(HAUTEUR_MIN_CADRE, hauteurCadre - Math.ceil(trop));
+    if (cible < hauteurCadre) setHauteurCadre(cible);
+  };
 
   const holes = useMemo(() => {
     if (!wall || walls.length === 0) return [];
@@ -2169,6 +2216,23 @@ export function WallElevation({
         <Check size={19} color="#FFFFFF" strokeWidth={2.8} />
         <Text style={styles.validerText}>Enregistrer</Text>
       </TouchableOpacity>
+      {/*
+        LE TÉMOIN DE FIN DE FEUILLE — zéro pixel de haut, et il mesure tout.
+
+        Son ORDONNÉE dit à quelle hauteur la feuille se termine : c'est la
+        hauteur du contenu, mesurée et non estimée (voir `raboter`).
+
+        Il est posé en DERNIER, et c'est important au-delà de la géométrie :
+        mettre cette mesure sur la vue racine aurait fait d'elle la première
+        vue mesurable de la feuille — et cinq bancs qui servent « la première
+        vue qui se mesure » auraient nourri la racine au lieu du dessin. Le
+        dessin serait resté à zéro pixel, sans rien afficher, et les bancs
+        auraient crié sur un écran vide.
+      */}
+      <View
+        style={styles.temoin}
+        onLayout={(e) => raboter(e.nativeEvent.layout.y)}
+      />
     </View>
   );
 }
@@ -2265,6 +2329,8 @@ const getStyles = themedStyles((c: Palette) =>
      * qu'il occupe — et le dessin, lui, a déjà sa hauteur propre, calculée
      * sur les proportions du mur.
      */
+    /* Zéro pixel : il ne se voit pas, il se mesure. Voir `raboter`. */
+    temoin: { height: 0 },
     sheet: {
       backgroundColor: c.surface,
       borderRadius: radius.lg,

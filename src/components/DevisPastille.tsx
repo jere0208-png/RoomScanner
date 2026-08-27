@@ -17,9 +17,18 @@
  *   permanence sur un plan qu'on lit finit par se faire couvrir de la main.
  *
  * IL EST DONC DISCRET, ET IL DIT LE PRIX. Pas d'onde, pas de fondu, pas de
- * couleur pleine : un contour vert, le total, et rien d'autre. Il se remet à
- * jour tout seul — poser une prise le fait monter — ce qui en fait un
- * compteur qu'on surveille du coin de l'œil pendant qu'on pose.
+ * couleur pleine : un contour, le total, et rien d'autre. Il se remet à jour
+ * tout seul — poser une prise le fait monter — ce qui en fait un compteur
+ * qu'on surveille du coin de l'œil pendant qu'on pose.
+ *
+ * ET IL EST BLEU, comme tout le devis. Il a été vert : le vert disait
+ * « conforme », et il le dit déjà sur la pastille des normes juste à côté —
+ * deux verts voisins pour deux choses sans rapport. Relevé du patron :
+ * « change le vert du bouton en bleu pour le devis, et même les couleurs
+ * dans les pages, on veut du bleu ; donne un style unique à ton bleu,
+ * partout ». C'est `c.blue`, celui de toute l'application, et rien d'autre :
+ * une teinte qui n'existe qu'à un endroit n'est pas une couleur, c'est une
+ * exception.
  */
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity } from 'react-native';
@@ -59,7 +68,7 @@ export function DevisPastille({
   const c = useTheme();
   const styles = getStyles(c);
   const actif = total !== null && total > 0;
-  const teinte = actif ? c.green : c.inkFaint;
+  const teinte = actif ? c.blue : c.inkFaint;
 
   return (
     <TouchableOpacity

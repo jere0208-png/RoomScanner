@@ -8702,6 +8702,119 @@ sélectionnable par son sol, comme partout ailleurs.
 
 **172 → 0.**
 
+### Une couronne sert plusieurs tronçons — mais on ne la raboute pas
+
+Relevé du patron : « si une gaine est achetée, elle est utile pas pour un seul
+trajet, mais peut servir sur les 100 m, donc pas une gaine par circuit mais
+pour tout où il peut être utile (**sauf si longueur plus longue que le restant
+de gaine, on ne rallonge pas les gaines**) ».
+
+Les deux moitiés comptent, et le bordereau n'en tenait qu'une. Il additionnait
+les mètres par diamètre, tous circuits confondus — la première moitié était donc
+juste — puis divisait par cent. **Diviser par cent suppose qu'on peut découper
+la couronne n'importe où (vrai) et rabouter les chutes (faux).** Un conduit ne se
+raboute pas, un conducteur non plus : un tronçon se tire d'un seul tenant ou il
+ne se tire pas.
+
+L'écart n'est pas théorique. **Trois départs de 51 m font 153 m : la division
+annonce deux couronnes.** Après le premier, il reste 49 m — pas assez pour le
+deuxième. Il en faut **trois**, et le bordereau qui en annonce deux envoie
+l'ouvrier au comptoir en plein chantier.
+
+Il fallait donc la longueur de **chaque** départ, pas leur somme : `planRoutes`
+la connaissait déjà (un tracé par appareil desservi) et ne la remontait pas. La
+ligne de tirage porte maintenant ses tronçons, et le découpage les range du plus
+long au plus court dans la première couronne où ils tiennent. La **chute** est
+écrite sur la ligne : sans elle, on lit « 153 m » et on achète trois cents
+mètres, et le bordereau a l'air de se tromper.
+
+Un départ de plus de cent mètres ne se tire d'un seul tenant sous aucune
+découpe : il est signalé, plutôt que d'être noyé dans un total. C'est le genre
+de chose qu'on découvre autrement le jour du tirage.
+
+Deux garde-fous : un métré ancien qui ne dit pas le détail des départs voit son
+total réparti également entre eux — faux dans le détail, juste au total, et
+toujours mieux qu'un chariot vide ; et sans métré du tout, le forfait de douze
+mètres par départ fournit les tronçons.
+
+### Deux corrections d'un électricien
+
+**Les images des fils avaient disparu.** Le jour où le fil s'est mis à sortir
+couleur par couleur — `fil-1.5-phase` au lieu de `fil-1.5` — toutes les
+vignettes de fil sont tombées d'un coup : elles étaient rangées à la section, et
+plus personne ne demandait ce code-là. Une couronne de rouge et une de bleu sont
+la même bobine : la photo retombe sur la section, comme le prix le faisait déjà.
+
+**Le bornier de terre n'avait rien à faire là.** Relevé : « pas besoin de
+bornier de terre, c'est déjà dans les tableaux actuels ». C'est vrai de tous les
+coffrets du commerce, et le compter faisait payer deux fois une pièce déjà dans
+la boîte. La photo qu'on lui avait trouvée était en prime **un répartiteur de
+phases** — de quoi faire acheter la mauvaise pièce à qui se fie à l'image.
+
+### Un meuble sur un autre, une feuille trop haute, et le devis passe au bleu
+
+#### « On clique sur celui qu'on souhaite visuellement »
+
+Relevé du patron : « quand un meuble est sur un autre, impossible de
+sélectionner celui qu'on souhaite facilement… pourtant on clique sur celui
+qu'on souhaite visuellement ».
+
+Deux causes, et la première est celle du halo d'un mur, reprise à l'identique.
+Chaque meuble porte une cible plus large que son dessin — huit points de débord,
+sans quoi une chaise dézoomée est invisable — et cette tolérance **mord sur le
+voisin** : une chaise glissée sous une table voyait son dessin recouvert par le
+débord de la table. La seconde est plus sournoise : l'ordre des cibles était
+celui de la **liste des meubles**, c'est-à-dire l'ordre du scan, qui ne veut
+rien dire à l'écran.
+
+Même remède que pour les murs : le débord reste avec le dessin, la cible
+**stricte** — le dessin, exactement — passe par-dessus tous les meubles. Elle
+reste sous les murs, les appareils et les menuiseries, dont la priorité était
+déjà réglée.
+
+**Et le plus petit passe devant.** Une chaise posée sur un tapis est entièrement
+contenue dans lui : si le tapis gagnait, la chaise serait injoignable, alors que
+le tapis reste attrapable partout ailleurs. On range du plus grand au plus
+petit, et c'est le plus petit qui se pose en dernier.
+
+#### Le banc a passé pour la mauvaise raison, encore
+
+Les deux nouvelles épreuves ont été vertes du premier coup — et pour rien. Le
+banc de toucher ne lisait que les transformations portées par les **groupes**,
+ce qui était vrai tant qu'aucune forme n'en portait. La cible stricte a la
+sienne : ses points restaient au coin de la page. La mesure était fausse **et
+cohérente** — le point cherché et la forme comparée faux de la même façon — donc
+tout passait sans rien prouver.
+
+Corrigé, puis vérifié à l'envers en retirant la couche stricte : les trois
+épreuves crient.
+
+#### La feuille d'appareillage sortait de l'écran
+
+Relevé, capture à l'appui : sur un mur étroit — 33 cm de large pour 2,49 m de
+haut — l'élévation garde le rapport du mur, la feuille s'étire, et le bouton
+« Enregistrer » était **coupé en deux** en bas de l'écran.
+
+Une réserve de 390 points était censée garder la place des commandes. C'est une
+estimation, et une estimation se trompe : le bandeau de conformité apparaît ou
+non, l'ensemble de fusion aussi, et un téléphone étroit fait passer une rangée
+de boutons sur deux lignes. Elle avait déjà été ajustée deux fois.
+
+Plutôt que de la corriger au jugé une troisième fois, **on mesure**. La feuille
+rendue dit sa hauteur ; si elle dépasse l'écran, le dessin rend ce qui déborde.
+Le raccourci ne peut que rétrécir — rétrécir réduit la hauteur totale, donc le
+débord — il converge en une passe et ne peut pas se mettre à battre.
+
+#### Le devis passe au bleu
+
+Relevé : « change le vert du bouton en bleu pour le devis, et même les couleurs
+dans les pages, on veut du bleu ; donne un style unique à ton bleu, partout. »
+
+Le vert dit **« conforme »** dans cette application, et la pastille des normes
+le dit déjà juste à côté : deux verts voisins pour deux choses sans rapport.
+C'est donc `c.blue`, celui de toute l'application — une teinte qui n'existe qu'à
+un endroit n'est pas une couleur, c'est une exception.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

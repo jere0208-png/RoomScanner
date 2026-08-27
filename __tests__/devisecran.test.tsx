@@ -415,6 +415,21 @@ describe('les vignettes du ticket', () => {
     expect(t.root.findAllByType(Image).length).toBe(avecPhoto.length);
   });
 
+  it('et les couronnes de fil gardent la leur, couleur par couleur', () => {
+    /*
+      Releve du patron : « les images des fils ne sont pas visibles ». Le jour
+      ou le fil s'est mis a sortir couleur par couleur — `fil-1.5-phase` au
+      lieu de `fil-1.5` —, toutes les vignettes de fil ont disparu du ticket
+      d'un coup : elles etaient rangees a la section, et plus personne ne
+      demandait ce code-la. Une couronne de rouge et une de bleu sont la meme
+      bobine ; la photo retombe donc sur la section, comme le prix.
+    */
+    for (const code of ['fil-1.5-phase', 'fil-2.5-terre', 'fil-1.5-retour']) {
+      expect(`${code} : ${photoDe(code) !== null}`).toBe(`${code} : true`);
+    }
+    expect(photoDe('fil-1.5-phase')).toBe(photoDe('fil-1.5'));
+  });
+
   it('et les prises partagent une seule photo', () => {
     /*
       Releve du patron : « les prises doivent avoir la meme image, ce sont la

@@ -64,6 +64,9 @@ const TIRAGE: PullRow[] = [
     brins: TROIS_FILS(2.5),
     fils: 3,
     conduit: 20,
+    // Le detail des departs ne change rien ici : `pullSchedule` les
+    // repartit egalement quand on ne les donne pas.
+    troncons: [],
     runs: 8,
     conduitLength: 62,
     cableLength: 68,
@@ -77,6 +80,9 @@ const TIRAGE: PullRow[] = [
     brins: TROIS_FILS(1.5),
     fils: 3,
     conduit: 16,
+    // Le detail des departs ne change rien ici : `pullSchedule` les
+    // repartit egalement quand on ne les donne pas.
+    troncons: [],
     runs: 6,
     conduitLength: 47,
     cableLength: 52,
@@ -91,6 +97,9 @@ const TIRAGE: PullRow[] = [
     brins: [],
     fils: 3,
     conduit: 25,
+    // Le detail des departs ne change rien ici : `pullSchedule` les
+    // repartit egalement quand on ne les donne pas.
+    troncons: [],
     runs: 2,
     conduitLength: 21,
     cableLength: 24,
@@ -449,10 +458,22 @@ describe('ce qui manquait au chariot', () => {
     }
   });
 
-  it('les peignes et le bornier de terre, qu’on retourne toujours chercher', () => {
+  it('le peigne d’alimentation, qu’on retourne toujours chercher', () => {
     const d = devisDe('dooxie');
     expect(d.lignes.find((l) => l.code === 'peigne')!.quantite).toBeGreaterThan(0);
-    expect(d.lignes.find((l) => l.code === 'bornier-terre')!.quantite).toBe(1);
+  });
+
+  it('mais PAS de bornier de terre : il est fourni avec le coffret', () => {
+    /*
+      Releve du patron : « pas besoin de bornier de terre, c'est deja dans
+      les tableaux actuels ». Il y a figure, et le compter faisait payer deux
+      fois une piece deja dans la boite. La photo qu'on lui avait trouvee
+      etait en prime un repartiteur de phases — de quoi faire acheter la
+      mauvaise piece a qui se fie a l'image.
+    */
+    expect(devisDe('dooxie').lignes.some((l) => l.code === 'bornier-terre')).toBe(
+      false,
+    );
   });
 
   it('et les gaines, même sans tableau posé — estimées, et dites', () => {

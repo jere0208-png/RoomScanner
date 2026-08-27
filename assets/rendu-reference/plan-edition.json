@@ -841,7 +841,7 @@
             "propList": [
              "fill"
             ],
-            "accessibilityLabel": "Meuble Canapé",
+            "accessibilityLabel": "Autour du meuble Canapé",
             "x": -113.429,
             "y": -60.714,
             "width": 226.857,
@@ -949,7 +949,7 @@
             "propList": [
              "fill"
             ],
-            "accessibilityLabel": "Meuble Télévision",
+            "accessibilityLabel": "Autour du meuble Télévision",
             "x": -78.286,
             "y": -12.686,
             "width": 156.571,
@@ -1057,7 +1057,7 @@
             "propList": [
              "fill"
             ],
-            "accessibilityLabel": "Meuble Réfrigérateur",
+            "accessibilityLabel": "Autour du meuble Réfrigérateur",
             "x": -49,
             "y": -49,
             "width": 98,

@@ -129,6 +129,19 @@ export interface PullRow {
    * de rouge, une de bleu, une de vert-jaune, une de violet.
    */
   brins: Wire[];
+  /**
+   * LES TRONÇONS, UN PAR DÉPART — et non leur seule somme.
+   *
+   * Relevé du patron : « si une gaine est achetée, elle est utile pas pour un
+   * seul trajet mais peut servir sur les 100 m… sauf si longueur plus longue
+   * que le restant de gaine, on ne rallonge pas les gaines ».
+   *
+   * Le total ne suffit pas à commander : cent vingt mètres de gaine ne font
+   * pas deux couronnes si l'un des départs en fait soixante-dix — on ne
+   * raboute pas un conduit, et ce qui reste au bout d'une couronne ne sert
+   * qu'à un tronçon plus court. Voir `couronnes`.
+   */
+  troncons: { conduit: number; cable: number }[];
   /** Section des conducteurs (mm²), nulle en courants faibles. */
   section: number | null;
   conduit: ConduitD;
@@ -156,7 +169,15 @@ export interface PullRow {
  */
 export function pullSchedule(
   circuits: Circuit[],
-  metre?: Map<string, { conduit: number; cable: number; runs: number }>,
+  metre?: Map<
+    string,
+    {
+      conduit: number;
+      cable: number;
+      runs: number;
+      troncons?: { conduit: number; cable: number }[];
+    }
+  >,
   /** Circuits dont le tracé longe un contour reconstitué (voir `ElecPlan`). */
   approx?: Set<string>,
   /**
@@ -172,6 +193,24 @@ export function pullSchedule(
     const fils = brins.length;
     return {
       brins,
+      /*
+        LE DÉTAIL DES DÉPARTS, ou des départs égaux à défaut.
+
+        Un métré qui ne dit pas la longueur de CHAQUE départ — un relevé
+        d'avant, un chiffrage fait à la main — ne doit pas rendre zéro
+        couronne : le découpage lirait une liste vide et conclurait qu'il n'y
+        a rien à acheter. On répartit alors le total sur le nombre de
+        départs. C'est faux dans le détail et juste au total, et c'est
+        toujours mieux qu'un chariot vide.
+      */
+      troncons:
+        m?.troncons ??
+        (m
+          ? Array.from({ length: Math.max(1, m.runs) }, () => ({
+              conduit: m.conduit / Math.max(1, m.runs),
+              cable: m.cable / Math.max(1, m.runs),
+            }))
+          : []),
       approx: !!approx?.has(c.id),
       circuitId: c.id,
       label: c.label,
@@ -234,6 +273,60 @@ const frSection = (v: number) => String(v).replace('.', ',');
 const COURONNE = 100;
 
 /**
+ * COMBIEN DE COURONNES POUR CES TRONÇONS — et ce qui reste sur le touret.
+ *
+ * Relevé du patron : « si une gaine est achetée, elle est utile pas pour un
+ * seul trajet, mais peut servir sur les 100 m, donc pas une gaine par circuit
+ * mais pour tout où il peut être utile (sauf si longueur plus longue que le
+ * restant de gaine, on ne rallonge pas les gaines) ».
+ *
+ * Diviser le total par cent, c'est supposer qu'on peut découper la couronne
+ * n'importe où — vrai — ET rabouter les chutes — faux. Un conduit ne se
+ * raboute pas, un conducteur non plus : un tronçon se tire d'un seul tenant
+ * ou il ne se tire pas. Cent vingt mètres en trois départs de quarante font
+ * bien deux couronnes ; les mêmes cent vingt mètres en deux départs de
+ * soixante en font DEUX aussi, mais cent vingt mètres en un départ de
+ * soixante-dix et un de cinquante en font deux avec trente mètres de chute
+ * inutilisable. Le total ne dit pas lequel des trois cas on a.
+ *
+ * On range donc les tronçons du plus long au plus court et on les pose dans
+ * la première couronne où ils tiennent — c'est la « première place qui
+ * convient », et sur des longueurs de logement elle donne l'optimum ou tout
+ * comme. Ce qu'il reste au bout de chaque couronne est de la chute : on la
+ * rend, parce que c'est elle qui explique pourquoi on achète plus que la
+ * somme.
+ */
+export function couronnes(
+  longueurs: number[],
+  taille = COURONNE,
+): { nombre: number; chute: number; horsGabarit: number } {
+  const pieces = longueurs.filter((l) => l > 0).sort((a, b) => b - a);
+  const restes: number[] = [];
+  let horsGabarit = 0;
+  for (const l of pieces) {
+    // Un tronçon plus long qu'une couronne entière ne se tire pas d'un seul
+    // tenant : aucune découpe n'y change rien. On le signale plutôt que de
+    // faire semblant.
+    if (l > taille) {
+      horsGabarit++;
+      restes.push(0);
+      continue;
+    }
+    let i = restes.findIndex((r) => r >= l - 1e-9);
+    if (i < 0) {
+      restes.push(taille);
+      i = restes.length - 1;
+    }
+    restes[i] -= l;
+  }
+  return {
+    nombre: restes.length,
+    chute: Math.round(restes.reduce((t, r) => t + r, 0)),
+    horsGabarit,
+  };
+}
+
+/**
  * Ce qu'on compte par départ quand le tracé manque.
  *
  * Le même chiffre que `materialList` : deux feuilles d'un même dossier ne
@@ -294,6 +387,8 @@ export function buyingList(
     : `estimé à ${METRES_PAR_DEPART} m par départ, faute de tableau posé sur le plan`;
 
   const parConduit = new Map<ConduitD, number>();
+  /** Les tronçons de chaque diamètre, un par départ : voir `couronnes`. */
+  const tronconsDuConduit = new Map<ConduitD, number[]>();
   /** Ce que chaque diamètre doit avaler de conducteurs, au pire. */
   const filsDuConduit = new Map<ConduitD, number>();
   /*
@@ -315,7 +410,10 @@ export function buyingList(
     chaque couleur est une couronne. Les deux navettes d'un va-et-vient
     comptent deux fois, comme il se doit.
   */
-  const parBrin = new Map<string, { section: number; wire: Wire; metres: number }>();
+  const parBrin = new Map<
+    string,
+    { section: number; wire: Wire; metres: number; bouts: number[] }
+  >();
   for (const r of rows) {
     parConduit.set(
       r.conduit,
@@ -325,36 +423,72 @@ export function buyingList(
       r.conduit,
       Math.max(filsDuConduit.get(r.conduit) ?? 0, r.fils),
     );
+    /*
+      LE DÉTAIL DES DÉPARTS, ou le forfait à défaut.
+
+      Sans métré, on ne connaît pas la longueur de chaque départ : on prend
+      le forfait, autant de fois qu'il y a de départs. C'est cohérent avec
+      le total, et ça donne au découpage en couronnes des tronçons à ranger.
+    */
+    const bouts = mesure
+      ? r.troncons
+      : Array.from({ length: Math.max(1, r.runs) }, () => ({
+          conduit: METRES_PAR_DEPART,
+          cable: METRES_PAR_DEPART,
+        }));
+    const dejaConduit = tronconsDuConduit.get(r.conduit) ?? [];
+    dejaConduit.push(...bouts.map((b) => b.conduit));
+    tronconsDuConduit.set(r.conduit, dejaConduit);
     if (r.section === null) continue;
     const m = longueur(r, 'cable');
     for (const w of r.brins) {
       const cle = `${r.section}|${w.role}`;
       const e = parBrin.get(cle);
-      if (e) e.metres += m;
-      else parBrin.set(cle, { section: r.section, wire: w, metres: m });
+      if (e) {
+        e.metres += m;
+        e.bouts.push(...bouts.map((b) => b.cable));
+      } else {
+        parBrin.set(cle, {
+          section: r.section,
+          wire: w,
+          metres: m,
+          bouts: bouts.map((b) => b.cable),
+        });
+      }
     }
   }
 
   for (const [d, m] of [...parConduit.entries()].sort((a, b) => a[0] - b[0])) {
     if (m <= 0) continue;
+    const paquet = couronnes(tronconsDuConduit.get(d) ?? []);
     out.push({
       family: 'Conduits et conducteurs',
       code: `icta-${d}`,
       label: `Conduit ICTA Ø${d} mm`,
       spec: 'Gaine annelée souple avec tire-fil, NF EN 61386',
-      quantity: Math.ceil(m / COURONNE),
+      quantity: paquet.nombre,
       unit: 'cour. 100 m',
       /*
-        LE NOMBRE DE FILS EST ÉCRIT SUR LA LIGNE DE GAINE.
+        CE QU'ON ÉCRIT SUR UNE LIGNE DE GAINE.
 
-        Relevé du patron : « chaque câblage doit être noté en terme de nombre
-        de fils jusqu'au tableau, adapter la gaine en fonction ». C'est déjà
-        ce qui choisit le diamètre (`conduitPour`, règle du tiers) — encore
-        faut-il que celui qui tire puisse le VÉRIFIER avant de commander.
+        Le nombre de fils, d'abord — relevé du patron : « chaque câblage doit
+        être noté en terme de nombre de fils jusqu'au tableau, adapter la
+        gaine en fonction ». C'est ce qui choisit le diamètre (`conduitPour`,
+        règle du tiers), encore faut-il pouvoir le VÉRIFIER au comptoir.
+
+        La chute ensuite, quand il y en a : c'est elle qui explique pourquoi
+        on achète plus que la somme des mètres. Sans elle, le bordereau a
+        l'air de se tromper.
       */
-      note: `${forfait ?? `${m} m relevés sur le plan`} · jusqu'à ${
-        filsDuConduit.get(d) ?? 3
-      } conducteurs par gaine`,
+      note:
+        `${forfait ?? `${m} m relevés sur le plan`}` +
+        ` · jusqu'à ${filsDuConduit.get(d) ?? 3} conducteurs par gaine` +
+        (paquet.chute > 0 ? ` · ${paquet.chute} m de chute` : '') +
+        (paquet.horsGabarit > 0
+          ? ` · ${paquet.horsGabarit} départ${
+              paquet.horsGabarit > 1 ? 's' : ''
+            } de plus de 100 m : à tirer autrement`
+          : ''),
     });
   }
 
@@ -374,7 +508,7 @@ export function buyingList(
       code: `fil-${e.section}-${e.wire.role}`,
       label: `Conducteur H07V-U ${frSection(e.section)} mm² — ${e.wire.label}`,
       spec: 'Rigide cuivre 450/750 V',
-      quantity: Math.ceil(e.metres / COURONNE),
+      quantity: couronnes(e.bouts).nombre,
       unit: 'cour. 100 m',
       /*
         LA LONGUEUR EST CELLE DU PARCOURS ENTIER, ET C'EST VOLONTAIRE.

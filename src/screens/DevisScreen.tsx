@@ -31,6 +31,14 @@
  * cochées ; puis « ÉTAPE 2 SUR 3 » et un titre qui tient sur une ligne et
  * demie. On sait où on est sans compter.
  *
+ * TOUT LE DEVIS EST BLEU. Il a été vert — relevé du patron : « change le
+ * vert du bouton en bleu pour le devis, et même les couleurs dans les pages,
+ * on veut du bleu ; donne un style unique à ton bleu, partout ». Le vert dit
+ * « conforme » dans cette application, et la pastille des normes le dit déjà
+ * juste à côté : deux verts voisins pour deux choses sans rapport. C'est donc
+ * `c.blue`, celui de toute l'application — une teinte qui n'existe qu'à un
+ * endroit n'est pas une couleur, c'est une exception.
+ *
  * LE PLAN EXPLIQUE, IL NE DÉCORE PAS — et il l'explique EN UNE FOIS. La
  * première version faisait défiler des lots entourés d'une bague verte, un
  * toutes les trois secondes ; retirée sur relevé du patron : « ne fais pas
@@ -652,7 +660,7 @@ const getStyles = themedStyles((c: Palette) =>
       backgroundColor: c.line,
       marginTop: 15,
     },
-    filTraitFait: { backgroundColor: c.green },
+    filTraitFait: { backgroundColor: c.blue },
     pastille: {
       width: 32,
       height: 32,
@@ -663,14 +671,14 @@ const getStyles = themedStyles((c: Palette) =>
       alignItems: 'center',
       justifyContent: 'center',
     },
-    pastillePleine: { backgroundColor: c.green, borderColor: c.green },
+    pastillePleine: { backgroundColor: c.blue, borderColor: c.blue },
     pastilleTexte: { color: c.inkFaint, fontSize: 14, fontWeight: '800' },
     pastilleTexteFort: { color: '#FFFFFF' },
     filNom: { color: c.inkFaint, fontSize: 11, fontWeight: '700', marginTop: 5 },
     filNomFort: { color: c.ink },
     // ------------------------------------------------------- le gros titre
     rang: {
-      color: c.green,
+      color: c.blue,
       fontSize: 11.5,
       fontWeight: '800',
       letterSpacing: 1.1,
@@ -704,7 +712,7 @@ const getStyles = themedStyles((c: Palette) =>
       ...shadowCard,
       shadowOpacity: 0.05,
     },
-    carteChoisie: { borderColor: c.green },
+    carteChoisie: { borderColor: c.blue },
     carteNom: { color: c.ink, fontSize: 15.5, fontWeight: '800' },
     carteNote: {
       color: c.inkFaint,
@@ -721,7 +729,7 @@ const getStyles = themedStyles((c: Palette) =>
       alignItems: 'center',
       justifyContent: 'center',
     },
-    cocheOn: { backgroundColor: c.green, borderColor: c.green },
+    cocheOn: { backgroundColor: c.blue, borderColor: c.blue },
     cocheTexte: { color: '#FFFFFF', fontSize: 14, fontWeight: '800' },
     // ----------------------------------------------------- les exclusions
     exclusion: { flexDirection: 'row', gap: 9, marginBottom: 12 },
@@ -763,7 +771,7 @@ const getStyles = themedStyles((c: Palette) =>
       alignItems: 'center',
       justifyContent: 'center',
     },
-    triPilleOn: { backgroundColor: c.green },
+    triPilleOn: { backgroundColor: c.blue },
     triTexte: { color: c.inkSoft, fontSize: 13, fontWeight: '700' },
     triTexteOn: { color: '#FFFFFF' },
     vide: {
@@ -858,7 +866,7 @@ const getStyles = themedStyles((c: Palette) =>
       letterSpacing: 1.2,
     },
     total: {
-      color: c.green,
+      color: c.blue,
       fontSize: 30,
       fontWeight: '800',
       letterSpacing: -0.9,
@@ -891,7 +899,7 @@ const getStyles = themedStyles((c: Palette) =>
     action: {
       height: 50,
       borderRadius: radius.pill,
-      backgroundColor: c.green,
+      backgroundColor: c.blue,
       alignItems: 'center',
       justifyContent: 'center',
       marginTop: 10,

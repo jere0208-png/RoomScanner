@@ -26,8 +26,26 @@ import type { CeilingFixture } from './ceiling';
 export interface ElecPlan {
   /** Métré total par circuit, en mètres de câble, arrondi. */
   parCircuit: Map<string, number>;
-  /** Détail par circuit : gaine, câble, nombre de départs. */
-  metre: Map<string, { conduit: number; cable: number; runs: number }>;
+  /**
+   * Détail par circuit : gaine, câble, nombre de départs — et le DÉTAIL des
+   * départs, un par un.
+   *
+   * Relevé du patron : « si une gaine est achetée, elle est utile pas pour un
+   * seul trajet mais peut servir sur les 100 m… sauf si longueur plus longue
+   * que le restant de gaine, on ne rallonge pas les gaines ». Le total ne
+   * suffit donc pas à savoir combien de couronnes commander : il faut la
+   * longueur de CHAQUE tronçon, parce qu'aucun ne se raboute (voir
+   * `couronnes` dans `conduits.ts`).
+   */
+  metre: Map<
+    string,
+    {
+      conduit: number;
+      cable: number;
+      runs: number;
+      troncons: { conduit: number; cable: number }[];
+    }
+  >;
   /**
    * Le métré repose-t-il sur des contours SÛRS ?
    *
@@ -90,7 +108,12 @@ export function planRoutes(
   const parCircuit = new Map<string, number>();
   const metre = new Map<
     string,
-    { conduit: number; cable: number; runs: number }
+    {
+      conduit: number;
+      cable: number;
+      runs: number;
+      troncons: { conduit: number; cable: number }[];
+    }
   >();
   const traces: { id: string; path: Pt[] }[] = [];
   const approx = new Set<string>();
@@ -154,6 +177,9 @@ export function planRoutes(
       conduit: runs.reduce((t, r) => t + r.conduit, 0),
       cable: runs.reduce((t, r) => t + r.length, 0),
       runs: runs.length,
+      // Un tronçon = un départ du tableau vers un appareil. C'est l'unité
+      // qu'on ne peut pas couper en deux couronnes.
+      troncons: runs.map((r) => ({ conduit: r.conduit, cable: r.length })),
     });
     for (const r of runs) traces.push({ id: r.fixtureId, path: r.path });
   }

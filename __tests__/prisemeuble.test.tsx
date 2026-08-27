@@ -76,20 +76,33 @@ const monter = () => {
 };
 
 describe('la prise d’un meuble', () => {
-  it('porte une cible plus large que son dessin', () => {
+  it('porte DEUX cibles : le dessin exact, et un débord autour', () => {
+    /*
+      DEUX VERSIONS, ET LA SECONDE EST NEE D'UN AUTRE DEFAUT.
+
+      Il n'y avait qu'une cible, le dessin PLUS huit points de debord — sans
+      quoi une chaise dezoomee tombe sous les quarante-quatre points qu'Apple
+      donne pour minimum. Elle marchait, et elle mordait sur le voisin :
+      releve du patron, « quand un meuble est sur un autre, impossible de
+      selectionner celui qu'on souhaite… pourtant on clique sur celui qu'on
+      souhaite visuellement ». Le debord d'une table recouvrait le dessin
+      d'une chaise glissee dessous.
+
+      Meme remede que pour le halo d'un mur : le debord reste avec le dessin,
+      la cible STRICTE — le dessin, exactement — passe par-dessus tous les
+      meubles. Ce banc garde les deux : la tolerance existe toujours, et elle
+      n'est plus celle qui tranche.
+    */
     const t = monter();
-    // La cible porte son nom : c'est par lui qu'on la trouve, ici comme
-    // au doigt d'un lecteur d'ecran.
-    const cible = t.root.findAll((n) =>
-      String(n.props?.accessibilityLabel ?? '').startsWith('Meuble'),
+    const stricte = t.root.findAll((n) =>
+      String(n.props?.accessibilityLabel ?? '').startsWith('Meuble '),
     )[0];
-    expect(cible).toBeDefined();
-    // Elle depasse l'emprise du meuble d'au moins six points de chaque
-    // cote : de quoi rattraper un doigt qui vise a cote.
-    const emprise = 0.45 * 
-      // l'echelle du plan a ce cadrage, lue sur l'aplat du meuble lui-meme
-      1;
-    void emprise;
+    const large = t.root.findAll((n) =>
+      String(n.props?.accessibilityLabel ?? '').startsWith('Autour du meuble '),
+    )[0];
+    expect(stricte).toBeDefined();
+    expect(large).toBeDefined();
+    // L'aplat dessiné du meuble : le premier rectangle plein et petit.
     const aplat = t.root.findAll(
       (n) =>
         typeof n.props?.width === 'number' &&
@@ -98,7 +111,10 @@ describe('la prise d’un meuble', () => {
         (n.props.width as number) < 200,
     )[0];
     expect(aplat).toBeDefined();
-    expect(cible.props.width).toBeGreaterThanOrEqual(
+    // La stricte épouse le dessin ; le débord fait six points de plus de
+    // chaque côté, de quoi rattraper un doigt qui vise à côté.
+    expect(stricte.props.width).toBeCloseTo(aplat.props.width as number, 6);
+    expect(large.props.width).toBeGreaterThanOrEqual(
       (aplat.props.width as number) + 12,
     );
     act(() => t.unmount());

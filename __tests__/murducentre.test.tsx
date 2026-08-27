@@ -129,12 +129,24 @@ function appliquer(t: string, p: Pt): Pt {
   return out;
 }
 
-/** Un point local d'un nœud, porté dans le repère de la page. */
+/**
+ * Un point local d'un nœud, porté dans le repère de la page.
+ *
+ * ON LIT LA TRANSFORMATION DU NŒUD LUI-MÊME, ET PAS SEULEMENT CELLES DE SES
+ * GROUPES. Le banc ne regardait que les `G` — c'était vrai tant que les
+ * formes n'en portaient pas. Le jour où la cible stricte d'un meuble a eu la
+ * sienne, ses points sont restés au coin de la page : la mesure était fausse
+ * et COHÉRENTE — le point cherché et la forme comparée étaient faux de la
+ * même façon — donc les épreuves passaient sans rien prouver.
+ */
 function versLaPage(noeud: TestRenderer.ReactTestInstance, p: Pt): Pt {
   const chaine: string[] = [];
   let n: TestRenderer.ReactTestInstance | null = noeud;
   while (n) {
-    if (n.type === G && typeof n.props.transform === 'string') {
+    if (
+      (n === noeud || n.type === G) &&
+      typeof n.props.transform === 'string'
+    ) {
       chaine.push(n.props.transform);
     }
     n = n.parent;
@@ -311,12 +323,20 @@ const monter = (fait: string[]) => {
 
 /** L'aplat dessiné du meuble, en points de page. */
 function aplatDuMeuble(t: TestRenderer.ReactTestRenderer): Pt[] {
-  const cible = t.root
+  /*
+    LE DESSIN SE LIT DANS LE GROUPE DU MEUBLE.
+
+    On y arrive par la cible TOLÉRANTE — « Autour du meuble… » —, la seule qui
+    soit restée avec le dessin ; la cible stricte, elle, a déménagé dans sa
+    propre couche, par-dessus tous les meubles. Le premier rectangle du groupe
+    est l'aplat.
+  */
+  const tolerante = t.root
     .findAllByType(Rect)
-    .find((n) => String(n.props.accessibilityLabel ?? '').startsWith('Meuble '))!;
-  // Le premier rectangle du même groupe, c'est le dessin ; la cible, elle,
-  // est posée en dernier et déborde de la marge de prise.
-  const dessin = cible.parent!.findAllByType(Rect)[0];
+    .find((n) =>
+      String(n.props.accessibilityLabel ?? '').startsWith('Autour du meuble '),
+    )!;
+  const dessin = tolerante.parent!.findAllByType(Rect)[0];
   const x = Number(dessin.props.x);
   const y = Number(dessin.props.y);
   const w = Number(dessin.props.width);
@@ -451,5 +471,149 @@ describe('un doigt posé sur le meuble d’une petite pièce', () => {
       y: mil.y + dx * (cible.large / 2 - 1),
     });
     expect(fait).toEqual([expect.stringMatching(/^mur:/)]);
+  });
+});
+
+/*
+  UN MEUBLE SUR UN AUTRE — celui qu'on vise est celui qu'on voit.
+
+  Releve du patron : « quand un meuble est sur un autre, impossible de
+  selectionner celui qu'on souhaite facilement… pourtant on clique sur celui
+  qu'on souhaite visuellement ».
+
+  Deux causes, et la premiere est la meme que celle du halo d'un mur. Chaque
+  meuble porte une cible plus large que son dessin — huit points de debord,
+  sans quoi une chaise dezoomee est invisable — et cette tolerance MORD sur le
+  voisin. La seconde est plus sournoise : l'ordre des cibles etait celui de la
+  LISTE DES MEUBLES, c'est-a-dire l'ordre du scan, qui ne veut rien dire a
+  l'ecran.
+*/
+describe('deux meubles qui se recouvrent', () => {
+  /** Un tapis, et une chaise posee dessus. */
+  const TAPIS = {
+    id: 'tapis',
+    category: 'storage',
+    width: 2,
+    depth: 1.4,
+    height: 0.05,
+    roomId: 'r2',
+    transform: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 5.8, 0.02, 5.2, 1],
+  };
+  const CHAISE = {
+    id: 'chaise',
+    category: 'chair',
+    width: 0.45,
+    depth: 0.45,
+    height: 0.9,
+    roomId: 'r2',
+    transform: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 5.8, 0.45, 5.2, 1],
+  };
+
+  const planAvecLesDeux = () => {
+    let t!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      useScanStore.setState({
+        walls: LOGEMENT,
+        openings: [],
+        objects: [TAPIS, CHAISE] as never,
+        rooms: [
+          { id: 'r1', name: 'Séjour', floor: null },
+          { id: 'r2', name: "Salle d'eau", floor: null },
+        ] as never,
+        fixtures: [],
+        ceiling: [],
+        photos: [],
+        notes: [],
+        niveauCourant: 0,
+        showFurniture: true,
+      });
+      t = TestRenderer.create(
+        <FloorplanEditor
+          showMeasures={false}
+          editable
+          selectedWallId={null}
+          onSelectWall={() => {}}
+          onSelectObject={() => {}}
+          onSelectRoom={() => {}}
+        />,
+      );
+    });
+    act(() => {
+      const zone = t.root
+        .findAllByType(View)
+        .find((n) => typeof n.props.onLayout === 'function')!;
+      zone.props.onLayout({ nativeEvent: { layout: { width: 600, height: 480 } } });
+    });
+    arbre = t;
+    return t;
+  };
+
+  /** Le dessin d'un meuble, en points de page. */
+  const aplatDe = (t: TestRenderer.ReactTestRenderer, nom: string): Pt[] => {
+    const cible = t.root
+      .findAllByType(Rect)
+      .find((n) => String(n.props.accessibilityLabel ?? '') === `Meuble ${nom}`)!;
+    const x = Number(cible.props.x);
+    const y = Number(cible.props.y);
+    const w = Number(cible.props.width);
+    const h = Number(cible.props.height);
+    return [
+      { x, y },
+      { x: x + w, y },
+      { x: x + w, y: y + h },
+      { x, y: y + h },
+    ].map((p) => versLaPage(cible, p));
+  };
+
+  it('le plus petit se prend là où on le voit, jusque dans ses coins', () => {
+    /*
+      La chaise est ENTIEREMENT contenue dans le tapis. Si le tapis gagnait,
+      elle serait injoignable — alors que le tapis, lui, reste attrapable
+      partout ailleurs. C'est le plus petit qui passe devant.
+    */
+    const t = planAvecLesDeux();
+    const liste = cibles(t);
+    const cibleChaise = t.root
+      .findAllByType(Rect)
+      .find((n) => String(n.props.accessibilityLabel ?? '') === 'Meuble Chaise')!;
+    const coins = aplatDe(t, 'Chaise');
+    const centre = {
+      x: coins.reduce((s2, p) => s2 + p.x, 0) / 4,
+      y: coins.reduce((s2, p) => s2 + p.y, 0) / 4,
+    };
+    const voleurs: string[] = [];
+    for (const coin of [...coins, centre]) {
+      const pt = {
+        x: coin.x + (centre.x - coin.x) * 0.2,
+        y: coin.y + (centre.y - coin.y) * 0.2,
+      };
+      const dessus = toucher(liste, pt);
+      if (dessus !== cibleChaise) voleurs.push(nommer(dessus));
+    }
+    expect(`appuis volés à la chaise : ${[...new Set(voleurs)].join(', ')}`).toBe(
+      'appuis volés à la chaise : ',
+    );
+  });
+
+  it('et le plus grand reste pris partout où le petit n’est pas', () => {
+    // Le contrôle en sens inverse : faire passer la chaise devant ne doit pas
+    // rendre le tapis injoignable.
+    const t = planAvecLesDeux();
+    const liste = cibles(t);
+    const cibleTapis = t.root
+      .findAllByType(Rect)
+      .find((n) => String(n.props.accessibilityLabel ?? '') === 'Meuble Rangement')!;
+    const coins = aplatDe(t, 'Rangement');
+    const centre = {
+      x: coins.reduce((s2, p) => s2 + p.x, 0) / 4,
+      y: coins.reduce((s2, p) => s2 + p.y, 0) / 4,
+    };
+    // Un point du tapis franchement à l'écart de la chaise : le quart de la
+    // diagonale depuis un coin.
+    const pt = {
+      x: coins[0].x + (centre.x - coins[0].x) * 0.25,
+      y: coins[0].y + (centre.y - coins[0].y) * 0.25,
+    };
+    expect(nommer(toucher(liste, pt))).toBe(nommer(cibleTapis));
   });
 });
