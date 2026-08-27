@@ -144,6 +144,71 @@ export function wiresOf(circuit: Circuit, fixtures?: Fixture[]): Wire[] {
   return out;
 }
 
+/** Ce qu'un départ dessert — c'est ce qui décide de ses conducteurs. */
+export type RoleDepart = 'commande' | 'lumiere' | 'autre';
+
+/**
+ * LES CONDUCTEURS D'UN DÉPART — et non ceux du circuit entier.
+ *
+ * Relevé du patron, le PDF en main : « pour l'éclairage, le PDF d'un simple
+ * allumage montre 4 fils, alors qu'il n'y a que le retour lampe, bleu,
+ * terre ». Il a raison, et l'erreur était de compter par CIRCUIT.
+ *
+ * Un circuit d'éclairage emploie bien quatre conducteurs — phase, neutre,
+ * terre, retour de lampe — mais aucun départ ne les porte tous les quatre.
+ * Tout remonte au tableau (relevé du patron, la veille), donc :
+ *
+ *   — VERS UNE COMMANDE : la phase y monte, le retour de lampe en
+ *     redescend. Pas de neutre — un interrupteur ne coupe que la phase — et
+ *     pas de terre : il n'y a rien à mettre à la terre dans un boîtier
+ *     d'appareillage. Un va-et-vient remplace le retour par ses deux
+ *     navettes du côté de la seconde commande ; on tire donc trois fils de
+ *     chaque côté, jamais six dans la même gaine ;
+ *   — VERS UN POINT LUMINEUX : le neutre, la terre, et le retour de lampe.
+ *     C'est exactement ce que dit le relevé — « retour lampe, bleu, terre » ;
+ *   — VERS AUTRE CHOSE, une prise commandée par exemple : phase, neutre,
+ *     terre, comme n'importe quel socle.
+ *
+ * ET ÇA NE CHANGE PAS QUE LE DESSIN. Le diamètre de la gaine se calcule sur
+ * le nombre de fils qu'elle avale (règle du tiers, voir `conduitPour`) :
+ * compter le circuit au lieu du départ faisait choisir de l'ICTA 20 là où du
+ * 16 suffit. On sur-commandait, sur le document même qui sert à commander.
+ */
+export function wiresOfRun(
+  circuit: Circuit,
+  role: RoleDepart,
+  vaEtVient = false,
+): Wire[] {
+  const section = circuit.section ?? 0;
+  if (circuit.section === null) {
+    return [
+      { role: 'phase', color: '#8A94A6', label: 'Paires torsadées', section: 0 },
+    ];
+  }
+  const fil = (r: WireRole): Wire => ({ role: r, ...WIRE_COLORS[r], section });
+  if (circuit.nature !== 'eclairage' || role === 'autre') {
+    return [fil('phase'), fil('neutre'), fil('terre')];
+  }
+  if (role === 'commande') {
+    return vaEtVient
+      ? [fil('phase'), fil('navette'), fil('navette')]
+      : [fil('phase'), fil('retour')];
+  }
+  return [fil('neutre'), fil('terre'), fil('retour')];
+}
+
+/** Ce circuit se câble-t-il en va-et-vient ? Deux commandes, ou un « va ». */
+export function estVaEtVient(circuit: Circuit, fixtures?: Fixture[]): boolean {
+  if (!fixtures) return false;
+  const poses = circuit.fixtureIds
+    .map((id) => fixtures.find((f) => f.id === id))
+    .filter((f): f is Fixture => !!f);
+  return (
+    poses.filter((f) => COMMANDES.includes(f.kind)).length >= 2 ||
+    poses.some((f) => f.kind === 'va')
+  );
+}
+
 export interface SchemaRow {
   /** Repère porté sur le plan et sur le tableau : C1, C2… */
   mark: string;
@@ -234,7 +299,21 @@ export function schemaRows(
 export interface MultiWireSchema {
   mark: string;
   label: string;
+  /** Tous les conducteurs du circuit, réunis : l'en-tête du départ. */
   wires: Wire[];
+  /**
+   * LE CÂBLAGE, DÉPART PAR DÉPART.
+   *
+   * Relevé du patron, le PDF en main : « pour l'éclairage, le PDF d'un simple
+   * allumage montre 4 fils, alors qu'il n'y a que le retour lampe, bleu,
+   * terre ».
+   *
+   * La feuille traçait les conducteurs du CIRCUIT, quatre traits qui
+   * couraient d'un bord à l'autre — ce qui est vrai du circuit et faux de
+   * chaque gaine. Un multifilaire montre le câblage : il se lit départ par
+   * départ, et chacun n'a que ses fils.
+   */
+  runs: { titre: string; wires: Wire[] }[];
   /** Appareils desservis, dans l'ordre du plan. */
   devices: { id: string; kind: FixtureKind; label: string }[];
   note?: string;
@@ -252,18 +331,72 @@ export function multiWire(
   const commandes = devices.filter((d) =>
     ['inter', 'inter2', 'inter3', 'va', 'poussoir', 'variateur'].includes(d.kind),
   ).length;
+  const va = estVaEtVient(circuit, fixtures);
+  /*
+    UN BLOC PAR NATURE DE DÉPART, ET SEULEMENT CEUX QU'ON A.
+
+    Trois départs vers trois points lumineux se câblent pareil : les répéter
+    remplirait la feuille de copies. On montre donc le TYPE de départ — vers
+    une commande, vers un point lumineux, vers le reste — et le nombre
+    d'appareils est déjà écrit en haut du bloc.
+  */
+  const aCommande = devices.some((d) => COMMANDES.includes(d.kind));
+  const aLumiere =
+    devices.some((d) => LUMIERES.includes(d.kind)) ||
+    (circuit.ceilingIds?.length ?? 0) > 0;
+  const aAutre = devices.some(
+    (d) => !COMMANDES.includes(d.kind) && !LUMIERES.includes(d.kind),
+  );
+  const runs: { titre: string; wires: Wire[] }[] = [];
+  if (circuit.nature !== 'eclairage' || circuit.section === null) {
+    runs.push({
+      titre: 'Vers chaque appareil',
+      wires: wiresOfRun(circuit, 'autre'),
+    });
+  } else {
+    if (aCommande) {
+      runs.push({
+        titre: va ? 'Vers chaque commande' : 'Vers la commande',
+        wires: wiresOfRun(circuit, 'commande', va),
+      });
+    }
+    if (aLumiere) {
+      runs.push({
+        titre: 'Vers le point lumineux',
+        wires: wiresOfRun(circuit, 'lumiere', va),
+      });
+    }
+    if (aAutre) {
+      runs.push({
+        titre: 'Vers les autres appareils',
+        wires: wiresOfRun(circuit, 'autre', va),
+      });
+    }
+  }
+
   return {
     mark,
     label: circuit.label,
     wires: wiresOf(circuit, fixtures),
+    runs,
     devices,
     note:
       circuit.nature === 'eclairage' && commandes > 1
         ? 'Deux commandes ou plus : va-et-vient, deux navettes entre les ' +
           'boîtiers, retour de lampe au point lumineux.'
-        : circuit.nature === 'eclairage' &&
-          !devices.some((d) => LUMIERES.includes(d.kind))
-        ? 'Aucun point lumineux posé sur ce circuit : pas de retour de ' +
+        : circuit.nature === 'eclairage' && !aLumiere
+        ? /*
+             LE PLAFOND COMPTE AUSSI — et la note l'ignorait.
+
+             Elle ne regardait que l'appareillage MURAL. Sur un circuit
+             commandant un DCL, la feuille dessinait le retour de lampe et
+             écrivait dessous « aucun point lumineux posé sur ce circuit » :
+             deux phrases contradictoires sur la même ligne. C'est la même
+             frontière interne qui avait déjà fait sous-compter les
+             conducteurs (voir `wiresOf`) — un point de plafond ne vit pas
+             dans la liste des appareils de mur.
+          */
+          'Aucun point lumineux posé sur ce circuit : pas de retour de ' +
           'lampe. Ajoutez le point sur le plan pour l’obtenir.'
         : circuit.section === null
         ? 'Courants faibles : paires torsadées, jamais dans la même gaine ' +

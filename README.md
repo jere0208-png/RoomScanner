@@ -9032,6 +9032,51 @@ l'écran finit par mentir au calcul.
 celui qui compte les mètres après un déliage — parce que ce n'est pas une
 étiquette, c'est du cuivre.
 
+### Un simple allumage ne tire pas quatre fils dans la même gaine
+
+Relevé du patron, le PDF en main : « pour l'éclairage, le PDF d'un simple
+allumage montre 4 fils, alors qu'il n'y a que le retour lampe, bleu, terre ».
+
+Il a raison, et l'erreur était de compter **par circuit**. Un circuit
+d'éclairage emploie bien quatre conducteurs — phase, neutre, terre, retour de
+lampe — mais aucun départ ne les porte tous les quatre. Tout remonte au tableau,
+donc :
+
+- **vers une commande** : la phase monte, le retour redescend. Pas de neutre, un
+  interrupteur ne coupe que la phase ; pas de terre, il n'y a rien à mettre à la
+  terre dans un boîtier d'appareillage ;
+- **vers un point lumineux** : le neutre, la terre, et le retour de lampe. Mot
+  pour mot le relevé.
+
+Un va-et-vient tire trois fils de chaque côté — phase et deux navettes vers les
+commandes, neutre, terre et retour vers le point — jamais six dans la même
+gaine.
+
+**Et ce n'était pas qu'un dessin.** Le diamètre se calcule sur le nombre de fils
+que la gaine avale (règle du tiers) : compter le circuit faisait choisir de
+l'**ICTA 20 là où du 16 suffit** sur un va-et-vient en 1,5. Et la phase était
+commandée jusqu'à une lampe qui n'en veut pas — sur un circuit d'essai à trois
+départs, elle tombe de 50 m à 30 m, le neutre à 37 m.
+
+Le multifilaire se lit maintenant **départ par départ**, chacun avec ses seuls
+fils, au lieu de quatre traits qui couraient d'un bord à l'autre de la feuille.
+Vérifié à l'œil sur le PDF rendu.
+
+#### Deux choses trouvées en chemin
+
+**La note du schéma se contredisait.** Elle dessinait le retour de lampe et
+écrivait dessous « aucun point lumineux posé sur ce circuit ». Elle ne regardait
+que l'appareillage mural — la même frontière interne qui avait déjà fait
+sous-compter les conducteurs : un point de plafond ne vit pas dans la liste des
+appareils de mur.
+
+**Une épreuve ne démontrait rien.** Elle comparait quatre fils à trois en
+2,5 mm² pour montrer le gain de diamètre — et les deux tombent sur de l'ICTA 20.
+La règle du tiers a des paliers, et un écart de comptage n'en franchit pas
+toujours un. Une épreuve qui ne prouve rien est pire qu'une épreuve absente :
+elle donne l'impression que le sujet est gardé. Elle montre maintenant le cas où
+l'écart se paie.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

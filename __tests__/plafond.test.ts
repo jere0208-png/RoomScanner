@@ -450,6 +450,7 @@ describe('le plafond au bordereau', () => {
       circuitId: 'c1',
       label: 'Éclairage',
       section: 1.5,
+      nature: 'prises' as const,
       brins: TROIS_FILS(1.5),
       fils: 3,
       conduit: 16 as const,

@@ -109,6 +109,7 @@ describe('la liste d’achat', () => {
       circuitId: 'c1',
       label: 'Prises',
       section: 2.5,
+      nature: 'prises' as const,
       brins: TROIS_FILS(2.5),
       fils: 3,
       conduit: 20,
@@ -129,6 +130,7 @@ describe('la liste d’achat', () => {
       circuitId: 'c2',
       label: 'Éclairage',
       section: 1.5,
+      nature: 'prises' as const,
       brins: TROIS_FILS(1.5),
       fils: 3,
       conduit: 16,
@@ -148,6 +150,7 @@ describe('la liste d’achat', () => {
       circuitId: 'c3',
       label: 'VDI',
       section: null,
+      nature: 'vdi' as const,
     // Un courant faible n'a ni phase ni terre : ce sont des paires.
     brins: [],
       fils: 3,
@@ -285,7 +288,21 @@ describe('la liste d’achat', () => {
       undefined,
       [fx('i1', 'inter')],
     );
-    expect(lignes[0].fils).toBe(4);
+    /*
+      QUATRE CONDUCTEURS AU CIRCUIT, TROIS DANS LA GAINE.
+
+      Deuxieme version de cette epreuve. Elle exigeait `fils === 4` : le
+      circuit emploie bien quatre conducteurs — phase, neutre, terre, retour —
+      et l'on en concluait que la gaine en portait quatre. Releve du patron,
+      le PDF en main : « pour l'eclairage, le PDF d'un simple allumage montre
+      4 fils, alors qu'il n'y a que le retour lampe, bleu, terre ».
+
+      Il a raison : aucun depart ne porte les quatre. Vers la commande montent
+      la phase et le retour ; vers le point lumineux, le neutre, la terre et
+      le retour. Le diametre suit donc le depart le plus charge — trois — et
+      non le circuit.
+    */
+    expect(lignes[0].fils).toBe(3);
     const roles = lignes[0].brins.map((b) => b.role).sort();
     expect(roles).toEqual(['neutre', 'phase', 'retour', 'terre']);
 
@@ -344,12 +361,28 @@ describe('la liste d’achat', () => {
       [fx('i1', 'inter'), fx('p9', 'prise')],
     );
     const list = buyingList(lignes, [fx('i1', 'inter'), fx('p9', 'prise')]);
-    const retour = list.find((r) => r.code === 'fil-1.5-retour')!;
-    const phase = list.find((r) => r.code === 'fil-1.5-phase')!;
-    // Le retour : 13 + 20 = 33 m. La phase alimente tout : 13 + 20 + 17 = 50.
-    expect(retour.note).toContain('33 m');
-    expect(retour.note).toContain('départs des commandes et des points lumineux');
-    expect(phase.note).toContain('50 m');
+    const trouve = (role: string) =>
+      list.find((r) => r.code === `fil-1.5-${role}`)!;
+    /*
+      CHAQUE CONDUCTEUR SUR SES SEULS DEPARTS.
+
+      Deuxieme version. La premiere faisait courir la phase, le neutre et la
+      terre sur TOUS les departs — cinquante metres chacun — et ne reservait
+      le compte par depart qu'au retour et aux navettes. C'etait encore trop :
+      la phase ne va pas jusqu'a la lampe, le neutre ne monte pas a
+      l'interrupteur.
+
+      Ici : commande a 13 m, point lumineux a 20 m, prise commandee a 17 m.
+        — phase   : la commande et la prise, 13 + 17 = 30 ;
+        — neutre  : le point et la prise, 20 + 17 = 37 ;
+        — retour  : la commande et le point, 13 + 20 = 33.
+    */
+    expect(trouve('phase').note).toContain('30 m');
+    expect(trouve('neutre').note).toContain('37 m');
+    expect(trouve('retour').note).toContain('33 m');
+    expect(trouve('retour').note).toContain(
+      'départs des commandes et des points lumineux',
+    );
   });
 
   it('et les navettes ne courent que sur les départs des commandes', () => {
@@ -393,12 +426,19 @@ describe('la liste d’achat', () => {
     expect(navette.note).toContain('départs des commandes');
   });
 
-  it('et un VA-ET-VIENT fait grossir la gaine', () => {
+  it('et sans métré, un VA-ET-VIENT majore la gaine', () => {
     /*
-      Le controle en sens inverse du diametre : six conducteurs en 1,5 ne
-      passent pas dans un ICTA 16 — la regle du tiers l'interdit. Une gaine
-      choisie sur la seule section aurait annonce du 16, et le tirage se
-      serait fait au treuil.
+      DEUX LECTURES, ET LA PRUDENTE GAGNE QUAND ON NE SAIT PAS.
+
+      Un va-et-vient emploie six conducteurs — phase, neutre, terre, retour et
+      deux navettes — mais aucune gaine ne les porte tous : vers chaque
+      commande montent la phase et les deux navettes, vers le point le neutre,
+      la terre et le retour. Trois de chaque cote.
+
+      Sans metre, on ne sait pas ce que dessert chaque depart : on garde alors
+      le compte du CIRCUIT, six, et l'on commande de l'ICTA 20. C'est trop
+      large, et c'est voulu — une gaine trop juste se paie au treuil, une
+      gaine trop large ne se paie qu'une fois.
     */
     const va: Circuit = {
       id: 'e2',

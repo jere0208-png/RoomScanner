@@ -25,7 +25,13 @@ import { CEILINGS, type CeilingFixture } from './ceiling';
 import { FIXTURES, postsOf, type Fixture } from './electrical';
 import type { Circuit } from './nfc15100';
 import type { TronconMetre } from './elecplan';
-import { wiresOf, type Wire } from './schema';
+import {
+  estVaEtVient,
+  wiresOf,
+  wiresOfRun,
+  type RoleDepart,
+  type Wire,
+} from './schema';
 
 /** Diamètre extérieur du conduit ICTA, en millimètres. */
 export type ConduitD = 16 | 20 | 25 | 32;
@@ -145,6 +151,13 @@ export interface PullRow {
   troncons: TronconMetre[];
   /** Section des conducteurs (mm²), nulle en courants faibles. */
   section: number | null;
+  /**
+   * La nature du circuit — prises, éclairage, cuisson…
+   *
+   * Elle décide des conducteurs de chaque départ : un éclairage n'envoie pas
+   * les mêmes fils vers sa commande et vers son point (voir `wiresOfRun`).
+   */
+  nature: Circuit['nature'];
   conduit: ConduitD;
   /** Nombre de départs tirés depuis le tableau. */
   runs: number;
@@ -186,7 +199,27 @@ export function pullSchedule(
   return circuits.map((c) => {
     const m = metre?.get(c.id);
     const brins = wiresOf(c, fixtures);
-    const fils = brins.length;
+    /*
+      LE DIAMÈTRE SUIT LE DÉPART LE PLUS CHARGÉ, PAS LE CIRCUIT.
+
+      Relevé du patron, le PDF en main : « pour l'éclairage, le PDF d'un
+      simple allumage montre 4 fils, alors qu'il n'y a que le retour lampe,
+      bleu, terre ». Un circuit d'éclairage emploie bien quatre conducteurs,
+      mais aucune gaine ne les porte tous les quatre (voir `wiresOfRun`).
+
+      On sur-commandait donc : la règle du tiers voyait quatre fils là où
+      trois passent, et proposait de l'ICTA 20 pour du 16. C'est le départ le
+      plus chargé qui décide — et sans le détail des rôles, on garde le
+      compte du circuit, qui majore.
+    */
+    const va = estVaEtVient(c, fixtures);
+    const roles = new Set((m?.troncons ?? []).map((t) => t.role));
+    const fils =
+      roles.has('commande') || roles.has('lumiere')
+        ? Math.max(
+            ...[...roles].map((r) => wiresOfRun(c, r as RoleDepart, va).length),
+          )
+        : brins.length;
     return {
       brins,
       /*
@@ -215,6 +248,7 @@ export function pullSchedule(
       circuitId: c.id,
       label: c.label,
       section: c.section,
+      nature: c.nature,
       fils,
       conduit: conduitPour(c.section, fils),
       runs: m?.runs ?? c.fixtureIds.length,
@@ -469,31 +503,50 @@ export function buyingList(
     */
     const roles = new Set(bouts.map((b) => b.role));
     const connu = roles.has('commande') || roles.has('lumiere');
-    const concerne = (w: Wire) => {
-      if (!connu || w.role === 'phase' || w.role === 'neutre' || w.role === 'terre') {
-        return bouts;
-      }
-      if (w.role === 'retour') {
-        return bouts.filter((b) => b.role === 'commande' || b.role === 'lumiere');
-      }
-      return bouts.filter((b) => b.role === 'commande');
-    };
-    for (const w of r.brins) {
-      const miens = concerne(w);
-      if (miens.length === 0) continue;
-      const cle = `${r.section}|${w.role}`;
-      const e = parBrin.get(cle);
-      const metres = miens.reduce((t, b) => t + b.cable, 0);
-      if (e) {
-        e.metres += metres;
-        e.bouts.push(...miens.map((b) => b.cable));
-      } else {
-        parBrin.set(cle, {
-          section: r.section,
-          wire: w,
-          metres,
-          bouts: miens.map((b) => b.cable),
-        });
+    /*
+      CHAQUE DÉPART PORTE SES CONDUCTEURS, ET RIEN D'AUTRE.
+
+      C'était déjà vrai du retour de lampe et des navettes ; ça l'est
+      maintenant du neutre et de la phase. Relevé du patron : un départ vers
+      un point lumineux porte « retour lampe, bleu, terre » — pas de phase, la
+      commande la garde. Compter la phase jusqu'à la lampe, c'était une
+      couronne de rouge en trop sur chaque logement.
+
+      Sans le détail des rôles — un métré ancien, ou pas de métré du tout —
+      chaque tronçon reçoit tous les conducteurs du circuit : on retombe sur
+      l'ancien compte, qui majore. Mieux vaut majorer que manquer.
+    */
+    /*
+      LE VA-ET-VIENT SE LIT SUR LA LIGNE, pas sur les appareils.
+
+      La ligne de tirage porte déjà ses conducteurs (`brins`) : s'il y a des
+      navettes, c'est un va-et-vient. Le redemander à la liste des appareils
+      obligeait à reconstruire un circuit qu'on n'a plus ici — et un circuit
+      reconstruit de travers rend une réponse, jamais une erreur.
+    */
+    const va = r.brins.some((w) => w.role === 'navette');
+    for (const b of bouts) {
+      const siens = connu
+        ? wiresOfRun(
+            { nature: r.nature, section: r.section } as never,
+            b.role,
+            va,
+          )
+        : r.brins;
+      for (const w of siens) {
+        const cle = `${r.section}|${w.role}`;
+        const e = parBrin.get(cle);
+        if (e) {
+          e.metres += b.cable;
+          e.bouts.push(b.cable);
+        } else {
+          parBrin.set(cle, {
+            section: r.section,
+            wire: w,
+            metres: b.cable,
+            bouts: [b.cable],
+          });
+        }
       }
     }
   }

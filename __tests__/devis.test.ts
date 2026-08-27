@@ -61,6 +61,7 @@ const TIRAGE: PullRow[] = [
     circuitId: 'c1',
     label: 'Prises — Séjour',
     section: 2.5,
+    nature: 'prises' as const,
     brins: TROIS_FILS(2.5),
     fils: 3,
     conduit: 20,
@@ -77,6 +78,7 @@ const TIRAGE: PullRow[] = [
     circuitId: 'c2',
     label: 'Éclairage',
     section: 1.5,
+    nature: 'prises' as const,
     brins: TROIS_FILS(1.5),
     fils: 3,
     conduit: 16,
@@ -93,6 +95,7 @@ const TIRAGE: PullRow[] = [
     circuitId: 'c3',
     label: 'Communication',
     section: null,
+    nature: 'vdi' as const,
     // Un courant faible n'a ni phase ni terre : ce sont des paires.
     brins: [],
     fils: 3,

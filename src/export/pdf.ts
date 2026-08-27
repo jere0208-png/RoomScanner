@@ -3546,7 +3546,9 @@ function multifilairePage(
 
   for (const m of multi) {
     const noteLignes = m.note ? wrapText(m.note, 7.5, w - 26) : [];
-    const h = 22 + m.wires.length * FIL_H + noteLignes.length * 10 + 12;
+    // Chaque départ porte son titre et ses fils : voir `MultiWireSchema.runs`.
+    const fils = m.runs.reduce((t, r) => t + r.wires.length, 0);
+    const h = 22 + m.runs.length * 12 + fils * FIL_H + noteLignes.length * 10 + 12;
     if (y - h < BAS) {
       restants += 1;
       continue;
@@ -3565,23 +3567,35 @@ function multifilairePage(
       );
     }
     y -= 24;
-    for (const fil of m.wires) {
-      d.text(fil.label, x0 + 26, y - 2, 6.5, fil.color, { align: 'left' });
-      d.line(DEBUT_TRAIT, y, x0 + w, y, 1.4, fil.color);
-      // La terre est BICOLORE sur le chantier : un tireté jaune court sur
-      // le vert — c'est à cette livrée qu'on la reconnaît d'un coup d'œil.
-      if (fil.role === 'terre') {
-        d.dashedPath(
-          [
-            { x: DEBUT_TRAIT, y },
-            { x: x0 + w, y },
-          ],
-          0.7,
-          '#E7C51B',
-          [4, 4],
-        );
+    /*
+      UN BLOC PAR DÉPART — relevé du patron : « le PDF d'un simple allumage
+      montre 4 fils, alors qu'il n'y a que le retour lampe, bleu, terre ».
+
+      La feuille traçait les conducteurs du CIRCUIT, d'un bord à l'autre : vrai
+      du circuit, faux de chaque gaine. Un multifilaire se lit départ par
+      départ, et chacun n'a que ses fils.
+    */
+    for (const run of m.runs) {
+      d.text(run.titre, x0 + 26, y - 2, 7.5, INK, { bold: true, align: 'left' });
+      y -= 12;
+      for (const fil of run.wires) {
+        d.text(fil.label, x0 + 34, y - 2, 6.5, fil.color, { align: 'left' });
+        d.line(DEBUT_TRAIT, y, x0 + w, y, 1.4, fil.color);
+        // La terre est BICOLORE sur le chantier : un tireté jaune court sur
+        // le vert — c'est à cette livrée qu'on la reconnaît d'un coup d'œil.
+        if (fil.role === 'terre') {
+          d.dashedPath(
+            [
+              { x: DEBUT_TRAIT, y },
+              { x: x0 + w, y },
+            ],
+            0.7,
+            '#E7C51B',
+            [4, 4],
+          );
+        }
+        y -= FIL_H;
       }
-      y -= FIL_H;
     }
     for (const l of noteLignes) {
       d.text(l, x0 + 26, y - 2, 7.5, GREY, { align: 'left' });
