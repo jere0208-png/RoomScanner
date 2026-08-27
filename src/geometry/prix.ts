@@ -62,30 +62,25 @@ export interface Gamme {
 }
 
 /**
- * LES GAMMES PROPOSÉES, de la plus courante à la plus habillée.
+ * LES GAMMES PROPOSÉES, LA PLUS COURANTE EN PREMIER.
  *
  * Relevé du patron : « le modèle d'appareillage voulu : Legrand Céliane,
  * Legrand Mosaïc, etc. ». On en garde cinq — trois Legrand, deux Schneider —
  * parce qu'au-delà on ne choisit plus, on feuillette.
+ *
+ * L'ORDRE N'EST PAS CELUI DU PRIX. Elles étaient rangées du moins cher au
+ * plus habillé, ce qui paraissait logique et ne l'était pas : relevé du
+ * patron, « mets le Legrand Céliane et Mosaic en premier, c'est les plus
+ * communs ». Une liste de choix se range par ce qu'on prend le plus souvent,
+ * pas par ce qu'elle coûte — l'électricien qui pose du Céliane toute la
+ * semaine ne doit pas faire défiler trois lignes pour le trouver.
  */
 export const GAMMES: Gamme[] = [
   {
-    id: 'dooxie',
+    id: 'celiane',
     marque: 'Legrand',
-    nom: 'dooxie',
-    note: 'L’entrée de gamme Legrand : complet, blanc, pose rapide.',
-  },
-  {
-    id: 'ovalis',
-    marque: 'Schneider',
-    nom: 'Ovalis',
-    note: 'L’équivalent Schneider : le moins cher qui tienne le chantier.',
-  },
-  {
-    id: 'odace',
-    marque: 'Schneider',
-    nom: 'Odace',
-    note: 'Milieu de gamme, plaques interchangeables.',
+    nom: 'Céliane',
+    note: 'Le haut de gamme Legrand, matières et finitions.',
   },
   {
     id: 'mosaic',
@@ -94,10 +89,22 @@ export const GAMMES: Gamme[] = [
     note: 'Support + mécanisme + enjoliveur : le modulaire du tertiaire.',
   },
   {
-    id: 'celiane',
+    id: 'dooxie',
     marque: 'Legrand',
-    nom: 'Céliane',
-    note: 'Le haut de gamme Legrand, matières et finitions.',
+    nom: 'dooxie',
+    note: 'L’entrée de gamme Legrand : complet, blanc, pose rapide.',
+  },
+  {
+    id: 'odace',
+    marque: 'Schneider',
+    nom: 'Odace',
+    note: 'Milieu de gamme, plaques interchangeables.',
+  },
+  {
+    id: 'ovalis',
+    marque: 'Schneider',
+    nom: 'Ovalis',
+    note: 'L’équivalent Schneider : le moins cher qui tienne le chantier.',
   },
 ];
 

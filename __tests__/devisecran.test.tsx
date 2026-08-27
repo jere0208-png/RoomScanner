@@ -1,33 +1,33 @@
 /**
- * L'ECRAN DU DEVIS — la pastille verte, les trois etapes, et le plan qui
- * explique le prix.
+ * L'ECRAN DU DEVIS — le bouton du plan, les trois etapes, le ticket.
  *
- * Releve du patron, 27/08/2026 : « Un bouton visible en haut, a gauche de
- * l'icone normes. Anime comme elle, mais en VERT, avec € et ? qui alternent.
- * Au clic, une page de questions etape par etape… Le resultat : un prix
- * approximatif, avec un recap detaille, et un plan qui explique pourquoi ce
- * prix : une animation qui met en valeur les interrupteurs (par exemple), et
- * affiche leur nombre et le prix moyen public. »
+ * TROIS FORMES, ET DEUX ONT ECHOUE SUR LE MEME POINT : LE DEFILEMENT.
  *
- * CE QUE CE BANC TIENT, ET POURQUOI.
+ *   PREMIERE — une feuille modale, le plan au-dessus d'une liste a hauteur
+ *   bornee. « Le scroll sur la liste des produits du devis est casse, il
+ *   marche rarement. »
  *
- *   LA PLACE DE LA PASTILLE. « A gauche de l'icone normes » n'est pas un
- *   detail de gout : les deux boutons repondent a deux questions qu'on se
- *   pose l'une apres l'autre, et l'ordre de lecture est l'ordre des
- *   questions. Une ligne de code deplacee suffirait a l'inverser sans que
- *   rien ne le signale — le banc lit donc la source.
+ *   DEUXIEME — la meme feuille, mais un seul rouleau, plan compris. Mieux, et
+ *   toujours faux : « ca ne scrolle pas du tout ».
  *
- *   L'ETAPE DES EXCLUSIONS PASSE AVANT LE PRIX. C'est la seule page qui
- *   empeche un malentendu de mille euros. Quelqu'un qui lit le total sans
- *   avoir lu « luminaires non compris » n'a pas lu le devis, il a lu un
- *   chiffre.
+ *   TROISIEME — une PAGE. « Fais des pages entieres pas des pop-up. »
  *
- *   LE PLAN DIT LE MEME NOMBRE QUE LE RECAP. Le nombre ecrit sous le dessin
- *   et celui du chiffrage doivent etre le MEME nombre — sinon l'ecran se
- *   contredit lui-meme, sur une seule page.
+ * ET LA CAUSE ETAIT DANS LA COQUILLE, PAS DANS LA MISE EN PAGE. `SheetShell`
+ * enveloppe son contenu dans deux `Pressable` — le voile qui ferme, et la
+ * feuille qui arrete l'appui pour ne pas se fermer sous le doigt. Un
+ * `Pressable` prend le geste DES LE POSE ; une liste posee dessous doit le
+ * lui reprendre au premier millimetre de mouvement, et ce rattrapage ne se
+ * fait pas. Compter les zones de defilement — ce que faisait le banc de la
+ * deuxieme forme — ne pouvait donc pas suffire : il mesurait le symptome.
  *
- *   ET LA BAGUE NE SE POSE QUE SUR LE LOT DESIGNE. Une bague sur tout ne
- *   designe rien.
+ * LE BANC MESURE MAINTENANT LA CAUSE : aucun ancetre du rouleau ne doit
+ * prendre l'appui au pose. C'est vrai d'une page, et c'etait faux d'une
+ * feuille sous n'importe quelle mise en page.
+ *
+ * LE BOUTON A EU DEUX VERSIONS AUSSI. Anime, vert, avec « € » et « ? » qui
+ * alternaient — puis, une fois le devis en main : « modifie le en un bouton
+ * pas dynamique, discret, ou on affiche le € total mis a jour a chaque
+ * modification ». Une fois qu'on sait repondre, on ne demande plus.
  */
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn(async () => null),
@@ -38,22 +38,18 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import React from 'react';
-import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { Image, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { Path } from 'react-native-svg';
 import TestRenderer, { act } from 'react-test-renderer';
-import { DevisPastille } from '../src/components/DevisPastille';
-import { DevisSheet } from '../src/components/DevisSheet';
+import { DevisPastille, prixCourt } from '../src/components/DevisPastille';
+import { DevisScreen } from '../src/screens/DevisScreen';
 import { FloorplanEditor } from '../src/components/FloorplanEditor';
-import { buyingList, type PullRow } from '../src/geometry/conduits';
-import { chiffrer } from '../src/geometry/devis';
+import { chiffrerLePlan } from '../src/geometry/devisplan';
 import { postsSymbol, type Fixture, type FixtureKind } from '../src/geometry/electrical';
-import type { Circuit, Differential } from '../src/geometry/nfc15100';
 import { GAMMES } from '../src/geometry/prix';
+import { PHOTOS } from '../src/ui/produits';
 import { useScanStore } from '../src/store/scanStore';
 import type { WallSeg } from '../src/geometry/floorplan';
-
-beforeAll(() => jest.useFakeTimers());
-afterAll(() => jest.useRealTimers());
 
 let arbre: TestRenderer.ReactTestRenderer | null = null;
 afterEach(() => {
@@ -72,14 +68,12 @@ const mots = (t: TestRenderer.ReactTestRenderer): string[] =>
     )
     .filter((s) => s.length > 0);
 
-// ---------------------------------------------------------------- la pastille
+// ---------------------------------------------------------------- le bouton
 
-describe('la pastille du devis', () => {
-  it('se pose à GAUCHE de celle des normes', () => {
-    /*
-      Le banc lit la source : c'est un ORDRE dans un rendu, et rien d'autre
-      ne le garde. Une pastille qui passerait a droite le ferait en silence.
-    */
+describe('le bouton du plan', () => {
+  it('se pose à GAUCHE de celui des normes', () => {
+    // Le banc lit la source : c'est un ORDRE dans un rendu, et rien d'autre
+    // ne le garde.
     const src = readFileSync(
       join(__dirname, '..', 'src', 'screens', 'ResultScreen.tsx'),
       'utf8',
@@ -93,56 +87,57 @@ describe('la pastille du devis', () => {
     );
   });
 
-  it('porte les deux signes, € et ?', () => {
+  it('et il ouvre une PAGE, pas une feuille', () => {
+    // La correction du défilement tient dans cette ligne : une page entière,
+    // routée comme les quatre autres écrans, et non une fenêtre posée sur le
+    // plan.
+    const src = readFileSync(
+      join(__dirname, '..', 'src', 'screens', 'ResultScreen.tsx'),
+      'utf8',
+    );
+    expect(src).toContain("setScreen('devis')");
+    expect(src).not.toContain('DevisSheet');
+  });
+
+  it('affiche le total, et rien d’autre', () => {
+    /*
+      LA VERSION RETIREE demandait « € ? » en fondu ; celle-ci REPOND. Un
+      bouton qui pose une question invite a ouvrir une page pour connaitre un
+      chiffre qu'on pouvait ecrire la.
+    */
     let t!: TestRenderer.ReactTestRenderer;
     act(() => {
-      t = TestRenderer.create(<DevisPastille onPress={() => {}} />);
+      t = TestRenderer.create(<DevisPastille total={793.3} onPress={() => {}} />);
     });
     arbre = t;
-    expect(mots(t)).toEqual(expect.arrayContaining(['€', '?']));
+    expect(mots(t)).toEqual(['793 €']);
+  });
+
+  it('écrit court : au-delà du millier, on passe au k€', () => {
+    // Sur un bouton posé au-dessus d'un plan, « 1 284,50 € » prend la largeur
+    // de deux pièces.
+    expect(prixCourt(48)).toBe('48 €');
+    expect(prixCourt(793.3)).toBe('793 €');
+    expect(prixCourt(1284.5)).toBe('1,3 k€');
+    expect(prixCourt(12840)).toBe('12,8 k€');
   });
 
   it('et se tait quand il n’y a rien à chiffrer', () => {
-    // Le contrôle en sens inverse : un devis à zéro euro est une réponse,
-    // mais pas la bonne. La pastille le dit dans son nom parlé.
+    // Le contrôle en sens inverse : afficher « 0 € » est une réponse, mais
+    // pas la bonne.
     let t!: TestRenderer.ReactTestRenderer;
     act(() => {
-      t = TestRenderer.create(<DevisPastille actif={false} onPress={() => {}} />);
+      t = TestRenderer.create(<DevisPastille total={null} onPress={() => {}} />);
     });
     arbre = t;
-    const bouton = t.root.findAllByType(TouchableOpacity)[0];
-    expect(String(bouton.props.accessibilityLabel)).toContain('rien de posé');
+    expect(mots(t)).toEqual(['—']);
+    expect(
+      String(t.root.findAllByType(TouchableOpacity)[0].props.accessibilityLabel),
+    ).toContain('rien de posé');
   });
 });
 
-// ------------------------------------------------------------------ la feuille
-
-const TIRAGE: PullRow[] = [
-  {
-    circuitId: 'c1',
-    label: 'Prises',
-    section: 2.5,
-    fils: 3,
-    conduit: 20,
-    runs: 6,
-    conduitLength: 48,
-    cableLength: 53,
-    approx: false,
-    protection: '20 A',
-  },
-  {
-    circuitId: 'c2',
-    label: 'Éclairage',
-    section: 1.5,
-    fils: 3,
-    conduit: 16,
-    runs: 4,
-    conduitLength: 32,
-    cableLength: 35,
-    approx: false,
-    protection: '16 A',
-  },
-];
+// -------------------------------------------------------------------- la page
 
 const mur = (id: string, ax: number, az: number, bx: number, bz: number): WallSeg => ({
   id,
@@ -171,95 +166,61 @@ const fx = (id: string, kind: Fixture['kind'], along: number): Fixture => ({
 });
 
 const APPAREILS: Fixture[] = [
-  fx('p1', 'prise', 1),
-  fx('p2', 'prise', 2),
-  fx('p3', 'prise', 3),
-  fx('i1', 'inter', 4),
-  fx('i2', 'va', 4.5),
+  fx('p1', 'prise', 0.6),
+  fx('p2', 'prise', 1.2),
+  fx('p3', 'prise', 1.8),
+  fx('p4', 'prise20', 2.4),
+  fx('i1', 'inter', 3),
+  fx('i2', 'va', 3.6),
+  fx('r1', 'rj45', 4.2),
 ];
 
-const CIRCUITS: Circuit[] = [
-  {
-    id: 'c1',
-    label: 'Prises',
-    nature: 'prises',
-    points: 3,
-    section: 2.5,
-    breaker: 20,
-    rooms: ['Séjour'],
-    fixtureIds: ['p1', 'p2', 'p3'],
-  },
-  {
-    id: 'c2',
-    label: 'Éclairage',
-    nature: 'eclairage',
-    points: 2,
-    section: 1.5,
-    breaker: 16,
-    rooms: ['Séjour'],
-    fixtureIds: ['i1', 'i2'],
-  },
-];
+const ROOMS = [{ id: 'r1', name: 'Séjour', floor: null }];
 
-const DIFFS: Differential[] = [
-  { label: 'A 1', type: 'A', rating: 40, circuits: ['c1'] },
-];
-
-const ACHATS = buyingList(TIRAGE, APPAREILS, []);
-
-const poserLePlan = () =>
-  useScanStore.setState({
-    walls: MURS,
-    openings: [],
-    objects: [],
-    rooms: [{ id: 'r1', name: 'Séjour', floor: null }] as never,
-    fixtures: APPAREILS,
-    ceiling: [],
-    photos: [],
-    notes: [],
-    niveauCourant: 0,
-  });
-
-const ouvrir = (gamme = GAMMES[0].id) => {
-  let t!: TestRenderer.ReactTestRenderer;
-  act(() => {
-    poserLePlan();
-    t = TestRenderer.create(
-      <DevisSheet
-        visible
-        onClose={() => {}}
-        achats={ACHATS}
-        circuits={CIRCUITS}
-        differentiels={DIFFS}
-        gamme={gamme}
-        onGamme={() => {}}
-      />,
-    );
-  });
-  mesurer(t);
-  arbre = t;
-  return t;
-};
+const devisAttendu = () =>
+  chiffrerLePlan(MURS, ROOMS as never, APPAREILS, [], GAMMES[0].id);
 
 /*
   ON MESURE APRÈS CHAQUE ÉTAPE, ET PAS SEULEMENT À L'OUVERTURE.
 
   Le plan n'apparaît qu'au troisième écran : servir la mise en page une fois
   pour toutes, au montage, laissait ce plan-là à zéro pixel. Il ne dessinait
-  rien — et le banc mesurait un dessin vide en croyant compter des bagues.
-  Il criait donc juste, pour la mauvaise raison.
+  rien — et le banc mesurait un dessin vide en croyant compter des symboles.
 */
 function mesurer(t: TestRenderer.ReactTestRenderer) {
   act(() => {
     for (const n of t.root.findAllByType(View)) {
       if (typeof n.props.onLayout === 'function') {
-        n.props.onLayout({ nativeEvent: { layout: { width: 340, height: 200 } } });
+        n.props.onLayout({ nativeEvent: { layout: { width: 360, height: 240 } } });
       }
     }
   });
 }
 
-/** Le bouton d'une feuille, par son nom parlé. */
+const ouvrir = () => {
+  let t!: TestRenderer.ReactTestRenderer;
+  act(() => {
+    useScanStore.setState({
+      walls: MURS,
+      openings: [],
+      objects: [],
+      rooms: ROOMS as never,
+      fixtures: APPAREILS,
+      ceiling: [],
+      photos: [],
+      notes: [],
+      niveauCourant: 0,
+      screen: 'devis',
+      gammeDevis: GAMMES[0].id,
+    });
+    t = TestRenderer.create(<DevisScreen />);
+  });
+  mesurer(t);
+  arbre = t;
+  return t;
+};
+
+/** Le bouton d'une page, par son nom parlé. */
 const bouton = (t: TestRenderer.ReactTestRenderer, nom: string) =>
   t.root
     .findAll(
@@ -269,167 +230,222 @@ const bouton = (t: TestRenderer.ReactTestRenderer, nom: string) =>
     )
     .pop()!;
 
-describe('les trois étapes', () => {
-  it('commencent par le choix de l’appareillage, les cinq gammes offertes', () => {
-    const t = ouvrir();
-    const lus = mots(t);
-    expect(lus).toContain('Quel appareillage ?');
-    for (const g of GAMMES) {
-      expect(lus).toContain(`${g.marque} ${g.nom}`);
-    }
-  });
+const auTicket = () => {
+  const t = ouvrir();
+  act(() => bouton(t, 'Continuer').props.onPress());
+  act(() => bouton(t, 'Voir le prix').props.onPress());
+  mesurer(t);
+  return t;
+};
 
-  it('passent par ce qui n’est pas compté AVANT de donner le prix', () => {
+describe('le défilement de la page', () => {
+  it('n’a personne au-dessus du rouleau qui prenne l’appui', () => {
     /*
-      L'ordre est la regle : le total ne s'affiche jamais a quelqu'un qui
-      n'a pas pu lire ce qu'il ne contient pas.
+      LA CAUSE, ET NON LE SYMPTOME.
+
+      Un `Pressable` repond `true` a `onStartShouldSetResponder` : il prend le
+      geste au POSE du doigt. Une liste posee dessous doit le lui reprendre au
+      premier millimetre de mouvement, et ce rattrapage ne se fait pas.
+
+      Une page n'a pas de coquille. Le retour au bord, lui, ne capture qu'EN
+      ROUTE (`onStartShouldSetPanResponderCapture: () => false`, voir
+      `RetourGlisse`) : il ne gene rien.
     */
     const t = ouvrir();
-    act(() => bouton(t, 'Continuer').props.onPress());
-    const lus = mots(t).join(' ');
-    expect(lus).toContain('Ce qui est compté');
-    expect(lus).toContain('Luminaires');
-    // Le prix ne se voit pas encore.
-    expect(lus).not.toContain('Fourniture seule');
-  });
+    const rouleaux = t.root.findAllByType(ScrollView);
+    expect(rouleaux.length).toBe(1);
+    /*
+      L'EVENEMENT D'ESSAI DOIT RESSEMBLER A UN VRAI.
 
-  it('et finissent sur le prix, avec sa gamme et l’âge du catalogue', () => {
-    const t = ouvrir();
-    act(() => bouton(t, 'Continuer').props.onPress());
-    act(() => bouton(t, 'Voir le prix').props.onPress());
-    const devis = chiffrer(ACHATS, CIRCUITS, DIFFS, GAMMES[0].id);
-    const lus = mots(t).join(' ');
-    expect(lus).toContain(
-      `${devis.total.toFixed(2).replace('.', ',')} €`,
-    );
-    expect(lus).toContain(GAMMES[0].nom);
-    expect(lus).toContain(devis.version);
-  });
-
-  it('et on peut revenir en arrière sans perdre sa réponse', () => {
-    // Un choix fait au premier ecran ne doit pas devenir un choix definitif.
-    const t = ouvrir();
-    act(() => bouton(t, 'Continuer').props.onPress());
-    act(() => bouton(t, 'Étape précédente').props.onPress());
-    expect(mots(t)).toContain('Quel appareillage ?');
+      `PanResponder` ne se contente pas de l'appel : il lit `touchHistory`
+      pour recalculer l'etat du geste. Appele a vide, il lance — et un banc
+      qui prend cette exception pour une reponse ne mesure plus rien.
+    */
+    const appui = {
+      nativeEvent: { touches: [], changedTouches: [], identifier: 1, timestamp: 0 },
+      touchHistory: {
+        touchBank: [],
+        numberActiveTouches: 1,
+        indexOfSingleActiveTouch: 0,
+        mostRecentTimeStamp: 0,
+      },
+    } as never;
+    const gourmands: string[] = [];
+    let n: TestRenderer.ReactTestInstance | null = rouleaux[0].parent;
+    while (n) {
+      const p = n.props as {
+        onStartShouldSetResponder?: (e: never) => boolean;
+        onStartShouldSetResponderCapture?: (e: never) => boolean;
+      };
+      for (const [nom, f] of [
+        ['au posé', p.onStartShouldSetResponder],
+        ['à la capture', p.onStartShouldSetResponderCapture],
+      ] as [string, ((e: never) => boolean) | undefined][]) {
+        if (typeof f === 'function' && f(appui)) {
+          gourmands.push(
+            `${typeof n.type === 'string' ? n.type : 'composant'} prend ${nom}`,
+          );
+        }
+      }
+      n = n.parent;
+    }
+    expect(gourmands).toEqual([]);
   });
 });
 
-describe('le plan et sa légende', () => {
-  /*
-    DEUX VERSIONS, ET LA PREMIERE A ETE RETIREE.
+describe('les trois étapes', () => {
+  it('se voient : un numéro, un rang, un gros titre', () => {
+    // Relevé du patron : « fais des étapes modernes avec des gros titres et
+    // numéros ». On doit savoir où l'on est sans compter.
+    const lus = mots(ouvrir());
+    expect(lus).toContain('1');
+    expect(lus).toContain('ÉTAPE 1 SUR 3');
+    expect(lus).toContain('Quel appareillage ?');
+  });
 
-    Elle faisait defiler des lots sur le plan, entoures d'une bague verte, un
-    toutes les trois secondes, avec sous le dessin le nombre et le prix du lot
-    en vedette. Retiree sur releve du patron, telephone en main : « ne fais
-    pas l'animation, fais un simple listing avec les icones en legende du
-    plan ». Il avait raison sur le fond : on ne lit pas un prix en attendant
-    son tour.
+  it('offrent les cinq gammes, Céliane et Mosaic en tête', () => {
+    /*
+      Relevé du patron : « mets le Legrand Céliane et Mosaic en premier, c'est
+      les plus communs ». Une liste de choix se range par ce qu'on prend le
+      plus souvent, pas par ce qu'elle coûte.
+    */
+    const lus = mots(ouvrir());
+    for (const g of GAMMES) expect(lus).toContain(`${g.marque} ${g.nom}`);
+    const rang = (nom: string) => lus.findIndex((m) => m.includes(nom));
+    expect(rang('Céliane')).toBeLessThan(rang('dooxie'));
+    expect(rang('Mosaic')).toBeLessThan(rang('dooxie'));
+    expect(rang('Céliane')).toBeLessThan(rang('Mosaic'));
+  });
 
-    Ce qui ne change pas d'une version a l'autre — et c'est tout l'objet du
-    banc — : le nombre ecrit a cote d'un symbole est celui du chiffrage, et
-    le symbole est celui que le plan dessine, pas un dessin qui lui
-    ressemble.
-  */
-  const auPrix = () => {
+  it('passent par ce qui n’est pas compté AVANT de donner le prix', () => {
+    // L'ordre est la règle : le total ne s'affiche jamais à quelqu'un qui n'a
+    // pas pu lire ce qu'il ne contient pas.
     const t = ouvrir();
     act(() => bouton(t, 'Continuer').props.onPress());
-    act(() => bouton(t, 'Voir le prix').props.onPress());
-    mesurer(t);
-    return t;
-  };
+    const lus = mots(t).join(' ');
+    expect(lus).toContain('ÉTAPE 2 SUR 3');
+    expect(lus).toContain('Luminaires');
+    expect(lus).not.toContain('TOTAL TTC');
+  });
 
-  it('écrit une ligne par appareil dessiné, avec son nombre et son prix', () => {
-    const t = auPrix();
-    const devis = chiffrer(ACHATS, CIRCUITS, DIFFS, GAMMES[0].id);
+  it('et on revient sur son choix d’un appui sur le numéro', () => {
+    const t = auTicket();
+    act(() => bouton(t, 'Étape 1').props.onPress());
+    expect(mots(t)).toContain('Quel appareillage ?');
+  });
+
+  it('mais on ne saute pas celle qu’on n’a pas lue', () => {
+    // Le contrôle en sens inverse : l'étape des exclusions ne se contourne pas
+    // par le fil.
+    expect(bouton(ouvrir(), 'Étape 3').props.disabled).toBe(true);
+  });
+});
+
+describe('le ticket de caisse', () => {
+  it('porte une ligne par article, avec son compte et son prix', () => {
+    const t = auTicket();
+    const devis = devisAttendu();
     const lus = mots(t);
-    expect(devis.legende.length).toBeGreaterThan(1);
-    for (const l of devis.legende) {
-      expect(lus).toContain(l.titre);
+    expect(devis.lignes.length).toBeGreaterThan(5);
+    for (const l of devis.lignes) {
+      expect(lus).toContain(l.libelle);
       expect(lus).toContain(
-        `${l.quantite} × ${l.pu.toFixed(2).replace('.', ',')} € l’unité`,
+        `${l.quantite} ${l.unite} × ${l.pu!.toFixed(2).replace('.', ',')} €`,
       );
     }
   });
 
-  it('et le symbole est celui du plan, pas un dessin qui lui ressemble', () => {
+  it('et rien n’y est replié : un ticket qu’il faut déplier n’en est plus un', () => {
     /*
-      Une legende qui redessinerait ses propres symboles cesserait d'etre une
-      legende le jour ou l'un des deux changerait. On compare donc les traces
-      a la table que le plan emploie.
+      La version d'avant repliait chaque rayon derriere un chevron. Sur un
+      ticket, tout se lit d'un coup, du haut vers le bas — c'est ce qui fait
+      qu'on n'a jamais eu besoin qu'on nous explique comment lire un ticket.
     */
-    const t = auPrix();
-    const devis = chiffrer(ACHATS, CIRCUITS, DIFFS, GAMMES[0].id);
-    const traces = new Set(
-      t.root.findAllByType(Path).map((n) => String(n.props.d)),
+    const t = auTicket();
+    const chevrons = mots(t).filter((m) => m === '›');
+    expect(chevrons).toEqual([]);
+  });
+
+  it('et se termine par le total, après le trait de découpe', () => {
+    const t = auTicket();
+    const lus = mots(t);
+    const devis = devisAttendu();
+    expect(lus).toContain('TOTAL TTC');
+    expect(lus).toContain(`${devis.total.toFixed(2).replace('.', ',')} €`);
+    // Le total vient APRÈS le dernier article : c'est la fin d'un ticket.
+    expect(lus.indexOf('TOTAL TTC')).toBeGreaterThan(
+      lus.indexOf(devis.lignes[0].libelle),
     );
+  });
+
+  it('et chaque rayon dit son sous-total', () => {
+    const t = auTicket();
+    const lus = mots(t);
+    for (const f of devisAttendu().parFamille) {
+      // `textTransform` met la majuscule au DESSIN : le texte, lui, garde sa
+      // casse. Un banc qui chercherait la version en capitales chercherait
+      // une chaîne qui n'existe nulle part.
+      expect(lus).toContain(f.famille);
+      expect(lus).toContain(`${f.total.toFixed(2).replace('.', ',')} €`);
+    }
+  });
+});
+
+describe('les vignettes du ticket', () => {
+  it('portent la photo du produit quand on l’a', () => {
+    /*
+      Releve du patron : « une petite image avant son titre et son prix ». Les
+      photos sont les packshots des fabricants, detoures et reduits ; voir
+      `src/ui/produits.ts`.
+    */
+    const t = auTicket();
+    const devis = devisAttendu();
+    const avecPhoto = devis.lignes.filter((l) => PHOTOS[l.code]);
+    expect(avecPhoto.length).toBeGreaterThan(5);
+    expect(t.root.findAllByType(Image).length).toBe(avecPhoto.length);
+  });
+
+  it('et retombent sur le symbole du plan quand la photo manque', () => {
+    /*
+      Le controle en sens inverse : un article sans photo garde une image, et
+      le ticket ne se troue pas. C'est aussi ce qui rend le catalogue de
+      photos facultatif — on peut en ajouter une demain sans toucher a
+      l'ecran.
+    */
+    const t = auTicket();
+    const devis = devisAttendu();
+    const traces = new Set(t.root.findAllByType(Path).map((n) => String(n.props.d)));
+    for (const l of devis.lignes) {
+      if (PHOTOS[l.code] || !l.code.startsWith('meca-')) continue;
+      const kind = l.code.slice(5) as FixtureKind;
+      for (const seg of postsSymbol([kind], kind)) {
+        expect(`${l.libelle} : ${traces.has(seg.d)}`).toBe(`${l.libelle} : true`);
+      }
+    }
+  });
+
+  it('et la légende du plan garde le symbole, pas la photo', () => {
+    /*
+      Sous le plan, ce qu'on cherche est de relier un chiffre a un DESSIN.
+      Une photo n'y aiderait pas : elle ne ressemble pas au symbole.
+    */
+    const t = auTicket();
+    const devis = devisAttendu();
+    const traces = new Set(t.root.findAllByType(Path).map((n) => String(n.props.d)));
+    expect(devis.legende.length).toBeGreaterThan(1);
     for (const l of devis.legende) {
       if (l.plafond) continue;
-      for (const seg of postsSymbol([l.kind as FixtureKind], l.kind as FixtureKind)) {
+      const kind = l.kind as FixtureKind;
+      for (const seg of postsSymbol([kind], kind)) {
         expect(`${l.titre} : ${traces.has(seg.d)}`).toBe(`${l.titre} : true`);
       }
     }
   });
 
-  it('et plus rien ne bouge tout seul sur le plan', () => {
-    // Le controle en sens inverse de la version retiree : trois secondes
-    // passent, et la page est la meme. Une animation oubliee derriere une
-    // page immobile continuerait de tourner pour personne.
-    const t = auPrix();
-    const avant = mots(t).join('|');
-    act(() => {
-      jest.advanceTimersByTime(6000);
-    });
-    expect(mots(t).join('|')).toBe(avant);
-  });
-});
-
-describe('le défilement de la page du prix', () => {
-  it('n’a qu’UNE seule zone qui défile, plan compris', () => {
-    /*
-      Releve du patron : « le scroll sur la liste des produits du devis est
-      casse, il marche rarement ».
-
-      La page empilait un bloc haut — le plan, deux cents points — au-dessus
-      d'une liste a hauteur bornee, le tout dans une feuille deja pressable.
-      Le doigt tombait une fois sur deux hors de la seule bande qui defilait,
-      et rien ne se passait. Ce n'est pas un reglage a ajuster : c'est une
-      zone de trop.
-
-      Le banc compte donc les zones, et pas les pixels : une seule, et le
-      plan DEDANS. Un chiffre de hauteur aurait casse a la premiere refonte
-      de la page ; la nature du defaut, non.
-    */
-    const t = ouvrir();
-    act(() => bouton(t, 'Continuer').props.onPress());
-    act(() => bouton(t, 'Voir le prix').props.onPress());
-    mesurer(t);
-    const rouleaux = t.root.findAllByType(ScrollView);
-    expect(`zones de défilement : ${rouleaux.length}`).toBe(
-      'zones de défilement : 1',
-    );
-    expect(
-      rouleaux[0].findAllByType(FloorplanEditor).length,
-    ).toBe(1);
-  });
-});
-
-describe('le récapitulatif', () => {
-  it('se déplie rayon par rayon, et chaque rayon dit ce qu’il pèse', () => {
-    const t = ouvrir();
-    act(() => bouton(t, 'Continuer').props.onPress());
-    act(() => bouton(t, 'Voir le prix').props.onPress());
-    const devis = chiffrer(ACHATS, CIRCUITS, DIFFS, GAMMES[0].id);
+  it('et le plan du logement est bien là, en pied de ticket', () => {
+    const t = auTicket();
+    expect(t.root.findAllByType(FloorplanEditor).length).toBe(1);
     const lus = mots(t);
-    for (const f of devis.parFamille) {
-      expect(lus).toContain(f.famille);
-      expect(lus).toContain(`${f.total.toFixed(2).replace('.', ',')} €`);
-    }
-    // Replié, aucune ligne de détail n'est écrite.
-    expect(lus).not.toContain('Conduit ICTA Ø20 mm');
-    act(() =>
-      bouton(t, devis.parFamille[0].famille).props.onPress(),
-    );
-    expect(mots(t).length).toBeGreaterThan(lus.length);
+    expect(lus).toContain('D’où viennent ces quantités');
   });
 });

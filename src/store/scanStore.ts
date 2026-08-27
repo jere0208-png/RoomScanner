@@ -92,6 +92,7 @@ import {
   type Fixture,
   type FixtureKind,
 } from '../geometry/electrical';
+import { GAMMES, type GammeId } from '../geometry/prix';
 import { equilibrerLaScene, pointInPolygon } from '../geometry/appearance';
 import { ancrerElec } from '../geometry/viseur';
 import { poserLibre } from '../geometry/poser';
@@ -108,6 +109,7 @@ export type Screen =
   | 'result'
   | 'library'
   | 'export'
+  | 'devis'
   | 'camera'
   | 'profil'
   | 'confidentialite';
@@ -1264,6 +1266,15 @@ interface ScanState {
   // Meubles visibles (sinon : murs et sols seuls). Activé par défaut.
   showFurniture: boolean;
   setShowFurniture: (v: boolean) => void;
+  /**
+   * LA GAMME D'APPAREILLAGE RETENUE POUR LE DEVIS.
+   *
+   * Elle vit ici et non dans l'écran du devis parce que DEUX endroits la
+   * lisent : la page, et le bouton du plan qui affiche le total. Rangée dans
+   * l'écran, le bouton aurait chiffré une gamme et la page une autre.
+   */
+  gammeDevis: GammeId;
+  setGammeDevis: (g: GammeId) => void;
 
   // Surface au sol : fond pointillé + valeur en m². Activée par défaut.
   showSurfaces: boolean;
@@ -1955,6 +1966,10 @@ export const useScanStore = create<ScanState>((set, get) => {
       set({ showFurniture });
       AsyncStorage.setItem(FURNITURE_KEY, showFurniture ? '1' : '0').catch(() => {});
     },
+
+    // La première du catalogue : la plus posée, voir `GAMMES`.
+    gammeDevis: GAMMES[0].id,
+    setGammeDevis: (gammeDevis) => set({ gammeDevis }),
 
     /*
       LE MODÈLE S'OUVRE SUR LE BÂTI — relevé du patron : « sur la vue 3D de

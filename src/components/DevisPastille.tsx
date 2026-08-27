@@ -1,188 +1,98 @@
 /**
- * LA PASTILLE DU DEVIS — « combien j'en aurais pour mon installation ? »
+ * LE TOTAL DU DEVIS, POSÉ SUR LE PLAN.
  *
- * Relevé du patron, 27/08/2026 : « Un bouton visible en haut, à gauche de
- * l'icône normes. Animé comme elle, mais en VERT, avec € et ? qui alternent
- * — pour faire comprendre combien j'en aurais pour mon installation
- * actuelle. »
+ * DEUX VERSIONS, ET LA PREMIÈRE DEMANDAIT UNE QUESTION AU LIEU D'Y RÉPONDRE.
  *
- * POURQUOI DEUX SIGNES ET PAS UNE ICÔNE. Un billet, une calculette, un
- * caddie : chacun dit une moitié de la question et aucun ne dit l'autre. Les
- * deux caractères, eux, la posent en entier — « € ? », combien ça coûte —
- * et personne n'a besoin d'apprendre le pictogramme. Ils se relaient en
- * fondu plutôt qu'en saut : un signe qui clignote se lit comme une alerte,
- * et ce bouton n'alerte de rien.
+ *   PREMIÈRE VERSION — relevé du patron : « un bouton animé comme l'icône
+ *   normes, mais en vert, avec € et ? qui alternent — pour faire comprendre
+ *   combien j'en aurais pour mon installation actuelle ». Elle posait donc
+ *   la question à l'écran, en fondu, toutes les deux secondes.
  *
- * L'ONDE EST CELLE DU CONTRÔLE, EN VERT. La pastille des normes bat en rouge
- * quand quelque chose cloche ; celle-ci bat toujours, doucement, parce
- * qu'elle n'annonce pas un défaut mais une porte qu'on n'a pas encore
- * poussée. Même période, même amplitude — deux boutons voisins qui
- * respireraient à deux rythmes se disputeraient l'œil.
+ *   RETIRÉE, sur relevé du même patron une fois le devis en main : « modifie
+ *   le en un bouton pas dynamique, discret, où on affiche le € total mis à
+ *   jour à chaque modification ». Il a raison, et c'est une leçon qui vaut
+ *   au-delà de ce bouton : **une fois qu'on sait répondre, on ne demande
+ *   plus**. « € ? » clignotant invitait à ouvrir une page pour connaître un
+ *   chiffre qu'on pouvait écrire là, tout de suite. Et un bouton qui bat en
+ *   permanence sur un plan qu'on lit finit par se faire couvrir de la main.
+ *
+ * IL EST DONC DISCRET, ET IL DIT LE PRIX. Pas d'onde, pas de fondu, pas de
+ * couleur pleine : un contour vert, le total, et rien d'autre. Il se remet à
+ * jour tout seul — poser une prise le fait monter — ce qui en fait un
+ * compteur qu'on surveille du coin de l'œil pendant qu'on pose.
  */
-import React, { useEffect, useRef } from 'react';
-import { Animated, Easing, StyleSheet, Text, TouchableOpacity } from 'react-native';
+import React from 'react';
+import { StyleSheet, Text, TouchableOpacity } from 'react-native';
 import { shadowCard, themedStyles, useTheme, type Palette } from '../theme';
 
-/** Même diamètre que la pastille de contrôle : elles vont par deux. */
-const D = 30;
+/**
+ * LE PRIX, ÉCRIT COURT.
+ *
+ * Sur un bouton posé au-dessus d'un plan, « 1 284,50 € » prend la largeur
+ * de deux pièces. On arrondit donc à l'euro, et au-delà de mille on passe au
+ * millier avec une décimale : « 1,3 k€ ». Personne ne décide rien sur le
+ * centime d'une estimation — et celui qui veut le centime ouvre la page,
+ * c'est à cela qu'elle sert.
+ */
+export function prixCourt(total: number): string {
+  if (total >= 1000) {
+    return `${(Math.round(total / 100) / 10).toFixed(1).replace('.', ',')} k€`;
+  }
+  return `${Math.round(total)} €`;
+}
 
 export function DevisPastille({
   /**
-   * Y A-T-IL QUELQUE CHOSE À CHIFFRER ?
+   * Le total du devis, TTC. `null` quand il n'y a rien à chiffrer.
    *
    * Un logement sans un seul appareil posé n'a pas de prix — il a un plan.
-   * La pastille reste alors grise et muette, comme celle des normes devant
-   * une installation qui n'a pas commencé : proposer un devis à zéro euro
-   * est une réponse, mais pas la bonne.
+   * Le bouton reste alors gris et muet, comme celui des normes devant une
+   * installation qui n'a pas commencé : afficher « 0 € » est une réponse,
+   * mais pas la bonne.
    */
-  actif = true,
+  total,
   onPress,
 }: {
-  actif?: boolean;
+  total: number | null;
   onPress: () => void;
 }) {
   const c = useTheme();
   const styles = getStyles(c);
-  const onde = useRef(new Animated.Value(0)).current;
-  const bascule = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    if (!actif) {
-      onde.stopAnimation();
-      onde.setValue(0);
-      return;
-    }
-    const boucle = Animated.loop(
-      Animated.sequence([
-        Animated.timing(onde, {
-          toValue: 1,
-          duration: 1600,
-          easing: Easing.out(Easing.quad),
-          useNativeDriver: true,
-        }),
-        // Le temps mort de la pastille de contrôle : une onde qui enchaîne
-        // sans respirer devient un gyrophare.
-        Animated.timing(onde, {
-          toValue: 0,
-          duration: 1,
-          delay: 2400,
-          useNativeDriver: true,
-        }),
-      ]),
-    );
-    boucle.start();
-    return () => boucle.stop();
-  }, [actif, onde]);
-
-  useEffect(() => {
-    if (!actif) {
-      bascule.stopAnimation();
-      bascule.setValue(0);
-      return;
-    }
-    /*
-      DEUX SECONDES SUR CHAQUE SIGNE, UN QUART DE SECONDE POUR PASSER.
-
-      Plus vite, les deux caractères se lisent comme un scintillement ; plus
-      lentement, on ne voit jamais le second et le bouton n'a plus qu'un
-      sens. Le fondu se fait par le MILIEU — l'un s'efface avant que l'autre
-      n'arrive — sinon les deux se superposent une fraction de seconde et
-      donnent une tache.
-    */
-    const pause = (v: number) =>
-      Animated.timing(bascule, {
-        toValue: v,
-        duration: 260,
-        delay: 2000,
-        easing: Easing.inOut(Easing.quad),
-        useNativeDriver: true,
-      });
-    const boucle = Animated.loop(Animated.sequence([pause(1), pause(0)]));
-    boucle.start();
-    return () => boucle.stop();
-  }, [actif, bascule]);
-
+  const actif = total !== null && total > 0;
   const teinte = actif ? c.green : c.inkFaint;
-  // Chaque signe s'efface au tiers du passage, et l'autre n'apparaît qu'aux
-  // deux tiers : jamais tous les deux à la fois.
-  const opaciteEuro = bascule.interpolate({
-    inputRange: [0, 0.35, 1],
-    outputRange: [1, 0, 0],
-  });
-  const opaciteQuoi = bascule.interpolate({
-    inputRange: [0, 0.65, 1],
-    outputRange: [0, 0, 1],
-  });
 
   return (
-    <Animated.View style={styles.cadre}>
-      {actif && (
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            styles.onde,
-            {
-              borderColor: c.green,
-              opacity: onde.interpolate({
-                inputRange: [0, 0.15, 1],
-                outputRange: [0, 0.55, 0],
-              }),
-              transform: [
-                {
-                  // 1,45 comme le contrôle : au-delà, l'onde lèche son
-                  // voisin, et deux boutons côte à côte ne peuvent pas se
-                  // marcher dessus.
-                  scale: onde.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [1, 1.45],
-                  }),
-                },
-              ],
-            },
-          ]}
-        />
-      )}
-      <TouchableOpacity
-        accessibilityLabel={
-          actif
-            ? 'Devis — estimer le prix de cette installation'
-            : 'Devis — rien de posé à chiffrer'
-        }
-        accessibilityRole="button"
-        activeOpacity={0.8}
-        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        style={[styles.bouton, { borderColor: teinte }]}
-        onPress={onPress}>
-        <Animated.View style={[styles.signe, { opacity: opaciteEuro }]}>
-          <Text style={[styles.lettre, { color: teinte }]}>€</Text>
-        </Animated.View>
-        <Animated.View style={[styles.signe, { opacity: opaciteQuoi }]}>
-          <Text style={[styles.lettre, { color: teinte }]}>?</Text>
-        </Animated.View>
-      </TouchableOpacity>
-    </Animated.View>
+    <TouchableOpacity
+      accessibilityLabel={
+        actif
+          ? `Devis — environ ${Math.round(total)} euros de fourniture`
+          : 'Devis — rien de posé à chiffrer'
+      }
+      accessibilityRole="button"
+      activeOpacity={0.8}
+      hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
+      style={[styles.bouton, { borderColor: teinte }]}
+      onPress={onPress}>
+      <Text style={[styles.prix, { color: teinte }]} numberOfLines={1}>
+        {actif ? prixCourt(total) : '—'}
+      </Text>
+    </TouchableOpacity>
   );
 }
 
 const getStyles = themedStyles((c: Palette) =>
   StyleSheet.create({
-    cadre: {
-      width: D,
-      height: D,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    onde: {
-      position: 'absolute',
-      width: D,
-      height: D,
-      borderRadius: D / 2,
-      borderWidth: 2,
-    },
+    /*
+      LA MÊME HAUTEUR QUE LA PASTILLE DES NORMES, mais une largeur libre :
+      elles sont côte à côte, et deux boutons voisins de hauteurs
+      différentes se lisent comme deux rangées. Le mot, lui, décide de la
+      largeur — « 12 € » ne doit pas occuper la place de « 1,3 k€ ».
+    */
     bouton: {
-      width: D,
-      height: D,
-      borderRadius: D / 2,
+      height: 30,
+      minWidth: 30,
+      paddingHorizontal: 10,
+      borderRadius: 15,
       borderWidth: 2,
       backgroundColor: c.surface,
       alignItems: 'center',
@@ -190,20 +100,6 @@ const getStyles = themedStyles((c: Palette) =>
       ...shadowCard,
       shadowOpacity: 0.1,
     },
-    /* Les deux signes sont EMPILÉS, pas côte à côte : ils occupent la même
-       place et se relaient dessus. Posés l'un à côté de l'autre, le bouton
-       sauterait de largeur à chaque passage. */
-    signe: {
-      position: 'absolute',
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    lettre: {
-      fontSize: 16,
-      fontWeight: '800',
-      // Un « € » et un « ? » n'ont pas la même hauteur d'œil : sans cette
-      // ligne, le second remonte d'un point au moment du fondu.
-      lineHeight: 19,
-    },
+    prix: { fontSize: 13, fontWeight: '800', letterSpacing: -0.2 },
   }),
 );

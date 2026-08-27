@@ -8475,6 +8475,111 @@ ne recompte toujours rien.
 le forfait qui ne remplace pas un métré, le tableau qui ne se paie pas deux
 fois, et le plan sorti du rouleau qui fait crier le banc du défilement.
 
+### Le devis en page entière, et le ticket de caisse
+
+Trois relevés du patron dans le même passage, et le premier explique les deux
+autres : « le scroll a encore du mal, ça ne scrolle pas du tout. **Fais des
+pages entières pas des pop-up**, et fais des étapes modernes avec des gros
+titres et numéros. Mets le Legrand Céliane et Mosaic en premier, c'est les plus
+communs. » Puis : « le bouton €/? — modifie le en un bouton **pas dynamique,
+discret**, où on affiche le € total mis à jour à chaque modification, et au
+clic une page entière moderne **comme un ticket de caisse** ».
+
+#### Le défilement : la cause était dans la coquille, pas dans la mise en page
+
+Deux tentatives avaient échoué sur le même point. La première empilait le plan
+au-dessus d'une liste à hauteur bornée ; la seconde n'avait plus qu'un seul
+rouleau, et ne défilait toujours pas.
+
+`SheetShell` enveloppe son contenu dans **deux `Pressable`** — le voile qui
+ferme la feuille, et la feuille elle-même qui arrête l'appui pour ne pas se
+fermer sous le doigt. Un `Pressable` prend le geste **dès le posé** ; une liste
+posée dessous doit ensuite le lui reprendre au premier millimètre de mouvement,
+et ce rattrapage ne se fait pas. **Compter les zones de défilement ne pouvait
+donc pas suffire : ça mesurait le symptôme.**
+
+Une page n'a pas de coquille. Le rouleau est posé à même l'écran, rien au-dessus
+de lui ne réclame le doigt, et le retour se fait par le chevron ou par le bord —
+comme sur les quatre autres écrans de l'application, qui défilent tous très
+bien. Le retour au bord, lui, ne capture qu'**en route**
+(`onStartShouldSetPanResponderCapture: () => false`) : il ne gêne rien.
+
+Le banc mesure maintenant la cause : **aucun ancêtre du rouleau ne prend l'appui
+au posé**. Vérifié à l'envers en remettant un `Pressable` par-dessus — il crie,
+et il nomme le coupable.
+
+#### Le bouton : une fois qu'on sait répondre, on ne demande plus
+
+Il posait la question — « € » et « ? » en fondu, sur une onde verte. Il affiche
+maintenant **le total**, se met à jour quand on pose une prise, et ne bouge
+plus. C'est une leçon qui vaut au-delà de ce bouton : un « € ? » clignotant
+invitait à ouvrir une page pour connaître un chiffre qu'on pouvait écrire là.
+Et un bouton qui bat en permanence sur un plan qu'on lit finit par se faire
+couvrir de la main.
+
+Il écrit court — `793 €`, puis `1,3 k€` au-delà du millier : sur un bouton posé
+au-dessus d'un plan, « 1 284,50 € » prend la largeur de deux pièces. Qui veut le
+centime ouvre la page, c'est à ça qu'elle sert.
+
+Le total et la page sortent de `chiffrerLePlan`, un seul chemin : le jour où
+l'un recompterait de son côté, le bouton annoncerait un prix que la page ne
+retrouverait pas.
+
+#### Le ticket
+
+Les rayons du bordereau font les sections, une ligne par article : **la photo du
+produit**, son nom, sa quantité au prix unitaire, son total. Un trait de
+découpe, le total TTC, les mentions. **Rien n'est replié** — un ticket qu'il
+faut déplier n'est plus un ticket, et c'est justement le repli qui avait caché
+les disjoncteurs au patron la fois d'avant.
+
+Le plan vient **après**, en pied de ticket, sous le titre « d'où viennent ces
+quantités », avec sa légende. Là, la vignette redevient **le symbole du plan** et
+non la photo : ce qu'on cherche à cet endroit, c'est relier un chiffre à un
+dessin, et une photo n'y ressemble pas.
+
+Les étapes se voient : trois pastilles numérotées, celle qu'on a faite porte une
+coche et reste touchable — on revient sur son choix d'appareillage sans refaire
+le chemin —, celles d'après ne le sont pas : on ne saute pas la page qui dit ce
+que le prix ne contient pas.
+
+Et les gammes se rangent par ce qu'on pose le plus souvent, **Céliane et Mosaic
+en tête**, plus par ce qu'elles coûtent.
+
+#### Les photos produit : d'où elles viennent, et ce que ça engage
+
+48 vignettes de 200 points, pour l'essentiel les **packshots officiels de
+Legrand** (`assets.legrand.com`), le reste chez des distributeurs. 476 ko en
+tout.
+
+Le détourage se fait **par les coins et non par la couleur** : un « rendre le
+blanc transparent » aurait mangé le boîtier BLANC d'une prise Céliane en même
+temps que son fond. On ajoute un liseré blanc d'un pixel, on remplit depuis le
+coin — ce qui n'atteint que le fond connecté au bord — puis on rase le liseré.
+Cinq articles n'ont pas de frontière nette avec leur fond (les couronnes de fil,
+le peigne) : un garde-fou mesure ce qui subsiste, resserre la tolérance, et
+finit par **garder le fond blanc** — une vignette blanche vaut mieux qu'une
+vignette vide.
+
+La table `src/ui/produits.ts` se **régénère** (`node tools/gen-produits.mjs`) :
+React Native exige un `require` littéral, et une table tenue à la main se
+désynchronise du dossier au premier ajout.
+
+**Ce que ça engage.** Ces visuels restent la propriété de leurs auteurs. Le
+patron a été averti et a tranché en connaissance de cause ; c'est écrit en tête
+du fichier pour que personne ne le découvre à la publication. Le code retombe
+sur le symbole du plan quand une photo manque — donc les retirer un jour ne
+casse rien.
+
+Quelques vignettes sont **approximatives** faute de packshot exact : la prise
+20 A montre une prise étanche, la 32 A un boîtier blanc peu lisible. Elles se
+remplacent en une ligne dans le fichier de sources.
+
+**19 bancs d'écran**, dont trois contrôles en sens inverse : le `Pressable`
+remis par-dessus le rouleau qui fait crier le banc du défilement, l'étape qu'on
+ne peut pas sauter, et la vignette qui retombe sur le symbole quand la photo
+manque.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro
