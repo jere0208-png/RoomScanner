@@ -8037,6 +8037,84 @@ recherche pas : zéro apostrophe droite dans les textes affichés — la
 typographie est tenue partout —, et zéro bouton muet pour la synthèse vocale
 sur les cent soixante-douze que compte l'application.
 
+### Le 3D strict : on ne trie plus, on découpe
+
+Relevé du patron : « trouve des améliorations pour le 3D, fais un système
+plus infaillible en restant fluide mais avec un vrai 3D strict, impossible
+qu'un mur passe devant un élément ».
+
+Le classement actuel est à **zéro faute sur 1 008 prises de vue**, chemin
+exact de l'écran et masques compris. C'est excellent, et ça ne suffit pas :
+il compare les faces deux à deux là où elles se recouvrent, et cette méthode
+porte **deux impossibilités dans sa définition même**.
+
+- **La ronde.** A doit passer devant B, B devant C, C devant A. Configuration
+  géométrique parfaitement ordinaire, qu'aucun ordre de peinture ne satisfait.
+  `denouer()` tranche alors au moins pire — c'est-à-dire qu'il se trompe
+  exprès.
+- **Les volumes qui se traversent.** Deux boîtes qui s'interpénètrent n'ont
+  pas d'ordre : chacune est devant l'autre selon l'endroit qu'on regarde.
+  C'est le meuble à cheval sur une cloison, et le rabotage des boîtes trop
+  grandes n'en couvre qu'une partie.
+
+Zéro faute mesurée, donc, mais sur les scènes qu'on a mesurées. Un arbre BSP
+(`src/geometry/bsp.ts`) ne mesure rien : il choisit un plan, range de part et
+d'autre ce qui s'y range, et **coupe en deux ce qui le traverse**. À la fin,
+plus une seule paire ne se traverse et il n'existe plus de ronde — c'est une
+propriété de la **construction**. Pour n'importe quelle position d'œil, un
+parcours de l'arbre rend l'ordre exact.
+
+Et c'est **plus fluide**, pas moins : la scène ne bouge pas, seule la caméra
+tourne. L'arbre se construit une fois par plan, chaque image ne fait plus que
+le parcourir en temps linéaire — là où le classement à l'écran coûte une
+dizaine de millisecondes par image sur un logement meublé, au point qu'il
+faut le mémoriser tous les 1 à 4° et vivre avec ce qu'il laisse passer entre
+deux (`seuilDeReclassement`).
+
+#### Le banc s'est trompé avant l'arbre, et c'était prévisible
+
+Première version du banc : deux échecs, **284 fautes** sur la ronde et une
+paire fautive sur les volumes. La règle de la maison a servi — *un banc peut
+échouer pour la mauvaise raison* — et c'était bien le banc.
+
+Il réclamait deux propriétés de **forme** : que deux morceaux se rangent
+selon le demi-espace du plan de l'autre, et qu'aucun morceau ne traverse le
+plan d'aucun autre. Or un arbre BSP ne coupe une face que par les plans des
+**nœuds qu'elle traverse**, jamais par le plan de toutes les autres faces. Un
+mur posé *sur* le plan d'un nœud n'est donc pas coupé par le plan d'un caisson
+rangé dans un sous-arbre — et il n'a pas à l'être : l'ordre entre eux est
+déjà tranché, exactement, par le plan du nœud. Le banc réclamait une propriété
+**plus forte** que celle dont l'exactitude a besoin, et un découpage qui la
+satisferait multiplierait les morceaux pour rien.
+
+Deuxième version : on ne mesure plus la forme, on mesure **la seule chose qui
+se voit**. Deux morceaux qui se recouvrent à l'écran — recouvrement calculé
+par découpe convexe, pas par boîtes englobantes — et celui qui se peint en
+dernier doit être le plus proche de l'œil à l'endroit où ils se recouvrent.
+C'est mot pour mot la demande : « impossible qu'un mur passe devant un
+élément ». Aucun chiffre de réglage dans le critère : la nature de la faute
+suffit à la nommer.
+
+Avec ce compteur, l'arbre est à **zéro faute** sur les 216 directions d'œil
+d'un tour complet à trois inclinaisons, pour la ronde, pour les deux volumes
+qui se traversent, et pour une pièce de quatre murs et deux caissons.
+
+**Trois contrôles en sens inverse**, sans lesquels un compteur qui rendrait
+zéro sur tout ferait passer n'importe quoi : deux lames parallèles peintes à
+l'envers donnent une faute ; les mêmes décalées de trois mètres n'en donnent
+aucune (une faute qui ne se voit pas n'en est pas une) ; et l'ordre du BSP
+**retourné** en donne plus de cent sur la ronde.
+
+Le prix est mesuré aussi : sur la pièce de six faces, la découpe reste sous
+le triple du nombre de faces de départ. Une garantie qui multiplierait la
+scène ferait perdre au dessin ce que le parcours fait gagner au tri.
+
+**Ce qui reste à faire** : brancher l'arbre dans `Iso3DView`, mesurer sur les
+bancs existants du sujet (`audit3d`, `percemur`, `chaisecachee`,
+`meublecachemur`, `fluidite3d`) et chiffrer le coût réel (construction +
+parcours) avant de remplacer quoi que ce soit. Si l'arbre ne tient pas ses
+promesses, c'est le compteur qui tranchera, pas le raisonnement.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro
