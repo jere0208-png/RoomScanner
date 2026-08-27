@@ -13,6 +13,7 @@
 import React from 'react';
 import { Circle, G, Line, Path, Polyline, Rect, Text as SvgText } from 'react-native-svg';
 import type { Palette } from '../theme';
+import { BagueVedette } from './FixtureLayer';
 import {
   faceX,
   facePoint,
@@ -48,6 +49,7 @@ export function CeilingLayer({
   partOf,
   mapping,
   frame,
+  vedette,
   c,
 }: {
   ceiling?: CeilingFixture[];
@@ -79,6 +81,14 @@ export function CeilingLayer({
   mapping: Mapping;
   /** Angle de la trame du logement : les cotes s'y alignent. */
   frame: number;
+  /**
+   * LES POINTS DE PLAFOND QUE LE DEVIS MET EN VEDETTE.
+   *
+   * Même bague verte qu'au mur (`BagueVedette`) : un lot du devis peut
+   * porter des appareils des deux calques, et il serait illisible qu'ils ne
+   * se désignent pas de la même façon.
+   */
+  vedette?: readonly CeilingFixture['kind'][];
   c: Palette;
 }) {
   return (
@@ -106,6 +116,9 @@ export function CeilingLayer({
                 onSelectCeiling ? () => onSelectCeiling(cl.id) : undefined
               }>
               <Circle cx={q.x} cy={q.y} r={r + 6} fill="transparent" />
+              {vedette?.includes(cl.kind) && (
+                <BagueVedette cx={q.x} cy={q.y} r={r + 4} couleur={c.green} />
+              )}
               {choisi && (
                 <Circle
                   cx={q.x}

@@ -10,7 +10,8 @@
  * Sorti tel quel : le garde-fou du plan 2D compare l'arbre rendu élément par
  * élément, et il est resté vert — l'extraction n'a pas bougé un point.
  */
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
+import { Animated, Easing } from 'react-native';
 import { Circle, G, Line, Path, Polyline, Text as SvgText } from 'react-native-svg';
 import type { Palette } from '../theme';
 import {
@@ -33,6 +34,70 @@ interface Mapping {
   toPx: (p: Pt) => { x: number; y: number };
 }
 
+const CercleAnime = Animated.createAnimatedComponent(Circle);
+
+/**
+ * LA BAGUE QUI DÉSIGNE — « voilà ce que vous payez ».
+ *
+ * Relevé du patron, sur le devis : « un plan qui explique pourquoi ce prix :
+ * affichage du plan général avec une animation qui met en valeur les
+ * interrupteurs (par exemple), et affiche leur nombre et le prix moyen
+ * public ».
+ *
+ * Une bague verte qui respire, et rien d'autre. Pas de couleur changée sur
+ * le symbole : on doit continuer à reconnaître une prise d'un interrupteur
+ * pendant qu'on les compte. Elle bat en deux secondes et demie — le rythme
+ * d'une respiration, celui qui attire l'œil sans le retenir.
+ */
+export function BagueVedette({
+  cx,
+  cy,
+  r,
+  couleur,
+}: {
+  cx: number;
+  cy: number;
+  r: number;
+  couleur: string;
+}) {
+  const souffle = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const boucle = Animated.loop(
+      Animated.sequence([
+        Animated.timing(souffle, {
+          toValue: 1,
+          duration: 1250,
+          easing: Easing.inOut(Easing.quad),
+          // `r` d'un cercle SVG ne se pilote pas depuis le fil natif : le
+          // dessin se recalcule à chaque image. C'est le prix de la bague,
+          // et il ne se paie que sur les appareils désignés — jamais sur
+          // tout le plan.
+          useNativeDriver: false,
+        }),
+        Animated.timing(souffle, {
+          toValue: 0,
+          duration: 1250,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: false,
+        }),
+      ]),
+    );
+    boucle.start();
+    return () => boucle.stop();
+  }, [souffle]);
+  return (
+    <CercleAnime
+      cx={cx}
+      cy={cy}
+      r={souffle.interpolate({ inputRange: [0, 1], outputRange: [r, r + 5] })}
+      fill="none"
+      stroke={couleur}
+      strokeWidth={2.4}
+      opacity={souffle.interpolate({ inputRange: [0, 1], outputRange: [0.9, 0.2] })}
+    />
+  );
+}
+
 export function FixtureLayer({
   fixtures,
   circuitMarks,
@@ -42,6 +107,7 @@ export function FixtureLayer({
   viewRot,
   elecLod,
   navigating,
+  vedette,
   onSelectFixture,
   c,
 }: {
@@ -65,6 +131,16 @@ export function FixtureLayer({
    * a quelque chose et combien — et le symbole revient au relâcher.
    */
   navigating?: boolean;
+  /**
+   * LES APPAREILS QUE LE DEVIS MET EN VEDETTE.
+   *
+   * Une bague verte les entoure pendant qu'on lit leur nombre et leur prix.
+   * C'est une liste de TYPES et non d'identifiants : le devis chiffre par
+   * lot — « les prises », « les commandes » — et un lot ne connaît pas les
+   * appareils un par un. Un ensemble multipostes est désigné dès qu'un de
+   * ses postes en est.
+   */
+  vedette?: readonly Fixture['kind'][];
   onSelectFixture?: (id: string, wallId: string) => void;
   c: Palette;
 }) {
@@ -253,6 +329,9 @@ export function FixtureLayer({
                 r={Math.max(18, rayon + 8)}
                 fill="transparent"
               />
+              {vedette && postes.some((k) => vedette.includes(k)) && (
+                <BagueVedette cx={p.x} cy={p.y} r={rayon + 3} couleur={c.green} />
+              )}
               {/*
                 PENDANT LE GESTE, UN POINT SUFFIT.
 

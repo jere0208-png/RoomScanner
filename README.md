@@ -8272,6 +8272,69 @@ d'un lot en fait crier deux autres.
 boîte d'encastrement et une plaque un poste dans le bordereau. Environ trois
 euros en trop, dits plutôt que corrigés en douce.
 
+### Le devis, côté écran : une pastille verte, trois questions, un plan qui explique
+
+Seconde moitié : le bouton, le parcours, le résultat.
+
+**La pastille.** Verte, à gauche de celle des normes, même diamètre et même
+onde — relevé du patron. Les deux boutons répondent à deux questions qu'on se
+pose l'une après l'autre : combien ça coûte, et est-ce aux normes. L'ordre de
+lecture est l'ordre des questions, et un banc lit la source pour le garder :
+une ligne déplacée suffirait à l'inverser sans que rien ne le signale.
+
+Dedans, **« € » et « ? » se relaient en fondu**. Pas une icône : un billet,
+une calculette, un caddie disent chacun une moitié de la question et aucun ne
+dit l'autre. Les deux caractères la posent en entier, et personne n'a besoin
+d'apprendre le pictogramme. Deux secondes sur chaque signe, un quart de
+seconde pour passer, et le fondu se fait par le milieu — l'un s'efface avant
+que l'autre n'arrive, sinon les deux se superposent une fraction de seconde et
+donnent une tache. Ils sont **empilés** et non côte à côte : posés l'un à côté
+de l'autre, le bouton sauterait de largeur à chaque passage.
+
+Comme la pastille des normes, elle se tait devant un logement où rien n'est
+posé : un devis à zéro euro est une réponse, mais pas la bonne.
+
+**Trois écrans, et pas un de plus.** Le choix de la gamme, ce qui n'est pas
+compté, le prix. Une question par écran — c'est ce que « étape par étape »
+veut dire — et un retour qui ne perd pas la réponse.
+
+L'écran du milieu n'est pas une formalité : c'est **la seule page qui empêche
+un malentendu de mille euros**. Quelqu'un qui lit « 2 340 € » sans avoir lu
+« luminaires non compris » n'a pas lu le devis, il a lu un chiffre. Elle passe
+donc avant le prix, jamais après, et un banc tient cet ordre.
+
+**Le plan explique, il ne décore pas.** Le logement relevé, une bague verte
+qui respire sur un lot d'appareils à la fois, et sous le dessin la phrase qui
+dit combien il y en a et ce que coûte l'un d'eux. Les lots se relaient toutes
+les trois secondes, du plus lourd au plus léger — on explique un prix en
+commençant par ce qui le fait. Un seul lot à la fois : deux bagues de deux
+lots différents ne se distinguent pas, et on ne saurait plus quel chiffre lire.
+
+La bague ne change pas la couleur du symbole : on doit continuer à reconnaître
+une prise d'un interrupteur pendant qu'on les compte.
+
+Le bordereau ne se calcule **que la feuille ouverte** : sur un logement
+meublé, le métré des gaines coûte plus cher que tout le reste du rendu, et
+personne ne le regarde tant qu'on n'a pas touché la pastille.
+
+#### Ce que le banc a failli mesurer à vide
+
+Le plan n'apparaît qu'au troisième écran. Servir la mise en page une fois pour
+toutes, au montage, laissait ce plan-là **à zéro pixel** : il ne dessinait
+rien, et le banc comptait zéro bague sur un dessin vide. Il criait juste, pour
+la mauvaise raison — la panne exacte que la maison connaît par cœur. On mesure
+donc après chaque étape.
+
+**13 bancs**, dont le contrôle à l'envers : en coupant la transmission de la
+vedette au plan, le banc des bagues crie, et lui seul.
+
+**Non vérifié à l'œil** : c'est du React Native, je ne peux pas voir le rendu
+depuis cette machine. La structure est garantie par les bancs — les cinq
+gammes offertes, l'ordre des écrans, le total et sa gamme écrits, le nombre
+sous le plan égal à celui du chiffrage, le nombre de bagues égal au nombre
+d'appareils du lot. Le fondu des deux signes et le rythme de la bague, eux,
+demandent un coup d'œil sur le téléphone.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

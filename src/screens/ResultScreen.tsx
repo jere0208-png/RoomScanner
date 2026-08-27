@@ -45,6 +45,8 @@ import { CeilingBar } from '../components/CeilingBar';
 import { ObjectBar } from '../components/ObjectBar';
 import { corrigerConstat, poserAuxNormes } from '../geometry/auto';
 import { ControlePastille } from '../components/ControlePastille';
+import { DevisPastille } from '../components/DevisPastille';
+import { DevisSheet } from '../components/DevisSheet';
 import { ChoixScan } from '../components/ChoixScan';
 import { RoomBar } from '../components/RoomBar';
 import { StripBar } from '../components/StripBar';
@@ -85,6 +87,7 @@ import {
 } from '../geometry/floorplan';
 import { hasCapturedColors, pointInPolygon } from '../geometry/appearance';
 import { planRoutes } from '../geometry/elecplan';
+import type { GammeId } from '../geometry/prix';
 import { fixtureMarks } from '../geometry/schema';
 import {
   volumeAt,
@@ -498,6 +501,14 @@ export function ResultScreen() {
   const [existantOuvert, setExistantOuvert] = useState(false);
   const existant = useScanStore((s) => s.existant);
   const [checking, setChecking] = useState(false);
+  /*
+    LE DEVIS — relevé du patron : « combien j'en aurais pour mon installation
+    actuelle ». La gamme choisie survit à la fermeture de la feuille : on
+    referme pour aller compter une prise, on rouvre, et le choix est encore
+    là.
+  */
+  const [devisOuvert, setDevisOuvert] = useState(false);
+  const [gammeDevis, setGammeDevis] = useState<GammeId>('dooxie');
   // Choix du format d'export : plan PDF, modèle 3D, ou image de la vue.
   const [exporting, setExporting] = useState(false);
   /** La feuille « Ajouter une pièce » : nom, largeur, profondeur. */
@@ -1569,6 +1580,49 @@ export function ResultScreen() {
     () => planRoutes(walls, rooms, parts, fixtures, placement, ceiling),
     [walls, rooms, parts, fixtures, placement, ceiling],
   );
+
+  /**
+   * LE BORDEREAU ET LES CIRCUITS, POUR LE DEVIS.
+   *
+   * Exactement ceux de l'export : `buyingList` lit le tracé réel du plan et
+   * `planCircuits` déduit les protections. Le devis n'y ajoute qu'un prix
+   * (voir `chiffrer`) — ainsi le prix affiché et la liste du matériel
+   * envoyée au fournisseur ne peuvent pas décrire deux logements.
+   *
+   * Il ne se calcule QUE la feuille ouverte : sur un logement meublé, le
+   * métré des gaines coûte plus cher que tout le reste du rendu, et
+   * personne ne le regarde tant qu'on n'a pas touché la pastille verte.
+   */
+  const bordereau = useMemo(() => {
+    if (!devisOuvert) return null;
+    const liste = materialList(
+      roomInputs,
+      fixtures,
+      wallRooms,
+      placement,
+      cheminements?.parCircuit,
+      ceiling,
+    );
+    const pull = pullSchedule(
+      liste.circuits,
+      cheminements?.metre,
+      cheminements?.approx,
+      fixtures,
+    );
+    return {
+      achats: buyingList(pull, fixtures, ceiling),
+      circuits: liste.circuits,
+      differentiels: liste.differentials,
+    };
+  }, [
+    devisOuvert,
+    roomInputs,
+    fixtures,
+    wallRooms,
+    placement,
+    cheminements,
+    ceiling,
+  ]);
 
   /**
    * À QUELLE HAUTEUR ARRIVE CHAQUE GAINE.
@@ -3377,6 +3431,19 @@ export function ResultScreen() {
               coup d'œil, rouge qui pulse ou vert plein, en 2D comme en 3D,
               et toujours au même endroit.
             */}
+            {/*
+              LE DEVIS, À GAUCHE DU CONTRÔLE — relevé du patron. Les deux
+              pastilles répondent à deux questions qu'on se pose l'une après
+              l'autre : est-ce aux normes, et combien ça coûte. Elles vont
+              donc ensemble, et le prix vient en premier parce que c'est la
+              question qu'on se pose en entrant.
+            */}
+            <DevisPastille
+              /* Un logement sans un seul appareil n'a pas de prix : il a un
+                 plan. Même règle que le contrôle, pour la même raison. */
+              actif={fixtures.length > 0 || ceiling.length > 0}
+              onPress={() => setDevisOuvert(true)}
+            />
             <ControlePastille
               alertes={alertes}
               /* Un plan sans le moindre appareil n'est pas une installation
@@ -4518,6 +4585,19 @@ export function ResultScreen() {
         onRetirer={(id) => useScanStore.getState().retirerDepart(id)}
         onDecrire={(t) => useScanStore.getState().decrireTableau(t)}
       />
+
+      {/* ---------- Le devis ---------- */}
+      {bordereau && (
+        <DevisSheet
+          visible={devisOuvert}
+          onClose={() => setDevisOuvert(false)}
+          achats={bordereau.achats}
+          circuits={bordereau.circuits}
+          differentiels={bordereau.differentiels}
+          gamme={gammeDevis}
+          onGamme={setGammeDevis}
+        />
+      )}
 
       {/* ---------- Diagnostic du plan ---------- */}
       <DiagnosticSheet
