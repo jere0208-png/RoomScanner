@@ -8389,6 +8389,92 @@ autre caméra que celle du téléphone** — et il aurait passé, étant juste p
 sienne. C'est exactement la panne qui avait déjà coûté une session sur les
 planches de référence, où l'inclinaison échange sinus et cosinus.
 
+### Le devis relu sur le téléphone : un rouleau, une légende, et quatre trous bouchés
+
+Relevé du patron, le devis en main : « le scroll sur la liste des produits est
+cassé, il marche rarement », « ne fais pas l'animation, fais un simple listing
+avec les icônes en légende du plan », et « il manque des choses, refais un
+passage d'éléments — par exemple, tu n'as pas compté les disjoncteurs ».
+
+#### Le défilement : ce n'était pas un réglage, c'était une zone de trop
+
+La page du prix empilait un bloc haut — le plan, deux cents points — au-dessus
+d'une liste à hauteur bornée, le tout dans une feuille déjà `Pressable`. Le
+doigt tombait une fois sur deux hors de la seule bande qui défilait, et rien ne
+se passait. Tout le corps de la page ne fait plus qu'**un seul rouleau, le plan
+dedans** : on défile où qu'on pose le doigt, et le dessin remonte quand on
+cherche le détail.
+
+Le banc compte les **zones**, pas les pixels : une seule, et le plan à
+l'intérieur. Un chiffre de hauteur aurait cassé à la première refonte de la
+page ; la nature du défaut, non. Vérifié à l'envers en ressortant le plan du
+rouleau : le banc crie.
+
+#### L'animation retirée, et pourquoi il avait raison
+
+Les lots défilaient sur le plan, entourés d'une bague verte, un toutes les
+trois secondes. **On ne lit pas un prix en attendant son tour** : une animation
+qui cache quatre lignes sur cinq oblige à regarder le plan trois fois pour le
+comprendre une.
+
+La légende dit maintenant tout ensemble, une ligne par appareil dessiné, avec
+**le symbole exact du plan** — le même tracé, la même couleur, lus dans les
+mêmes tables que `FixtureLayer` et `CeilingLayer`. Une légende qui redessinerait
+ses propres symboles cesserait d'être une légende le jour où l'un des deux
+changerait ; un banc compare donc les tracés à la table du plan.
+
+Le code de la bague et sa transmission à travers trois composants sont partis
+avec elle. Ce qui n'est plus employé ne reste pas « au cas où ».
+
+#### Les disjoncteurs étaient là. Quatre autres choses, non.
+
+Les disjoncteurs figuraient bien au devis — rayon « Tableau », 284 € sur le
+logement d'essai. Ils étaient simplement **sous la liste**, hors de portée du
+défilement cassé. Mais le passage d'éléments demandé a mis au jour quatre trous
+réels, et aucun d'eux n'aurait crié tout seul : **un article absent d'un devis
+ne laisse aucune trace**.
+
+**Le câble des courants faibles.** La commande de conducteur ne valait que pour
+les circuits qui ont une *section* — et un courant faible n'en a pas. C'était
+juste pour du H07V-U, on ne tire pas de fil rigide dans une gaine de
+communication ; mais on y tire autre chose, et le bordereau n'en disait rien :
+**vingt mètres de gaine Ø25 figuraient au chariot, vides**. Une prise RJ45
+demande du F/UTP, une prise TV du coaxial ; le circuit ne dit pas laquelle est
+au bout, alors la longueur se répartit au prorata des prises, et la note le dit.
+
+**Le coffret de répartition.** Il n'existait que si l'on avait posé un tableau
+*sur un mur du plan*. Or on sait combien de modules il faut bien avant de savoir
+où on l'accroche : un module par disjoncteur, deux par différentiel, deux de
+réserve, treize modules la rangée. Et l'appareil « Tableau électrique » posé au
+mur **est** ce coffret : il passe à zéro avec un renvoi, sinon la ligne se
+payait deux fois.
+
+**Les peignes et le bornier de terre.** Absents. Ce sont exactement les articles
+qu'on oublie au comptoir et qu'on retourne chercher.
+
+**Les gaines et les fils quand aucun tableau n'est posé.** Le plus gros trou, et
+le plus silencieux. Le tracé ne se calcule qu'avec un tableau sur le plan ; sans
+lui, `planRoutes` s'abstient — et il a raison, on ne devine pas d'où part le
+câble. Mais le bordereau sortait alors **sans une seule ligne de gaine ni de
+fil** : le poste le plus lourd après l'appareillage, disparu, sur le document
+même qu'on emporte au comptoir. **Un zéro muet est le pire des chiffres.** On
+pose donc l'estimation que la liste du matériel emploie déjà — douze mètres par
+départ, le même chiffre qu'elle, deux feuilles d'un dossier ne pouvant pas
+estimer différemment — et chaque ligne porte écrit que c'est un forfait. Le
+contrôle en sens inverse compte autant : un vrai métré ne se fait **jamais**
+remplacer par le forfait.
+
+Sur le logement d'essai, le devis passe de **450 € à 793 €**. Ce n'est pas une
+hausse de prix, c'est ce qui manquait.
+
+Le correctif est dans `buyingList`, et non dans le devis : c'est le bordereau
+qui estime, donc la liste du matériel imprimée en profite aussi. Le devis, lui,
+ne recompte toujours rien.
+
+**28 bancs de chiffrage + 12 d'écran**, dont trois contrôles en sens inverse :
+le forfait qui ne remplace pas un métré, le tableau qui ne se paie pas deux
+fois, et le plan sorti du rouleau qui fait crier le banc du défilement.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

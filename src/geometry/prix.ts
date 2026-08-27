@@ -127,7 +127,7 @@ export const TARIFS_MECANISME: Record<
     thermostat: t(45),
     applique: t(0),
     boite: t(2.2),
-    tableau: t(55),
+    tableau: t(0),
   },
   ovalis: {
     prise: t(4.9),
@@ -143,7 +143,7 @@ export const TARIFS_MECANISME: Record<
     thermostat: t(48),
     applique: t(0),
     boite: t(2.2),
-    tableau: t(55),
+    tableau: t(0),
   },
   odace: {
     prise: t(8.5),
@@ -159,7 +159,7 @@ export const TARIFS_MECANISME: Record<
     thermostat: t(69),
     applique: t(0),
     boite: t(2.2),
-    tableau: t(55),
+    tableau: t(0),
   },
   mosaic: {
     prise: t(9.5),
@@ -175,7 +175,7 @@ export const TARIFS_MECANISME: Record<
     thermostat: t(72),
     applique: t(0),
     boite: t(2.2),
-    tableau: t(55),
+    tableau: t(0),
   },
   celiane: {
     prise: t(12.5),
@@ -191,7 +191,7 @@ export const TARIFS_MECANISME: Record<
     thermostat: t(79),
     applique: t(0),
     boite: t(2.2),
-    tableau: t(55),
+    tableau: t(0),
   },
 };
 
@@ -231,6 +231,9 @@ export const TARIFS_COMMUNS: Record<string, Tarif> = {
   'fil-2.5': t(26),
   'fil-6': t(62),
   'fil-10': t(105),
+  // Courants faibles — ce qu'on tire dans la gaine de communication.
+  futp6: t(78),
+  coax: t(55),
   // Encastrement.
   'boite-encastrement': t(0.9),
   'boite-dcl': t(3.5),
@@ -244,6 +247,21 @@ export const TARIFS_COMMUNS: Record<string, Tarif> = {
   'diff-AC': t(42),
   'diff-A': t(62),
   'coffret-com': t(135),
+  /*
+    LE COFFRET SE CHIFFRE À LA RANGÉE, ET IL EN FAUT UN.
+
+    Il n'existait au devis que si l'on avait posé un tableau SUR UN MUR du
+    plan. Or le tableau se déduit des circuits — on sait combien de modules
+    il faut avant de savoir où on l'accroche —, et un devis sans coffret
+    manque le poste le plus visible du tableau.
+  */
+  'coffret-1': t(22),
+  'coffret-2': t(38),
+  'coffret-3': t(52),
+  'coffret-4': t(68),
+  // Ce qui relie les modules entre eux, et qu'on oublie toujours.
+  peigne: t(9),
+  'bornier-terre': t(8),
   // Plafond : ce qui n'est pas un luminaire.
   'plafond-daaf': t(18),
   'plafond-vmc': t(12),

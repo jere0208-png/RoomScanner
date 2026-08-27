@@ -18,10 +18,25 @@
  * avoir lu « luminaires non compris » n'a pas lu le devis, il a lu un
  * chiffre. Elle passe donc AVANT le prix, jamais après.
  *
- * LE PLAN EXPLIQUE, IL NE DÉCORE PAS. Il montre le logement relevé, une
- * bague verte sur un lot d'appareils à la fois, et sous lui la phrase qui
- * dit ce que ce lot pèse. Les lots défilent du plus lourd au plus léger —
- * on explique un prix en commençant par ce qui le fait.
+ * LE PLAN EXPLIQUE, IL NE DÉCORE PAS — et il l'explique EN UNE FOIS.
+ *
+ * Première version : les lots défilaient, entourés d'une bague verte, un
+ * toutes les trois secondes. Retirée sur relevé du patron, téléphone en
+ * main : « ne fais pas l'animation, fais un simple listing avec les icônes
+ * en légende du plan ». Il avait raison sur le fond — on ne lit pas un prix
+ * en attendant son tour, et une animation qui cache quatre lignes sur cinq
+ * oblige à regarder le plan trois fois pour le comprendre une.
+ *
+ * La légende dit donc tout ensemble : une ligne par appareil dessiné, avec
+ * LE SYMBOLE EXACT du plan — le même tracé, la même couleur —, son nombre,
+ * le prix moyen public de l'un d'eux et ce que le lot pèse.
+ *
+ * ET UNE SEULE ZONE DE DÉFILEMENT. Relevé du patron : « le scroll sur la
+ * liste des produits est cassé, il marche rarement ». La page du prix
+ * empilait un bloc haut — le plan — au-dessus d'une liste à hauteur bornée,
+ * le tout dans une feuille déjà pressable : le doigt tombait une fois sur
+ * deux hors de la seule bande qui défilait. Tout le corps de la page ne fait
+ * plus qu'un seul rouleau, plan compris. On défile où qu'on pose le doigt.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import {
@@ -31,9 +46,12 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
 import { SheetShell } from './Sheet';
 import { FloorplanEditor } from './FloorplanEditor';
-import { chiffrer, type Devis } from '../geometry/devis';
+import { chiffrer, type Devis, type LigneLegende } from '../geometry/devis';
+import { FIXTURES, postsSymbol, type FixtureKind } from '../geometry/electrical';
+import { CEILINGS, CEILING_SYMBOL, type CeilingKind } from '../geometry/ceiling';
 import { GAMMES, type GammeId } from '../geometry/prix';
 import type { BuyRow } from '../geometry/conduits';
 import type { Circuit, Differential } from '../geometry/nfc15100';
@@ -45,9 +63,6 @@ import { radius, themedStyles, useTheme, type Palette } from '../theme';
 /** Un prix, écrit comme sur un ticket : virgule et euro collé au nombre. */
 const euros = (v: number) => `${fr(v, 2)} €`;
 
-/** Combien de temps chaque lot reste en vedette sur le plan. */
-const TEMPS_VEDETTE = 3200;
-
 export interface DevisSheetProps {
   visible: boolean;
   onClose: () => void;
@@ -58,6 +73,57 @@ export interface DevisSheetProps {
   /** La gamme retenue, gardée d'une ouverture à l'autre. */
   gamme: GammeId;
   onGamme: (g: GammeId) => void;
+}
+
+/**
+ * LE SYMBOLE D'UN APPAREIL, tel que le plan le dessine.
+ *
+ * Pas une icône « qui y ressemble » : le MÊME tracé et la MÊME couleur que
+ * `FixtureLayer` et `CeilingLayer` posent sur le plan, lus dans les mêmes
+ * tables. Une légende qui redessinerait ses propres symboles cesserait
+ * d'être une légende le jour où l'un des deux changerait.
+ *
+ * Les deux calques ne dessinent pas dans la même boîte — le mur travaille
+ * sur vingt-deux points de côté, le plafond sur dix-huit : chacun garde donc
+ * la sienne, faute de quoi la moitié des symboles sortirait rognée.
+ */
+function SymboleDuPlan({ ligne }: { ligne: LigneLegende }) {
+  if (ligne.plafond) {
+    const kind = ligne.kind as CeilingKind;
+    const spec = CEILINGS[kind];
+    return (
+      <Svg width={22} height={22} viewBox="-9 -9 18 18">
+        {(CEILING_SYMBOL[kind] ?? []).map((seg, i) => (
+          <Path
+            key={i}
+            d={seg.d}
+            stroke={spec.color}
+            strokeWidth={1.6}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            fill={seg.fill ? spec.color : 'none'}
+          />
+        ))}
+      </Svg>
+    );
+  }
+  const kind = ligne.kind as FixtureKind;
+  const spec = FIXTURES[kind];
+  return (
+    <Svg width={22} height={22} viewBox="-11 -11 22 22">
+      {postsSymbol([kind], kind).map((seg, i) => (
+        <Path
+          key={i}
+          d={seg.d}
+          stroke={spec.color}
+          strokeWidth={1.6}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill={seg.fill ? spec.color : 'none'}
+        />
+      ))}
+    </Svg>
+  );
 }
 
 export function DevisSheet({
@@ -73,7 +139,6 @@ export function DevisSheet({
   const styles = getStyles(c);
   const [etape, setEtape] = useState(0);
   const [ouverts, setOuverts] = useState<Record<string, boolean>>({});
-  const [vedette, setVedette] = useState(0);
 
   const devis: Devis = useMemo(
     () => chiffrer(achats, circuits, differentiels, gamme),
@@ -85,27 +150,6 @@ export function DevisSheet({
   useEffect(() => {
     if (visible) setEtape(0);
   }, [visible]);
-
-  /*
-    LES LOTS SE RELAIENT SUR LE PLAN.
-
-    Un seul à la fois : deux bagues vertes de deux lots différents ne se
-    distinguent pas, et l'on ne saurait plus quel chiffre lire sous le
-    dessin. Le compteur ne tourne que sur l'écran du prix — ailleurs, il
-    ferait travailler l'animation d'un plan que personne ne regarde.
-  */
-  const nVedettes = devis.vedettes.length;
-  useEffect(() => {
-    if (!visible || etape !== 2 || nVedettes < 2) return;
-    setVedette(0);
-    const t = setInterval(
-      () => setVedette((v) => (v + 1) % nVedettes),
-      TEMPS_VEDETTE,
-    );
-    return () => clearInterval(t);
-  }, [visible, etape, nVedettes]);
-
-  const enVedette = devis.vedettes[Math.min(vedette, Math.max(nVedettes - 1, 0))];
 
   const avancer = (n: number) => {
     haptic('leger');
@@ -243,49 +287,61 @@ export function DevisSheet({
           </View>
 
           {/*
-            LE PLAN QUI EXPLIQUE LE PRIX.
+            UN SEUL ROULEAU POUR TOUT LE CORPS DE LA PAGE.
 
-            Il n'est pas là pour faire joli : chaque lot s'allume à son tour
-            sur le logement relevé, et la phrase du dessous dit combien il y
-            en a et ce que coûte l'un d'eux. C'est la réponse à « pourquoi ce
-            prix », donnée par le dessin plutôt que par un tableau.
+            Relevé du patron : « le scroll sur la liste des produits est
+            cassé, il marche rarement ». Le plan tenait deux cents points au
+            -dessus d'une liste à hauteur bornée : deux blocs, un seul qui
+            défilait, et le doigt tombait une fois sur deux sur l'autre. Le
+            plan est maintenant DANS le rouleau — on défile où qu'on pose le
+            doigt, et le dessin remonte quand on cherche le détail.
           */}
-          {enVedette && (
-            <View style={styles.cadrePlan}>
-              <View style={styles.plan} pointerEvents="none">
+          <ScrollView
+            style={styles.corps}
+            showsVerticalScrollIndicator={false}
+            /* Le plan ne prend aucun toucher : sans cela, ses propres gestes
+               de déplacement se disputeraient le défilement de la page. */
+            keyboardShouldPersistTaps="handled">
+            <View style={styles.cadrePlan} pointerEvents="none">
+              <View style={styles.plan}>
                 <FloorplanEditor
                   showMeasures={false}
                   editable={false}
                   selectedWallId={null}
                   onSelectWall={() => {}}
-                  vedette={{
-                    murs: enVedette.murs,
-                    plafonds: enVedette.plafonds,
-                  }}
                 />
               </View>
-              <View style={styles.legende}>
-                <Text style={styles.legendeTitre}>
-                  {`${enVedette.quantite} × ${enVedette.titre.toLowerCase()}`}
-                </Text>
-                <Text style={styles.legendeDetail}>
-                  {`${euros(enVedette.pu)} l’unité · ${euros(enVedette.total)}`}
-                </Text>
-              </View>
-              {nVedettes > 1 && (
-                <View style={styles.points}>
-                  {devis.vedettes.map((v, i) => (
-                    <View
-                      key={v.id}
-                      style={[styles.point, i === vedette && styles.pointOn]}
-                    />
-                  ))}
-                </View>
-              )}
             </View>
-          )}
 
-          <ScrollView style={styles.liste} showsVerticalScrollIndicator={false}>
+            {/*
+              LA LÉGENDE DU PLAN — le même symbole, le même nombre.
+
+              Chaque ligne porte le tracé EXACT que le plan dessine au-dessus :
+              on retrouve l'appareil des yeux avant d'avoir lu son nom. Le
+              nombre, lui, sort du chiffrage : celui de la légende et celui du
+              récapitulatif sont le même (voir `chiffrer`).
+            */}
+            {devis.legende.length > 0 && (
+              <>
+                <Text style={styles.section}>Ce que le plan porte</Text>
+                {devis.legende.map((l) => (
+                  <View key={`${l.plafond ? 'p' : 'm'}-${l.kind}`} style={styles.ligne}>
+                    <View style={styles.vignette}>
+                      <SymboleDuPlan ligne={l} />
+                    </View>
+                    <View style={styles.texts}>
+                      <Text style={styles.ligneNom}>{l.titre}</Text>
+                      <Text style={styles.ligneDetail}>
+                        {`${l.quantite} × ${euros(l.pu)} l’unité`}
+                      </Text>
+                    </View>
+                    <Text style={styles.lignePrix}>{euros(l.total)}</Text>
+                  </View>
+                ))}
+              </>
+            )}
+
+            <Text style={styles.section}>Le détail, rayon par rayon</Text>
             {devis.parFamille.map((f) => {
               const deplie = !!ouverts[f.famille];
               const lignes = devis.lignes.filter((l) => l.famille === f.famille);
@@ -416,39 +472,35 @@ const getStyles = themedStyles((c: Palette) =>
     },
     manqueTitre: { color: c.ink, fontSize: 13, fontWeight: '800' },
     manqueTexte: { color: c.inkFaint, fontSize: 11.5, lineHeight: 16, marginTop: 3 },
-    // ------------------------------------------------------------- le plan
+    // ------------------------------------------------- le plan et sa légende
+    /* Le corps de la page du prix : UN seul rouleau, plan compris. Deux
+       zones de défilement l'une sur l'autre se disputaient le doigt. */
+    corps: { maxHeight: 430, marginTop: 12 },
     cadrePlan: {
-      marginTop: 14,
       borderRadius: radius.md,
       backgroundColor: c.surfaceSunken,
       overflow: 'hidden',
     },
     plan: { height: 200 },
-    legende: {
-      flexDirection: 'row',
-      alignItems: 'baseline',
-      justifyContent: 'space-between',
-      paddingHorizontal: 13,
-      paddingTop: 9,
+    section: {
+      color: c.inkFaint,
+      fontSize: 12,
+      fontWeight: '800',
+      letterSpacing: 0.3,
+      textTransform: 'uppercase',
+      marginTop: 16,
+      marginBottom: 2,
     },
-    legendeTitre: { color: c.ink, fontSize: 14, fontWeight: '800' },
-    legendeDetail: { color: c.green, fontSize: 12.5, fontWeight: '700' },
-    /* Les points de défilement : on doit voir qu'il y a d'autres lots, et
-       combien, sans attendre que le compteur ait fait le tour. */
-    points: {
-      flexDirection: 'row',
+    /* La vignette du symbole : fond clair, pour que le tracé se détache
+       comme il se détache du plan. */
+    vignette: {
+      width: 32,
+      height: 32,
+      borderRadius: 9,
+      backgroundColor: c.surface,
+      alignItems: 'center',
       justifyContent: 'center',
-      gap: 5,
-      paddingVertical: 9,
     },
-    point: {
-      width: 5,
-      height: 5,
-      borderRadius: 2.5,
-      backgroundColor: c.inkFaint,
-      opacity: 0.35,
-    },
-    pointOn: { backgroundColor: c.green, opacity: 1 },
     // ------------------------------------------------------------ le récap
     famille: {
       flexDirection: 'row',

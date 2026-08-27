@@ -317,49 +317,160 @@ describe('le tableau sort des circuits', () => {
   });
 });
 
-describe('le plan qui explique le prix', () => {
-  it('met en vedette des lots qui disent le même nombre que le récapitulatif', () => {
-    /*
-      Releve du patron : « une animation qui met en valeur les interrupteurs
-      (par exemple), et affiche leur nombre et le prix moyen public ». Le
-      nombre affiche sur le plan et celui du recapitulatif doivent etre le
-      MEME nombre — sinon l'ecran se contredit lui-meme, sur la meme page.
-    */
-    const d = devisDe('celiane');
-    for (const v of d.vedettes) {
-      const somme = d.lignes
-        .filter(
-          (l) =>
-            v.murs.some((k) => l.code === `meca-${k}`) ||
-            v.plafonds.some((k) => l.code === `plafond-${k}`),
-        )
-        .reduce((s, l) => s + l.quantite, 0);
-      expect(`${v.titre} : ${v.quantite}`).toBe(`${v.titre} : ${somme}`);
-    }
-  });
+describe('la légende du plan', () => {
+  /*
+    DEUX VERSIONS, ET LA PREMIERE A ETE RETIREE.
 
-  it('et le prix moyen d’un lot est bien sa moyenne', () => {
+    Elle rendait des VEDETTES : des lots — prises, commandes, courants
+    faibles — que le plan faisait defiler un a un, entoures d'une bague
+    verte. Retiree sur releve du patron, telephone en main : « ne fais pas
+    l'animation, fais un simple listing avec les icones en legende du plan ».
+    Il avait raison sur le fond : on ne lit pas un prix en attendant son
+    tour, et une animation qui cache quatre lignes sur cinq oblige a regarder
+    le plan trois fois pour le comprendre une.
+
+    La legende dit donc tout ensemble, une ligne par appareil DESSINE. Ce qui
+    ne change pas d'une version a l'autre, et qui est tout l'objet du banc :
+    le nombre ecrit a cote d'un symbole et celui du recapitulatif sont le
+    MEME nombre. Sinon l'ecran se contredit lui-meme, sur une seule page.
+  */
+  it('dit le même nombre que le chiffrage, ligne par ligne', () => {
     const d = devisDe('celiane');
-    for (const v of d.vedettes) {
-      expect(`${v.titre} : ${Math.round(v.pu * v.quantite)}`).toBe(
-        `${v.titre} : ${Math.round(v.total)}`,
+    expect(d.legende.length).toBeGreaterThan(0);
+    for (const l of d.legende) {
+      const code = `${l.plafond ? 'plafond' : 'meca'}-${l.kind}`;
+      const source = d.lignes.find((x) => x.code === code)!;
+      expect(`${l.titre} : ${l.quantite} à ${l.pu}`).toBe(
+        `${source.libelle} : ${source.quantite} à ${source.pu}`,
       );
     }
   });
 
-  it('et les lots se présentent du plus lourd au plus léger', () => {
-    // On explique un prix en commençant par ce qui le fait.
+  it('ne porte que ce que le plan dessine vraiment', () => {
+    /*
+      Le controle en sens inverse : une gaine, une boite d'encastrement, un
+      disjoncteur ne se dessinent pas sur le plan. Une legende qui les
+      porterait ne serait plus une legende, mais un second recapitulatif.
+    */
     const d = devisDe('celiane');
-    const totaux = d.vedettes.map((v) => v.total);
+    const hors = d.legende.filter(
+      (l) => !d.lignes.some((x) => x.code === `meca-${l.kind}` || x.code === `plafond-${l.kind}`),
+    );
+    expect(hors).toEqual([]);
+    expect(d.legende.some((l) => String(l.kind) === 'boite-encastrement')).toBe(false);
+  });
+
+  it('et se range du poste le plus lourd au plus léger', () => {
+    // On explique un prix en commençant par ce qui le fait.
+    const totaux = devisDe('celiane').legende.map((l) => l.total);
     expect(totaux).toEqual([...totaux].sort((a, b) => b - a));
   });
 
-  it('et il y a bien un lot de commandes, avec les va-et-vient dedans', () => {
-    const d = devisDe('celiane');
-    const cmd = d.vedettes.find((v) => v.id === 'commandes')!;
-    // Un interrupteur et deux va-et-vient : trois commandes.
-    expect(cmd.quantite).toBe(3);
-    expect(cmd.murs).toContain('va');
+  it('et laisse dehors ce qui ne se pose pas : rien à zéro exemplaire', () => {
+    for (const l of devisDe('dooxie').legende) {
+      expect(`${l.titre} : ${l.quantite > 0}`).toBe(`${l.titre} : true`);
+    }
+  });
+});
+
+/*
+  LE PASSAGE D'ELEMENTS — releve du patron, en relisant le devis sur le
+  telephone : « il manque des choses, refais un passage d'elements. Par
+  exemple, tu n'as pas compte les disjoncteurs. »
+
+  Les disjoncteurs, eux, etaient bien comptes : c'est le defilement casse qui
+  les mettait hors de portee. Mais le passage a mis au jour quatre trous
+  reels, et ces quatre-la n'auraient jamais crie tout seuls — un article
+  absent d'un devis ne laisse aucune trace.
+*/
+describe('ce qui manquait au chariot', () => {
+  it('le câble des courants faibles, que personne ne commandait', () => {
+    /*
+      La commande de conducteur ne vaut que pour les circuits qui ont une
+      SECTION — et un courant faible n'en a pas. C'etait juste pour du
+      H07V-U, et faux pour le reste : vingt metres de gaine Ø25 figuraient au
+      chariot, VIDES.
+    */
+    const d = devisDe('dooxie');
+    const futp = d.lignes.find((l) => l.code === 'futp6');
+    expect(futp).toBeDefined();
+    expect(futp!.total).toBeGreaterThan(0);
+  });
+
+  it('et le coaxial se sépare du F/UTP, au prorata des prises', () => {
+    // Une prise RJ45 ne prend pas le meme cable qu'une prise TV. Le circuit
+    // ne dit pas laquelle est au bout : on repartit, et on l'ecrit.
+    const achats = buyingList(TIRAGE, [...APPAREILS, fx('tv1', 'tv')], PLAFOND);
+    const d = chiffrer(achats, CIRCUITS, DIFFS, 'dooxie');
+    const coax = d.lignes.find((l) => l.code === 'coax');
+    expect(coax).toBeDefined();
+    expect(coax!.note).toContain('prorata');
+  });
+
+  it('le coffret de répartition, dimensionné aux modules', () => {
+    /*
+      Il n'existait que si l'on avait pose un tableau SUR UN MUR du plan. Or
+      on sait combien de modules il faut bien avant de savoir ou on
+      l'accroche.
+    */
+    const d = devisDe('dooxie');
+    const coffret = d.lignes.find((l) => l.code.startsWith('coffret-') && l.code !== 'coffret-com');
+    expect(coffret).toBeDefined();
+    expect(coffret!.quantite).toBe(1);
+    expect(coffret!.note).toContain('modules');
+  });
+
+  it('et le tableau posé au mur ne se paie pas deux fois', () => {
+    // Le controle en sens inverse : l'appareil « Tableau electrique » du
+    // plan EST ce coffret. Le compter aux deux endroits doublait la ligne.
+    const d = devisDe('dooxie');
+    const mural = d.lignes.find((l) => l.code === 'meca-tableau');
+    if (mural) {
+      expect(mural.total).toBe(0);
+      expect(mural.note).toContain('Tableau');
+    }
+  });
+
+  it('les peignes et le bornier de terre, qu’on retourne toujours chercher', () => {
+    const d = devisDe('dooxie');
+    expect(d.lignes.find((l) => l.code === 'peigne')!.quantite).toBeGreaterThan(0);
+    expect(d.lignes.find((l) => l.code === 'bornier-terre')!.quantite).toBe(1);
+  });
+
+  it('et les gaines, même sans tableau posé — estimées, et dites', () => {
+    /*
+      LE PIRE DES CHIFFRES EST UN ZERO MUET.
+
+      Le trace des gaines ne se calcule qu'avec un tableau pose sur le plan ;
+      sans lui, `planRoutes` s'abstient — et il a raison, on ne devine pas
+      d'ou part le cable. Mais le bordereau sortait alors SANS UNE SEULE
+      LIGNE de gaine ni de fil : le poste le plus lourd apres l'appareillage,
+      disparu en silence.
+    */
+    const sansTrace: PullRow[] = TIRAGE.map((r) => ({
+      ...r,
+      conduitLength: 0,
+      cableLength: 0,
+    }));
+    const d = chiffrer(
+      buyingList(sansTrace, APPAREILS, PLAFOND),
+      CIRCUITS,
+      DIFFS,
+      'dooxie',
+    );
+    const gaine = d.lignes.find((l) => l.code === 'icta-20')!;
+    expect(gaine.quantite).toBeGreaterThan(0);
+    expect(gaine.note).toContain('estimé');
+    const fil = d.lignes.find((l) => l.code === 'fil-2.5')!;
+    expect(fil.quantite).toBeGreaterThan(0);
+  });
+
+  it('mais un vrai métré ne se fait jamais remplacer par le forfait', () => {
+    // Le controle en sens inverse. L'estimation ne doit servir QUE la ou il
+    // n'y a rien : un metre releve sur le plan vaut mieux que douze metres
+    // par depart, et il doit gagner.
+    const d = devisDe('dooxie');
+    expect(d.lignes.find((l) => l.code === 'icta-20')!.note).toContain('relevés');
   });
 });
 

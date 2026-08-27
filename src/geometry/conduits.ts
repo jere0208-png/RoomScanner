@@ -221,6 +221,14 @@ const frSection = (v: number) => String(v).replace('.', ',');
 const COURONNE = 100;
 
 /**
+ * Ce qu'on compte par départ quand le tracé manque.
+ *
+ * Le même chiffre que `materialList` : deux feuilles d'un même dossier ne
+ * peuvent pas estimer différemment le même logement.
+ */
+const METRES_PAR_DEPART = 12;
+
+/**
  * La liste d'achat : gaines par diamètre, câble par section, boîtes et
  * plaques par nombre de postes.
  *
@@ -245,12 +253,45 @@ export function buyingList(
 ): BuyRow[] {
   const out: BuyRow[] = [];
 
+  /*
+    QUAND LE TRACÉ MANQUE, ON ESTIME — ET ON L'ÉCRIT.
+
+    Relevé du patron, en relisant le devis : « il manque des choses, refais
+    un passage d'éléments ». Le tracé des gaines ne se calcule qu'avec un
+    tableau posé sur le plan : sans lui, `planRoutes` s'abstient — et il a
+    raison, on ne devine pas d'où part le câble. Mais le bordereau sortait
+    alors SANS UNE SEULE LIGNE de gaine ni de fil : le poste le plus lourd
+    après l'appareillage, disparu en silence, sur le document même qu'on
+    emporte au comptoir.
+
+    Un zéro muet est le pire des chiffres. On pose donc l'estimation que la
+    liste du matériel emploie déjà — douze mètres par départ, le même chiffre
+    qu'elle, deux feuilles d'un dossier ne pouvant pas estimer
+    différemment — et chaque ligne porte écrit que c'est un forfait.
+  */
+  const mesure = rows.reduce((t, r) => t + r.conduitLength, 0) > 0;
+  const longueur = (r: PullRow, quoi: 'conduit' | 'cable') =>
+    mesure
+      ? quoi === 'conduit'
+        ? r.conduitLength
+        : r.cableLength
+      : r.runs * METRES_PAR_DEPART;
+  const forfait = mesure
+    ? undefined
+    : `estimé à ${METRES_PAR_DEPART} m par départ, faute de tableau posé sur le plan`;
+
   const parConduit = new Map<ConduitD, number>();
   const parSection = new Map<number, number>();
   for (const r of rows) {
-    parConduit.set(r.conduit, (parConduit.get(r.conduit) ?? 0) + r.conduitLength);
+    parConduit.set(
+      r.conduit,
+      (parConduit.get(r.conduit) ?? 0) + longueur(r, 'conduit'),
+    );
     if (r.section !== null) {
-      parSection.set(r.section, (parSection.get(r.section) ?? 0) + r.cableLength);
+      parSection.set(
+        r.section,
+        (parSection.get(r.section) ?? 0) + longueur(r, 'cable'),
+      );
     }
   }
 
@@ -263,7 +304,7 @@ export function buyingList(
       spec: 'Gaine annelée souple avec tire-fil, NF EN 61386',
       quantity: Math.ceil(m / COURONNE),
       unit: 'cour. 100 m',
-      note: `${m} m relevés sur le plan`,
+      note: forfait ?? `${m} m relevés sur le plan`,
     });
   }
 
@@ -278,8 +319,61 @@ export function buyingList(
       spec: 'Rigide cuivre 450/750 V — rouge, bleu, vert-jaune',
       quantity: Math.ceil(brins / COURONNE),
       unit: 'cour. 100 m',
-      note: `${m} m de parcours × 3 conducteurs = ${brins} m`,
+      note: forfait
+        ? `${Math.round(m)} m ${forfait}, × 3 conducteurs`
+        : `${m} m de parcours × 3 conducteurs = ${brins} m`,
     });
+  }
+
+  /*
+    LES COURANTS FAIBLES PRENNENT LEUR CÂBLE, ET PERSONNE NE L'ACHETAIT.
+
+    La boucle du dessus ne commande de conducteur que pour les circuits qui
+    ont une SECTION — et un circuit de courant faible n'en a pas. C'était
+    juste pour du H07V-U : on ne tire pas du fil rigide dans une gaine de
+    communication. Mais on y tire autre chose, et le bordereau n'en disait
+    rien : vingt mètres de gaine Ø25 figuraient au chariot, vides.
+
+    Une prise RJ45 demande du F/UTP, une prise TV du coaxial. Le circuit ne
+    dit pas laquelle est au bout : on répartit donc la longueur au PRORATA
+    des prises de chaque nature, et la note dit que c'est un prorata.
+  */
+  const vdi = rows
+    .filter((r) => r.section === null)
+    .reduce((t, r) => t + longueur(r, 'cable'), 0);
+  if (vdi > 0) {
+    const postes = fixtures.flatMap((f) => postsOf(f.kind));
+    const nRj = postes.filter((k) => k === 'rj45').length;
+    const nTv = postes.filter((k) => k === 'tv').length;
+    const total = nRj + nTv;
+    const part: [string, string, string, number][] = [
+      [
+        'futp6',
+        'Câble F/UTP catégorie 6',
+        '4 paires, pour les prises RJ45',
+        total === 0 ? vdi : (vdi * nRj) / total,
+      ],
+      [
+        'coax',
+        'Câble coaxial 17 VATC',
+        'Classe A, pour les prises TV',
+        total === 0 ? 0 : (vdi * nTv) / total,
+      ],
+    ];
+    for (const [code, label, spec, m] of part) {
+      if (m <= 0) continue;
+      out.push({
+        family: 'Conduits et conducteurs',
+        code,
+        label,
+        spec,
+        quantity: Math.ceil(m / COURONNE),
+        unit: 'cour. 100 m',
+        note: forfait
+          ? `${Math.round(m)} m au prorata des prises, ${forfait}`
+          : `${Math.round(m)} m au prorata des prises`,
+      });
+    }
   }
 
   // Boîtes et plaques : ce que porte le mur, poste par poste.

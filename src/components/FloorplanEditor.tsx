@@ -346,19 +346,6 @@ export interface VuePlan {
 interface Props {
   /** Cotes visibles le long des murs. */
   showMeasures: boolean;
-  /**
-   * CE QUE LE DEVIS DÉSIGNE SUR LE PLAN.
-   *
-   * Relevé du patron : « un plan qui explique pourquoi ce prix : affichage
-   * du plan général avec une animation qui met en valeur les interrupteurs
-   * (par exemple), et affiche leur nombre et le prix moyen public ». Le
-   * plan ne sait rien du devis : il reçoit des TYPES d'appareils, et pose
-   * une bague verte sur chacun. Voir `BagueVedette`.
-   */
-  vedette?: {
-    murs: readonly Fixture['kind'][];
-    plafonds: readonly CeilingFixture['kind'][];
-  };
   /** Cadrage de départ — celui que la 3D avait, quand on en revient. */
   vueInitiale?: VuePlan;
   /** Cadrage courant, remonté à chaque geste : la 3D le reprend tel quel. */
@@ -569,7 +556,6 @@ interface Props {
  */
 export function FloorplanEditor({
   showMeasures,
-  vedette,
   vueInitiale,
   onView,
   editable,
@@ -2414,7 +2400,6 @@ export function FloorplanEditor({
               partOf={partOf}
               mapping={mapping}
               frame={frame}
-              vedette={vedette?.plafonds}
               c={c}
             />
 
@@ -2455,7 +2440,6 @@ export function FloorplanEditor({
               viewRot={view.rot}
               elecLod={elecLod}
               navigating={false}
-              vedette={vedette?.murs}
               onSelectFixture={onSelectFixture}
               c={c}
             />

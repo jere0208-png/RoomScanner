@@ -54,27 +54,30 @@ export interface LigneDevis {
 }
 
 /**
- * UNE VEDETTE : ce que le plan met en valeur pour expliquer le prix.
+ * UNE LIGNE DE LÉGENDE : le symbole du plan, et ce qu'il coûte.
  *
- * Relevé du patron : « un plan qui explique pourquoi ce prix : affichage du
- * plan général avec une animation qui met en valeur les interrupteurs (par
- * exemple), et affiche leur nombre et le prix moyen public ». Une vedette
- * porte donc les deux moitiés de la phrase : les appareils à faire briller
- * sur le plan, et le chiffre à écrire à côté.
+ * Relevé du patron : « un plan qui explique pourquoi ce prix ». La première
+ * version faisait défiler des lots en les entourant d'une bague verte, un à
+ * la fois. Elle a été RETIRÉE — relevé du patron, sur le téléphone : « ne
+ * fais pas l'animation, fais un simple listing avec les icônes en légende du
+ * plan ». Il avait raison sur le fond : on ne lit pas un prix en attendant
+ * son tour, et une animation qui cache quatre lignes sur cinq oblige à
+ * regarder le plan trois fois pour le comprendre une.
+ *
+ * La légende dit donc tout en même temps, une ligne par appareil DESSINÉ sur
+ * le plan : son symbole — celui-là même qu'on voit au-dessus —, son nombre,
+ * le prix moyen public de l'un d'eux, et ce que le lot pèse.
  */
-export interface Vedette {
-  id: string;
+export interface LigneLegende {
+  /** L'appareil, tel que le plan le dessine : c'est lui qui choisit le symbole. */
+  kind: FixtureKind | CeilingKind;
+  /** Au plafond ou au mur : les deux symboles ne sont pas dans la même table. */
+  plafond: boolean;
   titre: string;
-  /** Combien il y en a. */
   quantite: number;
   /** Le prix moyen public de l'un d'eux, TTC. */
   pu: number;
-  /** Ce que le lot pèse. */
   total: number;
-  /** Les appareils muraux à mettre en valeur sur le plan. */
-  murs: FixtureKind[];
-  /** Ceux du plafond. */
-  plafonds: CeilingKind[];
 }
 
 export interface Devis {
@@ -90,21 +93,9 @@ export interface Devis {
   sansPrix: string[];
   /** Ce qui n'est volontairement pas compté, et pourquoi. */
   exclusions: string[];
-  /** Ce que le plan animera, du lot le plus lourd au plus léger. */
-  vedettes: Vedette[];
+  /** La légende du plan, du poste le plus lourd au plus léger. */
+  legende: LigneLegende[];
 }
-
-/** Les mécanismes qu'on met en valeur ensemble, et sous quel nom. */
-const LOTS: { id: string; titre: string; murs: FixtureKind[] }[] = [
-  { id: 'prises', titre: 'Prises de courant', murs: ['prise', 'prise20', 'prise32'] },
-  {
-    id: 'commandes',
-    titre: 'Interrupteurs et commandes',
-    murs: ['inter', 'va', 'poussoir', 'variateur'],
-  },
-  { id: 'faibles', titre: 'Courants faibles', murs: ['rj45', 'tv'] },
-  { id: 'divers', titre: 'Sorties et appareils divers', murs: ['sortieCable', 'thermostat', 'boite'] },
-];
 
 /**
  * Le prix d'une ligne du bordereau, dans une gamme.
@@ -122,6 +113,9 @@ function tarifDe(code: string, gamme: GammeId): Tarif | null {
   }
   return TARIFS_COMMUNS[code] ?? null;
 }
+
+/** Modules d'une rangée de tableau : la taille normalisée d'un coffret. */
+const MODULES_PAR_RANGEE = 13;
 
 /** Deux décimales, comme un ticket de caisse : on ne facture pas des millièmes. */
 const centimes = (v: number) => Math.round(v * 100) / 100;
@@ -202,7 +196,7 @@ export function chiffrer(
       unite: a.unit,
       note:
         a.code === 'meca-tableau'
-          ? 'Coffret de répartition. Il compte aussi pour une boîte et une plaque plus haut : environ trois euros en trop, assumés.'
+          ? 'Le coffret lui-même est compté au rayon Tableau, dimensionné aux modules.'
           : a.note,
     });
   }
@@ -258,6 +252,52 @@ export function chiffrer(
       unite: 'u',
     });
   }
+  /*
+    LE COFFRET, SES PEIGNES ET SON BORNIER DE TERRE.
+
+    Relevé du patron, en relisant le devis : « il manque des choses, refais
+    un passage d'éléments ». Le coffret n'existait que si l'on avait posé un
+    tableau SUR UN MUR du plan — or on sait combien de modules il faut bien
+    avant de savoir où on l'accroche, et un devis sans coffret manque le
+    poste le plus visible du tableau. Les peignes et le bornier de terre,
+    eux, n'y étaient pas du tout : ce sont exactement les articles qu'on
+    oublie au comptoir et qu'on retourne chercher.
+
+    On compte un module par disjoncteur, deux par différentiel, et deux de
+    réserve par rangée — la règle de tout tableau qu'on veut pouvoir
+    reprendre. Treize modules par rangée.
+  */
+  const modules =
+    [...calibres.values()].reduce((t2, q) => t2 + q, 0) + differentiels.length * 2;
+  if (modules > 0) {
+    const rangees = Math.max(1, Math.min(4, Math.ceil((modules + 2) / MODULES_PAR_RANGEE)));
+    poser({
+      famille: 'Tableau',
+      code: `coffret-${rangees}`,
+      libelle: `Coffret de répartition ${rangees} rangée${rangees > 1 ? 's' : ''}`,
+      precision: `${rangees * MODULES_PAR_RANGEE} modules, porte et rail DIN`,
+      quantite: 1,
+      unite: 'u',
+      note: `${modules} modules occupés, réserve comprise`,
+    });
+    poser({
+      famille: 'Tableau',
+      code: 'peigne',
+      libelle: 'Peigne d’alimentation',
+      precision: 'Horizontal, à couper à la longueur de la rangée',
+      quantite: rangees,
+      unite: 'u',
+      note: 'un par rangée',
+    });
+    poser({
+      famille: 'Tableau',
+      code: 'bornier-terre',
+      libelle: 'Bornier de terre',
+      precision: 'Répartition du conducteur de protection',
+      quantite: 1,
+      unite: 'u',
+    });
+  }
 
   // ---------------------------------------------------------- les totaux
   const total = centimes(lignes.reduce((s, l) => s + l.total, 0));
@@ -268,46 +308,36 @@ export function chiffrer(
     else parFamille.push({ famille: l.famille, total: l.total });
   }
 
-  // --------------------------------------------------------- les vedettes
+  // --------------------------------------------------------- la légende
   /*
-    CE QUE LE PLAN VA MONTRER.
+    CE QUE LE PLAN MONTRE, LIGNE PAR LIGNE.
 
-    Une vedette ne se calcule pas à part : elle regroupe des lignes déjà
-    chiffrées. Le nombre affiché sur le plan et le nombre du récapitulatif
-    sont donc le MÊME nombre — c'est la seule façon qu'ils ne se
-    contredisent jamais.
+    La légende ne calcule rien : elle relit des lignes DÉJÀ chiffrées. Le
+    nombre écrit à côté d'un symbole et celui du récapitulatif sont donc le
+    MÊME nombre — c'est la seule façon qu'ils ne se contredisent jamais.
   */
-  const vedettes: Vedette[] = [];
-  for (const lot of LOTS) {
-    const mien = lignes.filter((l) => lot.murs.some((k) => l.code === `meca-${k}`));
-    const quantite = mien.reduce((s, l) => s + l.quantite, 0);
-    if (quantite === 0) continue;
-    const somme = centimes(mien.reduce((s, l) => s + l.total, 0));
-    vedettes.push({
-      id: lot.id,
-      titre: lot.titre,
-      quantite,
-      pu: centimes(somme / quantite),
-      total: somme,
-      murs: lot.murs,
-      plafonds: [],
-    });
-  }
-  const auPlafond = lignes.filter((l) => l.code.startsWith('plafond-'));
-  const nPlafond = auPlafond.reduce((s, l) => s + l.quantite, 0);
-  if (nPlafond > 0) {
-    const somme = centimes(auPlafond.reduce((s, l) => s + l.total, 0));
-    vedettes.push({
-      id: 'plafond',
-      titre: 'Points de plafond',
-      quantite: nPlafond,
-      pu: centimes(somme / nPlafond),
-      total: somme,
-      murs: [],
-      plafonds: auPlafond.map((l) => l.code.slice(8) as CeilingKind),
-    });
-  }
-  vedettes.sort((a, b) => b.total - a.total);
+  const legende: LigneLegende[] = lignes
+    .filter(
+      (l) =>
+        (l.code.startsWith('meca-') || l.code.startsWith('plafond-')) &&
+        l.quantite > 0,
+    )
+    .map((l) => {
+      const plafond = l.code.startsWith('plafond-');
+      return {
+        kind: (plafond ? l.code.slice(8) : l.code.slice(5)) as
+          | FixtureKind
+          | CeilingKind,
+        plafond,
+        titre: l.libelle,
+        quantite: l.quantite,
+        pu: l.pu ?? 0,
+        total: l.total,
+      };
+    })
+    // Du plus lourd au plus léger : on explique un prix en commençant par ce
+    // qui le fait.
+    .sort((a, b) => b.total - a.total);
 
   const exclusions = [
     'Luminaires — lampes, spots, appliques, suspensions : cela dépend des envies. Leur boîte, leur fil et leur commande, eux, sont comptés.',
@@ -323,12 +353,12 @@ export function chiffrer(
     parFamille,
     sansPrix,
     exclusions,
-    vedettes,
+    legende,
   };
 }
 
 /** Le libellé d'un appareil, pour l'écran — une seule source de vérité. */
-export function nomDeVedette(k: FixtureKind | CeilingKind): string {
+export function nomDAppareil(k: FixtureKind | CeilingKind): string {
   return (
     (FIXTURES as Partial<Record<string, { label: string }>>)[k]?.label ??
     (CEILINGS as Partial<Record<string, { label: string }>>)[k]?.label ??

@@ -38,15 +38,15 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import React from 'react';
-import { Text, TouchableOpacity, View } from 'react-native';
-import { Circle } from 'react-native-svg';
+import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { Path } from 'react-native-svg';
 import TestRenderer, { act } from 'react-test-renderer';
 import { DevisPastille } from '../src/components/DevisPastille';
 import { DevisSheet } from '../src/components/DevisSheet';
 import { FloorplanEditor } from '../src/components/FloorplanEditor';
 import { buyingList, type PullRow } from '../src/geometry/conduits';
 import { chiffrer } from '../src/geometry/devis';
-import type { Fixture } from '../src/geometry/electrical';
+import { postsSymbol, type Fixture, type FixtureKind } from '../src/geometry/electrical';
 import type { Circuit, Differential } from '../src/geometry/nfc15100';
 import { GAMMES } from '../src/geometry/prix';
 import { useScanStore } from '../src/store/scanStore';
@@ -315,7 +315,22 @@ describe('les trois étapes', () => {
   });
 });
 
-describe('le plan qui explique le prix', () => {
+describe('le plan et sa légende', () => {
+  /*
+    DEUX VERSIONS, ET LA PREMIERE A ETE RETIREE.
+
+    Elle faisait defiler des lots sur le plan, entoures d'une bague verte, un
+    toutes les trois secondes, avec sous le dessin le nombre et le prix du lot
+    en vedette. Retiree sur releve du patron, telephone en main : « ne fais
+    pas l'animation, fais un simple listing avec les icones en legende du
+    plan ». Il avait raison sur le fond : on ne lit pas un prix en attendant
+    son tour.
+
+    Ce qui ne change pas d'une version a l'autre — et c'est tout l'objet du
+    banc — : le nombre ecrit a cote d'un symbole est celui du chiffrage, et
+    le symbole est celui que le plan dessine, pas un dessin qui lui
+    ressemble.
+  */
   const auPrix = () => {
     const t = ouvrir();
     act(() => bouton(t, 'Continuer').props.onPress());
@@ -324,66 +339,78 @@ describe('le plan qui explique le prix', () => {
     return t;
   };
 
-  it('dit sous le dessin le même nombre que le chiffrage', () => {
+  it('écrit une ligne par appareil dessiné, avec son nombre et son prix', () => {
     const t = auPrix();
     const devis = chiffrer(ACHATS, CIRCUITS, DIFFS, GAMMES[0].id);
-    const tete = devis.vedettes[0];
-    expect(mots(t)).toContain(`${tete.quantite} × ${tete.titre.toLowerCase()}`);
+    const lus = mots(t);
+    expect(devis.legende.length).toBeGreaterThan(1);
+    for (const l of devis.legende) {
+      expect(lus).toContain(l.titre);
+      expect(lus).toContain(
+        `${l.quantite} × ${l.pu.toFixed(2).replace('.', ',')} € l’unité`,
+      );
+    }
   });
 
-  it('et le prix moyen public de l’un d’eux', () => {
+  it('et le symbole est celui du plan, pas un dessin qui lui ressemble', () => {
+    /*
+      Une legende qui redessinerait ses propres symboles cesserait d'etre une
+      legende le jour ou l'un des deux changerait. On compare donc les traces
+      a la table que le plan emploie.
+    */
     const t = auPrix();
-    const tete = chiffrer(ACHATS, CIRCUITS, DIFFS, GAMMES[0].id).vedettes[0];
-    expect(mots(t).join(' ')).toContain(
-      `${tete.pu.toFixed(2).replace('.', ',')} € l’unité`,
+    const devis = chiffrer(ACHATS, CIRCUITS, DIFFS, GAMMES[0].id);
+    const traces = new Set(
+      t.root.findAllByType(Path).map((n) => String(n.props.d)),
     );
+    for (const l of devis.legende) {
+      if (l.plafond) continue;
+      for (const seg of postsSymbol([l.kind as FixtureKind], l.kind as FixtureKind)) {
+        expect(`${l.titre} : ${traces.has(seg.d)}`).toBe(`${l.titre} : true`);
+      }
+    }
   });
 
-  it('et ne met en valeur QUE le lot désigné', () => {
-    /*
-      Le plan recoit des TYPES d'appareils, pas « tout ». Une bague posee
-      sur tout ne designe rien — et c'est l'erreur qu'on ferait en passant
-      la scene entiere.
-    */
+  it('et plus rien ne bouge tout seul sur le plan', () => {
+    // Le controle en sens inverse de la version retiree : trois secondes
+    // passent, et la page est la meme. Une animation oubliee derriere une
+    // page immobile continuerait de tourner pour personne.
     const t = auPrix();
-    const plan = t.root.findAllByType(FloorplanEditor)[0];
-    const tete = chiffrer(ACHATS, CIRCUITS, DIFFS, GAMMES[0].id).vedettes[0];
-    expect(plan.props.vedette.murs).toEqual(tete.murs);
-    expect(plan.props.vedette.murs.length).toBeLessThan(APPAREILS.length);
-  });
-
-  it('et la bague ne se pose que sur les appareils de ce lot', () => {
-    /*
-      Le controle en sens inverse, sur le dessin lui-meme : trois prises et
-      deux commandes, un seul lot en vedette — il ne peut pas y avoir cinq
-      bagues.
-    */
-    const t = auPrix();
-    const devis = chiffrer(ACHATS, CIRCUITS, DIFFS, GAMMES[0].id);
-    const tete = devis.vedettes[0];
-    const attendus = APPAREILS.filter((f) =>
-      (tete.murs as string[]).includes(f.kind),
-    ).length;
-    // Les bagues sont les seuls cercles verts du plan.
-    const bagues = t.root
-      .findAllByType(Circle)
-      .filter((n) => n.props.stroke && n.props.fill === 'none');
-    expect(`bagues : ${bagues.length}`).toBe(`bagues : ${attendus}`);
-    expect(attendus).toBeLessThan(APPAREILS.length);
-  });
-
-  it('et les lots se relaient tout seuls', () => {
-    const t = auPrix();
-    const devis = chiffrer(ACHATS, CIRCUITS, DIFFS, GAMMES[0].id);
-    expect(devis.vedettes.length).toBeGreaterThan(1);
-    const premier = t.root.findAllByType(FloorplanEditor)[0].props.vedette.murs;
+    const avant = mots(t).join('|');
     act(() => {
-      jest.advanceTimersByTime(3300);
+      jest.advanceTimersByTime(6000);
     });
-    const suivant = t.root.findAllByType(FloorplanEditor)[0].props.vedette.murs;
-    expect(`${premier.join()} → ${suivant.join()}`).not.toBe(
-      `${premier.join()} → ${premier.join()}`,
+    expect(mots(t).join('|')).toBe(avant);
+  });
+});
+
+describe('le défilement de la page du prix', () => {
+  it('n’a qu’UNE seule zone qui défile, plan compris', () => {
+    /*
+      Releve du patron : « le scroll sur la liste des produits du devis est
+      casse, il marche rarement ».
+
+      La page empilait un bloc haut — le plan, deux cents points — au-dessus
+      d'une liste a hauteur bornee, le tout dans une feuille deja pressable.
+      Le doigt tombait une fois sur deux hors de la seule bande qui defilait,
+      et rien ne se passait. Ce n'est pas un reglage a ajuster : c'est une
+      zone de trop.
+
+      Le banc compte donc les zones, et pas les pixels : une seule, et le
+      plan DEDANS. Un chiffre de hauteur aurait casse a la premiere refonte
+      de la page ; la nature du defaut, non.
+    */
+    const t = ouvrir();
+    act(() => bouton(t, 'Continuer').props.onPress());
+    act(() => bouton(t, 'Voir le prix').props.onPress());
+    mesurer(t);
+    const rouleaux = t.root.findAllByType(ScrollView);
+    expect(`zones de défilement : ${rouleaux.length}`).toBe(
+      'zones de défilement : 1',
     );
+    expect(
+      rouleaux[0].findAllByType(FloorplanEditor).length,
+    ).toBe(1);
   });
 });
 
