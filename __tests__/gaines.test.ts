@@ -113,7 +113,12 @@ describe('la liste d’achat', () => {
       fils: 3,
       conduit: 20,
       // Huit departs egaux : 60 m de gaine et 66 m de cable a se partager.
-      troncons: Array.from({ length: 8 }, () => ({ conduit: 7.5, cable: 8.25 })),
+      troncons: Array.from({ length: 8 }, (_, i) => ({
+        id: `p${i}`,
+        conduit: 7.5,
+        cable: 8.25,
+        role: 'autre' as const,
+      })),
       runs: 8,
       conduitLength: 60,
       cableLength: 66,
@@ -127,7 +132,12 @@ describe('la liste d’achat', () => {
       brins: TROIS_FILS(1.5),
       fils: 3,
       conduit: 16,
-      troncons: Array.from({ length: 5 }, () => ({ conduit: 9, cable: 10 })),
+      troncons: Array.from({ length: 5 }, (_, i) => ({
+        id: `e${i}`,
+        conduit: 9,
+        cable: 10,
+        role: 'autre' as const,
+      })),
       runs: 5,
       conduitLength: 45,
       cableLength: 50,
@@ -142,7 +152,12 @@ describe('la liste d’achat', () => {
     brins: [],
       fils: 3,
       conduit: 25,
-      troncons: Array.from({ length: 2 }, () => ({ conduit: 12, cable: 13.5 })),
+      troncons: Array.from({ length: 2 }, (_, i) => ({
+        id: `v${i}`,
+        conduit: 12,
+        cable: 13.5,
+        role: 'autre' as const,
+      })),
       runs: 2,
       conduitLength: 24,
       cableLength: 27,
@@ -253,7 +268,20 @@ describe('la liste d’achat', () => {
     };
     const lignes = pullSchedule(
       [eclairage],
-      new Map([['e1', { conduit: 30, cable: 33, runs: 2 }]]),
+      new Map([
+        [
+          'e1',
+          {
+            conduit: 30,
+            cable: 33,
+            runs: 2,
+            troncons: [
+              { id: 'i1', conduit: 12, cable: 13, role: 'commande' as const },
+              { id: 'dcl1', conduit: 18, cable: 20, role: 'lumiere' as const },
+            ],
+          },
+        ],
+      ]),
       undefined,
       [fx('i1', 'inter')],
     );
@@ -265,9 +293,104 @@ describe('la liste d’achat', () => {
     const retour = list.find((r) => r.code === 'fil-1.5-retour');
     expect(retour).toBeDefined();
     expect(retour!.label).toContain('Retour de lampe — violet');
-    expect(retour!.note).toContain('marge assumée');
     // Les quatre conducteurs sont commandés, pas trois.
     expect(list.filter((r) => r.code?.startsWith('fil-1.5-'))).toHaveLength(4);
+  });
+
+  it('et le retour passe PAR LE TABLEAU : les deux départs, pas tout le circuit', () => {
+    /*
+      Releve du patron : « je veux que tout soit compte comme si on ramenait
+      toutes les gaines de tous les elements au tableau. Donc le retour lampe
+      fait tableau/interrupteur et tableau/point lumineux, pareil pour les
+      navettes, on les passe via le tableau. »
+
+      C'est un cablage en ETOILE, et il tranche une question qu'on avait
+      laissee ouverte : on comptait chaque conducteur sur la LONGUEUR TOTALE
+      du circuit, faute de savoir ou il courait — une marge, ecrite sur la
+      ligne. Ici, le retour vaut le depart de la commande PLUS celui du point
+      lumineux, et rien d'autre.
+    */
+    const eclairage: Circuit = {
+      id: 'e3',
+      label: 'Éclairage — Séjour',
+      nature: 'eclairage',
+      points: 3,
+      section: 1.5,
+      breaker: 16,
+      rooms: ['Séjour'],
+      fixtureIds: ['i1', 'p9'],
+      ceilingIds: ['dcl1'],
+    };
+    const lignes = pullSchedule(
+      [eclairage],
+      new Map([
+        [
+          'e3',
+          {
+            conduit: 45,
+            cable: 50,
+            runs: 3,
+            troncons: [
+              { id: 'i1', conduit: 12, cable: 13, role: 'commande' as const },
+              { id: 'dcl1', conduit: 18, cable: 20, role: 'lumiere' as const },
+              // Une prise commandee sur le meme circuit : elle est alimentee,
+              // elle ne porte pas le retour.
+              { id: 'p9', conduit: 15, cable: 17, role: 'autre' as const },
+            ],
+          },
+        ],
+      ]),
+      undefined,
+      [fx('i1', 'inter'), fx('p9', 'prise')],
+    );
+    const list = buyingList(lignes, [fx('i1', 'inter'), fx('p9', 'prise')]);
+    const retour = list.find((r) => r.code === 'fil-1.5-retour')!;
+    const phase = list.find((r) => r.code === 'fil-1.5-phase')!;
+    // Le retour : 13 + 20 = 33 m. La phase alimente tout : 13 + 20 + 17 = 50.
+    expect(retour.note).toContain('33 m');
+    expect(retour.note).toContain('départs des commandes et des points lumineux');
+    expect(phase.note).toContain('50 m');
+  });
+
+  it('et les navettes ne courent que sur les départs des commandes', () => {
+    // Le controle en sens inverse du precedent : une navette relie deux
+    // commandes, elle n'a rien a faire dans le depart d'un point lumineux.
+    const va: Circuit = {
+      id: 'e4',
+      label: 'Éclairage — Couloir',
+      nature: 'eclairage',
+      points: 3,
+      section: 1.5,
+      breaker: 16,
+      rooms: ['Couloir'],
+      fixtureIds: ['v1', 'v2'],
+      ceilingIds: ['dcl2'],
+    };
+    const lignes = pullSchedule(
+      [va],
+      new Map([
+        [
+          'e4',
+          {
+            conduit: 40,
+            cable: 44,
+            runs: 3,
+            troncons: [
+              { id: 'v1', conduit: 10, cable: 11, role: 'commande' as const },
+              { id: 'v2', conduit: 12, cable: 13, role: 'commande' as const },
+              { id: 'dcl2', conduit: 18, cable: 20, role: 'lumiere' as const },
+            ],
+          },
+        ],
+      ]),
+      undefined,
+      [fx('v1', 'va'), fx('v2', 'va')],
+    );
+    const list = buyingList(lignes, [fx('v1', 'va'), fx('v2', 'va')]);
+    const navette = list.find((r) => r.code === 'fil-1.5-navette')!;
+    // Deux navettes × (11 + 13) = 48 m, et pas un mètre du départ du point.
+    expect(navette.note).toContain('48 m');
+    expect(navette.note).toContain('départs des commandes');
   });
 
   it('et un VA-ET-VIENT fait grossir la gaine', () => {
@@ -413,9 +536,9 @@ describe('le découpage en couronnes', () => {
             cable: 160,
             runs: 3,
             troncons: [
-              { conduit: 51, cable: 53 },
-              { conduit: 51, cable: 53 },
-              { conduit: 51, cable: 54 },
+              { id: 'a', conduit: 51, cable: 53, role: 'autre' as const },
+              { id: 'b', conduit: 51, cable: 53, role: 'autre' as const },
+              { id: 'c', conduit: 51, cable: 54, role: 'autre' as const },
             ],
           },
         ],

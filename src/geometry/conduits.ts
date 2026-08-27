@@ -24,6 +24,7 @@
 import { CEILINGS, type CeilingFixture } from './ceiling';
 import { FIXTURES, postsOf, type Fixture } from './electrical';
 import type { Circuit } from './nfc15100';
+import type { TronconMetre } from './elecplan';
 import { wiresOf, type Wire } from './schema';
 
 /** Diamètre extérieur du conduit ICTA, en millimètres. */
@@ -141,7 +142,7 @@ export interface PullRow {
    * raboute pas un conduit, et ce qui reste au bout d'une couronne ne sert
    * qu'à un tronçon plus court. Voir `couronnes`.
    */
-  troncons: { conduit: number; cable: number }[];
+  troncons: TronconMetre[];
   /** Section des conducteurs (mm²), nulle en courants faibles. */
   section: number | null;
   conduit: ConduitD;
@@ -171,12 +172,7 @@ export function pullSchedule(
   circuits: Circuit[],
   metre?: Map<
     string,
-    {
-      conduit: number;
-      cable: number;
-      runs: number;
-      troncons?: { conduit: number; cable: number }[];
-    }
+    { conduit: number; cable: number; runs: number; troncons?: TronconMetre[] }
   >,
   /** Circuits dont le tracé longe un contour reconstitué (voir `ElecPlan`). */
   approx?: Set<string>,
@@ -206,9 +202,13 @@ export function pullSchedule(
       troncons:
         m?.troncons ??
         (m
-          ? Array.from({ length: Math.max(1, m.runs) }, () => ({
+          ? Array.from({ length: Math.max(1, m.runs) }, (_, i) => ({
+              id: `${c.id}-${i}`,
               conduit: m.conduit / Math.max(1, m.runs),
               cable: m.cable / Math.max(1, m.runs),
+              // Sans le détail, on ne sait pas ce que dessert ce départ :
+              // chaque conducteur le parcourra donc (voir `buyingList`).
+              role: 'autre' as const,
             }))
           : []),
       approx: !!approx?.has(c.id),
@@ -430,29 +430,69 @@ export function buyingList(
       le forfait, autant de fois qu'il y a de départs. C'est cohérent avec
       le total, et ça donne au découpage en couronnes des tronçons à ranger.
     */
-    const bouts = mesure
+    const bouts: TronconMetre[] = mesure
       ? r.troncons
-      : Array.from({ length: Math.max(1, r.runs) }, () => ({
+      : Array.from({ length: Math.max(1, r.runs) }, (_, i) => ({
+          id: `${r.circuitId}-${i}`,
           conduit: METRES_PAR_DEPART,
           cable: METRES_PAR_DEPART,
+          role: 'autre' as const,
         }));
     const dejaConduit = tronconsDuConduit.get(r.conduit) ?? [];
     dejaConduit.push(...bouts.map((b) => b.conduit));
     tronconsDuConduit.set(r.conduit, dejaConduit);
     if (r.section === null) continue;
-    const m = longueur(r, 'cable');
+    /*
+      TOUT REMONTE AU TABLEAU — donc chaque conducteur ne court que sur les
+      départs qui le concernent.
+
+      Relevé du patron : « je veux que tout soit compté comme si on ramenait
+      toutes les gaines de tous les éléments au tableau. Donc le retour lampe
+      fait tableau/interrupteur et tableau/point lumineux, pareil pour les
+      navettes, on les passe via le tableau. »
+
+      C'est un câblage en ÉTOILE, et il tranche une question qu'on avait
+      laissée ouverte. On comptait chaque conducteur sur la LONGUEUR TOTALE du
+      circuit, faute de savoir où il courait : marge assumée, écrite sur la
+      ligne. Elle n'a plus lieu d'être.
+        — phase, neutre, terre alimentent tout ce qui est au bout : tous les
+          départs ;
+        — le retour de lampe relie une commande à son point, par le tableau :
+          le départ de la commande ET celui du point lumineux ;
+        — les navettes relient deux commandes, par le tableau : les départs
+          des commandes.
+
+      Sans le détail des rôles — un métré ancien, ou pas de métré du tout —
+      chaque tronçon vaut « autre » et tous les conducteurs les parcourent :
+      on retombe sur l'ancien compte, qui majore. Mieux vaut majorer que
+      manquer.
+    */
+    const roles = new Set(bouts.map((b) => b.role));
+    const connu = roles.has('commande') || roles.has('lumiere');
+    const concerne = (w: Wire) => {
+      if (!connu || w.role === 'phase' || w.role === 'neutre' || w.role === 'terre') {
+        return bouts;
+      }
+      if (w.role === 'retour') {
+        return bouts.filter((b) => b.role === 'commande' || b.role === 'lumiere');
+      }
+      return bouts.filter((b) => b.role === 'commande');
+    };
     for (const w of r.brins) {
+      const miens = concerne(w);
+      if (miens.length === 0) continue;
       const cle = `${r.section}|${w.role}`;
       const e = parBrin.get(cle);
+      const metres = miens.reduce((t, b) => t + b.cable, 0);
       if (e) {
-        e.metres += m;
-        e.bouts.push(...bouts.map((b) => b.cable));
+        e.metres += metres;
+        e.bouts.push(...miens.map((b) => b.cable));
       } else {
         parBrin.set(cle, {
           section: r.section,
           wire: w,
-          metres: m,
-          bouts: bouts.map((b) => b.cable),
+          metres,
+          bouts: miens.map((b) => b.cable),
         });
       }
     }
@@ -511,20 +551,15 @@ export function buyingList(
       quantity: couronnes(e.bouts).nombre,
       unit: 'cour. 100 m',
       /*
-        LA LONGUEUR EST CELLE DU PARCOURS ENTIER, ET C'EST VOLONTAIRE.
-
-        Un retour de lampe ou une navette ne court pas tout le circuit : il
-        va de la commande au point lumineux. On ne connaît pas ce
-        sous-parcours — le tracé du plan mène le faisceau du tableau à chaque
-        appareil, pas d'un appareil à l'autre. On compte donc chaque
-        conducteur sur toute la longueur : c'est une marge, elle est du bon
-        côté, et elle est écrite.
+        CHAQUE CONDUCTEUR SUR SES DÉPARTS — voir plus haut. La note dit
+        lesquels, parce que c'est la seule façon de vérifier un métré sans
+        refaire le calcul.
       */
-      note: `${Math.round(e.metres)} m ${
-        forfait ?? 'de parcours'
-      }${
-        e.wire.role === 'retour' || e.wire.role === 'navette'
-          ? ' — compté sur tout le circuit, marge assumée'
+      note: `${Math.round(e.metres)} m ${forfait ?? 'de parcours'}${
+        e.wire.role === 'retour'
+          ? ' — départs des commandes et des points lumineux'
+          : e.wire.role === 'navette'
+          ? ' — départs des commandes'
           : ''
       }`,
     });

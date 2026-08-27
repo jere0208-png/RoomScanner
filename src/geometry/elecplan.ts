@@ -14,6 +14,7 @@ import {
 } from './electrical';
 import { wallQuadsOf, type Pt, type RoomPart, type WallSeg } from './floorplan';
 import { planCircuits, roomUse } from './nfc15100';
+import { COMMANDES, LUMIERES } from './schema';
 import type { RoomKind } from './furniture';
 import {
   HAUTEUR_GAINE,
@@ -22,6 +23,28 @@ import {
   projectOnRing,
 } from './routing';
 import type { CeilingFixture } from './ceiling';
+
+/**
+ * UN DÉPART DU TABLEAU VERS UN APPAREIL — et ce que cet appareil est.
+ *
+ * Le rôle n'est pas décoratif : il dit quels CONDUCTEURS passent dans ce
+ * tronçon-là. Relevé du patron : « je veux que tout soit compté comme si on
+ * ramenait toutes les gaines de tous les éléments au tableau ; donc le retour
+ * lampe fait tableau/interrupteur et tableau/point lumineux, pareil pour les
+ * navettes, on les passe via le tableau ». C'est un câblage en ÉTOILE, et
+ * dans une étoile un retour de lampe ne court pas « tout le circuit » : il
+ * court sur le départ de la commande et sur celui du point qu'elle allume.
+ */
+export interface TronconMetre {
+  /** L'appareil desservi. */
+  id: string;
+  /** Mètres de gaine. */
+  conduit: number;
+  /** Mètres de câble, mou compris. */
+  cable: number;
+  /** Ce que ce départ dessert : une commande, un point lumineux, ou le reste. */
+  role: 'commande' | 'lumiere' | 'autre';
+}
 
 export interface ElecPlan {
   /** Métré total par circuit, en mètres de câble, arrondi. */
@@ -43,7 +66,7 @@ export interface ElecPlan {
       conduit: number;
       cable: number;
       runs: number;
-      troncons: { conduit: number; cable: number }[];
+      troncons: TronconMetre[];
     }
   >;
   /**
@@ -112,7 +135,7 @@ export function planRoutes(
       conduit: number;
       cable: number;
       runs: number;
-      troncons: { conduit: number; cable: number }[];
+      troncons: TronconMetre[];
     }
   >();
   const traces: { id: string; path: Pt[] }[] = [];
@@ -177,9 +200,26 @@ export function planRoutes(
       conduit: runs.reduce((t, r) => t + r.conduit, 0),
       cable: runs.reduce((t, r) => t + r.length, 0),
       runs: runs.length,
-      // Un tronçon = un départ du tableau vers un appareil. C'est l'unité
-      // qu'on ne peut pas couper en deux couronnes.
-      troncons: runs.map((r) => ({ conduit: r.conduit, cable: r.length })),
+      /*
+        UN TRONÇON = UN DÉPART DU TABLEAU VERS UN APPAREIL.
+
+        C'est l'unité qu'on ne peut pas couper en deux couronnes, et c'est
+        aussi celle qui décide des conducteurs : un départ vers une commande
+        ne porte pas les mêmes fils qu'un départ vers une prise. Le plafond
+        est toujours un point lumineux ; au mur, c'est le type de l'appareil
+        qui tranche.
+      */
+      troncons: runs.map((r) => {
+        const mural = fixtures.find((x) => x.id === r.fixtureId);
+        const role: TronconMetre['role'] = !mural
+          ? 'lumiere'
+          : COMMANDES.includes(mural.kind)
+          ? 'commande'
+          : LUMIERES.includes(mural.kind)
+          ? 'lumiere'
+          : 'autre';
+        return { id: r.fixtureId, conduit: r.conduit, cable: r.length, role };
+      }),
     });
     for (const r of runs) traces.push({ id: r.fixtureId, path: r.path });
   }

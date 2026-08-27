@@ -8815,6 +8815,44 @@ le dit déjà juste à côté : deux verts voisins pour deux choses sans rapport
 C'est donc `c.blue`, celui de toute l'application — une teinte qui n'existe qu'à
 un endroit n'est pas une couleur, c'est une exception.
 
+### Tout remonte au tableau : le câblage en étoile tranche la dernière marge
+
+Relevé du patron : « je veux que tout soit compté comme si on ramenait toutes
+les gaines de tous les éléments au tableau. Donc le retour lampe fait
+tableau/interrupteur et tableau/point lumineux, pareil pour les navettes, on les
+passe via le tableau. »
+
+Ça répond à une question qu'on avait laissée ouverte, et qui était écrite en
+toutes lettres sur les lignes du bordereau : chaque conducteur était compté sur
+la **longueur totale du circuit**, faute de savoir où il courait. C'était une
+marge, elle était du bon côté, et elle était dite — mais c'était une marge.
+
+En étoile, il n'y a plus rien à supposer :
+
+- **phase, neutre, terre** alimentent ce qui est au bout : tous les départs ;
+- le **retour de lampe** relie une commande à son point, par le tableau : le
+  départ de la commande **et** celui du point lumineux ;
+- les **navettes** relient deux commandes, par le tableau : les départs des
+  commandes, et rien d'autre.
+
+Il fallait donc savoir ce que chaque départ dessert. `planRoutes` construit un
+tracé par appareil et connaissait déjà l'appareil : chaque tronçon porte
+maintenant son rôle — commande, point lumineux, ou le reste. Le plafond est
+toujours un point lumineux ; au mur, c'est le type de l'appareil qui tranche.
+
+Sur un circuit d'éclairage à trois départs — un interrupteur à 13 m, un point
+lumineux à 20 m, une prise commandée à 17 m — la phase fait **50 m** et le
+retour **33 m**. Avant, les deux faisaient 50. Chaque ligne dit sur quels
+départs elle court, parce que c'est la seule façon de vérifier un métré sans
+refaire le calcul.
+
+**Le garde-fou** : sans le détail des rôles — un métré ancien, ou pas de métré du
+tout — chaque tronçon vaut « autre » et tous les conducteurs les parcourent. On
+retombe alors sur l'ancien compte, qui majore. Mieux vaut majorer que manquer.
+
+Vérifié à l'envers en forçant ce garde-fou : les deux épreuves du modèle en
+étoile crient, et elles seules.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

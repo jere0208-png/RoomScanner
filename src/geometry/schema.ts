@@ -58,7 +58,7 @@ export const WIRE_COLORS: Record<WireRole, { color: string; label: string }> = {
  * phase ni terre : ce sont des paires, on ne les colorie pas comme du 230 V.
  */
 /** Les appareils qui COMMANDENT : eux seuls appellent un retour de lampe. */
-const COMMANDES: FixtureKind[] = [
+export const COMMANDES: FixtureKind[] = [
   'inter',
   'inter2',
   'inter3',
@@ -67,7 +67,7 @@ const COMMANDES: FixtureKind[] = [
   'variateur',
 ];
 /** Les POINTS LUMINEUX : sans l'un d'eux, il n'y a rien à retourner. */
-const LUMIERES: FixtureKind[] = ['applique', 'boite', 'sortieCable'];
+export const LUMIERES: FixtureKind[] = ['applique', 'boite', 'sortieCable'];
 
 /**
  * Les conducteurs d'un circuit — ceux qu'on tire VRAIMENT.
