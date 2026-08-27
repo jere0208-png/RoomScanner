@@ -380,6 +380,8 @@ export function ResultScreen() {
    * au moment de fermer, et plus de clavier à congédier.
    */
   const setScreen = useScanStore((s) => s.setScreen);
+  const lierPlafond = useScanStore((s) => s.lierPlafond);
+  const delierPlafond = useScanStore((s) => s.delierPlafond);
   const gammeDevis = useScanStore((s) => s.gammeDevis);
   const devisEcartes = useScanStore((s) => s.devisEcartes);
   const reset = useScanStore((s) => s.reset);
@@ -3637,6 +3639,43 @@ export function ResultScreen() {
                     }
                   : undefined
               }
+              /*
+                LIER CE SPOT, OU L'EN SORTIR.
+
+                Relevé du patron : « on doit pouvoir lier des spots entre eux
+                pour la logique de pontage, et délier un spot sur une ligne ».
+                Le bouton n'apparaît que s'il y a de quoi lier — un autre
+                point lumineux de la MÊME PIÈCE : ailleurs, il n'y a rien à
+                ponter, et une gaine ne traverse pas une cloison pour
+                rejoindre un spot d'à côté.
+
+                Lier rattache ce spot au voisin le plus proche : c'est celui
+                qu'on voulait, et c'est aussi celui vers lequel la gaine
+                partira.
+              */
+              onPonter={(() => {
+                if (!CEILINGS[cl.kind].commandable) return undefined;
+                const voisins = ceiling.filter(
+                  (x) =>
+                    x.id !== cl.id &&
+                    x.roomId === cl.roomId &&
+                    CEILINGS[x.kind].commandable,
+                );
+                if (voisins.length === 0) return undefined;
+                if (cl.row) {
+                  return { lie: true, faire: () => delierPlafond(cl.id) };
+                }
+                const proche = voisins.reduce((a, b) =>
+                  Math.hypot(a.at.x - cl.at.x, a.at.z - cl.at.z) <=
+                  Math.hypot(b.at.x - cl.at.x, b.at.z - cl.at.z)
+                    ? a
+                    : b,
+                );
+                return {
+                  lie: false,
+                  faire: () => lierPlafond(cl.id, proche.id),
+                };
+              })()}
               onRemove={() => {
                 removeCeiling(cl.id);
                 setSelCeiling(null);

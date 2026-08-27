@@ -327,25 +327,54 @@ describe('les trois étapes', () => {
     expect(rang('Céliane')).toBeLessThan(rang('Mosaic'));
   });
 
-  it('passent par la MÉTHODE avant de donner le prix', () => {
+  it('passent par l’AVERTISSEMENT avant de donner le prix', () => {
     /*
       L'ordre est la regle : le total ne s'affiche jamais a quelqu'un qui n'a
-      pas pu lire comment il se fabrique.
+      pas pu lire ce qui n'y est pas.
 
-      DEUX VERSIONS DE CETTE PAGE. La premiere listait ce qu'on ne compte pas
-      — luminaires, main-d'oeuvre, chutes —, c'est-a-dire qu'elle repondait a
-      une question que personne ne se pose devant un devis qu'il n'a pas
-      encore vu. Releve du patron : « on ne comprend pas bien pour ce qui est
-      compte ». Elle MONTRE maintenant comment le chiffre se fabrique, et la
-      mention sur l'eclairage tient en une phrase (voir `DevisDemo`).
+      TROIS VERSIONS DE CETTE PAGE, ET CHACUNE CORRIGEAIT LA PRECEDENTE.
+
+        PREMIERE — une liste d'exclusions : luminaires, main-d'oeuvre,
+        chutes. Elle repondait a une question que personne ne se pose devant
+        un devis qu'il n'a pas encore vu. Releve du patron : « on ne comprend
+        pas bien pour ce qui est compte ».
+
+        DEUXIEME — une demonstration animee du calcul : un tableau, un
+        interrupteur, un point lumineux, la gaine qui avance et le compteur
+        qui monte, le ticket qui se remplit. Elle expliquait la METHODE — et
+        l'ecran suivant la montre deja, ligne par ligne, quantite par
+        quantite. Cinq secondes perdues entre le choix et le prix.
+
+        TROISIEME — celle-ci. Releve du patron : « enleve la deuxieme page
+        explicative ; a la place fais une page dynamique Attention ». Reste
+        la seule chose qui coute de l'argent a qui la decouvre trop tard.
+
+      Le banc de la demonstration est parti avec elle ; son histoire est ici,
+      ou elle sert encore.
     */
     const t = ouvrir();
     act(() => bouton(t, 'Continuer').props.onPress());
-    const lus = mots(t).join(' ');
+    const lus = mots(t);
     expect(lus).toContain('ÉTAPE 2 SUR 3');
-    expect(lus).toContain('Comment on compte');
-    expect(lus).toContain('luminaires ne sont pas chiffrés');
-    expect(lus).not.toContain('TOTAL TTC');
+    expect(lus).toContain('Attention');
+    expect(lus.join(' ')).toContain(
+      'Les luminaires ne sont pas compris dans le devis',
+    );
+    // Ce qu'on a retire ne doit pas repousser ailleurs.
+    expect(lus.join(' ')).not.toContain('CE QUE ÇA MET AU TICKET');
+    expect(lus.join(' ')).not.toContain('TOTAL TTC');
+  });
+
+  it('et l’avertissement dit aussi ce qui EST compté', () => {
+    /*
+      Le controle en sens inverse. Un avertissement qui ne dit que ce qui
+      MANQUE laisse croire qu'il manque aussi le reste — et le contresens
+      possible coute cher : croire qu'il faudra acheter de quoi alimenter les
+      luminaires, en plus des luminaires.
+    */
+    const t = ouvrir();
+    act(() => bouton(t, 'Continuer').props.onPress());
+    expect(mots(t).join(' ')).toContain('est bien compté');
   });
 
   it('et on revient sur son choix d’un appui sur le numéro', () => {

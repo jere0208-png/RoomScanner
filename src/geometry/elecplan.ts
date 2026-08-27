@@ -287,9 +287,66 @@ export function planRoutes(
      * derniers segments, un circuit de six spots ne comptait que le tour
      * de la pièce — et le métré sous-estimait tous les éclairages.
      */
+    /*
+      UNE LIGNE DE SPOTS EST UN PONTAGE — comme une rangée de prises.
+
+      Relevé du patron : « pour les choses logiques de pontage, comme la ligne
+      de spots qu'on met, c'est des spots pontés entre eux ». C'est exact, et
+      c'est le seul autre endroit où la gaine ne remonte pas au tableau : six
+      spots alignés au plafond se tirent de proche en proche, on ne redescend
+      pas six fois.
+
+      La ligne existait déjà dans le modèle (`CeilingFixture.row`) — on la
+      pose, on la déplace, on la retourne d'un bloc. Elle ne servait qu'à
+      l'écran ; elle sert maintenant au métré.
+
+      LA TÊTE EST LE SPOT LE PLUS PROCHE DU TABLEAU, pour la même raison que
+      chez les prises : c'est lui qu'on alimente, et les autres se prennent en
+      s'éloignant.
+    */
+    const ligneDe = new Map<string, string>();
+    const parLigne = new Map<string, CeilingFixture[]>();
+    for (const id of c.ceilingIds ?? []) {
+      const cl = plafondParId.get(id);
+      if (!cl?.row) continue;
+      const l = parLigne.get(cl.row);
+      if (l) l.push(cl);
+      else parLigne.set(cl.row, [cl]);
+    }
+    for (const lot of parLigne.values()) {
+      if (lot.length < 2) continue;
+      // On enfile les spots du plus proche au plus lointain : la gaine suit
+      // la ligne, elle ne fait pas d'aller-retour.
+      const tri = [...lot].sort(
+        (a, b) =>
+          Math.hypot(a.at.x - depart.at.x, a.at.z - depart.at.z) -
+          Math.hypot(b.at.x - depart.at.x, b.at.z - depart.at.z),
+      );
+      for (let i = 1; i < tri.length; i++) ligneDe.set(tri[i].id, tri[i - 1].id);
+    }
+
     for (const id of c.ceilingIds ?? []) {
       const cl = plafondParId.get(id);
       if (!cl) continue;
+      /*
+        UN SPOT PONTÉ PART DE SON VOISIN, au plafond, en ligne droite : ils
+        sont sur le même plan et rien ne s'interpose. C'est le tirage réel
+        d'une ligne de spots.
+      */
+      const amont = ligneDe.get(cl.id);
+      if (amont) {
+        const de = plafondParId.get(amont);
+        if (de) {
+          const saut = Math.hypot(cl.at.x - de.at.x, cl.at.z - de.at.z);
+          runs.push({
+            fixtureId: cl.id,
+            path: [de.at, cl.at],
+            conduit: saut,
+            length: saut + MOU,
+          });
+          continue;
+        }
+      }
       const piece = parts.find((p) => p.roomId === cl.roomId);
       const ring = piece?.surface?.pts ?? parts[0]?.surface?.pts ?? [];
       if (ring.length < 3) continue;

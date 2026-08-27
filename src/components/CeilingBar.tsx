@@ -32,6 +32,7 @@ export function CeilingBar({
   onMove,
   onPrompt,
   onLink,
+  onPonter,
   onRemove,
   onDone,
 }: {
@@ -56,6 +57,19 @@ export function CeilingBar({
   onPrompt: (p: PromptData) => void;
   /** Absent quand l'appareil ne se commande pas — un détecteur de fumée. */
   onLink?: () => void;
+  /**
+   * LIER CE SPOT À SES VOISINS, OU L'EN SORTIR.
+   *
+   * Relevé du patron : « on doit pouvoir lier des spots entre eux pour la
+   * logique de pontage, et délier un spot sur une ligne ». Une ligne de spots
+   * est un pontage : la gaine va de l'un à l'autre au lieu de redescendre au
+   * tableau (voir `planRoutes`).
+   *
+   * Absent quand il n'y a rien à lier — un point lumineux seul dans sa pièce,
+   * un détecteur de fumée. Un bouton qui ne fait rien est pire qu'un bouton
+   * absent, et cette barre le dit déjà pour le bouton de commande.
+   */
+  onPonter?: { lie: boolean; faire: () => void };
   onRemove: () => void;
   onDone: () => void;
 }) {
@@ -235,6 +249,53 @@ export function CeilingBar({
                       {/* Le mot sous la pastille : voir `bandeauMot`. Une
                           icône seule ne se comprend qu'en l'essayant. */}
                       <Text style={styles.bandeauMot}>Relier</Text>
+                    </View>
+                  )}
+                  {onPonter && (
+                    <View style={styles.bandeauCellule}>
+                      <TouchableOpacity
+                        hitSlop={DEBORD_DOIGT}
+                        style={styles.iconBtn}
+                        /*
+                          IL DIT L'ÉTAT, PAS LE GESTE — comme le pontage des
+                          prises sur la fiche de pose. « Pontés » quand la
+                          gaine passe de spot en spot, « Seul » quand celui-ci
+                          redescend au tableau. On lit ce qui est, on ne
+                          devine pas ce qui va arriver.
+                        */
+                        accessibilityLabel={
+                          onPonter.lie
+                            ? 'Sortir ce spot de la ligne'
+                            : 'Lier ce spot à ses voisins'
+                        }
+                        onPress={onPonter.faire}>
+                        {/* Deux ronds reliés par un trait : le pontage, le
+                            même signe que sur la fiche d'un socle. */}
+                        <Svg width={17} height={17} viewBox="0 0 24 24">
+                          <Path
+                            d="M6 12 m-3 0 a3 3 0 1 0 6 0 a3 3 0 1 0 -6 0"
+                            stroke={onPonter.lie ? palette.blue : palette.inkSoft}
+                            strokeWidth={2}
+                            fill="none"
+                          />
+                          <Path
+                            d="M18 12 m-3 0 a3 3 0 1 0 6 0 a3 3 0 1 0 -6 0"
+                            stroke={onPonter.lie ? palette.blue : palette.inkSoft}
+                            strokeWidth={2}
+                            fill="none"
+                          />
+                          <Path
+                            d="M9 12 h6"
+                            stroke={onPonter.lie ? palette.blue : palette.inkSoft}
+                            strokeWidth={2}
+                            strokeLinecap="round"
+                            strokeDasharray={onPonter.lie ? undefined : '2 3'}
+                          />
+                        </Svg>
+                      </TouchableOpacity>
+                      <Text style={styles.bandeauMot}>
+                        {onPonter.lie ? 'Pontés' : 'Seul'}
+                      </Text>
                     </View>
                   )}
                   {/* Deux boutons en pictogramme, et rien pour les nommer :

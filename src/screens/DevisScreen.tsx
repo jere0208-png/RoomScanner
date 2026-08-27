@@ -59,7 +59,7 @@ import Svg, { Path } from 'react-native-svg';
 import { BackChevron } from '../components/BackChevron';
 import { RetourGlisse } from '../components/RetourGlisse';
 import { FloorplanEditor } from '../components/FloorplanEditor';
-import { DevisDemo } from '../components/DevisDemo';
+import { DevisAttention } from '../components/DevisAttention';
 import { cleDeLigne, type Devis, type LigneDevis, type LigneLegende } from '../geometry/devis';
 import { chiffrerLePlan } from '../geometry/devisplan';
 import { CEILINGS, CEILING_SYMBOL, type CeilingKind } from '../geometry/ceiling';
@@ -77,7 +77,7 @@ const euros = (v: number) => `${fr(v, 2)} €`;
 
 const ETAPES = [
   { titre: 'Quel appareillage ?', court: 'Appareillage' },
-  { titre: 'Comment on compte', court: 'Méthode' },
+  { titre: 'À savoir avant le prix', court: 'À savoir' },
   { titre: 'Votre estimation', court: 'Prix' },
 ];
 
@@ -385,25 +385,20 @@ export function DevisScreen() {
 
         {etape === 1 && (
           /*
-            ON MONTRE, ON N'ÉNUMÈRE PLUS.
+            UNE SEULE CHOSE À DIRE, ET C'EST CELLE QUI COÛTE.
 
-            Relevé du patron : « la deuxième page, on ne comprend pas bien ce
-            qui est compté ». Elle listait trois exclusions — luminaires,
-            main-d'œuvre, chutes — c'est-à-dire qu'elle répondait à une
-            question que personne ne se pose devant un devis qu'il n'a pas
-            encore vu. Ce qu'on veut savoir, c'est comment le chiffre se
-            fabrique.
+            Troisième version de cette page. Elle a listé des exclusions —
+            « on ne comprend pas bien pour ce qui est compté » —, puis joué
+            une démonstration animée du calcul, retirée à son tour : elle
+            expliquait une méthode que l'écran suivant montre déjà, ligne par
+            ligne, et faisait perdre cinq secondes entre le choix et le prix.
 
-            La démonstration le joue : un tableau, un interrupteur, un point
-            lumineux, la gaine qui part et le compteur qui monte, et le ticket
-            qui se remplit ligne par ligne. Voir `DevisDemo`.
+            Relevé du patron : « enlève la deuxième page explicative ; à la
+            place fais une page dynamique Attention ». Reste ce qui coûte de
+            l'argent à qui le découvre trop tard. Voir `DevisAttention`.
           */
           <>
-            <Text style={styles.sous}>
-              Le prix se calcule sur le plan que vous avez relevé : chaque
-              appareil fait une ligne, chaque mètre de gaine se mesure.
-            </Text>
-            <DevisDemo gamme={gamme} />
+            <DevisAttention />
             {devis.sansPrix.length > 0 && (
               /*
                 CE QUE LE CATALOGUE NE SAIT PAS CHIFFRER SE DIT ICI.

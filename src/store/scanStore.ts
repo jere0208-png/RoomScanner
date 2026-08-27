@@ -1228,6 +1228,20 @@ interface ScanState {
    * l'installation courante — et ce geste le retire.
    */
   basculerPontage: (id: string) => void;
+  /**
+   * LIER DES SPOTS EN UNE LIGNE, OU EN SORTIR UN.
+   *
+   * Relevé du patron : « on doit pouvoir lier des spots entre eux pour la
+   * logique de pontage, et délier un spot sur une ligne ». Une ligne, c'est
+   * un pontage : les spots s'y tirent de proche en proche au lieu de
+   * redescendre chacun au tableau (voir `planRoutes`).
+   *
+   * `lierPlafond` rattache un spot à la ligne d'un autre — et crée la ligne
+   * si le voisin n'en a pas encore. `delierPlafond` l'en sort, et il repart
+   * seul du tableau.
+   */
+  lierPlafond: (id: string, voisin: string) => void;
+  delierPlafond: (id: string) => void;
   removeFixture: (id: string) => void;
   /** Annule la dernière retouche. Vide = plus rien à annuler. */
   undo: () => void;
@@ -3715,6 +3729,48 @@ export const useScanStore = create<ScanState>((set, get) => {
         ),
       }));
       pushHistory('basculerPontage');
+    },
+
+    lierPlafond: (id, voisin) => {
+      set((e) => {
+        const cible = e.ceiling.find((x) => x.id === voisin);
+        if (!cible) return {};
+        // Le voisin n'a pas encore de ligne : on en ouvre une, et il la
+        // rejoint aussi — une ligne d'un seul spot n'aurait aucun sens.
+        const row = cible.row ?? `row-${voisin}`;
+        return {
+          ceiling: e.ceiling.map((x) =>
+            x.id === id || x.id === voisin ? { ...x, row } : x,
+          ),
+        };
+      });
+      pushHistory('lierPlafond');
+    },
+
+    delierPlafond: (id) => {
+      set((e) => {
+        const moi = e.ceiling.find((x) => x.id === id);
+        if (!moi?.row) return {};
+        const restants = e.ceiling.filter(
+          (x) => x.row === moi.row && x.id !== id,
+        );
+        /*
+          UN SPOT SEUL N'EST PAS UNE LIGNE.
+
+          Sortir l'avant-dernier laisserait le dernier dans une ligne d'un
+          seul — il se croirait ponté et n'aurait personne à qui se ponter.
+          On défait donc la ligne entière quand il ne resterait qu'un.
+        */
+        const aDefaire = restants.length <= 1;
+        return {
+          ceiling: e.ceiling.map((x) =>
+            x.id === id || (aDefaire && x.row === moi.row)
+              ? { ...x, row: undefined, axe: undefined }
+              : x,
+          ),
+        };
+      });
+      pushHistory('delierPlafond');
     },
 
     removeFixture: (id) => {

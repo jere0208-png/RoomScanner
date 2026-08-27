@@ -8959,6 +8959,79 @@ pas de feuille de style, il a des attributs. Le rebond se pilote donc par
 est déjà translaté, l'échelle se prend sur le centre de l'élément, qui grossit
 sur place au lieu de glisser depuis le coin du dessin.
 
+### La page « Attention », et la ligne de spots qui devient un pontage
+
+#### Troisième version de la deuxième page
+
+Relevé du patron : « enlève la deuxième page explicative. À la place fais une
+page dynamique "Attention" : les luminaires ne sont pas compris dans le devis,
+il faudra vous-même les choisir en magasin ou chez un fournisseur électrique. »
+
+Trois versions, et chacune corrigeait la précédente :
+
+- **une liste d'exclusions** — luminaires, main-d'œuvre, chutes. Elle répondait
+  à une question que personne ne se pose devant un devis qu'il n'a pas encore
+  vu ;
+- **une démonstration animée** du calcul — le tableau, l'interrupteur, le point
+  lumineux, la gaine qui avance, le compteur qui monte, le ticket qui se
+  remplit. Elle expliquait la **méthode**, et l'écran suivant la montre déjà,
+  ligne par ligne, quantité par quantité. Cinq secondes perdues entre le choix
+  et le prix ;
+- **un avertissement**. Il reste la seule chose qui coûte de l'argent à qui la
+  découvre trop tard.
+
+Elle est « dynamique » parce qu'un avertissement doit arrêter l'œil : le signe
+se pose avec un rebond, puis une bague respire autour de lui — le même geste que
+la pastille de contrôle sur le plan, au même rythme. Sur une page qu'on traverse
+pour aller voir un prix, un texte immobile se saute.
+
+**Une ligne de plus que ce qui était demandé**, et je la signale : « tout ce qui
+les alimente — la boîte, la gaine, le fil, l'interrupteur — est bien compté ».
+Un avertissement qui ne dit que ce qui **manque** laisse croire qu'il manque
+aussi le reste, et le contresens coûte cher : croire qu'il faudra acheter de
+quoi alimenter les luminaires, en plus des luminaires.
+
+Le banc de la démonstration est parti avec elle ; son histoire vit dans le banc
+de l'étape 2, où elle sert encore.
+
+#### Une ligne de spots est un pontage
+
+Relevé du patron : « pour les choses logiques de pontage, comme la ligne de
+spots qu'on met, c'est des spots pontés entre eux. On doit pouvoir lier des
+spots entre eux, et délier un spot sur une ligne. Au clic sur un spot, on doit
+voir tous ceux liés ensemble comme la sélection de la ligne. »
+
+**La sélection existait déjà** : un premier appui sur un spot d'une ligne la
+prend tout entière, surlignée d'un bout à l'autre ; un second l'en sort et donne
+le spot seul. Ce qui manquait, c'est le reste.
+
+**Le métré.** Chaque spot d'une ligne redescendait au tableau. C'est le second
+endroit — avec les socles — où la gaine ne remonte pas : six spots alignés se
+tirent de proche en proche. La ligne existait dans le modèle
+(`CeilingFixture.row`) et ne servait qu'à l'écran ; elle sert maintenant au
+calcul. Sur quatre spots à un mètre l'un de l'autre, la gaine **passe de moins
+de la moitié**.
+
+La tête de ligne est le spot le plus proche du tableau, pour la même raison que
+chez les prises : enfiler les spots dans l'ordre de la liste ferait remonter la
+gaine puis redescendre.
+
+**Lier et délier.** Deux spots posés séparément ne se pontent pas tout seuls —
+le pontage suit la ligne, pas la proximité : deux spots voisins peuvent
+n'avoir rien à voir, et c'est à l'électricien de le dire. Le bouton n'apparaît
+que s'il y a un autre point lumineux **dans la même pièce** : une gaine ne
+traverse pas une cloison pour rejoindre un spot d'à côté. Il dit l'état —
+« Pontés » ou « Seul » — comme celui des socles sur la fiche de pose.
+
+**Un spot seul n'est pas une ligne** : sortir l'avant-dernier défait la ligne
+entière, sans quoi le dernier se croirait ponté et n'aurait personne à qui se
+ponter. Le métré ignore les lignes de moins de deux — mais un modèle qui ment à
+l'écran finit par mentir au calcul.
+
+**8 bancs**, vérifiés à l'envers : en coupant le chaînage, quatre crient, dont
+celui qui compte les mètres après un déliage — parce que ce n'est pas une
+étiquette, c'est du cuivre.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro
