@@ -59,6 +59,7 @@ import Svg, { Path } from 'react-native-svg';
 import { BackChevron } from '../components/BackChevron';
 import { RetourGlisse } from '../components/RetourGlisse';
 import { FloorplanEditor } from '../components/FloorplanEditor';
+import { DevisDemo } from '../components/DevisDemo';
 import { cleDeLigne, type Devis, type LigneDevis, type LigneLegende } from '../geometry/devis';
 import { chiffrerLePlan } from '../geometry/devisplan';
 import { CEILINGS, CEILING_SYMBOL, type CeilingKind } from '../geometry/ceiling';
@@ -76,7 +77,7 @@ const euros = (v: number) => `${fr(v, 2)} €`;
 
 const ETAPES = [
   { titre: 'Quel appareillage ?', court: 'Appareillage' },
-  { titre: 'Ce qui est compté', court: 'Périmètre' },
+  { titre: 'Comment on compte', court: 'Méthode' },
   { titre: 'Votre estimation', court: 'Prix' },
 ];
 
@@ -383,18 +384,26 @@ export function DevisScreen() {
         )}
 
         {etape === 1 && (
+          /*
+            ON MONTRE, ON N'ÉNUMÈRE PLUS.
+
+            Relevé du patron : « la deuxième page, on ne comprend pas bien ce
+            qui est compté ». Elle listait trois exclusions — luminaires,
+            main-d'œuvre, chutes — c'est-à-dire qu'elle répondait à une
+            question que personne ne se pose devant un devis qu'il n'a pas
+            encore vu. Ce qu'on veut savoir, c'est comment le chiffre se
+            fabrique.
+
+            La démonstration le joue : un tableau, un interrupteur, un point
+            lumineux, la gaine qui part et le compteur qui monte, et le ticket
+            qui se remplit ligne par ligne. Voir `DevisDemo`.
+          */
           <>
             <Text style={styles.sous}>
-              Les gaines et les fils sont mesurés sur le tracé du plan — donc
-              approximatifs, comme tout métré. L’appareillage, les boîtes
-              d’encastrement, les plaques et le tableau sont comptés un par un.
+              Le prix se calcule sur le plan que vous avez relevé : chaque
+              appareil fait une ligne, chaque mètre de gaine se mesure.
             </Text>
-            {devis.exclusions.map((e) => (
-              <View key={e} style={styles.exclusion}>
-                <Text style={styles.tiret}>—</Text>
-                <Text style={styles.exclusionTexte}>{e}</Text>
-              </View>
-            ))}
+            <DevisDemo gamme={gamme} />
             {devis.sansPrix.length > 0 && (
               /*
                 CE QUE LE CATALOGUE NE SAIT PAS CHIFFRER SE DIT ICI.

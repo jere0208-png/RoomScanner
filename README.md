@@ -8905,6 +8905,60 @@ total plein pendant que la page annonçait le réduit. Le banc qui garde cette
 pas le chemin. Corrigé, et le bouton reçoit aussi les menuiseries, qui décident
 des pontages.
 
+### La deuxième page ne dit plus ce qu'elle ne compte pas : elle montre comment elle compte
+
+Relevé du patron : « la deuxième page, on ne comprend pas bien pour ce qui est
+compté. Mets juste une mention "l'éclairage n'est pas compté dans ce devis, il
+diffère des goûts" ou quelque chose de mieux dit. Fais sur cette deuxième page un
+tuto/animation en bounce et pops modernes : un TGBT apparaît, un inter et un
+éclairage aussi, un tracé de tableau à inter et tableau à l'éclairage, avec un
+métré de gaine qui augmente au fil de l'animation… ça doit être dynamique et
+moderne comme un jeu. »
+
+**Elle listait ce qu'elle ne comptait pas, et c'était l'erreur.** Trois tirets —
+luminaires, main-d'œuvre, chutes — répondaient à une question que personne ne se
+pose devant un devis qu'il n'a pas encore vu. Ce qu'on veut savoir, c'est
+**comment le chiffre se fabrique** : d'où sortent les mètres, et pourquoi il y a
+une ligne par article.
+
+On le montre donc, en cinq secondes. Le tableau se pose avec un rebond, puis
+l'interrupteur, puis le point lumineux. La gaine part du tableau et va vers
+chacun, et **le compteur de mètres monte pendant que le trait avance** — c'est
+la seule façon de faire comprendre que le prix de la gaine vient d'une longueur
+et non d'un forfait par appareil. Le ticket se remplit ligne par ligne, avec les
+mêmes photos et les mêmes prix que le devis, et se termine sur les **quatre
+conducteurs** d'un éclairage.
+
+Le rebond est élastique, et pas linéaire : un élément qui grandit régulièrement
+« arrive », un élément qui dépasse puis revient « se pose ». C'est la différence
+entre une image qui s'affiche et un objet qu'on installe — et c'est tout ce que
+« bounce et pops » veut dire.
+
+**La mention tient en une phrase, et elle dit pourquoi** : une suspension va de
+neuf à neuf cents euros, ça ne se devine pas ; tout ce qui l'alimente est compté.
+Sans le pourquoi, on lit un oubli.
+
+#### Les prix de la démonstration sont les vrais
+
+Lus dans le catalogue, à la gamme choisie. Un exemple qui inventerait ses
+chiffres serait une publicité ; celui-ci est le devis, en plus petit — et si le
+catalogue change, la démonstration change avec lui. Un banc le tient, et le
+vérifie à l'envers : deux gammes donnent deux prix d'interrupteur.
+
+**Ce que le banc ne peut pas tenir** : le rebond, le rythme, le trait qui avance.
+Ça se regarde sur un téléphone, et je ne peux pas le voir d'ici. Ce qui se
+vérifie, c'est la matière — l'ordre du ticket, le compteur qui monte avec le
+tracé, les prix du catalogue, la photo sur chaque ligne, et **le luminaire qui
+n'y figure jamais**. Ce dernier est le contrôle en sens inverse de la mention :
+une démonstration qui chiffrerait la lampe dirait le contraire de la phrase
+posée juste au-dessus d'elle.
+
+Une chose technique qui a coûté un aller-retour : un `G` de react-native-svg n'a
+pas de feuille de style, il a des attributs. Le rebond se pilote donc par
+`opacity` et `scale` du groupe, pas par un `style` de vue — et comme le groupe
+est déjà translaté, l'échelle se prend sur le centre de l'élément, qui grossit
+sur place au lieu de glisser depuis le coin du dessin.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

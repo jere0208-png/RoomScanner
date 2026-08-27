@@ -327,14 +327,24 @@ describe('les trois étapes', () => {
     expect(rang('Céliane')).toBeLessThan(rang('Mosaic'));
   });
 
-  it('passent par ce qui n’est pas compté AVANT de donner le prix', () => {
-    // L'ordre est la règle : le total ne s'affiche jamais à quelqu'un qui n'a
-    // pas pu lire ce qu'il ne contient pas.
+  it('passent par la MÉTHODE avant de donner le prix', () => {
+    /*
+      L'ordre est la regle : le total ne s'affiche jamais a quelqu'un qui n'a
+      pas pu lire comment il se fabrique.
+
+      DEUX VERSIONS DE CETTE PAGE. La premiere listait ce qu'on ne compte pas
+      — luminaires, main-d'oeuvre, chutes —, c'est-a-dire qu'elle repondait a
+      une question que personne ne se pose devant un devis qu'il n'a pas
+      encore vu. Releve du patron : « on ne comprend pas bien pour ce qui est
+      compte ». Elle MONTRE maintenant comment le chiffre se fabrique, et la
+      mention sur l'eclairage tient en une phrase (voir `DevisDemo`).
+    */
     const t = ouvrir();
     act(() => bouton(t, 'Continuer').props.onPress());
     const lus = mots(t).join(' ');
     expect(lus).toContain('ÉTAPE 2 SUR 3');
-    expect(lus).toContain('Luminaires');
+    expect(lus).toContain('Comment on compte');
+    expect(lus).toContain('luminaires ne sont pas chiffrés');
     expect(lus).not.toContain('TOTAL TTC');
   });
 
