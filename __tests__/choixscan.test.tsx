@@ -141,7 +141,25 @@ describe('le popup du choix', () => {
     expect(vu).toContain('NF C 15-100');
   });
 
-  it('coche tout d’office, se décoche d’un appui, et valide LES CHOIX', () => {
+  /*
+    LE POPUP A COCHÉ TOUT D'OFFICE, PUIS PLUS L'ÉLECTRICITÉ.
+
+    Première version : les deux cases arrivaient pleines, et cette épreuve
+    décochait l'élec pour vérifier qu'un appui suffit — elle attendait donc
+    `{ meubles: true, elec: false }` APRÈS un geste.
+
+    Seconde version, relevé du patron : « l'app n'est pas destinée de base
+    qu'aux électriciens (...) aussi pour modéliser son appartement et
+    placer des meubles ». Cocher l'élec d'office, c'était rendre tout
+    relevé électrique — y compris celui de quelqu'un venu voir son salon.
+    Le même résultat s'obtient désormais SANS RIEN TOUCHER, et c'est
+    l'appui qui l'AJOUTE.
+
+    Ce qui se mesure ici n'a pas changé : la case commande bien ce qu'elle
+    dit, et le popup rend les DEUX choix. Le détail des défauts et de la
+    neutralité vit dans `pasqueelec.test.tsx`.
+  */
+  it('rend les deux choix, et l’appui commande bien la ligne élec', () => {
     const onValider = jest.fn();
     const tree = monter(2, onValider);
     const ligneElec = tree.root
@@ -150,12 +168,20 @@ describe('le popup du choix', () => {
         String(n.props.accessibilityLabel ?? '').includes('Électricité'),
       )!;
     expect(ligneElec).toBeDefined();
+    const valider = () =>
+      act(() =>
+        tree.root
+          .findAllByType(TouchableOpacity)
+          .find((n) => n.props.accessibilityLabel === 'Intégrer')!
+          .props.onPress(),
+      );
+    // Sans geste : les meubles détectés, et rien d'électrique.
+    valider();
+    expect(onValider).toHaveBeenLastCalledWith({ meubles: true, elec: false });
+    // Un appui, et la norme s'ajoute — le métier reste à un geste.
     act(() => ligneElec.props.onPress());
-    const valider = tree.root
-      .findAllByType(TouchableOpacity)
-      .find((n) => n.props.accessibilityLabel === 'Intégrer')!;
-    act(() => valider.props.onPress());
-    expect(onValider).toHaveBeenCalledWith({ meubles: true, elec: false });
+    valider();
+    expect(onValider).toHaveBeenLastCalledWith({ meubles: true, elec: true });
   });
 
   it('sans meuble détecté, la ligne des meubles ne paraît pas', () => {

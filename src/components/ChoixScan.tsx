@@ -83,7 +83,31 @@ export function ChoixScan({
 }) {
   const c = useTheme();
   const styles = getStyles(c);
-  const [choix, setChoix] = useState<ChoixDuScan>({ meubles: true, elec: true });
+  /*
+    LES MEUBLES SONT COCHÉS, L'ÉLECTRICITÉ NE L'EST PLUS.
+
+    Relevé du patron : « l'app n'est pas destinée de base qu'aux
+    électriciens (...) comment faire comprendre à l'utilisateur que ce n'est
+    pas que pour les élec mais aussi pour modéliser son appartement et
+    placer des meubles pour se projeter ».
+
+    Les deux cases arrivaient cochées, et c'est ici que l'application se
+    présentait : TOUT relevé revenait couvert de socles, de RJ45, de
+    commandes et de points lumineux — y compris celui de quelqu'un venu
+    voir son salon en 3D. À la minute la plus décisive de l'app, la
+    première où l'on voit son plan, elle annonçait un métier au lieu d'un
+    logement.
+
+    Les meubles, eux, restent cochés : ils ont été DÉTECTÉS pendant le
+    relevé, ils sont ce qu'on est allé chercher, et les décocher revient à
+    jeter du travail déjà fait. L'électricité est PROPOSÉE : elle ajoute au
+    plan ce que personne n'a demandé, et une proposition se coche.
+
+    Ce n'est pas un retrait du métier — la ligne reste là, en tête de liste,
+    la norme écrite en toutes lettres, à UN appui. On la propose, on ne
+    l'impose plus.
+  */
+  const [choix, setChoix] = useState<ChoixDuScan>({ meubles: true, elec: false });
 
   const bascule = (cle: keyof ChoixDuScan) => {
     haptic('leger');

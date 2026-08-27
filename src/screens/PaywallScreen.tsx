@@ -53,9 +53,27 @@ import { alerte } from '../ui/alerte';
  * l'application sait faire ne se devine pas depuis l'accueil : le tableau
  * existant, le DXF pour l'architecte, le télémètre au Bluetooth. Chaque
  * ligne nomme une chose qui se FAIT, jamais une qualité.
+ *
+ * ET LA LISTE DIT POUR QUI C'EST — relevé du patron : « l'app n'est pas
+ * destinée de base qu'aux électriciens (...) comment faire comprendre à
+ * l'utilisateur que ce n'est pas que pour les élec mais aussi pour
+ * modéliser son appartement et placer des meubles pour se projeter ».
+ *
+ * Elle vendait six choses, dont DEUX électriques et AUCUNE qui parle de
+ * meubles, de 3D ou d'aménagement. C'est le pire endroit où oublier la
+ * moitié du produit : celui où l'on demande de l'argent. Quelqu'un venu
+ * meubler son appartement lisait une facture d'électricien et refermait.
+ *
+ * La ligne du mobilier entre donc, et en DEUXIÈME — juste après le
+ * relevé, à la place où l'œil s'arrête encore. L'ordre raconte l'usage :
+ * on relève, on meuble, on partage, puis vient le métier. Rien n'est
+ * retiré : la norme et le tableau existant sont ce qui distingue
+ * l'application de tous les scanners de pièces du magasin, et ils restent
+ * écrits mot pour mot.
  */
 const ATOUTS: { icone: keyof typeof SOLAIRES; mot: string }[] = [
   { icone: 'rooms', mot: 'Relevés illimités' },
+  { icone: 'furniture', mot: 'Meubles, 3D et cotes au centimètre' },
   { icone: 'partage', mot: 'Tous les exports : PDF, DXF, CSV' },
   { icone: 'save', mot: 'Plans gardés sous votre compte' },
   { icone: 'elec', mot: 'Contrôle NF C 15-100 et matériel' },

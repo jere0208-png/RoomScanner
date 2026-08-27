@@ -228,13 +228,20 @@ export function Toolbar2D({
           active={false}
           onPress={straightenPlan}
         />,
-        <ToolPill
-          key="plus"
-          icon="appareil"
-          label="Appareil"
-          active={!!pendingKind}
-          onPress={onFixture}
-        />,
+        /*
+          LE MEUBLE PASSE DEVANT L'APPAREIL — relevé du patron : « l'app
+          n'est pas destinée de base qu'aux électriciens (...) comment faire
+          comprendre à l'utilisateur que ce n'est pas que pour les élec mais
+          aussi pour modéliser son appartement et placer des meubles pour se
+          projeter ».
+
+          La rangée d'édition se lisait « Redresser · Appareil · Meuble » :
+          le premier geste de pose qu'on proposait était électrique. Or le
+          meuble est ce que TOUT LE MONDE pose — l'électricien y compris,
+          qui a besoin du plan de travail et du lit avant de savoir où va la
+          prise. L'appareil ne perd que son rang : il reste le second, celui
+          qu'on trouve sans chercher.
+        */
         // En édition, la pastille des meubles OUVRE LE CATALOGUE.
         //
         // Elle portait un « + » à côté d'elle, et restait par ailleurs un
@@ -259,6 +266,13 @@ export function Toolbar2D({
           label="Meuble"
           active={false}
           onPress={onFurniture}
+        />,
+        <ToolPill
+          key="plus"
+          icon="appareil"
+          label="Appareil"
+          active={!!pendingKind}
+          onPress={onFixture}
         />,
         // Le plafond s'équipe comme les murs : on choisit l'appareil, puis
         // on touche la pièce qui le reçoit.
@@ -327,9 +341,11 @@ export function Toolbar2D({
             setShowFurniture(!showFurniture);
           }}
         />,
-        // L'appareillage est le sujet de l'app : allumé au départ, mais il
-        // se coupe — sur un logement équipé, ses symboles couvrent la
-        // maçonnerie qu'on est venu regarder.
+        // L'appareillage s'allume au départ, mais il se coupe — sur un
+        // logement équipé, ses symboles couvrent la maçonnerie qu'on est
+        // venu regarder. Il n'a rien à montrer tant que rien n'est posé :
+        // depuis que la fin de scan ne coche plus l'électricité, un plan
+        // simplement meublé s'ouvre nu, et c'est bien ce qu'on veut.
         <ToolPill
           key="elec"
           icon="elec"

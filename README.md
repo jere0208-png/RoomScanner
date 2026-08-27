@@ -9122,6 +9122,53 @@ endroit ne se gênent pas et gardent l'axe.
 Vérifié à l'œil sur le PDF rendu : la ligne de spots ne porte plus que sa
 chaîne, `113 · 120 · 120 · 73`.
 
+### L'app n'est pas réservée aux électriciens
+
+**Relevé du patron :** « L'app n'est pas destinée de base qu'aux électriciens,
+mais je la trouve très axée élec, comment faire plus neutre en gardant nos
+fonctionnalités élec ? Comment faire comprendre à l'utilisateur que ce n'est pas
+que pour les élec mais aussi pour modéliser son appartement et placer des meubles
+pour se projeter. »
+
+En cherchant **où** l'application dit « élec » sans qu'on le lui demande, ce
+n'est pas le vocabulaire qui est ressorti. L'accueil ne prononce pas le mot, et
+sa promesse — « Votre appartement en 3D et en plan coté » — ne parle que de
+bâti : il n'y avait rien à y corriger. Ce sont les **réglages par défaut** et
+l'**ordre** qui parlaient à sa place.
+
+**Le popup de fin de scan cochait l'électricité d'office** (`ChoixScan`,
+`{ meubles: true, elec: true }`). Tout relevé revenait donc couvert de socles,
+de RJ45, de commandes et de points lumineux — y compris celui de quelqu'un venu
+voir son salon en 3D. Et cela tombait à la minute la plus décisive de
+l'application : la première où l'on voit son plan. Elle y annonçait un métier au
+lieu d'un logement. La case est désormais **décochée** ; celle des meubles reste
+pleine, parce que les meubles ont été *détectés* pendant le relevé — les décocher
+jette du travail déjà fait — quand l'électricité est *proposée*, et qu'une
+proposition se coche. **Rien n'est retiré :** la ligne garde sa place en tête de
+liste, la norme écrite en toutes lettres, à un seul appui.
+
+**La rangée d'édition se lisait « Redresser · Appareil · Meuble ».** Le premier
+geste de pose qu'on proposait était électrique. Le meuble passe devant : c'est ce
+que tout le monde pose, l'électricien compris, qui a besoin du plan de travail et
+du lit avant de savoir où va la prise. L'appareil ne perd que son rang — il reste
+le second, avant le plafond et la note.
+
+**La page Pro vendait six choses, dont deux électriques et aucune qui parle de
+meubles, de 3D ou d'aménagement.** C'est le pire endroit où oublier la moitié du
+produit : celui où l'on demande de l'argent. Une ligne entre, « Meubles, 3D et
+cotes au centimètre », en **deuxième** position — juste après le relevé, là où
+l'œil s'arrête encore. L'ordre raconte l'usage : on relève, on meuble, on
+partage, puis vient le métier. La norme et le tableau existant restent écrits mot
+pour mot : ce sont eux qui distinguent l'application de tous les scanners de
+pièces du magasin.
+
+Le banc `pasqueelec` mesure les trois, et chaque épreuve porte **son contrôle en
+sens inverse** — sans quoi elle passerait tout aussi bien si le métier avait
+simplement disparu : la case élec revient d'un appui et se pose ; l'appareil
+reste le second à poser ; la norme et le tableau restent vendus. Le banc
+`choixscan` raconte désormais les deux versions du popup plutôt que la seule
+ancienne.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro
