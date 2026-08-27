@@ -294,3 +294,57 @@ export function cableRuns(
 export function circuitLength(runs: CableRun[]): number {
   return Math.ceil(runs.reduce((t, r) => t + r.length, 0));
 }
+
+/**
+ * DEUX GAINES NE SE DESSINENT JAMAIS L'UNE SUR L'AUTRE.
+ *
+ * Relevé du patron, capture à l'appui : « plusieurs lignes se chevauchent, ça
+ * doit être impossible (courber une ligne si le cas) ».
+ *
+ * Tous les départs partent du MÊME tableau et longent le MÊME contour : leurs
+ * premiers mètres sont rigoureusement confondus. Tracés tels quels, trois
+ * départs font un seul tireté — on ne voit plus ni combien il y en a, ni où
+ * ils se séparent. Sur un plan de chantier, c'est justement ce qu'on cherche
+ * à lire.
+ *
+ * On les écarte donc latéralement, comme un chemin de câbles : chaque départ
+ * prend son rang, et se décale d'autant de fois le pas. L'ÉCART SE REFERME
+ * SUR L'APPAREIL — plein au départ, nul à l'arrivée : la gaine doit finir
+ * exactement sur le symbole qu'elle alimente, sinon on aurait échangé un
+ * chevauchement contre un mensonge.
+ *
+ * Le rang se prend sur le PREMIER SEGMENT : deux départs qui ne partent pas
+ * du même endroit ne se gênent pas, et gardent tous deux l'axe.
+ */
+export function ecarterLesGaines<T extends { path: Pt[] }>(
+  routes: T[],
+  /** L'écart entre deux gaines voisines, dans l'unité du tracé (mètres). */
+  pas = 0.06,
+): T[] {
+  const rangs = new Map<string, number>();
+  return routes.map((r) => {
+    const n = r.path.length;
+    if (n < 2) return r;
+    const a = r.path[0];
+    const b = r.path[1];
+    const cle = `${a.x.toFixed(2)},${a.z.toFixed(2)}|${b.x.toFixed(2)},${b.z.toFixed(2)}`;
+    const rang = rangs.get(cle) ?? 0;
+    rangs.set(cle, rang + 1);
+    if (rang === 0) return r;
+    return {
+      ...r,
+      path: r.path.map((p, i) => {
+        // La normale locale : celle du segment qui suit, ou du précédent au
+        // dernier point.
+        const q = i + 1 < n ? r.path[i + 1] : r.path[i];
+        const o = i + 1 < n ? p : r.path[i - 1];
+        const dx = q.x - o.x;
+        const dz = q.z - o.z;
+        const l = Math.hypot(dx, dz) || 1;
+        // Plein au départ, nul à l'arrivée : la gaine retrouve son appareil.
+        const k = rang * pas * (1 - i / (n - 1));
+        return { x: p.x + (-dz / l) * k, z: p.z + (dx / l) * k };
+      }),
+    };
+  });
+}

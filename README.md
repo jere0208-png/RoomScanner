@@ -9077,6 +9077,51 @@ toujours un. Une épreuve qui ne prouve rien est pire qu'une épreuve absente :
 elle donne l'impression que le sujet est gardé. Elle montre maintenant le cas où
 l'écart se paie.
 
+### Trois chiffres sur le même axe, et des gaines confondues
+
+Relevé du patron, capture à l'appui : « sur le premier plan PDF, les 3 spots au
+centre de la pièce sont recouverts de chiffres sur leur droite, on ne comprend
+pas si c'est la distance entre les spots ou autre ; plusieurs lignes se
+chevauchent, ça doit être impossible (courber une ligne si le cas) ».
+
+Ce qu'il voyait était un défaut ; en le cherchant, il y en avait trois.
+
+**La double cote.** Deux mesures se superposaient sur le même axe : la chaîne
+d'implantation de la ligne — « du mur au premier, entre chacun, du dernier au
+mur », `117 · 117 · 50` — et la cote de pose de chaque spot vers le même mur,
+`51 · 168 · 285`, c'est-à-dire les **mêmes écarts cumulés**. Les deux disent la
+vérité et se lisent en alternance le long d'un seul trait ; on ne sait plus
+laquelle on lit. La chaîne gagne — c'est elle qu'on suit, cordeau tendu. Un spot
+en ligne ne porte plus de cote de pose dans l'axe de sa ligne, et garde celle,
+perpendiculaire, qui dit à quelle distance du mur la ligne est tendue.
+
+**La boîte vérifiée n'était pas la boîte dessinée.** L'écart de chaîne demandait
+une place libre à `ecarterDe`, puis se redessinait à l'**abscisse d'origine** en
+ne gardant que l'ordonnée trouvée. Il contrôlait donc une place qu'il n'occupait
+pas — et pouvait s'imprimer en plein sur ce qu'il venait d'éviter. Et quand rien
+n'est libre, la valeur cède la place : le trait tireté reste, il porte la mesure.
+
+**Le cartouche ne fuyait que les sigles.** Il s'écartait de « SP » et retombait
+sur une cote. Il voit maintenant les cotes du plafond, posées avant lui. L'ordre
+est le bon : **une mesure ne bouge pas, un nom de pièce si.**
+
+#### Les gaines s'écartent en faisceau
+
+Tous les départs partent du même tableau et longent le même contour : leurs
+premiers mètres sont rigoureusement confondus. Tracés tels quels, trois départs
+font **un seul tireté** — on ne voit plus ni combien il y en a, ni où ils se
+séparent, qui est justement ce qu'on lit sur un plan de chantier.
+
+Elles s'écartent comme un chemin de câbles, chacune à son rang. Et **l'écart se
+referme sur l'appareil** : plein au départ, nul à l'arrivée. Sans ce retour à
+zéro, on aurait échangé un chevauchement contre un mensonge — une gaine qui
+finit à côté du symbole qu'elle alimente, sur le document qui sert à percer. Le
+rang se prend sur le premier segment : deux départs qui ne partent pas du même
+endroit ne se gênent pas et gardent l'axe.
+
+Vérifié à l'œil sur le PDF rendu : la ligne de spots ne porte plus que sa
+chaîne, `113 · 120 · 120 · 73`.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

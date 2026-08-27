@@ -102,6 +102,7 @@ import {
   type ScenePalette,
 } from '../geometry/scene3d';
 import { frCategory, furnKind, furnitureStrokes } from '../geometry/furniture';
+import { ecarterLesGaines } from '../geometry/routing';
 
 const PAGE_W = 595;
 const PAGE_H = 842;
@@ -1464,6 +1465,13 @@ function planPage(
    * milieu des cotes, et il resterait là où il gêne.
    */
   const siglesPlafond: Boite[] = [];
+  /**
+   * LES COTES DU PLAFOND — celles du cheminement, et les écarts de chaîne.
+   *
+   * Le cartouche de pièce s'en écarte comme il s'écarte des sigles : elles
+   * sont posées avant lui, et une mesure ne se déplace pas pour un nom.
+   */
+  const cotesPlafond: Boite[] = [];
   const cartouchesPiece: Boite[] = [];
   const fillOf = (roomId: string) => {
     const captured = showTextures ? floors[roomId]?.color : undefined;
@@ -2002,7 +2010,15 @@ function planPage(
     // il se superpose au métré du tableau de tirage — même source, mêmes
     // longueurs.
     if (ctx.routes && ctx.routes.length > 0) {
-      for (const r of ctx.routes) {
+      /*
+        LES GAINES S'ÉCARTENT EN FAISCEAU — voir `ecarterLesGaines`.
+
+        Elles partent toutes du même tableau et longent le même contour :
+        tracées telles quelles, trois départs font un seul tireté. L'écart se
+        referme sur l'appareil, pour que chaque gaine finisse exactement sur
+        le symbole qu'elle alimente.
+      */
+      for (const r of ecarterLesGaines(ctx.routes)) {
         if (r.path.length < 2) continue;
         // Un tireté fin : lisible sans manger le plan, et distinct du trait
         // plein des murs comme du pointillé des passages.
@@ -2361,11 +2377,59 @@ function planPage(
           w: 22,
           h: 10,
         });
+        /*
+          UNE LIGNE DE SPOTS SE COTE UNE FOIS, PAS DEUX.
+
+          Relevé du patron, capture à l'appui : « les 3 spots au centre de la
+          pièce sont recouverts de chiffres sur leur droite, on ne comprend
+          pas si c'est la distance entre les spots ou autre ».
+
+          Deux mesures se superposaient sur le MÊME axe. La chaîne
+          d'implantation — « du mur au premier, entre chacun, du dernier au
+          mur », 117 · 117 · 50 — et la cote de pose de chaque spot vers le
+          même mur — 51 · 168 · 285, c'est-à-dire les mêmes écarts cumulés.
+          Les deux disent la vérité, elles se lisent en alternance le long
+          d'un seul trait, et on ne sait plus laquelle on lit.
+
+          La chaîne gagne : c'est elle qu'on suit sur le chantier, cordeau
+          tendu. Un spot en ligne ne porte donc plus de cote de pose DANS
+          l'axe de sa ligne. Il garde l'autre, perpendiculaire : elle dit à
+          quelle distance du mur la ligne est tendue, et rien ne la double.
+        */
+        const axeDeLigne = new Map<string, { x: number; z: number }>();
+        for (const row of new Set(
+          plafond.map((cl) => cl.row).filter((r): r is string => !!r),
+        )) {
+          const lot = plafond.filter((cl) => cl.row === row);
+          if (lot.length < 2) continue;
+          let a = lot[0];
+          let b = lot[0];
+          let max = -1;
+          for (const u of lot) {
+            for (const v of lot) {
+              const dd = Math.hypot(u.at.x - v.at.x, u.at.z - v.at.z);
+              if (dd > max) {
+                max = dd;
+                a = u;
+                b = v;
+              }
+            }
+          }
+          if (max < 1e-6) continue;
+          axeDeLigne.set(row, {
+            x: (b.at.x - a.at.x) / max,
+            z: (b.at.z - a.at.z) / max,
+          });
+        }
+
         for (const cl of extra?.hideCotesPose ? [] : plafond) {
           for (const axe of [
             { x: -cosP, z: -sinP },
             { x: sinP, z: -cosP },
           ]) {
+            // Dans l'axe de sa propre ligne, la chaîne dit déjà tout.
+            const sien = cl.row ? axeDeLigne.get(cl.row) : undefined;
+            if (sien && Math.abs(sien.x * axe.x + sien.z * axe.z) > 0.9) continue;
             const dist = castToWall(cl.at, axe, walls);
             if (dist === null || dist < 0.02) continue;
             const a = px(cl.at);
@@ -2422,6 +2486,7 @@ function planPage(
             }
             if (!p) continue;
             etiquettes.push(boiteCote(p));
+            cotesPlafond.push(boiteCote(p));
             d.rect(p.x - 11, p.y - 5, 22, 10, '#FFFFFF', null);
             d.text(`${Math.round(dist * 100)}`, p.x, p.y - 2.5, 6.5, SKY, {
               bold: true,
@@ -2470,10 +2535,28 @@ function planPage(
             const pose = ecarterDe(
               { x: mil.x - 9, y: mil.y - 4.5, w: 18, h: 9 },
               [...etiquettes, ...pastilles],
-              16,
+              22,
             );
-            etiquettes.push(pose);
+            /*
+              ON VÉRIFIE LA BOÎTE QU'ON DESSINE, ET NON CELLE QU'ON A DEMANDÉE.
+
+              `ecarterDe` cherche une place libre et rend une boîte — mais le
+              nombre se pose ensuite à l'abscisse D'ORIGINE, en ne gardant que
+              l'ordonnée trouvée. La place vérifiée n'était donc pas la place
+              occupée : sur la capture du dossier, un écart de chaîne tombait
+              en plein milieu du cartouche « Séjour », alors même que la
+              recherche avait dit « libre ».
+
+              ET SI RIEN N'EST LIBRE, LA VALEUR CÈDE LA PLACE. C'est la règle
+              des cotes de mur et des cotes d'appareil : le trait tireté reste,
+              il porte la mesure, et le chiffre s'efface plutôt que de rendre
+              deux informations illisibles au lieu d'une.
+            */
             const m = { x: mil.x, y: pose.y + 4.5 };
+            const boite = { x: m.x - 9, y: m.y - 4.5, w: 18, h: 9 };
+            if (!auLarge(boite)) return;
+            etiquettes.push(boite);
+            cotesPlafond.push(boite);
             d.rect(m.x - 9, m.y - 4.5, 18, 9, '#FFFFFFDD', null, 0);
             d.text(`${Math.round(val * 100)}`, m.x, m.y - 2.5, 6.5, INK, {
               bold: true,
@@ -2621,7 +2704,20 @@ function planPage(
             w: larg,
             h: label ? 30 : 32,
           },
-          siglesPlafond,
+          /*
+            IL S'ÉCARTE DE TOUT CE QUE LE PLAFOND A ÉCRIT, pas des seuls
+            sigles.
+
+            Il ne fuyait que les sigles — « SP », « DCL ». Il se déplaçait
+            donc pour les éviter et retombait sur une COTE : sur la capture du
+            dossier, le cartouche « Séjour » atterrissait en plein sur un
+            écart de chaîne. Les cotes du plafond étaient pourtant déjà
+            posées, dans la même réserve ; il suffisait de les regarder.
+
+            Et l'ordre est le bon : une mesure ne bouge pas, un nom de pièce
+            si. Le cartouche cède, jamais la cote.
+          */
+          [...siglesPlafond, ...cotesPlafond],
           34,
         );
         // Le décalage retenu s'applique au texte comme au fond : les deux
