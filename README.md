@@ -8580,6 +8580,128 @@ remis par-dessus le rouleau qui fait crier le banc du défilement, l'étape qu'o
 ne peut pas sauter, et la vignette qui retombe sur le symbole quand la photo
 manque.
 
+### Le fil se compte par couleur, et le ticket se trie
+
+Quatre relevés du patron dans la foulée, et le plus lourd est le premier.
+
+#### « Le devis ne compte que le fil bleu »
+
+Relevé, après un essai sur un éclairage complet : « alors qu'en réalité, il faut
+la phase pour l'interrupteur, autre couleur pour retour lampe, etc. Et on doit
+s'assurer grâce aux métrés de gaines qu'on a assez pour tout. Chaque câblage
+doit être noté en terme de nombre de fils jusqu'au tableau, adapter la gaine en
+fonction. »
+
+Le bordereau multipliait le parcours par **trois, en dur**, et sortait une seule
+ligne « rouge, bleu, vert-jaune ». C'était juste pour un circuit de prises et
+faux pour tout le reste : un simple allumage tire **quatre** conducteurs, un
+va-et-vient **six**. Et surtout, **on n'achète pas « cinq conducteurs »** : on
+achète une couronne de chaque couleur. Le chariot partait avec un tiers de fil
+en moins *et* sans le violet du retour de lampe, qu'on ne trouve pas au comptoir
+en cours de chantier.
+
+Le comptage exact existait déjà — `wiresOf` sait qu'un éclairage commandé porte
+un retour, qu'un va-et-vient porte deux navettes — et `conduitPour` sait
+dimensionner la gaine à la règle du tiers. Ce qui manquait, c'est que le
+bordereau **s'en serve** : la ligne de tirage porte maintenant ses conducteurs
+(`brins`) et non plus seulement leur nombre.
+
+Sur un séjour avec va-et-vient et point lumineux :
+
+```
+Conduit ICTA Ø20 mm  ·  jusqu'à 6 conducteurs par gaine
+H07V-U 1,5 — Phase — rouge              36 m
+H07V-U 1,5 — Neutre — bleu clair        36 m
+H07V-U 1,5 — Terre — vert/jaune         36 m
+H07V-U 1,5 — Retour de lampe — violet   36 m
+H07V-U 1,5 — Navette — orange           72 m
+```
+
+Le Ø20 au lieu du Ø16 n'est pas un choix de confort : six conducteurs en 1,5 ne
+passent pas dans un 16, la norme borne le remplissage au tiers. Et le nombre de
+fils est **écrit sur la ligne de gaine** — celui qui tire doit pouvoir vérifier
+le compte avant de commander la couronne.
+
+**Une approximation, dite sur la ligne** : un retour de lampe ou une navette ne
+court pas tout le circuit, il va de la commande au point lumineux. On ne connaît
+pas ce sous-parcours — le tracé du plan mène le faisceau du tableau à chaque
+appareil, pas d'un appareil à l'autre. Chaque conducteur est donc compté sur
+toute la longueur : c'est une marge, elle est du bon côté, et elle est écrite.
+
+Le prix, lui, ne dépend pas de la couleur : une couronne de rouge coûte ce que
+coûte une couronne de bleu. Le catalogue garde une entrée par section, et le
+chiffrage y retombe.
+
+#### Les prises partagent une photo
+
+« Les prises doivent avoir la même image, ce sont la même chose en réalité. » Un
+socle 16 A, un 20 A et un 32 A sont le même objet sur le mur — même plaque, même
+couleur, même forme ; ce qui les sépare est écrit sur la ligne, en ampères.
+C'était en prime la réponse aux deux vignettes ratées : il ne fallait pas de
+meilleures photos, il n'en fallait qu'une.
+
+**Et le générateur a mordu.** Ajouter des renvois écrits à la main a suffi : la
+régénération suivante a effacé la fonction qui les lisait, sans un mot. C'est
+exactement le piège de `gen-solaires`, où une icône dessinée à la main ne
+survivait pas à l'outil — et il s'est reproduit dans l'heure. L'outil ne réécrit
+plus que le bloc entre deux repères, et refuse de travailler s'il ne les trouve
+pas.
+
+#### Chercher, trier, écarter
+
+« Fais un filtrage par prix croissant, décroissant, recherche etc. Si jamais la
+liste est longue. » Elle l'est : un logement complet passe la trentaine
+d'articles. Un champ, trois pastilles.
+
+**Par rayon, le ticket garde ses sections ; dès qu'on trie par prix ou qu'on
+cherche, il s'aplatit.** C'est voulu : les rayons sont l'ordre dans lequel on
+remplit le chariot, et cet ordre n'a plus de sens quand on demande « le plus
+cher d'abord ». Un en-tête de rayon qui ne regrouperait plus rien serait un
+mensonge de mise en page.
+
+La recherche ignore la casse, les accents et les apostrophes : personne ne tape
+« Boîte d'encastrement » avec son circonflexe. Un champ qui exige l'orthographe
+exacte d'un libellé ne sert à rien sur un téléphone, et il ne le dit pas — il
+rend une liste vide.
+
+« Qu'on puisse désélectionner des éléments dans le devis, le prix doit
+s'adapter. » Le cas est courant : on refait l'appareillage d'un logement dont
+les gaines sont déjà en place. **Toute la ligne est le bouton** — viser une case
+de vingt points avec des gants ne marche pas. L'article reste au ticket, **barré
+mais lisible avec son prix** : un article retiré qu'on ne voit plus est un
+article qu'on croit oublié, et c'est son prix qu'on regarde pour décider de le
+remettre. Le nombre d'écartés se dit sous le total, avec « tout remettre » — un
+total plus bas sans explication est un total suspect.
+
+La liste des écartés vit dans le magasin et non dans l'écran, pour la même
+raison que la gamme : **le bouton du plan affiche le total, et il doit afficher
+celui qu'on a sous les yeux.**
+
+#### Le meuble strictement sélectionné, et une demi-mesure corrigée
+
+« Un meuble est parfois difficile à cliquer selon son emplacement… fais en sorte
+que là où le doigt touche, si l'élément est dessus il est **strictement**
+sélectionné. »
+
+La règle posée quelques jours plus tôt était une demi-mesure : *ce qu'on voit a
+le droit de prendre l'appui, ce qu'on ne voit pas, non*. Elle réglait le halo
+invisible d'un mur et laissait passer les **cartouches de pièce**, qui sont
+dessinés par-dessus.
+
+Mesuré sur la salle d'eau meublée : **172 appuis sur 256 posés sur la baignoire
+revenaient à un cartouche** — celui de la pièce, et celui du séjour voisin.
+
+Deux causes, deux corrections. Le cartouche n'esquivait que le mobilier de **sa**
+pièce : le nom du séjour se posait donc sur la baignoire d'à côté en toute
+légalité. Il esquive maintenant tout le mobilier du plan — un nom illisible sur
+un meuble l'est autant qu'il appartienne à la pièce ou à celle d'en face. Et
+quand les sept places qu'il essaie sont toutes prises — ce qui arrive dans une
+petite pièce garnie — **il se pose quand même mais renonce à l'appui** : il faut
+bien nommer la pièce, mais ce qu'il recouvre est ce qu'on visait. La pièce reste
+sélectionnable par son sol, comme partout ailleurs.
+
+**172 → 0.**
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

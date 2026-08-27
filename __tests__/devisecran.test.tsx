@@ -47,7 +47,7 @@ import { FloorplanEditor } from '../src/components/FloorplanEditor';
 import { chiffrerLePlan } from '../src/geometry/devisplan';
 import { postsSymbol, type Fixture, type FixtureKind } from '../src/geometry/electrical';
 import { GAMMES } from '../src/geometry/prix';
-import { PHOTOS } from '../src/ui/produits';
+import { photoDe } from '../src/ui/produits';
 import { useScanStore } from '../src/store/scanStore';
 import type { WallSeg } from '../src/geometry/floorplan';
 
@@ -212,6 +212,16 @@ const ouvrir = () => {
       niveauCourant: 0,
       screen: 'devis',
       gammeDevis: GAMMES[0].id,
+      /*
+        LE MAGASIN SURVIT D'UN BANC A L'AUTRE.
+
+        Les articles ecartes vivent dans le magasin — il le faut, le bouton du
+        plan les lit aussi. Sans cette remise a zero, l'epreuve qui ecarte un
+        article laissait le suivant demarrer avec un devis deja ampute, et
+        c'est le banc qui se marche dessus : la panne exacte que la deuxieme
+        forme de cet ecran avait deja subie.
+      */
+      devisEcartes: [],
     });
     t = TestRenderer.create(<DevisScreen />);
   });
@@ -400,9 +410,26 @@ describe('les vignettes du ticket', () => {
     */
     const t = auTicket();
     const devis = devisAttendu();
-    const avecPhoto = devis.lignes.filter((l) => PHOTOS[l.code]);
+    const avecPhoto = devis.lignes.filter((l) => photoDe(l.code));
     expect(avecPhoto.length).toBeGreaterThan(5);
     expect(t.root.findAllByType(Image).length).toBe(avecPhoto.length);
+  });
+
+  it('et les prises partagent une seule photo', () => {
+    /*
+      Releve du patron : « les prises doivent avoir la meme image, ce sont la
+      meme chose en realite ». Un socle 16 A, un 20 A et un 32 A sont le MEME
+      objet sur le mur — meme plaque, meme couleur, meme forme ; ce qui les
+      separe est ecrit sur la ligne, en amperes.
+
+      C'etait en prime la reponse aux deux vignettes ratees du premier jet :
+      il ne fallait pas de meilleures photos, il n'en fallait qu'une.
+    */
+    for (const code of ['meca-prise20', 'meca-prise32']) {
+      expect(`${code} : ${photoDe(code) === photoDe('meca-prise')}`).toBe(
+        `${code} : true`,
+      );
+    }
   });
 
   it('et retombent sur le symbole du plan quand la photo manque', () => {
@@ -416,7 +443,7 @@ describe('les vignettes du ticket', () => {
     const devis = devisAttendu();
     const traces = new Set(t.root.findAllByType(Path).map((n) => String(n.props.d)));
     for (const l of devis.lignes) {
-      if (PHOTOS[l.code] || !l.code.startsWith('meca-')) continue;
+      if (photoDe(l.code) || !l.code.startsWith('meca-')) continue;
       const kind = l.code.slice(5) as FixtureKind;
       for (const seg of postsSymbol([kind], kind)) {
         expect(`${l.libelle} : ${traces.has(seg.d)}`).toBe(`${l.libelle} : true`);
@@ -447,5 +474,151 @@ describe('les vignettes du ticket', () => {
     expect(t.root.findAllByType(FloorplanEditor).length).toBe(1);
     const lus = mots(t);
     expect(lus).toContain('D’où viennent ces quantités');
+  });
+});
+
+describe('chercher et trier, quand la liste est longue', () => {
+  /*
+    Releve du patron : « fais un filtrage par prix croissant, decroissant,
+    recherche etc. Si jamais la liste est longue. » Elle l'est : un logement
+    complet passe la trentaine d'articles.
+  */
+  const champ = (t: TestRenderer.ReactTestRenderer) =>
+    t.root
+      .findAll(
+        (n) =>
+          typeof n.props?.onChangeText === 'function' &&
+          String(n.props?.accessibilityLabel ?? '').startsWith('Chercher'),
+      )
+      .pop()!;
+
+  it('la recherche ne garde que ce qu’on a demandé', () => {
+    const t = auTicket();
+    act(() => champ(t).props.onChangeText('disjoncteur'));
+    const lus = mots(t);
+    expect(lus.some((m) => m.startsWith('Disjoncteur'))).toBe(true);
+    expect(lus.some((m) => m.startsWith('Conduit ICTA'))).toBe(false);
+  });
+
+  it('et elle se moque des accents, de la casse et des apostrophes', () => {
+    // Personne ne tape « Boîte d'encastrement » avec son accent circonflexe.
+    const t = auTicket();
+    act(() => champ(t).props.onChangeText('BOITE D ENCASTREMENT'));
+    expect(mots(t).some((m) => m.startsWith('Boîte d’encastrement'))).toBe(true);
+  });
+
+  it('et le dit quand rien ne correspond, au lieu de rendre une page vide', () => {
+    const t = auTicket();
+    act(() => champ(t).props.onChangeText('zzzz'));
+    expect(mots(t).join(' ')).toContain('Aucun article ne correspond');
+  });
+
+  it('le tri par prix range du plus cher au moins cher', () => {
+    const t = auTicket();
+    act(() => bouton(t, 'Trier : Prix ↓').props.onPress());
+    const lus = mots(t);
+    const parPrix = [...devisAttendu().lignes]
+      .filter((l) => l.pu !== null)
+      .sort((a, b) => b.pu! * b.quantite - a.pu! * a.quantite);
+    expect(lus.indexOf(parPrix[0].libelle)).toBeLessThan(
+      lus.indexOf(parPrix[parPrix.length - 1].libelle),
+    );
+  });
+
+  it('et le tri inverse fait exactement l’inverse', () => {
+    // Le controle en sens inverse, au sens propre.
+    const t = auTicket();
+    act(() => bouton(t, 'Trier : Prix ↑').props.onPress());
+    const lus = mots(t);
+    const parPrix = [...devisAttendu().lignes]
+      .filter((l) => l.pu !== null)
+      .sort((a, b) => b.pu! * b.quantite - a.pu! * a.quantite);
+    expect(lus.indexOf(parPrix[0].libelle)).toBeGreaterThan(
+      lus.indexOf(parPrix[parPrix.length - 1].libelle),
+    );
+  });
+
+  it('et le ticket s’aplatit dès qu’on ne suit plus le chariot', () => {
+    /*
+      Les rayons sont l'ordre dans lequel on remplit le chariot ; cet ordre
+      n'a plus de sens quand on demande « le plus cher d'abord ». Un en-tete
+      de rayon qui ne regrouperait plus rien serait un mensonge de mise en
+      page.
+    */
+    const t = auTicket();
+    expect(mots(t)).toContain('Tableau');
+    act(() => bouton(t, 'Trier : Prix ↓').props.onPress());
+    expect(mots(t)).not.toContain('Tableau');
+  });
+});
+
+describe('écarter un article', () => {
+  /*
+    Releve du patron : « fais en sorte qu'on puisse deselectionner des
+    elements dans le devis si on en a pas besoin, le prix doit s'adapter ».
+    Le cas est courant : on refait l'appareillage d'un logement dont les
+    gaines sont deja en place.
+  */
+  const ligne = (t: TestRenderer.ReactTestRenderer, nom: string) =>
+    t.root
+      .findAll(
+        (n) =>
+          typeof n.props?.onPress === 'function' &&
+          String(n.props?.accessibilityLabel ?? '') === nom,
+      )
+      .pop()!;
+
+  const plusCher = () =>
+    [...devisAttendu().lignes].sort((a, b) => b.total - a.total)[0];
+
+  it('le retire du total, et le prix suit', () => {
+    const t = auTicket();
+    const devis = devisAttendu();
+    const cher = plusCher();
+    act(() => ligne(t, cher.libelle).props.onPress());
+    const attendu = (devis.total - cher.total).toFixed(2).replace('.', ',');
+    expect(mots(t)).toContain(`${attendu} €`);
+  });
+
+  it('mais la ligne reste au ticket, barrée, avec son prix', () => {
+    /*
+      Un article retire qu'on ne voit plus est un article qu'on croit oublie
+      — c'est le reproche qu'on faisait deja aux luminaires. Et c'est son
+      prix qu'on regarde pour decider de le remettre.
+    */
+    const t = auTicket();
+    const cher = plusCher();
+    act(() => ligne(t, cher.libelle).props.onPress());
+    const lus = mots(t);
+    expect(lus).toContain(cher.libelle);
+    expect(lus).toContain(`${cher.total.toFixed(2).replace('.', ',')} €`);
+    expect(ligne(t, `${cher.libelle}, écarté du devis`)).toBeDefined();
+  });
+
+  it('et on remet tout d’un appui', () => {
+    const t = auTicket();
+    const devis = devisAttendu();
+    act(() => ligne(t, plusCher().libelle).props.onPress());
+    act(() => bouton(t, 'Tout remettre').props.onPress());
+    expect(mots(t)).toContain(`${devis.total.toFixed(2).replace('.', ',')} €`);
+  });
+
+  it('et le bouton du plan annonce le MÊME prix que la page', () => {
+    /*
+      Les deux lisent `chiffrerLePlan` avec la meme liste d'ecartes, rangee
+      dans le magasin. Gardee dans l'ecran, elle aurait laisse le bouton
+      chiffrer un devis que la page n'annonce plus.
+    */
+    const t = auTicket();
+    act(() => ligne(t, plusCher().libelle).props.onPress());
+    const duBouton = chiffrerLePlan(
+      MURS,
+      ROOMS as never,
+      APPAREILS,
+      [],
+      GAMMES[0].id,
+      new Set(useScanStore.getState().devisEcartes),
+    ).total;
+    expect(mots(t)).toContain(`${duBouton.toFixed(2).replace('.', ',')} €`);
   });
 });

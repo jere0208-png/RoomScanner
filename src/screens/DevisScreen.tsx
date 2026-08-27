@@ -41,6 +41,7 @@ import React, { useMemo, useState } from 'react';
 import {
   Image,
   ScrollView,
+  TextInput,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -50,12 +51,13 @@ import Svg, { Path } from 'react-native-svg';
 import { BackChevron } from '../components/BackChevron';
 import { RetourGlisse } from '../components/RetourGlisse';
 import { FloorplanEditor } from '../components/FloorplanEditor';
-import { type Devis, type LigneLegende } from '../geometry/devis';
+import { cleDeLigne, type Devis, type LigneDevis, type LigneLegende } from '../geometry/devis';
 import { chiffrerLePlan } from '../geometry/devisplan';
 import { CEILINGS, CEILING_SYMBOL, type CeilingKind } from '../geometry/ceiling';
 import { FIXTURES, postsSymbol, type FixtureKind } from '../geometry/electrical';
 import { GAMMES } from '../geometry/prix';
 import { photoDe } from '../ui/produits';
+import { pourChercher } from '../ui/mots';
 import { fr } from './result/format';
 import { haptic } from '../ui/haptic';
 import { useScanStore } from '../store/scanStore';
@@ -145,6 +147,55 @@ const styles_vignette = StyleSheet.create({
   image: { width: 38, height: 38 },
 });
 
+/**
+ * UNE LIGNE DU TICKET — et le geste qui l'écarte.
+ *
+ * Relevé du patron : « fais en sorte qu'on puisse désélectionner des éléments
+ * dans le devis si on en a pas besoin, le prix doit s'adapter ». Toute la
+ * ligne est le bouton : viser une case à cocher de vingt points au milieu
+ * d'une liste, sur un chantier, avec des gants, ne marche pas. La case dit ce
+ * qui se passe ; c'est la ligne qui le fait.
+ */
+function Article({
+  ligne,
+  styles,
+  onBasculer,
+}: {
+  ligne: LigneDevis;
+  styles: ReturnType<typeof getStyles>;
+  onBasculer: () => void;
+}) {
+  const hors = !!ligne.ecarte;
+  return (
+    <TouchableOpacity
+      accessibilityLabel={`${ligne.libelle}${hors ? ', écarté du devis' : ''}`}
+      accessibilityRole="button"
+      activeOpacity={0.7}
+      style={styles.article}
+      onPress={onBasculer}>
+      <View style={[styles.vignette, hors && styles.efface]}>
+        <Vignette ligne={ligne} />
+      </View>
+      <View style={styles.texts}>
+        <Text style={[styles.articleNom, hors && styles.barre]}>
+          {ligne.libelle}
+        </Text>
+        <Text style={styles.articleDetail}>
+          {ligne.pu === null
+            ? `${ligne.quantite} ${ligne.unite} — pas de prix au catalogue`
+            : `${ligne.quantite} ${ligne.unite} × ${euros(ligne.pu)}`}
+        </Text>
+        {!!ligne.note && <Text style={styles.articleNote}>{ligne.note}</Text>}
+      </View>
+      <Text style={[styles.articlePrix, hors && styles.barre]}>
+        {hors
+          ? euros((ligne.pu ?? 0) * ligne.quantite)
+          : euros(ligne.total)}
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
 export function DevisScreen() {
   const c = useTheme();
   const styles = getStyles(c);
@@ -156,7 +207,12 @@ export function DevisScreen() {
 
   const gamme = useScanStore((s) => s.gammeDevis);
   const setGamme = useScanStore((s) => s.setGammeDevis);
+  const ecartes = useScanStore((s) => s.devisEcartes);
+  const basculer = useScanStore((s) => s.basculerArticleDevis);
+  const toutRemettre = useScanStore((s) => s.remettreLesArticlesDevis);
   const [etape, setEtape] = useState(0);
+  const [cherche, setCherche] = useState('');
+  const [tri, setTri] = useState<'rayon' | 'cher' | 'pasCher'>('rayon');
 
   /*
     LE MÊME CALCUL QUE LE BOUTON DU PLAN.
@@ -166,10 +222,40 @@ export function DevisScreen() {
     recompterait de son côté, le bouton annoncerait un prix que la page ne
     retrouverait pas.
   */
+  const horsJeu = useMemo(() => new Set(ecartes), [ecartes]);
   const devis: Devis = useMemo(
-    () => chiffrerLePlan(walls, rooms, fixtures, ceiling, gamme),
-    [walls, rooms, fixtures, ceiling, gamme],
+    () => chiffrerLePlan(walls, rooms, fixtures, ceiling, gamme, horsJeu),
+    [walls, rooms, fixtures, ceiling, gamme, horsJeu],
   );
+
+  /*
+    TRIER ET CHERCHER — « si jamais la liste est longue ».
+
+    Relevé du patron. Elle l'est : un logement complet passe la trentaine
+    d'articles, et l'on cherche rarement tout le ticket — on cherche « les
+    disjoncteurs » ou « ce qui coûte le plus cher ».
+
+    PAR RAYON, LE TICKET GARDE SES SECTIONS ; dès qu'on trie par prix ou qu'on
+    cherche un mot, il s'aplatit. C'est voulu : les rayons sont l'ordre dans
+    lequel on remplit le chariot, et cet ordre n'a plus de sens quand on
+    demande « le plus cher d'abord ». Un en-tête de rayon qui ne regrouperait
+    plus rien serait un mensonge de mise en page.
+  */
+  const filtrees = useMemo(() => {
+    const q = pourChercher(cherche.trim());
+    const gardees = q
+      ? devis.lignes.filter((l) =>
+          pourChercher(`${l.libelle} ${l.precision ?? ''} ${l.famille}`).includes(q),
+        )
+      : devis.lignes;
+    if (tri === 'rayon') return gardees;
+    const prix = (l: LigneDevis) => (l.pu ?? 0) * l.quantite;
+    return [...gardees].sort((a, b) =>
+      tri === 'cher' ? prix(b) - prix(a) : prix(a) - prix(b),
+    );
+  }, [devis.lignes, cherche, tri]);
+  /** À plat dès qu'on trie autrement ou qu'on cherche. */
+  const aPlat = tri !== 'rayon' || cherche.trim().length > 0;
 
   const avancer = (n: number) => {
     haptic('leger');
@@ -350,33 +436,90 @@ export function DevisScreen() {
               </Text>
             </View>
 
-            {devis.parFamille.map((f) => (
-              <View key={f.famille}>
-                <View style={styles.rayon}>
-                  <Text style={styles.rayonNom}>{f.famille}</Text>
-                  <Text style={styles.rayonPrix}>{euros(f.total)}</Text>
-                </View>
-                {devis.lignes
-                  .filter((l) => l.famille === f.famille)
-                  .map((l) => (
-                    <View key={`${f.famille}-${l.libelle}`} style={styles.article}>
-                      <View style={styles.vignette}>
-                        <Vignette ligne={l} />
-                      </View>
-                      <View style={styles.texts}>
-                        <Text style={styles.articleNom}>{l.libelle}</Text>
-                        <Text style={styles.articleDetail}>
-                          {l.pu === null
-                            ? `${l.quantite} ${l.unite} — pas de prix au catalogue`
-                            : `${l.quantite} ${l.unite} × ${euros(l.pu)}`}
-                        </Text>
-                        {!!l.note && <Text style={styles.articleNote}>{l.note}</Text>}
-                      </View>
-                      <Text style={styles.articlePrix}>{euros(l.total)}</Text>
+            {/*
+              CHERCHER ET TRIER — « si jamais la liste est longue ».
+
+              Elle l'est : un logement complet passe la trentaine d'articles.
+              Trois pastilles et un champ, posés juste sous l'en-tête, là où
+              l'on regarde avant de faire défiler.
+            */}
+            <View style={styles.outils}>
+              <TextInput
+                accessibilityLabel="Chercher un article"
+                style={styles.recherche}
+                placeholder="Chercher un article…"
+                placeholderTextColor={c.inkFaint}
+                value={cherche}
+                onChangeText={setCherche}
+                autoCorrect={false}
+                returnKeyType="search"
+                clearButtonMode="while-editing"
+              />
+            </View>
+            <View style={styles.tris}>
+              {(
+                [
+                  ['rayon', 'Par rayon'],
+                  ['cher', 'Prix ↓'],
+                  ['pasCher', 'Prix ↑'],
+                ] as const
+              ).map(([id, nom]) => (
+                <TouchableOpacity
+                  key={id}
+                  accessibilityLabel={`Trier : ${nom}`}
+                  accessibilityRole="button"
+                  activeOpacity={0.75}
+                  style={[styles.triPille, tri === id && styles.triPilleOn]}
+                  onPress={() => {
+                    haptic('leger');
+                    setTri(id);
+                  }}>
+                  <Text style={[styles.triTexte, tri === id && styles.triTexteOn]}>
+                    {nom}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {filtrees.length === 0 && (
+              <Text style={styles.vide}>
+                {`Aucun article ne correspond à « ${cherche.trim()} ».`}
+              </Text>
+            )}
+
+            {aPlat
+              ? filtrees.map((l) => (
+                  <Article
+                    key={`${l.famille}-${l.libelle}`}
+                    ligne={l}
+                    styles={styles}
+                    onBasculer={() => {
+                      haptic('leger');
+                      basculer(cleDeLigne(l));
+                    }}
+                  />
+                ))
+              : devis.parFamille.map((f) => (
+                  <View key={f.famille}>
+                    <View style={styles.rayon}>
+                      <Text style={styles.rayonNom}>{f.famille}</Text>
+                      <Text style={styles.rayonPrix}>{euros(f.total)}</Text>
                     </View>
-                  ))}
-              </View>
-            ))}
+                    {filtrees
+                      .filter((l) => l.famille === f.famille)
+                      .map((l) => (
+                        <Article
+                          key={`${f.famille}-${l.libelle}`}
+                          ligne={l}
+                          styles={styles}
+                          onBasculer={() => {
+                            haptic('leger');
+                            basculer(cleDeLigne(l));
+                          }}
+                        />
+                      ))}
+                  </View>
+                ))}
 
             {/* Le trait de découpe, puis le total : la fin d'un ticket. */}
             <View style={styles.decoupe} />
@@ -384,6 +527,31 @@ export function DevisScreen() {
               <Text style={styles.totalNom}>TOTAL TTC</Text>
               <Text style={styles.total}>{euros(devis.total)}</Text>
             </View>
+            {/*
+              CE QU'ON A ÉCARTÉ SE DIT SOUS LE TOTAL.
+
+              Un total plus bas sans explication est un total suspect : celui
+              qui reprend le devis huit jours plus tard doit voir, à côté du
+              chiffre, qu'on a retiré six articles — et pouvoir tout remettre
+              d'un appui.
+            */}
+            {ecartes.length > 0 && (
+              <TouchableOpacity
+                accessibilityLabel="Tout remettre au devis"
+                accessibilityRole="button"
+                activeOpacity={0.75}
+                style={styles.remettre}
+                onPress={() => {
+                  haptic('leger');
+                  toutRemettre();
+                }}>
+                <Text style={styles.remettreTexte}>
+                  {`${ecartes.length} article${
+                    ecartes.length > 1 ? 's' : ''
+                  } écarté${ecartes.length > 1 ? 's' : ''} — tout remettre`}
+                </Text>
+              </TouchableOpacity>
+            )}
             <Text style={styles.mentions}>
               Fourniture seule, hors main-d’œuvre et hors luminaires. Prix
               publics approximatifs, à valider au comptoir.
@@ -575,6 +743,36 @@ const getStyles = themedStyles((c: Palette) =>
       lineHeight: 16.5,
       marginTop: 3,
     },
+    // ----------------------------------------------- chercher et trier
+    outils: { marginTop: 14 },
+    recherche: {
+      height: 42,
+      borderRadius: radius.pill,
+      backgroundColor: c.surface,
+      paddingHorizontal: 16,
+      color: c.ink,
+      fontSize: 14.5,
+    },
+    tris: { flexDirection: 'row', gap: 8, marginTop: 9 },
+    /* Quarante points sous le doigt : c'est une commande, pas une étiquette. */
+    triPille: {
+      height: 34,
+      paddingHorizontal: 14,
+      borderRadius: radius.pill,
+      backgroundColor: c.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    triPilleOn: { backgroundColor: c.green },
+    triTexte: { color: c.inkSoft, fontSize: 13, fontWeight: '700' },
+    triTexteOn: { color: '#FFFFFF' },
+    vide: {
+      color: c.inkFaint,
+      fontSize: 13,
+      lineHeight: 18,
+      marginTop: 18,
+      textAlign: 'center',
+    },
     // ---------------------------------------------------------- le ticket
     /* L'en-tête d'un ticket : ce qu'on a acheté et où. Centré, en petites
        capitales espacées — la typographie d'une caisse, pas d'un formulaire. */
@@ -627,6 +825,25 @@ const getStyles = themedStyles((c: Palette) =>
     articleDetail: { color: c.inkFaint, fontSize: 12, marginTop: 2 },
     articleNote: { color: c.inkFaint, fontSize: 11, lineHeight: 15, marginTop: 3 },
     articlePrix: { color: c.ink, fontSize: 14, fontWeight: '800' },
+    /* Un article écarté : barré et pâli, mais TOUJOURS LISIBLE — c'est son
+       prix qu'on regarde pour décider de le remettre. */
+    barre: {
+      textDecorationLine: 'line-through',
+      color: c.inkFaint,
+      fontWeight: '600',
+    },
+    efface: { opacity: 0.35 },
+    remettre: {
+      alignSelf: 'flex-start',
+      height: 34,
+      paddingHorizontal: 14,
+      borderRadius: radius.pill,
+      backgroundColor: c.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginTop: 8,
+    },
+    remettreTexte: { color: c.blue, fontSize: 12.5, fontWeight: '700' },
     /* Le trait de découpe : deux filets, comme la perforation d'un rouleau. */
     decoupe: {
       borderTopWidth: 2,

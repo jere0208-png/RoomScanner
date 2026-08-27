@@ -53,3 +53,23 @@ export function resumeDuScan(x: {
     ...(x.objets > 0 ? [pluriel(x.objets, 'objet')] : []),
   ].join(' · ');
 }
+
+/**
+ * LE TEXTE TEL QU'ON LE CHERCHE — sans casse, sans accents, sans apostrophes.
+ *
+ * Personne ne tape « Boîte d'encastrement » avec son accent circonflexe et
+ * son apostrophe typographique : on tape « boite ». Un champ de recherche qui
+ * exige l'orthographe exacte d'un libellé ne sert à rien sur un téléphone,
+ * et il ne le dit pas — il rend simplement une liste vide.
+ *
+ * Ce n'est pas `sansAccent` de l'export DXF : celui-là translittère pour un
+ * format ASCII, garde la casse et remplace les tirets. Ici on compare, on
+ * n'écrit pas.
+ */
+export function pourChercher(s: string): string {
+  return s
+    .toLocaleLowerCase('fr')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/['’]/g, ' ');
+}

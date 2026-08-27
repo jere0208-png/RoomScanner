@@ -28,6 +28,7 @@ import {
 } from '../src/geometry/ceiling';
 import { buildScanPdf } from '../src/export/pdf';
 import { buildScene } from '../src/geometry/scene3d';
+import type { Wire } from '../src/geometry/schema';
 import { buyingList } from '../src/geometry/conduits';
 import {
   checkElectrical,
@@ -423,6 +424,19 @@ describe('les murs arrêtent l’appareil', () => {
 });
 
 /**
+ * Les trois conducteurs d'un depart ordinaire — phase, neutre, terre.
+ *
+ * Les lignes de tirage sont ecrites a la main dans ce banc ; en vrai c'est
+ * `wiresOf` qui les compte, et il en met davantage sur un eclairage. Ce qu'on
+ * eprouve ici ne depend pas de leur nombre.
+ */
+const TROIS_FILS = (section: number): Wire[] => [
+  { role: 'phase', color: '#B8352A', label: 'Phase — rouge', section },
+  { role: 'neutre', color: '#2E6FD6', label: 'Neutre — bleu clair', section },
+  { role: 'terre', color: '#5A9E31', label: 'Terre — vert/jaune', section },
+];
+
+/**
  * Le plafond entre dans le matériel — sinon personne ne l'achète.
  *
  * Huit spots figuraient au plan, et le bordereau n'en portait aucun. Chaque
@@ -436,6 +450,7 @@ describe('le plafond au bordereau', () => {
       circuitId: 'c1',
       label: 'Éclairage',
       section: 1.5,
+      brins: TROIS_FILS(1.5),
       fils: 3,
       conduit: 16 as const,
       runs: 2,

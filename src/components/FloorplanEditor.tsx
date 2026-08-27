@@ -2481,9 +2481,16 @@ export function FloorplanEditor({
               */
               if (!editable && !showSurfaces) return null;
               if (roomName === '' && !areaText && !editable) return null;
-              const foots = objects
-                .filter((o) => roomOf(o) === part.roomId)
-                .map((o) => footprintOf(o, partOf));
+              /*
+                LES MEUBLES DE TOUT LE PLAN, ET PAS SEULEMENT LES SIENS.
+
+                Le cartouche n'esquivait que le mobilier de SA pièce. Sur un
+                plan serré, le nom du séjour se posait donc sur la baignoire
+                de la salle d'eau voisine, en toute légalité — et il lui
+                volait ses appuis. Un nom illisible sur un meuble l'est
+                autant qu'il appartienne à la pièce ou à celle d'à côté.
+              */
+              const foots = objects.map((o) => footprintOf(o, partOf));
               const placeholder = roomName === '' && !areaText ? 'Nommer' : '';
               // Cotes hors-tout : ce que cherche un artisan avant tout.
               const extText =
@@ -2582,6 +2589,23 @@ export function FloorplanEditor({
               // collé à un. On s'en écarte juste assez pour éviter un meuble.
               const ctr = part.labelAt;
               let pos = ctr;
+              /*
+                ET QUAND IL NE TROUVE PAS OÙ SE METTRE, IL LÂCHE LE DOIGT.
+
+                Relevé du patron : « un meuble est parfois difficile à
+                cliquer selon son emplacement… fais en sorte que là où le
+                doigt touche, si l'élément est dessus il est STRICTEMENT
+                sélectionné ». Mesuré sur une salle d'eau meublée : 172
+                appuis sur 256 posés SUR la baignoire revenaient à un
+                cartouche — celui de la pièce, et celui du séjour voisin.
+
+                Le cartouche essaie sept places ; dans une petite pièce
+                garnie, les sept sont prises. Il se pose alors quand même —
+                il faut bien nommer la pièce — mais il renonce à l'appui :
+                ce qu'il recouvre est ce qu'on visait. La pièce reste
+                sélectionnable par son sol, comme partout ailleurs.
+              */
+              let gene = true;
               for (const [ox, oz] of [
                 [0, 0],
                 [0, 0.4],
@@ -2594,6 +2618,7 @@ export function FloorplanEditor({
                 const cand = { x: ctr.x + ox, z: ctr.z + oz };
                 if (!collides(cand)) {
                   pos = cand;
+                  gene = false;
                   break;
                 }
               }
@@ -2602,10 +2627,13 @@ export function FloorplanEditor({
               return (
                 <G
                   key={`label-${part.roomId}`}
+                  // Posé faute de mieux SUR un meuble : il se dessine, il ne
+                  // prend plus le doigt. Voir `gene` ci-dessus.
+                  pointerEvents={gene ? 'none' : 'auto'}
                   // En édition, le cartouche EST le bouton de renommage :
                   // on touche le nom là où il s'affiche.
                   onPress={
-                    editable
+                    editable && !gene
                       ? () => {
                           // Toucher le sol, c'est quitter le meuble.
                           onSelectObject?.(null);

@@ -36,6 +36,8 @@ export function chiffrerLePlan(
   fixtures: Fixture[],
   ceiling: CeilingFixture[],
   gamme: GammeId,
+  /** Les articles écartés à la main : voir `chiffrer`. */
+  ecartes?: ReadonlySet<string>,
 ): Devis {
   const parts = roomParts(walls, rooms);
   const nommees = rooms.map((r) => ({ ...r, name: r.name ?? '' }));
@@ -63,5 +65,6 @@ export function chiffrerLePlan(
     liste.circuits,
     liste.differentials,
     gamme,
+    ecartes,
   );
 }

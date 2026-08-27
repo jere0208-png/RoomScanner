@@ -4053,6 +4053,7 @@
         {
          "type": "RNSVGGroup",
          "props": {
+          "pointerEvents": "auto",
           "fill": {
            "type": 0,
            "payload": 4278190080

@@ -1275,6 +1275,17 @@ interface ScanState {
    */
   gammeDevis: GammeId;
   setGammeDevis: (g: GammeId) => void;
+  /**
+   * LES ARTICLES ÉCARTÉS DU DEVIS.
+   *
+   * Ici et non dans l'écran, pour la même raison que la gamme : le bouton du
+   * plan affiche le total, et il doit afficher CELUI qu'on a sous les yeux.
+   * Rangée dans l'écran, la liste aurait laissé le bouton chiffrer un devis
+   * que la page n'annonce plus.
+   */
+  devisEcartes: string[];
+  basculerArticleDevis: (cle: string) => void;
+  remettreLesArticlesDevis: () => void;
 
   // Surface au sol : fond pointillé + valeur en m². Activée par défaut.
   showSurfaces: boolean;
@@ -1970,6 +1981,15 @@ export const useScanStore = create<ScanState>((set, get) => {
     // La première du catalogue : la plus posée, voir `GAMMES`.
     gammeDevis: GAMMES[0].id,
     setGammeDevis: (gammeDevis) => set({ gammeDevis }),
+
+    devisEcartes: [],
+    basculerArticleDevis: (cle) =>
+      set((e) => ({
+        devisEcartes: e.devisEcartes.includes(cle)
+          ? e.devisEcartes.filter((x) => x !== cle)
+          : [...e.devisEcartes, cle],
+      })),
+    remettreLesArticlesDevis: () => set({ devisEcartes: [] }),
 
     /*
       LE MODÈLE S'OUVRE SUR LE BÂTI — relevé du patron : « sur la vue 3D de

@@ -4399,6 +4399,7 @@
         {
          "type": "RNSVGGroup",
          "props": {
+          "pointerEvents": "auto",
           "onResponderMove": "[fn]",
           "onResponderGrant": "[fn]",
           "onResponderRelease": "[fn]",

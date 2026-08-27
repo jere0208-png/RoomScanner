@@ -24,7 +24,7 @@
 import { CEILINGS, type CeilingFixture } from './ceiling';
 import { FIXTURES, postsOf, type Fixture } from './electrical';
 import type { Circuit } from './nfc15100';
-import { wiresOf } from './schema';
+import { wiresOf, type Wire } from './schema';
 
 /** Diamètre extérieur du conduit ICTA, en millimètres. */
 export type ConduitD = 16 | 20 | 25 | 32;
@@ -118,6 +118,17 @@ export interface PullRow {
    * vérifier le compte avant de commander la couronne.
    */
   fils: number;
+  /**
+   * LES CONDUCTEURS EUX-MÊMES — leur rôle, donc leur couleur.
+   *
+   * Relevé du patron, après un essai sur un éclairage complet : « le devis
+   * ne compte que le fil bleu, alors qu'en réalité il faut la phase pour
+   * l'interrupteur, autre couleur pour retour lampe, etc. ». Le compte
+   * (`fils`) suffisait à choisir la gaine ; il ne suffit pas à remplir un
+   * chariot. On n'achète pas « cinq conducteurs » : on achète une couronne
+   * de rouge, une de bleu, une de vert-jaune, une de violet.
+   */
+  brins: Wire[];
   /** Section des conducteurs (mm²), nulle en courants faibles. */
   section: number | null;
   conduit: ConduitD;
@@ -157,8 +168,10 @@ export function pullSchedule(
 ): PullRow[] {
   return circuits.map((c) => {
     const m = metre?.get(c.id);
-    const fils = wiresOf(c, fixtures).length;
+    const brins = wiresOf(c, fixtures);
+    const fils = brins.length;
     return {
+      brins,
       approx: !!approx?.has(c.id),
       circuitId: c.id,
       label: c.label,
@@ -281,17 +294,44 @@ export function buyingList(
     : `estimé à ${METRES_PAR_DEPART} m par départ, faute de tableau posé sur le plan`;
 
   const parConduit = new Map<ConduitD, number>();
-  const parSection = new Map<number, number>();
+  /** Ce que chaque diamètre doit avaler de conducteurs, au pire. */
+  const filsDuConduit = new Map<ConduitD, number>();
+  /*
+    LE FIL SE COMPTE PAR COULEUR, ET NON PAR MÈTRE DE PARCOURS.
+
+    Relevé du patron, après un essai sur un éclairage complet : « le devis ne
+    compte que le fil bleu, alors qu'en réalité il faut la phase pour
+    l'interrupteur, autre couleur pour retour lampe, etc. ».
+
+    Le bordereau multipliait le parcours par TROIS, en dur, et sortait une
+    seule ligne « rouge, bleu, vert-jaune ». C'était juste pour un circuit de
+    prises et faux pour tout le reste : un simple allumage tire quatre
+    conducteurs, un va-et-vient six — et surtout, on n'achète pas « cinq
+    conducteurs », on achète une couronne de chaque couleur. Le chariot
+    partait donc avec un tiers de fil en moins ET sans le violet du retour de
+    lampe, que personne ne trouve au comptoir en cours de chantier.
+
+    On regroupe donc par (section, rôle) : chaque rôle est une couleur, et
+    chaque couleur est une couronne. Les deux navettes d'un va-et-vient
+    comptent deux fois, comme il se doit.
+  */
+  const parBrin = new Map<string, { section: number; wire: Wire; metres: number }>();
   for (const r of rows) {
     parConduit.set(
       r.conduit,
       (parConduit.get(r.conduit) ?? 0) + longueur(r, 'conduit'),
     );
-    if (r.section !== null) {
-      parSection.set(
-        r.section,
-        (parSection.get(r.section) ?? 0) + longueur(r, 'cable'),
-      );
+    filsDuConduit.set(
+      r.conduit,
+      Math.max(filsDuConduit.get(r.conduit) ?? 0, r.fils),
+    );
+    if (r.section === null) continue;
+    const m = longueur(r, 'cable');
+    for (const w of r.brins) {
+      const cle = `${r.section}|${w.role}`;
+      const e = parBrin.get(cle);
+      if (e) e.metres += m;
+      else parBrin.set(cle, { section: r.section, wire: w, metres: m });
     }
   }
 
@@ -304,24 +344,55 @@ export function buyingList(
       spec: 'Gaine annelée souple avec tire-fil, NF EN 61386',
       quantity: Math.ceil(m / COURONNE),
       unit: 'cour. 100 m',
-      note: forfait ?? `${m} m relevés sur le plan`,
+      /*
+        LE NOMBRE DE FILS EST ÉCRIT SUR LA LIGNE DE GAINE.
+
+        Relevé du patron : « chaque câblage doit être noté en terme de nombre
+        de fils jusqu'au tableau, adapter la gaine en fonction ». C'est déjà
+        ce qui choisit le diamètre (`conduitPour`, règle du tiers) — encore
+        faut-il que celui qui tire puisse le VÉRIFIER avant de commander.
+      */
+      note: `${forfait ?? `${m} m relevés sur le plan`} · jusqu'à ${
+        filsDuConduit.get(d) ?? 3
+      } conducteurs par gaine`,
     });
   }
 
-  for (const [s, m] of [...parSection.entries()].sort((a, b) => a[0] - b[0])) {
-    if (m <= 0) continue;
-    // Trois conducteurs par départ : phase, neutre, terre.
-    const brins = m * 3;
+  const ordre: Record<string, number> = {
+    phase: 0,
+    neutre: 1,
+    terre: 2,
+    retour: 3,
+    navette: 4,
+  };
+  for (const e of [...parBrin.values()].sort(
+    (a, b) => a.section - b.section || ordre[a.wire.role] - ordre[b.wire.role],
+  )) {
+    if (e.metres <= 0) continue;
     out.push({
       family: 'Conduits et conducteurs',
-      code: `fil-${s}`,
-      label: `Conducteur H07V-U ${frSection(s)} mm²`,
-      spec: 'Rigide cuivre 450/750 V — rouge, bleu, vert-jaune',
-      quantity: Math.ceil(brins / COURONNE),
+      code: `fil-${e.section}-${e.wire.role}`,
+      label: `Conducteur H07V-U ${frSection(e.section)} mm² — ${e.wire.label}`,
+      spec: 'Rigide cuivre 450/750 V',
+      quantity: Math.ceil(e.metres / COURONNE),
       unit: 'cour. 100 m',
-      note: forfait
-        ? `${Math.round(m)} m ${forfait}, × 3 conducteurs`
-        : `${m} m de parcours × 3 conducteurs = ${brins} m`,
+      /*
+        LA LONGUEUR EST CELLE DU PARCOURS ENTIER, ET C'EST VOLONTAIRE.
+
+        Un retour de lampe ou une navette ne court pas tout le circuit : il
+        va de la commande au point lumineux. On ne connaît pas ce
+        sous-parcours — le tracé du plan mène le faisceau du tableau à chaque
+        appareil, pas d'un appareil à l'autre. On compte donc chaque
+        conducteur sur toute la longueur : c'est une marge, elle est du bon
+        côté, et elle est écrite.
+      */
+      note: `${Math.round(e.metres)} m ${
+        forfait ?? 'de parcours'
+      }${
+        e.wire.role === 'retour' || e.wire.role === 'navette'
+          ? ' — compté sur tout le circuit, marge assumée'
+          : ''
+      }`,
     });
   }
 

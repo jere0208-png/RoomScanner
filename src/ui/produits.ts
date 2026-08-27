@@ -14,19 +14,41 @@
  * publie hors de son usage propre.
  *
  * LE DÉTOURAGE SE FAIT PAR LES COINS et non par la couleur : un « rendre le
- * blanc transparent » aurait mangé le boîtier BLANC d'une prise en même
- * temps que son fond. On remplit depuis le coin de l'image, ce qui n'atteint
- * que le fond connecté au bord. Cinq articles — les couronnes de fil, le
- * peigne — n'ont pas de frontière nette avec leur fond : ils gardent leur
- * fond blanc, ce qui vaut mieux qu'une vignette vide.
+ * blanc transparent » aurait mangé le boîtier BLANC d'une prise en même temps
+ * que son fond. On remplit depuis le coin de l'image, ce qui n'atteint que le
+ * fond connecté au bord. Cinq articles — les couronnes de fil, le peigne —
+ * n'ont pas de frontière nette avec leur fond : ils gardent leur fond blanc,
+ * ce qui vaut mieux qu'une vignette vide.
  *
- * CE FICHIER EST ÉCRIT PAR `tools/gen-produits.mjs`. React Native exige un
- * `require` littéral — on ne compose pas un chemin à la volée — d'où cette
- * table, et d'où le fait qu'elle se régénère plutôt qu'elle ne se tienne à
- * jour à la main.
+ * LA TABLE DES FICHIERS S'ÉCRIT TOUTE SEULE (`tools/gen-produits.mjs`) :
+ * React Native exige un `require` littéral — on ne compose pas un chemin à la
+ * volée — et une table tenue à la main se désynchronise du dossier au premier
+ * ajout. Tout ce qui est ÉCRIT À LA MAIN, comme les renvois ci-dessous, vit
+ * en dehors du bloc régénéré, entre les deux repères.
  */
 import type { ImageSourcePropType } from 'react-native';
 
+/**
+ * DEUX ARTICLES, UNE SEULE PHOTO.
+ *
+ * Relevé du patron : « les prises doivent avoir la même image, ce sont la
+ * même chose en réalité ». Il a raison, et c'est plus qu'une économie de
+ * fichiers : un socle 16 A, un 20 A et un 32 A sont le MÊME objet sur le mur
+ * — même plaque, même couleur, même forme. Leur donner trois photos
+ * différentes aurait laissé croire à trois produits qui ne se ressemblent
+ * pas, alors que ce qui les sépare est écrit sur la ligne, en ampères.
+ *
+ * C'était en plus les deux vignettes ratées du premier jet : une prise
+ * étanche pour la 20 A, un boîtier blanc illisible pour la 32 A. La bonne
+ * réponse n'était pas de chercher de meilleures photos, c'était de n'en
+ * chercher qu'une.
+ */
+const RENVOIS: Record<string, string> = {
+  'meca-prise20': 'meca-prise',
+  'meca-prise32': 'meca-prise',
+};
+
+// ---- début du bloc régénéré (tools/gen-produits.mjs) ----
 export const PHOTOS: Record<string, ImageSourcePropType> = {
   'boite-dcl': require('../../assets/produits/boite-dcl.png'),
   'boite-derivation': require('../../assets/produits/boite-derivation.png'),
@@ -58,8 +80,6 @@ export const PHOTOS: Record<string, ImageSourcePropType> = {
   'meca-inter': require('../../assets/produits/meca-inter.png'),
   'meca-poussoir': require('../../assets/produits/meca-poussoir.png'),
   'meca-prise': require('../../assets/produits/meca-prise.png'),
-  'meca-prise20': require('../../assets/produits/meca-prise20.png'),
-  'meca-prise32': require('../../assets/produits/meca-prise32.png'),
   'meca-rj45': require('../../assets/produits/meca-rj45.png'),
   'meca-sortieCable': require('../../assets/produits/meca-sortieCable.png'),
   'meca-tableau': require('../../assets/produits/meca-tableau.png'),
@@ -77,8 +97,9 @@ export const PHOTOS: Record<string, ImageSourcePropType> = {
   'plaque-3': require('../../assets/produits/plaque-3.png'),
   'plaque-4': require('../../assets/produits/plaque-4.png'),
 };
+// ---- fin du bloc régénéré ----
 
-/** La photo d'un article, s'il en a une. */
+/** La photo d'un article, renvois compris. */
 export function photoDe(code: string): ImageSourcePropType | null {
-  return PHOTOS[code] ?? null;
+  return PHOTOS[RENVOIS[code] ?? code] ?? null;
 }

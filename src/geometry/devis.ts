@@ -51,6 +51,19 @@ export interface LigneDevis {
   note?: string;
   /** Le mois du relevé du prix, pour savoir ce qui vieillit. */
   releve?: string;
+  /**
+   * ÉCARTÉ DU DEVIS — présent sur le ticket, absent du total.
+   *
+   * Relevé du patron : « fais en sorte qu'on puisse désélectionner des
+   * éléments dans le devis si on en a pas besoin par exemple, le prix doit
+   * s'adapter ». Le cas est courant : on refait l'appareillage d'un logement
+   * dont les gaines sont déjà en place, ou le client fournit son tableau.
+   *
+   * La ligne ne DISPARAÎT pas — elle reste barrée, à zéro. Un article retiré
+   * qu'on ne voit plus est un article qu'on croit oublié, et c'est
+   * exactement le reproche qu'on faisait déjà aux luminaires.
+   */
+  ecarte?: boolean;
 }
 
 /**
@@ -111,6 +124,22 @@ function tarifDe(code: string, gamme: GammeId): Tarif | null {
   if (code.startsWith('plaque-')) {
     return tarifPlaque(gamme, Number(code.slice(7)) || 1);
   }
+  /*
+    LE FIL SE VEND À LA SECTION, PAS À LA COULEUR.
+
+    Le bordereau distingue les conducteurs par leur rôle — `fil-1.5-phase`,
+    `fil-1.5-retour` — parce qu'on achète une couronne par couleur. Le prix,
+    lui, ne bouge pas d'une couleur à l'autre : une couronne de rouge coûte
+    ce que coûte une couronne de bleu. Le catalogue n'a donc qu'une entrée
+    par section, et c'est ici qu'on retombe dessus.
+  */
+  if (code.startsWith('fil-')) {
+    return (
+      TARIFS_COMMUNS[code] ??
+      TARIFS_COMMUNS[`fil-${code.slice(4).split('-')[0]}`] ??
+      null
+    );
+  }
   return TARIFS_COMMUNS[code] ?? null;
 }
 
@@ -120,11 +149,23 @@ const MODULES_PAR_RANGEE = 13;
 /** Deux décimales, comme un ticket de caisse : on ne facture pas des millièmes. */
 const centimes = (v: number) => Math.round(v * 100) / 100;
 
+/**
+ * La clé d'une ligne, pour la retenir d'un calcul à l'autre.
+ *
+ * Le code de l'article quand il en a un — il ne change pas quand on réécrit
+ * un libellé. À défaut, le libellé : mieux vaut une clé fragile qu'aucune.
+ */
+export function cleDeLigne(l: { code: string; libelle: string }): string {
+  return l.code || l.libelle;
+}
+
 export function chiffrer(
   achats: BuyRow[],
   circuits: Circuit[],
   differentiels: Differential[],
   gamme: GammeId,
+  /** Les articles que l'on ne veut pas : ils restent listés, à zéro. */
+  ecartes?: ReadonlySet<string>,
 ): Devis {
   const lignes: LigneDevis[] = [];
   const sansPrix: string[] = [];
@@ -300,6 +341,20 @@ export function chiffrer(
   }
 
   // ---------------------------------------------------------- les totaux
+  /*
+    CE QU'ON A ÉCARTÉ NE COMPTE PLUS, ET SE VOIT ENCORE.
+
+    On marque la ligne et on met son total à zéro plutôt que de la retirer :
+    le ticket la garde, barrée. Le prix unitaire, lui, reste écrit — c'est ce
+    qu'on regarde pour décider si on la remet.
+  */
+  if (ecartes && ecartes.size > 0) {
+    for (const l of lignes) {
+      if (!ecartes.has(cleDeLigne(l))) continue;
+      l.ecarte = true;
+      l.total = 0;
+    }
+  }
   const total = centimes(lignes.reduce((s, l) => s + l.total, 0));
   const parFamille: { famille: string; total: number }[] = [];
   for (const l of lignes) {
@@ -320,7 +375,8 @@ export function chiffrer(
     .filter(
       (l) =>
         (l.code.startsWith('meca-') || l.code.startsWith('plafond-')) &&
-        l.quantite > 0,
+        l.quantite > 0 &&
+        !l.ecarte,
     )
     .map((l) => {
       const plafond = l.code.startsWith('plafond-');

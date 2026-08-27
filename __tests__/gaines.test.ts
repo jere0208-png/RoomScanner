@@ -14,6 +14,7 @@ import {
   pullSchedule,
   type PullRow,
 } from '../src/geometry/conduits';
+import type { Wire } from '../src/geometry/schema';
 import type { Circuit } from '../src/geometry/nfc15100';
 import type { Fixture } from '../src/geometry/electrical';
 
@@ -33,6 +34,19 @@ const circuit = (
   rooms: ['Séjour'],
   fixtureIds,
 });
+
+/**
+ * Les trois conducteurs d'un depart ordinaire — phase, neutre, terre.
+ *
+ * Les lignes de tirage sont ecrites a la main dans ce banc ; en vrai c'est
+ * `wiresOf` qui les compte, et il en met davantage sur un eclairage. Ce qu'on
+ * eprouve ici ne depend pas de leur nombre.
+ */
+const TROIS_FILS = (section: number): Wire[] => [
+  { role: 'phase', color: '#B8352A', label: 'Phase — rouge', section },
+  { role: 'neutre', color: '#2E6FD6', label: 'Neutre — bleu clair', section },
+  { role: 'terre', color: '#5A9E31', label: 'Terre — vert/jaune', section },
+];
 
 describe('le conduit qui convient', () => {
   it('suit la règle de remplissage, section par section', () => {
@@ -94,6 +108,7 @@ describe('la liste d’achat', () => {
       circuitId: 'c1',
       label: 'Prises',
       section: 2.5,
+      brins: TROIS_FILS(2.5),
       fils: 3,
       conduit: 20,
       runs: 8,
@@ -106,6 +121,7 @@ describe('la liste d’achat', () => {
       circuitId: 'c2',
       label: 'Éclairage',
       section: 1.5,
+      brins: TROIS_FILS(1.5),
       fils: 3,
       conduit: 16,
       runs: 5,
@@ -118,6 +134,8 @@ describe('la liste d’achat', () => {
       circuitId: 'c3',
       label: 'VDI',
       section: null,
+    // Un courant faible n'a ni phase ni terre : ce sont des paires.
+    brins: [],
       fils: 3,
       conduit: 25,
       runs: 2,
@@ -149,13 +167,130 @@ describe('la liste d’achat', () => {
     expect(g25.quantity).toBe(1);
   });
 
-  it('compte TROIS conducteurs par mètre de parcours', () => {
+  it('compte le fil COULEUR PAR COULEUR, et non par paquets de trois', () => {
+    /*
+      DEUX VERSIONS, ET LA PREMIERE SOUS-COMPTAIT.
+
+      Elle multipliait le parcours par TROIS, en dur, et sortait une seule
+      ligne « rouge, bleu, vert-jaune ». Releve du patron, apres un essai sur
+      un eclairage complet : « le devis ne compte que le fil bleu, alors qu'en
+      realite il faut la phase pour l'interrupteur, autre couleur pour retour
+      lampe, etc. »
+
+      C'etait juste pour un circuit de prises et faux pour tout le reste : un
+      simple allumage tire quatre conducteurs, un va-et-vient six. Et surtout,
+      ON N'ACHETE PAS « CINQ CONDUCTEURS » : on achete une couronne de chaque
+      couleur. Le chariot partait avec un tiers de fil en moins ET sans le
+      violet du retour de lampe, qu'on ne trouve pas en cours de chantier.
+
+      Une ligne par (section, role), donc. Ici, trois fils declares en 2,5 :
+      66 m de parcours pour chacun.
+    */
     const list = buyingList(rows, []);
-    // À la française : le fournisseur lit « 2,5 mm² », pas « 2.5 ».
-    const c25 = list.find((r) => r.label.includes('2,5 mm²'))!;
-    // 66 m de parcours → 198 m de fil → deux couronnes.
-    expect(c25.note).toContain('198');
-    expect(c25.quantity).toBe(2);
+    const en25 = list.filter((r) => r.code?.startsWith('fil-2.5-'));
+    expect(en25.map((r) => r.code).sort()).toEqual([
+      'fil-2.5-neutre',
+      'fil-2.5-phase',
+      'fil-2.5-terre',
+    ]);
+    for (const l of en25) {
+      // À la française : le fournisseur lit « 2,5 mm² », pas « 2.5 ».
+      expect(l.label).toContain('2,5 mm²');
+      expect(l.note).toContain('66 m');
+      expect(l.quantity).toBe(1);
+    }
+  });
+
+  it('et chaque couleur porte son nom, pas un code', () => {
+    // C'est ce qu'on lit au comptoir : « du violet, en 1,5 ».
+    const list = buyingList(rows, []);
+    const noms = list
+      .filter((r) => r.code?.startsWith('fil-'))
+      .map((r) => r.label);
+    expect(noms.some((n) => n.includes('Phase — rouge'))).toBe(true);
+    expect(noms.some((n) => n.includes('Neutre — bleu clair'))).toBe(true);
+    expect(noms.some((n) => n.includes('Terre — vert/jaune'))).toBe(true);
+  });
+
+  it('et la gaine dit combien de conducteurs elle porte', () => {
+    /*
+      Releve du patron : « chaque cablage doit etre note en terme de nombre de
+      fils jusqu'au tableau, adapter la gaine en fonction ». Le diametre suit
+      deja la regle du tiers (`conduitPour`) — encore faut-il que celui qui
+      tire puisse VERIFIER le compte avant de commander la couronne.
+    */
+    const list = buyingList(rows, []);
+    const g20 = list.find((r) => r.code === 'icta-20')!;
+    expect(g20.note).toContain('conducteurs par gaine');
+  });
+
+  it('et un ÉCLAIRAGE COMPLET tire son retour de lampe', () => {
+    /*
+      LE CAS QUI A FAIT LE RELEVE. Un interrupteur, un point lumineux : ce
+      n'est pas trois fils, c'est quatre — le quatrieme est le retour de
+      lampe, et c'est precisement lui qui distingue un circuit d'eclairage
+      d'une simple alimentation. Le bordereau n'en commandait pas un metre.
+
+      On part ici du VRAI chemin — `pullSchedule` compte les conducteurs avec
+      `wiresOf` — plutot que d'ecrire la ligne a la main : un banc qui declare
+      lui-meme le nombre de fils ne peut pas verifier qu'on les compte bien.
+    */
+    const eclairage: Circuit = {
+      id: 'e1',
+      label: 'Éclairage — Séjour',
+      nature: 'eclairage',
+      points: 2,
+      section: 1.5,
+      breaker: 16,
+      rooms: ['Séjour'],
+      fixtureIds: ['i1'],
+      ceilingIds: ['dcl1'],
+    };
+    const lignes = pullSchedule(
+      [eclairage],
+      new Map([['e1', { conduit: 30, cable: 33, runs: 2 }]]),
+      undefined,
+      [fx('i1', 'inter')],
+    );
+    expect(lignes[0].fils).toBe(4);
+    const roles = lignes[0].brins.map((b) => b.role).sort();
+    expect(roles).toEqual(['neutre', 'phase', 'retour', 'terre']);
+
+    const list = buyingList(lignes, [fx('i1', 'inter')]);
+    const retour = list.find((r) => r.code === 'fil-1.5-retour');
+    expect(retour).toBeDefined();
+    expect(retour!.label).toContain('Retour de lampe — violet');
+    expect(retour!.note).toContain('marge assumée');
+    // Les quatre conducteurs sont commandés, pas trois.
+    expect(list.filter((r) => r.code?.startsWith('fil-1.5-'))).toHaveLength(4);
+  });
+
+  it('et un VA-ET-VIENT fait grossir la gaine', () => {
+    /*
+      Le controle en sens inverse du diametre : six conducteurs en 1,5 ne
+      passent pas dans un ICTA 16 — la regle du tiers l'interdit. Une gaine
+      choisie sur la seule section aurait annonce du 16, et le tirage se
+      serait fait au treuil.
+    */
+    const va: Circuit = {
+      id: 'e2',
+      label: 'Éclairage — Couloir',
+      nature: 'eclairage',
+      points: 3,
+      section: 1.5,
+      breaker: 16,
+      rooms: ['Couloir'],
+      fixtureIds: ['v1', 'v2'],
+      ceilingIds: ['dcl2'],
+    };
+    const lignes = pullSchedule([va], undefined, undefined, [
+      fx('v1', 'va'),
+      fx('v2', 'va'),
+    ]);
+    expect(lignes[0].fils).toBe(6);
+    expect(`six fils en 1,5 : ICTA ${lignes[0].conduit}`).toBe(
+      'six fils en 1,5 : ICTA 20',
+    );
   });
 
   it('ne commande pas de conducteur pour les courants faibles', () => {

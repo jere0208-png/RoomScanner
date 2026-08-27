@@ -366,14 +366,22 @@ describe('un doigt posé sur le meuble d’une petite pièce', () => {
         };
         const dessus = toucher(liste, pt);
         /*
-          CE QU'ON VOIT A LE DROIT DE PRENDRE L'APPUI ; ce qu'on ne voit
-          pas, non. Un cartouche de pièce ou le poché d'un mur sont dessinés
-          par-dessus le meuble : les toucher, c'est les toucher pour de bon.
-          Le halo d'un mur, lui, est invisible — il n'a rien à voler.
+          LA RÈGLE S'EST DURCIE, ET C'EST LE PATRON QUI L'A DURCIE.
+
+          Première version : « ce qu'on VOIT a le droit de prendre l'appui,
+          ce qu'on ne voit pas, non ». Le halo invisible d'un mur n'avait
+          rien à voler ; un cartouche de pièce, lui, est dessiné par-dessus
+          le meuble, et on lui accordait l'appui.
+
+          Relevé du patron, quelques jours plus tard : « un meuble est
+          parfois difficile à cliquer selon son emplacement… fais en sorte
+          que là où le doigt touche, si l'élément est dessus il est
+          STRICTEMENT sélectionné ». Il a raison, et la première règle était
+          une demi-mesure : un cartouche qui n'a pas trouvé où s'écarter se
+          pose SUR un meuble, et il n'a pas plus de droit qu'un halo à
+          prendre ce qu'il recouvre. Le meuble est ce qu'on visait.
         */
-        if (dessus !== cibleDuMeuble && !couvre(dessus, pt, true)) {
-          voleurs.push(nommer(dessus));
-        }
+        if (dessus !== cibleDuMeuble) voleurs.push(nommer(dessus));
       }
     }
     expect(

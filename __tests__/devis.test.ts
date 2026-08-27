@@ -30,6 +30,7 @@
 import { buyingList, type PullRow } from '../src/geometry/conduits';
 import { chiffrer } from '../src/geometry/devis';
 import type { Fixture } from '../src/geometry/electrical';
+import type { Wire } from '../src/geometry/schema';
 import type { Circuit, Differential } from '../src/geometry/nfc15100';
 import { GAMMES, TARIFS_MECANISME, type GammeId } from '../src/geometry/prix';
 import type { CeilingFixture } from '../src/geometry/ceiling';
@@ -42,11 +43,25 @@ import type { CeilingFixture } from '../src/geometry/ceiling';
   luminaires. Sans l'un des trois, une moitie du chiffrage ne serait jamais
   parcourue par le banc.
 */
+/**
+ * Les trois conducteurs d'un depart ordinaire — phase, neutre, terre.
+ *
+ * Les lignes de tirage sont ecrites a la main dans ce banc ; en vrai c'est
+ * `wiresOf` qui les compte, et il en met davantage sur un eclairage. Ce qu'on
+ * eprouve ici ne depend pas de leur nombre.
+ */
+const TROIS_FILS = (section: number): Wire[] => [
+  { role: 'phase', color: '#B8352A', label: 'Phase — rouge', section },
+  { role: 'neutre', color: '#2E6FD6', label: 'Neutre — bleu clair', section },
+  { role: 'terre', color: '#5A9E31', label: 'Terre — vert/jaune', section },
+];
+
 const TIRAGE: PullRow[] = [
   {
     circuitId: 'c1',
     label: 'Prises — Séjour',
     section: 2.5,
+    brins: TROIS_FILS(2.5),
     fils: 3,
     conduit: 20,
     runs: 8,
@@ -59,6 +74,7 @@ const TIRAGE: PullRow[] = [
     circuitId: 'c2',
     label: 'Éclairage',
     section: 1.5,
+    brins: TROIS_FILS(1.5),
     fils: 3,
     conduit: 16,
     runs: 6,
@@ -71,6 +87,8 @@ const TIRAGE: PullRow[] = [
     circuitId: 'c3',
     label: 'Communication',
     section: null,
+    // Un courant faible n'a ni phase ni terre : ce sont des paires.
+    brins: [],
     fils: 3,
     conduit: 25,
     runs: 2,
@@ -461,7 +479,7 @@ describe('ce qui manquait au chariot', () => {
     const gaine = d.lignes.find((l) => l.code === 'icta-20')!;
     expect(gaine.quantite).toBeGreaterThan(0);
     expect(gaine.note).toContain('estimé');
-    const fil = d.lignes.find((l) => l.code === 'fil-2.5')!;
+    const fil = d.lignes.find((l) => l.code === 'fil-2.5-phase')!;
     expect(fil.quantite).toBeGreaterThan(0);
   });
 
