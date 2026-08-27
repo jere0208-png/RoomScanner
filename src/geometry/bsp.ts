@@ -28,12 +28,35 @@
  * propriété de la construction, pas un résultat de mesure. Pour n'importe
  * quelle position d'œil, un parcours de l'arbre rend l'ordre EXACT.
  *
- * ET C'EST PLUS FLUIDE, pas moins. La scène ne bouge pas — seule la caméra
- * tourne : l'arbre se construit UNE FOIS par plan, et chaque image ne fait
- * plus que le parcourir, en temps linéaire, sans comparer quoi que ce soit.
- * Le classement à l'écran, lui, coûtait une dizaine de millisecondes par
- * image sur un logement meublé, au point qu'il fallait le mémoriser quelques
- * degrés et vivre avec ce qu'il laissait passer entre deux.
+ * ET IL N'EST PAS BRANCHÉ. Il fallait le mesurer avant de le croire, et le
+ * compteur a tranché contre lui — voir le banc `bspcout`, qui garde les
+ * chiffres. Sur le salon meublé de onze meubles, avec la projection exacte
+ * de l'écran, sur cent huit prises de vue :
+ *
+ *     classement : 0 faute · 175 tracés · 4,1 ms par image
+ *     arbre BSP  : 0 faute · 306 tracés · 0,2 ms par image
+ *
+ * Deux constats, et ils vont dans le même sens.
+ *
+ *   LE CLASSEMENT EST DÉJÀ À ZÉRO FAUTE, volumes qui se traversent compris.
+ *   Le rabotage des boîtes trop grandes et les flèches de masquage ont
+ *   retiré du plan, en amont, les configurations que le tri du peintre ne
+ *   sait pas trancher. Il n'y a donc rien à gagner en exactitude, et une
+ *   garantie qui garantit un résultat déjà obtenu ne vaut que son prix.
+ *
+ *   ET SON PRIX EST DANS LA SEULE MONNAIE QUI COMPTE ICI. `grouperTraces` le
+ *   dit depuis le premier relevé de lenteur : « chaque face est une VUE
+ *   NATIVE que le moteur repeint et que React réconcilie à chaque image ;
+ *   cinq cent cinquante vues, c'est le mur ». La découpe fait passer une
+ *   pièce meublée de 175 tracés à 306 ; un T4 franchirait le mur. Les quatre
+ *   millisecondes de calcul gagnées ne rachètent pas cent trente vues de
+ *   plus : ce n'est jamais le calcul qui a fait ramer ce modèle.
+ *
+ * ON GARDE DONC L'ARBRE ICI, JUSTE ET INEMPLOYÉ. Il coûte deux fichiers et
+ * il documente, mesure à l'appui, pourquoi le classement actuel reste. Le
+ * jour où une scène mettra le classement en défaut — une vraie ronde, un
+ * volume que le rabotage ne rattrape pas — la pièce est prête, et le banc
+ * `bspcout` criera avant nous.
  */
 import type { Face3D, P3 } from './scene3d';
 
@@ -134,10 +157,20 @@ interface Noeud {
  * Prendre la première face venue construit un arbre déséquilibré et découpe
  * beaucoup ; essayer TOUTES les faces coûte un temps carré. On en tire donc
  * quelques-unes, régulièrement espacées, et l'on garde celle qui traverse le
- * moins de voisines — c'est l'heuristique classique, et elle suffit
- * largement sur une scène de logement.
+ * moins de voisines — c'est l'heuristique classique.
+ *
+ * COMBIEN EN ESSAYER : mesuré, pas deviné. Sur le salon meublé du banc
+ * `bspcout` — quatre cent quarante-huit aplats — le nombre de morceaux
+ * produits par la découpe tombe ainsi :
+ *
+ *     8 candidats : 773 morceaux · 16 : 713 · 32 : 687 · 64 : 687
+ *
+ * Trente-deux, donc : c'est là que la courbe se couche, et la construction
+ * y coûte encore une vingtaine de millisecondes — une seule fois par plan.
+ * Chaque morceau en moins est un tracé de moins à peindre à chaque image, et
+ * c'est le tracé qui coûte (voir `grouperTraces`).
  */
-const CANDIDATS = 8;
+const CANDIDATS = 32;
 
 function choisir(faces: FaceBsp[]): number {
   let best = -1;

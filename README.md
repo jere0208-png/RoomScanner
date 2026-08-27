@@ -8109,11 +8109,8 @@ Le prix est mesuré aussi : sur la pièce de six faces, la découpe reste sous
 le triple du nombre de faces de départ. Une garantie qui multiplierait la
 scène ferait perdre au dessin ce que le parcours fait gagner au tri.
 
-**Ce qui reste à faire** : brancher l'arbre dans `Iso3DView`, mesurer sur les
-bancs existants du sujet (`audit3d`, `percemur`, `chaisecachee`,
-`meublecachemur`, `fluidite3d`) et chiffrer le coût réel (construction +
-parcours) avant de remplacer quoi que ce soit. Si l'arbre ne tient pas ses
-promesses, c'est le compteur qui tranchera, pas le raisonnement.
+**Ce qui restait à faire** — brancher l'arbre et chiffrer son coût réel — a
+été fait, et le compteur a tranché contre lui : voir la section suivante.
 
 ### Ce qu'on touche prime sur ce qui est à côté
 
@@ -8334,6 +8331,63 @@ gammes offertes, l'ordre des écrans, le total et sa gamme écrits, le nombre
 sous le plan égal à celui du chiffrage, le nombre de bagues égal au nombre
 d'appareils du lot. Le fondu des deux signes et le rythme de la bague, eux,
 demandent un coup d'œil sur le téléphone.
+
+### Le BSP est juste, et il ne sera pas branché — le compteur a tranché contre lui
+
+Suite du 3D strict. L'arbre était prouvé exact sur les deux cas que le tri du
+peintre ne **peut** pas résoudre. Restait la seule question qui décide :
+qu'est-ce qu'il coûte sur une vraie scène ?
+
+Mesuré sur le salon meublé de onze meubles — celui qui avait fait ramer le
+modèle, repris tel quel de `fluidite3d` — avec la **projection exacte de
+l'écran du téléphone**, sur 108 prises de vue (36 azimuts × 3 inclinaisons) :
+
+| | fautes | tracés peints | par image |
+|---|---|---|---|
+| classement actuel | **0** | **175** | 4,1 ms |
+| arbre BSP | **0** | **306** | 0,2 ms |
+
+**Deux constats, et ils vont dans le même sens.**
+
+**Le classement est déjà à zéro faute, volumes qui se traversent compris.** Le
+rabotage des boîtes trop grandes et les flèches de masquage ont retiré du plan,
+en amont, les configurations que le tri du peintre ne sait pas trancher. Il n'y
+a donc rien à gagner en exactitude — et une garantie qui garantit un résultat
+déjà obtenu ne vaut que son prix.
+
+**Et son prix est dans la seule monnaie qui compte ici.** `grouperTraces` le
+dit depuis le premier relevé de lenteur : *« chaque face est une vue native que
+le moteur repeint et que React réconcilie à chaque image ; cinq cent cinquante
+vues, c'est le mur »*. La découpe fait passer **une** pièce meublée de 175
+tracés à 306. Un T4 franchirait le mur.
+
+L'économie de calcul est pourtant réelle — **0,2 ms contre 4,1**, vingt fois
+moins — et elle n'est pas cachée. Elle est simplement dans la mauvaise monnaie :
+quatre millisecondes de calcul gagnées ne rachètent pas cent trente vues natives
+de plus à repeindre. **Ce n'est jamais le calcul qui a fait ramer ce modèle.**
+
+#### Ce que la mesure a quand même rapporté
+
+Le nombre de plans essayés pour choisir un séparateur était posé à huit, sans
+raison. Mesuré : **8 candidats → 773 morceaux · 16 → 713 · 32 → 687 · 64 →
+687**. Trente-deux, là où la courbe se couche. Trois cents tracés au lieu de
+trois cent soixante — l'arbre reste inemployé, mais il ne coûte plus pour rien
+si un jour il sert.
+
+#### Ce qui reste dans le dépôt, et pourquoi
+
+`src/geometry/bsp.ts` et ses deux bancs. Il coûte deux fichiers et il
+documente, **mesure à l'appui**, pourquoi le classement actuel reste. Le banc
+`bspcout` garde les trois lignes du verdict : le jour où le classement se met à
+fauter, ou le jour où la découpe cesse de multiplier les tracés, il crie et la
+décision se relit.
+
+**Et un contrôle qui ne se voit pas mais fait tout le banc** : la direction
+d'œil donnée à l'arbre est comparée, point par point, à la profondeur que rend
+le projecteur de l'écran. Sans lui, l'arbre aurait pu être mesuré **sur une
+autre caméra que celle du téléphone** — et il aurait passé, étant juste pour la
+sienne. C'est exactement la panne qui avait déjà coûté une session sur les
+planches de référence, où l'inclinaison échange sinus et cosinus.
 
 ## Prérequis pour tester sur iPhone
 
