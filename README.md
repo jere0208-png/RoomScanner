@@ -9777,6 +9777,66 @@ fait.
 pas, le serveur répond « aucun catalogue », l'application garde ses prix
 embarqués et **le dit** — ce qui est déjà mieux qu'avant, où elle ne disait rien.
 
+### Six socles identiques ne sont plus six poses
+
+Relevé du patron : « duplication d'un appareil — six socles identiques, c'est
+six poses ; il n'existe aucun geste de duplication ». C'était écrit dans les
+questions en attente, et c'est le cas le plus courant d'un chantier : un plan de
+travail de cuisine, quatre à six socles alignés au même entraxe, à la même
+hauteur, sur la même face. On les posait un par un depuis le catalogue, puis on
+les traînait un par un à leur place.
+
+**UN « COPIER » A DÉJÀ VÉCU ICI, ET IL A ÉTÉ RETIRÉ** — relevé du patron, à
+l'époque : « enlève le bouton copier, remplace-le par un bouton lien... prise ou
+éclairage mural ». Ce qu'on remet n'est donc **pas** ce bouton-là, et le lien
+garde sa place (un banc le vérifie, sans quoi on remplacerait une demande par
+une autre sans s'en apercevoir).
+
+**LA DIFFÉRENCE TIENT EN UNE LIGNE.** Un copier pose un jumeau à côté et laisse
+l'électricien le traîner. **« Répéter » pose la copie là où la suivante doit
+tomber, et la sélectionne.** Six appuis font six socles régulièrement espacés,
+sans un seul glissement au doigt. C'est la resélection qui fait la série : sans
+elle, six appuis poseraient six fois le même écart depuis le même modèle.
+
+**LE PAS SE DEVINE, IL NE SE RÈGLE PAS.** La première copie prend `PAS_SERIE` —
+soixante centimètres, le module d'une cuisine française : c'est la largeur d'un
+caisson, d'un four, d'un lave-vaisselle, donc l'écart qui tombe juste le plus
+souvent. **Dès la deuxième, la série reprend l'écart réel de la précédente.** On
+pose le premier socle où on veut, le deuxième au pas qu'on veut — au doigt s'il
+le faut — et les quatre suivants suivent. Un pas qu'on ne pourrait pas corriger
+serait un pas qu'il faudrait régler ; celui-ci s'oublie.
+
+**LES RÈGLES D'UNE POSE ORDINAIRE NE S'ASSOUPLISSENT PAS** parce que le geste est
+plus rapide : la copie reste dans son mur, sur la maçonnerie, et ne s'empile pas
+sur une voisine. À droite d'abord — le sens de lecture d'une série —, puis à
+gauche, puis par crans d'entraxe si le pas voulu tombe dans une baie, **puis on
+renonce**. Un appareil dans une porte-fenêtre est pire qu'une copie qu'on refait
+à la main.
+
+**ET CE N'EST PAS UN POSTE DE PLUS SOUS LA MÊME PLAQUE.** La copie ne reprend ni
+le `group` de son modèle ni ses liens de commande : une série le long d'un plan
+de travail, ce sont des boîtes séparées — et un interrupteur qui commanderait six
+socles d'un coup parce qu'on a appuyé six fois serait un câblage qu'on n'a pas
+demandé.
+
+**UNE SEULE SOURCE POUR DÉCIDER ET POUR AFFICHER.** `placeRepetee` (dans
+`electrical.ts`, pas dans le magasin) répond à la fois au geste — « où tombe la
+copie ? » — et au bouton — « faut-il l'afficher ? ». C'est la règle de cette
+rangée depuis toujours, « un bouton qui ne commande rien donne à l'écran l'air
+d'être en panne », et deux calculs de la même chose auraient fini par diverger :
+on afficherait un bouton qui échoue, ou l'on cacherait un geste possible.
+
+**UN BANC QUI SE TROMPAIT AVANT LE CODE QU'IL MESURE.** La première version
+affirmait que le troisième socle reprend « un mètre » parce que le doigt avait
+posé le second à `along = 2`. C'était faux, et d'un chiffre rond : **l'abscisse
+d'un appareil se compte le long du mur, celle d'une pose le long de la face**, et
+les deux se décalent de la demi-épaisseur des retours d'angle — sept centimètres
+sur ce plan. Le banc mesurait un écart qu'il croyait connaître. Il mesure
+maintenant que le troisième reprend **l'écart du deuxième, quel qu'il soit**, et
+qu'il a bien oublié le pas d'usine. Une leçon de plus pour la liste : *un banc ne
+nomme jamais un réglage par son chiffre* — pas même un chiffre qu'il vient de
+poser lui-même.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

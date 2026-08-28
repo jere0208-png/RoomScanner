@@ -190,6 +190,102 @@ export const BOITE_D = 0.067;
 export const BOITE_P = 0.04;
 export const PLAQUE = 0.082;
 
+/**
+ * LE PAS D'UNE SÉRIE — soixante centimètres.
+ *
+ * Relevé du patron : « duplication d'un appareil — six socles identiques,
+ * c'est six poses ». Six socles identiques, sur un chantier, c'est presque
+ * toujours un plan de travail de cuisine : on les aligne au-dessus, à la
+ * hauteur du dosseret, à un socle par module de meuble. Le module standard de
+ * la cuisine française fait soixante centimètres — c'est la largeur d'un
+ * caisson, d'un four, d'un lave-vaisselle —, et c'est donc l'écart qui tombe
+ * juste le plus souvent.
+ *
+ * CE N'EST QU'UN POINT DE DÉPART, ET C'EST VOULU. Il ne sert qu'à la PREMIÈRE
+ * copie : dès la deuxième, la série reprend l'écart réel de la précédente
+ * (voir `repeterFixture`). On pose le premier socle où on le veut, le second
+ * au pas qu'on veut — au doigt s'il le faut —, et les suivants suivent. Un pas
+ * qu'on ne peut pas corriger serait un pas qu'il faudrait régler ; celui-ci
+ * s'oublie.
+ */
+export const PAS_SERIE = 0.6;
+
+/**
+ * OÙ TOMBE LA COPIE D'UN APPAREIL — la place, ou rien.
+ *
+ * Le calcul vit ICI, et pas dans le magasin, parce que DEUX endroits en ont
+ * besoin : le geste qui pose la copie, et le bouton qui décide s'il doit
+ * s'afficher. Un bouton qui ne commande rien donne à l'écran l'air d'être en
+ * panne ; deux calculs de la même chose finissent par diverger, et l'on
+ * afficherait alors un bouton qui échoue, ou l'on cacherait un geste possible.
+ *
+ * LE PAS, ET LE SENS. À droite d'abord — le sens de lecture d'une série. Le
+ * pas est l'écart avec le voisin de série situé DE L'AUTRE CÔTÉ, celui qu'on
+ * vient de poser : c'est lui qui porte l'intention. À défaut, `PAS_SERIE`.
+ *
+ * PUIS, SI RIEN N'EST LIBRE AU PAS VOULU, on cherche la place la plus proche
+ * par crans d'entraxe. Un mur percé d'une porte-fenêtre ne doit pas faire
+ * renoncer une série qui a largement la place à côté.
+ *
+ * Rend `null` quand il n'y a de place nulle part. Un appareil hors du mur, ou
+ * dans une baie vitrée, est pire qu'une copie qu'on refait à la main.
+ */
+export function placeRepetee(v: {
+  /** L'abscisse de l'appareil qu'on répète, sur la FACE. */
+  x0: number;
+  /** Sa hauteur, en mètres. */
+  hauteur: number;
+  /** Sa largeur d'encombrement (`FIXTURES[kind].w`). */
+  largeur: number;
+  /** La longueur de la face. */
+  longueur: number;
+  /** Les abscisses des appareils de la MÊME série : type, hauteur, face. */
+  serie: number[];
+  /** Tout ce que la face porte déjà : abscisse et hauteur. */
+  occupe: { x: number; y: number }[];
+  /** La maçonnerie disponible. Vide = le mur entier est plein. */
+  pleins: { x0: number; x1: number }[];
+}): number | null {
+  const demi = v.largeur / 2;
+  const dansLeMur = (px: number) => px - demi >= 0 && px + demi <= v.longueur;
+  const surDuPlein = (px: number) =>
+    v.pleins.length === 0 ||
+    v.pleins.some((r) => px - demi >= r.x0 && px + demi <= r.x1);
+  /*
+    « LA PLACE EST PRISE » SE MESURE SUR LES BOÎTES, une par poste — la même
+    règle qu'une pose ordinaire. Deux appareils à moins d'un entraxe
+    partageraient une plaque, et ce n'est pas ce qu'on demande ici : une série
+    le long d'un plan de travail, ce sont des boîtes séparées.
+  */
+  const libre = (px: number) =>
+    !v.occupe.some(
+      (o) =>
+        Math.abs(px - o.x) < ENTRAXE - 1e-6 &&
+        Math.abs(v.hauteur - o.y) < ENTRAXE - 1e-6,
+    );
+  const bonne = (px: number) => dansLeMur(px) && surDuPlein(px) && libre(px);
+
+  const pasVers = (sens: 1 | -1) => {
+    const derriere = v.serie
+      .filter((x) => (v.x0 - x) * sens > 1e-6)
+      .sort((a, b) => Math.abs(v.x0 - b) - Math.abs(v.x0 - a))
+      .pop();
+    return derriere === undefined ? PAS_SERIE : Math.abs(v.x0 - derriere);
+  };
+
+  for (const sens of [1, -1] as const) {
+    const px = v.x0 + sens * pasVers(sens);
+    if (bonne(px)) return px;
+  }
+  for (let k = 1; k <= 40; k++) {
+    for (const sens of [1, -1] as const) {
+      const px = v.x0 + sens * (pasVers(sens) + k * ENTRAXE);
+      if (bonne(px)) return px;
+    }
+  }
+  return null;
+}
+
 /** Largeur d'une plaque à N postes. */
 export const plaqueLargeur = (n: number) =>
   Math.max(1, n - 1) * ENTRAXE + PLAQUE - (n > 1 ? 0 : 0);

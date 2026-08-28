@@ -58,6 +58,7 @@ import {
   boxOffsets,
   masonryAxes,
   masonryRuns,
+  placeRepetee,
   postsOf,
   seCommande,
   type FixtureKind,
@@ -229,6 +230,7 @@ export function WallElevation({
   const flipFixture = useScanStore((s) => s.flipFixture);
   const basculerPontage = useScanStore((s) => s.basculerPontage);
   const removeFixture = useScanStore((s) => s.removeFixture);
+  const repeterFixture = useScanStore((s) => s.repeterFixture);
   const placeAssembly = useScanStore((s) => s.placeAssembly);
   const splitFixture = useScanStore((s) => s.splitFixture);
   const pendingJoin = useScanStore((s) => s.pendingJoin);
@@ -724,6 +726,37 @@ export function WallElevation({
 
   const spec = selected ? FIXTURES[selected.kind] : null;
   const selX = selected ? faceX(face, selected.along) : 0;
+  /*
+    Y A-T-IL UNE PLACE POUR UNE COPIE ? La MÊME réponse que celle du geste :
+    `placeRepetee` décide pour les deux (voir `electrical.ts`). Deux calculs de
+    la même chose finissent par diverger, et l'on afficherait alors un bouton
+    qui échoue — ou l'on cacherait un geste possible.
+
+    Pas de `useMemo` ici : on est après un retour anticipé, et un hook posé
+    plus bas qu'un autre chemin de rendu est un hook qui saute.
+  */
+  const peutRepeter =
+    selected && spec
+      ? placeRepetee({
+          x0: selX,
+          hauteur: selected.height,
+          largeur: spec.w,
+          longueur: face.len,
+          serie: mine
+            .filter(
+              (o) =>
+                o.id !== selected.id &&
+                o.side === selected.side &&
+                o.kind === selected.kind &&
+                Math.abs(o.height - selected.height) < 0.02,
+            )
+            .map((o) => faceX(face, o.along)),
+          occupe: mine
+            .filter((o) => o.side === selected.side)
+            .map((o) => ({ x: faceX(face, o.along), y: o.height })),
+          pleins: retours,
+        }) !== null
+      : false;
   /**
    * Le retour QUI PORTE l'appareil tenu.
    *
@@ -2117,6 +2150,44 @@ export function WallElevation({
                     prise.asset,
                   );
                   haptic('succes');
+                }
+              },
+            },
+            {
+              /**
+               * RÉPÉTER — six socles identiques ne sont plus six poses.
+               *
+               * Relevé du patron : « duplication d'un appareil — six socles
+               * identiques, c'est six poses ; il n'existe aucun geste de
+               * duplication ».
+               *
+               * CE N'EST PAS LE « COPIER » D'AVANT, celui qui a été retiré
+               * d'ici pour laisser la place au lien. Un copier posait un
+               * jumeau à côté et laissait l'électricien le traîner ; celui-ci
+               * pose la copie LÀ OÙ LA SUIVANTE DOIT TOMBER — au pas d'un
+               * plan de travail la première fois, puis au pas qu'on a
+               * réellement pris — et LA SÉLECTIONNE. Six appuis font six
+               * socles régulièrement espacés, sans un seul glissement.
+               *
+               * IL SE TAIT QUAND IL NE PEUT RIEN FAIRE. Sur un mur où il ne
+               * reste aucune place — un tableau de porte déjà occupé —, le
+               * bouton ne s'affiche pas : un bouton qui ne commande rien
+               * donne à l'écran l'air d'être en panne.
+               */
+              key: 'rep',
+              label: 'Répéter',
+              on: !!selected && !!peutRepeter,
+              tint: c.blue,
+              paths: [],
+              plein: SOLAIRES.dupliquer,
+              press: () => {
+                if (!selected) return;
+                const neuf = repeterFixture(selected.id);
+                if (neuf) {
+                  // La copie devient la sélection : le prochain appui pose la
+                  // suivante, au même pas. C'est ce qui fait la série.
+                  onSelect(neuf);
+                  haptic('leger');
                 }
               },
             },

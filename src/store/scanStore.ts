@@ -75,6 +75,7 @@ import {
   COMMANDES_MURALES,
   FIXTURES,
   ENTRAXE,
+  placeRepetee,
   faceX,
   fromFaceX,
   masonryRuns,
@@ -1078,6 +1079,17 @@ interface ScanState {
    */
   addFixture: (kind: FixtureKind, wallId: string, at?: number) => string | null;
   /** Déplace un appareil sur sa face : cote depuis le bord, hauteur d'axe. */
+  /**
+   * RÉPÈTE UN APPAREIL LE LONG DE SON MUR, AU PAS DE LA SÉRIE.
+   *
+   * Relevé du patron : « duplication d'un appareil — six socles identiques,
+   * c'est six poses ; il n'existe aucun geste de duplication ».
+   *
+   * Rend l'identifiant de la copie, ou `null` quand il n'y a de place nulle
+   * part : un appareil posé dans une baie vitrée ou hors du mur est pire
+   * qu'une copie qu'on refait à la main.
+   */
+  repeterFixture: (id: string) => string | null;
   moveFixture: (id: string, along: number, height: number) => void;
   /** Bascule l'appareil sur l'autre face du mur, sans le déplacer. */
   flipFixture: (id: string) => void;
@@ -3274,6 +3286,96 @@ export const useScanStore = create<ScanState>((set, get) => {
         dirty: true,
       });
       return id;
+    },
+
+    /**
+     * RÉPÈTE UN APPAREIL LE LONG DE SON MUR — la série d'un plan de travail.
+     *
+     * UN « COPIER » A DÉJÀ VÉCU DANS CETTE APPLICATION, et il a été retiré :
+     * relevé du patron, « enlève le bouton copier, remplace-le par un bouton
+     * lien ». Ce geste-ci n'est pas celui-là. Un copier posait un jumeau à
+     * côté et laissait l'électricien le traîner à sa place ; celui-ci pose la
+     * copie LÀ OÙ LA SUIVANTE DOIT TOMBER — au pas de la série — et se
+     * resélectionne. Six appuis font six socles régulièrement espacés, sans
+     * un seul glissement au doigt.
+     *
+     * LE PAS SE DEVINE. La première copie prend `PAS_SERIE`, le module d'une
+     * cuisine ; **dès la deuxième, on reprend l'écart réel du précédent** —
+     * l'appareil de même type, même hauteur et même face le plus proche à
+     * l'opposé du sens de pose. On règle donc le deuxième socle où on veut, et
+     * les quatre suivants suivent.
+     *
+     * LES RÈGLES D'UNE POSE ORDINAIRE NE S'ASSOUPLISSENT PAS parce que le
+     * geste est plus rapide : la copie reste dans son mur, sur la maçonnerie,
+     * et ne s'empile pas sur une voisine. À droite d'abord — le sens de
+     * lecture d'une série —, puis à gauche, puis on renonce.
+     *
+     * ET CE N'EST PAS UN POSTE DE PLUS SOUS LA MÊME PLAQUE : la copie ne
+     * reprend pas le `group` de son modèle. Une série le long d'un plan de
+     * travail, ce sont des boîtes séparées.
+     */
+    repeterFixture: (id) => {
+      const st = get();
+      const src = st.fixtures.find((f) => f.id === id);
+      if (!src) return null;
+      const wall = st.walls.find((w) => w.id === src.wallId);
+      if (!wall) return null;
+      const quad = wallQuadsOf(st.walls).get(src.wallId);
+      const face = wallFace(wall, quad, src.side);
+      const spec = FIXTURES[src.kind];
+      const x0 = faceX(face, src.along);
+
+      /*
+        LES VOISINS DE LA MÊME SÉRIE : même type, même hauteur, même face. Un
+        interrupteur posé à côté d'une prise ne dit rien du pas d'une série de
+        prises, et une prise plinthe ne dit rien d'une prise de plan de
+        travail — c'est la hauteur qui les sépare.
+      */
+      const memeSerie = st.fixtures
+        .filter(
+          (o) =>
+            o.id !== src.id &&
+            o.wallId === src.wallId &&
+            o.side === src.side &&
+            o.kind === src.kind &&
+            Math.abs(o.height - src.height) < 0.02,
+        )
+        .map((o) => faceX(face, o.along));
+
+      /** La maçonnerie du mur : une copie ne tombe pas dans une baie. */
+      const pleins = masonryRuns(
+        wallRuns(wall, st.openings),
+        segLength(wall),
+        face,
+      );
+      const place = placeRepetee({
+        x0,
+        hauteur: src.height,
+        largeur: spec.w,
+        longueur: face.len,
+        serie: memeSerie,
+        occupe: st.fixtures
+          .filter((o) => o.wallId === src.wallId && o.side === src.side)
+          .map((o) => ({ x: faceX(face, o.along), y: o.height })),
+        pleins,
+      });
+      // Nulle part où la poser : on ne pose pas.
+      if (place === null) return null;
+
+      pushHistory('repeterFixture');
+      const neuf: Fixture = {
+        ...src,
+        id: `el-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        along: fromFaceX(face, place),
+        // Une série, ce sont des boîtes SÉPARÉES : la copie ne rejoint pas la
+        // plaque de son modèle, et elle ne garde pas ses liens de commande —
+        // un interrupteur qui commanderait six socles d'un coup parce qu'on a
+        // appuyé six fois serait un câblage qu'on n'a pas demandé.
+        group: undefined,
+        commands: undefined,
+      };
+      set({ fixtures: [...st.fixtures, neuf], dirty: true });
+      return neuf.id;
     },
 
     moveFixture: (id, along, height) => {
