@@ -481,7 +481,7 @@ describe('le tremblement d’une main qui vise', () => {
     });
     // Puis la flèche, au centimètre : c'est un réglage volontaire.
     act(() => {
-      useScanStore.getState().setObjectCenter('o1', 3.4, 1.5, false);
+      useScanStore.getState().setObjectCenter('o1', 3.4, 1.5);
     });
     expect(useScanStore.getState().objects[0].transform[12]).toBeCloseTo(3.4, 2);
     // Et maintenant un simple APPUI sur le meuble : rien ne doit bouger.

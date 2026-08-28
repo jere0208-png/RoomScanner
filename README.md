@@ -9328,6 +9328,137 @@ instrument cassé.
 - **Il n'existe aucun geste de duplication** pour un appareil ou un meuble : six
   socles identiques, c'est six poses. Question déjà ouverte, toujours ouverte.
 
+### La flèche fait ce que fait le doigt
+
+**Relevé du patron :** « oui comme le doigt pour les flèches ».
+
+La mesure qui a emporté la décision, faite sur le code livré : une commode de
+**1,40 m** poussée à la flèche dans une alcôve de **1,20 m** en ressortait
+**rabotée à 1,04 m**. Cotes changées toutes seules, sans rien demander, sur un
+plan qui sert à commander du meuble. Le rabotage était réversible — au large,
+elle retrouvait ses cotes — mais entre-temps c'est une commode de 1,04 m qui
+partait sur le PDF. Au doigt, elle gardait ses 1,40 m et l'alcôve la repoussait,
+ce qui est la vérité du chantier : elle ne rentre pas.
+
+Les trois aides quittent donc le dernier chemin qui les portait : `fitInNook`
+(le rabotage), `alignToFit` (le quart de tour qui fait entrer), `hugWall` (le
+plaquage au nu). **Le mur arrête, il ne retaille pas** — la même règle pour les
+deux gestes. Vérifié : flèche et doigt rendent désormais des positions
+identiques au millimètre.
+
+Les trois fonctions restent dans `floorplan.ts`, marquées **retirées du
+service** : leurs bancs sont le relevé de ce que l'application a fait pendant un
+an, et la référence si la décision devait s'inverser. Les supprimer effacerait
+ce raisonnement du dépôt.
+
+**Et un défaut est sorti de l'ombre** en retirant le rabotage : une table de
+1,48 m poussée dans une niche de 1,10 m y **restait, à cheval sur les deux murs
+qui la bordent**. C'est mécanique — deux murs qui se font face poussent chacun
+dans son sens et s'annulent — et le rabotage le masquait en la faisant maigrir
+jusqu'à ce qu'elle entre. Le meuble glisse maintenant vers l'ancre de la pièce
+jusqu'au premier pas où il tient : il sort du cul-de-sac, **entier**.
+
+### L'ouverture ne passe plus par une page vide
+
+**Relevé du patron :** « au chargement de l'app, mets les 2 logos superposés
+comme on a fait pour l'accueil, mais centré à l'écran ».
+
+Trois images s'enchaînent en une seconde, et la coupure entre deux se remarque
+plus que chacune d'elles : l'écran de lancement d'iOS (l'icône, en grand, au
+centre), puis l'attente le temps de lire le compte, puis l'accueil. **Le milieu
+était vide** — un fond nu entre deux images de marque, ce qui se lit comme un
+plantage.
+
+Il porte maintenant la composition de l'accueil : le glyphe en filigrane, le
+logotype par-dessus. Mais **centré sur l'écran**, pas posé en haut : ici il n'y a
+rien d'autre à placer, et un logotype accroché au bord haut d'une page vide se
+lit comme une page qui n'a pas fini de charger. Pas d'animation, pas de
+tourniquet : cet écran dure quelques dizaines de millisecondes, et une animation
+qui n'a pas le temps de se jouer est un clignotement.
+
+Le banc lit le filigrane **sur l'accueil** et exige le même ici — pas un « 240 »
+comparé à un « 240 » : le jour où il changera, les deux écrans doivent changer
+ensemble plutôt qu'un banc tomber.
+
+### La plaque blanche sous un chiffre de cote
+
+**Deux relevés du patron, sur la même capture :** « le bloc blanc arrière pas si
+gros, il doit dépasser de 2px les chiffres sur les côtés » et « les chiffres sont
+cachés par le passage de la gaine, les pointillés gênent la lecture de la cote
+entre spots ».
+
+**Trois défauts, trois causes différentes.**
+
+1. **La plaque était écrite en dur, et à quatre endroits** : `26 × 14` à l'écran
+   pour la chaîne, `len × 7,2 + 14` pour les cotes de spot, `22 × 10` et `18 × 9`
+   dans le dossier. Quatre tailles pour la même chose, dont aucune ne suivait son
+   texte — la plaque d'une cote à deux chiffres était aussi large que celle d'une
+   cote à quatre. Elle se calcule désormais (`plaqueDeCote`), sur la même
+   estimation de largeur que tout le reste du plan, et ne déborde que de **deux
+   points**. La hauteur serre plus que la largeur : un chiffre n'occupe pas toute
+   sa police — ni jambage, ni accent.
+2. **Elle était translucide** (0,90 ; 0,94 ; `#FFFFFFDD`). Un tireté passait donc
+   *au travers* du chiffre : on lisait « 117 » barré. Une plaque de cote est
+   opaque en dessin technique — c'est sa raison d'être : la cote **interrompt**
+   ce qu'elle survole.
+3. **Et la gaine était dessinée après.** C'est la vraie cause de « les chiffres
+   sont cachés » : même opaque, une plaque ne protège rien de ce qui se peint
+   par-dessus. Le cheminement passe donc avant le calque du plafond — il passait
+   déjà sous les symboles d'appareil, « c'est un cheminement, pas une
+   annotation ». Un banc qui n'aurait mesuré que l'opacité aurait déclaré le
+   défaut corrigé alors que le tireté passait toujours dessus.
+
+**Un quatrième, trouvé en chemin :** la plaque des cotes de spot ne tournait pas
+avec son texte. Sur une cote en biais, le chiffre sortait de son fond par un
+coin. Elles portent la même rotation.
+
+**Vérifié à l'œil**, sur la planche de référence et sur le PDF rendu : le diff de
+la planche ne touche que **huit rectangles** — largeur, hauteur, rayon, opacité,
+et la matrice de rotation qui manquait. Aucun trait, aucun chiffre, aucun symbole
+n'a bougé.
+
+### Le bandeau du meuble : cinq rangées en font trois
+
+**Relevé du patron, capture à l'appui :** « réduis le bloc d'édition de meuble
+comme tu peux intelligemment, il prend trop de place. Fais en sorte qu'il soit
+pas sur un autre élément. »
+
+Il en faisait cinq — le nom seul sur sa ligne, les flèches, « H » et « Pose »,
+largeur × profondeur, puis « Pivoter » et « Retirer » : **217 points** sur un
+écran qui en fait huit cents, posés par-dessus le plan qu'on regarde.
+
+**Deux fusions, et aucun réglage perdu** — c'est la contrainte qui rend
+l'exercice intéressant : réduire un bandeau en lui retirant des réglages, ce
+n'est pas le réduire, c'est l'amputer.
+
+- Les **gestes** montent dans la ligne du titre, à droite. Cette ligne ne portait
+  qu'un mot et gardait toute sa hauteur pour lui.
+- Les **quatre cotes** tiennent sur une rangée, chacune avec son mot *à
+  l'intérieur* de sa pastille. « H » et « Pose » posés à côté coûtaient chacun une
+  largeur et deux marges pour une lettre.
+
+**150 points au lieu de 217 : un tiers de moins.**
+
+**Et il annonce ce qu'il prend.** L'écran gardait un nombre écrit à la main —
+132 — pour savoir où *ne pas* poser le menu d'un mur. Le bandeau en faisait 217 :
+**la réserve mentait de quatre-vingts points**, et c'est exactement « il est sur
+un autre élément ». C'est la leçon du peigne « Afficher », rencontrée une seconde
+fois : *celui qui dessine annonce son encombrement, l'écran ne le devine plus.*
+
+La hauteur déclarée est celle du **pire** cas (191), pas de l'ordinaire (150) :
+sur un petit écran les quatre cotes passent à la ligne. Déclarer l'ordinaire
+serait refaire le même défaut à l'envers — une réserve trop courte laisse poser
+un menu *sur* le bandeau, une réserve un peu large coûte quelques points de plan
+gardés pour rien. Les deux erreurs ne se valent pas.
+
+**Le filet a déménagé, il n'a pas disparu.** Les quatre coquilles du bas séparent
+d'un cheveu ce qu'on lit de ce qu'on touche ; le bandeau du meuble ayant monté
+ses gestes dans la ligne du titre, cette coupure n'y a plus de sens. Le filet est
+passé sous ce qui **nomme** le meuble, au-dessus de ce qui le **règle** — et son
+banc le cherche désormais par sa nature (une rangée qui porte une bordure haute)
+et non par sa place, sans quoi il l'aurait déclaré disparu alors qu'il avait
+seulement déménagé.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

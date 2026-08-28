@@ -281,7 +281,7 @@ describe('les flèches déplacent le meuble au centimètre', () => {
   /** Le geste du bandeau : un pas d'un centimètre, sans aimant. */
   const pas = (id: string, dx: number, dz: number) => {
     const t = useScanStore.getState().objects.find((o) => o.id === id)!.transform;
-    useScanStore.getState().setObjectCenter(id, t[12] + dx, t[14] + dz, false);
+    useScanStore.getState().setObjectCenter(id, t[12] + dx, t[14] + dz);
     return centre(id);
   };
 

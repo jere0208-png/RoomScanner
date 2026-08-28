@@ -2445,28 +2445,24 @@ export function FloorplanEditor({
               );
             })}
 
-            <CeilingLayer
-              ceiling={ceiling}
-              showCeiling={showCeiling}
-              selectedCeilingId={selectedCeilingId}
-              selectedCeilingRow={selectedCeilingRow}
-              /* Le bouton « Cotes » vaut aussi pour le plafond : les écarts
-                 d'une ligne de spots s'y lisent comme ceux d'un mur. */
-              showMeasures={showMeasures}
-              onSelectCeiling={onSelectCeiling}
-              fixtures={showFixtures ? fixtures : VIDE}
-              walls={walls}
-              quads={quads}
-              partOf={partOf}
-              mapping={mapping}
-              frame={frame}
-              c={c}
-            />
+            {/*
+              LES GAINES : un filet tireté qui longe les murs, du tableau à
+              chaque appareil. Son tracé est celui du métré porté au devis,
+              pas une illustration.
 
-            {/* Les gaines : un filet tireté qui longe les murs, du tableau
-                à chaque appareil. Il passe SOUS les symboles — c'est un
-                cheminement, pas une annotation — et son tracé est celui du
-                métré porté au devis, pas une illustration. */}
+              ELLES PASSENT SOUS LE PLAFOND, ET PLUS SEULEMENT SOUS LES
+              APPAREILS — relevé du patron : « les chiffres sont cachés par
+              le passage de la gaine, les pointillés gênent la lecture de la
+              cote entre spots ».
+
+              Elles étaient dessinées ENTRE le calque du plafond et celui des
+              appareils : les tiretés se peignaient donc par-dessus les cotes
+              de spots, qu'aucune plaque opaque ne pouvait protéger — une
+              plaque ne protège rien de ce qui vient après elle. Elles
+              remontent d'un cran. La règle ne change pas, elle s'applique
+              simplement à un calque de plus : un CHEMINEMENT passe sous ce
+              qui l'annote.
+            */}
             {cableRoutes?.map((r) => (
               <Polyline
                 key={`gaine-${r.id}`}
@@ -2491,6 +2487,24 @@ export function FloorplanEditor({
                 opacity={0.75}
               />
             ))}
+            <CeilingLayer
+              ceiling={ceiling}
+              showCeiling={showCeiling}
+              selectedCeilingId={selectedCeilingId}
+              selectedCeilingRow={selectedCeilingRow}
+              /* Le bouton « Cotes » vaut aussi pour le plafond : les écarts
+                 d'une ligne de spots s'y lisent comme ceux d'un mur. */
+              showMeasures={showMeasures}
+              onSelectCeiling={onSelectCeiling}
+              fixtures={showFixtures ? fixtures : VIDE}
+              walls={walls}
+              quads={quads}
+              partOf={partOf}
+              mapping={mapping}
+              frame={frame}
+              c={c}
+            />
+
             <FixtureLayer
               fixtures={showFixtures ? fixtures : VIDE}
               circuitMarks={circuitMarks}
@@ -3984,7 +3998,7 @@ export function ObjectDragHandle({
           );
           useScanStore
             .getState()
-            .setObjectCenter(objectId, vise.x, vise.z, true, true);
+            .setObjectCenter(objectId, vise.x, vise.z, true);
           dire?.(!essai.valide);
           // On range CE point-là au lâcher, valable ou non : c'est le mur qui
           // arrêtera, pas un retour en arrière.

@@ -13,6 +13,7 @@ import { SignInScreen } from './src/screens/SignInScreen';
 import { ProfilScreen } from './src/screens/ProfilScreen';
 import { ConfidentialiteScreen } from './src/screens/ConfidentialiteScreen';
 import { PaywallScreen } from './src/screens/PaywallScreen';
+import { EcranChargement } from './src/components/EcranChargement';
 import { EssaiEpuise } from './src/components/EssaiEpuise';
 import { SurprisePro } from './src/components/SurprisePro';
 import { AvisRecompense } from './src/components/AvisRecompense';
@@ -60,8 +61,19 @@ export default function App() {
    * connexion une demi-seconde à quelqu'un qui a déjà un compte ferait
    * croire à une déconnexion à chaque lancement.
    */
-  // Rien tant que le compte n'est pas LU : afficher l'accueil une
-  // demi-seconde avant la porte d'entrée ferait croire à une déconnexion.
+  /*
+    RIEN TANT QUE LE COMPTE N'EST PAS LU — mais « rien » n'est pas une page
+    vide.
+
+    La règle ne change pas : afficher l'accueil une demi-seconde avant la
+    porte d'entrée ferait croire à une déconnexion à chaque lancement. Ce qui
+    change, c'est ce qu'on montre pendant ce temps. C'était le fond nu, entre
+    l'écran de lancement d'iOS (l'icône, en grand, au centre) et l'accueil :
+    une coupure au milieu d'une ouverture se lit comme un plantage.
+
+    Relevé du patron : « au chargement de l'app, mets les 2 logos superposés
+    comme on a fait pour l'accueil, mais centré à l'écran ».
+  */
   if (!compteCharge) {
     return (
       <SafeAreaProvider>
@@ -69,6 +81,7 @@ export default function App() {
           barStyle={darkContent ? 'dark-content' : 'light-content'}
           backgroundColor={c.bg}
         />
+        <EcranChargement />
       </SafeAreaProvider>
     );
   }

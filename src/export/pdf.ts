@@ -76,6 +76,7 @@ import {
   type SchemaRow,
 } from '../geometry/schema';
 import { conduitPour, type BuyRow, type PullRow } from '../geometry/conduits';
+import { plaqueDeCote } from '../geometry/cotes';
 import {
   CEILINGS,
   ceilingChain,
@@ -2370,13 +2371,25 @@ function planPage(
           const v = `${Math.round(b.x)},${Math.round(b.y)}`;
           return u < v ? `${u}|${v}` : `${v}|${u}`;
         };
-        /** L'emprise du cartouche d'une cote, centré sur son point. */
-        const boiteCote = (p: Pt): Boite => ({
-          x: p.x - 11,
-          y: p.y - 5,
-          w: 22,
-          h: 10,
-        });
+        /**
+         * L'emprise de la plaque d'une cote, centrée sur son point.
+         *
+         * ELLE SE TAILLE SUR LE TEXTE — relevé du patron : « le bloc blanc
+         * arrière pas si gros, il doit dépasser de 2px les chiffres sur les
+         * côtés ». Elle valait 22 × 10 en dur, quel que soit le nombre : une
+         * cote à deux chiffres portait la plaque d'une cote à quatre, et
+         * réservait donc contre ses voisines une place qu'elle n'occupait
+         * pas — c'est le défaut « vérifier la boîte qu'on dessine, pas celle
+         * qu'on a demandée », mais pris à l'envers.
+         *
+         * La même fonction sert à RÉSERVER et à DESSINER : deux tailles pour
+         * une plaque finiraient par diverger.
+         */
+        const TAILLE_COTE = 6.5;
+        const boiteCote = (p: Pt, texte: string): Boite => {
+          const q = plaqueDeCote(texte, TAILLE_COTE);
+          return { x: p.x - q.w / 2, y: p.y - q.h / 2, w: q.w, h: q.h };
+        };
         /*
           UNE LIGNE DE SPOTS SE COTE UNE FOIS, PAS DEUX.
 
@@ -2474,21 +2487,23 @@ function planPage(
               x: q.x + ((b.y - a.y) / l) * k,
               y: q.y - ((b.x - a.x) / l) * k,
             });
+            const texteCote = `${Math.round(dist * 100)}`;
             let p: Pt | null = null;
             chercher: for (const k of [0, 9, -9, 18, -18]) {
               for (const t of [0.5, 0.34, 0.66, 0.22, 0.78, 0.14, 0.86]) {
                 const q = decale(sur(t), k);
-                if (auLarge(boiteCote(q))) {
+                if (auLarge(boiteCote(q, texteCote))) {
                   p = q;
                   break chercher;
                 }
               }
             }
             if (!p) continue;
-            etiquettes.push(boiteCote(p));
-            cotesPlafond.push(boiteCote(p));
-            d.rect(p.x - 11, p.y - 5, 22, 10, '#FFFFFF', null);
-            d.text(`${Math.round(dist * 100)}`, p.x, p.y - 2.5, 6.5, SKY, {
+            etiquettes.push(boiteCote(p, texteCote));
+            cotesPlafond.push(boiteCote(p, texteCote));
+            const plaque = boiteCote(p, texteCote);
+            d.rect(plaque.x, plaque.y, plaque.w, plaque.h, '#FFFFFF', null);
+            d.text(texteCote, p.x, p.y - 2.5, TAILLE_COTE, SKY, {
               bold: true,
             });
           }
@@ -2532,8 +2547,10 @@ function planPage(
             // Elle se pose au milieu de l'écart ; si la place est prise,
             // elle monte ou descend de quelques points — la chaîne se lit
             // toujours, c'est le trait qui porte la mesure.
+            const texteEcart = `${Math.round(val * 100)}`;
+            const q = plaqueDeCote(texteEcart, 6.5);
             const pose = ecarterDe(
-              { x: mil.x - 9, y: mil.y - 4.5, w: 18, h: 9 },
+              { x: mil.x - q.w / 2, y: mil.y - q.h / 2, w: q.w, h: q.h },
               [...etiquettes, ...pastilles],
               22,
             );
@@ -2552,13 +2569,23 @@ function planPage(
               il porte la mesure, et le chiffre s'efface plutôt que de rendre
               deux informations illisibles au lieu d'une.
             */
-            const m = { x: mil.x, y: pose.y + 4.5 };
-            const boite = { x: m.x - 9, y: m.y - 4.5, w: 18, h: 9 };
+            const m = { x: mil.x, y: pose.y + q.h / 2 };
+            const boite = { x: m.x - q.w / 2, y: m.y - q.h / 2, w: q.w, h: q.h };
             if (!auLarge(boite)) return;
             etiquettes.push(boite);
             cotesPlafond.push(boite);
-            d.rect(m.x - 9, m.y - 4.5, 18, 9, '#FFFFFFDD', null, 0);
-            d.text(`${Math.round(val * 100)}`, m.x, m.y - 2.5, 6.5, INK, {
+            /*
+              OPAQUE, ET PAS `#FFFFFFDD` — relevé du patron : « les pointillés
+              gênent la lecture de la cote entre spots ».
+
+              La plaque laissait passer treize pour cent de ce qu'elle
+              couvrait, et la chaîne des spots court sur un trait TIRETÉ
+              qu'elle est censée interrompre : on lisait « 150 » barré. Une
+              plaque de cote est opaque en dessin technique — c'est sa raison
+              d'être.
+            */
+            d.rect(boite.x, boite.y, boite.w, boite.h, '#FFFFFF', null, 0);
+            d.text(texteEcart, m.x, m.y - 2.5, 6.5, INK, {
               bold: true,
             });
           });

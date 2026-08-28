@@ -67,14 +67,14 @@ beforeEach(() => {
 
 describe('deplacer un meuble a la main', () => {
   it('le pose exactement ou on le demande', () => {
-    st().setObjectCenter('c1', 3.2, 2.6, false, true);
+    st().setObjectCenter('c1', 3.2, 2.6, true);
     expect(ou().x).toBeCloseTo(3.2, 3);
     expect(ou().z).toBeCloseTo(2.6, 3);
   });
 
   it('le laisse traverser les murs pendant le geste', () => {
     // Hors de la piece : le doigt y est alle, le meuble suit.
-    st().setObjectCenter('c1', 2.5, -1, false, true);
+    st().setObjectCenter('c1', 2.5, -1, true);
     expect(ou().z).toBeCloseTo(-1, 3);
   });
 
@@ -92,14 +92,14 @@ describe('deplacer un meuble a la main', () => {
     collision et non une aspiration : voir `collisionmeuble.test.ts`.
   */
   it('ne l’attire plus, meme tout pres d’un mur', () => {
-    st().setObjectCenter('c1', 2.5, 0.5, false, true);
+    st().setObjectCenter('c1', 2.5, 0.5, true);
     expect(ou().z).toBeCloseTo(0.5, 3);
   });
 
   it('et ne rabote plus le meuble pour le faire entrer', () => {
     // L'ancien mode retaillait un meuble trop large pour un recoin. En
     // libre, ses cotes sont celles du catalogue, toujours.
-    st().setObjectCenter('c1', 0.3, 0.3, false, true);
+    st().setObjectCenter('c1', 0.3, 0.3, true);
     expect(st().objects[0].width).toBeCloseTo(1.2, 3);
     expect(st().objects[0].depth).toBeCloseTo(0.45, 3);
   });

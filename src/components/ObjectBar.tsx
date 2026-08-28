@@ -24,6 +24,58 @@ import type { ObjectData } from 'react-native-room-scan';
 const fr2 = (v: number) => v.toFixed(2).replace('.', ',');
 
 /**
+ * CE QUE LE BANDEAU PREND EN HAUTEUR, ET IL L'ANNONCE LUI-MÊME.
+ *
+ * Relevé du patron : « fais en sorte qu'il soit pas sur un autre élément ».
+ * L'écran gardait un nombre écrit à la main — 132 points — pour savoir où NE
+ * PAS poser le menu d'un mur. Le bandeau en faisait deux cent dix-sept : la
+ * réserve mentait de quatre-vingts points, et tout ce qu'on plaçait « juste
+ * au-dessus » atterrissait dessus.
+ *
+ * C'est la leçon du peigne « Afficher », qui a rencontré le même mur et l'a
+ * réglée de la même façon : **celui qui dessine annonce son encombrement,
+ * l'écran ne le devine plus**. Un nombre écrit ailleurs dérive au premier
+ * changement de pastille ou de police.
+ *
+ * TROIS RANGÉES : le titre et ses deux gestes (une pastille et son mot
+ * dessous), les quatre flèches, les quatre cotes. Plus les interlignes et les
+ * marges de la carte. On MAJORE légèrement — une majoration coûte un peu de
+ * plan réservé pour rien, une minoration coûte un bandeau posé sur un menu.
+ */
+const RANGEE_TITRE = 34 + 12;
+/** Les flèches, plus les six points que le filet prend au-dessus d'elles. */
+const RANGEE_FLECHES = 34 + 6;
+const RANGEE_COTES = 34;
+/** L'interligne de la carte (son `gap`). */
+const INTERLIGNE = 7;
+const MARGES_CARTE = 7 + 9;
+
+/**
+ * CE QU'IL PREND D'ORDINAIRE : trois rangées.
+ *
+ * C'est ce que le patron verra sur son téléphone — cent cinquante points au
+ * lieu de deux cent dix-sept, un tiers de moins.
+ */
+export const HAUTEUR_BANDEAU_MEUBLE_COURANTE =
+  RANGEE_TITRE + RANGEE_FLECHES + RANGEE_COTES + 2 * INTERLIGNE + MARGES_CARTE;
+
+/**
+ * ET CE QU'IL PEUT PRENDRE AU PIRE — c'est CE nombre que l'écran réserve.
+ *
+ * Les quatre cotes tiennent sur une rangée sur un iPhone courant ; sur un
+ * petit modèle, elles passent à la ligne (`flexWrap`) — deux et deux, plutôt
+ * qu'une pastille rognée, et c'est toujours la cote qu'on vient lire.
+ *
+ * ON DÉCLARE DONC LE PIRE, et pas l'ordinaire. C'est exactement le défaut
+ * qu'on vient de corriger, pris à l'envers : une réserve trop courte laisse
+ * poser un menu SUR le bandeau. Une réserve un peu large coûte quelques
+ * points de plan gardés pour rien sur les grands écrans ; l'autre erreur
+ * coûte deux éléments l'un sur l'autre. Elles ne se valent pas.
+ */
+export const HAUTEUR_BANDEAU_MEUBLE =
+  HAUTEUR_BANDEAU_MEUBLE_COURANTE + RANGEE_COTES + INTERLIGNE;
+
+/**
  * TENIR LA FLÈCHE, C'EST CONTINUER — de plus en plus vite.
  *
  * Un pas par appui : décaler un meuble de vingt centimètres demandait vingt
@@ -152,7 +204,15 @@ export function ObjectBar({
   /** Le dessous du meuble, au-dessus du sol. */
   const pose = object.transform[13] - object.height / 2;
 
-  /** Une cote qu'on touche : elle ouvre la feuille, qui suit le clavier. */
+  /**
+   * Une cote qu'on touche : elle ouvre la feuille, qui suit le clavier.
+   *
+   * LE MOT EST DANS LA PASTILLE, PAS À CÔTÉ — c'est ce qui fait tenir les
+   * quatre cotes sur une seule rangée. « H » et « Pose » vivaient en `Text`
+   * séparés : chacun coûtait sa largeur, deux interlignes et un point
+   * d'alignement, pour une lettre. Dedans, ils ne coûtent que leur encre —
+   * et le chiffre reste ce qu'on lit, gras et sombre, le mot en retrait.
+   */
   const champ = (
     titre: string,
     valeur: number,
@@ -161,6 +221,8 @@ export function ObjectBar({
     sous?: string,
     /** Une hauteur de pose peut valoir zéro — une largeur, jamais. */
     depuisZero?: boolean,
+    /** Le mot qui rattache le chiffre, écrit DANS la pastille. */
+    mot?: string,
   ) => (
     <TouchableOpacity
       hitSlop={DEBORD_DOIGT}
@@ -181,6 +243,7 @@ export function ObjectBar({
           },
         })
       }>
+      {mot ? <Text style={styles.clMot}>{mot}</Text> : null}
       <Text style={styles.clValeur} numberOfLines={1}>
         {fr2(valeur)}
       </Text>
@@ -200,15 +263,54 @@ export function ObjectBar({
     />
   );
 
+  /** Une pastille de geste : la poignée, et son mot en retrait dessous. */
+  const geste = (
+    label: string,
+    mot: string,
+    d: string,
+    teinte: string,
+    onPress: () => void,
+  ) => (
+    <View style={styles.bandeauCellule}>
+      <TouchableOpacity
+        style={styles.iconBtn}
+        hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+        accessibilityLabel={label}
+        onPress={onPress}>
+        <Svg width={17} height={17} viewBox="0 0 24 24">
+          <Path d={d} fill={teinte} fillRule="evenodd" />
+        </Svg>
+      </TouchableOpacity>
+      {/* Le mot sous la pastille : voir `bandeauMot`. Il reste — un bouton
+          muet se touche pour savoir, et c'est un relevé du patron. */}
+      <Text style={styles.bandeauMot}>{mot}</Text>
+    </View>
+  );
+
   return (
     <View style={styles.bandeau}>
       {/*
-        EN HAUT CE QU'ON LIT ET CE QU'ON RÈGLE, EN BAS LES GESTES.
+        TROIS RANGÉES, ET RIEN N'EST PARTI — relevé du patron : « réduis le
+        bloc d'édition de meuble comme tu peux intelligemment, il prend trop
+        de place. Fais en sorte qu'il soit pas sur un autre élément. »
 
-        Trois rangées se partageaient une carte sans en-tête : on réglait
-        une largeur sans savoir de quel meuble. Le nom vient donc en tête,
-        les cotes dessous, et les gestes — pivoter, retirer — descendent dans
-        la rangée d'actions commune à tous les bandeaux du bas.
+        Il en faisait CINQ : le nom seul sur sa ligne, les flèches, « H » et
+        « Pose », largeur × profondeur, puis « Pivoter » et « Retirer ». Deux
+        cent dix-sept points sur un écran qui en fait huit cents — plus du
+        quart de la page pour régler un meuble, posé par-dessus le plan qu'on
+        est en train de regarder.
+
+        DEUX FUSIONS, ET AUCUN RÉGLAGE PERDU :
+
+          — les GESTES montent dans la ligne du titre, à droite. Cette ligne
+            ne portait qu'un mot et gardait toute sa hauteur pour lui ;
+          — les QUATRE COTES tiennent sur une rangée, chacune avec son mot À
+            L'INTÉRIEUR de sa pastille. « H » et « Pose » posés à côté
+            coûtaient chacun une largeur et deux marges pour une lettre.
+
+        Ce qu'on peut faire n'a pas changé d'un bouton : réduire un bandeau
+        en lui retirant des réglages, ce n'est pas le réduire, c'est
+        l'amputer.
       */}
       <View style={styles.bandeauEntete}>
         <IconeBandeau icone={SOLAIRES.meubles} styles={styles} />
@@ -217,9 +319,29 @@ export function ObjectBar({
             {frCategory(object.category)}
           </Text>
         </View>
+        {/* Les deux gestes, poussés à droite : le nom prend la place qui
+            reste, et les pastilles restent où l'œil les cherche. */}
+        <View style={styles.bandeauGestes}>
+          {geste('Pivoter', 'Pivoter', SOLAIRES.pivoter, palette.blue, onRotate)}
+          {/*
+            « RETIRER », pas « Annuler » — le mot dit ce que le geste fait.
+            La croix rouge ne défait pas une saisie : elle enlève le meuble du
+            plan. Et c'est la POUBELLE, comme partout ailleurs — relevé du
+            patron : « la poubelle partout où il y a la poubelle ».
+          */}
+          {geste(
+            'Retirer le meuble',
+            'Retirer',
+            SOLAIRES.supprimer,
+            palette.danger,
+            onCancel,
+          )}
+        </View>
       </View>
       {onNudge && (
-        <View style={styles.nudgeRow}>
+        /* Le filet passe ICI : au-dessus de ce qui règle, sous ce qui nomme.
+           Voir `bandeauFilet`. */
+        <View style={[styles.nudgeRow, styles.bandeauFilet]}>
           {fleche('Déplacer vers le haut', 0, -1, SOLAIRES.flecheHaut)}
           {fleche('Déplacer vers la gauche', -1, 0, SOLAIRES.flecheGauche)}
           {fleche('Déplacer vers la droite', 1, 0, SOLAIRES.flecheDroite)}
@@ -230,102 +352,58 @@ export function ObjectBar({
         </View>
       )}
       {/*
-        LA TROISIÈME COTE SUR SA PROPRE LIGNE.
+        LES QUATRE COTES SUR UNE SEULE RANGÉE.
 
-        Quatre pastilles et trois boutons ne tiennent pas dans la largeur
-        d'un iPhone : la dernière se serait écrasée, et c'est toujours celle
-        qu'on vient lire. La hauteur et la pose vont donc au-dessus, avec
-        leur mot devant — « H », « Pose » — parce qu'un chiffre nu de plus
-        dans une rangée de chiffres ne se rattache à rien.
+        Elles tenaient sur deux, parce que « quatre pastilles et trois boutons
+        ne tiennent pas dans la largeur d'un iPhone » — et c'était vrai tant
+        que les boutons partageaient la ligne. Ils sont montés ; la place
+        s'est libérée. La rangée PASSE À LA LIGNE si l'écran est trop étroit
+        (`flexWrap`) : sur un petit modèle, deux rangées de deux valent mieux
+        qu'une pastille rognée, et c'est toujours la cote qu'on vient lire.
       */}
-      {onHeight && (
-        <View style={styles.editRow}>
-          <Text style={styles.nudgeNote}>H</Text>
-          {champ(
-            'Hauteur du meuble',
-            object.height,
-            (v) => onHeight(v, undefined),
-            'm',
-            `${frCategory(object.category)} — du dessous au dessus.`,
-          )}
-          <Text style={styles.nudgeNote}>Pose</Text>
-          {champ(
-            'Hauteur de pose',
-            pose,
-            (v) => onHeight(undefined, v),
-            'm',
-            'Hauteur du DESSOUS au-dessus du sol. Zéro pour un meuble posé par terre.',
-            true,
-          )}
-        </View>
-      )}
       <View style={styles.editRow}>
-        {champ('Largeur', object.width, (v) => onResize(v, object.depth))}
-        <Text style={styles.unit}>×</Text>
-        {/* L'unité tient DANS la pastille : posée à côté, elle coûtait sa
-            propre largeur plus deux marges, pour une lettre. */}
-        {champ('Profondeur', object.depth, (v) => onResize(object.width, v), 'm')}
-      </View>
-      <View style={styles.bandeauActions}>
-          <View style={styles.bandeauCellule}>
-          <TouchableOpacity
-            style={styles.iconBtn}
-            hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
-            accessibilityLabel="Pivoter"
-            onPress={onRotate}>
-            {/* LA FLÈCHE D'UN QUART DE TOUR, du jeu commun. Elle était
-                tracée à la main — un arc et sa pointe — et en encre, quand
-                toutes ses voisines de bandeau sont bleues. */}
-            <Svg width={17} height={17} viewBox="0 0 24 24">
-              <Path d={SOLAIRES.pivoter} fill={palette.blue} fillRule="evenodd" />
-            </Svg>
-          </TouchableOpacity>
-            {/* Le mot sous la pastille : voir `bandeauMot`. */}
-            <Text style={styles.bandeauMot}>Pivoter</Text>
-          </View>
-          <View style={styles.bandeauCellule}>
-          <TouchableOpacity
-            style={styles.iconBtn}
-            hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
-            /*
-              « RETIRER », pas « Annuler » — le mot dit ce que le geste fait.
-
-              La croix rouge ne défait pas une saisie : elle enlève le meuble
-              du plan. L'étiquette parlée disait « Annuler », le mot écrit
-              dessous dit « Retirer » : deux noms pour un bouton, dont un
-              faux. C'est le second qui est juste.
-            */
-            accessibilityLabel="Retirer le meuble"
-            onPress={onCancel}>
-            {/* LA POUBELLE, comme partout ailleurs — relevé du patron :
-                « la poubelle partout où il y a la poubelle ». Une croix
-                nue disait « annuler » ; ce bouton-là ENLÈVE le meuble du
-                plan, et trois dessins servaient au même geste selon ce
-                qu'on avait touché. */}
-            <Svg width={17} height={17} viewBox="0 0 24 24">
-              <Path
-                d={SOLAIRES.supprimer}
-                fill={palette.danger}
-                fillRule="evenodd"
-              />
-            </Svg>
-          </TouchableOpacity>
-            <Text style={styles.bandeauMot}>Retirer</Text>
-          </View>
-          {/*
-            PLUS DE BOUTON « VALIDER » — relevé du patron : « pas de bouton
-            valider ».
-
-            Il n'adoptait qu'un meuble déjà posé : ses cotes partaient au
-            magasin dès qu'on les tapait, et sa position dès qu'on lâchait le
-            doigt. Il ne restait qu'un rituel — une coche à cocher pour dire
-            oui à ce qui était déjà fait — et un doute : tant qu'on ne l'avait
-            pas touchée, on ne savait pas si le meuble comptait.
-
-            La croix rouge reste, elle : c'est le geste qui RETIRE, et lui
-            change quelque chose.
-          */}
+        {champ(
+          'Largeur',
+          object.width,
+          (v) => onResize(v, object.depth),
+          undefined,
+          undefined,
+          undefined,
+          'L',
+        )}
+        {champ(
+          'Profondeur',
+          object.depth,
+          (v) => onResize(object.width, v),
+          undefined,
+          undefined,
+          undefined,
+          'P',
+        )}
+        {onHeight && (
+          <>
+            {champ(
+              'Hauteur du meuble',
+              object.height,
+              (v) => onHeight(v, undefined),
+              undefined,
+              `${frCategory(object.category)} — du dessous au dessus.`,
+              undefined,
+              'H',
+            )}
+            {champ(
+              'Hauteur de pose',
+              pose,
+              (v) => onHeight(undefined, v),
+              'm',
+              'Hauteur du DESSOUS au-dessus du sol. Zéro pour un meuble posé par terre.',
+              true,
+              'Pose',
+            )}
+          </>
+        )}
       </View>
     </View>
   );
+
 }

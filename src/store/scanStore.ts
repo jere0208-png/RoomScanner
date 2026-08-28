@@ -33,11 +33,8 @@ import {
   mergeColinear,
   openingsOn,
   pointOnSeg,
-  alignToFit,
-  fitInNook,
   pushOutOfObjects,
   separerMeubles,
-  hugWall,
   castToWall,
   pushOutOfWalls,
   snapSideToWalls,
@@ -1490,7 +1487,13 @@ interface ScanState {
     id: string,
     x: number,
     z: number,
-    aimant?: boolean,
+    /**
+     * `true` = LE DOIGT TIENT ENCORE LE MEUBLE : on pose brut, sans
+     * collision, pour que l'écran puisse montrer le refus en rouge. Au
+     * lâcher, c'est `rangerMeuble` qui range.
+     *
+     * `false` (ou omis) = la flèche, qui range aussitôt.
+     */
     libre?: boolean,
   ) => void;
   /**
@@ -5378,7 +5381,7 @@ export const useScanStore = create<ScanState>((set, get) => {
      * simple collision fait mieux et sans surprise : on pousse jusqu'au mur,
      * ça s'arrête pile contre le nu.
      */
-    setObjectCenter: (id, x, z, aimant = true, auDoigt = false) => {
+    setObjectCenter: (id, x, z, auDoigt = false) => {
       pushHistory(`moveObject:${id}`);
       const st = get();
       const obj = st.objects.find((o) => o.id === id);
@@ -5424,162 +5427,28 @@ export const useScanStore = create<ScanState>((set, get) => {
         });
         return;
       }
-      const parts = roomParts(st.walls, st.rooms);
-      // La pièce du meuble est celle où IL EST, pas celle que le doigt
-      // survole : pousser un lit contre un mur, c'est justement viser
-      // au-delà du mur. On garde donc, dans l'ordre : sa pièce déclarée,
-      // celle qui contient son centre actuel, celle du point visé.
-      const ici = { x: obj.transform[12], z: obj.transform[14] };
-      const part =
-        parts.find((p) => p.roomId === obj.roomId) ??
-        parts.find((p) => pointInPolygon(ici, p.surface?.pts ?? [])) ??
-        parts.find((p) => pointInPolygon({ x, z }, p.surface?.pts ?? [])) ??
-        parts.find((p) => p.roomId === roomOf(obj));
-      const yawPose = Math.atan2(obj.transform[2], obj.transform[0]);
       /*
-        UN MEUBLE DE BIAIS QUI NE PASSE PAS SE REMET DROIT.
+        LA FLÈCHE FAIT EXACTEMENT CE QUE FAIT LE DOIGT.
 
-        Le chantier a filmé la scène : un meuble de 62 cm refusait une alcôve
-        plus large que lui. Il était en losange — de biais, un carré occupe sa
-        diagonale, 88 cm. Plutôt que de le laisser rebondir sur les murs, on
-        lui rend le quart de tour qui le fait entrer. Au large, on ne touche
-        à rien : son angle est un choix.
-      */
-      const yaw = part
-        ? alignToFit(
-            { x, z },
-            { width: obj.width, depth: obj.depth, yaw: yawPose },
-            part.walls,
-            part.labelAt,
-            part.surface?.pts,
-            ici,
-          )
-        : yawPose;
-      /*
-        LE MEUBLE S'ADAPTE AU RECOIN, il ne s'en fait plus chasser.
+        Relevé du patron, après lui avoir montré la mesure : une commode de
+        1,40 m poussée à la flèche dans une alcôve de 1,20 m ressortait
+        **rabotée à 1,04 m** — ses cotes changées toutes seules, sans rien
+        demander, sur un plan qui sert à commander du meuble. Au doigt, elle
+        gardait ses 1,40 m et l'alcôve la repoussait, ce qui est la vérité du
+        chantier. « Oui comme le doigt pour les flèches. »
 
-        On repart TOUJOURS de sa cote d'origine, pas de celle qu'il porte :
-        sans ça, un meuble une fois raboté le resterait, et traverser une
-        niche l'aurait rétréci un peu plus à chaque passage. Ressorti au
-        large, il retrouve donc sa vraie taille tout seul.
-      */
-      const base = {
-        width: obj.baseWidth ?? obj.width,
-        depth: obj.baseDepth ?? obj.depth,
-      };
-      const ajuste = part
-        ? fitInNook(
-            { x, z },
-            { width: base.width, depth: base.depth, yaw },
-            part.walls,
-            part.surface?.pts,
-          )
-        : { width: base.width, depth: base.depth, centre: { x, z } };
-      const arrete = part
-        ? pushOutOfWalls(
-              ajuste.centre,
-              { width: ajuste.width, depth: ajuste.depth, yaw },
-              part.walls,
-              part.labelAt,
-            part.surface?.pts,
-            ici,
-          )
-        : { x, z };
-      /*
-        ET UNE FOIS ARRÊTÉ PAR LES MURS, IL SE PLAQUE CONTRE CELUI QU'IL
-        FRÔLE — mais seulement quand c'est le doigt qui l'amène.
+        Les trois aides s'en vont donc du dernier chemin qui les portait :
+        `alignToFit` (le quart de tour qui fait entrer), `fitInNook` (le
+        rabotage à la place disponible), `hugWall` (le plaquage au nu). Elles
+        avaient chacune une bonne raison — et ensemble, elles faisaient un
+        meuble qui décide à la place de celui qui le pose.
 
-        Un jour de trois centimètres n'existe pas sur un chantier : il vient
-        du doigt qui vise à peu près. La flèche, elle, vise juste, et son
-        centimètre doit rester où on l'a mis.
+        Il ne reste qu'une chose, la même pour les deux gestes : `rangerMeuble`.
+        Le mur arrête, le contour recadre, les voisins ne se traversent pas.
+        Le rabotage réversible qui vivait ici disparaît avec elles : les
+        cotes rendues sont TOUJOURS celles du catalogue.
       */
-      const pose = part && aimant
-        ? hugWall(
-            arrete,
-            { width: ajuste.width, depth: ajuste.depth, yaw },
-            part.walls,
-            part.labelAt,
-            ici,
-          )
-        : arrete;
-      /*
-        ET IL NE SE POSE PAS SUR UN AUTRE.
-
-        Les autres meubles de la même pièce le repoussent comme des caisses :
-        il ressort par le côté le plus court, et se cale contre eux quand il
-        n'en reste qu'un jour de quelques centimètres. Ceux d'à côté ne le
-        regardent pas — une cloison les sépare déjà.
-      */
-      const voisins = st.objects
-        .filter((o) => o.id !== id && roomOf(o) === roomOf(obj))
-        .map((o) => ({
-          cx: o.transform[12],
-          cz: o.transform[14],
-          width: o.width,
-          depth: o.depth,
-          yaw: Math.atan2(o.transform[2], o.transform[0]),
-          // Son étage : du dessous au dessus. C'est lui qui autorise une télé
-          // à surmonter un meuble bas, et qui interdit à une table de traverser
-          // un canapé.
-          y0: o.transform[13] - o.height / 2,
-          y1: o.transform[13] + o.height / 2,
-        }));
-      const libre = pushOutOfObjects(
-        pose,
-        {
-          width: ajuste.width,
-          depth: ajuste.depth,
-          yaw,
-          y0: obj.transform[13] - obj.height / 2,
-          y1: obj.transform[13] + obj.height / 2,
-        },
-        voisins,
-      );
-      /*
-        ET LE MUR A LE DERNIER MOT.
-
-        Relevé du chantier : « on voit le meuble légèrement dépassé de l'autre
-        côté du mur ». C'était un ordre d'opérations : on repoussait des murs,
-        PUIS des meubles voisins — et cette dernière poussée pouvait renvoyer
-        le meuble dans la maçonnerie, sans que personne ne repasse. Un meuble
-        qui chevauche un voisin se voit ; un meuble qui sort du logement ne se
-        pardonne pas.
-      */
-      const pose2 = part
-        ? pushOutOfWalls(
-            libre,
-            { width: ajuste.width, depth: ajuste.depth, yaw },
-            part.walls,
-            part.labelAt,
-            part.surface?.pts,
-            ici,
-          )
-        : libre;
-      set({
-        objects: st.objects.map((o) => {
-          if (o.id !== id) return o;
-          const t = [...o.transform];
-          t[12] = pose2.x;
-          t[14] = pose2.z;
-          if (yaw !== yawPose) {
-            const c = Math.cos(yaw);
-            const s2 = Math.sin(yaw);
-            t[0] = c;
-            t[2] = s2;
-            t[8] = -s2;
-            t[10] = c;
-          }
-          return {
-            ...o,
-            width: ajuste.width,
-            depth: ajuste.depth,
-            baseWidth: base.width,
-            baseDepth: base.depth,
-            transform: t,
-          };
-        }),
-        dirty: true,
-      });
+      get().rangerMeuble(id, x, z);
     },
 
     /*
@@ -5788,6 +5657,42 @@ export const useScanStore = create<ScanState>((set, get) => {
           }
         }
         if (meilleur) pose = meilleur.p;
+      }
+      /*
+        ET S'IL RESTE À CHEVAL SUR LA MAÇONNERIE, IL SORT DU CUL-DE-SAC.
+
+        Découvert en retirant le rabotage du chemin des flèches : une table de
+        1,48 m poussée dans une niche de 1,10 m y RESTAIT, à cheval sur les
+        deux murs qui la bordent. Le rabotage la masquait — il la faisait
+        maigrir jusqu'à ce qu'elle entre — et sans lui le défaut apparaît nu.
+
+        C'est mécanique : deux murs qui se font face poussent chacun dans son
+        sens, s'annulent, et la boucle finit là où elle a commencé. Aucune
+        passe supplémentaire n'y changera rien ; il faut CHANGER D'ENDROIT.
+
+        On glisse donc le meuble vers l'ancre de la pièce — le point au large,
+        celui qui porte le cartouche — et l'on s'arrête au PREMIER pas où il
+        tient. C'est le geste de quelqu'un qui essaie une place, voit que ça ne
+        rentre pas, et recule d'un mètre. Le meuble reste ENTIER : c'est ce que
+        le patron a demandé en retirant le rabotage.
+
+        `poserLibre` répond exactement à la question posée ici — « cette
+        emprise mord-elle un mur ? » —, c'est déjà elle qui allume le halo
+        rouge sous le doigt. Deux réponses valent mieux qu'une seule mesure
+        écrite deux fois.
+      */
+      if (!poserLibre({ x: pose.x, z: pose.z }, box, murs).valide) {
+        for (let k = 1; k <= 10; k++) {
+          const t = k / 10;
+          const essai = resoudre({
+            x: x + (ancre.x - x) * t,
+            z: z + (ancre.z - z) * t,
+          });
+          if (poserLibre(essai, box, murs).valide) {
+            pose = essai;
+            break;
+          }
+        }
       }
       set({
         objects: st.objects.map((o) => {

@@ -87,11 +87,28 @@ const bandeau = (icone?: string) => (
  * forme meme de ces bandeaux : le banc s'appuie dessus plutot que sur un
  * nom de style, qui ne dit rien de ce qu'on voit.
  */
+/**
+ * LA RANGÉE QUI PORTE LE FILET — cherchee par le FILET, pas par sa place.
+ *
+ * Elle etait « la derniere rangee qui passe a la ligne », et cela a tenu tant
+ * que la coupure tombait au meme endroit dans les quatre coquilles : en haut
+ * on lit, en bas on touche.
+ *
+ * Le bandeau du meuble a fondu de cinq rangees a trois — releve du patron :
+ * « reduis le bloc d'edition de meuble, il prend trop de place » — et ses
+ * deux gestes sont montes dans la ligne du titre. La coupure « lit / touche »
+ * n'y a plus de sens : la ligne du haut porte les deux. Le filet est passe
+ * sous ce qui NOMME le meuble, au-dessus de ce qui le REGLE.
+ *
+ * Une recherche par la PLACE aurait declare le filet disparu alors qu'il
+ * avait seulement demenage. On cherche donc la rangee qui porte une bordure
+ * haute, c'est-a-dire le filet lui-meme — sa nature, pas son rang.
+ */
 const rangee = (t: TestRenderer.ReactTestRenderer) =>
   t.root
     .findAllByType(View)
     .map((n) => plat(n.props.style))
-    .filter((st) => st.flexWrap === 'wrap' && st.flexDirection === 'row')
+    .filter((st) => Number(st.borderTopWidth) > 0)
     .pop();
 
 /** Les traces dessines dans le bandeau, dans l'ordre de l'arbre. */

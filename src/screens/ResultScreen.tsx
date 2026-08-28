@@ -42,7 +42,7 @@ import {
 } from '../components/FloorplanEditor';
 import { SidePill } from '../components/SidePill';
 import { CeilingBar } from '../components/CeilingBar';
-import { ObjectBar } from '../components/ObjectBar';
+import { HAUTEUR_BANDEAU_MEUBLE, ObjectBar } from '../components/ObjectBar';
 import { corrigerConstat, poserAuxNormes } from '../geometry/auto';
 import { ControlePastille } from '../components/ControlePastille';
 import { DevisPastille } from '../components/DevisPastille';
@@ -226,15 +226,25 @@ export function ResultScreen() {
   const ligneBandeau =
     ligneOutils + Math.max(PILL_CELL_H + PILL_GAP, PEIGNE_TOTAL + 8);
   /**
-   * LA HAUTEUR QU'UN BANDEAU PEUT PRENDRE, au pire.
+   * LA HAUTEUR QU'UN BANDEAU PEUT PRENDRE, au pire — ET C'EST LUI QUI LE DIT.
    *
-   * Deux parties — le texte sur deux lignes, une rangée de boutons de
-   * quarante-quatre points qui peut se replier — plus les marges de la
-   * carte. On la majore une fois ici plutôt que de la mesurer : le plan s'en
-   * sert pour ne PAS y ranger le menu d'un mur, et une mesure qui arrive
-   * après le premier rendu ferait sauter la barre sous les doigts.
+   * Le plan s'en sert pour ne PAS y ranger le menu d'un mur. C'était un
+   * nombre écrit à la main, 132, et le bandeau du meuble en faisait DEUX
+   * CENT DIX-SEPT : la réserve mentait de quatre-vingts points, et tout ce
+   * qu'on plaçait « juste au-dessus » atterrissait dessus. Relevé du patron,
+   * capture à l'appui : « fais en sorte qu'il soit pas sur un autre
+   * élément ».
+   *
+   * C'est la leçon du peigne « Afficher », rencontrée deux fois maintenant :
+   * **celui qui dessine annonce son encombrement, l'écran ne le devine
+   * plus.** Le plus haut des bandeaux gouverne, et c'est celui du meuble —
+   * trois rangées quand les autres en ont deux.
+   *
+   * On garde une VALEUR, pas une mesure : le plan s'en sert dès le premier
+   * rendu, et une hauteur qui arriverait après ferait sauter la barre sous
+   * les doigts.
    */
-  const HAUTEUR_BANDEAU = 132;
+  const HAUTEUR_BANDEAU = HAUTEUR_BANDEAU_MEUBLE;
   const tousLesMurs = useScanStore((s) => s.walls);
   const tousLesMeubles = useScanStore((s) => s.objects);
   const scanName = useScanStore((s) => s.scanName);
@@ -3591,16 +3601,24 @@ export function ResultScreen() {
               const mx = (dx * c - dy * s) * PAS;
               const mz = (dx * s + dy * c) * PAS;
               const t0 = selectedObject.transform;
-              // SANS AIMANT : le plaquage automatique referme tout jour de
-              // moins de cinq centimètres, et il reprenait chaque pas à
-              // peine posé — contre un mur, la flèche paraissait morte.
+              /*
+                LA FLÈCHE RANGE, COMME LE DOIGT — relevé du patron : « oui
+                comme le doigt pour les flèches ».
+
+                Elle a d'abord eu un aimant, qu'on lui a retiré parce qu'il
+                reprenait chaque pas à peine posé : contre un mur, la flèche
+                paraissait morte. Puis elle a gardé, seule, le rabotage et
+                le quart de tour automatiques — une commode de 1,40 m
+                poussée dans une alcôve de 1,20 en ressortait à 1,04, cotes
+                changées sans qu'on demande rien. Ils partent à leur tour :
+                le mur arrête, il ne retaille pas.
+              */
               useScanStore
                 .getState()
                 .setObjectCenter(
                   selectedObject.id,
                   t0[12] + mx,
                   t0[14] + mz,
-                  false,
                 );
             }}
           />

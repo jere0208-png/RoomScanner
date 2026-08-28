@@ -922,6 +922,28 @@ export function separerMeubles<
     .filter((b) => Math.hypot(b.dx, b.dz) > 1e-6);
 }
 
+/*
+  ============================================================================
+  TROIS AIDES RETIRÉES DU SERVICE — et gardées comme relevé.
+
+  `alignToFit` (le quart de tour qui fait entrer), `fitInNook` (le rabotage à
+  la place disponible) et `hugWall` (le plaquage au nu) ont gouverné le
+  placement des meubles pendant un an. Elles ont été retirées du doigt
+  d'abord — « elles font glisser le meuble tout seul » —, puis de la flèche :
+  « oui comme le doigt pour les flèches ». Plus AUCUN chemin ne les appelle.
+
+  La mesure qui a emporté la décision : une commode de 1,40 m poussée à la
+  flèche dans une alcôve de 1,20 m en ressortait rabotée à 1,04 m. Le
+  rabotage était réversible — au large, le meuble retrouvait ses cotes — mais
+  entre-temps c'est une commode de 1,04 m qui partait sur le PDF, sur un plan
+  qui sert à commander du meuble.
+
+  ELLES RESTENT ICI, ET C'EST VOLONTAIRE : leurs bancs (`recoin`) sont le
+  relevé de ce que l'application a fait, et la référence si la décision
+  devait s'inverser. Les supprimer effacerait ce raisonnement du dépôt. Ne
+  pas les rebrancher sans un relevé du patron.
+  ============================================================================
+*/
 /**
  * UN MEUBLE DE BIAIS QUI NE PASSE PAS SE REMET DROIT.
  *

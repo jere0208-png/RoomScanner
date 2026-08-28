@@ -385,9 +385,9 @@ describe('un glissement, une annulation', () => {
     const depart = { ...ou() };
     // Le doigt glisse — trois images, comme le PanResponder les envoie —
     // puis lache dans la maconnerie du mur nord.
-    st().setObjectCenter('c1', 2.5, 1.4, true, true);
-    st().setObjectCenter('c1', 2.5, 0.7, true, true);
-    st().setObjectCenter('c1', 2.5, 0.12, true, true);
+    st().setObjectCenter('c1', 2.5, 1.4, true);
+    st().setObjectCenter('c1', 2.5, 0.7, true);
+    st().setObjectCenter('c1', 2.5, 0.12, true);
     st().rangerMeuble('c1', 2.5, 0.12);
     expect(ou().z).not.toBeCloseTo(depart.z, 2);
     st().undo();
@@ -402,12 +402,12 @@ describe('un glissement, une annulation', () => {
   */
   it('mais deux glissements se defont l’un apres l’autre', () => {
     const depart = { ...ou() };
-    st().setObjectCenter('c1', 2.5, 1.4, true, true);
+    st().setObjectCenter('c1', 2.5, 1.4, true);
     st().rangerMeuble('c1', 2.5, 1.4);
     const apresLePremier = { ...ou() };
     // Le second geste, plus tard : l'historique ne les confond pas.
     jest.spyOn(Date, 'now').mockReturnValue(Date.now() + 5000);
-    st().setObjectCenter('c1', 3.6, 1.4, true, true);
+    st().setObjectCenter('c1', 3.6, 1.4, true);
     st().rangerMeuble('c1', 3.6, 1.4);
     st().undo();
     expect(ou().x).toBeCloseTo(apresLePremier.x, 3);
@@ -543,7 +543,7 @@ describe('mille lâchers sur le plan de référence', () => {
           ] as never,
         });
         if (ranger) st().rangerMeuble('b1', x, z);
-        else st().setObjectCenter('b1', x, z, true, true);
+        else st().setObjectCenter('b1', x, z, true);
         const p = ou('b1');
         n++;
         if (mordUnMur(p, yaw)) dansUnMur++;

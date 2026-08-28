@@ -12,6 +12,7 @@
  */
 import React from 'react';
 import { Circle, G, Line, Path, Polyline, Rect, Text as SvgText } from 'react-native-svg';
+import { plaqueDeCote } from '../geometry/cotes';
 import type { Palette } from '../theme';
 import {
   faceX,
@@ -204,6 +205,8 @@ export function CeilingLayer({
                   if (angle < -90) angle += 180;
                   const mx = (A.x + B.x) / 2;
                   const my = (A.y + B.y) / 2;
+                  /* Le texte AVANT la plaque : c'est lui qui la dimensionne. */
+                  const texteEcart = `${Math.round(val * 100)}`;
                   return (
                     <G key={`c${i}`}>
                       <Line
@@ -215,17 +218,29 @@ export function CeilingLayer({
                         strokeWidth={1}
                         strokeDasharray="4 3"
                       />
-                      {/* Le nombre se lit toujours à l'endroit, posé sur un
-                          fond clair : une cote écrite sur un semis de sol ne
-                          se lit pas. */}
+                      {/*
+                        LE NOMBRE SE LIT TOUJOURS À L'ENDROIT, sur une plaque
+                        OPAQUE taillée à sa mesure.
+
+                        Elle faisait 26 × 14 en dur, à neuf dixièmes
+                        d'opacité : six points de blanc de trop de chaque
+                        côté, et un tireté de gaine qui passait AU TRAVERS du
+                        chiffre. Relevé du patron : « le bloc blanc arrière
+                        pas si gros, il doit dépasser de 2px les chiffres sur
+                        les côtés » et « les pointillés gênent la lecture de
+                        la cote entre spots ».
+
+                        Une plaque de cote est opaque en dessin technique —
+                        c'est sa raison d'être : la cote INTERROMPT ce
+                        qu'elle survole.
+                      */}
                       <Rect
-                        x={mx - 13}
-                        y={my - 7}
-                        width={26}
-                        height={14}
-                        rx={4}
+                        x={mx - plaqueDeCote(texteEcart, 9.5).w / 2}
+                        y={my - plaqueDeCote(texteEcart, 9.5).h / 2}
+                        width={plaqueDeCote(texteEcart, 9.5).w}
+                        height={plaqueDeCote(texteEcart, 9.5).h}
+                        rx={3}
                         fill={c.surface}
-                        opacity={0.9}
                         transform={`rotate(${angle}, ${mx}, ${my})`}
                       />
                       <SvgText
@@ -236,7 +251,7 @@ export function CeilingLayer({
                         fontWeight="700"
                         textAnchor="middle"
                         transform={`rotate(${angle}, ${mx}, ${my})`}>
-                        {Math.round(val * 100)}
+                        {texteEcart}
                       </SvgText>
                     </G>
                   );
@@ -313,14 +328,25 @@ export function CeilingLayer({
                       strokeDasharray="3 3"
                     />
                     <Circle cx={B.x} cy={B.y} r={2} fill={c.blue} />
+                    {/*
+                      LA PLAQUE SUIT SON TEXTE — ET ELLE TOURNE AVEC LUI.
+
+                      Deux défauts d'un coup. Elle prenait sept points de
+                      blanc de chaque côté (« × 7,2 + 14 ») quand deux
+                      suffisent, et elle était translucide, donc traversée
+                      par les tiretés. Mais surtout : le TEXTE tournait avec
+                      la cote et la plaque, elle, restait droite — sur une
+                      cote en biais, le chiffre sortait de son fond par un
+                      coin. Elles portent maintenant la même rotation.
+                    */}
                     <Rect
-                      x={mx - (texte.length * 3.6 + 7)}
-                      y={my - 8}
-                      width={texte.length * 7.2 + 14}
-                      height={16}
-                      rx={5}
+                      x={mx - plaqueDeCote(texte, 10).w / 2}
+                      y={my - plaqueDeCote(texte, 10).h / 2}
+                      width={plaqueDeCote(texte, 10).w}
+                      height={plaqueDeCote(texte, 10).h}
+                      rx={3}
                       fill={c.surface}
-                      opacity={0.94}
+                      transform={`rotate(${angle}, ${mx}, ${my})`}
                     />
                     <SvgText
                       x={mx}

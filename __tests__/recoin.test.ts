@@ -7,8 +7,34 @@
  * côté ouvert. Sur un plan de chantier, cela n'a pas de sens : dans une
  * niche de 1,10 m on pose un meuble de 1,10 m, et on le note.
  *
- * Le meuble se rabote donc à la place disponible, garde sa cote d'origine
- * en mémoire, et la reprend dès qu'il ressort. Tout est réversible.
+ * Le meuble se rabotait donc à la place disponible, gardait sa cote d'origine
+ * en mémoire, et la reprenait dès qu'il ressortait. Tout était réversible.
+ *
+ * ET PUIS ON A CESSÉ. Relevé du patron : « oui comme le doigt pour les
+ * flèches ». La mesure qui a emporté la décision : une commode de 1,40 m
+ * poussée à la flèche dans une alcôve de 1,20 m en ressortait **rabotée à
+ * 1,04 m** — cotes changées toutes seules, sans rien demander, sur un plan
+ * qui sert à commander du meuble. Réversible, oui ; mais entre-temps c'est
+ * une commode de 1,04 m qui part sur le PDF.
+ *
+ * Les trois aides quittent donc le dernier chemin qui les portait :
+ * `fitInNook` (le rabotage), `alignToFit` (le quart de tour), `hugWall` (le
+ * plaquage). LE MUR ARRÊTE, IL NE RETAILLE PAS — la même règle pour le doigt
+ * et pour la flèche.
+ *
+ * CE QUE CE BANC EST DEVENU. Les trois fonctions vivent toujours dans
+ * `floorplan.ts`, et leurs épreuves d'unité ci-dessous aussi : elles sont le
+ * RELEVÉ de ce que l'application a fait pendant un an, et la référence si la
+ * décision devait s'inverser. Ce qui a changé, ce sont les épreuves qui
+ * passent par le MAGASIN : elles décrivent maintenant le meuble qui garde
+ * ses cotes et son angle, et elles racontent chacune sa version précédente.
+ *
+ * ET UN DÉFAUT EST SORTI DE L'OMBRE en retirant le rabotage : une table de
+ * 1,48 m poussée dans une niche de 1,10 m y RESTAIT, à cheval sur les deux
+ * murs qui la bordent — deux murs qui se font face poussent chacun dans son
+ * sens et s'annulent. Le rabotage le masquait en la faisant maigrir. Le
+ * meuble glisse désormais vers l'ancre de la pièce jusqu'au premier pas où
+ * il tient : il sort du cul-de-sac, entier.
  */
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn(async () => null),
@@ -27,6 +53,7 @@ import {
   roomParts,
   type WallSeg,
 } from '../src/geometry/floorplan';
+import { poserLibre } from '../src/geometry/poser';
 import { useScanStore } from '../src/store/scanStore';
 
 beforeAll(() => jest.useFakeTimers());
@@ -139,15 +166,33 @@ describe('la place disponible, mesurée sur le plan', () => {
 describe('poser un meuble dans une niche', () => {
   beforeEach(poser);
 
-  it('l’y laisse, ajusté, au lieu de l’éjecter', () => {
+  /*
+    DEUX VERSIONS, ET LA SECONDE REND SES COTES AU MEUBLE.
+
+    Premiere version : la table se RABOTAIT pour tenir dans la niche —
+    « dans une niche de 1,10 m on pose un meuble de 1,10 m, et on le note ».
+    Elle en ressortait a moins d'un metre, et retrouvait sa taille au large.
+
+    Seconde version, releve du patron : « oui comme le doigt pour les
+    fleches ». La mesure qui a emporte la decision : une commode de 1,40 m
+    poussee dans une alcove de 1,20 m en ressortait a 1,04 m — cotes changees
+    toutes seules, sans rien demander, sur un plan qui sert a commander du
+    meuble. Le rabotage etait reversible, mais entre-temps c'est une commode
+    de 1,04 m qui partait sur le PDF.
+
+    Le mur ARRETE desormais, il ne retaille pas. La table garde ses 1,48 m et
+    la niche la repousse — ce qui est la verite du chantier : elle ne rentre
+    pas.
+  */
+  it('lui laisse ses cotes, et la niche la repousse', () => {
     useScanStore.getState().setObjectCenter('t1', 1.55, -0.5);
     const o = table();
-    // Il a maigri...
-    expect(o.width).toBeLessThan(1);
-    // ...mais il est RESTÉ dans la niche : c'est tout l'objet du chantier.
-    expect(o.transform[14]).toBeLessThan(-0.1);
-    expect(Math.abs(o.transform[12] - 1.55)).toBeLessThan(0.3);
-    // Et ses quatre coins sont dans la pièce.
+    // Ses cotes n'ont pas bouge d'un millimetre.
+    expect(o.width).toBeCloseTo(1.48, 2);
+    expect(o.depth).toBeCloseTo(0.87, 2);
+    // Et la niche l'a REPOUSSEE : elle est ressortie dans la piece.
+    expect(o.transform[14]).toBeGreaterThan(0);
+    // Ses quatre coins sont dans la piece — la ou elle tient vraiment.
     const part = roomParts(MURS, [{ id: 'r1' }])[0];
     expect(part.surface).toBeTruthy();
     for (const [sx, sz] of [
@@ -164,9 +209,17 @@ describe('poser un meuble dans une niche', () => {
     }
   });
 
-  it('lui rend sa taille dès qu’il ressort', () => {
+  /*
+    ELLE RENDAIT SA TAILLE EN RESSORTANT ; MAINTENANT ELLE NE LA PERD PLUS.
+
+    L'epreuve verifiait la reversibilite du rabotage — le meuble maigrissait
+    dans la niche, retrouvait ses cotes au large. Elle verifie desormais
+    qu'il n'y a plus rien a rendre : les cotes sont les memes des deux cotes
+    du voyage. C'est la meme promesse, tenue plus tot.
+  */
+  it('et elle les garde des deux cotes du voyage', () => {
     useScanStore.getState().setObjectCenter('t1', 1.55, -0.5);
-    expect(table().width).toBeLessThan(1);
+    expect(table().width).toBeCloseTo(1.48, 2);
     useScanStore.getState().setObjectCenter('t1', 3, 2);
     expect(table().width).toBeCloseTo(1.48, 2);
     expect(table().depth).toBeCloseTo(0.87, 2);
@@ -307,7 +360,22 @@ describe('le meuble de biais dans une alcôve', () => {
     expect(yaw).toBeCloseTo(Math.PI / 4, 6);
   });
 
-  it('le pose dans l’alcôve, au lieu de le renvoyer', () => {
+  /*
+    DEUX VERSIONS : ON L'A REDRESSE, PUIS ON A CESSE DE LE FAIRE.
+
+    Premiere version : un meuble de 62 cm en losange occupe sa diagonale,
+    88 cm, et refusait une alcove plus large que lui. On lui rendait le quart
+    de tour qui le fait entrer plutot que de le laisser rebondir.
+
+    Seconde version, releve du patron : « oui comme le doigt pour les
+    fleches ». L'angle d'un meuble est un CHOIX — on met un buffet de biais
+    dans un angle parce qu'on le veut de biais. Le retourner sans le demander
+    est du meme ordre que le raboter : le plan decide a la place de celui qui
+    le pose. Le meuble garde donc son angle, et l'alcove le repousse.
+
+    Ce qui reste garanti est ce qui compte : il ne finit pas dans le mur.
+  */
+  it('garde son angle, et l’alcove le repousse', () => {
     useScanStore.setState({
       walls: ALCOVE,
       openings: [],
@@ -333,13 +401,20 @@ describe('le meuble de biais dans une alcôve', () => {
     });
     useScanStore.getState().setObjectCenter('b1', CIBLE.x, CIBLE.z);
     const o = useScanStore.getState().objects[0];
-    // Il est DANS l'alcôve — c'est tout l'objet de la manœuvre.
-    expect(Math.hypot(o.transform[12] - CIBLE.x, o.transform[14] - CIBLE.z))
-      .toBeLessThan(0.2);
-    // Et il s'est redressé.
+    // Son angle n'a pas bouge : il est toujours en losange.
     const yaw = Math.atan2(o.transform[2], o.transform[0]);
-    const reste = Math.abs(((yaw % (Math.PI / 2)) + Math.PI) % (Math.PI / 2));
-    expect(Math.min(reste, Math.PI / 2 - reste)).toBeLessThan(0.02);
+    expect(yaw).toBeCloseTo(Math.PI / 4, 3);
+    // Ses cotes non plus.
+    expect(o.width).toBeCloseTo(0.62, 3);
+    expect(o.depth).toBeCloseTo(0.62, 3);
+    // Et il ne mord pas la maconnerie.
+    expect(
+      poserLibre(
+        { x: o.transform[12], z: o.transform[14] },
+        { width: o.width, depth: o.depth, yaw },
+        ALCOVE,
+      ).valide,
+    ).toBe(true);
   });
 });
 
@@ -446,7 +521,15 @@ describe('le meuble poussé dans un coin', () => {
     expect(Math.min(reste, Math.PI / 2 - reste)).toBeLessThan(0.02);
   });
 
-  it('et le rabote à la largeur du coin', () => {
+  /*
+    ON LE RABOTAIT A LA LARGEUR DU COIN ; ON NE LE RABOTE PLUS.
+
+    Meme releve, meme raison que dans la niche : « oui comme le doigt pour
+    les fleches ». Un meuble garde ses cotes et son angle ; le coin le
+    repousse au lieu de le retailler. Ce qui reste garanti est l'essentiel —
+    il ne finit pas dans le mur.
+  */
+  it('garde ses cotes et son angle, et le coin le repousse', () => {
     useScanStore.setState({
       walls: COIN,
       openings: [],
@@ -471,13 +554,19 @@ describe('le meuble poussé dans un coin', () => {
     });
     useScanStore.getState().setObjectCenter('c1', CIBLE.x, CIBLE.z);
     const o = useScanStore.getState().objects[0];
-    // Il est DANS le coin, d'équerre, et sa plus grande cote tient dans la
-    // largeur disponible — 1,05 m d'axe à axe moins l'épaisseur d'un mur.
-    expect(o.transform[14]).toBeLessThan(1);
     const yaw = Math.atan2(o.transform[2], o.transform[0]);
-    const reste = Math.abs(((yaw % (Math.PI / 2)) + Math.PI) % (Math.PI / 2));
-    expect(Math.min(reste, Math.PI / 2 - reste)).toBeLessThan(0.02);
-    expect(Math.max(o.width, o.depth)).toBeLessThan(1.05);
+    // Ni ses cotes ni son angle n'ont bouge.
+    expect(o.width).toBeCloseTo(1.1, 3);
+    expect(o.depth).toBeCloseTo(0.5, 3);
+    expect(yaw).toBeCloseTo(0.6, 3);
+    // Et il ne mord pas la maconnerie.
+    expect(
+      poserLibre(
+        { x: o.transform[12], z: o.transform[14] },
+        { width: o.width, depth: o.depth, yaw },
+        COIN,
+      ).valide,
+    ).toBe(true);
   });
 });
 

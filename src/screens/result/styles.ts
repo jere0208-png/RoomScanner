@@ -707,10 +707,23 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     shadowOpacity: 0.12,
   },
   editLabel: { color: c.inkSoft, fontSize: 13, marginBottom: 8, fontWeight: '600' },
+  /*
+    LA RANGÉE DES COTES — ELLE PASSE À LA LIGNE PLUTÔT QUE DE ROGNER.
+
+    Elle portait deux pastilles et refusait de se replier : à deux, elles
+    tenaient partout. Elles sont quatre depuis que les gestes sont montés
+    dans la ligne du titre, et sur un petit modèle la dernière — celle qu'on
+    vient justement lire — serait poussée hors de la carte. Deux et deux
+    valent mieux qu'une pastille coupée.
+
+    Le bandeau ANNONCE ce pire cas (`HAUTEUR_BANDEAU_MEUBLE`) : une réserve
+    qui ne compterait que la rangée unique laisserait poser un menu dessus,
+    et c'est le défaut qu'on vient de corriger.
+  */
   editRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    flexWrap: 'nowrap',
+    flexWrap: 'wrap',
     gap: 5,
   },
   input: {
@@ -748,16 +761,71 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
+    gap: 3,
     backgroundColor: c.surfaceSunken,
     borderRadius: 11,
-    paddingHorizontal: 10,
-    minHeight: 38,
+    /*
+      RESSERRÉES ENCORE — elles sont quatre sur la ligne, pas deux.
+
+      Dix points de marge de chaque côté, c'était le réglage d'une rangée à
+      deux pastilles. À quatre, ces vingt points par pastille décident si la
+      dernière tient ou passe à la ligne. Huit suffisent : le nombre reste
+      détaché de son fond, et il reste gras — c'est lui qu'on vient lire.
+
+      Et trente-quatre de haut, comme TOUTES les pastilles de
+      l'application : « je veux une continuité parfaite des éléments de
+      l'interface ». Elles en faisaient trente-huit, pour rien.
+    */
+    paddingHorizontal: 8,
+    minHeight: 34,
     // Elle ne cède plus : depuis que les boutons ont leur propre rangée,
     // la ligne des cotes n'a plus personne à qui céder la place.
     flexShrink: 0,
   },
   clValeur: { color: c.ink, fontSize: 15.5, fontWeight: '800' },
+  /**
+   * LE MOT D'UNE COTE, ÉCRIT DANS SA PASTILLE.
+   *
+   * « H », « Pose », « L », « P » vivaient en `Text` posés À CÔTÉ des
+   * pastilles : chacun coûtait sa largeur, deux interlignes et un point
+   * d'alignement — pour une lettre. Dedans, ils ne coûtent que leur encre, et
+   * les quatre cotes tiennent enfin sur une seule rangée.
+   *
+   * Il se lit EN RETRAIT : c'est une étiquette, pas une valeur. Le chiffre
+   * reste ce qu'on vient lire.
+   */
+  clMot: { color: c.inkFaint, fontSize: 10.5, fontWeight: '700' },
+  /*
+    LES DEUX GESTES, POUSSÉS À DROITE DE LA LIGNE DU TITRE.
+
+    `marginLeft: 'auto'` les colle au bord : le nom du meuble prend la place
+    qui reste, et les pastilles restent là où l'œil les cherche quelle que
+    soit la longueur du mot — « Rangement » ou « Table de chevet ».
+  */
+  bandeauGestes: { flexDirection: 'row', gap: 7, marginLeft: 'auto' },
+  /**
+   * LE FILET DU BANDEAU DE MEUBLE — sous la ligne qui NOMME.
+   *
+   * Les quatre coquilles du bas séparent d'un cheveu ce qu'on lit de ce
+   * qu'on touche : c'est une règle de famille, et elle tient. Mais le
+   * bandeau du meuble a fusionné ses cinq rangées en trois, et ses deux
+   * gestes sont montés dans la ligne du titre : la coupure « en haut on
+   * lit, en bas on touche » n'y a plus de sens, puisque la ligne du haut
+   * porte maintenant les deux.
+   *
+   * Elle se déplace donc là où elle en garde un : sous ce qui NOMME le
+   * meuble — sa silhouette, son nom, et les deux gestes qui s'appliquent à
+   * lui tout entier — et au-dessus de ce qui le RÈGLE, flèches et cotes.
+   *
+   * ET IL NE COÛTE QUE SIX POINTS, pas dix-huit : la carte donne déjà son
+   * interligne entre les rangées (`gap`), et le doubler d'une marge rendrait
+   * une bonne part de la place qu'on vient de gagner.
+   */
+  bandeauFilet: {
+    paddingTop: 6,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: c.line,
+  },
   inputSmall: {
     backgroundColor: c.bg,
     color: c.ink,

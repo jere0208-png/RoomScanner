@@ -117,6 +117,48 @@ export function cotesLisibles(list: Etiquette[], jeu = 2): Set<string> {
 }
 
 /**
+ * CE DONT UNE PLAQUE DE COTE DÉBORDE, de chaque côté du chiffre.
+ *
+ * Relevé du patron : « le bloc blanc arrière ne doit pas être si gros, il
+ * doit dépasser de 2px les chiffres sur les côtés ».
+ *
+ * Deux points. C'est assez pour détacher le nombre de ce qu'il survole — un
+ * poché de mur, un semis de sol, un tireté de gaine — et assez peu pour que
+ * la plaque ne mange pas le dessin. Elle en prenait six de plus : sur un plan
+ * couvert de cotes, cela fait beaucoup de blanc.
+ */
+export const DEBORD_PLAQUE = 2;
+
+/**
+ * LA PLAQUE BLANCHE D'UN CHIFFRE DE COTE — taillée sur le texte.
+ *
+ * Elle était ÉCRITE EN DUR, et à quatre endroits : « 26 × 14 » à l'écran pour
+ * la chaîne, « len × 7,2 + 14 » pour les cotes de spot, « 22 × 10 » et
+ * « 18 × 9 » dans le dossier. Quatre tailles pour la même chose, dont aucune
+ * ne suivait son texte : la plaque d'une cote à deux chiffres était aussi
+ * large que celle d'une cote à quatre.
+ *
+ * ELLE SE CALCULE DONC, sur la même estimation de largeur que tout le reste
+ * du plan (`encombrement`, 0,55 em par signe) — deux estimations différentes
+ * pour un même texte finiraient par diverger.
+ *
+ * LA HAUTEUR SERRE PLUS QUE LA LARGEUR, et c'est voulu : un chiffre n'occupe
+ * pas toute sa police en hauteur — ni jambage, ni accent, ni majuscule. Une
+ * plaque à la hauteur de la police laisserait au-dessus et au-dessous un
+ * blanc que rien ne remplit. On prend la hauteur des CHIFFRES (~0,72 em) et
+ * l'on redonne le même débord de deux points.
+ */
+export function plaqueDeCote(
+  texte: string,
+  fontSize: number,
+): { w: number; h: number } {
+  return {
+    w: texte.length * fontSize * 0.55 + 2 * DEBORD_PLAQUE,
+    h: fontSize * 0.72 + 2 * DEBORD_PLAQUE,
+  };
+}
+
+/**
  * L'encombrement d'un texte pivoté, en pixels.
  *
  * Une cote verticale n'occupe pas un ruban horizontal : sans tenir compte de
