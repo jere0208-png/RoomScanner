@@ -227,6 +227,15 @@ export interface BrouillonScan {
    * passé à noter les départs d'un tableau en fait partie.
    */
   existant?: TableauExistant;
+  /**
+   * Et le chiffrage, pour la même raison — le filet retient tout ou il ment.
+   *
+   * Un devis touché rend le plan « à enregistrer » (voir `DevisEnregistre`),
+   * donc le brouillon se réécrit à chaque geste sur le ticket : sans cette
+   * ligne, il rendrait le plan sans son caddie, et l'on croirait avoir tout
+   * retrouvé.
+   */
+  devis?: DevisEnregistre;
 }
 
 /**
@@ -257,6 +266,17 @@ export interface PlanNote {
 /** Un plan porte des mots, pas des paragraphes : au-delà, plus rien ne se lit. */
 export const NOTE_MAX = 140;
 
+/** Le chiffrage attaché à un plan : ce que l'écran du devis a retenu. */
+export interface DevisEnregistre {
+  gamme: GammeId;
+  /** Clés des lignes écartées du ticket. */
+  ecartes: string[];
+  /** Quantités corrigées à la main, par clé de ligne. */
+  quantites: Record<string, number>;
+  /** Ce qu'on a pris au magasin. */
+  ajouts: { code: string; quantite: number }[];
+}
+
 export interface SavedScan {
   id: string;
   name: string;
@@ -285,6 +305,22 @@ export interface SavedScan {
    * la rénovation.
    */
   existant?: TableauExistant;
+  /**
+   * LE CHIFFRAGE FAIT SUR CE PLAN — gamme, écartés, quantités, caddie.
+   *
+   * Relevé du patron : « fais en sorte que le devis soit sauvegardé avec le
+   * plan actuel ». Tout cela vivait dans le magasin de l'application et nulle
+   * part ailleurs : un dossier rouvert le lendemain revenait en Céliane avec
+   * un ticket vierge, et le travail de chiffrage était à refaire.
+   *
+   * PIRE, IL PASSAIT D'UN CHANTIER À L'AUTRE : les articles pris au magasin
+   * pour un logement se retrouvaient sur le devis du suivant, puisque rien ne
+   * les effaçait entre deux relevés. Un devis faux dans le sens qui coûte.
+   *
+   * Absent des relevés d'avant ce jour : ils s'ouvrent sur un ticket neuf,
+   * comme ils l'ont toujours fait.
+   */
+  devis?: DevisEnregistre;
   /** Dossier qui contient ce scan. Absent = à la racine. */
   folderId?: string;
   /**
@@ -1754,6 +1790,42 @@ export const useScanStore = create<ScanState>((set, get) => {
   };
 
   /**
+   * LE CHIFFRAGE COURANT, TEL QU'IL S'ÉCRIT DANS UNE ENTRÉE.
+   *
+   * Une seule lecture pour les quatre endroits qui enregistrent — mise à jour
+   * du dossier courant, copie, création à la volée, brouillon. Quatre
+   * recopies finiraient par diverger au premier champ ajouté, et l'on
+   * perdrait le caddie d'un chemin sur deux sans que rien ne casse.
+   */
+  const devisDuPlan = (st: {
+    gammeDevis: GammeId;
+    devisEcartes: string[];
+    devisQuantites: Record<string, number>;
+    devisAjouts: { code: string; quantite: number }[];
+  }): DevisEnregistre => ({
+    gamme: st.gammeDevis,
+    ecartes: st.devisEcartes,
+    quantites: st.devisQuantites,
+    ajouts: st.devisAjouts,
+  });
+
+  /**
+   * ET CE QU'ON REMET DANS LE MAGASIN EN OUVRANT UN PLAN.
+   *
+   * Un relevé d'avant ce jour n'en porte pas : il s'ouvre sur un ticket NEUF,
+   * et surtout pas sur celui qu'on avait sous les yeux — c'est exactement la
+   * panne qu'on corrige, un devis qui passe d'un chantier à l'autre.
+   */
+  const devisRepose = (devis?: DevisEnregistre) => ({
+    gammeDevis: devis?.gamme ?? GAMMES[0].id,
+    devisEcartes: devis?.ecartes ?? [],
+    devisQuantites: devis?.quantites ?? {},
+    devisAjouts: devis?.ajouts ?? [],
+    // Un dossier qu'on ouvre n'a pas lu l'avertissement du devis.
+    etapeDevis: 0,
+  });
+
+  /**
    * La profondeur d'historique au moment du dernier enregistrement.
    *
    * C'est elle qui dit si le plan a VRAIMENT changé. `dirty` était posé à
@@ -1867,6 +1939,8 @@ export const useScanStore = create<ScanState>((set, get) => {
         notes: st.notes,
             north: st.north ?? undefined,
             modelPath: st.modelPath,
+            // Le chiffrage suit le plan : voir `DevisEnregistre`.
+            devis: devisDuPlan(st),
             updatedAt: Date.now(),
           }
         : s,
@@ -2065,9 +2139,22 @@ export const useScanStore = create<ScanState>((set, get) => {
       AsyncStorage.setItem(FURNITURE_KEY, showFurniture ? '1' : '0').catch(() => {});
     },
 
+    /*
+      CHIFFRER, C'EST MODIFIER LE DOSSIER.
+
+      Depuis que le devis voyage avec son plan (voir `DevisEnregistre`), le
+      changer laisse le dossier différent de ce qui est écrit sur le disque —
+      et l'électricien doit le voir. Sans ce drapeau, on chiffre une heure, on
+      quitte, et rien ne prévient : c'est la faute la plus chère de cette
+      application, celle qui coûte un déplacement.
+
+      CE N'EST PAS UNE ENTRÉE D'HISTORIQUE, en revanche : « Annuler » sert à
+      défaire un geste sur le PLAN. Reculer d'un cran après avoir touché à un
+      ticket ramènerait un mur, ce que personne n'attend.
+    */
     // La première du catalogue : la plus posée, voir `GAMMES`.
     gammeDevis: GAMMES[0].id,
-    setGammeDevis: (gammeDevis) => set({ gammeDevis }),
+    setGammeDevis: (gammeDevis) => set({ gammeDevis, dirty: true }),
 
     etapeDevis: 0,
     setEtapeDevis: (etapeDevis) => set({ etapeDevis }),
@@ -2086,6 +2173,7 @@ export const useScanStore = create<ScanState>((set, get) => {
     */
     reglerQuantiteDevis: (cle, quantite) =>
       set((e) => ({
+        dirty: true,
         devisQuantites: {
           ...e.devisQuantites,
           [cle]: !isFinite(quantite) || quantite < 0 ? 0 : quantite,
@@ -2095,6 +2183,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       set((e) => {
         const deja = e.devisAjouts.find((a) => a.code === code);
         return {
+          dirty: true,
           devisAjouts: deja
             ? e.devisAjouts.map((a) =>
                 a.code === code
@@ -2112,14 +2201,18 @@ export const useScanStore = create<ScanState>((set, get) => {
       d'être là.
     */
     retirerDuDevis: (code) =>
-      set((e) => ({ devisAjouts: e.devisAjouts.filter((a) => a.code !== code) })),
+      set((e) => ({
+        dirty: true,
+        devisAjouts: e.devisAjouts.filter((a) => a.code !== code),
+      })),
     basculerArticleDevis: (cle) =>
       set((e) => ({
+        dirty: true,
         devisEcartes: e.devisEcartes.includes(cle)
           ? e.devisEcartes.filter((x) => x !== cle)
           : [...e.devisEcartes, cle],
       })),
-    remettreLesArticlesDevis: () => set({ devisEcartes: [] }),
+    remettreLesArticlesDevis: () => set({ devisEcartes: [], dirty: true }),
 
     /*
       LE MODÈLE S'OUVRE SUR LE BÂTI — relevé du patron : « sur la vue 3D de
@@ -5158,6 +5251,7 @@ export const useScanStore = create<ScanState>((set, get) => {
           north: st.north ?? undefined,
           client: st.client || undefined,
           address: st.address || undefined,
+          devis: devisDuPlan(st),
         };
         const saves = [save, ...st.saves];
         set({ saves, currentSaveId: save.id, dirty: false });
@@ -6073,6 +6167,10 @@ export const useScanStore = create<ScanState>((set, get) => {
         north: migrated.north ?? null,
         client: migrated.client ?? '',
         address: migrated.address ?? '',
+        // « TOUT revient » vaut aussi pour le chiffrage : abandonner les
+        // modifications en gardant le caddie laisserait un ticket que le
+        // dossier enregistré ne connaît pas.
+        ...devisRepose(migrated.devis),
         dirty: false,
       });
       clearHistory();
@@ -6103,6 +6201,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         north: st.north ?? undefined,
         client: st.client || undefined,
         address: st.address || undefined,
+        devis: devisDuPlan(st),
       };
       const saves = [save, ...st.saves];
       set({ saves, currentSaveId: save.id, scanName: clean, dirty: false });
@@ -6174,6 +6273,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         existant: st.existant ?? undefined,
         photos: st.photos,
         modelPath: st.modelPath,
+        devis: devisDuPlan(st),
       };
       // L'horodatage change à chaque tick : on compare SANS lui, sinon on
       // réécrirait un relevé identique toutes les trente secondes.
@@ -6219,6 +6319,9 @@ export const useScanStore = create<ScanState>((set, get) => {
         existant: b.existant ?? null,
         photos: b.photos,
         modelPath: b.modelPath,
+        // Le chiffrage aussi : un filet qui retient la moitié de ce qui
+        // tombe est un filet qui ment.
+        ...devisRepose(b.devis),
         // Il n'a jamais été enregistré : il l'est d'autant moins maintenant.
         currentSaveId: null,
         dirty: true,
@@ -6370,6 +6473,9 @@ export const useScanStore = create<ScanState>((set, get) => {
         // d'un autre logement.
         arrivage: null,
         north: save.north ?? null,
+        // Le chiffrage revient avec son plan — et un relevé d'avant s'ouvre
+        // sur un ticket NEUF, surtout pas sur celui du chantier d'avant.
+        ...devisRepose(save.devis),
         dirty: false,
         resultOrigin: 'library',
         /* Un plan qui s'ouvre repose ses calques. */
@@ -6497,10 +6603,19 @@ export const useScanStore = create<ScanState>((set, get) => {
         north: null,
         // Le popup de fin de scan appartient au scan qui vient de finir.
         arrivage: null,
-        // Un nouveau relevé n'a pas encore lu l'avertissement du devis : on
-        // ne lui fait pas sauter la page qui dit ce que le prix ne contient
-        // pas.
-        etapeDevis: 0,
+        /*
+          ET LE CHIFFRAGE REPART DE ZÉRO.
+
+          Il ne le faisait pas : les articles pris au magasin pour un
+          chantier se retrouvaient sur le devis du suivant, la gamme d'un
+          logement sur celle d'un autre. Un devis faux dans le sens qui
+          coûte — trop d'articles, chez quelqu'un qui ne les a pas demandés.
+
+          Le rang de l'étape part avec : un nouveau relevé n'a pas encore lu
+          l'avertissement, et l'on ne lui fait pas sauter la page qui dit ce
+          que le prix ne contient pas.
+        */
+        ...devisRepose(undefined),
       });
     },
   };

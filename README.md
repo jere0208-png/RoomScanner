@@ -10820,6 +10820,60 @@ par ne plus être lancé.
 **À juger à l'usage** : `ATTENTE_MIN` (2,5 s) rejoint la liste des rythmes que je
 ne peux pas voir depuis cette machine.
 
+### Le devis voyage avec son plan
+
+Relevé du patron : « fais en sorte que le devis soit sauvegardé avec le plan
+actuel ».
+
+**CE QUI SE PERDAIT, ET CE QUE ÇA COÛTAIT.** La gamme d'appareillage, les
+articles écartés du ticket, les quantités corrigées à la main et tout ce qu'on
+avait pris au magasin vivaient dans le magasin de l'application, et **nulle part
+ailleurs**. Un dossier rouvert le lendemain revenait en Céliane avec un ticket
+vierge — et le chiffrage, qui est un vrai travail sur un logement complet, était
+à refaire.
+
+**PIRE : IL PASSAIT D'UN CHANTIER À L'AUTRE.** Rien n'effaçait le caddie entre
+deux relevés. Les vis et le plâtre pris pour le T3 de la rue Pasteur se
+retrouvaient sur le devis du pavillon suivant. C'est un devis faux **dans le sens
+qui coûte** : trop d'articles, chez quelqu'un qui ne les a pas demandés. Ce
+défaut-là n'avait été signalé par personne, et il est sorti en écrivant le banc
+du premier.
+
+**QUATRE ENDROITS ENREGISTRENT, UNE SEULE LECTURE.** Mise à jour du dossier
+courant, copie, création à la volée, brouillon de secours : `devisDuPlan(st)` est
+la seule fonction qui dit ce qu'on écrit, et `devisRepose(devis)` la seule qui dit
+ce qu'on remet. Quatre recopies auraient divergé au premier champ ajouté, et l'on
+aurait perdu le caddie d'un chemin sur deux sans que rien ne casse.
+
+**UN RELEVÉ D'AVANT S'OUVRE SUR UN TICKET NEUF.** Les dossiers déjà enregistrés
+n'ont pas de chiffrage dans leur entrée ; ils ne doivent surtout pas hériter de
+celui qu'on avait sous les yeux — c'est exactement la panne qu'on corrige.
+`devisRepose(undefined)` rend un devis vierge, et c'est aussi ce que `reset()`
+appelle : un nouveau relevé repart d'un devis neuf.
+
+**CHIFFRER, C'EST MODIFIER LE DOSSIER.** Puisque le devis appartient au plan, le
+changer laisse le dossier différent de ce qui est écrit sur le disque, et
+l'électricien doit le voir : les cinq gestes du ticket lèvent maintenant le
+drapeau des modifications. Sans lui, on chiffre une heure, on quitte, et rien ne
+prévient — c'est la faute la plus chère de cette application, celle qui coûte un
+déplacement. **Ce n'est pas une entrée d'historique** en revanche : « Annuler »
+sert à défaire un geste sur le PLAN, et reculer d'un cran après avoir touché un
+ticket ramènerait un mur, ce que personne n'attend.
+
+**ET LE FILET DE SECOURS LE RETIENT AUSSI.** Le brouillon se réécrit dès que le
+plan est « à enregistrer » — donc, désormais, à chaque geste sur le ticket. S'il
+n'avait pas porté le chiffrage, une reprise après plantage aurait rendu le plan
+sans son caddie, et l'on aurait cru avoir tout retrouvé. « Un filet qui retient la
+moitié de ce qui tombe est un filet qui MENT » : c'est écrit dans la reprise
+elle-même, et ça valait pour ce champ-là aussi.
+
+**Neuf épreuves** (`devisduplan`), six rouges avant : l'écriture des quatre
+champs, la mise à jour d'un plan chiffré après coup, l'ouverture qui rend le
+sien — avec le contrôle qui compte, **et pas celui du chantier d'avant** —, le
+relevé d'avant qui s'ouvre vierge, le relevé neuf qui repart vierge, le brouillon
+dans les deux sens, et le drapeau avec son contrôle inverse : ouvrir un dossier ne
+le salit pas.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro
