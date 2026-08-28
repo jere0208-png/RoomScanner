@@ -37,7 +37,12 @@ import {
   lienAmazon,
   offreAmazon,
 } from '../src/geometry/magasin';
-import { GAMMES, TARIFS_COMMUNS } from '../src/geometry/prix';
+import {
+  GAMMES,
+  TARIFS_COMMUNS,
+  TARIFS_MECANISME,
+  tarifPlaque,
+} from '../src/geometry/prix';
 import { buyingList, type PullRow } from '../src/geometry/conduits';
 import { chiffrer } from '../src/geometry/devis';
 import type { Fixture } from '../src/geometry/electrical';
@@ -93,6 +98,53 @@ describe('le catalogue tient debout', () => {
       expect(`${attendu} au catalogue : ${codes.has(attendu)}`).toBe(
         `${attendu} au catalogue : true`,
       );
+    }
+  });
+});
+
+describe('l’ordre des gammes se tient', () => {
+  /*
+    UNE ODACE NE PEUT PAS COÛTER PLUS QU'UNE CÉLIANE — et c'est le genre de
+    chose que personne ne vérifie, puisqu'on ne compare jamais deux gammes
+    ligne à ligne.
+
+    CE BANC EST UN GARDE-FOU, PAS LA RÉPARATION D'UN ACCIDENT, et il faut le
+    dire : remis sur l'ancien catalogue, il PASSE. L'ordre y tenait encore.
+    Mais il ne tenait qu'à un centime — la prise Odace était estimée à 10,90 €
+    sous une Céliane supposée à 15,90 €, qui n'en vaut que 10,90 en rayon. Le
+    relevé a fait descendre la borne haute sur le milieu de gamme ; le suivant
+    l'aurait fait passer dessous.
+
+    Le rayon donne maintenant les deux BORNES, mesurées pièce par pièce :
+    l'entrée (dooxie) et le haut (Céliane). Ce banc tient l'ordre entre elles,
+    et c'est ce qui empêchera un recalage futur de repasser par-dessus.
+
+    IL NE JUGE QUE LES MÉCANISMES QU'ON POSE PARTOUT. Un thermostat ou un
+    variateur se choisit sur ses fonctions, pas sur sa gamme : deux modèles
+    peuvent s'inverser sans que ce soit une erreur.
+  */
+  const ORDRE = ['dooxie', 'ovalis', 'odace', 'mosaic', 'celiane'] as const;
+
+  it('l’entrée de gamme reste sous le haut de gamme, pièce par pièce', () => {
+    for (const kind of ['prise', 'inter', 'va', 'rj45', 'tv'] as const) {
+      const bas = TARIFS_MECANISME.dooxie[kind]!.pu;
+      const haut = TARIFS_MECANISME.celiane[kind]!.pu;
+      expect(`${kind} : ${bas < haut}`).toBe(`${kind} : true`);
+      // Et ce qui est entre les deux y reste vraiment.
+      for (const g of ORDRE) {
+        const pu = TARIFS_MECANISME[g][kind]!.pu;
+        expect(`${g}/${kind} : ${pu >= bas && pu <= haut}`).toBe(
+          `${g}/${kind} : true`,
+        );
+      }
+    }
+  });
+
+  it('et une plaque suit le même ordre', () => {
+    for (let n = 1; n <= 3; n++) {
+      const bas = tarifPlaque('dooxie', n)!.pu;
+      const haut = tarifPlaque('celiane', n)!.pu;
+      expect(`${n} poste(s) : ${bas < haut}`).toBe(`${n} poste(s) : true`);
     }
   });
 });

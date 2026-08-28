@@ -10194,6 +10194,66 @@ couronnes de dix, le 2,5 en couronnes de cent.
 
 **Bilan : 116 articles, 28 prix relevés en rayon.**
 
+### L'appareillage — deux bornes mesurées, et un prix qu'on a refusé de recopier
+
+Dernier gros rayon du contrôle, et le plus visible sur un devis : c'est ce que le
+client voit sur ses murs. **Relevé pièce par pièce dans les deux gammes qui
+servent de bornes** — dooxie en entrée, Céliane en haut — mécanisme seul, la
+plaque se comptant à part comme au bordereau.
+
+| article | catalogue | relevé en rayon |
+|---|---|---|
+| dooxie — va-et-vient | 5,20 € | **5,50 €** |
+| dooxie — poussoir | 7,50 € | **9,69 €** |
+| Céliane — prise 2P+T | 15,90 € | **10,90 €** |
+| Céliane — va-et-vient | 15,50 € | **11,90 €** |
+| Céliane — poussoir | 17,90 € | **20,90 €** |
+| Céliane — RJ45 | 31 € | **25,90 €** |
+
+**LE HAUT DE GAMME ÉTAIT SURESTIMÉ, l'entrée de gamme sous-estimée** : l'écart
+entre les deux était supposé bien plus grand qu'il n'est. La prise Céliane vaut
+deux fois la dooxie, pas trois.
+
+#### Trois prix qu'on a refusé de prendre
+
+**Le variateur dooxie, à 74,90 €.** C'est plus cher que le variateur Céliane, ce
+qui n'a pas de sens pour une entrée de gamme — il s'agit très probablement d'un
+modèle connecté, et on n'a pas pu le confirmer. **Un prix qu'on ne comprend pas
+ne se recopie pas** : il reste estimé, et l'écran le dit.
+
+**Le variateur et la prise TV Céliane**, affichés en DÉSTOCKAGE (43,92 € et
+19,74 €). Un prix de fin de série n'est pas un prix courant, et le devis d'un
+chantier qui commence dans trois semaines ne peut pas s'appuyer dessus.
+
+**Et Mosaic n'est pas une gamme de grande surface** : Castorama n'en vend
+presque pas, et le peu qu'on y trouve vient de vendeurs tiers. C'est une gamme
+de distributeur professionnel — légitime au catalogue, elle se pose beaucoup en
+tertiaire — mais ses prix resteront estimés tant qu'on relèvera en grande
+surface.
+
+#### Un garde-fou, et une affirmation fausse rattrapée à temps
+
+Les trois gammes du milieu ont été redescendues entre les deux bornes mesurées,
+et un banc garde désormais l'ordre : **une Odace ne peut pas coûter plus qu'une
+Céliane**, ce que personne ne vérifie puisqu'on ne compare jamais deux gammes
+ligne à ligne.
+
+**J'avais écrit que le catalogue affirmait cette inversion. C'était faux**, et le
+banc l'a montré : remis sur l'ancien catalogue, **il passe**. J'avais comparé un
+prix NOUVEAU (Céliane à 10,90 €) à un prix ANCIEN (Odace à 10,90 €) — deux états
+différents du même fichier. L'ordre tenait encore ; il ne tenait qu'à un centime,
+et le relevé suivant l'aurait fait basculer.
+
+Le commentaire a été corrigé dans le code ET dans le banc. **Un commentaire qui
+invente un défaut qui n'a jamais existé est un mensonge à retardement**, au même
+titre qu'un commentaire qui décrit une intention plutôt que le code — et celui-là
+aurait survécu longtemps, puisqu'il racontait une histoire crédible.
+
+**Bilan du contrôle complet : 116 articles, 37 prix relevés en rayon**, cinq
+rayons passés (tableau, conduits et conducteurs, encastrement, appareillage,
+plus les couples Amazon). Restent estimés les courants faibles, les consommables
+et l'outillage — les postes les plus légers d'un devis.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

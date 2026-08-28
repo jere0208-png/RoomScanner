@@ -167,16 +167,26 @@ export const TARIFS_MECANISME: Record<
   Partial<Record<FixtureKind, Tarif>>
 > = {
   dooxie: {
-    // Relevé chez Castorama le 28/08/2026 : la 2P+T blanche complète y est à
-    // 5,50 €, la RJ45 à 19,50 €, la TV à 12,90 €. Le catalogue en posait
-    // 4,50 / 14,90 / 8,90 — l'appareillage d'entrée de gamme était lui aussi
-    // sous-estimé, d'un bon quart.
+    /*
+      RELEVÉ EN RAYON, PIÈCE PAR PIÈCE, le 28/08/2026 : la 2P+T blanche à
+      5,50 €, le va-et-vient à 5,50 €, le poussoir à 9,69 €, la RJ45 à
+      19,50 €, la TV à 12,90 €. Le catalogue posait 4,50 / 5,20 / 7,50 /
+      14,90 / 8,90 — l'entrée de gamme était sous-estimée d'un bon quart,
+      partout.
+
+      LE VARIATEUR N'EST PAS RETENU, et c'est délibéré. Le rayon affiche
+      74,90 € pour « variateur dooxie blanc » ; c'est plus cher que le
+      variateur Céliane, ce qui n'a pas de sens pour une entrée de gamme —
+      il s'agit très probablement d'un modèle connecté, et l'on n'a pas pu
+      le confirmer. Un prix qu'on ne comprend pas ne se recopie pas : il
+      reste estimé, et l'écran le dit.
+    */
     prise: r(5.5),
     prise20: t(11.9),
     prise32: t(18.9),
-    inter: t(5.2),
-    va: t(5.5),
-    poussoir: t(7.5),
+    inter: r(5.5),
+    va: r(5.5),
+    poussoir: r(9.69),
     variateur: t(29.9),
     rj45: r(19.5),
     tv: r(12.9),
@@ -186,13 +196,34 @@ export const TARIFS_MECANISME: Record<
     boite: t(2.2),
     tableau: t(0),
   },
+  /*
+    LES TROIS GAMMES DU MILIEU SE RECALENT ENTRE DEUX BORNES MESURÉES.
+
+    Le rayon donne maintenant l'entrée (dooxie) et le haut (Céliane) pièce par
+    pièce, et LA BORNE HAUTE A BAISSÉ : la prise Céliane était posée à 15,90 €,
+    elle en vaut 10,90. Or les gammes du milieu avaient été estimées SOUS
+    l'ancienne borne — la prise Odace à 10,90 €, la Mosaic à 11,90 €. Elles
+    rattrapaient donc, voire dépassaient, le haut de gamme réel.
+
+    L'ordre n'était pas encore inversé dans l'ancien catalogue (on l'a vérifié
+    en le remettant : le banc passe), mais il ne tenait plus qu'à un centime,
+    et il aurait basculé au premier relevé suivant. On redescend donc tout le
+    milieu, et un banc garde l'ordre — c'est un garde-fou posé avant l'accident,
+    pas la réparation d'un accident.
+
+    MOSAIC N'EST PAS UNE GAMME DE GRANDE SURFACE, et le relevé l'a montré :
+    Castorama n'en vend presque pas, et le peu qu'on y trouve vient de
+    vendeurs tiers. C'est une gamme de distributeur professionnel — légitime
+    au catalogue, elle se pose beaucoup en tertiaire —, mais ses prix
+    resteront estimés tant qu'on relèvera en grande surface.
+  */
   ovalis: {
     prise: t(5.9),
     prise20: t(12.5),
     prise32: t(19.9),
-    inter: t(5.5),
+    inter: t(5.9),
     va: t(5.9),
-    poussoir: t(7.9),
+    poussoir: t(9.9),
     variateur: t(32),
     rj45: t(20.9),
     tv: t(13.9),
@@ -203,14 +234,14 @@ export const TARIFS_MECANISME: Record<
     tableau: t(0),
   },
   odace: {
-    prise: t(10.9),
-    prise20: t(16.9),
-    prise32: t(27),
-    inter: t(9.9),
-    va: t(10.5),
-    poussoir: t(12.5),
+    prise: t(8.9),
+    prise20: t(15.5),
+    prise32: t(23),
+    inter: t(9.5),
+    va: t(9.5),
+    poussoir: t(16.9),
     variateur: t(49),
-    rj45: t(24.9),
+    rj45: t(22.9),
     tv: t(16.5),
     sortieCable: t(9.9),
     thermostat: t(89),
@@ -219,14 +250,14 @@ export const TARIFS_MECANISME: Record<
     tableau: t(0),
   },
   mosaic: {
-    prise: t(11.9),
-    prise20: t(17.9),
-    prise32: t(28),
-    inter: t(11.5),
-    va: t(11.9),
-    poussoir: t(13.9),
+    prise: t(9.9),
+    prise20: t(16.5),
+    prise32: t(24),
+    inter: t(10.5),
+    va: t(10.5),
+    poussoir: t(18.5),
     variateur: t(52),
-    rj45: t(25.9),
+    rj45: t(24.5),
     tv: t(17.5),
     sortieCable: t(10.5),
     thermostat: t(92),
@@ -235,14 +266,29 @@ export const TARIFS_MECANISME: Record<
     tableau: t(0),
   },
   celiane: {
-    prise: t(15.9),
-    prise20: t(22),
-    prise32: t(33),
-    inter: t(14.9),
-    va: t(15.5),
-    poussoir: t(17.9),
+    /*
+      RELEVÉ EN RAYON, MÉCANISME SEUL (la plaque se compte à part, c'est le
+      découpage du bordereau) : prise 10,90 €, va-et-vient 11,90 €, poussoir
+      20,90 €, RJ45 25,90 €.
+
+      LE CATALOGUE SURESTIMAIT LE HAUT DE GAMME. Il posait 15,90 € la prise
+      et 31 € la RJ45 — l'écart avec l'entrée de gamme était supposé plus
+      grand qu'il n'est. Deux bornes mesurées valent mieux qu'une pente
+      devinée : la prise Céliane vaut deux fois la dooxie, pas trois.
+
+      DEUX PRIX ÉCARTÉS : le variateur (43,92 €) et la TV (19,74 €) étaient
+      affichés en DÉSTOCKAGE. Un prix de fin de série n'est pas un prix
+      courant, et le devis d'un chantier qui commence dans trois semaines ne
+      peut pas s'appuyer dessus.
+    */
+    prise: r(10.9),
+    prise20: t(17),
+    prise32: t(26),
+    inter: r(11.9),
+    va: r(11.9),
+    poussoir: r(20.9),
     variateur: t(62),
-    rj45: t(31),
+    rj45: r(25.9),
     tv: t(19.9),
     sortieCable: t(12.5),
     thermostat: t(99),
