@@ -10254,6 +10254,77 @@ rayons passés (tableau, conduits et conducteurs, encastrement, appareillage,
 plus les couples Amazon). Restent estimés les courants faibles, les consommables
 et l'outillage — les postes les plus légers d'un devis.
 
+### La légende explique enfin le plan — et elle tronquait ses propres libellés
+
+Défaut connu, écrit depuis longtemps dans les questions en attente : « la légende
+du plan PDF n'explique ni les repères ronds des murs ni les menuiseries ».
+
+**CE QUE ÇA COÛTE À CELUI QUI LIT.** Le plan porte des pastilles numérotées dans
+l'épaisseur des murs : ce sont les renvois vers les feuilles d'élévation, et sans
+elles une feuille « Séjour, nord » ne désigne rien de sûr sur un plan qui compte
+quatre pans au nord. Le client — ou le maçon — qui reçoit le dossier voyait des
+chiffres dans des ronds et n'avait **aucun moyen** de savoir ce qu'ils veulent
+dire. La légende expliquait consciencieusement des symboles d'appareillage qu'il
+ne regardera pas, et laissait sans un mot ce qui organise tout le reste.
+
+Une section « PLAN » a donc rejoint « APPAREILLAGE » et « PLAFOND » : repère de
+mur, porte, fenêtre. **Elle ne parle que de ce qui est sur la feuille** — un plan
+sans fenêtre n'explique pas ce qu'est une fenêtre, c'est la règle de cette
+légende depuis toujours.
+
+#### Le banc a trouvé bien pire que ce qu'il cherchait
+
+**LA LÉGENDE TRONQUAIT DÉJÀ SES LIBELLÉS.** En lisant le flux du PDF pour
+vérifier qu'on y trouvait « Porte », le banc a montré le reste de la ligne :
+« Prise 16 » pour *Prise 16 A*, « Tableau » pour *Tableau électrique*. **La seule
+partie du dossier dont la fonction est d'expliquer était elle-même illisible**,
+et personne ne l'avait vu parce qu'on ne relit pas une légende qu'on connaît par
+cœur.
+
+**Trois causes empilées, et les trois sont des classiques de la maison :**
+
+1. **La largeur était écrite en clair** — 132, 154 ou 300 points selon les cas —
+   et la légende se remplissait mille lignes plus loin. Deux calculs de la même
+   chose, dont le second ignorait ce que le premier avait réservé. Les colonnes
+   se construisent maintenant **là où la place est retenue**, et la largeur se
+   déduit du plus long libellé : *celui qui dessine annonce son encombrement* ;
+2. **Deux estimations de largeur de texte divergeaient** : `fitText` mesure à
+   0,52 em par signe, le calcul de largeur à 0,50. Deux centièmes, et
+   « élévation » devenait « élévati ». C'est exactement ce que le README
+   interdit depuis `encombrement` — la constante s'appelle maintenant
+   `EM_TEXTE` et les deux s'en servent ;
+3. **Les parenthèses comptent double.** « Repère de mur (élévation) » tenait au
+   calcul et sortait coupé : `escText` échappe les parenthèses (`\(`) et la
+   mesure les compte pour deux signes. Un tiret dit la même chose et ne ment pas
+   sur sa longueur.
+
+**ET DEUX CHEMINS DE DESSIN SONT DEVENUS UN.** Il y avait un cadre simple sans
+plafond, un cadre à colonnes avec — la section « PLAN » aurait dû être ajoutée
+aux deux, et le jour où l'on n'aurait modifié qu'un seul, la légende aurait dit
+deux choses différentes selon qu'un logement a des spots ou non.
+`drawElecLegend` a donc disparu ; **sa leçon est déplacée** dans
+`drawLegendBox`, qui la garde vivante.
+
+**REGARDÉ EN IMAGE, et il a fallu deux essais.** Le premier symbole du repère de
+mur — un cercle tracé d'un seul arc presque refermé, plus un « 1 » au trait —
+donnait un petit haricot noir illisible. Un cercle se trace en deux demi-arcs, et
+le chiffre n'a rien à faire là : la légende dit à quoi sert le rond, pas quel
+numéro il porte.
+
+### La page Magasin avait été livrée sans banc
+
+Dette remboursée. Le catalogue avait le sien, le devis aussi, mais **la page
+qu'on touche n'était tenue par rien** — le genre de trou qui ne se voit pas le
+jour où on le creuse : tout marche, les bancs sont verts, et le premier
+changement de mise en page casse quelque chose que personne ne rattrape.
+
+`magasinecran` tient treize épreuves : les rayons dans l'ordre du chantier, la
+recherche (accents et casse compris) et son message quand rien ne correspond, le
+caddie qui écrit **dans le devis et non dans une liste à part**, le « − » qui
+s'éteint à zéro, l'article qui disparaît quand on le repose, le prix qui dit
+toujours d'où il vient — et surtout **qu'aucun `Pressable` ne surplombe le
+rouleau**, la cause du défilement cassé payée deux fois sur l'écran du devis.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

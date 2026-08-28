@@ -59,7 +59,6 @@ import {
   PLAQUE,
   SYMBOL_SPAN,
   type Fixture,
-  type FixtureKind,
   type SymbolStroke,
 } from '../geometry/electrical';
 import {
@@ -202,8 +201,19 @@ function escText(s: string): string {
 }
 
 /** Tronque une chaîne pour tenir dans maxW points (Helvetica ≈ 0,52 em/signe). */
+/**
+ * LA LARGEUR D'UN SIGNE, POUR TOUT CE QUI SE TAILLE SUR SON TEXTE.
+ *
+ * Elle était écrite ici, à 0,52 em, et recopiée à 0,50 ailleurs — d'où une
+ * légende dont les libellés tenaient au calcul et sortaient tronqués au
+ * dessin. Deux estimations de la même chose finissent toujours par diverger ;
+ * celle-ci a divergé de deux centièmes, ce qui suffit à couper « élévation »
+ * en « élévati ».
+ */
+export const EM_TEXTE = 0.52;
+
 function fitText(s: string, size: number, maxW: number): string {
-  const perChar = size * 0.52;
+  const perChar = size * EM_TEXTE;
   const max = Math.max(1, Math.floor(maxW / perChar));
   return s.length <= max ? s : `${s.slice(0, max - 1)}…`;
 }
@@ -724,6 +734,12 @@ const CADRE_PUCE = 18;
 
 /**
  * Dessine un cadre de légende : titre(s), lignes colorées, marges égales.
+ *
+ * ELLE NE PARLE QUE DE CE QU'ON A SOUS LES YEUX — c'est la règle héritée de
+ * `drawElecLegend`, qui dessinait autrefois la légende de l'appareillage à
+ * elle seule et qui a disparu le jour où toutes les légendes ont pris le même
+ * chemin. Une légende qui liste tout un catalogue n'apprend rien ; celle-ci se
+ * lit en trois secondes parce qu'elle ne montre que les symboles présents.
  *
  * Le cadre se dimensionne SUR SON CONTENU. On lui donne des sections, il
  * rend sa hauteur — personne n'a plus à compter les lignes à la main.
@@ -1544,21 +1560,132 @@ function planPage(
   const plafondLegende = extra?.hideLegend
     ? []
     : [...new Set((ctx.ceiling ?? []).map((c) => c.kind))];
-  const rangsLegende = Math.max(
-    kindsLegende.length > 0 ? kindsLegende.length + 1 : 0,
-    plafondLegende.length > 0 ? plafondLegende.length + 2 : 0,
-  );
+  /**
+   * CE QUE LA LÉGENDE VA DIRE — construit ICI, dessiné plus bas.
+   *
+   * Elle se dimensionnait sur trois largeurs écrites en clair (132, 154, 300)
+   * et se remplissait mille lignes plus loin. Deux calculs de la même chose,
+   * et le second ne savait pas ce que le premier avait réservé : le résultat
+   * se lisait sur la feuille, où « Prise 16 A » sortait tronqué en
+   * « Prise 16 » et « Tableau électrique » en « Tableau ». Une légende dont
+   * les libellés ne tiennent pas n'explique rien — c'est le seul endroit du
+   * dossier dont c'est la seule fonction.
+   *
+   * ON CONSTRUIT DONC LES COLONNES UNE FOIS, et la largeur se DÉDUIT du plus
+   * long libellé : celui qui dessine annonce son encombrement, l'écran ne le
+   * devine plus. C'est la même leçon que le bandeau du meuble et que la
+   * fenêtre de découpe.
+   */
+  const lignesDuPlan: LegendLine[] = [];
+  if (wallNumbers(ctx).size > 0) {
+    lignesDuPlan.push({
+      /*
+        PAS DE PARENTHÈSES DANS UN LIBELLÉ DE LÉGENDE. Elles sont ÉCHAPPÉES
+        dans le flux PDF (« \( »), donc comptées double par la mesure de
+        largeur : le libellé tenait au calcul et sortait tronqué au dessin.
+        Un tiret dit la même chose et ne ment pas sur sa longueur.
+      */
+      texte: 'Repère de mur — élévation',
+      /*
+        UN ROND, ET RIEN DEDANS. La première version dessinait le cercle en un
+        seul arc presque refermé et lui ajoutait un « 1 » au trait : regardé en
+        image, cela donnait un petit haricot noir illisible. Un cercle se trace
+        en DEUX demi-arcs, et le chiffre n'a rien à faire là — la légende dit
+        à quoi sert le rond, pas quel numéro il porte.
+      */
+      symbole: {
+        paths: [{ d: 'M-3.2 0 a3.2 3.2 0 1 0 6.4 0 a3.2 3.2 0 1 0 -6.4 0' }],
+        color: INK,
+      },
+    });
+  }
+  if (openings.some((o) => o.type !== 'window')) {
+    lignesDuPlan.push({
+      texte: 'Porte',
+      symbole: {
+        paths: [{ d: 'M-4 3 v-6' }, { d: 'M-4 -3 a6 6 0 0 1 6 6 H-4' }],
+        color: GREY,
+      },
+    });
+  }
+  if (openings.some((o) => o.type === 'window')) {
+    lignesDuPlan.push({
+      texte: 'Fenêtre',
+      symbole: { paths: [{ d: 'M-5 -1.2 H5' }, { d: 'M-5 1.2 H5' }], color: GREY },
+    });
+  }
+  const colonnesLegende: LegendSection[][] = [];
+  if (kindsLegende.length > 0) {
+    colonnesLegende.push([
+      {
+        titre: 'APPAREILLAGE',
+        lignes: kindsLegende.map((k) => ({
+          texte: FIXTURES[k].label,
+          symbole: { paths: assemblySymbol(k), color: FIXTURES[k].color },
+        })),
+      },
+    ]);
+  }
+  {
+    const seconde: LegendSection[] = [];
+    if (plafondLegende.length > 0) {
+      seconde.push({
+        titre: 'PLAFOND',
+        lignes: plafondLegende.map((k) => ({
+          texte: CEILINGS[k].label,
+          symbole: { paths: CEILING_SYMBOL[k], color: CEILINGS[k].color },
+        })),
+      });
+      seconde.push({ lignes: [{ couleur: GREY, texte: 'Lien de commande' }] });
+    }
+    if (lignesDuPlan.length > 0) {
+      seconde.push({ titre: 'PLAN', lignes: lignesDuPlan });
+    }
+    if (seconde.length > 0) colonnesLegende.push(seconde);
+  }
+  /*
+    LA LARGEUR SUIT LE PLUS LONG LIBELLÉ de chaque colonne — sa vignette, son
+    écart, et la marge du cadre. Bornée : une légende plus large que le tiers
+    de la feuille mangerait le dessin qu'elle explique.
+  */
+  const largeurColonne = (sections: LegendSection[]) =>
+    Math.min(
+      190,
+      Math.max(
+        96,
+        ...sections.flatMap((sec) => [
+          latin1(sec.titre ?? '').length * 6 * EM_TEXTE + CADRE_PUCE,
+          ...sec.lignes.map(
+            // La MÊME largeur de signe que `fitText`, qui décidera de couper
+            // ou non : deux estimations divergentes, c'est un libellé qui
+            // tient au calcul et se coupe au dessin.
+            (l) => latin1(l.texte).length * 7 * EM_TEXTE + CADRE_PUCE + 2,
+          ),
+        ]),
+      ),
+    );
+  /*
+    ET TOUTES LES COLONNES ONT LA MÊME LARGEUR, parce que c'est ainsi que
+    `drawLegendBox` les répartit : il divise la place également. Calculer une
+    largeur par colonne et en dessiner une autre, c'était refaire l'erreur
+    qu'on venait de corriger — la boîte réservée doit être celle qu'on
+    dessine, ici aussi.
+  */
   const legendeW =
-    kindsLegende.length > 0 && plafondLegende.length > 0
-      ? 300
-      : plafondLegende.length > 0
-        ? 154
-        : 132;
+    colonnesLegende.length === 0
+      ? 0
+      : Math.max(...colonnesLegende.map(largeurColonne)) *
+          colonnesLegende.length +
+        CADRE_MARGE * (colonnesLegende.length + 1);
+  /* Autant de rangs que la colonne la plus fournie — titres compris. */
+  const rangsDeColonne = (sections: LegendSection[]) =>
+    sections.reduce((t, sec) => t + (sec.titre ? 1 : 0) + sec.lignes.length, 0);
   const legendeH =
-    plafondLegende.length > 0
-      ? rangsLegende * CADRE_LIGNE + CADRE_MARGE * 2
-      : 22 + kindsLegende.length * 15;
-  const avecLegende = kindsLegende.length > 0 || plafondLegende.length > 0;
+    colonnesLegende.length === 0
+      ? 0
+      : Math.max(...colonnesLegende.map(rangsDeColonne)) * CADRE_LIGNE +
+        CADRE_MARGE * 2;
+  const avecLegende = colonnesLegende.length > 0;
   // 16 pt sous la légende, et 48 pt entre elle et le dessin : la place des
   // chaînes de cotes qui pendent sous le cadre.
   const reserve = avecLegende ? Math.max(0, legendeH + 16 + 48 - 70) : 0;
@@ -3004,42 +3131,14 @@ function planPage(
        * expliquer. On mesure donc l'emprise du plan sur la page, et on
        * choisit le coin qu'il recouvre le moins.
        */
-      const presents = kindsLegende;
-      const vusPlafond = plafondLegende;
-      if (presents.length > 0 || vusPlafond.length > 0) {
-        const lw = legendeW;
-        const lh = legendeH;
-        void lw;
-        // Dans SA bande, réservée avant le cadrage : plus aucun coin à
-        // choisir, plus rien à recouvrir.
-        const choisi = { x: FRAME.x + 16, y: FRAME.y + TITLE_H + 16 + lh };
-        if (vusPlafond.length === 0) {
-          drawElecLegend(d, presents, choisi.x, choisi.y);
-        } else {
-          const colonnes: LegendSection[][] = [];
-          if (presents.length > 0) {
-            colonnes.push([
-              {
-                titre: 'APPAREILLAGE',
-                lignes: presents.map((k) => ({
-                  texte: FIXTURES[k].label,
-                  symbole: { paths: assemblySymbol(k), color: FIXTURES[k].color },
-                })),
-              },
-            ]);
-          }
-          colonnes.push([
-            {
-              titre: 'PLAFOND',
-              lignes: vusPlafond.map((k) => ({
-                texte: CEILINGS[k].label,
-                symbole: { paths: CEILING_SYMBOL[k], color: CEILINGS[k].color },
-              })),
-            },
-            { lignes: [{ couleur: GREY, texte: 'Lien de commande' }] },
-          ]);
-          drawLegendBox(d, choisi.x, choisi.y - lh, lw, colonnes);
-        }
+      if (colonnesLegende.length > 0) {
+        /*
+          ON RELIT LES COLONNES, ON NE LES REFAIT PAS. Elles ont été bâties là
+          où la place a été réservée : c'est la seule façon que la boîte
+          dessinée soit celle qu'on a retenue.
+        */
+        const choisi = { x: FRAME.x + 16, y: FRAME.y + TITLE_H + 16 + legendeH };
+        drawLegendBox(d, choisi.x, choisi.y - legendeH, legendeW, colonnesLegende);
       }
     }
 
@@ -5049,33 +5148,6 @@ function drawSymbol(
   }
 }
 
-/**
- * La légende des symboles — **seulement ceux qui figurent sur le plan**.
- * Une légende qui liste tout un catalogue n'apprend rien ; celle-ci se lit
- * en trois secondes parce qu'elle ne parle que de ce qu'on a sous les yeux.
- */
-function drawElecLegend(d: Draw, kinds: FixtureKind[], x: number, y: number) {
-  if (kinds.length === 0) return;
-  const lineH = 15;
-  const w = 132;
-  const h = 22 + kinds.length * lineH;
-  d.rect(x, y - h, w, h, '#FFFFFF', '#D6DBE3', 0.8);
-  d.text('APPAREILLAGE', x + 10, y - 14, 6.5, GREY_LIGHT, { align: 'left' });
-  kinds.forEach((kind, i) => {
-    const cy = y - 26 - i * lineH;
-    const spec = FIXTURES[kind];
-    drawSymbol(d, assemblySymbol(kind), x + 18, cy - 1, 0.38, spec.color, 0.9);
-    const tag = FIXTURE_TAG[kind];
-    d.text(
-      fitText(tag ? `${spec.label} (${tag})` : spec.label, 7.5, w - 44),
-      x + 32,
-      cy - 3,
-      7.5,
-      INK,
-      { align: 'left' },
-    );
-  });
-}
 
 // ------------------------------------------ feuille « liste du matériel »
 
