@@ -77,6 +77,8 @@ import {
   wallFace,
   type FixtureKind,
 } from '../geometry/electrical';
+import type { Circuit } from '../geometry/nfc15100';
+import { circuitColor } from '../geometry/schema';
 
 /** Paramètres de caméra de la vue 3D (contrôlables de l'extérieur). */
 export interface View3DParams {
@@ -178,6 +180,24 @@ const PORTEE_LAMPE = 1.1;
  */
 const HALO_MIN = 9;
 const HALO_PART = 0.3;
+
+/**
+ * LA BAGUE D'UN DÉPART, EN MÈTRES — et pour la même raison que le halo.
+ *
+ * Elle marque un APPAREIL : sa taille est celle de l'appareil, pas celle d'un
+ * écran. Seize centimètres de rayon, soit une plaque simple (8 cm) débordée de
+ * ce qu'il faut pour qu'on voie la bague sans qu'elle cache le symbole. Écrite
+ * en pixels, elle aurait fait le coup du halo de 54 : juste sur la maquette où
+ * on l'a posée, absurde à tout autre cadrage.
+ *
+ * ET IL N'Y A PAS DE BORNE HAUTE, à la différence du halo. Une portée de
+ * lumière peut couvrir une petite pièce entière — d'où sa fraction du
+ * logement ; une bague de seize centimètres ne peut couvrir qu'une plaque, à
+ * n'importe quel zoom. Seul le plancher est utile : de très loin, on doit
+ * encore voir QUELS appareils sont sur le départ.
+ */
+const BAGUE_DEPART = 0.16;
+const BAGUE_MIN = 4;
 
 /** Le centre d'un contour — il sert à faire déborder une zone humide. */
 function centreDe(pts: { x: number; z: number }[]) {
@@ -319,6 +339,21 @@ interface Props {
    * préparation et rangés : les étapes n'ont plus qu'à les reprendre.
    */
   prebuildRooms?: (string | null)[];
+  /**
+   * LES DÉPARTS DU TABLEAU — pour que la prise puisse montrer son circuit.
+   *
+   * Ils viennent de l'écran, ils ne se recalculent PAS ici. `planCircuits`
+   * découpe les circuits d'après la pièce de chaque appareil, et cette pièce
+   * se déduit du contour au sol : refaire le calcul dans la maquette avec des
+   * entrées légèrement différentes donnerait un plan qui dit « C3 » et un
+   * modèle qui dit « C2 » pour la même prise. Un seul calcul, celui du
+   * dossier, passé de main en main.
+   *
+   * Absents — la visite guidée, l'aperçu d'export —, l'appareillage ne
+   * répond plus au doigt sauf pour allumer : une cible qui ne mène nulle part
+   * donne à l'écran l'air d'être en panne.
+   */
+  circuits?: Circuit[];
 }
 
 /**
@@ -343,6 +378,7 @@ export function Iso3DView({
   elecCotes = null,
   light = false,
   prebuildRooms,
+  circuits,
 }: Props) {
   const tousLesMurs = useScanStore((s) => s.walls);
   const toutesLesOuvertures = useScanStore((s) => s.openings);
@@ -526,6 +562,39 @@ export function Iso3DView({
   const [allumees, setAllumees] = useState<ReadonlySet<string>>(
     () => new Set<string>(),
   );
+  /**
+   * LE DÉPART D'UN APPAREIL — index dressé une fois pour toutes.
+   *
+   * Le rang compte autant que le circuit : c'est lui qui donne le repère du
+   * tableau (`C3`) et la teinte de la roue. Les points de PLAFOND sont dans le
+   * même index — un circuit d'éclairage porte des appliques au mur et des
+   * spots au plafond, et l'on ne va pas montrer la moitié d'un départ.
+   */
+  const departDe = useMemo(() => {
+    const m = new Map<string, { circuit: Circuit; rang: number }>();
+    (circuits ?? []).forEach((circuit, rang) => {
+      for (const id of circuit.fixtureIds) m.set(id, { circuit, rang });
+      for (const id of circuit.ceilingIds ?? []) m.set(id, { circuit, rang });
+    });
+    return m;
+  }, [circuits]);
+  /**
+   * LE DÉPART QU'ON REGARDE — un état de VISITE, comme les lumières.
+   *
+   * On en montre UN à la fois, et c'est tout l'intérêt : dix départs entourés
+   * de dix couleurs, c'est le plan des gaines, qui existe déjà et qui répond à
+   * une autre question. Ici on demande « celle-là, elle est sur quoi ? ».
+   *
+   * L'ANCRE est l'appareil qu'on a touché. Elle sert à deux choses : poser
+   * l'étiquette du départ près du doigt, et savoir quel second appui éteint —
+   * retoucher LA MÊME prise referme, toucher une autre prise passe à son
+   * départ. Éteindre au toucher d'une sœur serait cohérent et déroutant : on
+   * vient de dire à l'écran « celles-là m'intéressent ».
+   */
+  const [departMontre, setDepartMontre] = useState<{
+    circuit: string;
+    ancre: string;
+  } | null>(null);
   /**
    * LE SCINTILLEMENT — une seule boucle pour toutes les lampes.
    *
@@ -899,7 +968,13 @@ export function Iso3DView({
     référence, remise à jour à chaque rendu.
   */
   const renduRef = useRef<{
-    ciblesInter: { id: string; cx: number; cy: number; lampes: string[] }[];
+    ciblesInter: {
+      id: string;
+      cx: number;
+      cy: number;
+      lampes: string[];
+      departs: string[];
+    }[];
   } | null>(null);
 
   const rendered = useMemo(() => {
@@ -1216,7 +1291,28 @@ export function Iso3DView({
       projection, avec les mêmes nombres que le dessin : une cible calculée à
       part finirait par viser à côté de ce qu'on voit.
     */
-    const ciblesInter: { id: string; cx: number; cy: number; lampes: string[] }[] = [];
+    const ciblesInter: {
+      id: string;
+      cx: number;
+      cy: number;
+      lampes: string[];
+      departs: string[];
+    }[] = [];
+    /**
+     * OÙ SE POSE LA BAGUE D'UN DÉPART.
+     *
+     * La même liste que les cibles, à ceci près qu'elle garde AUSSI ce qui
+     * n'est touchable par personne : le tableau, qui n'appartient à aucun
+     * circuit et qu'on entoure pourtant à chaque fois — c'est de lui que part
+     * tout ce qu'on montre.
+     */
+    const posAppareils: {
+      id: string;
+      cx: number;
+      cy: number;
+      departs: string[];
+      tableau: boolean;
+    }[] = [];
     const posLampes: { id: string; cx: number; cy: number; r: number }[] = [];
     // Semis du sol : même code que le plan 2D, projeté sur le plan y = 0.
     // C'est ce fond pointillé qui distingue la surface au sol des murs.
@@ -1401,9 +1497,20 @@ export function Iso3DView({
               lot.some((f) => (f.commands ?? []).includes(cl.id)),
           )
           .map((cl) => cl.id);
-        // Un appareil qui ne commande rien n'offre aucune cible : un appui qui
-        // ne fait rien donne à l'écran l'air d'être en panne.
-        if (lampes.length === 0) continue;
+        /*
+          ET SUR QUEL DÉPART EST-IL ?
+
+          Un lot est ce qu'on voit sous une même plaque, et rien n'oblige ses
+          socles à partager un circuit : le neuvième socle d'un départ plein
+          bascule sur le suivant, plaque ou pas. On garde donc TOUS les départs
+          du lot — la bague se pose dès que l'un d'eux est celui qu'on montre,
+          et c'est le premier qui répond à l'appui.
+        */
+        const departs: string[] = [];
+        for (const id of mes) {
+          const d = departDe.get(id);
+          if (d && !departs.includes(d.circuit.id)) departs.push(d.circuit.id);
+        }
         const w = murParId.get(lot[0].wallId);
         if (!w) continue;
         const face = wallFace(w, quadsC.get(w.id), lot[0].side);
@@ -1414,7 +1521,27 @@ export function Iso3DView({
         const hauteur = lot.reduce((t, f) => t + f.height, 0) / lot.length;
         const pc = facePoint(face, cx, 0.06);
         const qc = project({ x: pc.x, y: hauteur, z: pc.z });
-        ciblesInter.push({ id: lot[0].id, cx: qc.sx, cy: qc.sy, lampes });
+        posAppareils.push({
+          id: lot[0].id,
+          cx: qc.sx,
+          cy: qc.sy,
+          departs,
+          tableau: lot.some((f) => f.kind === 'tableau'),
+        });
+        /*
+          UN APPAREIL QUI NE RÉPOND À RIEN N'OFFRE AUCUNE CIBLE : un appui qui
+          ne fait rien donne à l'écran l'air d'être en panne. Restent le
+          tableau — qui n'est sur aucun départ — et, quand l'écran ne passe
+          pas ses circuits, tout ce qui n'allume pas.
+        */
+        if (lampes.length === 0 && departs.length === 0) continue;
+        ciblesInter.push({
+          id: lot[0].id,
+          cx: qc.sx,
+          cy: qc.sy,
+          lampes,
+          departs,
+        });
       }
     }
 
@@ -1786,7 +1913,19 @@ export function Iso3DView({
       calculs.
     */
     const canevas = mettreAPlat(geometrie as never);
-    return { groupes, autres, canevas, ciblesInter, posLampes, volumes, interdits };
+    return {
+      groupes,
+      autres,
+      canevas,
+      ciblesInter,
+      posAppareils,
+      posLampes,
+      volumes,
+      interdits,
+      // Le rayon de la bague se calcule ICI, avec l'échelle du dessin, comme
+      // celui du halo : le rendu ne fait que le poser.
+      rBague: Math.max(BAGUE_MIN, BAGUE_DEPART * scale),
+    };
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, [
     scene,
@@ -1815,6 +1954,7 @@ export function Iso3DView({
     pov,
     focusWallId,
     showVolumes,
+    departDe,
   ]);
 
   /**
@@ -1835,6 +1975,17 @@ export function Iso3DView({
    * fait sept centimètres sur un mur de cinq mètres — quelques pixels à
    * l'écran — et l'on vise avec un doigt. C'est la règle du plan 2D : la cible
    * est plus tolérante que le dessin, et elle ne se confond jamais avec lui.
+   *
+   * ET TOUT LE RESTE MONTRE SON DÉPART. Une commande a déjà son travail ; une
+   * prise, une sortie de câble, une prise de communication n'avaient rien à
+   * répondre. Elles répondent à la question qu'on pose vraiment devant un
+   * logement qu'on n'a pas câblé soi-même — « celle-là, elle est sur quoi ? » —
+   * en entourant leurs sœurs du même circuit, et le tableau avec elles.
+   *
+   * UN APPAREIL NE FAIT JAMAIS LES DEUX. Faire allumer ET entourer une
+   * commande poserait des bagues à demeure dès qu'une lampe est allumée, et
+   * l'on ne désignerait plus rien. Le partage se lit sans notice : ce qui
+   * commande allume, ce qui consomme montre d'où il vient.
    */
   const basculerRef = useRef<((tx: number, ty: number) => void) | null>(null);
   basculerRef.current = (tx, ty) => {
@@ -1851,7 +2002,17 @@ export function Iso3DView({
       }
     }
     if (!touchee) return;
+    const cible = touchee;
     haptic('leger');
+    if (cible.lampes.length === 0) {
+      // Ce qui ne commande rien montre son départ.
+      const depart = cible.departs[0];
+      if (!depart) return;
+      setDepartMontre((avant) =>
+        avant && avant.ancre === cible.id ? null : { circuit: depart, ancre: cible.id },
+      );
+      return;
+    }
     setAllumees((avant) => {
       const apres = new Set(avant);
       /*
@@ -1860,8 +2021,8 @@ export function Iso3DView({
         on ne laisse pas un va-et-vient dans un état que la vraie installation
         ne peut pas prendre.
       */
-      const toutAllume = touchee!.lampes.every((id: string) => apres.has(id));
-      for (const id of touchee!.lampes) {
+      const toutAllume = cible.lampes.every((id: string) => apres.has(id));
+      for (const id of cible.lampes) {
         if (toutAllume) apres.delete(id);
         else apres.add(id);
       }
@@ -1871,6 +2032,58 @@ export function Iso3DView({
 
   // La référence suit le rendu : le geste lit toujours l'état affiché.
   renduRef.current = rendered ? { ciblesInter: rendered.ciblesInter } : null;
+
+  /**
+   * LE DÉPART MONTRÉ, MIS EN FORME — repère, teinte, libellé.
+   *
+   * Le repère et la teinte se déduisent du RANG dans le tableau, exactement
+   * comme le plan, le PDF et le schéma unifilaire les déduisent : `C3` est le
+   * troisième départ, et sa couleur est la troisième de la roue. Une teinte
+   * choisie ici dirait « C2 » en vert sur le dossier et en bleu sur le modèle.
+   *
+   * LE DÉPART S'ANNONCE, SINON LA COULEUR NE DIT RIEN. Trois prises entourées
+   * de violet, c'est joli et muet : ce qu'on veut savoir, c'est quel
+   * disjoncteur couper et sous quelle section. Le libellé porte donc le
+   * repère, le nom du départ et sa protection — le calibre d'abord, c'est lui
+   * qu'on cherche.
+   */
+  const departVu = (() => {
+    if (!departMontre) return null;
+    const rang = (circuits ?? []).findIndex((x) => x.id === departMontre.circuit);
+    if (rang < 0) return null;
+    const circuit = (circuits ?? [])[rang];
+    // La virgule décimale du métier : « 2,5 mm² », jamais « 2.5 ».
+    const section =
+      circuit.section === null ? null : String(circuit.section).replace('.', ',');
+    const protection =
+      circuit.breaker === null
+        ? 'sans disjoncteur'
+        : `${circuit.breaker} A${section ? ` · ${section} mm²` : ''}`;
+    return {
+      id: circuit.id,
+      /** Les points de PLAFOND du départ : eux aussi portent la bague. */
+      plafond: new Set(circuit.ceilingIds ?? []),
+      teinte: circuitColor(rang),
+      /*
+        DEUX LIGNES, ET C'EST UNE MESURE, PAS UN GOÛT.
+
+        Sur une seule ligne, « C2 · Prises 1 — 20 A · 2,5 mm² » réserve 228
+        pixels. Vu à l'œil sur le rendu réel dézoomé à 0,35, le logement entier
+        tenait dans 145 : l'étiquette recouvrait le plan qu'elle commente. Le
+        halo l'avait déjà fait à sa façon, et la leçon est la même — ce qui
+        s'écrit en pixels ne rétrécit pas avec le dessin, il faut donc qu'il
+        soit COURT.
+
+        Coupée en deux — l'identité au-dessus, les caractéristiques en
+        dessous —, elle tombe à 116 pixels. C'est la forme du cartouche de
+        pièce, dix lignes plus bas dans ce même fichier : même estimation de
+        largeur, même hauteur, même partage. Deux cartouches sur une maquette
+        ne s'inventent pas chacun leur mise en page.
+      */
+      titre: `C${rang + 1} · ${circuit.label}`,
+      protection,
+    };
+  })();
 
   return (
     <View
@@ -2036,6 +2249,124 @@ export function Iso3DView({
                   />
                 </React.Fragment>
               ))}
+            {/*
+              LE DÉPART QU'ON MONTRE : ses appareils, et le tableau.
+
+              UNE BAGUE, PAS UN DISQUE — la même règle que l'appareil interdit :
+              elle cercle le repère sans le cacher, et c'est le repère qu'on est
+              venu regarder. Le tableau la porte à chaque fois : savoir que deux
+              prises sont sœurs sans savoir d'où elles viennent ne dit pas où
+              couper, et couper est la raison pour laquelle on pose la question.
+
+              ELLES SE POSENT AVANT LES CIBLES et après les halos : ce qu'on
+              touche prime sur ce qui est à côté.
+            */}
+            {departVu && (
+              <>
+                {rendered.posAppareils
+                  .filter((a) => a.tableau || a.departs.includes(departVu.id))
+                  .map((a) => (
+                    <Circle
+                      key={`bague-${a.id}`}
+                      testID={`bague-${a.id}`}
+                      cx={a.cx}
+                      cy={a.cy}
+                      r={rendered.rBague}
+                      fill="none"
+                      stroke={departVu.teinte}
+                      strokeWidth={2.5}
+                    />
+                  ))}
+                {/* Un circuit d'éclairage porte des appliques au mur ET des
+                    points au plafond : montrer la moitié d'un départ vaudrait
+                    mieux ne rien montrer. */}
+                {rendered.posLampes
+                  .filter((l) => departVu.plafond.has(l.id))
+                  .map((l) => (
+                    <Circle
+                      key={`bague-${l.id}`}
+                      testID={`bague-${l.id}`}
+                      cx={l.cx}
+                      cy={l.cy}
+                      r={rendered.rBague}
+                      fill="none"
+                      stroke={departVu.teinte}
+                      strokeWidth={2.5}
+                    />
+                  ))}
+                {(() => {
+                  /*
+                    L'ÉTIQUETTE SE POSE PRÈS DU DOIGT — sur l'appareil qu'on
+                    vient de toucher. Ancrée au tableau, elle aurait obligé à
+                    chercher des yeux à l'autre bout du logement ce qu'on vient
+                    de demander ; ancrée en haut de l'écran, elle aurait dépendu
+                    de ce que le parent met par-dessus la vue.
+
+                    L'ANCRE PEUT AVOIR TOURNÉ HORS DU CHAMP : on retombe alors
+                    sur le premier appareil visible du départ, et s'il n'y en a
+                    aucun, l'étiquette se tait — le départ reste montré, il n'y
+                    a simplement plus rien à désigner de ce côté-ci.
+                  */
+                  const ancre =
+                    rendered.posAppareils.find(
+                      (a) => a.id === departMontre?.ancre,
+                    ) ??
+                    rendered.posAppareils.find((a) =>
+                      a.departs.includes(departVu.id),
+                    );
+                  if (!ancre) return null;
+                  // La même estimation de largeur que le cartouche de pièce,
+                  // quelques lignes plus bas : deux mesures divergentes
+                  // finissent toujours par tronquer un libellé.
+                  const wpx = Math.max(
+                    46,
+                    Math.max(departVu.titre.length, departVu.protection.length) *
+                      7 +
+                      18,
+                  );
+                  const hpx = 38;
+                  const x = clamp(ancre.cx, wpx / 2 + 6, layout.w - wpx / 2 - 6);
+                  const y = Math.max(
+                    hpx / 2 + 6,
+                    ancre.cy - rendered.rBague - 24,
+                  );
+                  return (
+                    <>
+                      <Rect
+                        x={x - wpx / 2}
+                        y={y - hpx / 2}
+                        width={wpx}
+                        height={hpx}
+                        rx={6}
+                        fill={c.surface}
+                        stroke={departVu.teinte}
+                        strokeWidth={1.5}
+                      />
+                      <SvgText
+                        testID="etiquette-depart"
+                        x={x}
+                        y={y - 3}
+                        fontSize={11}
+                        fontWeight="700"
+                        fill={c.ink}
+                        textAnchor="middle">
+                        {departVu.titre}
+                      </SvgText>
+                      <SvgText
+                        testID="etiquette-protection"
+                        x={x}
+                        y={y + 12}
+                        fontSize={10}
+                        fontWeight="700"
+                        fill={c.inkSoft}
+                        textAnchor="middle">
+                        {departVu.protection}
+                      </SvgText>
+                    </>
+                  );
+                })()}
+              </>
+            )}
             {/*
               LA CIBLE D'UN INTERRUPTEUR — invisible, et plus large que lui.
 

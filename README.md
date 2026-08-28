@@ -10516,6 +10516,106 @@ Mesuré à trois cadrages : 22, 63 et 158 points de rayon, soit **toujours la m�
 part de la maquette**. Regardé en image, avant contre après, au cadrage exact de
 la capture : le halo débordait du logement, il tient maintenant dedans.
 
+### La prise montre son circuit
+
+Devant un logement qu'on n'a pas câblé soi-même, la question qu'on pose est
+toujours la même : **« celle-là, elle est sur quoi ? »** Jusqu'ici, y répondre
+demandait d'ouvrir le schéma unifilaire, d'y lire un repère, puis de revenir
+chercher ce repère sur le plan, appareil par appareil. On touche maintenant la
+prise sur la maquette : ses sœurs du même départ s'entourent d'une bague, le
+tableau aussi, et une étiquette nomme le circuit.
+
+**POURQUOI SUR LA MAQUETTE, ET PAS SUR LE PLAN.** Un départ ne se lit pas en
+liste. « Les six prises du séjour et les deux du couloir sur le même 20 A » ne
+veut rien dire tant qu'on ne voit pas où elles sont les unes par rapport aux
+autres — et c'est là que le pontage se comprend : des socles voisins, sur un
+même pan, sur un même départ, se tirent de proche en proche.
+
+**LE TABLEAU EST ENTOURÉ À CHAQUE FOIS**, et c'est la moitié de la réponse.
+Savoir que deux prises sont sœurs sans savoir d'où elles viennent ne dit pas où
+couper — et couper est la raison pour laquelle on pose la question. Il n'est sur
+aucun départ, il est donc traité à part : il porte la bague dès qu'un départ est
+montré, et un appui sur lui ne fait toujours rien.
+
+**UN APPAREIL NE FAIT JAMAIS LES DEUX.** L'appui simple servait déjà à allumer
+ce qu'une commande commande. Le partage est le suivant, et il se lit sans
+notice : **ce qui commande allume, ce qui consomme montre d'où il vient.** Faire
+faire les deux à un interrupteur aurait posé des bagues à demeure dès qu'une
+lampe est allumée — le contraire de ce qu'on cherche, qui est de désigner un
+départ à la fois. Effet de bord voulu : plus aucun appareil ne reste muet sous
+le doigt, alors qu'une prise ne répondait rien.
+
+**UN SEUL CALCUL DE CIRCUITS, DEUX LECTURES.** L'écran de résultat appelait
+`planCircuits` de façon anonyme, aussitôt consommé par `fixtureMarks` : le plan
+2D recevait les repères, et personne d'autre ne pouvait rien en faire. Les
+circuits sont maintenant nommés (`circuitsDuPlan`), les repères s'en déduisent,
+et la maquette reçoit **les mêmes**. Refaire le découpage dans la vue aurait
+donné, au premier glissement d'entrées, un plan qui dit « C3 » devant un modèle
+qui dit « C2 » — pire que pas de repère du tout. C'est la règle de la maison sur
+les prix, appliquée aux départs.
+
+La teinte vient de la même roue que le plan, le PDF et l'unifilaire
+(`circuitColor` au rang du départ) : une couleur choisie dans la vue aurait
+menti d'un document à l'autre.
+
+**LA BAGUE SE MESURE EN MÈTRES.** Seize centimètres de rayon — une plaque simple
+débordée de ce qu'il faut pour qu'on la voie sans cacher le symbole — projetés
+avec l'échelle de la maquette. Écrite en pixels, elle aurait refait le coup du
+halo de cinquante-quatre : juste sur le cadrage où on l'a posée, absurde partout
+ailleurs. Pas de borne haute, à la différence du halo : une portée de lumière
+peut couvrir une petite pièce entière, une bague de seize centimètres ne peut
+couvrir qu'une plaque. Seul le plancher est utile (quatre points), pour qu'on
+voie encore de très loin **quels** appareils sont sur le départ.
+
+**L'ÉTIQUETTE EST PASSÉE À DEUX LIGNES, ET C'EST L'IMAGE QUI L'A DEMANDÉ.**
+Écrite d'un trait, « C2 · Prises 1 — 20 A · 2,5 mm² » réservait **228 pixels**.
+Regardé sur le rendu réel dézoomé à 0,35 — la vue rendue par le vrai composant,
+transcrite en SVG depuis ses propres nombres —, le logement entier tenait dans
+**145** : le commentaire recouvrait le plan qu'il commente. Le halo l'avait déjà
+fait à sa façon ; la leçon est la même, **ce qui s'écrit en pixels ne rétrécit
+pas avec le dessin, il faut donc que ce soit court**. Coupée en deux — identité
+au-dessus, protection en dessous —, elle tombe à **116 pixels**. C'est la forme
+du cartouche de pièce, dans le même fichier : même estimation de largeur, même
+hauteur, même partage. Deux cartouches sur une maquette ne s'inventent pas
+chacun leur mise en page.
+
+Elle s'ancre sur l'appareil qu'on vient de toucher — au tableau, elle aurait
+obligé à chercher des yeux à l'autre bout du logement ce qu'on vient de
+demander ; en tête d'écran, elle aurait dépendu de ce que le parent pose
+par-dessus la vue (la rangée « étage / 2D-3D » y est ancrée à dix points du
+bord). Si l'ancre a tourné hors du champ, l'étiquette retombe sur le premier
+appareil visible du départ ; s'il n'y en a plus aucun, elle se tait — le départ
+reste montré, il n'y a simplement plus rien à désigner de ce côté-ci.
+
+**RETOUCHER LA MÊME PRISE REFERME ; toucher une autre prise passe à son
+départ.** Éteindre au toucher d'une sœur aurait été cohérent et déroutant : on
+vient de dire à l'écran que celles-là nous intéressent.
+
+**Vingt-deux épreuves** (`circuitdelaprise`), écrites avant le correctif et
+vérifiées en échec sur le code d'avant — seize rouges, les cinq qui passaient
+décrivant l'état antérieur. Elles tiennent le choix (une prise entoure ses
+sœurs, pas celles d'un autre départ), le partage des deux gestes, la teinte, la
+mise en forme de l'étiquette, l'échelle de la bague à quatre cadrages, et
+surtout **le fil jusqu'à l'écran** : la vue 3D reçoit bien les circuits du
+dossier, et ils portent la pièce — un `planCircuits` appelé sans le placement
+des appareils rendrait des départs dont la pièce est vide, et rien d'autre ne
+l'attraperait.
+
+Le banc `allumerlalumiere` gardait une épreuve dont la RAISON a changé : « une
+prise n'a même pas de cible ». Elle passe toujours, parce que cette vue-là est
+montée sans circuits — la visite guidée et l'aperçu d'export n'ont pas de
+dossier électrique derrière eux. Le commentaire le dit maintenant, sans quoi
+l'épreuve serait passée un jour pour la mauvaise raison.
+
+**CE QU'ON A VU EN IMAGE ET QU'ON N'A PAS CORRIGÉ.** Un appareil posé bas sur un
+mur du fond, près d'un angle, est **caché par le mur du premier plan** — et son
+repère est dessiné par-dessus quand même. C'est un choix ancien et assumé du
+modèle (« un repère est une annotation, pas un volume ; il se lit par-dessus »),
+et la bague le suit fidèlement : elle se pose exactement là où la vue dessine
+l'appareil, à moins de trois points près, mesuré sur le rendu. Le résultat, mur
+plein, est une bague verte sur un pan vide. En écorché, le pan s'efface et tout
+revient. C'est une question ouverte pour le repère lui-même, pas pour la bague.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

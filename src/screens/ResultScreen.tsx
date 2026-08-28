@@ -1647,19 +1647,32 @@ export function ResultScreen() {
    * schéma unifilaire porte les mêmes repères. Ils se calculent sans
    * tableau posé — un circuit existe dès qu'il y a des appareils.
    */
-  const marks = useMemo(() => {
+  /*
+    LES DÉPARTS D'ABORD, LES REPÈRES ENSUITE.
+
+    Ils sortaient d'un `planCircuits` anonyme, consommé sur place par
+    `fixtureMarks` : le plan 2D recevait les repères, et personne d'autre ne
+    pouvait rien en faire. La maquette 3D en a besoin ENTIERS — pour montrer
+    le départ d'une prise, il faut ses sœurs, ses points de plafond, son
+    calibre et sa section, pas seulement l'étiquette « C2 ».
+
+    Un seul calcul, donc, et deux lectures : c'est la règle de la maison sur
+    les circuits comme sur les prix. Deux appels donneraient deux découpages
+    le jour où l'un des deux jeux d'entrées glisserait — et un plan qui dit
+    « C3 » devant un modèle qui dit « C2 » est pire que pas de repère.
+  */
+  const circuitsDuPlan = useMemo(() => {
     const pieceDe = (f: Fixture) =>
       rooms.find((r) => r.id === placement.get(f.id));
-    return fixtureMarks(
-      planCircuits(
-        fixtures,
-        (f) => pieceDe(f)?.name ?? '',
-        (f) => roomUse(pieceDe(f)?.name ?? '', pieceDe(f)?.kind) === 'cuisine',
-        (f) => pieceDe(f)?.id,
-        ceiling,
-      ),
+    return planCircuits(
+      fixtures,
+      (f) => pieceDe(f)?.name ?? '',
+      (f) => roomUse(pieceDe(f)?.name ?? '', pieceDe(f)?.kind) === 'cuisine',
+      (f) => pieceDe(f)?.id,
+      ceiling,
     );
   }, [fixtures, rooms, placement, ceiling]);
+  const marks = useMemo(() => fixtureMarks(circuitsDuPlan), [circuitsDuPlan]);
 
   /**
    * Volumes de salle d'eau : le seul contrôle où une erreur est dangereuse.
@@ -3314,6 +3327,14 @@ export function ResultScreen() {
             showNorth={showNorth}
             showCeiling={showCeiling}
             showVolumes={showVolumes}
+            /* On touche une prise, ses sœurs du même départ s'entourent — et
+               le tableau avec elles. Les circuits sont ceux du dossier, pas
+               un découpage refait dans la vue : voir `circuitsDuPlan`.
+
+               ILS NE DÉPENDENT D'AUCUN CALQUE, à la différence des repères
+               qui accompagnent les gaines : essayer une installation n'a rien
+               à voir avec ce qu'on a choisi d'afficher. */
+            circuits={circuitsDuPlan}
             value={view3d}
             onChange={setView3d}
             focusRoomId={rooms[focusIdx]?.id ?? null}

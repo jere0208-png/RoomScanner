@@ -262,12 +262,23 @@ describe('un appui sur l’interrupteur allume ce qu’il commande', () => {
     expect(halos(t)).toHaveLength(0);
   });
 
-  it('une prise ne commande rien : elle n’a même pas de cible', () => {
+  it('une prise ne commande rien : sans départs, elle n’a même pas de cible', () => {
     /*
       LE CONTRÔLE EN SENS INVERSE. Si toute la surface allumait quelque chose,
       les trois épreuves du dessus passeraient sans rien prouver. Un appareil
       qui ne commande aucun point lumineux n'offre donc aucune cible — et un
       appui dessus ne fait rien.
+
+      LA RAISON A CHANGÉ DEPUIS, ET IL FAUT LE DIRE, sinon cette épreuve
+      passerait un jour pour la mauvaise. À l'écriture, une prise n'avait
+      RIEN à répondre : le tap ne servait qu'à allumer, donc pas de commande,
+      pas de cible. Une prise répond maintenant elle aussi — elle montre son
+      départ (banc `circuitdelaprise`).
+
+      CE QUI TIENT ENCORE ICI, c'est que cette vue-là est montée SANS
+      circuits : la visite guidée et l'aperçu d'export n'ont pas de dossier
+      électrique derrière eux. Sans départs à montrer, la prise redevient
+      muette, et la règle est intacte — pas de réponse, pas de cible.
     */
     const t = monter();
     expect(
