@@ -11177,6 +11177,72 @@ les sigles —, le mot ENTRE au lieu de se poser, avec son contrôle en sens inv
 mot), le titre par-dessus le dossier, la barre qui part de zéro, finit plein et ne
 recule jamais, et la durée sous six secondes.
 
+### Un seul plan sans abonnement — et cinq portes qui ne le savaient pas
+
+Relevé du patron : « vérifie que pour un utilisateur pas abonné, il ne peut
+scanner qu'un seul plan, et même pas ajouter d'étage etc. »
+
+**LA RÈGLE ÉTAIT JUSTE, ET DÉJÀ ÉPROUVÉE.** `peutCreerPlan()` rend faux dès qu'un
+plan a été enregistré (`PLANS_GRATUITS = 1`), et deux bancs le tiennent —
+`compte` et `paywall`. L'accueil la consulte à ses deux portes : « Commencer le
+scan » et « Dessiner un plan ». Jusque-là, tout va bien.
+
+**MAIS C'ÉTAIT L'OUTIL QUI ÉTAIT ÉPROUVÉ, PAS L'OUVRAGE** — la faute que cette
+maison connaît par cœur. **Cinq autres portes créaient un plan sans jamais
+consulter la règle :**
+
+| porte | où | ce qu'elle faisait |
+|---|---|---|
+| « Scanner un étage de plus » | menu des étages | lançait le scan |
+| « Scanner un étage » | « … » du plan | lançait le scan |
+| « Scanner un sous-sol » | « … » du plan | lançait le scan |
+| « Dupliquer » | bibliothèque | créait une entrée, sans débiter |
+| « Enregistrer une copie » | bandeau du plan | créait une entrée, sans débiter |
+
+Autrement dit : le palier gratuit s'arrêtait à l'accueil. Une fois dedans, on
+montait autant d'étages qu'on voulait sur le plan qu'on avait le droit de faire,
+et l'on dupliquait ce plan sans limite — **dix copies, et le compteur en voyait
+toujours une**.
+
+**LA CINQUIÈME EST CELLE QUI SURPREND LE PLUS**, parce qu'elle porte le mot
+« enregistrer » : le geste normal de sauvegarde (`commitCurrent`) débitait bien,
+sa variante « copie » non.
+
+**LE VERROU DES ÉTAGES EST POSÉ À LA PORTE COMMUNE.** Les trois boutons appellent
+tous `demarrerEtage` : c'est là que la règle se juge, et non dans chacun d'eux —
+un quatrième bouton demain retombe sur le même verrou. C'est la règle de la
+maison sur les sources uniques, appliquée à une porte.
+
+**ET C'EST L'OFFRE QUI S'OUVRE, PAS UN REFUS** : le popup « Surprise ! » et son
+−20 %, exactement comme à l'accueil. On ne met pas un mur devant quelqu'un qui
+vient de relever un logement.
+
+**UNE COPIE EST UN PLAN**, donc elle se compte : `placePourUnPlanDePlus()`
+consulte la règle et la débite, et les deux gestes de copie y passent. Une copie
+se chiffre à part, s'exporte à part, vit sa vie — c'est un plan.
+
+**CE QUI RESTE OUVERT, ET C'EST VOULU : « Scanner une pièce ».** Une pièce de
+plus est le MÊME plan — un logement se relève pièce par pièce, c'est le geste
+normal du premier relevé. Un étage, lui, est un autre niveau : le plan, le métré
+et le dossier en parlent séparément. Si le palier doit aussi s'arrêter là, c'est
+une ligne à changer, et il faut me le dire.
+
+**Sept épreuves** (`unseulplan`), cinq rouges avant : un plan enregistré et c'est
+fini, l'étage et le sous-sol refusés avec l'offre à la place, la copie refusée —
+et surtout **les deux contrôles en sens inverse qui portent tout** : un abonné
+monte bien son étage et duplique bien son plan, sans quoi un verrou qui bloque
+tout le monde passerait les épreuves et l'abonnement ne servirait plus à rien.
+
+**Une huitième lit le code source** de l'écran du plan : il ne sait lancer un
+étage QUE par `demarrerEtage`. Le jour où quelqu'un appellerait `scannerUnEtage`
+puis `beginScan` à la main, le palier serait contourné sans qu'une seule épreuve
+de comportement ne bouge.
+
+Quatre bancs voisins reposent maintenant le compteur avant d'enregistrer, avec la
+raison écrite : depuis qu'une copie coûte un plan, la deuxième sauvegarde d'un
+banc tombait dans le vide — **le magasin du compte survit d'une épreuve à
+l'autre**, comme celui du scan.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

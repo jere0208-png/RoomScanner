@@ -1837,6 +1837,26 @@ export const useScanStore = create<ScanState>((set, get) => {
    */
   let savedDepth = 0;
 
+  /**
+   * UNE ENTRÉE DE BIBLIOTHÈQUE DE PLUS — le palier gratuit décide, et paie.
+   *
+   * Relevé du patron : « vérifie que pour un utilisateur pas abonné, il ne
+   * peut scanner qu'un seul plan ». Deux gestes créaient une entrée sans
+   * jamais consulter la règle NI la débiter : « Dupliquer » dans la
+   * bibliothèque, et « Enregistrer une copie » dans le bandeau du plan. Un
+   * plan dupliqué dix fois faisait dix plans, et le compteur en voyait
+   * toujours un.
+   *
+   * Une copie EST un plan : elle se chiffre à part, elle s'exporte à part,
+   * elle vit sa vie. Elle se compte donc comme un plan.
+   */
+  const placePourUnPlanDePlus = (): boolean => {
+    const compte = useAccountStore.getState();
+    if (!compte.peutCreerPlan()) return false;
+    compte.noterPlanCree();
+    return true;
+  };
+
   /*
     CE PLAN A-T-IL DÉJÀ ÉTÉ COMPTÉ ?
 
@@ -3681,6 +3701,8 @@ export const useScanStore = create<ScanState>((set, get) => {
       const st = get();
       const source = st.saves.find((x) => x.id === id);
       if (!source) return;
+      // Une copie est un plan : voir `placePourUnPlanDePlus`.
+      if (!placePourUnPlanDePlus()) return;
       const now = Date.now();
       const copie: SavedScan = {
         ...source,
@@ -6181,6 +6203,8 @@ export const useScanStore = create<ScanState>((set, get) => {
     saveAsCopy: (name) => {
       const st = get();
       if (st.walls.length === 0) return;
+      // Une copie est un plan : voir `placePourUnPlanDePlus`.
+      if (!placePourUnPlanDePlus()) return;
       const now = Date.now();
       const clean = name.trim() || `${st.scanName} (copie)`;
       const save: SavedScan = {

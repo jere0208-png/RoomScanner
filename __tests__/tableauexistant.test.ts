@@ -13,6 +13,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 import { type WallSeg } from '../src/geometry/floorplan';
+import { useAccountStore } from '../src/store/accountStore';
 import { useScanStore } from '../src/store/scanStore';
 
 /** Un carre de quatre murs : sans plan, une sauvegarde ne part pas. */
@@ -32,7 +33,22 @@ const PIECE: WallSeg[] = [
 
 beforeAll(() => jest.useFakeTimers());
 afterAll(() => jest.useRealTimers());
+/*
+  LE PALIER GRATUIT N'EST PAS LE SUJET DE CE BANC.
+
+  Depuis qu'une COPIE compte pour un plan (voir `unseulplan`), `saveAsCopy`
+  refuse quand le palier est épuisé — et le magasin du compte survit d'une
+  épreuve à l'autre. La deuxième sauvegarde d'un banc tombait donc dans le
+  vide, sans qu'aucune épreuve ne parle d'abonnement.
+
+  On travaille donc ici sur un compte qui a le droit d'enregistrer, et l'on
+  dit pourquoi : le verrou est éprouvé là où il est le sujet.
+*/
+const compteQuiPeutEnregistrer = () =>
+  useAccountStore.setState({ pro: true, plansUtilises: 0, bonusEssais: 0 });
+
 beforeEach(() => {
+  compteQuiPeutEnregistrer();
   jest.advanceTimersByTime(2000);
   useScanStore.setState({
     walls: PIECE,

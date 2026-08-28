@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { RoomScan, scanEvents, type ScanUpdate } from 'react-native-room-scan';
 import { useScanStore } from '../store/scanStore';
+import { useAccountStore } from '../store/accountStore';
 
 /** Instructions RoomPlan (enum Swift) → libellés français. */
 const INSTRUCTIONS_FR: Record<string, string> = {
@@ -43,6 +44,29 @@ export async function demarrerComplement(): Promise<void> {
  */
 export async function demarrerEtage(n: number): Promise<void> {
   const st = useScanStore.getState();
+  /*
+    LE PALIER GRATUIT SE JUGE ICI, À LA PORTE COMMUNE.
+
+    Relevé du patron : « vérifie que pour un utilisateur pas abonné, il ne peut
+    scanner qu'un seul plan, et même pas ajouter d'étage etc. » La règle était
+    juste et tenue par deux bancs — et TROIS boutons ne la consultaient pas :
+    « Scanner un étage de plus », « Scanner un étage », « Scanner un sous-sol ».
+    Le palier s'arrêtait à l'accueil, et l'on montait autant d'étages qu'on
+    voulait sur le plan qu'on avait le droit de faire.
+
+    Le verrou est posé à la fonction que les trois appellent, et non dans
+    chacun des trois : un quatrième bouton demain retombe sur le même verrou.
+    C'est la règle de la maison sur les sources uniques, appliquée à une porte.
+
+    ET C'EST L'OFFRE QUI S'OUVRE, PAS UN REFUS. Exactement comme à l'accueil :
+    le popup « Surprise ! » et son −20 % tendent la page Pro. On ne met pas un
+    mur devant quelqu'un qui vient de relever un logement.
+  */
+  const compte = useAccountStore.getState();
+  if (!compte.peutCreerPlan()) {
+    compte.ouvrirSurprise();
+    return;
+  }
   st.scannerUnEtage(n);
   st.beginScan();
   await RoomScan.start();
