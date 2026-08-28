@@ -302,7 +302,7 @@ export const TARIFS_COMMUNS: Record<string, Tarif> = {
   'disj-20': t(11.9),
   'disj-32': t(16.5),
   'diff-AC': r(72.9),
-  'diff-A': t(108),
+  'diff-A': r(81.9),
   'coffret-com': t(179),
   /*
     LE COFFRET SE CHIFFRE À LA RANGÉE, ET IL EN FAUT UN.
@@ -313,7 +313,7 @@ export const TARIFS_COMMUNS: Record<string, Tarif> = {
     manque le poste le plus visible du tableau.
   */
   'coffret-1': t(29),
-  'coffret-2': t(52),
+  'coffret-2': r(52.9),
   'coffret-3': t(72),
   'coffret-4': t(95),
   // Le peigne, qu'on oublie toujours. (Le bornier de terre, lui, est fourni
@@ -370,9 +370,9 @@ export const TARIFS_COMMUNS: Record<string, Tarif> = {
   'disj-6': t(10.5),
   'disj-25': t(13.5),
   'disj-40': t(22.9),
-  'diff-A-63': t(139),
+  'diff-A-63': t(105),
   'diff-AC-63': t(92),
-  'diff-HPI': t(155),
+  'diff-HPI': t(119),
   parafoudre: t(89),
   'contacteur-jn': t(56),
   telerupteur: t(42),
@@ -420,6 +420,38 @@ export const TARIFS_COMMUNS: Record<string, Tarif> = {
   'pince-coupante': t(22),
   'tournevis-testeur': t(9),
   multimetre: t(35),
+  /*
+    CE QU'UNE RÉNOVATION D'APPARTEMENT DEMANDE, ET QUI MANQUAIT.
+
+    Relevé du patron : « fais un check du rayon complet électrique pour les
+    besoins standards, rénovation d'appartement par exemple ». Le catalogue
+    couvrait le neuf — saigner, tirer, câbler — et laissait de côté ce qui est
+    PROPRE À LA RÉNOVATION, où l'on travaille dans des murs déjà finis.
+
+    LE PLUS IMPORTANT EST LA LIAISON ÉQUIPOTENTIELLE. Elle est OBLIGATOIRE
+    dans une salle d'eau (NF C 15-100), elle se refait à chaque rénovation
+    parce qu'on y touche les canalisations, et elle ne coûte presque rien —
+    c'est exactement le genre de poste qu'on oublie au devis et qu'on paie sur
+    le chantier. Elle n'était nulle part.
+  */
+  // ---------------------------------------------- propre à la rénovation
+  'icta-prefilee-3g1.5': r(95.9),
+  'icta-prefilee-3g2.5': r(149.9),
+  'barrette-equipotentielle': t(12.9),
+  'collier-equipotentiel': t(4.5),
+  'rehausse-boite': t(1.9),
+  'obturateur': r(6.09),
+  // Protections d'un départ seul : courantes en rénovation, où l'on ajoute
+  // un circuit sans refaire toute la rangée.
+  'disj-diff-16': t(59),
+  'disj-diff-20': t(62),
+  // Pièces humides et non chauffées — salle d'eau, cave, balcon.
+  'prise-etanche': t(12.9),
+  'inter-etanche': t(14.9),
+  // Ce qui se raccorde en dur : plaque, sèche-serviette, volet.
+  'sortie-cable-32': t(12.9),
+  'inter-volet': t(24.9),
+  carillon: t(32),
   // ------------------------------------------------------ plafond et divers
   'transfo-led': t(28),
   'ruban-led': t(24),

@@ -10027,6 +10027,66 @@ le bloc **n'impose aucune hauteur** et laisse son contenu le pousser. Une
 hauteur écrite en dur est la seule façon qu'un logo sorte d'un cadre — c'est la
 leçon du bandeau du meuble, qui mentait de quatre-vingts points sur sa réserve.
 
+### Le rayon électrique passé au crible d'une rénovation d'appartement
+
+Relevé du patron : « fais un check du rayon complet électrique pour les besoins
+standards, rénovation d'appartement par exemple ».
+
+**UN CATALOGUE SE JUGE À CE QU'IL NE CONTIENT PAS, et un manque ne se voit
+pas** : on ne remarque une barrette de liaison équipotentielle absente qu'au
+moment où l'on en cherche une. Une relecture attentive laisse passer ce qu'elle
+n'a pas pensé à chercher — la preuve, c'est que la première version du
+catalogue, écrite d'une traite en regardant ce que le plan sait compter, n'avait
+**ni la préfilée ni la liaison équipotentielle**, deux articles qu'aucune
+rénovation ne saute.
+
+**ON A DONC ÉCRIT LE CHANTIER, ET DEMANDÉ AU CATALOGUE DE RÉPONDRE.** Le banc
+`renovationappart` liste un T3 des années soixante-dix qu'on refait à neuf —
+tableau déposé, circuits refaits, cloisons déjà finies — **poste par poste, avec
+le geste en face du code**. Il se relit comme un métré, pas comme un inventaire.
+Vérifié qu'il échoue sur le catalogue d'avant : **douze manques**.
+
+**LES DEUX QUI COMPTENT VRAIMENT :**
+
+- **La liaison équipotentielle** (barrette + colliers). Elle est OBLIGATOIRE en
+  salle d'eau (NF C 15-100), elle se refait à chaque rénovation puisqu'on touche
+  aux canalisations, et elle ne coûte presque rien : **c'est exactement le poste
+  qu'on oublie au devis et qu'on paie sur le chantier.** Elle n'était nulle
+  part ;
+- **La gaine préfilée**, l'article de la rénovation. En neuf on tire ses fils,
+  parce qu'on a le mur ouvert et qu'on choisit ses couleurs ; en rénovation on
+  passe dans des cloisons finies, et le fil qu'on ne tire pas est une
+  demi-journée gagnée.
+
+Les dix autres : disjoncteur différentiel (ajouter un départ sans refaire la
+rangée), rehausse de boîte (rattraper un doublage), obturateur, sortie de câble
+32 A (la plaque se raccorde en dur), interrupteur de volet roulant, carillon,
+prise et interrupteur étanches (balcon, cave).
+
+#### Quatre relevés de plus, et deux erreurs de catalogue corrigées
+
+| article | catalogue | relevé en rayon |
+|---|---|---|
+| Gaine préfilée 3G1,5 Ø16, 100 m | — | **95,90 €** |
+| Gaine préfilée 3G2,5 Ø20, 100 m | — | **149,90 €** |
+| Coffret 2 rangées 26 modules | 52 € | **52,90 €** |
+| Différentiel 40 A **type A** | 108 € estimés | **81,90 €** |
+
+**Le type A était surestimé d'un quart.** Il avait été recalé sur l'écart mesuré
+du type AC (× 1,74) faute de mieux ; le vrai écart est de × 1,95 sur l'AC et de
+× 1,3 seulement sur le A. Un recalage par famille est une béquille, et celle-ci
+boitait de vingt-six euros sur un article qu'un tableau porte une à trois fois.
+
+**ET LE COFFRET NE VIENT PAS AVEC SA PORTE.** Le catalogue écrivait « 26
+modules, avec porte » ; la fiche annonce les borniers et le kit de fixation, pas
+la porte. **Un devis qui promet une porte qu'on n'achète pas est un devis faux
+de trente euros, découverts au comptoir.** C'est le genre de détail qu'on ne
+trouve qu'en allant lire la fiche — et c'est bien pour ça qu'on y va.
+
+**Le catalogue compte désormais 116 articles**, et le banc garde la couverture :
+le jour où un geste de chantier n'aura plus son article, il le dira avec le
+geste en clair, pas avec un code.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

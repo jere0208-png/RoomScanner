@@ -348,6 +348,48 @@ const CONDUITS: ArticleMagasin[] = [
     unite: 'couronne',
   },
   {
+    code: 'icta-prefilee-3g1.5',
+    rayon: 'Conduits et conducteurs',
+    libelle: 'Gaine préfilée 3G1,5 Ø 16',
+    precision: 'Couronne de 100 m — éclairage, en rénovation surtout',
+    unite: 'couronne',
+    /*
+      LA PRÉFILÉE EST L'ARTICLE DE LA RÉNOVATION, et le catalogue l'ignorait.
+
+      En neuf on tire ses fils, parce qu'on a le mur ouvert et qu'on choisit
+      ses couleurs. En rénovation on passe dans des cloisons finies, souvent
+      d'en haut, et le fil qu'on ne tire pas est une demi-journée gagnée. Elle
+      coûte plus cher que gaine + fils achetés séparément — 95,90 € contre
+      environ 56 € — et c'est un ARBITRAGE, pas une erreur : le devis doit
+      pouvoir proposer les deux.
+    */
+    offres: [
+      {
+        enseigne: 'Castorama',
+        prix: 95.9,
+        intitule: 'Gaine préfilée 3G1,5 Diall ø16 - 100 m',
+        reference: '3389978204113',
+        jour: '2026-08-28',
+      },
+    ],
+  },
+  {
+    code: 'icta-prefilee-3g2.5',
+    rayon: 'Conduits et conducteurs',
+    libelle: 'Gaine préfilée 3G2,5 Ø 20',
+    precision: 'Couronne de 100 m — prises et spécialisés, en rénovation',
+    unite: 'couronne',
+    offres: [
+      {
+        enseigne: 'Castorama',
+        prix: 149.9,
+        intitule: 'Gaine préfilée 3G2,5 Diall ø20 - 100 m',
+        reference: '3389978204120',
+        jour: '2026-08-28',
+      },
+    ],
+  },
+  {
     code: 'gaine-tpc-40',
     rayon: 'Conduits et conducteurs',
     libelle: 'Gaine TPC Ø 40 rouge',
@@ -487,6 +529,34 @@ const ENCASTREMENT: ArticleMagasin[] = [
     unite: 'u',
   },
   {
+    code: 'rehausse-boite',
+    rayon: 'Encastrement et finition',
+    libelle: 'Rehausse de boîte d’encastrement',
+    precision: 'Rattrape l’épaisseur d’un doublage ou d’un carrelage',
+    unite: 'u',
+  },
+  {
+    code: 'obturateur',
+    rayon: 'Encastrement et finition',
+    libelle: 'Obturateur de plaque',
+    precision: 'Ferme un poste laissé libre sous une plaque double ou triple',
+    unite: 'u',
+    /*
+      Relevé sur la page Dooxie de Castorama, au milieu des prises : c'est un
+      article qu'on n'achète jamais exprès et qui manque toujours, quand on
+      pose une plaque double pour un seul mécanisme en prévision.
+    */
+    offres: [
+      {
+        enseigne: 'Castorama',
+        prix: 6.09,
+        intitule: 'Obturateur dooxie',
+        reference: 'dooxie obturateur',
+        jour: '2026-08-28',
+      },
+    ],
+  },
+  {
     code: 'boite-etanche',
     rayon: 'Encastrement et finition',
     libelle: 'Boîte étanche IP 55',
@@ -623,9 +693,52 @@ const TABLEAU: ArticleMagasin[] = [
     code: 'diff-A',
     rayon: 'Tableau',
     libelle: 'Interrupteur différentiel 40 A type A',
-    precision: '30 mA — lave-linge, plaque, borne de recharge',
+    precision: 'Legrand — 30 mA, lave-linge, plaque, borne de recharge',
     unite: 'u',
     duMetre: true,
+    offres: [
+      {
+        enseigne: 'Castorama',
+        prix: 81.9,
+        intitule: 'Interrupteur différentiel 40A 30mA type A sortie haut Legrand',
+        reference: '3245060928360',
+        jour: '2026-08-28',
+      },
+    ],
+  },
+  {
+    code: 'disj-diff-16',
+    rayon: 'Tableau',
+    libelle: 'Disjoncteur différentiel 16 A',
+    precision: '30 mA — protège un départ seul, sans refaire la rangée',
+    unite: 'u',
+  },
+  {
+    code: 'disj-diff-20',
+    rayon: 'Tableau',
+    libelle: 'Disjoncteur différentiel 20 A',
+    precision: '30 mA — lave-linge ou lave-vaisselle ajouté après coup',
+    unite: 'u',
+  },
+  {
+    code: 'barrette-equipotentielle',
+    rayon: 'Tableau',
+    libelle: 'Barrette de liaison équipotentielle',
+    /*
+      OBLIGATOIRE EN SALLE D'EAU (NF C 15-100), et elle n'était nulle part.
+      Elle se refait à chaque rénovation — on touche aux canalisations — et
+      elle ne coûte presque rien : c'est exactement le poste qu'on oublie au
+      devis et qu'on paie sur le chantier.
+    */
+    precision: 'Salle d’eau — obligatoire, relie les canalisations à la terre',
+    unite: 'u',
+  },
+  {
+    code: 'collier-equipotentiel',
+    rayon: 'Tableau',
+    libelle: 'Colliers de liaison équipotentielle',
+    precision: 'Lot — se serrent sur les tubes d’eau et de chauffage',
+    unite: 'lot',
   },
   {
     code: 'diff-AC-63',
@@ -660,9 +773,24 @@ const TABLEAU: ArticleMagasin[] = [
     code: 'coffret-2',
     rayon: 'Tableau',
     libelle: 'Coffret 2 rangées',
-    precision: '26 modules, avec porte',
+    precision: 'Legrand — 26 modules, borniers fournis, porte à part',
     unite: 'u',
     duMetre: true,
+    /*
+      LA PORTE N'EST PAS DEDANS, et le relevé l'a montré : la fiche Castorama
+      annonce les borniers et le kit de fixation, pas la porte. Le catalogue
+      écrivait « avec porte » — un devis qui promet une porte qu'on n'achète
+      pas est un devis faux de trente euros, découverts au comptoir.
+    */
+    offres: [
+      {
+        enseigne: 'Castorama',
+        prix: 52.9,
+        intitule: 'Tableau électrique à équiper 2 rangées - 26 modules Legrand',
+        reference: '3245060930219',
+        jour: '2026-08-28',
+      },
+    ],
   },
   {
     code: 'coffret-3',
@@ -809,6 +937,44 @@ const FAIBLES: ArticleMagasin[] = [
     rayon: 'Courants faibles',
     libelle: 'Répartiteur TV',
     precision: '4 sorties, blindé',
+    unite: 'u',
+  },
+];
+
+const HUMIDE: ArticleMagasin[] = [
+  {
+    code: 'prise-etanche',
+    rayon: 'Appareillage',
+    libelle: 'Prise étanche IP 44',
+    precision: 'Balcon, cave, garage — en saillie, avec couvercle',
+    unite: 'u',
+  },
+  {
+    code: 'inter-etanche',
+    rayon: 'Appareillage',
+    libelle: 'Interrupteur étanche IP 55',
+    precision: 'Cave, garage, extérieur — en saillie',
+    unite: 'u',
+  },
+  {
+    code: 'sortie-cable-32',
+    rayon: 'Appareillage',
+    libelle: 'Sortie de câble 32 A',
+    precision: 'Plaque de cuisson — raccordement en dur, pas de prise',
+    unite: 'u',
+  },
+  {
+    code: 'inter-volet',
+    rayon: 'Appareillage',
+    libelle: 'Interrupteur de volet roulant',
+    precision: 'Montée / descente, avec sa plaque',
+    unite: 'u',
+  },
+  {
+    code: 'carillon',
+    rayon: 'Appareillage',
+    libelle: 'Carillon filaire et son bouton',
+    precision: 'Entrée d’appartement — alimenté en 230 V ou en TBT',
     unite: 'u',
   },
 ];
@@ -1111,6 +1277,7 @@ export const ARTICLES: ArticleMagasin[] = [
   ...PLAFOND,
   ...TABLEAU,
   ...FAIBLES,
+  ...HUMIDE,
   ...FIXATION,
   ...OUTILS,
 ];
