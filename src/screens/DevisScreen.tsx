@@ -47,7 +47,6 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Image,
   ScrollView,
   TextInput,
   StyleSheet,
@@ -71,6 +70,7 @@ import {
 } from '../components/PrixQuiSActualisent';
 import { verifierLesTarifs, type IssueTarifs } from '../net/tarifs';
 import { photoDe } from '../ui/produits';
+import { VignetteProduit } from '../components/VignetteProduit';
 import { pourChercher } from '../ui/mots';
 import { fr } from './result/format';
 import { haptic } from '../ui/haptic';
@@ -166,20 +166,28 @@ function SymboleDuPlan({ ligne }: { ligne: LigneLegende }) {
  * et le ticket ne se troue pas. C'est aussi ce qui rend le catalogue de
  * photos facultatif — on peut en ajouter une demain sans toucher à l'écran.
  */
-function Vignette({ ligne }: { ligne: { code: string } }) {
-  const photo = photoDe(ligne.code);
-  if (photo) {
-    return <Image source={photo} style={styles_vignette.image} resizeMode="contain" />;
-  }
+function Vignette({ ligne }: { ligne: { code: string; libelle?: string } }) {
   const plafond = ligne.code.startsWith('plafond-');
   const kind = plafond ? ligne.code.slice(8) : ligne.code.slice(5);
-  if (!ligne.code.startsWith('meca-') && !plafond) return null;
-  return <SymboleDuPlan ligne={{ kind, plafond } as LigneLegende} />;
+  /*
+    LE SYMBOLE DU PLAN PASSE AVANT LA PASTILLE AU NOM, et après la photo. Pour
+    un appareil, le dessin du plan dit plus que trois mots écrits petit : c'est
+    celui qu'on a sous les yeux sur le relevé.
+  */
+  if (!photoDe(ligne.code) && (ligne.code.startsWith('meca-') || plafond)) {
+    return <SymboleDuPlan ligne={{ kind, plafond } as LigneLegende} />;
+  }
+  /*
+    ET LE TROISIÈME REPLI, QUI MANQUAIT : un article venu du magasin — du
+    plâtre, une aiguille, une alimentation LED — n'a ni photo ni symbole, et la
+    vignette rendait `null`. La ligne s'ouvrait sur un carré vide, ce qui se lit
+    comme une panne. Relevé du patron, à propos du magasin : « si pas dispo
+    marque sur l'image ». Même règle ici, et le même composant.
+  */
+  return (
+    <VignetteProduit code={ligne.code} libelle={ligne.libelle ?? ''} taille={38} />
+  );
 }
-
-const styles_vignette = StyleSheet.create({
-  image: { width: 38, height: 38 },
-});
 
 /**
  * UNE LIGNE DU TICKET — et le geste qui l'écarte.

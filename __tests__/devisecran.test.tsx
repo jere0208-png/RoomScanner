@@ -556,6 +556,30 @@ describe('les vignettes du ticket', () => {
     }
   });
 
+  it('et sur leur NOM quand il n’y a ni photo ni symbole', async () => {
+    /*
+      LE TROISIÈME REPLI, ET IL MANQUAIT. Un article venu du magasin — du
+      plâtre, une aiguille, une alimentation LED — n'a ni photo ni symbole de
+      plan : la vignette rendait alors `null`, et la ligne s'ouvrait sur un
+      carré vide. Relevé du patron, à propos du magasin : « si pas dispo
+      marque sur l'image ». C'est la même règle, et le même composant.
+    */
+    const t = await auTicket();
+    act(() => {
+      useScanStore.getState().ajouterAuDevis('transfo-led', 1);
+    });
+    mesurer(t);
+    expect(photoDe('transfo-led')).toBeNull();
+    const vue = t.root.findAll(
+      (n) => String(n.props?.testID ?? '') === 'vignette-transfo-led',
+    )[0];
+    expect(vue).toBeDefined();
+    expect(String(vue.findAllByType(Text)[0].props.children)).toBe(
+      'Alimentation LED 24 V',
+    );
+    act(() => useScanStore.getState().retirerDuDevis('transfo-led'));
+  });
+
   it('et la légende du plan garde le symbole, pas la photo', async () => {
     /*
       Sous le plan, ce qu'on cherche est de relier un chiffre a un DESSIN.

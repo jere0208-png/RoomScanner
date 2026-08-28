@@ -36,6 +36,7 @@ import Svg, { Path } from 'react-native-svg';
 import { BackChevron } from '../components/BackChevron';
 import { RetourGlisse } from '../components/RetourGlisse';
 import { BoutonAmazon } from '../components/BoutonAmazon';
+import { VignetteProduit } from '../components/VignetteProduit';
 import {
   RAYONS,
   catalogueDuMagasin,
@@ -112,6 +113,14 @@ function LigneArticle({
   return (
     <View style={styles.article}>
       <View style={styles.ligne}>
+        {/*
+          LA VIGNETTE EN TÊTE DE LIGNE — relevé du patron : « donne des images
+          à chaque élément du magasin aussi ». C'est elle qui fait reconnaître
+          une gaine annelée entre deux goulottes avant d'avoir lu le libellé.
+          Quand la photo manque — quatre-vingt-six articles sur cent seize —,
+          elle porte le nom : un trou dans une liste se lit comme une panne.
+        */}
+        <VignetteProduit code={article.code} libelle={article.libelle} taille={44} />
         <View style={styles.texte}>
           <Text style={styles.nom}>{article.libelle}</Text>
           {!!article.precision && (

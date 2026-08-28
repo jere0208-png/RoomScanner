@@ -10690,6 +10690,67 @@ Tous deux reposent désormais `etapeDevis` à zéro à chaque montage — le mag
 Zustand survit d'un banc à l'autre, et la première épreuve qui allait jusqu'au
 ticket laissait la suivante démarrer dessus.
 
+### Une image par article, et son nom quand la photo manque
+
+Relevé du patron : « donne des images à chaque élément du magasin aussi, et si
+pas dispo marque sur l'image (par exemple si le Alim LED 24V est pas dispo, on
+marque son nom proprement) ».
+
+Le ticket du devis portait des photos ; le magasin, non — **cent seize lignes de
+texte**, où l'on cherche une gaine annelée entre deux goulottes en lisant chaque
+libellé. La photo est ce qui fait reconnaître un article avant de le lire.
+
+**IL N'Y A QUE TRENTE PHOTOS POUR CENT SEIZE ARTICLES.** Le catalogue d'images
+couvre l'appareillage et le tableau ; les consommables, les courants faibles et
+l'outillage n'en ont pas. **Quatre-vingt-six lignes** auraient donc montré un
+trou — et un trou, dans une liste, se lit comme une panne.
+
+**POURQUOI ON N'A PAS RENVOYÉ VERS UNE PHOTO VOISINE**, alors que la maison le
+fait déjà : « une prise 16, une 20 et une 32 sont le MÊME objet sur le mur », une
+seule photo pour les trois. Ça marche parce qu'un socle **ne porte pas son
+calibre écrit dessus**. Un disjoncteur, si : la photo du 16 A posée sur la ligne
+du 6 A dirait « 16 » à côté d'un libellé qui dit 6. Même chose pour un ICTA Ø 40
+renvoyé sur le Ø 32, ou pour un différentiel HPI renvoyé sur un type A. **Une
+vignette qui contredit sa ligne est pire qu'une vignette absente** — c'est la
+règle des prix appliquée aux images : ce qu'on ne peut pas montrer honnêtement,
+on l'écrit.
+
+**« PROPREMENT » A ÉTÉ MESURÉ.** Premier jet : le nom sur trois lignes, corps 8,
+coupé à la fin. Rendu à l'échelle réelle avec de vraies métriques de police,
+dans une pastille de quarante-quatre points, **un corps de 8 tient huit à neuf
+signes par ligne** — et « Alimentation » en fait douze. Le mot se cassait en deux
+ou débordait des deux côtés ; les deux se lisent comme un défaut d'affichage.
+
+On ne rogne pas le libellé à la main — une estimation de largeur se tromperait de
+police, et la maison a déjà payé deux centièmes d'em pour l'apprendre. On demande
+au rendu de **réduire le corps jusqu'à ce que le nom entier tienne**
+(`adjustsFontSizeToFit`), avec un plancher à six dixièmes : en dessous on ne lit
+plus, et la coupure à la fin reprend la main. Le nom complet est de toute façon
+écrit en grand juste à côté — la pastille sert à reconnaître, pas à lire.
+
+La pastille est **neutre**, et pas teintée par rayon : huit couleurs inventées
+pour huit rayons donneraient un code visuel de plus à apprendre, alors que le
+rayon est déjà écrit en tête de section.
+
+**LE TICKET DU DEVIS AVAIT LE MÊME TROU**, et il est bouché par le même
+composant. Sa vignette suivait deux replis — la photo, puis le symbole du plan
+pour un appareil — et rendait `null` pour tout le reste : un article venu du
+magasin (du plâtre, une aiguille, une alimentation LED) ouvrait sa ligne sur un
+carré vide. Le symbole du plan garde la priorité sur le nom quand il existe : pour
+un appareil, le dessin qu'on a sous les yeux sur le relevé dit plus que trois
+mots écrits petit.
+
+**Sept épreuves** (`vignettemagasin`), toutes rouges avant : aucune ligne sans
+vignette, les photos vraiment portées, le nom pour les autres — avec l'exemple du
+relevé, l'alimentation LED —, et le contrôle en sens inverse qui compte : un
+article **qui a** sa photo n'écrit rien dessus, sans quoi une pastille au nom
+posée partout ferait tout passer sans qu'aucune photo ne s'affiche jamais. Une
+huitième au banc `devisecran` tient le troisième repli du ticket.
+
+**Ce que ce banc ne peut pas tenir** : à quoi ressemble le nom réduit sur un
+iPhone. `adjustsFontSizeToFit` est fait exactement pour ce cas et c'est iOS qui
+mesure, mais le rendu ne se regarde pas depuis cette machine.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro
