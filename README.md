@@ -10325,6 +10325,96 @@ s'éteint à zéro, l'article qui disparaît quand on le repose, le prix qui dit
 toujours d'où il vient — et surtout **qu'aucun `Pressable` ne surplombe le
 rouleau**, la cause du défilement cassé payée deux fois sur l'écran du devis.
 
+### L'ouverture de l'application : deux marques, une seule application
+
+Relevé du patron : « au chargement de l'application je vois toujours l'icône de
+l'app et pas le logo qu'on a sur l'accueil avec derrière l'autre logo, je veux
+pareil mais centré au clic sur l'application ».
+
+**CE QUI SE PASSAIT, ET POURQUOI ÇA N'AVAIT PAS ÉTÉ VU.** L'écran d'attente JS
+porte déjà les deux logos centrés — c'est `EcranChargement`, livré il y a
+plusieurs versions, et son banc était vert. Mais **avant lui, iOS affiche SON
+écran de lancement**, un storyboard natif, et celui-là montrait l'icône de
+l'application à cent quatre-vingts points. On voyait donc l'icône, puis la
+marque : deux ouvertures différentes pour une seule application.
+
+**C'est un défaut qu'aucun banc JS ne pouvait attraper** : il vit hors de
+JavaScript, dans `ios/RoomScanner/LaunchScreen.storyboard`. Ce sont les défauts
+les plus tenaces — corrigés « en apparence » du côté qu'on sait mesurer.
+
+**LA MÊME COMPOSITION QUE L'ACCUEIL, AUX MÊMES NOMBRES** : le glyphe en
+filigrane à 240 points et sept centièmes d'opacité, le logotype par-dessus à
+160 × 102. Un filigrane qui changerait de force entre deux écrans qui se suivent
+se remarque.
+
+**ET IL SUIT LE THÈME.** Le fond, le glyphe et le logotype ont chacun leur
+variante sombre dans le catalogue d'images (`appearances: luminosity dark`) ;
+le fond reprend exactement `#0D1015`, celui de `theme.ts`. Sans cela,
+l'ouverture en thème sombre commencerait par un éclair blanc — le défaut que
+`EcranChargement` avait déjà eu à corriger de son côté.
+
+Regardé en image, les deux thèmes composés aux mesures déclarées par le
+storyboard. **Il faut une compilation EAS pour le voir sur le téléphone** : un
+storyboard est du natif, il ne descend pas par un rechargement JS.
+
+### On appuie sur l'interrupteur, la lumière s'allume
+
+Relevé du patron : « sur le plan 3D, enlève le clic sur un mur qui donne la
+caméra face à ce mur ; ajoute un système qui fait qu'un clic sur un interrupteur
+qui est lié à une lumière allume celle-ci ; élargis un tout petit peu la zone
+autour de l'interrupteur pour que le clic soit plus facile ; on doit voir les
+lumières scintiller et plus brillantes. »
+
+**CE QUE LE TAP FAISAIT, ET POURQUOI ÇA GÊNAIT.** Il cadrait la caméra face au
+mur touché — bonne idée pour lire une élévation, mauvaise pour tout le reste :
+la maquette bougeait dès qu'on la touchait sans vouloir la tourner, et il ne
+restait **aucun appui disponible** pour agir sur ce qu'on voit. Un geste qui
+recadre bloque tous les autres.
+
+Le tap sert maintenant à **essayer l'installation** : on touche l'interrupteur,
+les points lumineux qu'il commande s'allument. C'est le geste qu'on fait sur un
+chantier fini, et la seule façon de vérifier d'un coup d'œil qu'on a bien lié ce
+qu'il fallait. Un second appui éteint — et **un interrupteur bascule tout son
+groupe ensemble** : s'il commande deux points et qu'un seul est allumé, l'appui
+allume le second, parce qu'un va-et-vient réel ne prend pas d'état bâtard.
+
+**LA CIBLE EST UN RAYON DE VINGT-DEUX POINTS**, invisible, plus large que le
+symbole. Un mécanisme fait sept centimètres sur un mur de cinq mètres — quelques
+pixels — et l'on vise avec un doigt. C'est la règle du plan 2D : la cible est
+plus tolérante que le dessin. La moitié d'un doigt et pas le doigt entier, sinon
+deux commandes voisines se voleraient l'appui ; **la plus proche gagne**, ce
+qu'un test d'appartenance ne saurait pas départager.
+
+**UN DÉFAUT ÉVITÉ DE JUSTESSE.** La collecte des cibles vivait d'abord dans la
+couche des étiquettes, qui ne se monte que si « Repères » ou « Cotes » est
+allumé — la cible en dépendait donc, et sur une maquette nue un appui n'aurait
+rien fait. Le geste aurait marché « parfois », et l'on aurait cherché longtemps.
+Essayer l'installation n'a rien à voir avec l'affichage des repères : la
+collecte a sa propre boucle.
+
+**LE HALO SE POSE EN SVG, PAS DANS LA SCÈNE.** La scène 3D est mise en cache par
+pièce ; la repeindre à chaque appui coûterait tout ce qu'on a gagné à passer au
+canevas natif. Trois cercles concentriques par lampe — le plus large et le plus
+pâle donne la portée, le plus serré la source — et **une seule boucle
+d'animation pour toutes les lampes** : une par point lumineux ferait tourner
+autant de boucles qu'il y a de lampes, et cette vue se bat déjà pour ses images.
+Elles battent donc ensemble, ce qui est d'ailleurs plus juste — elles sont sur le
+même réseau.
+
+**ET C'EST UN SOUFFLE, PAS UN CLIGNOTEMENT** : l'opacité respire entre 28 et 50
+centièmes en deux secondes et demie. Une lampe qui s'éteindrait à moitié se lit
+comme une panne.
+
+**Le banc ne peut pas tenir le scintillement** — c'est une animation, et le rendu
+ne se regarde pas depuis cette machine ; c'est écrit dans son en-tête. Il tient
+ce qui se mesure : le halo qui apparaît, qui disparaît, qui porte la bonne
+lampe ; la tolérance et sa limite ; et **qu'une prise n'offre aucune cible**,
+le contrôle en sens inverse sans lequel les autres épreuves ne prouveraient rien.
+
+**Et le piège du `PanResponder`, encore lui** : la première version du banc lui
+passait un état de geste, qu'il ignore — il le recalcule depuis `touchHistory`,
+et lançait sur un `touchBank` vide. L'épreuve échouait à côté de son sujet.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

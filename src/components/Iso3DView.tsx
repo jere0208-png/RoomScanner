@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { PanResponder, StyleSheet, View } from 'react-native';
+import { Animated, Easing, PanResponder, StyleSheet, View } from 'react-native';
 import Svg, {
   Circle,
   G,
@@ -8,6 +8,12 @@ import Svg, {
   Rect,
   Text as SvgText,
 } from 'react-native-svg';
+
+/*
+  UN CERCLE ANIMABLE : le halo d'une lampe respire, et une valeur animée ne
+  se pose pas sur une balise SVG ordinaire.
+*/
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 import { RoomScanCanvas } from 'react-native-room-scan';
 import { grouperTraces } from '../ui/traces';
 import { mettreAPlat } from '../ui/canevas';
@@ -51,6 +57,7 @@ import {
 import { hiddenByBox } from '../geometry/furniture';
 import { MAQUETTE } from '../ui/maquette';
 import { parImage } from '../ui/parImage';
+import { haptic } from '../ui/haptic';
 import { floorsOf, useScanStore } from '../store/scanStore';
 import { CardinalRing } from './CardinalRing';
 import {
@@ -116,23 +123,32 @@ const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v
  * discret de loin sans devenir illisible, et jamais plus gros qu'avant de
  * près — au-delà, c'est la désignation longue qui prend le relais.
  */
+/**
+ * LA TOLÉRANCE DE LA CIBLE D'UN INTERRUPTEUR, en pixels d'écran.
+ *
+ * Relevé du patron : « élargis un tout petit peu la zone autour de
+ * l'interrupteur pour que le clic soit plus facile ». Vingt-deux points : le
+ * doigt d'un adulte en couvre quarante-quatre — c'est le chiffre que la maison
+ * emploie déjà pour la CIBLE des appareils sur le plan —, mais un interrupteur
+ * a des voisins, et une cible trop large volerait l'appui du mécanisme d'à
+ * côté. La moitié du doigt, donc : assez pour rattraper la visée, assez peu
+ * pour que deux commandes voisines restent distinctes.
+ */
+export const RAYON_CIBLE = 22;
+
+/*
+  ET C'EST UN RAYON, PLUS UN POLYGONE.
+
+  Le tap visait autrefois les MURS, et un mur est un quadrilatère : il fallait
+  savoir si le doigt tombait dedans (`pointInPoly`, parti avec le recadrage).
+  Un interrupteur, lui, n'a pas de forme à l'écran — c'est un point, et l'on
+  vise autour. Une distance suffit, et elle a l'avantage de départager
+  proprement deux commandes voisines : la plus proche gagne, ce qu'un test
+  d'appartenance ne sait pas faire quand deux zones se chevauchent.
+*/
+
 export function tailleDuSigle(scale: number): number {
   return Math.max(5.5, Math.min(10, scale * 0.085));
-}
-
-function pointInPoly(x: number, y: number, pts: { sx: number; sy: number }[]) {
-  let inside = false;
-  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
-    const a = pts[i];
-    const b = pts[j];
-    if (
-      (a.sy > y) !== (b.sy > y) &&
-      x < ((b.sx - a.sx) * (y - a.sy)) / (b.sy - a.sy) + a.sx
-    ) {
-      inside = !inside;
-    }
-  }
-  return inside;
 }
 
 interface Props {
@@ -434,6 +450,62 @@ export function Iso3DView({
   } | null>(null);
 
   // Créé UNE seule fois : un responder recréé en plein geste perd le suivi.
+  /**
+   * LES LUMIÈRES ALLUMÉES — un état de VISITE, pas du plan.
+   *
+   * On allume pour essayer l'installation, comme on le ferait sur un chantier
+   * fini ; ça ne modifie pas le relevé et ça n'a rien à faire dans le magasin.
+   * Fermer la maquette éteint tout, et c'est très bien : un plan ne se souvient
+   * pas de quelle lampe on a essayée.
+   */
+  const [allumees, setAllumees] = useState<ReadonlySet<string>>(
+    () => new Set<string>(),
+  );
+  /**
+   * LE SCINTILLEMENT — une seule boucle pour toutes les lampes.
+   *
+   * Relevé du patron : « on doit voir les lumières scintiller ». Une animation
+   * par lampe ferait tourner autant de boucles qu'il y a de points lumineux, et
+   * cette vue se bat déjà pour ses images. Une seule valeur, partagée : les
+   * lampes d'un logement battent ensemble, ce qui est d'ailleurs plus juste —
+   * elles sont sur le même réseau.
+   *
+   * ET C'EST UN SOUFFLE, PAS UN CLIGNOTEMENT. Entre soixante-dix et cent
+   * centièmes d'opacité : une lampe qui s'éteint à moitié se lit comme une
+   * panne. Deux secondes et demie l'aller-retour — le rythme d'une respiration,
+   * celui du halo de la pastille de contrôle.
+   */
+  const battement = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (allumees.size === 0) return;
+    const boucle = Animated.loop(
+      Animated.sequence([
+        Animated.timing(battement, {
+          toValue: 1,
+          duration: 1250,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(battement, {
+          toValue: 0,
+          duration: 1250,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    boucle.start();
+    return () => boucle.stop();
+  }, [allumees.size, battement]);
+  const scintille = battement.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.28, 0.5],
+  });
+  const halo2 = battement.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.55, 0.8],
+  });
+
   const pan = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
@@ -525,7 +597,7 @@ export function Iso3DView({
           estUnTap(g.dx, g.dy) &&
           Date.now() - geste.t0 < 500
         ) {
-          focusRef.current?.(geste.x, geste.y);
+          basculerRef.current?.(geste.x, geste.y);
         }
       },
       onPanResponderTerminate: () => setInteracting(false),
@@ -753,6 +825,17 @@ export function Iso3DView({
    * de la fréquence du suivant : voir `seuilDeReclassement`.
    */
   const coutTri = useRef(10);
+
+  /*
+    LE RENDU COURANT, LU PAR LE GESTE.
+
+    Une valeur lue dans un `PanResponder` est FIGÉE au premier rendu — la
+    leçon que cette maison a payée plusieurs fois. Le geste passe donc par une
+    référence, remise à jour à chaque rendu.
+  */
+  const renduRef = useRef<{
+    ciblesInter: { id: string; cx: number; cy: number; lampes: string[] }[];
+  } | null>(null);
 
   const rendered = useMemo(() => {
     if (layout.w === 0 || layout.h === 0) return null;
@@ -1060,6 +1143,16 @@ export function Iso3DView({
           area: string;
         };
     const items: Item[] = dessinables.map((p) => ({ kind: 'poly' as const, ...p }));
+    /*
+      OÙ APPUYER POUR ALLUMER, ET OÙ LA LUMIÈRE SE POSE.
+
+      Relevé du patron : « un clic sur un interrupteur qui est lié à une
+      lumière allume celle-ci ». Les deux listes se remplissent PENDANT la
+      projection, avec les mêmes nombres que le dessin : une cible calculée à
+      part finirait par viser à côté de ce qu'on voit.
+    */
+    const ciblesInter: { id: string; cx: number; cy: number; lampes: string[] }[] = [];
+    const posLampes: { id: string; cx: number; cy: number }[] = [];
     // Semis du sol : même code que le plan 2D, projeté sur le plan y = 0.
     // C'est ce fond pointillé qui distingue la surface au sol des murs.
     /**
@@ -1207,6 +1300,59 @@ export function Iso3DView({
       La couche se monte donc pour l'un OU l'autre, et chacun n'y prend que
       ce qui est à lui : « Repères » la désignation, « Cotes » les nombres.
     */
+    /*
+      OÙ APPUYER POUR ALLUMER — indépendamment de tout calque.
+
+      La collecte vivait d'abord DANS la couche des étiquettes, qui ne se monte
+      que si « Repères » ou « Cotes » est allumé. La cible d'un interrupteur en
+      dépendait donc : maquette nue, un appui ne faisait rien, et l'on aurait
+      cherché longtemps pourquoi — le geste marchait « parfois ». Essayer
+      l'installation n'a rien à voir avec l'affichage des repères.
+
+      ELLE NE DÉPEND PAS NON PLUS DES COTES NI DU ZOOM : la cible existe dès
+      qu'un appareil commande une lumière et que sa face regarde la caméra.
+    */
+    {
+      const quadsC = wallQuads(keptWalls);
+      const murParId = new Map(keptWalls.map((w) => [w.id, w]));
+      const lotsC = new Map<string, typeof fixtures>();
+      for (const f of fixtures) {
+        const cle = f.group ? `g:${f.group}:${f.wallId}:${f.side}` : `s:${f.id}`;
+        const l = lotsC.get(cle);
+        if (l) l.push(f);
+        else lotsC.set(cle, [f]);
+      }
+      for (const lot of lotsC.values()) {
+        /*
+          CE LOT COMMANDE-T-IL UNE LUMIÈRE ? Un appareil et un plafonnier sont
+          liés par `commands`, dans un sens comme dans l'autre : c'est le lien
+          qu'on noue à l'établi, et celui que le plan dessine en tireté.
+        */
+        const mes = lot.map((f) => f.id);
+        const lampes = (showCeiling ? (ceiling ?? []) : [])
+          .filter(
+            (cl) =>
+              (cl.commands ?? []).some((id) => mes.includes(id)) ||
+              lot.some((f) => (f.commands ?? []).includes(cl.id)),
+          )
+          .map((cl) => cl.id);
+        // Un appareil qui ne commande rien n'offre aucune cible : un appui qui
+        // ne fait rien donne à l'écran l'air d'être en panne.
+        if (lampes.length === 0) continue;
+        const w = murParId.get(lot[0].wallId);
+        if (!w) continue;
+        const face = wallFace(w, quadsC.get(w.id), lot[0].side);
+        // Face qui tourne le dos à la caméra : l'appareil est derrière le mur.
+        if (face.nx * st * sp + face.nz * ct * sp <= 0) continue;
+        const cx =
+          lot.reduce((t, f) => t + faceX(face, f.along), 0) / lot.length;
+        const hauteur = lot.reduce((t, f) => t + f.height, 0) / lot.length;
+        const pc = facePoint(face, cx, 0.06);
+        const qc = project({ x: pc.x, y: hauteur, z: pc.z });
+        ciblesInter.push({ id: lot[0].id, cx: qc.sx, cy: qc.sy, lampes });
+      }
+    }
+
     if (!interacting && (showElecTags || showMeasures)) {
       const quads = wallQuads(keptWalls);
       const byId = new Map(keptWalls.map((w) => [w.id, w]));
@@ -1478,6 +1624,21 @@ export function Iso3DView({
       qui est posé PAR-DESSUS ensuite. C'est déjà ce que faisait le tri —
       un repère d'appareil se classe à `1e6`, tout au-devant.
     */
+    /*
+      LA LUMIÈRE SE POSE SOUS LE PLAFONNIER, pas dessus : c'est de là qu'elle
+      tombe. On la projette au ras du plafond de sa pièce, comme la pastille
+      que `buildScene` y dessine.
+    */
+    for (const cl of showCeiling ? (ceiling ?? []) : []) {
+      const mursDeLaPiece = walls.filter((w) => roomOf(w) === cl.roomId);
+      const haut = (mursDeLaPiece.length > 0 ? mursDeLaPiece : walls).reduce(
+        (m, w) => Math.max(m, w.height),
+        0,
+      );
+      if (!(haut > 0.5)) continue;
+      const q = project({ x: cl.at.x, y: haut - 0.08, z: cl.at.z });
+      posLampes.push({ id: cl.id, cx: q.sx, cy: q.sy });
+    }
     const geometrie = items.filter((it) => it.kind === 'poly');
     const groupes = grouperTraces(geometrie as never);
     const autres = items.filter((it) => it.kind !== 'poly');
@@ -1490,7 +1651,8 @@ export function Iso3DView({
       calculs.
     */
     const canevas = mettreAPlat(geometrie as never);
-    return { groupes, autres, canevas };
+    return { groupes, autres, canevas, ciblesInter, posLampes };
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, [
     scene,
     faces,
@@ -1519,80 +1681,60 @@ export function Iso3DView({
     focusWallId,
   ]);
 
-  // Tap sur un mur : oriente la caméra face au mur, zoome pour le voir entier.
-  const focusRef = useRef<((tx: number, ty: number) => void) | null>(null);
-  focusRef.current = (tx, ty) => {
-    if (layout.w === 0 || walls.length === 0) return;
-    const v = viewRef.current;
-    const ct = Math.cos(rad(v.theta));
-    const st = Math.sin(rad(v.theta));
-    const cp = Math.cos(rad(v.tilt));
-    const sp = Math.sin(rad(v.tilt));
-    const baseScale = (Math.min(layout.w, layout.h) * 0.44) / radius3d;
-    const scale = baseScale * v.zoom;
-    const project = (p: P3) => {
-      const x = p.x - center.x;
-      const y = p.y - center.y;
-      const z = p.z - center.z;
-      const rx = x * ct - z * st;
-      const rz = x * st + z * ct;
-      return {
-        sx: layout.w / 2 + v.ox + rx * scale,
-        sy: layout.h / 2 + v.oy + (rz * cp - y * sp) * scale,
-        depth: rz * sp + y * cp,
-      };
-    };
-
-    let best: { wall: WallSeg; depth: number } | null = null;
-    for (const w of walls) {
-      const quad = [
-        project({ x: w.a.x, y: 0, z: w.a.z }),
-        project({ x: w.b.x, y: 0, z: w.b.z }),
-        project({ x: w.b.x, y: w.height, z: w.b.z }),
-        project({ x: w.a.x, y: w.height, z: w.a.z }),
-      ];
-      if (pointInPoly(tx, ty, quad)) {
-        const depth = quad.reduce((s, p) => s + p.depth, 0) / 4;
-        if (!best || depth > best.depth) best = { wall: w, depth };
+  /**
+   * TAPER SUR UN INTERRUPTEUR ALLUME CE QU'IL COMMANDE.
+   *
+   * Relevé du patron : « enlève le clic sur un mur qui donne la caméra face à
+   * ce mur ; ajoute un système qui fait qu'un clic sur un interrupteur qui est
+   * lié à une lumière allume celle-ci ».
+   *
+   * CE QUE LE TAP FAISAIT, ET POURQUOI ÇA GÊNAIT. Il cadrait la caméra face au
+   * mur touché — bonne idée pour lire une élévation, mauvaise pour tout le
+   * reste : la maquette bougeait dès qu'on la touchait sans vouloir la tourner,
+   * et il ne restait AUCUN appui disponible pour agir sur ce qu'on voit. Un
+   * geste qui recadre bloque tous les autres.
+   *
+   * LA CIBLE EST PLUS LARGE QUE LE SYMBOLE, et c'est le relevé qui le demande :
+   * « élargis un tout petit peu la zone autour de l'interrupteur ». Un mécanisme
+   * fait sept centimètres sur un mur de cinq mètres — quelques pixels à
+   * l'écran — et l'on vise avec un doigt. C'est la règle du plan 2D : la cible
+   * est plus tolérante que le dessin, et elle ne se confond jamais avec lui.
+   */
+  const basculerRef = useRef<((tx: number, ty: number) => void) | null>(null);
+  basculerRef.current = (tx, ty) => {
+    const cibles = renduRef.current?.ciblesInter ?? [];
+    let touchee: (typeof cibles)[number] | null = null;
+    let plusProche = Infinity;
+    for (const c of cibles) {
+      const d = Math.hypot(tx - c.cx, ty - c.cy);
+      // La plus proche DANS la cible : deux interrupteurs voisins sur une
+      // même plaque ne doivent pas se disputer l'appui.
+      if (d <= RAYON_CIBLE && d < plusProche) {
+        plusProche = d;
+        touchee = c;
       }
     }
-    if (!best) return;
-    const w = best.wall;
-
-    // Face au mur, du CÔTÉ où l'on regarde : on choisit l'orientation qui
-    // demande la plus petite rotation depuis le point de vue actuel — la
-    // face touchée vient vers la caméra, jamais celle de derrière.
-    const phi = (Math.atan2(w.b.z - w.a.z, w.b.x - w.a.x) * 180) / Math.PI;
-    const midw = { x: (w.a.x + w.b.x) / 2, z: (w.a.z + w.b.z) / 2 };
-    const norm180 = (a: number) => ((a + 540) % 360) - 180;
-    const cand = [-phi, -phi + 180].reduce((bestC, c2) =>
-      Math.abs(norm180(c2 - v.theta)) < Math.abs(norm180(bestC - v.theta))
-        ? c2
-        : bestC,
-    );
-    // Continuité : on applique le delta au theta courant (pas de saut à 360°).
-    const thetaN = v.theta + norm180(cand - v.theta);
-    const tiltN = 30;
-    const span = Math.max(segLength(w), w.height * 1.4);
-    const zoomN = clamp((0.85 * Math.min(layout.w, layout.h)) / (span * baseScale), 1, 4);
-    const scaleN = baseScale * zoomN;
-    const ct2 = Math.cos(rad(thetaN));
-    const st2 = Math.sin(rad(thetaN));
-    const cp2 = Math.cos(rad(tiltN));
-    const sp2 = Math.sin(rad(tiltN));
-    const x = midw.x - center.x;
-    const yy = w.height / 2 - center.y;
-    const z = midw.z - center.z;
-    const rx = x * ct2 - z * st2;
-    const rz = x * st2 + z * ct2;
-    update({
-      theta: thetaN,
-      tilt: tiltN,
-      zoom: zoomN,
-      ox: -rx * scaleN,
-      oy: -(rz * cp2 - yy * sp2) * scaleN,
+    if (!touchee) return;
+    haptic('leger');
+    setAllumees((avant) => {
+      const apres = new Set(avant);
+      /*
+        UN INTERRUPTEUR BASCULE TOUT SON GROUPE ENSEMBLE. S'il commande deux
+        points lumineux et qu'un seul est allumé, l'appui allume le second —
+        on ne laisse pas un va-et-vient dans un état que la vraie installation
+        ne peut pas prendre.
+      */
+      const toutAllume = touchee!.lampes.every((id: string) => apres.has(id));
+      for (const id of touchee!.lampes) {
+        if (toutAllume) apres.delete(id);
+        else apres.add(id);
+      }
+      return apres;
     });
   };
+
+  // La référence suit le rendu : le geste lit toujours l'état affiché.
+  renduRef.current = rendered ? { ciblesInter: rendered.ciblesInter } : null;
 
   return (
     <View
@@ -1669,6 +1811,61 @@ export function Iso3DView({
                 />
                 ),
               )}
+            {/*
+              LES LUMIÈRES ALLUMÉES, PAR-DESSUS LA MAQUETTE.
+
+              Relevé du patron : « on doit voir les lumières scintiller et plus
+              brillantes ». Le halo se pose EN SVG, et non dans la scène : la
+              scène est mise en cache par pièce, et la repeindre à chaque appui
+              coûterait tout ce qu'on a gagné à passer au canevas natif. Un
+              cercle par lampe allumée, c'est tout.
+
+              TROIS CERCLES CONCENTRIQUES plutôt qu'un dégradé : le plus large
+              et le plus pâle donne la portée, le plus serré donne la source.
+              C'est ce qui fait qu'on lit une lumière et non une pastille de
+              couleur.
+            */}
+            {rendered.posLampes
+              .filter((l) => allumees.has(l.id))
+              .map((l) => (
+                <React.Fragment key={`lum-${l.id}`}>
+                  <AnimatedCircle
+                    testID={`halo-${l.id}`}
+                    cx={l.cx}
+                    cy={l.cy}
+                    r={54}
+                    fill="#FFE9A8"
+                    opacity={scintille}
+                  />
+                  <AnimatedCircle
+                    cx={l.cx}
+                    cy={l.cy}
+                    r={26}
+                    fill="#FFF3CE"
+                    opacity={halo2}
+                  />
+                  <Circle cx={l.cx} cy={l.cy} r={9} fill="#FFFDF4" opacity={0.95} />
+                </React.Fragment>
+              ))}
+            {/*
+              LA CIBLE D'UN INTERRUPTEUR — invisible, et plus large que lui.
+
+              Elle est dessinée APRÈS les halos : ce qu'on touche prime sur ce
+              qui est à côté, et c'est la règle de la maison. Elle ne porte
+              aucune couleur : un halo de visée sur une maquette se lirait
+              comme une lampe de plus.
+            */}
+            {rendered.ciblesInter.map((c) => (
+              <Circle
+                key={`cible-${c.id}`}
+                testID={`cible-${c.id}`}
+                cx={c.cx}
+                cy={c.cy}
+                r={RAYON_CIBLE}
+                fill="#000000"
+                opacity={0}
+              />
+            ))}
             {rendered.autres.map((item, i) =>
               item.kind === 'dot' ? (
                 <Circle key={i} cx={item.x} cy={item.y} r={1.1} fill={item.color} />

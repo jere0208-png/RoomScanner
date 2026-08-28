@@ -4,8 +4,8 @@
  * Elles se suivent en une seconde, et la coupure entre deux se remarque plus
  * que chacune d'elles :
  *
- *   1. L'ÉCRAN DE LANCEMENT d'iOS — l'icône de l'app, en grand, au centre.
- *      C'est un storyboard natif, cuit dans l'IPA ;
+ *   1. L'ÉCRAN DE LANCEMENT d'iOS — la marque, en grand, au centre. C'est un
+ *      storyboard natif, cuit dans l'IPA ;
  *   2. L'ÉCRAN D'ATTENTE, en JavaScript, le temps de lire le compte dans le
  *      stockage. Il était VIDE : un fond nu entre deux images de marque, ce
  *      qui se lit comme un plantage. Relevé du patron : « au chargement de
@@ -18,17 +18,33 @@
  * logotype de l'attente sont ceux de l'accueil, aux mêmes valeurs. Un
  * filigrane qui change de force entre deux écrans qui se suivent se voit.
  *
- * L'ÉCRAN DE LANCEMENT — l'icône de l'app, en grand, au centre.
+ * L'ÉCRAN DE LANCEMENT — TROIS VERSIONS, ET UN ALLER-RETOUR ASSUMÉ.
  *
- * Le lancement est le moment où l'on vient d'APPUYER sur l'icône : la
- * retrouver seule, au centre de l'écran, fait une continuité — c'est le
- * geste de tout iOS. Le logo composé (glyphe + mot) vivait ici en petit,
- * au tiers haut ; le mot, lui, a sa place sur l'accueil.
+ *   PREMIÈRE — le logo composé (glyphe + mot), en petit, au TIERS HAUT.
  *
- * Ce banc tient le storyboard et l'image cuite : un storyboard ne se
- * regarde pas dans un simulateur sous Windows, il se vérifie ici. Et iOS
- * met l'écran de lancement en CACHE : sans banc, une image absente ou mal
- * nommée ne se verrait qu'à la réinstallation — c'est-à-dire trop tard.
+ *   DEUXIÈME — l'icône de l'application, seule et en grand, au centre. Le
+ *   raisonnement se tenait : le lancement est le moment où l'on vient
+ *   d'APPUYER sur l'icône, la retrouver au centre fait une continuité, et
+ *   c'est le geste de tout iOS.
+ *
+ *   TROISIÈME — celle-ci. Relevé du patron, en regardant l'application
+ *   s'ouvrir : « au chargement de l'application je vois toujours l'icône de
+ *   l'app et pas le logo qu'on a sur l'accueil avec derrière l'autre logo, je
+ *   veux pareil mais centré au clic sur l'application ». Ce qui manquait au
+ *   raisonnement d'avant, c'est ce qui vient APRÈS : l'écran d'attente et
+ *   l'accueil portent tous deux la marque composée. Montrer l'icône d'abord
+ *   faisait donc DEUX ouvertures pour une seule application — et la coupure
+ *   entre deux images se remarque plus que chacune d'elles.
+ *
+ * La composition est celle de l'accueil, AUX MÊMES NOMBRES : filigrane de 240
+ * à sept centièmes, logotype de 160 × 102. Et elle suit le thème — fond,
+ * glyphe et logotype ont chacun leur variante sombre —, sans quoi l'ouverture
+ * en thème sombre commencerait par un éclair blanc.
+ *
+ * Ce banc tient le storyboard et les images cuites : un storyboard ne se
+ * regarde pas dans un simulateur sous Windows, il se vérifie ici. Et iOS met
+ * l'écran de lancement en CACHE : sans banc, une image absente ou mal nommée
+ * ne se verrait qu'à la réinstallation — c'est-à-dire trop tard.
  */
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn(async () => null),
@@ -50,48 +66,95 @@ const cotesPng = (chemin: string): [number, number] => {
 };
 
 describe("l'écran de lancement", () => {
-  it("montre l'icône de l'app, et plus le logo composé", () => {
+  it('porte la marque composée, et non plus l’icône seule', () => {
     const s = storyboard();
-    expect(s).toContain('image="LaunchIcon"');
-    expect(s).not.toContain('LaunchLogo');
-    // L'ancien imageset est parti avec lui : un asset orphelin pèse dans
-    // l'IPA et laisse croire qu'il sert encore.
-    expect(
-      existsSync(join(IOS, 'Images.xcassets', 'LaunchLogo.imageset')),
-    ).toBe(false);
+    expect(s).toContain('image="LaunchMark"');
+    expect(s).toContain('image="LaunchWordmark"');
+    // L'icône n'est plus posée sur cet écran : elle reste l'icône de
+    // l'application, à sa place, sur la grille de l'iPhone.
+    expect(s).not.toContain('image="LaunchIcon"');
   });
 
-  it('la pose en grand, au centre — plus au tiers haut', () => {
+  it('centrée sur l’écran, les deux images sur le même axe', () => {
     const s = storyboard();
+    // Ni tiers haut, ni décalage : le relevé dit « centré ».
     expect(s).not.toContain('multiplier="1/3"');
-    expect(s).toMatch(
-      /firstAttribute="centerY" secondItem="Ze5-6b-2t3" secondAttribute="centerY"/,
-    );
-    // Carrée et grande : une icône est carrée, 180 points tiennent le
-    // centre sans toucher les bords du plus petit écran.
-    expect(s).toMatch(/firstAttribute="width" constant="180"/);
-    expect(s).toMatch(/firstAttribute="height" constant="180"/);
+    for (const id of ['Mrk-01-aaa', 'Wrd-01-bbb']) {
+      for (const axe of ['centerX', 'centerY']) {
+        expect(s).toContain(
+          `firstItem="${id}" firstAttribute="${axe}" secondItem="Ze5-6b-2t3" secondAttribute="${axe}"`,
+        );
+      }
+    }
   });
 
-  it("l'image existe aux trois densités, carrée, à la bonne taille", () => {
-    const dir = join(IOS, 'Images.xcassets', 'LaunchIcon.imageset');
-    expect(existsSync(join(dir, 'Contents.json'))).toBe(true);
-    const attendus: [string, number][] = [
-      ['LaunchIcon.png', 180],
-      ['LaunchIcon@2x.png', 360],
-      ['LaunchIcon@3x.png', 540],
-    ];
-    for (const [nom, cote] of attendus) {
-      const chemin = join(dir, nom);
-      expect({ nom, present: existsSync(chemin) }).toEqual({
-        nom,
-        present: true,
-      });
-      expect({ nom, cotes: cotesPng(chemin) }).toEqual({
-        nom,
-        cotes: [cote, cote],
-      });
+  it('aux mesures de l’accueil : 240 pour le filigrane, 160 × 102 pour le mot', () => {
+    /*
+      LES MÊMES NOMBRES QU'`EcranChargement` ET QUE L'ACCUEIL. Un filigrane
+      qui changerait de force ou de taille entre deux écrans qui se suivent se
+      remarque — et ces trois-là se suivent en une seconde.
+    */
+    const s = storyboard();
+    expect(s).toMatch(/firstAttribute="width" constant="240"/);
+    expect(s).toMatch(/firstAttribute="height" constant="240"/);
+    expect(s).toMatch(/firstAttribute="width" constant="160"/);
+    expect(s).toMatch(/firstAttribute="height" constant="102"/);
+    // Sept centièmes : on le sent, on ne le lit pas.
+    expect(s).toContain('alpha="0.07"');
+  });
+
+  it('et le filigrane est DERRIÈRE le mot', () => {
+    // L'ordre des frères suffit, comme à l'accueil : ce qui est rendu en
+    // premier passe dessous.
+    const s = storyboard();
+    expect(s.indexOf('image="LaunchMark"')).toBeLessThan(
+      s.indexOf('image="LaunchWordmark"'),
+    );
+  });
+
+  it('les deux images existent aux trois densités, en clair et en sombre', () => {
+    /*
+      SANS VARIANTE SOMBRE, l'ouverture d'une application en thème sombre
+      commence par un éclair blanc — le défaut que l'écran d'attente avait
+      déjà eu à corriger de son côté.
+    */
+    for (const [nom, cotes] of [
+      ['LaunchMark', [240, 480, 720]],
+      ['LaunchWordmark', [160, 320, 480]],
+    ] as [string, number[]][]) {
+      const dir = join(IOS, 'Images.xcassets', `${nom}.imageset`);
+      expect(existsSync(join(dir, 'Contents.json'))).toBe(true);
+      const contenu = JSON.parse(
+        readFileSync(join(dir, 'Contents.json'), 'utf8'),
+      ) as { images: { filename: string; appearances?: unknown[] }[] };
+      // Trois densités en clair, trois en sombre.
+      expect(contenu.images.filter((im) => !im.appearances)).toHaveLength(3);
+      expect(contenu.images.filter((im) => im.appearances)).toHaveLength(3);
+      for (const im of contenu.images) {
+        const chemin = join(dir, im.filename);
+        expect({ f: im.filename, present: existsSync(chemin) }).toEqual({
+          f: im.filename,
+          present: true,
+        });
+      }
+      // Et la largeur suit bien les trois densités.
+      const larges = contenu.images
+        .filter((im) => !im.appearances)
+        .map((im) => cotesPng(join(dir, im.filename))[0])
+        .sort((a, b) => a - b);
+      expect(larges).toEqual(cotes);
     }
+  });
+
+  it('le fond suit le thème, et c’est celui de l’application', () => {
+    const s = storyboard();
+    expect(s).toContain('name="LaunchBackground"');
+    const dir = join(IOS, 'Images.xcassets', 'LaunchBackground.colorset');
+    const contenu = JSON.parse(
+      readFileSync(join(dir, 'Contents.json'), 'utf8'),
+    ) as { colors: { appearances?: unknown[] }[] };
+    expect(contenu.colors).toHaveLength(2);
+    expect(contenu.colors.filter((c) => c.appearances)).toHaveLength(1);
   });
 });
 

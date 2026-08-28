@@ -1,9 +1,37 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+    L'ÉCRAN DE LANCEMENT — LA MÊME MARQUE QUE L'ACCUEIL, CENTRÉE.
+
+    Relevé du patron : « au chargement de l'application je vois toujours
+    l'icône de l'app et pas le logo qu'on a sur l'accueil avec derrière
+    l'autre logo, je veux pareil mais centré au clic sur l'application ».
+
+    CE QUI SE PASSAIT, ET POURQUOI ÇA N'AVAIT PAS ÉTÉ VU. L'écran d'attente
+    JS porte déjà les deux logos centrés (voir `EcranChargement`), et il avait
+    été livré comme tel. Mais AVANT lui, iOS affiche SON écran de lancement —
+    celui-ci, un storyboard natif — et il montrait l'icône de l'application à
+    cent quatre-vingts points. On voyait donc : l'icône, puis la marque. Deux
+    ouvertures différentes pour une seule application.
+
+    LA MÊME COMPOSITION QUE L'ACCUEIL, aux mêmes nombres : le glyphe en
+    filigrane à deux cent quarante points et sept centièmes d'opacité, le
+    logotype par-dessus à cent soixante sur cent deux. Ce sont les valeurs de
+    `EcranChargement` et de l'accueil — un filigrane qui changerait de force
+    entre deux écrans qui se suivent se remarque.
+
+    ET IL SUIT LE THÈME. Le fond, le glyphe et le logotype ont chacun leur
+    variante sombre dans le catalogue d'images : sans cela, l'ouverture d'une
+    application en thème sombre commencerait par un éclair blanc.
+
+    IL FAUT UNE COMPILATION EAS pour le voir : un storyboard est du natif, il
+    ne descend pas par un rechargement JS.
+-->
 <document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="15702" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" launchScreen="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES" initialViewController="01J-lp-oVM">
     <device id="retina4_7" orientation="portrait" appearance="light"/>
     <dependencies>
         <deployment identifier="iOS"/>
         <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="15704"/>
+        <capability name="Named colors" minToolsVersion="9.0"/>
         <capability name="Safe area layout guides" minToolsVersion="9.0"/>
         <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
     </dependencies>
@@ -16,18 +44,42 @@
                         <rect key="frame" x="0.0" y="0.0" width="375" height="667"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <subviews>
-<imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" horizontalHuggingPriority="251" verticalHuggingPriority="251" image="LaunchIcon" translatesAutoresizingMaskIntoConstraints="NO" id="GJd-Yh-RWb">
-                                <rect key="frame" x="97.5" y="243.5" width="180" height="180"/>
+                            <!--
+                                LE FILIGRANE EST RENDU EN PREMIER, donc DERRIÈRE :
+                                l'ordre des frères suffit, comme à l'accueil. Il
+                                déborde largement le logotype qu'il accompagne — c'est
+                                ce qui en fait un fond et non une image posée à côté.
+                            -->
+                            <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" horizontalHuggingPriority="251" verticalHuggingPriority="251" alpha="0.07" image="LaunchMark" translatesAutoresizingMaskIntoConstraints="NO" id="Mrk-01-aaa">
+                                <rect key="frame" x="67.5" y="213.5" width="240" height="240"/>
                                 <constraints>
-                                    <constraint firstAttribute="width" constant="180" id="ecp-lw-001"/>
-                                    <constraint firstAttribute="height" constant="180" id="ecp-lh-002"/>
+                                    <constraint firstAttribute="width" constant="240" id="Mrk-w0-001"/>
+                                    <constraint firstAttribute="height" constant="240" id="Mrk-h0-002"/>
+                                </constraints>
+                            </imageView>
+                            <!--
+                                LE LOGOTYPE TIENT SUR DEUX LIGNES — « echo » au-dessus
+                                de « plan » —, cent soixante sur cent deux. Deux
+                                fichiers et pas une teinte : le dessin a des ondes en
+                                dégradé, et une teinte les écraserait toutes en aplat.
+                            -->
+                            <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" horizontalHuggingPriority="251" verticalHuggingPriority="251" image="LaunchWordmark" translatesAutoresizingMaskIntoConstraints="NO" id="Wrd-01-bbb">
+                                <rect key="frame" x="107.5" y="282.5" width="160" height="102"/>
+                                <constraints>
+                                    <constraint firstAttribute="width" constant="160" id="Wrd-w0-003"/>
+                                    <constraint firstAttribute="height" constant="102" id="Wrd-h0-004"/>
                                 </constraints>
                             </imageView>
                         </subviews>
-                        <color key="backgroundColor" red="0.96470588235294119" green="0.96862745098039216" blue="0.97647058823529409" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                        <color key="backgroundColor" name="LaunchBackground"/>
                         <constraints>
-                            <constraint firstItem="Bcu-3y-fUS" firstAttribute="centerX" secondItem="GJd-Yh-RWb" secondAttribute="centerX" id="Q3B-4B-g5h"/>
-                            <constraint firstItem="GJd-Yh-RWb" firstAttribute="centerY" secondItem="Ze5-6b-2t3" secondAttribute="centerY" id="moa-c2-u7t"/>
+                            <!-- Les deux images partagent le MÊME centre : le
+                                 filigrane est centré sur le mot qu'il accompagne,
+                                 et l'ensemble est centré sur l'écran. -->
+                            <constraint firstItem="Mrk-01-aaa" firstAttribute="centerX" secondItem="Ze5-6b-2t3" secondAttribute="centerX" id="Ctr-x0-011"/>
+                            <constraint firstItem="Mrk-01-aaa" firstAttribute="centerY" secondItem="Ze5-6b-2t3" secondAttribute="centerY" id="Ctr-y0-012"/>
+                            <constraint firstItem="Wrd-01-bbb" firstAttribute="centerX" secondItem="Ze5-6b-2t3" secondAttribute="centerX" id="Ctr-x1-013"/>
+                            <constraint firstItem="Wrd-01-bbb" firstAttribute="centerY" secondItem="Ze5-6b-2t3" secondAttribute="centerY" id="Ctr-y1-014"/>
                         </constraints>
                         <viewLayoutGuide key="safeArea" id="Bcu-3y-fUS"/>
                     </view>
@@ -38,6 +90,10 @@
         </scene>
     </scenes>
     <resources>
-        <image name="LaunchIcon" width="180" height="180"/>
+        <image name="LaunchMark" width="240" height="240"/>
+        <image name="LaunchWordmark" width="160" height="102"/>
+        <namedColor name="LaunchBackground">
+            <color red="0.96470588235294119" green="0.96862745098039216" blue="0.97647058823529409" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+        </namedColor>
     </resources>
 </document>

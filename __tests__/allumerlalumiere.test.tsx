@@ -1,0 +1,318 @@
+/**
+ * ON APPUIE SUR L'INTERRUPTEUR, LA LUMIÈRE S'ALLUME.
+ *
+ * Relevé du patron : « sur le plan 3D, enlève le clic sur un mur qui donne la
+ * caméra face à ce mur ; ajoute un système qui fait qu'un clic sur un
+ * interrupteur qui est lié à une lumière allume celle-ci ; élargis un tout
+ * petit peu la zone autour de l'interrupteur pour que le clic soit plus
+ * facile ; on doit voir les lumières scintiller et plus brillantes. »
+ *
+ * CE QUE LE TAP FAISAIT AVANT, ET POURQUOI ÇA GÊNAIT. Un appui simple cadrait
+ * la caméra face au mur touché. C'était une bonne idée pour lire une élévation,
+ * et une mauvaise pour tout le reste : la maquette bougeait dès qu'on la
+ * touchait sans vouloir la tourner, et il n'y avait plus AUCUN appui
+ * disponible pour agir sur ce qu'on voit. Un geste qui recadre bloque tous les
+ * autres.
+ *
+ * CE QUE ÇA DEVIENT. Le tap sert à ESSAYER l'installation : on touche
+ * l'interrupteur, les points lumineux qu'il commande s'allument. C'est le geste
+ * qu'on fait sur un chantier fini, et c'est la seule façon de vérifier d'un
+ * coup d'œil qu'on a bien lié ce qu'il fallait.
+ *
+ * LA ZONE EST PLUS LARGE QUE LE SYMBOLE, et c'est le relevé qui le demande :
+ * un mécanisme fait sept centimètres sur un mur de cinq mètres — quelques
+ * pixels à l'écran. On vise avec un doigt, pas avec une souris. C'est la même
+ * règle que le plan 2D : la cible est plus tolérante que le dessin, et elle ne
+ * se confond jamais avec lui.
+ *
+ * CE QUE CE BANC NE PEUT PAS TENIR : le scintillement. C'est une animation, et
+ * le rendu ne se regarde pas depuis cette machine. Il tient ce qui se mesure —
+ * qu'un halo apparaît, qu'il disparaît, et qu'il porte bien la lumière qu'on
+ * vient d'allumer.
+ */
+const canevasPresent = { valeur: false };
+
+jest.mock('@react-native-async-storage/async-storage', () => ({
+  getItem: jest.fn(async () => null),
+  setItem: jest.fn(async () => undefined),
+  removeItem: jest.fn(async () => undefined),
+}));
+
+jest.mock('react-native-room-scan', () => ({
+  RoomScan: {
+    isSupported: jest.fn(async () => true),
+    viewModel: jest.fn(async () => false),
+  },
+  scanEvents: {
+    addListener: jest.fn(() => ({ remove: jest.fn() })),
+    removeAllListeners: jest.fn(),
+  },
+  laserEvents: {
+    addListener: jest.fn(() => ({ remove: jest.fn() })),
+    removeAllListeners: jest.fn(),
+  },
+  RoomScanView: 'RoomScanView',
+  get RoomScanCanvas() {
+    return canevasPresent.valeur ? 'RoomScanCanvas' : undefined;
+  },
+}));
+
+import React from 'react';
+import { View } from 'react-native';
+import { Circle } from 'react-native-svg';
+import TestRenderer, { act } from 'react-test-renderer';
+import { Iso3DView } from '../src/components/Iso3DView';
+import { useScanStore } from '../src/store/scanStore';
+import type { WallSeg } from '../src/geometry/floorplan';
+import type { Fixture } from '../src/geometry/electrical';
+import type { CeilingFixture } from '../src/geometry/ceiling';
+
+const mur = (id: string, ax: number, az: number, bx: number, bz: number): WallSeg => ({
+  id,
+  type: 'wall',
+  a: { x: ax, z: az },
+  b: { x: bx, z: bz },
+  height: 2.5,
+  yCenter: 1.25,
+  roomId: 'r1',
+});
+
+const MURS: WallSeg[] = [
+  mur('n', 0, 0, 5, 0),
+  mur('e', 5, 0, 5, 4),
+  mur('s', 5, 4, 0, 4),
+  mur('o', 0, 4, 0, 0),
+];
+
+/** Un interrupteur qui commande le point lumineux, et un qui ne commande rien. */
+const INTER: Fixture = {
+  id: 'i1',
+  kind: 'inter',
+  wallId: 'n',
+  along: 2.5,
+  height: 1.1,
+  side: 1,
+};
+const PRISE: Fixture = {
+  id: 'p1',
+  kind: 'prise',
+  wallId: 's',
+  along: 2.5,
+  height: 0.25,
+  side: 1,
+};
+
+const LAMPE: CeilingFixture = {
+  id: 'c1',
+  kind: 'dcl',
+  roomId: 'r1',
+  at: { x: 2.5, z: 2 },
+  commands: ['i1'],
+};
+
+let arbre: TestRenderer.ReactTestRenderer | null = null;
+afterEach(() => {
+  act(() => arbre?.unmount());
+  arbre = null;
+});
+
+const monter = (props: Record<string, unknown> = {}) => {
+  let t!: TestRenderer.ReactTestRenderer;
+  act(() => {
+    useScanStore.getState().reset();
+    useScanStore.setState({
+      walls: MURS,
+      openings: [],
+      objects: [],
+      rooms: [{ id: 'r1', name: 'Séjour', floor: null }] as never,
+      fixtures: [INTER, PRISE],
+      ceiling: [LAMPE],
+      photos: [],
+    });
+    t = TestRenderer.create(
+      <Iso3DView
+        value={{ theta: -32, tilt: 56, zoom: 1, ox: 0, oy: 0 }}
+        {...props}
+      />,
+    );
+  });
+  act(() => {
+    const zone = t.root
+      .findAllByType(View)
+      .find((n) => typeof n.props.onLayout === 'function')!;
+    zone.props.onLayout({ nativeEvent: { layout: { width: 600, height: 480 } } });
+  });
+  arbre = t;
+  return t;
+};
+
+/** La vue qui porte les gestes. */
+const gestes = (t: TestRenderer.ReactTestRenderer) =>
+  t.root.findAll(
+    (n) => typeof n.props?.onStartShouldSetResponder === 'function',
+  )[0];
+
+/**
+ * UN APPUI SIMPLE, tel que le `PanResponder` le voit.
+ *
+ * `PanResponder` IGNORE l'état de geste qu'on lui passe et le RECALCULE depuis
+ * `e.touchHistory` — c'est le piège que la maison connaît par cœur, et la
+ * première version de ce banc est tombée dedans : appelé avec un `touchBank`
+ * vide, il lance sur `touchActive` et l'épreuve échoue à côté de son sujet.
+ *
+ * On lui donne donc un doigt crédible : posé, puis relâché au même endroit.
+ */
+const taper = (t: TestRenderer.ReactTestRenderer, x: number, y: number) => {
+  const v = gestes(t);
+  const horloge = 1000;
+  const doigt = {
+    touchActive: true,
+    startPageX: x,
+    startPageY: y,
+    startTimeStamp: horloge,
+    currentPageX: x,
+    currentPageY: y,
+    currentTimeStamp: horloge,
+    previousPageX: x,
+    previousPageY: y,
+    previousTimeStamp: horloge,
+  };
+  const ev = (actif: boolean) => ({
+    nativeEvent: {
+      touches: actif ? [{ identifier: 0, pageX: x, pageY: y }] : [],
+      changedTouches: [{ identifier: 0, pageX: x, pageY: y }],
+      identifier: 0,
+      pageX: x,
+      pageY: y,
+      locationX: x,
+      locationY: y,
+      timestamp: horloge,
+    },
+    touchHistory: {
+      touchBank: [{ ...doigt, touchActive: actif }],
+      numberActiveTouches: actif ? 1 : 0,
+      indexOfSingleActiveTouch: 0,
+      mostRecentTimeStamp: horloge,
+    },
+  });
+  act(() => {
+    v.props.onStartShouldSetResponder?.(ev(true));
+    v.props.onResponderGrant?.(ev(true));
+  });
+  act(() => {
+    v.props.onResponderRelease?.(ev(false));
+  });
+};
+
+/** Les halos de lumière posés sur la maquette. */
+const halos = (t: TestRenderer.ReactTestRenderer) =>
+  t.root
+    .findAllByType(Circle)
+    .filter((n) => String(n.props.testID ?? '').startsWith('halo-'));
+
+describe('le tap ne recadre plus la caméra', () => {
+  it('un appui sur un mur laisse la vue où elle est', () => {
+    /*
+      C'est le relevé, mot pour mot : « enlève le clic sur un mur qui donne la
+      caméra face à ce mur ». On le mesure par ce que la vue REND au parent —
+      si elle recadrait, elle annoncerait un nouveau point de vue.
+    */
+    const vus: unknown[] = [];
+    const t = monter({ onChange: (v: unknown) => vus.push(v) });
+    // Plein milieu de la vue : sur un logement centré, c'est du mur.
+    taper(t, 300, 240);
+    expect(vus).toEqual([]);
+  });
+});
+
+describe('un appui sur l’interrupteur allume ce qu’il commande', () => {
+  it('rien n’est allumé au départ', () => {
+    expect(halos(monter())).toHaveLength(0);
+  });
+
+  it('et l’appui pose un halo sur la lumière commandée', () => {
+    const t = monter();
+    const cible = t.root.findAll(
+      (n) => String(n.props?.testID ?? '') === 'cible-i1',
+    )[0];
+    expect(cible).toBeDefined();
+    taper(t, cible.props.cx, cible.props.cy);
+    const vus = halos(t);
+    expect(vus).toHaveLength(1);
+    expect(vus[0].props.testID).toBe('halo-c1');
+  });
+
+  it('un second appui l’éteint : c’est un interrupteur', () => {
+    const t = monter();
+    const cible = t.root.findAll(
+      (n) => String(n.props?.testID ?? '') === 'cible-i1',
+    )[0];
+    taper(t, cible.props.cx, cible.props.cy);
+    taper(t, cible.props.cx, cible.props.cy);
+    expect(halos(t)).toHaveLength(0);
+  });
+
+  it('une prise ne commande rien : elle n’a même pas de cible', () => {
+    /*
+      LE CONTRÔLE EN SENS INVERSE. Si toute la surface allumait quelque chose,
+      les trois épreuves du dessus passeraient sans rien prouver. Un appareil
+      qui ne commande aucun point lumineux n'offre donc aucune cible — et un
+      appui dessus ne fait rien.
+    */
+    const t = monter();
+    expect(
+      t.root.findAll((n) => String(n.props?.testID ?? '') === 'cible-p1'),
+    ).toHaveLength(0);
+  });
+});
+
+describe('la zone de l’interrupteur est plus large que son symbole', () => {
+  it('elle est tolérante, et invisible', () => {
+    /*
+      Un mécanisme fait sept centimètres sur un mur de cinq mètres : quelques
+      pixels à l'écran. On vise avec un doigt, pas avec une souris — c'est la
+      règle du plan 2D, où la cible est plus tolérante que le dessin.
+    */
+    const t = monter();
+    const cible = t.root.findAll(
+      (n) => String(n.props?.testID ?? '') === 'cible-i1',
+    )[0];
+    expect(cible.props.r).toBeGreaterThan(12);
+    // Invisible : elle ne doit rien ajouter au dessin.
+    expect(cible.props.opacity ?? 0).toBe(0);
+  });
+
+  it('et un appui À CÔTÉ du symbole allume quand même', () => {
+    const t = monter();
+    const cible = t.root.findAll(
+      (n) => String(n.props?.testID ?? '') === 'cible-i1',
+    )[0];
+    // À la limite de la cible : c'est justement ce qu'elle sert à rattraper.
+    taper(t, cible.props.cx + cible.props.r * 0.8, cible.props.cy);
+    expect(halos(t)).toHaveLength(1);
+  });
+
+  it('mais un appui LOIN n’allume rien', () => {
+    // Le contrôle en sens inverse de la tolérance : elle a une limite.
+    const t = monter();
+    const cible = t.root.findAll(
+      (n) => String(n.props?.testID ?? '') === 'cible-i1',
+    )[0];
+    taper(t, cible.props.cx + cible.props.r * 4, cible.props.cy);
+    expect(halos(t)).toHaveLength(0);
+  });
+});
+
+describe('une lumière allumée se voit', () => {
+  it('son halo est clair et large — plus que la pastille du plafonnier', () => {
+    const t = monter();
+    const cible = t.root.findAll(
+      (n) => String(n.props?.testID ?? '') === 'cible-i1',
+    )[0];
+    taper(t, cible.props.cx, cible.props.cy);
+    const halo = halos(t)[0];
+    // Un halo de lumière déborde largement de ce qui l'émet.
+    expect(halo.props.r).toBeGreaterThan(20);
+    expect(String(halo.props.fill)).toMatch(/^#|^url\(/);
+  });
+});
