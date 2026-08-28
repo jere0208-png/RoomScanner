@@ -811,6 +811,50 @@ function drawLegendBox(
   return haut;
 }
 const TITLE_H = 66;
+/**
+ * LE BANDEAU DU TITRE EST RESERVE, pas partage.
+ *
+ * Le titre s'ecrivait par-dessus le dessin : sur un logement haut, le plan
+ * montait jusqu'en tete de feuille et le barrait de ses murs. Le dessin
+ * s'arrete donc sous le bandeau, et la fenetre de decoupe avec lui : c'est
+ * la seule facon d'en etre sur, puisque le zoom vient de l'utilisateur.
+ */
+const BANDEAU = 44;
+/**
+ * LA FENETRE DE DECOUPE DU PLAN — annoncee, pas devinee.
+ *
+ * C'est le rectangle auquel `planPage` rogne son dessin : tout ce qui est
+ * ecrit dedans appartient au plan, tout ce qui est ecrit dehors appartient
+ * a la feuille (tete, cartouche). Elle etait ecrite en clair a l'endroit du
+ * `clip`, et un banc qui voulait mesurer le plan devait la RECOPIER — deux
+ * calculs de la meme chose divergent, c'est la lecon du bandeau du meuble :
+ * celui qui dessine annonce son encombrement, personne ne le devine plus.
+ */
+/**
+ * LE DISQUE D'UN APPAREIL DE PLAFOND, en points de page.
+ *
+ * Ni plus petit que lisible — un spot de 9 cm ferait deux points au 1:100 —
+ * ni plus gros que le symbole. Le calcul était écrit trois fois dans la
+ * feuille du plan ; c'est un chiffre que le dessin ANNONCE, et dont les
+ * bancs se servent pour savoir jusqu'où un sigle a le droit d'aller.
+ */
+export const RAYON_PLAFOND_MIN = 7;
+export const RAYON_PLAFOND_MAX = 16;
+/**
+ * JUSQU'OÙ LE SIGLE D'UN PLAFONNIER S'ÉCARTE DE SON DISQUE.
+ *
+ * Il tient à son symbole : c'est lui qu'il nomme. Il fait le tour du disque
+ * — dessous d'abord, puis dessus, puis de part et d'autre — sans jamais
+ * dépasser cet écart, sans quoi il désignerait l'appareil voisin.
+ */
+export const ECART_SIGLE_PLAFOND = 15;
+
+export const FENETRE_PLAN = {
+  x: FRAME.x + 2,
+  y: FRAME.y + TITLE_H + 2,
+  w: FRAME.w - 4,
+  h: FRAME.h - TITLE_H - 4 - BANDEAU,
+};
 
 function drawSheetChrome(
   d: Draw,
@@ -1484,16 +1528,6 @@ function planPage(
   const centerOf = (roomId: string) =>
     partOf.get(roomId)?.labelAt ?? { x: 0, z: 0 };
 
-  /**
-   * LE BANDEAU DU TITRE EST RÉSERVÉ, pas partagé.
-   *
-   * Le titre s'écrivait par-dessus le dessin : sur un logement haut, le
-   * plan montait jusqu'en tête de feuille et le barrait de ses murs —
-   * « Plan d'implantation » rayé par une cloison. Le dessin s'arrête
-   * donc sous le bandeau, et la fenêtre de découpe avec lui : c'est la
-   * seule façon d'en être sûr, puisque le zoom vient de l'utilisateur.
-   */
-  const BANDEAU = 44;
   // Zone de dessin (cotes extérieures comprises)
   /*
     LA LÉGENDE RÉSERVE SA PLACE AVANT LE CADRAGE.
@@ -1590,12 +1624,7 @@ function planPage(
     // l'aperçu s'applique tel quel, et un plan agrandi allait jusqu'à
     // traverser le cartouche.
     d.save();
-    d.clip(
-      FRAME.x + 2,
-      FRAME.y + TITLE_H + 2,
-      FRAME.w - 4,
-      FRAME.h - TITLE_H - 4 - BANDEAU,
-    );
+    d.clip(FENETRE_PLAN.x, FENETRE_PLAN.y, FENETRE_PLAN.w, FENETRE_PLAN.h);
     /*
       UNE ÉCHELLE VRAIE, PAS UNE MISE À LA FEUILLE.
 
@@ -1692,6 +1721,52 @@ function planPage(
       return { x: cx - w2 / 2, y: cy - h2 / 2, w: w2, h: h2 };
     };
     /**
+     * UNE COTE PIVOTÉE : LA BOÎTE QU'ON RÉSERVE EST CELLE QU'ON DESSINE.
+     *
+     * La valeur d'une cote se centrait sur son point en descendant la ligne
+     * de base de deux points et demi — un décalage pris SUR L'AXE Y DE LA
+     * PAGE, alors que le texte, lui, est incliné. Sur un mur vertical, le
+     * chiffre partait donc de côté pendant que la réserve, elle, restait
+     * droite : la place vérifiée n'était pas la place occupée, et l'arbitre
+     * déclarait « libre » un coin où le lecteur voyait deux nombres se
+     * toucher. C'est le défaut connu de la maison, pris à l'envers.
+     *
+     * On calcule donc le point de base COMME LE FAIT `Draw.text` — décalé le
+     * long du texte pour le centrer, et le long de sa normale pour l'asseoir
+     * — et l'emprise sur les quatre coins tournés, hauteur des CHIFFRES.
+     */
+    const coteAPoser = (
+      txt: string,
+      cx: number,
+      cy: number,
+      size: number,
+      ang: number,
+    ) => {
+      const r = (ang * Math.PI) / 180;
+      const c = Math.cos(r);
+      const sn = Math.sin(r);
+      const l = latin1(txt).length * size * 0.5;
+      const h = size * 0.72;
+      // Le point que `Draw.text` recevra : il retirera lui-même la moitié
+      // de la longueur le long du texte.
+      const ax = cx + (sn * h) / 2;
+      const ay = cy - (c * h) / 2;
+      const bx = ax - (l / 2) * c;
+      const by = ay - (l / 2) * sn;
+      const xs = [bx, bx + l * c, bx + l * c - h * sn, bx - h * sn];
+      const ys = [by, by + l * sn, by + l * sn + h * c, by + h * c];
+      return {
+        x: ax,
+        y: ay,
+        boite: {
+          x: Math.min(...xs),
+          y: Math.min(...ys),
+          w: Math.max(...xs) - Math.min(...xs),
+          h: Math.max(...ys) - Math.min(...ys),
+        },
+      };
+    };
+    /**
      * L'étiquette tient-elle ENTIÈREMENT dans la fenêtre de la feuille ?
      *
      * On se règle sur la fenêtre de découpe, pas sur la zone de dessin : le
@@ -1728,6 +1803,426 @@ function planPage(
         if (!numeros.get(w.id)) continue;
         const p2 = px(wallTagAt(w, openings));
         posees.push({ x: p2.x - 7.1, y: p2.y - 7.1, w: 14.2, h: 14.2 });
+      }
+    }
+
+    /**
+     * LES MOTS DE L'APPAREILLAGE S'INSCRIVENT AVANT LES COTES.
+     *
+     * Mesuré sur trente cadrages du plan de référence : **47 chevauchements
+     * sur 2 494 étiquettes** (banc `cotespdfsanschoc`). Le sigle d'un
+     * appareil — « 20A », « 32A », « TV » — et son repère de circuit
+     * s'écrivaient au moment du symbole, c'est-à-dire APRÈS les cotes, et
+     * SANS INTERROGER la réserve : ils poussaient leur boîte dedans une fois
+     * écrits, ce qui protégeait les suivants et personne d'autre. D'où
+     * « 0,90 » de menuiserie barré par « 32A », et « 1,20 » par un « 9 ».
+     *
+     * C'EST L'ORDRE DES LIBERTÉS, et il était à l'envers. Un sigle tient à
+     * son symbole : il le nomme, il ne peut pas partir ailleurs. Une cote
+     * glisse le long de son propre trait sans rien perdre. C'est donc au
+     * sigle de s'inscrire d'abord et à la cote de s'écarter — la même règle
+     * que les numéros de mur juste au-dessus, et que le plan à l'écran.
+     *
+     * ILS SE DESSINENT PLUS BAS, à la place retenue ici. La boîte réservée
+     * EST la boîte écrite : elles se calculaient séparément — le fond
+     * réservait cinq points et demi de haut là où le texte en occupe quatre,
+     * décalé de deux — et deux calculs de la même chose finissent par
+     * diverger.
+     */
+    const murQuads = wallQuads(walls);
+    const murParIdent = new Map(walls.map((w) => [w.id, w]));
+    const poses = (ctx.fixtures ?? [])
+      .map((f) => {
+        const w = murParIdent.get(f.wallId);
+        if (!w) return null;
+        const face = wallFace(w, murQuads.get(w.id), f.side);
+        return { f, face, along: faceX(face, f.along) };
+      })
+      .filter((v): v is NonNullable<typeof v> => !!v);
+    /**
+     * UN ENSEMBLE SE DESSINE UNE FOIS, avec tous ses postes.
+     *
+     * Le papier dessinait un symbole PAR APPAREIL : une double prise sortait
+     * en deux symboles distants de 71 mm — deux pixels à l'échelle d'un
+     * logement — qui se recouvraient. Sur le mur, c'est pourtant UNE plaque,
+     * à deux mécanismes.
+     */
+    const lots = new Map<string, typeof poses>();
+    for (const v of poses) {
+      const cle = v.f.group
+        ? `g:${v.f.group}:${v.f.wallId}:${v.f.side}`
+        : `s:${v.f.id}`;
+      const l = lots.get(cle);
+      if (l) l.push(v);
+      else lots.set(cle, [v]);
+    }
+    const unites = [...lots.values()].map((membres) => {
+      const tri = [...membres].sort((a, b) => a.along - b.along);
+      const xs = tri.map((m) => m.along);
+      return {
+        f: tri[0].f,
+        face: tri[0].face,
+        // Le symbole se pose au MILIEU de la plaque : c'est ce qu'on voit
+        // sur le mur, et ce que l'écran dessine déjà.
+        along: (Math.min(...xs) + Math.max(...xs)) / 2,
+        postes: tri.flatMap((m) => postsOf(m.f.kind)),
+        membres: tri,
+      };
+    });
+    // L'échelonnement compte les PLAQUES, pas les postes : deux appareils
+    // d'un même ensemble ne s'écartent pas l'un de l'autre.
+    const ranks = stackRanks(
+      unites.map((v) => ({
+        id: v.f.id,
+        wallId: v.f.wallId,
+        side: v.f.side,
+        x: v.along,
+      })),
+    );
+    /** Où sort le symbole du mur : le rang l'échelonne le long de son filet. */
+    const sortieDuMur = (id: string) => 0.2 + (ranks.get(id) ?? 0) * 0.24;
+    /**
+     * L'EMPAN DU SYMBOLE COMPOSÉ — ce qui l'entoure se pose dessus.
+     *
+     * Un rond fait pour un poste laissait les symboles d'un ensemble de
+     * trois déborder des deux côtés. Le rayon suit donc l'empan RÉEL : même
+     * pas d'entraxe que `postsSymbol`, demi-symbole aux extrémités, le tout
+     * à l'échelle du dessin.
+     */
+    const ECHELLE_SYMBOLE = 0.5;
+    const rayonDuSymbole = (n: number) =>
+      6.5 +
+      ((Math.max(1, n) - 1) *
+        ((ENTRAXE / PLAQUE) * SYMBOL_SPAN) *
+        ECHELLE_SYMBOLE) /
+        2;
+    /** La taille des mots qui accompagnent un symbole. */
+    const TAILLE_SIGLE = 5.5;
+    /**
+     * LA BOÎTE D'UN MOT ÉCRIT À GAUCHE, telle que le lecteur la verra.
+     *
+     * `d.text(..., align: 'left')` pose le début de la ligne de base en
+     * (x, y) ; le texte occupe la hauteur de ses CHIFFRES (0,72 em), pas
+     * celle de sa police — ni jambage, ni accent. Une seule fonction pour
+     * réserver et pour dessiner.
+     */
+    const boiteEcrite = (texte: string, x: number, y: number, taille: number) => ({
+      x,
+      y,
+      w: latin1(texte).length * taille * 0.5,
+      h: taille * 0.72,
+    });
+    /** Un mot retenu ici, dessiné plus bas, à la place qu'il a trouvée. */
+    const motsAppareil: {
+      texte: string;
+      x: number;
+      y: number;
+      couleur: string;
+      bold: boolean;
+    }[] = [];
+    for (const { f, face, along, postes, membres } of unites) {
+      const x = Math.max(0, Math.min(face.len, along));
+      const q = px(facePoint(face, x, sortieDuMur(f.id)));
+      if (!dansLeCadre(q)) continue;
+      const rayon = rayonDuSymbole(postes.length);
+      /*
+        LE SIGLE CUMULÉ. Le plan reste sobre — seuls les appareils qui se
+        distinguent portent un mot (20 A, RJ, TV) —, mais une plaque annonce
+        TOUT ce qu'elle porte : « RJ + TV » sous une plaque de communication.
+      */
+      const tags = [
+        ...new Set(postes.map((k) => FIXTURE_TAG[k]).filter(Boolean)),
+      ].join(' + ');
+      if (tags) {
+        const larg = latin1(tags).length * TAILLE_SIGLE * 0.5;
+        /*
+          À DROITE DU DISQUE D'ABORD — c'est là qu'on lit un sigle, et c'est
+          là qu'il était. Puis à gauche, puis d'un cran plus haut ou plus
+          bas : il reste attaché à son symbole dans tous les cas. À droite
+          « du disque », jamais « du centre » : sur une plaque de trois
+          postes, le sigle tombait en plein sur le dernier symbole.
+        */
+        const places = [
+          { x: q.x + rayon + 5, y: q.y + 4 },
+          { x: q.x - rayon - 5 - larg, y: q.y + 4 },
+          { x: q.x + rayon + 5, y: q.y - 5 },
+          { x: q.x - rayon - 5 - larg, y: q.y - 5 },
+          { x: q.x + rayon + 5, y: q.y + 12 },
+          { x: q.x - rayon - 5 - larg, y: q.y + 12 },
+          { x: q.x - larg / 2, y: q.y + rayon + 3 },
+          { x: q.x + rayon + 5, y: q.y - 13 },
+          { x: q.x - rayon - 5 - larg, y: q.y - 13 },
+          { x: q.x + rayon + 14, y: q.y + 4 },
+          { x: q.x - rayon - 14 - larg, y: q.y + 4 },
+          { x: q.x - larg / 2, y: q.y + rayon + 11 },
+        ];
+        const p =
+          places.find((c) => libre(boiteEcrite(tags, c.x, c.y, TAILLE_SIGLE))) ??
+          places[0];
+        posees.push(boiteEcrite(tags, p.x, p.y, TAILLE_SIGLE));
+        motsAppareil.push({
+          texte: tags,
+          x: p.x,
+          y: p.y,
+          couleur: FIXTURES[f.kind].color,
+          bold: false,
+        });
+      }
+      /*
+        LE REPÈRE DE CIRCUIT, sous l'appareil — celui-là même qu'on lit à
+        l'écran et qu'on retrouve sur le tableau. Le dossier le taisait :
+        celui qui tire les gaines devait deviner de quel départ dépend
+        chaque prise, alors que l'app le sait.
+      */
+      const mark = ctx.marks?.get(membres[0].f.id);
+      if (mark) {
+        const larg = latin1(mark).length * TAILLE_SIGLE * 0.5;
+        // SOUS le disque (l'axe y du PDF monte), puis au-dessus, puis de
+        // part et d'autre : il désigne son symbole, il ne part pas loin.
+        const places = [
+          { x: q.x - larg / 2, y: q.y - rayon - 6 },
+          { x: q.x - larg / 2, y: q.y + rayon + 2 },
+          { x: q.x - rayon - 4 - larg, y: q.y - rayon - 6 },
+          { x: q.x + rayon + 4, y: q.y - rayon - 6 },
+          { x: q.x - larg / 2, y: q.y - rayon - 13 },
+          { x: q.x - rayon - 4 - larg, y: q.y + rayon + 2 },
+          { x: q.x + rayon + 4, y: q.y + rayon + 2 },
+          { x: q.x - larg / 2, y: q.y + rayon + 9 },
+          { x: q.x - larg / 2, y: q.y - rayon - 20 },
+        ];
+        const p =
+          places.find((c) => libre(boiteEcrite(mark, c.x, c.y, TAILLE_SIGLE))) ??
+          places[0];
+        posees.push(boiteEcrite(mark, p.x, p.y, TAILLE_SIGLE));
+        motsAppareil.push({
+          texte: mark,
+          x: p.x,
+          y: p.y,
+          couleur: markColor(mark),
+          bold: true,
+        });
+      }
+    }
+
+    /**
+     * LE PLAFOND ANNONCE SES PASTILLES ET SES SIGLES, LUI AUSSI AVANT LES
+     * COTES.
+     *
+     * Le sigle d'un plafonnier — « SP », « DCL », « DAAF » — n'a aucune
+     * liberté : il tient sous SON symbole, sinon il ne nomme plus rien.
+     * C'était écrit dans le code, et pourtant il passait EN DERNIER : il ne
+     * s'écartait que de ses semblables et des disques, jamais du reste de la
+     * feuille. Sur la mesure : « DAAF » sur un repère de circuit, « SP » sur
+     * le cartouche « 9,0 m² ».
+     *
+     * Il s'inscrit donc ici, avec les mots de l'appareillage, dans le même
+     * ordre des libertés — et ce sont les cotes qui s'écartent.
+     */
+    const plafondPose = ctx.ceiling ?? [];
+    /**
+     * LE DISQUE DU SYMBOLE se retient avant tout le reste.
+     *
+     * Un symbole de plafond ne pose plus de fond blanc, mais sa place reste
+     * réservée : une cote écrite dessous se lisait à moitié — sur la
+     * capture, « 243 » se lisait « 24 », le dernier chiffre mangé par le
+     * spot qu'il servait justement à poser.
+     */
+    const pastillesPlafond: Boite[] = [];
+    for (const cl of plafondPose) {
+      const q = px(cl.at);
+      if (!dansLeCadre(q)) continue;
+      const r =
+        Math.max(
+          RAYON_PLAFOND_MIN,
+          Math.min(RAYON_PLAFOND_MAX, (CEILINGS[cl.kind].d / 2) * scale),
+        ) + 2;
+      pastillesPlafond.push({ x: q.x - r, y: q.y - r, w: r * 2, h: r * 2 });
+    }
+    posees.push(...pastillesPlafond);
+    /**
+     * PUIS LE SIGLE, sous son symbole — et sinon tout autour.
+     *
+     * Le cas qui a tout déclenché : le DAAF posé à dix centimètres du point
+     * lumineux, comme la norme le veut dans la circulation. Deux sigles pour
+     * un même point : le second passe de l'autre côté, et le plan cesse de
+     * porter « DCAF ».
+     */
+    const siglesPose = new Map<string, Boite>();
+    const TAILLE_SIGLE_PLAFOND = 6.5;
+    for (const cl of plafondPose) {
+      const q = px(cl.at);
+      if (!dansLeCadre(q)) continue;
+      const spec = CEILINGS[cl.kind];
+      const r = Math.max(
+        RAYON_PLAFOND_MIN,
+        Math.min(RAYON_PLAFOND_MAX, (spec.d / 2) * scale),
+      );
+      const larg = latin1(spec.short).length * TAILLE_SIGLE_PLAFOND * 0.5;
+      const E = ECART_SIGLE_PLAFOND;
+      const places = [
+        { x: q.x - larg / 2, y: q.y - r - 8 },
+        { x: q.x - larg / 2, y: q.y + r + 2 },
+        { x: q.x + r + 3, y: q.y - 3 },
+        { x: q.x - r - 3 - larg, y: q.y - 3 },
+        { x: q.x - larg / 2, y: q.y - r - E },
+        { x: q.x - larg / 2, y: q.y + r + E - 6 },
+      ];
+      const c =
+        places.find((v) =>
+          libre(boiteEcrite(spec.short, v.x, v.y, TAILLE_SIGLE_PLAFOND)),
+        ) ?? places[0];
+      const b = boiteEcrite(spec.short, c.x, c.y, TAILLE_SIGLE_PLAFOND);
+      posees.push(b);
+      siglesPose.set(cl.id, b);
+    }
+
+    /**
+     * PUIS LE CARTOUCHE DE LA PIÈCE — avant les cotes, et il CÈDE LIGNE PAR
+     * LIGNE.
+     *
+     * C'est la règle du dossier imprimé, et c'est celle que l'écran a
+     * adoptée : « le cartouche évite les sigles, la cote évite les deux ».
+     * Un nom de pièce se lit n'importe où DANS sa pièce ; une cote est
+     * attachée à ce qu'elle mesure. Le papier faisait l'inverse — le
+     * cartouche passait en dernier et ne cherchait qu'à monter ou descendre
+     * de trente-quatre points. Quand il ne trouvait rien, il s'écrivait
+     * quand même : sur la mesure, « SP » disparaissait sous « 9,0 m² ».
+     *
+     * DEUX LIBERTÉS, ET DANS CET ORDRE. Il se décale d'abord — en hauteur,
+     * puis de côté, sans quitter sa pièce. Et s'il ne trouve toujours rien,
+     * IL ABANDONNE SA SURFACE : le nom seul tient dans dix-huit points de
+     * haut là où l'ensemble en demande trente. Le nom est ce qu'on cherche
+     * en premier sur un plan, la surface se relit au métré.
+     */
+    const cartouchesPose = new Map<
+      string,
+      { x: number; y: number; w: number; h: number; cx: number; cy: number; avecAire: boolean }
+    >();
+    if (showSurfaces) {
+      const gros = parts.length === 1 ? 14 : 10.5;
+      const petit = parts.length === 1 ? 11 : 9;
+      /*
+        LES PLACES, EN ANNEAUX AUTOUR DU MILIEU — c'est là qu'on va chercher
+        le nom d'une pièce, et l'on s'en éloigne le moins possible.
+
+        Une grille de neuf points en croix ne suffisait pas : dans une
+        chambre chargée de spots et de sigles, aucune des neuf n'était libre
+        et le cartouche retombait sur sa place d'origine, par-dessus un
+        « SP ». On balaie donc tout le voisinage, du plus proche au plus
+        loin — c'est ce que fait l'écran depuis `cotessanschoc`.
+      */
+      const PAS_CARTOUCHE = 9;
+      const ecarts: [number, number][] = [];
+      for (let i = -10; i <= 10; i++) {
+        for (let j = -10; j <= 10; j++) {
+          ecarts.push([i * PAS_CARTOUCHE, j * PAS_CARTOUCHE]);
+        }
+      }
+      ecarts.sort((a, b) => Math.hypot(a[0], a[1]) - Math.hypot(b[0], b[1]));
+      /**
+       * IL NE SORT PAS DE SA PIÈCE.
+       *
+       * Un cartouche posé dans le couloir d'à côté ne nomme plus rien — et
+       * il est pire qu'un cartouche gênant : on croit lire le nom de la
+       * pièce où il se trouve. Le contour de la pièce, projeté sur la page,
+       * borne donc la recherche.
+       */
+      const dansLaPiece = (contour: Pt[], q: Pt) => {
+        let dedans = false;
+        for (let i = 0, j = contour.length - 1; i < contour.length; j = i++) {
+          const a = contour[i];
+          const b = contour[j];
+          if (
+            a.y > q.y !== b.y > q.y &&
+            q.x < ((b.x - a.x) * (q.y - a.y)) / (b.y - a.y) + a.x
+          ) {
+            dedans = !dedans;
+          }
+        }
+        return dedans;
+      };
+      for (const part of parts) {
+        if (!part.surface) continue;
+        const cp = px(part.labelAt);
+        const label = roomNames[part.roomId] ?? '';
+        const area = `${part.surface.exact ? '' : '≈ '}${fr1(part.surface.area)} m²`;
+        /** L'emprise du cartouche, avec ou sans sa ligne de surface. */
+        const emprise = (avecAire: boolean, cx: number, cy: number) => {
+          const larg =
+            (avecAire
+              ? Math.max(latin1(label).length * gros, latin1(area).length * petit)
+              : latin1(label).length * gros) *
+              0.52 +
+            10;
+          const haut = avecAire ? (label ? 30 : 32) : 18;
+          return {
+            x: cx - larg / 2,
+            y: cy - (avecAire ? (label ? 15 : 16) : 9),
+            w: larg,
+            h: haut,
+            cx,
+            cy,
+            avecAire,
+          };
+        };
+        // Sans nom, il ne reste rien à céder : la surface EST l'information.
+        const variantes = label ? [true, false] : [true];
+        const contour = (part.surface?.pts ?? []).map(px);
+        /*
+          ET SI RIEN N'EST LIBRE, IL EN DIT LE MOINS POSSIBLE.
+
+          Le repli était le cartouche COMPLET à sa place d'origine : la
+          pièce la plus chargée du plan — celle qui n'a justement pas de
+          place — écopait de la plus grosse boîte. « 9,0 m² » s'écrivait
+          alors par-dessus le sigle d'un spot. Le repli, c'est la dernière
+          variante, pas la première : le nom seul.
+        */
+        let choisi = emprise(variantes[variantes.length - 1], cp.x, cp.y);
+        let gene = true;
+        chercher: for (const avecAire of variantes) {
+          for (const [dx, dy] of ecarts) {
+            const q = { x: cp.x + dx, y: cp.y + dy };
+            if (contour.length >= 3 && !dansLaPiece(contour, q)) continue;
+            const b = emprise(avecAire, q.x, q.y);
+            if (libre(b)) {
+              choisi = b;
+              gene = false;
+              break chercher;
+            }
+          }
+        }
+        /*
+          UNE PIÈCE SATURÉE GARDE SON NOM, ET C'EST LE SIGLE QUI S'EFFACE.
+
+          Le cas est réel et il est extrême : une chambre où seize appareils
+          de plafond, leurs sigles et l'appareillage des quatre murs ne
+          laissent pas dix-huit points de libre. Il faut trancher, et le
+          partage se fait sur CE QUI SE RETROUVE AILLEURS.
+
+          Le sigle « SP » se retrouve : son symbole reste dessiné, et la
+          légende de la feuille dit ce qu'est ce symbole. Le nom de la pièce,
+          lui, n'est écrit qu'une fois sur tout le dossier — le perdre, c'est
+          lire un plan de logement sans savoir quelle pièce on regarde. Le
+          cartouche pose donc son fond, et les sigles qu'il recouvrirait ne
+          s'écrivent pas : mieux vaut un sigle absent que deux mots empilés,
+          où l'on croit avoir lu les deux.
+        */
+        if (gene) {
+          for (const [id, b] of [...siglesPose]) {
+            const dessous =
+              choisi.x < b.x + b.w &&
+              choisi.x + choisi.w > b.x &&
+              choisi.y < b.y + b.h &&
+              choisi.y + choisi.h > b.y;
+            if (!dessous) continue;
+            siglesPose.delete(id);
+            const i = posees.indexOf(b);
+            if (i >= 0) posees.splice(i, 1);
+          }
+        }
+        posees.push(choisi);
+        cartouchesPiece.push(choisi);
+        cartouchesPose.set(part.roomId, choisi);
       }
     }
 
@@ -1933,24 +2428,16 @@ function planPage(
       const my = (A.y + B.y) / 2;
       let place: { x: number; y: number } | null = null;
       for (const ecart of [8, 19, 30]) {
-        const q = { x: mx + nx2 * ecart, y: my + ny2 * ecart };
-        const bb = boite(texte, q.x, q.y, 8.5, angle);
-        if (libre(bb) && dansLaFenetre(bb)) {
-          posees.push(bb);
-          place = q;
+        const q = coteAPoser(texte, mx + nx2 * ecart, my + ny2 * ecart, 8.5, angle);
+        if (libre(q.boite) && dansLaFenetre(q.boite)) {
+          posees.push(q.boite);
+          place = { x: q.x, y: q.y };
           break;
         }
       }
       // Rien de libre : la ligne de cote reste, la valeur cède la place.
       if (!place) continue;
-      d.text(
-        texte,
-        place.x,
-        place.y - 3,
-        8.5,
-        INK,
-        { angle },
-      );
+      d.text(texte, place.x, place.y, 8.5, INK, { angle });
     }
 
     // ---------------------------------------- cotes des menuiseries
@@ -1996,12 +2483,16 @@ function planPage(
         // de murs : deux menuiseries voisines ne doivent pas se marcher
         // dessus, et une porte ne doit pas se poser sur une cote.
         const txt = frLen(segLength(o));
-        const qx = (A.x + B.x) / 2 + nx2 * 7;
-        const qy = (A.y + B.y) / 2 + ny2 * 7;
-        const bb = boite(txt, qx, qy, 7.5, angle);
-        if (!libre(bb) || !dansLaFenetre(bb)) continue;
-        posees.push(bb);
-        d.text(txt, qx, qy - 2.5, 7.5, GREY, { angle });
+        const q = coteAPoser(
+          txt,
+          (A.x + B.x) / 2 + nx2 * 7,
+          (A.y + B.y) / 2 + ny2 * 7,
+          7.5,
+          angle,
+        );
+        if (!libre(q.boite) || !dansLaFenetre(q.boite)) continue;
+        posees.push(q.boite);
+        d.text(txt, q.x, q.y, 7.5, GREY, { angle });
       }
     }
 
@@ -2032,64 +2523,13 @@ function planPage(
     // devant la face qui le porte, relié au mur par un filet. Les appareils
     // qui tombent au même point s'échelonnent le long de ce filet.
     if (ctx.fixtures && ctx.fixtures.length > 0) {
-      const murQuads = wallQuads(walls);
-      const byId = new Map(walls.map((w) => [w.id, w]));
-      const poses = ctx.fixtures
-        .map((f) => {
-          const w = byId.get(f.wallId);
-          if (!w) return null;
-          const face = wallFace(w, murQuads.get(w.id), f.side);
-          return { f, face, along: faceX(face, f.along) };
-        })
-        .filter((v): v is NonNullable<typeof v> => !!v);
-      /**
-       * UN ENSEMBLE SE DESSINE UNE FOIS, avec tous ses postes.
-       *
-       * Le papier dessinait un symbole PAR APPAREIL : une double prise
-       * sortait en deux symboles distants de 71 mm — deux pixels à
-       * l'échelle d'un logement — qui se recouvraient. Sur le mur, c'est
-       * pourtant UNE plaque, à deux mécanismes. L'écran le savait depuis
-       * longtemps ; le dossier imprimé, non.
-       */
-      const lots = new Map<string, typeof poses>();
-      for (const v of poses) {
-        const cle = v.f.group
-          ? `g:${v.f.group}:${v.f.wallId}:${v.f.side}`
-          : `s:${v.f.id}`;
-        const l = lots.get(cle);
-        if (l) l.push(v);
-        else lots.set(cle, [v]);
-      }
-      const unites = [...lots.values()].map((membres) => {
-        const tri = [...membres].sort((a, b) => a.along - b.along);
-        const xs = tri.map((m) => m.along);
-        return {
-          f: tri[0].f,
-          face: tri[0].face,
-          // Le symbole se pose au MILIEU de la plaque : c'est ce qu'on
-          // voit sur le mur, et ce que l'écran dessine déjà.
-          along: (Math.min(...xs) + Math.max(...xs)) / 2,
-          postes: tri.flatMap((m) => postsOf(m.f.kind)),
-          membres: tri,
-        };
-      });
-      // L'échelonnement compte les PLAQUES, pas les postes : deux appareils
-      // d'un même ensemble ne s'écartent pas l'un de l'autre.
-      const ranks = stackRanks(
-        unites.map((v) => ({
-          id: v.f.id,
-          wallId: v.f.wallId,
-          side: v.f.side,
-          x: v.along,
-        })),
-      );
       /*
         LES LIENS MURAUX D'ABORD — même règle que le plafond : ils passent
         SOUS les symboles, jamais dessus. Et le filet s'ancre LÀ OÙ EST le
         symbole (0,2 + rang × 0,24 du mur) : ancré à 0,16 fixe, il
         s'arrêtait vingt-huit centimètres avant un appareil échelonné.
       */
-      const sortie = (g: Fixture) => 0.2 + (ranks.get(g.id) ?? 0) * 0.24;
+      const sortie = (g: Fixture) => sortieDuMur(g.id);
       /** L'unité qui porte cet appareil : un lien vise une PLAQUE. */
       const uniteDe = (id: string) =>
         unites.find((u) => u.membres.some((m) => m.f.id === id));
@@ -2115,35 +2555,16 @@ function planPage(
           );
         }
       }
-      for (const { f, face, along, postes, membres } of unites) {
+      for (const { f, face, along, postes } of unites) {
         const spec = FIXTURES[f.kind];
         // Une cote d'appareil devenue folle — un mur recoupé depuis la pose,
         // par exemple — enverrait son symbole à l'autre bout de la feuille.
         // On la borne à la face, et on jette ce qui sortirait du cadre.
         const x = Math.max(0, Math.min(face.len, along));
-        const out = 0.2 + (ranks.get(f.id) ?? 0) * 0.24;
         const anchor = px(facePoint(face, x, 0.02));
-        const q = px(facePoint(face, x, out));
+        const q = px(facePoint(face, x, sortieDuMur(f.id)));
         if (!dansLeCadre(q)) continue;
         d.path([anchor, q], 0.6, spec.color);
-        /*
-          LE DISQUE PREND LA MESURE DE LA PLAQUE.
-
-          Relu à l'œil sur le document : un rond fait pour un poste laissait
-          les symboles d'un ensemble de trois déborder des deux côtés, et
-          le fond blanc ne protégeait plus rien. Le rayon suit donc l'empan
-          RÉEL du symbole composé — même pas d'entraxe que `postsSymbol`,
-          demi-symbole aux extrémités, le tout à l'échelle du dessin.
-        */
-        const ech = 0.5;
-        const pas = (ENTRAXE / PLAQUE) * SYMBOL_SPAN;
-        /*
-          L'EMPAN DU SYMBOLE — il portait un disque blanc, il ne sert plus
-          qu'à poser ce qui l'entoure : le sigle à sa droite, le repère de
-          circuit dessous. Même calcul, un dessin de moins.
-        */
-        const rayon =
-          6.5 + ((Math.max(1, postes.length) - 1) * pas * ech) / 2;
         /*
           PLUS DE PASTILLE BLANCHE SOUS LE SYMBOLE — relevé du patron :
           « enlève le bloc blanc derrière les icônes des éléments
@@ -2154,40 +2575,28 @@ function planPage(
           est venu lire. Le symbole se pose au nu du mur, du côté de la
           pièce, où le fond est clair de toute façon.
         */
+        drawSymbol(
+          d,
+          postsSymbol(postes, f.kind),
+          q.x,
+          q.y,
+          ECHELLE_SYMBOLE,
+          spec.color,
+          0.9,
+        );
+      }
+      /*
+        ET LES MOTS PAR-DESSUS, aux places retenues avant les cotes.
 
-        drawSymbol(d, postsSymbol(postes, f.kind), q.x, q.y, ech, spec.color, 0.9);
-        /*
-          LE SIGLE CUMULÉ. Le plan reste sobre — seuls les appareils qui se
-          distinguent portent un mot (20 A, RJ, TV) —, mais une plaque
-          annonce TOUT ce qu'elle porte : « RJ » sous une prise + RJ45,
-          « RJ + TV » sous une plaque de communication.
-        */
-        const tags = [
-          ...new Set(postes.map((k) => FIXTURE_TAG[k]).filter(Boolean)),
-        ].join(' + ');
-        if (tags) {
-          // À DROITE DU DISQUE, pas à droite du centre : sur une plaque de
-          // trois postes, le sigle tombait en plein sur le dernier symbole.
-          posees.push(boite(tags, q.x + rayon + 5 + tags.length * 1.4, q.y + 6, 5.5, 0));
-          d.text(tags, q.x + rayon + 5, q.y + 4, 5.5, spec.color, {
-            align: 'left',
-          });
-        }
-        /*
-          LE REPÈRE DE CIRCUIT, sous l'appareil — celui-là même qu'on lit à
-          l'écran et qu'on retrouve sur le tableau. Le dossier le taisait :
-          celui qui tire les gaines devait deviner de quel départ dépend
-          chaque prise, alors que l'app le sait.
-        */
-        const mark = ctx.marks?.get(membres[0].f.id);
-        if (mark) {
-          // SOUS le disque (l'axe y du PDF monte) : écrit à onze points du
-          // centre, il se posait sur les pieds des symboles.
-          posees.push(boite(mark, q.x, q.y - rayon - 4, 5.5, 0));
-          d.text(mark, q.x, q.y - rayon - 6, 5.5, markColor(mark), {
-            bold: true,
-          });
-        }
+        Ils se dessinent après TOUS les symboles, jamais entre deux : un
+        sigle passait sous le filet de l'appareil suivant, et le dernier
+        dessiné gagnait — l'ordre de tracé bat l'opacité.
+      */
+      for (const m of motsAppareil) {
+        d.text(m.texte, m.x, m.y, TAILLE_SIGLE, m.couleur, {
+          align: 'left',
+          bold: m.bold,
+        });
       }
     }
 
@@ -2221,28 +2630,8 @@ function planPage(
         que le dessin, plus bas — pour que les cotes du plafond l'évitent.
         Voir `siglesPlafond` pour l'autre moitié de la règle.
       */
-      if (showSurfaces && cartouchesPiece.length === 0) {
-        const gros = parts.length === 1 ? 14 : 10.5;
-        for (const part of parts) {
-          if (!part.surface) continue;
-          const q = px(part.labelAt);
-          const nom = roomNames[part.roomId] ?? '';
-          const aire = `${part.surface.exact ? '' : '≈ '}${fr1(part.surface.area)} m²`;
-          const larg =
-            Math.max(
-              latin1(nom).length * gros,
-              latin1(aire).length * (parts.length === 1 ? 11 : 9),
-            ) *
-              0.52 +
-            10;
-          cartouchesPiece.push({
-            x: q.x - larg / 2,
-            y: q.y - (nom ? 15 : 16),
-            w: larg,
-            h: nom ? 30 : 32,
-          });
-        }
-      }
+      // Les cartouches sont posés bien plus haut, AVANT les cotes : ils
+      // sont déjà dans la réserve, il n'y a rien à y ajouter ici.
 
       if (plafond.length > 0) {
         // Les liens d'abord : ils passent SOUS les symboles, jamais dessus.
@@ -2295,7 +2684,6 @@ function planPage(
           familles qui ne se voyaient pas.
         */
         const etiquettes = posees;
-        etiquettes.push(...cartouchesPiece);
         /**
          * ET LES PASTILLES DES APPAREILS, qui se peignent EN DERNIER.
          *
@@ -2304,52 +2692,13 @@ function planPage(
          * « 243 » se lisait « 24 » — le dernier chiffre mangé par le spot
          * qu'il servait justement à poser.
          */
-        const pastilles: Boite[] = [];
-        for (const cl of plafond) {
-          const q = px(cl.at);
-          if (!dansLeCadre(q)) continue;
-          const r =
-            Math.max(7, Math.min(16, (CEILINGS[cl.kind].d / 2) * scale)) + 2;
-          pastilles.push({ x: q.x - r, y: q.y - r, w: r * 2, h: r * 2 });
-        }
-        /**
-         * LE SIGLE SE RÉSERVE SA PLACE LE PREMIER.
-         *
-         * C'est le seul qui n'ait aucune liberté : il tient sous SON
-         * symbole, sinon il ne nomme plus rien. Une cote, elle, glisse le
-         * long de son propre trait sans rien perdre. En laissant les sigles
-         * passer en dernier, on les envoyait chercher une place de plus en
-         * plus loin — jusque sous le cartouche de la pièce, où le dossier
-         * imprimé les a montrés à moitié mangés. C'est donc à la cote de
-         * s'écarter, parce qu'elle le peut.
-         *
-         * Reste le cas qui a tout déclenché : le DAAF posé à dix
-         * centimètres du point lumineux, comme la norme le veut dans la
-         * circulation. Là, deux sigles pour un même point : le second
-         * descend d'un cran, et le plan cesse de porter « DCAF ».
-         */
-        const sigles = new Map<string, Boite>();
-        for (const cl of plafond) {
-          const q = px(cl.at);
-          if (!dansLeCadre(q)) continue;
-          const spec = CEILINGS[cl.kind];
-          const r = Math.max(7, Math.min(16, (spec.d / 2) * scale));
-          const larg = spec.short.length * 6.5 * 0.5;
-          sigles.set(
-            cl.id,
-            ecarterDe(
-              { x: q.x - larg / 2, y: q.y - r - 8, w: larg, h: 6.5 },
-              [...sigles.values(), ...pastilles],
-              20,
-            ),
-          );
-        }
-        etiquettes.push(...sigles.values());
+        // Pastilles et sigles ont été retenus plus haut, AVANT les cotes :
+        // voir « le plafond annonce ses pastilles et ses sigles ». Ils sont
+        // déjà dans la réserve ; on les relit, on ne les recalcule pas.
+        const pastilles = pastillesPlafond;
+        const sigles = siglesPose;
         // Et le cartouche, lui, n'aura que les sigles à éviter.
         siglesPlafond.push(...sigles.values());
-        // Un symbole de plafond n'a plus de disque blanc sous lui : sa place
-        // reste retenue pour que rien ne vienne s'y écrire.
-        posees.push(...pastilles);
         const seTouchent = (a: Boite, b: Boite) =>
           a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
         const auLarge = (b: Boite) =>
@@ -2610,7 +2959,10 @@ function planPage(
           const spec = CEILINGS[cl.kind];
           const q = px(cl.at);
           if (!dansLeCadre(q)) continue;
-          const r = Math.max(7, Math.min(16, (spec.d / 2) * scale));
+          const r = Math.max(
+        RAYON_PLAFOND_MIN,
+        Math.min(RAYON_PLAFOND_MAX, (spec.d / 2) * scale),
+      );
           /*
             PLUS DE PASTILLE BLANCHE SOUS LE SYMBOLE DE PLAFOND — relevé du
             patron : « enlève les blocs blancs derrière les icônes élec dans
@@ -2623,10 +2975,21 @@ function planPage(
           */
           drawSymbol(d, CEILING_SYMBOL[cl.kind], q.x, q.y, r / 9, spec.color, 1.1);
           // La place retenue plus haut, avant que les cotes ne se posent.
+          // Absente : le sigle a cédé la place au nom de sa pièce, qui n'en
+          // avait aucune autre — voir « une pièce saturée garde son nom ».
           const pose = sigles.get(cl.id);
-          d.text(spec.short, q.x, pose ? pose.y : q.y - r - 8, 6.5, spec.color, {
-            bold: true,
-          });
+          if (!pose) continue;
+          // À la place retenue, en x COMME en y : le sigle peut être passé
+          // de l'autre côté de son symbole, et le texte doit suivre — sinon
+          // la place vérifiée n'est pas la place occupée.
+          d.text(
+            spec.short,
+            pose ? pose.x : q.x - latin1(spec.short).length * 6.5 * 0.25,
+            pose ? pose.y : q.y - r - 8,
+            6.5,
+            spec.color,
+            { bold: true, align: 'left' },
+          );
         }
       }
 
@@ -2696,7 +3059,6 @@ function planPage(
       const big = parts.length === 1;
       for (const part of parts) {
         if (!part.surface) continue;
-        const cp2 = px(part.labelAt);
         const label = roomNames[part.roomId] ?? '';
         const area = `${part.surface.exact ? '' : '≈ '}${fr1(part.surface.area)} m²`;
         /*
@@ -2711,55 +3073,26 @@ function planPage(
           cartouche.
         */
         const gros = big ? 14 : 10.5;
-        // La MÊME emprise que celle retenue plus haut pour les étiquettes
-        // du plafond : deux formules qui divergeraient d'un point feraient
-        // revenir le défaut sans qu'on comprenne pourquoi.
-        const larg =
-          Math.max(latin1(label).length * gros, latin1(area).length * (big ? 11 : 9)) *
-            0.52 +
-          10;
-        // On retient l'emprise : les notes s'en écarteront, sans quoi
-        // elles se peignent par-dessus (elles passent en dernier) et le
-        // lecteur perd les DEUX informations d'un coup.
-        // Il s'écarte de ce que le plafond a déjà écrit : voir
-        // `etiquettesPlafond`. On cherche large — un cartouche fait trente
-        // points de haut, il faut pouvoir dégager un sigle entier.
-        const pose = ecarterDe(
-          {
-            x: cp2.x - larg / 2,
-            y: cp2.y - (label ? 15 : 16),
-            w: larg,
-            h: label ? 30 : 32,
-          },
-          /*
-            IL S'ÉCARTE DE TOUT CE QUE LE PLAFOND A ÉCRIT, pas des seuls
-            sigles.
-
-            Il ne fuyait que les sigles — « SP », « DCL ». Il se déplaçait
-            donc pour les éviter et retombait sur une COTE : sur la capture du
-            dossier, le cartouche « Séjour » atterrissait en plein sur un
-            écart de chaîne. Les cotes du plafond étaient pourtant déjà
-            posées, dans la même réserve ; il suffisait de les regarder.
-
-            Et l'ordre est le bon : une mesure ne bouge pas, un nom de pièce
-            si. Le cartouche cède, jamais la cote.
-          */
-          [...siglesPlafond, ...cotesPlafond],
-          34,
-        );
-        // Le décalage retenu s'applique au texte comme au fond : les deux
-        // sont un seul objet, ils ne se séparent pas.
-        const dy = pose.y - (cp2.y - (label ? 15 : 16));
+        /*
+          LA PLACE A ÉTÉ RETENUE AVANT LES COTES — voir « puis le cartouche
+          de la pièce ». On la relit, on ne la recalcule pas : deux calculs
+          de la même chose finissent par diverger, et l'arbitre protégerait
+          alors une place que le dessin n'occupe pas.
+        */
+        const pose = cartouchesPose.get(part.roomId);
+        if (!pose) continue;
         emprises.push(pose);
-        posees.push(pose);
         d.rect(pose.x, pose.y, pose.w, pose.h, '#FFFFFF', null);
         // Nom au-dessus, surface en dessous (l'axe y du PDF monte).
-        if (label) {
-          d.text(label, cp2.x, cp2.y + 3 + dy, gros, INK, { bold: true });
-          d.text(area, cp2.x, cp2.y - 9 + dy, big ? 11 : 9, GREY);
+        if (label && pose.avecAire) {
+          d.text(label, pose.cx, pose.cy + 3, gros, INK, { bold: true });
+          d.text(area, pose.cx, pose.cy - 9, big ? 11 : 9, GREY);
+        } else if (label) {
+          // La surface a cédé la place : il ne reste que le nom, centré.
+          d.text(label, pose.cx, pose.cy - 3, gros, INK, { bold: true });
         } else {
-          d.text(area, cp2.x, cp2.y + 4 + dy, big ? 15 : 11, INK, { bold: true });
-          d.text('surface au sol', cp2.x, cp2.y - 10 + dy, 8, GREY);
+          d.text(area, pose.cx, pose.cy + 4, big ? 15 : 11, INK, { bold: true });
+          d.text('surface au sol', pose.cx, pose.cy - 10, 8, GREY);
         }
       }
       /*
@@ -2782,24 +3115,33 @@ function planPage(
         const mot = fitText(note.text, 6.5, 150);
         const larg = latin1(mot).length * 6.5 * 0.5 + 10;
         /*
-          LA PUNAISE NE BOUGE PAS, LE MOT SI.
+          LA PUNAISE NE BOUGE PAS, LE MOT SI — ET IL PEUT ALLER LOIN.
 
-          Le point visé porte le sens — « gaine à reprendre » ne veut rien
-          dire trois mètres plus loin — mais l'étiquette peut monter ou
-          descendre sans rien perdre, et c'est ce qui l'empêche de couvrir
-          le cartouche de la pièce.
+          Le point visé porte le sens : « gaine à reprendre » ne veut rien
+          dire trois mètres plus loin. Mais un FILET relie la punaise à son
+          étiquette, et tant qu'il est là le mot peut se poser où il veut :
+          on sait toujours ce qu'il désigne.
+
+          Il ne cherchait qu'en MONTANT ET EN DESCENDANT, et s'écrivait quand
+          même s'il ne trouvait rien. Sur la mesure, « colonne montante ici »
+          barrait un « 3,00 m » et un « SP » à la fois — trois informations
+          perdues pour une. Il tourne donc autour de sa punaise, du plus près
+          au plus loin, comme le cartouche autour du milieu de sa pièce.
         */
-        const pose = ecarterDe(
-          { x: q.x + 5, y: q.y - 5.5, w: larg, h: 11 },
-          // Tout ce que la feuille porte déjà, pas seulement les cartouches
-          // de pièce : un « Canapé » sous une note reste un mot perdu.
-          [...emprises, ...posees],
-          80,
-        );
+        const voulu = { x: q.x + 5, y: q.y - 5.5, w: larg, h: 11 };
+        const tours: [number, number][] = [];
+        for (let i = -16; i <= 16; i++) {
+          for (let j = -16; j <= 16; j++) tours.push([i * 11, j * 8]);
+        }
+        tours.sort((a, b) => Math.hypot(a[0], a[1]) - Math.hypot(b[0], b[1]));
+        const pose =
+          tours
+            .map((t) => ({ ...voulu, x: voulu.x + t[0], y: voulu.y + t[1] }))
+            .find((b) => libre(b) && dansLaFenetre(b)) ?? voulu;
         d.path([q, { x: q.x + 5, y: q.y - 3.5 }, { x: q.x + 5, y: q.y + 3.5 }, q], 0.8, INK);
         // Le filet qui relie la punaise à son étiquette quand elle s'est
         // écartée : sans lui, on ne sait plus quel mot désigne quel point.
-        if (Math.abs(pose.y - (q.y - 5.5)) > 0.5) {
+        if (Math.hypot(pose.x - voulu.x, pose.y - voulu.y) > 0.5) {
           d.line(q.x + 5, q.y, pose.x, pose.y + 5.5, 0.5, GREY);
         }
         d.rect(pose.x, pose.y, larg, 11, '#FFFFFFEE', INK, 0.5);

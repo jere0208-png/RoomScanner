@@ -9596,6 +9596,94 @@ lui donne des boîtes construites pour se chevaucher, et l'on exige qu'elle les
 compte. Vérifié qu'il échoue sur le code d'avant : **12 des 16 cadrages** au
 rouge.
 
+### Le papier n'avait pas eu le tour de l'écran : 47 chevauchements → 0
+
+L'écran a été réuni sous un seul arbitre et mesuré à zéro chevauchement (juste
+au-dessus). **Le PDF, lui, gardait sa propre discipline — plus ancienne, faite
+de `libre()`, `ecarterDe` et `auLarge` — et personne ne l'avait jamais
+mesurée.** C'était écrit en toutes lettres dans les défauts connus. On l'a
+mesurée.
+
+**LA SONDE D'ABORD, ET ELLE LIT CE QUE LE PDF ÉCRIT VRAIMENT.** Chaque mot est
+relu dans le flux de la page — `BT /F1 <taille> Tf … <cos sin -sin cos tx ty>
+Tm (texte) Tj ET` —, c'est-à-dire exactement ce que le lecteur affichera :
+taille, place, inclinaison. Elle ne recalcule pas la géométrie de son côté ; un
+dessin qui refait les calculs de celui qu'il juge ne prouve rien. Et elle ne
+juge que ce qui est écrit DANS le plan : la fenêtre de découpe, qui séparait le
+plan de la feuille, était écrite en clair à l'endroit du `clip` et un banc
+aurait dû la recopier — elle s'appelle maintenant `FENETRE_PLAN` et le dessin
+l'annonce. C'est la leçon du bandeau du meuble, encore.
+
+**MESURÉ AU DÉPART** sur trente cadrages du plan de référence — appareillage
+tous les 60, 90 et 140 cm sur tous les murs, cinq zooms, avec et sans plafond,
+deux notes au crayon : **47 chevauchements sur 2 494 étiquettes**. Le banc
+`cotespdfsanschoc` échouait sur **19 des 30 cadrages**.
+
+**QUATRE FAMILLES ÉCRIVAIENT SANS REGARDER PERSONNE**, alors que la feuille
+tient pourtant une réserve commune (`posees`) depuis longtemps :
+
+- **le sigle d'un appareil** (« 20A », « 32A », « TV ») et **son repère de
+  circuit** : ils poussaient leur boîte dans la réserve APRÈS s'être écrits.
+  Ils protégeaient donc les suivants, et personne d'autre. D'où « 0,90 » de
+  menuiserie barré par « 32A », et « 1,20 » par un « 9 » ;
+- **le sigle d'un plafonnier** (« SP », « DAAF ») : il ne s'écartait que de ses
+  semblables et des disques. D'où « DAAF » sur un repère de circuit et « SP »
+  sur le cartouche « 9,0 m² » ;
+- **la note** : elle cherchait une place libre, mais seulement EN MONTANT ET EN
+  DESCENDANT, et s'écrivait quand même si elle n'en trouvait pas. « colonne
+  montante ici » barrait un « 3,00 m » et un « SP » à la fois — trois
+  informations perdues pour une.
+
+**L'ORDRE ÉTAIT À L'ENVERS, et c'est le fond du sujet.** C'est l'ordre des
+libertés : un sigle tient à son symbole, il le nomme, il ne peut pas partir
+ailleurs ; une cote glisse le long de son propre trait sans rien perdre. C'est
+donc au sigle de s'inscrire d'abord et à la cote de s'écarter. Le papier faisait
+l'inverse. Les numéros de mur, eux, le faisaient déjà bien — c'est ce modèle
+qu'on a étendu à tout le monde : **numéros de mur → mots de l'appareillage →
+pastilles et sigles du plafond → cartouches de pièce → cotes → notes.**
+
+**ET UNE BOÎTE FAUSSE, QU'ON N'AURAIT PAS TROUVÉE AUTREMENT.** La valeur d'une
+cote se centrait sur son point en descendant sa ligne de base de deux points et
+demi — un décalage pris **sur l'axe Y de la page**, alors que le texte, lui, est
+incliné. Sur un mur vertical, le chiffre partait de côté pendant que la réserve
+restait droite : l'arbitre déclarait « libre » un coin où le lecteur voyait deux
+nombres se toucher. C'est le défaut connu de la maison — vérifier la boîte qu'on
+dessine, pas celle qu'on a demandée — pris à l'envers. `coteAPoser` calcule
+maintenant le point de base **comme le fait `Draw.text`** et l'emprise sur les
+quatre coins tournés. À lui seul, il a supprimé les deux dernières familles de
+chocs sur les cotes.
+
+**UNE PIÈCE SATURÉE GARDE SON NOM, ET C'EST LE SIGLE QUI S'EFFACE.** Le dernier
+cas résistait : une chambre où seize appareils de plafond, leurs sigles et
+l'appareillage des quatre murs ne laissent pas dix-huit points de libre. Il faut
+trancher, et **le partage se fait sur ce qui se retrouve ailleurs** : le sigle
+« SP » se retrouve — son symbole reste dessiné et la légende dit ce qu'est ce
+symbole —, le nom de la pièce n'est écrit qu'une fois sur tout le dossier. Le
+cartouche cède d'abord sa surface (dix-huit points au lieu de trente), puis, s'il
+ne trouve toujours rien, il pose son fond et les sigles qu'il recouvrirait ne
+s'écrivent pas.
+
+**APRÈS : zéro chevauchement sur les trente cadrages.** Regardé en image, avant
+et après : « DCL » ne mange plus « TV », « 20A » ne mange plus son voisin, la
+note a quitté la cote, et la largeur « 1,20 » de la porte redevient lisible.
+
+**CE QUI A ÉTÉ PERDU AU PASSAGE, et c'est dit ici parce que c'est un choix :**
+sur un logement très chargé, **le nom d'un meuble** (« Canapé ») cède désormais
+plus souvent qu'avant — il passe après les mots de l'appareillage, qui réservent
+maintenant leur place. C'est conforme à sa propre règle, écrite dans le code
+depuis longtemps : le nom d'un meuble est ce qu'on cède le plus volontiers, sa
+silhouette le dit déjà. Sur un plan d'appareillage normal, il reste écrit.
+
+**UN BANC RÉÉCRIT PLUTÔT QUE SUPPRIMÉ.** `etiquettesplafond` bornait à
+vingt-quatre points l'écart **en Y** entre deux sigles voisins : c'était vrai du
+temps où le second sigle DESCENDAIT d'un cran, et c'était fragile — il nommait
+la direction que le dessin prenait alors, pas ce qu'on lui demandait. Le sigle
+fait maintenant le tour de son disque, deux voisins se retrouvent l'un dessus
+l'autre dessous, et le banc tombait sans qu'il se soit rien passé de mauvais. Il
+mesure donc ce qu'il voulait mesurer depuis le début — **la distance** —, bornée
+par ce que le dessin s'autorise (`RAYON_PLAFOND_MAX` + `ECART_SIGLE_PLAFOND`,
+deux chiffres que le dessin annonce au lieu qu'on les recopie).
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

@@ -17,7 +17,11 @@
  * papier, « 139 » frappé deux fois se lit « 139 / 139 » ou pire, une bouillie
  * d'encre dont on ne tire plus le chiffre.
  */
-import { buildScanPdf } from '../src/export/pdf';
+import {
+  buildScanPdf,
+  ECART_SIGLE_PLAFOND,
+  RAYON_PLAFOND_MAX,
+} from '../src/export/pdf';
 import type { WallSeg } from '../src/geometry/floorplan';
 import type { CeilingFixture } from '../src/geometry/ceiling';
 
@@ -119,14 +123,39 @@ describe('les sigles du plafond sur le plan imprimé', () => {
   });
 
   /**
-   * Et le sigle reste SOUS son appareil : c'est ce qui le rattache à son
-   * point. On l'écarte de quelques points, pas d'un mètre.
+   * ET LE SIGLE RESTE AU DROIT DE SON APPAREIL — c'est ce qui le rattache à
+   * son point. On l'écarte du tour de son symbole, pas d'un mètre.
+   *
+   * DEUX VERSIONS SUCCESSIVES, ET LA PREMIÈRE MESURAIT UN AXE.
+   *
+   * Au début, le second sigle DESCENDAIT d'un cran : les deux restaient donc
+   * dans la même colonne, et ce banc bornait leur écart EN Y à vingt-quatre
+   * points. C'était vrai, et c'était fragile — il nommait la direction que
+   * le dessin prenait à ce moment-là, pas ce qu'on lui demandait.
+   *
+   * Depuis que tous les mots du plan partagent une seule réserve (voir
+   * `cotespdfsanschoc`), le sigle fait LE TOUR de son disque : dessous
+   * d'abord, puis dessus, puis de part et d'autre. Deux sigles voisins se
+   * retrouvent alors l'un au-dessus, l'autre en dessous — trente-neuf points
+   * d'écart en y, et le banc tombait alors qu'il ne s'était rien passé de
+   * mauvais.
+   *
+   * Il mesure donc ce qu'il voulait mesurer depuis le début : la DISTANCE,
+   * bornée par ce que le dessin s'autorise — le rayon du disque plus l'écart
+   * du sigle, de part et d'autre. Les deux chiffres viennent du dessin
+   * lui-même, ils ne sont pas recopiés ici.
    */
   it('garde chaque sigle au droit de son appareil', () => {
     const mots = motsDu(dossier(VOISINS));
     const dcl = mots.find((m) => m.texte === 'DCL')!;
     const daaf = mots.find((m) => m.texte === 'DAAF')!;
-    expect(Math.abs(dcl.y - daaf.y)).toBeLessThanOrEqual(24);
+    // Les deux appareils sont à dix centimètres : leurs symboles tombent au
+    // même point de la page. Le pire écart possible entre leurs sigles, ce
+    // sont donc deux places diamétralement opposées autour de ce point.
+    const tour = RAYON_PLAFOND_MAX + ECART_SIGLE_PLAFOND;
+    expect(Math.hypot(dcl.x - daaf.x, dcl.y - daaf.y)).toBeLessThanOrEqual(
+      2 * tour,
+    );
   });
 });
 
