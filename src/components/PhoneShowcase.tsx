@@ -20,11 +20,28 @@
  * le téléphone ne fait plus que les feuilleter. Rien à recalculer, donc rien
  * qui puisse ramer, chauffer, ni diverger d'un appareil à l'autre.
  *
- * Le boîtier, lui, ne bouge plus : c'est le contenu qui raconte, et un
- * téléphone qui se balance en même temps ne fait que brouiller la lecture.
+ * ET LE BOÎTIER S'INCLINE, ce qui n'a pas toujours été le cas.
+ *
+ * Il a d'abord bougé, puis on l'a figé : « c'est le contenu qui raconte, et un
+ * téléphone qui se balance en même temps ne fait que brouiller la lecture ».
+ * L'argument valait pour un balancement AMPLE, qui déplace le dessin qu'on est
+ * en train de lire.
+ *
+ * Relevé du patron, photo à l'appui : « fais l'iPhone un peu incliné comme sur
+ * la photo et donne-lui une légère animation de l'iPhone lui-même, avec une
+ * légère rotation horizontale (seulement un faible angle et qui loop) ». La
+ * photo montre un appareil vu de trois quarts, posé de biais — pas une
+ * façade. C'est ce qui le fait exister comme objet, au lieu d'un cadre plat
+ * autour d'une image.
+ *
+ * SIX DEGRÉS D'AMPLITUDE, PAS DAVANTAGE. Le boîtier tourne entre −22° et −10°
+ * autour de sa verticale, en quatre secondes aller-retour : assez pour que la
+ * lumière glisse sur la tranche, trop peu pour qu'un mot du dessin change de
+ * place. L'ancien argument reste vrai — c'est l'amplitude qui l'avait rendu
+ * juste, pas le principe.
  */
-import React, { useEffect, useState } from 'react';
-import { Image, StyleSheet, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Animated, Easing, Image, StyleSheet, View } from 'react-native';
 import { SHOWCASE_IMAGES } from '../assets/showcase';
 import { useTheme, type Palette } from '../theme';
 
@@ -39,6 +56,17 @@ const BOITIER = { w: ECRAN.w + 14, h: ECRAN.h + 14 };
 /** Quinze images par seconde : le cycle complet dure trois secondes et demie. */
 const PERIODE = 68;
 
+/**
+ * L'INCLINAISON DU BOÎTIER — en degrés autour de sa verticale.
+ *
+ * `AU_REPOS` est l'assiette de la photo : l'appareil de trois quarts, sa
+ * tranche gauche vers nous. Le balancement se compte de part et d'autre.
+ */
+export const AU_REPOS = -16;
+export const BALANCEMENT = 6;
+/** Un aller ou un retour, en millisecondes : quatre secondes le cycle. */
+export const RESPIRATION = 2000;
+
 export function PhoneShowcase() {
   const styles = getStyles(useTheme());
   const [image, setImage] = useState(0);
@@ -51,9 +79,56 @@ export function PhoneShowcase() {
     return () => clearInterval(h);
   }, []);
 
+  /*
+    LE BALANCEMENT TOURNE SUR LE FIL NATIF.
+
+    Une rotation pilotée depuis JavaScript rendrait la main à l'accueil
+    soixante fois par seconde, pendant que le flipbook change d'image toutes
+    les soixante-huit millisecondes. `useNativeDriver` la confie au système :
+    elle ne coûte plus rien à la boucle qui feuillette.
+  */
+  const balance = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const aller = (vers: number) =>
+      Animated.timing(balance, {
+        toValue: vers,
+        duration: RESPIRATION,
+        easing: Easing.inOut(Easing.sin),
+        useNativeDriver: true,
+      });
+    const boucle = Animated.loop(
+      Animated.sequence([aller(1), aller(0)]),
+    );
+    boucle.start();
+    return () => boucle.stop();
+  }, [balance]);
+  const rotation = balance.interpolate({
+    inputRange: [0, 1],
+    outputRange: [
+      `${AU_REPOS - BALANCEMENT / 2}deg`,
+      `${AU_REPOS + BALANCEMENT / 2}deg`,
+    ],
+  });
+
   return (
     <View style={styles.scene}>
-      <View style={styles.boitier}>
+      {/*
+        LA PERSPECTIVE VIENT AVANT LA ROTATION, et l'ordre compte : posée
+        après, elle ne s'applique plus à rien et le boîtier tourne à plat,
+        comme une carte à jouer. C'est elle qui donne la tranche.
+      */}
+      <Animated.View
+        style={[
+          styles.boitier,
+          {
+            transform: [
+              { perspective: 900 },
+              { rotateY: rotation },
+              { rotateX: '3deg' },
+              { rotateZ: '-1.5deg' },
+            ],
+          },
+        ]}>
         <View style={styles.ecran}>
           {/*
             TOUTES LES IMAGES SONT MONTÉES, une seule est visible.
@@ -82,7 +157,7 @@ export function PhoneShowcase() {
         </View>
         {/* L'îlot dynamique : deux points suffisent à dire « iPhone ». */}
         <View style={styles.ilot} pointerEvents="none" />
-      </View>
+      </Animated.View>
     </View>
   );
 }
@@ -102,10 +177,14 @@ const getStyles = (() => {
         // que le boîtier, comme le métal d'une tranche.
         borderWidth: 1.5,
         borderColor: c.inkSoft,
+        /*
+          L'OMBRE TOMBE DE BIAIS, comme sur la photo du relevé : un appareil
+          incliné dont l'ombre descend droit se lit comme un autocollant.
+        */
         shadowColor: c.ink,
         shadowOpacity: 0.3,
-        shadowRadius: 20,
-        shadowOffset: { width: 0, height: 12 },
+        shadowRadius: 22,
+        shadowOffset: { width: 10, height: 14 },
         elevation: 10,
       },
       ecran: {

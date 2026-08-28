@@ -11011,6 +11011,110 @@ ses lignes de fil — c'est là que la couleur se perdait. Deux bancs voisins de
 désormais les conducteurs (ils ont une image, ce n'est plus une photo), et
 l'ancien banc du repli raconte les trois versions et tient ce qui en reste.
 
+### La vitrine raconte le cheminement, et le téléphone s'incline
+
+Relevé du patron, photo à l'appui : « refais l'animation de l'iPhone et fais
+l'iPhone un peu incliné comme sur la photo et donne-lui une légère animation de
+l'iPhone lui-même, avec une légère rotation horizontale (seulement un faible
+angle et qui loop). Refais à l'intérieur de l'écran une animation moderne, rapide
+et compréhensible : plan 2D, les murs montent et forment un plan 3D, des
+interrupteurs et prises pop à des endroits, on affiche les cotes rapidement, avec
+des transitions rapides mais en fondu toujours, et un aperçu d'un scroll du PDF
+final des plans etc. en 5-8 secondes, on doit comprendre le cheminement de
+l'app. »
+
+**CE QUE LA VITRINE MONTRAIT, ET CE QUI LUI MANQUAIT.** Elle jouait UN geste — la
+bascule 2D/3D, en boucle, trois secondes et demie. C'était juste et court, et ça
+ne disait pas ce que l'application **produit** : elle s'arrêtait au volume, alors
+que le volume n'est qu'une étape. Ce qu'on emporte sur le chantier, c'est le
+dossier.
+
+**SEPT TEMPS, SEPT SECONDES**, cent cinq images à quinze par seconde — le milieu
+de la fourchette demandée :
+
+1. **le plan**, à plat, huit dixièmes de seconde pour le lire ;
+2. **la levée** : les murs montent, la caméra s'incline, le même dessin devient
+   un volume ;
+3. **la pose** : les appareils paraissent un par un, chacun à sa place sur son
+   mur — et ils paraissent **en grandissant**, de 60 % à 100 % de leur taille,
+   ce qui fait lire un « pop » plutôt qu'un fondu ;
+4. **les cotes** : chaque appareil descend un filet au sol et dit sa hauteur en
+   centimètres, comme le calque « Cotes » de l'app ;
+5. **le fondu** vers le dossier ;
+6. **la page qui défile** : le plan imprimé avec sa légende et son cartouche,
+   puis le bordereau de fournitures ;
+7. **le retour** au plan, et ça recommence.
+
+**LES APPAREILS ÉTAIENT LÀ DEPUIS LA PREMIÈRE IMAGE** — c'est ce qui manquait au
+scénario. Ils ne pouvaient donc pas *arriver*, et le geste le plus propre à
+l'application ne se voyait pas. Chacun a maintenant sa fenêtre, calée sur son
+rang : six appareils qui paraissent d'un bloc, c'est un calque qu'on allume ; six
+qui se posent l'un après l'autre, c'est quelqu'un qui équipe un logement.
+
+**LES COTES SONT REVENUES, MAIS PAS LES MÊMES.** On les avait retirées, et pour
+une bonne raison écrite noir sur blanc : celles du logement donnaient la taille
+d'un plan inventé, ce qui n'apprend rien. Celles-ci sont les cotes de **pose** —
+la hauteur qu'on trace au crayon avant de percer. Une cote d'appareil dit ce que
+l'application sait faire ; une cote de mur ne disait que la taille d'un décor.
+
+**LA FEUILLE PORTE LE VRAI PLAN**, et pas une illustration à côté : elle rappelle
+la même fonction de dessin, à plat, appareils posés. Deux plans dessinés
+séparément finiraient par ne plus se ressembler.
+
+Premier jet : le plan était rendu au format de l'écran, puis écrasé dans le bloc
+de la feuille. Le cadrage réserve déjà une marge franche sur les quatre côtés ;
+réduit une seconde fois, **le plan tenait dans le tiers de la largeur et la
+feuille était un désert blanc**. Regardé en image, c'est ce qui sautait aux yeux.
+Il est maintenant rendu **directement au format du bloc** — la même fonction, un
+autre papier. Et le bas de la feuille a reçu son cartouche : un plan d'exécution
+en porte un, c'est ce qui le fait reconnaître comme un document plutôt qu'une
+capture d'écran encadrée.
+
+**LE FONDU SE FAIT PAR SUPERPOSITION**, et non par un changement de scène : les
+deux dessins sont posés l'un sur l'autre avec leurs opacités. C'est ce que le
+relevé demande — « des transitions rapides mais en fondu toujours ». Derrière la
+page, la maquette **redescend quand même** vers le plan, en douceur : elle est
+cachée, mais le cycle se referme sans qu'aucune valeur ne saute, et le garde-fou
+de continuité garde son sens.
+
+**LE BOÎTIER S'INCLINE — et il avait été figé exprès.** « C'est le contenu qui
+raconte, et un téléphone qui se balance en même temps ne fait que brouiller la
+lecture » : l'argument valait pour un balancement AMPLE, qui déplace le dessin
+qu'on est en train de lire. Il tourne maintenant de **six degrés** en tout, entre
+−19° et −13° autour de sa verticale, quatre secondes l'aller-retour, sur une
+assiette de trois quarts prise de la photo du relevé. Assez pour que la lumière
+glisse sur la tranche, trop peu pour qu'un mot du dessin change de place — c'est
+l'amplitude qui avait rendu l'ancien argument juste, pas le principe.
+
+La perspective est déclarée **avant** la rotation : posée après, elle ne
+s'applique plus à rien et le boîtier tourne à plat, comme une carte à jouer. Et
+le balancement court sur le fil natif : il ne coûte rien à la boucle qui
+feuillette les images.
+
+**Onze épreuves neuves** (`showcase`) : la durée dans la fourchette 5–8 s, les
+quatre temps **dans l'ordre** — un plan qu'on lève, des appareils qu'on pose, des
+cotes qu'on lit, un dossier qu'on remet —, avec son contrôle en sens inverse (un
+plan qui se lève à la deuxième image n'a jamais été montré) ; la pose l'un après
+l'autre ; **aucun appareil sur la première image, tous après la pose** ; les cotes
+en centimètres, absentes avant ; le dossier qui passe devant et qui défile ; la
+maquette **cachée et non éteinte**, sans quoi le fondu serait une coupure ; le
+cycle qui se referme sur le plan ; et le garde-fou qui interdit une image vide au
+croisement des deux opacités.
+
+Deux bancs voisins sont **réécrits, pas supprimés** : celui des cotes raconte
+pourquoi elles étaient parties et pourquoi celles qui reviennent ne sont pas les
+mêmes ; celui des appareils dit ce qu'il tient encore — appelée sans état, la
+fonction rend la maquette équipée, et c'est ce dont la feuille du dossier a
+besoin.
+
+**Le coût** : 105 images au lieu de 52, **884 ko** dans l'IPA au lieu de 430. Le
+prix d'une vitrine qui explique au lieu de décorer.
+
+**Ce que je n'ai pas pu voir** : l'inclinaison du boîtier et son balancement. Ce
+sont des transformations React Native, et le rendu ne se regarde pas depuis cette
+machine — la structure est tenue par bancs, l'assiette est à juger sur l'appareil.
+Les cent cinq images, elles, ont été regardées.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

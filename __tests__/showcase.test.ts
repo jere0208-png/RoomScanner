@@ -14,11 +14,15 @@
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { FIXTURES } from '../src/geometry/electrical';
 import {
   avancement,
   camera,
   cascade,
+  etatDeLImage,
   frameSvg,
+  imageSvg,
+  pose,
   PLAN,
   SHOWCASE_FRAMES,
   SHOWCASE_PALETTE,
@@ -149,19 +153,145 @@ describe('la vague du mobilier', () => {
   });
 });
 
+describe('le cheminement, en sept temps', () => {
+  /*
+    RELEVÉ DU PATRON : « refais à l'intérieur de l'écran une animation
+    moderne, rapide et compréhensible : plan 2D, les murs montent et forment
+    un plan 3D, des interrupteurs et prises pop à des endroits, on affiche les
+    cotes rapidement, avec des transitions rapides mais en fondu toujours, et
+    un aperçu d'un scroll du PDF final des plans, etc. En 5-8 secondes, on
+    doit comprendre le cheminement de l'app. »
+
+    La vitrine d'avant jouait UN geste — la bascule 2D/3D, en boucle. C'était
+    juste et court, et ça ne disait pas ce que l'application produit.
+  */
+  const IMAGES_PAR_SECONDE = 15;
+  const etats = Array.from({ length: SHOWCASE_FRAMES }, (_, i) =>
+    etatDeLImage(i),
+  );
+
+  it('dure entre cinq et huit secondes', () => {
+    const secondes = SHOWCASE_FRAMES / IMAGES_PAR_SECONDE;
+    expect(secondes).toBeGreaterThanOrEqual(5);
+    expect(secondes).toBeLessThanOrEqual(8);
+  });
+
+  it('les quatre temps se suivent, et jamais dans le désordre', () => {
+    /*
+      L'ORDRE EST LE SUJET : un plan qu'on lève, des appareils qu'on pose,
+      des cotes qu'on lit, un dossier qu'on remet. Chaque chose commence
+      APRÈS la précédente — sinon on ne raconte plus un cheminement, on
+      empile des effets.
+    */
+    const premier = (lire: (e: (typeof etats)[number]) => number) =>
+      etats.findIndex((e) => lire(e) > 0.02);
+    const leve = etats.findIndex((e) => e.t > 0.02);
+    const posee = premier((e) => e.elec);
+    const cote = premier((e) => e.cotes);
+    const dossier = premier((e) => e.page);
+    expect(leve).toBeGreaterThan(0);
+    expect(posee).toBeGreaterThan(leve);
+    expect(cote).toBeGreaterThan(posee);
+    expect(dossier).toBeGreaterThan(cote);
+  });
+
+  it('et le plan tient assez longtemps pour se lire avant de monter', () => {
+    // Le contrôle en sens inverse du dessus : un plan qui se lève à la
+    // deuxième image n'a jamais été montré.
+    const debut = etats.findIndex((e) => e.t > 0.02) / IMAGES_PAR_SECONDE;
+    expect(debut).toBeGreaterThan(0.5);
+  });
+
+  it('les appareils se posent l’un après l’autre', () => {
+    /*
+      Six appareils qui paraissent d'un bloc, c'est un calque qu'on allume ;
+      six qui se posent l'un après l'autre, c'est quelqu'un qui équipe un
+      logement.
+    */
+    const avances = PLAN.elec.map((_, k) => pose(0.5, k));
+    expect(avances[0]).toBeGreaterThan(avances[PLAN.elec.length - 1]);
+    // Et tous finissent posés : aucun ne reste en route.
+    for (const [k] of PLAN.elec.entries()) expect(pose(1, k)).toBeCloseTo(1, 2);
+  });
+
+  it('la première image ne porte AUCUN appareil, la pose finie les porte tous', () => {
+    const sigles = (dessin: string) =>
+      PLAN.elec.filter((f) =>
+        dessin.includes(`>${FIXTURES[f.kind].short}</text>`),
+      ).length;
+    expect(sigles(imageSvg(0, W, H))).toBe(0);
+    const finDePose = etats.findIndex((e) => e.elec > 0.99);
+    expect(finDePose).toBeGreaterThan(0);
+    expect(sigles(imageSvg(finDePose, W, H))).toBe(PLAN.elec.length);
+  });
+
+  it('les cotes de pose paraissent, en centimètres', () => {
+    const auxCotes = etats.findIndex((e) => e.cotes > 0.9);
+    expect(auxCotes).toBeGreaterThan(0);
+    // La hauteur d'un interrupteur, telle que le plan la porte : 110 cm.
+    expect(imageSvg(auxCotes, W, H)).toContain('>110</text>');
+    // Et le contrôle en sens inverse : rien de tel avant qu'elles arrivent.
+    expect(imageSvg(0, W, H)).not.toContain('>110</text>');
+  });
+
+  it('le dossier passe devant, et il défile', () => {
+    const premiere = etats.findIndex((e) => e.page > 0.99);
+    const derniere =
+      etats.length - 1 - etats.slice().reverse().findIndex((e) => e.page > 0.99);
+    expect(premiere).toBeGreaterThan(0);
+    const tete = imageSvg(premiere, W, H);
+    expect(tete).toContain('FOURNITURES');
+    // Il défile : la même page, posée à deux hauteurs différentes.
+    expect(tete).not.toBe(imageSvg(derniere, W, H));
+  });
+
+  it('et la maquette est CACHÉE derrière, pas éteinte', () => {
+    /*
+      LE CONTRÔLE EN SENS INVERSE, et il tient le fondu : si la maquette
+      disparaissait au lieu de passer dessous, la transition serait une
+      coupure. Elle reste dessinée, à opacité nulle, et c'est ce qui permet
+      au fondu de se jouer dans les deux sens.
+    */
+    const pleinePage = etats.findIndex((e) => e.page > 0.99);
+    expect(imageSvg(pleinePage, W, H)).toContain('<g opacity="0.00">');
+  });
+
+  it('le cycle se referme sur le plan', () => {
+    const dernier = etatDeLImage(SHOWCASE_FRAMES - 1);
+    expect(dernier.t).toBe(0);
+    expect(dernier.page).toBeLessThan(0.35);
+    expect(etatDeLImage(SHOWCASE_FRAMES)).toEqual(etatDeLImage(0));
+  });
+
+  it('et aucune image n’est vide', () => {
+    // Le garde-fou du fondu : deux opacités qui se croisent mal laisseraient
+    // un écran blanc au milieu de la vitrine.
+    for (let i = 0; i < SHOWCASE_FRAMES; i++) {
+      const e = etatDeLImage(i);
+      expect(`${i} : ${Math.max(1 - e.page, e.page) > 0.4}`).toBe(`${i} : true`);
+    }
+  });
+});
+
 describe('les images de la vitrine', () => {
   const svg = (t: number) => frameSvg(t, W, H);
 
   /*
-    PLUS DE COTES — NULLE PART.
+    PLUS DE COTES DE LOGEMENT — ET C'EST TOUJOURS VRAI.
 
     Elles disaient la taille d'un logement inventé, ce qui n'apprend rien, et
     elles étaient le seul élément de l'image qui devait s'effacer en cours de
     route : un fondu à régler, un écart à la maçonnerie à régler, et deux
-    corrections déjà. La vitrine montre un logement qui se lève ; les cotes,
-    c'est dans l'app.
+    corrections déjà.
+
+    LES COTES SONT REVENUES, MAIS PAS CELLES-LÀ. Relevé du patron : « on
+    affiche les cotes rapidement ». Ce sont maintenant les cotes de POSE des
+    appareils — la hauteur qu'on trace au crayon avant de percer —, et elles
+    ne paraissent qu'après eux (voir « le cheminement »). Une cote d'appareil
+    dit ce que l'application sait faire ; une cote de mur ne disait que la
+    taille d'un plan inventé.
   */
-  it('ne cote plus rien, ni à plat ni en volume', () => {
+  it('ne cote toujours pas le logement lui-même', () => {
     for (const t of [0, 0.5, 1]) expect(svg(t)).not.toContain(' m</text>');
   });
 
@@ -212,7 +342,21 @@ describe('les images de la vitrine', () => {
     }
   });
 
-  it('lève le plan en gardant ses appareils', () => {
+  it('lève le plan en gardant ses appareils quand on les lui demande', () => {
+    /*
+      DEUX LECTURES DE CETTE ÉPREUVE, ET LA SECONDE EST PLUS ÉTROITE.
+
+      Elle disait : les appareils sont là du début à la fin. C'était vrai, et
+      c'était justement le défaut — relevé du patron, « des interrupteurs et
+      prises pop à des endroits » : ils paraissaient dès la première image,
+      donc on ne les voyait jamais arriver. Le CYCLE les pose maintenant après
+      la levée.
+
+      Ce qu'elle tient encore, et qui vaut : appelé sans état, `frameSvg` rend
+      la maquette ÉQUIPÉE. C'est ce dont la page du dossier a besoin pour
+      montrer le plan imprimé — et c'est ce qui garantit que le plan de la
+      feuille et celui de la vitrine sont le même dessin.
+    */
     const volume = svg(1);
     expect(volume).toContain('>PC<');
     expect(volume).toContain('>I<');
@@ -279,10 +423,9 @@ describe('les images de la vitrine', () => {
       const nom = `frame-${String(i).padStart(2, '0')}.svg`;
       // La caméra du cycle est passée en clair : c'est elle qui dérive sur
       // les paliers, et `t` seul ne sait pas le dire.
-      writeFileSync(
-        join(dir, nom),
-        frameSvg(avancement(i), W, H, SHOWCASE_PALETTE, camera(i)),
-      );
+      // L'IMAGE ENTIÈRE, dossier compris : `frameSvg` ne rend que la
+      // maquette, et le cycle se termine par la page qui défile.
+      writeFileSync(join(dir, nom), imageSvg(i, W, H, SHOWCASE_PALETTE));
     }
     expect(true).toBe(true);
   });

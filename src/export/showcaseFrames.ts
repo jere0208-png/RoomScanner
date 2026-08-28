@@ -39,8 +39,20 @@ import type { ObjectData } from 'react-native-room-scan';
  * petit entre deux images — et le pas le plus grand de l'ancien cycle
  * faisait cinq degrés et demi d'inclinaison d'un coup, ce qui se lisait
  * comme des paliers. Huit images de plus, c'est 80 ko dans l'IPA.
+ *
+ * PUIS DE 52 À 105, quand la vitrine a cessé de montrer un geste pour
+ * raconter un CHEMINEMENT. Relevé du patron : « refais à l'intérieur de
+ * l'écran une animation moderne, rapide et compréhensible : plan 2D, les murs
+ * montent et forment un plan 3D, des interrupteurs et prises pop à des
+ * endroits, on affiche les cotes rapidement, avec des transitions rapides
+ * mais en fondu toujours, et un aperçu d'un scroll du PDF final des plans,
+ * etc. En 5-8 secondes, on doit comprendre le cheminement de l'app. »
+ *
+ * Cent cinq images à quinze par seconde font SEPT SECONDES, au milieu de la
+ * fourchette demandée. C'est un demi-méga-octet de plus dans l'IPA, et c'est
+ * le prix d'une vitrine qui explique au lieu de décorer.
  */
-export const SHOWCASE_FRAMES = 52;
+export const SHOWCASE_FRAMES = 105;
 
 const mur = (
   id: string,
@@ -208,48 +220,131 @@ const soie = (t: number) =>
   (1 - Math.cos(Math.PI * Math.max(0, Math.min(1, t)))) / 2;
 
 /*
- * LE SCÉNARIO, en quatre temps — et la caméra ne s'arrête JAMAIS.
+ * LE SCÉNARIO, EN SEPT TEMPS — le cheminement de l'application.
  *
- * Un palier sur le plan (on lit le logement), la levée, un palier sur le
- * volume (on regarde les meubles), puis le retour — et ça recommence. Les
- * paliers font l'essentiel du travail : sans eux, on ne voit qu'un
- * mouvement, jamais les deux états qu'il relie.
+ * Relevé du patron : « en 5-8 secondes, on doit comprendre le cheminement de
+ * l'app ». La version d'avant jouait UN geste — la bascule 2D/3D, en boucle.
+ * C'était juste et court, et ça ne disait pas ce que l'application produit.
  *
- * Mais un palier où TOUT s'arrête se lit comme un diaporama. La visite
- * guidée l'a déjà appris : c'est le zoom qui avance pendant l'arrêt qui
- * donne la vie. Sur le palier du volume, la caméra dérive donc en azimut
- * (−14° → −21°) et se rapproche d'un souffle (+4 %) — assez pour que
- * l'image respire, trop peu pour qu'on le remarque. Le retour ramène tout
- * (angle, zoom, hauteur) d'un seul geste : il part de la dérive là où elle
- * s'est posée, et le cycle se referme sur le plan de départ.
+ *   1. LE PLAN. Un T2 à plat, vu de dessus. C'est par là qu'on commence.
+ *   2. LA LEVÉE. Les murs montent, la caméra s'incline : le même dessin
+ *      devient un volume. Rien n'est remplacé — c'est le plan qui se relève.
+ *   3. LA POSE. Les appareils paraissent un par un, chacun à sa place sur son
+ *      mur. C'est le sujet de l'application, et c'est le temps qui manquait :
+ *      ils étaient là depuis la première image, donc on ne les voyait pas
+ *      arriver.
+ *   4. LES COTES. Chaque appareil dit sa hauteur, en fondu rapide. C'est le
+ *      calque « Cotes » de l'app, joué en une seconde.
+ *   5. LE FONDU vers le dossier.
+ *   6. LA PAGE qui défile — le PDF qu'on remet au client.
+ *   7. LE RETOUR au plan, et ça recommence.
+ *
+ * ET LA CAMÉRA NE S'ARRÊTE JAMAIS. Un palier où tout se fige se lit comme un
+ * diaporama : la visite guidée l'a déjà appris, c'est le mouvement qui
+ * continue pendant l'arrêt qui donne la vie. Pendant la pose et les cotes, la
+ * caméra dérive en azimut et se rapproche d'un souffle.
+ *
+ * LA SCÈNE REDESCEND PENDANT QUE LA PAGE EST DEVANT. Elle est cachée — la
+ * page couvre l'écran — mais elle redescend quand même, en douceur : le cycle
+ * se referme sur le plan sans qu'aucune valeur ne saute, et le garde-fou de
+ * continuité garde son sens.
  */
-const PALIER_PLAN = 8;
-const LEVEE = 17;
-const PALIER_VOLUME = 11;
+const PLAN_PLAT = 12;
+const LEVEE = 24;
+const POSE = 15;
+const COTES = 12;
+const FONDU = 8;
+const PAGE = 26;
+/** Le retour occupe ce qui reste : 105 − 97 = 8 images. */
 
 interface Instant {
   t: number;
   theta: number;
   zoom: number;
+  /** L'arrivée des appareils, 0 → 1. */
+  elec: number;
+  /** Les cotes de pose, 0 (rien) → 1 (toutes). */
+  cotes: number;
+  /** Le fondu vers la page du dossier, 0 (la maquette) → 1 (la page). */
+  page: number;
+  /** Le défilement de la page, 0 (en tête) → 1 (en pied). */
+  defilement: number;
 }
+
+const NEUTRE = { elec: 0, cotes: 0, page: 0, defilement: 0 };
 
 function instant(frame: number): Instant {
   const n = SHOWCASE_FRAMES;
   const i = ((frame % n) + n) % n;
-  if (i < PALIER_PLAN) return { t: 0, theta: 0, zoom: 1 };
-  if (i < PALIER_PLAN + LEVEE) {
-    const t = soie((i - PALIER_PLAN) / LEVEE);
-    return { t, theta: -14 * t, zoom: 1 + 0.045 * t };
+  let d = 0;
+
+  // 1 — le plan, à plat.
+  if (i < (d += PLAN_PLAT)) return { ...NEUTRE, t: 0, theta: 0, zoom: 1 };
+
+  // 2 — la levée.
+  if (i < (d += LEVEE)) {
+    const t = soie((i - PLAN_PLAT) / LEVEE);
+    return { ...NEUTRE, t, theta: -14 * t, zoom: 1 + 0.045 * t };
   }
-  if (i < PALIER_PLAN + LEVEE + PALIER_VOLUME) {
-    // La dérive est elle-même lissée : elle part du glissement nul où la
-    // levée l'a laissée, et se pose avant que le retour ne commence.
-    const h = soie((i - PALIER_PLAN - LEVEE) / (PALIER_VOLUME - 1));
-    return { t: 1, theta: -14 - 7 * h, zoom: 1.045 + 0.04 * h };
+
+  // 3 — la pose des appareils, sur une caméra qui dérive.
+  if (i < (d += POSE)) {
+    const h = soie((i - PLAN_PLAT - LEVEE) / (POSE - 1));
+    return {
+      ...NEUTRE,
+      t: 1,
+      theta: -14 - 4 * h,
+      zoom: 1.045 + 0.02 * h,
+      elec: h,
+    };
   }
-  const reste = n - (PALIER_PLAN + LEVEE + PALIER_VOLUME);
-  const t = 1 - soie((i - PALIER_PLAN - LEVEE - PALIER_VOLUME) / reste);
-  return { t, theta: -21 * t, zoom: 1 + 0.085 * t };
+
+  // 4 — les cotes, appareils posés.
+  if (i < (d += COTES)) {
+    const h = soie((i - PLAN_PLAT - LEVEE - POSE) / (COTES - 1));
+    return {
+      ...NEUTRE,
+      t: 1,
+      theta: -18 - 3 * h,
+      zoom: 1.065 + 0.02 * h,
+      elec: 1,
+      cotes: h,
+    };
+  }
+
+  // 5 — le fondu vers le dossier : la maquette reste, la page monte dessus.
+  if (i < (d += FONDU)) {
+    const h = soie((i - PLAN_PLAT - LEVEE - POSE - COTES) / FONDU);
+    return {
+      t: 1,
+      theta: -21,
+      zoom: 1.085,
+      elec: 1,
+      cotes: 1,
+      page: h,
+      defilement: 0,
+    };
+  }
+
+  // 6 — la page défile. Derrière, la maquette redescend vers le plan.
+  if (i < (d += PAGE)) {
+    const h = (i - PLAN_PLAT - LEVEE - POSE - COTES - FONDU) / (PAGE - 1);
+    const t = 1 - soie(h);
+    return {
+      t,
+      theta: -21 * t,
+      zoom: 1 + 0.085 * t,
+      elec: 1 - soie(h * 1.6),
+      cotes: 0,
+      page: 1,
+      defilement: soie(h),
+    };
+  }
+
+  // 7 — le retour : la page s'efface sur le plan, prêt à recommencer.
+  const reste = n - d;
+  const h = soie((i - d) / reste);
+  return { ...NEUTRE, t: 0, theta: 0, zoom: 1, page: 1 - h, defilement: 1 };
 }
 
 export function avancement(frame: number): number {
@@ -260,6 +355,24 @@ export function avancement(frame: number): number {
 export function camera(frame: number): { theta: number; zoom: number } {
   const { theta, zoom } = instant(frame);
   return { theta, zoom };
+}
+
+/** Tout ce qui n'est ni la levée ni la caméra : appareils, cotes, dossier. */
+export function etatDeLImage(frame: number): Instant {
+  return instant(frame);
+}
+
+/*
+ * LA POSE D'UN APPAREIL — chacun son tour, et pas tous ensemble.
+ *
+ * Six appareils qui paraissent d'un bloc, c'est un calque qu'on allume ; six
+ * appareils qui se posent l'un après l'autre, c'est quelqu'un qui équipe un
+ * logement. Les fenêtres se chevauchent largement — on ne compte pas jusqu'à
+ * six, on voit un logement s'équiper.
+ */
+export function pose(elec: number, k: number): number {
+  const debut = (k / Math.max(1, PLAN.elec.length)) * 0.55;
+  return soie((elec - debut) / 0.45);
 }
 
 /*
@@ -290,6 +403,11 @@ export function frameSvg(
   // La caméra du CYCLE : `t` ne dit que la levée, la dérive des paliers
   // vient d'ici. Sans elle, on retombe sur une caméra asservie à `t`.
   cam?: { theta?: number; zoom?: number },
+  /*
+    CE QUI NE SE DÉDUIT PAS DE LA LEVÉE : les appareils arrivent après elle,
+    les cotes après eux. `t` ne sait dire que la hauteur des murs.
+  */
+  etat?: { elec?: number; cotes?: number },
 ): string {
   /*
     LE PLAN SE LÈVE, AU SENS PROPRE.
@@ -455,14 +573,27 @@ export function frameSvg(
   }
 
   /*
-    LES APPAREILS RESTENT VISIBLES DU DÉBUT À LA FIN.
+    LES APPAREILS SE POSENT, ILS NE SONT PLUS LÀ D'AVANCE.
 
-    C'est le sujet de l'application : le plan sert à savoir où sont les
-    prises. Les cotes, elles, s'effacent en montant — un volume couvert de
-    chiffres ne se lit pas, et sur le chantier on ne cote pas une perspective.
+    C'est le sujet de l'application, et c'était le temps qui manquait au
+    scénario : ils paraissaient dès la première image, donc on ne les voyait
+    jamais arriver. Relevé du patron : « des interrupteurs et prises pop à des
+    endroits ». Chacun a sa fenêtre (`pose`), et il grandit en paraissant —
+    c'est ce sursaut d'échelle qui fait lire un « pop » plutôt qu'un fondu.
+
+    PUIS ILS DISENT LEUR HAUTEUR. « On affiche les cotes rapidement » : un
+    filet jusqu'au sol et le nombre en centimètres, comme le calque « Cotes »
+    de l'application. La vitrine ne cotait plus rien depuis qu'on lui avait
+    retiré les cotes du PLAN — celles-là donnaient la taille d'un logement
+    inventé, ce qui n'apprend rien. Une cote d'appareil, elle, dit ce que
+    l'app sait faire.
   */
+  const elec = Math.max(0, Math.min(1, etat?.elec ?? 1));
+  const cotes = Math.max(0, Math.min(1, etat?.cotes ?? 0));
   const parMur = new Map(murs.map((w) => [w.id, w]));
-  for (const f of PLAN.elec) {
+  for (const [k, f] of PLAN.elec.entries()) {
+    const vu = pose(elec, k);
+    if (vu < 0.02) continue;
     const w = parMur.get(f.wallId);
     if (!w) continue;
     const len = segLength(w) || 1;
@@ -484,18 +615,223 @@ export function frameSvg(
     */
     const cx = q.sx.toFixed(1);
     const cy = (q.sy + 3).toFixed(1);
+    // Le sursaut : il paraît à 60 % de sa taille et finit à 100 %.
+    const corps = (9 * (0.6 + 0.4 * vu)).toFixed(1);
     const police =
-      `font-family="Helvetica" font-size="9" font-weight="bold" ` +
+      `font-family="Helvetica" font-size="${corps}" font-weight="bold" ` +
       `text-anchor="middle"`;
     out.push(
       `<text x="${cx}" y="${cy}" ${police} fill="none" ` +
-        `stroke="#FFFFFF" stroke-width="3">${spec.short}</text>`,
-      `<text x="${cx}" y="${cy}" ${police} fill="${spec.color}">${spec.short}</text>`,
+        `stroke="#FFFFFF" stroke-width="3" opacity="${vu.toFixed(2)}">` +
+        `${spec.short}</text>`,
+      `<text x="${cx}" y="${cy}" ${police} fill="${spec.color}" ` +
+        `opacity="${vu.toFixed(2)}">${spec.short}</text>`,
     );
+    if (cotes > 0.02) {
+      /*
+        LE FILET DESCEND AU SOL, sous l'appareil, et le nombre se pose
+        dessus. C'est le dessin du calque « Cotes » : on lit la hauteur de
+        pose, celle qu'on trace au crayon avant de percer.
+      */
+      const bas = project({ x: at.x, y: 0, z: at.z });
+      const o = (cotes * vu).toFixed(2);
+      out.push(
+        `<line x1="${cx}" y1="${(q.sy + 6).toFixed(1)}" x2="${bas.sx.toFixed(1)}" ` +
+          `y2="${bas.sy.toFixed(1)}" stroke="${p.cote}" stroke-width="0.7" ` +
+          `stroke-dasharray="2 2" opacity="${o}"/>`,
+        `<text x="${((q.sx + bas.sx) / 2 + 7).toFixed(1)}" ` +
+          `y="${((q.sy + bas.sy) / 2).toFixed(1)}" font-family="Helvetica" ` +
+          `font-size="7.5" font-weight="bold" fill="none" stroke="#FFFFFF" ` +
+          `stroke-width="2.5" opacity="${o}">${Math.round(f.height * 100)}</text>`,
+        `<text x="${((q.sx + bas.sx) / 2 + 7).toFixed(1)}" ` +
+          `y="${((q.sy + bas.sy) / 2).toFixed(1)}" font-family="Helvetica" ` +
+          `font-size="7.5" font-weight="bold" fill="${p.cote}" ` +
+          `opacity="${o}">${Math.round(f.height * 100)}</text>`,
+      );
+    }
   }
 
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" ` +
     `viewBox="0 0 ${W} ${H}">${out.join('')}</svg>`
+  );
+}
+
+/**
+ * LE DOSSIER QU'ON REMET AU CLIENT — deux feuilles, qui défilent.
+ *
+ * Relevé du patron : « un aperçu d'un scroll du PDF final des plans etc. ».
+ * C'est la fin du cheminement, et c'est ce qu'on ne montrait nulle part : la
+ * vitrine s'arrêtait au volume, alors que le volume n'est qu'une étape — ce
+ * qu'on emporte sur le chantier, c'est le dossier.
+ *
+ * LA PREMIÈRE FEUILLE PORTE LE VRAI PLAN. Elle rappelle `frameSvg` à plat et
+ * le réduit dans son cadre : c'est le même dessin que celui qu'on vient de
+ * regarder se lever, pas une illustration à côté. Deux plans dessinés
+ * séparément finiraient par ne plus se ressembler.
+ *
+ * LA SECONDE EST UN BORDEREAU : des lignes, des quantités à droite, un total
+ * plus foncé. On ne cherche pas à le faire lire — on cherche à ce qu'on le
+ * RECONNAISSE en une demi-seconde, et une liste chiffrée se reconnaît à sa
+ * forme.
+ */
+export function pageSvg(
+  defilement: number,
+  W: number,
+  H: number,
+  p: FramePalette = SHOWCASE_PALETTE,
+): string {
+  const d = Math.max(0, Math.min(1, defilement));
+  // Deux feuilles et leur entre-deux : la course du défilement, c'est ce qui
+  // dépasse de l'écran.
+  const feuille = H * 0.98;
+  const ecart = H * 0.06;
+  const total = feuille * 2 + ecart;
+  const y0 = -d * (total - H);
+  const out: string[] = [];
+  out.push(`<rect width="${W}" height="${H}" fill="#E7EAF0"/>`);
+  out.push(`<g transform="translate(0 ${y0.toFixed(1)})">`);
+
+  /** Une feuille blanche, ombre portée comprise. */
+  const sheet = (y: number) =>
+    `<rect x="6" y="${y.toFixed(1)}" width="${W - 12}" height="${feuille.toFixed(1)}" ` +
+    `fill="#FFFFFF" stroke="#D5DCEA" stroke-width="1"/>`;
+
+  // ---------------------------------------------------------- feuille 1
+  out.push(sheet(0));
+  const cartouche = (y: number, titre: string) =>
+    `<rect x="6" y="${y.toFixed(1)}" width="${W - 12}" height="26" fill="${p.meubleTrait}"/>` +
+    `<text x="18" y="${(y + 18).toFixed(1)}" font-family="Helvetica" font-size="12" ` +
+    `font-weight="bold" fill="#FFFFFF">${titre}</text>`;
+  out.push(cartouche(0, 'PLAN — T2, 27 m²'));
+  /*
+    LE PLAN DE LA FEUILLE EST LE PLAN DE LA VITRINE, réduit. Le rappel se fait
+    à plat, appareils posés, sans cotes : c'est le plan qu'on imprime.
+  */
+  const cadreP = {
+    x: 16,
+    y: 40,
+    w: Math.round(W - 32),
+    h: Math.round(feuille * 0.52),
+  };
+  /*
+    LE PLAN SE REND À LA TAILLE DE SON CADRE, il ne se réduit pas.
+
+    Premier jet : on rendait le plan sur le format de l'écran, puis on
+    l'écrasait dans le bloc de la feuille. Le cadrage de `frameSvg` réserve
+    déjà une marge franche sur les quatre côtés ; réduit une seconde fois, le
+    plan tenait dans le tiers de la largeur et la feuille était un désert
+    blanc. Regardé en image, c'est ce qui sautait aux yeux.
+
+    Rendu DIRECTEMENT au format du bloc, il se cadre tout seul dessus : la
+    même fonction, un autre papier.
+  */
+  const mini = frameSvg(
+    0,
+    cadreP.w,
+    cadreP.h,
+    p,
+    { theta: 0, zoom: 1 },
+    { elec: 1, cotes: 0 },
+  )
+    .replace(/^[\s\S]*?viewBox="[^"]*">/, '')
+    .replace(/<\/svg>$/, '');
+  out.push(
+    `<g transform="translate(${cadreP.x} ${cadreP.y})">${mini}</g>`,
+  );
+  // Le bloc de légende, sous le plan : trois lignes et leur pastille.
+  const legende = cadreP.y + cadreP.h + 14;
+  for (const [i, teinte] of [p.meubleTrait, p.porte, p.baie].entries()) {
+    const y = legende + i * 16;
+    out.push(
+      `<circle cx="24" cy="${y.toFixed(1)}" r="4" fill="${teinte}"/>`,
+      `<rect x="34" y="${(y - 3.5).toFixed(1)}" width="${(W * 0.42 - i * 18).toFixed(0)}" ` +
+        `height="7" rx="3.5" fill="#C9D0DC"/>`,
+    );
+  }
+
+  /*
+    ET LE CARTOUCHE, EN PIED DE FEUILLE.
+
+    Regardé en image, le bas de la première page était un désert blanc sur
+    quarante pour cent de sa hauteur. Un plan d'exécution porte son cartouche
+    en bas à droite — c'est ce qui le fait reconnaître comme un document et
+    non comme une capture d'écran encadrée.
+  */
+  const yc = feuille - 76;
+  out.push(
+    `<rect x="${(W * 0.38).toFixed(0)}" y="${yc.toFixed(1)}" ` +
+      `width="${(W * 0.62 - 6).toFixed(0)}" height="56" fill="none" ` +
+      `stroke="#C9D0DC" stroke-width="1"/>`,
+    `<line x1="${(W * 0.38).toFixed(0)}" y1="${(yc + 18).toFixed(1)}" ` +
+      `x2="${(W - 6).toFixed(0)}" y2="${(yc + 18).toFixed(1)}" ` +
+      `stroke="#C9D0DC" stroke-width="1"/>`,
+    `<text x="${(W * 0.38 + 8).toFixed(0)}" y="${(yc + 13).toFixed(1)}" ` +
+      `font-family="Helvetica" font-size="8" font-weight="bold" ` +
+      `fill="${p.cote}">ECHOPLAN</text>`,
+  );
+  for (let i = 0; i < 3; i++) {
+    out.push(
+      `<rect x="${(W * 0.38 + 8).toFixed(0)}" y="${(yc + 26 + i * 10).toFixed(1)}" ` +
+        `width="${(W * 0.42 - i * 14).toFixed(0)}" height="5" rx="2.5" ` +
+        `fill="#D5DCEA"/>`,
+    );
+  }
+
+  // ---------------------------------------------------------- feuille 2
+  const y2 = feuille + ecart;
+  out.push(sheet(y2));
+  out.push(cartouche(y2, 'FOURNITURES'));
+  for (let i = 0; i < 13; i++) {
+    const y = y2 + 44 + i * 20;
+    const large = 0.34 + ((i * 7) % 5) * 0.07;
+    out.push(
+      `<rect x="18" y="${(y - 8).toFixed(1)}" width="14" height="14" rx="3" ` +
+        `fill="#EDF1F8" stroke="#D5DCEA" stroke-width="0.8"/>`,
+      `<rect x="38" y="${(y - 3.5).toFixed(1)}" width="${(W * large).toFixed(0)}" ` +
+        `height="7" rx="3.5" fill="#C9D0DC"/>`,
+      `<rect x="${(W - 62).toFixed(0)}" y="${(y - 3.5).toFixed(1)}" width="44" ` +
+        `height="7" rx="3.5" fill="#9AA5B5"/>`,
+    );
+  }
+  const yTotal = y2 + 44 + 13 * 20 + 10;
+  out.push(
+    `<line x1="18" y1="${yTotal.toFixed(1)}" x2="${W - 18}" y2="${yTotal.toFixed(1)}" ` +
+      `stroke="#9AA5B5" stroke-width="1" stroke-dasharray="3 3"/>`,
+    `<rect x="${(W - 96).toFixed(0)}" y="${(yTotal + 10).toFixed(1)}" width="78" ` +
+      `height="12" rx="6" fill="${p.meubleTrait}"/>`,
+  );
+
+  out.push('</g>');
+  return out.join('');
+}
+
+/**
+ * UNE IMAGE DU CYCLE, tout compris — la maquette, puis le dossier par-dessus.
+ *
+ * LE FONDU SE FAIT ICI, ET NON PAR UN CHANGEMENT DE SCÈNE. Les deux dessins
+ * sont posés l'un sur l'autre avec leurs opacités : c'est ce qui donne une
+ * transition en fondu plutôt qu'une coupure, et c'est ce que le relevé
+ * demande — « des transitions rapides mais en fondu toujours ».
+ */
+export function imageSvg(
+  frame: number,
+  W: number,
+  H: number,
+  p: FramePalette = SHOWCASE_PALETTE,
+): string {
+  const e = instant(frame);
+  const scene = frameSvg(e.t, W, H, p, { theta: e.theta, zoom: e.zoom }, e)
+    .replace(/^[\s\S]*?viewBox="[^"]*">/, '')
+    .replace(/<\/svg>$/, '');
+  const corps = [`<g opacity="${(1 - e.page).toFixed(2)}">${scene}</g>`];
+  if (e.page > 0.01) {
+    corps.push(
+      `<g opacity="${e.page.toFixed(2)}">${pageSvg(e.defilement, W, H, p)}</g>`,
+    );
+  }
+  return (
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" ` +
+    `viewBox="0 0 ${W} ${H}">${corps.join('')}</svg>`
   );
 }
