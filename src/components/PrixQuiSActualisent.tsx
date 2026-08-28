@@ -197,10 +197,30 @@ export function PrixQuiSActualisent({ etape }: { etape: string }) {
  * n'a pas pu y aller — et dans ce dernier cas on dit AVEC QUOI on chiffre,
  * parce qu'un prix sans provenance ne vaut pas mieux qu'une devinette.
  */
+/**
+ * COMBIEN DE TEMPS L'ATTENTE RESTE À L'ÉCRAN, AU MINIMUM.
+ *
+ * Relevé du patron : « laisse un chargement plus long pour la vérification,
+ * c'est trop rapide on aperçoit à peine la page là ». Sur un catalogue déjà
+ * frais, ou hors ligne, la réponse tombe en quelques millisecondes : la page
+ * paraissait et disparaissait dans la même image, ce qui se lit comme un
+ * clignotement — pas comme un travail.
+ *
+ * DEUX SECONDES ET DEMIE, et le chiffre se déduit du texte : le second mot
+ * d'attente — « Comparaison des tarifs… » — tombe à la seconde. Il faut donc
+ * qu'il ait le temps de se lire après être apparu, sans quoi on aurait écrit
+ * une phrase que personne ne voit.
+ *
+ * C'EST CELUI QUI DESSINE LA PAGE QUI ANNONCE SA DURÉE, et non l'écran qui la
+ * devine : la règle de la maison sur l'encombrement vaut aussi pour le temps.
+ */
+export const ATTENTE_MIN = 2500;
+
 export function BandeauTarifs({
   etat,
   enseigne,
   jour,
+  duJour = false,
   onVerifier,
 }: {
   etat: 'actualise' | 'ajour' | 'horsligne';
@@ -208,13 +228,34 @@ export function BandeauTarifs({
   enseigne: string;
   /** Le jour du relevé, déjà mis en français. */
   jour: string;
+  /**
+   * LE CATALOGUE A-T-IL ÉTÉ RELEVÉ AUJOURD'HUI ?
+   *
+   * Relevé du patron : « le "prix non vérifiés" n'inspire pas confiance alors
+   * qu'ils sont vérifiés ». Un catalogue passé en rayon le matin même n'est
+   * pas « non vérifié », même si l'on n'a pas pu joindre le serveur à cette
+   * seconde-là : ce sont deux questions différentes, et l'on répondait à la
+   * mauvaise.
+   */
+  duJour?: boolean;
   onVerifier?: () => void;
 }) {
   const c = useTheme();
   const styles = getStyles(c);
-  const horsLigne = etat === 'horsligne';
-  const mot =
-    etat === 'actualise'
+  const horsLigne = etat === 'horsligne' && !duJour;
+  /*
+    QUATRE ÉTATS, ET LE PLUS FORT GAGNE. « Vérifiés aujourd'hui » est la
+    phrase la plus vraie qu'on puisse écrire quand elle est vraie : elle dit
+    QUAND on est allé voir, ce que « actualisés » et « à jour » ne disent
+    qu'en creux.
+
+    ET ELLE DATE LE CATALOGUE, PAS CHAQUE LIGNE. Trente-sept prix ont été vus
+    en rayon, les autres sont recalés et le disent, ligne par ligne, comme
+    avant. Ce qui est affirmé ici, c'est la date du dernier passage.
+  */
+  const mot = duJour
+    ? 'Prix vérifiés aujourd’hui'
+    : etat === 'actualise'
       ? 'Prix actualisés'
       : etat === 'ajour'
         ? 'Prix à jour'
@@ -222,7 +263,11 @@ export function BandeauTarifs({
 
   return (
     <View
-      style={[styles.bandeau, horsLigne && styles.bandeauGris]}
+      style={[
+        styles.bandeau,
+        horsLigne && styles.bandeauGris,
+        duJour && styles.bandeauVert,
+      ]}
       accessibilityLabel={`${mot}, ${enseigne}, ${jour}`}>
       <Svg width={18} height={18} viewBox="0 0 24 24">
         {horsLigne ? (
@@ -238,7 +283,7 @@ export function BandeauTarifs({
         ) : (
           <Path
             d="M20 6 9 17l-5-5"
-            stroke={c.blue}
+            stroke={duJour ? c.green : c.blue}
             strokeWidth={2.4}
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -247,7 +292,12 @@ export function BandeauTarifs({
         )}
       </Svg>
       <View style={styles.bandeauTexte}>
-        <Text style={[styles.bandeauMot, horsLigne && styles.bandeauMotGris]}>
+        <Text
+          style={[
+            styles.bandeauMot,
+            horsLigne && styles.bandeauMotGris,
+            duJour && styles.bandeauMotVert,
+          ]}>
           {mot}
         </Text>
         {/*
@@ -336,9 +386,17 @@ const getStyles = themedStyles((c: Palette) =>
     },
     /* Hors ligne, le bandeau perd son bleu : il n'annonce plus une réussite. */
     bandeauGris: { backgroundColor: c.line },
+    /*
+      LE VERT DE CE QUI EST ACQUIS — celui du total du devis. Le bleu informe,
+      le gris s'excuse ; ni l'un ni l'autre n'inspire confiance, et c'est
+      exactement ce que le relevé reproche au bandeau. Le fond reste très
+      pâle : un aplat vert en tête de ticket se lirait comme un bouton.
+    */
+    bandeauVert: { backgroundColor: 'rgba(30,160,90,0.12)' },
     bandeauTexte: { flex: 1 },
     bandeauMot: { fontSize: 13, fontWeight: '800', color: c.blue },
     bandeauMotGris: { color: c.ink },
+    bandeauMotVert: { color: c.green },
     bandeauSource: { fontSize: 11, color: c.inkFaint, marginTop: 1 },
     bandeauAction: {
       fontSize: 12,

@@ -63,8 +63,14 @@ import { cleDeLigne, type Devis, type LigneDevis, type LigneLegende } from '../g
 import { chiffrerLePlan } from '../geometry/devisplan';
 import { CEILINGS, CEILING_SYMBOL, type CeilingKind } from '../geometry/ceiling';
 import { FIXTURES, postsSymbol, type FixtureKind } from '../geometry/electrical';
-import { GAMMES, dateDuReleve } from '../geometry/prix';
 import {
+  GAMMES,
+  RELEVE_RAYON,
+  dateDuReleve,
+  releveDuJour,
+} from '../geometry/prix';
+import {
+  ATTENTE_MIN,
   BandeauTarifs,
   PrixQuiSActualisent,
 } from '../components/PrixQuiSActualisent';
@@ -363,6 +369,8 @@ export function DevisScreen() {
     issue: IssueTarifs;
     enseigne: string;
     jour: string;
+    /** Le catalogue qui chiffre a-t-il été relevé aujourd'hui ? */
+    duJour: boolean;
   } | null>(null);
   const [enCours, setEnCours] = useState(false);
   const [motDAttente, setMotDAttente] = useState('Connexion au catalogue…');
@@ -469,16 +477,41 @@ export function DevisScreen() {
       () => setMotDAttente('Comparaison des tarifs…'),
       1000,
     );
-    const v = await verifierLesTarifs(Date.now(), forcer);
+    /*
+      ON LAISSE L'ATTENTE SE VOIR — relevé du patron : « c'est trop rapide on
+      aperçoit à peine la page là ». Sur un catalogue déjà frais, ou hors
+      ligne, la réponse tombe en quelques millisecondes ; la page paraissait
+      et disparaissait dans la même image.
+
+      LA PLUS LONGUE DES DEUX, ET NON UN DÉLAI AJOUTÉ. Une pause posée APRÈS
+      la réponse ferait attendre deux secondes et demie de plus quelqu'un qui
+      vient d'en attendre trois. Les deux courent ensemble : une réponse lente
+      n'est pas rallongée, une réponse instantanée est tenue à l'écran.
+    */
+    const [v] = await Promise.all([
+      verifierLesTarifs(Date.now(), forcer),
+      new Promise((suite) => setTimeout(suite, ATTENTE_MIN)),
+    ]);
     clearTimeout(relais);
+    /*
+      LE JOUR DU RELEVÉ, ET NON LE NUMÉRO DE VERSION.
+
+      Hors ligne, on datait le catalogue avec `devis.version` — « 2026-08.2 »,
+      une chaîne que `dateDuReleve` ne sait pas mettre en français et rend
+      telle quelle. Le bandeau annonçait donc « Prix non vérifiés · 2026-08.2 »
+      d'un catalogue passé en rayon le matin même. Le jour existait dans la
+      table des prix ; personne ne le lui passait.
+    */
+    const releve = v.catalogue?.releve ?? RELEVE_RAYON;
     setVerif({
       issue: v.issue,
       enseigne: v.catalogue?.source ?? TARIF_EMBARQUE,
-      jour: dateDuReleve(v.catalogue?.releve ?? devis.version),
+      jour: dateDuReleve(releve),
+      duJour: releveDuJour(releve, Date.now()),
     });
     setVersionTarifs((n) => n + 1);
     setEnCours(false);
-  }, [devis.version]);
+  }, []);
 
   useEffect(() => {
     if (etape !== ETAPE_PRIX || dejaVu.current) return;
@@ -719,6 +752,7 @@ export function DevisScreen() {
                   etat={verif.issue}
                   enseigne={verif.enseigne}
                   jour={verif.jour}
+                  duJour={verif.duJour}
                   onVerifier={() => {
                     haptic('leger');
                     verifier(true).catch(() => {});

@@ -47,6 +47,7 @@ import TestRenderer, { act } from 'react-test-renderer';
 import { DevisScreen } from '../src/screens/DevisScreen';
 import { SERVEUR } from '../src/config/serveur';
 import { GAMMES, appliquerLesTarifs, dateDuReleve } from '../src/geometry/prix';
+import { ATTENTE_MIN } from '../src/components/PrixQuiSActualisent';
 import { useScanStore } from '../src/store/scanStore';
 import type { Fixture } from '../src/geometry/electrical';
 import type { WallSeg } from '../src/geometry/floorplan';
@@ -107,6 +108,18 @@ const muet = () => {
   }) as unknown as typeof fetch;
 };
 
+/*
+  DES MINUTEURS FEINTS, DEPUIS QUE L'ATTENTE DES PRIX A UNE DURÉE MINIMALE.
+
+  Relevé du patron : « laisse un chargement plus long pour la vérification,
+  c'est trop rapide on aperçoit à peine la page là ». La page d'attente reste
+  donc `ATTENTE_MIN` à l'écran (voir `prixverifies`). Attendre pour de vrai
+  deux secondes et demie à chaque épreuve qui va au ticket coûterait une
+  minute sur ce banc — et un banc lent finit par ne plus être lancé.
+*/
+beforeAll(() => jest.useFakeTimers());
+afterAll(() => jest.useRealTimers());
+
 let arbre: TestRenderer.ReactTestRenderer | null = null;
 afterEach(() => {
   act(() => arbre?.unmount());
@@ -115,6 +128,12 @@ afterEach(() => {
 });
 
 beforeEach(() => {
+  /*
+    L'HORLOGE REPART DU RÉEL à chaque épreuve : celles qui la figent le font
+    elles-mêmes, et une date laissée en place contaminerait la suivante — le
+    magasin Zustand nous a déjà appris ce que coûte un état qui survit.
+  */
+  jest.setSystemTime(new Date());
   appels = 0;
   mockCoffre.clear();
   appliquerLesTarifs(null);
@@ -192,6 +211,13 @@ const demanderLePrix = (t: TestRenderer.ReactTestRenderer) => {
   act(() => bouton(t, 'Voir le prix').props.onPress());
 };
 
+/** L'attente des prix tient l'écran un temps minimum : on l'épuise. */
+const laisserLAttenteFinir = async () => {
+  await act(async () => {
+    jest.advanceTimersByTime(ATTENTE_MIN + 50);
+  });
+};
+
 describe('on ne dérange le serveur que quand on demande le prix', () => {
   it('l’avertissement n’appelle personne', () => {
     /*
@@ -209,7 +235,7 @@ describe('on ne dérange le serveur que quand on demande le prix', () => {
     repond({ ok: true, tarifs: CATALOGUE });
     const t = ouvrir();
     demanderLePrix(t);
-    await act(async () => {});
+    await laisserLAttenteFinir();
     expect(appels).toBe(1);
   });
 });
@@ -223,7 +249,7 @@ describe('pendant qu’on va voir', () => {
     const pendant = mots(t);
     expect(pendant).toContain('Vérification des prix');
     expect(pendant).not.toContain('ESTIMATION DE FOURNITURE');
-    await act(async () => {});
+    await laisserLAttenteFinir();
     const apres = mots(t);
     expect(apres).toContain('ESTIMATION DE FOURNITURE');
     expect(apres).not.toContain('Vérification des prix');
@@ -235,22 +261,52 @@ describe('le bandeau dit d’où viennent les prix', () => {
     repond({ ok: true, tarifs: CATALOGUE });
     const t = ouvrir();
     demanderLePrix(t);
-    await act(async () => {});
+    await laisserLAttenteFinir();
     const lus = mots(t);
     expect(lus).toContain('Prix actualisés');
     expect(lus).toContain(`Castorama · ${dateDuReleve('2026-09-03')}`);
   });
 
   it('et le dit autrement quand on n’a pas pu y aller', async () => {
+    /*
+      DEUX VERSIONS DE CETTE ÉPREUVE, ET LA SECONDE FIGE L'HORLOGE.
+
+      Elle disait simplement « hors ligne, le bandeau annonce Prix non
+      vérifiés ». Depuis que le bandeau reconnaît un catalogue relevé LE JOUR
+      MÊME (voir `prixverifies`), la phrase dépend de la date du jour : le 28
+      août 2026, le catalogue embarqué est du jour et le bandeau dit
+      « vérifiés ». L'épreuve serait donc passée ce jour-là et tombée le
+      lendemain, sans qu'une ligne de code ait bougé.
+
+      On lui donne une date. Ici, un jour QUELCONQUE, bien après le relevé
+      embarqué : c'est le cas que l'épreuve veut tenir — on n'a pas pu aller
+      voir, et le catalogue qui chiffre n'est plus tout jeune.
+    */
+    jest.setSystemTime(new Date(2026, 10, 15, 9, 0, 0));
     muet();
     const t = ouvrir();
     demanderLePrix(t);
-    await act(async () => {});
+    await laisserLAttenteFinir();
     const lus = mots(t);
     expect(lus).toContain('Prix non vérifiés');
     // On dit AVEC QUOI l'on chiffre : un prix sans provenance ne vaut pas
     // mieux qu'une devinette.
     expect(lus.some((m) => m.startsWith('Estimation EchoPlan · '))).toBe(true);
+  });
+
+  it('mais le jour du relevé, hors ligne, il ne s’excuse pas', async () => {
+    /*
+      LE CŒUR DU RELEVÉ DU PATRON : « le "prix non vérifiés" n'inspire pas
+      confiance alors qu'ils sont vérifiés ». Sans réseau, un catalogue passé
+      en rayon le matin même n'est pas « non vérifié » — ce sont deux
+      questions différentes, et l'on répondait à la mauvaise.
+    */
+    jest.setSystemTime(new Date(2026, 7, 28, 9, 0, 0));
+    muet();
+    const t = ouvrir();
+    demanderLePrix(t);
+    await laisserLAttenteFinir();
+    expect(mots(t)).toContain('Prix vérifiés aujourd’hui');
   });
 });
 
@@ -259,7 +315,7 @@ describe('le total suit le catalogue reçu', () => {
     muet();
     const t = ouvrir();
     demanderLePrix(t);
-    await act(async () => {});
+    await laisserLAttenteFinir();
     // Le total est écrit juste après « TOTAL TTC » : on lit le voisin, pas
     // une étiquette qu'on aurait recopiée.
     const totalLu = (u: TestRenderer.ReactTestRenderer) => {
@@ -293,7 +349,7 @@ describe('chaque ligne porte sa propre référence', () => {
     repond({ ok: true, tarifs: CATALOGUE });
     const t = ouvrir();
     demanderLePrix(t);
-    await act(async () => {});
+    await laisserLAttenteFinir();
     const lus = mots(t);
     const jour = dateDuReleve('2026-09-03');
     expect(lus.filter((m) => m === `Castorama · ${jour}`).length).toBeGreaterThan(1);

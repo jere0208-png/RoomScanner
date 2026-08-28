@@ -43,6 +43,7 @@ import { GammeScreen } from '../src/screens/GammeScreen';
 import { useScanStore } from '../src/store/scanStore';
 import { chiffrerLePlan } from '../src/geometry/devisplan';
 import { GAMMES } from '../src/geometry/prix';
+import { ATTENTE_MIN } from '../src/components/PrixQuiSActualisent';
 import { FIXTURES } from '../src/geometry/electrical';
 import type { WallSeg } from '../src/geometry/floorplan';
 import type { Fixture } from '../src/geometry/electrical';
@@ -84,6 +85,18 @@ const APPAREILS: Fixture[] = [
 ];
 
 const ROOMS = [{ id: 'r1', name: 'Séjour', floor: null }];
+
+/*
+  DES MINUTEURS FEINTS, DEPUIS QUE L'ATTENTE DES PRIX A UNE DURÉE MINIMALE.
+
+  Relevé du patron : « laisse un chargement plus long pour la vérification,
+  c'est trop rapide on aperçoit à peine la page là ». La page d'attente reste
+  donc `ATTENTE_MIN` à l'écran (voir `prixverifies`). Attendre pour de vrai
+  deux secondes et demie à chaque épreuve qui va au ticket coûterait une
+  minute sur ce banc — et un banc lent finit par ne plus être lancé.
+*/
+beforeAll(() => jest.useFakeTimers());
+afterAll(() => jest.useRealTimers());
 
 let arbre: TestRenderer.ReactTestRenderer | null = null;
 afterEach(() => {
@@ -187,7 +200,10 @@ const etapes = (t: TestRenderer.ReactTestRenderer) => {
 const auTicket = async (appareils: Fixture[] = APPAREILS) => {
   const t = ouvrir(appareils);
   act(() => bouton(t, 'Voir le prix')!.props.onPress());
-  await act(async () => {});
+  await act(async () => {
+    // L'attente des prix tient l'écran un temps minimum : on l'épuise.
+    jest.advanceTimersByTime(ATTENTE_MIN + 50);
+  });
   mesurer(t);
   return t;
 };
@@ -270,7 +286,9 @@ describe('la page des gammes', () => {
     act(() => arbre?.unmount());
     arbre = null;
     const t = ouvrir(APPAREILS, false);
-    await act(async () => {});
+    await act(async () => {
+      jest.advanceTimersByTime(ATTENTE_MIN + 50);
+    });
     expect(texte(t)).toContain('ESTIMATION DE FOURNITURE');
   });
 });
@@ -354,7 +372,9 @@ describe('on ne repart plus du début en revenant du magasin', () => {
     // On rouvre SANS remise à zéro : c'est exactement ce que fait un retour
     // du magasin, qui ne touche pas au relevé.
     const t = ouvrir(APPAREILS, false);
-    await act(async () => {});
+    await act(async () => {
+      jest.advanceTimersByTime(ATTENTE_MIN + 50);
+    });
     expect(texte(t)).toContain('ESTIMATION DE FOURNITURE');
   });
 

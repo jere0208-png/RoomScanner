@@ -47,9 +47,22 @@ import { FloorplanEditor } from '../src/components/FloorplanEditor';
 import { chiffrerLePlan } from '../src/geometry/devisplan';
 import { postsSymbol, type Fixture, type FixtureKind } from '../src/geometry/electrical';
 import { GAMMES } from '../src/geometry/prix';
+import { ATTENTE_MIN } from '../src/components/PrixQuiSActualisent';
 import { photoDe } from '../src/ui/produits';
 import { useScanStore } from '../src/store/scanStore';
 import type { WallSeg } from '../src/geometry/floorplan';
+
+/*
+  DES MINUTEURS FEINTS, DEPUIS QUE L'ATTENTE DES PRIX A UNE DURÉE MINIMALE.
+
+  Relevé du patron : « laisse un chargement plus long pour la vérification,
+  c'est trop rapide on aperçoit à peine la page là ». La page d'attente reste
+  donc `ATTENTE_MIN` à l'écran (voir `prixverifies`). Attendre pour de vrai
+  deux secondes et demie à chaque épreuve qui va au ticket coûterait une
+  minute sur ce banc — et un banc lent finit par ne plus être lancé.
+*/
+beforeAll(() => jest.useFakeTimers());
+afterAll(() => jest.useRealTimers());
 
 let arbre: TestRenderer.ReactTestRenderer | null = null;
 afterEach(() => {
@@ -272,7 +285,10 @@ const auTicket = async () => {
     l'estimation (voir `gammechoisie`) ; reste l'avertissement, puis le prix.
   */
   act(() => bouton(t, 'Voir le prix').props.onPress());
-  await act(async () => {});
+  await act(async () => {
+    // L'attente des prix tient l'écran un temps minimum : on l'épuise.
+    jest.advanceTimersByTime(ATTENTE_MIN + 50);
+  });
   mesurer(t);
   return t;
 };

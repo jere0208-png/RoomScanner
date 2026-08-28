@@ -92,8 +92,18 @@ const releveLe = (pu: number, source: string, jour: string): Tarif => ({
 });
 /** L'enseigne du relevé du 28 août 2026, et le jour. */
 const ENSEIGNE = 'Castorama';
-const JOUR = '2026-08-28';
-const r = (pu: number): Tarif => releveLe(pu, ENSEIGNE, JOUR);
+/**
+ * LE JOUR DU DERNIER PASSAGE EN RAYON — exporté, et c'était le manque.
+ *
+ * Relevé du patron : « le "prix non vérifiés" n'inspire pas confiance alors
+ * qu'ils sont vérifiés ». Il avait raison, et la cause était plus bête que le
+ * symptôme : hors ligne, le bandeau datait le catalogue avec la VERSION des
+ * tarifs — « 2026-08.2 » —, une chaîne que `dateDuReleve` ne sait pas mettre
+ * en français et rend telle quelle. Le jour du passage existait pourtant ici,
+ * à la journée près ; personne ne le lui passait.
+ */
+export const RELEVE_RAYON = '2026-08-28';
+const r = (pu: number): Tarif => releveLe(pu, ENSEIGNE, RELEVE_RAYON);
 
 // --------------------------------------------------------------- gammes
 
@@ -630,6 +640,28 @@ export function dateDuReleve(releve: string): string {
   if (!m) return releve;
   const mois = MOIS[Number(m[2]) - 1] ?? m[2];
   return m[3] ? `${Number(m[3])} ${mois} ${m[1]}` : `${mois} ${m[1]}`;
+}
+
+/**
+ * CE RELEVÉ EST-IL D'AUJOURD'HUI ?
+ *
+ * Relevé du patron : « si le jour de l'update est le jour même, on met "prix
+ * vérifiés" avec belle couleur ». Un catalogue passé en rayon le matin même
+ * n'est pas « non vérifié » — le dire fait douter du reste.
+ *
+ * L'HEURE SE PASSE EN PARAMÈTRE. Une fonction qui lit l'horloge du monde ne
+ * se met pas sur un banc, et c'est la règle de la maison partout ailleurs
+ * (voir `verifierLesTarifs`).
+ *
+ * UN RELEVÉ SANS JOUR — « 2026-08 », celui des prix estimés — n'est JAMAIS du
+ * jour : on ne sait pas quand il a été posé, donc on n'affirme rien. C'est la
+ * règle du prix qu'on ne comprend pas, appliquée aux dates.
+ */
+export function releveDuJour(releve: string, maintenant: number): boolean {
+  const d = new Date(maintenant);
+  const deuxChiffres = (n: number) => String(n).padStart(2, '0');
+  const aujourdhui = `${d.getFullYear()}-${deuxChiffres(d.getMonth() + 1)}-${deuxChiffres(d.getDate())}`;
+  return releve === aujourdhui;
 }
 
 /** Le prix d'une plaque, à n postes, dans une gamme. */

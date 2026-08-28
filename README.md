@@ -10751,6 +10751,75 @@ huitième au banc `devisecran` tient le troisième repli du ticket.
 iPhone. `adjustsFontSizeToFit` est fait exactement pour ce cas et c'est iOS qui
 mesure, mais le rendu ne se regarde pas depuis cette machine.
 
+### « Prix vérifiés » quand ils l'ont été, et une attente qu'on voit
+
+Relevé du patron : « le "prix non vérifiés" n'inspire pas confiance alors qu'ils
+sont vérifiés, fais en sorte que si le jour de l'update est le jour même, on met
+"prix vérifiés" avec belle couleur. Et laisse un chargement plus long pour la
+vérification, c'est trop rapide on aperçoit à peine la page là. »
+
+**LA CAUSE ÉTAIT PLUS BÊTE QUE LE SYMPTÔME.** Hors ligne, le bandeau datait le
+catalogue avec la **version** des tarifs — `2026-08.2` —, une chaîne que
+`dateDuReleve` ne sait pas mettre en français et rend telle quelle. Le bandeau
+annonçait donc « Prix non vérifiés · 2026-08.2 » d'un catalogue passé en rayon
+**le matin même**. Le jour du passage existait pourtant dans la table des prix, à
+la journée près (`JOUR = '2026-08-28'`, celui du relevé Castorama) : personne ne
+le lui passait. Il est maintenant exporté sous le nom `RELEVE_RAYON`, et c'est
+lui qui date le bandeau.
+
+**UN QUATRIÈME ÉTAT, ET C'EST LE PLUS FORT QUI GAGNE.** `releveDuJour(releve,
+maintenant)` répond à une question simple : ce catalogue a-t-il été relevé
+aujourd'hui ? Si oui, le bandeau dit **« Prix vérifiés aujourd'hui »**, en vert —
+la couleur du total du devis, celle de ce qui est acquis. Le bleu informe, le gris
+s'excuse ; ni l'un ni l'autre n'inspire confiance, et c'est exactement le
+reproche. Les trois états d'avant sont intacts derrière : « actualisés », « à
+jour », « non vérifiés ».
+
+**L'HEURE SE PASSE EN PARAMÈTRE** — une fonction qui lit l'horloge du monde ne se
+met pas sur un banc, c'est déjà la règle de `verifierLesTarifs`. Et **un relevé
+sans jour n'est jamais « du jour »** : les prix estimés portent `2026-08`, sans
+date ; on ne sait pas quand ils ont été posés, donc on n'affirme rien. C'est la
+règle du prix qu'on ne comprend pas, appliquée aux dates.
+
+**CE QUE « VÉRIFIÉS » DIT, ET CE QU'IL NE DIT PAS.** Le bandeau date le
+CATALOGUE, pas chaque ligne : trente-sept prix ont été vus en rayon, les autres
+sont recalés et le disent, ligne par ligne, comme avant. Ce qui est affirmé, c'est
+la date du dernier passage — et elle est vraie.
+
+**L'ATTENTE DURE MAINTENANT DEUX SECONDES ET DEMIE AU MINIMUM** (`ATTENTE_MIN`).
+Sur un catalogue déjà frais, ou hors ligne, la réponse tombe en quelques
+millisecondes : la page paraissait et disparaissait dans la même image, ce qui se
+lit comme un clignotement, pas comme un travail. Le chiffre se déduit du texte —
+le second mot d'attente, « Comparaison des tarifs… », tombe à la seconde ; il faut
+qu'il ait le temps de se lire après être apparu, sans quoi on aurait écrit une
+phrase que personne ne voit.
+
+**LA PLUS LONGUE DES DEUX, ET NON UN DÉLAI AJOUTÉ.** Une pause posée *après* la
+réponse ferait attendre deux secondes et demie **de plus** quelqu'un qui vient
+d'en attendre trois. Les deux courent ensemble : une réponse lente n'est pas
+rallongée, une réponse instantanée est tenue à l'écran. Et c'est la page qui
+annonce sa durée, pas l'écran qui la devine — la règle de la maison sur
+l'encombrement vaut aussi pour le temps.
+
+**Douze épreuves** (`prixverifies`), huit rouges avant : la reconnaissance du jour
+avec ses deux contrôles en sens inverse (la veille, et un relevé qui ne dit que
+son mois), le mot et le vert du bandeau, le contrôle inverse qui compte — sans
+relevé du jour, il ne se vante pas —, la ligne de source qui porte enfin une
+date, et l'attente tenue par ses deux bornes.
+
+**UN BANC VOISIN SERAIT DEVENU UNE BOMBE À RETARDEMENT.** `prixecran` disait
+« hors ligne, le bandeau annonce Prix non vérifiés ». Le 28 août 2026 le
+catalogue embarqué est du jour, donc l'épreuve passait ce jour-là et serait tombée
+le lendemain, sans qu'une ligne de code ait bougé. Elle est **réécrite avec une
+horloge figée** (`jest.setSystemTime`), et doublée d'une seconde qui tient le cas
+neuf : hors ligne, le jour du relevé, le bandeau ne s'excuse pas. Trois bancs qui
+vont jusqu'au ticket sont passés aux minuteurs feints — attendre deux secondes et
+demie pour de vrai à chaque épreuve coûterait une minute, et un banc lent finit
+par ne plus être lancé.
+
+**À juger à l'usage** : `ATTENTE_MIN` (2,5 s) rejoint la liste des rythmes que je
+ne peux pas voir depuis cette machine.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro
