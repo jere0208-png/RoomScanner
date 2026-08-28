@@ -10087,6 +10087,62 @@ trouve qu'en allant lire la fiche — et c'est bien pour ça qu'on y va.
 le jour où un geste de chantier n'aura plus son article, il le dira avec le
 geste en clair, pas avec un code.
 
+### Le tableau, relevé ligne par ligne — et l'interpolation qui mentait
+
+Suite du contrôle du rayon : le tableau est le poste où les écarts sont les plus
+gros, et c'est celui qu'on a relevé en entier. **Six prix de plus, deux erreurs
+qui comptent, et une leçon sur la façon dont les estimations étaient
+fabriquées.**
+
+| article | catalogue | relevé en rayon |
+|---|---|---|
+| Disjoncteur 10 A | 10,50 € | 10,50 € ✔ |
+| Disjoncteur 20 A | 11,90 € | **10,50 €** |
+| Disjoncteur 32 A | 16,50 € | **23,90 €** |
+| Peigne horizontal 13 modules | 12,90 € | **5,19 €** |
+| Coffret 1 rangée, 13 modules | 29 € | **34,90 €** |
+| Coffret 2 rangées, 26 modules | 52 € | 52,90 € ✔ |
+
+**LE PEIGNE ÉTAIT SURESTIMÉ DE PLUS DU DOUBLE** — 12,90 € annoncés, 5,19 € en
+rayon. C'est un article qu'on compte une à quatre fois par tableau et que
+personne n'aurait relu : un peigne, on le prend sans regarder l'étiquette.
+
+**ET LE DISJONCTEUR 32 A SOUS-ESTIMÉ DE MOITIÉ**, ce qui casse le raisonnement
+qui avait servi à l'estimer. Le catalogue partait de l'idée qu'« un disjoncteur
+est un disjoncteur, le calibre change le prix mais pas beaucoup » et
+interpolait : 10 A, 16 A, 20 A, puis 32 A un peu au-dessus. **Le rayon dit
+autre chose** : le 10, le 16 et le 20 valent tous exactement 10,50 €, et le 32
+en vaut 23,90 — plus du double. **Il n'y a pas de pente, il y a un seuil**, et
+une interpolation sur une régularité qui n'existe pas fabrique un chiffre faux
+avec l'air d'être raisonné.
+
+C'est la limite du recalage par famille, déjà vue sur le différentiel type A
+(surestimé d'un quart au relevé précédent) : **une béquille utile pour ce qu'on
+n'a pas vu, jamais une réponse.** Les articles recalés portent `A_VALIDER`, et
+l'écran le dit ligne par ligne — c'est exactement pour ces cas-là.
+
+**LES COFFRETS NE PROMETTENT PLUS LEUR PORTE**, ni celui d'une rangée ni ceux de
+trois et quatre : le relevé a montré que la fiche annonce les borniers et le kit
+de fixation, pas la porte. La correction est passée sur toute la famille, pas
+seulement sur l'article vérifié. Et l'écart d'une rangée à l'autre est
+maintenant mesuré — dix-huit euros — au lieu d'être supposé.
+
+#### Aucun couple Amazon de plus, et c'est un résultat
+
+Le différentiel type A de Castorama est le **Legrand 092836** (identifié par son
+EAN via le catalogue Legrand). Sur Amazon, aucun des résultats n'est cette
+référence : ce sont des type AC, un tétrapolaire, un type F. **Deux appareils
+qui s'appellent pareil et ne protègent pas la même chose** — un type AC ne
+protège pas une plaque de cuisson ni un lave-linge, là où la norme impose du
+type A.
+
+Pas de rapprochement, donc, et pas de bouton. **Ne rien trouver est une réponse
+utile** quand la règle est « on n'a pas le droit à l'erreur » : c'est le même
+refus que pour la gaine ICTA et la boîte d'encastrement au relevé précédent.
+
+**Bilan du catalogue : 116 articles, 21 prix relevés en rayon**, le reste estimé
+et marqué comme tel.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

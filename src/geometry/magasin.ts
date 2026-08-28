@@ -598,9 +598,18 @@ const TABLEAU: ArticleMagasin[] = [
     code: 'disj-10',
     rayon: 'Tableau',
     libelle: 'Disjoncteur 10 A',
-    precision: '1P+N, courbe C — éclairage',
+    precision: 'Legrand phase + neutre, courbe C — éclairage',
     unite: 'u',
     duMetre: true,
+    offres: [
+      {
+        enseigne: 'Castorama',
+        prix: 10.5,
+        intitule: 'Disjoncteur Phase + neutre 10A Legrand',
+        reference: '3245060928223',
+        jour: '2026-08-28',
+      },
+    ],
   },
   {
     code: 'disj-16',
@@ -623,9 +632,18 @@ const TABLEAU: ArticleMagasin[] = [
     code: 'disj-20',
     rayon: 'Tableau',
     libelle: 'Disjoncteur 20 A',
-    precision: '1P+N, courbe C — prises, lave-linge, four',
+    precision: 'Legrand phase + neutre, courbe C — lave-linge, four',
     unite: 'u',
     duMetre: true,
+    offres: [
+      {
+        enseigne: 'Castorama',
+        prix: 10.5,
+        intitule: 'Disjoncteur Phase + neutre 20A Legrand',
+        reference: '3245060928247',
+        jour: '2026-08-28',
+      },
+    ],
   },
   {
     code: 'disj-25',
@@ -638,9 +656,24 @@ const TABLEAU: ArticleMagasin[] = [
     code: 'disj-32',
     rayon: 'Tableau',
     libelle: 'Disjoncteur 32 A',
-    precision: '1P+N, courbe C — plaque de cuisson',
+    precision: 'Legrand phase + neutre, courbe C — plaque de cuisson',
     unite: 'u',
     duMetre: true,
+    /*
+      SOUS-ESTIMÉ DE MOITIÉ, et c'est le calibre qui casse le raisonnement
+      « un disjoncteur est un disjoncteur ». Le 10, le 16 et le 20 valent tous
+      10,50 € au même rayon ; le 32, lui, en vaut 23,90. Le catalogue lui en
+      donnait 16,50 par interpolation — une régularité qui n'existe pas.
+    */
+    offres: [
+      {
+        enseigne: 'Castorama',
+        prix: 23.9,
+        intitule: 'Disjoncteur Phase + neutre 32A Legrand',
+        reference: '3245060928254',
+        jour: '2026-08-28',
+      },
+    ],
   },
   {
     code: 'disj-40',
@@ -765,9 +798,18 @@ const TABLEAU: ArticleMagasin[] = [
     code: 'coffret-1',
     rayon: 'Tableau',
     libelle: 'Coffret 1 rangée',
-    precision: '13 modules, avec porte',
+    precision: 'Legrand Drivia — 13 modules, borniers fournis, porte à part',
     unite: 'u',
     duMetre: true,
+    offres: [
+      {
+        enseigne: 'Castorama',
+        prix: 34.9,
+        intitule: 'Tableau électrique à équiper 1 rangée - 13 modules Legrand',
+        reference: '3245060930202',
+        jour: '2026-08-28',
+      },
+    ],
   },
   {
     code: 'coffret-2',
@@ -796,7 +838,7 @@ const TABLEAU: ArticleMagasin[] = [
     code: 'coffret-3',
     rayon: 'Tableau',
     libelle: 'Coffret 3 rangées',
-    precision: '39 modules, avec porte',
+    precision: '39 modules, borniers fournis, porte à part',
     unite: 'u',
     duMetre: true,
   },
@@ -804,7 +846,7 @@ const TABLEAU: ArticleMagasin[] = [
     code: 'coffret-4',
     rayon: 'Tableau',
     libelle: 'Coffret 4 rangées',
-    precision: '52 modules, avec porte',
+    precision: '52 modules, borniers fournis, porte à part',
     unite: 'u',
     duMetre: true,
   },
@@ -819,9 +861,23 @@ const TABLEAU: ArticleMagasin[] = [
     code: 'peigne',
     rayon: 'Tableau',
     libelle: 'Peigne d’alimentation horizontal',
-    precision: '13 modules, 1P+N',
+    precision: 'Legrand — 13 modules, réversible Ph/N',
     unite: 'u',
     duMetre: true,
+    /*
+      SURESTIMÉ DE PLUS DU DOUBLE : 12,90 € au catalogue, 5,19 € en rayon.
+      C'est un article qu'on compte une à quatre fois par tableau, et personne
+      ne l'aurait relu — un peigne, on le prend sans regarder l'étiquette.
+    */
+    offres: [
+      {
+        enseigne: 'Castorama',
+        prix: 5.19,
+        intitule: 'Peigne horizontal 13 modules réversibles Ph/N Legrand',
+        reference: '3245060927936',
+        jour: '2026-08-28',
+      },
+    ],
   },
   {
     code: 'peigne-vertical',

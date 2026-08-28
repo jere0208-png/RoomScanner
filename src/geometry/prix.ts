@@ -297,10 +297,10 @@ export const TARIFS_COMMUNS: Record<string, Tarif> = {
   'boite-derivation': t(3.9),
   // Tableau : le calibre change le prix, pas beaucoup.
   'disj-2': t(10.5),
-  'disj-10': t(10.5),
+  'disj-10': r(10.5),
   'disj-16': r(10.5),
-  'disj-20': t(11.9),
-  'disj-32': t(16.5),
+  'disj-20': r(10.5),
+  'disj-32': r(23.9),
   'diff-AC': r(72.9),
   'diff-A': r(81.9),
   'coffret-com': t(179),
@@ -312,13 +312,13 @@ export const TARIFS_COMMUNS: Record<string, Tarif> = {
     il faut avant de savoir où on l'accroche —, et un devis sans coffret
     manque le poste le plus visible du tableau.
   */
-  'coffret-1': t(29),
+  'coffret-1': r(34.9),
   'coffret-2': r(52.9),
-  'coffret-3': t(72),
-  'coffret-4': t(95),
+  'coffret-3': t(70.9),
+  'coffret-4': t(88.9),
   // Le peigne, qu'on oublie toujours. (Le bornier de terre, lui, est fourni
   // avec le coffret : voir `chiffrer`.)
-  peigne: t(12.9),
+  peigne: r(5.19),
   // Plafond : ce qui n'est pas un luminaire.
   'plafond-daaf': t(24.9),
   'plafond-vmc': t(16.9),
@@ -368,8 +368,8 @@ export const TARIFS_COMMUNS: Record<string, Tarif> = {
   'boite-sol': t(45),
   // --------------------------------------------------------------- tableau
   'disj-6': t(10.5),
-  'disj-25': t(13.5),
-  'disj-40': t(22.9),
+  'disj-25': t(16.9),
+  'disj-40': t(28.9),
   'diff-A-63': t(105),
   'diff-AC-63': t(92),
   'diff-HPI': t(119),
@@ -380,7 +380,7 @@ export const TARIFS_COMMUNS: Record<string, Tarif> = {
   delesteur: t(169),
   'bornier-terre': t(8.9),
   'bornier-repartition': t(18.9),
-  'peigne-vertical': t(32),
+  'peigne-vertical': t(30.9),
   gtl: t(79),
   'coffret-etanche': t(59),
   'disj-abonne': t(99),
