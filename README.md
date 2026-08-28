@@ -10476,6 +10476,46 @@ maquette 3D qui le dessine. `tsc` l'a signalé à la seconde suivante — un cal
 proposé là où rien ne s'allumerait serait un bouton en panne. C'est écrit dans le
 code, à côté de la prop, pour la prochaine fois.
 
+### Un halo mesuré en pixels : la lampe qui avalait le plan
+
+Relevé du patron, capture à l'appui, le lendemain de la livraison : « un plan 3D
+dézoomé avec la lumière allumée fait que la lumière devient trop grosse pour le
+plan ».
+
+**ET C'ÉTAIT ÉCRIT NOIR SUR BLANC DANS LE CODE.** Les trois cercles du halo
+avaient des rayons **en pixels d'écran** — 54, 26 et 9 — posés à l'œil sur une
+maquette vue de près. Dézoomé, un logement entier tient dans cent cinquante
+pixels : un halo de cinquante-quatre le noie, et l'on ne voit plus qu'une tache
+jaune à la place du plan.
+
+C'est la faute que cette maison connaît sous un autre nom — **un réglage nommé
+par son chiffre, qui ne vaut que pour le cadrage où on l'a posé**. Elle a coûté
+cinq bancs le jour où le `strokeWidth === 30` d'un mur est devenu proportionnel ;
+elle revient ici par la porte du dessin.
+
+**UNE LUMIÈRE A UNE PORTÉE PHYSIQUE** — `PORTEE_LAMPE`, un mètre dix, ce qu'on
+voit s'éclairer au sol sous une suspension — et elle se projette avec la même
+échelle que la maquette, comme tout le reste de cette vue.
+
+**LE PLAFOND N'EST PAS UN NOMBRE DE PIXELS NON PLUS**, et c'est la moitié du
+correctif. Un premier essai bornait à soixante-quatre points : le banc l'a
+accepté, l'image a dit non — soixante-quatre points sont une lampe sur une
+maquette qui remplit l'écran, et un brouillard sur celle de la capture. Ce qui
+compte n'est pas la taille du halo, **c'est sa part du dessin** : il est borné à
+trente centièmes du logement projeté. Une lampe n'éclaire jamais la moitié d'un
+appartement.
+
+Le plancher, lui, reste absolu (neuf points) : une lampe doit rester visible
+quand on regarde de très loin, sinon elle s'éteint sans qu'on l'ait éteinte.
+
+**ET LES TROIS CERCLES SE DÉDUISENT D'UN SEUL RAYON** — la portée, la nappe, la
+source — au lieu d'être trois nombres indépendants qui se seraient contredits au
+premier changement d'échelle.
+
+Mesuré à trois cadrages : 22, 63 et 158 points de rayon, soit **toujours la même
+part de la maquette**. Regardé en image, avant contre après, au cadrage exact de
+la capture : le halo débordait du logement, il tient maintenant dedans.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

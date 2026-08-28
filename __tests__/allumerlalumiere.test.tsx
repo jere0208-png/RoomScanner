@@ -384,3 +384,56 @@ describe('un va-et-vient se prouve depuis les deux bouts', () => {
     expect(cible(t, 'i1').props.cx).not.toBe(cible(t, 'i2').props.cx);
   });
 });
+
+describe('le halo suit l’échelle du dessin', () => {
+  /*
+    RELEVÉ DU PATRON, CAPTURE À L'APPUI : « un plan 3D dézoomé avec la lumière
+    allumée fait que la lumière devient trop grosse pour le plan ».
+
+    Et c'était écrit noir sur blanc dans le code : les trois cercles du halo
+    avaient des rayons EN PIXELS D'ÉCRAN — 54, 26 et 9 — posés à l'œil sur une
+    maquette vue de près. Dézoomé, le logement entier tient dans cent
+    cinquante pixels : un halo de cinquante-quatre le noie.
+
+    UNE LUMIÈRE A UNE PORTÉE PHYSIQUE, en mètres, comme tout le reste de cette
+    vue. Elle se projette donc comme la maquette, avec la même échelle — et
+    l'on borne aux deux bouts : assez grande pour se voir quand on est très
+    loin, assez petite pour ne jamais avaler le plan.
+  */
+  const allumer = (t: TestRenderer.ReactTestRenderer) => {
+    const cible = t.root.findAll(
+      (n) => String(n.props?.testID ?? '') === 'cible-i1',
+    )[0];
+    taper(t, cible.props.cx, cible.props.cy);
+    return halos(t)[0];
+  };
+
+  it('il grandit quand on zoome', () => {
+    const loin = allumer(monter({ value: { theta: -32, tilt: 56, zoom: 0.5, ox: 0, oy: 0 } }));
+    const petitRayon = loin.props.r;
+    act(() => arbre?.unmount());
+    arbre = null;
+    const pres = allumer(monter({ value: { theta: -32, tilt: 56, zoom: 3, ox: 0, oy: 0 } }));
+    expect(pres.props.r).toBeGreaterThan(petitRayon);
+  });
+
+  it('et dézoomé, il ne mange pas la maquette', () => {
+    /*
+      LA MESURE QUI COMPTE, et c'est celle de la capture : le halo rapporté à
+      la taille du LOGEMENT. Un rayon en pixels ne dit rien tout seul — c'est
+      sa part du dessin qui fait qu'on voit un plan ou une tache jaune.
+    */
+    const t = monter({ value: { theta: -32, tilt: 56, zoom: 0.35, ox: 0, oy: 0 } });
+    const halo = allumer(t);
+    // Le logement fait 5 × 4 m ; à ce cadrage il occupe une fraction de la
+    // vue. Le halo doit rester une lampe, pas un brouillard.
+    expect(halo.props.r).toBeLessThan(30);
+  });
+
+  it('mais il ne disparaît jamais tout à fait', () => {
+    // Le contrôle en sens inverse : borner par le haut ne doit pas faire
+    // disparaître la lumière quand on regarde le logement de très loin.
+    const t = monter({ value: { theta: -32, tilt: 56, zoom: 0.2, ox: 0, oy: 0 } });
+    expect(allumer(t).props.r).toBeGreaterThan(6);
+  });
+});

@@ -144,6 +144,41 @@ const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v
  */
 export const RAYON_CIBLE = 22;
 
+/**
+ * LA PORTÉE D'UNE LAMPE, EN MÈTRES — et non en pixels.
+ *
+ * Relevé du patron, capture à l'appui : « un plan 3D dézoomé avec la lumière
+ * allumée fait que la lumière devient trop grosse pour le plan ».
+ *
+ * Les trois cercles du halo avaient des rayons écrits EN PIXELS D'ÉCRAN — 54,
+ * 26 et 9 — posés à l'œil sur une maquette vue de près. Dézoomé, un logement
+ * entier tient dans cent cinquante pixels : un halo de cinquante-quatre le
+ * noie, et l'on ne voit plus qu'une tache jaune. C'est la faute que cette
+ * maison connaît sous un autre nom — un réglage nommé par son chiffre, qui ne
+ * vaut que pour le cadrage où on l'a posé.
+ *
+ * UN MÈTRE DIX : la portée utile d'un point lumineux de plafond sur le sol —
+ * ce qu'on voit s'éclairer sous une suspension. Elle se projette avec la même
+ * échelle que la maquette, comme tout le reste de cette vue.
+ */
+const PORTEE_LAMPE = 1.1;
+/**
+ * ET ELLE EST BORNÉE AUX DEUX BOUTS — dont un qui n'est PAS un nombre de
+ * pixels.
+ *
+ * EN BAS, un plancher absolu : une lampe doit rester visible quand on regarde
+ * un logement de très loin, sinon elle s'éteint sans qu'on l'ait éteinte.
+ *
+ * EN HAUT, une FRACTION DU LOGEMENT PROJETÉ, et c'est là qu'était la vraie
+ * faute. Un plafond en pixels ne veut rien dire : soixante-quatre points sont
+ * une lampe sur une maquette qui remplit l'écran, et un brouillard sur celle
+ * de la capture, où le logement entier tient dans cent cinquante. Ce qui
+ * compte n'est pas la taille du halo, c'est SA PART DU DESSIN — une lampe
+ * n'éclaire jamais la moitié d'un appartement.
+ */
+const HALO_MIN = 9;
+const HALO_PART = 0.3;
+
 /** Le centre d'un contour — il sert à faire déborder une zone humide. */
 function centreDe(pts: { x: number; z: number }[]) {
   const n = Math.max(1, pts.length);
@@ -1182,7 +1217,7 @@ export function Iso3DView({
       part finirait par viser à côté de ce qu'on voit.
     */
     const ciblesInter: { id: string; cx: number; cy: number; lampes: string[] }[] = [];
-    const posLampes: { id: string; cx: number; cy: number }[] = [];
+    const posLampes: { id: string; cx: number; cy: number; r: number }[] = [];
     // Semis du sol : même code que le plan 2D, projeté sur le plan y = 0.
     // C'est ce fond pointillé qui distingue la surface au sol des murs.
     /**
@@ -1667,7 +1702,17 @@ export function Iso3DView({
       );
       if (!(haut > 0.5)) continue;
       const q = project({ x: cl.at.x, y: haut - 0.08, z: cl.at.z });
-      posLampes.push({ id: cl.id, cx: q.sx, cy: q.sy });
+      // Le rayon se calcule ICI, avec l'échelle du dessin : le rendu n'a plus
+      // qu'à le poser, et il ne peut plus le deviner de travers.
+      posLampes.push({
+        id: cl.id,
+        cx: q.sx,
+        cy: q.sy,
+        r: Math.max(
+          HALO_MIN,
+          Math.min(HALO_PART * radius3d * scale, PORTEE_LAMPE * scale),
+        ),
+      });
     }
     /*
       LES VOLUMES DE SALLE D'EAU — dessinés au sol, comme un gabarit tracé à la
@@ -1961,22 +2006,34 @@ export function Iso3DView({
               .filter((l) => allumees.has(l.id))
               .map((l) => (
                 <React.Fragment key={`lum-${l.id}`}>
+                  {/*
+                    TROIS CERCLES TIRÉS D'UN SEUL RAYON — la portée, la nappe,
+                    la source. Trois nombres indépendants finiraient par se
+                    contredire au premier changement d'échelle : ce sont des
+                    FRACTIONS du même halo.
+                  */}
                   <AnimatedCircle
                     testID={`halo-${l.id}`}
                     cx={l.cx}
                     cy={l.cy}
-                    r={54}
+                    r={l.r}
                     fill="#FFE9A8"
                     opacity={scintille}
                   />
                   <AnimatedCircle
                     cx={l.cx}
                     cy={l.cy}
-                    r={26}
+                    r={l.r * 0.48}
                     fill="#FFF3CE"
                     opacity={halo2}
                   />
-                  <Circle cx={l.cx} cy={l.cy} r={9} fill="#FFFDF4" opacity={0.95} />
+                  <Circle
+                    cx={l.cx}
+                    cy={l.cy}
+                    r={Math.max(3, l.r * 0.17)}
+                    fill="#FFFDF4"
+                    opacity={0.95}
+                  />
                 </React.Fragment>
               ))}
             {/*
