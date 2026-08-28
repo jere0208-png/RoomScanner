@@ -36,10 +36,11 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 import React from 'react';
-import { View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import { DevisScreen } from '../src/screens/DevisScreen';
 import { GammeScreen } from '../src/screens/GammeScreen';
+import { RetourGlisse } from '../src/components/RetourGlisse';
 import { useScanStore } from '../src/store/scanStore';
 import { chiffrerLePlan } from '../src/geometry/devisplan';
 import { GAMMES } from '../src/geometry/prix';
@@ -290,6 +291,59 @@ describe('la page des gammes', () => {
       jest.advanceTimersByTime(ATTENTE_MIN + 50);
     });
     expect(texte(t)).toContain('ESTIMATION DE FOURNITURE');
+  });
+});
+
+describe('la page ne démarre pas sous la barre d’état', () => {
+  /*
+    RELEVÉ DU PATRON, CAPTURE À L'APPUI : « la page pour modifier la gamme est
+    trop haute ». Sur l'image, le titre « Quel appareillage ? » chevauche
+    l'heure et la jauge de batterie : la page commence au pixel zéro de
+    l'écran, sous l'encoche.
+
+    C'EST UNE FAUTE DE NAISSANCE DE CETTE PAGE. Ses deux voisines — le devis et
+    le magasin — réservent la marge haute ; celle-ci, écrite dans la foulée,
+    ne l'a pas reprise. Elle réserve maintenant la marge que l'APPAREIL
+    déclare, ce qui vaut mieux que le nombre en dur des deux autres : un
+    téléphone sans encoche n'a pas besoin de soixante points.
+  */
+  const ouvrirGammes = () => {
+    let t!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      poser();
+      useScanStore.setState({ screen: 'gamme' });
+      t = TestRenderer.create(<GammeScreen />);
+    });
+    arbre = t;
+    return t;
+  };
+
+  it('elle réserve la marge haute déclarée par l’appareil', () => {
+    const t = ouvrirGammes();
+    const fond = StyleSheet.flatten(
+      t.root.findByType(RetourGlisse).props.style as never,
+    ) as { paddingTop?: number };
+    // Le banc d'essai déclare 59 points de marge haute, comme un iPhone à
+    // encoche (voir `jest.setup.js`).
+    expect(fond.paddingTop).toBeGreaterThanOrEqual(59);
+  });
+
+  it('et le titre est POSÉ dessous, pas dessus', () => {
+    /*
+      LE CONTRÔLE EN SENS INVERSE. Une marge posée sur le cadre extérieur ne
+      sert à rien si l'en-tête la remonte : on vérifie que la rangée du titre
+      n'a pas de marge NÉGATIVE, et qu'elle ne s'ancre pas au bord.
+    */
+    const t = ouvrirGammes();
+    const titre = t.root
+      .findAll((n) => String(n.props?.children) === 'Quel appareillage ?')
+      .pop()!;
+    const style = StyleSheet.flatten(titre.props.style as never) as {
+      position?: string;
+      top?: number;
+    };
+    expect(style.position).not.toBe('absolute');
+    expect(style.top ?? 0).toBeGreaterThanOrEqual(0);
   });
 });
 

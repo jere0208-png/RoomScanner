@@ -10874,6 +10874,35 @@ relevé d'avant qui s'ouvre vierge, le relevé neuf qui repart vierge, le brouil
 dans les deux sens, et le drapeau avec son contrôle inverse : ouvrir un dossier ne
 le salit pas.
 
+### La page des gammes passait sous la barre d'état
+
+Relevé du patron, capture à l'appui : « la page pour modifier la gamme est trop
+haute ». Sur l'image, le titre « Quel appareillage ? » chevauche l'heure et la
+jauge de batterie — la page commençait au pixel zéro de l'écran, sous l'encoche.
+
+**C'ÉTAIT UNE FAUTE DE NAISSANCE DE CETTE PAGE**, livrée deux heures plus tôt.
+Ses deux voisines — le devis et le magasin — réservent le haut de l'écran ;
+celle-ci, écrite dans la foulée, ne l'avait pas repris.
+
+**ET ELLE NE COPIE PAS LEUR NOMBRE.** Le devis réserve cinquante-huit points, le
+magasin soixante : deux nombres écrits à la main qui tombent juste sur un iPhone
+à encoche et réservent du vide partout ailleurs. C'est le défaut que cette maison
+connaît sous un autre nom — un réglage nommé par son chiffre, qui ne vaut que
+pour l'appareil où on l'a posé. La page demande donc la marge à celui qui la
+connaît (`useSafeAreaInsets`), avec un plancher de quatorze points pour les
+appareils qui n'en déclarent aucune : le titre ne colle pas au bord non plus
+quand il n'y a pas d'encoche.
+
+**ET L'EN-TÊTE NE LA REMONTE PAS.** Il portait huit points de marge haute à lui :
+le titre serait tombé neuf points plus bas que celui du devis, et ce saut se voit
+en passant d'une page à l'autre.
+
+**Deux épreuves** ajoutées à `gammechoisie`, la première rouge avant : la marge
+haute déclarée par l'appareil est bien réservée — le banc d'essai en annonce
+cinquante-neuf, comme un iPhone à encoche —, et le contrôle en sens inverse, qui
+vérifie que le titre est POSÉ dessous et non ancré au bord : une marge sur le
+cadre extérieur ne sert à rien si l'en-tête la reprend.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

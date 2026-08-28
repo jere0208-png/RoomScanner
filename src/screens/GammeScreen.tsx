@@ -28,6 +28,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BackChevron } from '../components/BackChevron';
 import { RetourGlisse } from '../components/RetourGlisse';
 import { chiffrerLePlan } from '../geometry/devisplan';
@@ -41,6 +42,21 @@ import { radius, themedStyles, useTheme, type Palette } from '../theme';
 export function GammeScreen() {
   const c = useTheme();
   const styles = getStyles(c);
+  /*
+    LA MARGE HAUTE VIENT DE L'APPAREIL, pas d'un nombre écrit à la main.
+
+    Relevé du patron, capture à l'appui : « la page pour modifier la gamme est
+    trop haute ». Le titre chevauchait l'heure et la jauge de batterie — la
+    page commençait au pixel zéro, sous l'encoche.
+
+    C'ÉTAIT UNE FAUTE DE NAISSANCE DE CETTE PAGE : ses deux voisines, le devis
+    et le magasin, réservent le haut de l'écran ; celle-ci, écrite dans la
+    foulée, ne l'avait pas repris. Elles le font avec un nombre en dur —
+    cinquante-huit et soixante points —, ce qui tombe juste sur un iPhone à
+    encoche et réserve du vide sur tout le reste. On demande la marge à celui
+    qui la connaît.
+  */
+  const marges = useSafeAreaInsets();
   const setScreen = useScanStore((s) => s.setScreen);
   const walls = useScanStore((s) => s.walls);
   const rooms = useScanStore((s) => s.rooms);
@@ -87,7 +103,11 @@ export function GammeScreen() {
   };
 
   return (
-    <RetourGlisse onRetour={() => setScreen('devis')} style={styles.container}>
+    <RetourGlisse
+      onRetour={() => setScreen('devis')}
+      /* Un plancher, pour les appareils qui ne déclarent aucune marge : le
+         titre ne colle pas au bord non plus quand il n'y a pas d'encoche. */
+      style={[styles.container, { paddingTop: Math.max(marges.top, 14) }]}>
       <View style={styles.headerRow}>
         <TouchableOpacity
           style={styles.roundButton}
@@ -146,11 +166,15 @@ export function GammeScreen() {
 const getStyles = themedStyles((c: Palette) =>
   StyleSheet.create({
     container: { flex: 1, backgroundColor: c.bg, paddingHorizontal: 20 },
+    /*
+      L'EN-TÊTE NE REMONTE PAS LA MARGE. Il portait huit points de plus en
+      haut : le titre serait tombé neuf points plus bas que celui du devis,
+      et l'on voit ce saut en passant d'une page à l'autre.
+    */
     headerRow: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 12,
-      paddingTop: 8,
       paddingBottom: 6,
     },
     roundButton: {
