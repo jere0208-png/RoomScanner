@@ -413,15 +413,42 @@ export function multiWire(
  * chantier, on suit la couleur avant de lire le texte : elle doit donc être
  * décidée UNE fois, ici, et non dans chaque module qui dessine.
  *
- * Douze teintes, distinctes entre elles et lisibles sur fond blanc comme sur
- * un aplat de sol. Au-delà de douze départs on recommence la roue : deux
- * circuits de même teinte restent distingués par leur repère, et une
- * installation qui dépasse douze départs a de toute façon son tableau pour
- * référence.
+ * DIX TEINTES, ET PAS UNE ROUGE — question du patron, sur une capture :
+ * « pourquoi l'affichage des gaines est rouge pour l'interrupteur ? »
+ *
+ * Ce n'était pas un bug, et c'est ce qui le rendait gênant : la deuxième
+ * teinte de la roue était rouge, et l'éclairage tombe en C2 dans un logement
+ * sans plaque ni circuit spécialisé. L'interrupteur était rouge parce que son
+ * circuit portait le numéro deux, et pour aucune autre raison.
+ *
+ * TROIS SENS POUR UNE COULEUR, À DIX CENTIMÈTRES LES UNS DES AUTRES. Le rouge
+ * d'ALARME de l'application — le halo d'un meuble qu'on ne peut pas poser, la
+ * pastille des normes non conformes. Le rouge NORMATIF du métier — la phase,
+ * « rouge, marron ou noir », NF C 15-100 reprenant la CEI 60446. Et ce
+ * troisième, qui ne voulait rien dire, et qui portait EXACTEMENT le code du
+ * fil de phase, `#B8352A`.
+ *
+ * Arbitrage du patron : « évite le rouge mais il doit rester dans le schéma
+ * pour la phase, le rouge est une norme pour le fil de phase. » La roue perd
+ * donc ses deux teintes rouges — le rouge franc et le rouille — SANS
+ * REMPLACEMENT : dix couleurs franchement distinctes valent mieux que douze
+ * dont deux mentent. Sur le plan, le rouge ne dit plus qu'une seule chose.
+ *
+ * Au-delà de dix départs on recommence la roue : deux circuits de même teinte
+ * restent distingués par leur repère, et une installation qui dépasse dix
+ * départs a de toute façon son tableau pour référence.
+ *
+ * UNE FAIBLESSE CONNUE, MESURÉE : les deux verts (`#2E8B57` et `#127A5E`) ne
+ * sont séparés que de 33 sur 255 — moins que les voisines de rang, qui sont
+ * toutes au-delà de 50. Ils sont à huit rangs l'un de l'autre et ne se
+ * rencontrent donc presque jamais sur un même plan ; les remplacer
+ * demanderait une teinte franche de plus sur fond blanc, et l'espace des
+ * couleurs ne la donne pas sans revenir vers le rouge ou vers un gris qui se
+ * perdrait sur un aplat de sol.
  */
 const ROUE = [
-  '#2F6BFF', '#B8352A', '#2E8B57', '#8A5CD1', '#C77A18', '#0F8C9E',
-  '#B5326E', '#5C7A1E', '#3757A8', '#A34D2A', '#6B4FA0', '#127A5E',
+  '#2F6BFF', '#2E8B57', '#8A5CD1', '#C77A18', '#0F8C9E',
+  '#B5326E', '#5C7A1E', '#3757A8', '#6B4FA0', '#127A5E',
 ] as const;
 
 export function circuitColor(index: number): string {

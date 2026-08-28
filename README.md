@@ -9459,6 +9459,75 @@ banc le cherche désormais par sa nature (une rangée qui porte une bordure haut
 et non par sa place, sans quoi il l'aurait déclaré disparu alors qu'il avait
 seulement déménagé.
 
+### Le rouge ne dit plus qu'une seule chose : la phase
+
+**Question du patron, sur une capture :** « pourquoi l'affichage des gaines est
+rouge pour l'interrupteur ? »
+
+**Ce n'était pas un bug, et c'est ce qui le rendait gênant.** La teinte d'une
+gaine est celle de son **circuit**, prise dans une roue de douze. Et les circuits
+sont numérotés dans l'ordre où la NF C 15-100 les crée : cuisson (32 A) →
+spécialisés (20 A) → prises → **éclairage** → sorties → VDI. Dans un logement
+sans plaque ni circuit spécialisé, l'éclairage tombe donc en **C2**, et C2 était
+rouge. L'interrupteur était rouge parce que son circuit portait le numéro deux,
+et pour aucune autre raison.
+
+**Trois sens pour une couleur, à dix centimètres les uns des autres :**
+
+- le rouge **d'alarme** de l'application — le halo d'un meuble qu'on ne peut pas
+  poser, la pastille des normes non conformes ;
+- le rouge **normatif** du métier — la phase, « rouge, marron ou noir »
+  (NF C 15-100, reprenant la CEI 60446) ;
+- et ce troisième, qui ne voulait rien dire, et qui portait **exactement** le
+  code du fil de phase, `#B8352A`.
+
+**Arbitrage du patron :** « évite le rouge mais il doit rester dans le schéma
+pour la phase, le rouge est une norme pour le fil de phase. »
+
+La roue perd donc ses deux teintes rouges — le rouge franc et le rouille —
+**sans remplacement** : dix couleurs franchement distinctes valent mieux que
+douze dont deux mentent. `WIRE_COLORS.phase` est intact : sur le schéma
+multifilaire, la phase reste rouge, et c'est désormais le seul rouge du dossier.
+
+**Le banc mesure la couleur par sa nature, pas par son code** : un banc qui
+listerait les hexadécimaux interdits laisserait passer le premier rouge écrit
+autrement. On convertit en teinte et l'on refuse la *bande* rouge (340°→20°) —
+l'orange à 34° et le magenta à 332° n'en sont pas, et la roue en a besoin. Le
+contrôle en sens inverse est la moitié qui compte : **la phase, elle, doit être
+rouge**, et aucun autre conducteur ne doit l'être.
+
+**Une faiblesse connue, mesurée et laissée telle quelle :** les deux verts
+(`#2E8B57` et `#127A5E`) ne sont séparés que de **33 sur 255**, quand toutes les
+voisines de rang sont au-delà de 50. Ils sont à huit rangs l'un de l'autre et ne
+se rencontrent presque jamais sur un même plan ; les remplacer demanderait une
+teinte franche de plus sur fond blanc, et l'espace des couleurs ne la donne pas
+sans revenir vers le rouge ou vers un gris qui se perdrait sur un aplat de sol.
+
+### Le cartouche d'une pièce suit son calque, sans exception
+
+**Relevé du patron :** « lors du mode édition, le plan affiche le nom de la
+pièce, il ne faut pas tant que la surface n'est pas affichée. »
+
+Le cartouche restait allumé **en édition quoi qu'il arrive**, calque éteint
+compris, et l'argument se défendait : c'est par lui qu'on nomme une pièce, et
+« un réglage d'affichage ne doit jamais retirer un outil de travail ».
+
+**L'argument se retourne.** Un calque qu'on éteint et qui reste allumé dans un
+mode, c'est un interrupteur qui ne commande pas ce qu'il annonce. Et l'on entre
+en édition pour **poser** — un meuble, un appareil, une note : le nom d'une pièce
+vient alors se mettre entre le doigt et ce qu'on pose, alors même qu'on l'avait
+éteint.
+
+**Ce que cela coûte, et il faut le dire :** nommer une pièce demande maintenant
+d'allumer « Surfaces » d'abord. C'est un geste de plus — sur le calque qui porte
+justement les noms et les surfaces, c'est-à-dire là où on le chercherait. Le banc
+le vérifie plutôt que de l'écrire : calque allumé, une pièce **sans nom** garde
+son cartouche, et c'est lui qu'on touche.
+
+Le banc de la planche de rendu racontait l'ancienne règle (« sauf en édition ») :
+il est réécrit en racontant les deux, et le détail du nouveau comportement vit
+dans `cartoucheniveau`.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

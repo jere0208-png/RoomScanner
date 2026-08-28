@@ -2547,13 +2547,28 @@ export function FloorplanEditor({
                     .replace('.', ',')} m²`
                 : null;
               /*
-                EN ÉDITION, LE CARTOUCHE RESTE QUOI QU'IL ARRIVE.
+                LE CARTOUCHE SUIT SON CALQUE, DANS LES DEUX MODES.
 
-                C'est par lui qu'on nomme une pièce — même quand elle n'a
-                encore ni nom ni surface, et même calque éteint : un réglage
-                d'AFFICHAGE ne doit jamais retirer un outil de travail.
+                Il restait allumé EN ÉDITION quoi qu'il arrive, et l'argument
+                se défendait : c'est par lui qu'on nomme une pièce, et « un
+                réglage d'AFFICHAGE ne doit jamais retirer un outil de
+                travail ».
+
+                Relevé du patron : « lors du mode édition, le plan affiche le
+                nom de la pièce, il ne faut pas tant que la surface n'est pas
+                affichée. » Il a raison, et l'argument d'avant se retourne :
+                un calque qu'on éteint et qui reste allumé dans un mode, c'est
+                un interrupteur qui ne commande pas ce qu'il annonce. On entre
+                en édition pour POSER — un meuble, un appareil, une note — et
+                le nom d'une pièce vient alors se mettre entre le doigt et ce
+                qu'on pose, alors même qu'on l'avait éteint.
+
+                CE QUE CELA COÛTE, ET IL FAUT LE DIRE : nommer une pièce qui
+                n'a pas encore de nom demande d'allumer « Surfaces » d'abord.
+                C'est un geste de plus, sur le calque qui porte justement les
+                noms et les surfaces — l'endroit où on le chercherait.
               */
-              if (!editable && !showSurfaces) return null;
+              if (!showSurfaces) return null;
               if (roomName === '' && !areaText && !editable) return null;
               /*
                 LES MEUBLES DE TOUT LE PLAN, ET PAS SEULEMENT LES SIENS.

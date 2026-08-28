@@ -244,7 +244,26 @@ describe('les conventions du dessin de plan', () => {
     nomme une pièce, et un réglage d'affichage ne doit pas retirer un outil
     de travail.
   */
-  it('cache le cartouche avec le calque des surfaces, sauf en édition', () => {
+  /*
+    DEUX VERSIONS, ET L'ÉDITION A CESSÉ D'ÊTRE UNE EXCEPTION.
+
+    Première : « cache le cartouche avec le calque des surfaces, SAUF en
+    édition ». L'argument se défendait — c'est par le cartouche qu'on nomme
+    une pièce, et un réglage d'affichage ne doit pas retirer un outil de
+    travail.
+
+    Seconde, relevé du patron : « lors du mode édition, le plan affiche le nom
+    de la pièce, il ne faut pas tant que la surface n'est pas affichée. »
+    L'argument se retourne : un calque qu'on éteint et qui reste allumé dans
+    un mode, c'est un interrupteur qui ne commande pas ce qu'il annonce — et
+    l'on entre en édition pour POSER, moment où le nom d'une pièce vient se
+    mettre entre le doigt et ce qu'on pose.
+
+    Le détail du nouveau comportement, et ce qu'il coûte au nommage, vivent
+    dans `cartoucheniveau.test.tsx`. Ce qui reste ici, c'est la convention de
+    dessin : le calque commande, sans exception.
+  */
+  it('cache le cartouche avec le calque des surfaces, sans exception', () => {
     const mots = (t: ReturnType<typeof rendu>) =>
       t.root
         .findAll((n) => (n.type as { displayName?: string })?.displayName === 'Text')
@@ -259,12 +278,13 @@ describe('les conventions du dessin de plan', () => {
     });
     expect(mots(lecture).some((t) => t.includes('m²'))).toBe(false);
 
-    // En édition, il revient : on nomme une pièce en touchant son cartouche.
+    // EN ÉDITION AUSSI : c'était l'exception, elle n'en est plus une.
     const edition = rendu(true);
+    expect(mots(edition).some((t) => t.includes('m²'))).toBe(true);
     act(() => {
       useScanStore.setState({ showSurfaces: false });
     });
-    expect(mots(edition).some((t) => t.includes('m²'))).toBe(true);
+    expect(mots(edition).some((t) => t.includes('m²'))).toBe(false);
     act(() => {
       useScanStore.setState({ showSurfaces: true });
     });
