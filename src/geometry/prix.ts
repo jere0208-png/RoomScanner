@@ -279,15 +279,15 @@ export const TARIFS_PLAQUE: Record<GammeId, number[]> = {
  */
 export const TARIFS_COMMUNS: Record<string, Tarif> = {
   // Conduits — la couronne de 100 m, telle qu'elle se commande.
-  'icta-16': t(24),
+  'icta-16': r(26.9),
   'icta-20': r(30.9),
-  'icta-25': t(46),
-  'icta-32': t(75),
+  'icta-25': r(53.9),
+  'icta-32': t(84),
   // Conducteurs rigides — la couronne de 100 m, par section.
   'fil-1.5': r(25.9),
   'fil-2.5': r(41.9),
-  'fil-6': t(99),
-  'fil-10': t(165),
+  'fil-6': r(16.9),
+  'fil-10': t(28),
   // Courants faibles — ce qu'on tire dans la gaine de communication.
   futp6: t(99),
   coax: t(69),
@@ -342,11 +342,11 @@ export const TARIFS_COMMUNS: Record<string, Tarif> = {
   */
   // ------------------------------------------------ conducteurs et conduits
   'fil-4': t(66),
-  'fil-16': t(255),
-  'fil-25': t(390),
+  'fil-16': t(43),
+  'fil-25': t(65),
   // Les câbles souples, pour ce qui sort du mur : four, plaque, extérieur.
-  'cable-3g1.5': t(89),
-  'cable-3g2.5': t(139),
+  'cable-3g1.5': r(89.9),
+  'cable-3g2.5': r(139.9),
   'cable-5g2.5': t(219),
   'cable-3g6': t(289),
   'icta-40': t(59),

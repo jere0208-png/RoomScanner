@@ -307,6 +307,46 @@ const frSection = (v: number) => String(v).replace('.', ',');
 const COURONNE = 100;
 
 /**
+ * LA COURONNE N'A PAS LA MÊME LONGUEUR SELON LA SECTION.
+ *
+ * Trouvé en relevant le rayon des conducteurs chez Castorama : **le fil de
+ * 6 mm² n'y existe pas en couronne de cent mètres**. Il se vend en couronnes
+ * de cinq ou dix mètres, ou à la coupe — et c'est logique, personne ne tire
+ * cent mètres de 6 : on en tire dix, entre le tableau et la plaque de cuisson.
+ *
+ * LE MÉTRÉ COMPTAIT DES COURONNES DE CENT POUR TOUTES LES SECTIONS. Sur une
+ * rénovation avec plaque, cela donnait une couronne de 6 à 99 € là où l'on
+ * achète trois couronnes de dix mètres — cinquante euros de trop, sur un
+ * article qu'on ne commande qu'une fois et qu'on ne relit donc jamais.
+ *
+ * CE QUI A ÉTÉ VU, ET CE QUI EST DÉDUIT. Seul le 6 mm² a été relevé en rayon
+ * (couronne de 10 m, 16,90 €). Les sections au-dessus suivent la même règle
+ * par déduction — on ne tire pas des dizaines de mètres de 10, de 16 ou de 25
+ * dans un logement —, et le catalogue le dit : leurs prix portent
+ * « estimation ». Les petites sections, elles, restent au cent mètres : c'est
+ * ce qu'on a relevé pour le 1,5 et le 2,5.
+ */
+export const COURONNE_DU_FIL: Record<number, number> = {
+  1.5: 100,
+  2.5: 100,
+  4: 100,
+  6: 10,
+  10: 10,
+  16: 10,
+  25: 10,
+};
+
+/**
+ * La longueur de couronne d'une section, en mètres.
+ *
+ * Une section inconnue retombe sur cent mètres : se tromper de conditionnement
+ * coûte moins cher que de ne pas chiffrer du tout.
+ */
+export function longueurDeCouronne(section: number): number {
+  return COURONNE_DU_FIL[section] ?? COURONNE;
+}
+
+/**
  * COMBIEN DE COURONNES POUR CES TRONÇONS — et ce qui reste sur le touret.
  *
  * Relevé du patron : « si une gaine est achetée, elle est utile pas pour un
@@ -601,8 +641,10 @@ export function buyingList(
       code: `fil-${e.section}-${e.wire.role}`,
       label: `Conducteur H07V-U ${frSection(e.section)} mm² — ${e.wire.label}`,
       spec: 'Rigide cuivre 450/750 V',
-      quantity: couronnes(e.bouts).nombre,
-      unit: 'cour. 100 m',
+      quantity: couronnes(e.bouts, longueurDeCouronne(e.section)).nombre,
+      // L'unité DIT la longueur qu'on achète : « cour. 100 m » sur du 6 mm²
+      // envoyait commander cent mètres d'un fil qui se vend par dix.
+      unit: `cour. ${longueurDeCouronne(e.section)} m`,
       /*
         CHAQUE CONDUCTEUR SUR SES DÉPARTS — voir plus haut. La note dit
         lesquels, parce que c'est la seule façon de vérifier un métré sans

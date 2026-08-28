@@ -189,9 +189,18 @@ const CONDUITS: ArticleMagasin[] = [
     code: 'icta-16',
     rayon: 'Conduits et conducteurs',
     libelle: 'Gaine ICTA Ø 16',
-    precision: 'ICTA 3422, avec tire-fil — couronne de 100 m',
+    precision: 'Diall, avec tire-fil — couronne de 100 m',
     unite: 'couronne',
     duMetre: true,
+    offres: [
+      {
+        enseigne: 'Castorama',
+        prix: 26.9,
+        intitule: 'Gaine ICTA Diall ø16 - 100 m',
+        reference: '3454978152402',
+        jour: '2026-08-28',
+      },
+    ],
   },
   {
     code: 'icta-20',
@@ -224,9 +233,18 @@ const CONDUITS: ArticleMagasin[] = [
     code: 'icta-25',
     rayon: 'Conduits et conducteurs',
     libelle: 'Gaine ICTA Ø 25',
-    precision: 'ICTA 3422, avec tire-fil — couronne de 100 m',
+    precision: 'Diall, avec tire-fil — couronne de 100 m',
     unite: 'couronne',
     duMetre: true,
+    offres: [
+      {
+        enseigne: 'Castorama',
+        prix: 53.9,
+        intitule: 'Gaine électrique ICTA Diall ø25 - 100 m',
+        reference: '3454978114332',
+        jour: '2026-08-28',
+      },
+    ],
   },
   {
     code: 'icta-32',
@@ -292,46 +310,81 @@ const CONDUITS: ArticleMagasin[] = [
   {
     code: 'fil-6',
     rayon: 'Conduits et conducteurs',
-    libelle: 'Fil H07V-U 6 mm²',
-    precision: 'Rigide, couronne de 100 m — plaque de cuisson 32 A',
-    unite: 'couronne',
+    libelle: 'Fil H07V-R 6 mm²',
+    /*
+      DIX MÈTRES, PAS CENT — et c'est le conditionnement du rayon, pas une
+      commodité. Personne ne tire cent mètres de 6 : on en tire dix, du
+      tableau à la plaque. Le catalogue en proposait cent, à un prix au mètre
+      lui-même faux (0,99 € contre 1,69 € en rayon) : deux erreurs qui se
+      compensaient en partie, ce qui est le pire cas — un total à peu près
+      crédible, obtenu par deux chiffres faux.
+    */
+    precision: 'Rigide, couronne de 10 m — plaque de cuisson 32 A',
+    unite: 'couronne de 10 m',
     duMetre: true,
+    offres: [
+      {
+        enseigne: 'Castorama',
+        prix: 16.9,
+        intitule: 'Fil 6mm² H07VR rouge couronne 10m (Nexans)',
+        reference: '3170231002078',
+        jour: '2026-08-28',
+      },
+    ],
   },
   {
     code: 'fil-10',
     rayon: 'Conduits et conducteurs',
-    libelle: 'Fil H07V-U 10 mm²',
-    precision: 'Rigide, couronne de 100 m — liaison au disjoncteur d’abonné',
-    unite: 'couronne',
+    libelle: 'Fil H07V-R 10 mm²',
+    precision: 'Rigide, couronne de 10 m — liaison au disjoncteur d’abonné',
+    unite: 'couronne de 10 m',
     duMetre: true,
   },
   {
     code: 'fil-16',
     rayon: 'Conduits et conducteurs',
-    libelle: 'Fil H07V-U 16 mm²',
-    precision: 'Rigide, couronne de 100 m — alimentation de tableau',
-    unite: 'couronne',
+    libelle: 'Fil H07V-R 16 mm²',
+    precision: 'Rigide, couronne de 10 m — alimentation de tableau',
+    unite: 'couronne de 10 m',
   },
   {
     code: 'fil-25',
     rayon: 'Conduits et conducteurs',
-    libelle: 'Fil H07V-U 25 mm²',
-    precision: 'Rigide, couronne de 100 m — liaison au compteur',
-    unite: 'couronne',
+    libelle: 'Fil H07V-R 25 mm²',
+    precision: 'Rigide, couronne de 10 m — liaison au compteur',
+    unite: 'couronne de 10 m',
   },
   {
     code: 'cable-3g1.5',
     rayon: 'Conduits et conducteurs',
-    libelle: 'Câble R2V 3G1,5',
+    libelle: 'Câble U1000 R2V 3G1,5',
     precision: 'Couronne de 100 m — ce qui sort du mur, apparent ou enterré',
     unite: 'couronne',
+    offres: [
+      {
+        enseigne: 'Castorama',
+        prix: 89.9,
+        intitule: 'Câble électrique U1000R2V 3x1,5 mm² 100 m',
+        reference: '3427500883839',
+        jour: '2026-08-28',
+      },
+    ],
   },
   {
     code: 'cable-3g2.5',
     rayon: 'Conduits et conducteurs',
-    libelle: 'Câble R2V 3G2,5',
+    libelle: 'Câble U1000 R2V 3G2,5',
     precision: 'Couronne de 100 m',
     unite: 'couronne',
+    offres: [
+      {
+        enseigne: 'Castorama',
+        prix: 139.9,
+        intitule: 'Câble électrique U1000R2V 3X2,5 mm² 100 m',
+        reference: '3427500884041',
+        jour: '2026-08-28',
+      },
+    ],
   },
   {
     code: 'cable-5g2.5',

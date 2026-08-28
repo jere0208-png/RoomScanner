@@ -10143,6 +10143,57 @@ refus que pour la gaine ICTA et la boîte d'encastrement au relevé précédent.
 **Bilan du catalogue : 116 articles, 21 prix relevés en rayon**, le reste estimé
 et marqué comme tel.
 
+### Les conducteurs — et une couronne de cent mètres qui n'existe pas
+
+Suite du contrôle. Les conduits et les câbles étaient **bien estimés**, et c'est
+une bonne nouvelle qu'il faut dire aussi : le R2V 3G1,5 valait 89 € au catalogue
+contre **89,90 €** en rayon, le 3G2,5 139 € contre **139,90 €**. Les gaines ICTA
+étaient légèrement basses (Ø16 : 24 € contre **26,90 €**, Ø25 : 46 € contre
+**53,90 €**). Corrigé, sans surprise.
+
+**LA SURPRISE ÉTAIT AILLEURS, ET ELLE TOUCHE LE MÉTRÉ, PAS LE CATALOGUE.**
+
+**Le fil de 6 mm² n'existe pas en couronne de cent mètres.** Chez Castorama il se
+vend en couronnes de cinq ou dix mètres, ou à la coupe — et c'est logique :
+personne ne tire cent mètres de 6, on en tire dix, du tableau à la plaque de
+cuisson. Le catalogue proposait un conditionnement que le magasin ne vend pas.
+
+**Le métré comptait des couronnes de cent pour TOUTES les sections.** Sur une
+rénovation avec plaque, cela donnait une couronne de 6 mm² à 99 € là où l'on
+achète trois couronnes de dix mètres à 16,90 € — **cinquante euros de trop, sur
+un article qu'on ne commande qu'une fois et qu'on ne relit donc jamais**.
+
+**ET LE PRIX AU MÈTRE ÉTAIT FAUX AUSSI, DANS L'AUTRE SENS** : 0,99 €/m au
+catalogue, 1,69 €/m en rayon. Les deux erreurs se compensaient en partie, **ce
+qui est le pire cas** — un total à peu près crédible, obtenu par deux chiffres
+faux. C'est exactement ce qu'un contrôle article par article trouve et qu'une
+relecture de total ne trouve jamais.
+
+`couronnes()` acceptait déjà une longueur en paramètre : le changement tient
+dans une table, `COURONNE_DU_FIL`, et dans l'unité écrite au bordereau — qui dit
+maintenant « cour. 10 m » au lieu de « cour. 100 m ». **L'unité est ce qu'on lit
+au comptoir** ; se tromper dessus, c'est repartir avec dix fois trop.
+
+Ce qui a été VU : le 6 mm² (couronne de 10 m, 16,90 €). Ce qui est DÉDUIT : le
+10, le 16 et le 25 suivent la même règle — on ne tire pas des dizaines de mètres
+de grosse section dans un logement — et leurs prix portent « estimation ».
+
+#### Un banc qui avait vérifié l'outil, pas l'ouvrage
+
+La première version de `couronnefil` éprouvait `couronnes()` avec des longueurs
+écrites à la main : elle prouvait que **la fonction** sait compter par dix, pas
+que **le bordereau** l'appelle avec la bonne longueur. C'est le genre d'épreuve
+qui reste verte pendant que l'application continue de facturer cent mètres.
+
+L'épreuve qui manquait passe par `buyingList` — et elle a échoué du premier
+coup, **pour aucune raison** : le jeu d'essai n'avait pas de tronçons mesurés,
+`buyingList` rendait donc un bordereau sans un mètre de fil, et le filtre ne
+trouvait rien. Une épreuve qui ne trouve rien à mesurer n'échoue pas sur le
+sujet : elle échoue à côté. Corrigée, elle tient les deux sens — le 6 en
+couronnes de dix, le 2,5 en couronnes de cent.
+
+**Bilan : 116 articles, 28 prix relevés en rayon.**
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro
