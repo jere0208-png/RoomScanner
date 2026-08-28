@@ -12,20 +12,36 @@
  * dans le dessin. Un bouton qui déciderait lui-même finirait par s'afficher
  * sur un produit qu'on n'a pas vérifié.
  *
- * LE LOGO EST REDESSINÉ, PAS COPIÉ — la flèche sourire qui va du « a » au
- * « z », comme sur la marque : c'est ce qui rend le bouton reconnaissable
- * d'un coup d'œil, et c'est ce que le patron a demandé. Il est dessiné au
- * trait, dans la couleur de la marque, à la taille du texte.
+ * LE LOGO EST CELUI DE LA MARQUE, PAS UN DESSIN — et c'est la deuxième
+ * version de ce bouton.
  *
- * ATTENTION, ET C'EST DIT AU PATRON : la flèche d'Amazon est une marque
+ * LA PREMIÈRE REDESSINAIT LA FLÈCHE SOURIRE au trait, en se disant qu'un arc
+ * orange suffirait à faire reconnaître Amazon. Relevé du patron, sans appel :
+ * « tu es sérieux avec ta flèche pour Amazon ? tiens l'image du logo ». Il
+ * avait raison, et la leçon dépasse ce bouton : **une marque ne s'approxime
+ * pas**. Un logo à peu près ressemblant ne se lit pas comme la marque, il se
+ * lit comme une imitation — ce qui est pire que pas de logo du tout, sur un
+ * bouton dont tout l'intérêt est qu'on le reconnaisse sans lire.
+ *
+ * C'EST DONC LE LOGOTYPE FOURNI, posé tel quel, aux trois densités
+ * (`src/assets/amazon*.png`). On ne le retouche pas, on ne le recolore pas,
+ * on ne l'étire pas : `resizeMode="contain"` garde ses proportions.
+ *
+ * ATTENTION, ET C'EST DIT AU PATRON : le logotype d'Amazon est une marque
  * déposée. L'usage nominatif — « voir ce produit sur Amazon » — est l'usage
  * ordinaire d'un lien marchand, mais Amazon encadre l'emploi de ses logos et
  * demande normalement de passer par son programme partenaire. C'est prévu :
  * la balise partenaire a sa place réservée dans `magasin.ts`.
  */
 import React from 'react';
-import { Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
+import {
+  Image,
+  Linking,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { lienAmazon, type Offre } from '../geometry/magasin';
 import { fr } from '../screens/result/format';
 import { radius, themedStyles, useTheme, type Palette } from '../theme';
@@ -34,32 +50,13 @@ import { radius, themedStyles, useTheme, type Palette } from '../theme';
 const ORANGE = '#FF9900';
 
 /**
- * LA FLÈCHE SOURIRE, redessinée.
+ * LA TAILLE DU LOGOTYPE SUR LE BOUTON.
  *
- * Un arc qui part sous le premier signe et remonte vers le dernier, avec sa
- * pointe relevée. C'est le seul élément qui fait reconnaître la marque sans
- * lire, et c'est pour cela qu'il est là plutôt qu'un simple mot.
+ * Quarante-huit points de large : assez pour que le mot « amazon » se lise —
+ * il occupe les trois quarts de la vignette —, assez peu pour rester une
+ * signature à gauche du texte et non l'objet principal du bouton.
  */
-function FlecheAmazon({ taille }: { taille: number }) {
-  return (
-    <Svg width={taille} height={taille * 0.42} viewBox="0 0 40 17">
-      <Path
-        d="M2 11.2C8.5 15.4 16.5 16.6 23.5 15.2c2.6-.5 5.2-1.5 7.4-2.8"
-        stroke={ORANGE}
-        strokeWidth={2.8}
-        strokeLinecap="round"
-        fill="none"
-      />
-      {/*
-        LA POINTE SUIT LA TANGENTE DE L'ARC, et il a fallu trois essais pour
-        la trouver : regardée en image, la première version pointait vers le
-        haut à angle droit — on lisait un chevron posé sur un trait, pas une
-        flèche. Elle part maintenant DANS le prolongement du geste.
-      */}
-      <Path d="M28.6 8.6 L37 9.4 L31.2 15.4 Z" fill={ORANGE} />
-    </Svg>
-  );
-}
+const LOGO = { w: 48, h: 30 };
 
 export function BoutonAmazon({
   offre,
@@ -73,11 +70,20 @@ export function BoutonAmazon({
   const styles = getStyles(c);
   const gain = reference - offre.prix;
   /*
-    « ÉQUIVALENT » N'EST PAS « MOINS CHER », et le bouton ne doit pas le
-    laisser croire. Sous un centime d'écart, on dit « même prix » : annoncer
-    « économisez 0,00 € » ferait douter de tous les autres chiffres.
+    CE QUE LE BANDEAU ANNONCE — relevé du patron : « indique avec un texte
+    discret "Un meilleur prix a été trouvé sur Amazon", et logo et prix ».
+
+    DEUX PHRASES, PARCE QUE DEUX SITUATIONS. Le bouton s'affiche aussi quand
+    les prix sont ÉGAUX — c'est la règle du patron, « équivalent ou
+    inférieur » —, et écrire « un meilleur prix » sur un article qui coûte
+    exactement pareil serait faux. Un chiffre faux, même petit, fait douter de
+    tous les autres : à égalité, on dit simplement qu'on le trouve aussi
+    là-bas.
   */
-  const mot = gain >= 0.01 ? `− ${fr(gain, 2)} €` : 'même prix';
+  const meilleur = gain >= 0.01;
+  const phrase = meilleur
+    ? 'Un meilleur prix a été trouvé sur Amazon'
+    : 'Cet article est au même prix sur Amazon';
 
   const ouvrir = () => {
     if (!offre.asin) return;
@@ -89,23 +95,29 @@ export function BoutonAmazon({
     <TouchableOpacity
       style={styles.bouton}
       accessibilityRole="link"
-      accessibilityLabel={`Voir sur Amazon, ${fr(offre.prix, 2)} euros, ${
-        gain >= 0.01 ? `${fr(gain, 2)} euros de moins` : 'même prix'
+      accessibilityLabel={`${phrase}, ${fr(offre.prix, 2)} euros${
+        meilleur ? `, ${fr(gain, 2)} euros de moins` : ''
       }`}
       activeOpacity={0.75}
       onPress={ouvrir}>
-      <FlecheAmazon taille={26} />
-      <View style={styles.texte}>
-        <Text style={styles.titre}>Voir sur Amazon</Text>
-        {/*
-          LE PRIX D'ABORD, L'ÉCART ENSUITE. C'est le prix qu'on compare, et
-          c'est lui que le patron a demandé sur le bouton ; l'écart n'est là
-          que pour dire s'il vaut la peine de changer de magasin.
-        */}
-        <Text style={styles.prix}>
-          {`${fr(offre.prix, 2)} €`}
-          <Text style={styles.gain}>{`  ${mot}`}</Text>
-        </Text>
+      {/*
+        LA PHRASE D'ABORD, ET DISCRÈTE. C'est une information, pas une
+        réclame : l'action principale de cet écran reste d'ajouter l'article
+        au devis. Elle se lit en petit, au-dessus du logo et du prix, comme
+        une mention en rayon.
+      */}
+      <Text style={styles.phrase}>{phrase}</Text>
+      <View style={styles.rangee}>
+        <Image
+          source={require('../assets/amazon.png')}
+          style={styles.logo}
+          resizeMode="contain"
+          accessibilityLabel="Amazon"
+        />
+        <Text style={styles.prix}>{`${fr(offre.prix, 2)} €`}</Text>
+        {meilleur && (
+          <Text style={styles.gain}>{`− ${fr(gain, 2)} €`}</Text>
+        )}
       </View>
     </TouchableOpacity>
   );
@@ -114,22 +126,25 @@ export function BoutonAmazon({
 const getStyles = themedStyles((c: Palette) =>
   StyleSheet.create({
     bouton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 10,
-      paddingVertical: 8,
+      paddingVertical: 10,
       paddingHorizontal: 12,
       borderRadius: radius.md,
       borderWidth: 1,
-      borderColor: ORANGE,
-      /* Le fond reste celui de la page : un aplat orange ferait de ce lien
-         le bouton le plus fort de l'écran, alors que l'action principale
-         reste d'ajouter au devis. */
+      borderColor: c.line,
+      /*
+        LE CADRE EST GRIS, PAS ORANGE — et c'est la deuxième version.
+
+        Un liseré orange faisait de ce lien le bouton le plus fort de la
+        fiche, alors que le geste principal reste d'ajouter l'article au
+        devis. « Discret », dit le relevé : c'est le logo qui porte la
+        couleur de la marque, le cadre n'a pas à la répéter.
+      */
       backgroundColor: c.surface,
     },
-    texte: { flex: 1 },
-    titre: { fontSize: 13, fontWeight: '700', color: c.ink },
-    prix: { fontSize: 12, color: c.inkSoft, marginTop: 1 },
-    gain: { color: ORANGE, fontWeight: '700' },
+    phrase: { fontSize: 11, color: c.inkSoft, marginBottom: 6 },
+    rangee: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    logo: { width: LOGO.w, height: LOGO.h },
+    prix: { fontSize: 14, fontWeight: '800', color: c.ink },
+    gain: { fontSize: 12, fontWeight: '700', color: ORANGE },
   }),
 );

@@ -9975,6 +9975,58 @@ l'estimation, qui a changé le jour du relevé. Il vérifie maintenant qu'une li
 au moins ne porte pas l'enseigne du catalogue reçu. **Un banc ne nomme jamais un
 réglage par son chiffre — ni par son libellé.**
 
+### Le logo d'Amazon : une marque ne s'approxime pas
+
+Relevé du patron, sans appel : « tu es sérieux avec ta flèche pour Amazon ?
+tiens l'image du logo. »
+
+**La première version redessinait la flèche sourire au trait**, en se disant
+qu'un arc orange suffirait à faire reconnaître Amazon. Elle avait même été
+regardée en image, et retouchée trois fois pour que la pointe suive la tangente
+de l'arc. Le travail était propre et le résultat sans valeur : **un logo à peu
+près ressemblant ne se lit pas comme la marque, il se lit comme une imitation**
+— ce qui est pire que pas de logo du tout, sur un bouton dont tout l'intérêt est
+qu'on le reconnaisse SANS LIRE.
+
+C'est la même famille de faute que « vérifier la boîte qu'on dessine, pas celle
+qu'on a demandée » : on avait vérifié qu'un arc orange était bien dessiné, pas
+qu'il ressemblait à quoi que ce soit. **On ne vérifiait pas la bonne chose.**
+
+Le logotype fourni est donc posé tel quel, aux trois densités
+(`src/assets/amazon*.png`), en `resizeMode="contain"` — on ne le retouche pas,
+on ne le recolore pas, on ne l'étire pas.
+
+**ET LE BANDEAU DIT CE QU'IL A À DIRE, PAS UN ORDRE.** Relevé du patron :
+« indique avec un texte discret "Un meilleur prix a été trouvé sur Amazon", et
+logo et prix ». Il disait « Voir sur Amazon » dans un cadre orange : un ordre,
+et le bouton le plus fort de la fiche, alors que le geste principal reste
+d'ajouter l'article au devis. Le cadre est redevenu gris — c'est le logo qui
+porte la couleur de la marque, le cadre n'a pas à la répéter.
+
+**DEUX PHRASES, PARCE QUE DEUX SITUATIONS.** Le bandeau s'affiche aussi à prix
+ÉGAL — c'est la règle du patron, « équivalent ou inférieur ». Écrire « un
+meilleur prix » sur un article qui coûte exactement pareil serait faux, et un
+chiffre faux, même petit, fait douter de tous les autres : à égalité, on dit
+« cet article est au même prix sur Amazon », et aucune économie n'est annoncée.
+
+#### « Le logo sort du bloc » — et c'était ma maquette qui mentait
+
+Relevé du patron sur la capture que je venais de lui montrer. Vérification
+faite : **le bloc tient**, le logo est à l'intérieur, aligné avec le prix. Ce
+qui débordait, c'était la MAQUETTE — composée à la main avec un décalage
+inventé, puis montrée telle quelle. Deux images fausses avant de regarder la
+bonne.
+
+**La leçon est pour la méthode, pas pour le composant** : une preuve à l'œil
+composée « à peu près » ne prouve rien et fait perdre un aller-retour. Le logo
+est maintenant EMBARQUÉ dans le rendu et posé aux coordonnées CALCULÉES sur les
+mesures déclarées par le composant, jamais placées au jugé.
+
+Et ce que l'œil ne peut pas tenir, un banc le tient : `boutonamazon` vérifie que
+le bloc **n'impose aucune hauteur** et laisse son contenu le pousser. Une
+hauteur écrite en dur est la seule façon qu'un logo sorte d'un cadre — c'est la
+leçon du bandeau du meuble, qui mentait de quatre-vingts points sur sa réserve.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro
