@@ -30,7 +30,9 @@ import {
   TARIFS_COMMUNS,
   TARIFS_MECANISME,
   VERSION_TARIFS,
+  cleDuTarif,
   tarifPlaque,
+  tarifRecu,
   type GammeId,
   type Tarif,
 } from './prix';
@@ -49,8 +51,19 @@ export interface LigneDevis {
   /** Ce que la ligne pèse au total. Zéro quand le prix manque. */
   total: number;
   note?: string;
-  /** Le mois du relevé du prix, pour savoir ce qui vieillit. */
+  /** Le mois — ou le jour — du relevé du prix, pour savoir ce qui vieillit. */
   releve?: string;
+  /**
+   * OÙ CE PRIX A ÉTÉ VU.
+   *
+   * Relevé du patron : « fournir une référence pour le prix (ex : Castorama -
+   * date) ». Le catalogue portait déjà l'information ; elle s'arrêtait au
+   * catalogue. Un devis qui cache d'où sortent ses chiffres n'est pas un
+   * devis, c'est une devinette — et la réponse n'est pas la même selon qu'un
+   * prix vient d'une enseigne relevée hier ou d'une estimation de l'an
+   * dernier.
+   */
+  source?: string;
   /**
    * ÉCARTÉ DU DEVIS — présent sur le ticket, absent du total.
    *
@@ -117,6 +130,15 @@ export interface Devis {
  * diverger dès la première exception.
  */
 function tarifDe(code: string, gamme: GammeId): Tarif | null {
+  /*
+    CE QUI EST ARRIVÉ DU SERVEUR PASSE AVANT CE QUI EST EMBARQUÉ.
+
+    Un seul point de décision, et c'est ici : le prix reçu gagne quand il
+    existe, le prix posé à la main sert de fond de carte. Article par article
+    — un catalogue qui ne connaît que le cuivre n'efface pas l'appareillage.
+  */
+  const recu = tarifRecu(cleDuTarif(code, gamme));
+  if (recu) return recu;
   if (code.startsWith('meca-')) {
     const kind = code.slice(5) as FixtureKind;
     return TARIFS_MECANISME[gamme][kind] ?? null;
@@ -170,7 +192,9 @@ export function chiffrer(
   const lignes: LigneDevis[] = [];
   const sansPrix: string[] = [];
 
-  const poser = (r: Omit<LigneDevis, 'pu' | 'total' | 'releve'> & { code: string }) => {
+  const poser = (
+    r: Omit<LigneDevis, 'pu' | 'total' | 'releve' | 'source'> & { code: string },
+  ) => {
     const tarif = tarifDe(r.code, gamme);
     if (!tarif) {
       sansPrix.push(r.libelle);
@@ -182,6 +206,7 @@ export function chiffrer(
       pu: tarif.pu,
       total: centimes(tarif.pu * r.quantite),
       releve: tarif.releve,
+      source: tarif.source,
     });
   };
 

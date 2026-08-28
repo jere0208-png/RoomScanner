@@ -240,10 +240,24 @@ const bouton = (t: TestRenderer.ReactTestRenderer, nom: string) =>
     )
     .pop()!;
 
-const auTicket = () => {
+/**
+ * JUSQU'AU TICKET — et l'on attend que les prix soient vérifiés.
+ *
+ * Depuis que « Voir le prix » va demander au serveur si les tarifs ont bougé
+ * (voir `tarifsreseau`), le ticket ne s'affiche plus tout de suite : on montre
+ * l'attente, puis LE prix. Afficher un total et le voir changer une seconde
+ * plus tard est pire que d'attendre — on ne sait plus lequel des deux est le
+ * bon, et c'est le premier qu'on retient.
+ *
+ * Ces bancs doivent donc laisser la vérification finir. Sans réseau sous
+ * Jest, elle finit en « hors ligne » à la micro-tâche suivante : un `act`
+ * asynchrone vide la file, et le ticket est là.
+ */
+const auTicket = async () => {
   const t = ouvrir();
   act(() => bouton(t, 'Continuer').props.onPress());
   act(() => bouton(t, 'Voir le prix').props.onPress());
+  await act(async () => {});
   mesurer(t);
   return t;
 };
@@ -377,8 +391,8 @@ describe('les trois étapes', () => {
     expect(mots(t).join(' ')).toContain('est bien compté');
   });
 
-  it('et on revient sur son choix d’un appui sur le numéro', () => {
-    const t = auTicket();
+  it('et on revient sur son choix d’un appui sur le numéro', async () => {
+    const t = await auTicket();
     act(() => bouton(t, 'Étape 1').props.onPress());
     expect(mots(t)).toContain('Quel appareillage ?');
   });
@@ -391,8 +405,8 @@ describe('les trois étapes', () => {
 });
 
 describe('le ticket de caisse', () => {
-  it('porte une ligne par article, avec son compte et son prix', () => {
-    const t = auTicket();
+  it('porte une ligne par article, avec son compte et son prix', async () => {
+    const t = await auTicket();
     const devis = devisAttendu();
     const lus = mots(t);
     expect(devis.lignes.length).toBeGreaterThan(5);
@@ -404,19 +418,19 @@ describe('le ticket de caisse', () => {
     }
   });
 
-  it('et rien n’y est replié : un ticket qu’il faut déplier n’en est plus un', () => {
+  it('et rien n’y est replié : un ticket qu’il faut déplier n’en est plus un', async () => {
     /*
       La version d'avant repliait chaque rayon derriere un chevron. Sur un
       ticket, tout se lit d'un coup, du haut vers le bas — c'est ce qui fait
       qu'on n'a jamais eu besoin qu'on nous explique comment lire un ticket.
     */
-    const t = auTicket();
+    const t = await auTicket();
     const chevrons = mots(t).filter((m) => m === '›');
     expect(chevrons).toEqual([]);
   });
 
-  it('et se termine par le total, après le trait de découpe', () => {
-    const t = auTicket();
+  it('et se termine par le total, après le trait de découpe', async () => {
+    const t = await auTicket();
     const lus = mots(t);
     const devis = devisAttendu();
     expect(lus).toContain('TOTAL TTC');
@@ -427,8 +441,8 @@ describe('le ticket de caisse', () => {
     );
   });
 
-  it('et chaque rayon dit son sous-total', () => {
-    const t = auTicket();
+  it('et chaque rayon dit son sous-total', async () => {
+    const t = await auTicket();
     const lus = mots(t);
     for (const f of devisAttendu().parFamille) {
       // `textTransform` met la majuscule au DESSIN : le texte, lui, garde sa
@@ -441,13 +455,13 @@ describe('le ticket de caisse', () => {
 });
 
 describe('les vignettes du ticket', () => {
-  it('portent la photo du produit quand on l’a', () => {
+  it('portent la photo du produit quand on l’a', async () => {
     /*
       Releve du patron : « une petite image avant son titre et son prix ». Les
       photos sont les packshots des fabricants, detoures et reduits ; voir
       `src/ui/produits.ts`.
     */
-    const t = auTicket();
+    const t = await auTicket();
     const devis = devisAttendu();
     const avecPhoto = devis.lignes.filter((l) => photoDe(l.code));
     expect(avecPhoto.length).toBeGreaterThan(5);
@@ -486,14 +500,14 @@ describe('les vignettes du ticket', () => {
     }
   });
 
-  it('et retombent sur le symbole du plan quand la photo manque', () => {
+  it('et retombent sur le symbole du plan quand la photo manque', async () => {
     /*
       Le controle en sens inverse : un article sans photo garde une image, et
       le ticket ne se troue pas. C'est aussi ce qui rend le catalogue de
       photos facultatif — on peut en ajouter une demain sans toucher a
       l'ecran.
     */
-    const t = auTicket();
+    const t = await auTicket();
     const devis = devisAttendu();
     const traces = new Set(t.root.findAllByType(Path).map((n) => String(n.props.d)));
     for (const l of devis.lignes) {
@@ -505,12 +519,12 @@ describe('les vignettes du ticket', () => {
     }
   });
 
-  it('et la légende du plan garde le symbole, pas la photo', () => {
+  it('et la légende du plan garde le symbole, pas la photo', async () => {
     /*
       Sous le plan, ce qu'on cherche est de relier un chiffre a un DESSIN.
       Une photo n'y aiderait pas : elle ne ressemble pas au symbole.
     */
-    const t = auTicket();
+    const t = await auTicket();
     const devis = devisAttendu();
     const traces = new Set(t.root.findAllByType(Path).map((n) => String(n.props.d)));
     expect(devis.legende.length).toBeGreaterThan(1);
@@ -523,8 +537,8 @@ describe('les vignettes du ticket', () => {
     }
   });
 
-  it('et le plan du logement est bien là, en pied de ticket', () => {
-    const t = auTicket();
+  it('et le plan du logement est bien là, en pied de ticket', async () => {
+    const t = await auTicket();
     expect(t.root.findAllByType(FloorplanEditor).length).toBe(1);
     const lus = mots(t);
     expect(lus).toContain('D’où viennent ces quantités');
@@ -546,29 +560,29 @@ describe('chercher et trier, quand la liste est longue', () => {
       )
       .pop()!;
 
-  it('la recherche ne garde que ce qu’on a demandé', () => {
-    const t = auTicket();
+  it('la recherche ne garde que ce qu’on a demandé', async () => {
+    const t = await auTicket();
     act(() => champ(t).props.onChangeText('disjoncteur'));
     const lus = mots(t);
     expect(lus.some((m) => m.startsWith('Disjoncteur'))).toBe(true);
     expect(lus.some((m) => m.startsWith('Conduit ICTA'))).toBe(false);
   });
 
-  it('et elle se moque des accents, de la casse et des apostrophes', () => {
+  it('et elle se moque des accents, de la casse et des apostrophes', async () => {
     // Personne ne tape « Boîte d'encastrement » avec son accent circonflexe.
-    const t = auTicket();
+    const t = await auTicket();
     act(() => champ(t).props.onChangeText('BOITE D ENCASTREMENT'));
     expect(mots(t).some((m) => m.startsWith('Boîte d’encastrement'))).toBe(true);
   });
 
-  it('et le dit quand rien ne correspond, au lieu de rendre une page vide', () => {
-    const t = auTicket();
+  it('et le dit quand rien ne correspond, au lieu de rendre une page vide', async () => {
+    const t = await auTicket();
     act(() => champ(t).props.onChangeText('zzzz'));
     expect(mots(t).join(' ')).toContain('Aucun article ne correspond');
   });
 
-  it('le tri par prix range du plus cher au moins cher', () => {
-    const t = auTicket();
+  it('le tri par prix range du plus cher au moins cher', async () => {
+    const t = await auTicket();
     act(() => bouton(t, 'Trier : Prix ↓').props.onPress());
     const lus = mots(t);
     const parPrix = [...devisAttendu().lignes]
@@ -579,9 +593,9 @@ describe('chercher et trier, quand la liste est longue', () => {
     );
   });
 
-  it('et le tri inverse fait exactement l’inverse', () => {
+  it('et le tri inverse fait exactement l’inverse', async () => {
     // Le controle en sens inverse, au sens propre.
-    const t = auTicket();
+    const t = await auTicket();
     act(() => bouton(t, 'Trier : Prix ↑').props.onPress());
     const lus = mots(t);
     const parPrix = [...devisAttendu().lignes]
@@ -592,14 +606,14 @@ describe('chercher et trier, quand la liste est longue', () => {
     );
   });
 
-  it('et le ticket s’aplatit dès qu’on ne suit plus le chariot', () => {
+  it('et le ticket s’aplatit dès qu’on ne suit plus le chariot', async () => {
     /*
       Les rayons sont l'ordre dans lequel on remplit le chariot ; cet ordre
       n'a plus de sens quand on demande « le plus cher d'abord ». Un en-tete
       de rayon qui ne regrouperait plus rien serait un mensonge de mise en
       page.
     */
-    const t = auTicket();
+    const t = await auTicket();
     expect(mots(t)).toContain('Tableau');
     act(() => bouton(t, 'Trier : Prix ↓').props.onPress());
     expect(mots(t)).not.toContain('Tableau');
@@ -625,8 +639,8 @@ describe('écarter un article', () => {
   const plusCher = () =>
     [...devisAttendu().lignes].sort((a, b) => b.total - a.total)[0];
 
-  it('le retire du total, et le prix suit', () => {
-    const t = auTicket();
+  it('le retire du total, et le prix suit', async () => {
+    const t = await auTicket();
     const devis = devisAttendu();
     const cher = plusCher();
     act(() => ligne(t, cher.libelle).props.onPress());
@@ -634,13 +648,13 @@ describe('écarter un article', () => {
     expect(mots(t)).toContain(`${attendu} €`);
   });
 
-  it('mais la ligne reste au ticket, barrée, avec son prix', () => {
+  it('mais la ligne reste au ticket, barrée, avec son prix', async () => {
     /*
       Un article retire qu'on ne voit plus est un article qu'on croit oublie
       — c'est le reproche qu'on faisait deja aux luminaires. Et c'est son
       prix qu'on regarde pour decider de le remettre.
     */
-    const t = auTicket();
+    const t = await auTicket();
     const cher = plusCher();
     act(() => ligne(t, cher.libelle).props.onPress());
     const lus = mots(t);
@@ -649,21 +663,21 @@ describe('écarter un article', () => {
     expect(ligne(t, `${cher.libelle}, écarté du devis`)).toBeDefined();
   });
 
-  it('et on remet tout d’un appui', () => {
-    const t = auTicket();
+  it('et on remet tout d’un appui', async () => {
+    const t = await auTicket();
     const devis = devisAttendu();
     act(() => ligne(t, plusCher().libelle).props.onPress());
     act(() => bouton(t, 'Tout remettre').props.onPress());
     expect(mots(t)).toContain(`${devis.total.toFixed(2).replace('.', ',')} €`);
   });
 
-  it('et le bouton du plan annonce le MÊME prix que la page', () => {
+  it('et le bouton du plan annonce le MÊME prix que la page', async () => {
     /*
       Les deux lisent `chiffrerLePlan` avec la meme liste d'ecartes, rangee
       dans le magasin. Gardee dans l'ecran, elle aurait laisse le bouton
       chiffrer un devis que la page n'annonce plus.
     */
-    const t = auTicket();
+    const t = await auTicket();
     act(() => ligne(t, plusCher().libelle).props.onPress());
     const duBouton = chiffrerLePlan(
       MURS,

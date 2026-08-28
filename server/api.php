@@ -12,6 +12,9 @@
  *   etat       {identifiant, jeton}          → {ok, pro, plans}
  *   plan       {identifiant, jeton}          → {ok, plans}   (n += 1)
  *   code       {identifiant, jeton, code}    → {ok, pro}
+ *   tarifs     {}                            → {ok, tarifs} ou {ok:false}
+ *              Le catalogue public des prix — sans compte, sans base.
+
  *
  * Le jeton est un HMAC de l'identifiant : sans état côté serveur, il prouve
  * que l'appelant est bien passé par `connecter` — assez pour une API de
@@ -35,6 +38,38 @@ if (!is_array($corps)) {
   sortir(['ok' => false, 'raison' => 'Requête vide.']);
 }
 $action = $corps['action'] ?? '';
+
+/*
+  LES TARIFS SE SERVENT AVANT TOUT LE RESTE, ET SANS COMPTE.
+
+  Ce n'est pas une donnee de compte : c'est un catalogue public, le meme pour
+  tout le monde. Il passe donc AVANT le controle d'identifiant — sans quoi
+  l'application devrait se connecter pour savoir combien coute une gaine — et
+  AVANT l'ouverture de la base : un catalogue qui tomberait avec MySQL priverait
+  de prix a jour tous les devis d'un chantier, pour rien.
+
+  D'OU VIENNENT CES PRIX. Les sites de vente refusent la lecture automatique
+  (Leroy Merlin et 123elec renvoient une page anti-robot) : le releve se fait
+  A LA MAIN, ici, dans `tarifs.json`, par quelqu'un qui va voir. Le fichier
+  porte l'enseigne et le jour ; l'application les affiche tels quels sur le
+  devis, et chaque ligne du ticket cite sa provenance.
+
+  Voir `tarifs.exemple.json` pour la forme attendue.
+*/
+if ($action === 'tarifs') {
+  $chemin = __DIR__ . '/tarifs.json';
+  if (!is_readable($chemin)) {
+    // Pas de catalogue depose : l'application garde ses prix embarques, et
+    // le dit a l'utilisateur. Ce n'est pas une erreur.
+    sortir(['ok' => false, 'raison' => 'Aucun catalogue de tarifs.']);
+  }
+  $brut = json_decode((string) file_get_contents($chemin), true);
+  if (!is_array($brut)) {
+    sortir(['ok' => false, 'raison' => 'Catalogue de tarifs illisible.']);
+  }
+  sortir(['ok' => true, 'tarifs' => $brut]);
+}
+
 $identifiant = trim((string) ($corps['identifiant'] ?? ''));
 if ($identifiant === '' || strlen($identifiant) > 191) {
   sortir(['ok' => false, 'raison' => 'Identifiant manquant.']);

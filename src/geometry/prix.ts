@@ -292,6 +292,117 @@ export const LUMINAIRES: CeilingKind[] = [
   'ventilateur',
 ];
 
+// ------------------------------------------------ le catalogue qui arrive
+
+/**
+ * UN CATALOGUE REÇU DU SERVEUR — des prix qui remplacent les nôtres.
+ *
+ * Relevé du patron : « pour les prix, j'aimerais une actualisation
+ * automatique via l'application, au clic sur le devis, un chargement des prix
+ * pour voir si les prix sont à jour. Fournir une référence pour le prix
+ * (ex : Castorama - date). »
+ *
+ * C'ÉTAIT LE SEUL ENDROIT OÙ L'APPLICATION AVANÇAIT SANS PREUVE. Les tarifs
+ * ci-dessus sont datés et signés, mais POSÉS À LA MAIN : les rafraîchir
+ * demandait une nouvelle version de l'application, et un tarif vieillit tout
+ * seul. Le devis peut maintenant aller les chercher.
+ *
+ * IL REMPLACE ARTICLE PAR ARTICLE, ET SEULEMENT CE QU'IL PORTE. Un catalogue
+ * qui ne connaîtrait que le cuivre ne doit pas effacer l'appareillage : ce
+ * qu'il ignore reste ce qu'il était. C'est aussi ce qui permet de le remplir
+ * peu à peu, rayon par rayon, sans jamais casser le devis.
+ *
+ * LES CLÉS SONT CELLES DU BORDEREAU, à une exception près : l'appareillage
+ * dépend de la gamme, et le bordereau ne la porte pas dans son code. Un
+ * mécanisme s'écrit donc `meca-<gamme>-<type>` et une plaque
+ * `plaque-<gamme>-<postes>` — voir `cleDuTarif`.
+ */
+export interface TarifsRecus {
+  /** La version du catalogue distant : elle s'affiche sur le devis. */
+  version: string;
+  /** Le JOUR du relevé, AAAA-MM-JJ. Le nôtre n'a que le mois. */
+  releve: string;
+  /** L'enseigne où ces prix ont été relevés — « Castorama », par exemple. */
+  source: string;
+  /** Le prix TTC de chaque article connu, par clé de catalogue. */
+  prix: Record<string, number>;
+}
+
+/*
+  L'ÉTAT VIT DANS LE MODULE, ET C'EST VOULU.
+
+  `chiffrer` est appelé depuis une demi-douzaine d'endroits — l'écran du
+  devis, la pastille du plan, le PDF, le CSV. Faire descendre le catalogue en
+  paramètre jusqu'à chacun d'eux, c'était six chemins à tenir d'accord, et le
+  premier oublié aurait annoncé un prix que les autres ne retrouvaient pas.
+  Un seul catalogue courant, posé une fois, lu partout.
+
+  EN CONTREPARTIE, IL SURVIT D'UN BANC À L'AUTRE — le même piège que le
+  magasin Zustand. `appliquerLesTarifs(null)` le remet à zéro, et les bancs
+  s'en servent après chaque épreuve.
+*/
+let recus: TarifsRecus | null = null;
+
+/** Pose (ou retire) le catalogue reçu. `null` rend les prix embarqués. */
+export function appliquerLesTarifs(t: TarifsRecus | null): void {
+  recus = t;
+}
+
+/** Ce qui est appliqué en ce moment — `null` quand rien n'est venu. */
+export function tarifsAppliques(): TarifsRecus | null {
+  return recus;
+}
+
+/**
+ * LA CLÉ D'UN ARTICLE DANS UN CATALOGUE REÇU.
+ *
+ * Le code du bordereau, sauf pour ce qui dépend de la gamme : un « meca-prise »
+ * ne veut rien dire sans savoir si l'on pose du dooxie ou du Céliane.
+ */
+export function cleDuTarif(code: string, gamme: GammeId): string {
+  if (code.startsWith('meca-')) return `meca-${gamme}-${code.slice(5)}`;
+  if (code.startsWith('plaque-')) return `plaque-${gamme}-${code.slice(7)}`;
+  return code;
+}
+
+/** Le prix reçu pour cette clé, s'il en est venu un. */
+export function tarifRecu(cle: string): Tarif | null {
+  const pu = recus?.prix[cle];
+  if (pu === undefined || !isFinite(pu) || pu < 0) return null;
+  return { pu, releve: recus!.releve, source: recus!.source };
+}
+
+/**
+ * LE RELEVÉ D'UN PRIX, ÉCRIT POUR ÊTRE LU.
+ *
+ * Deux formes cohabitent, et c'est voulu : le catalogue embarqué est posé au
+ * MOIS (« 2026-08 ») parce qu'un ordre de grandeur ne se date pas au jour ;
+ * un catalogue reçu du serveur est daté au JOUR (« 2026-09-03 ») parce qu'on
+ * sait exactement quand on est allé voir. On rend donc ce qu'on a, sans
+ * inventer une précision qui n'existe pas.
+ */
+const MOIS = [
+  'janvier',
+  'février',
+  'mars',
+  'avril',
+  'mai',
+  'juin',
+  'juillet',
+  'août',
+  'septembre',
+  'octobre',
+  'novembre',
+  'décembre',
+];
+
+export function dateDuReleve(releve: string): string {
+  const m = /^(\d{4})-(\d{2})(?:-(\d{2}))?$/.exec(releve);
+  if (!m) return releve;
+  const mois = MOIS[Number(m[2]) - 1] ?? m[2];
+  return m[3] ? `${Number(m[3])} ${mois} ${m[1]}` : `${mois} ${m[1]}`;
+}
+
 /** Le prix d'une plaque, à n postes, dans une gamme. */
 export function tarifPlaque(gamme: GammeId, postes: number): Tarif | null {
   const table = TARIFS_PLAQUE[gamme];

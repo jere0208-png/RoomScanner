@@ -45,7 +45,7 @@
  * l'animation, fais un simple listing avec les icônes en légende du plan ».
  * Il avait raison sur le fond — on ne lit pas un prix en attendant son tour.
  */
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Image,
   ScrollView,
@@ -64,7 +64,12 @@ import { cleDeLigne, type Devis, type LigneDevis, type LigneLegende } from '../g
 import { chiffrerLePlan } from '../geometry/devisplan';
 import { CEILINGS, CEILING_SYMBOL, type CeilingKind } from '../geometry/ceiling';
 import { FIXTURES, postsSymbol, type FixtureKind } from '../geometry/electrical';
-import { GAMMES } from '../geometry/prix';
+import { GAMMES, dateDuReleve } from '../geometry/prix';
+import {
+  BandeauTarifs,
+  PrixQuiSActualisent,
+} from '../components/PrixQuiSActualisent';
+import { verifierLesTarifs, type IssueTarifs } from '../net/tarifs';
 import { photoDe } from '../ui/produits';
 import { pourChercher } from '../ui/mots';
 import { fr } from './result/format';
@@ -74,6 +79,16 @@ import { radius, shadowCard, themedStyles, useTheme, type Palette } from '../the
 
 /** Un prix, écrit comme sur un ticket : virgule, et l'euro collé au nombre. */
 const euros = (v: number) => `${fr(v, 2)} €`;
+
+/**
+ * CE QU'ON ÉCRIT QUAND AUCUN CATALOGUE N'EST ARRIVÉ.
+ *
+ * Pas « inconnu » : les prix embarqués ont une provenance, elle est écrite
+ * dans `prix.ts` — des ordres de grandeur du marché français, posés à la
+ * main, qui attendent d'être relus par quelqu'un qui achète. Le dire est plus
+ * honnête que de laisser croire à un relevé d'enseigne.
+ */
+const TARIF_EMBARQUE = 'Estimation EchoPlan';
 
 const ETAPES = [
   { titre: 'Quel appareillage ?', court: 'Appareillage' },
@@ -194,6 +209,21 @@ function Article({
             ? `${ligne.quantite} ${ligne.unite} — pas de prix au catalogue`
             : `${ligne.quantite} ${ligne.unite} × ${euros(ligne.pu)}`}
         </Text>
+        {/*
+          D'OÙ SORT CE PRIX — relevé du patron : « fournir une référence pour
+          le prix (ex : Castorama - date) ».
+
+          Elle est sur la LIGNE, et pas seulement en tête du ticket : un
+          catalogue reçu ne couvre pas tout le bordereau, et les articles
+          qu'il ignore gardent le prix embarqué, plus vieux et posé à la main.
+          Une seule référence en haut de page les ferait tous passer pour des
+          prix d'enseigne relevés le même jour.
+        */}
+        {!!ligne.source && ligne.pu !== null && (
+          <Text style={styles.articleSource}>
+            {`${ligne.source}${ligne.releve ? ` · ${dateDuReleve(ligne.releve)}` : ''}`}
+          </Text>
+        )}
         {!!ligne.note && <Text style={styles.articleNote}>{ligne.note}</Text>}
       </View>
       <Text style={[styles.articlePrix, hors && styles.barre]}>
@@ -222,6 +252,34 @@ export function DevisScreen() {
   const toutRemettre = useScanStore((s) => s.remettreLesArticlesDevis);
   const [etape, setEtape] = useState(0);
   const [cherche, setCherche] = useState('');
+  /*
+    LA VÉRIFICATION DES PRIX — relevé du patron : « une actualisation
+    automatique via l'application, au clic sur le devis, un chargement des
+    prix avec une animation moderne pour voir si les prix sont à jour ».
+
+    Elle part QUAND ON DEMANDE LE PRIX, pas à l'ouverture de la page : les
+    deux premières étapes ne montrent aucun chiffre, et un aller-retour au
+    serveur pendant qu'on choisit sa gamme serait un appel pour rien — on peut
+    très bien reculer et ne jamais voir le ticket.
+  */
+  const [verif, setVerif] = useState<{
+    issue: IssueTarifs;
+    enseigne: string;
+    jour: string;
+  } | null>(null);
+  const [enCours, setEnCours] = useState(false);
+  const [motDAttente, setMotDAttente] = useState('Connexion au catalogue…');
+  /*
+    CE QUI FORCE LE RECHIFFRAGE.
+
+    `chiffrerLePlan` lit le catalogue courant, qui vit dans un module — React
+    ne le voit pas changer. Sans ce compteur, les prix arriveraient et
+    l'écran continuerait d'afficher les anciens : le devis mentirait sur ce
+    qu'il vient lui-même d'aller chercher.
+  */
+  const [versionTarifs, setVersionTarifs] = useState(0);
+  /** Une vérification déjà partie ne repart pas : on n'appelle qu'une fois. */
+  const dejaVu = useRef(false);
   const [tri, setTri] = useState<'rayon' | 'cher' | 'pasCher'>('rayon');
 
   /*
@@ -235,7 +293,19 @@ export function DevisScreen() {
   const horsJeu = useMemo(() => new Set(ecartes), [ecartes]);
   const devis: Devis = useMemo(
     () => chiffrerLePlan(walls, rooms, fixtures, ceiling, gamme, horsJeu, openings),
-    [walls, rooms, fixtures, ceiling, gamme, horsJeu, openings],
+    /*
+      `versionTarifs` N'ENTRE DANS AUCUN CALCUL, et c'est pour cela qu'il est
+      là. Le catalogue courant vit dans un module (`prix.ts`) : React ne le
+      voit pas changer, et sans ce compteur les nouveaux prix arriveraient
+      pendant que l'écran continuerait d'afficher les anciens — le devis
+      mentirait sur ce qu'il vient lui-même d'aller chercher.
+
+      Le linter le signale comme inutile parce qu'il ne lit que le corps de la
+      fonction ; la dépendance est réelle, elle passe simplement par un état
+      qu'il ne sait pas suivre.
+    */
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [walls, rooms, fixtures, ceiling, gamme, horsJeu, openings, versionTarifs],
   );
 
   /*
@@ -266,6 +336,43 @@ export function DevisScreen() {
   }, [devis.lignes, cherche, tri]);
   /** À plat dès qu'on trie autrement ou qu'on cherche. */
   const aPlat = tri !== 'rayon' || cherche.trim().length > 0;
+
+  /**
+   * ALLER VOIR, ET LE DIRE.
+   *
+   * Jamais bloquant : quoi qu'il arrive, on retombe sur un ticket. Hors
+   * ligne, ce sont les prix gardés — ou les prix embarqués — qui chiffrent,
+   * et le bandeau dit lequel.
+   */
+  const verifier = useCallback(async (forcer: boolean) => {
+    setEnCours(true);
+    setMotDAttente('Connexion au catalogue…');
+    /*
+      DEUX MOTS, PAS UN. Le premier tombe tout de suite, le second à la
+      seconde : sur une réponse rapide on ne voit que « connexion », sur une
+      réponse lente on voit que ça avance. Un texte immobile pendant six
+      secondes fait douter que quelque chose se passe.
+    */
+    const relais = setTimeout(
+      () => setMotDAttente('Comparaison des tarifs…'),
+      1000,
+    );
+    const v = await verifierLesTarifs(Date.now(), forcer);
+    clearTimeout(relais);
+    setVerif({
+      issue: v.issue,
+      enseigne: v.catalogue?.source ?? TARIF_EMBARQUE,
+      jour: dateDuReleve(v.catalogue?.releve ?? devis.version),
+    });
+    setVersionTarifs((n) => n + 1);
+    setEnCours(false);
+  }, [devis.version]);
+
+  useEffect(() => {
+    if (etape !== 2 || dejaVu.current) return;
+    dejaVu.current = true;
+    verifier(false).catch(() => {});
+  }, [etape, verifier]);
 
   const avancer = (n: number) => {
     haptic('leger');
@@ -421,7 +528,18 @@ export function DevisScreen() {
           </>
         )}
 
-        {etape === 2 && (
+        {/*
+          PENDANT QU'ON VA VOIR, LE TICKET NE S'AFFICHE PAS.
+
+          Il pourrait : les prix embarqués chiffrent déjà. Mais afficher un
+          total puis le voir changer sous les yeux, une seconde plus tard,
+          c'est pire que d'attendre — on ne sait plus lequel des deux est le
+          bon, et c'est le premier qu'on retient. On montre donc l'attente,
+          puis LE prix.
+        */}
+        {etape === 2 && enCours && <PrixQuiSActualisent etape={motDAttente} />}
+
+        {etape === 2 && !enCours && (
           /*
             LE TICKET DE CAISSE — relevé du patron : « au clic on affiche une
             page entière moderne qui affiche tout bien fait comme un ticket de
@@ -448,6 +566,25 @@ export function DevisScreen() {
                 } · tarifs ${devis.version}`}
               </Text>
             </View>
+
+            {/*
+              D'OÙ VIENNENT CES CHIFFRES — avant le premier article, pas après
+              le total. On doit savoir de quand datent les prix AVANT de les
+              lire, sans quoi on les a déjà crus.
+            */}
+            {verif && (
+              <View style={styles.bandeauTarifs}>
+                <BandeauTarifs
+                  etat={verif.issue}
+                  enseigne={verif.enseigne}
+                  jour={verif.jour}
+                  onVerifier={() => {
+                    haptic('leger');
+                    verifier(true).catch(() => {});
+                  }}
+                />
+              </View>
+            )}
 
             {/*
               CHERCHER ET TRIER — « si jamais la liste est longue ».
@@ -837,6 +974,11 @@ const getStyles = themedStyles((c: Palette) =>
     articleNom: { color: c.ink, fontSize: 14, fontWeight: '700' },
     articleDetail: { color: c.inkFaint, fontSize: 12, marginTop: 2 },
     articleNote: { color: c.inkFaint, fontSize: 11, lineHeight: 15, marginTop: 3 },
+    /* La provenance du prix : plus petite et plus pâle que le reste. On la
+       cherche quand on la cherche, elle ne dispute pas la ligne au libellé. */
+    articleSource: { color: c.inkFaint, fontSize: 10, marginTop: 2 },
+    /* Le bandeau des tarifs respire au-dessus des outils de recherche. */
+    bandeauTarifs: { marginBottom: 12 },
     articlePrix: { color: c.ink, fontSize: 14, fontWeight: '800' },
     /* Un article écarté : barré et pâli, mais TOUJOURS LISIBLE — c'est son
        prix qu'on regarde pour décider de le remettre. */

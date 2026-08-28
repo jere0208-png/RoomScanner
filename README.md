@@ -9684,6 +9684,99 @@ mesure donc ce qu'il voulait mesurer depuis le début — **la distance** —, b
 par ce que le dessin s'autorise (`RAYON_PLAFOND_MAX` + `ECART_SIGLE_PLAFOND`,
 deux chiffres que le dessin annonce au lieu qu'on les recopie).
 
+### Les prix vont voir s'ils sont à jour, et disent d'où ils viennent
+
+C'était **le seul endroit où l'application avançait sans preuve**, et c'était
+écrit dans les questions en attente. Le catalogue est daté et signé depuis le
+premier jour — chaque article porte le mois de son relevé et l'endroit où on l'a
+vu — mais ces chiffres sont **posés à la main**, et les rafraîchir demandait une
+nouvelle version de l'application. Un tarif vieillit tout seul : le cuivre bouge
+d'un trimestre à l'autre, l'appareillage beaucoup moins.
+
+Relevé du patron : « pour les prix, j'aimerais une actualisation automatique via
+l'application, au clic sur le devis, un chargement des prix avec une animation
+moderne pour voir si les prix sont à jour. Fournir une référence pour le prix
+(ex : Castorama - date). »
+
+**POURQUOI PAS UN ROBOT QUI LIT LES SITES DE VENTE.** Leroy Merlin et 123elec
+renvoient tous deux une page de vérification anti-robot — c'est déjà écrit dans
+`prix.ts`, et c'est la raison pour laquelle ces prix étaient posés à la main. Un
+téléphone qui irait les lire se ferait fermer la porte au premier chantier. Le
+relevé se fait donc **une fois, en amont, du côté du serveur**, dans un fichier
+`server/tarifs.json` que quelqu'un remplit après être allé voir (voir
+`server/tarifs.exemple.json`, qui explique la forme et les clés). L'application
+ne fait que redescendre le résultat — avec son enseigne et son jour, qu'elle
+affiche.
+
+**LE CATALOGUE REÇU REMPLACE ARTICLE PAR ARTICLE, et seulement ce qu'il porte.**
+Un catalogue qui ne connaîtrait que le cuivre n'efface pas l'appareillage : ce
+qu'il ignore garde le prix embarqué. C'est ce qui permet de le remplir peu à peu,
+rayon par rayon, sans jamais casser le devis. Un seul point de décision —
+`tarifDe`, dans `devis.ts` — et le reste de la chaîne n'a pas bougé.
+
+**LE PRIX GARDE SA RÉFÉRENCE JUSQU'AU TICKET, LIGNE PAR LIGNE.** Un bandeau en
+tête dit d'où vient le catalogue, mais **chaque ligne porte la sienne** :
+« Castorama · 3 septembre 2026 » pour ce que le catalogue couvre, « Ordre de
+grandeur du marché français… » pour le reste. Une seule référence en haut de page
+ferait passer tout le bordereau pour des prix d'enseigne relevés le même jour.
+
+**TROIS ISSUES, TROIS PHRASES, ET AUCUNE NE MENT.** « Prix actualisés » quand
+quelque chose a bougé ; « Prix à jour » quand on est allé voir et que rien
+n'avait changé ; « Prix non vérifiés » quand on n'a pas pu y aller — et là on dit
+**avec quoi** l'on chiffre, parce qu'un prix sans provenance ne vaut pas mieux
+qu'une devinette. Le bandeau perd alors son bleu : il n'annonce plus une
+réussite.
+
+**« ACTUALISÉ » VEUT DIRE « CHANGÉ », PAS « ARRIVÉ »** — c'est le piège de ce
+module, et il a sa propre épreuve. Un serveur qui rend la même version que la
+veille n'a rien actualisé ; l'annoncer quand même ferait mentir l'écran à chaque
+ouverture, et l'on cesserait vite de le lire. On compare donc la version.
+
+**ON NE DÉRANGE LE SERVEUR QUE QUAND ON DEMANDE LE PRIX**, et pas plus d'une fois
+par jour. Les deux premières étapes du devis ne montrent aucun chiffre, et l'on
+peut reculer sans jamais voir le ticket : un aller-retour pendant qu'on choisit sa
+gamme serait un appel pour rien, sur un chantier où le réseau se paie. Le
+catalogue gardé de moins d'un jour ressert sans toucher au réseau ; le bouton
+« Vérifier » du bandeau, lui, y retourne tout de suite.
+
+**OFFLINE-FIRST, COMME LE RESTE.** Six secondes d'attente, puis on passe. Le
+dernier catalogue reçu dort sur le téléphone et **reprend sa place au lancement**
+— sans quoi la pastille du plan chiffrerait aux prix embarqués pendant que le
+devis chiffre au dernier catalogue reçu, et les deux se contrediraient. Un
+catalogue mal formé est refusé en bloc ; un prix nul, négatif ou illisible est
+écarté **article par article**, le reste s'applique quand même.
+
+**L'ATTENTE SE MONTRE, ET LE TICKET ATTEND SON TOUR.** L'écran d'attente du
+lancement, lui, ne montre rien — il dure quelques dizaines de millisecondes, et
+une animation qui n'a pas le temps de se jouer est un clignotement. Celle-ci dure
+un aller-retour depuis un chantier : une à six secondes, parfois pour rien. Trois
+fantômes de lignes de ticket respirent en cascade — mêmes gabarits, même
+gouttière, l'œil sait déjà ce qui va s'écrire là — sous un anneau qui **tourne
+sans progresser** : une barre de progression promettrait une fin qu'on ne connaît
+pas. Et le ticket ne s'affiche qu'après : afficher un total puis le voir changer
+sous les yeux est pire que d'attendre, on ne sait plus lequel des deux est le bon
+et c'est le premier qu'on retient.
+
+**CE QUE LES BANCS GARANTISSENT, ET CE QU'ILS NE PEUVENT PAS.** `tarifsajour`
+tient le catalogue (remplacement article par article, référence jusqu'à la ligne,
+retour en arrière) ; `tarifsreseau` tient le voyage (les trois issues, la
+fraîcheur d'un jour, le refus d'un catalogue mal formé — avec son contrôle en
+sens inverse : on prouve que la porte SAIT refuser) ; `prixecran` tient la
+structure de l'écran. **Le rythme de l'animation, lui, est à juger dans
+l'application** — le rendu React Native ne se regarde pas depuis cette machine,
+et c'est dit dans l'en-tête du banc.
+
+**UN HARNAIS RÉÉCRIT.** `devisecran` menait au ticket en deux appuis
+synchrones ; le ticket attend maintenant la fin de la vérification, et ses seize
+épreuves de ticket ont dû devenir asynchrones. C'est un changement de
+comportement assumé, pas un contournement : le banc dit désormais ce que l'écran
+fait.
+
+**CE QU'IL RESTE À FAIRE, ET QUI N'EST PAS DU CODE :** déposer un
+`server/tarifs.json` rempli après un vrai passage en magasin. Tant qu'il n'y en a
+pas, le serveur répond « aucun catalogue », l'application garde ses prix
+embarqués et **le dit** — ce qui est déjà mieux qu'avant, où elle ne disait rien.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

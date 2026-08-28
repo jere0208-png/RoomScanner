@@ -14,6 +14,7 @@ import { ProfilScreen } from './src/screens/ProfilScreen';
 import { ConfidentialiteScreen } from './src/screens/ConfidentialiteScreen';
 import { PaywallScreen } from './src/screens/PaywallScreen';
 import { EcranChargement } from './src/components/EcranChargement';
+import { reprendreLesTarifs } from './src/net/tarifs';
 import { EssaiEpuise } from './src/components/EssaiEpuise';
 import { SurprisePro } from './src/components/SurprisePro';
 import { AvisRecompense } from './src/components/AvisRecompense';
@@ -35,6 +36,19 @@ export default function App() {
   useEffect(() => {
     loadSaves();
     chargerCompte();
+    /*
+      LES PRIX GARDÉS REPRENNENT LEUR PLACE AU LANCEMENT.
+
+      Sans réseau, et sans ouvrir le devis. La pastille du plan annonce un
+      total avant même qu'on ait demandé le prix : si elle chiffrait aux prix
+      embarqués pendant que le devis chiffre au dernier catalogue reçu, les
+      deux se contrediraient — et c'est toujours celui qu'on n'a pas relu qui
+      part au client.
+    */
+    reprendreLesTarifs().catch(() => {
+      // Rien de gardé, ou stockage illisible : les prix embarqués chiffrent,
+      // comme ils l'ont toujours fait.
+    });
   }, [loadSaves, chargerCompte]);
 
   /*
