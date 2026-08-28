@@ -48,11 +48,17 @@ import type { ObjectData } from 'react-native-room-scan';
  * mais en fondu toujours, et un aperçu d'un scroll du PDF final des plans,
  * etc. En 5-8 secondes, on doit comprendre le cheminement de l'app. »
  *
- * Cent cinq images à quinze par seconde font SEPT SECONDES, au milieu de la
- * fourchette demandée. C'est un demi-méga-octet de plus dans l'IPA, et c'est
- * le prix d'une vitrine qui explique au lieu de décorer.
+ * PUIS DE 105 À 80, parce que sept secondes, c'est long. Relevé du patron, en
+ * la regardant tourner : « fais une meilleure animation dans l'iPhone, moderne
+ * avec du peps, et des gros titres. Rapide. » Cinq secondes et un tiers : le
+ * bas de la fourchette demandée, et vingt-cinq images de moins dans l'IPA.
+ *
+ * CE QU'ON A RACCOURCI, ET CE QU'ON N'A PAS TOUCHÉ. Les temps de LECTURE se
+ * resserrent — on comprend un plan en une demi-seconde quand un titre le
+ * nomme. Le défilement du dossier, lui, garde sa durée : c'est le seul moment
+ * où l'œil suit quelque chose au lieu de le reconnaître.
  */
-export const SHOWCASE_FRAMES = 105;
+export const SHOWCASE_FRAMES = 80;
 
 const mur = (
   id: string,
@@ -249,13 +255,13 @@ const soie = (t: number) =>
  * se referme sur le plan sans qu'aucune valeur ne saute, et le garde-fou de
  * continuité garde son sens.
  */
-const PLAN_PLAT = 12;
-const LEVEE = 24;
-const POSE = 15;
-const COTES = 12;
-const FONDU = 8;
-const PAGE = 26;
-/** Le retour occupe ce qui reste : 105 − 97 = 8 images. */
+const PLAN_PLAT = 8;
+const LEVEE = 18;
+const POSE = 12;
+const COTES = 9;
+const FONDU = 5;
+const PAGE = 22;
+/** Le retour occupe ce qui reste : 80 − 74 = 6 images. */
 
 interface Instant {
   t: number;
@@ -362,6 +368,93 @@ export function etatDeLImage(frame: number): Instant {
   return instant(frame);
 }
 
+/**
+ * LES GROS TITRES — un mot par temps, et c'est lui qui fait comprendre.
+ *
+ * Relevé du patron : « moderne avec du peps, et des gros titres ». Une
+ * animation muette demande à l'œil de deviner ce qu'il regarde : on voit un
+ * plan se lever sans savoir que c'est ÇA, le geste de l'application. Un mot
+ * posé dessus fait la moitié du travail — et permet de raccourcir le reste,
+ * parce qu'on lit « LE RELEVÉ » plus vite qu'on ne le déduit.
+ *
+ * CINQ MOTS, DIX SIGNES AU PLUS. C'est ce qui permet de les écrire GROS : à
+ * dix signes, le mot tient toute la largeur de l'écran en corps 30. Un
+ * sixième mot, ou un mot de quinze signes, et l'on retombe sur du texte.
+ */
+export const TITRES: { mot: string; jusqua: number }[] = [
+  { mot: 'LE RELEVÉ', jusqua: PLAN_PLAT },
+  { mot: 'EN VOLUME', jusqua: PLAN_PLAT + LEVEE },
+  { mot: 'LES PRISES', jusqua: PLAN_PLAT + LEVEE + POSE },
+  { mot: 'LES COTES', jusqua: PLAN_PLAT + LEVEE + POSE + COTES },
+  { mot: 'LE DOSSIER', jusqua: SHOWCASE_FRAMES },
+];
+
+/**
+ * Le titre d'une image, et son ENTRÉE.
+ *
+ * `avance` va de 0 à 1 sur les trois premières images du temps : le mot
+ * monte de douze points et paraît. Trois images, c'est deux dixièmes de
+ * seconde — assez pour que ce soit un mouvement, trop peu pour qu'on
+ * attende. C'est ça, le peps : rien ne se pose mollement.
+ */
+export function titreDeLImage(frame: number): { mot: string; avance: number } {
+  const n = SHOWCASE_FRAMES;
+  const i = ((frame % n) + n) % n;
+  let debut = 0;
+  for (const t of TITRES) {
+    if (i < t.jusqua) {
+      return { mot: t.mot, avance: soie((i - debut + 1) / 3) };
+    }
+    debut = t.jusqua;
+  }
+  return { mot: TITRES[TITRES.length - 1].mot, avance: 1 };
+}
+
+/** Où l'on en est du cycle, de 0 à 1 : c'est la barre du bandeau. */
+export function progression(frame: number): number {
+  const n = SHOWCASE_FRAMES;
+  return (((frame % n) + n) % n) / (n - 1);
+}
+
+/**
+ * LE BANDEAU DU TITRE — posé sur tout, y compris sur le dossier.
+ *
+ * Il est PLEIN et bleu, et non un texte posé à même l'image : le mot doit se
+ * lire aussi bien sur un plan blanc que sur une page de bordereau grise, et
+ * un texte qui change de fond change de lisibilité. Un aplat règle la
+ * question une fois pour toutes.
+ *
+ * ET IL PORTE LA BARRE D'AVANCEMENT. Elle ne sert à rien qu'à dire « ça
+ * tourne, et ça va finir » — c'est exactement ce qu'on regarde sans le
+ * savoir sur une vitrine.
+ */
+export function bandeauSvg(
+  frame: number,
+  W: number,
+  H: number,
+  p: FramePalette = SHOWCASE_PALETTE,
+): string {
+  const { mot, avance } = titreDeLImage(frame);
+  const haut = 58;
+  const y = H - haut;
+  // Le mot monte en paraissant : douze points, sur les trois images d'entrée.
+  const monte = (1 - avance) * 12;
+  const corps = Math.min(30, (W * 0.86) / (mot.length * 0.58));
+  return (
+    `<rect x="0" y="${y}" width="${W}" height="${haut}" fill="${p.meubleTrait}"/>` +
+    `<g opacity="${avance.toFixed(2)}">` +
+    `<text x="${(W / 2).toFixed(0)}" y="${(y + 36 + monte).toFixed(1)}" ` +
+    `font-family="Helvetica" font-size="${corps.toFixed(1)}" font-weight="bold" ` +
+    `letter-spacing="0.5" text-anchor="middle" fill="#FFFFFF">${mot}</text>` +
+    `</g>` +
+    // La barre : un rail sombre, un trait blanc qui avance dessus.
+    `<rect x="0" y="${(H - 4).toFixed(0)}" width="${W}" height="4" ` +
+    `fill="#FFFFFF" fill-opacity="0.25"/>` +
+    `<rect x="0" y="${(H - 4).toFixed(0)}" ` +
+    `width="${(W * progression(frame)).toFixed(1)}" height="4" fill="#FFFFFF"/>`
+  );
+}
+
 /*
  * LA POSE D'UN APPAREIL — chacun son tour, et pas tous ensemble.
  *
@@ -370,6 +463,21 @@ export function etatDeLImage(frame: number): Instant {
  * logement. Les fenêtres se chevauchent largement — on ne compte pas jusqu'à
  * six, on voit un logement s'équiper.
  */
+/**
+ * L'APPAREIL QUI PORTE LA COTE ÉCRITE.
+ *
+ * UN INTERRUPTEUR, parce qu'il est haut — cent dix centimètres — : son filet
+ * est long et la bulle a de la place. Une cote de prise à vingt-cinq
+ * centimètres se pose au ras du sol, là où le mobilier passe devant.
+ *
+ * ET CELUI DU REFEND, PAS CELUI DU SÉJOUR. Le premier choix était
+ * l'interrupteur de l'entrée, posé sur le mur de droite : sa bulle sortait de
+ * l'écran par le bord, et le temps fort des cotes ne montrait rien du tout.
+ * Celui du refend est au milieu du logement, quel que soit l'angle de la
+ * caméra.
+ */
+const COTE_MONTREE = 'f5';
+
 export function pose(elec: number, k: number): number {
   const debut = (k / Math.max(1, PLAN.elec.length)) * 0.55;
   return soie((elec - debut) / 0.45);
@@ -627,27 +735,75 @@ export function frameSvg(
       `<text x="${cx}" y="${cy}" ${police} fill="${spec.color}" ` +
         `opacity="${vu.toFixed(2)}">${spec.short}</text>`,
     );
+    /*
+      L'ONDE DU POP — un anneau qui s'ouvre et s'efface, sur les trois quarts
+      de l'apparition. C'est ce qui distingue un appareil qui SE POSE d'un
+      appareil qui se contente de paraître : l'œil suit le cercle, et sait
+      qu'il vient d'arriver quelque chose ici.
+    */
+    if (vu > 0.02 && vu < 0.98) {
+      const onde = Math.max(0, Math.min(1, vu / 0.85));
+      out.push(
+        `<circle cx="${cx}" cy="${(q.sy - 1).toFixed(1)}" ` +
+          `r="${(4 + 14 * onde).toFixed(1)}" fill="none" ` +
+          `stroke="${spec.color}" stroke-width="${(2.2 * (1 - onde)).toFixed(2)}" ` +
+          `opacity="${(0.75 * (1 - onde)).toFixed(2)}"/>`,
+      );
+    }
     if (cotes > 0.02) {
       /*
-        LE FILET DESCEND AU SOL, sous l'appareil, et le nombre se pose
-        dessus. C'est le dessin du calque « Cotes » : on lit la hauteur de
-        pose, celle qu'on trace au crayon avant de percer.
+        LE FILET DESCEND AU SOL, sous l'appareil : c'est le dessin du calque
+        « Cotes », la hauteur de pose qu'on trace au crayon avant de percer.
+
+        MAIS LE NOMBRE NE S'ÉCRIT PLUS À CÔTÉ DE CHAQUE FILET. Premier jet :
+        un « 110 » et un « 25 » en corps sept et demi, sur chacun des six
+        appareils. Regardé à la taille réelle de la maquette — l'écran fait
+        cent dix-huit points de large, l'image deux cent soixante-quatre —,
+        ces nombres tombaient sous quatre points : six taches grises
+        illisibles, et un temps fort qui ne montrait rien.
+
+        Les filets restent — ils disent que le calque est allumé — et UNE
+        SEULE cote s'écrit, en grand, sur un appareil (voir plus bas). C'est
+        la même chose qu'un plan qu'on annote pour une photo : on ne cote pas
+        tout, on montre qu'on cote.
       */
       const bas = project({ x: at.x, y: 0, z: at.z });
-      const o = (cotes * vu).toFixed(2);
       out.push(
         `<line x1="${cx}" y1="${(q.sy + 6).toFixed(1)}" x2="${bas.sx.toFixed(1)}" ` +
-          `y2="${bas.sy.toFixed(1)}" stroke="${p.cote}" stroke-width="0.7" ` +
-          `stroke-dasharray="2 2" opacity="${o}"/>`,
-        `<text x="${((q.sx + bas.sx) / 2 + 7).toFixed(1)}" ` +
-          `y="${((q.sy + bas.sy) / 2).toFixed(1)}" font-family="Helvetica" ` +
-          `font-size="7.5" font-weight="bold" fill="none" stroke="#FFFFFF" ` +
-          `stroke-width="2.5" opacity="${o}">${Math.round(f.height * 100)}</text>`,
-        `<text x="${((q.sx + bas.sx) / 2 + 7).toFixed(1)}" ` +
-          `y="${((q.sy + bas.sy) / 2).toFixed(1)}" font-family="Helvetica" ` +
-          `font-size="7.5" font-weight="bold" fill="${p.cote}" ` +
-          `opacity="${o}">${Math.round(f.height * 100)}</text>`,
+          `y2="${bas.sy.toFixed(1)}" stroke="${p.cote}" stroke-width="0.9" ` +
+          `stroke-dasharray="2 2" opacity="${(cotes * vu).toFixed(2)}"/>`,
       );
+      if (f.id === COTE_MONTREE) {
+        /*
+          LA BULLE DE COTE — grosse, pleine, posée à côté de son appareil.
+          Dix-huit points sur une image de deux cent soixante-quatre : elle se
+          lit sur le téléphone, ce qui est tout ce qu'on lui demande.
+        */
+        const cm = `${Math.round(f.height * 100)} cm`;
+        const larg = cm.length * 10 + 16;
+        /*
+          LA BULLE SE POSE DU CÔTÉ OÙ IL Y A DE LA PLACE. Toujours à droite,
+          elle sortait du cadre dès que l'appareil était dans la moitié droite
+          de l'écran — et une bulle hors champ ne cote rien.
+        */
+        const aGauche = q.sx > W * 0.55;
+        const bx = aGauche ? q.sx - 12 - larg : q.sx + 12;
+        const by = (q.sy + bas.sy) / 2 - 12;
+        out.push(
+          `<line x1="${cx}" y1="${((q.sy + bas.sy) / 2).toFixed(1)}" ` +
+            `x2="${(aGauche ? bx + larg - 4 : bx + 4).toFixed(1)}" ` +
+            `y2="${(by + 12).toFixed(1)}" ` +
+            `stroke="${p.meubleTrait}" stroke-width="1.2" ` +
+            `opacity="${cotes.toFixed(2)}"/>`,
+          `<rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${larg}" ` +
+            `height="24" rx="12" fill="${p.meubleTrait}" ` +
+            `opacity="${cotes.toFixed(2)}"/>`,
+          `<text x="${(bx + larg / 2).toFixed(1)}" y="${(by + 17).toFixed(1)}" ` +
+            `font-family="Helvetica" font-size="14" font-weight="bold" ` +
+            `text-anchor="middle" fill="#FFFFFF" ` +
+            `opacity="${cotes.toFixed(2)}">${cm}</text>`,
+        );
+      }
     }
   }
 
@@ -830,6 +986,13 @@ export function imageSvg(
       `<g opacity="${e.page.toFixed(2)}">${pageSvg(e.defilement, W, H, p)}</g>`,
     );
   }
+  /*
+    LE TITRE PASSE APRÈS TOUT LE MONDE — c'est la couche qui NARRE, et elle ne
+    participe pas au fondu : le mot ne doit pas pâlir pendant qu'une page monte
+    dessous, sinon la seule chose qui explique l'image devient illisible juste
+    au moment où l'image change.
+  */
+  corps.push(bandeauSvg(frame, W, H, p));
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" ` +
     `viewBox="0 0 ${W} ${H}">${corps.join('')}</svg>`

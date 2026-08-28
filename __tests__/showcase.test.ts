@@ -15,14 +15,20 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { FIXTURES } from '../src/geometry/electrical';
+/** La première image du cycle : le plan, et le premier titre. */
+const PLAN_DEBUT = 0;
 import {
   avancement,
   camera,
   cascade,
   etatDeLImage,
   frameSvg,
+  bandeauSvg,
   imageSvg,
   pose,
+  progression,
+  titreDeLImage,
+  TITRES,
   PLAN,
   SHOWCASE_FRAMES,
   SHOWCASE_PALETTE,
@@ -228,10 +234,18 @@ describe('le cheminement, en sept temps', () => {
   it('les cotes de pose paraissent, en centimètres', () => {
     const auxCotes = etats.findIndex((e) => e.cotes > 0.9);
     expect(auxCotes).toBeGreaterThan(0);
-    // La hauteur d'un interrupteur, telle que le plan la porte : 110 cm.
-    expect(imageSvg(auxCotes, W, H)).toContain('>110</text>');
+    /*
+      LA COTE S'ÉCRIT EN TOUTES LETTRES, ET UNE SEULE.
+
+      Premier jet : un nombre à côté de chacun des six filets, en corps sept
+      et demi. Mesuré à la taille réelle — l'écran fait cent dix-huit points
+      de large, l'image deux cent soixante-quatre —, ces nombres tombaient
+      sous quatre points : six taches grises, et un temps fort qui ne montrait
+      rien. Les filets restent, une seule cote s'écrit, en grand.
+    */
+    expect(imageSvg(auxCotes, W, H)).toContain('>110 cm</text>');
     // Et le contrôle en sens inverse : rien de tel avant qu'elles arrivent.
-    expect(imageSvg(0, W, H)).not.toContain('>110</text>');
+    expect(imageSvg(0, W, H)).not.toContain('>110 cm</text>');
   });
 
   it('le dossier passe devant, et il défile', () => {
@@ -270,6 +284,106 @@ describe('le cheminement, en sept temps', () => {
       const e = etatDeLImage(i);
       expect(`${i} : ${Math.max(1 - e.page, e.page) > 0.4}`).toBe(`${i} : true`);
     }
+  });
+});
+
+describe('les gros titres, et le peps', () => {
+  /*
+    RELEVÉ DU PATRON, en la regardant tourner : « fais une meilleure animation
+    dans l'iPhone, moderne avec du peps, et des gros titres. Rapide. »
+
+    UNE ANIMATION MUETTE DEMANDE À L'ŒIL DE DEVINER. On voyait un plan se
+    lever sans savoir que c'était ÇA, le geste de l'application. Un mot posé
+    dessus fait la moitié du travail — et c'est LUI qui permet de raccourcir
+    le reste : on lit « LE RELEVÉ » plus vite qu'on ne le déduit.
+  */
+  const IMAGES_PAR_SECONDE = 15;
+
+  it('un mot par temps, et jamais deux fois le même', () => {
+    const mots = TITRES.map((t) => t.mot);
+    expect(mots).toHaveLength(5);
+    expect(new Set(mots).size).toBe(mots.length);
+  });
+
+  it('et chaque image en porte un', () => {
+    for (let i = 0; i < SHOWCASE_FRAMES; i++) {
+      expect(`${i} : ${titreDeLImage(i).mot.length > 0}`).toBe(`${i} : true`);
+    }
+  });
+
+  it('ils sont COURTS, donc ils peuvent être gros', () => {
+    /*
+      Dix signes au plus : c'est ce qui permet de les écrire en corps 30 sur un
+      écran de deux cent soixante-quatre points. Un mot de quinze signes, et
+      l'on retombe sur du texte — la vitrine cesse d'annoncer, elle explique.
+    */
+    for (const t of TITRES) {
+      expect(`${t.mot} : ${t.mot.length}`).toBe(`${t.mot} : ${t.mot.length}`);
+      expect(t.mot.length).toBeLessThanOrEqual(10);
+    }
+  });
+
+  it('et ils s’écrivent VRAIMENT gros sur l’image', () => {
+    // Le contrôle qui compte : un titre court ne sert à rien s'il est écrit
+    // en corps 9 comme les sigles des appareils.
+    const corps = [...bandeauSvg(4, W, H).matchAll(/font-size="([\d.]+)"/g)].map(
+      (m) => Number(m[1]),
+    );
+    expect(Math.max(...corps)).toBeGreaterThanOrEqual(24);
+  });
+
+  it('le mot entre au lieu de se poser', () => {
+    /*
+      LE PEPS EST LÀ, et pas ailleurs : trois images d'entrée — deux dixièmes
+      de seconde —, le mot monte de douze points et paraît. Rien ne se pose
+      mollement.
+    */
+    const debut = titreDeLImage(PLAN_DEBUT).avance;
+    const plein = titreDeLImage(PLAN_DEBUT + 4).avance;
+    expect(debut).toBeLessThan(0.6);
+    expect(plein).toBeCloseTo(1, 2);
+  });
+
+  it('mais il ne clignote pas : une fois entré, il reste', () => {
+    // Le contrôle en sens inverse : une entrée rejouée à chaque image ferait
+    // battre le mot au lieu de l'annoncer.
+    const t = TITRES[1];
+    for (let i = TITRES[0].jusqua + 4; i < t.jusqua; i++) {
+      expect(`${i} : ${titreDeLImage(i).avance}`).toBe(`${i} : 1`);
+    }
+  });
+
+  it('et le titre passe PAR-DESSUS le dossier', () => {
+    /*
+      La couche qui NARRE ne participe pas au fondu : le mot ne doit pas pâlir
+      pendant qu'une page monte dessous, sinon la seule chose qui explique
+      l'image devient illisible juste au moment où l'image change.
+    */
+    const etats = Array.from({ length: SHOWCASE_FRAMES }, (_, i) =>
+      etatDeLImage(i),
+    );
+    const pleinePage = etats.findIndex((e) => e.page > 0.99);
+    expect(imageSvg(pleinePage, W, H)).toContain(
+      `>${titreDeLImage(pleinePage).mot}</text>`,
+    );
+  });
+
+  it('la barre d’avancement part de zéro et finit plein', () => {
+    expect(progression(0)).toBe(0);
+    expect(progression(SHOWCASE_FRAMES - 1)).toBe(1);
+    // Et elle ne recule jamais : une barre qui redescend dit qu'on a raté
+    // quelque chose.
+    for (let i = 1; i < SHOWCASE_FRAMES; i++) {
+      expect(`${i} : ${progression(i) >= progression(i - 1)}`).toBe(
+        `${i} : true`,
+      );
+    }
+  });
+
+  it('et le tout est plus RAPIDE qu’avant', () => {
+    // Sept secondes, c'était long. Le relevé dit « rapide » : on tient le bas
+    // de la fourchette.
+    expect(SHOWCASE_FRAMES / IMAGES_PAR_SECONDE).toBeLessThanOrEqual(6);
   });
 });
 

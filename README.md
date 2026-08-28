@@ -11115,6 +11115,68 @@ sont des transformations React Native, et le rendu ne se regarde pas depuis cett
 machine — la structure est tenue par bancs, l'assiette est à juger sur l'appareil.
 Les cent cinq images, elles, ont été regardées.
 
+### La vitrine gagne ses gros titres, et cinq secondes suffisent
+
+Relevé du patron, en la regardant tourner : « fais une meilleure animation dans
+l'iPhone, moderne avec du peps, et des gros titres. Rapide. »
+
+**UNE ANIMATION MUETTE DEMANDE À L'ŒIL DE DEVINER.** On voyait un plan se lever
+sans savoir que c'était ÇA, le geste de l'application. Un mot posé dessus fait la
+moitié du travail — et c'est lui qui permet de raccourcir le reste : **on lit
+« LE RELEVÉ » plus vite qu'on ne le déduit.**
+
+Cinq mots, un par temps, dix signes au plus : **LE RELEVÉ · EN VOLUME · LES
+PRISES · LES COTES · LE DOSSIER**. C'est la brièveté qui permet de les écrire
+gros — à dix signes, le mot tient toute la largeur en corps 30. Un sixième mot,
+ou un mot de quinze signes, et l'on retombe sur du texte.
+
+**LE BANDEAU EST PLEIN, ET BLEU.** Le mot doit se lire aussi bien sur un plan
+blanc que sur une page de bordereau grise ; un texte posé à même l'image change
+de lisibilité en même temps que son fond. Un aplat règle la question une fois
+pour toutes. Et il **passe après tout le monde** : la couche qui narre ne
+participe pas au fondu, sans quoi la seule chose qui explique l'image
+deviendrait illisible juste au moment où l'image change.
+
+**LE PEPS EST DANS LES ENTRÉES.** Le mot monte de douze points et paraît en
+**trois images** — deux dixièmes de seconde. Rien ne se pose mollement. Et
+chaque appareil qui se pose émet une **onde** : un anneau de sa couleur qui
+s'ouvre et s'efface, ce qui distingue un appareil qui ARRIVE d'un appareil qui
+se contente de paraître.
+
+Le bandeau porte aussi la **barre d'avancement** du cycle. Elle ne sert à rien
+qu'à dire « ça tourne, et ça va finir » — c'est exactement ce qu'on regarde sans
+le savoir sur une vitrine.
+
+**DE SEPT SECONDES À CINQ ET UN TIERS** — 80 images au lieu de 105. Les temps de
+LECTURE se resserrent, puisqu'un titre les nomme ; le défilement du dossier, lui,
+garde sa durée : c'est le seul moment où l'œil SUIT quelque chose au lieu de le
+reconnaître. Au passage, l'IPA reprend 190 ko.
+
+**UNE SEULE COTE S'ÉCRIT, ET C'EST UNE MESURE QUI L'A DÉCIDÉ.** Premier jet : un
+nombre à côté de chacun des six filets, en corps sept et demi. Rapporté à la
+taille réelle de la maquette — **l'écran fait 118 points de large, l'image 264
+pixels**, soit 0,45 point par pixel —, ces nombres tombaient **sous quatre
+points** : six taches grises illisibles, et un temps fort qui ne montrait rien.
+Les filets restent, parce qu'ils disent que le calque est allumé, et **une seule
+cote s'écrit en grand**, dans une bulle bleue : « 110 cm ». C'est ce qu'on fait
+sur un plan qu'on annote pour une photo — on ne cote pas tout, on montre qu'on
+cote.
+
+**ET ELLE SORTAIT DE L'ÉCRAN.** L'appareil choisi était l'interrupteur de
+l'entrée, posé sur le mur de droite : sa bulle passait le bord, et le temps fort
+ne montrait rien du tout. C'est celui du **refend** qui la porte — au milieu du
+logement, quel que soit l'angle de la caméra — et la bulle bascule du côté où il
+y a de la place. Regardé en image aux trois moments de l'apparition : elle se lit
+d'un coup d'œil.
+
+**Neuf épreuves neuves** : un mot par temps et jamais deux fois le même, chaque
+image en porte un, ils sont courts, **et ils s'écrivent vraiment gros sur l'image**
+— le contrôle qui compte, un titre court ne sert à rien s'il est en corps 9 comme
+les sigles —, le mot ENTRE au lieu de se poser, avec son contrôle en sens inverse
+(une fois entré, il reste : une entrée rejouée à chaque image ferait battre le
+mot), le titre par-dessus le dossier, la barre qui part de zéro, finit plein et ne
+recule jamais, et la durée sous six secondes.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro
