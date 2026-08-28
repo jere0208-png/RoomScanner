@@ -7,6 +7,7 @@ import Svg, {
   Path,
   Rect,
   Text as SvgText,
+  Polygon,
 } from 'react-native-svg';
 
 /*
@@ -55,6 +56,13 @@ import {
   type ScenePalette,
 } from '../geometry/scene3d';
 import { hiddenByBox } from '../geometry/furniture';
+import {
+  VOLUME2_DEBORD,
+  volumeAt,
+  volumeVerdict,
+  wetZones,
+  type WetZone,
+} from '../geometry/volumes';
 import { MAQUETTE } from '../ui/maquette';
 import { parImage } from '../ui/parImage';
 import { haptic } from '../ui/haptic';
@@ -136,6 +144,15 @@ const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v
  */
 export const RAYON_CIBLE = 22;
 
+/** Le centre d'un contour — il sert à faire déborder une zone humide. */
+function centreDe(pts: { x: number; z: number }[]) {
+  const n = Math.max(1, pts.length);
+  return {
+    x: pts.reduce((t, p) => t + p.x, 0) / n,
+    z: pts.reduce((t, p) => t + p.z, 0) / n,
+  };
+}
+
 /*
   ET C'EST UN RAYON, PLUS UN POLYGONE.
 
@@ -152,6 +169,18 @@ export function tailleDuSigle(scale: number): number {
 }
 
 interface Props {
+  /**
+   * LE GABARIT DES VOLUMES DE SALLE D'EAU, posé sur la maquette.
+   *
+   * La géométrie existait depuis longtemps (`volumes.ts`) et ne servait qu'au
+   * contrôle ÉCRIT — une ligne dans la feuille des diagnostics. Personne ne
+   * relit une ligne de texte pour une pièce qu'il croit connaître, et un socle
+   * en volume 1 se voit au Consuel : il se dépose, se rebouche, se repeint.
+   *
+   * On le montre donc LÀ OÙ L'ON POSE. Éteint par défaut : un gabarit
+   * permanent finirait par masquer la maquette qu'il sert à vérifier.
+   */
+  showVolumes?: boolean;
   /**
    * L'ŒIL DANS LE LOGEMENT, au lieu de la maquette vue de loin.
    *
@@ -272,6 +301,7 @@ export function Iso3DView({
   focusWallId,
   showNorth = true,
   showCeiling = true,
+  showVolumes = false,
   cableRoutes,
   routeHeights,
   cutaway,
@@ -1639,6 +1669,66 @@ export function Iso3DView({
       const q = project({ x: cl.at.x, y: haut - 0.08, z: cl.at.z });
       posLampes.push({ id: cl.id, cx: q.sx, cy: q.sy });
     }
+    /*
+      LES VOLUMES DE SALLE D'EAU — dessinés au sol, comme un gabarit tracé à la
+      craie avant de percer.
+
+      DEUX NAPPES ET PAS TROIS : le volume 0 est l'intérieur de la baignoire
+      elle-même, déjà dessinée par le meuble ; le redoubler d'une nappe
+      n'apprendrait rien. On montre le 1 — au droit de la zone humide — et le 2
+      — soixante centimètres autour —, qui sont ceux où l'on hésite.
+
+      AU SOL, ET NON À HAUTEUR DE POSE. Un volume monte à 2,25 m, mais une
+      nappe verticale masquerait le mur qu'on regarde. Le sol suffit à situer :
+      c'est l'aplomb qui compte pour savoir si une boîte tombe dedans.
+    */
+    const volumes: { id: string; niveau: 1 | 2; pts: { sx: number; sy: number }[] }[] = [];
+    const interdits: { id: string; cx: number; cy: number }[] = [];
+    if (showVolumes) {
+      const zones: WetZone[] = wetZones(keptObjects as never);
+      for (const [i, z] of zones.entries()) {
+        // Le contour de la zone, et son débord : deux anneaux concentriques.
+        for (const [niveau, marge] of [
+          [2, VOLUME2_DEBORD],
+          [1, 0],
+        ] as [1 | 2, number][]) {
+          const c = centreDe(z.pts);
+          const pts = z.pts.map((q: { x: number; z: number }) => {
+            const dx = q.x - c.x;
+            const dz = q.z - c.z;
+            const d = Math.hypot(dx, dz) || 1;
+            const p3 = { x: q.x + (dx / d) * marge, y: 0.01, z: q.z + (dz / d) * marge };
+            const pr = project(p3);
+            return { sx: pr.sx, sy: pr.sy };
+          });
+          volumes.push({ id: `${i}`, niveau, pts });
+        }
+      }
+      /*
+        ET L'APPAREIL QUI TOMBE DEDANS SE SIGNALE SUR PLACE. On ne demande pas
+        à l'électricien d'aller lire une feuille pour savoir que la prise qu'il
+        regarde est interdite.
+      */
+      if (zones.length > 0) {
+        const quadsV = wallQuads(keptWalls);
+        const murV = new Map(keptWalls.map((w) => [w.id, w]));
+        for (const f of fixtures) {
+          const w = murV.get(f.wallId);
+          if (!w) continue;
+          const face = wallFace(w, quadsV.get(w.id), f.side);
+          if (face.nx * st * sp + face.nz * ct * sp <= 0) continue;
+          const pf = facePoint(face, faceX(face, f.along), 0.02);
+          const v = volumeAt({ x: pf.x, z: pf.z }, f.height, zones);
+          if (v === null) continue;
+          // La norme ne dit pas la même chose de tout : un socle est interdit
+          // en volume 2, une commande y est admise. C'est `volumeVerdict` qui
+          // tranche — une seule source pour la règle, ici comme au contrôle.
+          if (volumeVerdict(f.kind, v).allowed) continue;
+          const q = project({ x: pf.x, y: f.height, z: pf.z });
+          interdits.push({ id: f.id, cx: q.sx, cy: q.sy });
+        }
+      }
+    }
     const geometrie = items.filter((it) => it.kind === 'poly');
     const groupes = grouperTraces(geometrie as never);
     const autres = items.filter((it) => it.kind !== 'poly');
@@ -1651,7 +1741,7 @@ export function Iso3DView({
       calculs.
     */
     const canevas = mettreAPlat(geometrie as never);
-    return { groupes, autres, canevas, ciblesInter, posLampes };
+    return { groupes, autres, canevas, ciblesInter, posLampes, volumes, interdits };
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, [
     scene,
@@ -1679,6 +1769,7 @@ export function Iso3DView({
     light,
     pov,
     focusWallId,
+    showVolumes,
   ]);
 
   /**
@@ -1811,6 +1902,47 @@ export function Iso3DView({
                 />
                 ),
               )}
+            {/*
+              LE GABARIT DES VOLUMES, AU RAS DU SOL.
+
+              Il se dessine AVANT tout le reste : c'est un fond de repérage, il
+              passe sous les appareils qu'il sert à juger. Le volume 2 d'abord,
+              le volume 1 par-dessus — du plus large au plus serré, sinon le
+              grand recouvrirait le petit.
+
+              LES TEINTES SONT CELLES DU CONTRÔLE : l'ambre pour « regarde »,
+              le rouge pour « interdit ». Elles ne veulent rien dire d'autre
+              ailleurs dans l'application.
+            */}
+            {rendered.volumes.map((v) => (
+              <Polygon
+                key={`volume-${v.niveau}-${v.id}`}
+                testID={`volume-${v.niveau}-${v.id}`}
+                points={v.pts.map((q) => `${q.sx},${q.sy}`).join(' ')}
+                fill={v.niveau === 1 ? c.danger : c.amber}
+                opacity={v.niveau === 1 ? 0.22 : 0.13}
+                stroke={v.niveau === 1 ? c.danger : c.amber}
+                strokeWidth={1}
+                strokeOpacity={0.5}
+              />
+            ))}
+            {/*
+              ET L'APPAREIL INTERDIT ROUGIT SUR PLACE — une bague, pas un
+              disque : elle cercle le repère sans le cacher, et c'est le repère
+              qu'on est venu regarder.
+            */}
+            {rendered.interdits.map((f) => (
+              <Circle
+                key={`interdit-${f.id}`}
+                testID={`interdit-${f.id}`}
+                cx={f.cx}
+                cy={f.cy}
+                r={13}
+                fill="none"
+                stroke={c.danger}
+                strokeWidth={2.5}
+              />
+            ))}
             {/*
               LES LUMIÈRES ALLUMÉES, PAR-DESSUS LA MAQUETTE.
 

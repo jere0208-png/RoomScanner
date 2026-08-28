@@ -435,6 +435,9 @@ export function Toolbar3D({
   setShowNorth,
   showCeiling,
   setShowCeiling,
+  showVolumes,
+  setShowVolumes,
+  zonesHumides,
   showElecTags,
   setShowElecTags,
   colorsAvailable,
@@ -447,6 +450,17 @@ export function Toolbar3D({
   setShowNorth: (f: (v: boolean) => boolean) => void;
   showCeiling: boolean;
   setShowCeiling: (v: boolean) => void;
+  /**
+   * LE GABARIT DES VOLUMES DE SALLE D'EAU — et de quoi savoir s'il existe.
+   *
+   * Il vit sur la barre de la 3D parce que c'est la maquette qui le dessine :
+   * un calque proposé là où rien ne s'allumerait serait un bouton en panne.
+   * Il a d'abord été posé sur la barre du PLAN, par erreur — `tsc` l'a dit
+   * aussitôt, et c'est exactement pour ça qu'on l'écoute.
+   */
+  showVolumes: boolean;
+  setShowVolumes: (v: boolean) => void;
+  zonesHumides: number;
   showElecTags: boolean;
   setShowElecTags: (f: (v: boolean) => boolean) => void;
   /** Le scan a relevé des couleurs : sinon la pastille n'allume rien. */
@@ -499,6 +513,26 @@ export function Toolbar3D({
       active={showNorth}
       onPress={() => setShowNorth((v) => !v)}
     />,
+    /*
+      LES VOLUMES DE SALLE D'EAU — seulement s'il y en a.
+
+      Le calque n'existe que quand une baignoire ou une douche a été relevée :
+      sans zone humide, il n'y a pas de volume à montrer, et une pastille qui
+      n'allume rien donne à l'écran l'air d'être en panne. C'est la règle du
+      « Plafond » juste en dessous.
+
+      IL PART ÉTEINT : un gabarit permanent finirait par masquer la maquette
+      qu'il sert à vérifier. On l'allume au moment de poser.
+    */
+    zonesHumides > 0 ? (
+      <ToolPill
+        key="volumes"
+        icon="check"
+        label="Volumes"
+        active={showVolumes}
+        onPress={() => setShowVolumes(!showVolumes)}
+      />
+    ) : null,
     /* Le plafond existe aussi en 3D : même calque, même bouton. */
     ceiling.length > 0 ? (
       <ToolPill

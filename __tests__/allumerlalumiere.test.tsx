@@ -102,12 +102,22 @@ const PRISE: Fixture = {
   side: 1,
 };
 
+/** Le second point de commande : c'est ce qui fait un va-et-vient. */
+const VA: Fixture = {
+  id: 'i2',
+  kind: 'va',
+  wallId: 'e',
+  along: 2,
+  height: 1.1,
+  side: 1,
+};
+
 const LAMPE: CeilingFixture = {
   id: 'c1',
   kind: 'dcl',
   roomId: 'r1',
   at: { x: 2.5, z: 2 },
-  commands: ['i1'],
+  commands: ['i1', 'i2'],
 };
 
 let arbre: TestRenderer.ReactTestRenderer | null = null;
@@ -125,7 +135,7 @@ const monter = (props: Record<string, unknown> = {}) => {
       openings: [],
       objects: [],
       rooms: [{ id: 'r1', name: 'Séjour', floor: null }] as never,
-      fixtures: [INTER, PRISE],
+      fixtures: [INTER, VA, PRISE],
       ceiling: [LAMPE],
       photos: [],
     });
@@ -314,5 +324,63 @@ describe('une lumière allumée se voit', () => {
     // Un halo de lumière déborde largement de ce qui l'émet.
     expect(halo.props.r).toBeGreaterThan(20);
     expect(String(halo.props.fill)).toMatch(/^#|^url\(/);
+  });
+});
+
+describe('un va-et-vient se prouve depuis les deux bouts', () => {
+  /*
+    C'EST LE PIÈGE DE CÂBLAGE DU VA-ET-VIENT, et la seule raison d'essayer
+    l'installation avant de percer : on allume en entrant dans le couloir, on
+    doit pouvoir éteindre en sortant par l'autre bout. Un lien oublié ne se
+    voit sur aucun plan — il se voit ICI, quand le second interrupteur
+    n'éteint pas.
+
+    CES ÉPREUVES SONT UN GARDE-FOU, PAS UNE CORRECTION — et il faut le dire,
+    sinon ce commentaire mentirait. On les a écrites en croyant corriger une
+    approximation : la bascule regarde le GROUPE d'un interrupteur (« si
+    toutes ses lampes sont allumées, éteindre ; sinon allumer »), et l'on
+    pensait que deux commandes se comporteraient donc comme deux copies d'un
+    même bouton.
+
+    ELLES SONT PASSÉES DU PREMIER COUP. Sur une lampe commandée de deux
+    endroits, « toutes allumées » est vrai dès que la première commande l'a
+    allumée : la seconde éteint. Le comportement était déjà celui d'un
+    va-et-vient, et l'épreuve l'a montré au lieu de le corriger.
+
+    Elles restent, parce qu'elles fixent ce comportement : le jour où l'on
+    touchera à la bascule — pour le disjoncteur qui coupe, par exemple — c'est
+    le va-et-vient qui cassera en premier, et sans un mot.
+  */
+  const cible = (t: TestRenderer.ReactTestRenderer, id: string) =>
+    t.root.findAll((n) => String(n.props?.testID ?? '') === `cible-${id}`)[0];
+
+  it('l’un allume, l’AUTRE éteint', () => {
+    const t = monter();
+    const un = cible(t, 'i1');
+    const deux = cible(t, 'i2');
+    expect(un).toBeDefined();
+    expect(deux).toBeDefined();
+    taper(t, un.props.cx, un.props.cy);
+    expect(halos(t)).toHaveLength(1);
+    taper(t, deux.props.cx, deux.props.cy);
+    expect(halos(t)).toHaveLength(0);
+  });
+
+  it('et dans l’autre sens, évidemment', () => {
+    const t = monter();
+    taper(t, cible(t, 'i2').props.cx, cible(t, 'i2').props.cy);
+    expect(halos(t)).toHaveLength(1);
+    taper(t, cible(t, 'i1').props.cx, cible(t, 'i1').props.cy);
+    expect(halos(t)).toHaveLength(0);
+  });
+
+  it('les deux points de commande offrent chacun leur cible', () => {
+    // Le contrôle en sens inverse : si le second n'avait pas de cible, les
+    // deux épreuves du dessus ne prouveraient rien de plus que la première.
+    const t = monter();
+    expect(cible(t, 'i1')).toBeDefined();
+    expect(cible(t, 'i2')).toBeDefined();
+    // Et ils ne sont pas au même endroit : deux murs différents.
+    expect(cible(t, 'i1').props.cx).not.toBe(cible(t, 'i2').props.cx);
   });
 });

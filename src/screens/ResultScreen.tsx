@@ -770,6 +770,14 @@ export function ResultScreen() {
     son bouton ne paraît même pas.
   */
   const [showCeiling, setShowCeiling] = useState(true);
+  /*
+    LE GABARIT DES VOLUMES DE SALLE D'EAU — éteint d'office.
+
+    La géométrie servait déjà au contrôle écrit ; elle se voit maintenant sur
+    la maquette, là où l'on pose. Éteint par défaut : un gabarit permanent
+    masquerait ce qu'il sert à vérifier.
+  */
+  const [showVolumes, setShowVolumes] = useState(false);
   /** Appareil de plafond en attente de pose : on touche la pièce qui le reçoit. */
   const [pendingCeiling, setPendingCeiling] = useState<CeilingKind | null>(null);
   /** On attend le point où poser un mot sur le plan. */
@@ -1659,6 +1667,9 @@ export function ResultScreen() {
    * mobilier, l'app ne peut rien affirmer, et le dire vaut mieux que
    * rassurer.
    */
+  /** Combien de zones humides le relevé porte : le calque en dépend. */
+  const zonesHumides = useMemo(() => wetZones(objects).length, [objects]);
+
   const volumes = useMemo(() => {
     const zones = wetZones(objects);
     const out = new Map<string, VolumeVerdict>();
@@ -3302,6 +3313,7 @@ export function ResultScreen() {
             routeHeights={showRoutes ? hauteursDesservies : undefined}
             showNorth={showNorth}
             showCeiling={showCeiling}
+            showVolumes={showVolumes}
             value={view3d}
             onChange={setView3d}
             focusRoomId={rooms[focusIdx]?.id ?? null}
@@ -3393,6 +3405,9 @@ export function ResultScreen() {
             setShowNorth={setShowNorth}
             showCeiling={showCeiling}
             setShowCeiling={setShowCeiling}
+            showVolumes={showVolumes}
+            setShowVolumes={setShowVolumes}
+            zonesHumides={zonesHumides}
             showElecTags={showElecTags}
             setShowElecTags={setShowElecTags}
             colorsAvailable={colorsAvailable}

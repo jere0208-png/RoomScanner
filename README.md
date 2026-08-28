@@ -10415,6 +10415,67 @@ le contrôle en sens inverse sans lequel les autres épreuves ne prouveraient ri
 passait un état de geste, qu'il ignore — il le recalcule depuis `touchHistory`,
 et lançait sur un `touchBank` vide. L'épreuve échouait à côté de son sujet.
 
+### Les volumes de la salle d'eau se voient enfin sur la maquette
+
+Suite des « idées dans ce genre » : la maquette 3D devient un banc d'essai, et
+c'est ce qu'un électricien veut vérifier avant de percer.
+
+**LA GÉOMÉTRIE EXISTAIT DEPUIS LONGTEMPS** — `wetZones`, `volumeAt`,
+`volumeVerdict` — et elle ne servait qu'au CONTRÔLE ÉCRIT : une ligne dans la
+feuille des diagnostics, « prise en volume 1, interdite ». **Personne ne relit
+une ligne de texte pour une pièce qu'il croit connaître.**
+
+Or c'est la faute la plus chère du métier : un socle en volume 1 se voit au
+Consuel, se dépose, se rebouche, se repeint. Elle ne coûte rien à éviter et tout
+à corriger — et elle se prend en posant « à peu près là », parce qu'un volume ne
+se dessine nulle part sur un mur nu.
+
+**ON LE MONTRE DONC LÀ OÙ L'ON POSE** : un gabarit au sol, comme tracé à la
+craie. Le volume 1 au droit de la zone humide, le volume 2 à soixante
+centimètres autour — pas le volume 0, qui est l'intérieur de la baignoire
+elle-même, déjà dessinée. **Au sol et non à hauteur de pose** : une nappe
+verticale masquerait le mur qu'on regarde, alors que c'est l'aplomb qui décide.
+
+**ET L'APPAREIL INTERDIT ROUGIT SUR PLACE**, cerclé d'une bague qui ne le cache
+pas — on ne demande pas d'aller lire une feuille pour savoir que la prise qu'on
+regarde est interdite. C'est `volumeVerdict` qui tranche, **la même source que
+le contrôle écrit** : la norme ne dit pas la même chose d'un socle et d'une
+commande, et signaler les deux pareil apprendrait à ignorer le signal.
+
+**LE CALQUE N'EXISTE QUE S'IL Y A DE QUOI LE CALCULER** — sans baignoire ni
+douche relevée, pas de pastille : un bouton qui n'allume rien donne à l'écran
+l'air d'être en panne. Et il part **éteint** : un gabarit permanent finirait par
+masquer la maquette qu'il sert à vérifier.
+
+Regardé en image, à partir des vrais nombres du composant : le rouge au droit de
+la baignoire, l'ambre qui déborde, la bague sur la prise du mur nord.
+
+#### Une épreuve qui ne prouvait rien, reconnue plutôt qu'habillée
+
+Avant les volumes, on a voulu corriger une « approximation » du geste livré la
+veille : l'interrupteur bascule le GROUPE de lampes qu'il commande, et l'on
+croyait que deux commandes se comporteraient donc comme deux copies d'un même
+bouton, jamais comme un va-et-vient.
+
+**Les épreuves sont passées du premier coup.** Sur une lampe commandée de deux
+endroits, « toutes allumées » est vrai dès que la première l'a allumée : la
+seconde éteint. Le comportement était déjà juste, et le banc l'a montré au lieu
+de le corriger.
+
+Les épreuves restent — elles fixent ce comportement, et le jour où l'on touchera
+à la bascule c'est le va-et-vient qui cassera en premier, sans un mot — mais
+**leur en-tête le dit** : garde-fou, pas réparation. C'est la deuxième fois de la
+session qu'un banc rattrape une histoire que j'allais écrire à tort (après
+l'ordre des gammes), et les deux fois c'est le même réflexe qui a sauvé : le
+faire tourner sur le code d'AVANT.
+
+#### Et une erreur de branchement que `tsc` a dite tout de suite
+
+Le calque « Volumes » a d'abord été posé sur la barre du PLAN, alors que c'est la
+maquette 3D qui le dessine. `tsc` l'a signalé à la seconde suivante — un calque
+proposé là où rien ne s'allumerait serait un bouton en panne. C'est écrit dans le
+code, à côté de la prop, pour la prochaine fois.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro
