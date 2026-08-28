@@ -166,6 +166,13 @@ const ouvrir = () => {
       screen: 'devis',
       gammeDevis: GAMMES[0].id,
       devisEcartes: [],
+      /*
+        LE RANG DE L'ÉTAPE SURVIT D'UN BANC À L'AUTRE : il vit dans le magasin
+        depuis qu'il doit survivre à l'aller-retour vers le magasin des
+        articles (voir `gammechoisie`). Sans cette remise à zéro, la première
+        épreuve qui va jusqu'au ticket laisse la suivante démarrer dessus.
+      */
+      etapeDevis: 0,
     });
     t = TestRenderer.create(<DevisScreen />);
   });
@@ -174,18 +181,27 @@ const ouvrir = () => {
   return t;
 };
 
-/** Les deux appuis qui mènent au prix. */
+/**
+ * L'APPUI QUI MÈNE AU PRIX — un seul, et il y en avait deux.
+ *
+ * Le tunnel commençait par le choix de gamme. Il a sa page à lui, ouverte
+ * depuis l'estimation (voir `gammechoisie`) : reste l'avertissement, puis le
+ * prix.
+ */
 const demanderLePrix = (t: TestRenderer.ReactTestRenderer) => {
-  act(() => bouton(t, 'Continuer').props.onPress());
   act(() => bouton(t, 'Voir le prix').props.onPress());
 };
 
 describe('on ne dérange le serveur que quand on demande le prix', () => {
-  it('les deux premières étapes n’appellent personne', () => {
+  it('l’avertissement n’appelle personne', () => {
+    /*
+      DEUX ÉTAPES MUETTES, ET IL N'EN RESTE QU'UNE : le choix de gamme est
+      parti sur sa page. La règle, elle, n'a pas bougé — aucun aller-retour au
+      serveur tant qu'aucun chiffre n'est demandé, parce qu'on peut très bien
+      reculer et ne jamais voir le ticket.
+    */
     repond({ ok: true, tarifs: CATALOGUE });
-    const t = ouvrir();
-    expect(appels).toBe(0);
-    act(() => bouton(t, 'Continuer').props.onPress());
+    ouvrir();
     expect(appels).toBe(0);
   });
 

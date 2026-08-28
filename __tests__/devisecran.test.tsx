@@ -222,6 +222,15 @@ const ouvrir = () => {
         forme de cet ecran avait deja subie.
       */
       devisEcartes: [],
+      /*
+        LE RANG DE L'ÉTAPE AUSSI SURVIT D'UN BANC À L'AUTRE — et pour la même
+        raison que les articles écartés : il vit dans le magasin, parce qu'il
+        doit survivre à l'aller-retour au magasin des articles (voir
+        `gammechoisie`). Sans cette remise à zéro, la première épreuve qui va
+        jusqu'au ticket laisse la suivante démarrer SUR le ticket, où le
+        bouton « Voir le prix » n'existe plus.
+      */
+      etapeDevis: 0,
     });
     t = TestRenderer.create(<DevisScreen />);
   });
@@ -255,7 +264,13 @@ const bouton = (t: TestRenderer.ReactTestRenderer, nom: string) =>
  */
 const auTicket = async () => {
   const t = ouvrir();
-  act(() => bouton(t, 'Continuer').props.onPress());
+  /*
+    UNE SEULE MARCHE, ET IL Y EN AVAIT DEUX.
+
+    Le tunnel commençait par le choix de gamme : il fallait « Continuer »,
+    puis « Voir le prix ». Le choix de gamme a sa page à lui, ouverte depuis
+    l'estimation (voir `gammechoisie`) ; reste l'avertissement, puis le prix.
+  */
   act(() => bouton(t, 'Voir le prix').props.onPress());
   await act(async () => {});
   mesurer(t);
@@ -317,31 +332,44 @@ describe('le défilement de la page', () => {
   });
 });
 
-describe('les trois étapes', () => {
+describe('les deux étapes', () => {
+  /*
+    ELLES ÉTAIENT TROIS, ET LA PREMIÈRE DEMANDAIT LA GAMME.
+
+    On choisissait sa marque d'appareillage AVANT d'avoir vu le moindre prix
+    — c'est-à-dire avant d'avoir la seule information qui permette de
+    choisir —, et tout aller-retour au magasin y ramenait, deux pages avant
+    l'article qu'on venait d'ajouter. Le choix de gamme a maintenant sa page,
+    ouverte depuis l'estimation : c'est le banc `gammechoisie` qui le tient,
+    avec la phrase qui compte l'appareillage du relevé.
+
+    Restent les deux marches qui doivent se lire dans l'ordre : ce que le prix
+    ne contient pas, puis le prix.
+  */
   it('se voient : un numéro, un rang, un gros titre', () => {
     // Relevé du patron : « fais des étapes modernes avec des gros titres et
     // numéros ». On doit savoir où l'on est sans compter.
     const lus = mots(ouvrir());
     expect(lus).toContain('1');
-    expect(lus).toContain('ÉTAPE 1 SUR 3');
-    expect(lus).toContain('Quel appareillage ?');
+    expect(lus).toContain('ÉTAPE 1 SUR 2');
+    expect(lus).toContain('À savoir avant le prix');
   });
 
-  it('offrent les cinq gammes, Céliane et Mosaic en tête', () => {
+  it('et le tunnel ne demande plus la gamme en chemin', () => {
     /*
-      Relevé du patron : « mets le Legrand Céliane et Mosaic en premier, c'est
-      les plus communs ». Une liste de choix se range par ce qu'on prend le
-      plus souvent, pas par ce qu'elle coûte.
+      LE CONTRÔLE EN SENS INVERSE de la page qui a déménagé : si les cartes
+      étaient restées là, l'épreuve du dessus passerait quand même — deux
+      étapes, mais le même tunnel.
+
+      L'ordre des gammes, lui — « mets le Legrand Céliane et Mosaic en
+      premier, c'est les plus communs » —, reste tenu là où elles vivent
+      désormais.
     */
-    const lus = mots(ouvrir());
-    for (const g of GAMMES) expect(lus).toContain(`${g.marque} ${g.nom}`);
-    const rang = (nom: string) => lus.findIndex((m) => m.includes(nom));
-    expect(rang('Céliane')).toBeLessThan(rang('dooxie'));
-    expect(rang('Mosaic')).toBeLessThan(rang('dooxie'));
-    expect(rang('Céliane')).toBeLessThan(rang('Mosaic'));
+    const lus = mots(ouvrir()).join(' ');
+    for (const g of GAMMES) expect(lus).not.toContain(`${g.marque} ${g.nom}`);
   });
 
-  it('passent par l’AVERTISSEMENT avant de donner le prix', () => {
+  it('l’AVERTISSEMENT vient avant le prix', () => {
     /*
       L'ordre est la regle : le total ne s'affiche jamais a quelqu'un qui n'a
       pas pu lire ce qui n'y est pas.
@@ -366,10 +394,7 @@ describe('les trois étapes', () => {
       Le banc de la demonstration est parti avec elle ; son histoire est ici,
       ou elle sert encore.
     */
-    const t = ouvrir();
-    act(() => bouton(t, 'Continuer').props.onPress());
-    const lus = mots(t);
-    expect(lus).toContain('ÉTAPE 2 SUR 3');
+    const lus = mots(ouvrir());
     expect(lus).toContain('Attention');
     expect(lus.join(' ')).toContain(
       'Les luminaires ne sont pas compris dans le devis',
@@ -386,21 +411,19 @@ describe('les trois étapes', () => {
       possible coute cher : croire qu'il faudra acheter de quoi alimenter les
       luminaires, en plus des luminaires.
     */
-    const t = ouvrir();
-    act(() => bouton(t, 'Continuer').props.onPress());
-    expect(mots(t).join(' ')).toContain('est bien compté');
+    expect(mots(ouvrir()).join(' ')).toContain('est bien compté');
   });
 
-  it('et on revient sur son choix d’un appui sur le numéro', async () => {
+  it('et on revient sur l’avertissement d’un appui sur le numéro', async () => {
     const t = await auTicket();
     act(() => bouton(t, 'Étape 1').props.onPress());
-    expect(mots(t)).toContain('Quel appareillage ?');
+    expect(mots(t)).toContain('À savoir avant le prix');
   });
 
   it('mais on ne saute pas celle qu’on n’a pas lue', () => {
     // Le contrôle en sens inverse : l'étape des exclusions ne se contourne pas
     // par le fil.
-    expect(bouton(ouvrir(), 'Étape 3').props.disabled).toBe(true);
+    expect(bouton(ouvrir(), 'Étape 2').props.disabled).toBe(true);
   });
 });
 

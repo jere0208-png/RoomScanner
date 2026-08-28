@@ -10616,6 +10616,80 @@ l'appareil, à moins de trois points près, mesuré sur le rendu. Le résultat, 
 plein, est une bague verte sur un pan vide. En écorché, le pan s'efface et tout
 revient. C'est une question ouverte pour le repère lui-même, pas pour la bague.
 
+### Le choix de gamme quitte le tunnel, et dit à quoi il sert
+
+Relevé du patron, en deux temps :
+
+> « Dans la page "Quel appareillage ?" on indique en dessous une belle phrase
+> bleue "Vous avez x interrupteurs, x prises, x RJ, etc" et l'utilisateur doit
+> comprendre qu'on lui propose une gamme pour ceux-ci. »
+
+> « Ajouter un article au magasin l'ajoute mais on retourne sur la première page
+> du choix de gamme à l'ajout. Fais en sorte que la gamme soit sauvegardée et
+> changeable que depuis la page estimation (icône changement — nom de la gamme
+> actuelle). »
+
+**LA PANNE, ET SA CAUSE.** L'écran du devis était un tunnel à trois étapes dont
+le rang vivait **dans le composant**. Ouvrir le magasin DÉMONTE ce composant :
+en revenant, on retombait sur la première étape — le choix de gamme —, avec son
+article bien ajouté et aucun moyen de s'en apercevoir. **Le geste le plus
+courant de la page punissait celui qui le faisait** : c'est devant le ticket, en
+lisant la liste, qu'on se dit « il manque les chevilles ».
+
+Le rang passe donc au magasin de l'application (`etapeDevis`). Il ne voyage pas
+avec le plan : c'est une position de lecture, pas un relevé, et un dossier
+rouvert repart de l'avertissement — on ne fait pas sauter à quelqu'un la page
+qui dit ce que le prix ne contient pas.
+
+**ET LA GAMME N'AVAIT RIEN À FAIRE EN TÊTE DE TUNNEL.** On choisissait sa marque
+d'appareillage **avant d'avoir vu le moindre prix**, c'est-à-dire avant d'avoir
+la seule information qui permette de choisir. Elle a maintenant sa page
+(`GammeScreen`), ouverte depuis l'estimation par un encart bleu qui porte le nom
+en toutes lettres — « APPAREILLAGE / Legrand Céliane » — et deux flèches en
+boucle. On lit le total, on se dit « en Odace, ça donnerait quoi ? », on change,
+on revoit le total. C'est le seul geste qui donne un sens au choix.
+
+L'encart prend **la forme exacte de la porte du magasin** posée deux lignes plus
+bas : même fond bleu, même chevron. Ce sont les deux seuls gestes du ticket qui
+mènent ailleurs ; leur donner deux dessins ferait chercher lequel ouvre quoi.
+
+**LA PHRASE BLEUE COMPTE AVANT DE PROPOSER.** Devant cinq marques, la question
+qu'on se pose est « une gamme pour quoi ? ». La page répond : « Votre relevé
+compte 5 prises, 3 commandes et 1 prise de communication. C'est le prix de
+ceux-là que la gamme fait bouger — d'une marque à l'autre, du simple au double. »
+Et, en dessous : « Le reste — gaines, fils, boîtes, tableau — ne change pas. »
+
+**Ces nombres sont CEUX DU TICKET**, et pas d'autres : `ceQueLaGammeChange` relit
+la légende du devis, qui relit elle-même les lignes déjà chiffrées. Une page qui
+compterait les appareils de son côté finirait par annoncer « 4 prises » devant un
+ticket qui en chiffre cinq, et cet écart-là ne se retrouve jamais. Les points de
+plafond sont dehors : un luminaire ne se choisit pas dans une gamme
+d'appareillage.
+
+Les mots sont donnés à la main (`MOTS_DE_FAMILLE`), parce que « 3 Courants
+faibles » ne se dit pas et « 3 Prisess » encore moins — c'est la règle de la
+maison sur les pluriels, l'irrégulier s'écrit. Et `enumerer` pose le « et » avant
+le dernier : une énumération toute en virgules se lit comme une liste tronquée.
+
+Sans appareil au relevé, la phrase ne compte pas des zéros — elle dit « Aucun
+appareil au relevé pour l'instant. La gamme se choisit quand même : elle
+s'appliquera à tout ce que vous poserez. »
+
+**Treize épreuves** (`gammechoisie`), écrites avant le correctif : six rouges sur
+le code d'avant, vérifiées en remettant les deux fichiers en état
+(`git stash`). Elles tiennent le tunnel à deux marches, l'absence de gamme en
+chemin, le bouton qui la nomme, la page qui la retient, la phrase et ses nombres,
+le contrôle du relevé vide — et surtout **le rang qui survit au démontage**,
+avec son contrôle en sens inverse : un devis ouvert pour la première fois
+commence bien au début.
+
+Deux bancs voisins décrivaient l'ancien tunnel et sont **réécrits, pas
+supprimés** : `devisecran` raconte les trois étapes devenues deux et où le choix
+de gamme est parti, `prixecran` raconte les deux étapes muettes devenues une.
+Tous deux reposent désormais `etapeDevis` à zéro à chaque montage — le magasin
+Zustand survit d'un banc à l'autre, et la première épreuve qui allait jusqu'au
+ticket laissait la suivante démarrer dessus.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

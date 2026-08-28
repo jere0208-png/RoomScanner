@@ -73,3 +73,17 @@ export function pourChercher(s: string): string {
     .replace(/[̀-ͯ]/g, '')
     .replace(/['’]/g, ' ');
 }
+
+/**
+ * « a », « a et b », « a, b et c ».
+ *
+ * Une énumération séparée par des virgules jusqu'au bout — « 9 prises, 5
+ * commandes, 1 RJ45 » — se lit comme une liste tronquée : on attend la suite.
+ * Le « et » dit que c'est fini. C'est le genre de détail qui distingue une
+ * phrase d'un tableau mis à plat.
+ */
+export function enumerer(morceaux: string[]): string {
+  if (morceaux.length === 0) return '';
+  if (morceaux.length === 1) return morceaux[0];
+  return `${morceaux.slice(0, -1).join(', ')} et ${morceaux[morceaux.length - 1]}`;
+}

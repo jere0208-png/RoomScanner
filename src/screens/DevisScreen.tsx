@@ -90,11 +90,21 @@ const euros = (v: number) => `${fr(v, 2)} €`;
  */
 const TARIF_EMBARQUE = 'Estimation EchoPlan';
 
+/*
+  DEUX ÉTAPES, ET IL Y EN AVAIT TROIS.
+
+  La première demandait la gamme d'appareillage. Elle est partie sur sa propre
+  page (`GammeScreen`), ouverte depuis l'estimation : on choisissait sa marque
+  AVANT d'avoir vu le moindre prix, c'est-à-dire avant d'avoir la seule
+  information qui permette de choisir. Reste ce qui doit se lire dans l'ordre :
+  ce que le prix ne contient pas, puis le prix.
+*/
 const ETAPES = [
-  { titre: 'Quel appareillage ?', court: 'Appareillage' },
   { titre: 'À savoir avant le prix', court: 'À savoir' },
   { titre: 'Votre estimation', court: 'Prix' },
 ];
+/** Le rang de l'estimation : le seul écran qui montre des chiffres. */
+const ETAPE_PRIX = 1;
 
 /**
  * LE SYMBOLE D'UN APPAREIL, tel que le plan le dessine.
@@ -311,7 +321,6 @@ export function DevisScreen() {
   const openings = useScanStore((s) => s.openings);
 
   const gamme = useScanStore((s) => s.gammeDevis);
-  const setGamme = useScanStore((s) => s.setGammeDevis);
   const ecartes = useScanStore((s) => s.devisEcartes);
   const quantites = useScanStore((s) => s.devisQuantites);
   const ajouts = useScanStore((s) => s.devisAjouts);
@@ -320,7 +329,17 @@ export function DevisScreen() {
   const retirerDuDevis = useScanStore((s) => s.retirerDuDevis);
   const basculer = useScanStore((s) => s.basculerArticleDevis);
   const toutRemettre = useScanStore((s) => s.remettreLesArticlesDevis);
-  const [etape, setEtape] = useState(0);
+  /*
+    LE RANG DE L'ÉTAPE VIT DANS LE MAGASIN DE L'APPLICATION, pas ici.
+
+    Relevé du patron : « ajouter un article au magasin l'ajoute mais on
+    retourne sur la première page ». Ouvrir le magasin DÉMONTE cette page ; le
+    rang repartait donc à zéro, et l'on revenait deux écrans avant l'article
+    qu'on venait d'ajouter. Le geste le plus courant de la page punissait
+    celui qui le faisait.
+  */
+  const etape = useScanStore((s) => s.etapeDevis);
+  const setEtape = useScanStore((s) => s.setEtapeDevis);
   const [cherche, setCherche] = useState('');
   /*
     LA VÉRIFICATION DES PRIX — relevé du patron : « une actualisation
@@ -454,7 +473,7 @@ export function DevisScreen() {
   }, [devis.version]);
 
   useEffect(() => {
-    if (etape !== 2 || dejaVu.current) return;
+    if (etape !== ETAPE_PRIX || dejaVu.current) return;
     dejaVu.current = true;
     verifier(false).catch(() => {});
   }, [etape, verifier]);
@@ -481,6 +500,12 @@ export function DevisScreen() {
     }
     reglerQuantiteDevis(cleDeLigne(l), voulue);
   };
+
+  /** Le nom de la gamme en toutes lettres — l'en-tête et le bouton le lisent. */
+  const nomDeLaGamme = useMemo(() => {
+    const g = GAMMES.find((x) => x.id === gamme);
+    return g ? `${g.marque} ${g.nom}` : String(gamme);
+  }, [gamme]);
 
   const avancer = (n: number) => {
     haptic('leger');
@@ -564,41 +589,6 @@ export function DevisScreen() {
         contentContainerStyle={styles.rouleauFond}
         showsVerticalScrollIndicator={false}>
         {etape === 0 && (
-          <>
-            <Text style={styles.sous}>
-              C’est ce qui change le plus le prix : d’une gamme à l’autre, un
-              même logement va du simple au double. Le reste — gaines, fils,
-              boîtes, tableau — ne bouge pas.
-            </Text>
-            {GAMMES.map((g) => {
-              const choisi = g.id === gamme;
-              return (
-                <TouchableOpacity
-                  key={g.id}
-                  accessibilityLabel={`${g.marque} ${g.nom}${
-                    choisi ? ', choisi' : ''
-                  }`}
-                  accessibilityRole="button"
-                  activeOpacity={0.75}
-                  style={[styles.carte, choisi && styles.carteChoisie]}
-                  onPress={() => {
-                    haptic('leger');
-                    setGamme(g.id);
-                  }}>
-                  <View style={styles.texts}>
-                    <Text style={styles.carteNom}>{`${g.marque} ${g.nom}`}</Text>
-                    <Text style={styles.carteNote}>{g.note}</Text>
-                  </View>
-                  <View style={[styles.coche, choisi && styles.cocheOn]}>
-                    {choisi && <Text style={styles.cocheTexte}>✓</Text>}
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
-          </>
-        )}
-
-        {etape === 1 && (
           /*
             UNE SEULE CHOSE À DIRE, ET C'EST CELLE QUI COÛTE.
 
@@ -645,9 +635,9 @@ export function DevisScreen() {
           bon, et c'est le premier qu'on retient. On montre donc l'attente,
           puis LE prix.
         */}
-        {etape === 2 && enCours && <PrixQuiSActualisent etape={motDAttente} />}
+        {etape === ETAPE_PRIX && enCours && <PrixQuiSActualisent etape={motDAttente} />}
 
-        {etape === 2 && !enCours && (
+        {etape === ETAPE_PRIX && !enCours && (
           /*
             LE TICKET DE CAISSE — relevé du patron : « au clic on affiche une
             page entière moderne qui affiche tout bien fait comme un ticket de
@@ -668,12 +658,47 @@ export function DevisScreen() {
           <>
             <View style={styles.entete}>
               <Text style={styles.enseigne}>ESTIMATION DE FOURNITURE</Text>
-              <Text style={styles.sousEnseigne}>
-                {`${GAMMES.find((g) => g.id === gamme)?.marque ?? ''} ${
-                  GAMMES.find((g) => g.id === gamme)?.nom ?? gamme
-                } · tarifs ${devis.version}`}
-              </Text>
+              <Text style={styles.sousEnseigne}>{`tarifs ${devis.version}`}</Text>
             </View>
+
+            {/*
+              LA GAMME SE CHANGE ICI, ET NULLE PART AILLEURS.
+
+              Relevé du patron : « icône changement — nom de la gamme
+              actuelle ». Elle ouvrait le devis, avant tout prix ; elle se
+              change maintenant DEVANT le total qu'elle fait bouger, ce qui
+              est le seul moment où le choix veut dire quelque chose.
+
+              Le nom en toutes lettres, et non une simple icône : le ticket
+              doit dire ce qu'il chiffre sans qu'on ait à ouvrir la page pour
+              s'en souvenir.
+            */}
+            <TouchableOpacity
+              style={styles.gammeBouton}
+              accessibilityRole="button"
+              accessibilityLabel={`Changer de gamme — ${nomDeLaGamme}`}
+              activeOpacity={0.75}
+              onPress={() => {
+                haptic('leger');
+                setScreen('gamme');
+              }}>
+              <Svg width={17} height={17} viewBox="0 0 24 24">
+                {/* Deux flèches en boucle : le signe universel du « changer ». */}
+                <Path
+                  d="M4 9 a8 8 0 0 1 13.5 -3.5 L20 8 M20 4 v4 h-4 M20 15 a8 8 0 0 1 -13.5 3.5 L4 16 M4 20 v-4 h4"
+                  stroke={c.blue}
+                  strokeWidth={1.9}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  fill="none"
+                />
+              </Svg>
+              <View style={styles.gammeTextes}>
+                <Text style={styles.gammeRole}>APPAREILLAGE</Text>
+                <Text style={styles.gammeNom}>{nomDeLaGamme}</Text>
+              </View>
+              <Text style={styles.porteChevron}>›</Text>
+            </TouchableOpacity>
 
             {/*
               D'OÙ VIENNENT CES CHIFFRES — avant le premier article, pas après
@@ -894,16 +919,14 @@ export function DevisScreen() {
 
       {/* Le bouton reste POSÉ SUR LA PAGE, sous le rouleau : on ne fait pas
           défiler trente lignes pour retrouver « Continuer ». */}
-      {etape < 2 && (
+      {etape < ETAPE_PRIX && (
         <TouchableOpacity
-          accessibilityLabel={etape === 0 ? 'Continuer' : 'Voir le prix'}
+          accessibilityLabel="Voir le prix"
           accessibilityRole="button"
           activeOpacity={0.85}
           style={styles.action}
           onPress={() => avancer(etape + 1)}>
-          <Text style={styles.actionTexte}>
-            {etape === 0 ? 'Continuer' : 'Voir le prix'}
-          </Text>
+          <Text style={styles.actionTexte}>Voir le prix</Text>
         </TouchableOpacity>
       )}
     </RetourGlisse>
@@ -1152,6 +1175,31 @@ const getStyles = themedStyles((c: Palette) =>
     },
     porteMot: { flex: 1, color: c.blue, fontSize: 14, fontWeight: '700' },
     porteChevron: { color: c.blue, fontSize: 20, fontWeight: '700' },
+    /*
+      LE CHANGEMENT DE GAMME PREND LA FORME DE LA PORTE DU MAGASIN — même
+      encart bleu, même chevron. Ce sont les deux seuls gestes du ticket qui
+      mènent ailleurs ; leur donner deux dessins différents ferait chercher
+      lequel des deux ouvre quoi.
+    */
+    gammeBouton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      backgroundColor: c.blueSoft,
+      borderRadius: radius.md,
+      paddingVertical: 10,
+      paddingHorizontal: 14,
+      marginBottom: 12,
+    },
+    gammeTextes: { flex: 1, gap: 1 },
+    gammeRole: {
+      color: c.blue,
+      fontSize: 10,
+      fontWeight: '800',
+      letterSpacing: 0.8,
+      opacity: 0.8,
+    },
+    gammeNom: { color: c.blue, fontSize: 15, fontWeight: '900' },
     /* Le bandeau des tarifs respire au-dessus des outils de recherche. */
     bandeauTarifs: { marginBottom: 12 },
     articlePrix: { color: c.ink, fontSize: 14, fontWeight: '800' },

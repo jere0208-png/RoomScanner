@@ -15,6 +15,7 @@ import { ConfidentialiteScreen } from './src/screens/ConfidentialiteScreen';
 import { PaywallScreen } from './src/screens/PaywallScreen';
 import { EcranChargement } from './src/components/EcranChargement';
 import { MagasinScreen } from './src/screens/MagasinScreen';
+import { GammeScreen } from './src/screens/GammeScreen';
 import { reprendreLesTarifs } from './src/net/tarifs';
 import { EssaiEpuise } from './src/components/EssaiEpuise';
 import { SurprisePro } from './src/components/SurprisePro';
@@ -137,6 +138,7 @@ export default function App() {
       {screen === 'export' && <ExportScreen />}
       {screen === 'devis' && <DevisScreen />}
       {screen === 'magasin' && <MagasinScreen />}
+      {screen === 'gamme' && <GammeScreen />}
       {screen === 'camera' && <CameraScreen />}
       <PaywallScreen />
       <EssaiEpuise />

@@ -540,3 +540,55 @@ export function nomDAppareil(k: FixtureKind | CeilingKind): string {
     String(k)
   );
 }
+
+/**
+ * CE QUE LA GAMME CHANGE, FAMILLE PAR FAMILLE.
+ *
+ * Devant cinq marques, la question qu'on se pose est « une gamme pour quoi ? ».
+ * Elle se répond en comptant ce que le relevé porte — et en le comptant AVEC
+ * LES NOMBRES DU TICKET, puisqu'on relit la légende, qui relit elle-même les
+ * lignes déjà chiffrées. Une phrase qui recompterait de son côté annoncerait
+ * « 4 prises » devant un ticket qui en chiffre cinq, et cet écart-là ne se
+ * retrouve jamais.
+ *
+ * LES POINTS DE PLAFOND SONT DEHORS : un luminaire ne se choisit pas dans une
+ * gamme d'appareillage, et son prix ne bouge pas d'une marque à l'autre.
+ *
+ * LES MOTS SONT DONNÉS À LA MAIN, parce que « 3 Courants faibles » ne se dit
+ * pas et que « 3 Prisess » encore moins. C'est la règle de la maison sur les
+ * pluriels : l'irrégulier s'écrit, il ne se devine pas.
+ */
+const MOTS_DE_FAMILLE: Record<string, [string, string]> = {
+  Prises: ['prise', 'prises'],
+  Commandes: ['commande', 'commandes'],
+  'Courants faibles': ['prise de communication', 'prises de communication'],
+  Éclairage: ['applique', 'appliques'],
+  Divers: ['autre appareil', 'autres appareils'],
+};
+
+export interface CompteDeGamme {
+  famille: string;
+  quantite: number;
+  /** Le mot accordé, prêt à écrire : « 9 prises ». */
+  mot: string;
+}
+
+export function ceQueLaGammeChange(legende: LigneLegende[]): CompteDeGamme[] {
+  const parFamille = new Map<string, number>();
+  for (const l of legende) {
+    if (l.plafond) continue;
+    const famille = FIXTURES[l.kind as FixtureKind]?.family;
+    if (!famille) continue;
+    parFamille.set(famille, (parFamille.get(famille) ?? 0) + l.quantite);
+  }
+  // L'ordre est celui du sélecteur d'appareillage : prises, commandes,
+  // courants faibles, éclairage, divers. C'est l'ordre dans lequel on les
+  // pose, et celui dans lequel on les cherche.
+  return Object.keys(MOTS_DE_FAMILLE)
+    .filter((f) => (parFamille.get(f) ?? 0) > 0)
+    .map((famille) => {
+      const quantite = parFamille.get(famille) ?? 0;
+      const [un, plusieurs] = MOTS_DE_FAMILLE[famille];
+      return { famille, quantite, mot: quantite > 1 ? plusieurs : un };
+    });
+}

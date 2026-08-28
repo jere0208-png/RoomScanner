@@ -111,6 +111,15 @@ export type Screen =
   // Le catalogue : une PAGE entière, comme le devis, et pour la même
   // raison — une liste de cent cinquante articles doit défiler.
   | 'magasin'
+  /*
+    LE CHOIX DE GAMME — une page, et non plus la première marche d'un tunnel.
+
+    Il ouvrait le devis : on choisissait sa marque d'appareillage AVANT
+    d'avoir vu le moindre prix, c'est-à-dire avant d'avoir la seule
+    information qui permette de choisir. Il s'ouvre maintenant depuis
+    l'estimation, quand on voit le total qu'il va faire bouger.
+  */
+  | 'gamme'
   | 'camera'
   | 'profil'
   | 'confidentialite';
@@ -1311,6 +1320,22 @@ interface ScanState {
   gammeDevis: GammeId;
   setGammeDevis: (g: GammeId) => void;
   /**
+   * OÙ L'ON EN EST DANS LE DEVIS — et pourquoi ce rang vit ICI.
+   *
+   * Relevé du patron : « ajouter un article au magasin l'ajoute mais on
+   * retourne sur la première page ». Aller au magasin DÉMONTE l'écran du
+   * devis ; le rang vivait dans le composant, il repartait donc à zéro. On
+   * revenait deux écrans avant l'article qu'on venait d'ajouter — le geste le
+   * plus courant de la page punissait celui qui le faisait.
+   *
+   * Il ne voyage PAS avec le plan (voir `SavedScan`) : c'est une position de
+   * lecture, pas un relevé. Un dossier rouvert repart de l'avertissement, et
+   * c'est bien : on ne saute pas la page qui dit ce que le prix ne contient
+   * pas à qui ne l'a jamais lue.
+   */
+  etapeDevis: number;
+  setEtapeDevis: (n: number) => void;
+  /**
    * LES ARTICLES ÉCARTÉS DU DEVIS.
    *
    * Ici et non dans l'écran, pour la même raison que la gamme : le bouton du
@@ -2043,6 +2068,9 @@ export const useScanStore = create<ScanState>((set, get) => {
     // La première du catalogue : la plus posée, voir `GAMMES`.
     gammeDevis: GAMMES[0].id,
     setGammeDevis: (gammeDevis) => set({ gammeDevis }),
+
+    etapeDevis: 0,
+    setEtapeDevis: (etapeDevis) => set({ etapeDevis }),
 
     devisEcartes: [],
     devisQuantites: {},
@@ -6469,6 +6497,10 @@ export const useScanStore = create<ScanState>((set, get) => {
         north: null,
         // Le popup de fin de scan appartient au scan qui vient de finir.
         arrivage: null,
+        // Un nouveau relevé n'a pas encore lu l'avertissement du devis : on
+        // ne lui fait pas sauter la page qui dit ce que le prix ne contient
+        // pas.
+        etapeDevis: 0,
       });
     },
   };
