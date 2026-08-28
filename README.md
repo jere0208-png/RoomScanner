@@ -10903,6 +10903,59 @@ cinquante-neuf, comme un iPhone à encoche —, et le contrôle en sens inverse,
 vérifie que le titre est POSÉ dessous et non ancré au bord : une marge sur le
 cadre extérieur ne sert à rien si l'en-tête la reprend.
 
+### Le halo d'une lampe : une marque, plus une portée
+
+Relevé du patron, après l'avoir vu tourner : « fais moins gros les lumières
+allumées au clic d'un interrupteur, divise par 2 l'étendue. **On veut juste voir
+que ça allume.** »
+
+**IL A RAISON, ET LA PHRASE DIT EXACTEMENT CE QUI CLOCHAIT.** Le halo avait été
+posé comme une PORTÉE : un mètre dix, ce qu'on voit s'éclairer au sol sous une
+suspension. Le raisonnement tenait — une lumière a une taille physique, elle doit
+se projeter comme la maquette — mais il répondait à la mauvaise question. Ce
+dessin ne simule pas un éclairement : il **signale** qu'une lampe est allumée.
+
+**MESURÉ SUR LE RENDU RÉEL, à quatre cadrages** (banc temporaire, nombres du vrai
+composant) :
+
+    zoom 0,2 → 12,7 px · 0,35 → 22,2 · 1 → 63,4 · 2,5 → 158,4
+
+et surtout, **le diamètre du halo rapporté à la largeur du logement dessiné :
+0,323 aux quatre cadrages**. C'est la mesure qui compte, et elle est constante
+parce que le halo suit l'échelle : un tiers de la pièce passait en jaune pour dire
+qu'une ampoule est allumée. Après division : **0,162**.
+
+**LE NOM SUIT LE SENS.** `PORTEE_LAMPE` (1,10 m) devient `HALO_LAMPE` (0,55 m) —
+un nom qui dit « portée » sur une marque est un commentaire qui ment, et cette
+maison paie assez cher les commentaires qui décrivent une intention.
+
+**LES DEUX BORNES SUIVENT LA MÊME DIVISION**, et ce n'était pas facultatif.
+`HALO_PART` passe de 0,30 à 0,15 : borner à trente centièmes du logement une
+marque qui n'en vaut plus que quinze l'aurait laissée repasser à sa taille
+d'avant **sur les petites pièces**, là même où elle gênait le plus. `HALO_MIN`
+passe de 9 à 4,5 points : un plancher qui ne bouge pas ferait, de loin, une lampe
+plus grosse que le dessin qui l'entoure.
+
+**ET LE CŒUR DE LA SOURCE AUSSI.** Les trois cercles se déduisent d'un seul
+rayon — la portée, la nappe, la source — sauf le dernier, qui avait un plancher
+de trois points. Sur un halo divisé par deux, il devenait **plus large que la
+nappe qui l'entoure** : trois contre 3,05 au cadrage le plus large. Trois cercles
+qui se croisent ne se lisent plus comme une lumière. Le plancher tombe à 1,5.
+
+**Regardé en image, avant contre après**, au rendu réel transcrit en SVG depuis
+les nombres du composant : le halo couvrait le tiers de la pièce, il tient
+maintenant autour du point lumineux. Dézoomé, il reste visible sans écraser le
+plan. *(La transcription rend les cercles opaques — leur opacité est animée entre
+28 et 80 centièmes, donc le vrai halo est plus doux que sur l'image ; ce qu'on
+juge ici, c'est l'étendue.)*
+
+**Trois épreuves neuves**, deux rouges avant : le diamètre tient dans le cinquième
+du logement, il en couvre encore le huitième — le contrôle en sens inverse, parce
+que diviser par deux ne doit pas rendre la lampe invisible —, et cette part ne
+bouge pas avec le cadrage, ce qui distingue une taille physique d'un nombre de
+pixels. Les deux bornes existantes sont resserrées à la moitié et racontent les
+deux versions.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

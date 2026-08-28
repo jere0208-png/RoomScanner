@@ -159,11 +159,24 @@ export const RAYON_CIBLE = 22;
  * maison connaît sous un autre nom — un réglage nommé par son chiffre, qui ne
  * vaut que pour le cadrage où on l'a posé.
  *
- * UN MÈTRE DIX : la portée utile d'un point lumineux de plafond sur le sol —
- * ce qu'on voit s'éclairer sous une suspension. Elle se projette avec la même
- * échelle que la maquette, comme tout le reste de cette vue.
+ * ET CE N'EST PAS UNE PORTÉE — c'est une MARQUE. Relevé du patron, après
+ * l'avoir vu tourner : « fais moins gros les lumières allumées au clic d'un
+ * interrupteur, divise par 2 l'étendue. On veut juste voir que ça allume. »
+ *
+ * La première version valait un mètre dix : la portée utile d'un point lumineux
+ * de plafond sur le sol, ce qu'on voit s'éclairer sous une suspension. Le
+ * raisonnement était juste et le résultat trop gros — mesuré sur le rendu réel,
+ * soixante-trois points de rayon à zoom 1, et un diamètre qui couvrait 32 % de
+ * la largeur du logement dessiné, à TOUS les cadrages puisqu'il suit l'échelle.
+ * Une pièce sur trois passait en jaune pour dire qu'une ampoule est allumée.
+ *
+ * CINQUANTE-CINQ CENTIMÈTRES : ce qu'il faut pour voir qu'une lampe est
+ * allumée sans éclairer la pièce. Le halo ne simule rien, il signale — et le
+ * nom suit le sens, parce qu'un nom qui dit « portée » sur une marque est un
+ * commentaire qui ment. Il reste EN MÈTRES, et se projette avec l'échelle de la
+ * maquette : c'est la leçon qui, elle, n'a pas changé.
  */
-const PORTEE_LAMPE = 1.1;
+const HALO_LAMPE = 0.55;
 /**
  * ET ELLE EST BORNÉE AUX DEUX BOUTS — dont un qui n'est PAS un nombre de
  * pixels.
@@ -178,8 +191,15 @@ const PORTEE_LAMPE = 1.1;
  * compte n'est pas la taille du halo, c'est SA PART DU DESSIN — une lampe
  * n'éclaire jamais la moitié d'un appartement.
  */
-const HALO_MIN = 9;
-const HALO_PART = 0.3;
+/*
+  LES DEUX BORNES SUIVENT LA MÊME DIVISION : borner à trente centièmes du
+  logement une marque qui n'en vaut plus que quinze laisserait le halo repasser
+  à sa taille d'avant sur les petites pièces, là même où il gênait le plus. Et
+  un plancher qui ne bouge pas ferait, de loin, une lampe plus grosse que le
+  dessin qui l'entoure.
+*/
+const HALO_MIN = 4.5;
+const HALO_PART = 0.15;
 
 /**
  * LA BAGUE D'UN DÉPART, EN MÈTRES — et pour la même raison que le halo.
@@ -1837,7 +1857,7 @@ export function Iso3DView({
         cy: q.sy,
         r: Math.max(
           HALO_MIN,
-          Math.min(HALO_PART * radius3d * scale, PORTEE_LAMPE * scale),
+          Math.min(HALO_PART * radius3d * scale, HALO_LAMPE * scale),
         ),
       });
     }
@@ -2240,10 +2260,18 @@ export function Iso3DView({
                     fill="#FFF3CE"
                     opacity={halo2}
                   />
+                  {/*
+                    LE PLANCHER DE LA SOURCE SUIT AUSSI. À un point et demi
+                    près, il valait trois : sur un halo divisé par deux, le
+                    cœur devenait plus large que la nappe qui l'entoure —
+                    trois contre trois virgule zéro cinq, à zoom 0,2. Trois
+                    cercles qui se croisent ne se lisent plus comme une
+                    lumière.
+                  */}
                   <Circle
                     cx={l.cx}
                     cy={l.cy}
-                    r={Math.max(3, l.r * 0.17)}
+                    r={Math.max(1.5, l.r * 0.17)}
                     fill="#FFFDF4"
                     opacity={0.95}
                   />

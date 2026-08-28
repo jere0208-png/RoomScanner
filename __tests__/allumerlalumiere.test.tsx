@@ -214,6 +214,29 @@ const taper = (t: TestRenderer.ReactTestRenderer, x: number, y: number) => {
   });
 };
 
+/**
+ * L'EMPRISE DU DESSIN, mesurée sur ce qui est VRAIMENT tracé.
+ *
+ * Un rayon en pixels ne dit rien tout seul : c'est sa part du dessin qui fait
+ * qu'on voit un plan ou une tache jaune. On lit donc les tracés de la maquette
+ * — les `Path`, qui sont la maçonnerie ; les cercles du halo et les cibles
+ * n'en sont pas et ne polluent pas la mesure.
+ */
+const largeurDuDessin = (t: TestRenderer.ReactTestRenderer) => {
+  const xs: number[] = [];
+  const lire = (n: unknown): void => {
+    if (!n || typeof n !== 'object') return;
+    const o = n as { type?: string; props?: { d?: string }; children?: unknown[] };
+    if (o.type === 'RNSVGPath' && typeof o.props?.d === 'string') {
+      const m = (o.props.d.match(/-?\d+\.?\d*/g) ?? []).map(Number);
+      for (let i = 0; i + 1 < m.length; i += 2) xs.push(m[i]);
+    }
+    (o.children ?? []).forEach(lire);
+  };
+  lire(t.toJSON());
+  return Math.max(...xs) - Math.min(...xs);
+};
+
 /** Les halos de lumière posés sur la maquette. */
 const halos = (t: TestRenderer.ReactTestRenderer) =>
   t.root
@@ -438,13 +461,71 @@ describe('le halo suit l’échelle du dessin', () => {
     const halo = allumer(t);
     // Le logement fait 5 × 4 m ; à ce cadrage il occupe une fraction de la
     // vue. Le halo doit rester une lampe, pas un brouillard.
-    expect(halo.props.r).toBeLessThan(30);
+    expect(halo.props.r).toBeLessThan(15);
   });
 
   it('mais il ne disparaît jamais tout à fait', () => {
     // Le contrôle en sens inverse : borner par le haut ne doit pas faire
     // disparaître la lumière quand on regarde le logement de très loin.
     const t = monter({ value: { theta: -32, tilt: 56, zoom: 0.2, ox: 0, oy: 0 } });
-    expect(allumer(t).props.r).toBeGreaterThan(6);
+    expect(allumer(t).props.r).toBeGreaterThan(4);
+  });
+});
+
+describe('et il ne fait que DIRE que la lampe est allumée', () => {
+  /*
+    RELEVÉ DU PATRON, APRÈS L'AVOIR VU TOURNER : « fais moins gros les lumières
+    allumées au clic d'un interrupteur, divise par 2 l'étendue. On veut juste
+    voir que ça allume. »
+
+    DEUX VERSIONS DE CE HALO, ET LA SECONDE CHANGE CE QU'IL PRÉTEND ÊTRE.
+
+      PREMIÈRE — une PORTÉE : un mètre dix, ce qu'on voit s'éclairer au sol
+      sous une suspension. Le raisonnement était bon (une lumière a une taille
+      physique, elle se projette comme la maquette) et le résultat trop gros :
+      mesuré sur le rendu réel, le halo faisait 63 points de rayon à zoom 1,
+      et son diamètre couvrait 32 % de la largeur du logement dessiné — à
+      TOUS les cadrages, puisqu'il suit l'échelle. Une pièce sur trois passait
+      en jaune pour dire qu'une ampoule est allumée.
+
+      SECONDE — une MARQUE. Le halo ne simule rien : il signale. Cinquante-cinq
+      centimètres, c'est ce qu'il faut pour voir qu'une lampe est allumée sans
+      éclairer la pièce. Le nom suit le sens : `PORTEE_LAMPE` est devenu
+      `HALO_LAMPE`, parce qu'un nom qui dit « portée » sur une marque est un
+      commentaire qui ment.
+
+    LA MESURE EST LA PART DU DESSIN, et pas un nombre de pixels : c'est elle
+    qui était constante d'un cadrage à l'autre, donc c'est elle qu'on divise.
+    32 % avant, 16 % après.
+  */
+  const partDuDessin = (zoom: number) => {
+    const t = monter({ value: { theta: -32, tilt: 56, zoom, ox: 0, oy: 0 } });
+    const cible = t.root.findAll(
+      (n) => String(n.props?.testID ?? '') === 'cible-i1',
+    )[0];
+    taper(t, cible.props.cx, cible.props.cy);
+    const part = (halos(t)[0].props.r * 2) / largeurDuDessin(t);
+    act(() => arbre?.unmount());
+    arbre = null;
+    return part;
+  };
+
+  it('son diamètre tient dans le cinquième du logement', () => {
+    expect(partDuDessin(1)).toBeLessThan(0.2);
+  });
+
+  it('et il en couvre encore le huitième : on VOIT que ça allume', () => {
+    // Le contrôle en sens inverse : diviser par deux ne doit pas rendre la
+    // lampe invisible, c'est tout ce que le geste sert à montrer.
+    expect(partDuDessin(1)).toBeGreaterThan(0.12);
+  });
+
+  it('et cette part ne bouge pas avec le cadrage', () => {
+    /*
+      C'est ce qui distingue une taille PHYSIQUE d'un nombre de pixels : deux
+      cadrages qui donnent deux parts différentes trahiraient un halo revenu
+      en points d'écran.
+    */
+    expect(partDuDessin(0.35)).toBeCloseTo(partDuDessin(2.5), 2);
   });
 });
