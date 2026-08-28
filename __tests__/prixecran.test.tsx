@@ -281,11 +281,21 @@ describe('chaque ligne porte sa propre référence', () => {
     const lus = mots(t);
     const jour = dateDuReleve('2026-09-03');
     expect(lus.filter((m) => m === `Castorama · ${jour}`).length).toBeGreaterThan(1);
-    // Et il reste des lignes chiffrées à l'estimation maison : sans elles,
-    // cette épreuve ne prouverait rien.
-    expect(lus.some((m) => m.startsWith('Ordre de grandeur du marché'))).toBe(
-      true,
+    /*
+      ET IL RESTE DES LIGNES CHIFFRÉES AUTREMENT : sans elles, cette épreuve ne
+      prouverait rien — un ticket dont TOUTES les lignes viennent du catalogue
+      reçu passerait sans montrer que les deux provenances cohabitent.
+
+      On ne nomme pas le libellé de l'estimation : il a déjà changé une fois
+      (« Ordre de grandeur du marché français » est devenu « Estimation au
+      niveau des grandes surfaces » le jour du relevé en rayon) et ce banc est
+      tombé pour cette seule raison. Ce qui compte, c'est qu'une ligne au moins
+      NE PORTE PAS l'enseigne du catalogue reçu.
+    */
+    const autrement = lus.filter(
+      (m) => / · /.test(m) && !m.startsWith('Castorama · ') && m.length > 12,
     );
+    expect(autrement.length).toBeGreaterThan(0);
   });
 });
 

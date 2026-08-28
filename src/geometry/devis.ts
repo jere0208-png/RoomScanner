@@ -23,6 +23,7 @@
  */
 import type { BuyRow } from './conduits';
 import { CEILINGS, type CeilingKind } from './ceiling';
+import { articleDuMagasin } from './magasin';
 import { FIXTURES, type FixtureKind } from './electrical';
 import type { Circuit, Differential } from './nfc15100';
 import {
@@ -77,6 +78,41 @@ export interface LigneDevis {
    * exactement le reproche qu'on faisait déjà aux luminaires.
    */
   ecarte?: boolean;
+  /**
+   * LA QUANTITÉ VIENT DE L'ÉLECTRICIEN, PAS DU MÉTRÉ.
+   *
+   * Relevé du patron : « ajoute la possibilité d'augmenter ou diminuer le
+   * nombre de produits dans le devis ». Un métré est une estimation : le plan
+   * compte deux couronnes, on sait qu'il en faudra trois parce qu'on connaît
+   * la maison.
+   *
+   * Mais on ne fait pas passer un chiffre humain pour un chiffre mesuré. Une
+   * quantité venue du métré se retrouve sur le plan ; une quantité corrigée ne
+   * se retrouve nulle part ailleurs, et le devis doit le dire.
+   */
+  ajustee?: boolean;
+  /**
+   * L'ARTICLE VIENT DU MAGASIN, il n'était pas au métré.
+   *
+   * Les chevilles, les colliers, le plâtre, l'aiguille : personne ne peut les
+   * déduire d'un relevé — ça dépend du mur, de l'ancienneté du bâti, de ce
+   * qu'on a déjà dans la camionnette.
+   */
+  duMagasin?: boolean;
+}
+
+/**
+ * CE QUE L'ÉLECTRICIEN CORRIGE À LA MAIN, par-dessus le métré.
+ *
+ * Deux gestes, deux natures : on CORRIGE une quantité que le plan a comptée,
+ * on AJOUTE un article que le plan ne pouvait pas connaître. Le devis ne les
+ * confond pas, et l'écran non plus.
+ */
+export interface AjustementsDevis {
+  /** Par clé de ligne (voir `cleDeLigne`) : la quantité voulue. */
+  quantites?: Readonly<Record<string, number>>;
+  /** Les articles pris au magasin, par code de catalogue. */
+  ajouts?: readonly { code: string; quantite: number }[];
 }
 
 /**
@@ -188,6 +224,8 @@ export function chiffrer(
   gamme: GammeId,
   /** Les articles que l'on ne veut pas : ils restent listés, à zéro. */
   ecartes?: ReadonlySet<string>,
+  /** Ce que l'électricien corrige ou ajoute à la main. */
+  ajustements?: AjustementsDevis,
 ): Devis {
   const lignes: LigneDevis[] = [];
   const sansPrix: string[] = [];
@@ -362,6 +400,62 @@ export function chiffrer(
       quantite: rangees,
       unite: 'u',
       note: 'un par rangée',
+    });
+  }
+
+  /*
+    ------------------------------------------------------------------
+    CE QUE L'ÉLECTRICIEN A CORRIGÉ, ET CE QU'IL A PRIS AU MAGASIN.
+    ------------------------------------------------------------------
+
+    Cela se pose APRÈS le chiffrage et AVANT les totaux : le métré fait son
+    travail sans savoir qu'on le corrigera, et les totaux comptent ce qui est
+    réellement au ticket. Un ajustement glissé avant le chiffrage aurait
+    obligé le métré à se méfier de lui-même.
+  */
+  const voulues = ajustements?.quantites;
+  if (voulues) {
+    for (const l of lignes) {
+      const q = voulues[cleDeLigne(l)];
+      if (q === undefined) continue;
+      /*
+        UNE QUANTITÉ EST UN NOMBRE DE CHOSES : ni négative, ni fractionnaire
+        au millième. On borne plutôt que de refuser — l'écran n'offre que des
+        boutons « moins » et « plus », mais un catalogue reçu, un plan
+        réimporté ou une main maladroite peuvent tout écrire.
+      */
+      const nette = !isFinite(q) || q < 0 ? 0 : Math.round(q * 100) / 100;
+      l.quantite = nette;
+      l.total = l.pu === null ? 0 : centimes(l.pu * nette);
+      l.ajustee = true;
+    }
+  }
+  for (const a of ajustements?.ajouts ?? []) {
+    const art = articleDuMagasin(a.code, gamme);
+    // Un code que le catalogue ne connaît pas n'entre pas : une ligne sans
+    // prix au milieu d'un ticket est pire qu'une ligne absente.
+    if (!art) continue;
+    const q = !isFinite(a.quantite) || a.quantite < 0 ? 0 : a.quantite;
+    const deja = lignes.find((l) => l.code === a.code);
+    if (deja) {
+      // Deux fois le même article ne fait pas deux lignes : on additionne, et
+      // c'est ce que ferait n'importe quel caddie.
+      deja.quantite += q;
+      deja.total = deja.pu === null ? 0 : centimes(deja.pu * deja.quantite);
+      continue;
+    }
+    lignes.push({
+      famille: art.rayon,
+      code: art.code,
+      libelle: art.libelle,
+      precision: art.precision,
+      quantite: q,
+      unite: art.unite,
+      pu: art.tarif.pu,
+      total: centimes(art.tarif.pu * q),
+      releve: art.tarif.releve,
+      source: art.tarif.source,
+      duMagasin: true,
     });
   }
 

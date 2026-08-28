@@ -9837,6 +9837,144 @@ qu'il a bien oublié le pas d'usine. Une leçon de plus pour la liste : *un banc
 nomme jamais un réglage par son chiffre* — pas même un chiffre qu'il vient de
 poser lui-même.
 
+### Le Magasin, le caddie, et un catalogue qu'on est allé voir
+
+Relevé du patron, en quatre temps : « ajoute la possibilité d'augmenter ou
+diminuer le nombre de produits dans le devis ou d'en ajouter un, tu fais un vrai
+catalogue aux prix actuels mis à jour avec un maximum de produits utiles,
+jusqu'aux vis. Page entière Magasin. » Puis : « sers-toi de grands magasins
+publics comme Leroy Merlin, Castorama — les prix sont plus réalistes. » Puis :
+« on n'a pas le droit à l'erreur, pour chaque produit tu dois vérifier que ce
+soit bien celui qu'on présente », avec un bouton « Voir sur Amazon » quand
+Amazon est au même prix ou moins cher. Et enfin : « on mettra plus tard un lien
+partenaires Amazon. »
+
+#### Le relevé, et le premier magasin qu'on a eu tort de choisir
+
+Le premier passage est allé chez un DISTRIBUTEUR PROFESSIONNEL, en se disant que
+c'est là qu'un électricien achète. **Le patron a corrigé, et le chiffre qui
+tranche est celui-ci** : un interrupteur différentiel 40 A type AC coûte 37,31 €
+chez le pro et **72,90 € chez Castorama** — presque le double. Un devis qu'on
+montre à un client doit être celui qu'il verra en rayon s'il va vérifier.
+
+**Leroy Merlin refuse la lecture automatique (HTTP 403, comme 123elec).
+Castorama non** — c'est donc l'enseigne du relevé, et c'est écrit sur chaque
+prix qui en vient. **Onze articles relevés le 28 août 2026**, et deux surprises
+en sens inverse :
+
+| article | posé à la main | relevé en rayon |
+|---|---|---|
+| Fil H07V-U 1,5 mm², 100 m | 16 € | **25,90 €** |
+| Fil H07V-U 2,5 mm², 100 m | 26 € | **41,90 €** |
+| Gaine ICTA Ø 20, 100 m | 28 € | **30,90 €** |
+| Boîte d'encastrement 1 poste | 0,90 € | **1,69 €** |
+| Interrupteur différentiel 40 A type AC | 42 € | **72,90 €** |
+| Disjoncteur 16 A | 9,50 € | 10,50 € |
+| Prise 2P+T dooxie complète | 4,50 € | 5,50 € |
+
+**Le cuivre, les gaines et le petit matériel étaient sous-estimés**, et ce sont
+la moitié invisible d'un devis — celle qu'on ne voit pas sur les murs, et celle
+qui pèse le plus lourd sur un logement entier. **Ce qui n'a pas été relevé est
+recalé famille par famille sur l'écart mesuré, et porte la mention
+« estimation »** : l'écran le dit ligne par ligne.
+
+#### Le catalogue, jusqu'aux vis
+
+Une centaine d'articles neufs : câbles R2V, gaines TPC, goulottes, boîtes de
+toutes sortes, un tableau complet (parafoudre, contacteur jour/nuit,
+télérupteur, délesteur, GTL), les courants faibles — et **le rayon que le devis
+n'avait jamais eu** : vis, chevilles, colliers, cavaliers, agrafes, ruban, wago,
+dominos, embouts, plâtre de scellement, mousse, silicone, puis l'outillage,
+aiguille tire-fil et scie cloche comprises.
+
+**Ces articles-là ne se déduisent pas du plan, et c'est voulu** : personne ne
+peut savoir combien de chevilles tient un chantier. Ils vivent au magasin, on
+les ajoute à la main, et **le devis dit qu'ils viennent du magasin et non du
+métré** — la confiance qu'on accorde à un chiffre n'est pas la même.
+
+`magasin.ts` DÉCRIT (rayon, libellé, unité, conditionnement), `prix.ts` CHIFFRE.
+Deux tables de prix finiraient par diverger, et le magasin annoncerait un tarif
+que le devis ne retrouverait pas.
+
+#### « On n'a pas le droit à l'erreur » — et le banc a trouvé mes fautes
+
+Chaque offre porte sa RÉFÉRENCE, et **un rapprochement n'est retenu que si les
+deux côtés portent la même**. Un libellé qui se ressemble ne prouve rien : deux
+différentiels « 40 A 30 mA type AC » peuvent être deux appareils à trente euros
+d'écart.
+
+**Le banc `magasin` a refusé trois rapprochements que j'avais écrits**, et il
+avait raison sur les trois :
+
+- **la gaine ICTA** — Diall chez Castorama, Zenitech sur Amazon : deux marques,
+  deux produits ;
+- **le fil 2,5 mm²** — même chose, deux fabricants pour une même norme ;
+- **la boîte d'encastrement** — Amazon vend bien la 080041, mais la page
+  Castorama ne publie que son EAN et **on n'a pas établi** qu'il désigne cette
+  référence-là. Sans la preuve, pas de rapprochement, même quand il n'aurait
+  rien changé à l'écran.
+
+Il a aussi attrapé un prix que j'avais oublié de reporter (les colliers, 6,90 €
+au catalogue contre 9,99 € relevés). C'est exactement le travail qu'on lui
+demande.
+
+**Deux couples survivent, et ils sont prouvés :**
+
+- **Interrupteur différentiel Legrand 092840** — 72,90 € chez Castorama,
+  **47,49 € sur Amazon**. La page Castorama ne donne que l'EAN 3245060928407 ;
+  cet EAN renvoie au catalogue Legrand à la référence 092840, et la fiche
+  Amazon porte « 092840 » écrit noir sur blanc. Vingt-cinq euros d'écart sur un
+  article qu'un tableau porte deux à quatre fois ;
+- **Colliers Diall 4,8 × 250, lot de 100** — 9,99 € des deux côtés. C'est le cas
+  « équivalent » du relevé, et le bouton dit « même prix » plutôt que
+  « économisez 0,00 € ».
+
+Le bouton exige **deux conditions**, et la seconde est la plus importante :
+Amazon au plus au prix du rayon, **et les deux prix vus**. Comparer une offre
+Amazon relevée à une estimation, ce serait annoncer une économie qu'on n'a pas
+mesurée — le banc le vérifie avec son contrôle en sens inverse : on fabrique une
+offre Amazon imbattable sur un article jamais relevé, et l'on exige que le
+bouton refuse de s'afficher.
+
+**LE LIEN SE FABRIQUE À UN SEUL ENDROIT.** On garde l'ASIN, pas l'adresse :
+`lienAmazon` construit l'URL et `PARTENAIRE_AMAZON` (vide aujourd'hui) s'y
+insère. Le jour où le compte partenaire existe, **c'est une ligne à écrire**, pas
+cent cinquante adresses à réécrire — et un banc interdit toute adresse en dur
+dans le catalogue.
+
+**La flèche Amazon est redessinée, et il a fallu trois essais** : regardée en
+image, la première pointait vers le haut à angle droit — on lisait un chevron
+posé sur un trait, pas une flèche. Elle part maintenant dans le prolongement du
+geste. *Réserve à lever :* la flèche est une marque déposée ; l'usage nominatif
+d'un lien marchand est ordinaire, mais Amazon encadre l'emploi de ses logos et
+demande normalement de passer par son programme partenaire.
+
+#### Le caddie, et les deux gestes du devis
+
+**Corriger une quantité** du métré : « − » et « + » sur la ligne, et la ligne
+**dit** qu'elle a été corrigée. On ne fait pas passer un chiffre humain pour un
+chiffre mesuré — une quantité venue du métré se retrouve sur le plan, une
+quantité corrigée ne se retrouve nulle part ailleurs.
+
+**Ajouter un article** : la porte du magasin est en tête de ticket, parce que
+c'est là qu'on s'en aperçoit — devant la liste, en se disant « il manque les
+chevilles ». Pas dans un menu ailleurs.
+
+À zéro, une ligne du métré **reste** au ticket (un article qu'on ne voit plus est
+un article qu'on croit oublié) ; un article du magasin, lui, **disparaît** : il
+n'a jamais eu de raison d'être là. Et le total reste la somme de ses lignes, au
+centime — c'est la règle du ticket depuis le premier jour.
+
+#### Deux bancs réécrits, tous les deux pour la même faute
+
+`devisecran` exigeait qu'AUCUN chevron « › » ne figure sur le ticket — vrai tant
+que le seul chevron possible était celui d'un rayon replié. La porte du magasin
+en porte un, qui ne replie rien. Il mesure maintenant **la cause** : toutes les
+lignes du devis sont écrites. `prixecran`, lui, nommait le libellé de
+l'estimation, qui a changé le jour du relevé. Il vérifie maintenant qu'une ligne
+au moins ne porte pas l'enseigne du catalogue reçu. **Un banc ne nomme jamais un
+réglage par son chiffre — ni par son libellé.**
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

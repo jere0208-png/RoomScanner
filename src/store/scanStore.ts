@@ -108,6 +108,9 @@ export type Screen =
   | 'library'
   | 'export'
   | 'devis'
+  // Le catalogue : une PAGE entière, comme le devis, et pour la même
+  // raison — une liste de cent cinquante articles doit défiler.
+  | 'magasin'
   | 'camera'
   | 'profil'
   | 'confidentialite';
@@ -1318,6 +1321,19 @@ interface ScanState {
   devisEcartes: string[];
   basculerArticleDevis: (cle: string) => void;
   remettreLesArticlesDevis: () => void;
+  /**
+   * LES QUANTITÉS CORRIGÉES À LA MAIN, par clé de ligne.
+   *
+   * Relevé du patron : « ajoute la possibilité d'augmenter ou diminuer le
+   * nombre de produits dans le devis ». Un métré est une estimation ; celui
+   * qui connaît la maison sait qu'il faudra une couronne de plus.
+   */
+  devisQuantites: Record<string, number>;
+  reglerQuantiteDevis: (cle: string, quantite: number) => void;
+  /** Ce qu'on a pris au magasin, et que le plan ne pouvait pas deviner. */
+  devisAjouts: { code: string; quantite: number }[];
+  ajouterAuDevis: (code: string, quantite?: number) => void;
+  retirerDuDevis: (code: string) => void;
 
   // Surface au sol : fond pointillé + valeur en m². Activée par défaut.
   showSurfaces: boolean;
@@ -2029,6 +2045,46 @@ export const useScanStore = create<ScanState>((set, get) => {
     setGammeDevis: (gammeDevis) => set({ gammeDevis }),
 
     devisEcartes: [],
+    devisQuantites: {},
+    devisAjouts: [],
+    /*
+      RÉGLER UNE QUANTITÉ, ET SAVOIR REVENIR EN ARRIÈRE.
+
+      Une quantité remise à ce que le métré disait ne doit pas RESTER une
+      quantité corrigée : la ligne cesserait de dire la vérité sur elle-même.
+      L'écran ne sait pas quel était le chiffre d'origine — c'est le devis qui
+      le sait — alors on garde le geste simple : ce qui est écrit ici est ce
+      que l'électricien veut, et `retirerLaCorrection` efface la correction.
+    */
+    reglerQuantiteDevis: (cle, quantite) =>
+      set((e) => ({
+        devisQuantites: {
+          ...e.devisQuantites,
+          [cle]: !isFinite(quantite) || quantite < 0 ? 0 : quantite,
+        },
+      })),
+    ajouterAuDevis: (code, quantite = 1) =>
+      set((e) => {
+        const deja = e.devisAjouts.find((a) => a.code === code);
+        return {
+          devisAjouts: deja
+            ? e.devisAjouts.map((a) =>
+                a.code === code
+                  ? { ...a, quantite: Math.max(0, a.quantite + quantite) }
+                  : a,
+              )
+            : [...e.devisAjouts, { code, quantite: Math.max(0, quantite) }],
+        };
+      }),
+    /*
+      RETIRER UN ARTICLE DU MAGASIN LE FAIT DISPARAÎTRE POUR DE BON — et c'est
+      la différence avec une ligne du métré, qui reste barrée à zéro. Une ligne
+      du métré qu'on ne voit plus est une ligne qu'on croit oubliée ; un
+      article qu'on a pris au magasin et qu'on repose n'a jamais eu de raison
+      d'être là.
+    */
+    retirerDuDevis: (code) =>
+      set((e) => ({ devisAjouts: e.devisAjouts.filter((a) => a.code !== code) })),
     basculerArticleDevis: (cle) =>
       set((e) => ({
         devisEcartes: e.devisEcartes.includes(cle)

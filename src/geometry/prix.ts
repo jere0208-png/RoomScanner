@@ -42,12 +42,58 @@ export interface Tarif {
  * d'écart ne donnent pas le même total, et c'est normal : encore faut-il
  * pouvoir le dire.
  */
-export const VERSION_TARIFS = '2026-08';
+export const VERSION_TARIFS = '2026-08.2';
 
 /** La source commune à tout ce qui a été posé à la main. */
-const A_VALIDER = 'Ordre de grandeur du marché français, à valider au comptoir';
+const A_VALIDER =
+  'Estimation au niveau des grandes surfaces, à valider en rayon';
 const RELEVE = '2026-08';
 const t = (pu: number): Tarif => ({ pu, releve: RELEVE, source: A_VALIDER });
+
+/**
+ * UN PRIX QU'ON EST ALLÉ VOIR — enseigne et jour à l'appui.
+ *
+ * Relevé du patron : « tu fais un vrai catalogue aux prix actuels mis à jour »,
+ * puis, une fois le premier relevé fait : « sers-toi de grands magasins publics
+ * comme Leroy Merlin, Castorama, etc. — les prix sont plus réalistes ».
+ *
+ * ET IL AVAIT RAISON. Le premier relevé était allé chez un DISTRIBUTEUR
+ * PROFESSIONNEL, en se disant que c'est là qu'un électricien achète. Le
+ * chiffre qui a tranché : un interrupteur différentiel 40 A type AC coûte
+ * 37,31 € chez le pro et **72,90 € chez Castorama** — presque le double. Un
+ * devis qu'on montre à un client doit être celui qu'il verra en rayon s'il va
+ * vérifier ; sinon on annonce un prix qu'on ne tiendra pas.
+ *
+ * LEROY MERLIN REFUSE TOUJOURS LA LECTURE AUTOMATIQUE (HTTP 403, comme
+ * 123elec), CASTORAMA NON. Le relevé du 28 août 2026 est donc fait chez
+ * Castorama, et c'est écrit sur chaque prix qui en vient.
+ *
+ * ONZE ARTICLES RELEVÉS, ET DEUX SURPRISES EN SENS INVERSE.
+ *
+ *   LE CUIVRE ET LES GAINES ÉTAIENT SOUS-ESTIMÉS. Fil 1,5 mm² : 16 € posés,
+ *   **25,90 € en rayon**. Fil 2,5 mm² : 26 € posés, **41,90 €**. Gaine ICTA
+ *   Ø 20 : 28 € posés, **30,90 €**. Or les conduits et les conducteurs sont la
+ *   MOITIÉ INVISIBLE d'un devis — celle qu'on ne voit pas sur les murs, et
+ *   celle qui pèse le plus lourd sur un logement entier.
+ *
+ *   ET LE PETIT MATÉRIEL AUSSI. Une boîte d'encastrement : 0,90 € posés,
+ *   **1,69 € en rayon** — presque le double, sur l'article qu'on achète par
+ *   cinquante.
+ *
+ * CE QUI RESTE ESTIMÉ EST MARQUÉ COMME TEL. On ne relève pas cent
+ * cinquante articles à la main ; ceux qu'on n'a pas vus sont recalés famille
+ * par famille sur l'écart mesuré par ceux qu'on a vus, et ils portent
+ * `A_VALIDER`. L'écran du devis le dit ligne par ligne.
+ */
+const releveLe = (pu: number, source: string, jour: string): Tarif => ({
+  pu,
+  releve: jour,
+  source,
+});
+/** L'enseigne du relevé du 28 août 2026, et le jour. */
+const ENSEIGNE = 'Castorama';
+const JOUR = '2026-08-28';
+const r = (pu: number): Tarif => releveLe(pu, ENSEIGNE, JOUR);
 
 // --------------------------------------------------------------- gammes
 
@@ -121,81 +167,85 @@ export const TARIFS_MECANISME: Record<
   Partial<Record<FixtureKind, Tarif>>
 > = {
   dooxie: {
-    prise: t(4.5),
-    prise20: t(8.5),
-    prise32: t(14.5),
-    inter: t(4.2),
-    va: t(4.2),
-    poussoir: t(5.9),
-    variateur: t(24),
-    rj45: t(14.9),
-    tv: t(8.9),
-    sortieCable: t(5.5),
-    thermostat: t(45),
+    // Relevé chez Castorama le 28/08/2026 : la 2P+T blanche complète y est à
+    // 5,50 €, la RJ45 à 19,50 €, la TV à 12,90 €. Le catalogue en posait
+    // 4,50 / 14,90 / 8,90 — l'appareillage d'entrée de gamme était lui aussi
+    // sous-estimé, d'un bon quart.
+    prise: r(5.5),
+    prise20: t(11.9),
+    prise32: t(18.9),
+    inter: t(5.2),
+    va: t(5.5),
+    poussoir: t(7.5),
+    variateur: t(29.9),
+    rj45: r(19.5),
+    tv: r(12.9),
+    sortieCable: t(6.9),
+    thermostat: t(55),
     applique: t(0),
     boite: t(2.2),
     tableau: t(0),
   },
   ovalis: {
-    prise: t(4.9),
-    prise20: t(8.9),
-    prise32: t(15),
-    inter: t(4.5),
-    va: t(4.5),
-    poussoir: t(6.2),
-    variateur: t(26),
-    rj45: t(15.5),
-    tv: t(9.5),
-    sortieCable: t(5.8),
-    thermostat: t(48),
+    prise: t(5.9),
+    prise20: t(12.5),
+    prise32: t(19.9),
+    inter: t(5.5),
+    va: t(5.9),
+    poussoir: t(7.9),
+    variateur: t(32),
+    rj45: t(20.9),
+    tv: t(13.9),
+    sortieCable: t(7.2),
+    thermostat: t(59),
     applique: t(0),
     boite: t(2.2),
     tableau: t(0),
   },
   odace: {
-    prise: t(8.5),
-    prise20: t(12.5),
-    prise32: t(21),
-    inter: t(7.9),
-    va: t(7.9),
-    poussoir: t(9.5),
-    variateur: t(39),
-    rj45: t(18.5),
-    tv: t(11.5),
-    sortieCable: t(7.5),
-    thermostat: t(69),
+    prise: t(10.9),
+    prise20: t(16.9),
+    prise32: t(27),
+    inter: t(9.9),
+    va: t(10.5),
+    poussoir: t(12.5),
+    variateur: t(49),
+    rj45: t(24.9),
+    tv: t(16.5),
+    sortieCable: t(9.9),
+    thermostat: t(89),
     applique: t(0),
     boite: t(2.2),
     tableau: t(0),
   },
   mosaic: {
-    prise: t(9.5),
-    prise20: t(13.5),
-    prise32: t(22),
-    inter: t(8.9),
-    va: t(8.9),
-    poussoir: t(10.5),
-    variateur: t(42),
-    rj45: t(19.5),
-    tv: t(12.5),
-    sortieCable: t(8),
-    thermostat: t(72),
+    prise: t(11.9),
+    prise20: t(17.9),
+    prise32: t(28),
+    inter: t(11.5),
+    va: t(11.9),
+    poussoir: t(13.9),
+    variateur: t(52),
+    rj45: t(25.9),
+    tv: t(17.5),
+    sortieCable: t(10.5),
+    thermostat: t(92),
     applique: t(0),
     boite: t(2.2),
     tableau: t(0),
   },
   celiane: {
-    prise: t(12.5),
-    prise20: t(17),
-    prise32: t(26),
-    inter: t(11.5),
-    va: t(11.5),
-    poussoir: t(13.5),
-    variateur: t(49),
-    rj45: t(24),
-    tv: t(14.5),
-    sortieCable: t(9.5),
-    thermostat: t(79),
+    prise: t(15.9),
+    prise20: t(22),
+    prise32: t(33),
+    inter: t(14.9),
+    va: t(15.5),
+    poussoir: t(17.9),
+    variateur: t(62),
+    rj45: t(31),
+    tv: t(19.9),
+    sortieCable: t(12.5),
+    thermostat: t(99),
     applique: t(0),
     boite: t(2.2),
     tableau: t(0),
@@ -211,11 +261,11 @@ export const TARIFS_MECANISME: Record<
  */
 export const TARIFS_PLAQUE: Record<GammeId, number[]> = {
   // Index 0 = plaque 1 poste, index 1 = 2 postes, et ainsi de suite.
-  dooxie: [1.9, 3.5, 5.5, 8, 10.5],
-  ovalis: [2.1, 3.8, 5.8, 8.5, 11],
-  odace: [4.2, 7.5, 10.5, 14.5, 18.5],
-  mosaic: [4.9, 8.5, 12, 16.5, 21],
-  celiane: [6.5, 11, 15.5, 21, 27],
+  dooxie: [2.5, 4.6, 7.2, 10.4, 13.7],
+  ovalis: [2.7, 4.9, 7.5, 11, 14.3],
+  odace: [5.5, 9.8, 13.7, 18.9, 24],
+  mosaic: [6.4, 11, 15.6, 21.5, 27.3],
+  celiane: [8.5, 14.3, 20.2, 27.3, 35],
 };
 
 // --------------------------------------------------------- hors gamme
@@ -229,31 +279,31 @@ export const TARIFS_PLAQUE: Record<GammeId, number[]> = {
  */
 export const TARIFS_COMMUNS: Record<string, Tarif> = {
   // Conduits — la couronne de 100 m, telle qu'elle se commande.
-  'icta-16': t(22),
-  'icta-20': t(28),
-  'icta-25': t(42),
-  'icta-32': t(68),
+  'icta-16': t(24),
+  'icta-20': r(30.9),
+  'icta-25': t(46),
+  'icta-32': t(75),
   // Conducteurs rigides — la couronne de 100 m, par section.
-  'fil-1.5': t(16),
-  'fil-2.5': t(26),
-  'fil-6': t(62),
-  'fil-10': t(105),
+  'fil-1.5': r(25.9),
+  'fil-2.5': r(41.9),
+  'fil-6': t(99),
+  'fil-10': t(165),
   // Courants faibles — ce qu'on tire dans la gaine de communication.
-  futp6: t(78),
-  coax: t(55),
+  futp6: t(99),
+  coax: t(69),
   // Encastrement.
-  'boite-encastrement': t(0.9),
-  'boite-dcl': t(3.5),
-  'boite-derivation': t(2.2),
+  'boite-encastrement': r(1.69),
+  'boite-dcl': t(4.9),
+  'boite-derivation': t(3.9),
   // Tableau : le calibre change le prix, pas beaucoup.
-  'disj-2': t(9.5),
-  'disj-10': t(9.5),
-  'disj-16': t(9.5),
-  'disj-20': t(10.5),
-  'disj-32': t(14.5),
-  'diff-AC': t(42),
-  'diff-A': t(62),
-  'coffret-com': t(135),
+  'disj-2': t(10.5),
+  'disj-10': t(10.5),
+  'disj-16': r(10.5),
+  'disj-20': t(11.9),
+  'disj-32': t(16.5),
+  'diff-AC': r(72.9),
+  'diff-A': t(108),
+  'coffret-com': t(179),
   /*
     LE COFFRET SE CHIFFRE À LA RANGÉE, ET IL EN FAUT UN.
 
@@ -262,18 +312,119 @@ export const TARIFS_COMMUNS: Record<string, Tarif> = {
     il faut avant de savoir où on l'accroche —, et un devis sans coffret
     manque le poste le plus visible du tableau.
   */
-  'coffret-1': t(22),
-  'coffret-2': t(38),
-  'coffret-3': t(52),
-  'coffret-4': t(68),
+  'coffret-1': t(29),
+  'coffret-2': t(52),
+  'coffret-3': t(72),
+  'coffret-4': t(95),
   // Le peigne, qu'on oublie toujours. (Le bornier de terre, lui, est fourni
   // avec le coffret : voir `chiffrer`.)
-  peigne: t(9),
+  peigne: t(12.9),
   // Plafond : ce qui n'est pas un luminaire.
-  'plafond-daaf': t(18),
-  'plafond-vmc': t(12),
-  'plafond-detecteur': t(35),
-  'plafond-camera': t(89),
+  'plafond-daaf': t(24.9),
+  'plafond-vmc': t(16.9),
+  'plafond-detecteur': t(44.9),
+  'plafond-camera': t(119),
+  /*
+    ET TOUT CE QU'ON ACHÈTE AUSSI — relevé du patron : « tu fais un vrai
+    catalogue aux prix actuels mis à jour avec un maximum de produits utiles,
+    JUSQU'AUX VIS ».
+
+    Le devis ne chiffrait que ce que le plan sait compter : des gaines, des
+    fils, des mécanismes, des protections. Or on ne part pas au comptoir avec
+    cette liste-là — il y manque les chevilles qui tiennent les boîtes, les
+    colliers qui tiennent les gaines, le ruban, les wago, le plâtre, et
+    l'aiguille sans laquelle rien ne passe. Ce sont des petits prix, et
+    ensemble ils font le plein d'un caddie.
+
+    CES ARTICLES-LÀ NE SE DÉDUISENT PAS DU PLAN, et c'est voulu : personne ne
+    peut savoir combien de vis tient un chantier. Ils vivent au MAGASIN, on
+    les ajoute au devis à la main, avec leur quantité — voir `magasin.ts`.
+  */
+  // ------------------------------------------------ conducteurs et conduits
+  'fil-4': t(66),
+  'fil-16': t(255),
+  'fil-25': t(390),
+  // Les câbles souples, pour ce qui sort du mur : four, plaque, extérieur.
+  'cable-3g1.5': t(89),
+  'cable-3g2.5': t(139),
+  'cable-5g2.5': t(219),
+  'cable-3g6': t(289),
+  'icta-40': t(59),
+  // Les gaines de terre et de réseau, en tranchée.
+  'gaine-tpc-40': t(32),
+  'gaine-tpc-63': t(55),
+  'gaine-annelee-16': t(12),
+  // Ce qui passe EN APPARENT, quand on ne saigne pas le mur.
+  'goulotte-40': t(9.5),
+  'plinthe-passe-cable': t(12),
+  // ---------------------------------------------------------- encastrement
+  'boite-encastrement-2': t(2.9),
+  'boite-encastrement-3': t(4.2),
+  'boite-maconnerie': t(1.95),
+  'boite-maconnerie-2': t(3.3),
+  'boite-etanche': t(6.9),
+  'boite-derivation-etanche': t(7.9),
+  'couvercle-derivation': t(2.2),
+  'boite-sol': t(45),
+  // --------------------------------------------------------------- tableau
+  'disj-6': t(10.5),
+  'disj-25': t(13.5),
+  'disj-40': t(22.9),
+  'diff-A-63': t(139),
+  'diff-AC-63': t(92),
+  'diff-HPI': t(155),
+  parafoudre: t(89),
+  'contacteur-jn': t(56),
+  telerupteur: t(42),
+  'horloge-modulaire': t(72),
+  delesteur: t(169),
+  'bornier-terre': t(8.9),
+  'bornier-repartition': t(18.9),
+  'peigne-vertical': t(32),
+  gtl: t(79),
+  'coffret-etanche': t(59),
+  'disj-abonne': t(99),
+  'sectionneur-63': t(36),
+  // ------------------------------------------------------- courants faibles
+  'rj45-keystone': t(8.9),
+  brassage: t(5.9),
+  dti: t(24.9),
+  'repartiteur-tv': t(18.9),
+  // ------------------------------------------------- fixation, jusqu'aux vis
+  'vis-placo': t(6.9),
+  'vis-beton': t(18),
+  'cheville-placo': t(14),
+  'cheville-nylon': t(5.5),
+  'collier-colson': r(9.99),
+  'collier-gaine-20': t(9.5),
+  'cavalier-16': t(4.5),
+  'agrafe-icta': t(8.9),
+  // ------------------------------------------------------------ connexions
+  'ruban-isolant': t(5.9),
+  'wago-2': r(19.9),
+  'wago-3': t(17.9),
+  'wago-5': t(15.9),
+  domino: t(4.5),
+  'embout-cable': t(16),
+  'gaine-thermo': t(9.9),
+  // ------------------------------------------------------- scellement, pose
+  'platre-scellement': t(14),
+  'mousse-pu': t(8.9),
+  silicone: t(6.5),
+  // ----------------------------------------------------------------- outils
+  'tire-fil': t(32),
+  'scie-cloche-67': t(18),
+  'foret-beton-6': t(4.5),
+  'fraise-placo-67': t(22),
+  'niveau-40': t(15),
+  'pince-coupante': t(22),
+  'tournevis-testeur': t(9),
+  multimetre: t(35),
+  // ------------------------------------------------------ plafond et divers
+  'transfo-led': t(28),
+  'ruban-led': t(24),
+  'gaine-vmc-125': t(18),
+  'bouche-vmc': t(12),
 };
 
 /**

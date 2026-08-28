@@ -423,10 +423,24 @@ describe('le ticket de caisse', () => {
       La version d'avant repliait chaque rayon derriere un chevron. Sur un
       ticket, tout se lit d'un coup, du haut vers le bas — c'est ce qui fait
       qu'on n'a jamais eu besoin qu'on nous explique comment lire un ticket.
+
+      DEUX VERSIONS DE CETTE ÉPREUVE, ET LA PREMIÈRE COMPTAIT LES CHEVRONS.
+      Elle exigeait qu'aucun « › » ne figure sur la page — ce qui était vrai
+      tant que le seul chevron possible était celui d'un rayon replié. Le jour
+      où le ticket a porté une PORTE vers le magasin, elle est tombée : ce
+      chevron-là ne replie rien, il annonce une autre page.
+
+      Elle mesure donc la cause et non le symptôme : TOUTES les lignes du
+      devis sont écrites, sans exception. C'est ce qu'on voulait dire depuis le
+      début, et aucun chevron ne peut le faire mentir.
     */
     const t = await auTicket();
-    const chevrons = mots(t).filter((m) => m === '›');
-    expect(chevrons).toEqual([]);
+    const lus = mots(t);
+    const devis = devisAttendu();
+    const absents = devis.lignes
+      .map((l) => l.libelle)
+      .filter((nom) => !lus.includes(nom));
+    expect(absents).toEqual([]);
   });
 
   it('et se termine par le total, après le trait de découpe', async () => {

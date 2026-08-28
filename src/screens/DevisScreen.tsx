@@ -183,11 +183,17 @@ const styles_vignette = StyleSheet.create({
 function Article({
   ligne,
   styles,
+  couleurs,
   onBasculer,
+  onMoins,
+  onPlus,
 }: {
   ligne: LigneDevis;
   styles: ReturnType<typeof getStyles>;
+  couleurs: Palette;
   onBasculer: () => void;
+  onMoins: () => void;
+  onPlus: () => void;
 }) {
   const hors = !!ligne.ecarte;
   return (
@@ -219,6 +225,18 @@ function Article({
           Une seule référence en haut de page les ferait tous passer pour des
           prix d'enseigne relevés le même jour.
         */}
+        {/*
+          CE QUI VIENT DU MÉTRÉ ET CE QUI N'EN VIENT PAS — la confiance qu'on
+          accorde à un nombre n'est pas la même, et le devis ne doit pas les
+          confondre. « Corrigé » : le plan disait autre chose, c'est
+          l'électricien qui a tranché. « Du magasin » : aucun plan n'aurait pu
+          le compter.
+        */}
+        {(ligne.ajustee || ligne.duMagasin) && (
+          <Text style={styles.articleOrigine}>
+            {ligne.duMagasin ? 'Pris au magasin' : 'Quantité corrigée'}
+          </Text>
+        )}
         {!!ligne.source && ligne.pu !== null && (
           <Text style={styles.articleSource}>
             {`${ligne.source}${ligne.releve ? ` · ${dateDuReleve(ligne.releve)}` : ''}`}
@@ -226,11 +244,58 @@ function Article({
         )}
         {!!ligne.note && <Text style={styles.articleNote}>{ligne.note}</Text>}
       </View>
-      <Text style={[styles.articlePrix, hors && styles.barre]}>
-        {hors
-          ? euros((ligne.pu ?? 0) * ligne.quantite)
-          : euros(ligne.total)}
-      </Text>
+      <View style={styles.colonneDroite}>
+        <Text style={[styles.articlePrix, hors && styles.barre]}>
+          {hors
+            ? euros((ligne.pu ?? 0) * ligne.quantite)
+            : euros(ligne.total)}
+        </Text>
+        {/*
+          « − » ET « + », SUR LA LIGNE ELLE-MÊME — relevé du patron : « ajoute
+          la possibilité d'augmenter ou diminuer le nombre de produits dans le
+          devis ».
+
+          Ils ne s'affichent pas sur une ligne écartée : un article qu'on ne
+          veut pas n'a pas de quantité à régler, et deux boutons qui ne
+          servent à rien donnent à l'écran l'air d'être en panne. Ils ne
+          s'affichent pas non plus sur une ligne SANS PRIX — corriger le
+          nombre d'un article que le catalogue ne sait pas chiffrer ne
+          changerait aucun total.
+        */}
+        {!hors && ligne.pu !== null && (
+          <View style={styles.pasRangee}>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel={`Un ${ligne.libelle} de moins`}
+              disabled={ligne.quantite <= 0}
+              style={[styles.pas, ligne.quantite <= 0 && styles.pasEteint]}
+              onPress={onMoins}>
+              <Svg width={14} height={14} viewBox="0 0 24 24">
+                <Path
+                  d="M5 12 h14"
+                  stroke={ligne.quantite <= 0 ? couleurs.inkFaint : couleurs.blue}
+                  strokeWidth={2.8}
+                  strokeLinecap="round"
+                />
+              </Svg>
+            </TouchableOpacity>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel={`Un ${ligne.libelle} de plus`}
+              style={styles.pas}
+              onPress={onPlus}>
+              <Svg width={14} height={14} viewBox="0 0 24 24">
+                <Path
+                  d="M12 5 v14 M5 12 h14"
+                  stroke={couleurs.blue}
+                  strokeWidth={2.8}
+                  strokeLinecap="round"
+                />
+              </Svg>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
     </TouchableOpacity>
   );
 }
@@ -248,6 +313,11 @@ export function DevisScreen() {
   const gamme = useScanStore((s) => s.gammeDevis);
   const setGamme = useScanStore((s) => s.setGammeDevis);
   const ecartes = useScanStore((s) => s.devisEcartes);
+  const quantites = useScanStore((s) => s.devisQuantites);
+  const ajouts = useScanStore((s) => s.devisAjouts);
+  const reglerQuantiteDevis = useScanStore((s) => s.reglerQuantiteDevis);
+  const ajouterAuDevis = useScanStore((s) => s.ajouterAuDevis);
+  const retirerDuDevis = useScanStore((s) => s.retirerDuDevis);
   const basculer = useScanStore((s) => s.basculerArticleDevis);
   const toutRemettre = useScanStore((s) => s.remettreLesArticlesDevis);
   const [etape, setEtape] = useState(0);
@@ -292,7 +362,11 @@ export function DevisScreen() {
   */
   const horsJeu = useMemo(() => new Set(ecartes), [ecartes]);
   const devis: Devis = useMemo(
-    () => chiffrerLePlan(walls, rooms, fixtures, ceiling, gamme, horsJeu, openings),
+    () =>
+      chiffrerLePlan(walls, rooms, fixtures, ceiling, gamme, horsJeu, openings, {
+        quantites,
+        ajouts,
+      }),
     /*
       `versionTarifs` N'ENTRE DANS AUCUN CALCUL, et c'est pour cela qu'il est
       là. Le catalogue courant vit dans un module (`prix.ts`) : React ne le
@@ -305,7 +379,18 @@ export function DevisScreen() {
       qu'il ne sait pas suivre.
     */
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [walls, rooms, fixtures, ceiling, gamme, horsJeu, openings, versionTarifs],
+    [
+      walls,
+      rooms,
+      fixtures,
+      ceiling,
+      gamme,
+      horsJeu,
+      openings,
+      quantites,
+      ajouts,
+      versionTarifs,
+    ],
   );
 
   /*
@@ -373,6 +458,29 @@ export function DevisScreen() {
     dejaVu.current = true;
     verifier(false).catch(() => {});
   }, [etape, verifier]);
+
+  /**
+   * UN DE PLUS, UN DE MOINS — et le devis rechiffre.
+   *
+   * Le pas est d'UNE unité de vente : une couronne, une boîte, un sachet.
+   * C'est l'unité qui donne son sens au nombre — personne n'achète un demi-
+   * sachet de chevilles —, et c'est celle qui est écrite juste à côté.
+   *
+   * UN ARTICLE PRIS AU MAGASIN SE RETIRE VRAIMENT quand on descend à zéro :
+   * il n'a jamais été au métré, il n'a donc aucune raison de rester barré au
+   * ticket. Une ligne du métré, elle, reste — à zéro, mais visible : un
+   * article qu'on ne voit plus est un article qu'on croit oublié.
+   */
+  const reglerLaQuantite = (l: LigneDevis, pas: number) => {
+    haptic('leger');
+    const voulue = Math.max(0, l.quantite + pas);
+    if (l.duMagasin) {
+      if (voulue === 0) retirerDuDevis(l.code);
+      else ajouterAuDevis(l.code, pas);
+      return;
+    }
+    reglerQuantiteDevis(cleDeLigne(l), voulue);
+  };
 
   const avancer = (n: number) => {
     haptic('leger');
@@ -587,6 +695,37 @@ export function DevisScreen() {
             )}
 
             {/*
+              LA PORTE DU MAGASIN, EN TÊTE DE TICKET.
+
+              Relevé du patron : « ou d'en ajouter un ». C'est ici qu'on s'en
+              aperçoit — devant le ticket, en lisant la liste, on se dit « il
+              manque les chevilles ». Pas dans un menu ailleurs.
+            */}
+            <TouchableOpacity
+              style={styles.porteMagasin}
+              accessibilityRole="button"
+              accessibilityLabel="Ouvrir le magasin"
+              onPress={() => {
+                haptic('leger');
+                setScreen('magasin');
+              }}>
+              <Svg width={18} height={18} viewBox="0 0 24 24">
+                <Path
+                  d="M4 8 h16 l-1.2 11.5 a1 1 0 0 1 -1 .9 H6.2 a1 1 0 0 1 -1 -.9 Z M8.5 8 V6.2 a3.5 3.5 0 0 1 7 0 V8"
+                  stroke={c.blue}
+                  strokeWidth={1.8}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  fill="none"
+                />
+              </Svg>
+              <Text style={styles.porteMot}>
+                Ajouter un article du magasin
+              </Text>
+              <Text style={styles.porteChevron}>›</Text>
+            </TouchableOpacity>
+
+            {/*
               CHERCHER ET TRIER — « si jamais la liste est longue ».
 
               Elle l'est : un logement complet passe la trentaine d'articles.
@@ -643,10 +782,13 @@ export function DevisScreen() {
                     key={`${l.famille}-${l.libelle}`}
                     ligne={l}
                     styles={styles}
+                    couleurs={c}
                     onBasculer={() => {
                       haptic('leger');
                       basculer(cleDeLigne(l));
                     }}
+                    onMoins={() => reglerLaQuantite(l, -1)}
+                    onPlus={() => reglerLaQuantite(l, 1)}
                   />
                 ))
               : devis.parFamille.map((f) => (
@@ -662,6 +804,9 @@ export function DevisScreen() {
                           key={`${f.famille}-${l.libelle}`}
                           ligne={l}
                           styles={styles}
+                          couleurs={c}
+                          onMoins={() => reglerLaQuantite(l, -1)}
+                          onPlus={() => reglerLaQuantite(l, 1)}
                           onBasculer={() => {
                             haptic('leger');
                             basculer(cleDeLigne(l));
@@ -977,6 +1122,36 @@ const getStyles = themedStyles((c: Palette) =>
     /* La provenance du prix : plus petite et plus pâle que le reste. On la
        cherche quand on la cherche, elle ne dispute pas la ligne au libellé. */
     articleSource: { color: c.inkFaint, fontSize: 10, marginTop: 2 },
+    /* Ce qui n'a pas été mesuré le dit, en bleu : c'est la couleur du devis. */
+    articleOrigine: {
+      color: c.blue,
+      fontSize: 10,
+      fontWeight: '700',
+      marginTop: 3,
+    },
+    colonneDroite: { alignItems: 'flex-end' },
+    pasRangee: { flexDirection: 'row', gap: 6, marginTop: 6 },
+    pas: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: c.blueSoft,
+    },
+    pasEteint: { backgroundColor: c.line },
+    porteMagasin: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      backgroundColor: c.blueSoft,
+      borderRadius: radius.md,
+      paddingVertical: 12,
+      paddingHorizontal: 14,
+      marginBottom: 12,
+    },
+    porteMot: { flex: 1, color: c.blue, fontSize: 14, fontWeight: '700' },
+    porteChevron: { color: c.blue, fontSize: 20, fontWeight: '700' },
     /* Le bandeau des tarifs respire au-dessus des outils de recherche. */
     bandeauTarifs: { marginBottom: 12 },
     articlePrix: { color: c.ink, fontSize: 14, fontWeight: '800' },

@@ -517,16 +517,48 @@ describe('ce qui manquait au chariot', () => {
 });
 
 describe('le catalogue dit son âge', () => {
-  it('porte sa version sur le devis', () => {
-    expect(devisDe('dooxie').version).toMatch(/^\d{4}-\d{2}$/);
+  /*
+    DEUX FORMES DE DATE, ET C'EST VOULU — le banc l'a appris en tombant.
+
+    Au début, tous les prix étaient POSÉS À LA MAIN, aux ordres de grandeur du
+    marché : on ne date pas une estimation au jour près, et le catalogue ne
+    portait donc que des MOIS (« 2026-08 »). Ce banc exigeait ce format-là,
+    partout.
+
+    Depuis le relevé en rayon, une partie des prix a été VUE, un jour donné,
+    dans une enseigne donnée (« 2026-08-28 », Castorama). Prétendre qu'ils
+    datent « du mois d'août » serait perdre la seule chose qui les distingue
+    d'une estimation. Les deux formes cohabitent donc, et le banc accepte les
+    deux : ce qu'il garde, c'est qu'AUCUNE ligne chiffrée ne se taise sur son
+    âge — un chiffre nu, dans six mois, ne se distingue plus d'un chiffre juste.
+
+    LA VERSION, ELLE, PORTE UNE RÉVISION. Deux relevés du même mois ne donnent
+    pas le même total, et « 2026-08 » ne les distinguerait pas. D'où
+    « 2026-08.2 » : le mois, puis le rang du relevé dans ce mois.
+  */
+  it('porte sa version, et sa révision, sur le devis', () => {
+    expect(devisDe('dooxie').version).toMatch(/^\d{4}-\d{2}(\.\d+)?$/);
   });
 
-  it('et chaque ligne chiffrée dit le mois de son relevé', () => {
-    // Un chiffre nu, dans six mois, ne se distingue plus d'un chiffre juste.
+  it('et chaque ligne chiffrée dit quand son prix a été relevé', () => {
     for (const l of devisDe('dooxie').lignes) {
       if (l.pu === null || l.total === 0) continue;
       expect(`${l.libelle} : ${l.releve ?? 'sans date'}`).toMatch(
-        /: \d{4}-\d{2}$/,
+        /: \d{4}-\d{2}(-\d{2})?$/,
+      );
+    }
+  });
+
+  it('et dit AUSSI d’où il vient : enseigne relevée, ou estimation', () => {
+    /*
+      C'est la moitié qui manquait. « 2026-08-28 » ne dit pas si le prix a été
+      VU en rayon ou POSÉ à la main, et la confiance qu'on accorde aux deux
+      n'est pas la même. Relevé du patron : « on n'a pas le droit à l'erreur ».
+    */
+    for (const l of devisDe('dooxie').lignes) {
+      if (l.pu === null || l.total === 0) continue;
+      expect(`${l.libelle} : ${l.source ?? 'sans source'}`).not.toContain(
+        'sans source',
       );
     }
   });

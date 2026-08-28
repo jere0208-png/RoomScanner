@@ -12,7 +12,7 @@
  * prix. Cette fonction ne fait que les enchaîner, dans l'ordre de l'export.
  */
 import { buyingList, pullSchedule } from './conduits';
-import { chiffrer, type Devis } from './devis';
+import { chiffrer, type AjustementsDevis, type Devis } from './devis';
 import { planRoutes } from './elecplan';
 import { roomParts, type WallSeg } from './floorplan';
 import {
@@ -40,6 +40,8 @@ export function chiffrerLePlan(
   ecartes?: ReadonlySet<string>,
   /** Les menuiseries : elles coupent les pans, donc les pontages. */
   openings: WallSeg[] = [],
+  /** Ce que l'électricien corrige ou ajoute à la main : voir `chiffrer`. */
+  ajustements?: AjustementsDevis,
 ): Devis {
   const parts = roomParts(walls, rooms);
   const nommees = rooms.map((r) => ({ ...r, name: r.name ?? '' }));
@@ -76,5 +78,6 @@ export function chiffrerLePlan(
     liste.differentials,
     gamme,
     ecartes,
+    ajustements,
   );
 }
