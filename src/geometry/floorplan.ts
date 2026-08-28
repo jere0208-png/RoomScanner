@@ -751,6 +751,18 @@ export function pushOutOfObjects(
   centre: Pt,
   box: { width: number; depth: number; yaw: number; y0?: number; y1?: number },
   autres: Emprise[],
+  /**
+   * REFERMER LE DERNIER JOUR, OU NON.
+   *
+   * À la flèche, oui : on avance au centimètre, et un jour de trois
+   * centimètres entre deux meubles vient du pas, pas d'une intention.
+   *
+   * AU DOIGT, NON — relevé du patron : « enlève l'attraction mais mets une
+   * collision intelligente ». Une collision REFUSE une place impossible ;
+   * elle ne déplace pas ce qui tenait déjà. Le jour lâché est le jour gardé,
+   * comme contre un mur.
+   */
+  aimant = true,
 ): Pt {
   /** Deux meubles se gêlent-ils vraiment, c'est-à-dire au même étage ? */
   const memeEtage = (o: Emprise) => {
@@ -828,7 +840,7 @@ export function pushOutOfObjects(
     */
     // L'aimant ne joue qu'à la première passe : la seconde ne fait que
     // séparer ce que la première a pu rapprocher de trop.
-    if (passe > 0 || separateurs.length !== 1) continue;
+    if (!aimant || passe > 0 || separateurs.length !== 1) continue;
     const a = separateurs[0];
     if (a.jeu >= AIMANT) continue;
     const sens = a.d >= 0 ? 1 : -1;

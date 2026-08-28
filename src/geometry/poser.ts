@@ -17,19 +17,28 @@
  * cloison pour aller dans la pièce d'à côté, c'est le geste naturel de qui
  * déménage une commode. Ce qui est refusé, c'est de LÂCHER dans la
  * maçonnerie.
+ *
+ * ET L'AIMANT EST PARTI À SON TOUR — relevé du patron : « peaufine les
+ * meubles et sa physique, enlève l'attraction mais mets une collision
+ * intelligente (pas collé au mur, recadré si dépasse de la zone surface,
+ * etc) ».
+ *
+ * Il tirait au nu tout ce qui passait à moins de vingt-cinq centimètres. On
+ * l'avait voulu contre les doigts qui visent à peu près ; il s'est retourné
+ * contre ceux qui visent juste. Vingt centimètres derrière une commode, ce
+ * n'est pas une erreur : c'est un radiateur, un coffrage, une porte qui bat,
+ * une gaine qui monte. Le plan n'a pas à en décider — et un meuble qui saute
+ * de vingt centimètres au moment où le doigt se lève est exactement le
+ * « meuble qui glisse tout seul » que ce fichier avait été écrit pour
+ * supprimer. L'aimant était la dernière de ces aides ; il s'en va.
+ *
+ * `poserLibre` ne DÉPLACE donc plus rien du tout. Elle dit seulement si la
+ * place tient — c'est le halo rouge sous le doigt. Le rangement au lâcher,
+ * lui, est une COLLISION et vit dans le magasin (`rangerMeuble`) : il a
+ * besoin de la pièce, de sa surface et des autres meubles, que la géométrie
+ * d'un seul meuble ne connaît pas.
  */
 import { WALL_T, type Pt, type WallSeg } from './floorplan';
-
-/**
- * PORTÉE DE L'AIMANT, en mètres depuis le nu du mur.
- *
- * Vingt-cinq centimètres : une commode lâchée à cette distance n'a pas été
- * posée là exprès — c'est un doigt qui n'a pas visé juste, et personne ne
- * laisse volontairement un jeu de vingt centimètres derrière un meuble. Au
- * large, en revanche, on ne touche à rien : un îlot de cuisine est au milieu
- * de la pièce parce que quelqu'un l'y a mis.
- */
-export const PORTEE_AIMANT = 0.25;
 
 /** Ce qu'on sait d'un meuble pour le poser : son emprise et son cap. */
 export interface EmpriseMeuble {
@@ -70,21 +79,27 @@ function versLeMur(p: Pt, w: WallSeg) {
   return { d, t, nx, nz, len };
 }
 
-/** Le résultat d'une pose : où le meuble va, et ce qu'il faut en dire. */
+/**
+ * Le résultat d'une pose : où le meuble va, et ce qu'il faut en dire.
+ *
+ * `centre` vaut TOUJOURS le point visé depuis que l'aimant est parti. Il
+ * reste dans le résultat parce que l'appelant le lit — et parce qu'une
+ * fonction qui répond « oui/non » sur une position doit rendre la position
+ * sur laquelle elle a répondu.
+ */
 export interface PoseMeuble {
   centre: Pt;
   /** `false` = il chevauche la maçonnerie ; l'écran le montre en ROUGE. */
   valide: boolean;
-  /** L'aimant a joué : la main doit le sentir, l'œil aussi. */
-  aimante: boolean;
 }
 
 /**
- * Où poser le meuble que le doigt amène à `vise`.
+ * Le meuble que le doigt amène à `vise` tient-il là ?
  *
- * On ne DÉPLACE jamais le meuble contre la volonté du doigt, sauf d'un
- * cheveu : l'aimant, et lui seul, a le droit de corriger — et seulement pour
- * amener AU NU d'un mur ce qui en est tout près.
+ * On ne DÉPLACE jamais le meuble contre la volonté du doigt — plus du tout,
+ * depuis le retrait de l'aimant. Cette fonction ne fait plus qu'une chose :
+ * dire si l'emprise chevauche la maçonnerie, pour que l'écran la montre en
+ * rouge tant que le doigt est posé.
  */
 export function poserLibre(
   vise: Pt,
@@ -92,8 +107,6 @@ export function poserLibre(
   murs: WallSeg[],
 ): PoseMeuble {
   const demi = WALL_T / 2;
-  /** Le mur le plus proche que le meuble longe, et de combien il en est. */
-  let meilleur: { jeu: number; w: WallSeg; signe: number } | null = null;
   let dansLeMur = false;
 
   for (const w of murs) {
@@ -114,36 +127,16 @@ export function poserLibre(
       coins du meuble se répartissent des deux côtés de cette bande — ou
       dedans — c'est qu'il mord dans la maçonnerie, et on ne lâche pas là.
     */
-    if (min < demi && max > -demi) dansLeMur = true;
-    // Le jeu : la distance du bord le plus proche au nu du mur, du côté où
-    // le meuble se trouve.
-    const cote = min >= 0 ? 1 : -1;
-    const jeu = cote > 0 ? min - demi : -max - demi;
-    if (jeu >= 0 && (!meilleur || jeu < meilleur.jeu)) {
-      meilleur = { jeu, w, signe: cote };
+    if (min < demi && max > -demi) {
+      dansLeMur = true;
+      // Un seul mur mordu suffit à refuser : rien ne sert de mesurer les
+      // autres. C'est aussi ce qui rend la boucle rapide sur un plan chargé,
+      // et elle tourne à chaque image du geste.
+      break;
     }
   }
 
-  if (dansLeMur) return { centre: vise, valide: false, aimante: false };
-
-  /*
-    L'AIMANT AMÈNE AU NU, JAMAIS AU-DELÀ.
-
-    Une commode lâchée à vingt centimètres d'un mur n'a pas été posée là
-    exprès. On l'amène CONTRE — sa face arrière au nu — et pas dedans : un
-    meuble se pose contre un mur, il n'y entre pas.
-  */
-  if (meilleur && meilleur.jeu > 1e-4 && meilleur.jeu <= PORTEE_AIMANT) {
-    const { nx, nz } = versLeMur(vise, meilleur.w);
-    const k = meilleur.jeu * meilleur.signe;
-    return {
-      centre: { x: vise.x - nx * k, z: vise.z - nz * k },
-      valide: true,
-      aimante: true,
-    };
-  }
-
-  return { centre: vise, valide: true, aimante: false };
+  return { centre: vise, valide: !dansLeMur };
 }
 
 /**

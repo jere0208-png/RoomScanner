@@ -386,7 +386,7 @@ describe('le tremblement d’une main qui vise', () => {
     expect(apres[14]).toBeCloseTo(1.5, 2);
   });
 
-  it('repose le meuble où il tenait quand un appel coupe le geste', () => {
+  it('range le meuble hors du mur quand un appel coupe le geste', () => {
     /*
       UN GESTE COUPÉ NE LAISSE PAS LE MEUBLE DANS UN MUR.
 
@@ -394,6 +394,15 @@ describe('le tremblement d’une main qui vise', () => {
       le toucher : `Terminate` remplace `Release`. Il éteignait le halo rouge
       mais laissait le meuble là où le doigt l'avait mené — dans la
       maçonnerie, à une place que l'app refuse elle-même au lâcher.
+
+      DEUX FAÇONS DE LE SORTIR DE LÀ, ET LA SECONDE EST LA BONNE. La première
+      le renvoyait à la dernière place qui tenait — ici 2,40 m, où le doigt
+      était passé une demi-seconde plus tôt. C'était un retour en arrière :
+      le meuble sautait de près d'un mètre, et personne ne comprenait
+      pourquoi. Relevé du patron : « enlève l'attraction mais mets une
+      collision intelligente ». Le mur ARRÊTE désormais au lieu de renvoyer,
+      et le meuble s'immobilise au contact, dos au nu — c'est-à-dire le plus
+      près possible de là où le doigt le voulait.
     */
     unMeuble();
     act(() => {
@@ -426,9 +435,17 @@ describe('le tremblement d’une main qui vise', () => {
       h.onResponderMove?.(m.bouger(350, 150));
       h.onResponderTerminate?.(m.bouger(350, 150));
     });
-    // Le meuble est revenu à la dernière place qui tenait : pas dans le mur.
     const x = useScanStore.getState().objects[0].transform[12];
-    expect(x).toBeLessThan(2.9);
+    // Il n'est plus dans la maçonnerie : son bord droit est au nu du mur
+    // (4 m), pas au-delà. C'est ce que le geste coupé doit garantir.
+    expect(x + 1.2 / 2).toBeLessThanOrEqual(4 - 0.14 / 2 + 0.005);
+    /*
+      ET IL NE RECULE PAS. Le contrôle en sens inverse de cette épreuve :
+      renvoyer le meuble à 2,40 m — la dernière place qui tenait — passerait
+      la vérification du dessus tout aussi bien. Il doit rester CONTRE le mur,
+      là où le doigt l'a poussé.
+    */
+    expect(x).toBeGreaterThan(3.2);
   });
 
   it('garde le même seuil des deux côtés : ni tap ni glissement n’a de trou', () => {

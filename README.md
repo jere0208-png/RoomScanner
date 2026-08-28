@@ -9169,6 +9169,101 @@ reste le second à poser ; la norme et le tableau restent vendus. Le banc
 `choixscan` raconte désormais les deux versions du popup plutôt que la seule
 ancienne.
 
+### Le meuble ne se fait plus aspirer : il se cogne
+
+**Relevé du patron :** « peaufine les meubles et sa physique, enlève
+l'attraction mais mets une collision intelligente (pas collé au mur, recadré si
+dépasse de la zone surface, etc) ».
+
+**Trois versions de ce geste**, et chacune corrigeait la précédente.
+
+1. **La géométrie disposait.** Le meuble était contraint à chaque image :
+   rabattu hors des murs, retourné pour entrer dans une niche, raboté pour tenir
+   dans un recoin. Trois aides défendables seules, ensemble un meuble qui glisse
+   tout seul sous le doigt.
+2. **Le doigt commandait, un aimant de 25 cm rattrapait.** Le meuble suivait
+   exactement, murs compris ; lâché près d'un mur, il s'y collait. Lâché *dans*
+   un mur, il sautait à la dernière position qui tenait.
+3. **Celle-ci : le doigt commande, le mur arrête.**
+
+**Pourquoi l'aimant devait partir.** On l'avait voulu contre les doigts qui
+visent à peu près ; il s'est retourné contre ceux qui visent juste. Vingt
+centimètres derrière une commode, ce n'est pas une erreur de visée : c'est un
+radiateur, un coffrage, une porte qui bat, une gaine qui monte. Et un meuble qui
+saute de vingt centimètres au moment où le doigt se lève est exactement le
+« meuble qui glisse tout seul » que `poserLibre` avait été écrit pour supprimer.
+L'aimant en était la dernière survivance. `poserLibre` ne déplace donc plus rien
+du tout : elle répond à une seule question — la place tient-elle ? — et c'est le
+halo rouge sous le doigt.
+
+**Pourquoi le retour en arrière devait partir aussi.** Le lâcher dans un mur
+renvoyait le meuble à la dernière position valable, parfois quarante centimètres
+en amont du glissement. Le refus était juste, la sanction aveugle : on poussait
+une commode contre un mur, on dépassait de trois centimètres, et elle repartait
+au milieu de la pièce. **Une collision répond à la même question sans punir :**
+le mur arrête au contact, dos au nu, c'est-à-dire au plus près de là où le doigt
+la voulait.
+
+**Ce que fait `rangerMeuble` (magasin), dans cet ordre.** C'est la mécanique que
+la flèche utilisait déjà, *moins ses trois aides* — pas d'`alignToFit` qui fait
+pivoter, pas de `fitInNook` qui rabote, pas de `hugWall` qui plaque :
+
+1. le **mur** arrête ;
+2. le **contour de la pièce** recadre ce qui en dépasse — c'est `pushOutOfWalls`
+   qui le fait, en ramenant d'abord le point sur le contour : sans cela, un
+   meuble lâché au-delà d'un **angle** n'est en face d'aucun des deux murs et
+   s'échappe par la diagonale ;
+3. les **autres meubles** ne se traversent pas — mais ils se **superposent** à
+   des étages différents : une télé se pose sur un meuble bas, et l'interdire
+   serait une régression ;
+4. le **mur**, une seconde fois : la poussée des voisins peut renvoyer dans la
+   maçonnerie ce que la première avait sorti.
+
+Et `aimant = false` sur les voisins : le jour lâché est le jour gardé.
+
+**Deux défauts trouvés en peaufinant, tous deux invisibles avant ce geste.**
+
+**Le meuble qui change de pièce gardait l'étiquette de l'ancienne.** Traverser
+une cloison est *le* geste que le doigt sait faire, et le `roomId` ne suivait
+pas : le meuble était dessiné dans le séjour et compté dans la chambre. Ce n'est
+pas qu'une étiquette — **c'est ce qui fait la collision** : les voisins qui
+repoussent sont ceux de la même pièce. Un meuble mal étiqueté se cognait donc
+aux meubles d'à côté *à travers le mur*, et traversait sans rien sentir ceux qui
+l'entouraient vraiment. Il se ré-étiquette sur la pièce où il atterrit ; sans
+pièce reconnue, il garde la sienne — une étiquette vide est pire qu'une ancienne.
+
+**Quand le plus court chemin ne mène nulle part, il faut sortir de l'autre
+côté.** Relevé à l'image sur ce code même : un canapé de 2 × 0,90 plaqué au mur
+sud laisse **28 cm** derrière lui, la commode en fait **45**. Lâchée dessus, elle
+sortait par le sud — le côté le plus court, celui qui dérange le moins la
+position visée — et le mur la renvoyait aussitôt dans le canapé. Elle finissait à
+cheval sur les deux, et personne ne repassait. **Chacune des deux passes fait
+pourtant bien son travail : c'est leur enchaînement qui échoue, et aucune des
+deux ne peut le voir seule.** On essaie donc les quatre sorties du meuble qui
+bloque et l'on garde celle qui tient vraiment, la plus proche du point visé —
+ici 67 cm au nord, devant le canapé. Si aucune ne tient, on garde la première :
+le mur a le dernier mot, un meuble qui chevauche un voisin se voit, un meuble
+hors du logement ne se pardonne pas.
+
+**Vérifié à l'œil**, sur sept lâchers passés par le vrai `rangerMeuble` (le
+dessin ne fait que colorier les nombres qu'il rend) : à cheval sur le mur nord
+→ +18 cm, dos au nu ; au large → ne bouge pas ; jeu volontaire de 20 cm → gardé ;
+lâché dehors → revient ; au-delà du coin → rangé dans l'angle, plus de fuite par
+la diagonale ; sur le canapé → ressort devant.
+
+**Le banc `collisionmeuble` porte le contrôle en sens inverse partout**, et c'est
+lui qui compte : une fonction qui replacerait bêtement chaque meuble contre le
+mur le plus proche passerait toutes les épreuves de collision. On vérifie donc
+autant que le meuble **reste** où on le pose qu'il **sort** d'où il ne peut pas
+être. `poserlibre`, `deplacerlibre` et `doigt` racontent désormais les deux
+versions de leur épreuve plutôt que la seule ancienne — même point d'essai,
+attente retournée.
+
+**Reste en l'état, signalé :** `hugWall` (le plaquage de la flèche) n'est plus
+appelé par personne — l'écran passe `aimant = false` depuis que la flèche
+paraissait morte contre un mur. La fonction et son banc restent ; c'est du code
+mort à retirer le jour où l'on touchera à ce chemin.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

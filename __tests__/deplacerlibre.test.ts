@@ -78,12 +78,22 @@ describe('deplacer un meuble a la main', () => {
     expect(ou().z).toBeCloseTo(-1, 3);
   });
 
-  it('l’attire contre un mur quand il en est tout pres', () => {
+  /*
+    DEUX VERSIONS DE CETTE EPREUVE, SUR LE MEME POINT D'ESSAI.
+
+    Elle s'appelait « l'attire contre un mur quand il en est tout pres » : a
+    cinquante centimetres du nu, le meuble devait SAUTER contre le mur. C'etait
+    l'aimant de vingt-cinq centimetres du mode libre.
+
+    Releve du patron : « enleve l'attraction mais mets une collision
+    intelligente ». Le meme point d'essai prouve donc l'inverse — le meuble
+    reste ou le doigt le met. Ce que l'aimant faisait de legitime (ne pas
+    laisser un meuble dans la maconnerie) est passe au LACHER, ou c'est une
+    collision et non une aspiration : voir `collisionmeuble.test.ts`.
+  */
+  it('ne l’attire plus, meme tout pres d’un mur', () => {
     st().setObjectCenter('c1', 2.5, 0.5, false, true);
-    // Amene au nu : le bord arriere touche le mur, le meuble reste entier
-    // du bon cote.
-    expect(ou().z - 0.45 / 2).toBeGreaterThanOrEqual(0.04);
-    expect(ou().z - 0.45 / 2).toBeLessThanOrEqual(0.12);
+    expect(ou().z).toBeCloseTo(0.5, 3);
   });
 
   it('et ne rabote plus le meuble pour le faire entrer', () => {

@@ -1493,6 +1493,14 @@ interface ScanState {
     aimant?: boolean,
     libre?: boolean,
   ) => void;
+  /**
+   * RANGE LE MEUBLE LÀ OÙ LE DOIGT L'A LÂCHÉ — par collision, sans aimant.
+   *
+   * Le mur l'arrête, le contour de la pièce le recadre, les autres meubles
+   * ne se traversent pas. Rien ne l'attire : au large, il ne bouge pas d'un
+   * millimètre. Voir l'implémentation pour l'ordre des quatre passes.
+   */
+  rangerMeuble: (id: string, x: number, z: number) => void;
   resizeObject: (id: string, width: number, depth: number) => void;
   /**
    * LA TROISIÈME COTE, et la hauteur à laquelle elle commence.
@@ -5568,6 +5576,225 @@ export const useScanStore = create<ScanState>((set, get) => {
             baseWidth: base.width,
             baseDepth: base.depth,
             transform: t,
+          };
+        }),
+        dirty: true,
+      });
+    },
+
+    /*
+      LE RANGEMENT AU LÂCHER — LA COLLISION, PAS L'AIMANT.
+
+      Relevé du patron : « peaufine les meubles et sa physique, enlève
+      l'attraction mais mets une collision intelligente (pas collé au mur,
+      recadré si dépasse de la zone surface, etc) ».
+
+      CE QU'IL Y AVAIT AVANT, ET POURQUOI ÇA NE POUVAIT PAS TENIR. Le geste
+      au doigt gardait en mémoire la dernière position valable, et le lâcher
+      dans un mur y REVENAIT. Sur le papier c'est raisonnable ; à l'usage, on
+      pousse une commode contre un mur, on dépasse de trois centimètres, et
+      le meuble saute quarante centimètres en arrière — jusqu'au dernier
+      point où il tenait, qui peut dater du milieu du glissement. Le refus
+      était juste, la sanction était aveugle.
+
+      UNE COLLISION RÉPOND À LA MÊME QUESTION SANS PUNIR : le mur arrête, il
+      ne renvoie pas. Le meuble ressort par le plus court chemin — là où le
+      doigt l'a amené — et s'arrête AU CONTACT, dos au nu. C'est aussi ce que
+      fait déjà la flèche depuis toujours (`pushOutOfWalls`) : les deux
+      chemins se rejoignent enfin, et pour la même raison.
+
+      ON REPREND DONC LA MÉCANIQUE DE LA FLÈCHE, MOINS SES TROIS AIDES.
+      Pas d'`alignToFit` (qui fait pivoter), pas de `fitInNook` (qui rabote),
+      pas de `hugWall` (qui plaque). Ce sont exactement les aides que le
+      patron avait fait retirer du doigt — « elles font glisser le meuble
+      tout seul » —, et une collision n'a pas besoin d'elles. Il reste :
+
+        1. le mur, qui arrête ;
+        2. le contour de la pièce, qui RECADRE ce qui en dépasse (c'est
+           `pushOutOfWalls` qui le fait, en ramenant d'abord le point sur le
+           contour : sans cela, un meuble lâché au-delà d'un ANGLE n'est en
+           face d'aucun des deux murs et s'échappe par la diagonale) ;
+        3. les autres meubles, qui ne se traversent pas — mais qui se
+           SUPERPOSENT quand ils sont à des étages différents : une télé se
+           pose sur un meuble bas, et l'interdire serait une régression ;
+        4. le mur, une seconde fois. Relevé du chantier : « on voit le
+           meuble légèrement dépassé de l'autre côté du mur ». La poussée des
+           voisins peut renvoyer dans la maçonnerie ce que la première avait
+           sorti. Un meuble qui chevauche un voisin se voit ; un meuble qui
+           sort du logement ne se pardonne pas.
+
+      Et `aimant = false` sur les voisins : le jour lâché est le jour gardé.
+
+      LA PIÈCE EST CELLE OÙ LE MEUBLE ATTERRIT, pas celle d'où il vient.
+      C'est l'inverse de la flèche, et c'est voulu : traverser une cloison
+      pour changer une commode de pièce est LE geste que le doigt sait faire.
+      Le ranger dans son ancienne pièce le ferait revenir sur ses pas.
+    */
+    rangerMeuble: (id, x, z) => {
+      pushHistory(`rangerMeuble:${id}`);
+      const st = get();
+      const obj = st.objects.find((o) => o.id === id);
+      if (!obj) return;
+      const yaw = Math.atan2(obj.transform[2], obj.transform[0]);
+      const box = {
+        width: obj.baseWidth ?? obj.width,
+        depth: obj.baseDepth ?? obj.depth,
+        yaw,
+      };
+      /** D'où il vient : c'est ce qui dit de quel côté chaque mur repousse. */
+      const ici = { x: obj.transform[12], z: obj.transform[14] };
+      const parts = roomParts(st.walls, st.rooms);
+      const part =
+        parts.find((p) => pointInPolygon({ x, z }, p.surface?.pts ?? [])) ??
+        parts.find((p) => pointInPolygon(ici, p.surface?.pts ?? [])) ??
+        parts.find((p) => p.roomId === obj.roomId);
+      // Sans pièce reconnue — un plan dont les contours ne se referment pas
+      // — les murs arrêtent quand même : c'est le mur qui fait la collision,
+      // la pièce ne fait que dire de quel côté.
+      const murs = part ? part.walls : st.walls;
+      const ancre = part ? part.labelAt : ici;
+      const contour = part?.surface?.pts;
+      const arrete = pushOutOfWalls({ x, z }, box, murs, ancre, contour, ici);
+      /*
+        LES VOISINS SONT CEUX DE LA PIÈCE D'ARRIVÉE, PAS CEUX D'AVANT.
+
+        Le défaut que ce geste a rendu visible : le meuble gardait le
+        `roomId` de sa pièce d'origine en traversant une cloison. Il était
+        donc DESSINÉ dans le séjour et COMPTÉ dans la chambre — et, ce qui
+        est pire pour une collision, il se cognait aux meubles de la chambre
+        À TRAVERS LE MUR pendant qu'il traversait sans rien sentir ceux qui
+        l'entouraient vraiment.
+      */
+      const piece = part?.roomId ?? roomOf(obj);
+      const voisins = st.objects
+        .filter((o) => o.id !== id && roomOf(o) === piece)
+        .map((o) => ({
+          cx: o.transform[12],
+          cz: o.transform[14],
+          width: o.width,
+          depth: o.depth,
+          yaw: Math.atan2(o.transform[2], o.transform[0]),
+          y0: o.transform[13] - o.height / 2,
+          y1: o.transform[13] + o.height / 2,
+        }));
+      const boite = {
+        ...box,
+        y0: obj.transform[13] - obj.height / 2,
+        y1: obj.transform[13] + obj.height / 2,
+      };
+      /** Les deux dernières passes, enchaînées : les voisins, puis le mur. */
+      const resoudre = (depart: { x: number; z: number }) =>
+        pushOutOfWalls(
+          // Pas de jour refermé : au doigt, on ne déplace pas ce qui tenait.
+          pushOutOfObjects(depart, boite, voisins, false),
+          box,
+          murs,
+          ancre,
+          contour,
+          ici,
+        );
+      /**
+       * RESTE-T-IL UN CHEVAUCHEMENT ? (deux rectangles tournés, par axes)
+       *
+       * Les quatre axes des deux emprises suffisent à trancher : s'il en
+       * existe un qui les sépare, elles ne se touchent pas. Et deux meubles
+       * d'étages différents ne se gênent jamais — une télé se pose sur un
+       * meuble bas.
+       */
+      const chevauchePar = (p: { x: number; z: number }) =>
+        voisins.find((o) => {
+          const bas = Math.max(boite.y0, o.y0);
+          const haut = Math.min(boite.y1, o.y1);
+          if (haut - bas <= 0.05) return false;
+          const demi = (
+            e: { width: number; depth: number; yaw: number },
+            n: { x: number; z: number },
+          ) =>
+            Math.abs(Math.cos(e.yaw) * n.x + Math.sin(e.yaw) * n.z) *
+              (e.width / 2) +
+            Math.abs(-Math.sin(e.yaw) * n.x + Math.cos(e.yaw) * n.z) *
+              (e.depth / 2);
+          for (const n of [
+            { x: Math.cos(box.yaw), z: Math.sin(box.yaw) },
+            { x: -Math.sin(box.yaw), z: Math.cos(box.yaw) },
+            { x: Math.cos(o.yaw), z: Math.sin(o.yaw) },
+            { x: -Math.sin(o.yaw), z: Math.cos(o.yaw) },
+          ]) {
+            const d = (p.x - o.cx) * n.x + (p.z - o.cz) * n.z;
+            // Un demi-millimètre de tolérance : deux meubles à touche-touche
+            // se séparent par un flottant, pas par un chevauchement.
+            if (Math.abs(d) - demi(box, n) - demi(o, n) > -0.0005) return false;
+          }
+          return true;
+        });
+      const chevauche = (p: { x: number; z: number }) => !!chevauchePar(p);
+
+      let pose = resoudre(arrete);
+      /*
+        QUAND LE PLUS COURT CHEMIN NE MÈNE NULLE PART, ON SORT DE L'AUTRE CÔTÉ.
+
+        Relevé fait à l'image sur ce code même : un canapé plaqué au mur sud
+        laisse vingt-huit centimètres derrière lui, la commode en fait
+        quarante-cinq. Lâchée dessus, elle sortait PAR LE SUD — le côté le
+        plus court, celui qui dérange le moins la position visée — et le mur
+        la renvoyait aussitôt dans le canapé. Elle finissait à cheval sur les
+        deux, et personne ne repassait.
+
+        Chacune des deux passes fait pourtant bien son travail : c'est leur
+        ENCHAÎNEMENT qui échoue, et aucune des deux ne peut le voir seule. On
+        essaie donc les autres sorties du meuble qui bloque — quatre, une par
+        côté — et l'on garde celle qui tient VRAIMENT, la plus proche du point
+        visé. C'est ce qui sépare une collision d'une collision intelligente.
+
+        Si aucune ne tient — une pièce trop pleine, un meuble trop grand — on
+        garde la première : le mur a le dernier mot, et un meuble qui
+        chevauche un voisin se voit, quand un meuble hors du logement ne se
+        pardonne pas.
+      */
+      const bloqueur = chevauchePar(pose);
+      if (bloqueur) {
+        let meilleur: { p: { x: number; z: number }; d: number } | null = null;
+        for (const n of [
+          { x: Math.cos(box.yaw), z: Math.sin(box.yaw) },
+          { x: -Math.sin(box.yaw), z: Math.cos(box.yaw) },
+        ]) {
+          for (const sens of [1, -1]) {
+            const axe = { x: n.x * sens, z: n.z * sens };
+            const demi = (e: { width: number; depth: number; yaw: number }) =>
+              Math.abs(Math.cos(e.yaw) * axe.x + Math.sin(e.yaw) * axe.z) *
+                (e.width / 2) +
+              Math.abs(-Math.sin(e.yaw) * axe.x + Math.cos(e.yaw) * axe.z) *
+                (e.depth / 2);
+            // Le point qui dégage tout juste le meuble gênant de ce côté.
+            const ecart = demi(box) + demi(bloqueur);
+            const essai = resoudre({
+              x: bloqueur.cx + axe.x * ecart,
+              z: bloqueur.cz + axe.z * ecart,
+            });
+            if (chevauche(essai)) continue;
+            const d = Math.hypot(essai.x - x, essai.z - z);
+            if (!meilleur || d < meilleur.d) meilleur = { p: essai, d };
+          }
+        }
+        if (meilleur) pose = meilleur.p;
+      }
+      set({
+        objects: st.objects.map((o) => {
+          if (o.id !== id) return o;
+          const t = [...o.transform];
+          t[12] = pose.x;
+          t[14] = pose.z;
+          // Les cotes du catalogue, toujours : le doigt ne rabote pas.
+          return {
+            ...o,
+            transform: t,
+            width: o.baseWidth ?? o.width,
+            depth: o.baseDepth ?? o.depth,
+            // Il appartient à la pièce où il ATTERRIT. Sans pièce reconnue —
+            // un plan dont les contours ne se referment pas — on ne lui
+            // retire pas la sienne : une étiquette vide est pire qu'une
+            // étiquette ancienne.
+            roomId: piece,
           };
         }),
         dirty: true,

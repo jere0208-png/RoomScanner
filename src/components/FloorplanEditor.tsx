@@ -3876,10 +3876,23 @@ export function ObjectDragHandle({
 }) {
   const styles = getStyles(useTheme());
   const startRef = useRef({ x: raw.transform[12], z: raw.transform[14] });
-  /** La dernière position qui tenait : on y revient si le doigt lâche dans un mur. */
-  const derniereBonne = useRef<{ x: number; z: number } | null>(null);
-  /** L'aimant a-t-il joué à l'image précédente ? (pour ne vibrer qu'une fois) */
-  const aimanteAvant = useRef(false);
+  /**
+   * LE DERNIER POINT VISÉ — celui qu'on range, pas celui qui tenait.
+   *
+   * Il a gardé « la dernière position qui tenait », et le lâcher dans un mur
+   * y REVENAIT : on poussait une commode contre un mur, on dépassait de
+   * trois centimètres, et le meuble sautait jusqu'au dernier point valable
+   * du glissement — parfois quarante centimètres en arrière. Le refus était
+   * juste, la sanction aveugle.
+   *
+   * Le magasin RANGE désormais le point visé (`rangerMeuble`) : le mur
+   * arrête au lieu de renvoyer. On garde donc le point du DOIGT, y compris
+   * quand il est dans la maçonnerie — c'est justement là que la collision
+   * sert.
+   */
+  const dernierVise = useRef<{ x: number; z: number } | null>(null);
+  /** Le meuble était-il refusé à l'image précédente ? (pour ne vibrer qu'une fois) */
+  const refuseAvant = useRef(false);
   /**
    * Ce qui change à chaque frame passe par une RÉFÉRENCE, jamais par les
    * dépendances du geste.
@@ -3957,34 +3970,36 @@ export function ObjectDragHandle({
             .getState()
             .setObjectCenter(objectId, vise.x, vise.z, true, true);
           dire?.(!essai.valide);
+          // On range CE point-là au lâcher, valable ou non : c'est le mur qui
+          // arrêtera, pas un retour en arrière.
+          dernierVise.current = vise;
           if (essai.valide) {
-            // La dernière position qui tient : c'est là qu'on reviendra si
-            // le doigt se lève dans un mur.
-            derniereBonne.current = essai.centre;
             releaseHaptic('butee');
-            // L'aimant vient de coller le meuble au mur : la main doit le
-            // sentir, parce que l'œil est caché par le doigt.
-            if (essai.aimante && !aimanteAvant.current) haptic('accroche');
           } else {
             haptic('butee', true);
           }
-          aimanteAvant.current = essai.aimante;
+          refuseAvant.current = !essai.valide;
         },
         /*
-          AU LÂCHER, ON NE LAISSE PAS UN MEUBLE DANS UN MUR.
+          AU LÂCHER, LE MEUBLE SE RANGE — il ne revient pas en arrière.
 
-          Il revient à la dernière position qui tenait — celle qu'il avait
-          juste avant d'entrer dans la maçonnerie. Sans ce retour, le refus
-          ne serait qu'une couleur : on lâcherait quand même dans le mur.
+          Le mur l'arrête au contact, le contour de la pièce le recadre s'il
+          en dépasse, les autres meubles ne se laissent pas traverser. Rien
+          ne l'attire : lâché au large, il ne bouge pas d'un millimètre.
+          Voir `rangerMeuble` dans le magasin.
+
+          Si le doigt n'a jamais franchi le seuil de glissement, il n'y a pas
+          de point visé — c'était un appui, pas un déplacement, et on ne
+          range rien : un simple tap ne doit pas déplacer un meuble que le
+          relevé a posé de travers exprès.
         */
         onPanResponderRelease: () => {
           releaseHaptic('butee');
           live.current.onRefus?.(false);
-          const bonne = derniereBonne.current;
-          if (bonne) {
-            useScanStore
-              .getState()
-              .setObjectCenter(objectId, bonne.x, bonne.z, true, true);
+          const vise = dernierVise.current;
+          if (vise) {
+            useScanStore.getState().rangerMeuble(objectId, vise.x, vise.z);
+            if (refuseAvant.current) haptic('accroche');
           }
         },
         /*
@@ -3997,15 +4012,16 @@ export function ObjectDragHandle({
           deux, DANS la maçonnerie, à une place que l'app elle-même refuse au
           lâcher. On repose donc à la dernière position qui tenait, comme
           au lâcher : c'est le même geste, il finit simplement autrement.
+          Depuis que le lâcher RANGE au lieu de revenir en arrière, celui-ci
+          range aussi — un appel entrant ne doit pas laisser le meuble dans
+          un mur, mais il ne doit pas non plus le renvoyer d'où il vient.
         */
         onPanResponderTerminate: () => {
           releaseHaptic('butee');
           live.current.onRefus?.(false);
-          const bonne = derniereBonne.current;
-          if (bonne) {
-            useScanStore
-              .getState()
-              .setObjectCenter(objectId, bonne.x, bonne.z, true, true);
+          const vise = dernierVise.current;
+          if (vise) {
+            useScanStore.getState().rangerMeuble(objectId, vise.x, vise.z);
           }
         },
       }),
