@@ -448,6 +448,52 @@ describe('le tremblement d’une main qui vise', () => {
     expect(x).toBeGreaterThan(3.2);
   });
 
+  it('un appui, après un glissement, ne range rien du tout', () => {
+    /*
+      LE POINT VISÉ NE SURVIT PAS AU GESTE QUI L'A PRODUIT.
+
+      Le lâcher range le DERNIER POINT VISÉ par le doigt. Ce point vivait
+      dans une référence que rien ne remettait à zéro : il survivait au
+      geste, et le geste SUIVANT en héritait.
+
+      Tant qu'on enchaîne des glissements, cela ne se voit pas — chaque
+      mouvement réécrit le point avant le lâcher. Mais un APPUI simple ne
+      bouge pas : le seuil n'est pas franchi, aucun mouvement n'est
+      enregistré, et le lâcher rangeait alors le point du glissement
+      PRÉCÉDENT. Toucher un meuble pour le sélectionner le renvoyait donc où
+      le doigt l'avait laissé la dernière fois — en effaçant, au passage,
+      tout ce que les flèches avaient réglé entre-temps.
+
+      C'est le cas que reproduit cette épreuve : on glisse, on règle à la
+      flèche, puis on TOUCHE. Le meuble ne doit pas broncher.
+    */
+    unMeuble();
+    const h = poigneeDeMeuble(useScanStore.getState().objects[0].transform);
+    const m = main();
+    // Un vrai glissement, jusqu'à 2,60 m.
+    const e0 = m.poser(200, 150);
+    act(() => {
+      h.onStartShouldSetResponder?.(e0);
+      h.onResponderGrant?.(e0);
+      h.onResponderMove?.(m.bouger(230, 150));
+      h.onResponderMove?.(m.bouger(260, 150));
+      h.onResponderRelease?.(m.lever());
+    });
+    // Puis la flèche, au centimètre : c'est un réglage volontaire.
+    act(() => {
+      useScanStore.getState().setObjectCenter('o1', 3.4, 1.5, false);
+    });
+    expect(useScanStore.getState().objects[0].transform[12]).toBeCloseTo(3.4, 2);
+    // Et maintenant un simple APPUI sur le meuble : rien ne doit bouger.
+    const e1 = m.poser(200, 150);
+    act(() => {
+      h.onStartShouldSetResponder?.(e1);
+      h.onResponderGrant?.(e1);
+      h.onResponderRelease?.(m.lever());
+    });
+    expect(useScanStore.getState().objects[0].transform[12]).toBeCloseTo(3.4, 2);
+  });
+
   it('garde le même seuil des deux côtés : ni tap ni glissement n’a de trou', () => {
     // Un seul chiffre pour toute l'app : le glissement commence là où le
     // tap finit, sans zone morte entre les deux.

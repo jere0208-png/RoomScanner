@@ -3931,6 +3931,22 @@ export function ObjectDragHandle({
           seuil.reprendre();
           const t = live.current.raw.transform;
           startRef.current = { x: t[12], z: t[14] };
+          /*
+            LE POINT VISÉ NE SURVIT PAS AU GESTE QUI L'A PRODUIT.
+
+            Il vivait dans une référence que rien ne remettait à zéro, et le
+            geste suivant en héritait. Entre deux glissements cela ne se
+            voyait pas — chaque mouvement le réécrit avant le lâcher. Mais
+            un APPUI simple ne bouge pas : le seuil n'est pas franchi,
+            aucun mouvement n'est enregistré, et le lâcher rangeait le point
+            du glissement PRÉCÉDENT. Toucher un meuble pour le sélectionner
+            le renvoyait donc où le doigt l'avait laissé la dernière fois —
+            en effaçant au passage tout ce que les flèches avaient réglé
+            entre-temps. Quatre-vingts centimètres, sur le banc qui l'a
+            attrapé.
+          */
+          dernierVise.current = null;
+          refuseAvant.current = false;
         },
         /*
           LE DOIGT COMMANDE — relevé du patron : « on doit pouvoir les placer

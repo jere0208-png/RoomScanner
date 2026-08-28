@@ -5631,7 +5631,18 @@ export const useScanStore = create<ScanState>((set, get) => {
       Le ranger dans son ancienne pièce le ferait revenir sur ses pas.
     */
     rangerMeuble: (id, x, z) => {
-      pushHistory(`rangerMeuble:${id}`);
+      /*
+        LA MÊME CLÉ QUE LE GLISSEMENT — le lâcher en est la QUEUE, pas un
+        geste de plus.
+
+        L'historique fusionne les états d'un geste continu, et il les
+        reconnaît à leur clé : `moveObject:o1`. Poussé sous une clé à lui,
+        le rangement coûtait une seconde annulation — et la première
+        ramenait le meuble là où le doigt l'avait lâché, c'est-à-dire, une
+        fois sur deux, DANS un mur. « Annuler » rendait une position que
+        l'application refuse elle-même de produire.
+      */
+      pushHistory(`moveObject:${id}`);
       const st = get();
       const obj = st.objects.find((o) => o.id === id);
       if (!obj) return;

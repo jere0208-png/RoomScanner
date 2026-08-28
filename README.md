@@ -9264,6 +9264,70 @@ appelé par personne — l'écran passe `aimant = false` depuis que la flèche
 paraissait morte contre un mur. La fonction et son banc restent ; c'est du code
 mort à retirer le jour où l'on touchera à ce chemin.
 
+### Deux défauts que la collision avait apportés avec elle
+
+Chasse menée sur la livraison précédente, dans l'heure qui l'a suivie. Les deux
+sont de moi, les deux sont du même genre : **une pièce mobile ajoutée sans
+regarder ce qui vivait déjà autour d'elle.**
+
+**Un glissement coûtait deux annulations.** L'historique fusionne les états d'un
+geste continu — un meuble qu'on fait glisser en envoie cinquante par seconde — et
+il les reconnaît à leur clé, qui désigne l'objet manipulé (`moveObject:o1`). Le
+rangement au lâcher poussait sous une clé à lui. Résultat : « Annuler » une fois
+ne défaisait que le rangement et **rendait le meuble à l'endroit où le doigt
+l'avait lâché — c'est-à-dire, une fois sur deux, dans un mur.** Le filet rendait
+une position que l'application refuse elle-même de produire. Le lâcher est la
+*queue* du glissement, pas un geste de plus : il porte la même clé.
+
+**Un simple appui effaçait 80 cm de réglage à la flèche.** Le lâcher range le
+dernier point visé par le doigt, gardé dans une référence que rien ne remettait à
+zéro au début du geste suivant. Entre deux glissements cela ne se voit pas —
+chaque mouvement réécrit le point avant le lâcher. Mais **un appui ne bouge
+pas** : le seuil n'est pas franchi, aucun mouvement n'est enregistré, et le
+lâcher rangeait le point du glissement *précédent*. Toucher un meuble pour le
+sélectionner le renvoyait donc là où le doigt l'avait laissé la fois d'avant.
+Mesuré sur le banc qui l'a attrapé : on glisse, on règle à la flèche jusqu'à
+3,40 m, on touche — le meuble repart à 2,60 m.
+
+Le commentaire que j'avais écrit la veille affirmait le contraire (« il n'y a pas
+de point visé, on ne range rien »). **Un commentaire qui décrit une intention
+plutôt que le code est un mensonge à retardement** : celui-ci a tenu vingt-quatre
+heures.
+
+### La sonde : mille lâchers sur un vrai relevé
+
+Les épreuves nommées décrivent chacune un cas qu'on a su prévoir. Celle-ci ne
+nomme rien : elle lâche un buffet de 90 × 50 sur une grille couvrant tout le plan
+de référence — murs de travers, alcôves, angles rentrants, six pièces déjà
+meublées — et compte les positions **impossibles**. Droit puis **de biais à 30°**,
+où un meuble occupe sa diagonale et où les projections comptent autrement.
+
+**289 lâchers par orientation : 0 dans un mur, 0 hors de toute pièce.** Mesuré
+plus large pendant la mise au point (625 par orientation, 1 250 en tout) : mêmes
+zéros, et aucun meuble déplacé de plus de trois mètres.
+
+**Et la sonde porte son contrôle en sens inverse, qui est la moitié qui compte.**
+Une sonde qui ne trouve jamais rien peut être une sonde aveugle. On mesure donc
+le même plan **sans rangement** — le point brut du doigt — et l'on exige qu'elle y
+trouve des fautes en nombre (plus de 20 dans un mur, plus de 50 hors pièce). Si
+les deux comptes tombaient à zéro, ce ne serait pas une preuve : ce serait un
+instrument cassé.
+
+### Signalé, non corrigé
+
+- **`hugWall` est du code mort.** Le plaquage de la flèche n'est plus appelé par
+  personne : l'écran passe `aimant = false` depuis que la flèche paraissait morte
+  contre un mur. La fonction et son banc restent — à retirer le jour où l'on
+  touchera à ce chemin.
+- **Le chemin des flèches garde `alignToFit` et `fitInNook`**, les deux aides qui
+  font pivoter et raboter. Sondées sur un séjour simple, elles ne se déclenchent
+  pas (aucune rotation, aucune cote modifiée sur quatre pas mesurés) ; elles
+  n'entrent en jeu que dans une alcôve plus étroite que le meuble. C'est le geste
+  au centimètre, pas le doigt — mais un meuble qui pivote seul sous une flèche
+  reste surprenant. À trancher avec le patron.
+- **Il n'existe aucun geste de duplication** pour un appareil ou un meuble : six
+  socles identiques, c'est six poses. Question déjà ouverte, toujours ouverte.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

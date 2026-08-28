@@ -42,7 +42,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 import { poserLibre } from '../src/geometry/poser';
-import { WALL_T, type WallSeg } from '../src/geometry/floorplan';
+import { WALL_T, type Pt, type WallSeg } from '../src/geometry/floorplan';
 import { useScanStore } from '../src/store/scanStore';
 
 const st = () => useScanStore.getState();
@@ -95,7 +95,15 @@ const ou = (id = 'c1') => {
 
 beforeEach(() => {
   mockMagasin.clear();
-  // Le magasin SURVIT d'un banc à l'autre : on repart d'un séjour neuf.
+  /*
+    LE MAGASIN SURVIT D'UN BANC A L'AUTRE — et son HISTORIQUE aussi.
+
+    L'historique est de portee MODULE : `setState` ne le touche pas. Une
+    epreuve qui annule remontait donc dans le plan d'une epreuve
+    precedente, et rendait une position venue de nulle part. `reset()` est
+    le seul geste qui efface le filet.
+  */
+  useScanStore.getState().reset();
   useScanStore.setState({
     walls: MURS,
     openings: [],
@@ -351,5 +359,235 @@ describe('un meuble qui change de pièce change d’étiquette', () => {
     useScanStore.setState({ rooms: [] as never });
     st().rangerMeuble('c1', 2.4, 1.6);
     expect(st().objects[0].roomId).toBe('r1');
+  });
+});
+
+describe('un glissement, une annulation', () => {
+  /*
+    LE DEFAUT QUE LE RANGEMENT AU LACHER A INTRODUIT.
+
+    L'historique fusionne les etats d'un geste CONTINU — un mur qu'on fait
+    glisser envoie cinquante etats par seconde, et sans la fusion il faudrait
+    cinquante annulations pour revenir en arriere d'un seul geste. Les gestes
+    continus se reconnaissent a leur cle, qui designe l'objet manipule :
+    `moveObject:o1`.
+
+    `rangerMeuble` poussait sous une cle a lui, `rangerMeuble:o1`. Un
+    glissement au doigt coutait donc DEUX annulations — et la premiere
+    ramenait le meuble la ou le doigt l'avait lache, c'est-a-dire, une fois
+    sur deux, DANS un mur. « Annuler » rendait une position que
+    l'application refuse elle-meme de produire.
+
+    Le lacher est la QUEUE du glissement, pas un geste de plus : il porte
+    donc la meme cle, et fusionne avec lui.
+  */
+  it('le glissement et son rangement ne font qu’une seule annulation', () => {
+    const depart = { ...ou() };
+    // Le doigt glisse — trois images, comme le PanResponder les envoie —
+    // puis lache dans la maconnerie du mur nord.
+    st().setObjectCenter('c1', 2.5, 1.4, true, true);
+    st().setObjectCenter('c1', 2.5, 0.7, true, true);
+    st().setObjectCenter('c1', 2.5, 0.12, true, true);
+    st().rangerMeuble('c1', 2.5, 0.12);
+    expect(ou().z).not.toBeCloseTo(depart.z, 2);
+    st().undo();
+    expect(ou().x).toBeCloseTo(depart.x, 3);
+    expect(ou().z).toBeCloseTo(depart.z, 3);
+  });
+
+  /*
+    LE CONTROLE EN SENS INVERSE : deux glissements restent deux gestes. Une
+    fusion trop large avalerait le precedent, et « Annuler » deferait deux
+    deplacements d'un coup — le defaut exactement symetrique.
+  */
+  it('mais deux glissements se defont l’un apres l’autre', () => {
+    const depart = { ...ou() };
+    st().setObjectCenter('c1', 2.5, 1.4, true, true);
+    st().rangerMeuble('c1', 2.5, 1.4);
+    const apresLePremier = { ...ou() };
+    // Le second geste, plus tard : l'historique ne les confond pas.
+    jest.spyOn(Date, 'now').mockReturnValue(Date.now() + 5000);
+    st().setObjectCenter('c1', 3.6, 1.4, true, true);
+    st().rangerMeuble('c1', 3.6, 1.4);
+    st().undo();
+    expect(ou().x).toBeCloseTo(apresLePremier.x, 3);
+    st().undo();
+    expect(ou().x).toBeCloseTo(depart.x, 3);
+    jest.restoreAllMocks();
+  });
+});
+
+/*
+  LA SONDE : MILLE LÂCHERS SUR UN VRAI RELEVÉ.
+
+  Les épreuves ci-dessus décrivent chacune un cas qu'on a su nommer. Celle-ci
+  ne nomme rien : elle lâche un buffet sur une grille couvrant tout le plan de
+  référence — murs de travers, alcôves, angles rentrants, pièces déjà meublées
+  — et compte les positions IMPOSSIBLES. C'est ce qui attrape ce qu'on n'a pas
+  pensé à écrire.
+
+  ET ELLE PORTE SON CONTRÔLE EN SENS INVERSE, qui est ici la moitié la plus
+  importante : une sonde qui ne trouve jamais rien peut être une sonde aveugle.
+  On mesure donc AUSSI le même plan sans rangement — le point brut du doigt —
+  et l'on exige qu'elle y trouve des fautes en nombre. Si les deux comptes
+  tombaient à zéro, ce ne serait pas une preuve : ce serait un instrument cassé.
+*/
+describe('mille lâchers sur le plan de référence', () => {
+  const {
+    SNAPSHOT_OPENINGS,
+    SNAPSHOT_ROOMS,
+    SNAPSHOT_WALLS,
+  } = require('../src/export/snapshotFixture');
+  const { roomParts } = require('../src/geometry/floorplan');
+  const { pointInPolygon } = require('../src/geometry/appearance');
+
+  /** Un buffet de 90 x 50. */
+  const BW = 0.9;
+  const BD = 0.5;
+
+  const coinsDe = (c: { x: number; z: number }, yaw: number) => {
+    const co = Math.cos(yaw);
+    const si = Math.sin(yaw);
+    return [
+      [-BW / 2, -BD / 2],
+      [BW / 2, -BD / 2],
+      [BW / 2, BD / 2],
+      [-BW / 2, BD / 2],
+    ].map(([lx, lz]) => ({
+      x: c.x + lx * co - lz * si,
+      z: c.z + lx * si + lz * co,
+    }));
+  };
+
+  /** L'emprise mord-elle la bande de maçonnerie d'un mur ? */
+  const mordUnMur = (c: { x: number; z: number }, yaw: number) =>
+    (SNAPSHOT_WALLS as WallSeg[]).some((w) => {
+      if (w.type !== 'wall') return false;
+      const dx = w.b.x - w.a.x;
+      const dz = w.b.z - w.a.z;
+      const len = Math.hypot(dx, dz) || 1;
+      const nx = -dz / len;
+      const nz = dx / len;
+      const cs = coinsDe(c, yaw);
+      const ts = cs.map(
+        (p) => ((p.x - w.a.x) * dx + (p.z - w.a.z) * dz) / (len * len),
+      );
+      if (Math.max(...ts) < 0 || Math.min(...ts) > 1) return false;
+      const ds = cs.map((p) => (p.x - w.a.x) * nx + (p.z - w.a.z) * nz);
+      // Deux millimètres de tolérance : un meuble posé AU nu n'est pas dedans.
+      return (
+        Math.min(...ds) < NU - 0.002 && Math.max(...ds) > -NU + 0.002
+      );
+    });
+
+  const rooms = SNAPSHOT_ROOMS.map((r: { id: string }, i: number) => ({
+    id: r.id,
+    name: `Pièce ${i + 1}`,
+    floor: null,
+  }));
+
+  /**
+   * Lâche le buffet sur toute la grille et compte les positions impossibles.
+   *
+   * `ranger` vaut `false` pour le contrôle en sens inverse : on garde alors le
+   * point brut du doigt, celui que l'écran montre en rouge.
+   */
+  const balayer = (yaw: number, ranger: boolean) => {
+    const parts = roomParts(SNAPSHOT_WALLS, rooms);
+    const xs = (SNAPSHOT_WALLS as WallSeg[]).flatMap((w) => [w.a.x, w.b.x]);
+    const zs = (SNAPSHOT_WALLS as WallSeg[]).flatMap((w) => [w.a.z, w.b.z]);
+    const x0 = Math.min(...xs) - 1;
+    const x1 = Math.max(...xs) + 1;
+    const z0 = Math.min(...zs) - 1;
+    const z1 = Math.max(...zs) + 1;
+    const co = Math.cos(yaw);
+    const si = Math.sin(yaw);
+    let dansUnMur = 0;
+    let horsDeToutePiece = 0;
+    let n = 0;
+    for (let i = 0; i <= 16; i++) {
+      for (let j = 0; j <= 16; j++) {
+        const x = x0 + ((x1 - x0) * i) / 16;
+        const z = z0 + ((z1 - z0) * j) / 16;
+        useScanStore.setState({
+          walls: SNAPSHOT_WALLS,
+          openings: SNAPSHOT_OPENINGS,
+          rooms: rooms as never,
+          objects: [
+            {
+              id: 'b1',
+              roomId: parts[0].roomId,
+              category: 'storage',
+              width: BW,
+              baseWidth: BW,
+              depth: BD,
+              baseDepth: BD,
+              height: 0.9,
+              transform: [co, 0, si, 0, 0, 1, 0, 0, -si, 0, co, 0,
+                parts[0].labelAt.x, 0.45, parts[0].labelAt.z, 1],
+            },
+            // Chaque pièce reçoit un gros meuble : le buffet doit composer
+            // avec eux, pas seulement avec les murs.
+            ...parts.slice(0, 6).map((p: { roomId: string; labelAt: Pt }, k: number) => ({
+              id: `v${k}`,
+              roomId: p.roomId,
+              category: 'sofa',
+              width: 1.6,
+              baseWidth: 1.6,
+              depth: 0.8,
+              baseDepth: 0.8,
+              height: 0.8,
+              transform: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0,
+                p.labelAt.x, 0.4, p.labelAt.z, 1],
+            })),
+          ] as never,
+        });
+        if (ranger) st().rangerMeuble('b1', x, z);
+        else st().setObjectCenter('b1', x, z, true, true);
+        const p = ou('b1');
+        n++;
+        if (mordUnMur(p, yaw)) dansUnMur++;
+        if (
+          !parts.some((q: { surface: { pts: Pt[] } | null }) =>
+            pointInPolygon(p, q.surface?.pts ?? []),
+          )
+        ) {
+          horsDeToutePiece++;
+        }
+      }
+    }
+    return { n, dansUnMur, horsDeToutePiece };
+  };
+
+  it('aucun ne finit dans un mur ni hors de toute pièce, droit', () => {
+    const r = balayer(0, true);
+    expect(r.n).toBe(289);
+    expect({ dansUnMur: r.dansUnMur, hors: r.horsDeToutePiece }).toEqual({
+      dansUnMur: 0,
+      hors: 0,
+    });
+  });
+
+  it('ni de biais, où les projections comptent autrement', () => {
+    // Trente degrés : un meuble de biais occupe sa diagonale, et c'est le cas
+    // qui a fait rebondir les anciennes aides sur les murs.
+    const r = balayer(Math.PI / 6, true);
+    expect({ dansUnMur: r.dansUnMur, hors: r.horsDeToutePiece }).toEqual({
+      dansUnMur: 0,
+      hors: 0,
+    });
+  });
+
+  /*
+    LE CONTRÔLE EN SENS INVERSE — la moitié qui compte.
+
+    Sans rangement, le buffet reste où le doigt l'a lâché. La sonde DOIT y
+    trouver des fautes en nombre : c'est ce qui prouve qu'elle sait en voir,
+    et donc que les deux zéros ci-dessus disent quelque chose.
+  */
+  it('et la sonde sait voir une faute : sans rangement, il y en a des dizaines', () => {
+    const r = balayer(0, false);
+    expect(r.dansUnMur).toBeGreaterThan(20);
+    expect(r.horsDeToutePiece).toBeGreaterThan(50);
   });
 });
