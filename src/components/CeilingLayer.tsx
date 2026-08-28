@@ -21,13 +21,16 @@ import {
   type Fixture,
 } from '../geometry/electrical';
 import { castToWall, type Pt, type RoomPart, type WallSeg } from '../geometry/floorplan';
+import {
+  TAILLE_ECART,
+  etiquettesDesEcarts,
+} from '../ui/etiquettesPlafond';
 
 import {
   CEILINGS,
   CEILING_SYMBOL,
   linkAnchor,
   linkCurve,
-  ceilingChain,
   type CeilingFixture,
 } from '../geometry/ceiling';
 
@@ -38,6 +41,7 @@ interface Mapping {
 
 export function CeilingLayer({
   ceiling,
+  ecartsGardes,
   showCeiling,
   selectedCeilingId,
   selectedCeilingRow,
@@ -52,6 +56,18 @@ export function CeilingLayer({
   c,
 }: {
   ceiling?: CeilingFixture[];
+  /**
+   * LES ÉCARTS QUE LE PLAN A GARDÉS, ET OÙ IL LES A POSÉS.
+   *
+   * Le plan place TOUTES les étiquettes ensemble — cotes de mur, cotes de
+   * tronçon, écarts de plafond — chacune à la première de ses places qui soit
+   * libre. Il dit ici lesquelles survivent, et à quel endroit : un écart peut
+   * s'être décalé perpendiculairement pour laisser passer une cote de mur.
+   *
+   * Absent, on dessine tout à sa place d'origine : c'est le cas d'un calque
+   * monté seul, dans un banc.
+   */
+  ecartsGardes?: Map<string, { x: number; y: number }>;
   showCeiling?: boolean;
   selectedCeilingId?: string | null;
   /**
@@ -178,88 +194,74 @@ export function CeilingLayer({
         de bout jusqu'aux murs — la chaîne complète, celle qu'on relève au
         mètre.
       */}
+      {/*
+        LES ÉCARTS D'UNE LIGNE D'APPAREILS — DESSINÉS ICI, ARBITRÉS AILLEURS.
+
+        Une ligne de spots se pose au cordeau : ce qu'on lit pour l'implanter,
+        ce sont les écarts, pas six paires de coordonnées.
+
+        CE CALQUE NE DÉCIDE PLUS OÙ ILS VONT. Il les écrivait sans regarder
+        personne — il ne connaît ni les cotes de mur, ni le cartouche de la
+        pièce — et le plan avait donc DEUX arbitres qui ne se parlaient pas.
+        Relevé du patron : « il faut absolument pas que 2 cotes se touchent ou
+        qu'un élément vienne entrave la lecture d'une cote ». Mesuré sur le
+        plan de référence à seize cadrages : 28 chevauchements, dont seize
+        impliquaient une de ces cotes-ci.
+
+        La géométrie vit maintenant dans `etiquettesDesEcarts`, et le PLAN
+        arbitre l'ensemble d'un coup. Ce calque reçoit la liste de ce qui a
+        été gardé (`ecartsGardes`) et dessine, rien de plus. On ne recopie pas
+        la géométrie pour l'arbitrer : deux calculs de la même chose finissent
+        par diverger, et l'arbitre protégerait alors une place que le dessin
+        n'occupe pas.
+      */}
       {showCeiling &&
         showMeasures &&
-        [...new Set((ceiling ?? []).map((x) => x.row).filter(Boolean))].map(
-          (row) => {
-            const lot = (ceiling ?? []).filter((cl) => cl.row === row);
-            const murs = partOf.get(lot[0].roomId)?.walls ?? walls;
-            const chaine = ceilingChain(lot, murs, frame);
-            if (!chaine) return null;
-            const jalons: (Pt | null)[] = [
-              chaine.bouts[0],
-              ...chaine.points,
-              chaine.bouts[1],
-            ];
+        etiquettesDesEcarts(ceiling, partOf, walls, frame, mapping.toPx)
+          .filter((e) => !ecartsGardes || ecartsGardes.has(e.id))
+          .map((brut) => {
+            // La place que le plan lui a trouvée, à défaut la sienne.
+            const pose = ecartsGardes?.get(brut.id);
+            const e = pose ? { ...brut, at: pose } : brut;
             return (
-              <G key={`chaine-${row}`}>
-                {chaine.cotes.map((val, i) => {
-                  const a = jalons[i];
-                  const b = jalons[i + 1];
-                  if (val === null || !a || !b) return null;
-                  const A = mapping.toPx(a);
-                  const B = mapping.toPx(b);
-                  if (Math.hypot(B.x - A.x, B.y - A.y) < 18) return null;
-                  let angle = (Math.atan2(B.y - A.y, B.x - A.x) * 180) / Math.PI;
-                  if (angle > 90) angle -= 180;
-                  if (angle < -90) angle += 180;
-                  const mx = (A.x + B.x) / 2;
-                  const my = (A.y + B.y) / 2;
-                  /* Le texte AVANT la plaque : c'est lui qui la dimensionne. */
-                  const texteEcart = `${Math.round(val * 100)}`;
-                  return (
-                    <G key={`c${i}`}>
-                      <Line
-                        x1={A.x}
-                        y1={A.y}
-                        x2={B.x}
-                        y2={B.y}
-                        stroke={c.inkFaint}
-                        strokeWidth={1}
-                        strokeDasharray="4 3"
-                      />
-                      {/*
-                        LE NOMBRE SE LIT TOUJOURS À L'ENDROIT, sur une plaque
-                        OPAQUE taillée à sa mesure.
-
-                        Elle faisait 26 × 14 en dur, à neuf dixièmes
-                        d'opacité : six points de blanc de trop de chaque
-                        côté, et un tireté de gaine qui passait AU TRAVERS du
-                        chiffre. Relevé du patron : « le bloc blanc arrière
-                        pas si gros, il doit dépasser de 2px les chiffres sur
-                        les côtés » et « les pointillés gênent la lecture de
-                        la cote entre spots ».
-
-                        Une plaque de cote est opaque en dessin technique —
-                        c'est sa raison d'être : la cote INTERROMPT ce
-                        qu'elle survole.
-                      */}
-                      <Rect
-                        x={mx - plaqueDeCote(texteEcart, 9.5).w / 2}
-                        y={my - plaqueDeCote(texteEcart, 9.5).h / 2}
-                        width={plaqueDeCote(texteEcart, 9.5).w}
-                        height={plaqueDeCote(texteEcart, 9.5).h}
-                        rx={3}
-                        fill={c.surface}
-                        transform={`rotate(${angle}, ${mx}, ${my})`}
-                      />
-                      <SvgText
-                        x={mx}
-                        y={my + 3.5}
-                        fill={c.inkSoft}
-                        fontSize={9.5}
-                        fontWeight="700"
-                        textAnchor="middle"
-                        transform={`rotate(${angle}, ${mx}, ${my})`}>
-                        {texteEcart}
-                      </SvgText>
-                    </G>
-                  );
-                })}
-              </G>
+            <G key={e.id}>
+              <Line
+                x1={e.a.x}
+                y1={e.a.y}
+                x2={e.b.x}
+                y2={e.b.y}
+                stroke={c.inkFaint}
+                strokeWidth={1}
+                strokeDasharray="4 3"
+              />
+              {/*
+                LE NOMBRE SE LIT TOUJOURS À L'ENDROIT, sur une plaque OPAQUE
+                taillée à sa mesure — voir `plaqueDeCote`. Une plaque de cote
+                est opaque en dessin technique : c'est sa raison d'être, la
+                cote INTERROMPT ce qu'elle survole.
+              */}
+              <Rect
+                x={e.at.x - plaqueDeCote(e.texte, TAILLE_ECART).w / 2}
+                y={e.at.y - plaqueDeCote(e.texte, TAILLE_ECART).h / 2}
+                width={plaqueDeCote(e.texte, TAILLE_ECART).w}
+                height={plaqueDeCote(e.texte, TAILLE_ECART).h}
+                rx={3}
+                fill={c.surface}
+                transform={`rotate(${e.angle}, ${e.at.x}, ${e.at.y})`}
+              />
+              <SvgText
+                x={e.at.x}
+                y={e.at.y + 3.5}
+                fill={c.inkSoft}
+                fontSize={TAILLE_ECART}
+                fontWeight="700"
+                textAnchor="middle"
+                transform={`rotate(${e.angle}, ${e.at.x}, ${e.at.y})`}>
+                {e.texte}
+              </SvgText>
+            </G>
             );
-          },
-        )}
+          })}
 
       {/*
         LES DÉGAGEMENTS DE L'APPAREIL DE PLAFOND CHOISI.

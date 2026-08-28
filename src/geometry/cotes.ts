@@ -91,6 +91,73 @@ export interface Etiquette {
  * `jeu` est l'écart minimal entre deux boîtes : à zéro, deux chiffres qui se
  * frôlent se lisent encore comme un seul nombre.
  */
+/**
+ * UNE ÉTIQUETTE QUI PEUT SE POSER À PLUSIEURS ENDROITS.
+ *
+ * Relevé du patron : « fais un tour pour le placement intelligent des cotes
+ * SUR TOUTE LONGUEUR. Il faut absolument pas que 2 cotes se touchent ou qu'un
+ * élément vienne entraver la lecture d'une cote. »
+ *
+ * « Sur toute longueur » est la clé, et c'est ce qui manquait : une cote de
+ * mur se posait au MILIEU de son mur, un point et pas deux. Quand ce point
+ * était pris, elle n'avait qu'un recours — disparaître. Or une cote peut
+ * glisser le long de ce qu'elle mesure sans rien perdre : elle reste attachée
+ * au même mur, elle dit la même chose. C'est ce que fait un dessinateur.
+ *
+ * Les places sont proposées de la MEILLEURE à la moins bonne : le milieu
+ * d'abord, puis de part et d'autre, puis l'autre côté du mur. La première
+ * libre gagne.
+ */
+export interface EtiquetteMobile extends Omit<Etiquette, 'at'> {
+  /** Où elle voudrait se poser, par ordre de préférence. */
+  places: Px[];
+}
+
+/**
+ * Pose chaque étiquette à la première de ses places qui soit libre.
+ *
+ * Les plus lourdes passent d'abord et prennent la meilleure place ; les
+ * suivantes se rangent autour. Celle qui ne trouve aucune place libre RENONCE
+ * — c'est la règle de la maison : un chiffre illisible est pire qu'un chiffre
+ * absent, absent on va le chercher, empilé on croit l'avoir lu.
+ *
+ * `jeu` est l'écart minimal entre deux boîtes : à zéro, deux chiffres qui se
+ * frôlent se lisent encore comme un seul nombre.
+ *
+ * `prises` est ce qui occupe déjà le plan et ne bougera pas — un cartouche de
+ * pièce, par exemple.
+ */
+export function placerEtiquettes(
+  list: EtiquetteMobile[],
+  prises: { x: number; y: number; w: number; h: number }[] = [],
+  jeu = 2,
+): Map<string, Px> {
+  const occupees = [...prises];
+  const out = new Map<string, Px>();
+  for (const e of [...list].sort((u, v) => v.poids - u.poids)) {
+    for (const p of e.places) {
+      const b = {
+        x: p.x - e.taille.w / 2,
+        y: p.y - e.taille.h / 2,
+        w: e.taille.w,
+        h: e.taille.h,
+      };
+      const libre = occupees.every(
+        (o) =>
+          b.x > o.x + o.w + jeu ||
+          o.x > b.x + b.w + jeu ||
+          b.y > o.y + o.h + jeu ||
+          o.y > b.y + b.h + jeu,
+      );
+      if (!libre) continue;
+      occupees.push(b);
+      out.set(e.id, p);
+      break;
+    }
+  }
+  return out;
+}
+
 export function cotesLisibles(list: Etiquette[], jeu = 2): Set<string> {
   const gardees: { x: number; y: number; w: number; h: number }[] = [];
   const out = new Set<string>();

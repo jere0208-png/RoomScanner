@@ -72,6 +72,12 @@ import { CeilingLayer } from './CeilingLayer';
 import { FixtureLayer } from './FixtureLayer';
 import { NotesLayer } from './NotesLayer';
 import { aimanterCoin, poserLibre } from '../geometry/poser';
+import {
+  POIDS_ECART,
+  etiquettesDesEcarts,
+} from '../ui/etiquettesPlafond';
+import type { Boite } from '../ui/ecarter';
+import { pointInPolygon as insidePoly } from '../geometry/appearance';
 import type { Fixture } from '../geometry/electrical';
 import type { CeilingFixture } from '../geometry/ceiling';
 import { CloseCross } from './CloseCross';
@@ -93,6 +99,8 @@ import { CardinalRing, NorthBadge } from './CardinalRing';
  * alléger en la cachant.
  */
 const VIDE: Fixture[] = [];
+/** Le même tableau vide à chaque rendu : voir `objects`. */
+const VIDE_MEUBLES: ObjectData[] = [];
 
 /**
  * L'encombrement du menu du mur — partagé avec le banc, qui prouve mur par
@@ -290,10 +298,10 @@ import { RoomScan } from 'react-native-room-scan';
 import { useScanStore } from '../store/scanStore';
 import type { PlanNote } from '../store/scanStore';
 import {
-  cotesLisibles,
   encombrement,
   milieuVisible,
-  type Etiquette,
+  placerEtiquettes,
+  type EtiquetteMobile,
 } from '../geometry/cotes';
 import { haptic, releaseHaptic } from '../ui/haptic';
 import { creerSeuil, estUnGlissement, estUnTap } from '../ui/geste';
@@ -651,10 +659,19 @@ export function FloorplanEditor({
   );
   // Un appareil de plafond en réglage : le sol s'efface pour qu'on voie
   // où il tombe par rapport aux murs.
-  const objects =
-    showFurniture && !selectedCeilingId && !selectedCeilingRow
-      ? meublesDuNiveau
-      : [];
+  /*
+    STABLE D'UN RENDU À L'AUTRE — sinon les mémos qui en dépendent se
+    refont à chaque image. Un tableau littéral `[]` est un objet NEUF à
+    chaque rendu : le mémo des cartouches, qui compte les meubles à esquiver,
+    se recalculerait cinquante fois par seconde pendant un glissement.
+  */
+  const objects = useMemo(
+    () =>
+      showFurniture && !selectedCeilingId && !selectedCeilingRow
+        ? meublesDuNiveau
+        : VIDE_MEUBLES,
+    [showFurniture, selectedCeilingId, selectedCeilingRow, meublesDuNiveau],
+  );
   const north = useScanStore((s) => s.north);
   const colorOpenings = useScanStore((s) => s.showOpeningColors);
   const showSurfaces = useScanStore((s) => s.showSurfaces);
@@ -1149,9 +1166,10 @@ export function FloorplanEditor({
     const vide = {
       murs: new Map<string, { x: number; y: number }>(),
       runs: new Map<string, { x: number; y: number }>(),
+      items: [] as EtiquetteMobile[],
     };
     if (!showMeasures || !mapping || layout.w === 0) return vide;
-    const items: Etiquette[] = [];
+    const items: EtiquetteMobile[] = [];
     const murs = new Map<string, { x: number; y: number }>();
     const runs = new Map<string, { x: number; y: number }>();
     const bodyPx = WALL_T * mapping.scale;
@@ -1169,14 +1187,36 @@ export function FloorplanEditor({
       if (1 - detail > 0.02) {
         const mil = milieuVisible(a, b, layout);
         if (mil) {
-          const at = {
-            x: mil.x + n.x * (bodyPx / 2 + 9),
-            y: mil.y + n.y * (bodyPx / 2 + 9),
-          };
-          murs.set(w.id, at);
+          /*
+            ELLE PEUT GLISSER LE LONG DE SON MUR — relevé du patron : « le
+            placement intelligent des cotes SUR TOUTE LONGUEUR ».
+
+            Elle se posait au milieu, un point et pas deux : quand ce point
+            était pris, elle n'avait qu'un recours, disparaître. Or une cote
+            glisse le long de ce qu'elle mesure sans rien perdre — elle reste
+            sur le même mur, elle dit la même chose. C'est ce que fait un
+            dessinateur, et c'est ce que fait déjà le dossier imprimé.
+
+            Les places vont de la meilleure à la moins bonne : le milieu
+            visible d'abord, puis de part et d'autre le long du mur, puis
+            l'AUTRE CÔTÉ du mur — un dernier recours, parce qu'une cote lue
+            du mauvais côté oblige à chercher à quel mur elle appartient.
+          */
+          const leLong = { x: dx / norm, y: dy / norm };
+          const places: { x: number; y: number }[] = [];
+          for (const cote of [1, -1]) {
+            for (const d of [0, 0.18, -0.18, 0.34, -0.34]) {
+              const glisse = d * norm;
+              places.push({
+                x: mil.x + n.x * cote * (bodyPx / 2 + 9) + leLong.x * glisse,
+                y: mil.y + n.y * cote * (bodyPx / 2 + 9) + leLong.y * glisse,
+              });
+            }
+          }
+          murs.set(w.id, places[0]);
           items.push({
             id: `w:${w.id}`,
-            at,
+            places,
             taille: encombrement(
               `${segLength(w).toFixed(2)} m`.replace('.', ','),
               10,
@@ -1198,12 +1238,34 @@ export function FloorplanEditor({
           const p0 = { x: a.x + dx * run.t0, y: a.y + dy * run.t0 };
           const p1 = { x: a.x + dx * run.t1, y: a.y + dy * run.t1 };
           const mil = milieuVisible(p0, p1, layout) ?? brut;
-          const at = { x: mil.x + n.x * off, y: mil.y + n.y * off };
           const cle = `${w.id}#${ri}`;
-          runs.set(cle, at);
+          /*
+            UN TRONÇON GLISSE MOINS LOIN QU'UN MUR : il est plus court, et
+            une cote poussée à son bout ne dit plus de quel morceau elle
+            parle. Un peu plus d'un quart de sa longueur de chaque côté, pas
+            davantage — et l'autre côté du mur en dernier recours, comme pour
+            les murs entiers.
+
+            Mesuré : à trois places seulement, un « 0,90 » de menuiserie ne
+            trouvait plus où aller sur le plan de référence et renonçait. Un
+            chiffre absent vaut mieux qu'un chiffre illisible, mais un chiffre
+            LISIBLE vaut mieux que les deux.
+          */
+          const leLongR = { x: dx / norm, y: dy / norm };
+          const longueurPx = (run.t1 - run.t0) * norm;
+          const places: { x: number; y: number }[] = [];
+          for (const cote of [1, -1]) {
+            for (const d of [0, 0.14, -0.14, 0.28, -0.28]) {
+              places.push({
+                x: mil.x + n.x * cote * off + leLongR.x * d * longueurPx,
+                y: mil.y + n.y * cote * off + leLongR.y * d * longueurPx,
+              });
+            }
+          }
+          runs.set(cle, places[0]);
           items.push({
             id: `r:${cle}`,
-            at,
+            places,
             taille: encombrement(
               run.length.toFixed(2).replace('.', ','),
               9.5,
@@ -1214,14 +1276,18 @@ export function FloorplanEditor({
         });
       }
     }
-    const gardees = cotesLisibles(items);
-    for (const cle of [...murs.keys()]) {
-      if (!gardees.has(`w:${cle}`)) murs.delete(cle);
-    }
-    for (const cle of [...runs.keys()]) {
-      if (!gardees.has(`r:${cle}`)) runs.delete(cle);
-    }
-    return { murs, runs };
+    /*
+      L'ARBITRAGE NE SE FAIT PLUS ICI — il se fait plus bas, sur TOUT.
+
+      Ce mémo ne connaît que les murs. Il rendait donc son verdict entre
+      cotes de mur, et les écarts d'une ligne de spots s'écrivaient de leur
+      côté sans regarder personne : deux arbitres qui ne se parlaient pas.
+      Mesuré sur le plan de référence à seize cadrages, 28 chevauchements sur
+      478 étiquettes.
+
+      Il rend maintenant ses CANDIDATS. Voir `cotesArbitrees`.
+    */
+    return { murs, runs, items };
   }, [walls, openings, mapping, layout, showMeasures, detail]);
 
   /**
@@ -1372,6 +1438,283 @@ export function FloorplanEditor({
     () => new Map(parts.map((p) => [p.roomId, p])),
     [parts],
   );
+  /**
+   * OÙ SE POSE LE CARTOUCHE DE CHAQUE PIÈCE — CALCULÉ AVANT LES COTES.
+   *
+   * L'ORDRE EST LE SUJET. Le cartouche esquivait les cotes ; les cotes
+   * ignoraient le cartouche. Chacun cherchait donc sa place contre un
+   * adversaire qui avait déjà choisi la sienne, et dans une pièce serrée le
+   * dernier arrivé n'avait plus rien : il se posait DESSUS.
+   *
+   * Le dossier imprimé avait tranché il y a longtemps, et dans l'autre
+   * sens : « le cartouche évite les sigles, la cote évite les deux ». C'est
+   * la bonne règle. Un nom de pièce se lit n'importe où DANS sa pièce — il
+   * n'a qu'une contrainte, y rester. Une cote, elle, est attachée à ce
+   * qu'elle mesure : elle glisse le long de son mur, mais elle ne peut pas
+   * aller ailleurs.
+   *
+   * On pose donc les cartouches EN PREMIER, contre les meubles et les
+   * appareils de plafond ; les cotes se rangent ensuite autour d'eux.
+   *
+   * CE MÉMO NE CALCULE QUE LA GÉOMÉTRIE — les textes, leur taille, la place
+   * retenue. Les couleurs et les gestes restent au rendu : c'est la seule
+   * façon d'avoir UNE source pour la boîte qu'on réserve et celle qu'on
+   * dessine. Deux calculs de la même boîte finissent par diverger, et
+   * l'arbitre protège alors une place que le dessin n'occupe pas.
+   */
+  const cartouches = useMemo(() => {
+    const out = new Map<
+      string,
+      {
+        pos: Pt;
+        textes: { t: string; role: 'nom' | 'aire' | 'hors' | 'invite' }[];
+        wpx: number;
+        hpx: number;
+        gene: boolean;
+      }
+    >();
+    if (!mapping || !showSurfaces || layout.w === 0) return out;
+    const foots = objects.map((o) => footprintOf(o, partOf));
+    const obstacles = [
+      ...foots.map((f) => ({
+        x: f.cx,
+        z: f.cz,
+        rx: f.width / 2,
+        rz: f.depth / 2,
+      })),
+      ...(showCeiling ? ceiling ?? [] : []).map((sp) => ({
+        x: sp.at.x,
+        z: sp.at.z,
+        rx: 0.3,
+        rz: 0.3,
+      })),
+    ];
+    const PAD = 4;
+    const LH = 12.5;
+    const TAILLES: Record<string, number> = {
+      nom: 10.5,
+      aire: 9.5,
+      hors: 8.5,
+      invite: 10.5,
+    };
+    const emprise = (ls: { t: string; role: string }[]) => ({
+      w: Math.max(
+        44,
+        Math.max(...ls.map((l) => l.t.length * (TAILLES[l.role] * 0.62))) + 14,
+      ),
+      h: PAD * 2 + ls.length * LH,
+    });
+    /*
+      DES ANNEAUX DE PLUS EN PLUS LARGES, SEIZE DIRECTIONS CHACUN.
+
+      Huit directions laissaient des trous : entre deux rayons à
+      quarante-cinq degrés, la place libre d'une pièce étroite passe
+      inaperçue. Et l'on va jusqu'à trois mètres — au-delà on sortirait de
+      la plupart des pièces, et le contour refuse de toute façon.
+    */
+    const anneaux: [number, number][] = [[0, 0]];
+    for (const r of [0.3, 0.6, 0.9, 1.2, 1.6, 2, 2.5, 3]) {
+      for (let k = 0; k < 16; k++) {
+        const a = (k * Math.PI) / 8;
+        anneaux.push([Math.cos(a) * r, Math.sin(a) * r]);
+      }
+    }
+    for (const part of parts) {
+      const roomName = roomById.get(part.roomId)?.name ?? '';
+      const areaText = part.surface
+        ? `${part.surface.exact ? '' : '≈ '}${part.surface.area
+            .toFixed(1)
+            .replace('.', ',')} m²`
+        : null;
+      if (roomName === '' && !areaText && !editable) continue;
+      const extText =
+        showMeasures && part.surface
+          ? (() => {
+              const e = roomExtent(part.surface.pts);
+              return `${e.width.toFixed(2).replace('.', ',')} × ${e.depth
+                .toFixed(2)
+                .replace('.', ',')} m`;
+            })()
+          : null;
+      const textes: { t: string; role: 'nom' | 'aire' | 'hors' | 'invite' }[] =
+        [];
+      if (roomName !== '') textes.push({ t: roomName, role: 'nom' });
+      if (areaText) textes.push({ t: areaText, role: 'aire' });
+      if (extText) textes.push({ t: extText, role: 'hors' });
+      if (textes.length === 0 && roomName === '' && !areaText) {
+        textes.push({ t: 'Nommer', role: 'invite' });
+      }
+      if (textes.length === 0) continue;
+      /*
+        ET S'IL NE TROUVE AUCUNE PLACE, IL EN DIT MOINS.
+
+        Chercher plus loin ne suffit pas, et c'est la mesure qui l'a montré :
+        sur un téléphone étroit, un logement de sept mètres se dessine à
+        quarante pixels le mètre. Le cartouche à trois lignes fait alors
+        soixante pixels de haut dans une chambre qui en fait cent — il n'y a
+        PAS de place libre, et mieux la chercher ne la crée pas.
+
+        Il cède donc ligne par ligne, de la moins utile à la plus utile :
+        d'abord les hors-tout, puis la surface, et il ne reste que le NOM. Un
+        nom seul fait vingt pixels de haut et trouve presque toujours où se
+        mettre. C'est la règle du dossier imprimé, appliquée à l'écran :
+        quand rien n'est libre, la valeur cède la place.
+      */
+      const variantes = [textes];
+      if (textes.length > 2) variantes.push(textes.slice(0, 2));
+      if (textes.length > 1) variantes.push(textes.slice(0, 1));
+      const dernier = variantes[variantes.length - 1];
+      let retenues = dernier;
+      let boite = emprise(dernier);
+      let pos = part.labelAt;
+      let gene = true;
+      const contour = part.surface?.pts;
+      for (const essai of variantes) {
+        const box = emprise(essai);
+        const lw = box.w / mapping.scale;
+        const lh = box.h / mapping.scale;
+        for (const [ox, oz] of anneaux) {
+          const cand = { x: part.labelAt.x + ox, z: part.labelAt.z + oz };
+          if (contour && contour.length >= 3 && !insidePoly(cand, contour)) {
+            continue;
+          }
+          if (cartoucheHeurte(cand, lw / 2, lh / 2, obstacles)) continue;
+          pos = cand;
+          retenues = essai;
+          boite = box;
+          gene = false;
+          break;
+        }
+        if (!gene) break;
+      }
+      out.set(part.roomId, {
+        pos,
+        textes: retenues,
+        wpx: boite.w,
+        hpx: boite.h,
+        gene,
+      });
+    }
+    return out;
+  }, [
+    parts,
+    partOf,
+    roomById,
+    objects,
+    ceiling,
+    showCeiling,
+    showSurfaces,
+    showMeasures,
+    editable,
+    mapping,
+    layout,
+  ]);
+
+  /**
+   * TOUTES LES ÉTIQUETTES DU PLAN, ARBITRÉES ENSEMBLE.
+   *
+   * Relevé du patron : « fais un tour pour le placement intelligent des cotes
+   * sur toute longueur. Il faut absolument pas que 2 cotes se touchent ou
+   * qu'un élément vienne entraver la lecture d'une cote. »
+   *
+   * LE PLAN AVAIT DEUX ARBITRES QUI NE SE PARLAIENT PAS. `placementCotes` ne
+   * connaît que les murs — il tranchait donc entre cotes de mur, et rien
+   * d'autre. Les écarts d'une ligne de spots vivaient dans le calque du
+   * plafond et s'écrivaient sans regarder personne. Le cartouche d'une pièce,
+   * lui, esquivait les meubles et les spots, mais pas les cotes.
+   *
+   * Mesuré avant correction, sur le plan de référence à seize cadrages :
+   * **28 chevauchements sur 478 étiquettes**. Trois familles, et toujours
+   * entre deux systèmes différents : cote de mur contre cartouche (18 fois),
+   * cote de mur contre écart de plafond (12), écart contre cartouche (4).
+   *
+   * UN SEUL ARBITRE, DONC, ET IL PASSE APRÈS LES PIÈCES : c'est ici qu'on
+   * connaît enfin le plafond (`ceiling`), la trame (`frame`) et le découpage
+   * en pièces (`partOf`). Les écarts entrent dans la même balance que les
+   * cotes de mur, avec le poids que leur donne le métier — voir
+   * `POIDS_ECART`.
+   *
+   * ET L'ON GARDE LES BOÎTES, pas seulement les gagnantes : le cartouche de
+   * la pièce s'en sert plus bas pour se ranger ailleurs. Une mesure ne bouge
+   * pas, un nom de pièce si — c'est déjà la règle du dossier imprimé.
+   */
+  const cotesArbitrees = useMemo(() => {
+    const vide = {
+      poses: new Map<string, { x: number; y: number }>(),
+      gardees: new Set<string>(),
+      ecarts: new Map<string, { x: number; y: number }>(),
+      boites: [] as Boite[],
+    };
+    if (!showMeasures || !mapping || layout.w === 0) return vide;
+    const ecarts =
+      showCeiling && ceiling
+        ? etiquettesDesEcarts(ceiling, partOf, walls, frame, mapping.toPx)
+        : [];
+    const items: EtiquetteMobile[] = [
+      ...placementCotes.items,
+      ...ecarts.map((e) => ({
+        id: e.id,
+        /*
+          UN ÉCART DE PLAFOND GLISSE PERPENDICULAIREMENT, pas le long de son
+          trait : le long, il quitterait le segment qu'il mesure et l'on ne
+          saurait plus de quel intervalle il parle. À côté, il reste en face.
+        */
+        places: [0, 11, -11, 22, -22].map((k) => {
+          const ux = e.b.x - e.a.x;
+          const uy = e.b.y - e.a.y;
+          const l = Math.hypot(ux, uy) || 1;
+          return { x: e.at.x - (uy / l) * k, y: e.at.y + (ux / l) * k };
+        }),
+        taille: e.taille,
+        poids: POIDS_ECART + e.valeur,
+      })),
+    ];
+    /*
+      LES CARTOUCHES SONT DÉJÀ POSÉS : ils ne bougeront plus, et les cotes se
+      rangent autour. C'est la règle du dossier imprimé — « le cartouche évite
+      les sigles, la cote évite les deux ».
+    */
+    const prises: Boite[] = [];
+    for (const car of cartouches.values()) {
+      const q = mapping.toPx(car.pos);
+      prises.push({
+        x: q.x - car.wpx / 2,
+        y: q.y - car.hpx / 2,
+        w: car.wpx,
+        h: car.hpx,
+      });
+    }
+    const poses = placerEtiquettes(items, prises);
+    const boites = [...poses.entries()].map(([id, p]) => {
+      const e = items.find((x) => x.id === id)!;
+      return {
+        x: p.x - e.taille.w / 2,
+        y: p.y - e.taille.h / 2,
+        w: e.taille.w,
+        h: e.taille.h,
+      };
+    });
+    return {
+      poses,
+      gardees: new Set(poses.keys()),
+      ecarts: new Map(
+        ecarts.filter((e) => poses.has(e.id)).map((e) => [e.id, poses.get(e.id)!]),
+      ),
+      boites,
+    };
+  }, [
+    placementCotes,
+    cartouches,
+    ceiling,
+    showCeiling,
+    partOf,
+    walls,
+    frame,
+    mapping,
+    layout,
+    showMeasures,
+  ]);
+
   /**
    * Semis du sol : motif répété, calé sur l'origine du monde. Un vrai nuage
    * de points suivrait mieux la rotation, mais coûterait un millier de
@@ -1973,8 +2316,11 @@ export function FloorplanEditor({
                 /* Une piece qu'on vient de poser et qu'on n'a pas encore
                    lachee : son trait reste ouvert. Voir `WallBody`. */
                 neuve={!!roomById.get(roomOf(w) ?? '')?.neuve}
-                showMeasure={placementCotes.murs.has(w.id)}
-                measureAt={placementCotes.murs.get(w.id)}
+                showMeasure={
+                  placementCotes.murs.has(w.id) &&
+                  cotesArbitrees.gardees.has(`w:${w.id}`)
+                }
+                measureAt={cotesArbitrees.poses.get(`w:${w.id}`)}
                 measureOpacity={1 - detail}
                 selected={editable && w.id === selectedWallId}
                 onPress={
@@ -2290,7 +2636,8 @@ export function FloorplanEditor({
                   if (angle < -90) angle += 180;
                   // Où elle s'écrit — et si elle s'écrit : le placement a
                   // déjà tranché, valeur par valeur.
-                  const pose = placementCotes.runs.get(`${w.id}#${ri}`);
+                  const cle = `${w.id}#${ri}`;
+                  const pose = cotesArbitrees.poses.get(`r:${cle}`);
                   if (!pose) return null;
                   const px = pose.x;
                   const py = pose.y;
@@ -2488,6 +2835,7 @@ export function FloorplanEditor({
               />
             ))}
             <CeilingLayer
+              ecartsGardes={cotesArbitrees.ecarts}
               ceiling={ceiling}
               showCeiling={showCeiling}
               selectedCeilingId={selectedCeilingId}
@@ -2524,193 +2872,51 @@ export function FloorplanEditor({
                 cartouche tombe au CENTRE de la pièce, c'est-à-dire là où se
                 pose un point lumineux. */}
             {(selectedCeilingId ? [] : parts).map((part) => {
+              /*
+                LE CARTOUCHE NE SE CALCULE PLUS ICI — il se DESSINE.
+
+                Sa géométrie (les textes retenus, leur taille, la place
+                trouvée) vit dans le mémo `cartouches`, et pour une raison de
+                fond : il doit être posé AVANT les cotes, qui se rangent
+                ensuite autour de lui. Le calculer au rendu, c'était le
+                calculer après elles — et dans une pièce serrée, le dernier
+                arrivé n'avait plus de place et se posait dessus.
+
+                Une SEULE source pour la boîte qu'on réserve et celle qu'on
+                dessine : deux calculs de la même boîte finissent par
+                diverger, et l'arbitre protège alors une place que le dessin
+                n'occupe pas.
+
+                Ce qui reste ici est ce qui ne regarde que le dessin : les
+                couleurs, l'état de sélection, le geste de renommage.
+              */
+              const car = cartouches.get(part.roomId);
+              if (!car) return null;
               const roomName = roomById.get(part.roomId)?.name ?? '';
-              /*
-                « SURFACES » COMMANDE LE CARTOUCHE ENTIER — nom compris.
-
-                La surface en a été DÉTACHÉE un temps, et pour une bonne
-                raison d'alors : le calque allume aussi le semis coloré des
-                sols. On voulait donc la surface, et l'on obtenait un plan
-                barbouillé ; ou un plan propre, et pas de surface.
-
-                Relevé du patron : « fais en sorte que Surfaces affiche et
-                cache le nom des pièces aussi ». Le calque redevient donc ce
-                que son nom dit — tout ce qui parle de la surface d'une
-                pièce, son NOM compris, puisque les deux vivent dans le même
-                cartouche et qu'on ne coupe pas un cartouche en deux. Qui
-                veut un plan nu l'a d'un geste ; qui veut les pièces nommées
-                les rallume du même.
-              */
-              const areaText = part.surface
-                ? `${part.surface.exact ? '' : '≈ '}${part.surface.area
-                    .toFixed(1)
-                    .replace('.', ',')} m²`
-                : null;
-              /*
-                LE CARTOUCHE SUIT SON CALQUE, DANS LES DEUX MODES.
-
-                Il restait allumé EN ÉDITION quoi qu'il arrive, et l'argument
-                se défendait : c'est par lui qu'on nomme une pièce, et « un
-                réglage d'AFFICHAGE ne doit jamais retirer un outil de
-                travail ».
-
-                Relevé du patron : « lors du mode édition, le plan affiche le
-                nom de la pièce, il ne faut pas tant que la surface n'est pas
-                affichée. » Il a raison, et l'argument d'avant se retourne :
-                un calque qu'on éteint et qui reste allumé dans un mode, c'est
-                un interrupteur qui ne commande pas ce qu'il annonce. On entre
-                en édition pour POSER — un meuble, un appareil, une note — et
-                le nom d'une pièce vient alors se mettre entre le doigt et ce
-                qu'on pose, alors même qu'on l'avait éteint.
-
-                CE QUE CELA COÛTE, ET IL FAUT LE DIRE : nommer une pièce qui
-                n'a pas encore de nom demande d'allumer « Surfaces » d'abord.
-                C'est un geste de plus, sur le calque qui porte justement les
-                noms et les surfaces — l'endroit où on le chercherait.
-              */
-              if (!showSurfaces) return null;
-              if (roomName === '' && !areaText && !editable) return null;
-              /*
-                LES MEUBLES DE TOUT LE PLAN, ET PAS SEULEMENT LES SIENS.
-
-                Le cartouche n'esquivait que le mobilier de SA pièce. Sur un
-                plan serré, le nom du séjour se posait donc sur la baignoire
-                de la salle d'eau voisine, en toute légalité — et il lui
-                volait ses appuis. Un nom illisible sur un meuble l'est
-                autant qu'il appartienne à la pièce ou à celle d'à côté.
-              */
-              const foots = objects.map((o) => footprintOf(o, partOf));
-              const placeholder = roomName === '' && !areaText ? 'Nommer' : '';
-              // Cotes hors-tout : ce que cherche un artisan avant tout.
-              const extText =
-                showMeasures && part.surface
-                  ? (() => {
-                      const e = roomExtent(part.surface.pts);
-                      return `${e.width.toFixed(2).replace('.', ',')} × ${e.depth
-                        .toFixed(2)
-                        .replace('.', ',')} m`;
-                    })()
-                  : null;
-              // Le cartouche se compose LIGNE PAR LIGNE, et sa hauteur se
-              // déduit d'elles : à hauteur fixe, la dernière ligne finissait
-              // collée au bord pendant que le titre gardait son air. Une
-              // boîte qui n'a pas la même marge en haut et en bas se voit,
-              // même quand on ne saurait pas dire pourquoi.
-              const lignes: {
-                t: string;
-                size: number;
-                fill: string;
-                bold: boolean;
-              }[] = [];
-              // Un constat de conformité sur cette pièce : un point ambre
-              // devant son nom. Discret, mais là où l'on regarde.
-              /*
-                LE CARTOUCHE SE RESSERRE — relevé du patron, capture à
-                l'appui : « le bloc qui affiche aussi la surface avec le nom
-                de pièce est trop gros et devrait avoir une opacité du
-                fond ».
-
-                Il vit AU MILIEU du sol, c'est-à-dire là où l'on pose les
-                meubles et les points lumineux : chaque point qu'il prend est
-                un point de plan en moins. Les corps descendent d'un demi, la
-                marge et l'interligne d'un point et demi — assez pour qu'il
-                reste lisible à bout de bras, et deux fois moins encombrant.
-              */
-              if (roomName !== '') {
-                lignes.push({
-                  t: roomName,
-                  size: 10.5,
-                  fill:
-                    selectedRoomId === part.roomId && editable ? c.blue : c.ink,
-                  bold: true,
-                });
-              }
-              if (areaText) {
-                lignes.push({
-                  t: areaText,
-                  size: roomName !== '' ? 9.5 : 10.5,
-                  fill: roomName !== '' ? c.inkSoft : c.ink,
-                  bold: roomName === '',
-                });
-              }
-              if (extText) {
-                lignes.push({ t: extText, size: 8.5, fill: c.inkFaint, bold: false });
-              }
-              if (placeholder !== '' && lignes.length === 0) {
-                lignes.push({ t: placeholder, size: 10.5, fill: c.inkFaint, bold: true });
-              }
-              // Le cartouche SERRE son texte, et son fond est OPAQUE, comme
-              // sur le PDF : translucide, il se faisait traverser par les
-              // meubles. Le sol qu'il annote reste accessible autrement — il
-              // s'efface pendant le réglage d'un appareil de plafond, et il
-              // esquive les meubles de sa pièce.
+              const { pos, wpx, hpx, gene } = car;
               const PAD = 4;
               const LH = 12.5;
-              const hpx = PAD * 2 + lignes.length * LH;
-              const wpx = Math.max(
-                44,
-                Math.max(...lignes.map((l) => l.t.length * (l.size * 0.62))) + 14,
-              );
-              const labelW = wpx / mapping.scale;
-              const labelH = hpx / mapping.scale;
-              /*
-                LES OBSTACLES DU CARTOUCHE : les meubles, ET les appareils
-                du plafond — relevé du patron : après l'ajout d'une ligne
-                de spots, le nom se posait SUR un spot.
-              */
-              const obstacles = [
-                ...foots.map((f) => ({
-                  x: f.cx,
-                  z: f.cz,
-                  rx: f.width / 2,
-                  rz: f.depth / 2,
-                })),
-                ...(showCeiling ? ceiling ?? [] : []).map((sp) => ({
-                  x: sp.at.x,
-                  z: sp.at.z,
-                  rx: 0.3,
-                  rz: 0.3,
-                })),
-              ];
-              const collides = (pt: Pt) =>
-                cartoucheHeurte(pt, labelW / 2, labelH / 2, obstacles);
-              // Point le plus au large de la pièce : jamais dans un mur ni
-              // collé à un. On s'en écarte juste assez pour éviter un meuble.
-              const ctr = part.labelAt;
-              let pos = ctr;
-              /*
-                ET QUAND IL NE TROUVE PAS OÙ SE METTRE, IL LÂCHE LE DOIGT.
-
-                Relevé du patron : « un meuble est parfois difficile à
-                cliquer selon son emplacement… fais en sorte que là où le
-                doigt touche, si l'élément est dessus il est STRICTEMENT
-                sélectionné ». Mesuré sur une salle d'eau meublée : 172
-                appuis sur 256 posés SUR la baignoire revenaient à un
-                cartouche — celui de la pièce, et celui du séjour voisin.
-
-                Le cartouche essaie sept places ; dans une petite pièce
-                garnie, les sept sont prises. Il se pose alors quand même —
-                il faut bien nommer la pièce — mais il renonce à l'appui :
-                ce qu'il recouvre est ce qu'on visait. La pièce reste
-                sélectionnable par son sol, comme partout ailleurs.
-              */
-              let gene = true;
-              for (const [ox, oz] of [
-                [0, 0],
-                [0, 0.4],
-                [0, -0.4],
-                [0.5, 0],
-                [-0.5, 0],
-                [0, 0.8],
-                [0, -0.8],
-              ]) {
-                const cand = { x: ctr.x + ox, z: ctr.z + oz };
-                if (!collides(cand)) {
-                  pos = cand;
-                  gene = false;
-                  break;
-                }
-              }
+              const TAILLES = {
+                nom: 10.5,
+                aire: roomName !== '' ? 9.5 : 10.5,
+                hors: 8.5,
+                invite: 10.5,
+              } as const;
+              const retenues = car.textes.map((t) => ({
+                t: t.t,
+                size: TAILLES[t.role],
+                fill:
+                  t.role === 'nom'
+                    ? selectedRoomId === part.roomId && editable
+                      ? c.blue
+                      : c.ink
+                    : t.role === 'aire'
+                      ? roomName !== ''
+                        ? c.inkSoft
+                        : c.ink
+                      : c.inkFaint,
+                bold: t.role === 'nom' || t.role === 'invite' || roomName === '',
+              }));
               const p = mapping.toPx(pos);
               const selected = editable && part.roomId === selectedRoomId;
               return (
@@ -2755,7 +2961,7 @@ export function FloorplanEditor({
                   {/* Le point ambre de conformité a vécu ici — relevé du
                       patron : rien sur le nom de la pièce. Les constats se
                       lisent dans le dossier, où ils se chiffrent. */}
-                  {lignes.map((l, li) => (
+                  {retenues.map((l, li) => (
                     <SvgText
                       key={li}
                       x={p.x}

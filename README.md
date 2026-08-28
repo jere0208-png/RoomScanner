@@ -9528,6 +9528,74 @@ Le banc de la planche de rendu racontait l'ancienne règle (« sauf en édition 
 il est réécrit en racontant les deux, et le détail du nouveau comportement vit
 dans `cartoucheniveau`.
 
+### Le placement des cotes : trois systèmes qui ne se parlaient pas
+
+**Relevé du patron :** « fais un tour pour le placement intelligent des cotes
+**sur toute longueur**. Il faut absolument pas que 2 cotes se touchent ou qu'un
+élément vienne entraver la lecture d'une cote. Tout doit être bien pensé. »
+
+**Le diagnostic, avant tout correctif.** Le plan écrivait ses chiffres depuis
+trois endroits qui s'ignoraient :
+
+- les **cotes de mur et de tronçon** passaient par `cotesLisibles` — la plus
+  grande gagne, les autres renoncent. Elles ne connaissaient qu'elles-mêmes ;
+- les **écarts d'une ligne de spots** vivaient dans le calque du plafond et
+  s'écrivaient sans regarder personne ;
+- le **cartouche d'une pièce** esquivait les meubles et les spots, jamais un
+  chiffre — et il se plaçait *après* les cotes, donc contre un adversaire qui
+  avait déjà choisi sa place.
+
+**Mesuré** sur le plan de référence, à seize cadrages de l'iPhone SE à la
+tablette : **40 chevauchements sur 478 étiquettes**.
+
+**Une sonde peut se tromper, et la mienne s'est trompée d'abord.** Sa première
+version ignorait l'**inclinaison** des chiffres : une cote de mur vertical est
+écrite en biais, son emprise est haute et étroite, pas large et basse. Elle
+comptait donc des chevauchements imaginaires et en manquait d'autres — le premier
+chiffre que j'ai annoncé (28) était faux dans les deux sens. **Toute mesure doit
+d'abord se mesurer elle-même.**
+
+**Quatre changements, et c'est le troisième qui a tout débloqué.**
+
+1. **Une seule source pour les écarts de plafond** (`etiquettesDesEcarts`) : le
+   calque les dessine, le plan les arbitre, et les deux lisent le même calcul. On
+   ne recopie pas une géométrie pour l'arbitrer — deux calculs de la même chose
+   finissent par diverger, et l'arbitre protège alors une place que le dessin
+   n'occupe pas.
+2. **Le cartouche cède ligne par ligne** quand rien n'est libre : les hors-tout
+   d'abord, puis la surface, et il ne reste que le nom. Chercher plus loin ne
+   suffisait pas, et c'est la mesure qui l'a montré : sur un téléphone étroit, un
+   logement de sept mètres se dessine à quarante pixels le mètre — un cartouche à
+   trois lignes fait soixante pixels de haut dans une chambre qui en fait cent.
+   **Il n'y a pas de place libre, et mieux la chercher ne la crée pas.**
+3. **L'ordre s'inverse.** Le cartouche se pose *d'abord*, les cotes se rangent
+   autour. C'est la règle que le dossier imprimé avait tranchée il y a longtemps
+   — « le cartouche évite les sigles, la cote évite les deux » — et c'est la
+   bonne : un nom de pièce se lit n'importe où *dans* sa pièce, une cote est
+   attachée à ce qu'elle mesure.
+4. **Une cote glisse le long de son mur** au lieu de disparaître
+   (`placerEtiquettes`). C'est le « sur toute longueur » du relevé, et c'est ce
+   que fait un dessinateur : dix places par cote de mur — le milieu visible, puis
+   de part et d'autre, puis l'autre côté du mur en dernier recours ; dix pour un
+   tronçon ; cinq pour un écart de plafond, qui se décale perpendiculairement
+   pour rester en face du segment qu'il mesure.
+
+**Après : zéro chevauchement** sur les seize cadrages. Et un dernier réglage
+trouvé en regardant le diff : à trois places seulement, un « 0,90 » de menuiserie
+ne trouvait plus où aller et renonçait — un chiffre absent vaut mieux qu'un
+chiffre illisible, mais un chiffre **lisible** vaut mieux que les deux. Avec dix
+places, il glisse de trente pixels et reste.
+
+**Preuve à l'œil :** le diff des planches de référence ne touche **qu'une seule
+étiquette**, celle qui a glissé. Aucun trait, aucun symbole, aucun autre chiffre
+n'a bougé.
+
+**Le banc `cotessanschoc` garde le résultat**, et il porte son contrôle en sens
+inverse — une sonde qui ne trouve jamais rien peut être une sonde aveugle : on
+lui donne des boîtes construites pour se chevaucher, et l'on exige qu'elle les
+compte. Vérifié qu'il échoue sur le code d'avant : **12 des 16 cadrages** au
+rouge.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro
