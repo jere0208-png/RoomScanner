@@ -34,8 +34,69 @@
  */
 import React from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
+import Svg, { Circle, Path } from 'react-native-svg';
 import { photoDe } from '../ui/produits';
+import { WIRE_COLORS, roleDuFil } from '../geometry/schema';
 import { themedStyles, useTheme, type Palette } from '../theme';
+
+/**
+ * UNE COURONNE DE FIL, DANS LA COULEUR DE SON CONDUCTEUR.
+ *
+ * Relevé du patron : « la couleur des fils en image doit changer sur le devis,
+ * on a que du bleu partout là ».
+ *
+ * POURQUOI TOUT ÉTAIT BLEU. Le bordereau distingue les conducteurs par leur
+ * RÔLE — `fil-1.5-phase`, `fil-1.5-terre` —, mais la vignette retombait sur la
+ * SECTION (`fil-1.5`) et servait la même photo à tous : une bobine bleue, pour
+ * la phase comme pour la terre. Le ticket alignait quatre lignes qui ne
+ * différaient que par leur libellé, là où la couleur est justement ce qu'on
+ * regarde en rayon.
+ *
+ * ON NE VA PAS CHERCHER QUATRE PHOTOS PAR SECTION. Les couleurs de conducteur
+ * sont NORMÉES et l'application les connaît déjà : `WIRE_COLORS`, la table que
+ * lisent le schéma unifilaire et le tracé des fils. La couronne se DESSINE dans
+ * cette teinte-là. Une cinquième table de couleurs de fil, ce serait un plan
+ * qui dit rouge devant un ticket qui montre bleu.
+ *
+ * ET C'EST UNE COURONNE, PAS UNE BOBINE : un anneau épais, deux spires plus
+ * claires par-dessus. C'est ce qu'on prend en rayon et ce que le devis compte —
+ * l'unité de la ligne dit « cour. 100 m ».
+ */
+function CouronneDeFil({ role, taille }: { role: keyof typeof WIRE_COLORS; taille: number }) {
+  const teinte = WIRE_COLORS[role].color;
+  const r = taille * 0.34;
+  const c = taille / 2;
+  return (
+    <Svg width={taille} height={taille} viewBox={`0 0 ${taille} ${taille}`}>
+      <Circle
+        cx={c}
+        cy={c}
+        r={r}
+        fill="none"
+        stroke={teinte}
+        strokeWidth={taille * 0.19}
+      />
+      {/* Deux spires, en clair : c'est ce qui fait lire un enroulement plutôt
+          qu'un simple anneau de couleur. */}
+      <Path
+        d={`M${c - r} ${c} A${r} ${r} 0 0 1 ${c} ${c - r}`}
+        fill="none"
+        stroke="#FFFFFF"
+        strokeOpacity={0.55}
+        strokeWidth={taille * 0.05}
+        strokeLinecap="round"
+      />
+      <Path
+        d={`M${c + r} ${c} A${r} ${r} 0 0 1 ${c} ${c + r}`}
+        fill="none"
+        stroke="#FFFFFF"
+        strokeOpacity={0.4}
+        strokeWidth={taille * 0.05}
+        strokeLinecap="round"
+      />
+    </Svg>
+  );
+}
 
 export function VignetteProduit({
   code,
@@ -50,8 +111,21 @@ export function VignetteProduit({
 }) {
   const c = useTheme();
   const styles = getStyles(c);
-  const photo = photoDe(code);
+  /*
+    LE CONDUCTEUR PASSE AVANT LA PHOTO — c'est le seul article dont l'image
+    dépend d'autre chose que de son code de produit. Sans ce détour, le repli
+    sur la section reprendrait la main et rendrait la bobine bleue.
+  */
+  const role = roleDuFil(code);
   const cadre = { width: taille, height: taille };
+  if (role) {
+    return (
+      <View testID={`vignette-${code}`} style={cadre}>
+        <CouronneDeFil role={role} taille={taille} />
+      </View>
+    );
+  }
+  const photo = photoDe(code);
   if (photo) {
     return (
       <View testID={`vignette-${code}`} style={cadre}>

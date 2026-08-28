@@ -39,7 +39,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import React from 'react';
 import { Image, ScrollView, Text, TouchableOpacity, View } from 'react-native';
-import { Path } from 'react-native-svg';
+import { Circle, Path } from 'react-native-svg';
 import TestRenderer, { act } from 'react-test-renderer';
 import { DevisPastille, prixCourt } from '../src/components/DevisPastille';
 import { DevisScreen } from '../src/screens/DevisScreen';
@@ -47,6 +47,7 @@ import { FloorplanEditor } from '../src/components/FloorplanEditor';
 import { chiffrerLePlan } from '../src/geometry/devisplan';
 import { postsSymbol, type Fixture, type FixtureKind } from '../src/geometry/electrical';
 import { GAMMES } from '../src/geometry/prix';
+import { WIRE_COLORS, roleDuFil } from '../src/geometry/schema';
 import { ATTENTE_MIN } from '../src/components/PrixQuiSActualisent';
 import { photoDe } from '../src/ui/produits';
 import { useScanStore } from '../src/store/scanStore';
@@ -516,24 +517,82 @@ describe('les vignettes du ticket', () => {
     */
     const t = await auTicket();
     const devis = devisAttendu();
-    const avecPhoto = devis.lignes.filter((l) => photoDe(l.code));
+    /*
+      LES CONDUCTEURS SONT DEHORS, ET C'EST NEUF. Leur couronne est DESSINÉE
+      dans la couleur de son rôle (voir plus bas) : ils ont bien une image,
+      simplement ce n'est plus une photo. Compter toutes les lignes qui ont une
+      photo au catalogue reviendrait à attendre sept images de plus que ce que
+      le ticket pose.
+    */
+    const avecPhoto = devis.lignes.filter(
+      (l) => photoDe(l.code) && !roleDuFil(l.code),
+    );
     expect(avecPhoto.length).toBeGreaterThan(5);
     expect(t.root.findAllByType(Image).length).toBe(avecPhoto.length);
   });
 
-  it('et les couronnes de fil gardent la leur, couleur par couleur', () => {
+  it('et le repli sur la section reste, pour les couronnes du MAGASIN', () => {
     /*
-      Releve du patron : « les images des fils ne sont pas visibles ». Le jour
-      ou le fil s'est mis a sortir couleur par couleur — `fil-1.5-phase` au
-      lieu de `fil-1.5` —, toutes les vignettes de fil ont disparu du ticket
-      d'un coup : elles etaient rangees a la section, et plus personne ne
-      demandait ce code-la. Une couronne de rouge et une de bleu sont la meme
-      bobine ; la photo retombe donc sur la section, comme le prix.
+      TROIS VERSIONS DE L'IMAGE D'UN FIL, ET CHACUNE CORRIGEAIT LA PRÉCÉDENTE.
+
+        PREMIÈRE — une photo par section, `fil-1.5`. Le jour où le fil s'est
+        mis à sortir couleur par couleur au bordereau — `fil-1.5-phase` au lieu
+        de `fil-1.5` —, toutes les vignettes de fil ont disparu du ticket d'un
+        coup : plus personne ne demandait ce code-là.
+
+        DEUXIÈME — le repli sur la section, comme le prix le fait déjà : une
+        couronne de rouge et une de bleu, c'est la même bobine. Les images sont
+        revenues. Relevé du patron, en la regardant : « la couleur des fils en
+        image doit changer sur le devis, on a que du bleu partout là ». Il a
+        raison — la couleur EST ce qu'on regarde en rayon, et le ticket
+        alignait quatre lignes qui ne différaient que par leur libellé.
+
+        TROISIÈME — la couronne DESSINÉE dans la couleur de son rôle, celle de
+        `WIRE_COLORS`. C'est l'épreuve d'après.
+
+      LE REPLI N'A PAS DISPARU POUR AUTANT, et cette épreuve le tient : le
+      magasin vend des couronnes SANS rôle — « fil-4 », « fil-16 » —, et
+      celles-là gardent leur photo. C'est aussi ce qui protège le jour où un
+      code de fil sortirait sans son rôle.
     */
-    for (const code of ['fil-1.5-phase', 'fil-2.5-terre', 'fil-1.5-retour']) {
-      expect(`${code} : ${photoDe(code) !== null}`).toBe(`${code} : true`);
-    }
+    expect(roleDuFil('fil-2.5')).toBeNull();
+    expect(photoDe('fil-2.5')).not.toBeNull();
     expect(photoDe('fil-1.5-phase')).toBe(photoDe('fil-1.5'));
+  });
+
+  it('et les couronnes portent CHACUNE la couleur de son conducteur', async () => {
+    /*
+      RELEVÉ DU PATRON : « la couleur des fils en image doit changer sur le
+      devis, on a que du bleu partout là ». La vignette retombait sur la
+      SECTION et servait la même bobine bleue à la phase comme à la terre.
+
+      L'ÉPREUVE DE L'OUVRAGE, ET NON DE L'OUTIL. Le banc `filsencouleur`
+      éprouve la vignette toute seule ; celle-ci part du TICKET et regarde ce
+      qu'il pose vraiment sur ses lignes de fil — c'est là que la couleur se
+      perdait.
+    */
+    const t = await auTicket();
+    const devis = devisAttendu();
+    const roles = devis.lignes
+      .map((l) => ({ code: l.code, role: roleDuFil(l.code) }))
+      .filter((x) => x.role !== null);
+    expect(roles.length).toBeGreaterThan(2);
+    const vues = new Set<string>();
+    for (const { code, role } of roles) {
+      const vignette = t.root.findAll(
+        (n) => String(n.props?.testID ?? '') === `vignette-${code}`,
+      )[0];
+      expect(`${code} : ${vignette !== undefined}`).toBe(`${code} : true`);
+      const teintes = vignette
+        .findAllByType(Circle)
+        .map((n) => String(n.props.stroke));
+      const attendue = WIRE_COLORS[role!].color;
+      expect(`${code} : ${teintes.includes(attendue)}`).toBe(`${code} : true`);
+      vues.add(attendue);
+    }
+    // Le contrôle en sens inverse : plusieurs rôles au ticket, plusieurs
+    // teintes. Une couleur unique passerait tout ce qui précède.
+    expect(vues.size).toBeGreaterThan(1);
   });
 
   it('et les prises partagent une seule photo', () => {

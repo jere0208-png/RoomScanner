@@ -50,6 +50,25 @@ export const WIRE_COLORS: Record<WireRole, { color: string; label: string }> = {
 };
 
 /**
+ * LE RÔLE D'UN CONDUCTEUR, LU SUR LE CODE DE SA LIGNE DE DEVIS.
+ *
+ * Le bordereau nomme ses couronnes `fil-<section>-<rôle>` — c'est
+ * `conduits.ts` qui écrit ce code, parce qu'on achète une couronne par
+ * couleur. Le rôle sert ensuite à la vignette du ticket, qui doit montrer la
+ * teinte du fil et non une bobine bleue pour tout le monde.
+ *
+ * UNE COURONNE DU MAGASIN N'A PAS DE RÔLE : « fil-4 », « fil-16 » — on achète
+ * du fil, on décide de sa couleur au moment de tirer. Une lecture trop
+ * gourmande leur en inventerait un et les repeindrait au hasard de leur
+ * section.
+ */
+export function roleDuFil(code: string): WireRole | null {
+  const m = /^fil-[\d.]+-([a-z]+)$/.exec(code);
+  const role = m?.[1];
+  return role && role in WIRE_COLORS ? (role as WireRole) : null;
+}
+
+/**
  * Les conducteurs d'un circuit.
  *
  * Trois fils pour un circuit de prises (phase, neutre, terre) ; un

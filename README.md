@@ -10956,6 +10956,61 @@ bouge pas avec le cadrage, ce qui distingue une taille physique d'un nombre de
 pixels. Les deux bornes existantes sont resserrées à la moitié et racontent les
 deux versions.
 
+### Les couronnes de fil prennent la couleur de leur conducteur
+
+Relevé du patron : « la couleur des fils en image doit changer sur le devis, on a
+que du bleu partout là ».
+
+**TROIS VERSIONS DE L'IMAGE D'UN FIL, ET CHACUNE CORRIGEAIT LA PRÉCÉDENTE.**
+
+- **Première** — une photo par section, `fil-1.5`. Le jour où le fil s'est mis à
+  sortir couleur par couleur au bordereau — `fil-1.5-phase` au lieu de
+  `fil-1.5` —, toutes les vignettes de fil ont disparu du ticket d'un coup :
+  plus personne ne demandait ce code-là.
+- **Deuxième** — le repli sur la section, comme le prix le fait déjà : « une
+  couronne de rouge et une de bleu, c'est la même bobine ». Les images sont
+  revenues, **toutes bleues**. Le ticket alignait quatre lignes qui ne
+  différaient que par leur libellé, là où la couleur est justement ce qu'on
+  regarde en rayon.
+- **Troisième** — celle-ci : la couronne est **dessinée** dans la couleur de son
+  rôle.
+
+**ON NE VA PAS CHERCHER QUATRE PHOTOS PAR SECTION.** Les couleurs de conducteur
+sont NORMÉES, et l'application les connaît déjà : `WIRE_COLORS`, la table que
+lisent le schéma unifilaire et le tracé des fils sur le plan. Une cinquième table
+de couleurs de fil, ce serait un plan qui dit rouge devant un ticket qui montre
+bleu. La terre reste donc du vert de cette table-là — le libellé de la ligne dit
+« vert/jaune », et le plan la dessine de la même teinte.
+
+**ET C'EST UNE COURONNE, PAS UNE BOBINE** : un anneau épais, deux spires plus
+claires par-dessus — ce qui fait lire un enroulement plutôt qu'un anneau de
+couleur. C'est ce qu'on prend en rayon et ce que le devis compte : l'unité de la
+ligne dit « cour. 100 m ». Regardé en image, les cinq rôles côte à côte : rouge,
+bleu, vert, orange, violet, tous lisibles à quarante-quatre points.
+
+**LE RÔLE SE LIT SUR LE CODE DE LA LIGNE** (`roleDuFil`), posé à côté de
+`WIRE_COLORS` — c'est `conduits.ts` qui écrit `fil-<section>-<rôle>`, parce qu'on
+achète une couronne par couleur.
+
+**ET LE REPLI SUR LA SECTION RESTE**, ce qui n'est pas un détail : le magasin
+vend des couronnes **sans rôle** — « fil-4 », « fil-16 » —, on achète du fil et
+l'on décide de sa couleur au moment de tirer. Celles-là gardent leur photo. Une
+lecture trop gourmande leur aurait inventé un rôle et les aurait repeintes au
+hasard de leur section.
+
+**Huit épreuves** (`filsencouleur`), six rouges avant : la lecture du rôle avec
+ses deux contrôles en sens inverse — une couronne du magasin n'en a pas, un
+article qui n'est pas un fil non plus —, le rouge de la phase, et surtout **cinq
+rôles, cinq teintes, et jamais celle d'un autre** : une teinte posée sur toutes
+les couronnes ferait passer le reste sans rien changer à l'écran.
+
+**Et une neuvième au ticket, parce qu'un banc peut vérifier l'outil et non
+l'ouvrage** : celle-là part du devis rendu et regarde ce qu'il pose vraiment sur
+ses lignes de fil — c'est là que la couleur se perdait. Deux bancs voisins de
+`devisecran` sont **réécrits, pas supprimés** : le comptage des photos exclut
+désormais les conducteurs (ils ont une image, ce n'est plus une photo), et
+l'ancien banc du repli raconte les trois versions et tient ce qui en reste.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro
