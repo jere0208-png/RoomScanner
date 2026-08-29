@@ -11297,6 +11297,58 @@ lui dit de se taire (`showNorth={false}`). **Le plan de l'écran de résultat le
 garde**, lui : c'est là qu'on cherche le nord, et une épreuve le vérifie —
 sinon on aurait pu les retirer partout sans que rien ne le dise.
 
+### L'avertissement de sortie : un bloc et une poubelle
+
+Relevé du patron, référence à l'appui — une fenêtre de suppression de compte,
+en clair et en sombre : « lorsqu'on quitte sans enregistrer, je voulais un
+avertissement de ce type, dans le design du bloc, de la poubelle etc. »
+
+**DEUX DESSINS, ET LE SECOND EST CELUI-CI.**
+
+- **Premier — un gyrophare.** C'était un relevé antérieur, mot pour mot : « une
+  belle page avec l'icône en gros, légère animation de la couleur dans l'icône,
+  avec une lumière halo réaliste dynamique, faisant croire que le gyro est
+  allumé ». Une sirène en dégradé, un halo qui bat, deux faisceaux qui tournent.
+  C'était juste, et c'était **beaucoup** : 176 points de scène, trois couches
+  animées et deux horloges pour dire « attention ».
+- **Second — un bloc et une poubelle.** Le motif que tout le monde reconnaît
+  sans le lire : un badge d'anneaux concentriques, l'icône de ce qu'on va perdre
+  au milieu, un gros titre, une phrase, les deux issues.
+
+**LES ANNEAUX FONT UNE CIBLE**, et ce n'est pas décoratif : l'œil tombe au
+centre avant d'avoir lu une ligne, et ce qu'il y trouve est le dessin de ce
+qu'on s'apprête à perdre. Ils s'éteignent vers le dehors — 18, 12, 7 centièmes.
+Trois anneaux de même densité feraient une cocarde ; c'est la dégressivité qui
+donne la lueur.
+
+**UN SOUFFLE, PAS UN GYROPHARE.** Le dessin d'avant tournait et battait ;
+celui-ci respire — une seconde et demie l'aller-retour, sans jamais s'éteindre.
+Et **seuls les deux anneaux du dehors respirent** : le disque du centre porte
+l'icône, et le faire varier ferait clignoter la poubelle. Une icône qui clignote
+se lit comme une erreur, pas comme un avertissement.
+
+**CE QUI N'A PAS CHANGÉ, ET NE DEVAIT PAS.** Les BOUTONS : « blanc, contour et
+texte bleu, pour enregistrer et rouge pour le quitter quand même » — c'est un
+relevé antérieur, et il tient toujours. Le nouveau parle du bloc, pas des issues.
+La fenêtre continue de ne décider de rien : elle rend l'`ActionData` que
+`garderLeTravail` lui donne, dans son ordre.
+
+**Regardé en image avant d'être codé**, aux deux thèmes, avec les cotes qui sont
+ensuite parties dans le composant : si le dessin est juste, c'est le composant
+qui est juste.
+
+**Quatre épreuves neuves**, toutes rouges sur l'ancien dessin (vérifié en
+remettant le fichier en état) : la poubelle est bien là — c'est le tracé de la
+table des icônes, pas un dessin refait —, les anneaux s'emboîtent du plus large
+au plus serré, ceux du dehors respirent **et celui du centre non**, et **plus
+rien ne tourne** : une rotation qui traînerait serait un reste de l'ancien
+dessin, et se verrait à l'écran.
+
+**Ce que je n'ai pas pu faire** : ouvrir la référence. Dribbble est refusé depuis
+cette machine — comme Leroy Merlin et 123elec. Le motif est reconstruit d'après
+la description du relevé (« le bloc, la poubelle ») et d'après le genre, pas
+d'après l'image.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

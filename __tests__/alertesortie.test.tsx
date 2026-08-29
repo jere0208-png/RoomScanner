@@ -25,8 +25,10 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 
 import React from 'react';
 import { StyleSheet, Text } from 'react-native';
+import { Path } from 'react-native-svg';
 import TestRenderer, { act } from 'react-test-renderer';
 import { AlerteSortie } from '../src/components/AlerteSortie';
+import { SOLAIRES } from '../src/ui/solaires';
 import { light } from '../src/theme';
 import type { ActionData } from '../src/components/Sheet';
 
@@ -139,53 +141,94 @@ describe('l’alerte de sortie', () => {
   });
 
   /*
-    LE GYROPHARE TOURNE, IL NE FAIT PAS SEMBLANT.
+    LE BLOC ET LA POUBELLE — deux dessins, et le second est celui-ci.
 
-    Deux couches animées : le halo qui bat (échelle et opacité) et les
-    faisceaux qui tournent. On ne peut pas compter leur MOUVEMENT ici — ces
-    animations partent sur le fil natif, et l'arbre d'essai n'en a pas : la
-    valeur rendue ne bougerait pas d'une image à l'autre même sur un vrai
-    téléphone. Ce qui se compte, c'est leur NATURE : une valeur animée, pas
-    un nombre écrit en dur. Un nombre voudrait dire que rien ne bougera
-    jamais, et tous les autres bancs passeraient quand même.
+      PREMIER — UN GYROPHARE : une sirène en dégradé, un halo qui bat, deux
+      faisceaux qui tournent. C'était le relevé du patron, et c'était BEAUCOUP :
+      cent soixante-seize points de scène, trois couches animées et deux
+      horloges pour dire « attention ».
+
+      SECOND — relevé du patron, référence à l'appui (une fenêtre de
+      suppression de compte, en clair et en sombre) : « je voulais un
+      avertissement de ce type, dans le design du bloc, de la poubelle etc. »
+      Un badge d'anneaux concentriques, l'icône de ce qu'on va perdre au
+      milieu.
+
+    CE BANC A SUIVI. Il comptait deux couches animées PORTANT UN TRANSFORM —
+    le halo qui enfle, les faisceaux qui tournent. Plus rien ne tourne : les
+    anneaux ne font que respirer, en opacité. La règle qu'il tenait, elle, n'a
+    pas bougé : ce qui doit bouger porte une valeur ANIMÉE et non un nombre
+    écrit en dur. On ne peut pas compter le mouvement ici — ces animations
+    partent sur le fil natif, et l'arbre d'essai n'en a pas.
   */
-  it('anime son halo et son balayage, au lieu de les figer', () => {
-    const t = monter();
-    const couches = t.root
-      .findAll((n) => {
-        const st = plat(n.props?.style);
-        return st.position === 'absolute' && Array.isArray(st.transform);
-      })
-      .map((n) => plat(n.props.style));
-    expect(couches.length).toBeGreaterThanOrEqual(2);
-    /*
-      ON LIT LE STYLE BRUT, PAS LE STYLE APLATI.
 
-      `StyleSheet.flatten` résout une valeur animée en son nombre du moment :
-      aplati, un halo qui bat ressemble à un halo figé. Le tableau d'origine,
-      lui, porte encore l'objet animé — c'est là qu'on voit la différence
-      entre « ça bougera » et « ça ne bougera jamais ».
+  /** Les anneaux du badge : des carrés parfaitement ronds, superposés. */
+  const anneaux = (t: TestRenderer.ReactTestRenderer) =>
+    t.root.findAll((n) => {
+      const st = plat(n.props?.style);
+      return (
+        st.position === 'absolute' &&
+        typeof st.width === 'number' &&
+        st.width === (st.borderRadius as number) * 2
+      );
+    });
+
+  it('porte la POUBELLE de ce qu’on va perdre', () => {
+    const t = monter();
+    expect(t.root.findAllByType(Path).map((n) => String(n.props.d))).toContain(
+      SOLAIRES.supprimer,
+    );
+  });
+
+  it('et un badge d’anneaux concentriques, de plus en plus serrés', () => {
+    /*
+      LES ANNEAUX FONT UNE CIBLE : l'œil tombe au centre avant d'avoir lu une
+      ligne. Trois anneaux de même taille feraient un disque — c'est
+      l'emboîtement qui donne la lueur, et c'est lui qu'on mesure.
     */
-    const animes = t.root
-      .findAll((n) => {
-        const st = plat(n.props?.style);
-        return st.position === 'absolute' && Array.isArray(st.transform);
-      })
+    const tailles = anneaux(monter())
+      .map((n) => plat(n.props.style).width as number)
+      .filter((w, i, tous) => tous.indexOf(w) === i)
+      .sort((a, b) => b - a);
+    expect(tailles.length).toBeGreaterThanOrEqual(3);
+    for (let i = 1; i < tailles.length; i++) {
+      expect(tailles[i]).toBeLessThan(tailles[i - 1]);
+    }
+  });
+
+  it('ceux du dehors respirent, celui du centre non', () => {
+    /*
+      LE CONTRÔLE EN SENS INVERSE de l'animation, et il a un sens de métier :
+      le disque du centre porte l'icône. Le faire varier ferait CLIGNOTER la
+      poubelle — et une icône qui clignote se lit comme une erreur, pas comme
+      un avertissement.
+
+      On lit le style BRUT, pas le style aplati : `StyleSheet.flatten` résout
+      une valeur animée en son nombre du moment, et un anneau qui respire y
+      ressemblerait à un anneau figé.
+    */
+    const opacites = anneaux(monter())
       .map((n) => (Array.isArray(n.props.style) ? n.props.style : [n.props.style]))
       .map((tab) => tab.find((x: unknown) => !!x && 'opacity' in (x as object)))
-      /*
-        Chaque vue animée paraît DEUX FOIS dans l'arbre — le composant, puis
-        la vue d'accueil sur laquelle il a déjà résolu ses valeurs. On ne
-        garde que celles qui portent encore l'objet animé : ce sont les
-        vraies, et il en faut au moins deux (le halo, le balayage).
-      */
-      .filter((st) => !!st && typeof st.opacity === 'object');
-    expect(animes.length).toBeGreaterThanOrEqual(2);
-    for (const st of animes) {
-      const tr = st.transform as Record<string, unknown>[];
-      for (const v of tr.flatMap((x) => Object.values(x))) {
-        expect(typeof v).toBe('object');
-      }
-    }
+      .filter(Boolean)
+      .map((x) => (x as { opacity: unknown }).opacity);
+    expect(opacites.filter((o) => typeof o === 'object').length).toBeGreaterThanOrEqual(
+      2,
+    );
+    expect(opacites.filter((o) => typeof o === 'number').length).toBeGreaterThanOrEqual(
+      1,
+    );
+  });
+
+  it('et plus rien ne tourne', () => {
+    // Le gyrophare est parti : une rotation qui traînerait serait un reste de
+    // l'ancien dessin, et se verrait à l'écran.
+    const rotations = monter()
+      .root.findAll((n) => Array.isArray(plat(n.props?.style).transform))
+      .flatMap(
+        (n) => (plat(n.props.style).transform ?? []) as Record<string, unknown>[],
+      )
+      .filter((x) => 'rotate' in x);
+    expect(rotations).toHaveLength(0);
   });
 });
