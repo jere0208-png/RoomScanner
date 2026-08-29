@@ -35,6 +35,7 @@ import { PLANS_GRATUITS, useAccountStore } from '../store/accountStore';
 import { useScanStore, type ThemePref } from '../store/scanStore';
 import { radius, shadowCard, useTheme, type Palette } from '../theme';
 import { alerte } from '../ui/alerte';
+import { panne as expliquer } from '../ui/panne';
 
 /**
  * LES TROIS APPARENCES, DANS L'ORDRE DU DESIGN.
@@ -111,7 +112,10 @@ export function ProfilScreen() {
           : 'L’App Store ne connaît pas d’abonnement pour ce compte Apple.',
       );
     } catch (e) {
-      alerte('Restauration impossible', (e as Error).message);
+      alerte(
+        expliquer('restauration', e).titre,
+        expliquer('restauration', e).message,
+      );
     }
   };
 

@@ -24,6 +24,11 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  ELEC_PLEIN_BAS,
+  ELEC_PLEIN_HAUT,
+} from '../screens/result/styles';
 import Svg, {
   Circle,
   G,
@@ -120,8 +125,19 @@ export const COTE_H = 26;
  */
 const RESERVE_COMMANDES = 390;
 
-/** Ce qu'on laisse respirer en bas de l'écran, sous la feuille. */
-const MARGE_ECRAN = 24;
+/**
+ * Ce qu'on laisse respirer en bas de l'écran, SOUS la barre du système.
+ *
+ * Ce n'était pas ça avant : c'était vingt-quatre points censés couvrir tout
+ * ce qui n'est pas la feuille — les marges de la modale ET la barre
+ * d'accueil. Elles en font cent deux. Le garde-fou laissait donc passer
+ * soixante-dix-huit points de débord, soit très exactement la hauteur du
+ * bouton « Enregistrer », que le patron a vu coupé en deux.
+ *
+ * Il ne reste ici que ce que personne d'autre ne sait dire : le souffle sous
+ * la barre. Le reste se lit à sa source (voir `ELEC_PLEIN_HAUT`).
+ */
+const MARGE_ECRAN = 12;
 
 /**
  * Le dessin ne descend pas sous cette hauteur.
@@ -245,6 +261,19 @@ export function WallElevation({
   const [layout, setLayout] = useState({ w: 0, h: 0 });
   /** La hauteur de l'écran : c'est elle qui borne le dessin. */
   const { height: hauteurEcran } = useWindowDimensions();
+  /*
+    LA BARRE D'ACCUEIL EST UNE MESURE, PAS UNE CONSTANTE : trente-quatre
+    points sur un iPhone récent, zéro sur un iPhone à bouton, et le téléphone
+    est le seul à savoir lequel il est.
+  */
+  const margesSysteme = useSafeAreaInsets();
+  /** La place que la fiche a VRAIMENT : l'écran, moins tout ce qui l'entoure. */
+  const placeUtile =
+    hauteurEcran -
+    ELEC_PLEIN_HAUT -
+    ELEC_PLEIN_BAS -
+    margesSysteme.bottom -
+    MARGE_ECRAN;
   /**
    * La hauteur que réclame CE mur, une fois la largeur connue.
    *
@@ -359,13 +388,19 @@ export function WallElevation({
      * de conformité, pas de réglage, trois champs, cinq boutons) et le
      * dessin prend ce qui reste.
      */
-    const reste = hauteurEcran - RESERVE_COMMANDES;
+    /*
+      ET L'ESTIMATION D'OUVERTURE PART DE LA MÊME PLACE. Elle partait de
+      l'écran entier : la fiche s'ouvrait trop grande, puis se rabotait sous
+      les yeux à la première mesure. Un saut d'une image, à chaque ouverture,
+      sur tous les murs étroits.
+    */
+    const reste = placeUtile - RESERVE_COMMANDES;
     setHauteurCadre(
       Math.round(
         Math.min(430, Math.max(HAUTEUR_MIN_CADRE, reste), Math.max(190, voulue + PAD_TOP + PAD_BOTTOM)),
       ),
     );
-  }, [face, wall, layout.w, hauteurEcran]);
+  }, [face, wall, layout.w, placeUtile]);
 
   /**
    * ET SI ÇA DÉBORDE QUAND MÊME, ON RABOTE — mesuré, pas deviné.
@@ -388,7 +423,7 @@ export function WallElevation({
    */
   const raboter = (hauteurRendue: number) => {
     if (hauteurCadre === null) return;
-    const trop = hauteurRendue - (hauteurEcran - MARGE_ECRAN);
+    const trop = hauteurRendue - placeUtile;
     if (trop <= 1) return;
     const cible = Math.max(HAUTEUR_MIN_CADRE, hauteurCadre - Math.ceil(trop));
     if (cible < hauteurCadre) setHauteurCadre(cible);

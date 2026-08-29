@@ -29,6 +29,7 @@ import { connexionWeb } from '../native/account';
 import { SERVEUR } from '../config/serveur';
 import { dark, useTheme, type Palette } from '../theme';
 import { alerte } from '../ui/alerte';
+import { panne as expliquer } from '../ui/panne';
 
 export function SignInScreen() {
   const c = useTheme();
@@ -42,7 +43,7 @@ export function SignInScreen() {
   const [email, setEmail] = useState('');
 
   const refuse = (raison?: string) =>
-    alerte('Connexion impossible', raison ?? 'Réessayez.');
+    alerte(expliquer('connexion', raison).titre, expliquer('connexion', raison).message);
 
   const viaApple = async () => {
     const r = await connecterApple();

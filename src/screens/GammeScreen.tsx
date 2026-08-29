@@ -116,7 +116,17 @@ export function GammeScreen() {
           onPress={() => setScreen('devis')}>
           <BackChevron color={c.ink} />
         </TouchableOpacity>
-        <Text style={styles.titrePage}>Quel appareillage ?</Text>
+        {/*
+          UNE QUESTION QU'ON COMPREND SANS ÊTRE ÉLECTRICIEN.
+
+          « Quel appareillage ? » est le mot juste du métier, et le seul mot
+          de cet écran que le visiteur ne connaît pas — alors que c'est le
+          titre, donc la première chose qu'il lit. On nomme les objets :
+          des prises, des interrupteurs.
+        */}
+        <Text style={styles.titrePage} numberOfLines={2}>
+          Quelles prises et quels interrupteurs ?
+        </Text>
       </View>
 
       {/*

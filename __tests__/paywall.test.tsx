@@ -125,7 +125,7 @@ describe('la page Pro', () => {
     const vu = textesDe(monter(<PaywallScreen />));
     expect(vu).toContain('Pro');
     expect(vu).toContain('4,90 €');
-    expect(vu).toContain('Relevés illimités');
+    expect(vu).toContain('Autant de logements que vous voulez');
     // Plus de colonne « Gratuit » : on ne vend pas ce que l'utilisateur
     // possède déjà, et on ne lui prend pas la moitié de l'écran pour le
     // lui rappeler.

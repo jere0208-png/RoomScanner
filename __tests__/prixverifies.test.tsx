@@ -446,7 +446,7 @@ describe('l’attente dure assez longtemps pour se voir', () => {
     await act(async () => {
       jest.advanceTimersByTime(ATTENTE_MIN - 200);
     });
-    expect(mots(t)).not.toContain('ESTIMATION DE FOURNITURE');
+    expect(mots(t)).not.toContain('ESTIMATION DU MATÉRIEL');
   });
 
   it('et il paraît juste après', async () => {
@@ -458,6 +458,6 @@ describe('l’attente dure assez longtemps pour se voir', () => {
     await act(async () => {
       jest.advanceTimersByTime(ATTENTE_MIN + 200);
     });
-    expect(mots(t)).toContain('ESTIMATION DE FOURNITURE');
+    expect(mots(t)).toContain('ESTIMATION DU MATÉRIEL');
   });
 });

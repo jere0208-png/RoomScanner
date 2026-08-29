@@ -145,6 +145,7 @@ import {
   type PromptData,
 } from '../components/Sheet';
 import { alerte } from '../ui/alerte';
+import { panne as expliquer } from '../ui/panne';
 
 type Tab = '2d' | '3d';
 
@@ -180,7 +181,13 @@ export function ResultScreen() {
   const panne = useScanStore((st) => st.panne);
   useEffect(() => {
     if (!panne) return;
-    alerte('Enregistrement impossible', panne.message, [
+    /*
+      LA PANNE DIT QUOI FAIRE. Le message brut du système — « NSFileWriteOut
+      OfSpaceError » et ses cousins — n'apprenait rien à personne. Il est
+      toujours là, derrière la consigne, entre parenthèses.
+    */
+    const dit = expliquer('enregistrement', panne.message);
+    alerte(dit.titre, dit.message, [
       {
         label: 'Compris',
         onPress: () => useScanStore.getState().oublierPanne(),
@@ -1135,7 +1142,7 @@ export function ResultScreen() {
       await RoomScan.shareFile(uri);
     } catch (e: any) {
       setCapturing(false);
-      alerte('Capture impossible', e?.message ?? 'Erreur inconnue');
+      alerte(expliquer('capture', e).titre, expliquer('capture', e).message);
     }
   };
 
@@ -1152,7 +1159,7 @@ export function ResultScreen() {
       );
       await RoomScan.shareText(obj, objFilename(scanName));
     } catch (e: any) {
-      alerte('Export impossible', e?.message ?? 'Erreur inconnue');
+      alerte(expliquer('export', e).titre, expliquer('export', e).message);
     }
   };
 
@@ -1187,7 +1194,7 @@ export function ResultScreen() {
       const bytes = buildMaterialPdf(scanName, list, tirage);
       await RoomScan.sharePDF(toBase64(bytes), materialFilename(scanName));
     } catch (e: any) {
-      alerte('Export impossible', e?.message ?? 'Erreur inconnue');
+      alerte(expliquer('export', e).titre, expliquer('export', e).message);
     }
   };
 
@@ -1235,7 +1242,7 @@ export function ResultScreen() {
         metreFilename(scanName),
       );
     } catch (e: any) {
-      alerte('Export impossible', e?.message ?? 'Erreur inconnue');
+      alerte(expliquer('export', e).titre, expliquer('export', e).message);
     }
   };
 
@@ -1262,7 +1269,7 @@ export function ResultScreen() {
         ),
       );
     } catch (e: any) {
-      alerte('Export impossible', e?.message ?? 'Erreur inconnue');
+      alerte(expliquer('export', e).titre, expliquer('export', e).message);
     }
   };
 
@@ -2623,9 +2630,12 @@ export function ResultScreen() {
                     onPress: () => {
                       demarrerComplement().catch((e: any) =>
                         alerte(
-                          'Relevé impossible',
-                          e?.message ??
-                            'La réunion de plusieurs relevés demande iOS 17.',
+                          expliquer('releve', e).titre,
+                          expliquer(
+                            'releve',
+                            e?.message ??
+                              'La réunion de plusieurs relevés demande iOS 17.',
+                          ).message,
                         ),
                       );
                     },

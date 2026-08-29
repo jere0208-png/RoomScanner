@@ -248,10 +248,10 @@ describe('pendant qu’on va voir', () => {
     // Avant que la promesse ne se règle : l'attente, et pas de ticket.
     const pendant = mots(t);
     expect(pendant).toContain('Vérification des prix');
-    expect(pendant).not.toContain('ESTIMATION DE FOURNITURE');
+    expect(pendant).not.toContain('ESTIMATION DU MATÉRIEL');
     await laisserLAttenteFinir();
     const apres = mots(t);
-    expect(apres).toContain('ESTIMATION DE FOURNITURE');
+    expect(apres).toContain('ESTIMATION DU MATÉRIEL');
     expect(apres).not.toContain('Vérification des prix');
   });
 });

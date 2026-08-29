@@ -11559,6 +11559,101 @@ désélectionne pas »), la bande couvre le mur d'un bout à l'autre, et le mur 
 n'a rien perdu. Le banc se joue sur une pièce **à pan coupé** : sur un logement
 tout en angles droits, le défaut est invisible par construction.
 
+### Les mots de quelqu'un qui n'est pas électricien
+
+Relevé du patron, après une passe globale sur l'application : « on doit penser
+utilisateur simple, sans professionnalisme forcément. On doit rendre la chose
+ludique. »
+
+#### Le ticket disait « fourniture » — et le total pouvait tromper
+
+« ESTIMATION DE FOURNITURE », puis « TOTAL TTC » en gros. Un professionnel lit
+« fourniture » et comprend **sans la pose**. Un particulier lit le prix de ses
+travaux, et il se trompe d'un facteur deux ou trois.
+
+**La mise en garde existait déjà** — en pied de ticket, en petit, et dans la
+langue du métier : « Fourniture seule, hors main-d'œuvre ». Personne ne lit
+trois paragraphes plus bas ce qui contredit le chiffre qu'il vient de lire en
+gros. Elle est maintenant **sous le total** : « Le matériel seul — la pose n'est
+pas comprise. » Une épreuve mesure cette **distance de lecture** : pas plus de
+trois lignes entre le chiffre et sa moitié de phrase manquante.
+
+Au passage : « ESTIMATION DU MATÉRIEL », « PRISES ET INTERRUPTEURS » à la place
+d'« APPAREILLAGE », et la page des gammes demande « Quelles prises et quels
+interrupteurs ? » — le seul mot de cet écran que le visiteur ne connaissait pas
+était son titre.
+
+#### La page Pro promettait ce qu'elle ne verrouillait pas
+
+Elle vendait « Meubles, 3D et cotes au centimètre » et « Tous les exports : PDF,
+DXF, CSV ». Or **rien de tout ça n'est verrouillé** : le seul palier de
+l'application est le nombre de plans (`PLANS_GRATUITS`), et le drapeau `pro`
+n'est lu ni par la vue 3D, ni par les cotes, ni par l'export.
+
+Autrement dit, on vendait à quelqu'un ce qu'il était **déjà en train
+d'utiliser**, au seul endroit de l'application où l'on demande de l'argent.
+Trouvé en relisant les verrous, pas en lisant la page — la page était
+parfaitement crédible.
+
+Ce qui est vraiment réservé se vend très bien : **le premier logement est offert
+en entier**, l'abonnement ouvre les suivants, les étages, les copies. On ne vend
+plus une fonction, on vend la suite. Et la page le dit maintenant : « Votre
+premier logement reste gratuit, en entier. »
+
+**L'épreuve tient la promesse à l'envers** : elle lit le code source des écrans
+et vérifie qu'aucun ne consulte l'abonnement. Le jour où l'export sera vraiment
+réservé, elle tombera — et c'est exactement ce qu'on veut, puisque la page
+pourra alors le promettre.
+
+#### Les pannes disaient la panne, jamais la sortie
+
+    « Export impossible » — « Erreur inconnue »
+    « Capture impossible » — « Erreur inconnue »
+
+« Impossible » est un constat, et l'utilisateur l'a déjà fait : il vient de voir
+que ça n'a pas marché. « Erreur inconnue » est un aveu. Ni l'un ni l'autre ne
+répond à la seule question qu'on se pose devant un écran bloqué.
+
+**Le ton juste existait déjà ici**, et c'est ce qui rend l'écart embarrassant :
+le guide du scan dit « balayez plus lentement, du sol au plafond, avec davantage
+de lumière ». Une consigne, un geste, une sortie. Il n'était écrit nulle part
+ailleurs.
+
+Un module (`src/ui/panne.ts`) porte les sept moments où l'application peut
+échouer devant quelqu'un, chacun avec **ce qu'il faut faire**. Le détail
+technique n'est pas jeté : il suit la consigne, entre parenthèses, et
+**seulement s'il est court** — une trace d'appel de six lignes collée sous la
+phrase, c'est la phrase qu'on ne lit plus. Une épreuve relit les six écrans :
+plus un seul « Erreur inconnue », plus un seul titre en « … impossible ».
+
+### La fiche d'élévation dépassait de l'écran
+
+Relevé du patron, capture à l'appui : « ce menu dépasse de l'écran
+verticalement ». Sur un mur de trente-trois centimètres de large pour deux
+mètres cinquante de haut — une salle de bains —, le bouton « Enregistrer » était
+coupé en deux par la barre d'accueil.
+
+**Le garde-fou existait, et il visait trop bas.** La fiche mesure sa propre
+hauteur une fois rendue et rabote son dessin de ce qui dépasse — c'est la bonne
+méthode, et elle avait déjà sauvé cet écran une fois. Mais elle comparait cette
+hauteur à `hauteurEcran − 24`, un nombre écrit à la main, alors que la modale qui
+la porte lui prend **56 points en haut, 12 en bas, et la barre d'accueil en
+prend 34**. Cent deux points, contre vingt-quatre autorisés : le garde-fou
+laissait passer soixante-dix-huit points de débord — très exactement la hauteur
+du bouton coupé.
+
+**Deux nombres pour la même chose, et l'un des deux se trompe toujours.** Les
+marges de la modale sont désormais déclarées à un seul endroit et lues par les
+deux fichiers ; la barre d'accueil est *mesurée*, puisque le téléphone est seul
+à savoir s'il en a une. L'estimation d'ouverture part de la même place, sinon la
+fiche s'ouvrait trop grande puis se rabotait sous les yeux — un saut d'une image
+à chaque ouverture.
+
+**Quatre épreuves, deux rouges avant**, et les deux vertes protègent l'acquis :
+la barre d'accueil est bien rendue par le banc, et **un dessin qui tient n'est
+pas raboté** — sans ce contrôle, un garde-fou qui rétrécit toujours passerait
+l'épreuve sans rien prouver.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

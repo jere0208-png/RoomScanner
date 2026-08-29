@@ -13,6 +13,7 @@ import { useScanStore } from '../store/scanStore';
 import { useRoomScan } from '../native/useRoomScan';
 import { CloseCross } from '../components/CloseCross';
 import { haptic } from '../ui/haptic';
+import { panne as expliquer } from '../ui/panne';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GuidePose } from './scan/GuidePose';
 import { FIXTURE_SYMBOL } from '../geometry/electrical';
@@ -452,8 +453,17 @@ export function ScanScreen() {
       */}
       {!!error && !processing && (
         <View style={styles.pannePanneau}>
-          <Text style={styles.panneTitre}>Le relevé n’a pas abouti</Text>
-          <Text style={styles.panneTexte}>{error}</Text>
+          {/*
+            LE MÊME TEXTE QUE PARTOUT AILLEURS. Ce panneau disait déjà la
+            bonne chose — c'est ici que le ton juste avait été trouvé — et il
+            l'écrivait en dur, pour lui seul. Il le prend maintenant à la
+            source commune : une consigne qui ne vit qu'à un endroit ne peut
+            pas se contredire ailleurs.
+          */}
+          <Text style={styles.panneTitre}>{expliquer('releve').titre}</Text>
+          <Text style={styles.panneTexte}>
+            {expliquer('releve', error).message}
+          </Text>
           <TouchableOpacity
             style={styles.panneBouton}
             accessibilityLabel="Quitter le scan"

@@ -46,6 +46,7 @@ import { deviceNames } from '../geometry/naming';
 import { PromptSheet, type PromptData } from '../components/Sheet';
 import type { CeilingFixture } from '../geometry/ceiling';
 import { alerte } from '../ui/alerte';
+import { panne as expliquer } from '../ui/panne';
 
 
 /**
@@ -442,7 +443,7 @@ const styles = getStyles(c);
           : batir(vignettes);
       await RoomScan.sharePDF(toBase64(bytes), pdfFilename(titreDuDossier));
     } catch (e: any) {
-      alerte('Export impossible', e?.message ?? 'Erreur inconnue');
+      alerte(expliquer('export', e).titre, expliquer('export', e).message);
     }
   };
 

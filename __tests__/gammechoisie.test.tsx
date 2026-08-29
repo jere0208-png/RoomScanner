@@ -290,7 +290,7 @@ describe('la page des gammes', () => {
     await act(async () => {
       jest.advanceTimersByTime(ATTENTE_MIN + 50);
     });
-    expect(texte(t)).toContain('ESTIMATION DE FOURNITURE');
+    expect(texte(t)).toContain('ESTIMATION DU MATÉRIEL');
   });
 });
 
@@ -336,7 +336,7 @@ describe('la page ne démarre pas sous la barre d’état', () => {
     */
     const t = ouvrirGammes();
     const titre = t.root
-      .findAll((n) => String(n.props?.children) === 'Quel appareillage ?')
+      .findAll((n) => String(n.props?.children) === 'Quelles prises et quels interrupteurs ?')
       .pop()!;
     const style = StyleSheet.flatten(titre.props.style as never) as {
       position?: string;
@@ -429,7 +429,7 @@ describe('on ne repart plus du début en revenant du magasin', () => {
     await act(async () => {
       jest.advanceTimersByTime(ATTENTE_MIN + 50);
     });
-    expect(texte(t)).toContain('ESTIMATION DE FOURNITURE');
+    expect(texte(t)).toContain('ESTIMATION DU MATÉRIEL');
   });
 
   it('mais un devis qu’on ouvre pour la première fois commence au début', () => {
@@ -437,7 +437,7 @@ describe('on ne repart plus du début en revenant du magasin', () => {
     // sauter l'avertissement à qui ne l'a jamais lu.
     useScanStore.getState().reset();
     const t = ouvrir();
-    expect(texte(t)).not.toContain('ESTIMATION DE FOURNITURE');
+    expect(texte(t)).not.toContain('ESTIMATION DU MATÉRIEL');
     expect(etapes(t)[0]).toContain('en cours');
   });
 });

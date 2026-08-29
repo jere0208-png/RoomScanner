@@ -45,6 +45,7 @@ import {
 } from '../store/accountStore';
 import { dark, radius, shadowCard, useTheme, type Palette } from '../theme';
 import { alerte } from '../ui/alerte';
+import { panne as expliquer } from '../ui/panne';
 
 /**
  * CE QU'ON ACHÈTE, ÉNUMÉRÉ.
@@ -71,11 +72,31 @@ import { alerte } from '../ui/alerte';
  * l'application de tous les scanners de pièces du magasin, et ils restent
  * écrits mot pour mot.
  */
+/*
+  ET ELLE NE PROMET PLUS DE DÉBLOQUER CE QUI N'EST PAS BLOQUÉ.
+
+  Elle vendait « Meubles, 3D et cotes au centimètre » et « Tous les exports :
+  PDF, DXF, CSV ». Or RIEN DE TOUT ÇA N'EST VERROUILLÉ : le seul palier de
+  l'application est le NOMBRE de logements (`PLANS_GRATUITS`), et l'abonnement
+  n'est consulté ni par la vue 3D, ni par les cotes, ni par l'export.
+
+  Autrement dit, on vendait à quelqu'un ce qu'il était déjà en train
+  d'utiliser — au seul endroit de l'application où l'on demande de l'argent.
+  Trouvé en relisant les verrous, pas en lisant la page : la page était
+  parfaitement crédible.
+
+  CE QUI EST VRAIMENT RÉSERVÉ SE VEND TRÈS BIEN : le premier logement est
+  offert EN ENTIER, et l'abonnement ouvre les suivants — les étages, les
+  copies, les variantes. On ne vend plus une fonction, on vend la suite. Un
+  banc lit le code source des écrans pour tenir cette promesse à l'envers :
+  le jour où l'export sera vraiment réservé, il tombera, et la page pourra le
+  dire.
+*/
 const ATOUTS: { icone: keyof typeof SOLAIRES; mot: string }[] = [
-  { icone: 'rooms', mot: 'Relevés illimités' },
-  { icone: 'furniture', mot: 'Meubles, 3D et cotes au centimètre' },
-  { icone: 'partage', mot: 'Tous les exports : PDF, DXF, CSV' },
-  { icone: 'save', mot: 'Plans gardés sous votre compte' },
+  { icone: 'rooms', mot: 'Autant de logements que vous voulez' },
+  { icone: 'save', mot: 'Les étages, les sous-sols, les copies' },
+  { icone: 'furniture', mot: 'Meubles, 3D et cotes sur chacun d’eux' },
+  { icone: 'partage', mot: 'PDF, DXF et CSV sur chacun d’eux' },
   { icone: 'elec', mot: 'Contrôle NF C 15-100 et matériel' },
   { icone: 'metre', mot: 'Tableau existant et diagnostic' },
   { icone: 'etoile', mot: 'Les nouveautés en premier' },
@@ -130,7 +151,7 @@ export function PaywallScreen() {
     try {
       await acheterPro(offre);
     } catch (e) {
-      alerte('Achat impossible', (e as Error).message);
+      alerte(expliquer('achat', e).titre, expliquer('achat', e).message);
     }
   };
 
@@ -274,6 +295,17 @@ export function PaywallScreen() {
                   <Text style={s.atoutMot}>{a.mot}</Text>
                 </View>
               ))}
+              {/*
+                ET CE QUI RESTE GRATUIT, DIT AVANT DE DEMANDER DE L'ARGENT.
+
+                Une page qui ne nomme que ce qu'on gagne à payer laisse croire
+                que le reste est fermé. Le premier logement est offert en
+                entier — c'est vrai, c'est généreux, et le taire ne servait
+                qu'à rendre la page moins crédible.
+              */}
+              <Text style={s.gratuit}>
+                Votre premier logement reste gratuit, en entier.
+              </Text>
             </View>
           </ContourVif>
             <BadgePro style={s.badge} />
@@ -305,7 +337,10 @@ export function PaywallScreen() {
                       : 'L’App Store ne connaît pas d’abonnement pour ce compte Apple.',
                   );
                 } catch (e) {
-                  alerte('Restauration impossible', (e as Error).message);
+                  alerte(
+                    expliquer('restauration', e).titre,
+                    expliquer('restauration', e).message,
+                  );
                 }
               }}>
               <Text style={s.lien}>Restaurer l’achat</Text>
@@ -533,6 +568,13 @@ const themed = (c: Palette) =>
     separateurMot: { color: c.inkFaint, fontSize: 12, fontWeight: '700' },
     atout: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 3.5 },
     atoutMot: { flex: 1, color: c.ink, fontSize: 13.5, lineHeight: 18 },
+    gratuit: {
+      color: c.inkSoft,
+      fontSize: 12.5,
+      lineHeight: 17,
+      marginTop: 10,
+      textAlign: 'center',
+    },
     liens: {
       flexDirection: 'row',
       alignItems: 'center',

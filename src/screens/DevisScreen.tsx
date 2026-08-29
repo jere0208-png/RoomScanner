@@ -699,7 +699,16 @@ export function DevisScreen() {
           */
           <>
             <View style={styles.entete}>
-              <Text style={styles.enseigne}>ESTIMATION DE FOURNITURE</Text>
+              {/*
+                « MATÉRIEL », ET NON « FOURNITURE ».
+
+                « Fourniture » est le mot juste du métier — et un mot que
+                personne d'autre n'emploie. Relevé du patron : « on doit
+                penser utilisateur simple, sans professionnalisme
+                forcément. » « Matériel » dit la même chose à tout le monde,
+                et n'enlève rien à celui qui connaît l'autre.
+              */}
+              <Text style={styles.enseigne}>ESTIMATION DU MATÉRIEL</Text>
               {/*
                 LE MOIS, ET NON LE NUMÉRO DE VERSION. « tarifs 2026-08.2 » a un
                 sens pour le code — le mois, puis le rang du relevé dans ce
@@ -744,7 +753,7 @@ export function DevisScreen() {
                 />
               </Svg>
               <View style={styles.gammeTextes}>
-                <Text style={styles.gammeRole}>APPAREILLAGE</Text>
+                <Text style={styles.gammeRole}>PRISES ET INTERRUPTEURS</Text>
                 <Text style={styles.gammeNom}>{nomDeLaGamme}</Text>
               </View>
               <Text style={styles.porteChevron}>›</Text>
@@ -899,6 +908,24 @@ export function DevisScreen() {
               <Text style={styles.total}>{euros(devis.total)}</Text>
             </View>
             {/*
+              LE SEUL MALENTENDU QUI PUISSE COÛTER CHER À QUELQU'UN.
+
+              Le total s'écrit en gros, et il ne dit QUE le matériel. Un
+              professionnel lit « estimation de fourniture » et comprend sans
+              la pose ; un particulier lit le prix de ses travaux, et il se
+              trompe d'un facteur deux ou trois.
+
+              LA MISE EN GARDE EXISTAIT DÉJÀ — en pied de ticket, en petit, et
+              dans la langue du métier : « Fourniture seule, hors
+              main-d'œuvre ». Personne ne lit trois paragraphes plus bas ce
+              qui contredit le chiffre qu'il vient de lire en gros. Elle se
+              pose donc SOUS le total, en français de tout le monde, et le
+              banc mesure cette distance-là.
+            */}
+            <Text style={styles.sousTotal}>
+              Le matériel seul — la pose n’est pas comprise.
+            </Text>
+            {/*
               CE QU'ON A ÉCARTÉ SE DIT SOUS LE TOTAL.
 
               Un total plus bas sans explication est un total suspect : celui
@@ -924,8 +951,8 @@ export function DevisScreen() {
               </TouchableOpacity>
             )}
             <Text style={styles.mentions}>
-              Fourniture seule, hors main-d’œuvre et hors luminaires. Prix
-              publics approximatifs, à valider au comptoir.
+              Les luminaires ne sont pas comptés. Prix publics indicatifs, à
+              confirmer en magasin.
             </Text>
 
             {/*
@@ -1290,6 +1317,15 @@ const getStyles = themedStyles((c: Palette) =>
       borderTopColor: c.ink,
       marginTop: 20,
       opacity: 0.85,
+    },
+    /* Sous le chiffre, et gris : ce n'est pas une note de bas de page,
+       c'est la moitié de la phrase que le total commence. */
+    sousTotal: {
+      color: c.inkSoft,
+      fontSize: 12.5,
+      lineHeight: 17,
+      textAlign: 'right',
+      marginTop: 4,
     },
     totalNom: {
       color: c.ink,

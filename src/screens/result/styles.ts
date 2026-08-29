@@ -12,6 +12,21 @@ import { StyleSheet } from 'react-native';
 import { glow, radius, shadowCard, themedStyles, type Palette } from '../../theme';
 import { MARGE_RANGEE, PILL_GAP } from '../../components/ToolPill';
 
+/**
+ * LES MARGES DE LA MODALE PLEIN ÉCRAN — et pourquoi elles sont exportées.
+ *
+ * Relevé du patron, capture à l'appui : « ce menu dépasse de l'écran
+ * verticalement ». La fiche d'élévation mesure sa propre hauteur et se rabote
+ * de ce qui dépasse — bonne méthode — mais elle supposait la place
+ * disponible : `hauteurEcran − 24`, un nombre écrit chez elle, alors que ces
+ * marges-ci lui prenaient déjà soixante-huit points, plus la barre d'accueil.
+ *
+ * DEUX NOMBRES POUR LA MÊME CHOSE, ET L'UN DES DEUX SE TROMPE TOUJOURS. Ils
+ * n'en font plus qu'un : la modale les pose, la fiche les lit.
+ */
+export const ELEC_PLEIN_HAUT = 56;
+export const ELEC_PLEIN_BAS = 12;
+
 export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   container: {
     flex: 1,
@@ -1153,7 +1168,11 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   elecWrapPlein: { flex: 1, justifyContent: 'center' },
   elecPlein: { width: '100%' },
   // Plein écran, aux marges près : le pouce a besoin de la place.
-  modalBackdropPlein: { padding: 12, paddingTop: 56, justifyContent: 'flex-end' },
+  modalBackdropPlein: {
+    padding: ELEC_PLEIN_BAS,
+    paddingTop: ELEC_PLEIN_HAUT,
+    justifyContent: 'flex-end',
+  },
   // Diagnostic : un état d'abord — combien, et est-ce grave —, puis la
   // liste. L'ancienne fenêtre commençait par une consigne d'usage.
   // Le volet d'une pièce : son nom, le nombre de constats, un chevron qui
