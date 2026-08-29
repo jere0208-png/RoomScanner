@@ -22,12 +22,37 @@ import { SurprisePro } from './src/components/SurprisePro';
 import { AvisRecompense } from './src/components/AvisRecompense';
 import { AlerteHote } from './src/components/AlerteHote';
 import { AstuceHote } from './src/components/AstuceHote';
+import { GardeFou } from './src/components/GardeFou';
+import { usePannes } from './src/ui/journalPannes';
 import { PremierLancement } from './src/components/PremierLancement';
 import { usePremieresFois } from './src/store/premieresFois';
 import { useScanStore } from './src/store/scanStore';
 import { useAccountStore } from './src/store/accountStore';
 
+/**
+ * LE GARDE-FOU ENVELOPPE TOUT — voir `src/components/GardeFou.tsx`.
+ *
+ * Relevé du patron : « l'app a quitté plusieurs fois après des clics sur des
+ * meubles. Fais en sorte qu'on ait un diagnostic d'erreurs. »
+ *
+ * IL EST POSÉ AU-DESSUS DE TOUT, y compris du fournisseur de marges et du
+ * thème : ce qu'on veut attraper, c'est une panne qui pouvait venir de
+ * n'importe où — et un filet qui commence sous la branche cassée ne sert à
+ * rien.
+ *
+ * IL LIT L'ÉCRAN AU MOMENT DE LA PANNE, et directement dans le magasin : un
+ * composant de secours n'a pas le droit d'être abonné à quoi que ce soit,
+ * puisque l'abonnement est peut-être ce qui vient de tomber.
+ */
 export default function App() {
+  return (
+    <GardeFou ecran={() => useScanStore.getState().screen}>
+      <Application />
+    </GardeFou>
+  );
+}
+
+function Application() {
   const screen = useScanStore((s) => s.screen);
   const loadSaves = useScanStore((s) => s.loadSaves);
   const savesCharges = useScanStore((s) => s.savesCharges);
@@ -41,6 +66,7 @@ export default function App() {
   const chargerLesPremieresFois = usePremieresFois((s) => s.charger);
   const premierLancement = usePremieresFois((s) => s.charge && !s.vues.includes('accueil'));
   const marquerPremiere = usePremieresFois((s) => s.marquer);
+  const chargerLesPannes = usePannes((s) => s.charger);
 
   useEffect(() => {
     loadSaves();
@@ -54,6 +80,13 @@ export default function App() {
     */
     chargerLesPremieresFois();
     /*
+      ET LE JOURNAL DES PANNES, pour que le profil sache s'il a quelque chose
+      à montrer. Il est lu au lancement et non à l'ouverture du profil : une
+      pastille qui n'apparaît qu'après être entré dans la page ne dit à
+      personne qu'il faut y entrer.
+    */
+    chargerLesPannes();
+    /*
       LES PRIX GARDÉS REPRENNENT LEUR PLACE AU LANCEMENT.
 
       Sans réseau, et sans ouvrir le devis. La pastille du plan annonce un
@@ -66,7 +99,7 @@ export default function App() {
       // Rien de gardé, ou stockage illisible : les prix embarqués chiffrent,
       // comme ils l'ont toujours fait.
     });
-  }, [loadSaves, chargerCompte, chargerLesPremieresFois]);
+  }, [loadSaves, chargerCompte, chargerLesPremieresFois, chargerLesPannes]);
 
   /*
     LES PLANS DU COMPTE REDESCENDENT DÈS QUE LES DEUX SONT LÀ.

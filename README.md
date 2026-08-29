@@ -11865,6 +11865,120 @@ contraire. Ça se verrait, et exactement au pire moment.
 **Vingt-deux épreuves neuves** en tout, dont deux qui protègent contre un disque
 abîmé : une clé inventée est ignorée, un fichier illisible ne casse rien.
 
+### L'application ne se ferme plus sans rien dire
+
+Relevé du patron : « l'app a quitté plusieurs fois après des clics sur des
+meubles. **Fais en sorte qu'on ait un diagnostic d'erreurs.** »
+
+#### Pourquoi on n'en savait rien
+
+Une erreur JavaScript non rattrapée dans un **gestionnaire d'appui** — le doigt
+sur un meuble — ne passe **pas** par les frontières d'erreur de React :
+celles-ci n'attrapent que le *rendu*. Elle remonte au gestionnaire global de la
+plateforme, et en production elle est **fatale** : l'application se ferme. Sans
+console branchée, il ne reste rien — ni message, ni pile, ni même la certitude
+qu'il s'agissait d'un défaut du programme plutôt que d'un manque de mémoire.
+
+**Il faut donc les deux portes**, et c'est le point qu'on rate d'habitude : une
+frontière d'erreur seule n'aurait rien changé au cas décrit — on aurait ajouté
+un filet là où personne ne tombe.
+
+- **Le rendu** → une frontière d'erreur (`GardeFou`) ;
+- **le reste** → le gestionnaire global, qu'on **observe sans le remplacer**.
+  L'écraser couperait les rapports de plantage et le message rouge du mode
+  développement, c'est-à-dire les deux choses qui servent à déboguer, au nom
+  d'un outil censé aider à déboguer.
+
+#### Ce qu'on montre, et ce qu'on garde
+
+Un écran de secours qui dit ce qui s'est passé, donne le détail **en clair** —
+le cacher derrière un « afficher les détails » garantit qu'on ne le recevra
+jamais — et propose de **reprendre**.
+
+**Reprendre plutôt que redémarrer**, et c'est un choix. Après une erreur, l'état
+peut être bancal ; le réflexe prudent serait de tout remettre à zéro. Mais
+« tout remettre à zéro » veut dire **jeter le relevé en cours**, c'est-à-dire
+faire exactement le dégât qu'on cherche à éviter.
+
+Les dix derniers incidents sont **écrits sur le disque** — immédiatement, sans
+regroupement ni délai : une panne fatale ne laisse pas le temps d'une deuxième
+opération, et la seule panne qui compte serait justement celle qu'on perdrait.
+Ils se relisent dans **Profil → Diagnostic**, avec la date, l'écran et la pile,
+en texte **sélectionnable** : un diagnostic qu'on ne peut pas recopier ne sort
+pas du téléphone.
+
+L'enregistrement **ne peut pas échouer** — c'est sa seule vraie exigence. Une
+fonction de diagnostic qui lève une erreur pendant qu'on traite une erreur fait
+perdre la panne d'origine, et l'on se retrouve à chercher un défaut qui n'existe
+pas. Le banc lui envoie donc tout ce qu'un `throw` peut porter, objet
+auto-référent compris.
+
+**Un défaut trouvé en écrivant le banc** : la frontière rendait `null` depuis
+`getDerivedStateFromError`, c'est-à-dire « je n'ai pas changé d'état ». React
+redessine alors les enfants, qui relèvent la même erreur, et **il finit par la
+rejeter** — la frontière ne servait à rien. Elle bascule maintenant tout de
+suite avec le message ; `componentDidCatch` repasse derrière avec la pile.
+
+#### Et un trou qui explique très bien ce genre d'arrêt
+
+En relisant le chemin des meubles :
+
+```js
+if (width <= 0 || depth <= 0) return;
+```
+
+La garde paraît complète, et elle laisse passer **le pire des nombres** :
+`NaN <= 0` vaut **faux**. Un NaN traverse les deux conditions et s'écrit dans le
+meuble.
+
+Et un NaN ne reste pas où il est né : la largeur nourrit le dessin 2D, le volume
+3D, le métré et le PDF ; elle devient des coordonnées `NaN,NaN` dans un tracé
+SVG, et un tracé illisible fait tomber la couche native — **c'est-à-dire
+l'application, sans un mot**, exactement comme décrit.
+
+D'où peut-il venir ? Du **glissement**, le geste même du relevé : la poignée
+calcule le centre avec `t0[12] + dx` ; si la matrice d'un meuble n'a pas la
+longueur attendue — un scan bancal, un vieux plan relu —, `t0[12]` vaut
+`undefined`, et `undefined + dx` vaut NaN. `setObjectCenter` n'avait, lui,
+**aucune garde du tout**.
+
+**Ce n'est pas une preuve**, et il faut le dire ainsi : je n'ai pas la pile du
+plantage. C'est un trou réel, sur exactement le geste décrit, et il est bouché.
+
+**La leçon, et elle vaut partout :** une garde qui cherche ce qu'elle **refuse**
+laisse toujours passer NaN, parce que toute comparaison avec NaN est fausse. Une
+garde qui exige ce qu'elle **accepte** ne peut pas se tromper. `setObjectHeight`
+était écrite dans ce sens-là — `!(height > 0.05 && height <= 4)` — et elle, elle
+tenait ; un banc le vérifie, pour que la leçon soit lisible dans les deux sens.
+
+**Vingt et une épreuves** en tout, dont la garde posée **avant** l'historique :
+un geste refusé qui empile quand même un point d'annulation oblige à appuyer
+deux fois sur « Annuler » pour défaire une seule chose — et l'on croit que
+l'annulation est cassée.
+
+### Le bouton Apple était d'un noir qui n'appartenait à personne
+
+Relevé du patron, capture à l'appui : « le bouton Apple est noir différent ».
+
+Sa couleur était écrite en dur — `#0B0D12` —, et ce nombre-là n'est pas une
+couleur de marque : c'est **l'encre du thème clair**. Sur fond clair, un bouton
+noir : la règle d'Apple, et le dessin juste. Sur fond sombre, la page vaut
+`#0D1015` et le bouton `#0B0D12` — un noir **plus sombre que la page**, à un
+cheveu près. Il ne se lisait plus comme un bouton mais comme un trou, et c'était
+le seul des trois à ne pas avoir de contour pour le rattraper.
+
+Apple pose ce bouton en **noir ou en blanc**, jamais dans une nuance de la
+charte d'à côté, et l'on prend celui qui tranche. C'est ce qu'on ne suivait qu'à
+moitié.
+
+**L'épreuve mesure l'écart de clarté avec le fond**, pas la couleur : vérifier
+« il est blanc en sombre » n'empêcherait pas de le repeindre demain dans un gris
+de la palette. Ce qu'on veut n'est pas une teinte, c'est un contraste — et avant,
+en sombre, l'écart valait **un centième**.
+
+Le banc a trouvé au passage une **espace parasite** devant « Continuer avec
+Apple », invisible sur un texte centré.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

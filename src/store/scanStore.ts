@@ -790,6 +790,17 @@ const DEPOT_DELAI = 2000;
 /** Un dépôt en attente par plan : deux plans différents ne s'annulent pas. */
 const depots = new Map<string, ReturnType<typeof setTimeout>>();
 
+/**
+ * UNE COTE VALABLE : un nombre fini, strictement positif, et pas délirant.
+ *
+ * Douze mètres est la borne haute de tout ce qui se saisit dans cette
+ * application — un mur, un meuble, une pièce. Au-delà, ce n'est plus une
+ * faute de frappe, c'est un calcul qui a dérapé.
+ */
+function estUneCote(v: number): boolean {
+  return Number.isFinite(v) && v > 0 && v < 12;
+}
+
 function persistSoon(saves: SavedScan[]) {
   if (persistTimer) clearTimeout(persistTimer);
   persistTimer = setTimeout(() => {
@@ -5737,6 +5748,22 @@ export const useScanStore = create<ScanState>((set, get) => {
      * ça s'arrête pile contre le nu.
      */
     setObjectCenter: (id, x, z, auDoigt = false) => {
+      /*
+        IL N'Y AVAIT AUCUNE GARDE ICI, et c'est le chemin du GLISSEMENT —
+        celui qu'on emprunte en traînant un meuble du doigt.
+
+        La poignée calcule le nouveau centre avec `t0[12] + dx` : si la
+        matrice d'un meuble n'a pas la longueur attendue — un scan bancal, un
+        vieux plan relu —, `t0[12]` vaut `undefined`, et `undefined + dx`
+        vaut NaN. Personne ne s'en aperçoit avant le dessin, et le dessin
+        emporte l'application.
+
+        ELLE SE POSE AVANT `pushHistory` : un geste refusé qui empile quand
+        même un point d'annulation oblige à appuyer deux fois sur « Annuler »
+        pour défaire une seule chose — et l'on croit que l'annulation est
+        cassée.
+      */
+      if (!Number.isFinite(x) || !Number.isFinite(z)) return;
       pushHistory(`moveObject:${id}`);
       const st = get();
       const obj = st.objects.find((o) => o.id === id);
@@ -6182,7 +6209,26 @@ export const useScanStore = create<ScanState>((set, get) => {
     },
 
     resizeObject: (id, width, depth) => {
-      if (width <= 0 || depth <= 0) return;
+      /*
+        UNE COTE EST UN NOMBRE FINI ET POSITIF — et l'on EXIGE ça, on ne
+        refuse plus le contraire.
+
+        La garde d'avant s'écrivait `width <= 0 || depth <= 0`. Elle paraît
+        complète, et elle laissait passer LE pire des nombres : `NaN <= 0`
+        vaut FAUX. Un NaN traversait donc les deux conditions et s'écrivait
+        dans le meuble.
+
+        ET UN NaN NE RESTE PAS OÙ IL EST NÉ. La largeur nourrit le dessin 2D,
+        le volume 3D, le métré et le PDF ; elle devient des coordonnées
+        `NaN,NaN` dans un tracé SVG, et un tracé illisible fait tomber la
+        couche native — c'est-à-dire l'application, sans un mot.
+
+        LA LEÇON, ET ELLE VAUT PARTOUT : une garde qui cherche ce qu'elle
+        REFUSE laisse toujours passer NaN, parce que toute comparaison avec
+        NaN est fausse. Une garde qui exige ce qu'elle ACCEPTE ne peut pas se
+        tromper.
+      */
+      if (!estUneCote(width) || !estUneCote(depth)) return;
       pushHistory(`resize:${id}`);
       set({
         objects: get().objects.map((o) =>

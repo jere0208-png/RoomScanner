@@ -28,6 +28,8 @@ import { RetourGlisse } from '../components/RetourGlisse';
 import { MoreDots } from '../components/MoreDots';
 import { MenuCompte } from '../components/MenuCompte';
 import { SupportSheet } from '../components/SupportSheet';
+import { JournalSheet } from '../components/JournalSheet';
+import { usePannes } from '../ui/journalPannes';
 import { ThemeGlyph } from '../components/ThemeGlyph';
 import { ContourVif, TexteVif } from '../components/ContourVif';
 import { SOLAIRES } from '../ui/solaires';
@@ -88,6 +90,8 @@ export function ProfilScreen() {
   const saves = useScanStore((st) => st.saves);
   const compte = useAccountStore((st) => st.compte);
   const pro = useAccountStore((st) => st.pro);
+  const [journal, setJournal] = useState(false);
+  const incidents = usePannes((x) => x.incidents);
   const proVia = useAccountStore((st) => st.proVia);
   const plansUtilises = useAccountStore((st) => st.plansUtilises);
   const bonusEssais = useAccountStore((st) => st.bonusEssais);
@@ -335,10 +339,33 @@ export function ProfilScreen() {
           label="Confidentialité des données"
           onPress={() => setScreen('confidentialite')}
         />
+        {/*
+          LE DIAGNOSTIC — ce qui s'est passé quand l'application s'est arrêtée.
+
+          Relevé du patron : « l'app a quitté plusieurs fois après des clics
+          sur des meubles. Fais en sorte qu'on ait un diagnostic d'erreurs. »
+
+          IL VIT ICI, ET SEULEMENT ICI. Ce n'est pas un réglage et ça n'a rien
+          à faire dans un écran de travail : on ne va le chercher que quand
+          quelque chose s'est mal passé — et c'est là qu'on va chercher.
+
+          LE COMPTE EST ÉCRIT À CÔTÉ. Un « 3 » discret dit qu'il y a quelque
+          chose à lire ; sans lui, personne n'ouvrirait jamais cette page, et
+          le journal ne servirait qu'à ceux qui savent qu'il existe.
+        */}
+        <Rangee
+          s={s}
+          c={c}
+          icone="sirene"
+          label="Diagnostic"
+          note={incidents.length ? String(incidents.length) : undefined}
+          onPress={() => setJournal(true)}
+        />
       </ScrollView>
 
       <MenuCompte visible={menu} fermer={() => setMenu(false)} />
       <SupportSheet visible={support} fermer={() => setSupport(false)} />
+      <JournalSheet visible={journal} fermer={() => setJournal(false)} />
     </RetourGlisse>
   );
 }

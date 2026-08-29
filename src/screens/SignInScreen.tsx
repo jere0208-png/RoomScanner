@@ -136,7 +136,7 @@ export function SignInScreen() {
             accessibilityLabel="Continuer avec Apple"
             style={({ pressed }) => [s.btn, s.btnApple, pressed && s.enfonce]}
             onPress={viaApple}>
-            <Text style={s.btnAppleTexte}> Continuer avec Apple</Text>
+            <Text style={s.btnAppleTexte}>Continuer avec Apple</Text>
           </Pressable>
         </View>
         <View style={s.slot}>
@@ -238,8 +238,28 @@ const themed = (c: Palette) =>
       justifyContent: 'center',
     },
     enfonce: { transform: [{ scale: 0.97 }] },
-    btnApple: { backgroundColor: '#0B0D12' },
-    btnAppleTexte: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
+    /*
+      LE BOUTON APPLE EST NOIR SUR CLAIR, ET BLANC SUR SOMBRE.
+
+      Relevé du patron, capture à l'appui : « le bouton Apple est noir
+      différent ». Il l'était, et c'était un noir qui n'appartenait à
+      personne : `#0B0D12` écrit en dur, c'est-à-dire l'ENCRE DU THÈME
+      CLAIR. Sur fond clair, un bouton noir — la règle d'Apple, et le dessin
+      juste. Sur fond sombre, la page vaut `#0D1015` et le bouton
+      `#0B0D12` : un noir PLUS SOMBRE que la page, à un cheveu près. Il ne
+      se lisait plus comme un bouton mais comme un trou, et c'était le seul
+      des trois à ne pas avoir de contour pour le rattraper.
+
+      Apple pose ce bouton en NOIR ou en BLANC — jamais dans une nuance de la
+      charte d'à côté — et l'on prend celui qui tranche. C'est ce qu'on ne
+      suivait qu'à moitié.
+    */
+    btnApple: { backgroundColor: c === dark ? '#FFFFFF' : '#000000' },
+    btnAppleTexte: {
+      color: c === dark ? '#000000' : '#FFFFFF',
+      fontSize: 16,
+      fontWeight: '700',
+    },
     btnClair: {
       backgroundColor: c.surface,
       borderWidth: 1,
