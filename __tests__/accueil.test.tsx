@@ -49,6 +49,7 @@ import {
   PhoneShowcase,
 } from '../src/components/PhoneShowcase';
 import { GlowButton } from '../src/components/GlowButton';
+import { LightRibbon } from '../src/components/LightRibbon';
 import { ThemeGlyph } from '../src/components/ThemeGlyph';
 import { TexteVif } from '../src/components/ContourVif';
 import { useScanStore } from '../src/store/scanStore';
@@ -400,6 +401,70 @@ describe('l’accueil', () => {
     // Elle boucle : après un cycle complet, on est revenu au plan.
     act(() => jest.advanceTimersByTime(PERIODE * SHOWCASE_FRAMES));
     expect(visible()).toBe(apres);
+  });
+
+  /*
+   * LE RUBAN PASSE DERRIÈRE LA MAQUETTE, ET C'EST LA MAQUETTE QUI LE DIT.
+   *
+   * Relevé du patron : « les lignes derrière l'iPhone de l'accueil traversent
+   * l'iPhone, elles doivent être derrière. »
+   *
+   * LE RUBAN DEMANDAIT À RECULER au lieu que la maquette demande à avancer :
+   * il portait `zIndex: -1`. C'est le sens fragile des deux. Un `zIndex`
+   * négatif ne fait pas seulement passer derrière ses frères — il sort du plan
+   * de son parent, et ce que le parent compose ensuite (ici une opacité
+   * animée, l'apparition de l'accueil) peut le ramener devant.
+   *
+   * Ces épreuves tiennent les DEUX moitiés de la correction, parce que
+   * chacune a l'air suffisante toute seule : l'ordre du document, et le sens
+   * positif de l'empilement.
+   */
+  const styleDe = (n: { props: { style?: unknown } }) =>
+    (StyleSheet.flatten(n.props.style as never) ?? {}) as Record<string, number>;
+
+  it('le ruban est écrit AVANT la maquette', () => {
+    /*
+      L'ordre du document est la première moitié : à empilement égal, c'est
+      lui qui décide, et il ne dépend d'aucune subtilité de plateforme.
+    */
+    const t = monter();
+    const ordre: string[] = [];
+    const lire = (n: unknown): void => {
+      if (!n || typeof n !== 'object') return;
+      const o = n as { type?: unknown; children?: unknown[] };
+      if (o.type === LightRibbon) ordre.push('ruban');
+      if (o.type === PhoneShowcase) ordre.push('maquette');
+      (o.children ?? []).forEach(lire);
+    };
+    lire(t.root as unknown);
+    expect(ordre).toEqual(['ruban', 'maquette']);
+  });
+
+  it('et rien ne demande à RECULER : c’est la maquette qui avance', () => {
+    /*
+      La seconde moitié, et la vraie correction. On interdit le `zIndex`
+      négatif — celui qui sort du plan du parent — et l'on exige que la
+      maquette porte un empilement positif, `elevation` comprise : sur
+      Android, c'est elle qui décide de l'ordre de peinture, et un `zIndex`
+      seul y laisserait le ruban devant.
+    */
+    const t = monter();
+    const empilements = t.root
+      .findAllByType(View)
+      .map((n) => styleDe(n).zIndex)
+      .filter((z): z is number => typeof z === 'number');
+    expect(empilements.filter((z) => z < 0)).toEqual([]);
+
+    const porteur = t.root.findAll(
+      (n) =>
+        n.type === View &&
+        n.findAllByType(PhoneShowcase).length > 0 &&
+        typeof styleDe(n).zIndex === 'number',
+    );
+    expect(porteur.length).toBeGreaterThan(0);
+    const dessus = styleDe(porteur[porteur.length - 1]);
+    expect(dessus.zIndex).toBeGreaterThan(0);
+    expect(dessus.elevation).toBeGreaterThan(0);
   });
 
   /*

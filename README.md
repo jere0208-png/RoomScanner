@@ -11472,6 +11472,93 @@ pour une cadence, le flipbook les feuillette à une autre — réglés séparém
 cycle ne dure plus les cinq secondes annoncées, et personne ne le voit, parce que
 ça reste une jolie animation, simplement trop lente.
 
+### Trois défauts d'un même relevé
+
+#### La prise commandée allumait la lampe du voisin
+
+Relevé du patron : « j'ai lié une prise à un interrupteur (PC commandée) et au
+clic, ça allume la lumière alors qu'aucun lien avec cet interrupteur. »
+
+**Il décrivait exactement ce qui se passait, et la cause était ailleurs.** La vue
+3D cherchait ce qu'un interrupteur allume **uniquement dans la table du
+plafond**. L'interrupteur d'une prise commandée n'avait donc aucune lumière —
+donc **aucune cible**, puisqu'un appareil qui ne répond à rien n'en offre pas.
+
+Et comme la cible est volontairement **plus large que le symbole** — un mécanisme
+fait sept centimètres sur un mur de cinq mètres, on vise avec un doigt —, le
+doigt posé sur cet interrupteur muet **tombait dans la cible du voisin**. C'est
+l'autre interrupteur qui recevait l'appui, et c'est sa lampe qui s'allumait.
+« Aucun lien avec cet interrupteur » : exactement vrai.
+
+**Un défaut plus gros dormait à côté.** L'**applique** est un point lumineux, et
+elle est au mur : elle ne s'allumait donc **jamais**, quel que soit
+l'interrupteur touché. Personne ne l'avait relevé, et c'est logique — on n'essaie
+pas ce qui ne marche pas du tout, on essaie ce qui marche de travers.
+
+La règle, désormais : ce qui s'allume est ce que dit `seCommande` — les prises
+16 A et l'applique —, **plus** la table du plafond. Une seule liste, celle du
+modèle électrique, et non la seule table qui était à portée de main. Le halo d'un
+point mural vaut sept dixièmes de celui d'un plafonnier : une applique éclaire
+son pan, un plafonnier éclaire la pièce.
+
+**Neuf épreuves, sept rouges avant.**
+
+#### Le ruban traversait l'iPhone
+
+Relevé du patron : « les lignes derrière l'iPhone de l'accueil traversent
+l'iPhone, elles doivent être derrière. »
+
+**Le ruban demandait à reculer au lieu que la maquette demande à avancer** : il
+portait `zIndex: -1`. C'est le sens fragile des deux. Un `zIndex` négatif ne fait
+pas seulement passer derrière ses frères — il sort du plan de son parent, et ce
+que le parent compose ensuite (ici l'opacité animée de l'apparition de l'accueil)
+peut le ramener devant. Le sens positif ne demande rien à personne.
+
+L'ordre du document était déjà bon — **une des deux épreuves passait déjà**, et
+c'est honnête de le dire : la correction porte sur l'empilement, pas sur l'ordre.
+`elevation` accompagne `zIndex`, sinon Android laisserait le ruban devant. Le
+paywall portait le même `zIndex: -1` : corrigé aussi, même raison.
+
+#### Un mur s'étirait à distance, et ne se désélectionnait plus
+
+Relevé du patron : « la désélection d'un mur doit se faire si on clique hors de
+ce mur, hors même dans un vide ; s'il est proche du mur il ne se désélectionne
+pas. Aussi on doit pouvoir étirer la pièce en restant **sur** le mur — là je peux
+le faire à distance s'il est sélectionné. **Je pense qu'il y a un rapport avec la
+désélection qui ne se fait pas.** »
+
+**Il avait raison sur le rapport, et c'est la même ligne de code.**
+
+La zone de prise du mur choisi était sa **boîte englobante**, élargie de quinze
+points :
+
+```
+left: min(ax, bx) − 15,  width:  |bx − ax| + 30
+top:  min(ay, by) − 15,  height: |by − ay| + 30
+```
+
+Sur un mur horizontal ou vertical, c'est exactement la bande qu'on voulait —
+d'où le fait que le défaut a vécu si longtemps sans se voir. Sur un mur **en
+biais**, c'est un grand rectangle qui couvre tout ce que le segment traverse, et
+ce rectangle est **posé par-dessus le dessin**.
+
+De là viennent les deux symptômes à la fois :
+
+- on étire le mur en glissant **loin** de lui, puisque le vide de la boîte prend
+  le geste ;
+- on ne le désélectionne plus en touchant ce vide, puisque l'appui n'atteint
+  jamais le fond qui lâche la sélection.
+
+Un seul rectangle, deux symptômes. La zone est maintenant une **bande tournée** —
+longue comme le mur, épaisse de trente-quatre points. Ce qu'on attrape est ce
+qu'on voit.
+
+**Six épreuves, trois rouges avant**, et les trois vertes protègent l'acquis : la
+tolérance tient encore à douze points du trait (« s'il est proche du mur il ne se
+désélectionne pas »), la bande couvre le mur d'un bout à l'autre, et le mur droit
+n'a rien perdu. Le banc se joue sur une pièce **à pan coupé** : sur un logement
+tout en angles droits, le défaut est invisible par construction.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

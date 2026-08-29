@@ -4597,6 +4597,25 @@ export function SideHandle({
  * La zone de prise est le mur lui-même, élargie à trente points : c'est ce
  * qu'on voit, donc ce qu'on attrape. Le geste ne se rend pas au plan, sans
  * quoi les premiers pixels pousseraient le mur et le plan reprendrait tout.
+ *
+ * ET « LE MUR LUI-MÊME » N'ÉTAIT PAS LE MUR : C'ÉTAIT SA BOÎTE.
+ *
+ * Relevé du patron : « on doit pouvoir étirer la pièce mais en restant sur le
+ * mur et en le glissant — là je peux le faire à distance s'il est sélectionné.
+ * Je pense qu'il y a un rapport avec la désélection qui ne se fait pas. »
+ *
+ * Il avait raison sur le rapport, et c'est la même ligne. La zone était la
+ * BOÎTE ENGLOBANTE du segment, élargie de quinze points. Sur un mur droit,
+ * c'est exactement la bande qu'on voulait — d'où le fait que le défaut a vécu
+ * si longtemps. Sur un mur EN BIAIS, c'est un grand rectangle qui couvre tout
+ * ce que le segment traverse, et ce rectangle est POSÉ PAR-DESSUS le dessin.
+ *
+ * D'où les deux symptômes à la fois : on étire le mur en glissant loin de lui,
+ * et l'appui dans ce vide n'atteint jamais le fond qui lâche la sélection.
+ *
+ * La zone est maintenant une BANDE TOURNÉE — longue comme le mur, épaisse
+ * comme la tolérance. Ce qu'on attrape est ce qu'on voit, et le reste de
+ * l'écran redevient du fond.
  */
 function WallMoveHandle({
   wall,
@@ -4637,18 +4656,35 @@ function WallMoveHandle({
   );
   const a = mapping.toPx(wall.a);
   const b = mapping.toPx(wall.b);
+  /*
+    LA BANDE SE POSE À PLAT PUIS TOURNE, et l'ordre n'a rien d'arbitraire :
+    une vue tourne autour de SON centre. On la construit donc centrée sur le
+    milieu du mur, longue de sa longueur, épaisse de la tolérance — et la
+    rotation la couche sur le trait.
+
+    TRENTE-QUATRE POINTS D'ÉPAISSEUR : les trente d'avant, plus le trait. Un
+    mur fait quelques points de large à l'écran et l'on vise avec un doigt —
+    rétrécir la bande au trait la rendrait inattrapable, ce qui serait le
+    défaut inverse.
+  */
+  const EPAISSEUR = 34;
+  const cx = (a.x + b.x) / 2;
+  const cy = (a.y + b.y) / 2;
+  const len = Math.max(1, Math.hypot(b.x - a.x, b.y - a.y));
+  const angle = (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI;
   return (
     <View
       {...pan.panHandlers}
-      // Rien à dessiner : le mur est déjà là, sous le doigt. Seule la boîte
+      // Rien à dessiner : le mur est déjà là, sous le doigt. Seule la bande
       // se calcule, et elle change à chaque image du geste.
       style={[
         styles.wallGrab,
         {
-          left: Math.min(a.x, b.x) - 15,
-          top: Math.min(a.y, b.y) - 15,
-          width: Math.abs(b.x - a.x) + 30,
-          height: Math.abs(b.y - a.y) + 30,
+          left: cx - len / 2,
+          top: cy - EPAISSEUR / 2,
+          width: len,
+          height: EPAISSEUR,
+          transform: [{ rotate: `${angle}deg` }],
         },
       ]}
     />

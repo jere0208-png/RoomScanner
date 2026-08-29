@@ -200,7 +200,27 @@ export function HomeScreen() {
         <View style={styles.ruban} pointerEvents="none">
           <LightRibbon width={winW} palette={c} sombre={sombre} />
         </View>
-        <PhoneShowcase />
+        {/*
+          ET LA MAQUETTE EST DEVANT, DIT EXPLICITEMENT.
+
+          Relevé du patron : « les lignes derrière l'iPhone de l'accueil
+          traversent l'iPhone, elles doivent être derrière. »
+
+          LE RUBAN DEMANDAIT À RECULER, au lieu que la maquette demande à
+          avancer : il portait `zIndex: -1`. C'est le sens fragile des deux.
+          Un `zIndex` négatif ne fait pas seulement passer derrière ses
+          frères — il sort du plan de son parent, et ce que le parent
+          compose ensuite (une opacité animée, une ombre, un rognage) peut
+          le ramener devant. Le sens positif, lui, ne demande rien à
+          personne : la maquette est au-dessus, point.
+
+          On garde l'ordre du document — le ruban écrit avant — ET on lève
+          la maquette. Les deux disent la même chose, et il en faut deux :
+          l'ordre seul avait déjà l'air suffisant.
+        */}
+        <View style={styles.devant}>
+          <PhoneShowcase />
+        </View>
       </Animated.View>
 
       {supported === false && (
@@ -512,7 +532,9 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     marginVertical: 4,
   },
   /* Centré en hauteur sur la maquette, débordant des deux côtés : le ruban
-     doit sortir du cadre, sinon il paraît posé dans une boîte. */
+     doit sortir du cadre, sinon il paraît posé dans une boîte.
+
+     IL NE PORTE PLUS DE `zIndex` NÉGATIF — voir `devant` juste dessous. */
   ruban: {
     position: 'absolute',
     left: 0,
@@ -520,8 +542,14 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     top: '50%',
     marginTop: -RIBBON_H / 2,
     alignItems: 'center',
-    zIndex: -1,
   },
+  /**
+   * LA MAQUETTE PASSE DEVANT LE RUBAN, et c'est elle qui le dit.
+   *
+   * `elevation` accompagne `zIndex` : sur Android, c'est elle qui décide de
+   * l'ordre de peinture, et un `zIndex` seul y laisserait le ruban devant.
+   */
+  devant: { zIndex: 1, elevation: 1 },
   /** Appareil incompatible, ou erreur du scan : un bandeau, pas une alerte. */
   warning: {
     backgroundColor: '#FDECEC',

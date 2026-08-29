@@ -174,7 +174,15 @@ export function PaywallScreen() {
           <LightRibbon width={largeur} palette={c} sombre={c === dark} />
         </View>
 
+        {/*
+          LE CONTENU PASSE DEVANT LE RUBAN, et c'est lui qui le dit — le
+          ruban demandait à reculer (`zIndex: -1`), ce qui est le sens
+          fragile des deux : un `zIndex` négatif sort du plan de son parent,
+          et ce que le parent compose ensuite peut le ramener devant. Même
+          correction qu'à l'accueil, même raison.
+        */}
         <ScrollView
+          style={s.devant}
           contentContainerStyle={s.contenu}
           showsVerticalScrollIndicator={false}>
           {/*
@@ -430,8 +438,9 @@ const themed = (c: Palette) =>
       height: RIBBON_H,
       alignItems: 'center',
       opacity: 0.22,
-      zIndex: -1,
     },
+    /** Tout ce qui se lit passe devant le ruban. Voir `ruban`. */
+    devant: { zIndex: 1, elevation: 1 },
     // Le titre est en deux morceaux : l'encre annonce, l'or nomme.
     // Le « Passer en » est la MISE EN BOUCHE : plus petit que le nom, il
     // le laisse porter l'affiche. Serré dessus (interligne court), les

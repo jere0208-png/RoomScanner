@@ -216,6 +216,13 @@ const HALO_PART = 0.15;
  * n'importe quel zoom. Seul le plancher est utile : de très loin, on doit
  * encore voir QUELS appareils sont sur le départ.
  */
+/**
+ * LA PART DU HALO POUR UN POINT MURAL — applique, prise commandée.
+ *
+ * Une applique éclaire son pan de mur, un plafonnier éclaire la pièce : le
+ * même halo aux sept dixièmes dit cette différence sans qu'on ait à l'écrire.
+ */
+const HALO_MURAL = 0.7;
 const BAGUE_DEPART = 0.16;
 const BAGUE_MIN = 4;
 
@@ -1518,6 +1525,32 @@ export function Iso3DView({
           )
           .map((cl) => cl.id);
         /*
+          ET CE QUI S'ALLUME AU MUR — la prise commandée, l'applique.
+
+          RELEVÉ DU PATRON : « j'ai lié une prise à un interrupteur (PC
+          commandée) et au clic, ça allume la lumière alors qu'aucun lien avec
+          cet interrupteur. »
+
+          LE DÉFAUT ÉTAIT PIRE QUE CE QU'IL DISAIT. On ne cherchait ce qu'un
+          interrupteur allume QUE dans le plafond. L'interrupteur d'une prise
+          commandée n'avait donc AUCUNE lumière, donc AUCUNE cible — et comme
+          la cible est plus large que le symbole, le doigt tombait sur la cible
+          voisine la plus proche : l'autre interrupteur, dont la lampe
+          s'allumait. D'où le « aucun lien avec cet interrupteur », qui était
+          exactement vrai.
+
+          ET L'APPLIQUE ÉTAIT DANS LE MÊME CAS. C'est un point lumineux, il est
+          au MUR, et il ne s'allumait donc jamais — un défaut plus gros que
+          celui qui a été relevé, découvert en cherchant celui-là. Ce que dit
+          `seCommande` est la liste de ce qui s'allume depuis un interrupteur ;
+          c'est cette liste-là qu'on lit maintenant, et pas la seule table du
+          plafond.
+        */
+        for (const f of fixtures) {
+          if (mes.includes(f.id)) continue;
+          if ((f.commands ?? []).some((id) => mes.includes(id))) lampes.push(f.id);
+        }
+        /*
           ET SUR QUEL DÉPART EST-IL ?
 
           Un lot est ce qu'on voit sous une même plaque, et rien n'oblige ses
@@ -1548,6 +1581,29 @@ export function Iso3DView({
           departs,
           tableau: lot.some((f) => f.kind === 'tableau'),
         });
+        /*
+          CE LOT EST-IL COMMANDÉ ? Alors il peut s'allumer, et il lui faut une
+          place où poser son halo — au mur, là où il est.
+
+          LE HALO D'UN MUR EST PLUS PETIT que celui d'un plafond, et c'est
+          juste : une applique éclaire son pan, un plafonnier éclaire la pièce.
+          C'est une FRACTION du même halo et non un troisième nombre — deux
+          réglages indépendants finissent par se contredire au premier
+          changement d'échelle.
+        */
+        for (const f of lot) {
+          if ((f.commands ?? []).length === 0) continue;
+          posLampes.push({
+            id: f.id,
+            cx: qc.sx,
+            cy: qc.sy,
+            r:
+              Math.max(
+                HALO_MIN,
+                Math.min(HALO_PART * radius3d * scale, HALO_LAMPE * scale),
+              ) * HALO_MURAL,
+          });
+        }
         /*
           UN APPAREIL QUI NE RÉPOND À RIEN N'OFFRE AUCUNE CIBLE : un appui qui
           ne fait rien donne à l'écran l'air d'être en panne. Restent le
