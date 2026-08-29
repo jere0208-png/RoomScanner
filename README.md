@@ -11754,6 +11754,117 @@ voyait le lien écrit et n'avait aucun moyen de le rompre.
 **Douze épreuves** sur la fiche, toutes sur un module pur — donc rapides, et
 lisibles sans monter quatre mille lignes d'écran.
 
+### Ce que l'application ne disait pas, et ne fêtait pas
+
+Relevé du patron : « on doit penser utilisateur simple, sans professionnalisme
+forcément. **On doit rendre la chose ludique.** »
+
+#### Il manquait une façon de parler
+
+L'application en avait deux, et aucune ne convenait pour « au fait, vous pouvez
+toucher cet interrupteur ». L'**alerte** arrête tout et attend qu'on la referme
+— juste pour un échec. La **feuille** demande un choix. Manquait la troisième :
+celle qui dit une chose et s'en va.
+
+L'**astuce** est une pastille qui monte du bas, se lit en quatre secondes et
+repart. Elle ne demande rien, elle **ne prend jamais le doigt** — une pastille
+qui avale un appui, c'est un bouton manqué et quelqu'un qui ne comprend pas
+pourquoi — et sa seule cible est sa croix, pour qui a déjà lu.
+
+Deux détails qui coûtent cher quand on les oublie : les astuces **font la
+queue** au lieu de se cacher l'une l'autre, et **la même phrase ne s'empile pas
+sur elle-même** — deux gestes rapides la feraient passer deux fois de suite, ce
+qui se lit comme un défaut d'affichage.
+
+L'attente est une **animation**, pas un minuteur : `Animated.delay` vit dans la
+même séquence que l'entrée et la sortie, donc tout s'arrête ensemble si le
+composant se démonte. Un `setTimeout` à côté survivrait et fermerait une astuce
+déjà remplacée.
+
+#### Le geste caché : on touche un interrupteur, la lumière s'allume
+
+C'est le seul geste de l'application qui fasse sourire, et **rien ne disait
+qu'il existait** : celui qui ne l'avait pas trouvé par hasard ne le trouvait
+jamais.
+
+Il se dit maintenant **au moment où il devient vrai** — quand on vient de nouer
+un lien — et pas à l'ouverture de l'écran. Avant qu'un lien existe, la phrase ne
+veut rien dire : on toucherait un interrupteur qui ne commande rien, il ne se
+passerait rien, et **une astuce qui ment une fois n'est plus lue**.
+
+#### Trois moments qui ne se fêtaient pas
+
+- **Le relevé qui aboutit.** C'est LE moment de l'application — celui où l'on
+  découvre ce que le balayage a donné — et le plan s'ouvrait sans un mot. Deux
+  nombres : combien de pièces, combien de mètres carrés. Posé dans le chemin du
+  scan et non dans l'écran du plan, parce que trois chemins y mènent — un scan
+  neuf, un étage, un passage complémentaire — et que l'écran ne saurait pas d'où
+  l'on vient. Rien n'est dit si le relevé n'a donné aucune pièce : une fête sur
+  un plan vide serait une moquerie.
+- **Le premier plan enregistré.** Mesuré sur une **augmentation**, jamais sur un
+  total : se contenter de « il y a au moins un plan » féliciterait, à la
+  première ouverture après une mise à jour, quelqu'un qui en a déjà dix.
+- **Le total du devis.** Voir ci-dessous — c'est le seul des trois qui m'a fait
+  faire une erreur.
+
+#### La fête qui m'a fait fausse route
+
+Premier dessin : **le total montait de zéro** à son montant en sept dixièmes de
+seconde, avec un ralenti à l'arrivée. C'était joli, et c'était une faute.
+
+Le total est le nombre **le plus éprouvé de l'application** : quatre bancs le
+lisent en toutes lettres, et le prochain le lira aussi. Le faire dépendre du
+temps, c'est demander à chaque épreuve, pour toujours, de savoir qu'il faut
+avancer les horloges avant de lire un prix — et celui qui l'ignorera lira
+« 0,00 € » sans comprendre pourquoi.
+
+**Deux bancs sont tombés à l'écriture. Ils avaient raison.** Le chiffre ne bouge
+plus : c'est sa **ligne** qui arrive, d'un dixième plus petite, avec un ressort.
+Même « ta-da » — l'œil suit un mouvement à l'endroit du chiffre — et la valeur
+est lisible à la première image, pour l'utilisateur comme pour les bancs.
+
+La leçon est écrite dans le fichier parce qu'elle se représentera : **ce qui se
+mesure ne s'anime pas ; on anime ce qui le porte.**
+
+#### Le premier lancement ne racontait rien
+
+L'application s'ouvrait sur un bouton « Commencer le scan », et rien d'autre. Un
+électricien sait ce qu'il va y trouver ; quelqu'un qui vient refaire son
+appartement voit un bouton qui lance sa caméra, sans savoir ni ce qu'il doit
+balayer, ni ce qu'il obtiendra. C'est le moment où l'on décide si l'on continue,
+et c'était le seul écran muet.
+
+**Trois cartes, et pas un octet de plus.** Les images sont celles de la
+**vitrine** — les cent vingt images cuites au build qui tournent déjà derrière
+l'accueil. On en prend trois, une par temps fort.
+
+C'est plus qu'une économie, c'est une garantie de justesse : ces images sortent
+de la **même géométrie** que l'application. Une capture d'écran refaite à la main
+vieillirait au premier changement de dessin, et personne ne s'en apercevrait —
+l'accueil montrerait une application qui n'existe plus. Un banc le tient.
+
+Trois cartes et pas cinq : la vitrine raconte cinq temps parce qu'elle a cinq
+secondes et personne à retenir. Ici, chaque carte est un appui à donner. On garde
+ce qu'on **fait**, ce qu'on **pose**, ce qu'on **emporte**. Et l'on peut passer à
+tout moment — trois cartes, c'est court, et c'est justement pour ça qu'on peut
+les sauter : retenir quelqu'un devant une présentation est le meilleur moyen
+qu'il n'en lise aucune.
+
+#### Les premières fois
+
+Un magasin à part (`premieresFois`), et non un champ du compte : ces marques
+appartiennent à **l'appareil** et ne se synchronisent pas. Quelqu'un qui se
+reconnecte ne veut pas revoir la présentation ; quelqu'un qui installe l'app sur
+un nouveau téléphone, si.
+
+Le détail qui compte : **rien n'est neuf tant que le disque n'a pas répondu.**
+Au démarrage la liste est vide et tout paraîtrait neuf — on montrerait la
+présentation à chaque lancement, une demi-seconde avant que le disque ne dise le
+contraire. Ça se verrait, et exactement au pire moment.
+
+**Vingt-deux épreuves neuves** en tout, dont deux qui protègent contre un disque
+abîmé : une clé inventée est ignorée, un fichier illisible ne casse rien.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

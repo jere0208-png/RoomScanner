@@ -147,6 +147,8 @@ import {
 import { alerte } from '../ui/alerte';
 import { panne as expliquer } from '../ui/panne';
 import { ficheElec, motDuLien } from './result/ficheElec';
+import { astuce } from '../ui/astuce';
+import { usePremieresFois } from '../store/premieresFois';
 
 type Tab = '2d' | '3d';
 
@@ -839,6 +841,54 @@ export function ResultScreen() {
    */
   const [pendingLienMur, setPendingLienMur] = useState<string | null>(null);
   const lierElements = useScanStore((st) => st.lierElements);
+  /*
+   * ─────────────────────────────────────────────────────────────────────
+   * LES DEUX CHOSES QU'ON NE DIT QU'UNE FOIS.
+   *
+   * Relevé du patron : « on doit rendre la chose ludique. »
+   */
+  const premiereFois = usePremieresFois();
+
+  /**
+   * LE GESTE CACHÉ, DIT AU MOMENT OÙ IL DEVIENT VRAI.
+   *
+   * On touche un interrupteur sur la maquette 3D et la lumière s'allume.
+   * C'est le seul geste de l'application qui fasse sourire, et RIEN ne disait
+   * qu'il existait : celui qui ne l'avait pas trouvé par hasard ne le
+   * trouvait jamais.
+   *
+   * ON LE DIT QUAND ON VIENT DE NOUER UN LIEN, et pas à l'ouverture de
+   * l'écran : avant qu'un lien existe, la phrase ne veut rien dire — on
+   * toucherait un interrupteur qui ne commande rien, et il ne se passerait
+   * rien. Une astuce qui ment une fois n'est plus lue.
+   */
+  const apresUnLien = useCallback(() => {
+    if (!premiereFois.estNeuve('allumer')) return;
+    premiereFois.marquer('allumer');
+    astuce(
+      'Sur la vue 3D, touchez cet interrupteur : ce qu’il commande s’allume.',
+      { icone: 'appareil' },
+    );
+  }, [premiereFois]);
+
+  /**
+   * LE PREMIER PLAN ENREGISTRÉ — le seul moment où l'application se réjouit.
+   *
+   * ON LE MESURE SUR UNE AUGMENTATION, jamais sur un total. Se contenter de
+   * « il y a au moins un plan » ferait féliciter, à la première ouverture
+   * après une mise à jour, quelqu'un qui en a déjà dix — et une félicitation
+   * qui tombe à côté est pire que pas de félicitation du tout.
+   */
+  const combienDePlans = useRef<number | null>(null);
+  useEffect(() => {
+    const avant = combienDePlans.current;
+    combienDePlans.current = saves.length;
+    if (avant === null || saves.length <= avant) return;
+    if (!premiereFois.estNeuve('planGarde')) return;
+    premiereFois.marquer('planGarde');
+    astuce('Votre premier logement est dans la poche.', { fete: true });
+  }, [saves.length, premiereFois]);
+
   /**
    * LA FICHE D'UN APPAREIL, HORS ÉDITION.
    *
@@ -3294,6 +3344,7 @@ export function ResultScreen() {
                 if (lierElements(pendingLienMur, id)) {
                   haptic('succes');
                   setPendingLienMur(null);
+                  apresUnLien();
                 } else {
                   haptic('alerte');
                   setMenu(refusDeLien(() => setPendingLienMur(null)));
@@ -3397,6 +3448,7 @@ export function ResultScreen() {
                 if (lierElements(pendingLienMur, id)) {
                   haptic('succes');
                   setPendingLienMur(null);
+                  apresUnLien();
                 } else {
                   haptic('alerte');
                   setMenu(refusDeLien(() => setPendingLienMur(null)));
@@ -3413,6 +3465,7 @@ export function ResultScreen() {
                   }
                   haptic('succes');
                   setPendingLink(null);
+                  apresUnLien();
                 } else {
                   // Une prise n'allume rien : on le dit, plutôt que de
                   // tracer un lien qui n'existe pas dans la réalité.

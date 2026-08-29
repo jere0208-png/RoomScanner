@@ -1,6 +1,8 @@
 import { useEffect } from 'react';
 import { RoomScan, scanEvents, type ScanUpdate } from 'react-native-room-scan';
 import { useScanStore } from '../store/scanStore';
+import { roomSurface } from '../geometry/floorplan';
+import { astuce } from '../ui/astuce';
 import { useAccountStore } from '../store/accountStore';
 
 /** Instructions RoomPlan (enum Swift) → libellés français. */
@@ -97,6 +99,29 @@ export function useRoomScan() {
   }, []);
 
   /** Démarre réellement la session (caméra déjà accordée). */
+/**
+ * LE RÉSUMÉ D'UN RELEVÉ QUI VIENT D'ABOUTIR.
+ *
+ * On compte les pièces et l'on additionne leurs surfaces. Si le relevé n'a
+ * rien donné de nommable — un balayage trop court, un couloir seul — on ne dit
+ * rien : une fête sur un plan vide serait une moquerie.
+ */
+function resumerLeReleve() {
+  const st = useScanStore.getState();
+  const pieces = st.rooms.length;
+  if (pieces === 0) return;
+  const aire = st.rooms.reduce((total, r) => {
+    const murs = st.walls.filter((w) => w.roomId === r.id);
+    return total + (roomSurface(murs)?.area ?? 0);
+  }, 0);
+  const m2 = Math.round(aire);
+  astuce(
+    `${pieces} pièce${pieces > 1 ? 's' : ''} relevée${pieces > 1 ? 's' : ''}` +
+      (m2 > 0 ? ` · ${m2} m²` : ''),
+    { icone: 'rooms', fete: true },
+  );
+}
+
   const begin = async () => {
     store.setError(null);
     store.beginScan();
@@ -162,6 +187,21 @@ export function useRoomScan() {
         } else {
           useScanStore.getState().finalize(result);
         }
+        /*
+          CE QU'ON VIENT DE TROUVER, DIT TOUT DE SUITE.
+
+          Relevé du patron : « on doit rendre la chose ludique. » C'est LE
+          moment de l'application — celui où l'on découvre ce que le balayage
+          a donné —, et le plan s'ouvrait sans un mot. Deux nombres suffisent :
+          combien de pièces, combien de mètres carrés. C'est court, c'est vrai,
+          et c'est exactement ce qu'on cherche des yeux en arrivant.
+
+          ELLE EST POSÉE ICI, ET NON DANS L'ÉCRAN DU PLAN. Trois chemins
+          mènent au même endroit — un scan neuf, un étage de plus, un passage
+          complémentaire — et ils convergent trois lignes plus haut. L'écran,
+          lui, ne saurait pas d'où l'on vient.
+        */
+        resumerLeReleve();
       } catch (e: any) {
         store.setProcessing(false);
         store.setComplement(false);

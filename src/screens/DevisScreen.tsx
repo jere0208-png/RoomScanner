@@ -59,6 +59,7 @@ import { BackChevron } from '../components/BackChevron';
 import { RetourGlisse } from '../components/RetourGlisse';
 import { FloorplanEditor } from '../components/FloorplanEditor';
 import { DevisAttention } from '../components/DevisAttention';
+import { TotalQuiMonte } from '../components/TotalQuiMonte';
 import { cleDeLigne, type Devis, type LigneDevis, type LigneLegende } from '../geometry/devis';
 import { chiffrerLePlan } from '../geometry/devisplan';
 import { CEILINGS, CEILING_SYMBOL, type CeilingKind } from '../geometry/ceiling';
@@ -905,7 +906,16 @@ export function DevisScreen() {
             <View style={styles.decoupe} />
             <View style={styles.rayon}>
               <Text style={styles.totalNom}>TOTAL TTC</Text>
-              <Text style={styles.total}>{euros(devis.total)}</Text>
+              {/*
+                LE SEUL NOMBRE POUR LEQUEL ON EST VENU — il monte au lieu de
+                paraître. Voir `TotalQuiMonte` : sept dixièmes de seconde,
+                et il ralentit en arrivant pour dire qu'il est arrivé.
+              */}
+              <TotalQuiMonte
+                valeur={devis.total}
+                format={euros}
+                style={styles.total}
+              />
             </View>
             {/*
               LE SEUL MALENTENDU QUI PUISSE COÛTER CHER À QUELQU'UN.

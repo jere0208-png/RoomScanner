@@ -21,6 +21,9 @@ import { EssaiEpuise } from './src/components/EssaiEpuise';
 import { SurprisePro } from './src/components/SurprisePro';
 import { AvisRecompense } from './src/components/AvisRecompense';
 import { AlerteHote } from './src/components/AlerteHote';
+import { AstuceHote } from './src/components/AstuceHote';
+import { PremierLancement } from './src/components/PremierLancement';
+import { usePremieresFois } from './src/store/premieresFois';
 import { useScanStore } from './src/store/scanStore';
 import { useAccountStore } from './src/store/accountStore';
 
@@ -35,9 +38,21 @@ export default function App() {
   const c = useTheme();
   const darkContent = screen !== 'scan' && c.bg === '#F6F7F9';
 
+  const chargerLesPremieresFois = usePremieresFois((s) => s.charger);
+  const premierLancement = usePremieresFois((s) => s.charge && !s.vues.includes('accueil'));
+  const marquerPremiere = usePremieresFois((s) => s.marquer);
+
   useEffect(() => {
     loadSaves();
     chargerCompte();
+    /*
+      CE QU'ON N'A PAS ENCORE DIT, LU AU LANCEMENT.
+
+      Tant que le disque n'a pas répondu, RIEN n'est neuf (voir `estNeuve`) :
+      c'est le sens prudent, et il évite de montrer une visite guidée une
+      demi-seconde avant que le disque ne dise qu'on l'a déjà vue.
+    */
+    chargerLesPremieresFois();
     /*
       LES PRIX GARDÉS REPRENNENT LEUR PLACE AU LANCEMENT.
 
@@ -51,7 +66,7 @@ export default function App() {
       // Rien de gardé, ou stockage illisible : les prix embarqués chiffrent,
       // comme ils l'ont toujours fait.
     });
-  }, [loadSaves, chargerCompte]);
+  }, [loadSaves, chargerCompte, chargerLesPremieresFois]);
 
   /*
     LES PLANS DU COMPTE REDESCENDENT DÈS QUE LES DEUX SONT LÀ.
@@ -142,12 +157,30 @@ export default function App() {
       {screen === 'camera' && <CameraScreen />}
       <PaywallScreen />
       <EssaiEpuise />
+      {/*
+        LE PREMIER LANCEMENT, ET RIEN QU'UNE FOIS.
+
+        Il ne se montre que sur l'ACCUEIL : quelqu'un qui a un scan en cours
+        — l'application rouverte au milieu d'un relevé — n'a pas à recevoir
+        une présentation par-dessus son travail.
+      */}
+      {screen === 'home' && premierLancement && (
+        <PremierLancement onFini={() => marquerPremiere('accueil')} />
+      )}
       <SurprisePro />
       <AvisRecompense />
       {/* Nos alertes à nous : voir `src/ui/alerte.ts`. Montée ici parce
           qu'un message d'erreur doit survivre à l'écran qui l'a levé — on
           apprend souvent EN QUITTANT qu'un enregistrement a échoué. */}
       <AlerteHote />
+      {/*
+        ET LE MOT QUI PASSE — voir `src/ui/astuce.ts`. Monté ici pour la même
+        raison que l'alerte : une astuce naît là où le geste se produit, et
+        l'écran qui l'a levée peut disparaître avant elle. C'est même le cas
+        de la plus importante, celle du plan qu'on vient d'enregistrer juste
+        avant de sortir.
+      */}
+      <AstuceHote />
     </SafeAreaProvider>
   );
 }
