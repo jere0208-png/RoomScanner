@@ -11281,6 +11281,22 @@ son `act` final est ASYNCHRONE : avancer les minuteurs déclenche la promesse de
 vérification, mais sa résolution attend la micro-tâche suivante. Le premier jet
 mesurait la page d'attente en croyant lire le ticket.
 
+### Le plan du devis perd ses points cardinaux
+
+Relevé du patron : « sur le plan 2D affiché dans le devis, enlève les points
+cardinaux ».
+
+Il a raison, et la raison est écrite dans le titre posé au-dessus de ce plan :
+**« D'où viennent ces quantités »**. Ce plan-là ne sert pas à s'orienter sur un
+chantier — il sert à relier un chiffre du ticket à un dessin. La couronne des
+points cardinaux répond à une question que personne ne se pose devant un devis,
+et sur une vignette de cette taille elle prend les quatre coins.
+
+Le composant est le même que celui de l'écran de résultat ; c'est le devis qui
+lui dit de se taire (`showNorth={false}`). **Le plan de l'écran de résultat les
+garde**, lui : c'est là qu'on cherche le nord, et une épreuve le vérifie —
+sinon on aurait pu les retirer partout sans que rien ne le dise.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

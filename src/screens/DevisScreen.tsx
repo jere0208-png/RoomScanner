@@ -941,6 +941,17 @@ export function DevisScreen() {
               <View style={styles.plan}>
                 <FloorplanEditor
                   showMeasures={false}
+                  /*
+                    PAS DE POINTS CARDINAUX ICI — relevé du patron.
+
+                    Le titre au-dessus dit à quoi sert ce plan : « D'où
+                    viennent ces quantités ». Il ne sert pas à s'orienter sur
+                    un chantier, il sert à relier un chiffre du ticket à un
+                    dessin. La couronne répond à une question que personne ne
+                    se pose devant un devis, et sur une vignette de cette
+                    taille elle prend les quatre coins.
+                  */
+                  showNorth={false}
                   editable={false}
                   selectedWallId={null}
                   onSelectWall={() => {}}

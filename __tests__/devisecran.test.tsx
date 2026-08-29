@@ -44,6 +44,7 @@ import TestRenderer, { act } from 'react-test-renderer';
 import { DevisPastille, prixCourt } from '../src/components/DevisPastille';
 import { DevisScreen } from '../src/screens/DevisScreen';
 import { FloorplanEditor } from '../src/components/FloorplanEditor';
+import { CardinalRing, NorthBadge } from '../src/components/CardinalRing';
 import { chiffrerLePlan } from '../src/geometry/devisplan';
 import { postsSymbol, type Fixture, type FixtureKind } from '../src/geometry/electrical';
 import { GAMMES } from '../src/geometry/prix';
@@ -678,6 +679,54 @@ describe('les vignettes du ticket', () => {
     expect(t.root.findAllByType(FloorplanEditor).length).toBe(1);
     const lus = mots(t);
     expect(lus).toContain('D’où viennent ces quantités');
+  });
+
+  it('mais SANS les points cardinaux', async () => {
+    /*
+      RELEVÉ DU PATRON : « sur le plan 2D affiché dans le devis, enlève les
+      points cardinaux ».
+
+      Il a raison, et la raison est dans le titre au-dessus du plan : « D'où
+      viennent ces quantités ». Ce plan-là ne sert pas à s'orienter sur un
+      chantier — il sert à relier un chiffre du ticket à un dessin. La
+      couronne des points cardinaux répond à une question que personne ne se
+      pose devant un devis, et sur une vignette de cette taille elle prend
+      les quatre coins.
+
+      LE PLAN DE L'ÉCRAN DE RÉSULTAT LES GARDE, lui : c'est le même composant,
+      et c'est là qu'on cherche le nord.
+    */
+    const t = await auTicket();
+    expect(t.root.findAllByType(CardinalRing)).toHaveLength(0);
+    expect(t.root.findAllByType(NorthBadge)).toHaveLength(0);
+  });
+
+  it('et le plan les montre toujours quand on ne les lui retire pas', () => {
+    /*
+      LE CONTRÔLE EN SENS INVERSE, et il porte le correctif : sans lui, on
+      aurait pu retirer les points cardinaux du composant LUI-MÊME — donc
+      partout, y compris sur l'écran de résultat où l'on cherche le nord — et
+      l'épreuve du dessus serait passée au vert.
+
+      Le même plan, monté sans consigne, les porte.
+    */
+    let seul!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      seul = TestRenderer.create(
+        <FloorplanEditor
+          showMeasures={false}
+          editable={false}
+          selectedWallId={null}
+          onSelectWall={() => {}}
+        />,
+      );
+    });
+    mesurer(seul);
+    expect(
+      seul.root.findAllByType(CardinalRing).length +
+        seul.root.findAllByType(NorthBadge).length,
+    ).toBeGreaterThan(0);
+    act(() => seul.unmount());
   });
 });
 
