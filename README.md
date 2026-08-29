@@ -12182,6 +12182,87 @@ mesurés, mais sur l'emprise du quadrilatère — en axonométrie, un mur *court
 l'écran, et sa base seule occupe déjà soixante-dix points de haut. C'est l'arête
 verticale qu'on mesure maintenant, et elle seule.
 
+### La feuille devient une feuille
+
+Relevé du patron devant l'accueil épuré : « il y a trop d'espace inutilisé,
+propose des idées. » Puis, sur la proposition retenue : « essaye le tracé, mais
+affiche *Pas de scan ? Tracez avec votre doigt.* en titre bien placé. »
+
+#### L'idée écartée, et pourquoi elle l'a été
+
+La réponse facile était d'y mettre **les derniers plans** : une carte avec la
+vignette du dernier relevé, sa surface, un bouton « Ouvrir ». La bibliothèque
+sait déjà tout dessiner, le coût était nul, et ça supprimait le détour
+*Accueil → Mes scans → chercher*.
+
+Le patron l'a écartée d'une phrase : « **il faut penser aux nouveaux qui n'ont
+pas de plan** ». Une idée qui ne marche qu'au bout de trois relevés n'est pas
+une idée — c'est un écran à deux états dont le premier est vide.
+
+#### Ce qui la remplace : le papier retrouve sa fonction
+
+Le vide arrête d'être un fond. **On y trace sa pièce du doigt** : un carreau
+vaut vingt-cinq centimètres, les cotes s'écrivent pendant le geste, et l'on
+arrive dans l'éditeur avec sa première pièce **déjà posée**.
+
+C'est le **même écran au premier lancement et au centième** : rien à avoir, rien
+à accumuler. Et ce n'est pas un objet de plus posé sur l'écran — on venait
+justement d'en retirer un, la maquette d'iPhone. C'est le quadrillage qui cesse
+d'être décoratif : une feuille à carreaux sert à tracer, et l'échelle en fait
+une **règle graduée**.
+
+**Ce que ça raccourcit.** « Dessiner un plan » ouvre un plan *vide* : il faut
+ensuite ajouter une pièce, choisir sa taille, la poser — deux écrans avant le
+premier trait. Ici, le premier trait **est** le geste d'entrée.
+
+#### Trois décisions qui se défendent
+
+**Deux gestes, pas un.** Ouvrir directement au relâcher serait plus vif — et
+l'accueil est un écran qu'on touche pour autre chose. Se retrouver dans
+l'éditeur pour avoir effleuré le fond serait le pire défaut que ce geste puisse
+avoir. Le rectangle reste donc affiché avec ses cotes, un bouton le confirme, et
+un tracé raté se refait par-dessus. Un doigt simplement posé n'efface même pas
+l'invitation.
+
+**Les cotes se collent au carreau.** On est sur du papier millimétré : un
+rectangle qui s'arrête entre deux traits n'a pas de sens, et « 1,03 m » sur un
+geste au doigt est une **fausse précision** qu'on paierait plus tard en la
+croyant. On rend des quarts de mètre, et l'éditeur laisse taper la vraie cote
+juste après — là où c'est le métier de le faire.
+
+**L'échelle borne le geste, et c'est assumé.** La feuille fait trois mètres et
+demi de large : on y trace une chambre, pas un séjour de six. Ce tracé sert à
+*démarrer*, pas à coter.
+
+Et la feuille a des bords, même fondus : un doigt qui sort du cadre ne fait pas
+grandir la pièce sous les boutons. **On borne le point courant, pas le
+rectangle** — borner le rectangle après coup ferait sauter le coin qu'on tient.
+
+#### L'épreuve qui compte le plus
+
+**Le palier gratuit est consulté ici aussi.** Une passe entière a déjà trouvé
+*cinq* portes qui créaient un plan sans consulter la règle — trois boutons
+d'étage et deux gestes de copie. Une troisième entrée qui l'oublierait rouvrirait
+exactement ce trou, et personne ne s'en apercevrait avant que quelqu'un ne relève
+dix logements gratuitement. Un banc le tient : palier épuisé, le tracé n'ouvre
+rien et c'est **l'offre** qui paraît — pas un refus.
+
+**Treize épreuves neuves**, dont deux contrôles en sens inverse : un simple appui
+ne trace rien, et une pièce sous trois carreaux ne propose pas de s'ouvrir —
+puisque le magasin refuse déjà tout rectangle sous un demi-mètre, on ne propose
+pas un geste dont on sait qu'il ne fera rien.
+
+**Et deux bancs se sont corrigés eux-mêmes**, encore : le premier ne lisait que
+les `Text` de React Native et concluait qu'aucune cote n'était écrite — elles
+sont dessinées *dans* le SVG, c'est ce qui leur permet de suivre le rectangle au
+point près. Le second ne mesurait qu'une seule zone de l'écran alors qu'il y en a
+deux, le fond et la feuille : trois épreuves accusaient le composant alors que
+c'est le banc qui n'avait rien mesuré.
+
+**« Dessiner un plan » est resté.** Il est désormais redondant — le tracé fait la
+même chose en plus court — mais le retirer n'a pas été demandé, et c'est une
+porte documentée et éprouvée. Elle part sur un mot.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

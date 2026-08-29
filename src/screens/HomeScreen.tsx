@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { TexteVif } from '../components/ContourVif';
 import {
   Animated,
@@ -25,6 +25,7 @@ import { GlowButton } from '../components/GlowButton';
 import { LogoMark } from '../components/LogoMark';
 import { AvatarGlyph } from '../components/AvatarGlyph';
 import { Quadrillage } from '../components/Quadrillage';
+import { TraceUnePiece } from '../components/TraceUnePiece';
 import { useScanStore } from '../store/scanStore';
 import { useAccountStore } from '../store/accountStore';
 import { useRoomScan } from '../native/useRoomScan';
@@ -113,6 +114,35 @@ export function HomeScreen() {
       w: e.nativeEvent.layout.width,
       h: e.nativeEvent.layout.height,
     });
+
+  const [feuille, setFeuille] = useState({ w: 0, h: 0 });
+  /**
+   * LA PIÈCE TRACÉE OUVRE UN PLAN, avec elle dedans.
+   *
+   * `commencerAuClavier` ouvrait un plan VIDE : il fallait ensuite ajouter une
+   * pièce, choisir sa taille, la poser — deux écrans avant le premier trait.
+   * Le rectangle qu'on vient de tracer est posé dans la foulée, et l'on arrive
+   * sur son plan.
+   *
+   * LE PALIER GRATUIT SE JUGE ICI AUSSI, exactement comme sur les deux autres
+   * portes : un plan tracé à la main est un plan, et il compte comme tel. Une
+   * troisième entrée qui l'oublierait rouvrirait le trou que la passe sur le
+   * palier avait bouché — cinq portes créaient un plan sans consulter la
+   * règle.
+   */
+  const tracerLaPiece = useCallback(
+    (largeur: number, profondeur: number) => {
+      if (!peutCreerPlan()) {
+        ouvrirSurprise();
+        return;
+      }
+      commencerAuClavier();
+      useScanStore
+        .getState()
+        .addRoomRect({ x: 0, z: 0 }, { x: largeur, z: profondeur });
+    },
+    [peutCreerPlan, ouvrirSurprise, commencerAuClavier],
+  );
 
   // Fondu en cascade : chaque bloc apparaît juste après le précédent.
   const fadeIn = (i: number) => {
@@ -232,7 +262,36 @@ export function HomeScreen() {
         du papier quadrillé. Un écran d'accueil épuré n'a rien à montrer — il
         a une marque, une promesse et deux portes.
       */}
-      <View style={styles.respiration} pointerEvents="none" />
+      {/*
+        LA FEUILLE SERT À TRACER — voir `TraceUnePiece`.
+
+        Relevé du patron : « il y a trop d'espace inutilisé », puis « essaye le
+        tracé ». Le vide arrête d'être un fond : on y dessine sa pièce du
+        doigt, un carreau vaut vingt-cinq centimètres, et l'on arrive dans
+        l'éditeur avec sa première pièce DÉJÀ posée.
+
+        ET C'EST LE MÊME ÉCRAN POUR TOUT LE MONDE. La réponse facile au vide
+        était d'y mettre les derniers plans — relevé du patron : « il faut
+        penser aux nouveaux qui n'ont pas de plan ». Une idée qui ne marche
+        qu'au bout de trois relevés n'est pas une idée.
+      */}
+      <View
+        style={styles.respiration}
+        onLayout={(e) =>
+          setFeuille({
+            w: e.nativeEvent.layout.width,
+            h: e.nativeEvent.layout.height,
+          })
+        }>
+        {feuille.h > 120 && (
+          <TraceUnePiece
+            width={feuille.w}
+            height={feuille.h}
+            palette={c}
+            onTracee={tracerLaPiece}
+          />
+        )}
+      </View>
 
       {supported === false && (
         <View style={styles.warning}>
@@ -540,7 +599,7 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
    * gardent exactement l'assiette qu'elles avaient — un écran qui se vide ne
    * doit pas se réorganiser, sinon on ne le reconnaît plus.
    */
-  respiration: { flex: 1, minHeight: 40 },
+  respiration: { flex: 1, minHeight: 40, alignItems: 'center' },
   /** Appareil incompatible, ou erreur du scan : un bandeau, pas une alerte. */
   warning: {
     backgroundColor: '#FDECEC',

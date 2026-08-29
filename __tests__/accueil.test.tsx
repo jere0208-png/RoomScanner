@@ -51,6 +51,7 @@ import { LogoMark } from '../src/components/LogoMark';
 import { AvatarGlyph } from '../src/components/AvatarGlyph';
 import { GlowButton } from '../src/components/GlowButton';
 import { Quadrillage } from '../src/components/Quadrillage';
+import { TraceUnePiece } from '../src/components/TraceUnePiece';
 import { ThemeGlyph } from '../src/components/ThemeGlyph';
 import { TexteVif } from '../src/components/ContourVif';
 import { useScanStore } from '../src/store/scanStore';
@@ -87,12 +88,19 @@ function monter() {
     que c'est le banc qui n'aurait rien mesuré.
   */
   act(() => {
-    const zone = t.root
-      .findAllByType(View)
-      .find((n) => typeof n.props.onLayout === 'function');
-    zone?.props.onLayout({
-      nativeEvent: { layout: { width: 390, height: 844 } },
-    });
+    /*
+      TOUTES LES ZONES QUI SE MESURENT, et pas seulement la première.
+
+      L'écran en a DEUX : le fond, qui porte le quadrillage, et la feuille à
+      tracer, qui prend ce qui reste. Ne nourrir que la première laissait la
+      seconde à zéro de haut — donc absente — et trois épreuves accusaient le
+      composant alors que c'est le banc qui n'avait rien mesuré.
+    */
+    for (const n of t.root.findAllByType(View)) {
+      n.props.onLayout?.({
+        nativeEvent: { layout: { width: 342, height: 300 } },
+      });
+    }
   });
   arbre = t;
   return t;
@@ -456,6 +464,73 @@ describe('l’accueil', () => {
       .map((n) => (StyleSheet.flatten(n.props.style as never) ?? {}) as Record<string, number>)
       .filter((st) => st.flex === 1 && typeof st.minHeight === 'number');
     expect(respire.length).toBeGreaterThan(0);
+  });
+
+  /*
+   * ET LA FEUILLE SERT À TRACER.
+   *
+   * Relevé du patron : « il y a trop d'espace inutilisé », puis « essaye le
+   * tracé ». Le vide arrête d'être un fond : on y dessine sa pièce du doigt.
+   *
+   * LA RÉPONSE FACILE ÉTAIT D'Y METTRE LES DERNIERS PLANS — et le patron l'a
+   * écartée d'une phrase : « il faut penser aux nouveaux qui n'ont pas de
+   * plan ». Une idée qui ne marche qu'au bout de trois relevés n'est pas une
+   * idée. Ce geste-ci est le même au premier lancement et au centième.
+   */
+  const feuille = (t: TestRenderer.ReactTestRenderer) =>
+    t.root.findByType(TraceUnePiece);
+
+  it('le vide est une feuille sur laquelle on trace', () => {
+    expect(monter().root.findAllByType(TraceUnePiece)).toHaveLength(1);
+  });
+
+  it('une pièce tracée ouvre un plan QUI LA CONTIENT', () => {
+    /*
+      C'est ce que le geste raccourcit. « Dessiner un plan » ouvre un plan
+      VIDE : il faut ensuite ajouter une pièce, choisir sa taille, la poser —
+      deux écrans avant le premier trait. Ici le rectangle est posé dans la
+      foulée, et l'on arrive sur SON plan.
+    */
+    const t = monter();
+    act(() => feuille(t).props.onTracee(3, 2.5));
+    const st = useScanStore.getState();
+    expect(st.screen).toBe('result');
+    expect(st.rooms).toHaveLength(1);
+    // Quatre murs, aux cotes tracées.
+    expect(st.walls).toHaveLength(4);
+    const largeurs = st.walls.map((w) =>
+      Math.round(Math.hypot(w.b.x - w.a.x, w.b.z - w.a.z) * 100) / 100,
+    );
+    expect(largeurs.sort()).toEqual([2.5, 2.5, 3, 3]);
+  });
+
+  it('et le palier gratuit est consulté, comme aux deux autres portes', () => {
+    /*
+      L'ÉPREUVE QUI COMPTE LE PLUS ICI. Une passe entière a déjà trouvé CINQ
+      portes qui créaient un plan sans consulter la règle — trois boutons
+      d'étage et deux gestes de copie. Une troisième entrée qui l'oublierait
+      rouvrirait exactement ce trou, et personne ne s'en apercevrait avant que
+      quelqu'un ne relève dix logements gratuitement.
+    */
+    act(() => {
+      useAccountStore.setState({ pro: false, plansUtilises: 1, surpriseVisible: false });
+      useScanStore.getState().reset();
+    });
+    const t = monter();
+    act(() => feuille(t).props.onTracee(3, 2.5));
+    // Rien n'a été créé, et c'est l'OFFRE qui s'ouvre — pas un refus.
+    expect(useScanStore.getState().rooms).toHaveLength(0);
+    expect(useScanStore.getState().screen).not.toBe('result');
+    expect(useAccountStore.getState().surpriseVisible).toBe(true);
+    /*
+      ET L'ON REPOSE LE COMPTEUR — le magasin du compte survit d'une épreuve à
+      l'autre, et la maison le sait par cœur. Sans ça, le banc suivant touche
+      « Commencer le scan » avec un palier déjà épuisé, tombe sur l'offre au
+      lieu du scan, et accuse un écran qui va très bien.
+    */
+    act(() => {
+      useAccountStore.setState({ plansUtilises: 0, surpriseVisible: false });
+    });
   });
 
   it('porte ses deux boutons, et le second seulement s’il y a des scans', () => {
