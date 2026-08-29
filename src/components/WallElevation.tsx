@@ -65,6 +65,7 @@ import {
   masonryRuns,
   placeRepetee,
   postsOf,
+  COMMANDES_MURALES,
   seCommande,
   type FixtureKind,
 } from '../geometry/electrical';
@@ -2284,10 +2285,27 @@ export function WallElevation({
                * interrupteur, comme un point du plafond. On tient
                * l'appareil ici, on ferme l'établi, et l'on touche sa
                * commande sur le plan — le geste des lignes de spots.
+               *
+               * ET L'INTERRUPTEUR LE PORTE AUSSI, DÉSORMAIS — relevé du
+               * patron : « si on clique sur un interrupteur, on ne voit pas
+               * "lier", alors que sur prise et éclairage si. » Le geste
+               * n'existait que dans un sens, et c'est justement le sens le
+               * moins naturel : on pense une installation depuis la
+               * commande — « celui-ci allumera quoi ? » —, et c'était le
+               * seul appareil de l'établi à ne rien pouvoir faire de ce
+               * bouton.
+               *
+               * L'ÉTABLI NE DÉCIDE PAS DU SENS : il rend l'appareil tenu, et
+               * c'est la PAIRE qui tranche au moment du second appui (voir
+               * `lierElements`). Deux boutons, un seul chemin.
                */
               key: 'lien',
               label: 'Lier',
-              on: !!selected && seCommande(selected.kind) && !!onLinkRequest,
+              on:
+                !!selected &&
+                (seCommande(selected.kind) ||
+                  COMMANDES_MURALES.includes(selected.kind)) &&
+                !!onLinkRequest,
               tint: c.blue,
               // Deux maillons de chaîne, au trait comme ses voisins.
               paths: [
@@ -2297,7 +2315,8 @@ export function WallElevation({
               ],
               press: () =>
                 selected &&
-                seCommande(selected.kind) &&
+                (seCommande(selected.kind) ||
+                  COMMANDES_MURALES.includes(selected.kind)) &&
                 onLinkRequest?.(selected.id),
             },
             {

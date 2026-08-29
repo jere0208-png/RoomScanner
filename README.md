@@ -11654,6 +11654,106 @@ la barre d'accueil est bien rendue par le banc, et **un dessin qui tient n'est
 pas raboté** — sans ce contrôle, un garde-fou qui rétrécit toujours passerait
 l'épreuve sans rien prouver.
 
+### Le lien se noue dans les deux sens, et la prise pulse
+
+#### « Lier » manquait sur l'interrupteur
+
+Relevé du patron : « ajoute aussi ce bouton pour le mode édition : si on clique
+sur un interrupteur, on ne voit pas "lier", alors que sur prise et éclairage
+si. »
+
+Le geste n'existait que dans **un** sens : on tenait la prise, on fermait
+l'établi, on touchait l'interrupteur. L'inverse — tenir l'interrupteur et
+désigner ce qu'il allume — était impossible. Or c'est le sens **naturel** quand
+on pose une installation : on sait qu'il y a une commande à l'entrée, on cherche
+ce qu'elle commandera. C'était le seul appareil de l'établi à ne rien pouvoir
+faire de ce bouton.
+
+**La correction n'est pas d'ajouter un second chemin, c'est d'en supprimer un.**
+La règle s'écrivait dans l'écran, à l'endroit du geste : « celui qu'on tient
+reçoit, celui qu'on touche commande ». Elle vit maintenant dans le magasin, sur
+la **paire** (`lierElements`) : on donne deux identifiants, il trouve lequel
+allume et lequel s'allume.
+
+**L'ordre des appuis cesse donc d'avoir un sens** — ce qui est la bonne réponse,
+puisqu'il n'en a jamais eu pour l'utilisateur. Et l'écran n'a plus qu'un seul
+chemin à tenir au lieu de deux, ce qui est la seule façon de garantir qu'ils se
+comportent pareil. Le lien vit toujours sur ce qui **s'allume** : deux gestes,
+un seul état, sinon on aurait deux liens là où il n'y a qu'un fil.
+
+Au passage, un cas qui manquait : le lien armé depuis l'établi ne pouvait se
+poser que sur un mur. Il se ferme désormais aussi sur un **point du plafond** —
+et c'est là que va neuf fois sur dix ce qu'un interrupteur commande.
+
+**Douze épreuves, dix rouges avant**, dont trois contrôles en sens inverse qui
+portent la règle du métier : deux interrupteurs ne se lient pas entre eux, deux
+prises non plus, et le courant faible n'a rien à allumer.
+
+#### Une prise alimentée pulse en bleu — elle n'éclaire pas
+
+Relevé du patron : « montre aussi une prise alimentée par une légère animation
+dessus sur le plan 3D, comme un pulse bleu. »
+
+Il a raison, et le défaut était **de sens, pas de goût** : la prise commandée
+portait le même halo jaune qu'un plafonnier. C'était le plus simple à écrire, et
+ça dit une chose fausse — qu'une prise émet de la lumière. Sur un plan, on
+chercherait l'ampoule.
+
+Une prise commandée n'éclaire rien : elle est **sous tension**. Une onde bleue
+qui part de son socle dit exactement ça, sans un mot. L'applique, elle, garde le
+halo chaud : c'est un point lumineux, il éclaire.
+
+**Trois anneaux fixes, et c'est l'opacité qui voyage.** Un anneau qui grandit
+demanderait d'animer son *rayon* — et le rayon d'un cercle SVG ne passe pas par
+le pilote natif : la boucle rendrait la main à JavaScript soixante fois par
+seconde, sur une vue qui se bat déjà pour ses images. Trois anneaux posés à trois
+distances, dont l'éclat s'allume l'un après l'autre, donnent la même onde et ne
+coûtent rien. Une seule boucle pour toutes les prises — elles sont sur le même
+réseau.
+
+Et elle va **dans un seul sens**, du socle vers le dehors : un aller-retour
+ferait revenir l'onde vers le centre, ce qui se lit comme une aspiration.
+
+#### Hors édition, on regarde — on ne règle pas
+
+Relevé du patron : « un clic sur un interrupteur ou lumière ou autre élément élec
+sans être dans le mode Édition doit juste afficher les liens circuits en lien, et
+la possibilité de link à un inter. »
+
+Ça ouvrait **l'établi** — la fiche d'élévation complète, ses flèches au
+centimètre, ses champs de cote et son bouton « Retirer ». Un atelier, pour
+quelqu'un qui regardait.
+
+Hors édition, on vient répondre à deux questions : « elle est sur quoi ? » et
+« elle est reliée à quoi ? ». La fiche les dit en une ligne — pièce, circuit,
+liens — et porte le bouton de lien. L'établi reste à un appui, « Voir le mur »,
+parce qu'on change parfois d'avis en regardant.
+
+**La phrase est un module à part** (`ficheElec`), et pas quinze lignes dans
+l'écran, parce qu'elle dépend de la nature de l'appareil : un interrupteur
+allume, une prise s'allume, une RJ45 ne fait ni l'un ni l'autre. Trois cas,
+chacun avec **son absence à dire** — et une absence bien dite est ce qui
+distingue « rien n'est relié » de « on ne sait pas ».
+
+Deux d'entre elles valent d'être écrites :
+
+- « **pas encore sur un circuit** » plutôt qu'un blanc : un appareil sans départ
+  n'est pas une anomalie, c'est un plan sur lequel on n'a pas encore posé de
+  tableau. Un blanc à cet endroit ferait chercher l'erreur.
+- « **n'allume rien pour l'instant** » sur un interrupteur — c'est le cas le plus
+  utile de toute la fiche, parce qu'un interrupteur jamais relié ne se distingue
+  d'un interrupteur relié par rien, sur le plan.
+- et **rien du tout** sur une prise ordinaire : dire « aucun interrupteur » de
+  toutes les prises du logement ferait lire un défaut sur quarante appareils qui
+  vont très bien. Une prise commandée est l'exception, pas la règle.
+
+Et « Détacher » se fait maintenant **d'où l'on voit le lien** : il ne se défaisait
+que depuis le point du plafond, si bien que celui qui regardait l'interrupteur
+voyait le lien écrit et n'avait aucun moyen de le rompre.
+
+**Douze épreuves** sur la fiche, toutes sur un module pur — donc rapides, et
+lisibles sans monter quatre mille lignes d'écran.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

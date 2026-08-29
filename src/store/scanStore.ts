@@ -1248,6 +1248,27 @@ interface ScanState {
    * n'allume rien) : la garde vit ICI, quel que soit le chemin.
    */
   toggleFixtureCommand: (fixtureId: string, commandeId: string) => void;
+  /**
+   * NOUER (OU DÉNOUER) LE LIEN ENTRE DEUX ÉLÉMENTS, DANS N'IMPORTE QUEL SENS.
+   *
+   * Relevé du patron : « si on clique sur un interrupteur, on ne voit pas
+   * "lier", alors que sur prise et éclairage si. »
+   *
+   * Le geste n'existait que dans UN sens : on tenait la prise, on désignait
+   * l'interrupteur. L'inverse — tenir l'interrupteur et désigner ce qu'il
+   * allume — était impossible, alors que c'est le sens naturel quand on pose
+   * une installation : on sait qu'il y a une commande à l'entrée, on cherche
+   * ce qu'elle commandera.
+   *
+   * LA RÈGLE VIT DONC ICI, SUR LA PAIRE, et non dans l'écran à l'endroit du
+   * geste. On donne deux identifiants, le magasin trouve lequel commande et
+   * lequel s'allume — et l'ordre des appuis cesse d'avoir un sens, ce qui est
+   * la bonne réponse puisqu'il n'en a jamais eu pour l'utilisateur.
+   *
+   * Rend FAUX quand la paire n'a pas de sens : deux interrupteurs, deux
+   * prises, un courant faible. L'écran s'en sert pour le dire.
+   */
+  lierElements: (aId: string, bId: string) => boolean;
   /** Repose le relevé sur un autre mur. Renvoie le nombre d'appareils posés. */
   /**
    * Un appareil vient d'être rangé à côté d'un autre, sous une plaque
@@ -3970,6 +3991,38 @@ export const useScanStore = create<ScanState>((set, get) => {
     removePhoto: (id) => {
       pushHistory('photo');
       set({ photos: get().photos.filter((p) => p.id !== id), dirty: true });
+    },
+
+    lierElements: (aId, bId) => {
+      if (aId === bId) return false;
+      const st = get();
+      /*
+        CE QUI COMMANDE, ET CE QUI S'ALLUME — les deux listes du modèle
+        électrique, et pas une troisième écrite ici. `COMMANDES_MURALES` dit
+        ce qui allume ; `seCommande` dit ce qui s'allume au mur ; un point du
+        plafond s'allume toujours.
+      */
+      const mural = (id: string) => st.fixtures.find((f) => f.id === id);
+      const plafond = (id: string) => st.ceiling.find((c) => c.id === id);
+      const estCommande = (id: string) => {
+        const f = mural(id);
+        return !!f && COMMANDES_MURALES.includes(f.kind);
+      };
+      const sAllume = (id: string) => {
+        const f = mural(id);
+        if (f) return seCommande(f.kind);
+        return !!plafond(id);
+      };
+      const [commande, cible] = estCommande(aId)
+        ? [aId, bId]
+        : estCommande(bId)
+        ? [bId, aId]
+        : [null, null];
+      // Ni l'un ni l'autre n'allume : deux prises, deux points, un fantôme.
+      if (!commande || !cible || !sAllume(cible)) return false;
+      if (plafond(cible)) get().toggleCeilingCommand(cible, commande);
+      else get().toggleFixtureCommand(cible, commande);
+      return true;
     },
 
     toggleFixtureCommand: (fixtureId, commandeId) => {

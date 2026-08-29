@@ -146,6 +146,7 @@ import {
 } from '../components/Sheet';
 import { alerte } from '../ui/alerte';
 import { panne as expliquer } from '../ui/panne';
+import { ficheElec, motDuLien } from './result/ficheElec';
 
 type Tab = '2d' | '3d';
 
@@ -361,7 +362,6 @@ export function ResultScreen() {
   const setCeilingRow = useScanStore((s) => s.setCeilingRow);
   const removeCeilingRow = useScanStore((s) => s.removeCeilingRow);
   const toggleCeilingCommand = useScanStore((s) => s.toggleCeilingCommand);
-  const toggleFixtureCommand = useScanStore((s) => s.toggleFixtureCommand);
   // L'arrivage du scan : lu ICI, avec les autres liaisons — un hook après
   // un retour anticipé casse l'ordre des hooks.
   const arrivage = useScanStore((s) => s.arrivage);
@@ -838,6 +838,129 @@ export function ResultScreen() {
    * sur le plan : le même geste que pour une ligne de spots.
    */
   const [pendingLienMur, setPendingLienMur] = useState<string | null>(null);
+  const lierElements = useScanStore((st) => st.lierElements);
+  /**
+   * LA FICHE D'UN APPAREIL, HORS ÉDITION.
+   *
+   * Relevé du patron : « un clic sur un interrupteur ou lumière ou autre
+   * élément élec sans être dans le mode Édition doit juste afficher les liens
+   * circuits en lien, et la possibilité de link à un inter. »
+   *
+   * ÇA OUVRAIT L'ÉTABLI — la fiche d'élévation complète, ses flèches au
+   * centimètre, ses champs de cote et son bouton « Retirer ». Un atelier, pour
+   * quelqu'un qui regardait. Hors édition, on ne vient pas déplacer une prise :
+   * on vient répondre à deux questions, « elle est sur quoi ? » et « elle est
+   * reliée à quoi ? », et éventuellement nouer un lien.
+   *
+   * L'établi reste à UN appui — « Voir le mur » —, parce qu'on change parfois
+   * d'avis en regardant.
+   */
+  const nomLisible = (id: string): string | null => {
+    const f = fixtures.find((x) => x.id === id);
+    if (f) return FIXTURES[f.kind].label.toLowerCase();
+    const cl = ceiling.find((x) => x.id === id);
+    return cl ? CEILINGS[cl.kind].label.toLowerCase() : null;
+  };
+  const ouvrirLaFiche = (f: Fixture) => {
+    const allumePar = (f.commands ?? [])
+      .map(nomLisible)
+      .filter((x): x is string => !!x);
+    const allume = [
+      ...fixtures
+        .filter((x) => (x.commands ?? []).includes(f.id))
+        .map((x) => FIXTURES[x.kind].label.toLowerCase()),
+      ...ceiling
+        .filter((cl) => (cl.commands ?? []).includes(f.id))
+        .map((cl) => CEILINGS[cl.kind].label.toLowerCase()),
+    ];
+    const { titre, sousTitre } = ficheElec({
+      appareil: f,
+      piece: rooms.find((r) => r.id === placement.get(f.id))?.name,
+      circuit: marks.get(f.id) || undefined,
+      allumePar,
+      allume,
+    });
+    const mot = motDuLien(f);
+    /*
+      DÉTACHER SE FAIT D'OÙ L'ON VOIT LE LIEN. Il ne se défaisait que depuis
+      le point du plafond : celui qui regardait l'interrupteur voyait le lien
+      écrit et n'avait aucun moyen de le rompre.
+    */
+    const liens = [
+      ...(f.commands ?? []).map((id) => ({ id, nom: nomLisible(id) })),
+      ...fixtures
+        .filter((x) => (x.commands ?? []).includes(f.id))
+        .map((x) => ({ id: x.id, nom: FIXTURES[x.kind].label.toLowerCase() })),
+      ...ceiling
+        .filter((cl) => (cl.commands ?? []).includes(f.id))
+        .map((cl) => ({ id: cl.id, nom: CEILINGS[cl.kind].label.toLowerCase() })),
+    ].filter((l) => !!l.nom);
+    setMenu({
+      title: titre,
+      subtitle: sousTitre,
+      actions: [
+        ...(mot
+          ? [
+              {
+                label: mot,
+                icon: 'fusionner' as const,
+                onPress: () => {
+                  seulGeste('lien');
+                  setPendingLienMur(f.id);
+                },
+              },
+            ]
+          : []),
+        ...liens.map((l) => ({
+          label: `Détacher ${l.nom}`,
+          icon: 'scinder' as const,
+          onPress: () => {
+            useScanStore.getState().lierElements(f.id, l.id);
+          },
+        })),
+        {
+          label: 'Voir le mur',
+          icon: 'metre' as const,
+          onPress: () => {
+            setElecWallId(f.wallId);
+            setElecSel(f.id);
+            setElecView('mur');
+            setElecOpen(true);
+          },
+        },
+      ],
+    });
+  };
+
+  /**
+   * CE QU'ON DIT QUAND LA PAIRE N'A PAS DE SENS.
+   *
+   * Le message dépend de ce qu'on TIENT, pas de ce qu'on vient de toucher :
+   * celui qui tient un interrupteur cherche ce qu'il allume, celui qui tient
+   * une prise cherche ce qui l'allume. Deux phrases, jamais la même erreur.
+   */
+  const refusDeLien = (abandonner: () => void) => {
+    const tenu = fixtures.find((x) => x.id === pendingLienMur);
+    const commande = !!tenu && COMMANDES_MURALES.includes(tenu.kind);
+    return {
+      title: commande ? 'Ça ne s’allume pas' : 'Ce n’est pas une commande',
+      subtitle: commande
+        ? 'Un interrupteur allume une prise commandée, une applique ou un ' +
+          'point lumineux — pas une prise de communication. Touchez l’un ' +
+          'de ceux-là.'
+        : 'Une prise commandée ou une applique s’allume par un ' +
+          'interrupteur, un va-et-vient, un poussoir ou un variateur. ' +
+          'Touchez l’un de ceux-là.',
+      actions: [
+        { label: 'Continuer', onPress: () => {} },
+        {
+          label: 'Abandonner la liaison',
+          danger: true,
+          onPress: abandonner,
+        },
+      ],
+    };
+  };
   /*
     LE MUR QU'ON S'APPRÊTE À PERCER.
 
@@ -3159,6 +3282,24 @@ export function ResultScreen() {
                 setPendingLink(null);
                 return;
               }
+              /*
+                UN LIEN EN COURS SE FERME AUSSI SUR UN POINT DU PLAFOND.
+
+                C'est le cas qui manquait quand on part de l'interrupteur :
+                neuf fois sur dix, ce qu'il allume est au plafond. Sans ça,
+                le geste s'armait depuis l'établi et ne pouvait se poser que
+                sur un mur — la moitié du chemin.
+              */
+              if (pendingLienMur) {
+                if (lierElements(pendingLienMur, id)) {
+                  haptic('succes');
+                  setPendingLienMur(null);
+                } else {
+                  haptic('alerte');
+                  setMenu(refusDeLien(() => setPendingLienMur(null)));
+                }
+                return;
+              }
               // Un appui sur un appareil de plafond propose de le retirer :
               // il n'a ni cote ni hauteur à régler, seulement une place.
               const cl = ceiling.find((x) => x.id === id);
@@ -3242,30 +3383,23 @@ export function ResultScreen() {
             onEditRoomName={promptRoomFor}
             onPierChange={setPier}
             onSelectFixture={(id, wallId) => {
-              // Un appareil MURAL attend sa commande : ce toucher la donne.
+              /*
+                UN LIEN EST EN COURS : C'EST LA PAIRE QUI TRANCHE.
+
+                L'écran décidait du sens — « celui qu'on tient reçoit, celui
+                qu'on touche commande » —, ce qui interdisait de partir de
+                l'interrupteur. Il ne décide plus : il donne les deux
+                identifiants au magasin, qui sait lequel allume et lequel
+                s'allume (`lierElements`). Un seul chemin pour les deux sens,
+                donc aucun risque qu'ils se comportent différemment.
+              */
               if (pendingLienMur) {
-                const f = fixtures.find((x) => x.id === id);
-                if (f && COMMANDES_MURALES.includes(f.kind)) {
-                  toggleFixtureCommand(pendingLienMur, f.id);
+                if (lierElements(pendingLienMur, id)) {
                   haptic('succes');
                   setPendingLienMur(null);
                 } else {
                   haptic('alerte');
-                  setMenu({
-                    title: 'Ce n’est pas une commande',
-                    subtitle:
-                      'Une prise commandée ou une applique s’allume par un ' +
-                      'interrupteur, un va-et-vient, un poussoir ou un ' +
-                      'variateur. Touchez l’un de ceux-là.',
-                    actions: [
-                      { label: 'Continuer', onPress: () => {} },
-                      {
-                        label: 'Abandonner la liaison',
-                        danger: true,
-                        onPress: () => setPendingLienMur(null),
-                      },
-                    ],
-                  });
+                  setMenu(refusDeLien(() => setPendingLienMur(null)));
                 }
                 return;
               }
@@ -3303,6 +3437,18 @@ export function ResultScreen() {
                   });
                 }
                 return;
+              }
+              /*
+                HORS ÉDITION, ON REGARDE — ON NE RÈGLE PAS. Voir
+                `ouvrirLaFiche` : deux questions, un bouton de lien, et
+                l'établi à un appui pour qui change d'avis.
+              */
+              if (!editMode) {
+                const f = fixtures.find((x) => x.id === id);
+                if (f) {
+                  ouvrirLaFiche(f);
+                  return;
+                }
               }
               setElecWallId(wallId);
               setElecSel(id);
@@ -4054,7 +4200,12 @@ export function ResultScreen() {
                   : pendingLink
                   ? 'l’interrupteur qui l’allume'
                   : pendingLienMur
-                  ? 'l’interrupteur qui le commande'
+                  ? COMMANDES_MURALES.includes(
+                      fixtures.find((x) => x.id === pendingLienMur)?.kind ??
+                        'prise',
+                    )
+                    ? 'ce qu’il allume'
+                    : 'l’interrupteur qui le commande'
                   : pendingCeiling
                   ? 'une pièce'
                   : pier

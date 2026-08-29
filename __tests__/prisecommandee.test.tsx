@@ -61,6 +61,7 @@ import TestRenderer, { act } from 'react-test-renderer';
 import { Iso3DView } from '../src/components/Iso3DView';
 import { useScanStore } from '../src/store/scanStore';
 import { seCommande } from '../src/geometry/electrical';
+import { light } from '../src/theme';
 import type { WallSeg } from '../src/geometry/floorplan';
 import type { Fixture } from '../src/geometry/electrical';
 import type { CeilingFixture } from '../src/geometry/ceiling';
@@ -224,17 +225,32 @@ const taper = (t: TestRenderer.ReactTestRenderer, x: number, y: number) => {
   });
 };
 
-/** Les halos allumés, par identifiant d'appareil. */
+/**
+ * CE QUI EST ALLUMÉ, par identifiant — halo chaud OU onde bleue.
+ *
+ * Les deux marques disent la même chose — « ceci est sous tension » — et se
+ * dessinent différemment parce qu'elles ne racontent pas la même chose : une
+ * lampe ÉCLAIRE, une prise est ALIMENTÉE. Ce relevé-ci ne s'occupe que du
+ * lien ; la distinction se mesure plus bas, à sa place.
+ */
 const allumes = (t: TestRenderer.ReactTestRenderer) =>
   t.root
     .findAllByType(Circle)
-    .filter((n) => String(n.props.testID ?? '').startsWith('halo-'))
-    .map((n) => String(n.props.testID).slice(5))
+    .map((n) => String(n.props.testID ?? ''))
+    .filter((id) => id.startsWith('halo-') || id.startsWith('pulse-'))
+    .map((id) => id.replace(/^(halo|pulse)-/, ''))
     .filter((id, i, tous) => tous.indexOf(id) === i)
     .sort();
 
 const cible = (t: TestRenderer.ReactTestRenderer, id: string) =>
   t.root.findAll((n) => String(n.props?.testID ?? '') === `cible-${id}`)[0];
+
+/** Monte la scène et allume la prise commandée : le cas de toutes ces épreuves. */
+const monterEtAllumer = () => {
+  const t = monter();
+  appuyerSur(t, 'i2');
+  return t;
+};
 
 const appuyerSur = (t: TestRenderer.ReactTestRenderer, id: string) => {
   const c = cible(t, id);
@@ -349,5 +365,96 @@ describe('le halo d’un point mural', () => {
     expect(rayon('a1')).toBeLessThan(rayon('c1'));
     // Mais il reste un halo : divisé par deux, ce serait une pastille.
     expect(rayon('a1')).toBeGreaterThan(rayon('c1') * 0.5);
+  });
+});
+
+describe('une prise alimentée PULSE en bleu, elle n’éclaire pas', () => {
+  /*
+    RELEVÉ DU PATRON : « montre aussi une prise alimentée par une légère
+    animation dessus sur le plan 3D, comme un pulse bleu. »
+
+    IL A RAISON, ET LE DÉFAUT ÉTAIT DE SENS, PAS DE GOÛT. La prise commandée
+    portait le même halo jaune qu'un plafonnier — c'était le plus simple à
+    écrire, et ça dit une chose fausse : qu'une prise émet de la lumière. Sur
+    un plan, on chercherait l'ampoule.
+
+    Une prise commandée n'éclaire rien : elle est SOUS TENSION. Une onde bleue
+    qui part de son socle dit exactement ça, et elle le dit sans un mot.
+  */
+  const cerclesDe = (t: TestRenderer.ReactTestRenderer, prefixe: string) =>
+    t.root
+      .findAllByType(Circle)
+      .filter((n) => String(n.props.testID ?? '').startsWith(prefixe));
+
+  it('la prise porte une onde, jamais un halo', () => {
+    const t = monter();
+    appuyerSur(t, 'i2');
+    expect(cerclesDe(t, 'pulse-p1').length).toBeGreaterThanOrEqual(3);
+    expect(cerclesDe(t, 'halo-p1')).toHaveLength(0);
+  });
+
+  it('et l’onde est BLEUE, celle du thème', () => {
+    const t = monter();
+    appuyerSur(t, 'i2');
+    for (const n of cerclesDe(t, 'pulse-p1')) {
+      expect(n.props.stroke).toBe(light.blue);
+      // Un anneau, pas un disque : une onde se lit à son bord.
+      expect(n.props.fill).toBe('none');
+    }
+  });
+
+  it('les trois anneaux sont DÉCALÉS, c’est ce qui fait voyager l’onde', () => {
+    /*
+      LE CONTRÔLE QUI PORTE LE MOT « PULSE », et ce qu'il peut porter.
+
+      CE QU'IL NE PEUT PAS TENIR : le mouvement. La boucle tourne sur le fil
+      natif — comme tout ce qui boucle dans cette application — et l'arbre
+      d'essai n'en a pas ; avancer les horloges ne bouge rien de ce côté-ci.
+      La maison le sait depuis le scintillement des lampes, et le dit là-bas
+      dans les mêmes termes.
+
+      CE QU'IL TIENT, ET QUI SUFFIT À DISTINGUER UNE ONDE D'UN CLIGNOTEMENT :
+      à un instant donné, les trois anneaux n'ont PAS le même éclat. C'est ce
+      décalage qui fait qu'on lit quelque chose qui part du socle et s'en va,
+      au lieu de trois cercles qui battent ensemble — lesquels se liraient
+      comme une alerte, exactement le contraire de ce qu'on veut dire.
+
+      Trois opacités écrites en dur, ou trois anneaux en phase, tomberaient
+      ici.
+    */
+    const t = monter();
+    appuyerSur(t, 'i2');
+    const opacites = cerclesDe(t, 'pulse-p1').map((n) => Number(n.props.opacity));
+    expect(opacites).toHaveLength(3);
+    expect(new Set(opacites).size).toBeGreaterThan(1);
+    // Et le premier est le plus vif : l'onde part du socle, elle n'y revient
+    // pas. Un aller-retour se lirait comme une aspiration.
+    expect(opacites[0]).toBeGreaterThan(opacites[2]);
+  });
+
+  it('les trois anneaux sont à des distances DIFFÉRENTES', () => {
+    // Sans quoi l'onde ne voyage pas : trois anneaux confondus font un
+    // clignotement, ce qui se lit comme une alerte et non comme du courant.
+    const rayons = cerclesDe(monterEtAllumer(), 'pulse-p1').map((n) =>
+      Number(n.props.r),
+    );
+    expect(new Set(rayons).size).toBe(rayons.length);
+  });
+
+  it('mais une APPLIQUE garde son halo chaud : elle éclaire, elle', () => {
+    /*
+      LE CONTRÔLE EN SENS INVERSE, et c'est lui qui tient la distinction. Si
+      tout ce qui est au mur pulsait en bleu, on aurait remplacé une erreur
+      par une autre — l'applique est un point lumineux, elle éclaire, et son
+      halo doit ressembler à celui du plafonnier.
+    */
+    const t = monter([INTER_LAMPE, INTER_PRISE, PRISE, APPLIQUE]);
+    appuyerSur(t, 'i1');
+    expect(cerclesDe(t, 'halo-a1').length).toBeGreaterThan(0);
+    expect(cerclesDe(t, 'pulse-a1')).toHaveLength(0);
+  });
+
+  it('et rien ne pulse tant que l’interrupteur n’est pas touché', () => {
+    expect(cerclesDe(monter(), 'pulse-')).toHaveLength(0);
   });
 });

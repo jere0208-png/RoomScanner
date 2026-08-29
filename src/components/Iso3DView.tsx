@@ -667,6 +667,55 @@ export function Iso3DView({
     outputRange: [0.55, 0.8],
   });
 
+  /**
+   * LE PULSE D'UNE PRISE ALIMENTÉE — une onde bleue qui part du socle.
+   *
+   * Relevé du patron : « montre aussi une prise alimentée par une légère
+   * animation dessus sur le plan 3D, comme un pulse bleu. »
+   *
+   * TROIS ANNEAUX FIXES, ET C'EST L'OPACITÉ QUI VOYAGE. Un anneau qui grandit
+   * demanderait d'animer son RAYON — et le rayon d'un cercle SVG ne passe pas
+   * par le pilote natif : la boucle rendrait la main à JavaScript soixante
+   * fois par seconde, sur une vue qui se bat déjà pour ses images. Trois
+   * anneaux posés à trois distances, dont l'éclat s'allume l'un après
+   * l'autre, donnent la même onde et ne coûtent rien.
+   *
+   * UNE SEULE BOUCLE POUR TOUTES LES PRISES, comme pour le scintillement des
+   * lampes : elles sont sur le même réseau, elles pulsent ensemble.
+   *
+   * ET ELLE VA DANS UN SEUL SENS — du socle vers le dehors. Un aller-retour
+   * ferait revenir l'onde vers le centre, ce qui se lit comme une aspiration :
+   * exactement l'inverse de ce qu'on veut dire.
+   */
+  const onde = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (allumees.size === 0) return;
+    const boucle = Animated.loop(
+      Animated.timing(onde, {
+        toValue: 1,
+        duration: 1600,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+    );
+    boucle.start();
+    return () => boucle.stop();
+  }, [allumees.size, onde]);
+  /** L'éclat de l'anneau de rang `k` : il passe, puis c'est au suivant. */
+  const eclat = (k: number) =>
+    onde.interpolate({
+      /*
+        LES BORNES DÉBORDENT DE [0, 1], ET C'EST VOULU : le premier anneau
+        doit être à son éclat DÈS la première image, sinon l'onde commence
+        par une absence. Un `Math.max(0, …)` sur la borne basse écraserait
+        les deux premières valeurs l'une sur l'autre — et une plage
+        d'entrée qui ne croît pas strictement n'est pas interpolable.
+      */
+      inputRange: [k * 0.3 - 0.22, k * 0.3, k * 0.3 + 0.34],
+      outputRange: [0, 0.65, 0],
+      extrapolate: 'clamp',
+    });
+
   const pan = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
@@ -1340,7 +1389,25 @@ export function Iso3DView({
       departs: string[];
       tableau: boolean;
     }[] = [];
-    const posLampes: { id: string; cx: number; cy: number; r: number }[] = [];
+    /**
+     * CE QUI EST ALLUMÉ — et de quelle façon ça se montre.
+     *
+     * `genre` sépare deux choses que le même lien produit : une LUMIÈRE
+     * (plafonnier, applique) éclaire, et se dessine en halo chaud ; une PRISE
+     * COMMANDÉE, elle, n'éclaire rien — elle est simplement SOUS TENSION.
+     * Relevé du patron : « montre aussi une prise alimentée par une légère
+     * animation dessus sur le plan 3D, comme un pulse bleu. »
+     *
+     * Leur donner le même halo jaune dirait qu'une prise émet de la lumière,
+     * ce qui est faux et se voit : on chercherait l'ampoule.
+     */
+    const posLampes: {
+      id: string;
+      cx: number;
+      cy: number;
+      r: number;
+      genre: 'lumiere' | 'alimente';
+    }[] = [];
     // Semis du sol : même code que le plan 2D, projeté sur le plan y = 0.
     // C'est ce fond pointillé qui distingue la surface au sol des murs.
     /**
@@ -1602,6 +1669,8 @@ export function Iso3DView({
                 HALO_MIN,
                 Math.min(HALO_PART * radius3d * scale, HALO_LAMPE * scale),
               ) * HALO_MURAL,
+            // Une applique éclaire ; une prise commandée est alimentée.
+            genre: f.kind === 'applique' ? 'lumiere' : 'alimente',
           });
         }
         /*
@@ -1915,6 +1984,7 @@ export function Iso3DView({
           HALO_MIN,
           Math.min(HALO_PART * radius3d * scale, HALO_LAMPE * scale),
         ),
+        genre: 'lumiere',
       });
     }
     /*
@@ -2291,8 +2361,47 @@ export function Iso3DView({
               C'est ce qui fait qu'on lit une lumière et non une pastille de
               couleur.
             */}
+            {/*
+              LES PRISES ALIMENTÉES — l'onde bleue, avant les halos.
+
+              Elles passent EN PREMIER pour une raison de dessin : une prise
+              commandée est souvent sous une applique qu'elle partage, et
+              c'est la lumière qui doit couvrir l'électricité, jamais
+              l'inverse. On voit ce qui éclaire ; on devine ce qui alimente.
+            */}
             {rendered.posLampes
-              .filter((l) => allumees.has(l.id))
+              .filter((l) => l.genre === 'alimente' && allumees.has(l.id))
+              .flatMap((l) =>
+                [0, 1, 2].map((k) => (
+                  <AnimatedCircle
+                    key={`pulse-${l.id}-${k}`}
+                    testID={`pulse-${l.id}`}
+                    cx={l.cx}
+                    cy={l.cy}
+                    r={l.r * (0.34 + k * 0.28)}
+                    fill="none"
+                    stroke={c.blue}
+                    strokeWidth={1.6}
+                    opacity={eclat(k)}
+                  />
+                )),
+              )}
+            {/* Et le socle lui-même, bleu plein : sans lui, l'onde partirait
+                de nulle part. */}
+            {rendered.posLampes
+              .filter((l) => l.genre === 'alimente' && allumees.has(l.id))
+              .map((l) => (
+                <Circle
+                  key={`vif-${l.id}`}
+                  cx={l.cx}
+                  cy={l.cy}
+                  r={Math.max(1.6, l.r * 0.16)}
+                  fill={c.blue}
+                  opacity={0.9}
+                />
+              ))}
+            {rendered.posLampes
+              .filter((l) => l.genre === 'lumiere' && allumees.has(l.id))
               .map((l) => (
                 <React.Fragment key={`lum-${l.id}`}>
                   {/*
