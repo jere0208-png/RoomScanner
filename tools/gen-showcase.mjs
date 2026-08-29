@@ -34,8 +34,16 @@ const frames = readdirSync(SVG)
   .sort();
 for (const f of frames) {
   const nom = f.replace('.svg', '.png');
-  // Palette réduite : ces images sont des aplats et des traits, 96 couleurs
-  // suffisent. En couleurs vraies, l'animation pesait 1,3 Mo dans l'IPA.
+  /*
+    PALETTE RÉDUITE, ET SANS TRAMAGE.
+
+    Ces images sont des aplats et des traits : soixante-quatre couleurs
+    suffisent, et le tramage ne sert à rien ici. Il ne rattrape que les
+    dégradés, et il n'y en a plus un seul dans les images depuis que la lueur
+    et le vignettage sont posés en direct par le téléphone (voir
+    `PhoneShowcase`). Le laisser allumé COÛTE : chaque aplat se met à
+    grésiller, et le PNG ne compresse plus rien.
+  */
   /*
     LES CHEMINS SONT ENTRE GUILLEMETS.
 
@@ -52,7 +60,8 @@ for (const f of frames) {
       '-background', 'white',
       '-alpha', 'remove',
       '-resize', '264x536',
-      '-colors', '96',
+      '-dither', 'None',
+      '-colors', '64',
       '-define', 'png:compression-level=9',
       q(`PNG8:${join(PNG, nom)}`),
     ],

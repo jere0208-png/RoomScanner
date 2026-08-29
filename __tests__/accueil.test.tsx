@@ -43,14 +43,18 @@ import { light } from '../src/theme';
 import { HomeScreen } from '../src/screens/HomeScreen';
 import { LogoMark } from '../src/components/LogoMark';
 import { AvatarGlyph } from '../src/components/AvatarGlyph';
-import { PhoneShowcase } from '../src/components/PhoneShowcase';
+import {
+  BALANCEMENT,
+  PERIODE,
+  PhoneShowcase,
+} from '../src/components/PhoneShowcase';
 import { GlowButton } from '../src/components/GlowButton';
 import { ThemeGlyph } from '../src/components/ThemeGlyph';
 import { TexteVif } from '../src/components/ContourVif';
 import { useScanStore } from '../src/store/scanStore';
 import { useAccountStore } from '../src/store/accountStore';
 import { SHOWCASE_IMAGES } from '../src/assets/showcase';
-import { SHOWCASE_FRAMES } from '../src/export/showcaseFrames';
+import { IPS, SHOWCASE_FRAMES } from '../src/export/showcaseFrames';
 
 beforeEach(() => {
   jest.useFakeTimers();
@@ -394,8 +398,103 @@ describe('l’accueil', () => {
     const apres = visible();
     expect(apres).toBeGreaterThan(0);
     // Elle boucle : après un cycle complet, on est revenu au plan.
-    act(() => jest.advanceTimersByTime(68 * SHOWCASE_FRAMES));
+    act(() => jest.advanceTimersByTime(PERIODE * SHOWCASE_FRAMES));
     expect(visible()).toBe(apres);
+  });
+
+  /*
+   * LE BOÎTIER EST UN OBJET, PAS UN CADRE AUTOUR D’UNE IMAGE.
+   *
+   * Relevé du patron : « l'animation de l'iPhone et de son écran ne me
+   * convainc pas, on dirait un truc bas de gamme. Je veux quelque chose de
+   * dynamique, rapide, fluide, JS style. Un vrai art style. »
+   *
+   * Le dedans de l'écran a été refait ailleurs. Le BOÎTIER, lui, était un
+   * rectangle sombre avec un liséré, une diagonale claire FIXE en guise de
+   * reflet, et une rotation lente. Un objet plat. Ces bancs tiennent les
+   * quatre couches vivantes qui le remettent debout — et surtout le fait
+   * qu'elles soient ANIMÉES : un nombre écrit en dur à leur place passerait
+   * toutes les épreuves de structure sans que rien ne bouge à l'écran.
+   */
+  const vitrine = (t: TestRenderer.ReactTestRenderer) =>
+    t.root.findByType(PhoneShowcase);
+  /** Les styles à plat d'un nœud, sans résoudre les valeurs animées. */
+  const couches = (n: { props: { style?: unknown } }) =>
+    (Array.isArray(n.props.style) ? n.props.style : [n.props.style]).filter(
+      Boolean,
+    ) as Record<string, unknown>[];
+
+  it('la vitrine porte sa lueur, son étalonnage et son reflet', () => {
+    /*
+      TROIS COUCHES VECTORIELLES, ET DEUX D'ENTRE ELLES ÉTAIENT CUITES DANS
+      LES IMAGES. La lueur du fond et le vignettage y pesaient 480 ko — un
+      dégradé lisse est le pire ennemi d'une palette réduite. Posés ici, ils
+      sont plus lisses, gratuits, et ils peuvent bouger.
+    */
+    const dessins = vitrine(monter()).findAllByType(Svg);
+    expect(dessins.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('le boîtier FLOTTE et tourne, sur deux horloges différentes', () => {
+    /*
+      DEUX MOUVEMENTS DE MÊME PÉRIODE se lisent comme UN mouvement, et un
+      mouvement qui se répète toutes les quatre secondes se remarque. Le
+      flottement a donc sa propre horloge, volontairement bancale : les deux
+      ne retombent en phase qu'au bout de vingt-six secondes.
+
+      On lit les transformations SANS les aplatir : `StyleSheet.flatten`
+      résout une valeur animée en son nombre du moment, et un boîtier qui
+      tourne y ressemblerait à un boîtier figé.
+    */
+    const transformes = vitrine(monter())
+      .findAll((n) => couches(n).some((c) => Array.isArray(c.transform)))
+      .flatMap((n) =>
+        couches(n).flatMap(
+          (c) => (c.transform ?? []) as Record<string, unknown>[],
+        ),
+      );
+    const anime = (cle: string) =>
+      transformes.filter(
+        (x) => cle in x && typeof x[cle] === 'object' && x[cle] !== null,
+      );
+    // La rotation du boîtier, et sa montée : les deux sont des valeurs
+    // animées, pas des nombres écrits en dur.
+    expect(anime('rotateY').length).toBeGreaterThanOrEqual(1);
+    expect(anime('translateY').length).toBeGreaterThanOrEqual(1);
+    // Et le reflet TRAVERSE la dalle.
+    expect(anime('translateX').length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('et le reflet suit la ROTATION, il n’a pas d’horloge à lui', () => {
+    /*
+      C'EST TOUT LE POINT. Sur un objet qui tourne, ce qui trahit le faux
+      n'est pas l'absence de reflet, c'est un reflet qui ne réagit pas — et
+      l'ancien dessin posait une diagonale claire immobile.
+
+      Les deux valeurs viennent de la même animation : l'amplitude du reflet
+      est donc solidaire de celle du boîtier par construction, et l'on ne peut
+      pas les désynchroniser en réglant l'une sans l'autre. Le contrôle tient
+      ça : la rotation reste un balancement FAIBLE — six degrés —, sans quoi
+      le dessin qu'on lit changerait de place à chaque tour.
+    */
+    expect(BALANCEMENT).toBeLessThanOrEqual(8);
+  });
+
+  it('le téléphone les joue à la cadence pour laquelle elles sont cuites', () => {
+    /*
+      LES DEUX NOMBRES VIVENT DANS DEUX FICHIERS, et rien ne les tenait
+      ensemble : la cuisson calcule les images pour `IPS`, le flipbook les
+      feuillette toutes les `PERIODE` millisecondes. Réglés séparément, le
+      cycle ne dure plus les cinq secondes annoncées — et personne ne le voit,
+      parce que ça reste une jolie animation, simplement trop lente.
+
+      QUINZE IMAGES PAR SECONDE, C'ÉTAIT LE DÉFAUT. On peut lisser une
+      trajectoire autant qu'on veut : à quinze, l'œil sépare encore les poses
+      d'un mouvement rapide, et c'est ce hachage-là qui se lit comme du bas de
+      gamme.
+    */
+    expect(Math.round(1000 / PERIODE)).toBe(IPS);
+    expect(IPS).toBeGreaterThanOrEqual(24);
   });
 
   it('porte ses deux boutons, et le second seulement s’il y a des scans', () => {

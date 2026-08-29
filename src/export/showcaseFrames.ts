@@ -1,19 +1,60 @@
 /**
  * L'ANIMATION DE LA VITRINE — le plan qui se lève, image par image.
  *
- * Elle montre en trois secondes ce que fait l'application : un plan 2D coté,
- * avec ses appareils électriques, qui se RELÈVE pour devenir un logement
- * meublé en volume. C'est le geste de l'app — la bascule 2D/3D — joué tout
- * seul, et c'est ce qu'on comprend sans une ligne de texte.
+ * Elle montre en cinq secondes ce que fait l'application : un plan qui se
+ * RELÈVE en volume, s'équipe, se cote, et finit en dossier. C'est le
+ * cheminement de l'app, joué tout seul.
  *
  * CES IMAGES SONT CALCULÉES AU BUILD, PAS SUR LE TÉLÉPHONE.
  *
- * La version précédente rendait la scène à vingt-cinq images par seconde sur
- * l'appareil : cent cinquante polygones reprojetés à chaque image, sur un
- * écran d'accueil qui n'a rien à calculer. Ici, tout est cuit d'avance
- * (`npm run showcase`) et embarqué dans l'app : le téléphone ne fait plus que
- * feuilleter des images. Rien à recalculer, donc rien qui puisse ramer ni
- * diverger d'un appareil à l'autre.
+ * La toute première version rendait la scène à vingt-cinq images par seconde
+ * sur l'appareil : cent cinquante polygones reprojetés à chaque image, sur un
+ * écran d'accueil qui n'a rien à calculer. Tout est cuit d'avance
+ * (`npm run showcase`) et embarqué : le téléphone ne fait que feuilleter.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * L'ART DIRECTION : NUIT ÉLECTRIQUE.
+ *
+ * Relevé du patron, en la regardant tourner : « l'animation de l'iPhone et de
+ * son écran ne me convainc pas, on dirait un truc bas de gamme. Je veux
+ * quelque chose de dynamique, rapide, fluide, JS style. Un vrai art style. »
+ *
+ * IL A RAISON, ET LE DÉFAUT SE NOMME. La vitrine d'avant était un DESSIN
+ * TECHNIQUE JUSTE, pas une image : fond blanc, murs blancs, feuilles
+ * blanches, un bandeau bleu plein en bas avec le mot dedans. Rien de faux —
+ * et rien de choisi. Une capture d'écran de logiciel de CAO, exactement ce
+ * qu'on ne veut pas montrer pour vendre.
+ *
+ * QUATRE DÉCISIONS, ET C'EST TOUT CE QUI CHANGE :
+ *
+ *   1. LE FOND DEVIENT NOIR. C'est le seul geste qui transforme un plan de
+ *      CAO en objet : sur le noir, le bleu et le cyan ÉMETTENT au lieu de
+ *      colorier. Le poché du plan s'inverse — blanc lumineux au lieu de noir
+ *      —, et l'on retrouve le plan d'architecte en négatif, qui est ce que
+ *      tout le monde reconnaît comme « une image de plan ».
+ *
+ *   2. LE SOL EST UNE GRILLE. Une trame d'un mètre, qui DÉPASSE du logement
+ *      et s'éteint vers les bords. Le logement cesse de flotter dans le vide :
+ *      il est POSÉ quelque part, et cette trame dit l'échelle sans écrire un
+ *      chiffre. C'est la profondeur qu'un aplat n'a pas.
+ *
+ *   3. LE BANDEAU DISPARAÎT, LE TITRE DESCEND EN BAS À GAUCHE. Un aplat plein
+ *      avec un mot centré dedans, c'est une barre d'état ; un mot posé à même
+ *      l'image, gros, aligné à gauche, avec son numéro et son filet, c'est une
+ *      affiche. Et il ENTRE PAR UNE FENTE — un masque qui découvre le mot
+ *      pendant qu'il monte, et le ravale à la fin du temps. Rien ne se pose
+ *      mollement, rien ne s'efface non plus : ça coupe au montage.
+ *
+ *   4. VINGT-QUATRE IMAGES PAR SECONDE, ET NON QUINZE. C'est le mot
+ *      « fluide », et il ne s'obtient pas autrement : à quinze, un mouvement
+ *      rapide se lit par saccades, quel que soit le lissage. Soixante pour
+ *      cent d'images en plus, et le lissage sinusoïdal peut enfin aller vite
+ *      sans stroboscoper.
+ *
+ * ET LE DOSSIER CESSE D'ÊTRE UNE PAGE BLANCHE PLEIN CADRE. C'est une FEUILLE
+ * qui monte du bas, avec ses marges et son ombre portée, pendant que la
+ * maquette recule et s'assombrit derrière. On voit un document se poser sur
+ * une scène, au lieu d'un écran qui devient blanc.
  *
  * Le fichier ne contient que de la GÉOMÉTRIE : il rend une chaîne SVG pour un
  * avancement donné, et c'est l'outil qui les convertit en images.
@@ -24,41 +65,39 @@ import {
   faceDepth,
   isHiddenFace,
   sceneFraming,
-  shadeFill,
   type ScenePalette,
 } from '../geometry/scene3d';
 import { segLength, type WallSeg } from '../geometry/floorplan';
 import { FIXTURES, type Fixture } from '../geometry/electrical';
 import type { ObjectData } from 'react-native-room-scan';
 
+/** La cadence de la vitrine. Voir `SHOWCASE_FRAMES` pour le pourquoi. */
+export const IPS = 24;
+
 /**
- * Le nombre d'images du cycle complet.
+ * Le nombre d'images du cycle complet — cinq secondes rondes à 24 i/s.
  *
- * Il est passé de 44 à 52 quand la levée s'est allongée : à cadence égale
- * (quinze images par seconde), la douceur ne peut venir QUE d'un pas plus
- * petit entre deux images — et le pas le plus grand de l'ancien cycle
- * faisait cinq degrés et demi d'inclinaison d'un coup, ce qui se lisait
- * comme des paliers. Huit images de plus, c'est 80 ko dans l'IPA.
+ * IL A LONGTEMPS SUIVI LA DURÉE, IL SUIT MAINTENANT LA CADENCE. De 44 à 52
+ * quand la levée s'est allongée, de 52 à 105 quand la vitrine a cessé de
+ * montrer un geste pour raconter un cheminement, de 105 à 80 parce que sept
+ * secondes c'était long.
  *
- * PUIS DE 52 À 105, quand la vitrine a cessé de montrer un geste pour
- * raconter un CHEMINEMENT. Relevé du patron : « refais à l'intérieur de
- * l'écran une animation moderne, rapide et compréhensible : plan 2D, les murs
- * montent et forment un plan 3D, des interrupteurs et prises pop à des
- * endroits, on affiche les cotes rapidement, avec des transitions rapides
- * mais en fondu toujours, et un aperçu d'un scroll du PDF final des plans,
- * etc. En 5-8 secondes, on doit comprendre le cheminement de l'app. »
+ * DE 80 À 120 POUR UNE RAISON D'UNE AUTRE NATURE : la durée ne bouge pas
+ * — cinq secondes avant, cinq secondes après —, c'est la CADENCE qui passe
+ * de quinze à vingt-quatre images par seconde. Relevé du patron : « je veux
+ * quelque chose de dynamique, rapide, fluide ».
  *
- * PUIS DE 105 À 80, parce que sept secondes, c'est long. Relevé du patron, en
- * la regardant tourner : « fais une meilleure animation dans l'iPhone, moderne
- * avec du peps, et des gros titres. Rapide. » Cinq secondes et un tiers : le
- * bas de la fourchette demandée, et vingt-cinq images de moins dans l'IPA.
+ * ET « FLUIDE » NE S'OBTIENT PAS AUTREMENT. On peut lisser une trajectoire
+ * autant qu'on veut : à quinze images par seconde, l'œil sépare encore les
+ * poses d'un mouvement rapide, et c'est ce hachage-là qu'on lit comme du bas
+ * de gamme. Vingt-quatre, c'est la cadence du cinéma, et c'est le premier
+ * palier où un mouvement franc cesse de se décomposer.
  *
- * CE QU'ON A RACCOURCI, ET CE QU'ON N'A PAS TOUCHÉ. Les temps de LECTURE se
- * resserrent — on comprend un plan en une demi-seconde quand un titre le
- * nomme. Le défilement du dossier, lui, garde sa durée : c'est le seul moment
- * où l'œil suit quelque chose au lieu de le reconnaître.
+ * CE QUE ÇA COÛTE : quarante images de plus dans l'IPA. Elles sont en
+ * palette réduite sur un fond presque noir — de grands aplats sombres, ce
+ * que le PNG compresse le mieux.
  */
-export const SHOWCASE_FRAMES = 80;
+export const SHOWCASE_FRAMES = 120;
 
 const mur = (
   id: string,
@@ -147,31 +186,106 @@ export const PLAN = {
 };
 
 export interface FramePalette {
+  /** Le fond de l'écran, et la couleur du voile de vignettage. */
   fond: string;
+  /** La lueur derrière la maquette : ce qui la décolle du fond. */
+  lueur: string;
+  /** La trame du sol, en dessous et autour du logement. */
+  grille: string;
   sol: string;
   solTrait: string;
   mur: string;
   murTrait: string;
+  /** Le poché VU DE DESSUS, à plat : c'est le trait du plan. */
+  poche: string;
+  pocheTrait: string;
+  /** Le dessus des cloisons, une fois le volume levé. */
   murDessus: string;
+  murDessusTrait: string;
   meuble: string;
+  meubleDessus: string;
   meubleTrait: string;
   cote: string;
   baie: string;
   porte: string;
+  /** La couleur qui signe : titres, filets, bulles de cote. */
+  accent: string;
+  texte: string;
+  /** Les deux pôles de l'ombrage : le côté à l'ombre, le côté éclairé. */
+  ombre: string;
+  lumiere: string;
 }
 
+/**
+ * LA PALETTE DE LA VITRINE — nuit électrique.
+ *
+ * Trois familles, et pas une de plus : le NOIR BLEUTÉ du fond et de ses
+ * dégradés, le BLEU ÉLECTRIQUE qui signe (titres, filets, mobilier), le CYAN
+ * et l'AMBRE qui ne servent qu'aux ouvertures — une fenêtre, une porte. Tout
+ * le reste est du gris bleu.
+ *
+ * LE POCHÉ EST BLANC, ET C'EST L'INVERSION QUI FAIT L'IMAGE. Sur papier, la
+ * coupe de la maçonnerie se dessine pleine et noire ; c'est la convention, et
+ * c'est ce qui rend un plan lisible d'un coup d'œil. Sur un fond noir, la
+ * même convention se lit à l'envers : le poché devient la seule chose
+ * lumineuse de l'écran, et la première image du cycle est un plan
+ * d'architecte en négatif.
+ */
 export const SHOWCASE_PALETTE: FramePalette = {
+  fond: '#080B12',
+  lueur: '#16386E',
+  grille: '#2B3E63',
+  sol: '#1C2D4B',
+  solTrait: '#2E4166',
+  mur: '#0F1829',
+  murTrait: '#3E5375',
+  poche: '#E9F0FF',
+  pocheTrait: '#FFFFFF',
+  murDessus: '#7C90B6',
+  murDessusTrait: '#A9BCDD',
+  meuble: '#17233C',
+  meubleDessus: '#22314F',
+  meubleTrait: '#3D7BFF',
+  cote: '#93A6C6',
+  baie: '#22D3EE',
+  porte: '#FFB020',
+  accent: '#3D7BFF',
+  texte: '#FFFFFF',
+  ombre: '#040711',
+  lumiere: '#A8C8FF',
+};
+
+/**
+ * LA PALETTE DU PAPIER — celle du plan IMPRIMÉ, sur la feuille du dossier.
+ *
+ * Elle n'est pas là par nostalgie : un PDF est blanc, et c'est justement le
+ * CONTRASTE avec l'écran sombre qui fait lire « voilà le document » en une
+ * demi-seconde. La même géométrie, un autre papier.
+ */
+export const PAPIER_PALETTE: FramePalette = {
   fond: '#FFFFFF',
-  sol: '#EEF2FB',
-  solTrait: '#D5DCEA',
+  lueur: '#FFFFFF',
+  grille: '#EFF3FA',
+  sol: '#F3F6FC',
+  solTrait: '#D9E0EC',
   mur: '#FFFFFF',
   murTrait: '#8A93A3',
+  poche: '#12161D',
+  pocheTrait: '#12161D',
   murDessus: '#E4E9F2',
+  murDessusTrait: '#8A93A3',
   meuble: '#DCE6FA',
+  meubleDessus: '#FFFFFF',
   meubleTrait: '#2F6BFF',
   cote: '#5A6472',
   baie: '#3EB8E5',
   porte: '#E8A13B',
+  accent: '#2F6BFF',
+  texte: '#0B0D12',
+  // Les pôles de l'application, à l'identique : sur du papier, ce dessin-là
+  // est déjà le bon, et c'est celui qu'on imprime.
+  ombre: '#A08D74',
+  lumiere: '#FFFFFF',
 };
 
 /** Mélange de deux couleurs, en fraction. */
@@ -191,77 +305,155 @@ function melange(a: string, b: string, t: number): string {
 }
 
 /**
- * LE POCHÉ EST NOIR SUR LE PLAN, GRIS SUR LE VOLUME.
+ * ÉCLAIRCIR UNE COULEUR DE L'APPLICATION POUR LA POSER SUR DU NOIR.
  *
- * C'est la convention du dessin d'architecte, et c'est ce qui rend un plan
- * lisible d'un coup d'œil : la coupe de la maçonnerie se dessine pleine. Vu
- * d'en haut, on ne voit QUE ce dessus — un gris clair y donnait une feuille
- * blanche où rien ne se lisait. En volume, la même surface redevient le
- * dessus des cloisons, et un noir franc y ferait une balafre.
+ * Les couleurs de familles d'appareillage (`FIXTURES`) sont réglées pour du
+ * papier blanc : l'ambre des prises est un brun, le bleu des commandes est
+ * sombre. Posées telles quelles sur un fond noir, elles disparaissent.
+ *
+ * ON NE LES CHANGE PAS DANS L'APPLICATION — ce sont les couleurs des schémas,
+ * elles s'impriment. On les éclaircit ICI, pour cette image-là, et le lien
+ * avec la famille reste lisible : un PC ambre reste ambre, en plus clair.
  */
-const scenePalette = (p: FramePalette, t = 0): ScenePalette => ({
-  floor: p.sol,
-  floorStroke: p.solTrait,
-  wall: p.mur,
-  wallStroke: p.murTrait,
-  wallTop: melange('#12161D', p.murDessus, Math.min(1, t * 2.2)),
-  wallTopStroke: melange('#12161D', p.murTrait, Math.min(1, t * 2.2)),
-  opening: p.baie,
-  door: p.porte,
-  window: p.baie,
-  passage: p.meubleTrait,
-  object: p.meuble,
-  objectTop: '#FFFFFF',
-  objectStroke: p.meubleTrait,
-});
+const eclaircir = (c: string, f: number) => melange(c, '#FFFFFF', f);
+
+/**
+ * L'OMBRAGE DE LA VITRINE — et pourquoi il ne peut pas être celui de l'app.
+ *
+ * `shadeFill` éclaire les pans d'un volume avec DEUX PÔLES : le côté à
+ * l'ombre tire vers un brun chaud (`#A08D74`), le côté éclairé vers le blanc.
+ * C'est un réglage juste, longuement défendu — « dans une pièce éclairée par
+ * le jour, une ombre garde la chaleur de ce qu'elle assombrit » — et c'est ce
+ * qui fait passer le rendu du dessin technique à la maquette.
+ *
+ * SUR DU PAPIER BLANC. Sur du noir, il DÉTRUIT la couleur : un mur bleu nuit
+ * mélangé à 38 % de brun devient un gris de carton, et à 34 % de blanc un
+ * gris un peu plus clair. Regardé en image, c'était le dernier reste de bas
+ * de gamme — un logement en carton posé sur une belle nuit.
+ *
+ * ON NE TOUCHE PAS À `shadeFill` : c'est l'ombrage de la vue 3D de
+ * l'application, et il s'imprime. On refait ICI le même calcul avec les pôles
+ * de la palette — pour la nuit, une ombre presque noire et une lumière bleue.
+ * La géométrie de l'éclairage est la même (la lumière décalée de 35° du
+ * regard, pour que deux pans symétriques ne prennent jamais la même teinte) ;
+ * seules les deux couleurs changent.
+ */
+const LUM_COS = Math.cos((35 * Math.PI) / 180);
+const LUM_SIN = Math.sin((35 * Math.PI) / 180);
+const HEXA = /^#[0-9a-fA-F]{6}$/;
+
+function teinteDeFace(
+  f: { fill: string | null; shade?: boolean; normal?: { x: number; z: number } | null; pts: { x: number; z: number }[] },
+  ct: number,
+  st: number,
+  p: FramePalette,
+): string | null {
+  if (!f.shade || !f.fill || !HEXA.test(f.fill)) return f.fill;
+  let nx: number;
+  let nz: number;
+  if (f.normal) {
+    nx = f.normal.x;
+    nz = f.normal.z;
+  } else {
+    const [a, b] = f.pts;
+    const dx = b.x - a.x;
+    const dz = b.z - a.z;
+    const len = Math.hypot(dx, dz) || 1;
+    nx = -dz / len;
+    nz = dx / len;
+  }
+  const lx = st * LUM_COS + ct * LUM_SIN;
+  const lz = ct * LUM_COS - st * LUM_SIN;
+  const face = (nx * lx + nz * lz + 1) / 2;
+  return melange(
+    melange(f.fill, p.ombre, 0.38),
+    melange(f.fill, p.lumiere, 0.34),
+    face,
+  );
+}
+
+/**
+ * LE POCHÉ S'INVERSE PENDANT LA LEVÉE.
+ *
+ * Vu d'en haut, à plat, on ne voit QUE le dessus des cloisons : c'est le
+ * trait du plan, et sur fond noir il doit être blanc. Une fois le volume
+ * levé, la même surface redevient le dessus d'un mur qu'on regarde de biais,
+ * et un blanc franc y ferait une balafre. Le passage se fait sur le premier
+ * tiers de la levée — assez tôt pour qu'on ne le voie pas comme un
+ * changement de couleur.
+ */
+const scenePalette = (p: FramePalette, t = 0): ScenePalette => {
+  const k = Math.min(1, t * 2.2);
+  return {
+    floor: p.sol,
+    floorStroke: p.solTrait,
+    wall: p.mur,
+    wallStroke: p.murTrait,
+    wallTop: melange(p.poche, p.murDessus, k),
+    wallTopStroke: melange(p.pocheTrait, p.murDessusTrait, k),
+    opening: p.baie,
+    door: p.porte,
+    window: p.baie,
+    passage: p.meubleTrait,
+    object: p.meuble,
+    objectTop: p.meubleDessus,
+    objectStroke: p.meubleTrait,
+  };
+};
 
 /**
  * Lissage SINUSOÏDAL : le plan démarre et s'arrête en douceur, comme une
  * main. Il a remplacé le quadratique pour sa vitesse de pointe : à mi-course,
- * le quadratique file à 1,5 fois la moyenne, le sinus à π/2 — et à quinze
- * images par seconde, c'est ce pic-là qui se voit. Il est borné : hors de
- * [0, 1], une rampe n'a rien à dire.
+ * le quadratique file à 1,5 fois la moyenne, le sinus à π/2 — et c'est ce
+ * pic-là qui se voit. Il est borné : hors de [0, 1], une rampe n'a rien à
+ * dire.
  */
 const soie = (t: number) =>
   (1 - Math.cos(Math.PI * Math.max(0, Math.min(1, t)))) / 2;
 
+/**
+ * LE LISSAGE QUI DÉPASSE, pour ce qui doit claquer.
+ *
+ * `soie` arrive à destination et s'y arrête : c'est ce qu'on veut d'une
+ * caméra. Un objet qui SE POSE, lui, dépasse sa cible et revient — c'est ce
+ * que fait toute matière, et c'est exactement ce qu'on lit comme « vivant »
+ * plutôt que comme « interpolé ». Six pour cent de dépassement : de quoi le
+ * sentir, pas de quoi le voir.
+ */
+const ressort = (t: number) => {
+  const x = Math.max(0, Math.min(1, t));
+  return 1 - Math.pow(1 - x, 3) * Math.cos(x * Math.PI * 1.1);
+};
+
 /*
- * LE SCÉNARIO, EN SEPT TEMPS — le cheminement de l'application.
+ * LE SCÉNARIO, EN SIX TEMPS — le cheminement de l'application.
  *
- * Relevé du patron : « en 5-8 secondes, on doit comprendre le cheminement de
- * l'app ». La version d'avant jouait UN geste — la bascule 2D/3D, en boucle.
- * C'était juste et court, et ça ne disait pas ce que l'application produit.
- *
- *   1. LE PLAN. Un T2 à plat, vu de dessus. C'est par là qu'on commence.
+ *   1. LE PLAN. Un T2 à plat, vu de dessus, poché blanc sur nuit. C'est par
+ *      là qu'on commence, et c'est déjà une image.
  *   2. LA LEVÉE. Les murs montent, la caméra s'incline : le même dessin
  *      devient un volume. Rien n'est remplacé — c'est le plan qui se relève.
  *   3. LA POSE. Les appareils paraissent un par un, chacun à sa place sur son
- *      mur. C'est le sujet de l'application, et c'est le temps qui manquait :
- *      ils étaient là depuis la première image, donc on ne les voyait pas
- *      arriver.
- *   4. LES COTES. Chaque appareil dit sa hauteur, en fondu rapide. C'est le
- *      calque « Cotes » de l'app, joué en une seconde.
- *   5. LE FONDU vers le dossier.
- *   6. LA PAGE qui défile — le PDF qu'on remet au client.
- *   7. LE RETOUR au plan, et ça recommence.
+ *      mur, avec l'onde qui dit qu'il vient d'arriver.
+ *   4. LES COTES. Le calque « Cotes » s'allume : les filets descendent au
+ *      sol, et une hauteur de pose s'écrit en grand.
+ *   5. LE DOSSIER. Une feuille monte du bas et défile pendant que la maquette
+ *      recule derrière.
+ *   6. LE RETOUR. La feuille redescend, le plan est là, et ça recommence.
  *
  * ET LA CAMÉRA NE S'ARRÊTE JAMAIS. Un palier où tout se fige se lit comme un
- * diaporama : la visite guidée l'a déjà appris, c'est le mouvement qui
- * continue pendant l'arrêt qui donne la vie. Pendant la pose et les cotes, la
- * caméra dérive en azimut et se rapproche d'un souffle.
- *
- * LA SCÈNE REDESCEND PENDANT QUE LA PAGE EST DEVANT. Elle est cachée — la
- * page couvre l'écran — mais elle redescend quand même, en douceur : le cycle
- * se referme sur le plan sans qu'aucune valeur ne saute, et le garde-fou de
- * continuité garde son sens.
+ * diaporama : c'est le mouvement qui continue pendant l'arrêt qui donne la
+ * vie. Pendant la pose et les cotes, la caméra dérive en azimut et se
+ * rapproche d'un souffle.
  */
-const PLAN_PLAT = 8;
-const LEVEE = 18;
-const POSE = 12;
-const COTES = 9;
-const FONDU = 5;
-const PAGE = 22;
-/** Le retour occupe ce qui reste : 80 − 74 = 6 images. */
+const PLAN_PLAT = 14;
+const LEVEE = 28;
+const POSE = 20;
+const COTES = 16;
+const DOSSIER = 30;
+/** Le retour occupe ce qui reste : 120 − 108 = 12 images, une demi-seconde. */
+
+/** La part du temps du dossier consacrée à la MONTÉE de la feuille. */
+const MONTEE = 8;
 
 interface Instant {
   t: number;
@@ -271,9 +463,9 @@ interface Instant {
   elec: number;
   /** Les cotes de pose, 0 (rien) → 1 (toutes). */
   cotes: number;
-  /** Le fondu vers la page du dossier, 0 (la maquette) → 1 (la page). */
+  /** La feuille du dossier, 0 (hors champ, en bas) → 1 (posée). */
   page: number;
-  /** Le défilement de la page, 0 (en tête) → 1 (en pied). */
+  /** Le défilement de la feuille, 0 (en tête) → 1 (en pied). */
   defilement: number;
 }
 
@@ -318,23 +510,18 @@ function instant(frame: number): Instant {
     };
   }
 
-  // 5 — le fondu vers le dossier : la maquette reste, la page monte dessus.
-  if (i < (d += FONDU)) {
-    const h = soie((i - PLAN_PLAT - LEVEE - POSE - COTES) / FONDU);
-    return {
-      t: 1,
-      theta: -21,
-      zoom: 1.085,
-      elec: 1,
-      cotes: 1,
-      page: h,
-      defilement: 0,
-    };
-  }
+  // 5 — la feuille monte, puis défile. Derrière, la maquette redescend.
+  if (i < (d += DOSSIER)) {
+    const j = i - PLAN_PLAT - LEVEE - POSE - COTES;
+    /*
+      LA MONTÉE SE FAIT AU RESSORT, ET C'EST TOUT LE PROPOS.
 
-  // 6 — la page défile. Derrière, la maquette redescend vers le plan.
-  if (i < (d += PAGE)) {
-    const h = (i - PLAN_PLAT - LEVEE - POSE - COTES - FONDU) / (PAGE - 1);
+      Une feuille qui arrive en fondu, c'est un calque qu'on allume ; une
+      feuille qui monte du bas et se cale d'un dépassement, c'est un document
+      qu'on pose sur la table. Huit images — un tiers de seconde.
+    */
+    const page = ressort(j / MONTEE);
+    const h = Math.max(0, (j - MONTEE) / (DOSSIER - MONTEE - 1));
     const t = 1 - soie(h);
     return {
       t,
@@ -342,12 +529,12 @@ function instant(frame: number): Instant {
       zoom: 1 + 0.085 * t,
       elec: 1 - soie(h * 1.6),
       cotes: 0,
-      page: 1,
+      page,
       defilement: soie(h),
     };
   }
 
-  // 7 — le retour : la page s'efface sur le plan, prêt à recommencer.
+  // 6 — le retour : la feuille redescend, le plan est prêt à recommencer.
   const reste = n - d;
   const h = soie((i - d) / reste);
   return { ...NEUTRE, t: 0, theta: 0, zoom: 1, page: 1 - h, defilement: 1 };
@@ -371,14 +558,13 @@ export function etatDeLImage(frame: number): Instant {
 /**
  * LES GROS TITRES — un mot par temps, et c'est lui qui fait comprendre.
  *
- * Relevé du patron : « moderne avec du peps, et des gros titres ». Une
- * animation muette demande à l'œil de deviner ce qu'il regarde : on voit un
- * plan se lever sans savoir que c'est ÇA, le geste de l'application. Un mot
- * posé dessus fait la moitié du travail — et permet de raccourcir le reste,
- * parce qu'on lit « LE RELEVÉ » plus vite qu'on ne le déduit.
+ * Une animation muette demande à l'œil de deviner ce qu'il regarde : on voit
+ * un plan se lever sans savoir que c'est ÇA, le geste de l'application. Un
+ * mot posé dessus fait la moitié du travail — et permet de raccourcir le
+ * reste, parce qu'on lit « LE RELEVÉ » plus vite qu'on ne le déduit.
  *
  * CINQ MOTS, DIX SIGNES AU PLUS. C'est ce qui permet de les écrire GROS : à
- * dix signes, le mot tient toute la largeur de l'écran en corps 30. Un
+ * dix signes, le mot tient toute la largeur de l'écran en corps 34. Un
  * sixième mot, ou un mot de quinze signes, et l'on retombe sur du texte.
  */
 export const TITRES: { mot: string; jusqua: number }[] = [
@@ -390,68 +576,188 @@ export const TITRES: { mot: string; jusqua: number }[] = [
 ];
 
 /**
- * Le titre d'une image, et son ENTRÉE.
+ * LA FENTE DU TITRE — sa hauteur, et la course d'un mot qui la traverse.
  *
- * `avance` va de 0 à 1 sur les trois premières images du temps : le mot
- * monte de douze points et paraît. Trois images, c'est deux dixièmes de
- * seconde — assez pour que ce soit un mouvement, trop peu pour qu'on
- * attende. C'est ça, le peps : rien ne se pose mollement.
+ * Le mot n'existe qu'entre ces deux lignes : il y monte par le bas, il en
+ * sort par le haut. La fente épouse la boîte des capitales, et la course vaut
+ * sa hauteur — c'est ce qui garantit qu'un mot est ENTIÈREMENT dessous avant
+ * d'entrer, et entièrement dessus après être sorti.
  */
-export function titreDeLImage(frame: number): { mot: string; avance: number } {
+const FENTE = 34;
+
+/**
+ * LA BASCULE EST UN ROULEAU, PAS UNE COUPURE.
+ *
+ * Premier réglage : chaque mot entrait au début de son temps et sortait à la
+ * fin. Entre les deux, la fente restait VIDE pendant une image ou deux, et
+ * l'on voyait passer un mot coupé en tranche — ce qui se lit comme un défaut
+ * d'affichage, pas comme un montage.
+ *
+ * La bascule est maintenant À CHEVAL sur la coupure : sur cinq images, le mot
+ * qui s'en va monte pendant que le suivant arrive, dans la même fente. Il y a
+ * donc toujours quelque chose à lire, et le passage d'un temps à l'autre est
+ * un mouvement continu — c'est le geste qu'on connaît des compteurs
+ * kilométriques, et c'est ce qui donne le rythme.
+ */
+const ROULEAU = 5;
+
+/** Où en est un titre à cette image : sa place dans la fente, et sa densité. */
+function placeDuTitre(i: number, debut: number, fin: number) {
+  const dedans = soie((i - debut + ROULEAU / 2) / ROULEAU);
+  const dehors = soie((i - fin + ROULEAU / 2) / ROULEAU);
+  return {
+    dedans,
+    dehors,
+    dy: (1 - dedans) * FENTE - dehors * FENTE,
+    opacite: dedans * (1 - dehors),
+  };
+}
+
+export interface EtatDuTitre {
+  mot: string;
+  /** Le rang du temps, à partir de 1 : c'est le numéro affiché. */
+  rang: number;
+  /** L'entrée, 0 (encore sous la fente) → 1 (en place). */
+  avance: number;
+  /** La sortie, 0 (en place) → 1 (ravalé au-dessus de la fente). */
+  sortie: number;
+  /** Le décalage dans la fente, en points : positif = encore dessous. */
+  dy: number;
+  opacite: number;
+}
+
+/**
+ * LES MOTS PRÉSENTS À CETTE IMAGE — un, ou deux pendant la bascule.
+ *
+ * LE CYCLE SE REFERME AUSSI SUR LE TITRE. Le dernier mot doit sortir pendant
+ * que le premier entre, et ces deux moments sont de part et d'autre de
+ * l'image zéro. Chaque titre est donc évalué DEUX FOIS — à `i` et à `i + n` —
+ * et l'on garde la meilleure des deux : c'est ce qui fait que la boucle ne se
+ * voit pas, au lieu d'une fente vide à chaque tour.
+ */
+export function titresDeLImage(frame: number): EtatDuTitre[] {
   const n = SHOWCASE_FRAMES;
   const i = ((frame % n) + n) % n;
+  const vus: EtatDuTitre[] = [];
   let debut = 0;
-  for (const t of TITRES) {
-    if (i < t.jusqua) {
-      return { mot: t.mot, avance: soie((i - debut + 1) / 3) };
+  for (const [k, t] of TITRES.entries()) {
+    const a = placeDuTitre(i, debut, t.jusqua);
+    const b = placeDuTitre(i + n, debut, t.jusqua);
+    const q = b.opacite > a.opacite ? b : a;
+    if (q.opacite > 0.01) {
+      vus.push({
+        mot: t.mot,
+        rang: k + 1,
+        avance: q.dedans,
+        sortie: q.dehors,
+        dy: q.dy,
+        opacite: q.opacite,
+      });
     }
     debut = t.jusqua;
   }
-  return { mot: TITRES[TITRES.length - 1].mot, avance: 1 };
+  return vus.sort((x, y) => x.opacite - y.opacite);
 }
 
-/** Où l'on en est du cycle, de 0 à 1 : c'est la barre du bandeau. */
+/** Le mot DOMINANT de l'image : celui qu'on lit, celui qui donne le numéro. */
+export function titreDeLImage(frame: number): EtatDuTitre {
+  const vus = titresDeLImage(frame);
+  if (vus.length) return vus[vus.length - 1];
+  // Hors bascule, la boucle repasse toujours par un titre : ce retour n'est
+  // là que pour que la fonction soit totale.
+  return {
+    mot: TITRES[0].mot,
+    rang: 1,
+    avance: 1,
+    sortie: 0,
+    dy: 0,
+    opacite: 1,
+  };
+}
+
+/** Où l'on en est du cycle, de 0 à 1 : c'est le filet du bas. */
 export function progression(frame: number): number {
   const n = SHOWCASE_FRAMES;
   return (((frame % n) + n) % n) / (n - 1);
 }
 
 /**
- * LE BANDEAU DU TITRE — posé sur tout, y compris sur le dossier.
+ * LA BANDE DU BAS — le titre, son numéro, son filet, et l'avancement.
  *
- * Il est PLEIN et bleu, et non un texte posé à même l'image : le mot doit se
- * lire aussi bien sur un plan blanc que sur une page de bordereau grise, et
- * un texte qui change de fond change de lisibilité. Un aplat règle la
- * question une fois pour toutes.
+ * ELLE N'EST PLUS UN APLAT. La version d'avant posait un rectangle bleu plein
+ * en pied d'écran avec le mot centré dedans : c'est le dessin d'une barre
+ * d'état, pas d'une affiche, et c'était la première chose qui faisait bas de
+ * gamme. Le mot est maintenant posé À MÊME l'image, aligné à gauche, avec
+ * son numéro de temps au-dessus et un filet d'accent qui pousse sous lui.
  *
- * ET IL PORTE LA BARRE D'AVANCEMENT. Elle ne sert à rien qu'à dire « ça
- * tourne, et ça va finir » — c'est exactement ce qu'on regarde sans le
- * savoir sur une vitrine.
+ * IL RESTE LISIBLE SANS APLAT parce que le fond est noir et le mot blanc :
+ * c'est le passage en nuit qui a rendu le rectangle inutile. Sur la feuille
+ * du dossier — le seul moment clair de la vitrine — le titre garde sa place :
+ * la feuille s'arrête au-dessus de la bande, elle ne monte jamais dessous.
  */
-export function bandeauSvg(
+export const BANDE = 92;
+
+export function titreSvg(
   frame: number,
   W: number,
   H: number,
   p: FramePalette = SHOWCASE_PALETTE,
 ): string {
-  const { mot, avance } = titreDeLImage(frame);
-  const haut = 58;
-  const y = H - haut;
-  // Le mot monte en paraissant : douze points, sur les trois images d'entrée.
-  const monte = (1 - avance) * 12;
-  const corps = Math.min(30, (W * 0.86) / (mot.length * 0.58));
+  const vus = titresDeLImage(frame);
+  const chef = titreDeLImage(frame);
+  const marge = 18;
+  const base = H - 34;
+  const fente = { y: base - 28, h: FENTE };
+  const id = `f${frame}`;
+  const out: string[] = [];
+
+  // Le numéro du temps, au-dessus du mot : « 03 / 05 ».
+  out.push(
+    `<text x="${marge}" y="${(base - 40).toFixed(0)}" ` +
+      `font-family="Helvetica, Arial, sans-serif" ` +
+      `font-size="9.5" font-weight="bold" letter-spacing="2.2" fill="${p.accent}" ` +
+      `opacity="${(chef.opacite * 0.95).toFixed(2)}">` +
+      `0${chef.rang} / 0${TITRES.length}</text>`,
+  );
+
+  // Les mots, dans la fente — le sortant et l'entrant se croisent dedans.
+  const dedans = vus
+    .map((v) => {
+      const corps = Math.min(34, (W - 2 * marge) / (v.mot.length * 0.62));
+      return (
+        `<text x="${marge}" y="${(base + v.dy).toFixed(1)}" ` +
+        `font-family="Helvetica, Arial, sans-serif" ` +
+        `font-size="${corps.toFixed(1)}" font-weight="bold" letter-spacing="-0.9" ` +
+        `fill="${p.texte}" opacity="${v.opacite.toFixed(2)}">${v.mot}</text>`
+      );
+    })
+    .join('');
+  out.push(
+    `<defs><clipPath id="${id}"><rect x="0" y="${fente.y.toFixed(1)}" ` +
+      `width="${W}" height="${fente.h}"/></clipPath></defs>`,
+    `<g clip-path="url(#${id})">${dedans}</g>`,
+  );
+
+  // Le filet d'accent, qui pousse sous le mot en même temps qu'il entre.
+  out.push(
+    `<rect x="${marge}" y="${(base + 9).toFixed(1)}" ` +
+      `width="${(38 * chef.opacite).toFixed(1)}" height="3" ` +
+      `fill="${p.accent}"/>`,
+  );
+
+  /*
+    L'AVANCEMENT EST UN FILET D'UN POINT ET DEMI, au ras du bord.
+
+    Il ne sert à rien qu'à dire « ça tourne, et ça va finir » — c'est
+    exactement ce qu'on regarde sans le savoir sur une vitrine. Un point et
+    demi, parce qu'une barre plus épaisse redeviendrait un élément d'interface.
+  */
+  const yb = H - 1.5;
   return (
-    `<rect x="0" y="${y}" width="${W}" height="${haut}" fill="${p.meubleTrait}"/>` +
-    `<g opacity="${avance.toFixed(2)}">` +
-    `<text x="${(W / 2).toFixed(0)}" y="${(y + 36 + monte).toFixed(1)}" ` +
-    `font-family="Helvetica" font-size="${corps.toFixed(1)}" font-weight="bold" ` +
-    `letter-spacing="0.5" text-anchor="middle" fill="#FFFFFF">${mot}</text>` +
-    `</g>` +
-    // La barre : un rail sombre, un trait blanc qui avance dessus.
-    `<rect x="0" y="${(H - 4).toFixed(0)}" width="${W}" height="4" ` +
-    `fill="#FFFFFF" fill-opacity="0.25"/>` +
-    `<rect x="0" y="${(H - 4).toFixed(0)}" ` +
-    `width="${(W * progression(frame)).toFixed(1)}" height="4" fill="#FFFFFF"/>`
+    out.join('') +
+    `<rect x="0" y="${yb}" width="${W}" height="1.5" fill="${p.texte}" fill-opacity="0.12"/>` +
+    `<rect x="0" y="${yb}" width="${(W * progression(frame)).toFixed(1)}" ` +
+    `height="1.5" fill="${p.accent}"/>`
   );
 }
 
@@ -499,9 +805,15 @@ export function cascade(t: number, k: number): number {
 /**
  * Une image de l'animation, en SVG.
  *
- * `t` va de 0 (le plan, à plat, coté) à 1 (le volume meublé). Tout le reste
- * en découle : la hauteur des murs, l'inclinaison de la caméra, la présence
- * des meubles, l'effacement des cotes.
+ * `t` va de 0 (le plan, à plat, poché blanc) à 1 (le volume meublé). Tout le
+ * reste en découle : la hauteur des murs, l'inclinaison de la caméra, la
+ * présence des meubles.
+ *
+ * ELLE NE POSE AUCUN `id` SVG, et c'est délibéré : cette fonction est
+ * RAPPELÉE À L'INTÉRIEUR d'une autre image — le plan imprimé de la feuille du
+ * dossier est ce même dessin, réduit. Deux `<clipPath id="x">` dans un même
+ * document, et c'est le dernier qui gagne pour tout le monde. Les dégradés et
+ * les masques vivent donc dans `imageSvg` et dans `titreSvg`, jamais ici.
  */
 export function frameSvg(
   t: number,
@@ -515,7 +827,7 @@ export function frameSvg(
     CE QUI NE SE DÉDUIT PAS DE LA LEVÉE : les appareils arrivent après elle,
     les cotes après eux. `t` ne sait dire que la hauteur des murs.
   */
-  etat?: { elec?: number; cotes?: number },
+  etat?: { elec?: number; cotes?: number; grille?: boolean },
 ): string {
   /*
     LE PLAN SE LÈVE, AU SENS PROPRE.
@@ -536,9 +848,6 @@ export function frameSvg(
     était un trait horizontal, et le banc l'a dit avant l'écran.
   */
   const tilt = 52 * t;
-  // Un quart de tour très lent pendant la levée : le volume se révèle au
-  // lieu de se déplier de face. Le cycle complet passe sa propre caméra,
-  // qui dérive aussi pendant les paliers.
   const theta = cam?.theta ?? -14 * t;
   const zoom = cam?.zoom ?? 1;
 
@@ -578,14 +887,10 @@ export function frameSvg(
     baie('porte-chambre', 3.0, 2.7, 3.85, 2.7, 'door', 2.05, 0),
   ];
   /*
-    LE MOBILIER ARRIVE EN VAGUE, PAS D'UN COUP — ni même d'un seul fondu.
-
-    Il sortait du sol à pleine opacité : une coupure, corrigée d'abord par un
-    fondu global. Mais un logement entier qui se matérialise d'un bloc reste
-    mécanique. Chaque meuble a maintenant sa fenêtre (`cascade`), calée sur
-    sa position : la vague suit la levée du nord au sud, chaque meuble sort
-    du sol en fondu, et les fenêtres se chevauchent assez pour qu'on voie un
-    logement se remplir — pas des meubles surgir.
+    LE MOBILIER ARRIVE EN VAGUE, calée sur la position de chaque meuble : la
+    vague suit la levée du nord au sud, chaque meuble sort du sol en fondu, et
+    les fenêtres se chevauchent assez pour qu'on voie un logement se remplir —
+    pas des meubles surgir.
   */
   const apparitions = PLAN.meubles.map((_, k) => cascade(t, k));
   const appParId = new Map(
@@ -641,7 +946,61 @@ export function frameSvg(
   const oeil = { ct, st, cp, sp };
 
   const out: string[] = [];
-  out.push(`<rect width="${W}" height="${H}" fill="${p.fond}"/>`);
+
+  /*
+    LA TRAME DU SOL — un mètre, et elle DÉPASSE du logement.
+
+    C'est le geste qui décolle la maquette du fond. Sans elle, un logement
+    sombre sur un fond sombre flotte dans le vide, et l'œil n'a rien pour
+    juger ni la taille ni l'assiette. Avec elle, le logement est POSÉ, et la
+    trame dit l'échelle sans écrire un chiffre — un carreau, un mètre.
+
+    ELLE S'ÉTEINT VERS LES BORDS, par le calcul et non par un masque : chaque
+    ligne prend son opacité de sa distance au logement. Un masque en dégradé
+    demanderait un `id` SVG, et cette fonction n'a pas le droit d'en poser
+    (voir l'en-tête). C'est la contrainte qui a choisi la méthode, et le
+    résultat est le même.
+
+    Elle est dessinée AVANT la scène : le sol des pièces, opaque, la couvre à
+    l'intérieur du logement. Il ne reste donc que le pourtour — exactement ce
+    qu'on veut voir.
+  */
+  if (etat?.grille !== false) {
+    const bord = 3.4;
+    const cxp = 2.1;
+    const czp = 3.2;
+    const trame: string[] = [];
+    const ligne = (
+      a: { x: number; z: number },
+      b: { x: number; z: number },
+      loin: number,
+    ) => {
+      const o = Math.max(0, 0.62 - loin * 0.055);
+      if (o < 0.03) return;
+      const q1 = project({ x: a.x, y: 0, z: a.z });
+      const q2 = project({ x: b.x, y: 0, z: b.z });
+      trame.push(
+        `<line x1="${q1.sx.toFixed(1)}" y1="${q1.sy.toFixed(1)}" ` +
+          `x2="${q2.sx.toFixed(1)}" y2="${q2.sy.toFixed(1)}" ` +
+          `stroke="${p.grille}" stroke-width="0.8" opacity="${o.toFixed(2)}"/>`,
+      );
+    };
+    for (let x = -bord; x <= 4.2 + bord + 0.001; x += 1) {
+      ligne(
+        { x, z: -bord },
+        { x, z: 6.4 + bord },
+        Math.abs(x - cxp) > 2.1 ? Math.abs(x - cxp) - 2.1 : 0,
+      );
+    }
+    for (let z = -bord; z <= 6.4 + bord + 0.001; z += 1) {
+      ligne(
+        { x: -bord, z },
+        { x: 4.2 + bord, z },
+        Math.abs(z - czp) > 3.2 ? Math.abs(z - czp) - 3.2 : 0,
+      );
+    }
+    out.push(trame.join(''));
+  }
 
   const polys = scene.faces
     .filter((f) => !isHiddenFace(f, oeil))
@@ -650,8 +1009,10 @@ export function frameSvg(
       const voile = f.cutaway && f.normal ? cutawayOpacity(f.normal, oeil) : 1;
       return {
         depth: faceDepth(f, project, oeil),
-        fill: shadeFill(f, ct, st),
+        fill: teinteDeFace(f, ct, st, p),
         stroke: f.stroke,
+        // Le sol est le seul pan qui laisse voir ce qu'il y a dessous.
+        sol: f.isFloor === true,
         // `ownerId` dit À QUEL meuble appartient la face : c'est ce qui
         // permet à chacun de suivre sa propre fenêtre de la vague.
         owner: f.ownerId,
@@ -664,7 +1025,18 @@ export function frameSvg(
   for (const q of polys) {
     // Chaque meuble monte en opacité sur sa fenêtre ; la maçonnerie, elle,
     // est là dès la première image — c'est le plan.
-    const vu = q.owner ? q.voile * (appParId.get(q.owner) ?? 1) : q.voile;
+    /*
+      LE SOL EST TRANSLUCIDE, ET C'EST LA TRAME QUI EN PROFITE.
+
+      Elle est dessinée AVANT la scène : le sol des pièces, opaque, la couvrait
+      donc à l'intérieur du logement, et les deux pièces se lisaient comme deux
+      trous noirs au milieu d'un quadrillage. À sept dixièmes, le sol garde sa
+      teinte et la trame se devine dessous — le carrelage d'un plan technique,
+      exactement ce qu'on veut ici.
+    */
+    const vu =
+      (q.owner ? q.voile * (appParId.get(q.owner) ?? 1) : q.voile) *
+      (q.sol && p.fond !== '#FFFFFF' ? 0.7 : 1);
     if (vu < 0.01) continue;
     // Le trait d'un meuble suit exactement son fondu ; celui de la
     // maçonnerie garde son minimum, qui dit l'écorché.
@@ -685,19 +1057,15 @@ export function frameSvg(
 
     C'est le sujet de l'application, et c'était le temps qui manquait au
     scénario : ils paraissaient dès la première image, donc on ne les voyait
-    jamais arriver. Relevé du patron : « des interrupteurs et prises pop à des
-    endroits ». Chacun a sa fenêtre (`pose`), et il grandit en paraissant —
-    c'est ce sursaut d'échelle qui fait lire un « pop » plutôt qu'un fondu.
+    jamais arriver. Chacun a sa fenêtre (`pose`), et il grandit en paraissant
+    — c'est ce sursaut d'échelle qui fait lire un « pop » plutôt qu'un fondu.
 
-    PUIS ILS DISENT LEUR HAUTEUR. « On affiche les cotes rapidement » : un
-    filet jusqu'au sol et le nombre en centimètres, comme le calque « Cotes »
-    de l'application. La vitrine ne cotait plus rien depuis qu'on lui avait
-    retiré les cotes du PLAN — celles-là donnaient la taille d'un logement
-    inventé, ce qui n'apprend rien. Une cote d'appareil, elle, dit ce que
-    l'app sait faire.
+    PUIS ILS DISENT LEUR HAUTEUR. Un filet jusqu'au sol et le nombre en
+    centimètres, comme le calque « Cotes » de l'application.
   */
   const elec = Math.max(0, Math.min(1, etat?.elec ?? 1));
   const cotes = Math.max(0, Math.min(1, etat?.cotes ?? 0));
+  const sombre = p.fond !== '#FFFFFF';
   const parMur = new Map(murs.map((w) => [w.id, w]));
   for (const [k, f] of PLAN.elec.entries()) {
     const vu = pose(elec, k);
@@ -713,26 +1081,46 @@ export function frameSvg(
     };
     const q = project(at);
     const spec = FIXTURES[f.kind];
+    // Sur la nuit, la couleur de famille s'éclaircit pour émettre ; sur le
+    // papier, elle reste celle du schéma imprimé.
+    const teinte = sombre ? eclaircir(spec.color, 0.45) : spec.color;
     /*
       LE SIGLE S'ÉCRIT, il ne se met pas dans une pastille.
 
       Un disque de couleur dit qu'il y a quelque chose, jamais quoi : sur un
       mur qui en porte trois, on comptait des confettis. Le sigle se lit à la
-      même taille, dans la couleur de sa famille, avec un liseré clair qui le
-      détache du poché comme du mobilier.
+      même taille, dans la couleur de sa famille, avec un liseré qui le
+      détache du poché comme du mobilier — clair sur le papier, sombre sur la
+      nuit.
     */
     const cx = q.sx.toFixed(1);
     const cy = (q.sy + 3).toFixed(1);
+    /*
+      LA LUEUR DE L'APPAREIL — deux disques, et c'est ce qui fait la nuit.
+
+      Un sigle de neuf points posé sur du noir est un caractère perdu ; le
+      même sigle sur une lueur de sa couleur devient un POINT LUMINEUX qu'on
+      repère avant de le lire. C'est le seul endroit de l'image où l'on
+      dépense de la couleur, et c'est le sujet de l'application.
+    */
+    if (sombre) {
+      out.push(
+        `<circle cx="${cx}" cy="${(q.sy - 1).toFixed(1)}" r="${(13 * vu).toFixed(1)}" ` +
+          `fill="${teinte}" opacity="${(0.13 * vu).toFixed(2)}"/>`,
+        `<circle cx="${cx}" cy="${(q.sy - 1).toFixed(1)}" r="${(7 * vu).toFixed(1)}" ` +
+          `fill="${teinte}" opacity="${(0.22 * vu).toFixed(2)}"/>`,
+      );
+    }
     // Le sursaut : il paraît à 60 % de sa taille et finit à 100 %.
     const corps = (9 * (0.6 + 0.4 * vu)).toFixed(1);
     const police =
-      `font-family="Helvetica" font-size="${corps}" font-weight="bold" ` +
-      `text-anchor="middle"`;
+      `font-family="Helvetica Neue, Helvetica, Arial, sans-serif" ` +
+      `font-size="${corps}" font-weight="bold" text-anchor="middle"`;
     out.push(
       `<text x="${cx}" y="${cy}" ${police} fill="none" ` +
-        `stroke="#FFFFFF" stroke-width="3" opacity="${vu.toFixed(2)}">` +
+        `stroke="${p.fond}" stroke-width="3" opacity="${vu.toFixed(2)}">` +
         `${spec.short}</text>`,
-      `<text x="${cx}" y="${cy}" ${police} fill="${spec.color}" ` +
+      `<text x="${cx}" y="${cy}" ${police} fill="${teinte}" ` +
         `opacity="${vu.toFixed(2)}">${spec.short}</text>`,
     );
     /*
@@ -745,9 +1133,9 @@ export function frameSvg(
       const onde = Math.max(0, Math.min(1, vu / 0.85));
       out.push(
         `<circle cx="${cx}" cy="${(q.sy - 1).toFixed(1)}" ` +
-          `r="${(4 + 14 * onde).toFixed(1)}" fill="none" ` +
-          `stroke="${spec.color}" stroke-width="${(2.2 * (1 - onde)).toFixed(2)}" ` +
-          `opacity="${(0.75 * (1 - onde)).toFixed(2)}"/>`,
+          `r="${(4 + 16 * onde).toFixed(1)}" fill="none" ` +
+          `stroke="${teinte}" stroke-width="${(2.4 * (1 - onde)).toFixed(2)}" ` +
+          `opacity="${(0.85 * (1 - onde)).toFixed(2)}"/>`,
       );
     }
     if (cotes > 0.02) {
@@ -757,15 +1145,10 @@ export function frameSvg(
 
         MAIS LE NOMBRE NE S'ÉCRIT PLUS À CÔTÉ DE CHAQUE FILET. Premier jet :
         un « 110 » et un « 25 » en corps sept et demi, sur chacun des six
-        appareils. Regardé à la taille réelle de la maquette — l'écran fait
-        cent dix-huit points de large, l'image deux cent soixante-quatre —,
-        ces nombres tombaient sous quatre points : six taches grises
-        illisibles, et un temps fort qui ne montrait rien.
-
-        Les filets restent — ils disent que le calque est allumé — et UNE
-        SEULE cote s'écrit, en grand, sur un appareil (voir plus bas). C'est
-        la même chose qu'un plan qu'on annote pour une photo : on ne cote pas
-        tout, on montre qu'on cote.
+        appareils. Regardé à la taille réelle de la maquette, ces nombres
+        tombaient sous quatre points : six taches illisibles, et un temps fort
+        qui ne montrait rien. Les filets restent — ils disent que le calque
+        est allumé — et UNE SEULE cote s'écrit, en grand.
       */
       const bas = project({ x: at.x, y: 0, z: at.z });
       out.push(
@@ -793,14 +1176,14 @@ export function frameSvg(
           `<line x1="${cx}" y1="${((q.sy + bas.sy) / 2).toFixed(1)}" ` +
             `x2="${(aGauche ? bx + larg - 4 : bx + 4).toFixed(1)}" ` +
             `y2="${(by + 12).toFixed(1)}" ` +
-            `stroke="${p.meubleTrait}" stroke-width="1.2" ` +
+            `stroke="${p.accent}" stroke-width="1.2" ` +
             `opacity="${cotes.toFixed(2)}"/>`,
           `<rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${larg}" ` +
-            `height="24" rx="12" fill="${p.meubleTrait}" ` +
+            `height="24" rx="12" fill="${p.accent}" ` +
             `opacity="${cotes.toFixed(2)}"/>`,
           `<text x="${(bx + larg / 2).toFixed(1)}" y="${(by + 17).toFixed(1)}" ` +
-            `font-family="Helvetica" font-size="14" font-weight="bold" ` +
-            `text-anchor="middle" fill="#FFFFFF" ` +
+            `font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="14" ` +
+            `font-weight="bold" text-anchor="middle" fill="#FFFFFF" ` +
             `opacity="${cotes.toFixed(2)}">${cm}</text>`,
         );
       }
@@ -814,22 +1197,26 @@ export function frameSvg(
 }
 
 /**
- * LE DOSSIER QU'ON REMET AU CLIENT — deux feuilles, qui défilent.
+ * LE DOSSIER QU'ON REMET AU CLIENT — une feuille, qui monte et défile.
  *
- * Relevé du patron : « un aperçu d'un scroll du PDF final des plans etc. ».
- * C'est la fin du cheminement, et c'est ce qu'on ne montrait nulle part : la
- * vitrine s'arrêtait au volume, alors que le volume n'est qu'une étape — ce
- * qu'on emporte sur le chantier, c'est le dossier.
+ * C'est la fin du cheminement : la vitrine s'arrêtait au volume, alors que le
+ * volume n'est qu'une étape — ce qu'on emporte sur le chantier, c'est le
+ * dossier.
  *
- * LA PREMIÈRE FEUILLE PORTE LE VRAI PLAN. Elle rappelle `frameSvg` à plat et
- * le réduit dans son cadre : c'est le même dessin que celui qu'on vient de
- * regarder se lever, pas une illustration à côté. Deux plans dessinés
- * séparément finiraient par ne plus se ressembler.
+ * ELLE NE REMPLIT PLUS L'ÉCRAN, ET C'EST TOUT CE QUI A CHANGÉ. Le premier
+ * dessin posait une page blanche de bord à bord : sur un fond noir, ça ne
+ * dit pas « voici le document », ça dit « l'écran est devenu blanc ». La
+ * feuille a maintenant ses marges, ses coins arrondis et son ombre portée —
+ * on voit un objet posé sur une scène.
  *
- * LA SECONDE EST UN BORDEREAU : des lignes, des quantités à droite, un total
- * plus foncé. On ne cherche pas à le faire lire — on cherche à ce qu'on le
- * RECONNAISSE en une demi-seconde, et une liste chiffrée se reconnaît à sa
- * forme.
+ * LA PREMIÈRE PAGE PORTE LE VRAI PLAN. Elle rappelle `frameSvg` à plat, sur
+ * la palette du PAPIER, et le rend dans son cadre : c'est le même dessin que
+ * celui qu'on vient de regarder se lever, pas une illustration à côté. Deux
+ * plans dessinés séparément finiraient par ne plus se ressembler.
+ *
+ * LA SECONDE EST UN BORDEREAU : des lignes, des quantités à droite, un total.
+ * On ne cherche pas à le faire lire — on cherche à ce qu'on le RECONNAISSE en
+ * une demi-seconde, et une liste chiffrée se reconnaît à sa forme.
  */
 export function pageSvg(
   defilement: number,
@@ -838,137 +1225,192 @@ export function pageSvg(
   p: FramePalette = SHOWCASE_PALETTE,
 ): string {
   const d = Math.max(0, Math.min(1, defilement));
-  // Deux feuilles et leur entre-deux : la course du défilement, c'est ce qui
-  // dépasse de l'écran.
-  const feuille = H * 0.98;
-  const ecart = H * 0.06;
+  const pap = p.fond === '#FFFFFF' ? p : PAPIER_PALETTE;
+  // La fenêtre de la feuille : des marges, et le titre laissé libre en bas.
+  const x0 = 18;
+  const larg = W - 2 * x0;
+  const y0 = 22;
+  const haut = H - BANDE - y0 - 10;
+  /*
+    UNE FEUILLE À PEINE PLUS HAUTE QUE SA FENÊTRE.
+
+    Premier dessin : des feuilles d'un tiers plus hautes, et un défilement
+    qui courait jusqu'en bas de la seconde. Regardé en image, le dernier
+    tiers du temps fort ne montrait QUE du blanc — la page était finie et
+    l'on continuait de dérouler. La feuille fait maintenant six pour cent de
+    plus que la fenêtre : le défilement va d'une page à l'autre, et il
+    s'arrête là où le contenu s'arrête.
+  */
+  const feuille = haut * 1.06;
+  const ecart = 14;
   const total = feuille * 2 + ecart;
-  const y0 = -d * (total - H);
+  const dy = -d * (total - haut);
   const out: string[] = [];
-  out.push(`<rect width="${W}" height="${H}" fill="#E7EAF0"/>`);
-  out.push(`<g transform="translate(0 ${y0.toFixed(1)})">`);
 
-  /** Une feuille blanche, ombre portée comprise. */
-  const sheet = (y: number) =>
-    `<rect x="6" y="${y.toFixed(1)}" width="${W - 12}" height="${feuille.toFixed(1)}" ` +
-    `fill="#FFFFFF" stroke="#D5DCEA" stroke-width="1"/>`;
+  /*
+    L'OMBRE PORTÉE, EN TROIS COUCHES. Une ombre floue demanderait un filtre
+    SVG, donc un `id`, donc un risque de collision dans le document complet.
+    Trois rectangles décalés et de plus en plus faibles font le même office à
+    cette taille — et ne coûtent rien au rendu.
+  */
+  for (const [i, o] of [0.5, 0.3, 0.16].entries()) {
+    const e = (i + 1) * 3;
+    out.push(
+      `<rect x="${(x0 - e / 2).toFixed(1)}" y="${(y0 + e).toFixed(1)}" ` +
+        `width="${(larg + e).toFixed(1)}" height="${haut.toFixed(1)}" rx="${(7 + e / 2).toFixed(1)}" ` +
+        `fill="#000000" opacity="${o}"/>`,
+    );
+  }
 
-  // ---------------------------------------------------------- feuille 1
-  out.push(sheet(0));
+  const contenu: string[] = [];
+  /** Une page blanche, dans le défilement. */
+  const page = (y: number) =>
+    `<rect x="0" y="${y.toFixed(1)}" width="${larg}" height="${feuille.toFixed(1)}" ` +
+    `fill="#FFFFFF"/>`;
   const cartouche = (y: number, titre: string) =>
-    `<rect x="6" y="${y.toFixed(1)}" width="${W - 12}" height="26" fill="${p.meubleTrait}"/>` +
-    `<text x="18" y="${(y + 18).toFixed(1)}" font-family="Helvetica" font-size="12" ` +
-    `font-weight="bold" fill="#FFFFFF">${titre}</text>`;
-  out.push(cartouche(0, 'PLAN — T2, 27 m²'));
-  /*
-    LE PLAN DE LA FEUILLE EST LE PLAN DE LA VITRINE, réduit. Le rappel se fait
-    à plat, appareils posés, sans cotes : c'est le plan qu'on imprime.
-  */
-  const cadreP = {
-    x: 16,
-    y: 40,
-    w: Math.round(W - 32),
-    h: Math.round(feuille * 0.52),
-  };
-  /*
-    LE PLAN SE REND À LA TAILLE DE SON CADRE, il ne se réduit pas.
+    `<rect x="0" y="${y.toFixed(1)}" width="${larg}" height="24" fill="${pap.accent}"/>` +
+    `<text x="10" y="${(y + 16.5).toFixed(1)}" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" ` +
+    `font-size="11" font-weight="bold" letter-spacing="0.6" fill="#FFFFFF">${titre}</text>`;
 
-    Premier jet : on rendait le plan sur le format de l'écran, puis on
-    l'écrasait dans le bloc de la feuille. Le cadrage de `frameSvg` réserve
-    déjà une marge franche sur les quatre côtés ; réduit une seconde fois, le
-    plan tenait dans le tiers de la largeur et la feuille était un désert
-    blanc. Regardé en image, c'est ce qui sautait aux yeux.
+  // ---------------------------------------------------------- page 1
+  contenu.push(page(0), cartouche(0, 'PLAN — T2, 27 m²'));
+  /*
+    LE PLAN DE LA FEUILLE SE REND À LA TAILLE DE SON CADRE, il ne se réduit
+    pas. Premier jet : on rendait le plan au format de l'écran, puis on
+    l'écrasait dans le bloc. Le cadrage de `frameSvg` réserve déjà une marge
+    franche ; réduit une seconde fois, le plan tenait dans le tiers de la
+    largeur et la feuille était un désert blanc.
 
-    Rendu DIRECTEMENT au format du bloc, il se cadre tout seul dessus : la
-    même fonction, un autre papier.
+    ET SANS SA TRAME : la grille du sol est un décor d'écran. Sur une feuille
+    imprimée, elle ferait un fond de page quadrillé qui n'a rien à y faire.
   */
+  const cadreP = { x: 12, y: 34, w: Math.round(larg - 24), h: Math.round(feuille * 0.46) };
   const mini = frameSvg(
     0,
     cadreP.w,
     cadreP.h,
-    p,
+    pap,
     { theta: 0, zoom: 1 },
-    { elec: 1, cotes: 0 },
+    { elec: 1, cotes: 0, grille: false },
   )
     .replace(/^[\s\S]*?viewBox="[^"]*">/, '')
     .replace(/<\/svg>$/, '');
-  out.push(
-    `<g transform="translate(${cadreP.x} ${cadreP.y})">${mini}</g>`,
-  );
-  // Le bloc de légende, sous le plan : trois lignes et leur pastille.
-  const legende = cadreP.y + cadreP.h + 14;
-  for (const [i, teinte] of [p.meubleTrait, p.porte, p.baie].entries()) {
+  contenu.push(`<g transform="translate(${cadreP.x} ${cadreP.y})">${mini}</g>`);
+  // La légende, sous le plan : trois lignes et leur pastille de famille.
+  const legende = cadreP.y + cadreP.h + 16;
+  for (const [i, teinte] of [pap.accent, pap.porte, pap.baie].entries()) {
     const y = legende + i * 16;
-    out.push(
-      `<circle cx="24" cy="${y.toFixed(1)}" r="4" fill="${teinte}"/>`,
-      `<rect x="34" y="${(y - 3.5).toFixed(1)}" width="${(W * 0.42 - i * 18).toFixed(0)}" ` +
+    contenu.push(
+      `<circle cx="18" cy="${y.toFixed(1)}" r="4" fill="${teinte}"/>`,
+      `<rect x="28" y="${(y - 3.5).toFixed(1)}" width="${(larg * 0.46 - i * 18).toFixed(0)}" ` +
         `height="7" rx="3.5" fill="#C9D0DC"/>`,
     );
   }
-
   /*
-    ET LE CARTOUCHE, EN PIED DE FEUILLE.
-
-    Regardé en image, le bas de la première page était un désert blanc sur
-    quarante pour cent de sa hauteur. Un plan d'exécution porte son cartouche
-    en bas à droite — c'est ce qui le fait reconnaître comme un document et
-    non comme une capture d'écran encadrée.
+    ET LE CARTOUCHE, EN PIED DE PAGE. Un plan d'exécution porte le sien en bas
+    à droite — c'est ce qui le fait reconnaître comme un document, et non
+    comme une capture d'écran encadrée.
   */
-  const yc = feuille - 76;
-  out.push(
-    `<rect x="${(W * 0.38).toFixed(0)}" y="${yc.toFixed(1)}" ` +
-      `width="${(W * 0.62 - 6).toFixed(0)}" height="56" fill="none" ` +
+  const yc = feuille - 68;
+  contenu.push(
+    `<rect x="${(larg * 0.36).toFixed(0)}" y="${yc.toFixed(1)}" ` +
+      `width="${(larg * 0.64 - 12).toFixed(0)}" height="54" fill="none" ` +
       `stroke="#C9D0DC" stroke-width="1"/>`,
-    `<line x1="${(W * 0.38).toFixed(0)}" y1="${(yc + 18).toFixed(1)}" ` +
-      `x2="${(W - 6).toFixed(0)}" y2="${(yc + 18).toFixed(1)}" ` +
+    `<line x1="${(larg * 0.36).toFixed(0)}" y1="${(yc + 17).toFixed(1)}" ` +
+      `x2="${(larg - 12).toFixed(0)}" y2="${(yc + 17).toFixed(1)}" ` +
       `stroke="#C9D0DC" stroke-width="1"/>`,
-    `<text x="${(W * 0.38 + 8).toFixed(0)}" y="${(yc + 13).toFixed(1)}" ` +
-      `font-family="Helvetica" font-size="8" font-weight="bold" ` +
-      `fill="${p.cote}">ECHOPLAN</text>`,
+    `<text x="${(larg * 0.36 + 8).toFixed(0)}" y="${(yc + 12.5).toFixed(1)}" ` +
+      `font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="8.5" ` +
+      `font-weight="bold" letter-spacing="1" fill="${pap.cote}">ECHOPLAN</text>`,
   );
   for (let i = 0; i < 3; i++) {
-    out.push(
-      `<rect x="${(W * 0.38 + 8).toFixed(0)}" y="${(yc + 26 + i * 10).toFixed(1)}" ` +
-        `width="${(W * 0.42 - i * 14).toFixed(0)}" height="5" rx="2.5" ` +
-        `fill="#D5DCEA"/>`,
+    contenu.push(
+      `<rect x="${(larg * 0.36 + 8).toFixed(0)}" y="${(yc + 25 + i * 10).toFixed(1)}" ` +
+        `width="${(larg * 0.44 - i * 14).toFixed(0)}" height="5" rx="2.5" fill="#D5DCEA"/>`,
     );
   }
 
-  // ---------------------------------------------------------- feuille 2
+  // ---------------------------------------------------------- page 2
   const y2 = feuille + ecart;
-  out.push(sheet(y2));
-  out.push(cartouche(y2, 'FOURNITURES'));
-  for (let i = 0; i < 13; i++) {
-    const y = y2 + 44 + i * 20;
-    const large = 0.34 + ((i * 7) % 5) * 0.07;
-    out.push(
-      `<rect x="18" y="${(y - 8).toFixed(1)}" width="14" height="14" rx="3" ` +
+  contenu.push(page(y2), cartouche(y2, 'FOURNITURES'));
+  const lignes = Math.max(6, Math.floor((feuille - 96) / 20));
+  for (let i = 0; i < lignes; i++) {
+    const y = y2 + 42 + i * 20;
+    const large = 0.32 + ((i * 7) % 5) * 0.07;
+    contenu.push(
+      `<rect x="12" y="${(y - 8).toFixed(1)}" width="14" height="14" rx="3" ` +
         `fill="#EDF1F8" stroke="#D5DCEA" stroke-width="0.8"/>`,
-      `<rect x="38" y="${(y - 3.5).toFixed(1)}" width="${(W * large).toFixed(0)}" ` +
+      `<rect x="32" y="${(y - 3.5).toFixed(1)}" width="${(larg * large).toFixed(0)}" ` +
         `height="7" rx="3.5" fill="#C9D0DC"/>`,
-      `<rect x="${(W - 62).toFixed(0)}" y="${(y - 3.5).toFixed(1)}" width="44" ` +
+      `<rect x="${(larg - 56).toFixed(0)}" y="${(y - 3.5).toFixed(1)}" width="44" ` +
         `height="7" rx="3.5" fill="#9AA5B5"/>`,
     );
   }
-  const yTotal = y2 + 44 + 13 * 20 + 10;
-  out.push(
-    `<line x1="18" y1="${yTotal.toFixed(1)}" x2="${W - 18}" y2="${yTotal.toFixed(1)}" ` +
+  const yTotal = y2 + 42 + lignes * 20 + 8;
+  contenu.push(
+    `<line x1="12" y1="${yTotal.toFixed(1)}" x2="${larg - 12}" y2="${yTotal.toFixed(1)}" ` +
       `stroke="#9AA5B5" stroke-width="1" stroke-dasharray="3 3"/>`,
-    `<rect x="${(W - 96).toFixed(0)}" y="${(yTotal + 10).toFixed(1)}" width="78" ` +
-      `height="12" rx="6" fill="${p.meubleTrait}"/>`,
+    `<rect x="${(larg - 90).toFixed(0)}" y="${(yTotal + 10).toFixed(1)}" width="78" ` +
+      `height="12" rx="6" fill="${pap.accent}"/>`,
   );
 
-  out.push('</g>');
+  /*
+    LE DÉFILEMENT EST DÉCOUPÉ PAR LA FEUILLE, pas par un masque : deux
+    rectangles blancs arrondis se recouvrent, et l'on dessine par-dessus. Le
+    `clipPath` d'un `id` unique serait plus propre — et rendrait cette
+    fonction inutilisable à l'intérieur d'une autre image, comme `frameSvg`.
+    On paie donc le découpage par un fond de fenêtre et un cadre par-dessus.
+  */
+  out.push(
+    `<rect x="${x0}" y="${y0}" width="${larg}" height="${haut.toFixed(1)}" rx="5" fill="#FFFFFF"/>`,
+    `<svg x="${x0}" y="${y0}" width="${larg}" height="${haut.toFixed(1)}" ` +
+      `viewBox="0 ${(-dy).toFixed(1)} ${larg} ${haut.toFixed(1)}">${contenu.join('')}</svg>`,
+    // Le liseré de la feuille, par-dessus, pour rattraper les coins arrondis.
+    `<rect x="${x0}" y="${y0}" width="${larg}" height="${haut.toFixed(1)}" rx="5" ` +
+      `fill="none" stroke="${p.fond}" stroke-width="4"/>`,
+    `<rect x="${(x0 - 0.5).toFixed(1)}" y="${(y0 - 0.5).toFixed(1)}" ` +
+      `width="${larg + 1}" height="${(haut + 1).toFixed(1)}" rx="5.5" ` +
+      `fill="none" stroke="#FFFFFF" stroke-opacity="0.22" stroke-width="1"/>`,
+  );
   return out.join('');
 }
 
 /**
- * UNE IMAGE DU CYCLE, tout compris — la maquette, puis le dossier par-dessus.
+ * LE FOND DE L'ÉCRAN CUIT — un aplat, et rien d'autre.
  *
- * LE FONDU SE FAIT ICI, ET NON PAR UN CHANGEMENT DE SCÈNE. Les deux dessins
- * sont posés l'un sur l'autre avec leurs opacités : c'est ce qui donne une
- * transition en fondu plutôt qu'une coupure, et c'est ce que le relevé
- * demande — « des transitions rapides mais en fondu toujours ».
+ * IL A PORTÉ LA LUEUR, IL NE LA PORTE PLUS, ET C'EST UNE DÉCISION DE POIDS.
+ *
+ * Le premier dessin posait ici deux dégradés radiaux : une lueur bleue
+ * derrière la maquette, un vignettage sur les bords. C'était juste, et
+ * regardé en image c'était même ce qui décollait la maquette du fond.
+ *
+ * MESURÉ, C'ÉTAIT 480 KO DANS L'IPA. Un dégradé lisse est le pire ennemi
+ * d'une palette réduite : chaque image doit tramer le passage d'un ton à
+ * l'autre sur toute sa surface, et le PNG ne compresse plus rien. Cent vingt
+ * images passaient de 820 ko à 1,3 Mo — pour un fond qui ne change JAMAIS
+ * d'une image à l'autre.
+ *
+ * ON NE LE CUIT DONC PLUS : la lueur et le vignettage sont posés EN DIRECT
+ * dans l'écran du téléphone, en vectoriel (voir `PhoneShowcase`). C'est le
+ * même dessin, il est plus lisse — un vecteur ne trame pas —, il ne coûte pas
+ * un octet, et il peut respirer avec le boîtier, ce qu'une image cuite ne
+ * saura jamais faire.
+ */
+function fondSvg(W: number, H: number, p: FramePalette): string {
+  return `<rect width="${W}" height="${H}" fill="${p.fond}"/>`;
+}
+
+/**
+ * UNE IMAGE DU CYCLE, tout compris — la nuit, la maquette, le dossier, le mot.
+ *
+ * LE DOSSIER NE REMPLACE PAS LA MAQUETTE, IL PASSE DEVANT ELLE. La feuille
+ * monte du bas pendant que la scène RECULE — elle se réduit d'un dixième et
+ * s'assombrit, sans jamais disparaître. C'est ce qu'on fait quand on pose un
+ * document sur une table : ce qu'il y avait dessous reste là, en dessous.
+ *
+ * Une transition en fondu pur laissait, à mi-course, une image double où l'on
+ * ne lisait ni le plan ni la page. Ici, à mi-course, on lit une feuille qui
+ * monte — parce qu'il y a un MOUVEMENT à suivre.
  */
 export function imageSvg(
   frame: number,
@@ -980,19 +1422,43 @@ export function imageSvg(
   const scene = frameSvg(e.t, W, H, p, { theta: e.theta, zoom: e.zoom }, e)
     .replace(/^[\s\S]*?viewBox="[^"]*">/, '')
     .replace(/<\/svg>$/, '');
-  const corps = [`<g opacity="${(1 - e.page).toFixed(2)}">${scene}</g>`];
-  if (e.page > 0.01) {
+  const corps = [fondSvg(W, H, p)];
+  /*
+    LA MAQUETTE SE CENTRE DANS CE QUI RESTE, pas au milieu de l'écran.
+
+    `frameSvg` cadre sur H/2 — c'est juste pour une image seule. Ici, la bande
+    du titre mange quatre-vingt-douze points en bas : centrée sur H/2, la
+    maquette descendait sous le mot. Elle remonte donc de la demi-bande, et
+    le recul du dossier se prend sur CE centre-là.
+  */
+  const k = 1 - 0.1 * e.page;
+  corps.push(
+    `<g opacity="${(1 - 0.78 * e.page).toFixed(2)}" ` +
+      `transform="translate(0 ${(-BANDE / 2).toFixed(1)}) ` +
+      `translate(${(W / 2).toFixed(1)} ${(H / 2).toFixed(1)}) ` +
+      `scale(${k.toFixed(3)}) translate(${(-W / 2).toFixed(1)} ${(-H / 2).toFixed(1)})">` +
+      `${scene}</g>`,
+  );
+  if (e.page > 0.005) {
+    /*
+      LA FEUILLE MONTE DU BAS. Hors champ à `page` = 0, posée à `page` = 1 :
+      c'est la même valeur qui fait reculer la scène, donc les deux
+      mouvements sont solidaires par construction et ne peuvent pas se
+      désynchroniser.
+    */
+    const monte = (1 - e.page) * H;
     corps.push(
-      `<g opacity="${e.page.toFixed(2)}">${pageSvg(e.defilement, W, H, p)}</g>`,
+      `<g transform="translate(0 ${monte.toFixed(1)})">` +
+        `${pageSvg(e.defilement, W, H, p)}</g>`,
     );
   }
   /*
     LE TITRE PASSE APRÈS TOUT LE MONDE — c'est la couche qui NARRE, et elle ne
-    participe pas au fondu : le mot ne doit pas pâlir pendant qu'une page monte
-    dessous, sinon la seule chose qui explique l'image devient illisible juste
-    au moment où l'image change.
+    participe à aucune transition : le mot ne doit pas pâlir pendant qu'une
+    page monte dessous, sinon la seule chose qui explique l'image devient
+    illisible juste au moment où l'image change.
   */
-  corps.push(bandeauSvg(frame, W, H, p));
+  corps.push(titreSvg(frame, W, H, p));
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" ` +
     `viewBox="0 0 ${W} ${H}">${corps.join('')}</svg>`

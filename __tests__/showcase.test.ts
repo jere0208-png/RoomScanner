@@ -15,20 +15,21 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { FIXTURES } from '../src/geometry/electrical';
-/** La première image du cycle : le plan, et le premier titre. */
-const PLAN_DEBUT = 0;
 import {
   avancement,
   camera,
   cascade,
   etatDeLImage,
   frameSvg,
-  bandeauSvg,
+  titreSvg,
   imageSvg,
   pose,
   progression,
   titreDeLImage,
+  titresDeLImage,
+  IPS,
   TITRES,
+  PAPIER_PALETTE,
   PLAN,
   SHOWCASE_FRAMES,
   SHOWCASE_PALETTE,
@@ -149,10 +150,24 @@ describe('la vague du mobilier', () => {
 
   it("s'observe sur l'image : des opacités étagées à mi-levée", () => {
     const s = frameSvg(0.3, 264, 536);
+    /*
+      LE BLEU SE LIT DANS LA PALETTE, il ne se recopie plus.
+
+      Ce banc cherchait « #2F6BFF » en toutes lettres. Le jour où la vitrine
+      est passée en nuit, le bleu du mobilier a changé d'un ton — et le banc
+      ne trouvait plus rien, donc plus aucun fondu, alors que le fondu était
+      intact. Une épreuve qui recopie une couleur devient fausse au premier
+      coup de peinture.
+    */
     const etages = new Set(
-      [...s.matchAll(/fill-opacity="([\d.]+)" stroke="#2F6BFF"/g)].map(
-        (m) => m[1],
-      ),
+      [
+        ...s.matchAll(
+          new RegExp(
+            `fill-opacity="([\\d.]+)" stroke="${SHOWCASE_PALETTE.meubleTrait}"`,
+            'g',
+          ),
+        ),
+      ].map((m) => m[1]),
     );
     // Au moins trois niveaux distincts : un fondu global n'en donne qu'un.
     expect(etages.size).toBeGreaterThanOrEqual(3);
@@ -171,7 +186,7 @@ describe('le cheminement, en sept temps', () => {
     La vitrine d'avant jouait UN geste — la bascule 2D/3D, en boucle. C'était
     juste et court, et ça ne disait pas ce que l'application produit.
   */
-  const IMAGES_PAR_SECONDE = 15;
+  const IMAGES_PAR_SECONDE = IPS;
   const etats = Array.from({ length: SHOWCASE_FRAMES }, (_, i) =>
     etatDeLImage(i),
   );
@@ -248,6 +263,57 @@ describe('le cheminement, en sept temps', () => {
     expect(imageSvg(0, W, H)).not.toContain('>110 cm</text>');
   });
 
+  it('la feuille MONTE, elle ne paraît pas en fondu', () => {
+    /*
+      RELEVÉ DU PATRON : « on dirait un truc bas de gamme. Je veux quelque
+      chose de dynamique. »
+
+      LE PREMIER DESSIN CROISAIT DEUX OPACITÉS : la maquette s'éteignait
+      pendant qu'une page blanche s'allumait. À mi-course, on ne lisait NI
+      l'une NI l'autre — une image double, qui est exactement ce qu'on
+      reproche à un fondu enchaîné entre deux images pleines.
+
+      La feuille monte maintenant du bas, et la maquette RECULE derrière au
+      lieu de s'éteindre. À mi-course il y a un mouvement à suivre, et l'on
+      comprend qu'un document se pose sur une scène.
+    */
+    const jeune = etats.findIndex((e) => e.page > 0.3 && e.page < 0.75);
+    expect(jeune).toBeGreaterThan(0);
+    const dessin = imageSvg(jeune, W, H);
+    // La feuille est TRANSLATÉE : c'est le mouvement, et il se lit dans le
+    // dessin. Un fondu n'aurait qu'une opacité à montrer.
+    const montees = [...dessin.matchAll(/translate\(0 ([\d.]+)\)/g)].map((m) =>
+      Number(m[1]),
+    );
+    expect(montees.some((y) => y > 40)).toBe(true);
+  });
+
+  it('et la maquette RECULE derrière au lieu de s’éteindre', () => {
+    /*
+      LE CONTRÔLE EN SENS INVERSE, et il porte la même idée : si la maquette
+      disparaissait, on aurait remplacé une image par une autre. Elle reste
+      dessinée, plus petite et plus sombre — donc le dossier se pose SUR le
+      relevé, ce qui est le propos.
+    */
+    const pleinePage = etats.findIndex((e) => e.page > 0.99);
+    const dessin = imageSvg(pleinePage, W, H);
+    const opacites = [...dessin.matchAll(/<g opacity="([\d.]+)"/g)].map((m) =>
+      Number(m[1]),
+    );
+    expect(opacites.some((o) => o > 0.1 && o < 0.35)).toBe(true);
+    /*
+      L'ÉCHELLE SE LIT, ELLE NE SE COMPARE PAS À UNE CHAÎNE. La montée de la
+      feuille se fait au RESSORT : elle dépasse sa cible de quelques pour
+      cent avant d'y revenir — c'est ce dépassement qui la fait lire comme un
+      document qu'on pose, et non comme un calque qu'on allume. Le recul, qui
+      est asservi à la même valeur, dépasse donc lui aussi.
+    */
+    const echelles = [...dessin.matchAll(/scale\(([\d.]+)\)/g)].map((m) =>
+      Number(m[1]),
+    );
+    expect(echelles.some((k) => k > 0.85 && k < 0.95)).toBe(true);
+  });
+
   it('le dossier passe devant, et il défile', () => {
     const premiere = etats.findIndex((e) => e.page > 0.99);
     const derniere =
@@ -259,17 +325,6 @@ describe('le cheminement, en sept temps', () => {
     expect(tete).not.toBe(imageSvg(derniere, W, H));
   });
 
-  it('et la maquette est CACHÉE derrière, pas éteinte', () => {
-    /*
-      LE CONTRÔLE EN SENS INVERSE, et il tient le fondu : si la maquette
-      disparaissait au lieu de passer dessous, la transition serait une
-      coupure. Elle reste dessinée, à opacité nulle, et c'est ce qui permet
-      au fondu de se jouer dans les deux sens.
-    */
-    const pleinePage = etats.findIndex((e) => e.page > 0.99);
-    expect(imageSvg(pleinePage, W, H)).toContain('<g opacity="0.00">');
-  });
-
   it('le cycle se referme sur le plan', () => {
     const dernier = etatDeLImage(SHOWCASE_FRAMES - 1);
     expect(dernier.t).toBe(0);
@@ -278,26 +333,38 @@ describe('le cheminement, en sept temps', () => {
   });
 
   it('et aucune image n’est vide', () => {
-    // Le garde-fou du fondu : deux opacités qui se croisent mal laisseraient
-    // un écran blanc au milieu de la vitrine.
+    /*
+      LE GARDE-FOU DE LA BASCULE. Il lisait les deux opacités du fondu ; il
+      lit maintenant le DESSIN, ce qui est plus étroit et plus vrai : quoi
+      qu'il arrive, chaque image du cycle porte de la matière — des faces,
+      un mot. Une transition mal réglée laisserait un écran noir, et c'est
+      exactement ce qu'on ne verra jamais passer à l'œil sur cinq secondes.
+    */
     for (let i = 0; i < SHOWCASE_FRAMES; i++) {
-      const e = etatDeLImage(i);
-      expect(`${i} : ${Math.max(1 - e.page, e.page) > 0.4}`).toBe(`${i} : true`);
+      const d = imageSvg(i, W, H);
+      const formes = (d.match(/<(polygon|rect|line|text|circle)/g) ?? []).length;
+      expect(`${i} : ${formes > 12}`).toBe(`${i} : true`);
     }
   });
 });
 
-describe('les gros titres, et le peps', () => {
+describe('les gros titres, et le rouleau', () => {
   /*
-    RELEVÉ DU PATRON, en la regardant tourner : « fais une meilleure animation
-    dans l'iPhone, moderne avec du peps, et des gros titres. Rapide. »
+    RELEVÉ DU PATRON : « je veux quelque chose de dynamique, rapide, fluide,
+    JS style. Un vrai art style. »
 
-    UNE ANIMATION MUETTE DEMANDE À L'ŒIL DE DEVINER. On voyait un plan se
-    lever sans savoir que c'était ÇA, le geste de l'application. Un mot posé
-    dessus fait la moitié du travail — et c'est LUI qui permet de raccourcir
-    le reste : on lit « LE RELEVÉ » plus vite qu'on ne le déduit.
+    LE BANDEAU BLEU EST MORT ICI. La vitrine posait un rectangle plein en pied
+    d'écran avec le mot centré dedans : c'est le dessin d'une barre d'état,
+    pas d'une affiche, et c'était la première chose qui faisait bas de gamme.
+    Le mot est maintenant posé À MÊME l'image, aligné à gauche, avec son
+    numéro de temps et son filet d'accent.
+
+    ET IL BASCULE PAR UN ROULEAU. Chaque mot entrait au début de son temps et
+    sortait à la fin : entre les deux, la fente restait vide une image ou
+    deux, et l'on voyait passer un mot coupé en tranche. Le sortant monte
+    maintenant PENDANT que l'entrant arrive, dans la même fente.
   */
-  const IMAGES_PAR_SECONDE = 15;
+  const IMAGES_PAR_SECONDE = IPS;
 
   it('un mot par temps, et jamais deux fois le même', () => {
     const mots = TITRES.map((t) => t.mot);
@@ -313,51 +380,111 @@ describe('les gros titres, et le peps', () => {
 
   it('ils sont COURTS, donc ils peuvent être gros', () => {
     /*
-      Dix signes au plus : c'est ce qui permet de les écrire en corps 30 sur un
+      Dix signes au plus : c'est ce qui permet de les écrire en corps 34 sur un
       écran de deux cent soixante-quatre points. Un mot de quinze signes, et
       l'on retombe sur du texte — la vitrine cesse d'annoncer, elle explique.
     */
-    for (const t of TITRES) {
-      expect(`${t.mot} : ${t.mot.length}`).toBe(`${t.mot} : ${t.mot.length}`);
-      expect(t.mot.length).toBeLessThanOrEqual(10);
-    }
+    for (const t of TITRES) expect(t.mot.length).toBeLessThanOrEqual(10);
   });
 
   it('et ils s’écrivent VRAIMENT gros sur l’image', () => {
     // Le contrôle qui compte : un titre court ne sert à rien s'il est écrit
     // en corps 9 comme les sigles des appareils.
-    const corps = [...bandeauSvg(4, W, H).matchAll(/font-size="([\d.]+)"/g)].map(
+    const corps = [...titreSvg(20, W, H).matchAll(/font-size="([\d.]+)"/g)].map(
       (m) => Number(m[1]),
     );
-    expect(Math.max(...corps)).toBeGreaterThanOrEqual(24);
+    expect(Math.max(...corps)).toBeGreaterThanOrEqual(30);
   });
 
-  it('le mot entre au lieu de se poser', () => {
+  it('LE BANDEAU PLEIN A DISPARU', () => {
     /*
-      LE PEPS EST LÀ, et pas ailleurs : trois images d'entrée — deux dixièmes
-      de seconde —, le mot monte de douze points et paraît. Rien ne se pose
-      mollement.
+      C'EST LE BANC DU RELEVÉ, et il se mesure. L'ancien dessin remplissait
+      toute la largeur de l'écran sur cinquante-huit points de haut, en bleu
+      plein. Rien de tel ne doit revenir : le mot se lit sur la nuit, sans
+      aplat pour le porter.
+
+      On cherche un rectangle pleine largeur et HAUT — le filet d'avancement
+      fait aussi toute la largeur, mais un point et demi de haut, et c'est
+      justement la différence entre un filet et une barre d'interface.
     */
-    const debut = titreDeLImage(PLAN_DEBUT).avance;
-    const plein = titreDeLImage(PLAN_DEBUT + 4).avance;
-    expect(debut).toBeLessThan(0.6);
-    expect(plein).toBeCloseTo(1, 2);
+    const gros = [...titreSvg(20, W, H).matchAll(/<rect[^>]*>/g)].filter((m) => {
+      const l = Number((m[0].match(/width="([\d.]+)"/) ?? [])[1] ?? 0);
+      const h = Number((m[0].match(/height="([\d.]+)"/) ?? [])[1] ?? 0);
+      // ON NE COMPTE QUE CE QUI EST PEINT : le rectangle de la fente fait
+      // toute la largeur lui aussi, et il ne met pas une goutte d'encre —
+      // c'est un masque.
+      return m[0].includes('fill="') && l >= W && h > 6;
+    });
+    expect(gros).toHaveLength(0);
+  });
+
+  it('le mot entre par une FENTE, il ne paraît pas', () => {
+    /*
+      LE PEPS EST LÀ, et pas ailleurs : le mot monte de trente-quatre points
+      — la hauteur de sa propre boîte — pendant qu'un masque le découvre.
+      C'est ce masque qui fait la différence entre un mot qui ENTRE et un mot
+      qui s'allume, et il se lit dans le dessin.
+    */
+    expect(titreSvg(20, W, H)).toContain('<clipPath');
+    /*
+      ON INTERROGE LE MOT QUI ARRIVE, ET NON LE MOT DOMINANT. Pendant la
+      bascule, c'est encore le SORTANT qu'on lit le mieux — il est presque
+      entier, l'autre commence à peine. Demander « où en est le titre de
+      l'image » ne dit donc rien de l'entrée : il faut nommer celui qu'on
+      suit.
+    */
+    const debut = TITRES[1].jusqua;
+    const arrivant = TITRES[2].mot;
+    const place = (i: number) =>
+      titresDeLImage(i).find((v) => v.mot === arrivant)!;
+    // Juste avant d'être posé, il est encore dessous ; posé, il est à zéro.
+    expect(place(debut - 1).dy).toBeGreaterThan(4);
+    expect(Math.abs(place(debut + 4).dy)).toBeLessThan(0.6);
+  });
+
+  it('et à la bascule, DEUX mots sont dans la fente', () => {
+    /*
+      LE ROULEAU. C'est ce qui remplace la fente vide : à la coupure, le mot
+      qui s'en va et celui qui arrive sont là ensemble, l'un au-dessus de
+      l'autre, et l'œil suit un mouvement continu.
+    */
+    const coupure = TITRES[1].jusqua;
+    const vus = titresDeLImage(coupure);
+    expect(vus.map((v) => v.mot).sort()).toEqual(
+      [TITRES[1].mot, TITRES[2].mot].sort(),
+    );
+    // Et l'un monte pendant que l'autre descend : leurs places sont de part
+    // et d'autre de la ligne de lecture.
+    const places = vus.map((v) => v.dy).sort((a, b) => a - b);
+    expect(places[0]).toBeLessThan(0);
+    expect(places[places.length - 1]).toBeGreaterThan(0);
+  });
+
+  it('la boucle du titre se referme, elle aussi', () => {
+    /*
+      À L'IMAGE ZÉRO, LE DERNIER MOT DOIT ENCORE ÊTRE LÀ. Sans ça, le tour de
+      manège recommence sur une fente vide : le seul endroit du cycle où la
+      vitrine ne dit rien, et c'est celui qu'on regarde le plus, puisque
+      c'est là qu'on arrive.
+    */
+    const mots = titresDeLImage(0).map((v) => v.mot);
+    expect(mots).toContain(TITRES[TITRES.length - 1].mot);
+    expect(mots).toContain(TITRES[0].mot);
   });
 
   it('mais il ne clignote pas : une fois entré, il reste', () => {
     // Le contrôle en sens inverse : une entrée rejouée à chaque image ferait
     // battre le mot au lieu de l'annoncer.
-    const t = TITRES[1];
-    for (let i = TITRES[0].jusqua + 4; i < t.jusqua; i++) {
-      expect(`${i} : ${titreDeLImage(i).avance}`).toBe(`${i} : 1`);
+    for (let i = TITRES[0].jusqua + 4; i < TITRES[1].jusqua - 4; i++) {
+      expect(`${i} : ${titreDeLImage(i).opacite}`).toBe(`${i} : 1`);
     }
   });
 
   it('et le titre passe PAR-DESSUS le dossier', () => {
     /*
-      La couche qui NARRE ne participe pas au fondu : le mot ne doit pas pâlir
-      pendant qu'une page monte dessous, sinon la seule chose qui explique
-      l'image devient illisible juste au moment où l'image change.
+      La couche qui NARRE ne participe à aucune transition : le mot ne doit
+      pas pâlir pendant qu'une page monte dessous, sinon la seule chose qui
+      explique l'image devient illisible juste au moment où l'image change.
     */
     const etats = Array.from({ length: SHOWCASE_FRAMES }, (_, i) =>
       etatDeLImage(i),
@@ -380,10 +507,182 @@ describe('les gros titres, et le peps', () => {
     }
   });
 
-  it('et le tout est plus RAPIDE qu’avant', () => {
-    // Sept secondes, c'était long. Le relevé dit « rapide » : on tient le bas
-    // de la fourchette.
+  it('cinq secondes, et vingt-quatre images par seconde', () => {
+    /*
+      « FLUIDE » NE S'OBTIENT PAS AUTREMENT. On peut lisser une trajectoire
+      autant qu'on veut : à quinze images par seconde, l'œil sépare encore
+      les poses d'un mouvement rapide. Vingt-quatre est la cadence du cinéma,
+      et le premier palier où un mouvement franc cesse de se décomposer.
+    */
+    expect(IPS).toBeGreaterThanOrEqual(24);
     expect(SHOWCASE_FRAMES / IMAGES_PAR_SECONDE).toBeLessThanOrEqual(6);
+  });
+
+});
+
+describe('la nuit électrique — l’art direction de la vitrine', () => {
+  /*
+    RELEVÉ DU PATRON, EN LA REGARDANT TOURNER : « l'animation de l'iPhone et
+    de son écran ne me convainc pas, on dirait un truc bas de gamme. Je veux
+    quelque chose de dynamique, rapide, fluide, JS style. Un vrai art style. »
+
+    IL A RAISON, ET LE DÉFAUT SE NOMME. La vitrine était un DESSIN TECHNIQUE
+    JUSTE, pas une image : fond blanc, murs blancs, feuilles blanches, un
+    bandeau bleu plein en bas. Rien de faux — et rien de choisi. Une capture
+    d'écran de logiciel de CAO, exactement ce qu'on ne veut pas montrer pour
+    vendre une application.
+
+    Ce banc tient les quatre décisions qui font l'image, parce qu'une couleur
+    se change d'un caractère et qu'aucune épreuve de géométrie ne s'en
+    apercevrait.
+  */
+  const dessin = (i: number) => imageSvg(i, W, H);
+
+  it('le fond est NOIR, et le poché du plan est blanc', () => {
+    /*
+      C'est le seul geste qui transforme un plan de CAO en objet : sur le
+      noir, le bleu et le cyan ÉMETTENT au lieu de colorier. Et la convention
+      du plan s'inverse avec lui — sur papier la coupe des murs se dessine
+      pleine et noire, sur la nuit elle devient la seule chose lumineuse de
+      l'écran.
+    */
+    const lire = (h: string) =>
+      [1, 3, 5].map((k) => parseInt(h.slice(k, k + 2), 16));
+    const clarte = (h: string) => lire(h).reduce((a, b) => a + b, 0) / 3;
+    expect(clarte(SHOWCASE_PALETTE.fond)).toBeLessThan(30);
+    expect(clarte(SHOWCASE_PALETTE.poche)).toBeGreaterThan(200);
+    // Et l'image le porte : la première du cycle peint son fond en sombre.
+    expect(dessin(0)).toContain(`fill="${SHOWCASE_PALETTE.fond}"`);
+  });
+
+  it('mais le plan IMPRIMÉ reste noir sur blanc', () => {
+    /*
+      LE CONTRÔLE EN SENS INVERSE, et il vaut de l'argent : la nuit est un
+      parti pris d'ÉCRAN. Un plan qu'on imprime et qu'on emporte sur un
+      chantier se lit en noir sur blanc — un poché blanc sur fond noir vide
+      une cartouche d'encre et ne se lit pas au soleil.
+    */
+    const lire = (h: string) =>
+      [1, 3, 5].map((k) => parseInt(h.slice(k, k + 2), 16));
+    const clarte = (h: string) => lire(h).reduce((a, b) => a + b, 0) / 3;
+    expect(clarte(PAPIER_PALETTE.fond)).toBeGreaterThan(240);
+    expect(clarte(PAPIER_PALETTE.poche)).toBeLessThan(40);
+  });
+
+  it('le sol porte une TRAME, et elle dépasse du logement', () => {
+    /*
+      Le logement cessait de flotter dans le vide le jour où il a été POSÉ
+      sur quelque chose. La trame dit l'échelle sans écrire un chiffre — un
+      carreau, un mètre — et c'est son DÉBORDEMENT qui fait la profondeur :
+      une trame qui s'arrête au mur est un carrelage, pas un sol.
+    */
+    const traits = [...frameSvg(0, W, H).matchAll(/<line [^>]*stroke="([^"]+)"/g)]
+      .filter((m) => m[1] === SHOWCASE_PALETTE.grille);
+    expect(traits.length).toBeGreaterThan(10);
+    // Elle déborde : des lignes passent hors du rectangle du logement.
+    const xs = [...frameSvg(0, W, H).matchAll(/<line x1="([-\d.]+)"/g)].map((m) =>
+      Number(m[1]),
+    );
+    expect(Math.min(...xs)).toBeLessThan(20);
+    expect(Math.max(...xs)).toBeGreaterThan(W - 20);
+  });
+
+  it('et le plan de la FEUILLE n’en a pas', () => {
+    // Le contrôle en sens inverse : une trame sur un document imprimé serait
+    // un fond de page quadrillé, qui n'a rien à y faire.
+    const surPapier = frameSvg(0, 120, 200, PAPIER_PALETTE, undefined, {
+      grille: false,
+    });
+    expect(surPapier).not.toContain(`stroke="${PAPIER_PALETTE.grille}"`);
+  });
+
+  it('aucun dégradé n’est CUIT dans les images', () => {
+    /*
+      LE BANC DES 480 KO. La lueur et le vignettage sont les deux couches qui
+      donnent sa profondeur à l'écran — et un dégradé lisse est le pire
+      ennemi d'une palette réduite : chaque image doit tramer le passage d'un
+      ton à l'autre sur toute sa surface, et le PNG ne compresse plus rien.
+      Cent vingt images passaient de 820 ko à 1,3 Mo, pour un fond qui ne
+      change JAMAIS d'une image à l'autre.
+
+      Ils sont posés en direct dans l'écran du téléphone, en vectoriel. Le
+      jour où l'on en recuit un ici, l'IPA reprend un demi-mégaoctet sans que
+      personne ne s'en aperçoive : c'est ce que ce banc empêche.
+    */
+    for (const i of [0, 30, 60, 90]) {
+      expect(`${i} : ${dessin(i).includes('Gradient')}`).toBe(`${i} : false`);
+    }
+  });
+
+  it('aucun `id` ne se répète dans une image', () => {
+    /*
+      LE PIÈGE DU PLAN DANS LA FEUILLE. Le plan imprimé du dossier est le
+      MÊME dessin que celui de la vitrine, rappelé à l'intérieur de l'image
+      complète. Deux `<clipPath id="x">` dans un même document, et c'est le
+      dernier qui gagne pour tout le monde : le masque du titre se mettrait à
+      découper le plan de la feuille, ou l'inverse.
+
+      C'est pour ça que `frameSvg` et `pageSvg` ne posent AUCUN `id` — la
+      règle est écrite dans leur en-tête, et elle se vérifie ici.
+    */
+    for (const i of [0, 30, 60, 90]) {
+      const ids = [...dessin(i).matchAll(/\bid="([^"]+)"/g)].map((m) => m[1]);
+      expect(`${i} : ${ids.length}`).toBe(`${i} : ${new Set(ids).size}`);
+    }
+  });
+
+  it('l’ombrage GARDE la couleur des pans, il ne les grise pas', () => {
+    /*
+      LE DERNIER RESTE DE CARTON. `shadeFill` — l'ombrage de la vue 3D de
+      l'application — éclaire les pans avec deux pôles : le côté à l'ombre
+      tire vers un brun chaud, le côté éclairé vers le blanc. C'est juste SUR
+      DU PAPIER BLANC, et longuement défendu.
+
+      Sur du noir, il DÉTRUIT la couleur : un mur bleu nuit mélangé à 38 % de
+      brun devient un gris de carton. On avait une belle nuit, et un logement
+      en carton posé dessus.
+
+      On mesure donc la SATURATION des pans : sur la nuit, aucune face pleine
+      ne doit être un gris neutre. C'est la seule façon de tenir ce réglage —
+      une couleur se change d'un caractère, et la géométrie n'en saurait rien.
+    */
+    const fonds = [...frameSvg(1, W, H).matchAll(/<polygon [^>]*fill="(#[0-9a-f]{6})"/g)]
+      .map((m) => m[1])
+      .filter((h, i, tous) => tous.indexOf(h) === i);
+    expect(fonds.length).toBeGreaterThan(6);
+    const neutres = fonds.filter((h) => {
+      const [r, v, b] = [1, 3, 5].map((k) => parseInt(h.slice(k, k + 2), 16));
+      const max = Math.max(r, v, b);
+      const min = Math.min(r, v, b);
+      /*
+        Un gris : moins de 8 % d'écart entre sa composante la plus forte et
+        la plus faible. On ne juge que les tons MOYENS — le noir est gris par
+        nature et c'est le fond ; un reflet qui approche le blanc l'est
+        aussi, et c'est un reflet. Entre les deux, il y a les pans, et c'est
+        eux qu'on regarde : le carton faisait 0x50 à 0xB6.
+      */
+      return max > 40 && max < 200 && (max - min) / max < 0.08;
+    });
+    expect(neutres).toEqual([]);
+  });
+
+  it('et les appareils ÉCLAIRENT au lieu de colorier', () => {
+    /*
+      Un sigle de neuf points posé sur du noir est un caractère perdu ; le
+      même sur une lueur de sa couleur devient un POINT LUMINEUX qu'on repère
+      avant de le lire. C'est le seul endroit de l'image où l'on dépense de la
+      couleur, et c'est le sujet de l'application.
+    */
+    const posee = frameSvg(1, W, H, SHOWCASE_PALETTE, undefined, { elec: 1 });
+    const lueurs = [...posee.matchAll(/<circle [^>]*fill="(#[0-9A-Fa-f]{6})"/g)];
+    expect(lueurs.length).toBeGreaterThanOrEqual(PLAN.elec.length);
+    // Le contrôle en sens inverse : sur le papier, pas de lueur — on
+    // n'imprime pas un halo.
+    const surPapier = frameSvg(1, W, H, PAPIER_PALETTE, undefined, {
+      elec: 1,
+      grille: false,
+    });
+    expect([...surPapier.matchAll(/<circle [^>]*fill="#/g)]).toHaveLength(0);
   });
 });
 
@@ -438,7 +737,10 @@ describe('les images de la vitrine', () => {
     */
     const opacite = (t: number) => {
       const m = svg(t).match(
-        /fill="#[0-9A-Fa-f]{6}" fill-opacity="([\d.]+)" stroke="#2F6BFF"/,
+        new RegExp(
+          `fill="#[0-9A-Fa-f]{6}" fill-opacity="([\\d.]+)" ` +
+            `stroke="${SHOWCASE_PALETTE.meubleTrait}"`,
+        ),
       );
       return m ? parseFloat(m[1]) : 0;
     };
@@ -534,7 +836,7 @@ describe('les images de la vitrine', () => {
     const dir = join(__dirname, '..', 'assets', 'showcase');
     mkdirSync(dir, { recursive: true });
     for (let i = 0; i < SHOWCASE_FRAMES; i++) {
-      const nom = `frame-${String(i).padStart(2, '0')}.svg`;
+      const nom = `frame-${String(i).padStart(3, '0')}.svg`;
       // La caméra du cycle est passée en clair : c'est elle qui dérive sur
       // les paliers, et `t` seul ne sait pas le dire.
       // L'IMAGE ENTIÈRE, dossier compris : `frameSvg` ne rend que la

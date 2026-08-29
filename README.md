@@ -11349,6 +11349,129 @@ cette machine — comme Leroy Merlin et 123elec. Le motif est reconstruit d'apr�
 la description du relevé (« le bloc, la poubelle ») et d'après le genre, pas
 d'après l'image.
 
+### La vitrine passe en nuit électrique
+
+Relevé du patron, en la regardant tourner : « l'animation de l'iPhone et de son
+écran ne me convainc pas, on dirait un truc bas de gamme. Je veux quelque chose
+de dynamique, rapide, fluide, JS style. Un vrai art style. »
+
+**IL A RAISON, ET LE DÉFAUT SE NOMME.** La vitrine était un *dessin technique
+juste*, pas une image : fond blanc, murs blancs, feuilles blanches, un bandeau
+bleu plein en pied d'écran avec le mot centré dedans. Rien de faux — et rien de
+choisi. Une capture d'écran de logiciel de CAO, exactement ce qu'on ne veut pas
+montrer pour vendre une application.
+
+**Cinq décisions, et c'est tout ce qui change.**
+
+**1 — LE FOND DEVIENT NOIR.** C'est le seul geste qui transforme un plan de CAO
+en objet : sur le noir, le bleu et le cyan *émettent* au lieu de colorier. Et la
+convention du plan s'inverse avec lui — sur papier, la coupe des murs se dessine
+pleine et noire ; sur la nuit, elle devient la seule chose lumineuse de l'écran,
+et la première image du cycle est **un plan d'architecte en négatif**. Le plan
+*imprimé* de la feuille du dossier, lui, reste noir sur blanc : la nuit est un
+parti pris d'écran, et une épreuve en sens inverse le tient — un poché blanc sur
+fond noir vide une cartouche d'encre et ne se lit pas au soleil.
+
+**2 — LE SOL EST UNE TRAME.** Un mètre, qui **dépasse** du logement et s'éteint
+vers les bords. Le logement cessait de flotter dans le vide le jour où il a été
+*posé* sur quelque chose, et la trame dit l'échelle sans écrire un chiffre. Le
+sol des pièces est translucide pour qu'elle se devine dessous, sans quoi les deux
+pièces faisaient deux trous noirs au milieu d'un quadrillage.
+
+**3 — LE BANDEAU DISPARAÎT, LE TITRE DESCEND EN BAS À GAUCHE**, gros, avec son
+numéro de temps (« 03 / 05 ») et son filet d'accent. Et il **entre par une
+fente** : un masque le découvre pendant qu'il monte de la hauteur de sa propre
+boîte. La bascule est un **rouleau à cheval sur la coupure** — le mot qui s'en va
+monte pendant que le suivant arrive, dans la même fente. Premier réglage : chacun
+entrait au début de son temps et sortait à la fin, et l'on voyait passer *un mot
+coupé en tranche* sur une fente vide, ce qui se lit comme un défaut d'affichage,
+pas comme un montage. La boucle se referme sur le titre elle aussi : à l'image
+zéro, le dernier mot est encore là pendant que le premier arrive.
+
+**4 — VINGT-QUATRE IMAGES PAR SECONDE, ET NON QUINZE.** C'est le mot « fluide »,
+et il ne s'obtient pas autrement : on peut lisser une trajectoire autant qu'on
+veut, à quinze images par seconde l'œil sépare encore les poses d'un mouvement
+rapide, et c'est ce hachage-là qu'on lit comme du bas de gamme. La durée ne bouge
+pas — cinq secondes avant, cinq secondes après —, c'est la cadence qui monte.
+
+**5 — LE DOSSIER MONTE, IL NE SE FOND PLUS.** C'est une *feuille*, avec ses
+marges, ses coins et son ombre portée, qui monte du bas **au ressort** pendant
+que la maquette **recule** derrière — un dixième d'échelle en moins, assombrie,
+jamais éteinte. Le premier dessin croisait deux opacités : à mi-course on ne
+lisait ni l'une ni l'autre, une image double, ce qu'on reproche à tout fondu
+enchaîné entre deux images pleines. Ici, à mi-course, il y a un mouvement à
+suivre, et l'on comprend qu'un document se pose sur une scène.
+
+#### Ce qui faisait vraiment le carton : l'ombrage
+
+Le dernier reste de bas de gamme n'était pas une couleur, c'était un **calcul**.
+`shadeFill` — l'ombrage de la vue 3D de l'application — éclaire les pans avec
+deux pôles : le côté à l'ombre tire vers un brun chaud, le côté éclairé vers le
+blanc. C'est juste **sur du papier blanc**, et longuement défendu ici même :
+« dans une pièce éclairée par le jour, une ombre garde la chaleur de ce qu'elle
+assombrit ».
+
+Sur du noir, il **détruit** la couleur. Un mur bleu nuit mélangé à 38 % de brun
+devient un gris de carton : on avait une belle nuit, et un logement en carton
+posé dessus. `shadeFill` n'est pas touché — c'est l'ombrage qu'on imprime — et la
+vitrine refait le même calcul avec **ses** pôles : une ombre presque noire, une
+lumière bleue. Une épreuve mesure désormais la **saturation** des pans : sur la
+nuit, aucune face de ton moyen ne doit être un gris neutre. C'est la seule façon
+de tenir ce réglage — une couleur se change d'un caractère, et la géométrie n'en
+saurait rien.
+
+#### Le boîtier redevient un objet
+
+Il était un rectangle sombre avec un liseré, une diagonale claire **fixe** en
+guise de reflet, et une rotation lente. Quatre couches vivantes :
+
+- **La nappe**, sous le boîtier et **plus large que lui** : une lueur qui
+  s'arrête au bord de l'objet est un contour, pas une lueur.
+- **La lueur et le vignettage de la dalle**, en vectoriel.
+- **Le reflet qui glisse**, piloté par *la même valeur animée* que la rotation.
+  Sur un objet qui tourne, ce qui trahit le faux n'est pas l'absence de reflet,
+  c'est un reflet qui ne réagit pas ; et comme les deux sortent de la même
+  animation, on ne peut pas les désynchroniser en réglant l'une sans l'autre.
+- **Le flottement**, sur une horloge volontairement bancale — 2 600 ms contre
+  2 000. Deux mouvements de même période se lisent comme *un* mouvement, et un
+  mouvement qui se répète toutes les quatre secondes se remarque. Ces deux-là ne
+  retombent en phase qu'au bout de vingt-six secondes.
+
+#### Le banc des 480 ko
+
+La lueur et le vignettage ont d'abord été **cuits** dans les images. C'était
+juste à l'écran, et **mesuré, ça coûtait 480 ko dans l'IPA** : un dégradé lisse
+est le pire ennemi d'une palette réduite — chaque image doit tramer le passage
+d'un ton à l'autre sur toute sa surface, et le PNG ne compresse plus rien. Cent
+vingt images passaient de 820 ko à 1,3 Mo, **pour un fond qui ne change jamais
+d'une image à l'autre**.
+
+Ils sont donc posés en direct par le téléphone, en vectoriel : c'est le même
+dessin, il est plus lisse, il ne coûte pas un octet, et il peut respirer avec le
+boîtier — ce qu'une image cuite ne saura jamais faire. Une épreuve interdit d'en
+recuire un : sans elle, l'IPA reprendrait un demi-mégaoctet sans que personne ne
+s'en aperçoive. Le tramage d'ImageMagick est éteint pour la même raison, et il
+n'y a plus rien à tramer.
+
+**Coût final : 1,2 Mo pour 120 images**, contre 692 ko pour 80. Cinquante pour
+cent d'images en plus, et une image par image plus riche.
+
+#### Et une épreuve qui n'a rien de décoratif
+
+**Aucun `id` ne se répète dans une image.** Le plan imprimé du dossier est le
+*même* dessin que celui de la vitrine, rappelé à l'intérieur de l'image complète.
+Deux `<clipPath id="x">` dans un même document, et c'est le dernier qui gagne
+pour tout le monde : le masque du titre se mettrait à découper le plan de la
+feuille. C'est pour ça que `frameSvg` et `pageSvg` ne posent aucun `id` — la
+règle est écrite dans leur en-tête, et elle se vérifie.
+
+**Vingt-et-une épreuves rouges avant** (vérifié en remettant les deux fichiers en
+état), sur quarante-cinq dans le banc de la vitrine. Et deux nombres qui vivaient
+dans deux fichiers sont maintenant tenus ensemble : la cuisson calcule les images
+pour une cadence, le flipbook les feuillette à une autre — réglés séparément, le
+cycle ne dure plus les cinq secondes annoncées, et personne ne le voit, parce que
+ça reste une jolie animation, simplement trop lente.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro
