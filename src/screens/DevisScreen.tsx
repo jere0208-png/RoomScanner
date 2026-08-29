@@ -67,6 +67,7 @@ import {
   GAMMES,
   RELEVE_RAYON,
   dateDuReleve,
+  moisDeLaVersion,
   releveDuJour,
 } from '../geometry/prix';
 import {
@@ -699,7 +700,15 @@ export function DevisScreen() {
           <>
             <View style={styles.entete}>
               <Text style={styles.enseigne}>ESTIMATION DE FOURNITURE</Text>
-              <Text style={styles.sousEnseigne}>{`tarifs ${devis.version}`}</Text>
+              {/*
+                LE MOIS, ET NON LE NUMÉRO DE VERSION. « tarifs 2026-08.2 » a un
+                sens pour le code — le mois, puis le rang du relevé dans ce
+                mois — et aucun pour qui lit un devis. La révision voyage
+                toujours avec le devis ; elle ne s'affiche plus.
+              */}
+              <Text style={styles.sousEnseigne}>
+                {`Tarifs ${moisDeLaVersion(devis.version)}`}
+              </Text>
             </View>
 
             {/*

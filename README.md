@@ -11243,6 +11243,44 @@ raison écrite : depuis qu'une copie coûte un plan, la deuxième sauvegarde d'u
 banc tombait dans le vide — **le magasin du compte survit d'une épreuve à
 l'autre**, comme celui du scan.
 
+### « Tarifs 2026-08.2 » devient « Tarifs Août 2026 »
+
+Relevé du patron : « dans la page devis, "tarifs 2026-08.2" est peu
+compréhensible. Fais "Tarifs Août 2026". »
+
+**C'EST LA SECONDE FOIS QUE CETTE CHAÎNE SE MONTRE OÙ IL NE FAUT PAS.** Le
+bandeau des prix la donnait déjà pour une date — corrigé le jour même en lui
+passant le jour du relevé en rayon. Elle restait en clair dans l'en-tête du
+ticket, où elle a un sens pour le code — le mois, puis le **rang du relevé dans
+ce mois**, parce que deux relevés d'août ne donnent pas le même total — et aucun
+pour qui lit un devis.
+
+**LA RÉVISION NE SE PERD PAS.** Elle vit toujours dans `VERSION_TARIFS`, elle
+voyage avec le devis, et c'est elle qui distingue deux chiffrages du même mois.
+Elle ne s'AFFICHE simplement plus : ce qu'on montre à un client, c'est un mois.
+
+**LA MAJUSCULE EST DEMANDÉE, ET C'EST UN INTITULÉ.** « Tarifs Août 2026 » se lit
+comme un titre de colonne, pas comme une phrase. Ailleurs — dans le bandeau, au
+fil du texte — `dateDuReleve` garde la minuscule du français : « Castorama · 28
+août 2026 ».
+
+**CE QU'ON NE SAIT PAS LIRE SE RECOPIE** : une version d'un format inattendu
+ressort telle quelle, plutôt que de devenir « Janvier 1970 ». C'est la règle du
+prix qu'on ne comprend pas, appliquée aux dates.
+
+**Quatre épreuves**, toutes rouges avant : la conversion, la version sans
+révision, le contrôle en sens inverse sur ce qu'on ne sait pas lire — et
+**l'épreuve de l'ouvrage**, qui part du ticket rendu et vérifie qu'il écrit le
+mois et **plus jamais le numéro**. C'est exactement ce qui manquait la première
+fois : la fonction peut être juste et l'en-tête continuer d'écrire le numéro,
+comme le bandeau l'avait fait.
+
+Le montage du ticket sort du banc où il était né, pour servir aux deux épreuves
+qui en ont besoin — deux montages recopiés divergent au premier champ ajouté. Et
+son `act` final est ASYNCHRONE : avancer les minuteurs déclenche la promesse de
+vérification, mais sa résolution attend la micro-tâche suivante. Le premier jet
+mesurait la page d'attente en croyant lire le ticket.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

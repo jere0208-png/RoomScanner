@@ -643,6 +643,37 @@ export function dateDuReleve(releve: string): string {
 }
 
 /**
+ * LE MOIS D'UNE VERSION DE TARIFS — « 2026-08.2 » → « Août 2026 ».
+ *
+ * Relevé du patron : « dans la page devis, "tarifs 2026-08.2" est peu
+ * compréhensible. Fais "Tarifs Août 2026". »
+ *
+ * ET C'EST LA SECONDE FOIS QUE CETTE CHAÎNE SE MONTRE OÙ IL NE FAUT PAS. Le
+ * bandeau des prix la donnait déjà pour une date — corrigé le jour même en lui
+ * passant le jour du relevé. Elle restait en clair dans l'en-tête du ticket, où
+ * elle a un sens pour le code et aucun pour qui lit un devis.
+ *
+ * LA RÉVISION NE SE PERD PAS POUR AUTANT : le rang du relevé dans le mois vit
+ * dans `VERSION_TARIFS`, il voyage avec le devis, et c'est lui qui distingue
+ * deux chiffrages du même août. Il ne s'AFFICHE simplement plus — ce qu'on
+ * montre à un client, c'est un mois.
+ *
+ * LA MAJUSCULE EST DEMANDÉE, et c'est un intitulé : « Tarifs Août 2026 » se lit
+ * comme un titre de colonne, pas comme une phrase. Ailleurs — dans le bandeau,
+ * au fil du texte — `dateDuReleve` garde la minuscule du français.
+ *
+ * CE QU'ON NE SAIT PAS LIRE SE RECOPIE : une version d'un format inattendu
+ * ressort telle quelle, plutôt que de devenir « Janvier 1970 ». C'est la règle
+ * du prix qu'on ne comprend pas, appliquée aux dates.
+ */
+export function moisDeLaVersion(version: string): string {
+  const m = /^(\d{4})-(\d{2})(?:\.\d+)?$/.exec(version);
+  const mois = m ? MOIS[Number(m[2]) - 1] : undefined;
+  if (!m || !mois) return version;
+  return `${mois[0].toUpperCase()}${mois.slice(1)} ${m[1]}`;
+}
+
+/**
  * CE RELEVÉ EST-IL D'AUJOURD'HUI ?
  *
  * Relevé du patron : « si le jour de l'update est le jour même, on met "prix

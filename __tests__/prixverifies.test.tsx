@@ -45,8 +45,10 @@ import { SERVEUR } from '../src/config/serveur';
 import {
   GAMMES,
   RELEVE_RAYON,
+  VERSION_TARIFS,
   appliquerLesTarifs,
   dateDuReleve,
+  moisDeLaVersion,
   releveDuJour,
 } from '../src/geometry/prix';
 import { light } from '../src/theme';
@@ -212,13 +214,71 @@ describe('le bandeau dit « vérifiés » quand ça l’est', () => {
 
 // ------------------------------------------------------------- dans l'écran
 
-describe('l’écran, hors ligne, avec un catalogue relevé aujourd’hui', () => {
-  const muet = () => {
-    global.fetch = jest.fn(async () => {
-      throw new Error('réseau');
-    }) as unknown as typeof fetch;
-  };
+/*
+  DEUX BANCS ONT BESOIN DU MÊME TICKET : celui qui date le catalogue et celui
+  qui lit son en-tête. Le montage sort donc du `describe` où il était né —
+  deux montages recopiés divergent au premier champ ajouté.
+*/
+const muet = () => {
+  global.fetch = jest.fn(async () => {
+    throw new Error('réseau');
+  }) as unknown as typeof fetch;
+};
 
+const boutonDe = (t: TestRenderer.ReactTestRenderer, nom: string) =>
+  t.root
+    .findAll(
+      (n) =>
+        typeof n.props?.onPress === 'function' &&
+        String(n.props?.accessibilityLabel ?? '').startsWith(nom),
+    )
+    .pop()!;
+
+/**
+ * Jusqu'au ticket, l'attente épuisée.
+ *
+ * L'`act` de la fin est ASYNCHRONE, et c'est nécessaire : avancer les
+ * minuteurs déclenche la promesse de vérification, mais sa résolution attend
+ * la micro-tâche suivante. Le premier jet mesurait la page d'attente en
+ * croyant lire le ticket.
+ */
+const ouvrirLeTicket = async () => {
+  let t!: TestRenderer.ReactTestRenderer;
+  act(() => {
+    useScanStore.getState().reset();
+    useScanStore.setState({
+      walls: MURS,
+      openings: [],
+      objects: [],
+      rooms: ROOMS as never,
+      fixtures: APPAREILS,
+      ceiling: [],
+      photos: [],
+      notes: [],
+      niveauCourant: 0,
+      screen: 'devis',
+      gammeDevis: GAMMES[0].id,
+      devisEcartes: [],
+      etapeDevis: 0,
+    });
+    t = TestRenderer.create(<DevisScreen />);
+  });
+  act(() => {
+    for (const v of t.root.findAllByType(View)) {
+      v.props.onLayout?.({
+        nativeEvent: { layout: { width: 390, height: 620 } },
+      });
+    }
+  });
+  arbre = t;
+  act(() => boutonDe(t, 'Voir le prix').props.onPress());
+  await act(async () => {
+    jest.advanceTimersByTime(ATTENTE_MIN + 50);
+  });
+  return t;
+};
+
+describe('l’écran, hors ligne, avec un catalogue relevé aujourd’hui', () => {
   const ouvrir = () => {
     let t!: TestRenderer.ReactTestRenderer;
     act(() => {
@@ -281,6 +341,57 @@ describe('l’écran, hors ligne, avec un catalogue relevé aujourd’hui', () =
 });
 
 // --------------------------------------------------------------- l'attente
+
+describe('l’en-tête du ticket dit le mois, pas un numéro de version', () => {
+  /*
+    RELEVÉ DU PATRON : « dans la page devis, "tarifs 2026-08.2" est peu
+    compréhensible. Fais "Tarifs Août 2026". »
+
+    IL A RAISON, ET C'EST LA SECONDE FOIS QUE CETTE CHAÎNE SE MONTRE OÙ IL NE
+    FAUT PAS. Le bandeau des prix la donnait déjà pour une date — corrigé le
+    jour même. Elle restait en clair dans l'en-tête du ticket, où elle a un
+    sens pour le code (le mois, puis le RANG du relevé dans ce mois : deux
+    relevés d'août ne donnent pas le même total) et aucun pour qui lit un
+    devis.
+
+    LA RÉVISION NE SE PERD PAS : elle vit dans `VERSION_TARIFS`, elle voyage
+    avec le devis, et c'est elle qui distingue deux chiffrages du même mois.
+    Elle ne s'AFFICHE simplement plus — ce qu'on montre à un client, c'est un
+    mois.
+  */
+  it('« 2026-08.2 » devient « Août 2026 »', () => {
+    expect(moisDeLaVersion('2026-08.2')).toBe('Août 2026');
+  });
+
+  it('et une version sans révision se lit pareil', () => {
+    expect(moisDeLaVersion('2026-08')).toBe('Août 2026');
+    expect(moisDeLaVersion('2027-01.4')).toBe('Janvier 2027');
+  });
+
+  it('mais ce qu’on ne sait pas lire se rend tel quel', () => {
+    /*
+      LE CONTRÔLE EN SENS INVERSE. Une fonction qui invente un mois pour
+      n'importe quelle chaîne finirait par écrire « Janvier 1970 » sur un
+      devis. Ce qu'on ne comprend pas, on le recopie — c'est la règle des prix
+      appliquée aux dates.
+    */
+    expect(moisDeLaVersion('bientôt')).toBe('bientôt');
+    expect(moisDeLaVersion('2026-13.1')).toBe('2026-13.1');
+  });
+
+  it('et le TICKET l’écrit en toutes lettres', async () => {
+    /*
+      L'ÉPREUVE DE L'OUVRAGE. La fonction peut être juste et l'en-tête
+      continuer d'écrire le numéro : c'est exactement ce qui s'était passé
+      pour le bandeau, corrigé d'un côté et pas de l'autre.
+    */
+    muet();
+    const t = await ouvrirLeTicket();
+    const lus = mots(t);
+    expect(lus).toContain(`Tarifs ${moisDeLaVersion(VERSION_TARIFS)}`);
+    expect(lus.some((m) => m.includes(VERSION_TARIFS))).toBe(false);
+  });
+});
 
 describe('l’attente dure assez longtemps pour se voir', () => {
   const repondVite = () => {
