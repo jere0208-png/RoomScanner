@@ -34,28 +34,27 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   removeItem: jest.fn(async () => undefined),
 }));
 
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import React from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
-import Svg, { LinearGradient, Path, Rect } from 'react-native-svg';
+import Svg, {
+  LinearGradient as SvgLinearGradient,
+  Path,
+  Rect,
+} from 'react-native-svg';
 import { ContourVif } from '../src/components/ContourVif';
 import { light } from '../src/theme';
 import { HomeScreen } from '../src/screens/HomeScreen';
 import { LogoMark } from '../src/components/LogoMark';
 import { AvatarGlyph } from '../src/components/AvatarGlyph';
-import {
-  BALANCEMENT,
-  PERIODE,
-  PhoneShowcase,
-} from '../src/components/PhoneShowcase';
 import { GlowButton } from '../src/components/GlowButton';
-import { LightRibbon } from '../src/components/LightRibbon';
+import { Quadrillage } from '../src/components/Quadrillage';
 import { ThemeGlyph } from '../src/components/ThemeGlyph';
 import { TexteVif } from '../src/components/ContourVif';
 import { useScanStore } from '../src/store/scanStore';
 import { useAccountStore } from '../src/store/accountStore';
-import { SHOWCASE_IMAGES } from '../src/assets/showcase';
-import { IPS, SHOWCASE_FRAMES } from '../src/export/showcaseFrames';
 
 beforeEach(() => {
   jest.useFakeTimers();
@@ -78,6 +77,22 @@ function monter() {
   let t!: TestRenderer.ReactTestRenderer;
   act(() => {
     t = TestRenderer.create(<HomeScreen />);
+  });
+  /*
+    L'ÉCRAN SE MESURE, DONC LE BANC LE MESURE AUSSI.
+
+    Le quadrillage du fond couvre exactement la surface de l'accueil : il
+    attend que celle-ci se soit annoncée. Sans cet appel, il ne se dessine
+    jamais — et l'épreuve du papier tomberait en accusant le composant, alors
+    que c'est le banc qui n'aurait rien mesuré.
+  */
+  act(() => {
+    const zone = t.root
+      .findAllByType(View)
+      .find((n) => typeof n.props.onLayout === 'function');
+    zone?.props.onLayout({
+      nativeEvent: { layout: { width: 390, height: 844 } },
+    });
   });
   arbre = t;
   return t;
@@ -209,7 +224,7 @@ describe('l’accueil', () => {
       et rien ne brille ; c'est le Pro qui s'anime, et lui seul.
     */
     expect(vu).not.toContain('GRATUIT');
-    expect(bloc.findAllByType(LinearGradient)).toHaveLength(0);
+    expect(bloc.findAllByType(SvgLinearGradient)).toHaveLength(0);
     expect(bloc.findAllByType(ContourVif)).toHaveLength(0);
     const nomGris = bloc
       .findAllByType(Text)
@@ -350,216 +365,97 @@ describe('l’accueil', () => {
     expect(vu).toContain('en plan coté');
   });
 
-  it('montre le logement, image par image', () => {
-    const t = monter();
-    expect(t.root.findAllByType(PhoneShowcase)).toHaveLength(1);
-    // Toutes les images sont montées d'emblée : les charger une par une
-    // ferait sauter la première boucle.
-    expect(
-      t.root.findByType(PhoneShowcase).findAllByType(Image),
-    ).toHaveLength(SHOWCASE_IMAGES.length);
-  });
-
-  /**
-   * LES IMAGES CUITES SUIVENT LE SCÉNARIO.
-   *
-   * Elles sont calculées au build : si quelqu'un change le scénario sans
-   * relancer `npm run showcase`, l'accueil joue l'ancienne animation et rien
-   * ne le dit. Le compte, lui, le dit.
-   */
-  it('a autant d’images que le scénario en demande', () => {
-    expect(SHOWCASE_IMAGES).toHaveLength(SHOWCASE_FRAMES);
-  });
-
-  /**
-   * ET ELLE TOURNE.
-   *
-   * Une maquette figée aurait exactement le même arbre au premier rendu :
-   * seule la comparaison dans le temps prouve le mouvement.
-   */
-  it('déroule l’animation toute seule, et en boucle', () => {
-    const t = monter();
-    /**
-     * L'image visible : la seule de la VITRINE dont l'opacité n'est pas
-     * nulle. On cherche dans la vitrine et non dans l'écran entier — le
-     * logotype de la marque est une image lui aussi, et il passait devant.
-     */
-    const visible = () =>
-      t.root
-        .findByType(PhoneShowcase)
-        .findAllByType(Image)
-        .findIndex((n) => {
-          const st = Array.isArray(n.props.style)
-            ? Object.assign({}, ...n.props.style.filter(Boolean))
-            : n.props.style;
-          return (st?.opacity ?? 1) !== 0;
-        });
-    expect(visible()).toBe(0);
-    act(() => jest.advanceTimersByTime(500));
-    const apres = visible();
-    expect(apres).toBeGreaterThan(0);
-    // Elle boucle : après un cycle complet, on est revenu au plan.
-    act(() => jest.advanceTimersByTime(PERIODE * SHOWCASE_FRAMES));
-    expect(visible()).toBe(apres);
-  });
-
   /*
-   * LE RUBAN PASSE DERRIÈRE LA MAQUETTE, ET C'EST LA MAQUETTE QUI LE DIT.
+   * L'IPHONE A QUITTÉ L'ACCUEIL, ET LE PAPIER A PRIS SA PLACE.
    *
-   * Relevé du patron : « les lignes derrière l'iPhone de l'accueil traversent
-   * l'iPhone, elles doivent être derrière. »
+   * Relevé du patron : « refais l'accueil, enlève l'iPhone et son animation.
+   * L'accueil doit être moderne, avec un design épuré mais bien pensé qui
+   * rappelle le but de l'app (architecture, plan). Par exemple pour les
+   * boutons, ils seraient dans un quadrillage avec les côtés fondus. »
    *
-   * LE RUBAN DEMANDAIT À RECULER au lieu que la maquette demande à avancer :
-   * il portait `zIndex: -1`. C'est le sens fragile des deux. Un `zIndex`
-   * négatif ne fait pas seulement passer derrière ses frères — il sort du plan
-   * de son parent, et ce que le parent compose ensuite (ici une opacité
-   * animée, l'apparition de l'accueil) peut le ramener devant.
+   * LA MAQUETTE A ÉTÉ UNE BONNE IDÉE, ET ELLE EST DEVENUE UN OBJET DE PLUS.
+   * Un téléphone dessiné DANS un téléphone est une mise en abyme qu'on
+   * remarque une fois, puis qui encombre : elle prenait la moitié de
+   * l'accueil, tournait en boucle, et pesait 1,2 Mo d'images cuites dans
+   * l'application. Ce qu'elle racontait — le relevé, l'équipement, le dossier
+   * — est raconté mieux, et une seule fois, par la présentation du premier
+   * lancement.
    *
-   * Ces épreuves tiennent les DEUX moitiés de la correction, parce que
-   * chacune a l'air suffisante toute seule : l'ordre du document, et le sens
-   * positif de l'empilement.
+   * CE QUI REMPLIT SA PLACE N'EST PAS UN AUTRE OBJET : c'est du VIDE, sur du
+   * papier quadrillé.
    */
-  const styleDe = (n: { props: { style?: unknown } }) =>
-    (StyleSheet.flatten(n.props.style as never) ?? {}) as Record<string, number>;
-
-  it('le ruban est écrit AVANT la maquette', () => {
+  it('n’a plus de maquette de téléphone', () => {
     /*
-      L'ordre du document est la première moitié : à empilement égal, c'est
-      lui qui décide, et il ne dépend d'aucune subtilité de plateforme.
+      L'ÉPREUVE DU RELEVÉ, et elle se mesure sur le CODE SOURCE autant que sur
+      l'arbre : un composant qu'on cesse d'afficher mais qu'on garde importé
+      revient au premier copier-coller, et ses 1,2 Mo d'images avec lui.
     */
-    const t = monter();
-    const ordre: string[] = [];
-    const lire = (n: unknown): void => {
-      if (!n || typeof n !== 'object') return;
-      const o = n as { type?: unknown; children?: unknown[] };
-      if (o.type === LightRibbon) ordre.push('ruban');
-      if (o.type === PhoneShowcase) ordre.push('maquette');
-      (o.children ?? []).forEach(lire);
-    };
-    lire(t.root as unknown);
-    expect(ordre).toEqual(['ruban', 'maquette']);
-  });
-
-  it('et rien ne demande à RECULER : c’est la maquette qui avance', () => {
-    /*
-      La seconde moitié, et la vraie correction. On interdit le `zIndex`
-      négatif — celui qui sort du plan du parent — et l'on exige que la
-      maquette porte un empilement positif, `elevation` comprise : sur
-      Android, c'est elle qui décide de l'ordre de peinture, et un `zIndex`
-      seul y laisserait le ruban devant.
-    */
-    const t = monter();
-    const empilements = t.root
-      .findAllByType(View)
-      .map((n) => styleDe(n).zIndex)
-      .filter((z): z is number => typeof z === 'number');
-    expect(empilements.filter((z) => z < 0)).toEqual([]);
-
-    const porteur = t.root.findAll(
-      (n) =>
-        n.type === View &&
-        n.findAllByType(PhoneShowcase).length > 0 &&
-        typeof styleDe(n).zIndex === 'number',
+    const src = readFileSync(
+      join(__dirname, '..', 'src', 'screens', 'HomeScreen.tsx'),
+      'utf8',
     );
-    expect(porteur.length).toBeGreaterThan(0);
-    const dessus = styleDe(porteur[porteur.length - 1]);
-    expect(dessus.zIndex).toBeGreaterThan(0);
-    expect(dessus.elevation).toBeGreaterThan(0);
+    expect(src).not.toContain('PhoneShowcase');
+    expect(src).not.toContain('SHOWCASE');
   });
 
-  /*
-   * LE BOÎTIER EST UN OBJET, PAS UN CADRE AUTOUR D’UNE IMAGE.
-   *
-   * Relevé du patron : « l'animation de l'iPhone et de son écran ne me
-   * convainc pas, on dirait un truc bas de gamme. Je veux quelque chose de
-   * dynamique, rapide, fluide, JS style. Un vrai art style. »
-   *
-   * Le dedans de l'écran a été refait ailleurs. Le BOÎTIER, lui, était un
-   * rectangle sombre avec un liséré, une diagonale claire FIXE en guise de
-   * reflet, et une rotation lente. Un objet plat. Ces bancs tiennent les
-   * quatre couches vivantes qui le remettent debout — et surtout le fait
-   * qu'elles soient ANIMÉES : un nombre écrit en dur à leur place passerait
-   * toutes les épreuves de structure sans que rien ne bouge à l'écran.
-   */
-  const vitrine = (t: TestRenderer.ReactTestRenderer) =>
-    t.root.findByType(PhoneShowcase);
-  /** Les styles à plat d'un nœud, sans résoudre les valeurs animées. */
-  const couches = (n: { props: { style?: unknown } }) =>
-    (Array.isArray(n.props.style) ? n.props.style : [n.props.style]).filter(
-      Boolean,
-    ) as Record<string, unknown>[];
-
-  it('la vitrine porte sa lueur, son étalonnage et son reflet', () => {
+  it('mais il porte le PAPIER de l’architecte', () => {
     /*
-      TROIS COUCHES VECTORIELLES, ET DEUX D'ENTRE ELLES ÉTAIENT CUITES DANS
-      LES IMAGES. La lueur du fond et le vignettage y pesaient 480 ko — un
-      dégradé lisse est le pire ennemi d'une palette réduite. Posés ici, ils
-      sont plus lisses, gratuits, et ils peuvent bouger.
+      C'est le seul motif qui dit le métier sans un mot. Une application qui
+      relève des logements n'a pas besoin d'un pictogramme de maison : elle a
+      besoin du papier sur lequel on trace — et c'est déjà la trame du sol de
+      la vue 3D.
     */
-    const dessins = vitrine(monter()).findAllByType(Svg);
-    expect(dessins.length).toBeGreaterThanOrEqual(3);
+    const t = monter();
+    expect(t.root.findAllByType(Quadrillage).length).toBeGreaterThan(0);
+    // Et il est vraiment tracé : un quadrillage sans traits est un fond nu.
+    expect(
+      t.root.findAll((n) => n.props?.testID === 'trait-quadrillage').length,
+    ).toBeGreaterThan(10);
   });
 
-  it('le boîtier FLOTTE et tourne, sur deux horloges différentes', () => {
+  it('et ses côtés se FONDENT, ce qui demande un dégradé', () => {
     /*
-      DEUX MOUVEMENTS DE MÊME PÉRIODE se lisent comme UN mouvement, et un
-      mouvement qui se répète toutes les quatre secondes se remarque. Le
-      flottement a donc sa propre horloge, volontairement bancale : les deux
-      ne retombent en phase qu'au bout de vingt-six secondes.
+      Un quadrillage qui s'arrête net a un BORD, et un bord fait de lui un
+      rectangle posé sur l'écran — un objet de plus. Fondu, il devient le
+      papier : on ne sait plus où il commence, donc on ne le regarde plus.
 
-      On lit les transformations SANS les aplatir : `StyleSheet.flatten`
-      résout une valeur animée en son nombre du moment, et un boîtier qui
-      tourne y ressemblerait à un boîtier figé.
+      ET LE FONDU EST PORTÉ PAR LE TRAIT. Faire varier l'opacité ligne par
+      ligne fond la grille vers le haut et le bas, mais chaque ligne garde ses
+      deux bouts francs. Un trait qui se fond sur sa propre longueur demande un
+      dégradé — c'est ce qu'on vérifie ici.
     */
-    const transformes = vitrine(monter())
-      .findAll((n) => couches(n).some((c) => Array.isArray(c.transform)))
-      .flatMap((n) =>
-        couches(n).flatMap(
-          (c) => (c.transform ?? []) as Record<string, unknown>[],
-        ),
-      );
-    const anime = (cle: string) =>
-      transformes.filter(
-        (x) => cle in x && typeof x[cle] === 'object' && x[cle] !== null,
-      );
-    // La rotation du boîtier, et sa montée : les deux sont des valeurs
-    // animées, pas des nombres écrits en dur.
-    expect(anime('rotateY').length).toBeGreaterThanOrEqual(1);
-    expect(anime('translateY').length).toBeGreaterThanOrEqual(1);
-    // Et le reflet TRAVERSE la dalle.
-    expect(anime('translateX').length).toBeGreaterThanOrEqual(1);
+    const t = monter();
+    const traits = t.root.findAll(
+      (n) => n.props?.testID === 'trait-quadrillage',
+    );
+    expect(traits.length).toBeGreaterThan(0);
+    /*
+      ON LIT LE NŒUD COMPOSITE, PAS SON HÔTE. `findAll` rend les deux, et
+      `react-native-svg` transforme la couleur en objet avant de la passer à
+      la vue native : sur l'hôte, on ne lit plus qu'un « [object Object] ».
+    */
+    const dits = traits
+      .map((n) => n.props.stroke)
+      .filter((v): v is string => typeof v === 'string');
+    expect(dits.length).toBeGreaterThan(0);
+    for (const v of dits) expect(v).toMatch(/^url\(#/);
+    expect(t.root.findAllByType(SvgLinearGradient).length).toBeGreaterThan(0);
   });
 
-  it('et le reflet suit la ROTATION, il n’a pas d’horloge à lui', () => {
+  it('le vide qui reste est VOULU, pas un trou', () => {
     /*
-      C'EST TOUT LE POINT. Sur un objet qui tourne, ce qui trahit le faux
-      n'est pas l'absence de reflet, c'est un reflet qui ne réagit pas — et
-      l'ancien dessin posait une diagonale claire immobile.
-
-      Les deux valeurs viennent de la même animation : l'amplitude du reflet
-      est donc solidaire de celle du boîtier par construction, et l'on ne peut
-      pas les désynchroniser en réglant l'une sans l'autre. Le contrôle tient
-      ça : la rotation reste un balancement FAIBLE — six degrés —, sans quoi
-      le dessin qu'on lit changerait de place à chaque tour.
+      LE CONTRÔLE EN SENS INVERSE. Retirer la maquette sans rien mettre à sa
+      place ferait remonter les boutons de deux cents points : la marque du
+      haut et les portes du bas changeraient d'assiette, et l'on ne
+      reconnaîtrait plus l'écran. La place est donc TENUE — c'est le vide qui
+      fait l'épuré, et il est déclaré.
     */
-    expect(BALANCEMENT).toBeLessThanOrEqual(8);
-  });
-
-  it('le téléphone les joue à la cadence pour laquelle elles sont cuites', () => {
-    /*
-      LES DEUX NOMBRES VIVENT DANS DEUX FICHIERS, et rien ne les tenait
-      ensemble : la cuisson calcule les images pour `IPS`, le flipbook les
-      feuillette toutes les `PERIODE` millisecondes. Réglés séparément, le
-      cycle ne dure plus les cinq secondes annoncées — et personne ne le voit,
-      parce que ça reste une jolie animation, simplement trop lente.
-
-      QUINZE IMAGES PAR SECONDE, C'ÉTAIT LE DÉFAUT. On peut lisser une
-      trajectoire autant qu'on veut : à quinze, l'œil sépare encore les poses
-      d'un mouvement rapide, et c'est ce hachage-là qui se lit comme du bas de
-      gamme.
-    */
-    expect(Math.round(1000 / PERIODE)).toBe(IPS);
-    expect(IPS).toBeGreaterThanOrEqual(24);
+    const t = monter();
+    const respire = t.root
+      .findAllByType(View)
+      .map((n) => (StyleSheet.flatten(n.props.style as never) ?? {}) as Record<string, number>)
+      .filter((st) => st.flex === 1 && typeof st.minHeight === 'number');
+    expect(respire.length).toBeGreaterThan(0);
   });
 
   it('porte ses deux boutons, et le second seulement s’il y a des scans', () => {

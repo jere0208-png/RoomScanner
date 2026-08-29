@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { TexteVif } from '../components/ContourVif';
 import {
   Animated,
@@ -8,8 +8,8 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  useWindowDimensions,
   View,
+  type LayoutChangeEvent,
 } from 'react-native';
 import { RoomScan } from 'react-native-room-scan';
 import {
@@ -24,8 +24,7 @@ import {
 import { GlowButton } from '../components/GlowButton';
 import { LogoMark } from '../components/LogoMark';
 import { AvatarGlyph } from '../components/AvatarGlyph';
-import { LightRibbon, RIBBON_H } from '../components/LightRibbon';
-import { PhoneShowcase } from '../components/PhoneShowcase';
+import { Quadrillage } from '../components/Quadrillage';
 import { useScanStore } from '../store/scanStore';
 import { useAccountStore } from '../store/accountStore';
 import { useRoomScan } from '../native/useRoomScan';
@@ -91,7 +90,6 @@ export function HomeScreen() {
     filigrane serait plus visible que le filigrane. « Pas de contour rien »
     vaut aussi pour ce qui tourne autour.
   */
-  const { width: winW } = useWindowDimensions();
   const reveal = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     Animated.timing(reveal, {
@@ -101,6 +99,20 @@ export function HomeScreen() {
       useNativeDriver: true,
     }).start();
   }, [reveal]);
+
+  /*
+    LA TAILLE DE L'ÉCRAN, MESURÉE ET NON DEVINÉE.
+
+    Le quadrillage doit couvrir exactement le fond : une largeur prise à la
+    fenêtre laisserait les marges de l'écran hors trame, et le papier aurait
+    deux bords francs — précisément ce qu'on ne veut pas.
+  */
+  const [cadre, setCadre] = useState({ w: 0, h: 0 });
+  const mesurer = (e: LayoutChangeEvent) =>
+    setCadre({
+      w: e.nativeEvent.layout.width,
+      h: e.nativeEvent.layout.height,
+    });
 
   // Fondu en cascade : chaque bloc apparaît juste après le précédent.
   const fadeIn = (i: number) => {
@@ -124,7 +136,31 @@ export function HomeScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={styles.container} onLayout={mesurer}>
+      {/*
+        LE PAPIER SUR LEQUEL CETTE APPLICATION DESSINE.
+
+        Relevé du patron : « l'accueil doit être moderne, avec un design épuré
+        mais bien pensé qui rappelle le but de l'app (architecture, plan). Par
+        exemple pour les boutons, ils seraient dans un quadrillage avec les
+        côtés fondus. »
+
+        C'est le seul motif qui dit le métier sans un mot. Une application qui
+        relève des logements n'a pas besoin d'un pictogramme de maison : elle a
+        besoin du PAPIER sur lequel on trace. Et c'est déjà la trame du sol de
+        la vue 3D — l'accueil devient la première page du même dessin.
+
+        IL EST DERRIÈRE TOUT, ET IL NE REÇOIT JAMAIS LE DOIGT.
+      */}
+      {cadre.w > 0 && (
+        <Quadrillage
+          width={cadre.w}
+          height={cadre.h}
+          palette={c}
+          force={1.2}
+          cle="accueil"
+        />
+      )}
       {/* `box-none` : le bloc pleine largeur laisse passer le doigt là où
           lui-même n'a rien à toucher — plus jamais un fantôme au-dessus
           des boutons du bandeau. */}
@@ -179,49 +215,24 @@ export function HomeScreen() {
       </View>
 
       {/*
-        LA VITRINE, À LA PLACE DU MODE D'EMPLOI.
+        ICI VIVAIT UNE MAQUETTE D'IPHONE, et elle n'y vit plus.
 
-        « Scannez, ajustez, explorez » : trois pictogrammes et neuf mots pour
-        dire ce qu'une seule image montre mieux — le résultat. On ne vend pas
-        un scanner de pièces avec une notice, on le vend avec le plan qui en
-        sort. Et ce plan-là n'est pas une illustration : il passe par le même
-        chemin que la vue 3D de l'application.
+        Relevé du patron : « refais l'accueil, enlève l'iPhone et son
+        animation. »
+
+        ELLE A ÉTÉ UNE BONNE IDÉE, ET ELLE EST DEVENUE UN OBJET DE PLUS. Un
+        téléphone dessiné DANS un téléphone est une mise en abyme qu'on
+        remarque une fois, puis qui encombre : elle prenait la moitié de
+        l'accueil, tournait en boucle, et pesait 1,2 Mo d'images cuites dans
+        l'application. Ce qu'elle racontait — le cheminement du relevé au
+        dossier — est raconté mieux, et une seule fois, par la présentation du
+        premier lancement.
+
+        CE QUI REMPLIT SA PLACE N'EST PAS UN AUTRE OBJET : c'est du VIDE, sur
+        du papier quadrillé. Un écran d'accueil épuré n'a rien à montrer — il
+        a une marque, une promesse et deux portes.
       */}
-      <Animated.View style={[styles.vitrine, fadeIn(2)]}>
-        {/*
-          LE RUBAN PASSE DERRIÈRE LA MAQUETTE.
-
-          Il traverse l'écran de bord à bord, à mi-hauteur du téléphone, et
-          ne reçoit jamais le doigt : c'est un fond, pas un objet. Posé en
-          absolu, il ne pousse rien — la maquette garde sa place au centre —
-          et son ondulation lente donne au bloc la profondeur qu'un aplat
-          n'a pas.
-        */}
-        <View style={styles.ruban} pointerEvents="none">
-          <LightRibbon width={winW} palette={c} sombre={sombre} />
-        </View>
-        {/*
-          ET LA MAQUETTE EST DEVANT, DIT EXPLICITEMENT.
-
-          Relevé du patron : « les lignes derrière l'iPhone de l'accueil
-          traversent l'iPhone, elles doivent être derrière. »
-
-          LE RUBAN DEMANDAIT À RECULER, au lieu que la maquette demande à
-          avancer : il portait `zIndex: -1`. C'est le sens fragile des deux.
-          Un `zIndex` négatif ne fait pas seulement passer derrière ses
-          frères — il sort du plan de son parent, et ce que le parent
-          compose ensuite (une opacité animée, une ombre, un rognage) peut
-          le ramener devant. Le sens positif, lui, ne demande rien à
-          personne : la maquette est au-dessus, point.
-
-          On garde l'ordre du document — le ruban écrit avant — ET on lève
-          la maquette. Les deux disent la même chose, et il en faut deux :
-          l'ordre seul avait déjà l'air suffisant.
-        */}
-        <View style={styles.devant}>
-          <PhoneShowcase />
-        </View>
-      </Animated.View>
+      <View style={styles.respiration} pointerEvents="none" />
 
       {supported === false && (
         <View style={styles.warning}>
@@ -522,34 +533,14 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   },
 
   /**
-   * La vitrine prend la place laissée par les étapes : elle respire, et
-   * c'est elle qu'on regarde en attendant de toucher le bouton.
-   */
-  vitrine: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginVertical: 4,
-  },
-  /* Centré en hauteur sur la maquette, débordant des deux côtés : le ruban
-     doit sortir du cadre, sinon il paraît posé dans une boîte.
-
-     IL NE PORTE PLUS DE `zIndex` NÉGATIF — voir `devant` juste dessous. */
-  ruban: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: '50%',
-    marginTop: -RIBBON_H / 2,
-    alignItems: 'center',
-  },
-  /**
-   * LA MAQUETTE PASSE DEVANT LE RUBAN, et c'est elle qui le dit.
+   * LA RESPIRATION — ce qui remplace la maquette.
    *
-   * `elevation` accompagne `zIndex` : sur Android, c'est elle qui décide de
-   * l'ordre de peinture, et un `zIndex` seul y laisserait le ruban devant.
+   * Ce n'est pas un oubli : c'est le vide qui fait l'épuré. Il prend la place
+   * que prenait le téléphone, et la marque du haut comme les portes du bas
+   * gardent exactement l'assiette qu'elles avaient — un écran qui se vide ne
+   * doit pas se réorganiser, sinon on ne le reconnaît plus.
    */
-  devant: { zIndex: 1, elevation: 1 },
+  respiration: { flex: 1, minHeight: 40 },
   /** Appareil incompatible, ou erreur du scan : un bandeau, pas une alerte. */
   warning: {
     backgroundColor: '#FDECEC',

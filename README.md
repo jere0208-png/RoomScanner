@@ -12079,6 +12079,109 @@ balaierait tout passerait les six épreuves et effacerait la bibliothèque, le
 thème et les préférences d'affichage. La règle n'est pas « tout effacer », c'est
 « rien du **chantier** ».
 
+### L'accueil passe au papier, et l'iPhone s'en va
+
+Relevé du patron : « refais l'accueil, enlève l'iPhone et son animation. Refais
+les étapes animées pour la première utilisation : un plan 2D sur la première
+page, plan équipé sur la page 2 et plan 3D sur la page 3, avec explication de la
+possibilité d'exporter. L'accueil doit être moderne, avec un design épuré mais
+bien pensé qui rappelle le but de l'app (architecture, plan). Par exemple pour
+les boutons, ils seraient dans un quadrillage avec les côtés fondus. »
+
+#### La maquette d'iPhone est retirée — et avec elle 1,2 Mo
+
+Elle a été une bonne idée, et elle était devenue **un objet de plus**. Un
+téléphone dessiné *dans* un téléphone est une mise en abyme qu'on remarque une
+fois, puis qui encombre : elle prenait la moitié de l'accueil, tournait en
+boucle, et pesait **1,2 Mo d'images cuites** dans l'IPA. Ce qu'elle racontait —
+le relevé, l'équipement, le dossier — est raconté mieux, et une seule fois, par
+la présentation du premier lancement.
+
+Ce qui a été supprimé, et c'est assumé : le composant, les 120 images, les 120
+SVG sources, le module de scénario, l'outil de cuisson (`npm run showcase`) et
+son banc. **Tout est dans l'historique** — un `git revert` le ramène. Laisser
+1,2 Mo d'images inutilisées dans une application serait objectivement faux, et
+du code mort pourrit.
+
+#### Le quadrillage : le papier sur lequel cette application dessine
+
+C'est le seul motif qui dit le métier **sans un mot**. Une application qui relève
+des logements n'a pas besoin d'un pictogramme de maison pour se présenter : elle
+a besoin du papier sur lequel on trace. Et c'est déjà la trame du sol de la vue
+3D — l'accueil devient la première page du même dessin.
+
+**Les côtés se fondent, et c'est un dégradé, pas un masque.** Un quadrillage qui
+s'arrête net a un *bord*, et un bord fait de lui un rectangle posé sur l'écran —
+un objet de plus. Fondu, il devient le papier : on ne sait plus où il commence,
+donc on ne le regarde plus, et c'est ce qu'on demande à un fond.
+
+Et il y a **deux façons de fondre, dont une seule marche ici**. Faire varier
+l'opacité *ligne par ligne* fond la grille vers le haut et le bas, mais chaque
+ligne garde ses deux bouts francs : on voit une grille aux bords coupés dont la
+densité change. Le trait doit se fondre **sur sa propre longueur**, ce qui
+demande un dégradé porté par le trait. D'où deux dégradés seulement — un par
+direction —, partagés par toutes les lignes : ce n'est pas une économie, c'est
+la seule façon d'avoir le même fondu partout.
+
+**Ce qui remplace la maquette n'est pas un autre objet : c'est du vide.** Un
+écran d'accueil épuré n'a rien à montrer — il a une marque, une promesse et deux
+portes. La place est tenue explicitement, pour que la marque du haut et les
+portes du bas gardent exactement leur assiette : un écran qui se vide ne doit
+pas se réorganiser, sinon on ne le reconnaît plus.
+
+#### Les trois étapes se dessinent maintenant
+
+Les cartes du premier lancement montraient **trois photos** — trois images cuites
+de la vitrine. C'était juste, gratuit, et figé : trois captures d'écran dans une
+présentation, c'est-à-dire ce que fait tout le monde.
+
+Le plan **se fait** désormais : les murs se tracent l'un après l'autre, les
+appareils se posent, le logement se lève. On ne montre plus le résultat, on
+montre le **geste** — la seule chose qu'une présentation puisse apprendre.
+
+**C'est le même logement aux trois pages**, et c'est tout l'intérêt : trois
+illustrations sans rapport diraient « voici trois fonctions ». Le même plan qui
+se trace, s'équipe et se lève dit « voici ce qui arrive à *votre* logement ».
+
+**Deux façons d'animer, et le choix se justifie page par page.** Les deux
+premières se contentent d'opacités étagées, sur le fil natif : une seule valeur
+animée, décalée par élément. La troisième ne peut pas — des murs qui montent,
+c'est une géométrie qui change à chaque image, et aucun `transform` ne la
+produit. Elle est donc pilotée depuis JavaScript.
+
+Et c'est **acceptable ici alors que ça ne l'était pas pour la vitrine** : cette
+page s'affiche une fois dans la vie de l'application, seule à l'écran. La
+vitrine, elle, tournait en boucle derrière un écran vivant — d'où les images
+cuites. Même geste, deux contextes, deux réponses.
+
+**L'export est nommé par ses formats.** « Exportez votre projet » ne dit rien :
+tout le monde exporte. Le PDF au client, le DXF à l'architecte, le CSV au
+comptoir — trois extensions disent *à qui l'on parle*, et font comprendre en une
+ligne que le travail **sort** de l'application.
+
+#### Regardé avant d'être livré, et trois fois de travers
+
+Le dessin a été rendu en image à chaque étape (`voirleplan`, sous `VOIR_PLAN=1`).
+C'est cet outil qui a montré que le volume était une **boîte fermée** : cinq murs
+levés, et l'on ne voyait ni le sol, ni le refend, ni les pièces — c'est-à-dire
+rien de ce que l'application produit. Les murs qui nous font face s'effacent
+maintenant, comme dans la vue 3D de l'application.
+
+**Mais la sonde a menti trois fois**, et chaque mensonge a coûté un
+aller-retour : les couleurs arrivent en entiers ARGB (tout paraissait noir) ; un
+`fill="none"` perdu redevient noir par défaut (un sol bleu très pâle passait pour
+une dalle d'ardoise) ; et les dégradés ne se transcrivent pas du tout (le
+quadrillage paraissait absent alors qu'il était là). Ces limites sont désormais
+écrites en tête de l'outil : mieux vaut les lire avant de conclure qu'un dessin
+est cassé.
+
+**Et deux bancs se sont corrigés eux-mêmes** en cours de route. Le premier
+comptait les pans de mur pour vérifier la levée — or ils sont dessinés dès la
+première image, simplement plats : l'épreuve passait à vide. Le second les a donc
+mesurés, mais sur l'emprise du quadrilatère — en axonométrie, un mur *court* à
+l'écran, et sa base seule occupe déjà soixante-dix points de haut. C'est l'arête
+verticale qu'on mesure maintenant, et elle seule.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

@@ -8,8 +8,7 @@
     "lint": "eslint .",
     "start": "react-native start",
     "test": "jest",
-    "snapshots": "node tools/render-snapshots.mjs",
-    "showcase": "node tools/gen-showcase.mjs"
+    "snapshots": "node tools/render-snapshots.mjs"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "^3.1.1",

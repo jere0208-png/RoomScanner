@@ -28,11 +28,15 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 import React from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import { PremierLancement } from '../src/components/PremierLancement';
-import { SHOWCASE_IMAGES } from '../src/assets/showcase';
+import { PlanAnime } from '../src/components/PlanAnime';
+import { Quadrillage } from '../src/components/Quadrillage';
 import { light } from '../src/theme';
+
+beforeAll(() => jest.useFakeTimers());
+afterAll(() => jest.useRealTimers());
 
 let arbre: TestRenderer.ReactTestRenderer | null = null;
 afterEach(() => {
@@ -62,6 +66,41 @@ const bouton = (t: TestRenderer.ReactTestRenderer, nom: string) =>
       String(n.props?.accessibilityLabel ?? '').startsWith(nom),
   )[0];
 
+/**
+ * LA HAUTEUR DES PANS DE MUR, à l'écran.
+ *
+ * ON NE COMPTE PAS LES PANS, ON LES MESURE — et c'est une correction que le
+ * banc s'est faite à lui-même. Compter passait à VIDE : les quadrilatères sont
+ * dessinés dès la première image, simplement plats. Une épreuve qui les compte
+ * dit « il y en a trois » aussi bien avant qu'après la levée, et ne prouve
+ * donc rien du tout.
+ */
+const hauteurDesPans = (t: TestRenderer.ReactTestRenderer) => {
+  const pans = t.root
+    .findAll((n) => n.props?.testID === 'pan-de-mur')
+    .map((n) => n.props.points)
+    .filter((v): v is string => typeof v === 'string');
+  /*
+    ON MESURE L'ARÊTE VERTICALE, PAS L'EMPRISE DU QUADRILATÈRE.
+
+    Seconde correction que ce banc s'est faite : en axonométrie, un mur COURT
+    à l'écran — sa base seule occupe déjà soixante-dix points de haut. Prendre
+    l'emprise du quadrilatère mesurait donc la longueur du mur, pas sa hauteur,
+    et l'épreuve trouvait un mur "levé" avant qu'il ne commence à monter.
+
+    Les quatre points sont écrits dans l'ordre `base-début, base-fin, haut-fin,
+    haut-début` : la hauteur, c'est l'écart entre le premier et le dernier.
+  */
+  let haut = 0;
+  for (const p of pans) {
+    const pts = p.split(' ').map((c) => Number(c.split(',')[1]));
+    if (pts.length === 4 && Number.isFinite(pts[0]) && Number.isFinite(pts[3])) {
+      haut = Math.max(haut, Math.abs(pts[0] - pts[3]));
+    }
+  }
+  return haut;
+};
+
 describe('les trois cartes', () => {
   it('la première dit ce qu’on fait, pas ce que l’app est', () => {
     /*
@@ -75,7 +114,7 @@ describe('les trois cartes', () => {
   it('et l’on avance jusqu’au bout', () => {
     const t = monter();
     act(() => bouton(t, 'Suivant').props.onPress());
-    expect(mots(t)).toContain('Posez vos prises');
+    expect(mots(t)).toContain('Placez vos prises');
     act(() => bouton(t, 'Suivant').props.onPress());
     expect(mots(t)).toContain('Emportez le dossier');
   });
@@ -138,38 +177,125 @@ describe('les trois cartes', () => {
   });
 });
 
-describe('les images sont celles de la vitrine', () => {
-  it('chaque carte en montre une, et elle en vient', () => {
-    /*
-      C'EST LA GARANTIE DE JUSTESSE, et elle vaut plus que l'économie d'octets
-      : ces images sortent de la même géométrie que l'application. Une
-      illustration dessinée à côté vieillirait sans que personne ne le voie.
-    */
+describe('le plan se fait sous les yeux', () => {
+  /*
+    RELEVÉ DU PATRON : « refais les étapes animées pour la première
+    utilisation, sans texte juste : un plan 2D sur la première page, plan
+    équipé sur la page 2 et plan 3D sur la page 3. »
+
+    PREMIER DESSIN — TROIS PHOTOS. Les cartes montraient trois images cuites
+    de la vitrine de l'accueil. C'était juste, gratuit, et FIGÉ : trois
+    captures d'écran dans une présentation, c'est-à-dire ce que fait tout le
+    monde.
+
+    SECOND — LE PLAN SE FAIT. Les murs se tracent, les appareils se posent, le
+    logement se lève. On ne montre plus le résultat, on montre le GESTE — la
+    seule chose qu'une présentation puisse apprendre.
+  */
+  it('trois étapes, et jamais deux fois la même', () => {
     const t = monter();
-    const source = () => t.root.findAllByType(Image)[0].props.source;
-    expect(SHOWCASE_IMAGES).toContain(source());
-    const premiere = source();
+    const etape = () => t.root.findByType(PlanAnime).props.etape;
+    expect(etape()).toBe('plan');
     act(() => bouton(t, 'Suivant').props.onPress());
-    expect(SHOWCASE_IMAGES).toContain(source());
-    // Et ce n'est pas la même : trois cartes, trois moments.
-    expect(source()).not.toBe(premiere);
+    expect(etape()).toBe('equipe');
+    act(() => bouton(t, 'Suivant').props.onPress());
+    expect(etape()).toBe('volume');
   });
 
-  it('et le cadre garde la proportion d’un écran', () => {
+  it('et l’animation se REJOUE quand on revient sur une étape', () => {
     /*
-      LE CONTRÔLE QUI PROTÈGE LE DESSIN. Un cadre aux mauvaises proportions
-      étirerait un plan — la seule chose qu'une application de métré ne peut
-      pas se permettre, y compris sur une image de présentation.
+      LE DÉTAIL QUI DÉCIDE DE TOUT : sans redémarrage, la deuxième visite
+      d'une étape s'afficherait déjà finie — on aurait payé trois animations
+      pour n'en voir qu'une.
+
+      ON LE MESURE SUR LA LEVÉE, parce que c'est la seule des trois qui soit
+      LISIBLE depuis un banc : elle vit dans l'état du composant, tandis que
+      les deux autres partent sur le fil natif, que l'arbre d'essai n'a pas.
+    */
+    let t!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      t = TestRenderer.create(
+        <PlanAnime etape="volume" width={280} height={220} palette={light} />,
+      );
+    });
+    arbre = t;
+    act(() => {
+      jest.advanceTimersByTime(1200);
+    });
+    expect(hauteurDesPans(t)).toBeGreaterThan(30);
+    // On repasse par une autre étape, puis l'on revient : tout repart de zéro.
+    act(() => {
+      t.update(
+        <PlanAnime etape="plan" width={280} height={220} palette={light} />,
+      );
+    });
+    act(() => {
+      t.update(
+        <PlanAnime etape="volume" width={280} height={220} palette={light} />,
+      );
+    });
+    expect(hauteurDesPans(t)).toBeLessThan(4);
+    act(() => {
+      jest.advanceTimersByTime(1200);
+    });
+    expect(hauteurDesPans(t)).toBeGreaterThan(30);
+  });
+
+  it('le plan à plat porte ses murs, l’équipé porte en plus ses sigles', () => {
+    /*
+      C'est le MÊME logement aux trois pages, et c'est tout l'intérêt : trois
+      illustrations sans rapport diraient « voici trois fonctions ». Le même
+      plan qui se trace puis s'équipe dit « voici ce qui arrive à VOTRE
+      logement ».
     */
     const t = monter();
-    const cadre = t.root
-      .findAllByType(View)
-      .map((n) => (StyleSheet.flatten(n.props.style as never) ?? {}) as Record<string, number>)
-      .find((st) => typeof st.width === 'number' && typeof st.height === 'number' && st.height > 200)!;
-    expect(cadre).toBeDefined();
-    // Les images cuites font 264 × 536 : un peu plus de deux fois plus haut
-    // que large. Le cadre doit s'y tenir à quelques centièmes près.
-    const rapport = cadre.height / cadre.width;
-    expect(Math.abs(rapport - 536 / 264)).toBeLessThan(0.12);
+    const compte = (id: string) =>
+      t.root.findAll((n) => n.props?.testID === id).length;
+    expect(compte('mur-du-plan')).toBeGreaterThan(0);
+    expect(compte('sigle-appareil')).toBe(0);
+    act(() => bouton(t, 'Suivant').props.onPress());
+    expect(compte('mur-du-plan')).toBeGreaterThan(0);
+    expect(compte('sigle-appareil')).toBeGreaterThan(0);
+  });
+
+  it('et le volume LÈVE des pans, une fois l’horloge passée', () => {
+    /*
+      Des murs qui montent, c'est une géométrie qui change à chaque image :
+      aucun `transform` ne la produit. La levée est donc pilotée depuis
+      JavaScript — et au premier rendu, les pans font zéro de haut. Le banc
+      avance les horloges, comme l'utilisateur attend neuf dixièmes de
+      seconde.
+    */
+    const t = monter();
+    act(() => bouton(t, 'Suivant').props.onPress());
+    act(() => bouton(t, 'Suivant').props.onPress());
+    // À plat au premier instant : les murs n'ont pas encore commencé à monter.
+    expect(hauteurDesPans(t)).toBeLessThan(4);
+    act(() => {
+      jest.advanceTimersByTime(1200);
+    });
+    expect(hauteurDesPans(t)).toBeGreaterThan(30);
+  });
+
+  it('et la troisième carte NOMME les exports', () => {
+    /*
+      Relevé du patron : « avec explication de possibilité d'exporter ».
+
+      « Exportez votre projet » ne dit rien — tout le monde exporte. Trois
+      extensions, elles, disent à QUI l'on parle : le PDF au client, le DXF à
+      l'architecte, le CSV au comptoir. C'est ce qui fait comprendre en une
+      ligne que le travail SORT de l'application.
+    */
+    const t = monter();
+    act(() => bouton(t, 'Suivant').props.onPress());
+    act(() => bouton(t, 'Suivant').props.onPress());
+    const lus = mots(t);
+    for (const f of ['PDF', 'DXF', 'CSV']) expect(lus).toContain(f);
+  });
+
+  it('le dessin est posé sur le PAPIER, comme l’accueil', () => {
+    // La présentation et l'application ouvrent sur la même feuille : c'est ce
+    // qui fait de la première une promesse tenue plutôt qu'une affiche.
+    expect(monter().root.findAllByType(Quadrillage).length).toBeGreaterThan(0);
   });
 });
