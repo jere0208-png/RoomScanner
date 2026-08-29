@@ -791,6 +791,25 @@ const DEPOT_DELAI = 2000;
 const depots = new Map<string, ReturnType<typeof setTimeout>>();
 
 /**
+ * DES NOMBRES QUI EN SONT VRAIMENT.
+ *
+ * LA PORTE DU MAGASIN EST LE SEUL ENDROIT OÙ ÇA SE VÉRIFIE. Un NaN qui entre
+ * ici ne repart plus : il nourrit le dessin 2D, le volume 3D, le métré et le
+ * PDF, et finit en coordonnées `NaN,NaN` dans un tracé SVG — ce qui fait
+ * tomber la couche native, c'est-à-dire l'application, sans un mot.
+ *
+ * ET IL FAUT L'ÉCRIRE AINSI, EN EXIGEANT. Une garde qui cherche ce qu'elle
+ * REFUSE — `x <= 0`, `Math.max(0.1, Math.min(6, x))` — laisse toujours passer
+ * NaN, parce que toute comparaison avec NaN est fausse et que `Math.min` le
+ * propage. C'est le défaut qu'un banc de balayage a trouvé quatorze fois dans
+ * ce fichier (`aucunnombrefou`), sur les gestes les plus utilisés de
+ * l'application : pousser un mur, tirer un coin, déplacer une pièce.
+ */
+function sontFinis(...v: (number | undefined)[]): boolean {
+  return v.every((x) => x === undefined || Number.isFinite(x));
+}
+
+/**
  * UNE COTE VALABLE : un nombre fini, strictement positif, et pas délirant.
  *
  * Douze mètres est la borne haute de tout ce qui se saisit dans cette
@@ -2304,6 +2323,7 @@ export const useScanStore = create<ScanState>((set, get) => {
     },
 
     moveRoom: (roomId, dx, dz) => {
+      if (!sontFinis(dx, dz)) return;
       const st = get();
       const piece = st.rooms.find((r) => r.id === roomId);
       if (!piece) return;
@@ -2544,10 +2564,22 @@ export const useScanStore = create<ScanState>((set, get) => {
 
     mergeRooms: (aId, bId) => {
       const st = get();
-      pushHistory('mergeRooms');
       const a = st.rooms.find((r) => r.id === aId);
       const b = st.rooms.find((r) => r.id === bId);
       if (!a || !b || aId === bId) return;
+      /*
+        LA GARDE PASSE AVANT LE POINT DE REPRISE.
+
+        `pushHistory` veut dire « retiens l'état d'avant ». Appelé puis suivi
+        d'un renoncement, il laisse dans l'historique un point qui ne
+        correspond à AUCUN changement — et au doigt, cela donne : on touche
+        « Annuler », il ne se passe rien, on touche une seconde fois, et là
+        ça revient en arrière.
+
+        C'est l'un des rares défauts qu'on ne signale jamais, parce qu'on
+        croit avoir mal appuyé. Voir `annulerunefois`.
+      */
+      pushHistory('mergeRooms');
       // La cloison commune cesse de border : elle devient intérieure à la
       // pièce réunie, et le contour se referme sur l'enveloppe des deux.
       const inA = new Set(a.wallIds ?? []);
@@ -2584,9 +2616,21 @@ export const useScanStore = create<ScanState>((set, get) => {
 
     splitRoom: (roomId) => {
       const st = get();
-      pushHistory('splitRoom');
       const part = roomParts(st.walls, st.rooms).find((p) => p.roomId === roomId);
       if (!part?.surface) return;
+      /*
+        LA GARDE PASSE AVANT LE POINT DE REPRISE.
+
+        `pushHistory` veut dire « retiens l'état d'avant ». Appelé puis suivi
+        d'un renoncement, il laisse dans l'historique un point qui ne
+        correspond à AUCUN changement — et au doigt, cela donne : on touche
+        « Annuler », il ne se passe rien, on touche une seconde fois, et là
+        ça revient en arrière.
+
+        C'est l'un des rares défauts qu'on ne signale jamais, parce qu'on
+        croit avoir mal appuyé. Voir `annulerunefois`.
+      */
+      pushHistory('splitRoom');
       // Cloison posée en travers, perpendiculaire au grand axe et passant par
       // le point le plus au large. Ses deux bouts s'arrêtent EXACTEMENT sur
       // le contour : sans ça rien ne se soude, aucun nœud n'apparaît et la
@@ -2635,7 +2679,6 @@ export const useScanStore = create<ScanState>((set, get) => {
 
     redetectRooms: () => {
       const st = get();
-      pushHistory('redetect');
       const olds = roomParts(st.walls, st.rooms);
       // Le graphe a pu changer (cloison ajoutée, coin déplacé) : on le
       // renettoie avant d'y rechercher les faces.
@@ -2644,6 +2687,19 @@ export const useScanStore = create<ScanState>((set, get) => {
       // ce qui s'ouvre est une pièce, si petit soit-il.
       const shapes = detectRooms(walls, undefined, st.openings);
       if (shapes.length === 0) return;
+      /*
+        LA GARDE PASSE AVANT LE POINT DE REPRISE.
+
+        `pushHistory` veut dire « retiens l'état d'avant ». Appelé puis suivi
+        d'un renoncement, il laisse dans l'historique un point qui ne
+        correspond à AUCUN changement — et au doigt, cela donne : on touche
+        « Annuler », il ne se passe rien, on touche une seconde fois, et là
+        ça revient en arrière.
+
+        C'est l'un des rares défauts qu'on ne signale jamais, parce qu'on
+        croit avoir mal appuyé. Voir `annulerunefois`.
+      */
+      pushHistory('redetect');
       /**
        * Le graphe vient d'être recousu : un mur coupé en deux ne garde son
        * identifiant que sur le premier morceau, un mur fusionné que celui
@@ -3608,6 +3664,7 @@ export const useScanStore = create<ScanState>((set, get) => {
     },
 
     moveFixture: (id, along, height) => {
+      if (!sontFinis(along, height)) return;
       const st = get();
       const f = st.fixtures.find((x) => x.id === id);
       const wall = f ? st.walls.find((w) => w.id === f.wallId) : null;
@@ -4079,6 +4136,7 @@ export const useScanStore = create<ScanState>((set, get) => {
     },
 
     splitFixture: (id, along) => {
+      if (!sontFinis(along)) return;
       pushHistory('separer');
       set({
         fixtures: get().fixtures.map((f) =>
@@ -4969,10 +5027,22 @@ export const useScanStore = create<ScanState>((set, get) => {
      * (autres murs) suivent, et l'angle snappe à l'horizontale/verticale.
      */
     moveWallPoint: (id, end, p) => {
-      pushHistory(`move:${id}:${end}`);
       const { walls } = get();
       const wall = walls.find((w) => w.id === id);
-      if (!wall) return;
+      if (!wall || !sontFinis(p?.x, p?.z)) return;
+      /*
+        LA GARDE PASSE AVANT LE POINT DE REPRISE.
+
+        `pushHistory` veut dire « retiens l'état d'avant ». Appelé puis suivi
+        d'un renoncement, il laisse dans l'historique un point qui ne
+        correspond à AUCUN changement — et au doigt, cela donne : on touche
+        « Annuler », il ne se passe rien, on touche une seconde fois, et là
+        ça revient en arrière.
+
+        C'est l'un des rares défauts qu'on ne signale jamais, parce qu'on
+        croit avoir mal appuyé. Voir `annulerunefois`.
+      */
+      pushHistory(`move:${id}:${end}`);
       const old = wall[end];
       const fixed = wall[end === 'a' ? 'b' : 'a'];
       // Le magnétisme se règle sur la trame du LOGEMENT, jamais sur les axes
@@ -5102,6 +5172,7 @@ export const useScanStore = create<ScanState>((set, get) => {
     },
 
     moveWall: (id, dx, dz) => {
+      if (!sontFinis(dx, dz)) return;
       const st = get();
       const wall = st.walls.find((w) => w.id === id);
       if (!wall || (Math.abs(dx) < 1e-9 && Math.abs(dz) < 1e-9)) return;
@@ -5240,6 +5311,7 @@ export const useScanStore = create<ScanState>((set, get) => {
 
     /** Modifie la longueur d'un mur en déplaçant son extrémité B le long de sa direction. */
     setWallLength: (id, length) => {
+      if (!sontFinis(length)) return;
       const { walls, moveWallPoint } = get();
       const wall = walls.find((w) => w.id === id);
       if (!wall || length <= 0) return;
@@ -5419,9 +5491,20 @@ export const useScanStore = create<ScanState>((set, get) => {
       const ux = (o.b.x - o.a.x) / len;
       const uz = (o.b.z - o.a.z) / len;
       const mid = { x: (o.a.x + o.b.x) / 2, z: (o.a.z + o.b.z) / 2 };
-      const l = width !== undefined ? Math.max(0.1, Math.min(6, width)) : len;
+      /*
+        `Math.max(0.1, Math.min(6, x))` A L'AIR DE BORNER, et ne borne pas ce
+        qu'il faut : `Math.min(6, NaN)` vaut NaN, et `Math.max` le propage.
+        Deux bornes soigneusement posées, et le seul nombre dont on avait
+        vraiment peur passait entre les deux.
+      */
+      const l =
+        width !== undefined && Number.isFinite(width)
+          ? Math.max(0.1, Math.min(6, width))
+          : len;
       const h =
-        height !== undefined ? Math.max(0.2, Math.min(3, height)) : o.height;
+        height !== undefined && Number.isFinite(height)
+          ? Math.max(0.2, Math.min(3, height))
+          : o.height;
       // L'allège ne bouge pas : c'est le linteau qui monte ou descend.
       const base = o.yCenter - o.height / 2;
       set({
@@ -5455,6 +5538,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       le mur de refend. Le magasin fait la conversion, une fois, ici.
     */
     moveOpening: (id, bord) => {
+      if (!sontFinis(bord)) return;
       const st = get();
       const o = st.openings.find((x) => x.id === id);
       if (!o) return;
@@ -5556,6 +5640,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       hauteur donnerait deux gestes qui se défont l'un l'autre.
     */
     setAllege: (id, h) => {
+      if (!sontFinis(h)) return;
       const st = get();
       const o = st.openings.find((x) => x.id === id);
       // Une porte a le sol pour allège, par définition : un réglage qui ne
@@ -5692,6 +5777,7 @@ export const useScanStore = create<ScanState>((set, get) => {
     },
 
     setObjectYaw: (id, yaw) => {
+      if (!sontFinis(yaw)) return;
       pushHistory(`yaw:${id}`);
       const cos = Math.cos(yaw);
       const sin = Math.sin(yaw);
@@ -5763,11 +5849,22 @@ export const useScanStore = create<ScanState>((set, get) => {
         pour défaire une seule chose — et l'on croit que l'annulation est
         cassée.
       */
-      if (!Number.isFinite(x) || !Number.isFinite(z)) return;
-      pushHistory(`moveObject:${id}`);
       const st = get();
       const obj = st.objects.find((o) => o.id === id);
-      if (!obj) return;
+      if (!obj || !sontFinis(x, z)) return;
+      /*
+        LA GARDE PASSE AVANT LE POINT DE REPRISE.
+
+        `pushHistory` veut dire « retiens l'état d'avant ». Appelé puis suivi
+        d'un renoncement, il laisse dans l'historique un point qui ne
+        correspond à AUCUN changement — et au doigt, cela donne : on touche
+        « Annuler », il ne se passe rien, on touche une seconde fois, et là
+        ça revient en arrière.
+
+        C'est l'un des rares défauts qu'on ne signale jamais, parce qu'on
+        croit avoir mal appuyé. Voir `annulerunefois`.
+      */
+      pushHistory(`moveObject:${id}`);
       /*
         EN LIBRE, LE MAGASIN N'ARBITRE PLUS.
 
@@ -5893,10 +5990,22 @@ export const useScanStore = create<ScanState>((set, get) => {
         fois sur deux, DANS un mur. « Annuler » rendait une position que
         l'application refuse elle-même de produire.
       */
-      pushHistory(`moveObject:${id}`);
       const st = get();
       const obj = st.objects.find((o) => o.id === id);
-      if (!obj) return;
+      if (!obj || !sontFinis(x, z)) return;
+      /*
+        LA GARDE PASSE AVANT LE POINT DE REPRISE.
+
+        `pushHistory` veut dire « retiens l'état d'avant ». Appelé puis suivi
+        d'un renoncement, il laisse dans l'historique un point qui ne
+        correspond à AUCUN changement — et au doigt, cela donne : on touche
+        « Annuler », il ne se passe rien, on touche une seconde fois, et là
+        ça revient en arrière.
+
+        C'est l'un des rares défauts qu'on ne signale jamais, parce qu'on
+        croit avoir mal appuyé. Voir `annulerunefois`.
+      */
+      pushHistory(`moveObject:${id}`);
       const yaw = Math.atan2(obj.transform[2], obj.transform[0]);
       const box = {
         width: obj.baseWidth ?? obj.width,
@@ -6726,6 +6835,36 @@ export const useScanStore = create<ScanState>((set, get) => {
         north: null,
         // Le popup de fin de scan appartient au scan qui vient de finir.
         arrivage: null,
+        /*
+          ET TOUT CE QUI DÉSIGNE LE CHANTIER PRÉCÉDENT.
+
+          Trouvé en comparant, champ par champ, ce que l'état contient et ce
+          que ce `reset` reposait : cinquante-neuf champs de données,
+          vingt-huit reposés à la main. Une liste écrite à la main finit
+          toujours par prendre du retard sur la structure qu'elle décrit.
+
+          LE NOM ET L'ADRESSE SONT LE PIRE DES SIX, et de loin : ils vont
+          dans le CARTOUCHE DU PDF. On relève un logement rue Pasteur, on en
+          relève un autre le lendemain, on exporte — et l'on tend à quelqu'un
+          un dossier au nom d'un autre, avec son adresse. Ce n'est pas un
+          défaut d'affichage, c'est une fuite entre deux clients.
+
+          L'ÉTAGE COURANT LAISSAIT UN PLAN VIDE : les murs d'un relevé neuf
+          sont au niveau zéro, et rester au premier ne montrait rien. Un plan
+          vide après un scan se lit comme un scan raté — on recommence, et ça
+          refait la même chose.
+
+          L'ÉTAGE ARMÉ, lui, faisait atterrir le scan SUIVANT au premier
+          étage d'un dossier qui n'avait rien demandé. Le code connaît ce
+          piège : il le désarme à l'abandon et à l'échec du post-traitement,
+          mais pas quand on repart d'un relevé neuf.
+        */
+        client: undefined,
+        address: undefined,
+        niveauCourant: 0,
+        etageEnCours: null,
+        panne: null,
+        pendingJoin: null,
         /*
           ET LE CHIFFRAGE REPART DE ZÉRO.
 

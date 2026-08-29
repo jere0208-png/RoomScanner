@@ -11979,6 +11979,106 @@ en sombre, l'écart valait **un centième**.
 Le banc a trouvé au passage une **espace parasite** devant « Continuer avec
 Apple », invisible sur un texte centré.
 
+### Trois chasses aux défauts
+
+Relevé du patron : « **trouve des défauts.** »
+
+Trois familles, cherchées **par classe** et non une par une : un défaut trouvé
+au hasard se corrige une fois ; une famille se ferme pour de bon.
+
+#### 1. Le poison des nombres — quatorze portes ouvertes
+
+La correction du plantage des meubles avait montré qu'une garde écrite
+`width <= 0` laisse passer NaN. **La bonne question après une correction est
+toujours la même : est-ce que la même faute dort ailleurs ?**
+
+Le magasin porte une trentaine de gestes qui prennent des nombres — hauteurs,
+longueurs, angles, positions — chacun avec sa garde écrite à la main, à des
+années d'intervalle. On ne les a pas relus un par un : un banc les **éprouve
+tous**, avec le même poison, et regarde ce qui ressort du modèle.
+
+**Quatorze laissaient passer**, dont les gestes les plus utilisés de
+l'application : pousser un mur, tirer un coin, déplacer une pièce, déplacer un
+appareil, régler une allège. Une variante mérite d'être montrée :
+
+```js
+Math.max(0.1, Math.min(6, width))
+```
+
+Deux bornes soigneusement posées — et `Math.min(6, NaN)` vaut NaN, que
+`Math.max` propage. La garde a l'air de border, et le seul nombre dont on avait
+vraiment peur passait entre les deux.
+
+> **Une garde qui cherche ce qu'elle refuse laisse toujours passer NaN**, parce
+> que toute comparaison avec NaN est fausse. Une garde qui **exige** ce qu'elle
+> accepte ne peut pas se tromper.
+
+Le banc lit **tous les nombres du modèle** après chaque geste — murs,
+ouvertures, meubles, appareils, plafond — et nomme le chemin du coupable. Le
+geste écrit dans six mois y tombera tout seul. Et son **contrôle en sens
+inverse** rejoue les vingt-huit gestes avec de bonnes valeurs : un magasin qui
+refuserait tout passerait la première moitié du banc sans rien prouver.
+
+*Au passage, une famille vérifiée et déclarée saine :* toutes les divisions par
+une longueur, dans la géométrie, sont gardées (`if (len < 1e-6) continue`, ou
+`|| 1`). Rien à corriger — et c'est une information, pas un silence.
+
+#### 2. « Annuler » qui demande deux appuis
+
+Sept gestes appelaient `pushHistory` — « retiens l'état d'avant » — **puis**
+renonçaient : le mur a disparu, la pièce n'a pas de surface, les deux pièces à
+fusionner sont la même. L'historique gardait alors un point qui ne correspond à
+**aucun changement**.
+
+Au doigt : on touche « Annuler », il ne se passe rien ; on touche une seconde
+fois, et là ça revient en arrière. C'est l'un des rares défauts qu'on ne signale
+jamais **parce qu'on croit avoir mal appuyé**, et l'un des plus agaçants quand
+on travaille vite.
+
+L'historique ne peut pas dédoublonner : il **fusionne** les états d'un geste
+continu — un mur qu'on fait glisser envoie cinquante états par seconde — et il
+les reconnaît à leur clé. La correction vient donc de l'ordre : **la garde avant
+le point de reprise**.
+
+Six confirmés, six corrigés, et le contrôle en sens inverse qui exige que deux
+vrais gestes coûtent bien deux annulations — sans lui, un historique qui
+n'empilerait plus rien passerait tout le banc.
+
+#### 3. Ce qui restait du chantier précédent
+
+Trouvé en comparant, **champ par champ**, ce que l'état du magasin contient et
+ce que `reset()` reposait : cinquante-neuf champs de données, vingt-huit reposés
+à la main. Une liste écrite à la main finit toujours par prendre du retard sur
+la structure qu'elle décrit.
+
+**Six survivaient. Le premier est le plus grave de toute cette passe :**
+
+| ce qui restait | ce que ça donne |
+|---|---|
+| **le nom du client** | il part dans le **cartouche du PDF** du chantier suivant |
+| **son adresse** | idem |
+| l'étage qu'on regardait | les murs neufs sont au niveau 0 → **un plan vide** |
+| l'étage qu'on s'apprêtait à scanner | le scan suivant atterrit au 1ᵉʳ étage d'un dossier qui n'a rien demandé |
+| l'échec d'enregistrement | une alerte d'hier levée aujourd'hui |
+| un raccord de mur en suspens | — |
+
+Le nom et l'adresse ne sont pas un défaut d'affichage : c'est une **fuite
+d'information entre deux clients**. On relève un logement rue Pasteur, on en
+relève un autre le lendemain, on exporte — et l'on tend à quelqu'un un dossier
+au nom d'un autre.
+
+L'étage courant, lui, laissait un **plan vide** après un scan. Et un plan vide
+après un scan se lit comme un scan raté : on recommence, et ça refait la même
+chose.
+
+*Le code connaissait déjà le piège de l'étage armé* : il le désarme à l'abandon
+et à l'échec du post-traitement — mais pas quand on repart d'un relevé neuf.
+
+**Le contrôle en sens inverse est indispensable ici** : un `reset()` qui
+balaierait tout passerait les six épreuves et effacerait la bibliothèque, le
+thème et les préférences d'affichage. La règle n'est pas « tout effacer », c'est
+« rien du **chantier** ».
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro
