@@ -12535,6 +12535,26 @@ Ce qui a été percé, et comment il tient :
 - se déconnecter ne bascule pas en invité : c'est un geste de compte, il en
   appelle un autre — l'écran de connexion revient.
 
+### Chaque bouton a une voix
+
+Un tour d'accessibilité a MESURÉ ce qu'on croyait : sur les grands écrans de
+l'application, aucun élément tactile n'est muet — chacun porte un texte
+visible ou une étiquette VoiceOver. La propriété valait d'être figée : elle
+se perd une pastille à la fois, le prochain bouton dessiné à la va-vite, une
+icône posée sans son mot — et quelqu'un qui navigue à l'oreille tombe sur
+« bouton » sans savoir lequel.
+
+Le banc `voixhaute` monte six écrans (accueil, bibliothèque, profil, ticket,
+export, connexion) et compte les muets : zéro, et ça doit le rester. S'il
+rougit un jour, la correction n'est jamais dans le banc — elle est sur le
+bouton qu'on vient d'ajouter.
+
+Évalué et laissé à la 1.1, en connaissance de cause : le plafonnement du
+grossissement de police système (Dynamic Type). React 19 ignore
+`defaultProps` sur les composants de fonction — le plafonner proprement
+demande un composant Texte maison adopté partout, pas un réglage de veille
+de sortie.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro
