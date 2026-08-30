@@ -70,6 +70,32 @@ describe('l’échelle du plan', () => {
     expect(m.scale).toBeLessThanOrEqual(ECHELLE_MAX_PLAN);
   });
 
+  it('ouvre une pièce seule avec des murs de PLAN, pas des murs de poster', () => {
+    /*
+      Relevé du patron : « les murs sont plus épais quand on trace
+      directement depuis l'accueil la pièce, qu'un autre plan scanné.. ça
+      doit être identique. »
+
+      La maçonnerie est identique — quatorze centimètres partout. C'est
+      l'ÉCHELLE D'OUVERTURE qui trahissait : le cadrage ajuste le contenu au
+      cadre, et une pièce tracée seule (3 m sur un écran de téléphone) se
+      faisait grossir à 103 pt/m — des murs de quinze points, trois fois
+      l'épaisseur du même mur dans un logement scanné (31 pt/m). Deux plans
+      côte à côte, deux graisses de trait.
+
+      Le plafond descend donc là où vivent les VRAIS logements : un T2 de
+      six mètres remplit encore son cadre (51 pt/m, sous le plafond), et la
+      pièce seule s'ouvre à l'échelle qu'elle aura quand le logement sera
+      complet — le pincement reste libre d'aller plus près.
+    */
+    const m = makeMapping({ minX: 0, maxX: 3, minZ: 0, maxZ: 2.5 }, 390, 600);
+    expect(m.scale).toBeLessThanOrEqual(55);
+    // Et le mur qu'elle dessine reste dans la famille de celui d'un T2 :
+    // moins d'un tiers d'écart, là où l'on avait un facteur trois.
+    const t2 = makeMapping({ minX: 0, maxX: 6, minZ: 0, maxZ: 8 }, 390, 600);
+    expect(m.scale / t2.scale).toBeLessThanOrEqual(1.34);
+  });
+
   it('mais remplit toujours le cadre pour un logement ordinaire', () => {
     const m = makeMapping({ minX: 0, maxX: 10, minZ: 0, maxZ: 8 }, 600, 480);
     // Huit mètres dans 480 points, moins deux marges de 40 : la hauteur

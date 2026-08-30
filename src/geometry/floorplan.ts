@@ -3452,12 +3452,21 @@ export function bounds(walls: WallSeg[]): Bounds {
  * trente se retrouve grossi jusqu'à remplir un téléphone : on ne voit plus
  * ni où l'on est, ni le niveau du dessous sur lequel on doit l'aligner.
  *
- * Cent quarante points par mètre, c'est déjà très près : une porte de
- * quatre-vingt-trois centimètres y fait cent seize points, la largeur d'un
- * pouce. Au-delà, on n'apprend plus rien du plan — on ne fait que perdre le
- * nord. Le pincement, lui, reste libre d'aller plus loin.
+ * PUIS LE PLAFOND EST DESCENDU LÀ OÙ VIVENT LES VRAIS LOGEMENTS — relevé
+ * du patron : « les murs sont plus épais quand on trace directement depuis
+ * l'accueil la pièce, qu'un autre plan scanné.. ça doit être identique. »
+ * La maçonnerie EST identique (quatorze centimètres partout) ; c'est
+ * l'échelle d'ouverture qui trahissait : une pièce tracée seule se faisait
+ * grossir à 103 pt/m — des murs de quinze points, trois fois l'épaisseur du
+ * même mur dans un logement scanné à 31. Deux plans côte à côte, deux
+ * graisses de trait.
+ *
+ * Cinquante-cinq points par mètre : un T2 de six mètres remplit encore son
+ * cadre (51 pt/m, sous le plafond), et une pièce seule s'ouvre à l'échelle
+ * qu'elle aura quand le logement sera complet. Le pincement, lui, reste
+ * libre d'aller plus près.
  */
-export const ECHELLE_MAX_PLAN = 140;
+export const ECHELLE_MAX_PLAN = 55;
 
 export function makeMapping(b: Bounds, viewW: number, viewH: number, margin = 40) {
   const w = Math.max(b.maxX - b.minX, 0.5);

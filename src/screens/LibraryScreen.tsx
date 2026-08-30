@@ -1212,14 +1212,23 @@ export function LibraryScreen() {
       {vide ? (
         <View style={styles.empty}>
           <EmptyPlanArt c={palette} />
-          <Text style={styles.emptyTitle}>Aucun scan enregistré</Text>
+          <Text style={styles.emptyTitle}>Aucun plan enregistré</Text>
+          {/*
+            LES DEUX PORTES, PAS SEULEMENT LE SCAN. L'état vide ne parlait
+            que du scan — or l'accueil offre aussi le tracé au doigt, et sur
+            un téléphone sans LiDAR le scan est précisément la porte qui
+            refuse. Le premier écran qu'un nouveau venu voit vide ne doit
+            pas le pousser vers la seule chose que son appareil ne sait pas
+            faire.
+          */}
           <Text style={styles.emptyText}>
-            Chaque scan terminé est sauvegardé automatiquement et apparaîtra ici.
+            Scannez une pièce, ou tracez-la du doigt depuis l'accueil : chaque
+            plan enregistré apparaîtra ici.
           </Text>
           <TouchableOpacity
             style={styles.primaryButton}
             onPress={() => setScreen('home')}>
-            <Text style={styles.primaryText}>Commencer un scan</Text>
+            <Text style={styles.primaryText}>Créer mon premier plan</Text>
           </TouchableOpacity>
         </View>
       ) : (

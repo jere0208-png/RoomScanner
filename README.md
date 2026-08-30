@@ -12470,6 +12470,42 @@ Le plafond prend maintenant le même bloc que sa pièce, aux deux étages de la
 chaîne : l'équerre (`straightenPlan`) ET la redétection qui la suit
 (`weldCorners` y déplace aussi des pans de mur).
 
+### Le même trait pour tous les plans — et la bibliothèque apprend le tracé
+
+Relevé du patron : « les murs sont plus épais quand on trace directement
+depuis l'accueil la pièce, qu'un autre plan scanné.. ça doit être
+identique. »
+
+**La maçonnerie était identique** — quatorze centimètres partout. C'est
+l'ÉCHELLE D'OUVERTURE qui trahissait : le cadrage ajuste le contenu au
+cadre, et une pièce tracée seule se faisait grossir à 103 pt/m — des murs de
+quinze points, trois fois l'épaisseur du même mur dans un logement scanné à
+31 pt/m. Deux plans côte à côte, deux graisses de trait.
+
+Le plafond d'échelle (`ECHELLE_MAX_PLAN`) descend de 140 à **55 pt/m**, là
+où vivent les vrais logements : un T2 de six mètres remplit encore son cadre
+(51 pt/m, sous le plafond — un banc le tient), et une pièce seule s'ouvre à
+l'échelle qu'elle aura quand le logement sera complet. Deux conséquences
+assumées : les cotes de tronçons et les symboles d'appareillage suivent le
+même niveau de détail qu'un plan scanné (la cote globale de chaque mur
+reste, le pincement rapproche) — c'est le sens même de « identique ». Les
+planches de référence du rendu ont été régénérées et leur diff RELU : seuls
+changent l'échelle, les traits (22,4 → 13,7 px) et les cotes de tronçons
+passées sous le seuil.
+
+**Et la bibliothèque vide apprend les deux portes.** Son état vide ne
+parlait que du scan — « chaque scan terminé… », bouton « Commencer un
+scan » — alors que l'accueil offre aussi le tracé au doigt, et que sur un
+téléphone sans LiDAR le scan est précisément la porte qui refuse. Elle dit
+maintenant les deux, et son bouton — « Créer mon premier plan » — ramène à
+l'accueil, où les deux portes vivent.
+
+Fouillé sans rien trouver à redire, cette fois : l'ascenseur du mur (cibles
+de 44 pt, sélection collante), l'export (PDF pré-bâti pendant le choix des
+options, pannes expliquées), les retours haptiques (l'aimant se sent), la
+symétrie des gestes entre familles d'objets, et les vignettes de la
+bibliothèque (déjà mémoïsées, un banc compte les appels).
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

@@ -129,6 +129,45 @@ const dits = (tree: TestRenderer.ReactTestRenderer) =>
     .map((n) => String(n.props.children))
     .join(' | ');
 
+describe('la bibliothèque vide', () => {
+  /*
+   * ELLE CONNAÎT LES DEUX PORTES. L'état vide ne parlait que du scan —
+   * « chaque scan terminé… », bouton « Commencer un scan » — alors que
+   * l'accueil offre AUSSI le tracé au doigt, et que sur un téléphone sans
+   * LiDAR le scan est précisément la porte qui refuse. Le premier écran
+   * qu'un nouveau venu voit vide ne doit pas le pousser vers la seule
+   * chose que son appareil ne sait pas faire.
+   */
+  const monterVide = () => {
+    let tree!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      useScanStore.setState({
+        screen: 'library',
+        saves: [],
+        folders: [],
+        currentSaveId: null,
+      });
+      tree = TestRenderer.create(<LibraryScreen />);
+    });
+    arbre = tree;
+    return tree;
+  };
+
+  it('parle des deux portes, pas seulement du scan', () => {
+    const mots = dits(monterVide());
+    expect(mots).toMatch(/[Tt]racez|[Tt]racé/);
+    expect(mots).toMatch(/[Ss]can/);
+  });
+
+  it('et son bouton ramène à l’accueil, où les deux portes vivent', () => {
+    const tree = monterVide();
+    const bouton = choixQuiDit(tree, 'Créer mon premier plan');
+    expect(bouton).toBeTruthy();
+    act(() => bouton!.props.onPress());
+    expect(useScanStore.getState().screen).toBe('home');
+  });
+});
+
 describe('la bibliothèque des relevés', () => {
   it('montre les dossiers enregistrés, le plus récent d’abord', () => {
     const tree = monter();
