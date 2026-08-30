@@ -104,7 +104,10 @@ export function ProfilScreen() {
   const [support, setSupport] = useState(false);
 
   const restant = Math.max(0, PLANS_GRATUITS + bonusEssais - plansUtilises);
-  const nom = compte?.prenom || compte?.email || 'Mon compte';
+  const quitterInvite = useAccountStore((st) => st.quitterInvite);
+  // L'invité s'appelle par son état, pas par un « Mon compte » qui promet
+  // une identité qu'il n'a pas.
+  const nom = compte?.prenom || compte?.email || 'Invité';
 
   const restaurer = async () => {
     try {
@@ -159,14 +162,18 @@ export function ProfilScreen() {
                 <Path d={SOLAIRES.tchat} fill={c.ink} fillRule="evenodd" />
               </Svg>
             </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Plus d’options"
-              style={s.rondBarre}
-              hitSlop={10}
-              onPress={() => setMenu(true)}>
-              <MoreDots color={c.ink} size={20} />
-            </Pressable>
+            {/* Se déconnecter ou supprimer un compte qu'on n'a pas n'est
+                pas un geste : l'invité n'a pas ce menu. */}
+            {compte && (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Plus d’options"
+                style={s.rondBarre}
+                hitSlop={10}
+                onPress={() => setMenu(true)}>
+                <MoreDots color={c.ink} size={20} />
+              </Pressable>
+            )}
           </View>
         </View>
 
@@ -205,6 +212,20 @@ export function ProfilScreen() {
           <Text style={s.email} numberOfLines={1}>
             {compte.email}
           </Text>
+        )}
+        {/*
+          LA PORTE DE L'INVITÉ : la connexion — c'est exactement ce qui lui
+          manque. Le drapeau retombe, et la porte d'entrée de l'app montre
+          l'écran de connexion.
+        */}
+        {!compte && (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Créer un compte ou se connecter"
+            style={({ pressed }) => [s.seConnecter, pressed && { opacity: 0.7 }]}
+            onPress={quitterInvite}>
+            <Text style={s.seConnecterTexte}>Créer un compte ou se connecter</Text>
+          </Pressable>
         )}
 
         <Text style={s.section}>Abonnement</Text>
@@ -461,6 +482,19 @@ const themed = (c: Palette) =>
       textAlign: 'center',
       marginTop: 3,
     },
+    /* La porte de l'invité : un bouton d'encre, sobre — le frère de celui
+       du tracé de l'accueil. */
+    seConnecter: {
+      marginTop: 14,
+      alignSelf: 'center',
+      backgroundColor: c.ink,
+      borderRadius: 999,
+      paddingHorizontal: 20,
+      minHeight: 40,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    seConnecterTexte: { color: c.bg, fontSize: 14, fontWeight: '700' },
     // Les titres de section : petits, gras, à gauche — ils découpent la
     // page sans jamais se disputer la vedette avec le nom.
     section: {

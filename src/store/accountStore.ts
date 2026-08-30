@@ -125,6 +125,18 @@ export interface Compte {
 interface AccountState {
   charge: boolean;
   compte: Compte | null;
+  /**
+   * ON DÉCOUVRE SANS COMPTE. Le cœur de l'application est 100 % local —
+   * scanner, tracer, coter, exporter — et la revue Apple (5.1.1) refuse
+   * qu'on exige un compte pour ce qui n'en a pas besoin. L'invité passe la
+   * porte ; le compte reste ce qu'il est : la sauvegarde en ligne et le
+   * code promo. Et le PALIER GRATUIT NE CHANGE PAS DE RÈGLE : il se compte
+   * par appareil (le marqueur du trousseau), invité ou pas.
+   */
+  invite: boolean;
+  entrerEnInvite: () => void;
+  /** Depuis le profil de l'invité : retombe sur l'écran de connexion. */
+  quitterInvite: () => void;
   pro: boolean;
   proVia: 'abonnement' | 'code' | null;
   plansUtilises: number;
@@ -214,6 +226,7 @@ const persister = (s: AccountState) =>
     CLE,
     JSON.stringify({
       compte: s.compte,
+      invite: s.invite,
       pro: s.pro,
       proVia: s.proVia,
       plansUtilises: s.plansUtilises,
@@ -252,6 +265,7 @@ async function fusionnerMarqueur(
 export const useAccountStore = create<AccountState>((set, get) => ({
   charge: false,
   compte: null,
+  invite: false,
   pro: false,
   proVia: null,
   plansUtilises: 0,
@@ -317,6 +331,9 @@ export const useAccountStore = create<AccountState>((set, get) => ({
     set({
       charge: true,
       compte: compteLocal,
+      // Le choix « sans compte » survit au redémarrage : sans ça, l'invité
+      // retombe sur le mur de connexion à chaque lancement.
+      invite: !!local.invite,
       pro: !!local.pro || !!proDuTrousseau,
       proVia:
         (local.proVia as AccountState['proVia']) ?? proDuTrousseau ?? null,
@@ -447,9 +464,21 @@ export const useAccountStore = create<AccountState>((set, get) => ({
     }
   },
 
+  entrerEnInvite: () => {
+    set({ invite: true });
+    persister(get());
+  },
+
+  quitterInvite: () => {
+    set({ invite: false });
+    persister(get());
+  },
+
   deconnecter: () => {
-    // Le marqueur d'appareil RESTE : c'est tout son sens.
-    set({ compte: null });
+    // Le marqueur d'appareil RESTE : c'est tout son sens. Et l'on retombe
+    // sur l'écran de connexion, pas en invité : se déconnecter est un
+    // geste de compte, il en appelle un autre.
+    set({ compte: null, invite: false });
     persister(get());
   },
 

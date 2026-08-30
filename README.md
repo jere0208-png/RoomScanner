@@ -12506,6 +12506,35 @@ options, pannes expliquées), les retours haptiques (l'aimant se sent), la
 symétrie des gestes entre familles d'objets, et les vignettes de la
 bibliothèque (déjà mémoïsées, un banc compte les appels).
 
+### La porte « sans compte »
+
+Trouvé au tour du chef, la veille de la sortie : l'application entière
+vivait derrière un mur de connexion — `if (!compte) → SignInScreen`, trois
+boutons, aucune autre porte. Or son cœur est **100 % local** : scanner,
+tracer, coter, équiper, exporter — rien de tout ça n'a besoin d'une
+identité. Le compte ne sert qu'à la sauvegarde en ligne et au code promo.
+
+Deux raisons de percer la porte, et chacune suffirait : la revue Apple
+(5.1.1) refuse qu'on exige un compte pour des fonctions qui n'en ont pas
+besoin ; et le tout public — un curieux qui vient d'installer et tombe sur
+un formulaire repart. Le mur de connexion est l'écran où l'on perd le plus
+de monde, et on le montrait AVANT la première seconde d'usage.
+
+Ce qui a été percé, et comment il tient :
+
+- **« Découvrir sans compte »**, en lien discret sous les trois connexions —
+  offert, pas vendu. Le choix survit au redémarrage (sans ça, l'invité
+  retomberait sur le mur à chaque lancement) ;
+- **le profil de l'invité** offre LA chose qui lui manque — « Créer un
+  compte ou se connecter » — et ne montre ni déconnexion ni suppression :
+  il n'y a rien à défaire ;
+- **l'invité n'est pas un contournement** : le palier gratuit se compte par
+  APPAREIL (le marqueur du trousseau) — c'était déjà sa règle, supprimer-
+  recréer un compte ne le remet pas à zéro, et l'invité s'y range. C'est la
+  contre-épreuve la plus importante du banc ;
+- se déconnecter ne bascule pas en invité : c'est un geste de compte, il en
+  appelle un autre — l'écran de connexion revient.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

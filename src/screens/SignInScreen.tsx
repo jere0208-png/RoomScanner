@@ -37,6 +37,7 @@ export function SignInScreen() {
   const { width: largeur } = useWindowDimensions();
   const sombre = c === dark;
   const connecter = useAccountStore((st) => st.connecter);
+  const entrerEnInvite = useAccountStore((st) => st.entrerEnInvite);
   const connecterApple = useAccountStore((st) => st.connecterApple);
   const [parEmail, setParEmail] = useState(false);
   const [prenom, setPrenom] = useState('');
@@ -192,6 +193,22 @@ export function SignInScreen() {
         )}
       </View>
 
+      {/*
+        LA PORTE SANS COMPTE — sous les trois connexions, discrète mais
+        entière. Le cœur de l'app est local ; un curieux qui vient
+        d'installer ne doit pas buter sur un formulaire avant sa première
+        seconde d'usage (et la revue Apple refuse qu'on l'y oblige). Le
+        palier gratuit, lui, se compte par appareil : l'invité n'y échappe
+        pas.
+      */}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Découvrir sans compte"
+        style={({ pressed }) => [s.sansCompte, pressed && s.enfonce]}
+        onPress={entrerEnInvite}>
+        <Text style={s.sansCompteTexte}>Découvrir sans compte</Text>
+      </Pressable>
+
       <Text style={s.mentions}>
         Un seul compte par téléphone. Le plan gratuit permet un relevé ; le
         Pro les rend illimités.
@@ -268,6 +285,14 @@ const themed = (c: Palette) =>
     btnClairTexte: { color: c.ink, fontSize: 16, fontWeight: '600' },
     btnBleu: { backgroundColor: c.blue },
     btnBleuTexte: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
+    /* Un lien, pas un quatrième bouton : la porte est offerte, pas vendue. */
+    sansCompte: { alignSelf: 'center', paddingVertical: 10, paddingHorizontal: 16 },
+    sansCompteTexte: {
+      color: c.inkSoft,
+      fontSize: 14.5,
+      fontWeight: '600',
+      textDecorationLine: 'underline',
+    },
     formulaire: { gap: 10 },
     champ: {
       height: 48,

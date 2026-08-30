@@ -58,6 +58,7 @@ function Application() {
   const savesCharges = useScanStore((s) => s.savesCharges);
   const repriseAuBesoin = useScanStore((s) => s.repriseAuBesoin);
   const compte = useAccountStore((s) => s.compte);
+  const invite = useAccountStore((s) => s.invite);
   const compteCharge = useAccountStore((s) => s.charge);
   const chargerCompte = useAccountStore((s) => s.charger);
   const c = useTheme();
@@ -149,7 +150,9 @@ function Application() {
       </SafeAreaProvider>
     );
   }
-  if (!compte) {
+  // Sans compte MAIS en invité, l'app s'ouvre : son cœur est local, et le
+  // mur de connexion était l'écran où l'on perdait le plus de monde.
+  if (!compte && !invite) {
     return (
       <SafeAreaProvider>
         <StatusBar
