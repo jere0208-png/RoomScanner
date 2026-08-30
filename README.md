@@ -12422,6 +12422,54 @@ sont gardées (le motif « exiger ce qu'on accepte »), aucune chaîne anglaise
 ne traîne dans les écrans, les icônes App Store sont complètes, et la 3D ne
 reconstruit rien pendant les gestes.
 
+### Ce qui est dans la pièce suit la pièce
+
+Relevé du patron : « au déplacement d'un mur, les ouvrants ne suivent pas.
+De plus, au redressage d'une pièce, les spots se décentrent.. il faut qu'ils
+gardent une cohérence de centrage si c'était voulu. »
+
+#### Deux trous dans la même règle
+
+Pousser un mur, tirer un coin, poser un angle : ces trois gestes emportaient
+déjà les percements. Mais le **redimensionnement d'une pièce**
+(`reposerPiece` — taper « 5,18 × 4,05 » au bandeau, OU tirer un bord au
+doigt, le geste le plus visible depuis le tracé de l'accueil) recalait
+l'appareillage… et oubliait les **menuiseries**, en coordonnées absolues :
+la fenêtre restait dans le vide. Et le **plafond** n'était suivi nulle
+part — ni au redimensionnement, ni au redressage.
+
+#### La cohérence demandée, traduite en règles
+
+- **une menuiserie garde sa cote depuis le bout qui a le moins bougé, et sa
+  largeur** — une porte de 83 ne devient pas une porte de 104 parce que le
+  mur s'allonge (`reporterOuverture`, la règle déjà écrite pour le coin
+  tiré) ; ce qui déborde d'un mur raccourci revient dedans ; les murs
+  RECOUSUS comptent aussi — la cloison mitoyenne d'une pièce voisine bouge
+  avec ses percements ;
+- **un point de plafond garde sa position relative** (`recadrerAuCadre`) :
+  il s'exprime en fractions de la boîte de sa pièce et se repose aux mêmes
+  fractions dans la boîte d'arrivée. Le centre reste le centre, le quart
+  reste le quart — c'est la seule lecture de « si c'était voulu » qui tienne
+  pour un semis posé aux tiers.
+
+#### Le banc a dû chercher le vrai décentrage — deux fois
+
+Une pièce seule, même de guingois, **garde son centre au redressage** :
+l'alignement moyenne les coins, et une moyenne préserve le milieu. La
+première version du banc tournait la pièce d'un bloc — l'équerre la laisse
+en paix (déjà droite dans sa propre trame) ; la deuxième posait deux pièces
+à interstice — la soudure refuse de souder entre pièces, c'est sa règle.
+Deux passes vertes qui ne prouvaient rien.
+
+Le décentrage réel vient des **chaînes** : les groupes d'alignement se
+forment de proche en proche par les nœuds partagés. Un mur de couloir
+légèrement en pente, accroché au coin de la pièce, entre dans le même groupe
+que le mur du haut — et la moyenne du groupe tire tout le bord de plusieurs
+centimètres. La pièce se recale ; le spot restait aux coordonnées du scan.
+Le plafond prend maintenant le même bloc que sa pièce, aux deux étages de la
+chaîne : l'équerre (`straightenPlan`) ET la redétection qui la suit
+(`weldCorners` y déplace aussi des pans de mur).
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

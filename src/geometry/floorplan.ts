@@ -2751,6 +2751,49 @@ export function straightenWalls(
  * LE LONG de son mur d'origine, puis on la repose au même endroit sur le mur
  * devenu droit — même identifiant, même fraction de longueur.
  */
+/**
+ * REPOSE UN POINT INTÉRIEUR DANS SA PIÈCE, quand la pièce a bougé.
+ *
+ * Relevé du patron : « au redressage d'une pièce, les spots se décentrent..
+ * il faut qu'ils gardent une cohérence de centrage si c'était voulu. »
+ *
+ * LA COHÉRENCE, C'EST LA POSITION RELATIVE : le point s'exprime en
+ * fractions de la boîte de sa pièce (le centre est à un demi, le quart à un
+ * quart), et se repose aux mêmes fractions dans la boîte d'arrivée. Un spot
+ * centré reste centré, un semis posé aux tiers reste aux tiers — que la
+ * pièce ait été redimensionnée, recalée par la soudure des coins ou remise
+ * d'équerre.
+ *
+ * LA BOÎTE EST CELLE DES AXES DU PLAN, et ça suffit : les pièces qui
+ * passent ici sont d'aplomb ou en train de le devenir — et le seul cas où
+ * une boîte d'axes trahirait (une pièce uniformément tournée) est
+ * précisément celui où rien ne bouge, l'équerre la laissant en paix.
+ */
+export function recadrerAuCadre(p: Pt, avant: Pt[], apres: Pt[]): Pt {
+  if (avant.length < 3 || apres.length < 3) return p;
+  const boite = (pts: Pt[]) => {
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minZ = Infinity;
+    let maxZ = -Infinity;
+    for (const q of pts) {
+      minX = Math.min(minX, q.x);
+      maxX = Math.max(maxX, q.x);
+      minZ = Math.min(minZ, q.z);
+      maxZ = Math.max(maxZ, q.z);
+    }
+    return { minX, maxX, minZ, maxZ, w: maxX - minX, h: maxZ - minZ };
+  };
+  const a = boite(avant);
+  const b = boite(apres);
+  if (a.w < 1e-6 || a.h < 1e-6 || b.w < 1e-6 || b.h < 1e-6) return p;
+  // Un point qui débordait déjà ne se projette pas hors de la nouvelle
+  // boîte : on borne la fraction, pas le résultat.
+  const u = Math.max(0, Math.min(1, (p.x - a.minX) / a.w));
+  const v = Math.max(0, Math.min(1, (p.z - a.minZ) / a.h));
+  return { x: b.minX + u * b.w, z: b.minZ + v * b.h };
+}
+
 export function reprojectOpenings(
   oldWalls: WallSeg[],
   newWalls: WallSeg[],

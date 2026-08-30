@@ -60,6 +60,8 @@ import {
   niveauDe,
   niveauxPresents,
   murPorteurDe,
+  recadrerAuCadre,
+  type RoomPart,
   reporterOuverture,
   deplacerNiveau,
   COFFRE_H,
@@ -2213,9 +2215,77 @@ export const useScanStore = create<ScanState>((set, get) => {
         const b = suivre(w.b);
         return a || b ? { ...w, a: a ?? w.a, b: b ?? w.b } : w;
       };
+      const mursApres = st.walls.map(recousu);
+
+      /*
+        LES MENUISERIES SUIVENT LEUR MUR — relevé du patron : « au
+        déplacement d'un mur, les ouvrants ne suivent pas ». Pousser un mur,
+        tirer un coin, poser un angle : ces trois gestes emportaient déjà
+        les percements. Le redimensionnement recalait l'appareillage… et
+        oubliait les menuiseries, en coordonnées absolues : la fenêtre
+        restait dans le vide.
+
+        C'est la règle du coin tiré (`reporterOuverture`) : la cote se garde
+        depuis le bout qui a le moins bougé, la largeur ne change pas — une
+        porte de 83 ne devient pas une porte de 104 parce que le mur
+        s'allonge — et ce qui déborde d'un mur raccourci revient dedans.
+        Les murs RECOUSUS comptent aussi : la cloison mitoyenne d'une pièce
+        voisine bouge avec ses percements.
+      */
+      const bouges: { avant: WallSeg; apres: WallSeg }[] = [];
+      for (let i = 0; i < st.walls.length; i++) {
+        if (st.walls[i] !== mursApres[i]) {
+          bouges.push({ avant: st.walls[i], apres: mursApres[i] });
+        }
+      }
+      const emporter = (o: WallSeg): WallSeg => {
+        const mid = { x: (o.a.x + o.b.x) / 2, z: (o.a.z + o.b.z) / 2 };
+        const sur = bouges.find(
+          (m) => pointOnSeg(mid, m.avant.a, m.avant.b).dist < 0.4,
+        );
+        if (!sur) return o;
+        // Le bout FIXE est celui qui a le moins bougé : c'est lui qui
+        // garde la cote — la logique du chantier, mètre posé au coin.
+        const da = Math.hypot(
+          sur.apres.a.x - sur.avant.a.x,
+          sur.apres.a.z - sur.avant.a.z,
+        );
+        const db = Math.hypot(
+          sur.apres.b.x - sur.avant.b.x,
+          sur.apres.b.z - sur.avant.b.z,
+        );
+        return reporterOuverture(o, sur.avant, sur.apres, da <= db ? 'a' : 'b');
+      };
+
+      /*
+        LE PLAFOND GARDE SON CENTRAGE — relevé du patron : « il faut qu'ils
+        gardent une cohérence de centrage si c'était voulu ». Le centre
+        reste le centre, le quart reste le quart : la position RELATIVE dans
+        la boîte de la pièce est ce qu'on a voulu en posant le semis.
+      */
+      const bAvant = [
+        { x: x0, z: z0 },
+        { x: x1, z: z0 },
+        { x: x1, z: z1 },
+        { x: x0, z: z1 },
+      ];
+      const xs2 = murs2.flatMap((w) => [w.a.x, w.b.x]);
+      const zs2 = murs2.flatMap((w) => [w.a.z, w.b.z]);
+      const bApres = [
+        { x: Math.min(...xs2), z: Math.min(...zs2) },
+        { x: Math.max(...xs2), z: Math.min(...zs2) },
+        { x: Math.max(...xs2), z: Math.max(...zs2) },
+        { x: Math.min(...xs2), z: Math.max(...zs2) },
+      ];
 
       set({
-        walls: st.walls.map(recousu),
+        walls: mursApres,
+        openings: st.openings.map(emporter),
+        ceiling: st.ceiling.map((cl) =>
+          cl.roomId === roomId
+            ? { ...cl, at: recadrerAuCadre(cl.at, bAvant, bApres) }
+            : cl,
+        ),
         fixtures: st.fixtures.map((f) =>
           neufs.has(f.wallId) ? { ...f, along: recaler(f.along, f.wallId) } : f,
         ),
@@ -2734,6 +2804,17 @@ export const useScanStore = create<ScanState>((set, get) => {
       // une annulation, l'utilisateur n'a fait qu'un geste.
       pushHistory('redetect');
       const droits = straightenWalls(st.walls);
+      /*
+        LE PLAFOND PREND LE MÊME BLOC QUE SA PIÈCE — relevé du patron :
+        « au redressage d'une pièce, les spots se décentrent ». Un spot est
+        posé PAR RAPPORT à sa pièce (au centre, aux tiers) : quand l'équerre
+        recale les murs, il garde sa position relative dans la boîte —
+        `recadrerAuCadre`.
+      */
+      const avantParts = roomParts(st.walls, st.rooms);
+      const apresParts = roomParts(droits, st.rooms);
+      const cadreDe = (parts: RoomPart[], roomId: string) =>
+        parts.find((r) => r.roomId === roomId)?.surface?.pts;
       set({
         walls: droits,
         // Les portes et fenêtres suivent leur mur : sans ça elles restaient
@@ -2743,6 +2824,11 @@ export const useScanStore = create<ScanState>((set, get) => {
         // identifiant de mur, et le redressement le change.
         fixtures: reprojectFixtures(st.walls, droits, st.fixtures),
         photos: reprojectAnchors(st.walls, droits, st.photos),
+        ceiling: st.ceiling.map((cl) => {
+          const v = cadreDe(avantParts, cl.roomId);
+          const n = cadreDe(apresParts, cl.roomId);
+          return v && n ? { ...cl, at: recadrerAuCadre(cl.at, v, n) } : cl;
+        }),
         dirty: true,
       });
       get().redetectRooms();
@@ -2799,8 +2885,18 @@ export const useScanStore = create<ScanState>((set, get) => {
       const auto = nameRooms(kinds);
       // Les noms donnés à la main survivent : on rattache chaque nouvelle
       // pièce à l'ancienne dont le point de cartouche tombe dedans.
+      /*
+        QUELLE ANCIENNE PIÈCE DEVIENT QUELLE NOUVELLE : le lien sert deux
+        fois — garder les noms donnés à la main, et REPOSER le plafond. La
+        soudure des coins (`weldCorners`) vient peut-être de tirer un pan de
+        mur de plusieurs centimètres pour refermer un interstice : la pièce
+        s'est recalée, ses spots doivent se recaler du même coup.
+      */
+      const liens = shapes.map((s) =>
+        olds.find((p) => pointInPolygon(p.labelAt, s.outline)),
+      );
       const rooms: RoomEntry[] = shapes.map((s, i) => {
-        const previous = olds.find((p) => pointInPolygon(p.labelAt, s.outline));
+        const previous = liens[i];
         const kept = previous
           ? st.rooms.find((r) => r.id === previous.roomId)
           : undefined;
@@ -2827,8 +2923,23 @@ export const useScanStore = create<ScanState>((set, get) => {
         Chaque point se rattache à la pièce qui contient son ancrage.
       */
       const ceiling = st.ceiling.map((cl) => {
-        const idx = roomIndexAt(cl.at, shapes.map((s) => s.outline));
-        return { ...cl, roomId: `room-${idx + 1}` };
+        /*
+          LE POINT SE REPOSE D'ABORD, PUIS SE RATTACHE. Sa pièce d'avant se
+          retrouve par son identifiant, ou à défaut par le polygone qui le
+          contient (les identifiants d'avant la détection) ; sa pièce
+          d'après est celle que le lien désigne. Entre les deux boîtes, il
+          garde sa position relative — le centre reste le centre.
+        */
+        const vieille =
+          olds.find((r) => r.roomId === cl.roomId) ??
+          olds.find((r) => r.surface && pointInPolygon(cl.at, r.surface.pts));
+        const j = vieille ? liens.findIndex((l) => l === vieille) : -1;
+        const at =
+          vieille?.surface && j >= 0
+            ? recadrerAuCadre(cl.at, vieille.surface.pts, shapes[j].outline)
+            : cl.at;
+        const idx = roomIndexAt(at, shapes.map((s) => s.outline));
+        return { ...cl, at, roomId: `room-${idx + 1}` };
       });
       set({ walls, rooms, objects, fixtures, photos, ceiling, dirty: true });
     },
