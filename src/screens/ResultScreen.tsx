@@ -1571,7 +1571,7 @@ export function ResultScreen() {
       subtitle:
         quoi === 'largeur'
           ? 'Elle se retaille autour de son axe.'
-          : 'L’allège ne bouge pas : c’est le linteau qui suit.',
+          : 'Le bas de la fenêtre ne bouge pas : c’est le haut qui suit.',
       value: actuel.toFixed(2).replace('.', ','),
       unit: 'm',
       numeric: true,
@@ -1634,7 +1634,7 @@ export function ResultScreen() {
       title: 'Position sur le mur',
       subtitle:
         'Du coin du mur au BORD de la menuiserie — la cote qu’on mesure ' +
-        'sur place, mètre posé contre le refend.',
+        'sur place, mètre posé contre le mur.',
       value: Math.max(0, proj - l / 2)
         .toFixed(2)
         .replace('.', ','),
@@ -1682,8 +1682,15 @@ export function ResultScreen() {
     const o = openings.find((x) => x.id === id);
     if (!o) return;
     setPrompt({
-      title: 'Allège',
-      subtitle: 'Du sol au repos de la baie — la cote d’une prise dessous.',
+      /*
+        LE MOT SIMPLE MÈNE, LE MOT DU MÉTIER SUIT — sortie tout public :
+        « allège » est le mot juste, et un mot que personne d'autre
+        n'emploie. Écrit ainsi, le pro s'y retrouve et le particulier
+        comprend ce qu'il règle. Le dossier PDF, document d'étude remis à
+        des artisans, garde sa voix de pro.
+      */
+      title: 'Bas de fenêtre (allège)',
+      subtitle: 'Du sol au bas de la fenêtre — la cote d’une prise dessous.',
       /* Depuis le SOL DU MUR, pas depuis le zéro du repère : ARKit place
          son origine à hauteur de main, et la cote lue au bandeau ne
          correspondait alors à rien de ce qu'on mesure sur place. */
@@ -1937,7 +1944,7 @@ export function ResultScreen() {
                 type: 'linteau',
                 openingId: i.openingId,
                 haut: i.linteau,
-                label: 'Remonter le linteau',
+                label: 'Remonter au niveau des autres',
               } as const)
             : undefined,
       })),
@@ -4344,7 +4351,9 @@ export function ResultScreen() {
                       // Une porte a le sol pour allège, par définition : un
                       // réglage qui ne peut valoir que zéro se lit comme un
                       // geste raté.
-                      label: 'Allège',
+                      // Icône seule à l'écran : ce mot-ci est celui
+                      // que VoiceOver prononce.
+                      label: 'Bas de fenêtre (allège)',
                       icone: SOLAIRES.allege,
                       sansMot: true,
                       ghost: true,

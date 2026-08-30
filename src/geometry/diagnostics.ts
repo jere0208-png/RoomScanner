@@ -141,8 +141,8 @@ export function checkPlan(
       )} cm, les autres à ${Math.round(r.linteau * 100)}`,
       hint:
         'Le volet devait pendre sous son coffre pendant le scan : la baie ' +
-        'a été cadrée sous le tablier. Un appui remonte son linteau au ' +
-        'niveau des autres.',
+        'a été cadrée sous le tablier. Un appui la remonte au niveau ' +
+        'des autres.',
     });
   }
 

@@ -139,7 +139,7 @@ describe('les cotes courantes, depuis l’ecran', () => {
     poser({ ...PORTE, type: 'window', height: 1.15, yCenter: 1.525 });
     const t = monter();
     choisir(t, 'o1');
-    toucher(t, 'Allège');
+    toucher(t, 'Bas de fenêtre (allège)');
     expect(proposees(t)).toEqual(['Cote 0', 'Cote 45', 'Cote 95', 'Cote 110']);
     act(() => t.unmount());
   });
@@ -195,7 +195,7 @@ describe('les cotes courantes, depuis l’ecran', () => {
     const boutons = t.root
       .findAll((n) => typeof n.props?.accessibilityLabel === 'string')
       .map((n) => n.props.accessibilityLabel as string);
-    expect(boutons).not.toContain('Allège');
+    expect(boutons).not.toContain('Bas de fenêtre (allège)');
     act(() => t.unmount());
   });
 });

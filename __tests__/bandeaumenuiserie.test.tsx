@@ -160,14 +160,14 @@ describe('les gestes d’une porte', () => {
   });
 
   it('n’offrent pas d’allege : une porte part du sol', () => {
-    expect(boutons(choisir('door'))).not.toContain('Allège');
+    expect(boutons(choisir('door'))).not.toContain('Bas de fenêtre (allège)');
   });
 });
 
 describe('les gestes d’une fenetre', () => {
   it('remplacent le battant par l’allege et le coffre', () => {
     const vus = boutons(choisir('window'));
-    expect(vus).toContain('Allège');
+    expect(vus).toContain('Bas de fenêtre (allège)');
     expect(vus.some((b) => /[Cc]offre/.test(b))).toBe(true);
     // Une fenetre ne dessine pas de vantail : un reglage invisible est un
     // reglage qu'on croit rate.
@@ -189,7 +189,7 @@ describe('les gestes d’une baie libre', () => {
       pas une porte, et rien ne justifiait de le lui retirer au passage —
       une refonte de bandeau ne doit rien faire disparaitre en chemin.
     */
-    expect(vus).toContain('Allège');
+    expect(vus).toContain('Bas de fenêtre (allège)');
     // Mais pas de vantail : ni bord de pivot, ni sens d'ouverture.
     expect(vus).not.toContain('Charnière');
     expect(vus).not.toContain('Sens d’ouverture');

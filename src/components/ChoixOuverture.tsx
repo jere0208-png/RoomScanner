@@ -184,7 +184,7 @@ export function ChoixOuverture({
     {
       nature: 'window',
       mot: 'Fenêtre',
-      hint: `${cote('window')} · allège 95`,
+      hint: `${cote('window')} · bas à 95 du sol`,
       teinte: c.sky,
       Vignette: VignetteFenetre,
     },

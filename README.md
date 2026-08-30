@@ -12371,6 +12371,57 @@ pièges du cache par références : un mur DISPARU change le compte, et la clé
 est l'entrée de pièce elle-même (`WeakMap`) — deux dossiers qui numérotent
 tous deux « room-1 » ne peuvent pas se télescoper.
 
+### La veille de la sortie — conformité et français de tout le monde
+
+Relevé du patron : « finalise l'app pour du tout public + pro, elle doit
+sortir demain. » Deux chantiers, choisis pour ce qu'une veille de sortie
+permet : ce qui BLOQUE la sortie, et ce qui se corrige sans rien casser.
+
+#### Ce que la revue Apple aurait rejeté
+
+Trois défauts dormaient dans les fichiers natifs, hors de portée des bancs
+JavaScript — et chacun coûte un aller-retour avec la revue (deux jours, au
+mieux) :
+
+- **une chaîne d'usage vide** (`NSLocationWhenInUseUsageDescription`) : la
+  localisation n'est demandée nulle part — la boussole passe par CoreMotion,
+  choisi justement pour ne rien demander — et une clé vide est un motif de
+  rejet automatique. Elle part ;
+- **l'exemption de chiffrement absente** : HTTPS standard uniquement, mais
+  sans `ITSAppUsesNonExemptEncryption`, chaque envoi TestFlight repose la
+  question de l'export de chiffrement ;
+- **un manifeste de confidentialité qui jurait « rien collecté »** alors que
+  le serveur des comptes est configuré : e-mail et prénom à la connexion,
+  identifiants de compte et d'appareil, et les plans eux-mêmes montent en
+  sauvegarde. Mentir là, c'est l'étiquette App Store qui ment. Tout est
+  déclaré — lié au compte, aucun pistage, fonction de l'app.
+
+Un banc (`pretpourlestore`) lit désormais ces fichiers : le jour où
+quelqu'un ajoutera une permission, il lui rappellera d'écrire sa phrase.
+
+#### Le point nº 1 du compte rendu, tranché par la sortie tout public
+
+« Allège », « linteau », « trumeau », « refend » : les mots JUSTES du
+métier, et des mots que personne d'autre n'emploie. La règle appliquée —
+**le mot simple mène, le mot du métier suit entre parenthèses** là où il
+apporte quelque chose (« Bas de fenêtre (allège) » : le pro s'y retrouve, le
+particulier comprend), et il disparaît là où il n'apportait rien (« mètre
+posé contre le mur » dit tout ce que « contre le refend » disait). Les
+conseils NF C 15-100 ne renvoient plus personne au trumeau : « sur le mur
+plein à côté de la baie » dit la même chose à tout le monde.
+
+**Le dossier PDF garde sa voix de pro** : c'est un document d'étude remis à
+des artisans, « allège » y est le mot attendu.
+
+**Et le point nº 2 (les préréglages de calques) reste volontairement à
+quai** : redessiner un contrôle central la veille d'une sortie, c'est
+échanger un inconfort connu contre un risque neuf. Il attend la 1.1.
+
+Vérifié au passage, sans rien à corriger : toutes les saisies numériques
+sont gardées (le motif « exiger ce qu'on accepte »), aucune chaîne anglaise
+ne traîne dans les écrans, les icônes App Store sont complètes, et la 3D ne
+reconstruit rien pendant les gestes.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

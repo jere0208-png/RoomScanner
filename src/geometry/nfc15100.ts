@@ -1240,7 +1240,7 @@ export function constatsDePose(
           regle:
             'L’axe tombe dans l’emprise d’une porte ou d’une fenêtre, à ' +
             'une hauteur où il n’y a pas de maçonnerie. Décalez-le sur le ' +
-            'trumeau, ou au-dessus du linteau.',
+            'mur plein à côté de la baie, ou au-dessus d’elle.',
         });
         break;
       }
@@ -1259,8 +1259,9 @@ export function constatsDePose(
           message: `${nom} : posé dans le coffre de volet`,
           regle:
             'Le coffre abrite la coulisse, le tablier enroulé et son tube : ' +
-            'on n’y perce pas. Descendez l’appareil sous le linteau, ou ' +
-            'décalez-le sur le trumeau — le moteur, lui, s’alimente depuis ' +
+            'on n’y perce pas. Descendez l’appareil sous le haut de la ' +
+            'fenêtre, ou décalez-le sur le mur plein à côté — le moteur, ' +
+            'lui, s’alimente depuis ' +
             'le coffre par une sortie de câble placée à son aplomb.',
         });
         break;

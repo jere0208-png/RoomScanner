@@ -33,7 +33,6 @@
 	<true/>
 	<key>NSAppTransportSecurity</key>
 	<dict>
-	  <!-- Do not change NSAllowsArbitraryLoads to true, or you will risk app rejection! -->
 		<key>NSAllowsArbitraryLoads</key>
 		<false/>
 		<key>NSAllowsLocalNetworking</key>
@@ -47,8 +46,6 @@
 	<string>Vos photos de repérage sont rangées dans un album EchoPlan : elles restent sur votre téléphone même si vous réinstallez l’application.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Pour retrouver vos photos de repérage après une réinstallation, l’application relit les images qu’elle a rangées dans votre album EchoPlan.</string>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string></string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIRequiredDeviceCapabilities</key>
@@ -67,6 +64,8 @@
 		<string>UIInterfaceOrientationPortraitUpsideDown</string>
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
+	<false/>
+	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 </dict>
 </plist>

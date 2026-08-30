@@ -95,7 +95,7 @@ describe('la feuille « qu’est-ce qu’on perce ? »', () => {
     // La cote de depart est DITE, pas seulement dessinee : elle sera posee
     // telle quelle, et c'est ce qu'on corrige ensuite au bandeau.
     expect(mots.find((m) => m.startsWith('Porte'))).toContain('83');
-    expect(mots.find((m) => m.startsWith('Fenêtre'))).toContain('allège 95');
+    expect(mots.find((m) => m.startsWith('Fenêtre'))).toContain('bas à 95 du sol');
     act(() => t.unmount());
   });
 
