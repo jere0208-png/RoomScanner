@@ -1392,8 +1392,10 @@ export function FloorplanEditor({
     pour une pièce.
   */
   const massifs = useMemo(
-    () => massifsTechniques(walls, openings),
-    [walls, openings],
+    // Les pièces déclarées passent aussi : une pièce qu'on vient de tracer
+    // n'a pas encore de porte, et elle n'est pas pour autant du plein.
+    () => massifsTechniques(walls, openings, rooms),
+    [walls, openings, rooms],
   );
   /*
     De quel bout chaque porte pivote : le choix se fait sur TOUTES les

@@ -12263,6 +12263,44 @@ c'est le banc qui n'avait rien mesuré.
 même chose en plus court — mais le retirer n'a pas été demandé, et c'est une
 porte documentée et éprouvée. Elle part sur un mot.
 
+### Deux règles justes, un résultat faux
+
+Relevé du patron, au premier essai du tracé : « j'ai fait un petit bloc sur
+l'accueil, j'ai un rendu d'une pièce **complètement noire** ».
+
+Le plan poche en noir les **recoins techniques** — une règle posée sur un
+chantier précédent : « quand il y a 4 murs qui encerclent un recoin vide, il
+doit être rempli de noir pour ne pas confondre avec une pièce ». On les
+reconnaît à deux signes : c'est petit, et rien ne s'y ouvre.
+
+Or une pièce tracée au doigt est petite, et sa porte n'est pas encore posée.
+Elle portait donc les deux signes du vide de construction. Aucune des deux
+règles n'était fausse ; leur rencontre l'était.
+
+**Ce qui tranche, c'est la déclaration.** La règle de départ tenait sur un
+mot — « un recoin *vide* ». Un vide, c'est ce que **personne n'a réclamé**.
+Une pièce posée par l'utilisateur a un identifiant et une liste de murs :
+attendre sa porte pour cesser de la noircir revient à punir le début du
+relevé. Le poché garde tout ce qu'il visait — les faces qu'aucune pièce ne
+réclame restent de la maçonnerie, et un banc en sens inverse le tient.
+
+Le défaut ne venait pas de l'accueil : il touchait **toute petite pièce
+dessinée avant sa porte**, à l'écran comme dans le dossier imprimé. Le tracé
+l'a seulement rendu visible du premier coup.
+
+**La sonde de rendu a servi une fois de plus** : c'est en regardant l'image
+qu'on a vu que le noir était un polygone *au-dessus* du sol, et non un sol
+mal teinté — deux causes qui se ressemblent et ne se corrigent pas au même
+endroit.
+
+**Et le bouton du tracé passe en noir et blanc.** Relevé : « le bouton
+"ouvrir cette pièce" est trop proche du bouton commencer un scan. Fais un
+bouton plus sobre, blanc et noir. » En bleu, il portait la couleur de l'appel
+principal — deux boutons bleus l'un sur l'autre, et l'œil ne sait plus lequel
+est *le* geste. À l'encre du plan, il se lit comme la suite du trait qu'on
+vient de faire ; et il se décolle du bas, où il touchait « Commencer le
+scan ».
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

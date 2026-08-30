@@ -2410,7 +2410,7 @@ function planPage(
       qu'à l'écran. Un vide blanc au milieu d'un plan imprimé se lit comme
       une pièce qu'on aurait oublié de nommer ; c'est du plein.
     */
-    for (const contour of massifsTechniques(walls, openings)) {
+    for (const contour of massifsTechniques(walls, openings, ctx.rooms)) {
       d.poly(contour.map(px), INK, null);
     }
 

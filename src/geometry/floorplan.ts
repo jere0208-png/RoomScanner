@@ -3097,10 +3097,27 @@ function mursOuverts(walls: WallSeg[], openings: WallSeg[]): Set<string> {
  *
  * Ce sont exactement les faces que la détection écarte : closes, petites,
  * et sans la moindre ouverture.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * MAIS CE QUI EST DÉCLARÉ N'EST PAS UN VIDE.
+ *
+ * Relevé du patron : « j'ai fait un petit bloc sur l'accueil, j'ai un rendu
+ * d'une pièce complètement noire ». Une pièce qu'on vient de tracer n'a pas
+ * encore de porte, et elle est petite : elle réunissait les deux signes du
+ * recoin technique, et le plan la pochait en noir. On ouvrait l'éditeur sur
+ * un rectangle d'encre.
+ *
+ * La règle de départ tient sur un mot — « un recoin VIDE ». Un vide, c'est
+ * ce que PERSONNE n'a déclaré. Une pièce posée par l'utilisateur a un
+ * identifiant, une liste de murs et bientôt un nom : attendre sa porte pour
+ * cesser de la noircir revient à punir le début du relevé. Le poché reste
+ * entier pour ce qu'il visait — les faces qu'aucune pièce ne réclame.
  */
 export function massifsTechniques(
   walls: WallSeg[],
   openings: WallSeg[],
+  /** Les pièces déclarées : aucune d'elles n'est de la maçonnerie. */
+  rooms: RoomShape[] = [],
 ): Pt[][] {
   /*
     LE GRAPHE SE RECOUD D'ABORD. Un coffre de gaines s'appuie contre un mur
@@ -3110,12 +3127,25 @@ export function massifsTechniques(
   */
   const propres = splitAtJunctions(weldCorners(walls));
   const ouverts = mursOuverts(propres, openings);
+  /*
+    LES MURS RECOUSUS PORTENT DES IDENTIFIANTS DÉRIVÉS. Un mur coupé en T
+    devient « m » et « m#1 » (`splitAtJunctions`) : comparé tel quel à la
+    liste d'une pièce, le morceau n'y figure pas et la pièce redeviendrait
+    un massif dès qu'une cloison vient buter contre elle. On compare donc
+    les murs D'ORIGINE.
+  */
+  const listes = rooms
+    .map((r) => new Set(r.wallIds ?? []))
+    .filter((l) => l.size > 0);
+  const reclamee = (ids: string[]) =>
+    listes.some((liste) => ids.every((id) => liste.has(id.split('#')[0])));
   return facesFermees(propres)
     .filter(
       (f) =>
         f.area > 0.02 &&
         f.area < AIRE_SANS_PORTE &&
-        !f.wallIds.some((id) => ouverts.has(id)),
+        !f.wallIds.some((id) => ouverts.has(id)) &&
+        !reclamee(f.wallIds),
     )
     .map((f) => f.outline);
 }

@@ -38,7 +38,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 import React from 'react';
-import { Text } from 'react-native';
+import { StyleSheet, Text } from 'react-native';
 import { Text as SvgText } from 'react-native-svg';
 import TestRenderer, { act } from 'react-test-renderer';
 import {
@@ -249,6 +249,43 @@ describe('le tracé', () => {
     glisser(t, { x: 40, y: 40 }, { x: 40 + PAS_QUADRILLAGE * 4, y: 40 + PAS_QUADRILLAGE * 8 });
     expect(mots(t)).not.toContain('2,00 m | ');
     expect(mots(t)).toContain('1,00 m');
+  });
+
+  /**
+   * LE BOUTON EST SOBRE, ET IL GARDE SES DISTANCES.
+   *
+   * Relevé du patron : « le bouton "ouvrir cette pièce" est trop proche du
+   * bouton commencer un scan. Fais un bouton plus sobre, blanc et noir. »
+   *
+   * DEUX DÉFAUTS EN UN. En bleu, il portait la couleur de l'appel principal
+   * de l'écran — deux boutons bleus l'un sur l'autre, et l'œil ne sait plus
+   * lequel est LE geste. En noir et blanc, il dit ce qu'il est : la suite du
+   * tracé qu'on vient de faire, pas un second appel.
+   *
+   * Et il se décolle du bas : collé au bord de la feuille, il touchait
+   * « Commencer le scan ».
+   */
+  it('porte l’encre du plan, pas la couleur de l’appel principal', () => {
+    const t = monter();
+    glisser(
+      t,
+      { x: 40, y: 40 },
+      { x: 40 + PAS_QUADRILLAGE * 8, y: 40 + PAS_QUADRILLAGE * 6 },
+    );
+    const style = StyleSheet.flatten(ouvrir(t).props.style);
+    expect(style.backgroundColor).toBe(light.ink);
+    expect(style.backgroundColor).not.toBe(light.blue);
+  });
+
+  it('et ne touche pas le bouton du dessous', () => {
+    const t = monter();
+    glisser(
+      t,
+      { x: 40, y: 40 },
+      { x: 40 + PAS_QUADRILLAGE * 8, y: 40 + PAS_QUADRILLAGE * 6 },
+    );
+    const style = StyleSheet.flatten(ouvrir(t).props.style);
+    expect(Number(style.bottom)).toBeGreaterThanOrEqual(10);
   });
 
   it('le tracé reste DANS la feuille', () => {

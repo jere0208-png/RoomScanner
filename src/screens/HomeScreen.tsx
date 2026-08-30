@@ -599,7 +599,9 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
    * gardent exactement l'assiette qu'elles avaient — un écran qui se vide ne
    * doit pas se réorganiser, sinon on ne le reconnaît plus.
    */
-  respiration: { flex: 1, minHeight: 40, alignItems: 'center' },
+  /* La feuille s'arrête AVANT l'appel principal : le bouton du tracé se
+     posait sinon à même « Commencer le scan » — relevé du patron. */
+  respiration: { flex: 1, minHeight: 40, alignItems: 'center', marginBottom: 12 },
   /** Appareil incompatible, ou erreur du scan : un bandeau, pas une alerte. */
   warning: {
     backgroundColor: '#FDECEC',

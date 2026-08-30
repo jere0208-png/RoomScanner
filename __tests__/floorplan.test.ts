@@ -1877,6 +1877,37 @@ describe('les petites pièces et les gaines', () => {
     // Avec sa porte, ce n'est plus un massif : c'est le WC.
     expect(massifsTechniques(WC, [PORTE])).toHaveLength(0);
   });
+
+  /**
+   * MAIS UNE PIÈCE QU'ON A DESSINÉE N'EST JAMAIS DE LA MAÇONNERIE.
+   *
+   * Relevé du patron : « j'ai fait un petit bloc sur l'accueil, j'ai un rendu
+   * d'une pièce complètement noire ». Une pièce tracée au doigt n'a pas
+   * encore de porte, et elle est petite : elle réunissait donc les deux
+   * signes du recoin technique, et le plan la pochait en noir. On ouvrait
+   * l'éditeur sur un rectangle d'encre.
+   *
+   * LA RÈGLE DE DÉPART TENAIT SUR UN VIDE : « quand il y a 4 murs qui
+   * encerclent un recoin VIDE ». Un vide, c'est ce que personne n'a déclaré.
+   * Une pièce que l'utilisateur vient de poser est le contraire d'un vide —
+   * elle a un identifiant, une liste de murs, et bientôt un nom. Ce qu'elle
+   * n'a pas encore, c'est sa porte, et attendre une porte pour cesser de la
+   * noircir revient à punir le début du relevé.
+   */
+  it('mais une pièce DÉCLARÉE ne se poche pas, porte ou non', () => {
+    const declaree = [{ id: 'wc', wallIds: WC.map((w) => w.id) }];
+    expect(massifsTechniques(WC, [], declaree)).toHaveLength(0);
+  });
+
+  it('et le recoin voisin, lui, reste de la maçonnerie', () => {
+    /*
+      LE CONTRÔLE EN SENS INVERSE, et il compte autant : ce qui a motivé le
+      poché n'a pas bougé d'un pouce. Un vide que personne n'a déclaré se
+      lit comme une pièce oubliée ; c'est une gaine.
+    */
+    const gaine = [{ id: 'sejour', wallIds: ['un-autre-mur'] }];
+    expect(massifsTechniques(WC, [], gaine)).toHaveLength(1);
+  });
 });
 
 /**

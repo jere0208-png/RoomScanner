@@ -284,6 +284,14 @@ export function TraceUnePiece({
 /** Ce que le titre prend en haut de la zone. */
 const ENTETE = 46;
 
+/**
+ * CE QUI SÉPARE LE BOUTON DU BAS DE LA FEUILLE.
+ *
+ * Sous la feuille commence l'appel principal de l'écran. Posé à zéro, le
+ * bouton du tracé le touchait — relevé du patron.
+ */
+const MARGE_BAS = 14;
+
 const getStyles = themedStyles((c: Palette) =>
   StyleSheet.create({
     zone: { alignItems: 'center' },
@@ -304,19 +312,30 @@ const getStyles = themedStyles((c: Palette) =>
       color: c.inkFaint,
       fontSize: 12,
     },
-    /* Le bouton se pose SUR la feuille, à la place de l'échelle : il ne
-       pousse rien, donc le tracé ne saute pas quand il apparaît. */
+    /*
+      LE BOUTON SE POSE SUR LA FEUILLE, à la place de l'échelle : il ne
+      pousse rien, donc le tracé ne saute pas quand il apparaît.
+
+      IL EST EN NOIR ET BLANC, ET IL SE DÉCOLLE DU BAS. Relevé du patron :
+      « le bouton "ouvrir cette pièce" est trop proche du bouton commencer
+      un scan. Fais un bouton plus sobre, blanc et noir. » En bleu, il
+      portait la couleur de l'appel principal : deux boutons bleus l'un sur
+      l'autre, et l'œil ne sait plus lequel est LE geste. À l'encre du plan,
+      il se lit comme la suite du trait qu'on vient de faire.
+    */
     ouvrir: {
       position: 'absolute',
-      bottom: 0,
+      bottom: MARGE_BAS,
       alignSelf: 'center',
-      backgroundColor: c.blue,
+      backgroundColor: c.ink,
       borderRadius: radius.pill,
       paddingHorizontal: 20,
       minHeight: 38,
       alignItems: 'center',
       justifyContent: 'center',
     },
-    ouvrirMot: { color: '#FFFFFF', fontSize: 13.5, fontWeight: '800' },
+    /* Le fond de l'écran : blanc sur noir en plein jour, noir sur blanc la
+       nuit — c'est le même contraste, retourné avec le thème. */
+    ouvrirMot: { color: c.bg, fontSize: 13.5, fontWeight: '800' },
   }),
 );
