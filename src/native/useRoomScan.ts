@@ -77,9 +77,19 @@ export async function demarrerEtage(n: number): Promise<void> {
   st.setPaused(false);
 }
 
-/** Abonne le store aux événements natifs et expose les commandes du scan. */
+/**
+ * Abonne le store aux événements natifs et expose les commandes du scan.
+ *
+ * SANS S'ABONNER LUI-MÊME. Ce crochet appelait `useScanStore()` sans
+ * sélecteur — l'abonnement intégral : chaque écriture du magasin re-rendait
+ * l'écran porteur. Or il est porté par les trois écrans les plus sensibles,
+ * l'écran de scan en tête, où le natif écrit plusieurs fois par seconde
+ * pendant que le téléphone se bat déjà pour suivre le LiDAR. Le crochet ne
+ * rend que des COMMANDES, et une commande lit le magasin au moment du geste :
+ * `getState()`, jamais un abonnement.
+ */
 export function useRoomScan() {
-  const store = useScanStore();
+  const store = useScanStore.getState();
 
   useEffect(() => {
     const subs = [

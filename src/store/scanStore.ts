@@ -236,6 +236,15 @@ export interface BrouillonScan {
    * retrouvé.
    */
   devis?: DevisEnregistre;
+  /**
+   * LE DOSSIER DONT CE BROUILLON EST LA RETOUCHE, s'il en a un.
+   *
+   * Sans lui, la reprise d'un dossier de bibliothèque renaissait en plan
+   * SANS entrée : on enregistrait, et la bibliothèque portait deux « Maison
+   * Dupont » — l'ancien sans les prises, le nouveau sans l'historique.
+   * Absent des brouillons d'avant, et des relevés jamais enregistrés.
+   */
+  saveId?: string;
 }
 
 /**
@@ -696,8 +705,32 @@ export function resetPersistCache() {
 async function loadLibrary(): Promise<SavedScan[] | null> {
   const index = await AsyncStorage.getItem(INDEX_KEY);
   if (index) {
-    const ids = JSON.parse(index) as string[];
-    if (!Array.isArray(ids)) return null;
+    let ids: string[] | null = null;
+    try {
+      const lu = JSON.parse(index) as string[];
+      if (Array.isArray(lu)) ids = lu;
+    } catch {
+      // Un index illisible n'est pas une bibliothèque perdue : voir plus bas.
+    }
+    /*
+      L'INDEX SAIT SE REBÂTIR. Il ne donne que l'ORDRE ; les scans, eux,
+      portent chacun leur clé. Un index corrompu — une écriture coupée par
+      une extinction — se reconstruit donc en les énumérant, du plus récent
+      au plus ancien, et se réécrit pour que le prochain démarrage reprenne
+      le chemin normal. Abandonner trente chantiers pour un kilooctet abîmé
+      serait la pire réponse possible.
+    */
+    const rebati = ids === null;
+    if (ids === null) {
+      const prefixe = scanKey('');
+      const enumerer = (
+        AsyncStorage as { getAllKeys?: () => Promise<string[]> }
+      ).getAllKeys;
+      const toutes = enumerer ? await enumerer().catch(() => []) : [];
+      ids = toutes
+        .filter((k) => k.startsWith(prefixe))
+        .map((k) => k.slice(prefixe.length));
+    }
     const out: SavedScan[] = [];
     for (const id of ids) {
       const raw = await AsyncStorage.getItem(scanKey(id));
@@ -710,13 +743,28 @@ async function loadLibrary(): Promise<SavedScan[] | null> {
         // tout l'intérêt de ne plus tout mettre dans la même chaîne.
       }
     }
+    if (rebati) {
+      // L'ordre exact de l'index est perdu ; les scans, non. Les plus
+      // récents remontent en tête, comme partout dans la bibliothèque — et
+      // l'index se réécrit pour que le prochain démarrage soit ordinaire.
+      out.sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
+      await AsyncStorage.setItem(
+        INDEX_KEY,
+        JSON.stringify(out.map((x) => x.id)),
+      ).catch(() => {});
+    }
     return out;
   }
 
   // --------------------------------------------- reprise de l'ancien format
   const legacy = await AsyncStorage.getItem(STORAGE_KEY);
   if (!legacy) return null;
-  const saves = JSON.parse(legacy) as SavedScan[];
+  let saves: SavedScan[];
+  try {
+    saves = JSON.parse(legacy) as SavedScan[];
+  } catch {
+    return null;
+  }
   if (!Array.isArray(saves)) return null;
   for (const s of saves) {
     const json = JSON.stringify(s);
@@ -773,6 +821,29 @@ let draftEcrit = '';
 function arreterBrouillon() {
   if (draftTimer) clearInterval(draftTimer);
   draftTimer = null;
+}
+
+/**
+ * ARME LE FILET DES TRENTE SECONDES — et le RÉARME, toujours.
+ *
+ * On ne se contente pas de « s'il n'y en a pas déjà un » : une minuterie
+ * retenue par une référence morte — un retour de veille, un cycle de vie qui
+ * a coupé les horloges — laisserait le relevé sans filet, et rien ne le
+ * dirait.
+ *
+ * ELLE S'ARME À CHAQUE PORTE DE L'ÉDITEUR, pas seulement au scan. Elle ne
+ * vivait que dans `setScanning` : « Dessiner un plan », un dossier rouvert
+ * depuis la bibliothèque et le brouillon repris lui-même travaillaient SANS
+ * filet — une heure de pose au clavier, l'app jetée par iOS pendant un
+ * appel, et tout était perdu. Exactement le scénario que le brouillon avait
+ * été construit pour empêcher.
+ */
+function armerBrouillon(tick: () => void) {
+  arreterBrouillon();
+  draftTimer = setInterval(tick, DRAFT_PERIODE);
+  // Sous Node (les bancs), une minuterie vivante retient le processus ;
+  // `unref` la laisse mourir avec lui. N'existe pas sur téléphone : tant pis.
+  (draftTimer as { unref?: () => void }).unref?.();
 }
 
 /**
@@ -4399,12 +4470,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         le téléphone meurt.
       */
       if (scanning) {
-        // On RÉARME, on ne se contente pas de « s'il n'y en a pas déjà un » :
-        // une minuterie retenue par une référence morte — un scan repris
-        // après un retour de veille, un cycle de vie qui a coupé les
-        // horloges — laissait le relevé sans filet, et rien ne l'aurait dit.
-        arreterBrouillon();
-        draftTimer = setInterval(() => get().ecrireBrouillon(), DRAFT_PERIODE);
+        armerBrouillon(() => get().ecrireBrouillon());
       }
     },
     setPaused: (paused) => set({ paused }),
@@ -5417,11 +5483,23 @@ export const useScanStore = create<ScanState>((set, get) => {
         savedDepth = history.length;
         // Le plan monte au compte comme n'importe quel enregistrement.
         deposerPlusTard(save.id);
+        // Enregistré : le brouillon n'a plus rien à protéger — voir plus bas.
+        get().ecrireBrouillon();
         return;
       }
       syncCurrent();
       savedDepth = history.length;
       set({ dirty: false });
+      /*
+        LE FILET SE REPLIE SUR-LE-CHAMP, pas au prochain tour de minuterie.
+
+        La fenêtre de trente secondes était un piège : on enregistre, on
+        ferme l'app — et le brouillon d'AVANT l'enregistrement traîne sur le
+        disque. Au prochain démarrage, l'accueil proposait de « reprendre »
+        un relevé déjà rangé. `ecrireBrouillon` sait déjà faire : un plan
+        enregistré tel quel efface sa clé.
+      */
+      get().ecrireBrouillon();
     },
 
     /*
@@ -6495,6 +6573,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       const brouillon: BrouillonScan = {
         at: Date.now(),
         name: st.scanName,
+        saveId: st.currentSaveId ?? undefined,
         walls: st.walls,
         openings: st.openings,
         objects: st.objects,
@@ -6554,11 +6633,22 @@ export const useScanStore = create<ScanState>((set, get) => {
         // Le chiffrage aussi : un filet qui retient la moitié de ce qui
         // tombe est un filet qui ment.
         ...devisRepose(b.devis),
-        // Il n'a jamais été enregistré : il l'est d'autant moins maintenant.
-        currentSaveId: null,
+        /*
+          LES RETOUCHES REVIENNENT DANS LEUR DOSSIER. Un brouillon qui porte
+          un `saveId` encore en bibliothèque rouvre CE dossier : enregistrer
+          retombe dans son entrée, pas dans un clone. Un brouillon d'avant,
+          ou dont le dossier a été supprimé entre-temps, redevient ce qu'il
+          était : un plan à enregistrer.
+        */
+        currentSaveId:
+          b.saveId && get().saves.some((s) => s.id === b.saveId)
+            ? b.saveId
+            : null,
         dirty: true,
         brouillon: null,
       });
+      // Le filet qui vient de vous sauver se réarme derrière vous.
+      armerBrouillon(() => get().ecrireBrouillon());
     },
 
     oublierBrouillon: () => {
@@ -6589,10 +6679,23 @@ export const useScanStore = create<ScanState>((set, get) => {
         if (tex === '1' || tex === '0') {
           set({ showTextures: tex === '1' });
         }
-        const dossiers = await AsyncStorage.getItem(FOLDERS_KEY);
-        if (dossiers) {
-          const parsed = JSON.parse(dossiers) as ScanFolder[];
-          if (Array.isArray(parsed)) set({ folders: parsed });
+        /*
+          CHAQUE CLÉ DANS SA GARDE. Tout se lisait dans le même try/catch,
+          et les dossiers de rangement se lisent AVANT les scans : trois
+          octets abîmés dans cette petite clé-là, et la bibliothèque entière
+          paraissait vide — puis le premier enregistrement réécrivait
+          l'index par-dessus. Une clé d'un kilooctet effaçait trente
+          chantiers.
+        */
+        try {
+          const dossiers = await AsyncStorage.getItem(FOLDERS_KEY);
+          if (dossiers) {
+            const parsed = JSON.parse(dossiers) as ScanFolder[];
+            if (Array.isArray(parsed)) set({ folders: parsed });
+          }
+        } catch {
+          // Des dossiers illisibles : les scans restent, le rangement se
+          // refait d'un geste.
         }
         const saves = await loadLibrary();
         if (saves) set({ saves: saves.map(migrateSave) });
@@ -6603,15 +6706,21 @@ export const useScanStore = create<ScanState>((set, get) => {
           volontairement un essai raté, et se voir imposer son retour serait
           pire que de l'avoir perdu. L'écran d'accueil pose la question.
         */
-        const brut = await AsyncStorage.getItem(DRAFT_KEY);
-        if (brut) {
-          const b = JSON.parse(brut) as BrouillonScan;
-          // Un brouillon vide n'a rien à proposer.
-          if (b && Array.isArray(b.walls) && b.walls.length > 0) {
-            set({ brouillon: b });
-          } else {
-            AsyncStorage.removeItem(DRAFT_KEY).catch(() => {});
+        try {
+          const brut = await AsyncStorage.getItem(DRAFT_KEY);
+          if (brut) {
+            const b = JSON.parse(brut) as BrouillonScan;
+            // Un brouillon vide n'a rien à proposer.
+            if (b && Array.isArray(b.walls) && b.walls.length > 0) {
+              set({ brouillon: b });
+            } else {
+              AsyncStorage.removeItem(DRAFT_KEY).catch(() => {});
+            }
           }
+        } catch {
+          // Un brouillon illisible ne protège rien — et sans l'effacement,
+          // il referait trébucher CHAQUE démarrage.
+          AsyncStorage.removeItem(DRAFT_KEY).catch(() => {});
         }
         /*
           LE GRAND BALAYAGE DES MODÈLES, une fois par ouverture.
@@ -6715,6 +6824,8 @@ export const useScanStore = create<ScanState>((set, get) => {
         screen: 'result',
       });
       clearHistory();
+      // Vingt prises ajoutées sur place méritent le même filet qu'un scan.
+      armerBrouillon(() => get().ecrireBrouillon());
     },
 
     deleteSave: (id) => {
@@ -6781,6 +6892,9 @@ export const useScanStore = create<ScanState>((set, get) => {
         resultOrigin: 'scan',
         niveauCourant: NIVEAU_RDC,
       });
+      // `reset` vient d'arrêter la minuterie : un plan au clavier se
+      // construit sous le même filet qu'un scan.
+      armerBrouillon(() => get().ecrireBrouillon());
     },
 
     reset: () => {

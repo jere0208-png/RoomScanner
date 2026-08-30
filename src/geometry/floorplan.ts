@@ -1375,17 +1375,47 @@ export interface RoomShape {
  * pièces à la fois, il figure donc dans les deux listes. Faute de liste
  * (scans d'avant la détection automatique), on regroupe par `roomId`.
  */
+/**
+ * LE DÉCOUPAGE D'UNE PIÈCE SE GARDE tant que ses murs sont LES MÊMES OBJETS.
+ *
+ * `makePart` n'est pas gratuit : le pole du cartouche est une recherche sur
+ * grille (169 essais puis descente), ~5 ms pour un T4 sur un ordinateur de
+ * bureau. Or un mur qu'on fait GLISSER rejoue `roomParts` à chaque image —
+ * sur un téléphone, ce seul calcul mange le budget d'une image, pour des
+ * pièces dont aucun mur n'a bougé.
+ *
+ * Le magasin ne retouche jamais un mur en place, il le REMPLACE : « mêmes
+ * objets, même compte » suffit donc à dire « même pièce ». La clé est
+ * l'ENTRÉE de pièce elle-même (une `WeakMap`) : deux dossiers qui numérotent
+ * tous deux « room-1 » ne peuvent pas se télescoper, et la mémoire part avec
+ * les pièces qu'on ne regarde plus.
+ */
+const partsGardees = new WeakMap<
+  RoomShape,
+  { items: WallSeg[]; part: RoomPart }
+>();
+
 export function roomParts(walls: WallSeg[], rooms?: RoomShape[]): RoomPart[] {
   if (rooms && rooms.some((r) => r.wallIds)) {
     const byId = new Map(walls.map((w) => [w.id, w]));
-    return rooms.map((r) =>
-      makePart(
-        r.id,
-        (r.wallIds ?? [])
-          .map((id) => byId.get(id))
-          .filter((w): w is WallSeg => !!w),
-      ),
-    );
+    return rooms.map((r) => {
+      const items = (r.wallIds ?? [])
+        .map((id) => byId.get(id))
+        .filter((w): w is WallSeg => !!w);
+      const garde = partsGardees.get(r);
+      if (
+        garde &&
+        // Les deux sens : un mur disparu change le compte, un mur remplacé
+        // change la référence.
+        garde.items.length === items.length &&
+        garde.items.every((w, i) => w === items[i])
+      ) {
+        return garde.part;
+      }
+      const part = makePart(r.id, items);
+      partsGardees.set(r, { items, part });
+      return part;
+    });
   }
   return groupByRoom(walls).map(({ roomId, items }) => makePart(roomId, items));
 }

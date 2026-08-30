@@ -12301,6 +12301,76 @@ est *le* geste. À l'encre du plan, il se lit comme la suite du trait qu'on
 vient de faire ; et il se décolle du bas, où il touchait « Commencer le
 scan ».
 
+### Le tour du chef de chantier — quatre solidités d'un coup
+
+Relevé du patron : « fais un tour de l'app à la recherche d'optimisation,
+fais tout ce que tu penses nécessaire pour rendre l'app plus solide. » Le
+tour a sondé les chemins chauds (rendu, gestes, démarrage, stockage) en
+MESURANT avant de toucher — et quatre chantiers en sont sortis.
+
+#### 1. Le filet des trente secondes couvre enfin l'édition
+
+Le brouillon automatique existait pour « le seul défaut qui coûte un
+déplacement » : une app tuée pendant un relevé. Mais sa minuterie ne
+s'armait qu'au scan LiDAR. **Trois portes sur quatre travaillaient sans
+filet** : « Dessiner un plan » (dont `reset` ARRÊTAIT la minuterie sans la
+relancer), un dossier rouvert depuis la bibliothèque, et le brouillon repris
+lui-même. Une heure de pose au clavier, l'app jetée par iOS pendant un
+appel — tout était perdu, exactement le scénario que le brouillon devait
+empêcher.
+
+La minuterie s'arme désormais à CHAQUE porte de l'éditeur. Et deux défauts
+voisins sont tombés avec :
+
+- **le brouillon dit de quel dossier il vient** (`saveId`). Sans lui, la
+  reprise d'un dossier de bibliothèque renaissait en plan sans entrée : on
+  enregistrait, et la bibliothèque portait deux « Maison Dupont » — l'ancien
+  sans les prises, le nouveau sans l'historique ;
+- **l'enregistrement replie le filet sur-le-champ**, pas au prochain tour de
+  minuterie : la fenêtre de trente secondes laissait traîner un brouillon
+  d'AVANT l'enregistrement, et l'accueil proposait de « reprendre » un
+  relevé déjà rangé.
+
+#### 2. Une clé pourrie ne coûte plus la bibliothèque
+
+Le démarrage lisait tout dans UN try/catch : dossiers de rangement, index,
+scans, brouillon. Une seule clé corrompue — une écriture coupée par une
+extinction — et tout ce qui venait après n'était jamais lu. Le pire cas
+était réel : les dossiers de rangement se lisent AVANT les scans ; trois
+octets abîmés dans cette petite clé, la bibliothèque paraissait vide, et le
+premier enregistrement réécrivait l'index par-dessus. **Une clé d'un
+kilooctet effaçait trente chantiers.**
+
+Chaque clé se lit désormais dans SA garde, un brouillon illisible s'efface
+(sans quoi il referait trébucher chaque démarrage), et **l'index sait se
+rebâtir** : les scans portent chacun leur clé, un index corrompu se
+reconstruit en les énumérant au lieu de les abandonner.
+
+#### 3. Le pont natif n'abonnait personne… si : tout le monde
+
+`useRoomScan` appelait `useScanStore()` SANS sélecteur — l'abonnement
+intégral. Porté par les trois écrans les plus sensibles, l'écran de scan en
+tête, où le natif écrit plusieurs fois par seconde pendant que le téléphone
+se bat déjà pour suivre le LiDAR : chaque événement re-rendait tout
+l'écran, caméra comprise. Le crochet ne rend pourtant que des COMMANDES —
+et une commande lit le magasin au moment du geste, pas à chaque écriture.
+
+#### 4. Les pièces que le geste ne touche pas ne se redécoupent plus
+
+La mesure d'abord : sur un T4, `roomParts` — contour, surface et pole du
+cartouche de chaque pièce — coûtait **4,7 ms par appel** sur un ordinateur
+de bureau. Or un mur qu'on fait glisser le rejoue à chaque image : sur un
+téléphone, ce seul calcul mangeait le budget d'une image, pour des pièces
+dont aucun mur n'a bougé.
+
+Chaque pièce garde son découpage tant que ses murs sont LES MÊMES OBJETS —
+le magasin ne retouche jamais un mur en place, il le remplace. Pendant un
+glissement, seule sa pièce (ses deux pièces, pour un refend) se recalcule.
+Même scène, après : **0,57 ms par image.** Le banc tient aussi les deux
+pièges du cache par références : un mur DISPARU change le compte, et la clé
+est l'entrée de pièce elle-même (`WeakMap`) — deux dossiers qui numérotent
+tous deux « room-1 » ne peuvent pas se télescoper.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro
