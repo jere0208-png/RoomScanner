@@ -101,6 +101,13 @@ export function ElecSheet({
             </View>
           ) : (
             <View style={styles.modalCard}>
+              {/*
+                EN GRANDES TUILES — relevé du patron : « ça paraît petit,
+                inadapté, pas ergonomique ». Les pilules serrées deviennent
+                des cartes de la taille d'un pouce : le symbole normalisé
+                en grand, le nom dessous. On choisit ce qu'on va lire sur
+                le plan, et on le choisit sans viser.
+              */}
               <Text style={styles.modalTitle}>Ajouter un appareil</Text>
               <Text style={styles.modalSubtitle}>
                 Il se pose à 20 cm du coin bas gauche du mur, puis se
@@ -129,7 +136,7 @@ export function ElecSheet({
                               on choisit ce qu'on va lire.
                             */}
                             <View style={styles.elecTuile}>
-                              <Svg width={30} height={30} viewBox="-13 -13 26 26">
+                              <Svg width={40} height={40} viewBox="-13 -13 26 26">
                                 {FIXTURE_SYMBOL[kind].map((s, i) => (
                                   <Path
                                     key={i}

@@ -309,6 +309,15 @@ export function WallElevation({
   if (depart.current === null) depart.current = fixtures;
   const modifie = fixtures !== depart.current;
   const [guide, setGuide] = useState<{ x?: number; y?: number }>({});
+  /**
+   * LA POSITION VIVANTE DU GLISSEMENT, en mètres de face — relevé du
+   * patron : « il faut viser avec le doigt sans bien voir ce que l'on
+   * fait ». Les trois cotes du sélectionné se dessinent autour de lui,
+   * c'est-à-dire sous la main qui le déplace. Tant qu'elle est posée, un
+   * réticule traverse la face et une loupe flotte au-dessus du doigt avec
+   * les cotes en gros. Le doigt levé, le mur redevient calme.
+   */
+  const [traine, setTraine] = useState<{ x: number; y: number } | null>(null);
   const [editing, setEditing] = useState<'g' | 'd' | 'h' | null>(null);
   /** Pas du réglage fin : le centimètre, ou les cinq centimètres. */
   const [pas, setPas] = useState(0.01);
@@ -654,12 +663,14 @@ export function WallElevation({
         x = Math.round(x * 100) / 100;
         y = Math.round(y * 100) / 100;
         setGuide({ x: sx ?? undefined, y: sy ?? undefined });
+        setTraine({ x, y });
         L.move(d.id, fromFaceX(L.face, x), y);
       },
       onPanResponderRelease: () => {
         const d = drag.current;
         drag.current = null;
         setGuide({});
+        setTraine(null);
         // Posé SUR un autre appareil : c'est le geste qui demande à les
         // réunir sous une même plaque. On ne décide pas à sa place — on
         // demande de quel côté.
@@ -691,6 +702,7 @@ export function WallElevation({
       onPanResponderTerminate: () => {
         drag.current = null;
         setGuide({});
+        setTraine(null);
       },
     }),
   ).current;
@@ -1683,14 +1695,53 @@ export function WallElevation({
               />
             )}
 
+            {/*
+              LE RÉTICULE DU GLISSEMENT : deux fils fins qui traversent
+              TOUTE la face. Le doigt couvre l'appareil et ses cotes — les
+              fils, eux, dépassent de la main : on voit où ça se pose sans
+              rien lâcher. Bleu plein, pour ne pas se confondre avec le
+              vert tireté des aimants.
+            */}
+            {traine && (
+              <>
+                <Line
+                  testID="reticule-x"
+                  x1={px(traine.x)}
+                  y1={py(0)}
+                  x2={px(traine.x)}
+                  y2={py(H)}
+                  stroke={c.blue}
+                  strokeWidth={1.4}
+                  opacity={0.85}
+                />
+                <Line
+                  testID="reticule-y"
+                  x1={px(0)}
+                  y1={py(traine.y)}
+                  x2={px(face.len)}
+                  y2={py(traine.y)}
+                  stroke={c.blue}
+                  strokeWidth={1.4}
+                  opacity={0.85}
+                />
+              </>
+            )}
+
             {/* Appareils. Ceux de l'autre face restent visibles, en creux :
                 savoir qu'une prise est déjà posée dos à dos évite de percer
                 deux fois au même endroit. */}
             {mine.map((f) => {
               const s = FIXTURES[f.kind];
               const x = faceX(face, f.along);
-              const w = Math.max(20, s.w * scale);
-              const h = Math.max(20, s.h * scale);
+              /*
+                JAMAIS SOUS TRENTE POINTS — relevé du patron : « ça paraît
+                petit, inadapté ». Une plaque de 8,2 cm à l'échelle d'un
+                mur de cinq mètres fait six points ; le plancher de vingt
+                restait la moitié d'une cible de pouce. À trente, on voit
+                ce qu'on va saisir — la cote reste vraie au bandeau.
+              */
+              const w = Math.max(30, s.w * scale);
+              const h = Math.max(30, s.h * scale);
               const on = f.id === selectedId;
               const ghost = f.side !== side;
               return (
@@ -1763,6 +1814,35 @@ export function WallElevation({
               </G>
             )}
           </Svg>
+        )}
+
+        {/*
+          LA LOUPE DU GLISSEMENT — les cotes vivantes, AU-DESSUS du doigt.
+          Gauche, droite, hauteur, en gros : c'est ce que la main cache. On
+          la décale pour qu'elle reste dans le cadre, et elle ne prend
+          aucun geste — elle montre, c'est tout.
+        */}
+        {traine && face && scale > 0 && (
+          <View
+            testID="loupe"
+            pointerEvents="none"
+            style={[
+              styles.loupe,
+              {
+                left: Math.max(
+                  8,
+                  Math.min(px(traine.x) - LOUPE_L / 2, layout.w - LOUPE_L - 8),
+                ),
+                top: Math.max(8, py(traine.y) - LOUPE_HAUT),
+              },
+            ]}>
+            <Text style={styles.loupeCotes}>
+              {`◂ ${cm(traine.x)}   ${cm(face.len - traine.x)} ▸`}
+            </Text>
+            <Text style={styles.loupeHauteur}>
+              {`haut. ${cm(traine.y)} cm`}
+            </Text>
+          </View>
         )}
 
         {/* L'alerte de hauteur se pose SUR le dessin, au-dessus de
@@ -2502,6 +2582,10 @@ function Dim({
   );
 }
 
+/** La loupe du glissement : sa largeur, et de combien elle survole le doigt. */
+const LOUPE_L = 172;
+const LOUPE_HAUT = 96;
+
 const getStyles = themedStyles((c: Palette) =>
   StyleSheet.create({
     /**
@@ -2593,6 +2677,25 @@ const getStyles = themedStyles((c: Palette) =>
       borderColor: c.line,
       overflow: 'hidden',
     },
+    /* La loupe : une carte franche, lisible sur n'importe quel mur. */
+    loupe: {
+      position: 'absolute',
+      width: LOUPE_L,
+      alignItems: 'center',
+      backgroundColor: c.surface,
+      borderRadius: radius.lg,
+      borderWidth: 1,
+      borderColor: c.blue,
+      paddingVertical: 8,
+      ...shadowCard,
+    },
+    loupeCotes: {
+      color: c.ink,
+      fontSize: 19,
+      fontWeight: '800',
+      fontVariant: ['tabular-nums'],
+    },
+    loupeHauteur: { color: c.inkSoft, fontSize: 13, fontWeight: '700', marginTop: 1 },
     /**
      * L'interrupteur des meubles, posé SUR le dessin.
      *

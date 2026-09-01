@@ -12555,6 +12555,46 @@ grossissement de police système (Dynamic Type). React 19 ignore
 demande un composant Texte maison adopté partout, pas un réglage de veille
 de sortie.
 
+### L'établi se travaille au pouce
+
+Relevé du patron : « le menu du mur où l'on peut ajouter des éléments élec
+semble pas optimisé pour smartphone, il faut viser avec le doigt sans bien
+voir ce que l'on fait et ça paraît petit, inadapté, pas ergonomique.
+Propose une refonte moderne (…) en gardant une simplicité de placement. »
+
+Trois causes MESURÉES, trois réponses — et rien de nouveau à apprendre :
+
+**1. Les appareils faisaient vingt points.** Une plaque de 8,2 cm à
+l'échelle d'un mur de cinq mètres fait six points ; le plancher visuel la
+remontait à vingt — la moitié d'une cible de pouce. Il monte à trente : on
+voit ce qu'on va saisir, et la cote reste vraie au bandeau.
+
+**2. Le doigt couvrait l'appareil ET ses cotes.** Les trois cotes du
+sélectionné se dessinent autour de lui — exactement sous la main qui le
+déplace : on posait à l'aveugle. Pendant le glissement, un **réticule**
+traverse désormais toute la face — deux fils bleus fins, qui dépassent de
+la main : on voit où ça se pose, même le doigt dessus — et une **loupe**
+flotte au-dessus du doigt avec les cotes vivantes en gros chiffres
+tabulaires : gauche, droite, hauteur. Le doigt levé, le mur redevient
+calme — le banc tient le contre-sens (un réticule qui reste est un mur
+rayé).
+
+**3. Le catalogue était en pilules serrées** — tuile de 36 points, texte
+accolé. Il passe en **grandes tuiles** : trois par rangée, le symbole
+normalisé en 40 points (celui que le plan dessinera — on choisit ce qu'on
+va lire), le nom dessous, des cibles de la taille d'un pouce. La fenêtre
+grandit d'autant, et tient sur le plus petit iPhone supporté.
+
+**Ce qui ne bouge pas, et le banc le prouve** : les aimants verts, les
+cotes éditables du bandeau, la fusion sous plaque — et l'appareil suit le
+geste exactement comme avant. La simplicité de placement était la consigne.
+
+Le banc s'est corrigé deux fois en route, sur deux pièges maison : sa sonde
+de geste attrapait un `Pressable` de la fenêtre au lieu du `PanResponder`
+(seuls les gestes posent la variante *capture* — c'est elle qu'on cherche),
+et `findAll` rendait le réticule en trois exemplaires (composite ET natifs
+— on ne compte que le composant).
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

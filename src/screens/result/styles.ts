@@ -1232,7 +1232,9 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     paddingVertical: 9,
   },
   elecSeeText: { color: c.inkSoft, fontSize: 12.5, fontWeight: '700' },
-  elecScroll: { maxHeight: 340 },
+  /* Les tuiles ont grandi : la fenêtre aussi, sinon on ne verrait qu'une
+     famille et demie. */
+  elecScroll: { maxHeight: 480 },
   elecFamily: {
     color: c.inkFaint,
     fontSize: 11.5,
@@ -1274,15 +1276,18 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     textAlign: 'center',
   },
   catDims: { color: c.inkFaint, fontSize: 9.5, fontWeight: '600', marginTop: 1 },
+  /* Une carte de pouce, pas une pilule : trois par rangée, le symbole en
+     grand, le nom dessous. */
   elecChip: {
-    flexDirection: 'row',
+    width: '31.5%',
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'center',
+    gap: 6,
+    minHeight: 92,
     backgroundColor: c.surfaceSunken,
-    borderRadius: radius.pill,
-    paddingLeft: 6,
-    paddingRight: 14,
-    paddingVertical: 6,
+    borderRadius: radius.lg,
+    paddingHorizontal: 4,
+    paddingVertical: 10,
   },
   elecDot: {
     width: 26,
@@ -1295,16 +1300,22 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   // La tuile du catalogue : elle porte le SYMBOLE normalisé du plan —
   // on choisit ce qu'on va lire, pas une pastille à sigle.
   elecTuile: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+    width: 52,
+    height: 52,
+    borderRadius: 14,
     backgroundColor: c.surface,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: c.lineStrong,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  elecChipText: { color: c.ink, fontSize: 13.5, fontWeight: '700' },
+  elecChipText: {
+    color: c.ink,
+    fontSize: 12,
+    fontWeight: '700',
+    textAlign: 'center',
+    lineHeight: 15,
+  },
   modalSubtitle: {
     color: c.inkFaint,
     fontSize: 12.5,
