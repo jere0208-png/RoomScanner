@@ -1746,10 +1746,23 @@ function jointsDuSol(
  *  d'électroménager, la céramique des sanitaires. */
 const TEINTE_MATIERE: Record<string, string> = {
   bois: '#B9905F',
+  boisFonce: '#8A6A45',
   tissu: AMBRE_MEUBLE,
-  blanc: '#ECEAE4',
-  ceramique: '#E8ECEC',
+  /*
+    LA PALETTE DE LA MISE EN AMBIANCE — relevé du patron : « coussins
+    blancs, sommier bois, couverture neutre blanc cassé/beige.. tous les
+    mobiliers dans ce style. Ils ne servent pas à redécorer mais à imaginer
+    la pièce seulement. » Des neutres chauds, aucun motif : ce qui se pose
+    doit suggérer l'échelle et l'usage, jamais imposer un goût.
+  */
+  blanc: '#F1EEE7',
+  beige: '#E4D8C6',
+  lin: '#D8CCB8',
+  ceramique: '#E9ECEC',
+  inox: '#C9CDD0',
   sombre: '#3A3F46',
+  verre: '#D7E0E2',
+  feuillage: '#7E9B6E',
 };
 
 /** Ce que la catégorie laisse deviner, quand le catalogue n'a rien dit. */
@@ -3071,7 +3084,13 @@ export function buildScene(
       const fond = yb + part.y0 * obj.height;
       const haut = yb + part.y1 * obj.height;
       if (haut - fond < 1e-4) return;
-      const fill = teintes[part.tone];
+      // La matière de la PIÈCE prime ; sans elle, le rôle de teinte
+      // décline la couleur du meuble — et la couleur relevée au scan, si
+      // elle est demandée, garde le dernier mot via `base`.
+      const fill =
+        !skin && part.mat && TEINTE_MATIERE[part.mat]
+          ? TEINTE_MATIERE[part.mat]
+          : teintes[part.tone];
       pushWallBlock(
         { a1: bloc[3], b1: bloc[2], b2: bloc[1], a2: bloc[0] },
         0,

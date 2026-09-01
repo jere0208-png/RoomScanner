@@ -126,9 +126,7 @@ export function FurnitureSheet({
                           {item.label}
                         </Text>
                         <Text style={styles.catDims}>
-                          {/* La marque devant la cote : une référence du
-                              commerce se reconnaît, une cote se vérifie. */}
-                          {`${item.marque ? `${item.marque} · ` : ''}${fr(item.w, 2)} × ${fr(item.d, 2)} m`}
+                          {`${fr(item.w, 2)} × ${fr(item.d, 2)} m`}
                         </Text>
                       </TouchableOpacity>
                     ))}

@@ -97,10 +97,18 @@ describe('chaque meuble a une silhouette, et elle tient dans son emprise', () =>
     expect(matelas.y1).toBeLessThan(tete.y1);
   });
 
-  it('une table est un plateau sur quatre pieds', () => {
+  it('une table est un plateau sur quatre pieds — et son fil de bois', () => {
+    /*
+      Depuis la mise en ambiance, le plateau porte deux veines de bois
+      foncé (« le fil ») : c'est ce qui sépare un rectangle beige d'un
+      plateau de bois. Sept pièces donc — plateau, deux veines, quatre
+      pieds — et toujours quatre pieds sombres SOUS le plateau.
+    */
     const parts = furnitureParts('table');
-    expect(parts).toHaveLength(5);
-    expect(parts.filter((p) => p.tone === 'dark')).toHaveLength(4);
+    expect(parts).toHaveLength(7);
+    expect(
+      parts.filter((p) => p.tone === 'dark' && p.y1 <= 0.93),
+    ).toHaveLength(4);
   });
 
   /**

@@ -12811,6 +12811,48 @@ matière déclarée, rien ») le tient.
 **Restent pour le prochain round, notés : les plinthes** (la bande basse des
 pans intérieurs — la boucle des morceaux de murs demande sa propre passe).
 
+### Le mobilier maison — un catalogue complet, un seul style
+
+Relevé du patron : « enlève les mobiliers aux noms IKEA, fais un catalogue
+de notre propre source, avec nos noms (basiques). Mais fais un catalogue
+complet, et des textures réalistes au 3D. Coussins blancs pour un lit,
+sommier bois, support bois, couverture neutre blanc cassé/beige.. fais tous
+les mobiliers dans ce style. Ils ne servent pas à redécorer mais à imaginer
+la pièce seulement. »
+
+#### Le catalogue redevient à nous
+
+Cinquante-cinq meubles, sept familles — l'Entrée s'ajoute (meuble à
+chaussures, portemanteau, banc, miroir) — et les manques comblés : grand
+lit 180, lit bébé, îlot central, micro-ondes, buffet, table ronde, double
+vasque, colonne, tapis, plante verte. Les noms sont basiques (« Lit 160 »,
+« Étagère à casiers 2×2 »), les COTES du commerce restent — elles font le
+réalisme d'un plan — et plus aucune entrée ne porte de marque : un banc le
+tient. Les catégories neuves parlent français (`tapis`, `plante`) : le
+repli des noms les affiche telles quelles, pas en anglais.
+
+#### Un seul style : la mise en ambiance
+
+Chaque PIÈCE d'un meuble porte désormais SA matière (`FurnPart.mat`) — le
+lit, mot pour mot : sommier bois, matelas blanc, couverture beige tirée
+jusqu'aux oreillers blancs, tête de lit bois. Canapés et fauteuils en lin à
+coussins blanc cassé sur patins bois ; plateaux de bois avec leur FIL (deux
+veines fines — ce qui sépare un rectangle beige d'un plateau) ;
+électroménager blanc à poignées inox, sanitaires céramique, écrans
+sombres, feuillage vert doux. Aucun motif, aucun rouge : ces meubles
+suggèrent l'échelle et l'usage, jamais un goût.
+
+#### Ce que les bancs de la maison ont attrapé au passage
+
+- **la loi des silhouettes a mordu** : la première couverture TRAVERSAIT le
+  matelas et les oreillers — le tri du peintre ne sait pas départager deux
+  volumes qui se croisent. L'empilement est désormais strict : matelas,
+  couverture posée dessus jusqu'aux pieds, oreillers sur le matelas nu ;
+- **le contrat de la table a évolué en le disant** : cinq pièces hier,
+  sept aujourd'hui — le fil du bois compte, et le banc explique pourquoi ;
+- **les plans d'hier ne cassent pas** : les clés de modèles de l'ancien
+  catalogue sont des alias des formes d'aujourd'hui.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro
