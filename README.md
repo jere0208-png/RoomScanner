@@ -12676,6 +12676,49 @@ Trois verrous, du plus profond au plus sûr :
 - `satisfies Record<string, string[]>` remplace l'annotation : la forme est
   vérifiée SANS élargir les clés — la prochaine invention ne compile pas.
 
+### L'application est vivante — et le catalogue montre ce qu'on achète
+
+Relevé du patron : « refais les choix en images réalistes, pas icônes.
+Comme le devis. Aussi, ajoute de courtes animations fluides lors d'ajouts
+et autres interactions (…) Par exemple, on fait un lien d'interrupteur à
+lumière, on voit des pointillés qui se génèrent de l'interrupteur à la
+lampe, puis la lampe qui s'allume à la fin de l'animation. Trouves beaucoup
+d'idées comme celle-ci et fais-les. »
+
+#### Le catalogue élec en vraies images
+
+Les tuiles portent désormais LA PHOTO DU DEVIS — même système
+(`VignetteProduit`), même honnêteté (pas de photo ? le nom, proprement).
+Les déclinaisons reprennent la photo de leur famille (une prise double est
+une prise ; le NOMBRE de postes se lit au libellé) — sans ces renvois, la
+moitié du catalogue montrait des trous. Et le symbole normalisé — celui que
+le plan dessinera — reste en INSIGNE au coin de chaque tuile : on choisit
+ce qu'on pose, on apprend ce qu'on lira.
+
+#### Un mécanisme de vie, pas des cas particuliers (`Vivant`)
+
+- **`useNaissances`** sait ce qui vient d'APPARAÎTRE — la règle qui compte :
+  une naissance, c'est ce qui arrive APRÈS le premier rendu. Rouvrir un
+  dossier de trente prises n'est pas trente naissances : un accueil qui
+  scintille de partout n'est plus vivant, il est agité (banc en sens
+  inverse) ;
+- **l'ondée de pose** — l'anneau du pouls des prises 3D, repris pour saluer
+  chaque naissance : prise (plan ET établi), point lumineux, meuble,
+  menuiserie, pièce entière — chacun à son rayon. Les SÉRIES partent en
+  cascade (six spots, six anneaux échelonnés, pas une détonation) ;
+- **le lien qui se tisse** — la vitrine demandée, mot pour mot : la courbe
+  du lien définitif se DÉROULE de l'interrupteur vers la lampe (un seul
+  tiret long comme le chemin, dont le décalage fond), puis la lampe
+  s'allume — halo chaud qui monte et s'éteint. Vaut aussi pour les liens
+  muraux : prise commandée, applique.
+
+**La règle de la maison tient : on n'anime jamais ce qui se mesure.** Les
+ondées et le tissage sont des calques séparés, à durée de vie courte
+(0,9 s / 1,6 s), posés PAR-DESSUS la géométrie — pas une cote, pas un trait
+de plan ne change pendant qu'ils vivent. C'est ce qui a permis de traverser
+2 800 bancs en n'en réveillant qu'un : les planches de référence, dont le
+diff relu ne montre que l'enveloppe des liens.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

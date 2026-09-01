@@ -42,6 +42,7 @@ import Svg, {
   Text as SvgText,
 } from 'react-native-svg';
 import { radius, shadowCard, themedStyles, useTheme, type Palette } from '../theme';
+import { OndeePose, useNaissances } from './Vivant';
 import {
   estTraversante,
   roomOf,
@@ -348,6 +349,8 @@ export function WallElevation({
     () => fixtures.filter((f) => f.wallId === wallId),
     [fixtures, wallId],
   );
+  /* Les poses se voient naître ici aussi — voir `Vivant`. */
+  const nes = useNaissances(mine.map((f) => f.id));
   const selected = mine.find((f) => f.id === selectedId) ?? null;
 
   // La face qu'on regarde est celle de l'appareil sélectionné : le retourner
@@ -1779,6 +1782,21 @@ export function WallElevation({
                 </G>
               );
             })}
+
+            {/* Les ondées des poses, par-dessus les appareils. */}
+            {mine
+              .filter((f) => nes.has(f.id) && f.side === side)
+              .map((f, i) => (
+                <OndeePose
+                  key={`nee-${f.id}`}
+                  id={f.id}
+                  cx={px(faceX(face, f.along))}
+                  cy={py(f.height)}
+                  color={FIXTURES[f.kind].color}
+                  rayon={30}
+                  retard={i * 70}
+                />
+              ))}
 
             {/* Les trois cotes de l'appareil sélectionné. */}
             {selected && (

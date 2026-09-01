@@ -70,6 +70,7 @@ import { frCategory, furnKind, furnitureStrokes } from '../geometry/furniture';
 import { markColor } from '../geometry/schema';
 import { CeilingLayer } from './CeilingLayer';
 import { FixtureLayer } from './FixtureLayer';
+import { OndeePose, useNaissances } from './Vivant';
 import { NotesLayer } from './NotesLayer';
 import { aimanterCoin, poserLibre } from '../geometry/poser';
 import {
@@ -1744,6 +1745,15 @@ export function FloorplanEditor({
     return [...seen.entries()].map(([key, v]) => ({ key, ...v }));
   }, [walls]);
 
+  /*
+    LES POSES SE VOIENT NAÎTRE — voir `Vivant`. Une pièce ajoutée, un
+    meuble posé, une menuiserie percée : chacun salue d'une ondée, à sa
+    taille. Rouvrir un dossier ne fait naître personne.
+  */
+  const piecesNees = useNaissances(rooms.map((r) => r.id));
+  const meublesNes = useNaissances(objects.map((o) => o.id));
+  const menuiseriesNees = useNaissances(openings.map((o) => o.id));
+
   return (
     <View
       style={styles.container}
@@ -2867,6 +2877,60 @@ export function FloorplanEditor({
               onSelectFixture={onSelectFixture}
               c={c}
             />
+
+            {/* Les ondées des poses : pièces, meubles, menuiseries. */}
+            {parts
+              .filter((p) => piecesNees.has(p.roomId))
+              .map((p) => {
+                const g = mapping.toPx(p.labelAt);
+                return (
+                  <OndeePose
+                    key={`nee-${p.roomId}`}
+                    id={p.roomId}
+                    cx={g.x}
+                    cy={g.y}
+                    color={c.blue}
+                    rayon={44}
+                  />
+                );
+              })}
+            {objects
+              .filter((o) => meublesNes.has(o.id))
+              .map((o, i) => {
+                const g = mapping.toPx({
+                  x: o.transform[12],
+                  z: o.transform[14],
+                });
+                return (
+                  <OndeePose
+                    key={`nee-${o.id}`}
+                    id={o.id}
+                    cx={g.x}
+                    cy={g.y}
+                    color={c.inkSoft}
+                    rayon={30}
+                    retard={i * 70}
+                  />
+                );
+              })}
+            {openings
+              .filter((o) => menuiseriesNees.has(o.id))
+              .map((o) => {
+                const g = mapping.toPx({
+                  x: (o.a.x + o.b.x) / 2,
+                  z: (o.a.z + o.b.z) / 2,
+                });
+                return (
+                  <OndeePose
+                    key={`nee-${o.id}`}
+                    id={o.id}
+                    cx={g.x}
+                    cy={g.y}
+                    color={c.amber}
+                    rayon={26}
+                  />
+                );
+              })}
 
             {/* Cartouche par pièce : nom encadré et surface au sol.
                 Chacun esquive les meubles de sa pièce pour rester lisible.

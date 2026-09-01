@@ -15,6 +15,12 @@ import { Circle, G, Line, Path, Polyline, Rect, Text as SvgText } from 'react-na
 import { plaqueDeCote } from '../geometry/cotes';
 import type { Palette } from '../theme';
 import {
+  LienQuiSeTisse,
+  OndeePose,
+  useNaissances,
+  VIE_TISSAGE,
+} from './Vivant';
+import {
   faceX,
   facePoint,
   wallFace,
@@ -98,6 +104,19 @@ export function CeilingLayer({
   frame: number;
   c: Palette;
 }) {
+  /*
+    LES POSES SE VOIENT NAÎTRE — voir `Vivant`. Une ligne de spots posée
+    d'un geste fait sa cascade d'ondées ; un lien noué se tisse de
+    l'interrupteur au point lumineux, puis la lampe s'allume.
+  */
+  const nes = useNaissances((ceiling ?? []).map((cl) => cl.id));
+  const liensNes = useNaissances(
+    (ceiling ?? []).flatMap((cl) =>
+      (cl.commands ?? []).map((fid) => `${cl.id}|${fid}`),
+    ),
+    VIE_TISSAGE,
+  );
+
   return (
     <>
       {/*
@@ -172,18 +191,44 @@ export function CeilingLayer({
               return `${g.x},${g.y}`;
             });
             return (
-              <Polyline
-                key={`lien-${cl.id}-${fid}`}
-                points={courbe.join(' ')}
-                fill="none"
-                stroke={c.inkSoft}
-                strokeWidth={1.1}
-                strokeDasharray="1.5 3.5"
-                strokeLinecap="round"
-              />
+              <G key={`lien-${cl.id}-${fid}`}>
+                <Polyline
+                  points={courbe.join(' ')}
+                  fill="none"
+                  stroke={c.inkSoft}
+                  strokeWidth={1.1}
+                  strokeDasharray="1.5 3.5"
+                  strokeLinecap="round"
+                />
+                {liensNes.has(`${cl.id}|${fid}`) && (
+                  /* La vitrine demandée : les pointillés se génèrent de
+                     l'interrupteur à la lampe, puis la lampe s'allume. */
+                  <LienQuiSeTisse
+                    points={courbe.join(' ')}
+                    bout={mapping.toPx(cl.at)}
+                    color={c.inkSoft}
+                  />
+                )}
+              </G>
             );
           }),
         )}
+      {showCeiling &&
+        (ceiling ?? [])
+          .filter((cl) => nes.has(cl.id))
+          .map((cl, i) => {
+            const g = mapping.toPx(cl.at);
+            return (
+              <OndeePose
+                key={`nee-${cl.id}`}
+                id={cl.id}
+                cx={g.x}
+                cy={g.y}
+                color={c.amber}
+                retard={i * 70}
+              />
+            );
+          })}
 
       {/*
         LES ÉCARTS D'UNE LIGNE D'APPAREILS, sous le bouton « Cotes ».

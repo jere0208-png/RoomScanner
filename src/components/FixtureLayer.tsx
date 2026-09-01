@@ -27,6 +27,12 @@ import {
 import { linkCurve } from '../geometry/ceiling';
 import type { Pt, WallSeg } from '../geometry/floorplan';
 import { markColor } from '../geometry/schema';
+import {
+  LienQuiSeTisse,
+  OndeePose,
+  useNaissances,
+  VIE_TISSAGE,
+} from './Vivant';
 
 interface Mapping {
   scale: number;
@@ -68,6 +74,26 @@ export function FixtureLayer({
   onSelectFixture?: (id: string, wallId: string) => void;
   c: Palette;
 }) {
+  /*
+    LES POSES SE VOIENT NAÎTRE — voir `Vivant`. Une prise posée fait son
+    ondée ; un lien noué se TISSE de la commande vers ce qu'il allume, puis
+    l'allumage. Rouvrir un dossier ne fait naître personne.
+  */
+  const nes = useNaissances((fixtures ?? []).map((f) => f.id));
+  const liensNes = useNaissances(
+    (fixtures ?? []).flatMap((f) =>
+      (f.commands ?? []).map((cid) => `${f.id}|${cid}`),
+    ),
+    VIE_TISSAGE,
+  );
+  /** La position écran d'un appareil : celle de son symbole. */
+  const pxDe = (f: Fixture) => {
+    const w = walls.find((x) => x.id === f.wallId);
+    if (!w) return null;
+    const fa = wallFace(w, quads.get(w.id), f.side);
+    const pt = facePoint(fa, faceX(fa, f.along), 0.16);
+    return mapping.toPx({ x: pt.x, z: pt.z });
+  };
   const view = { rot: viewRot };
   return (
     <>
@@ -95,18 +121,45 @@ export function FixtureLayer({
             return `${g.x},${g.y}`;
           });
           return (
-            <Polyline
-              key={`lienmur-${f.id}-${cid}`}
-              points={courbe.join(' ')}
-              fill="none"
-              stroke={c.inkSoft}
-              strokeWidth={1.1}
-              strokeDasharray="1.5 3.5"
-              strokeLinecap="round"
-            />
+            <G key={`lienmur-${f.id}-${cid}`}>
+              <Polyline
+                points={courbe.join(' ')}
+                fill="none"
+                stroke={c.inkSoft}
+                strokeWidth={1.1}
+                strokeDasharray="1.5 3.5"
+                strokeLinecap="round"
+              />
+              {liensNes.has(`${f.id}|${cid}`) && (
+                /* Le tissage part de la COMMANDE vers ce qu'elle allume :
+                   la courbe est celle du lien définitif, renversée. */
+                <LienQuiSeTisse
+                  points={[...courbe].reverse().join(' ')}
+                  bout={mapping.toPx({ x: de.x, z: de.z })}
+                  color={c.inkSoft}
+                />
+              )}
+            </G>
           );
         }),
       )}
+      {/* Les ondées des poses : par-dessus les liens, sous les symboles. */}
+      {(fixtures ?? [])
+        .filter((f) => nes.has(f.id))
+        .map((f, i) => {
+          const g = pxDe(f);
+          if (!g) return null;
+          return (
+            <OndeePose
+              key={`nee-${f.id}`}
+              id={f.id}
+              cx={g.x}
+              cy={g.y}
+              color={FIXTURES[f.kind].color}
+              retard={i * 70}
+            />
+          );
+        })}
       {/* L'appareillage se dessine APRÈS les menuiseries : la
           trouée d'une baie est un aplat opaque, et posée
           par-dessus elle effaçait les prises du mur — on croyait

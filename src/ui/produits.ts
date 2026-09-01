@@ -46,6 +46,25 @@ import type { ImageSourcePropType } from 'react-native';
 const RENVOIS: Record<string, string> = {
   'meca-prise20': 'meca-prise',
   'meca-prise32': 'meca-prise',
+  /*
+    LE CATALOGUE ÉLEC EN VRAIES IMAGES — relevé du patron : « refais les
+    choix en images réalistes, pas icônes. Comme le devis. » Les
+    déclinaisons reprennent la photo de leur famille : une prise double est
+    une prise, un va-et-vient reste un va-et-vient — le NOMBRE de postes se
+    lit sur le libellé, pas sur la photo. Sans ces renvois, la moitié du
+    catalogue montrerait un nom dans une pastille à côté de vraies photos —
+    un catalogue à trous.
+  */
+  'meca-prise2': 'meca-prise',
+  'meca-prise3': 'meca-prise',
+  'meca-inter2': 'meca-inter',
+  'meca-inter3': 'meca-inter',
+  'meca-rj2': 'meca-rj45',
+  'meca-rjPrise': 'meca-rj45',
+  'meca-rjPrise2': 'meca-rj45',
+  'meca-tvPrise': 'meca-tv',
+  // L'applique se raccorde sur une boîte DCL : c'est SA photo de chantier.
+  'meca-applique': 'boite-dcl',
 };
 
 // ---- début du bloc régénéré (tools/gen-produits.mjs) ----

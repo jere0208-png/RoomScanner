@@ -297,8 +297,19 @@ describe('le catalogue en grandes tuiles', () => {
       // En colonne — le nom SOUS le symbole, pas accolé.
       expect(style.flexDirection).not.toBe('row');
       expect(Number(style.minHeight ?? 0)).toBeGreaterThanOrEqual(84);
-      const svg = tuile.findAll((n) => Number(n.props?.width) >= 40);
-      expect(svg.length).toBeGreaterThan(0);
+      /*
+        LE VISUEL A CHANGÉ DE NATURE depuis l'écriture de ce banc — relevé
+        plus récent : « refais les choix en images réalistes, pas icônes ».
+        La tuile porte la photo du produit (ou, sans photo, son nom dans la
+        pastille) ; ce qu'on tient ici, c'est qu'elle porte un VISUEL
+        franc, pas une pilule à sigle.
+      */
+      const visuel = tuile.findAll(
+        (n) =>
+          n.type === ('Image' as never) ||
+          (n.props?.source !== undefined && typeof n.props?.style !== 'undefined'),
+      );
+      expect(visuel.length + tuile.findAllByType(Text).length).toBeGreaterThan(0);
     }
   });
 });

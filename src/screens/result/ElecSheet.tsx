@@ -28,6 +28,7 @@ import {
   type FixtureKind,
 } from '../../geometry/electrical';
 import { getStyles } from './styles';
+import { VignetteProduit } from '../../components/VignetteProduit';
 
 export function ElecSheet({
   visible,
@@ -129,26 +130,36 @@ export function ElecSheet({
                             accessibilityLabel={spec.label}
                             onPress={() => onChoose(kind)}>
                             {/*
-                              LE VRAI SYMBOLE, PAS UNE PASTILLE À SIGLE —
-                              relevé du patron : « des images plus
-                              compréhensibles ». La tuile montre le
-                              symbole normalisé que le plan dessinera :
-                              on choisit ce qu'on va lire.
+                              LA PHOTO DU DEVIS, PAS UN PICTOGRAMME —
+                              relevé du patron : « refais les choix en
+                              images réalistes, pas icônes. Comme le
+                              devis. » La tuile montre le produit qu'on
+                              achète ; le symbole normalisé — celui que le
+                              plan dessinera — reste en insigne au coin :
+                              on choisit ce qu'on pose ET l'on apprend ce
+                              qu'on lira.
                             */}
                             <View style={styles.elecTuile}>
-                              <Svg width={40} height={40} viewBox="-13 -13 26 26">
-                                {FIXTURE_SYMBOL[kind].map((s, i) => (
-                                  <Path
-                                    key={i}
-                                    d={s.d}
-                                    stroke={spec.color}
-                                    strokeWidth={1.8}
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    fill={s.fill ? spec.color : 'none'}
-                                  />
-                                ))}
-                              </Svg>
+                              <VignetteProduit
+                                code={`meca-${kind}`}
+                                libelle={spec.label}
+                                taille={52}
+                              />
+                              <View style={styles.elecInsigne}>
+                                <Svg width={16} height={16} viewBox="-13 -13 26 26">
+                                  {FIXTURE_SYMBOL[kind].map((s, i) => (
+                                    <Path
+                                      key={i}
+                                      d={s.d}
+                                      stroke={spec.color}
+                                      strokeWidth={2.6}
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      fill={s.fill ? spec.color : 'none'}
+                                    />
+                                  ))}
+                                </Svg>
+                              </View>
                             </View>
                             <Text style={styles.elecChipText}>
                               {spec.label}
