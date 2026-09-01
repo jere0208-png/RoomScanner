@@ -63,7 +63,9 @@ import {
   wetZones,
   type WetZone,
 } from '../geometry/volumes';
-import { MAQUETTE } from '../ui/maquette';
+import { MAQUETTE,
+  matieresDesSols,
+} from '../ui/maquette';
 import { parImage } from '../ui/parImage';
 import { haptic } from '../ui/haptic';
 import { floorsOf, useScanStore } from '../store/scanStore';
@@ -975,6 +977,9 @@ export function Iso3DView({
             // Le plafond suit son propre calque, comme sur le plan :
             // superposé au mobilier, il ne se lit plus.
             ceiling: showCeiling ? ceiling : [],
+            // Parquet et carrelage, d'après le nom des pièces : le réalisme
+            // du sol coûte quelques arêtes, pas un calque de plus.
+            matieres: matieresDesSols(rooms),
             routes: cableRoutes,
             routeHeights,
             /*

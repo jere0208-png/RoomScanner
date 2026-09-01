@@ -298,9 +298,9 @@ describe('un meuble d’angle', () => {
       fixtures: [],
       showSurfaces: false,
     });
-    const meuble = sc.faces.filter(
-      (f) => f.fill === PAL.object || f.fill === PAL.objectTop,
-    );
+    // Par PROPRIÉTAIRE, plus par couleur : depuis les matières, un
+    // rangement est bois, pas gris neutre.
+    const meuble = sc.faces.filter((f) => f.ownerId === RANGEMENT.id);
     expect(meuble.length).toBeGreaterThan(0);
     expect(fuites(sc.faces, meuble)).toEqual([]);
     // Et aucun mur situé derrière lui ne vient le repeindre.

@@ -35,6 +35,7 @@
  *     là où quinze volumes gris se ressemblent tous.
  */
 import type { ScenePalette } from '../geometry/scene3d';
+import { roomUse } from '../geometry/nfc15100';
 
 export const MAQUETTE: ScenePalette = {
   /* Le sol : un sable clair, pas un gris d'écran. */
@@ -74,3 +75,25 @@ export const AMBRE_MEUBLE = '#EFC978';
  * rien — c'est le contraste qui fait lire le plan.
  */
 export const MEUBLE_MOELLEUX = /bed|sofa|couch|armchair|chair|stool/i;
+
+/**
+ * LA MATIÈRE DU SOL, D'APRÈS L'USAGE DE LA PIÈCE — relevé du patron :
+ * « revoir aussi le sol et murs pour un réalisme profond ». Carrelage dans
+ * les pièces d'eau et la cuisine, parquet partout ailleurs : la règle des
+ * logements français, et celle qu'on lit d'un coup d'œil sur la maquette.
+ * L'usage vient du NOM de la pièce — la même lecture que le contrôle
+ * NF C 15-100, pour que la maquette et la norme parlent du même logement.
+ */
+export function matieresDesSols(
+  pieces: { id: string; name?: string | null; kind?: string | null }[],
+): Record<string, 'parquet' | 'carrelage'> {
+  const out: Record<string, 'parquet' | 'carrelage'> = {};
+  for (const p of pieces) {
+    const usage = roomUse(p.name ?? '', p.kind as never);
+    out[p.id] =
+      usage === 'cuisine' || usage === 'sdb' || usage === 'wc'
+        ? 'carrelage'
+        : 'parquet';
+  }
+  return out;
+}

@@ -145,6 +145,11 @@ export interface ObjectFootprint {
   yaw: number;
   /** Couleur moyenne relevée pendant le scan (#RRGGBB), si captée. */
   color?: string;
+  /** Référence du catalogue (meuble posé à la main) : elle spécialise la
+   *  silhouette 3D. */
+  modele?: string;
+  /** Matière dominante, pour l'habillage 3D. */
+  matiere?: string;
 }
 
 /**
@@ -265,6 +270,8 @@ export function toFootprint(o: ObjectData): ObjectFootprint {
     yCenter: m[13],
     yaw: Math.atan2(m[2], m[0]),
     color: o.color,
+    modele: o.modele,
+    matiere: o.matiere,
   };
 }
 

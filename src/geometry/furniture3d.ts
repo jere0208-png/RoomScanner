@@ -69,8 +69,67 @@ const portes = (y0 = 0.04, y1 = 0.96): FurnPart[] => [
  * escalier ou un objet non identifié, et ça évite d'inventer une silhouette
  * à ce qu'on ne sait pas nommer.
  */
-export function furnitureParts(category: string): FurnPart[] {
+export function furnitureParts(category: string, modele?: string): FurnPart[] {
   const c = (category || '').toLowerCase();
+
+  /*
+    LES RÉFÉRENCES ICONIQUES ONT LEUR SILHOUETTE À ELLES — relevé du
+    patron : « l'ajout réaliste de meubles depuis un catalogue de mobiliers
+    existants réellement ». Un KALLAX est une GRILLE de casiers, un BILLY
+    une colonne d'étagères, un PAX deux hautes portes : trois « storage »
+    au catalogue, trois meubles qu'on reconnaît de l'autre bout de la
+    pièce. Le modèle voyage avec le meuble posé (`ObjectData.modele`) ;
+    un meuble relevé au scan n'en a pas, et garde la silhouette de sa
+    catégorie.
+  */
+  const m = (modele || '').toLowerCase();
+  if (m.startsWith('kallax')) {
+    const n = m.includes('44') ? 4 : 2;
+    const cadre = 0.05;
+    const out: FurnPart[] = [
+      // Le caisson : fond, flancs, dessus, dessous.
+      P(0, 1, 0, 1, 0.82, 1),
+      P(0, cadre, 0, 1, 0, 1),
+      P(1 - cadre, 1, 0, 1, 0, 1),
+      P(0, 1, 1 - cadre, 1, 0, 1),
+      P(0, 1, 0, cadre, 0, 1),
+    ];
+    // Les croisillons : la grille qui fait le KALLAX.
+    for (let i = 1; i < n; i++) {
+      const t = i / n;
+      out.push(P(t - 0.015, t + 0.015, cadre, 1 - cadre, 0, 0.95, 'soft'));
+      out.push(P(cadre, 1 - cadre, t - 0.015, t + 0.015, 0, 0.95, 'soft'));
+    }
+    return out;
+  }
+  if (m.startsWith('billy')) {
+    const out: FurnPart[] = [
+      P(0, 1, 0, 1, 0.85, 1),
+      P(0, 0.05, 0, 1, 0, 1),
+      P(0.95, 1, 0, 1, 0, 1),
+      P(0, 1, 0.96, 1, 0, 1),
+      P(0, 1, 0, 0.04, 0, 1),
+    ];
+    // Cinq étagères, la signature de la colonne.
+    for (let i = 1; i <= 5; i++) {
+      const t = i / 6;
+      out.push(P(0.05, 0.95, t - 0.012, t + 0.012, 0.05, 0.95, 'soft'));
+    }
+    return out;
+  }
+  if (m.startsWith('pax')) {
+    // Le caisson, son socle, et deux portes pleine hauteur : la haute
+    // armoire se reconnaît à sa façade d'un seul tenant.
+    return [
+      P(0, 1, 0, 1, 0.06, 1),
+      P(0.01, 0.99, 0, 0.02, 0.03, 1, 'dark'),
+      ...portes(0.02, 0.98),
+    ];
+  }
+  if (m.startsWith('lack')) {
+    // Le plateau épais et ses quatre pieds carrés : la table LACK.
+    return [P(0, 1, 0.88, 1, 0, 1, 'soft'), ...pieds(0.88, 0.1)];
+  }
 
   if (c.includes('bed')) {
     return [

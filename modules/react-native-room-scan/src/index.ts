@@ -67,6 +67,14 @@ export interface ObjectData {
   /** Pièce d'appartenance, estampillée côté JS après le scan. */
   roomId?: string;
   /**
+   * LA RÉFÉRENCE DU CATALOGUE, pour un meuble posé à la main : c'est elle
+   * qui spécialise la silhouette 3D (un KALLAX est une grille de casiers,
+   * pas une boîte). Absente des meubles relevés au scan.
+   */
+  modele?: string;
+  /** La matière dominante (bois, tissu, blanc…) : elle habille la 3D. */
+  matiere?: string;
+  /**
    * TAILLE DE RÉFÉRENCE, quand le meuble s'est ajusté à un recoin.
    *
    * Un meuble posé dans une niche plus étroite que lui s'y adapte au lieu

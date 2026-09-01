@@ -27,6 +27,16 @@ export interface CatalogItem {
   h: number;
   /** Hauteur du dessous du meuble (m) : 0 sauf s'il est suspendu. */
   base?: number;
+  /**
+   * LA RÉFÉRENCE RÉELLE, quand c'en est une — relevé du patron : « l'ajout
+   * réaliste de meubles depuis un catalogue de mobiliers existants
+   * réellement ». La maison cite déjà ses marques au devis (Legrand
+   * Céliane, Schneider Odace) : des faits de catalogue. Le mobilier suit —
+   * et c'est la COTE réelle qui fait le réalisme d'un plan, pas la photo.
+   */
+  marque?: string;
+  /** La matière dominante : c'est elle qui habille la 3D. */
+  matiere?: 'bois' | 'tissu' | 'blanc' | 'ceramique' | 'sombre';
 }
 
 export interface CatalogFamily {
@@ -44,6 +54,17 @@ export const CATALOGUE: CatalogFamily[] = [
       { key: 'chevet', label: 'Table de chevet', category: 'storage', w: 0.45, d: 0.4, h: 0.55 },
       { key: 'armoire', label: 'Armoire', category: 'storage', w: 1.2, d: 0.6, h: 2.1 },
       { key: 'commode', label: 'Commode', category: 'storage', w: 1.0, d: 0.45, h: 0.85 },
+      /*
+        LES RÉFÉRENCES DU COMMERCE — cotes constructeur, vérifiables au
+        mètre chez n'importe qui. Une référence à la mauvaise cote serait
+        pire qu'un meuble générique : on planifierait sa chambre sur un
+        mensonge.
+      */
+      { key: 'malm160', label: 'Lit MALM 160', category: 'bed', marque: 'IKEA', matiere: 'bois', w: 1.76, d: 2.09, h: 1.0 },
+      { key: 'hemnes160', label: 'Lit HEMNES 160', category: 'bed', marque: 'IKEA', matiere: 'bois', w: 1.68, d: 2.11, h: 1.2 },
+      { key: 'hemneschevet', label: 'Chevet HEMNES', category: 'storage', marque: 'IKEA', matiere: 'bois', w: 0.46, d: 0.35, h: 0.7 },
+      { key: 'malmcommode', label: 'Commode MALM 4 tiroirs', category: 'storage', marque: 'IKEA', matiere: 'bois', w: 0.8, d: 0.48, h: 1.0 },
+      { key: 'pax100', label: 'Armoire PAX 100', category: 'storage', marque: 'IKEA', matiere: 'blanc', w: 1.0, d: 0.58, h: 2.01 },
     ],
   },
   {
@@ -86,6 +107,16 @@ export const CATALOGUE: CatalogFamily[] = [
       { key: 'tv', label: 'Télévision', category: 'television', w: 1.2, d: 0.08, h: 0.7, base: 1.0 },
       { key: 'meubleTv', label: 'Meuble TV', category: 'storage', w: 1.4, d: 0.4, h: 0.5 },
       { key: 'biblio', label: 'Bibliothèque', category: 'storage', w: 0.8, d: 0.3, h: 1.8 },
+      { key: 'kivik3', label: 'Canapé KIVIK 3 pl.', category: 'sofa', marque: 'IKEA', matiere: 'tissu', w: 2.28, d: 0.95, h: 0.83 },
+      { key: 'klippan2', label: 'Canapé KLIPPAN 2 pl.', category: 'sofa', marque: 'IKEA', matiere: 'tissu', w: 1.8, d: 0.88, h: 0.66 },
+      { key: 'poang', label: 'Fauteuil POÄNG', category: 'chair', marque: 'IKEA', matiere: 'tissu', w: 0.68, d: 0.82, h: 1.0 },
+      { key: 'lack118', label: 'Table basse LACK', category: 'table', marque: 'IKEA', matiere: 'blanc', w: 1.18, d: 0.78, h: 0.45 },
+      { key: 'lack55', label: 'Bout de canapé LACK', category: 'table', marque: 'IKEA', matiere: 'blanc', w: 0.55, d: 0.55, h: 0.45 },
+      { key: 'ekedalen120', label: 'Table EKEDALEN 120', category: 'table', marque: 'IKEA', matiere: 'bois', w: 1.2, d: 0.8, h: 0.75 },
+      { key: 'besta180', label: 'Banc TV BESTÅ 180', category: 'storage', marque: 'IKEA', matiere: 'blanc', w: 1.8, d: 0.42, h: 0.38 },
+      { key: 'kallax22', label: 'Étagère KALLAX 2×2', category: 'storage', marque: 'IKEA', matiere: 'blanc', w: 0.77, d: 0.39, h: 0.77 },
+      { key: 'kallax44', label: 'Étagère KALLAX 4×4', category: 'storage', marque: 'IKEA', matiere: 'blanc', w: 1.47, d: 0.39, h: 1.47 },
+      { key: 'billy80', label: 'Bibliothèque BILLY', category: 'storage', marque: 'IKEA', matiere: 'blanc', w: 0.8, d: 0.28, h: 2.02 },
     ],
   },
   {
@@ -106,6 +137,8 @@ export const CATALOGUE: CatalogFamily[] = [
       { key: 'bureau', label: 'Bureau', category: 'table', w: 1.2, d: 0.6, h: 0.75 },
       { key: 'fauteuil', label: 'Fauteuil', category: 'chair', w: 0.6, d: 0.6, h: 1.1 },
       { key: 'caisson', label: 'Caisson', category: 'storage', w: 0.42, d: 0.55, h: 0.6 },
+      { key: 'micke', label: 'Bureau MICKE', category: 'table', marque: 'IKEA', matiere: 'blanc', w: 1.05, d: 0.5, h: 0.75 },
+      { key: 'bekant160', label: 'Bureau BEKANT 160', category: 'table', marque: 'IKEA', matiere: 'bois', w: 1.6, d: 0.8, h: 0.73 },
     ],
   },
 ];

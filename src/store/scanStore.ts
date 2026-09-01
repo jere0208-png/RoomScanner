@@ -5935,6 +5935,10 @@ export const useScanStore = create<ScanState>((set, get) => {
             depth: item.d,
             height: item.h,
             roomId: accueil?.roomId,
+            // La référence voyage avec le meuble : c'est elle qui
+            // spécialise la silhouette 3D et sa matière.
+            modele: item.key,
+            matiere: item.matiere,
             // Sur LE sol du scan, pas sur l'altitude zéro : ARKit place le
             // plancher où il l'a trouvé, souvent un demi-mètre plus bas, et
             // le meuble se retrouvait sinon suspendu en l'air.

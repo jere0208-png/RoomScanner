@@ -1333,6 +1333,13 @@ export interface SceneOptions {
   floors?: Record<string, FloorData | null | undefined>;
   /** Pièces du scan, avec les murs qui bordent chacune. */
   rooms?: RoomShape[];
+  /**
+   * LA MATIÈRE DU SOL, pièce par pièce — relevé du patron : « revoir aussi
+   * le sol et murs pour un réalisme profond ». Parquet dans les pièces
+   * sèches, carrelage dans les pièces d'eau : c'est l'appelant qui tranche
+   * (il connaît les NOMS des pièces), la scène dessine.
+   */
+  matieres?: Record<string, 'parquet' | 'carrelage' | undefined>;
   /** Appareillage électrique posé sur les faces de murs. */
   fixtures?: Fixture[];
   /**
@@ -1630,6 +1637,143 @@ export function sceneFraming(faces: Face3D[]): {
   return { center, radius3d };
 }
 
+/**
+ * UN SEGMENT, GARDÉ LÀ OÙ IL EST DANS LA PIÈCE.
+ *
+ * Les joints du parquet et du carrelage traversent la boîte englobante ;
+ * dans une pièce en L, la moitié serait dans la pièce d'à côté. On coupe le
+ * segment aux bords du contour et l'on ne garde que les tronçons dont le
+ * MILIEU est dedans — la règle robuste pour un polygone quelconque.
+ */
+function clipAuContour(a: Pt, b: Pt, poly: Pt[]): [Pt, Pt][] {
+  const ts = [0, 1];
+  const dx = b.x - a.x;
+  const dz = b.z - a.z;
+  for (let i = 0; i < poly.length; i++) {
+    const p = poly[i];
+    const q = poly[(i + 1) % poly.length];
+    const ex = q.x - p.x;
+    const ez = q.z - p.z;
+    const den = dx * ez - dz * ex;
+    if (Math.abs(den) < 1e-12) continue;
+    const t = ((p.x - a.x) * ez - (p.z - a.z) * ex) / den;
+    const u = ((p.x - a.x) * dz - (p.z - a.z) * dx) / den;
+    if (t > 0 && t < 1 && u >= 0 && u <= 1) ts.push(t);
+  }
+  ts.sort((x, y) => x - y);
+  const out: [Pt, Pt][] = [];
+  for (let i = 0; i + 1 < ts.length; i++) {
+    const t0 = ts[i];
+    const t1 = ts[i + 1];
+    if (t1 - t0 < 1e-6) continue;
+    const milieu = { x: a.x + dx * (t0 + t1) / 2, z: a.z + dz * (t0 + t1) / 2 };
+    if (!pointInPolygon(milieu, poly)) continue;
+    out.push([
+      { x: a.x + dx * t0, z: a.z + dz * t0 },
+      { x: a.x + dx * t1, z: a.z + dz * t1 },
+    ]);
+  }
+  return out;
+}
+
+/**
+ * LES JOINTS D'UN SOL — ce qui fait lire la matière d'un coup d'œil.
+ *
+ * PARQUET : les lames courent le long de la pièce (pas de 0,22 m), leurs
+ * abouts décalés d'une demi-lame un rang sur deux — le calepinage réel.
+ * CARRELAGE : la trame carrée de 0,60, dans les deux sens. Les joints sont
+ * des ARÊTES (deux points), posées un souffle au-dessus du sol pour passer
+ * devant lui au tri — quelques dizaines par pièce, pas des centaines.
+ */
+function jointsDuSol(
+  poly: Pt[],
+  matiere: 'parquet' | 'carrelage',
+): [Pt, Pt][] {
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minZ = Infinity;
+  let maxZ = -Infinity;
+  for (const q of poly) {
+    minX = Math.min(minX, q.x);
+    maxX = Math.max(maxX, q.x);
+    minZ = Math.min(minZ, q.z);
+    maxZ = Math.max(maxZ, q.z);
+  }
+  const out: [Pt, Pt][] = [];
+  if (matiere === 'carrelage') {
+    const PAS = 0.6;
+    for (let x = minX + PAS; x < maxX; x += PAS) {
+      out.push(...clipAuContour({ x, z: minZ }, { x, z: maxZ }, poly));
+    }
+    for (let z = minZ + PAS; z < maxZ; z += PAS) {
+      out.push(...clipAuContour({ x: minX, z }, { x: maxX, z }, poly));
+    }
+    return out;
+  }
+  const LAME = 0.22;
+  const LONG = 1.35;
+  const auLong = maxX - minX >= maxZ - minZ;
+  const across = auLong ? maxZ - minZ : maxX - minX;
+  let rang = 0;
+  for (let d = LAME; d < across; d += LAME, rang++) {
+    const a = auLong
+      ? { x: minX, z: minZ + d }
+      : { x: minX + d, z: minZ };
+    const b = auLong
+      ? { x: maxX, z: minZ + d }
+      : { x: minX + d, z: maxZ };
+    out.push(...clipAuContour(a, b, poly));
+  }
+  // Les abouts, décalés d'une demi-lame un rang sur deux.
+  rang = 0;
+  for (let d = 0; d < across; d += LAME, rang++) {
+    const depart = rang % 2 === 0 ? LONG / 2 : LONG;
+    const fin = auLong ? maxX - minX : maxZ - minZ;
+    for (let l = depart; l < fin; l += LONG) {
+      const a = auLong
+        ? { x: minX + l, z: minZ + d }
+        : { x: minX + d, z: minZ + l };
+      const b = auLong
+        ? { x: minX + l, z: minZ + Math.min(d + LAME, across) }
+        : { x: minX + Math.min(d + LAME, across), z: minZ + l };
+      out.push(...clipAuContour(a, b, poly));
+    }
+  }
+  return out;
+}
+
+/** Les teintes de matière : le bois chaud de la maquette, le blanc
+ *  d'électroménager, la céramique des sanitaires. */
+const TEINTE_MATIERE: Record<string, string> = {
+  bois: '#B9905F',
+  tissu: AMBRE_MEUBLE,
+  blanc: '#ECEAE4',
+  ceramique: '#E8ECEC',
+  sombre: '#3A3F46',
+};
+
+/** Ce que la catégorie laisse deviner, quand le catalogue n'a rien dit. */
+const MATIERE_PAR_CATEGORIE: [RegExp, string][] = [
+  [/refrigerator|washer|dryer|dishwasher|oven/i, 'blanc'],
+  [/sink|toilet|bathtub/i, 'ceramique'],
+  [/television|stove/i, 'sombre'],
+  [/table|storage|chair|stool/i, 'bois'],
+];
+
+function matiereDuMeuble(obj: {
+  matiere?: string;
+  category?: string;
+}): string | undefined {
+  if (obj.matiere && TEINTE_MATIERE[obj.matiere]) {
+    return TEINTE_MATIERE[obj.matiere];
+  }
+  const c = obj.category ?? '';
+  for (const [motif, matiere] of MATIERE_PAR_CATEGORIE) {
+    if (motif.test(c)) return TEINTE_MATIERE[matiere];
+  }
+  return undefined;
+}
+
 /** Construit la scène complète : sol, murs, ouvertures, meubles. */
 export function buildScene(
   walls: WallSeg[],
@@ -1654,7 +1798,20 @@ export function buildScene(
   // entièrement contenues dans SON contour.
   const rooms: SceneRoom[] = parts.map((part) => {
     const floor = opts.floors?.[part.roomId] ?? null;
-    const floorFill = (opts.showTextures ? floor?.color : undefined) ?? pal.floor;
+    const matiere = opts.matieres?.[part.roomId];
+    /*
+      LA MATIÈRE TEINTE LE FOND : chêne clair pour le parquet, gris porcelaine
+      pour le carrelage. La couleur RELEVÉE au scan garde la priorité — une
+      mesure passe devant un habillage.
+    */
+    const fondMatiere =
+      matiere === 'parquet'
+        ? mixHex(pal.floor, '#C89A66', 0.55)
+        : matiere === 'carrelage'
+        ? mixHex(pal.floor, '#E3E6E4', 0.6)
+        : undefined;
+    const floorFill =
+      (opts.showTextures ? floor?.color : undefined) ?? fondMatiere ?? pal.floor;
     const surface = part.surface;
     if (surface && opts.showSurfaces) {
       faces.push({
@@ -1663,6 +1820,20 @@ export function buildScene(
         stroke: pal.floorStroke,
         isFloor: true,
       });
+      if (matiere) {
+        const joint = mixHex(floorFill, '#0B0D12', 0.22);
+        for (const [a, b] of jointsDuSol(surface.pts, matiere)) {
+          faces.push({
+            pts: [
+              { x: a.x, y: 0.004, z: a.z },
+              { x: b.x, y: 0.004, z: b.z },
+            ],
+            fill: null,
+            stroke: joint,
+            isFloor: true,
+          });
+        }
+      }
       const ftex = opts.showTextures ? floor?.texture : undefined;
       if (ftex && ftex.cols > 0 && ftex.rows > 0) {
         const cw = (ftex.maxX - ftex.minX) / ftex.cols;
@@ -2853,7 +3024,16 @@ export function buildScene(
       ? AMBRE_MEUBLE
       : undefined;
     const skin = opts.showTextures ? obj.color : undefined;
-    const base = skin ?? teinteMoelleuse ?? pal.object;
+    /*
+      LA MATIÈRE HABILLE LE MEUBLE — relevé du patron : « un réalisme
+      profond ». Quinze volumes du même gris se ressemblent tous ; un frigo
+      est BLANC, une table est BOIS, un lavabo est CÉRAMIQUE. La matière du
+      catalogue prime (elle est déclarée pièce par pièce) ; à défaut, la
+      catégorie la devine. La couleur RELEVÉE au scan reste devant : c'est
+      une mesure, pas un parti pris.
+    */
+    const base =
+      skin ?? matiereDuMeuble(obj) ?? teinteMoelleuse ?? pal.object;
     const teintes = {
       body: base,
       soft: mixHex(base, '#FFFFFF', 0.45),
@@ -3069,7 +3249,7 @@ export function buildScene(
     // caisse dès qu'on tourne la pièce, puis redevenir un lit au relâcher,
     // c'est pire que tout — et une douzaine de faces de plus par meuble ne
     // se sent pas.
-    const morceaux = furnitureParts(obj.category ?? '');
+    const morceaux = furnitureParts(obj.category ?? '', obj.modele);
     if (morceaux.length === 0) {
       poser({ x0: 0, x1: 1, y0: 0, y1: 1, z0: 0, z1: 1, tone: 'body' });
     } else {

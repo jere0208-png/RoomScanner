@@ -12762,6 +12762,55 @@ ne montrait un interrupteur simple. Ce qui en est fait :
   crochet de plafond — la montrer pour une applique murale contredirait sa
   ligne, et une vignette qui contredit est pire qu'une vignette absente.
 
+### Le mobilier réel, et les sols qui disent leur matière
+
+Relevé du patron : « j'aimerais comme la plupart des apps de ce type, pour
+les meubles, l'ajout réaliste de meubles depuis un catalogue de mobiliers
+existants réellement. Il faut dans ce cas revoir aussi le sol et murs pour
+un réalisme profond. »
+
+#### De vraies références, aux vraies cotes
+
+La maison cite déjà ses marques au devis — Legrand Céliane, Schneider
+Odace : des faits de catalogue. Le mobilier suit : dix-sept références IKEA
+(MALM 176 × 209, KALLAX 77 × 77 × 39, BILLY 80 × 28 × 202, PAX, KIVIK,
+KLIPPAN, POÄNG, LACK, EKEDALEN, BESTÅ, MICKE, BEKANT, HEMNES…), fondues
+dans les familles existantes, la marque affichée devant la cote. **C'est la
+cote vraie qui fait le réalisme d'un plan, pas la photo** — une référence à
+la mauvaise cote serait pire qu'un meuble générique : on planifierait sa
+chambre sur un mensonge (les cotes sont tenues par un banc).
+
+#### La 3D les reconnaît, et les matières habillent tout
+
+Le modèle voyage avec le meuble posé (`ObjectData.modele`) : un KALLAX se
+dessine en GRILLE de casiers, un BILLY en colonne d'étagères, un PAX en deux
+hautes portes sur socle, une LACK en plateau épais sur pieds carrés. Et les
+MATIÈRES teintent tout le mobilier, relevé au scan compris : blanc
+d'électroménager, céramique des sanitaires, bois chaud des tables et
+rangements, tissu ambré des assises, sombre des écrans. La couleur RELEVÉE
+au scan garde la priorité — une mesure passe devant un habillage. Deux
+bancs qui sélectionnaient les meubles « par la couleur neutre » ont été
+recalés sur le propriétaire des faces : la teinte unique ne désigne plus
+rien, et c'est le but.
+
+#### Les sols : parquet et carrelage, d'après le nom des pièces
+
+Parquet à lames dans les pièces sèches — calepinage réel, abouts décalés
+d'une demi-lame un rang sur deux —, carrelage 60 × 60 à joints croisés dans
+la cuisine et les pièces d'eau. La matière se décide d'après le NOM de la
+pièce, par la même lecture que le contrôle NF C 15-100 : la maquette et la
+norme parlent du même logement. Les joints sont des ARÊTES clipsées au
+contour (pièces en L comprises), quelques dizaines par pièce — le réalisme
+ne coûte pas un calque. Le dossier PDF montre les mêmes sols que l'app.
+
+Le premier banc des sols est passé VERT SANS RIEN PROUVER — il comptait
+« toute arête au ras du sol », et les bases de murs en sont : le sélecteur
+compte désormais les seuls joints de matière, et le contre-sens (« sans
+matière déclarée, rien ») le tient.
+
+**Restent pour le prochain round, notés : les plinthes** (la bande basse des
+pans intérieurs — la boucle des morceaux de murs demande sa propre passe).
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

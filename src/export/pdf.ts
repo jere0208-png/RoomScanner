@@ -103,6 +103,7 @@ import {
 } from '../geometry/scene3d';
 import { frCategory, furnKind, furnitureStrokes } from '../geometry/furniture';
 import { ecarterLesGaines } from '../geometry/routing';
+import { matieresDesSols } from '../ui/maquette';
 
 const PAGE_W = 595;
 const PAGE_H = 842;
@@ -1049,6 +1050,9 @@ function draw3DView(
     floors: opts.floors,
     rooms: opts.rooms,
     fixtures: opts.fixtures,
+    // Le dossier montre les mêmes sols que l'app : parquet et carrelage,
+    // d'après le nom des pièces.
+    matieres: matieresDesSols(opts.rooms ?? []),
   });
   const faces = scene.faces;
   if (faces.length === 0) return;

@@ -621,7 +621,9 @@ describe('meubles', () => {
 
   it('rend chaque meuble comme un volume, faces arrière masquées', () => {
     const scene = buildScene(box, [], [tv], { palette: TEST_PALETTE });
-    const faces = scene.faces.filter((f) => f.fill === TEST_PALETTE.object);
+    // Par PROPRIÉTAIRE, plus par couleur : depuis les matières (une télé
+    // est sombre, un frigo blanc), la teinte neutre ne désigne plus rien.
+    const faces = scene.faces.filter((f) => f.ownerId === tv.id);
     expect(faces.length).toBeGreaterThan(0);
     // Toutes les faces d'un meuble portent leur normale : c'est ce qui
     // empêche les flancs de clignoter au fil de la rotation.
