@@ -63,8 +63,21 @@ const RENVOIS: Record<string, string> = {
   'meca-rjPrise': 'meca-rj45',
   'meca-rjPrise2': 'meca-rj45',
   'meca-tvPrise': 'meca-tv',
-  // L'applique se raccorde sur une boîte DCL : c'est SA photo de chantier.
-  'meca-applique': 'boite-dcl',
+  /*
+    VÉRIFIÉ À L'ŒIL, image par image — relevé du patron : « cherche bien
+    les images, vérifies et pose les ». `meca-inter.png` montrait une
+    commande de VOLET ROULANT (elle est devenue la photo de l'élément
+    `volet`) ; l'interrupteur simple est né par retouche du poussoir à
+    voyant, points effacés. Le va-et-vient a la MÊME face que le simple —
+    c'est le câblage qui change, pas la photo.
+  */
+  'meca-va': 'meca-inter',
+  /*
+    PAS DE RENVOI POUR L'APPLIQUE — vérifié à l'œil : la seule photo DCL du
+    jeu porte un CROCHET, c'est une boîte de plafond. La montrer pour une
+    applique murale contredirait sa ligne, et « une vignette qui contredit
+    sa ligne est pire qu'une vignette absente ». Le nom, proprement.
+  */
 };
 
 // ---- début du bloc régénéré (tools/gen-produits.mjs) ----
@@ -105,6 +118,7 @@ export const PHOTOS: Record<string, ImageSourcePropType> = {
   'meca-tv': require('../../assets/produits/meca-tv.png'),
   'meca-va': require('../../assets/produits/meca-va.png'),
   'meca-variateur': require('../../assets/produits/meca-variateur.png'),
+  'meca-volet': require('../../assets/produits/meca-volet.png'),
   'peigne': require('../../assets/produits/peigne.png'),
   'plafond-camera': require('../../assets/produits/plafond-camera.png'),
   'plafond-daaf': require('../../assets/produits/plafond-daaf.png'),

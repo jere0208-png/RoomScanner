@@ -79,5 +79,7 @@ export function chiffrerLePlan(
     gamme,
     ecartes,
     ajustements,
+    // Le tableau ne se compte que si son GESTE a été fait : un TGBT posé.
+    fixtures.some((f) => f.kind === 'tableau'),
   );
 }

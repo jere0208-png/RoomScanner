@@ -226,6 +226,19 @@ export function chiffrer(
   ecartes?: ReadonlySet<string>,
   /** Ce que l'électricien corrige ou ajoute à la main. */
   ajustements?: AjustementsDevis,
+  /**
+   * LE TABLEAU FAIT-IL PARTIE DU CHANTIER ? — relevé du patron : « si pas
+   * de TGBT présent sur le plan, on ne doit pas le compter dans le devis. »
+   *
+   * Revirement assumé d'un relevé plus ancien (le coffret se déduisait des
+   * circuits, tableau posé ou non). Les deux règles sont justes, mais pas
+   * pour les mêmes chantiers : sur un logement à refaire, le tableau se
+   * déduit ; sur deux prises ajoutées dans une cuisine, le tableau existant
+   * reste — et un devis qui facture un coffret quatre rangées pour deux
+   * prises est un devis qu'on ne montre pas au client. Le GESTE tranche :
+   * poser le TGBT sur le plan, c'est dire « le tableau est du chantier ».
+   */
+  tableauPose = true,
 ): Devis {
   const lignes: LigneDevis[] = [];
   const sansPrix: string[] = [];
@@ -306,6 +319,7 @@ export function chiffrer(
   }
 
   // ------------------------------------------------------------ tableau
+  if (tableauPose) {
   /*
     LES PROTECTIONS SORTENT DES CIRCUITS, PAS D'UN FORFAIT.
 
@@ -401,6 +415,7 @@ export function chiffrer(
       unite: 'u',
       note: 'un par rangée',
     });
+  }
   }
 
   /*

@@ -30,6 +30,18 @@ import {
 import { getStyles } from './styles';
 import { VignetteProduit } from '../../components/VignetteProduit';
 
+/**
+ * LES COMBOS MONTRENT LEURS DEUX VISAGES — relevé du patron : « "TV +
+ * prise" affiche que la TV.. on doit voir les deux images avec un + au
+ * centre. » Un poste combiné, c'est deux mécanismes sous une plaque : la
+ * tuile montre les deux, séparés du signe qui les unit.
+ */
+const DUOS: Partial<Record<string, [string, string]>> = {
+  tvPrise: ['meca-tv', 'meca-prise'],
+  rjPrise: ['meca-rj45', 'meca-prise'],
+  rjPrise2: ['meca-rj45', 'meca-prise'],
+};
+
 export function ElecSheet({
   visible,
   vue,
@@ -140,11 +152,27 @@ export function ElecSheet({
                               qu'on lira.
                             */}
                             <View style={styles.elecTuile}>
-                              <VignetteProduit
-                                code={`meca-${kind}`}
-                                libelle={spec.label}
-                                taille={52}
-                              />
+                              {DUOS[kind] ? (
+                                <View style={styles.elecDuo}>
+                                  <VignetteProduit
+                                    code={DUOS[kind]![0]}
+                                    libelle={spec.label}
+                                    taille={30}
+                                  />
+                                  <Text style={styles.elecPlus}>+</Text>
+                                  <VignetteProduit
+                                    code={DUOS[kind]![1]}
+                                    libelle={spec.label}
+                                    taille={30}
+                                  />
+                                </View>
+                              ) : (
+                                <VignetteProduit
+                                  code={`meca-${kind}`}
+                                  libelle={spec.label}
+                                  taille={52}
+                                />
+                              )}
                               <View style={styles.elecInsigne}>
                                 <Svg width={16} height={16} viewBox="-13 -13 26 26">
                                   {FIXTURE_SYMBOL[kind].map((s, i) => (

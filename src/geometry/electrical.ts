@@ -43,6 +43,7 @@ export type FixtureKind =
   | 'prise20'
   | 'prise32'
   | 'inter'
+  | 'volet'
   | 'va'
   | 'poussoir'
   | 'variateur'
@@ -368,6 +369,24 @@ export const FIXTURES: Record<FixtureKind, FixtureSpec> = {
     std: 1.1,
     note: 'Manette entre 0,90 m et 1,30 m du sol.',
   },
+  volet: {
+    /*
+      NÉ D'UNE PHOTO QUI MENTAIT — relevé du patron : « l'interrupteur
+      affiche une image d'interrupteur volet roulant (…) trouve d'autres
+      éléments à incorporer et rends-les fonctionnels ». La photo montrait
+      un vrai produit ; l'élément existe maintenant pour de vrai : au
+      catalogue, sur le plan, au devis.
+    */
+    label: 'Inter volet roulant',
+    short: 'VR',
+    family: 'Commandes',
+    w: 0.08,
+    h: 0.08,
+    depth: 0.022,
+    color: C_CMD,
+    std: 1.1,
+    note: 'Près de la baie qu’il commande, à hauteur des autres commandes.',
+  },
   va: {
     label: 'Va-et-vient',
     short: 'VV',
@@ -590,7 +609,7 @@ export const FIXTURE_FAMILIES: { name: string; kinds: FixtureKind[] }[] = [
   },
   {
     name: 'Commandes',
-    kinds: ['inter', 'inter2', 'inter3', 'va', 'poussoir', 'variateur'],
+    kinds: ['inter', 'inter2', 'inter3', 'va', 'poussoir', 'variateur', 'volet'],
   },
   {
     name: 'Courants faibles',
@@ -615,6 +634,7 @@ const TAG_BASE: Partial<Record<FixtureKind, string>> = {
   prise20: 'PC 20A',
   prise32: 'PC 32A',
   inter: 'INT',
+  volet: 'VR',
   va: 'VV',
   poussoir: 'BP',
   variateur: 'VAR',
@@ -1111,6 +1131,11 @@ export const FIXTURE_SYMBOL: Record<FixtureKind, SymbolStroke[]> = {
     { d: 'M-9 -7 H9 V7 H-9 Z' },
     { d: 'M-4 7 L2 -7' },
     { d: 'M1 7 L7 -7' },
+  ],
+  volet: [
+    { d: 'M-6 0 a6 6 0 1 0 12 0 a6 6 0 1 0 -12 0' },
+    { d: 'M-2.5 -1 L0 -3.8 L2.5 -1' },
+    { d: 'M-2.5 1 L0 3.8 L2.5 1' },
   ],
   thermostat: [
     { d: 'M-6 0 a6 6 0 1 0 12 0 a6 6 0 1 0 -12 0' },

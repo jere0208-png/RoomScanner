@@ -1310,6 +1310,9 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  /* Deux visages et le signe qui les unit : le combo. */
+  elecDuo: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  elecPlus: { color: c.inkSoft, fontSize: 15, fontWeight: '800' },
   /* Le symbole normalisé, en insigne au coin de la photo. */
   elecInsigne: {
     position: 'absolute',

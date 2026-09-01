@@ -12719,6 +12719,49 @@ de plan ne change pendant qu'ils vivent. C'est ce qui a permis de traverser
 2 800 bancs en n'en réveillant qu'un : les planches de référence, dont le
 diff relu ne montre que l'enveloppe des liens.
 
+### Le devis suit le geste du tableau, et le catalogue dit vrai
+
+Deux relevés du patron, la même séance : « si pas de TGBT présent sur le
+plan, on ne doit pas le compter dans le devis » — puis « dans la page
+Attention, si pas de TGBT, informe-le ; si manque pour la NF C 15-100,
+informe-le. (…) L'interrupteur affiche une image d'interrupteur volet
+roulant.. le va-et-vient affiche un bouton poussoir lumineux… "TV + prise"
+affiche que la TV. Cherche bien les images, vérifies et pose les. Trouve
+d'autres éléments à incorporer et rends-les fonctionnels. »
+
+#### Le TGBT ne se facture que si son geste a été fait
+
+Revirement ASSUMÉ d'une règle antérieure (le coffret se déduisait des
+circuits, posé ou non) : les deux règles sont justes, mais pas pour les
+mêmes chantiers. Sur deux prises ajoutées dans une cuisine, le tableau
+existant reste en place — un devis qui facture un coffret quatre rangées
+pour deux prises est un devis qu'on ne montre pas au client. Poser le TGBT
+sur le plan, c'est dire « le tableau est du chantier » : sans lui, tout le
+rayon Tableau reste au magasin. Et la page ATTENTION le dit, avec la vraie
+photo du coffret et le geste qui répare ; les réserves NF C 15-100 y ont
+leur carte aussi, comptées par le même contrôle que l'écran du plan.
+
+#### Les photos, vérifiées à l'œil — et ce qu'on a trouvé
+
+Le relevé était exact, et pire : `meca-inter.png` montrait une commande de
+volet roulant, `meca-va.png` un poussoir à voyant, et AUCUN fichier du jeu
+ne montrait un interrupteur simple. Ce qui en est fait :
+
+- l'interrupteur simple est né PAR RETOUCHE — le poussoir à voyant,
+  débarrassé de ses trois points (greffe d'un morceau propre du basculeur).
+  Photoréaliste, et sans question de source ;
+- le va-et-vient renvoie à la même face : c'est le câblage qui change, pas
+  la photo ;
+- la photo de volet roulant cesse de mentir : elle est devenue celle d'un
+  NOUVEL élément, l'« Inter volet roulant » — fonctionnel de bout en bout
+  (fiche, famille Commandes, symbole VR à chevrons, sigle 3D, prix dans les
+  cinq gammes) ;
+- les combos montrent leurs deux visages : « TV + prise » = la photo de la
+  TV, un « + », la photo de la prise — pareil pour RJ45 + prise ;
+- et PAS de renvoi pour l'applique : la seule boîte DCL du jeu porte un
+  crochet de plafond — la montrer pour une applique murale contredirait sa
+  ligne, et une vignette qui contredit est pire qu'une vignette absente.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

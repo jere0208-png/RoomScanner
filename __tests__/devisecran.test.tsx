@@ -188,6 +188,10 @@ const APPAREILS: Fixture[] = [
   fx('i1', 'inter', 3),
   fx('i2', 'va', 3.6),
   fx('r1', 'rj45', 4.2),
+  // Le TGBT est POSÉ : depuis que le devis suit le geste (pas de tableau
+  // sur le plan, pas de rayon Tableau — voir `tgbtabsent`), les épreuves
+  // qui cherchent un disjoncteur doivent d'abord en avoir mérité un.
+  fx('tb', 'tableau', 4.8),
 ];
 
 const ROOMS = [{ id: 'r1', name: 'Séjour', floor: null }];

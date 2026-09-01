@@ -34,7 +34,9 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
+import { Image } from 'react-native';
 import { radius, themedStyles, useTheme, type Palette } from '../theme';
+import { photoDe } from '../ui/produits';
 
 /**
  * LE DIAMÈTRE DU SIGNE, en points.
@@ -46,7 +48,21 @@ import { radius, themedStyles, useTheme, type Palette } from '../theme';
  */
 const D = 78;
 
-export function DevisAttention() {
+export function DevisAttention({
+  /**
+   * LE TABLEAU N'EST PAS DU CHANTIER — relevé du patron : « dans la page
+   * Attention du devis, si pas de TGBT, informe-le ». Depuis que le devis
+   * suit le geste (pas de TGBT posé, pas de rayon Tableau), il faut le
+   * DIRE là où on lit le prix : un total sans coffret qui ne s'explique
+   * pas se lit comme une erreur.
+   */
+  tableauAbsent = false,
+  /** Les réserves NF C 15-100 du plan : leur compte, dit en clair. */
+  manquesNfc = 0,
+}: {
+  tableauAbsent?: boolean;
+  manquesNfc?: number;
+} = {}) {
   const c = useTheme();
   const styles = getStyles(c);
   const pose = useRef(new Animated.Value(0)).current;
@@ -174,6 +190,62 @@ export function DevisAttention() {
         Tout ce qui les alimente — la boîte, la gaine, le fil, l’interrupteur —
         est bien compté.
       </Text>
+
+      {tableauAbsent && (
+        <View style={styles.carte}>
+          {/* La vraie photo du coffret — celle du devis : on montre ce qui
+              manque, pas un pictogramme. */}
+          {photoDe('meca-tableau') && (
+            <Image
+              source={photoDe('meca-tableau')!}
+              style={styles.carteImage}
+              resizeMode="contain"
+            />
+          )}
+          <View style={styles.carteTextes}>
+            <Text style={styles.carteTitre}>Tableau non compté</Text>
+            <Text style={styles.carteMessage}>
+              Aucun TGBT sur le plan : le devis n’inclut ni coffret ni
+              disjoncteurs. Posez le tableau sur un mur pour les chiffrer.
+            </Text>
+          </View>
+        </View>
+      )}
+
+      {manquesNfc > 0 && (
+        <View style={styles.carte}>
+          {/* Le badge de la norme : un écusson, pas une photo — la norme
+              n'a pas de produit à montrer. */}
+          <View style={styles.carteBadge}>
+            <Svg width={30} height={30} viewBox="0 0 24 24">
+              <Path
+                d="M12 2.5 L20 5.5 V12 C20 17 16.5 20.5 12 21.8 C7.5 20.5 4 17 4 12 V5.5 Z"
+                fill="none"
+                stroke={c.amber}
+                strokeWidth={1.8}
+                strokeLinejoin="round"
+              />
+              <Path
+                d="M8.2 12.2 L11 15 L16 9.4"
+                fill="none"
+                stroke={c.amber}
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </Svg>
+          </View>
+          <View style={styles.carteTextes}>
+            <Text style={styles.carteTitre}>NF C 15-100 — à revoir</Text>
+            <Text style={styles.carteMessage}>
+              {`${manquesNfc} point${manquesNfc > 1 ? 's' : ''} relevé${
+                manquesNfc > 1 ? 's' : ''
+              } au contrôle. Le devis chiffre le plan tel quel — levez-les
+depuis l’écran du plan pour un chiffrage aux normes.`}
+            </Text>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -181,6 +253,30 @@ export function DevisAttention() {
 const getStyles = themedStyles((c: Palette) =>
   StyleSheet.create({
     cadre: { alignItems: 'center', paddingTop: 18, paddingHorizontal: 6 },
+    /* Une carte par manque : l'image à gauche, le titre franc, le geste
+       qui répare. */
+    carte: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      alignSelf: 'stretch',
+      backgroundColor: c.surfaceSunken,
+      borderRadius: radius.lg,
+      padding: 12,
+      marginTop: 12,
+    },
+    carteImage: { width: 46, height: 46, borderRadius: 10 },
+    carteBadge: {
+      width: 46,
+      height: 46,
+      borderRadius: 10,
+      backgroundColor: c.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    carteTextes: { flex: 1 },
+    carteTitre: { color: c.ink, fontSize: 14.5, fontWeight: '800' },
+    carteMessage: { color: c.inkSoft, fontSize: 12.5, lineHeight: 17, marginTop: 2 },
     /* Le cadre fait la taille du signe : l'onde déborde SANS pousser le
        texte — elle est absolue, et ne prend aucun toucher. */
     signeCadre: {

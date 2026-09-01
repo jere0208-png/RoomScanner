@@ -59,6 +59,13 @@ import { BackChevron } from '../components/BackChevron';
 import { RetourGlisse } from '../components/RetourGlisse';
 import { FloorplanEditor } from '../components/FloorplanEditor';
 import { DevisAttention } from '../components/DevisAttention';
+import {
+  checkElectrical,
+  fixturePlacement,
+  roomInputsOf,
+  wallToRooms,
+} from '../geometry/nfc15100';
+import { roomParts } from '../geometry/floorplan';
 import { TotalQuiMonte } from '../components/TotalQuiMonte';
 import { cleDeLigne, type Devis, type LigneDevis, type LigneLegende } from '../geometry/devis';
 import { chiffrerLePlan } from '../geometry/devisplan';
@@ -398,6 +405,29 @@ export function DevisScreen() {
     retrouverait pas.
   */
   const horsJeu = useMemo(() => new Set(ecartes), [ecartes]);
+  /*
+    CE QUE LA PAGE ATTENTION DOIT SAVOIR : le tableau est-il du chantier,
+    et combien de réserves NF C 15-100 le plan porte-t-il. Le même contrôle
+    que l'écran du plan, compté une fois à l'ouverture — pas de geste ici
+    qui le rejouerait.
+  */
+  const tableauAbsent = !fixtures.some((f) => f.kind === 'tableau');
+  const manquesNfc = useMemo(() => {
+    const entrees = roomInputsOf(
+      rooms.map((r) => ({ ...r, name: r.name ?? '' })),
+      roomParts(walls, rooms),
+    );
+    return checkElectrical(
+      entrees,
+      fixtures,
+      wallToRooms(entrees),
+      fixturePlacement(fixtures, walls, entrees),
+      undefined,
+      undefined,
+      ceiling,
+      { walls, openings },
+    ).length;
+  }, [walls, rooms, fixtures, ceiling, openings]);
   const devis: Devis = useMemo(
     () =>
       chiffrerLePlan(walls, rooms, fixtures, ceiling, gamme, horsJeu, openings, {
@@ -646,7 +676,10 @@ export function DevisScreen() {
             l'argent à qui le découvre trop tard. Voir `DevisAttention`.
           */
           <>
-            <DevisAttention />
+            <DevisAttention
+              tableauAbsent={tableauAbsent}
+              manquesNfc={manquesNfc}
+            />
             {devis.sansPrix.length > 0 && (
               /*
                 CE QUE LE CATALOGUE NE SAIT PAS CHIFFRER SE DIT ICI.
