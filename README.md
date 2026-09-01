@@ -12649,6 +12649,33 @@ et le relâcher : le tap tient.
 Balayé dans la foulée : aucune autre fenêtre de geste ne lit `Date.now()` —
 celle-ci était la seule.
 
+### Une feuille de choix tombait pour un pictogramme
+
+Relevé du chantier, capture du garde-fou à l'appui : « L'application s'est
+arrêtée net — Cannot read property 'map' of undefined, at ActionSheet ». Le
+diagnostic embarqué a payé sa place : écran, message, pile — le coupable
+s'est lu depuis la capture.
+
+La fiche circuits d'un appareil (« Voir le mur », la fiche hors édition)
+portait un choix `icon: 'metre'` — une clé qui n'a JAMAIS existé dans la
+planche d'icônes. `ICONS['metre']` rendait `undefined`, son `.map` jetait,
+et toute la feuille — puis tout l'écran — tombait pour un dessin de vingt
+points.
+
+**Et le typage n'a rien vu, voilà le vrai trou** : la planche était annotée
+`const ICONS: Record<string, string[]>`. Cette annotation ÉLARGIT
+`keyof typeof ICONS` à `string` — le champ `icon` des choix, pourtant écrit
+sur ces clés, acceptait n'importe quelle chaîne. Un type qui a l'air strict
+et ne l'est pas est pire qu'un type lâche : on a cessé de se méfier.
+
+Trois verrous, du plus profond au plus sûr :
+
+- la clé fautive est corrigée — « Voir le mur » porte la règle ;
+- la feuille ENCAISSE une clé inconnue : le choix se rend sans pictogramme,
+  jamais sans écran — une donnée d'hier peut toujours en porter une ;
+- `satisfies Record<string, string[]>` remplace l'annotation : la forme est
+  vérifiée SANS élargir les clés — la prochaine invention ne compile pas.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

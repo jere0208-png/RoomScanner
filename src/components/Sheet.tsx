@@ -46,7 +46,15 @@ import { radius, shadowCard, themedStyles, useTheme, type Palette } from '../the
  * pardonnantes sur le détail : ce qui ne se lit pas en vingt points n'a rien
  * à faire ici.
  */
-const ICONS: Record<string, string[]> = {
+/*
+  PAS D'ANNOTATION `Record<string, …>` ICI — c'est elle qui a fait tomber
+  l'app sur le chantier. Elle élargissait `keyof typeof ICONS` à `string` :
+  le champ `icon` des choix, pourtant typé sur ces clés, acceptait alors
+  N'IMPORTE QUELLE chaîne — et `ICONS['metre']`, qui n'a jamais existé,
+  rendait `undefined` dont le `.map` jetait toute la feuille. `satisfies`
+  vérifie la forme SANS élargir : la prochaine clé inventée ne compile pas.
+*/
+const ICONS = {
   // Le crayon sur une fiche : renommer, c'est réécrire l'étiquette.
   renommer: [
     'M11 4 H5.5 A1.5 1.5 0 0 0 4 5.5 v13 A1.5 1.5 0 0 0 5.5 20 h13 A1.5 1.5 0 0 0 20 18.5 V13',
@@ -167,7 +175,7 @@ const ICONS: Record<string, string[]> = {
     'M8 6.5 v0.01',
     'M8 12.5 v0.01',
   ],
-};
+} satisfies Record<string, string[]>;
 
 export interface SheetAction {
   label: string;
@@ -487,7 +495,9 @@ export function ActionSheet({
                 onClose();
               }}>
               {a.node}
-              {a.icon && (
+              {/* Une clé inconnue — donnée d'hier, faute de frappe — rend
+                  le choix SANS pictogramme, jamais sans écran. */}
+              {a.icon && ICONS[a.icon] && (
                 <Svg width={20} height={20} viewBox="0 0 24 24">
                   {ICONS[a.icon].map((d) => (
                     <Path

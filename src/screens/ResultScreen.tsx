@@ -971,7 +971,7 @@ export function ResultScreen() {
         })),
         {
           label: 'Voir le mur',
-          icon: 'metre' as const,
+          icon: 'regle' as const,
           onPress: () => {
             setElecWallId(f.wallId);
             setElecSel(f.id);
