@@ -42,6 +42,7 @@ import {
 import { fixtureMarks, multiWire, schemaRows } from '../geometry/schema';
 import { planRoutes } from '../geometry/elecplan';
 import { floorsOf, useScanStore } from '../store/scanStore';
+import { useAccountStore } from '../store/accountStore';
 import { deviceNames } from '../geometry/naming';
 import { PromptSheet, type PromptData } from '../components/Sheet';
 import type { CeilingFixture } from '../geometry/ceiling';
@@ -404,7 +405,12 @@ const styles = getStyles(c);
     setVues((liste) => liste.map((_, i) => ({ ...angleSuivant(i) })));
   };
 
+  const exportOuvert = useAccountStore((st) => st.exportOuvert);
+
   const doExport = async () => {
+    /* L'invité regarde, le compte exporte : la barrière est ici — voir
+       `exportOuvert`. */
+    if (!exportOuvert()) return;
     try {
       /**
        * Les photos, relues et réduites AVANT de bâtir le document.

@@ -14,10 +14,19 @@
  *     formulaire repart — le mur de connexion est l'écran où l'on perd le
  *     plus de monde, et on le montrait AVANT la première seconde d'usage.
  *
- * CE QUE L'INVITÉ N'EST PAS : un contournement. Le palier gratuit se
- * compte PAR APPAREIL (le marqueur du trousseau), pas par compte — un
- * invité qui a relevé son logement gratuit est au même palier qu'un
- * connecté. C'est la contre-épreuve la plus importante de ce banc.
+ * LA BARRIÈRE DE L'INVITÉ EST L'EXPORT, PAS LA CRÉATION — relevé du
+ * patron : « on doit pouvoir scan des plans mais sans pouvoir rien
+ * exporter. Si un "continuer sans compte" fait un scan et cherche à
+ * exporter, on lui propose de créer un compte pour l'ouvrir avec.
+ * Cependant son compte sera à 0 scan possible par la suite. »
+ *
+ * L'invité scanne donc LIBREMENT — plus d'offre −20 % à la première porte
+ * (le premier réglage bloquait ses portes dès que l'appareil avait un
+ * essai consommé : on entrait « sans compte » et on tombait sur les
+ * offres). Mais chaque relevé CONTINUE de se compter au marqueur de
+ * l'appareil : le compte créé ensuite naît avec son essai déjà consommé —
+ * zéro relevé gratuit restant. L'invité n'est pas un contournement, c'est
+ * un paiement différé du même palier.
  */
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn(async () => null),
@@ -48,6 +57,9 @@ import TestRenderer, { act } from 'react-test-renderer';
 import { SignInScreen } from '../src/screens/SignInScreen';
 import { ProfilScreen } from '../src/screens/ProfilScreen';
 import { useAccountStore } from '../src/store/accountStore';
+import { useAlerte } from '../src/ui/alerte';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 let arbre: TestRenderer.ReactTestRenderer | null = null;
 afterEach(() => {
@@ -134,12 +146,14 @@ describe('le profil de l’invité', () => {
   });
 });
 
-describe('l’invité n’est pas un contournement', () => {
-  it('le palier gratuit vaut pour lui comme pour un connecté', () => {
+describe('l’invité scanne librement, et paie à l’export', () => {
+  it('les portes de création s’ouvrent, même l’essai de l’appareil consommé', () => {
     /*
-      LE PALIER EST À L'APPAREIL, PAS AU COMPTE — c'est déjà sa règle
-      (supprimer-recréer un compte ne le remet pas à zéro), et l'invité
-      s'y range : un logement gratuit relevé, et c'est l'offre qui parle.
+      LE BUG DU PREMIER RÉGLAGE, mot pour mot : « j'ai fait continuer sans
+      compte à l'ouverture de l'app, et je vois directement les offres
+      -20 % ». L'appareil avait déjà un essai au compteur, chaque porte
+      consultait le palier, et l'invité tombait sur l'offre avant d'avoir
+      rien fait. Sa porte à lui est plus loin — à l'export.
     */
     act(() =>
       useAccountStore.setState({
@@ -150,6 +164,74 @@ describe('l’invité n’est pas un contournement', () => {
         bonusEssais: 0,
       }),
     );
+    expect(useAccountStore.getState().peutCreerPlan()).toBe(true);
+  });
+
+  it('mais ses relevés se comptent : le compte créé ensuite naît à zéro', () => {
+    act(() =>
+      useAccountStore.setState({
+        invite: true,
+        compte: null,
+        pro: false,
+        plansUtilises: 0,
+        bonusEssais: 0,
+      }),
+    );
+    // Le relevé de l'invité passe par le même compteur que tout le monde.
+    act(() => useAccountStore.getState().noterPlanCree());
+    expect(useAccountStore.getState().plansUtilises).toBe(1);
+    // Il crée son compte : l'essai de l'appareil est déjà consommé —
+    // « son compte sera à 0 scan possible par la suite ».
+    act(() =>
+      useAccountStore.setState({
+        compte: { id: 'email:a@b.fr', email: 'a@b.fr', methode: 'email' },
+      }),
+    );
     expect(useAccountStore.getState().peutCreerPlan()).toBe(false);
+  });
+
+  it('l’export se refuse à l’invité, et lui propose LE compte', () => {
+    act(() =>
+      useAccountStore.setState({ invite: true, compte: null, pro: false }),
+    );
+    expect(useAccountStore.getState().exportOuvert()).toBe(false);
+    // La proposition est posée — pas un refus sec : le plan est prêt, le
+    // compte est la clé qui l'ouvre.
+    const q = useAlerte.getState().courante;
+    expect(q).toBeTruthy();
+    expect(`${q!.titre} ${q!.message ?? ''}`).toMatch(/compte/i);
+    const creer = q!.actions?.find((a) => /compte/i.test(a.label));
+    expect(creer).toBeTruthy();
+    act(() => creer!.onPress?.());
+    // Le drapeau retombe : la porte d'entrée montre l'écran de connexion,
+    // et l'on revient exactement là où l'export attendait.
+    expect(useAccountStore.getState().invite).toBe(false);
+  });
+
+  it('avec un compte, l’export s’ouvre sans un mot', () => {
+    act(() => {
+      useAlerte.setState({ courante: null, file: [] });
+      useAccountStore.setState({
+        invite: false,
+        compte: { id: 'email:a@b.fr', email: 'a@b.fr', methode: 'email' },
+      });
+    });
+    expect(useAccountStore.getState().exportOuvert()).toBe(true);
+    expect(useAlerte.getState().courante).toBeNull();
+  });
+
+  it('et CHAQUE chemin d’export consulte la barrière', () => {
+    /*
+      PAR LA MESURE, comme `motsclairs` : cinq gestes sortent un livrable
+      du plan — le dossier PDF, le modèle 3D, le PDF matériel, le métré
+      CSV, le DXF. Un seul qui oublierait la barrière, et l'invité
+      exporterait par cette porte-là. On lit le code source des deux
+      écrans : chaque fonction de partage commence par la consulter.
+    */
+    const src =
+      readFileSync(join(__dirname, '..', 'src', 'screens', 'ResultScreen.tsx'), 'utf8') +
+      readFileSync(join(__dirname, '..', 'src', 'screens', 'ExportScreen.tsx'), 'utf8');
+    const gardes = src.match(/if \(!exportOuvert\(\)\) return;/g) ?? [];
+    expect(gardes.length).toBeGreaterThanOrEqual(5);
   });
 });

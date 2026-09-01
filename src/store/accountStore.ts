@@ -33,6 +33,7 @@ import {
   type DeviceMarker,
 } from '../native/account';
 import { SERVEUR } from '../config/serveur';
+import { alerte } from '../ui/alerte';
 
 /**
  * L'API du serveur, quand il est configuré. OFFLINE-FIRST : cinq secondes
@@ -207,6 +208,14 @@ interface AccountState {
   acheterPro: (offre?: Offre) => Promise<void>;
   restaurerPro: () => Promise<boolean>;
   peutCreerPlan: () => boolean;
+  /**
+   * LA BARRIÈRE DE L'INVITÉ EST L'EXPORT — relevé du patron : « on doit
+   * pouvoir scan des plans mais sans pouvoir rien exporter. Si un
+   * "continuer sans compte" cherche à exporter, on lui propose de créer un
+   * compte pour l'ouvrir avec. » Rend vrai si l'export peut partir ; sinon
+   * pose la proposition de compte et rend faux.
+   */
+  exportOuvert: () => boolean;
   noterPlanCree: () => void;
   ouvrirPaywall: () => void;
   fermerPaywall: () => void;
@@ -558,7 +567,38 @@ export const useAccountStore = create<AccountState>((set, get) => ({
 
   peutCreerPlan: () => {
     const s = get();
+    /*
+      L'INVITÉ SCANNE LIBREMENT — relevé du patron : « on doit pouvoir scan
+      des plans mais sans pouvoir rien exporter ». Sa barrière est plus
+      loin, à l'export (`exportOuvert`). Et ce n'est pas un contournement :
+      chaque relevé passe par `noterPlanCree` comme les autres — le compte
+      créé ensuite naît avec l'essai de l'appareil déjà consommé, « à 0
+      scan possible par la suite ».
+
+      C'était aussi LE bug du premier réglage : l'appareil avait un essai
+      au compteur, chaque porte consultait le palier, et l'invité tombait
+      sur l'offre −20 % avant d'avoir rien fait.
+    */
+    if (!s.compte && s.invite) return true;
     return s.pro || s.plansUtilises < PLANS_GRATUITS + s.bonusEssais;
+  },
+
+  exportOuvert: () => {
+    const s = get();
+    if (s.compte) return true;
+    // Pas un refus sec : le plan est prêt, le compte est la clé qui
+    // l'ouvre — et l'on revient exactement là où l'export attendait,
+    // puisque l'écran du magasin de plans ne change pas.
+    alerte(
+      'Créez un compte pour exporter',
+      'Votre plan est prêt. Un compte gratuit sert à l’ouvrir en PDF, ' +
+        'CSV ou DXF — et à retrouver vos plans après une réinstallation.',
+      [
+        { label: 'Plus tard' },
+        { label: 'Créer mon compte', onPress: () => get().quitterInvite() },
+      ],
+    );
+    return false;
   },
 
   noterPlanCree: () => {

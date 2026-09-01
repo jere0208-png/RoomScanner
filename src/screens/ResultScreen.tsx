@@ -127,6 +127,7 @@ import {
 } from '../geometry/electrical';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useScanStore } from '../store/scanStore';
+import { useAccountStore } from '../store/accountStore';
 import { demarrerComplement, demarrerEtage } from '../native/useRoomScan';
 import { DiagnosticSheet, type Constat } from '../components/DiagnosticSheet';
 import { ClientTour } from '../components/ClientTour';
@@ -1302,6 +1303,8 @@ export function ResultScreen() {
   /** Capture la vue affichée (2D ou 3D) en PNG — avec watermark EchoPlan —
    *  et ouvre le partage. Le watermark n'apparaît que sur l'image. */
   const [capturing, setCapturing] = useState(false);
+  const exportOuvert = useAccountStore((st) => st.exportOuvert);
+
   const shareImage = async () => {
     try {
       setCapturing(true);
@@ -1325,6 +1328,9 @@ export function ResultScreen() {
    * lui, ignore toutes les retouches ; il reste accessible par « Modèle AR ».
    */
   const shareObj = async () => {
+    /* L'invité regarde, le compte exporte : la barrière est ici — voir
+       `exportOuvert`. */
+    if (!exportOuvert()) return;
     try {
       const obj = buildObj(
         { walls, openings, objects, rooms, fixtures },
@@ -1342,6 +1348,9 @@ export function ResultScreen() {
    * n'a donc rien à ressaisir.
    */
   const shareMaterial = async () => {
+    /* L'invité regarde, le compte exporte : la barrière est ici — voir
+       `exportOuvert`. */
+    if (!exportOuvert()) return;
     try {
       const list = materialList(
         roomInputs,
@@ -1379,6 +1388,9 @@ export function ResultScreen() {
    * murale, qui commandent les saignées, les plinthes et les gaines.
    */
   const shareCsv = async () => {
+    /* L'invité regarde, le compte exporte : la barrière est ici — voir
+       `exportOuvert`. */
+    if (!exportOuvert()) return;
     try {
       const list = materialList(
         roomInputs,
@@ -1432,6 +1444,9 @@ export function ResultScreen() {
     pièces du bas, et personne ne saurait les démêler.
   */
   const shareDxf = async () => {
+    /* L'invité regarde, le compte exporte : la barrière est ici — voir
+       `exportOuvert`. */
+    if (!exportOuvert()) return;
     try {
       await RoomScan.shareText(
         buildDxf({ walls, openings, rooms, fixtures, objects }),

@@ -12595,6 +12595,39 @@ de geste attrapait un `Pressable` de la fenêtre au lieu du `PanResponder`
 et `findAll` rendait le réticule en trois exemplaires (composite ET natifs
 — on ne compte que le composant).
 
+### L'invité scanne librement, et paie à l'export
+
+Relevé du patron, après le premier essai de la porte sans compte : « j'ai
+fait continuer sans compte à l'ouverture de l'app, et je vois directement
+les offres −20 %. On doit pouvoir scan des plans mais sans pouvoir rien
+exporter. Si un "continuer sans compte" fait un scan et cherche à exporter,
+on lui propose de créer un compte pour l'ouvrir avec. Cependant son compte
+sera à 0 scan possible par la suite. »
+
+**Le bug d'abord** : l'appareil du patron avait déjà un essai au compteur —
+chaque porte de création consultait le palier, et l'invité tombait sur
+l'offre −20 % avant d'avoir rien fait. Le mur de connexion percé, on en
+avait dressé un autre trois mètres plus loin.
+
+**La règle nouvelle, celle du relevé** : la barrière de l'invité DÉMÉNAGE —
+de la création vers l'export.
+
+- **il scanne et trace librement** (`peutCreerPlan` le laisse passer), sans
+  offre ni popup : il découvre le cœur de l'app, ce que la porte « sans
+  compte » promettait ;
+- **il n'exporte rien** : les cinq livrables du plan — dossier PDF, modèle
+  3D, PDF matériel, métré CSV, DXF — consultent `exportOuvert`, qui pose la
+  proposition : « Créez un compte pour exporter. Votre plan est prêt. » Un
+  appui, l'écran de connexion ; le compte créé, on revient exactement là où
+  l'export attendait (l'écran du magasin de plans n'a pas changé). La photo
+  de repérage, elle, reste partageable : c'est la sienne, pas un livrable ;
+- **et ce n'est pas un contournement** : chaque relevé d'invité passe par
+  le compteur de l'appareil comme les autres. Le compte créé ensuite naît
+  avec l'essai déjà consommé — « à 0 scan possible par la suite » — et
+  c'est l'annonce d'entrée existante qui le lui dit à la connexion. Un banc
+  tient l'arithmétique, un autre lit le code source des deux écrans
+  d'export : cinq gardes, pas une de moins.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro
