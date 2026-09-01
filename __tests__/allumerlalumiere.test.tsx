@@ -400,6 +400,32 @@ describe('un va-et-vient se prouve depuis les deux bouts', () => {
     expect(halos(t)).toHaveLength(0);
   });
 
+  it('un tap reste un tap, même derrière un thread occupé', () => {
+    /*
+      LE FANTÔME DE LA CI, attrapé en vert local et rouge machine chargée :
+      la fenêtre du tap se mesurait à l'HORLOGE RÉELLE (`Date.now() − t0 <
+      500 ms`). Sur une CI sous charge — ou sur un téléphone dont le thread
+      JS digère une grosse scène —, le relâcher est TRAITÉ une seconde
+      après l'appui alors que le doigt n'a touché qu'un dixième : le tap
+      était requalifié en appui long, et l'interrupteur restait muet.
+
+      Le geste se mesure désormais aux horodatages DES ÉVÉNEMENTS : le
+      temps du doigt, pas celui de la machine qui les traite.
+    */
+    const t = monter();
+    const vraiNow = Date.now;
+    try {
+      // La machine met dix secondes à traiter — le doigt, un instant
+      // (les horodatages du banc datent l'appui et le relâcher pareil).
+      let horloge = vraiNow();
+      Date.now = () => (horloge += 10_000);
+      taper(t, cible(t, 'i1').props.cx, cible(t, 'i1').props.cy);
+    } finally {
+      Date.now = vraiNow;
+    }
+    expect(halos(t)).toHaveLength(1);
+  });
+
   it('et dans l’autre sens, évidemment', () => {
     const t = monter();
     taper(t, cible(t, 'i2').props.cx, cible(t, 'i2').props.cy);

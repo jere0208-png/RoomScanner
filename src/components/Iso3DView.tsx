@@ -727,7 +727,15 @@ export function Iso3DView({
           x: e.nativeEvent.locationX,
           y: e.nativeEvent.locationY,
           multi: t.length >= 2,
-          t0: Date.now(),
+          /*
+            LE TEMPS DU DOIGT, PAS CELUI DE LA MACHINE. La fenêtre du tap se
+            mesurait à `Date.now()` : sur un thread JS occupé — une grosse
+            scène à digérer, une CI sous charge —, le relâcher est TRAITÉ
+            une seconde après l'appui alors que le doigt n'a touché qu'un
+            dixième, et le tap était requalifié en appui long. Les
+            horodatages des événements tactiles, eux, datent le geste.
+          */
+          t0: e.nativeEvent.timestamp ?? Date.now(),
         };
         baseRef.current = {
           v: viewRef.current,
@@ -791,7 +799,7 @@ export function Iso3DView({
           });
         }
       },
-      onPanResponderRelease: (_e, g) => {
+      onPanResponderRelease: (e, g) => {
         setInteracting(false);
         // Tap simple (sans glisser) : cadrer la vue sur le mur touché.
         //
@@ -805,7 +813,7 @@ export function Iso3DView({
           !geste.multi &&
           baseRef.current.mode === 'rotate' &&
           estUnTap(g.dx, g.dy) &&
-          Date.now() - geste.t0 < 500
+          (e.nativeEvent.timestamp ?? Date.now()) - geste.t0 < 500
         ) {
           basculerRef.current?.(geste.x, geste.y);
         }

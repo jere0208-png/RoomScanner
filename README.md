@@ -12628,6 +12628,27 @@ de la création vers l'export.
   tient l'arithmétique, un autre lit le code source des deux écrans
   d'export : cinq gardes, pas une de moins.
 
+### Le fantôme de la CI : un tap chronométré à la mauvaise horloge
+
+L'expédition de la règle invité a rougi en CI sur `allumerlalumiere` — un
+banc vert cinq fois sur cinq en local. Le fantôme classique, et il a
+échappé à tout le monde jusqu'à ce qu'une machine chargée le montre : la
+fenêtre du tap de la vue 3D se mesurait à l'HORLOGE RÉELLE
+(`Date.now() − t0 < 500 ms`). Sur une CI sous charge — ou sur un téléphone
+dont le thread JS digère une grosse scène —, le relâcher est TRAITÉ une
+seconde après l'appui alors que le doigt n'a touché qu'un dixième : le tap
+était requalifié en appui long, et l'interrupteur restait muet.
+
+Ce n'était donc pas un banc fragile, c'était un DÉFAUT D'APPAREIL attrapé
+par la CI : le même utilisateur, sur un logement lourd, verrait ses taps
+avalés. Le geste se mesure désormais aux horodatages DES ÉVÉNEMENTS
+tactiles — le temps du doigt, pas celui de la machine qui les traite. Le
+banc rejoue le scénario en avançant l'horloge de dix secondes entre l'appui
+et le relâcher : le tap tient.
+
+Balayé dans la foulée : aucune autre fenêtre de geste ne lit `Date.now()` —
+celle-ci était la seule.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro
