@@ -791,6 +791,17 @@ export function ResultScreen() {
   const [showVolumes, setShowVolumes] = useState(false);
   /* La tombée du jour sur la maquette : un état de VISITE, jamais du plan. */
   const [nuit, setNuit] = useState(false);
+  /*
+    LA LEVÉE EST DUE UNE SEULE FOIS, sur le plan qui sort d'un scan.
+
+    Un `ref` et non un état : le lire ne doit pas re-rendre l'écran, et sa
+    valeur est consommée par la vue au moment où elle se monte. Le drapeau
+    tombe dès qu'elle a servi.
+  */
+  const leveeDue = useRef(false);
+  useEffect(() => {
+    leveeDue.current = resultOrigin === 'scan' && !currentSaveId;
+  }, [resultOrigin, currentSaveId]);
   /** Appareil de plafond en attente de pose : on touche la pièce qui le reçoit. */
   const [pendingCeiling, setPendingCeiling] = useState<CeilingKind | null>(null);
   /** On attend le point où poser un mot sur le plan. */
@@ -3579,6 +3590,16 @@ export function ResultScreen() {
             showCeiling={showCeiling}
             showVolumes={showVolumes}
             nuit={nuit}
+            /*
+              LE LOGEMENT SE LÈVE, UNE FOIS, AU RETOUR D'UN SCAN.
+
+              C'est le moment fort du produit : on vient de balayer un
+              logement, la maquette se construit sous les yeux. Elle ne
+              rejoue pas — ni au retour du plan vers le volume, ni sur un
+              dossier rouvert depuis la bibliothèque : une animation qu'on
+              revoit dix fois devient une attente.
+            */
+            leveeAuMontage={leveeDue.current}
             /* On touche une prise, ses sœurs du même départ s'entourent — et
                le tableau avec elles. Les circuits sont ceux du dossier, pas
                un découpage refait dans la vue : voir `circuitsDuPlan`.

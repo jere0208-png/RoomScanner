@@ -12979,6 +12979,32 @@ Trois gardes, et chacune vaut son poids :
   devient un clignotant. Et la récompense appartient AU PLAN : ouvrir un
   autre dossier rend sa fête au suivant.
 
+### 4/10 — Le logement se lève : le récap de fin de relevé
+
+Après un scan, on ne tombe plus sur une maquette déjà debout : les murs
+MONTENT du sol en une seconde, et le logement qu'on vient de relever se
+construit sous les yeux. C'est le moment le plus fort du produit — celui
+qu'on montre à quelqu'un.
+
+**Et il ne coûte presque rien, parce qu'on anime la PROJECTION.** Rebâtir
+la scène à chaque image pour faire monter des murs, c'est jouer quarante
+fois le calcul le plus lourd de la vue — l'accueil l'avait appris en
+animant sa maquette. Ici, chaque point est simplement projeté PLUS BAS tant
+que la levée n'est pas finie : le sol reste où il est, tout ce qui est
+dessus s'écrase vers lui, rien n'est reconstruit — et les meubles montent
+avec leurs murs.
+
+**La courbe vit à part** (`ui/levee`) parce qu'elle se MESURE : un banc
+vérifie qu'elle part du sol, finit d'aplomb, ne redescend jamais et ne
+dépasse pas. Trois lignes perdues dans un rendu de trois mille ne se
+vérifient pas — et une levée qui redescend d'un cheveu se lit comme un
+tremblement. Départ franc, arrivée douce : le geste d'un plan qu'on relève,
+celui que la vue emploie déjà pour s'incliner.
+
+**Elle ne se joue qu'une fois**, sur le plan qui sort d'un scan : ni au
+retour du plan vers le volume, ni sur un dossier rouvert depuis la
+bibliothèque. Une animation qu'on revoit dix fois devient une attente.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

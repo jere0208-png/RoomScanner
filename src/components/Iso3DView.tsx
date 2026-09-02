@@ -62,6 +62,7 @@ import {
   wetZones,
   type WetZone,
 } from '../geometry/volumes';
+import { DUREE_LEVEE, hauteurLevee } from '../ui/levee';
 import { ECLAT_LAMPE,
   MAQUETTE,
   crepuscule,
@@ -275,6 +276,14 @@ interface Props {
    */
   nuit?: boolean;
   /**
+   * LE LOGEMENT SE LÈVE À L'OUVERTURE — le récap de fin de relevé.
+   *
+   * Les murs montent du sol en une seconde, et le logement qu'on vient de
+   * relever se construit sous les yeux. Ce n'est pas un ornement : c'est le
+   * moment qu'on montre à quelqu'un. Voir `ui/levee`.
+   */
+  leveeAuMontage?: boolean;
+  /**
    * L'ŒIL DANS LE LOGEMENT, au lieu de la maquette vue de loin.
    *
    * Quand cette caméra est fournie, la vue passe en PERSPECTIVE : on se tient
@@ -411,6 +420,7 @@ export function Iso3DView({
   showCeiling = true,
   showVolumes = false,
   nuit = false,
+  leveeAuMontage = false,
   cableRoutes,
   routeHeights,
   cutaway,
@@ -601,6 +611,30 @@ export function Iso3DView({
   const [allumees, setAllumees] = useState<ReadonlySet<string>>(
     () => new Set<string>(),
   );
+  /**
+   * LA LEVÉE DU MODÈLE — de 0 (à plat) à 1 (d'aplomb).
+   *
+   * Elle est pilotée DEPUIS JAVASCRIPT, et c'est voulu : elle change la
+   * PROJECTION, donc la géométrie à l'écran, et le pilote natif ne sait pas
+   * animer ça. C'est la même mécanique que la maquette de l'accueil — le
+   * seul endroit de l'app où l'on assume une horloge JS, parce qu'elle dure
+   * une seconde et ne se rejoue pas.
+   */
+  const [leve, setLeve] = useState(leveeAuMontage ? 0 : 1);
+  useEffect(() => {
+    if (!leveeAuMontage) {
+      setLeve(1);
+      return;
+    }
+    const depart = Date.now();
+    setLeve(hauteurLevee(0));
+    const h = setInterval(() => {
+      const t = Date.now() - depart;
+      setLeve(hauteurLevee(t));
+      if (t >= DUREE_LEVEE) clearInterval(h);
+    }, 33);
+    return () => clearInterval(h);
+  }, [leveeAuMontage]);
   /**
    * LE DÉPART D'UN APPAREIL — index dressé une fois pour toutes.
    *
@@ -1105,9 +1139,24 @@ export function Iso3DView({
       proche, mêmes couleurs.
     */
     const perspective = pov ? povProjector(pov, layout) : null;
-    const project = perspective
-      ? (p: P3) => perspective(p)
-      : (p: P3) => {
+    /*
+      LA LEVÉE SE FAIT ICI, ET NULLE PART AILLEURS.
+
+      Chaque point est projeté PLUS BAS tant que le modèle monte : le sol
+      reste où il est, tout ce qui est dessus s'écrase vers lui. Rebâtir la
+      scène à chaque image aurait joué quarante fois le calcul le plus lourd
+      de la vue — l'accueil l'avait appris en animant sa maquette. Ici, rien
+      n'est reconstruit, et les meubles montent avec leurs murs.
+    */
+    const leverY = (p: P3): P3 =>
+      leve >= 1 ? p : { ...p, y: scene.floorY + (p.y - scene.floorY) * leve };
+    const perspectiveLevee = perspective
+      ? (p: P3) => perspective(leverY(p))
+      : null;
+    const project = perspectiveLevee
+      ? (p0: P3) => perspectiveLevee(p0)
+      : (p0: P3) => {
+      const p = leverY(p0);
       const x = p.x - center.x;
       const y = p.y - center.y;
       const z = p.z - center.z;
@@ -2053,6 +2102,7 @@ export function Iso3DView({
     };
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, [
+    leve,
     scene,
     faces,
     fixtures,
