@@ -33,6 +33,8 @@ import {
 export type ToolIcon =
   /* La nuit de la maquette : on éteint pour voir les lumières s'allumer. */
   | 'lune'
+  /* La visite guidée : le logement qui se raconte tout seul. */
+  | 'baguette'
   | 'plafond'
   | 'note'
   | 'save'

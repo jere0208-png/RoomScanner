@@ -50,6 +50,7 @@ import { deviceNames, wallCardinal } from '../geometry/naming';
 import { fixturePlacement, roomInputsOf } from '../geometry/nfc15100';
 import { useScanStore } from '../store/scanStore';
 import { pluriel } from '../ui/mots';
+import { prendreLaVeille } from '../ui/veille';
 
 /** Un moment de la visite : une caméra d'arrivée, un carton, une durée. */
 interface Etape {
@@ -150,9 +151,19 @@ function azimutFaceAuMur(wall: WallSeg, centre: Pt): number {
 export function ClientTour({
   visible,
   onClose,
+  nuit = false,
 }: {
   visible: boolean;
   onClose: () => void;
+  /**
+   * LA VISITE HÉRITE DE LA NUIT.
+   *
+   * Le mode nuit allume les luminaires pour de vrai. La visite se jouait
+   * toujours en plein jour : l'installation qu'on vient de concevoir ne se
+   * montrait jamais ALLUMÉE, ce qui est pourtant la seule chose qu'un
+   * client comprend d'un plan électrique.
+   */
+  nuit?: boolean;
 }) {
   const c = useTheme();
   const styles = getStyles(c);
@@ -162,6 +173,24 @@ export function ClientTour({
   const ceiling = useScanStore((s) => s.ceiling);
   const north = useScanStore((s) => s.north);
   const scanName = useScanStore((s) => s.scanName);
+
+  /*
+    L'ÉCRAN NE S'ÉTEINT PAS PENDANT QU'ON MONTRE.
+
+    On tend le téléphone au client, on retire la main — et iOS baisse la
+    luminosité au bout de trente secondes. Le seul geste qui sauvait la
+    visite consistait à retoucher l'écran, c'est-à-dire à interrompre
+    exactement ce qu'on était en train de montrer. Voir `ui/veille`.
+
+    Le nettoyage rend la veille dans TOUS les cas — fermeture, mais aussi
+    démontage en pleine visite (un appel entrant, un retour arrière) : une
+    veille oubliée vide le téléphone dans la poche, et personne ne fait le
+    rapprochement deux heures plus tard.
+  */
+  useEffect(() => {
+    if (!visible) return;
+    return prendreLaVeille();
+  }, [visible]);
 
   /**
    * LE SCÉNARIO, tiré du plan lui-même.
@@ -628,6 +657,9 @@ export function ClientTour({
         <Iso3DView
           pov={pov}
           value={vue}
+          /* La visite se joue à l'heure de la maquette : de nuit, on montre
+             l'installation ALLUMÉE. */
+          nuit={nuit}
           showMeasures={false}
           showElecTags={!!etape.mur}
           showNorth={false}

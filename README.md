@@ -13060,6 +13060,46 @@ porte pour cela `collapsable={false}` — une vue fondue par le compilateur
 n'a pas de contrepartie native à mesurer. C'est la seule ligne qui change
 dans les planches de rendu de référence : le dessin, lui, est identique.
 
+### 6/10 — La présentation client, sortie de son tiroir
+
+La visite guidée existait déjà, et bien : le logement tourne, la caméra
+s'arrête sur chaque pièce puis se place face à chaque mur équipé, un carton
+nomme les appareils. Ce qui manquait n'était pas la visite — c'était tout
+ce qui l'entoure.
+
+**L'écran s'éteignait pendant la visite.** C'est LE défaut d'un mode
+présentation, et il ne se voit qu'en s'en servant : on tend le téléphone au
+client, on retire la main de l'écran — et iOS baisse la luminosité au bout
+de trente secondes, puis verrouille. Une visite dure plus que ça, et le seul
+geste qui la sauvait consistait à retoucher l'écran, c'est-à-dire à
+interrompre exactement ce qu'on montrait. `ui/veille` retient l'écran, et
+`RoomScanEcran` porte la ligne d'UIKit.
+
+Ce qui mérite d'être écrit, c'est ce qui l'entoure :
+
+- **On compte les preneurs**, et le natif n'entend que les passages de zéro.
+  Une veille prise deux fois et rendue une fois doit rester tenue.
+- **Rendre deux fois ne compte qu'une** : sans cette garde, un `useEffect`
+  nettoyé deux fois ferait passer le compteur sous zéro, et l'écran ne se
+  rallumerait plus de toute la session — le téléphone se vide dans la poche,
+  et personne ne fait le rapprochement deux heures plus tard.
+- **Le natif relâche à la mise en arrière-plan** quoi qu'ait dit le
+  JavaScript, qui peut très bien ne jamais reprendre la main (un appel
+  entrant, une application tuée). Le drapeau retrouve sa valeur au retour.
+- **La visite rend sa veille au démontage**, pas seulement à la fermeture.
+
+**Elle était enterrée sous « Exporter »** — trois appuis et une attente pour
+le moment le plus fort du produit. Une pastille « Visite » la lance depuis
+la barre de la 3D, là où l'on est déjà quand on veut montrer quelque chose.
+Son entrée par l'export reste : c'est là qu'on la cherche quand on prépare
+un envoi.
+
+**Elle ignorait la nuit.** Le mode nuit (1/10) allume les luminaires pour de
+vrai ; la visite se jouait toujours en plein jour, et l'installation qu'on
+vient de concevoir ne se montrait donc jamais ALLUMÉE — la seule chose qu'un
+client comprenne d'un plan électrique. La pastille « Visite » est posée
+juste après « Nuit » pour que les deux se lisent ensemble.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

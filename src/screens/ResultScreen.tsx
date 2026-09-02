@@ -3839,6 +3839,9 @@ export function ResultScreen() {
             colorsAvailable={colorsAvailable}
             focusIdx={focusIdx}
             setFocusIdx={setFocusIdx}
+            /* La visite guidée se lance d'ici, plus seulement du fond de
+               l'export : c'est là qu'on est quand on veut montrer. */
+            onVisite={() => setVisite(true)}
           />
         )}
 
@@ -4864,7 +4867,13 @@ export function ResultScreen() {
       */}
 
       {/* La présentation, lancée depuis le menu « Exporter ». */}
-      <ClientTour visible={visite} onClose={() => setVisite(false)} />
+      <ClientTour
+        visible={visite}
+        onClose={() => setVisite(false)}
+        /* La visite se joue à l'heure de la maquette : de nuit, elle montre
+           l'installation allumée. */
+        nuit={nuit}
+      />
 
       {/* Transition vers l'export : ondes EchoPlan sur toute la page */}
       {transiting && (

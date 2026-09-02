@@ -445,6 +445,7 @@ export function Toolbar3D({
   colorsAvailable,
   focusIdx,
   setFocusIdx,
+  onVisite,
 }: Cadre & {
   showMeasures: boolean;
   setShowMeasures: (f: (v: boolean) => boolean) => void;
@@ -479,6 +480,16 @@ export function Toolbar3D({
   /** Pièce isolée en coupe (-1 = tout le logement). */
   focusIdx: number;
   setFocusIdx: (f: (i: number) => number) => void;
+  /**
+   * LA VISITE GUIDÉE, EN UN GESTE.
+   *
+   * Elle était enterrée sous « Exporter » — trois appuis et une attente pour
+   * le moment le plus fort du produit, celui où l'on tend le téléphone. Elle
+   * se lance depuis ici, là où l'on est déjà quand on veut montrer quelque
+   * chose. Son entrée par l'export reste : c'est là qu'on la cherche quand
+   * on prépare un envoi.
+   */
+  onVisite: () => void;
 }) {
   const teinte = useTheme();
   const styles = getStyles(teinte);
@@ -563,6 +574,22 @@ export function Toolbar3D({
       label="Nuit"
       active={nuit}
       onPress={() => setNuit((v) => !v)}
+    />,
+    /*
+      LA VISITE GUIDÉE — elle se lance d'ici, pas du fond de l'export.
+
+      Elle est POSÉE APRÈS LA NUIT, et ce n'est pas un hasard : la visite
+      hérite de l'heure de la maquette, et les deux pastilles se lisent donc
+      ensemble — on éteint, puis on montre l'installation allumée.
+    */
+    <ToolPill
+      key="visite"
+      icon="baguette"
+      label="Visite"
+      /* Elle ne s'allume pas : ce n'est pas un calque qu'on laisse posé,
+         c'est un geste qui ouvre une fenêtre et se referme avec elle. */
+      active={false}
+      onPress={onVisite}
     />,
     /* Le plafond existe aussi en 3D : même calque, même bouton. */
     ceiling.length > 0 ? (
