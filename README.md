@@ -12895,6 +12895,33 @@ Le banc du mur uni a été RÉVISÉ en le disant : hier il jurait « la teinte
 que le scan a relevée » (la moyenne) ; la doctrine du pic le remplace, et
 le commentaire porte le nouveau relevé.
 
+### 1/10 — La nuit tombe, et les lumières s'allument vraiment
+
+Relevé du patron : « propose des améliorations modernisant l'app et la
+rendant plus ludique », puis « fais tout, un par un en prenant le temps de
+bien faire les finitions pour chaque ». Voici la première.
+
+**Tout existait sauf la nuit.** L'application savait déjà quoi allume quoi
+(les liens), tenait l'état des lampes allumées et posait leurs halos. Mais
+en plein jour, un halo ambre sur un sol crème ne se voit pas : on touchait
+un interrupteur, et « il ne se passait rien ». Le crépuscule n'ajoute donc
+aucune fonction — il crée la CONDITION pour que celles d'avant se voient.
+
+- **on descend la lumière, on garde la teinte** : un crépuscule qui vire au
+  bleu-gris refait l'écran technique que la maquette a fui. Le sable devient
+  une pénombre de sable ; les menuiseries, elles, n'y touchent pas — une
+  porte DÉSIGNE, ce n'est pas de la matière qu'on éteint ;
+- **la lampe éclaire plus fort la nuit** (`ECLAT_LAMPE`) : assombrir le bâti
+  en laissant les halos timides, c'est perdre des deux côtés. Les bornes
+  sont nommées à côté de la palette, et le banc mesure que la nuit éclaire
+  plus que le jour ;
+- **c'est un état de VISITE** : le relevé n'en sait rien, refermer la
+  maquette rallume le jour — la règle des lampes allumées, déjà écrite.
+
+`tsc` a corrigé la pastille en route : posée d'abord sur la barre du PLAN,
+il l'a refusée — une nuit n'a aucun sens sur un dessin vu de dessus. Elle
+vit sur la barre du VOLUME, comme le gabarit des volumes avant elle.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

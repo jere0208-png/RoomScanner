@@ -62,7 +62,9 @@ import {
   wetZones,
   type WetZone,
 } from '../geometry/volumes';
-import { MAQUETTE,
+import { ECLAT_LAMPE,
+  MAQUETTE,
+  crepuscule,
   matieresDesSols,
 } from '../ui/maquette';
 import { parImage } from '../ui/parImage';
@@ -265,6 +267,14 @@ interface Props {
    */
   showVolumes?: boolean;
   /**
+   * LA TOMBÉE DU JOUR — pour qu'on VOIE les lumières s'allumer.
+   *
+   * Un état de VISITE, comme les lampes allumées : on essaie l'installation
+   * comme sur un chantier fini, le relevé n'en sait rien, et fermer la
+   * maquette rallume le jour.
+   */
+  nuit?: boolean;
+  /**
    * L'ŒIL DANS LE LOGEMENT, au lieu de la maquette vue de loin.
    *
    * Quand cette caméra est fournie, la vue passe en PERSPECTIVE : on se tient
@@ -400,6 +410,7 @@ export function Iso3DView({
   showNorth = true,
   showCeiling = true,
   showVolumes = false,
+  nuit = false,
   cableRoutes,
   routeHeights,
   cutaway,
@@ -659,13 +670,19 @@ export function Iso3DView({
     boucle.start();
     return () => boucle.stop();
   }, [allumees.size, battement]);
+  /*
+    LA NUIT ÉCLAIRE PLUS FORT — voir `ECLAT_LAMPE`. Éteindre la maquette
+    sans rehausser les halos, c'est perdre des deux côtés : le bâti s'assombrit
+    et la lampe reste timide. Les bornes sont nommées et mesurées.
+  */
+  const eclatLampe = nuit ? ECLAT_LAMPE.nuit : ECLAT_LAMPE.jour;
   const scintille = battement.interpolate({
     inputRange: [0, 1],
-    outputRange: [0.28, 0.5],
+    outputRange: eclatLampe.nappe,
   });
   const halo2 = battement.interpolate({
     inputRange: [0, 1],
-    outputRange: [0.55, 0.8],
+    outputRange: eclatLampe.coeur,
   });
 
   /**
@@ -837,15 +854,20 @@ export function Iso3DView({
     Les menuiseries gardent les teintes du THÈME : elles ne décorent pas,
     elles désignent, et elles doivent rester les mêmes que sur le plan 2D.
   */
-  const palette: ScenePalette = useMemo(
-    () => ({
+  const palette: ScenePalette = useMemo(() => {
+    const jour: ScenePalette = {
       ...MAQUETTE,
       door: c.amber,
       window: c.sky,
       passage: c.blue,
-    }),
-    [c],
-  );
+    };
+    /*
+      LA NUIT EST UNE PALETTE, PAS UN CALQUE — voir `crepuscule`. On éteint
+      le bâti pour que les halos des lampes se voient enfin : l'application
+      savait déjà quoi allume quoi, il lui manquait la pénombre.
+    */
+    return nuit ? crepuscule(jour) : jour;
+  }, [c, nuit]);
 
   /**
    * LE MODÈLE DÉJÀ BÂTI SE RETROUVE, il ne se refait pas.

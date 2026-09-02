@@ -60,6 +60,68 @@ export const MAQUETTE: ScenePalette = {
 };
 
 /**
+ * LA MAQUETTE À LA TOMBÉE DU JOUR — pour qu'on VOIE les lumières s'allumer.
+ *
+ * L'application savait déjà quoi allume quoi, tenait l'état des lampes
+ * allumées et posait leurs halos. Mais en plein jour, un halo ambre sur un
+ * sol crème ne se voit pas : on touchait un interrupteur, et « il ne se
+ * passait rien ». Le crépuscule n'ajoute donc aucune fonction — il crée la
+ * CONDITION pour que celles d'avant se voient enfin.
+ *
+ * ON DESCEND LA LUMIÈRE, ON GARDE LA TEINTE. Un crépuscule qui vire au
+ * bleu-gris refait l'écran technique que la maquette a justement fui : le
+ * sable devient une pénombre de sable, le blanc cassé une paroi sourde. La
+ * conversion passe donc par la LUMINOSITÉ de chaque canal, pondérée pour
+ * garder la chaleur — et les menuiseries n'y touchent pas : une porte et
+ * une fenêtre DÉSIGNENT, elles ne sont pas de la matière qu'on éteint.
+ *
+ * La fonction est PURE : deux appels donnent la même nuit. Un rendu qui la
+ * recalcule ne s'enfonce pas dans le noir à chaque image.
+ */
+export function crepuscule(pal: ScenePalette): ScenePalette {
+  const eteindre = (hex: string, garde = 0.24): string => {
+    const n = parseInt(hex.replace('#', ''), 16);
+    const r = (n >> 16) & 255;
+    const g = (n >> 8) & 255;
+    const b = n & 255;
+    // Un fond de nuit très légèrement bleuté sous une teinte gardée chaude :
+    // c'est la lumière du soir, pas un filtre gris.
+    const melange = (v: number, fond: number) =>
+      Math.round(Math.max(0, Math.min(255, v * garde + fond)));
+    const hex2 = (v: number) => v.toString(16).padStart(2, '0');
+    return `#${hex2(melange(r, 16))}${hex2(melange(g, 15))}${hex2(melange(b, 20))}`;
+  };
+  return {
+    ...pal,
+    floor: eteindre(pal.floor),
+    floorStroke: eteindre(pal.floorStroke, 0.2),
+    wall: eteindre(pal.wall),
+    wallStroke: eteindre(pal.wallStroke, 0.2),
+    wallTop: eteindre(pal.wallTop, 0.28),
+    wallTopStroke: eteindre(pal.wallTopStroke, 0.2),
+    opening: eteindre(pal.opening),
+    object: eteindre(pal.object),
+    objectTop: eteindre(pal.objectTop, 0.28),
+    objectStroke: eteindre(pal.objectStroke, 0.2),
+  };
+}
+
+/**
+ * L'ÉCLAT D'UNE LAMPE ALLUMÉE — deux jeux, selon l'heure.
+ *
+ * De jour, un halo doit se deviner sans manger la maquette : on reste
+ * discret. De NUIT, c'est l'inverse — la lampe est la seule chose qui
+ * éclaire, et un halo timide dans une pénombre se lit comme une panne. Les
+ * bornes vivent ici, à côté de la palette qu'elles accompagnent, pour être
+ * mesurables : le banc vérifie que la nuit éclaire PLUS que le jour, ce
+ * qu'une paire de nombres perdus dans un rendu ne garantirait pas.
+ */
+export const ECLAT_LAMPE = {
+  jour: { nappe: [0.28, 0.5] as [number, number], coeur: [0.55, 0.8] as [number, number] },
+  nuit: { nappe: [0.5, 0.78] as [number, number], coeur: [0.8, 0.98] as [number, number] },
+};
+
+/**
  * L'AMBRE DU MOBILIER MOELLEUX.
  *
  * Lits, canapés, fauteuils : ce qui accueille le corps. Sur la maquette du

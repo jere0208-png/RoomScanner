@@ -788,6 +788,8 @@ export function ResultScreen() {
     masquerait ce qu'il sert à vérifier.
   */
   const [showVolumes, setShowVolumes] = useState(false);
+  /* La tombée du jour sur la maquette : un état de VISITE, jamais du plan. */
+  const [nuit, setNuit] = useState(false);
   /** Appareil de plafond en attente de pose : on touche la pièce qui le reçoit. */
   const [pendingCeiling, setPendingCeiling] = useState<CeilingKind | null>(null);
   /** On attend le point où poser un mot sur le plan. */
@@ -3558,6 +3560,7 @@ export function ResultScreen() {
             showNorth={showNorth}
             showCeiling={showCeiling}
             showVolumes={showVolumes}
+            nuit={nuit}
             /* On touche une prise, ses sœurs du même départ s'entourent — et
                le tableau avec elles. Les circuits sont ceux du dossier, pas
                un découpage refait dans la vue : voir `circuitsDuPlan`.
@@ -3659,6 +3662,8 @@ export function ResultScreen() {
             setShowCeiling={setShowCeiling}
             showVolumes={showVolumes}
             setShowVolumes={setShowVolumes}
+            nuit={nuit}
+            setNuit={setNuit}
             zonesHumides={zonesHumides}
             showElecTags={showElecTags}
             setShowElecTags={setShowElecTags}

@@ -437,6 +437,8 @@ export function Toolbar3D({
   setShowCeiling,
   showVolumes,
   setShowVolumes,
+  nuit,
+  setNuit,
   zonesHumides,
   showElecTags,
   setShowElecTags,
@@ -450,6 +452,15 @@ export function Toolbar3D({
   setShowNorth: (f: (v: boolean) => boolean) => void;
   showCeiling: boolean;
   setShowCeiling: (v: boolean) => void;
+  /**
+   * LA TOMBÉE DU JOUR — l'essai de l'installation, pour de vrai.
+   *
+   * On éteint la maquette, et toucher un interrupteur allume ce qu'il
+   * commande. Un état de VISITE : le relevé n'en sait rien, et refermer la
+   * maquette rallume le jour.
+   */
+  nuit: boolean;
+  setNuit: (f: (v: boolean) => boolean) => void;
   /**
    * LE GABARIT DES VOLUMES DE SALLE D'EAU — et de quoi savoir s'il existe.
    *
@@ -533,6 +544,26 @@ export function Toolbar3D({
         onPress={() => setShowVolumes(!showVolumes)}
       />
     ) : null,
+    /*
+      LA NUIT — la pastille qui rend l'installation VIVANTE.
+
+      On éteint la maquette et l'on touche un interrupteur : ce qu'il
+      commande s'allume pour de bon. Tout existait déjà — les liens, l'état
+      des lampes, leurs halos —, il manquait la PÉNOMBRE pour que ça se
+      voie : en plein jour, un halo ambre sur un sol crème ne dit rien.
+
+      Elle vit sur la barre du VOLUME, jamais sur celle du plan : sur un
+      dessin vu de dessus, une nuit ne veut rien dire. (La première version
+      l'avait posée sur la barre 2D — `tsc` l'a dit aussitôt, comme pour le
+      gabarit des volumes avant elle.)
+    */
+    <ToolPill
+      key="nuit"
+      icon="lune"
+      label="Nuit"
+      active={nuit}
+      onPress={() => setNuit((v) => !v)}
+    />,
     /* Le plafond existe aussi en 3D : même calque, même bouton. */
     ceiling.length > 0 ? (
       <ToolPill
