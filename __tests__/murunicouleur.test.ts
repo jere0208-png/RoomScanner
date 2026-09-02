@@ -22,6 +22,7 @@
  * deux. Le relevé du patron dit « tout doit être uni » ; c'est la réponse.
  */
 import { buildScene, type ScenePalette } from '../src/geometry/scene3d';
+import { couleurAuPic } from '../src/geometry/appearance';
 import type { WallSeg } from '../src/geometry/floorplan';
 import type { SurfaceTexture } from 'react-native-room-scan';
 
@@ -107,8 +108,20 @@ describe('un mur relevé en couleur', () => {
     expect([...teintes]).toHaveLength(1);
   });
 
-  it('et cette teinte est celle que le scan a relevée', () => {
-    expect(aplats('n')[0].fill?.toLowerCase()).toBe('#3e5a32');
+  it('et cette teinte est celle du scan — À SON PIC', () => {
+    /*
+      DOCTRINE RÉVISÉE — relevé du patron : « les murs aussi doivent avoir
+      la même couleur au pic de luminosité du scan ». La moyenne relevée
+      tirait vers l'ombre ; le mur porte désormais la teinte du quart le
+      plus lumineux de son relevé (`couleurAuPic`), la même règle que le
+      sol. Uni, toujours — une seule teinte sur tout le pan.
+    */
+    const pans = aplats('n');
+    expect(pans.length).toBeGreaterThan(0);
+    const attendu = couleurAuPic(NUANCES, '#3E5A32');
+    for (const f of pans) {
+      expect(f.fill).toBe(attendu);
+    }
   });
 
   it('un mur sans couleur relevée reste au blanc du dessin', () => {

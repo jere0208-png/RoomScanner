@@ -35,7 +35,6 @@ const midOf = (o: WallSeg): Pt => ({
   x: (o.a.x + o.b.x) / 2,
   z: (o.a.z + o.b.z) / 2,
 });
-import { dotStep, inkOn, mixHex, pointsDuSol } from '../geometry/appearance';
 import {
   faceDepth,
   buildScene,
@@ -1466,76 +1465,21 @@ export function Iso3DView({
       return false;
     };
 
+    /*
+      PLUS DE SEMIS SUR LES SOLS — relevé du patron : « enlève les points
+      de la surface sur le plan 3D. On doit voir le nom et le sol, sans
+      pointillés. » Le sol porte désormais sa matière (teinte au pic,
+      lattes ou carreaux) : les points ne disaient plus rien qu'elle ne
+      dise mieux. L'ÉTIQUETTE, elle, reste — « le nom et le sol ».
+    */
     if (showSurfaces && !interacting) {
-      // Une pièce = un semis et une étiquette. Le budget de points est
-      // partagé : dix pièces ne doivent pas coûter dix fois plus cher.
-      const budget = Math.max(80, Math.round(350 / Math.max(1, scene.rooms.length)));
       for (const room of scene.rooms) {
         if (!room.surface) continue;
-        const base = room.floorFill;
-        const dotColor = mixHex(base, inkOn(base), 0.42);
-        /*
-          ARRETE AU NU DES MURS — releve du patron : « la surface ne doit
-          pas se voir a travers les murs du modele 3D ». Le contour d'une
-          piece suit l'AXE de ses murs : sans ce retrait, le semis s'etend
-          sous la moitie de leur epaisseur, et l'ecorche le laisse voir.
-        */
-        /*
-          LE SEMIS DESCEND DANS LA GÉOMÉTRIE.
-
-          Relevé du patron, deuxième fois sur le même sujet : « la surface du
-          plan 3D d'un scan doit pas se voir à travers les murs ». La
-          première réponse avait arrêté le semis au nu des murs — juste, et
-          insuffisant : ce n'était pas une question de PROFONDEUR (il se
-          classait déjà sous tout, à moins l'infini) mais de COUCHE.
-
-          Le modèle se dessine en deux : la géométrie, qui part au canevas
-          natif, et par-dessus une couche de balises pour ce qui porte du
-          texte. Le semis vivait dans la seconde — donc au-dessus des murs,
-          quoi qu'en dise son rang. Chaque point devient un minuscule carré
-          de géométrie : il repasse sous la maçonnerie, et le regroupement
-          des tracés n'en fait qu'un seul chemin, comme pour le reste.
-        */
-        for (const p of pointsDuSol(
-          room.surface.pts,
-          walls,
-          dotStep(scale, 22),
-          budget,
-        )) {
-          const q = project({ x: p.x, y: 0, z: p.z });
-          const r = 1.1;
-          items.push({
-            kind: 'poly',
-            depth: -Infinity,
-            proj: [
-              { sx: q.sx - r, sy: q.sy - r, depth: q.depth },
-              { sx: q.sx + r, sy: q.sy - r, depth: q.depth },
-              { sx: q.sx + r, sy: q.sy + r, depth: q.depth },
-              { sx: q.sx - r, sy: q.sy + r, depth: q.depth },
-            ],
-            fill: dotColor,
-            stroke: dotColor,
-            voile: 1,
-            dashed: false,
-          } as never);
-        }
         // Même cartouche qu'en 2D, au même endroit : le nom donné sur le
         // plan se retrouve au centre de la pièce sur le modèle.
         const q = project({ x: room.labelAt.x, y: 0, z: room.labelAt.z });
-        /*
-          ET L'ÉTIQUETTE NE S'ÉCRIT PAS SUR UNE FAÇADE AVEUGLE.
-
-          Elle restait une balise — c'est du texte, il doit rester net — donc
-          au-dessus de toute la géométrie. Le code l'assumait : « posé
-          par-dessus tout le reste : un mur ne doit pas la trancher ». C'est
-          vrai d'un PLAN, où l'on regarde à travers ; c'est faux d'un MODÈLE,
-          qu'on regarde de l'extérieur : on lisait « 9,0 m² » sur un pan
-          plein, sans savoir de quelle pièce il s'agissait.
-
-          Elle ne se dessine donc plus quand un pan de mur PLEIN se dresse
-          entre l'œil et son point. En écorché, elle reste : le mur y est
-          justement effacé pour qu'on voie la pièce.
-        */
+        // Et elle ne s'écrit pas sur une façade aveugle : quand un pan
+        // PLEIN se dresse entre l'œil et son point, on se tait.
         if (!solidWalls || !masqueParUnMur(room.labelAt, q)) {
           items.push({
             kind: 'area',

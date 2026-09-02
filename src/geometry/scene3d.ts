@@ -21,7 +21,7 @@ import {
   type RoomSurface,
   type WallSeg,
 } from './floorplan';
-import { floorColorAt, mixHex, pointInPolygon, sampleTexture } from './appearance';
+import { couleurAuPic, matiereRelevee, mixHex, pointInPolygon, sampleTexture } from './appearance';
 import { AMBRE_MEUBLE, MEUBLE_MOELLEUX } from '../ui/maquette';
 import { furnitureParts, type FurnPart } from './furniture3d';
 import { CEILINGS, type CeilingFixture } from './ceiling';
@@ -1688,6 +1688,8 @@ function clipAuContour(a: Pt, b: Pt, poly: Pt[]): [Pt, Pt][] {
 function jointsDuSol(
   poly: Pt[],
   matiere: 'parquet' | 'carrelage',
+  /** Le sens des lames, quand le RELEVÉ l'a dit ; sinon le grand côté. */
+  sens?: 'x' | 'z',
 ): [Pt, Pt][] {
   let minX = Infinity;
   let maxX = -Infinity;
@@ -1712,7 +1714,7 @@ function jointsDuSol(
   }
   const LAME = 0.22;
   const LONG = 1.35;
-  const auLong = maxX - minX >= maxZ - minZ;
+  const auLong = sens ? sens === 'x' : maxX - minX >= maxZ - minZ;
   const across = auLong ? maxZ - minZ : maxX - minX;
   let rang = 0;
   for (let d = LAME; d < across; d += LAME, rang++) {
@@ -1811,12 +1813,22 @@ export function buildScene(
   // entièrement contenues dans SON contour.
   const rooms: SceneRoom[] = parts.map((part) => {
     const floor = opts.floors?.[part.roomId] ?? null;
-    const matiere = opts.matieres?.[part.roomId];
     /*
-      LA MATIÈRE TEINTE LE FOND : chêne clair pour le parquet, gris porcelaine
-      pour le carrelage. La couleur RELEVÉE au scan garde la priorité — une
-      mesure passe devant un habillage.
+      LE RELEVÉ A LE DERNIER MOT, MAIS AU PIC — relevé du patron : « le sol
+      dans un scan que j'ai fait est violet ». La couleur transmise est une
+      moyenne d'ombres ; on peint la teinte des cases les plus lumineuses
+      (`couleurAuPic`). Et la MATIÈRE se lit dans la grille : des lattes ou
+      des carreaux détectés au scan priment sur ce que le nom de la pièce
+      laissait deviner.
     */
+    const releve = opts.showTextures ? matiereRelevee(floor?.texture) : null;
+    const matiere: 'parquet' | 'carrelage' | undefined =
+      releve?.type === 'lattes'
+        ? 'parquet'
+        : releve?.type === 'carreaux'
+        ? 'carrelage'
+        : opts.matieres?.[part.roomId];
+    const sensLattes = releve?.type === 'lattes' ? releve.sens : undefined;
     const fondMatiere =
       matiere === 'parquet'
         ? mixHex(pal.floor, '#C89A66', 0.55)
@@ -1824,7 +1836,11 @@ export function buildScene(
         ? mixHex(pal.floor, '#E3E6E4', 0.6)
         : undefined;
     const floorFill =
-      (opts.showTextures ? floor?.color : undefined) ?? fondMatiere ?? pal.floor;
+      (opts.showTextures
+        ? couleurAuPic(floor?.texture, floor?.color)
+        : undefined) ??
+      fondMatiere ??
+      pal.floor;
     const surface = part.surface;
     if (surface && opts.showSurfaces) {
       faces.push({
@@ -1835,7 +1851,7 @@ export function buildScene(
       });
       if (matiere) {
         const joint = mixHex(floorFill, '#0B0D12', 0.22);
-        for (const [a, b] of jointsDuSol(surface.pts, matiere)) {
+        for (const [a, b] of jointsDuSol(surface.pts, matiere, sensLattes)) {
           faces.push({
             pts: [
               { x: a.x, y: 0.004, z: a.z },
@@ -1847,32 +1863,12 @@ export function buildScene(
           });
         }
       }
-      const ftex = opts.showTextures ? floor?.texture : undefined;
-      if (ftex && ftex.cols > 0 && ftex.rows > 0) {
-        const cw = (ftex.maxX - ftex.minX) / ftex.cols;
-        const ch = (ftex.maxZ - ftex.minZ) / ftex.rows;
-        for (let r = 0; r < ftex.rows; r++) {
-          for (let i = 0; i < ftex.cols; i++) {
-            const x0 = ftex.minX + i * cw;
-            const z0 = ftex.minZ + r * ch;
-            const cell: Pt[] = [
-              { x: x0, z: z0 },
-              { x: x0 + cw, z: z0 },
-              { x: x0 + cw, z: z0 + ch },
-              { x: x0, z: z0 + ch },
-            ];
-            if (!cell.every((p) => pointInPolygon(p, surface.pts))) continue;
-            const col = floorColorAt(floor, { x: x0 + cw / 2, z: z0 + ch / 2 });
-            if (!col) continue;
-            faces.push({
-              pts: cell.map((p) => ({ x: p.x, y: 0, z: p.z })),
-              fill: col,
-              stroke: null,
-              isFloor: true,
-            });
-          }
-        }
-      }
+      /*
+        LA MOSAÏQUE DE CASES A DISPARU — c'était elle, le patchwork sombre :
+        chaque case portait sa moyenne locale, ombres comprises. Le sol
+        porte maintenant SA teinte au pic, et sa matière détectée dessine
+        les joints. Un sol se lit, il ne se pixelise pas.
+      */
     }
     return {
       roomId: part.roomId,
@@ -2338,7 +2334,9 @@ export function buildScene(
       et c'est là que la variation a un sens : un carrelage n'est pas un mur
       peint).
     */
-    const avg = opts.showTextures ? w.color : undefined;
+    // Le pic du relevé, pas sa moyenne : même règle que le sol — la teinte
+    // du mur là où la lumière le montre.
+    const avg = opts.showTextures ? couleurAuPic(w.texture, w.color) : undefined;
     const skin = {
       // Marque les deux faces : `pushWallBlock` saura laquelle est dehors.
       cutaway: true,

@@ -12853,6 +12853,48 @@ suggèrent l'échelle et l'usage, jamais un goût.
 - **les plans d'hier ne cassent pas** : les clés de modèles de l'ancien
   catalogue sont des alias des formes d'aujourd'hui.
 
+### Le scan dit sa vraie couleur — et sa matière
+
+Relevé du patron, capture d'un scan à l'appui : « le sol dans un scan que
+j'ai fait est violet et il n'y a pas l'effet parquet de partout. La couleur
+doit refléter la couleur du sol lors du scan, à son pic de luminosité, et
+détecter si on a des lattes, des carreaux, ou autre et l'incorporer au
+plan. Les murs aussi doivent avoir la même couleur au pic de luminosité du
+scan. Enlève les points de la surface sur le plan 3D. On doit voir le nom
+et le sol, sans pointillés. »
+
+#### Pourquoi le violet, et le remède
+
+La couleur transmise par le relevé est une MOYENNE — et la moyenne d'un sol
+pris entre ombres et reflets tire vers un gris-violet qui n'existe nulle
+part dans la pièce. Ce qu'on voit « en vrai », c'est la matière là où la
+lumière la montre : LE PIC. Sols et murs portent désormais la teinte du
+quart le plus lumineux de leur relevé (`couleurAuPic`) — la mesure reste
+une mesure, on choisit le bon échantillon. La mosaïque de cases sombres qui
+pixelisait les sols scannés est partie avec.
+
+#### La matière lue dans la grille du relevé
+
+Des lattes font varier la couleur EN TRAVERS des lames et presque pas le
+long ; un carrelage varie dans les deux sens ; un sol uni ne varie pas.
+L'anisotropie de la luminance décide (`matiereRelevee`) : lattes — et leur
+SENS —, carreaux, ou rien. Le détecté prime sur ce que le nom de la pièce
+laissait deviner ; à défaut, le nom parle comme avant. L'effet parquet
+arrive donc PARTOUT, scans compris, dans la teinte du scan.
+
+#### Plus de pointillés — et l'étiquette a failli partir avec
+
+Le semis de points quitte les sols 3D, dans l'app comme dans la page 3D du
+dossier : le nom, le sol, sa matière. Et une leçon au passage : le retrait
+du semis a d'abord EMPORTÉ l'étiquette « Séjour · 12,0 m² » qui vivait dans
+le même bloc — c'est le banc `surfaceautravers` qui a mordu, pas un œil.
+« On doit voir le nom et le sol » : l'étiquette est revenue, avec sa règle
+intacte (elle se tait derrière un pan plein).
+
+Le banc du mur uni a été RÉVISÉ en le disant : hier il jurait « la teinte
+que le scan a relevée » (la moyenne) ; la doctrine du pic le remplace, et
+le commentaire porte le nouveau relevé.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

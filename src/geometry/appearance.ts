@@ -542,6 +542,97 @@ export function pointInPolygon(p: Pt, poly: Pt[]): boolean {
  * Pas du semis, en mètres : choisi pour que les points soient espacés
  * d'environ `targetPx` à l'écran, sur une échelle « ronde » (0,125 m, 0,25 m…).
  */
+/**
+ * LA COULEUR AU PIC DE LUMINOSITÉ — relevé du patron, capture d'un scan à
+ * l'appui : « le sol dans un scan que j'ai fait est violet. La couleur doit
+ * refléter la couleur du sol lors du scan, à son pic de luminosité. »
+ *
+ * POURQUOI LE VIOLET : la couleur transmise est une MOYENNE, et la moyenne
+ * d'un sol pris entre ombres et reflets tire vers un gris-violet qui
+ * n'existe nulle part dans la pièce. Ce qu'on voit « en vrai », c'est la
+ * matière là où la lumière la montre. On garde donc le QUART le plus
+ * lumineux des cases du relevé et l'on moyenne CES cases-là : la mesure
+ * reste une mesure — on choisit le bon échantillon, on n'invente rien.
+ */
+export function couleurAuPic(
+  tex: SurfaceTexture | undefined,
+  repli?: string,
+): string | undefined {
+  if (!tex || !tex.texels || tex.texels.length === 0) return repli;
+  const lus = tex.texels
+    .map((t) => {
+      const n = parseInt(String(t).replace('#', ''), 16);
+      if (!Number.isFinite(n)) return null;
+      const r = (n >> 16) & 255;
+      const g = (n >> 8) & 255;
+      const b = n & 255;
+      return { r, g, b, lum: 0.2126 * r + 0.7152 * g + 0.0722 * b };
+    })
+    .filter((x): x is NonNullable<typeof x> => x !== null);
+  if (lus.length === 0) return repli;
+  lus.sort((a, b) => b.lum - a.lum);
+  const garde = lus.slice(0, Math.max(1, Math.ceil(lus.length / 4)));
+  const moy = (v: (x: (typeof garde)[0]) => number) =>
+    Math.round(garde.reduce((t, x) => t + v(x), 0) / garde.length);
+  const hex = (v: number) => v.toString(16).padStart(2, '0');
+  return `#${hex(moy((x) => x.r))}${hex(moy((x) => x.g))}${hex(moy((x) => x.b))}`;
+}
+
+/**
+ * LA MATIÈRE, LUE DANS LA GRILLE DU RELEVÉ — « détecter si on a des lattes,
+ * des carreaux, ou autre et l'incorporer au plan ».
+ *
+ * Des lattes font varier la couleur EN TRAVERS des lames et presque pas le
+ * long ; un carrelage varie dans les deux sens ; un sol uni ne varie pas.
+ * On mesure donc l'ANISOTROPIE de la luminance : le gradient moyen le long
+ * des colonnes contre celui le long des rangées. Trois verdicts, et un
+ * refus franc — un relevé qui ne tranche pas ne prétend rien.
+ */
+export function matiereRelevee(
+  tex: SurfaceTexture | undefined,
+): { type: 'lattes'; sens: 'x' | 'z' } | { type: 'carreaux' } | null {
+  if (!tex || tex.cols < 3 || tex.rows < 3) {
+    // Deux rangées suffisent pourtant à des lattes franches.
+    if (!tex || tex.cols < 2 || tex.rows < 2) return null;
+  }
+  const L: number[][] = [];
+  for (let r = 0; r < tex.rows; r++) {
+    const ligne: number[] = [];
+    for (let c = 0; c < tex.cols; c++) {
+      const n = parseInt(String(tex.texels[r * tex.cols + c] ?? '').replace('#', ''), 16);
+      if (!Number.isFinite(n)) return null;
+      ligne.push(0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255));
+    }
+    L.push(ligne);
+  }
+  let gx = 0;
+  let nx = 0;
+  let gz = 0;
+  let nz = 0;
+  for (let r = 0; r < tex.rows; r++) {
+    for (let c = 0; c + 1 < tex.cols; c++) {
+      gx += Math.abs(L[r][c + 1] - L[r][c]);
+      nx++;
+    }
+  }
+  for (let r = 0; r + 1 < tex.rows; r++) {
+    for (let c = 0; c < tex.cols; c++) {
+      gz += Math.abs(L[r + 1][c] - L[r][c]);
+      nz++;
+    }
+  }
+  gx = nx ? gx / nx : 0;
+  gz = nz ? gz / nz : 0;
+  const SEUIL = 6;
+  if (gx < SEUIL && gz < SEUIL) return null;
+  // Les rangées courent en x : si la couleur change de rangée en rangée
+  // (gz fort) et presque pas le long d'une rangée (gx faible), les lames
+  // courent en x.
+  if (gz > gx * 1.6) return { type: 'lattes', sens: 'x' };
+  if (gx > gz * 1.6) return { type: 'lattes', sens: 'z' };
+  return { type: 'carreaux' };
+}
+
 export function dotStep(scalePxPerM: number, targetPx = 15): number {
   let step = 0.25;
   if (scalePxPerM <= 0) return step;

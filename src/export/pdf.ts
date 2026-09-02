@@ -39,7 +39,7 @@ import {
   graduationsRegle,
 } from './echelle';
 import { ecarterDe, type Boite } from '../ui/ecarter';
-import { dotStep, floorDots, mixHex } from '../geometry/appearance';
+import { mixHex } from '../geometry/appearance';
 import { wallLabel, type DeviceName } from '../geometry/naming';
 import {
   FIXTURES,
@@ -1214,14 +1214,10 @@ function draw3DView(
   // Semis du sol et surface : mêmes repères que sur le plan 2D, pièce
   // par pièce — chaque sol garde sa teinte et porte son propre libellé.
   if (opts.showSurfaces) {
-    const budget = Math.max(150, Math.round(600 / Math.max(1, scene.rooms.length)));
     for (const room of scene.rooms) {
       if (!room.surface) continue;
-      const dotColor = mixHex(room.floorFill, '#4A5361', 0.55);
-      for (const p of floorDots(room.surface.pts, dotStep(scale, 13), budget)) {
-        const q = project({ x: p.x, y: 0, z: p.z });
-        items.push({ kind: 'dot', depth: -Infinity, x: q.x, y: q.y, color: dotColor });
-      }
+      // Plus de semis — relevé du patron : « on doit voir le nom et le
+      // sol, sans pointillés ». Le sol porte sa matière, elle dit tout.
       const q = project({ x: room.labelAt.x, y: 0, z: room.labelAt.z });
       const name = opts.roomNames?.[room.roomId] ?? '';
       const area = `${room.surface.exact ? '' : '≈ '}${fr1(room.surface.area)} m²`;
