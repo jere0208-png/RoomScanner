@@ -12955,6 +12955,30 @@ socle au circuit ») ; puis il a cherché un anneau sur un plan SANS
 cartouche, le calque des surfaces partant éteint. Les deux corrections
 portent leur raison.
 
+### 3/10 — Le plan passe aux normes, et l'app le dit
+
+Quand le contrôle NF C 15-100 tombe à ZÉRO réserve, la récompense du
+travail bien fait : « Plan aux normes NF C 15-100 : plus aucune réserve »,
+en fête, avec le bouclier de la maison.
+
+**Ce moment n'existait nulle part.** L'écran comptait les réserves et les
+listait ; passer de « 1 » à « 0 » ne produisait rien — le compteur
+disparaissait, c'est tout. Or c'est LE moment du travail d'électricien :
+celui où le plan devient montrable au client et défendable au Consuel.
+
+Trois gardes, et chacune vaut son poids :
+
+- **il faut avoir eu des réserves avant.** Un plan vide n'en a aucune :
+  féliciter quelqu'un qui vient d'ouvrir l'app, c'est lui apprendre du même
+  coup que les félicitations de cette app ne valent rien. La maison
+  connaissait déjà la règle — « une fête sur un plan vide serait une
+  moquerie » ;
+- **il faut du travail réel** — des appareils posés, pas des murs nus ;
+- **ça ne se dit qu'une fois par plan.** Une fête qui repasse à chaque
+  aller-retour du contrôle (on pose une prise de trop, on la retire)
+  devient un clignotant. Et la récompense appartient AU PLAN : ouvrir un
+  autre dossier rend sa fête au suivant.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

@@ -149,6 +149,7 @@ import { alerte } from '../ui/alerte';
 import { panne as expliquer } from '../ui/panne';
 import { ficheElec, motDuLien } from './result/ficheElec';
 import { astuce } from '../ui/astuce';
+import { celebrerSiAuxNormes, resetCelebration } from '../ui/auxNormes';
 import { usePremieresFois } from '../store/premieresFois';
 
 type Tab = '2d' | '3d';
@@ -1983,6 +1984,23 @@ export function ResultScreen() {
     () => issues.filter((i) => i.severity === 'alerte').length,
     [issues],
   );
+  /*
+    LE PLAN PASSE AUX NORMES — et l'application le dit, une fois.
+
+    Ce moment n'existait nulle part : on comptait les réserves, on les
+    listait, et passer de « 1 » à « 0 » ne produisait rien — le compteur
+    disparaissait. Or c'est LE moment du travail d'électricien, celui où le
+    plan devient montrable au client. Les gardes vivent dans `auxNormes` :
+    il faut avoir eu des réserves, avoir posé, et ça ne se dit qu'une fois
+    par plan.
+  */
+  useEffect(() => {
+    celebrerSiAuxNormes({ reserves: alertes, appareils: fixtures.length + ceiling.length });
+  }, [alertes, fixtures.length, ceiling.length]);
+  /* Un autre dossier s'ouvre : la récompense appartient au plan suivant. */
+  useEffect(() => {
+    resetCelebration();
+  }, [currentSaveId]);
   /*
     LES CONSTATS QUI NE DÉPENDENT PAS DE LA POSE.
 
