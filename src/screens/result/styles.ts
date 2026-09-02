@@ -1314,6 +1314,39 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   },
   /* Le lacher ne tomberait nulle part : le fantome le dit AVANT le lacher. */
   catFantomeRefus: { borderWidth: 1.5, borderColor: c.danger, opacity: 0.8 },
+  /*
+    LE NUANCIER D'UNE PIECE.
+
+    Une couleur ne se juge pas sur une pastille de douze points : les carres
+    font soixante-douze de cote, et leur nom se lit dessous — « Vert sauge »
+    dit plus qu'un carre vert quand il s'agit d'en parler a quelqu'un.
+  */
+  peintureGrille: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    paddingTop: 4,
+  },
+  peintureCase: { width: 72, alignItems: 'center' },
+  peintureCarre: {
+    width: 72,
+    height: 60,
+    borderRadius: radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: c.line,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  /* Le liseré de la teinte prise : un cadre, pas une ombre — une ombre se
+     confondrait avec le relief des autres cases. */
+  peintureCarrePrise: { borderWidth: 2.5, borderColor: c.blue },
+  peintureNom: {
+    color: c.ink,
+    fontSize: 11,
+    fontWeight: '700',
+    marginTop: 4,
+    textAlign: 'center',
+  },
   catFantomeNom: {
     color: c.ink,
     fontSize: 11.5,

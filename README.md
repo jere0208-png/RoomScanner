@@ -13100,6 +13100,49 @@ vient de concevoir ne se montrait donc jamais ALLUMÉE — la seule chose qu'un
 client comprenne d'un plan électrique. La pastille « Visite » est posée
 juste après « Nuit » pour que les deux se lisent ensemble.
 
+### 7/10 — Peindre les pièces
+
+La maquette rendait deux choses : le blanc cassé du dessin, ou la teinte
+RELEVÉE au scan. Entre les deux, rien — et c'est justement là que se tient
+la question qu'un client pose toujours : « et si on mettait du vert d'eau ? ».
+On y répondait en la mimant du doigt. Le bandeau d'une pièce porte
+maintenant « Peindre », qui ouvre un nuancier de douze teintes.
+
+**La palette est imposée**, et c'est la doctrine du mobilier, mot pour mot —
+« ils ne servent pas à redécorer mais à imaginer la pièce seulement ». Un
+sélecteur de couleur libre produirait des maquettes fuchsia qu'on ne montre
+à personne, et ferait d'une application de relevé un logiciel de décoration.
+Douze pots, ceux qu'on trouve chez le marchand : six clairs pour agrandir,
+quatre teintes sourdes qui passent partout, et deux foncés — parce qu'un pan
+sombre est la seule façon de montrer un mur d'accent, et que c'est demandé
+dès qu'on parle peinture. Le blanc cassé ouvre la liste : choisir le premier,
+c'est revenir à ce qu'on avait.
+
+**Chaque FACE prend la peinture de la pièce qu'elle regarde.** C'est le seul
+comportement juste, et c'est celui qui coûte : un refend borde deux pièces,
+et peindre le mur entier ferait déborder le vert d'eau du séjour dans la
+chambre — sur une maquette qu'on montre, une couleur qui traverse une cloison
+se voit avant tout le reste. `pushWallBlock` accepte donc une seconde teinte
+pour sa face `−n`, et la pièce de chaque côté se trouve en sondant à une
+demi-épaisseur de mur. La face extérieure d'un mur de façade, elle, ne
+regarde aucune pièce : elle reste au blanc du dessin, faute de quoi le
+logement serait peint en vert d'eau jusque sur sa façade.
+
+**La peinture passe devant le relevé.** Le relevé dit ce qui EST, la peinture
+dit ce qu'on PROJETTE — et quand on vient de choisir une teinte, on veut la
+voir. Le côté qu'on n'a pas peint garde la parole du scan.
+
+**La pièce retient la CLÉ, pas la teinte** (`RoomEntry.peinture`). Une palette
+qui s'ajuste d'une version à l'autre repeint alors les dossiers déjà faits,
+au lieu de les laisser avec un hexadécimal orphelin dont plus personne ne
+sait le nom. Une clé inconnue — un dossier enregistré par une version plus
+récente — ne donne rien : le mur retombe sur le blanc, plutôt que sur une
+couleur tirée au sort. Retirer la peinture EFFACE le champ au lieu de le
+mettre à `null` : un dossier relu ne doit pas avoir deux façons de dire
+« jamais peinte ». Et repeindre de la même teinte ne pose pas de point
+d'annulation — la garde passe avant le point de reprise, comme partout
+ailleurs dans ce magasin.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

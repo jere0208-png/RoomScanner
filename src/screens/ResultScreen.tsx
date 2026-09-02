@@ -33,6 +33,7 @@ import { LaserSheet } from './result/LaserSheet';
 import { ExportSheet } from './result/ExportSheet';
 import { FurnitureSheet } from './result/FurnitureSheet';
 import { PhotoSheet } from './result/PhotoSheet';
+import { PeintureSheet } from './result/PeintureSheet';
 import { RenameSheet } from './result/RenameSheet';
 import { RoomNameSheet } from './result/RoomNameSheet';
 import { Toolbar2D, Toolbar3D } from './result/ResultToolbar';
@@ -1298,6 +1299,8 @@ export function ResultScreen() {
   }, []);
   /** Le lâcher tomberait-il dans une pièce ? Le fantôme du doigt le dit. */
   const [poseValide, setPoseValide] = useState(true);
+  /** Le nuancier de la pièce choisie est ouvert. */
+  const [peignant, setPeignant] = useState(false);
 
   // Départ vers l'export : ondes qui traversent toute la page puis fondu.
   const { width: winW, height: winH } = useWindowDimensions();
@@ -4360,6 +4363,8 @@ export function ResultScreen() {
               styles={stylesBarres}
               onName={() => setNaming(true)}
               onHeight={promptRoomHeight}
+              /* Peindre ses murs : le nuancier de douze teintes. */
+              onPeindre={() => setPeignant(true)}
               onCotes={
                 estRectangle(targetPart?.walls ?? []) ? promptRoomCotes : undefined
               }
@@ -5153,6 +5158,23 @@ export function ResultScreen() {
       />
 
       {/* ---------- Catalogue de mobilier ---------- */}
+      {/* ---------- Peindre les murs d'une pièce ---------- */}
+      <PeintureSheet
+        visible={peignant && !!targetRoom}
+        nomPiece={
+          targetRoom?.name ? targetRoom.name.toLowerCase() : 'la pièce'
+        }
+        choisie={targetRoom?.peinture ?? null}
+        onChoisir={(cle) => {
+          if (targetRoom) {
+            useScanStore.getState().setRoomPeinture(targetRoom.id, cle);
+            haptic('leger');
+          }
+          setPeignant(false);
+        }}
+        onClose={() => setPeignant(false)}
+      />
+
       <FurnitureSheet
         visible={catalogue}
         quete={quete}

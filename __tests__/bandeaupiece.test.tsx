@@ -64,6 +64,7 @@ const monter = (props: Partial<React.ComponentProps<typeof RoomBar>> = {}) => {
         onDupliquer={() => {}}
         onFusionner={() => {}}
         onScinder={() => {}}
+        onPeindre={() => {}}
         onRetirer={() => {}}
         {...props}
       />,

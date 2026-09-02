@@ -1340,6 +1340,19 @@ export interface SceneOptions {
    * (il connaît les NOMS des pièces), la scène dessine.
    */
   matieres?: Record<string, 'parquet' | 'carrelage' | undefined>;
+  /**
+   * LA PEINTURE CHOISIE, pièce par pièce — teinte déjà résolue en hexa.
+   *
+   * Chaque FACE de mur prend la peinture de la pièce qu'elle regarde : un
+   * refend borde deux pièces, et peindre le mur entier ferait déborder le
+   * vert d'eau du séjour dans la chambre. La face extérieure d'un mur de
+   * façade ne regarde aucune pièce, elle reste au blanc du dessin.
+   *
+   * Elle l'emporte sur la couleur relevée : le relevé dit ce qui EST, la
+   * peinture dit ce qu'on PROJETTE, et quand on vient de choisir une teinte
+   * on veut la voir — c'est la seule raison pour laquelle on l'a choisie.
+   */
+  peintures?: Record<string, string | undefined>;
   /** Appareillage électrique posé sur les faces de murs. */
   fixtures?: Fixture[];
   /**
@@ -2160,6 +2173,15 @@ export function buildScene(
     yt: number,
     o: {
       fill: string;
+      /**
+       * La teinte de la face −n, quand elle diffère de `fill`.
+       *
+       * Un refend regarde DEUX pièces : chacune peut avoir sa peinture. Sans
+       * cette seconde teinte, le mur entier prenait celle d'une seule, et la
+       * couleur traversait la cloison — ce qui se voit avant tout le reste
+       * sur une maquette qu'on montre.
+       */
+      fillMoins?: string;
       top: string;
       stroke: string;
       topStroke: string;
@@ -2204,9 +2226,9 @@ export function buildScene(
       tex?: SurfaceTexture,
       uFrom = 0,
       uTo = 1,
-      extra: { cutaway?: boolean } = {},
+      extra: { cutaway?: boolean; fill?: string } = {},
     ) =>
-      pushStrips(p, r, yb, yt, o.fill, {
+      pushStrips(p, r, yb, yt, extra.fill ?? o.fill, {
         shade: o.shade ?? true,
         captured: o.captured,
         tex,
@@ -2227,6 +2249,7 @@ export function buildScene(
     });
     face(r2, p2, o.texOnPlus ? undefined : o.tex, t1, t0, {
       cutaway: dehors === undefined ? undefined : !!o.texOnPlus,
+      fill: o.fillMoins,
     });
     if (o.facesSeules) return;
     // Tableaux (chants) : trop étroits pour mériter un découpage.
@@ -2311,6 +2334,26 @@ export function buildScene(
     const plusIsInner =
       (interior.x - mid.x) * nrm.x + (interior.z - mid.z) * nrm.z > 0;
     /*
+      QUELLE PIÈCE CHAQUE FACE REGARDE-T-ELLE ?
+
+      `plusIsInner` répond pour LA pièce du mur ; un refend en borde deux, et
+      la peinture se choisit par pièce. On sonde donc de part et d'autre du
+      mur, à une demi-épaisseur : le point qui tombe dans un contour désigne
+      la pièce de ce côté-là. Aucun contour ne le contient — c'est la façade,
+      et cette face ne regarde rien.
+    */
+    const pieceDuCote = (signe: 1 | -1): string | null => {
+      const px = mid.x + nrm.x * signe * WALL_T;
+      const pz = mid.z + nrm.z * signe * WALL_T;
+      for (const part of parts) {
+        const pts = part.surface?.pts;
+        if (pts && pts.length >= 3 && pointInPolygon({ x: px, z: pz }, pts)) {
+          return part.roomId;
+        }
+      }
+      return null;
+    };
+    /*
       UN MUR EN COULEUR EST D'UNE SEULE COULEUR.
 
       Relevé du patron, troisième passage sur le même sujet : « il y a des
@@ -2337,14 +2380,39 @@ export function buildScene(
     // Le pic du relevé, pas sa moyenne : même règle que le sol — la teinte
     // du mur là où la lumière le montre.
     const avg = opts.showTextures ? couleurAuPic(w.texture, w.color) : undefined;
+    /*
+      LA PEINTURE CHOISIE PASSE DEVANT LE RELEVÉ.
+
+      Le relevé dit ce qui EST, la peinture dit ce qu'on PROJETTE — et quand
+      on vient de choisir une teinte on veut la voir, c'est la seule raison
+      pour laquelle on l'a choisie. Le côté qu'on n'a pas peint, lui, garde
+      la parole du scan.
+    */
+    const peintureDe = (roomId: string | null) =>
+      roomId ? opts.peintures?.[roomId] : undefined;
+    const peintPlus = peintureDe(pieceDuCote(1));
+    const peintMoins = peintureDe(pieceDuCote(-1));
+    const fondPlus = peintPlus ?? avg ?? pal.wall;
+    const fondMoins = peintMoins ?? avg ?? pal.wall;
+    /*
+      L'ARASE SUIT LA FACE INTÉRIEURE. Vue de dessus, elle borde la pièce
+      qu'on regarde ; la caler sur la façade donnerait un liseré blanc autour
+      d'une pièce peinte, qu'on lirait comme une plinthe de plafond.
+    */
+    const fondDedans = plusIsInner ? fondPlus : fondMoins;
+    const teinteMur = peintPlus ?? peintMoins ?? avg;
     const skin = {
       // Marque les deux faces : `pushWallBlock` saura laquelle est dehors.
       cutaway: true,
-      fill: avg ?? pal.wall,
-      top: avg ? mixHex(avg, '#FFFFFF', 0.45) : pal.wallTop,
+      fill: fondPlus,
+      fillMoins: fondMoins,
+      top:
+        fondDedans === pal.wall
+          ? pal.wallTop
+          : mixHex(fondDedans, '#FFFFFF', 0.45),
       stroke: pal.wallStroke,
       topStroke: pal.wallTopStroke,
-      captured: !!avg,
+      captured: !!teinteMur,
       texOnPlus: plusIsInner,
     };
 

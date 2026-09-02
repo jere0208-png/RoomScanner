@@ -158,6 +158,7 @@ const COQUILLES: [string, () => React.ReactElement][] = [
         onDupliquer={() => {}}
         onFusionner={() => {}}
         onScinder={() => {}}
+        onPeindre={() => {}}
         onRetirer={() => {}}
       />
     ),

@@ -68,6 +68,7 @@ import { ECLAT_LAMPE,
   crepuscule,
   matieresDesSols,
 } from '../ui/maquette';
+import { hexDePeinture } from '../ui/peintures';
 import { parImage } from '../ui/parImage';
 import { haptic } from '../ui/haptic';
 import { floorsOf, useScanStore } from '../store/scanStore';
@@ -969,6 +970,23 @@ export function Iso3DView({
   );
 
   /** Bâtir la scène d'une pièce, ou la reprendre au magasin. */
+  /*
+    LES PEINTURES CHOISIES, résolues en teintes.
+
+    La pièce garde une CLÉ (« sauge ») ; la scène veut un hexadécimal. La
+    traduction se fait ici, une fois, et une clé inconnue — un dossier
+    enregistré par une version plus récente — ne donne rien : le mur retombe
+    sur le blanc du dessin plutôt que sur une couleur tirée au sort.
+  */
+  const peintures = useMemo(() => {
+    const out: Record<string, string> = {};
+    for (const r of rooms) {
+      const hex = hexDePeinture(r.peinture);
+      if (hex) out[r.id] = hex;
+    }
+    return out;
+  }, [rooms]);
+
   const batir = useCallback(
     (focus: string | null): Scene => {
       const cle = focus ?? '—';
@@ -984,6 +1002,7 @@ export function Iso3DView({
         rooms: e.rooms,
         fixtures: e.fixtures,
         ceiling: showCeiling ? ceiling : [],
+        peintures,
         routes: cableRoutes,
         routeHeights,
         coarse: true,
@@ -999,6 +1018,7 @@ export function Iso3DView({
       showTextures,
       ceiling,
       showCeiling,
+      peintures,
       cableRoutes,
       routeHeights,
     ],
@@ -1035,6 +1055,8 @@ export function Iso3DView({
             // Parquet et carrelage, d'après le nom des pièces : le réalisme
             // du sol coûte quelques arêtes, pas un calque de plus.
             matieres: matieresDesSols(rooms),
+            // La peinture choisie, face par face : voir `ui/peintures`.
+            peintures,
             routes: cableRoutes,
             routeHeights,
             /*
@@ -1077,6 +1099,7 @@ export function Iso3DView({
       showTextures,
       floors,
       rooms,
+      peintures,
       ceiling,
       showCeiling,
       fixtures,

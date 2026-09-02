@@ -44,6 +44,7 @@ const monter = (onCotes?: () => void) => {
         onHeight={() => {}}
         onDupliquer={() => {}}
         onScinder={() => {}}
+        onPeindre={() => {}}
       />,
     );
   });

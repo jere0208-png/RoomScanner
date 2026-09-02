@@ -268,6 +268,21 @@ describe('la tuile du catalogue se prend en main', () => {
     },
   });
 
+  /*
+    ON DÉMONTE APRÈS CHAQUE ÉPREUVE.
+
+    La tuile lance de courtes animations (l'enfoncement, la levée) : laissées
+    en vol quand le banc se termine, elles gardent un minuteur vivant, et
+    Jest signale un ouvrier qui refuse de rendre la main. Le défaut n'est pas
+    dans l'application — elle démonte proprement — mais un avertissement
+    qu'on laisse traîner finit par masquer un vrai.
+  */
+  let vivant: Rendu | null = null;
+  afterEach(() => {
+    renderer.act(() => vivant?.unmount());
+    vivant = null;
+  });
+
   const monter = (props: Partial<React.ComponentProps<typeof FurnitureSheet>>) => {
     let t!: Rendu;
     renderer.act(() => {
@@ -284,6 +299,7 @@ describe('la tuile du catalogue se prend en main', () => {
         />,
       );
     });
+    vivant = t;
     return t;
   };
 

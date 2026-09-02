@@ -136,6 +136,7 @@ describe('le bandeau d’une piece neuve', () => {
           onHeight={() => {}}
           onDupliquer={() => {}}
         onScinder={() => {}}
+        onPeindre={() => {}}
         />,
       );
     });

@@ -159,6 +159,15 @@ export interface RoomEntry {
   /** Couleurs du sol relevées au scan. */
   floor?: FloorData | null;
   /**
+   * LA PEINTURE CHOISIE POUR SES MURS — une clé de `ui/peintures`.
+   *
+   * Absent = le mur reste tel que le relevé l'a vu, ou au blanc du dessin.
+   * On garde la CLÉ et non la teinte : une palette qui s'ajuste d'une
+   * version à l'autre repeint alors les dossiers déjà faits, au lieu de les
+   * laisser avec un hexadécimal orphelin dont plus personne ne sait le nom.
+   */
+  peinture?: string;
+  /**
    * L'ÉTAGE de la pièce. Absent = rez-de-chaussée, comme pour les murs.
    * Ne pas confondre avec `floor`, qui est la couleur du SOL.
    */
@@ -1080,6 +1089,8 @@ interface ScanState {
   rooms: RoomEntry[];
   /** Renomme une pièce ; nom vide = plus de cartouche nommé. */
   setRoomName: (roomId: string, name: string) => void;
+  /** Peint les murs d'une pièce. `null` la ramène au blanc du dessin. */
+  setRoomPeinture: (roomId: string, cle: string | null) => void;
   /** Retire une pièce du scan (sa géométrie part avec elle). */
   removeRoom: (roomId: string) => void;
   /**
@@ -2457,6 +2468,33 @@ export const useScanStore = create<ScanState>((set, get) => {
         rooms: get().rooms.map((r) =>
           r.id === roomId
             ? { ...r, name: name.trim().slice(0, NOM_PIECE_MAX) }
+            : r,
+        ),
+        dirty: true,
+      });
+    },
+
+    /**
+     * PEINDRE LES MURS D'UNE PIÈCE.
+     *
+     * Un seul geste, annulable comme les autres. La clé s'enregistre avec
+     * le dossier ; `null` retire la peinture, et le mur retrouve la teinte
+     * que le scan lui avait relevée — ou le blanc du dessin.
+     */
+    setRoomPeinture: (roomId, cle) => {
+      const st = get();
+      const piece = st.rooms.find((r) => r.id === roomId);
+      if (!piece || (piece.peinture ?? null) === cle) return;
+      pushHistory(`peinture:${roomId}`);
+      set({
+        rooms: st.rooms.map((r) =>
+          r.id === roomId
+            ? cle
+              ? { ...r, peinture: cle }
+              // Le champ s'EFFACE plutot que de valoir « null » : un
+              // dossier relu ne doit pas avoir deux facons de dire
+              // « jamais peinte ».
+              : (({ peinture: _retiree, ...reste }) => reste)(r)
             : r,
         ),
         dirty: true,

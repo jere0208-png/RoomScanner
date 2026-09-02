@@ -95,6 +95,7 @@ export function RoomBar({
   onFusionner,
   onScinder,
   onRetirer,
+  onPeindre,
 }: {
   room: { id: string; name: string; neuve?: boolean };
   /** Surface au sol, quand le contour se referme. */
@@ -124,6 +125,14 @@ export function RoomBar({
   onFusionner?: () => void;
   onScinder: () => void;
   onRetirer?: () => void;
+  /**
+   * PEINDRE SES MURS — septième des dix améliorations.
+   *
+   * Elle est posée avec les gestes qui décrivent la pièce (cotes, hauteur)
+   * et non avec ceux qui changent le plan (scinder, fusionner) : une
+   * peinture ne touche pas à la géométrie, elle habille.
+   */
+  onPeindre: () => void;
 }) {
   /*
     LA HAUTEUR SE LIT, ELLE NE SE TOUCHE PAS.
@@ -209,6 +218,13 @@ export function RoomBar({
           d={SOLAIRES.elevations}
           styles={styles}
           onPress={onHeight}
+        />
+        <Geste
+          nom="Peindre les murs de la pièce"
+          mot="Peindre"
+          d={SOLAIRES.couleurs}
+          styles={styles}
+          onPress={onPeindre}
         />
         <Geste
           nom="Dupliquer la pièce"
