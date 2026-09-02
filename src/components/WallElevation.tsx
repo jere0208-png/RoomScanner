@@ -71,6 +71,7 @@ import {
   type FixtureKind,
 } from '../geometry/electrical';
 import {
+  avancementDesPieces,
   checkElectrical,
   fixturePlacement,
   heightRuleAt,
@@ -492,7 +493,15 @@ export function WallElevation({
     const pose = fixturePlacement(fixtures, walls, inputs);
     const socles = (f: (typeof fixtures)[number]) =>
       pose.get(f.id) === mien.id ? socketsOf(f.kind) : 0;
-    const poses = fixtures.reduce((n, f) => n + socles(f), 0);
+    /*
+      LE MÊME COMPTE QUE L'ANNEAU DU PLAN — `avancementDesPieces`. Il se
+      lit à deux endroits sur le même écran, à trente centimètres l'un de
+      l'autre : deux comptages du même nombre finissent par diverger, et
+      c'est l'utilisateur qui arbitre entre deux vérités.
+    */
+    const poses =
+      avancementDesPieces(rooms, walls, fixtures).get(mien.id)?.poses ??
+      fixtures.reduce((n, f) => n + socles(f), 0);
     // Cuisine : ce sont les socles du plan de travail qui manquent en
     // premier, et ceux-là se posent à 1,10 m, pas en plinthe.
     const hauts = fixtures.reduce(

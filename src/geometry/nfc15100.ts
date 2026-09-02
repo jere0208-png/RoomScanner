@@ -36,7 +36,7 @@ import {
   facePoint,
   wallFace,
 } from './electrical';
-import { wallQuadsOf, type Pt, type WallSeg } from './floorplan';
+import { roomParts, wallQuadsOf, type Pt, type WallSeg } from './floorplan';
 import {
   FIXTURES,
   postsOf,
@@ -602,6 +602,54 @@ export function fixturePlacement(
  * et l'app le prévoit toute seule. Ce cas ressort en simple information,
  * jamais en alerte.
  */
+/**
+ * OÙ EN EST CHAQUE PIÈCE — socles posés contre socles exigés.
+ *
+ * L'anneau du cartouche et le guide de l'établi lisent CE compte-là, et pas
+ * un autre : deux comptages du même nombre, à trente centimètres l'un de
+ * l'autre sur le même écran, finissent toujours par diverger.
+ *
+ * DEUX PIÈCES N'Y FIGURENT PAS, et c'est voulu :
+ *   — celle dont la norme n'exige aucun socle (dégagement, cellier) : un
+ *     anneau vide s'y lirait comme un reproche, alors qu'il n'y a rien à
+ *     poser ;
+ *   — celle dont on IGNORE l'usage (pas de nom, pas de type). `roomUse`
+ *     rend « autre » faute de mieux, et « autre » n'exige presque rien :
+ *     une pièce anonyme s'afficherait FINIE avec deux prises, quand la même
+ *     nommée « Chambre » en réclame trois. Le relevé passerait, le chantier
+ *     non — l'établi connaît ce piège depuis longtemps.
+ */
+export function avancementDesPieces(
+  rooms: { id: string; name: string; kind?: RoomKind | null; wallIds?: string[] }[],
+  walls: WallSeg[],
+  fixtures: Fixture[],
+): Map<string, { nom: string; poses: number; exiges: number; fini: boolean }> {
+  const inputs = roomInputsOf(rooms, roomParts(walls, rooms));
+  const pose = fixturePlacement(fixtures, walls, inputs);
+  const out = new Map<
+    string,
+    { nom: string; poses: number; exiges: number; fini: boolean }
+  >();
+  for (const piece of inputs) {
+    if (!usageConnu(piece.name, piece.kind)) continue;
+    const req = requirementFor(roomUse(piece.name, piece.kind), piece.area);
+    if (req.socles === 0) continue;
+    // Un socle double compte pour deux : la règle du métier, celle que le
+    // contrôle et le devis appliquent déjà (`socketsOf`).
+    const poses = fixtures.reduce(
+      (n, f) => n + (pose.get(f.id) === piece.id ? socketsOf(f.kind) : 0),
+      0,
+    );
+    out.set(piece.id, {
+      nom: piece.name,
+      poses,
+      exiges: req.socles,
+      fini: poses >= req.socles,
+    });
+  }
+  return out;
+}
+
 export function checkElectrical(
   rooms: RoomInput[],
   fixtures: Fixture[],

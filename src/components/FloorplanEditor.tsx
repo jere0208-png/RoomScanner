@@ -59,6 +59,7 @@ import {
   type WallRun,
   type WallSeg,
 } from '../geometry/floorplan';
+import { avancementDesPieces } from '../geometry/nfc15100';
 import type { ObjectData } from 'react-native-room-scan';
 import {
   faceX,
@@ -1745,6 +1746,31 @@ export function FloorplanEditor({
     return [...seen.entries()].map(([key, v]) => ({ key, ...v }));
   }, [walls]);
 
+  /**
+   * OÙ EN EST CHAQUE PIÈCE — l'anneau du cartouche.
+   *
+   * Socles posés contre socles exigés : équiper devient une partie à finir.
+   * Le compte est celui de la norme, partagé avec l'établi
+   * (`avancementDesPieces`) — deux comptages du même nombre finissent par
+   * diverger.
+   *
+   * IL NE PARAÎT QU'EN TRAIN D'ÉQUIPER, et c'est la clé. Un relevé
+   * antérieur avait refusé un point de conformité sur le cartouche :
+   * « rien sur le nom de la pièce ». Ce refus reste juste — quand on
+   * MONTRE son plan, rien ne doit ressembler à un reproche. Mais quand on
+   * POSE des prises, calque électrique allumé et édition ouverte, la même
+   * information devient l'aide qu'on cherchait. C'est le contexte qui
+   * change, pas le goût : la jauge s'affiche là où l'on travaille, et
+   * disparaît dès qu'on regarde.
+   */
+  const avancement = useMemo(
+    () =>
+      editable && showFixtures
+        ? avancementDesPieces(rooms, walls, fixtures)
+        : new Map<string, { nom: string; poses: number; exiges: number; fini: boolean }>(),
+    [editable, showFixtures, rooms, walls, fixtures],
+  );
+
   /*
     LES POSES SE VOIENT NAÎTRE — voir `Vivant`. Une pièce ajoutée, un
     meuble posé, une menuiserie percée : chacun salue d'une ondée, à sa
@@ -3039,6 +3065,70 @@ export function FloorplanEditor({
                       {l.t}
                     </SvgText>
                   ))}
+                  {(() => {
+                    /*
+                      L'ANNEAU DE PROGRESSION — socles posés / exigés.
+
+                      IL SE POSE HORS DE LA BOÎTE, à droite. Le dedans est
+                      arbitré au point près contre les cotes et les meubles
+                      (voir `cartouches`) : y glisser un rond élargirait
+                      l'emprise réservée et redistribuerait tout le plan
+                      pour un ornement. Dehors, il ne coûte rien à
+                      personne — et il ne prend pas le doigt, le cartouche
+                      reste le bouton de renommage.
+                    */
+                    const av = avancement.get(part.roomId);
+                    if (!av) return null;
+                    const R = 7;
+                    const cx = p.x + wpx / 2 + R + 3;
+                    const cy = p.y;
+                    const part01 = Math.max(
+                      0,
+                      Math.min(1, av.exiges > 0 ? av.poses / av.exiges : 0),
+                    );
+                    const teinte = av.fini ? c.green : c.blue;
+                    /*
+                      L'ARC EST UN TRAIT, PAS UN SECTEUR : un disque plein
+                      qui grandit se lit comme une tache ; un anneau qui se
+                      remplit se lit comme une jauge. Le tiret courant fait
+                      la part, le reste est laissé au fond.
+                    */
+                    const tour = 2 * Math.PI * R;
+                    return (
+                      <G pointerEvents="none">
+                        <Circle
+                          cx={cx}
+                          cy={cy}
+                          r={R}
+                          fill={c.surface}
+                          fillOpacity={0.85}
+                          stroke={c.line}
+                          strokeWidth={1.6}
+                        />
+                        {part01 > 0 && (
+                          <Circle
+                            testID={`anneau-${part.roomId}`}
+                            cx={cx}
+                            cy={cy}
+                            r={R}
+                            fill="none"
+                            stroke={teinte}
+                            strokeWidth={1.8}
+                            strokeLinecap="round"
+                            strokeDasharray={`${tour * part01} ${tour}`}
+                            /* Le départ à midi, comme une horloge : un arc
+                               qui part de trois heures se lit de travers. */
+                            transform={`rotate(-90 ${cx} ${cy})`}
+                          />
+                        )}
+                        {av.fini && (
+                          /* Fini : le point plein au centre dit « c'est
+                             bon » sans qu'on ait à compter les arcs. */
+                          <Circle cx={cx} cy={cy} r={2.6} fill={c.green} />
+                        )}
+                      </G>
+                    );
+                  })()}
                 </G>
               );
             })}

@@ -12922,6 +12922,39 @@ aucune fonction — il crée la CONDITION pour que celles d'avant se voient.
 il l'a refusée — une nuit n'a aucun sens sur un dessin vu de dessus. Elle
 vit sur la barre du VOLUME, comme le gabarit des volumes avant elle.
 
+### 2/10 — L'anneau de progression : équiper devient une partie à finir
+
+Sur le cartouche de chaque pièce, un petit anneau qui se remplit — socles
+posés contre socles exigés par la norme —, bleu tant qu'il manque, vert et
+plein quand le compte y est.
+
+**Le calcul existait, à un seul endroit** : l'établi du mur l'affichait pour
+LE mur ouvert. Or c'est une information de PIÈCE, et on la veut là où l'on
+travaille. Il devient une lecture partagée (`avancementDesPieces`) que
+l'établi reprend : deux comptages du même nombre, à trente centimètres l'un
+de l'autre sur le même écran, finissent toujours par diverger.
+
+**Le refus antérieur du patron est respecté.** Un relevé avait chassé le
+point de conformité du cartouche : « rien sur le nom de la pièce ». Ce refus
+reste juste — quand on MONTRE son plan, rien ne doit ressembler à un
+reproche. L'anneau ne paraît donc qu'en train d'ÉQUIPER : édition ouverte
+ET calque électrique allumé. C'est le contexte qui décide, pas le goût.
+
+Trois refus de plus, écrits dans la lecture : pas d'anneau sur une pièce que
+la norme n'équipe pas (un anneau vide sur un WC se lirait comme un
+reproche), pas d'anneau sur une pièce SANS NOM (« autre » n'exige presque
+rien : elle s'afficherait finie avec deux prises, quand la même nommée
+« Chambre » en réclame trois), et l'anneau se pose HORS de la boîte du
+cartouche — son dedans est arbitré au point près contre les cotes et les
+meubles, y glisser un rond redistribuerait tout le plan pour un ornement.
+
+**Le banc s'est trompé deux fois, le dessin jamais** : il a d'abord exigé
+qu'un socle double compte pour DEUX — la maison avait tranché l'inverse il y
+a longtemps (`socketsOf` : « deux socles sous une plaque comptent pour un
+socle au circuit ») ; puis il a cherché un anneau sur un plan SANS
+cartouche, le calque des surfaces partant éteint. Les deux corrections
+portent leur raison.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro
