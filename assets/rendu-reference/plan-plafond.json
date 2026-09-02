@@ -1,6 +1,7 @@
 {
  "type": "View",
  "props": {
+  "collapsable": false,
   "style": {
    "flex": 1,
    "backgroundColor": "#FFFFFF",

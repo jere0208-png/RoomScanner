@@ -1276,6 +1276,50 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     textAlign: 'center',
   },
   catDims: { color: c.inkFaint, fontSize: 9.5, fontWeight: '600', marginTop: 1 },
+  /*
+    LE GLISSER-POSER DU CATALOGUE.
+
+    La tuile prise en main se detache du fond ; la fenetre, elle, s'efface
+    pour laisser voir le plan qui est dessous — elle ne se FERME pas, ce qui
+    romprait le toucher en cours.
+  */
+  catCardEnMain: {
+    backgroundColor: c.blueSoft,
+    borderWidth: 1.5,
+    borderColor: c.blue,
+  },
+  catVoile: { width: '100%' },
+  catAide: {
+    color: c.inkFaint,
+    fontSize: 11.5,
+    fontWeight: '600',
+    marginTop: 3,
+    marginBottom: 2,
+  },
+  catFantomeCadre: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
+  /*
+    LE MEUBLE EN MAIN — au-dessus du doigt, jamais dessous : le pouce cache
+    exactement ce qu'on cherche a placer.
+  */
+  catFantome: {
+    position: 'absolute',
+    width: 110,
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderRadius: radius.md,
+    backgroundColor: c.surface,
+    opacity: 0.96,
+    ...shadowCard,
+    shadowOpacity: 0.3,
+  },
+  /* Le lacher ne tomberait nulle part : le fantome le dit AVANT le lacher. */
+  catFantomeRefus: { borderWidth: 1.5, borderColor: c.danger, opacity: 0.8 },
+  catFantomeNom: {
+    color: c.ink,
+    fontSize: 11.5,
+    fontWeight: '700',
+    marginTop: 2,
+  },
   /* Une carte de pouce, pas une pilule : trois par rangée, le symbole en
      grand, le nom dessous. */
   elecChip: {

@@ -13005,6 +13005,61 @@ celui que la vue emploie déjà pour s'incliner.
 retour du plan vers le volume, ni sur un dossier rouvert depuis la
 bibliothèque. Une animation qu'on revoit dix fois devient une attente.
 
+### 5/10 — Glisser-poser depuis le catalogue
+
+Poser un meuble demandait trois décisions pour un geste qui n'en vaut
+qu'une : toucher une tuile, répondre à « dans quelle pièce ? », puis
+rattraper au doigt le meuble atterri au centre de celle-ci. On MAINTIENT
+maintenant la tuile, le catalogue s'écarte, et le meuble se lâche à sa
+place sur le plan. La pièce se déduit du point ; plus personne ne la
+demande.
+
+**Maintenir, et pas tirer tout de suite** — le catalogue défile
+verticalement, un glissement immédiat appartient donc à la LISTE, et si la
+tuile s'en emparait on ne pourrait plus parcourir le catalogue. C'est le
+geste d'iOS, et il n'y en a pas d'autre de possible : la tuile prend le
+toucher dès l'appui, puis REND LA MAIN à la liste
+(`onResponderTerminationRequest`) tant qu'elle n'est pas levée. L'appui
+bref, lui, ne change pas : il pose toujours au centre d'une pièce, comme
+hier — le glisser-poser ajoute un geste, il n'en retire aucun.
+
+**Le catalogue s'efface, il ne se ferme pas.** Le fermer romprait le
+toucher en cours, et le meuble tomberait au premier centimètre. La fenêtre
+devient seulement transparente : le plan, qui est dessous, réapparaît, et
+le doigt continue de tenir sa tuile. Le clavier de la recherche, lui, se
+retire — on ne tire pas un meuble sur un plan qu'il cache.
+
+**Tout le poids du geste est dans l'atterrissage** (`geometry/lacher`), et
+c'est pour ça qu'il vit à part du rendu : un lâcher, ça vise mal.
+
+| Le doigt lâche… | Ce qui se passe |
+|---|---|
+| en plein milieu d'une pièce | le meuble se pose là, exactement |
+| dans un coin | l'emprise rentre en ENTIER, collée au coin visé — pas renvoyée au centre |
+| sur un mur (30 cm de tolérance) | il tombe dans la pièce d'à côté du trait |
+| dans une pièce trop petite | refus qui NOMME la pièce visée et la place qu'il faudrait |
+| hors de toute pièce | refus dit ; hors du plan, rien — c'est le geste du renoncement |
+
+Une pièce en L a un rectangle hors-tout plus grand qu'elle : le recalage
+peut y laisser un coin du meuble dehors. Les quatre coins sont donc
+vérifiés, et à défaut le meuble retombe au centre de la pièce — exactement
+où le catalogue posait hier. Un repli connu vaut mieux qu'un meuble à
+cheval sur une cloison, celui qu'on ne découvre qu'au devis trois jours
+plus tard.
+
+**Le refus se dit AVANT le lâcher** : le fantôme sous le doigt s'entoure de
+rouge et devient « Pas ici » dès que le point ne mène nulle part. Un refus
+qui n'arrive qu'après coup se vit comme une panne, et l'on recommence trois
+fois le même geste.
+
+**Le plan remonte de quoi viser** (`ViseurPlan`) — il est le seul à savoir
+où il est à l'écran et quelle échelle il porte. Son cadre se mesure au LEVER
+de la tuile, pas au lâcher : `measureInWindow` rend sa réponse plus tard, et
+un meuble posé une image après le doigt se pose à côté. Le conteneur du plan
+porte pour cela `collapsable={false}` — une vue fondue par le compilateur
+n'a pas de contrepartie native à mesurer. C'est la seule ligne qui change
+dans les planches de rendu de référence : le dessin, lui, est identique.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

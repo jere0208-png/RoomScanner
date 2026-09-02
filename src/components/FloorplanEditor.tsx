@@ -307,6 +307,7 @@ import {
 } from '../geometry/cotes';
 import { haptic, releaseHaptic } from '../ui/haptic';
 import { creerSeuil, estUnGlissement, estUnTap } from '../ui/geste';
+import { dansLeCadre, type CadreEcran } from '../geometry/lacher';
 import { DEBORD_DOIGT } from '../ui/bandeau';
 import { SOLAIRES } from '../ui/solaires';
 
@@ -353,6 +354,28 @@ export interface VuePlan {
   rot: number;
 }
 
+/**
+ * DE QUOI VISER LE PLAN DEPUIS L'EXTÉRIEUR — le glisser-poser du catalogue.
+ *
+ * Le plan est le seul à savoir où il est à l'écran et quelle échelle il
+ * porte : un meuble tiré depuis une fenêtre POSÉE PAR-DESSUS ne peut pas
+ * atterrir sans le lui demander. Il remonte donc ces deux services, et rien
+ * d'autre — l'écran n'a pas à connaître le zoom, la rotation, ni le cadrage.
+ *
+ * LA MESURE SE FAIT AU DÉBUT DU GESTE, pas au lâcher : `measureInWindow`
+ * rend sa réponse plus tard, et un meuble qui se pose une image après le
+ * doigt se pose à côté.
+ */
+export interface ViseurPlan {
+  /** Le cadre du plan en coordonnées de page. `null` s'il n'est pas monté. */
+  mesurer: (rendu: (cadre: CadreEcran | null) => void) => void;
+  /** Un point de page vers le plan, en mètres. `null` s'il tombe dehors. */
+  viser: (
+    page: { x: number; y: number },
+    cadre: CadreEcran,
+  ) => { x: number; z: number } | null;
+}
+
 interface Props {
   /** Cotes visibles le long des murs. */
   showMeasures: boolean;
@@ -360,6 +383,11 @@ interface Props {
   vueInitiale?: VuePlan;
   /** Cadrage courant, remonté à chaque geste : la 3D le reprend tel quel. */
   onView?: (v: VuePlan) => void;
+  /**
+   * Remonte de quoi VISER le plan depuis l'écran — le glisser-poser du
+   * catalogue. Appelé une fois au montage, et avec `null` au démontage.
+   */
+  onViseur?: (v: ViseurPlan | null) => void;
   /** Mode édition : sélection des murs + poignées de coin. */
   editable: boolean;
   selectedWallId: string | null;
@@ -568,6 +596,7 @@ export function FloorplanEditor({
   showMeasures,
   vueInitiale,
   onView,
+  onViseur,
   editable,
   selectedWallId,
   onSelectWall,
@@ -679,6 +708,9 @@ export function FloorplanEditor({
   const showSurfaces = useScanStore((s) => s.showSurfaces);
   const c = useTheme();
   const styles = getStyles(c);
+  /* Le conteneur du plan : c'est LUI qu'on mesure pour viser depuis
+     l'ecran, pas son parent, qui porte des marges. */
+  const hote = useRef<View>(null);
   const [layout, setLayout] = useState({ w: 0, h: 0 });
   const setNorth = useScanStore((s) => s.setNorth);
   /** La consigne d'orientation est affichée : le prochain appui valide. */
@@ -1780,8 +1812,44 @@ export function FloorplanEditor({
   const meublesNes = useNaissances(objects.map((o) => o.id));
   const menuiseriesNees = useNaissances(openings.map((o) => o.id));
 
+  /*
+    LE VISEUR — de quoi lâcher un meuble du catalogue à l'endroit du doigt.
+
+    Il se publie UNE SEULE FOIS et lit le cadrage courant dans une
+    référence. Le republier à chaque changement de cadrage voudrait dire un
+    rappel par image pendant qu'on promène le plan, pour une valeur dont
+    personne ne se sert entre deux gestes.
+  */
+  const cadrageVif = useRef(mapping);
+  cadrageVif.current = mapping;
+  const viseur = useMemo<ViseurPlan>(
+    () => ({
+      mesurer: (rendu) => {
+        const vue = hote.current;
+        if (!vue || typeof vue.measureInWindow !== 'function') {
+          rendu(null);
+          return;
+        }
+        vue.measureInWindow((x, y, w, h) => rendu({ x, y, w, h }));
+      },
+      viser: (page, cadre) => {
+        const m = cadrageVif.current;
+        if (!m) return null;
+        const local = dansLeCadre(page, cadre);
+        return local ? m.toMeters(local) : null;
+      },
+    }),
+    [],
+  );
+  useEffect(() => {
+    onViseur?.(viseur);
+    return () => onViseur?.(null);
+  }, [onViseur, viseur]);
+
   return (
     <View
+      ref={hote}
+      collapsable={false}
       style={styles.container}
       onLayout={(e) =>
         setLayout({

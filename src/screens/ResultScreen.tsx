@@ -39,7 +39,14 @@ import { Toolbar2D, Toolbar3D } from './result/ResultToolbar';
 import {
   FloorplanEditor,
   type VuePlan,
+  type ViseurPlan,
 } from '../components/FloorplanEditor';
+import {
+  lacherUnMeuble,
+  type CadreEcran,
+  type SalleCible,
+} from '../geometry/lacher';
+import type { Pt } from '../geometry/floorplan';
 import { SidePill } from '../components/SidePill';
 import { CeilingBar } from '../components/CeilingBar';
 import { HAUTEUR_BANDEAU_MEUBLE, ObjectBar } from '../components/ObjectBar';
@@ -1272,6 +1279,26 @@ export function ResultScreen() {
   const canvasRef = useRef<View>(null);
   const partageEnAttente = useRef<null | (() => void)>(null);
 
+  /*
+    LE GLISSER-POSER DU CATALOGUE — cinquième des dix améliorations.
+
+    Le plan remonte de quoi VISER (`ViseurPlan`) ; le catalogue, posé
+    par-dessus, remonte le point du doigt. L'écran est le seul à voir les
+    deux, c'est donc lui qui fait atterrir.
+
+    LE CADRE SE MESURE AU LEVER DE LA TUILE, pas au lâcher :
+    `measureInWindow` rend sa réponse plus tard, et un meuble posé une image
+    après le doigt se pose à côté. Quand la tuile se lève, on a une seconde
+    de geste devant soi — largement de quoi.
+  */
+  const viseurPlan = useRef<ViseurPlan | null>(null);
+  const cadrePlan = useRef<CadreEcran | null>(null);
+  const recevoirViseur = useCallback((v: ViseurPlan | null) => {
+    viseurPlan.current = v;
+  }, []);
+  /** Le lâcher tomberait-il dans une pièce ? Le fantôme du doigt le dit. */
+  const [poseValide, setPoseValide] = useState(true);
+
   // Départ vers l'export : ondes qui traversent toute la page puis fondu.
   const { width: winW, height: winH } = useWindowDimensions();
   const ringScale = (Math.max(winW, winH) * 2.4) / 120;
@@ -1476,11 +1503,15 @@ export function ResultScreen() {
   };
 
   /**
-   * Pose un meuble au centre de la pièce demandée, puis le sélectionne : un
-   * meuble qu'on vient de poser, on va le déplacer.
+   * Pose un meuble à un point du plan, puis le sélectionne : un meuble
+   * qu'on vient de poser, on va le déplacer.
+   *
+   * Un seul chemin de pose pour les deux gestes — l'appui bref qui vise le
+   * centre d'une pièce, et le glisser-poser qui vise le doigt. Deux chemins
+   * pour un même acte finissent toujours par diverger : l'un sélectionne le
+   * meuble, l'autre non, et on ne sait plus lequel des deux on regarde.
    */
-  const poserDans = (item: CatalogItem, cible: RoomPart | null) => {
-    const at = cible?.labelAt ?? { x: 0, z: 0 };
+  const poserAu = (item: CatalogItem, at: Pt) => {
     const id = addObject(item, at.x, at.z);
     setDraftObject(id);
     setQuete('');
@@ -1492,6 +1523,103 @@ export function ResultScreen() {
     // Les cotes restent CACHÉES : on vient de poser un meuble, on veut le
     // placer, pas le redimensionner. La pastille de mesure les appellera.
     setObjDims(false);
+    return id;
+  };
+
+  /** Pose un meuble au centre de la pièce demandée. */
+  const poserDans = (item: CatalogItem, cible: RoomPart | null) => {
+    poserAu(item, cible?.labelAt ?? { x: 0, z: 0 });
+  };
+
+  /** Les pièces du niveau, telles que l'atterrissage les demande. */
+  const sallesDuLacher = (): SalleCible[] =>
+    parts
+      .filter((p) => p.surface)
+      .map((p) => ({
+        roomId: p.roomId,
+        pts: p.surface!.pts,
+        centre: p.labelAt,
+      }));
+
+  /** Le point du doigt, en mètres sur le plan. `null` s'il est hors cadre. */
+  const viserLePlan = (page: { x: number; y: number }): Pt | null => {
+    const v = viseurPlan.current;
+    const cadre = cadrePlan.current;
+    if (!v || !cadre) return null;
+    return v.viser(page, cadre);
+  };
+
+  /**
+   * LE MEUBLE EST EN MAIN, au-dessus de ce point.
+   *
+   * On mesure le cadre du plan à la première image du geste, puis on dit au
+   * catalogue si le lâcher tomberait quelque part : le fantôme sous le
+   * doigt change d'air, et l'on sait AVANT de lever le doigt si le meuble
+   * va se poser. Un refus qui n'arrive qu'après coup se vit comme une
+   * panne.
+   */
+  const suivreLeMeuble = (item: CatalogItem, page: { x: number; y: number }) => {
+    if (!cadrePlan.current) {
+      viseurPlan.current?.mesurer((c) => {
+        cadrePlan.current = c;
+      });
+    }
+    const monde = viserLePlan(page);
+    const ok =
+      monde !== null &&
+      lacherUnMeuble({ width: item.w, depth: item.d }, monde, sallesDuLacher())
+        .pose;
+    setPoseValide(ok);
+  };
+
+  /**
+   * LE DOIGT SE LÈVE : le meuble atterrit, ou l'on dit pourquoi non.
+   *
+   * Trois refus, et chacun a ses mots. Hors du plan : rien ne se passe, le
+   * catalogue revient — c'est le geste qu'on fait pour renoncer, il ne doit
+   * pas produire de message. Hors de toute pièce : on le dit, parce que le
+   * doigt était SUR le dessin et que le silence passerait pour un bogue.
+   * Trop grand : on nomme la pièce visée et la place qu'il faudrait.
+   */
+  const lacherLeMeuble = (
+    item: CatalogItem,
+    page: { x: number; y: number } | null,
+  ) => {
+    setPoseValide(true);
+    cadrePlan.current = null;
+    if (!page) return;
+    const monde = viserLePlan(page);
+    if (!monde) return;
+    const salles = sallesDuLacher();
+    const verdict = lacherUnMeuble(
+      { width: item.w, depth: item.d },
+      monde,
+      salles,
+    );
+    if (!verdict.pose) {
+      haptic('butee');
+      if (verdict.raison === 'trop-grand') {
+        const salle = salles.find((x) => x.roomId === verdict.roomId);
+        const e = salle ? roomExtent(salle.pts) : null;
+        const nom = rooms.find((r) => r.id === verdict.roomId)?.name ?? 'pièce';
+        astuce(
+          e
+            ? `${item.label} ne rentre pas : ${nom} n'offre que ${fr(
+                Math.min(e.width, e.depth),
+                2,
+              )} × ${fr(Math.max(e.width, e.depth), 2)} m.`
+            : `${item.label} ne rentre pas dans ${nom}.`,
+          { icone: 'meubles' },
+        );
+      } else {
+        astuce('Lâchez le meuble à l’intérieur d’une pièce.', {
+          icone: 'meubles',
+        });
+      }
+      return;
+    }
+    poserAu(item, verdict.at);
+    haptic('succes');
   };
 
   /**
@@ -3212,6 +3340,8 @@ export function ResultScreen() {
           <FloorplanEditor
             vueInitiale={vuePlan}
             onView={setVuePlan}
+            /* De quoi lâcher un meuble du catalogue à l'endroit du doigt. */
+            onViseur={recevoirViseur}
             cableRoutes={showRoutes ? cheminements?.traces : undefined}
             showFixtures={showFixtures}
             circuitMarks={showRoutes ? marks : undefined}
@@ -5020,6 +5150,11 @@ export function ResultScreen() {
         onQuete={setQuete}
         onClose={() => setCatalogue(false)}
         onPick={placeObject}
+        /* Maintenue, la tuile se tire jusque sur le plan : le catalogue
+           s'efface, le meuble suit le doigt, et il atterrit où on le lâche. */
+        onGlisser={suivreLeMeuble}
+        onLacher={lacherLeMeuble}
+        poseValide={poseValide}
       />
 
       {/* ---------- Électricité : catalogue, puis le mur vu de face ---------- */}
