@@ -4,6 +4,21 @@
 <dict>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
+	<!-- L'APPUI LONG SUR L'ICONE : le meme raccourci que la phrase de Siri.
+	     Deux chemins, une seule demande — voir AppDelegate.swift. -->
+	<key>UIApplicationShortcutItems</key>
+	<array>
+		<dict>
+			<key>UIApplicationShortcutItemType</key>
+			<string>nouveau-releve</string>
+			<key>UIApplicationShortcutItemTitle</key>
+			<string>Nouveau relevé</string>
+			<key>UIApplicationShortcutItemSubtitle</key>
+			<string>Scanner une pièce</string>
+			<key>UIApplicationShortcutItemIconType</key>
+			<string>UIApplicationShortcutIconTypeCapturePhoto</string>
+		</dict>
+	</array>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>fr</string>
 	<key>CFBundleLocalizations</key>

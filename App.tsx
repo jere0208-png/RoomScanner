@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { StatusBar } from 'react-native';
+import { AppState, StatusBar } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useTheme } from './src/theme';
 import { HomeScreen } from './src/screens/HomeScreen';
@@ -27,6 +27,8 @@ import { usePannes } from './src/ui/journalPannes';
 import { PremierLancement } from './src/components/PremierLancement';
 import { usePremieresFois } from './src/store/premieresFois';
 import { useScanStore } from './src/store/scanStore';
+import { prendreLaDemande, suiteDuRaccourci } from './src/ui/raccourci';
+import { astuce } from './src/ui/astuce';
 import { useAccountStore } from './src/store/accountStore';
 
 /**
@@ -101,6 +103,50 @@ function Application() {
       // comme ils l'ont toujours fait.
     });
   }, [loadSaves, chargerCompte, chargerLesPremieresFois, chargerLesPannes]);
+
+  /*
+    « DIS SIRI, NOUVEAU RELEVÉ » — et l'appui long sur l'icône.
+
+    L'écoute vit ICI, dans le seul composant toujours monté : la demande peut
+    arriver alors que l'accueil ne l'est pas — on dit la phrase en marchant,
+    l'application était restée sur un plan.
+
+    ELLE SE PREND AU LANCEMENT ET À CHAQUE RETOUR AU PREMIER PLAN. Le
+    lancement à froid est le cas le plus fréquent (on parle justement quand
+    l'app est fermée) ; le retour couvre l'autre, où iOS ramène l'app sans
+    la relancer.
+
+    ET C'EST L'ACCUEIL QUI SCANNE, par son propre chemin — garde du palier
+    gratuit comprise. Une porte dérobée qui contournerait l'offre serait un
+    défaut, pas une facilité.
+  */
+  useEffect(() => {
+    let vivant = true;
+    const traiter = async () => {
+      const demande = await prendreLaDemande();
+      if (!vivant || !demande) return;
+      const st = useScanStore.getState();
+      const suite = suiteDuRaccourci({
+        demande,
+        screen: st.screen,
+        dirty: st.dirty,
+      });
+      if (suite.faire === 'scanner') {
+        if (st.screen !== 'home') st.setScreen('home');
+        st.setRaccourciEnAttente(true);
+      } else if (suite.faire === 'dire') {
+        astuce(suite.message, { icone: 'save' });
+      }
+    };
+    traiter();
+    const abonne = AppState.addEventListener('change', (etat) => {
+      if (etat === 'active') traiter();
+    });
+    return () => {
+      vivant = false;
+      abonne.remove();
+    };
+  }, []);
 
   /*
     LES PLANS DU COMPTE REDESCENDENT DÈS QUE LES DEUX SONT LÀ.

@@ -38,6 +38,12 @@ RCT_EXTERN_METHOD(poser:(NSString *)nom
                   reject:(RCTPromiseRejectBlock)reject)
 @end
 
+// « Dis Siri, nouveau releve » : voir RoomScanRaccourci.
+@interface RCT_EXTERN_MODULE(RoomScanRaccourci, NSObject)
+RCT_EXTERN_METHOD(prendre:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+@end
+
 @interface RCT_EXTERN_MODULE(RoomScanAccount, NSObject)
 RCT_EXTERN_METHOD(accountMarker:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
 RCT_EXTERN_METHOD(setAccountMarker:(NSString *)json

@@ -60,6 +60,10 @@ const FILIGRANE_OPACITE = 0.07;
 
 export function HomeScreen() {
   const supported = useScanStore((s) => s.supported);
+  const raccourciEnAttente = useScanStore((s) => s.raccourciEnAttente);
+  const setRaccourciEnAttente = useScanStore(
+    (s) => s.setRaccourciEnAttente,
+  );
   const setSupported = useScanStore((s) => s.setSupported);
   const error = useScanStore((s) => s.error);
   const saves = useScanStore((s) => s.saves);
@@ -143,6 +147,37 @@ export function HomeScreen() {
     },
     [peutCreerPlan, ouvrirSurprise, commencerAuClavier],
   );
+
+  /*
+    LE RACCOURCI SE CONSOMME ICI — « Dis Siri, nouveau relevé ».
+
+    Il ne fait rien de plus que le bouton, et c'est le but : MÊME chemin,
+    MÊME garde du palier gratuit. Une porte dérobée qui contournerait
+    l'offre serait un défaut, pas une facilité.
+
+    ON ATTEND QUE LA COMPATIBILITÉ SOIT CONNUE. `supported` vaut `null`
+    pendant la vérification du capteur : consommer la demande à cet
+    instant-là, c'est la perdre — le scan ne partirait pas, et rien ne
+    dirait pourquoi. On laisse le drapeau levé jusqu'à ce que le téléphone
+    ait répondu.
+  */
+  useEffect(() => {
+    if (!raccourciEnAttente || supported === null) return;
+    setRaccourciEnAttente(false);
+    if (supported !== true) return;
+    if (!peutCreerPlan()) {
+      ouvrirSurprise();
+      return;
+    }
+    start();
+  }, [
+    raccourciEnAttente,
+    supported,
+    setRaccourciEnAttente,
+    peutCreerPlan,
+    ouvrirSurprise,
+    start,
+  ]);
 
   // Fondu en cascade : chaque bloc apparaît juste après le précédent.
   const fadeIn = (i: number) => {

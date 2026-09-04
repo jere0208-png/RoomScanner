@@ -1582,6 +1582,16 @@ interface ScanState {
   setShowTextures: (v: boolean) => void;
 
   setScreen: (s: Screen) => void;
+  /**
+   * UN RACCOURCI A DEMANDÉ UN RELEVÉ — voir `ui/raccourci`.
+   *
+   * Le drapeau vit ici et non dans l'accueil parce que la demande peut
+   * arriver alors que l'accueil n'est même pas monté : on dit la phrase
+   * en marchant, l'app était restée sur un plan. L'accueil le consomme
+   * quand il paraît, et le scan part par SON chemin — celui du bouton.
+   */
+  raccourciEnAttente: boolean;
+  setRaccourciEnAttente: (v: boolean) => void;
   setSupported: (v: boolean) => void;
   setScanning: (v: boolean) => void;
   setPaused: (v: boolean) => void;
@@ -4713,6 +4723,10 @@ export const useScanStore = create<ScanState>((set, get) => {
       }),
 
     setScreen: (screen) => set({ screen }),
+
+    raccourciEnAttente: false,
+    setRaccourciEnAttente: (raccourciEnAttente) =>
+      set({ raccourciEnAttente }),
     setSupported: (supported) => set({ supported }),
     setScanning: (scanning) => {
       set({ scanning });

@@ -13272,6 +13272,60 @@ lève son alerte à chaque appel, même pour reposer l'icône déjà en place. E
 l'icône n'est PAS reposée au démarrage — elle est déjà sur l'écran
 d'accueil ; on ne lit le réglage que pour le montrer.
 
+### 10/10 — « Dis Siri, nouveau relevé »
+
+Un électricien arrive sur un chantier les mains prises. Sortir le téléphone,
+le déverrouiller, trouver l'icône, attendre l'accueil, viser le bouton : cinq
+gestes pour commencer ce qu'il est venu faire. La phrase les remplace, et
+l'appui long sur l'icône aussi — **le même raccourci, deux chemins** : un
+`AppIntent` pour Siri et Spotlight, un `UIApplicationShortcutItems` pour
+l'icône. Un raccourci qui se comporterait autrement selon le chemin emprunté
+est un raccourci qu'on n'ose plus employer.
+
+**Il ne franchit pas la barrière du palier gratuit.** L'intention ne lance
+pas le relevé elle-même : elle pose une demande, et c'est l'accueil qui
+l'exécute par SON chemin — `peutCreerPlan` puis `start`, exactement celui du
+bouton. Une porte dérobée qui contournerait l'offre serait un défaut, pas une
+facilité.
+
+**Ce qui se mesure, c'est ce qu'on fait de la demande** (`ui/raccourci`). Un
+raccourci arrive à un moment, et l'application est quelque part :
+
+| L'app est… | Ce qui se passe |
+|---|---|
+| sur l'accueil | on scanne |
+| ailleurs, rien de modifié | on scanne aussi |
+| sur un plan MODIFIÉ | refus, et on dit pourquoi |
+| déjà en train de scanner | rien |
+| demande d'une version future | ignorée, jamais devinée |
+
+Le refus sur un plan modifié est le cas qui compte : partir scanner perdrait
+le travail en cours, et personne ne relie une perte à une phrase dite trente
+secondes plus tôt. Le silence serait pire encore — on croirait que le
+raccourci n'a pas marché, on le redirait, et le plan serait perdu au second
+essai.
+
+**L'écoute vit dans `App.tsx`**, le seul composant toujours monté : la demande
+peut arriver alors que l'accueil ne l'est pas. Elle est prise au lancement ET
+à chaque retour au premier plan — le lancement à froid est le cas fréquent
+(on parle justement quand l'app est fermée), le retour couvre l'autre. Et
+l'accueil **attend de savoir si le téléphone sait scanner** avant de consommer
+le drapeau : `supported` vaut `null` pendant la vérification du capteur, et
+consommer là, c'est perdre la demande sans rien dire.
+
+**La demande se PREND, elle ne se lit pas** : une demande qui reste écrite
+redémarre un scan à chaque retour au premier plan — on quitte l'application
+pour prendre une photo, on revient, et le relevé recommence.
+
+**Deux détails d'implantation qui ont dicté la forme.** L'`AppShortcutsProvider`
+doit être compilé dans le target de l'application : le système ne va pas le
+chercher dans une bibliothèque liée. Or ajouter un fichier au target demande
+de retoucher à la main `project.pbxproj`, sans compilateur local pour dire si
+l'on s'est trompé — le code vit donc dans `AppDelegate.swift`, qui y est
+déjà. Et comme l'application voit la bibliothèque des modules natifs mais pas
+l'inverse, la demande voyage par `UserDefaults`, le seul endroit que les deux
+côtés voient — et qui survit à un lancement à froid.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro
