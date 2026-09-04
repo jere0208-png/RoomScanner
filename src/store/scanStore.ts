@@ -14,6 +14,7 @@ import {
   deletePhotoFiles,
   reposerDuCoffre,
 } from '../ui/photos';
+import { bornerCalage, CALAGE_NEUTRE, type Calage } from '../ui/calage';
 import { identiteDuCompte, useAccountStore } from './accountStore';
 import {
   insetOnRing,
@@ -212,6 +213,14 @@ export interface ScanPhoto {
   asset?: string;
   /** Horodatage de la prise de vue. */
   at: number;
+  /**
+   * SON CALAGE SUR L'ÉLÉVATION DU MUR — absent tant qu'on ne l'a pas bougée.
+   *
+   * En fractions du mur, jamais en points d'écran : un calage retenu en
+   * points ne veut plus rien dire sur un autre téléphone ni après une
+   * rotation. Voir `ui/calage`.
+   */
+  calage?: Calage;
 }
 
 /** Ce qu'un brouillon retient : de quoi reprendre là où l'on s'est arrêté. */
@@ -1091,6 +1100,8 @@ interface ScanState {
   setRoomName: (roomId: string, name: string) => void;
   /** Peint les murs d'une pièce. `null` la ramène au blanc du dessin. */
   setRoomPeinture: (roomId: string, cle: string | null) => void;
+  /** Cale une photo sur l'élévation de son mur. `null` la remet au neutre. */
+  setPhotoCalage: (photoId: string, calage: Calage | null) => void;
   /** Retire une pièce du scan (sa géométrie part avec elle). */
   removeRoom: (roomId: string) => void;
   /**
@@ -2497,6 +2508,43 @@ export const useScanStore = create<ScanState>((set, get) => {
               : (({ peinture: _retiree, ...reste }) => reste)(r)
             : r,
         ),
+        dirty: true,
+      });
+    },
+
+    /**
+     * CALER UNE PHOTO SUR L'ÉLÉVATION DE SON MUR.
+     *
+     * Le calage est BORNÉ à l'entrée : ce qui s'enregistre doit être sain.
+     * Un calage aberrant écrit dans le dossier ressort tel quel à la
+     * réouverture, et le garde-fou du dessin n'aurait plus rien à corriger
+     * si personne ne retouche la photo.
+     *
+     * Un calage de repérage n'entre PAS dans l'historique d'annulation : on
+     * le règle au doigt, en continu, et vingt points de reprise pour un
+     * geste rendraient le bouton « Annuler » inutilisable.
+     */
+    setPhotoCalage: (photoId, calage) => {
+      const st = get();
+      if (!st.photos.some((p) => p.id === photoId)) return;
+      const sain = calage ? bornerCalage(calage) : null;
+      const neutre =
+        !sain ||
+        (sain.dx === CALAGE_NEUTRE.dx &&
+          sain.dy === CALAGE_NEUTRE.dy &&
+          sain.k === CALAGE_NEUTRE.k);
+      set({
+        photos: st.photos.map((p) => {
+          if (p.id !== photoId) return p;
+          // Le champ s'EFFACE au neutre : une photo jamais calée et une
+          // photo remise à neuf se relisent pareil.
+          if (neutre) {
+            const copie = { ...p };
+            delete copie.calage;
+            return copie;
+          }
+          return { ...p, calage: sain };
+        }),
         dirty: true,
       });
     },

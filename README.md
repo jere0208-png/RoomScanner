@@ -13143,6 +13143,51 @@ mettre à `null` : un dossier relu ne doit pas avoir deux façons de dire
 d'annulation — la garde passe avant le point de reprise, comme partout
 ailleurs dans ce magasin.
 
+### 8/10 — La photo du mur derrière son élévation
+
+L'établi dessine un mur vu de face, et l'on y pose les prises. À côté, dans
+un bouton, dormait une photo DE CE MUR — prise sur place une minute plus
+tôt, pour se souvenir de la gaine qui en sort. Les deux ne se sont jamais
+rencontrées : on ouvrait la photo en grand, on la refermait, et on replaçait
+sa prise de mémoire.
+
+Elle se pose maintenant dans le rectangle EXACT du mur, derrière le dessin,
+et un **rideau** qu'on tire découvre l'un ou l'autre — à gauche ce qui
+existe, à droite ce qu'on projette. C'est l'avant/après du chantier.
+
+**C'est un repère, pas une cote, et l'écran le dit en toutes lettres.** Une
+photo prise à main levée, de biais, ne mesure rien. La caler automatiquement
+demanderait de redresser la perspective — et une photo mal redressée est
+PIRE qu'une photo brute : on y placerait des prises au mauvais endroit en
+croyant mesurer. On la pose donc au mieux (elle couvre le mur, proportions
+gardées) et on donne le geste pour la caler à la main : « Caler la photo »,
+puis on la pousse et on la pince.
+
+**Le calage se compte en fractions du mur, jamais en points d'écran.** Un
+calage retenu en points ne veut plus rien dire sur un autre téléphone ni
+après une rotation : le même dossier ouvert sur un iPad retrouverait sa
+photo à trente centimètres du mur. Il est borné à l'entrée du magasin et pas
+seulement au dessin — un calage aberrant écrit dans le dossier ressort tel
+quel à la réouverture. Et il n'entre pas dans l'historique d'annulation : on
+le règle au doigt, en continu, et vingt points de reprise pour un geste
+rendraient « Annuler » inutilisable.
+
+**Le calque se monte EN DEUX, de part et d'autre du dessin.** La photo doit
+être sous le dessin — sans quoi elle cacherait les prises qu'on est venu
+poser — et sa poignée au-dessus, sans quoi on ne pourrait pas l'attraper.
+Deux enfants d'un même parent s'empilent dans leur ordre d'écriture :
+`CalquePhotoFond` avant le SVG, `CalquePhotoPoignee` après. Plutôt qu'un
+`zIndex` négatif, qui marche jusqu'au jour où quelqu'un ajoute un troisième
+calque. Le fond ne prend JAMAIS le doigt : l'établi sert à poser des
+appareils.
+
+**Le rideau est le seul réglage visible.** Un curseur d'opacité, une bascule,
+un choix de photo et un mode calage feraient quatre commandes pour un
+calque. On tire le rideau, et c'est tout. La photo montrée est la DERNIÈRE
+prise sur ce mur — celle qu'on vient de prendre, donc celle qu'on veut voir ;
+un sélecteur ferait une commande de plus pour un cas rare, sur un établi
+déjà chargé.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

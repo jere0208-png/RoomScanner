@@ -97,6 +97,7 @@ import {
 import { RoomScan } from 'react-native-room-scan';
 import { useScanStore } from '../store/scanStore';
 import { haptic } from '../ui/haptic';
+import { CalquePhotoFond, CalquePhotoPoignee } from './CalquePhoto';
 import { SOLAIRES } from '../ui/solaires';
 import { CloseCross } from './CloseCross';
 import { wallLabel } from '../geometry/naming';
@@ -256,12 +257,24 @@ export function WallElevation({
   const objects = useScanStore((s) => s.objects);
   const addPhoto = useScanStore((s) => s.addPhoto);
   const photos = useScanStore((s) => s.photos);
+  const setPhotoCalage = useScanStore((s) => s.setPhotoCalage);
   const north = useScanStore((s) => s.north);
   const clearPendingJoin = useScanStore((s) => s.clearPendingJoin);
   const c = useTheme();
   const styles = getStyles(c);
 
   const [layout, setLayout] = useState({ w: 0, h: 0 });
+  /*
+    LE CALQUE PHOTO — l'avant/après du chantier.
+
+    Le rideau s'ouvre à MOITIÉ quand on allume le calque : ouvert en grand,
+    on ne voit plus le dessin qu'on est venu faire ; fermé, on ne voit pas
+    qu'il s'est passé quelque chose. À moitié, les deux se comparent d'un
+    coup d'œil, ce qui est tout l'objet.
+  */
+  const [calque, setCalque] = useState(false);
+  const [rideau, setRideau] = useState(0.5);
+  const [calant, setCalant] = useState(false);
   /** La hauteur de l'écran : c'est elle qui borne le dessin. */
   const { height: hauteurEcran } = useWindowDimensions();
   /*
@@ -848,6 +861,26 @@ export function WallElevation({
     anticipé du mur introuvable, et un hook ne se place pas là.
   */
   const mesPhotos = photos.filter((p) => p.wallId === wallId);
+  /*
+    LA PHOTO DU CALQUE : LA DERNIÈRE PRISE SUR CE MUR.
+
+    Un mur peut en porter plusieurs — un plan large, puis le détail d'un
+    boîtier. La dernière est celle qu'on vient de prendre, donc celle qu'on
+    veut voir ; offrir un sélecteur ferait une commande de plus pour un cas
+    rare, sur un établi déjà chargé.
+  */
+  const photoDuCalque =
+    mesPhotos.length > 0
+      ? mesPhotos.reduce((a, b) => (b.at >= a.at ? b : a))
+      : null;
+  /** Le rectangle du mur à l'écran : c'est là, et pas ailleurs, que la
+   *  photo se pose — posée n'importe où sur le cadre, elle ne se compare
+   *  à rien. */
+  const cadreDuMur =
+    face && scale > 0
+      ? { left: px(0), top: py(H), w: face.len * scale, h: H * scale }
+      : null;
+  const calqueVisible = calque && !!photoDuCalque && !!cadreDuMur;
   const roomName =
     rooms.find((r) => r.id === roomOf(wall))?.name ?? '';
   /**
@@ -1219,6 +1252,22 @@ export function WallElevation({
           })
         }
         {...pan.panHandlers}>
+        {/*
+          LE CALQUE PHOTO, SOUS LE DESSIN.
+
+          Il occupe le rectangle EXACT du mur — c'est ce qui lui donne son
+          sens : une photo posée n'importe où sur le cadre ne se compare à
+          rien. Il ne prend le doigt qu'en mode calage ; le reste du temps,
+          l'établi sert à poser des appareils.
+        */}
+        {calqueVisible && (
+          <CalquePhotoFond
+            cadre={cadreDuMur!}
+            uri={`file://${photoDuCalque!.path}`}
+            calage={photoDuCalque!.calage}
+            rideau={rideau}
+          />
+        )}
         {scale > 0 && (
           <Svg width={layout.w} height={layout.h}>
             <Defs>
@@ -1842,6 +1891,32 @@ export function WallElevation({
             )}
           </Svg>
         )}
+        {/*
+          CE QUE VAUT LA PHOTO, DIT EN TOUTES LETTRES.
+
+          Posée sur une élévation cotée, elle se prend pour une élévation
+          cotée. Elle ne l'est pas : prise à main levée, de biais, elle ne
+          mesure rien.
+        */}
+        {calqueVisible && (
+          <Text style={styles.calqueNote} pointerEvents="none">
+            {calant
+              ? 'Poussez et pincez la photo pour la caler sur le mur'
+              : 'Repère visuel — la photo n’est pas à l’échelle'}
+          </Text>
+        )}
+        {/* LA POIGNÉE DU RIDEAU — au-dessus du dessin, sinon on ne
+            l'attraperait pas. Voir `CalquePhoto`. */}
+        {calqueVisible && (
+          <CalquePhotoPoignee
+            cadre={cadreDuMur!}
+            calage={photoDuCalque!.calage}
+            onCalage={(cal) => setPhotoCalage(photoDuCalque!.id, cal)}
+            rideau={rideau}
+            onRideau={setRideau}
+            calant={calant}
+          />
+        )}
 
         {/*
           LA LOUPE DU GLISSEMENT — les cotes vivantes, AU-DESSUS du doigt.
@@ -2297,6 +2372,53 @@ export function WallElevation({
               },
             },
             {
+              /*
+                LE CALQUE : LA PHOTO DERRIÈRE LE DESSIN.
+
+                Huitième des dix améliorations, et c'est un REPÈRE, pas une
+                cote — une photo prise à main levée, de biais, ne mesure
+                rien. Le bouton ne paraît que s'il y a une photo de ce mur :
+                un bouton qui ne commande rien donne à l'écran l'air d'être
+                en panne.
+              */
+              key: 'calque',
+              label: calque ? 'Masquer la photo' : 'Photo au fond',
+              on: mesPhotos.length > 0,
+              tint: calque ? c.blue : c.ink,
+              paths: [],
+              plein: SOLAIRES.image,
+              press: () => {
+                setCalant(false);
+                setCalque((v) => !v);
+                // Le rideau repart à moitié : ouvert en grand on ne voit
+                // plus le dessin, fermé on ne voit pas qu'il s'est passé
+                // quelque chose.
+                setRideau(0.5);
+                haptic('leger');
+              },
+            },
+            {
+              /*
+                CALER LA PHOTO — le seul geste qui l'aligne.
+
+                Elle ne s'aligne pas toute seule, et on ne prétend pas le
+                contraire : redresser la perspective d'une photo de chantier
+                donnerait un faux plan, sur lequel on placerait des prises au
+                mauvais endroit en croyant mesurer. On la pousse et on la
+                pince à la main, et le calage reste avec elle.
+              */
+              key: 'caler',
+              label: calant ? 'Terminer le calage' : 'Caler la photo',
+              on: calqueVisible,
+              tint: calant ? c.blue : c.ink,
+              paths: [],
+              plein: SOLAIRES.centrer,
+              press: () => {
+                setCalant((v) => !v);
+                haptic('leger');
+              },
+            },
+            {
               /**
                * RÉPÉTER — six socles identiques ne sont plus six poses.
                *
@@ -2742,6 +2864,23 @@ const getStyles = themedStyles((c: Palette) =>
       backgroundColor: c.surfaceSunken,
     },
     calqueOn: { backgroundColor: c.inkSoft },
+    /*
+      CE QUE VAUT LA PHOTO DU CALQUE, dit en toutes lettres.
+
+      Posee sur une elevation cotee, elle se prend pour une elevation cotee.
+      Elle ne l'est pas — prise a main levee, de biais, elle ne mesure rien —
+      et le dire est la seule facon honnete de la montrer.
+    */
+    calqueNote: {
+      position: 'absolute',
+      left: 10,
+      right: 10,
+      top: 8,
+      textAlign: 'center',
+      color: c.inkFaint,
+      fontSize: 10.5,
+      fontWeight: '700',
+    },
     calqueText: { color: c.inkSoft, fontSize: 11, fontWeight: '800' },
     calqueTextOn: { color: '#FFFFFF' },
     /** LE BANDEAU DE CONFORMITÉ : une ligne, une jauge, un geste. */
