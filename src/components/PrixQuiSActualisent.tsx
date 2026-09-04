@@ -221,6 +221,7 @@ export function BandeauTarifs({
   enseigne,
   jour,
   duJour = false,
+  releves = false,
   onVerifier,
 }: {
   etat: 'actualise' | 'ajour' | 'horsligne';
@@ -238,20 +239,39 @@ export function BandeauTarifs({
    * mauvaise.
    */
   duJour?: boolean;
+  /**
+   * LE CATALOGUE PORTE-T-IL DES PRIX QU'ON EST ALLÉ VOIR ?
+   *
+   * Relevé du patron, il y a quelques versions : « le "prix non vérifiés"
+   * n'inspire pas confiance alors qu'ils SONT vérifiés ». Sans réseau, un
+   * catalogue passé en rayon la semaine dernière n'est pas « non vérifié » :
+   * ce sont deux questions différentes — « a-t-on pu joindre le serveur ? »
+   * et « ces prix ont-ils été vus quelque part ? » — et l'on répondait à la
+   * mauvaise.
+   */
+  releves?: boolean;
   onVerifier?: () => void;
 }) {
   const c = useTheme();
   const styles = getStyles(c);
-  const horsLigne = etat === 'horsligne' && !duJour;
+  const horsLigne = etat === 'horsligne' && !duJour && !releves;
   /*
-    QUATRE ÉTATS, ET LE PLUS FORT GAGNE. « Vérifiés aujourd'hui » est la
-    phrase la plus vraie qu'on puisse écrire quand elle est vraie : elle dit
-    QUAND on est allé voir, ce que « actualisés » et « à jour » ne disent
-    qu'en creux.
+    CINQ ÉTATS, ET LE PLUS FORT GAGNE. « Vérifiés aujourd'hui » est la phrase
+    la plus vraie qu'on puisse écrire quand elle est vraie : elle dit QUAND on
+    est allé voir, ce que « actualisés » et « à jour » ne disent qu'en creux.
 
-    ET ELLE DATE LE CATALOGUE, PAS CHAQUE LIGNE. Trente-sept prix ont été vus
-    en rayon, les autres sont recalés et le disent, ligne par ligne, comme
-    avant. Ce qui est affirmé ici, c'est la date du dernier passage.
+    ET ELLE DATE LE CATALOGUE PAR SON ARTICLE LE PLUS VIEUX — jamais par sa
+    visite la plus récente. La doctrine d'avant disait le contraire (« ce qui
+    est affirmé ici, c'est la date du dernier passage ») et elle a fini par
+    mentir : relever les seules plaques le 5 septembre suffisait à peindre ce
+    bandeau en vert sur trente-trois articles du 28 août. Relevé du patron :
+    « des prix s'affichent à la date d'aujourd'hui mais d'autres restent par
+    exemple au 28 août ». Le plus vieil article, lui, est une garantie — voir
+    `ageDuCatalogue`.
+
+    « PRIX RELEVÉS EN RAYON » EST LE CINQUIÈME, et il répond à une plainte
+    plus ancienne : hors ligne, un catalogue vu en magasin n'est pas « non
+    vérifié ». On ne s'excuse que lorsqu'on n'a RIEN à montrer.
   */
   const mot = duJour
     ? 'Prix vérifiés aujourd’hui'
@@ -259,7 +279,9 @@ export function BandeauTarifs({
       ? 'Prix actualisés'
       : etat === 'ajour'
         ? 'Prix à jour'
-        : 'Prix non vérifiés';
+        : releves
+          ? 'Prix relevés en rayon'
+          : 'Prix non vérifiés';
 
   return (
     <View

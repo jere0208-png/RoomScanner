@@ -335,8 +335,22 @@ describe('l’écran, hors ligne, avec un catalogue relevé aujourd’hui', () =
     */
     const source = mots(t).find((m) => m.startsWith('Estimation EchoPlan · '));
     expect(source).toBeDefined();
+    // LE SUJET DE L'ÉPREUVE, ET IL TIENT : jamais un numéro de version là où
+    // l'on attend une date.
     expect(source).not.toContain('2026-08.2');
-    expect(source).toBe(`Estimation EchoPlan · ${dateDuReleve(RELEVE_RAYON)}`);
+    /*
+      LA DATE EST DEVENUE UNE PÉRIODE, et l'épreuve suit.
+
+      Elle épinglait `RELEVE_RAYON`, le jour du dernier passage en rayon. Le
+      catalogue embarqué porte maintenant DEUX relevés — les mécanismes du
+      28 août, les plaques du 5 septembre — et le bandeau les dit tous les
+      deux : relevé du patron, « des prix s'affichent à la date d'aujourd'hui
+      mais d'autres restent par exemple au 28 août ». Ce qu'on vérifie ici,
+      c'est que la ligne porte une date EN FRANÇAIS, et que le dernier
+      passage y figure.
+    */
+    expect(source).toContain(dateDuReleve(RELEVE_RAYON));
+    expect(source).toMatch(/\d{4}$/);
   });
 });
 

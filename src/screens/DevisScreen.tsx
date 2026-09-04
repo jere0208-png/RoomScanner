@@ -67,16 +67,20 @@ import {
 } from '../geometry/nfc15100';
 import { roomParts } from '../geometry/floorplan';
 import { TotalQuiMonte } from '../components/TotalQuiMonte';
-import { cleDeLigne, type Devis, type LigneDevis, type LigneLegende } from '../geometry/devis';
+import {
+  ageDuCatalogue,
+  cleDeLigne,
+  type Devis,
+  type LigneDevis,
+  type LigneLegende,
+} from '../geometry/devis';
 import { chiffrerLePlan } from '../geometry/devisplan';
 import { CEILINGS, CEILING_SYMBOL, type CeilingKind } from '../geometry/ceiling';
 import { FIXTURES, postsSymbol, type FixtureKind } from '../geometry/electrical';
 import {
   GAMMES,
-  RELEVE_RAYON,
   dateDuReleve,
   moisDeLaVersion,
-  releveDuJour,
 } from '../geometry/prix';
 import {
   ATTENTE_MIN,
@@ -374,12 +378,22 @@ export function DevisScreen() {
     serveur pendant qu'on choisit sa gamme serait un appel pour rien — on peut
     très bien reculer et ne jamais voir le ticket.
   */
+  /*
+    LA DATE NE VIT PLUS ICI — elle se calcule sur les LIGNES du devis.
+
+    Relevé du patron : « des prix s'affichent à la date d'aujourd'hui mais
+    d'autres restent par exemple au 28 août ». Le bandeau datait le catalogue
+    par sa VISITE la plus récente : relever les seules plaques le 5 septembre
+    suffisait donc à peindre « Prix vérifiés aujourd'hui » en vert sur
+    trente-trois articles du 28 août.
+
+    Une valeur tenue à la main à côté de la mesure qu'elle décrit finit
+    toujours par s'en écarter. Elle se déduit maintenant de ce qui est
+    RÉELLEMENT affiché — voir `ageDuCatalogue`.
+  */
   const [verif, setVerif] = useState<{
     issue: IssueTarifs;
     enseigne: string;
-    jour: string;
-    /** Le catalogue qui chiffre a-t-il été relevé aujourd'hui ? */
-    duJour: boolean;
   } | null>(null);
   const [enCours, setEnCours] = useState(false);
   const [motDAttente, setMotDAttente] = useState('Connexion au catalogue…');
@@ -486,6 +500,20 @@ export function DevisScreen() {
       tri === 'cher' ? prix(b) - prix(a) : prix(a) - prix(b),
     );
   }, [devis.lignes, cherche, tri]);
+
+  /*
+    L'ÂGE DU CATALOGUE, DÉDUIT DE CE QUI EST AFFICHÉ.
+
+    Il se recalcule avec le devis : ajouter un article estimé fait reculer la
+    date annoncée, comme il se doit. `versionTarifs` entre dans les
+    dépendances parce qu'un catalogue reçu change les prix SANS changer les
+    lignes — c'est le même compteur qui force le rechiffrage.
+  */
+  const age = useMemo(
+    () => ageDuCatalogue(devis.lignes, Date.now()),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [devis.lignes, versionTarifs],
+  );
   /** À plat dès qu'on trie autrement ou qu'on cherche. */
   const aPlat = tri !== 'rayon' || cherche.trim().length > 0;
 
@@ -534,12 +562,9 @@ export function DevisScreen() {
       d'un catalogue passé en rayon le matin même. Le jour existait dans la
       table des prix ; personne ne le lui passait.
     */
-    const releve = v.catalogue?.releve ?? RELEVE_RAYON;
     setVerif({
       issue: v.issue,
       enseigne: v.catalogue?.source ?? TARIF_EMBARQUE,
-      jour: dateDuReleve(releve),
-      duJour: releveDuJour(releve, Date.now()),
     });
     setVersionTarifs((n) => n + 1);
     setEnCours(false);
@@ -813,8 +838,11 @@ export function DevisScreen() {
                 <BandeauTarifs
                   etat={verif.issue}
                   enseigne={verif.enseigne}
-                  jour={verif.jour}
-                  duJour={verif.duJour}
+                  jour={age.jour ?? ''}
+                  duJour={age.duJour}
+                  /* Hors ligne, un catalogue vu en magasin n'est pas « non
+                     vérifié » : on ne s'excuse que sans rien à montrer. */
+                  releves={age.jour !== null}
                   onVerifier={() => {
                     haptic('leger');
                     verifier(true).catch(() => {});

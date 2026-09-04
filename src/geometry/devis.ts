@@ -32,6 +32,7 @@ import {
   TARIFS_MECANISME,
   VERSION_TARIFS,
   cleDuTarif,
+  dateDuReleve,
   tarifPlaque,
   tarifRecu,
   type GammeId,
@@ -157,6 +158,90 @@ export interface Devis {
   exclusions: string[];
   /** La légende du plan, du poste le plus lourd au plus léger. */
   legende: LigneLegende[];
+}
+
+/**
+ * Une date de relevé porte-t-elle le JOUR — donc un passage en rayon — ou
+ * seulement le mois, marque d'une estimation ?
+ */
+const auJour = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v);
+
+/**
+ * LES DEUX BOUTS DES RELEVÉS D'UN DEVIS.
+ *
+ * Un devis mêle des prix vus à des jours différents — et c'est voulu : chaque
+ * ligne porte le sien, et c'est ce qui permet de savoir ce qu'il faut revoir
+ * sans tout revoir. Ce qui manquait, c'est de pouvoir le DIRE en haut de
+ * page.
+ *
+ * SEULS LES PRIX QU'ON EST ALLÉ VOIR ENTRENT DANS LA FOURCHETTE, et la
+ * PRÉCISION DE LA DATE suffit à les distinguer : un passage en rayon se date
+ * au JOUR (« 2026-08-28 »), une estimation au MOIS (« 2026-08 »). Une
+ * estimation n'a jamais été relevée — la faire vieillir un relevé n'aurait
+ * pas de sens, et elle se signale déjà LIGNE PAR LIGNE (« à valider en
+ * rayon »), là où l'information sert vraiment.
+ *
+ * LES DATES SE TRIENT ENSUITE COMME DU TEXTE, ce que le format ISO autorise :
+ * à précision égale, l'ordre alphabétique est l'ordre chronologique.
+ *
+ * UNE LIGNE SANS PRIX NE DATE RIEN NON PLUS : un article que le catalogue ne
+ * connaît pas n'a jamais été relevé, et le compter ferait vieillir le
+ * catalogue au nom d'un prix qui n'existe pas.
+ */
+export function fourchetteDesReleves(
+  lignes: LigneDevis[],
+): { plusVieux: string; plusRecent: string } | null {
+  let plusVieux: string | null = null;
+  let plusRecent: string | null = null;
+  for (const l of lignes) {
+    if (l.pu === null || !l.releve || !auJour(l.releve)) continue;
+    if (plusVieux === null || l.releve < plusVieux) plusVieux = l.releve;
+    if (plusRecent === null || l.releve > plusRecent) plusRecent = l.releve;
+  }
+  return plusVieux && plusRecent ? { plusVieux, plusRecent } : null;
+}
+
+/**
+ * CE QUE LE BANDEAU A LE DROIT D'AFFIRMER SUR L'ÂGE DES PRIX.
+ *
+ * Relevé du patron : « tous les prix ne sont pas à jour dans l'app, même
+ * après la mise à jour ; des prix s'affichent à la date d'aujourd'hui mais
+ * d'autres restent par exemple au 28 août ».
+ *
+ * UN CATALOGUE SE DATE PAR SON ARTICLE LE PLUS VIEUX, jamais par sa visite la
+ * plus récente. L'ancienne règle était « la date du dernier passage » : elle
+ * ne dit rien de ce qu'on n'a PAS revu ce jour-là, et il suffisait d'aller
+ * corriger un seul prix pour repartir avec un bandeau vert sur un catalogue
+ * de l'an dernier. Le plus vieil article, lui, est une GARANTIE : tous ces
+ * prix ont au moins été vus depuis ce jour-là.
+ *
+ * ET QUAND LES DATES SE MÊLENT, ON LE DIT. « Du 28 août au 5 septembre »
+ * répond d'avance à la question qu'on se pose en ouvrant le ticket, au lieu
+ * de cacher l'une des deux.
+ */
+export function ageDuCatalogue(
+  lignes: LigneDevis[],
+  maintenant: number,
+): { jour: string | null; duJour: boolean } {
+  const f = fourchetteDesReleves(lignes);
+  if (!f) return { jour: null, duJour: false };
+  const d = new Date(maintenant);
+  const deux = (n: number) => String(n).padStart(2, '0');
+  const aujourdhui = `${d.getFullYear()}-${deux(d.getMonth() + 1)}-${deux(
+    d.getDate(),
+  )}`;
+  // « Vérifiés aujourd'hui » ne vaut que si le PLUS VIEUX l'est : la promesse
+  // porte sur le catalogue entier, ou elle ne vaut rien.
+  const duJour = f.plusVieux === aujourdhui;
+  if (f.plusVieux === f.plusRecent) {
+    return { jour: dateDuReleve(f.plusVieux), duJour };
+  }
+  const memeAnnee = f.plusVieux.slice(0, 4) === f.plusRecent.slice(0, 4);
+  // Même année : le millésime ne se dit qu'une fois, à la fin.
+  const debut = memeAnnee
+    ? dateDuReleve(f.plusVieux).replace(/ \d{4}$/, '')
+    : dateDuReleve(f.plusVieux);
+  return { jour: `du ${debut} au ${dateDuReleve(f.plusRecent)}`, duJour };
 }
 
 /**

@@ -13427,6 +13427,57 @@ sont ILLUSTRATIFS et plusieurs sont faux (fil 1,5 mm² à 16,90 € quand le
 rayon dit 25,90 €). Déposé tel quel, il rendrait les prix pires qu'ils ne
 sont.
 
+### Le bandeau datait le catalogue par sa visite la plus récente
+
+Relevé du patron, juste après la correction des plaques : « tous les prix ne
+sont pas à jour dans l'app, même après la mise à jour ; des prix s'affichent
+à la date d'aujourd'hui mais d'autres restent par exemple au 28 août ».
+
+Il a raison, et **le défaut était de moi**. Relever les plaques le 5 septembre
+a fait passer `RELEVE_RAYON` à cette date, et le bandeau — qui s'y calait —
+annonçait « Prix vérifiés aujourd'hui », en vert, pendant que trente-trois
+articles portaient toujours le 28 août, ligne par ligne.
+
+**Un catalogue se date par son article LE PLUS VIEUX**, jamais par sa visite
+la plus récente. L'ancienne doctrine était écrite dans le bandeau : « ce qui
+est affirmé ici, c'est la date du dernier passage ». Elle ne tient pas — le
+dernier passage ne dit rien de ce qu'on n'a PAS revu ce jour-là, et il
+suffisait d'aller corriger un seul prix pour repartir avec un bandeau vert
+sur un catalogue de l'an dernier. Le plus vieil article, lui, est une
+GARANTIE : tous ces prix ont au moins été vus depuis ce jour-là.
+
+**Et quand les dates se mêlent, on le dit** : « du 28 août au 5 septembre »
+répond d'avance à la question qu'on se pose en ouvrant le ticket, au lieu de
+cacher l'une des deux. Deux dates dans un devis ne sont pas un défaut — chaque
+prix porte le jour où on l'a vu, et c'est ce qui permet de savoir quoi revoir
+sans tout revoir. Le défaut était de n'en montrer qu'une.
+
+**La date se déduit des LIGNES, plus d'une constante.** L'écran calait sa date
+sur `RELEVE_RAYON`, posée à la main : une valeur tenue à côté de la mesure
+qu'elle décrit finit toujours par s'en écarter. `ageDuCatalogue` la calcule
+sur ce qui est réellement affiché, et se recalcule avec le devis — ajouter un
+article estimé fait reculer la date annoncée, comme il se doit.
+
+**Seuls les prix qu'on est allé voir entrent dans la période**, et la
+PRÉCISION de la date suffit à les distinguer : un passage en rayon se date au
+JOUR (`2026-08-28`), une estimation au MOIS (`2026-08`). Une estimation n'a
+jamais été relevée ; la compter ferait dire « relevés depuis août » d'un prix
+que personne n'est allé voir. Elle se signale déjà ligne par ligne.
+
+**Un cinquième état pour le bandeau : « Prix relevés en rayon ».** Il répond à
+une plainte plus ancienne — « le "prix non vérifiés" n'inspire pas confiance
+alors qu'ils SONT vérifiés ». Hors ligne, un catalogue vu en magasin n'est pas
+« non vérifié » : ce sont deux questions différentes — « a-t-on pu joindre le
+serveur ? » et « ces prix ont-ils été vus quelque part ? ». On ne s'excuse que
+lorsqu'on n'a rien à montrer.
+
+**Le serveur, lui, répond maintenant** : `bourseur.fr/api.php` sert bien
+`tarifs.json`. Restent les articles relevés le 28 août, qui sont justes mais
+d'une semaine — les amener tous au même jour demande de les revoir un par un,
+page produit par page produit. C'est un travail à part, et le faire vite est
+exactement ce qui a produit l'erreur des plaques : une recherche automatique
+proposait, ce jour-là, 219 € pour un différentiel qui en vaut 73.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

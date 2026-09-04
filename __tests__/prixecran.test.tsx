@@ -293,7 +293,17 @@ describe('le bandeau dit d’où viennent les prix', () => {
     demanderLePrix(t);
     await laisserLAttenteFinir();
     const lus = mots(t);
-    expect(lus).toContain('Prix non vérifiés');
+    /*
+      TROISIÈME VERSION, ET C'EST LE MOT QUI CHANGE.
+
+      Elle attendait « Prix non vérifiés ». Mais le catalogue embarqué PORTE
+      des prix vus en rayon : s'en excuser parce que le serveur n'a pas
+      répondu, c'est confondre deux questions — « a-t-on pu joindre le
+      serveur ? » et « ces prix ont-ils été vus quelque part ? ». On ne
+      s'excuse que lorsqu'on n'a RIEN à montrer.
+    */
+    expect(lus).toContain('Prix relevés en rayon');
+    expect(lus).not.toContain('Prix non vérifiés');
     // On dit AVEC QUOI l'on chiffre : un prix sans provenance ne vaut pas
     // mieux qu'une devinette.
     expect(lus.some((m) => m.startsWith('Estimation EchoPlan · '))).toBe(true);
@@ -322,7 +332,24 @@ describe('le bandeau dit d’où viennent les prix', () => {
     const t = ouvrir();
     demanderLePrix(t);
     await laisserLAttenteFinir();
-    expect(mots(t)).toContain('Prix vérifiés aujourd’hui');
+    const lus = mots(t);
+    /*
+      « VÉRIFIÉS AUJOURD'HUI » NE SE DIT PLUS À LA LÉGÈRE.
+
+      Le catalogue embarqué porte maintenant DEUX relevés — les mécanismes du
+      28 août, les plaques du 5 septembre — et la promesse porte sur le plus
+      vieux : elle vaut pour le catalogue entier, ou elle ne vaut rien.
+      Relevé du patron : « des prix s'affichent à la date d'aujourd'hui mais
+      d'autres restent par exemple au 28 août ».
+
+      Ce que l'épreuve tient depuis toujours reste tenu, et c'était son
+      sujet : hors ligne, le bandeau ne s'EXCUSE pas sur des prix qui ont bien
+      été vus en magasin. Il dit désormais la période, ce qui répond d'avance
+      à la question.
+    */
+    expect(lus).not.toContain('Prix non vérifiés');
+    expect(lus).toContain('Prix relevés en rayon');
+    expect(lus.some((m) => m.includes('28 août'))).toBe(true);
   });
 });
 
