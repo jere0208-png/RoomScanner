@@ -13348,6 +13348,85 @@ Le symbole se dessine donc deux fois, et il faut le dire. Mais seulement AU
 REPOS : pendant qu'on promène le plan, un appareil n'est qu'un point, et ce
 chemin-là ne change pas.
 
+### Les prix des plaques étaient faux — et trois choses en étaient cause
+
+Relevé du patron, lien à l'appui : la plaque 1 poste Legrand Céliane CP0021
+blanc émaillé est à **2,29 €** chez Castorama ; le devis en annonçait
+**8,50 €**. Le relevé du 05/09/2026 a montré que le défaut ne tenait pas à
+un chiffre mais à trois causes distinctes.
+
+**1. La table des plaques n'avait jamais été relevée.** Les mécanismes
+l'avaient été, pièce par pièce, en rayon — ils portent la marque `r()`. Les
+plaques n'étaient qu'un tableau de nombres NUS : pas de date, pas
+d'enseigne, rien qui dise qu'on ne les avait jamais vérifiées. C'est
+exactement pour ça qu'elles sont restées fausses pendant que tout le reste
+se corrigeait. Elles portent maintenant leur `Tarif`, comme le reste.
+
+| Gamme | 1 poste relevé | ce qu'annonçait le devis |
+|---|---|---|
+| Dooxie | 1,90 € | 2,50 € |
+| Ovalis | 2,15 € | 2,70 € |
+| Odace | 1,99 € | **5,50 €** |
+| Céliane | 2,29 € | **8,50 €** |
+
+**La cause se lit dans les chiffres** : l'ancienne ligne Céliane
+(8,50 / 14,30 / 20,20 / 27,30) est à un cheveu du **blanc amande décoratif**
+relevé le même jour (7,29 / 14,50 / 21,50 / 27,90). On avait chiffré une
+finition de décoration là où un devis compte du blanc standard. Le prix
+d'une plaque ne suit pas la gamme, il suit la FINITION : la même Céliane
+1 poste va de 1,84 € (blanc laqué) à 39,90 € (verre opale).
+
+**Un banc garde maintenant l'invariant qui aurait attrapé le défaut** : une
+plaque ne dépasse jamais la moitié de la prise de sa gamme. La raison est
+physique — une plaque est du plastique moulé, le mécanisme derrière elle
+porte du laiton, des ressorts et des bornes. Passé sur l'ancien catalogue,
+il tombe sur Céliane, Odace et Mosaic — les trois fausses — et laisse passer
+dooxie et ovalis, les deux justes. Il ne dit pas « c'est faux » : il dit
+LESQUELLES.
+
+**Et le relevé a contredit un commentaire du catalogue.** Il affirmait
+qu'« une plaque triple ne vaut pas trois plaques simples — la matière est
+partagée ». Le rayon dit le contraire : Céliane 2,29 / 4,59 / 6,99 / 9,45,
+soit 2,29 / 2,30 / 2,33 / 2,36 le poste. Le prix est linéaire, et monte même
+très légèrement avec la taille. La table reste — ce « très légèrement » se
+mesure — mais le motif était faux, et un commentaire qui donne une fausse
+raison est pire qu'un commentaire absent.
+
+**2. Le magasin ne voyait pas le catalogue reçu.** Le devis interrogeait les
+prix venus du serveur avant les siens (`tarifDe`) ; la page Magasin lisait
+les tables embarquées en direct. Le jour où le serveur répond, les deux
+écrans annoncent DEUX PRIX pour le même article — celui du ticket qu'on
+montre au client, et celui de la page où l'on rachète. « Une seule mesure,
+un seul endroit » ne s'applique pas qu'aux longueurs.
+
+**3. Le prix du plan n'allait pas voir.** Relevé du patron : « une
+récupération des prix mise à jour à chaque clic sur le prix du devis sur le
+plan 2D ». La pastille ouvrait le devis, qui ne redemandait au serveur qu'au
+bout d'un jour : on pouvait toucher le prix dix fois sans que rien n'aille
+voir. Un drapeau (`forcerTarifs`) passe par le magasin — le devis s'ouvre
+par une ROUTE, pas par un appel — et se CONSOMME à la lecture : oublié levé,
+il forcerait six secondes d'attente à chaque coup d'œil sur un ticket.
+Ouvert autrement, le devis garde sa règle d'un jour.
+
+### Ce qu'il reste à faire côté serveur
+
+**Le catalogue distant n'a jamais fonctionné en production.** Interrogé,
+`bourseur.fr/api.php` répond `{"ok":false,"raison":"Identifiant manquant."}` :
+le fichier déployé est ANTÉRIEUR à l'action `tarifs`, qui est pourtant la
+première branche du `api.php` du dépôt. L'application demandait, le serveur
+ne comprenait pas la question, et elle retombait silencieusement sur ses
+prix embarqués — depuis toujours.
+
+Deux fichiers à déposer pour que la mise à jour vive :
+
+1. `server/api.php` (celui du dépôt, qui porte l'action `tarifs`) ;
+2. `server/tarifs.json` — le relevé réel du 05/09/2026, prêt à l'emploi.
+
+`server/tarifs.exemple.json` porte désormais un avertissement : ses chiffres
+sont ILLUSTRATIFS et plusieurs sont faux (fil 1,5 mm² à 16,90 € quand le
+rayon dit 25,90 €). Déposé tel quel, il rendrait les prix pires qu'ils ne
+sont.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

@@ -3873,7 +3873,16 @@ export function ResultScreen() {
               donc ensemble, et le prix vient en premier parce que c'est la
               question qu'on se pose en entrant.
             */}
-            <DevisPastille total={totalDevis} onPress={() => setScreen('devis')} />
+            <DevisPastille
+              total={totalDevis}
+              /* On a TOUCHÉ le prix : le devis ira voir si les tarifs ont
+                 bougé, sans attendre sa règle d'un jour — voir `forcerTarifs`
+                 dans le magasin. */
+              onPress={() => {
+                useScanStore.getState().demanderLesTarifs();
+                setScreen('devis');
+              }}
+            />
             <ControlePastille
               alertes={alertes}
               /* Un plan sans le moindre appareil n'est pas une installation

@@ -46,7 +46,12 @@ import { Text, View } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import { DevisScreen } from '../src/screens/DevisScreen';
 import { SERVEUR } from '../src/config/serveur';
-import { GAMMES, appliquerLesTarifs, dateDuReleve } from '../src/geometry/prix';
+import {
+  GAMMES,
+  RELEVE_RAYON,
+  appliquerLesTarifs,
+  dateDuReleve,
+} from '../src/geometry/prix';
 import { ATTENTE_MIN } from '../src/components/PrixQuiSActualisent';
 import { useScanStore } from '../src/store/scanStore';
 import type { Fixture } from '../src/geometry/electrical';
@@ -301,7 +306,18 @@ describe('le bandeau dit d’où viennent les prix', () => {
       en rayon le matin même n'est pas « non vérifié » — ce sont deux
       questions différentes, et l'on répondait à la mauvaise.
     */
-    jest.setSystemTime(new Date(2026, 7, 28, 9, 0, 0));
+    /*
+      LE JOUR SE PREND DANS LA CONSTANTE, PAS EN DUR.
+
+      Il était écrit « 28 août 2026 » dans le banc. Le relevé suivant — celui
+      des plaques, le 5 septembre — a donc fait tomber cette épreuve alors que
+      rien n'était cassé : elle vérifiait l'écran contre une date que le
+      catalogue avait quittée. Une épreuve qui recopie une valeur du code
+      qu'elle éprouve tombe à chaque fois que cette valeur bouge, et l'on finit
+      par la corriger sans la lire.
+    */
+    const [an, mois, jour] = RELEVE_RAYON.split('-').map(Number);
+    jest.setSystemTime(new Date(an, mois - 1, jour, 9, 0, 0));
     muet();
     const t = ouvrir();
     demanderLePrix(t);

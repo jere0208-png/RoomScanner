@@ -35,7 +35,13 @@
     "catalogue qui ne connait que le cuivre n'efface pas l'appareillage.",
     "",
     "TOUS LES PRIX SONT TTC, EN EUROS. Un prix nul, negatif ou illisible est",
-    "ecarte article par article ; le reste du catalogue s'applique quand meme."
+    "ecarte article par article ; le reste du catalogue s'applique quand meme.",
+    "",
+    "ATTENTION — LES CHIFFRES CI-DESSOUS SONT ILLUSTRATIFS, PAS RELEVES. Ils",
+    "montrent la FORME du fichier, et plusieurs sont faux (le fil 1,5 est a",
+    "25,90 en rayon, pas 16,90). Deposer ce fichier tel quel rendrait les prix",
+    "PIRES qu'ils ne sont. Le vrai catalogue, releve, est dans `tarifs.json` :",
+    "c'est celui-la qu'on met en ligne."
   ],
 
   "version": "2026-09",

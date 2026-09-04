@@ -31,6 +31,8 @@ import {
   TARIFS_COMMUNS,
   TARIFS_MECANISME,
   tarifPlaque,
+  tarifRecu,
+  cleDuTarif,
   type GammeId,
   type Tarif,
 } from './prix';
@@ -1408,13 +1410,29 @@ export interface ArticleTarife extends ArticleMagasin {
  */
 export function catalogueDuMagasin(gamme: GammeId): ArticleTarife[] {
   const out: ArticleTarife[] = [];
+  /*
+    CE QUI EST ARRIVÉ DU SERVEUR PASSE AVANT CE QUI EST EMBARQUÉ — ICI AUSSI.
+
+    Le devis le faisait depuis le premier jour (`tarifDe`) ; le magasin, lui,
+    lisait les tables embarquées en direct. Le jour où le serveur répond, les
+    deux écrans annoncent DEUX PRIX pour le même article, et l'électricien ne
+    sait plus lequel croire — celui du ticket qu'il montre au client, ou
+    celui de la page où il rachète.
+
+    La maison connaît la règle : « une seule mesure, un seul endroit — deux
+    comptes du même nombre finissent toujours par diverger ». Elle ne
+    s'applique pas qu'aux longueurs.
+  */
+  const prixDe = (code: string, embarque: Tarif | null): Tarif | null =>
+    tarifRecu(cleDuTarif(code, gamme)) ?? embarque;
   for (const a of ARTICLES) {
-    const tarif = TARIFS_COMMUNS[a.code];
+    const tarif = prixDe(a.code, TARIFS_COMMUNS[a.code] ?? null);
     if (tarif) out.push({ ...a, tarif });
   }
   const g = GAMMES.find((x) => x.id === gamme);
   const marque = g ? `${g.marque} ${g.nom}` : gamme;
-  for (const [kind, tarif] of Object.entries(TARIFS_MECANISME[gamme])) {
+  for (const [kind, embarque] of Object.entries(TARIFS_MECANISME[gamme])) {
+    const tarif = prixDe(`meca-${kind}`, embarque ?? null);
     // Un mécanisme à zéro euro n'est pas un article : c'est une place tenue
     // dans la table pour un appareil qui se chiffre ailleurs (le tableau) ou
     // qui ne se chiffre pas du tout (un luminaire).
@@ -1434,7 +1452,7 @@ export function catalogueDuMagasin(gamme: GammeId): ArticleTarife[] {
   // Les plaques, par nombre de postes : une plaque triple ne vaut pas trois
   // plaques simples, la matière est partagée.
   for (let n = 1; n <= 5; n++) {
-    const tarif = tarifPlaque(gamme, n);
+    const tarif = prixDe(`plaque-${n}`, tarifPlaque(gamme, n));
     if (!tarif || tarif.pu <= 0) continue;
     out.push({
       code: `plaque-${n}`,

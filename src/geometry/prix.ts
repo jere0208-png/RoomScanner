@@ -42,7 +42,7 @@ export interface Tarif {
  * d'écart ne donnent pas le même total, et c'est normal : encore faut-il
  * pouvoir le dire.
  */
-export const VERSION_TARIFS = '2026-08.2';
+export const VERSION_TARIFS = '2026-09.1';
 
 /** La source commune à tout ce qui a été posé à la main. */
 const A_VALIDER =
@@ -102,8 +102,10 @@ const ENSEIGNE = 'Castorama';
  * en français et rend telle quelle. Le jour du passage existait pourtant ici,
  * à la journée près ; personne ne le lui passait.
  */
-export const RELEVE_RAYON = '2026-08-28';
-const r = (pu: number): Tarif => releveLe(pu, ENSEIGNE, RELEVE_RAYON);
+export const RELEVE_RAYON = '2026-09-05';
+const r = (pu: number): Tarif => releveLe(pu, ENSEIGNE, '2026-08-28');
+/** Le relevé des PLAQUES, du 5 septembre 2026 — voir `TARIFS_PLAQUE`. */
+const p5 = (pu: number): Tarif => releveLe(pu, ENSEIGNE, '2026-09-05');
 
 // --------------------------------------------------------------- gammes
 
@@ -314,19 +316,65 @@ export const TARIFS_MECANISME: Record<
 };
 
 /**
- * LES PLAQUES, par nombre de postes.
+ * LES PLAQUES, par nombre de postes — RELEVÉES EN RAYON le 05/09/2026.
  *
- * Une plaque triple ne vaut pas trois plaques simples — la matière est
- * partagée, le prix suit mal. C'est pour cela qu'elles ont leur propre
- * table plutôt qu'un prix au poste.
+ * ─────────────────────────────────────────────────────────────────────────
+ * ELLES ÉTAIENT FAUSSES, ET DE TRÈS LOIN.
+ *
+ * Relevé du patron, lien à l'appui : la plaque 1 poste Legrand Céliane
+ * CP0021 blanc émaillé est à **2,29 €** chez Castorama ; le devis en
+ * annonçait **8,50 €**. Odace : 1,99 € en rayon contre 5,50 € posés. Mosaic
+ * de même. Sur un logement de quarante postes, cela faisait deux à trois
+ * cents euros de devis qui n'existaient pas.
+ *
+ * LA CAUSE, ET ELLE SE LIT DANS LES CHIFFRES. L'ancienne ligne Céliane
+ * (8,50 / 14,30 / 20,20 / 27,30) est à un cheveu du **blanc amande
+ * décoratif** relevé le même jour (7,29 / 14,50 / 21,50 / 27,90). On avait
+ * chiffré une finition de DÉCORATION là où un devis compte du blanc
+ * standard. Le prix d'une plaque ne suit pas la gamme : il suit la
+ * FINITION — la même Céliane 1 poste va de 1,84 € (blanc laqué) à 39,90 €
+ * (verre opale). C'est le blanc de base qu'on chiffre, et lui seul.
+ *
+ * ET POURQUOI ÇA N'A PAS ÉTÉ VU. Les mécanismes portaient leur provenance
+ * depuis le premier relevé ; les plaques n'étaient qu'un tableau de nombres
+ * NUS — pas de date, pas d'enseigne, rien qui dise qu'on ne les avait
+ * jamais vérifiées. Elles portent maintenant leur `Tarif`, comme tout le
+ * reste, et un banc refuse une plaque qui coûterait plus que la moitié du
+ * mécanisme qu'elle finit.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LA « MATIÈRE PARTAGÉE » N'EXISTE PAS, et l'ancien commentaire l'affirmait.
+ *
+ * Il disait : « une plaque triple ne vaut pas trois plaques simples — la
+ * matière est partagée ». Le rayon dit le contraire. Céliane : 2,29 puis
+ * 4,59 puis 6,99 puis 9,45 — soit 2,29 / 2,30 / 2,33 / 2,36 le poste. Le
+ * prix est LINÉAIRE, et monte même très légèrement avec la taille (une
+ * grande plaque casse plus au transport). La table reste, parce que ce
+ * « très légèrement » se mesure ; le motif, lui, était faux, et un
+ * commentaire qui donne une fausse raison est pire qu'un commentaire absent.
+ *
+ * LE 5 POSTES N'EST PAS VENDU EN GRANDE SURFACE : il est extrapolé au prix
+ * du poste de sa gamme, et il le dit.
  */
-export const TARIFS_PLAQUE: Record<GammeId, number[]> = {
+export const TARIFS_PLAQUE: Record<GammeId, Tarif[]> = {
   // Index 0 = plaque 1 poste, index 1 = 2 postes, et ainsi de suite.
-  dooxie: [2.5, 4.6, 7.2, 10.4, 13.7],
-  ovalis: [2.7, 4.9, 7.5, 11, 14.3],
-  odace: [5.5, 9.8, 13.7, 18.9, 24],
-  mosaic: [6.4, 11, 15.6, 21.5, 27.3],
-  celiane: [8.5, 14.3, 20.2, 27.3, 35],
+  /* Legrand Dooxie 6 009 0x, blanc. */
+  dooxie: [p5(1.9), p5(3.9), p5(6.09), p5(7.9), t(9.9)],
+  /* Schneider Ovalis S3207xx, blanc. Le 4 postes n'était pas affiché au
+     relevé : il suit le prix du poste des trois autres. */
+  ovalis: [p5(2.15), p5(4.29), p5(6.49), t(8.6), t(10.75)],
+  /* Schneider Odace, blanc craie — la finition de base de la gamme. */
+  odace: [p5(1.99), p5(3.99), p5(5.69), p5(8.0), t(9.95)],
+  /*
+    MOSAIC RESTE ESTIMÉE, et le relevé l'a confirmé une seconde fois :
+    Castorama n'affiche qu'UN article Mosaic blanc, vendu par un tiers. C'est
+    une gamme de distributeur professionnel — légitime au catalogue, elle se
+    pose beaucoup en tertiaire —, mais son prix ne peut pas prétendre avoir
+    été vu en rayon. Recalée sur le poste des gammes voisines.
+  */
+  mosaic: [t(3.2), t(6.4), t(9.3), t(12.4), t(15.5)],
+  /* Legrand Céliane CP002x, blanc émaillé — celui du relevé du patron. */
+  celiane: [p5(2.29), p5(4.59), p5(6.99), p5(9.45), t(11.8)],
 };
 
 // --------------------------------------------------------- hors gamme
@@ -700,9 +748,15 @@ export function releveDuJour(releve: string, maintenant: number): boolean {
   return releve === aujourdhui;
 }
 
-/** Le prix d'une plaque, à n postes, dans une gamme. */
+/**
+ * Le prix d'une plaque, à n postes, dans une gamme.
+ *
+ * Il rend le `Tarif` DE LA TABLE, avec sa provenance : une plaque relevée en
+ * rayon cite l'enseigne et le jour, une plaque estimée le dit. C'était le
+ * manque — un tableau de nombres nus ne laisse à personne le moyen de savoir
+ * ce qui a été vérifié.
+ */
 export function tarifPlaque(gamme: GammeId, postes: number): Tarif | null {
   const table = TARIFS_PLAQUE[gamme];
-  const pu = table[Math.min(Math.max(postes, 1), table.length) - 1];
-  return pu === undefined ? null : { pu, releve: RELEVE, source: A_VALIDER };
+  return table[Math.min(Math.max(postes, 1), table.length) - 1] ?? null;
 }

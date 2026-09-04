@@ -548,7 +548,17 @@ export function DevisScreen() {
   useEffect(() => {
     if (etape !== ETAPE_PRIX || dejaVu.current) return;
     dejaVu.current = true;
-    verifier(false).catch(() => {});
+    /*
+      TOUCHER LE PRIX SUR LE PLAN, C'EST DEMANDER CELUI D'AUJOURD'HUI.
+
+      Relevé du patron : « une récupération des prix mise à jour à chaque clic
+      sur le prix du devis sur le plan 2D ». Ouvert autrement — par la barre,
+      par le menu — le devis garde sa règle d'un jour : un tarif d'appareillage
+      ne bouge pas dans la journée, et rappeler le serveur à chaque coup d'œil
+      ferait attendre pour rien.
+    */
+    const forcer = useScanStore.getState().consommerLaDemandeDeTarifs();
+    verifier(forcer).catch(() => {});
   }, [etape, verifier]);
 
   /**

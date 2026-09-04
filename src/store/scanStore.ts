@@ -1006,6 +1006,22 @@ export function defaultName(d: Date): string {
 
 interface ScanState {
   screen: Screen;
+  /**
+   * ON A TOUCHÉ LE PRIX SUR LE PLAN : le devis doit ALLER VOIR.
+   *
+   * Relevé du patron : « une récupération des prix mise à jour à chaque clic
+   * sur le prix du devis sur le plan 2D ». La pastille ouvrait le devis, qui
+   * ne redemandait au serveur qu'au bout d'un jour — on pouvait donc toucher
+   * le prix dix fois sans que rien n'aille voir.
+   *
+   * Le drapeau voyage par le magasin parce que le devis s'ouvre par une
+   * ROUTE, pas par un appel : `setScreen('devis')` ne porte pas d'argument, et
+   * lui en inventer un pour ce seul cas ferait un chemin de plus à tenir.
+   * Il se CONSOMME à la lecture (`consommerLaDemandeDeTarifs`) : un drapeau
+   * qu'on oublie de baisser force à chaque ouverture, y compris celles où
+   * personne n'a rien demandé.
+   */
+  forcerTarifs: boolean;
   supported: boolean | null;
   scanning: boolean;
   paused: boolean;
@@ -1582,6 +1598,10 @@ interface ScanState {
   setShowTextures: (v: boolean) => void;
 
   setScreen: (s: Screen) => void;
+  /** Le prix du plan a été touché : la prochaine ouverture du devis ira voir. */
+  demanderLesTarifs: () => void;
+  /** Lit la demande ET la baisse : elle ne vaut que pour une ouverture. */
+  consommerLaDemandeDeTarifs: () => boolean;
   /**
    * UN RACCOURCI A DEMANDÉ UN RELEVÉ — voir `ui/raccourci`.
    *
@@ -2349,6 +2369,7 @@ export const useScanStore = create<ScanState>((set, get) => {
 
   return {
     screen: 'home',
+    forcerTarifs: false,
     supported: null,
     scanning: false,
     brouillon: null,
@@ -4723,6 +4744,12 @@ export const useScanStore = create<ScanState>((set, get) => {
       }),
 
     setScreen: (screen) => set({ screen }),
+    demanderLesTarifs: () => set({ forcerTarifs: true }),
+    consommerLaDemandeDeTarifs: () => {
+      const veut = get().forcerTarifs;
+      if (veut) set({ forcerTarifs: false });
+      return veut;
+    },
 
     raccourciEnAttente: false,
     setRaccourciEnAttente: (raccourciEnAttente) =>
@@ -7201,6 +7228,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       AsyncStorage.removeItem(DRAFT_KEY).catch(() => {});
       set({
         screen: 'home',
+        forcerTarifs: false,
         brouillon: null,
         scanning: false,
         paused: false,

@@ -1,0 +1,71 @@
+{
+  "_lisez_moi": [
+    "LE CATALOGUE PUBLIC DES PRIX — a deposer a cote de `api.php`.",
+    "",
+    "CE FICHIER EST LE RELEVE REEL DU 05/09/2026, pas un exemple. Il corrige",
+    "les plaques de finition, qui n'avaient jamais ete relevees et etaient",
+    "deux a trois fois trop cheres : la plaque 1 poste Celiane blanc emaille",
+    "CP0021 est a 2,29 EUR chez Castorama, le devis en annoncait 8,50.",
+    "",
+    "La cause : l'ancienne ligne Celiane (8,50 / 14,30 / 20,20 / 27,30) est a",
+    "un cheveu du blanc amande DECORATIF (7,29 / 14,50 / 21,50 / 27,90). On",
+    "avait chiffre une finition de decoration la ou un devis compte du blanc",
+    "standard. Le prix d'une plaque suit la FINITION, pas la gamme : la meme",
+    "Celiane 1 poste va de 1,84 EUR (blanc laque) a 39,90 EUR (verre opale).",
+    "",
+    "POUR METTRE A JOUR : changez `version` (l'application compare les",
+    "versions pour dire « prix actualises » plutot que « deja a jour »),",
+    "changez `releve` au JOUR ou vous etes alle voir, et corrigez les prix.",
+    "Ce que ce fichier ne porte pas garde le prix embarque dans",
+    "l'application : on peut donc le remplir rayon par rayon.",
+    "",
+    "TOUS LES PRIX SONT TTC, EN EUROS."
+  ],
+
+  "version": "2026-09.1",
+  "releve": "2026-09-05",
+  "source": "Castorama",
+
+  "prix": {
+    "plaque-dooxie-1": 1.9,
+    "plaque-dooxie-2": 3.9,
+    "plaque-dooxie-3": 6.09,
+    "plaque-dooxie-4": 7.9,
+
+    "plaque-ovalis-1": 2.15,
+    "plaque-ovalis-2": 4.29,
+    "plaque-ovalis-3": 6.49,
+
+    "plaque-odace-1": 1.99,
+    "plaque-odace-2": 3.99,
+    "plaque-odace-3": 5.69,
+    "plaque-odace-4": 8.0,
+
+    "plaque-celiane-1": 2.29,
+    "plaque-celiane-2": 4.59,
+    "plaque-celiane-3": 6.99,
+    "plaque-celiane-4": 9.45,
+
+    "meca-dooxie-prise": 5.5,
+    "meca-dooxie-inter": 5.5,
+    "meca-dooxie-va": 5.5,
+    "meca-dooxie-poussoir": 9.69,
+    "meca-dooxie-rj45": 19.5,
+    "meca-dooxie-tv": 12.9,
+
+    "meca-celiane-prise": 10.9,
+    "meca-celiane-inter": 11.9,
+    "meca-celiane-va": 11.9,
+    "meca-celiane-poussoir": 20.9,
+    "meca-celiane-rj45": 25.9,
+
+    "icta-16": 26.9,
+    "icta-20": 30.9,
+    "icta-25": 53.9,
+
+    "fil-1.5": 25.9,
+    "fil-2.5": 41.9,
+
+    "boite-encastrement": 1.69
+  }
+}
