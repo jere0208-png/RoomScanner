@@ -2665,22 +2665,6 @@
              "children": null
             },
             {
-             "type": "RNSVGCircle",
-             "props": {
-              "fill": {
-               "type": 0,
-               "payload": 4294967295
-              },
-              "propList": [
-               "fill"
-              ],
-              "cx": 457.597,
-              "cy": 350.975,
-              "r": 7
-             },
-             "children": null
-            },
-            {
              "type": "RNSVGGroup",
              "props": {
               "fill": {
@@ -2697,6 +2681,75 @@
               ]
              },
              "children": [
+              {
+               "type": "RNSVGPath",
+               "props": {
+                "fill": null,
+                "stroke": {
+                 "type": 0,
+                 "payload": 4294967295
+                },
+                "strokeWidth": 4.4,
+                "strokeLinecap": 1,
+                "strokeLinejoin": 1,
+                "propList": [
+                 "fill",
+                 "stroke",
+                 "strokeWidth",
+                 "strokeLinecap",
+                 "strokeLinejoin"
+                ],
+                "opacity": 0.6,
+                "d": "M-8 2 H8"
+               },
+               "children": null
+              },
+              {
+               "type": "RNSVGPath",
+               "props": {
+                "fill": null,
+                "stroke": {
+                 "type": 0,
+                 "payload": 4294967295
+                },
+                "strokeWidth": 4.4,
+                "strokeLinecap": 1,
+                "strokeLinejoin": 1,
+                "propList": [
+                 "fill",
+                 "stroke",
+                 "strokeWidth",
+                 "strokeLinecap",
+                 "strokeLinejoin"
+                ],
+                "opacity": 0.6,
+                "d": "M-8 2 A8 8 0 0 1 8 2"
+               },
+               "children": null
+              },
+              {
+               "type": "RNSVGPath",
+               "props": {
+                "fill": null,
+                "stroke": {
+                 "type": 0,
+                 "payload": 4294967295
+                },
+                "strokeWidth": 4.4,
+                "strokeLinecap": 1,
+                "strokeLinejoin": 1,
+                "propList": [
+                 "fill",
+                 "stroke",
+                 "strokeWidth",
+                 "strokeLinecap",
+                 "strokeLinejoin"
+                ],
+                "opacity": 0.6,
+                "d": "M0 2 V10"
+               },
+               "children": null
+              },
               {
                "type": "RNSVGPath",
                "props": {
@@ -2828,22 +2881,6 @@
              "children": null
             },
             {
-             "type": "RNSVGCircle",
-             "props": {
-              "fill": {
-               "type": 0,
-               "payload": 4294967295
-              },
-              "propList": [
-               "fill"
-              ],
-              "cx": 480.192,
-              "cy": 355.778,
-              "r": 7
-             },
-             "children": null
-            },
-            {
              "type": "RNSVGGroup",
              "props": {
               "fill": {
@@ -2860,6 +2897,78 @@
               ]
              },
              "children": [
+              {
+               "type": "RNSVGPath",
+               "props": {
+                "fill": {
+                 "type": 0,
+                 "payload": 4294967295
+                },
+                "stroke": {
+                 "type": 0,
+                 "payload": 4294967295
+                },
+                "strokeWidth": 4.4,
+                "strokeLinecap": 1,
+                "strokeLinejoin": 1,
+                "propList": [
+                 "fill",
+                 "stroke",
+                 "strokeWidth",
+                 "strokeLinecap",
+                 "strokeLinejoin"
+                ],
+                "opacity": 0.6,
+                "d": "M0 8 m-2.4 0 a2.4 2.4 0 1 0 4.8 0 a2.4 2.4 0 1 0 -4.8 0"
+               },
+               "children": null
+              },
+              {
+               "type": "RNSVGPath",
+               "props": {
+                "fill": null,
+                "stroke": {
+                 "type": 0,
+                 "payload": 4294967295
+                },
+                "strokeWidth": 4.4,
+                "strokeLinecap": 1,
+                "strokeLinejoin": 1,
+                "propList": [
+                 "fill",
+                 "stroke",
+                 "strokeWidth",
+                 "strokeLinecap",
+                 "strokeLinejoin"
+                ],
+                "opacity": 0.6,
+                "d": "M0 8 L6 -4"
+               },
+               "children": null
+              },
+              {
+               "type": "RNSVGPath",
+               "props": {
+                "fill": null,
+                "stroke": {
+                 "type": 0,
+                 "payload": 4294967295
+                },
+                "strokeWidth": 4.4,
+                "strokeLinecap": 1,
+                "strokeLinejoin": 1,
+                "propList": [
+                 "fill",
+                 "stroke",
+                 "strokeWidth",
+                 "strokeLinecap",
+                 "strokeLinejoin"
+                ],
+                "opacity": 0.6,
+                "d": "M2.6 -5.6 L9.6 -2.2"
+               },
+               "children": null
+              },
               {
                "type": "RNSVGPath",
                "props": {
@@ -2994,22 +3103,6 @@
              "children": null
             },
             {
-             "type": "RNSVGCircle",
-             "props": {
-              "fill": {
-               "type": 0,
-               "payload": 4294967295
-              },
-              "propList": [
-               "fill"
-              ],
-              "cx": 330.256,
-              "cy": 212.013,
-              "r": 7
-             },
-             "children": null
-            },
-            {
              "type": "RNSVGGroup",
              "props": {
               "fill": {
@@ -3026,6 +3119,144 @@
               ]
              },
              "children": [
+              {
+               "type": "RNSVGPath",
+               "props": {
+                "fill": null,
+                "stroke": {
+                 "type": 0,
+                 "payload": 4294967295
+                },
+                "strokeWidth": 4.4,
+                "strokeLinecap": 1,
+                "strokeLinejoin": 1,
+                "propList": [
+                 "fill",
+                 "stroke",
+                 "strokeWidth",
+                 "strokeLinecap",
+                 "strokeLinejoin"
+                ],
+                "opacity": 0.6,
+                "d": "M-17.52 2 H-1.52"
+               },
+               "children": null
+              },
+              {
+               "type": "RNSVGPath",
+               "props": {
+                "fill": null,
+                "stroke": {
+                 "type": 0,
+                 "payload": 4294967295
+                },
+                "strokeWidth": 4.4,
+                "strokeLinecap": 1,
+                "strokeLinejoin": 1,
+                "propList": [
+                 "fill",
+                 "stroke",
+                 "strokeWidth",
+                 "strokeLinecap",
+                 "strokeLinejoin"
+                ],
+                "opacity": 0.6,
+                "d": "M-17.52 2 A8 8 0 0 1 -1.52 2"
+               },
+               "children": null
+              },
+              {
+               "type": "RNSVGPath",
+               "props": {
+                "fill": null,
+                "stroke": {
+                 "type": 0,
+                 "payload": 4294967295
+                },
+                "strokeWidth": 4.4,
+                "strokeLinecap": 1,
+                "strokeLinejoin": 1,
+                "propList": [
+                 "fill",
+                 "stroke",
+                 "strokeWidth",
+                 "strokeLinecap",
+                 "strokeLinejoin"
+                ],
+                "opacity": 0.6,
+                "d": "M-9.52 2 V10"
+               },
+               "children": null
+              },
+              {
+               "type": "RNSVGPath",
+               "props": {
+                "fill": null,
+                "stroke": {
+                 "type": 0,
+                 "payload": 4294967295
+                },
+                "strokeWidth": 4.4,
+                "strokeLinecap": 1,
+                "strokeLinejoin": 1,
+                "propList": [
+                 "fill",
+                 "stroke",
+                 "strokeWidth",
+                 "strokeLinecap",
+                 "strokeLinejoin"
+                ],
+                "opacity": 0.6,
+                "d": "M1.52 2 H17.52"
+               },
+               "children": null
+              },
+              {
+               "type": "RNSVGPath",
+               "props": {
+                "fill": null,
+                "stroke": {
+                 "type": 0,
+                 "payload": 4294967295
+                },
+                "strokeWidth": 4.4,
+                "strokeLinecap": 1,
+                "strokeLinejoin": 1,
+                "propList": [
+                 "fill",
+                 "stroke",
+                 "strokeWidth",
+                 "strokeLinecap",
+                 "strokeLinejoin"
+                ],
+                "opacity": 0.6,
+                "d": "M1.52 2 A8 8 0 0 1 17.52 2"
+               },
+               "children": null
+              },
+              {
+               "type": "RNSVGPath",
+               "props": {
+                "fill": null,
+                "stroke": {
+                 "type": 0,
+                 "payload": 4294967295
+                },
+                "strokeWidth": 4.4,
+                "strokeLinecap": 1,
+                "strokeLinejoin": 1,
+                "propList": [
+                 "fill",
+                 "stroke",
+                 "strokeWidth",
+                 "strokeLinecap",
+                 "strokeLinejoin"
+                ],
+                "opacity": 0.6,
+                "d": "M9.52 2 V10"
+               },
+               "children": null
+              },
               {
                "type": "RNSVGPath",
                "props": {
@@ -3223,22 +3454,6 @@
              "children": null
             },
             {
-             "type": "RNSVGCircle",
-             "props": {
-              "fill": {
-               "type": 0,
-               "payload": 4294967295
-              },
-              "propList": [
-               "fill"
-              ],
-              "cx": 362.535,
-              "cy": 218.874,
-              "r": 7
-             },
-             "children": null
-            },
-            {
              "type": "RNSVGGroup",
              "props": {
               "fill": {
@@ -3255,6 +3470,98 @@
               ]
              },
              "children": [
+              {
+               "type": "RNSVGPath",
+               "props": {
+                "fill": null,
+                "stroke": {
+                 "type": 0,
+                 "payload": 4294967295
+                },
+                "strokeWidth": 4.4,
+                "strokeLinecap": 1,
+                "strokeLinejoin": 1,
+                "propList": [
+                 "fill",
+                 "stroke",
+                 "strokeWidth",
+                 "strokeLinecap",
+                 "strokeLinejoin"
+                ],
+                "opacity": 0.6,
+                "d": "M-8 2 H8"
+               },
+               "children": null
+              },
+              {
+               "type": "RNSVGPath",
+               "props": {
+                "fill": null,
+                "stroke": {
+                 "type": 0,
+                 "payload": 4294967295
+                },
+                "strokeWidth": 4.4,
+                "strokeLinecap": 1,
+                "strokeLinejoin": 1,
+                "propList": [
+                 "fill",
+                 "stroke",
+                 "strokeWidth",
+                 "strokeLinecap",
+                 "strokeLinejoin"
+                ],
+                "opacity": 0.6,
+                "d": "M-8 2 A8 8 0 0 1 8 2"
+               },
+               "children": null
+              },
+              {
+               "type": "RNSVGPath",
+               "props": {
+                "fill": null,
+                "stroke": {
+                 "type": 0,
+                 "payload": 4294967295
+                },
+                "strokeWidth": 4.4,
+                "strokeLinecap": 1,
+                "strokeLinejoin": 1,
+                "propList": [
+                 "fill",
+                 "stroke",
+                 "strokeWidth",
+                 "strokeLinecap",
+                 "strokeLinejoin"
+                ],
+                "opacity": 0.6,
+                "d": "M0 2 V10"
+               },
+               "children": null
+              },
+              {
+               "type": "RNSVGPath",
+               "props": {
+                "fill": null,
+                "stroke": {
+                 "type": 0,
+                 "payload": 4294967295
+                },
+                "strokeWidth": 4.4,
+                "strokeLinecap": 1,
+                "strokeLinejoin": 1,
+                "propList": [
+                 "fill",
+                 "stroke",
+                 "strokeWidth",
+                 "strokeLinecap",
+                 "strokeLinejoin"
+                ],
+                "opacity": 0.6,
+                "d": "M-4.5 -2.5 H4.5"
+               },
+               "children": null
+              },
               {
                "type": "RNSVGPath",
                "props": {
@@ -3408,22 +3715,6 @@
              "children": null
             },
             {
-             "type": "RNSVGCircle",
-             "props": {
-              "fill": {
-               "type": 0,
-               "payload": 4294967295
-              },
-              "propList": [
-               "fill"
-              ],
-              "cx": 394.814,
-              "cy": 225.735,
-              "r": 7
-             },
-             "children": null
-            },
-            {
              "type": "RNSVGGroup",
              "props": {
               "fill": {
@@ -3440,6 +3731,121 @@
               ]
              },
              "children": [
+              {
+               "type": "RNSVGPath",
+               "props": {
+                "fill": null,
+                "stroke": {
+                 "type": 0,
+                 "payload": 4294967295
+                },
+                "strokeWidth": 4.4,
+                "strokeLinecap": 1,
+                "strokeLinejoin": 1,
+                "propList": [
+                 "fill",
+                 "stroke",
+                 "strokeWidth",
+                 "strokeLinecap",
+                 "strokeLinejoin"
+                ],
+                "opacity": 0.6,
+                "d": "M-8 2 H8"
+               },
+               "children": null
+              },
+              {
+               "type": "RNSVGPath",
+               "props": {
+                "fill": null,
+                "stroke": {
+                 "type": 0,
+                 "payload": 4294967295
+                },
+                "strokeWidth": 4.4,
+                "strokeLinecap": 1,
+                "strokeLinejoin": 1,
+                "propList": [
+                 "fill",
+                 "stroke",
+                 "strokeWidth",
+                 "strokeLinecap",
+                 "strokeLinejoin"
+                ],
+                "opacity": 0.6,
+                "d": "M-8 2 A8 8 0 0 1 8 2"
+               },
+               "children": null
+              },
+              {
+               "type": "RNSVGPath",
+               "props": {
+                "fill": null,
+                "stroke": {
+                 "type": 0,
+                 "payload": 4294967295
+                },
+                "strokeWidth": 4.4,
+                "strokeLinecap": 1,
+                "strokeLinejoin": 1,
+                "propList": [
+                 "fill",
+                 "stroke",
+                 "strokeWidth",
+                 "strokeLinecap",
+                 "strokeLinejoin"
+                ],
+                "opacity": 0.6,
+                "d": "M0 2 V10"
+               },
+               "children": null
+              },
+              {
+               "type": "RNSVGPath",
+               "props": {
+                "fill": null,
+                "stroke": {
+                 "type": 0,
+                 "payload": 4294967295
+                },
+                "strokeWidth": 4.4,
+                "strokeLinecap": 1,
+                "strokeLinejoin": 1,
+                "propList": [
+                 "fill",
+                 "stroke",
+                 "strokeWidth",
+                 "strokeLinecap",
+                 "strokeLinejoin"
+                ],
+                "opacity": 0.6,
+                "d": "M-4.5 -2.5 H4.5"
+               },
+               "children": null
+              },
+              {
+               "type": "RNSVGPath",
+               "props": {
+                "fill": null,
+                "stroke": {
+                 "type": 0,
+                 "payload": 4294967295
+                },
+                "strokeWidth": 4.4,
+                "strokeLinecap": 1,
+                "strokeLinejoin": 1,
+                "propList": [
+                 "fill",
+                 "stroke",
+                 "strokeWidth",
+                 "strokeLinecap",
+                 "strokeLinejoin"
+                ],
+                "opacity": 0.6,
+                "d": "M-4.5 -5 H4.5"
+               },
+               "children": null
+              },
               {
                "type": "RNSVGPath",
                "props": {
@@ -3615,22 +4021,6 @@
              "children": null
             },
             {
-             "type": "RNSVGCircle",
-             "props": {
-              "fill": {
-               "type": 0,
-               "payload": 4294967295
-              },
-              "propList": [
-               "fill"
-              ],
-              "cx": 427.093,
-              "cy": 232.596,
-              "r": 7
-             },
-             "children": null
-            },
-            {
              "type": "RNSVGGroup",
              "props": {
               "fill": {
@@ -3647,6 +4037,98 @@
               ]
              },
              "children": [
+              {
+               "type": "RNSVGPath",
+               "props": {
+                "fill": null,
+                "stroke": {
+                 "type": 0,
+                 "payload": 4294967295
+                },
+                "strokeWidth": 4.4,
+                "strokeLinecap": 1,
+                "strokeLinejoin": 1,
+                "propList": [
+                 "fill",
+                 "stroke",
+                 "strokeWidth",
+                 "strokeLinecap",
+                 "strokeLinejoin"
+                ],
+                "opacity": 0.6,
+                "d": "M-8 2 H8"
+               },
+               "children": null
+              },
+              {
+               "type": "RNSVGPath",
+               "props": {
+                "fill": null,
+                "stroke": {
+                 "type": 0,
+                 "payload": 4294967295
+                },
+                "strokeWidth": 4.4,
+                "strokeLinecap": 1,
+                "strokeLinejoin": 1,
+                "propList": [
+                 "fill",
+                 "stroke",
+                 "strokeWidth",
+                 "strokeLinecap",
+                 "strokeLinejoin"
+                ],
+                "opacity": 0.6,
+                "d": "M-8 2 A8 8 0 0 1 8 2"
+               },
+               "children": null
+              },
+              {
+               "type": "RNSVGPath",
+               "props": {
+                "fill": null,
+                "stroke": {
+                 "type": 0,
+                 "payload": 4294967295
+                },
+                "strokeWidth": 4.4,
+                "strokeLinecap": 1,
+                "strokeLinejoin": 1,
+                "propList": [
+                 "fill",
+                 "stroke",
+                 "strokeWidth",
+                 "strokeLinecap",
+                 "strokeLinejoin"
+                ],
+                "opacity": 0.6,
+                "d": "M0 2 V10"
+               },
+               "children": null
+              },
+              {
+               "type": "RNSVGPath",
+               "props": {
+                "fill": null,
+                "stroke": {
+                 "type": 0,
+                 "payload": 4294967295
+                },
+                "strokeWidth": 4.4,
+                "strokeLinecap": 1,
+                "strokeLinejoin": 1,
+                "propList": [
+                 "fill",
+                 "stroke",
+                 "strokeWidth",
+                 "strokeLinecap",
+                 "strokeLinejoin"
+                ],
+                "opacity": 0.6,
+                "d": "M0 2 V-5"
+               },
+               "children": null
+              },
               {
                "type": "RNSVGPath",
                "props": {
@@ -3800,22 +4282,6 @@
              "children": null
             },
             {
-             "type": "RNSVGCircle",
-             "props": {
-              "fill": {
-               "type": 0,
-               "payload": 4294967295
-              },
-              "propList": [
-               "fill"
-              ],
-              "cx": 459.372,
-              "cy": 239.457,
-              "r": 7
-             },
-             "children": null
-            },
-            {
              "type": "RNSVGGroup",
              "props": {
               "fill": {
@@ -3832,6 +4298,121 @@
               ]
              },
              "children": [
+              {
+               "type": "RNSVGPath",
+               "props": {
+                "fill": null,
+                "stroke": {
+                 "type": 0,
+                 "payload": 4294967295
+                },
+                "strokeWidth": 4.4,
+                "strokeLinecap": 1,
+                "strokeLinejoin": 1,
+                "propList": [
+                 "fill",
+                 "stroke",
+                 "strokeWidth",
+                 "strokeLinecap",
+                 "strokeLinejoin"
+                ],
+                "opacity": 0.6,
+                "d": "M-8 2 H8"
+               },
+               "children": null
+              },
+              {
+               "type": "RNSVGPath",
+               "props": {
+                "fill": null,
+                "stroke": {
+                 "type": 0,
+                 "payload": 4294967295
+                },
+                "strokeWidth": 4.4,
+                "strokeLinecap": 1,
+                "strokeLinejoin": 1,
+                "propList": [
+                 "fill",
+                 "stroke",
+                 "strokeWidth",
+                 "strokeLinecap",
+                 "strokeLinejoin"
+                ],
+                "opacity": 0.6,
+                "d": "M-8 2 A8 8 0 0 1 8 2"
+               },
+               "children": null
+              },
+              {
+               "type": "RNSVGPath",
+               "props": {
+                "fill": null,
+                "stroke": {
+                 "type": 0,
+                 "payload": 4294967295
+                },
+                "strokeWidth": 4.4,
+                "strokeLinecap": 1,
+                "strokeLinejoin": 1,
+                "propList": [
+                 "fill",
+                 "stroke",
+                 "strokeWidth",
+                 "strokeLinecap",
+                 "strokeLinejoin"
+                ],
+                "opacity": 0.6,
+                "d": "M0 2 V10"
+               },
+               "children": null
+              },
+              {
+               "type": "RNSVGPath",
+               "props": {
+                "fill": null,
+                "stroke": {
+                 "type": 0,
+                 "payload": 4294967295
+                },
+                "strokeWidth": 4.4,
+                "strokeLinecap": 1,
+                "strokeLinejoin": 1,
+                "propList": [
+                 "fill",
+                 "stroke",
+                 "strokeWidth",
+                 "strokeLinecap",
+                 "strokeLinejoin"
+                ],
+                "opacity": 0.6,
+                "d": "M0 2 V-5"
+               },
+               "children": null
+              },
+              {
+               "type": "RNSVGPath",
+               "props": {
+                "fill": null,
+                "stroke": {
+                 "type": 0,
+                 "payload": 4294967295
+                },
+                "strokeWidth": 4.4,
+                "strokeLinecap": 1,
+                "strokeLinejoin": 1,
+                "propList": [
+                 "fill",
+                 "stroke",
+                 "strokeWidth",
+                 "strokeLinecap",
+                 "strokeLinejoin"
+                ],
+                "opacity": 0.6,
+                "d": "M-3.5 -5 L0 -8 L3.5 -5"
+               },
+               "children": null
+              },
               {
                "type": "RNSVGPath",
                "props": {

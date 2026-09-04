@@ -339,12 +339,47 @@ export function FixtureLayer({
                     stroke={spec.color}
                     strokeWidth={1.2}
                   />
-                  <Circle cx={p.x} cy={p.y} r={rayon} fill={c.surface} />
+                  {/*
+                    LE HALO SUIT LA FORME DU SYMBOLE — relevé du patron :
+                    « le bloc blanc rond derrière les icônes élec prend trop
+                    de place, fais juste un contour de l'icône en blanc avec
+                    un peu d'opacité. Le blanc cache parfois des cotes. »
+
+                    Un disque plein de la taille du symbole, sur un mur qui
+                    en porte quatre, fait quatre trous blancs dans le
+                    dessin — et les cotes qui passent dessous disparaissent.
+                    Or elles sont la raison d'être du plan.
+
+                    Un anneau aurait le même défaut en plus fin : il masque
+                    encore une couronne entière. On repasse donc CHAQUE
+                    TRACÉ en blanc, plus épais et à demi transparent, avant
+                    de le dessiner en couleur. Le symbole se détache de ce
+                    qui passe derrière, et le plan reste visible entre ses
+                    traits.
+
+                    LE HALO SE PEINT AVANT LE TRAIT, jamais après : peint
+                    après, il effacerait le symbole qu'il est censé
+                    détacher. C'est la leçon du liseré de l'icône — « le
+                    reflet se peint avant le fil ».
+                  */}
                   <G
                     transform={
                       `translate(${p.x}, ${p.y}) ` +
                       `rotate(${dir}) scale(${rayon / 11})`
                     }>
+                    {/* HALO_BLANC : le contour, sous le symbole. */}
+                    {symbol.map((seg, si) => (
+                      <Path
+                        key={`halo-${si}`}
+                        d={seg.d}
+                        stroke="#FFFFFF"
+                        strokeWidth={4.4}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        fill={seg.fill ? '#FFFFFF' : 'none'}
+                        opacity={0.6}
+                      />
+                    ))}
                     {symbol.map((seg, si) => (
                       <Path
                         key={si}

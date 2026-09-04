@@ -13326,6 +13326,28 @@ déjà. Et comme l'application voit la bibliothèque des modules natifs mais pas
 l'inverse, la demande voyage par `UserDefaults`, le seul endroit que les deux
 côtés voient — et qui survit à un lancement à froid.
 
+### Le blanc derrière les symboles élec ne cache plus le plan
+
+Relevé du patron, resté en souffrance : « le bloc blanc rond derrière les
+icônes élec sur le plan 2D prend trop de place, fais juste un contour de
+l'icône en blanc avec un peu d'opacité. Le blanc cache parfois des cotes. »
+
+Un disque plein de la taille du symbole, sur un mur qui en porte quatre, fait
+quatre trous blancs dans le dessin — et les cotes qui passent dessous
+disparaissent. Or elles sont la raison d'être du plan.
+
+**Le halo suit la forme du symbole, il ne l'entoure pas.** Un anneau aurait le
+même défaut en plus fin : il masque encore une couronne entière. Chaque tracé
+est donc repassé en blanc, plus épais et à 60 % d'opacité, AVANT d'être
+dessiné en couleur. Le symbole se détache de ce qui passe derrière, et le
+plan reste visible entre ses traits. Peint après, le halo effacerait le
+symbole qu'il est censé détacher — c'est la leçon du liseré de l'icône,
+« le reflet se peint avant le fil », et un banc vérifie l'ordre.
+
+Le symbole se dessine donc deux fois, et il faut le dire. Mais seulement AU
+REPOS : pendant qu'on promène le plan, un appareil n'est qu'un point, et ce
+chemin-là ne change pas.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro
