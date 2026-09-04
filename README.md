@@ -13229,6 +13229,49 @@ chargement, le cycle marcherait jusqu'au jour où l'ordre d'évaluation change
 et où l'un voit `undefined`. Le mode d'affichage est donc dit par l'appelant,
 qui le connaît déjà.
 
+### 9/10 (suite) — Les icônes alternatives
+
+La teinte d'accent habille l'application ; l'icône habille l'écran d'accueil.
+Quatre habits — **Claire**, **Indigo**, **Prune**, **Graphite** — sous les
+teintes, dans les mêmes réglages.
+
+**Le glyphe ne change jamais.** C'est lui qu'on reconnaît au pouce, sans
+lire, parmi cent icônes : une icône dont la forme change n'est plus la même
+application. Seul l'habit change — fond clair et glyphe d'encre pour
+l'originale, fond teinté et glyphe blanc pour les trois autres. Le liseré du
+bord reste sombre partout : c'est lui qui pose l'icône sur n'importe quel
+fond d'écran.
+
+**L'icône est un réglage À PART de la teinte, et c'est iOS qui l'impose.**
+Changer d'icône fait apparaître une alerte du système — « Vous avez changé
+l'icône de EchoPlan » — qu'aucune application ne peut supprimer. Lier les
+deux ferait surgir cette alerte à chaque essai de teinte, c'est-à-dire trois
+fois de suite pendant qu'on compare. Deux réglages, deux gestes ; la ligne
+le dit plutôt que de laisser la surprise arriver.
+
+**Chaque jeu est complet.** Une icône alternative sans ses petites tailles
+retombe sur l'originale là où elle manque : l'écran d'accueil serait indigo,
+les réglages et les notifications blancs. `tools/gen-icons.mjs` génère donc
+toutes les tailles pour chaque habit, et un banc compte les fichiers —
+personne ne va vérifier Spotlight à la main. Il vérifie aussi que
+l'originale n'a pas bougé d'un octet : le générateur pose les habits l'un
+après l'autre en changeant trois variables, et s'il oublie de les remettre,
+l'icône d'origine sort teintée — un défaut qui ne se voit qu'une fois
+l'application installée.
+
+**Côté projet Xcode**, deux réglages, dans Debug ET dans Release : sans
+`ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS`, Xcode ne compile que le
+jeu principal — les trois autres sont dans le dépôt, absents du binaire, et
+`setAlternateIconName` répond « icône inconnue » sans que rien n'explique
+pourquoi. Le banc les compte aussi, dans les deux configurations : une
+variante qui n'a pas le réglage se comporte autrement que l'autre, et c'est
+toujours celle qu'on ne teste pas.
+
+**Le natif ne demande rien quand rien ne change** : `setAlternateIconName`
+lève son alerte à chaque appel, même pour reposer l'icône déjà en place. Et
+l'icône n'est PAS reposée au démarrage — elle est déjà sur l'écran
+d'accueil ; on ne lit le réglage que pour le montrer.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

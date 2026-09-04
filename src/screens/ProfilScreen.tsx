@@ -37,6 +37,7 @@ import { PLANS_GRATUITS, useAccountStore } from '../store/accountStore';
 import { useScanStore, type ThemePref } from '../store/scanStore';
 import { dark, radius, shadowCard, useTheme, type Palette } from '../theme';
 import { ACCENTS } from '../ui/accents';
+import { ICONES } from '../ui/icone';
 import { alerte } from '../ui/alerte';
 import { haptic } from '../ui/haptic';
 import { panne as expliquer } from '../ui/panne';
@@ -89,6 +90,8 @@ export function ProfilScreen() {
   const setScreen = useScanStore((st) => st.setScreen);
   const themePref = useScanStore((st) => st.themePref);
   const accentPref = useScanStore((st) => st.accentPref);
+  const iconePref = useScanStore((st) => st.iconePref);
+  const setIconePref = useScanStore((st) => st.setIconePref);
   const setAccentPref = useScanStore((st) => st.setAccentPref);
   const setThemePref = useScanStore((st) => st.setThemePref);
   const saves = useScanStore((st) => st.saves);
@@ -383,6 +386,55 @@ export function ProfilScreen() {
           })}
         </View>
 
+        {/*
+          L'ICÔNE DE L'APPLICATION — sous les teintes, et à PART d'elles.
+
+          Elles vont ensemble, mais changer d'icône fait apparaître une
+          alerte du système qu'aucune application ne peut supprimer : les
+          lier ferait surgir cette alerte à chaque essai de teinte. La ligne
+          le dit, plutôt que de laisser la surprise arriver.
+        */}
+        <Text style={s.teinteTitre}>Icône de l’application</Text>
+        <View style={s.teintes}>
+          {ICONES.map((i) => {
+            const actif = iconePref === i.cle;
+            const habit = ACCENTS.find((a) => a.cle === i.cle);
+            const teinte = i.natif
+              ? habit?.clair.blueDark ?? c.ink
+              : c.surface;
+            return (
+              <Pressable
+                key={i.cle}
+                accessibilityRole="button"
+                accessibilityLabel={`Icône ${i.nom}`}
+                accessibilityState={{ selected: actif }}
+                style={s.teinte}
+                onPress={() => {
+                  setIconePref(i.cle);
+                  haptic('leger');
+                }}>
+                <View
+                  style={[
+                    s.iconeCarre,
+                    { backgroundColor: teinte },
+                    actif && { borderColor: c.ink },
+                  ]}>
+                  <Svg width={22} height={22} viewBox="0 0 24 24">
+                    <Path
+                      d={SOLAIRES.rooms}
+                      fill={i.natif ? '#FFFFFF' : c.ink}
+                      fillRule="evenodd"
+                    />
+                  </Svg>
+                </View>
+                <Text style={[s.teinteMot, actif && s.apparenceMotActif]}>
+                  {i.nom}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
         <Text style={s.section}>Données et compte</Text>
         <Rangee
           s={s}
@@ -618,6 +670,27 @@ const themed = (c: Palette) =>
       shadowOpacity: 0.08,
     },
     teinteMot: { color: c.inkSoft, fontSize: 11.5, fontWeight: '600' },
+    teinteTitre: {
+      color: c.inkSoft,
+      fontSize: 12.5,
+      fontWeight: '700',
+      marginTop: 18,
+      marginBottom: 2,
+    },
+    /* L'icône est un CARRÉ arrondi, pas un rond : c'est la forme qu'elle
+       aura sur l'écran d'accueil, et une pastille ronde ferait croire à une
+       troisième teinte. */
+    iconeCarre: {
+      width: 44,
+      height: 44,
+      borderRadius: 11,
+      borderWidth: 2.5,
+      borderColor: 'transparent',
+      alignItems: 'center',
+      justifyContent: 'center',
+      ...shadowCard,
+      shadowOpacity: 0.08,
+    },
     apparenceMotActif: { color: c.blue, fontWeight: '800' },
     rangee: {
       flexDirection: 'row',

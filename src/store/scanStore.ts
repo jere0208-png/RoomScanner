@@ -16,6 +16,7 @@ import {
 } from '../ui/photos';
 import { bornerCalage, CALAGE_NEUTRE, type Calage } from '../ui/calage';
 import { ACCENT_DEFAUT, estUnAccent } from '../ui/accents';
+import { ICONE_DEFAUT, estUneIcone, poserIcone } from '../ui/icone';
 import { identiteDuCompte, useAccountStore } from './accountStore';
 import {
   insetOnRing,
@@ -679,6 +680,7 @@ const NOM_PIECE_MAX = 40;
 const NOM_PLAN_MAX = 60;
 const THEME_KEY = 'roomscanner.themePref.v1';
 const ACCENT_KEY = 'roomscanner.accentPref.v1';
+const ICONE_KEY = 'roomscanner.iconePref.v1';
 const COLORS_KEY = 'roomscanner.openingColors.v1';
 const FURNITURE_KEY = 'roomscanner.showFurniture.v1';
 const SURFACES_KEY = 'roomscanner.showSurfaces.v1';
@@ -1493,8 +1495,17 @@ interface ScanState {
    * hexadécimal dont plus personne ne sait le nom.
    */
   accentPref: string;
+  /**
+   * L'ICÔNE DE L'APPLICATION — voir `ui/icone`.
+   *
+   * À PART de la teinte, et c'est iOS qui l'impose : changer d'icône fait
+   * apparaître une alerte du système, qu'on ne veut pas voir surgir trois
+   * fois pendant qu'on compare des teintes.
+   */
+  iconePref: string;
   setThemePref: (p: ThemePref) => void;
   setAccentPref: (cle: string) => void;
+  setIconePref: (cle: string) => void;
 
   // Couleur des portes/fenêtres (2D, 3D, PDF). Décoché par défaut.
   showOpeningColors: boolean;
@@ -2367,6 +2378,7 @@ export const useScanStore = create<ScanState>((set, get) => {
     folders: [],
     themePref: 'system',
     accentPref: ACCENT_DEFAUT,
+    iconePref: ICONE_DEFAUT,
     showOpeningColors: false,
 
     setThemePref: (themePref) => {
@@ -2385,6 +2397,27 @@ export const useScanStore = create<ScanState>((set, get) => {
       const sain = estUnAccent(cle) ? cle : ACCENT_DEFAUT;
       set({ accentPref: sain });
       AsyncStorage.setItem(ACCENT_KEY, sain).catch(() => {});
+    },
+
+    /**
+     * CHOISIT L'ICÔNE DE L'APPLICATION.
+     *
+     * Le réglage est posé TOUT DE SUITE, sans attendre le système : la
+     * pastille se marque à l'instant du doigt, et l'alerte d'iOS arrive
+     * par-dessus. Si le système refuse — un contexte où les icônes
+     * alternatives n'existent pas —, on revient à l'origine plutôt que de
+     * montrer un réglage qui ne correspond à rien sur l'écran d'accueil.
+     */
+    setIconePref: (cle) => {
+      const sain = estUneIcone(cle) ? cle : ICONE_DEFAUT;
+      set({ iconePref: sain });
+      AsyncStorage.setItem(ICONE_KEY, sain).catch(() => {});
+      poserIcone(sain).then((pose) => {
+        if (!pose && sain !== ICONE_DEFAUT) {
+          set({ iconePref: ICONE_DEFAUT });
+          AsyncStorage.setItem(ICONE_KEY, ICONE_DEFAUT).catch(() => {});
+        }
+      });
     },
 
     setShowOpeningColors: (showOpeningColors) => {
@@ -6891,6 +6924,11 @@ export const useScanStore = create<ScanState>((set, get) => {
         }
         const accent = await AsyncStorage.getItem(ACCENT_KEY);
         if (estUnAccent(accent)) set({ accentPref: accent as string });
+        /* L'icône, elle, n'est PAS reposée au démarrage : elle est déjà sur
+           l'écran d'accueil, et la reposer déclencherait l'alerte du système
+           à chaque lancement. On ne lit que le réglage, pour le montrer. */
+        const icone = await AsyncStorage.getItem(ICONE_KEY);
+        if (estUneIcone(icone)) set({ iconePref: icone as string });
         const colors = await AsyncStorage.getItem(COLORS_KEY);
         if (colors === '1' || colors === '0') {
           set({ showOpeningColors: colors === '1' });

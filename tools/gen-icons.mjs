@@ -107,10 +107,34 @@ function glyphAlpha(gx, gy, aa) {
   return a;
 }
 
-// Fond blanc (léger dégradé vers gris très clair), glyphe noir.
-const TOP = [0xff, 0xff, 0xff];
-const BOT = [0xf1, 0xf3, 0xf6];
-const INK = [0x0b, 0x0d, 0x12];
+/*
+  QUATRE HABITS POUR LA MÊME SILHOUETTE — les icônes alternatives.
+
+  Neuvième des dix améliorations, seconde moitié : la teinte d'accent habille
+  l'application, l'icône habille l'écran d'accueil. Le glyphe ne change
+  JAMAIS : c'est lui qu'on reconnaît au pouce, et une icône dont la forme
+  change n'est plus la même application. Seul l'habit change — fond clair et
+  glyphe d'encre pour l'originale, fond teinté et glyphe blanc pour les
+  autres.
+
+  Le liseré du bord, lui, reste sombre partout : c'est ce qui pose l'icône
+  sur n'importe quel fond d'écran, et une bordure claire sur un fond clair
+  redonnerait à l'icône le contour flou qu'on lui a justement retiré.
+*/
+const HABITS = [
+  // L'originale : fond blanc en léger dégradé, glyphe noir.
+  { nom: null, top: [0xff, 0xff, 0xff], bot: [0xf1, 0xf3, 0xf6], ink: [0x0b, 0x0d, 0x12] },
+  { nom: 'Indigo', top: [0x6d, 0x5f, 0xff], bot: [0x3f, 0x31, 0xd6], ink: [0xff, 0xff, 0xff] },
+  { nom: 'Prune', top: [0xac, 0x4d, 0xba], bot: [0x7b, 0x2c, 0x88], ink: [0xff, 0xff, 0xff] },
+  { nom: 'Graphite', top: [0x4a, 0x54, 0x63], bot: [0x23, 0x2a, 0x34], ink: [0xff, 0xff, 0xff] },
+];
+
+/* L'habit du rendu en cours. `render` le lit ; il n'est pas passé en
+   argument parce que `render` est appelé de six endroits, et qu'un argument
+   de plus à chacun se serait oublié quelque part. */
+let TOP = HABITS[0].top;
+let BOT = HABITS[0].bot;
+let INK = HABITS[0].ink;
 
 /**
  * LE LISERÉ DU BORD — ce qui pose l'icône sur le fond d'écran.
@@ -339,6 +363,37 @@ const contents = {
   info: { author: 'xcode', version: 1 },
 };
 writeFileSync(join(iosDir, 'Contents.json'), JSON.stringify(contents, null, 2));
+
+/*
+  LES ICÔNES ALTERNATIVES — un jeu complet par habit.
+
+  Chacune est un `.appiconset` à part entière, du même catalogue : c'est ce
+  qu'iOS 15 et suivants attendent (`ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS`
+  et `ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES` côté projet). On génère
+  TOUTES les tailles et pas seulement le 120 et le 180 : les réglages, les
+  notifications et Spotlight vont chercher les petites, et une icône
+  alternative qui n'en a pas retombe sur l'originale — l'écran d'accueil
+  serait indigo, les réglages blancs.
+*/
+for (const habit of HABITS) {
+  if (!habit.nom) continue;
+  TOP = habit.top;
+  BOT = habit.bot;
+  INK = habit.ink;
+  const dir = join(ROOT, `ios/RoomScanner/Images.xcassets/AppIcon-${habit.nom}.appiconset`);
+  mkdirSync(dir, { recursive: true });
+  const faits = new Set();
+  for (const [, , px] of iosSizes) {
+    if (faits.has(px)) continue;
+    faits.add(px);
+    writeFileSync(join(dir, `icon-${px}.png`), encodePNG(px, render(px, 'none'), false));
+  }
+  writeFileSync(join(dir, 'Contents.json'), JSON.stringify(contents, null, 2));
+  console.log(`iOS AppIcon-${habit.nom}.appiconset`);
+}
+TOP = HABITS[0].top;
+BOT = HABITS[0].bot;
+INK = HABITS[0].ink;
 
 // ---------------------------------------------------- écran de lancement
 /*

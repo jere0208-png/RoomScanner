@@ -31,6 +31,13 @@ RCT_EXTERN_METHOD(tap:(NSString *)kind)
 RCT_EXTERN_METHOD(garderEveille:(BOOL)oui)
 @end
 
+// Quatre habits pour le meme glyphe : voir RoomScanIcone.
+@interface RCT_EXTERN_MODULE(RoomScanIcone, NSObject)
+RCT_EXTERN_METHOD(poser:(NSString *)nom
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+@end
+
 @interface RCT_EXTERN_MODULE(RoomScanAccount, NSObject)
 RCT_EXTERN_METHOD(accountMarker:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
 RCT_EXTERN_METHOD(setAccountMarker:(NSString *)json
