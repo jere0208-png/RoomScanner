@@ -332,24 +332,17 @@ describe('le bandeau dit d’où viennent les prix', () => {
     const t = ouvrir();
     demanderLePrix(t);
     await laisserLAttenteFinir();
-    const lus = mots(t);
     /*
-      « VÉRIFIÉS AUJOURD'HUI » NE SE DIT PLUS À LA LÉGÈRE.
+      ET L'ÉPREUVE RETROUVE SON ASSERTION D'ORIGINE.
 
-      Le catalogue embarqué porte maintenant DEUX relevés — les mécanismes du
-      28 août, les plaques du 5 septembre — et la promesse porte sur le plus
-      vieux : elle vaut pour le catalogue entier, ou elle ne vaut rien.
-      Relevé du patron : « des prix s'affichent à la date d'aujourd'hui mais
-      d'autres restent par exemple au 28 août ».
-
-      Ce que l'épreuve tient depuis toujours reste tenu, et c'était son
-      sujet : hors ligne, le bandeau ne s'EXCUSE pas sur des prix qui ont bien
-      été vus en magasin. Il dit désormais la période, ce qui répond d'avance
-      à la question.
+      Elle avait dû céder un moment : le catalogue portait DEUX relevés — les
+      mécanismes du 28 août, les plaques du 5 septembre — et la promesse
+      « vérifiés aujourd'hui » porte sur le PLUS VIEUX, donc ne tenait plus.
+      Le relevé complet du 5 septembre a ramené le catalogue à une seule
+      date, et la phrase redevient vraie. Relevé du patron : « tous les prix
+      ne sont pas à jour dans l'app ».
     */
-    expect(lus).not.toContain('Prix non vérifiés');
-    expect(lus).toContain('Prix relevés en rayon');
-    expect(lus.some((m) => m.includes('28 août'))).toBe(true);
+    expect(mots(t)).toContain('Prix vérifiés aujourd’hui');
   });
 });
 

@@ -42,7 +42,7 @@ export interface Tarif {
  * d'écart ne donnent pas le même total, et c'est normal : encore faut-il
  * pouvoir le dire.
  */
-export const VERSION_TARIFS = '2026-09.1';
+export const VERSION_TARIFS = '2026-09.2';
 
 /** La source commune à tout ce qui a été posé à la main. */
 const A_VALIDER =
@@ -103,9 +103,15 @@ const ENSEIGNE = 'Castorama';
  * à la journée près ; personne ne le lui passait.
  */
 export const RELEVE_RAYON = '2026-09-05';
-const r = (pu: number): Tarif => releveLe(pu, ENSEIGNE, '2026-08-28');
-/** Le relevé des PLAQUES, du 5 septembre 2026 — voir `TARIFS_PLAQUE`. */
-const p5 = (pu: number): Tarif => releveLe(pu, ENSEIGNE, '2026-09-05');
+/**
+ * UN PRIX VU EN RAYON, LE JOUR DE LA CAMPAGNE.
+ *
+ * Il n'y a qu'UNE date, et c'est le sujet du relevé du 5 septembre — relevé
+ * du patron : « tous les prix ne sont pas à jour, des prix s'affichent à la
+ * date d'aujourd'hui mais d'autres restent par exemple au 28 août ». Deux
+ * dates dans un catalogue embarqué, c'est une campagne laissée à moitié.
+ */
+const r = (pu: number): Tarif => releveLe(pu, ENSEIGNE, RELEVE_RAYON);
 
 // --------------------------------------------------------------- gammes
 
@@ -359,12 +365,12 @@ export const TARIFS_MECANISME: Record<
 export const TARIFS_PLAQUE: Record<GammeId, Tarif[]> = {
   // Index 0 = plaque 1 poste, index 1 = 2 postes, et ainsi de suite.
   /* Legrand Dooxie 6 009 0x, blanc. */
-  dooxie: [p5(1.9), p5(3.9), p5(6.09), p5(7.9), t(9.9)],
+  dooxie: [r(1.9), r(3.9), r(6.09), r(7.9), t(9.9)],
   /* Schneider Ovalis S3207xx, blanc. Le 4 postes n'était pas affiché au
      relevé : il suit le prix du poste des trois autres. */
-  ovalis: [p5(2.15), p5(4.29), p5(6.49), t(8.6), t(10.75)],
+  ovalis: [r(2.15), r(4.29), r(6.49), t(8.6), t(10.75)],
   /* Schneider Odace, blanc craie — la finition de base de la gamme. */
-  odace: [p5(1.99), p5(3.99), p5(5.69), p5(8.0), t(9.95)],
+  odace: [r(1.99), r(3.99), r(5.69), r(8.0), t(9.95)],
   /*
     MOSAIC RESTE ESTIMÉE, et le relevé l'a confirmé une seconde fois :
     Castorama n'affiche qu'UN article Mosaic blanc, vendu par un tiers. C'est
@@ -374,7 +380,7 @@ export const TARIFS_PLAQUE: Record<GammeId, Tarif[]> = {
   */
   mosaic: [t(3.2), t(6.4), t(9.3), t(12.4), t(15.5)],
   /* Legrand Céliane CP002x, blanc émaillé — celui du relevé du patron. */
-  celiane: [p5(2.29), p5(4.59), p5(6.99), p5(9.45), t(11.8)],
+  celiane: [r(2.29), r(4.59), r(6.99), r(9.45), t(11.8)],
 };
 
 // --------------------------------------------------------- hors gamme
@@ -401,17 +407,49 @@ export const TARIFS_COMMUNS: Record<string, Tarif> = {
   futp6: t(99),
   coax: t(69),
   // Encastrement.
-  'boite-encastrement': r(1.69),
+  /*
+    LA BOÎTE SE VEND PAR DIX, et c'est comme ça qu'on l'achète pour un
+    logement : le lot Batibox cloison sèche P.40 de dix boîtes est à 20,50 €,
+    soit 2,05 € l'unité (2,39 € à la pièce). Même doctrine que la couronne de
+    cent mètres — on chiffre au conditionnement du chantier, pas à la pièce
+    détachée. L'ancienne valeur, 1,69 €, ne correspondait à aucun des deux.
+  */
+  'boite-encastrement': r(2.05),
   'boite-dcl': t(4.9),
   'boite-derivation': t(3.9),
-  // Tableau : le calibre change le prix, pas beaucoup.
-  'disj-2': t(10.5),
-  'disj-10': r(10.5),
-  'disj-16': r(10.5),
-  'disj-20': r(10.5),
+  /*
+    LE TABLEAU, RELEVÉ ARTICLE PAR ARTICLE LE 05/09/2026.
+
+    Relevé du patron : « il est impossible que l'interrupteur différentiel
+    était à 219 € — c'est hors norme comme prix pour ça. Les prix doivent
+    absolument être exacts. » Il avait raison deux fois : les 219 € venaient
+    d'un RÉSUMÉ DE RECHERCHE, qui mélangeait des produits, et le vrai prix,
+    lu sur la page produit, est de 49,90 €.
+
+    SEULE UNE PAGE PRODUIT FAIT FOI, et ce relevé l'a prouvé trois fois : une
+    liste de recherche a annoncé 72,90 € pour un câble à 89,90 €, 4,90 € pour
+    un peigne à 5,19 €, et 219 € pour ce différentiel. C'est exactement le
+    piège qui avait fait chiffrer les plaques sur une finition décorative.
+
+    CE QUI A BOUGÉ, ET C'EST LE TABLEAU QUI PAYAIT LE PLUS CHER :
+      · différentiel type AC : 72,90 → 49,90 (−32 %)
+      · différentiel type A  : 81,90 → 64,90 (−21 %)
+      · disjoncteurs 10/16/20 : 10,50 → 9,99
+    Un tableau de logement porte trois à quatre différentiels : le devis en
+    annonçait près de quatre-vingts euros de trop, sur le seul poste que le
+    client regarde en premier.
+
+    ET DEUX ESTIMATIONS SONT DEVENUES DES RELEVÉS : le disjoncteur 2 A, très
+    sous-estimé (10,50 posés, 27,90 en rayon — un petit calibre est rare, donc
+    cher), et les coffrets 3 et 4 rangées.
+  */
+  'disj-2': r(27.9),
+  'disj-10': r(9.99),
+  'disj-16': r(9.99),
+  'disj-20': r(9.99),
   'disj-32': r(23.9),
-  'diff-AC': r(72.9),
-  'diff-A': r(81.9),
+  'diff-AC': r(49.9),
+  'diff-A': r(64.9),
   'coffret-com': t(179),
   /*
     LE COFFRET SE CHIFFRE À LA RANGÉE, ET IL EN FAUT UN.
@@ -423,8 +461,8 @@ export const TARIFS_COMMUNS: Record<string, Tarif> = {
   */
   'coffret-1': r(34.9),
   'coffret-2': r(52.9),
-  'coffret-3': t(70.9),
-  'coffret-4': t(88.9),
+  'coffret-3': r(85.9),
+  'coffret-4': r(109.9),
   // Le peigne, qu'on oublie toujours. (Le bornier de terre, lui, est fourni
   // avec le coffret : voir `chiffrer`.)
   peigne: r(5.19),
@@ -510,7 +548,14 @@ export const TARIFS_COMMUNS: Record<string, Tarif> = {
   'agrafe-icta': t(8.9),
   // ------------------------------------------------------------ connexions
   'ruban-isolant': t(5.9),
-  'wago-2': r(19.9),
+  /*
+    LES BORNES WAGO 273 NE SONT PLUS VENDUES — l'article est marqué « n'est
+    plus proposé à la vente ». Le prix redevient donc une ESTIMATION : un
+    relevé qu'on ne peut plus refaire n'est plus un relevé, et le laisser
+    passer pour tel ferait vieillir la confiance qu'on accorde à tous les
+    autres. La valeur est celle du dernier lot vu (10,90 € les cinquante).
+  */
+  'wago-2': t(19.9),
   'wago-3': t(17.9),
   'wago-5': t(15.9),
   domino: t(4.5),
@@ -549,7 +594,15 @@ export const TARIFS_COMMUNS: Record<string, Tarif> = {
   'barrette-equipotentielle': t(12.9),
   'collier-equipotentiel': t(4.5),
   'rehausse-boite': t(1.9),
-  'obturateur': r(6.09),
+  /*
+    L'OBTURATEUR N'EST PLUS AFFICHÉ QU'EN DÉSTOCKAGE (7,92 € le 05/09). La
+    maison refuse les prix de fin de série depuis le premier relevé — le
+    variateur dooxie et la prise TV Céliane ont été écartés pour la même
+    raison : « le devis d'un chantier qui commence dans trois semaines ne
+    peut pas s'appuyer dessus ». Le prix retombe donc au rang d'estimation,
+    à la valeur du dernier relevé courant.
+  */
+  'obturateur': t(6.09),
   // Protections d'un départ seul : courantes en rénovation, où l'on ajoute
   // un circuit sans refaire toute la rangée.
   'disj-diff-16': t(59),

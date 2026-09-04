@@ -2,16 +2,30 @@
   "_lisez_moi": [
     "LE CATALOGUE PUBLIC DES PRIX — a deposer a cote de `api.php`.",
     "",
-    "CE FICHIER EST LE RELEVE REEL DU 05/09/2026, pas un exemple. Il corrige",
-    "les plaques de finition, qui n'avaient jamais ete relevees et etaient",
-    "deux a trois fois trop cheres : la plaque 1 poste Celiane blanc emaille",
-    "CP0021 est a 2,29 EUR chez Castorama, le devis en annoncait 8,50.",
+    "RELEVE COMPLET DU 05/09/2026, page produit par page produit, chez",
+    "Castorama. Ce n'est pas un exemple : c'est le catalogue qui chiffre.",
     "",
-    "La cause : l'ancienne ligne Celiane (8,50 / 14,30 / 20,20 / 27,30) est a",
-    "un cheveu du blanc amande DECORATIF (7,29 / 14,50 / 21,50 / 27,90). On",
-    "avait chiffre une finition de decoration la ou un devis compte du blanc",
-    "standard. Le prix d'une plaque suit la FINITION, pas la gamme : la meme",
-    "Celiane 1 poste va de 1,84 EUR (blanc laque) a 39,90 EUR (verre opale).",
+    "SEULE UNE PAGE PRODUIT FAIT FOI. Au cours de ce relevé, les listes de",
+    "recherche automatique ont annonce trois fois un prix faux : 219 EUR pour",
+    "un interrupteur differentiel a 49,90, 72,90 pour un cable a 89,90, et",
+    "4,90 pour un peigne a 5,19. C'est le meme piege qui avait fait chiffrer",
+    "les plaques de finition sur une finition decorative.",
+    "",
+    "CE QUI A BOUGE DEPUIS LE 28/08 :",
+    "  differentiel type AC  72,90 -> 49,90  (-32 %)",
+    "  differentiel type A   81,90 -> 64,90  (-21 %)",
+    "  disjoncteurs 10/16/20 10,50 ->  9,99",
+    "  boite d'encastrement   1,69 ->  2,05  (lot Batibox P.40 de 10)",
+    "  disjoncteur 2 A       10,50 -> 27,90  (etait estime)",
+    "  coffret 3 rangees     70,90 -> 85,90  (etait estime)",
+    "  coffret 4 rangees     88,90 -> 109,90 (etait estime)",
+    "Les vingt-quatre autres articles releves sont INCHANGES.",
+    "",
+    "DEUX ARTICLES NE SONT PLUS RELEVABLES et restent des estimations dans",
+    "l'application : l'obturateur (plus affiche qu'en destockage) et les",
+    "bornes Wago serie 273 (plus vendues). Un prix de fin de serie ne se",
+    "recopie pas — le devis d'un chantier qui commence dans trois semaines ne",
+    "peut pas s'appuyer dessus. Ils ne figurent donc pas ci-dessous.",
     "",
     "POUR METTRE A JOUR : changez `version` (l'application compare les",
     "versions pour dire « prix actualises » plutot que « deja a jour »),",
@@ -22,7 +36,7 @@
     "TOUS LES PRIX SONT TTC, EN EUROS."
   ],
 
-  "version": "2026-09.1",
+  "version": "2026-09.2",
   "releve": "2026-09-05",
   "source": "Castorama",
 
@@ -62,10 +76,31 @@
     "icta-16": 26.9,
     "icta-20": 30.9,
     "icta-25": 53.9,
+    "icta-prefilee-3g1.5": 95.9,
+    "icta-prefilee-3g2.5": 149.9,
 
     "fil-1.5": 25.9,
     "fil-2.5": 41.9,
+    "fil-6": 16.9,
+    "cable-3g1.5": 89.9,
+    "cable-3g2.5": 139.9,
 
-    "boite-encastrement": 1.69
+    "boite-encastrement": 2.05,
+
+    "disj-2": 27.9,
+    "disj-10": 9.99,
+    "disj-16": 9.99,
+    "disj-20": 9.99,
+    "disj-32": 23.9,
+    "diff-AC": 49.9,
+    "diff-A": 64.9,
+
+    "coffret-1": 34.9,
+    "coffret-2": 52.9,
+    "coffret-3": 85.9,
+    "coffret-4": 109.9,
+    "peigne": 5.19,
+
+    "collier-colson": 9.99
   }
 }

@@ -13478,6 +13478,77 @@ page produit par page produit. C'est un travail à part, et le faire vite est
 exactement ce qui a produit l'erreur des plaques : une recherche automatique
 proposait, ce jour-là, 219 € pour un différentiel qui en vaut 73.
 
+### Le relevé complet du 5 septembre 2026 — une seule date, partout
+
+Relevé du patron : « vas-y fais tout ça. Mais vérifie bien, il est impossible
+que l'interrupteur différentiel était à 219 € — c'est hors norme comme prix
+pour ça. Les prix doivent absolument être exacts. »
+
+Il avait raison sur les deux points. Les 219 € venaient d'un **résumé de
+recherche automatique**, qui mélangeait des produits ; le vrai prix, lu sur la
+page produit, est de **49,90 €**.
+
+**SEULE UNE PAGE PRODUIT FAIT FOI**, et ce relevé l'a prouvé trois fois :
+
+| Ce qu'annonçait une liste de recherche | Ce que dit la page produit |
+|---|---|
+| Différentiel 40 A : 219 € | **49,90 €** |
+| Câble U1000R2V 3G1,5 : 72,90 € | **89,90 €** |
+| Peigne 13 modules : 4,90 € | **5,19 €** |
+
+Trois fois sur trois, la liste avait tort. C'est exactement le piège qui avait
+fait chiffrer les plaques sur une finition décorative, et c'est pourquoi les
+trente-trois articles ont été rouverts un par un.
+
+**Ce qui a bougé** — et c'est le tableau qui payait le plus cher :
+
+| Article | 28 août | 5 septembre | |
+|---|---|---|---|
+| Différentiel 40 A type AC | 72,90 € | **49,90 €** | −32 % |
+| Différentiel 40 A type A | 81,90 € | **64,90 €** | −21 % |
+| Disjoncteurs 10/16/20 A | 10,50 € | **9,99 €** | −5 % |
+| Boîte d'encastrement | 1,69 € | **2,05 €** | lot Batibox P.40 de 10 |
+| Disjoncteur 2 A *(estimé)* | 10,50 € | **27,90 €** | +166 % |
+| Coffret 3 rangées *(estimé)* | 70,90 € | **85,90 €** | +21 % |
+| Coffret 4 rangées *(estimé)* | 88,90 € | **109,90 €** | +24 % |
+
+Un tableau de logement porte trois à quatre différentiels : le devis en
+annonçait près de **quatre-vingts euros de trop**, sur le poste que le client
+regarde en premier. Les vingt-quatre autres articles relevés sont
+**inchangés** — le relevé du 28 août était bon, il n'était plus daté d'hier.
+
+**La boîte se chiffre au conditionnement du chantier**, comme la couronne de
+cent mètres : le lot Batibox P.40 de dix est à 20,50 €, soit 2,05 € l'unité
+(2,39 € à la pièce). L'ancienne valeur, 1,69 €, ne correspondait à aucun des
+deux.
+
+**Deux articles ne sont plus relevables et redeviennent des estimations.**
+L'obturateur n'est plus affiché qu'en déstockage (7,92 €), et les bornes Wago
+série 273 ne sont plus vendues. La maison refuse les prix de fin de série
+depuis le premier relevé — « le devis d'un chantier qui commence dans trois
+semaines ne peut pas s'appuyer dessus ». Un relevé qu'on ne peut plus refaire
+n'est plus un relevé, et le laisser passer pour tel ferait vieillir la
+confiance qu'on accorde à tous les autres.
+
+**Une campagne, une date.** Le catalogue embarqué ne porte plus qu'un seul
+jour de relevé, un banc le garde, et le bandeau du devis annonce donc une date
+simple au lieu d'une fourchette. C'était la demande : « des prix s'affichent à
+la date d'aujourd'hui mais d'autres restent par exemple au 28 août ».
+
+**Deux garde-fous nouveaux**, qui auraient crié devant 219 € : un interrupteur
+différentiel de logement tient entre 30 et 120 € (au-delà, on a recopié autre
+chose — un modèle HPI, un différentiel de tête), et il coûte forcément plus
+qu'un disjoncteur modulaire. Ce ne sont pas des goûts : c'est ce qu'il y a
+dans le boîtier — un tore et une électronique que le disjoncteur n'a pas.
+
+**Le magasin porte un second exemplaire de ces prix** (`ARTICLES[].offres`,
+qui cite l'intitulé et la référence vus en rayon), et c'est le banc maison qui
+l'a rappelé en tombant : les vingt-trois offres Castorama ont été alignées et
+redatées avec le catalogue. Une seule mesure, un seul endroit.
+
+`server/tarifs.json` porte le relevé complet, prêt à déposer : cinquante
+articles, une version, une date.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro
