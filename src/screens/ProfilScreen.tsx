@@ -35,8 +35,10 @@ import { ContourVif, TexteVif } from '../components/ContourVif';
 import { SOLAIRES } from '../ui/solaires';
 import { PLANS_GRATUITS, useAccountStore } from '../store/accountStore';
 import { useScanStore, type ThemePref } from '../store/scanStore';
-import { radius, shadowCard, useTheme, type Palette } from '../theme';
+import { dark, radius, shadowCard, useTheme, type Palette } from '../theme';
+import { ACCENTS } from '../ui/accents';
 import { alerte } from '../ui/alerte';
+import { haptic } from '../ui/haptic';
 import { panne as expliquer } from '../ui/panne';
 
 /**
@@ -86,6 +88,8 @@ export function ProfilScreen() {
   const insets = useSafeAreaInsets();
   const setScreen = useScanStore((st) => st.setScreen);
   const themePref = useScanStore((st) => st.themePref);
+  const accentPref = useScanStore((st) => st.accentPref);
+  const setAccentPref = useScanStore((st) => st.setAccentPref);
   const setThemePref = useScanStore((st) => st.setThemePref);
   const saves = useScanStore((st) => st.saves);
   const compte = useAccountStore((st) => st.compte);
@@ -337,6 +341,48 @@ export function ProfilScreen() {
           })}
         </View>
 
+        {/*
+          LA TEINTE D'ACCENT — neuvième des dix améliorations.
+
+          Elle est POSÉE SOUS le clair et le sombre, dans la même section :
+          les trois règlent la même chose, l'allure de l'application. Une
+          section « Couleurs » à part ferait chercher à deux endroits ce qui
+          se décide d'un seul coup d'œil.
+
+          QUATRE PASTILLES DE LA COULEUR QU'ELLES POSENT — pas de mots, sinon
+          celui de la teinte. On choisit une couleur en la voyant ; « Prune »
+          écrit en gris ne dit rien à personne.
+        */}
+        <View style={s.teintes}>
+          {ACCENTS.map((a) => {
+            const actif = accentPref === a.cle;
+            const teinte = c === dark ? a.sombre.blue : a.clair.blue;
+            return (
+              <Pressable
+                key={a.cle}
+                accessibilityRole="button"
+                accessibilityLabel={`Teinte ${a.nom}`}
+                accessibilityState={{ selected: actif }}
+                style={s.teinte}
+                onPress={() => {
+                  setAccentPref(a.cle);
+                  haptic('leger');
+                }}>
+                <View
+                  style={[
+                    s.teinteRond,
+                    { backgroundColor: teinte },
+                    actif && { borderColor: c.ink },
+                  ]}
+                />
+                <Text style={[s.teinteMot, actif && s.apparenceMotActif]}>
+                  {a.nom}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
         <Text style={s.section}>Données et compte</Text>
         <Rangee
           s={s}
@@ -554,6 +600,24 @@ const themed = (c: Palette) =>
     },
     apparenceRondActif: { borderColor: c.blue, backgroundColor: c.blueSoft },
     apparenceMot: { color: c.inkSoft, fontSize: 12.5, fontWeight: '600' },
+    /* Les teintes d'accent : quatre pastilles de la couleur qu'elles posent.
+       On choisit une couleur en la voyant. */
+    teintes: { flexDirection: 'row', gap: 12, marginTop: 14 },
+    teinte: { flex: 1, alignItems: 'center', gap: 6 },
+    teinteRond: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      borderWidth: 2.5,
+      borderColor: 'transparent',
+      // La règle de la maison pour tout bloc rond : il déclare son centrage,
+      // même vide — la coche qu'on y posera un jour tombera juste.
+      alignItems: 'center',
+      justifyContent: 'center',
+      ...shadowCard,
+      shadowOpacity: 0.08,
+    },
+    teinteMot: { color: c.inkSoft, fontSize: 11.5, fontWeight: '600' },
     apparenceMotActif: { color: c.blue, fontWeight: '800' },
     rangee: {
       flexDirection: 'row',

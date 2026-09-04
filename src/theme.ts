@@ -6,6 +6,7 @@
  */
 import { useColorScheme } from 'react-native';
 import { useScanStore } from './store/scanStore';
+import { paletteTeintee } from './ui/accents';
 
 export interface Palette {
   bg: string;
@@ -94,10 +95,24 @@ export const dark: Palette = {
  */
 export function useTheme(): Palette {
   const pref = useScanStore((s) => s.themePref);
+  const accent = useScanStore((s) => s.accentPref);
   const systeme = useColorScheme();
-  if (pref === 'dark') return dark;
-  if (pref === 'light') return light;
-  return systeme === 'dark' ? dark : light;
+  const sombre =
+    pref === 'dark' || (pref !== 'light' && systeme === 'dark');
+  /*
+    LA TEINTE D'ACCENT SE POSE ICI, ET NULLE PART AILLEURS.
+
+    Un seul endroit décide de la palette du moment : les écrans continuent
+    d'appeler `useTheme()` sans rien savoir de l'accent. Et `paletteTeintee`
+    rend TOUJOURS le même objet pour un même couple — c'est ce qui permet au
+    cache de `themedStyles`, qui mémorise par identité, de tomber juste.
+    Voir `ui/accents`.
+  */
+  return paletteTeintee(
+    sombre ? dark : light,
+    accent,
+    sombre ? 'sombre' : 'clair',
+  );
 }
 
 /**

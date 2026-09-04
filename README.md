@@ -13188,6 +13188,47 @@ prise sur ce mur — celle qu'on vient de prendre, donc celle qu'on veut voir ;
 un sélecteur ferait une commande de plus pour un cas rare, sur un établi
 déjà chargé.
 
+### 9/10 — La teinte d'accent
+
+Un seul bleu tenait toute l'application depuis le premier jour. C'est un bon
+bleu, et il reste celui par défaut ; mais un outil qu'on ouvre tous les jours
+de l'année, on aime qu'il soit un peu à soi. Quatre teintes, dans les
+réglages, sous le clair et le sombre — les trois règlent la même chose.
+
+**Ce qui décide de la liste, ce sont les couleurs DÉJÀ PRISES.** Le plan
+parle en couleurs, et ce ne sont pas des ornements : l'ambre est une porte,
+le ciel une fenêtre, le vert la conformité, le rouge le danger. L'accent,
+lui, désigne ce qu'on peut toucher — et il se pose sur le plan, puisqu'un mur
+sélectionné le porte. Un accent vert dirait « conforme » sur un mur qui n'est
+que choisi ; un accent ambre dirait « porte ». C'est pour cette raison, et
+pas par goût, que les deux teintes qu'on proposerait spontanément ne figurent
+pas : restent **Bleu**, **Indigo**, **Prune** et **Graphite** — ce dernier
+pour qui ne veut aucune couleur, et qui laisse le dessin parler seul.
+
+**Le piège était dans le cache des styles, et il est invisible à la
+lecture.** `themedStyles` mémorise ses feuilles PAR IDENTITÉ DE PALETTE — une
+`Map<Palette, T>`. Il n'y en avait que deux, `light` et `dark`, deux objets
+constants : le cache tombait juste à chaque fois. Une palette fabriquée à la
+volée à chaque rendu ferait manquer le cache À CHAQUE IMAGE, reconstruirait
+toutes les feuilles de style de l'écran, et remplirait la `Map` jusqu'à ce
+que la mémoire cède — sans rien montrer, sinon une application devenue lente
+sans que personne sache quand. Chaque couple (palette, accent, mode) n'est
+donc fabriqué **qu'une fois**, gardé dans une `WeakMap`, et rendu tel quel
+ensuite. Un banc le vérifie en comptant les fabrications.
+
+**L'accent par défaut rend la palette de base SANS COPIE** : rien ne change
+pour qui n'a rien choisi, pas même une adresse mémoire, donc pas une feuille
+de style à refaire au démarrage. Une clé inconnue — un réglage écrit par une
+version plus récente — retombe sur le bleu, et le magasin la REFUSE à
+l'entrée plutôt que de la poser : posée, elle ressortirait à chaque
+démarrage et le réglage montrerait un choix sans effet.
+
+`ui/accents` n'importe de `theme` qu'un TYPE, jamais une valeur : `theme`
+appelle `paletteTeintee`, et si les deux se tenaient par la manche au
+chargement, le cycle marcherait jusqu'au jour où l'ordre d'évaluation change
+et où l'un voit `undefined`. Le mode d'affichage est donc dit par l'appelant,
+qui le connaît déjà.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

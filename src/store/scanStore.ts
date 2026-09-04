@@ -15,6 +15,7 @@ import {
   reposerDuCoffre,
 } from '../ui/photos';
 import { bornerCalage, CALAGE_NEUTRE, type Calage } from '../ui/calage';
+import { ACCENT_DEFAUT, estUnAccent } from '../ui/accents';
 import { identiteDuCompte, useAccountStore } from './accountStore';
 import {
   insetOnRing,
@@ -677,6 +678,7 @@ const MUR_MAX_M = 60;
 const NOM_PIECE_MAX = 40;
 const NOM_PLAN_MAX = 60;
 const THEME_KEY = 'roomscanner.themePref.v1';
+const ACCENT_KEY = 'roomscanner.accentPref.v1';
 const COLORS_KEY = 'roomscanner.openingColors.v1';
 const FURNITURE_KEY = 'roomscanner.showFurniture.v1';
 const SURFACES_KEY = 'roomscanner.showSurfaces.v1';
@@ -1483,7 +1485,16 @@ interface ScanState {
 
   // Apparence : clair par défaut, bascule manuelle.
   themePref: ThemePref;
+  /**
+   * LA TEINTE D'ACCENT — voir `ui/accents`.
+   *
+   * Une CLÉ, jamais une couleur : une palette qui s'ajuste d'une version
+   * à l'autre suit alors le réglage, au lieu de le laisser figé sur un
+   * hexadécimal dont plus personne ne sait le nom.
+   */
+  accentPref: string;
   setThemePref: (p: ThemePref) => void;
+  setAccentPref: (cle: string) => void;
 
   // Couleur des portes/fenêtres (2D, 3D, PDF). Décoché par défaut.
   showOpeningColors: boolean;
@@ -2355,11 +2366,25 @@ export const useScanStore = create<ScanState>((set, get) => {
     savesCharges: false,
     folders: [],
     themePref: 'system',
+    accentPref: ACCENT_DEFAUT,
     showOpeningColors: false,
 
     setThemePref: (themePref) => {
       set({ themePref });
       AsyncStorage.setItem(THEME_KEY, themePref).catch(() => {});
+    },
+
+    /**
+     * CHOISIT LA TEINTE D'ACCENT.
+     *
+     * Une clé inconnue est REFUSÉE plutôt que posée : elle ressortirait à
+     * chaque démarrage, l'app retomberait silencieusement sur le bleu, et le
+     * réglage montrerait un choix qui n'a aucun effet.
+     */
+    setAccentPref: (cle) => {
+      const sain = estUnAccent(cle) ? cle : ACCENT_DEFAUT;
+      set({ accentPref: sain });
+      AsyncStorage.setItem(ACCENT_KEY, sain).catch(() => {});
     },
 
     setShowOpeningColors: (showOpeningColors) => {
@@ -6864,6 +6889,8 @@ export const useScanStore = create<ScanState>((set, get) => {
         if (pref === 'light' || pref === 'dark' || pref === 'system') {
           set({ themePref: pref });
         }
+        const accent = await AsyncStorage.getItem(ACCENT_KEY);
+        if (estUnAccent(accent)) set({ accentPref: accent as string });
         const colors = await AsyncStorage.getItem(COLORS_KEY);
         if (colors === '1' || colors === '0') {
           set({ showOpeningColors: colors === '1' });
