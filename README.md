@@ -13549,6 +13549,67 @@ redatées avec le catalogue. Une seule mesure, un seul endroit.
 `server/tarifs.json` porte le relevé complet, prêt à déposer : cinquante
 articles, une version, une date.
 
+### Le canal des prix ne dépend plus d'un script
+
+**Ce défaut s'est produit deux fois, et la seconde a annulé la première
+correction.** Le 5 septembre, interrogé, `bourseur.fr/api.php` répondait
+`{"ok":false,"raison":"Identifiant manquant."}` : le fichier en ligne était
+ANTÉRIEUR à l'action `tarifs`, tombait dans sa branche d'authentification, et
+l'application repartait silencieusement avec ses prix embarqués. Le serveur a
+été remis à jour, il a fonctionné — puis, le 8 septembre, il répondait de
+nouveau la même chose, alors que `tarifs.json` était toujours en ligne et
+parfaitement lisible.
+
+**Un fichier statique ne se désynchronise pas.** Le script est du CODE : il se
+redéploie, il se remplace, il repart en arrière — et quand il repart en
+arrière, il emporte une fonctionnalité qui n'a rien à voir avec lui. Le
+fichier est là, ou il n'est pas là.
+
+L'application demande donc les DEUX en même temps :
+
+| Chemin | Rôle |
+|---|---|
+| `POST <serveur>/api.php` `{action:'tarifs'}` | prioritaire — il pourra un jour servir un catalogue calculé, par région ou par compte |
+| `GET <serveur>/tarifs.json` | le filet — le même catalogue, pris directement dans son fichier |
+
+**En même temps, et non l'un après l'autre.** Deux attentes de six secondes en
+file donneraient douze secondes sur un chantier sans réseau, pour un geste
+dont toute la promesse est d'être rapide. Les deux partent ensemble : le
+budget d'attente ne bouge pas, et un banc le garde en vérifiant que la seconde
+requête est déjà partie avant que la première n'ait répondu.
+
+Le fichier passe par la MÊME garde que le reste : un catalogue sans version,
+sans jour ou sans enseigne est refusé en bloc. Il est édité à la main — une
+virgule de trop et il ne vaut rien —, et un devis qui cache d'où sortent ses
+chiffres n'est pas un devis.
+
+**Un script qui PEND ne retient plus la réponse du fichier.** C'est le cas le
+plus vicieux, et c'est celui qu'on a vu : le script ne refuse pas, il ne
+répond pas. La borne d'attente est donc partagée par toute la visite, et l'on
+repart avec ce qui EST déjà arrivé quand elle expire.
+
+**Et le sablier se range.** Chaque requête portait son propre `setTimeout` de
+six secondes que personne n'éteignait quand la réponse arrivait la première ;
+avec deux portes, cela faisait deux minuteurs pendants à CHAQUE consultation
+du prix. Il y en a maintenant UN pour toute la visite, effacé dès qu'elle est
+finie — un banc vérifie qu'il ne reste aucun minuteur derrière. C'est aussi la
+bonne sémantique : ce qu'on borne, c'est l'attente de l'utilisateur, pas celle
+de chaque paquet.
+
+**Le banc de l'écran compte désormais des VISITES, pas des requêtes.** Une
+visite frappe à deux portes ; ce que la page éprouve — on ne dérange le
+serveur que lorsqu'on demande le prix, et une fois par geste — n'a pas changé.
+
+**Et les épreuves ont vingt secondes, plus cinq.** La livraison a échoué deux
+fois de suite sur des dépassements de délai — neuf puis treize épreuves,
+aucune assertion en cause — alors que la même suite passait en soixante-dix
+secondes à froid une minute plus tôt, et que les suites incriminées mettaient
+dix secondes lancées seules. Cinq secondes est le défaut de Jest, pensé pour
+des épreuves unitaires ; or la moitié des bancs d'ici MONTE UN ÉCRAN ENTIER
+puis le pilote au doigt. Cela n'affaiblit aucune vérification : une épreuve
+qui pend vraiment échoue toujours, un peu plus tard. Ce qu'on retire, c'est la
+sanction de la lenteur — qui ne prouve rien sur le code.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

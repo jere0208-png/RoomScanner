@@ -97,18 +97,32 @@ const CATALOGUE = {
   prix: { 'icta-20': 100, 'icta-16': 100, 'icta-25': 100 },
 };
 
+/**
+ * LES VISITES AU SERVEUR — et non les requêtes.
+ *
+ * Une visite frappe désormais à DEUX portes en même temps : le script
+ * `api.php` et le fichier `tarifs.json` posé à côté de lui. Le script est du
+ * code, il se redéploie et il repart en arrière — il a emporté deux fois la
+ * mise à jour des prix avec lui —, alors qu'un fichier statique ne se
+ * désynchronise pas. Voir `net/tarifs`.
+ *
+ * Ce que cette page éprouve n'a pas changé : on ne dérange le serveur QUE
+ * lorsqu'on demande le prix, et une fois par geste. On compte donc les
+ * visites, en s'attachant à la porte principale, et non les paquets envoyés.
+ */
 let appels = 0;
+const estUneVisite = (url: unknown) => String(url).includes('api.php');
 
 const repond = (charge: Record<string, unknown>) => {
-  global.fetch = jest.fn(async () => {
-    appels += 1;
+  global.fetch = jest.fn(async (url: unknown) => {
+    if (estUneVisite(url)) appels += 1;
     return { json: async () => charge } as Response;
   }) as unknown as typeof fetch;
 };
 
 const muet = () => {
-  global.fetch = jest.fn(async () => {
-    appels += 1;
+  global.fetch = jest.fn(async (url: unknown) => {
+    if (estUneVisite(url)) appels += 1;
     throw new Error('réseau');
   }) as unknown as typeof fetch;
 };
