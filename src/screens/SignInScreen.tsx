@@ -124,8 +124,8 @@ export function SignInScreen() {
         <LogoMark size={92} />
         <Text style={s.titre}>EchoPlan</Text>
         <Text style={s.sousTitre}>
-          Scannez un logement, repartez avec le plan coté, la 3D et le dossier
-          électrique.
+          Scannez un logement, repartez avec le plan coté et la 3D — puis
+          entrez dedans.
         </Text>
       </View>
 

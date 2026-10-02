@@ -296,6 +296,16 @@ interface Props {
    * et ça ne sert qu'à montrer — on ne mesure pas sur une fuyante.
    */
   pov?: PovCamera | null;
+  /**
+   * L'ŒIL EST EN MOUVEMENT — on marche, ou l'on tourne la tête.
+   *
+   * La vue à la première personne n'a pas de doigt sur elle : c'est
+   * l'exploration qui la pilote, et elle seule sait qu'un geste est en
+   * cours. Elle le dit ici, et la vue s'accorde la même économie que sous
+   * le doigt en orbite : l'ordre de peinture se réutilise sur quelques
+   * centimètres et quelques degrés, puis l'ordre EXACT revient à l'arrêt.
+   */
+  enMarche?: boolean;
   /** Mode contrôlé (aperçu d'export) : état de caméra fourni par le parent. */
   value?: View3DParams;
   onChange?: (v: View3DParams) => void;
@@ -424,6 +434,7 @@ const AUCUN_PLAFOND: CeilingFixture[] = [];
 
 export function Iso3DView({
   pov,
+  enMarche = false,
   value,
   onChange,
   showMeasures,
@@ -638,6 +649,8 @@ export function Iso3DView({
   const ordreMemo = useRef<{
     theta: number;
     tilt: number;
+    /** Où se tenait l'œil, à la première personne. */
+    lieu: { x: number; z: number } | null;
     faces: typeof faces;
     d: Map<number, number>;
   } | null>(null);
@@ -1426,13 +1439,28 @@ export function Iso3DView({
       l'image suivante arrive dans trente millisecondes et un trait de dos
       qui paraît le temps d'un clignement ne se voit pas.
     */
-    const enMouvement = interacting || light;
+    /*
+      À LA PREMIÈRE PERSONNE, LE MÊME PACTE — voir `enMarche`. L'angle se
+      lit sur le regard (en degrés, comme l'orbite), et la marche compte
+      aussi : cinq centimètres par degré de seuil, soit vingt au plus — un
+      pas et demi de visite. Au-delà, l'œil a pu franchir le plan d'un pan,
+      et l'ordre d'avant mentirait.
+    */
+    const enMouvement = interacting || light || (!!pov && enMarche);
     const seuil = seuilDeReclassement(coutTri.current);
+    const theta = pov ? (pov.yaw * 180) / Math.PI : view.theta;
+    const tilt = pov ? (pov.pitch * 180) / Math.PI : view.tilt;
+    const lieu = pov ? { x: pov.at.x, z: pov.at.z } : null;
     const perime =
       !memoire ||
       !enMouvement ||
-      Math.abs(view.theta - memoire.theta) > seuil ||
-      Math.abs(view.tilt - memoire.tilt) > seuil ||
+      Math.abs(theta - memoire.theta) > seuil ||
+      Math.abs(tilt - memoire.tilt) > seuil ||
+      !lieu !== !memoire.lieu ||
+      (!!lieu &&
+        !!memoire.lieu &&
+        Math.hypot(lieu.x - memoire.lieu.x, lieu.z - memoire.lieu.z) >
+          seuil * 0.05) ||
       memoire.faces !== faces;
     if (perime) {
       const t0 = Date.now();
@@ -1449,8 +1477,9 @@ export function Iso3DView({
         if (p.pan !== undefined) table.set(p.pan, p.depth);
       }
       ordreMemo.current = {
-        theta: view.theta,
-        tilt: view.tilt,
+        theta,
+        tilt,
+        lieu,
         faces,
         d: table,
       };
@@ -2234,6 +2263,8 @@ export function Iso3DView({
     // calcule avant elle.
     light,
     pov,
+    // Le pouce qui se lève doit rendre l'ordre exact à l'image arrêtée.
+    enMarche,
     focusWallId,
     showVolumes,
     departDe,

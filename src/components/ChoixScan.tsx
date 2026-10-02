@@ -66,6 +66,7 @@ export function ChoixScan({
   visible,
   meubles,
   posesViseur = 0,
+  elec = true,
   onValider,
   onClose,
 }: {
@@ -78,6 +79,11 @@ export function ChoixScan({
    * l'électricité pour les garder.
    */
   posesViseur?: number;
+  /**
+   * Le mode Électricité est allumé. Éteint, la ligne de la norme ne paraît
+   * pas : elle poserait des socles que le plan, ensuite, cache.
+   */
+  elec?: boolean;
   onValider: (choix: ChoixDuScan) => void;
   onClose: () => void;
 }) {
@@ -133,10 +139,12 @@ export function ChoixScan({
           },
         ]
       : []),
-    {
-      cle: 'elec' as const,
-      icone: SOLAIRES.elec,
-      /*
+    ...(elec
+      ? [
+          {
+            cle: 'elec' as const,
+            icone: SOLAIRES.elec,
+            /*
         CE QU'ON A POSÉ AU VISEUR EST DÉJÀ LÀ.
 
         Relevé du chantier : « je voulais avoir que ce que j'ai ajouté, pas
@@ -144,19 +152,23 @@ export function ChoixScan({
         visé pendant le relevé — elle ne commande que le COMPLÉMENT aux
         normes. Le titre le dit, sinon on décoche en croyant tout perdre.
       */
-      titre:
-        posesViseur > 0
-          ? 'Compléter aux normes'
-          : 'Électricité proposée aux normes',
-      detail:
-        posesViseur > 0
-          ? `Vos ${posesViseur} appareil${
-              posesViseur > 1 ? 's' : ''
-            } posé${posesViseur > 1 ? 's' : ''} au viseur sont déjà dans le ` +
-            'plan. Cochez pour AJOUTER ce qui manque à la NF C 15-100.'
-          : 'Socles, RJ45, commandes et points lumineux selon la NF C 15-100, ' +
-            'posés hors meubles. Tout reste déplaçable.',
-    },
+            titre:
+              posesViseur > 0
+                ? 'Compléter aux normes'
+                : 'Électricité proposée aux normes',
+            detail:
+              posesViseur > 0
+                ? `Vos ${posesViseur} appareil${
+                    posesViseur > 1 ? 's' : ''
+                  } posé${
+                    posesViseur > 1 ? 's' : ''
+                  } au viseur sont déjà dans le ` +
+                  'plan. Cochez pour AJOUTER ce qui manque à la NF C 15-100.'
+                : 'Socles, RJ45, commandes et points lumineux selon la NF C 15-100, ' +
+                  'posés hors meubles. Tout reste déplaçable.',
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -165,7 +177,7 @@ export function ChoixScan({
       <Text style={styles.sous}>
         Cochez ce que le plan intègre — le reste ne se pose pas.
       </Text>
-      {lignes.map((l) => (
+      {lignes.map(l => (
         <TouchableOpacity
           key={l.cle}
           // Le lecteur d'écran entend le VRAI titre (nombre compris), sait
@@ -175,7 +187,8 @@ export function ChoixScan({
           accessibilityState={{ checked: choix[l.cle] }}
           style={[styles.ligne, choix[l.cle] && styles.ligneCochee]}
           activeOpacity={0.8}
-          onPress={() => bascule(l.cle)}>
+          onPress={() => bascule(l.cle)}
+        >
           <View style={styles.puce}>
             <Svg width={19} height={19} viewBox="0 0 24 24">
               <Path
@@ -199,7 +212,8 @@ export function ChoixScan({
         onPress={() => {
           haptic('succes');
           onValider(choix);
-        }}>
+        }}
+      >
         <Text style={styles.validerTexte}>Intégrer</Text>
       </TouchableOpacity>
     </SheetShell>

@@ -25,7 +25,7 @@
  * l'intérieur. La marche, elle, vit dans `geometry/exploration`, et s'éprouve
  * à la règle.
  */
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   Modal,
   PanResponder,
@@ -90,6 +90,23 @@ const RAYON_MANETTE = 58;
 const ZONE_MORTE = 0.12;
 /** Une image toutes les trente-trois millisecondes, pas davantage. */
 const PERIODE = 33;
+/** Au pire, huit images par seconde : en dessous, on ne marche plus, on saute. */
+const PERIODE_MAX = 125;
+
+/**
+ * LA CADENCE SUIT CE QUE COÛTE UNE IMAGE.
+ *
+ * Demander une image toutes les 33 ms quand chacune en coûte 80, c'est
+ * occuper le fil JavaScript sans relâche : les pouces n'y trouvent plus de
+ * place, la manette répond en retard — et c'est ÇA qui se sent fébrile,
+ * davantage qu'une image de moins par seconde. On laisse donc un tiers du
+ * temps libre (l'image coûte deux tiers de la période), sans jamais
+ * descendre sous trente images par seconde quand le téléphone les tient.
+ */
+export function cadenceDeMarche(coutMs: number): number {
+  if (!Number.isFinite(coutMs)) return PERIODE;
+  return Math.max(PERIODE, Math.min(PERIODE_MAX, Math.round(coutMs * 1.5)));
+}
 
 /** Où l'on se tient, et où l'on regarde — `lacet` à la façon de la 3D. */
 interface Pose {
@@ -317,7 +334,12 @@ export function Exploration({
     pouce redessinerait le logement entier.
   */
   const pose = useRef<Pose>({ x: 0, z: 0, lacet: 0, tangage: 0 });
-  const [vue, setVue] = useState<Pose>(pose.current);
+  /*
+    `geste` : l'image est prise EN MOUVEMENT. La 3D s'y accorde un ordre de
+    peinture approché (voir `enMarche`) ; l'image où l'on s'arrête, elle,
+    est forcée sans ce drapeau, et retrouve l'ordre exact.
+  */
+  const [vue, setVue] = useState<Pose & { geste?: boolean }>(pose.current);
   const manette = useRef({ x: 0, y: 0 });
   const [aBouge, setABouge] = useState(false);
   const dernierRendu = useRef(0);
@@ -338,12 +360,21 @@ export function Exploration({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
 
+  const cadence = useRef(PERIODE);
+  const demande = useRef(0);
   const montrer = (force = false) => {
     const t = Date.now();
-    if (!force && t - dernierRendu.current < PERIODE) return;
+    if (!force && t - dernierRendu.current < cadence.current) return;
     dernierRendu.current = t;
-    setVue({ ...pose.current });
+    demande.current = t;
+    setVue({ ...pose.current, geste: !force });
   };
+  // Ce qu'a coûté l'image qu'on vient de poser décide de la suivante.
+  useLayoutEffect(() => {
+    if (!demande.current) return;
+    cadence.current = cadenceDeMarche(Date.now() - demande.current);
+    demande.current = 0;
+  }, [vue]);
 
   /*
     LA BOUCLE DE MARCHE — elle ne tourne que pendant qu'on marche.
@@ -456,7 +487,12 @@ export function Exploration({
             pouces sont pour la manette et le regard. */}
         <View style={StyleSheet.absoluteFill} pointerEvents="none">
           {visible && walls.length > 0 && (
-            <Iso3DView pov={camera} showMeasures={false} showNorth={false} />
+            <Iso3DView
+              pov={camera}
+              enMarche={!!vue.geste}
+              showMeasures={false}
+              showNorth={false}
+            />
           )}
         </View>
 

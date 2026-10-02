@@ -35,6 +35,7 @@ import { BadgePro } from '../components/BadgePro';
 import { LightRibbon, RIBBON_H } from '../components/LightRibbon';
 import { ContourVif, TexteVif } from '../components/ContourVif';
 import { SOLAIRES } from '../ui/solaires';
+import { useModeElec } from '../store/usage';
 import {
   MOIS_OFFERTS,
   PRIX_PRO,
@@ -95,12 +96,29 @@ import { panne as expliquer } from '../ui/panne';
 const ATOUTS: { icone: keyof typeof SOLAIRES; mot: string }[] = [
   { icone: 'rooms', mot: 'Autant de logements que vous voulez' },
   { icone: 'save', mot: 'Les étages, les sous-sols, les copies' },
-  { icone: 'furniture', mot: 'Meubles, 3D et cotes sur chacun d’eux' },
+  { icone: 'furniture', mot: 'Meubles, 3D et exploration de chacun' },
   { icone: 'partage', mot: 'PDF, DXF et CSV sur chacun d’eux' },
   { icone: 'elec', mot: 'Contrôle NF C 15-100 et matériel' },
   { icone: 'metre', mot: 'Tableau existant et diagnostic' },
   { icone: 'etoile', mot: 'Les nouveautés en premier' },
 ];
+/*
+  AU GRAND PUBLIC, LE MÉTIER TIENT EN UNE LIGNE — et elle se lit comme une
+  porte, pas comme un jargon. Deux lignes de norme et de tableau, à
+  quelqu'un venu meubler son salon, disaient « ce n'est pas pour vous » ;
+  les retirer tout à fait cachait ce qui distingue l'application. Une ligne,
+  qui nomme le mode : on sait qu'il existe, et où le trouver.
+*/
+const LIGNE_DU_METIER: (typeof ATOUTS)[number] = {
+  icone: 'elec',
+  mot: 'Mode Électricité : NF C 15-100 et devis',
+};
+const atoutsPour = (modeElec: boolean) =>
+  modeElec
+    ? ATOUTS
+    : ATOUTS.flatMap((a) =>
+        a.icone === 'elec' ? [LIGNE_DU_METIER] : a.icone === 'metre' ? [] : [a],
+      );
 
 export function PaywallScreen() {
   const c = useTheme();
@@ -114,6 +132,7 @@ export function PaywallScreen() {
   const restaurerPro = useAccountStore((st) => st.restaurerPro);
   const remisePct = useAccountStore((st) => st.remisePct);
   const codeOffert = useAccountStore((st) => st.codeOffert);
+  const modeElec = useModeElec();
   const [code, setCode] = useState('');
   /*
     LE MENSUEL D'ABORD.
@@ -287,7 +306,7 @@ export function PaywallScreen() {
                 <View style={s.filet} />
               </View>
 
-              {ATOUTS.map((a) => (
+              {atoutsPour(modeElec).map((a) => (
                 <View key={a.mot} testID="ligne-atout" style={s.atout}>
                   <Svg width={19} height={19} viewBox="0 0 24 24">
                     <Path d={SOLAIRES[a.icone]} fill={c.blue} fillRule="evenodd" />

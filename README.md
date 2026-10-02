@@ -13774,6 +13774,48 @@ enjamber un tapis, passer sous un élément haut, entrer en retrait) et
 `explorationecran.test.tsx` (pastille en 2D et 3D, hauteur d'œil, avancer dans
 le sens du regard, regard borné, Terminer, plafonds).
 
+### 5 — Le grand public partout, et une marche moins fébrile
+
+**L'électricité ne s'invite plus nulle part sans le mode.** En refaisant le
+tour de chaque écran avec les yeux de quelqu'un venu meubler son salon, cinq
+endroits la laissaient encore passer :
+
+| Écran | Avant, pour tout le monde | Grand public, maintenant |
+|---|---|---|
+| Scan | un viseur et « Prise · Inter · Lumière », plus un guide qui s'ouvrait seul | on scanne, simplement |
+| Fin du scan | « Électricité proposée aux normes », à cocher | les meubles détectés seulement ; sans meuble, la feuille ne s'ouvre pas |
+| Mes scans | la vignette peignait en rouge les pièces sans prise (toutes, donc) | un plan, sans verdict |
+| Connexion | « le plan coté, la 3D et le dossier électrique » | « le plan coté et la 3D — puis entrez dedans » |
+| Page Pro | deux lignes de norme, rien sur l'exploration | « Meubles, 3D et exploration », et le métier en une ligne : « Mode Électricité : NF C 15-100 et devis » |
+
+En mode Électricité, tout est là comme avant — on masque, on ne retire pas.
+Et le plan ne calcule plus la norme pour qui ne la voit pas : c'était le
+calcul le plus lourd de l'écran du relevé.
+
+**La marche.** Mesurée au banc, une image de l'exploration coûtait 25 ms sous
+Node ; sur l'iPhone, Hermes ne compile pas à la volée, il faut compter
+plusieurs fois plus — la marche passait sous les dix images par seconde.
+Deux corrections :
+
+- **l'ordre de peinture se réutilise en marchant**, comme il le faisait déjà
+  sous le doigt en orbite : tant qu'on n'a bougé que de quelques degrés et
+  de quelques centimètres (vingt au plus), on ne reclasse pas tout le
+  logement. Pouce levé, l'image arrêtée retrouve son ordre exact. Le calcul
+  propre à la 3D est divisé par deux en marche ;
+- **la cadence suit ce que coûte une image** : quand une image en coûte 80 ms,
+  on n'en demande plus une toutes les 33 — le fil JavaScript resterait
+  occupé sans relâche et la manette répondrait en retard, ce qui se sent bien
+  plus qu'une image de moins. Un tiers du temps reste libre pour les pouces,
+  entre trente et huit images par seconde.
+
+Bancs : `grandpublicpartout.test.tsx` (chaque fuite, et son contrôle en mode
+Électricité) et `marchefluide.test.tsx` (vingt petits pas ne reclassent pas
+vingt fois, un grand pas ou un grand tour de tête si, l'arrêt reclasse, la
+cadence).
+
+Ce qui ne se mesure pas ici : la sensation sur le téléphone. Les gains
+ci-dessus sont prouvés au banc ; leur effet sur un iPhone se juge à la main.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

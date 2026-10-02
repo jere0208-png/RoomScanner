@@ -1282,6 +1282,18 @@ export function ResultScreen() {
     les deux pastilles du plan, son menu, son export, la fête des normes.
   */
   const modeElec = useModeElec();
+  /*
+    UNE FIN DE SCAN SANS RIEN À COCHER NE S'OUVRE PAS.
+
+    Au grand public, la feuille ne propose que les meubles détectés. S'il
+    n'y en a aucun, elle s'ouvrirait vide — « cochez ce que le plan
+    intègre », et rien dessous. La question est donc consommée d'office :
+    elle ne reviendra pas plus tard.
+  */
+  const rienACocher = !!arrivage && !modeElec && arrivage.meubles <= 0;
+  useEffect(() => {
+    if (rienACocher) useScanStore.getState().oublierArrivage();
+  }, [rienACocher]);
   /** L'exploration à la première personne est ouverte. */
   const [explorant, setExplorant] = useState(false);
   const canvasRef = useRef<View>(null);
@@ -2068,21 +2080,29 @@ export function ResultScreen() {
    * exactement le genre de travail qu'un doigt posé sur l'écran ne doit pas
    * déclencher soixante fois par seconde.
    */
+  /*
+    ET SEULEMENT EN MODE ÉLECTRICITÉ : c'est le calcul le plus lourd de
+    l'écran, et le grand public n'en voit jamais le résultat — ni pastille,
+    ni constat. On ne le paie pas pour rien.
+  */
   const elecIssues = useMemo(
     () =>
-      checkElectrical(
-        roomInputs,
-        fixtures,
-        wallRooms,
-        placement,
-        volumes,
-        wallWorktops,
-        ceiling,
-        // La géométrie ouvre les constats de pose : face extérieure d'un
-        // mur, appareil dans le vide d'une baie.
-        { walls, openings },
-      ),
+      !modeElec
+        ? []
+        : checkElectrical(
+            roomInputs,
+            fixtures,
+            wallRooms,
+            placement,
+            volumes,
+            wallWorktops,
+            ceiling,
+            // La géométrie ouvre les constats de pose : face extérieure d'un
+            // mur, appareil dans le vide d'une baie.
+            { walls, openings },
+          ),
     [
+      modeElec,
       roomInputs,
       fixtures,
       wallRooms,
@@ -5081,9 +5101,10 @@ export function ResultScreen() {
 
       {/* ---------- Le choix de fin de scan ---------- */}
       <ChoixScan
-        visible={!!arrivage && !capturing}
+        visible={!!arrivage && !capturing && !rienACocher}
         meubles={arrivage?.meubles ?? 0}
         posesViseur={arrivage?.posesViseur ?? 0}
+        elec={modeElec}
         onValider={validerArrivage}
         // Fermer sans valider : les meubles restent (ils sont déjà là),
         // rien ne se pose — et la question ne reviendra pas.

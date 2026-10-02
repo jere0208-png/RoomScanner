@@ -10,6 +10,7 @@ import Svg, { Path } from 'react-native-svg';
 import { RoomScan, RoomScanView } from 'react-native-room-scan';
 import { themedStyles, useTheme, type Palette } from '../theme';
 import { useScanStore } from '../store/scanStore';
+import { useModeElec } from '../store/usage';
 import { useRoomScan } from '../native/useRoomScan';
 import { CloseCross } from '../components/CloseCross';
 import { haptic } from '../ui/haptic';
@@ -60,6 +61,16 @@ export function ScanScreen() {
   /* Ce que le post-traitement a refusé de faire : il faut bien le dire. */
   const error = useScanStore((s) => s.error);
   const { pause, resume, stop, cancel } = useRoomScan();
+  /*
+    LE VISEUR EST UN OUTIL D'ÉLECTRICIEN.
+
+    Un carré au centre et trois boutons « Prise · Inter · Lumière » : pour
+    quelqu'un venu relever son salon, c'est la première impression de
+    l'application — et elle annonce un métier qui n'est pas le sien. Le
+    grand public scanne, tout simplement ; le bloc et son guide attendent le
+    mode Électricité.
+  */
+  const modeElec = useModeElec();
   const c = useTheme();
   const styles = getStyles(c);
 
@@ -303,7 +314,7 @@ export function ScanScreen() {
         patron —, hors du chemin du pouce qui tient le téléphone et loin de
         la miniature 3D de RoomPlan, qui occupe le centre-bas.
       */}
-      {!paused && !processing && (
+      {modeElec && !paused && !processing && (
         <>
           <View style={styles.viseur} pointerEvents="none">
             <View style={[styles.viseurCoin, styles.viseurHG]} />
@@ -437,7 +448,7 @@ export function ScanScreen() {
         ces boutons —, et le scan continue derrière : RoomPlan tourne, la
         pièce se relève, rien n'est perdu à lire trois phrases.
       */}
-      <GuidePose visible={guide && !processing} onFermer={fermerGuide} />
+      <GuidePose visible={modeElec && guide && !processing} onFermer={fermerGuide} />
 
       {/*
         UNE FIN DE SCAN QUI ÉCHOUE SE DIT ICI.

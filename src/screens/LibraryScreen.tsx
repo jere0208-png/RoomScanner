@@ -32,6 +32,7 @@ import {
   wallToRooms,
 } from '../geometry/nfc15100';
 import { useScanStore, type SavedScan, type ScanFolder } from '../store/scanStore';
+import { useModeElec } from '../store/usage';
 import {
   ActionSheet,
   PromptSheet,
@@ -189,9 +190,15 @@ const THUMB_H = 62;
  */
 function PlanThumb({ scan, c }: { scan: SavedScan; c: Palette }) {
   const { parts } = decoupageDe(scan);
+  const modeElec = useModeElec();
   // Les mêmes constats que sur le plan : une pièce en défaut sort en rouge
   // ici aussi, sinon la vignette raconterait autre chose que le plan.
+  //
+  // EN MODE ÉLECTRICITÉ SEULEMENT. Sans une prise posée, toutes les pièces
+  // manquent à la NF C 15-100 : la vignette du salon de quelqu'un venu le
+  // meubler sortait tout en rouge, pour une norme qu'il n'a jamais ouverte.
   const alertes = (() => {
+    if (!modeElec) return new Set<string>();
     try {
       const inputs = roomInputsOf(scan.rooms, parts);
       const fx = scan.fixtures ?? [];
