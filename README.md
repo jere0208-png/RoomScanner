@@ -13816,6 +13816,18 @@ cadence).
 Ce qui ne se mesure pas ici : la sensation sur le téléphone. Les gains
 ci-dessus sont prouvés au banc ; leur effet sur un iPhone se juge à la main.
 
+### 6 — La fiche App Store
+
+[`docs/fiche-app-store.md`](docs/fiche-app-store.md) : nom, sous-titre,
+mots-clés, texte promotionnel et description, comptés aux limites d'Apple ;
+les catégories ; l'ordre et la légende des six captures — les trois premières,
+celles des résultats de recherche, sans un sigle électrique. Le métier arrive
+en fin de description, comme dans l'application.
+
+Elle se termine par **ce qu'il faut régler avant la soumission** — au premier
+rang, le popup qui offre un relevé contre un avis : les règles de l'App Store
+interdisent les avis récompensés, c'est un refus probable.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro
