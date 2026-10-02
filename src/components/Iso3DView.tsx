@@ -69,6 +69,7 @@ import { ECLAT_LAMPE,
   matieresDesSols,
 } from '../ui/maquette';
 import { hexDePeinture } from '../ui/peintures';
+import { useModeElec } from '../store/usage';
 import { parImage } from '../ui/parImage';
 import { haptic } from '../ui/haptic';
 import { floorsOf, useScanStore } from '../store/scanStore';
@@ -80,9 +81,11 @@ import {
   facePoint,
   postsOf,
   wallFace,
+  type Fixture,
   type FixtureKind,
 } from '../geometry/electrical';
 import type { Circuit } from '../geometry/nfc15100';
+import type { CeilingFixture } from '../geometry/ceiling';
 import { circuitColor } from '../geometry/schema';
 
 /** Paramètres de caméra de la vue 3D (contrôlables de l'extérieur). */
@@ -409,20 +412,30 @@ interface Props {
  * que le plan 2D : murs épais extrudés, portes/fenêtres, meubles.
  * Un doigt : tourner/incliner. Deux doigts : pincer pour zoomer, déplacer.
  */
+/*
+  DES LISTES VIDES STABLES, pour le mode sans électricité. Un `[]` écrit dans
+  le rendu serait un objet NEUF à chaque image : tous les mémos qui en
+  dépendent — la scène, son tri, son cadrage — se referaient pendant qu'on
+  tourne le modèle, ce qui est précisément le moment où l'on n'en a pas les
+  moyens.
+*/
+const AUCUN_APPAREIL: Fixture[] = [];
+const AUCUN_PLAFOND: CeilingFixture[] = [];
+
 export function Iso3DView({
   pov,
   value,
   onChange,
   showMeasures,
-  showElecTags = true,
+  showElecTags: showElecTagsDemande = true,
   focusRoomId,
   focusWallId,
   showNorth = true,
-  showCeiling = true,
-  showVolumes = false,
-  nuit = false,
+  showCeiling: showCeilingDemande = true,
+  showVolumes: showVolumesDemande = false,
+  nuit: nuitDemandee = false,
   leveeAuMontage = false,
-  cableRoutes,
+  cableRoutes: cableRoutesDemandees,
   routeHeights,
   cutaway,
   elecCotes = null,
@@ -430,15 +443,35 @@ export function Iso3DView({
   prebuildRooms,
   circuits,
 }: Props) {
+  /*
+    LE MODE ÉLECTRICITÉ, LU À LA SOURCE — comme pour le plan (voir
+    `FloorplanEditor` et `store/usage`).
+
+    Sans lui, le volume ne montre ni appareils, ni plafond équipé, ni
+    gaines, ni repères, ni gabarit des volumes de salle d'eau — et la nuit,
+    qui n'éclaire que des luminaires posés, n'aurait rien à allumer : elle
+    s'éteint avec eux. La 3D est montée par l'écran du relevé, par l'export
+    et par l'exploration ; c'est donc ICI que la décision se prend, une fois.
+  */
+  const modeElec = useModeElec();
+  const showElecTags = modeElec && showElecTagsDemande;
+  const showCeiling = modeElec && showCeilingDemande;
+  const showVolumes = modeElec && showVolumesDemande;
+  const nuit = modeElec && nuitDemandee;
+  const cableRoutes = modeElec ? cableRoutesDemandees : undefined;
   const tousLesMurs = useScanStore((s) => s.walls);
   const toutesLesOuvertures = useScanStore((s) => s.openings);
   const tousLesMeubles = useScanStore((s) => s.objects);
   const niveauCourant = useScanStore((s) => s.niveauCourant);
   const showFurniture = useScanStore((s) => s.showFurniture);
   const north = useScanStore((s) => s.north);
-  const toutLePlafond = useScanStore((s) => s.ceiling);
+  const toutLePlafondStocke = useScanStore((s) => s.ceiling);
   const toutesLesPieces = useScanStore((s) => s.rooms);
-  const toutLAppareillage = useScanStore((s) => s.fixtures);
+  const toutLAppareillageStocke = useScanStore((s) => s.fixtures);
+  // Masqués, pas effacés : la scène reçoit des listes vides, le relevé
+  // garde les siennes.
+  const toutLePlafond = modeElec ? toutLePlafondStocke : AUCUN_PLAFOND;
+  const toutLAppareillage = modeElec ? toutLAppareillageStocke : AUCUN_APPAREIL;
   /*
     UN SEUL ÉTAGE À LA FOIS — et en volume, l'enjeu est plus grave qu'en
     plan.

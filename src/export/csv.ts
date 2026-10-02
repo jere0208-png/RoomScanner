@@ -79,7 +79,13 @@ const NATURES: Record<Circuit['nature'], string> = {
 export function buildMetreCsv(
   name: string,
   pieces: RoomMetre[],
-  list: MaterialList,
+  /**
+   * `null` = sans le mode Électricité : le fichier ne porte que le métré des
+   * pièces. Quatre sections électriques vides en dessous — appareillage,
+   * circuits, différentiels, tableau — feraient croire à un particulier que
+   * son relevé est incomplet.
+   */
+  list: MaterialList | null,
 ): string {
   const out: string[] = [];
   const section = (titre: string, entete: string[]) => {
@@ -111,6 +117,9 @@ export function buildMetreCsv(
   }
   const totalSol = pieces.reduce((t, p) => t + (p.area ?? 0), 0);
   out.push(ligne(['TOTAL', totalSol, '', '', '', '']));
+  // Sans le mode : le métré des pièces, et rien d'autre. Même sortie que le
+  // fichier complet — BOM compris, sans quoi Excel lit mal les accents.
+  if (!list) return `﻿${out.join('\r\n')}\r\n`;
 
   // --------------------------------------------------------- appareillage
   section('APPAREILLAGE PAR PIÈCE', [

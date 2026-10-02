@@ -310,6 +310,7 @@ import { creerSeuil, estUnGlissement, estUnTap } from '../ui/geste';
 import { dansLeCadre, type CadreEcran } from '../geometry/lacher';
 import { DEBORD_DOIGT } from '../ui/bandeau';
 import { SOLAIRES } from '../ui/solaires';
+import { useModeElec } from '../store/usage';
 
 
 /**
@@ -600,8 +601,8 @@ export function FloorplanEditor({
   editable,
   selectedWallId,
   onSelectWall,
-  cableRoutes,
-  circuitMarks,
+  cableRoutes: cableRoutesDemandees,
+  circuitMarks: circuitMarksDemandes,
   filigrane,
   poses,
   onPose,
@@ -618,9 +619,9 @@ export function FloorplanEditor({
   onWallAction,
   onSelectFixture,
   ceiling,
-  showCeiling,
+  showCeiling: showCeilingDemande,
   showNorth = true,
-  showFixtures = true,
+  showFixtures: showFixturesDemande = true,
   onSelectCeiling,
   placing,
   tracantPiece,
@@ -639,6 +640,35 @@ export function FloorplanEditor({
   showObjectDims,
   onToggleObjectDims,
 }: Props) {
+  /*
+    LE MODE ÉLECTRICITÉ, LU ICI ET NULLE PART AILLEURS POUR LE PLAN.
+
+    Relevé du patron : « c'est trop axé électricité et pas très intuitif pour
+    ceux qui n'y comprennent rien ». Sans le mode, le plan ne dessine ni
+    appareils, ni plafond équipé, ni gaines, ni repères de circuit — même si
+    le relevé en porte. Il les MASQUE : les données restent, et rallumer le
+    mode les rend telles quelles (voir `store/usage`).
+
+    C'EST LE PLAN QUI LIT LA PRÉFÉRENCE, et non l'écran qui la lui passe : il
+    est monté par l'écran du relevé, par l'export, par l'exploration — un
+    seul oubli parmi eux, et un particulier verrait réapparaître une prise.
+    Une décision prise à la source ne s'oublie pas en route.
+  */
+  const modeElec = useModeElec();
+  const showFixtures = modeElec && showFixturesDemande;
+  const showCeiling = modeElec ? showCeilingDemande : false;
+  const cableRoutes = modeElec ? cableRoutesDemandees : undefined;
+  const circuitMarks = modeElec ? circuitMarksDemandes : undefined;
+  /*
+    ET LA BARRE D'UN MUR PERD SON ACTION « ÉLEC ». Elle se centre sur sa
+    VRAIE largeur — quarante-quatre points par action, plus son rembourrage
+    — et non sur celle de quatre : à trois actions, elle aurait glissé d'un
+    demi-bouton vers la gauche de son mur.
+  */
+  const actionsDuMur = modeElec
+    ? WALL_ACTIONS
+    : WALL_ACTIONS.filter((a) => a.action !== 'electricite');
+  const largeurBarreMur = actionsDuMur.length * 44 + 10;
   const tousLesMurs = useScanStore((s) => s.walls);
   const niveauCourant = useScanStore((s) => s.niveauCourant);
   const toutesLesOuvertures = useScanStore((s) => s.openings);
@@ -3898,10 +3928,10 @@ export function FloorplanEditor({
                 <View
                   style={[
                     styles.wallActions,
-                    { left: bx - WALL_MENU.w / 2, top: by - WALL_MENU.h / 2 },
+                    { left: bx - largeurBarreMur / 2, top: by - WALL_MENU.h / 2 },
                   ]}
                   pointerEvents="box-none">
-                  {WALL_ACTIONS.map(({ action, label, d }) => {
+                  {actionsDuMur.map(({ action, label, d }) => {
                     const teinte = action === 'supprimer' ? c.danger : c.ink;
                     return (
                       <TouchableOpacity

@@ -1026,6 +1026,9 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     paddingHorizontal: 13,
     paddingVertical: 12,
   },
+  /* La dernière tuile d'un compte impair : elle prend la ligne, la grille
+     ne finit pas sur un trou. */
+  exportTuileLarge: { width: '100%' },
   /** La vignette passe AU-DESSUS du texte : à mi-largeur, il n'y a plus la
    *  place de la mettre à côté sans hacher le titre en trois lignes. */
   exportTuileArt: { marginBottom: 7 },

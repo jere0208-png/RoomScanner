@@ -13637,6 +13637,65 @@ leur fichier sans parler d'elle — le nord du dossier, les marges du système,
 la bascule plan/volume — restent, et deux gardes d'absence vérifient qu'elle
 ne revient pas.
 
+### 2 — Le mode Électricité
+
+Tout ce qui est électrique passe derrière UN interrupteur. Sans lui,
+l'application sert à ce que le grand public vient y chercher : scanner une
+pièce, lire ses cotes, la meubler, la peindre, l'exporter.
+
+| Sans le mode | Avec le mode |
+|---|---|
+| Cotes, meubles, surfaces, nord, murs, couleurs, pièces | tout cela, plus : |
+| — | appareils, plafond équipé, gaines, repères |
+| — | pastilles du devis et du contrôle NF C 15-100 |
+| — | nuit (les luminaires s'allument), volumes de salle d'eau |
+| — | action « Élec » sur un mur, relevé du tableau existant |
+| Métré CSV : surfaces et murs des pièces | métré complet : appareillage, circuits, tableau, conformité |
+| Plan PDF, DXF, 3D, image | plus la liste du matériel |
+
+**Une préférence de l'APPAREIL, pas du plan** (`store/usage`). C'est la
+personne qui est électricienne, pas le salon : un électricien veut ses outils
+sur le plan de sa propre cuisine, et un particulier qui reçoit un plan équipé
+d'un artisan ne doit pas voir l'application changer de visage.
+
+**Elle masque, elle n'efface pas.** Les prises, les gaines, le plafond équipé
+restent dans le relevé ; on les retrouve en rallumant le mode. Un interrupteur
+qui effacerait le travail d'un chantier ne serait pas un interrupteur.
+
+**Ce sont les VUES qui lisent la préférence**, pas l'écran qui la leur passe.
+Le plan 2D et la 3D sont montés par l'écran du relevé, par l'export, et
+bientôt par l'exploration : un seul oubli parmi eux, et un particulier
+verrait réapparaître une prise. Une décision prise à la source ne s'oublie
+pas en route. Les barres d'outils, elles, filtrent leurs pastilles PAR CLÉ à
+la sortie — la liste de ce qui est électrique se lit en une ligne au lieu
+d'être éparpillée dans deux cents lignes de JSX.
+
+**Trois états, et le troisième compte** : grand public, électricité, et « pas
+encore répondu ». C'est lui qui permet au premier lancement de poser la
+question une fois, et à la déduction de ne jamais écraser une réponse.
+
+**Ceux qui étaient là avant gardent leurs outils.** Le jour de la mise à
+jour, l'électricien qui a des dizaines de plans équipés ne doit ni voir ses
+prises disparaître, ni recevoir la question « êtes-vous électricien ? ». Dès
+que la bibliothèque et la préférence sont lues, des appareils posés quelque
+part allument le mode tout seul. Une réponse déjà donnée n'est jamais
+écrasée — quelqu'un qui a choisi le grand public puis reçu le plan d'un
+collègue ne verra pas l'application changer dans son dos.
+
+**La proposition** : sans le mode, le menu « … » du plan offre « Passer en
+mode Électricité ». C'est la porte de l'électricien qui découvre l'app par
+l'App Store — il ne fouille pas les réglages, il cherche dans le menu qu'il a
+sous les yeux. L'interrupteur, lui, vit dans le Profil, section « Mon
+usage », avec une phrase en mots de particulier.
+
+**Les autres bancs restent en mode Électricité.** Les trois mille épreuves
+écrites avant la refonte décrivent l'atelier tel qu'il a été construit :
+`jest.setup.js` allume le mode pour elles, et seul le banc du mode
+(`modeelectricite`) l'éteint, là où il veut éprouver le grand public. Le
+stockage de la préférence se charge À LA DEMANDE pour cette raison : importé
+en tête de module, il se serait chargé pendant le setup, avant que chaque
+banc n'ait posé son doublet du disque.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

@@ -40,6 +40,8 @@ import {
   wallToRooms,
 } from '../geometry/nfc15100';
 import { fixtureMarks, multiWire, schemaRows } from '../geometry/schema';
+import { useModeElec } from '../store/usage';
+import type { Fixture } from '../geometry/electrical';
 import { planRoutes } from '../geometry/elecplan';
 import { floorsOf, useScanStore } from '../store/scanStore';
 import { useAccountStore } from '../store/accountStore';
@@ -140,13 +142,26 @@ export function feuillesElevations(
   };
 }
 
+/* Des listes vides STABLES : un `[]` écrit dans le rendu serait neuf à chaque
+   image, et referait le dossier entier à chaque bascule d'option. */
+const AUCUN_APPAREIL: Fixture[] = [];
+const AUCUN_PLAFOND: CeilingFixture[] = [];
+
 export function ExportScreen() {
   const setScreen = useScanStore((s) => s.setScreen);
   const scanName = useScanStore((s) => s.scanName);
   const tousLesMurs = useScanStore((s) => s.walls);
   const toutesLesOuvertures = useScanStore((s) => s.openings);
   const tousLesMeubles = useScanStore((s) => s.objects);
-  const toutLAppareillage = useScanStore((s) => s.fixtures);
+  /*
+    LE MODE ÉLECTRICITÉ — voir `store/usage`. Sans lui, le dossier ne porte ni
+    appareils, ni plafond équipé, ni gaines, ni schémas : on lui donne des
+    listes vides, et tout ce qui s'en déduit — tirages, repères, cotes
+    d'appareils, schémas — se tait de soi-même. Le relevé, lui, les garde.
+  */
+  const modeElec = useModeElec();
+  const appareillageStocke = useScanStore((s) => s.fixtures);
+  const toutLAppareillage = modeElec ? appareillageStocke : AUCUN_APPAREIL;
   const showOpeningColors = useScanStore((s) => s.showOpeningColors);
   const setShowOpeningColors = useScanStore((s) => s.setShowOpeningColors);
   const showFurniture = useScanStore((s) => s.showFurniture);
@@ -196,7 +211,8 @@ const styles = getStyles(c);
    * quand c'est l'électricien qui imprime.
    */
   const [gaines, setGaines] = useState(false);
-  const toutLePlafond = useScanStore((s) => s.ceiling);
+  const plafondStocke = useScanStore((s) => s.ceiling);
+  const toutLePlafond = modeElec ? plafondStocke : AUCUN_PLAFOND;
   const toutesLesNotes = useScanStore((s) => s.notes);
   /** La feuille d'implantation du plafond, avec ses liens de commande. */
   const [plafond, setPlafond] = useState(false);
@@ -778,12 +794,17 @@ const styles = getStyles(c);
               ],
               // Les murs équipés, de face et cotés — absorbé par les
               // élévations quand elles sont là : jamais de feuille double.
-              [
-                'cotesElec',
-                'Cotes Élec',
-                cotesElec,
-                () => setCotesElec(!cotesElec),
-              ] as OptionDef,
+              // Les cotes d'appareils n'ont rien à coter sans le mode.
+              ...(modeElec
+                ? [
+                    [
+                      'cotesElec',
+                      'Cotes Élec',
+                      cotesElec,
+                      () => setCotesElec(!cotesElec),
+                    ] as OptionDef,
+                  ]
+                : []),
               ...(schemas
                 ? [
                     [

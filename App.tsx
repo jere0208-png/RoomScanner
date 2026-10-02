@@ -26,6 +26,7 @@ import { GardeFou } from './src/components/GardeFou';
 import { usePannes } from './src/ui/journalPannes';
 import { PremierLancement } from './src/components/PremierLancement';
 import { usePremieresFois } from './src/store/premieresFois';
+import { useUsage } from './src/store/usage';
 import { useScanStore } from './src/store/scanStore';
 import { prendreLaDemande, suiteDuRaccourci } from './src/ui/raccourci';
 import { astuce } from './src/ui/astuce';
@@ -70,6 +71,8 @@ function Application() {
   const premierLancement = usePremieresFois((s) => s.charge && !s.vues.includes('accueil'));
   const marquerPremiere = usePremieresFois((s) => s.marquer);
   const chargerLesPannes = usePannes((s) => s.charger);
+  const chargerUsage = useUsage((s) => s.charger);
+  const usageCharge = useUsage((s) => s.charge);
 
   useEffect(() => {
     loadSaves();
@@ -82,6 +85,12 @@ function Application() {
       demi-seconde avant que le disque ne dise qu'on l'a déjà vue.
     */
     chargerLesPremieresFois();
+    /*
+      LE MODE D'USAGE — grand public ou électricité (voir `store/usage`).
+      Lu au lancement avec le reste : l'écran du plan ne s'ouvre jamais
+      avant, et ce qu'il montre en dépend.
+    */
+    chargerUsage();
     /*
       ET LE JOURNAL DES PANNES, pour que le profil sache s'il a quelque chose
       à montrer. Il est lu au lancement et non à l'ouverture du profil : une
@@ -102,7 +111,27 @@ function Application() {
       // Rien de gardé, ou stockage illisible : les prix embarqués chiffrent,
       // comme ils l'ont toujours fait.
     });
-  }, [loadSaves, chargerCompte, chargerLesPremieresFois, chargerLesPannes]);
+  }, [
+    loadSaves,
+    chargerCompte,
+    chargerLesPremieresFois,
+    chargerLesPannes,
+    chargerUsage,
+  ]);
+
+  /*
+    CEUX QUI ÉTAIENT LÀ AVANT GARDENT LEURS OUTILS.
+
+    Le jour de la mise à jour, un électricien qui a des dizaines de plans
+    équipés ne doit ni voir ses prises disparaître, ni recevoir la question
+    « êtes-vous électricien ? ». Dès que la bibliothèque et la préférence
+    sont lues, on regarde : des appareils posés quelque part, et le mode
+    s'allume tout seul. Une réponse déjà donnée n'est jamais écrasée.
+  */
+  useEffect(() => {
+    if (!savesCharges || !usageCharge) return;
+    useUsage.getState().deduireDuPasse(useScanStore.getState().saves);
+  }, [savesCharges, usageCharge]);
 
   /*
     « DIS SIRI, NOUVEAU RELEVÉ » — et l'appui long sur l'icône.

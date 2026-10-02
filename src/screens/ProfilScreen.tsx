@@ -18,6 +18,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   View,
 } from 'react-native';
@@ -30,6 +31,7 @@ import { MenuCompte } from '../components/MenuCompte';
 import { SupportSheet } from '../components/SupportSheet';
 import { JournalSheet } from '../components/JournalSheet';
 import { usePannes } from '../ui/journalPannes';
+import { useUsage } from '../store/usage';
 import { ThemeGlyph } from '../components/ThemeGlyph';
 import { ContourVif, TexteVif } from '../components/ContourVif';
 import { SOLAIRES } from '../ui/solaires';
@@ -84,6 +86,8 @@ const APPARENCES: { cle: ThemePref; mot: string; label: string }[] = [
 ];
 
 export function ProfilScreen() {
+  const modeElec = useUsage((u) => u.modeElec);
+  const choisirUsage = useUsage((u) => u.choisir);
   const c = useTheme();
   const s = themed(c);
   const insets = useSafeAreaInsets();
@@ -300,6 +304,39 @@ export function ProfilScreen() {
           )}
         </View>
 
+        {/*
+          MON USAGE — l'interrupteur du mode Électricité.
+
+          Relevé du patron : « une proposition pour passer à un mode
+          "Électricité", sans quoi on pourrait simplement scanner la pièce
+          pour les cotes, meubles etc. » Il vit ici, avec l'apparence : c'est
+          une préférence de l'APPAREIL, pas du plan — c'est la personne qui
+          est électricienne, pas le salon (voir `store/usage`).
+
+          Un interrupteur d'iOS, et non deux boutons : on l'allume ou on
+          l'éteint, il n'y a pas de troisième réponse. Et sa phrase dit ce
+          qu'il ajoute, en mots de particulier — quelqu'un qui hésite doit
+          pouvoir trancher sans connaître la NF C 15-100.
+        */}
+        <Text style={s.section}>Mon usage</Text>
+        <View style={s.carteAbo}>
+          <View style={s.aboTextes}>
+            <Text style={s.aboTitre}>Mode Électricité</Text>
+            <Text style={s.aboSous}>
+              Prises, éclairage et tableau sur le plan, contrôle des normes
+              et devis. Pour les électriciens.
+            </Text>
+          </View>
+          <Switch
+            accessibilityLabel="Mode Électricité"
+            value={modeElec}
+            onValueChange={(v) => {
+              haptic('leger');
+              choisirUsage(v);
+            }}
+            trackColor={{ true: c.blue, false: c.line }}
+          />
+        </View>
         <Text style={s.section}>Apparence</Text>
         {/*
           TROIS RONDS, PAS UNE LISTE — c'est le design du patron, et c'est

@@ -157,6 +157,7 @@ import { panne as expliquer } from '../ui/panne';
 import { ficheElec, motDuLien } from './result/ficheElec';
 import { astuce } from '../ui/astuce';
 import { celebrerSiAuxNormes, resetCelebration } from '../ui/auxNormes';
+import { useModeElec, useUsage } from '../store/usage';
 import { usePremieresFois } from '../store/premieresFois';
 
 type Tab = '2d' | '3d';
@@ -1274,6 +1275,12 @@ export function ResultScreen() {
     });
   }, [editMode, barMode, swap]);
 
+  /*
+    LE MODE ÉLECTRICITÉ — voir `store/usage`. Les vues (plan, volume) le lisent
+    elles-mêmes ; l'écran, lui, en a besoin pour ce qui n'appartient qu'à lui :
+    les deux pastilles du plan, son menu, son export, la fête des normes.
+  */
+  const modeElec = useModeElec();
   const canvasRef = useRef<View>(null);
   const partageEnAttente = useRef<null | (() => void)>(null);
 
@@ -1464,7 +1471,8 @@ export function ResultScreen() {
         };
       });
       await RoomScan.shareText(
-        buildMetreCsv(scanName, metre, list),
+        // Sans le mode Électricité, le fichier s'arrête au métré des pièces.
+        buildMetreCsv(scanName, metre, modeElec ? list : null),
         metreFilename(scanName),
       );
     } catch (e: any) {
@@ -2134,8 +2142,9 @@ export function ResultScreen() {
     par plan.
   */
   useEffect(() => {
+    if (!modeElec) return;
     celebrerSiAuxNormes({ reserves: alertes, appareils: fixtures.length + ceiling.length });
-  }, [alertes, fixtures.length, ceiling.length]);
+  }, [modeElec, alertes, fixtures.length, ceiling.length]);
   /* Un autre dossier s'ouvre : la récompense appartient au plan suivant. */
   useEffect(() => {
     resetCelebration();
@@ -3095,23 +3104,52 @@ export function ResultScreen() {
                       demarrerEtage(Math.max(...niveaux) + 1).catch(() => {});
                     },
                   },
-                  {
-                    /*
-                      LE TABLEAU QU'ON TROUVE EN ARRIVANT.
+                  ...(modeElec
+                    ? [
+                      {
+                        /*
+                          LE TABLEAU QU'ON TROUVE EN ARRIVANT.
 
-                      La moitié des chantiers est de la rénovation, et elle
-                      commence toujours pareil : on ouvre le tableau, on note
-                      ce qu'il y a, on dit au client ce qu'il faut reprendre.
-                      Les applications de plan dessinent du neuf ; celle-ci
-                      sait aussi lire ce qui est déjà là.
-                    */
-                    label: 'Relever le tableau existant',
-                    icon: 'tableau' as const,
-                    hint: existant?.departs.length
-                      ? `${existant.departs.length} module(s) relevé(s).`
-                      : 'Rénovation : notez les départs, l’app diagnostique.',
-                    onPress: () => setExistantOuvert(true),
-                  },
+                          La moitié des chantiers est de la rénovation, et elle
+                          commence toujours pareil : on ouvre le tableau, on note
+                          ce qu'il y a, on dit au client ce qu'il faut reprendre.
+                          Les applications de plan dessinent du neuf ; celle-ci
+                          sait aussi lire ce qui est déjà là.
+                        */
+                        label: 'Relever le tableau existant',
+                        icon: 'tableau' as const,
+                        hint: existant?.departs.length
+                          ? `${existant.departs.length} module(s) relevé(s).`
+                          : 'Rénovation : notez les départs, l’app diagnostique.',
+                        onPress: () => setExistantOuvert(true),
+                      },
+                      ]
+                    : [
+                        {
+                          /*
+                            LA PROPOSITION — relevé du patron : « une
+                            proposition pour passer à un mode "Électricité" ».
+
+                            C'est la porte d'entrée de l'électricien qui
+                            découvre l'application par l'App Store, en
+                            particulier : il ne fouille pas les réglages, il
+                            cherche dans le menu du plan qu'il a sous les
+                            yeux. Elle se tait dès que le mode est allumé.
+                          */
+                          label: 'Passer en mode Électricité',
+                          icon: 'tableau' as const,
+                          hint:
+                            'Prises, éclairage, normes NF C 15-100 et devis. ' +
+                            'Pour les électriciens.',
+                          onPress: () => {
+                            useUsage.getState().choisir(true);
+                            haptic('succes');
+                            astuce('Mode Électricité activé.', {
+                              icone: 'elec',
+                            });
+                          },
+                        },
+                      ]),
                   {
                     label: 'Scanner un sous-sol',
                     icon: 'soussol' as const,
@@ -3867,31 +3905,43 @@ export function ResultScreen() {
               donc ensemble, et le prix vient en premier parce que c'est la
               question qu'on se pose en entrant.
             */}
-            <DevisPastille
-              total={totalDevis}
-              /* On a TOUCHÉ le prix : le devis ira voir si les tarifs ont
-                 bougé, sans attendre sa règle d'un jour — voir `forcerTarifs`
-                 dans le magasin. */
-              onPress={() => {
-                useScanStore.getState().demanderLesTarifs();
-                setScreen('devis');
-              }}
-            />
-            <ControlePastille
-              alertes={alertes}
-              /* Un plan sans le moindre appareil n'est pas une installation
-                 non conforme : c'est une installation qui n'a pas commencé,
-                 et le verdict attend le premier socle.
+            {/*
+              LE DEVIS ET LE CONTRÔLE NE PARLENT QU'À L'ÉLECTRICIEN.
 
-                 MAIS un défaut de RELEVÉ, lui, est vrai avant la pose —
-                 relevé du patron : la pastille restait grise devant sept
-                 baies cadrées sous leur tablier. Il allume la pastille tout
-                 seul. */
-              commence={
-                fixtures.length > 0 || ceiling.length > 0 || alertesDePlan > 0
-              }
-              onPress={() => setChecking(true)}
-            />
+              Un total « 1,3 k€ » et un verdict NF C 15-100 étaient les deux
+              premières choses qu'un particulier voyait sur son plan — et les
+              deux lui parlaient une langue qu'il ne parle pas. Sans le mode,
+              la rangée garde l'étage et la bascule 2D/3D, rien d'autre.
+            */}
+            {modeElec && (
+              <>
+              <DevisPastille
+                total={totalDevis}
+                /* On a TOUCHÉ le prix : le devis ira voir si les tarifs ont
+                   bougé, sans attendre sa règle d'un jour — voir `forcerTarifs`
+                   dans le magasin. */
+                onPress={() => {
+                  useScanStore.getState().demanderLesTarifs();
+                  setScreen('devis');
+                }}
+              />
+              <ControlePastille
+                alertes={alertes}
+                /* Un plan sans le moindre appareil n'est pas une installation
+                   non conforme : c'est une installation qui n'a pas commencé,
+                   et le verdict attend le premier socle.
+
+                   MAIS un défaut de RELEVÉ, lui, est vrai avant la pose —
+                   relevé du patron : la pastille restait grise devant sept
+                   baies cadrées sous leur tablier. Il allume la pastille tout
+                   seul. */
+                commence={
+                  fixtures.length > 0 || ceiling.length > 0 || alertesDePlan > 0
+                }
+                onPress={() => setChecking(true)}
+              />
+              </>
+            )}
             {/*
               L'ÉTAGE, contre le contrôle et le 2D/3D.
 
@@ -4919,6 +4969,7 @@ export function ResultScreen() {
       {/* ---------- Choix du format d'export ---------- */}
       <ExportSheet
         visible={exporting}
+        modeElec={modeElec}
         onClose={() => setExporting(false)}
         onDismiss={lancerPartage}
         onPdf={() => {

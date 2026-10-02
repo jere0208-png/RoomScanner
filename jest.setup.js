@@ -130,3 +130,22 @@ try {
 global.fetch = jest.fn(async () => {
   throw new Error('fetch interdit dans un banc — mockez-le.');
 });
+
+/**
+ * LES BANCS DÉCRIVENT L'ATELIER D'ÉLECTRICIEN — le mode est allumé pour eux.
+ *
+ * Depuis la refonte grand public, l'électricité vit derrière un interrupteur
+ * (voir `src/store/usage.ts`), éteint par défaut sur une installation neuve.
+ * Les trois mille épreuves écrites avant elle décrivent l'application telle
+ * qu'elle a été construite, relevé après relevé : avec ses prises, son devis,
+ * son contrôle des normes. Elles démarrent donc mode allumé.
+ *
+ * Le banc du mode (`modeelectricite.test.tsx`) l'éteint lui-même, là où il
+ * veut éprouver le grand public — et c'est le seul qui ait à le faire.
+ */
+try {
+  const { useUsage } = require('./src/store/usage');
+  useUsage.setState({ charge: true, modeElec: true, choisi: true });
+} catch {
+  // Le module bouge ? Le banc du mode le dira mieux que ce setup.
+}

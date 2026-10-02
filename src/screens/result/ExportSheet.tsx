@@ -13,6 +13,7 @@ import { getStyles } from './styles';
 
 export function ExportSheet({
   visible,
+  modeElec = true,
   onClose,
   onDismiss,
   onPdf,
@@ -23,6 +24,12 @@ export function ExportSheet({
   onImage,
 }: {
   visible: boolean;
+  /**
+   * LE MODE ÉLECTRICITÉ — voir `store/usage`. Sans lui, la liste du matériel
+   * (appareillage, circuits, conformité) n'a rien à lister, et le métré ne
+   * porte plus que les pièces : surfaces, périmètres, murs à peindre.
+   */
+  modeElec?: boolean;
   onClose: () => void;
   /** iOS ne présente pas deux écrans à la fois : le partage attend ici. */
   onDismiss: () => void;
@@ -65,7 +72,9 @@ export function ExportSheet({
     [
       'csv',
       'Métré CSV',
-      'En colonnes, pour chiffrer dans Excel.',
+      modeElec
+        ? 'En colonnes, pour chiffrer dans Excel.'
+        : 'Surfaces et murs, pour Excel.',
       onCsv,
     ],
     /*
@@ -90,6 +99,17 @@ export function ExportSheet({
       onImage,
     ],
   ];
+  /*
+    SANS LE MODE, CINQ SORTIES — et la cinquième prend la ligne entière.
+
+    Une grille de deux qui finit sur une tuile seule laisse un trou à droite,
+    qu'on lit comme un bouton manquant. La dernière s'étale donc quand le
+    compte est impair : la grille reste pleine, quel que soit le mode.
+  */
+  const visibles = modeElec
+    ? sorties
+    : sorties.filter(([art]) => art !== 'materiel');
+  const impaire = visibles.length % 2 === 1;
   return (
     <Modal
       visible={visible}
@@ -125,10 +145,13 @@ export function ExportSheet({
               ne parlait qu'aux électriciens. On entre désormais dans le
               logement soi-même — c'est l'Exploration, sur la barre de la 3D.
             */}
-            {sorties.map(([art, titre, detail, action]) => (
+            {visibles.map(([art, titre, detail, action], i) => (
               <TouchableOpacity
                 key={titre}
-                style={styles.exportTuile}
+                style={[
+                  styles.exportTuile,
+                  impaire && i === visibles.length - 1 && styles.exportTuileLarge,
+                ]}
                 activeOpacity={0.8}
                 /* La tuile se lit d'un nom : le commentaire qui la précède
                    éloignait son titre du lecteur d'écran. */

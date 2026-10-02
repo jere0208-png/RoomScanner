@@ -48,6 +48,34 @@ import {
 import { type FixtureKind } from '../../geometry/electrical';
 import { type ActionData } from '../../components/Sheet';
 import { useScanStore } from '../../store/scanStore';
+import { useModeElec } from '../../store/usage';
+
+/*
+  LES OUTILS DE L'ÉLECTRICIEN, PAR LEUR CLÉ — voir `store/usage`.
+
+  Sans le mode Électricité, la barre du plan ne propose ni d'appareil à poser,
+  ni de plafond à équiper, ni de gaines à montrer ; celle du volume, ni la nuit
+  (qui n'allume que des luminaires posés), ni le gabarit des volumes de salle
+  d'eau, ni les repères d'appareils. Relevé du patron : « c'est trop axé
+  électricité et pas très intuitif pour ceux qui n'y comprennent rien ».
+
+  ON FILTRE PAR CLÉ, à la sortie, plutôt que d'envelopper chaque pastille
+  d'une condition : une pastille ajoutée demain au milieu de la rangée n'a pas
+  à savoir qu'il existe un mode, et la liste de ce qui est électrique se lit
+  ici, en une ligne, au lieu d'être éparpillée dans deux cents lignes de JSX.
+*/
+const OUTILS_ELEC_PLAN = new Set(['plus', 'plafond', 'gaines', 'elec']);
+const OUTILS_ELEC_VOLUME = new Set(['volumes', 'nuit', 'plafond', 'reperes']);
+
+const sansElec = (
+  outils: (React.ReactElement | null | false | undefined)[],
+  cles: Set<string>,
+  modeElec: boolean,
+): React.ReactElement[] =>
+  outils.filter(
+    (el): el is React.ReactElement =>
+      !!el && (modeElec || !cles.has(String(el.key))),
+  );
 import { getStyles } from './styles';
 
 /** Ce que les deux rangées partagent : la place qu'elles occupent. */
@@ -140,6 +168,7 @@ export function Toolbar2D({
   const showSurfaces = useScanStore((s) => s.showSurfaces);
   const setShowSurfaces = useScanStore((s) => s.setShowSurfaces);
   const straightenPlan = useScanStore((s) => s.straightenPlan);
+  const modeElec = useModeElec();
 
   /**
    * LE MENU DU PLAFOND.
@@ -404,7 +433,7 @@ export function Toolbar2D({
         remet tout le plan d'équerre, et le peigne commence après lui.
       */
       peigne={edition ? { mot: 'Ajouter', depuis: 1 } : { mot: 'Afficher' }}
-      elements={outils.filter((el): el is React.ReactElement => !!el)}
+      elements={sansElec(outils, OUTILS_ELEC_PLAN, modeElec)}
     />
   );
 }
@@ -493,6 +522,7 @@ export function Toolbar3D({
   const setShowTextures = useScanStore((s) => s.setShowTextures);
   const solidWalls = useScanStore((s) => s.solidWalls);
   const toggleSolidWalls = useScanStore((s) => s.toggleSolidWalls);
+  const modeElec = useModeElec();
 
   const outils = [
     <ToolPill
@@ -625,7 +655,7 @@ export function Toolbar3D({
       bas={bas}
       dessus={0}
       onSuite={onSuite}
-      elements={outils.filter((el): el is React.ReactElement => !!el)}
+      elements={sansElec(outils, OUTILS_ELEC_VOLUME, modeElec)}
     />
   );
 }
