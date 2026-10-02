@@ -46,7 +46,6 @@ import {
 import { Circle, Path, Polygon, Rect, Text as SvgText } from 'react-native-svg';
 import TestRenderer, { act } from 'react-test-renderer';
 import { ResultScreen } from '../src/screens/ResultScreen';
-import { ClientTour } from '../src/components/ClientTour';
 import { FloorplanEditor } from '../src/components/FloorplanEditor';
 import { FIXTURE_FAMILIES, FIXTURE_SYMBOL } from '../src/geometry/electrical';
 import { CEILINGS, CEILING_KINDS } from '../src/geometry/ceiling';
@@ -1325,19 +1324,8 @@ describe('les feuilles de l’écran des résultats', () => {
     expect(vu).toContain('Modèle 3D');
     expect(vu).toContain('Liste du matériel');
     expect(vu).toContain('Image');
-    expect(vu).toContain('Présentation animée');
-  });
-
-  /**
-   * LA PRÉSENTATION N'EST MONTÉE QU'UNE FOIS.
-   *
-   * Elle l'était deux fois, à deux endroits du même rendu : deux visites
-   * animées superposées, chacune avec ses minuteries et son état. Personne
-   * ne l'avait vu — la seconde est cachée sous la première.
-   */
-  it('ne monte la présentation qu’une seule fois', () => {
-    const tree = monter();
-    expect(tree.root.findAllByType(ClientTour)).toHaveLength(1);
+    // La présentation animée a été retirée avec la refonte grand public.
+    expect(vu).not.toContain('Présentation animée');
   });
 
   /**

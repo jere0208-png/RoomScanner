@@ -33,7 +33,6 @@ const monter = () => {
         onCsv={() => appels.push('csv')}
         onDxf={() => appels.push('dxf')}
         onImage={() => appels.push('image')}
-        onPresentation={() => appels.push('presentation')}
       />,
     );
   });
@@ -98,25 +97,27 @@ describe('les sorties offertes', () => {
   });
 
   /*
-    LA PRESENTATION GARDE SA PLEINE LARGEUR.
-
-    Les six premieres sont des FICHIERS : on les obtient, on les envoie.
-    La derniere ne produit rien — c est un spectacle qu on lance devant
-    quelqu un, sur place. Deux natures, deux formes ; et sept tuiles dans
-    une grille de deux laisseraient de toute facon un trou.
+    PLUS DE TUILE A PART. La septieme sortie etait la presentation animee, en
+    pleine largeur parce qu elle ne produisait pas de fichier. Elle a ete
+    retiree avec la refonte grand public : il reste six fichiers, trois
+    rangees pleines, et aucun trou.
   */
-  it('sauf la presentation, qui n est pas un fichier', () => {
+  it('ne range plus que des fichiers, six en trois rangees', () => {
     const t = monter();
-    const l = plat(tuiles(t)[6].props.style).width;
-    expect(l).toBe('100%');
+    const liste = tuiles(t);
+    expect(liste).toHaveLength(6);
+    for (const x of liste) {
+      const l = plat(x.props.style).width;
+      expect(typeof l === 'string' && parseFloat(l) <= 50).toBe(true);
+    }
     act(() => t.unmount());
   });
 
   it('chaque tuile appelle la sienne, et pas celle d a cote', () => {
     const t = monter();
     const liste = tuiles(t);
-    // Sept sorties : PDF, 3D, materiel, CSV, DXF, image, presentation.
-    expect(liste.length).toBeGreaterThanOrEqual(7);
+    // Six sorties : PDF, 3D, materiel, CSV, DXF, image.
+    expect(liste.length).toBe(6);
     for (const tuile of liste) act(() => tuile.props.onPress());
     // Chacune une fois, aucune deux fois : un doublon signalerait deux
     // entrees branchees sur la meme action.

@@ -138,7 +138,6 @@ import { useScanStore } from '../store/scanStore';
 import { useAccountStore } from '../store/accountStore';
 import { demarrerComplement, demarrerEtage } from '../native/useRoomScan';
 import { DiagnosticSheet, type Constat } from '../components/DiagnosticSheet';
-import { ClientTour } from '../components/ClientTour';
 import { EnAttente } from '../components/PendingPill';
 import {
   CEILINGS,
@@ -555,8 +554,6 @@ export function ResultScreen() {
     qui sert a la piece posee, et le jour ou un geste de trace revient, il
     n'y aura pas a la reecrire.
   */
-  /** La présentation guidée, plein écran : ce qu'on montre au client. */
-  const [visite, setVisite] = useState(false);
   // Vue 3D : bascule « vue de dessus », comme un plan.
   const [view3d, setView3d] = useState<View3DParams>(DEFAULT_VIEW3D);
   /*
@@ -3842,9 +3839,6 @@ export function ResultScreen() {
             colorsAvailable={colorsAvailable}
             focusIdx={focusIdx}
             setFocusIdx={setFocusIdx}
-            /* La visite guidée se lance d'ici, plus seulement du fond de
-               l'export : c'est là qu'on est quand on veut montrer. */
-            onVisite={() => setVisite(true)}
           />
         )}
 
@@ -4880,15 +4874,6 @@ export function ResultScreen() {
         tout l'espace.
       */}
 
-      {/* La présentation, lancée depuis le menu « Exporter ». */}
-      <ClientTour
-        visible={visite}
-        onClose={() => setVisite(false)}
-        /* La visite se joue à l'heure de la maquette : de nuit, elle montre
-           l'installation allumée. */
-        nuit={nuit}
-      />
-
       {/* Transition vers l'export : ondes EchoPlan sur toute la page */}
       {transiting && (
         <View style={styles.transition} pointerEvents="auto">
@@ -4960,19 +4945,7 @@ export function ResultScreen() {
           setExporting(false);
           apresFermeture(shareImage);
         }}
-        onPresentation={() => {
-          setExporting(false);
-          apresFermeture(() => setVisite(true));
-        }}
       />
-
-      {/*
-        LA PRÉSENTATION N'EST MONTÉE QU'UNE FOIS.
-
-        Elle l'était deux fois, à deux endroits du même rendu — la seconde
-        cachée sous la première, avec ses propres minuteries. Elle se tient
-        plus haut, avec la transition d'export.
-      */}
 
       {/* ---------- Ajouter une pièce ---------- */}
       <AddRoomSheet

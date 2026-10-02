@@ -21,7 +21,6 @@ export function ExportSheet({
   onCsv,
   onDxf,
   onImage,
-  onPresentation,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -33,7 +32,6 @@ export function ExportSheet({
   onCsv: () => void;
   onDxf: () => void;
   onImage: () => void;
-  onPresentation: () => void;
 }) {
   const teinte = useTheme();
   const styles = getStyles(teinte);
@@ -91,23 +89,6 @@ export function ExportSheet({
       'La vue affichée, filigranée.',
       onImage,
     ],
-    /*
-      LA PRÉSENTATION SE CHOISIT ICI, avec les autres sorties.
-
-      Elle a longtemps cherché sa place : au pied de l'écran d'export, puis
-      sur l'écran du scan, puis sous l'aperçu du plan. À chaque fois le même
-      malentendu — on la rangeait dans le réglage d'un DOCUMENT, alors que
-      c'est une SORTIE, au même titre qu'un PDF ou un modèle 3D. Elle est
-      donc dans le menu qui les propose : c'est celle qu'on lance devant
-      quelqu'un.
-    */
-    [
-      'presentation',
-      'Présentation animée',
-      'Le logement se présente tout seul, pièce par pièce. ' +
-        'À montrer au client, sur place.',
-      onPresentation,
-    ],
   ];
   return (
     <Modal
@@ -120,7 +101,7 @@ export function ExportSheet({
         <Pressable style={styles.modalCard} onPress={() => {}}>
           <Text style={styles.modalTitle}>Exporter</Text>
           <Text style={styles.modalSubtitle}>
-            Un document à remettre, ou une présentation à montrer.
+            Un document à remettre, ou un fichier à envoyer.
           </Text>
           {/*
             DEUX PAR LIGNE — relevé du patron : « refais ce pop-up pour le
@@ -134,49 +115,35 @@ export function ExportSheet({
             la rangée qu'elle remplaçait, et l'on n'aurait rien gagné.
           */}
           <View style={styles.exportGrille}>
-            {sorties.map(([art, titre, detail, action]) =>
-              /*
-                LA PRÉSENTATION GARDE SA PLEINE LARGEUR.
+            {/*
+              SIX FICHIERS, TROIS RANGÉES — et plus de tuile à part.
 
-                Les six premières sont des FICHIERS : on les obtient, on les
-                envoie. La dernière ne produit rien — c'est un spectacle
-                qu'on lance devant quelqu'un, sur place. Deux natures, deux
-                formes ; et sept tuiles dans une grille de deux laisseraient
-                de toute façon un trou.
-              */
-              art === 'presentation' ? (
-                <TouchableOpacity
-                  key={titre}
-                  style={[styles.exportChoice, styles.exportChoiceLarge]}
-                  activeOpacity={0.8}
-                  accessibilityLabel={titre}
-                  onPress={action}>
+              La septième sortie était la présentation animée, en pleine
+              largeur parce qu'elle ne produisait pas de fichier. Elle a
+              disparu avec la refonte grand public (voir README) : une visite
+              qui défile toute seule, mur par mur et appareil par appareil,
+              ne parlait qu'aux électriciens. On entre désormais dans le
+              logement soi-même — c'est l'Exploration, sur la barre de la 3D.
+            */}
+            {sorties.map(([art, titre, detail, action]) => (
+              <TouchableOpacity
+                key={titre}
+                style={styles.exportTuile}
+                activeOpacity={0.8}
+                /* La tuile se lit d'un nom : le commentaire qui la précède
+                   éloignait son titre du lecteur d'écran. */
+                accessibilityLabel={titre}
+                onPress={action}>
+                {/* La vignette dit CE QU'ON OBTIENT : une feuille cotée,
+                    un volume, un bordereau, une capture. On la reconnaît
+                    sans lire — quatre lignes de texte, non. */}
+                <View style={styles.exportTuileArt}>
                   <ExportArt kind={art} c={teinte} />
-                  <View style={styles.exportChoiceTexts}>
-                    <Text style={styles.exportChoiceTitle}>{titre}</Text>
-                    <Text style={styles.exportChoiceDetail}>{detail}</Text>
-                  </View>
-                </TouchableOpacity>
-              ) : (
-                <TouchableOpacity
-                  key={titre}
-                  style={styles.exportTuile}
-                  activeOpacity={0.8}
-                  /* La tuile se lit d'un nom : le commentaire qui la précède
-                     éloignait son titre du lecteur d'écran. */
-                  accessibilityLabel={titre}
-                  onPress={action}>
-                  {/* La vignette dit CE QU'ON OBTIENT : une feuille cotée,
-                      un volume, un bordereau, une capture. On la reconnaît
-                      sans lire — quatre lignes de texte, non. */}
-                  <View style={styles.exportTuileArt}>
-                    <ExportArt kind={art} c={teinte} />
-                  </View>
-                  <Text style={styles.exportChoiceTitle}>{titre}</Text>
-                  <Text style={styles.exportChoiceDetail}>{detail}</Text>
-                </TouchableOpacity>
-              ),
-            )}
+                </View>
+                <Text style={styles.exportChoiceTitle}>{titre}</Text>
+                <Text style={styles.exportChoiceDetail}>{detail}</Text>
+              </TouchableOpacity>
+            ))}
           </View>
         </Pressable>
       </Pressable>

@@ -13610,6 +13610,33 @@ puis le pilote au doigt. Cela n'affaiblit aucune vérification : une épreuve
 qui pend vraiment échoue toujours, un peu plus tard. Ce qu'on retire, c'est la
 sanction de la lenteur — qui ne prouve rien sur le code.
 
+## La refonte grand public
+
+Relevé du patron : « reformons comme il faut l'application. Elle doit être
+suggérée à un public large sur l'App Store et non seulement aux électriciens.
+Mais j'ai édité l'application pour qu'elle me serve à moi aussi, en tant
+qu'électricien. Sauf que c'est trop axé électricité et pas très intuitif pour
+ceux qui n'y comprennent rien. » Et : « enlève la visualisation vidéo, mais
+ajoute un vrai mode où l'on rentre dans la pièce créée ».
+
+### 1 — La présentation animée est retirée
+
+C'était la « visualisation vidéo » : la visite qui défilait toute seule, mur
+par mur, en annonçant les appareils de chacun. Elle ne parlait qu'aux
+électriciens — un particulier n'a que faire de « Mur nord · trois appareils »
+— et on ne la pilotait pas : on la regardait.
+
+Elle part avec tout ce qui ne servait qu'elle : son entrée dans le menu
+d'export (six fichiers restent, en trois rangées pleines), sa pastille
+« Visite » sur la barre 3D, et le module natif `RoomScanEcran` qui gardait
+l'écran allumé pendant qu'elle tournait — une exploration qu'on pilote au
+doigt n'en a pas besoin, l'écran ne s'éteint pas sous un pouce qui bouge.
+
+Les bancs qui l'éprouvaient sont retirés avec elle ; ceux qui partageaient
+leur fichier sans parler d'elle — le nord du dossier, les marges du système,
+la bascule plan/volume — restent, et deux gardes d'absence vérifient qu'elle
+ne revient pas.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

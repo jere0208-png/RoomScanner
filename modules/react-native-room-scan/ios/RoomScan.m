@@ -26,10 +26,6 @@ RCT_EXTERN_METHOD(setTorch:(BOOL)on resolve:(RCTPromiseResolveBlock)resolve reje
 RCT_EXTERN_METHOD(tap:(NSString *)kind)
 @end
 
-// Tenir l'ecran allume pendant la presentation client : voir RoomScanEcran.
-@interface RCT_EXTERN_MODULE(RoomScanEcran, NSObject)
-RCT_EXTERN_METHOD(garderEveille:(BOOL)oui)
-@end
 
 // Quatre habits pour le meme glyphe : voir RoomScanIcone.
 @interface RCT_EXTERN_MODULE(RoomScanIcone, NSObject)

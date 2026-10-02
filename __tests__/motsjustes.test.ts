@@ -105,12 +105,6 @@ describe('plus personne ne recompte dans son coin', () => {
     // Le pluriel fige a disparu, avec le « 1 objets » qu'il produisait.
     expect(src).not.toMatch(/\}\s*objets/);
   });
-
-  it('la visite client aussi', () => {
-    const src = lire('components/ClientTour.tsx');
-    expect(src).toContain('pluriel(');
-    expect(src).not.toMatch(/\}\s*murs/);
-  });
 });
 
 /*
