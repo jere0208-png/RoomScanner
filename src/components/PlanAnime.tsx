@@ -39,7 +39,7 @@ import type { Palette } from '../theme';
 const ALine = Animated.createAnimatedComponent(Line);
 const AG = Animated.createAnimatedComponent(G);
 
-export type EtapeDuPlan = 'plan' | 'equipe' | 'volume';
+export type EtapeDuPlan = 'plan' | 'meuble' | 'volume';
 
 /**
  * LE LOGEMENT — un T2 qu'on pourrait relever demain.
@@ -78,31 +78,52 @@ const BAIES: { seg: Segment; porte: boolean }[] = [
 ];
 
 /**
- * L'APPAREILLAGE — c'est ce qu'on vient chercher dans cette application.
+ * LE MOBILIER — ce qu'on vient faire dans cette application, quand on n'est
+ * pas électricien.
  *
- * Quatre points seulement, et un de chaque famille : une prise, une prise de
- * communication, une commande, un point lumineux. Un logement complètement
- * équipé ferait quarante symboles sur une carte de la taille d'une main, et
- * l'on n'y lirait plus rien.
+ * Relevé du patron, à la refonte grand public : « c'est trop axé électricité
+ * et pas très intuitif pour ceux qui n'y comprennent rien ». La deuxième page
+ * posait des prises ; elle pose maintenant un lit, une armoire, un canapé —
+ * ce que tout le monde reconnaît sans légende. Le mode Électricité se propose
+ * à la fin de la présentation, à ceux qu'il concerne.
+ *
+ * Six meubles, deux pièces : assez pour qu'on lise une chambre et un séjour,
+ * pas assez pour encombrer une carte de la taille d'une main. Les portes
+ * restent dégagées — un plan meublé qui bouche ses passages se lit comme une
+ * erreur.
  */
-const APPAREILS: { x: number; z: number; mot: string; famille: 'prise' | 'cmd' | 'faible' }[] = [
-  { x: 1.6, z: 4.05, mot: 'PC', famille: 'prise' },
-  { x: 0.15, z: 3.2, mot: 'PC', famille: 'prise' },
-  { x: 3.45, z: 3.9, mot: 'I', famille: 'cmd' },
-  { x: 5.2, z: 0.15, mot: 'RJ', famille: 'faible' },
+interface Meuble {
+  x0: number;
+  z0: number;
+  x1: number;
+  z1: number;
+  /** Les traits qui font reconnaître le meuble : oreillers, dossier, vantaux. */
+  traits?: [number, number, number, number][];
+}
+const MEUBLES: Meuble[] = [
+  // La chambre : un lit tête au mur, ses deux oreillers, un chevet, une armoire.
+  {
+    x0: 0.9, z0: 2.15, x1: 2.5, z1: 4.1,
+    traits: [
+      [1.0, 3.72, 1.62, 3.72],
+      [1.78, 3.72, 2.4, 3.72],
+      [0.9, 3.4, 2.5, 3.4],
+    ],
+  },
+  { x0: 2.6, z0: 3.7, x1: 2.95, z1: 4.05 },
+  { x0: 2.65, z0: 0.12, x1: 3.5, z1: 0.7, traits: [[3.075, 0.12, 3.075, 0.7]] },
+  // Le séjour : un canapé contre le mur, sa table basse, le meuble télé.
+  {
+    x0: 5.3, z0: 1.05, x1: 5.9, z1: 3.15,
+    traits: [
+      [5.74, 1.05, 5.74, 3.15],
+      [5.3, 1.27, 5.74, 1.27],
+      [5.3, 2.93, 5.74, 2.93],
+    ],
+  },
+  { x0: 4.45, z0: 1.75, x1: 5.0, z1: 2.45 },
+  { x0: 3.7, z0: 1.25, x1: 3.95, z1: 2.4 },
 ];
-
-/** Les points lumineux, au milieu de chaque pièce. */
-const LUMIERES = [
-  { x: REFEND / 2, z: P / 2 },
-  { x: (REFEND + L) / 2, z: P / 2 },
-];
-
-const TEINTES = {
-  prise: '#C8770A',
-  cmd: '#1E7FBF',
-  faible: '#7B3FC4',
-};
 
 /** Le cosinus et le sinus de trente degrés : l'axonométrie de l'architecte. */
 const CO = Math.cos(Math.PI / 6);
@@ -310,44 +331,44 @@ export function PlanAnime({
             })()}
           </AG>
 
-          {/* ─────────── ET L'APPAREILLAGE, SUR LA DEUXIÈME PAGE SEULEMENT. */}
-          {etape === 'equipe' && (
-            <>
-              {LUMIERES.map((l, i) => {
-                const q = pt(l.x, l.z);
-                return (
-                  <AG key={`l${i}`} opacity={paraitre(4 + i, 7)}>
-                    <Circle cx={q.sx} cy={q.sy} r={13} fill={c.amber} opacity={0.16} />
-                    <Circle cx={q.sx} cy={q.sy} r={5.5} fill="none" stroke={c.amber} strokeWidth={1.6} />
-                    <Path
-                      d={`M${q.sx - 4} ${q.sy - 4} L${q.sx + 4} ${q.sy + 4} M${q.sx + 4} ${q.sy - 4} L${q.sx - 4} ${q.sy + 4}`}
-                      stroke={c.amber}
-                      strokeWidth={1.6}
-                    />
-                  </AG>
-                );
-              })}
-              {APPAREILS.map((f, i) => {
-                const q = pt(f.x, f.z);
-                const teinte = TEINTES[f.famille];
-                return (
-                  <AG key={`f${i}`} opacity={paraitre(i, 7)}>
-                    <Circle cx={q.sx} cy={q.sy} r={11} fill={teinte} opacity={0.14} />
-                    <SvgText
-                      testID="sigle-appareil"
-                      x={q.sx}
-                      y={q.sy + 3.5}
-                      fontSize={9.5}
-                      fontWeight="800"
-                      fill={teinte}
-                      textAnchor="middle">
-                      {f.mot}
-                    </SvgText>
-                  </AG>
-                );
-              })}
-            </>
-          )}
+          {/* ─────────── ET LES MEUBLES, SUR LA DEUXIÈME PAGE SEULEMENT. */}
+          {etape === 'meuble' &&
+            MEUBLES.map((m, i) => {
+              const coins = [
+                pt(m.x0, m.z0),
+                pt(m.x1, m.z0),
+                pt(m.x1, m.z1),
+                pt(m.x0, m.z1),
+              ];
+              return (
+                <AG key={`m${i}`} opacity={paraitre(i, MEUBLES.length + 1)}>
+                  <Polygon
+                    testID="meuble-pose"
+                    points={coins.map((q) => `${q.sx},${q.sy}`).join(' ')}
+                    fill={c.surface}
+                    stroke={bleu}
+                    strokeWidth={1.4}
+                    strokeLinejoin="round"
+                  />
+                  {(m.traits ?? []).map(([ax, az, bx, bz], k) => {
+                    const a = pt(ax, az);
+                    const b = pt(bx, bz);
+                    return (
+                      <Line
+                        key={k}
+                        x1={a.sx}
+                        y1={a.sy}
+                        x2={b.sx}
+                        y2={b.sy}
+                        stroke={bleu}
+                        strokeWidth={1}
+                        opacity={0.6}
+                      />
+                    );
+                  })}
+                </AG>
+              );
+            })}
         </Svg>
       </View>
     );
@@ -417,6 +438,32 @@ export function PlanAnime({
           strokeWidth={1}
           opacity={0.5}
         />
+        {/*
+          LES MEUBLES RESTENT AU SOL, et ils se peignent AVANT les murs.
+
+          C'est le même logement, meublé à la page d'avant. Posés à plat sur le
+          sol plutôt qu'en volume, ils n'ont pas à être départagés des murs :
+          le refend qui se lève passe naturellement devant ceux de la chambre,
+          qui est derrière lui, et derrière ceux du séjour, qui est devant.
+        */}
+        {MEUBLES.map((m, i) => (
+          <Polygon
+            key={`vm${i}`}
+            points={[
+              pt(m.x0, m.z0),
+              pt(m.x1, m.z0),
+              pt(m.x1, m.z1),
+              pt(m.x0, m.z1),
+            ]
+              .map((q) => `${q.sx},${q.sy}`)
+              .join(' ')}
+            fill={c.surface}
+            fillOpacity={0.9}
+            stroke={bleu}
+            strokeWidth={1}
+            strokeOpacity={0.7}
+          />
+        ))}
         {ordonnes.map(({ m }, i) => {
           const a0 = pt(m.a.x, m.a.z);
           const b0 = pt(m.b.x, m.b.z);
@@ -445,21 +492,6 @@ export function PlanAnime({
                 opacity={0.85}
               />
             </G>
-          );
-        })}
-        {/* Les points lumineux restent visibles au plafond : c'est le même
-            logement, équipé à la page d'avant. */}
-        {LUMIERES.map((l, i) => {
-          const q = pt(l.x, l.z, h * 0.98);
-          return (
-            <Circle
-              key={`vl${i}`}
-              cx={q.sx}
-              cy={q.sy}
-              r={9 * leve}
-              fill={c.amber}
-              opacity={0.25 * leve}
-            />
           );
         })}
       </Svg>

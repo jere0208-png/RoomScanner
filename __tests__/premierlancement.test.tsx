@@ -114,9 +114,11 @@ describe('les trois cartes', () => {
   it('et l’on avance jusqu’au bout', () => {
     const t = monter();
     act(() => bouton(t, 'Suivant').props.onPress());
-    expect(mots(t)).toContain('Placez vos prises');
+    // La deuxième page ne pose plus de prises : la présentation est vue par
+    // tout le monde, avant la question du mode (refonte grand public).
+    expect(mots(t)).toContain('Aménagez-la');
     act(() => bouton(t, 'Suivant').props.onPress());
-    expect(mots(t)).toContain('Emportez le dossier');
+    expect(mots(t)).toContain('Entrez dedans');
   });
 
   it('la dernière ne dit plus « Suivant » : elle lance', () => {
@@ -197,7 +199,7 @@ describe('le plan se fait sous les yeux', () => {
     const etape = () => t.root.findByType(PlanAnime).props.etape;
     expect(etape()).toBe('plan');
     act(() => bouton(t, 'Suivant').props.onPress());
-    expect(etape()).toBe('equipe');
+    expect(etape()).toBe('meuble');
     act(() => bouton(t, 'Suivant').props.onPress());
     expect(etape()).toBe('volume');
   });
@@ -241,21 +243,25 @@ describe('le plan se fait sous les yeux', () => {
     expect(hauteurDesPans(t)).toBeGreaterThan(30);
   });
 
-  it('le plan à plat porte ses murs, l’équipé porte en plus ses sigles', () => {
+  it('le plan à plat porte ses murs, l’aménagé porte en plus ses meubles', () => {
     /*
       C'est le MÊME logement aux trois pages, et c'est tout l'intérêt : trois
       illustrations sans rapport diraient « voici trois fonctions ». Le même
-      plan qui se trace puis s'équipe dit « voici ce qui arrive à VOTRE
+      plan qui se trace puis se meuble dit « voici ce qui arrive à VOTRE
       logement ».
+
+      ET PLUS UNE PRISE NULLE PART : la présentation est vue avant la
+      question du mode, par un public qui n'a que faire d'un sigle « PC ».
     */
     const t = monter();
     const compte = (id: string) =>
       t.root.findAll((n) => n.props?.testID === id).length;
     expect(compte('mur-du-plan')).toBeGreaterThan(0);
-    expect(compte('sigle-appareil')).toBe(0);
+    expect(compte('meuble-pose')).toBe(0);
     act(() => bouton(t, 'Suivant').props.onPress());
     expect(compte('mur-du-plan')).toBeGreaterThan(0);
-    expect(compte('sigle-appareil')).toBeGreaterThan(0);
+    expect(compte('meuble-pose')).toBeGreaterThan(0);
+    expect(compte('sigle-appareil')).toBe(0);
   });
 
   it('et le volume LÈVE des pans, une fois l’horloge passée', () => {
@@ -277,7 +283,7 @@ describe('le plan se fait sous les yeux', () => {
     expect(hauteurDesPans(t)).toBeGreaterThan(30);
   });
 
-  it('et la troisième carte NOMME les exports', () => {
+  it('et la troisième carte NOMME les exports qui servent à tous', () => {
     /*
       Relevé du patron : « avec explication de possibilité d'exporter ».
 
@@ -290,12 +296,82 @@ describe('le plan se fait sous les yeux', () => {
     act(() => bouton(t, 'Suivant').props.onPress());
     act(() => bouton(t, 'Suivant').props.onPress());
     const lus = mots(t);
-    for (const f of ['PDF', 'DXF', 'CSV']) expect(lus).toContain(f);
+    // Le PDF à imprimer, le DXF à l'architecte. Le CSV — la liste du
+    // matériel électrique — n'est plus annoncé à un public qui n'en a pas.
+    for (const f of ['PDF', 'DXF']) expect(lus).toContain(f);
+    expect(lus).not.toContain('matériel');
   });
 
   it('le dessin est posé sur le PAPIER, comme l’accueil', () => {
     // La présentation et l'application ouvrent sur la même feuille : c'est ce
     // qui fait de la première une promesse tenue plutôt qu'une affiche.
     expect(monter().root.findAllByType(Quadrillage).length).toBeGreaterThan(0);
+  });
+});
+
+describe('la question du mode, en dernière page', () => {
+  /*
+    Relevé du patron : « une proposition pour passer à un mode
+    "Électricité" ». Elle se pose ICI la première fois — après avoir vu ce que
+    fait l'application, pas avant : demander « êtes-vous électricien ? » à
+    quelqu'un qui ne sait pas encore ce qu'il a téléchargé, c'est lui faire
+    choisir à l'aveugle.
+  */
+  const { useUsage } = require('../src/store/usage') as typeof import('../src/store/usage');
+  afterEach(() => useUsage.setState({ charge: true, modeElec: true, choisi: true }));
+
+  const jusquALaQuestion = (onFini = () => {}) => {
+    useUsage.setState({ charge: true, modeElec: false, choisi: false });
+    const t = monter(onFini);
+    act(() => bouton(t, 'Suivant').props.onPress());
+    act(() => bouton(t, 'Suivant').props.onPress());
+    // La troisième carte ne lance plus : il reste une page.
+    act(() => bouton(t, 'Suivant').props.onPress());
+    return t;
+  };
+
+  it('vient après les trois cartes, et porte deux réponses', () => {
+    const t = jusquALaQuestion();
+    const lus = mots(t);
+    expect(lus).toContain('À quoi va vous servir EchoPlan ?');
+    expect(bouton(t, 'Mesurer et aménager')).toBeDefined();
+    expect(bouton(t, 'Je suis électricien')).toBeDefined();
+    // Ses deux cartes tiennent lieu de bouton : pas de « C'est parti » en bas.
+    expect(bouton(t, 'Commencer')).toBeUndefined();
+  });
+
+  it('« Je suis électricien » allume le mode, et referme', () => {
+    const fini = jest.fn();
+    const t = jusquALaQuestion(fini);
+    act(() => bouton(t, 'Je suis électricien').props.onPress());
+    expect(useUsage.getState().modeElec).toBe(true);
+    expect(useUsage.getState().choisi).toBe(true);
+    expect(fini).toHaveBeenCalledTimes(1);
+  });
+
+  it('« Mesurer et aménager » laisse le grand public, et c’est une RÉPONSE', () => {
+    /*
+      Elle compte comme réponse : la déduction tirée des plans ne pourra plus
+      allumer le mode dans le dos de quelqu'un qui a dit non.
+    */
+    const t = jusquALaQuestion();
+    act(() => bouton(t, 'Mesurer et aménager').props.onPress());
+    expect(useUsage.getState().modeElec).toBe(false);
+    expect(useUsage.getState().choisi).toBe(true);
+  });
+
+  it('quatre points quand elle se pose, trois quand on a déjà répondu', () => {
+    const points = (t: TestRenderer.ReactTestRenderer) =>
+      t.root.findAll(
+        (n) =>
+          typeof n.props?.testID === 'string' &&
+          n.props.testID.startsWith('point-') &&
+          typeof n.type === 'string',
+      ).length;
+    useUsage.setState({ charge: true, modeElec: false, choisi: false });
+    expect(points(monter())).toBe(4);
+    act(() => arbre?.unmount());
+    useUsage.setState({ charge: true, modeElec: true, choisi: true });
+    expect(points(monter())).toBe(3);
   });
 });

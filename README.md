@@ -13696,6 +13696,42 @@ stockage de la préférence se charge À LA DEMANDE pour cette raison : importé
 en tête de module, il se serait chargé pendant le setup, avant que chaque
 banc n'ait posé son doublet du disque.
 
+### 3 — Un premier lancement pour tout le monde
+
+La présentation est vue par TOUT le monde, avant que quiconque ait dit s'il
+est électricien. Elle montre donc ce que tout le monde vient faire :
+
+| Page | Avant | Après |
+|---|---|---|
+| 1 | Balayez la pièce | Balayez la pièce |
+| 2 | **Placez vos prises** — sigles PC, I, RJ | **Aménagez-la** — un lit, une armoire, un canapé |
+| 3 | Emportez le dossier — PDF, DXF, liste du matériel en CSV | **Entrez dedans** — la 3D, l'exploration, le PDF et le DXF |
+| 4 | — | **À quoi va vous servir EchoPlan ?** |
+
+**Le même logement aux trois pages**, comme avant : il se trace, se meuble,
+se lève. Six meubles, deux pièces — assez pour qu'on lise une chambre et un
+séjour, pas assez pour encombrer une carte de la taille d'une main — et les
+portes restent dégagées : un plan meublé qui bouche ses passages se lit comme
+une erreur. En volume, les meubles restent posés AU SOL et se peignent avant
+les murs : le refend qui se lève passe naturellement devant ceux de la
+chambre, sans qu'on ait à les départager.
+
+**La question vient en dernier**, après avoir vu ce que fait l'application :
+demander « êtes-vous électricien ? » à quelqu'un qui ne sait pas encore ce
+qu'il a téléchargé, c'est lui faire choisir à l'aveugle. Deux grandes cartes,
+chacune avec sa phrase — on choisit sur ce qu'on fera, pas sur un mot :
+
+- **Mesurer et aménager** — scanner une pièce, lire ses cotes, la meubler, la
+  partager ;
+- **Je suis électricien** — en plus : prises et éclairage sur le plan, normes
+  NF C 15-100 et devis.
+
+Elle ne se pose qu'à qui n'a pas répondu : l'électricien reconnu à ses plans
+équipés voit trois pages, pas quatre. « Mesurer et aménager » compte comme une
+réponse — la déduction ne pourra plus allumer le mode dans le dos de
+quelqu'un qui a dit non. « Passer » reste possible à tout moment, et laisse le
+grand public.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro
