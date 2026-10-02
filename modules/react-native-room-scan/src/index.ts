@@ -182,6 +182,31 @@ export const RoomScanCanvas = UIManager.getViewManagerConfig?.(
   : undefined;
 
 /**
+ * LA VISITE À LA PREMIÈRE PERSONNE — SceneKit, pas un canevas.
+ *
+ * Le canevas reçoit un dessin DÉJÀ PROJETÉ, trente fois par seconde : c'est
+ * bien pour une maquette qu'on tourne du doigt, c'est trop pour une marche.
+ * Ici la scène voyage UNE fois, en triangles (`maillage`, `sols`), et le
+ * moteur 3D d'iOS la tient sur la carte graphique ; ensuite seule la
+ * `camera` change — six nombres par image. Voir `geometry/visite3d`.
+ *
+ * `undefined` quand le natif n'est pas là (banc d'essai) : la vue en
+ * JavaScript reste alors en place, et rien ne se voit.
+ */
+export const RoomScanVisite = UIManager.getViewManagerConfig?.(
+  'RoomScanVisite',
+)
+  ? requireNativeComponent<
+      ViewProps & {
+        maillage: number[];
+        sols: number[];
+        camera: number[];
+        fond: string;
+      }
+    >('RoomScanVisite')
+  : undefined;
+
+/**
  * Émetteur d'événements du scan : 'onScanUpdate', 'onInstruction', 'onScanError'.
  * iOS émet via le module RoomScanEvents, Android via le DeviceEventEmitter.
  */

@@ -37,9 +37,16 @@ import {
 } from 'react-native';
 import Svg, { Circle, Line, Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { RoomScanVisite } from 'react-native-room-scan';
 import { Iso3DView } from './Iso3DView';
-import { useScanStore } from '../store/scanStore';
+import { floorsOf, useScanStore } from '../store/scanStore';
+import { useModeElec } from '../store/usage';
 import { filtrerAuNiveau, type Pt } from '../geometry/floorplan';
+import { buildScene, type ScenePalette } from '../geometry/scene3d';
+import { cameraNative, maillageDeLaVisite } from '../geometry/visite3d';
+import { mixHex } from '../geometry/appearance';
+import { MAQUETTE, matieresDesSols } from '../ui/maquette';
+import { hexDePeinture } from '../ui/peintures';
 import {
   HAUTEUR_OEIL,
   deplacer,
@@ -90,6 +97,12 @@ const RAYON_MANETTE = 58;
 const ZONE_MORTE = 0.12;
 /** Une image toutes les trente-trois millisecondes, pas davantage. */
 const PERIODE = 33;
+/**
+ * EN NATIF, UNE IMAGE PAR RAFRAÎCHISSEMENT. SceneKit tient la scène sur la
+ * carte graphique ; le JavaScript n'a plus qu'à déplacer le point et poser
+ * six nombres. Soixante fois par seconde, c'est un pas qui ne saccade pas.
+ */
+export const PERIODE_NATIF = 16;
 /** Au pire, huit images par seconde : en dessous, on ne marche plus, on saute. */
 const PERIODE_MAX = 125;
 
@@ -103,9 +116,9 @@ const PERIODE_MAX = 125;
  * temps libre (l'image coûte deux tiers de la période), sans jamais
  * descendre sous trente images par seconde quand le téléphone les tient.
  */
-export function cadenceDeMarche(coutMs: number): number {
-  if (!Number.isFinite(coutMs)) return PERIODE;
-  return Math.max(PERIODE, Math.min(PERIODE_MAX, Math.round(coutMs * 1.5)));
+export function cadenceDeMarche(coutMs: number, plancher = PERIODE): number {
+  if (!Number.isFinite(coutMs)) return plancher;
+  return Math.max(plancher, Math.min(PERIODE_MAX, Math.round(coutMs * 1.5)));
 }
 
 /** Où l'on se tient, et où l'on regarde — `lacet` à la façon de la 3D. */
@@ -120,7 +133,8 @@ interface Pose {
 /** L'avant et la droite du regard, couchés sur le sol. */
 const reperes = (lacet: number) => ({
   avant: { x: Math.sin(lacet), z: Math.cos(lacet) },
-  droite: { x: Math.cos(lacet), z: -Math.sin(lacet) },
+  // La droite de qui regarde +z est −x : voir `povBase`, même repère.
+  droite: { x: -Math.cos(lacet), z: Math.sin(lacet) },
 });
 
 /**
@@ -304,26 +318,97 @@ export function Exploration({
   const toutesLesPieces = useScanStore((s) => s.rooms);
   const tousLesMeubles = useScanStore((s) => s.objects);
   const niveauCourant = useScanStore((s) => s.niveauCourant);
-  const { walls, openings, rooms, objects } = useMemo(
+  // L'appareillage ne se voit qu'en mode Électricité — comme partout.
+  const modeElec = useModeElec();
+  const toutLAppareillage = useScanStore((s) => s.fixtures);
+  const toutLePlafond = useScanStore((s) => s.ceiling);
+  const showTextures = useScanStore((s) => s.showTextures);
+  const colorOpenings = useScanStore((s) => s.showOpeningColors);
+  const { walls, openings, rooms, objects, fixtures, ceiling } = useMemo(
     () =>
       filtrerAuNiveau(
         {
           walls: tousLesMurs,
           openings: toutesLesOuvertures,
           rooms: toutesLesPieces,
-          fixtures: [],
+          fixtures: modeElec ? toutLAppareillage : [],
           photos: [],
           objects: tousLesMeubles,
-          ceiling: [],
+          ceiling: modeElec ? toutLePlafond : [],
         },
         niveauCourant,
       ),
-    [tousLesMurs, toutesLesOuvertures, toutesLesPieces, tousLesMeubles, niveauCourant],
+    [
+      tousLesMurs,
+      toutesLesOuvertures,
+      toutesLesPieces,
+      tousLesMeubles,
+      modeElec,
+      toutLAppareillage,
+      toutLePlafond,
+      niveauCourant,
+    ],
   );
   const obstacles = useMemo(
     () => obstaclesDeLaVisite(walls, openings, objects, rooms),
     [walls, openings, objects, rooms],
   );
+
+  /*
+    LA SCÈNE EST BÂTIE AVANT QU'ON ENTRE — et une seule fois.
+
+    Relevé du patron : « il faut précharger le rendu ». Ce composant est
+    monté avec l'écran du relevé, fermé ; les triangles se calculent donc
+    ici, pendant qu'on regarde encore le plan, et ne changent qu'avec lui.
+    À l'ouverture, le natif reçoit une scène prête ; ensuite, seule la
+    caméra voyage. La maquette (`buildScene`) reste la source unique du
+    modèle : mêmes baies, mêmes meubles, mêmes teintes relevées — avec un
+    sol et un plafond, puisqu'on est dedans.
+  */
+  const natif = !!RoomScanVisite;
+  const palette = useMemo<ScenePalette>(
+    () => ({ ...MAQUETTE, door: teinte.amber, window: teinte.sky, passage: teinte.blue }),
+    [teinte],
+  );
+  const peintures = useMemo(() => {
+    const out: Record<string, string> = {};
+    for (const r of rooms) {
+      const hex = hexDePeinture(r.peinture);
+      if (hex) out[r.id] = hex;
+    }
+    return out;
+  }, [rooms]);
+  const maille = useMemo(() => {
+    if (!natif || walls.length === 0) return null;
+    const { faces } = buildScene(walls, openings, objects, {
+      palette,
+      colorOpenings,
+      showSurfaces: true,
+      plafonds: true,
+      showTextures,
+      floors: floorsOf(rooms),
+      rooms,
+      fixtures,
+      ceiling,
+      matieres: matieresDesSols(rooms),
+      peintures,
+    });
+    return maillageDeLaVisite(faces);
+  }, [
+    natif,
+    walls,
+    openings,
+    objects,
+    palette,
+    colorOpenings,
+    showTextures,
+    rooms,
+    fixtures,
+    ceiling,
+    peintures,
+  ]);
+  // Derrière les baies : un ciel clair, dans la teinte du thème.
+  const fond = useMemo(() => mixHex(teinte.sky, '#FFFFFF', 0.55), [teinte.sky]);
 
   /*
     LA POSE VIT DANS UNE RÉFÉRENCE, ET L'ÉCRAN EN PREND UNE COPIE.
@@ -360,7 +445,8 @@ export function Exploration({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
 
-  const cadence = useRef(PERIODE);
+  const plancher = natif ? PERIODE_NATIF : PERIODE;
+  const cadence = useRef(plancher);
   const demande = useRef(0);
   const montrer = (force = false) => {
     const t = Date.now();
@@ -372,9 +458,9 @@ export function Exploration({
   // Ce qu'a coûté l'image qu'on vient de poser décide de la suivante.
   useLayoutEffect(() => {
     if (!demande.current) return;
-    cadence.current = cadenceDeMarche(Date.now() - demande.current);
+    cadence.current = cadenceDeMarche(Date.now() - demande.current, plancher);
     demande.current = 0;
-  }, [vue]);
+  }, [vue, plancher]);
 
   /*
     LA BOUCLE DE MARCHE — elle ne tourne que pendant qu'on marche.
@@ -450,7 +536,9 @@ export function Exploration({
           };
         },
         onPanResponderMove: (_e, g) => {
-          const lacet = departRegard.current.lacet + g.dx * SENSIBILITE;
+          // Glisser vers la droite tourne vers la droite — c'est-à-dire vers
+          // −x quand on regarde +z : le lacet DÉCROÎT (voir `povBase`).
+          const lacet = departRegard.current.lacet - g.dx * SENSIBILITE;
           const tangage = Math.max(
             -TANGAGE_MAX,
             Math.min(TANGAGE_MAX, departRegard.current.tangage - g.dy * SENSIBILITE),
@@ -475,6 +563,7 @@ export function Exploration({
     }),
     [vue, largeur, hauteur],
   );
+  const cameraPlate = useMemo(() => cameraNative(camera), [camera]);
 
   return (
     <Modal
@@ -486,7 +575,17 @@ export function Exploration({
         {/* La 3D, à hauteur d'œil. Elle ne prend aucun doigt : les deux
             pouces sont pour la manette et le regard. */}
         <View style={StyleSheet.absoluteFill} pointerEvents="none">
-          {visible && walls.length > 0 && (
+          {visible && walls.length > 0 && RoomScanVisite && maille && (
+            <RoomScanVisite
+              style={StyleSheet.absoluteFill}
+              maillage={maille.maillage}
+              sols={maille.sols}
+              camera={cameraPlate}
+              fond={fond}
+            />
+          )}
+          {/* Sans le natif (banc d'essai), la vue en JavaScript tient lieu. */}
+          {visible && walls.length > 0 && !(RoomScanVisite && maille) && (
             <Iso3DView
               pov={camera}
               enMarche={!!vue.geste}

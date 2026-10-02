@@ -64,6 +64,19 @@ export interface Face3D {
   bias?: number;
   isFloor?: boolean;
   /**
+   * LA MATIÈRE D'UN SOL, et le sens de ses lames — pour la visite en natif,
+   * qui en fait une texture (voir `visite3d`). La maquette, elle, les lit
+   * dans ses joints.
+   */
+  matiere?: 'parquet' | 'carrelage';
+  sensLattes?: 'x' | 'z';
+  /**
+   * UNE OMBRE PORTÉE — la nappe décalquée sous un meuble, à même le sol.
+   * La visite en natif n'en veut pas : sa lumière et son occlusion font le
+   * contact, et une nappe posée sur le sol se battrait avec lui au pixel.
+   */
+  ombre?: boolean;
+  /**
    * UN PLAFOND — émis seulement quand on se tient DANS le logement (voir
    * `SceneOptions.plafonds`). Sa normale regarde le sol : vu d'en haut, la
    * maquette ne le dessine jamais.
@@ -1100,9 +1113,19 @@ export function povBase(cam: PovCamera) {
   const sy = Math.sin(cam.yaw);
   const cp = Math.cos(cam.pitch);
   const sp = Math.sin(cam.pitch);
+  /*
+    LA DROITE EST −x QUAND ON REGARDE +z — et pas +x, comme on l'écrivait.
+
+    Le plan est une vue de dessus : x vers la droite, z vers le bas de la
+    feuille. Qui regarde vers +z sur ce plan — vers le bas de la feuille —
+    a −x à sa droite. L'ancien repère mettait +x à droite : la vue à la
+    première personne était le MIROIR du plan, la porte à gauche sur la
+    mini-carte sortait à droite sous les yeux. C'est le produit vectoriel
+    qui tranche : droite = avant × haut, dans un monde où y monte.
+  */
   return {
     avant: { x: sy * cp, y: sp, z: cy * cp },
-    droite: { x: cy, y: 0, z: -sy },
+    droite: { x: -cy, y: 0, z: sy },
     haut: { x: -sy * sp, y: cp, z: -cy * sp },
   };
 }
@@ -1895,6 +1918,8 @@ export function buildScene(
         fill: floorFill,
         stroke: pal.floorStroke,
         isFloor: true,
+        matiere,
+        sensLattes,
       });
       if (matiere) {
         const joint = mixHex(floorFill, '#0B0D12', 0.22);
@@ -3251,6 +3276,7 @@ export function buildScene(
           // Comme le sol : tout au fond du tri, dans l'ordre où on les
           // pousse — donc par-dessus le sol, sous tout le reste.
           isFloor: true,
+          ombre: true,
         });
       };
       nappe(0.09, 0.07);

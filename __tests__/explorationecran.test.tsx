@@ -24,7 +24,7 @@ import { ResultScreen } from '../src/screens/ResultScreen';
 import { Iso3DView } from '../src/components/Iso3DView';
 import { useScanStore } from '../src/store/scanStore';
 import { HAUTEUR_OEIL } from '../src/geometry/exploration';
-import { buildScene, dosTourne } from '../src/geometry/scene3d';
+import { buildScene, dosTourne, povBase } from '../src/geometry/scene3d';
 import { MAQUETTE } from '../src/ui/maquette';
 import {
   SNAPSHOT_FIXTURES,
@@ -223,8 +223,14 @@ describe('les deux pouces', () => {
     glisser(regard, 120, 0);
     lever(regard, 120, 0);
     act(() => jest.advanceTimersByTime(50));
-    // Glisser vers la droite tourne vers la droite : le lacet croît.
-    expect(camera(t).yaw).toBeGreaterThan(avant + 0.3);
+    // Glisser vers la droite tourne vers la droite. Le lacet compte depuis
+    // +z vers +x ; or la droite de qui regarde +z est −x (le plan est une
+    // vue de dessus, z vers le bas de la feuille) : le lacet DÉCROÎT.
+    expect(camera(t).yaw).toBeLessThan(avant - 0.3);
+    const b = povBase(camera(t));
+    // Et ce qu'on voit à droite est bien à droite : droite = avant × haut.
+    expect(b.droite.x).toBeCloseTo(b.avant.y * b.haut.z - b.avant.z * b.haut.y, 9);
+    expect(b.droite.z).toBeCloseTo(b.avant.x * b.haut.y - b.avant.y * b.haut.x, 9);
   });
 
   it('et le regard ne se renverse jamais : ni le plafond, ni les pieds', () => {

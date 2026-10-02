@@ -113,6 +113,17 @@ RCT_EXPORT_VIEW_PROPERTY(styles, NSArray)
 @end
 
 /*
+  LA VISITE A LA PREMIERE PERSONNE — SceneKit. La scene voyage UNE fois, en
+  triangles ; ensuite seule la camera change, six nombres par image.
+*/
+@interface RCT_EXTERN_MODULE(RoomScanVisiteManager, RCTViewManager)
+RCT_EXPORT_VIEW_PROPERTY(maillage, NSArray)
+RCT_EXPORT_VIEW_PROPERTY(sols, NSArray)
+RCT_EXPORT_VIEW_PROPERTY(camera, NSArray)
+RCT_EXPORT_VIEW_PROPERTY(fond, NSString)
+@end
+
+/*
   LE TELEMETRE LASER — un emetteur : c est l appareil qui parle quand on
   appuie sur SON bouton, pas l application qui l interroge.
 */

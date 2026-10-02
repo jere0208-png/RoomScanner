@@ -13824,6 +13824,63 @@ en fin de description, comme dans l'application.
 Elle se termine par **ce qu'il faut régler avant la soumission** — le popup
 de l'avis contre un relevé, qui y figurait en tête, est retiré depuis.
 
+### 7 — L'exploration passe au natif (SceneKit)
+
+Relevé du patron, l'IPA en main : « l'exploration n'est pas du tout fluide
+lorsqu'on se déplace s'il y a un minimum d'éléments (...) le sol en parquet
+apparaît mal aussi, selon la vue, il disparaît (...) fais quelque chose de
+fluide et fiable, quitte à revoir le modélisme 3D ».
+
+Les deux défauts ont la même cause : la vue à la première personne était
+**peinte en JavaScript** — six cents faces projetées, triées comme un
+peintre, envoyées au canevas, à chaque image. L'économie de l'étape 5
+(réutiliser l'ordre en marchant) divisait le tri par deux ; elle ne changeait
+rien au reste, et sur le téléphone, Hermes ne compile pas à la volée. Quant
+au parquet, ses lames étaient des traits posés un souffle au-dessus du sol :
+un tri qui range les faces sur UN nombre les laissait tomber derrière lui dès
+qu'on les regardait de biais.
+
+**On ne peint plus en JavaScript.** La scène — la même que la maquette,
+`buildScene` : murs percés de leurs baies, meubles, sols, plafonds, teintes
+relevées au scan — est découpée en triangles (`geometry/visite3d.ts`) et
+remise **une fois** à SceneKit, le moteur 3D d'iOS
+(`RoomScanVisite.swift`), qui la tient sur la carte graphique. Ensuite seule
+la caméra voyage : six nombres par image, soixante fois par seconde. La
+profondeur se juge au pixel, par le matériel : rien ne passe plus devant ce
+qui est devant.
+
+| | Avant | Maintenant |
+|---|---|---|
+| Par image | projeter, trier, grouper, envoyer ~600 faces | envoyer 6 nombres |
+| Profondeur | tri du peintre (un nombre par face) | tampon de profondeur (au pixel) |
+| Parquet, carrelage | des traits au-dessus du sol | une **texture** à l'échelle réelle (lame 22 cm × 1,35 m, abouts décalés ; carreau 60 cm), répétée — elle ne peut pas disparaître |
+| Angles, contact au sol | arêtes tracées, ombres décalquées | lumière à trois sources et occlusion ambiante |
+| Préchargement | la 3D se calculait en entrant | les triangles se calculent **avant** d'entrer, pendant qu'on regarde le plan, et ne changent qu'avec lui |
+
+**La droite est à droite.** En relisant le repère de l'œil pour l'aligner sur
+SceneKit : il mettait +x à droite de qui regarde +z. Or le plan est une vue
+de dessus — x vers la droite, z vers le bas de la feuille — et la droite de
+qui regarde +z est −x. La vue JavaScript était le **miroir** du plan : une
+porte à gauche sur la mini-carte sortait à droite sous les yeux. Corrigé par
+le produit vectoriel (droite = avant × haut), manette et regard réalignés ;
+SceneKit, lui, ne se trompait pas de main.
+
+Sans le natif (banc d'essai), la vue en JavaScript tient toujours lieu : les
+bancs de l'étape 4 continuent de l'éprouver. Les ombres portées de la maquette
+ne partent pas en natif (elles se battraient avec le sol au pixel) ; les
+arêtes non plus.
+
+Bancs : `visite3d.test.ts` (découpe d'un sol en L sans triangle hors de la
+pièce, orientation sol/plafond/murs, parquet envoyé comme matière et non
+comme traits, douze nombres finis par triangle, droite = avant × haut, le
+pont et la vue Swift bien branchés) et `visitenative.test.tsx` (triangles
+prêts à l'ouverture, caméra à hauteur d'œil qui avance avec la manette, la
+scène n'est pas recalculée au pas, rien n'est peint en JavaScript derrière).
+
+Ce qui ne se vérifie pas ici : le rendu lui-même — la vue SceneKit ne
+s'exécute que sur l'iPhone. Les lumières, l'ouverture et la texture sont
+réglées au jugé ; c'est l'IPA qui tranche.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro
