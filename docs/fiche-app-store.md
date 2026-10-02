@@ -103,14 +103,9 @@ réduit lui-même pour les écrans plus petits.
 Ces points ne sont pas des textes : ce sont des refus probables à la revue, ou
 des trous de configuration. À cocher un par un.
 
-- [ ] **L'avis contre un relevé doit disparaître.** Le popup « laissez un avis,
-      gagnez un relevé » récompense un avis : c'est explicitement interdit par
-      les règles de l'App Store (avis incités) et c'est un motif de refus — voire
-      de retrait du compte développeur en cas de récidive. À retirer avant
-      d'envoyer la première version (je peux le faire : demandez-le).
-- [ ] **L'identifiant de l'app dans l'URL d'avis** : elle porte encore un
-      identifiant gabarit, à remplacer par celui qu'App Store Connect attribue
-      à la création de la fiche.
+- [x] **L'avis contre un relevé est retiré.** Le popup « laissez un avis,
+      gagnez un relevé » récompensait un avis, ce que les règles de l'App
+      Store interdisent. Il n'existe plus, ni son URL d'avis.
 - [ ] **Les deux abonnements** `echoplan.pro.mensuel` et `echoplan.pro.annuel`
       créés dans App Store Connect, avec leur prix (4,90 € / 49 €), et joints à
       la première version.

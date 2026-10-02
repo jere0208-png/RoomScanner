@@ -44,15 +44,13 @@ jest.mock('../src/native/account', () => ({
 import React from 'react';
 import { Image, StyleSheet, Text, TextInput, type ViewStyle } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
-import { LinearGradient, Mask, Path, Stop, Text as SvgText } from 'react-native-svg';
+import { LinearGradient, Mask, Stop, Text as SvgText } from 'react-native-svg';
 import { PaywallScreen } from '../src/screens/PaywallScreen';
 import { BadgePro } from '../src/components/BadgePro';
 import { ContourVif, BLEUS, TexteVif } from '../src/components/ContourVif';
 import { dark, light } from '../src/theme';
 import { EssaiEpuise } from '../src/components/EssaiEpuise';
 import { SurprisePro } from '../src/components/SurprisePro';
-import { AvisRecompense } from '../src/components/AvisRecompense';
-import { SOLAIRES } from '../src/ui/solaires';
 import { SignInScreen } from '../src/screens/SignInScreen';
 import { HomeScreen } from '../src/screens/HomeScreen';
 import { ProfilScreen } from '../src/screens/ProfilScreen';
@@ -616,66 +614,48 @@ describe('la surprise Pro', () => {
 });
 
 /*
- * L'AVIS CONTRE UN ESSAI — l'offre de la dernière chance.
+ * PLUS D'AVIS CONTRE UN ESSAI.
  *
- * Relevé du patron : refuser l'offre de réduction propose de laisser un
- * avis App Store, contre UN relevé supplémentaire. ATTENTION revue Apple :
- * récompenser un avis est contraire aux règles (avis incités) — le patron
- * est prévenu, l'app assume en attendant la soumission.
+ * Refuser l'offre de réduction proposait de laisser un avis App Store
+ * contre UN relevé de plus. Les règles de l'App Store interdisent de
+ * récompenser un avis : c'était un refus à la revue, voire pire en cas de
+ * récidive. Le popup est retiré ; refuser l'offre referme, simplement.
+ *
+ * Le relevé déjà gagné par ceux qui avaient laissé leur avis, lui, reste
+ * acquis : c'est un dû, on ne le reprend pas.
  */
-describe('l’avis contre un essai', () => {
-  it('refuser la surprise, essai épuisé, propose l’avis — pas avant', () => {
-    useAccountStore.setState({
-      surpriseVisible: true,
-      avisVisible: false,
-      avisDonne: false,
-      plansUtilises: 1,
-      pro: false,
-    });
+describe('plus d’avis contre un essai', () => {
+  it('refuser la surprise, essai épuisé, referme — sans rien proposer', () => {
+    useAccountStore.setState({ surpriseVisible: true, plansUtilises: 1, pro: false });
     act(() => useAccountStore.getState().fermerSurprise());
-    expect(useAccountStore.getState().avisVisible).toBe(true);
-    // À la première inscription, l'essai est encore là : pas d'avis à
-    // acheter, on laisse l'utilisateur découvrir l'app.
-    useAccountStore.setState({
-      surpriseVisible: true,
-      avisVisible: false,
-      plansUtilises: 0,
-    });
-    act(() => useAccountStore.getState().fermerSurprise());
-    expect(useAccountStore.getState().avisVisible).toBe(false);
+    const s = useAccountStore.getState() as unknown as Record<string, unknown>;
+    expect(s.surpriseVisible).toBe(false);
+    expect(s.avisVisible).toBeUndefined();
+    expect(s.donnerAvis).toBeUndefined();
   });
 
-  it('l’avis débloque UN essai, une seule fois', () => {
-    useAccountStore.setState({
-      avisVisible: true,
-      avisDonne: false,
-      bonusEssais: 0,
-      plansUtilises: 1,
-      pro: false,
-    });
-    expect(useAccountStore.getState().peutCreerPlan()).toBe(false);
-    act(() => useAccountStore.getState().donnerAvis());
-    const s = useAccountStore.getState();
-    expect(s.avisVisible).toBe(false);
-    expect(s.avisDonne).toBe(true);
-    expect(s.bonusEssais).toBe(1);
-    expect(s.peutCreerPlan()).toBe(true);
-    // L'essai bonus consommé, refuser à nouveau ne rejoue rien : un avis
-    // ne se laisse qu'une fois.
-    useAccountStore.setState({ surpriseVisible: true, plansUtilises: 2 });
-    act(() => useAccountStore.getState().fermerSurprise());
-    expect(useAccountStore.getState().avisVisible).toBe(false);
+  it('le relevé déjà gagné reste acquis', () => {
+    useAccountStore.setState({ bonusEssais: 1, plansUtilises: 1, pro: false });
+    expect(useAccountStore.getState().peutCreerPlan()).toBe(true);
+    useAccountStore.setState({ bonusEssais: 0 });
   });
 
-  it('montre cinq étoiles d’or et les deux gestes', () => {
-    useAccountStore.setState({ avisVisible: true });
-    const t = monter(<AvisRecompense />);
-    const etoiles = t.root
-      .findAllByType(Path)
-      .filter((n) => n.props.d === SOLAIRES.etoile);
-    expect(etoiles).toHaveLength(5);
-    expect(bouton(t, 'Laisser un avis')).toBeDefined();
-    expect(bouton(t, 'Plus tard')).toBeDefined();
+  it('et plus rien dans l’app n’ouvre la page « Rédiger un avis »', () => {
+    const fs = require('node:fs') as typeof import('node:fs');
+    const path = require('node:path') as typeof import('node:path');
+    const fichiers: string[] = [];
+    const parcourir = (d: string) => {
+      for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+        const p = path.join(d, e.name);
+        if (e.isDirectory()) parcourir(p);
+        else if (/\.(ts|tsx)$/.test(e.name)) fichiers.push(p);
+      }
+    };
+    parcourir(path.join(__dirname, '..', 'src'));
+    fichiers.push(path.join(__dirname, '..', 'App.tsx'));
+    for (const f of fichiers) {
+      expect(fs.readFileSync(f, 'utf8')).not.toMatch(/write-review|AvisRecompense/);
+    }
   });
 });
 

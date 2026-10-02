@@ -19,7 +19,6 @@ import { GammeScreen } from './src/screens/GammeScreen';
 import { reprendreLesTarifs } from './src/net/tarifs';
 import { EssaiEpuise } from './src/components/EssaiEpuise';
 import { SurprisePro } from './src/components/SurprisePro';
-import { AvisRecompense } from './src/components/AvisRecompense';
 import { AlerteHote } from './src/components/AlerteHote';
 import { AstuceHote } from './src/components/AstuceHote';
 import { GardeFou } from './src/components/GardeFou';
@@ -279,7 +278,6 @@ function Application() {
         <PremierLancement onFini={() => marquerPremiere('accueil')} />
       )}
       <SurprisePro />
-      <AvisRecompense />
       {/* Nos alertes à nous : voir `src/ui/alerte.ts`. Montée ici parce
           qu'un message d'erreur doit survivre à l'écran qui l'a levé — on
           apprend souvent EN QUITTANT qu'un enregistrement a échoué. */}

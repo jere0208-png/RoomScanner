@@ -58,9 +58,6 @@ jest.mock('../src/screens/SignInScreen', () => ({ SignInScreen: () => null }));
 jest.mock('../src/screens/PaywallScreen', () => ({ PaywallScreen: () => null }));
 jest.mock('../src/components/EssaiEpuise', () => ({ EssaiEpuise: () => null }));
 jest.mock('../src/components/SurprisePro', () => ({ SurprisePro: () => null }));
-jest.mock('../src/components/AvisRecompense', () => ({
-  AvisRecompense: () => null,
-}));
 
 import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';

@@ -1521,16 +1521,13 @@ Pro et le bouton d'achat prennent la surface du thème — deux dalles
 blanches sur fond sombre éblouissaient — et le contour vif reste : c'est
 lui, la signature.
 
-**Refuser l'offre ouvre la dernière chance : un avis contre un essai.**
-Quand l'essai est épuisé (jamais à la première inscription — l'utilisateur
-a encore son relevé) et qu'on repousse la surprise, un popup aux cinq
-étoiles d'or propose de laisser un avis App Store contre UN relevé
-supplémentaire. Le bonus s'encaisse SUR L'HONNEUR — aucune API ne dit si
-l'avis a été posté —, une seule fois, et il survit au redémarrage.
-ATTENTION REVUE APPLE : récompenser un avis est contraire aux règles de
-l'App Store (avis incités) ; le patron est prévenu, à revoir avant la
-soumission. L'URL d'avis porte un identifiant GABARIT tant que la fiche
-App Store Connect n'existe pas.
+**L'avis contre un essai est retiré.** Refuser la surprise ouvrait un popup
+aux cinq étoiles d'or : un avis App Store contre UN relevé supplémentaire.
+Les règles de l'App Store interdisent de récompenser un avis — c'était un
+refus assuré à la revue. Refuser l'offre referme désormais, simplement. Le
+relevé déjà gagné par ceux qui avaient laissé leur avis reste acquis
+(`bonusEssais`, c'est un dû). Banc : `paywall.test.tsx`, qui vérifie aussi
+que plus rien dans `src/` n'ouvre la page « Rédiger un avis ».
 
 **Le profil est un bloc, en haut à gauche** — et il s'est ÉPURÉ en trois
 retouches du patron : l'avatar Solar et le prénom, RIEN d'autre. La barre
@@ -13824,9 +13821,8 @@ les catégories ; l'ordre et la légende des six captures — les trois premièr
 celles des résultats de recherche, sans un sigle électrique. Le métier arrive
 en fin de description, comme dans l'application.
 
-Elle se termine par **ce qu'il faut régler avant la soumission** — au premier
-rang, le popup qui offre un relevé contre un avis : les règles de l'App Store
-interdisent les avis récompensés, c'est un refus probable.
+Elle se termine par **ce qu'il faut régler avant la soumission** — le popup
+de l'avis contre un relevé, qui y figurait en tête, est retiré depuis.
 
 ## Prérequis pour tester sur iPhone
 
