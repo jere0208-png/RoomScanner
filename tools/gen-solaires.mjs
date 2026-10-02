@@ -207,6 +207,14 @@ const CHOIX = {
   // --- la pastille de contrôle des normes, et son geste de correction
   bouclier: ['shield-check-bold', 'shield-star-bold', 'shield-bold'],
   baguette: ['magic-stick-3-bold', 'magic-stick-bold', 'stars-bold'],
+  /*
+    L'EXPLORATION — un marcheur, refonte grand public.
+
+    On entre dans la pièce et l'on s'y promène : la silhouette qui marche dit
+    le geste mieux qu'un œil (on ne regarde pas, on y va) et mieux qu'un cube
+    (on n'est plus devant la maquette, on est dedans).
+  */
+  marcher: ['walking-bold'],
 };
 
 async function tracer(nom) {

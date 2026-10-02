@@ -193,6 +193,15 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     shadowOpacity: 0.1,
   },
   vuePastilleTexte: { color: c.ink, fontSize: 14, fontWeight: '800' },
+  /*
+    L'EXPLORATION, EN BLEU PLEIN — la seule pastille pleine de la rangée.
+
+    Les autres disent un ÉTAT (la vue, l'étage, le prix, le verdict) ; celle-ci
+    est une INVITATION, et c'est la fonction qu'on montre : elle doit se voir
+    du premier coup d'œil sur un plan qu'on vient de relever.
+  */
+  explorerPastille: { backgroundColor: c.blue, gap: 6, paddingHorizontal: 13 },
+  explorerPastilleTexte: { color: '#FFFFFF', fontSize: 14, fontWeight: '800' },
   canvas: { flex: 1, ...shadowCard, borderRadius: radius.lg },
   // Jusqu'à neuf pastilles : la barre défile plutôt que de se replier sur
   // deux rangs et de manger le plan.

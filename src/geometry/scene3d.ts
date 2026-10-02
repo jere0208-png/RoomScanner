@@ -11,6 +11,7 @@ import {
   estTraversante,
   pointOnSeg,
   roomOf,
+  roomHeight,
   roomParts,
   toFootprint,
   wallQuads,
@@ -62,6 +63,12 @@ export interface Face3D {
   /** Biais de tri (m), pour départager deux faces à la même profondeur. */
   bias?: number;
   isFloor?: boolean;
+  /**
+   * UN PLAFOND — émis seulement quand on se tient DANS le logement (voir
+   * `SceneOptions.plafonds`). Sa normale regarde le sol : vu d'en haut, la
+   * maquette ne le dessine jamais.
+   */
+  isCeiling?: boolean;
   /**
    * Face extérieure d'un mur : celle qui tourne le dos à sa pièce.
    *
@@ -1353,6 +1360,17 @@ export interface SceneOptions {
    * on veut la voir — c'est la seule raison pour laquelle on l'a choisie.
    */
   peintures?: Record<string, string | undefined>;
+  /**
+   * LES PLAFONDS DES PIÈCES — pour l'exploration à la première personne.
+   *
+   * La maquette se regarde d'en haut : un plafond n'y aurait aucun sens, il
+   * cacherait tout. Mais dès qu'on se tient DANS le logement, à hauteur
+   * d'œil, il en faut un : sans lui, on voit le vide par-dessus les murs, et
+   * la pièce se lit comme un décor de théâtre ouvert sur le ciel. Leur
+   * normale regarde le sol, si bien qu'une maquette vue d'en haut ne les
+   * dessine de toute façon jamais.
+   */
+  plafonds?: boolean;
   /** Appareillage électrique posé sur les faces de murs. */
   fixtures?: Fixture[];
   /**
@@ -1855,6 +1873,22 @@ export function buildScene(
       fondMatiere ??
       pal.floor;
     const surface = part.surface;
+    if (surface && opts.plafonds) {
+      /*
+        Le plafond suit le contour de la pièce, à SA hauteur — une
+        mezzanine et un séjour n'ont pas la même. On inverse l'ordre des
+        sommets pour que la face regarde vers le bas, et la normale le dit
+        aussi : c'est elle que lit la règle des faces de dos.
+      */
+      const hp = roomHeight(part.walls) || 2.5;
+      faces.push({
+        pts: [...surface.pts].reverse().map((p) => ({ x: p.x, y: hp, z: p.z })),
+        fill: mixHex(pal.wall, '#FFFFFF', 0.35),
+        stroke: null,
+        normal: { x: 0, y: -1, z: 0 },
+        isCeiling: true,
+      });
+    }
     if (surface && opts.showSurfaces) {
       faces.push({
         pts: surface.pts.map((p) => ({ x: p.x, y: 0, z: p.z })),

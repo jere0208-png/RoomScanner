@@ -524,6 +524,15 @@ export function Iso3DView({
   );
   const colorOpenings = useScanStore((s) => s.showOpeningColors);
   const showSurfaces = useScanStore((s) => s.showSurfaces);
+  /*
+    DEDANS — l'œil est-il DANS le logement ?
+
+    Un booléen, et non la caméra : elle change à chaque pas de l'exploration,
+    et la scène — le calcul le plus lourd de la vue — se rebâtirait trente
+    fois par seconde. Être dedans ou dehors, en revanche, ne change qu'à
+    l'entrée et à la sortie.
+  */
+  const dedans = !!pov;
   const showTextures = useScanStore((s) => s.showTextures);
   const solidWallsReglage = useScanStore((s) => s.solidWalls);
   // La présentation impose l'écorché ; ailleurs, c'est le réglage qui décide.
@@ -1077,7 +1086,13 @@ export function Iso3DView({
         : buildScene(keptWalls, keptOpenings, keptObjects, {
             palette,
             colorOpenings,
-            showSurfaces,
+            /*
+              DEDANS, IL FAUT UN SOL ET UN PLAFOND — voir l'exploration.
+              Le calque « Surfaces » éteint ne vaut que pour la maquette vue
+              d'en haut ; à hauteur d'œil, sans sol, on marcherait sur le vide.
+            */
+            showSurfaces: showSurfaces || dedans,
+            plafonds: dedans,
             showTextures,
             floors,
             rooms,
@@ -1129,6 +1144,7 @@ export function Iso3DView({
       palette,
       colorOpenings,
       showSurfaces,
+      dedans,
       showTextures,
       floors,
       rooms,
@@ -1254,7 +1270,15 @@ export function Iso3DView({
     };
     const polys = faces
       .filter((face) =>
-        pov ? !dosTourne(face, pov.at) && !face.isFloor : !isHiddenFace(face, cam),
+        /*
+          LE SOL RESTE, DEDANS. Il était retranché quand la seule vue à la
+          première personne était une présentation qui défilait à hauteur de
+          mur ; pour marcher, sans lui on avance au-dessus du vide. Il se
+          peint en PREMIER (voir `fond`), ce qui règle ce qui l'avait fait
+          exclure : un grand pan, dont la profondeur moyenne tombait au
+          milieu de la pièce, repeignait les meubles du fond.
+        */
+        pov ? !dosTourne(face, pov.at) : !isHiddenFace(face, cam),
       )
       /*
         UN MUR PRÉSENTÉ, C'EST LUI SEUL.
@@ -1305,7 +1329,9 @@ export function Iso3DView({
       // Écorché : un mur qui nous fait face s'efface pour laisser voir la
       // pièce. Il garde son arête, donc sa présence.
       const voile =
-        !solidWalls && face.cutaway && face.normal
+        // Dedans, pas d'écorché : il se calcule pour la caméra de la
+        // maquette, et rendrait translucides les cloisons qu'on longe.
+        !pov && !solidWalls && face.cutaway && face.normal
           ? // Et ce qu'il masque décide de son voile : un mur vu de champ
             // qui coupe un meuble ne reste pas plein (voir `cutawayOpacity`).
             cutawayOpacity(face.normal, cam, masquesScene.get(face.panId ?? -1)?.cache)
@@ -1348,6 +1374,13 @@ export function Iso3DView({
           voile, sinon il ne voile rien.
         */
         cache: masqueDe(face.panId),
+        /*
+          LE FOND D'UNE PIÈCE VUE DE DEDANS — 2 pour un sol, 1 pour un
+          plafond, 0 pour le reste. Ils se peignent avant tout le reste (voir
+          plus bas) : rien n'est jamais derrière le sol sur lequel on marche,
+          ni derrière le plafond au-dessus de la tête.
+        */
+        fond: pov ? (face.isFloor ? 2 : face.isCeiling ? 1 : 0) : 0,
       };
       });
     // Ce que la coupe a entièrement retranché — une face derrière l'œil —
@@ -1403,7 +1436,12 @@ export function Iso3DView({
       memoire.faces !== faces;
     if (perime) {
       const t0 = Date.now();
-      ajusterBlocs(dessinables, false);
+      // Le fond n'a rien à départager avec le reste, et c'est le plus grand
+      // des pans : le laisser au classement exact coûterait sans rien gagner.
+      ajusterBlocs(
+        pov ? dessinables.filter((p) => p.fond === 0) : dessinables,
+        false,
+      );
       // Ce que ce classement vient de coûter décide du prochain seuil.
       coutTri.current = Date.now() - t0;
       const table = new Map<number, number>();
@@ -1497,7 +1535,20 @@ export function Iso3DView({
           name: string;
           area: string;
         };
-    const items: Item[] = dessinables.map((p) => ({ kind: 'poly' as const, ...p }));
+    /*
+      SOLS D'ABORD, PLAFONDS ENSUITE, LE RESTE PAR PROFONDEUR — dedans.
+
+      C'est la règle d'un intérieur, et elle vaut pour plusieurs pièces à la
+      fois : à travers une porte, le sol de la pièce voisine se peint en
+      premier, puis les murs proches le recouvrent partout sauf dans
+      l'embrasure. Sans elle, la profondeur moyenne d'un sol tombe au milieu
+      de sa pièce, et il repeint les meubles du fond.
+    */
+    const items: Item[] = dessinables.map((p) => ({
+      kind: 'poly' as const,
+      ...p,
+      depth: p.fond ? p.depth - p.fond * 1e7 : p.depth,
+    }));
     /*
       OÙ APPUYER POUR ALLUMER, ET OÙ LA LUMIÈRE SE POSE.
 

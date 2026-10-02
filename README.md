@@ -13732,6 +13732,48 @@ réponse — la déduction ne pourra plus allumer le mode dans le dos de
 quelqu'un qui a dit non. « Passer » reste possible à tout moment, et laisse le
 grand public.
 
+### 4 — L'exploration à la première personne
+
+Une pastille bleue **Explorer**, sur le plan comme en 3D, fait entrer dans le
+logement scanné, à hauteur d'œil (1,60 m) — comme dans un jeu mobile :
+
+- **pouce gauche** : une manette virtuelle ; la pousser vers le haut fait
+  avancer **dans le sens du regard**, pas vers le haut du plan. Vitesse de
+  marche (1,4 m/s), proportionnelle à l'inclinaison, avec une zone morte ;
+- **pouce droit** : on glisse n'importe où ailleurs pour tourner la tête et
+  lever ou baisser les yeux — jamais au-delà de ±34°, on ne se renverse pas ;
+- une **mini-carte** en coin, nord en haut, le point bleu et son cône de vue ;
+- **Terminer** referme ; on a regardé, rien n'a changé dans le plan.
+
+**Les collisions** sont toute la différence avec l'ancienne promenade, retirée
+parce qu'elle « butait » :
+
+| | Avant | Maintenant |
+|---|---|---|
+| Murs | un trait, avec les montants des portes en travers | des murs épais, coupés aux portes et aux passages ; les montants sont arrondis et **entonnent** dans l'ouverture |
+| Meubles | traversés | des volumes, posés exactement où la 3D les dessine (même rognage contre les murs) |
+| Contact | arrêt net | on **glisse** le long du mur ou du meuble, sans tremblement dans les coins |
+| Vitesse | un pas pouvait sauter un mur mince | pas découpés en demi-rayons : on ne traverse jamais |
+
+Ce qu'on enjambe et ce sous quoi on passe se règle à la hauteur : un tapis
+(moins de 8 cm) se franchit, un élément haut suspendu (au-delà de 90 cm du
+sol) laisse passer dessous. On entre par la plus grande pièce, en retrait,
+le dos au mur et la plus longue perspective devant soi — comme une visite
+d'agence commence au seuil. Un petit choc haptique signale la butée.
+
+Pour marcher dedans, la 3D a appris à **tenir un intérieur** : un sol sous les
+pieds et **un plafond par pièce**, à sa hauteur. Les plafonds regardent le sol,
+si bien que vue d'en haut, la maquette ne les montre jamais ; de dedans, ils
+se peignent en fond, derrière les murs et les meubles. Le champ de vision se
+règle sur la largeur de l'écran (68°), pas sur sa hauteur : sur un téléphone
+tenu droit, on voyait sinon la pièce par une meurtrière.
+
+Bancs : `exploration.test.ts` (franchir une porte à ±20 cm de son axe, longer
+un mur en diagonale, sortir d'un coin sans trembler, ne jamais traverser,
+enjamber un tapis, passer sous un élément haut, entrer en retrait) et
+`explorationecran.test.tsx` (pastille en 2D et 3D, hauteur d'œil, avancer dans
+le sens du regard, regard borné, Terminer, plafonds).
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

@@ -33,6 +33,8 @@ import {
 export type ToolIcon =
   /* La nuit de la maquette : on éteint pour voir les lumières s'allumer. */
   | 'lune'
+  /* L'exploration : on entre dans la pièce et l'on s'y promène. */
+  | 'marcher'
   | 'plafond'
   | 'note'
   | 'save'

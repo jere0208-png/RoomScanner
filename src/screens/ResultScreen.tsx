@@ -34,6 +34,7 @@ import { ExportSheet } from './result/ExportSheet';
 import { FurnitureSheet } from './result/FurnitureSheet';
 import { PhotoSheet } from './result/PhotoSheet';
 import { PeintureSheet } from './result/PeintureSheet';
+import { Exploration } from '../components/Exploration';
 import { RenameSheet } from './result/RenameSheet';
 import { RoomNameSheet } from './result/RoomNameSheet';
 import { Toolbar2D, Toolbar3D } from './result/ResultToolbar';
@@ -1281,6 +1282,8 @@ export function ResultScreen() {
     les deux pastilles du plan, son menu, son export, la fête des normes.
   */
   const modeElec = useModeElec();
+  /** L'exploration à la première personne est ouverte. */
+  const [explorant, setExplorant] = useState(false);
   const canvasRef = useRef<View>(null);
   const partageEnAttente = useRef<null | (() => void)>(null);
 
@@ -3951,6 +3954,30 @@ export function ResultScreen() {
               le menu « … » avec les autres actions du plan — on ne part pas
               scanner un étage par mégarde en visant le sélecteur.
             */}
+            {/*
+              EXPLORER — ENTRER DANS LA PIÈCE.
+
+              Relevé du patron : « un vrai mode où l'on rentre dans la pièce
+              créée ». Il vit dans cette rangée, à côté de la bascule 2D/3D,
+              parce qu'il est un troisième regard sur le même relevé — et
+              qu'ici, il se voit dans les deux vues dès qu'un plan s'ouvre.
+              Pas de murs, rien où marcher : la pastille se tait.
+            */}
+            {walls.length > 0 && (
+              <TouchableOpacity
+                style={[styles.vuePastille, styles.explorerPastille]}
+                accessibilityLabel="Explorer"
+                accessibilityHint="Entrer dans la pièce et s’y promener"
+                onPress={() => {
+                  haptic('leger');
+                  setExplorant(true);
+                }}>
+                <Svg width={16} height={16} viewBox="0 0 24 24">
+                  <Trace d={SOLAIRES.marcher} fill="#FFFFFF" fillRule="evenodd" />
+                </Svg>
+                <Text style={styles.explorerPastilleTexte}>Explorer</Text>
+              </TouchableOpacity>
+            )}
             {niveaux.length > 1 && (
               <TouchableOpacity
                 style={styles.vuePastille}
@@ -5191,6 +5218,9 @@ export function ResultScreen() {
       />
 
       {/* ---------- Catalogue de mobilier ---------- */}
+      {/* ---------- Entrer dans la pièce ---------- */}
+      <Exploration visible={explorant} onClose={() => setExplorant(false)} />
+
       {/* ---------- Peindre les murs d'une pièce ---------- */}
       <PeintureSheet
         visible={peignant && !!targetRoom}

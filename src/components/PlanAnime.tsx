@@ -33,7 +33,7 @@
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, View } from 'react-native';
-import Svg, { Circle, G, Line, Path, Polygon, Text as SvgText } from 'react-native-svg';
+import Svg, { G, Line, Polygon, Text as SvgText } from 'react-native-svg';
 import type { Palette } from '../theme';
 
 const ALine = Animated.createAnimatedComponent(Line);
