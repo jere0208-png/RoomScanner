@@ -13898,8 +13898,10 @@ quatre postes tournaient pour rien :
 
 **Et l'on mesure.** À la fin de chaque scan, le natif rend sa durée, la
 batterie consommée (à 1 % près, c'est ce qu'iOS donne) et l'état thermique ;
-le **Diagnostic** (Profil) l'affiche : « 5 min 12 s · −4 % de batterie ·
-iPhone tiède ». C'est le chiffre qui dira si une version fait mieux — et si
+le **Diagnostic** (Profil, tout en bas) l'affiche : « 5 min 12 s · −4 % de
+batterie · iPhone tiède » — et un bandeau le dit **tout de suite après le
+scan**, avec le maillage relevé (« · maillage LiDAR 38 ancres »), là où l'on
+est déjà : relevé du patron, « je ne vois pas le diagnostic sur l'app ». C'est le chiffre qui dira si une version fait mieux — et si
 l'étape suivante, le maillage LiDAR, coûte.
 
 Honnêtement : ces quatre postes font 10 à 20 % de la dépense d'un scan, pas

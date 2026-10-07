@@ -1,10 +1,11 @@
 import { useEffect } from 'react';
-import { RoomScan, scanEvents, type ScanUpdate } from 'react-native-room-scan';
+import { RoomScan, scanEvents, type ScanResult, type ScanUpdate } from 'react-native-room-scan';
 import { useScanStore } from '../store/scanStore';
 import { roomSurface } from '../geometry/floorplan';
 import { astuce } from '../ui/astuce';
 import { useAccountStore } from '../store/accountStore';
 import { usePannes } from '../ui/journalPannes';
+import { phraseEnergie } from '../ui/energie';
 
 /** Instructions RoomPlan (enum Swift) → libellés français. */
 const INSTRUCTIONS_FR: Record<string, string> = {
@@ -117,6 +118,27 @@ export function useRoomScan() {
  * rien donné de nommable — un balayage trop court, un couloir seul — on ne dit
  * rien : une fête sur un plan vide serait une moquerie.
  */
+/**
+ * CE QUE LE SCAN A COÛTÉ, DIT TOUT DE SUITE.
+ *
+ * Relevé du patron : « je ne vois pas le diagnostic sur l'app ». Il est au
+ * fond de la page Profil — la bonne place pour un journal, la mauvaise pour
+ * une mesure qu'on veut lire en posant le téléphone. Elle passe donc aussi
+ * en bandeau, juste après le résumé du relevé, là où l'on est déjà.
+ */
+function annoncerLaDepense(r: ScanResult) {
+  if (!r.energie) return;
+  const bouts = [phraseEnergie(r.energie)];
+  if (r.maillage) {
+    bouts.push(
+      r.maillage.ancres > 0
+        ? `maillage LiDAR ${r.maillage.ancres} ancre${r.maillage.ancres > 1 ? 's' : ''}`
+        : 'pas de maillage LiDAR',
+    );
+  }
+  astuce(bouts.join(' · '), { icone: 'elec' });
+}
+
 function resumerLeReleve() {
   const st = useScanStore.getState();
   const pieces = st.rooms.length;
@@ -218,6 +240,7 @@ function resumerLeReleve() {
           lui, ne saurait pas d'où l'on vient.
         */
         resumerLeReleve();
+        annoncerLaDepense(result);
       } catch (e: any) {
         store.setProcessing(false);
         store.setComplement(false);

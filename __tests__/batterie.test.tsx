@@ -46,6 +46,7 @@ import { JournalSheet } from '../src/components/JournalSheet';
 import { useScanStore } from '../src/store/scanStore';
 import { usePannes } from '../src/ui/journalPannes';
 import { phraseEnergie } from '../src/ui/energie';
+import { useAstuce } from '../src/ui/astuce';
 
 const racine = join(__dirname, '..');
 const lire = (p: string) => readFileSync(join(racine, p), 'utf8');
@@ -162,7 +163,9 @@ describe('et l’on mesure', () => {
       objects: [],
       modelPath: '',
       energie: { secondes: 200, batterie: 3, thermique: 'frais' },
+      maillage: { ancres: 12, faces: 4000, sommets: 2100, classe: true },
     });
+    act(() => useAstuce.setState({ courante: null, file: [] }));
     act(() => {
       useScanStore.getState().reset();
       useScanStore.setState({ screen: 'scan', scanning: true, paused: false, processing: false });
@@ -182,6 +185,11 @@ describe('et l’on mesure', () => {
     expect(d).not.toBeNull();
     expect(d!.secondes).toBe(200);
     expect(d!.batterie).toBe(3);
+    // Et le bandeau le dit tout de suite, à l'écran où l'on est — relevé
+    // du patron : « je ne vois pas le diagnostic sur l'app ».
+    const a = useAstuce.getState();
+    const bandeaux = [a.courante, ...a.file].filter(Boolean).map((x) => x!.texte);
+    expect(bandeaux.some((x) => x.includes('3 min 20 s') && x.includes('−3 %') && x.includes('12 ancres'))).toBe(true);
     act(() => arbre?.unmount());
     arbre = null;
 
