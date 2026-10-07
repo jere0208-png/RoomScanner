@@ -18,7 +18,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 import React from 'react';
-import { Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import { ResultScreen } from '../src/screens/ResultScreen';
 import { Iso3DView } from '../src/components/Iso3DView';
@@ -90,67 +90,55 @@ const camera = (t: TestRenderer.ReactTestRenderer) =>
   t.root.findAllByType(Iso3DView).find((n) => !!n.props.pov)?.props.pov;
 
 /*
-  UN DOIGT CRÉDIBLE POUR LE `PanResponder` — le piège que la maison connaît
-  par cœur : il IGNORE l'état de geste qu'on lui passe et le recalcule depuis
-  `e.touchHistory`. On lui donne donc un historique où le doigt est parti
-  d'un point, et se trouve maintenant à un autre.
-*/
-let horloge = 1000;
-const doigt = (x0: number, y0: number, x: number, y: number, actif = true) => {
-  horloge += 16;
-  return {
-    nativeEvent: {
-      touches: actif ? [{ identifier: 0, pageX: x, pageY: y, locationX: x0, locationY: y0 }] : [],
-      changedTouches: [{ identifier: 0, pageX: x, pageY: y }],
-      identifier: 0,
-      pageX: x,
-      pageY: y,
-      locationX: x0,
-      locationY: y0,
-      timestamp: horloge,
-    },
-    touchHistory: {
-      touchBank: [
-        {
-          touchActive: actif,
-          startPageX: x0,
-          startPageY: y0,
-          startTimeStamp: 1000,
-          currentPageX: x,
-          currentPageY: y,
-          currentTimeStamp: horloge,
-          previousPageX: x0,
-          previousPageY: y0,
-          previousTimeStamp: horloge - 16,
-        },
-      ],
-      numberActiveTouches: actif ? 1 : 0,
-      indexOfSingleActiveTouch: 0,
-      mostRecentTimeStamp: horloge,
-    },
-  };
-};
+  DEUX POUCES SUR UNE SEULE VUE.
 
-const zone = (t: TestRenderer.ReactTestRenderer, label: string) =>
+  La manette et le regard étaient deux responders, et React Native n'en
+  accorde qu'un à la fois : « on ne peut pas se déplacer et tourner en même
+  temps ». Une seule vue reçoit désormais tous les doigts et les départage
+  par leur identifiant et leur moitié d'écran (à gauche on marche, à droite
+  on regarde). On lui parle donc comme le système : des listes de touches.
+  L'écran du banc fait 750 points de large : la moitié est à 375.
+*/
+const touche = (id: number, x: number, y: number) => ({
+  identifier: id,
+  pageX: x,
+  pageY: y,
+  locationX: x,
+  locationY: y,
+});
+const evenement = (touches: ReturnType<typeof touche>[]) => ({
+  nativeEvent: {
+    touches,
+    changedTouches: touches,
+    pageX: touches[0]?.pageX ?? 0,
+    pageY: touches[0]?.pageY ?? 0,
+    timestamp: Date.now(),
+  },
+});
+const pouces = (t: TestRenderer.ReactTestRenderer) =>
   t.root
     .findAllByType(View)
     .find(
       (n) =>
-        n.props.accessibilityLabel === label &&
+        n.props.accessibilityLabel === 'Marcher et regarder' &&
         typeof n.props.onResponderGrant === 'function',
     )!;
-
-/** Glisse un doigt dans une zone, de (0,0) à (dx,dy), et le garde posé. */
-const glisser = (z: TestRenderer.ReactTestInstance, dx: number, dy: number) => {
+const poser = (z: TestRenderer.ReactTestInstance, touches: ReturnType<typeof touche>[]) =>
   act(() => {
-    z.props.onStartShouldSetResponder(doigt(60, 60, 60, 60));
-    z.props.onResponderGrant(doigt(60, 60, 60, 60));
-    z.props.onResponderMove(doigt(60, 60, 60 + dx, 60 + dy));
+    z.props.onStartShouldSetResponder(evenement(touches));
+    z.props.onResponderGrant(evenement(touches));
   });
-};
-const lever = (z: TestRenderer.ReactTestInstance, dx: number, dy: number) => {
-  act(() => z.props.onResponderRelease(doigt(60, 60, 60 + dx, 60 + dy, false)));
-};
+const ajouter = (z: TestRenderer.ReactTestInstance, touches: ReturnType<typeof touche>[]) =>
+  act(() => z.props.onResponderStart(evenement(touches)));
+const bouger = (z: TestRenderer.ReactTestInstance, touches: ReturnType<typeof touche>[]) =>
+  act(() => z.props.onResponderMove(evenement(touches)));
+const lever = (z: TestRenderer.ReactTestInstance, restantes: ReturnType<typeof touche>[] = []) =>
+  act(() => {
+    if (restantes.length) z.props.onResponderEnd(evenement(restantes));
+    else z.props.onResponderRelease(evenement([]));
+  });
+const GAUCHE = { x: 120, y: 900 };
+const DROITE = { x: 560, y: 640 };
 
 describe('on y entre depuis le plan', () => {
   it('la pastille « Explorer » est sur le plan, en 2D comme en 3D', () => {
@@ -188,10 +176,11 @@ describe('les deux pouces', () => {
     const t = monter();
     presser(t, 'Explorer');
     const avant = camera(t);
-    const manette = zone(t, 'Marcher');
-    glisser(manette, 0, -50); // pouce poussé vers le haut : avancer
+    const z = pouces(t);
+    poser(z, [touche(0, GAUCHE.x, GAUCHE.y)]);
+    bouger(z, [touche(0, GAUCHE.x, GAUCHE.y - 50)]); // pouce poussé vers le haut : avancer
     act(() => jest.advanceTimersByTime(600));
-    lever(manette, 0, -50);
+    lever(z);
     act(() => jest.advanceTimersByTime(100));
     const apres = camera(t);
     const dx = apres.at.x - avant.at.x;
@@ -202,13 +191,30 @@ describe('les deux pouces', () => {
     expect((dx * f.x + dz * f.z) / Math.hypot(dx, dz)).toBeGreaterThan(0.8);
   });
 
+  it('la manette naît sous le pouce, en verre, et s’efface quand il se lève', () => {
+    const t = monter();
+    presser(t, 'Explorer');
+    const baton = () => t.root.findAll((n) => n.props?.accessibilityLabel === 'Manette');
+    expect(baton()).toHaveLength(0);
+    const z = pouces(t);
+    poser(z, [touche(0, GAUCHE.x, GAUCHE.y)]);
+    expect(baton().length).toBeGreaterThan(0);
+    // Elle est LÀ où le pouce s'est posé, pas dans un coin.
+    const style = StyleSheet.flatten(baton()[0].props.style) as { left: number; top: number };
+    expect(style.left).toBeCloseTo(GAUCHE.x - 58, 0);
+    expect(style.top).toBeCloseTo(GAUCHE.y - 58, 0);
+    lever(z);
+    expect(baton()).toHaveLength(0);
+  });
+
   it('pouce levé, plus rien ne bouge', () => {
     const t = monter();
     presser(t, 'Explorer');
-    const manette = zone(t, 'Marcher');
-    glisser(manette, 0, -50);
+    const z = pouces(t);
+    poser(z, [touche(0, GAUCHE.x, GAUCHE.y)]);
+    bouger(z, [touche(0, GAUCHE.x, GAUCHE.y - 50)]);
     act(() => jest.advanceTimersByTime(300));
-    lever(manette, 0, -50);
+    lever(z);
     act(() => jest.advanceTimersByTime(100));
     const pose = camera(t).at;
     act(() => jest.advanceTimersByTime(800));
@@ -219,9 +225,10 @@ describe('les deux pouces', () => {
     const t = monter();
     presser(t, 'Explorer');
     const avant = camera(t).yaw;
-    const regard = zone(t, 'Regarder autour');
-    glisser(regard, 120, 0);
-    lever(regard, 120, 0);
+    const z = pouces(t);
+    poser(z, [touche(0, DROITE.x, DROITE.y)]);
+    bouger(z, [touche(0, DROITE.x + 120, DROITE.y)]);
+    lever(z);
     act(() => jest.advanceTimersByTime(50));
     // Glisser vers la droite tourne vers la droite. Le lacet compte depuis
     // +z vers +x ; or la droite de qui regarde +z est −x (le plan est une
@@ -236,11 +243,54 @@ describe('les deux pouces', () => {
   it('et le regard ne se renverse jamais : ni le plafond, ni les pieds', () => {
     const t = monter();
     presser(t, 'Explorer');
-    const regard = zone(t, 'Regarder autour');
-    glisser(regard, 0, -4000);
-    lever(regard, 0, -4000);
+    const z = pouces(t);
+    poser(z, [touche(0, DROITE.x, DROITE.y)]);
+    bouger(z, [touche(0, DROITE.x, DROITE.y - 4000)]);
+    lever(z);
     act(() => jest.advanceTimersByTime(50));
     expect(Math.abs(camera(t).pitch)).toBeLessThanOrEqual(0.6 + 1e-9);
+  });
+
+  it('ET LES DEUX À LA FOIS : on marche en tournant la tête', () => {
+    /*
+      Relevé du patron : « on ne peut pas se déplacer et tourner en même
+      temps ». Deux doigts, un seul geste : le gauche pousse, le droit
+      glisse, dans le même événement — et la caméra avance ET tourne.
+    */
+    const t = monter();
+    presser(t, 'Explorer');
+    const avant = camera(t);
+    const z = pouces(t);
+    poser(z, [touche(0, GAUCHE.x, GAUCHE.y)]);
+    ajouter(z, [touche(0, GAUCHE.x, GAUCHE.y), touche(1, DROITE.x, DROITE.y)]);
+    for (let k = 1; k <= 6; k++) {
+      bouger(z, [
+        touche(0, GAUCHE.x, GAUCHE.y - 50),
+        touche(1, DROITE.x + 20 * k, DROITE.y),
+      ]);
+      act(() => jest.advanceTimersByTime(100));
+    }
+    lever(z, [touche(0, GAUCHE.x, GAUCHE.y - 50)]); // le droit se lève, le gauche pousse encore
+    act(() => jest.advanceTimersByTime(200));
+    lever(z);
+    act(() => jest.advanceTimersByTime(100));
+    const apres = camera(t);
+    expect(Math.hypot(apres.at.x - avant.at.x, apres.at.z - avant.at.z)).toBeGreaterThan(0.1);
+    expect(apres.yaw).toBeLessThan(avant.yaw - 0.3);
+  });
+
+  it('un doigt posé du mauvais côté prend le rôle qui reste', () => {
+    // Deux pouces à gauche : le second regarde quand même — on ne laisse
+    // pas un doigt sans emploi.
+    const t = monter();
+    presser(t, 'Explorer');
+    const avant = camera(t).yaw;
+    const z = pouces(t);
+    poser(z, [touche(0, GAUCHE.x, GAUCHE.y)]);
+    ajouter(z, [touche(0, GAUCHE.x, GAUCHE.y), touche(1, GAUCHE.x + 60, GAUCHE.y - 200)]);
+    bouger(z, [touche(0, GAUCHE.x, GAUCHE.y), touche(1, GAUCHE.x + 180, GAUCHE.y - 200)]);
+    lever(z);
+    expect(camera(t).yaw).toBeLessThan(avant - 0.3);
   });
 });
 

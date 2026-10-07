@@ -28,17 +28,19 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   Modal,
-  PanResponder,
   Pressable,
   StyleSheet,
   Text,
   View,
   useWindowDimensions,
+  type GestureResponderEvent,
 } from 'react-native';
 import Svg, { Circle, Line, Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RoomScanVisite } from 'react-native-room-scan';
 import { Iso3DView } from './Iso3DView';
+import { Verre } from './Verre';
+import { SOLAIRES } from '../ui/solaires';
 import { floorsOf, useScanStore } from '../store/scanStore';
 import { useModeElec } from '../store/usage';
 import { filtrerAuNiveau, type Pt } from '../geometry/floorplan';
@@ -138,93 +140,6 @@ const reperes = (lacet: number) => ({
 });
 
 /**
- * LA MANETTE — sous le pouce gauche.
- *
- * Elle tient SON état (la position du bouton) et n'écrit que dans une
- * référence : la bouger ne redessine pas la scène, qui ne se redessine qu'au
- * rythme de la boucle de marche. Un bouton qui suivrait le pouce en
- * redessinant tout le logement à chaque millimètre serait en retard sur lui.
- */
-function Manette({
-  surVecteur,
-  styles,
-  teinte,
-}: {
-  surVecteur: (v: { x: number; y: number }) => void;
-  styles: ReturnType<typeof getStyles>;
-  teinte: Palette;
-}) {
-  const [bouton, setBouton] = useState({ x: 0, y: 0 });
-  const centre = useRef({ x: 0, y: 0 });
-  const pan = useMemo(
-    () =>
-      PanResponder.create({
-        onStartShouldSetPanResponder: () => true,
-        onMoveShouldSetPanResponder: () => true,
-        onPanResponderTerminationRequest: () => false,
-        onPanResponderGrant: (e) => {
-          // Le centre est là où le pouce s'est posé dans la base : on ne
-          // vise pas le milieu exact d'un cercle qu'on ne regarde pas.
-          const { locationX, locationY } = e.nativeEvent;
-          centre.current = {
-            x: Number.isFinite(locationX) ? locationX : RAYON_MANETTE,
-            y: Number.isFinite(locationY) ? locationY : RAYON_MANETTE,
-          };
-          haptic('leger');
-        },
-        onPanResponderMove: (_e, g) => {
-          let dx = g.dx;
-          let dy = g.dy;
-          const d = Math.hypot(dx, dy);
-          if (d > RAYON_MANETTE) {
-            dx = (dx / d) * RAYON_MANETTE;
-            dy = (dy / d) * RAYON_MANETTE;
-          }
-          setBouton({ x: dx, y: dy });
-          const vx = dx / RAYON_MANETTE;
-          const vy = dy / RAYON_MANETTE;
-          const force = Math.hypot(vx, vy);
-          if (force < ZONE_MORTE) {
-            surVecteur({ x: 0, y: 0 });
-            return;
-          }
-          // Au-delà de la zone morte, la vitesse repart de zéro : sans ça,
-          // on démarrerait d'un coup à douze pour cent.
-          const k = (force - ZONE_MORTE) / (1 - ZONE_MORTE) / force;
-          surVecteur({ x: vx * k, y: vy * k });
-        },
-        onPanResponderRelease: () => {
-          setBouton({ x: 0, y: 0 });
-          surVecteur({ x: 0, y: 0 });
-        },
-        onPanResponderTerminate: () => {
-          setBouton({ x: 0, y: 0 });
-          surVecteur({ x: 0, y: 0 });
-        },
-      }),
-    [surVecteur],
-  );
-  return (
-    <View
-      {...pan.panHandlers}
-      accessibilityLabel="Marcher"
-      accessibilityHint="Poussez dans la direction où vous voulez aller"
-      style={styles.manette}>
-      <View
-        pointerEvents="none"
-        style={[
-          styles.manetteBouton,
-          {
-            transform: [{ translateX: bouton.x }, { translateY: bouton.y }],
-            backgroundColor: teinte.blue,
-          },
-        ]}
-      />
-    </View>
-  );
-}
-
-/**
  * LE POINT QUI SE BALADE — la mini-carte.
  *
  * Le plan tel qu'on l'a vu en 2D, nord en haut, et soi dessus : un point et
@@ -270,7 +185,7 @@ function MiniCarte({
   const g = cone(-1);
   const d = cone(1);
   return (
-    <View style={styles.carte} pointerEvents="none" accessibilityLabel="Plan">
+    <Verre style={styles.carte} epais pointerEvents="none" accessibilityLabel="Plan">
       <Svg width={T} height={T}>
         {murs.map((m, i) => {
           const a = px(m.a);
@@ -297,7 +212,7 @@ function MiniCarte({
         <Circle cx={ici.x} cy={ici.y} r={6} fill="#FFFFFF" />
         <Circle cx={ici.x} cy={ici.y} r={4.5} fill={teinte.blue} />
       </Svg>
-    </View>
+    </Verre>
   );
 }
 
@@ -522,38 +437,120 @@ export function Exploration({
     [],
   );
 
-  // Le regard : sous le pouce droit, on glisse et la tête tourne.
-  const departRegard = useRef({ lacet: 0, tangage: 0 });
-  const regard = useMemo(
-    () =>
-      PanResponder.create({
-        onStartShouldSetPanResponder: () => true,
-        onMoveShouldSetPanResponder: () => true,
-        onPanResponderGrant: () => {
-          departRegard.current = {
-            lacet: pose.current.lacet,
-            tangage: pose.current.tangage,
-          };
-        },
-        onPanResponderMove: (_e, g) => {
-          // Glisser vers la droite tourne vers la droite — c'est-à-dire vers
-          // −x quand on regarde +z : le lacet DÉCROÎT (voir `povBase`).
-          const lacet = departRegard.current.lacet - g.dx * SENSIBILITE;
-          const tangage = Math.max(
-            -TANGAGE_MAX,
-            Math.min(TANGAGE_MAX, departRegard.current.tangage - g.dy * SENSIBILITE),
-          );
-          pose.current = { ...pose.current, lacet, tangage };
-          setABouge(true);
-          montrer();
-        },
-        onPanResponderRelease: () => montrer(true),
-      }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
-  );
-
   const { width: largeur, height: hauteur } = useWindowDimensions();
+
+  /*
+    UN SEUL GESTE POUR LES DEUX POUCES.
+
+    Relevé du patron : « on ne peut pas se déplacer et tourner en même
+    temps ». La manette et le regard étaient deux responders, et React
+    Native n'en accorde qu'UN à la fois à toute l'application : le second
+    pouce frappait une porte fermée. Ici une seule vue reçoit tout, et c'est
+    elle qui départage les doigts — par leur identifiant, et par la moitié
+    de l'écran où ils se posent : à gauche on marche, à droite on regarde.
+    Deux doigts, deux rôles, un seul geste.
+
+    ET LA MANETTE NAÎT SOUS LE POUCE. Elle n'est plus un disque posé en bas
+    à gauche qui mange la vue : elle apparaît là où le pouce se pose, en
+    verre, et disparaît quand il se lève. Ce qui reste à l'écran au repos,
+    ce sont deux repères de verre, discrets, qui disent qu'on peut marcher
+    et tourner — pas où.
+  */
+  interface Doigt {
+    role: 'marche' | 'regard';
+    x0: number;
+    y0: number;
+    x: number;
+    y: number;
+  }
+  const doigts = useRef(new Map<number, Doigt>());
+  const [baton, setBaton] = useState<{ x: number; y: number; dx: number; dy: number } | null>(null);
+  const touchesDe = (e: GestureResponderEvent) =>
+    (e.nativeEvent.touches ?? []) as { identifier: number | string; pageX: number; pageY: number }[];
+  const accueillir = (e: GestureResponderEvent) => {
+    for (const t of touchesDe(e)) {
+      const id = Number(t.identifier);
+      if (doigts.current.has(id)) continue;
+      const roles = new Set([...doigts.current.values()].map((d) => d.role));
+      const aGauche = t.pageX < largeur / 2;
+      const voulu: Doigt['role'] = aGauche ? 'marche' : 'regard';
+      const autre: Doigt['role'] = aGauche ? 'regard' : 'marche';
+      // Le rôle de sa moitié d'écran, sinon l'autre s'il est libre.
+      const role = !roles.has(voulu) ? voulu : !roles.has(autre) ? autre : null;
+      if (!role) continue;
+      doigts.current.set(id, { role, x0: t.pageX, y0: t.pageY, x: t.pageX, y: t.pageY });
+      if (role === 'marche') {
+        setBaton({ x: t.pageX, y: t.pageY, dx: 0, dy: 0 });
+        haptic('leger');
+      }
+    }
+  };
+  const suivre = (e: GestureResponderEvent) => {
+    let regardBouge = false;
+    for (const t of touchesDe(e)) {
+      const d = doigts.current.get(Number(t.identifier));
+      if (!d) continue;
+      if (d.role === 'marche') {
+        let dx = t.pageX - d.x0;
+        let dy = t.pageY - d.y0;
+        const dist = Math.hypot(dx, dy);
+        if (dist > RAYON_MANETTE) {
+          dx = (dx / dist) * RAYON_MANETTE;
+          dy = (dy / dist) * RAYON_MANETTE;
+        }
+        setBaton({ x: d.x0, y: d.y0, dx, dy });
+        const vx = dx / RAYON_MANETTE;
+        const vy = dy / RAYON_MANETTE;
+        const force = Math.hypot(vx, vy);
+        if (force < ZONE_MORTE) surVecteur({ x: 0, y: 0 });
+        else {
+          const k = (force - ZONE_MORTE) / (1 - ZONE_MORTE) / force;
+          surVecteur({ x: vx * k, y: vy * k });
+        }
+      } else {
+        const ddx = t.pageX - d.x;
+        const ddy = t.pageY - d.y;
+        if (ddx !== 0 || ddy !== 0) {
+          // Glisser vers la droite tourne vers la droite — c'est-à-dire
+          // vers −x quand on regarde +z : le lacet DÉCROÎT (voir `povBase`).
+          const p = pose.current;
+          pose.current = {
+            ...p,
+            lacet: p.lacet - ddx * SENSIBILITE,
+            tangage: Math.max(-TANGAGE_MAX, Math.min(TANGAGE_MAX, p.tangage - ddy * SENSIBILITE)),
+          };
+          regardBouge = true;
+        }
+      }
+      d.x = t.pageX;
+      d.y = t.pageY;
+    }
+    if (regardBouge) {
+      setABouge(true);
+      montrer();
+    }
+  };
+  const lacher = (e: GestureResponderEvent) => {
+    const vivants = new Set(touchesDe(e).map((t) => Number(t.identifier)));
+    for (const id of [...doigts.current.keys()]) {
+      if (vivants.has(id)) continue;
+      const d = doigts.current.get(id)!;
+      doigts.current.delete(id);
+      if (d.role === 'marche') {
+        setBaton(null);
+        surVecteur({ x: 0, y: 0 });
+      } else {
+        montrer(true);
+      }
+    }
+  };
+  const toutLacher = () => {
+    doigts.current.clear();
+    setBaton(null);
+    surVecteur({ x: 0, y: 0 });
+    montrer(true);
+  };
+
   const camera = useMemo(
     () => ({
       at: { x: vue.x, y: HAUTEUR_OEIL, z: vue.z },
@@ -595,13 +592,63 @@ export function Exploration({
           )}
         </View>
 
-        {/* Le regard occupe tout l'écran SOUS la manette et la carte. */}
+        {/* Les deux pouces, une seule vue : voir « UN SEUL GESTE ». */}
         <View
           style={StyleSheet.absoluteFill}
-          accessibilityLabel="Regarder autour"
-          accessibilityHint="Glissez pour tourner la tête"
-          {...regard.panHandlers}
+          accessibilityLabel="Marcher et regarder"
+          accessibilityHint="Pouce gauche pour marcher, pouce droit pour regarder"
+          onStartShouldSetResponder={() => true}
+          onMoveShouldSetResponder={() => true}
+          onResponderTerminationRequest={() => false}
+          onResponderGrant={accueillir}
+          onResponderStart={accueillir}
+          onResponderMove={(e) => {
+            accueillir(e);
+            suivre(e);
+          }}
+          onResponderEnd={lacher}
+          onResponderRelease={toutLacher}
+          onResponderTerminate={toutLacher}
         />
+
+        {/* Au repos : deux repères de verre, qui disent qu'on peut marcher
+            et tourner — sans prendre la vue. */}
+        {!baton && (
+          <View
+            style={[styles.repere, styles.repereGauche, { bottom: marges.bottom + 34 }]}
+            pointerEvents="none">
+            <Verre style={styles.repereVerre}>
+              <Svg width={22} height={22} viewBox="0 0 24 24">
+                <Path d={SOLAIRES.marcher} fill={teinte.ink} fillRule="evenodd" opacity={0.75} />
+              </Svg>
+            </Verre>
+          </View>
+        )}
+        <View
+          style={[styles.repere, styles.repereDroit, { bottom: marges.bottom + 34 }]}
+          pointerEvents="none">
+          <Verre style={styles.repereVerre}>
+            <Svg width={22} height={22} viewBox="0 0 24 24">
+              <Path d={SOLAIRES.pivoter} fill={teinte.ink} fillRule="evenodd" opacity={0.75} />
+            </Svg>
+          </Verre>
+        </View>
+
+        {/* Le bâton, né sous le pouce. */}
+        {baton && (
+          <View
+            pointerEvents="none"
+            accessibilityLabel="Manette"
+            style={[styles.baton, { left: baton.x - RAYON_MANETTE, top: baton.y - RAYON_MANETTE }]}>
+            <Verre style={styles.batonVerre} />
+            <View
+              style={[
+                styles.batonBouton,
+                { transform: [{ translateX: baton.dx }, { translateY: baton.dy }] },
+              ]}
+            />
+          </View>
+        )}
 
         <View style={[styles.haut, { top: marges.top + 8 }]} pointerEvents="box-none">
           <MiniCarte
@@ -613,13 +660,15 @@ export function Exploration({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Terminer l’exploration"
-            style={({ pressed }) => [styles.terminer, pressed && styles.enfonce]}
+            style={({ pressed }) => [pressed && styles.enfonce]}
             hitSlop={10}
             onPress={() => {
               manette.current = { x: 0, y: 0 };
               onClose();
             }}>
-            <Text style={styles.terminerTexte}>Terminer</Text>
+            <Verre style={styles.terminer} epais>
+              <Text style={styles.terminerTexte}>Terminer</Text>
+            </Verre>
           </Pressable>
         </View>
 
@@ -629,16 +678,13 @@ export function Exploration({
           rappeler, et elle s'efface dès le premier pas.
         */}
         {!aBouge && (
-          <View style={[styles.consigne, { bottom: marges.bottom + 170 }]} pointerEvents="none">
+          <View style={[styles.consigne, { bottom: marges.bottom + 118 }]} pointerEvents="none">
             <Text style={styles.consigneTexte}>
               Pouce gauche pour marcher · glissez à droite pour regarder
             </Text>
           </View>
         )}
 
-        <View style={[styles.bas, { bottom: marges.bottom + 26 }]} pointerEvents="box-none">
-          <Manette surVecteur={surVecteur} styles={styles} teinte={teinte} />
-        </View>
       </View>
     </Modal>
   );
@@ -659,18 +705,13 @@ const getStyles = themedStyles((c: Palette) =>
       width: 112,
       height: 112,
       borderRadius: radius.lg,
-      backgroundColor: c.surfaceVoile,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: c.line,
       overflow: 'hidden',
     },
     terminer: {
       paddingHorizontal: 16,
       paddingVertical: 10,
       borderRadius: radius.pill,
-      backgroundColor: c.surfaceVoile,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: c.line,
+      overflow: 'hidden',
     },
     terminerTexte: { color: c.ink, fontSize: 15, fontWeight: '700' },
     enfonce: { opacity: 0.7 },
@@ -691,27 +732,44 @@ const getStyles = themedStyles((c: Palette) =>
       paddingHorizontal: 14,
       paddingVertical: 8,
     },
-    bas: { position: 'absolute', left: 26 },
-    /* La base : un disque voilé, juste assez visible pour qu'on sache où
-       poser le pouce. */
-    manette: {
-      width: RAYON_MANETTE * 2,
-      height: RAYON_MANETTE * 2,
-      borderRadius: RAYON_MANETTE,
-      backgroundColor: c.surfaceVoile,
-      borderWidth: 1.5,
-      borderColor: c.line,
+    /* Les repères de verre au repos : petits, dans les coins, translucides. */
+    repere: { position: 'absolute' },
+    repereGauche: { left: 26 },
+    repereDroit: { right: 26 },
+    repereVerre: {
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      overflow: 'hidden',
       alignItems: 'center',
       justifyContent: 'center',
     },
-    manetteBouton: {
-      width: 50,
-      height: 50,
-      borderRadius: 25,
+    /* Le bâton : un disque de verre sous le pouce, un bouton blanc dedans. */
+    baton: {
+      position: 'absolute',
+      width: RAYON_MANETTE * 2,
+      height: RAYON_MANETTE * 2,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    batonVerre: {
+      position: 'absolute',
+      left: 0,
+      top: 0,
+      right: 0,
+      bottom: 0,
+      borderRadius: RAYON_MANETTE,
+      overflow: 'hidden',
+    },
+    batonBouton: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: '#FFFFFF',
       opacity: 0.92,
       shadowColor: '#0B0D12',
-      shadowOpacity: 0.25,
-      shadowRadius: 6,
+      shadowOpacity: 0.18,
+      shadowRadius: 8,
       shadowOffset: { width: 0, height: 2 },
     },
   }),

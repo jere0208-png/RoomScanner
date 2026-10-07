@@ -13949,6 +13949,48 @@ Banc : `maillage.test.tsx` (le format se relit exactement, ancre par ancre,
 classes comprises ; le natif lit avant d'arrêter, sort les indices sur
 quatre octets, ne garde qu'un fichier ; le Diagnostic décrit et partage).
 
+## Le style — « Apple like », fluide, rien de vieillot
+
+Relevé du patron : « Dynamise l'app avec un style plus "Apple like", pur avec
+des mouvements fluides de motion design, rien ne doit faire vieillot (...)
+Tout doit être bien pensé dans le design et se fier à ce qui marche chez les
+plus grandes apps. » Quatre étapes, livrées une à une.
+
+### A — La visite : deux pouces, un seul geste, du verre
+
+Relevé du patron : « on ne peut pas se déplacer et tourner en même temps, et
+le joystick prend trop de place, on doit utiliser un effet "glass"
+transparent pour juste montrer que l'on peut avancer et tourner, sans gêner
+la vision ».
+
+**Pourquoi on ne pouvait pas.** La manette et le regard étaient deux
+responders, et React Native n'en accorde qu'UN à la fois à toute
+l'application : le second pouce frappait une porte fermée. Une seule vue
+reçoit désormais tous les doigts et les départage elle-même — par leur
+identifiant, et par la moitié d'écran où ils se posent : à gauche on
+marche, à droite on regarde ; un doigt posé du mauvais côté prend le rôle
+qui reste. Deux doigts, deux rôles, un seul geste : on avance en tournant la
+tête.
+
+**La manette naît sous le pouce.** Plus de disque posé en bas à gauche qui
+mange la vue : elle apparaît là où le pouce se pose — un disque de verre,
+un bouton blanc dedans — et disparaît quand il se lève. Au repos, il ne
+reste que deux petits repères de verre dans les coins du bas (marcher,
+tourner), qui disent qu'on peut, sans dire où.
+
+**Le verre est celui d'iOS.** `RoomScanVerre.swift` expose
+`UIVisualEffectView` (matériau ultra-fin, ou fin pour la mini-carte et
+« Terminer », où un texte doit rester lisible) : flouté, teinté par le mode
+clair ou sombre, celui des commandes de Plans et de l'appareil photo.
+`components/Verre.tsx` l'emploie quand il est là ; sans natif (banc d'essai),
+un voile clair tient lieu, mêmes enfants, même style.
+
+Bancs : `explorationecran.test.tsx` (avancer dans le sens du regard, la
+manette naît sous le pouce et s'efface, tourner la tête, le regard borné,
+**marcher et tourner en même temps**, le doigt du mauvais côté), `verre.test.tsx`
+(le voile porte ses enfants ; le natif met l'effet sous les enfants et suit
+le rayon).
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

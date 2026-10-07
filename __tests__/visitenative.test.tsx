@@ -118,49 +118,37 @@ const presser = (t: TestRenderer.ReactTestRenderer, label: string) => {
 const natif = (t: TestRenderer.ReactTestRenderer) =>
   t.root.findAll((n) => (n.type as unknown) === 'RoomScanVisite')[0];
 
-let horloge = 1000;
-const doigt = (x0: number, y0: number, x: number, y: number, actif = true) => {
-  horloge += 16;
-  return {
-    nativeEvent: {
-      touches: actif ? [{ identifier: 0, pageX: x, pageY: y, locationX: x0, locationY: y0 }] : [],
-      changedTouches: [{ identifier: 0, pageX: x, pageY: y }],
-      identifier: 0,
-      pageX: x,
-      pageY: y,
-      locationX: x0,
-      locationY: y0,
-      timestamp: horloge,
-    },
-    touchHistory: {
-      touchBank: [
-        {
-          touchActive: actif,
-          startPageX: x0,
-          startPageY: y0,
-          startTimeStamp: 1000,
-          currentPageX: x,
-          currentPageY: y,
-          currentTimeStamp: horloge,
-          previousPageX: x0,
-          previousPageY: y0,
-          previousTimeStamp: horloge - 16,
-        },
-      ],
-      numberActiveTouches: actif ? 1 : 0,
-      indexOfSingleActiveTouch: 0,
-      mostRecentTimeStamp: horloge,
-    },
-  };
-};
-const zone = (t: TestRenderer.ReactTestRenderer, label: string) =>
+const touche = (id: number, x: number, y: number) => ({
+  identifier: id,
+  pageX: x,
+  pageY: y,
+  locationX: x,
+  locationY: y,
+});
+const evenement = (touches: ReturnType<typeof touche>[]) => ({
+  nativeEvent: { touches, changedTouches: touches, pageX: 0, pageY: 0, timestamp: Date.now() },
+});
+/** La vue des deux pouces — voir `explorationecran.test.tsx`. */
+const pouces = (t: TestRenderer.ReactTestRenderer) =>
   t.root
     .findAllByType(View)
     .find(
       (n) =>
-        n.props.accessibilityLabel === label &&
+        n.props.accessibilityLabel === 'Marcher et regarder' &&
         typeof n.props.onResponderGrant === 'function',
     )!;
+/** Le pouce gauche pousse vers le haut pendant `ms`, puis se lève. */
+const marcher = (t: TestRenderer.ReactTestRenderer, ms: number) => {
+  const z = pouces(t);
+  act(() => {
+    z.props.onStartShouldSetResponder(evenement([touche(0, 120, 900)]));
+    z.props.onResponderGrant(evenement([touche(0, 120, 900)]));
+    z.props.onResponderMove(evenement([touche(0, 120, 850)]));
+  });
+  act(() => jest.advanceTimersByTime(ms));
+  act(() => z.props.onResponderRelease(evenement([])));
+  act(() => jest.advanceTimersByTime(100));
+};
 
 describe('la scène part vers SceneKit', () => {
   it('des triangles et des sols, prêts à l’ouverture', () => {
@@ -197,15 +185,7 @@ describe('la scène part vers SceneKit', () => {
     const t = monter();
     presser(t, 'Explorer');
     const avant = natif(t).props.camera as number[];
-    const manette = zone(t, 'Marcher');
-    act(() => {
-      manette.props.onStartShouldSetResponder(doigt(60, 60, 60, 60));
-      manette.props.onResponderGrant(doigt(60, 60, 60, 60));
-      manette.props.onResponderMove(doigt(60, 60, 60, 10));
-    });
-    act(() => jest.advanceTimersByTime(600));
-    act(() => manette.props.onResponderRelease(doigt(60, 60, 60, 10, false)));
-    act(() => jest.advanceTimersByTime(100));
+    marcher(t, 600);
     const apres = natif(t).props.camera as number[];
     const dx = apres[0] - avant[0];
     const dz = apres[2] - avant[2];
@@ -220,15 +200,7 @@ describe('la scène part vers SceneKit', () => {
     const t = monter();
     presser(t, 'Explorer');
     const maille = natif(t).props.maillage;
-    const manette = zone(t, 'Marcher');
-    act(() => {
-      manette.props.onStartShouldSetResponder(doigt(60, 60, 60, 60));
-      manette.props.onResponderGrant(doigt(60, 60, 60, 60));
-      manette.props.onResponderMove(doigt(60, 60, 60, 10));
-    });
-    act(() => jest.advanceTimersByTime(300));
-    act(() => manette.props.onResponderRelease(doigt(60, 60, 60, 10, false)));
-    act(() => jest.advanceTimersByTime(100));
+    marcher(t, 300);
     expect(natif(t).props.maillage).toBe(maille);
   });
 });

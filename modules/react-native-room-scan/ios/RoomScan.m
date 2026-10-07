@@ -124,6 +124,14 @@ RCT_EXPORT_VIEW_PROPERTY(fond, NSString)
 @end
 
 /*
+  LE VERRE — la matiere translucide d iOS, pour ce qui se pose sur une
+  image sans la cacher (manette de la visite, mini-carte).
+*/
+@interface RCT_EXTERN_MODULE(RoomScanVerreManager, RCTViewManager)
+RCT_EXPORT_VIEW_PROPERTY(epais, BOOL)
+@end
+
+/*
   LE TELEMETRE LASER — un emetteur : c est l appareil qui parle quand on
   appuie sur SON bouton, pas l application qui l interroge.
 */
