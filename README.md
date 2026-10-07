@@ -14019,11 +14019,39 @@ Le visuel reçoit une taille dès la première image (déduite de l'écran, puis
 précisée à la pose) : sans cela, il arriverait une image en retard — un
 clignement à chaque ouverture.
 
-Bancs : `presentation.test.tsx` (taille dès la première image, titre sur
-deux lignes à 34 pt, les tirets et le vif, Suivant / Passer / la dernière
-page, la page à corps libre sans bouton), `premierlancement.test.tsx` et
-`guidepose.test.tsx` (inchangés dans ce qu'ils exigent : les trois temps,
-la question, le papier, le jargon absent).
+Bancs : `cadrepresentation.test.tsx` (taille dès la première image, titre
+sur deux lignes à 34 pt, les tirets et le vif, Suivant / Passer / la
+dernière page, la page à corps libre sans bouton, le balayage),
+`premierlancement.test.tsx` et `guidepose.test.tsx` (inchangés dans ce
+qu'ils exigent : les trois temps, la question, le papier, le jargon absent).
+
+### C — L'accueil : un rond pour le compte, des boutons qui répondent au doigt
+
+Relevé du patron : « l'icône profil et le nom en bleu clair, ça fait
+cheap ».
+
+**Le compte est un rond, en haut à droite** (`components/Avatar.tsx`) :
+l'initiale du prénom — sinon de l'adresse — sur un gris doux, et rien
+d'autre. Le nom n'a rien à faire sur l'accueil : on sait qui l'on est. C'est
+le rond qu'on reconnaît d'une application à l'autre (l'App Store, Plans,
+Musique), et le grade Pro ne brille plus ici : il vit dans la page du
+compte, où l'on va le chercher. Sans compte, une silhouette.
+
+**Les boutons ne s'animent plus au repos** (`components/Bouton.tsx`). Le
+bouton d'accueil émettait deux anneaux en boucle et portait un halo : c'est
+ce qui vieillit le plus vite dans une interface. Les grandes applications
+font RÉPONDRE leurs boutons au doigt — un léger enfoncement (0,97), un
+ressort au relâcher — et c'est tout. Trois variantes, toujours la même
+pilule de 56 points : **primaire** (plein, bleu), **secondaire** (teinté
+bleu pâle, texte bleu — « Dessiner un plan » quand le scan est là),
+**discret** (surface et liseré — « Mes scans », son compte à côté du mot).
+`GlowButton` est retiré.
+
+Bancs : `accueil.test.tsx` (le rond en haut à droite, l'initiale, pas de
+nom, rien qui brille même en Pro, la silhouette sans compte ; aucun anneau
+au repos, l'enfoncement branché, « Vérification… » éteint ; « Dessiner un
+plan » primaire sans LiDAR ; le compte de « Mes scans » sur la ligne du
+mot).
 
 ## Prérequis pour tester sur iPhone
 

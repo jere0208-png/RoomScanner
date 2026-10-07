@@ -49,7 +49,7 @@ import { light } from '../src/theme';
 import { HomeScreen } from '../src/screens/HomeScreen';
 import { LogoMark } from '../src/components/LogoMark';
 import { AvatarGlyph } from '../src/components/AvatarGlyph';
-import { GlowButton } from '../src/components/GlowButton';
+import { Avatar } from '../src/components/Avatar';
 import { Quadrillage } from '../src/components/Quadrillage';
 import { TraceUnePiece } from '../src/components/TraceUnePiece';
 import { ThemeGlyph } from '../src/components/ThemeGlyph';
@@ -116,10 +116,15 @@ const textes = (t: TestRenderer.ReactTestRenderer) =>
     )
     .join(' | ');
 
+// Par son libellé, quel que soit le bouton : l'accueil est passé du
+// `GlowButton` à ondes au `Bouton` de la maison, qui ne s'anime que sous
+// le doigt.
 const bouton = (t: TestRenderer.ReactTestRenderer, label: string) =>
-  t.root
-    .findAllByType(GlowButton)
-    .find((n) => (n.props.accessibilityLabel ?? n.props.label) === label);
+  t.root.findAll(
+    (n) =>
+      typeof n.props?.onPress === 'function' &&
+      (n.props?.accessibilityLabel ?? n.props?.label) === label,
+  )[0];
 
 describe('l’accueil', () => {
   /*
@@ -194,7 +199,13 @@ describe('l’accueil', () => {
    * GRATUIT s'écrit gris fade ; PRO respire comme sur la page Pro (la
    * typo d'or). Le clic garde le geste de l'ancienne rangée du bas.
    */
-  it('porte le profil en haut à gauche : avatar, nom souligné, grade', () => {
+  it('porte le compte en haut à droite : un rond, une initiale, pas de nom', () => {
+    /*
+      Relevé du patron : « l'icône profil et le nom en bleu clair, ça fait
+      cheap ». Le nom n'a rien à faire sur l'accueil : on sait qui l'on est.
+      Un rond en haut à droite, l'initiale sur un gris doux — c'est le rond
+      qu'on reconnaît d'une application à l'autre.
+    */
     useAccountStore.setState({
       compte: { id: 'email:j@c.fr', prenom: 'Jérôme', methode: 'email' },
       pro: false,
@@ -209,86 +220,34 @@ describe('l’accueil', () => {
     const st = StyleSheet.flatten(bloc.props.style) as {
       position?: string;
       top?: number;
+      right?: number;
       left?: number;
+      height?: number;
+      paddingHorizontal?: number;
     };
     expect(st.position).toBe('absolute');
-    expect(typeof st.top).toBe('number');
-    expect(typeof st.left).toBe('number');
-    /*
-      L'AVATAR EST UN ROND QUI RESPIRE, plus une silhouette pleine.
-
-      Relevé du patron, lien à l'appui : « utilise cette icône pour l'avatar
-      à l'accueil et enlève le contour présent ». C'est un « user-circle »
-      duotone de Phosphor — deux tracés, dont un en retrait. Le reste de
-      l'app garde le jeu Solar : l'avatar n'est pas un outil, c'est une
-      porte vers le compte.
-    */
-    expect(bloc.findAllByType(AvatarGlyph)).toHaveLength(1);
-    const vu = textes(t);
-    expect(vu).toContain('Jérôme');
-    /*
-      L'AVATAR ET LE PRÉNOM, RIEN D'AUTRE — relevé du patron : la barre
-      est partie, le grade écrit aussi. En gratuit, le prénom se lit GRIS
-      et rien ne brille ; c'est le Pro qui s'anime, et lui seul.
-    */
-    expect(vu).not.toContain('GRATUIT');
+    expect(st.top).toBeGreaterThanOrEqual(44);
+    expect(typeof st.right).toBe('number');
+    expect(st.left).toBeUndefined();
+    // Le cadre invisible du clic — relevé du patron : « un clic même autour
+    // doit fonctionner » — reste de la vraie surface de toucher.
+    expect(st.paddingHorizontal ?? 0).toBeGreaterThanOrEqual(10);
+    expect(Number(st.height)).toBeGreaterThanOrEqual(56);
+    expect(bloc.findAllByType(Avatar)).toHaveLength(1);
+    const lettres = bloc.findAllByType(Text).map((n) => String(n.props.children));
+    expect(lettres).toContain('J');
+    // Pas de nom, pas de grade, rien qui brille.
+    expect(textes(t)).not.toContain('Jérôme');
+    expect(bloc.findAllByType(TexteVif)).toHaveLength(0);
+    expect(bloc.findAllByType(ContourVif)).toHaveLength(0);
     expect(bloc.findAllByType(SvgLinearGradient)).toHaveLength(0);
-    expect(bloc.findAllByType(ContourVif)).toHaveLength(0);
-    const nomGris = bloc
-      .findAllByType(Text)
-      .find((n) =>
-        (Array.isArray(n.props.children)
-          ? n.props.children.join('')
-          : String(n.props.children)
-        ).includes('Jérôme'),
-      );
-    expect(nomGris).toBeDefined();
-    const stNom = StyleSheet.flatten(nomGris!.props.style) as {
-      color?: string;
-      fontWeight?: string;
-    };
-    expect(stNom.color).toBe(light.inkSoft);
-    // Moins gras — relevé du patron : le prénom n'est pas un titre.
-    expect(Number(stNom.fontWeight)).toBeLessThanOrEqual(600);
-    /*
-      LE BLOC RESTE POSÉ EN HAUT, PAS COLLÉ AU BORD — relevé du patron :
-      « le clic doit être fait un peu au-dessus pour que ça fonctionne ».
-      Il partageait sa ligne avec le bouton de thème, et les deux étaient
-      alignés par construction ; le thème est parti dans la page profil,
-      le profil garde sa hauteur — c'est celle qui a été réglée sur le
-      chantier, elle n'a pas de raison de bouger parce que son voisin s'en
-      est allé.
-    */
-    const stBloc = StyleSheet.flatten(bloc.props.style) as { top?: number };
-    expect(stBloc.top).toBeGreaterThanOrEqual(44);
-    /*
-      LE CADRE INVISIBLE DU PROFIL — relevé du patron : « un clic même
-      autour doit fonctionner ». Le rembourrage vit DANS le bouton :
-      c'est de la vraie surface de toucher.
-    */
-    const stCadre = StyleSheet.flatten(bloc.props.style) as {
-      paddingHorizontal?: number;
-      height?: number;
-    };
-    expect(stCadre.paddingHorizontal ?? 0).toBeGreaterThanOrEqual(10);
-    expect(Number(stCadre.height)).toBeGreaterThanOrEqual(56);
-    /*
-      TOUT LE BLOC PREND LE CLIC — avatar, nom, barre, grade. Une vue SVG
-      avale le toucher si on la laisse faire : les enfants directs du
-      bouton sont donc transparents au doigt, et rien à l'intérieur ne
-      se dispute le geste.
-    */
-    expect(
-      bloc.findAll((n) => n.props?.pointerEvents === 'none').length,
-    ).toBeGreaterThanOrEqual(2);
-    expect(
-      bloc.findAll(
-        (n) => typeof n.props?.onPress === 'function' && n !== bloc,
-      ).length,
-    ).toBe(0);
+    // Tout le bloc prend le clic : l'enfant est transparent au doigt, et
+    // rien à l'intérieur ne se dispute le geste.
+    expect(bloc.findAll((n) => n.props?.pointerEvents === 'none').length).toBeGreaterThanOrEqual(1);
+    expect(bloc.findAll((n) => typeof n.props?.onPress === 'function' && n !== bloc)).toHaveLength(0);
   });
 
-  it('en Pro, le prénom s’anime en couleurs et l’avatar reste nu', () => {
+  it('en Pro, rien ne brille sur l’accueil : le grade vit dans la page du compte', () => {
     useAccountStore.setState({
       compte: { id: 'email:j@c.fr', prenom: 'Jérôme', methode: 'email' },
       pro: true,
@@ -299,69 +258,30 @@ describe('l’accueil', () => {
         n.props?.accessibilityLabel === 'Mon compte' &&
         typeof n.props?.onPress === 'function',
     )[0];
-    // Le prénom respire dans la typo d'or…
-    const typos = bloc.findAllByType(TexteVif);
-    expect(typos).toHaveLength(1);
-    expect(typos[0].props.texte).toBe('Jérôme');
-    /*
-      …ET L'AVATAR NE SE CERCLE PLUS DE RIEN.
-
-      L'anneau d'or a cerclé l'avatar en Pro le temps de deux versions — le
-      grade se voyait au lieu de s'écrire. Relevé du patron, en même temps
-      que le changement d'icône : « enlève le contour présent ». Le grade se
-      voit toujours, à côté : c'est le prénom qui porte la typo d'or, et
-      l'avatar redevient une porte vers le compte, pas un blason.
-    */
+    expect(bloc.findAllByType(TexteVif)).toHaveLength(0);
     expect(bloc.findAllByType(ContourVif)).toHaveLength(0);
-    expect(bloc.findAllByType(AvatarGlyph)).toHaveLength(1);
-    // Et le prénom doré s'allège comme le gris.
-    const typoNom = bloc.findAllByType(TexteVif)[0];
-    expect(Number(typoNom.props.graisse)).toBeLessThanOrEqual(600);
+    expect(bloc.findAllByType(Avatar)[0].props.taille).toBe(38);
     useAccountStore.setState({ pro: false });
   });
 
-  /*
-   * L'AVATAR GARDE SA TAILLE — relevé du patron : « agrandis légèrement le
-   * bouton profil ». Il l'avait prise pour égaler la pastille du thème, qui
-   * vivait à sa droite : deux ronds inégaux sur la même ligne se lisaient
-   * comme un accident. Le thème est parti dans la page profil ; la taille,
-   * elle, reste — c'est celle qu'on a réglée en la regardant, et un avatar
-   * qui rétrécirait au départ de son voisin serait une régression que
-   * personne n'a demandée.
-   */
-  it('garde l’avatar à la taille réglée, en Pro comme en gratuit', () => {
-    useAccountStore.setState({
-      compte: { id: 'email:j@c.fr', prenom: 'Jérôme', methode: 'email' },
-      pro: true,
-    });
+  it('sans prénom, l’initiale vient de l’adresse ; sans compte, une silhouette', () => {
+    useAccountStore.setState({ compte: { id: 'email:m@c.fr', email: 'marie@c.fr', methode: 'email' } });
     const t = monter();
     const bloc = t.root.findAll(
       (n) =>
         n.props?.accessibilityLabel === 'Mon compte' &&
         typeof n.props?.onPress === 'function',
     )[0];
-    /*
-      L'avatar Pro se lisait en 36 dans son anneau d'or ; l'anneau est parti
-      — « enlève le contour présent » — et c'est le glyphe lui-même qui
-      porte la taille, la MÊME dans les deux grades. Un avatar qui change de
-      taille avec l'abonnement ferait sauter la barre du haut à chaque
-      renouvellement.
-    */
-    expect(bloc.findAllByType(AvatarGlyph)[0].props.size).toBe(34);
-    // En gratuit, l'avatar nu suit le mouvement : lui aussi a grandi.
-    // Le premier arbre se démonte AVANT le second : deux accueils vivants
-    // à la fois, et leurs animations se disputent les minuteries sans fin.
+    expect(bloc.findAllByType(Text).map((n) => String(n.props.children))).toContain('M');
     act(() => t.unmount());
-    useAccountStore.setState({ pro: false });
+    useAccountStore.setState({ compte: null });
     const t2 = monter();
-    const bloc2 = t2.root.findAll(
+    const b2 = t2.root.findAll(
       (n) =>
         n.props?.accessibilityLabel === 'Mon compte' &&
         typeof n.props?.onPress === 'function',
     )[0];
-    // En gratuit, le MÊME glyphe et la même taille : rien ne distingue plus
-    // les deux grades sur l'avatar — c'est le prénom qui les distingue.
-    expect(bloc2.findAllByType(AvatarGlyph)[0].props.size).toBe(34);
+    expect(b2.findAllByType(AvatarGlyph)).toHaveLength(1);
   });
 
   it('ne récite plus le mode d’emploi', () => {
@@ -605,8 +525,7 @@ describe('l’accueil', () => {
  * plus rien dans le centrage.
  */
 describe('le bouton « Mes scans »', () => {
-  it('centre son mot, la pastille accrochée à côté', () => {
-    // La pastille n'existe qu'avec des relevés à compter.
+  it('porte son compte à côté du mot, sur la même ligne', () => {
     act(() => {
       useScanStore.setState({
         saves: [{ id: 's1' }, { id: 's2' }] as never,
@@ -617,47 +536,24 @@ describe('le bouton « Mes scans »', () => {
       .findAllByType(View)
       .find((n) => n.props.accessibilityLabel === 'Nombre de scans');
     expect(badge).toBeDefined();
+    expect(badge!.findAllByType(Text).map((n) => String(n.props.children))).toContain('2');
     /*
-      ET ELLE EST CENTRÉE SUR LA LIGNE DU MOT.
-
-      Premier jet : la pastille était posée à « 50 % de haut, moins la
-      moitié de sa hauteur ». Deux approximations qui s'ajoutent — le
-      pourcentage se prend sur la boîte du texte, dont la hauteur dépend de
-      l'interligne de la police du téléphone, et la demi-hauteur de la
-      pastille était écrite en dur. Elle tombait sous la ligne.
-
-      Un cadre qui occupe TOUTE la hauteur du mot et centre son contenu ne
-      dépend d'aucun chiffre : c'est la seule façon que ça tienne d'un
-      appareil à l'autre.
+      LE COMPTE VIT DANS LE BOUTON, À DROITE DU MOT — plus de pastille posée
+      en absolu à « 100 % » : le `Bouton` de la maison aligne le mot et ce
+      qu'on lui accroche sur une même rangée centrée, et rien ne dépend de
+      la hauteur d'une police.
     */
-    const cadre = badge!.parent!;
-    const st = (Array.isArray(cadre.props.style)
-      ? Object.assign({}, ...cadre.props.style.filter(Boolean))
-      : cadre.props.style) as {
-      position?: string;
-      left?: string;
-      top?: number;
-      bottom?: number;
-      justifyContent?: string;
-    };
-    expect(st.position).toBe('absolute');
-    expect(st.left).toBe('100%');
-    expect(st.top).toBe(0);
-    expect(st.bottom).toBe(0);
-    expect(st.justifyContent).toBe('center');
+    const scans = bouton(tree, 'Mes scans')!;
+    expect(scans.findAll((n) => n.props?.accessibilityLabel === 'Nombre de scans').length).toBeGreaterThan(0);
+    const rangee = scans.findAll((n) => {
+      const st = StyleSheet.flatten(n.props?.style) as { flexDirection?: string; justifyContent?: string } | undefined;
+      return st?.flexDirection === 'row' && st?.justifyContent === 'center';
+    });
+    expect(rangee.length).toBeGreaterThan(0);
     act(() => tree.unmount());
   });
 });
 
-/**
- * LE GLYPHE REMPLIT SON BLOC COMME SUR L'ICÔNE DU TÉLÉPHONE.
- *
- * Le logo de l'accueil et l'icône iOS sont le même dessin, mais l'icône
- * l'agrandit de 1,45 autour du centre (`ZOOM` de tools/gen-icons.mjs) : posés
- * côte à côte, le bloc de l'accueil semblait porter un glyphe de timbre-poste.
- * On mesure ici la boîte des tracés, traits compris, dans le repère 76 du
- * bloc — le même chiffre que l'icône, pour le même œil.
- */
 describe('le logo de l’accueil', () => {
   it('donne au glyphe la part du bloc que l’icône lui donne', () => {
     const t = monter();
@@ -726,113 +622,54 @@ describe('le logo de l’accueil', () => {
  * l'accueil n'en a pas — deux choses qui bougent pour un seul geste à
  * faire, et l'œil ne sait plus laquelle est l'importante.
  */
-describe('l’onde du bouton principal', () => {
-  const anneaux = (t: TestRenderer.ReactTestRenderer, dans: unknown) =>
-    (dans as TestRenderer.ReactTestInstance).findAll((n) => {
+describe('le bouton ne s’anime que sous le doigt', () => {
+  /*
+    L'ONDE EST PARTIE — relevé du patron : « un style plus "Apple like",
+    pur (...) rien ne doit faire vieillot ». Le bouton d'accueil émettait
+    deux anneaux en boucle : c'est ce qui vieillit le plus vite dans une
+    interface. Il RÉPOND maintenant au doigt — un enfoncement, un ressort —
+    et c'est tout.
+  */
+  const anneaux = (dans: TestRenderer.ReactTestInstance) =>
+    dans.findAll((n) => {
       const st = StyleSheet.flatten(n.props?.style) as
-        | {
-            borderColor?: string;
-            borderRadius?: number;
-            position?: string;
-            backgroundColor?: string;
-          }
+        | { borderColor?: string; position?: string; backgroundColor?: string }
         | undefined;
-      // Le CORPS du bouton porte lui aussi un bord bleu et une échelle (son
-      // enfoncement) : ce qui distingue un anneau, c'est qu'il est posé en
-      // absolu et qu'il ne peint rien — il n'est que du contour.
-      return (
-        st?.borderColor === light.blue &&
-        st?.position === 'absolute' &&
-        st?.backgroundColor === undefined &&
-        typeof st?.borderRadius === 'number' &&
-        Array.isArray((st as { transform?: unknown[] }).transform)
-      );
+      return st?.borderColor === light.blue && st?.position === 'absolute' && st?.backgroundColor === undefined;
     });
 
-  it('émet deux anneaux, décalés, transparents au doigt', () => {
+  it('aucun anneau au repos, sur aucun bouton', () => {
     const t = monter();
-    const scan = t.root
-      .findAllByType(GlowButton)
-      .find((n) => n.props.accessibilityLabel === 'Commencer le scan')!;
-    const ondes = anneaux(t, scan);
-    // Deux, pas un : une onde seule bat comme un clignotant ; deux, décalées,
-    // se lisent comme une propagation.
-    expect(ondes.length).toBeGreaterThanOrEqual(2);
-    for (const o of ondes) {
-      expect(o.props.pointerEvents).toBe('none');
-      // Chacune se dilate ET s'efface : un anneau qui grandit sans pâlir
-      // finit en cadre posé autour du bouton.
-      const st = StyleSheet.flatten(o.props.style) as {
-        transform: Record<string, unknown>[];
-        opacity?: unknown;
-      };
-      // Le rendu de test résout les valeurs animées à leur instant zéro :
-      // ce qu'on tient ici, c'est que les deux LEVIERS sont branchés —
-      // l'échelle et l'opacité. Que la boucle qui les pousse soit native et
-      // sans fin, c'est `batterie.test.tsx` qui le prouve.
-      expect(st.transform.some((x) => 'scale' in x)).toBe(true);
-      expect(st.opacity).toBeDefined();
+    for (const label of ['Commencer le scan', 'Dessiner un plan sans scanner']) {
+      const b = bouton(t, label)!;
+      expect(b).toBeDefined();
+      expect(anneaux(b)).toHaveLength(0);
     }
   });
 
-  it('les laisse hors du corps, qui rogne ce qu’il porte', () => {
+  it('mais il s’enfonce et revient : les deux gestes du doigt sont branchés', () => {
     const t = monter();
-    const scan = t.root
-      .findAllByType(GlowButton)
-      .find((n) => n.props.accessibilityLabel === 'Commencer le scan')!;
-    for (const o of anneaux(t, scan)) {
-      let p = o.parent;
-      while (p) {
-        const st = StyleSheet.flatten(p.props?.style) as
-          | { overflow?: string }
-          | undefined;
-        // Un anneau qui déborde ne déborde que si rien ne le coupe.
-        expect(st?.overflow).not.toBe('hidden');
-        if (p.type === GlowButton) break;
-        p = p.parent;
-      }
-    }
+    // Le `Bouton` est un composant ; le doigt, lui, touche sa pressable.
+    const scan = bouton(t, 'Commencer le scan')!.findAll(
+      (n) => typeof n.props?.onPressIn === 'function',
+    )[0];
+    expect(scan).toBeDefined();
+    expect(typeof scan.props.onPressOut).toBe('function');
+    act(() => scan.props.onPressIn());
+    act(() => scan.props.onPressOut());
   });
 
-  it('n’en donne pas au second bouton, ni au bouton éteint', () => {
-    const t = monter();
-    const dessiner = t.root
-      .findAllByType(GlowButton)
-      .find((n) => n.props.label === 'Dessiner un plan')!;
-    expect(anneaux(t, dessiner)).toHaveLength(0);
-
-    /*
-      ET LE BOUTON « VÉRIFICATION… » NON PLUS, tant qu'on ne sait pas si
-      l'appareil sait scanner : il n'invite à rien, l'animer serait mentir.
-      (Sur un appareil incompatible, le bouton n'existe simplement plus.)
-    */
-    act(() => t.unmount());
+  it('« Vérification… » se dit éteint, tant qu’on ne sait pas si l’appareil sait scanner', () => {
     useScanStore.setState({ supported: null });
-    const attente = monter();
-    const scan = attente.root
-      .findAllByType(GlowButton)
-      .find((n) => n.props.accessibilityLabel === 'Commencer le scan')!;
-    expect(anneaux(attente, scan)).toHaveLength(0);
+    const t = monter();
+    const scan = bouton(t, 'Commencer le scan')!;
+    expect(scan.props.disabled).toBe(true);
+    const pressable = scan.findAll((n) => n.props?.accessibilityState?.disabled === true)[0];
+    expect(pressable).toBeDefined();
     useScanStore.setState({ supported: true });
   });
 });
 
-/**
- * SUR UN APPAREIL SANS LiDAR, L'ACCUEIL PROPOSE CE QU'ON PEUT FAIRE.
- *
- * Trouvé en parcourant l'application comme un utilisateur qui la découvre,
- * sur le téléphone le plus courant — un iPhone qui n'est pas « Pro ».
- * L'écran affichait le refus (« cet appareil n'est pas compatible »), et
- * gardait pourtant « Commencer le scan » en bouton PRINCIPAL, éteint, avec
- * un conseil de scan en pied de page : « allumez les lumières et dégagez le
- * centre de la pièce ». Trois éléments sur quatre parlaient d'une chose
- * impossible.
- *
- * Or l'application sait tout faire sans caméra — plan, normes, métré,
- * dossier — et c'est même souvent le chemin le plus court. Sur un appareil
- * sans LiDAR, « Dessiner un plan » devient donc le geste principal, le scan
- * s'efface, et le conseil se tait.
- */
 describe('l’accueil sur un appareil sans LiDAR', () => {
   const sansLidar = () => {
     useScanStore.setState({ supported: false });
@@ -845,7 +682,7 @@ describe('l’accueil sur un appareil sans LiDAR', () => {
     expect(principal).toBeDefined();
     // Le geste possible porte la couleur ; le scan a disparu, plutôt que de
     // rester en gros et éteint.
-    expect(principal!.props.variant).toBe('primary');
+    expect(principal!.props.variante).toBe('primaire');
     expect(bouton(t, 'Commencer le scan')).toBeUndefined();
   });
 
@@ -908,25 +745,15 @@ describe('le glyphe incrusté', () => {
     « Noir », c'est l'encre du THÈME : un noir en dur disparaîtrait sur un
     fond sombre, et l'icône n'y serait plus qu'un contour bleu vide.
   */
-  it('porte l’encre du thème, et plus aucun cerne', () => {
+  it('sans compte, la silhouette porte l’encre douce du thème, un seul tracé, sans cerne', () => {
     /*
-      TROIS HABITS EN TROIS RELEVÉS, ET C'EST LE TROISIÈME QUI TIENT.
-
-        1. le GRIS des textes secondaires — discrète au point de se confondre
-           avec le prénom posé à côté, alors que c'est la seule porte de
-           l'accueil vers le compte ;
-        2. l'ENCRE DU THÈME CERNÉE DE BLEU — « l'icône de l'avatar à
-           l'accueil doit être noire avec un contour bleu » ; le cerne était
-           une silhouette DILATÉE et non un filet suivi, car un trait posé
-           sur une forme pleine aurait soudé les trois lignes de la fiche ;
-        3. l'ENCRE SEULE — « enlève le contour bleu de l'avatar sur
-           l'accueil ».
-
-      Ce banc garde les trois, parce qu'un jour quelqu'un se demandera
-      pourquoi cette icône se peint en UN tracé quand deux seraient si
-      commodes pour la cerner. Ce qu'on vérifie aujourd'hui : un seul tracé,
-      à l'encre du THÈME — un noir en dur disparaîtrait sur fond sombre.
+      TROIS HABITS EN TROIS RELEVÉS, puis le rond. Le gris, l'encre cernée
+      de bleu, l'encre seule — et maintenant un rond en haut à droite,
+      l'initiale dedans (voir « porte le compte en haut à droite »). La
+      silhouette ne sert plus qu'à qui n'a pas de compte : un seul tracé, à
+      l'encre douce du THÈME — un noir en dur disparaîtrait sur fond sombre.
     */
+    useAccountStore.setState({ compte: null });
     const t = monter();
     const avatar = t.root
       .findAll(
@@ -934,10 +761,10 @@ describe('le glyphe incrusté', () => {
           typeof n.props?.onPress === 'function',
       )[0]
       .findByType(AvatarGlyph);
-    expect(avatar.props.teinte).toBe(light.ink);
+    expect(avatar.props.teinte).toBe(light.inkSoft);
     const traces = avatar.findAllByType(Path);
     expect(traces).toHaveLength(1);
-    expect(traces[0].props.fill).toBe(light.ink);
+    expect(traces[0].props.fill).toBe(light.inkSoft);
     expect(traces[0].props.stroke).toBeUndefined();
   });
 

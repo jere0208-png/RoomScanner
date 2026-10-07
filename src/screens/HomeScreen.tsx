@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { TexteVif } from '../components/ContourVif';
 import {
   Animated,
   Easing,
@@ -14,16 +13,14 @@ import {
 import { RoomScan } from 'react-native-room-scan';
 import {
   dark,
-  glow,
   radius,
-  shadowCard,
   themedStyles,
   useTheme,
   type Palette,
 } from '../theme';
-import { GlowButton } from '../components/GlowButton';
+import { Bouton } from '../components/Bouton';
+import { Avatar } from '../components/Avatar';
 import { LogoMark } from '../components/LogoMark';
-import { AvatarGlyph } from '../components/AvatarGlyph';
 import { Quadrillage } from '../components/Quadrillage';
 import { TraceUnePiece } from '../components/TraceUnePiece';
 import { useScanStore } from '../store/scanStore';
@@ -76,7 +73,6 @@ export function HomeScreen() {
   const peutCreerPlan = useAccountStore((s) => s.peutCreerPlan);
   const ouvrirSurprise = useAccountStore((s) => s.ouvrirSurprise);
   const compte = useAccountStore((s) => s.compte);
-  const pro = useAccountStore((s) => s.pro);
   const c = useTheme();
   /** Le fond est-il sombre ? C'est lui qui choisit le logotype. */
   const sombre = c === dark;
@@ -395,7 +391,7 @@ export function HomeScreen() {
       */}
       {supported !== false && (
       <Animated.View style={[styles.ctaWrap, fadeIn(3)]}>
-        <GlowButton
+        <Bouton
           label={supported === null ? 'Vérification…' : 'Commencer le scan'}
           accessibilityLabel="Commencer le scan"
           disabled={supported !== true}
@@ -432,10 +428,10 @@ export function HomeScreen() {
         le plus court, pas un lot de consolation.
       */}
       <Animated.View style={[styles.secondWrap, fadeIn(4)]}>
-        <GlowButton
+        <Bouton
           label="Dessiner un plan"
           // Seul geste possible sans caméra : il en porte la couleur.
-          variant={supported === false ? 'primary' : 'ghost'}
+          variante={supported === false ? 'primaire' : 'secondaire'}
           accessibilityLabel="Dessiner un plan sans scanner"
           onPress={() => {
             // Le palier gratuit se juge ICI aussi : un plan tracé à la main
@@ -451,11 +447,11 @@ export function HomeScreen() {
 
       {saves.length > 0 && (
         <Animated.View style={[styles.secondWrap, fadeIn(4)]}>
-          <GlowButton
+          <Bouton
             label="Mes scans"
-            variant="ghost"
+            variante="discret"
             onPress={() => setScreen('library')}
-            right={
+            droite={
               <View
                 accessibilityLabel="Nombre de scans"
                 style={styles.libraryBadge}>
@@ -487,13 +483,17 @@ export function HomeScreen() {
       </Animated.Text>
 
       {/*
-        LE PROFIL EST UN BLOC, EN HAUT À GAUCHE — croquis Paint du patron.
+        LE COMPTE EST UN ROND, EN HAUT À DROITE — relevé du patron : « l'icône
+        profil et le nom en bleu clair, ça fait cheap ».
 
-        La mention du compte vivait en pied d'écran, minuscule ; elle est
-        maintenant un petit bloc qui ne gêne pas : l'avatar et le prénom,
-        gris en gratuit, parés d'or en Pro. C'est toujours la seule porte
-        VOLONTAIRE vers la page Pro : le clic garde tout le geste de
-        l'ancienne rangée.
+        Le nom n'a rien à faire sur l'accueil : on sait qui l'on est. Les
+        grandes applications posent un rond en haut à droite — l'initiale sur
+        un gris doux, ou la photo — et rien d'autre ; c'est ce rond qu'on
+        reconnaît d'une application à l'autre. Le grade (Pro) ne brille plus
+        ici : il vit dans la page du compte, où l'on va le chercher.
+
+        C'est toujours la seule porte VOLONTAIRE vers la page Pro, et tout le
+        bloc prend le clic : l'enfant est transparent au doigt.
       */}
       <Pressable
         accessibilityRole="button"
@@ -501,42 +501,7 @@ export function HomeScreen() {
         style={styles.profilBloc}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         onPress={() => setScreen('profil')}>
-        {/*
-          L'AVATAR ET LE PRÉNOM, RIEN D'AUTRE — relevé du patron : la
-          barre est partie, le grade écrit aussi. En gratuit, tout se lit
-          GRIS ; en Pro, le prénom passe à la typo d'or et l'avatar se
-          cercle du contour qui respire — le grade se VOIT, il ne s'écrit
-          plus. Les enfants restent transparents au doigt : c'est TOUT le
-          bloc qui ouvre le menu.
-        */}
-        {/*
-          L'AVATAR : LE MÊME DANS LES DEUX GRADES, ET SANS AUCUN CERNE.
-
-          Deux contours lui sont partis, dans cet ordre : l'anneau d'or du
-          Pro — « utilise cette icône pour l'avatar à l'accueil et enlève le
-          contour présent » —, puis le cerne bleu qui l'avait remplacé :
-          « enlève le contour bleu de l'avatar sur l'accueil ».
-
-          Il ne reste que l'encre du thème, et c'est assez : le grade se lit
-          au prénom posé à côté, qui garde la typo d'or en Pro, et l'avatar
-          redevient ce qu'il est — une porte vers le compte, pas une
-          décoration.
-        */}
-        <AvatarGlyph size={34} teinte={c.ink} />
-        <View style={styles.profilColonne} pointerEvents="none">
-          {pro ? (
-            <TexteVif
-              texte={compte?.prenom || compte?.email || 'Compte'}
-              taille={14.5}
-              graisse="600"
-              fond={c.bg}
-            />
-          ) : (
-            <Text style={styles.profilNom} numberOfLines={1}>
-              {compte?.prenom || compte?.email || 'Compte'}
-            </Text>
-          )}
-        </View>
+        <Avatar compte={compte} taille={38} />
       </Pressable>
 
     </View>
@@ -605,13 +570,6 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     height: 102,
     marginTop: 14,
   },
-  subtitle: {
-    color: c.inkSoft,
-    fontSize: 15,
-    lineHeight: 21,
-    textAlign: 'center',
-    marginTop: 8,
-  },
   /*
     L'INCRUSTATION : posée en absolu, elle ne pousse rien.
 
@@ -648,28 +606,6 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   warningText: { color: '#A33A3E', fontSize: 13, lineHeight: 18 },
   ctaWrap: { marginTop: 'auto', paddingHorizontal: 22 },
   secondWrap: { paddingHorizontal: 22, marginTop: 10 },
-  cta: {
-    backgroundColor: c.blue,
-    borderRadius: radius.pill,
-    paddingVertical: 18,
-    alignItems: 'center',
-    ...glow(c.blue),
-    shadowOpacity: 0.36,
-  },
-  ctaDisabled: { backgroundColor: c.lineStrong, shadowOpacity: 0 },
-  ctaText: { color: '#FFFFFF', fontSize: 17, fontWeight: '700' },
-  libraryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: c.surface,
-    borderRadius: radius.pill,
-    paddingVertical: 15,
-    marginTop: 10,
-    ...shadowCard,
-    shadowOpacity: 0.05,
-  },
-  libraryText: { color: c.ink, fontSize: 15.5, fontWeight: '600' },
   libraryBadge: {
     backgroundColor: c.blueSoft,
     borderRadius: radius.pill,
@@ -704,19 +640,10 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   profilBloc: {
     position: 'absolute',
     top: 47,
-    left: 8,
+    right: 8,
     height: 72,
     paddingHorizontal: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 9,
-    maxWidth: '50%',
+    justifyContent: 'center',
     zIndex: 2,
   },
-  profilColonne: { flexShrink: 1 },
-  // Moins gras — relevé du patron : le prénom n'est pas un titre.
-  profilNom: { color: c.inkSoft, fontSize: 14.5, fontWeight: '600', maxWidth: 130 },
-  // L'anneau d'or AU RAS de l'icône : 36 pour un avatar de 29 — plus de
-  // disque clair entre eux, le couvercle est la couleur du fond. Et 36,
-  // c'est la pastille du thème : les deux ronds du bandeau sont jumeaux.
 }));

@@ -54,7 +54,6 @@ import { SurprisePro } from '../src/components/SurprisePro';
 import { SignInScreen } from '../src/screens/SignInScreen';
 import { HomeScreen } from '../src/screens/HomeScreen';
 import { ProfilScreen } from '../src/screens/ProfilScreen';
-import { GlowButton } from '../src/components/GlowButton';
 import { useAccountStore } from '../src/store/accountStore';
 import { useScanStore } from '../src/store/scanStore';
 
@@ -405,9 +404,11 @@ describe('l’accueil et le quota', () => {
       surpriseVisible: false,
     });
     const t = monter(<HomeScreen />);
-    const cta = t.root
-      .findAllByType(GlowButton)
-      .find((n) => n.props.accessibilityLabel === 'Commencer le scan')!;
+    const cta = t.root.findAll(
+      (n) =>
+        n.props?.accessibilityLabel === 'Commencer le scan' &&
+        typeof n.props?.onPress === 'function',
+    )[0];
     act(() => {
       cta.props.onPress();
     });
@@ -419,9 +420,11 @@ describe('l’accueil et le quota', () => {
   it('laisse passer le premier scan, et un Pro sans limite', () => {
     useAccountStore.setState({ paywallVisible: false });
     const t = monter(<HomeScreen />);
-    const cta = t.root
-      .findAllByType(GlowButton)
-      .find((n) => n.props.accessibilityLabel === 'Commencer le scan')!;
+    const cta = t.root.findAll(
+      (n) =>
+        n.props?.accessibilityLabel === 'Commencer le scan' &&
+        typeof n.props?.onPress === 'function',
+    )[0];
     act(() => {
       cta.props.onPress();
     });
