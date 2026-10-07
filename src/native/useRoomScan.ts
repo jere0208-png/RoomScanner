@@ -4,6 +4,7 @@ import { useScanStore } from '../store/scanStore';
 import { roomSurface } from '../geometry/floorplan';
 import { astuce } from '../ui/astuce';
 import { useAccountStore } from '../store/accountStore';
+import { usePannes } from '../ui/journalPannes';
 
 /** Instructions RoomPlan (enum Swift) → libellés français. */
 const INSTRUCTIONS_FR: Record<string, string> = {
@@ -169,6 +170,9 @@ function resumerLeReleve() {
       try {
         // Le post-traitement RoomPlan prend quelques secondes.
         const result = await RoomScan.stop();
+        // Ce que ce scan a coûté : noté même si l'on abandonne ensuite, c'est
+        // une mesure, pas un dossier.
+        if (result?.energie) usePannes.getState().noterScan(result.energie);
         /*
           ET SI L'ON A ABANDONNÉ ENTRE-TEMPS, ON N'OUVRE RIEN.
 

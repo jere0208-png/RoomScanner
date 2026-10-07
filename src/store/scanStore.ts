@@ -4788,12 +4788,19 @@ export const useScanStore = create<ScanState>((set, get) => {
           est devant. C'est le compte qui compte, pas le détail : on ne va
           pas demander à quelqu'un qui balaie une pièce de lire une liste.
         */
-        mursDouteux: (u.surfaces ?? []).filter((s2) => {
-          const c2 = String(s2.confidence ?? '').toLowerCase();
-          return (
-            (s2.type ?? 'wall') === 'wall' && (c2 === 'low' || c2 === 'medium')
-          );
-        }).length,
+        // Le compte vient du natif (cinq nombres au lieu des surfaces
+        // entières, deux fois par seconde) ; un natif ancien les envoie
+        // encore, et l'on sait toujours compter.
+        mursDouteux:
+          typeof u.mursDouteux === 'number'
+            ? u.mursDouteux
+            : (u.surfaces ?? []).filter((s2) => {
+                const c2 = String(s2.confidence ?? '').toLowerCase();
+                return (
+                  (s2.type ?? 'wall') === 'wall' &&
+                  (c2 === 'low' || c2 === 'medium')
+                );
+              }).length,
       }),
 
     arrivage: null,

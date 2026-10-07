@@ -79,7 +79,10 @@ final class RepereLayerView: UIView {
 
   private func demarrerHorloge() {
     horloge?.invalidate()
-    guard session != nil else { return }
+    horloge = nil
+    // Rien à placer : rien à battre. L'horloge tournait à trente images par
+    // seconde dès que la vue existait, repères ou pas.
+    guard session != nil, !reperes.isEmpty else { return }
     let h = CADisplayLink(target: RelaisFaible(cible: self),
                           selector: #selector(RelaisFaible.battre))
     // Trente images par seconde suffisent : ces étiquettes suivent un
@@ -106,16 +109,23 @@ final class RepereLayerView: UIView {
     etiquette.isHidden = true
     addSubview(etiquette)
     reperes.append(Repere(position: position, vue: etiquette))
+    if horloge == nil { demarrerHorloge() }
   }
 
   func retirerDernier() {
     guard let dernier = reperes.popLast() else { return }
     dernier.vue.removeFromSuperview()
+    if reperes.isEmpty {
+      horloge?.invalidate()
+      horloge = nil
+    }
   }
 
   func vider() {
     for r in reperes { r.vue.removeFromSuperview() }
     reperes.removeAll()
+    horloge?.invalidate()
+    horloge = nil
   }
 
   /// La couleur du métier, et le sigle qu'on relit de loin.

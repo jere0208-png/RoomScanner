@@ -22,6 +22,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SheetShell } from './Sheet';
 import { radius, themedStyles, useTheme, type Palette } from '../theme';
 import { datePanne, usePannes } from '../ui/journalPannes';
+import { phraseEnergie } from '../ui/energie';
 
 export function JournalSheet({
   visible,
@@ -33,6 +34,7 @@ export function JournalSheet({
   const c = useTheme();
   const s = getStyles(c);
   const incidents = usePannes((x) => x.incidents);
+  const dernierScan = usePannes((x) => x.dernierScan);
   const vider = usePannes((x) => x.vider);
 
   return (
@@ -44,6 +46,17 @@ export function JournalSheet({
           ? 'Rien à signaler : l’application ne s’est pas arrêtée toute seule depuis son installation.'
           : `Les ${incidents.length} derniers arrêts inattendus, le plus récent en premier.`}
       </Text>
+      {/*
+        CE QUE LE DERNIER SCAN A COÛTÉ — relevé du patron : « le scan
+        consomme beaucoup de batterie ». Le chiffre vit ici, avec le reste
+        du diagnostic : c'est lui qui dira si une version fait mieux.
+      */}
+      {dernierScan && (
+        <View style={s.bloc}>
+          <Text style={s.entete}>{`${datePanne(dernierScan.quand)} · dernier scan`}</Text>
+          <Text style={s.message}>{phraseEnergie(dernierScan)}</Text>
+        </View>
+      )}
       {incidents.length > 0 && (
         <>
           <ScrollView style={s.liste}>

@@ -28,6 +28,7 @@
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
+import type { EnergieDuScan } from 'react-native-room-scan';
 
 export interface Panne {
   /** Quand, en millisecondes depuis l'époque : l'affichage met en français. */
@@ -43,6 +44,8 @@ export interface Panne {
 }
 
 const CLE = 'roomscanner.pannes.v1';
+/** La dépense du dernier scan — durée, batterie, chaleur — à part des pannes. */
+const CLE_ENERGIE = 'roomscanner.energie.v1';
 /** Ce qu'on garde : le dernier compte, et les précédents pour voir un motif. */
 export const PANNES_GARDEES = 10;
 /**
@@ -57,6 +60,13 @@ const PILE_MAX = 1000;
 interface EtatPannes {
   charge: boolean;
   incidents: Panne[];
+  /**
+   * CE QUE LE DERNIER SCAN A COÛTÉ. Relevé du patron : « le scan consomme
+   * beaucoup de batterie ». Un chiffre par scan, ici, pour comparer — un scan
+   * à l'autre, une version à l'autre.
+   */
+  dernierScan: (EnergieDuScan & { quand: number }) | null;
+  noterScan: (e: EnergieDuScan) => void;
   charger: () => Promise<void>;
   vider: () => void;
 }
@@ -64,7 +74,27 @@ interface EtatPannes {
 export const usePannes = create<EtatPannes>((set) => ({
   charge: false,
   incidents: [],
+  dernierScan: null,
+  noterScan: (e) => {
+    const d = {
+      secondes: e.secondes,
+      batterie: e.batterie,
+      thermique: e.thermique,
+      quand: Date.now(),
+    };
+    set({ dernierScan: d });
+    AsyncStorage.setItem(CLE_ENERGIE, JSON.stringify(d)).catch(() => {});
+  },
   charger: async () => {
+    const brutEnergie = await AsyncStorage.getItem(CLE_ENERGIE).catch(() => null);
+    try {
+      const e = JSON.parse(brutEnergie ?? 'null');
+      if (e && typeof e === 'object' && typeof e.secondes === 'number') {
+        set({ dernierScan: e });
+      }
+    } catch {
+      // Un journal illisible ne vaut pas une panne.
+    }
     const brut = await AsyncStorage.getItem(CLE).catch(() => null);
     let lu: unknown = [];
     try {

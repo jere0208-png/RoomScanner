@@ -13881,6 +13881,35 @@ Ce qui ne se vérifie pas ici : le rendu lui-même — la vue SceneKit ne
 s'exécute que sur l'iPhone. Les lumières, l'ouverture et la texture sont
 réglées au jugé ; c'est l'IPA qui tranche.
 
+### 8 — La batterie pendant le scan
+
+Relevé du patron : « la recherche scan de l'app consomme beaucoup de
+batterie sur l'iPhone ». Le gros de la dépense est RoomPlan lui-même —
+caméra à 60 images par seconde, LiDAR, reconstruction sur le Neural Engine —
+et ne se discute pas. Mais en relisant ce que NOUS ajoutons par-dessus,
+quatre postes tournaient pour rien :
+
+| Poste | Avant | Maintenant |
+|---|---|---|
+| L'aperçu envoyé au JavaScript | les surfaces entières (identifiant, dimensions, confiance, matrice de 16 nombres chacune), 2 fois par seconde, pour en tirer un compte de murs douteux | cinq nombres, comptés en natif, et seulement s'ils ont changé |
+| L'échantillonneur de couleurs | lisait l'image caméra 5 fois par seconde, téléphone immobile compris | ne lit que si l'œil a bougé de 2 cm ou tourné de 1° — avant même de verrouiller le tampon |
+| La boussole | magnétomètre et centrale inertielle jusqu'à la fin du scan | s'arrête d'elle-même après 120 relevés (une minute) : la moyenne circulaire ne bouge plus ensuite |
+| L'horloge des repères | 30 battements par seconde dès que la vue existait, repères ou pas | ne bat que s'il y a un repère à placer |
+
+**Et l'on mesure.** À la fin de chaque scan, le natif rend sa durée, la
+batterie consommée (à 1 % près, c'est ce qu'iOS donne) et l'état thermique ;
+le **Diagnostic** (Profil) l'affiche : « 5 min 12 s · −4 % de batterie ·
+iPhone tiède ». C'est le chiffre qui dira si une version fait mieux — et si
+l'étape suivante, le maillage LiDAR, coûte.
+
+Honnêtement : ces quatre postes font 10 à 20 % de la dépense d'un scan, pas
+plus. Le reste est à Apple, et la seule prise qu'on ait dessus est la
+configuration de la session ARKit — ce que la partie maillage va ouvrir.
+
+Banc : `batterie.test.tsx` (le compte vient du natif, l'ancien format se lit
+encore, les quatre règles dans la source Swift, la phrase du diagnostic, la
+fin d'un scan note sa dépense et le Diagnostic l'affiche).
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

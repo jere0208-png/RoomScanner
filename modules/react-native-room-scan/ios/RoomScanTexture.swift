@@ -47,6 +47,18 @@ final class RoomColorSampler {
    */
   private static let rate = 5.0
 
+  /**
+   ON NE LIT L'IMAGE QUE SI L'ŒIL A BOUGÉ.
+
+   Téléphone immobile — on lit la consigne, on regarde le compteur —, cinq
+   lectures par seconde donnaient cinq fois la même image, pour la même
+   médiane. Deux centimètres ou un degré : en deçà, rien de neuf à relever,
+   et l'on n'a même pas verrouillé le tampon de la caméra.
+   */
+  private static let SEUIL_DEPLACEMENT: Float = 0.02
+  private static let SEUIL_ROTATION_COS: Float = 0.99985  // cos(1°)
+  private var dernierePose: (position: SIMD3<Float>, visee: SIMD3<Float>)?
+
   // MARK: - Accumulateurs
 
   /// Combien d'échantillons on garde par case, et le minimum pour trancher.
@@ -160,6 +172,7 @@ final class RoomColorSampler {
       self.objects.removeAll()
       self.floorTiles.removeAll()
       self.room = nil
+      self.dernierePose = nil
     }
   }
 
@@ -174,6 +187,15 @@ final class RoomColorSampler {
     guard let session = session, let room = room,
           let frame = session.currentFrame else { return }
     guard case .normal = frame.camera.trackingState else { return }
+    let m = frame.camera.transform
+    let position = SIMD3<Float>(m.columns.3.x, m.columns.3.y, m.columns.3.z)
+    let visee = SIMD3<Float>(m.columns.2.x, m.columns.2.y, m.columns.2.z)
+    if let p = dernierePose,
+       simd_distance(p.position, position) < Self.SEUIL_DEPLACEMENT,
+       simd_dot(p.visee, visee) > Self.SEUIL_ROTATION_COS {
+      return
+    }
+    dernierePose = (position, visee)
     guard let img = FrameImage(frame: frame) else { return }
     defer { img.release() }
 

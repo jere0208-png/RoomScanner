@@ -17,6 +17,17 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
   private var stopResolver: RCTPromiseResolveBlock?
   private var stopRejecter: RCTPromiseRejectBlock?
   private var lastLiveEmit = Date.distantPast
+  /// Les cinq nombres du dernier aperçu envoyé : on ne renvoie pas le même.
+  private var dernierApercu: [Int] = []
+  /**
+   CE QUE LE SCAN COÛTE — relevé au départ, rendu à la fin.
+
+   Relevé du patron : « la recherche scan consomme beaucoup de batterie ».
+   Sans chiffre, on ne saura jamais si l'on a gagné quelque chose : iOS donne
+   le niveau à 1 % près, c'est assez pour comparer un scan à l'autre.
+   */
+  private var debutDuScan: Date?
+  private var batterieAuDepart: Float = -1
   // startRoomScan() est appelé côté JS AVANT que la vue AR soit montée :
   // on mémorise la demande et on lance la session à la création de la vue.
   private var pendingStart = false
@@ -161,7 +172,11 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
       }
     }
     if additif { self.additif = true }
+    dernierApercu = []
     DispatchQueue.main.async {
+      UIDevice.current.isBatteryMonitoringEnabled = true
+      self.debutDuScan = Date()
+      self.batterieAuDepart = UIDevice.current.batteryLevel
       // Une vue d'un scan précédent peut encore traîner, détachée de l'écran :
       // ne relancer la session que sur une vue réellement affichée.
       if let view = self.captureView, view.window != nil {
@@ -351,6 +366,26 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
 
   private func clearPromise() { stopResolver = nil; stopRejecter = nil }
 
+  /// Durée, batterie consommée (en points de pour cent) et chaleur.
+  private func energieDuScan() -> [String: Any] {
+    var out: [String: Any] = [
+      "secondes": debutDuScan.map { Date().timeIntervalSince($0) } ?? 0,
+    ]
+    let fin = UIDevice.current.batteryLevel
+    // Simulateur, ou niveau inconnu : −1. On ne l'invente pas.
+    if batterieAuDepart >= 0, fin >= 0 {
+      out["batterie"] = max(0, Double(batterieAuDepart - fin) * 100)
+    }
+    switch ProcessInfo.processInfo.thermalState {
+    case .nominal: out["thermique"] = "frais"
+    case .fair: out["thermique"] = "tiède"
+    case .serious: out["thermique"] = "chaud"
+    case .critical: out["thermique"] = "brûlant"
+    @unknown default: break
+    }
+    return out
+  }
+
   // MARK: - RoomCaptureViewDelegate (résultat final)
 
   // true = laisser RoomPlan post-traiter les données brutes.
@@ -514,6 +549,7 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
       if let north = RoomScanCompass.shared.northOffset {
         payload["north"] = north
       }
+      payload["energie"] = energieDuScan()
       RoomColorSampler.shared.detach()
       RoomScanCompass.shared.detach()
       stopResolver?(payload)
@@ -531,15 +567,33 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
     RoomColorSampler.shared.update(room: room)
     // C'est elle qui nommera le mur visé à la prochaine pose.
     vueCourante = room
-    // Throttle à 2 Hz : le JS n'a besoin que d'un aperçu.
+    /*
+      CINQ NOMBRES, DEUX FOIS PAR SECONDE AU PLUS, ET SEULEMENT S'ILS CHANGENT.
+
+      Les surfaces entières — identifiant, dimensions, confiance, matrice de
+      seize nombres chacune — traversaient le pont deux fois par seconde,
+      pour que le JavaScript en tire UN compte : les murs que RoomPlan voit
+      mal. Le compte se fait ici. Et un aperçu identique au précédent ne part
+      pas : réveiller le JavaScript pour lui redire la même chose, c'est de
+      la batterie pour rien.
+    */
     guard Date().timeIntervalSince(lastLiveEmit) > 0.5 else { return }
+    // « medium » compte autant que « low » : un mur moyen est un mur qu'on
+    // ferait mieux de repasser, et c'est gratuit tant qu'on est devant.
+    let douteux = room.walls.filter { s in
+      if case .high = s.confidence { return false }
+      return true
+    }.count
+    let apercu = [room.walls.count, room.objects.count, room.doors.count, room.windows.count, douteux]
+    guard apercu != dernierApercu else { return }
+    dernierApercu = apercu
     lastLiveEmit = Date()
     RoomScanEvents.shared?.emit(name: "onScanUpdate", body: [
       "wallCount": room.walls.count,
       "objectCount": room.objects.count,
       "doorCount": room.doors.count,
       "windowCount": room.windows.count,
-      "surfaces": Self.surfacesJSON(room),
+      "mursDouteux": douteux,
     ])
   }
 

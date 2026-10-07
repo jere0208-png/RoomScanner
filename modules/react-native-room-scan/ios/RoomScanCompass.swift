@@ -47,10 +47,17 @@ final class RoomScanCompass {
 
   /// Nombre de relevés en dessous duquel on préfère ne rien affirmer.
   private let minSamples = 4
+  /**
+   ET AU-DELÀ DUQUEL ON ARRÊTE LE CAPTEUR. Cent vingt relevés à 2 Hz, c'est
+   une minute : la moyenne circulaire ne bouge plus d'un dixième de degré
+   ensuite, et le magnétomètre et la centrale inertielle tournaient jusqu'à
+   la fin du scan pour rien.
+   */
+  private let maxSamples = 120
 
   func attach(to session: ARSession) {
     self.session = session
-    guard motion.isDeviceMotionAvailable else { return }
+    guard motion.isDeviceMotionAvailable, count < maxSamples else { return }
     if !motion.isDeviceMotionActive {
       motion.deviceMotionUpdateInterval = 0.2
       motion.startDeviceMotionUpdates(using: .xMagneticNorthZVertical)
@@ -93,6 +100,11 @@ final class RoomScanCompass {
     sumX += cos(offset)
     sumY += sin(offset)
     count += 1
+    if count >= maxSamples {
+      timer?.invalidate()
+      timer = nil
+      motion.stopDeviceMotionUpdates()
+    }
   }
 
   /// Cap de l'axe −Z du monde ARKit, en degrés horaires depuis le nord.

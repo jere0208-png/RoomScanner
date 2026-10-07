@@ -98,7 +98,21 @@ export interface ScanUpdate {
   objectCount: number;
   doorCount: number;
   windowCount: number;
-  surfaces: SurfaceData[];
+  /** Les murs que RoomPlan voit mal (confiance basse ou moyenne), comptés en natif. */
+  mursDouteux?: number;
+  /** Un natif ancien envoyait les surfaces entières : on sait encore les lire. */
+  surfaces?: SurfaceData[];
+}
+
+/**
+ * CE QUE LE SCAN A COÛTÉ. `batterie` en points de pour cent (absent quand iOS
+ * ne donne pas le niveau — simulateur) ; `thermique` : frais, tiède, chaud,
+ * brûlant.
+ */
+export interface EnergieDuScan {
+  secondes: number;
+  batterie?: number;
+  thermique?: string;
 }
 
 /**
@@ -108,6 +122,8 @@ export interface ScanUpdate {
  * du graphe des murs (`detectRooms`) puis les nomme d'après le mobilier.
  */
 export interface ScanResult {
+  /** Durée, batterie consommée, chaleur : voir `EnergieDuScan`. */
+  energie?: EnergieDuScan;
   /**
    * Ce qu'on a posé au viseur pendant le relevé : des points du monde,
    * que le JS rattache aux murs et aux plafonds (`ancrerElec`).
