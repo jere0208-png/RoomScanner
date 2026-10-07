@@ -35,6 +35,7 @@ import { FurnitureSheet } from './result/FurnitureSheet';
 import { PhotoSheet } from './result/PhotoSheet';
 import { PeintureSheet } from './result/PeintureSheet';
 import { Exploration } from '../components/Exploration';
+import { FondVerre } from '../components/FondVerre';
 import { RenameSheet } from './result/RenameSheet';
 import { RoomNameSheet } from './result/RoomNameSheet';
 import { Toolbar2D, Toolbar3D } from './result/ResultToolbar';
@@ -2721,6 +2722,7 @@ export function ResultScreen() {
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityLabel="Retour"
             onPress={sortirDuPlan}>
+            <FondVerre rayon={19} />
             <BackChevron color={teinte.ink} />
           </TouchableOpacity>
         </View>
@@ -3290,6 +3292,7 @@ export function ResultScreen() {
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           accessibilityLabel="Retour"
           onPress={sortirDuPlan}>
+          <FondVerre rayon={19} />
           <BackChevron color={teinte.ink} />
         </TouchableOpacity>
         <TouchableOpacity
@@ -3325,6 +3328,7 @@ export function ResultScreen() {
             accessibilityLabel="Exporter"
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             onPress={() => setExporting(true)}>
+            <FondVerre rayon={19} />
             {/* La silhouette Solar : centrée par construction — le dessin
                 lucide flottait au-dessus du centre de sa pastille. */}
             <Svg width={20} height={20} viewBox="0 0 24 24">
@@ -3337,6 +3341,7 @@ export function ResultScreen() {
           accessibilityLabel="Plus"
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           onPress={menuDuScan}>
+          <FondVerre rayon={19} />
           <Svg width={20} height={20} viewBox="0 0 24 24">
             <Trace d={SOLAIRES.points} fill={teinte.ink} fillRule="evenodd" />
           </Svg>
@@ -3992,6 +3997,7 @@ export function ResultScreen() {
                   haptic('leger');
                   setExplorant(true);
                 }}>
+                <FondVerre rayon={17} />
                 <Svg width={16} height={16} viewBox="0 0 24 24">
                   <Trace d={SOLAIRES.marcher} fill="#FFFFFF" fillRule="evenodd" />
                 </Svg>
@@ -4003,6 +4009,7 @@ export function ResultScreen() {
                 style={styles.vuePastille}
                 accessibilityLabel="Changer d’étage"
                 onPress={() => setMenu(menuDesEtages())}>
+                <FondVerre rayon={17} />
                 <Text style={styles.vuePastilleTexte}>
                   {abregerNiveau(niveauCourant)}
                 </Text>
@@ -4017,6 +4024,7 @@ export function ResultScreen() {
               style={styles.vuePastille}
               accessibilityLabel={vue === '2d' ? 'Passer en 3D' : 'Passer en 2D'}
               onPress={basculerVue}>
+              <FondVerre rayon={17} />
               <Text style={styles.vuePastilleTexte}>
                 {vue === '2d' ? '2D' : '3D'}
               </Text>

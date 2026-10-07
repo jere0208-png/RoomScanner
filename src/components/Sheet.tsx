@@ -698,7 +698,7 @@ const getStyles = themedStyles((c: Palette) =>
       justifyContent: 'center',
       zIndex: 5,
     },
-    title: { color: c.ink, fontSize: 18, fontWeight: '800', letterSpacing: -0.3 },
+    title: { color: c.ink, fontSize: 18, fontWeight: '600', letterSpacing: -0.3 },
     subtitle: {
       color: c.inkFaint,
       fontSize: 12.5,
@@ -800,6 +800,6 @@ const getStyles = themedStyles((c: Palette) =>
       alignItems: 'center',
       backgroundColor: c.blue,
     },
-    primaryText: { color: '#FFFFFF', fontWeight: '800', fontSize: 15 },
+    primaryText: { color: '#FFFFFF', fontWeight: '600', fontSize: 15 },
   }),
 );

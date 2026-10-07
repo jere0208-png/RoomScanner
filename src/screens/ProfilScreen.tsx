@@ -14,6 +14,7 @@
  * est une chose qu'on vient FAIRE ici, jamais une décoration.
  */
 import React, { useState } from 'react';
+import { FondVerre } from '../components/FondVerre';
 import {
   Pressable,
   ScrollView,
@@ -153,6 +154,7 @@ export function ProfilScreen() {
             style={s.rondBarre}
             hitSlop={10}
             onPress={() => setScreen('home')}>
+            <FondVerre rayon={20} />
             <BackChevron color={c.ink} />
           </Pressable>
           <Text style={s.titreBarre}>Profil</Text>
@@ -169,6 +171,7 @@ export function ProfilScreen() {
               style={s.rondBarre}
               hitSlop={10}
               onPress={() => setSupport(true)}>
+              <FondVerre rayon={20} />
               <Svg width={20} height={20} viewBox="0 0 24 24">
                 <Path d={SOLAIRES.tchat} fill={c.ink} fillRule="evenodd" />
               </Svg>
@@ -182,6 +185,7 @@ export function ProfilScreen() {
                 style={s.rondBarre}
                 hitSlop={10}
                 onPress={() => setMenu(true)}>
+                <FondVerre rayon={20} />
                 <MoreDots color={c.ink} size={20} />
               </Pressable>
             )}
@@ -578,11 +582,9 @@ const themed = (c: Palette) =>
       width: 40,
       height: 40,
       borderRadius: 20,
-      backgroundColor: c.surface,
+      backgroundColor: 'transparent',
       alignItems: 'center',
       justifyContent: 'center',
-      ...shadowCard,
-      shadowOpacity: 0.07,
     },
     titreBarre: { color: c.ink, fontSize: 17, fontWeight: '700' },
     // Deux ronds jumeaux à droite : le tchat, puis le menu.
@@ -606,7 +608,7 @@ const themed = (c: Palette) =>
     nom: {
       color: c.ink,
       fontSize: 21,
-      fontWeight: '800',
+      fontWeight: '700',
       textAlign: 'center',
       marginTop: 12,
     },
@@ -635,7 +637,7 @@ const themed = (c: Palette) =>
     section: {
       color: c.ink,
       fontSize: 16,
-      fontWeight: '800',
+      fontWeight: '600',
       marginTop: 26,
       marginBottom: 10,
     },
@@ -672,7 +674,7 @@ const themed = (c: Palette) =>
       paddingHorizontal: 15,
       paddingVertical: 9,
     },
-    boutonAboTexte: { color: c.bg, fontSize: 13, fontWeight: '800' },
+    boutonAboTexte: { color: c.bg, fontSize: 13, fontWeight: '600' },
     apparences: { flexDirection: 'row', gap: 12 },
     apparence: { flex: 1, alignItems: 'center', gap: 7 },
     apparenceRond: {
@@ -728,7 +730,7 @@ const themed = (c: Palette) =>
       ...shadowCard,
       shadowOpacity: 0.08,
     },
-    apparenceMotActif: { color: c.blue, fontWeight: '800' },
+    apparenceMotActif: { color: c.blue, fontWeight: '600' },
     rangee: {
       flexDirection: 'row',
       alignItems: 'center',

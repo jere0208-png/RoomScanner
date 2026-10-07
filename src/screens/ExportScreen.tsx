@@ -15,7 +15,7 @@ import Svg, { Path } from 'react-native-svg';
 import { SOLAIRES } from '../ui/solaires';
 import { RoomScan } from 'react-native-room-scan';
 import {
-  glow,
+  ombreAction,
   radius,
   shadowCard,
   themedStyles,
@@ -1145,7 +1145,7 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     borderRadius: radius.pill,
     paddingVertical: 16,
     alignItems: 'center',
-    ...glow(c.blue),
+    ...ombreAction,
   },
   exportText: { color: '#FFFFFF', fontSize: 15.5, fontWeight: '700' },
 }));

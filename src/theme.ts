@@ -176,11 +176,19 @@ export const shadowLift = {
   elevation: 6,
 };
 
-/** Ombre colorée d'un élément d'action : la teinte du bouton lui-même. */
-export const glow = (color: string) => ({
-  shadowColor: color,
-  shadowOpacity: 0.32,
-  shadowRadius: 14,
-  shadowOffset: { width: 0, height: 6 },
-  elevation: 6,
-});
+/**
+ * L'OMBRE D'UN ÉLÉMENT D'ACTION — neutre, courte, posée.
+ *
+ * Elle était de la couleur du bouton : un halo bleu sous chaque bouton bleu
+ * (`glow`). Relevé du patron : « rien ne doit faire vieillot ». Le halo
+ * coloré est l'effet qui date le plus une interface ; les grandes
+ * applications posent leurs boutons avec une ombre grise, courte, qui dit
+ * « au-dessus » sans rien éclairer.
+ */
+export const ombreAction = {
+  shadowColor: '#0B0D12',
+  shadowOpacity: 0.12,
+  shadowRadius: 10,
+  shadowOffset: { width: 0, height: 4 },
+  elevation: 4,
+};

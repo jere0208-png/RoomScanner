@@ -231,7 +231,7 @@ const getStyles = themedStyles((c: Palette) =>
     // La consigne dit QUOI toucher : bridée à 138 points elle sortait
     // tronquée (« Touchez l'interrupteur q… »), c'est-à-dire muette.
     attenteTextes: { flex: 1 },
-    attenteNom: { color: c.ink, fontSize: 13.5, fontWeight: '800' },
+    attenteNom: { color: c.ink, fontSize: 13.5, fontWeight: '600' },
     attenteHint: { color: c.inkFaint, fontSize: 11, marginTop: 1 },
     attenteClose: {
     width: 30,

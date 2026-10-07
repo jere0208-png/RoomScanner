@@ -9,7 +9,7 @@
  * tout le monde recoit LE MEME objet, sans un style recalcule.
  */
 import { StyleSheet } from 'react-native';
-import { glow, radius, shadowCard, themedStyles, type Palette } from '../../theme';
+import { ombreAction, radius, shadowCard, themedStyles, type Palette } from '../../theme';
 import { MARGE_RANGEE, PILL_GAP } from '../../components/ToolPill';
 
 /**
@@ -63,9 +63,9 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     borderRadius: radius.pill,
     paddingVertical: 15,
     alignItems: 'center',
-    ...glow(c.blue),
+    ...ombreAction,
   },
-  emptyTitle: { color: c.ink, fontSize: 22, fontWeight: '800' },
+  emptyTitle: { color: c.ink, fontSize: 22, fontWeight: '700' },
   emptyText: {
     color: c.inkSoft,
     fontSize: 14,
@@ -83,28 +83,22 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     marginLeft: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: c.surface,
-    ...shadowCard,
-    shadowOpacity: 0.07,
-    shadowRadius: 8,
+    backgroundColor: 'transparent',
   },
   backButton: {
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: c.surface,
+    backgroundColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
-    ...shadowCard,
-    shadowOpacity: 0.07,
-    shadowRadius: 8,
     marginRight: 12,
   },
   titleWrap: { flexDirection: 'row', alignItems: 'center', flex: 1 },
   title: {
     color: c.ink,
     fontSize: 24,
-    fontWeight: '800',
+    fontWeight: '700',
     // Un titre serré se lit comme un titre ; espacé, comme une étiquette.
     letterSpacing: -0.6,
     flexShrink: 1,
@@ -154,7 +148,7 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   metricValue: {
     color: c.ink,
     fontSize: 17,
-    fontWeight: '800',
+    fontWeight: '600',
     letterSpacing: -0.4,
   },
   metricLabel: {
@@ -188,11 +182,9 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     height: 34,
     paddingHorizontal: 12,
     borderRadius: radius.pill,
-    backgroundColor: c.surface,
-    ...shadowCard,
-    shadowOpacity: 0.1,
+    backgroundColor: 'transparent',
   },
-  vuePastilleTexte: { color: c.ink, fontSize: 14, fontWeight: '800' },
+  vuePastilleTexte: { color: c.ink, fontSize: 14, fontWeight: '600' },
   /*
     L'EXPLORATION, EN BLEU PLEIN — la seule pastille pleine de la rangée.
 
@@ -201,7 +193,7 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     du premier coup d'œil sur un plan qu'on vient de relever.
   */
   explorerPastille: { backgroundColor: c.blue, gap: 6, paddingHorizontal: 13 },
-  explorerPastilleTexte: { color: '#FFFFFF', fontSize: 14, fontWeight: '800' },
+  explorerPastilleTexte: { color: '#FFFFFF', fontSize: 14, fontWeight: '600' },
   canvas: { flex: 1, ...shadowCard, borderRadius: radius.lg },
   // Jusqu'à neuf pastilles : la barre défile plutôt que de se replier sur
   // deux rangs et de manger le plan.
@@ -355,14 +347,14 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     gap: 12,
   },
   photoLegende: { color: '#FFFFFF', fontSize: 13, fontWeight: '700', flex: 1 },
-  photoSuppr: { color: '#FF6B6B', fontSize: 13, fontWeight: '800' },
+  photoSuppr: { color: '#FF6B6B', fontSize: 13, fontWeight: '600' },
   /**
    * Le filigrane suit la forme du logotype : deux lignes, pas une bande.
    * Pas de teinte non plus — les ondes du dessin ne survivraient pas à un
    * aplat, et une capture se partage telle qu'elle est.
    */
   watermarkLogo: { width: 92, height: 59, opacity: 0.85 },
-  watermarkText: { color: '#0B0D12', fontSize: 13, fontWeight: '800' },
+  watermarkText: { color: '#0B0D12', fontSize: 13, fontWeight: '600' },
   watermarkAccent: { color: c.blue },
   /**
    * La pastille d'attente : EN BAS À GAUCHE.
@@ -388,7 +380,7 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   },
   wallLengthLabel: { color: c.inkFaint, fontSize: 12, fontWeight: '600', flex: 1 },
   /** La sortie d'un mode, posée contre ce qu'il annonce — jamais ailleurs. */
-  wallLengthDone: { color: c.blue, fontSize: 13, fontWeight: '800' },
+  wallLengthDone: { color: c.blue, fontSize: 13, fontWeight: '600' },
   // Le mur sélectionné : une seule ligne, au pied du plan, à côté du bouton
   // d'enregistrement. Elle dit l'essentiel et ne mange pas le dessin.
   /*
@@ -444,7 +436,7 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   wallStripText: { color: c.inkSoft, fontSize: 13, flexShrink: 1 },
   wallStripStrong: {
     color: c.ink,
-    fontWeight: '800',
+    fontWeight: '600',
     fontSize: 14,
     flexShrink: 0,
   },
@@ -472,7 +464,7 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     flexShrink: 1,
     minWidth: 0,
   },
-  wallStripActionText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
+  wallStripActionText: { color: '#FFFFFF', fontSize: 13, fontWeight: '600' },
   wallStripGhost: {
     backgroundColor: c.surfaceSunken,
     borderRadius: radius.pill,
@@ -482,7 +474,7 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     flexShrink: 1,
     minWidth: 0,
   },
-  wallStripGhostText: { color: c.inkSoft, fontSize: 13, fontWeight: '800' },
+  wallStripGhostText: { color: c.inkSoft, fontSize: 13, fontWeight: '600' },
   // Une seule ligne, au pied du plan, et LOIN du bouton d'enregistrement :
   // le bandeau faisait deux étages et son bouton de validation finissait
   // derrière la pastille bleue.
@@ -580,7 +572,7 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   */
   bandeauEntete: { flexDirection: 'row', alignItems: 'center', gap: 9 },
   bandeauTexte: { gap: 1, flexShrink: 1 },
-  bandeauTitre: { color: c.ink, fontSize: 14.5, fontWeight: '800' },
+  bandeauTitre: { color: c.ink, fontSize: 14.5, fontWeight: '600' },
   bandeauSous: { color: c.inkSoft, fontSize: 12, lineHeight: 15 },
   /*
     La partie basse : une rangée qui PASSE À LA LIGNE. C'est elle qui
@@ -708,8 +700,8 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   bandeauIcone: { color: c.blue },
   bandeauIconeDanger: { color: c.danger },
   bandeauIconePleine: { color: '#FFFFFF' },
-  bandeauBtnTexte: { color: '#FFFFFF', fontSize: 13.5, fontWeight: '800' },
-  bandeauBtnGhostTexte: { color: c.inkSoft, fontSize: 13.5, fontWeight: '800' },
+  bandeauBtnTexte: { color: '#FFFFFF', fontSize: 13.5, fontWeight: '600' },
+  bandeauBtnGhostTexte: { color: c.inkSoft, fontSize: 13.5, fontWeight: '600' },
   /*
     L'ANCIENNE CARTE, gardée pour les bandeaux qui portent des CHAMPS et pas
     seulement des boutons — les cotes d'un meuble, celles d'un appareil de
@@ -806,7 +798,7 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     // la ligne des cotes n'a plus personne à qui céder la place.
     flexShrink: 0,
   },
-  clValeur: { color: c.ink, fontSize: 15.5, fontWeight: '800' },
+  clValeur: { color: c.ink, fontSize: 15.5, fontWeight: '600' },
   /**
    * LE MOT D'UNE COTE, ÉCRIT DANS SA PASTILLE.
    *
@@ -982,7 +974,7 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
    * difforme — c'est ce qu'on voyait après l'ajout d'une pièce.
    */
   roomHead: { paddingHorizontal: 4, paddingBottom: 8 },
-  roomNom: { color: c.ink, fontSize: 15, fontWeight: '800' },
+  roomNom: { color: c.ink, fontSize: 15, fontWeight: '600' },
   roomCotes: { color: c.inkFaint, fontSize: 12.5, fontWeight: '600', marginTop: 1 },
   roomActions: {
     flexDirection: 'row',
@@ -1087,7 +1079,7 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   nameChipText: { color: c.ink, fontSize: 14, fontWeight: '600' },
   /** Les cotes de la pièce proposée, sous son nom. */
   nameChipDim: { color: c.inkFaint, fontSize: 11, fontWeight: '600' },
-  nameChipTextOn: { color: c.blue, fontWeight: '800' },
+  nameChipTextOn: { color: c.blue, fontWeight: '600' },
   removeRoomButton: {
     backgroundColor: c.surfaceSunken,
     borderRadius: radius.sm,
@@ -1115,7 +1107,7 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     paddingVertical: 16,
     alignItems: 'center',
     marginTop: 14,
-    ...glow(c.blue),
+    ...ombreAction,
   },
   switchRow: {
     flexDirection: 'row',
@@ -1137,7 +1129,7 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     borderRadius: radius.pill,
     paddingVertical: 15,
     alignItems: 'center',
-    ...glow(c.blue),
+    ...ombreAction,
   },
   primaryText: { color: '#FFFFFF', fontSize: 15.5, fontWeight: '700' },
   /** La seconde issue d'un écran vide : offerte, jamais mise en avant. */
@@ -1173,7 +1165,7 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     width: '100%',
     ...shadowCard,
   },
-  modalTitle: { color: c.ink, fontSize: 17, fontWeight: '800' },
+  modalTitle: { color: c.ink, fontSize: 17, fontWeight: '600' },
   elecWrap: { width: '100%' },
   // L'établi ne s'étire plus jusqu'au bas de l'écran : il fait la taille
   // de ce qu'il porte, et se pose au milieu de la hauteur libre.
@@ -1211,7 +1203,7 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     borderRadius: 4,
     backgroundColor: c.danger,
   },
-  elecCardTitle: { color: c.ink, fontSize: 13.5, fontWeight: '800', flex: 1 },
+  elecCardTitle: { color: c.ink, fontSize: 13.5, fontWeight: '600', flex: 1 },
   elecCardRule: {
     color: c.inkSoft,
     fontSize: 11.5,
@@ -1236,7 +1228,7 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 9,
   },
-  elecFixText: { color: '#FFFFFF', fontSize: 12.5, fontWeight: '800' },
+  elecFixText: { color: '#FFFFFF', fontSize: 12.5, fontWeight: '600' },
   elecSee: {
     backgroundColor: c.surfaceSunken,
     borderRadius: radius.sm,
@@ -1250,7 +1242,7 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   elecFamily: {
     color: c.inkFaint,
     fontSize: 11.5,
-    fontWeight: '800',
+    fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginTop: 12,
@@ -1385,7 +1377,7 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  elecDotText: { color: '#FFFFFF', fontSize: 9.5, fontWeight: '800' },
+  elecDotText: { color: '#FFFFFF', fontSize: 9.5, fontWeight: '600' },
   // La tuile du catalogue : elle porte le SYMBOLE normalisé du plan —
   // on choisit ce qu'on va lire, pas une pastille à sigle.
   elecTuile: {
@@ -1401,7 +1393,7 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   },
   /* Deux visages et le signe qui les unit : le combo. */
   elecDuo: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  elecPlus: { color: c.inkSoft, fontSize: 15, fontWeight: '800' },
+  elecPlus: { color: c.inkSoft, fontSize: 15, fontWeight: '600' },
   /* Le symbole normalisé, en insigne au coin de la photo. */
   elecInsigne: {
     position: 'absolute',

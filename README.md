@@ -14079,6 +14079,48 @@ vérifie pas ici — les ressorts, les tailles et les matières sont réglés au
 jugé, sur ce que font les grandes applications ; c'est l'IPA qui tranche,
 et une capture d'écran de ce qui cloche vaut mieux qu'une description.
 
+### E — Le plan, le devis, la bibliothèque : la même passe
+
+Relevé du patron : « Continue avec le plan, le devis et la bibliothèque ».
+Trois règles posées à la SOURCE — dans le thème et dans deux composants —
+plutôt qu'écran par écran : un style qui se règle à huit endroits diverge
+au neuvième.
+
+**1. Plus de halo coloré.** Chaque bouton bleu portait une ombre bleue
+(`glow`, dans le thème) : l'effet qui date le plus une interface. Il est
+remplacé par `ombreAction` — une ombre grise, courte, posée — et `glow`
+n'existe plus. Huit endroits en profitent d'un coup : les boutons pleins du
+plan, de l'export et de la bibliothèque, la pastille d'outil allumée.
+
+**2. Le verre sur ce qui flotte.** Les boutons ronds des barres (retour,
+icônes du plan, devis, bibliothèque, profil) et les pastilles posées sur le
+plan (outils, 2D/3D, étage, Explorer, prix, contrôle) étaient des disques
+blancs à ombre portée. Ils perdent leur fond et leur ombre, et
+`components/FondVerre.tsx` se glisse dessous : le verre d'iOS au même rayon,
+bordé d'un filet d'un demi-point — sur le fond clair et uni d'une barre, un
+verre sans bord disparaîtrait dans la page. Une pastille allumée se peint
+toujours en bleu plein et le recouvre ; les contours de sens (vert, rouge,
+gris du contrôle ; bleu du prix) restent.
+
+**3. Des graisses d'Apple.** Les écrans criaient en 800 et 900 — plus de
+cinquante styles. Ils passent à **700 pour les grands titres** (20 pt et
+plus) et **600 pour tout le reste** : c'est la hiérarchie d'iOS, où le gras
+se réserve à ce qui ouvre une page.
+
+**Et un motif d'Android en moins.** La bibliothèque créait ses dossiers par
+un bouton rond flottant en bas à droite — le motif de Material, pas d'iOS.
+« Nouveau dossier » vit maintenant dans la barre, à droite, en disque de
+verre jumeau du retour, le « + » à l'encre de la maison — comme Notes,
+Rappels ou Fichiers. La liste rend les 64 points qu'elle gardait pour le
+dégager.
+
+Banc : `passestyle.test.tsx` (`glow` n'existe plus et aucune source ne
+l'appelle ; les pastilles d'outil, de prix et de contrôle ont leur verre,
+sans fond blanc ni ombre, contours de sens gardés ; le compte des fonds de
+verre écran par écran ; ni 800 ni 900 sur les écrans et feuilles touchés,
+700 gardé au grand titre ; « Nouveau dossier » dans la barre, sans bouton
+flottant).
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

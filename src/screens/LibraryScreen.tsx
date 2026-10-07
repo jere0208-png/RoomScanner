@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { FondVerre } from '../components/FondVerre';
 import { BackChevron } from '../components/BackChevron';
 import { RetourGlisse } from '../components/RetourGlisse';
 import { garderLeTravail } from '../ui/gardeTravail';
@@ -16,7 +17,7 @@ import {
 } from 'react-native';
 import Svg, { G, Line, Path, Polygon, Rect, Text as SvgText } from 'react-native-svg';
 import {
-  glow,
+  ombreAction,
   radius,
   shadowCard,
   themedStyles,
@@ -1083,6 +1084,7 @@ export function LibraryScreen() {
           // rien : le nom s'écrit.
           accessibilityLabel="Retour"
           onPress={() => (dossierOuvert ? setInside(null) : setScreen('home'))}>
+          <FondVerre rayon={19} />
           <BackChevron color={palette.ink} />
         </TouchableOpacity>
         {/*
@@ -1101,6 +1103,35 @@ export function LibraryScreen() {
         <View style={styles.countPill}>
           <Text style={styles.countText}>{liste.length}</Text>
         </View>
+        {/*
+          « NOUVEAU DOSSIER » VIT DANS LA BARRE, À DROITE — plus en bouton
+          flottant. Relevé du patron : « un style plus "Apple like" ». Le
+          rond bleu posé en bas à droite de la liste est un motif d'Android
+          (Material) ; sur iOS, l'action principale d'une liste se tient en
+          haut à droite de sa barre — Notes, Rappels, Fichiers. Un disque de
+          verre, jumeau du retour, le « + » à l'encre de la maison.
+        */}
+        {!dossierOuvert && (
+          <TouchableOpacity
+            style={styles.ajouter}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityLabel="Nouveau dossier"
+            onPress={() => addFolder()}>
+            <FondVerre rayon={19} />
+            <Svg width={20} height={20} viewBox="0 0 24 24">
+              {['M12 5 v14', 'M5 12 h14'].map((d) => (
+                <Path
+                  key={d}
+                  d={d}
+                  stroke={palette.blue}
+                  strokeWidth={2.4}
+                  strokeLinecap="round"
+                  fill="none"
+                />
+              ))}
+            </Svg>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/*
@@ -1309,8 +1340,6 @@ export function LibraryScreen() {
         </ScrollView>
       )}
 
-      {/* Créer un dossier : bouton flottant en bas à droite, là où le pouce
-          tombe naturellement. */}
       <ActionSheet data={menu} onClose={() => setMenu(null)} />
       <AlerteSortie
         data={alerteSortie}
@@ -1318,26 +1347,6 @@ export function LibraryScreen() {
       />
       <PromptSheet data={prompt} onClose={() => setPrompt(null)} />
 
-      {!dossierOuvert && (
-        <TouchableOpacity
-          style={styles.fab}
-          activeOpacity={0.85}
-          accessibilityLabel="Nouveau dossier"
-          onPress={() => addFolder()}>
-          <Svg width={26} height={26} viewBox="0 0 24 24">
-            {['M12 5 v14', 'M5 12 h14'].map((d) => (
-              <Path
-                key={d}
-                d={d}
-                stroke="#FFFFFF"
-                strokeWidth={2.6}
-                strokeLinecap="round"
-                fill="none"
-              />
-            ))}
-          </Svg>
-        </TouchableOpacity>
-      )}
     </View>
     </RetourGlisse>
   );
@@ -1388,18 +1397,15 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     backgroundColor: c.surface,
     justifyContent: 'center',
   },
-  triText: { color: c.blue, fontSize: 13.5, fontWeight: '800' },
+  triText: { color: c.blue, fontSize: 13.5, fontWeight: '600' },
   rowClient: { color: c.blue, fontSize: 12, fontWeight: '700', marginTop: 1 },
   backButton: {
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: c.surface,
+    backgroundColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
-    ...shadowCard,
-    shadowOpacity: 0.07,
-    shadowRadius: 8,
     marginRight: 12,
   },
   /* Cinquante-six points de part et d'autre : la largeur du bouton de
@@ -1408,7 +1414,7 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   title: {
     color: c.ink,
     fontSize: 24,
-    fontWeight: '800',
+    fontWeight: '700',
     letterSpacing: -0.5,
     flexShrink: 1,
   },
@@ -1424,7 +1430,7 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  countText: { color: c.blue, fontSize: 13.5, fontWeight: '800' },
+  countText: { color: c.blue, fontSize: 13.5, fontWeight: '600' },
   /**
    * LA BULLE — une carte qu'on tient au bout du doigt.
    *
@@ -1477,10 +1483,11 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 16,
     alignItems: 'center',
-    ...glow(c.blue),
+    ...ombreAction,
   },
-  dragHintText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
-  list: { paddingTop: 6, paddingBottom: 104 },
+  dragHintText: { color: '#FFFFFF', fontSize: 13, fontWeight: '600' },
+  // Plus de bouton flottant à dégager en bas : la liste respire, sans plus.
+  list: { paddingTop: 6, paddingBottom: 40 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 4, marginBottom: 20 },
   tile: { width: '33.33%', alignItems: 'center', marginBottom: 18 },
   tileTouch: { alignItems: 'center', width: 96 },
@@ -1500,7 +1507,7 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     shadowOpacity: 0.14,
     shadowRadius: 6,
   },
-  tileBadgeText: { color: c.ink, fontSize: 11.5, fontWeight: '800' },
+  tileBadgeText: { color: c.ink, fontSize: 11.5, fontWeight: '600' },
   tileName: {
     color: c.ink,
     fontSize: 12.5,
@@ -1561,21 +1568,16 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  fab: {
-    position: 'absolute',
-    right: 18,
-    bottom: 34,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: c.blue,
+  ajouter: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    marginLeft: 'auto',
     alignItems: 'center',
     justifyContent: 'center',
-    ...glow(c.blue),
-    shadowOpacity: 0.4,
   },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
-  emptyTitle: { color: c.ink, fontSize: 19, fontWeight: '800', marginTop: 14 },
+  emptyTitle: { color: c.ink, fontSize: 19, fontWeight: '600', marginTop: 14 },
   emptyText: {
     color: c.inkSoft,
     fontSize: 14,
@@ -1590,7 +1592,7 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     paddingVertical: 15,
     paddingHorizontal: 30,
     alignItems: 'center',
-    ...glow(c.blue),
+    ...ombreAction,
   },
   primaryText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
 }));

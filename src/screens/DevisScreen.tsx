@@ -46,6 +46,7 @@
  * Il avait raison sur le fond — on ne lit pas un prix en attendant son tour.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { FondVerre } from '../components/FondVerre';
 import {
   ScrollView,
   TextInput,
@@ -628,6 +629,7 @@ export function DevisScreen() {
           accessibilityLabel="Retour"
           accessibilityRole="button"
           onPress={() => setScreen('result')}>
+          <FondVerre rayon={19} />
           <BackChevron color={c.ink} />
         </TouchableOpacity>
         <Text style={styles.titrePage}>Devis</Text>
@@ -1116,17 +1118,14 @@ const getStyles = themedStyles((c: Palette) =>
       width: 38,
       height: 38,
       borderRadius: 19,
-      backgroundColor: c.surface,
+      backgroundColor: 'transparent',
       alignItems: 'center',
       justifyContent: 'center',
-      ...shadowCard,
-      shadowOpacity: 0.07,
-      shadowRadius: 8,
     },
     titrePage: {
       color: c.ink,
       fontSize: 21,
-      fontWeight: '800',
+      fontWeight: '700',
       letterSpacing: -0.3,
       marginLeft: 12,
     },
@@ -1152,7 +1151,7 @@ const getStyles = themedStyles((c: Palette) =>
       justifyContent: 'center',
     },
     pastillePleine: { backgroundColor: c.blue, borderColor: c.blue },
-    pastilleTexte: { color: c.inkFaint, fontSize: 14, fontWeight: '800' },
+    pastilleTexte: { color: c.inkFaint, fontSize: 14, fontWeight: '600' },
     pastilleTexteFort: { color: '#FFFFFF' },
     filNom: { color: c.inkFaint, fontSize: 11, fontWeight: '700', marginTop: 5 },
     filNomFort: { color: c.ink },
@@ -1160,14 +1159,14 @@ const getStyles = themedStyles((c: Palette) =>
     rang: {
       color: c.blue,
       fontSize: 11.5,
-      fontWeight: '800',
+      fontWeight: '600',
       letterSpacing: 1.1,
     },
     gros: {
       color: c.ink,
       fontSize: 30,
       lineHeight: 35,
-      fontWeight: '800',
+      fontWeight: '700',
       letterSpacing: -0.9,
       marginTop: 2,
       marginBottom: 4,
@@ -1193,7 +1192,7 @@ const getStyles = themedStyles((c: Palette) =>
       shadowOpacity: 0.05,
     },
     carteChoisie: { borderColor: c.blue },
-    carteNom: { color: c.ink, fontSize: 15.5, fontWeight: '800' },
+    carteNom: { color: c.ink, fontSize: 15.5, fontWeight: '600' },
     carteNote: {
       color: c.inkFaint,
       fontSize: 12,
@@ -1210,7 +1209,7 @@ const getStyles = themedStyles((c: Palette) =>
       justifyContent: 'center',
     },
     cocheOn: { backgroundColor: c.blue, borderColor: c.blue },
-    cocheTexte: { color: '#FFFFFF', fontSize: 14, fontWeight: '800' },
+    cocheTexte: { color: '#FFFFFF', fontSize: 14, fontWeight: '600' },
     // ----------------------------------------------------- les exclusions
     exclusion: { flexDirection: 'row', gap: 9, marginBottom: 12 },
     tiret: { color: c.inkFaint, fontSize: 14, lineHeight: 19 },
@@ -1224,7 +1223,7 @@ const getStyles = themedStyles((c: Palette) =>
       paddingVertical: 11,
       marginTop: 6,
     },
-    manqueTitre: { color: c.ink, fontSize: 13.5, fontWeight: '800' },
+    manqueTitre: { color: c.ink, fontSize: 13.5, fontWeight: '600' },
     manqueTexte: {
       color: c.inkFaint,
       fontSize: 12,
@@ -1268,7 +1267,7 @@ const getStyles = themedStyles((c: Palette) =>
     enseigne: {
       color: c.ink,
       fontSize: 13,
-      fontWeight: '800',
+      fontWeight: '600',
       letterSpacing: 1.6,
     },
     sousEnseigne: { color: c.inkFaint, fontSize: 11.5, marginTop: 3 },
@@ -1287,11 +1286,11 @@ const getStyles = themedStyles((c: Palette) =>
     rayonNom: {
       color: c.ink,
       fontSize: 12,
-      fontWeight: '800',
+      fontWeight: '600',
       letterSpacing: 0.6,
       textTransform: 'uppercase',
     },
-    rayonPrix: { color: c.ink, fontSize: 13, fontWeight: '800' },
+    rayonPrix: { color: c.ink, fontSize: 13, fontWeight: '600' },
     /* Une ligne d'article : la photo, le nom, le compte, le prix. Aucun
        cadre, aucune ombre — un ticket est une colonne, pas des cartes. */
     article: {
@@ -1365,14 +1364,14 @@ const getStyles = themedStyles((c: Palette) =>
     gammeRole: {
       color: c.blue,
       fontSize: 10,
-      fontWeight: '800',
+      fontWeight: '600',
       letterSpacing: 0.8,
       opacity: 0.8,
     },
-    gammeNom: { color: c.blue, fontSize: 15, fontWeight: '900' },
+    gammeNom: { color: c.blue, fontSize: 15, fontWeight: '700' },
     /* Le bandeau des tarifs respire au-dessus des outils de recherche. */
     bandeauTarifs: { marginBottom: 12 },
-    articlePrix: { color: c.ink, fontSize: 14, fontWeight: '800' },
+    articlePrix: { color: c.ink, fontSize: 14, fontWeight: '600' },
     /* Un article écarté : barré et pâli, mais TOUJOURS LISIBLE — c'est son
        prix qu'on regarde pour décider de le remettre. */
     barre: {
@@ -1411,13 +1410,13 @@ const getStyles = themedStyles((c: Palette) =>
     totalNom: {
       color: c.ink,
       fontSize: 14,
-      fontWeight: '800',
+      fontWeight: '600',
       letterSpacing: 1.2,
     },
     total: {
       color: c.blue,
       fontSize: 30,
-      fontWeight: '800',
+      fontWeight: '700',
       letterSpacing: -0.9,
     },
     mentions: {
@@ -1443,7 +1442,7 @@ const getStyles = themedStyles((c: Palette) =>
       paddingVertical: 5,
     },
     legendeNom: { flex: 1, color: c.inkSoft, fontSize: 12.5 },
-    legendeCompte: { color: c.ink, fontSize: 12.5, fontWeight: '800' },
+    legendeCompte: { color: c.ink, fontSize: 12.5, fontWeight: '600' },
     // ------------------------------------------------------------ l'action
     action: {
       height: 50,
@@ -1454,6 +1453,6 @@ const getStyles = themedStyles((c: Palette) =>
       marginTop: 10,
       marginBottom: 22,
     },
-    actionTexte: { color: '#FFFFFF', fontSize: 16, fontWeight: '800' },
+    actionTexte: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
   }),
 );
