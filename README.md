@@ -14053,6 +14053,32 @@ au repos, l'enfoncement branché, « Vérification… » éteint ; « Dessiner u
 plan » primaire sans LiDAR ; le compte de « Mes scans » sur la ligne du
 mot).
 
+### D — Les pages entrent en scène
+
+Relevé du patron : « des mouvements fluides de motion design ». Les écrans
+se remplaçaient d'une **coupe sèche** dans `App.tsx` : on touchait
+« Profil », et la page était là, sans que rien ne l'ait amenée. C'est ce qui
+fait « fébrile » plus que tout le reste — une application dont les pages
+apparaissent n'a pas de profondeur.
+
+`components/Scene.tsx` donne à chaque page son entrée, avec un ressort et le
+pilote natif (soixante images par seconde sans toucher au fil JavaScript) :
+
+| Pages | Entrée |
+|---|---|
+| Profil, Confidentialité, Mes scans, Export, Devis, Magasin, Gamme | **poussée** : la page vient de la droite (36 pt) en s'allumant — la pile de navigation d'iOS, celle qu'un pouce connaît ; le bord gauche la ramène (`RetourGlisse`) |
+| Accueil, Plan | **fondu** : la page s'allume en grandissant d'un rien (0,98 → 1) — elles ne sont pas « sous » une autre page |
+| Scan, Caméra | **aucune** : on ne fait pas attendre un capteur |
+
+Banc : `scene.test.tsx` (la page est portée et amenée par des valeurs
+animées, pas des nombres figés ; le fondu grandit, la poussée glisse ; dans
+`App.tsx`, chaque page a son entrée et la caméra n'en a pas).
+
+Ce qui reste à faire, et que je n'ai pas fait : le rendu lui-même ne se
+vérifie pas ici — les ressorts, les tailles et les matières sont réglés au
+jugé, sur ce que font les grandes applications ; c'est l'IPA qui tranche,
+et une capture d'écran de ce qui cloche vaut mieux qu'une description.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

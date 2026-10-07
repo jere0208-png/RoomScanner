@@ -24,6 +24,7 @@ import { AstuceHote } from './src/components/AstuceHote';
 import { GardeFou } from './src/components/GardeFou';
 import { usePannes } from './src/ui/journalPannes';
 import { PremierLancement } from './src/components/PremierLancement';
+import { Scene } from './src/components/Scene';
 import { usePremieresFois } from './src/store/premieresFois';
 import { useUsage } from './src/store/usage';
 import { useScanStore } from './src/store/scanStore';
@@ -254,16 +255,58 @@ function Application() {
         barStyle={darkContent ? 'dark-content' : 'light-content'}
         backgroundColor={screen === 'scan' ? '#000000' : c.bg}
       />
-      {screen === 'home' && <HomeScreen />}
-      {screen === 'profil' && <ProfilScreen />}
-      {screen === 'confidentialite' && <ConfidentialiteScreen />}
+      {/*
+        CHAQUE PAGE ENTRE EN SCÈNE — voir `components/Scene`. Les pages
+        qu'on ouvre depuis l'accueil sont POUSSÉES, comme la pile d'iOS ;
+        l'accueil et le plan se FONDENT ; la caméra et le scan restent à
+        l'image même — on ne fait pas attendre un capteur.
+      */}
+      {screen === 'home' && (
+        <Scene entree="fondu">
+          <HomeScreen />
+        </Scene>
+      )}
+      {screen === 'profil' && (
+        <Scene entree="poussee">
+          <ProfilScreen />
+        </Scene>
+      )}
+      {screen === 'confidentialite' && (
+        <Scene entree="poussee">
+          <ConfidentialiteScreen />
+        </Scene>
+      )}
       {screen === 'scan' && <ScanScreen />}
-      {screen === 'result' && <ResultScreen />}
-      {screen === 'library' && <LibraryScreen />}
-      {screen === 'export' && <ExportScreen />}
-      {screen === 'devis' && <DevisScreen />}
-      {screen === 'magasin' && <MagasinScreen />}
-      {screen === 'gamme' && <GammeScreen />}
+      {screen === 'result' && (
+        <Scene entree="fondu">
+          <ResultScreen />
+        </Scene>
+      )}
+      {screen === 'library' && (
+        <Scene entree="poussee">
+          <LibraryScreen />
+        </Scene>
+      )}
+      {screen === 'export' && (
+        <Scene entree="poussee">
+          <ExportScreen />
+        </Scene>
+      )}
+      {screen === 'devis' && (
+        <Scene entree="poussee">
+          <DevisScreen />
+        </Scene>
+      )}
+      {screen === 'magasin' && (
+        <Scene entree="poussee">
+          <MagasinScreen />
+        </Scene>
+      )}
+      {screen === 'gamme' && (
+        <Scene entree="poussee">
+          <GammeScreen />
+        </Scene>
+      )}
       {screen === 'camera' && <CameraScreen />}
       <PaywallScreen />
       <EssaiEpuise />
