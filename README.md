@@ -13910,6 +13910,43 @@ Banc : `batterie.test.tsx` (le compte vient du natif, l'ancien format se lit
 encore, les quatre règles dans la source Swift, la phrase du diagnostic, la
 fin d'un scan note sa dépense et le Diagnostic l'affiche).
 
+### 9 — Le maillage LiDAR, première étape : le relever
+
+Relevé du patron : « lent pour vraiment comprendre la structure des parois,
+ne forme pas les angles des retours de volets roulants ». RoomPlan rend des
+murs plans, sans épaisseur, et tout relief de moins de vingt ou trente
+centimètres disparaît — le coffre de volet roulant, la niche, le retour
+court. Sous lui, ARKit tient pourtant la vraie surface : un maillage de
+triangles à un ou deux centimètres, **classé** (mur, sol, plafond, porte,
+fenêtre, table, siège).
+
+On ne bâtit pas une détection sur une pièce imaginée. **Cette étape relève
+la matière** : à la fin de chaque scan, juste avant d'arrêter la session
+(après, il n'y a plus d'image courante, donc plus d'ancres),
+`RoomScanMaillage.swift` lit les ancres de maillage de la session de
+RoomPlan — sans rien lui disputer —, passe les sommets dans le monde, et
+écrit le tout dans un fichier compact (`maillage-<id>.bin`, six à dix
+mégaoctets, un seul gardé). Le **Diagnostic** le décrit (« 38 ancres ·
+312 000 faces · classé · 7,2 Mo ») et le bouton **Partager le maillage**
+l'envoie par la feuille iOS (AirDrop, Mail, Fichiers).
+
+Le format est lu ici par `geometry/maillage.ts` (`lireMaillage`,
+`ecrireMaillage`) : c'est ce qui permettra de **rejouer des pièces réelles
+au banc** — avec coffres de volets, niches, cloisons scannées des deux
+côtés — et d'y bâtir la détection, triangle par triangle, avant d'en mettre
+une ligne dans l'app.
+
+**Ce qu'on ne sait pas encore, et que le premier scan dira** : si la session
+de RoomPlan expose ses ancres de maillage à qui les lit (« aucun maillage
+LiDAR reçu » sinon), et si elles sont classées. Si non, la suite passera par
+notre propre session ARKit (iOS 17, `RoomCaptureSession(arSession:)`), ce
+qui ouvre aussi le réglage du format vidéo — la seule vraie prise sur la
+batterie qui reste.
+
+Banc : `maillage.test.tsx` (le format se relit exactement, ancre par ancre,
+classes comprises ; le natif lit avant d'arrêter, sort les indices sur
+quatre octets, ne garde qu'un fichier ; le Diagnostic décrit et partage).
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

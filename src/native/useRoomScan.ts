@@ -172,7 +172,9 @@ function resumerLeReleve() {
         const result = await RoomScan.stop();
         // Ce que ce scan a coûté : noté même si l'on abandonne ensuite, c'est
         // une mesure, pas un dossier.
-        if (result?.energie) usePannes.getState().noterScan(result.energie);
+        if (result?.energie) {
+          usePannes.getState().noterScan(result.energie, result.maillage);
+        }
         /*
           ET SI L'ON A ABANDONNÉ ENTRE-TEMPS, ON N'OUVRE RIEN.
 

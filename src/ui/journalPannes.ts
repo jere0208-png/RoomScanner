@@ -29,6 +29,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import type { EnergieDuScan } from 'react-native-room-scan';
+import type { MaillageReleve } from '../geometry/maillage';
 
 export interface Panne {
   /** Quand, en millisecondes depuis l'époque : l'affichage met en français. */
@@ -65,8 +66,8 @@ interface EtatPannes {
    * beaucoup de batterie ». Un chiffre par scan, ici, pour comparer — un scan
    * à l'autre, une version à l'autre.
    */
-  dernierScan: (EnergieDuScan & { quand: number }) | null;
-  noterScan: (e: EnergieDuScan) => void;
+  dernierScan: (EnergieDuScan & { quand: number; maillage?: MaillageReleve }) | null;
+  noterScan: (e: EnergieDuScan, maillage?: MaillageReleve) => void;
   charger: () => Promise<void>;
   vider: () => void;
 }
@@ -75,12 +76,13 @@ export const usePannes = create<EtatPannes>((set) => ({
   charge: false,
   incidents: [],
   dernierScan: null,
-  noterScan: (e) => {
+  noterScan: (e, maillage) => {
     const d = {
       secondes: e.secondes,
       batterie: e.batterie,
       thermique: e.thermique,
       quand: Date.now(),
+      ...(maillage ? { maillage } : {}),
     };
     set({ dernierScan: d });
     AsyncStorage.setItem(CLE_ENERGIE, JSON.stringify(d)).catch(() => {});

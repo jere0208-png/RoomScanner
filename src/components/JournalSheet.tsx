@@ -23,6 +23,8 @@ import { SheetShell } from './Sheet';
 import { radius, themedStyles, useTheme, type Palette } from '../theme';
 import { datePanne, usePannes } from '../ui/journalPannes';
 import { phraseEnergie } from '../ui/energie';
+import { phraseMaillage } from '../geometry/maillage';
+import { RoomScan } from 'react-native-room-scan';
 
 export function JournalSheet({
   visible,
@@ -55,6 +57,25 @@ export function JournalSheet({
         <View style={s.bloc}>
           <Text style={s.entete}>{`${datePanne(dernierScan.quand)} · dernier scan`}</Text>
           <Text style={s.message}>{phraseEnergie(dernierScan)}</Text>
+          {/*
+            LE MAILLAGE LIDAR, ET LE MOYEN DE L'ENVOYER. C'est la matière
+            sur laquelle la détection des coffres et des épaisseurs se
+            bâtit : un scan réel vaut toutes les pièces imaginées.
+          */}
+          {dernierScan.maillage && (
+            <Text style={s.message}>{`Maillage LiDAR : ${phraseMaillage(dernierScan.maillage)}`}</Text>
+          )}
+          {!!dernierScan.maillage?.fichier && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Partager le maillage"
+              style={s.partager}
+              onPress={() => {
+                RoomScan.shareFile(dernierScan.maillage!.fichier!).catch(() => {});
+              }}>
+              <Text style={s.partagerMot}>Partager le maillage</Text>
+            </Pressable>
+          )}
         </View>
       )}
       {incidents.length > 0 && (
@@ -118,6 +139,8 @@ const getStyles = themedStyles((c: Palette) =>
     message: { color: c.ink, fontSize: 13.5, lineHeight: 18, marginTop: 4 },
     /* La pile en petit : elle sert à la recopier, pas à la lire. */
     pile: { color: c.inkFaint, fontSize: 10.5, lineHeight: 14, marginTop: 6 },
+    partager: { alignSelf: 'flex-start', paddingVertical: 8, marginTop: 6 },
+    partagerMot: { color: c.blue, fontSize: 14.5, fontWeight: '700' },
     vider: { alignSelf: 'center', paddingVertical: 12, marginTop: 4 },
     viderMot: { color: c.danger, fontSize: 14.5, fontWeight: '700' },
   }),

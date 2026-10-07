@@ -28,6 +28,8 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
    */
   private var debutDuScan: Date?
   private var batterieAuDepart: Float = -1
+  /// Le maillage LiDAR relevé à l'arrêt (voir `RoomScanMaillage`).
+  private var maillageReleve: [String: Any]?
   // startRoomScan() est appelé côté JS AVANT que la vue AR soit montée :
   // on mémorise la demande et on lance la session à la création de la vue.
   private var pendingStart = false
@@ -360,6 +362,11 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
     // Déclenche le post-traitement RoomPlan ; le résultat final
     // arrive dans captureView(didPresent:error:).
     DispatchQueue.main.async {
+      // Le maillage se lit AVANT l'arrêt : une session arrêtée n'a plus
+      // d'image courante, donc plus d'ancres.
+      if let session = self.captureView?.captureSession.arSession {
+        self.maillageReleve = RoomScanMaillage.relever(from: session)
+      }
       self.captureView?.captureSession.stop()
     }
   }
@@ -550,6 +557,9 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
         payload["north"] = north
       }
       payload["energie"] = energieDuScan()
+      if let maillage = maillageReleve {
+        payload["maillage"] = maillage
+      }
       RoomColorSampler.shared.detach()
       RoomScanCompass.shared.detach()
       stopResolver?(payload)

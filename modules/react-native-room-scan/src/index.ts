@@ -125,6 +125,18 @@ export interface ScanResult {
   /** Durée, batterie consommée, chaleur : voir `EnergieDuScan`. */
   energie?: EnergieDuScan;
   /**
+   * LE MAILLAGE LIDAR relevé à l'arrêt : combien d'ancres, de faces, s'il
+   * est classé, et le fichier où il est écrit (voir `geometry/maillage`).
+   */
+  maillage?: {
+    ancres: number;
+    faces: number;
+    sommets: number;
+    classe: boolean;
+    fichier?: string;
+    octets?: number;
+  };
+  /**
    * Ce qu'on a posé au viseur pendant le relevé : des points du monde,
    * que le JS rattache aux murs et aux plafonds (`ancrerElec`).
    */
