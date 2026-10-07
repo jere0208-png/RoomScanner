@@ -13991,6 +13991,40 @@ manette naît sous le pouce et s'efface, tourner la tête, le regard borné,
 (le voile porte ses enfants ; le natif met l'effet sous les enfants et suit
 le rayon).
 
+### B — Le premier lancement et le guide d'avant-scan : un grand visuel, un grand titre
+
+Relevé du patron : « pour les étapes tuto (avant un scan, ou au lancement
+de l'app), j'imaginais des gros titres avec grandes images très visuelles »,
+référence à l'appui — un visuel qui prend la moitié haute dans une carte
+douce, un titre gras sur deux lignes, une phrase grise courte, des tirets de
+pagination en haut à gauche, « Passer » en haut à droite, un seul bouton
+pilule pleine largeur.
+
+**Un seul cadre, `components/Presentation.tsx`**, pour les deux entrées : le
+premier lancement (le plan qui se trace, se meuble, se lève, puis la
+question du mode) et le guide d'avant-scan (viser, poser, le repère qui
+reste). Deux présentations dessinées chacune de leur côté auraient divergé à
+la première retouche ; ici elles partagent le cadre, le rythme et le geste,
+et ne diffèrent que par ce qu'elles montrent.
+
+| | Avant | Maintenant |
+|---|---|---|
+| Visuel | une feuille de 292 × 236 au centre | la moitié haute de l'écran, dans une carte douce (`blueSoft`), à la taille du téléphone |
+| Titre | 25 pt | 34 pt, gras, deux lignes, lettrage resserré |
+| Pagination | points centrés en bas | tirets en haut à gauche, le vif plus long |
+| Guide d'avant-scan | une carte posée sur un voile sombre, scènes de 118 pt | plein écran, même cadre que le lancement, scènes agrandies à la largeur |
+| Mouvement | aucun | à chaque page, le visuel entre d'un souffle (0,96 → 1), titre et phrase montent de 18 pt en s'allumant — un ressort, pas une minuterie ; on balaie entre les pages |
+
+Le visuel reçoit une taille dès la première image (déduite de l'écran, puis
+précisée à la pose) : sans cela, il arriverait une image en retard — un
+clignement à chaque ouverture.
+
+Bancs : `presentation.test.tsx` (taille dès la première image, titre sur
+deux lignes à 34 pt, les tirets et le vif, Suivant / Passer / la dernière
+page, la page à corps libre sans bouton), `premierlancement.test.tsx` et
+`guidepose.test.tsx` (inchangés dans ce qu'ils exigent : les trois temps,
+la question, le papier, le jargon absent).
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

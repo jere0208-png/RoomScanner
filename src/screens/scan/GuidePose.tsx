@@ -2,42 +2,35 @@
  * « À QUOI SERVENT CES TROIS BOUTONS ? » — la page qui répond avant qu'on
  * pose la question.
  *
- * Relevé du chantier : « les 3 boutons de placement d'éléments élec lors
- * d'un scan ne sont pas forcément compréhensibles de tous ». C'est juste :
- * PC, INT, LUM sont des abréviations de métier, et même un électricien peut
- * ne pas deviner qu'on POSE quelque chose sur le mur qu'on filme.
- *
- * Elle s'ouvre une fois, à la première caméra, et jamais plus — sauf si on
- * la redemande par le « ? » du bloc. Une explication qui revient à chaque
- * scan devient un obstacle, et on finit par la fermer sans la lire.
+ * Relevé du chantier : « les 3 boutons de placement d'éléments élec lors du
+ * scan ne sont pas forcément compréhensibles de tous ». PC, INT, LUM sont
+ * des abréviations de métier, et même un électricien peut hésiter devant un
+ * viseur qu'on ne lui a pas expliqué. Elle s'ouvre une fois, à la première
+ * caméra, et jamais plus — sauf si on la rappelle par le « ? ».
  *
  * LE GESTE SE MONTRE, IL NE SE RACONTE PAS. Chaque étape porte une petite
- * scène animée : le viseur qui cherche le mur, l'appareil qui s'y pose, les
- * repères qui restent en place quand la caméra bouge. Trois secondes de
- * boucle, pas un tutoriel de trois minutes.
+ * scène animée : le viseur qui cherche le mur, l'appareil qui se pose, le
+ * repère qui reste pendant que la caméra tourne. Les scènes sont des VUES,
+ * pas des SVG animés : `Animated` avec le pilote natif, soixante images par
+ * seconde sans toucher au fil JavaScript.
  *
- * LES SCÈNES SONT DES VUES, PAS DES SVG ANIMÉS. Animer un `<G>` de
- * react-native-svg demande de passer par des props que le typage refuse, et
- * le résultat tourne sur le fil JS. Un décor SVG fixe, des vues animées
- * par-dessus : le mouvement part sur le fil natif, et la page reste fluide
- * même pendant que RoomPlan mouline derrière.
+ * LE CADRE EST CELUI DE `Presentation` — le même que le premier lancement :
+ * relevé du patron, « des gros titres avec grandes images très visuelles ».
+ * La scène occupe la moitié haute de l'écran, agrandie à la largeur du
+ * téléphone ; le titre et la phrase en dessous ; un bouton. Une étape à la
+ * fois (relevé du chantier : « un step by step en 3 étapes avec possibilité
+ * de passer »), et la sortie toujours en haut à droite.
  */
 import React, { useEffect, useRef, useState } from 'react';
-import {
-  Animated,
-  Easing,
-  Modal,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { Animated, Easing, Modal, StyleSheet, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
-import { radius, useTheme, type Palette } from '../../theme';
+import { Presentation, type PageDePresentation } from '../../components/Presentation';
+import { radius, themedStyles, useTheme, type Palette } from '../../theme';
 import { FIXTURE_SYMBOL } from '../../geometry/electrical';
 import { CEILING_SYMBOL } from '../../geometry/ceiling';
 
-const SCENE_H = 118;
+/** La scène se dessine à cette taille, puis s'agrandit à celle de la carte. */
+const SCENE = { w: 292, h: 140 };
 
 /** La boucle d'un va-et-vient, montée une fois et arrêtée avec la scène. */
 function useVaEtVient(duree: number, delai = 0) {
@@ -66,8 +59,9 @@ function useVaEtVient(duree: number, delai = 0) {
   return v;
 }
 
-/** Le pan de mur : le décor commun des trois scènes. */
-function Mur({ styles }: { styles: ReturnType<typeof getStyles> }) {
+type Styles = ReturnType<typeof getStyles>;
+
+function Mur({ styles }: { styles: Styles }) {
   return (
     <View style={styles.mur}>
       <View style={styles.plinthe} />
@@ -75,7 +69,7 @@ function Mur({ styles }: { styles: ReturnType<typeof getStyles> }) {
   );
 }
 
-/** Le viseur : le carré du centre de l'écran, celui qu'on amène sur le mur. */
+/** Le viseur : quatre coins, comme à l'écran de scan. */
 function Viseur({ c }: { c: Palette }) {
   const t = 2.6;
   const s = { position: 'absolute' as const, backgroundColor: c.blue };
@@ -97,7 +91,7 @@ function Viseur({ c }: { c: Palette }) {
   );
 }
 
-/** Une pastille d'appareil, avec le symbole du plan. */
+/** Un appareil : le symbole du plan dans une pastille. Même langue partout. */
 function Pastille({
   c,
   traits,
@@ -121,33 +115,16 @@ function Pastille({
       }}>
       <Svg width={taille * 0.6} height={taille * 0.6} viewBox="-14 -14 28 28">
         {traits.map((seg, i) => (
-          <Path
-            key={i}
-            d={seg.d}
-            stroke="#FFFFFF"
-            strokeWidth={2}
-            strokeLinecap="round"
-            fill="none"
-          />
+          <Path key={i} d={seg.d} stroke="#FFFFFF" strokeWidth={2} strokeLinecap="round" fill="none" />
         ))}
       </Svg>
     </View>
   );
 }
 
-/** ÉTAPE 1 — le viseur cherche le mur : il va et vient, puis se cale. */
-function SceneViser({
-  c,
-  styles,
-}: {
-  c: Palette;
-  styles: ReturnType<typeof getStyles>;
-}) {
+function SceneViser({ c, styles }: { c: Palette; styles: Styles }) {
   const v = useVaEtVient(1300);
-  const translateX = v.interpolate({
-    inputRange: [0, 1],
-    outputRange: [-52, 52],
-  });
+  const translateX = v.interpolate({ inputRange: [0, 1], outputRange: [-52, 52] });
   return (
     <View style={styles.scene}>
       <Mur styles={styles} />
@@ -158,20 +135,10 @@ function SceneViser({
   );
 }
 
-/** ÉTAPE 2 — on appuie : l'appareil se pose à l'endroit visé. */
-function ScenePoser({
-  c,
-  styles,
-}: {
-  c: Palette;
-  styles: ReturnType<typeof getStyles>;
-}) {
+function ScenePoser({ c, styles }: { c: Palette; styles: Styles }) {
   const v = useVaEtVient(520, 600);
   const scale = v.interpolate({ inputRange: [0, 1], outputRange: [0.2, 1] });
-  const opacity = v.interpolate({
-    inputRange: [0, 0.35, 1],
-    outputRange: [0, 1, 1],
-  });
+  const opacity = v.interpolate({ inputRange: [0, 0.35, 1], outputRange: [0, 1, 1] });
   return (
     <View style={styles.scene}>
       <Mur styles={styles} />
@@ -190,36 +157,20 @@ function ScenePoser({
   );
 }
 
-/** ÉTAPE 3 — la caméra bouge, les repères RESTENT sur leur mur. */
-function SceneRester({
-  c,
-  styles,
-}: {
-  c: Palette;
-  styles: ReturnType<typeof getStyles>;
-}) {
+function SceneRester({ c, styles }: { c: Palette; styles: Styles }) {
   const v = useVaEtVient(1500);
-  const translateX = v.interpolate({
-    inputRange: [0, 1],
-    outputRange: [24, -24],
-  });
+  const translateX = v.interpolate({ inputRange: [0, 1], outputRange: [24, -24] });
   return (
     <View style={styles.scene}>
       {/* C'est le MUR qui défile : la caméra tourne, les appareils ne
           bougent pas de leur place sur la cloison. */}
-      <Animated.View
-        style={[StyleSheet.absoluteFill, { transform: [{ translateX }] }]}>
+      <Animated.View style={[StyleSheet.absoluteFill, { transform: [{ translateX }] }]}>
         <Mur styles={styles} />
-        <View style={[styles.pose, { left: '26%', top: 26 }]}>
+        <View style={[styles.pose, { left: '26%', top: 30 }]}>
           <Pastille c={c} traits={FIXTURE_SYMBOL.inter} taille={30} />
         </View>
-        <View style={[styles.pose, { right: '24%', top: 54 }]}>
-          <Pastille
-            c={c}
-            traits={CEILING_SYMBOL.dcl}
-            teinte={c.amber}
-            taille={30}
-          />
+        <View style={[styles.pose, { right: '24%', top: 64 }]}>
+          <Pastille c={c} traits={CEILING_SYMBOL.dcl} teinte={c.amber} taille={30} />
         </View>
       </Animated.View>
       <View style={styles.centre}>
@@ -229,158 +180,81 @@ function SceneRester({
   );
 }
 
+/* Trois temps, en clair — « Prise » et non « PC » : le jargon est ce qu'on
+   vient expliquer. */
 const ETAPES = [
   {
+    cle: 'viser',
     titre: 'Visez le mur',
-    texte:
+    phrase:
       'Le carré au centre de l’écran est votre viseur. Amenez-le à l’endroit exact où l’appareil doit aller.',
     Scene: SceneViser,
   },
   {
+    cle: 'poser',
     titre: 'Appuyez sur ce que vous posez',
-    texte:
+    phrase:
       'Prise, interrupteur ou point lumineux : un appui, et l’appareil se pose là où vous visez. Rien à mesurer.',
     Scene: ScenePoser,
   },
   {
+    cle: 'rester',
     titre: 'Le repère reste sur le mur',
-    texte:
+    phrase:
       'Continuez à scanner : ce que vous avez posé ne bouge plus, et se retrouve sur votre plan à la fin du relevé.',
     Scene: SceneRester,
   },
 ];
 
-export function GuidePose({
-  visible,
-  onFermer,
-}: {
-  visible: boolean;
-  onFermer: () => void;
-}) {
+export function GuidePose({ visible, onFermer }: { visible: boolean; onFermer: () => void }) {
   const c = useTheme();
   const styles = getStyles(c);
-  /*
-    UNE ÉTAPE À LA FOIS — relevé du chantier : « fais un step by step en
-    3 étapes avec possibilité de passer ».
-
-    Les trois scènes étaient empilées dans une page qui défilait : on voyait
-    trois animations tourner ensemble, on lisait la première, et l'on
-    fermait sans dérouler le reste. Une étape seule à l'écran se regarde ;
-    et comme rien d'autre ne bouge, l'œil suit le geste qu'on lui montre.
-
-    LA SORTIE EST TOUJOURS LÀ, en haut à droite et dès la première étape :
-    qui sait déjà s'en va, et personne n'est retenu dans une explication.
-  */
   const [etape, setEtape] = useState(0);
-  // Chaque ouverture repart du début : c'est une explication, pas un
-  // formulaire dont on garde l'avancement.
   useEffect(() => {
     if (visible) setEtape(0);
   }, [visible]);
-  const derniere = etape >= ETAPES.length - 1;
-  const { titre, texte, Scene } = ETAPES[etape];
+
+  const pages: PageDePresentation[] = ETAPES.map(({ cle, titre, phrase, Scene }) => ({
+    cle,
+    titre,
+    phrase,
+    visuel: ({ w, h }) => {
+      // La scène se dessine à sa taille, puis s'agrandit à la carte : des
+      // vues et des traits, rien qui se pixelise.
+      const k = Math.max(1, Math.min((w - 32) / SCENE.w, (h - 32) / SCENE.h));
+      return (
+        <View style={{ width: SCENE.w, height: SCENE.h, transform: [{ scale: k }] }}>
+          <Scene c={c} styles={styles} />
+        </View>
+      );
+    },
+  }));
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onFermer}>
-      <View style={styles.fond}>
-        <View style={styles.carte}>
-          <View style={styles.tete}>
-            <Text style={styles.titre}>Posez vos appareils en scannant</Text>
-            <TouchableOpacity
-              accessibilityLabel="Passer l’explication"
-              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-              onPress={onFermer}>
-              <Text style={styles.passer}>Passer</Text>
-            </TouchableOpacity>
-          </View>
-
-          <Scene c={c} styles={styles} />
-
-          <View style={styles.etapeTexte}>
-            <View style={styles.numero}>
-              <Text style={styles.numeroTexte}>{etape + 1}</Text>
-            </View>
-            <View style={styles.etapeMots}>
-              <Text style={styles.etapeTitre}>{titre}</Text>
-              <Text style={styles.etapeCorps}>{texte}</Text>
-            </View>
-          </View>
-
-          {/* Les trois points : où l'on en est, et combien il en reste. */}
-          <View style={styles.points}>
-            {ETAPES.map((e, i) => (
-              <View
-                key={e.titre}
-                style={[styles.point, i === etape && styles.pointActif]}
-              />
-            ))}
-          </View>
-
-          <TouchableOpacity
-            style={styles.valider}
-            accessibilityLabel={
-              derniere ? 'Compris, commencer le scan' : 'Étape suivante'
-            }
-            onPress={() => (derniere ? onFermer() : setEtape((n) => n + 1))}>
-            <Text style={styles.validerTexte}>
-              {derniere ? 'C’est compris' : 'Suivant'}
-            </Text>
-          </TouchableOpacity>
-          <Text style={styles.rappel}>
-            Le « ? » rouvre cette page pendant le scan.
-          </Text>
-        </View>
-      </View>
+    <Modal visible={visible} transparent={false} animationType="fade" onRequestClose={onFermer}>
+      <Presentation
+        pages={pages}
+        rang={etape}
+        onRang={setEtape}
+        onPasser={onFermer}
+        onFinir={onFermer}
+        labels={{
+          passer: 'Passer l’explication',
+          suivant: 'Étape suivante',
+          finir: 'Compris, commencer le scan',
+          finirTexte: 'C’est compris',
+        }}
+      />
     </Modal>
   );
 }
 
-const getStyles = (c: Palette) =>
+const getStyles = themedStyles((c: Palette) =>
   StyleSheet.create({
-    fond: {
-      flex: 1,
-      backgroundColor: 'rgba(11,13,18,0.72)',
-      justifyContent: 'center',
-      padding: 18,
-    },
-    carte: {
-      backgroundColor: c.bg,
-      borderRadius: radius.lg,
-      padding: 20,
-      maxHeight: '88%',
-    },
-    tete: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: 12,
-      marginBottom: 14,
-    },
-    titre: { color: c.ink, fontSize: 18, fontWeight: '800', flex: 1 },
-    /** La sortie, offerte des la premiere etape : personne n est retenu. */
-    passer: { color: c.inkFaint, fontSize: 14, fontWeight: '700' },
-    points: {
-      flexDirection: 'row',
-      gap: 6,
-      justifyContent: 'center',
-      marginTop: 16,
-      marginBottom: 14,
-    },
-    point: {
-      width: 6,
-      height: 6,
-      borderRadius: 3,
-      backgroundColor: c.line,
-    },
-    pointActif: { backgroundColor: c.blue, width: 18 },
-    chapeau: { color: c.inkSoft, fontSize: 13.5, lineHeight: 19, marginTop: 6 },
     scene: {
-      height: SCENE_H,
-      borderRadius: radius.md,
+      width: SCENE.w,
+      height: SCENE.h,
+      borderRadius: radius.lg,
       overflow: 'hidden',
       backgroundColor: c.surface,
       alignItems: 'center',
@@ -393,46 +267,19 @@ const getStyles = (c: Palette) =>
       right: 0,
       bottom: 0,
       margin: 12,
-      borderRadius: 8,
+      borderRadius: 10,
       backgroundColor: c.surfaceSunken,
     },
     plinthe: {
       position: 'absolute',
       left: 0,
       right: 0,
-      bottom: 18,
+      bottom: 20,
       height: 1.5,
       backgroundColor: c.line,
     },
     centre: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
     pose: { position: 'absolute' },
-    doigt: { position: 'absolute', right: 18, top: SCENE_H / 2 - 13 },
-    etapeTexte: { flexDirection: 'row', gap: 10, marginTop: 10 },
-    numero: {
-      width: 22,
-      height: 22,
-      borderRadius: 11,
-      backgroundColor: c.blue,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    numeroTexte: { color: '#FFFFFF', fontSize: 12, fontWeight: '800' },
-    etapeMots: { flex: 1 },
-    etapeTitre: { color: c.ink, fontSize: 15, fontWeight: '700' },
-    etapeCorps: { color: c.inkSoft, fontSize: 13, lineHeight: 18, marginTop: 2 },
-    valider: {
-      backgroundColor: c.blue,
-      borderRadius: radius.md,
-      height: 50,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginTop: 4,
-    },
-    validerTexte: { color: '#FFFFFF', fontSize: 16, fontWeight: '800' },
-    rappel: {
-      color: c.inkFaint,
-      fontSize: 11.5,
-      textAlign: 'center',
-      marginTop: 10,
-    },
-  });
+    doigt: { position: 'absolute', right: 18, top: SCENE.h / 2 - 13 },
+  }),
+);

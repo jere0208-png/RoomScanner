@@ -16,7 +16,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 import React from 'react';
-import { Text, TouchableOpacity } from 'react-native';
+import { Text } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GuidePose } from '../src/screens/scan/GuidePose';
@@ -24,10 +24,12 @@ import { GuidePose } from '../src/screens/scan/GuidePose';
 const textes = (t: TestRenderer.ReactTestRenderer) =>
   t.root.findAllByType(Text).map((n) => String(n.props.children));
 
+// Par son libellé, quel que soit le bouton : la page est passée de
+// `TouchableOpacity` à `Pressable` en prenant le cadre de `Presentation`.
 const bouton = (t: TestRenderer.ReactTestRenderer, nom: string) =>
-  t.root
-    .findAllByType(TouchableOpacity)
-    .find((n) => n.props.accessibilityLabel === nom);
+  t.root.findAll(
+    (n) => n.props?.accessibilityLabel === nom && typeof n.props?.onPress === 'function',
+  )[0];
 
 /*
   UNE ÉTAPE À LA FOIS — relevé du chantier : « fais un step by step en
