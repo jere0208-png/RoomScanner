@@ -35,7 +35,7 @@
  */
 import type { ObjectData } from 'react-native-room-scan';
 import {
-  WALL_T,
+  epaisseurDe,
   clampFootprint,
   roomOf,
   roomParts,
@@ -150,12 +150,12 @@ export function obstaclesDeLaVisite(
     let curseur = 0;
     for (const trou of trousDuMur(w, openings)) {
       if (trou.de > curseur + 1e-3) {
-        out.push({ kind: 'mur', a: point(curseur), b: point(trou.de), demi: WALL_T / 2 });
+        out.push({ kind: 'mur', a: point(curseur), b: point(trou.de), demi: epaisseurDe(w) / 2 });
       }
       curseur = Math.max(curseur, trou.a);
     }
     if (curseur < len - 1e-3) {
-      out.push({ kind: 'mur', a: point(curseur), b: point(len), demi: WALL_T / 2 });
+      out.push({ kind: 'mur', a: point(curseur), b: point(len), demi: epaisseurDe(w) / 2 });
     }
   }
 

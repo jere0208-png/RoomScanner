@@ -1,7 +1,26 @@
 import type { ObjectData, SurfaceData, SurfaceTexture } from 'react-native-room-scan';
 
-/** Épaisseur donnée aux murs dans tous les rendus (m). */
+/** Épaisseur d'un mur dont personne n'a dit l'épaisseur (m). */
 export const WALL_T = 0.14;
+
+/**
+ * LES ÉPAISSEURS QU'ON RENCONTRE — relevé du patron : « les épaisseurs des
+ * murs comptent ». Tous les murs avaient la même, quatorze centimètres :
+ * une cloison de placard et un mur de refend se dessinaient pareil, et un
+ * mur neuf posé à une cote mesurée tombait à côté de l'épaisseur qu'il
+ * aurait dû avoir. Les valeurs sont celles du commerce : plaque sur
+ * ossature, doublage, brique, parpaing.
+ */
+export const EPAISSEURS: { mot: string; m: number }[] = [
+  { mot: 'Cloison', m: 0.07 },
+  { mot: 'Doublage', m: 0.1 },
+  { mot: 'Mur', m: WALL_T },
+  { mot: 'Porteur', m: 0.2 },
+];
+
+/** L'épaisseur d'un mur : la sienne, ou celle de tous. */
+export const epaisseurDe = (w: { epaisseur?: number }): number =>
+  w.epaisseur && w.epaisseur > 0 ? w.epaisseur : WALL_T;
 
 /** Point au sol, en mètres (repère monde, plan XZ). */
 export interface Pt {
@@ -103,6 +122,16 @@ export interface WallSeg {
    * ressouder.
    */
   libre?: boolean;
+  /**
+   * L'ÉPAISSEUR DE CE MUR (m), quand elle n'est pas celle de tous.
+   *
+   * Absente sur tout ce que RoomPlan a relevé — il ne la mesure pas — et
+   * cette absence vaut `WALL_T`. Elle se donne à la pose d'un mur neuf, ou
+   * se change sur un mur choisi. Le trait du plan reste l'AXE : l'épaisseur
+   * s'étend de part et d'autre, et `wallQuads` en tire les onglets, en 2D,
+   * en 3D, dans le PDF et le DXF.
+   */
+  epaisseur?: number;
 }
 
 /** Pièce d'un élément, valeur par défaut comprise. */
@@ -393,8 +422,16 @@ export function pointOnSeg(p: Pt, a: Pt, b: Pt): { dist: number; t: number } {
  * s'appuie sur le flanc d'un autre mur (jonction en T), elle est prolongée
  * d'une demi-épaisseur pour entrer dans son corps sans laisser de fente.
  */
-export function wallQuads(walls: WallSeg[], t = WALL_T): Map<string, WallQuad> {
-  const half = t / 2;
+export function wallQuads(walls: WallSeg[], t?: number): Map<string, WallQuad> {
+  /*
+    UNE DEMI-ÉPAISSEUR PAR MUR. Un `t` donné les force toutes (les rendus
+    qui le demandent explicitement) ; sinon chaque mur porte la sienne, et
+    l'onglet entre une cloison de sept et un mur de vingt se coupe là où
+    leurs faces se croisent vraiment.
+  */
+  const demiDe = new Map(walls.map((w) => [w.id, (t ?? epaisseurDe(w)) / 2]));
+  const demi = (id: string) => demiDe.get(id) ?? WALL_T / 2;
+  const plusEpais = Math.max(WALL_T, ...walls.map((w) => t ?? epaisseurDe(w)));
   const arms = new Map<string, Arm[]>();
   // Deux pièces mitoyennes ont chacune leur mur : leurs bouts ne se
   // prolongent pas l'un dans l'autre, seuls les murs d'une même pièce
@@ -447,15 +484,17 @@ export function wallQuads(walls: WallSeg[], t = WALL_T): Map<string, WallQuad> {
     if (list.length === 1) {
       const arm = list[0];
       const armRoom = roomById.get(arm.wallId);
-      const tee = walls.some((v) => {
+      const hote = walls.find((v) => {
         if (v.id === arm.wallId || roomOf(v) !== armRoom) return false;
         const { dist, t: pos } = pointOnSeg(P, v.a, v.b);
-        return dist < t && pos > 0.02 && pos < 0.98;
+        return dist < demi(v.id) * 2 && pos > 0.02 && pos < 0.98;
       });
-      // Le prolongement part À L'OPPOSÉ du corps du mur, dans celui du voisin.
-      const C = tee
-        ? { x: P.x - arm.dir.x * half, z: P.z - arm.dir.z * half }
+      // Le prolongement part À L'OPPOSÉ du corps du mur, dans celui du
+      // voisin — d'une demi-épaisseur DU VOISIN : c'est lui qu'on traverse.
+      const C = hote
+        ? { x: P.x - arm.dir.x * demi(hote.id), z: P.z - arm.dir.z * demi(hote.id) }
         : P;
+      const half = demi(arm.wallId);
       const nrm = perp(arm.dir);
       // +perp(dir) vaut +n en 'a' (dir = u) mais −n en 'b' (dir = −u).
       const sPlus: 1 | -1 = arm.end === 'a' ? 1 : -1;
@@ -476,15 +515,16 @@ export function wallQuads(walls: WallSeg[], t = WALL_T): Map<string, WallQuad> {
       const B = sorted[(i + 1) % sorted.length];
       const na = perp(A.dir);
       const nb = perp(B.dir);
-      // Faces qui bordent le secteur A→B : côté +perp pour A, −perp pour B.
-      const pa = { x: P.x + na.x * half, z: P.z + na.z * half };
-      const pb = { x: P.x - nb.x * half, z: P.z - nb.z * half };
+      // Faces qui bordent le secteur A→B : côté +perp pour A, −perp pour B
+      // — chacune à SA demi-épaisseur.
+      const pa = { x: P.x + na.x * demi(A.wallId), z: P.z + na.z * demi(A.wallId) };
+      const pb = { x: P.x - nb.x * demi(B.wallId), z: P.z - nb.z * demi(B.wallId) };
       let X = lineCross(pa, A.dir, pb, B.dir);
       // Murs alignés (secteur plat ou replié) : pas d'onglet, on reste au bord.
       if (!X) X = pa;
       // Angle très aigu : l'onglet part à l'infini, on l'écrête.
       const d = Math.hypot(X.x - P.x, X.z - P.z);
-      const maxOut = t * 3;
+      const maxOut = plusEpais * 3;
       if (d > maxOut) {
         X = {
           x: P.x + ((X.x - P.x) / d) * maxOut,
@@ -514,11 +554,14 @@ export function wallQuads(walls: WallSeg[], t = WALL_T): Map<string, WallQuad> {
  * en place, comparer les références suffit — et une seule entrée suffit
  * aussi : on travaille toujours sur le plan courant.
  */
-let quadMemo: { walls: WallSeg[]; t: number; map: Map<string, WallQuad> } | null =
-  null;
+let quadMemo: {
+  walls: WallSeg[];
+  t: number | undefined;
+  map: Map<string, WallQuad>;
+} | null = null;
 export function wallQuadsOf(
   walls: WallSeg[],
-  t = WALL_T,
+  t?: number,
 ): Map<string, WallQuad> {
   if (quadMemo && quadMemo.walls === walls && quadMemo.t === t) return quadMemo.map;
   const map = wallQuads(walls, t);
@@ -2411,6 +2454,12 @@ export interface PoseDeMur {
   angle: 0 | 90 | -90;
   a: Pt;
   b: Pt;
+  /**
+   * `bout` : au bout libre d'un mur (par défaut) ; `t` : une cloison qui
+   * part du FLANC d'un mur, en T — le placard, la salle d'eau qu'on
+   * recoupe dans une chambre.
+   */
+  genre?: 'bout' | 't';
 }
 
 /**
@@ -2479,6 +2528,121 @@ export function posesDeMur(
     }
   }
   return out;
+}
+
+/**
+ * LA CLOISON EN T — les deux poses au flanc d'un mur choisi.
+ *
+ * Les poses au bout libre ne savent pas recouper une pièce : un placard,
+ * une salle d'eau prise sur une chambre partent du MILIEU d'un mur, pas de
+ * son bout. On en propose deux, une de chaque côté, au milieu du mur ; la
+ * position exacte se donne ensuite en centimètres (`murNeufCote`).
+ */
+export function posesEnT(w: WallSeg, longueur = 1): PoseDeMur[] {
+  const l = segLength(w);
+  if (l < 0.3) return [];
+  const u = { x: (w.b.x - w.a.x) / l, z: (w.b.z - w.a.z) / l };
+  const n = { x: -u.z, z: u.x };
+  const m = { x: (w.a.x + w.b.x) / 2, z: (w.a.z + w.b.z) / 2 };
+  return ([1, -1] as const).map((s) => ({
+    id: `${w.id}:t:${s}`,
+    wallId: w.id,
+    bout: 'a' as const,
+    angle: (s === 1 ? 90 : -90) as 90 | -90,
+    genre: 't' as const,
+    a: m,
+    b: { x: m.x + n.x * s * longueur, z: m.z + n.z * s * longueur },
+  }));
+}
+
+/** Ce qu'on a mesuré au mètre ruban pour poser un mur neuf (m). */
+export interface SaisieMurNeuf {
+  /** Du nu du mur de départ au bout du mur neuf. */
+  longueur: number;
+  epaisseur: number;
+  /** En T : du nu du coin au nu du mur neuf, le long du mur de départ. */
+  depuis?: number;
+  /** En T : compter depuis l'autre coin du mur de départ. */
+  depuisB?: boolean;
+}
+
+/**
+ * Le retrait du coin d'un mur : la demi-épaisseur du mur qui s'y soude.
+ *
+ * Le trait du plan est l'axe ; la pièce, elle, commence au NU du mur
+ * voisin. Une cote prise au mètre dans un angle part de ce nu.
+ */
+function retraitDuCoin(walls: WallSeg[], hote: WallSeg, coin: Pt): number {
+  const voisin = walls.find(
+    (o) =>
+      o.id !== hote.id &&
+      o.type === 'wall' &&
+      (Math.hypot(o.a.x - coin.x, o.a.z - coin.z) < 0.05 ||
+        Math.hypot(o.b.x - coin.x, o.b.z - coin.z) < 0.05),
+  );
+  return voisin ? epaisseurDe(voisin) / 2 : 0;
+}
+
+/** La cote par défaut d'une cloison en T : celle du milieu du mur, au nu. */
+export function depuisParDefaut(
+  walls: WallSeg[],
+  pose: PoseDeMur,
+  epaisseur: number,
+  depuisB = false,
+): number {
+  const hote = walls.find((w) => w.id === pose.wallId);
+  if (!hote) return 0;
+  const coin = depuisB ? hote.b : hote.a;
+  const v = segLength(hote) / 2 - retraitDuCoin(walls, hote, coin) - epaisseur / 2;
+  return Math.max(0, Math.round(v * 100) / 100);
+}
+
+/**
+ * LE MUR NEUF AUX COTES DU MÈTRE RUBAN — relevé du patron : « l'ajout d'un
+ * mur n'est pas opérationnel, on doit le placer au millimètre près
+ * nous-même, alors que les épaisseurs des murs comptent ».
+ *
+ * Le mur neuf naissait à un mètre, et il fallait le tirer au doigt jusqu'à
+ * la bonne cote — sur un écran où le millimètre fait un dixième de pixel.
+ * On TAPE maintenant ce qu'on a mesuré, et on le mesure comme sur le
+ * chantier : d'une face à l'autre. L'application fait la conversion vers
+ * l'axe, qui est ce que le plan dessine :
+ *
+ *   — au bout libre, droit devant : la longueur est celle du mur neuf ;
+ *   — à l'équerre d'un bout, ou en T : la longueur part de la FACE du mur
+ *     de départ, à une demi-épaisseur de son axe ;
+ *   — en T, la position se mesure du nu du coin au nu du mur neuf : le
+ *     coin recule d'une demi-épaisseur du mur qui le ferme, et l'axe du mur
+ *     neuf avance de la moitié de la sienne.
+ */
+export function murNeufCote(
+  walls: WallSeg[],
+  pose: PoseDeMur,
+  s: SaisieMurNeuf,
+): { a: Pt; b: Pt } | null {
+  const hote = walls.find((w) => w.id === pose.wallId);
+  if (!hote || !(s.longueur > 0) || !(s.epaisseur > 0)) return null;
+  const eH = epaisseurDe(hote);
+  const l0 = Math.hypot(pose.b.x - pose.a.x, pose.b.z - pose.a.z);
+  if (l0 < 1e-6) return null;
+  const d = { x: (pose.b.x - pose.a.x) / l0, z: (pose.b.z - pose.a.z) / l0 };
+  const tirer = (p: Pt, axe: number) => ({
+    a: { x: p.x, z: p.z },
+    b: { x: p.x + d.x * axe, z: p.z + d.z * axe },
+  });
+  if (pose.genre !== 't') {
+    return tirer(pose.a, pose.angle === 0 ? s.longueur : s.longueur + eH / 2);
+  }
+  const L = segLength(hote);
+  if (L < 1e-6) return null;
+  const u = { x: (hote.b.x - hote.a.x) / L, z: (hote.b.z - hote.a.z) / L };
+  const coin = s.depuisB ? hote.b : hote.a;
+  const sens = s.depuisB ? -1 : 1;
+  let t = retraitDuCoin(walls, hote, coin) + (s.depuis ?? 0) + s.epaisseur / 2;
+  // Le mur neuf reste SUR son mur de départ : au-delà, ce ne serait plus un T.
+  t = Math.min(Math.max(t, s.epaisseur / 2), L - s.epaisseur / 2);
+  const p = { x: coin.x + u.x * sens * t, z: coin.z + u.z * sens * t };
+  return tirer(p, s.longueur + eH / 2);
 }
 
 /**

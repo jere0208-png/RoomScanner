@@ -77,7 +77,12 @@ import {
 import {
   fitsInRoom,
   posesDeMur,
+  posesEnT,
+  murNeufCote,
+  EPAISSEURS,
+  epaisseurDe,
   type PoseDeMur,
+  type SaisieMurNeuf,
   planFrameAngle,
   filtrerAuNiveau,
   nomDuNiveau,
@@ -149,6 +154,7 @@ import {
   type SpotAxis,
 } from '../geometry/ceiling';
 import { haptic } from '../ui/haptic';
+import { MurNeufSheet } from '../components/MurNeufSheet';
 import {
   ActionSheet,
   PromptSheet,
@@ -835,6 +841,12 @@ export function ResultScreen() {
    * il choisit.
    */
   const [posesMur, setPosesMur] = useState<PoseDeMur[] | null>(null);
+  /*
+    LA POSE TOUCHÉE, en attente de ses cotes — voir `MurNeufSheet`. Et le
+    mur que donneraient les cotes tapées, dessiné derrière la feuille.
+  */
+  const [murNeuf, setMurNeuf] = useState<PoseDeMur | null>(null);
+  const [apercuMur, setApercuMur] = useState<PoseDeMur | null>(null);
   /** La note tenue en main : son bandeau propose de la reprendre. */
   const [selNote, setSelNote] = useState<string | null>(null);
   /**
@@ -2981,6 +2993,16 @@ export function ResultScreen() {
                 title: scanName,
                 subtitle: majTexte ?? undefined,
                 actions: [
+                  /*
+                    L'ORDRE DU MENU — relevé du patron : « fais un tour de toutes
+                    les options ». Elles étaient rangées dans l'ordre où elles
+                    avaient été écrites : « Scanner un étage » entre deux
+                    gestes de dessin, le sous-sol après le mode Électricité,
+                    « Renommer » au milieu des relevés, et « Normes auto »
+                    offerte au particulier qui n'a jamais vu la norme. On lit
+                    maintenant de haut en bas : acheter, RELEVER, DESSINER,
+                    corriger, le métier, puis le dossier lui-même.
+                  */
                   {
                     /*
                       CE QU'IL FAUT ACHETER — en tête du menu, pour tout le
@@ -2993,11 +3015,61 @@ export function ResultScreen() {
                     onPress: () => setTravauxOuvert(true),
                   },
                   {
-                    label: 'Renommer le scan',
-                    icon: 'renommer' as const,
+                    /**
+                     * SCANNER UNE PIÈCE DE PLUS — la vraie version.
+                     *
+                     * « Ajouter une pièce » pose un rectangle aux cotes
+                     * qu'on donne : c'est du dépannage. Ici on RELÈVE la
+                     * pièce, et `StructureBuilder` (iOS 17) l'aligne sur ce
+                     * qui existe déjà. L'appareillage posé survit, reprojeté
+                     * sur les murs neufs — sans quoi ajouter une chambre
+                     * coûterait vingt prises.
+                     */
+                    label: 'Scanner une pièce',
+                    icon: 'scanner' as const,
+                    hint: 'Un relevé de plus, réuni au plan. iOS 17, LiDAR.',
                     onPress: () => {
-                      setNameInput(scanName);
-                      setRenaming(true);
+                      demarrerComplement().catch((e: any) =>
+                        alerte(
+                          expliquer('releve', e).titre,
+                          expliquer(
+                            'releve',
+                            e?.message ??
+                              'La réunion de plusieurs relevés demande iOS 17.',
+                          ).message,
+                        ),
+                      );
+                    },
+                  },
+                  {
+                    /*
+                      SCANNER UN NIVEAU DE PLUS.
+
+                      Une maison, c'est un rez-de-chaussée ET un étage —
+                      parfois un sous-sol. Le relevé du haut s'ajoute à CE
+                      dossier : un seul plan, un seul métré, un seul devis.
+
+                      L'étage arrive pré-calé au-dessus de celui du dessous,
+                      qui reste visible en filigrane : c'est là-dessus qu'on
+                      le pose d'aplomb, cage d'escalier contre cage
+                      d'escalier.
+                    */
+                    label: 'Scanner un étage',
+                    icon: 'etage' as const,
+                    hint:
+                      niveaux.length > 1
+                        ? `Le dossier en compte ${niveaux.length}.`
+                        : 'Il s’ajoute au-dessus de ce plan.',
+                    onPress: () => {
+                      demarrerEtage(Math.max(...niveaux) + 1).catch(() => {});
+                    },
+                  },
+                  {
+                    label: 'Scanner un sous-sol',
+                    icon: 'soussol' as const,
+                    hint: 'Cave, garage : il se range sous le plan.',
+                    onPress: () => {
+                      demarrerEtage(Math.min(...niveaux) - 1).catch(() => {});
                     },
                   },
                   {
@@ -3028,30 +3100,166 @@ export function ResultScreen() {
                     },
                   },
                   {
-                    /**
-                     * SCANNER UNE PIÈCE DE PLUS — la vraie version.
-                     *
-                     * « Ajouter une pièce » pose un rectangle aux cotes
-                     * qu'on donne : c'est du dépannage. Ici on RELÈVE la
-                     * pièce, et `StructureBuilder` (iOS 17) l'aligne sur ce
-                     * qui existe déjà. L'appareillage posé survit, reprojeté
-                     * sur les murs neufs — sans quoi ajouter une chambre
-                     * coûterait vingt prises.
-                     */
-                    label: 'Scanner une pièce',
-                    icon: 'scanner' as const,
-                    hint: 'Un relevé de plus, réuni au plan. iOS 17, LiDAR.',
+                    label: 'Ajouter un mur',
+                    icon: 'regle' as const,
+                    hint: 'Aux cotes du mètre. En T : touchez un mur, puis « Cloison ».',
                     onPress: () => {
-                      demarrerComplement().catch((e: any) =>
-                        alerte(
-                          expliquer('releve', e).titre,
-                          expliquer(
-                            'releve',
-                            e?.message ??
-                              'La réunion de plusieurs relevés demande iOS 17.',
-                          ).message,
+                      /*
+                        IL NAÎT ACCROCHÉ, PAS AU MILIEU DU SÉJOUR.
+
+                        Relevé du chantier : « une facilité pour le joindre à
+                        une extrémité de mur ». Posé au centre du plan, le mur
+                        neuf flottait loin de tout et il fallait recoller ses
+                        DEUX coins au doigt. Il part maintenant du dernier
+                        bout libre du tracé, droit dans sa continuité : un
+                        coin est déjà soudé, il ne reste qu'à tirer l'autre —
+                        et le suivant repartira du bout de celui-ci, jusqu'à
+                        refermer la pièce.
+
+                        Le centre reste le recours quand il n'y a aucun bout
+                        libre : plan vide, ou contour déjà fermé.
+                      */
+                      /*
+                        ON MONTRE LES POSES, ON N'EN CHOISIT PLUS UNE.
+
+                        Relevé du patron : « doit afficher les multiples
+                        possibilités d'attachement… dans des angles de 90° et
+                        180° pour droit, à chaque fin de mur ». Trois
+                        fantômes bleus par bout libre ; le doigt tranche.
+
+                        Sans aucun bout libre — plan vide, ou contour déjà
+                        fermé — il n'y a rien à proposer : le mur se pose au
+                        centre, comme avant, et il n'y a qu'à le tirer.
+                      */
+                      // Un mur déjà choisi offre aussi ses deux poses en T.
+                      const choix = [
+                        ...posesDeMur(walls, 1),
+                        ...(selectedWall ? posesEnT(selectedWall) : []),
+                      ];
+                      setEditMode(true);
+                      if (choix.length > 0) {
+                        seulGeste('pose');
+                        setPosesMur(choix);
+                        haptic('leger');
+                        return;
+                      }
+                      const xs = walls.flatMap((w) => [w.a.x, w.b.x]);
+                      const zs = walls.flatMap((w) => [w.a.z, w.b.z]);
+                      const cx = xs.length
+                        ? (Math.min(...xs) + Math.max(...xs)) / 2
+                        : 0;
+                      const cz = zs.length
+                        ? (Math.min(...zs) + Math.max(...zs)) / 2
+                        : 0;
+                      useScanStore
+                        .getState()
+                        .addWallBetween(
+                          { x: cx - 0.5, z: cz },
+                          { x: cx + 0.5, z: cz },
+                        );
+                      haptic('succes');
+                    },
+                  },
+                  {
+                    /**
+                     * REDÉTECTER LES PIÈCES — sur un plan déjà relevé.
+                     *
+                     * Sans ce geste, un correctif de détection ne profite
+                     * qu'aux scans À VENIR : les dossiers déjà faits gardent
+                     * leurs pièces manquantes pour toujours. La fonction
+                     * existait, mais aucun bouton n'y menait — elle ne se
+                     * déclenchait qu'en passant par « Redresser », qui bouge
+                     * la géométrie des murs par-dessus le marché.
+                     */
+                    label: 'Redétecter les pièces',
+                    icon: 'redetecter' as const,
+                    // Une ligne, pas un mode d'emploi : ce que la fonction
+                    // garde (les noms donnés à la main) se voit en la
+                    // lançant, et le README le raconte en entier.
+                    hint: 'Retrouve les espaces clos, les nomme et les cote.',
+                    onPress: () => {
+                      useScanStore.getState().redetectRooms();
+                      haptic('succes');
+                    },
+                  },
+                  ...(modeElec
+                    ? [
+                      {
+                        /*
+                          LE TABLEAU QU'ON TROUVE EN ARRIVANT.
+
+                          La moitié des chantiers est de la rénovation, et elle
+                          commence toujours pareil : on ouvre le tableau, on note
+                          ce qu'il y a, on dit au client ce qu'il faut reprendre.
+                          Les applications de plan dessinent du neuf ; celle-ci
+                          sait aussi lire ce qui est déjà là.
+                        */
+                        label: 'Relever le tableau existant',
+                        icon: 'tableau' as const,
+                        hint: existant?.departs.length
+                          ? `${existant.departs.length} module(s) relevé(s).`
+                          : 'Rénovation : notez les départs, l’app diagnostique.',
+                        onPress: () => setExistantOuvert(true),
+                      },
+                      {
+                        /*
+                          NORMES AUTO — l'installation qui se pose toute seule.
+
+                          Elle COMPLÈTE ce qui existe : on ne touche à rien de ce
+                          que l'électricien a placé. Et si tout est déjà conforme,
+                          elle le DIT — un outil qui ne répond rien laisse croire
+                          qu'il n'a pas compris la demande.
+                        */
+                        label: 'Normes auto',
+                        // Le bouclier de la pastille de contrôle — relevé du
+                        // patron : c'est le même sujet, c'est le même dessin.
+                        node: (
+                          <Svg width={20} height={20} viewBox="0 0 24 24">
+                            <Trace
+                              d={SOLAIRES.bouclier}
+                              fill={teinte.ink}
+                              fillRule="evenodd"
+                            />
+                          </Svg>
                         ),
-                      );
+                        // Une ligne : le détail de ce qui se pose est le sujet
+                        // de l'écran de contrôle, pas du menu qui y mène.
+                        hint: 'Pose ce qui manque pour la NF C 15-100.',
+                        onPress: poserNormes,
+                      },
+                      ]
+                    : [
+                        {
+                          /*
+                            LA PROPOSITION — relevé du patron : « une
+                            proposition pour passer à un mode "Électricité" ».
+
+                            C'est la porte d'entrée de l'électricien qui
+                            découvre l'application par l'App Store, en
+                            particulier : il ne fouille pas les réglages, il
+                            cherche dans le menu du plan qu'il a sous les
+                            yeux. Elle se tait dès que le mode est allumé.
+                          */
+                          label: 'Passer en mode Électricité',
+                          icon: 'tableau' as const,
+                          hint:
+                            'Prises, éclairage, normes NF C 15-100 et devis. ' +
+                            'Pour les électriciens.',
+                          onPress: () => {
+                            useUsage.getState().choisir(true);
+                            haptic('succes');
+                            astuce('Mode Électricité activé.', {
+                              icone: 'elec',
+                            });
+                          },
+                        },
+                      ]),
+                  {
+                    label: 'Renommer le scan',
+                    icon: 'renommer' as const,
+                    onPress: () => {
+                      setNameInput(scanName);
+                      setRenaming(true);
                     },
                   },
                   /*
@@ -3096,202 +3304,6 @@ export function ResultScreen() {
                         },
                       ]
                     : []),
-                  {
-                    /**
-                     * AJOUTER UN MUR — le geste qui manquait à l'appel.
-                     *
-                     * Relevé du chantier : « impossible de les joindre ou
-                     * d'en créer un facilement ». Et pour cause : le
-                     * magasin savait poser un mur entre deux points depuis
-                     * des mois, mais aucun bouton n'y menait — du code mort
-                     * d'un côté, un manque criant de l'autre.
-                     *
-                     * Le mur neuf se pose au MILIEU DU PLAN, d'un mètre :
-                     * assez grand pour se saisir, assez petit pour ne rien
-                     * masquer. On le tire ensuite par ses coins, et l'aimant
-                     * le soude à ses voisins comme n'importe quel mur.
-                     */
-                    /**
-                     * REDÉTECTER LES PIÈCES — sur un plan déjà relevé.
-                     *
-                     * Sans ce geste, un correctif de détection ne profite
-                     * qu'aux scans À VENIR : les dossiers déjà faits gardent
-                     * leurs pièces manquantes pour toujours. La fonction
-                     * existait, mais aucun bouton n'y menait — elle ne se
-                     * déclenchait qu'en passant par « Redresser », qui bouge
-                     * la géométrie des murs par-dessus le marché.
-                     */
-                    label: 'Redétecter les pièces',
-                    icon: 'redetecter' as const,
-                    // Une ligne, pas un mode d'emploi : ce que la fonction
-                    // garde (les noms donnés à la main) se voit en la
-                    // lançant, et le README le raconte en entier.
-                    hint: 'Retrouve les espaces clos, les nomme et les cote.',
-                    onPress: () => {
-                      useScanStore.getState().redetectRooms();
-                      haptic('succes');
-                    },
-                  },
-                  {
-                    /*
-                      SCANNER UN NIVEAU DE PLUS.
-
-                      Une maison, c'est un rez-de-chaussée ET un étage —
-                      parfois un sous-sol. Le relevé du haut s'ajoute à CE
-                      dossier : un seul plan, un seul métré, un seul devis.
-
-                      L'étage arrive pré-calé au-dessus de celui du dessous,
-                      qui reste visible en filigrane : c'est là-dessus qu'on
-                      le pose d'aplomb, cage d'escalier contre cage
-                      d'escalier.
-                    */
-                    label: 'Scanner un étage',
-                    icon: 'etage' as const,
-                    hint:
-                      niveaux.length > 1
-                        ? `Le dossier en compte ${niveaux.length}.`
-                        : 'Il s’ajoute au-dessus de ce plan.',
-                    onPress: () => {
-                      demarrerEtage(Math.max(...niveaux) + 1).catch(() => {});
-                    },
-                  },
-                  ...(modeElec
-                    ? [
-                      {
-                        /*
-                          LE TABLEAU QU'ON TROUVE EN ARRIVANT.
-
-                          La moitié des chantiers est de la rénovation, et elle
-                          commence toujours pareil : on ouvre le tableau, on note
-                          ce qu'il y a, on dit au client ce qu'il faut reprendre.
-                          Les applications de plan dessinent du neuf ; celle-ci
-                          sait aussi lire ce qui est déjà là.
-                        */
-                        label: 'Relever le tableau existant',
-                        icon: 'tableau' as const,
-                        hint: existant?.departs.length
-                          ? `${existant.departs.length} module(s) relevé(s).`
-                          : 'Rénovation : notez les départs, l’app diagnostique.',
-                        onPress: () => setExistantOuvert(true),
-                      },
-                      ]
-                    : [
-                        {
-                          /*
-                            LA PROPOSITION — relevé du patron : « une
-                            proposition pour passer à un mode "Électricité" ».
-
-                            C'est la porte d'entrée de l'électricien qui
-                            découvre l'application par l'App Store, en
-                            particulier : il ne fouille pas les réglages, il
-                            cherche dans le menu du plan qu'il a sous les
-                            yeux. Elle se tait dès que le mode est allumé.
-                          */
-                          label: 'Passer en mode Électricité',
-                          icon: 'tableau' as const,
-                          hint:
-                            'Prises, éclairage, normes NF C 15-100 et devis. ' +
-                            'Pour les électriciens.',
-                          onPress: () => {
-                            useUsage.getState().choisir(true);
-                            haptic('succes');
-                            astuce('Mode Électricité activé.', {
-                              icone: 'elec',
-                            });
-                          },
-                        },
-                      ]),
-                  {
-                    label: 'Scanner un sous-sol',
-                    icon: 'soussol' as const,
-                    hint: 'Cave, garage : il se range sous le plan.',
-                    onPress: () => {
-                      demarrerEtage(Math.min(...niveaux) - 1).catch(() => {});
-                    },
-                  },
-                  {
-                    label: 'Ajouter un mur',
-                    icon: 'regle' as const,
-                    hint: 'Un mètre accroché au bout libre, à tirer.',
-                    onPress: () => {
-                      /*
-                        IL NAÎT ACCROCHÉ, PAS AU MILIEU DU SÉJOUR.
-
-                        Relevé du chantier : « une facilité pour le joindre à
-                        une extrémité de mur ». Posé au centre du plan, le mur
-                        neuf flottait loin de tout et il fallait recoller ses
-                        DEUX coins au doigt. Il part maintenant du dernier
-                        bout libre du tracé, droit dans sa continuité : un
-                        coin est déjà soudé, il ne reste qu'à tirer l'autre —
-                        et le suivant repartira du bout de celui-ci, jusqu'à
-                        refermer la pièce.
-
-                        Le centre reste le recours quand il n'y a aucun bout
-                        libre : plan vide, ou contour déjà fermé.
-                      */
-                      /*
-                        ON MONTRE LES POSES, ON N'EN CHOISIT PLUS UNE.
-
-                        Relevé du patron : « doit afficher les multiples
-                        possibilités d'attachement… dans des angles de 90° et
-                        180° pour droit, à chaque fin de mur ». Trois
-                        fantômes bleus par bout libre ; le doigt tranche.
-
-                        Sans aucun bout libre — plan vide, ou contour déjà
-                        fermé — il n'y a rien à proposer : le mur se pose au
-                        centre, comme avant, et il n'y a qu'à le tirer.
-                      */
-                      const choix = posesDeMur(walls, 1);
-                      setEditMode(true);
-                      if (choix.length > 0) {
-                        seulGeste('pose');
-                        setPosesMur(choix);
-                        haptic('leger');
-                        return;
-                      }
-                      const xs = walls.flatMap((w) => [w.a.x, w.b.x]);
-                      const zs = walls.flatMap((w) => [w.a.z, w.b.z]);
-                      const cx = xs.length
-                        ? (Math.min(...xs) + Math.max(...xs)) / 2
-                        : 0;
-                      const cz = zs.length
-                        ? (Math.min(...zs) + Math.max(...zs)) / 2
-                        : 0;
-                      useScanStore
-                        .getState()
-                        .addWallBetween(
-                          { x: cx - 0.5, z: cz },
-                          { x: cx + 0.5, z: cz },
-                        );
-                      haptic('succes');
-                    },
-                  },
-                  {
-                    /*
-                      NORMES AUTO — l'installation qui se pose toute seule.
-
-                      Elle COMPLÈTE ce qui existe : on ne touche à rien de ce
-                      que l'électricien a placé. Et si tout est déjà conforme,
-                      elle le DIT — un outil qui ne répond rien laisse croire
-                      qu'il n'a pas compris la demande.
-                    */
-                    label: 'Normes auto',
-                    // Le bouclier de la pastille de contrôle — relevé du
-                    // patron : c'est le même sujet, c'est le même dessin.
-                    node: (
-                      <Svg width={20} height={20} viewBox="0 0 24 24">
-                        <Trace
-                          d={SOLAIRES.bouclier}
-                          fill={teinte.ink}
-                          fillRule="evenodd"
-                        />
-                      </Svg>
-                    ),
-                    // Une ligne : le détail de ce qui se pose est le sujet
-                    // de l'écran de contrôle, pas du menu qui y mène.
-                    hint: 'Pose ce qui manque pour la NF C 15-100.',
-                    onPress: poserNormes,
-                  },
                   {
                     label: 'Nouveau scan',
                     icon: 'sortir' as const,
@@ -3436,13 +3448,18 @@ export function ResultScreen() {
             circuitMarks={showRoutes ? marks : undefined}
             filigrane={filigrane}
             /* Les fantômes bleus d'un mur neuf, et le doigt qui tranche. */
-            poses={posesMur ?? undefined}
+            poses={posesMur ?? (apercuMur ? [apercuMur] : undefined)}
             onPose={(id) => {
               const pose = posesMur?.find((x) => x.id === id);
               if (!pose) return;
-              useScanStore.getState().addWallBetween(pose.a, pose.b);
+              /*
+                LA POSE CHOISIE NE POSE PLUS UN MÈTRE AU HASARD : elle
+                demande les cotes. Relevé du patron : « on doit le placer au
+                millimètre près nous-même ». Voir `MurNeufSheet`.
+              */
               setPosesMur(null);
-              haptic('succes');
+              setMurNeuf(pose);
+              haptic('leger');
             }}
             recalage={
               recalage
@@ -4870,7 +4887,7 @@ export function ResultScreen() {
               selectedWall.height,
               2,
             )} m`}
-            note="mur"
+            note={`mur · ${Math.round(epaisseurDe(selectedWall) * 100)} cm d’épaisseur`}
             actions={[
               /*
                 UN SEUL GESTE : « MESURES », AVEC SON CRAYON.
@@ -4944,6 +4961,51 @@ export function ResultScreen() {
                 On ne devine pas l'intention : on la dit. Et l'aimant
                 raccroche dès qu'on ramène le bout près d'un autre.
               */
+              /*
+                L'ÉPAISSEUR — relevé du patron : « les épaisseurs des murs
+                comptent ». RoomPlan ne la mesure pas ; elle se dit ici,
+                d'un choix, et le plan, la 3D et le PDF la suivent.
+              */
+              {
+                label: 'Épaisseur',
+                icone: SOLAIRES.largeur,
+                sansMot: true,
+                onPress: () => {
+                  const id = selectedWall.id;
+                  const actuelle = epaisseurDe(selectedWall);
+                  setMenu({
+                    title: 'Épaisseur du mur',
+                    subtitle: 'Le mur garde son axe : il s’épaissit des deux côtés.',
+                    actions: EPAISSEURS.map((ep) => ({
+                      label: `${ep.mot} · ${Math.round(ep.m * 100)} cm`,
+                      hint: Math.abs(ep.m - actuelle) < 1e-6 ? 'Épaisseur actuelle' : undefined,
+                      onPress: () => {
+                        useScanStore.getState().setEpaisseurMur(id, ep.m);
+                        haptic('succes');
+                      },
+                    })),
+                  });
+                },
+              },
+              /*
+                LA CLOISON EN T — un placard, une salle d'eau prise sur une
+                chambre partent du flanc d'un mur, pas de son bout. Deux
+                fantômes au milieu de CE mur, un de chaque côté ; la
+                position exacte se tape ensuite au centimètre.
+              */
+              {
+                label: 'Cloison en T',
+                mot: 'Cloison',
+                icone: SOLAIRES.plus,
+                sansMot: true,
+                onPress: () => {
+                  const poses = posesEnT(selectedWall);
+                  if (poses.length === 0) return;
+                  seulGeste('pose');
+                  setPosesMur(poses);
+                  haptic('leger');
+                },
+              },
               ...(selectedWall.libre
                 ? []
                 : [
@@ -5291,6 +5353,38 @@ export function ResultScreen() {
         }}
       />
       <ActionSheet data={menu} onClose={() => setMenu(null)} />
+      <MurNeufSheet
+        pose={murNeuf}
+        walls={walls}
+        onClose={() => {
+          setMurNeuf(null);
+          setApercuMur(null);
+        }}
+        onApercu={(saisie: SaisieMurNeuf | null) => {
+          const seg = murNeuf && saisie ? murNeufCote(walls, murNeuf, saisie) : null;
+          setApercuMur(
+            seg && murNeuf ? { ...murNeuf, id: 'apercu-mur', a: seg.a, b: seg.b } : null,
+          );
+        }}
+        onPoser={(saisie: SaisieMurNeuf) => {
+          const pose = murNeuf;
+          if (!pose) return;
+          const seg = murNeufCote(walls, pose, saisie);
+          setApercuMur(null);
+          if (!seg) return;
+          const id = useScanStore.getState().addWallBetween(seg.a, seg.b, {
+            epaisseur: saisie.epaisseur,
+            depuis: pose.wallId,
+          });
+          if (!id) return;
+          // Le mur posé reste choisi : sa cote et son épaisseur se lisent
+          // dans le bandeau, et se reprennent d'un geste.
+          setEditMode(true);
+          seuleSelection('mur');
+          setSelectedWallId(id);
+          haptic('succes');
+        }}
+      />
       <AlerteSortie
         data={alerteSortie}
         onClose={() => setAlerteSortie(null)}

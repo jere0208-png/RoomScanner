@@ -1202,8 +1202,22 @@ interface ScanState {
    * Trace un mur entre deux points choisis sur le plan. Le premier est
    * généralement l'extrémité d'un mur existant, pour que le nouveau s'y
    * raccroche ; le second se déplace ensuite par sa poignée.
+   *
+   * `epaisseur` : celle qu'on a choisie à la pose (absente, celle de tous).
+   * `depuis` : le mur de départ — le neuf entre dans SA pièce, sans quoi
+   * l'onglet et la jonction en T ne se feraient pas (`wallQuads` n'assemble
+   * que les murs d'une même pièce). Rend l'identifiant du mur posé.
    */
-  addWallBetween: (a: Pt, b: Pt) => void;
+  addWallBetween: (
+    a: Pt,
+    b: Pt,
+    opts?: { epaisseur?: number; depuis?: string },
+  ) => string | undefined;
+  /**
+   * L'ÉPAISSEUR D'UN MUR — cloison, doublage, mur, porteur. Voir
+   * `EPAISSEURS` et `WallSeg.epaisseur`.
+   */
+  setEpaisseurMur: (id: string, epaisseur: number) => void;
   /**
    * COMBLE UN TROU DU RELEVÉ — le mur manquant, et la porte avec.
    *
@@ -3367,25 +3381,60 @@ export const useScanStore = create<ScanState>((set, get) => {
       }
     },
 
-    addWallBetween: (a, b) => {
+    addWallBetween: (a, b, opts) => {
       const st = get();
-      if (Math.hypot(b.x - a.x, b.z - a.z) < 0.2) return;
+      if (!sontFinis(a.x, a.z, b.x, b.z)) return undefined;
+      if (Math.hypot(b.x - a.x, b.z - a.z) < 0.2) return undefined;
       pushHistory('addWall');
-      const h = st.walls[0]?.height ?? 2.5;
+      const depart = opts?.depuis
+        ? st.walls.find((w) => w.id === opts.depuis)
+        : undefined;
+      // La hauteur de son mur de départ : un muret de cuisine prolongé
+      // reste un muret. Sinon celle du plan.
+      const h = depart?.height ?? st.walls[0]?.height ?? 2.5;
+      const id = `mur-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      const e = opts?.epaisseur;
       set({
         walls: [
           ...st.walls,
           {
-            id: `mur-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            id,
             type: 'wall',
             a,
             b,
             height: h,
             yCenter: h / 2,
             // Il naît à l'étage où l'on travaille : voir `addRoomBox`.
-            niveau: st.niveauCourant,
+            niveau: depart?.niveau ?? st.niveauCourant,
+            ...(depart?.roomId ? { roomId: depart.roomId } : {}),
+            ...(e && e > 0 && Math.abs(e - WALL_T) > 1e-6
+              ? { epaisseur: Math.min(Math.max(e, 0.03), 0.6) }
+              : {}),
           },
         ],
+        dirty: true,
+      });
+      return id;
+    },
+
+    setEpaisseurMur: (id, epaisseur) => {
+      if (!sontFinis(epaisseur) || epaisseur <= 0) return;
+      const st = get();
+      const w = st.walls.find((x) => x.id === id);
+      if (!w) return;
+      // Trois centimètres (une plaque collée) à soixante (un mur de pierre).
+      const e = Math.min(Math.max(epaisseur, 0.03), 0.6);
+      if (Math.abs((w.epaisseur ?? WALL_T) - e) < 1e-6) return;
+      pushHistory('epaisseur');
+      set({
+        walls: st.walls.map((x) => {
+          if (x.id !== id) return x;
+          // Revenue à l'épaisseur de tous, elle ne s'écrit plus : le mur
+          // redevient comme ceux que RoomPlan a relevés.
+          const reste: WallSeg = { ...x };
+          delete reste.epaisseur;
+          return Math.abs(e - WALL_T) < 1e-6 ? reste : { ...reste, epaisseur: e };
+        }),
         dirty: true,
       });
     },

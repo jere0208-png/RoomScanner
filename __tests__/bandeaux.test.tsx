@@ -1854,6 +1854,47 @@ describe('le menu du scan', () => {
         .length,
     ).toBe(1);
   });
+
+  /*
+    L'ORDRE DU MENU, ET À QUI IL PARLE — relevé du patron : « fais un tour
+    de toutes les options dans les "…" ». Les relevés ensemble, puis le
+    dessin, puis le dossier ; et « Normes auto » n'est plus offerte au
+    particulier, qui n'a jamais allumé la norme.
+  */
+  it('se lit dans l’ordre : relever, dessiner, puis le dossier', () => {
+    const tree = monter();
+    act(() => bouton(tree, 'Plus')!.props.onPress());
+    const vu = textes(tree);
+    const rang = (m: string) => {
+      const i = vu.indexOf(m);
+      expect(`${m} : ${i >= 0}`).toBe(`${m} : true`);
+      return i;
+    };
+    const ordre = [
+      'Ce qu’il faut acheter',
+      'Scanner une pièce',
+      'Scanner un étage',
+      'Scanner un sous-sol',
+      'Ajouter une pièce',
+      'Ajouter un mur',
+      'Redétecter les pièces',
+      'Renommer le scan',
+      'Nouveau scan',
+    ].map(rang);
+    expect(ordre).toEqual([...ordre].sort((x, y) => x - y));
+  });
+
+  it('ne propose pas « Normes auto » au grand public', () => {
+    const { useUsage } = require('../src/store/usage');
+    const avant = useUsage.getState().modeElec;
+    act(() => useUsage.setState({ modeElec: false }));
+    const tree = monter();
+    act(() => bouton(tree, 'Plus')!.props.onPress());
+    const vu = textes(tree);
+    expect(vu).not.toContain('Normes auto');
+    expect(vu).toContain('Passer en mode Électricité');
+    act(() => useUsage.setState({ modeElec: avant }));
+  });
 });
 
 /**

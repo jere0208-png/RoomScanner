@@ -14285,6 +14285,48 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Le mur neuf aux cotes du mètre, et l'épaisseur de chaque mur
+
+Relevé du patron : « l'ajout d'un mur n'est pas opérationnel, on doit le
+placer au mm près nous-même, alors que les épaisseurs des murs comptent ».
+
+**Avant** : toucher une pose posait un mur d'un mètre, à tirer au doigt jusqu'à
+sa cote ; tous les murs avaient la même épaisseur (14 cm), et un mur ne pouvait
+partir que d'un bout libre.
+
+**Maintenant** :
+
+- **Chaque mur a son épaisseur** (`WallSeg.epaisseur`, absente = 14 cm) :
+  Cloison 7, Doublage 10, Mur 14, Porteur 20 (`EPAISSEURS`). `wallQuads`
+  prend la demi-épaisseur de chaque mur — onglets, jonctions en T —, donc le
+  plan, la 3D, l'exploration, le PDF et le DXF la suivent. Elle se change sur
+  un mur choisi (bandeau → « Épaisseur ») et s'y lit (« mur · 7 cm
+  d'épaisseur »).
+- **La feuille « Nouveau mur »** (`MurNeufSheet`) s'ouvre quand on touche une
+  pose : longueur en centimètres, épaisseur, et pour une cloison en T la
+  distance depuis le coin (« Autre coin » pour compter de l'autre bout). Un
+  schéma dit de quoi chaque nombre est la cote, et le mur se dessine en
+  aperçu sur le plan à chaque chiffre tapé.
+- **Tout se mesure d'une face à l'autre**, comme au mètre ruban ;
+  `murNeufCote` convertit vers l'axe : à l'équerre ou en T, la longueur part
+  de la face du mur de départ ; en T, le coin recule de la demi-épaisseur du
+  mur qui le ferme, et l'axe de la cloison avance de la moitié de la sienne.
+- **La cloison en T** (`posesEnT`) : un mur choisi → « Cloison » dans son
+  bandeau, ou « Ajouter un mur » avec un mur choisi. Deux fantômes au milieu
+  du mur, un de chaque côté.
+- Le mur neuf hérite de la **pièce**, de l'étage et de la hauteur de son mur de
+  départ — sans la pièce, `wallQuads` ne faisait ni l'onglet ni le T. Il reste
+  sélectionné après la pose.
+
+**Le menu « … » relu** : rangé dans l'ordre où l'on travaille — ce qu'il faut
+acheter, relever (pièce, étage, sous-sol), dessiner (pièce, mur), redétecter,
+le métier, puis le dossier (renommer, revenir, nouveau scan). « Normes auto »
+n'est plus proposée au grand public : elle vit avec « Relever le tableau
+existant », en mode Électricité.
+
+Bancs : `murcote` (épaisseurs, cotes au nu, T, magasin, feuille), `bandeaux`
+(ordre du menu, « Normes auto » hors du grand public).
+
 ## Le modèle Pro — scanner est libre, envoyer est Pro
 
 Relevé du patron avant le lancement : « l'utilisateur doit trouver un intérêt
