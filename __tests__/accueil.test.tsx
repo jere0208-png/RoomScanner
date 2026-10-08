@@ -424,34 +424,23 @@ describe('l’accueil', () => {
     expect(largeurs.sort()).toEqual([2.5, 2.5, 3, 3]);
   });
 
-  it('et le palier gratuit est consulté, comme aux deux autres portes', () => {
+  it('et un plan déjà gardé n’empêche pas d’en tracer un autre', () => {
     /*
-      L'ÉPREUVE QUI COMPTE LE PLUS ICI. Une passe entière a déjà trouvé CINQ
-      portes qui créaient un plan sans consulter la règle — trois boutons
-      d'étage et deux gestes de copie. Une troisième entrée qui l'oublierait
-      rouvrirait exactement ce trou, et personne ne s'en apercevrait avant que
-      quelqu'un ne relève dix logements gratuitement.
+      SCANNER EST LIBRE — le Pro se vend à l'export, pas au nombre de
+      logements. Un compte gratuit qui a déjà gardé un plan trace le suivant,
+      et aucune offre ne se met en travers du geste.
     */
     act(() => {
-      useAccountStore.setState({ pro: false, plansUtilises: 1, surpriseVisible: false });
+      useAccountStore.setState({ pro: false, plansUtilises: 1, surpriseVisible: false, paywallVisible: false });
       useScanStore.getState().reset();
     });
     const t = monter();
     act(() => feuille(t).props.onTracee(3, 2.5));
-    // Rien n'a été créé, et c'est l'OFFRE qui s'ouvre — pas un refus : la
-    // surprise si Apple porte une offre de lancement, sinon la page Pro.
-    expect(useScanStore.getState().rooms).toHaveLength(0);
-    expect(useScanStore.getState().screen).not.toBe('result');
+    expect(useScanStore.getState().rooms).toHaveLength(1);
     const st = useAccountStore.getState();
-    expect(st.surpriseVisible || st.paywallVisible).toBe(true);
-    /*
-      ET L'ON REPOSE LE COMPTEUR — le magasin du compte survit d'une épreuve à
-      l'autre, et la maison le sait par cœur. Sans ça, le banc suivant touche
-      « Commencer le scan » avec un palier déjà épuisé, tombe sur l'offre au
-      lieu du scan, et accuse un écran qui va très bien.
-    */
+    expect(st.surpriseVisible || st.paywallVisible).toBe(false);
     act(() => {
-      useAccountStore.setState({ plansUtilises: 0, surpriseVisible: false, paywallVisible: false });
+      useAccountStore.setState({ plansUtilises: 0 });
     });
   });
 

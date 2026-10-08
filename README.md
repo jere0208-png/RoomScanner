@@ -14285,6 +14285,43 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Le modèle Pro — scanner est libre, envoyer est Pro
+
+Relevé du patron avant le lancement : « l'utilisateur doit trouver un intérêt
+à l'achat ». L'ancien palier — un seul logement gratuit, puis l'abonnement
+pour les suivants, les étages et les copies — ne faisait jamais payer celui
+qui n'a qu'un appartement, c'est-à-dire presque tout le monde. Modèle choisi :
+**« exporter et partager »**.
+
+| Gratuit, sans limite | EchoPlan Pro |
+|---|---|
+| Scanner, autant de logements, d'étages et de copies qu'on veut | Plan **PDF** coté, à envoyer ou imprimer |
+| Plan coté, vue 3D, exploration, meubles | **DXF** (AutoCAD, ArchiCAD), **modèle 3D** (OBJ) |
+| « Ce qu'il faut acheter » (peinture, sol, plinthes) | **Métré CSV**, **liste du matériel** |
+| Contrôle NF C 15-100, tableau existant, diagnostic | **Sauvegarde en ligne** des plans |
+| Image du plan, avec filigrane | **Devis** aux prix du magasin |
+
+Où ça se joue :
+
+- `peutCreerPlan` rend toujours vrai ; les portes qui la consultent (accueil,
+  étages, copies) restent branchées — un palier qui reviendrait n'aurait
+  qu'un endroit à toucher. Le compteur de plans continue de tourner.
+- `exportOuvert` est la seule barrière d'export : l'invité se voit proposer
+  un compte ; le compte gratuit rencontre l'offre (la surprise si Apple porte
+  une offre de lancement, sinon la page Pro) ; l'abonné exporte. L'aperçu du
+  PDF reste libre : on voit ce qu'on achète.
+- La feuille d'export porte un badge **PRO** sur ce qui est Pro, et rien sur
+  l'image — le dire avant le toucher.
+- La sauvegarde en ligne (`deposerPlusTard`) ne monte rien sans abonnement ;
+  le plan reste écrit dans le téléphone.
+- La pastille du devis ouvre l'offre au lieu du devis détaillé.
+- La page Pro énumère exactement ces verrous, et dit ce qui est gratuit.
+
+Bancs : `scanlibre` (remplace `unseulplan`), `exportsheet` (badge),
+`synchro` (rien ne monte sans Pro), `sanscompte`, `parcourscompte`, `compte`,
+`paywall`, `abonnement`, `motsclairs`, `pasqueelec`, `grandpublicpartout`,
+`accueil`, `planvierge`.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

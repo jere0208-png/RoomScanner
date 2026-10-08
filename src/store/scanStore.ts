@@ -2125,6 +2125,9 @@ export const useScanStore = create<ScanState>((set, get) => {
       id,
       setTimeout(() => {
         depots.delete(id);
+        // La sauvegarde en ligne est Pro : sans abonnement, le plan reste
+        // dans le téléphone (il y est déjà écrit), et rien ne monte.
+        if (!useAccountStore.getState().pro) return;
         get()
           .deposerAuCompte(id, identiteDuCompte())
           .catch(() => {

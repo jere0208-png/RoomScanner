@@ -100,17 +100,19 @@ const plan = (id: string, nom: string): SavedScan => ({
   ceiling: [],
 });
 
-/** Le compte connecté, jeton en poche : l'état d'un patron au travail. */
+/** Le compte connecté, jeton en poche, abonné : l'état d'un patron au
+ *  travail. La sauvegarde en ligne est Pro — voir la dernière épreuve. */
 const poserCompte = () =>
   useAccountStore.setState({
     charge: true,
     compte: { id: 'compte-1', methode: 'email' },
     jeton: 'jeton-1',
+    pro: true,
   });
 
 /** Ni compte ni jeton — hors ligne, ou pas encore inscrit. */
 const sansCompte = () =>
-  useAccountStore.setState({ charge: true, compte: null, jeton: null });
+  useAccountStore.setState({ charge: true, compte: null, jeton: null, pro: false });
 
 /** Laisse tourner les délais du store, puis les promesses qu'ils lancent. */
 const laisserPasser = async (ms = 5000) => {
@@ -146,6 +148,24 @@ afterEach(() => {
 });
 
 describe('le plan enregistré monte au compte', () => {
+  it('sans abonnement, rien ne monte : le plan reste dans le téléphone', async () => {
+    /* LA SAUVEGARDE EN LIGNE EST PRO — le modèle « exporter et partager ».
+       Le plan est écrit dans le téléphone comme pour tout le monde. */
+    poserCompte();
+    useAccountStore.setState({ pro: false });
+    useScanStore.setState({
+      saves: [plan('p1', 'Chantier Dupont')],
+      currentSaveId: 'p1',
+      scanName: 'Chantier Dupont',
+      walls: [mur('m1')],
+      dirty: true,
+    });
+    useScanStore.getState().commitCurrent();
+    await laisserPasser();
+    expect(depose).not.toHaveBeenCalled();
+    expect(useScanStore.getState().saves).toHaveLength(1);
+  });
+
   it("« Enregistrer » dépose le relevé, sans le faire attendre", async () => {
     poserCompte();
     useScanStore.setState({

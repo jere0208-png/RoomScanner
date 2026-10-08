@@ -240,7 +240,7 @@ describe('5 — la page Pro vend ce qu’on va faire', () => {
     });
   });
 
-  it('grand public : l’exploration est vendue, la norme se résume au mode', () => {
+  it('grand public : l’exploration est dite, la norme se résume au mode', () => {
     enMode(false);
     const t = monter(<PaywallScreen />);
     const vu = textesDe(t);

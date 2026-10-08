@@ -9,7 +9,16 @@
  *   du compte créé ici et le nombre de plans consommés. Créer un AUTRE compte
  *   sur le même appareil est refusé ; se reconnecter au sien passe toujours.
  *
- * - LE QUOTA SE CONSOMME À L'ENREGISTREMENT, pas au scan. « Générer un
+ * - SCANNER EST GRATUIT, SANS LIMITE ; EXPORTER EST PRO. Relevé du patron :
+ *   « l'utilisateur doit trouver un intérêt à l'achat ». Un particulier n'a
+ *   qu'un logement : un palier au NOMBRE de logements ne le faisait jamais
+ *   payer. Il relève, mesure, meuble et visite autant qu'il veut ; il paie
+ *   au moment où il veut ENVOYER son plan — PDF, DXF, 3D, métré —, le
+ *   sauvegarder en ligne ou, électricien, le chiffrer. Voir `exportOuvert`.
+ *   Le compteur de plans continue de tourner (le trousseau le garde), mais
+ *   ne ferme plus rien.
+ *
+ * - LE QUOTA SE CONSOMMAIT À L'ENREGISTREMENT, pas au scan. « Générer un
  *   plan », c'est le garder : un essai raté qu'on jette ne brûle pas l'unique
  *   plan gratuit. Et supprimer un relevé ne rend PAS le quota — sinon le
  *   palier gratuit serait infini par corbeille.
@@ -489,9 +498,8 @@ export const useAccountStore = create<AccountState>((set, get) => ({
           }
         })
         .catch(() => {});
-    } else if (!s.pro && s.plansUtilises >= PLANS_GRATUITS) {
-      set({ essaiEpuiseVisible: true });
     }
+    // Plus d'« essai épuisé » à l'entrée : le scan ne s'épuise plus.
     persister(get());
     return { ok: true };
   },
@@ -609,18 +617,35 @@ export const useAccountStore = create<AccountState>((set, get) => ({
       sur l'offre −20 % avant d'avoir rien fait.
     */
     if (!s.compte && s.invite) return true;
-    return s.pro || s.plansUtilises < PLANS_GRATUITS + s.bonusEssais;
+    /*
+      ET TOUT LE MONDE SCANNE SANS LIMITE — relevé du patron, modèle choisi :
+      « exporter et partager » est Pro, scanner ne l'est pas. Les portes qui
+      consultent encore cette règle (accueil, étages, copies) restent
+      branchées : si le palier revenait un jour, il n'y aurait qu'ici à
+      toucher.
+    */
+    return true;
   },
 
   exportOuvert: () => {
     const s = get();
-    if (s.compte) return true;
+    if (s.compte && s.pro) return true;
+    if (s.compte) {
+      /*
+        LE MOMENT OÙ L'ON VEUT ENVOYER SON PLAN — c'est ce que le Pro vend.
+        Le plan est fait, on l'a vu en PDF : l'offre arrive à l'instant où
+        elle a un sens. La surprise si Apple porte une offre de lancement,
+        sinon la page Pro.
+      */
+      get().ouvrirSurprise();
+      return false;
+    }
     // Pas un refus sec : le plan est prêt, le compte est la clé qui
     // l'ouvre — et l'on revient exactement là où l'export attendait,
     // puisque l'écran du magasin de plans ne change pas.
     alerte(
       'Créez un compte pour exporter',
-      'Votre plan est prêt. Un compte gratuit sert à l’ouvrir en PDF, ' +
+      'Votre plan est prêt. Un compte sert à l’envoyer en PDF, ' +
         'CSV ou DXF — et à retrouver vos plans après une réinstallation.',
       [
         { label: 'Plus tard' },

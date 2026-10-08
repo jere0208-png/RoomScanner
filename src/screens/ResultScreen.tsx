@@ -4003,6 +4003,12 @@ export function ResultScreen() {
                    bougé, sans attendre sa règle d'un jour — voir `forcerTarifs`
                    dans le magasin. */
                 onPress={() => {
+                  // Le total se voit gratuitement ; le devis détaillé, aux
+                  // prix du magasin, est Pro — l'offre s'ouvre à sa place.
+                  if (!useAccountStore.getState().pro) {
+                    useAccountStore.getState().ouvrirSurprise();
+                    return;
+                  }
                   useScanStore.getState().demanderLesTarifs();
                   setScreen('devis');
                 }}

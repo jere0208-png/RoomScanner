@@ -424,7 +424,7 @@ const styles = getStyles(c);
   const exportOuvert = useAccountStore((st) => st.exportOuvert);
 
   const doExport = async () => {
-    /* L'invité regarde, le compte exporte : la barrière est ici — voir
+    /* L'aperçu est libre, l'export est Pro : la barrière est ici — voir
        `exportOuvert`. */
     if (!exportOuvert()) return;
     try {

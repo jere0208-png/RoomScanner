@@ -29,7 +29,7 @@ jest.mock('../src/native/account', () => ({
 /* Ce que l'App Store répond sur l'abonnement, réglé par chaque épreuve. */
 let mockEcheance: unknown = null;
 
-import { PLANS_GRATUITS, useAccountStore } from '../src/store/accountStore';
+import { useAccountStore } from '../src/store/accountStore';
 import { SERVEUR } from '../src/config/serveur';
 
 /** La fusion du marqueur lit puis écrit : deux microtâches à laisser passer. */
@@ -78,7 +78,7 @@ describe('l’essai gratuit appartient au téléphone', () => {
     expect(useAccountStore.getState().compte?.id).toBe('google:autre');
   });
 
-  it('le nouveau compte hérite de l’essai consommé par le téléphone', async () => {
+  it('le nouveau compte hérite du compteur du téléphone — sans popup : scanner est libre', async () => {
     mockMarqueur = { compte: MARTIN.id, plans: 1 };
     const r = await useAccountStore
       .getState()
@@ -86,9 +86,10 @@ describe('l’essai gratuit appartient au téléphone', () => {
     expect(r.ok).toBe(true);
     const s = useAccountStore.getState();
     expect(s.plansUtilises).toBe(1);
-    expect(s.peutCreerPlan()).toBe(false);
-    // Et le popup l'annonce, plutôt qu'un scan qui bute plus tard.
-    expect(s.essaiEpuiseVisible).toBe(true);
+    // Le modèle « exporter et partager » : le compteur ne ferme plus rien,
+    // il n'y a donc rien à annoncer.
+    expect(s.peutCreerPlan()).toBe(true);
+    expect(s.essaiEpuiseVisible).toBe(false);
   });
 
   it('ne montre AUCUN popup quand l’essai est encore là', async () => {
@@ -112,8 +113,7 @@ describe('l’essai gratuit appartient au téléphone', () => {
     expect(r.ok).toBe(true);
     const s = useAccountStore.getState();
     expect(s.pro).toBe(false);
-    // Et l'essai du téléphone étant consommé, le popup l'annonce.
-    expect(s.essaiEpuiseVisible).toBe(true);
+    expect(s.essaiEpuiseVisible).toBe(false);
     // Le trousseau ne porte plus le Pro de l'ancien compte : il ne doit
     // pas se réappliquer au suivant par accident.
     expect(mockMarqueur?.pro).toBeUndefined();
@@ -130,13 +130,14 @@ describe('l’essai gratuit appartient au téléphone', () => {
   });
 });
 
-describe('le palier gratuit', () => {
-  it('offre exactement un plan', () => {
+describe('le compteur de plans', () => {
+  it('compte, mais ne ferme plus rien : scanner est libre, exporter est Pro', () => {
     const s = useAccountStore.getState();
-    expect(PLANS_GRATUITS).toBe(1);
     expect(s.peutCreerPlan()).toBe(true);
     s.noterPlanCree();
-    expect(useAccountStore.getState().peutCreerPlan()).toBe(false);
+    s.noterPlanCree();
+    expect(useAccountStore.getState().plansUtilises).toBe(2);
+    expect(useAccountStore.getState().peutCreerPlan()).toBe(true);
   });
 
   it('retient le compteur dans le trousseau : la réinstallation ne rend rien', async () => {
@@ -149,7 +150,6 @@ describe('le palier gratuit', () => {
     useAccountStore.setState({ plansUtilises: 0 });
     await useAccountStore.getState().charger();
     expect(useAccountStore.getState().plansUtilises).toBe(1);
-    expect(useAccountStore.getState().peutCreerPlan()).toBe(false);
   });
 
   it('ne borne plus rien en Pro', () => {
@@ -202,7 +202,7 @@ describe('la suppression du compte', () => {
     expect(mockMarqueur?.plans).toBe(1);
   });
 
-  it('autorise un NOUVEAU compte après suppression, quota conservé', async () => {
+  it('autorise un NOUVEAU compte après suppression, compteur conservé', async () => {
     await useAccountStore.getState().connecter(MARTIN);
     useAccountStore.getState().noterPlanCree();
     await tick();
@@ -212,7 +212,7 @@ describe('la suppression du compte', () => {
       .connecter({ id: 'email:autre@exemple.fr', methode: 'email' });
     expect(r.ok).toBe(true);
     await useAccountStore.getState().charger();
-    expect(useAccountStore.getState().peutCreerPlan()).toBe(false);
+    expect(useAccountStore.getState().plansUtilises).toBe(1);
   });
 });
 

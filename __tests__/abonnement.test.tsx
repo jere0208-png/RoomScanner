@@ -103,7 +103,7 @@ describe('la page se lit de haut en bas', () => {
     expect(t).toContain(PRIX_PRO);
     // Ce qu'on achète s'ÉNUMÈRE : un prix sans liste ne dit pas ce qu'on
     // paie, et la moitié des fonctions de l'app ne se devinent pas.
-    expect(t).toContain('Autant de logements que vous voulez');
+    expect(t).toContain('Plan PDF coté, à envoyer ou imprimer');
     expect(noeuds(a).filter((n) => n.props?.testID === 'ligne-atout').length)
       .toBeGreaterThanOrEqual(5);
   });

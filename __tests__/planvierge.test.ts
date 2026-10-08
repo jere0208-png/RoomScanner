@@ -66,12 +66,12 @@ describe('« Enregistrer » sur un plan dessiné', () => {
     expect(useScanStore.getState().saves).toHaveLength(1);
   });
 
-  it('consomme le palier gratuit, comme un scan', () => {
+  it('se compte comme un scan — sans rien fermer', () => {
     dessinerEtEnregistrer();
-    // « Générer un plan, c'est en garder un » : la règle ne dépend pas du
-    // chemin. Un plan tracé à la main est un plan.
+    // « Générer un plan, c'est en garder un » : le compteur ne dépend pas du
+    // chemin. Mais scanner est libre : le suivant s'ouvre quand même.
     expect(useAccountStore.getState().plansUtilises).toBe(1);
-    expect(useAccountStore.getState().peutCreerPlan()).toBe(false);
+    expect(useAccountStore.getState().peutCreerPlan()).toBe(true);
   });
 
   it('mais ne le consomme qu’UNE fois, même si l’on ré-enregistre', () => {

@@ -210,8 +210,8 @@ export function SignInScreen() {
       </Pressable>
 
       <Text style={s.mentions}>
-        Un seul compte par téléphone. Le plan gratuit permet un relevé ; le
-        Pro les rend illimités.
+        Un seul compte par téléphone. Scanner est gratuit et sans limite ;
+        le Pro envoie vos plans en PDF, DXF ou 3D.
       </Text>
       </KeyboardAvoidingView>
     </SafeAreaView>

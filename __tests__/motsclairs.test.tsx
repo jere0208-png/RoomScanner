@@ -266,14 +266,15 @@ describe('la page Pro ne vend que ce qu’elle verrouille vraiment', () => {
   };
 
   /**
-   * LE SEUL VERROU DE L'APPLICATION, mesuré sur le code et non sur la
-   * mémoire : les écrans qui rendent la 3D, les cotes et les exports ne
-   * consultent JAMAIS l'abonnement.
+   * L'ABONNEMENT N'EST LU QU'À LA PORTE, mesuré sur le code et non sur la
+   * mémoire : les écrans qui rendent la 3D, les cotes et l'aperçu des
+   * exports ne consultent jamais `pro` eux-mêmes — la seule barrière est
+   * `exportOuvert`, au moment d'envoyer.
    */
   const lireSource = (chemin: string) =>
     readFileSync(join(__dirname, '..', 'src', chemin), 'utf8');
 
-  it('aucun écran ne réserve la 3D ni les exports à l’abonné', () => {
+  it('aucun écran ne réserve la 3D ni l’aperçu à l’abonné', () => {
     for (const f of [
       'screens/ResultScreen.tsx',
       'screens/ExportScreen.tsx',
@@ -284,30 +285,32 @@ describe('la page Pro ne vend que ce qu’elle verrouille vraiment', () => {
     }
   });
 
-  it('donc elle ne promet ni la 3D ni les exports comme un déblocage', async () => {
+  it('donc elle ne promet pas la 3D ni les meubles comme un déblocage', async () => {
     /*
       C'EST LA CONSÉQUENCE DE L'ÉPREUVE DU DESSUS, et c'est elle qui compte :
       promettre de débloquer ce qui n'est pas bloqué, c'est mentir à celui à
-      qui l'on demande de l'argent. Ce qui est vraiment réservé, c'est le
-      NOMBRE de logements — et ça se vend très bien.
+      qui l'on demande de l'argent. Ce qui est vraiment réservé, c'est
+      d'ENVOYER son plan, de le sauvegarder en ligne, et le devis.
     */
     const lus = prose(await ouvrir());
     expect(lus).not.toMatch(/Tous les exports/i);
     expect(lus).not.toMatch(/Meubles, 3D et cotes au centimètre/i);
   });
 
-  it('elle dit ce qui est RÉSERVÉ : plusieurs logements', async () => {
+  it('elle dit ce qui est RÉSERVÉ : les exports, la sauvegarde, le devis', async () => {
     const lus = prose(await ouvrir()).toLowerCase();
-    expect(lus).toMatch(/logements|plans/);
-    expect(lus).toMatch(/étages?/);
+    expect(lus).toMatch(/pdf/);
+    expect(lus).toMatch(/dxf/);
+    expect(lus).toMatch(/sauvegard/);
+    expect(lus).toMatch(/devis/);
   });
 
   it('et elle dit ce qui est GRATUIT, avant de demander de l’argent', async () => {
     /*
       Le contrôle en sens inverse d'une page de vente honnête : si elle ne
       nomme que ce qu'on gagne à payer, elle laisse croire que le reste est
-      fermé. Le premier logement est offert EN ENTIER — c'est vrai, c'est
-      généreux, et ça se dit.
+      fermé. Scanner, mesurer, meubler et explorer sont gratuits sans
+      limite — c'est vrai, c'est généreux, et ça se dit.
     */
     expect(prose(await ouvrir()).toLowerCase()).toMatch(
       /premier logement|gratuit/,

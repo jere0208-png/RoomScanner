@@ -149,7 +149,7 @@ describe('la page Pro', () => {
     const vu = textesDe(monter(<PaywallScreen />));
     expect(vu).toContain('Pro');
     expect(vu).toContain('4,90 €');
-    expect(vu).toContain('Autant de logements que vous voulez');
+    expect(vu).toContain('Plan PDF coté, à envoyer ou imprimer');
     // Plus de colonne « Gratuit » : on ne vend pas ce que l'utilisateur
     // possède déjà, et on ne lui prend pas la moitié de l'écran pour le
     // lui rappeler.
@@ -435,39 +435,19 @@ describe('la porte d’entrée', () => {
 
 describe('l’accueil et le quota', () => {
   /*
-    LA SURPRISE À LA PLACE DE LA PORTE — relevé du patron. Quand l'essai
-    est épuisé et qu'on relance un scan, on ne tombait que sur la page
-    Pro ; on tombe maintenant sur le popup « Surprise ! » et son −20 %,
-    qui TEND la page Pro avec le code déjà rempli. Le scan, lui, ne part
-    toujours pas : le palier s'arrête AVANT le scan, pas après.
+    SCANNER EST LIBRE — le modèle « exporter et partager ». L'accueil ne
+    ferme plus la porte du scan, même à qui a déjà gardé dix plans : l'offre
+    se présente à l'EXPORT, quand le plan est fait et qu'on veut l'envoyer
+    (voir `scanlibre.test.ts`).
   */
-  it('ouvre l’offre quand le plan gratuit est consommé : la surprise si Apple en porte une', () => {
+  it('un compte gratuit qui a déjà des plans scanne encore, sans offre en travers', () => {
     vendre({ eligible: true });
     useAccountStore.setState({
-      plansUtilises: 1,
+      plansUtilises: 10,
       paywallVisible: false,
       surpriseVisible: false,
-      offres: {
-        mensuel: mockProduits[0],
-        annuel: mockProduits[1],
-      },
+      offres: { mensuel: mockProduits[0], annuel: mockProduits[1] },
     });
-    const t = monter(<HomeScreen />);
-    const cta = t.root.findAll(
-      (n) =>
-        n.props?.accessibilityLabel === 'Commencer le scan' &&
-        typeof n.props?.onPress === 'function',
-    )[0];
-    act(() => {
-      cta.props.onPress();
-    });
-    expect(useAccountStore.getState().surpriseVisible).toBe(true);
-    expect(useAccountStore.getState().paywallVisible).toBe(false);
-    expect(useScanStore.getState().screen).toBe('home');
-  });
-
-  it('et la page Pro tout droit quand il n’y a pas d’offre — plus de remise promise pour rien', () => {
-    useAccountStore.setState({ plansUtilises: 1, paywallVisible: false, surpriseVisible: false, offres: null });
     const t = monter(<HomeScreen />);
     const cta = t.root.findAll(
       (n) =>
@@ -478,8 +458,8 @@ describe('l’accueil et le quota', () => {
       cta.props.onPress();
     });
     expect(useAccountStore.getState().surpriseVisible).toBe(false);
-    expect(useAccountStore.getState().paywallVisible).toBe(true);
-    expect(useScanStore.getState().screen).toBe('home');
+    expect(useAccountStore.getState().paywallVisible).toBe(false);
+    useAccountStore.setState({ plansUtilises: 0 });
   });
 
   it('laisse passer le premier scan, et un Pro sans limite', () => {

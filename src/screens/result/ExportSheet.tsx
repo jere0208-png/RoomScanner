@@ -23,6 +23,7 @@ import {
   type MurDuFond,
 } from '../../components/ExportFond';
 import { getStyles } from './styles';
+import { useAccountStore } from '../../store/accountStore';
 
 /** La hauteur d'une carte : assez pour que l'image se lise, pas plus. */
 export const HAUTEUR_CARTE = 92;
@@ -64,6 +65,12 @@ export function ExportSheet({
 }) {
   const teinte = useTheme();
   const styles = getStyles(teinte);
+  /*
+    LE BADGE PRO SUR CE QUI EST PRO — le dire AVANT le toucher, pas après.
+    L'image filigranée reste libre : c'est un partage qui fait connaître
+    l'application, et il ne cède rien de ce qui se vend.
+  */
+  const pro = useAccountStore((st) => st.pro);
   const sorties: [ExportArtKind, string, string, () => void][] = [
     [
       'pdf',
@@ -188,11 +195,18 @@ export function ExportSheet({
                     />
                   </View>
                   <View style={styles.exportCarteTextes} pointerEvents="none">
-                    <Text
-                      style={[styles.exportCarteTitre, sombre && styles.exportCarteTitreClair]}
-                      numberOfLines={1}>
-                      {titre}
-                    </Text>
+                    <View style={styles.exportCarteLigne}>
+                      <Text
+                        style={[styles.exportCarteTitre, sombre && styles.exportCarteTitreClair]}
+                        numberOfLines={1}>
+                        {titre}
+                      </Text>
+                      {!pro && art !== 'image' && (
+                        <View style={styles.exportBadgePro} testID={`badge-pro-${art}`}>
+                          <Text style={styles.exportBadgeProTexte}>PRO</Text>
+                        </View>
+                      )}
+                    </View>
                     <Text
                       style={[styles.exportCarteDetail, sombre && styles.exportCarteDetailClair]}
                       numberOfLines={2}>

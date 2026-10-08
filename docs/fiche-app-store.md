@@ -35,7 +35,7 @@ meubles, visite) n'y sont pas répétés : Apple les indexe déjà.
 ## Texte promotionnel (170 caractères max — modifiable sans nouvelle version)
 
 ```
-Nouveau : entrez dans votre pièce scannée et promenez-vous dedans, comme dans un jeu — murs et meubles compris. Votre premier logement est offert, en entier.
+Nouveau : entrez dans votre pièce scannée et promenez-vous dedans, comme dans un jeu — murs et meubles compris. Scanner, mesurer, meubler et explorer : gratuit et sans limite.
 ```
 157 caractères.
 
@@ -70,7 +70,7 @@ ET SI VOUS ÊTES ÉLECTRICIEN
 Un interrupteur, et EchoPlan devient votre outil de relevé : prises, interrupteurs et points lumineux posés sur le plan ou visés pendant le scan, contrôle NF C 15-100 pièce par pièce, circuits et gaines, tableau existant, liste du matériel et devis aux prix relevés en magasin. Le mode se coupe aussi simplement : il masque, il n'efface rien.
 
 GRATUIT POUR COMMENCER
-Votre premier logement est offert, en entier : scan, plan, 3D, exploration et exports. L'abonnement EchoPlan Pro ouvre les logements suivants, les étages, les copies. 4,90 € par mois ou 49 € par an, sans engagement.
+Scanner, mesurer, meubler, explorer en 3D et savoir ce qu'il faut acheter : gratuit, sans limite de logements ni d'étages. L'abonnement EchoPlan Pro sert à envoyer vos plans — PDF coté, DXF pour l'architecte, modèle 3D, métré CSV, liste du matériel —, à les sauvegarder en ligne et, pour les électriciens, à chiffrer le devis aux prix du magasin. 4,90 € par mois ou 49 € par an, sans engagement.
 
 Compatibilité : le scan nécessite un iPhone ou un iPad équipé du LiDAR (iPhone 12 Pro et modèles Pro suivants, iPad Pro 2020 et suivants). Le dessin au doigt fonctionne sur tous les appareils.
 ```

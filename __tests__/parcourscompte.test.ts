@@ -38,7 +38,7 @@ jest.mock('../src/native/account', () => ({
   ouvrirCodeOffre: jest.fn(async () => true),
 }));
 
-import { PLANS_GRATUITS, useAccountStore } from '../src/store/accountStore';
+import { useAccountStore } from '../src/store/accountStore';
 
 const ac = () => useAccountStore.getState();
 const tick = () => new Promise((r) => setImmediate(r));
@@ -66,19 +66,22 @@ beforeEach(() => {
 });
 
 describe('le parcours complet d’un abonne', () => {
-  it('essaie, se heurte au verrou, paie, et le verrou se leve', async () => {
-    // 1. Il essaie : le palier gratuit est ouvert.
+  it('scanne librement, veut envoyer son plan, paie, et l’export s’ouvre', async () => {
+    useAccountStore.setState({ compte: MARTIN });
+    // 1. Il relève autant qu'il veut : scanner est gratuit, sans limite.
+    ac().noterPlanCree();
+    ac().noterPlanCree();
     expect(ac().peutCreerPlan()).toBe(true);
-    for (let i = 0; i < PLANS_GRATUITS; i++) ac().noterPlanCree();
 
-    // 2. Le verrou tombe — et il tombe AVANT le travail, pas apres : on ne
-    //    laisse pas quelqu'un relever un logement pour lui dire ensuite.
-    expect(ac().peutCreerPlan()).toBe(false);
+    // 2. Il veut ENVOYER son plan : c'est là que l'offre se présente — au
+    //    moment où elle a un sens, le plan fait et vu.
+    expect(ac().exportOuvert()).toBe(false);
+    expect(ac().surpriseVisible || ac().paywallVisible).toBe(true);
 
     // 3. Il paie.
     await ac().acheterPro();
     expect(ac().pro).toBe(true);
-    expect(ac().peutCreerPlan()).toBe(true);
+    expect(ac().exportOuvert()).toBe(true);
 
     // 4. Et il voit jusqu'a quand : une echeance qu'on ne montre pas est un
     //    prelevement qu'on decouvre sur son releve bancaire.
@@ -132,16 +135,14 @@ describe('le parcours complet d’un abonne', () => {
     const rendu = await ac().restaurerPro();
     expect(rendu).toBe(true);
     expect(ac().pro).toBe(true);
-    // Il ne repasse pas a la caisse, et son essai reste consomme : le
-    // palier gratuit appartient au client, pas a l'appareil.
-    expect(ac().peutCreerPlan()).toBe(true);
+    // Il ne repasse pas a la caisse : l'export lui est rendu.
+    expect(ac().exportOuvert()).toBe(true);
   });
 
   it('un code d’offre Apple deverrouille par l’App Store, et ne s’use pas', async () => {
-    ac().noterPlanCree();
-    expect(ac().peutCreerPlan()).toBe(false);
+    useAccountStore.setState({ compte: MARTIN });
     await ac().codeOffre();
     expect(ac().pro).toBe(true);
-    expect(ac().peutCreerPlan()).toBe(true);
+    expect(ac().exportOuvert()).toBe(true);
   });
 });

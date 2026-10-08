@@ -167,7 +167,7 @@ describe('l’invité scanne librement, et paie à l’export', () => {
     expect(useAccountStore.getState().peutCreerPlan()).toBe(true);
   });
 
-  it('mais ses relevés se comptent : le compte créé ensuite naît à zéro', () => {
+  it('ses relevés se comptent, et le compte créé ensuite scanne librement', () => {
     act(() =>
       useAccountStore.setState({
         invite: true,
@@ -180,14 +180,14 @@ describe('l’invité scanne librement, et paie à l’export', () => {
     // Le relevé de l'invité passe par le même compteur que tout le monde.
     act(() => useAccountStore.getState().noterPlanCree());
     expect(useAccountStore.getState().plansUtilises).toBe(1);
-    // Il crée son compte : l'essai de l'appareil est déjà consommé —
-    // « son compte sera à 0 scan possible par la suite ».
+    // Il crée son compte : scanner reste libre — c'est l'export qui se
+    // vend, pas le nombre de logements.
     act(() =>
       useAccountStore.setState({
         compte: { id: 'email:a@b.fr', email: 'a@b.fr', methode: 'email' },
       }),
     );
-    expect(useAccountStore.getState().peutCreerPlan()).toBe(false);
+    expect(useAccountStore.getState().peutCreerPlan()).toBe(true);
   });
 
   it('l’export se refuse à l’invité, et lui propose LE compte', () => {
@@ -208,16 +208,37 @@ describe('l’invité scanne librement, et paie à l’export', () => {
     expect(useAccountStore.getState().invite).toBe(false);
   });
 
-  it('avec un compte, l’export s’ouvre sans un mot', () => {
+  it('avec un compte gratuit, l’export ouvre l’offre — pas une alerte', () => {
     act(() => {
       useAlerte.setState({ courante: null, file: [] });
       useAccountStore.setState({
         invite: false,
+        pro: false,
+        offres: null,
+        paywallVisible: false,
+        surpriseVisible: false,
+        compte: { id: 'email:a@b.fr', email: 'a@b.fr', methode: 'email' },
+      });
+    });
+    expect(useAccountStore.getState().exportOuvert()).toBe(false);
+    expect(useAlerte.getState().courante).toBeNull();
+    const st = useAccountStore.getState();
+    expect(st.surpriseVisible || st.paywallVisible).toBe(true);
+    act(() => useAccountStore.setState({ paywallVisible: false, surpriseVisible: false }));
+  });
+
+  it('avec un compte abonné, l’export s’ouvre sans un mot', () => {
+    act(() => {
+      useAlerte.setState({ courante: null, file: [] });
+      useAccountStore.setState({
+        invite: false,
+        pro: true,
         compte: { id: 'email:a@b.fr', email: 'a@b.fr', methode: 'email' },
       });
     });
     expect(useAccountStore.getState().exportOuvert()).toBe(true);
     expect(useAlerte.getState().courante).toBeNull();
+    act(() => useAccountStore.setState({ pro: false }));
   });
 
   it('et CHAQUE chemin d’export consulte la barrière', () => {

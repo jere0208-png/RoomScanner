@@ -19,6 +19,7 @@ import TestRenderer, { act } from 'react-test-renderer';
 import { ExportSheet, HAUTEUR_CARTE } from '../src/screens/result/ExportSheet';
 import { ExportFond, PLAN_EXEMPLE, TEINTE_DU_FOND, cadrerLePlan } from '../src/components/ExportFond';
 import { dark, light } from '../src/theme';
+import { useAccountStore } from '../src/store/accountStore';
 
 const appels: string[] = [];
 const monter = () => {
@@ -187,5 +188,37 @@ describe('les images de fond', () => {
       expect([k, luminance(TEINTE_DU_FOND(k, light)) > 0.8]).toEqual([k, true]);
       expect([k, luminance(TEINTE_DU_FOND(k, dark)) < 0.2]).toEqual([k, true]);
     }
+  });
+});
+
+/*
+  LE PRO SE DIT AVANT LE TOUCHER — modèle « exporter et partager ». Une
+  carte qui ouvre l'offre au lieu du fichier, sans prévenir, ressemble à un
+  piège ; un badge « PRO » sur ce qui est Pro, et rien sur l'image
+  filigranée, qui reste libre.
+*/
+describe('le badge Pro', () => {
+  const badges = (t: TestRenderer.ReactTestRenderer) =>
+    t.root
+      .findAll((n) => typeof n.props?.testID === 'string' && n.props.testID.startsWith('badge-pro-'))
+      .map((n) => n.props.testID as string)
+      .filter((x, i, a) => a.indexOf(x) === i)
+      .sort();
+
+  it('marque les cinq exports Pro, pas l’image, quand on n’est pas abonné', () => {
+    act(() => useAccountStore.setState({ pro: false }));
+    const t = monter();
+    expect(badges(t)).toEqual(
+      ['badge-pro-csv', 'badge-pro-dxf', 'badge-pro-materiel', 'badge-pro-obj', 'badge-pro-pdf'],
+    );
+    act(() => t.unmount());
+  });
+
+  it('et disparaît chez l’abonné : il n’y a plus rien à acheter', () => {
+    act(() => useAccountStore.setState({ pro: true }));
+    const t = monter();
+    expect(badges(t)).toEqual([]);
+    act(() => t.unmount());
+    act(() => useAccountStore.setState({ pro: false }));
   });
 });

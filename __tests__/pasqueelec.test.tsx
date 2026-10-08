@@ -279,10 +279,12 @@ describe('la page Pro vend aussi ce qui n’est pas électrique', () => {
     LE CONTRÔLE EN SENS INVERSE : on n'a pas troqué un métier contre
     l'autre. La norme et le tableau existant sont ce qui distingue
     l'application de tous les scanners de pièces du magasin — ils restent
-    écrits, et ils restent vendus.
+    écrits. Depuis le modèle « exporter et partager », ils sont GRATUITS,
+    et la page le dit à l'électricien ; c'est le devis qui se vend.
   */
-  it('sans effacer le métier : la norme et le tableau restent vendus', () => {
+  it('sans effacer le métier : la norme et le tableau restent dits — gratuits', () => {
     const vu = textesDe(monter(<PaywallScreen />));
+    expect(pourChercher(vu)).toContain('devis');
     expect(vu).toContain('NF C 15-100');
     expect(pourChercher(vu)).toContain('tableau');
   });

@@ -97,20 +97,24 @@ import { panne as expliquer } from '../ui/panne';
   Trouvé en relisant les verrous, pas en lisant la page : la page était
   parfaitement crédible.
 
-  CE QUI EST VRAIMENT RÉSERVÉ SE VEND TRÈS BIEN : le premier logement est
-  offert EN ENTIER, et l'abonnement ouvre les suivants — les étages, les
-  copies, les variantes. On ne vend plus une fonction, on vend la suite. Un
-  banc lit le code source des écrans pour tenir cette promesse à l'envers :
-  le jour où l'export sera vraiment réservé, il tombera, et la page pourra le
-  dire.
+  CE QUI EST VRAIMENT RÉSERVÉ, DEPUIS LE MODÈLE « EXPORTER ET PARTAGER » :
+  envoyer son plan (PDF, DXF, 3D, CSV, matériel), le sauvegarder en ligne,
+  et le devis. Scanner, mesurer, meubler et explorer sont gratuits sans
+  limite — un particulier n'a qu'un logement, et un palier au nombre de
+  logements ne le faisait jamais payer. Les bancs `scanlibre` et
+  `motsclairs` tiennent la page à ce que le code verrouille vraiment.
+*/
+/*
+  CE QUE LE PRO DÉBLOQUE VRAIMENT — modèle choisi par le patron : « exporter
+  et partager ». Chaque ligne est un verrou réel (`exportOuvert`, la
+  sauvegarde en ligne, le devis) : la page ne vend rien de ce qu'on a déjà.
 */
 const ATOUTS: { icone: keyof typeof SOLAIRES; mot: string }[] = [
-  { icone: 'rooms', mot: 'Autant de logements que vous voulez' },
-  { icone: 'save', mot: 'Les étages, les sous-sols, les copies' },
-  { icone: 'furniture', mot: 'Meubles, 3D et exploration de chacun' },
-  { icone: 'partage', mot: 'PDF, DXF et CSV sur chacun d’eux' },
-  { icone: 'elec', mot: 'Contrôle NF C 15-100 et matériel' },
-  { icone: 'metre', mot: 'Tableau existant et diagnostic' },
+  { icone: 'partage', mot: 'Plan PDF coté, à envoyer ou imprimer' },
+  { icone: 'model', mot: 'DXF pour l’architecte, modèle 3D' },
+  { icone: 'metre', mot: 'Métré CSV pour Excel' },
+  { icone: 'save', mot: 'Vos plans sauvegardés en ligne' },
+  { icone: 'elec', mot: 'Devis aux prix du magasin' },
   { icone: 'etoile', mot: 'Les nouveautés en premier' },
 ];
 /*
@@ -122,14 +126,12 @@ const ATOUTS: { icone: keyof typeof SOLAIRES; mot: string }[] = [
 */
 const LIGNE_DU_METIER: (typeof ATOUTS)[number] = {
   icone: 'elec',
-  mot: 'Mode Électricité : NF C 15-100 et devis',
+  mot: 'Mode Électricité : devis aux prix réels',
 };
 const atoutsPour = (modeElec: boolean) =>
   modeElec
     ? ATOUTS
-    : ATOUTS.flatMap((a) =>
-        a.icone === 'elec' ? [LIGNE_DU_METIER] : a.icone === 'metre' ? [] : [a],
-      );
+    : ATOUTS.map((a) => (a.icone === 'elec' ? LIGNE_DU_METIER : a));
 
 export function PaywallScreen() {
   const c = useTheme();
@@ -336,12 +338,15 @@ export function PaywallScreen() {
                 ET CE QUI RESTE GRATUIT, DIT AVANT DE DEMANDER DE L'ARGENT.
 
                 Une page qui ne nomme que ce qu'on gagne à payer laisse croire
-                que le reste est fermé. Le premier logement est offert en
-                entier — c'est vrai, c'est généreux, et le taire ne servait
-                qu'à rendre la page moins crédible.
+                que le reste est fermé. Scanner, explorer — et pour
+                l'électricien, le contrôle de la norme — ne coûtent rien et
+                sans limite : c'est vrai, c'est généreux, et le taire ne
+                servirait qu'à rendre la page moins crédible.
               */}
               <Text style={s.gratuit}>
-                Votre premier logement reste gratuit, en entier.
+                {modeElec
+                  ? 'Scanner, meubler, explorer, la NF C 15-100 et le tableau : gratuits.'
+                  : 'Scanner, mesurer, meubler et explorer restent gratuits, sans limite.'}
               </Text>
             </View>
           </ContourVif>

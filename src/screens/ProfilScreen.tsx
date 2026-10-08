@@ -35,7 +35,7 @@ import { useUsage } from '../store/usage';
 import { ThemeGlyph } from '../components/ThemeGlyph';
 import { ContourVif, TexteVif } from '../components/ContourVif';
 import { SOLAIRES } from '../ui/solaires';
-import { PLANS_GRATUITS, useAccountStore } from '../store/accountStore';
+import { useAccountStore } from '../store/accountStore';
 import { useScanStore, type ThemePref } from '../store/scanStore';
 import { ombreBouton, dark, radius, shadowCard, useTheme, type Palette } from '../theme';
 import { ACCENTS } from '../ui/accents';
@@ -104,8 +104,6 @@ export function ProfilScreen() {
   const [journal, setJournal] = useState(false);
   const incidents = usePannes((x) => x.incidents);
   const proVia = useAccountStore((st) => st.proVia);
-  const plansUtilises = useAccountStore((st) => st.plansUtilises);
-  const bonusEssais = useAccountStore((st) => st.bonusEssais);
   const ouvrirPaywall = useAccountStore((st) => st.ouvrirPaywall);
   const proEcheance = useAccountStore((st) => st.proEcheance);
   const proReconduit = useAccountStore((st) => st.proReconduit);
@@ -114,7 +112,6 @@ export function ProfilScreen() {
   /** Le mot au service client : sujet, message, photo. */
   const [support, setSupport] = useState(false);
 
-  const restant = Math.max(0, PLANS_GRATUITS + bonusEssais - plansUtilises);
   const quitterInvite = useAccountStore((st) => st.quitterInvite);
   // L'invité s'appelle par son état, pas par un « Mon compte » qui promet
   // une identité qu'il n'a pas.
@@ -266,9 +263,7 @@ export function ProfilScreen() {
                 ? proVia === 'code'
                   ? 'Débloqué par code · relevés illimités'
                   : 'Abonnement actif · relevés illimités'
-                : `Plan gratuit · ${restant} relevé${
-                    restant > 1 ? 's' : ''
-                  } restant${restant > 1 ? 's' : ''}`}
+                : 'Gratuit · scans illimités, exports en Pro'}
             </Text>
             {/*
               JUSQU'À QUAND — relevé du patron : « sur le profil on doit voir
