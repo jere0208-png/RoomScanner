@@ -18,7 +18,7 @@
  * patron est « légère ».
  */
 import React, { useEffect, useRef } from 'react';
-import { Animated, Easing, StyleSheet, TouchableOpacity } from 'react-native';
+import { Animated, Easing, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { SOLAIRES } from '../ui/solaires';
 import { ombreBouton, themedStyles, useTheme, type Palette } from '../theme';
@@ -129,6 +129,20 @@ export function ControlePastille({
           <Path d={SOLAIRES.bouclier} fill={teinte} fillRule="evenodd" />
         </Svg>
       </TouchableOpacity>
+      {/*
+        LE COMPTE, SUR LE BOUTON — relevé du patron : « peaufine la partie
+        élec ». Le rouge disait « pas aux normes », pas COMBIEN. Une
+        pastille de compte, celle des notifications d'iOS : on sait d'un coup
+        d'œil s'il reste un point ou douze, sans ouvrir la feuille. Elle ne
+        prend pas le doigt — c'est le bouton qui ouvre.
+      */}
+      {enAlerte && (
+        <View style={styles.compte} pointerEvents="none" testID="compte-alertes">
+          <Text style={styles.compteTexte} numberOfLines={1}>
+            {alertes > 99 ? '99+' : String(alertes)}
+          </Text>
+        </View>
+      )}
     </Animated.View>
   );
 }
@@ -137,6 +151,21 @@ const getStyles = themedStyles((c: Palette) =>
   StyleSheet.create({
     /* Le cadre fait la taille du bouton : l'onde déborde SANS pousser la
        rangée — elle est absolue, et ne prend aucun toucher. */
+    compte: {
+      position: 'absolute',
+      top: -6,
+      right: -8,
+      minWidth: 18,
+      height: 18,
+      paddingHorizontal: 4,
+      borderRadius: 9,
+      backgroundColor: c.danger,
+      borderWidth: 1.5,
+      borderColor: c.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    compteTexte: { color: '#FFFFFF', fontSize: 11, fontWeight: '700' },
     cadre: {
       width: D,
       height: D,

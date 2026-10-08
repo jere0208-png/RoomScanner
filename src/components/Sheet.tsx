@@ -168,6 +168,8 @@ const ICONS = {
   coffre: ['M4 4 h16 v4.5 h-16 z', 'M6.5 8.5 v10', 'M17.5 8.5 v10', 'M6.5 18.5 h11'],
   // Le mur rebouché, appareillé : fermer une ouverture, c'est retirer le trou.
   murer: ['M3.5 5 h17 v14 h-17 z', 'M3.5 12 h17', 'M12 5 v7', 'M8 12 v7', 'M16 12 v7'],
+  // Le rouleau du peintre : les travaux, ce qu'il faut acheter.
+  rouleau: ['M4 4 h13 v5 h-13 z', 'M17 6.5 h2.5 v5 h-7.5 v3', 'M12 14.5 v6'],
   tableau: [
     'M3.5 3.5 h17 v17 h-17 z',
     'M3.5 9.5 h17',
@@ -776,13 +778,13 @@ const getStyles = themedStyles((c: Palette) =>
       alignItems: 'center',
       justifyContent: 'center',
       borderRadius: radius.pill,
-      backgroundColor: c.surfaceSunken,
+      backgroundColor: c.surface,
       borderWidth: 1,
-      borderColor: 'transparent',
+      borderColor: c.lineStrong,
     },
     pastilleCourante: { borderColor: c.blue, backgroundColor: c.blueSoft },
     pastillePressee: { backgroundColor: c.line },
-    pastilleTexte: { color: c.inkSoft, fontSize: 15, fontWeight: '700' },
+    pastilleTexte: { color: c.ink, fontSize: 15, fontWeight: '700' },
     pastilleTexteCourant: { color: c.blue },
     actions: { flexDirection: 'row', gap: 10, marginTop: 14 },
     ghost: {
@@ -790,9 +792,9 @@ const getStyles = themedStyles((c: Palette) =>
       borderRadius: radius.pill,
       paddingVertical: 13,
       alignItems: 'center',
-      backgroundColor: c.surfaceSunken,
+      backgroundColor: c.blueSoft,
     },
-    ghostText: { color: c.inkSoft, fontWeight: '700', fontSize: 15 },
+    ghostText: { color: c.blue, fontWeight: '700', fontSize: 15 },
     primary: {
       flex: 1.4,
       borderRadius: radius.pill,

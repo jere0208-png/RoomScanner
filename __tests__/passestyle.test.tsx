@@ -34,7 +34,6 @@ import TestRenderer, { act } from 'react-test-renderer';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import * as theme from '../src/theme';
-import { Verre } from '../src/components/Verre';
 import { ToolPill } from '../src/components/ToolPill';
 import { DevisPastille } from '../src/components/DevisPastille';
 import { ControlePastille } from '../src/components/ControlePastille';
@@ -89,7 +88,6 @@ describe('2 — du blanc net sur les pages claires', () => {
 
   it('la pastille d’outil : blanche, ombre neutre et légère, aucun verre', () => {
     const t = monter(<ToolPill icon="ruler" label="Cotes" active={false} onPress={() => {}} />);
-    expect(t.root.findAllByType(Verre)).toHaveLength(0);
     const st = plein(t.root.findAllByType(TouchableOpacity)[0].props.style);
     expect(st.fond).toBe(theme.light.surface);
     expect(st.ombre).toBe('#0B0D12');
@@ -98,11 +96,9 @@ describe('2 — du blanc net sur les pages claires', () => {
 
   it('les pastilles de prix et de contrôle aussi, leur contour de sens gardé', () => {
     const prix = monter(<DevisPastille total={1248} onPress={() => {}} />);
-    expect(prix.root.findAllByType(Verre)).toHaveLength(0);
     expect(plein(prix.root.findAllByType(TouchableOpacity)[0].props.style).fond).toBe(theme.light.surface);
     act(() => arbre?.unmount());
     const ctrl = monter(<ControlePastille alertes={0} commence onPress={() => {}} />);
-    expect(ctrl.root.findAllByType(Verre)).toHaveLength(0);
     const b = ctrl.root.findAllByType(TouchableOpacity)[0];
     const st = StyleSheet.flatten(b.props.style) as { borderColor?: string; backgroundColor?: string };
     expect(st.borderColor).toBe(theme.light.green);
@@ -124,18 +120,26 @@ describe('2 — du blanc net sur les pages claires', () => {
     expect(theme.ombreBouton.shadowOpacity).toBeLessThanOrEqual(0.1);
   });
 
-  it('le verre ne reste que dans la visite, au-dessus d’une image, et sans filet', () => {
-    const avecVerre = [...sources('src'), 'App.tsx'].filter(
-      (p) => p !== 'src/components/Verre.tsx' && /<Verre\b/.test(lire(p)),
-    );
-    expect(avecVerre).toEqual(['src/components/Exploration.tsx']);
-    // Aucun filet sur le verre : c'est lui qui sortait crénelé.
-    const visite = lire('src/components/Exploration.tsx');
-    for (const nom of ['carte', 'terminer', 'repereVerre', 'batonVerre']) {
-      const a = visite.indexOf(`    ${nom}: {`);
-      const corps = visite.slice(a, visite.indexOf('\n    },', a));
-      expect([nom, /borderWidth/.test(corps)]).toEqual([nom, false]);
+  it('plus de verre du tout, visite comprise : il rendait gris ce qu’il ne floutait pas', () => {
+    /*
+      Relevé du patron, après la visite : « le bouton quitter est mal fait,
+      le bouton plus petit que le texte, et les boutons toujours grisés ».
+      Le verre s'en va de l'app : composant, vue native et pont.
+    */
+    for (const p of [...sources('src'), 'App.tsx', 'modules/react-native-room-scan/src/index.ts']) {
+      expect([p, /\bVerre\b|RoomScanVerre/.test(lire(p))]).toEqual([p, false]);
     }
+    expect(lire('modules/react-native-room-scan/ios/RoomScan.m')).not.toContain('RoomScanVerre');
+  });
+
+  it('« Terminer » porte lui-même sa pilule : ce qu’on voit est ce qu’on touche', () => {
+    const visite = lire('src/components/Exploration.tsx');
+    const a = visite.indexOf('    terminer: {');
+    const corps = visite.slice(a, visite.indexOf('\n    },', a));
+    expect(corps).toContain('backgroundColor: c.surface');
+    expect(corps).toMatch(/height: 4\d/);
+    expect(corps).toContain('paddingHorizontal');
+    expect(visite).toMatch(/style=\{\(\{ pressed \}\) => \[styles\.terminer, pressed && styles\.enfonce\]\}/);
   });
 });
 

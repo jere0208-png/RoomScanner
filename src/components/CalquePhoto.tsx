@@ -278,7 +278,7 @@ export function CalquePhotoPoignee({
             alignItems: 'center',
             justifyContent: 'center',
           }}>
-          <Text style={{ color: c.blue, fontSize: 13, fontWeight: '900' }}>
+          <Text style={{ color: c.blue, fontSize: 13, fontWeight: '700' }}>
             ↔
           </Text>
         </View>

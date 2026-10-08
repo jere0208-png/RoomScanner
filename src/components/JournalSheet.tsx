@@ -115,7 +115,7 @@ export function JournalSheet({
 
 const getStyles = themedStyles((c: Palette) =>
   StyleSheet.create({
-    titre: { color: c.ink, fontSize: 18, fontWeight: '800', paddingRight: 40 },
+    titre: { color: c.ink, fontSize: 18, fontWeight: '600', paddingRight: 40 },
     sous: {
       color: c.inkSoft,
       fontSize: 13.5,

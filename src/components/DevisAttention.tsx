@@ -275,7 +275,7 @@ const getStyles = themedStyles((c: Palette) =>
       justifyContent: 'center',
     },
     carteTextes: { flex: 1 },
-    carteTitre: { color: c.ink, fontSize: 14.5, fontWeight: '800' },
+    carteTitre: { color: c.ink, fontSize: 14.5, fontWeight: '600' },
     carteMessage: { color: c.inkSoft, fontSize: 12.5, lineHeight: 17, marginTop: 2 },
     /* Le cadre fait la taille du signe : l'onde déborde SANS pousser le
        texte — elle est absolue, et ne prend aucun toucher. */
@@ -303,7 +303,7 @@ const getStyles = themedStyles((c: Palette) =>
     titre: {
       color: c.ink,
       fontSize: 26,
-      fontWeight: '800',
+      fontWeight: '700',
       letterSpacing: -0.6,
       marginTop: 18,
     },

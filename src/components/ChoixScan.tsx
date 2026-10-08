@@ -225,7 +225,7 @@ const getStyles = themedStyles((c: Palette) =>
     titre: {
       color: c.ink,
       fontSize: 19,
-      fontWeight: '800',
+      fontWeight: '600',
       letterSpacing: -0.3,
     },
     sous: { color: c.inkFaint, fontSize: 12.5, lineHeight: 17, marginTop: 3 },
@@ -252,7 +252,7 @@ const getStyles = themedStyles((c: Palette) =>
       justifyContent: 'center',
     },
     textes: { flex: 1 },
-    ligneTitre: { color: c.ink, fontSize: 14.5, fontWeight: '800' },
+    ligneTitre: { color: c.ink, fontSize: 14.5, fontWeight: '600' },
     ligneDetail: {
       color: c.inkFaint,
       fontSize: 11.5,
@@ -267,6 +267,6 @@ const getStyles = themedStyles((c: Palette) =>
       alignItems: 'center',
       justifyContent: 'center',
     },
-    validerTexte: { color: '#FFFFFF', fontSize: 15.5, fontWeight: '800' },
+    validerTexte: { color: '#FFFFFF', fontSize: 15.5, fontWeight: '600' },
   }),
 );

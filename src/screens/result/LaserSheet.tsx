@@ -274,7 +274,7 @@ const getStyles = (c: Palette) =>
     },
     tete: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
     teteTexte: { flex: 1 },
-    titre: { color: c.ink, fontSize: 19, fontWeight: '800' },
+    titre: { color: c.ink, fontSize: 19, fontWeight: '600' },
     sousTitre: { color: c.inkFaint, fontSize: 13, marginTop: 2 },
     croix: { color: c.inkFaint, fontSize: 17, fontWeight: '700' },
     cadran: {
@@ -287,7 +287,7 @@ const getStyles = (c: Palette) =>
     valeur: {
       color: c.ink,
       fontSize: 40,
-      fontWeight: '800',
+      fontWeight: '700',
       fontVariant: ['tabular-nums'],
     },
     reference: { color: c.inkFaint, fontSize: 12.5, marginTop: 6 },
@@ -325,7 +325,7 @@ const getStyles = (c: Palette) =>
       padding: 12,
       marginTop: 12,
     },
-    alerteTitre: { color: c.ink, fontSize: 14, fontWeight: '800' },
+    alerteTitre: { color: c.ink, fontSize: 14, fontWeight: '600' },
     alerteTexte: {
       color: c.inkSoft,
       fontSize: 12.5,
@@ -341,5 +341,5 @@ const getStyles = (c: Palette) =>
       marginTop: 14,
     },
     validerEteint: { backgroundColor: c.surface },
-    validerTexte: { color: '#FFFFFF', fontSize: 16, fontWeight: '800' },
+    validerTexte: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
   });

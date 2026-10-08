@@ -319,7 +319,7 @@ const getStyles = themedStyles((c: Palette) =>
       justifyContent: 'center',
       backgroundColor: c.surface,
     },
-    titrePage: { marginLeft: 8, fontSize: 22, fontWeight: '800', color: c.ink },
+    titrePage: { marginLeft: 8, fontSize: 22, fontWeight: '700', color: c.ink },
     sous: { color: c.inkSoft, fontSize: 13, lineHeight: 18, marginBottom: 12 },
     recherche: {
       backgroundColor: c.surface,
@@ -336,7 +336,7 @@ const getStyles = themedStyles((c: Palette) =>
       marginTop: 18,
       marginBottom: 6,
       fontSize: 11,
-      fontWeight: '800',
+      fontWeight: '600',
       letterSpacing: 0.8,
       color: c.inkFaint,
     },
@@ -352,7 +352,7 @@ const getStyles = themedStyles((c: Palette) =>
     precision: { color: c.inkSoft, fontSize: 12, marginTop: 2, lineHeight: 16 },
     source: { color: c.inkFaint, fontSize: 10, marginTop: 3 },
     droite: { alignItems: 'flex-end' },
-    prix: { color: c.ink, fontSize: 15, fontWeight: '800' },
+    prix: { color: c.ink, fontSize: 15, fontWeight: '600' },
     unite: { color: c.inkFaint, fontSize: 10, marginTop: 1 },
     amazon: { marginTop: 10 },
     compteur: {
@@ -375,9 +375,9 @@ const getStyles = themedStyles((c: Palette) =>
       textAlign: 'center',
       color: c.ink,
       fontSize: 15,
-      fontWeight: '800',
+      fontWeight: '600',
     },
-    sousTotal: { marginLeft: 'auto', color: c.blue, fontWeight: '800' },
+    sousTotal: { marginLeft: 'auto', color: c.blue, fontWeight: '600' },
     vide: {
       color: c.inkSoft,
       fontSize: 13,
@@ -399,6 +399,6 @@ const getStyles = themedStyles((c: Palette) =>
       paddingHorizontal: 18,
     },
     caddieMot: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
-    caddiePrix: { color: '#FFFFFF', fontSize: 16, fontWeight: '800' },
+    caddiePrix: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
   }),
 );

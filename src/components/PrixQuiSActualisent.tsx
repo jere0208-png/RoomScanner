@@ -353,7 +353,7 @@ const getStyles = themedStyles((c: Palette) =>
     titre: {
       marginTop: 18,
       fontSize: 19,
-      fontWeight: '800',
+      fontWeight: '600',
       color: c.ink,
     },
     etape: {
@@ -416,7 +416,7 @@ const getStyles = themedStyles((c: Palette) =>
     */
     bandeauVert: { backgroundColor: 'rgba(30,160,90,0.12)' },
     bandeauTexte: { flex: 1 },
-    bandeauMot: { fontSize: 13, fontWeight: '800', color: c.blue },
+    bandeauMot: { fontSize: 13, fontWeight: '600', color: c.blue },
     bandeauMotGris: { color: c.ink },
     bandeauMotVert: { color: c.green },
     bandeauSource: { fontSize: 11, color: c.inkFaint, marginTop: 1 },

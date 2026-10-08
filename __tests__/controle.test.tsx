@@ -205,6 +205,16 @@ describe('la pastille de contrôle', () => {
       .findAllByType(TouchableOpacity)
       .find((n) => String(n.props.accessibilityLabel ?? '').startsWith('Contrôle'))!;
     expect(bouton.props.accessibilityLabel).toContain('3');
+    // Et le compte se lit SUR le bouton, en pastille : combien, pas seulement « rouge ».
+    const compte = tree.root.findAll((n) => n.props?.testID === 'compte-alertes')[0];
+    expect(compte).toBeDefined();
+    expect(compte.findAllByType(Text).map((t) => t.props.children)).toContain('3');
+  });
+
+  it('au-delà de 99, la pastille de compte ne déborde pas', () => {
+    const tree = monter(140);
+    const compte = tree.root.findAll((n) => n.props?.testID === 'compte-alertes')[0];
+    expect(compte.findAllByType(Text).map((t) => t.props.children)).toContain('99+');
   });
 
   it('porte un contour vert fixe quand rien n’est à redire', () => {
@@ -212,6 +222,8 @@ describe('la pastille de contrôle', () => {
     const b = bordures(tree);
     expect(b).toContain(VERT);
     expect(b).not.toContain(ROUGE);
+    // Rien à compter : pas de pastille.
+    expect(tree.root.findAll((n) => n.props?.testID === 'compte-alertes')).toHaveLength(0);
   });
 
   it('ouvre le contrôle d’un appui', () => {

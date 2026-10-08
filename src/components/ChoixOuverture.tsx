@@ -235,7 +235,7 @@ export function ChoixOuverture({
 const getStyles = themedStyles((c: Palette) =>
   StyleSheet.create({
     entete: { marginBottom: 14, paddingRight: 34 },
-    title: { color: c.ink, fontSize: 18, fontWeight: '800', letterSpacing: -0.3 },
+    title: { color: c.ink, fontSize: 18, fontWeight: '600', letterSpacing: -0.3 },
     subtitle: {
       color: c.inkFaint,
       fontSize: 12.5,

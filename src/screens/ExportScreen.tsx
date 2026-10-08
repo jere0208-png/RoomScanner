@@ -998,7 +998,7 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   title: {
     color: c.ink,
     fontSize: 21,
-    fontWeight: '800',
+    fontWeight: '700',
     letterSpacing: -0.3,
     marginLeft: 12,
   },
@@ -1041,7 +1041,7 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     textAlign: 'center',
     marginTop: 3,
   },
-  optionTextOn: { color: c.blue, fontWeight: '800' },
+  optionTextOn: { color: c.blue, fontWeight: '600' },
   switchRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1082,7 +1082,7 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   dossierTitre: {
     color: c.inkFaint,
     fontSize: 9.5,
-    fontWeight: '800',
+    fontWeight: '600',
     letterSpacing: 0.6,
   },
   dossierValeur: { color: c.ink, fontSize: 14.5, fontWeight: '700', marginTop: 3 },

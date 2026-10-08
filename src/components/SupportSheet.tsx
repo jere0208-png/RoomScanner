@@ -208,7 +208,7 @@ const themed = (c: Palette) =>
       flex: 1,
       color: c.ink,
       fontSize: 17,
-      fontWeight: '800',
+      fontWeight: '600',
       // La place de la croix de la coquille, posée en absolu à douze points
       // du bord : sans cette réserve, un titre long passerait dessous.
       paddingRight: 34,
@@ -249,6 +249,6 @@ const themed = (c: Palette) =>
     // Éteint tant qu'il n'y a rien à envoyer : un bouton qui ne fait rien
     // doit se voir avant d'être touché, pas après.
     envoyerEteint: { backgroundColor: c.lineStrong },
-    envoyerMot: { color: '#FFFFFF', fontSize: 15.5, fontWeight: '800' },
+    envoyerMot: { color: '#FFFFFF', fontSize: 15.5, fontWeight: '600' },
     enfonce: { transform: [{ scale: 0.97 }] },
   });

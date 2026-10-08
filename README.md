@@ -14165,6 +14165,81 @@ ailleurs ; nom et indication pour le lecteur d'écran ; le plan cadré sans
 déborder ; le logement d'exemple ; les teintes profondes en sombre), et
 toujours chaque sortie qui appelle la sienne.
 
+### G — Plus rien de gris, et « Ce qu'il faut acheter »
+
+Relevé du patron : « Le bouton quitter dans le explorer est mal fait, le
+bouton plus petit que le texte, et les boutons toujours grisés. Corrige ça
+et améliore l'app considérablement toujours avec l'idée de plaire à tout le
+monde qui souhaite scanner son appartement sans y connaître en élec. Et
+peaufiner la partie élec. »
+
+**La visite sans verre.** « Terminer » vivait dans une vue native de verre
+posée DANS le bouton : sa taille ne suivait pas le texte, et le mot en
+sortait. Le bouton porte maintenant lui-même sa pilule — blanche, 40 points
+de haut, le mot en bleu : ce qu'on voit est ce qu'on touche. La mini-carte
+devient une carte blanche, les deux repères des disques blancs à l'icône
+bleue, la manette un anneau blanc franc et son bouton plein. Le verre
+s'en va de l'app tout entière — composant, vue native, pont : il rendait
+gris tout ce qu'il ne savait pas flouter.
+
+**Les boutons secondaires ne sont plus gris.** Partout (feuilles, bandeaux
+du plan, élévation des murs, choix), le bouton secondaire était un fond gris
+enfoncé portant un mot gris : l'apparence exacte d'un bouton éteint. Ils
+sont **teintés** — fond bleu pâle, mot bleu, le bouton « teinté » d'iOS,
+qui se lit actif. Les puces et cartes de choix (noms de pièces, appareils,
+meubles du catalogue, pastilles des feuilles) sont **blanches, bordées d'un
+filet** ; « Retirer la pièce » est teinté de rouge. Les champs de saisie,
+les blocs de liste et les croix de fermeture gardent leur gris : c'est la
+norme iOS, et ce ne sont pas des boutons d'action.
+
+**Des graisses d'Apple partout** — l'élévation des murs, le magasin, la
+gamme, le tableau existant, le diagnostic, le télémètre, l'export, le scan :
+700 pour les grands titres, 600 pour le reste. L'accueil, la connexion, la
+page Pro et la présentation n'ont pas été touchés.
+
+**Ce qu'il faut acheter** (`geometry/travaux.ts`,
+`components/TravauxSheet.tsx`). Devant le plan de son salon, un particulier
+ne se demande pas si la NF C 15-100 est respectée : il se demande combien de
+pots de peinture prendre. Le relevé le sait. Par pièce : le sol et le
+plafond (le contour), les **murs à peindre** (le tour × la hauteur, portes,
+fenêtres et passages déduits — une baie ne se déduit jamais au-delà de la
+hauteur du mur), les **plinthes** (le tour, seuils des portes et passages
+déduits). Une porte entre deux pièces se retire des deux côtés : chacun
+peint sa face de la cloison. Puis le chariot :
+
+| Achat | Ce qu'on lit en gros | Et dessous |
+|---|---|---|
+| Peinture des murs | 3 pots | 6,3 L pour 31,6 m² |
+| Peinture des plafonds | 1 pot | 2,4 L pour 12 m² |
+| Revêtement de sol | 7 paquets | 13,2 m², chute comprise |
+| Plinthes | 6 barres | 13,1 m, seuils déduits |
+
+(une chambre de 4 × 3 m, une porte, une fenêtre). Les hypothèses sont
+écrites sous les chiffres — 2 couches à 10 m²/L, pots de 2,5 L, 10 % de
+chute, paquets de 2 m², plinthes de 2,4 m — parce qu'un nombre sans sa règle
+ne se vérifie pas en magasin. On repeint rarement tout un logement : une
+coche par pièce, toutes cochées à l'ouverture, et les totaux suivent.
+
+La feuille s'ouvre par une pastille **« Travaux »** sur le plan, à la place
+libre du prix et du contrôle quand le mode Électricité est éteint, et pour
+tout le monde par **« Ce qu'il faut acheter »**, en tête du menu « Plus ».
+
+**Le contrôle dit combien.** La pastille de contrôle disait « pas aux
+normes » par son rouge, pas combien de points restent. Elle porte
+maintenant une **pastille de compte** — celle des notifications d'iOS : un
+point ou douze, d'un coup d'œil (99+ au-delà). L'onde rouge demandée à
+l'origine reste.
+
+Bancs : `travaux.test.tsx` (les comptes faits à la main sur une chambre de
+4 × 3 avec porte et fenêtre ; la porte commune déduite des deux côtés ; une
+baie loin des murs ignorée ; jamais plus que la hauteur du mur ; 2,50 m par
+défaut ; les pots, paquets et barres arrondis au-dessus, sans pot fantôme ni
+pot de trop ; la feuille, ses hypothèses, ses coches qui refont les comptes ;
+la pastille du grand public, absente pour l'électricien ; l'entrée en tête
+du menu), `controle.test.tsx` (le compte sur le bouton, 99+ au-delà, rien
+quand c'est conforme), `passestyle.test.tsx` (plus de verre du tout ;
+« Terminer » porte sa pilule).
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

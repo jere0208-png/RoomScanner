@@ -39,7 +39,6 @@ import Svg, { Circle, Line, Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RoomScanVisite } from 'react-native-room-scan';
 import { Iso3DView } from './Iso3DView';
-import { Verre } from './Verre';
 import { SOLAIRES } from '../ui/solaires';
 import { floorsOf, useScanStore } from '../store/scanStore';
 import { useModeElec } from '../store/usage';
@@ -56,7 +55,7 @@ import {
   pointDeDepart,
 } from '../geometry/exploration';
 import { haptic, releaseHaptic } from '../ui/haptic';
-import { radius, themedStyles, useTheme, type Palette } from '../theme';
+import { ombreBouton, radius, themedStyles, useTheme, type Palette } from '../theme';
 
 /**
  * LE PAS — 1,4 m/s à fond de manette : celui de quelqu'un qui visite.
@@ -185,7 +184,7 @@ function MiniCarte({
   const g = cone(-1);
   const d = cone(1);
   return (
-    <Verre style={styles.carte} epais pointerEvents="none" accessibilityLabel="Plan">
+    <View style={styles.carte} pointerEvents="none" accessibilityLabel="Plan">
       <Svg width={T} height={T}>
         {murs.map((m, i) => {
           const a = px(m.a);
@@ -212,7 +211,7 @@ function MiniCarte({
         <Circle cx={ici.x} cy={ici.y} r={6} fill="#FFFFFF" />
         <Circle cx={ici.x} cy={ici.y} r={4.5} fill={teinte.blue} />
       </Svg>
-    </Verre>
+    </View>
   );
 }
 
@@ -611,27 +610,32 @@ export function Exploration({
           onResponderTerminate={toutLacher}
         />
 
-        {/* Au repos : deux repères de verre, qui disent qu'on peut marcher
-            et tourner — sans prendre la vue. */}
+        {/*
+          AU REPOS : DEUX REPÈRES, NETS — qui disent qu'on peut marcher et
+          tourner, sans prendre la vue. Ils ont été en verre ; relevé du
+          patron : « les boutons toujours grisés ». Le verre d'iOS rend gris
+          ce qu'il ne sait pas flouter, et un repère gris se lit éteint. Ils
+          sont blancs, l'icône à l'encre de la maison.
+        */}
         {!baton && (
           <View
             style={[styles.repere, styles.repereGauche, { bottom: marges.bottom + 34 }]}
             pointerEvents="none">
-            <Verre style={styles.repereVerre}>
+            <View style={styles.repereRond}>
               <Svg width={22} height={22} viewBox="0 0 24 24">
-                <Path d={SOLAIRES.marcher} fill={teinte.ink} fillRule="evenodd" opacity={0.75} />
+                <Path d={SOLAIRES.marcher} fill={teinte.blue} fillRule="evenodd" />
               </Svg>
-            </Verre>
+            </View>
           </View>
         )}
         <View
           style={[styles.repere, styles.repereDroit, { bottom: marges.bottom + 34 }]}
           pointerEvents="none">
-          <Verre style={styles.repereVerre}>
+          <View style={styles.repereRond}>
             <Svg width={22} height={22} viewBox="0 0 24 24">
-              <Path d={SOLAIRES.pivoter} fill={teinte.ink} fillRule="evenodd" opacity={0.75} />
+              <Path d={SOLAIRES.pivoter} fill={teinte.blue} fillRule="evenodd" />
             </Svg>
-          </Verre>
+          </View>
         </View>
 
         {/* Le bâton, né sous le pouce. */}
@@ -640,7 +644,7 @@ export function Exploration({
             pointerEvents="none"
             accessibilityLabel="Manette"
             style={[styles.baton, { left: baton.x - RAYON_MANETTE, top: baton.y - RAYON_MANETTE }]}>
-            <Verre style={styles.batonVerre} />
+            <View style={styles.batonAnneau} />
             <View
               style={[
                 styles.batonBouton,
@@ -657,18 +661,26 @@ export function Exploration({
             styles={styles}
             teinte={teinte}
           />
+          {/*
+            « TERMINER » EST SA PILULE — relevé du patron : « le bouton quitter
+            est mal fait, le bouton plus petit que le texte ». Le mot vivait
+            dans une vue native de verre, posée dans le bouton : sa taille ne
+            suivait pas celle du texte. Le bouton porte maintenant lui-même
+            son fond, sa hauteur et son rembourrage : ce qu'on voit est ce
+            qu'on touche, et le mot ne peut plus en sortir.
+          */}
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Terminer l’exploration"
-            style={({ pressed }) => [pressed && styles.enfonce]}
+            style={({ pressed }) => [styles.terminer, pressed && styles.enfonce]}
             hitSlop={10}
             onPress={() => {
               manette.current = { x: 0, y: 0 };
               onClose();
             }}>
-            <Verre style={styles.terminer} epais>
-              <Text style={styles.terminerTexte}>Terminer</Text>
-            </Verre>
+            <Text style={styles.terminerTexte} numberOfLines={1}>
+              Terminer
+            </Text>
           </Pressable>
         </View>
 
@@ -705,15 +717,19 @@ const getStyles = themedStyles((c: Palette) =>
       width: 112,
       height: 112,
       borderRadius: radius.lg,
-      overflow: 'hidden',
+      backgroundColor: c.surface,
+      ...ombreBouton,
     },
     terminer: {
-      paddingHorizontal: 16,
-      paddingVertical: 10,
-      borderRadius: radius.pill,
-      overflow: 'hidden',
+      height: 40,
+      paddingHorizontal: 18,
+      borderRadius: 20,
+      backgroundColor: c.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+      ...ombreBouton,
     },
-    terminerTexte: { color: c.ink, fontSize: 15, fontWeight: '700' },
+    terminerTexte: { color: c.blue, fontSize: 16, fontWeight: '600' },
     enfonce: { opacity: 0.7 },
     consigne: {
       position: 'absolute',
@@ -736,15 +752,16 @@ const getStyles = themedStyles((c: Palette) =>
     repere: { position: 'absolute' },
     repereGauche: { left: 26 },
     repereDroit: { right: 26 },
-    repereVerre: {
-      width: 56,
-      height: 56,
-      borderRadius: 28,
-      overflow: 'hidden',
+    repereRond: {
+      width: 52,
+      height: 52,
+      borderRadius: 26,
+      backgroundColor: c.surface,
       alignItems: 'center',
       justifyContent: 'center',
+      ...ombreBouton,
     },
-    /* Le bâton : un disque de verre sous le pouce, un bouton blanc dedans. */
+    /* Le bâton : un anneau blanc franc sous le pouce, un bouton plein dedans. */
     baton: {
       position: 'absolute',
       width: RAYON_MANETTE * 2,
@@ -752,14 +769,16 @@ const getStyles = themedStyles((c: Palette) =>
       alignItems: 'center',
       justifyContent: 'center',
     },
-    batonVerre: {
+    batonAnneau: {
       position: 'absolute',
       left: 0,
       top: 0,
       right: 0,
       bottom: 0,
       borderRadius: RAYON_MANETTE,
-      overflow: 'hidden',
+      borderWidth: 2,
+      borderColor: 'rgba(255,255,255,0.95)',
+      backgroundColor: 'rgba(255,255,255,0.22)',
     },
     batonBouton: {
       width: 44,

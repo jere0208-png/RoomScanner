@@ -5251,7 +5251,7 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     backgroundColor: c.blue,
     alignItems: 'center',
   },
-  wallAngleText: { color: '#FFFFFF', fontSize: 12.5, fontWeight: '800' },
+  wallAngleText: { color: '#FFFFFF', fontSize: 12.5, fontWeight: '600' },
   handle: {
     position: 'absolute',
     width: 32,
@@ -5296,7 +5296,7 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 7,
   },
-  pierNoteTitle: { color: c.blue, fontSize: 12, fontWeight: '800' },
+  pierNoteTitle: { color: c.blue, fontSize: 12, fontWeight: '600' },
   pierNoteHint: {
     color: c.inkSoft,
     fontSize: 10,
@@ -5343,7 +5343,7 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     paddingVertical: 4,
     alignItems: 'center',
   },
-  rotBadgeText: { color: '#FFFFFF', fontSize: 12, fontWeight: '800' },
+  rotBadgeText: { color: '#FFFFFF', fontSize: 12, fontWeight: '600' },
   // Commandes du mur sélectionné : posées à côté de lui, jamais dessus.
   /*
     UNE PILULE, PAS UNE DALLE — relevé du patron : « trop imposant et

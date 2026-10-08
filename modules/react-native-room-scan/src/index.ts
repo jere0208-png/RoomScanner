@@ -235,15 +235,6 @@ export const RoomScanVisite = UIManager.getViewManagerConfig?.(
   : undefined;
 
 /**
- * LE VERRE — `UIVisualEffectView` : la matière translucide d'iOS, floutée,
- * teintée par le mode clair ou sombre. `undefined` sans le natif : un voile
- * clair tient lieu (voir `components/Verre`).
- */
-export const RoomScanVerre = UIManager.getViewManagerConfig?.('RoomScanVerre')
-  ? requireNativeComponent<ViewProps & { epais?: boolean }>('RoomScanVerre')
-  : undefined;
-
-/**
  * Émetteur d'événements du scan : 'onScanUpdate', 'onInstruction', 'onScanError'.
  * iOS émet via le module RoomScanEvents, Android via le DeviceEventEmitter.
  */

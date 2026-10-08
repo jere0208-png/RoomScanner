@@ -144,7 +144,7 @@ const getStyles = themedStyles((c: Palette) =>
     phrase: { fontSize: 11, color: c.inkSoft, marginBottom: 6 },
     rangee: { flexDirection: 'row', alignItems: 'center', gap: 10 },
     logo: { width: LOGO.w, height: LOGO.h },
-    prix: { fontSize: 14, fontWeight: '800', color: c.ink },
+    prix: { fontSize: 14, fontWeight: '600', color: c.ink },
     gain: { fontSize: 12, fontWeight: '700', color: ORANGE },
   }),
 );

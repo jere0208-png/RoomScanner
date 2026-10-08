@@ -29,6 +29,8 @@ import { fr } from './result/format';
 import { AddRoomSheet } from './result/AddRoomSheet';
 import { ElecSheet } from './result/ElecSheet';
 import { ExistantSheet } from './result/ExistantSheet';
+import { TravauxSheet } from '../components/TravauxSheet';
+import { travauxDesPieces } from '../geometry/travaux';
 import { LaserSheet } from './result/LaserSheet';
 import { ExportSheet } from './result/ExportSheet';
 import { FurnitureSheet } from './result/FurnitureSheet';
@@ -532,6 +534,8 @@ export function ResultScreen() {
   const [recalage, setRecalage] = useState(false);
   /** La feuille du tableau existant — rénovation. */
   const [existantOuvert, setExistantOuvert] = useState(false);
+  /** La feuille « Ce qu'il faut acheter » (voir `geometry/travaux`). */
+  const [travauxOuvert, setTravauxOuvert] = useState(false);
   const existant = useScanStore((s) => s.existant);
   const [checking, setChecking] = useState(false);
   // Choix du format d'export : plan PDF, modèle 3D, ou image de la vue.
@@ -1902,6 +1906,19 @@ export function ResultScreen() {
     doigt déplaçait un meuble.
   */
   const parts = useMemo(() => roomParts(walls, rooms), [walls, rooms]);
+  /*
+    LES TRAVAUX, PIÈCE PAR PIÈCE — peinture, sol, plinthes. Calculés sur le
+    niveau affiché, comme tout l'écran : on refait un étage à la fois.
+  */
+  const piecesTravaux = useMemo(
+    () =>
+      travauxDesPieces(
+        parts,
+        openings,
+        (id, rang) => rooms.find((r) => r.id === id)?.name || `Pièce ${rang + 1}`,
+      ),
+    [parts, openings, rooms],
+  );
   const surface = totalArea(parts);
   // Une seule pièce : l'outil de nommage n'a pas besoin de sélection.
   const targetRoomId =
@@ -2965,6 +2982,17 @@ export function ResultScreen() {
                 subtitle: majTexte ?? undefined,
                 actions: [
                   {
+                    /*
+                      CE QU'IL FAUT ACHETER — en tête du menu, pour tout le
+                      monde. C'est la question qu'un particulier se pose
+                      devant le plan de son salon.
+                    */
+                    label: 'Ce qu’il faut acheter',
+                    icon: 'rouleau' as const,
+                    hint: 'Peinture, sol, plinthes : les quantités, pièce par pièce.',
+                    onPress: () => setTravauxOuvert(true),
+                  },
+                  {
                     label: 'Renommer le scan',
                     icon: 'renommer' as const,
                     onPress: () => {
@@ -3936,6 +3964,37 @@ export function ResultScreen() {
               deux lui parlaient une langue qu'il ne parle pas. Sans le mode,
               la rangée garde l'étage et la bascule 2D/3D, rien d'autre.
             */}
+            {/*
+              LES TRAVAUX, À LA PLACE DU PRIX ET DU CONTRÔLE — pour qui n'a
+              pas le mode Électricité. La place est libre, et c'est la
+              question que se pose un particulier : combien de peinture,
+              de sol, de plinthes.
+            */}
+            {!modeElec && piecesTravaux.length > 0 && (
+              <TouchableOpacity
+                style={styles.vuePastille}
+                accessibilityLabel="Travaux"
+                accessibilityHint="Ce qu’il faut acheter : peinture, sol, plinthes"
+                onPress={() => {
+                  haptic('leger');
+                  setTravauxOuvert(true);
+                }}>
+                <Svg width={16} height={16} viewBox="0 0 24 24">
+                  {['M4 4 h13 v5 h-13 z', 'M17 6.5 h2.5 v5 h-7.5 v3', 'M12 14.5 v6'].map((d) => (
+                    <Trace
+                      key={d}
+                      d={d}
+                      stroke={teinte.blue}
+                      strokeWidth={2}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      fill="none"
+                    />
+                  ))}
+                </Svg>
+                <Text style={styles.vuePastilleTexte}>Travaux</Text>
+              </TouchableOpacity>
+            )}
             {modeElec && (
               <>
               <DevisPastille
@@ -5146,6 +5205,11 @@ export function ResultScreen() {
       />
 
       {/* ---------- Le tableau trouvé sur place (rénovation) ---------- */}
+      <TravauxSheet
+        visible={travauxOuvert}
+        onClose={() => setTravauxOuvert(false)}
+        pieces={piecesTravaux}
+      />
       <ExistantSheet
         visible={existantOuvert}
         existant={existant}

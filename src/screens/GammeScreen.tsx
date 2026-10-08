@@ -195,7 +195,7 @@ const getStyles = themedStyles((c: Palette) =>
       justifyContent: 'center',
       backgroundColor: c.surface,
     },
-    titrePage: { color: c.ink, fontSize: 22, fontWeight: '900' },
+    titrePage: { color: c.ink, fontSize: 22, fontWeight: '700' },
     /*
       L'ENCART EST BLEU, et c'est le bleu de l'information de cette
       application — celui du bouton du magasin, celui des pastilles de calque.
@@ -209,7 +209,7 @@ const getStyles = themedStyles((c: Palette) =>
       marginTop: 6,
       marginBottom: 12,
     },
-    encartTexte: { color: c.blue, fontSize: 14, fontWeight: '800', lineHeight: 20 },
+    encartTexte: { color: c.blue, fontSize: 14, fontWeight: '600', lineHeight: 20 },
     encartFin: { color: c.blue, fontSize: 12, fontWeight: '700', opacity: 0.85 },
     rouleau: { flex: 1 },
     rouleauFond: { paddingBottom: 28, gap: 10 },
@@ -225,7 +225,7 @@ const getStyles = themedStyles((c: Palette) =>
     },
     carteChoisie: { borderColor: c.blue },
     texts: { flex: 1, gap: 3 },
-    carteNom: { color: c.ink, fontSize: 16, fontWeight: '900' },
+    carteNom: { color: c.ink, fontSize: 16, fontWeight: '700' },
     carteNote: { color: c.inkSoft, fontSize: 12, fontWeight: '600' },
     coche: {
       width: 26,
@@ -237,6 +237,6 @@ const getStyles = themedStyles((c: Palette) =>
       justifyContent: 'center',
     },
     cocheOn: { backgroundColor: c.blue, borderColor: c.blue },
-    cocheTexte: { color: '#FFFFFF', fontSize: 15, fontWeight: '900' },
+    cocheTexte: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
   }),
 );

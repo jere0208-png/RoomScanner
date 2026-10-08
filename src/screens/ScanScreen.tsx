@@ -643,7 +643,7 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   poseSecondaireTexte: {
     color: c.scanInk,
     fontSize: 15,
-    fontWeight: '800',
+    fontWeight: '600',
     opacity: 0.85,
   },
   poseBandeau: {
@@ -671,7 +671,7 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   },
   stat: { alignItems: 'center', paddingHorizontal: 9 },
   statBorder: { borderLeftWidth: 1, borderLeftColor: 'rgba(255,255,255,0.14)' },
-  statValue: { color: c.scanInk, fontSize: 15, fontWeight: '800' },
+  statValue: { color: c.scanInk, fontSize: 15, fontWeight: '600' },
   statLabel: {
     color: 'rgba(244,246,250,0.62)',
     fontSize: 9,

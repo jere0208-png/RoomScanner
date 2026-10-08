@@ -2760,7 +2760,7 @@ const getStyles = themedStyles((c: Palette) =>
     headerTexts: { flex: 1, paddingRight: 10, minWidth: 0 },
     /** Les trois sorties alignées, à la même hauteur et au même gabarit. */
     headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    title: { color: c.ink, fontSize: 17, fontWeight: '800' },
+    title: { color: c.ink, fontSize: 17, fontWeight: '600' },
     subtitle: {
       color: c.inkFaint,
       fontSize: 12,
@@ -2785,7 +2785,7 @@ const getStyles = themedStyles((c: Palette) =>
       borderRadius: radius.md,
       backgroundColor: c.blue,
     },
-    validerText: { color: '#FFFFFF', fontSize: 15.5, fontWeight: '800' },
+    validerText: { color: '#FFFFFF', fontSize: 15.5, fontWeight: '600' },
     /**
      * LA CROIX EST UN BLOC, pas une pastille.
      *
@@ -2841,7 +2841,7 @@ const getStyles = themedStyles((c: Palette) =>
     loupeCotes: {
       color: c.ink,
       fontSize: 19,
-      fontWeight: '800',
+      fontWeight: '600',
       fontVariant: ['tabular-nums'],
     },
     loupeHauteur: { color: c.inkSoft, fontSize: 13, fontWeight: '700', marginTop: 1 },
@@ -2881,7 +2881,7 @@ const getStyles = themedStyles((c: Palette) =>
       fontSize: 10.5,
       fontWeight: '700',
     },
-    calqueText: { color: c.inkSoft, fontSize: 11, fontWeight: '800' },
+    calqueText: { color: c.inkSoft, fontSize: 11, fontWeight: '600' },
     calqueTextOn: { color: '#FFFFFF' },
     /** LE BANDEAU DE CONFORMITÉ : une ligne, une jauge, un geste. */
     bilan: {
@@ -2904,7 +2904,7 @@ const getStyles = themedStyles((c: Palette) =>
     bilanFill: { width: 4, backgroundColor: c.danger, borderRadius: 2 },
     bilanFillOk: { backgroundColor: c.green },
     bilanTextes: { flex: 1, minWidth: 0 },
-    bilanTitre: { color: c.ink, fontSize: 13, fontWeight: '800' },
+    bilanTitre: { color: c.ink, fontSize: 13, fontWeight: '600' },
     bilanManque: { color: c.danger, fontSize: 11.5, fontWeight: '700', marginTop: 1 },
     bilanFix: {
       backgroundColor: c.blue,
@@ -2916,7 +2916,7 @@ const getStyles = themedStyles((c: Palette) =>
       maxWidth: 150,
       justifyContent: 'center',
     },
-    bilanFixText: { color: '#FFFFFF', fontSize: 12, fontWeight: '800' },
+    bilanFixText: { color: '#FFFFFF', fontSize: 12, fontWeight: '600' },
     bilanRegle: {
       color: c.inkFaint,
       fontSize: 11.5,
@@ -2933,7 +2933,7 @@ const getStyles = themedStyles((c: Palette) =>
     },
     guideHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
     guideTitle: { color: c.ink, fontSize: 12.5, fontWeight: '700', flex: 1 },
-    guideState: { fontSize: 13, fontWeight: '800', letterSpacing: -0.3 },
+    guideState: { fontSize: 13, fontWeight: '600', letterSpacing: -0.3 },
     guideFix: {
       width: 28,
       height: 28,
@@ -2971,14 +2971,14 @@ const getStyles = themedStyles((c: Palette) =>
       paddingVertical: 8,
     },
     warnHead: { flexDirection: 'row', alignItems: 'center' },
-    warnTitle: { color: c.danger, fontSize: 12.5, fontWeight: '800', flex: 1 },
+    warnTitle: { color: c.danger, fontSize: 12.5, fontWeight: '600', flex: 1 },
     warnFix: {
       backgroundColor: c.danger,
       borderRadius: radius.pill,
       paddingHorizontal: 12,
       paddingVertical: 6,
     },
-    warnFixText: { color: '#FFFFFF', fontSize: 11.5, fontWeight: '800' },
+    warnFixText: { color: '#FFFFFF', fontSize: 11.5, fontWeight: '600' },
     warnRule: { color: c.inkSoft, fontSize: 10.5, lineHeight: 14.5, marginTop: 3 },
     // L'ensemble, en UNE ligne de commandes : le côté, l'axe, et de quoi
     // défaire. L'ancien pavé posait une question à laquelle l'appareil avait
@@ -2999,9 +2999,9 @@ const getStyles = themedStyles((c: Palette) =>
       alignItems: 'center',
       justifyContent: 'center',
     },
-    ensPastilleText: { color: '#FFFFFF', fontSize: 11.5, fontWeight: '900' },
+    ensPastilleText: { color: '#FFFFFF', fontSize: 11.5, fontWeight: '700' },
     ensTitres: { flex: 1, minWidth: 0 },
-    ensTitre: { color: c.ink, fontSize: 12.5, fontWeight: '800' },
+    ensTitre: { color: c.ink, fontSize: 12.5, fontWeight: '600' },
     ensSous: { color: c.inkFaint, fontSize: 9.5, fontWeight: '700' },
     ensOk: {
       backgroundColor: c.blue,
@@ -3012,12 +3012,12 @@ const getStyles = themedStyles((c: Palette) =>
       minHeight: 44,
       justifyContent: 'center',
     },
-    ensOkText: { color: '#FFFFFF', fontSize: 14, fontWeight: '800' },
+    ensOkText: { color: '#FFFFFF', fontSize: 14, fontWeight: '600' },
     /** Le titre d'un sélecteur, comme les en-têtes de section d'iOS. */
     ensLabel: {
       color: c.inkFaint,
       fontSize: 10,
-      fontWeight: '800',
+      fontWeight: '600',
       letterSpacing: 0.6,
       marginTop: 12,
       marginBottom: 5,
@@ -3048,7 +3048,7 @@ const getStyles = themedStyles((c: Palette) =>
       gap: 1,
     },
     ensSegItemOn: { backgroundColor: c.blue },
-    ensSegText: { color: c.ink, fontSize: 11.5, fontWeight: '800' },
+    ensSegText: { color: c.ink, fontSize: 11.5, fontWeight: '600' },
     ensSegTextOn: { color: '#FFFFFF' },
     ensSegHint: { color: c.inkFaint, fontSize: 9, fontWeight: '700' },
     ensSegHintOn: { color: '#FFFFFFCC' },
@@ -3060,7 +3060,7 @@ const getStyles = themedStyles((c: Palette) =>
       alignItems: 'center',
       justifyContent: 'center',
     },
-    ensSplitText: { color: c.danger, fontSize: 13, fontWeight: '800' },
+    ensSplitText: { color: c.danger, fontSize: 13, fontWeight: '600' },
     fusion: {
       marginTop: 10,
       backgroundColor: c.blueSoft,
@@ -3069,7 +3069,7 @@ const getStyles = themedStyles((c: Palette) =>
       paddingVertical: 10,
     },
     fusionHead: { flexDirection: 'row', alignItems: 'center' },
-    fusionTitle: { color: c.blue, fontSize: 13, fontWeight: '800', flex: 1 },
+    fusionTitle: { color: c.blue, fontSize: 13, fontWeight: '600', flex: 1 },
     fusionNon: { color: c.inkFaint, fontSize: 12.5, fontWeight: '700' },
     fusionRule: {
       color: c.inkSoft,
@@ -3102,7 +3102,7 @@ const getStyles = themedStyles((c: Palette) =>
     alerteTexte: {
       color: c.danger,
       fontSize: 12.5,
-      fontWeight: '900',
+      fontWeight: '700',
       textAlign: 'center',
       textShadowColor: c.surface,
       textShadowOffset: { width: 0, height: 0 },
@@ -3111,7 +3111,7 @@ const getStyles = themedStyles((c: Palette) =>
     alerteFixe: {
       color: c.inkSoft,
       fontSize: 11.5,
-      fontWeight: '800',
+      fontWeight: '600',
     },
     // Un pavé de flèches larges : 44 px, la cible minimale d'un pouce.
     pave: {
@@ -3126,12 +3126,12 @@ const getStyles = themedStyles((c: Palette) =>
       paddingHorizontal: 12,
       paddingVertical: 11,
     },
-    pavePasText: { color: '#FFFFFF', fontSize: 12, fontWeight: '800' },
+    pavePasText: { color: '#FFFFFF', fontSize: 12, fontWeight: '600' },
     paveBtn: {
       flex: 1,
       height: 44,
       borderRadius: radius.sm,
-      backgroundColor: c.surfaceSunken,
+      backgroundColor: c.blueSoft,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -3156,14 +3156,14 @@ const getStyles = themedStyles((c: Palette) =>
     percageTitle: {
       color: c.blue,
       fontSize: 10,
-      fontWeight: '800',
+      fontWeight: '600',
       textTransform: 'uppercase',
       letterSpacing: 0.4,
     },
     percageVals: {
       color: c.ink,
       fontSize: 15,
-      fontWeight: '800',
+      fontWeight: '600',
       marginTop: 2,
     },
     percageUnit: { color: c.inkFaint, fontSize: 10.5, fontWeight: '700' },
@@ -3202,17 +3202,16 @@ const getStyles = themedStyles((c: Palette) =>
       flex: 1,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: c.surfaceSunken,
+      backgroundColor: c.blueSoft,
       borderRadius: radius.sm,
       paddingVertical: 9,
     },
     actionAdd: { backgroundColor: c.blue },
     actionText: {
-      color: c.inkSoft,
+      color: c.blue,
       fontWeight: '700',
       fontSize: 9.5,
       marginTop: 3,
-      opacity: 0.75,
     },
     actionTextAdd: { color: '#FFFFFF', opacity: 0.9 },
     actionOff: { opacity: 0.35 },
@@ -3221,8 +3220,8 @@ const getStyles = themedStyles((c: Palette) =>
       borderRadius: radius.sm,
       paddingVertical: 12,
       alignItems: 'center',
-      backgroundColor: c.surfaceSunken,
+      backgroundColor: c.blueSoft,
     },
-    ghostText: { color: c.inkSoft, fontWeight: '600', fontSize: 14.5 },
+    ghostText: { color: c.blue, fontWeight: '600', fontSize: 14.5 },
   }),
 );

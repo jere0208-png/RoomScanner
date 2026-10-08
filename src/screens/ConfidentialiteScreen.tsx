@@ -176,7 +176,7 @@ const themed = (c: Palette) =>
       ...shadowCard,
       shadowOpacity: 0.05,
     },
-    blocTitre: { color: c.ink, fontSize: 15, fontWeight: '800' },
+    blocTitre: { color: c.ink, fontSize: 15, fontWeight: '600' },
     blocTexte: {
       color: c.inkSoft,
       fontSize: 13.5,

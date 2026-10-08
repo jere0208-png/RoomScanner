@@ -173,6 +173,6 @@ const getStyles = themedStyles((c: Palette) => ({
     borderColor: c.line,
   },
   carteLibre: { backgroundColor: c.surface },
-  nom: { color: c.ink, fontSize: 13.5, fontWeight: '800' as const, marginTop: 6 },
+  nom: { color: c.ink, fontSize: 13.5, fontWeight: '600' as const, marginTop: 6 },
   cotes: { color: c.inkFaint, fontSize: 11.5, fontWeight: '600' as const },
 }));

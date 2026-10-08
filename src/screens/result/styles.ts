@@ -469,7 +469,7 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   },
   wallStripActionText: { color: '#FFFFFF', fontSize: 13, fontWeight: '600' },
   wallStripGhost: {
-    backgroundColor: c.surfaceSunken,
+    backgroundColor: c.blueSoft,
     borderRadius: radius.pill,
     paddingHorizontal: 11,
     paddingVertical: 9,
@@ -477,7 +477,7 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     flexShrink: 1,
     minWidth: 0,
   },
-  wallStripGhostText: { color: c.inkSoft, fontSize: 13, fontWeight: '600' },
+  wallStripGhostText: { color: c.blue, fontSize: 13, fontWeight: '600' },
   // Une seule ligne, au pied du plan, et LOIN du bouton d'enregistrement :
   // le bandeau faisait deux étages et son bouton de validation finissait
   // derrière la pastille bleue.
@@ -642,7 +642,7 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: c.surfaceSunken,
+    backgroundColor: c.blueSoft,
     borderRadius: radius.pill,
     paddingHorizontal: 12,
     minHeight: 34,
@@ -704,7 +704,7 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   bandeauIconeDanger: { color: c.danger },
   bandeauIconePleine: { color: '#FFFFFF' },
   bandeauBtnTexte: { color: '#FFFFFF', fontSize: 13.5, fontWeight: '600' },
-  bandeauBtnGhostTexte: { color: c.inkSoft, fontSize: 13.5, fontWeight: '600' },
+  bandeauBtnGhostTexte: { color: c.blue, fontSize: 13.5, fontWeight: '600' },
   /*
     L'ANCIENNE CARTE, gardée pour les bandeaux qui portent des CHAMPS et pas
     seulement des boutons — les cotes d'un meuble, celles d'un appareil de
@@ -906,7 +906,7 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: radius.pill,
-    backgroundColor: c.surfaceSunken,
+    backgroundColor: c.blueSoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -937,7 +937,7 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: radius.pill,
-    backgroundColor: c.surfaceSunken,
+    backgroundColor: c.blueSoft,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
@@ -952,14 +952,14 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     flexShrink: 0,
   },
   openingButton: {
-    backgroundColor: c.surfaceSunken,
+    backgroundColor: c.blueSoft,
     borderRadius: radius.sm,
     paddingHorizontal: 12,
     paddingVertical: 11,
     marginLeft: 'auto',
     marginRight: 8,
   },
-  openingText: { color: c.inkSoft, fontWeight: '700', fontSize: 13 },
+  openingText: { color: c.blue, fontWeight: '700', fontSize: 13 },
   applyButton: {
     backgroundColor: c.blue,
     borderRadius: radius.sm,
@@ -986,14 +986,14 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     gap: 8,
   },
   roomAction: {
-    backgroundColor: c.surfaceSunken,
+    backgroundColor: c.blueSoft,
     borderRadius: radius.sm,
     paddingHorizontal: 16,
     minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  roomActionText: { color: c.inkSoft, fontWeight: '700', fontSize: 13.5 },
+  roomActionText: { color: c.blue, fontWeight: '700', fontSize: 13.5 },
   exportChoice: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1065,7 +1065,7 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   nameScroll: { maxHeight: 260 },
   nameGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
   nameChip: {
-    backgroundColor: c.surfaceSunken,
+    backgroundColor: c.surface,
     borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: c.line,
@@ -1078,7 +1078,7 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   nameChipDim: { color: c.inkFaint, fontSize: 11, fontWeight: '600' },
   nameChipTextOn: { color: c.blue, fontWeight: '600' },
   removeRoomButton: {
-    backgroundColor: c.surfaceSunken,
+    backgroundColor: 'rgba(229,72,77,0.12)',
     borderRadius: radius.sm,
     paddingHorizontal: 16,
     paddingVertical: 11,
@@ -1227,12 +1227,12 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   },
   elecFixText: { color: '#FFFFFF', fontSize: 12.5, fontWeight: '600' },
   elecSee: {
-    backgroundColor: c.surfaceSunken,
+    backgroundColor: c.blueSoft,
     borderRadius: radius.sm,
     paddingHorizontal: 14,
     paddingVertical: 9,
   },
-  elecSeeText: { color: c.inkSoft, fontSize: 12.5, fontWeight: '700' },
+  elecSeeText: { color: c.blue, fontSize: 12.5, fontWeight: '700' },
   /* Les tuiles ont grandi : la fenêtre aussi, sinon on ne verrait qu'une
      famille et demie. */
   elecScroll: { maxHeight: 480 },
@@ -1264,10 +1264,12 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   catCard: {
     width: 92,
     alignItems: 'center',
-    backgroundColor: c.surfaceSunken,
+    backgroundColor: c.surface,
     borderRadius: radius.md,
     paddingVertical: 8,
     paddingHorizontal: 4,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: c.lineStrong,
   },
   catName: {
     color: c.ink,
@@ -1362,10 +1364,12 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
     minHeight: 92,
-    backgroundColor: c.surfaceSunken,
+    backgroundColor: c.surface,
     borderRadius: radius.lg,
     paddingHorizontal: 4,
     paddingVertical: 10,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: c.lineStrong,
   },
   elecDot: {
     width: 26,
@@ -1438,9 +1442,9 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     borderRadius: radius.sm,
     paddingVertical: 12,
     alignItems: 'center',
-    backgroundColor: c.surfaceSunken,
+    backgroundColor: c.blueSoft,
   },
-  modalGhostText: { color: c.inkSoft, fontWeight: '600', fontSize: 14.5 },
+  modalGhostText: { color: c.blue, fontWeight: '600', fontSize: 14.5 },
   modalPrimary: {
     flex: 1,
     borderRadius: radius.sm,

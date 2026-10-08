@@ -200,7 +200,7 @@ const styles = StyleSheet.create({
     padding: 20,
     maxHeight: '86%',
   },
-  titre: { color: light.ink, fontSize: 22, fontWeight: '800' },
+  titre: { color: light.ink, fontSize: 22, fontWeight: '700' },
   phrase: {
     color: light.inkSoft,
     fontSize: 14.5,
@@ -223,5 +223,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  boutonTexte: { color: '#FFFFFF', fontSize: 16.5, fontWeight: '800' },
+  boutonTexte: { color: '#FFFFFF', fontSize: 16.5, fontWeight: '600' },
 });

@@ -171,7 +171,7 @@ const getStyles = themedStyles((c: Palette) =>
       color: c.inkSoft,
       fontSize: 9,
       lineHeight: 11,
-      fontWeight: '800',
+      fontWeight: '600',
       textAlign: 'center',
     },
   }),

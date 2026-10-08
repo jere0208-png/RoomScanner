@@ -241,7 +241,7 @@ const getStyles = themedStyles((c: Palette) =>
     titre: {
       color: c.ink,
       fontSize: 25,
-      fontWeight: '800',
+      fontWeight: '700',
       letterSpacing: -0.7,
       textAlign: 'center',
       marginTop: 18,
@@ -264,7 +264,7 @@ const getStyles = themedStyles((c: Palette) =>
       alignItems: 'center',
       justifyContent: 'center',
     },
-    btnGarderTexte: { color: c.blue, fontSize: 16.5, fontWeight: '800' },
+    btnGarderTexte: { color: c.blue, fontSize: 16.5, fontWeight: '600' },
     btnJeter: {
       alignSelf: 'stretch',
       backgroundColor: c.danger,
@@ -274,6 +274,6 @@ const getStyles = themedStyles((c: Palette) =>
       justifyContent: 'center',
       marginTop: 10,
     },
-    btnJeterTexte: { color: '#FFFFFF', fontSize: 16.5, fontWeight: '800' },
+    btnJeterTexte: { color: '#FFFFFF', fontSize: 16.5, fontWeight: '600' },
   }),
 );

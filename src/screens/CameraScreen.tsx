@@ -125,7 +125,7 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     marginBottom: 26,
     ...shadowCard,
   },
-  title: { color: c.ink, fontSize: 25, fontWeight: '800', letterSpacing: -0.4 },
+  title: { color: c.ink, fontSize: 25, fontWeight: '700', letterSpacing: -0.4 },
   text: {
     color: c.inkSoft,
     fontSize: 15,
