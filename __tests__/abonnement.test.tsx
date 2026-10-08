@@ -36,6 +36,11 @@ jest.mock('../src/native/account', () => ({
   connexionApple: jest.fn(async () => null),
   lireMarqueur: jest.fn(async () => null),
   ecrireMarqueur: jest.fn(async () => {}),
+  // L'App Store ne répond pas dans ce banc : la page garde ce qu'on lui
+  // a posé dans `offres`, ou ses prix de référence.
+  produitsPro: jest.fn(async () => []),
+  ouvrirCodeOffre: jest.fn(async () => true),
+  echeanceAbonnement: jest.fn(async () => null),
 }));
 
 import React from 'react';
@@ -86,8 +91,7 @@ beforeEach(() => {
     jeton: null,
     pro: false,
     paywallVisible: true,
-    remisePct: 0,
-    codeOffert: null,
+    offres: null,
   });
 });
 
@@ -175,16 +179,17 @@ describe('la page tient dans l’écran, sans défilement', () => {
     }
   });
 
-  it('range le code promo dans une feuille, pas au fil de la page', () => {
+  it('« J’ai un code » n’ajoute rien à la page : c’est la feuille d’Apple qui s’ouvre', async () => {
+    const { ouvrirCodeOffre } = require('../src/native/account');
     const a = rendre();
-    // Fermée, elle ne prend pas un point de hauteur : le code promo sert
-    // une fois, il n'a pas à pousser le prix hors de l'écran.
     expect(parLabel(a, 'Code promo')).toBeUndefined();
-    act(() => {
+    await act(async () => {
       parLabel(a, 'J’ai un code')?.props.onPress();
     });
-    expect(parLabel(a, 'Code promo')).toBeDefined();
-    expect(parLabel(a, 'Appliquer le code')).toBeDefined();
+    expect(ouvrirCodeOffre).toHaveBeenCalled();
+    // Ni champ ni bouton maison : un code se saisit chez Apple.
+    expect(parLabel(a, 'Code promo')).toBeUndefined();
+    expect(parLabel(a, 'Appliquer le code')).toBeUndefined();
   });
 
   it('ne pose rien d’inerte dans la barre du haut', () => {
@@ -207,13 +212,9 @@ describe('la page tient dans l’écran, sans défilement', () => {
 });
 
 describe('ce qui ne doit jamais disparaître', () => {
-  it('garde le code promo du patron, sous la main', () => {
+  it('garde « J’ai un code », sous la main — pour les codes d’offre d’Apple', () => {
     const a = rendre();
-    act(() => {
-      parLabel(a, 'J’ai un code')?.props.onPress();
-    });
-    expect(parLabel(a, 'Code promo')).toBeDefined();
-    expect(parLabel(a, 'Appliquer le code')).toBeDefined();
+    expect(parLabel(a, 'J’ai un code')).toBeDefined();
   });
 
   it('garde « Restaurer l’achat » — Apple l’exige', () => {
@@ -221,12 +222,30 @@ describe('ce qui ne doit jamais disparaître', () => {
     expect(parLabel(a, 'Restaurer l’achat')).toBeDefined();
   });
 
-  it('montre la remise appliquée, prix plein barré à côté', () => {
-    useAccountStore.setState({ remisePct: 20, codeOffert: 'FIRST20' });
-    const a = rendre();
-    const t = texte(a);
+  it('montre l’offre de bienvenue d’Apple, prix plein barré à côté — seulement si elle s’applique', () => {
+    const mensuel = {
+      id: 'echoplan.pro.mensuel',
+      prix: PRIX_PRO,
+      valeur: 4.9,
+      periode: { unite: 'mois' as const, valeur: 1 },
+      offre: {
+        prix: '3,92 €',
+        valeur: 3.92,
+        periode: { unite: 'mois' as const, valeur: 1 },
+        nombre: 1,
+        mode: 'remise' as const,
+        eligible: true,
+      },
+    };
+    useAccountStore.setState({ offres: { mensuel } });
+    let a = rendre();
     // Une remise sans référence n'est qu'un prix comme un autre.
-    expect(t).toContain('3,92 €');
-    expect(t).toContain(PRIX_PRO);
+    expect(texte(a)).toContain('3,92 €');
+    expect(texte(a)).toContain(PRIX_PRO);
+    act(() => a.unmount());
+    // Déjà eue : plus de prix barré.
+    useAccountStore.setState({ offres: { mensuel: { ...mensuel, offre: { ...mensuel.offre, eligible: false } } } });
+    a = rendre();
+    expect(texte(a)).not.toContain('3,92 €');
   });
 });

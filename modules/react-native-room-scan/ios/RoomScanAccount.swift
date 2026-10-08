@@ -30,6 +30,126 @@ class RoomScanAccount: NSObject, ASAuthorizationControllerDelegate,
 
   @objc static func requiresMainQueueSetup() -> Bool { false }
 
+  /**
+   L'ÉCOUTE DES TRANSACTIONS, dès que le module existe.
+
+   Tout ne passe pas par le bouton « S'abonner » : un renouvellement, un code
+   d'offre utilisé depuis l'App Store, un achat validé plus tard par un parent
+   (« Demander l'achat ») arrivent PAR ICI. Apple demande qu'on les écoute et
+   qu'on les solde — sans quoi ils reviennent à chaque lancement, et StoreKit
+   le signale à la revue. Le JS relit ensuite l'échéance (`proExpiry`).
+   */
+  private var ecoute: Task<Void, Never>?
+
+  override init() {
+    super.init()
+    ecoute = Task.detached {
+      for await resultat in Transaction.updates {
+        if case .verified(let transaction) = resultat {
+          await transaction.finish()
+        }
+      }
+    }
+  }
+
+  deinit { ecoute?.cancel() }
+
+  /**
+   LES PRODUITS, TELS QUE L'APP STORE LES VEND — prix, période, offre.
+
+   Le prix ne s'écrit plus en dur dans l'app : il change avec le pays de
+   l'App Store, et avec App Store Connect. On rend pour chaque produit son
+   prix AFFICHABLE (« 4,90 € », déjà dans la bonne monnaie), sa valeur, sa
+   période, et l'offre de lancement s'il y en a une ET que cet utilisateur y
+   a droit (Apple n'en accorde qu'une par groupe d'abonnements).
+   */
+  @objc func proProducts(
+    _ productIds: [String],
+    resolve: @escaping RCTPromiseResolveBlock,
+    reject: @escaping RCTPromiseRejectBlock
+  ) {
+    Task {
+      do {
+        let produits = try await Product.products(for: productIds)
+        var out: [[String: Any]] = []
+        for p in produits {
+          var ligne: [String: Any] = [
+            "id": p.id,
+            "prix": p.displayPrice,
+            "valeur": NSDecimalNumber(decimal: p.price).doubleValue,
+          ]
+          if let abo = p.subscription {
+            ligne["periode"] = Self.periode(abo.subscriptionPeriod)
+            if let intro = abo.introductoryOffer {
+              let eligible = await abo.isEligibleForIntroOffer
+              var offre: [String: Any] = [
+                "prix": intro.displayPrice,
+                "valeur": NSDecimalNumber(decimal: intro.price).doubleValue,
+                "periode": Self.periode(intro.period),
+                "nombre": intro.periodCount,
+                "eligible": eligible,
+              ]
+              switch intro.paymentMode {
+              case .freeTrial: offre["mode"] = "essai"
+              case .payAsYouGo: offre["mode"] = "remise"
+              case .payUpFront: offre["mode"] = "avance"
+              default: offre["mode"] = "autre"
+              }
+              ligne["offre"] = offre
+            }
+          }
+          out.append(ligne)
+        }
+        resolve(out)
+      } catch {
+        reject("produits", "Produits indisponibles : \(error.localizedDescription)", error)
+      }
+    }
+  }
+
+  private static func periode(_ p: Product.SubscriptionPeriod) -> [String: Any] {
+    let unite: String
+    switch p.unit {
+    case .day: unite = "jour"
+    case .week: unite = "semaine"
+    case .month: unite = "mois"
+    case .year: unite = "an"
+    @unknown default: unite = "mois"
+    }
+    return ["unite": unite, "valeur": p.value]
+  }
+
+  /**
+   LA FEUILLE DES CODES D'OFFRE — celle d'Apple.
+
+   Un code maison qui débloque le Pro sans passer par l'App Store est
+   interdit (règle 3.1.1). Les codes d'offre, eux, se créent dans App Store
+   Connect et se saisissent dans cette feuille-ci : l'abonnement accordé
+   arrive ensuite par `Transaction.updates`. On rend la main quand la
+   feuille se ferme ; le JS relit alors l'échéance.
+   */
+  @objc func presentOfferCode(
+    _ resolve: @escaping RCTPromiseResolveBlock,
+    reject: @escaping RCTPromiseRejectBlock
+  ) {
+    Task { @MainActor in
+      guard let scene = UIApplication.shared.connectedScenes
+        .compactMap({ $0 as? UIWindowScene })
+        .first(where: { $0.activationState == .foregroundActive })
+        ?? UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first
+      else {
+        reject("code", "Aucune fenêtre pour présenter la feuille", nil)
+        return
+      }
+      do {
+        try await AppStore.presentOfferCodeRedeemSheet(in: scene)
+        resolve(true)
+      } catch {
+        reject("code", "Feuille des codes indisponible : \(error.localizedDescription)", error)
+      }
+    }
+  }
+
   // ---------------------------------------------------------- trousseau
 
   @objc func accountMarker(
@@ -270,7 +390,13 @@ class RoomScanAccount: NSObject, ASAuthorizationControllerDelegate,
         }
       }
       guard let fin = echeance, let produit = produitActif else {
-        resolve(nil)
+        /*
+          AUCUN ABONNEMENT EN COURS — et on le DIT, au lieu de rendre rien.
+          `currentEntitlements` se lit hors ligne : c'est une réponse, pas un
+          silence. Le JS s'en sert pour retirer le Pro d'un abonnement
+          résilié ou échu, ce qu'il ne savait pas faire.
+        */
+        resolve(["aucun": true])
         return
       }
       // Le renouvellement se lit sur l'ABONNEMENT, pas sur la transaction :

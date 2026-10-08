@@ -39,7 +39,31 @@ jest.mock('../src/native/account', () => ({
   }),
   connexionApple: jest.fn(async () => ({ id: 'A1' })),
   acheterAbonnement: jest.fn(async () => true),
+  // Ce que l'App Store vend, réglé par chaque épreuve (voir `vendre`).
+  produitsPro: jest.fn(async () => mockProduits),
+  ouvrirCodeOffre: jest.fn(async () => true),
+  echeanceAbonnement: jest.fn(async () => null),
 }));
+/* eslint-disable @typescript-eslint/no-explicit-any */
+let mockProduits: any[] = [];
+/**
+ * L'App Store vend le mensuel à 4,90 € et l'annuel à 49 € ; avec `offre`,
+ * le mensuel porte une offre de lancement (−20 % le premier mois).
+ */
+const vendre = (offre: false | { eligible: boolean }) => {
+  mockProduits = [
+    {
+      id: 'echoplan.pro.mensuel',
+      prix: '4,90 €',
+      valeur: 4.9,
+      periode: { unite: 'mois', valeur: 1 },
+      offre: offre
+        ? { prix: '3,92 €', valeur: 3.92, periode: { unite: 'mois', valeur: 1 }, nombre: 1, mode: 'remise', eligible: offre.eligible }
+        : undefined,
+    },
+    { id: 'echoplan.pro.annuel', prix: '49,00 €', valeur: 49, periode: { unite: 'an', valeur: 1 } },
+  ];
+};
 
 import React from 'react';
 import { Image, StyleSheet, Text, TextInput, type ViewStyle } from 'react-native';
@@ -60,6 +84,7 @@ import { useScanStore } from '../src/store/scanStore';
 beforeEach(() => {
   jest.useFakeTimers();
   mockMarqueur = null;
+  mockProduits = [];
   useAccountStore.setState({
     charge: true,
     compte: { id: 'email:x@y.fr', methode: 'email' },
@@ -68,6 +93,8 @@ beforeEach(() => {
     plansUtilises: 0,
     paywallVisible: true,
     essaiEpuiseVisible: false,
+    surpriseVisible: false,
+    offres: null,
   });
   useScanStore.setState({ screen: 'home', supported: true, saves: [], brouillon: null });
 });
@@ -130,38 +157,55 @@ describe('la page Pro', () => {
     expect(vu).not.toContain('1 relevé complet');
   });
 
-  it('le code CARIDI12 déverrouille et ferme la page', () => {
+  /*
+    PLUS DE CODE MAISON. « CARIDI12 » donnait le Pro sans passer par l'App
+    Store : la règle 3.1.1 l'interdit, et c'était un refus à la revue. « J'ai
+    un code » ouvre maintenant la feuille d'Apple, celle des codes d'offre
+    créés dans App Store Connect ; l'abonnement accordé arrive par l'App
+    Store, et l'échéance se relit derrière.
+  */
+  it('« J’ai un code » ouvre la feuille d’Apple, pas un champ maison', async () => {
+    const { ouvrirCodeOffre } = require('../src/native/account');
     const t = monter(<PaywallScreen />);
-    // LE CODE PROMO A QUITTÉ LE FIL DE LA PAGE — relevé du patron :
-    // « tout doit être visible sans scroll ». Le champ poussait le prix
-    // hors de l'écran pour un geste qu'on ne fait qu'une fois ; il vit
-    // maintenant dans une feuille, appelée par « J'ai un code ».
-    act(() => {
+    await act(async () => {
       bouton(t, 'J’ai un code').props.onPress();
     });
-    act(() => {
-      t.root.findByType(TextInput).props.onChangeText('CARIDI12');
-    });
-    act(() => {
-      bouton(t, 'Appliquer le code').props.onPress();
-    });
-    expect(useAccountStore.getState().pro).toBe(true);
-    expect(useAccountStore.getState().paywallVisible).toBe(false);
-  });
-
-  it('un mauvais code laisse tout verrouillé', () => {
-    const t = monter(<PaywallScreen />);
-    act(() => {
-      bouton(t, 'J’ai un code').props.onPress();
-    });
-    act(() => {
-      t.root.findByType(TextInput).props.onChangeText('RIEN');
-    });
-    act(() => {
-      bouton(t, 'Appliquer le code').props.onPress();
-    });
+    expect(ouvrirCodeOffre).toHaveBeenCalled();
+    expect(t.root.findAllByType(TextInput)).toHaveLength(0);
+    // Le code d'offre ne donne rien par lui-même : sans abonnement relu, pas de Pro.
     expect(useAccountStore.getState().pro).toBe(false);
   });
+
+  it('le prix est celui de l’App Store quand il répond', async () => {
+    mockProduits = [
+      { id: 'echoplan.pro.mensuel', prix: '5,49 €', valeur: 5.49, periode: { unite: 'mois', valeur: 1 } },
+      { id: 'echoplan.pro.annuel', prix: '54,99 €', valeur: 54.99, periode: { unite: 'an', valeur: 1 } },
+    ];
+    const t = monter(<PaywallScreen />);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    const typos = t.root.findAllByType(TexteVif).map((n) => String(n.props.texte));
+    expect(typos.some((x) => x.includes('5,49 €'))).toBe(true);
+    expect(typos.some((x) => x.includes('4,90'))).toBe(false);
+  });
+
+  /*
+    LES MENTIONS DE LA RÈGLE 3.1.2 — le nom, la durée, le prix, le
+    renouvellement automatique, la résiliation ; et les deux liens.
+  */
+  it('dit ce qu’on achète, en toutes lettres, avec les conditions et la confidentialité', () => {
+    const t = monter(<PaywallScreen />);
+    const mentions = t.root.findAll((n) => n.props?.testID === 'mentions-abonnement')[0];
+    const texte = String(mentions.props.children);
+    expect(texte).toMatch(/renouvellement automatique/);
+    expect(texte).toMatch(/4,90 € par mois/);
+    expect(texte).toMatch(/24 heures avant la fin/);
+    expect(texte).toMatch(/compte Apple/);
+    expect(bouton(t, 'Conditions d’utilisation')).toBeDefined();
+    expect(bouton(t, 'Politique de confidentialité')).toBeDefined();
+  });
+
 });
 
 /*
@@ -397,11 +441,16 @@ describe('l’accueil et le quota', () => {
     qui TEND la page Pro avec le code déjà rempli. Le scan, lui, ne part
     toujours pas : le palier s'arrête AVANT le scan, pas après.
   */
-  it('ouvre la surprise — pas le scan ni la page Pro — quand le plan gratuit est consommé', () => {
+  it('ouvre l’offre quand le plan gratuit est consommé : la surprise si Apple en porte une', () => {
+    vendre({ eligible: true });
     useAccountStore.setState({
       plansUtilises: 1,
       paywallVisible: false,
       surpriseVisible: false,
+      offres: {
+        mensuel: mockProduits[0],
+        annuel: mockProduits[1],
+      },
     });
     const t = monter(<HomeScreen />);
     const cta = t.root.findAll(
@@ -414,6 +463,22 @@ describe('l’accueil et le quota', () => {
     });
     expect(useAccountStore.getState().surpriseVisible).toBe(true);
     expect(useAccountStore.getState().paywallVisible).toBe(false);
+    expect(useScanStore.getState().screen).toBe('home');
+  });
+
+  it('et la page Pro tout droit quand il n’y a pas d’offre — plus de remise promise pour rien', () => {
+    useAccountStore.setState({ plansUtilises: 1, paywallVisible: false, surpriseVisible: false, offres: null });
+    const t = monter(<HomeScreen />);
+    const cta = t.root.findAll(
+      (n) =>
+        n.props?.accessibilityLabel === 'Commencer le scan' &&
+        typeof n.props?.onPress === 'function',
+    )[0];
+    act(() => {
+      cta.props.onPress();
+    });
+    expect(useAccountStore.getState().surpriseVisible).toBe(false);
+    expect(useAccountStore.getState().paywallVisible).toBe(true);
     expect(useScanStore.getState().screen).toBe('home');
   });
 
@@ -455,7 +520,8 @@ describe('ce que l’essai adversarial a exigé', () => {
  * popup fermé.
  */
 describe('la surprise Pro', () => {
-  it('se lève à la première inscription, pas à la reconnexion', async () => {
+  it('se lève à la première inscription — si Apple porte une offre —, pas à la reconnexion', async () => {
+    vendre({ eligible: true });
     useAccountStore.setState({
       compte: null,
       surpriseVisible: false,
@@ -479,6 +545,18 @@ describe('la surprise Pro', () => {
     expect(useAccountStore.getState().surpriseVisible).toBe(false);
   });
 
+  it('et ne se lève pas quand l’App Store n’a pas d’offre, ou que l’utilisateur l’a déjà eue', async () => {
+    for (const cas of [false, { eligible: false }] as const) {
+      vendre(cas);
+      useAccountStore.setState({ compte: null, surpriseVisible: false, offres: null });
+      mockMarqueur = null;
+      await act(async () => {
+        await useAccountStore.getState().connecter({ id: 'email:c@d.fr', methode: 'email' });
+      });
+      expect(useAccountStore.getState().surpriseVisible).toBe(false);
+    }
+  });
+
   /*
    * LE POPUP SE LIT D'UN COUP D'ŒIL — relevé du patron, capture à
    * l'appui : « trop de chiffres, les phrases sont cassées, l'ensemble ne
@@ -487,20 +565,26 @@ describe('la surprise Pro', () => {
    * nombre — le « −20 % » en héros doré — et des mots courts. Les prix,
    * c'est la page Pro qui les montre, ancien barré à l'appui.
    */
-  it('montre le cadeau, « Surprise ! », et UN seul nombre : −20 %', () => {
+  it('montre le cadeau, « Surprise ! », et UN seul nombre : celui de l’offre d’Apple', async () => {
+    vendre({ eligible: true });
+    await act(async () => {
+      await useAccountStore.getState().chargerOffres();
+    });
     useAccountStore.setState({ surpriseVisible: true });
     const t = monter(<SurprisePro />);
     expect(t.root.findAllByType(Image).length).toBeGreaterThanOrEqual(1);
-    const vu = textesDe(t);
-    expect(vu).toContain('Surprise');
-    expect(vu).toContain('20');
-    // Le seul groupe de chiffres de tout le popup : « 20 ». Ni 3,92,
-    // ni 4,90, ni FIRST20.
-    expect(vu.match(/\d+/g)).toEqual(['20']);
+    const typos = t.root.findAllByType(TexteVif).map((n) => String(n.props.texte));
+    expect(typos).toContain('Surprise !');
+    // Le pourcentage est CALCULÉ sur les prix de l'App Store : 3,92 / 4,90.
+    expect(typos).toContain('−20 %');
     expect(bouton(t, 'Plus tard')).toBeDefined();
   });
 
-  it('un clic applique FIRST20 tout seul et ouvre la page Pro remisée', () => {
+  it('« J’en profite » ouvre la page Pro, et le prix affiché est celui qu’Apple facturera', async () => {
+    vendre({ eligible: true });
+    await act(async () => {
+      await useAccountStore.getState().chargerOffres();
+    });
     useAccountStore.setState({ surpriseVisible: true, paywallVisible: false });
     const t = monter(<SurprisePro />);
     act(() => {
@@ -509,48 +593,32 @@ describe('la surprise Pro', () => {
     const s = useAccountStore.getState();
     expect(s.surpriseVisible).toBe(false);
     expect(s.paywallVisible).toBe(true);
-    expect(s.remisePct).toBe(20);
-    // Une remise n'est PAS un déverrouillage : le Pro reste à acheter.
+    // Une offre n'est PAS un déverrouillage : le Pro reste à acheter.
     expect(s.pro).toBe(false);
-    // La page Pro arrive avec le code déjà dans son champ, et le prix
-    // remisé écrit sur le bouton.
     const p = monter(<PaywallScreen />);
-    // Le code offert attend DANS la feuille, déjà écrit : il ne reste qu'à
-    // l'ouvrir et à appuyer.
-    act(() => {
-      bouton(p, 'J’ai un code').props.onPress();
+    await act(async () => {
+      await Promise.resolve();
     });
-    expect(p.root.findByType(TextInput).props.value).toBe('FIRST20');
-    const typos = p.root
-      .findAllByType(TexteVif)
-      .map((n) => String(n.props.texte));
-    expect(typos.some((x) => x.includes('3,92'))).toBe(true);
-    /*
-      LA ZONE D'ABONNEMENT SE LIT COMME UNE PHRASE — relevé du patron :
-      « trop de chiffres et de tirets ». Le bouton dit « S'abonner pour
-      3,92 € par mois » (zéro tiret), et la note n'a plus ni code ni
-      chiffre : la remise se voit déjà sur le prix barré de la carte.
-    */
-    expect(typos.some((x) => x.includes('S’abonner pour'))).toBe(true);
-    expect(typos.some((x) => x.includes('—'))).toBe(false);
-    const vuPaywall = textesDe(p);
-    expect(vuPaywall).toContain('Remise de bienvenue appliquée');
-    expect(vuPaywall).not.toContain('FIRST20');
+    const typos = p.root.findAllByType(TexteVif).map((n) => String(n.props.texte));
+    // Le prix de l'offre, celui de l'App Store : 3,92 €, et le plein barré.
+    expect(typos.some((x) => x.includes('3,92 €'))).toBe(true);
+    expect(textesDe(p)).toContain('4,90 €');
+    expect(textesDe(p)).toContain('Offre de bienvenue');
+    // Plus aucun code maison nulle part.
+    expect(textesDe(p)).not.toMatch(/FIRST20|CARIDI12/);
   });
 
-  it('FIRST20 remise sans déverrouiller ; CARIDI12 déverrouille toujours', () => {
-    useAccountStore.setState({ paywallVisible: true, remisePct: 0 });
-    expect(useAccountStore.getState().utiliserCode('first20')).toBe(true);
-    let s = useAccountStore.getState();
-    expect(s.remisePct).toBe(20);
-    expect(s.pro).toBe(false);
-    // La page Pro RESTE ouverte : c'est là qu'on voit la remise.
-    expect(s.paywallVisible).toBe(true);
-    expect(useAccountStore.getState().utiliserCode('CARIDI12')).toBe(true);
-    s = useAccountStore.getState();
-    expect(s.pro).toBe(true);
-    expect(s.paywallVisible).toBe(false);
+  it('sans offre éligible, ni prix barré ni « offre de bienvenue »', async () => {
+    vendre({ eligible: false });
+    const p = monter(<PaywallScreen />);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(textesDe(p)).not.toContain('Offre de bienvenue');
+    const typos = p.root.findAllByType(TexteVif).map((n) => String(n.props.texte));
+    expect(typos.some((x) => x.includes('3,92'))).toBe(false);
   });
+
 
   /*
    * LES DEUX CARTES SONT DEVENUES UNE — et les pouces sont partis avec.

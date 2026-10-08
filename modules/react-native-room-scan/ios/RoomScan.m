@@ -55,6 +55,11 @@ RCT_EXTERN_METHOD(restorePro:(NSString *)productId
 RCT_EXTERN_METHOD(proExpiry:(NSArray *)productIds
                   resolve:(RCTPromiseResolveBlock)resolve
                   reject:(RCTPromiseRejectBlock)reject)
+RCT_EXTERN_METHOD(proProducts:(NSArray *)productIds
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+RCT_EXTERN_METHOD(presentOfferCode:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
 RCT_EXTERN_METHOD(webAuth:(NSString *)url
                   scheme:(NSString *)scheme
                   resolve:(RCTPromiseResolveBlock)resolve

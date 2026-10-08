@@ -4,7 +4,7 @@
  * Trois règles, chacune vérifiée ici parce qu'elle se contourne autrement :
  * un seul compte par appareil (le marqueur du trousseau refuse le second),
  * un seul plan gratuit (le compteur ne se remet pas à zéro), et le code
- * promo du patron (CARIDI12) qui déverrouille tout.
+ * d'offre, qui passent désormais par l'App Store.
  */
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn(async () => null),
@@ -22,7 +22,12 @@ jest.mock('../src/native/account', () => ({
   connexionApple: jest.fn(async () => ({ id: 'A1', prenom: 'Jé' })),
   acheterAbonnement: jest.fn(async () => true),
   restaurerAbonnement: jest.fn(async () => true),
+  echeanceAbonnement: jest.fn(async () => mockEcheance),
+  produitsPro: jest.fn(async () => []),
+  ouvrirCodeOffre: jest.fn(async () => true),
 }));
+/* Ce que l'App Store répond sur l'abonnement, réglé par chaque épreuve. */
+let mockEcheance: unknown = null;
 
 import { PLANS_GRATUITS, useAccountStore } from '../src/store/accountStore';
 import { SERVEUR } from '../src/config/serveur';
@@ -38,6 +43,7 @@ const MARTIN = {
 
 beforeEach(() => {
   mockMarqueur = null;
+  mockEcheance = null;
   useAccountStore.setState({
     charge: true,
     compte: null,
@@ -156,11 +162,11 @@ describe('le palier gratuit', () => {
 });
 
 describe('ce que la réinstallation ne défait pas', () => {
-  it('le Pro au code survit à la réinstallation — pour SON compte', async () => {
+  it('le Pro d’un abonnement survit à la réinstallation — pour SON compte', async () => {
     await useAccountStore.getState().connecter(MARTIN);
-    useAccountStore.getState().utiliserCode('CARIDI12');
+    await useAccountStore.getState().acheterPro();
     await tick();
-    expect(mockMarqueur?.pro).toBe('code');
+    expect(mockMarqueur?.pro).toBe('abonnement');
     // « Réinstallation » : stockage local vidé, trousseau intact. Le Pro
     // ne revient qu'à la RECONNEXION du compte qui l'a acquis — un
     // chargement anonyme ne donne rien à personne.
@@ -174,11 +180,11 @@ describe('ce que la réinstallation ne défait pas', () => {
 
   it('noter un plan ne fait pas tomber le Pro du trousseau', async () => {
     await useAccountStore.getState().connecter(MARTIN);
-    useAccountStore.getState().utiliserCode('CARIDI12');
+    await useAccountStore.getState().acheterPro();
     await tick();
     useAccountStore.getState().noterPlanCree();
     await tick();
-    expect(mockMarqueur?.pro).toBe('code');
+    expect(mockMarqueur?.pro).toBe('abonnement');
     expect(mockMarqueur?.plans).toBe(1);
   });
 });
@@ -211,16 +217,48 @@ describe('la suppression du compte', () => {
 });
 
 describe('le code promo et l’achat', () => {
-  it('CARIDI12 déverrouille le Pro, quelle que soit la casse', () => {
-    const s = useAccountStore.getState();
-    expect(s.utiliserCode('  caridi12 ')).toBe(true);
-    expect(useAccountStore.getState().pro).toBe(true);
-    expect(useAccountStore.getState().proVia).toBe('code');
+  /*
+    PLUS DE CODE MAISON. « CARIDI12 » donnait le Pro sans passer par l'App
+    Store : la règle 3.1.1 l'interdit. Les codes d'offre se créent dans App
+    Store Connect, et c'est l'App Store qui accorde l'abonnement.
+  */
+  it('aucun code maison : le compte ne sait plus déverrouiller tout seul', () => {
+    expect((useAccountStore.getState() as unknown as Record<string, unknown>).utiliserCode).toBeUndefined();
+    expect(useAccountStore.getState().pro).toBe(false);
   });
 
-  it('un code inconnu ne déverrouille rien', () => {
-    expect(useAccountStore.getState().utiliserCode('GRATUIT')).toBe(false);
+  it('un code d’offre Apple : la feuille d’Apple, puis l’abonnement relu à l’App Store', async () => {
+    mockEcheance = { produit: 'echoplan.pro.mensuel', expiration: Date.now() + 86400000 * 30, reconduit: true };
+    useAccountStore.setState({ paywallVisible: true });
+    await useAccountStore.getState().codeOffre();
+    expect(useAccountStore.getState().pro).toBe(true);
+    expect(useAccountStore.getState().proVia).toBe('abonnement');
+    expect(useAccountStore.getState().paywallVisible).toBe(false);
+  });
+
+  /*
+    UN ABONNEMENT RÉSILIÉ S'EN VA. L'échéance savait accorder le Pro, pas le
+    reprendre : un abonné qui résiliait le gardait à vie. Seul un « aucun »
+    explicite de l'App Store le retire — un silence (hors ligne) ne retire
+    rien, et le Pro d'un ancien code n'en dépend pas.
+  */
+  it('l’App Store dit « aucun abonnement » : le Pro d’abonnement s’en va', async () => {
+    useAccountStore.setState({ pro: true, proVia: 'abonnement' });
+    mockEcheance = { aucun: true };
+    await useAccountStore.getState().rafraichirEcheance();
     expect(useAccountStore.getState().pro).toBe(false);
+    expect(useAccountStore.getState().proVia).toBeNull();
+  });
+
+  it('mais un silence ne retire rien, ni le Pro d’un ancien code', async () => {
+    useAccountStore.setState({ pro: true, proVia: 'abonnement' });
+    mockEcheance = null;
+    await useAccountStore.getState().rafraichirEcheance();
+    expect(useAccountStore.getState().pro).toBe(true);
+    useAccountStore.setState({ pro: true, proVia: 'code' });
+    mockEcheance = { aucun: true };
+    await useAccountStore.getState().rafraichirEcheance();
+    expect(useAccountStore.getState().pro).toBe(true);
   });
 
   it('l’achat StoreKit passe le compte en Pro et ferme la page', async () => {

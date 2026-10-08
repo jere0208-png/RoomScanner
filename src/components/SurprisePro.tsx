@@ -19,7 +19,7 @@
 import React from 'react';
 import { Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { ContourVif, TexteVif } from './ContourVif';
-import { useAccountStore } from '../store/accountStore';
+import { offreDeBienvenue, useAccountStore } from '../store/accountStore';
 import { useTheme, type Palette } from '../theme';
 
 export function SurprisePro() {
@@ -28,6 +28,14 @@ export function SurprisePro() {
   const visible = useAccountStore((st) => st.surpriseVisible);
   const fermer = useAccountStore((st) => st.fermerSurprise);
   const profiter = useAccountStore((st) => st.profiterSurprise);
+  /*
+    L'OFFRE EST CELLE D'APPLE, et le popup la dit telle quelle — « −20 % »,
+    « 1 mois offert » —, lue à l'App Store. Il ne s'ouvre d'ailleurs que si
+    elle existe et s'applique (voir `ouvrirSurprise`) : plus de remise
+    promise que l'App Store ne ferait pas.
+  */
+  const offres = useAccountStore((st) => st.offres);
+  const bienvenue = offreDeBienvenue(offres);
 
   return (
     <Modal
@@ -57,11 +65,8 @@ export function SurprisePro() {
                 resizeMode="contain"
               />
               <TexteVif texte="Surprise !" taille={22} fond="#FFFFFF" />
-              <TexteVif texte="−20 %" taille={44} fond="#FFFFFF" />
-              <Text style={s.corps}>
-                sur votre abonnement Pro,{'\n'}pour votre première
-                souscription.
-              </Text>
+              <TexteVif texte={bienvenue?.accroche ?? 'Pro'} taille={44} fond="#FFFFFF" />
+              <Text style={s.corps}>{bienvenue?.phrase ?? ''}</Text>
               {/* L'affordance du geste : un bouton dessiné — mais c'est
                   toute la carte qui répond, on ne peut pas le rater. */}
               <View style={s.cta}>

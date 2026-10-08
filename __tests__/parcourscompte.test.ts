@@ -34,6 +34,8 @@ jest.mock('../src/native/account', () => ({
     expiration: Date.now() + 30 * 86400000,
     reconduit: true,
   })),
+  produitsPro: jest.fn(async () => []),
+  ouvrirCodeOffre: jest.fn(async () => true),
 }));
 
 import { PLANS_GRATUITS, useAccountStore } from '../src/store/accountStore';
@@ -135,14 +137,11 @@ describe('le parcours complet d’un abonne', () => {
     expect(ac().peutCreerPlan()).toBe(true);
   });
 
-  it('le code du patron deverrouille, et ne s’use pas', () => {
+  it('un code d’offre Apple deverrouille par l’App Store, et ne s’use pas', async () => {
     ac().noterPlanCree();
     expect(ac().peutCreerPlan()).toBe(false);
-    expect(ac().utiliserCode('CARIDI12')).toBe(true);
+    await ac().codeOffre();
     expect(ac().pro).toBe(true);
     expect(ac().peutCreerPlan()).toBe(true);
-    // Un code faux ne rend rien et ne casse rien.
-    expect(ac().utiliserCode('NIMPORTEQUOI')).toBe(false);
-    expect(ac().pro).toBe(true);
   });
 });

@@ -17,6 +17,7 @@ export function EssaiEpuise() {
   const s = themed(c);
   const visible = useAccountStore((st) => st.essaiEpuiseVisible);
   const fermer = useAccountStore((st) => st.fermerEssaiEpuise);
+  const prixMensuel = useAccountStore((st) => st.offres?.mensuel?.prix) ?? PRIX_PRO;
   const ouvrirPaywall = useAccountStore((st) => st.ouvrirPaywall);
 
   return (
@@ -39,7 +40,9 @@ export function EssaiEpuise() {
               fermer();
               ouvrirPaywall();
             }}>
-            <Text style={s.ctaTexte}>Passer en Pro — {PRIX_PRO} / mois</Text>
+            {/* Le prix de l'App Store, celui qui sera facturé ; la
+                référence ne tient lieu que s'il ne répond pas. */}
+            <Text style={s.ctaTexte}>Passer en Pro — {prixMensuel} / mois</Text>
           </Pressable>
           <Pressable
             accessibilityRole="button"

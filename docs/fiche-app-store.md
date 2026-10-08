@@ -106,12 +106,31 @@ des trous de configuration. À cocher un par un.
 - [x] **L'avis contre un relevé est retiré.** Le popup « laissez un avis,
       gagnez un relevé » récompensait un avis, ce que les règles de l'App
       Store interdisent. Il n'existe plus, ni son URL d'avis.
+- [x] **Plus de code maison ni de remise appliquée par l'app.** « CARIDI12 »
+      donnait le Pro sans passer par l'App Store (interdit, règle 3.1.1) et le
+      « −20 % » s'affichait sans être facturé. Les prix sont lus à l'App Store,
+      la remise est une offre de lancement Apple, « J'ai un code » ouvre la
+      feuille d'Apple, et la page Pro porte les mentions de la règle 3.1.2.
 - [ ] **Les deux abonnements** `echoplan.pro.mensuel` et `echoplan.pro.annuel`
-      créés dans App Store Connect, avec leur prix (4,90 € / 49 €), et joints à
-      la première version.
+      créés dans App Store Connect, dans **le même groupe d'abonnements**, avec
+      leur prix (4,90 € / 49 €), et joints à la première version. L'app lit
+      ces prix : changer un tarif dans App Store Connect suffit, sans nouvelle
+      version.
+- [ ] **L'offre de bienvenue** (facultatif) : une *offre de lancement* sur
+      chacun, « paiement au fur et à mesure », par exemple 3,92 € le premier
+      mois et 39,20 € la première année (−20 %). Le popup « Surprise ! » ne
+      s'affiche que si elle existe ; sans elle, l'app mène droit à la page Pro.
+- [ ] **Ton accès Pro à toi** : « CARIDI12 » n'existe plus. Crée un *code
+      d'offre* dans App Store Connect (Abonnements → Codes d'offre), saisis-le
+      via « J'ai un code » — c'est gratuit, et c'est la voie autorisée.
+- [ ] **L'adresse de la politique de confidentialité** : App Store Connect exige
+      une URL publique. Publier le texte de l'écran « Confidentialité des
+      données » sur bourseur.fr, et renseigner l'adresse.
 - [ ] **Les étiquettes de confidentialité** (« App Privacy ») : l'e-mail et le
-      prénom du compte, l'identifiant Apple si l'on se connecte avec Apple.
-      Les plans restent sur le téléphone.
+      prénom du compte, l'identifiant Apple si l'on se connecte avec Apple —
+      ET **les plans** (« Contenu utilisateur », lié à l'identité) : quand on
+      est connecté, ils sont déposés sur le serveur pour suivre le compte d'un
+      téléphone à l'autre. Les photos, elles, restent sur le téléphone.
 - [ ] **La phrase d'usage de la caméra** (`NSCameraUsageDescription`) relue :
       Apple refuse les phrases vagues.
 - [ ] **Un compte de démonstration** pour l'équipe de revue, et une note qui

@@ -14,10 +14,15 @@
  *   plan gratuit. Et supprimer un relevé ne rend PAS le quota — sinon le
  *   palier gratuit serait infini par corbeille.
  *
- * - LE CODE PROMO DÉVERROUILLE LOCALEMENT. CARIDI12 donne le Pro sans
- *   paiement. L'abonnement réel (4,90 €/mois) passe par StoreKit : le
- *   produit `echoplan.pro.mensuel` doit exister dans App Store Connect —
- *   tant qu'il n'y est pas, le bouton d'achat le dit clairement.
+ * - TOUT CE QUI SE PAIE PASSE PAR L'APP STORE. L'abonnement, ses prix (lus
+ *   à l'App Store, jamais écrits en dur), son offre de lancement et ses
+ *   codes d'offre. Il y a eu un code maison qui donnait le Pro sans paiement
+ *   et un « −20 % » appliqué par l'app : le premier est interdit par la règle
+ *   3.1.1, et le second affichait un prix que l'App Store ne facturait pas.
+ *   Les deux sont partis ; la remise de bienvenue est désormais une OFFRE DE
+ *   LANCEMENT Apple, et les codes sont ceux d'App Store Connect (voir
+ *   `codeOffre`). Les produits `echoplan.pro.mensuel` et `.annuel` doivent
+ *   exister dans App Store Connect.
  */
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -28,8 +33,11 @@ import {
   echeanceAbonnement,
   ecrireMarqueur,
   lireMarqueur,
+  ouvrirCodeOffre,
+  produitsPro,
   restaurerAbonnement,
   type DeviceMarker,
+  type ProduitPro,
 } from '../native/account';
 import { SERVEUR } from '../config/serveur';
 import { alerte } from '../ui/alerte';
@@ -86,21 +94,45 @@ export const MOIS_OFFERTS = Math.round(
 );
 /** Les deux facturations, telles que la page les nomme. */
 export type Offre = 'mensuel' | 'annuel';
-/** Le prix remisé, écrit à la française. */
-export const prixRemise = (pct: number, offre: Offre = 'mensuel') =>
-  `${((offre === 'annuel' ? PRIX_PRO_AN_NUM : PRIX_PRO_NUM) * (1 - pct / 100))
-    .toFixed(2)
-    .replace('.', ',')} €`;
-/** Les codes qui déverrouillent le Pro, en clair : offre du patron. */
-const CODES_PROMO = ['CARIDI12'];
+/** Les abonnements tels que l'App Store les vend, par facturation. */
+export type OffresPro = Partial<Record<Offre, ProduitPro>>;
+
 /**
- * Les codes de REMISE : ils baissent le prix, ils n'ouvrent rien. FIRST20
- * est l'offre de bienvenue (−20 % sur la première souscription), portée
- * par le popup « Surprise ! » — et par la table `codes_promo` en base,
- * qui connaît déjà les pourcentages.
+ * L'OFFRE DE BIENVENUE — celle qu'Apple accorde, et seulement si elle existe.
+ *
+ * Le popup « Surprise ! » et le prix barré de la page Pro ne s'affichent que
+ * si App Store Connect porte une offre de lancement sur l'abonnement ET que
+ * cet utilisateur y a droit. Au paiement, c'est l'App Store qui l'applique :
+ * le prix annoncé est le prix facturé. Rend l'accroche à afficher en grand
+ * (« −20 % », « 1 mois offert ») et la phrase qui la précise, ou `null`.
  */
-const CODES_REMISE: Record<string, number> = { FIRST20: 20 };
-export const CODE_BIENVENUE = 'FIRST20';
+export function offreDeBienvenue(
+  offres: OffresPro | null,
+  facturation: Offre = 'mensuel',
+): { accroche: string; phrase: string; prix: string; apres: string } | null {
+  const p = offres?.[facturation] ?? (facturation === 'mensuel' ? offres?.annuel : offres?.mensuel);
+  const o = p?.offre;
+  if (!p || !o || !o.eligible) return null;
+  const unite = (u: string, n: number) =>
+    u === 'mois' ? 'mois' : u === 'an' ? (n > 1 ? 'ans' : 'an') : u === 'semaine' ? (n > 1 ? 'semaines' : 'semaine') : n > 1 ? 'jours' : 'jour';
+  const duree = `${o.periode.valeur * o.nombre} ${unite(o.periode.unite, o.periode.valeur * o.nombre)}`;
+  const parPeriode = p.periode ? (p.periode.unite === 'an' ? '/an' : '/mois') : '';
+  const apres = `puis ${p.prix}${parPeriode}`;
+  if (o.mode === 'essai') {
+    return { accroche: `${duree} offert${o.nombre > 1 || o.periode.valeur > 1 ? 's' : ''}`, phrase: `d’essai gratuit, ${apres}.`, prix: '0', apres };
+  }
+  const memePeriode = p.periode && p.periode.unite === o.periode.unite && p.periode.valeur === o.periode.valeur;
+  const pct = memePeriode && p.valeur > 0 ? Math.round((1 - o.valeur / p.valeur) * 100) : 0;
+  if (pct > 0 && o.mode === 'remise') {
+    return {
+      accroche: `−${pct} %`,
+      phrase: `sur ${o.nombre > 1 ? `vos ${o.nombre} premiers ${unite(o.periode.unite, 2)}` : `votre premier ${unite(o.periode.unite, 1)}`} d’abonnement Pro, ${apres}.`,
+      prix: o.prix,
+      apres,
+    };
+  }
+  return { accroche: o.prix, phrase: `pour ${duree}, ${apres}.`, prix: o.prix, apres };
+}
 
 const CLE = 'roomscanner.compte.v1';
 /** La surprise ne se joue qu'une fois par appareil : le drapeau du déjà-vu. */
@@ -141,16 +173,18 @@ interface AccountState {
    */
   essaiEpuiseVisible: boolean;
   /**
-   * Le popup « Surprise ! » : le cadeau qui offre −20 % (FIRST20). Levé à
-   * la PREMIÈRE inscription de l'appareil, et quand l'essai épuisé bloque
-   * un nouveau scan — l'offre à la place de la porte.
+   * Le popup « Surprise ! » : l'offre de lancement d'Apple, quand elle
+   * existe et que l'utilisateur y a droit. Levé à la PREMIÈRE inscription
+   * de l'appareil, et quand l'essai épuisé bloque un nouveau scan.
    */
   surpriseVisible: boolean;
-  /** La remise appliquée sur l'abonnement, en pour cent (0 = plein prix). */
-  remisePct: number;
-  /** Le code que la page Pro doit préremplir — personne ne recopie un
-   *  code depuis un popup fermé. */
-  codeOffert: string | null;
+  /**
+   * LES ABONNEMENTS, LUS À L'APP STORE — prix localisés, périodes, offre de
+   * lancement. `null` tant qu'on ne les a pas demandés ; les prix de
+   * référence (`PRIX_PRO`) tiennent lieu tant que l'App Store ne répond pas.
+   */
+  offres: OffresPro | null;
+  chargerOffres: () => Promise<void>;
   /**
    * Relevés offerts en plus du palier gratuit.
    *
@@ -192,7 +226,8 @@ interface AccountState {
    * retrouve par « Restaurer l'achat ».
    */
   supprimerCompte: () => Promise<void>;
-  utiliserCode: (code: string) => boolean;
+  /** La feuille d'Apple des codes d'offre, puis l'échéance relue. */
+  codeOffre: () => Promise<void>;
   /** L'achat StoreKit de l'offre choisie. Mensuel par défaut. */
   acheterPro: (offre?: Offre) => Promise<void>;
   restaurerPro: () => Promise<boolean>;
@@ -225,7 +260,6 @@ const persister = (s: AccountState) =>
       pro: s.pro,
       proVia: s.proVia,
       plansUtilises: s.plansUtilises,
-      remisePct: s.remisePct,
       bonusEssais: s.bonusEssais,
       jeton: s.jeton,
     }),
@@ -266,8 +300,7 @@ export const useAccountStore = create<AccountState>((set, get) => ({
   paywallVisible: false,
   essaiEpuiseVisible: false,
   surpriseVisible: false,
-  remisePct: 0,
-  codeOffert: null,
+  offres: null,
   bonusEssais: 0,
   jeton: null,
   proEcheance: null,
@@ -290,6 +323,22 @@ export const useAccountStore = create<AccountState>((set, get) => ({
     const e = await echeanceAbonnement([PRODUIT_PRO, PRODUIT_PRO_AN]);
     if (!e) {
       set({ proEcheance: null });
+      return;
+    }
+    if ('aucun' in e) {
+      /*
+        L'APP STORE DIT « AUCUN ABONNEMENT » — résilié et échu, ou remboursé.
+        Le Pro tenu PAR ABONNEMENT s'en va ; celui d'un ancien code reste
+        (il ne dépend pas de l'App Store). Sans cette branche, un abonné qui
+        résiliait gardait le Pro à vie. Un silence (`null`), lui, ne retire
+        rien : hors ligne ou sans réponse, on ne punit personne.
+      */
+      set({ proEcheance: null });
+      if (get().pro && get().proVia === 'abonnement') {
+        set({ pro: false, proVia: null });
+        persister(get());
+        fusionnerMarqueur({ pro: undefined }).catch(() => {});
+      }
       return;
     }
     set({ proEcheance: e.expiration, proReconduit: e.reconduit });
@@ -333,10 +382,7 @@ export const useAccountStore = create<AccountState>((set, get) => ({
         Number(local.plansUtilises) || 0,
         marqueur?.plans ?? 0,
       ),
-      // La remise survit au redémarrage : un −20 % accepté puis perdu au
-      // relancement serait vécu comme une promesse reprise. Le relevé
-      // offert pareil — c'est un dû.
-      remisePct: Number(local.remisePct) || 0,
+      // Le relevé offert survit au redémarrage : c'est un dû.
       bonusEssais: Number(local.bonusEssais) || 0,
       jeton: typeof local.jeton === 'string' ? local.jeton : null,
     });
@@ -432,8 +478,17 @@ export const useAccountStore = create<AccountState>((set, get) => ({
     const dejaVue = await AsyncStorage.getItem(CLE_SURPRISE).catch(() => null);
     const s = get();
     if (!marqueur?.compte && !dejaVue && !s.pro) {
-      set({ surpriseVisible: true });
-      AsyncStorage.setItem(CLE_SURPRISE, '1').catch(() => {});
+      // On demande l'offre à l'App Store sans faire attendre la connexion :
+      // la surprise ne se lève que si elle existe et s'applique.
+      get()
+        .chargerOffres()
+        .then(() => {
+          if (offreDeBienvenue(get().offres) && !get().pro) {
+            set({ surpriseVisible: true });
+            AsyncStorage.setItem(CLE_SURPRISE, '1').catch(() => {});
+          }
+        })
+        .catch(() => {});
     } else if (!s.pro && s.plansUtilises >= PLANS_GRATUITS) {
       set({ essaiEpuiseVisible: true });
     }
@@ -487,30 +542,22 @@ export const useAccountStore = create<AccountState>((set, get) => ({
     persister(get());
   },
 
-  utiliserCode: (code) => {
-    const propre = code.trim().toUpperCase();
-    if (propre in CODES_REMISE) {
-      // Une remise n'ouvre rien : elle baisse le prix, et la page Pro
-      // reste ouverte — c'est là qu'on la VOIT s'appliquer.
-      set({ remisePct: CODES_REMISE[propre] });
-      persister(get());
-      return true;
+  codeOffre: async () => {
+    await ouvrirCodeOffre();
+    // L'abonnement accordé par un code arrive par l'App Store : on relit.
+    await get().rafraichirEcheance();
+    if (get().pro) set({ paywallVisible: false });
+  },
+
+  chargerOffres: async () => {
+    const liste = await produitsPro([PRODUIT_PRO, PRODUIT_PRO_AN]);
+    if (liste.length === 0) return;
+    const offres: OffresPro = {};
+    for (const p of liste) {
+      if (p.id === PRODUIT_PRO) offres.mensuel = p;
+      if (p.id === PRODUIT_PRO_AN) offres.annuel = p;
     }
-    if (!CODES_PROMO.includes(propre)) return false;
-    set({ pro: true, proVia: 'code', paywallVisible: false });
-    persister(get());
-    // Au trousseau (le Pro survit à la réinstallation) et au serveur,
-    // meilleur effort : le local a déjà tranché.
-    fusionnerMarqueur({ pro: 'code' }).catch(() => {});
-    const s = get();
-    if (s.compte && s.jeton) {
-      api('code', {
-        identifiant: s.compte.id,
-        jeton: s.jeton,
-        code: propre,
-      }).catch(() => {});
-    }
-    return true;
+    set({ offres });
   },
 
   acheterPro: async (offre = 'mensuel') => {
@@ -606,22 +653,23 @@ export const useAccountStore = create<AccountState>((set, get) => ({
   ouvrirPaywall: () => set({ paywallVisible: true }),
   fermerPaywall: () => set({ paywallVisible: false }),
   fermerEssaiEpuise: () => set({ essaiEpuiseVisible: false }),
-  ouvrirSurprise: () => set({ surpriseVisible: true }),
+  /*
+    LA SURPRISE N'EXISTE QUE SI L'OFFRE EXISTE. Sans offre de lancement
+    éligible, le geste mène droit à la page Pro : promettre une remise que
+    l'App Store ne fera pas, c'est le défaut qu'on vient de retirer.
+  */
+  ouvrirSurprise: () => {
+    if (offreDeBienvenue(get().offres)) set({ surpriseVisible: true });
+    else set({ paywallVisible: true });
+  },
   /*
     Refuser l'offre referme, simplement. Elle ouvrait l'« avis contre un
     essai » — retiré : les règles de l'App Store interdisent de récompenser
     un avis, et c'était un refus assuré à la revue.
   */
   fermerSurprise: () => set({ surpriseVisible: false }),
-  profiterSurprise: () => {
-    set({
-      surpriseVisible: false,
-      paywallVisible: true,
-      remisePct: CODES_REMISE[CODE_BIENVENUE],
-      codeOffert: CODE_BIENVENUE,
-    });
-    persister(get());
-  },
+  // En profiter, c'est ouvrir la page Pro : l'App Store applique l'offre.
+  profiterSurprise: () => set({ surpriseVisible: false, paywallVisible: true }),
 }));
 
 /*

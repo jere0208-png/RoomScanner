@@ -18,12 +18,12 @@
  */
 import React, { useEffect, useState } from 'react';
 import {
+  Linking,
   Modal,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -40,10 +40,21 @@ import {
   MOIS_OFFERTS,
   PRIX_PRO,
   PRIX_PRO_AN,
-  prixRemise,
+  offreDeBienvenue,
   useAccountStore,
   type Offre,
 } from '../store/accountStore';
+import { useScanStore } from '../store/scanStore';
+
+/**
+ * LES CONDITIONS D'UTILISATION — le contrat de licence standard d'Apple.
+ *
+ * La règle 3.1.2 demande, sur toute page qui vend un abonnement, un lien
+ * vers les conditions et un vers la politique de confidentialité. Sans
+ * conditions propres, c'est l'EULA standard d'Apple qui s'applique, et
+ * c'est vers elle qu'on renvoie.
+ */
+export const URL_CONDITIONS = 'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/';
 import { dark, radius, shadowCard, useTheme, type Palette } from '../theme';
 import { alerte } from '../ui/alerte';
 import { panne as expliquer } from '../ui/panne';
@@ -127,13 +138,18 @@ export function PaywallScreen() {
   const { width: largeur } = useWindowDimensions();
   const visible = useAccountStore((st) => st.paywallVisible);
   const fermer = useAccountStore((st) => st.fermerPaywall);
-  const utiliserCode = useAccountStore((st) => st.utiliserCode);
+  const codeOffre = useAccountStore((st) => st.codeOffre);
+  const offres = useAccountStore((st) => st.offres);
+  const chargerOffres = useAccountStore((st) => st.chargerOffres);
   const acheterPro = useAccountStore((st) => st.acheterPro);
   const restaurerPro = useAccountStore((st) => st.restaurerPro);
-  const remisePct = useAccountStore((st) => st.remisePct);
-  const codeOffert = useAccountStore((st) => st.codeOffert);
   const modeElec = useModeElec();
-  const [code, setCode] = useState('');
+  /* Les prix se relisent à l'App Store à chaque ouverture : ils changent
+     avec le pays, avec App Store Connect, et l'offre de lancement ne vaut
+     qu'une fois par personne. */
+  useEffect(() => {
+    if (visible) chargerOffres().catch(() => {});
+  }, [visible, chargerOffres]);
   /*
     LE MENSUEL D'ABORD.
 
@@ -143,28 +159,24 @@ export function PaywallScreen() {
   */
   const [offre, setOffre] = useState<Offre>('mensuel');
   /** La feuille du code promo : appelee par « J'ai un code ». */
-  const [feuilleCode, setFeuilleCode] = useState(false);
 
   const annuel = offre === 'annuel';
-  const prixPlein = annuel ? PRIX_PRO_AN : PRIX_PRO;
-  const prix = remisePct > 0 ? prixRemise(remisePct, offre) : prixPlein;
-
   /*
-    LE CODE OFFERT ARRIVE DÉJÀ ÉCRIT. La surprise applique FIRST20 toute
-    seule ; le champ le MONTRE, pour que la remise ait une explication
-    visible — un prix qui baisse sans raison ressemble à une erreur.
+    LE PRIX EST CELUI DE L'APP STORE — jamais écrit en dur. Les prix de
+    référence ne tiennent lieu que tant qu'il ne répond pas (hors ligne,
+    produits pas encore créés) ; la feuille d'achat d'Apple, elle, dira
+    toujours le vrai.
   */
-  useEffect(() => {
-    if (visible && codeOffert) setCode(codeOffert);
-  }, [visible, codeOffert]);
-
-  const valideCode = () => {
-    if (utiliserCode(code)) {
-      alerte('Bienvenue en Pro', 'Le code a été appliqué : tout est débloqué.');
-    } else {
-      alerte('Code inconnu', 'Vérifiez le code — il ne correspond à aucune offre.');
-    }
-  };
+  const prixPlein = offres?.[offre]?.prix ?? (annuel ? PRIX_PRO_AN : PRIX_PRO);
+  /* L'offre de lancement de CETTE facturation, si l'App Store l'accorde. */
+  const bienvenue = offreDeBienvenue({ [offre]: offres?.[offre] }, offre);
+  const essai = bienvenue?.prix === '0';
+  const prix = bienvenue && !essai ? bienvenue.prix : prixPlein;
+  /* Les mois que l'annuel fait gagner, aux prix réels quand on les a. */
+  const moisOfferts =
+    offres?.mensuel && offres?.annuel && offres.mensuel.valeur > 0
+      ? Math.round((offres.mensuel.valeur * 12 - offres.annuel.valeur) / offres.mensuel.valeur)
+      : MOIS_OFFERTS;
 
   const acheter = async () => {
     try {
@@ -271,9 +283,11 @@ export function PaywallScreen() {
                     {o === 'mensuel' ? 'Mensuel' : 'Annuel'}
                   </Text>
                   {o === 'annuel' && (
-                    <Text style={s.ongletNote}>
-                      {`${MOIS_OFFERTS} mois offerts`}
-                    </Text>
+                    moisOfferts > 0 && (
+                      <Text style={s.ongletNote}>
+                        {`${moisOfferts} mois offerts`}
+                      </Text>
+                    )
                   )}
                 </Pressable>
               );
@@ -292,12 +306,16 @@ export function PaywallScreen() {
                 <Text style={s.parQuoi}>{annuel ? '/an' : '/mois'}</Text>
                 {/* L'ancien prix reste visible, barré : une remise sans
                     référence n'est qu'un prix comme un autre. */}
-                {remisePct > 0 && <Text style={s.prixBarre}>{prixPlein}</Text>}
+                {bienvenue && !essai && <Text style={s.prixBarre}>{prixPlein}</Text>}
               </View>
               <Text style={s.prixNote}>
-                {annuel
-                  ? 'Un an d’un coup, deux mois pour rien.'
-                  : 'Sans engagement : vous arrêtez quand vous voulez.'}
+                {bienvenue
+                  ? `${bienvenue.accroche} ${bienvenue.phrase}`
+                  : annuel
+                    ? moisOfferts > 0
+                      ? `Un an d’un coup, ${moisOfferts} mois pour rien.`
+                      : 'Un an d’un coup.'
+                    : 'Sans engagement : vous arrêtez quand vous voulez.'}
               </Text>
 
               <View style={s.separateur}>
@@ -369,8 +387,50 @@ export function PaywallScreen() {
               accessibilityRole="button"
               accessibilityLabel="J’ai un code"
               hitSlop={8}
-              onPress={() => setFeuilleCode(true)}>
+              // La feuille d'Apple : les codes d'offre se créent dans App
+              // Store Connect et se saisissent là, jamais chez nous.
+              onPress={() => {
+                codeOffre().catch(() => {});
+              }}>
               <Text style={s.lien}>J’ai un code</Text>
+            </Pressable>
+          </View>
+
+          {/*
+            CE QU'ON ACHÈTE, EN TOUTES LETTRES — règle 3.1.2 d'Apple. Le nom,
+            la durée, le prix, le renouvellement automatique et la façon d'y
+            mettre fin ; puis les deux liens obligatoires. Une page qui vend
+            un abonnement sans le dire est refusée à la revue — et elle a
+            raison : c'est ce qu'on veut savoir avant de payer.
+          */}
+          <Text style={s.mentions} testID="mentions-abonnement">
+            {`EchoPlan Pro, abonnement ${annuel ? 'annuel' : 'mensuel'} à renouvellement automatique : ` +
+              `${prixPlein} par ${annuel ? 'an' : 'mois'}` +
+              (bienvenue ? `, après l’offre de bienvenue (${bienvenue.accroche.toLowerCase()})` : '') +
+              '. Le paiement est débité sur votre compte Apple à la confirmation de l’achat. ' +
+              'L’abonnement se renouvelle automatiquement au même prix, sauf résiliation au moins ' +
+              '24 heures avant la fin de la période en cours, depuis les réglages de votre compte Apple.'}
+          </Text>
+          <View style={s.liens}>
+            <Pressable
+              accessibilityRole="link"
+              accessibilityLabel="Conditions d’utilisation"
+              hitSlop={8}
+              onPress={() => {
+                Linking.openURL(URL_CONDITIONS).catch(() => {});
+              }}>
+              <Text style={s.lien}>Conditions d’utilisation</Text>
+            </Pressable>
+            <Text style={s.lienPoint}>·</Text>
+            <Pressable
+              accessibilityRole="link"
+              accessibilityLabel="Politique de confidentialité"
+              hitSlop={8}
+              onPress={() => {
+                fermer();
+                useScanStore.getState().setScreen('confidentialite');
+              }}>
+              <Text style={s.lien}>Confidentialité</Text>
             </Pressable>
           </View>
         </ScrollView>
@@ -385,8 +445,8 @@ export function PaywallScreen() {
           en est de la lecture.
         */}
         <View style={[s.pied, { paddingBottom: insets.bottom + 14 }]}>
-          {remisePct > 0 && (
-            <Text style={s.remiseNote}>✓ Remise de bienvenue appliquée</Text>
+          {bienvenue && (
+            <Text style={s.remiseNote}>{`✓ Offre de bienvenue : ${bienvenue.accroche}`}</Text>
           )}
           <Pressable
             accessibilityRole="button"
@@ -398,7 +458,13 @@ export function PaywallScreen() {
                 {/* Une PHRASE, pas une formule — relevé du patron : « trop
                     de chiffres et de tirets ». Un seul nombre, zéro tiret. */}
                 <TexteVif
-                  texte={`S’abonner pour ${prix} par ${annuel ? 'an' : 'mois'}`}
+                  texte={
+                    essai
+                      ? 'Commencer l’essai gratuit'
+                      : bienvenue
+                        ? `S’abonner pour ${prix} la première ${annuel ? 'année' : 'fois'}`
+                        : `S’abonner pour ${prix} par ${annuel ? 'an' : 'mois'}`
+                  }
                   taille={16.5}
                   fond={c.surface}
                 />
@@ -407,47 +473,6 @@ export function PaywallScreen() {
           </Pressable>
         </View>
 
-        {/*
-          LA FEUILLE DU CODE PROMO — appelée, jamais posée.
-
-          Elle porte le champ et son bouton, et rien d'autre : le code
-          arrive déjà écrit quand la surprise l'a offert, il ne reste qu'à
-          appuyer. Fermée, elle ne coûte pas un point de hauteur à la page
-          qui vend.
-        */}
-        <Modal
-          visible={feuilleCode}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setFeuilleCode(false)}>
-          <Pressable
-            testID="voile-code"
-            style={s.voile}
-            onPress={() => setFeuilleCode(false)}>
-            <Pressable style={s.feuille} onPress={() => {}}>
-              <Text style={s.feuilleTitre}>Code promo</Text>
-              <View style={s.promo}>
-                <TextInput
-                  accessibilityLabel="Code promo"
-                  style={s.champ}
-                  placeholder="Votre code"
-                  placeholderTextColor={c.inkFaint}
-                  value={code}
-                  onChangeText={setCode}
-                  autoCapitalize="characters"
-                  autoCorrect={false}
-                />
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Appliquer le code"
-                  style={({ pressed }) => [s.btnCode, pressed && s.enfonce]}
-                  onPress={valideCode}>
-                  <Text style={s.btnCodeTexte}>Appliquer</Text>
-                </Pressable>
-              </View>
-            </Pressable>
-          </Pressable>
-        </Modal>
       </RetourGlisse>
     </Modal>
   );
@@ -603,49 +628,14 @@ const themed = (c: Palette) =>
     },
     lien: { color: c.blue, fontSize: 13, fontWeight: '600' },
     lienPoint: { color: c.inkFaint, fontSize: 13 },
-    voile: {
-      flex: 1,
-      backgroundColor: 'rgba(8, 10, 14, 0.45)',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: 26,
+    mentions: {
+      color: c.inkFaint,
+      fontSize: 11.5,
+      lineHeight: 16,
+      textAlign: 'center',
+      marginTop: 18,
+      paddingHorizontal: 6,
     },
-    feuille: {
-      alignSelf: 'stretch',
-      borderRadius: radius.lg,
-      backgroundColor: c.surface,
-      padding: 20,
-      ...shadowCard,
-    },
-    feuilleTitre: {
-      color: c.ink,
-      fontSize: 16,
-      fontWeight: '800',
-      marginBottom: 12,
-    },
-    promo: { flexDirection: 'row', gap: 10 },
-    champ: {
-      flex: 1,
-      height: 48,
-      borderRadius: 12,
-      borderWidth: 1,
-      borderColor: c.lineStrong,
-      backgroundColor: c.surface,
-      color: c.ink,
-      paddingHorizontal: 14,
-      fontSize: 15,
-    },
-    btnCode: {
-      height: 48,
-      borderRadius: 12,
-      paddingHorizontal: 18,
-      backgroundColor: c.surface,
-      borderWidth: 1,
-      borderColor: c.lineStrong,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    btnCodeTexte: { color: c.ink, fontSize: 15, fontWeight: '700' },
     // Le pied se pose SUR le fond, pas dans le défilement : il porte donc
     // sa propre surface, sinon le texte qui glisse dessous se lirait au
     // travers.

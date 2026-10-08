@@ -14240,6 +14240,51 @@ du menu), `controle.test.tsx` (le compte sur le bouton, 99+ au-delà, rien
 quand c'est conforme), `passestyle.test.tsx` (plus de verre du tout ;
 « Terminer » porte sa pilule).
 
+## Avant le lancement — ce que la revue d'Apple aurait refusé
+
+Relevé du patron : « Trouve des améliorations majeures à apporter pour un
+lancement proche sur l'App Store, on veut que tout soit cohérent, utile et
+fonctionnel. L'utilisateur doit trouver un intérêt à l'achat. »
+
+L'audit a commencé par ce qui fait refuser une app, avant ce qui la fait
+acheter. Quatre défauts sur l'abonnement, dont deux graves :
+
+| Défaut | Pourquoi c'est grave | Ce qui le remplace |
+|---|---|---|
+| Le « −20 % » de bienvenue s'affichait, mais l'achat se faisait au **plein tarif** (aucune offre Apple attachée) | l'utilisateur voyait un prix et en payait un autre : refus quasi certain, et un vrai tort au client | une **offre de lancement Apple**, lue à l'App Store avec l'éligibilité de l'utilisateur ; le popup « Surprise ! » et le prix barré n'apparaissent que si elle existe et s'applique — et c'est l'App Store qui l'applique au paiement |
+| « CARIDI12 » **donnait le Pro sans passer par l'App Store** | interdit par la règle 3.1.1 | « J'ai un code » ouvre **la feuille d'Apple** des codes d'offre (`AppStore.presentOfferCodeRedeemSheet`) ; l'abonnement accordé arrive par l'App Store |
+| Les prix étaient **écrits en dur** (« 4,90 € ») | faux sur un App Store étranger, faux dès qu'on change le tarif | les prix sont **lus à l'App Store** (`Product.displayPrice`), dans la bonne monnaie ; les prix de référence ne tiennent lieu que s'il ne répond pas — et la feuille d'achat d'Apple dit toujours le vrai |
+| La page Pro ne disait **ni le renouvellement automatique, ni comment résilier**, et n'avait **ni conditions ni confidentialité** | règle 3.1.2, cause de refus classique | les mentions en toutes lettres (nom, durée, prix, renouvellement, résiliation 24 h avant) et les deux liens : conditions d'utilisation (contrat standard d'Apple) et confidentialité |
+
+Et deux défauts de fonctionnement :
+
+- **Un abonnement résilié n'était jamais retiré.** L'échéance savait
+  accorder le Pro, pas le reprendre : un abonné qui résiliait le gardait à
+  vie. Le natif dit maintenant « aucun abonnement » explicitement (la
+  réponse se lit hors ligne, c'est une réponse et pas un silence), et le
+  Pro tenu par abonnement s'en va. Un silence (`null`) ne retire rien.
+- **Les transactions hors du bouton n'étaient pas écoutées.** Un
+  renouvellement, un code d'offre utilisé depuis l'App Store, un achat validé
+  plus tard par un parent arrivent par `Transaction.updates` ; Apple demande
+  qu'on les écoute et qu'on les solde. C'est fait dès que le module existe.
+
+Ce qui reste à régler dans App Store Connect est listé dans
+[`docs/fiche-app-store.md`](docs/fiche-app-store.md) (« À régler AVANT la
+soumission ») : l'offre de lancement, un code d'offre pour remplacer
+CARIDI12, l'URL publique de la politique de confidentialité, et les
+étiquettes de confidentialité — qui doivent déclarer les plans déposés sur
+le serveur quand on est connecté.
+
+Bancs : `paywall.test.tsx` (la feuille d'Apple pour les codes, sans champ
+maison ; le prix de l'App Store quand il répond ; les mentions et les deux
+liens ; la surprise si Apple porte une offre, la page Pro tout droit sinon ;
+pas de surprise sans offre ou déjà eue ; « J'en profite » mène au prix
+qu'Apple facturera, sans aucun code maison ; pas de prix barré sans offre
+éligible), `abonnement.test.tsx`, `compte.test.ts` (plus de code maison ; un
+code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
+d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
+`parcourscompte.test.ts`.
+
 ## Prérequis pour tester sur iPhone
 
 1. **Un iPhone avec LiDAR** : iPhone 12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro

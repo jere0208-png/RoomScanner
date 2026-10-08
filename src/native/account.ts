@@ -44,7 +44,10 @@ const natif = () => NativeModules.RoomScanAccount as
         produit?: string;
         expiration?: number;
         reconduit?: boolean;
+        aucun?: boolean;
       } | null>;
+      proProducts?: (productIds: string[]) => Promise<unknown[]>;
+      presentOfferCode?: () => Promise<boolean>;
       webAuth?: (url: string, scheme: string) => Promise<string>;
     }
   | undefined;
@@ -120,6 +123,103 @@ export interface EcheancePro {
 }
 
 /**
+ * La réponse de l'App Store sur l'abonnement : une échéance, ou « AUCUN »
+ * — dit explicitement, hors ligne compris —, ou `null` quand on n'a pas pu
+ * demander (pas de natif, erreur). Seul « aucun » autorise à retirer le Pro.
+ */
+export type EtatAbonnement = EcheancePro | { aucun: true } | null;
+
+/** Une période d'abonnement, telle que l'App Store la décrit. */
+export interface Periode {
+  unite: 'jour' | 'semaine' | 'mois' | 'an';
+  valeur: number;
+}
+
+/** L'offre de lancement d'un abonnement, si App Store Connect en porte une. */
+export interface OffreDeLancement {
+  /** Prix affichable, dans la monnaie de l'App Store (« 3,92 € »). */
+  prix: string;
+  valeur: number;
+  periode: Periode;
+  /** Combien de périodes au prix d'offre. */
+  nombre: number;
+  mode: 'essai' | 'remise' | 'avance' | 'autre';
+  /** Cet utilisateur y a-t-il droit ? Une seule par groupe d'abonnements. */
+  eligible: boolean;
+}
+
+/** Un abonnement, tel que l'App Store le vend. */
+export interface ProduitPro {
+  id: string;
+  prix: string;
+  valeur: number;
+  periode?: Periode;
+  offre?: OffreDeLancement;
+}
+
+const UNITES = ['jour', 'semaine', 'mois', 'an'] as const;
+const periodeDe = (x: unknown): Periode | undefined => {
+  const p = x as { unite?: unknown; valeur?: unknown } | null;
+  if (!p || !UNITES.includes(p.unite as Periode['unite'])) return undefined;
+  return { unite: p.unite as Periode['unite'], valeur: Number(p.valeur) || 1 };
+};
+
+/**
+ * Les abonnements, lus à l'App Store. `[]` quand il ne répond pas (hors
+ * ligne, produits pas encore créés) : la page Pro retombe alors sur ses
+ * prix de référence, et la feuille d'achat d'Apple dira le vrai.
+ */
+export async function produitsPro(productIds: string[]): Promise<ProduitPro[]> {
+  const fn = natif()?.proProducts;
+  if (!fn) return [];
+  try {
+    const brut = await fn(productIds);
+    if (!Array.isArray(brut)) return [];
+    return brut.flatMap((x): ProduitPro[] => {
+      const p = x as Record<string, unknown>;
+      if (typeof p?.id !== 'string' || typeof p.prix !== 'string') return [];
+      const o = p.offre as Record<string, unknown> | undefined;
+      const periodeOffre = o ? periodeDe(o.periode) : undefined;
+      return [
+        {
+          id: p.id,
+          prix: p.prix,
+          valeur: Number(p.valeur) || 0,
+          periode: periodeDe(p.periode),
+          offre:
+            o && typeof o.prix === 'string' && periodeOffre
+              ? {
+                  prix: o.prix,
+                  valeur: Number(o.valeur) || 0,
+                  periode: periodeOffre,
+                  nombre: Number(o.nombre) || 1,
+                  mode: (['essai', 'remise', 'avance'] as const).includes(o.mode as never)
+                    ? (o.mode as OffreDeLancement['mode'])
+                    : 'autre',
+                  eligible: o.eligible === true,
+                }
+              : undefined,
+        },
+      ];
+    });
+  } catch {
+    return [];
+  }
+}
+
+/** La feuille d'Apple pour saisir un code d'offre. `false` si indisponible. */
+export async function ouvrirCodeOffre(): Promise<boolean> {
+  const fn = natif()?.presentOfferCode;
+  if (!fn) return false;
+  try {
+    await fn();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * L'ÉCHÉANCE DE L'ABONNEMENT, DEMANDÉE À L'APP STORE.
  *
  * `null` quand personne ne détient l'abonnement, quand l'App Store ne
@@ -129,11 +229,12 @@ export interface EcheancePro {
  */
 export async function echeanceAbonnement(
   productIds: string[],
-): Promise<EcheancePro | null> {
+): Promise<EtatAbonnement> {
   const fn = natif()?.proExpiry;
   if (!fn) return null;
   try {
     const r = await fn(productIds);
+    if (r?.aucun === true) return { aucun: true };
     if (!r || typeof r.expiration !== 'number' || !isFinite(r.expiration)) {
       return null;
     }

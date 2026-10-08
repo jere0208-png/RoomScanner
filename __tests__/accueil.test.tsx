@@ -438,10 +438,12 @@ describe('l’accueil', () => {
     });
     const t = monter();
     act(() => feuille(t).props.onTracee(3, 2.5));
-    // Rien n'a été créé, et c'est l'OFFRE qui s'ouvre — pas un refus.
+    // Rien n'a été créé, et c'est l'OFFRE qui s'ouvre — pas un refus : la
+    // surprise si Apple porte une offre de lancement, sinon la page Pro.
     expect(useScanStore.getState().rooms).toHaveLength(0);
     expect(useScanStore.getState().screen).not.toBe('result');
-    expect(useAccountStore.getState().surpriseVisible).toBe(true);
+    const st = useAccountStore.getState();
+    expect(st.surpriseVisible || st.paywallVisible).toBe(true);
     /*
       ET L'ON REPOSE LE COMPTEUR — le magasin du compte survit d'une épreuve à
       l'autre, et la maison le sait par cœur. Sans ça, le banc suivant touche
@@ -449,7 +451,7 @@ describe('l’accueil', () => {
       lieu du scan, et accuse un écran qui va très bien.
     */
     act(() => {
-      useAccountStore.setState({ plansUtilises: 0, surpriseVisible: false });
+      useAccountStore.setState({ plansUtilises: 0, surpriseVisible: false, paywallVisible: false });
     });
   });
 
