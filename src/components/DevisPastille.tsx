@@ -31,9 +31,8 @@
  * exception.
  */
 import React from 'react';
-import { FondVerre } from './FondVerre';
 import { StyleSheet, Text, TouchableOpacity } from 'react-native';
-import { themedStyles, useTheme, type Palette } from '../theme';
+import { ombreBouton, themedStyles, useTheme, type Palette } from '../theme';
 
 /**
  * LE PRIX, ÉCRIT COURT.
@@ -83,7 +82,6 @@ export function DevisPastille({
       hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
       style={[styles.bouton, { borderColor: teinte }]}
       onPress={onPress}>
-      <FondVerre rayon={15} />
       <Text style={[styles.prix, { color: teinte }]} numberOfLines={1}>
         {actif ? prixCourt(total) : '—'}
       </Text>
@@ -91,7 +89,7 @@ export function DevisPastille({
   );
 }
 
-const getStyles = themedStyles((_c: Palette) =>
+const getStyles = themedStyles((c: Palette) =>
   StyleSheet.create({
     /*
       LA MÊME HAUTEUR QUE LA PASTILLE DES NORMES, mais une largeur libre :
@@ -105,9 +103,10 @@ const getStyles = themedStyles((_c: Palette) =>
       paddingHorizontal: 10,
       borderRadius: 15,
       borderWidth: 2,
-      backgroundColor: 'transparent',
+      backgroundColor: c.surface,
       alignItems: 'center',
       justifyContent: 'center',
+      ...ombreBouton,
     },
     prix: { fontSize: 13, fontWeight: '600', letterSpacing: -0.2 },
   }),

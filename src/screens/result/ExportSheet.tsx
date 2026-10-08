@@ -5,15 +5,32 @@
  * quatre mille lignes, retoucher la vignette d'une sortie obligeait à
  * traverser tout le plan et ses bandeaux pour y arriver.
  */
-import React from 'react';
-import { Modal, Pressable, Text, TouchableOpacity, View } from 'react-native';
+import React, { useState } from 'react';
+import {
+  Modal,
+  Pressable,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
+  useWindowDimensions,
+} from 'react-native';
 import { useTheme } from '../../theme';
-import { ExportArt, type ExportArtKind } from '../../components/ExportArt';
+import { type ExportArtKind } from '../../components/ExportArt';
+import {
+  ExportFond,
+  FOND_SOMBRE,
+  type MurDuFond,
+} from '../../components/ExportFond';
 import { getStyles } from './styles';
+
+/** La hauteur d'une carte : assez pour que l'image se lise, pas plus. */
+export const HAUTEUR_CARTE = 92;
 
 export function ExportSheet({
   visible,
   modeElec = true,
+  murs = [],
   onClose,
   onDismiss,
   onPdf,
@@ -30,6 +47,11 @@ export function ExportSheet({
    * porte plus que les pièces : surfaces, périmètres, murs à peindre.
    */
   modeElec?: boolean;
+  /**
+   * Les murs du niveau affiché : c'est LEUR plan que les images de fond
+   * dessinent. Vide, un logement d'exemple tient lieu.
+   */
+  murs?: MurDuFond[];
   onClose: () => void;
   /** iOS ne présente pas deux écrans à la fois : le partage attend ici. */
   onDismiss: () => void;
@@ -99,17 +121,18 @@ export function ExportSheet({
       onImage,
     ],
   ];
-  /*
-    SANS LE MODE, CINQ SORTIES — et la cinquième prend la ligne entière.
-
-    Une grille de deux qui finit sur une tuile seule laisse un trou à droite,
-    qu'on lit comme un bouton manquant. La dernière s'étale donc quand le
-    compte est impair : la grille reste pleine, quel que soit le mode.
-  */
   const visibles = modeElec
     ? sorties
     : sorties.filter(([art]) => art !== 'materiel');
-  const impaire = visibles.length % 2 === 1;
+  /*
+    LA LARGEUR DES CARTES. L'image se dessine à la taille de la carte : elle
+    est déduite de l'écran dès la première image (la feuille garde 28 points
+    de marge de part et d'autre, la carte 20 de rembourrage), puis précisée
+    à la pose.
+  */
+  const ecran = useWindowDimensions();
+  const [largeur, setLargeur] = useState(Math.max(200, ecran.width - 96));
+
   return (
     <Modal
       visible={visible}
@@ -124,50 +147,62 @@ export function ExportSheet({
             Un document à remettre, ou un fichier à envoyer.
           </Text>
           {/*
-            DEUX PAR LIGNE — relevé du patron : « refais ce pop-up pour le
-            réduire en faisant des blocs de 2 par ligne ».
+            UNE SORTIE PAR LIGNE, ET CHACUNE MONTRE CE QU'ELLE DONNE.
 
-            Sept sorties en pleine largeur faisaient une feuille plus haute
-            que l'écran : l'image et la présentation ne se trouvaient qu'en
-            défilant, et une sortie qu'on ne voit pas n'existe pas. Le
-            détail de chacune s'est resserré à une ligne au passage — à
-            mi-largeur, la phrase entière rendait la tuile plus haute que
-            la rangée qu'elle remplaçait, et l'on n'aurait rien gagné.
+            Relevé du patron : « revois le menu exporter pour afficher des
+            options dans un listing vertical 1 par 1, avec des images de fond
+            pour une compréhension visuelle ». La grille de deux tenait dans
+            l'écran, mais chaque tuile ne portait qu'une icône de 44 points :
+            on lisait le format, on ne voyait pas le résultat. Chaque carte
+            prend maintenant la largeur, et son fond MONTRE ce qu'on obtient
+            — avec le plan qu'on vient de relever (voir `ExportFond`). La
+            liste défile si l'écran est court : six cartes, c'est plus haut
+            qu'un petit iPhone.
           */}
-          <View style={styles.exportGrille}>
-            {/*
-              SIX FICHIERS, TROIS RANGÉES — et plus de tuile à part.
-
-              La septième sortie était la présentation animée, en pleine
-              largeur parce qu'elle ne produisait pas de fichier. Elle a
-              disparu avec la refonte grand public (voir README) : une visite
-              qui défile toute seule, mur par mur et appareil par appareil,
-              ne parlait qu'aux électriciens. On entre désormais dans le
-              logement soi-même — c'est l'Exploration, sur la barre de la 3D.
-            */}
-            {visibles.map(([art, titre, detail, action], i) => (
-              <TouchableOpacity
-                key={titre}
-                style={[
-                  styles.exportTuile,
-                  impaire && i === visibles.length - 1 && styles.exportTuileLarge,
-                ]}
-                activeOpacity={0.8}
-                /* La tuile se lit d'un nom : le commentaire qui la précède
-                   éloignait son titre du lecteur d'écran. */
-                accessibilityLabel={titre}
-                onPress={action}>
-                {/* La vignette dit CE QU'ON OBTIENT : une feuille cotée,
-                    un volume, un bordereau, une capture. On la reconnaît
-                    sans lire — quatre lignes de texte, non. */}
-                <View style={styles.exportTuileArt}>
-                  <ExportArt kind={art} c={teinte} />
-                </View>
-                <Text style={styles.exportChoiceTitle}>{titre}</Text>
-                <Text style={styles.exportChoiceDetail}>{detail}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          <ScrollView
+            style={{ maxHeight: ecran.height * 0.66 }}
+            contentContainerStyle={styles.exportListe}
+            showsVerticalScrollIndicator={false}
+            onLayout={(e) => {
+              const w = e.nativeEvent.layout.width;
+              if (w > 0 && Math.abs(w - largeur) > 1) setLargeur(w);
+            }}>
+            {visibles.map(([art, titre, detail, action]) => {
+              const sombre = FOND_SOMBRE(art, teinte);
+              return (
+                <TouchableOpacity
+                  key={titre}
+                  style={styles.exportCarte}
+                  activeOpacity={0.85}
+                  accessibilityRole="button"
+                  accessibilityLabel={titre}
+                  accessibilityHint={detail}
+                  onPress={action}>
+                  <View style={styles.exportCarteFond} pointerEvents="none">
+                    <ExportFond
+                      kind={art}
+                      c={teinte}
+                      largeur={largeur}
+                      hauteur={HAUTEUR_CARTE}
+                      murs={murs}
+                    />
+                  </View>
+                  <View style={styles.exportCarteTextes} pointerEvents="none">
+                    <Text
+                      style={[styles.exportCarteTitre, sombre && styles.exportCarteTitreClair]}
+                      numberOfLines={1}>
+                      {titre}
+                    </Text>
+                    <Text
+                      style={[styles.exportCarteDetail, sombre && styles.exportCarteDetailClair]}
+                      numberOfLines={2}>
+                      {detail}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
         </Pressable>
       </Pressable>
     </Modal>

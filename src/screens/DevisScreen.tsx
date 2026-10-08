@@ -46,7 +46,6 @@
  * Il avait raison sur le fond — on ne lit pas un prix en attendant son tour.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FondVerre } from '../components/FondVerre';
 import {
   ScrollView,
   TextInput,
@@ -95,7 +94,7 @@ import { pourChercher } from '../ui/mots';
 import { fr } from './result/format';
 import { haptic } from '../ui/haptic';
 import { useScanStore } from '../store/scanStore';
-import { radius, shadowCard, themedStyles, useTheme, type Palette } from '../theme';
+import { ombreBouton, radius, shadowCard, themedStyles, useTheme, type Palette } from '../theme';
 
 /** Un prix, écrit comme sur un ticket : virgule, et l'euro collé au nombre. */
 const euros = (v: number) => `${fr(v, 2)} €`;
@@ -629,7 +628,6 @@ export function DevisScreen() {
           accessibilityLabel="Retour"
           accessibilityRole="button"
           onPress={() => setScreen('result')}>
-          <FondVerre rayon={19} />
           <BackChevron color={c.ink} />
         </TouchableOpacity>
         <Text style={styles.titrePage}>Devis</Text>
@@ -1118,9 +1116,10 @@ const getStyles = themedStyles((c: Palette) =>
       width: 38,
       height: 38,
       borderRadius: 19,
-      backgroundColor: 'transparent',
+      backgroundColor: c.surface,
       alignItems: 'center',
       justifyContent: 'center',
+      ...ombreBouton,
     },
     titrePage: {
       color: c.ink,

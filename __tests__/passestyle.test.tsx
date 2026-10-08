@@ -10,9 +10,13 @@
  *   1. PLUS DE HALO COLORÉ. Chaque bouton bleu portait une ombre bleue
  *      (`glow`) : l'effet qui date le plus une interface. L'ombre d'action
  *      est neutre, courte, posée (`ombreAction`).
- *   2. LE VERRE SUR CE QUI FLOTTE. Boutons ronds des barres, pastilles du
- *      plan (outils, vues, prix, contrôle) : des disques blancs à ombre
- *      portée devenus verre, comme les barres d'iOS.
+ *   2. DU BLANC NET SUR LES PAGES CLAIRES. Boutons ronds des barres,
+ *      pastilles du plan (outils, vues, prix, contrôle) : un temps passés
+ *      en verre, ils revenaient GRIS et cernés d'un filet crénelé — relevé
+ *      du patron : « je t'ai demandé une modernisation pas un déclin ». Le
+ *      verre n'a rien à flouter sur une page unie. Ils sont blancs pleins,
+ *      avec une ombre neutre à peine posée (`ombreBouton`) ; le verre ne
+ *      reste que dans la visite, au-dessus d'une image.
  *   3. DES GRAISSES D'APPLE. 800 et 900 partout, c'était crier : 700 pour
  *      les grands titres, 600 pour le reste.
  *
@@ -30,7 +34,7 @@ import TestRenderer, { act } from 'react-test-renderer';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import * as theme from '../src/theme';
-import { FondVerre } from '../src/components/FondVerre';
+import { Verre } from '../src/components/Verre';
 import { ToolPill } from '../src/components/ToolPill';
 import { DevisPastille } from '../src/components/DevisPastille';
 import { ControlePastille } from '../src/components/ControlePastille';
@@ -73,42 +77,64 @@ describe('1 — plus de halo coloré', () => {
   });
 });
 
-describe('2 — le verre sur ce qui flotte', () => {
-  it('la pastille d’outil : du verre dessous, plus de fond blanc ; le bleu plein la recouvre quand elle est allumée', () => {
+describe('2 — du blanc net sur les pages claires', () => {
+  const plein = (style: unknown) => {
+    const st = StyleSheet.flatten(style as never) as {
+      backgroundColor?: string;
+      shadowColor?: string;
+      shadowOpacity?: number;
+    };
+    return { fond: st.backgroundColor, ombre: st.shadowColor, force: st.shadowOpacity };
+  };
+
+  it('la pastille d’outil : blanche, ombre neutre et légère, aucun verre', () => {
     const t = monter(<ToolPill icon="ruler" label="Cotes" active={false} onPress={() => {}} />);
-    expect(t.root.findAllByType(FondVerre)).toHaveLength(1);
-    const pille = t.root.findAllByType(TouchableOpacity)[0];
-    const st = StyleSheet.flatten(pille.props.style) as { backgroundColor?: string; shadowOpacity?: number };
-    expect(st.backgroundColor).toBe('transparent');
-    expect(st.shadowOpacity).toBeUndefined();
+    expect(t.root.findAllByType(Verre)).toHaveLength(0);
+    const st = plein(t.root.findAllByType(TouchableOpacity)[0].props.style);
+    expect(st.fond).toBe(theme.light.surface);
+    expect(st.ombre).toBe('#0B0D12');
+    expect(st.force).toBeLessThanOrEqual(0.1);
   });
 
   it('les pastilles de prix et de contrôle aussi, leur contour de sens gardé', () => {
     const prix = monter(<DevisPastille total={1248} onPress={() => {}} />);
-    expect(prix.root.findAllByType(FondVerre)).toHaveLength(1);
+    expect(prix.root.findAllByType(Verre)).toHaveLength(0);
+    expect(plein(prix.root.findAllByType(TouchableOpacity)[0].props.style).fond).toBe(theme.light.surface);
     act(() => arbre?.unmount());
     const ctrl = monter(<ControlePastille alertes={0} commence onPress={() => {}} />);
-    expect(ctrl.root.findAllByType(FondVerre)).toHaveLength(1);
+    expect(ctrl.root.findAllByType(Verre)).toHaveLength(0);
     const b = ctrl.root.findAllByType(TouchableOpacity)[0];
     const st = StyleSheet.flatten(b.props.style) as { borderColor?: string; backgroundColor?: string };
     expect(st.borderColor).toBe(theme.light.green);
-    expect(st.backgroundColor).toBe('transparent');
+    expect(st.backgroundColor).toBe(theme.light.surface);
   });
 
-  it('les boutons ronds des barres : plan, devis, bibliothèque, profil', () => {
-    const compte = (p: string) => (lire(p).match(/<FondVerre rayon=/g) ?? []).length;
-    // Plan : deux retours, deux icônes, la rangée des vues (2D/3D, étage, Explorer).
-    expect(compte('src/screens/ResultScreen.tsx')).toBe(7);
-    expect(compte('src/screens/DevisScreen.tsx')).toBe(1);
-    // Bibliothèque : le retour, et « Nouveau dossier ».
-    expect(compte('src/screens/LibraryScreen.tsx')).toBe(2);
-    expect(compte('src/screens/ProfilScreen.tsx')).toBe(3);
-    // Et leurs styles n'ont plus de fond blanc ni d'ombre.
+  it('les boutons ronds des barres : blancs pleins, plus un seul fond de verre dans l’app', () => {
+    for (const p of [...sources('src'), 'App.tsx']) {
+      expect([p, /FondVerre/.test(lire(p))]).toEqual([p, false]);
+    }
     const styles = lire('src/screens/result/styles.ts');
     for (const nom of ['headerIcon', 'backButton', 'vuePastille']) {
       const a = styles.indexOf(`  ${nom}: {`);
       const corps = styles.slice(a, styles.indexOf('\n  },', a));
-      expect([nom, corps.includes("backgroundColor: 'transparent'"), corps.includes('shadowCard')]).toEqual([nom, true, false]);
+      expect([nom, corps.includes('backgroundColor: c.surface'), corps.includes('...ombreBouton')]).toEqual([nom, true, true]);
+    }
+    // L'ombre d'un bouton est neutre et légère : pas de halo, pas de flou gris.
+    expect(theme.ombreBouton.shadowColor).toBe('#0B0D12');
+    expect(theme.ombreBouton.shadowOpacity).toBeLessThanOrEqual(0.1);
+  });
+
+  it('le verre ne reste que dans la visite, au-dessus d’une image, et sans filet', () => {
+    const avecVerre = [...sources('src'), 'App.tsx'].filter(
+      (p) => p !== 'src/components/Verre.tsx' && /<Verre\b/.test(lire(p)),
+    );
+    expect(avecVerre).toEqual(['src/components/Exploration.tsx']);
+    // Aucun filet sur le verre : c'est lui qui sortait crénelé.
+    const visite = lire('src/components/Exploration.tsx');
+    for (const nom of ['carte', 'terminer', 'repereVerre', 'batonVerre']) {
+      const a = visite.indexOf(`    ${nom}: {`);
+      const corps = visite.slice(a, visite.indexOf('\n    },', a));
+      expect([nom, /borderWidth/.test(corps)]).toEqual([nom, false]);
     }
   });
 });
@@ -154,7 +180,8 @@ describe('la bibliothèque n’a plus de bouton flottant', () => {
     // Il partage sa rangée avec le retour.
     const rangee = nouveau.parent!;
     expect(rangee.findAll((n) => n.props?.accessibilityLabel === 'Retour').length).toBeGreaterThan(0);
-    expect(nouveau.findAllByType(FondVerre)).toHaveLength(1);
+    // Blanc plein, comme le retour : un bouton, pas un trou gris dans la barre.
+    expect(StyleSheet.flatten(nouveau.props.style).backgroundColor).toBe(theme.light.surface);
     expect(lire('src/screens/LibraryScreen.tsx')).not.toMatch(/\bfab\b/);
   });
 });

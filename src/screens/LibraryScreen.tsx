@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { FondVerre } from '../components/FondVerre';
 import { BackChevron } from '../components/BackChevron';
 import { RetourGlisse } from '../components/RetourGlisse';
 import { garderLeTravail } from '../ui/gardeTravail';
@@ -16,14 +15,7 @@ import {
   View,
 } from 'react-native';
 import Svg, { G, Line, Path, Polygon, Rect, Text as SvgText } from 'react-native-svg';
-import {
-  ombreAction,
-  radius,
-  shadowCard,
-  themedStyles,
-  useTheme,
-  type Palette,
-} from '../theme';
+import { ombreBouton, ombreAction, radius, shadowCard, themedStyles, useTheme, type Palette } from '../theme';
 import { bounds, roomParts, totalArea, WALL_T } from '../geometry/floorplan';
 import {
   checkElectrical,
@@ -1084,7 +1076,6 @@ export function LibraryScreen() {
           // rien : le nom s'écrit.
           accessibilityLabel="Retour"
           onPress={() => (dossierOuvert ? setInside(null) : setScreen('home'))}>
-          <FondVerre rayon={19} />
           <BackChevron color={palette.ink} />
         </TouchableOpacity>
         {/*
@@ -1117,7 +1108,6 @@ export function LibraryScreen() {
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityLabel="Nouveau dossier"
             onPress={() => addFolder()}>
-            <FondVerre rayon={19} />
             <Svg width={20} height={20} viewBox="0 0 24 24">
               {['M12 5 v14', 'M5 12 h14'].map((d) => (
                 <Path
@@ -1403,10 +1393,11 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: 'transparent',
+    backgroundColor: c.surface,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
+    ...ombreBouton,
   },
   /* Cinquante-six points de part et d'autre : la largeur du bouton de
      retour et celle de la pastille, marges comprises. Le titre s'y centre,
@@ -1569,12 +1560,14 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     justifyContent: 'center',
   },
   ajouter: {
+    backgroundColor: c.surface,
     width: 38,
     height: 38,
     borderRadius: 19,
     marginLeft: 'auto',
     alignItems: 'center',
     justifyContent: 'center',
+    ...ombreBouton,
   },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
   emptyTitle: { color: c.ink, fontSize: 19, fontWeight: '600', marginTop: 14 },

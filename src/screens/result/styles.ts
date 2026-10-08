@@ -9,7 +9,7 @@
  * tout le monde recoit LE MEME objet, sans un style recalcule.
  */
 import { StyleSheet } from 'react-native';
-import { ombreAction, radius, shadowCard, themedStyles, type Palette } from '../../theme';
+import { ombreBouton, ombreAction, radius, shadowCard, themedStyles, type Palette } from '../../theme';
 import { MARGE_RANGEE, PILL_GAP } from '../../components/ToolPill';
 
 /**
@@ -83,16 +83,18 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     marginLeft: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'transparent',
+    backgroundColor: c.surface,
+    ...ombreBouton,
   },
   backButton: {
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: 'transparent',
+    backgroundColor: c.surface,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
+    ...ombreBouton,
   },
   titleWrap: { flexDirection: 'row', alignItems: 'center', flex: 1 },
   title: {
@@ -182,7 +184,8 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     height: 34,
     paddingHorizontal: 12,
     borderRadius: radius.pill,
-    backgroundColor: 'transparent',
+    backgroundColor: c.surface,
+    ...ombreBouton,
   },
   vuePastilleTexte: { color: c.ink, fontSize: 14, fontWeight: '600' },
   /*
@@ -1018,31 +1021,25 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     rang partagent leur hauteur (c'est le propre d'une ligne de flexbox),
     donc un détail de deux lignes ne décale pas sa voisine.
   */
-  exportGrille: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
-  /** Une demi-largeur, l'écart déduit : deux tiennent côte à côte. */
-  exportTuile: {
-    width: '48%',
+  /* La liste des sorties : une carte par ligne, l'image en fond. */
+  exportListe: { gap: 10, paddingBottom: 2 },
+  exportCarte: {
+    height: 92,
+    borderRadius: 18,
+    overflow: 'hidden',
+    justifyContent: 'center',
     backgroundColor: c.surfaceSunken,
-    borderRadius: radius.md,
-    paddingHorizontal: 13,
-    paddingVertical: 12,
   },
-  /* La dernière tuile d'un compte impair : elle prend la ligne, la grille
-     ne finit pas sur un trou. */
-  exportTuileLarge: { width: '100%' },
-  /** La vignette passe AU-DESSUS du texte : à mi-largeur, il n'y a plus la
-   *  place de la mettre à côté sans hacher le titre en trois lignes. */
-  exportTuileArt: { marginBottom: 7 },
+  exportCarteFond: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
+  /* Le texte tient la moitié gauche, sur le fondu : il se lit toujours. */
+  exportCarteTextes: { paddingHorizontal: 18, width: '58%' },
+  exportCarteTitre: { color: c.ink, fontSize: 17, fontWeight: '600', letterSpacing: -0.2 },
+  exportCarteTitreClair: { color: '#FFFFFF' },
+  exportCarteDetail: { color: c.inkSoft, fontSize: 13, lineHeight: 17, marginTop: 3 },
+  exportCarteDetailClair: { color: 'rgba(255,255,255,0.72)' },
   exportChoiceTexts: { flex: 1 },
   exportChoiceOn: { backgroundColor: c.blueSoft },
-  exportChoiceTitle: { color: c.ink, fontSize: 15.5, fontWeight: '700' },
   exportChoiceTitleOn: { color: c.blue },
-  exportChoiceDetail: {
-    color: c.inkFaint,
-    fontSize: 12.5,
-    lineHeight: 17,
-    marginTop: 2,
-  },
   issueScroll: { maxHeight: 320, marginTop: 4 },
   issueRow: {
     flexDirection: 'row',

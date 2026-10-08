@@ -18,11 +18,10 @@
  * patron est « légère ».
  */
 import React, { useEffect, useRef } from 'react';
-import { FondVerre } from './FondVerre';
 import { Animated, Easing, StyleSheet, TouchableOpacity } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { SOLAIRES } from '../ui/solaires';
-import { themedStyles, useTheme, type Palette } from '../theme';
+import { ombreBouton, themedStyles, useTheme, type Palette } from '../theme';
 
 /** Diamètre du bouton : plus petit que la pastille 2D/3D, comme demandé. */
 const D = 30;
@@ -126,7 +125,6 @@ export function ControlePastille({
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         style={[styles.bouton, { borderColor: teinte }]}
         onPress={onPress}>
-        <FondVerre rayon={D / 2} />
         <Svg width={17} height={17} viewBox="0 0 24 24">
           <Path d={SOLAIRES.bouclier} fill={teinte} fillRule="evenodd" />
         </Svg>
@@ -135,7 +133,7 @@ export function ControlePastille({
   );
 }
 
-const getStyles = themedStyles((_c: Palette) =>
+const getStyles = themedStyles((c: Palette) =>
   StyleSheet.create({
     /* Le cadre fait la taille du bouton : l'onde déborde SANS pousser la
        rangée — elle est absolue, et ne prend aucun toucher. */
@@ -157,9 +155,10 @@ const getStyles = themedStyles((_c: Palette) =>
       height: D,
       borderRadius: D / 2,
       borderWidth: 2,
-      backgroundColor: 'transparent',
+      backgroundColor: c.surface,
       alignItems: 'center',
       justifyContent: 'center',
+      ...ombreBouton,
     },
   }),
 );

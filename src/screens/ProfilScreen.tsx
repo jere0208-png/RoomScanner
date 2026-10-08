@@ -14,7 +14,6 @@
  * est une chose qu'on vient FAIRE ici, jamais une décoration.
  */
 import React, { useState } from 'react';
-import { FondVerre } from '../components/FondVerre';
 import {
   Pressable,
   ScrollView,
@@ -38,7 +37,7 @@ import { ContourVif, TexteVif } from '../components/ContourVif';
 import { SOLAIRES } from '../ui/solaires';
 import { PLANS_GRATUITS, useAccountStore } from '../store/accountStore';
 import { useScanStore, type ThemePref } from '../store/scanStore';
-import { dark, radius, shadowCard, useTheme, type Palette } from '../theme';
+import { ombreBouton, dark, radius, shadowCard, useTheme, type Palette } from '../theme';
 import { ACCENTS } from '../ui/accents';
 import { ICONES } from '../ui/icone';
 import { alerte } from '../ui/alerte';
@@ -154,7 +153,6 @@ export function ProfilScreen() {
             style={s.rondBarre}
             hitSlop={10}
             onPress={() => setScreen('home')}>
-            <FondVerre rayon={20} />
             <BackChevron color={c.ink} />
           </Pressable>
           <Text style={s.titreBarre}>Profil</Text>
@@ -171,7 +169,6 @@ export function ProfilScreen() {
               style={s.rondBarre}
               hitSlop={10}
               onPress={() => setSupport(true)}>
-              <FondVerre rayon={20} />
               <Svg width={20} height={20} viewBox="0 0 24 24">
                 <Path d={SOLAIRES.tchat} fill={c.ink} fillRule="evenodd" />
               </Svg>
@@ -185,7 +182,6 @@ export function ProfilScreen() {
                 style={s.rondBarre}
                 hitSlop={10}
                 onPress={() => setMenu(true)}>
-                <FondVerre rayon={20} />
                 <MoreDots color={c.ink} size={20} />
               </Pressable>
             )}
@@ -582,9 +578,10 @@ const themed = (c: Palette) =>
       width: 40,
       height: 40,
       borderRadius: 20,
-      backgroundColor: 'transparent',
+      backgroundColor: c.surface,
       alignItems: 'center',
       justifyContent: 'center',
+      ...ombreBouton,
     },
     titreBarre: { color: c.ink, fontSize: 17, fontWeight: '700' },
     // Deux ronds jumeaux à droite : le tchat, puis le menu.

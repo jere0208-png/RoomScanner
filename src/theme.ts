@@ -185,6 +185,27 @@ export const shadowLift = {
  * applications posent leurs boutons avec une ombre grise, courte, qui dit
  * « au-dessus » sans rien éclairer.
  */
+/**
+ * L'OMBRE D'UN BOUTON ROND OU D'UNE PASTILLE — à peine posée.
+ *
+ * Relevé du patron, après un passage en verre : « le design des boutons
+ * grisés et le contour de faible qualité qui présente des pixels ne me
+ * plaisent pas ». Le verre d'iOS, posé sur une page claire et unie, n'a
+ * rien à flouter : il rend un disque gris, qui se lit comme un bouton
+ * éteint ; et son filet d'un demi-point, dessiné par React Native en image
+ * redimensionnée, sortait crénelé. Les boutons des barres et les pastilles
+ * du plan reviennent donc au BLANC PLEIN — net, vectoriel — avec cette
+ * ombre-ci : grise, courte, très légère. Le verre ne reste que là où il a
+ * une image à flouter : la visite à la première personne.
+ */
+export const ombreBouton = {
+  shadowColor: '#0B0D12',
+  shadowOpacity: 0.08,
+  shadowRadius: 8,
+  shadowOffset: { width: 0, height: 2 },
+  elevation: 2,
+};
+
 export const ombreAction = {
   shadowColor: '#0B0D12',
   shadowOpacity: 0.12,

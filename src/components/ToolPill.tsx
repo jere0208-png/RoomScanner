@@ -12,7 +12,6 @@
  * savoir de leur dessin.
  */
 import React, { useEffect, useRef } from 'react';
-import { FondVerre } from './FondVerre';
 import {
   Animated,
   Easing,
@@ -23,7 +22,7 @@ import {
 } from 'react-native';
 import Svg, { Path, Rect } from 'react-native-svg';
 import { SOLAIRES } from '../ui/solaires';
-import { themedStyles, useTheme, type Palette } from '../theme';
+import { ombreBouton, themedStyles, useTheme, type Palette } from '../theme';
 
 export type ToolIcon =
   /* La nuit de la maquette : on éteint pour voir les lumières s'allumer. */
@@ -265,7 +264,6 @@ export function ToolPill({
          */
         hitSlop={{ top: 4, bottom: 4, left: 6, right: 6 }}
         onPress={onPress}>
-        <FondVerre rayon={14} />
         {halo && active && (
           <View pointerEvents="none" style={styles.toolHalo}>
             {/* Le contour épouse exactement la pastille : un anneau posé
@@ -333,9 +331,10 @@ const getStyles = themedStyles((c: Palette) =>
     width: PILL_SIZE,
     height: PILL_SIZE,
     borderRadius: 14,
-    backgroundColor: 'transparent',
+    backgroundColor: c.surface,
     alignItems: 'center',
     justifyContent: 'center',
+    ...ombreBouton,
   },
   // Le liseré épouse la pastille, à deux pixels près.
   // Le liséré fait 40 sur une pastille de 38 : il déborde d'UN point de

@@ -14,9 +14,11 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
-import { ExportSheet } from '../src/screens/result/ExportSheet';
+import { ExportSheet, HAUTEUR_CARTE } from '../src/screens/result/ExportSheet';
+import { ExportFond, PLAN_EXEMPLE, TEINTE_DU_FOND, cadrerLePlan } from '../src/components/ExportFond';
+import { dark, light } from '../src/theme';
 
 const appels: string[] = [];
 const monter = () => {
@@ -54,62 +56,89 @@ describe('les sorties offertes', () => {
   });
 
   /*
-    DEUX PAR LIGNE — releve du patron : « refais ce pop-up pour le reduire
-    en faisant des blocs de 2 par ligne ».
+    UNE SORTIE PAR LIGNE, ET CHACUNE MONTRE CE QU ELLE DONNE — releve du
+    patron : « revois le menu exporter pour afficher des options dans un
+    listing vertical 1 par 1, avec des images de fond pour une comprehension
+    visuelle ».
 
-    Sept sorties en pleine largeur, chacune avec sa vignette et deux lignes
-    de texte : la feuille faisait plus haut que l ecran, et les dernieres
-    sorties — l image, la presentation — se trouvaient en defilant. Une
-    sortie qu on ne voit pas n existe pas.
+    La grille de deux tenait dans l ecran, mais chaque tuile ne portait
+    qu une icone : on lisait le format, on ne voyait pas le resultat. Chaque
+    carte prend maintenant la largeur, et son fond le montre — dessine avec
+    le plan qu on vient de relever. La liste defile si l ecran est court.
   */
   const tuiles = (t: TestRenderer.ReactTestRenderer) =>
     t.root
       .findAllByType(TouchableOpacity)
       .filter((n) => typeof n.props.onPress === 'function');
 
-  const plat = (st: unknown) =>
-    (StyleSheet.flatten(st as never) ?? {}) as {
-      width?: number | string;
-      flexWrap?: string;
-    };
-
-  it('range les sorties deux par ligne', () => {
-    const t = monter();
-    const liste = tuiles(t);
-    // La grille passe a la ligne toute seule : c est elle qui met deux
-    // tuiles par rang, pas un decoupage ecrit a la main.
-    let n: TestRenderer.ReactTestInstance | null = liste[0].parent;
-    let grille: TestRenderer.ReactTestInstance | null = null;
-    while (n) {
-      if (plat(n.props?.style).flexWrap === 'wrap') {
-        grille = n;
-        break;
-      }
-      n = n.parent;
-    }
-    expect(grille).not.toBeNull();
-    // Une demi-largeur chacune : deux tiennent cote a cote.
-    const largeurs = liste.map((x) => plat(x.props.style).width);
-    for (const l of largeurs.slice(0, 6)) {
-      expect(typeof l === 'string' && parseFloat(l) <= 50).toBe(true);
-    }
-    act(() => t.unmount());
-  });
-
-  /*
-    PLUS DE TUILE A PART. La septieme sortie etait la presentation animee, en
-    pleine largeur parce qu elle ne produisait pas de fichier. Elle a ete
-    retiree avec la refonte grand public : il reste six fichiers, trois
-    rangees pleines, et aucun trou.
-  */
-  it('ne range plus que des fichiers, six en trois rangees', () => {
+  it('range les sorties en liste, une par ligne, dans une vue qui defile', () => {
     const t = monter();
     const liste = tuiles(t);
     expect(liste).toHaveLength(6);
     for (const x of liste) {
-      const l = plat(x.props.style).width;
-      expect(typeof l === 'string' && parseFloat(l) <= 50).toBe(true);
+      const st = StyleSheet.flatten(x.props.style) as { width?: unknown; height?: number };
+      // Pleine largeur : aucune demi-largeur ne traine.
+      expect(st.width).toBeUndefined();
+      expect(st.height).toBe(HAUTEUR_CARTE);
     }
+    // Toutes dans la meme liste qui defile, sans grille qui passe a la ligne.
+    const defile = t.root.findAllByType(ScrollView);
+    expect(defile).toHaveLength(1);
+    for (const x of liste) {
+      let n: TestRenderer.ReactTestInstance | null = x.parent;
+      let dans = false;
+      while (n) {
+        if (n === defile[0]) dans = true;
+        expect((StyleSheet.flatten(n.props?.style) as { flexWrap?: string } | undefined)?.flexWrap).not.toBe('wrap');
+        n = n.parent;
+      }
+      expect(dans).toBe(true);
+    }
+    act(() => t.unmount());
+  });
+
+  it('chaque carte porte son image de fond, a sa taille, et le plan releve', () => {
+    const murs = [
+      { a: { x: 0, z: 0 }, b: { x: 4, z: 0 } },
+      { a: { x: 4, z: 0 }, b: { x: 4, z: 3 } },
+    ];
+    let t!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      t = TestRenderer.create(
+        <ExportSheet
+          visible
+          murs={murs}
+          onClose={() => {}}
+          onDismiss={() => {}}
+          onPdf={() => {}}
+          onObj={() => {}}
+          onMaterial={() => {}}
+          onCsv={() => {}}
+          onDxf={() => {}}
+          onImage={() => {}}
+        />,
+      );
+    });
+    const fonds = t.root.findAllByType(ExportFond);
+    expect(fonds.map((f) => f.props.kind)).toEqual(['pdf', 'obj', 'materiel', 'csv', 'dxf', 'image']);
+    for (const f of fonds) {
+      expect(f.props.hauteur).toBe(HAUTEUR_CARTE);
+      expect(f.props.largeur).toBeGreaterThan(150);
+      expect(f.props.murs).toBe(murs);
+    }
+    // Le titre se lit en clair sur l ecran noir du DXF, a l encre ailleurs.
+    const titreDxf = t.root.findAllByType(Text).find((n) => n.props.children === 'Plan DXF')!;
+    expect(StyleSheet.flatten(titreDxf.props.style).color).toBe('#FFFFFF');
+    const titrePdf = t.root.findAllByType(Text).find((n) => n.props.children === 'Plan PDF')!;
+    expect(StyleSheet.flatten(titrePdf.props.style).color).toBe(light.ink);
+    act(() => t.unmount());
+  });
+
+  it('chaque carte se dit au lecteur d ecran : son nom, et ce qu elle donne', () => {
+    const t = monter();
+    const pdf = tuiles(t).find((x) => x.props.accessibilityLabel === 'Plan PDF')!;
+    expect(pdf.props.accessibilityRole).toBe('button');
+    expect(pdf.props.accessibilityHint).toMatch(/Cot/);
     act(() => t.unmount());
   });
 
@@ -125,5 +154,38 @@ describe('les sorties offertes', () => {
       expect(appels.filter((a) => a === nom)).toHaveLength(1);
     }
     act(() => t.unmount());
+  });
+});
+
+describe('les images de fond', () => {
+  it('cadrent le plan dans leur zone, sans deborder', () => {
+    const boite = { x: 100, y: 10, w: 120, h: 60 };
+    const segs = cadrerLePlan(
+      [
+        { a: { x: 2, z: 5 }, b: { x: 12, z: 5 } },
+        { a: { x: 12, z: 5 }, b: { x: 12, z: 9 } },
+      ],
+      boite,
+    );
+    for (const s of segs) {
+      for (const [x, y] of [[s.x1, s.y1], [s.x2, s.y2]]) {
+        expect(x).toBeGreaterThanOrEqual(boite.x - 1e-9);
+        expect(x).toBeLessThanOrEqual(boite.x + boite.w + 1e-9);
+        expect(y).toBeGreaterThanOrEqual(boite.y - 1e-9);
+        expect(y).toBeLessThanOrEqual(boite.y + boite.h + 1e-9);
+      }
+    }
+  });
+
+  it('sans murs, un logement d exemple : le dessin ne reste jamais blanc', () => {
+    expect(cadrerLePlan([], { x: 0, y: 0, w: 100, h: 50 })).toHaveLength(PLAN_EXEMPLE.length);
+  });
+
+  it('en sombre, des teintes profondes : le titre clair du theme reste lisible', () => {
+    const { luminance } = require('../src/geometry/appearance') as typeof import('../src/geometry/appearance');
+    for (const k of ['obj', 'materiel', 'csv', 'image'] as const) {
+      expect([k, luminance(TEINTE_DU_FOND(k, light)) > 0.8]).toEqual([k, true]);
+      expect([k, luminance(TEINTE_DU_FOND(k, dark)) < 0.2]).toEqual([k, true]);
+    }
   });
 });

@@ -14092,15 +14092,21 @@ remplacé par `ombreAction` — une ombre grise, courte, posée — et `glow`
 n'existe plus. Huit endroits en profitent d'un coup : les boutons pleins du
 plan, de l'export et de la bibliothèque, la pastille d'outil allumée.
 
-**2. Le verre sur ce qui flotte.** Les boutons ronds des barres (retour,
-icônes du plan, devis, bibliothèque, profil) et les pastilles posées sur le
-plan (outils, 2D/3D, étage, Explorer, prix, contrôle) étaient des disques
-blancs à ombre portée. Ils perdent leur fond et leur ombre, et
-`components/FondVerre.tsx` se glisse dessous : le verre d'iOS au même rayon,
-bordé d'un filet d'un demi-point — sur le fond clair et uni d'une barre, un
-verre sans bord disparaîtrait dans la page. Une pastille allumée se peint
-toujours en bleu plein et le recouvre ; les contours de sens (vert, rouge,
-gris du contrôle ; bleu du prix) restent.
+**2. Du blanc net, pas du verre, sur les pages claires.** Les boutons ronds
+des barres (retour, icônes du plan, devis, bibliothèque, profil) et les
+pastilles posées sur le plan (outils, 2D/3D, étage, Explorer, prix,
+contrôle) sont passés un temps en verre, bordé d'un filet d'un demi-point.
+Relevé du patron, l'IPA en main : « le design des boutons grisés et le
+contour de faible qualité qui présente des pixels ne me plaisent pas. Je
+t'ai demandé une modernisation pas un déclin du design. » Il avait raison,
+pour deux causes précises : le verre d'iOS posé sur une page claire et unie
+n'a rien à flouter — il rend un disque GRIS, qui se lit comme un bouton
+éteint ; et le filet, dessiné par React Native en image redimensionnée
+par-dessus la vue floutée, sortait crénelé. Ils sont revenus au **blanc
+plein** — net, vectoriel — avec `ombreBouton` : une ombre grise, courte,
+très légère (0,08). Le verre ne reste que dans la visite, au-dessus d'une
+image qu'il a vraiment à flouter, et sans filet. Les contours de sens
+(vert, rouge, gris du contrôle ; bleu du prix) restent.
 
 **3. Des graisses d'Apple.** Les écrans criaient en 800 et 900 — plus de
 cinquante styles. Ils passent à **700 pour les grands titres** (20 pt et
@@ -14110,16 +14116,54 @@ se réserve à ce qui ouvre une page.
 **Et un motif d'Android en moins.** La bibliothèque créait ses dossiers par
 un bouton rond flottant en bas à droite — le motif de Material, pas d'iOS.
 « Nouveau dossier » vit maintenant dans la barre, à droite, en disque de
-verre jumeau du retour, le « + » à l'encre de la maison — comme Notes,
+blanc jumeau du retour, le « + » à l'encre de la maison — comme Notes,
 Rappels ou Fichiers. La liste rend les 64 points qu'elle gardait pour le
 dégager.
 
 Banc : `passestyle.test.tsx` (`glow` n'existe plus et aucune source ne
-l'appelle ; les pastilles d'outil, de prix et de contrôle ont leur verre,
-sans fond blanc ni ombre, contours de sens gardés ; le compte des fonds de
-verre écran par écran ; ni 800 ni 900 sur les écrans et feuilles touchés,
-700 gardé au grand titre ; « Nouveau dossier » dans la barre, sans bouton
-flottant).
+l'appelle ; les pastilles d'outil, de prix et de contrôle sont blanches
+pleines, ombre neutre et légère, contours de sens gardés ; plus un seul
+fond de verre hors de la visite, et aucun filet sur celui qui reste ; ni
+800 ni 900 sur les écrans et feuilles touchés, 700 gardé au grand titre ;
+« Nouveau dossier » dans la barre, blanc plein, sans bouton flottant).
+
+### F — Le menu Exporter : une sortie par ligne, et ce qu'elle donne en image
+
+Relevé du patron : « revois le menu exporter pour afficher des options dans
+un listing vertical 1 par 1, avec des images de fond pour une compréhension
+visuelle ».
+
+La grille de deux tenait dans l'écran, mais chaque tuile ne portait qu'une
+icône de 44 points : on lisait le format, on ne voyait pas le résultat.
+Chaque sortie est maintenant **une carte pleine largeur** (92 points), et son
+fond **montre ce qu'on obtient** (`components/ExportFond.tsx`) — dessiné avec
+**le plan qu'on vient de relever** (les murs du niveau affiché) :
+
+| Sortie | L'image de fond |
+|---|---|
+| Plan PDF | une feuille posée de biais : le plan, sa cote, son cartouche |
+| Modèle 3D | les murs du plan levés en volume, les faces qui fuient plus sombres |
+| Liste du matériel | un bordereau : pastilles, articles, prix |
+| Métré CSV | un tableur : l'en-tête vert, les cases remplies |
+| Plan DXF | l'écran noir d'un logiciel de dessin : le plan en calques de couleur, la grille, le curseur |
+| Image | une photo : le cadre blanc, la vue du plan, le filigrane |
+
+Le titre et la phrase tiennent la moitié gauche, sur un fondu à la teinte de
+la carte : ils se lisent toujours. Sans murs relevés, un deux-pièces
+d'exemple tient lieu — le dessin ne reste jamais blanc. **En thème sombre**,
+les cartes prennent des teintes profondes (une carte pastel aurait rendu
+illisible le titre, qui passe à l'encre claire), et les dessins gardent la
+palette claire : une feuille, un tableur, une photo restent blancs la nuit.
+La liste défile si l'écran est court (six cartes dépassent un petit iPhone).
+
+Rendu vérifié en image, en clair et en sombre, avant l'envoi.
+
+Bancs : `exportsheet.test.tsx` (une carte par ligne, pleine largeur, à 92
+points, dans une seule liste qui défile ; chaque carte a son image, à sa
+taille, avec les murs relevés ; le titre blanc sur le DXF, à l'encre
+ailleurs ; nom et indication pour le lecteur d'écran ; le plan cadré sans
+déborder ; le logement d'exemple ; les teintes profondes en sombre), et
+toujours chaque sortie qui appelle la sienne.
 
 ## Prérequis pour tester sur iPhone
 
