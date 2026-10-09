@@ -14285,6 +14285,69 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## « Comment ça marche » devient un film
+
+Relevé du patron : « les tutos de comment ça marche sont mal faits ; fais un
+tutoriel réaliste, sous forme de vidéo en motion design, fluide et rapide,
+avec une coupure entre chaque étape et un bouton « Suivant » qui apparaît, qui
+débloque la suite de la vidéo, étape 2, 3… Pas de design fait rapidement pour
+la présentation des plans. »
+
+`FilmTutoriel.tsx` remplace les trois cartes du premier lancement (et se
+rejoue depuis la tuile « Comment ça marche » de l'accueil). Cinq chapitres,
+24,8 secondes en tout :
+
+1. **Scannez la pièce** — un iPhone, le séjour dans l'écran ; le téléphone
+   balaie (l'image glisse et se resserre) et les arêtes se tracent sur les
+   murs, les baies, puis autour des meubles ; « Balayez lentement » devient
+   « Pièce relevée ».
+2. **Le plan se dessine** — un faisceau bleu balaie la feuille et laisse
+   derrière lui sols, murs à leur épaisseur, fenêtres et portes avec leur
+   débattement ; chaque pièce dit son nom et sa surface ; les cotes
+   d'ensemble s'étirent.
+3. **Aménagez-le** — le catalogue monte, un doigt prend le canapé et le pose
+   dans le séjour, puis tout le mobilier tombe à sa place.
+4. **Visitez-le en 3D** — le logement vide se pose, le mobilier y apparaît,
+   la caméra s'approche ; une vignette montre la même pièce à hauteur d'œil.
+5. **Partagez un dossier pro** — la feuille sort (cartouche, plan meublé, 3D,
+   surfaces par pièce), les formats PDF, DXF et 3D se posent autour, « Dossier
+   envoyé ».
+
+Le lecteur : une piste par chapitre qui se remplit (façon « stories ») ;
+« Suivant » n'existe pas tant que le chapitre joue et APPARAÎT à sa fin (un
+ressort), avec « Revoir » ; un appui sur l'image va droit à la fin du
+chapitre ; entre deux chapitres, une COUPURE (un battement de fond de 110 ms,
+puis le chapitre suivant) ; « Passer » sort à tout moment ; qui a demandé
+moins de mouvement reçoit chaque chapitre déjà joué. Tout bouge sur le fil
+natif : les courbes d'accélération sont échantillonnées (`fenetre`), les
+traits se tracent en échelle depuis leur origine.
+
+LE RÉALISME. Les images (`src/assets/film/`) sont des RENDUS de l'appartement
+d'exemple — ses murs, son parquet, ses meubles à leurs cotes, ombres douces —
+produits avec les modèles de `modeles3d` : la vue intérieure du séjour au
+format d'un écran d'iPhone, et le logement en plan 3D coupé à 1,10 m, vide
+puis meublé. Les arêtes du scan (`data/film.ts`) sont PROJETÉES par la caméra
+même du rendu : chaque trait tombe pile sur son mur, sa baie, son meuble. Le
+plan est tracé avec la géométrie de l'app (contours et surfaces des pièces,
+murs à leur épaisseur et leurs jonctions, symboles des meubles), les portes
+s'ouvrent vers l'intérieur, le carrelage va aux pièces d'eau (au MOT :
+« Bureau » contient « eau »).
+
+Après le film, la question du mode (« Mesurer et aménager » ou « Je suis
+électricien ») se pose toujours à qui n'y a pas répondu ; le dernier bouton
+dit alors « Continuer ». L'ancienne animation (`PlanAnime`, `Quadrillage`) et
+sa sonde sont retirées.
+
+Banc : `premierlancement.test.tsx` — cinq chapitres et cinq pistes ;
+« Suivant » n'agit pas tant que le chapitre joue, puis apparaît et enchaîne
+après la coupure ; un appui sur l'image va à la fin ; « Revoir » rejoue ;
+jusqu'au dernier, qui lance l'app ; « Passer » ; moins de mouvement ; les
+arêtes du scan toutes dans l'image (murs, baies, meubles) ; le plan nomme les
+vraies pièces avec leurs surfaces et sa cote ; carrelage à l'eau, pas au
+bureau ; chaque meuble de l'exemple se pose ; la 3D passe du vide au meublé
+puis à hauteur d'œil ; le dossier porte nom, surface, pièces et formats ; la
+question du mode après le film, ses deux réponses, et « Passer ».
+
 ## Les meubles en vrai : des modèles à leurs cotes, plus des caisses
 
 Relevé du patron : « il faut avoir des modèles réalistes de meubles aux

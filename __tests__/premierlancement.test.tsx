@@ -1,20 +1,24 @@
 /**
- * LE PREMIER LANCEMENT — trois cartes, et rien qu'une fois.
+ * LE FILM « COMMENT ÇA MARCHE » — et la question du mode, après lui.
  *
- * Relevé du patron : « on doit penser utilisateur simple, sans
- * professionnalisme forcément. On doit rendre la chose ludique. »
+ * Relevé du patron : « les tutos de comment ça marche sont mal faits. Fais en
+ * sorte d'avoir un tutoriel réaliste, sous forme de vidéo en motion design,
+ * fluide et rapide, avec une coupure entre chaque étape et un bouton
+ * « Suivant » qui apparaît, qui débloque la suite de la vidéo, étape 2, 3…
+ * Pas de design fait rapidement pour la présentation des plans. »
  *
- * L'application s'ouvrait sur un bouton « Commencer le scan », et rien
- * d'autre. Un électricien sait ce qu'il va y trouver ; quelqu'un qui vient
- * refaire son appartement voit un bouton qui lance sa caméra, et il ne sait ni
- * ce qu'il doit balayer, ni ce qu'il obtiendra. C'est le moment où l'on décide
- * si l'on continue, et c'était le seul écran muet.
- *
- * CE QUE CE BANC TIENT DE PARTICULIER : que les images viennent de la VITRINE.
- * Une capture d'écran refaite à la main vieillirait au premier changement de
- * dessin, et personne ne s'en apercevrait — l'accueil montrerait une
- * application qui n'existe plus. Ici, ce sont les mêmes images que celles qui
- * tournent derrière l'accueil, produites par la même géométrie.
+ * Ce banc tient :
+ *   — le FILM : cinq chapitres, chacun joue sur son horloge ; « Suivant »
+ *     n'agit pas tant que le chapitre joue, APPARAÎT à sa fin, et enchaîne
+ *     après une coupure ; un appui sur l'image va droit à la fin ; « Revoir »
+ *     rejoue ; « Passer » sort à tout moment ; moins de mouvement demandé,
+ *     chaque chapitre est servi déjà joué ;
+ *   — le RÉALISME : les arêtes du scan sont celles du rendu, toutes dans
+ *     l'image ; le plan nomme les VRAIES pièces de l'exemple avec leurs
+ *     surfaces ; l'aménagement pose chacun de ses meubles ; la 3D passe du
+ *     logement vide au logement meublé ;
+ *   — la QUESTION du mode, après le film, seulement si personne n'y a
+ *     répondu.
  */
 const mockDisque = new Map<string, string>();
 jest.mock('@react-native-async-storage/async-storage', () => ({
@@ -28,12 +32,13 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 import React from 'react';
-import { StyleSheet, Text } from 'react-native';
+import { AccessibilityInfo, Image, Text } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import { PremierLancement } from '../src/components/PremierLancement';
-import { PlanAnime } from '../src/components/PlanAnime';
-import { Quadrillage } from '../src/components/Quadrillage';
-import { light } from '../src/theme';
+import { planDuFilm } from '../src/components/FilmTutoriel';
+import { ARETES_DU_SCAN, CHAPITRES } from '../src/data/film';
+import { appartementExemple } from '../src/data/exemple';
+import { useUsage } from '../src/store/usage';
 
 beforeAll(() => jest.useFakeTimers());
 afterAll(() => jest.useRealTimers());
@@ -42,12 +47,18 @@ let arbre: TestRenderer.ReactTestRenderer | null = null;
 afterEach(() => {
   act(() => arbre?.unmount());
   arbre = null;
+  useUsage.setState({ charge: true, modeElec: true, choisi: true });
 });
 
 const monter = (onFini = () => {}) => {
   let t!: TestRenderer.ReactTestRenderer;
   act(() => {
     t = TestRenderer.create(<PremierLancement onFini={onFini} />);
+  });
+  // La scène prend sa taille : c'est elle qui fait jouer le décor.
+  act(() => {
+    const scene = t.root.find((n) => n.props?.accessibilityRole === 'image' && typeof n.props?.onLayout === 'function');
+    scene.props.onLayout({ nativeEvent: { layout: { width: 350, height: 470 } } });
   });
   arbre = t;
   return t;
@@ -56,288 +67,226 @@ const monter = (onFini = () => {}) => {
 const mots = (t: TestRenderer.ReactTestRenderer) =>
   t.root
     .findAllByType(Text)
-    .map((n) => String(n.props.children))
+    .map((n) => (Array.isArray(n.props.children) ? n.props.children.join('') : String(n.props.children)))
     .join(' | ');
 
 const bouton = (t: TestRenderer.ReactTestRenderer, nom: string) =>
   t.root.findAll(
-    (n) =>
-      typeof n.props?.onPress === 'function' &&
-      String(n.props?.accessibilityLabel ?? '').startsWith(nom),
+    (n) => typeof n.props?.onPress === 'function' && String(n.props?.accessibilityLabel ?? '').startsWith(nom),
   )[0];
 
-/**
- * LA HAUTEUR DES PANS DE MUR, à l'écran.
- *
- * ON NE COMPTE PAS LES PANS, ON LES MESURE — et c'est une correction que le
- * banc s'est faite à lui-même. Compter passait à VIDE : les quadrilatères sont
- * dessinés dès la première image, simplement plats. Une épreuve qui les compte
- * dit « il y en a trois » aussi bien avant qu'après la levée, et ne prouve
- * donc rien du tout.
- */
-const hauteurDesPans = (t: TestRenderer.ReactTestRenderer) => {
-  const pans = t.root
-    .findAll((n) => n.props?.testID === 'pan-de-mur')
-    .map((n) => n.props.points)
-    .filter((v): v is string => typeof v === 'string');
-  /*
-    ON MESURE L'ARÊTE VERTICALE, PAS L'EMPRISE DU QUADRILATÈRE.
-
-    Seconde correction que ce banc s'est faite : en axonométrie, un mur COURT
-    à l'écran — sa base seule occupe déjà soixante-dix points de haut. Prendre
-    l'emprise du quadrilatère mesurait donc la longueur du mur, pas sa hauteur,
-    et l'épreuve trouvait un mur "levé" avant qu'il ne commence à monter.
-
-    Les quatre points sont écrits dans l'ordre `base-début, base-fin, haut-fin,
-    haut-début` : la hauteur, c'est l'écart entre le premier et le dernier.
-  */
-  let haut = 0;
-  for (const p of pans) {
-    const pts = p.split(' ').map((c) => Number(c.split(',')[1]));
-    if (pts.length === 4 && Number.isFinite(pts[0]) && Number.isFinite(pts[3])) {
-      haut = Math.max(haut, Math.abs(pts[0] - pts[3]));
-    }
-  }
-  return haut;
+/** « Suivant » est-il là, et actif ? */
+const suivantActif = (t: TestRenderer.ReactTestRenderer, nom = 'Suivant') => {
+  const b = bouton(t, nom);
+  return !!b && b.props.accessibilityState?.disabled === false;
 };
 
-describe('les trois cartes', () => {
-  it('la première dit ce qu’on fait, pas ce que l’app est', () => {
-    /*
-      « Balayez la pièce » est une consigne ; « Scanner 3D LiDAR » est une
-      fiche technique. Celui qui hésite à installer une application ne veut
-      pas savoir ce qu'elle EST, il veut savoir ce qu'il va FAIRE.
-    */
-    expect(mots(monter())).toContain('Balayez la pièce');
+/** Laisse le chapitre en cours jouer jusqu'au bout. */
+const jouer = (rang: number) => {
+  act(() => {
+    jest.advanceTimersByTime(CHAPITRES[rang].duree + 400);
   });
+};
 
-  it('et l’on avance jusqu’au bout', () => {
+/** Appuie « Suivant », et laisse passer la coupure. */
+const enchainer = (t: TestRenderer.ReactTestRenderer, nom = 'Suivant') => {
+  act(() => bouton(t, nom).props.onPress());
+  act(() => {
+    jest.advanceTimersByTime(500);
+  });
+};
+
+describe('un film, chapitre par chapitre', () => {
+  it('cinq chapitres, cinq pistes, et l’on commence par le scan', () => {
     const t = monter();
-    act(() => bouton(t, 'Suivant').props.onPress());
-    // La deuxième page ne pose plus de prises : la présentation est vue par
-    // tout le monde, avant la question du mode (refonte grand public).
-    expect(mots(t)).toContain('Aménagez-la');
-    act(() => bouton(t, 'Suivant').props.onPress());
-    expect(mots(t)).toContain('Entrez dedans');
+    expect(CHAPITRES).toHaveLength(5);
+    expect(t.root.findAll((n) => typeof n.props?.testID === 'string' && n.props.testID.startsWith('piste-') && typeof n.type === 'string')).toHaveLength(5);
+    expect(mots(t)).toContain(CHAPITRES[0].titre);
+    expect(mots(t)).toContain('1 / 5');
   });
 
-  it('la dernière ne dit plus « Suivant » : elle lance', () => {
-    // Un « Suivant » sur la dernière carte laisse croire qu'il en reste une,
-    // et l'on appuie en s'attendant à autre chose que l'accueil.
+  it('« Suivant » n’agit pas tant que le chapitre joue — puis il apparaît', () => {
     const t = monter();
+    expect(suivantActif(t)).toBe(false);
+    // Un appui trop tôt ne fait rien.
     act(() => bouton(t, 'Suivant').props.onPress());
-    act(() => bouton(t, 'Suivant').props.onPress());
-    expect(bouton(t, 'Suivant')).toBeUndefined();
-    expect(mots(t)).toContain('C’est parti');
+    act(() => {
+      jest.advanceTimersByTime(500);
+    });
+    expect(mots(t)).toContain(CHAPITRES[0].titre);
+    jouer(0);
+    expect(suivantActif(t)).toBe(true);
   });
 
-  it('et c’est elle qui referme', () => {
+  it('il débloque la suite, après une coupure', () => {
+    const t = monter();
+    jouer(0);
+    enchainer(t);
+    expect(mots(t)).toContain(CHAPITRES[1].titre);
+    expect(mots(t)).toContain('2 / 5');
+    // Le nouveau chapitre rejoue : « Suivant » s'est retiré.
+    expect(suivantActif(t)).toBe(false);
+  });
+
+  it('un appui sur l’image va droit à la fin du chapitre', () => {
+    const t = monter();
+    const scene = t.root.find((n) => n.props?.accessibilityRole === 'image' && typeof n.props?.onPress === 'function');
+    act(() => scene.props.onPress());
+    expect(suivantActif(t)).toBe(true);
+  });
+
+  it('« Revoir » rejoue l’étape', () => {
+    const t = monter();
+    jouer(0);
+    act(() => bouton(t, 'Revoir').props.onPress());
+    expect(suivantActif(t)).toBe(false);
+    jouer(0);
+    expect(suivantActif(t)).toBe(true);
+    expect(mots(t)).toContain(CHAPITRES[0].titre);
+  });
+
+  it('jusqu’au dernier, qui lance l’app quand on a déjà répondu', () => {
     const fini = jest.fn();
     const t = monter(fini);
-    act(() => bouton(t, 'Suivant').props.onPress());
-    act(() => bouton(t, 'Suivant').props.onPress());
-    act(() => bouton(t, 'Commencer').props.onPress());
-    expect(fini).toHaveBeenCalled();
+    for (let i = 0; i < CHAPITRES.length - 1; i++) {
+      jouer(i);
+      enchainer(t);
+    }
+    expect(mots(t)).toContain(CHAPITRES[4].titre);
+    jouer(4);
+    expect(bouton(t, 'Suivant')).toBeUndefined();
+    act(() => bouton(t, 'C’est parti').props.onPress());
+    expect(fini).toHaveBeenCalledTimes(1);
   });
 
-  it('on peut passer à tout moment', () => {
-    /*
-      TROIS CARTES, C'EST COURT — et c'est justement pour ça qu'on peut les
-      sauter sans rien perdre. Retenir quelqu'un devant une présentation est
-      le meilleur moyen qu'il n'en lise aucune.
-    */
+  it('« Passer » sort à tout moment', () => {
     const fini = jest.fn();
     const t = monter(fini);
     act(() => bouton(t, 'Passer').props.onPress());
-    expect(fini).toHaveBeenCalled();
+    expect(fini).toHaveBeenCalledTimes(1);
   });
 
-  it('trois points, et le vif suit la carte', () => {
+  it('moins de mouvement demandé : chaque chapitre est servi déjà joué', async () => {
+    const espion = jest.spyOn(AccessibilityInfo, 'isReduceMotionEnabled').mockResolvedValue(true);
     const t = monter();
-    /*
-      ON DÉDOUBLONNE PAR TESTID. `findAll` rend le nœud composite ET son
-      nœud d'hôte : chaque point compte double, et l'index du vif se
-      retrouve à deux au lieu de un. Le piège est connu de la maison.
-    */
-    const vif = () => {
-      const vus = new Map<string, boolean>();
-      for (const n of t.root.findAll((x) =>
-        String(x.props?.testID ?? '').startsWith('point-'),
-      )) {
-        const st = (StyleSheet.flatten(n.props.style as never) ?? {}) as Record<
-          string,
-          unknown
-        >;
-        const cle = String(n.props.testID);
-        vus.set(cle, (vus.get(cle) ?? false) || st.backgroundColor === light.blue);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(suivantActif(t)).toBe(true);
+    espion.mockRestore();
+  });
+});
+
+describe('un film réaliste', () => {
+  it('les arêtes du scan sont celles du rendu, et toutes dans l’image', () => {
+    expect(ARETES_DU_SCAN.length).toBeGreaterThan(20);
+    for (const s of ARETES_DU_SCAN) {
+      for (const v of [...s.a, ...s.b]) {
+        expect(v).toBeGreaterThanOrEqual(-0.021);
+        expect(v).toBeLessThanOrEqual(1.021);
       }
-      return [...vus.entries()].findIndex(([, allume]) => allume);
-    };
-    expect(vif()).toBe(0);
-    act(() => bouton(t, 'Suivant').props.onPress());
-    expect(vif()).toBe(1);
-  });
-});
-
-describe('le plan se fait sous les yeux', () => {
-  /*
-    RELEVÉ DU PATRON : « refais les étapes animées pour la première
-    utilisation, sans texte juste : un plan 2D sur la première page, plan
-    équipé sur la page 2 et plan 3D sur la page 3. »
-
-    PREMIER DESSIN — TROIS PHOTOS. Les cartes montraient trois images cuites
-    de la vitrine de l'accueil. C'était juste, gratuit, et FIGÉ : trois
-    captures d'écran dans une présentation, c'est-à-dire ce que fait tout le
-    monde.
-
-    SECOND — LE PLAN SE FAIT. Les murs se tracent, les appareils se posent, le
-    logement se lève. On ne montre plus le résultat, on montre le GESTE — la
-    seule chose qu'une présentation puisse apprendre.
-  */
-  it('trois étapes, et jamais deux fois la même', () => {
+    }
+    // Les murs, les baies ET les meubles sont relevés.
+    for (const sorte of ['sol', 'angle', 'baie', 'meuble']) {
+      expect(ARETES_DU_SCAN.some((s) => s.sorte === sorte)).toBe(true);
+    }
     const t = monter();
-    const etape = () => t.root.findByType(PlanAnime).props.etape;
-    expect(etape()).toBe('plan');
-    act(() => bouton(t, 'Suivant').props.onPress());
-    expect(etape()).toBe('meuble');
-    act(() => bouton(t, 'Suivant').props.onPress());
-    expect(etape()).toBe('volume');
+    expect(t.root.findAll((n) => typeof n.props?.testID === 'string' && n.props.testID.startsWith('arete-') && typeof n.type === 'string')).toHaveLength(ARETES_DU_SCAN.length);
   });
 
-  it('et l’animation se REJOUE quand on revient sur une étape', () => {
-    /*
-      LE DÉTAIL QUI DÉCIDE DE TOUT : sans redémarrage, la deuxième visite
-      d'une étape s'afficherait déjà finie — on aurait payé trois animations
-      pour n'en voir qu'une.
-
-      ON LE MESURE SUR LA LEVÉE, parce que c'est la seule des trois qui soit
-      LISIBLE depuis un banc : elle vit dans l'état du composant, tandis que
-      les deux autres partent sur le fil natif, que l'arbre d'essai n'a pas.
-    */
-    let t!: TestRenderer.ReactTestRenderer;
-    act(() => {
-      t = TestRenderer.create(
-        <PlanAnime etape="volume" width={280} height={220} palette={light} />,
-      );
-    });
-    arbre = t;
-    act(() => {
-      jest.advanceTimersByTime(1200);
-    });
-    expect(hauteurDesPans(t)).toBeGreaterThan(30);
-    // On repasse par une autre étape, puis l'on revient : tout repart de zéro.
-    act(() => {
-      t.update(
-        <PlanAnime etape="plan" width={280} height={220} palette={light} />,
-      );
-    });
-    act(() => {
-      t.update(
-        <PlanAnime etape="volume" width={280} height={220} palette={light} />,
-      );
-    });
-    expect(hauteurDesPans(t)).toBeLessThan(4);
-    act(() => {
-      jest.advanceTimersByTime(1200);
-    });
-    expect(hauteurDesPans(t)).toBeGreaterThan(30);
-  });
-
-  it('le plan à plat porte ses murs, l’aménagé porte en plus ses meubles', () => {
-    /*
-      C'est le MÊME logement aux trois pages, et c'est tout l'intérêt : trois
-      illustrations sans rapport diraient « voici trois fonctions ». Le même
-      plan qui se trace puis se meuble dit « voici ce qui arrive à VOTRE
-      logement ».
-
-      ET PLUS UNE PRISE NULLE PART : la présentation est vue avant la
-      question du mode, par un public qui n'a que faire d'un sigle « PC ».
-    */
+  it('le plan nomme les vraies pièces de l’exemple, avec leurs surfaces', () => {
     const t = monter();
-    const compte = (id: string) =>
-      t.root.findAll((n) => n.props?.testID === id).length;
-    expect(compte('mur-du-plan')).toBeGreaterThan(0);
-    expect(compte('meuble-pose')).toBe(0);
-    act(() => bouton(t, 'Suivant').props.onPress());
-    expect(compte('mur-du-plan')).toBeGreaterThan(0);
-    expect(compte('meuble-pose')).toBeGreaterThan(0);
-    expect(compte('sigle-appareil')).toBe(0);
-  });
-
-  it('et le volume LÈVE des pans, une fois l’horloge passée', () => {
-    /*
-      Des murs qui montent, c'est une géométrie qui change à chaque image :
-      aucun `transform` ne la produit. La levée est donc pilotée depuis
-      JavaScript — et au premier rendu, les pans font zéro de haut. Le banc
-      avance les horloges, comme l'utilisateur attend neuf dixièmes de
-      seconde.
-    */
-    const t = monter();
-    act(() => bouton(t, 'Suivant').props.onPress());
-    act(() => bouton(t, 'Suivant').props.onPress());
-    // À plat au premier instant : les murs n'ont pas encore commencé à monter.
-    expect(hauteurDesPans(t)).toBeLessThan(4);
-    act(() => {
-      jest.advanceTimersByTime(1200);
-    });
-    expect(hauteurDesPans(t)).toBeGreaterThan(30);
-  });
-
-  it('et la troisième carte NOMME les exports qui servent à tous', () => {
-    /*
-      Relevé du patron : « avec explication de possibilité d'exporter ».
-
-      « Exportez votre projet » ne dit rien — tout le monde exporte. Trois
-      extensions, elles, disent à QUI l'on parle : le PDF au client, le DXF à
-      l'architecte, le CSV au comptoir. C'est ce qui fait comprendre en une
-      ligne que le travail SORT de l'application.
-    */
-    const t = monter();
-    act(() => bouton(t, 'Suivant').props.onPress());
-    act(() => bouton(t, 'Suivant').props.onPress());
+    jouer(0);
+    enchainer(t);
+    jouer(1);
     const lus = mots(t);
-    // Le PDF à imprimer, le DXF à l'architecte. Le CSV — la liste du
-    // matériel électrique — n'est plus annoncé à un public qui n'en a pas.
-    for (const f of ['PDF', 'DXF']) expect(lus).toContain(f);
-    expect(lus).not.toContain('matériel');
+    for (const r of appartementExemple().rooms as { name: string }[]) expect(lus).toContain(r.name);
+    expect(lus).toMatch(/\d+,\d m²/);
+    // Les cotes d'ensemble : la largeur et la profondeur du logement.
+    const plan = planDuFilm();
+    expect(lus).toContain(`${plan.lx.toFixed(2).replace('.', ',')} m`);
+    expect(plan.total).toBeGreaterThan(40);
   });
 
-  it('le dessin est posé sur le PAPIER, comme l’accueil', () => {
-    // La présentation et l'application ouvrent sur la même feuille : c'est ce
-    // qui fait de la première une promesse tenue plutôt qu'une affiche.
-    expect(monter().root.findAllByType(Quadrillage).length).toBeGreaterThan(0);
+  it('les sols disent la pièce : carrelage à l’eau, parquet ailleurs — « Bureau » compris', () => {
+    const plan = planDuFilm();
+    const humide = (nom: string) => plan.pieces.find((p) => p.nom === nom)?.humide;
+    expect(humide('Salle d’eau')).toBe(true);
+    // « Bur-eau » contient « eau » : c'est le MOT qui compte.
+    expect(humide('Bureau')).toBe(false);
+    expect(humide('Séjour')).toBe(false);
+  });
+
+  it('chaque porte s’ouvre vers l’intérieur du logement', () => {
+    const plan = planDuFilm();
+    expect(plan.baies.some((b) => b.type === 'door')).toBe(true);
+    // Les murs, à leur épaisseur, ET leurs axes qui bouchent les jonctions.
+    expect(plan.axes).toHaveLength(plan.murs.length);
+  });
+
+  it('l’aménagement pose CHAQUE meuble de l’exemple', () => {
+    const t = monter();
+    jouer(0);
+    enchainer(t);
+    jouer(1);
+    enchainer(t);
+    const poses = t.root.findAll(
+      (n) => typeof n.props?.testID === 'string' && n.props.testID.startsWith('meuble-film-') && typeof n.type === 'string',
+    );
+    expect(poses).toHaveLength(appartementExemple().objects.length);
+  });
+
+  it('la 3D passe du logement vide au logement meublé, puis à hauteur d’œil', () => {
+    const t = monter();
+    for (let i = 0; i < 3; i++) {
+      jouer(i);
+      enchainer(t);
+    }
+    expect(mots(t)).toContain(CHAPITRES[3].titre);
+    // Trois images : le vide, le meublé, et la vue de dedans.
+    expect(t.root.findAllByType(Image).length).toBeGreaterThanOrEqual(3);
+    expect(mots(t)).toContain('À hauteur d’œil');
+  });
+
+  it('le dossier porte le nom, la surface et les pièces — et ses formats', () => {
+    const t = monter();
+    for (let i = 0; i < 4; i++) {
+      jouer(i);
+      enchainer(t);
+    }
+    jouer(4);
+    const lus = mots(t);
+    for (const f of ['PDF', 'DXF', '3D']) expect(lus).toContain(f);
+    expect(lus).toContain('Dossier envoyé');
+    expect(lus).toMatch(/5 pièces · \d+,\d m²/);
   });
 });
 
-describe('la question du mode, en dernière page', () => {
+describe('la question du mode, après le film', () => {
   /*
-    Relevé du patron : « une proposition pour passer à un mode
-    "Électricité" ». Elle se pose ICI la première fois — après avoir vu ce que
-    fait l'application, pas avant : demander « êtes-vous électricien ? » à
-    quelqu'un qui ne sait pas encore ce qu'il a téléchargé, c'est lui faire
-    choisir à l'aveugle.
+    Elle se pose APRÈS le film — après avoir vu ce que fait l'application,
+    pas avant : demander « êtes-vous électricien ? » à quelqu'un qui ne sait
+    pas encore ce qu'il a téléchargé, c'est lui faire choisir à l'aveugle.
   */
-  const { useUsage } = require('../src/store/usage') as typeof import('../src/store/usage');
-  afterEach(() => useUsage.setState({ charge: true, modeElec: true, choisi: true }));
-
   const jusquALaQuestion = (onFini = () => {}) => {
     useUsage.setState({ charge: true, modeElec: false, choisi: false });
     const t = monter(onFini);
-    act(() => bouton(t, 'Suivant').props.onPress());
-    act(() => bouton(t, 'Suivant').props.onPress());
-    // La troisième carte ne lance plus : il reste une page.
-    act(() => bouton(t, 'Suivant').props.onPress());
+    for (let i = 0; i < CHAPITRES.length - 1; i++) {
+      jouer(i);
+      enchainer(t);
+    }
+    jouer(4);
+    // Le dernier chapitre ne lance pas : il reste la question.
+    act(() => bouton(t, 'Continuer').props.onPress());
     return t;
   };
 
-  it('vient après les trois cartes, et porte deux réponses', () => {
+  it('vient après le film, et porte deux réponses', () => {
     const t = jusquALaQuestion();
     const lus = mots(t);
     expect(lus).toContain('À quoi va vous servir EchoPlan ?');
     expect(bouton(t, 'Mesurer et aménager')).toBeDefined();
     expect(bouton(t, 'Je suis électricien')).toBeDefined();
-    // Ses deux cartes tiennent lieu de bouton : pas de « C'est parti » en bas.
-    expect(bouton(t, 'Commencer')).toBeUndefined();
   });
 
   it('« Je suis électricien » allume le mode, et referme', () => {
@@ -350,28 +299,17 @@ describe('la question du mode, en dernière page', () => {
   });
 
   it('« Mesurer et aménager » laisse le grand public, et c’est une RÉPONSE', () => {
-    /*
-      Elle compte comme réponse : la déduction tirée des plans ne pourra plus
-      allumer le mode dans le dos de quelqu'un qui a dit non.
-    */
     const t = jusquALaQuestion();
     act(() => bouton(t, 'Mesurer et aménager').props.onPress());
     expect(useUsage.getState().modeElec).toBe(false);
     expect(useUsage.getState().choisi).toBe(true);
   });
 
-  it('quatre points quand elle se pose, trois quand on a déjà répondu', () => {
-    const points = (t: TestRenderer.ReactTestRenderer) =>
-      t.root.findAll(
-        (n) =>
-          typeof n.props?.testID === 'string' &&
-          n.props.testID.startsWith('point-') &&
-          typeof n.type === 'string',
-      ).length;
-    useUsage.setState({ charge: true, modeElec: false, choisi: false });
-    expect(points(monter())).toBe(4);
-    act(() => arbre?.unmount());
-    useUsage.setState({ charge: true, modeElec: true, choisi: true });
-    expect(points(monter())).toBe(3);
+  it('on peut aussi la passer', () => {
+    const fini = jest.fn();
+    const t = jusquALaQuestion(fini);
+    act(() => bouton(t, 'Passer la question').props.onPress());
+    expect(fini).toHaveBeenCalledTimes(1);
+    expect(useUsage.getState().choisi).toBe(false);
   });
 });
