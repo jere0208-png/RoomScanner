@@ -27,7 +27,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import React from 'react';
-import { Text } from 'react-native';
+import { StyleSheet, Text } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import { lireMessage, lireMessages, type Message } from '../src/net/messages';
 import { MESSAGES_EMBARQUES } from '../src/data/nouveautes';
@@ -261,6 +261,24 @@ describe('l’écran', () => {
     act(() => bouton(t, 'Annuler la suppression').props.onPress());
     expect(useNotifications.getState().supprimes).not.toContain('bienvenue');
     expect(textes(t)).toContain('Bienvenue sur EchoPlan');
+  });
+
+  /*
+    LE BOUTON EST AU BORD DROIT — relevé du patron : « si on s'arrête en
+    cours de glissé, un bloc rouge sans texte s'affiche ». Il était rangé à
+    gauche, sous la ligne, par un étirement qui l'emportait sur
+    l'alignement : la part rouge découverte à droite restait vide.
+  */
+  it('la corbeille se découvre à droite, avec son mot', () => {
+    const t = monter();
+    const b = bouton(t, 'Supprimer Bienvenue sur EchoPlan');
+    const derriere = b.parent!;
+    const st = StyleSheet.flatten(derriere.props.style) as { flexDirection?: string; justifyContent?: string };
+    expect(st.flexDirection).toBe('row');
+    expect(st.justifyContent).toBe('flex-end');
+    expect((StyleSheet.flatten(b.props.style) as { alignSelf?: string }).alignSelf).toBeUndefined();
+    const mots = b.findAll((n) => n.props?.children === 'Supprimer');
+    expect(mots.length).toBeGreaterThan(0);
   });
 
   it('se supprime aussi depuis le message ouvert', () => {

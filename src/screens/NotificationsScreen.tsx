@@ -378,6 +378,8 @@ function LigneGlissante({
   const a = apparenceDuGenre(message.genre, c);
   const x = useRef(new Animated.Value(0)).current;
   const base = useRef(0);
+  /* Le seuil franchi, une fois : la vibration dit « lâcher supprime ». */
+  const auSeuil = useRef(false);
   const vers = (v: number, fin?: () => void) =>
     Animated.spring(x, { toValue: v, useNativeDriver: true, speed: 22, bounciness: 2 }).start(fin);
   const partir = () =>
@@ -388,12 +390,19 @@ function LigneGlissante({
       onMoveShouldSetPanResponder: (_e, g) => Math.abs(g.dx) > 10 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5,
       onPanResponderTerminationRequest: () => false,
       onPanResponderGrant: () => {
+        auSeuil.current = false;
         x.stopAnimation((v) => {
           base.current = v;
         });
       },
       onPanResponderMove: (_e, g) => {
-        x.setValue(Math.min(0, base.current + g.dx));
+        const v = Math.min(0, base.current + g.dx);
+        x.setValue(v);
+        const passe = v < -SEUIL_SUPPRIMER;
+        if (passe !== auSeuil.current) {
+          auSeuil.current = passe;
+          if (passe) haptic('leger');
+        }
       },
       onPanResponderRelease: (_e, g) => {
         const fin = base.current + g.dx;
@@ -407,13 +416,57 @@ function LigneGlissante({
 
   return (
     <View style={[s.ligneCadre, !premier && s.filet]}>
-      {/* Derrière la ligne : la corbeille, qui se découvre au glissé. */}
+      {/*
+        DERRIÈRE LA LIGNE : LA CORBEILLE, COLLÉE AU BORD DROIT.
+
+        Relevé du patron : « si on ne glisse pas totalement sur la gauche,
+        mais qu'on s'arrête en cours, un bloc rouge sans texte s'affiche ».
+        Le bouton existait, mais il était rangé À GAUCHE — sous la ligne —,
+        poussé là par un étirement qui l'emportait sur l'alignement à droite.
+        La rangée le pose maintenant à droite, et son contenu SUIT LE DOIGT,
+        comme dans Mail : il reste centré dans la part rouge découverte, la
+        corbeille dès les premiers points, le mot dès qu'il a la place ; au-
+        delà du bouton, il accompagne le bord de la ligne qui s'en va.
+      */}
       <View style={s.derriere}>
-        <Pressable accessibilityRole="button" accessibilityLabel={`Supprimer ${message.titre}`} style={s.corbeille} onPress={partir}>
-          <Svg width={20} height={20} viewBox="0 0 24 24">
-            <Path d={SOLAIRES.supprimer} fill="#FFFFFF" fillRule="evenodd" />
-          </Svg>
-          <Text style={s.corbeilleMot}>Supprimer</Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Supprimer ${message.titre}`}
+          style={s.corbeille}
+          onPress={partir}>
+          <Animated.View
+            style={[
+              s.corbeilleDedans,
+              {
+                transform: [
+                  {
+                    translateX: x.interpolate({
+                      inputRange: [-600, OUVERT, 0],
+                      // Centre de la part rouge : 46 + x/2 jusqu'au bouton ; au-delà,
+                      // le bord de la ligne qui s'en va : x + 92.
+                      outputRange: [-(600 + OUVERT), 0, -OUVERT / 2],
+                      extrapolate: 'clamp',
+                    }),
+                  },
+                ],
+              },
+            ]}>
+            <Animated.View
+              style={{
+                opacity: x.interpolate({ inputRange: [-34, -14], outputRange: [1, 0], extrapolate: 'clamp' }),
+              }}>
+              <Svg width={20} height={20} viewBox="0 0 24 24">
+                <Path d={SOLAIRES.supprimer} fill="#FFFFFF" fillRule="evenodd" />
+              </Svg>
+            </Animated.View>
+            <Animated.Text
+              style={[
+                s.corbeilleMot,
+                { opacity: x.interpolate({ inputRange: [-80, -62], outputRange: [1, 0], extrapolate: 'clamp' }) },
+              ]}>
+              Supprimer
+            </Animated.Text>
+          </Animated.View>
         </Pressable>
       </View>
       <Animated.View style={[s.devant, { transform: [{ translateX: x }] }]} {...pan.panHandlers}>
@@ -505,13 +558,17 @@ const getStyles = themedStyles((c: Palette) =>
     bloc: { backgroundColor: c.surface, borderRadius: 20, overflow: 'hidden', ...ombreBouton },
     ligneCadre: { position: 'relative' },
     filet: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.line },
+    /* Une RANGÉE qui pousse à droite : l'étirement se fait alors en hauteur,
+       et le bouton reste au bord droit, sur toute la hauteur de la ligne. */
     derriere: {
       position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
       backgroundColor: c.danger,
-      alignItems: 'flex-end',
-      justifyContent: 'center',
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      alignItems: 'stretch',
     },
-    corbeille: { width: -OUVERT, alignItems: 'center', justifyContent: 'center', gap: 3, alignSelf: 'stretch' },
+    corbeille: { width: -OUVERT, alignItems: 'center', justifyContent: 'center' },
+    corbeilleDedans: { alignItems: 'center', justifyContent: 'center', gap: 3 },
     corbeilleMot: { color: '#FFFFFF', fontSize: 12, fontWeight: '600' },
     devant: { backgroundColor: c.surface },
     ligne: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingVertical: 14, paddingHorizontal: 14 },

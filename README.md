@@ -14331,6 +14331,11 @@ murs s'éclaire quand l'onde l'atteint — le mur est détecté —, et tout ret
   titre en gras tant que c'est neuf, « Tout lire », glissé vers la gauche pour
   supprimer (ou la corbeille découverte), « Annuler » pendant quatre secondes,
   tirer pour rafraîchir. Un appui ouvre le message en entier, avec son bouton.
+  La corbeille est collée au BORD DROIT (une rangée qui pousse à droite — un
+  étirement l'avait rangée à gauche, sous la ligne, et un glissé arrêté en
+  chemin découvrait un bloc rouge vide) ; son contenu suit le doigt comme dans
+  Mail, centré dans la part rouge découverte, et une vibration marque le
+  seuil au-delà duquel lâcher supprime.
 - *La pastille* — rouge, sur la cloche de l'accueil : le nombre de non lus,
   « 9+ » au-delà ; une notification supprimée ne compte plus.
 
