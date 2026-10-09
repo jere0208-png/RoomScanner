@@ -21,7 +21,11 @@ import Svg, { Line, Rect, Text as SvgText } from 'react-native-svg';
 import { SheetShell } from './Sheet';
 import {
   EPAISSEURS,
+  coupeParDefaut,
+  dimensionsDeCoupe,
   depuisParDefaut,
+  type RoomPart,
+  type SaisieCoupe,
   epaisseurDe,
   type PoseDeMur,
   type SaisieMurNeuf,
@@ -33,6 +37,12 @@ import { radius, themedStyles, useTheme, type Palette } from '../theme';
 export const lireCm = (t: string): number | null => {
   const v = parseFloat(t.replace(',', '.').replace(/\s/g, ''));
   return isFinite(v) && v > 0 ? v / 100 : null;
+};
+
+/** Comme `lireCm`, mais zéro est une cote : « collé au mur ». */
+export const lireCote = (t: string): number | null => {
+  const v = parseFloat(t.replace(',', '.').replace(/\s/g, ''));
+  return isFinite(v) && v >= 0 ? v / 100 : null;
 };
 
 /** 0.835 m → « 83,5 ». */
@@ -370,3 +380,165 @@ const getStyles = themedStyles((c: Palette) =>
     inactif: { opacity: 0.4 },
   }),
 );
+
+/**
+ * COUPER UNE PIÈCE, À LA COTE ET À L'ÉPAISSEUR QU'ON DONNE.
+ *
+ * Relevé du patron : « fais pareil pour la sélection d'une pièce ».
+ * « Scinder » posait une cloison au milieu, sans rien demander. On dit
+ * maintenant dans quel sens, à combien du mur — au nu, comme au mètre — et
+ * de quelle épaisseur ; la cloison se dessine derrière la feuille à chaque
+ * chiffre tapé.
+ */
+export function CoupeSheet({
+  part,
+  onClose,
+  onCouper,
+  onApercu,
+}: {
+  part: RoomPart | null;
+  onClose: () => void;
+  onCouper: (saisie: SaisieCoupe) => void;
+  onApercu?: (saisie: SaisieCoupe | null) => void;
+}) {
+  const c = useTheme();
+  const s = getStyles(c);
+  const [sens, setSens] = useState<SaisieCoupe['sens']>('longueur');
+  const [depuis, setDepuis] = useState('');
+  const [depuisAutre, setDepuisAutre] = useState(false);
+  const [epaisseur, setEpaisseur] = useState(0.07);
+  const attente = useRef<null | (() => void)>(null);
+  const dims = part ? dimensionsDeCoupe(part) : null;
+
+  // À chaque pièce ouverte : la coupe au milieu de la longueur, en cloison.
+  useEffect(() => {
+    if (!part) return;
+    setSens('longueur');
+    setDepuisAutre(false);
+    setEpaisseur(0.07);
+    setDepuis(ecrireCm(coupeParDefaut(part, 'longueur', 0.07)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [part?.roomId]);
+
+  const D = lireCote(depuis);
+  const pret = D !== null;
+  const saisie: SaisieCoupe | null = pret ? { sens, depuis: D!, epaisseur, depuisAutre } : null;
+
+  useEffect(() => {
+    onApercu?.(part ? saisie : null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [part?.roomId, sens, D, epaisseur, depuisAutre]);
+
+  const choisirSens = (v: SaisieCoupe['sens']) => {
+    setSens(v);
+    if (part) setDepuis(ecrireCm(coupeParDefaut(part, v, epaisseur)));
+  };
+  const valider = () => {
+    if (!saisie) return;
+    const x = saisie;
+    attente.current = () => onCouper(x);
+    onClose();
+  };
+  const m = (v?: number) => (v === undefined ? '' : `${String(Math.round(v * 100) / 100).replace('.', ',')} m`);
+
+  return (
+    <SheetShell
+      visible={!!part}
+      onClose={onClose}
+      onClosed={() => {
+        const suite = attente.current;
+        attente.current = null;
+        suite?.();
+      }}>
+      <Text style={s.titre}>Couper la pièce</Text>
+      <Text style={s.sous}>Une cloison d’un mur à l’autre, à la cote du mètre.</Text>
+
+      <View style={s.pastilles}>
+        {(['longueur', 'largeur'] as const).map((v) => {
+          const choisi = sens === v;
+          return (
+            <Pressable
+              key={v}
+              accessibilityRole="button"
+              accessibilityLabel={v === 'longueur' ? 'Couper la longueur' : 'Couper la largeur'}
+              accessibilityState={{ selected: choisi }}
+              style={({ pressed }) => [s.pastille, choisi && s.pastilleChoisie, pressed && s.presse]}
+              onPress={() => choisirSens(v)}>
+              <Text style={[s.pastilleMot, choisi && s.pastilleMotChoisi]}>
+                {v === 'longueur' ? 'Dans la longueur' : 'Dans la largeur'}
+              </Text>
+              <Text style={[s.pastilleCote, choisi && s.pastilleMotChoisi]}>
+                {m(v === 'longueur' ? dims?.longueur : dims?.largeur)}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <View style={s.ligne}>
+        <Text style={s.etiquette}>Depuis le mur</Text>
+        <View style={s.champ}>
+          <TextInput
+            testID="champ-coupe"
+            accessibilityLabel="Distance depuis le mur, en centimètres"
+            style={s.saisie}
+            value={depuis}
+            onChangeText={setDepuis}
+            keyboardType="decimal-pad"
+            selectTextOnFocus
+            returnKeyType="done"
+            onSubmitEditing={valider}
+          />
+          <Text style={s.unite}>cm</Text>
+        </View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Mesurer depuis le mur d’en face"
+          hitSlop={6}
+          style={({ pressed }) => [s.autreCoin, pressed && s.presse]}
+          onPress={() => setDepuisAutre((x) => !x)}>
+          <Text style={s.autreCoinTexte}>Mur d’en face</Text>
+        </Pressable>
+      </View>
+
+      <Text style={[s.etiquette, s.etiquetteSeule]}>Épaisseur de la cloison</Text>
+      <View style={s.pastilles}>
+        {EPAISSEURS.map((ep) => {
+          const choisie = Math.abs(ep.m - epaisseur) < 1e-6;
+          return (
+            <Pressable
+              key={ep.mot}
+              accessibilityRole="button"
+              accessibilityLabel={`Épaisseur ${ep.mot}`}
+              accessibilityState={{ selected: choisie }}
+              style={({ pressed }) => [s.pastille, choisie && s.pastilleChoisie, pressed && s.presse]}
+              onPress={() => setEpaisseur(ep.m)}>
+              <Text style={[s.pastilleMot, choisie && s.pastilleMotChoisi]}>{ep.mot}</Text>
+              <Text style={[s.pastilleCote, choisie && s.pastilleMotChoisi]}>
+                {`${Math.round(ep.m * 100)} cm`}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <Text style={s.note}>
+        Du nu du mur au nu de la cloison. Les deux parties deviennent deux pièces.
+      </Text>
+
+      <View style={s.actions}>
+        <Pressable style={s.secondaire} onPress={onClose}>
+          <Text style={s.secondaireTexte}>Annuler</Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Couper"
+          accessibilityState={{ disabled: !pret }}
+          style={[s.principal, !pret && s.inactif]}
+          onPress={valider}>
+          <Text style={s.principalTexte}>Couper</Text>
+        </Pressable>
+      </View>
+    </SheetShell>
+  );
+}

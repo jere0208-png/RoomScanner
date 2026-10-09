@@ -14285,6 +14285,41 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## La pièce et le meuble aux cotes du mètre
+
+Relevé du patron, après le mur : « fais pareil pour la sélection d'une pièce
+et des meubles ».
+
+**La pièce — « Scinder » devient « Couper »**. La cloison tombait au milieu
+de la pièce, sans rien demander, à l'épaisseur de tous. La feuille « Couper
+la pièce » (`CoupeSheet`) demande le sens (dans la longueur / dans la largeur,
+avec la dimension au nu de chacune), la cote du nu du mur au nu de la cloison
+(« Mur d'en face » pour compter de l'autre côté) et l'épaisseur ; la cloison
+se dessine sur le plan à chaque chiffre. `coupeDePiece` passe par le pôle de
+la pièce : dans une pièce en L, elle coupe la branche où l'on est.
+`couperPiece` pose la cloison à son épaisseur et redétecte les pièces. La coupe
+au milieu (`splitRoom`) ne reste que pour une pièce sans contour fermé.
+
+**Le meuble — « Placer » et « Dupliquer »** dans son bandeau.
+
+- *Placer* : les quatre bords du meuble avec leur écart au nu du mur d'en
+  face, nommés comme on les voit à l'écran (« À gauche · 42 cm du mur »),
+  même plan tourné. On en touche un, on tape la cote — zéro, c'est contre le
+  mur. Les flèches d'un centimètre restent pour l'ajustement à l'œil.
+  (`ecartsAuxMurs`, `centrePourEcart`.)
+- *Dupliquer* : la copie se pose à côté, du côté où il y a la place, puis se
+  range comme au lâcher. Un seul « Annuler » la défait (même clé d'historique
+  que son rangement).
+
+**L'épaisseur de chaque mur compte aussi pour les meubles** : la collision
+(`pushOutOfWalls`), le jour qu'on referme, l'aimant au nu, la bande qui
+signale un meuble dans la maçonnerie (`poserLibre`), les cotes au mur
+(`castToWall`) et les faces d'appareillage prennent l'épaisseur du mur
+concerné. Contre une cloison de 7 cm, un meuble vient au nu de la cloison, et
+non à 3,5 cm de lui.
+
+Banc : `piecemeublecote`.
+
 ## Le mur neuf aux cotes du mètre, et l'épaisseur de chaque mur
 
 Relevé du patron : « l'ajout d'un mur n'est pas opérationnel, on doit le

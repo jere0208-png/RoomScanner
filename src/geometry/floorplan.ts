@@ -665,9 +665,9 @@ export function pushOutOfWalls(
         const versDepart =
           (depuis.x - w.a.x) * n.x + (depuis.z - w.a.z) * n.z;
         sens =
-          Math.abs(versIci) > WALL_T / 2
+          Math.abs(versIci) > epaisseurDe(w) / 2
             ? versIci
-            : Math.abs(versDepart) > WALL_T / 2
+            : Math.abs(versDepart) > epaisseurDe(w) / 2
               ? versDepart
               : versAncre;
       }
@@ -679,7 +679,9 @@ export function pushOutOfWalls(
       const demi =
         Math.abs((cos * n.x + sin * n.z) * (box.width / 2)) +
         Math.abs((-sin * n.x + cos * n.z) * (box.depth / 2));
-      const mini = demi + WALL_T / 2;
+      // Le nu de CE mur : une cloison de sept laisse le meuble plus près
+      // de son axe qu'un porteur de vingt.
+      const mini = demi + epaisseurDe(w) / 2;
       // Distance signée du centre au nu, comptée vers l'intérieur.
       const d = (p.x - w.a.x) * n.x + (p.z - w.a.z) * n.z;
       // Hors du segment : ce mur ne barre pas la route ici.
@@ -1059,7 +1061,7 @@ export function alignToFit(
         Math.abs((-sin * n.x + cos * n.z) * (d / 2));
       const dist = Math.abs((p.x - wall.a.x) * n.x + (p.z - wall.a.z) * n.z);
       // Un centimètre de tolérance : c'est le jeu que laisse la poussée.
-      if (dist < demi + WALL_T / 2 - 0.01) return false;
+      if (dist < demi + epaisseurDe(wall) / 2 - 0.01) return false;
     }
     return true;
   };
@@ -1169,9 +1171,9 @@ export function hugWall(
         ? (depuis.x - w.a.x) * n.x + (depuis.z - w.a.z) * n.z
         : 0;
       const sens =
-        Math.abs(versIci) > WALL_T / 2
+        Math.abs(versIci) > epaisseurDe(w) / 2
           ? versIci
-          : depuis && Math.abs(versDepart) > WALL_T / 2
+          : depuis && Math.abs(versDepart) > epaisseurDe(w) / 2
             ? versDepart
             : (inside.x - mid.x) * n.x + (inside.z - mid.z) * n.z;
       if (sens < 0) {
@@ -1188,7 +1190,7 @@ export function hugWall(
         Math.abs((cos * n.x + sin * n.z) * (box.width / 2)) +
         Math.abs((-sin * n.x + cos * n.z) * (box.depth / 2));
       const jeu =
-        (p.x - w.a.x) * n.x + (p.z - w.a.z) * n.z - demi - WALL_T / 2;
+        (p.x - w.a.x) * n.x + (p.z - w.a.z) * n.z - demi - epaisseurDe(w) / 2;
       if (jeu <= 1e-4 || jeu > JOUR) continue;
       if (!mieux || jeu < mieux.jeu) mieux = { n, jeu };
     }
@@ -1291,8 +1293,8 @@ export function snapSideToWalls(
     // du bon côté. C'est cette face-là qu'on affleure, pas l'axe.
     const versBord = (bord.x - w.a.x) * nw.x + (bord.z - w.a.z) * nw.z;
     const face = {
-      x: w.a.x + nw.x * (versBord >= 0 ? WALL_T / 2 : -WALL_T / 2),
-      z: w.a.z + nw.z * (versBord >= 0 ? WALL_T / 2 : -WALL_T / 2),
+      x: w.a.x + nw.x * (versBord >= 0 ? epaisseurDe(w) / 2 : -epaisseurDe(w) / 2),
+      z: w.a.z + nw.z * (versBord >= 0 ? epaisseurDe(w) / 2 : -epaisseurDe(w) / 2),
     };
     // Écart du côté au nu, mesuré le long de la normale du côté.
     const long = (face.x - bord.x) * n.x + (face.z - bord.z) * n.z;
@@ -3746,6 +3748,7 @@ export function snapToNeighbours(
  */
 export function castToWall(from: Pt, dir: Pt, walls: WallSeg[]): number | null {
   let best = Infinity;
+  let touche: WallSeg | null = null;
   for (const w of walls) {
     const ex = w.b.x - w.a.x;
     const ez = w.b.z - w.a.z;
@@ -3753,11 +3756,186 @@ export function castToWall(from: Pt, dir: Pt, walls: WallSeg[]): number | null {
     if (Math.abs(den) < 1e-9) continue;
     const t = ((w.a.x - from.x) * ez - (w.a.z - from.z) * ex) / den;
     const u = ((w.a.x - from.x) * dir.z - (w.a.z - from.z) * dir.x) / den;
-    if (t > 1e-3 && u >= -1e-6 && u <= 1 + 1e-6 && t < best) best = t;
+    if (t > 1e-3 && u >= -1e-6 && u <= 1 + 1e-6 && t < best) {
+      best = t;
+      touche = w;
+    }
   }
   // Jusqu'au NU du mur, pas jusqu'à son axe : c'est la cote qu'on relève
-  // sur place, mètre contre la plinthe.
-  return isFinite(best) ? Math.max(0, best - WALL_T / 2) : null;
+  // sur place, mètre contre la plinthe — au nu de CE mur, à son épaisseur.
+  return isFinite(best) && touche
+    ? Math.max(0, best - epaisseurDe(touche) / 2)
+    : null;
+}
+
+/* ====================================================================== */
+/*  COUPER UNE PIÈCE, PLACER UN MEUBLE — AUX COTES DU MÈTRE              */
+/* ====================================================================== */
+
+/** Ce qu'on a mesuré pour recouper une pièce d'une cloison (m). */
+export interface SaisieCoupe {
+  /**
+   * `longueur` : la cloison coupe la plus grande dimension (un dressing au
+   * fond d'une chambre) ; `largeur` : elle court dans la longueur et coupe
+   * la plus petite (un couloir pris le long d'un séjour).
+   */
+  sens: 'longueur' | 'largeur';
+  /** Du nu du mur de départ au nu de la cloison. */
+  depuis: number;
+  epaisseur: number;
+  /** Compter depuis le mur d'en face. */
+  depuisAutre?: boolean;
+}
+
+/** Le repère d'une pièce : son grand axe, son petit, et leurs étendues. */
+function repereDePiece(pts: Pt[]) {
+  const { angle } = roomExtent(pts);
+  const u = { x: Math.cos(angle), z: Math.sin(angle) };
+  const v = { x: -u.z, z: u.x };
+  const etendue = (d: Pt) => {
+    const ps = pts.map((p) => p.x * d.x + p.z * d.z);
+    return { min: Math.min(...ps), max: Math.max(...ps) };
+  };
+  const eu = etendue(u);
+  const ev = etendue(v);
+  const uLong = eu.max - eu.min >= ev.max - ev.min;
+  return uLong
+    ? { long: u, court: v, eLong: eu, eCourt: ev }
+    : { long: v, court: u, eLong: ev, eCourt: eu };
+}
+
+/** Le premier bord du contour atteint depuis `de`, dans la direction `d`. */
+function rayonContour(de: Pt, d: Pt, poly: Pt[]): Pt | null {
+  let best = Infinity;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const p = poly[j];
+    const q = poly[i];
+    const ex = q.x - p.x;
+    const ez = q.z - p.z;
+    const den = d.x * ez - d.z * ex;
+    if (Math.abs(den) < 1e-9) continue;
+    const t = ((p.x - de.x) * ez - (p.z - de.z) * ex) / den;
+    const u = ((p.x - de.x) * d.z - (p.z - de.z) * d.x) / den;
+    if (t > 1e-4 && u >= -1e-6 && u <= 1 + 1e-6 && t < best) best = t;
+  }
+  return isFinite(best) ? { x: de.x + d.x * best, z: de.z + d.z * best } : null;
+}
+
+/**
+ * Le mur qui ferme la pièce à cette extrémité de l'axe : c'est de SON nu
+ * qu'on mesure. Absent, l'épaisseur de tous.
+ */
+function demiDuBord(walls: WallSeg[], axe: Pt, borne: number): number {
+  const w = walls.find(
+    (x) =>
+      x.type === 'wall' &&
+      Math.abs(x.a.x * axe.x + x.a.z * axe.z - borne) < 0.08 &&
+      Math.abs(x.b.x * axe.x + x.b.z * axe.z - borne) < 0.08,
+  );
+  return (w ? epaisseurDe(w) : WALL_T) / 2;
+}
+
+/** Les deux dimensions d'une pièce, au nu, dans le sens où on la coupe. */
+export function dimensionsDeCoupe(part: RoomPart): { longueur: number; largeur: number } | null {
+  const pts = part.surface?.pts;
+  if (!pts || pts.length < 3) return null;
+  const r = repereDePiece(pts);
+  const nu = (axe: Pt, e: { min: number; max: number }) =>
+    e.max - e.min - demiDuBord(part.walls, axe, e.min) - demiDuBord(part.walls, axe, e.max);
+  return { longueur: nu(r.long, r.eLong), largeur: nu(r.court, r.eCourt) };
+}
+
+/**
+ * LA COUPE D'UNE PIÈCE, À LA COTE QU'ON A PRISE.
+ *
+ * Relevé du patron, après le mur : « fais pareil pour la sélection d'une
+ * pièce ». « Scinder » coupait la pièce en son milieu, sans rien demander :
+ * la cloison d'un dressing ne tombe jamais au milieu de la chambre, et elle
+ * n'a pas l'épaisseur d'un mur porteur. On donne maintenant la cote, du nu
+ * du mur au nu de la cloison, et son épaisseur — comme pour le mur neuf.
+ *
+ * La cloison va d'un bord du contour à l'autre, en passant par le pôle de
+ * la pièce : dans une pièce en L, elle coupe la branche où l'on se trouve,
+ * pas le vide.
+ */
+export function coupeDePiece(
+  part: RoomPart,
+  s: SaisieCoupe,
+): { a: Pt; b: Pt } | null {
+  const pts = part.surface?.pts;
+  if (!pts || pts.length < 3 || !(s.epaisseur > 0) || !(s.depuis >= 0)) return null;
+  const r = repereDePiece(pts);
+  const axe = s.sens === 'longueur' ? r.long : r.court;
+  const e = s.sens === 'longueur' ? r.eLong : r.eCourt;
+  const borne = s.depuisAutre ? e.max : e.min;
+  const sens = s.depuisAutre ? -1 : 1;
+  let pos = borne + sens * (demiDuBord(part.walls, axe, borne) + s.depuis + s.epaisseur / 2);
+  // La cloison reste DANS la pièce : au-delà, ce n'est plus une coupe.
+  pos = Math.min(Math.max(pos, e.min + s.epaisseur / 2 + 0.02), e.max - s.epaisseur / 2 - 0.02);
+  const pole = part.labelAt;
+  const decale = pos - (pole.x * axe.x + pole.z * axe.z);
+  const P = { x: pole.x + axe.x * decale, z: pole.z + axe.z * decale };
+  const travers = { x: -axe.z, z: axe.x };
+  const a = rayonContour(P, travers, pts);
+  const b = rayonContour(P, { x: -travers.x, z: -travers.z }, pts);
+  if (!a || !b || Math.hypot(a.x - b.x, a.z - b.z) < 0.2) return null;
+  return { a, b };
+}
+
+/** La cote proposée d'abord : la coupe au milieu, au nu. */
+export function coupeParDefaut(
+  part: RoomPart,
+  sens: SaisieCoupe['sens'],
+  epaisseur: number,
+): number {
+  const d = dimensionsDeCoupe(part);
+  if (!d) return 0;
+  const v = (sens === 'longueur' ? d.longueur : d.largeur) / 2 - epaisseur / 2;
+  return Math.max(0, Math.round(v * 100) / 100);
+}
+
+/**
+ * LES QUATRE ÉCARTS D'UN MEUBLE AUX MURS, de chacun de ses bords au nu du
+ * mur d'en face — la cote qu'on prend au mètre pour dire « le lit à
+ * quarante centimètres de la fenêtre ».
+ *
+ * Dans les axes DU MEUBLE : un lit posé de biais se cote le long de ses
+ * propres côtés, pas de ceux de l'écran. `null` quand aucun mur n'est en
+ * face (le meuble regarde une baie, ou le vide d'un plan ouvert).
+ */
+export function ecartsAuxMurs(
+  centre: Pt,
+  box: { width: number; depth: number; yaw: number },
+  walls: WallSeg[],
+): { dir: Pt; ecart: number | null }[] {
+  const c = Math.cos(box.yaw);
+  const sn = Math.sin(box.yaw);
+  const ax = { x: c, z: sn };
+  const az = { x: -sn, z: c };
+  const pleins = walls.filter((w) => w.type === 'wall');
+  return [
+    { dir: ax, demi: box.width / 2 },
+    { dir: { x: -ax.x, z: -ax.z }, demi: box.width / 2 },
+    { dir: az, demi: box.depth / 2 },
+    { dir: { x: -az.x, z: -az.z }, demi: box.depth / 2 },
+  ].map(({ dir, demi }) => {
+    const d = castToWall(centre, dir, pleins);
+    return { dir, ecart: d === null ? null : d - demi };
+  });
+}
+
+/**
+ * Le centre qui met CE bord du meuble à `voulu` du mur d'en face. Le
+ * meuble glisse le long de cet axe, et seulement de lui.
+ */
+export function centrePourEcart(
+  centre: Pt,
+  e: { dir: Pt; ecart: number | null },
+  voulu: number,
+): Pt | null {
+  if (e.ecart === null || !(voulu >= 0) || !isFinite(voulu)) return null;
+  const d = e.ecart - voulu;
+  return { x: centre.x + e.dir.x * d, z: centre.z + e.dir.z * d };
 }
 
 /* ====================================================================== */

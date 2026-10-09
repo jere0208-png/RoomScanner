@@ -243,8 +243,8 @@ export function RoomBar({
           />
         )}
         <Geste
-          nom="Scinder la pièce"
-          mot="Scinder"
+          nom="Couper la pièce"
+          mot="Couper"
           d={SOLAIRES.scinder}
           styles={styles}
           onPress={onScinder}

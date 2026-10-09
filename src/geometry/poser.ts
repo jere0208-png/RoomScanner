@@ -38,7 +38,7 @@
  * besoin de la pièce, de sa surface et des autres meubles, que la géométrie
  * d'un seul meuble ne connaît pas.
  */
-import { WALL_T, type Pt, type WallSeg } from './floorplan';
+import { epaisseurDe, type Pt, type WallSeg } from './floorplan';
 
 /** Ce qu'on sait d'un meuble pour le poser : son emprise et son cap. */
 export interface EmpriseMeuble {
@@ -106,11 +106,13 @@ export function poserLibre(
   meuble: EmpriseMeuble,
   murs: WallSeg[],
 ): PoseMeuble {
-  const demi = WALL_T / 2;
   let dansLeMur = false;
 
   for (const w of murs) {
     if (w.type !== 'wall') continue;
+    // La bande de CE mur : sept centimètres pour une cloison, vingt pour
+    // un porteur.
+    const demi = epaisseurDe(w) / 2;
     const cs = coins(vise, meuble);
     const infos = cs.map((p) => versLeMur(p, w));
     // Le meuble ne concerne que les murs qu'il LONGE : au-delà des bouts,
@@ -123,7 +125,7 @@ export function poserLibre(
     /*
       CHEVAUCHER, C'EST AVOIR UN PIED DE CHAQUE CÔTÉ DU NU.
 
-      Le mur occupe une bande d'épaisseur `WALL_T` autour de son axe. Si les
+      Le mur occupe une bande de son épaisseur autour de son axe. Si les
       coins du meuble se répartissent des deux côtés de cette bande — ou
       dedans — c'est qu'il mord dans la maçonnerie, et on ne lâche pas là.
     */

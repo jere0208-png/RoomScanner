@@ -30,7 +30,7 @@ import {
   segLength,
   wallQuads,
   wallsCentroid,
-  WALL_T,
+  epaisseurDe,
   type Pt,
   type RoomShape,
   type WallQuad,
@@ -706,7 +706,7 @@ function squareQuad(w: WallSeg): WallQuad {
   const len = segLength(w) || 1;
   const u = { x: (w.b.x - w.a.x) / len, z: (w.b.z - w.a.z) / len };
   const n = perpOf(u);
-  const h = WALL_T / 2;
+  const h = epaisseurDe(w) / 2;
   return {
     a1: { x: w.a.x + n.x * h, z: w.a.z + n.z * h },
     b1: { x: w.b.x + n.x * h, z: w.b.z + n.z * h },

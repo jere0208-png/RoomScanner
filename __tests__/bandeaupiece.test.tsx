@@ -102,7 +102,7 @@ describe('les gestes d’une piece', () => {
       'Hauteur sous plafond',
       'Dupliquer la pièce',
       'Fusionner avec une autre pièce',
-      'Scinder la pièce',
+      'Couper la pièce',
       'Retirer la pièce',
     ]) {
       expect([geste, vus.includes(geste)]).toEqual([geste, true]);
@@ -121,7 +121,7 @@ describe('les gestes d’une piece', () => {
   it('et chacun son mot, lisible sans le toucher', () => {
     const ecrits = mots(monter());
     expect(ecrits).toMatch(/Dupliquer/);
-    expect(ecrits).toMatch(/Scinder/);
+    expect(ecrits).toMatch(/Couper/);
   });
 });
 

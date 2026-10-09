@@ -173,6 +173,8 @@ export function ObjectBar({
   onRotate,
   onCancel,
   onNudge,
+  onPlacer,
+  onDupliquer,
 }: {
   object: ObjectData;
   /** Les styles de l'écran : le bandeau partage ceux des autres barres. */
@@ -189,6 +191,13 @@ export function ObjectBar({
    */
   onHeight?: (height?: number, base?: number) => void;
   onRotate: () => void;
+  /**
+   * PLACER AU CENTIMÈTRE — « le lit à quarante centimètres du mur ». Les
+   * flèches avancent d'un centimètre, et il fallait en compter quarante.
+   */
+  onPlacer?: () => void;
+  /** Un meuble de plus, le même : les chaises d'une table, deux chevets. */
+  onDupliquer?: () => void;
   onCancel: () => void;
   /**
    * LE DÉPLACEMENT AU CENTIMÈTRE, À LA FLÈCHE.
@@ -322,6 +331,10 @@ export function ObjectBar({
         {/* Les deux gestes, poussés à droite : le nom prend la place qui
             reste, et les pastilles restent où l'œil les cherche. */}
         <View style={styles.bandeauGestes}>
+          {onPlacer &&
+            geste('Placer au centimètre', 'Placer', SOLAIRES.metre, palette.blue, onPlacer)}
+          {onDupliquer &&
+            geste('Dupliquer le meuble', 'Dupliquer', SOLAIRES.dupliquer, palette.blue, onDupliquer)}
           {geste('Pivoter', 'Pivoter', SOLAIRES.pivoter, palette.blue, onRotate)}
           {/*
             « RETIRER », pas « Annuler » — le mot dit ce que le geste fait.

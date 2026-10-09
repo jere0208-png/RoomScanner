@@ -79,6 +79,10 @@ import {
   posesDeMur,
   posesEnT,
   murNeufCote,
+  coupeDePiece,
+  ecartsAuxMurs,
+  centrePourEcart,
+  type SaisieCoupe,
   EPAISSEURS,
   epaisseurDe,
   type PoseDeMur,
@@ -154,7 +158,7 @@ import {
   type SpotAxis,
 } from '../geometry/ceiling';
 import { haptic } from '../ui/haptic';
-import { MurNeufSheet } from '../components/MurNeufSheet';
+import { CoupeSheet, MurNeufSheet, lireCote } from '../components/MurNeufSheet';
 import {
   ActionSheet,
   PromptSheet,
@@ -847,6 +851,8 @@ export function ResultScreen() {
   */
   const [murNeuf, setMurNeuf] = useState<PoseDeMur | null>(null);
   const [apercuMur, setApercuMur] = useState<PoseDeMur | null>(null);
+  /* La pièce qu'on coupe, en attente de ses cotes — voir `CoupeSheet`. */
+  const [coupePiece, setCoupePiece] = useState<RoomPart | null>(null);
   /** La note tenue en main : son bandeau propose de la reprendre. */
   const [selNote, setSelNote] = useState<string | null>(null);
   /**
@@ -4214,6 +4220,70 @@ export function ResultScreen() {
             }}
             onRotate={() => rotateObject(selectedObject.id)}
             onCancel={cancelObject}
+            onDupliquer={() => {
+              const copie = useScanStore.getState().dupliquerMeuble(selectedObject.id);
+              if (!copie) return;
+              setSelectedObjectId(copie);
+              haptic('succes');
+            }}
+            onPlacer={() => {
+              /*
+                PLACER AU CENTIMÈTRE — « le lit à quarante centimètres du
+                mur ». Les quatre bords du meuble, chacun avec son écart au
+                nu du mur d'en face, nommés par où ils regardent À L'ÉCRAN :
+                le plan peut être tourné, et « à gauche » doit vouloir dire
+                la gauche qu'on voit.
+              */
+              const obj = selectedObject;
+              const t0 = obj.transform;
+              const centre = { x: t0[12], z: t0[14] };
+              const box = {
+                width: obj.baseWidth ?? obj.width,
+                depth: obj.baseDepth ?? obj.depth,
+                yaw: Math.atan2(t0[2], t0[0]),
+              };
+              const murs = parts.find((p2) => p2.roomId === obj.roomId)?.walls ?? walls;
+              const cs = Math.cos(vuePlan.rot);
+              const sn = Math.sin(vuePlan.rot);
+              const cote = (d: { x: number; z: number }) => {
+                const sx = d.x * cs - d.z * sn;
+                const sy = d.x * sn + d.z * cs;
+                return Math.abs(sx) >= Math.abs(sy)
+                  ? sx > 0 ? 'À droite' : 'À gauche'
+                  : sy > 0 ? 'En bas' : 'En haut';
+              };
+              const ecarts = ecartsAuxMurs(centre, box, murs).filter((e) => e.ecart !== null);
+              if (ecarts.length === 0) {
+                alerte('Aucun mur en face', 'Ce meuble ne regarde aucun mur : il se place au doigt ou aux flèches.');
+                return;
+              }
+              setMenu({
+                title: 'Placer le meuble',
+                subtitle: 'Choisissez un côté, puis tapez sa distance au mur, au nu.',
+                actions: ecarts.map((e) => ({
+                  label: `${cote(e.dir)} · ${Math.round((e.ecart ?? 0) * 100)} cm du mur`,
+                  icon: 'regle' as const,
+                  onPress: () =>
+                    setPrompt({
+                      title: `${cote(e.dir)} : distance au mur`,
+                      subtitle: 'Du bord du meuble au nu du mur. Zéro : contre le mur.',
+                      value: String(Math.round((e.ecart ?? 0) * 100)),
+                      unit: 'cm',
+                      numeric: true,
+                      okLabel: 'Placer',
+                      onSubmit: (t) => {
+                        const v = lireCote(t);
+                        if (v === null) return;
+                        const p2 = centrePourEcart(centre, e, v);
+                        if (!p2) return;
+                        useScanStore.getState().setObjectCenter(obj.id, p2.x, p2.z, true);
+                        setDraftObject(null);
+                        haptic('succes');
+                      },
+                    }),
+                })),
+              });
+            }}
             onNudge={(dx, dy) => {
               /*
                 UN CENTIMÈTRE DANS L'AXE DE L'ÉCRAN.
@@ -4585,6 +4655,15 @@ export function ResultScreen() {
                   : undefined
               }
               onScinder={() => {
+                /*
+                  COUPER À LA COTE — relevé du patron : « fais pareil pour la
+                  sélection d'une pièce ». La coupe au milieu, sans rien
+                  demander, ne reste que pour une pièce sans contour fermé.
+                */
+                if (targetPart?.surface) {
+                  setCoupePiece(targetPart);
+                  return;
+                }
                 splitRoom(selectedRoomId);
                 setSelectedRoomId(null);
               }}
@@ -5353,6 +5432,30 @@ export function ResultScreen() {
         }}
       />
       <ActionSheet data={menu} onClose={() => setMenu(null)} />
+      <CoupeSheet
+        part={coupePiece}
+        onClose={() => {
+          setCoupePiece(null);
+          setApercuMur(null);
+        }}
+        onApercu={(saisie: SaisieCoupe | null) => {
+          const seg = coupePiece && saisie ? coupeDePiece(coupePiece, saisie) : null;
+          setApercuMur(
+            seg
+              ? { id: 'apercu-coupe', wallId: '', bout: 'a', angle: 0, a: seg.a, b: seg.b }
+              : null,
+          );
+        }}
+        onCouper={(saisie: SaisieCoupe) => {
+          const part = coupePiece;
+          setApercuMur(null);
+          if (!part) return;
+          if (useScanStore.getState().couperPiece(part.roomId, saisie)) {
+            setSelectedRoomId(null);
+            haptic('succes');
+          }
+        }}
+      />
       <MurNeufSheet
         pose={murNeuf}
         walls={walls}

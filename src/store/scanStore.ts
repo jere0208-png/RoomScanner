@@ -45,6 +45,8 @@ import {
   roomHeight,
   roomOf,
   roomParts,
+  coupeDePiece,
+  type SaisieCoupe,
   WALL_T,
   planFrameAngle,
   reprojectOpenings,
@@ -1145,6 +1147,12 @@ interface ScanState {
   mergeRooms: (a: string, b: string) => void;
   /** Pose une cloison en travers d'une pièce, puis redétecte : elle se scinde. */
   splitRoom: (roomId: string) => void;
+  /**
+   * COUPE LA PIÈCE À UNE COTE DONNÉE, d'une cloison de l'épaisseur donnée —
+   * voir `coupeDePiece`. Rend faux quand la coupe ne tombe pas dans la
+   * pièce (rien n'est alors touché, pas même l'historique).
+   */
+  couperPiece: (roomId: string, saisie: SaisieCoupe) => boolean;
   /** Relit le graphe des murs et refait la liste des pièces. */
   redetectRooms: () => void;
   /** Redresse le plan sur sa propre trame : les angles redeviennent droits. */
@@ -1769,6 +1777,11 @@ interface ScanState {
   /** Il a lu le chiffre : on n'y revient pas. */
   oublierPlaceRendue: () => void;
   removeObject: (id: string) => void;
+  /**
+   * UN MEUBLE DE PLUS, LE MÊME — quatre chaises autour d'une table, deux
+   * chevets. Rend l'identifiant de la copie, posée à côté de l'original.
+   */
+  dupliquerMeuble: (id: string) => string | null;
   /** Pose en une fois ce que « Normes auto » propose. */
   poserDAuto: (fixtures: Fixture[], ceiling: CeilingFixture[]) => void;
   /**
@@ -2945,6 +2958,33 @@ export const useScanStore = create<ScanState>((set, get) => {
         ),
         dirty: true,
       });
+    },
+
+    couperPiece: (roomId, saisie) => {
+      const st = get();
+      const part = roomParts(st.walls, st.rooms).find((p) => p.roomId === roomId);
+      if (!part?.surface) return false;
+      const seg = coupeDePiece(part, saisie);
+      // La garde AVANT le point de reprise : voir `splitRoom`.
+      if (!seg) return false;
+      pushHistory('splitRoom');
+      const h = roomHeight(part.walls) || 2.5;
+      const e = saisie.epaisseur;
+      const wall: WallSeg = {
+        id: `cl-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        type: 'wall',
+        a: seg.a,
+        b: seg.b,
+        height: h,
+        yCenter: h / 2,
+        niveau: part.walls[0]?.niveau,
+        ...(Math.abs(e - WALL_T) > 1e-6
+          ? { epaisseur: Math.min(Math.max(e, 0.03), 0.6) }
+          : {}),
+      };
+      set({ walls: [...st.walls, wall], dirty: true });
+      get().redetectRooms();
+      return true;
     },
 
     splitRoom: (roomId) => {
@@ -6254,6 +6294,46 @@ export const useScanStore = create<ScanState>((set, get) => {
 
     placeRendue: null,
     oublierPlaceRendue: () => set({ placeRendue: null }),
+
+    dupliquerMeuble: (id) => {
+      const st = get();
+      const obj = st.objects.find((o) => o.id === id);
+      if (!obj || !sontFinis(obj.transform[12], obj.transform[14])) return null;
+      const yaw = Math.atan2(obj.transform[2], obj.transform[0]);
+      const ax = { x: Math.cos(yaw), z: Math.sin(yaw) };
+      const az = { x: -Math.sin(yaw), z: Math.cos(yaw) };
+      const ici = { x: obj.transform[12], z: obj.transform[14] };
+      /*
+        À CÔTÉ, PAS PAR-DESSUS — et du côté où il y a la place. On essaie
+        à droite, à gauche, devant, derrière, à dix centimètres de jour ;
+        la première place qui reste dans la pièce l'emporte. Le rangement
+        (`rangerMeuble`) fait ensuite ce qu'il fait au lâcher : le mur
+        arrête, les voisins ne se traversent pas.
+      */
+      const contour = roomParts(st.walls, st.rooms).find((p) => p.roomId === obj.roomId)
+        ?.surface?.pts;
+      const pas = [
+        { d: ax, l: obj.width + 0.1 },
+        { d: { x: -ax.x, z: -ax.z }, l: obj.width + 0.1 },
+        { d: az, l: obj.depth + 0.1 },
+        { d: { x: -az.x, z: -az.z }, l: obj.depth + 0.1 },
+      ].map(({ d, l }) => ({ x: ici.x + d.x * l, z: ici.z + d.z * l }));
+      const cible =
+        pas.find((p) => (contour ? pointInPolygon(p, contour) : true)) ?? pas[0];
+      const nouvel = `mb-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      // LA CLÉ DU RANGEMENT QUI SUIT : la copie et son rangement ne font
+      // qu'UN geste, et « Annuler » les défait d'un seul appui.
+      pushHistory(`moveObject:${nouvel}`);
+      const t = [...obj.transform];
+      t[12] = cible.x;
+      t[14] = cible.z;
+      set({
+        objects: [...st.objects, { ...obj, id: nouvel, transform: t }],
+        dirty: true,
+      });
+      get().rangerMeuble(nouvel, cible.x, cible.z);
+      return nouvel;
+    },
 
     removeObject: (id) => {
       pushHistory('removeObject');
