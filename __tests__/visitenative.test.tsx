@@ -205,6 +205,83 @@ describe('la scène part vers SceneKit', () => {
   });
 });
 
+/*
+  MARCHER ET TOURNER EN MÊME TEMPS — relevé du patron : « le déplacement se
+  coupe lorsqu'on change en même temps la vue dans la visite ».
+
+  Le banc rejoue ce qu'iOS envoie vraiment : pendant que seul le pouce du
+  regard bouge, la liste de TOUS les doigts (`touches`) redonne le pouce de
+  la marche à sa position d'arrivée. Relire cette liste ramenait la manette
+  au centre, et la marche s'arrêtait. Seuls les doigts de l'événement
+  (`changedTouches`) comptent désormais.
+*/
+describe('marcher et tourner en même temps', () => {
+  const ev = (changes: ReturnType<typeof touche>[], toutes: ReturnType<typeof touche>[]) => ({
+    nativeEvent: { touches: toutes, changedTouches: changes, pageX: 0, pageY: 0, timestamp: Date.now() },
+  });
+
+  it('tourner la vue ne coupe pas la marche', () => {
+    const t = monter();
+    presser(t, 'Explorer');
+    const z = pouces(t);
+    const depart = natif(t).props.camera as number[];
+    // Le pouce gauche se pose et pousse vers le haut : on avance.
+    act(() => {
+      z.props.onStartShouldSetResponder(ev([touche(0, 120, 900)], [touche(0, 120, 900)]));
+      z.props.onResponderGrant(ev([touche(0, 120, 900)], [touche(0, 120, 900)]));
+      z.props.onResponderMove(ev([touche(0, 120, 850)], [touche(0, 120, 850)]));
+    });
+    act(() => jest.advanceTimersByTime(300));
+    const enMarche = natif(t).props.camera as number[];
+    // Le pouce droit se pose, puis tourne — et iOS redonne le gauche à sa
+    // position d'arrivée dans la liste complète.
+    const gaucheFige = touche(0, 120, 900);
+    act(() => {
+      z.props.onResponderStart(ev([touche(1, 300, 500)], [gaucheFige, touche(1, 300, 500)]));
+    });
+    for (let i = 1; i <= 10; i++) {
+      act(() => {
+        z.props.onResponderMove(ev([touche(1, 300 + i * 6, 500)], [gaucheFige, touche(1, 300 + i * 6, 500)]));
+        jest.advanceTimersByTime(30);
+      });
+    }
+    const apres = natif(t).props.camera as number[];
+    // On a tourné…
+    expect(apres[3]).not.toBeCloseTo(enMarche[3], 3);
+    // …et l'on a CONTINUÉ d'avancer pendant ce temps.
+    const pendant = Math.hypot(apres[0] - enMarche[0], apres[2] - enMarche[2]);
+    expect(pendant).toBeGreaterThan(0.05);
+    expect(Math.hypot(enMarche[0] - depart[0], enMarche[2] - depart[2])).toBeGreaterThan(0.05);
+    act(() => z.props.onResponderRelease(ev([touche(0, 120, 850), touche(1, 360, 500)], [])));
+    act(() => jest.advanceTimersByTime(100));
+  });
+
+  it('lever le pouce du regard laisse marcher ; lever celui de la marche arrête', () => {
+    const t = monter();
+    presser(t, 'Explorer');
+    const z = pouces(t);
+    act(() => {
+      z.props.onResponderGrant(ev([touche(0, 120, 900)], [touche(0, 120, 900)]));
+      z.props.onResponderMove(ev([touche(0, 120, 850)], [touche(0, 120, 850)]));
+      z.props.onResponderStart(ev([touche(1, 300, 500)], [touche(0, 120, 850), touche(1, 300, 500)]));
+    });
+    act(() => jest.advanceTimersByTime(200));
+    // Le regard se lève : la marche continue.
+    act(() => z.props.onResponderEnd(ev([touche(1, 300, 500)], [touche(0, 120, 850)])));
+    const a = natif(t).props.camera as number[];
+    act(() => jest.advanceTimersByTime(300));
+    const b = natif(t).props.camera as number[];
+    expect(Math.hypot(b[0] - a[0], b[2] - a[2])).toBeGreaterThan(0.05);
+    // La marche se lève : on s'arrête.
+    act(() => z.props.onResponderEnd(ev([touche(0, 120, 850)], [])));
+    act(() => jest.advanceTimersByTime(100));
+    const c = natif(t).props.camera as number[];
+    act(() => jest.advanceTimersByTime(300));
+    const d = natif(t).props.camera as number[];
+    expect(Math.hypot(d[0] - c[0], d[2] - c[2])).toBeLessThan(1e-6);
+  });
+});
+
 describe('la cadence en natif', () => {
   it('une image par rafraîchissement quand le téléphone suit', () => {
     expect(PERIODE_NATIF).toBe(16);

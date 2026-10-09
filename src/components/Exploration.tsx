@@ -464,10 +464,25 @@ export function Exploration({
   }
   const doigts = useRef(new Map<number, Doigt>());
   const [baton, setBaton] = useState<{ x: number; y: number; dx: number; dy: number } | null>(null);
+  type Touche = { identifier: number | string; pageX: number; pageY: number };
   const touchesDe = (e: GestureResponderEvent) =>
-    (e.nativeEvent.touches ?? []) as { identifier: number | string; pageX: number; pageY: number }[];
+    (e.nativeEvent.touches ?? []) as Touche[];
+  /*
+    SEULS LES DOIGTS QUI ONT BOUGÉ — relevé du patron : « le déplacement se
+    coupe lorsqu'on change en même temps la vue dans la visite ».
+
+    Chaque mouvement relisait la position de TOUS les doigts posés
+    (`touches`). Quand seul le pouce du regard bouge, iOS peut redonner
+    celle du pouce de la marche telle qu'elle était à son arrivée : la
+    manette le croyait revenu au centre, dans la zone morte, et la marche
+    s'arrêtait net. Un doigt ne se met plus à jour que par les événements
+    qui le concernent (`changedTouches`) ; les autres gardent ce qu'on
+    savait d'eux.
+  */
+  const changesDe = (e: GestureResponderEvent) =>
+    ((e.nativeEvent.changedTouches as Touche[] | undefined) ?? touchesDe(e)) as Touche[];
   const accueillir = (e: GestureResponderEvent) => {
-    for (const t of touchesDe(e)) {
+    for (const t of changesDe(e)) {
       const id = Number(t.identifier);
       if (doigts.current.has(id)) continue;
       const roles = new Set([...doigts.current.values()].map((d) => d.role));
@@ -486,7 +501,7 @@ export function Exploration({
   };
   const suivre = (e: GestureResponderEvent) => {
     let regardBouge = false;
-    for (const t of touchesDe(e)) {
+    for (const t of changesDe(e)) {
       const d = doigts.current.get(Number(t.identifier));
       if (!d) continue;
       if (d.role === 'marche') {
@@ -530,9 +545,15 @@ export function Exploration({
     }
   };
   const lacher = (e: GestureResponderEvent) => {
+    // Les doigts LEVÉS sont ceux de l'événement ; à défaut, ceux qui ne sont
+    // plus posés.
+    const changes = e.nativeEvent.changedTouches as Touche[] | undefined;
     const vivants = new Set(touchesDe(e).map((t) => Number(t.identifier)));
+    const leves = changes
+      ? new Set(changes.map((t) => Number(t.identifier)))
+      : new Set([...doigts.current.keys()].filter((id) => !vivants.has(id)));
     for (const id of [...doigts.current.keys()]) {
-      if (vivants.has(id)) continue;
+      if (!leves.has(id)) continue;
       const d = doigts.current.get(id)!;
       doigts.current.delete(id);
       if (d.role === 'marche') {

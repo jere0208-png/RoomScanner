@@ -14285,6 +14285,24 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Marcher et tourner en même temps, pour de bon
+
+Relevé du patron : « le déplacement se coupe lorsqu'on change en même temps la
+vue dans la visite ».
+
+Les deux pouces partagent une seule vue (voir « UN SEUL GESTE » dans
+`Exploration.tsx`), qui départage les doigts par leur identifiant. Mais chaque
+mouvement relisait la position de TOUS les doigts posés (`touches`) — et quand
+seul le pouce du regard bouge, iOS peut redonner le pouce de la marche à sa
+position d'ARRIVÉE. La manette le croyait revenu au centre, dans la zone
+morte : la marche s'arrêtait net, et ne repartait qu'en rebougeant le pouce
+gauche.
+
+Un doigt ne se met plus à jour que par les événements qui le concernent
+(`changedTouches`) ; un doigt levé se reconnaît de même. Le banc
+`visitenative` rejoue la liste périmée qu'envoie iOS : il échoue sur l'ancien
+code, il passe sur le nouveau.
+
 ## La maquette 3D sur la carte graphique
 
 Relevé du patron : « le modèle 3D d'un plan contenant des meubles, comme le
