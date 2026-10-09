@@ -112,6 +112,11 @@ function decoupageDe(item: SavedScan) {
   return calcule;
 }
 
+/** La ligne de détails d'un scan, mémoïsée — partagée avec l'accueil. */
+export function detailsDuScan(item: SavedScan): string {
+  return decoupageDe(item).details;
+}
+
 /** Ce qu'un scan raconte en une ligne : pièces, murs, surface, objets. */
 function ligneDetails(
   item: SavedScan,
@@ -181,7 +186,7 @@ const THUMB_H = 62;
  * quelques traits dans 54 px. Rien à stocker, rien à invalider — un scan
  * retouché montre son nouveau contour à l'ouverture suivante de la liste.
  */
-function PlanThumb({ scan, c }: { scan: SavedScan; c: Palette }) {
+export function PlanThumb({ scan, c }: { scan: SavedScan; c: Palette }) {
   const { parts } = decoupageDe(scan);
   const modeElec = useModeElec();
   // Les mêmes constats que sur le plan : une pièce en défaut sort en rouge

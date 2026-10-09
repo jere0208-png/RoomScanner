@@ -1,3 +1,4 @@
+import { NOM_EXEMPLE, appartementExemple } from '../data/exemple';
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
@@ -1927,6 +1928,12 @@ interface ScanState {
    * (`addRoomBox`) : il n'y manquait que la porte d'entrée.
    */
   commencerAuClavier: () => void;
+  /**
+   * L'APPARTEMENT D'EXEMPLE, ouvert comme un relevé — voir `src/data/exemple`.
+   * Rien n'est enregistré tant qu'on ne touche pas « Enregistrer » : c'est
+   * une visite, pas un plan de plus dans la bibliothèque.
+   */
+  ouvrirExemple: () => void;
   /**
    * Vrai quand le plan a été ouvert AU CLAVIER, sans scanner.
    *
@@ -7419,6 +7426,30 @@ export const useScanStore = create<ScanState>((set, get) => {
       // `reset` vient d'arrêter la minuterie : un plan au clavier se
       // construit sous le même filet qu'un scan.
       armerBrouillon(() => get().ecrireBrouillon());
+    },
+
+    ouvrirExemple: () => {
+      get().reset();
+      const ex = appartementExemple();
+      set({
+        planVierge: false,
+        ...CALQUES_DE_BASE,
+        screen: 'result',
+        scanName: NOM_EXEMPLE,
+        // On en revient à l'accueil, d'où l'on est parti.
+        resultOrigin: 'scan',
+        niveauCourant: NIVEAU_RDC,
+        walls: ex.walls,
+        openings: ex.openings,
+        rooms: ex.rooms,
+        objects: ex.objects,
+        fixtures: [],
+        ceiling: [],
+        photos: [],
+        notes: [],
+        currentSaveId: null,
+        dirty: false,
+      });
     },
 
     reset: () => {

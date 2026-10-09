@@ -1,20 +1,27 @@
 /**
- * L'ACCUEIL — ce qu'on montre avant d'avoir scanné quoi que ce soit.
+ * L'ACCUEIL — une page qui a une identité, et qui montre le travail.
  *
- * Il expliquait l'application en trois lignes : « Scannez, ajustez,
- * explorez ». Trois pictogrammes et neuf mots pour dire ce qu'une seule
- * image montre mieux — le résultat. On ne vend pas un scanner de pièces avec
- * une notice, on le vend avec le plan qui en sort.
+ * Relevé du patron : « fais une refonte de la page d'accueil avec une vraie
+ * identité, plus qu'un logo et trois boutons ; un design épuré et unique,
+ * ludique et compréhensible, un petit message d'accueil moderne, les projets
+ * directement visibles sur la page ».
  *
- * Ce banc tient trois choses : le mode d'emploi est bien parti, la maquette
- * TOURNE VRAIMENT (une image figée aurait le même arbre, et l'on ne verrait
- * rien), et elle sort du même moteur que la vue 3D de l'app — pas d'un
- * dessin qui promettrait ce que l'application ne fait pas.
+ * Ce banc tient la page de haut en bas :
+ *
+ *   — QUI ET QUAND : la date en français, le salut à l'heure, au PRÉNOM — le
+ *     patron avait retiré le nom posé en bleu à côté du rond du compte (« ça
+ *     fait cheap ») ; il demande maintenant un message d'accueil, et c'est
+ *     dans la phrase que le prénom a sa place, pas en étiquette ;
+ *   — LE MOULINET : quatre tuiles, quatre gestes, deux colonnes coupées à
+ *     deux hauteurs, la marque au moyeu ;
+ *   — VOS PLANS : les trois derniers, dans l'ordre, ouverts d'un appui ; la
+ *     bibliothèque à côté du titre ; la recherche quand il y en a beaucoup ;
+ *   — LA PREMIÈRE PIÈCE : la feuille à tracer, pour qui n'a encore rien.
  */
 jest.mock('react-native-room-scan', () => ({
   RoomScan: {
     isSupported: jest.fn(async () => true),
-    // Le bouton demande l'autorisation de la caméra avant de lancer le scan.
+    // Le départ demande l'autorisation de la caméra avant de lancer le scan.
     cameraStatus: jest.fn(async () => 'granted'),
     start: jest.fn(async () => true),
     stop: jest.fn(async () => null),
@@ -34,28 +41,31 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   removeItem: jest.fn(async () => undefined),
 }));
 
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import React from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, TextInput, View } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
-import Svg, {
-  LinearGradient as SvgLinearGradient,
-  Path,
-  Rect,
-} from 'react-native-svg';
-import { ContourVif } from '../src/components/ContourVif';
+import Svg, { LinearGradient as SvgLinearGradient, Path, Rect } from 'react-native-svg';
+import { ContourVif, TexteVif } from '../src/components/ContourVif';
 import { light } from '../src/theme';
-import { HomeScreen } from '../src/screens/HomeScreen';
+import {
+  HomeScreen,
+  PLANS_A_LACCUEIL,
+  RECHERCHE_DES,
+  TEINTES_TUILES,
+  dateDuJour,
+  questionDuJour,
+  quand,
+  salutation,
+} from '../src/screens/HomeScreen';
 import { LogoMark } from '../src/components/LogoMark';
 import { AvatarGlyph } from '../src/components/AvatarGlyph';
 import { Avatar } from '../src/components/Avatar';
-import { Quadrillage } from '../src/components/Quadrillage';
 import { TraceUnePiece } from '../src/components/TraceUnePiece';
 import { ThemeGlyph } from '../src/components/ThemeGlyph';
-import { TexteVif } from '../src/components/ContourVif';
 import { useScanStore } from '../src/store/scanStore';
 import { useAccountStore } from '../src/store/accountStore';
+import { usePremieresFois } from '../src/store/premieresFois';
+import { NOM_EXEMPLE } from '../src/data/exemple';
 
 beforeEach(() => {
   jest.useFakeTimers();
@@ -64,7 +74,9 @@ beforeEach(() => {
     supported: true,
     saves: [],
     brouillon: null,
+    error: null,
   });
+  useAccountStore.setState({ compte: null, pro: false });
 });
 afterEach(() => jest.useRealTimers());
 
@@ -80,26 +92,13 @@ function monter() {
     t = TestRenderer.create(<HomeScreen />);
   });
   /*
-    L'ÉCRAN SE MESURE, DONC LE BANC LE MESURE AUSSI.
-
-    Le quadrillage du fond couvre exactement la surface de l'accueil : il
-    attend que celle-ci se soit annoncée. Sans cet appel, il ne se dessine
-    jamais — et l'épreuve du papier tomberait en accusant le composant, alors
-    que c'est le banc qui n'aurait rien mesuré.
+    L'ÉCRAN SE MESURE, DONC LE BANC LE MESURE AUSSI. La feuille du tracé
+    attend que sa carte se soit annoncée : sans cet appel, elle ne se
+    dessinerait jamais, et l'épreuve accuserait le composant.
   */
   act(() => {
-    /*
-      TOUTES LES ZONES QUI SE MESURENT, et pas seulement la première.
-
-      L'écran en a DEUX : le fond, qui porte le quadrillage, et la feuille à
-      tracer, qui prend ce qui reste. Ne nourrir que la première laissait la
-      seconde à zéro de haut — donc absente — et trois épreuves accusaient le
-      composant alors que c'est le banc qui n'avait rien mesuré.
-    */
     for (const n of t.root.findAllByType(View)) {
-      n.props.onLayout?.({
-        nativeEvent: { layout: { width: 342, height: 300 } },
-      });
+      n.props.onLayout?.({ nativeEvent: { layout: { width: 342, height: 280 } } });
     }
   });
   arbre = t;
@@ -116,320 +115,359 @@ const textes = (t: TestRenderer.ReactTestRenderer) =>
     )
     .join(' | ');
 
-// Par son libellé, quel que soit le bouton : l'accueil est passé du
-// `GlowButton` à ondes au `Bouton` de la maison, qui ne s'anime que sous
-// le doigt.
+/** Par son étiquette et son geste, quel que soit le composant. */
 const bouton = (t: TestRenderer.ReactTestRenderer, label: string) =>
   t.root.findAll(
-    (n) =>
-      typeof n.props?.onPress === 'function' &&
-      (n.props?.accessibilityLabel ?? n.props?.label) === label,
+    (n) => typeof n.props?.onPress === 'function' && n.props?.accessibilityLabel === label,
   )[0];
 
-describe('l’accueil', () => {
-  /*
-   * LE THÈME A QUITTÉ L'ACCUEIL — et ce banc en garde la trace.
-   *
-   * Il a longtemps vécu ici, en bas puis en haut à droite, dans une
-   * pastille dont la taille et la zone de clic ont été reprises trois fois
-   * sur relevé du patron. Rien de tout cela n'était perdu : c'était le
-   * signe qu'un RÉGLAGE n'a pas sa place sur l'écran d'arrivée. À portée
-   * du pouce qui vise « Commencer le scan », il se déclenche en visant
-   * autre chose — et il était le seul réglage de l'application à ne pas
-   * vivre avec les autres.
-   *
-   * Il est maintenant dans la page profil, en trois choix au lieu de deux
-   * (Système, Clair, Sombre) : voir `profil.test.tsx`. Ce qui reste vrai
-   * ici, c'est l'empilement — ce qui flotte au bandeau se rend EN DERNIER,
-   * sinon le bloc héros s'étend par-dessus et avale le toucher.
-   */
-  it('n’a plus de bouton de thème, et le profil reste au-dessus du héros', () => {
-    const t = monter();
-    expect(
-      t.root.findAll((n) =>
-        String(n.props?.accessibilityLabel ?? '').startsWith('Passer en thème'),
-      ),
-    ).toHaveLength(0);
-    expect(t.root.findAllByType(ThemeGlyph)).toHaveLength(0);
+const compteBloc = (t: TestRenderer.ReactTestRenderer) => bouton(t, 'Mon compte');
 
-    /*
-      ET RIEN NE RECOUVRE LE PROFIL — relevé du patron : « le clic ne fait
-      rien, sauf à un endroit précis ». Le bloc héros, rendu APRÈS lui,
-      s'étendait par-dessus et avalait le toucher partout où il le
-      chevauchait. C'est l'ORDRE des frères qui fait l'empilement.
-    */
-    const bloc = t.root.findAll(
-      (n) =>
-        n.props?.accessibilityLabel === 'Mon compte' &&
-        typeof n.props?.onPress === 'function',
-    )[0];
-    const enfants = bloc.parent!.children.filter(
-      (e): e is TestRenderer.ReactTestInstance => typeof e !== 'string',
-    );
-    const rangHero = enfants.findIndex(
-      (n) => n.findAllByType(LogoMark).length > 0,
-    );
-    const rangProfil = enfants.findIndex(
-      (n) => n.props?.accessibilityLabel === 'Mon compte',
-    );
-    expect(rangHero).toBeGreaterThanOrEqual(0);
-    expect(rangProfil).toBeGreaterThan(rangHero);
+/** Un plan de bibliothèque, assez complet pour sa vignette et son résumé. */
+const plan = (id: string, name: string, updatedAt: number) => ({
+  id,
+  name,
+  createdAt: updatedAt,
+  updatedAt,
+  walls: [
+    { id: `${id}-n`, type: 'wall', a: { x: 0, z: 0 }, b: { x: 4, z: 0 }, height: 2.5, yCenter: 1.25 },
+    { id: `${id}-e`, type: 'wall', a: { x: 4, z: 0 }, b: { x: 4, z: 3 }, height: 2.5, yCenter: 1.25 },
+    { id: `${id}-s`, type: 'wall', a: { x: 4, z: 3 }, b: { x: 0, z: 3 }, height: 2.5, yCenter: 1.25 },
+    { id: `${id}-o`, type: 'wall', a: { x: 0, z: 3 }, b: { x: 0, z: 0 }, height: 2.5, yCenter: 1.25 },
+  ],
+  openings: [],
+  objects: [],
+  rooms: [],
+});
+
+describe('qui et quand', () => {
+  it('écrit la date en français, sans moteur d’internationalisation', () => {
+    expect(dateDuJour(new Date(2026, 9, 9))).toBe('Vendredi 9 octobre');
+    expect(dateDuJour(new Date(2026, 0, 1))).toBe('Jeudi 1 janvier');
   });
 
-  /*
-   * ET LE BLOC PROFIL OUVRE LA PAGE, plus la carte modale qu'il ouvrait.
-   * Le compte a maintenant un ENDROIT : un popup de trois boutons ne
-   * pouvait pas porter l'abonnement, l'apparence et les réglages.
-   */
-  it('mène à la page profil', () => {
-    const t = monter();
-    const bloc = t.root.findAll(
-      (n) =>
-        n.props?.accessibilityLabel === 'Mon compte' &&
-        typeof n.props?.onPress === 'function',
-    )[0];
-    act(() => bloc.props.onPress());
-    expect(useScanStore.getState().screen).toBe('profil');
-    useScanStore.setState({ screen: 'home' });
+  it('salue à l’heure qu’il est', () => {
+    expect(salutation(8)).toBe('Bonjour');
+    expect(salutation(14)).toBe('Bon après-midi');
+    expect(salutation(20)).toBe('Bonsoir');
+    expect(salutation(2)).toBe('Bonsoir');
   });
 
-  /*
-   * LE PROFIL EST UN BLOC, EN HAUT À GAUCHE — croquis Paint du patron :
-   * l'avatar, le nom souligné d'une barre, et le grade centré dessous.
-   * GRATUIT s'écrit gris fade ; PRO respire comme sur la page Pro (la
-   * typo d'or). Le clic garde le geste de l'ancienne rangée du bas.
-   */
-  it('porte le compte en haut à droite : un rond, une initiale, pas de nom', () => {
-    /*
-      Relevé du patron : « l'icône profil et le nom en bleu clair, ça fait
-      cheap ». Le nom n'a rien à faire sur l'accueil : on sait qui l'on est.
-      Un rond en haut à droite, l'initiale sur un gris doux — c'est le rond
-      qu'on reconnaît d'une application à l'autre.
-    */
+  it('pose la question qui va avec ce qu’on a — le relevé en danger d’abord', () => {
+    expect(questionDuJour({ brouillon: true, plans: 4 })).toBe('Un relevé vous attend.');
+    expect(questionDuJour({ brouillon: false, plans: 0 })).toBe('Prêt pour votre premier plan ?');
+    expect(questionDuJour({ brouillon: false, plans: 3 })).toBe('Que mesure-t-on aujourd’hui ?');
+  });
+
+  it('dit « il y a 12 min », « hier », « il y a 3 jours »', () => {
+    const t0 = Date.UTC(2026, 9, 9, 12);
+    expect(quand(t0 - 12 * 60000, t0)).toBe('il y a 12 min');
+    expect(quand(t0 - 26 * 3600000, t0)).toBe('hier');
+    expect(quand(t0 - 3 * 86400000, t0)).toBe('il y a 3 jours');
+  });
+
+  it('salue au prénom — le premier, dans la phrase, pas en étiquette', () => {
     useAccountStore.setState({
-      compte: { id: 'email:j@c.fr', prenom: 'Jérôme', methode: 'email' },
-      pro: false,
+      compte: { id: 'email:j@c.fr', prenom: 'Jérôme Martin', methode: 'email' },
     });
-    const t = monter();
-    const bloc = t.root.findAll(
-      (n) =>
-        n.props?.accessibilityLabel === 'Mon compte' &&
-        typeof n.props?.onPress === 'function',
-    )[0];
-    expect(bloc).toBeDefined();
-    const st = StyleSheet.flatten(bloc.props.style) as {
-      position?: string;
-      top?: number;
-      right?: number;
-      left?: number;
-      height?: number;
-      paddingHorizontal?: number;
-    };
-    expect(st.position).toBe('absolute');
-    expect(st.top).toBeGreaterThanOrEqual(44);
-    expect(typeof st.right).toBe('number');
-    expect(st.left).toBeUndefined();
-    // Le cadre invisible du clic — relevé du patron : « un clic même autour
-    // doit fonctionner » — reste de la vraie surface de toucher.
-    expect(st.paddingHorizontal ?? 0).toBeGreaterThanOrEqual(10);
-    expect(Number(st.height)).toBeGreaterThanOrEqual(56);
-    expect(bloc.findAllByType(Avatar)).toHaveLength(1);
-    const lettres = bloc.findAllByType(Text).map((n) => String(n.props.children));
-    expect(lettres).toContain('J');
-    // Pas de nom, pas de grade, rien qui brille.
-    expect(textes(t)).not.toContain('Jérôme');
-    expect(bloc.findAllByType(TexteVif)).toHaveLength(0);
-    expect(bloc.findAllByType(ContourVif)).toHaveLength(0);
-    expect(bloc.findAllByType(SvgLinearGradient)).toHaveLength(0);
-    // Tout le bloc prend le clic : l'enfant est transparent au doigt, et
-    // rien à l'intérieur ne se dispute le geste.
-    expect(bloc.findAll((n) => n.props?.pointerEvents === 'none').length).toBeGreaterThanOrEqual(1);
-    expect(bloc.findAll((n) => typeof n.props?.onPress === 'function' && n !== bloc)).toHaveLength(0);
+    const vu = textes(monter());
+    expect(vu).toContain(`${salutation()}, Jérôme.`);
+    expect(vu).not.toContain('Martin');
+    expect(vu).toContain(dateDuJour());
   });
 
-  it('en Pro, rien ne brille sur l’accueil : le grade vit dans la page du compte', () => {
+  it('sans compte, un salut sans nom', () => {
+    const vu = textes(monter());
+    expect(vu).toContain(`${salutation()}.`);
+    expect(vu).toContain('Prêt pour votre premier plan ?');
+  });
+});
+
+describe('le compte', () => {
+  it('est un rond en haut à droite, dans la rangée de la date — rien qui brille', () => {
     useAccountStore.setState({
       compte: { id: 'email:j@c.fr', prenom: 'Jérôme', methode: 'email' },
       pro: true,
     });
     const t = monter();
-    const bloc = t.root.findAll(
-      (n) =>
-        n.props?.accessibilityLabel === 'Mon compte' &&
-        typeof n.props?.onPress === 'function',
-    )[0];
+    const bloc = compteBloc(t);
+    expect(bloc).toBeDefined();
+    // Il vit dans la rangée d'en-tête, après la date : le dernier de la rangée.
+    const rangee = bloc.parent!;
+    const enfants = rangee.children.filter((e): e is TestRenderer.ReactTestInstance => typeof e !== 'string');
+    expect(enfants[enfants.length - 1]).toBe(bloc);
+    expect(bloc.findAllByType(Avatar)[0].props.taille).toBe(40);
+    expect(bloc.findAllByType(Text).map((n) => String(n.props.children))).toContain('J');
+    // En Pro comme en gratuit : le grade vit dans la page du compte.
     expect(bloc.findAllByType(TexteVif)).toHaveLength(0);
     expect(bloc.findAllByType(ContourVif)).toHaveLength(0);
-    expect(bloc.findAllByType(Avatar)[0].props.taille).toBe(38);
-    useAccountStore.setState({ pro: false });
+    expect(bloc.findAllByType(SvgLinearGradient)).toHaveLength(0);
+    // Tout le bloc prend le clic, et le cadre du clic déborde du rond.
+    expect(Number(bloc.props.hitSlop)).toBeGreaterThanOrEqual(10);
+    expect(bloc.findAll((n) => typeof n.props?.onPress === 'function' && n !== bloc)).toHaveLength(0);
   });
 
-  it('sans prénom, l’initiale vient de l’adresse ; sans compte, une silhouette', () => {
+  it('mène à la page profil', () => {
+    const t = monter();
+    act(() => compteBloc(t).props.onPress());
+    expect(useScanStore.getState().screen).toBe('profil');
+  });
+
+  it('sans prénom, l’initiale vient de l’adresse ; sans compte, une silhouette sans cerne', () => {
     useAccountStore.setState({ compte: { id: 'email:m@c.fr', email: 'marie@c.fr', methode: 'email' } });
-    const t = monter();
-    const bloc = t.root.findAll(
-      (n) =>
-        n.props?.accessibilityLabel === 'Mon compte' &&
-        typeof n.props?.onPress === 'function',
-    )[0];
-    expect(bloc.findAllByType(Text).map((n) => String(n.props.children))).toContain('M');
+    let t = monter();
+    expect(compteBloc(t).findAllByType(Text).map((n) => String(n.props.children))).toContain('M');
     act(() => t.unmount());
+    arbre = null;
     useAccountStore.setState({ compte: null });
-    const t2 = monter();
-    const b2 = t2.root.findAll(
-      (n) =>
-        n.props?.accessibilityLabel === 'Mon compte' &&
-        typeof n.props?.onPress === 'function',
-    )[0];
-    expect(b2.findAllByType(AvatarGlyph)).toHaveLength(1);
+    t = monter();
+    const glyphe = compteBloc(t).findByType(AvatarGlyph);
+    expect(glyphe.props.teinte).toBe(light.inkSoft);
+    const traces = glyphe.findAllByType(Path);
+    expect(traces).toHaveLength(1);
+    expect(traces[0].props.stroke).toBeUndefined();
   });
 
-  it('ne récite plus le mode d’emploi', () => {
-    const vu = textes(monter());
-    for (const mot of ['Scannez', 'Ajustez', 'Explorez']) {
-      expect(vu).not.toContain(mot);
-    }
-    // La promesse, elle, reste : c'est une phrase, pas une notice.
-    expect(vu).toContain('en plan coté');
-  });
-
-  /*
-   * L'IPHONE A QUITTÉ L'ACCUEIL, ET LE PAPIER A PRIS SA PLACE.
-   *
-   * Relevé du patron : « refais l'accueil, enlève l'iPhone et son animation.
-   * L'accueil doit être moderne, avec un design épuré mais bien pensé qui
-   * rappelle le but de l'app (architecture, plan). Par exemple pour les
-   * boutons, ils seraient dans un quadrillage avec les côtés fondus. »
-   *
-   * LA MAQUETTE A ÉTÉ UNE BONNE IDÉE, ET ELLE EST DEVENUE UN OBJET DE PLUS.
-   * Un téléphone dessiné DANS un téléphone est une mise en abyme qu'on
-   * remarque une fois, puis qui encombre : elle prenait la moitié de
-   * l'accueil, tournait en boucle, et pesait 1,2 Mo d'images cuites dans
-   * l'application. Ce qu'elle racontait — le relevé, l'équipement, le dossier
-   * — est raconté mieux, et une seule fois, par la présentation du premier
-   * lancement.
-   *
-   * CE QUI REMPLIT SA PLACE N'EST PAS UN AUTRE OBJET : c'est du VIDE, sur du
-   * papier quadrillé.
-   */
-  it('n’a plus de maquette de téléphone', () => {
-    /*
-      L'ÉPREUVE DU RELEVÉ, et elle se mesure sur le CODE SOURCE autant que sur
-      l'arbre : un composant qu'on cesse d'afficher mais qu'on garde importé
-      revient au premier copier-coller, et ses 1,2 Mo d'images avec lui.
-    */
-    const src = readFileSync(
-      join(__dirname, '..', 'src', 'screens', 'HomeScreen.tsx'),
-      'utf8',
-    );
-    expect(src).not.toContain('PhoneShowcase');
-    expect(src).not.toContain('SHOWCASE');
-  });
-
-  it('mais il porte le PAPIER de l’architecte', () => {
-    /*
-      C'est le seul motif qui dit le métier sans un mot. Une application qui
-      relève des logements n'a pas besoin d'un pictogramme de maison : elle a
-      besoin du papier sur lequel on trace — et c'est déjà la trame du sol de
-      la vue 3D.
-    */
+  it('pas de bouton de thème : c’est un réglage, il vit dans le profil', () => {
     const t = monter();
-    expect(t.root.findAllByType(Quadrillage).length).toBeGreaterThan(0);
-    // Et il est vraiment tracé : un quadrillage sans traits est un fond nu.
+    expect(t.root.findAllByType(ThemeGlyph)).toHaveLength(0);
     expect(
-      t.root.findAll((n) => n.props?.testID === 'trait-quadrillage').length,
-    ).toBeGreaterThan(10);
+      t.root.findAll((n) => String(n.props?.accessibilityLabel ?? '').startsWith('Passer en thème')),
+    ).toHaveLength(0);
+  });
+});
+
+describe('le moulinet', () => {
+  const GESTES = [
+    'Commencer le scan',
+    'Dessiner un plan sans scanner',
+    'Voir un exemple',
+    'Comment ça marche',
+  ];
+  /** La carte colorée d'une tuile : la vue qui porte son fond. */
+  const carte = (t: TestRenderer.ReactTestRenderer, label: string) =>
+    bouton(t, label).findAll((n) => {
+      const st = StyleSheet.flatten(n.props?.style) as { backgroundColor?: string; height?: number } | undefined;
+      return typeof st?.height === 'number' && typeof st?.backgroundColor === 'string';
+    })[0];
+  const style = (n: TestRenderer.ReactTestInstance) =>
+    StyleSheet.flatten(n.props.style) as { backgroundColor: string; height: number };
+
+  it('porte quatre gestes, chacun sa couleur', () => {
+    const t = monter();
+    for (const g of GESTES) expect([g, !!bouton(t, g)]).toEqual([g, true]);
+    const fonds = GESTES.map((g) => style(carte(t, g)).backgroundColor);
+    expect(new Set(fonds).size).toBe(4);
+    expect(fonds.sort()).toEqual(Object.values(TEINTES_TUILES.clair).sort());
   });
 
-  it('et ses côtés se FONDENT, ce qui demande un dégradé', () => {
-    /*
-      Un quadrillage qui s'arrête net a un BORD, et un bord fait de lui un
-      rectangle posé sur l'écran — un objet de plus. Fondu, il devient le
-      papier : on ne sait plus où il commence, donc on ne le regarde plus.
-
-      ET LE FONDU EST PORTÉ PAR LE TRAIT. Faire varier l'opacité ligne par
-      ligne fond la grille vers le haut et le bas, mais chaque ligne garde ses
-      deux bouts francs. Un trait qui se fond sur sa propre longueur demande un
-      dégradé — c'est ce qu'on vérifie ici.
-    */
+  it('tourne : deux colonnes de même hauteur, coupées à deux hauteurs différentes', () => {
     const t = monter();
-    const traits = t.root.findAll(
-      (n) => n.props?.testID === 'trait-quadrillage',
+    const h = (g: string) => style(carte(t, g)).height;
+    const gauche = [h('Commencer le scan'), h('Voir un exemple')];
+    const droite = [h('Dessiner un plan sans scanner'), h('Comment ça marche')];
+    expect(gauche[0] + gauche[1]).toBe(droite[0] + droite[1]);
+    expect(gauche[0]).not.toBe(droite[0]);
+    // Le scan, geste principal, prend la grande tuile.
+    expect(gauche[0]).toBeGreaterThan(droite[0]);
+  });
+
+  it('la marque au moyeu, cernée du fond de la page, et qui ne prend pas le doigt', () => {
+    const t = monter();
+    const moyeu = t.root.findAll((n) => {
+      const st = StyleSheet.flatten(n.props?.style) as { position?: string; borderColor?: string } | undefined;
+      return st?.position === 'absolute' && st?.borderColor === light.bg && n.findAllByType(LogoMark).length === 1;
+    })[0];
+    expect(moyeu).toBeDefined();
+    expect(moyeu.props.pointerEvents).toBe('none');
+  });
+
+  it('chaque tuile s’enfonce et revient sous le doigt', () => {
+    const t = monter();
+    for (const g of GESTES) {
+      const b = bouton(t, g);
+      expect(typeof b.props.onPressIn).toBe('function');
+      expect(typeof b.props.onPressOut).toBe('function');
+      act(() => b.props.onPressIn());
+      act(() => b.props.onPressOut());
+    }
+  });
+
+  it('lance le scan au doigt', async () => {
+    const t = monter();
+    await act(async () => {
+      bouton(t, 'Commencer le scan').props.onPress();
+    });
+    expect(useScanStore.getState().screen).toBe('scan');
+  });
+
+  it('se tait tant qu’on ne sait pas si l’appareil sait scanner', () => {
+    useScanStore.setState({ supported: null });
+    const t = monter();
+    const b = bouton(t, 'Commencer le scan');
+    expect(b.props.disabled).toBe(true);
+    expect(b.props.accessibilityState?.disabled).toBe(true);
+    expect(textes(t)).toContain('Vérification…');
+  });
+
+  it('dessine un plan vierge', () => {
+    const t = monter();
+    act(() => bouton(t, 'Dessiner un plan sans scanner').props.onPress());
+    expect(useScanStore.getState().screen).toBe('result');
+    expect(useScanStore.getState().planVierge).toBe(true);
+  });
+
+  it('ouvre l’appartement d’exemple, sans rien enregistrer', () => {
+    const t = monter();
+    act(() => bouton(t, 'Voir un exemple').props.onPress());
+    const st = useScanStore.getState();
+    expect(st.screen).toBe('result');
+    expect(st.scanName).toBe(NOM_EXEMPLE);
+    expect(st.rooms.map((r) => r.name)).toEqual(
+      expect.arrayContaining(['Séjour', 'Chambre', 'Salle d’eau', 'Entrée', 'Bureau']),
     );
-    expect(traits.length).toBeGreaterThan(0);
-    /*
-      ON LIT LE NŒUD COMPOSITE, PAS SON HÔTE. `findAll` rend les deux, et
-      `react-native-svg` transforme la couleur en objet avant de la passer à
-      la vue native : sur l'hôte, on ne lit plus qu'un « [object Object] ».
-    */
-    const dits = traits
-      .map((n) => n.props.stroke)
-      .filter((v): v is string => typeof v === 'string');
-    expect(dits.length).toBeGreaterThan(0);
-    for (const v of dits) expect(v).toMatch(/^url\(#/);
-    expect(t.root.findAllByType(SvgLinearGradient).length).toBeGreaterThan(0);
+    expect(st.objects.length).toBeGreaterThan(10);
+    expect(st.currentSaveId).toBeNull();
+    expect(st.dirty).toBe(false);
+    expect(st.saves).toHaveLength(0);
   });
 
-  it('le vide qui reste est VOULU, pas un trou', () => {
-    /*
-      LE CONTRÔLE EN SENS INVERSE. Retirer la maquette sans rien mettre à sa
-      place ferait remonter les boutons de deux cents points : la marque du
-      haut et les portes du bas changeraient d'assiette, et l'on ne
-      reconnaîtrait plus l'écran. La place est donc TENUE — c'est le vide qui
-      fait l'épuré, et il est déclaré.
-    */
+  it('« Comment ça marche » rejoue la présentation du premier lancement', () => {
+    usePremieresFois.setState({ charge: true, vues: ['accueil', 'allumer'] });
     const t = monter();
-    const respire = t.root
-      .findAllByType(View)
-      .map((n) => (StyleSheet.flatten(n.props.style as never) ?? {}) as Record<string, number>)
-      .filter((st) => st.flex === 1 && typeof st.minHeight === 'number');
-    expect(respire.length).toBeGreaterThan(0);
+    act(() => bouton(t, 'Comment ça marche').props.onPress());
+    expect(usePremieresFois.getState().vues).toEqual(['allumer']);
+  });
+});
+
+describe('sur un appareil sans LiDAR', () => {
+  it('n’offre plus le scan, dit pourquoi, et garde le reste', () => {
+    useScanStore.setState({ supported: false });
+    const t = monter();
+    expect(bouton(t, 'Commencer le scan')).toBeUndefined();
+    expect(bouton(t, 'Scan indisponible sur cet appareil')).toBeDefined();
+    const vu = textes(t);
+    expect(vu).toContain('pas compatible');
+    expect(vu).toContain('capteur LiDAR');
+    expect(bouton(t, 'Dessiner un plan sans scanner')).toBeDefined();
+    expect(bouton(t, 'Voir un exemple')).toBeDefined();
+  });
+});
+
+describe('vos plans', () => {
+  const quatre = () =>
+    useScanStore.setState({
+      saves: [
+        plan('a', 'Studio Hugo', 1000),
+        plan('b', 'Appartement Dupont', 4000),
+        plan('c', 'Maison Leroy', 3000),
+        plan('d', 'Garage', 2000),
+      ] as never,
+    });
+
+  it('pour qui n’a encore rien : pas de liste vide, la feuille où tracer', () => {
+    const t = monter();
+    expect(textes(t)).not.toContain('Vos plans');
+    expect(bouton(t, 'Mes scans')).toBeUndefined();
+    expect(t.root.findAllByType(TraceUnePiece)).toHaveLength(1);
   });
 
-  /*
-   * ET LA FEUILLE SERT À TRACER.
-   *
-   * Relevé du patron : « il y a trop d'espace inutilisé », puis « essaye le
-   * tracé ». Le vide arrête d'être un fond : on y dessine sa pièce du doigt.
-   *
-   * LA RÉPONSE FACILE ÉTAIT D'Y METTRE LES DERNIERS PLANS — et le patron l'a
-   * écartée d'une phrase : « il faut penser aux nouveaux qui n'ont pas de
-   * plan ». Une idée qui ne marche qu'au bout de trois relevés n'est pas une
-   * idée. Ce geste-ci est le même au premier lancement et au centième.
-   */
-  const feuille = (t: TestRenderer.ReactTestRenderer) =>
-    t.root.findByType(TraceUnePiece);
-
-  it('le vide est une feuille sur laquelle on trace', () => {
-    expect(monter().root.findAllByType(TraceUnePiece)).toHaveLength(1);
+  it('les trois derniers touchés, dans l’ordre, sur l’accueil même', () => {
+    quatre();
+    const t = monter();
+    expect(textes(t)).toContain('Vos plans');
+    const cartes = t.root
+      .findAll((n) => typeof n.props?.onPress === 'function' && String(n.props?.accessibilityLabel ?? '').startsWith('Ouvrir '))
+      .map((n) => n.props.accessibilityLabel);
+    expect(cartes).toHaveLength(PLANS_A_LACCUEIL);
+    expect(cartes).toEqual(['Ouvrir Appartement Dupont', 'Ouvrir Maison Leroy', 'Ouvrir Garage']);
+    // Plus de feuille à tracer : la place est aux projets.
+    expect(t.root.findAllByType(TraceUnePiece)).toHaveLength(0);
   });
+
+  it('un appui ouvre le plan', () => {
+    quatre();
+    const ouvre = jest.fn();
+    const avant = useScanStore.getState().openSave;
+    useScanStore.setState({ openSave: ouvre } as never);
+    const t = monter();
+    act(() => bouton(t, 'Ouvrir Maison Leroy').props.onPress());
+    expect(ouvre).toHaveBeenCalledWith('c');
+    useScanStore.setState({ openSave: avant } as never);
+  });
+
+  it('la bibliothèque est au bout du titre, avec son compte', () => {
+    quatre();
+    const t = monter();
+    const lien = bouton(t, 'Mes scans');
+    expect(lien).toBeDefined();
+    const badge = lien.findAll((n) => n.props?.accessibilityLabel === 'Nombre de scans')[0];
+    expect(badge.findAllByType(Text).map((n) => String(n.props.children))).toContain('4');
+    act(() => lien.props.onPress());
+    expect(useScanStore.getState().screen).toBe('library');
+  });
+
+  it('la recherche n’apparaît qu’avec beaucoup de plans, et trouve sans accents', () => {
+    quatre();
+    let t = monter();
+    expect(t.root.findAllByType(TextInput)).toHaveLength(0);
+    act(() => t.unmount());
+    arbre = null;
+    useScanStore.setState({
+      saves: Array.from({ length: RECHERCHE_DES }, (_, i) =>
+        plan(`p${i}`, i === 2 ? 'Chambre d’Élodie' : `Chantier ${i}`, i),
+      ) as never,
+    });
+    t = monter();
+    const champ = t.root.findByType(TextInput);
+    act(() => champ.props.onChangeText('elodie'));
+    const cartes = t.root
+      .findAll((n) => typeof n.props?.onPress === 'function' && String(n.props?.accessibilityLabel ?? '').startsWith('Ouvrir '))
+      .map((n) => n.props.accessibilityLabel);
+    expect(cartes).toEqual(['Ouvrir Chambre d’Élodie']);
+    // Pendant qu'on cherche, le moulinet s'efface : on cherche, on ne commence pas.
+    expect(bouton(t, 'Commencer le scan')).toBeUndefined();
+    act(() => champ.props.onChangeText('zzz'));
+    expect(textes(t)).toContain('Aucun plan ne porte ce nom.');
+  });
+
+  it('le relevé interrompu passe en tête des plans', () => {
+    quatre();
+    useScanStore.setState({
+      brouillon: {
+        at: Date.now() - 5 * 60000,
+        name: 'Visite',
+        walls: plan('x', 'x', 0).walls,
+        openings: [],
+        objects: [],
+        rooms: [],
+        fixtures: [],
+        ceiling: [],
+        photos: [],
+        modelPath: null,
+      } as never,
+    });
+    const t = monter();
+    const vu = textes(t);
+    expect(vu.indexOf('Relevé interrompu')).toBeLessThan(vu.indexOf('Appartement Dupont'));
+    expect(vu).toContain('Un relevé vous attend.');
+  });
+});
+
+describe('la première pièce, au doigt', () => {
+  const feuille = (t: TestRenderer.ReactTestRenderer) => t.root.findByType(TraceUnePiece);
 
   it('une pièce tracée ouvre un plan QUI LA CONTIENT', () => {
-    /*
-      C'est ce que le geste raccourcit. « Dessiner un plan » ouvre un plan
-      VIDE : il faut ensuite ajouter une pièce, choisir sa taille, la poser —
-      deux écrans avant le premier trait. Ici le rectangle est posé dans la
-      foulée, et l'on arrive sur SON plan.
-    */
     const t = monter();
     act(() => feuille(t).props.onTracee(3, 2.5));
     const st = useScanStore.getState();
     expect(st.screen).toBe('result');
     expect(st.rooms).toHaveLength(1);
-    // Quatre murs, aux cotes tracées.
-    expect(st.walls).toHaveLength(4);
-    const largeurs = st.walls.map((w) =>
-      Math.round(Math.hypot(w.b.x - w.a.x, w.b.z - w.a.z) * 100) / 100,
-    );
+    const largeurs = st.walls.map((w) => Math.round(Math.hypot(w.b.x - w.a.x, w.b.z - w.a.z) * 100) / 100);
     expect(largeurs.sort()).toEqual([2.5, 2.5, 3, 3]);
   });
 
   it('et un plan déjà gardé n’empêche pas d’en tracer un autre', () => {
-    /*
-      SCANNER EST LIBRE — le Pro se vend à l'export, pas au nombre de
-      logements. Un compte gratuit qui a déjà gardé un plan trace le suivant,
-      et aucune offre ne se met en travers du geste.
-    */
     act(() => {
       useAccountStore.setState({ pro: false, plansUtilises: 1, surpriseVisible: false, paywallVisible: false });
       useScanStore.getState().reset();
@@ -439,410 +477,63 @@ describe('l’accueil', () => {
     expect(useScanStore.getState().rooms).toHaveLength(1);
     const st = useAccountStore.getState();
     expect(st.surpriseVisible || st.paywallVisible).toBe(false);
-    act(() => {
-      useAccountStore.setState({ plansUtilises: 0 });
-    });
-  });
-
-  it('porte ses deux boutons, et le second seulement s’il y a des scans', () => {
-    let t = monter();
-    expect(bouton(t, 'Commencer le scan')).toBeDefined();
-    expect(bouton(t, 'Mes scans')).toBeUndefined();
-    act(() => t.unmount());
-    arbre = null;
-    useScanStore.setState({
-      saves: [
-        {
-          id: 's1',
-          name: 'Chantier',
-          date: 1,
-          walls: [],
-          openings: [],
-          objects: [],
-          rooms: [],
-        } as never,
-      ],
-    });
-    t = monter();
-    expect(bouton(t, 'Mes scans')).toBeDefined();
-  });
-
-  it('lance le scan au doigt', async () => {
-    const t = monter();
-    // Le départ demande l'autorisation de la caméra puis ouvre la session :
-    // deux promesses avant que l'écran ne change.
-    await act(async () => {
-      bouton(t, 'Commencer le scan')!.props.onPress();
-    });
-    expect(useScanStore.getState().screen).toBe('scan');
-  });
-
-  /**
-   * LE BOUTON RESTE MORT TANT QUE L'APPAREIL N'EST PAS DIT COMPATIBLE.
-   *
-   * Un contour qui tourne sur un bouton qui ne fera rien est une promesse en
-   * l'air : l'animation s'arrête avec lui.
-   */
-  /*
-    IL NE L'ÉTEINT PLUS : IL LE RETIRE.
-
-    Ce banc exigeait que « Commencer le scan » soit là, désactivé. C'était
-    la moitié du chemin : un bouton éteint reste le plus gros élément de
-    l'écran, et sur un appareil sans LiDAR il annonçait en grand une chose
-    impossible, conseil de scan à l'appui. L'application sait pourtant tout
-    faire sans caméra — c'est même souvent le chemin le plus court.
-
-    Le scan disparaît donc, « Dessiner un plan » prend sa place et sa
-    couleur (voir plus bas), et le refus reste écrit : c'est lui qui
-    explique pourquoi.
-  */
-  it('retire le scan sur un appareil incompatible, et dit pourquoi', () => {
-    useScanStore.setState({ supported: false });
-    const t = monter();
-    expect(bouton(t, 'Commencer le scan')).toBeUndefined();
-    expect(textes(t)).toContain('pas compatible');
-  });
-});
-/**
- * « MES SCANS » EST CENTRÉ DANS SON BOUTON.
- *
- * Le mot et la pastille du compte vivaient côte à côte : c'est donc le
- * COUPLE qui se centrait, et le mot se retrouvait poussé à gauche du milieu
- * — d'autant plus loin que le nombre est long. Un bouton dont le texte
- * bouge selon le nombre de scans qu'on possède ne se lit pas comme un
- * bouton.
- *
- * La pastille se pose donc PAR RAPPORT au mot, à son bord droit, et ne pèse
- * plus rien dans le centrage.
- */
-describe('le bouton « Mes scans »', () => {
-  it('porte son compte à côté du mot, sur la même ligne', () => {
-    act(() => {
-      useScanStore.setState({
-        saves: [{ id: 's1' }, { id: 's2' }] as never,
-      });
-    });
-    const tree = monter();
-    const badge = tree.root
-      .findAllByType(View)
-      .find((n) => n.props.accessibilityLabel === 'Nombre de scans');
-    expect(badge).toBeDefined();
-    expect(badge!.findAllByType(Text).map((n) => String(n.props.children))).toContain('2');
-    /*
-      LE COMPTE VIT DANS LE BOUTON, À DROITE DU MOT — plus de pastille posée
-      en absolu à « 100 % » : le `Bouton` de la maison aligne le mot et ce
-      qu'on lui accroche sur une même rangée centrée, et rien ne dépend de
-      la hauteur d'une police.
-    */
-    const scans = bouton(tree, 'Mes scans')!;
-    expect(scans.findAll((n) => n.props?.accessibilityLabel === 'Nombre de scans').length).toBeGreaterThan(0);
-    const rangee = scans.findAll((n) => {
-      const st = StyleSheet.flatten(n.props?.style) as { flexDirection?: string; justifyContent?: string } | undefined;
-      return st?.flexDirection === 'row' && st?.justifyContent === 'center';
-    });
-    expect(rangee.length).toBeGreaterThan(0);
-    act(() => tree.unmount());
+    act(() => useAccountStore.setState({ plansUtilises: 0 }));
   });
 });
 
-describe('le logo de l’accueil', () => {
-  it('donne au glyphe la part du bloc que l’icône lui donne', () => {
+describe('la marque', () => {
+  /** Le filigrane : le LogoMark de 240, en retrait. */
+  const filigrane = (t: TestRenderer.ReactTestRenderer) =>
+    t.root.findAllByType(LogoMark).find((n) => n.props.size === 240)!;
+
+  it('le glyphe incrusté est dans l’angle, en retrait, et ne pousse ni ne prend rien', () => {
     const t = monter();
-    const logo = t.root.findByType(LogoMark);
+    const logo = filigrane(t);
+    expect(logo).toBeDefined();
+    expect(Number(logo.findByType(Svg).props.opacity)).toBeLessThanOrEqual(0.12);
+    expect(logo.findAllByType(Rect)).toHaveLength(0);
+    const cadre = logo.parent!;
+    expect((StyleSheet.flatten(cadre.props.style) as { position?: string }).position).toBe('absolute');
+    expect(cadre.props.pointerEvents).toBe('none');
+  });
+
+  it('la marque d’en-tête est le glyphe en blanc sur le bleu de l’app', () => {
+    const t = monter();
+    const marque = t.root.findAll((n) => n.props?.accessibilityLabel === 'EchoPlan')[0];
+    expect((StyleSheet.flatten(marque.props.style) as { backgroundColor?: string }).backgroundColor).toBe(light.blue);
+    expect(marque.findByType(LogoMark).props.teinte).toBe('#FFFFFF');
+  });
+
+  it('le glyphe garde la part du bloc que l’icône lui donne', () => {
+    const logo = filigrane(monter());
     let minX = Infinity;
     let maxX = -Infinity;
-    let minY = Infinity;
-    let maxY = -Infinity;
-    const chemins = logo.findAllByType(Path);
-    expect(chemins.length).toBeGreaterThanOrEqual(3);
-    for (const p of chemins) {
+    for (const p of logo.findAllByType(Path)) {
       const demi = (p.props.strokeWidth ?? 0) / 2;
-      // On ne lit que les POINTS D'ANCRAGE (M/L/H/V et l'arrivée des arcs) :
-      // rayons et drapeaux d'un « A » ne sont pas des coordonnées.
-      const d: string = p.props.d;
-      let x = 0;
-      let y = 0;
       const re = /([MLHVA])([^MLHVA]*)/g;
       let m: RegExpExecArray | null;
-      while ((m = re.exec(d))) {
+      let x = 0;
+      while ((m = re.exec(p.props.d))) {
         const nb = (m[2].trim().match(/-?[\d.]+/g) ?? []).map(Number);
         if (m[1] === 'H') x = nb[0];
-        else if (m[1] === 'V') y = nb[0];
-        else if (m[1] === 'A') {
-          x = nb[nb.length - 2];
-          y = nb[nb.length - 1];
-        } else {
-          x = nb[0];
-          y = nb[1];
-        }
+        else if (m[1] === 'V') continue;
+        else if (m[1] === 'A') x = nb[nb.length - 2];
+        else x = nb[0];
         minX = Math.min(minX, x - demi);
         maxX = Math.max(maxX, x + demi);
-        minY = Math.min(minY, y - demi);
-        maxY = Math.max(maxY, y + demi);
       }
     }
-    // L'icône : boîte de 33 × le zoom de 1,45 → 63 % du bloc de 76.
     expect((maxX - minX) / 76).toBeGreaterThan(0.61);
     expect((maxX - minX) / 76).toBeLessThan(0.66);
-    expect((maxY - minY) / 76).toBeGreaterThan(0.61);
-    expect((maxY - minY) / 76).toBeLessThan(0.66);
-    // Et il est CENTRÉ, comme sur l'icône : marges égales des quatre côtés.
-    expect(Math.abs((minX + maxX) / 2 - 38)).toBeLessThan(0.75);
-    expect(Math.abs((minY + maxY) / 2 - 38)).toBeLessThan(0.75);
   });
 });
 
-/**
- * L'ONDE DU BOUTON PRINCIPAL — l'écho, pas un reflet.
- *
- * Le bouton portait une bande claire qui le traversait toutes les trois
- * secondes. Elle avait le mérite de ne rien coûter (une translation, au fil
- * natif), mais c'est l'animation de n'importe quelle application : un
- * miroitement de carte bancaire, posé sur un bouton blanc où il se voit à
- * peine — relevé du patron : « refais une meilleure animation ».
- *
- * Ce que le bouton fait maintenant, l'application entière le fait déjà :
- * elle s'appelle EchoPlan, son logo émet des ondes à l'ouverture, et son
- * métier est de LIRE une pièce par écho. Le bouton émet donc la même chose
- * — deux anneaux qui naissent à son bord et se dilatent en s'effaçant.
- * C'est la marque qui bouge, pas un effet.
- *
- * Trois propriétés le rendent honnête, et ce banc les tient : les anneaux
- * vivent HORS du corps (qui rogne ce qu'il contient, sinon on ne verrait
- * rien dépasser), ils ne prennent jamais le doigt, et le second bouton de
- * l'accueil n'en a pas — deux choses qui bougent pour un seul geste à
- * faire, et l'œil ne sait plus laquelle est l'importante.
- */
-describe('le bouton ne s’anime que sous le doigt', () => {
-  /*
-    L'ONDE EST PARTIE — relevé du patron : « un style plus "Apple like",
-    pur (...) rien ne doit faire vieillot ». Le bouton d'accueil émettait
-    deux anneaux en boucle : c'est ce qui vieillit le plus vite dans une
-    interface. Il RÉPOND maintenant au doigt — un enfoncement, un ressort —
-    et c'est tout.
-  */
-  const anneaux = (dans: TestRenderer.ReactTestInstance) =>
-    dans.findAll((n) => {
-      const st = StyleSheet.flatten(n.props?.style) as
-        | { borderColor?: string; position?: string; backgroundColor?: string }
-        | undefined;
-      return st?.borderColor === light.blue && st?.position === 'absolute' && st?.backgroundColor === undefined;
-    });
-
-  it('aucun anneau au repos, sur aucun bouton', () => {
-    const t = monter();
-    for (const label of ['Commencer le scan', 'Dessiner un plan sans scanner']) {
-      const b = bouton(t, label)!;
-      expect(b).toBeDefined();
-      expect(anneaux(b)).toHaveLength(0);
+describe('la promesse', () => {
+  it('reste en pied de page — une phrase, pas une notice', () => {
+    const vu = textes(monter());
+    expect(vu).toContain('en plan coté');
+    for (const mot of ['Scannez', 'Ajustez', 'Explorez', 'Allumez les lumières']) {
+      expect(vu).not.toContain(mot);
     }
-  });
-
-  it('mais il s’enfonce et revient : les deux gestes du doigt sont branchés', () => {
-    const t = monter();
-    // Le `Bouton` est un composant ; le doigt, lui, touche sa pressable.
-    const scan = bouton(t, 'Commencer le scan')!.findAll(
-      (n) => typeof n.props?.onPressIn === 'function',
-    )[0];
-    expect(scan).toBeDefined();
-    expect(typeof scan.props.onPressOut).toBe('function');
-    act(() => scan.props.onPressIn());
-    act(() => scan.props.onPressOut());
-  });
-
-  it('« Vérification… » se dit éteint, tant qu’on ne sait pas si l’appareil sait scanner', () => {
-    useScanStore.setState({ supported: null });
-    const t = monter();
-    const scan = bouton(t, 'Commencer le scan')!;
-    expect(scan.props.disabled).toBe(true);
-    const pressable = scan.findAll((n) => n.props?.accessibilityState?.disabled === true)[0];
-    expect(pressable).toBeDefined();
-    useScanStore.setState({ supported: true });
-  });
-});
-
-describe('l’accueil sur un appareil sans LiDAR', () => {
-  const sansLidar = () => {
-    useScanStore.setState({ supported: false });
-    return monter();
-  };
-
-  it('met « Dessiner un plan » en avant, et n’offre plus le scan', () => {
-    const t = sansLidar();
-    const principal = bouton(t, 'Dessiner un plan sans scanner');
-    expect(principal).toBeDefined();
-    // Le geste possible porte la couleur ; le scan a disparu, plutôt que de
-    // rester en gros et éteint.
-    expect(principal!.props.variante).toBe('primaire');
-    expect(bouton(t, 'Commencer le scan')).toBeUndefined();
-  });
-
-  it('et se tait sur les conseils de scan', () => {
-    const vu = textes(sansLidar());
-    // « Allumez les lumières et dégagez le centre de la pièce » ne veut
-    // plus rien dire quand il n'y a pas de caméra à guider.
-    expect(vu).not.toContain('Allumez les lumières');
-    // Le refus, lui, reste : il explique POURQUOI le scan n'est pas là.
-    expect(vu).toContain('capteur LiDAR');
-  });
-
-  it('mais garde tout en place sur un appareil compatible', () => {
-    useScanStore.setState({ supported: true });
-    const t = monter();
-    expect(bouton(t, 'Commencer le scan')).toBeDefined();
-    /*
-      Le pied de page portait le conseil de scan — « allumez les lumières et
-      dégagez le centre de la pièce » — et il ne paraissait que sur un
-      appareil capable de scanner. Relevé du patron : c'est la PROMESSE qui
-      s'y tient maintenant, et elle ne dépend d'aucun capteur : un appareil
-      sans LiDAR dessine son plan au clavier, et la promesse tient toujours.
-    */
-    expect(textes(t)).toContain('Votre appartement en 3D');
-  });
-});
-
-
-/**
- * LE GLYPHE EST DANS LE FOND, IL N'EST PLUS POSÉ DESSUS.
- *
- * Relevé du patron : « sur la page d'accueil, la première image (icône de
- * l'app) est trop visible. Récupère que ce qui est dedans (l'angle et les 3
- * traits d'écho), supprime le fond blanc, et incruste-le dans le fond en
- * faible opacité. Pas de contour rien. »
- *
- * Il occupait le haut de l'accueil en badge blanc cerné d'un liseré, juste
- * au-dessus du logotype : deux fois la même marque l'une sur l'autre, et
- * c'est le badge — le plus bavard des deux — qui passait devant celui qui
- * porte le NOM.
- */
-describe('le glyphe incrusté', () => {
-  it('n’a plus ni fond blanc ni contour : les tracés, et rien d’autre', () => {
-    const logo = monter().root.findByType(LogoMark);
-    expect(logo.findAllByType(Rect)).toHaveLength(0);
-    // Les trois tracés restent : les deux ondes, et l'angle des murs.
-    expect(logo.findAllByType(Path).length).toBeGreaterThanOrEqual(3);
-  });
-
-  /*
-    L'AVATAR EST NOIR, CERNÉ DE BLEU — relevé du patron : « l'icône de
-    l'avatar à l'accueil doit être noire avec un contour bleu ».
-
-    Il se lisait dans le gris des textes secondaires : discret au point de se
-    confondre avec le prénom posé à côté, alors que c'est la seule porte de
-    l'accueil vers le compte. Le contour est une silhouette DILATÉE, pas un
-    filet suivi sur le tracé : un trait sur une forme pleine aurait épaissi
-    les trois lignes de la fiche jusqu'à les souder.
-
-    « Noir », c'est l'encre du THÈME : un noir en dur disparaîtrait sur un
-    fond sombre, et l'icône n'y serait plus qu'un contour bleu vide.
-  */
-  it('sans compte, la silhouette porte l’encre douce du thème, un seul tracé, sans cerne', () => {
-    /*
-      TROIS HABITS EN TROIS RELEVÉS, puis le rond. Le gris, l'encre cernée
-      de bleu, l'encre seule — et maintenant un rond en haut à droite,
-      l'initiale dedans (voir « porte le compte en haut à droite »). La
-      silhouette ne sert plus qu'à qui n'a pas de compte : un seul tracé, à
-      l'encre douce du THÈME — un noir en dur disparaîtrait sur fond sombre.
-    */
-    useAccountStore.setState({ compte: null });
-    const t = monter();
-    const avatar = t.root
-      .findAll(
-        (n) => n.props?.accessibilityLabel === 'Mon compte' &&
-          typeof n.props?.onPress === 'function',
-      )[0]
-      .findByType(AvatarGlyph);
-    expect(avatar.props.teinte).toBe(light.inkSoft);
-    const traces = avatar.findAllByType(Path);
-    expect(traces).toHaveLength(1);
-    expect(traces[0].props.fill).toBe(light.inkSoft);
-    expect(traces[0].props.stroke).toBeUndefined();
-  });
-
-  it('et se lit EN RETRAIT : on le sent, on ne le lit pas', () => {
-    const logo = monter().root.findByType(LogoMark);
-    expect(Number(logo.findByType(Svg).props.opacity)).toBeLessThanOrEqual(0.12);
-  });
-
-  it('posé en absolu : une incrustation ne pousse rien', () => {
-    const t = monter();
-    const logo = t.root.findByType(LogoMark);
-    let n: TestRenderer.ReactTestInstance | null = logo.parent;
-    let absolu = false;
-    while (n && !absolu) {
-      const st = StyleSheet.flatten(n.props?.style) as { position?: string };
-      if (st?.position === 'absolute') absolu = true;
-      if (n.type === HomeScreen) break;
-      n = n.parent;
-    }
-    expect(absolu).toBe(true);
-  });
-});
-
-/**
- * LE HÉROS DESCEND, ET LA PHRASE PART EN PIED DE PAGE.
- *
- * Relevé du patron : « sur l'accueil, descends le logo EchoPlan, et l'icône
- * qu'on vient de modifier avec, en suivant la même descente. Supprime le
- * texte sous le logo (votre appartement…), intègre-le en bas de page à la
- * place de "allumez les lumières", etc. »
- *
- * Le bloc d'accueil était collé sous la barre du haut, et il portait trois
- * choses : le glyphe, le mot, et la promesse. Le mot se retrouvait au
- * milieu d'un sandwich, et la promesse — ce qu'on VEND — se lisait en gris
- * clair juste sous lui, là où l'œil est encore occupé par la marque.
- *
- * Elle descend en pied de page, à la place du conseil de scan : c'est la
- * dernière chose qu'on lit avant de toucher le bouton, et c'est là qu'une
- * promesse a sa place. Le glyphe, lui, est DANS le bloc — il descend donc
- * avec lui, sans qu'on ait à le descendre séparément.
- */
-describe('le bloc d’accueil descendu', () => {
-  /** Le bloc de la marque : le plus PROCHE ancêtre du glyphe qui porte
-   *  aussi le logotype — la page entière les contient tous les deux. */
-  const hero = (t: TestRenderer.ReactTestRenderer) => {
-    let n: TestRenderer.ReactTestInstance | null = t.root.findByType(LogoMark)
-      .parent;
-    while (n) {
-      if (n.findAllByType(Image).length > 0) return n;
-      n = n.parent;
-    }
-    return null;
-  };
-
-  it('descend d’un cran sous la barre du haut', () => {
-    const bloc = hero(monter());
-    expect(bloc).toBeDefined();
-    const st = StyleSheet.flatten(bloc!.props.style) as { marginTop?: number };
-    expect(Number(st.marginTop ?? 0)).toBeGreaterThanOrEqual(24);
-  });
-
-  it('et le glyphe descend avec lui : il vit dedans', () => {
-    const bloc = hero(monter());
-    expect(bloc!.findAllByType(LogoMark)).toHaveLength(1);
-  });
-
-  it('la promesse a quitté le dessous du logo pour le pied de page', () => {
-    const t = monter();
-    const vu = textes(t);
-    expect(vu).toContain('Votre appartement en 3D');
-    // Elle n'est plus dans le bloc de la marque.
-    const dansLeHero = hero(t)!
-      .findAllByType(Text)
-      .map((x) => String(x.props.children))
-      .join(' | ');
-    expect(dansLeHero).not.toContain('Votre appartement');
-  });
-
-  /*
-    LE CONSEIL DE SCAN S'EN VA AVEC ELLE.
-
-    « Allumez les lumières et dégagez le centre de la pièce » a occupé ce
-    pied de page pendant plusieurs versions — c'est un bon conseil de
-    chantier, mais il vient trop tôt : on le lit sur l'accueil, on scanne
-    dix minutes plus tard. La promesse, elle, se lit juste avant d'appuyer.
-  */
-  it('et le conseil de scan a quitté l’accueil', () => {
-    expect(textes(monter())).not.toContain('Allumez les lumières');
   });
 });

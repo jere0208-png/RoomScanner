@@ -56,7 +56,9 @@ interface Etat {
   charger: () => Promise<void>;
   estNeuve: (k: PremiereFois) => boolean;
   marquer: (k: PremiereFois) => void;
-  /** Tout remettre à neuf — pour les bancs, et pour un futur « revoir ». */
+  /** Rejoue UNE première fois — « Comment ça marche » sur l'accueil. */
+  revoir: (k: PremiereFois) => void;
+  /** Tout remettre à neuf — pour les bancs. */
   oublier: () => void;
 }
 
@@ -100,6 +102,13 @@ export const usePremieresFois = create<Etat>((set, get) => ({
   marquer: (k) => {
     if (get().vues.includes(k)) return;
     const vues = [...get().vues, k];
+    set({ vues });
+    AsyncStorage.setItem(CLE, JSON.stringify(vues)).catch(() => {});
+  },
+
+  revoir: (k) => {
+    if (!get().vues.includes(k)) return;
+    const vues = get().vues.filter((x) => x !== k);
     set({ vues });
     AsyncStorage.setItem(CLE, JSON.stringify(vues)).catch(() => {});
   },

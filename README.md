@@ -14285,6 +14285,54 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## L'accueil refait : une identité, et le travail sous les yeux
+
+Relevé du patron, image de référence à l'appui : « une vraie identité, plus
+qu'un logo et trois boutons ; un design épuré et unique, ludique et
+compréhensible, un petit message d'accueil moderne ; les projets directement
+visibles sur la page ».
+
+L'ancien accueil (logotype, feuille quadrillée, « Commencer le scan »,
+« Dessiner un plan », « Mes scans ») était juste pour qui le voyait la
+première fois, vide pour qui revenait : ses plans étaient un écran plus loin.
+La page se lit maintenant de haut en bas :
+
+- **Qui et quand** — la marque (le glyphe blanc sur le bleu de l'app), la date
+  en français (`dateDuJour`, écrite à la main : les options de
+  `toLocaleDateString` ne sont pas garanties partout), le rond du compte. Puis
+  le **salut en deux tons** : « Bonsoir, Jérémy. » à l'encre, et la question
+  du moment en retrait (`questionDuJour`) — le relevé interrompu d'abord, le
+  premier plan pour qui n'a rien, « Que mesure-t-on aujourd'hui ? » pour
+  l'habitué. Le prénom vit dans la phrase, jamais en étiquette colorée.
+- **Le moulinet** — quatre tuiles pastel autour de la marque : *Scanner une
+  pièce*, *Dessiner un plan*, *Voir un exemple*, *Comment ça marche*. Deux
+  colonnes de même hauteur coupées à deux hauteurs différentes (152 / 126) :
+  c'est ce décalage qui fait tourner l'ensemble. Le moyeu porte le glyphe,
+  cerné du fond de la page, et respire doucement. Chaque tuile s'enfonce au
+  ressort sous le doigt. Teintes : `TEINTES_TUILES` (clair et sombre).
+- **Vos plans** — les trois derniers touchés (vignette, résumé, « il y a
+  2 h »), ouverts d'un appui ; « Tout voir » et le nombre de plans mènent à la
+  bibliothèque ; le relevé interrompu passe en tête ; la recherche (sans
+  accents) n'apparaît qu'à partir de six plans.
+- **La première pièce** — pour qui n'a encore aucun plan, la place n'est pas
+  vide : c'est la feuille où l'on trace une pièce au doigt. Le défilement de
+  la page se coupe le temps du tracé (`TraceUnePiece.onGeste`).
+
+**L'appartement d'exemple** (`src/data/exemple.ts`, `ouvrirExemple`) : un T2
+meublé de 48 m² — séjour avec cuisine ouverte, chambre, salle d'eau, entrée,
+bureau — qu'on ouvre depuis l'accueil pour tourner la 3D, s'y promener et voir
+ce qu'il faut acheter avant d'avoir relevé quoi que ce soit. Rien n'est
+enregistré tant qu'on ne touche pas « Enregistrer ». Ses meubles sont posés
+contre la face des murs avec un centimètre de jeu.
+
+**« Comment ça marche »** rejoue la présentation du premier lancement
+(`usePremieresFois.revoir('accueil')`).
+
+Le filigrane du glyphe garde la taille et le retrait de l'écran de lancement
+(240, 7 %) : le banc `lancement` les lit ici.
+
+Bancs : `accueil` (réécrit), `exemple`, `brouillon`.
+
 ## Le reste aux cotes du mètre : étages et plafond
 
 Relevé du patron : « fais pareil pour tout le reste ».

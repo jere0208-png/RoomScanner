@@ -40,7 +40,7 @@ jest.mock('react-native-room-scan', () => ({
 }));
 
 import React from 'react';
-import { Text, TouchableOpacity } from 'react-native';
+import { Text } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import { HomeScreen } from '../src/screens/HomeScreen';
 import { useScanStore, type BrouillonScan } from '../src/store/scanStore';
@@ -259,10 +259,12 @@ describe('l’accueil et le relevé interrompu', () => {
           .join(''),
       )
       .join(' | ');
+  /* Les gestes de l'accueil sont des `Pressable` depuis la refonte : on les
+     cherche par leur étiquette et leur geste, pas par leur composant. */
   const bouton = (arbre: TestRenderer.ReactTestRenderer, label: string) =>
-    arbre.root
-      .findAllByType(TouchableOpacity)
-      .find((n) => n.props.accessibilityLabel === label);
+    arbre.root.findAll(
+      (n) => n.props?.accessibilityLabel === label && typeof n.props?.onPress === 'function',
+    )[0];
 
   it('n’affiche rien quand il n’y a rien à reprendre', () => {
     useScanStore.setState({ brouillon: null, supported: true, saves: [] });

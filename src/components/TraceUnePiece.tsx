@@ -86,17 +86,30 @@ export function TraceUnePiece({
   height,
   palette,
   onTracee,
+  onGeste,
 }: {
   width: number;
   height: number;
   palette: Palette;
   /** La pièce validée, en MÈTRES : largeur puis profondeur. */
   onTracee: (largeur: number, profondeur: number) => void;
+  /**
+   * LE DOIGT EST POSÉ, OU LEVÉ — pour la page qui porte la feuille.
+   *
+   * Depuis la refonte de l'accueil, la feuille vit dans une page qui
+   * défile. Refuser de céder le geste ne suffit pas sur iOS : le défilement
+   * natif part quand même, et le rectangle s'arrête au premier glissé
+   * vertical. La page coupe donc son défilement le temps du tracé.
+   */
+  onGeste?: (actif: boolean) => void;
 }) {
   const c = palette;
   const styles = getStyles(c);
   const [coins, setCoins] = useState<{ a: Coin; b: Coin } | null>(null);
   const depart = useRef<Coin | null>(null);
+  /* Le rappel vit dans une référence : le répondeur, lui, est créé une fois. */
+  const geste = useRef(onGeste);
+  geste.current = onGeste;
 
   /*
     LA FEUILLE A DES BORDS, MÊME FONDUS.
@@ -117,6 +130,7 @@ export function TraceUnePiece({
       onMoveShouldSetPanResponder: () => true,
       onPanResponderTerminationRequest: () => false,
       onPanResponderGrant: (e: GestureResponderEvent) => {
+        geste.current?.(true);
         depart.current = {
           x: e.nativeEvent.locationX,
           y: e.nativeEvent.locationY,
@@ -135,6 +149,7 @@ export function TraceUnePiece({
         });
       },
       onPanResponderRelease: (e: GestureResponderEvent) => {
+        geste.current?.(false);
         const a = depart.current;
         depart.current = null;
         if (!a) return;
@@ -154,6 +169,7 @@ export function TraceUnePiece({
         haptic('leger');
       },
       onPanResponderTerminate: () => {
+        geste.current?.(false);
         depart.current = null;
       },
     }),
