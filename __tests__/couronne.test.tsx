@@ -303,18 +303,25 @@ describe('la rotation 3D survit au lâcher', () => {
       // La vue ne part qu'au battement suivant : un seul rendu par image.
       jest.advanceTimersByTime(20);
     });
-    const tourne = vues[vues.length - 1];
-    expect(tourne).toBeDefined();
-    // Le doigt a poussé vers la droite : l'angle a changé.
-    expect(tourne.theta).not.toBe(30);
+    /*
+      PENDANT LE GESTE, LA VUE RESTE DANS LA MAQUETTE — l'écran du plan ne
+      se redessine plus à chaque degré (voir « LA VUE VIVE »). Il apprend où
+      l'on s'est arrêté, au lâcher.
+    */
+    expect(vues).toHaveLength(0);
 
     act(() => {
       zone.props.onResponderRelease?.(doigt3d(280, 300, 200, 300));
       jest.advanceTimersByTime(20);
     });
     // ET IL RESTE. C'est tout le défaut : au lâcher, la vue repartait à 30.
-    const finale = vues[vues.length - 1];
-    expect(finale.theta).toBe(tourne.theta);
+    expect(vues).toHaveLength(1);
+    const finale = vues[0];
+    expect(finale.theta).not.toBe(30);
+    act(() => {
+      jest.advanceTimersByTime(100);
+    });
+    expect(vues[vues.length - 1].theta).toBe(finale.theta);
     act(() => tree.unmount());
   });
 });

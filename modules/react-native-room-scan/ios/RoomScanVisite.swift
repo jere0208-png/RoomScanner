@@ -27,6 +27,20 @@ import UIKit
  * d'une demi-lame un rang sur deux) sont dessinées dans une image, répétée
  * à l'échelle réelle sur le sol. Elle ne dépend d'aucun tri et ne disparaît
  * sous aucun angle.
+ *
+ * LA MAQUETTE AUSSI — relevé du patron : « le modèle 3D d'un plan avec des
+ * meubles est très lent ; les autres apps sont fluides, peu importe le
+ * nombre de meubles ». La vue 3D du plan passe par cette même vue, en mode
+ * ORBITE (voir `geometry/maquette3d.ts`) :
+ *
+ *   `orientes` : même format que `maillage`, mais leur dos n'est jamais
+ *                dessiné — c'est ce qui ouvre la maison de poupée ;
+ *   `ecorche`  : les faces extérieures des murs, voilées par la carte
+ *                graphique quand elles nous font face (`voile`) ;
+ *   `orbite`   : [cible (3), axe vers l'œil (3), haut (3), demi-hauteur
+ *                visible en mètres] — une caméra ORTHOGRAPHIQUE, qui tombe
+ *                au pixel sur la projection des cotes posées par-dessus ;
+ *   `levee`, `solY` : le logement qui monte de son sol, au retour d'un scan.
  */
 @objc(RoomScanVisite)
 final class RoomScanVisite: UIView {
@@ -35,6 +49,10 @@ final class RoomScanVisite: UIView {
   private let oeil = SCNNode()
   /// Le bâti : remplacé d'un bloc quand la scène change, jamais retouché.
   private let bati = SCNNode()
+  /// Les trois lumières, gardées : la maquette les règle autrement.
+  private let ambiante = SCNLight()
+  private let jour = SCNLight()
+  private let contre = SCNLight()
 
   @objc var maillage: [NSNumber] = [] {
     didSet { rebatir() }
@@ -50,6 +68,30 @@ final class RoomScanVisite: UIView {
 
   @objc var fond: String = "#DCE8F4" {
     didSet { vue.backgroundColor = couleur(fond) ?? .white }
+  }
+
+  @objc var orientes: [NSNumber] = [] {
+    didSet { rebatir() }
+  }
+
+  @objc var ecorche: [NSNumber] = [] {
+    didSet { rebatir() }
+  }
+
+  @objc var voile: Bool = true {
+    didSet { rebatir() }
+  }
+
+  @objc var orbite: [NSNumber] = [] {
+    didSet { placerOeil() }
+  }
+
+  @objc var levee: NSNumber = 1 {
+    didSet { lever() }
+  }
+
+  @objc var solY: NSNumber = 0 {
+    didSet { lever() }
   }
 
   override init(frame: CGRect) {
@@ -86,7 +128,6 @@ final class RoomScanVisite: UIView {
     // LA LUMIÈRE : une ambiance franche, un jour qui vient d'en haut et
     // d'un côté, un contre-jour plus faible de l'autre — assez pour que
     // deux murs d'une même teinte se distinguent à l'angle.
-    let ambiante = SCNLight()
     ambiante.type = .ambient
     ambiante.intensity = 620
     ambiante.color = UIColor.white
@@ -94,7 +135,6 @@ final class RoomScanVisite: UIView {
     noeudAmbiant.light = ambiante
     scene.rootNode.addChildNode(noeudAmbiant)
 
-    let jour = SCNLight()
     jour.type = .directional
     jour.intensity = 420
     jour.castsShadow = false
@@ -103,7 +143,6 @@ final class RoomScanVisite: UIView {
     noeudJour.eulerAngles = SCNVector3(x: -Float.pi / 2.6, y: Float.pi / 5, z: 0)
     scene.rootNode.addChildNode(noeudJour)
 
-    let contre = SCNLight()
     contre.type = .directional
     contre.intensity = 200
     contre.castsShadow = false
@@ -153,6 +192,11 @@ final class RoomScanVisite: UIView {
   // ------------------------------------------------------------- caméra
 
   private func placerOeil() {
+    if orbite.count >= 10 {
+      placerOrbite()
+      return
+    }
+    oeil.camera?.usesOrthographicProjection = false
     guard camera.count >= 6 else { return }
     let x = camera[0].floatValue
     let y = camera[1].floatValue
@@ -180,12 +224,119 @@ final class RoomScanVisite: UIView {
     SCNTransaction.commit()
   }
 
+  /**
+   * LA CAMÉRA DE LA MAQUETTE — orthographique, comme la projection des cotes
+   * posées par-dessus en JavaScript. L'œil se pose sur l'axe, loin, et
+   * regarde la cible ; « haut » reste le haut de l'écran. La demi-hauteur
+   * visible fait l'échelle : c'est elle qui zoome.
+   */
+  private func placerOrbite() {
+    let o = orbite.map { $0.floatValue }
+    guard o.count >= 10, o.allSatisfy({ $0.isFinite }), o[9] > 0.01 else { return }
+    let cible = SCNVector3(x: o[0], y: o[1], z: o[2])
+    let vers = SCNVector3(x: o[3], y: o[4], z: o[5])
+    let haut = SCNVector3(x: o[6], y: o[7], z: o[8])
+    // Assez loin pour que tout le logement soit devant l'œil, quel que soit
+    // l'angle ; la profondeur visible suit.
+    let recul: Float = 80
+    SCNTransaction.begin()
+    SCNTransaction.animationDuration = 0
+    SCNTransaction.disableActions = true
+    if let cam = oeil.camera {
+      cam.usesOrthographicProjection = true
+      cam.orthographicScale = Double(o[9])
+      cam.zNear = 1
+      cam.zFar = Double(recul * 2)
+      // L'occlusion ambiante est faite pour une perspective : sur une vue
+      // orthographique, elle creuse des halos là où il n'y a rien.
+      cam.screenSpaceAmbientOcclusionIntensity = 0
+    }
+    /*
+      LA LUMIÈRE DE LA MAQUETTE. Vue de dessus, l'arase des murs et les sols
+      reçoivent le jour de face : avec les réglages de la visite, ils
+      saturaient en blanc, et le sable du sol ne se distinguait plus du blanc
+      cassé des murs. On rend au dessus SA couleur, et les flancs gardent
+      assez d'écart pour qu'un angle se lise.
+    */
+    ambiante.intensity = 640
+    jour.intensity = 380
+    contre.intensity = 160
+    oeil.position = SCNVector3(
+      x: cible.x + vers.x * recul, y: cible.y + vers.y * recul, z: cible.z + vers.z * recul)
+    oeil.look(at: cible, up: haut, localFront: SCNVector3(x: 0, y: 0, z: -1))
+    SCNTransaction.commit()
+  }
+
+  /**
+   * LA LEVÉE — le logement monte de son sol, au retour d'un scan. Le sol ne
+   * bouge pas : tout ce qui est dessus s'écrase vers lui, puis se relève.
+   * C'est exactement ce que fait la projection des cotes par-dessus.
+   */
+  private func lever() {
+    let k = max(0.001, min(1, levee.floatValue))
+    let y0 = solY.floatValue
+    SCNTransaction.begin()
+    SCNTransaction.animationDuration = 0
+    SCNTransaction.disableActions = true
+    bati.scale = SCNVector3(x: 1, y: k, z: 1)
+    bati.position = SCNVector3(x: 0, y: y0 * (1 - k), z: 0)
+    SCNTransaction.commit()
+  }
+
   // --------------------------------------------------------------- bâti
 
+  /*
+    UNE RECONSTRUCTION PAR PASSAGE, PAS PAR PROPRIÉTÉ. Au montage, la vue
+    reçoit ses tableaux un par un — maillage, sols, orientés, écorché — et
+    chacun relançait la construction de tout le bâti. On la reporte au tour
+    suivant de la boucle principale : quatre propriétés, une construction.
+  */
+  private var rebatirPrevu = false
+
   private func rebatir() {
+    guard !rebatirPrevu else { return }
+    rebatirPrevu = true
+    DispatchQueue.main.async { [weak self] in
+      guard let self = self else { return }
+      self.rebatirPrevu = false
+      self.rebatirMaintenant()
+    }
+  }
+
+  private func rebatirMaintenant() {
     for enfant in bati.childNodes { enfant.removeFromParentNode() }
-    if let g = geometrieDuBati() {
+    if let g = geometrie(maillage, deuxFaces: true) {
       bati.addChildNode(SCNNode(geometry: g))
+    }
+    if let g = geometrie(orientes, deuxFaces: false) {
+      bati.addChildNode(SCNNode(geometry: g))
+    }
+    if let g = geometrie(ecorche, deuxFaces: false) {
+      if voile, let m = g.firstMaterial {
+        /*
+          L'ÉCORCHÉ, CALCULÉ AU PIXEL. Une face extérieure de mur qui nous
+          fait face masque la pièce : elle se voile, jusqu'à quinze pour cent,
+          de quoi garder la trace du mur. Vue de champ, elle reste pleine. La
+          normale est dans le repère de l'œil : sa composante z dit à quel
+          point la face nous regarde — le même nombre que le JavaScript
+          appelait « vers ».
+        */
+        m.shaderModifiers = [
+          .fragment: """
+          #pragma transparent
+          #pragma body
+          float vers = normalize(_surface.normal).z;
+          float a = 1.0 - 0.85 * smoothstep(0.08, 0.5, vers);
+          _output.color = float4(_output.color.rgb * a, a);
+          """
+        ]
+        m.blendMode = .alpha
+        m.writesToDepthBuffer = false
+      }
+      let n = SCNNode(geometry: g)
+      // Peint après le reste : un voile se pose sur ce qu'il voile.
+      n.renderingOrder = 10
+      bati.addChildNode(n)
     }
     for n in noeudsDesSols() { bati.addChildNode(n) }
   }
@@ -203,12 +354,17 @@ final class RoomScanVisite: UIView {
   }
 
   /**
-   * TOUT LE BÂTI EN UNE GÉOMÉTRIE : une couleur par sommet, une normale par
+   * TOUT UN GROUPE EN UNE GÉOMÉTRIE : une couleur par sommet, une normale par
    * triangle. Une seule pièce de géométrie, c'est un seul appel de dessin
-   * — c'est ce qui fait que six cents faces ne coûtent rien.
+   * — c'est ce qui fait que deux mille faces ne coûtent rien.
+   *
+   * `deuxFaces` : le mobilier tel qu'on le décrit n'a pas toujours un sens
+   * de parcours fiable, il se dessine des deux côtés. Les faces ORIENTÉES,
+   * elles, ne montrent jamais leur dos : vu de l'extérieur, le mur du devant
+   * ne cache pas la pièce.
    */
-  private func geometrieDuBati() -> SCNGeometry? {
-    let v = maillage.map { $0.floatValue }
+  private func geometrie(_ source: [NSNumber], deuxFaces: Bool) -> SCNGeometry? {
+    let v = source.map { $0.floatValue }
     let parTriangle = 12
     let n = v.count / parTriangle
     guard n > 0 else { return nil }
@@ -253,9 +409,10 @@ final class RoomScanVisite: UIView {
     m.lightingModel = .lambert
     m.diffuse.contents = UIColor.white
     m.locksAmbientWithDiffuse = true
-    // Les deux côtés : une face dont le sens de parcours s'est trompé reste
-    // un mur, pas un trou.
-    m.isDoubleSided = true
+    // Les deux côtés pour ce qui n'a pas de sens : une face dont le sens de
+    // parcours s'est trompé reste un mur, pas un trou.
+    m.isDoubleSided = deuxFaces
+    m.cullMode = .back
     g.materials = [m]
     return g
   }

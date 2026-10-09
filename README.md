@@ -14285,6 +14285,52 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## La maquette 3D sur la carte graphique
+
+Relevé du patron : « le modèle 3D d'un plan contenant des meubles, comme le
+plan de test, est très lent ; les autres apps de ce style sont fluides, peu
+importe le nombre de meubles ».
+
+**Ce qui coûtait.** La vue 3D du plan était PEINTE en JavaScript : à chaque
+image du doigt, l'appartement d'exemple — 2 617 faces, 7 803 sommets — était
+projeté, trié de la plus lointaine à la plus proche, départagé deux à deux là
+où les faces se recouvrent, coloré, puis redessiné. Sur iPhone, le JavaScript
+est interprété : ce travail ne tient pas soixante images par seconde, et il
+grandit avec chaque meuble. Pour la carte graphique, le même logement fait
+2 400 triangles : rien.
+
+**Ce qui change.**
+
+- *La maquette passe à SceneKit* (`geometry/maquette3d.ts`, mode orbite de
+  `RoomScanVisite`). Les faces partent UNE fois, quand la scène change, en
+  trois groupes : le mobilier sans orientation (dessiné des deux côtés), les
+  faces orientées (leur dos n'est jamais dessiné — c'est ce qui ouvre la
+  maison de poupée), et les faces extérieures des murs, que la carte
+  graphique voile selon l'angle (l'écorché, calculé au pixel). Le geste
+  n'envoie que la caméra : dix nombres par image. La profondeur se juge au
+  pixel — tout l'échafaudage du tri à la main disparaît de ce chemin.
+- *La caméra est orthographique* et refait EXACTEMENT la projection de la vue :
+  les cotes, noms de pièces et repères électriques, toujours posés en
+  JavaScript par-dessus, tombent au même pixel (un banc le vérifie sur 105
+  vues et trois points, à un millionième de pixel près). La levée au retour
+  d'un scan se fait dans SceneKit, de la même façon.
+- *La lumière de la maquette* rend aux dessus leur couleur (sable des sols,
+  blanc cassé des arases) ; l'occlusion ambiante, faite pour la perspective,
+  est coupée en orbite.
+- *L'écran du plan ne se redessine plus à chaque degré.* La vue 3D remontait
+  sa position à l'écran du plan à chaque image du doigt, et c'est tout
+  l'écran qui se recalculait soixante fois par seconde. Pendant le geste, la
+  vue garde sa position pour elle ; elle ne la rend qu'au lâcher — et un
+  simple appui ne rend rien.
+- *Ce qui reste en JavaScript* : la première personne quand SceneKit manque,
+  les vignettes et présentations (`light`), Android, et la capture d'image
+  partagée (`gpu={!capturing}`), qui sort du rendu que la capture a toujours
+  su lire.
+
+Bancs : `maquettegpu` (caméra au pixel, groupes et orientation des faces,
+géométrie qui ne voyage pas quand seule la caméra bouge, repli sans SceneKit),
+`couronne` (la vue remonte au lâcher).
+
 ## Les notifications, et l'accueil épuré
 
 Relevé du patron : « ne fais plus l'option de tracer avec le doigt ; ne mets

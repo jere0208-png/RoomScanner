@@ -3780,6 +3780,8 @@ export function ResultScreen() {
                qui accompagnent les gaines : essayer une installation n'a rien
                à voir avec ce qu'on a choisi d'afficher. */
             circuits={circuitsDuPlan}
+            // L'image partagée sort du rendu que la capture sait lire.
+            gpu={!capturing}
             value={view3d}
             onChange={setView3d}
             focusRoomId={rooms[focusIdx]?.id ?? null}

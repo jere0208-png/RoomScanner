@@ -15,7 +15,8 @@ import Svg, {
   se pose pas sur une balise SVG ordinaire.
 */
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
-import { RoomScanCanvas } from 'react-native-room-scan';
+import { RoomScanCanvas, RoomScanVisite } from 'react-native-room-scan';
+import { cameraOrbite, maillageDeLaMaquette } from '../geometry/maquette3d';
 import { grouperTraces } from '../ui/traces';
 import { mettreAPlat } from '../ui/canevas';
 import { estUnGlissement, estUnTap } from '../ui/geste';
@@ -415,6 +416,12 @@ interface Props {
    * donne à l'écran l'air d'être en panne.
    */
   circuits?: Circuit[];
+  /**
+   * LA CARTE GRAPHIQUE, quand elle est là — vrai par défaut. Faux le temps
+   * d'une capture d'écran : l'image partagée sort du rendu en JavaScript,
+   * celui que la capture a toujours su lire.
+   */
+  gpu?: boolean;
 }
 
 /**
@@ -433,6 +440,7 @@ const AUCUN_APPAREIL: Fixture[] = [];
 const AUCUN_PLAFOND: CeilingFixture[] = [];
 
 export function Iso3DView({
+  gpu = true,
   pov,
   enMarche = false,
   value,
@@ -588,7 +596,18 @@ export function Iso3DView({
 
   const [layout, setLayout] = useState({ w: 0, h: 0 });
   const [inner, setInner] = useState<View3DParams>(DEFAULT_VIEW3D);
-  const view = value ?? inner;
+  /*
+    LA VUE VIVE, PENDANT LE GESTE — elle reste ICI.
+
+    La vue était remontée à l'écran du plan à chaque image du doigt
+    (`onChange`), et c'est TOUT l'écran du plan — cinq mille lignes, ses
+    calques, ses cheminements — qui se redessinait soixante fois par
+    seconde pour qu'une maquette tourne. Le geste garde donc sa vue pour
+    lui, et ne la rend qu'au lâcher : l'écran du plan apprend où l'on s'est
+    arrêté, pas chaque degré du chemin.
+  */
+  const [geste, setGeste] = useState<View3DParams | null>(null);
+  const view = geste ?? value ?? inner;
   const viewRef = useRef(view);
   const changeRef = useRef<Props['onChange']>(undefined);
   useEffect(() => {
@@ -614,15 +633,40 @@ export function Iso3DView({
   */
   const rendu = useRef(
     parImage<View3DParams>((v) => {
-      if (changeRef.current) changeRef.current(v);
+      if (changeRef.current) setGeste(v);
       else setInner(v);
     }),
   ).current;
   useEffect(() => rendu.annuler, [rendu]);
 
+  /* Le geste a-t-il déplacé la vue ? Un appui seul ne doit rien remonter. */
+  const aBouge = useRef(false);
   const update = (v: View3DParams) => {
     viewRef.current = v;
+    aBouge.current = true;
     rendu(v);
+  };
+
+  /*
+    AU LÂCHER, LA VUE REMONTE — une fois. L'image en attente est annulée :
+    arrivée après, elle reposerait une vue vive par-dessus celle qu'on vient
+    de rendre, et l'écran du plan ne pourrait plus la changer.
+  */
+  const rendreLaVue = () => {
+    rendu.annuler();
+    const v = viewRef.current;
+    const bouge = aBouge.current;
+    aBouge.current = false;
+    if (!bouge) {
+      setGeste(null);
+      return;
+    }
+    if (changeRef.current) {
+      changeRef.current(v);
+      setGeste(null);
+    } else {
+      setInner(v);
+    }
   };
 
   const baseRef = useRef({
@@ -909,6 +953,7 @@ export function Iso3DView({
       },
       onPanResponderRelease: (e, g) => {
         setInteracting(false);
+        rendreLaVue();
         // Tap simple (sans glisser) : cadrer la vue sur le mur touché.
         //
         // « Sans glisser » ne suffisait pas : un pincement court laisse un
@@ -926,7 +971,10 @@ export function Iso3DView({
           basculerRef.current?.(geste.x, geste.y);
         }
       },
-      onPanResponderTerminate: () => setInteracting(false),
+      onPanResponderTerminate: () => {
+        setInteracting(false);
+        rendreLaVue();
+      },
     }),
   ).current;
 
@@ -1177,11 +1225,40 @@ export function Iso3DView({
   // dépend du nombre de points est un centre qui bouge pour rien.
   const { center, radius3d } = useMemo(() => sceneFraming(faces), [faces]);
 
+  /*
+    LA MAQUETTE SUR LA CARTE GRAPHIQUE — relevé du patron : « le modèle 3D
+    d'un plan avec des meubles est très lent ; les autres apps sont fluides,
+    peu importe le nombre de meubles ».
+
+    Quand SceneKit est là (l'iPhone), les faces partent UNE fois vers lui,
+    en triangles, et la carte graphique juge la profondeur au pixel. Plus
+    rien n'est projeté, trié ni redessiné face par face à chaque image : le
+    geste n'envoie que la caméra. Ce qui reste peint ici, par-dessus, ce sont
+    les quelques étiquettes — cotes, noms de pièces, repères —, sur la même
+    projection, donc au même pixel.
+
+    La première personne garde son chemin (l'exploration a le sien), et le
+    rendu allégé des vignettes aussi : ni l'un ni l'autre ne tourne au doigt.
+  */
+  const natif = gpu && !!RoomScanVisite && !pov && !light;
+  const maquette = useMemo(
+    () =>
+      natif
+        ? maillageDeLaMaquette(faces.filter((f) => visibleAvecLeMur(f, focusWallId)))
+        : null,
+    [natif, faces, focusWallId],
+  );
+
   /**
    * Quel pan masque quel meuble : la part qui ne dépend pas de l'angle.
    * Recalculée seulement quand la scène change, jamais quand on tourne.
    */
-  const masquesScene = useMemo(() => masquesDeScene(faces), [faces]);
+  // Sur la carte graphique, la profondeur se juge au pixel : ce que chaque
+  // pan cache ne sert plus qu'au tri fait à la main, ici.
+  const masquesScene = useMemo(
+    () => (natif ? new Map() as ReturnType<typeof masquesDeScene> : masquesDeScene(faces)),
+    [natif, faces],
+  );
 
   /**
    * Ce qu'a coûté le dernier classement exact, en millisecondes. Il décide
@@ -1281,7 +1358,9 @@ export function Iso3DView({
       const vers = m.n.x * st * sp + m.n.y * cp + m.n.z * ct * sp;
       return vers > 0 ? m.cache : undefined;
     };
-    const polys = faces
+    // Sur la carte graphique, aucune face n'est plus projetée ici : seules
+    // les étiquettes le sont, plus bas.
+    const polys = (natif ? faces.slice(0, 0) : faces)
       .filter((face) =>
         /*
           LE SOL RESTE, DEDANS. Il était retranché quand la seule vue à la
@@ -2268,6 +2347,7 @@ export function Iso3DView({
     focusWallId,
     showVolumes,
     departDe,
+    natif,
   ]);
 
   /**
@@ -2420,17 +2500,33 @@ export function Iso3DView({
             géométrie, elle — trois cents formes recalculées à chaque image
             —, passe au canevas natif : une seule vue, un seul dessin.
           */}
-          {!!RoomScanCanvas && (
-            <RoomScanCanvas
+          {natif && maquette && RoomScanVisite ? (
+            <RoomScanVisite
+              testID="maquette-native"
               style={{ width: layout.w, height: layout.h }}
-              formes={rendered.canevas.formes}
-              styles={rendered.canevas.styles}
+              maillage={maquette.maillage}
+              orientes={maquette.orientes}
+              ecorche={maquette.ecorche}
+              sols={maquette.sols}
+              voile={!solidWalls}
+              orbite={cameraOrbite(view, center, radius3d, layout)}
+              levee={leve}
+              solY={scene.floorY}
+              fond={c.surface}
             />
+          ) : (
+            !!RoomScanCanvas && (
+              <RoomScanCanvas
+                style={{ width: layout.w, height: layout.h }}
+                formes={rendered.canevas.formes}
+                styles={rendered.canevas.styles}
+              />
+            )
           )}
           <Svg
             width={layout.w}
             height={layout.h}
-            style={RoomScanCanvas ? StyleSheet.absoluteFill : undefined}>
+            style={RoomScanCanvas || natif ? StyleSheet.absoluteFill : undefined}>
             {/*
               LES FACES VOISINES DE MÊME PEAU EN UN SEUL TRACÉ.
 

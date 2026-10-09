@@ -228,8 +228,15 @@ export const RoomScanVisite = UIManager.getViewManagerConfig?.(
       ViewProps & {
         maillage: number[];
         sols: number[];
-        camera: number[];
+        camera?: number[];
         fond: string;
+        /* LE MODE ORBITE — la maquette du plan (voir `geometry/maquette3d`). */
+        orientes?: number[];
+        ecorche?: number[];
+        voile?: boolean;
+        orbite?: number[];
+        levee?: number;
+        solY?: number;
       }
     >('RoomScanVisite')
   : undefined;
