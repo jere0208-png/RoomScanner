@@ -406,4 +406,20 @@ describe('la cote saisie dans le bandeau du plafond', () => {
     const at = saisir('Distance au mur de gauche', String(actuel))!;
     expect(at.x).toBeCloseTo(2.5, 6);
   });
+
+  /*
+    LE MUR LE PLUS PROCHE — relevé du patron : « fais pareil pour tout le
+    reste ». Un spot à quarante centimètres du mur de droite se cotait
+    depuis le mur de gauche, à travers toute la pièce.
+  */
+  it('près du mur de droite, c’est lui qu’on cote — et la cote tombe juste', () => {
+    const at = saisir('Distance au mur de droite', '40', { x: 4.5, z: 2 })!;
+    expect(at).not.toBeNull();
+    expect(relire(at, { x: 1, z: 0 })).toBe(40);
+  });
+
+  it('près du mur du bas, de même', () => {
+    const at = saisir('Distance au mur du bas', '35', { x: 2.5, z: 3.6 })!;
+    expect(relire(at, { x: 0, z: 1 })).toBe(35);
+  });
 });

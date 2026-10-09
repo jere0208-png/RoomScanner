@@ -97,7 +97,7 @@ const CADENCE_VIVE = 100;
 /** Temps de montée en régime, une fois la répétition lancée. */
 const MONTEE = 1400;
 
-function useRepetition(action: () => void) {
+export function useRepetition(action: () => void) {
   const horloge = useRef<ReturnType<typeof setTimeout> | null>(null);
   const vivant = useRef(action);
   vivant.current = action;

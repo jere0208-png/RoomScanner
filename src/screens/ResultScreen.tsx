@@ -159,6 +159,7 @@ import {
   type SpotAxis,
 } from '../geometry/ceiling';
 import { haptic } from '../ui/haptic';
+import { PAS_ROTATION, RecalageBar } from '../components/RecalageBar';
 import {
   CoupeSheet,
   MurNeufSheet,
@@ -5257,21 +5258,27 @@ export function ResultScreen() {
         déplacer la vue, et l'étage partirait sans qu'on comprenne pourquoi.
       */}
       {recalage && (
-        <View style={styles.wallLengthBar}>
-          <Text style={styles.wallLengthLabel}>
-            {`Glissez ${abregerNiveau(
-              niveauCourant,
-            )} pour le poser sur le filigrane du dessous`}
-          </Text>
-          <TouchableOpacity
-            accessibilityLabel="Terminer le recalage"
-            onPress={() => {
-              setRecalage(false);
-              haptic('succes');
-            }}>
-            <Text style={styles.wallLengthDone}>Terminé</Text>
-          </TouchableOpacity>
-        </View>
+        <RecalageBar
+          texte={`Glissez ${abregerNiveau(
+            niveauCourant,
+          )} sur le filigrane, puis finissez aux flèches`}
+          onPas={(dx, dy) => {
+            // Un centimètre dans l'axe de l'ÉCRAN : on défait la rotation
+            // du plan, comme les flèches du meuble.
+            const cs = Math.cos(-vuePlan.rot);
+            const sn = Math.sin(-vuePlan.rot);
+            useScanStore
+              .getState()
+              .recalerNiveau(niveauCourant, (dx * cs - dy * sn) * 0.01, (dx * sn + dy * cs) * 0.01);
+          }}
+          onTourner={(sens) =>
+            useScanStore.getState().tournerNiveau(niveauCourant, sens * PAS_ROTATION)
+          }
+          onTerminer={() => {
+            setRecalage(false);
+            haptic('succes');
+          }}
+        />
       )}
 
       {/* ---------- Le télémètre laser ---------- */}

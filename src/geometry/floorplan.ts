@@ -4112,6 +4112,48 @@ export function niveauxPresents(
  * donc la prise — l'étage se recale à la main sur le filigrane du niveau du
  * dessous, jusqu'à ce que la cage d'escalier tombe juste.
  */
+/** Un point tourné de `angle` (radians) autour de `c`, dans le plan du sol. */
+export function pivoterPoint(p: Pt, c: Pt, angle: number): Pt {
+  const cs = Math.cos(angle);
+  const sn = Math.sin(angle);
+  const x = p.x - c.x;
+  const z = p.z - c.z;
+  return { x: c.x + x * cs - z * sn, z: c.z + x * sn + z * cs };
+}
+
+/** Le centre d'un étage : le milieu de l'emprise de ses murs. */
+export function centreDuNiveau(walls: WallSeg[], n: number): Pt | null {
+  const pts = walls.filter((w) => niveauDe(w) === n).flatMap((w) => [w.a, w.b]);
+  if (pts.length === 0) return null;
+  const xs = pts.map((p) => p.x);
+  const zs = pts.map((p) => p.z);
+  return {
+    x: (Math.min(...xs) + Math.max(...xs)) / 2,
+    z: (Math.min(...zs) + Math.max(...zs)) / 2,
+  };
+}
+
+/**
+ * TOURNER UN ÉTAGE — le pendant de `deplacerNiveau`.
+ *
+ * Deux relevés faits à deux moments ne partent pas du même cap : l'étage
+ * du dessus arrive souvent de quelques degrés de travers sur le filigrane
+ * du dessous, et le glisser ne le redresse pas.
+ */
+export function pivoterNiveau<T extends WallSeg>(
+  walls: T[],
+  niveau: number,
+  c: Pt,
+  angle: number,
+): T[] {
+  if (angle === 0) return walls;
+  return walls.map((w) =>
+    niveauDe(w) === niveau
+      ? { ...w, a: pivoterPoint(w.a, c, angle), b: pivoterPoint(w.b, c, angle) }
+      : w,
+  );
+}
+
 export function deplacerNiveau<T extends WallSeg>(
   walls: T[],
   niveau: number,

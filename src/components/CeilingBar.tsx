@@ -119,7 +119,6 @@ export function CeilingBar({
           const champ = (
             k: keyof typeof AXES,
             titre: string,
-            fleche: 'gauche' | 'haut',
           ) => (
             <TouchableOpacity
               style={styles.clChamp}
@@ -146,7 +145,17 @@ export function CeilingBar({
                   même chose. */}
               <Svg width={17} height={17} viewBox="0 0 24 24">
                 <Path
-                  d={fleche === 'gauche' ? SOLAIRES.longueur : SOLAIRES.largeur}
+                  /* LA FLÈCHE DIT LE MUR VISÉ : le champ prend le mur le
+                     plus proche, il doit donc dire lequel. */
+                  d={
+                    k === 'gauche'
+                      ? SOLAIRES.flecheGauche
+                      : k === 'droite'
+                        ? SOLAIRES.flecheDroite
+                        : k === 'haut'
+                          ? SOLAIRES.flecheHaut
+                          : SOLAIRES.flecheBas
+                  }
                   fill={palette.inkSoft}
                   fillRule="evenodd"
                 />
@@ -177,8 +186,29 @@ export function CeilingBar({
                     {CEILINGS[fixture.kind].label}
                   </Text>
                   <View style={styles.editRow}>
-                    {champ('gauche', 'Distance au mur de gauche', 'gauche')}
-                    {champ('haut', 'Distance au mur du haut', 'haut')}
+                    {/*
+                      LE MUR LE PLUS PROCHE, DE CHAQUE CÔTÉ — relevé du
+                      patron : « fais pareil pour tout le reste ». On ne
+                      cotait que depuis la gauche et le haut : un spot à
+                      30 cm du mur de droite se cotait « 3,42 m du mur de
+                      gauche », une mesure que personne ne prend. Chaque
+                      champ prend maintenant le mur le plus proche sur son
+                      axe — celui contre lequel on pose le mètre.
+                    */}
+                    {(() => {
+                      const g = ecart('gauche');
+                      const d = ecart('droite');
+                      return d !== null && (g === null || d < g - 1e-6)
+                        ? champ('droite', 'Distance au mur de droite')
+                        : champ('gauche', 'Distance au mur de gauche');
+                    })()}
+                    {(() => {
+                      const h = ecart('haut');
+                      const b = ecart('bas');
+                      return b !== null && (h === null || b < h - 1e-6)
+                        ? champ('bas', 'Distance au mur du bas')
+                        : champ('haut', 'Distance au mur du haut');
+                    })()}
                     <Text style={styles.unit}>cm</Text>
                   </View>
               </View>

@@ -14285,6 +14285,36 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Le reste aux cotes du mètre : étages et plafond
+
+Relevé du patron : « fais pareil pour tout le reste ».
+
+**Recaler un étage** ne se faisait qu'au doigt, et ne tournait pas. La barre
+de recalage (`RecalageBar`) garde le glissé pour le gros du geste et ajoute :
+
+- quatre flèches d'un centimètre, dans l'axe de l'écran même plan tourné ;
+- deux rotations d'un demi-degré (`tournerNiveau`, `PAS_ROTATION`) — deux
+  relevés faits à deux moments ne partent pas du même cap, et un étage arrivé
+  de deux degrés de travers le restait ;
+- tout se répète tant qu'on tient, et une série se défait d'un seul
+  « Annuler ».
+
+La rotation se fait autour du centre de l'étage (`centreDuNiveau`) et emporte
+murs, menuiseries, meubles (axes compris), plafond et notes.
+
+**Les notes suivent leur étage.** Le recalage les oubliait : l'étage se posait
+sur le filigrane, et « arrivée gaz » restait à l'ancienne place de la cuisine.
+
+**Le plafond se cote depuis le mur le plus proche.** Le bandeau d'un point
+lumineux ne cotait que depuis la gauche et le haut : un spot à 30 cm du mur
+de droite se lisait « 3,42 m du mur de gauche ». Chaque champ prend maintenant
+le mur le plus proche sur son axe, et sa flèche dit lequel.
+
+L'appareillage (prises, interrupteurs) se cotait déjà depuis l'un ou l'autre
+bout de sa face de mur, au nu : rien à reprendre.
+
+Bancs : `etagecote`, `cotesplafond`.
+
 ## Les ouvertures aux cotes du mètre
 
 Relevé du patron : « fais pareil pour les ouvertures (portes et fenêtres) ».

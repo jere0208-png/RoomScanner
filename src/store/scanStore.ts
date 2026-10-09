@@ -71,6 +71,9 @@ import {
   type RoomPart,
   reporterOuverture,
   deplacerNiveau,
+  pivoterNiveau,
+  pivoterPoint,
+  centreDuNiveau,
   COFFRE_H,
   type TrouDeReleve,
   type Pt,
@@ -1081,6 +1084,11 @@ interface ScanState {
    * plafonniers compris. Les autres niveaux ne bougent pas.
    */
   recalerNiveau: (n: number, dx: number, dz: number) => void;
+  /**
+   * TOURNE UN ÉTAGE de `angle` radians autour de son centre — tout ce qui
+   * y vit le suit : murs, menuiseries, meubles, plafond, notes.
+   */
+  tournerNiveau: (n: number, angle: number) => void;
   /**
    * RETIRE UN ÉTAGE DU DOSSIER, avec tout ce qui vit dessus.
    *
@@ -5113,11 +5121,57 @@ export const useScanStore = create<ScanState>((set, get) => {
             ? { ...cl, at: bouge(cl.at) }
             : cl;
         }),
+        /*
+          LES NOTES SUIVENT LEUR ÉTAGE. Elles portent leur niveau en propre
+          (voir `filtrerAuNiveau`), et le recalage les oubliait : on posait
+          l'étage sur le filigrane, et « arrivée gaz » restait dans le vide,
+          à la place qu'avait la cuisine avant le recalage.
+        */
+        notes: st.notes.map((x) => (niveauDe(x) === n ? { ...x, at: bouge(x.at) } : x)),
         dirty: true,
       });
       // L'appareillage et les photos tiennent à un mur par une cote le long
       // de ce mur : le mur bouge, elles bougent avec lui sans rien à faire.
       void idsDuNiveau;
+    },
+
+    tournerNiveau: (n, angle) => {
+      if (!sontFinis(angle) || angle === 0) return;
+      const st = get();
+      const c = centreDuNiveau(st.walls, n);
+      if (!c) return;
+      pushHistory(`recalerNiveau:${n}`);
+      const cs = Math.cos(angle);
+      const sn = Math.sin(angle);
+      const tourne = (p: Pt) => pivoterPoint(p, c, angle);
+      const dansLeNiveau = (roomId?: string) => {
+        const piece = st.rooms.find((r) => r.id === roomId);
+        return !!piece && niveauDe(piece) === n;
+      };
+      set({
+        walls: pivoterNiveau(st.walls, n, c, angle),
+        openings: pivoterNiveau(st.openings, n, c, angle),
+        objects: st.objects.map((o) => {
+          if (!dansLeNiveau(o.roomId)) return o;
+          const t = [...o.transform];
+          // Les trois axes du meuble tournent avec lui, puis sa place.
+          for (const k of [0, 4, 8]) {
+            const x = t[k];
+            const z = t[k + 2];
+            t[k] = x * cs - z * sn;
+            t[k + 2] = x * sn + z * cs;
+          }
+          const p = tourne({ x: t[12], z: t[14] });
+          t[12] = p.x;
+          t[14] = p.z;
+          return { ...o, transform: t };
+        }),
+        ceiling: st.ceiling.map((cl) =>
+          dansLeNiveau(cl.roomId) ? { ...cl, at: tourne(cl.at) } : cl,
+        ),
+        notes: st.notes.map((x) => (niveauDe(x) === n ? { ...x, at: tourne(x.at) } : x)),
+        dirty: true,
+      });
     },
 
     /*
