@@ -14285,6 +14285,78 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Les meubles en vrai : des modèles à leurs cotes, plus des caisses
+
+Relevé du patron : « il faut avoir des modèles réalistes de meubles aux
+mesures réelles, non pas des cubes codés ».
+
+Un meuble était une poignée de boîtes en PROPORTIONS (`furniture3d`, 0 à 1 sur
+chaque axe) : la silhouette s'étirait avec la taille, et c'était le défaut —
+une table de 2,40 m recevait des pieds de 19 cm, rien n'avait d'arrondi, un
+coussin était un pavé.
+
+`src/geometry/modeles3d.ts` FABRIQUE chaque meuble à ses cotes, en mètres :
+
+- **Un atelier de pièces** : boîtes aux arêtes arrondies (un rayon par axe,
+  normales lissées — un coussin galbe, une arête accroche la lumière), tubes
+  fuselés (pieds, montants, poignées, becs), pièces tournées en ellipse
+  (vasque creusée, cuvette, pot, plateau rond, hublot), blocs quelconques
+  (hotte, limon), feuilles à nervure. Sous 5 mm un arrondi reste franc : il
+  ne se verrait pas et coûterait des sommets.
+- **Ce qui a une taille réelle la garde** : pied de table 5,5 cm, assise à
+  45 cm, poignée qui saille de 3,6 cm, plateau de 3,5 cm. **Ce qui dépend de
+  la taille se compte** : places d'un canapé, portes d'une armoire (une par
+  demi-mètre), tablettes et livres d'une bibliothèque, marches d'un escalier
+  (une tous les 18 cm), modules de cuisine de 60.
+- **Tout le catalogue et toutes les catégories de RoomPlan** : lits
+  (capitonnés, oreillers, couette qui retombe, plaid), lit bébé à barreaux,
+  canapés et fauteuil (coussins d'assise et de dossier inclinés, coussins
+  déco), canapé d'angle, chaise, tabouret, banc, fauteuil de bureau à
+  roulettes, tables à manger / ronde / basse / bout de canapé, bureau,
+  télévision murale ou sur pied, armoires, cuisine (plinthe, façades, plan,
+  tiroirs), évier creusé et robinet col de cygne, plaque vitrocéramique,
+  cuisinière, four, micro-ondes, réfrigérateur, lave-linge à hublot chromé,
+  lave-vaisselle, lavabo sur colonne, meuble vasque à vasques à poser, WC à
+  réservoir, baignoire galbée, douche vitrée à colonne, bibliothèque garnie,
+  casiers et leurs paniers, commode, buffet, chevet à niche, meuble TV,
+  caisson, étagère murale, hotte, cheminée et ses bûches, escalier, plante en
+  pot au feuillage de feuilles, tapis, portemanteau, miroir.
+- **Les précisions de RoomPlan** (iOS 17) sont maintenant exportées par le
+  natif (`attributes` : « SofaType:lShaped », « ChairType:stool »,
+  « TableShapeType:circularElliptic », « StorageType:shelf »…) et choisissent
+  la forme ; sans elles, l'emprise décide (un rangement haut et peu profond
+  est une bibliothèque, un caisson de 90 cm sur 60 une cuisine…).
+- **Des matières réelles** rendues par SceneKit en matériaux physiques
+  (`RoomScanVisite.swift`, prop `meubles`) : le chêne a son fil, le lin sa
+  trame (textures dessinées une fois par teinte, comme le parquet), l'inox et
+  le chrome leur reflet sous un ciel d'environnement, le verre sa
+  transparence, les feuilles leurs deux faces. Sous chaque meuble posé au sol,
+  une ombre de contact douce : il pose au lieu de flotter.
+
+`buildScene` annonce désormais la POSE de chaque meuble (recalé hors de la
+maçonnerie, posé au sol — exactement où ses caisses étaient dessinées) ; la
+maquette et la visite envoient les vrais modèles à la carte graphique, groupés
+par matière (un appel de dessin par matière, quel que soit le nombre de
+meubles), et n'y envoient plus les caisses. Les modèles sont gardés en cache :
+déplacer un meuble ne refabrique rien. L'appartement d'exemple meublé tient en
+25 meubles et moins de 19 000 triangles, en 34 groupes.
+
+Le canevas en JavaScript (bancs d'essai, capture pour l'export) garde les
+caisses : il ne sait pas peindre mille triangles par meuble.
+
+Banc : `meublesreels.test.tsx` — chaque modèle du catalogue tient dans sa
+boîte relevée au millimètre (la robinetterie seule dépasse, par le haut) et la
+remplit ; un pied garde sa section sur une table deux fois plus grande (et
+l'ancien modèle, mesuré, l'épaississait) ; l'assise d'un canapé reste à
+hauteur d'assise ; places, portes et marches se comptent ; un canapé d'angle a
+sa méridienne d'un seul côté, un tabouret n'a pas de dossier, une table ronde
+n'a pas de coin, une étagère ouverte porte des livres ; aucune face retournée
+et des normales unitaires sur tout le catalogue ; dans l'appartement
+d'exemple, chaque modèle tient dans l'emprise de sa pose, comme son ancienne
+caisse, et la remplit ; le flux est bien formé et tient son budget ; une ombre
+sous ce qui pose, pas sous un tapis ; la vue 3D confie les modèles au natif et
+retire les caisses.
+
 ## Le mur en page entière : poser d'un appui, régler sous le pouce
 
 Relevé du patron : « revois complètement la page de placement d'appareils

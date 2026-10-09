@@ -5,6 +5,7 @@
  * de murs, mêmes bandes, mêmes couleurs relevées. Tout est donc calculé ici,
  * chaque rendu ne s'occupant plus que de projeter et de peindre.
  */
+import type { PoseDeMeuble } from './modeles3d';
 import type { FloorData, ObjectData, SurfaceTexture } from 'react-native-room-scan';
 import {
   clampFootprint,
@@ -60,6 +61,11 @@ export interface Face3D {
    * meuble, à chaque image.
    */
   ownerId?: string;
+  /**
+   * Face d'un MEUBLE en caisses (voir `furniture3d`). La carte graphique ne
+   * la reçoit pas : elle dessine le vrai modèle à sa place (`modeles3d`).
+   */
+  meuble?: boolean;
   /** Biais de tri (m), pour départager deux faces à la même profondeur. */
   bias?: number;
   isFloor?: boolean;
@@ -1653,6 +1659,12 @@ export interface Scene {
   rooms: SceneRoom[];
   /** Niveau du sol dans le repère monde (m). */
   floorY: number;
+  /**
+   * Chaque meuble À SA PLACE — recalé hors de la maçonnerie, posé au sol :
+   * exactement là où ses faces sont dessinées. La carte graphique y pose le
+   * vrai modèle (voir `modeles3d`).
+   */
+  meubles?: PoseDeMeuble[];
 }
 
 /**
@@ -3109,6 +3121,7 @@ export function buildScene(
   // ------------------------------------------------------------ meubles
   // Un meuble n'est recalé que contre les murs de SA pièce : sinon la
   // cloison d'à côté le repousserait au milieu du salon.
+  const poses: PoseDeMeuble[] = [];
   for (const source of objects) {
     /*
       RESSORTI DE TOUTE MAÇONNERIE, PAS SEULEMENT DE LA SIENNE.
@@ -3400,9 +3413,24 @@ export function buildScene(
     } else {
       for (const part of morceaux) poser(part);
     }
+    poses.push({
+      id: obj.id,
+      category: obj.category ?? '',
+      modele: obj.modele,
+      width: obj.width,
+      depth: obj.depth,
+      height: obj.height,
+      cx: obj.cx,
+      cz: obj.cz,
+      yaw: obj.yaw,
+      yb,
+      color: skin,
+      attributes: (source as { attributes?: string[] }).attributes,
+    });
     for (let i = avantMeuble; i < faces.length; i++) {
       const f = faces[i];
       f.ownerId = obj.id;
+      f.meuble = true;
       /*
         LA PIÈCE D'UN MEUBLE SE LIT SUR LE PLAN, pas sur son étiquette.
 
@@ -3434,7 +3462,7 @@ export function buildScene(
     }
   }
 
-  return { faces: faces.filter(nonDegenere), rooms, floorY };
+  return { faces: faces.filter(nonDegenere), rooms, floorY, meubles: poses };
 }
 
 /**

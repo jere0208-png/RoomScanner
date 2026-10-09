@@ -184,7 +184,7 @@ export function sensDesLames(pts: P3[], sens?: 'x' | 'z'): 0 | 1 {
  * l'occlusion font le contact d'un meuble avec le sol, et une nappe posée
  * sur le sol se battrait avec lui.
  */
-export function maillageDeLaVisite(faces: Face3D[]): MaillageDeVisite {
+export function maillageDeLaVisite(faces: Face3D[], o: { sansMeubles?: boolean } = {}): MaillageDeVisite {
   const maillage: number[] = [];
   const sols: number[] = [];
   const pousser = (cible: number[], pts: P3[], tri: [number, number, number]) => {
@@ -195,6 +195,8 @@ export function maillageDeLaVisite(faces: Face3D[]): MaillageDeVisite {
   };
   for (const face of faces) {
     if (face.pts.length < 3 || !face.fill || face.ombre) continue;
+    // Les meubles en caisses : la visite a les vrais modèles (`modeles3d`).
+    if (o.sansMeubles && face.meuble) continue;
     const voulue: P3 | null = face.isFloor
       ? { x: 0, y: 1, z: 0 }
       : face.isCeiling

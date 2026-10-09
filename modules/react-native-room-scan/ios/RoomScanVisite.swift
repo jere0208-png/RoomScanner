@@ -41,6 +41,19 @@ import UIKit
  *                visible en mètres] — une caméra ORTHOGRAPHIQUE, qui tombe
  *                au pixel sur la projection des cotes posées par-dessus ;
  *   `levee`, `solY` : le logement qui monte de son sol, au retour d'un scan.
+ *
+ * LES VRAIS MEUBLES — relevé du patron : « des modèles réalistes de meubles
+ * aux mesures réelles, non pas des cubes codés ». `meubles` porte chaque
+ * meuble FABRIQUÉ à ses cotes (voir `geometry/modeles3d.ts`), groupé par
+ * matière :
+ *
+ *   [code, r, g, b, rugosité, métal, nSommets, nIndices]
+ *   puis nSommets × (x, y, z, nx, ny, nz, u, v), puis les indices.
+ *
+ * Les normales sont LISSÉES (une arête arrondie accroche la lumière) et les
+ * matières sont PHYSIQUES : le chêne a son fil, le lin sa trame, l'inox son
+ * reflet, le verre sa transparence. Le code 9 est l'ombre de contact : un
+ * voile doux sous chaque meuble posé au sol.
  */
 @objc(RoomScanVisite)
 final class RoomScanVisite: UIView {
@@ -93,6 +106,13 @@ final class RoomScanVisite: UIView {
   @objc var solY: NSNumber = 0 {
     didSet { lever() }
   }
+
+  @objc var meubles: [NSNumber] = [] {
+    didSet { rebatir() }
+  }
+
+  /// Le fil du bois et la trame des tissus, dessinés une fois par teinte.
+  private var texturesDesMeubles: [String: UIImage] = [:]
 
   override init(frame: CGRect) {
     super.init(frame: frame)
@@ -152,6 +172,12 @@ final class RoomScanVisite: UIView {
     scene.rootNode.addChildNode(noeudContre)
 
     scene.rootNode.addChildNode(bati)
+
+    // L'ENVIRONNEMENT des matériaux physiques : un ciel clair au-dessus, un
+    // sol chaud dessous. Sans lui, un chrome ne reflète rien et paraît noir.
+    // Il n'éclaire que les meubles : le bâti reste en Lambert.
+    scene.lightingEnvironment.contents = RoomScanVisite.imageDEnvironnement()
+    scene.lightingEnvironment.intensity = 0.7
   }
 
   required init?(coder: NSCoder) { nil }
@@ -339,6 +365,216 @@ final class RoomScanVisite: UIView {
       bati.addChildNode(n)
     }
     for n in noeudsDesSols() { bati.addChildNode(n) }
+    for n in noeudsDesMeubles() { bati.addChildNode(n) }
+  }
+
+  // ------------------------------------------------------------- meubles
+
+  /** Les meubles : un nœud par matière, toutes les pièces de la scène dedans. */
+  private func noeudsDesMeubles() -> [SCNNode] {
+    let v = meubles.map { $0.floatValue }
+    var k = 0
+    var out: [SCNNode] = []
+    while k + 8 <= v.count {
+      let code = Int(v[k])
+      let teinte = UIColor(
+        red: CGFloat(v[k + 1]), green: CGFloat(v[k + 2]), blue: CGFloat(v[k + 3]), alpha: 1)
+      let rugosite = CGFloat(v[k + 4])
+      let metal = CGFloat(v[k + 5])
+      let nS = Int(v[k + 6])
+      let nI = Int(v[k + 7])
+      k += 8
+      guard nS > 0, nI > 0, k + nS * 8 + nI <= v.count else { break }
+      var sommets: [SCNVector3] = []
+      var normales: [SCNVector3] = []
+      var uvs: [CGPoint] = []
+      sommets.reserveCapacity(nS)
+      normales.reserveCapacity(nS)
+      uvs.reserveCapacity(nS)
+      for s in 0..<nS {
+        let b = k + s * 8
+        sommets.append(SCNVector3(x: v[b], y: v[b + 1], z: v[b + 2]))
+        normales.append(SCNVector3(x: v[b + 3], y: v[b + 4], z: v[b + 5]))
+        uvs.append(CGPoint(x: CGFloat(v[b + 6]), y: CGFloat(v[b + 7])))
+      }
+      k += nS * 8
+      var indices: [UInt32] = []
+      indices.reserveCapacity(nI)
+      let dernier = Float(nS - 1)
+      for j in 0..<nI {
+        indices.append(UInt32(max(0, min(dernier, v[k + j]))))
+      }
+      k += nI
+      let element = SCNGeometryElement(indices: indices, primitiveType: .triangles)
+      let g = SCNGeometry(
+        sources: [
+          SCNGeometrySource(vertices: sommets),
+          SCNGeometrySource(normals: normales),
+          SCNGeometrySource(textureCoordinates: uvs),
+        ],
+        elements: [element])
+      g.materials = [materiauDuMeuble(code, teinte, rugosite, metal)]
+      let n = SCNNode(geometry: g)
+      // Ce qui se pose PAR-DESSUS le reste — l'ombre, le verre — passe après.
+      if code == 9 { n.renderingOrder = 5 }
+      if code == 3 { n.renderingOrder = 6 }
+      out.append(n)
+    }
+    return out
+  }
+
+  /** Une matière physique : teinte, rugosité, métal — et ce que son code ajoute. */
+  private func materiauDuMeuble(
+    _ code: Int, _ teinte: UIColor, _ rugosite: CGFloat, _ metal: CGFloat
+  ) -> SCNMaterial {
+    let m = SCNMaterial()
+    m.lightingModel = .physicallyBased
+    m.diffuse.contents = teinte
+    m.roughness.contents = NSNumber(value: Float(rugosite))
+    m.metalness.contents = NSNumber(value: Float(metal))
+    m.isDoubleSided = false
+    m.cullMode = .back
+    switch code {
+    case 1, 2:
+      if let image = textureDuMeuble(code, teinte) {
+        m.diffuse.contents = image
+        m.diffuse.wrapS = .repeat
+        m.diffuse.wrapT = .repeat
+        m.diffuse.mipFilter = .linear
+        // Les coordonnées sont en mètres : le fil se répète tous les
+        // quatre-vingt-dix centimètres, la trame tous les trente.
+        let pas: Float = code == 1 ? 0.9 : 0.3
+        m.diffuse.contentsTransform = SCNMatrix4MakeScale(1 / pas, 1 / pas, 1)
+      }
+    case 3:
+      m.transparency = 0.3
+      m.transparencyMode = .dualLayer
+      m.isDoubleSided = true
+      m.writesToDepthBuffer = false
+    case 4:
+      m.isDoubleSided = true
+    case 9:
+      m.lightingModel = .constant
+      m.diffuse.contents = RoomScanVisite.imageDOmbre
+      m.blendMode = .alpha
+      m.writesToDepthBuffer = false
+    default:
+      break
+    }
+    return m
+  }
+
+  /** Le fil du bois (code 1) ou la trame d'un tissu (code 2), à la teinte donnée. */
+  private func textureDuMeuble(_ code: Int, _ teinte: UIColor) -> UIImage? {
+    var r: CGFloat = 0
+    var g: CGFloat = 0
+    var b: CGFloat = 0
+    var a: CGFloat = 0
+    teinte.getRed(&r, green: &g, blue: &b, alpha: &a)
+    let cle = "\(code)-\(Int(r * 255))-\(Int(g * 255))-\(Int(b * 255))"
+    if let deja = texturesDesMeubles[cle] { return deja }
+    let cote: CGFloat = code == 1 ? 512 : 256
+    let format = UIGraphicsImageRendererFormat()
+    format.scale = 1
+    let rendu = UIGraphicsImageRenderer(size: CGSize(width: cote, height: cote), format: format)
+    let image = rendu.image { ctx in
+      let c = ctx.cgContext
+      c.setFillColor(teinte.cgColor)
+      c.fill(CGRect(x: 0, y: 0, width: cote, height: cote))
+      var graine: UInt64 = 0x9E37_79B9_7F4A_7C15
+      func hasard() -> CGFloat {
+        graine = graine &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
+        return CGFloat((graine >> 33) & 0xFF_FFFF) / CGFloat(0xFF_FFFF)
+      }
+      if code == 1 {
+        // Le fil : des veines sinueuses, un peu plus sombres, le long de u.
+        for k in 0..<70 {
+          let y0 = hasard() * cote
+          let amplitude = 1.5 + hasard() * 3
+          let periode = 40 + hasard() * 60
+          c.setStrokeColor(
+            UIColor(red: 0.32, green: 0.2, blue: 0.1, alpha: 0.05 + hasard() * 0.1).cgColor)
+          c.setLineWidth(0.6 + hasard() * 2.2)
+          c.beginPath()
+          var x: CGFloat = 0
+          while x <= cote {
+            let y = y0 + CGFloat(sin(Double(x / periode) + Double(k))) * amplitude
+            if x == 0 {
+              c.move(to: CGPoint(x: x, y: y))
+            } else {
+              c.addLine(to: CGPoint(x: x, y: y))
+            }
+            x += 16
+          }
+          c.strokePath()
+        }
+      } else {
+        // La trame : des fils sombres en travers, des fils clairs en long.
+        var y: CGFloat = 0
+        while y < cote {
+          c.setFillColor(UIColor(white: 0, alpha: 0.025 + hasard() * 0.03).cgColor)
+          c.fill(CGRect(x: 0, y: y, width: cote, height: 1))
+          y += 2
+        }
+        var x: CGFloat = 0
+        while x < cote {
+          c.setFillColor(UIColor(white: 1, alpha: 0.02 + hasard() * 0.03).cgColor)
+          c.fill(CGRect(x: x, y: 0, width: 1, height: cote))
+          x += 2
+        }
+      }
+    }
+    texturesDesMeubles[cle] = image
+    return image
+  }
+
+  /**
+   * L'OMBRE DE CONTACT : un carré noir dont l'opacité reste franche jusqu'au
+   * bord du meuble, puis s'éteint sur la marge. C'est elle qui fait POSER un
+   * meuble — sans elle, il flotte, même parfaitement à sa place.
+   */
+  private static let imageDOmbre: UIImage = {
+    let n = 128
+    var pixels = [UInt8](repeating: 0, count: n * n * 4)
+    for y in 0..<n {
+      for x in 0..<n {
+        let u = abs((Double(x) + 0.5) / Double(n) * 2 - 1)
+        let w = abs((Double(y) + 0.5) / Double(n) * 2 - 1)
+        let d = pow(pow(u, 4) + pow(w, 4), 0.25)
+        let a = max(0, min(1, (1 - d) / 0.2))
+        pixels[(y * n + x) * 4 + 3] = UInt8(pow(a, 1.5) * 0.38 * 255)
+      }
+    }
+    guard let fournisseur = CGDataProvider(data: Data(pixels) as CFData),
+      let image = CGImage(
+        width: n, height: n, bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: n * 4,
+        space: CGColorSpaceCreateDeviceRGB(),
+        bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
+        provider: fournisseur, decode: nil, shouldInterpolate: true, intent: .defaultIntent)
+    else { return UIImage() }
+    return UIImage(cgImage: image)
+  }()
+
+  /** Le ciel des matériaux physiques : blanc en haut, gris chaud à l'horizon, sol beige. */
+  private static func imageDEnvironnement() -> UIImage {
+    let taille = CGSize(width: 256, height: 128)
+    let format = UIGraphicsImageRendererFormat()
+    format.scale = 1
+    return UIGraphicsImageRenderer(size: taille, format: format).image { ctx in
+      let couleurs =
+        [
+          UIColor.white.cgColor,
+          UIColor(red: 0.91, green: 0.9, blue: 0.88, alpha: 1).cgColor,
+          UIColor(red: 0.72, green: 0.69, blue: 0.65, alpha: 1).cgColor,
+        ] as CFArray
+      let positions: [CGFloat] = [0, 0.5, 1]
+      if let degrade = CGGradient(
+        colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: couleurs, locations: positions)
+      {
+        ctx.cgContext.drawLinearGradient(
+          degrade, start: .zero, end: CGPoint(x: 0, y: taille.height), options: [])
+      }
+    }
   }
 
   /** La normale d'un triangle, par son sens de parcours. */

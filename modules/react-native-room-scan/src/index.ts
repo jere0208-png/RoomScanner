@@ -85,6 +85,12 @@ export interface ObjectData {
    */
   baseWidth?: number;
   baseDepth?: number;
+  /**
+   * CE QUE ROOMPLAN PRÉCISE DU MEUBLE (iOS 17) : « SofaType:lShaped »,
+   * « ChairType:stool », « TableShapeType:circularElliptic »,
+   * « StorageType:shelf »… Le modèle 3D s'en sert pour choisir sa forme.
+   */
+  attributes?: string[];
 }
 
 /** Relevé colorimétrique du sol de la pièce. */
@@ -237,6 +243,11 @@ export const RoomScanVisite = UIManager.getViewManagerConfig?.(
         orbite?: number[];
         levee?: number;
         solY?: number;
+        /*
+          LES VRAIS MEUBLES — des modèles à leurs cotes, en matériaux
+          physiques, groupés par matière (voir `geometry/modeles3d`).
+        */
+        meubles?: number[];
       }
     >('RoomScanVisite')
   : undefined;

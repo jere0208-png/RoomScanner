@@ -17,6 +17,7 @@ import Svg, {
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 import { RoomScanCanvas, RoomScanVisite } from 'react-native-room-scan';
 import { cameraOrbite, maillageDeLaMaquette } from '../geometry/maquette3d';
+import { maillageDesMeubles } from '../geometry/modeles3d';
 import { grouperTraces } from '../ui/traces';
 import { mettreAPlat } from '../ui/canevas';
 import { estUnGlissement, estUnTap } from '../ui/geste';
@@ -1244,9 +1245,23 @@ export function Iso3DView({
   const maquette = useMemo(
     () =>
       natif
-        ? maillageDeLaMaquette(faces.filter((f) => visibleAvecLeMur(f, focusWallId)))
+        ? maillageDeLaMaquette(
+            faces.filter((f) => visibleAvecLeMur(f, focusWallId)),
+            { sansMeubles: true },
+          )
         : null,
     [natif, faces, focusWallId],
+  );
+  /*
+    LES VRAIS MEUBLES — relevé du patron : « des modèles réalistes aux
+    mesures réelles, non pas des cubes codés ». La carte graphique reçoit
+    chaque meuble FABRIQUÉ à ses cotes (voir `modeles3d`), à la place exacte
+    que la scène lui a donnée ; ses caisses restent au canevas, qui ne sait
+    pas peindre mille triangles par meuble.
+  */
+  const meublesNatifs = useMemo(
+    () => (natif ? maillageDesMeubles(scene.meubles ?? []) : null),
+    [natif, scene],
   );
 
   /**
@@ -2508,6 +2523,7 @@ export function Iso3DView({
               orientes={maquette.orientes}
               ecorche={maquette.ecorche}
               sols={maquette.sols}
+              meubles={meublesNatifs ?? undefined}
               voile={!solidWalls}
               orbite={cameraOrbite(view, center, radius3d, layout)}
               levee={leve}

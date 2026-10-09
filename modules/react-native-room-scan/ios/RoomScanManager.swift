@@ -684,6 +684,17 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
       if withColors, let color = RoomColorSampler.shared.color(for: obj) {
         out["color"] = color
       }
+      /*
+        CE QUE ROOMPLAN PRÉCISE DU MEUBLE — canapé d'angle, table ronde,
+        tabouret, étagère ouverte. Le type et la valeur, en clair :
+        « SofaType:lShaped ». C'est ce qui donne au modèle 3D sa forme.
+      */
+      if #available(iOS 17.0, *) {
+        let precisions = obj.attributes.map { a in
+          "\(String(describing: type(of: a))):\(String(describing: a))"
+        }
+        if !precisions.isEmpty { out["attributes"] = precisions }
+      }
       return out
     }
   }

@@ -67,10 +67,15 @@ function triangles(face: Face3D): { tris: [number, number, number][]; oriente: b
  * (faces sans aplat) et les ombres posées au sol n'y vont pas : la lumière
  * et l'occlusion de SceneKit font ce qu'elles simulaient.
  */
-export function maillageDeLaMaquette(faces: Face3D[]): MaillageDeMaquette {
+export function maillageDeLaMaquette(
+  faces: Face3D[],
+  o: { sansMeubles?: boolean } = {},
+): MaillageDeMaquette {
   const out: MaillageDeMaquette = { maillage: [], orientes: [], ecorche: [], sols: [] };
   for (const face of faces) {
     if (face.pts.length < 3 || !face.fill || face.ombre || face.isCeiling) continue;
+    // Les meubles en caisses restent au canevas : la carte graphique a les vrais.
+    if (o.sansMeubles && face.meuble) continue;
     const { tris, oriente } = triangles(face);
     if (tris.length === 0) continue;
     const [r, g, b] = composantes(face.fill);
