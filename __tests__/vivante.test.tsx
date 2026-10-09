@@ -192,7 +192,6 @@ describe('le catalogue élec en vraies images', () => {
           focusX={undefined}
           selectedId={null}
           onSelect={() => {}}
-          onAddRequest={() => {}}
           onChoose={() => {}}
           onClose={() => {}}
         />,

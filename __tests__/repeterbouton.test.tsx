@@ -96,7 +96,6 @@ function rendu(opts: {
         wallId="n"
         selectedId={opts.selectedId ?? null}
         onSelect={opts.onSelect ?? (() => {})}
-        onAddRequest={() => {}}
         onClose={() => {}}
       />,
     );
@@ -132,9 +131,9 @@ describe('le bouton « Répéter »', () => {
   it('n’existe pas tant qu’aucun appareil n’est tenu', () => {
     const t = rendu({ fixtures: [prise('a', 1)], selectedId: null });
     expect(bouton(t, 'Répéter')).toBeUndefined();
-    // Le contrôle en sens inverse : la rangée est bien là, elle porte
-    // « Ajouter ». Sans lui, l'épreuve passerait sur un écran vide.
-    expect(bouton(t, 'Ajouter')).toBeDefined();
+    // Le contrôle en sens inverse : le dock est bien là, il propose de
+    // poser. Sans lui, l'épreuve passerait sur un écran vide.
+    expect(bouton(t, 'Poser Prise 16 A')).toBeDefined();
   });
 
   it('apparaît dès qu’on en tient un', () => {
@@ -207,7 +206,6 @@ describe('et le lien garde sa place', () => {
           wallId="n"
           selectedId="a"
           onSelect={() => {}}
-          onAddRequest={() => {}}
           onLinkRequest={() => {}}
           onClose={() => {}}
         />,

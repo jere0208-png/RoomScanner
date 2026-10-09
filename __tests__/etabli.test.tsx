@@ -17,7 +17,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Text, TouchableOpacity, View } from 'react-native';
 import { Rect, Text as SvgText } from 'react-native-svg';
 import { light } from '../src/theme';
 import TestRenderer, { act } from 'react-test-renderer';
@@ -91,7 +91,6 @@ function rendu(
         wallId="n"
         selectedId={opts.fixtures?.[0]?.id ?? null}
         onSelect={() => {}}
-        onAddRequest={() => {}}
         onLinkRequest={opts.onLink}
         onClose={() => {}}
       />,
@@ -415,6 +414,15 @@ describe('les flèches de réglage', () => {
  * de bloc inutile ». Trois défauts de mise en page, tous vérifiables sans
  * capture d'écran — et donc tenus ici.
  */
+/**
+ * LA PAGE ENTIÈRE — relevé du patron : « revois complètement la page de
+ * placement d'appareils électriques sur un mur ; une page entière,
+ * complètement refaite, plus ludique, plus moderne ».
+ *
+ * Trois étages : où l'on est (l'en-tête et ses deux sorties), le mur, et ce
+ * qu'on fait (le dock). Ces épreuves tiennent la forme ; le dock a son banc
+ * (voir `etabliplein.test.tsx`).
+ */
 describe('la mise en page de l’établi', () => {
   /** Le style aplati d'un nœud, quel que soit son empilement de tableaux. */
   const style = (n: TestRenderer.ReactTestInstance) => {
@@ -427,55 +435,45 @@ describe('la mise en page de l’établi', () => {
       .findAllByType(TouchableOpacity)
       .find((n) => n.props.accessibilityLabel === label);
 
-  it('donne à la croix le gabarit du bouton d’enregistrement', () => {
+  it('les deux sorties se font face dans l’en-tête : abandonner à gauche, garder à droite', () => {
     const tree = rendu();
     const croix = boutonNommé(tree, 'Fermer sans garder');
+    const garder = boutonNommé(tree, 'Enregistrer et fermer');
     expect(croix).toBeDefined();
-    const enregistrer = tree.root
-      .findAllByType(TouchableOpacity)
-      .find((n) =>
-        n
-          .findAllByType(Text)
-          .some((t) => t.props.children === 'Enregistrer'),
-      );
-    expect(enregistrer).toBeDefined();
-    const sc = style(croix!);
-    const se = style(enregistrer!);
-    /*
-      LES DEUX SORTIES NE SE RESSEMBLENT PLUS, ET C'EST VOULU.
-
-      Elles étaient voisines dans l'en-tête, donc de même gabarit. La
-      refonte les sépare par ce qu'elles font : « Enregistrer » est
-      l'action principale — pleine largeur, en bas, sous le pouce ; la
-      croix est le geste rare qui ABANDONNE, et reste petite en haut.
-    */
-    expect(se.height).toBeGreaterThan(sc.height);
-    expect(se.width).toBe('100%');
-    // Et un bloc, pas une pastille : le rayon n'est plus la moitié du côté.
-    expect(sc.borderRadius).toBeLessThan(sc.height / 2);
-    // La règle des 44 points tient pour les deux.
-    expect(sc.height).toBeGreaterThanOrEqual(44);
-    expect(se.height).toBeGreaterThanOrEqual(44);
+    expect(garder).toBeDefined();
+    // Même rangée : un seul parent les porte.
+    expect(croix!.parent).toBe(garder!.parent);
+    const rangee = croix!.parent!.children.filter((x) => typeof x !== 'string');
+    expect(rangee.indexOf(croix!)).toBeLessThan(rangee.indexOf(garder!));
+    // « Enregistrer » est écrit, et c'est la seule chose bleue de l'en-tête.
+    expect(garder!.findAllByType(Text).some((t) => t.props.children === 'Enregistrer')).toBe(true);
+    expect(style(garder!).backgroundColor).toBeDefined();
+    // La règle des 44 points tient pour les deux, débord compris.
+    for (const b of [croix!, garder!]) {
+      const h = style(b).height + (b.props.hitSlop?.top ?? 0) + (b.props.hitSlop?.bottom ?? 0);
+      expect(h).toBeGreaterThanOrEqual(44);
+    }
   });
 
-  it('pose la pastille des meubles DANS le flux, sous la légende', () => {
+  it('pose la pastille des meubles dans la rangée d’état, jamais sur le dessin', () => {
     const tree = rendu({ objects: [BIBLIO] });
     const pastille = boutonNommé(tree, 'Meubles devant ce mur');
     expect(pastille).toBeDefined();
-    const sp = style(pastille!);
-    // Flottante, elle tombait sur la légende du mur et en cachait la
-    // moitié : plus rien ne se superpose.
-    expect(sp.position).toBeUndefined();
-    expect(sp.alignSelf).toBe('flex-start');
+    // Flottante, elle tombait sur la légende du mur : plus rien ne se
+    // superpose, elle vit avec la photo et la règle.
+    expect(style(pastille!).position).toBeUndefined();
+    const photo = tree.root
+      .findAllByType(TouchableOpacity)
+      .find((n) => String(n.props.accessibilityLabel ?? '').startsWith('Photo'))!;
+    expect(photo.parent).toBe(pastille!.parent);
   });
 
-  it('ne réserve plus toute la hauteur de l’écran', () => {
+  it('est une page entière : elle prend l’écran, le mur prend ce qui reste', () => {
     const tree = rendu();
-    // La feuille : le premier View, celui qui porte l'ombre et le fond.
-    const feuille = tree.root.findAllByType(View)[0];
-    const sf = style(feuille);
-    expect(sf.flex).toBeUndefined();
-    expect(sf.maxHeight).toBe('100%');
+    const page = tree.root.findAllByType(View)[0];
+    expect(style(page).flex).toBe(1);
+    const cadre = tree.root.findAllByType(View).find((n) => typeof n.props.onLayout === 'function')!;
+    expect(style(cadre).flex).toBe(1);
   });
 });
 
@@ -527,7 +525,6 @@ describe('la photo de repérage', () => {
           focusX={focusX}
           selectedId={null}
           onSelect={() => {}}
-          onAddRequest={() => {}}
           onClose={() => {}}
         />,
       );
@@ -604,33 +601,6 @@ describe('la photo de repérage', () => {
  *   un téléphone tenu d'une main.
  */
 describe('l’établi tient dans une main', () => {
-  const enTete = (tree: TestRenderer.ReactTestRenderer) =>
-    tree.root
-      .findAll((n) => {
-        const st = StyleSheet.flatten(n.props?.style) as
-          | { flexDirection?: string }
-          | undefined;
-        return (
-          st?.flexDirection === 'row' &&
-          n.findAllByType(Text).some((t) =>
-            String(t.props.children ?? '').includes('mur'),
-          )
-        );
-      })[0];
-
-  it('ne garde qu’une sortie dans l’en-tête : le titre a la place', () => {
-    const tree = rendu();
-    const tete = enTete(tree);
-    expect(tete).toBeDefined();
-    const boutons = tete
-      .findAllByType(TouchableOpacity)
-      .filter((n) => !String(n.props.accessibilityLabel ?? '').includes('Meubles'));
-    // La croix, et rien d'autre : « Enregistrer » et la photo sont
-    // descendus à portée de pouce.
-    expect(boutons).toHaveLength(1);
-    expect(String(boutons[0].props.accessibilityLabel)).toContain('Fermer');
-  });
-
   it('n’affiche aucun bouton éteint quand rien n’est tenu', () => {
     const tree = rendu();
     const morts = tree.root
@@ -639,32 +609,30 @@ describe('l’établi tient dans une main', () => {
     expect(morts).toHaveLength(0);
   });
 
-  it('garde le geste d’ajout et la photo sous le pouce', () => {
-    const vu = textes(rendu());
-    expect(vu).toContain('Ajouter');
-    // La photo devient un geste comme les autres, dans la même rangée.
+  it('garde la pose d’un appareil et la photo à portée de pouce', () => {
     const tree = rendu();
+    // Le dock propose les appareils en cartes, chacune posée d'un appui.
+    const poses = tree.root
+      .findAllByType(TouchableOpacity)
+      .filter((n) => String(n.props.accessibilityLabel ?? '').startsWith('Poser '));
+    expect(poses.length).toBeGreaterThan(2);
     const photo = tree.root
       .findAllByType(TouchableOpacity)
       .find((n) => String(n.props.accessibilityLabel ?? '').startsWith('Photo'));
     expect(photo).toBeDefined();
   });
 
-  it('pose « Enregistrer » en bas, sur toute la largeur', () => {
-    const tree = rendu();
-    const valider = tree.root
-      .findAllByType(TouchableOpacity)
-      .find((n) =>
-        n.findAllByType(Text).some((t) => t.props.children === 'Enregistrer'),
-      )!;
-    expect(valider).toBeDefined();
-    const st = StyleSheet.flatten(valider.props.style) as {
-      alignSelf?: string;
-      width?: number | string;
-      flexGrow?: number;
-    };
-    // Pleine largeur : c'est l'action principale, elle se vise sans regarder.
-    expect(st.width === '100%' || st.alignSelf === 'stretch').toBe(true);
+  it('un appareil tenu : le dock devient sa fiche, et se replie d’un geste', () => {
+    const tree = rendu({
+      fixtures: [{ id: 'a', kind: 'prise', wallId: 'n', along: 1, height: 0.25, side: 1 }],
+    });
+    const vu = textes(tree);
+    expect(vu).toContain('Gauche');
+    expect(vu).toContain('Hauteur');
+    expect(vu).not.toContain('Poser un appareil');
+    expect(
+      tree.root.findAllByType(TouchableOpacity).some((n) => n.props.accessibilityLabel === 'Reposer l’appareil'),
+    ).toBe(true);
   });
 });
 

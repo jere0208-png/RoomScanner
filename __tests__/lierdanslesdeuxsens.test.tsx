@@ -214,7 +214,6 @@ describe('l’établi montre « Lier » sur l’interrupteur aussi', () => {
           wallId="n"
           selectedId={choisi}
           onSelect={() => {}}
-          onAddRequest={() => {}}
           onLinkRequest={() => {}}
           onClose={() => {}}
         />,
@@ -266,7 +265,6 @@ describe('l’établi montre « Lier » sur l’interrupteur aussi', () => {
           wallId="n"
           selectedId="i1"
           onSelect={() => {}}
-          onAddRequest={() => {}}
           onLinkRequest={onLink}
           onClose={() => {}}
         />,

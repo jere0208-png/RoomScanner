@@ -12,21 +12,6 @@ import { StyleSheet } from 'react-native';
 import { ombreBouton, ombreAction, radius, shadowCard, themedStyles, type Palette } from '../../theme';
 import { MARGE_RANGEE, PILL_GAP } from '../../components/ToolPill';
 
-/**
- * LES MARGES DE LA MODALE PLEIN ÉCRAN — et pourquoi elles sont exportées.
- *
- * Relevé du patron, capture à l'appui : « ce menu dépasse de l'écran
- * verticalement ». La fiche d'élévation mesure sa propre hauteur et se rabote
- * de ce qui dépasse — bonne méthode — mais elle supposait la place
- * disponible : `hauteurEcran − 24`, un nombre écrit chez elle, alors que ces
- * marges-ci lui prenaient déjà soixante-huit points, plus la barre d'accueil.
- *
- * DEUX NOMBRES POUR LA MÊME CHOSE, ET L'UN DES DEUX SE TROMPE TOUJOURS. Ils
- * n'en font plus qu'un : la modale les pose, la fiche les lit.
- */
-export const ELEC_PLEIN_HAUT = 56;
-export const ELEC_PLEIN_BAS = 12;
-
 export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   container: {
     flex: 1,
@@ -1172,15 +1157,15 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   },
   modalTitle: { color: c.ink, fontSize: 17, fontWeight: '600' },
   elecWrap: { width: '100%' },
-  // L'établi ne s'étire plus jusqu'au bas de l'écran : il fait la taille
-  // de ce qu'il porte, et se pose au milieu de la hauteur libre.
-  elecWrapPlein: { flex: 1, justifyContent: 'center' },
-  elecPlein: { width: '100%' },
-  // Plein écran, aux marges près : le pouce a besoin de la place.
+  // L'établi est une PAGE : il prend tout, et range lui-même ses étages.
+  elecWrapPlein: { flex: 1, width: '100%' },
+  elecPlein: { flex: 1, width: '100%' },
+  // La page du mur : bord à bord, sur le fond de l'app, sans voile.
   modalBackdropPlein: {
-    padding: ELEC_PLEIN_BAS,
-    paddingTop: ELEC_PLEIN_HAUT,
-    justifyContent: 'flex-end',
+    padding: 0,
+    backgroundColor: c.bg,
+    alignItems: 'stretch',
+    justifyContent: 'flex-start',
   },
   // Diagnostic : un état d'abord — combien, et est-ce grave —, puis la
   // liste. L'ancienne fenêtre commençait par une consigne d'usage.
@@ -1401,8 +1386,6 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     justifyContent: 'center',
   },
   /* Deux visages et le signe qui les unit : le combo. */
-  elecDuo: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  elecPlus: { color: c.inkSoft, fontSize: 15, fontWeight: '600' },
   /* Le symbole normalisé, en insigne au coin de la photo. */
   elecInsigne: {
     position: 'absolute',

@@ -2562,9 +2562,12 @@ export function ResultScreen() {
 
   const startFixture = () => {
     seulGeste('mur');
-    setElecWallId(tab === '2d' ? selectedWallId ?? pier?.wallId ?? null : null);
+    const mur = tab === '2d' ? selectedWallId ?? pier?.wallId ?? null : null;
+    setElecWallId(mur);
     setElecSel(null);
-    setElecView('catalogue');
+    // Un mur désigné : sa page s'ouvre, et ses appareils sont dans son
+    // dock. Sans mur, le catalogue d'abord, puis l'appui sur le plan.
+    setElecView(mur ? 'mur' : 'catalogue');
     setElecOpen(true);
   };
 
@@ -5526,7 +5529,6 @@ export function ResultScreen() {
         focusX={elecWallId ? cibleDuRetour(elecWallId) : undefined}
         selectedId={elecSel}
         onSelect={setElecSel}
-        onAddRequest={() => setElecView('catalogue')}
         // « Lier » depuis l'établi : on ferme, et le plan attend
         // l'interrupteur — le geste des lignes de spots.
         onLinkRequest={(id) => {

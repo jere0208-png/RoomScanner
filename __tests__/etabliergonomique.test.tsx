@@ -104,7 +104,6 @@ const monterEtabli = () => {
         wallId="n"
         selectedId="a"
         onSelect={() => {}}
-        onAddRequest={() => {}}
         onClose={() => {}}
       />,
     );
@@ -273,7 +272,6 @@ describe('le catalogue en grandes tuiles', () => {
           focusX={undefined}
           selectedId={null}
           onSelect={() => {}}
-          onAddRequest={() => {}}
           onChoose={() => {}}
           onClose={() => {}}
         />,

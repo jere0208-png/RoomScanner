@@ -17,18 +17,14 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   PanResponder,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  useWindowDimensions,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import {
-  ELEC_PLEIN_BAS,
-  ELEC_PLEIN_HAUT,
-} from '../screens/result/styles';
 import Svg, {
   Circle,
   G,
@@ -41,7 +37,13 @@ import Svg, {
   Defs,
   Text as SvgText,
 } from 'react-native-svg';
-import { radius, shadowCard, themedStyles, useTheme, type Palette } from '../theme';
+import {
+  radius,
+  shadowCard,
+  themedStyles,
+  useTheme,
+  type Palette,
+} from '../theme';
 import { OndeePose, useNaissances } from './Vivant';
 import {
   estTraversante,
@@ -67,6 +69,7 @@ import {
   placeRepetee,
   postsOf,
   COMMANDES_MURALES,
+  FIXTURE_FAMILIES,
   seCommande,
   type FixtureKind,
 } from '../geometry/electrical';
@@ -100,9 +103,10 @@ import { haptic } from '../ui/haptic';
 import { CalquePhotoFond, CalquePhotoPoignee } from './CalquePhoto';
 import { SOLAIRES } from '../ui/solaires';
 import { CloseCross } from './CloseCross';
+import { VignetteAppareil } from './VignetteAppareil';
 import { wallLabel } from '../geometry/naming';
 import { frCategory } from '../geometry/furniture';
-import { Check, Sofa } from 'lucide-react-native';
+import { Sofa } from 'lucide-react-native';
 
 const PAD_X = 30;
 /**
@@ -120,36 +124,6 @@ const FUITE = 9;
 /** Hauteur de la ligne de cote au-dessus du plafond. */
 export const COTE_H = 26;
 
-/**
- * CE QUE LES COMMANDES PRENNENT SOUS LE DESSIN, en points.
- *
- * Bandeau de conformité, pas de réglage, trois champs, cinq boutons : une
- * ESTIMATION, et c'est bien pour cela qu'elle ne décide pas seule. Le dessin
- * se rabote ensuite sur ce que la feuille mesure vraiment (voir `raboter`).
- */
-const RESERVE_COMMANDES = 390;
-
-/**
- * Ce qu'on laisse respirer en bas de l'écran, SOUS la barre du système.
- *
- * Ce n'était pas ça avant : c'était vingt-quatre points censés couvrir tout
- * ce qui n'est pas la feuille — les marges de la modale ET la barre
- * d'accueil. Elles en font cent deux. Le garde-fou laissait donc passer
- * soixante-dix-huit points de débord, soit très exactement la hauteur du
- * bouton « Enregistrer », que le patron a vu coupé en deux.
- *
- * Il ne reste ici que ce que personne d'autre ne sait dire : le souffle sous
- * la barre. Le reste se lit à sa source (voir `ELEC_PLEIN_HAUT`).
- */
-const MARGE_ECRAN = 12;
-
-/**
- * Le dessin ne descend pas sous cette hauteur.
- *
- * En dessous, un mur de deux mètres cinquante n'a plus de quoi montrer une
- * prise à vingt-cinq centimètres : autant ne rien dessiner.
- */
-const HAUTEUR_MIN_CADRE = 170;
 /**
  * Les hauteurs de référence d'une installation, en mètres.
  *
@@ -212,8 +186,6 @@ interface Props {
   focusX?: number | null;
   selectedId: string | null;
   onSelect: (id: string | null) => void;
-  /** Ouvre le catalogue pour poser un appareil de plus sur ce mur. */
-  onAddRequest: () => void;
   /**
    * Rend l'appareil tenu au parent pour nouer son lien SUR LE PLAN : on
    * ferme l'établi, puis on touche l'interrupteur qui le commande — le
@@ -236,30 +208,29 @@ export function WallElevation({
   focusX,
   selectedId,
   onSelect,
-  onAddRequest,
   onLinkRequest,
   onClose,
   onDemander,
 }: Props) {
-  const walls = useScanStore((s) => s.walls);
-  const openings = useScanStore((s) => s.openings);
-  const rooms = useScanStore((s) => s.rooms);
-  const fixtures = useScanStore((s) => s.fixtures);
-  const moveFixture = useScanStore((s) => s.moveFixture);
-  const addFixture = useScanStore((s) => s.addFixture);
-  const flipFixture = useScanStore((s) => s.flipFixture);
-  const basculerPontage = useScanStore((s) => s.basculerPontage);
-  const removeFixture = useScanStore((s) => s.removeFixture);
-  const repeterFixture = useScanStore((s) => s.repeterFixture);
-  const placeAssembly = useScanStore((s) => s.placeAssembly);
-  const splitFixture = useScanStore((s) => s.splitFixture);
-  const pendingJoin = useScanStore((s) => s.pendingJoin);
-  const objects = useScanStore((s) => s.objects);
-  const addPhoto = useScanStore((s) => s.addPhoto);
-  const photos = useScanStore((s) => s.photos);
-  const setPhotoCalage = useScanStore((s) => s.setPhotoCalage);
-  const north = useScanStore((s) => s.north);
-  const clearPendingJoin = useScanStore((s) => s.clearPendingJoin);
+  const walls = useScanStore(s => s.walls);
+  const openings = useScanStore(s => s.openings);
+  const rooms = useScanStore(s => s.rooms);
+  const fixtures = useScanStore(s => s.fixtures);
+  const moveFixture = useScanStore(s => s.moveFixture);
+  const addFixture = useScanStore(s => s.addFixture);
+  const flipFixture = useScanStore(s => s.flipFixture);
+  const basculerPontage = useScanStore(s => s.basculerPontage);
+  const removeFixture = useScanStore(s => s.removeFixture);
+  const repeterFixture = useScanStore(s => s.repeterFixture);
+  const placeAssembly = useScanStore(s => s.placeAssembly);
+  const splitFixture = useScanStore(s => s.splitFixture);
+  const pendingJoin = useScanStore(s => s.pendingJoin);
+  const objects = useScanStore(s => s.objects);
+  const addPhoto = useScanStore(s => s.addPhoto);
+  const photos = useScanStore(s => s.photos);
+  const setPhotoCalage = useScanStore(s => s.setPhotoCalage);
+  const north = useScanStore(s => s.north);
+  const clearPendingJoin = useScanStore(s => s.clearPendingJoin);
   const c = useTheme();
   const styles = getStyles(c);
 
@@ -276,28 +247,12 @@ export function WallElevation({
   const [rideau, setRideau] = useState(0.5);
   const [calant, setCalant] = useState(false);
   /** La hauteur de l'écran : c'est elle qui borne le dessin. */
-  const { height: hauteurEcran } = useWindowDimensions();
   /*
     LA BARRE D'ACCUEIL EST UNE MESURE, PAS UNE CONSTANTE : trente-quatre
     points sur un iPhone récent, zéro sur un iPhone à bouton, et le téléphone
     est le seul à savoir lequel il est.
   */
   const margesSysteme = useSafeAreaInsets();
-  /** La place que la fiche a VRAIMENT : l'écran, moins tout ce qui l'entoure. */
-  const placeUtile =
-    hauteurEcran -
-    ELEC_PLEIN_HAUT -
-    ELEC_PLEIN_BAS -
-    margesSysteme.bottom -
-    MARGE_ECRAN;
-  /**
-   * La hauteur que réclame CE mur, une fois la largeur connue.
-   *
-   * Bornée des deux côtés : un couloir de six mètres ne doit pas se
-   * réduire à un trait, et un placard de quatre-vingts centimètres ne doit
-   * pas manger l'écran entier.
-   */
-  const [hauteurCadre, setHauteurCadre] = useState<number | null>(null);
   /** L'horloge de l'appui maintenu, et celle qui efface le trait d'aide. */
   const tenir = useRef<ReturnType<typeof setTimeout> | null>(null);
   const effaceGuide = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -309,7 +264,7 @@ export function WallElevation({
     },
     [],
   );
-  const restoreFixtures = useScanStore((st) => st.restoreFixtures);
+  const restoreFixtures = useScanStore(st => st.restoreFixtures);
   /**
    * L'APPAREILLAGE TEL QU'ON A OUVERT LE MUR.
    *
@@ -357,15 +312,17 @@ export function WallElevation({
   /** Les meubles du mur, en creux. Montrés d'emblée : c'est une surprise
    *  qu'on veut avoir AVANT de percer, pas après. */
   const [voirMeubles, setVoirMeubles] = useState(true);
+  /** La famille ouverte dans le dock des appareils. */
+  const [famille, setFamille] = useState(0);
 
-  const wall = walls.find((w) => w.id === wallId) ?? null;
+  const wall = walls.find(w => w.id === wallId) ?? null;
   const mine = useMemo(
-    () => fixtures.filter((f) => f.wallId === wallId),
+    () => fixtures.filter(f => f.wallId === wallId),
     [fixtures, wallId],
   );
   /* Les poses se voient naître ici aussi — voir `Vivant`. */
-  const nes = useNaissances(mine.map((f) => f.id));
-  const selected = mine.find((f) => f.id === selectedId) ?? null;
+  const nes = useNaissances(mine.map(f => f.id));
+  const selected = mine.find(f => f.id === selectedId) ?? null;
 
   // La face qu'on regarde est celle de l'appareil sélectionné : le retourner
   // fait donc passer la vue de l'autre côté, ce qui est exactement le geste
@@ -401,33 +358,6 @@ export function WallElevation({
    * la largeur d'une feuille ne dépend pas de sa hauteur, il n'y a donc
    * pas de boucle à craindre.
    */
-  useEffect(() => {
-    if (!face || layout.w <= 0 || !wall) return;
-    const utile = Math.max(80, layout.w - 2 * PAD_X);
-    const voulue = (utile * wall.height) / Math.max(0.5, face.len);
-    /**
-     * ET IL RESTE DANS L'ÉCRAN.
-     *
-     * Le dessin se calculait sur les seules proportions du mur, la feuille
-     * s'étirait pour l'accueillir, et sur un petit téléphone les commandes
-     * du bas — les cotes, « Ajouter », « Retirer » — sortaient par le bas.
-     * On réserve donc la place des commandes (environ 390 points : bandeau
-     * de conformité, pas de réglage, trois champs, cinq boutons) et le
-     * dessin prend ce qui reste.
-     */
-    /*
-      ET L'ESTIMATION D'OUVERTURE PART DE LA MÊME PLACE. Elle partait de
-      l'écran entier : la fiche s'ouvrait trop grande, puis se rabotait sous
-      les yeux à la première mesure. Un saut d'une image, à chaque ouverture,
-      sur tous les murs étroits.
-    */
-    const reste = placeUtile - RESERVE_COMMANDES;
-    setHauteurCadre(
-      Math.round(
-        Math.min(430, Math.max(HAUTEUR_MIN_CADRE, reste), Math.max(190, voulue + PAD_TOP + PAD_BOTTOM)),
-      ),
-    );
-  }, [face, wall, layout.w, placeUtile]);
 
   /**
    * ET SI ÇA DÉBORDE QUAND MÊME, ON RABOTE — mesuré, pas deviné.
@@ -448,13 +378,6 @@ export function WallElevation({
    * totale, donc le débord, donc l'ajustement suivant. Il converge en une
    * passe et ne peut pas se mettre à battre.
    */
-  const raboter = (hauteurRendue: number) => {
-    if (hauteurCadre === null) return;
-    const trop = hauteurRendue - placeUtile;
-    if (trop <= 1) return;
-    const cible = Math.max(HAUTEUR_MIN_CADRE, hauteurCadre - Math.ceil(trop));
-    if (cible < hauteurCadre) setHauteurCadre(cible);
-  };
 
   /**
    * Y A-T-IL DE QUOI PONTER ? — une prise voisine sur le même pan.
@@ -471,12 +394,15 @@ export function WallElevation({
     const pans = wallRuns(wall, openings);
     const panDe = (along: number) =>
       pans.findIndex(
-        (r) => r.kind === 'mur' && along / L >= r.t0 - 1e-6 && along / L <= r.t1 + 1e-6,
+        r =>
+          r.kind === 'mur' &&
+          along / L >= r.t0 - 1e-6 &&
+          along / L <= r.t1 + 1e-6,
       );
     const mien = panDe(selected.along);
     return (
       fixtures.find(
-        (f) =>
+        f =>
           f.id !== selected.id &&
           f.kind === 'prise' &&
           f.wallId === selected.wallId &&
@@ -488,7 +414,7 @@ export function WallElevation({
 
   const holes = useMemo(() => {
     if (!wall || walls.length === 0) return [];
-    const floorY = Math.min(...walls.map((w) => w.yCenter - w.height / 2));
+    const floorY = Math.min(...walls.map(w => w.yCenter - w.height / 2));
     return assignOpenings(walls, openings, floorY).get(wall.id) ?? [];
   }, [wall, walls, openings]);
 
@@ -499,7 +425,7 @@ export function WallElevation({
   const objectif = useMemo(() => {
     const inputs = roomInputsOf(rooms, roomParts(walls, rooms));
     const w2r = wallToRooms(inputs);
-    const mien = inputs.find((r) => (w2r.get(wallId) ?? []).includes(r.id));
+    const mien = inputs.find(r => (w2r.get(wallId) ?? []).includes(r.id));
     if (!mien) return null;
     const req = requirementFor(roomUse(mien.name, mien.kind), mien.area);
     if (req.socles === 0) return null;
@@ -555,7 +481,7 @@ export function WallElevation({
       w2r,
       fixturePlacement(fixtures, walls, inputs),
     ).filter(
-      (i) =>
+      i =>
         i.severity === 'alerte' &&
         i.code !== 'socles' &&
         i.code !== 'hauteur' &&
@@ -623,7 +549,7 @@ export function WallElevation({
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: (e) => {
+      onPanResponderGrant: e => {
         const L = live.current;
         if (!L.face || L.scale <= 0) return;
         const tx = e.nativeEvent.locationX;
@@ -668,21 +594,21 @@ export function WallElevation({
         const L = live.current;
         const d = drag.current;
         if (!d || !L.face || L.scale <= 0) return;
-        const spec = FIXTURES[L.mine.find((f) => f.id === d.id)?.kind ?? 'prise'];
+        const spec = FIXTURES[L.mine.find(f => f.id === d.id)?.kind ?? 'prise'];
         let x = d.x + g.dx / L.scale;
         let y = d.y - g.dy / L.scale;
         // Repères : hauteur usuelle du type posé, alignement avec les autres
         // appareils du mur, milieu du mur.
-        const others = L.mine.filter((f) => f.id !== d.id);
+        const others = L.mine.filter(f => f.id !== d.id);
         // L'axe de chaque retour assez large pour recevoir la plaque
         // entière : la règle est écrite une seule fois, dans la géométrie.
         const axes = masonryAxes(L.retours, spec.w);
         const sx = snapTo(x, [
-          ...others.map((f) => faceX(L.face!, f.along)),
+          ...others.map(f => faceX(L.face!, f.along)),
           ...axes,
           L.face.len / 2,
         ]);
-        const sy = snapTo(y, [spec.std, ...others.map((f) => f.height)]);
+        const sy = snapTo(y, [spec.std, ...others.map(f => f.height)]);
         if (sx !== null) x = sx;
         if (sy !== null) y = sy;
         x = Math.round(x * 100) / 100;
@@ -701,10 +627,10 @@ export function WallElevation({
         // demande de quel côté.
         const L = live.current;
         if (!d || !L.face) return;
-        const moi = L.mine.find((f) => f.id === d.id);
+        const moi = L.mine.find(f => f.id === d.id);
         if (!moi) return;
         const sous = L.mine.find(
-          (f) =>
+          f =>
             f.id !== moi.id &&
             f.side === moi.side &&
             !f.group &&
@@ -739,8 +665,8 @@ export function WallElevation({
    */
   useEffect(() => {
     if (!pendingJoin || !face) return;
-    const base = fixtures.find((f) => f.id === pendingJoin.base);
-    const moved = fixtures.find((f) => f.id === pendingJoin.moved);
+    const base = fixtures.find(f => f.id === pendingJoin.base);
+    const moved = fixtures.find(f => f.id === pendingJoin.moved);
     clearPendingJoin();
     if (!base || !moved || base.wallId !== wall?.id) return;
     const xb = faceX(face, base.along);
@@ -778,7 +704,7 @@ export function WallElevation({
   /** Les plans de travail que ce mur longe : ils changent la règle. */
   const plansDeTravail = useMemo(() => {
     if (!face || !wall) return [];
-    const piece = rooms.find((r) => r.id === roomOf(wall));
+    const piece = rooms.find(r => r.id === roomOf(wall));
     return worktopsOnWall(
       face,
       objects,
@@ -788,10 +714,10 @@ export function WallElevation({
 
   if (!wall || !face) {
     return (
-      <View style={styles.sheet}>
-        <Text style={styles.title}>Ce mur n’existe plus</Text>
-        <TouchableOpacity style={styles.ghost} onPress={onClose}>
-          <Text style={styles.ghostText}>Fermer</Text>
+      <View style={[styles.page, styles.disparu]}>
+        <Text style={styles.titre}>Ce mur n’existe plus</Text>
+        <TouchableOpacity style={styles.garder} onPress={onClose}>
+          <Text style={styles.garderMot}>Fermer</Text>
         </TouchableOpacity>
       </View>
     );
@@ -817,16 +743,16 @@ export function WallElevation({
           longueur: face.len,
           serie: mine
             .filter(
-              (o) =>
+              o =>
                 o.id !== selected.id &&
                 o.side === selected.side &&
                 o.kind === selected.kind &&
                 Math.abs(o.height - selected.height) < 0.02,
             )
-            .map((o) => faceX(face, o.along)),
+            .map(o => faceX(face, o.along)),
           occupe: mine
-            .filter((o) => o.side === selected.side)
-            .map((o) => ({ x: faceX(face, o.along), y: o.height })),
+            .filter(o => o.side === selected.side)
+            .map(o => ({ x: faceX(face, o.along), y: o.height })),
           pleins: retours,
         }) !== null
       : false;
@@ -838,7 +764,7 @@ export function WallElevation({
    * maçonnerie sous la main.
    */
   const monRetour = selected
-    ? retours.find((r) => selX >= r.x0 - 1e-6 && selX <= r.x1 + 1e-6) ?? null
+    ? retours.find(r => selX >= r.x0 - 1e-6 && selX <= r.x1 + 1e-6) ?? null
     : null;
   /**
    * LE RETOUR QU'ON REGARDE — celui que la photo va montrer.
@@ -851,7 +777,7 @@ export function WallElevation({
    */
   const retourVise =
     (focusX != null
-      ? retours.find((r) => focusX >= r.x0 && focusX <= r.x1)
+      ? retours.find(r => focusX >= r.x0 && focusX <= r.x1)
       : null) ??
     monRetour ??
     null;
@@ -860,7 +786,7 @@ export function WallElevation({
     Un simple filtre, pas un `useMemo` : nous sommes ici après le retour
     anticipé du mur introuvable, et un hook ne se place pas là.
   */
-  const mesPhotos = photos.filter((p) => p.wallId === wallId);
+  const mesPhotos = photos.filter(p => p.wallId === wallId);
   /*
     LA PHOTO DU CALQUE : LA DERNIÈRE PRISE SUR CE MUR.
 
@@ -881,8 +807,7 @@ export function WallElevation({
       ? { left: px(0), top: py(H), w: face.len * scale, h: H * scale }
       : null;
   const calqueVisible = calque && !!photoDuCalque && !!cadreDuMur;
-  const roomName =
-    rooms.find((r) => r.id === roomOf(wall))?.name ?? '';
+  const roomName = rooms.find(r => r.id === roomOf(wall))?.name ?? '';
   /**
    * DE QUEL MUR S'AGIT-IL ? Celui du nord, celui de l'est.
    *
@@ -893,7 +818,7 @@ export function WallElevation({
    */
   const cardinal = (() => {
     const centre = roomParts(walls, rooms).find(
-      (p) => p.roomId === roomOf(wall),
+      p => p.roomId === roomOf(wall),
     )?.labelAt;
     return centre ? wallLabel(wall, centre, north) : null;
   })();
@@ -928,7 +853,7 @@ export function WallElevation({
     const id = addFixture(kind, wallId);
     if (!id) return;
     if (height !== undefined) {
-      const pose = useScanStore.getState().fixtures.find((f) => f.id === id);
+      const pose = useScanStore.getState().fixtures.find(f => f.id === id);
       if (pose) moveFixture(id, pose.along, height);
     }
     onSelect(id);
@@ -941,18 +866,19 @@ export function WallElevation({
    */
   const cotesPossibles = (): PlateSide[] => {
     if (!fusion || !face || !wall) return [];
-    const base = mine.find((f) => f.id === fusion.base);
-    const moved = mine.find((f) => f.id === fusion.moved);
+    const base = mine.find(f => f.id === fusion.base);
+    const moved = mine.find(f => f.id === fusion.moved);
     if (!base || !moved) return [];
     const gabarit = FIXTURES[moved.kind];
     const axe = { x: fusion.axe, y: base.height };
-    return PLATE_SIDES.map((s) => s.key).filter((cote) => {
+    return PLATE_SIDES.map(s => s.key).filter(cote => {
       const p = plateSlot(axe, cote);
       if (p.x < gabarit.w / 2 || p.x > face.len - gabarit.w / 2) return false;
-      if (p.y < gabarit.h / 2 || p.y > wall.height - gabarit.h / 2) return false;
+      if (p.y < gabarit.h / 2 || p.y > wall.height - gabarit.h / 2)
+        return false;
       // Ni sur un troisième appareil déjà posé.
       return !mine.some(
-        (f) =>
+        f =>
           f.id !== moved.id &&
           f.id !== base.id &&
           f.side === base.side &&
@@ -977,7 +903,7 @@ export function WallElevation({
    */
   const appliquer = (cote: PlateSide, centre: boolean) => {
     if (!fusion || !face) return;
-    const base = mine.find((f) => f.id === fusion.base);
+    const base = mine.find(f => f.id === fusion.base);
     if (!base) return;
     const horiz = cote === 'gauche' || cote === 'droite';
     const sens = cote === 'gauche' || cote === 'bas' ? -1 : 1;
@@ -1019,12 +945,15 @@ export function WallElevation({
    */
   const montrerAlignement = (id: string, x: number, y: number) => {
     if (!face) return;
-    const autres = mine.filter((f) => f.id !== id);
+    const autres = mine.filter(f => f.id !== id);
     const pres = (v: number, cibles: number[]) =>
-      cibles.find((t) => Math.abs(v - t) < 0.005);
+      cibles.find(t => Math.abs(v - t) < 0.005);
     setGuide({
-      x: pres(x, [...autres.map((f) => faceX(face, f.along)), face.len / 2]),
-      y: pres(y, autres.map((f) => f.height)),
+      x: pres(x, [...autres.map(f => faceX(face, f.along)), face.len / 2]),
+      y: pres(
+        y,
+        autres.map(f => f.height),
+      ),
     });
     // Le trait s'efface tout seul : il dit un instant, il ne s'installe pas.
     if (effaceGuide.current) clearTimeout(effaceGuide.current);
@@ -1052,12 +981,16 @@ export function WallElevation({
      */
     const vif = useScanStore
       .getState()
-      .fixtures.find((f) => f.id === selected.id);
+      .fixtures.find(f => f.id === selected.id);
     if (!vif) return;
     const x = faceX(face, vif.along) + dx * pas;
     const y = vif.height + dy * pas;
     moveFixture(vif.id, fromFaceX(face, x), y);
-    montrerAlignement(vif.id, Math.round(x * 100) / 100, Math.round(y * 100) / 100);
+    montrerAlignement(
+      vif.id,
+      Math.round(x * 100) / 100,
+      Math.round(y * 100) / 100,
+    );
   };
 
   /**
@@ -1086,9 +1019,14 @@ export function WallElevation({
     const v = parseFloat(draft.replace(',', '.'));
     if (selected && editing && isFinite(v)) {
       const m = v / 100;
-      if (editing === 'g') moveFixture(selected.id, fromFaceX(face, m), selected.height);
+      if (editing === 'g')
+        moveFixture(selected.id, fromFaceX(face, m), selected.height);
       else if (editing === 'd')
-        moveFixture(selected.id, fromFaceX(face, face.len - m), selected.height);
+        moveFixture(
+          selected.id,
+          fromFaceX(face, face.len - m),
+          selected.height,
+        );
       else moveFixture(selected.id, selected.along, m);
     }
     setEditing(null);
@@ -1100,9 +1038,7 @@ export function WallElevation({
       <View style={styles.fieldBox}>
         <TextInput
           style={styles.fieldInput}
-          value={
-            editing === key ? draft : selected ? String(cm(value)) : '—'
-          }
+          value={editing === key ? draft : selected ? String(cm(value)) : '—'}
           editable={!!selected}
           keyboardType="number-pad"
           returnKeyType="done"
@@ -1120,83 +1056,52 @@ export function WallElevation({
     </View>
   );
 
-  return (
-    <View style={styles.sheet}>
-      <View style={styles.header}>
-        <View style={styles.headerTexts}>
-          <Text style={styles.title} numberOfLines={1}>
-            {spec ? spec.label : 'Face au mur'}
-          </Text>
-          {/*
-            DEUX LIGNES, PAS QUATRE.
+  /**
+   * POSER D'UN APPUI — le dock de la page.
+   *
+   * On passait par un catalogue dans une seconde fenêtre, l'appareil
+   * tombait à vingt centimètres du coin, puis il fallait le traîner. Il se
+   * pose maintenant là où l'on regarde — au milieu du mur, ou du retour
+   * visé — à sa hauteur type, sur la première place libre de part et
+   * d'autre ; il arrive choisi, prêt à être glissé ou coté.
+   */
+  const poserIci = (kind: FixtureKind) => {
+    const gabarit = FIXTURES[kind];
+    const cible = retourVise
+      ? (retourVise.x0 + retourVise.x1) / 2
+      : face.len / 2;
+    const libre = (x: number) =>
+      x - gabarit.w / 2 >= 0 &&
+      x + gabarit.w / 2 <= face.len &&
+      !mine.some(
+        f =>
+          f.side === side &&
+          overlaps(
+            { x, y: gabarit.std, kind },
+            { x: faceX(face, f.along), y: f.height, kind: f.kind },
+          ),
+      );
+    let x = cible;
+    for (let k = 0; k <= 16; k++) {
+      const essais = k === 0 ? [cible] : [cible + k * 0.25, cible - k * 0.25];
+      const trouve = essais.find(libre);
+      if (trouve !== undefined) {
+        x = trouve;
+        break;
+      }
+    }
+    const id = addFixture(kind, wallId, x);
+    if (!id) return;
+    onSelect(id);
+    haptic('succes');
+  };
 
-            La légende empilait la pièce, le mur, sa longueur, le retour et
-            la règle de l'appareil : quatre lignes de gris sous un titre,
-            qui poussaient les boutons et que la pastille des meubles
-            venait recouvrir. On garde ce qui SITUE (la pièce, le mur, sa
-            longueur) ; la règle de l'appareil, elle, est déjà dite par le
-            bandeau de conformité, juste dessous, là où elle sert.
-          */}
-          <Text style={styles.subtitle} numberOfLines={2}>
-            {roomName ? `${roomName} · ` : ''}
-            {cardinal
-              ? `${cardinal} de ${face.len.toFixed(2).replace('.', ',')} m`
-              : `mur de ${face.len.toFixed(2).replace('.', ',')} m`}
-            {monRetour ? ` · retour de ${cm(monRetour.x1 - monRetour.x0)} cm` : ''}
-          </Text>
-          {/*
-            LA PASTILLE DES MEUBLES REVIENT DANS LE FLUX.
-
-            Elle flottait par-dessus l'en-tête, à soixante-deux points du
-            haut : sur un titre de deux lignes elle tombait pile sur la
-            légende et en cachait la moitié. Posée sous la légende, elle
-            ne peut plus rien recouvrir, et elle se lit comme ce qu'elle
-            est : un calque à allumer.
-          */}
-          {meublesDuMur.length > 0 && (
-            <TouchableOpacity
-              style={[styles.calque, voirMeubles && styles.calqueOn]}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              accessibilityLabel="Meubles devant ce mur"
-              onPress={() => setVoirMeubles((v) => !v)}>
-              <Sofa
-                size={15}
-                color={voirMeubles ? '#FFFFFF' : c.inkSoft}
-                strokeWidth={2}
-              />
-              <Text
-                style={[styles.calqueText, voirMeubles && styles.calqueTextOn]}>
-                {`${meublesDuMur.length} meuble${
-                  meublesDuMur.length > 1 ? 's' : ''
-                }`}
-              </Text>
-            </TouchableOpacity>
-          )}
-        </View>
-        {/*
-          UNE SEULE SORTIE DANS L'EN-TÊTE — relevé du patron : « repense
-          cette page pour plus de simplicité, optimisé smartphone ».
-
-          Ils étaient trois à s'y partager la place avec le titre : la
-          photo, un « Enregistrer » vert qui prenait le tiers de la
-          largeur, et la croix. Résultat, le titre sortait tronqué DEUX
-          fois — « Face au… », « mur sud-est de 2,8… » —, c'est-à-dire que
-          l'écran ne disait plus devant quoi on se trouvait.
-
-          Ne reste ici que la sortie qui ABANDONNE : le geste rare, petit,
-          en haut. Ce qu'on fait souvent — poser, photographier, garder —
-          descend sous le pouce.
-        */}
-        <TouchableOpacity
-          style={styles.close}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          accessibilityLabel="Fermer sans garder"
-          onPress={() => {
-            if (!modifie) {
-              onClose();
-              return;
-            }
-            /*
+  const fermerSansGarder = () => {
+    if (!modifie) {
+      onClose();
+      return;
+    }
+    /*
               LA QUESTION SE POSE DANS NOTRE FEUILLE.
 
               Relevé du patron, capture à l'appui : « refonte de ce popup
@@ -1210,49 +1115,303 @@ export function WallElevation({
               l'établi tout seul), on garde l'alerte : mieux vaut une
               question laide qu'un mur qu'on abandonne sans demander.
             */
-            const abandonner = () => {
-              if (depart.current) restoreFixtures(depart.current);
-              depart.current = null;
-              onClose();
-            };
-            if (onDemander) {
-              onDemander({
-                title: 'Abandonner les modifications ?',
-                subtitle: 'Ce mur reviendra dans l’état où vous l’avez ouvert.',
-                actions: [
-                  {
-                    label: 'Abandonner',
-                    hint: 'Les appareils reprennent leur place d’origine.',
-                    icon: 'supprimer',
-                    danger: true,
-                    onPress: abandonner,
-                  },
-                ],
-              });
-              return;
-            }
-            alerte(
-              'Abandonner les modifications ?',
-              'Ce mur reviendra dans l’état où vous l’avez ouvert.',
-              [
-                { label: 'Continuer' },
-                { label: 'Abandonner', danger: true, onPress: abandonner },
-              ],
-            );
-          }}>
-          <CloseCross size={22} color={c.inkSoft} weight={3} />
+    const abandonner = () => {
+      if (depart.current) restoreFixtures(depart.current);
+      depart.current = null;
+      onClose();
+    };
+    if (onDemander) {
+      onDemander({
+        title: 'Abandonner les modifications ?',
+        subtitle: 'Ce mur reviendra dans l’état où vous l’avez ouvert.',
+        actions: [
+          {
+            label: 'Abandonner',
+            hint: 'Les appareils reprennent leur place d’origine.',
+            icon: 'supprimer',
+            danger: true,
+            onPress: abandonner,
+          },
+        ],
+      });
+      return;
+    }
+    alerte(
+      'Abandonner les modifications ?',
+      'Ce mur reviendra dans l’état où vous l’avez ouvert.',
+      [
+        { label: 'Continuer' },
+        { label: 'Abandonner', danger: true, onPress: abandonner },
+      ],
+    );
+  };
+
+  const garderEtFermer = () => {
+    depart.current = null;
+    haptic('succes');
+    onClose();
+  };
+
+  /** « Mur nord » quand le nord est connu ; « Face au mur » sinon. */
+  const titreDuMur = cardinal
+    ? `${cardinal.charAt(0).toUpperCase()}${cardinal.slice(1)}`
+    : 'Face au mur';
+  const mesures =
+    `${face.len.toFixed(2).replace('.', ',')} × ${H.toFixed(2).replace(
+      '.',
+      ',',
+    )} m` +
+    (retourVise ? ` · retour de ${cm(retourVise.x1 - retourVise.x0)} cm` : '');
+  const familleVue =
+    FIXTURE_FAMILIES[Math.min(famille, FIXTURE_FAMILIES.length - 1)];
+  /** Le compte de la conformité : où en est la pièce. */
+  const conforme =
+    !!objectif &&
+    !objectif.inconnu &&
+    objectif.poses >= objectif.exiges &&
+    constats.length === 0;
+  /** Les hauteurs qu'on pose d'un appui : celle du type, puis les repères. */
+  const hauteursRapides = spec
+    ? [spec.std, ...HAUTEURS_REF.map(r => r.y)]
+        .map(v => Math.round(v * 100) / 100)
+        .filter((v, i, t) => t.indexOf(v) === i)
+    : [];
+
+  return (
+    /*
+      L'ÉTABLI, PAGE ENTIÈRE — relevé du patron : « revois complètement la
+      page de placement d'appareils sur un mur ; une page entière,
+      complètement refaite, plus ludique, plus moderne, en cohérence avec
+      nos avancées ».
+
+      Trois étages, comme les écrans qu'on aime : en haut, OÙ l'on est (le
+      mur, la pièce, et la sortie de chaque côté) et l'état des choses en
+      pastilles ; au milieu, le MUR, sur toute la place qui reste ; en bas,
+      sous le pouce, CE QU'ON FAIT — poser un appareil d'un appui, ou régler
+      celui qu'on tient. Le moteur du mur (glissé, accroches, loupe, cotes,
+      retours, calque photo) n'a pas bougé d'une ligne : c'est la page
+      autour qui est neuve.
+    */
+    <View style={[styles.page, { paddingTop: margesSysteme.top + 6 }]}>
+      <View style={styles.entete}>
+        {/* La sortie qui ABANDONNE, à gauche ; celle qui GARDE, à droite. */}
+        <TouchableOpacity
+          style={styles.rond}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          accessibilityLabel="Fermer sans garder"
+          onPress={fermerSansGarder}
+        >
+          <CloseCross size={17} color={c.ink} weight={3} />
+        </TouchableOpacity>
+        <View style={styles.enteteTextes}>
+          <Text style={styles.titre} numberOfLines={1}>
+            {titreDuMur}
+          </Text>
+          <Text style={styles.sousTitre} numberOfLines={1}>
+            {roomName ? `${roomName} · ${mesures}` : mesures}
+          </Text>
+        </View>
+        <TouchableOpacity
+          style={styles.garder}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityLabel="Enregistrer et fermer"
+          onPress={garderEtFermer}
+        >
+          <Text style={styles.garderMot}>Enregistrer</Text>
         </TouchableOpacity>
       </View>
-      <View
-        style={[styles.canvas, hauteurCadre ? { height: hauteurCadre } : null]}
-        onLayout={(e) =>
-          setLayout({
-            w: e.nativeEvent.layout.width,
-            h: e.nativeEvent.layout.height,
-          })
-        }
-        {...pan.panHandlers}>
-        {/*
+
+      {/*
+        L'ÉTAT DES CHOSES, EN PASTILLES — la norme de la pièce, les meubles
+        devant le mur, la photo. Chacune dit ce qui EST et se touche pour
+        agir ; aucune n'apparaît si elle n'a rien à dire.
+      */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.pucesCadre}
+        contentContainerStyle={styles.puces}
+      >
+        {(objectif || constats.length > 0) && (
+          <TouchableOpacity
+            hitSlop={PUCE_SLOP}
+            style={[styles.puce, conforme ? styles.puceOk : styles.puceAVoir]}
+            accessibilityLabel={
+              regleOuverte ? 'Masquer la règle' : 'Voir la règle'
+            }
+            onPress={() => setRegleOuverte(v => !v)}
+          >
+            {objectif && !objectif.inconnu ? (
+              <Anneau
+                part={objectif.poses / Math.max(1, objectif.exiges)}
+                ok={conforme}
+                c={c}
+              />
+            ) : null}
+            <Text
+              style={[
+                styles.puceMot,
+                conforme ? styles.puceMotOk : styles.puceMotAVoir,
+              ]}
+              numberOfLines={1}
+            >
+              {!objectif
+                ? `${constats.length} point${
+                    constats.length > 1 ? 's' : ''
+                  } à revoir`
+                : objectif.inconnu
+                ? 'Pièce à nommer'
+                : `${objectif.nom} · ${objectif.poses}/${
+                    objectif.exiges
+                  } socle${objectif.exiges > 1 ? 's' : ''}`}
+            </Text>
+          </TouchableOpacity>
+        )}
+        {meublesDuMur.length > 0 && (
+          <TouchableOpacity
+            hitSlop={PUCE_SLOP}
+            style={[styles.puce, voirMeubles && styles.puceOn]}
+            accessibilityLabel="Meubles devant ce mur"
+            onPress={() => setVoirMeubles(v => !v)}
+          >
+            <Sofa
+              size={14}
+              color={voirMeubles ? '#FFFFFF' : c.inkSoft}
+              strokeWidth={2.2}
+            />
+            <Text style={[styles.puceMot, voirMeubles && styles.puceMotOn]}>
+              {`${meublesDuMur.length} meuble${
+                meublesDuMur.length > 1 ? 's' : ''
+              }`}
+            </Text>
+          </TouchableOpacity>
+        )}
+        <TouchableOpacity
+          hitSlop={PUCE_SLOP}
+          style={styles.puce}
+          accessibilityLabel={
+            (retourVise ? 'Photo du retour' : 'Photo') +
+            (mesPhotos.length > 0 ? ` (${mesPhotos.length})` : '')
+          }
+          onPress={async () => {
+            const prise = await RoomScan.takePhoto();
+            if (prise) {
+              const cible = retourVise
+                ? (retourVise.x0 + retourVise.x1) / 2
+                : face.len / 2;
+              // L'identifiant du coffre voyage avec la punaise : c'est lui
+              // qui retrouvera l'image après une réinstallation.
+              addPhoto(wallId, fromFaceX(face, cible), prise.path, prise.asset);
+              haptic('succes');
+            }
+          }}
+        >
+          <Svg width={15} height={15} viewBox="0 0 24 24">
+            <Path d={SOLAIRES.image} fill={c.inkSoft} fillRule="evenodd" />
+          </Svg>
+          <Text style={styles.puceMot}>
+            {(retourVise ? 'Photo du retour' : 'Photo') +
+              (mesPhotos.length > 0 ? ` · ${mesPhotos.length}` : '')}
+          </Text>
+        </TouchableOpacity>
+        {mesPhotos.length > 0 && (
+          <TouchableOpacity
+            hitSlop={PUCE_SLOP}
+            style={[styles.puce, calque && styles.puceOn]}
+            accessibilityLabel={calque ? 'Masquer la photo' : 'Photo au fond'}
+            onPress={() => {
+              setCalant(false);
+              setCalque(v => !v);
+              // Le rideau repart à moitié : ouvert en grand on ne voit plus
+              // le dessin, fermé on ne voit pas qu'il s'est passé quelque chose.
+              setRideau(0.5);
+              haptic('leger');
+            }}
+          >
+            <Text style={[styles.puceMot, calque && styles.puceMotOn]}>
+              Photo au fond
+            </Text>
+          </TouchableOpacity>
+        )}
+        {calqueVisible && (
+          <TouchableOpacity
+            hitSlop={PUCE_SLOP}
+            style={[styles.puce, calant && styles.puceOn]}
+            accessibilityLabel={
+              calant ? 'Terminer le calage' : 'Caler la photo'
+            }
+            onPress={() => {
+              setCalant(v => !v);
+              haptic('leger');
+            }}
+          >
+            <Text style={[styles.puceMot, calant && styles.puceMotOn]}>
+              {calant ? 'Terminer le calage' : 'Caler la photo'}
+            </Text>
+          </TouchableOpacity>
+        )}
+      </ScrollView>
+
+      {/* La règle, et le geste qui corrige — d'un appui sur la pastille. */}
+      {regleOuverte && (objectif || constats.length > 0) && (
+        <View style={styles.regle}>
+          <Text style={styles.regleTexte}>
+            {[
+              objectif?.inconnu
+                ? 'Ses exigences dépendent de son usage : nommez la pièce sur le plan.'
+                : null,
+              ...constats.map(i2 => i2.message),
+              objectif?.regle,
+              ...constats.map(i2 => i2.regle),
+            ]
+              .filter(Boolean)
+              .filter((r, k, t) => t.indexOf(r) === k)
+              .join('\n')}
+          </Text>
+          {(() => {
+            const fix = constats.find(i2 => i2.fix?.type === 'poser')?.fix as
+              | { kind: FixtureKind; height?: number; label: string }
+              | undefined;
+            if (fix) {
+              return (
+                <TouchableOpacity
+                  style={styles.regleFix}
+                  onPress={() => poser(fix.kind, fix.height)}
+                >
+                  <Text style={styles.regleFixMot}>{fix.label}</Text>
+                </TouchableOpacity>
+              );
+            }
+            if (objectif && objectif.poses < objectif.exiges) {
+              return (
+                <TouchableOpacity
+                  style={styles.regleFix}
+                  onPress={() =>
+                    poser('prise', objectif.surPlan ? 1.1 : undefined)
+                  }
+                >
+                  <Text style={styles.regleFixMot}>Poser une prise</Text>
+                </TouchableOpacity>
+              );
+            }
+            return null;
+          })()}
+        </View>
+      )}
+
+      {/* LE MUR — toute la place qui reste, dans sa carte. */}
+      <View style={styles.scene}>
+        <View
+          style={styles.canvas}
+          onLayout={e =>
+            setLayout({
+              w: e.nativeEvent.layout.width,
+              h: e.nativeEvent.layout.height,
+            })
+          }
+          {...pan.panHandlers}
+        >
+          {/*
           LE CALQUE PHOTO, SOUS LE DESSIN.
 
           Il occupe le rectangle EXACT du mur — c'est ce qui lui donne son
@@ -1260,27 +1419,27 @@ export function WallElevation({
           rien. Il ne prend le doigt qu'en mode calage ; le reste du temps,
           l'établi sert à poser des appareils.
         */}
-        {calqueVisible && (
-          <CalquePhotoFond
-            cadre={cadreDuMur!}
-            uri={`file://${photoDuCalque!.path}`}
-            calage={photoDuCalque!.calage}
-            rideau={rideau}
-          />
-        )}
-        {scale > 0 && (
-          <Svg width={layout.w} height={layout.h}>
-            <Defs>
-              {/* Un mur éclairé par le haut : la lumière vient du plafond,
+          {calqueVisible && (
+            <CalquePhotoFond
+              cadre={cadreDuMur!}
+              uri={`file://${photoDuCalque!.path}`}
+              calage={photoDuCalque!.calage}
+              rideau={rideau}
+            />
+          )}
+          {scale > 0 && (
+            <Svg width={layout.w} height={layout.h}>
+              <Defs>
+                {/* Un mur éclairé par le haut : la lumière vient du plafond,
                   comme dans une pièce. Rien de spectaculaire — juste de quoi
                   ne plus lire un rectangle gris. */}
-              <LinearGradient id="mur" x1="0" y1="0" x2="0" y2="1">
-                <Stop offset="0" stopColor={c.surface} />
-                <Stop offset="1" stopColor={c.surfaceSunken} />
-              </LinearGradient>
-            </Defs>
+                <LinearGradient id="mur" x1="0" y1="0" x2="0" y2="1">
+                  <Stop offset="0" stopColor={c.surface} />
+                  <Stop offset="1" stopColor={c.surfaceSunken} />
+                </LinearGradient>
+              </Defs>
 
-            {/*
+              {/*
               LÉGER RELIEF : l'épaisseur du mur, vue de trois quarts.
               Deux bandeaux en fuite — un au plafond, un sur le côté — et le
               mur cesse d'être un rectangle posé sur du vide : on lit une
@@ -1288,43 +1447,43 @@ export function WallElevation({
               dessus. La face, elle, reste exactement à l'échelle : c'est sur
               elle qu'on mesure.
             */}
-            <Polygon
-              points={[
-                `${px(0)},${py(H)}`,
-                `${px(0) + FUITE},${py(H) - FUITE}`,
-                `${px(face.len) + FUITE},${py(H) - FUITE}`,
-                `${px(face.len)},${py(H)}`,
-              ].join(' ')}
-              fill={c.surfaceSunken}
-              stroke={c.line}
-              strokeWidth={1}
-            />
-            <Polygon
-              points={[
-                `${px(face.len)},${py(H)}`,
-                `${px(face.len) + FUITE},${py(H) - FUITE}`,
-                `${px(face.len) + FUITE},${py(0) - FUITE}`,
-                `${px(face.len)},${py(0)}`,
-              ].join(' ')}
-              fill={c.line}
-              opacity={0.5}
-              stroke={c.line}
-              strokeWidth={1}
-            />
+              <Polygon
+                points={[
+                  `${px(0)},${py(H)}`,
+                  `${px(0) + FUITE},${py(H) - FUITE}`,
+                  `${px(face.len) + FUITE},${py(H) - FUITE}`,
+                  `${px(face.len)},${py(H)}`,
+                ].join(' ')}
+                fill={c.surfaceSunken}
+                stroke={c.line}
+                strokeWidth={1}
+              />
+              <Polygon
+                points={[
+                  `${px(face.len)},${py(H)}`,
+                  `${px(face.len) + FUITE},${py(H) - FUITE}`,
+                  `${px(face.len) + FUITE},${py(0) - FUITE}`,
+                  `${px(face.len)},${py(0)}`,
+                ].join(' ')}
+                fill={c.line}
+                opacity={0.5}
+                stroke={c.line}
+                strokeWidth={1}
+              />
 
-            {/* Le mur, vu de face : un rectangle à l'échelle. */}
-            <Rect
-              x={px(0)}
-              y={py(H)}
-              width={face.len * scale}
-              height={H * scale}
-              fill="url(#mur)"
-              stroke={c.lineStrong}
-              strokeWidth={1.5}
-              rx={2}
-            />
+              {/* Le mur, vu de face : un rectangle à l'échelle. */}
+              <Rect
+                x={px(0)}
+                y={py(H)}
+                width={face.len * scale}
+                height={H * scale}
+                fill="url(#mur)"
+                stroke={c.lineStrong}
+                strokeWidth={1.5}
+                rx={2}
+              />
 
-            {/*
+              {/*
               LES HAUTEURS DE RÉFÉRENCE, en filigrane.
               Poser un appareil, c'est viser une de ces quatre lignes : 25 cm
               pour une prise de plinthe, 1,10 m pour une commande ou un plan
@@ -1332,41 +1491,43 @@ export function WallElevation({
               Les avoir sous les yeux évite de les chercher, et fait voir
               d'un coup ce qui n'est pas aligné avec le reste.
             */}
-            {HAUTEURS_REF.filter((r) => r.y < H - 0.05).map((r) => (
-              <G key={`ref${r.y}`}>
-                <Line
-                  x1={px(0)}
-                  y1={py(r.y)}
-                  x2={px(face.len)}
-                  y2={py(r.y)}
-                  stroke={c.blue}
-                  strokeWidth={0.8}
-                  strokeDasharray="2 6"
-                  opacity={0.35}
-                />
-                <SvgText
-                  x={px(face.len) + 5}
-                  y={py(r.y) + 3}
-                  fill={c.inkFaint}
-                  fontSize={7.5}
-                  fontWeight="700"
-                  textAnchor="start">
-                  {libelleDeHauteur(r, layout.w - px(face.len) - 5, 7.5)}
-                </SvgText>
-              </G>
-            ))}
+              {HAUTEURS_REF.filter(r => r.y < H - 0.05).map(r => (
+                <G key={`ref${r.y}`}>
+                  <Line
+                    x1={px(0)}
+                    y1={py(r.y)}
+                    x2={px(face.len)}
+                    y2={py(r.y)}
+                    stroke={c.blue}
+                    strokeWidth={0.8}
+                    strokeDasharray="2 6"
+                    opacity={0.35}
+                  />
+                  <SvgText
+                    x={px(face.len) + 5}
+                    y={py(r.y) + 3}
+                    fill={c.inkFaint}
+                    fontSize={7.5}
+                    fontWeight="700"
+                    textAnchor="start"
+                  >
+                    {libelleDeHauteur(r, layout.w - px(face.len) - 5, 7.5)}
+                  </SvgText>
+                </G>
+              ))}
 
-            {/* Sol : trait épais et hachures — le zéro des hauteurs. */}
-            <Line
-              x1={px(0) - 14}
-              y1={py(0)}
-              x2={px(face.len) + 14}
-              y2={py(0)}
-              stroke={c.ink}
-              strokeWidth={2.5}
-            />
-            {Array.from({ length: Math.ceil(face.len * scale / 12) + 3 }).map(
-              (_, i) => {
+              {/* Sol : trait épais et hachures — le zéro des hauteurs. */}
+              <Line
+                x1={px(0) - 14}
+                y1={py(0)}
+                x2={px(face.len) + 14}
+                y2={py(0)}
+                stroke={c.ink}
+                strokeWidth={2.5}
+              />
+              {Array.from({
+                length: Math.ceil((face.len * scale) / 12) + 3,
+              }).map((_, i) => {
                 const x = px(0) - 12 + i * 12;
                 return (
                   <Line
@@ -1379,20 +1540,19 @@ export function WallElevation({
                     strokeWidth={1}
                   />
                 );
-              },
-            )}
-            {/* Plafond */}
-            <Line
-              x1={px(0)}
-              y1={py(H)}
-              x2={px(face.len)}
-              y2={py(H)}
-              stroke={c.inkFaint}
-              strokeWidth={1}
-              strokeDasharray="5 4"
-            />
+              })}
+              {/* Plafond */}
+              <Line
+                x1={px(0)}
+                y1={py(H)}
+                x2={px(face.len)}
+                y2={py(H)}
+                stroke={c.inkFaint}
+                strokeWidth={1}
+                strokeDasharray="5 4"
+              />
 
-            {/*
+              {/*
               LES COTES DU MUR, dans l'espace laissé libre au-dessus.
               Le dessin est calé en bas — c'est le sol, il n'y a pas à
               discuter — et le haut de la zone restait vide. Un plan
@@ -1400,56 +1560,58 @@ export function WallElevation({
               la hauteur sous plafond sur le côté. On les lisait jusqu'ici
               dans une phrase, en petit, sous le titre.
             */}
-            <G>
-              <Line
-                x1={px(0)}
-                y1={py(H) - COTE_H}
-                x2={px(face.len)}
-                y2={py(H) - COTE_H}
-                stroke={c.inkSoft}
-                strokeWidth={1}
-              />
-              {[0, face.len].map((x) => (
+              <G>
                 <Line
-                  key={`t${x}`}
-                  x1={px(x)}
-                  y1={py(H) - COTE_H - 4}
-                  x2={px(x)}
-                  y2={py(H) - COTE_H + 4}
+                  x1={px(0)}
+                  y1={py(H) - COTE_H}
+                  x2={px(face.len)}
+                  y2={py(H) - COTE_H}
                   stroke={c.inkSoft}
-                  strokeWidth={1.4}
+                  strokeWidth={1}
                 />
-              ))}
-              <Rect
-                x={px(face.len / 2) - 30}
-                y={py(H) - COTE_H - 9}
-                width={60}
-                height={18}
-                rx={9}
-                fill={c.bg}
-              />
-              <SvgText
-                x={px(face.len / 2)}
-                y={py(H) - COTE_H + 4}
-                fill={c.ink}
-                fontSize={12}
-                fontWeight="800"
-                textAnchor="middle">
-                {`${face.len.toFixed(2).replace('.', ',')} m`}
-              </SvgText>
-              <SvgText
-                x={px(0) - 8}
-                y={py(H / 2)}
-                fill={c.inkFaint}
-                fontSize={10}
-                fontWeight="700"
-                textAnchor="middle"
-                transform={`rotate(-90, ${px(0) - 8}, ${py(H / 2)})`}>
-                {`H ${H.toFixed(2).replace('.', ',')} m`}
-              </SvgText>
-            </G>
+                {[0, face.len].map(x => (
+                  <Line
+                    key={`t${x}`}
+                    x1={px(x)}
+                    y1={py(H) - COTE_H - 4}
+                    x2={px(x)}
+                    y2={py(H) - COTE_H + 4}
+                    stroke={c.inkSoft}
+                    strokeWidth={1.4}
+                  />
+                ))}
+                <Rect
+                  x={px(face.len / 2) - 30}
+                  y={py(H) - COTE_H - 9}
+                  width={60}
+                  height={18}
+                  rx={9}
+                  fill={c.bg}
+                />
+                <SvgText
+                  x={px(face.len / 2)}
+                  y={py(H) - COTE_H + 4}
+                  fill={c.ink}
+                  fontSize={12}
+                  fontWeight="800"
+                  textAnchor="middle"
+                >
+                  {`${face.len.toFixed(2).replace('.', ',')} m`}
+                </SvgText>
+                <SvgText
+                  x={px(0) - 8}
+                  y={py(H / 2)}
+                  fill={c.inkFaint}
+                  fontSize={10}
+                  fontWeight="700"
+                  textAnchor="middle"
+                  transform={`rotate(-90, ${px(0) - 8}, ${py(H / 2)})`}
+                >
+                  {`H ${H.toFixed(2).replace('.', ',')} m`}
+                </SvgText>
+              </G>
 
-            {/*
+              {/*
               LES MEUBLES, EN CREUX, sous tout le reste.
 
               Une silhouette hachurée et son nom : de quoi comprendre qu'un
@@ -1464,11 +1626,11 @@ export function WallElevation({
               accroché en l'air — meuble haut, hotte, télé, chauffe-eau — se
               voit maintenant comme il est, et la place libre sous lui aussi.
             */}
-            {voirMeubles &&
-              meublesDuMur.map((m, i) => {
-                const haut = Math.min(m.top, H);
-                const bas = Math.min(m.base, haut);
-                /*
+              {voirMeubles &&
+                meublesDuMur.map((m, i) => {
+                  const haut = Math.min(m.top, H);
+                  const bas = Math.min(m.base, haut);
+                  /*
                   CONTRE LE MUR, LE MEUBLE SE VOIT FRANCHEMENT — relevé du
                   patron : les silhouettes en creux (9 % d'opacité, tirets
                   pâles) ne se voyaient pas, et c'est le meuble COLLÉ qui
@@ -1476,36 +1638,39 @@ export function WallElevation({
                   il prend la convention du plan : bleu, trait plein. Le
                   lointain reste en creux.
                 */
-                const contre = m.ecart <= 0.12;
-                return (
-                  <G key={`mb${i}`}>
-                    <Rect
-                      x={px(m.from)}
-                      y={py(haut)}
-                      width={Math.max(2, (m.to - m.from) * scale)}
-                      height={Math.max(1, (haut - bas) * scale)}
-                      fill={contre ? c.blue : c.inkFaint}
-                      fillOpacity={contre ? 0.1 : 0.09}
-                      stroke={contre ? c.blue : c.inkFaint}
-                      strokeWidth={contre ? 1.4 : 1}
-                      strokeDasharray={contre ? undefined : '5 4'}
-                    />
-                    {(m.to - m.from) * scale > 46 && (
-                      <SvgText
-                        x={px((m.from + m.to) / 2)}
-                        y={py(haut) + 12}
-                        fill={c.inkFaint}
-                        fontSize={8.5}
-                        fontWeight="700"
-                        textAnchor="middle">
-                        {`${frCategory(m.category)} ${Math.round(m.top * 100)}`}
-                      </SvgText>
-                    )}
-                  </G>
-                );
-              })}
+                  const contre = m.ecart <= 0.12;
+                  return (
+                    <G key={`mb${i}`}>
+                      <Rect
+                        x={px(m.from)}
+                        y={py(haut)}
+                        width={Math.max(2, (m.to - m.from) * scale)}
+                        height={Math.max(1, (haut - bas) * scale)}
+                        fill={contre ? c.blue : c.inkFaint}
+                        fillOpacity={contre ? 0.1 : 0.09}
+                        stroke={contre ? c.blue : c.inkFaint}
+                        strokeWidth={contre ? 1.4 : 1}
+                        strokeDasharray={contre ? undefined : '5 4'}
+                      />
+                      {(m.to - m.from) * scale > 46 && (
+                        <SvgText
+                          x={px((m.from + m.to) / 2)}
+                          y={py(haut) + 12}
+                          fill={c.inkFaint}
+                          fontSize={8.5}
+                          fontWeight="700"
+                          textAnchor="middle"
+                        >
+                          {`${frCategory(m.category)} ${Math.round(
+                            m.top * 100,
+                          )}`}
+                        </SvgText>
+                      )}
+                    </G>
+                  );
+                })}
 
-            {/*
+              {/*
               LA HAUTEUR DE POSE SE COTE, comme celle d'un appareil.
 
               Un meuble accroché en l'air ne se décrit pas par sa seule
@@ -1516,11 +1681,11 @@ export function WallElevation({
               ce qui décolle vraiment du sol : écrire « 0 » sous chaque
               caisson noierait les seules cotes qu'on vient lire.
             */}
-            {voirMeubles &&
-              meublesDuMur
-                .filter((m) => m.base > 0.02 && m.base < H)
-                .map((m, i) => {
-                  /*
+              {voirMeubles &&
+                meublesDuMur
+                  .filter(m => m.base > 0.02 && m.base < H)
+                  .map((m, i) => {
+                    /*
                     LA COTE SE POSE AU BORD, PAS AU MILIEU.
 
                     Au centre du meuble, elle traverse tout ce qui est en
@@ -1531,98 +1696,100 @@ export function WallElevation({
                     lisible. Bornée au cadre, sinon l'étiquette du meuble le
                     plus à gauche sort du dessin.
                   */
-                  const xm = Math.max(px(0) + 22, px(m.from));
-                  return (
-                    <Dim
-                      key={`mbc${i}`}
-                      x1={xm}
-                      y1={py(0)}
-                      x2={xm}
-                      y2={py(m.base)}
-                      text={`${Math.round(m.base * 100)}`}
-                      c={c}
-                      vertical
-                      push={{ x: 1, y: 0 }}
-                    />
-                  );
-                })}
+                    const xm = Math.max(px(0) + 22, px(m.from));
+                    return (
+                      <Dim
+                        key={`mbc${i}`}
+                        x1={xm}
+                        y1={py(0)}
+                        x2={xm}
+                        y2={py(m.base)}
+                        text={`${Math.round(m.base * 100)}`}
+                        c={c}
+                        vertical
+                        push={{ x: 1, y: 0 }}
+                      />
+                    );
+                  })}
 
-            {/* Portes et fenêtres : on ne perce pas un mur à leur place. */}
-            {holes.map((hole, i) => {
-              const xa = faceXofT(face, hole.t0);
-              const xb = faceXofT(face, hole.t1);
-              const x0 = Math.min(xa, xb);
-              const w = Math.abs(xb - xa);
-              return (
-                <G key={`o${i}`}>
-                  <Rect
-                    x={px(x0)}
-                    y={py(hole.y1)}
-                    width={w * scale}
-                    height={(hole.y1 - hole.y0) * scale}
-                    fill={c.blueSoft}
-                    stroke={c.blue}
-                    strokeWidth={1.4}
-                  />
-                  {w * scale > 54 && (
-                    <SvgText
-                      x={px(x0 + w / 2)}
-                      y={py(hole.y0) - 8}
-                      fill={c.blue}
-                      fontSize={10}
-                      fontWeight="700"
-                      textAnchor="middle">
-                      {/* La NATURE nomme, pas un drapeau : une baie posée à
+              {/* Portes et fenêtres : on ne perce pas un mur à leur place. */}
+              {holes.map((hole, i) => {
+                const xa = faceXofT(face, hole.t0);
+                const xb = faceXofT(face, hole.t1);
+                const x0 = Math.min(xa, xb);
+                const w = Math.abs(xb - xa);
+                return (
+                  <G key={`o${i}`}>
+                    <Rect
+                      x={px(x0)}
+                      y={py(hole.y1)}
+                      width={w * scale}
+                      height={(hole.y1 - hole.y0) * scale}
+                      fill={c.blueSoft}
+                      stroke={c.blue}
+                      strokeWidth={1.4}
+                    />
+                    {w * scale > 54 && (
+                      <SvgText
+                        x={px(x0 + w / 2)}
+                        y={py(hole.y0) - 8}
+                        fill={c.blue}
+                        fontSize={10}
+                        fontWeight="700"
+                        textAnchor="middle"
+                      >
+                        {/* La NATURE nomme, pas un drapeau : une baie posée à
                           la main s'appelait « Porte ». Voir
                           `estTraversante`. */}
-                      {hole.seg.type === 'window'
-                        ? 'Fenêtre'
-                        : estTraversante(hole.seg)
-                        ? 'Passage'
-                        : 'Porte'}
-                    </SvgText>
-                  )}
-                  {/*
+                        {hole.seg.type === 'window'
+                          ? 'Fenêtre'
+                          : estTraversante(hole.seg)
+                          ? 'Passage'
+                          : 'Porte'}
+                      </SvgText>
+                    )}
+                    {/*
                     LE COFFRE DE VOLET, HACHURÉ — la zone où l'on ne perce
                     pas. Le scan ne le voit pas ; déclaré d'un geste, il se
                     dessine ici, coté, au-dessus de sa baie.
                   */}
-                  {(() => {
-                    const e = empriseDuCoffre(hole.seg, x0);
-                    if (!e) return null;
-                    const hh = (e.y1 - e.y0) * scale;
-                    return (
-                      <G>
-                        <Rect
-                          x={px(e.x0)}
-                          y={py(e.y1)}
-                          width={(e.x1 - e.x0) * scale}
-                          height={hh}
-                          fill={c.amber}
-                          fillOpacity={0.14}
-                          stroke={c.amber}
-                          strokeWidth={1.2}
-                          strokeDasharray="4 3"
-                        />
-                        {w * scale > 70 && hh > 11 && (
-                          <SvgText
-                            x={px(e.x0 + (e.x1 - e.x0) / 2)}
-                            y={py(e.y0) - hh / 2 + 3.5}
+                    {(() => {
+                      const e = empriseDuCoffre(hole.seg, x0);
+                      if (!e) return null;
+                      const hh = (e.y1 - e.y0) * scale;
+                      return (
+                        <G>
+                          <Rect
+                            x={px(e.x0)}
+                            y={py(e.y1)}
+                            width={(e.x1 - e.x0) * scale}
+                            height={hh}
                             fill={c.amber}
-                            fontSize={9}
-                            fontWeight="800"
-                            textAnchor="middle">
-                            {`COFFRE ${Math.round(hole.seg.coffre! * 100)}`}
-                          </SvgText>
-                        )}
-                      </G>
-                    );
-                  })()}
-                </G>
-              );
-            })}
+                            fillOpacity={0.14}
+                            stroke={c.amber}
+                            strokeWidth={1.2}
+                            strokeDasharray="4 3"
+                          />
+                          {w * scale > 70 && hh > 11 && (
+                            <SvgText
+                              x={px(e.x0 + (e.x1 - e.x0) / 2)}
+                              y={py(e.y0) - hh / 2 + 3.5}
+                              fill={c.amber}
+                              fontSize={9}
+                              fontWeight="800"
+                              textAnchor="middle"
+                            >
+                              {`COFFRE ${Math.round(hole.seg.coffre! * 100)}`}
+                            </SvgText>
+                          )}
+                        </G>
+                      );
+                    })()}
+                  </G>
+                );
+              })}
 
-            {/*
+              {/*
               LES RETOURS : leur cote, et leur axe.
 
               Le mur porte sa longueur au-dessus et son milieu en
@@ -1633,396 +1800,429 @@ export function WallElevation({
               on passe dessus. La cote se dessine APRÈS les baies pour
               rester lisible par-dessus le bleu d'une porte-fenêtre.
             */}
-            {retours.map((r, i) => {
-              const larg = r.x1 - r.x0;
-              const milieu = (r.x0 + r.x1) / 2;
-              // Celui qu'on a désigné sur le plan, ou à défaut celui qui
-              // porte l'appareil tenu : c'est le même besoin — savoir sur
-              // quel morceau de mur on travaille.
-              const vise =
-                (focusX != null && focusX >= r.x0 && focusX <= r.x1) ||
-                (!!monRetour && monRetour.x0 === r.x0 && monRetour.x1 === r.x1);
-              const teinte = vise ? c.blue : c.inkFaint;
-              const yc = py(H) + 15;
-              // Un retour étroit ne peut pas porter son nombre entre ses
-              // deux traits : on écrit alors la cote au-dessus, et on
-              // garde les traits pour dire où elle s'applique.
-              const large = larg * scale > 40;
-              return (
-                <G key={`ret${i}`}>
-                  {larg >= 0.06 && (
-                    <Line
-                      x1={px(milieu)}
-                      y1={py(H) - 2}
-                      x2={px(milieu)}
-                      y2={py(0) + 2}
-                      stroke={c.blue}
-                      strokeWidth={vise ? 1 : 0.8}
-                      strokeDasharray="2 6"
-                      opacity={vise ? 0.75 : 0.35}
-                    />
-                  )}
-                  <Line
-                    x1={px(r.x0) + 1}
-                    y1={yc}
-                    x2={px(r.x1) - 1}
-                    y2={yc}
-                    stroke={teinte}
-                    strokeWidth={1}
-                  />
-                  {[r.x0, r.x1].map((x) => (
-                    <Line
-                      key={`t${i}-${x}`}
-                      x1={px(x)}
-                      y1={yc - 4}
-                      x2={px(x)}
-                      y2={yc + 4}
-                      stroke={teinte}
-                      strokeWidth={1.2}
-                    />
-                  ))}
-                  <Rect
-                    x={px(milieu) - 17}
-                    y={(large ? yc : yc - 13) - 7}
-                    width={34}
-                    height={14}
-                    rx={7}
-                    fill={c.surface}
-                  />
-                  <SvgText
-                    x={px(milieu)}
-                    y={(large ? yc : yc - 13) + 4}
-                    fill={vise ? c.blue : c.inkSoft}
-                    fontSize={9}
-                    fontWeight={vise ? '800' : '700'}
-                    textAnchor="middle">
-                    {`${cm(larg)}`}
-                  </SvgText>
-                </G>
-              );
-            })}
-
-            {/* La plaque commune d'un ensemble : un cadre autour des postes
-                réunis. C'est ce qu'on visse, et ça se voit sur le mur. */}
-            {[...new Set(mine.filter((f) => f.group).map((f) => f.group))].map(
-              (g) => {
-                const lot = mine.filter((f) => f.group === g && f.side === side);
-                if (lot.length < 2) return null;
-                const xs = lot.map((f) => faceX(face, f.along));
-                const ys = lot.map((f) => f.height);
-                const larg = Math.max(...lot.map((f) => FIXTURES[f.kind].w));
-                const haut = Math.max(...lot.map((f) => FIXTURES[f.kind].h));
-                const x0 = Math.min(...xs) - larg / 2;
-                const x1 = Math.max(...xs) + larg / 2;
-                const y0 = Math.min(...ys) - haut / 2;
-                const y1 = Math.max(...ys) + haut / 2;
+              {retours.map((r, i) => {
+                const larg = r.x1 - r.x0;
+                const milieu = (r.x0 + r.x1) / 2;
+                // Celui qu'on a désigné sur le plan, ou à défaut celui qui
+                // porte l'appareil tenu : c'est le même besoin — savoir sur
+                // quel morceau de mur on travaille.
+                const vise =
+                  (focusX != null && focusX >= r.x0 && focusX <= r.x1) ||
+                  (!!monRetour &&
+                    monRetour.x0 === r.x0 &&
+                    monRetour.x1 === r.x1);
+                const teinte = vise ? c.blue : c.inkFaint;
+                const yc = py(H) + 15;
+                // Un retour étroit ne peut pas porter son nombre entre ses
+                // deux traits : on écrit alors la cote au-dessus, et on
+                // garde les traits pour dire où elle s'applique.
+                const large = larg * scale > 40;
                 return (
-                  <Rect
-                    key={g}
-                    x={px(x0) - 3}
-                    y={py(y1) - 3}
-                    width={(x1 - x0) * scale + 6}
-                    height={(y1 - y0) * scale + 6}
-                    rx={4}
-                    fill="none"
-                    stroke={c.inkFaint}
-                    strokeWidth={1.4}
-                  />
+                  <G key={`ret${i}`}>
+                    {larg >= 0.06 && (
+                      <Line
+                        x1={px(milieu)}
+                        y1={py(H) - 2}
+                        x2={px(milieu)}
+                        y2={py(0) + 2}
+                        stroke={c.blue}
+                        strokeWidth={vise ? 1 : 0.8}
+                        strokeDasharray="2 6"
+                        opacity={vise ? 0.75 : 0.35}
+                      />
+                    )}
+                    <Line
+                      x1={px(r.x0) + 1}
+                      y1={yc}
+                      x2={px(r.x1) - 1}
+                      y2={yc}
+                      stroke={teinte}
+                      strokeWidth={1}
+                    />
+                    {[r.x0, r.x1].map(x => (
+                      <Line
+                        key={`t${i}-${x}`}
+                        x1={px(x)}
+                        y1={yc - 4}
+                        x2={px(x)}
+                        y2={yc + 4}
+                        stroke={teinte}
+                        strokeWidth={1.2}
+                      />
+                    ))}
+                    <Rect
+                      x={px(milieu) - 17}
+                      y={(large ? yc : yc - 13) - 7}
+                      width={34}
+                      height={14}
+                      rx={7}
+                      fill={c.surface}
+                    />
+                    <SvgText
+                      x={px(milieu)}
+                      y={(large ? yc : yc - 13) + 4}
+                      fill={vise ? c.blue : c.inkSoft}
+                      fontSize={9}
+                      fontWeight={vise ? '800' : '700'}
+                      textAnchor="middle"
+                    >
+                      {`${cm(larg)}`}
+                    </SvgText>
+                  </G>
                 );
-              },
-            )}
+              })}
 
-            {/* Repère d'accrochage, le temps du geste. */}
-            {guide.x !== undefined && (
-              <Line
-                x1={px(guide.x)}
-                y1={py(H) - 6}
-                x2={px(guide.x)}
-                y2={py(0) + 6}
-                stroke={c.green}
-                strokeWidth={1.2}
-                strokeDasharray="4 3"
-              />
-            )}
-            {guide.y !== undefined && (
-              <Line
-                x1={px(0) - 6}
-                y1={py(guide.y)}
-                x2={px(face.len) + 6}
-                y2={py(guide.y)}
-                stroke={c.green}
-                strokeWidth={1.2}
-                strokeDasharray="4 3"
-              />
-            )}
+              {/* La plaque commune d'un ensemble : un cadre autour des postes
+                réunis. C'est ce qu'on visse, et ça se voit sur le mur. */}
+              {[...new Set(mine.filter(f => f.group).map(f => f.group))].map(
+                g => {
+                  const lot = mine.filter(
+                    f => f.group === g && f.side === side,
+                  );
+                  if (lot.length < 2) return null;
+                  const xs = lot.map(f => faceX(face, f.along));
+                  const ys = lot.map(f => f.height);
+                  const larg = Math.max(...lot.map(f => FIXTURES[f.kind].w));
+                  const haut = Math.max(...lot.map(f => FIXTURES[f.kind].h));
+                  const x0 = Math.min(...xs) - larg / 2;
+                  const x1 = Math.max(...xs) + larg / 2;
+                  const y0 = Math.min(...ys) - haut / 2;
+                  const y1 = Math.max(...ys) + haut / 2;
+                  return (
+                    <Rect
+                      key={g}
+                      x={px(x0) - 3}
+                      y={py(y1) - 3}
+                      width={(x1 - x0) * scale + 6}
+                      height={(y1 - y0) * scale + 6}
+                      rx={4}
+                      fill="none"
+                      stroke={c.inkFaint}
+                      strokeWidth={1.4}
+                    />
+                  );
+                },
+              )}
 
-            {/*
+              {/* Repère d'accrochage, le temps du geste. */}
+              {guide.x !== undefined && (
+                <Line
+                  x1={px(guide.x)}
+                  y1={py(H) - 6}
+                  x2={px(guide.x)}
+                  y2={py(0) + 6}
+                  stroke={c.green}
+                  strokeWidth={1.2}
+                  strokeDasharray="4 3"
+                />
+              )}
+              {guide.y !== undefined && (
+                <Line
+                  x1={px(0) - 6}
+                  y1={py(guide.y)}
+                  x2={px(face.len) + 6}
+                  y2={py(guide.y)}
+                  stroke={c.green}
+                  strokeWidth={1.2}
+                  strokeDasharray="4 3"
+                />
+              )}
+
+              {/*
               LE RÉTICULE DU GLISSEMENT : deux fils fins qui traversent
               TOUTE la face. Le doigt couvre l'appareil et ses cotes — les
               fils, eux, dépassent de la main : on voit où ça se pose sans
               rien lâcher. Bleu plein, pour ne pas se confondre avec le
               vert tireté des aimants.
             */}
-            {traine && (
-              <>
-                <Line
-                  testID="reticule-x"
-                  x1={px(traine.x)}
-                  y1={py(0)}
-                  x2={px(traine.x)}
-                  y2={py(H)}
-                  stroke={c.blue}
-                  strokeWidth={1.4}
-                  opacity={0.85}
-                />
-                <Line
-                  testID="reticule-y"
-                  x1={px(0)}
-                  y1={py(traine.y)}
-                  x2={px(face.len)}
-                  y2={py(traine.y)}
-                  stroke={c.blue}
-                  strokeWidth={1.4}
-                  opacity={0.85}
-                />
-              </>
-            )}
+              {traine && (
+                <>
+                  <Line
+                    testID="reticule-x"
+                    x1={px(traine.x)}
+                    y1={py(0)}
+                    x2={px(traine.x)}
+                    y2={py(H)}
+                    stroke={c.blue}
+                    strokeWidth={1.4}
+                    opacity={0.85}
+                  />
+                  <Line
+                    testID="reticule-y"
+                    x1={px(0)}
+                    y1={py(traine.y)}
+                    x2={px(face.len)}
+                    y2={py(traine.y)}
+                    stroke={c.blue}
+                    strokeWidth={1.4}
+                    opacity={0.85}
+                  />
+                </>
+              )}
 
-            {/* Appareils. Ceux de l'autre face restent visibles, en creux :
+              {/* Appareils. Ceux de l'autre face restent visibles, en creux :
                 savoir qu'une prise est déjà posée dos à dos évite de percer
                 deux fois au même endroit. */}
-            {mine.map((f) => {
-              const s = FIXTURES[f.kind];
-              const x = faceX(face, f.along);
-              /*
+              {mine.map(f => {
+                const s = FIXTURES[f.kind];
+                const x = faceX(face, f.along);
+                /*
                 JAMAIS SOUS TRENTE POINTS — relevé du patron : « ça paraît
                 petit, inadapté ». Une plaque de 8,2 cm à l'échelle d'un
                 mur de cinq mètres fait six points ; le plancher de vingt
                 restait la moitié d'une cible de pouce. À trente, on voit
                 ce qu'on va saisir — la cote reste vraie au bandeau.
               */
-              const w = Math.max(30, s.w * scale);
-              const h = Math.max(30, s.h * scale);
-              const on = f.id === selectedId;
-              const ghost = f.side !== side;
-              return (
-                <G key={f.id} opacity={ghost ? 0.32 : 1}>
-                  <Rect
-                    x={px(x) - w / 2}
-                    y={py(f.height) - h / 2}
-                    width={w}
-                    height={h}
-                    rx={4}
-                    fill={ghost ? 'none' : s.color}
-                    stroke={on ? c.ink : ghost ? c.inkFaint : '#00000033'}
-                    strokeWidth={on ? 2.4 : 1.2}
-                    strokeDasharray={ghost ? '4 3' : '0'}
-                  />
-                  <SvgText
-                    x={px(x)}
-                    y={py(f.height) + 3.5}
-                    fill={ghost ? c.inkFaint : '#FFFFFF'}
-                    fontSize={Math.min(11, Math.max(8, w / 2.6))}
-                    fontWeight="800"
-                    textAnchor="middle">
-                    {s.short}
-                  </SvgText>
-                  {on && (
-                    <Circle
-                      cx={px(x)}
-                      cy={py(f.height)}
-                      r={Math.max(w, h) / 2 + 7}
-                      fill="none"
-                      stroke={c.blue}
-                      strokeWidth={1.6}
+                const w = Math.max(30, s.w * scale);
+                const h = Math.max(30, s.h * scale);
+                const on = f.id === selectedId;
+                const ghost = f.side !== side;
+                return (
+                  <G key={f.id} opacity={ghost ? 0.32 : 1}>
+                    <Rect
+                      x={px(x) - w / 2}
+                      y={py(f.height) - h / 2}
+                      width={w}
+                      height={h}
+                      rx={4}
+                      fill={ghost ? 'none' : s.color}
+                      stroke={on ? c.ink : ghost ? c.inkFaint : '#00000033'}
+                      strokeWidth={on ? 2.4 : 1.2}
+                      strokeDasharray={ghost ? '4 3' : '0'}
                     />
-                  )}
+                    <SvgText
+                      x={px(x)}
+                      y={py(f.height) + 3.5}
+                      fill={ghost ? c.inkFaint : '#FFFFFF'}
+                      fontSize={Math.min(11, Math.max(8, w / 2.6))}
+                      fontWeight="800"
+                      textAnchor="middle"
+                    >
+                      {s.short}
+                    </SvgText>
+                    {on && (
+                      <Circle
+                        cx={px(x)}
+                        cy={py(f.height)}
+                        r={Math.max(w, h) / 2 + 7}
+                        fill="none"
+                        stroke={c.blue}
+                        strokeWidth={1.6}
+                      />
+                    )}
+                  </G>
+                );
+              })}
+
+              {/* Les ondées des poses, par-dessus les appareils. */}
+              {mine
+                .filter(f => nes.has(f.id) && f.side === side)
+                .map((f, i) => (
+                  <OndeePose
+                    key={`nee-${f.id}`}
+                    id={f.id}
+                    cx={px(faceX(face, f.along))}
+                    cy={py(f.height)}
+                    color={FIXTURES[f.kind].color}
+                    rayon={30}
+                    retard={i * 70}
+                  />
+                ))}
+
+              {/* Les trois cotes de l'appareil sélectionné. */}
+              {selected && (
+                <G>
+                  <Dim
+                    x1={px(0)}
+                    y1={py(selected.height)}
+                    x2={px(selX)}
+                    y2={py(selected.height)}
+                    text={`${cm(selX)}`}
+                    c={c}
+                    push={{ x: -1, y: 0 }}
+                  />
+                  <Dim
+                    x1={px(selX)}
+                    y1={py(selected.height)}
+                    x2={px(face.len)}
+                    y2={py(selected.height)}
+                    text={`${cm(face.len - selX)}`}
+                    c={c}
+                    push={{ x: 1, y: 0 }}
+                  />
+                  <Dim
+                    x1={px(selX)}
+                    y1={py(0)}
+                    x2={px(selX)}
+                    y2={py(selected.height)}
+                    text={`${cm(selected.height)}`}
+                    c={c}
+                    vertical
+                    push={{ x: 1, y: 0 }}
+                  />
                 </G>
-              );
-            })}
-
-            {/* Les ondées des poses, par-dessus les appareils. */}
-            {mine
-              .filter((f) => nes.has(f.id) && f.side === side)
-              .map((f, i) => (
-                <OndeePose
-                  key={`nee-${f.id}`}
-                  id={f.id}
-                  cx={px(faceX(face, f.along))}
-                  cy={py(f.height)}
-                  color={FIXTURES[f.kind].color}
-                  rayon={30}
-                  retard={i * 70}
-                />
-              ))}
-
-            {/* Les trois cotes de l'appareil sélectionné. */}
-            {selected && (
-              <G>
-                <Dim
-                  x1={px(0)}
-                  y1={py(selected.height)}
-                  x2={px(selX)}
-                  y2={py(selected.height)}
-                  text={`${cm(selX)}`}
-                  c={c}
-                  push={{ x: -1, y: 0 }}
-                />
-                <Dim
-                  x1={px(selX)}
-                  y1={py(selected.height)}
-                  x2={px(face.len)}
-                  y2={py(selected.height)}
-                  text={`${cm(face.len - selX)}`}
-                  c={c}
-                  push={{ x: 1, y: 0 }}
-                />
-                <Dim
-                  x1={px(selX)}
-                  y1={py(0)}
-                  x2={px(selX)}
-                  y2={py(selected.height)}
-                  text={`${cm(selected.height)}`}
-                  c={c}
-                  vertical
-                  push={{ x: 1, y: 0 }}
-                />
-              </G>
-            )}
-          </Svg>
-        )}
-        {/*
+              )}
+            </Svg>
+          )}
+          {/*
           CE QUE VAUT LA PHOTO, DIT EN TOUTES LETTRES.
 
           Posée sur une élévation cotée, elle se prend pour une élévation
           cotée. Elle ne l'est pas : prise à main levée, de biais, elle ne
           mesure rien.
         */}
-        {calqueVisible && (
-          <Text style={styles.calqueNote} pointerEvents="none">
-            {calant
-              ? 'Poussez et pincez la photo pour la caler sur le mur'
-              : 'Repère visuel — la photo n’est pas à l’échelle'}
-          </Text>
-        )}
-        {/* LA POIGNÉE DU RIDEAU — au-dessus du dessin, sinon on ne
+          {calqueVisible && (
+            <Text style={styles.calqueNote} pointerEvents="none">
+              {calant
+                ? 'Poussez et pincez la photo pour la caler sur le mur'
+                : 'Repère visuel — la photo n’est pas à l’échelle'}
+            </Text>
+          )}
+          {/* LA POIGNÉE DU RIDEAU — au-dessus du dessin, sinon on ne
             l'attraperait pas. Voir `CalquePhoto`. */}
-        {calqueVisible && (
-          <CalquePhotoPoignee
-            cadre={cadreDuMur!}
-            calage={photoDuCalque!.calage}
-            onCalage={(cal) => setPhotoCalage(photoDuCalque!.id, cal)}
-            rideau={rideau}
-            onRideau={setRideau}
-            calant={calant}
-          />
-        )}
+          {calqueVisible && (
+            <CalquePhotoPoignee
+              cadre={cadreDuMur!}
+              calage={photoDuCalque!.calage}
+              onCalage={cal => setPhotoCalage(photoDuCalque!.id, cal)}
+              rideau={rideau}
+              onRideau={setRideau}
+              calant={calant}
+            />
+          )}
 
-        {/*
+          {/*
           LA LOUPE DU GLISSEMENT — les cotes vivantes, AU-DESSUS du doigt.
           Gauche, droite, hauteur, en gros : c'est ce que la main cache. On
           la décale pour qu'elle reste dans le cadre, et elle ne prend
           aucun geste — elle montre, c'est tout.
         */}
-        {traine && face && scale > 0 && (
-          <View
-            testID="loupe"
-            pointerEvents="none"
-            style={[
-              styles.loupe,
-              {
-                left: Math.max(
-                  8,
-                  Math.min(px(traine.x) - LOUPE_L / 2, layout.w - LOUPE_L - 8),
-                ),
-                top: Math.max(8, py(traine.y) - LOUPE_HAUT),
-              },
-            ]}>
-            <Text style={styles.loupeCotes}>
-              {`◂ ${cm(traine.x)}   ${cm(face.len - traine.x)} ▸`}
-            </Text>
-            <Text style={styles.loupeHauteur}>
-              {`haut. ${cm(traine.y)} cm`}
-            </Text>
-          </View>
-        )}
+          {traine && face && scale > 0 && (
+            <View
+              testID="loupe"
+              pointerEvents="none"
+              style={[
+                styles.loupe,
+                {
+                  left: Math.max(
+                    8,
+                    Math.min(
+                      px(traine.x) - LOUPE_L / 2,
+                      layout.w - LOUPE_L - 8,
+                    ),
+                  ),
+                  top: Math.max(8, py(traine.y) - LOUPE_HAUT),
+                },
+              ]}
+            >
+              <Text style={styles.loupeCotes}>
+                {`◂ ${cm(traine.x)}   ${cm(face.len - traine.x)} ▸`}
+              </Text>
+              <Text style={styles.loupeHauteur}>
+                {`haut. ${cm(traine.y)} cm`}
+              </Text>
+            </View>
+          )}
 
-        {/* L'alerte de hauteur se pose SUR le dessin, au-dessus de
+          {/* L'alerte de hauteur se pose SUR le dessin, au-dessus de
             l'appareil qu'elle concerne — jamais dans le flux du panneau.
             En bandeau, elle poussait tout le reste vers le bas : le schéma
             changeait de taille selon qu'une prise était trop basse ou non,
             et le regard perdait le mur qu'il suivait. Ici, elle désigne ce
             dont elle parle, et rien ne bouge. */}
-        {hauteurKO && selected && face && (
-          (() => {
-            // Ni cadre, ni fond : rien ne doit masquer l'appareil dont on
-            // parle. Le mot suffit, en rouge, avec un liseré clair derrière
-            // les lettres pour qu'il tienne sur n'importe quel fond. On le
-            // pose AU-DESSUS de l'appareil, et en dessous quand il n'y a
-            // plus de place — près du plafond, il sortait du cadre.
-            const xc = px(faceX(face, selected.along));
-            const yTete = py(selected.height + SPECS[selected.kind].h / 2);
-            const dessus = yTete > 34;
-            return (
-              <TouchableOpacity
-                style={[
-                  styles.alerte,
-                  {
-                    left: Math.max(4, Math.min(layout.w - 204, xc - 100)),
-                    top: dessus
-                      ? yTete - 30
-                      : py(selected.height - SPECS[selected.kind].h / 2) + 8,
-                  },
-                ]}
-                activeOpacity={0.7}
-                onPress={() =>
-                  moveFixture(selected.id, selected.along, SPECS[selected.kind].std)
-                }>
-                <Text style={styles.alerteTexte} numberOfLines={1}>
-                  {`Trop ${hauteurKO.sens === 'trop bas' ? 'bas' : 'haut'}`}
-                  <Text style={styles.alerteFixe}>
-                    {`  ·  remettre à ${cm(SPECS[selected.kind].std)} cm`}
+          {hauteurKO &&
+            selected &&
+            face &&
+            (() => {
+              // Ni cadre, ni fond : rien ne doit masquer l'appareil dont on
+              // parle. Le mot suffit, en rouge, avec un liseré clair derrière
+              // les lettres pour qu'il tienne sur n'importe quel fond. On le
+              // pose AU-DESSUS de l'appareil, et en dessous quand il n'y a
+              // plus de place — près du plafond, il sortait du cadre.
+              const xc = px(faceX(face, selected.along));
+              const yTete = py(selected.height + SPECS[selected.kind].h / 2);
+              const dessus = yTete > 34;
+              return (
+                <TouchableOpacity
+                  style={[
+                    styles.alerte,
+                    {
+                      left: Math.max(4, Math.min(layout.w - 204, xc - 100)),
+                      top: dessus
+                        ? yTete - 30
+                        : py(selected.height - SPECS[selected.kind].h / 2) + 8,
+                    },
+                  ]}
+                  activeOpacity={0.7}
+                  onPress={() =>
+                    moveFixture(
+                      selected.id,
+                      selected.along,
+                      SPECS[selected.kind].std,
+                    )
+                  }
+                >
+                  <Text style={styles.alerteTexte} numberOfLines={1}>
+                    {`Trop ${hauteurKO.sens === 'trop bas' ? 'bas' : 'haut'}`}
+                    <Text style={styles.alerteFixe}>
+                      {`  ·  remettre à ${cm(SPECS[selected.kind].std)} cm`}
+                    </Text>
                   </Text>
-                </Text>
-              </TouchableOpacity>
-            );
-          })()
-        )}
+                </TouchableOpacity>
+              );
+            })()}
+          {/* Un mur vide dit par où commencer — sans prendre le doigt. */}
+          {mine.length === 0 && !calqueVisible && (
+            <View style={styles.vide} pointerEvents="none">
+              <Text style={styles.videMot}>
+                Touchez un appareil, en bas, pour le poser ici
+              </Text>
+            </View>
+          )}
+        </View>
       </View>
 
-{/* L'objectif de la pièce, en une ligne : son nom, où on en est, et le
-          geste. Le pavé précédent portait un titre sur deux lignes et un gros
-          bouton bleu qui le chevauchait — beaucoup de bruit pour dire
-          « il en manque quatre ». */}
-      {fusion &&
-        (() => {
-          const lot = mine.filter(
-            (f) => f.id === fusion.base || f.id === fusion.moved,
-          );
-          const n = lot.reduce((t, f) => t + postsOf(f.kind).length, 0);
-          const dispo = cotesPossibles();
-          return (
-            <View style={styles.ens}>
-              <View style={styles.ensHead}>
-                <View style={styles.ensPastille}>
-                  <Text style={styles.ensPastilleText}>{n}</Text>
+      {/*
+        SOUS LE POUCE — ce qu'on fait. Rien de tenu : le dock des appareils,
+        en images, famille par famille. Un appareil tenu : sa fiche, ses
+        trois cotes, ses hauteurs d'un appui, ses flèches, ses gestes. Un
+        ensemble qui se forme : ses deux questions.
+      */}
+      <View style={[styles.dock, { paddingBottom: margesSysteme.bottom + 12 }]}>
+        {fusion ? (
+          (() => {
+            const lot = mine.filter(
+              f => f.id === fusion.base || f.id === fusion.moved,
+            );
+            const n = lot.reduce((t, f) => t + postsOf(f.kind).length, 0);
+            const dispo = cotesPossibles();
+            return (
+              <View style={styles.ens}>
+                <View style={styles.ensHead}>
+                  <View style={styles.ensPastille}>
+                    <Text style={styles.ensPastilleText}>{n}</Text>
+                  </View>
+                  <View style={styles.ensTitres}>
+                    <Text style={styles.ensTitre} numberOfLines={1}>
+                      {`Ensemble ${n} postes`}
+                    </Text>
+                    <Text style={styles.ensSous} numberOfLines={1}>
+                      {`entraxe ${Math.round(
+                        ENTRAXE * 1000,
+                      )} mm · plaque ${Math.round(
+                        ((n - 1) * ENTRAXE + PLAQUE) * 1000,
+                      )} mm`}
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.ensOk}
+                    onPress={() => setFusion(null)}
+                  >
+                    <Text style={styles.ensOkText}>OK</Text>
+                  </TouchableOpacity>
                 </View>
-                <View style={styles.ensTitres}>
-                  <Text style={styles.ensTitre} numberOfLines={1}>
-                    {`Ensemble ${n} postes`}
-                  </Text>
-                  <Text style={styles.ensSous} numberOfLines={1}>
-                    {`entraxe ${Math.round(ENTRAXE * 1000)} mm · plaque ${Math.round(
-                      ((n - 1) * ENTRAXE + PLAQUE) * 1000,
-                    )} mm`}
-                  </Text>
-                </View>
-                <TouchableOpacity style={styles.ensOk} onPress={() => setFusion(null)}>
-                  <Text style={styles.ensOkText}>OK</Text>
-                </TouchableOpacity>
-              </View>
 
-              {/*
+                {/*
                 DEUX SÉLECTEURS ET UN BOUTON — à la taille du pouce.
 
                 Tout tenait sur une seule ligne : quatre flèches de 30 × 26
@@ -2037,225 +2237,190 @@ export function WallElevation({
                 la largeur, et l'action destructive isolée en bas, en
                 rouge, comme partout ailleurs dans le système.
               */}
-              <Text style={styles.ensLabel}>CÔTÉ DU SECOND POSTE</Text>
-              <View style={styles.ensSeg}>
-                {PLATE_SIDES.filter((sd) => dispo.includes(sd.key)).map((sd) => {
-                  const actif = fusion.cote === sd.key;
-                  return (
-                    <TouchableOpacity
-                      key={sd.key}
-                      style={[styles.ensSegItem, actif && styles.ensSegItemOn]}
-                      accessibilityLabel={sd.label}
-                      onPress={() => appliquer(sd.key, fusion.centre)}>
-                      <Svg width={18} height={18} viewBox="0 0 24 24">
-                        <Path
-                          d={sd.arrow}
-                          stroke={actif ? '#FFFFFF' : c.ink}
-                          strokeWidth={2.2}
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          fill="none"
-                        />
-                      </Svg>
-                      <Text
+                <Text style={styles.ensLabel}>CÔTÉ DU SECOND POSTE</Text>
+                <View style={styles.ensSeg}>
+                  {PLATE_SIDES.filter(sd => dispo.includes(sd.key)).map(sd => {
+                    const actif = fusion.cote === sd.key;
+                    return (
+                      <TouchableOpacity
+                        key={sd.key}
                         style={[
-                          styles.ensSegText,
-                          actif && styles.ensSegTextOn,
-                        ]}>
-                        {sd.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-
-              <Text style={styles.ensLabel}>AXE DE RÉFÉRENCE</Text>
-              <View style={styles.ensSeg}>
-                {[
-                  {
-                    on: false,
-                    label: 'Première fixe',
-                    hint: 'la première ne bouge pas',
-                  },
-                  {
-                    on: true,
-                    label: 'Centré',
-                    hint: 'la plaque se centre sur son axe',
-                  },
-                ].map((opt) => {
-                  const actif = fusion.centre === opt.on;
-                  return (
-                    <TouchableOpacity
-                      key={opt.label}
-                      style={[styles.ensSegLarge, actif && styles.ensSegItemOn]}
-                      onPress={() => appliquer(fusion.cote, opt.on)}>
-                      <Text
-                        style={[
-                          styles.ensSegText,
-                          actif && styles.ensSegTextOn,
-                        ]}>
-                        {opt.label}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.ensSegHint,
-                          actif && styles.ensSegHintOn,
+                          styles.ensSegItem,
+                          actif && styles.ensSegItemOn,
                         ]}
-                        numberOfLines={1}>
-                        {opt.hint}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
+                        accessibilityLabel={sd.label}
+                        onPress={() => appliquer(sd.key, fusion.centre)}
+                      >
+                        <Svg width={18} height={18} viewBox="0 0 24 24">
+                          <Path
+                            d={sd.arrow}
+                            stroke={actif ? '#FFFFFF' : c.ink}
+                            strokeWidth={2.2}
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            fill="none"
+                          />
+                        </Svg>
+                        <Text
+                          style={[
+                            styles.ensSegText,
+                            actif && styles.ensSegTextOn,
+                          ]}
+                        >
+                          {sd.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
 
-              <TouchableOpacity style={styles.ensSplit} onPress={separer}>
-                <Text style={styles.ensSplitText}>Séparer les appareils</Text>
+                <Text style={styles.ensLabel}>AXE DE RÉFÉRENCE</Text>
+                <View style={styles.ensSeg}>
+                  {[
+                    {
+                      on: false,
+                      label: 'Première fixe',
+                      hint: 'la première ne bouge pas',
+                    },
+                    {
+                      on: true,
+                      label: 'Centré',
+                      hint: 'la plaque se centre sur son axe',
+                    },
+                  ].map(opt => {
+                    const actif = fusion.centre === opt.on;
+                    return (
+                      <TouchableOpacity
+                        key={opt.label}
+                        style={[
+                          styles.ensSegLarge,
+                          actif && styles.ensSegItemOn,
+                        ]}
+                        onPress={() => appliquer(fusion.cote, opt.on)}
+                      >
+                        <Text
+                          style={[
+                            styles.ensSegText,
+                            actif && styles.ensSegTextOn,
+                          ]}
+                        >
+                          {opt.label}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.ensSegHint,
+                            actif && styles.ensSegHintOn,
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {opt.hint}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                <TouchableOpacity style={styles.ensSplit} onPress={separer}>
+                  <Text style={styles.ensSplitText}>Séparer les appareils</Text>
+                </TouchableOpacity>
+              </View>
+            );
+          })()
+        ) : selected && spec ? (
+          <View>
+            <View style={styles.ficheTete}>
+              <View style={styles.ficheVignette}>
+                <VignetteAppareil kind={selected.kind} taille={40} />
+              </View>
+              <View style={styles.ficheTextes}>
+                <Text style={styles.ficheTitre} numberOfLines={1}>
+                  {spec.label}
+                </Text>
+                <Text
+                  style={[styles.ficheSous, hauteurKO && styles.ficheSousKO]}
+                  numberOfLines={1}
+                >
+                  {hauteurKO
+                    ? `Trop ${
+                        hauteurKO.sens === 'trop bas' ? 'bas' : 'haut'
+                      } · la règle dit ${cm(spec.std)} cm`
+                    : `Hauteur type ${cm(spec.std)} cm`}
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.rondPetit}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityLabel="Reposer l’appareil"
+                onPress={() => onSelect(null)}
+              >
+                <Svg width={14} height={14} viewBox="0 0 24 24">
+                  <Path
+                    d="m6 9 6 6 6-6"
+                    stroke={c.inkSoft}
+                    strokeWidth={2.6}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    fill="none"
+                  />
+                </Svg>
               </TouchableOpacity>
             </View>
-          );
-        })()}
 
-      {/*
-        LA CONFORMITÉ TIENT EN UNE LIGNE.
-
-        Elle en prenait six : un bandeau d'objectif avec sa règle en toutes
-        lettres, puis un encadré rouge par constat — qui répétait LA MÊME
-        phrase. Sur un téléphone, ça mangeait le tiers de l'écran, juste
-        au-dessus des boutons, et on lisait deux fois « trois socles 16 A au
-        minimum » sans jamais voir le mur.
-
-        Ce qui compte se dit en une ligne : où on en est (2/3), ce qui
-        manque, et le geste qui corrige. La règle complète reste à un appui
-        — on la lit quand on la conteste, pas à chaque pose.
-      */}
-      {(objectif || constats.length > 0) && (
-        <View style={styles.bilan}>
-          <TouchableOpacity
-            style={styles.bilanHead}
-            activeOpacity={0.7}
-            accessibilityLabel={regleOuverte ? 'Masquer la règle' : 'Voir la règle'}
-            onPress={() => setRegleOuverte((v) => !v)}>
-            {objectif && (
-              <View style={styles.bilanJauge}>
-                <View
-                  style={[
-                    styles.bilanFill,
-                    objectif.poses >= objectif.exiges && styles.bilanFillOk,
-                    {
-                      width: `${Math.min(
-                        100,
-                        (objectif.poses / Math.max(1, objectif.exiges)) * 100,
-                      )}%`,
-                    },
-                  ]}
-                />
-              </View>
-            )}
-            <View style={styles.bilanTextes}>
-              <Text style={styles.bilanTitre} numberOfLines={1}>
-                {!objectif
-                  ? 'Conformité'
-                  : objectif.inconnu
-                    ? 'Pièce à nommer'
-                    : `${objectif.nom} · ${objectif.poses}/${objectif.exiges} socle${
-                        objectif.exiges > 1 ? 's' : ''
-                      }`}
-              </Text>
-              {objectif?.inconnu && (
-                <Text style={styles.bilanManque} numberOfLines={1}>
-                  Ses exigences dépendent de son usage · minimum appliqué
-                </Text>
-              )}
-              {constats.length > 0 && (
-                <Text style={styles.bilanManque} numberOfLines={1}>
-                  {constats.map((i2) => i2.message.split(' : ').pop()).join(' · ')}
-                </Text>
-              )}
+            <View style={styles.fields}>
+              {field('g', 'Gauche', selX)}
+              {field('d', 'Droite', face.len - selX)}
+              {field('h', 'Hauteur', selected.height)}
             </View>
-            {/* Le premier geste qui corrige, et lui seul : proposer trois
-                boutons rouges à la fois, c'est n'en faire toucher aucun. */}
-            {(() => {
-              const fix = constats.find((i2) => i2.fix?.type === 'poser')?.fix as
-                | { kind: FixtureKind; height?: number; label: string }
-                | undefined;
-              if (fix) {
-                return (
-                  <TouchableOpacity
-                    style={styles.bilanFix}
-                    hitSlop={{ top: 2, bottom: 2, left: 4, right: 4 }}
-                    onPress={() => poser(fix.kind, fix.height)}>
-                    <Text style={styles.bilanFixText} numberOfLines={1}>
-                      {fix.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              }
-              if (objectif && objectif.poses < objectif.exiges) {
-                return (
-                  <TouchableOpacity
-                    style={styles.bilanFix}
-                    hitSlop={{ top: 2, bottom: 2, left: 4, right: 4 }}
-                    onPress={() =>
-                      poser('prise', objectif.surPlan ? 1.1 : undefined)
-                    }>
-                    <Text style={styles.bilanFixText}>Poser une prise</Text>
-                  </TouchableOpacity>
-                );
-              }
-              return null;
-            })()}
-          </TouchableOpacity>
-          {regleOuverte && (
-            <Text style={styles.bilanRegle}>
-              {[objectif?.regle, ...constats.map((i2) => i2.regle)]
-                .filter(Boolean)
-                .filter((r, k, t) => t.indexOf(r) === k)
-                .join('\n')}
-            </Text>
-          )}
-        </View>
-      )}
 
-      {/* Un ensemble multiposte ne se pose pas au jugé : voici où percer,
-          depuis le bord gauche du mur. C'est la seule chose que
-          l'électricien ait à reporter sur son tracé. */}
-      {selected && postsOf(selected.kind).length > 1 && face && (
-        <View style={styles.percage}>
-          <Text style={styles.percageTitle}>
-            {`${postsOf(selected.kind).length} postes · entraxe ${Math.round(
-              ENTRAXE * 1000,
-            )} mm · boîte Ø ${Math.round(BOITE_D * 1000)}`}
-          </Text>
-          <Text style={styles.percageVals}>
-            {boxOffsets(selected.kind)
-              .map(
-                (o) =>
-                  `${Math.round(
-                    (faceX(face, selected.along) -
-                      FIXTURES[selected.kind].w / 2 +
-                      o) *
-                      100,
-                  )}`,
-              )
-              .join('  ·  ')}
-            <Text style={styles.percageUnit}>{'  cm du bord'}</Text>
-          </Text>
-        </View>
-      )}
+            {/*
+              PENDANT LA SAISIE, LA FICHE SE RESSERRE SUR SES TROIS COTES : le
+              clavier prend la moitié de l'écran, et le mur doit rester
+              visible au-dessus pour voir l'appareil suivre la valeur tapée.
+            */}
+            {editing === null && (
+              <>
+                {/* Les hauteurs qu'on pose d'un appui : celle du type d'abord. */}
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.hauteurs}
+                >
+                  {hauteursRapides.map((v, i) => {
+                    const actif = Math.abs(selected.height - v) < 0.005;
+                    return (
+                      <TouchableOpacity
+                        key={v}
+                        hitSlop={{ top: 6, bottom: 6 }}
+                        style={[styles.hauteur, actif && styles.hauteurOn]}
+                        accessibilityLabel={`${cm(v)} cm`}
+                        onPress={() => {
+                          moveFixture(selected.id, selected.along, v);
+                          haptic('leger');
+                        }}
+                      >
+                        <Text
+                          style={[
+                            styles.hauteurMot,
+                            actif && styles.hauteurMotOn,
+                          ]}
+                        >
+                          {i === 0 ? `Type · ${cm(v)}` : `${cm(v)}`}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
 
-      {/* Le pavé de réglage fin : le doigt cache toujours l'appareil qu'il
-          déplace, et un pouce ne vise pas au centimètre. Quatre flèches et
-          un pas règlent la cote sans rien masquer — et déplacent l'ENSEMBLE
-          quand l'appareil en fait partie. */}
-      {selected && (
-        <View style={styles.pave}>
-          <TouchableOpacity
-            style={styles.pavePas}
-            onPress={() => setPas(pas === 0.01 ? 0.05 : 0.01)}>
-            <Text style={styles.pavePasText}>{`${Math.round(pas * 100)} cm`}</Text>
-          </TouchableOpacity>
-          {/*
+                <View style={styles.pave}>
+                  <TouchableOpacity
+                    style={styles.pavePas}
+                    onPress={() => setPas(pas === 0.01 ? 0.05 : 0.01)}
+                  >
+                    <Text style={styles.pavePasText}>{`${Math.round(
+                      pas * 100,
+                    )} cm`}</Text>
+                  </TouchableOpacity>
+                  {/*
             LES QUATRE FLÈCHES VIENNENT DU JEU COMMUN — relevé du patron,
             liens à l'appui : `square-alt-arrow-left/down/right/up`.
 
@@ -2266,387 +2431,273 @@ export function WallElevation({
             touche — et c'en est une : on l'appuie dix fois de suite pour
             gagner dix centimètres.
           */}
-          {(
-            [
-              ['gauche', -1, 0, SOLAIRES.flecheGauche],
-              ['droite', 1, 0, SOLAIRES.flecheDroite],
-              ['haut', 0, 1, SOLAIRES.flecheHaut],
-              ['bas', 0, -1, SOLAIRES.flecheBas],
-            ] as const
-          ).map(([cle, dx, dy, fleche]) => (
-            <TouchableOpacity
-              key={cle}
-              style={styles.paveBtn}
-              accessibilityLabel={cle}
-              // `onPressIn` et non `onPress` : le pas part au contact, et
-              // l'enchaînement s'arrête quand le doigt se lève — y compris
-              // s'il glisse hors du bouton (`onPressOut` couvre les deux).
-              onPressIn={() => lancerFleche(dx, dy)}
-              onPressOut={arreterFleche}>
-              <Svg width={22} height={22} viewBox="0 0 24 24">
-                <Path d={fleche} fill={c.ink} fillRule="evenodd" />
-              </Svg>
-            </TouchableOpacity>
-          ))}
-        </View>
-      )}
+                  {(
+                    [
+                      ['gauche', -1, 0, SOLAIRES.flecheGauche],
+                      ['droite', 1, 0, SOLAIRES.flecheDroite],
+                      ['haut', 0, 1, SOLAIRES.flecheHaut],
+                      ['bas', 0, -1, SOLAIRES.flecheBas],
+                    ] as const
+                  ).map(([cle, dx, dy, fleche]) => (
+                    <TouchableOpacity
+                      key={cle}
+                      style={styles.paveBtn}
+                      accessibilityLabel={cle}
+                      // `onPressIn` et non `onPress` : le pas part au contact, et
+                      // l'enchaînement s'arrête quand le doigt se lève — y compris
+                      // s'il glisse hors du bouton (`onPressOut` couvre les deux).
+                      onPressIn={() => lancerFleche(dx, dy)}
+                      onPressOut={arreterFleche}
+                    >
+                      <Svg width={22} height={22} viewBox="0 0 24 24">
+                        <Path d={fleche} fill={c.ink} fillRule="evenodd" />
+                      </Svg>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                {selected && postsOf(selected.kind).length > 1 && face && (
+                  <View style={styles.percage}>
+                    <Text style={styles.percageTitle}>
+                      {`${
+                        postsOf(selected.kind).length
+                      } postes · entraxe ${Math.round(
+                        ENTRAXE * 1000,
+                      )} mm · boîte Ø ${Math.round(BOITE_D * 1000)}`}
+                    </Text>
+                    <Text style={styles.percageVals}>
+                      {boxOffsets(selected.kind)
+                        .map(
+                          o =>
+                            `${Math.round(
+                              (faceX(face, selected.along) -
+                                FIXTURES[selected.kind].w / 2 +
+                                o) *
+                                100,
+                            )}`,
+                        )
+                        .join('  ·  ')}
+                      <Text style={styles.percageUnit}>{'  cm du bord'}</Text>
+                    </Text>
+                  </View>
+                )}
 
-      {/*
-        LES COTES NE S'AFFICHENT QUE S'IL Y A UN APPAREIL.
-
-        Trois champs à « — » et cinq boutons éteints occupaient le bas de
-        l'écran dès l'ouverture : de la place prise par des commandes qui
-        ne commandaient rien. Sans sélection, il n'y a qu'une chose à
-        faire sur un mur vide, et elle tient sur un bouton.
-      */}
-      {selected && (
-        <View style={styles.fields}>
-          {field('g', 'Gauche', selX)}
-          {field('d', 'Droite', face.len - selX)}
-          {field('h', 'Hauteur', selected.height)}
-        </View>
-      )}
-
-      {/*
-        LA RANGÉE NE MONTRE QUE CE QUI SERT — relevé du patron : « plus de
-        simplicité, optimisé smartphone ».
-
-        Quatre boutons ÉTEINTS occupaient le bas dès l'ouverture : de la
-        place prise par des commandes qui ne commandaient rien, et un écran
-        qui a l'air en panne. Sans appareil tenu, il n'y a que deux gestes
-        possibles sur un mur — en poser un, le photographier — et ils
-        tiennent au large. Dès qu'on en tient un, ses quatre gestes
-        remplacent les deux autres.
-
-        La photo descend ici : c'est une ACTION, elle n'avait rien à faire
-        dans l'en-tête à disputer sa place au titre.
-      */}
-      <View style={styles.actions}>
-        {(
-          [
-            {
-              key: 'add',
-              label: 'Ajouter',
-              on: true,
-              tint: c.blue,
-              paths: ['M12 5 v14', 'M5 12 h14'],
-              press: onAddRequest,
-            },
-            {
-              key: 'photo',
-              label:
-                (retourVise ? 'Photo du retour' : 'Photo') +
-                (mesPhotos.length > 0 ? ` (${mesPhotos.length})` : ''),
-              on: !selected,
-              tint: c.ink,
-              /*
-                L'APPAREIL PHOTO DU JEU COMMUN — relevé du patron, lien à
-                l'appui : `camera`, « utilise cette icône là où il y a la
-                photo en icône pour la photo de mur ».
-
-                Il était dessiné à la main — boîtier, objectif, viseur, au
-                trait — et c'est le bouton qui DÉCLENCHE la photo : le
-                premier qu'on cherche du regard quand on veut garder une
-                trace d'un mur. La punaise posée sur le plan porte déjà la
-                même silhouette ; c'est le même objet, ce doit être le même
-                dessin.
-              */
-              paths: [],
-              plein: SOLAIRES.image,
-              press: async () => {
-                const prise = await RoomScan.takePhoto();
-                if (prise) {
-                  const cible = retourVise
-                    ? (retourVise.x0 + retourVise.x1) / 2
-                    : face.len / 2;
-                  // L'identifiant du coffre voyage avec la punaise : c'est
-                  // lui qui retrouvera l'image après une réinstallation.
-                  addPhoto(
-                    wallId,
-                    fromFaceX(face, cible),
-                    prise.path,
-                    prise.asset,
-                  );
-                  haptic('succes');
-                }
-              },
-            },
-            {
-              /*
-                LE CALQUE : LA PHOTO DERRIÈRE LE DESSIN.
-
-                Huitième des dix améliorations, et c'est un REPÈRE, pas une
-                cote — une photo prise à main levée, de biais, ne mesure
-                rien. Le bouton ne paraît que s'il y a une photo de ce mur :
-                un bouton qui ne commande rien donne à l'écran l'air d'être
-                en panne.
-              */
-              key: 'calque',
-              label: calque ? 'Masquer la photo' : 'Photo au fond',
-              on: mesPhotos.length > 0,
-              tint: calque ? c.blue : c.ink,
-              paths: [],
-              plein: SOLAIRES.image,
-              press: () => {
-                setCalant(false);
-                setCalque((v) => !v);
-                // Le rideau repart à moitié : ouvert en grand on ne voit
-                // plus le dessin, fermé on ne voit pas qu'il s'est passé
-                // quelque chose.
-                setRideau(0.5);
-                haptic('leger');
-              },
-            },
-            {
-              /*
-                CALER LA PHOTO — le seul geste qui l'aligne.
-
-                Elle ne s'aligne pas toute seule, et on ne prétend pas le
-                contraire : redresser la perspective d'une photo de chantier
-                donnerait un faux plan, sur lequel on placerait des prises au
-                mauvais endroit en croyant mesurer. On la pousse et on la
-                pince à la main, et le calage reste avec elle.
-              */
-              key: 'caler',
-              label: calant ? 'Terminer le calage' : 'Caler la photo',
-              on: calqueVisible,
-              tint: calant ? c.blue : c.ink,
-              paths: [],
-              plein: SOLAIRES.centrer,
-              press: () => {
-                setCalant((v) => !v);
-                haptic('leger');
-              },
-            },
-            {
-              /**
-               * RÉPÉTER — six socles identiques ne sont plus six poses.
-               *
-               * Relevé du patron : « duplication d'un appareil — six socles
-               * identiques, c'est six poses ; il n'existe aucun geste de
-               * duplication ».
-               *
-               * CE N'EST PAS LE « COPIER » D'AVANT, celui qui a été retiré
-               * d'ici pour laisser la place au lien. Un copier posait un
-               * jumeau à côté et laissait l'électricien le traîner ; celui-ci
-               * pose la copie LÀ OÙ LA SUIVANTE DOIT TOMBER — au pas d'un
-               * plan de travail la première fois, puis au pas qu'on a
-               * réellement pris — et LA SÉLECTIONNE. Six appuis font six
-               * socles régulièrement espacés, sans un seul glissement.
-               *
-               * IL SE TAIT QUAND IL NE PEUT RIEN FAIRE. Sur un mur où il ne
-               * reste aucune place — un tableau de porte déjà occupé —, le
-               * bouton ne s'affiche pas : un bouton qui ne commande rien
-               * donne à l'écran l'air d'être en panne.
-               */
-              key: 'rep',
-              label: 'Répéter',
-              on: !!selected && !!peutRepeter,
-              tint: c.blue,
-              paths: [],
-              plein: SOLAIRES.dupliquer,
-              press: () => {
-                if (!selected) return;
-                const neuf = repeterFixture(selected.id);
-                if (neuf) {
-                  // La copie devient la sélection : le prochain appui pose la
-                  // suivante, au même pas. C'est ce qui fait la série.
-                  onSelect(neuf);
-                  haptic('leger');
-                }
-              },
-            },
-            {
-              key: 'std',
-              label: spec ? `${cm(spec.std)} cm` : 'Hauteur',
-              on: !!selected,
-              tint: c.ink,
-              // Double flèche verticale : la hauteur normalisée.
-              paths: ['M12 4 v16', 'M8.5 7.5 L12 4 l3.5 3.5', 'M8.5 16.5 L12 20 l3.5 -3.5'],
-              press: () =>
-                selected && spec && moveFixture(selected.id, selected.along, spec.std),
-            },
-            {
-              /*
-                PONTER OU NON — proposé, jamais imposé.
-
-                Relevé du patron : « on propose de lier le câblage élec des
-                prises entre elles ; on peut refuser pour faire un circuit
-                indépendant par prise ». Le bouton n'apparaît que sur un
-                socle 16 A qui A UNE VOISINE sur le même pan : ailleurs il n'y
-                a rien à ponter, et un bouton qui ne commande rien donne à
-                l'écran l'air d'être en panne.
-
-                Il dit l'ÉTAT, pas le geste : « Ponté » quand la gaine passe
-                de prise en prise, « Seule » quand ce socle repart du
-                tableau. On lit ce qui est, on ne devine pas ce qui va
-                arriver.
-              */
-              key: 'pont',
-              label: selected?.sansPontage ? 'Seule' : 'Pontée',
-              on: !!selected && !!voisinePontable,
-              tint: selected?.sansPontage ? c.inkSoft : c.blue,
-              // Deux socles reliés par un trait : le pontage, en deux ronds.
-              paths: [
-                'M6 12 m-3 0 a3 3 0 1 0 6 0 a3 3 0 1 0 -6 0',
-                'M18 12 m-3 0 a3 3 0 1 0 6 0 a3 3 0 1 0 -6 0',
-                'M9 12 h6',
-              ],
-              press: () => selected && basculerPontage(selected.id),
-            },
-            {
-              key: 'flip',
-              label: 'Autre face',
-              on: !!selected,
-              tint: c.ink,
-              // Deux flèches opposées : on passe de l'autre côté du mur.
-              paths: ['M4 9 h16', 'M16.5 5.5 L20 9 l-3.5 3.5', 'M20 15 H4', 'M7.5 11.5 L4 15 l3.5 3.5'],
-              press: () => selected && flipFixture(selected.id),
-            },
-            {
-              /**
-               * LE COPIER A VÉCU, LE LIEN LE REMPLACE — relevé du patron :
-               * « enlève le bouton copier, remplace-le par un bouton
-               * lien... prise ou éclairage mural. Mais ça ne doit pas être
-               * possible pour le courant faible. »
-               *
-               * Une prise commandée, une applique : ils s'allument par un
-               * interrupteur, comme un point du plafond. On tient
-               * l'appareil ici, on ferme l'établi, et l'on touche sa
-               * commande sur le plan — le geste des lignes de spots.
-               *
-               * ET L'INTERRUPTEUR LE PORTE AUSSI, DÉSORMAIS — relevé du
-               * patron : « si on clique sur un interrupteur, on ne voit pas
-               * "lier", alors que sur prise et éclairage si. » Le geste
-               * n'existait que dans un sens, et c'est justement le sens le
-               * moins naturel : on pense une installation depuis la
-               * commande — « celui-ci allumera quoi ? » —, et c'était le
-               * seul appareil de l'établi à ne rien pouvoir faire de ce
-               * bouton.
-               *
-               * L'ÉTABLI NE DÉCIDE PAS DU SENS : il rend l'appareil tenu, et
-               * c'est la PAIRE qui tranche au moment du second appui (voir
-               * `lierElements`). Deux boutons, un seul chemin.
-               */
-              key: 'lien',
-              label: 'Lier',
-              on:
-                !!selected &&
-                (seCommande(selected.kind) ||
-                  COMMANDES_MURALES.includes(selected.kind)) &&
-                !!onLinkRequest,
-              tint: c.blue,
-              // Deux maillons de chaîne, au trait comme ses voisins.
-              paths: [
-                'M9.5 14.5 l5 -5',
-                'M11.5 7.5 l1.6 -1.6 a3.1 3.1 0 0 1 4.4 4.4 L15.9 11.9',
-                'M12.5 16.5 l-1.6 1.6 a3.1 3.1 0 0 1 -4.4 -4.4 L8.1 12.1',
-              ],
-              press: () =>
-                selected &&
-                (seCommande(selected.kind) ||
-                  COMMANDES_MURALES.includes(selected.kind)) &&
-                onLinkRequest?.(selected.id),
-            },
-            {
-              key: 'del',
-              label: 'Retirer',
-              on: !!selected,
-              tint: c.danger,
-              /* La poubelle du jeu commun — relevé du patron :
-                 `trash-bin-trash`, « partout où il y a la poubelle ». Elle
-                 était tracée à la main, au trait ; c'est la seule
-                 silhouette de cette rangée, et c'est celle qui doit se
-                 reconnaître sans lire. */
-              paths: [],
-              plein: SOLAIRES.supprimer,
-              press: () => {
-                if (!selected) return;
-                removeFixture(selected.id);
-                onSelect(null);
-              },
-            },
-          ] as const
-        )
-          // Un bouton qui ne commande rien ne s'affiche pas : il prenait
-          // la place, et donnait à l'écran l'air d'être en panne.
-          .filter((b) => b.on)
-          .map((b) => (
-          <TouchableOpacity
-            key={b.key}
-            style={[styles.action, b.key === 'add' && styles.actionAdd]}
-            // Le mot est dessous, en légende : c'est l'étiquette qui nomme
-            // le bouton pour qui se fait lire l'écran.
-            accessibilityLabel={b.label}
-            onPress={b.press}>
-            <Svg width={21} height={21} viewBox="0 0 24 24">
-              {'plein' in b && b.plein ? (
-                <Path d={b.plein} fill={b.tint} fillRule="evenodd" />
-              ) : (
-                b.paths.map((d) => (
-                  <Path
-                    key={d}
-                    d={d}
-                    stroke={b.key === 'add' ? '#FFFFFF' : b.tint}
-                    strokeWidth={2}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    fill="none"
-                  />
-                ))
-              )}
-            </Svg>
-            <Text
-              style={[
-                styles.actionText,
-                b.key === 'add' && styles.actionTextAdd,
-              ]}
-              numberOfLines={1}>
-              {b.label}
+                {/* Les gestes de l'appareil : seulement ceux qui peuvent agir. */}
+                <View style={styles.gestes}>
+                  {[
+                    {
+                      key: 'rep',
+                      label: 'Répéter',
+                      on: !!peutRepeter,
+                      tint: c.blue,
+                      plein: SOLAIRES.dupliquer,
+                      paths: [] as string[],
+                      press: () => {
+                        const neuf = repeterFixture(selected.id);
+                        if (neuf) {
+                          // La copie devient la sélection : le prochain appui
+                          // pose la suivante, au même pas.
+                          onSelect(neuf);
+                          haptic('leger');
+                        }
+                      },
+                    },
+                    {
+                      key: 'pont',
+                      label: selected.sansPontage ? 'Seule' : 'Pontée',
+                      on: !!voisinePontable,
+                      tint: selected.sansPontage ? c.inkSoft : c.blue,
+                      plein: null,
+                      paths: [
+                        'M6 12 m-3 0 a3 3 0 1 0 6 0 a3 3 0 1 0 -6 0',
+                        'M18 12 m-3 0 a3 3 0 1 0 6 0 a3 3 0 1 0 -6 0',
+                        'M9 12 h6',
+                      ],
+                      press: () => basculerPontage(selected.id),
+                    },
+                    {
+                      key: 'flip',
+                      label: 'Autre face',
+                      on: true,
+                      tint: c.ink,
+                      plein: null,
+                      paths: [
+                        'M4 9 h16',
+                        'M16.5 5.5 L20 9 l-3.5 3.5',
+                        'M20 15 H4',
+                        'M7.5 11.5 L4 15 l3.5 3.5',
+                      ],
+                      press: () => flipFixture(selected.id),
+                    },
+                    {
+                      key: 'lien',
+                      label: 'Lier',
+                      on:
+                        (seCommande(selected.kind) ||
+                          COMMANDES_MURALES.includes(selected.kind)) &&
+                        !!onLinkRequest,
+                      tint: c.blue,
+                      plein: null,
+                      paths: [
+                        'M9.5 14.5 l5 -5',
+                        'M11.5 7.5 l1.6 -1.6 a3.1 3.1 0 0 1 4.4 4.4 L15.9 11.9',
+                        'M12.5 16.5 l-1.6 1.6 a3.1 3.1 0 0 1 -4.4 -4.4 L8.1 12.1',
+                      ],
+                      press: () => onLinkRequest?.(selected.id),
+                    },
+                    {
+                      key: 'del',
+                      label: 'Retirer',
+                      on: true,
+                      tint: c.danger,
+                      plein: SOLAIRES.supprimer,
+                      paths: [] as string[],
+                      press: () => {
+                        removeFixture(selected.id);
+                        onSelect(null);
+                      },
+                    },
+                  ]
+                    .filter(g => g.on)
+                    .map(g => (
+                      <TouchableOpacity
+                        key={g.key}
+                        style={styles.geste}
+                        accessibilityLabel={g.label}
+                        onPress={g.press}
+                      >
+                        <View
+                          style={[
+                            styles.gesteRond,
+                            g.key === 'del' && styles.gesteRondDanger,
+                          ]}
+                        >
+                          <Svg width={20} height={20} viewBox="0 0 24 24">
+                            {g.plein ? (
+                              <Path
+                                d={g.plein}
+                                fill={g.tint}
+                                fillRule="evenodd"
+                              />
+                            ) : (
+                              g.paths.map(d => (
+                                <Path
+                                  key={d}
+                                  d={d}
+                                  stroke={g.tint}
+                                  strokeWidth={2}
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  fill="none"
+                                />
+                              ))
+                            )}
+                          </Svg>
+                        </View>
+                        <Text style={styles.gesteMot} numberOfLines={1}>
+                          {g.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                </View>
+              </>
+            )}
+          </View>
+        ) : (
+          <View>
+            <Text style={styles.dockTitre}>Poser un appareil</Text>
+            <Text style={styles.dockSous}>
+              Un appui le pose à sa hauteur type ; glissez-le ensuite, ou tapez
+              ses cotes.
             </Text>
-          </TouchableOpacity>
-        ))}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.familles}
+            >
+              {FIXTURE_FAMILIES.map((f, i) => {
+                const actif = i === famille;
+                return (
+                  <TouchableOpacity
+                    key={f.name}
+                    hitSlop={{ top: 5, bottom: 5 }}
+                    style={[styles.familleBtn, actif && styles.familleOn]}
+                    accessibilityLabel={`Famille ${f.name}`}
+                    accessibilityState={{ selected: actif }}
+                    onPress={() => {
+                      setFamille(i);
+                      haptic('leger');
+                    }}
+                  >
+                    <Text
+                      style={[styles.familleMot, actif && styles.familleMotOn]}
+                    >
+                      {f.name}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.cartes}
+            >
+              {familleVue.kinds.map(kind => (
+                <TouchableOpacity
+                  key={kind}
+                  style={styles.carte}
+                  accessibilityLabel={`Poser ${FIXTURES[kind].label}`}
+                  onPress={() => poserIci(kind)}
+                >
+                  <View style={styles.carteImage}>
+                    <VignetteAppareil kind={kind} taille={46} />
+                  </View>
+                  <Text style={styles.carteMot} numberOfLines={2}>
+                    {FIXTURES[kind].label}
+                  </Text>
+                  <Text style={styles.carteCote}>{`${cm(
+                    FIXTURES[kind].std,
+                  )} cm`}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
       </View>
-
-      {/*
-        GARDER ET REFERMER — l'action principale, en bas, sur toute la
-        largeur.
-
-        Elle vivait EN HAUT, en vert, coincée entre le titre et la croix :
-        sur un téléphone tenu d'une main, c'est le coin le plus difficile à
-        atteindre, et elle mangeait la place du titre. En bas et pleine
-        largeur, on la vise sans regarder — et elle prend le bleu de la
-        maison, le vert n'étant celui de rien d'autre dans l'app.
-      */}
-      <TouchableOpacity
-        style={styles.valider}
-        accessibilityLabel="Enregistrer et fermer"
-        onPress={() => {
-          depart.current = null;
-          haptic('succes');
-          onClose();
-        }}>
-        <Check size={19} color="#FFFFFF" strokeWidth={2.8} />
-        <Text style={styles.validerText}>Enregistrer</Text>
-      </TouchableOpacity>
-      {/*
-        LE TÉMOIN DE FIN DE FEUILLE — zéro pixel de haut, et il mesure tout.
-
-        Son ORDONNÉE dit à quelle hauteur la feuille se termine : c'est la
-        hauteur du contenu, mesurée et non estimée (voir `raboter`).
-
-        Il est posé en DERNIER, et c'est important au-delà de la géométrie :
-        mettre cette mesure sur la vue racine aurait fait d'elle la première
-        vue mesurable de la feuille — et cinq bancs qui servent « la première
-        vue qui se mesure » auraient nourri la racine au lieu du dessin. Le
-        dessin serait resté à zéro pixel, sans rien afficher, et les bancs
-        auraient crié sur un écran vide.
-      */}
-      <View
-        style={styles.temoin}
-        onLayout={(e) => raboter(e.nativeEvent.layout.y)}
-      />
     </View>
+  );
+}
+
+/**
+ * L'ANNEAU DE LA PIÈCE — où l'on en est des socles exigés, d'un coup d'œil :
+ * il se remplit à chaque prise posée, et passe au vert quand c'est fait.
+ */
+function Anneau({ part, ok, c }: { part: number; ok: boolean; c: Palette }) {
+  const r = 7;
+  const tour = 2 * Math.PI * r;
+  const p = Math.max(0, Math.min(1, part));
+  return (
+    <Svg width={18} height={18} viewBox="0 0 18 18">
+      <Circle
+        cx={9}
+        cy={9}
+        r={r}
+        stroke={c.line}
+        strokeWidth={2.6}
+        fill="none"
+      />
+      <Circle
+        cx={9}
+        cy={9}
+        r={r}
+        stroke={ok ? c.green : c.amber}
+        strokeWidth={2.6}
+        fill="none"
+        strokeLinecap="round"
+        strokeDasharray={`${tour * p} ${tour}`}
+        transform="rotate(-90 9 9)"
+      />
+    </Svg>
   );
 }
 
@@ -2677,7 +2728,7 @@ function Dim({
   // supprime surtout pas — c'est LA cote que l'électricien vient lire — on
   // sort l'étiquette du côté où il y a de la place.
   const trop = len < w + 6;
-  const echap = trop ? (w / 2 + 8) : 0;
+  const echap = trop ? w / 2 + 8 : 0;
   const mx = (x1 + x2) / 2 + (push?.x ?? 0) * echap;
   const my = (y1 + y2) / 2 + (push?.y ?? 0) * echap;
   if (len < 3) return null;
@@ -2724,12 +2775,16 @@ function Dim({
         fill={c.blue}
         fontSize={10.5}
         fontWeight="800"
-        textAnchor="middle">
+        textAnchor="middle"
+      >
         {text}
       </SvgText>
     </G>
   );
 }
+
+/** Les pastilles font 36 points dessinés ; le doigt en touche 44. */
+const PUCE_SLOP = { top: 4, bottom: 4, left: 2, right: 2 };
 
 /** La loupe du glissement : sa largeur, et de combien elle survole le doigt. */
 const LOUPE_L = 172;
@@ -2737,95 +2792,251 @@ const LOUPE_HAUT = 96;
 
 const getStyles = themedStyles((c: Palette) =>
   StyleSheet.create({
-    /**
-     * LA FEUILLE FAIT LA TAILLE DE CE QU'ELLE PORTE.
-     *
-     * Elle prenait toute la hauteur (`flex: 1`) : sous les commandes,
-     * cent cinquante à trois cents points de blanc, tous les jours, sur
-     * chaque mur. Un établi se juge à ce qu'il porte, pas à la place
-     * qu'il occupe — et le dessin, lui, a déjà sa hauteur propre, calculée
-     * sur les proportions du mur.
-     */
-    /* Zéro pixel : il ne se voit pas, il se mesure. Voir `raboter`. */
-    temoin: { height: 0 },
-    sheet: {
-      backgroundColor: c.surface,
-      borderRadius: radius.lg,
-      padding: 14,
-      width: '100%',
-      maxHeight: '100%',
-      ...shadowCard,
-    },
-    header: { flexDirection: 'row', alignItems: 'flex-start' },
-    headerTexts: { flex: 1, paddingRight: 10, minWidth: 0 },
-    /** Les trois sorties alignées, à la même hauteur et au même gabarit. */
-    headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    title: { color: c.ink, fontSize: 17, fontWeight: '600' },
-    subtitle: {
-      color: c.inkFaint,
-      fontSize: 12,
-      lineHeight: 16,
-      marginTop: 2,
-    },
-    /** L'enregistrement : vert, écrit, et à 44 points sous le doigt. */
     /*
-      L'ACTION PRINCIPALE : pleine largeur, en bas, dans le bleu maison.
-      Le vert n'était la couleur de rien d'autre dans l'app, et il criait
-      plus fort que le titre qu'il écrasait.
+      LA PAGE — trois étages : où l'on est, le mur, ce qu'on fait. Le fond
+      est celui de l'app ; le mur et le dock sont des cartes posées dessus,
+      comme l'accueil et les notifications.
     */
-    valider: {
-      width: '100%',
-      marginTop: 10,
+    page: { flex: 1, backgroundColor: c.bg },
+    disparu: { alignItems: 'center', justifyContent: 'center', gap: 16 },
+    entete: {
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'center',
-      gap: 7,
-      // 50 points : on la vise sans regarder, le pouce à plat.
-      height: 50,
-      borderRadius: radius.md,
-      backgroundColor: c.blue,
+      gap: 12,
+      paddingHorizontal: 16,
+      paddingBottom: 8,
     },
-    validerText: { color: '#FFFFFF', fontSize: 15.5, fontWeight: '600' },
-    /**
-     * LA CROIX EST UN BLOC, pas une pastille.
-     *
-     * Ronde et six points plus basse que le bouton vert, elle flottait à
-     * côté de lui : deux sorties voisines qui ne se ressemblaient pas,
-     * dont la plus destructrice était la plus petite. Même hauteur, même
-     * rayon, même famille — le vert garde, le gris abandonne.
-     */
-    close: {
-      width: 44,
-      height: 44,
-      borderRadius: radius.md,
+    /** Les ronds de l'en-tête : le même gabarit que la cloche de l'accueil. */
+    rond: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: c.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+      ...shadowCard,
+    },
+    rondPetit: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
       backgroundColor: c.surfaceSunken,
       alignItems: 'center',
       justifyContent: 'center',
     },
-    // Le mur occupe la moitié de l'écran, pas une vignette de 250 px.
-    //
-    // On place des appareils au doigt, à 5 cm près, sur un dessin qui
-    // faisait 250 px de haut : le pouce couvrait le tiers du mur. La feuille
-    // prend maintenant toute la hauteur disponible, et le dessin ce qui
-    // reste une fois les commandes posées.
-    /**
-     * LE CADRE ÉPOUSE LA FORME DU MUR.
-     *
-     * Il prenait toute la hauteur disponible (`flex: 1`, 300 points au
-     * minimum) : un mur de 2,70 m par 2,49 y flottait au milieu d'un grand
-     * vide, en haut comme en bas, et la feuille paraîssait mal remplie
-     * alors qu'elle était pleine — de rien. Sa hauteur se calcule
-     * désormais à partir de la largeur disponible et des proportions du
-     * mur : le dessin remplit son cadre, et la feuille se resserre.
-     */
-    canvas: {
-      marginTop: 10,
-      backgroundColor: c.bg,
+    enteteTextes: { flex: 1, minWidth: 0, alignItems: 'center' },
+    titre: {
+      color: c.ink,
+      fontSize: 18,
+      fontWeight: '700',
+      letterSpacing: -0.3,
+    },
+    sousTitre: {
+      color: c.inkFaint,
+      fontSize: 12.5,
+      fontWeight: '600',
+      marginTop: 1,
+    },
+    /** Garder : la seule chose bleue de l'en-tête — la sortie qui compte. */
+    garder: {
+      height: 40,
+      paddingHorizontal: 16,
+      borderRadius: 20,
+      backgroundColor: c.blue,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    garderMot: { color: '#FFFFFF', fontSize: 14.5, fontWeight: '700' },
+    /* Les pastilles d'état : une rangée qui défile, sans barre. */
+    pucesCadre: { flexGrow: 0 },
+    puces: { gap: 8, paddingHorizontal: 16, paddingVertical: 6 },
+    puce: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 7,
+      height: 36,
+      paddingHorizontal: 13,
+      borderRadius: 18,
+      backgroundColor: c.surface,
+      borderWidth: 1,
+      borderColor: c.line,
+    },
+    puceOn: { backgroundColor: c.ink, borderColor: c.ink },
+    puceOk: { backgroundColor: `${c.green}1F`, borderColor: `${c.green}33` },
+    puceAVoir: { backgroundColor: `${c.amber}24`, borderColor: `${c.amber}40` },
+    puceMot: { color: c.inkSoft, fontSize: 13, fontWeight: '600' },
+    puceMotOn: { color: '#FFFFFF' },
+    puceMotOk: { color: c.green },
+    puceMotAVoir: { color: c.ink },
+    /* La règle dépliée sous les pastilles : ce qu'elle dit, et le geste. */
+    regle: {
+      marginHorizontal: 16,
+      marginTop: 4,
+      padding: 12,
+      gap: 10,
       borderRadius: radius.md,
+      backgroundColor: c.surface,
+      borderWidth: 1,
+      borderColor: c.line,
+    },
+    regleTexte: { color: c.inkSoft, fontSize: 12.5, lineHeight: 18 },
+    regleFix: {
+      alignSelf: 'flex-start',
+      minHeight: 44,
+      paddingHorizontal: 14,
+      borderRadius: 20,
+      backgroundColor: c.blue,
+      justifyContent: 'center',
+    },
+    regleFixMot: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
+    /* Le mur, dans sa carte : toute la place que les deux autres laissent. */
+    scene: {
+      flex: 1,
+      marginHorizontal: 12,
+      marginTop: 8,
+      marginBottom: 10,
+      borderRadius: radius.lg,
+      backgroundColor: c.surface,
+      // Un filet, pas une ombre : `overflow: hidden` — qui arrondit le
+      // dessin — effacerait l'ombre sur iOS.
       borderWidth: 1,
       borderColor: c.line,
       overflow: 'hidden',
     },
+    canvas: { flex: 1 },
+    vide: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      top: 14,
+      alignItems: 'center',
+    },
+    videMot: {
+      color: c.inkFaint,
+      fontSize: 13,
+      fontWeight: '600',
+      backgroundColor: c.surfaceSunken,
+      overflow: 'hidden',
+      borderRadius: 14,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+    },
+    /* LE DOCK — la feuille d'en bas, toujours là, sous le pouce. */
+    dock: {
+      backgroundColor: c.surface,
+      borderTopLeftRadius: 26,
+      borderTopRightRadius: 26,
+      paddingTop: 16,
+      paddingHorizontal: 16,
+      shadowColor: '#000',
+      shadowOpacity: 0.08,
+      shadowRadius: 18,
+      shadowOffset: { width: 0, height: -4 },
+      elevation: 8,
+    },
+    dockTitre: {
+      color: c.ink,
+      fontSize: 17,
+      fontWeight: '700',
+      letterSpacing: -0.2,
+    },
+    dockSous: {
+      color: c.inkFaint,
+      fontSize: 12.5,
+      lineHeight: 17,
+      marginTop: 2,
+    },
+    familles: { gap: 6, paddingVertical: 12 },
+    familleBtn: {
+      height: 34,
+      paddingHorizontal: 14,
+      borderRadius: 17,
+      backgroundColor: c.surfaceSunken,
+      justifyContent: 'center',
+    },
+    familleOn: { backgroundColor: c.ink },
+    familleMot: { color: c.inkSoft, fontSize: 13, fontWeight: '600' },
+    familleMotOn: { color: '#FFFFFF' },
+    cartes: { gap: 10, paddingBottom: 2 },
+    /** La carte d'un appareil : sa photo, son nom, sa hauteur type. */
+    carte: {
+      width: 104,
+      padding: 10,
+      borderRadius: radius.md,
+      backgroundColor: c.bg,
+      alignItems: 'center',
+    },
+    carteImage: { height: 54, alignItems: 'center', justifyContent: 'center' },
+    carteMot: {
+      color: c.ink,
+      fontSize: 12,
+      fontWeight: '600',
+      textAlign: 'center',
+      marginTop: 6,
+      minHeight: 30,
+    },
+    carteCote: {
+      color: c.inkFaint,
+      fontSize: 11,
+      fontWeight: '600',
+      marginTop: 2,
+    },
+    /* LA FICHE de l'appareil tenu. */
+    ficheTete: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    ficheVignette: {
+      width: 52,
+      height: 52,
+      borderRadius: 14,
+      backgroundColor: c.bg,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    ficheTextes: { flex: 1, minWidth: 0 },
+    ficheTitre: {
+      color: c.ink,
+      fontSize: 16.5,
+      fontWeight: '700',
+      letterSpacing: -0.2,
+    },
+    ficheSous: {
+      color: c.inkFaint,
+      fontSize: 12.5,
+      fontWeight: '600',
+      marginTop: 1,
+    },
+    ficheSousKO: { color: c.danger },
+    hauteurs: { gap: 6, paddingTop: 10 },
+    hauteur: {
+      height: 32,
+      paddingHorizontal: 12,
+      borderRadius: 16,
+      backgroundColor: c.surfaceSunken,
+      justifyContent: 'center',
+    },
+    hauteurOn: { backgroundColor: c.blue },
+    hauteurMot: {
+      color: c.inkSoft,
+      fontSize: 12.5,
+      fontWeight: '700',
+      fontVariant: ['tabular-nums'],
+    },
+    hauteurMotOn: { color: '#FFFFFF' },
+    gestes: {
+      flexDirection: 'row',
+      justifyContent: 'space-around',
+      paddingTop: 12,
+    },
+    geste: { alignItems: 'center', minWidth: 56, gap: 4 },
+    gesteRond: {
+      width: 46,
+      height: 46,
+      borderRadius: 23,
+      backgroundColor: c.blueSoft,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    gesteRondDanger: { backgroundColor: `${c.danger}1A` },
+    gesteMot: { color: c.inkSoft, fontSize: 11, fontWeight: '600' },
     /* La loupe : une carte franche, lisible sur n'importe quel mur. */
     loupe: {
       position: 'absolute',
@@ -2844,26 +3055,12 @@ const getStyles = themedStyles((c: Palette) =>
       fontWeight: '600',
       fontVariant: ['tabular-nums'],
     },
-    loupeHauteur: { color: c.inkSoft, fontSize: 13, fontWeight: '700', marginTop: 1 },
-    /**
-     * L'interrupteur des meubles, posé SUR le dessin.
-     *
-     * Une ligne de plus dans une feuille déjà dense coûte plus cher qu'un
-     * bouton posé là où se voit son effet. Il ne paraît que si ce mur a
-     * des meubles devant lui — sinon il n'a rien à montrer.
-     */
-    calque: {
-      alignSelf: 'flex-start',
-      marginTop: 7,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-      height: 30,
-      paddingHorizontal: 10,
-      borderRadius: radius.pill,
-      backgroundColor: c.surfaceSunken,
+    loupeHauteur: {
+      color: c.inkSoft,
+      fontSize: 13,
+      fontWeight: '700',
+      marginTop: 1,
     },
-    calqueOn: { backgroundColor: c.inkSoft },
     /*
       CE QUE VAUT LA PHOTO DU CALQUE, dit en toutes lettres.
 
@@ -2881,105 +3078,6 @@ const getStyles = themedStyles((c: Palette) =>
       fontSize: 10.5,
       fontWeight: '700',
     },
-    calqueText: { color: c.inkSoft, fontSize: 11, fontWeight: '600' },
-    calqueTextOn: { color: '#FFFFFF' },
-    /** LE BANDEAU DE CONFORMITÉ : une ligne, une jauge, un geste. */
-    bilan: {
-      marginTop: 10,
-      backgroundColor: c.surfaceSunken,
-      borderRadius: radius.sm,
-      paddingHorizontal: 12,
-      paddingVertical: 10,
-    },
-    bilanHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-    /** La jauge est VERTICALE et fine : elle dit l'avancement sans ligne. */
-    bilanJauge: {
-      width: 4,
-      height: 30,
-      borderRadius: 2,
-      backgroundColor: c.line,
-      justifyContent: 'flex-end',
-      overflow: 'hidden',
-    },
-    bilanFill: { width: 4, backgroundColor: c.danger, borderRadius: 2 },
-    bilanFillOk: { backgroundColor: c.green },
-    bilanTextes: { flex: 1, minWidth: 0 },
-    bilanTitre: { color: c.ink, fontSize: 13, fontWeight: '600' },
-    bilanManque: { color: c.danger, fontSize: 11.5, fontWeight: '700', marginTop: 1 },
-    bilanFix: {
-      backgroundColor: c.blue,
-      borderRadius: radius.pill,
-      paddingHorizontal: 12,
-      // 40 points dessinés, 44 sous le doigt avec son débord : la règle
-      // d'iOS, que le banc d'essai vérifie bouton par bouton.
-      minHeight: 40,
-      maxWidth: 150,
-      justifyContent: 'center',
-    },
-    bilanFixText: { color: '#FFFFFF', fontSize: 12, fontWeight: '600' },
-    bilanRegle: {
-      color: c.inkFaint,
-      fontSize: 11.5,
-      lineHeight: 16,
-      marginTop: 8,
-    },
-    guide: {
-      marginTop: 10,
-      backgroundColor: c.surfaceSunken,
-      borderRadius: radius.sm,
-      paddingLeft: 12,
-      paddingRight: 8,
-      paddingVertical: 8,
-    },
-    guideHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-    guideTitle: { color: c.ink, fontSize: 12.5, fontWeight: '700', flex: 1 },
-    guideState: { fontSize: 13, fontWeight: '600', letterSpacing: -0.3 },
-    guideFix: {
-      width: 28,
-      height: 28,
-      borderRadius: 14,
-      backgroundColor: c.blue,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    guideOk: { color: c.green },
-    guideKo: { color: c.danger },
-    guideBar: {
-      height: 3,
-      borderRadius: 2,
-      backgroundColor: c.line,
-      marginTop: 8,
-      marginRight: 4,
-      overflow: 'hidden',
-    },
-    guideFill: { height: 3, borderRadius: 2, backgroundColor: c.danger },
-    guideFillOk: { backgroundColor: c.green },
-    guideRule: {
-      color: c.inkFaint,
-      fontSize: 10,
-      lineHeight: 13.5,
-      marginTop: 6,
-      marginRight: 4,
-    },
-    warn: {
-      marginTop: 8,
-      backgroundColor: c.surfaceSunken,
-      borderLeftWidth: 3,
-      borderLeftColor: c.danger,
-      borderRadius: radius.sm,
-      paddingHorizontal: 12,
-      paddingVertical: 8,
-    },
-    warnHead: { flexDirection: 'row', alignItems: 'center' },
-    warnTitle: { color: c.danger, fontSize: 12.5, fontWeight: '600', flex: 1 },
-    warnFix: {
-      backgroundColor: c.danger,
-      borderRadius: radius.pill,
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-    },
-    warnFixText: { color: '#FFFFFF', fontSize: 11.5, fontWeight: '600' },
-    warnRule: { color: c.inkSoft, fontSize: 10.5, lineHeight: 14.5, marginTop: 3 },
     // L'ensemble, en UNE ligne de commandes : le côté, l'axe, et de quoi
     // défaire. L'ancien pavé posait une question à laquelle l'appareil avait
     // déjà répondu — il était rangé avant même qu'on lise le titre.
@@ -3118,31 +3216,21 @@ const getStyles = themedStyles((c: Palette) =>
       flexDirection: 'row',
       alignItems: 'center',
       gap: 6,
-      marginTop: 10,
+      marginTop: 12,
     },
     pavePas: {
       backgroundColor: c.blue,
-      borderRadius: radius.sm,
-      paddingHorizontal: 12,
-      paddingVertical: 11,
+      borderRadius: 22,
+      paddingHorizontal: 14,
+      height: 44,
+      justifyContent: 'center',
     },
     pavePasText: { color: '#FFFFFF', fontSize: 12, fontWeight: '600' },
     paveBtn: {
       flex: 1,
       height: 44,
-      borderRadius: radius.sm,
+      borderRadius: 22,
       backgroundColor: c.blueSoft,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    // Une ACTION, pas un réglage : l'appareil photo prend le bleu de l'app.
-    // En gris sur gris, à côté de la croix de fermeture, on ne le voyait
-    // pas — et une photo de repérage non prise est une photo perdue.
-    photo: {
-      width: 44,
-      height: 44,
-      borderRadius: radius.md,
-      backgroundColor: c.blue,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -3167,7 +3255,7 @@ const getStyles = themedStyles((c: Palette) =>
       marginTop: 2,
     },
     percageUnit: { color: c.inkFaint, fontSize: 10.5, fontWeight: '700' },
-    fields: { flexDirection: 'row', gap: 8, marginTop: 12 },
+    fields: { flexDirection: 'row', gap: 8, marginTop: 14 },
     field: { flex: 1 },
     fieldLabel: {
       color: c.inkFaint,
@@ -3179,10 +3267,10 @@ const getStyles = themedStyles((c: Palette) =>
       flexDirection: 'row',
       alignItems: 'center',
       backgroundColor: c.bg,
-      borderRadius: radius.sm,
+      borderRadius: radius.md,
       borderWidth: 1,
-      borderColor: c.lineStrong,
-      paddingHorizontal: 10,
+      borderColor: c.line,
+      paddingHorizontal: 12,
     },
     fieldInput: {
       flex: 1,
@@ -3192,36 +3280,5 @@ const getStyles = themedStyles((c: Palette) =>
       paddingVertical: 9,
     },
     fieldUnit: { color: c.inkFaint, fontSize: 12, fontWeight: '600' },
-    actions: {
-      flexDirection: 'row',
-      gap: 8,
-      paddingTop: 12,
-      paddingBottom: 4,
-    },
-    action: {
-      flex: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: c.blueSoft,
-      borderRadius: radius.sm,
-      paddingVertical: 9,
-    },
-    actionAdd: { backgroundColor: c.blue },
-    actionText: {
-      color: c.blue,
-      fontWeight: '700',
-      fontSize: 9.5,
-      marginTop: 3,
-    },
-    actionTextAdd: { color: '#FFFFFF', opacity: 0.9 },
-    actionOff: { opacity: 0.35 },
-    ghost: {
-      marginTop: 12,
-      borderRadius: radius.sm,
-      paddingVertical: 12,
-      alignItems: 'center',
-      backgroundColor: c.blueSoft,
-    },
-    ghostText: { color: c.blue, fontWeight: '600', fontSize: 14.5 },
   }),
 );

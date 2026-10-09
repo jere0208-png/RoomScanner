@@ -81,7 +81,6 @@ function rendu(largeur = 700, hauteur = 420) {
         wallId="n"
         selectedId={null}
         onSelect={() => {}}
-        onAddRequest={() => {}}
         onClose={() => {}}
       />,
     );

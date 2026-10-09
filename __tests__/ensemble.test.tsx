@@ -92,7 +92,6 @@ function rendu() {
         wallId="n"
         selectedId="b"
         onSelect={() => {}}
-        onAddRequest={() => {}}
         onClose={() => {}}
       />,
     );

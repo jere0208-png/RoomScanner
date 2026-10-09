@@ -64,7 +64,7 @@ afterEach(() => {
   arbre = null;
 });
 
-const etabli = (nom: string) => {
+const etabli = (nom: string, regle = false) => {
   let t!: TestRenderer.ReactTestRenderer;
   act(() => {
     useScanStore.setState({
@@ -81,7 +81,6 @@ const etabli = (nom: string) => {
         wallId="n"
         selectedId={null}
         onSelect={() => {}}
-        onAddRequest={() => {}}
         onLinkRequest={() => {}}
         onClose={() => {}}
       />,
@@ -93,6 +92,14 @@ const etabli = (nom: string) => {
       .find((n) => typeof n.props.onLayout === 'function')!;
     zone.props.onLayout({ nativeEvent: { layout: { width: 390, height: 380 } } });
   });
+  if (regle) {
+    // La pastille de la pièce se touche, et dit sa règle.
+    act(() => {
+      t.root
+        .find((n) => n.props.accessibilityLabel === 'Voir la règle' && typeof n.props.onPress === 'function')
+        .props.onPress();
+    });
+  }
   arbre = t;
   return [...t.root.findAllByType(Text), ...t.root.findAllByType(SvgText)]
     .map((n) =>
@@ -125,7 +132,7 @@ describe('l’usage d’une pièce, connu ou déduit', () => {
 
 describe('l’établi devant une pièce non nommée', () => {
   it('n’annonce pas un objectif atteint', () => {
-    const vu = etabli('Pièce 1');
+    const vu = etabli('Pièce 1', true);
     // Ni « 2/1 socle », ni rien qui se lise comme une conformité.
     expect(vu).not.toMatch(/2\/1 socle/);
     expect(vu).toMatch(/Pièce à nommer/);

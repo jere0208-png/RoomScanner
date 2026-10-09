@@ -87,7 +87,6 @@ describe('les combos montrent leurs deux visages', () => {
           focusX={undefined}
           selectedId={null}
           onSelect={() => {}}
-          onAddRequest={() => {}}
           onChoose={() => {}}
           onClose={() => {}}
         />,

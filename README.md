@@ -14285,6 +14285,63 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Le mur en page entière : poser d'un appui, régler sous le pouce
+
+Relevé du patron : « revois complètement la page de placement d'appareils
+électriques sur un mur ; fais une page entière et complètement refaite, plus
+ludique, plus moderne, en cohérence avec nos avancées ».
+
+L'établi était une fiche flottante dans une fenêtre à marges : il estimait sa
+propre hauteur, la mesurait, puis rabotait son dessin de ce qui dépassait
+— trois nombres à tenir d'accord. Pour ajouter un appareil, il fallait
+« Ajouter », choisir dans un catalogue qui REMPLAÇAIT le mur, et l'appareil
+tombait à vingt centimètres du coin bas gauche, à traîner ensuite.
+
+La page a maintenant trois étages, comme l'accueil et les notifications :
+
+- **En haut, où l'on est.** Une croix ronde à gauche (« Fermer sans
+  garder », qui demande avant de jeter), le mur au centre (« Mur nord »
+  quand le nord est connu ; la pièce, la longueur et la hauteur dessous, et
+  le retour visé), « Enregistrer » en pastille bleue à droite. Dessous, une
+  rangée de pastilles d'état qui défile : la pièce avec un anneau qui se
+  remplit à chaque socle posé et passe au vert quand la règle est tenue (un
+  appui déplie la règle et son correctif), les meubles devant le mur, la
+  photo (« Photo du retour » sur un retour), la photo au fond, son calage.
+  Aucune pastille n'apparaît si elle n'a rien à dire.
+- **Au milieu, le mur**, dans sa carte, sur toute la place que les deux
+  autres laissent (`flex: 1`) : plus aucune hauteur calculée, donc plus de
+  débord possible. Le moteur — glissé, accroches, loupe, cotes, retours,
+  calque photo, fusion sous plaque — n'a pas bougé d'une ligne.
+- **En bas, sous le pouce, ce qu'on fait.** Rien de tenu : le dock « Poser
+  un appareil », famille par famille (Prises, Commandes, Courants faibles,
+  Éclairage, Divers), en cartes avec la photo du produit et la hauteur où il
+  arrivera. Un appui le pose au milieu du mur — ou du retour visé — à sa
+  hauteur type, sur la première place libre à un quart de mètre près, et il
+  arrive choisi. Un appareil tenu : le dock devient sa fiche — sa photo, son
+  nom, sa hauteur type (ou « Trop bas · la règle dit 25 cm »), les trois
+  cotes, les hauteurs d'un appui (celle du type en tête, puis 25, 110, 135,
+  210), les flèches au pas choisi, et des gestes ronds qui n'apparaissent que
+  s'ils peuvent agir (Répéter, Pontée/Seule, Autre face, Lier, Retirer). Un
+  chevron replie la fiche. Pendant la saisie d'une cote, elle se resserre sur
+  ses trois champs : le mur reste visible au-dessus du clavier.
+
+La fenêtre électrique monte du bas, bord à bord, sans voile qui la fermerait
+au moindre appui à côté ; le catalogue seul reste une fenêtre. Le bouton
+« Élec » ouvre directement la page quand un mur est sélectionné ; sans mur,
+le catalogue d'abord, puis l'appui sur le plan. Les vignettes de produit
+(dont les postes combinés et leurs deux visages) vivent une seule fois, dans
+`VignetteAppareil.tsx`, pour le catalogue comme pour le dock.
+
+Bancs : `etabliplein.test.tsx` (pose d'un appui au milieu à la hauteur du
+type et choisie ; jamais sur un appareil posé ; sur le retour visé ; familles ;
+hauteur annoncée sur la carte ; 44 points partout ; hauteurs d'un appui ;
+hauteur hors règle dite ; repli ; « Lier » seulement à ce qui se commande ;
+resserrement pendant la saisie ; « Retirer » ; pastille de la pièce et son
+correctif ; page bord à bord sans voile, catalogue avec), `ficheentiere`
+réécrit pour la page (encoche, « Enregistrer » au-dessus du mur, mur en
+`flex: 1`, dock au-dessus de la barre d'accueil), `etabli` (les deux sorties
+face à face, pastilles dans la rangée d'état, page entière, fiche du tenu).
+
 ## Marcher et tourner en même temps, pour de bon
 
 Relevé du patron : « le déplacement se coupe lorsqu'on change en même temps la

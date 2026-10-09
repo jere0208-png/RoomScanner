@@ -152,7 +152,6 @@ describe('refermer un mur sans garder', () => {
           wallId={SNAPSHOT_WALLS[0].id}
           selectedId="f1"
           onSelect={() => {}}
-          onAddRequest={() => {}}
           onClose={() => {}}
           onDemander={(d) => demandes.push(d)}
         />,

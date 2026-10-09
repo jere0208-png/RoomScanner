@@ -135,7 +135,6 @@ describe('l’élévation dessine les meubles à leur hauteur', () => {
           wallId="n"
           selectedId={null}
           onSelect={() => {}}
-          onAddRequest={() => {}}
           onClose={() => {}}
         />,
       );

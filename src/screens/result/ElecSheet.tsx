@@ -28,19 +28,7 @@ import {
   type FixtureKind,
 } from '../../geometry/electrical';
 import { getStyles } from './styles';
-import { VignetteProduit } from '../../components/VignetteProduit';
-
-/**
- * LES COMBOS MONTRENT LEURS DEUX VISAGES — relevé du patron : « "TV +
- * prise" affiche que la TV.. on doit voir les deux images avec un + au
- * centre. » Un poste combiné, c'est deux mécanismes sous une plaque : la
- * tuile montre les deux, séparés du signe qui les unit.
- */
-const DUOS: Partial<Record<string, [string, string]>> = {
-  tvPrise: ['meca-tv', 'meca-prise'],
-  rjPrise: ['meca-rj45', 'meca-prise'],
-  rjPrise2: ['meca-rj45', 'meca-prise'],
-};
+import { VignetteAppareil } from '../../components/VignetteAppareil';
 
 export function ElecSheet({
   visible,
@@ -49,7 +37,6 @@ export function ElecSheet({
   focusX,
   selectedId,
   onSelect,
-  onAddRequest,
   onLinkRequest,
   onChoose,
   onClose,
@@ -63,7 +50,6 @@ export function ElecSheet({
   focusX: number | undefined;
   selectedId: string | null;
   onSelect: (id: string | null) => void;
-  onAddRequest: () => void;
   /** « Lier » depuis l'établi : l'appareil tenu attend sa commande. */
   onLinkRequest?: (fixtureId: string) => void;
   onChoose: (kind: FixtureKind) => void;
@@ -77,14 +63,17 @@ export function ElecSheet({
     <Modal
       visible={visible}
       transparent
-      animationType="fade"
+      // La page du mur monte du bas, comme toute page entière d'iOS ; le
+      // catalogue, simple fenêtre, apparaît en fondu.
+      animationType={plein ? 'slide' : 'fade'}
       onRequestClose={onClose}>
       <View
         style={[
           styles.modalBackdrop,
-          // L'établi électrique prend l'écran : on y place des appareils
-          // au doigt, à cinq centimètres près. Le catalogue, lui, reste
-          // une fenêtre — on y choisit, on n'y travaille pas.
+          // L'établi électrique EST une page : bord à bord, sans voile ni
+          // marge — il tient lui-même compte de l'encoche et de la barre
+          // d'accueil. Le catalogue, lui, reste une fenêtre : on y choisit,
+          // on n'y travaille pas.
           plein && styles.modalBackdropPlein,
         ]}>
         {/*
@@ -94,7 +83,7 @@ export function ElecSheet({
           geste, et le déroulé ne partait que depuis un libellé. Le voile
           est posé DERRIÈRE la carte : il ne reçoit que ce qui la manque.
         */}
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+        {!plein && <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />}
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={[styles.elecWrap, plein && styles.elecWrapPlein]}
@@ -106,7 +95,6 @@ export function ElecSheet({
                 focusX={focusX}
                 selectedId={selectedId}
                 onSelect={onSelect}
-                onAddRequest={onAddRequest}
                 onLinkRequest={onLinkRequest}
                 onClose={onClose}
                 onDemander={onDemander}
@@ -123,8 +111,8 @@ export function ElecSheet({
               */}
               <Text style={styles.modalTitle}>Ajouter un appareil</Text>
               <Text style={styles.modalSubtitle}>
-                Il se pose à 20 cm du coin bas gauche du mur, puis se
-                déplace au doigt ou à la cote, face au mur.
+                Touchez ensuite le mur qui le reçoit : il s’y pose à sa
+                hauteur type, puis se règle au doigt ou à la cote.
               </Text>
               <ScrollView style={styles.elecScroll}>
                 {FIXTURE_FAMILIES.map((family) => (
@@ -152,27 +140,7 @@ export function ElecSheet({
                               qu'on lira.
                             */}
                             <View style={styles.elecTuile}>
-                              {DUOS[kind] ? (
-                                <View style={styles.elecDuo}>
-                                  <VignetteProduit
-                                    code={DUOS[kind]![0]}
-                                    libelle={spec.label}
-                                    taille={30}
-                                  />
-                                  <Text style={styles.elecPlus}>+</Text>
-                                  <VignetteProduit
-                                    code={DUOS[kind]![1]}
-                                    libelle={spec.label}
-                                    taille={30}
-                                  />
-                                </View>
-                              ) : (
-                                <VignetteProduit
-                                  code={`meca-${kind}`}
-                                  libelle={spec.label}
-                                  taille={52}
-                                />
-                              )}
+                              <VignetteAppareil kind={kind} taille={52} />
                               <View style={styles.elecInsigne}>
                                 <Svg width={16} height={16} viewBox="-13 -13 26 26">
                                   {FIXTURE_SYMBOL[kind].map((s, i) => (
