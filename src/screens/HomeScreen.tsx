@@ -11,18 +11,23 @@
  * le dixième jour : ses plans étaient à un écran de là, derrière « Mes
  * scans ». La page se lit maintenant de haut en bas comme une journée :
  *
- *   — QUI ET QUAND : la date, le compte, et un mot d'accueil à l'heure qu'il
- *     est, au prénom — deux tons, la question en retrait ;
+ *   — EN HAUT À DROITE : la cloche des notifications et le rond du compte ;
+ *     puis un mot d'accueil à l'heure qu'il est, au prénom — deux tons, la
+ *     question en retrait ;
  *   — PAR OÙ COMMENCER : quatre tuiles en moulinet autour de la marque,
  *     chacune sa couleur, son geste et sa flèche. Scanner, dessiner, voir un
  *     exemple, comprendre — les quatre portes d'une application qu'on
- *     découvre, et le moulinet est ce qu'on reconnaît d'un coup d'œil ;
+ *     découvre, et le moulinet est ce qu'on reconnaît d'un coup d'œil. La
+ *     marque n'apparaît qu'une fois, là, en noir, et elle « écoute » ;
  *   — VOS PLANS : les trois derniers, avec leur vignette, ouverts d'un
  *     appui. Le relevé interrompu passe en tête. Pour qui n'a encore rien,
- *     la place n'est pas vide : c'est la feuille où l'on trace sa première
- *     pièce du doigt.
+ *     une carte dit où ils apparaîtront.
+ *
+ * Relevé du patron, sur la première version : « ne mets pas la date et le
+ * logo en haut, le logo est déjà au centre, évitons la répétition abusive » ;
+ * et « ne fais plus l'option de tracer avec le doigt ».
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
@@ -32,19 +37,18 @@ import {
   Text,
   TextInput,
   View,
-  type LayoutChangeEvent,
 } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RoomScan } from 'react-native-room-scan';
-import { dark, radius, themedStyles, useTheme, type Palette } from '../theme';
+import { dark, ombreBouton as ombreBoutonDouce, radius, themedStyles, useTheme, type Palette } from '../theme';
 import { Avatar } from '../components/Avatar';
-import { LogoMark } from '../components/LogoMark';
-import { Quadrillage } from '../components/Quadrillage';
-import { TraceUnePiece } from '../components/TraceUnePiece';
+import { LogoEcho } from '../components/LogoMark';
 import { useScanStore, type SavedScan } from '../store/scanStore';
 import { useAccountStore } from '../store/accountStore';
 import { usePremieresFois } from '../store/premieresFois';
+import { nombreNonLus, useNotifications } from '../store/notifications';
+import { CLOCHE } from './NotificationsScreen';
 import { useRoomScan } from '../native/useRoomScan';
 import { SOLAIRES } from '../ui/solaires';
 import { haptic } from '../ui/haptic';
@@ -69,32 +73,7 @@ export function quand(at: number, maintenant = Date.now()): string {
   return `il y a ${j} jours`;
 }
 
-/**
- * LA TAILLE DE L'INCRUSTATION, et son retrait — les mêmes que l'écran de
- * lancement et que l'attente qui le suit (voir le banc `lancement`).
- *
- * Le glyphe ne trône plus au centre : il déborde dans l'angle, derrière le
- * mot d'accueil, comme un tampon sur le papier. Sept centièmes d'opacité :
- * on le sent, on ne le lit pas.
- */
-const FILIGRANE_LOGO = 240;
-const FILIGRANE_OPACITE = 0.07;
 
-const JOURS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
-const MOIS = [
-  'janvier', 'février', 'mars', 'avril', 'mai', 'juin',
-  'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre',
-];
-
-/**
- * « Vendredi 9 octobre ». Écrite à la main : `toLocaleDateString` et ses
- * options ne sont pas garanties par tous les moteurs JavaScript, et une date
- * en anglais sur un accueil en français se voit avant tout le reste.
- */
-export function dateDuJour(d = new Date()): string {
-  const j = JOURS[d.getDay()];
-  return `${j.charAt(0).toUpperCase()}${j.slice(1)} ${d.getDate()} ${MOIS[d.getMonth()]}`;
-}
 
 /** Le mot d'accueil qui va avec l'heure. */
 export function salutation(heure = new Date().getHours()): string {
@@ -191,41 +170,7 @@ export function HomeScreen() {
     };
   };
 
-  /*
-    LE MOYEU RESPIRE — une seule chose bouge sur la page quand plus rien
-    n'arrive : la marque, au centre du moulinet, qui gonfle d'un souffle
-    toutes les trois secondes. Assez pour qu'on la remarque, pas assez
-    pour qu'on la regarde.
-  */
-  const souffle = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    const boucle = Animated.loop(
-      Animated.sequence([
-        Animated.timing(souffle, { toValue: 1, duration: 1400, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-        Animated.timing(souffle, { toValue: 0, duration: 1400, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-      ]),
-    );
-    boucle.start();
-    return () => boucle.stop();
-  }, [souffle]);
 
-  /**
-   * LA PIÈCE TRACÉE OUVRE UN PLAN, avec elle dedans — voir `TraceUnePiece`.
-   * La règle du palier se consulte ici comme aux autres portes (elle laisse
-   * tout passer depuis le modèle « exporter et partager », mais une porte
-   * qui ne la consulte pas serait celle qu'on oublie le jour où elle change).
-   */
-  const tracerLaPiece = useCallback(
-    (largeur: number, profondeur: number) => {
-      if (!peutCreerPlan()) {
-        ouvrirSurprise();
-        return;
-      }
-      commencerAuClavier();
-      useScanStore.getState().addRoomRect({ x: 0, z: 0 }, { x: largeur, z: profondeur });
-    },
-    [peutCreerPlan, ouvrirSurprise, commencerAuClavier],
-  );
 
   /*
     LE RACCOURCI SE CONSOMME ICI — « Dis Siri, nouveau relevé ». Même chemin
@@ -273,39 +218,44 @@ export function HomeScreen() {
   const prenom = compte?.prenom?.trim().split(/\s+/)[0];
   const question = questionDuJour({ brouillon: !!brouillon, plans: saves.length });
 
-  /* La feuille du tracé se mesure : le quadrillage couvre exactement sa carte. */
-  const [feuille, setFeuille] = useState({ w: 0, h: 0 });
-  const mesurerFeuille = (e: LayoutChangeEvent) =>
-    setFeuille({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height });
 
   const scanIndisponible = supported === false;
-  /* Le défilement se coupe le temps qu'un doigt trace sur la feuille. */
-  const [trace, setTrace] = useState(false);
+  /* Le nombre de la pastille : ce qu'on n'a pas encore lu. */
+  const nonLus = useNotifications((n) => nombreNonLus(n));
 
   return (
     <View style={styles.container}>
       <ScrollView
         contentContainerStyle={[styles.page, { paddingTop: insets.top + 10, paddingBottom: insets.bottom + 28 }]}
         showsVerticalScrollIndicator={false}
-        scrollEnabled={!trace}
         keyboardShouldPersistTaps="handled">
         {/*
-          LE GLYPHE DANS L'ANGLE — un tampon sur le papier, derrière le mot
-          d'accueil. Il ne reçoit jamais le doigt.
+          EN HAUT À DROITE, DEUX RONDS JUMEAUX — la cloche et le compte. Rien
+          à gauche : ni date, ni logo. La marque est au centre du moulinet,
+          et une fois suffit.
         */}
-        {/* Son angle de murs file dans la barre d'état, ses ondes passent
-            derrière le salut — jamais derrière le rond du compte. */}
-        <View style={[styles.filigrane, { top: insets.top - 84 }]} pointerEvents="none">
-          <LogoMark size={FILIGRANE_LOGO} opacite={FILIGRANE_OPACITE} />
-        </View>
-
-        {/* QUI ET QUAND. */}
         <Animated.View style={[styles.entete, fadeIn(0)]}>
-          <View style={styles.marque} accessibilityLabel="EchoPlan">
-            <LogoMark size={30} teinte="#FFFFFF" />
-          </View>
-          <Text style={styles.date}>{dateDuJour()}</Text>
           <View style={styles.flex} />
+          {/*
+            LA CLOCHE — la boîte des messages de l'éditeur. La pastille rouge
+            dit combien on n'en a pas lu ; au-delà de neuf, « 9+ » : un
+            nombre qui déborde du rond ne se lit plus.
+          */}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={nonLus > 0 ? `Notifications, ${nonLus} non lue${nonLus > 1 ? 's' : ''}` : 'Notifications'}
+            style={styles.rondEntete}
+            hitSlop={8}
+            onPress={() => setScreen('notifications')}>
+            <Svg width={20} height={20} viewBox="0 0 24 24">
+              <Path d={CLOCHE} fill={c.ink} fillRule="evenodd" />
+            </Svg>
+            {nonLus > 0 && (
+              <View style={styles.pastille} testID="pastille-notifications">
+                <Text style={styles.pastilleMot}>{nonLus > 9 ? '9+' : String(nonLus)}</Text>
+              </View>
+            )}
+          </Pressable>
           {/*
             LE COMPTE EST UN ROND, EN HAUT À DROITE — l'initiale ou la
             silhouette, jamais le nom en couleur. C'est la porte de la page
@@ -436,18 +386,15 @@ export function HomeScreen() {
                   />
                 </Animated.View>
               </View>
-              <Animated.View
-                pointerEvents="none"
-                style={[
-                  styles.moyeu,
-                  {
-                    transform: [
-                      { scale: souffle.interpolate({ inputRange: [0, 1], outputRange: [1, 1.06] }) },
-                    ],
-                  },
-                ]}>
-                <LogoMark size={34} teinte={c.blue} />
-              </Animated.View>
+              {/*
+                LE MOYEU ÉCOUTE — le glyphe à l'encre, noir sur blanc : la
+                sobriété d'un outil de pro. Ses deux ondes s'allument l'une
+                après l'autre, comme un écho, et l'angle des murs s'éclaire
+                quand l'onde l'atteint — un mur détecté. Voir `LogoEcho`.
+              */}
+              <View pointerEvents="none" style={styles.moyeu}>
+                <LogoEcho size={34} teinte={c.ink} />
+              </View>
             </View>
 
             {scanIndisponible && (
@@ -537,28 +484,31 @@ export function HomeScreen() {
         )}
 
         {/*
-          LA PREMIÈRE PIÈCE, AU DOIGT — pour qui n'a encore aucun plan.
-
-          La place des projets n'est pas laissée vide : c'est la feuille de
-          l'architecte, où l'on trace un rectangle du doigt — un carreau vaut
-          vingt-cinq centimètres — et l'on arrive dans l'éditeur avec sa
-          première pièce déjà posée.
+          VOS PLANS, AVANT LE PREMIER — la place ne reste pas vide : une
+          carte dit ce qui viendra s'y ranger, et comment l'y faire venir.
         */}
-        {saves.length === 0 && (
-          <Animated.View style={[styles.feuilleCarte, fadeIn(7)]}>
-            <View style={styles.feuille} onLayout={mesurerFeuille}>
-              {feuille.w > 0 && (
-                <Quadrillage width={feuille.w} height={feuille.h} palette={c} force={1} cle="accueil" />
-              )}
-              {feuille.h > 120 && (
-                <TraceUnePiece
-                  width={feuille.w}
-                  height={feuille.h}
-                  palette={c}
-                  onTracee={tracerLaPiece}
-                  onGeste={setTrace}
-                />
-              )}
+        {saves.length === 0 && !brouillon && (
+          <Animated.View style={fadeIn(7)}>
+            <Text style={[styles.sectionTitre, styles.sectionSeule]}>Vos plans</Text>
+            <View style={styles.videCarte} testID="plans-vide">
+              <View style={styles.videVignette}>
+                <Svg width={44} height={34} viewBox="0 0 44 34">
+                  <Path
+                    d="M3 3H41V31H3Z M26 3V31 M3 19H26 M14 19V31 M26 17H41"
+                    stroke={c.inkFaint}
+                    strokeWidth={2}
+                    strokeLinejoin="round"
+                    strokeDasharray="4 3"
+                    fill="none"
+                  />
+                </Svg>
+              </View>
+              <View style={styles.carteTextes}>
+                <Text style={styles.carteNom}>Ils apparaîtront ici</Text>
+                <Text style={styles.carteMeta}>
+                  Vos relevés et vos dessins se rangeront ici, prêts à reprendre.
+                </Text>
+              </View>
             </View>
           </Animated.View>
         )}
@@ -692,17 +642,33 @@ const getStyles = themedStyles((c: Palette) => {
     container: { flex: 1, backgroundColor: c.bg },
     page: { paddingHorizontal: 20 },
     flex: { flex: 1 },
-    filigrane: { position: 'absolute', right: -70 },
     entete: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 44 },
-    marque: {
+    /* Les deux ronds de l'en-tête sont jumeaux, comme ceux du profil. */
+    rondEntete: {
       width: 40,
       height: 40,
-      borderRadius: 13,
-      backgroundColor: c.blue,
+      borderRadius: 20,
+      backgroundColor: c.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+      ...ombreBoutonDouce,
+    },
+    /* Le rouge d'iOS, cerné du fond : la pastille se détache du rond. */
+    pastille: {
+      position: 'absolute',
+      top: -3,
+      right: -3,
+      minWidth: 19,
+      height: 19,
+      borderRadius: 9.5,
+      paddingHorizontal: 5,
+      backgroundColor: c.danger,
+      borderWidth: 2,
+      borderColor: c.bg,
       alignItems: 'center',
       justifyContent: 'center',
     },
-    date: { color: c.inkSoft, fontSize: 14, fontWeight: '600' },
+    pastilleMot: { color: '#FFFFFF', fontSize: 10.5, fontWeight: '700' },
     profilBloc: { padding: 2 },
     salut: {
       color: c.ink,
@@ -830,14 +796,27 @@ const getStyles = themedStyles((c: Palette) => {
     reprendreTexte: { color: '#FFFFFF', fontSize: 13, fontWeight: '600' },
     jeter: { color: c.inkFaint, fontSize: 12.5, fontWeight: '600' },
     rien: { color: c.inkFaint, fontSize: 14, marginTop: 6 },
-    feuilleCarte: {
-      marginTop: 22,
-      backgroundColor: c.surface,
-      borderRadius: 24,
-      padding: 8,
-      ...ombre,
+    sectionSeule: { marginTop: 26, marginBottom: 10 },
+    videCarte: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      borderRadius: 20,
+      borderWidth: 1.5,
+      borderStyle: 'dashed',
+      borderColor: c.lineStrong,
+      paddingVertical: 12,
+      paddingLeft: 10,
+      paddingRight: 14,
     },
-    feuille: { height: 280, borderRadius: 18, overflow: 'hidden' },
+    videVignette: {
+      width: 78,
+      height: 62,
+      borderRadius: 14,
+      backgroundColor: c.surfaceSunken,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
     promesse: {
       color: c.inkFaint,
       fontSize: 12,

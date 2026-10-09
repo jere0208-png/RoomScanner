@@ -73,3 +73,7 @@ yarn-error.log
 !.yarn/releases
 !.yarn/sdks
 !.yarn/versions
+
+# Le mot de passe de la page des notifications : sur le serveur seulement.
+server/messages-cle.php
+server/messages.json.verrou

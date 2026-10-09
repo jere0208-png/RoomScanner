@@ -135,6 +135,7 @@ export type Screen =
   | 'gamme'
   | 'camera'
   | 'profil'
+  | 'notifications'
   | 'confidentialite';
 
 /**

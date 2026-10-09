@@ -16,7 +16,12 @@
  *     deux hauteurs, la marque au moyeu ;
  *   — VOS PLANS : les trois derniers, dans l'ordre, ouverts d'un appui ; la
  *     bibliothèque à côté du titre ; la recherche quand il y en a beaucoup ;
- *   — LA PREMIÈRE PIÈCE : la feuille à tracer, pour qui n'a encore rien.
+ *   — LA CLOCHE : la boîte des messages de l'éditeur, et sa pastille.
+ *
+ * Seconde passe du patron : « ne fais plus l'option de tracer avec le
+ * doigt ; ne mets pas la date et le logo en haut, le logo est déjà au
+ * centre ; le logo au centre doit être noir, et ses deux vagues varient en
+ * intensité comme un écho ».
  */
 jest.mock('react-native-room-scan', () => ({
   RoomScan: {
@@ -44,7 +49,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 import React from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
-import Svg, { LinearGradient as SvgLinearGradient, Path, Rect } from 'react-native-svg';
+import { LinearGradient as SvgLinearGradient, Path, Rect } from 'react-native-svg';
 import { ContourVif, TexteVif } from '../src/components/ContourVif';
 import { light } from '../src/theme';
 import {
@@ -52,20 +57,20 @@ import {
   PLANS_A_LACCUEIL,
   RECHERCHE_DES,
   TEINTES_TUILES,
-  dateDuJour,
   questionDuJour,
   quand,
   salutation,
 } from '../src/screens/HomeScreen';
-import { LogoMark } from '../src/components/LogoMark';
+import { LogoEcho, LogoMark } from '../src/components/LogoMark';
 import { AvatarGlyph } from '../src/components/AvatarGlyph';
 import { Avatar } from '../src/components/Avatar';
-import { TraceUnePiece } from '../src/components/TraceUnePiece';
 import { ThemeGlyph } from '../src/components/ThemeGlyph';
 import { useScanStore } from '../src/store/scanStore';
 import { useAccountStore } from '../src/store/accountStore';
 import { usePremieresFois } from '../src/store/premieresFois';
 import { NOM_EXEMPLE } from '../src/data/exemple';
+import { useNotifications } from '../src/store/notifications';
+import { MESSAGES_EMBARQUES } from '../src/data/nouveautes';
 
 beforeEach(() => {
   jest.useFakeTimers();
@@ -77,6 +82,8 @@ beforeEach(() => {
     error: null,
   });
   useAccountStore.setState({ compte: null, pro: false });
+  // Tout est lu, par défaut : chaque épreuve de la cloche pose son état.
+  useNotifications.setState({ charge: true, recus: [], lus: MESSAGES_EMBARQUES.map((m) => m.id), supprimes: [] });
 });
 afterEach(() => jest.useRealTimers());
 
@@ -141,11 +148,6 @@ const plan = (id: string, name: string, updatedAt: number) => ({
 });
 
 describe('qui et quand', () => {
-  it('écrit la date en français, sans moteur d’internationalisation', () => {
-    expect(dateDuJour(new Date(2026, 9, 9))).toBe('Vendredi 9 octobre');
-    expect(dateDuJour(new Date(2026, 0, 1))).toBe('Jeudi 1 janvier');
-  });
-
   it('salue à l’heure qu’il est', () => {
     expect(salutation(8)).toBe('Bonjour');
     expect(salutation(14)).toBe('Bon après-midi');
@@ -173,7 +175,6 @@ describe('qui et quand', () => {
     const vu = textes(monter());
     expect(vu).toContain(`${salutation()}, Jérôme.`);
     expect(vu).not.toContain('Martin');
-    expect(vu).toContain(dateDuJour());
   });
 
   it('sans compte, un salut sans nom', () => {
@@ -192,7 +193,7 @@ describe('le compte', () => {
     const t = monter();
     const bloc = compteBloc(t);
     expect(bloc).toBeDefined();
-    // Il vit dans la rangée d'en-tête, après la date : le dernier de la rangée.
+    // Il vit dans la rangée d'en-tête, après la cloche : le dernier de la rangée.
     const rangee = bloc.parent!;
     const enfants = rangee.children.filter((e): e is TestRenderer.ReactTestInstance => typeof e !== 'string');
     expect(enfants[enfants.length - 1]).toBe(bloc);
@@ -272,14 +273,23 @@ describe('le moulinet', () => {
     expect(gauche[0]).toBeGreaterThan(droite[0]);
   });
 
-  it('la marque au moyeu, cernée du fond de la page, et qui ne prend pas le doigt', () => {
+  it('la marque au moyeu, NOIRE, cernée du fond de la page, et qui ne prend pas le doigt', () => {
     const t = monter();
     const moyeu = t.root.findAll((n) => {
       const st = StyleSheet.flatten(n.props?.style) as { position?: string; borderColor?: string } | undefined;
-      return st?.position === 'absolute' && st?.borderColor === light.bg && n.findAllByType(LogoMark).length === 1;
+      return st?.position === 'absolute' && st?.borderColor === light.bg && n.findAllByType(LogoEcho).length === 1;
     })[0];
     expect(moyeu).toBeDefined();
     expect(moyeu.props.pointerEvents).toBe('none');
+    // La sobriété d'un outil de pro : l'encre, pas le bleu de l'action.
+    expect(moyeu.findByType(LogoEcho).props.teinte).toBe(light.ink);
+    for (const p of moyeu.findAllByType(Path)) expect(p.props.stroke).toBe(light.ink);
+  });
+
+  it('la marque n’apparaît qu’une fois sur la page : au moyeu', () => {
+    const t = monter();
+    expect(t.root.findAllByType(LogoEcho)).toHaveLength(1);
+    expect(t.root.findAllByType(LogoMark)).toHaveLength(0);
   });
 
   it('chaque tuile s’enfonce et revient sous le doigt', () => {
@@ -365,11 +375,12 @@ describe('vos plans', () => {
       ] as never,
     });
 
-  it('pour qui n’a encore rien : pas de liste vide, la feuille où tracer', () => {
+  it('pour qui n’a encore rien : une carte dit où ils apparaîtront — plus de tracé au doigt', () => {
     const t = monter();
-    expect(textes(t)).not.toContain('Vos plans');
+    expect(textes(t)).toContain('Vos plans');
+    expect(textes(t)).toContain('Ils apparaîtront ici');
+    expect(t.root.findAll((n) => n.props?.testID === 'plans-vide').length).toBeGreaterThan(0);
     expect(bouton(t, 'Mes scans')).toBeUndefined();
-    expect(t.root.findAllByType(TraceUnePiece)).toHaveLength(1);
   });
 
   it('les trois derniers touchés, dans l’ordre, sur l’accueil même', () => {
@@ -381,8 +392,8 @@ describe('vos plans', () => {
       .map((n) => n.props.accessibilityLabel);
     expect(cartes).toHaveLength(PLANS_A_LACCUEIL);
     expect(cartes).toEqual(['Ouvrir Appartement Dupont', 'Ouvrir Maison Leroy', 'Ouvrir Garage']);
-    // Plus de feuille à tracer : la place est aux projets.
-    expect(t.root.findAllByType(TraceUnePiece)).toHaveLength(0);
+    // La carte vide s'efface devant les vrais plans.
+    expect(t.root.findAll((n) => n.props?.testID === 'plans-vide')).toHaveLength(0);
   });
 
   it('un appui ouvre le plan', () => {
@@ -454,58 +465,61 @@ describe('vos plans', () => {
   });
 });
 
-describe('la première pièce, au doigt', () => {
-  const feuille = (t: TestRenderer.ReactTestRenderer) => t.root.findByType(TraceUnePiece);
+describe('la cloche', () => {
+  const cloche = (t: TestRenderer.ReactTestRenderer) =>
+    t.root.findAll(
+      (n) => typeof n.props?.onPress === 'function' && String(n.props?.accessibilityLabel ?? '').startsWith('Notifications'),
+    )[0];
+  const pastille = (t: TestRenderer.ReactTestRenderer) =>
+    t.root.findAll((n) => n.props?.testID === 'pastille-notifications')[0];
 
-  it('une pièce tracée ouvre un plan QUI LA CONTIENT', () => {
+  it('vit dans l’en-tête, juste avant le compte, et ouvre la boîte', () => {
     const t = monter();
-    act(() => feuille(t).props.onTracee(3, 2.5));
-    const st = useScanStore.getState();
-    expect(st.screen).toBe('result');
-    expect(st.rooms).toHaveLength(1);
-    const largeurs = st.walls.map((w) => Math.round(Math.hypot(w.b.x - w.a.x, w.b.z - w.a.z) * 100) / 100);
-    expect(largeurs.sort()).toEqual([2.5, 2.5, 3, 3]);
+    const b = cloche(t);
+    expect(b).toBeDefined();
+    const enfants = b.parent!.children.filter((e): e is TestRenderer.ReactTestInstance => typeof e !== 'string');
+    expect(enfants.indexOf(b)).toBe(enfants.indexOf(compteBloc(t)) - 1);
+    act(() => b.props.onPress());
+    expect(useScanStore.getState().screen).toBe('notifications');
   });
 
-  it('et un plan déjà gardé n’empêche pas d’en tracer un autre', () => {
-    act(() => {
-      useAccountStore.setState({ pro: false, plansUtilises: 1, surpriseVisible: false, paywallVisible: false });
-      useScanStore.getState().reset();
-    });
+  it('sans rien de neuf, pas de pastille', () => {
     const t = monter();
-    act(() => feuille(t).props.onTracee(3, 2.5));
-    expect(useScanStore.getState().rooms).toHaveLength(1);
-    const st = useAccountStore.getState();
-    expect(st.surpriseVisible || st.paywallVisible).toBe(false);
-    act(() => useAccountStore.setState({ plansUtilises: 0 }));
+    expect(pastille(t)).toBeUndefined();
+    expect(cloche(t).props.accessibilityLabel).toBe('Notifications');
+  });
+
+  it('la pastille compte ce qu’on n’a pas lu — et s’arrête à « 9+ »', () => {
+    useNotifications.setState({ lus: [] });
+    let t = monter();
+    const n = MESSAGES_EMBARQUES.length;
+    expect(pastille(t).findByType(Text).props.children).toBe(String(n));
+    expect(cloche(t).props.accessibilityLabel).toBe(`Notifications, ${n} non lue${n > 1 ? 's' : ''}`);
+    act(() => t.unmount());
+    arbre = null;
+    useNotifications.setState({
+      recus: Array.from({ length: 12 }, (_, i) => ({
+        id: `m${i}`,
+        date: Date.UTC(2026, 9, 1 + i),
+        titre: `Message ${i}`,
+        texte: 'Texte.',
+        genre: 'info' as const,
+      })),
+    });
+    t = monter();
+    expect(pastille(t).findByType(Text).props.children).toBe('9+');
+  });
+
+  it('une notification supprimée ne compte plus', () => {
+    const premier = MESSAGES_EMBARQUES[0].id;
+    useNotifications.setState({ lus: MESSAGES_EMBARQUES.slice(1).map((m) => m.id), supprimes: [premier] });
+    expect(pastille(monter())).toBeUndefined();
   });
 });
 
-describe('la marque', () => {
-  /** Le filigrane : le LogoMark de 240, en retrait. */
-  const filigrane = (t: TestRenderer.ReactTestRenderer) =>
-    t.root.findAllByType(LogoMark).find((n) => n.props.size === 240)!;
-
-  it('le glyphe incrusté est dans l’angle, en retrait, et ne pousse ni ne prend rien', () => {
-    const t = monter();
-    const logo = filigrane(t);
-    expect(logo).toBeDefined();
-    expect(Number(logo.findByType(Svg).props.opacity)).toBeLessThanOrEqual(0.12);
-    expect(logo.findAllByType(Rect)).toHaveLength(0);
-    const cadre = logo.parent!;
-    expect((StyleSheet.flatten(cadre.props.style) as { position?: string }).position).toBe('absolute');
-    expect(cadre.props.pointerEvents).toBe('none');
-  });
-
-  it('la marque d’en-tête est le glyphe en blanc sur le bleu de l’app', () => {
-    const t = monter();
-    const marque = t.root.findAll((n) => n.props?.accessibilityLabel === 'EchoPlan')[0];
-    expect((StyleSheet.flatten(marque.props.style) as { backgroundColor?: string }).backgroundColor).toBe(light.blue);
-    expect(marque.findByType(LogoMark).props.teinte).toBe('#FFFFFF');
-  });
-
-  it('le glyphe garde la part du bloc que l’icône lui donne', () => {
-    const logo = filigrane(monter());
+describe('le glyphe du moyeu', () => {
+  it('garde la part du bloc que l’icône lui donne', () => {
+    const logo = monter().root.findByType(LogoEcho);
     let minX = Infinity;
     let maxX = -Infinity;
     for (const p of logo.findAllByType(Path)) {
@@ -525,6 +539,15 @@ describe('la marque', () => {
     }
     expect((maxX - minX) / 76).toBeGreaterThan(0.61);
     expect((maxX - minX) / 76).toBeLessThan(0.66);
+  });
+
+  it('n’a ni fond ni contour : les trois tracés, chacun dans sa couche', () => {
+    const logo = monter().root.findByType(LogoEcho);
+    expect(logo.findAllByType(Rect)).toHaveLength(0);
+    expect(logo.findAllByType(Path)).toHaveLength(3);
+    for (const cle of ['courte', 'longue', 'angle']) {
+      expect(logo.findAll((n) => n.props?.testID === `echo-${cle}`).length).toBeGreaterThan(0);
+    }
   });
 });
 

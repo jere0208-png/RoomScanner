@@ -88,9 +88,9 @@ describe("l'écran de lancement", () => {
     }
   });
 
-  it('aux mesures de l’accueil : 240 pour le filigrane, 160 × 102 pour le mot', () => {
+  it('aux mesures de l’attente : 240 pour le filigrane, 160 × 102 pour le mot', () => {
     /*
-      LES MÊMES NOMBRES QU'`EcranChargement` ET QUE L'ACCUEIL. Un filigrane
+      LES MÊMES NOMBRES QU'`EcranChargement`. Un filigrane
       qui changerait de force ou de taille entre deux écrans qui se suivent se
       remarque — et ces trois-là se suivent en une seconde.
     */
@@ -226,29 +226,24 @@ describe("l'écran d'attente, entre le lancement et l'accueil", () => {
   });
 
   /*
-    LA CONTINUITÉ AVEC L'ACCUEIL — mesurée par NATURE, pas par le chiffre.
+    LA CONTINUITÉ AVEC L'ÉCRAN DE LANCEMENT — mesurée par NATURE.
 
-    On ne compare pas « 240 » à « 240 » : le jour où le filigrane changera de
-    taille, on veut que les deux écrans changent ENSEMBLE, pas qu'un banc
-    tombe. On lit donc la valeur sur l'accueil et on exige la même ici.
+    Le filigrane vivait aussi sur l'accueil ; il en est parti — relevé du
+    patron : « le logo est déjà au centre, évitons la répétition abusive ».
+    Ce qui reste, c'est l'enchaînement de l'écran de lancement d'iOS à
+    l'attente de l'app : on lit la taille et le retrait dans l'attente, et
+    on exige les mêmes dans le storyboard.
   */
-  it('reprend le filigrane de l’accueil, à la même taille et au même retrait', () => {
-    const source = readFileSync(
-      join(__dirname, '..', 'src', 'screens', 'HomeScreen.tsx'),
-      'utf8',
-    );
-    const attendu = {
-      taille: /FILIGRANE_LOGO = (\d+)/.exec(source)?.[1],
-      opacite: /FILIGRANE_OPACITE = ([\d.]+)/.exec(source)?.[1],
-    };
+  it('l’attente reprend le filigrane de l’écran de lancement, à la même taille et au même retrait', () => {
     const attente = readFileSync(
       join(__dirname, '..', 'src', 'components', 'EcranChargement.tsx'),
       'utf8',
     );
-    expect({
-      taille: /FILIGRANE_LOGO = (\d+)/.exec(attente)?.[1],
-      opacite: /FILIGRANE_OPACITE = ([\d.]+)/.exec(attente)?.[1],
-    }).toEqual(attendu);
-    expect(attendu.taille).toBeTruthy();
+    const taille = /FILIGRANE_LOGO = (\d+)/.exec(attente)?.[1];
+    const opacite = /FILIGRANE_OPACITE = ([\d.]+)/.exec(attente)?.[1];
+    expect(taille).toBeTruthy();
+    const s = storyboard();
+    expect(s).toMatch(new RegExp(`firstAttribute="width" constant="${taille}"`));
+    expect(s).toContain(`alpha="${opacite}"`);
   });
 });

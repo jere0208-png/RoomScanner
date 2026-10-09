@@ -14285,6 +14285,62 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Les notifications, et l'accueil épuré
+
+Relevé du patron : « ne fais plus l'option de tracer avec le doigt ; ne mets
+pas la date et le logo en haut, le logo est déjà au centre ; ajoute un bouton
+de notifications où l'on pourra suivre les avancées des mises à jour — un vrai
+système, une sorte de mail intra app : suppression, pastille du nombre de non
+lues ; le logo au centre noir, ses deux vagues qui varient en intensité comme
+un écho, et les traits rectilignes qui agissent en fonction, comme un mur
+détecté ».
+
+**L'accueil.** Plus de date, plus de marque en haut, plus de filigrane : en haut
+à droite, deux ronds jumeaux — la cloche et le compte. La marque n'apparaît
+qu'une fois, au moyeu du moulinet. Le tracé au doigt est retiré
+(`TraceUnePiece` supprimé) ; pour qui n'a encore aucun plan, une carte en
+pointillés dit « Ils apparaîtront ici ».
+
+**Le glyphe qui écoute** (`LogoEcho`, dans `LogoMark.tsx`). À l'encre du thème
+— noir en clair — sur le blanc du moyeu. Chaque tracé vit dans sa couche, et
+une seule horloge (2,6 s, au pilote natif) mène leurs opacités
+(`COURBES_ECHO`) : l'onde courte s'allume, puis la longue, puis l'angle des
+murs s'éclaire quand l'onde l'atteint — le mur est détecté —, et tout retombe.
+
+**Les notifications.**
+
+- *Le serveur* — `server/echoplan-messages.php` est la page d'envoi du patron :
+  mot de passe (`messages-cle.php`, jamais versionné), session, jeton
+  anti-CSRF, sortie échappée. On y écrit un titre, un texte, un genre
+  (Nouveauté, Astuce, Information, Offre) et un bouton facultatif (un écran de
+  l'app : Pro, exemple, plans, profil — ou un lien https). Publier écrit
+  `messages.json` sous verrou, par un fichier renommé ; « Retirer » enlève un
+  message. Le fichier statique est la leçon des tarifs : il ne se
+  désynchronise pas.
+- *L'app* — `net/messages.ts` lit `messages.json` comme une DONNÉE : chaque
+  champ vérifié et borné, genres et écrans pris dans une liste fermée, liens
+  en https seulement. `data/nouveautes.ts` porte les messages embarqués : la
+  bienvenue, et une note par version — elle arrive avec la mise à jour
+  elle-même, sans réseau. `store/notifications.ts` mêle les deux, garde la
+  dernière liste reçue, et ce que l'utilisateur fait — lu, supprimé — reste
+  dans le téléphone et survit aux synchronisations ; un message retiré par
+  l'éditeur emporte son état. La boîte se relit au lancement et à chaque
+  retour au premier plan.
+- *L'écran* (`NotificationsScreen`) — la forme de Mail : rangée par jour
+  (Aujourd'hui, Cette semaine, Plus tôt), filtre « Non lues », point bleu et
+  titre en gras tant que c'est neuf, « Tout lire », glissé vers la gauche pour
+  supprimer (ou la corbeille découverte), « Annuler » pendant quatre secondes,
+  tirer pour rafraîchir. Un appui ouvre le message en entier, avec son bouton.
+- *La pastille* — rouge, sur la cloche de l'accueil : le nombre de non lus,
+  « 9+ » au-delà ; une notification supprimée ne compte plus.
+
+**À déposer sur bourseur.fr** : `echoplan-messages.php`, `messages.json`, et
+`messages-cle.php` (copié de `messages-cle.exemple.php`, mot de passe rempli).
+
+Bancs : `notifications` (lecture, boîte, écran, page d'envoi), `accueil`,
+`lancement` (la continuité du filigrane se lit désormais entre l'écran de
+lancement et l'attente).
+
 ## L'accueil refait : une identité, et le travail sous les yeux
 
 Relevé du patron, image de référence à l'appui : « une vraie identité, plus

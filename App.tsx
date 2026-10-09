@@ -23,6 +23,8 @@ import { AlerteHote } from './src/components/AlerteHote';
 import { AstuceHote } from './src/components/AstuceHote';
 import { GardeFou } from './src/components/GardeFou';
 import { usePannes } from './src/ui/journalPannes';
+import { NotificationsScreen } from './src/screens/NotificationsScreen';
+import { useNotifications } from './src/store/notifications';
 import { PremierLancement } from './src/components/PremierLancement';
 import { Scene } from './src/components/Scene';
 import { usePremieresFois } from './src/store/premieresFois';
@@ -99,6 +101,16 @@ function Application() {
     */
     chargerLesPannes();
     /*
+      LA BOÎTE DES NOTIFICATIONS — relue du disque, puis demandée au serveur.
+      La pastille de la cloche doit être juste dès l'accueil : c'est elle qui
+      dit qu'il y a du nouveau, et personne n'ouvre une boîte pour vérifier.
+    */
+    useNotifications
+      .getState()
+      .charger()
+      .then(() => useNotifications.getState().rafraichir())
+      .catch(() => {});
+    /*
       LES PRIX GARDÉS REPRENNENT LEUR PLACE AU LANCEMENT.
 
       Sans réseau, et sans ouvrir le devis. La pastille du plan annonce un
@@ -169,7 +181,12 @@ function Application() {
     };
     traiter();
     const abonne = AppState.addEventListener('change', (etat) => {
-      if (etat === 'active') traiter();
+      if (etat === 'active') {
+        traiter();
+        // Et la boîte se relit au retour : un message publié pendant que
+        // l'app dormait doit allumer la pastille sans relancer l'app.
+        useNotifications.getState().rafraichir().catch(() => {});
+      }
     });
     return () => {
       vivant = false;
@@ -269,6 +286,11 @@ function Application() {
       {screen === 'profil' && (
         <Scene entree="poussee">
           <ProfilScreen />
+        </Scene>
+      )}
+      {screen === 'notifications' && (
+        <Scene entree="poussee">
+          <NotificationsScreen />
         </Scene>
       )}
       {screen === 'confidentialite' && (
