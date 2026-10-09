@@ -3769,6 +3769,125 @@ export function castToWall(from: Pt, dir: Pt, walls: WallSeg[]): number | null {
 }
 
 /* ====================================================================== */
+/*  LES OUVERTURES, AUX COTES DU MÈTRE                                    */
+/* ====================================================================== */
+
+/** Le mur qui porte une ouverture : le plus proche de son milieu. */
+export function murDeLOuverture(o: WallSeg, walls: WallSeg[]): WallSeg | null {
+  const mid = { x: (o.a.x + o.b.x) / 2, z: (o.a.z + o.b.z) / 2 };
+  let mur: WallSeg | null = null;
+  let best = Infinity;
+  for (const w of walls) {
+    if (w.type !== 'wall') continue;
+    const d = pointOnSeg(mid, w.a, w.b).dist;
+    if (d < best) {
+      best = d;
+      mur = w;
+    }
+  }
+  return mur && best <= 0.6 ? mur : null;
+}
+
+/**
+ * OÙ EST L'OUVERTURE, COMME ON LA MESURE — du nu de chaque coin au tableau
+ * le plus proche.
+ *
+ * La position se comptait depuis le bout du TRAIT du mur, c'est-à-dire
+ * l'axe du mur d'angle : on lisait 7 cm de plus que ce que donne le mètre
+ * posé contre le refend, et une porte tapée « à 10 cm du mur » se posait à
+ * 3 cm de lui. On compte maintenant depuis le NU du mur qui ferme le coin.
+ */
+export function positionOuverture(
+  o: WallSeg,
+  walls: WallSeg[],
+): { mur: WallSeg; depuisA: number; depuisB: number; retraitA: number; retraitB: number } | null {
+  const mur = murDeLOuverture(o, walls);
+  if (!mur) return null;
+  const L = segLength(mur);
+  if (L < 1e-6) return null;
+  const u = { x: (mur.b.x - mur.a.x) / L, z: (mur.b.z - mur.a.z) / L };
+  const t = (p: Pt) => (p.x - mur.a.x) * u.x + (p.z - mur.a.z) * u.z;
+  const t0 = Math.min(t(o.a), t(o.b));
+  const t1 = Math.max(t(o.a), t(o.b));
+  const retraitA = retraitDuCoin(walls, mur, mur.a);
+  const retraitB = retraitDuCoin(walls, mur, mur.b);
+  return {
+    mur,
+    retraitA,
+    retraitB,
+    depuisA: t0 - retraitA,
+    depuisB: L - t1 - retraitB,
+  };
+}
+
+/** Ce qu'on a mesuré pour une ouverture (m). */
+export interface SaisieOuverture {
+  largeur: number;
+  hauteur: number;
+  /** Du sol au bas de la menuiserie ; ignoré pour une porte. */
+  allege?: number;
+  /** Du nu du coin au tableau le plus proche. */
+  depuis: number;
+  /** Compter depuis l'autre coin du mur. */
+  depuisB?: boolean;
+}
+
+/**
+ * La cote `bord` qu'attend `moveOpening` — depuis le bout `a` du trait —
+ * pour une ouverture de `largeur` posée à `depuis` du nu du coin choisi.
+ */
+export function bordDepuisCoin(
+  p: { mur: WallSeg; retraitA: number; retraitB: number },
+  largeur: number,
+  depuis: number,
+  depuisB = false,
+): number {
+  const L = segLength(p.mur);
+  return depuisB ? L - p.retraitB - depuis - largeur : p.retraitA + depuis;
+}
+
+/**
+ * L'OUVERTURE AUX COTES SAISIES — ses deux bouts, sa hauteur, son centre.
+ *
+ * Une seule fonction pour l'aperçu dessiné derrière la feuille et pour ce
+ * que le magasin enregistre : l'aperçu ne peut pas promettre une place que
+ * l'enregistrement ne donnerait pas.
+ */
+export function ouvertureCotee(
+  o: WallSeg,
+  walls: WallSeg[],
+  s: SaisieOuverture,
+): { a: Pt; b: Pt; height: number; yCenter: number } | null {
+  const pos = positionOuverture(o, walls);
+  if (!pos) return null;
+  const { mur } = pos;
+  const L = segLength(mur);
+  const { sol, hauteur: plafond } = murPorteurDe(o, walls);
+  // Les mêmes bornes que les gestes un par un : rien ne sort du mur.
+  const l = Math.min(Math.max(0.1, s.largeur), Math.max(0.1, L - 0.02));
+  const allege =
+    o.type === 'door' ? 0 : Math.max(0, Math.min(s.allege ?? 0, plafond - 0.2));
+  const h = Math.min(Math.max(0.2, s.hauteur), Math.max(0.2, plafond - allege));
+  const bord = Math.min(
+    Math.max(0, bordDepuisCoin(pos, l, Math.max(0, s.depuis), s.depuisB)),
+    Math.max(0, L - l),
+  );
+  const ux = (mur.b.x - mur.a.x) / L;
+  const uz = (mur.b.z - mur.a.z) / L;
+  // Le sens du trait est gardé : le pivot et le battant d'une porte sont
+  // décrits par `a` et `b`, on ne les retourne pas en la cotant.
+  const memeSens = (o.b.x - o.a.x) * ux + (o.b.z - o.a.z) * uz >= 0;
+  const p0 = { x: mur.a.x + ux * bord, z: mur.a.z + uz * bord };
+  const p1 = { x: mur.a.x + ux * (bord + l), z: mur.a.z + uz * (bord + l) };
+  return {
+    a: memeSens ? p0 : p1,
+    b: memeSens ? p1 : p0,
+    height: h,
+    yCenter: sol + allege + h / 2,
+  };
+}
+
+/* ====================================================================== */
 /*  COUPER UNE PIÈCE, PLACER UN MEUBLE — AUX COTES DU MÈTRE              */
 /* ====================================================================== */
 

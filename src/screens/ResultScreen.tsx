@@ -83,6 +83,8 @@ import {
   ecartsAuxMurs,
   centrePourEcart,
   type SaisieCoupe,
+  ouvertureCotee,
+  type SaisieOuverture,
   EPAISSEURS,
   epaisseurDe,
   type PoseDeMur,
@@ -99,7 +101,6 @@ import {
   roomExtent,
   roomHeight,
   roomParts,
-  pointOnSeg,
   segLength,
   totalArea,
   type RoomPart,
@@ -158,7 +159,12 @@ import {
   type SpotAxis,
 } from '../geometry/ceiling';
 import { haptic } from '../ui/haptic';
-import { CoupeSheet, MurNeufSheet, lireCote } from '../components/MurNeufSheet';
+import {
+  CoupeSheet,
+  MurNeufSheet,
+  OuvertureSheet,
+  lireCote,
+} from '../components/MurNeufSheet';
 import {
   ActionSheet,
   PromptSheet,
@@ -393,7 +399,6 @@ export function ResultScreen() {
   const moveFixture = useScanStore((s) => s.moveFixture);
   const resizeOpening = useScanStore((s) => s.resizeOpening);
   const removeOpening = useScanStore((s) => s.removeOpening);
-  const moveOpening = useScanStore((s) => s.moveOpening);
   const setAllege = useScanStore((s) => s.setAllege);
   const setOpeningType = useScanStore((s) => s.setOpeningType);
   const addObject = useScanStore((s) => s.addObject);
@@ -853,6 +858,8 @@ export function ResultScreen() {
   const [apercuMur, setApercuMur] = useState<PoseDeMur | null>(null);
   /* La pièce qu'on coupe, en attente de ses cotes — voir `CoupeSheet`. */
   const [coupePiece, setCoupePiece] = useState<RoomPart | null>(null);
+  /* L'ouverture dont on donne les cotes — voir `OuvertureSheet`. */
+  const [coteOuverture, setCoteOuverture] = useState<string | null>(null);
   /** La note tenue en main : son bandeau propose de la reprendre. */
   const [selNote, setSelNote] = useState<string | null>(null);
   /**
@@ -1790,84 +1797,6 @@ export function ResultScreen() {
         if (!(v > 0)) return;
         if (quoi === 'largeur') resizeOpening(id, v, undefined);
         else resizeOpening(id, undefined, v);
-      },
-    });
-  };
-
-  /**
-   * REPLACER UNE MENUISERIE SUR SON MUR.
-   *
-   * « La porte à quatre-vingt-dix du mur » est la cote qu'un poseur mesure
-   * sur place, et la seule que le plan ne savait pas recevoir : le bandeau
-   * donnait largeur, hauteur, coffre et fermeture, jamais la position. Une
-   * porte à trente centimètres du bon endroit ne pouvait que se supprimer
-   * et se reposer, en reperdant sa hauteur, son type et son coffre.
-   *
-   * ON DEMANDE LA COTE DU TABLEAU, pas de l'axe : personne ne mesure
-   * jusqu'au milieu d'une porte, on pose le mètre contre le refend et on
-   * lit jusqu'au bord de la menuiserie.
-   */
-  const promptOpeningPos = (id: string) => {
-    const o = openings.find((x) => x.id === id);
-    if (!o) return;
-    // Le mur porteur : le plus proche du milieu de l'ouverture, comme le
-    // magasin le retrouve pour appliquer la cote.
-    const mid = { x: (o.a.x + o.b.x) / 2, z: (o.a.z + o.b.z) / 2 };
-    let mur: (typeof walls)[number] | null = null;
-    let best = Infinity;
-    for (const w of walls) {
-      const d = pointOnSeg(mid, w.a, w.b).dist;
-      if (d < best) {
-        best = d;
-        mur = w;
-      }
-    }
-    if (!mur || best > 0.6) return;
-    // La cote actuelle, pour que le champ parte de la vérité du plan.
-    const L = segLength(mur);
-    const l = segLength(o);
-    const proj =
-      L > 0
-        ? ((mid.x - mur.a.x) * (mur.b.x - mur.a.x) +
-            (mid.z - mur.a.z) * (mur.b.z - mur.a.z)) /
-          L
-        : 0;
-    setPrompt({
-      title: 'Position sur le mur',
-      subtitle:
-        'Du coin du mur au BORD de la menuiserie — la cote qu’on mesure ' +
-        'sur place, mètre posé contre le mur.',
-      value: Math.max(0, proj - l / 2)
-        .toFixed(2)
-        .replace('.', ','),
-      unit: 'm',
-      numeric: true,
-      /*
-        ICI, LES PROPOSITIONS NE SONT PAS DES COTES, CE SONT DES POSES.
-
-        « 1,35 » ne dit rien à personne : cette cote-là dépend de la
-        longueur du mur et de la largeur de la menuiserie. Ce qu'un poseur
-        demande, c'est « au milieu » ou « au ras du refend » — les deux
-        seules positions qui ne se mesurent pas. Elles sont calculées ici,
-        pour CE mur, et le champ reste pour les 90 relevés au mètre.
-
-        Rien à proposer si la menuiserie remplit le mur : trois pastilles
-        qui donneraient toutes la même cote se lisent comme un geste raté.
-      */
-      choix:
-        L - l > 0.25
-          ? [
-              { label: 'Centrée', value: ((L - l) / 2).toFixed(2).replace('.', ',') },
-              { label: '10 à gauche', value: '0,10' },
-              {
-                label: '10 à droite',
-                value: (L - l - 0.1).toFixed(2).replace('.', ','),
-              },
-            ]
-          : undefined,
-      onSubmit: (t) => {
-        const v = parseFloat(t.replace(',', '.'));
-        if (isFinite(v)) moveOpening(id, v);
       },
     });
   };
@@ -4831,7 +4760,9 @@ export function ResultScreen() {
                 icone: SOLAIRES.ruler,
                 sansMot: true,
                 ghost: true,
-                onPress: () => promptOpeningPos(selectedOpening.id),
+                // La feuille des cotes : la position s'y compte au NU du
+                // coin qu'on choisit, avec la largeur et la hauteur.
+                onPress: () => setCoteOuverture(selectedOpening.id),
               },
               {
                 /*
@@ -5427,11 +5358,49 @@ export function ResultScreen() {
           const mur = murAPercer.current;
           murAPercer.current = null;
           if (!mur) return;
-          addOpening(mur, nature);
+          const id = addOpening(mur, nature);
           haptic('succes');
+          /*
+            LA MENUISERIE NEUVE DEMANDE SES COTES — relevé du patron :
+            « fais pareil pour les ouvertures ». Posée au milieu du mur aux
+            cotes du catalogue, elle était presque toujours à reprendre ;
+            on donne maintenant d'un coup ce qu'on a mesuré.
+          */
+          if (id) {
+            setSelectedOpeningId(id);
+            setCoteOuverture(id);
+          }
         }}
       />
       <ActionSheet data={menu} onClose={() => setMenu(null)} />
+      <OuvertureSheet
+        ouverture={openings.find((x) => x.id === coteOuverture) ?? null}
+        walls={walls}
+        sol={(() => {
+          const o = openings.find((x) => x.id === coteOuverture);
+          return o ? murPorteurDe(o, walls).sol : 0;
+        })()}
+        onClose={() => {
+          setCoteOuverture(null);
+          setApercuMur(null);
+        }}
+        onApercu={(saisie: SaisieOuverture | null) => {
+          const o = openings.find((x) => x.id === coteOuverture);
+          const cote = o && saisie ? ouvertureCotee(o, walls, saisie) : null;
+          setApercuMur(
+            cote
+              ? { id: 'apercu-ouverture', wallId: '', bout: 'a', angle: 0, a: cote.a, b: cote.b }
+              : null,
+          );
+        }}
+        onAppliquer={(saisie: SaisieOuverture) => {
+          const id = coteOuverture;
+          setApercuMur(null);
+          if (!id) return;
+          useScanStore.getState().coterOuverture(id, saisie);
+          haptic('succes');
+        }}
+      />
       <CoupeSheet
         part={coupePiece}
         onClose={() => {

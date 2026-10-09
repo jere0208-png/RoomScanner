@@ -26,12 +26,21 @@ import {
   depuisParDefaut,
   type RoomPart,
   type SaisieCoupe,
+  positionOuverture,
+  segLength,
+  type SaisieOuverture,
   epaisseurDe,
   type PoseDeMur,
   type SaisieMurNeuf,
   type WallSeg,
 } from '../geometry/floorplan';
 import { radius, themedStyles, useTheme, type Palette } from '../theme';
+import {
+  ALLEGES_COURANTES,
+  hauteursCourantes,
+  largeursCourantes,
+  type Nature,
+} from '../ui/cotesCourantes';
 
 /** « 83,5 » → 0.835 m ; rien de lisible → null. */
 export const lireCm = (t: string): number | null => {
@@ -378,6 +387,17 @@ const getStyles = themedStyles((c: Palette) =>
     },
     principalTexte: { color: '#FFFFFF', fontWeight: '600', fontSize: 15 },
     inactif: { opacity: 0.4 },
+    courantes: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6, marginLeft: 122 },
+    courante: {
+      minHeight: 32,
+      paddingHorizontal: 11,
+      justifyContent: 'center',
+      borderRadius: radius.pill,
+      backgroundColor: c.surface,
+      borderWidth: 1,
+      borderColor: c.lineStrong,
+    },
+    couranteTexte: { color: c.ink, fontSize: 13, fontWeight: '600' },
   }),
 );
 
@@ -537,6 +557,206 @@ export function CoupeSheet({
           style={[s.principal, !pret && s.inactif]}
           onPress={valider}>
           <Text style={s.principalTexte}>Couper</Text>
+        </Pressable>
+      </View>
+    </SheetShell>
+  );
+}
+
+/**
+ * LES COTES D'UNE PORTE OU D'UNE FENÊTRE, ENSEMBLE — relevé du patron :
+ * « fais pareil pour les ouvertures ».
+ *
+ * Une menuiserie neuve se posait au milieu du mur, aux cotes du catalogue,
+ * et il fallait ensuite ouvrir quatre fenêtres de saisie l'une après
+ * l'autre. Surtout, la POSITION se comptait depuis l'axe du mur d'angle :
+ * sept centimètres de plus que ce que lit le mètre posé contre le refend.
+ * Ici tout se tape d'un coup, au nu, depuis le coin qu'on veut — et la
+ * menuiserie se dessine sur le plan à chaque chiffre.
+ */
+export function OuvertureSheet({
+  ouverture,
+  walls,
+  sol,
+  onClose,
+  onAppliquer,
+  onApercu,
+}: {
+  ouverture: WallSeg | null;
+  walls: WallSeg[];
+  /** Le sol du mur porteur : l'allège se compte depuis lui. */
+  sol: number;
+  onClose: () => void;
+  onAppliquer: (saisie: SaisieOuverture) => void;
+  onApercu?: (saisie: SaisieOuverture | null) => void;
+}) {
+  const c = useTheme();
+  const s = getStyles(c);
+  const [largeur, setLargeur] = useState('');
+  const [hauteur, setHauteur] = useState('');
+  const [allege, setAllege] = useState('');
+  const [depuis, setDepuis] = useState('');
+  const [depuisB, setDepuisB] = useState(false);
+  const attente = useRef<null | (() => void)>(null);
+  const porte = ouverture?.type === 'door';
+  const nature: Nature = (ouverture?.type as Nature) ?? 'opening';
+  const pos = ouverture ? positionOuverture(ouverture, walls) : null;
+
+  // Les cotes actuelles, depuis le coin LE PLUS PROCHE : c'est de lui
+  // qu'on mesure sur place.
+  useEffect(() => {
+    if (!ouverture) return;
+    setLargeur(ecrireCm(segLength(ouverture)));
+    setHauteur(ecrireCm(ouverture.height));
+    setAllege(ecrireCm(Math.max(0, ouverture.yCenter - ouverture.height / 2 - sol)));
+    const b = !!pos && pos.depuisB < pos.depuisA;
+    setDepuisB(b);
+    setDepuis(pos ? ecrireCm(Math.max(0, b ? pos.depuisB : pos.depuisA)) : '0');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ouverture?.id]);
+
+  const l = lireCm(largeur);
+  const h = lireCm(hauteur);
+  const al = porte ? 0 : lireCote(allege);
+  const d = lireCote(depuis);
+  const pret = l !== null && h !== null && al !== null && d !== null;
+  const saisie: SaisieOuverture | null = pret
+    ? { largeur: l!, hauteur: h!, allege: al!, depuis: d!, depuisB }
+    : null;
+
+  useEffect(() => {
+    onApercu?.(ouverture ? saisie : null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ouverture?.id, l, h, al, d, depuisB]);
+
+  const centrer = () => {
+    if (!pos || l === null) return;
+    const nu = segLength(pos.mur) - pos.retraitA - pos.retraitB;
+    setDepuisB(false);
+    setDepuis(ecrireCm(Math.max(0, (nu - l) / 2)));
+  };
+  const valider = () => {
+    if (!saisie) return;
+    const x = saisie;
+    attente.current = () => onAppliquer(x);
+    onClose();
+  };
+
+  const champ = (
+    mot: string,
+    valeur: string,
+    poser: (v: string) => void,
+    id: string,
+    choix?: number[],
+  ) => (
+    <>
+      <View style={s.ligne}>
+        <Text style={s.etiquette}>{mot}</Text>
+        <View style={s.champ}>
+          <TextInput
+            testID={id}
+            accessibilityLabel={mot + ', en centimètres'}
+            style={s.saisie}
+            value={valeur}
+            onChangeText={poser}
+            keyboardType="decimal-pad"
+            selectTextOnFocus
+            returnKeyType="done"
+            onSubmitEditing={valider}
+          />
+          <Text style={s.unite}>cm</Text>
+        </View>
+      </View>
+      {choix && choix.length > 0 ? (
+        <View style={s.courantes}>
+          {choix.map((v) => {
+            const t = ecrireCm(v);
+            const choisie = t === valeur;
+            return (
+              <Pressable
+                key={t}
+                accessibilityRole="button"
+                accessibilityLabel={mot + ' ' + t}
+                style={({ pressed }) => [s.courante, choisie && s.pastilleChoisie, pressed && s.presse]}
+                onPress={() => poser(t)}>
+                <Text style={[s.couranteTexte, choisie && s.pastilleMotChoisi]}>{t}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      ) : null}
+    </>
+  );
+
+  return (
+    <SheetShell
+      visible={!!ouverture}
+      onClose={onClose}
+      onClosed={() => {
+        const suite = attente.current;
+        attente.current = null;
+        suite?.();
+      }}>
+      <Text style={s.titre}>
+        {porte ? 'Cotes de la porte' : nature === 'window' ? 'Cotes de la fenêtre' : 'Cotes de la baie'}
+      </Text>
+      <Text style={s.sous}>Au mètre, d’une face à l’autre.</Text>
+
+      {champ('Largeur', largeur, setLargeur, 'champ-largeur', largeursCourantes(nature))}
+      {champ('Hauteur', hauteur, setHauteur, 'champ-hauteur', hauteursCourantes(nature))}
+      {!porte && champ('Bas (allège)', allege, setAllege, 'champ-allege', ALLEGES_COURANTES)}
+
+      <View style={s.ligne}>
+        <Text style={s.etiquette}>Depuis le coin</Text>
+        <View style={s.champ}>
+          <TextInput
+            testID="champ-position"
+            accessibilityLabel="Distance depuis le coin, en centimètres"
+            style={s.saisie}
+            value={depuis}
+            onChangeText={setDepuis}
+            keyboardType="decimal-pad"
+            selectTextOnFocus
+            returnKeyType="done"
+            onSubmitEditing={valider}
+          />
+          <Text style={s.unite}>cm</Text>
+        </View>
+      </View>
+      <View style={s.courantes}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Mesurer depuis l’autre coin"
+          style={({ pressed }) => [s.courante, pressed && s.presse]}
+          onPress={() => {
+            // La MÊME menuiserie, cotée de l'autre côté : la cote change,
+            // la menuiserie ne bouge pas.
+            const b = !depuisB;
+            setDepuisB(b);
+            if (pos) setDepuis(ecrireCm(Math.max(0, b ? pos.depuisB : pos.depuisA)));
+          }}>
+          <Text style={s.couranteTexte}>Autre coin</Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Centrer sur le mur"
+          style={({ pressed }) => [s.courante, pressed && s.presse]}
+          onPress={centrer}>
+          <Text style={s.couranteTexte}>Centrer</Text>
+        </Pressable>
+      </View>
+
+      <View style={s.actions}>
+        <Pressable style={s.secondaire} onPress={onClose}>
+          <Text style={s.secondaireTexte}>Annuler</Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Appliquer les cotes"
+          accessibilityState={{ disabled: !pret }}
+          style={[s.principal, !pret && s.inactif]}
+          onPress={valider}>
+          <Text style={s.principalTexte}>Appliquer</Text>
         </Pressable>
       </View>
     </SheetShell>

@@ -47,6 +47,8 @@ import {
   roomParts,
   coupeDePiece,
   type SaisieCoupe,
+  ouvertureCotee,
+  type SaisieOuverture,
   WALL_T,
   planFrameAngle,
   reprojectOpenings,
@@ -1712,7 +1714,13 @@ interface ScanState {
   addOpening: (
     wallId: string,
     nature?: 'door' | 'window' | 'opening',
-  ) => void;
+  ) => string | undefined;
+  /**
+   * TOUTES LES COTES D'UNE OUVERTURE, EN UN GESTE — largeur, hauteur,
+   * allège, et la position depuis le nu du coin. Voir `OuvertureSheet`.
+   * Une seule annulation les défait toutes.
+   */
+  coterOuverture: (id: string, s: SaisieOuverture) => void;
   /**
    * Retaille une ouverture. La largeur se prend autour de son axe, la
    * hauteur depuis son allège : une fenêtre monte, elle ne descend pas.
@@ -5939,6 +5947,22 @@ export const useScanStore = create<ScanState>((set, get) => {
         yCenter: base + allege + h / 2,
       };
       set({ openings: [...st.openings, opening], dirty: true });
+      return opening.id;
+    },
+
+    coterOuverture: (id, s) => {
+      if (!sontFinis(s.largeur, s.hauteur, s.depuis)) return;
+      const st = get();
+      const o = st.openings.find((x) => x.id === id);
+      if (!o) return;
+      const cote = ouvertureCotee(o, st.walls, s);
+      // La garde AVANT le point de reprise : voir `annulerunefois`.
+      if (!cote) return;
+      pushHistory('coterOuverture');
+      set({
+        openings: st.openings.map((x) => (x.id === id ? { ...x, ...cote } : x)),
+        dirty: true,
+      });
     },
 
     toggleCoffre: (id, hauteur) => {

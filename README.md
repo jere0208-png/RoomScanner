@@ -14285,6 +14285,34 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Les ouvertures aux cotes du mètre
+
+Relevé du patron : « fais pareil pour les ouvertures (portes et fenêtres) ».
+
+**La position se comptait depuis l'axe du mur d'angle.** La saisie disait
+« du coin au bord de la menuiserie, mètre posé contre le mur », mais elle
+mesurait depuis le bout du TRAIT : 7 cm de plus que le mètre (10 contre un
+porteur). Une porte tapée « à 10 cm du refend » tombait à 3 cm de lui. Elle
+se compte maintenant au NU du mur qui ferme le coin (`positionOuverture`,
+`bordDepuisCoin`).
+
+**La feuille « Cotes de la porte / de la fenêtre »** (`OuvertureSheet`) réunit
+largeur, hauteur, allège (pas pour une porte) et position, avec les cotes
+courantes en pastilles (83, 93… ; 95, 115…), « Autre coin » pour compter de
+l'autre bout, « Centrer » entre les deux nus. La menuiserie se dessine sur le
+plan à chaque chiffre. Elle s'ouvre :
+
+- dès qu'une menuiserie neuve est posée — elle naissait au milieu du mur, aux
+  cotes du catalogue, presque toujours à reprendre ;
+- par « Position » dans le bandeau d'une menuiserie choisie.
+
+`coterOuverture` applique tout d'un coup (une seule annulation) et garde le
+sens du trait : une porte cotée ne change ni de charnière ni de sens.
+`ouvertureCotee` sert à la fois l'aperçu et l'enregistrement — l'aperçu ne
+promet rien que l'enregistrement ne donne.
+
+Banc : `ouverturecote`.
+
 ## La pièce et le meuble aux cotes du mètre
 
 Relevé du patron, après le mur : « fais pareil pour la sélection d'une pièce
